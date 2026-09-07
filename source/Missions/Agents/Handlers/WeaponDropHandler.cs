@@ -304,6 +304,9 @@ public class WeaponDropHandler : IWeaponDropHandler
     private void HandleNetworkWeaponDropped(MessagePayload<NetworkWeaponDropped> payload)
     {
         NetworkWeaponDropped message = payload.What;
+#if DEBUG
+        WeaponDropBaselineDebugCommands.RecordObservedNetworkDrop(message, payload.Who);
+#endif
         GameThread.RunSafe(
             () => ApplyNetworkDrop(message),
             context: nameof(HandleNetworkWeaponDropped));
@@ -710,6 +713,9 @@ public class WeaponDropHandler : IWeaponDropHandler
 
         if (appliedDropIds.Contains(message.DropId))
         {
+#if DEBUG
+            WeaponDropBaselineDebugCommands.RecordDuplicateAlreadyApplied(message);
+#endif
             Logger.Debug("[WeaponDrop] Ignored duplicate drop={DropId}", message.DropId);
             return;
         }

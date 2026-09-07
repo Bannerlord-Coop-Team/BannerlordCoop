@@ -3,9 +3,11 @@ using Common;
 using Common.Commands;
 using GameInterface;
 using GameInterface.Services.ObjectManager;
+using Missions.Agents.Messages;
 using Missions.Battles;
 using Newtonsoft.Json;
 using System;
+using System.Collections.Generic;
 using System.Globalization;
 using System.Linq;
 using TaleWorlds.Core;
@@ -83,6 +85,54 @@ internal static class WeaponDropBaselineDebugCommands
         public WorldItemState[] WorldItems { get; set; }
         public bool NativeDropInvoked { get; set; }
     }
+
+    private sealed class CapturedDropState
+    {
+        public string BattleInstanceId { get; set; }
+        public Guid AgentId { get; set; }
+        public EquipmentIndex EquipmentIndex { get; set; }
+        public NetworkWeaponDropped Message { get; set; }
+        public bool CapturedFromNetworkPeer { get; set; }
+        public int CapturedNetworkCount { get; set; }
+        public int ReplaySendCount { get; set; }
+    }
+
+    private sealed class DuplicateDropState
+    {
+        public Guid DropId { get; set; }
+        public Guid WorldItemId { get; set; }
+        public Guid AgentId { get; set; }
+        public EquipmentIndex EquipmentIndex { get; set; }
+        public int Count { get; set; }
+    }
+
+    private sealed class ReplayStatusState
+    {
+        public bool Success { get; set; }
+        public string BattleInstanceId { get; set; }
+        public bool CaptureArmed { get; set; }
+        public string CapturedBattleInstanceId { get; set; }
+        public bool CapturedCurrentBattle { get; set; }
+        public bool CapturedValidNetworkMessage { get; set; }
+        public bool CapturedFromNetworkPeer { get; set; }
+        public string CapturedDropId { get; set; }
+        public string CapturedWorldItemId { get; set; }
+        public string CapturedAgentId { get; set; }
+        public int CapturedEquipmentSlot { get; set; }
+        public int CapturedNetworkCount { get; set; }
+        public int ReplaySendCount { get; set; }
+        public string ExpectedDropId { get; set; }
+        public string ExpectedWorldItemId { get; set; }
+        public bool DuplicateAlreadyAppliedObserved { get; set; }
+        public int DuplicateAlreadyAppliedCount { get; set; }
+        public string DuplicateAgentId { get; set; }
+        public int DuplicateEquipmentSlot { get; set; }
+    }
+
+    private static readonly object CaptureGate = new object();
+    private static readonly Dictionary<Guid, DuplicateDropState> DuplicateDrops =
+        new Dictionary<Guid, DuplicateDropState>();
+    private static CapturedDropState capturedDrop;
 
     private static CoopCommandResult Succeeded(string output) =>
         new CoopCommandResult(true, output);
@@ -256,6 +306,256 @@ internal static class WeaponDropBaselineDebugCommands
             snapshot.NativeDropInvoked = true;
             return Succeeded("LIVE_TEST_JSON=" + JsonConvert.SerializeObject(snapshot));
         }
+    }
+
+    public sealed class ArmCaptureCoopCommand : ICoopCommand
+    {
+        public string Prefix => "coop.debug.weapon_drop";
+
+        public string Name => "arm_capture";
+
+        public string Description => "Captures the next real network drop for one active battle agent slot.";
+
+        public CoopCommandSide Side => CoopCommandSide.Server;
+
+        public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
+        {
+            new ExpectedArgs("agent_id", "The registered agent id."),
+            new ExpectedArgs("equipment_slot", "The weapon equipment slot."),
+        };
+
+        public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
+        {
+            if (ModInformation.IsClient)
+                return Failed("WEAPON_DROP_ARM_CAPTURE must run on the server");
+            if (!TryGetActiveBattle(out Mission mission, out CoopBattleController controller, out string error))
+                return Failed(error);
+            if (!Guid.TryParse(args[0], out Guid agentId) ||
+                !TryParseEquipmentIndex(args[1], out EquipmentIndex equipmentIndex, out error))
+            {
+                return Failed(error ?? "WEAPON_DROP_ARM_CAPTURE agent id is invalid");
+            }
+            if (!ContainerProvider.TryResolve<INetworkAgentRegistry>(out var agentRegistry) ||
+                !agentRegistry.TryGetAgentInfo(agentId, out CoopAgentInfo agentInfo) ||
+                agentInfo.Agent == null ||
+                !agentInfo.Agent.IsActive() ||
+                agentInfo.Agent.Mission != mission)
+            {
+                return Failed("WEAPON_DROP_ARM_CAPTURE target agent is unavailable");
+            }
+
+            string battleInstanceId = Convert.ToString(controller.Session.InstanceId, CultureInfo.InvariantCulture);
+            lock (CaptureGate)
+            {
+                capturedDrop = new CapturedDropState
+                {
+                    BattleInstanceId = battleInstanceId,
+                    AgentId = agentId,
+                    EquipmentIndex = equipmentIndex,
+                };
+                DuplicateDrops.Clear();
+            }
+            return Succeeded("LIVE_TEST_JSON=" + JsonConvert.SerializeObject(
+                GetReplayStatus(battleInstanceId, Guid.Empty, Guid.Empty)));
+        }
+    }
+
+    public sealed class ReplayCapturedCoopCommand : ICoopCommand
+    {
+        public string Prefix => "coop.debug.weapon_drop";
+
+        public string Name => "replay_captured";
+
+        public string Description => "Replays the captured real network drop through the battle network.";
+
+        public CoopCommandSide Side => CoopCommandSide.Server;
+
+        public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
+        {
+            new ExpectedArgs("send_count", "The number of ordered replays, from one through three."),
+        };
+
+        public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
+        {
+            if (ModInformation.IsClient)
+                return Failed("WEAPON_DROP_REPLAY_CAPTURED must run on the server");
+            if (!TryGetActiveBattle(out _, out CoopBattleController controller, out string error))
+                return Failed(error);
+            if (!int.TryParse(args[0], NumberStyles.Integer, CultureInfo.InvariantCulture, out int sendCount) ||
+                sendCount < 1 ||
+                sendCount > 3)
+            {
+                return Failed("WEAPON_DROP_REPLAY_CAPTURED send count is invalid");
+            }
+            if (!ContainerProvider.TryResolve<IBattleNetwork>(out var network))
+                return Failed("WEAPON_DROP_REPLAY_CAPTURED battle network is unavailable");
+
+            string battleInstanceId = Convert.ToString(controller.Session.InstanceId, CultureInfo.InvariantCulture);
+            NetworkWeaponDropped message;
+            lock (CaptureGate)
+            {
+                if (capturedDrop == null ||
+                    capturedDrop.Message == null ||
+                    !string.Equals(capturedDrop.BattleInstanceId, battleInstanceId, StringComparison.Ordinal))
+                {
+                    return Failed("WEAPON_DROP_REPLAY_CAPTURED has no captured drop for the active battle");
+                }
+                message = capturedDrop.Message;
+            }
+
+            for (int index = 0; index < sendCount; index++)
+                network.SendAll(message);
+
+            lock (CaptureGate)
+            {
+                if (ReferenceEquals(capturedDrop?.Message, message))
+                    capturedDrop.ReplaySendCount += sendCount;
+            }
+            return Succeeded("LIVE_TEST_JSON=" + JsonConvert.SerializeObject(
+                GetReplayStatus(battleInstanceId, message.DropId, message.WorldItemId)));
+        }
+    }
+
+    public sealed class ReplayStatusCoopCommand : ICoopCommand
+    {
+        public string Prefix => "coop.debug.weapon_drop";
+
+        public string Name => "replay_status";
+
+        public string Description => "Reports captured replay and duplicate already-applied evidence for one drop.";
+
+        public CoopCommandSide Side => CoopCommandSide.Both;
+
+        public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
+        {
+            new ExpectedArgs("drop_id", "The captured network drop id."),
+            new ExpectedArgs("world_item_id", "The captured registered world item id."),
+        };
+
+        public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
+        {
+            if (!TryGetActiveBattle(out _, out CoopBattleController controller, out string error))
+                return Failed(error);
+            if (!Guid.TryParse(args[0], out Guid dropId) ||
+                !Guid.TryParse(args[1], out Guid worldItemId) ||
+                dropId == Guid.Empty ||
+                worldItemId == Guid.Empty)
+            {
+                return Failed("WEAPON_DROP_REPLAY_STATUS drop or world item id is invalid");
+            }
+
+            string battleInstanceId = Convert.ToString(controller.Session.InstanceId, CultureInfo.InvariantCulture);
+            return Succeeded("LIVE_TEST_JSON=" + JsonConvert.SerializeObject(
+                GetReplayStatus(battleInstanceId, dropId, worldItemId)));
+        }
+    }
+
+    internal static void RecordObservedNetworkDrop(NetworkWeaponDropped message, object source)
+    {
+        if (message == null ||
+            message.IsCatchUp ||
+            message.DropId == Guid.Empty ||
+            message.WorldItemId == Guid.Empty ||
+            message.AgentId == Guid.Empty ||
+            string.IsNullOrEmpty(message.OriginControllerId) ||
+            string.IsNullOrEmpty(message.ItemObjectId) ||
+            source == null)
+        {
+            return;
+        }
+
+        lock (CaptureGate)
+        {
+            if (capturedDrop == null ||
+                capturedDrop.Message != null ||
+                capturedDrop.AgentId != message.AgentId ||
+                capturedDrop.EquipmentIndex != message.EquipmentIndex)
+            {
+                return;
+            }
+
+            capturedDrop.Message = message;
+            capturedDrop.CapturedFromNetworkPeer = true;
+            capturedDrop.CapturedNetworkCount++;
+        }
+    }
+
+    internal static void RecordDuplicateAlreadyApplied(NetworkWeaponDropped message)
+    {
+        if (message == null ||
+            message.IsCatchUp ||
+            message.DropId == Guid.Empty ||
+            message.WorldItemId == Guid.Empty ||
+            message.AgentId == Guid.Empty)
+        {
+            return;
+        }
+
+        lock (CaptureGate)
+        {
+            if (!DuplicateDrops.TryGetValue(message.DropId, out DuplicateDropState duplicate) ||
+                duplicate.WorldItemId != message.WorldItemId)
+            {
+                duplicate = new DuplicateDropState
+                {
+                    DropId = message.DropId,
+                    WorldItemId = message.WorldItemId,
+                    AgentId = message.AgentId,
+                    EquipmentIndex = message.EquipmentIndex,
+                };
+                DuplicateDrops[message.DropId] = duplicate;
+            }
+            duplicate.Count++;
+        }
+    }
+
+    private static ReplayStatusState GetReplayStatus(
+        string battleInstanceId,
+        Guid expectedDropId,
+        Guid expectedWorldItemId)
+    {
+        var status = new ReplayStatusState
+        {
+            Success = true,
+            BattleInstanceId = battleInstanceId,
+            ExpectedDropId = expectedDropId == Guid.Empty ? null : expectedDropId.ToString("D"),
+            ExpectedWorldItemId = expectedWorldItemId == Guid.Empty ? null : expectedWorldItemId.ToString("D"),
+        };
+
+        lock (CaptureGate)
+        {
+            if (capturedDrop != null)
+            {
+                status.CaptureArmed = true;
+                status.CapturedBattleInstanceId = capturedDrop.BattleInstanceId;
+                status.CapturedCurrentBattle = string.Equals(
+                    capturedDrop.BattleInstanceId,
+                    battleInstanceId,
+                    StringComparison.Ordinal);
+                status.CapturedValidNetworkMessage = capturedDrop.Message != null;
+                status.CapturedFromNetworkPeer = capturedDrop.CapturedFromNetworkPeer;
+                status.CapturedNetworkCount = capturedDrop.CapturedNetworkCount;
+                status.ReplaySendCount = capturedDrop.ReplaySendCount;
+                if (capturedDrop.Message != null)
+                {
+                    status.CapturedDropId = capturedDrop.Message.DropId.ToString("D");
+                    status.CapturedWorldItemId = capturedDrop.Message.WorldItemId.ToString("D");
+                    status.CapturedAgentId = capturedDrop.Message.AgentId.ToString("D");
+                    status.CapturedEquipmentSlot = (int)capturedDrop.Message.EquipmentIndex;
+                }
+            }
+
+            if (expectedDropId != Guid.Empty &&
+                DuplicateDrops.TryGetValue(expectedDropId, out DuplicateDropState duplicate) &&
+                duplicate.WorldItemId == expectedWorldItemId)
+            {
+                status.DuplicateAlreadyAppliedObserved = true;
+                status.DuplicateAlreadyAppliedCount = duplicate.Count;
+                status.DuplicateAgentId = duplicate.AgentId.ToString("D");
+                status.DuplicateEquipmentSlot = (int)duplicate.EquipmentIndex;
+            }
+        }
+        return status;
     }
 
     private static bool TryGetActiveBattle(
