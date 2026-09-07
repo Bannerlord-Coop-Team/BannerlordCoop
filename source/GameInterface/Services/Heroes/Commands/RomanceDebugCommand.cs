@@ -32,6 +32,8 @@ internal class RomanceDebugCommand
 
         public string Description => "Lists current romance states.";
 
+        public CoopCommandSide Side => CoopCommandSide.Both;
+
         public IExpectedArgs[] ExpectedArgs { get; } = Array.Empty<IExpectedArgs>();
 
         public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
@@ -65,6 +67,8 @@ internal class RomanceDebugCommand
 
         public string Description => "Describes the romance debug commands.";
 
+        public CoopCommandSide Side => CoopCommandSide.Both;
+
         public IExpectedArgs[] ExpectedArgs { get; } = Array.Empty<IExpectedArgs>();
 
         public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
@@ -83,6 +87,8 @@ internal class RomanceDebugCommand
         public string Name => "status";
 
         public string Description => "Reports romance state for a player and NPC.";
+
+        public CoopCommandSide Side => CoopCommandSide.Both;
 
         public IExpectedArgs[] ExpectedArgs { get; } = CreatePairArguments();
 
@@ -112,6 +118,8 @@ internal class RomanceDebugCommand
         public string Name => "start";
 
         public string Description => "Starts courtship between a player and NPC.";
+
+        public CoopCommandSide Side => CoopCommandSide.Server;
 
         public IExpectedArgs[] ExpectedArgs { get; } = CreatePairArguments();
 
@@ -150,6 +158,8 @@ internal class RomanceDebugCommand
 
         public string Description => "Marks a romance pair as compatible.";
 
+        public CoopCommandSide Side => CoopCommandSide.Server;
+
         public IExpectedArgs[] ExpectedArgs { get; } = CreatePairArguments();
 
         public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
@@ -186,6 +196,8 @@ internal class RomanceDebugCommand
         public string Name => "agree";
 
         public string Description => "Marks a romance pair as agreed on marriage.";
+
+        public CoopCommandSide Side => CoopCommandSide.Server;
 
         public IExpectedArgs[] ExpectedArgs { get; } = CreatePairArguments();
 
@@ -224,6 +236,8 @@ internal class RomanceDebugCommand
 
         public string Description => "Marries a player hero and NPC hero.";
 
+        public CoopCommandSide Side => CoopCommandSide.Server;
+
         public IExpectedArgs[] ExpectedArgs { get; } = CreatePairArguments();
 
         public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
@@ -255,6 +269,8 @@ internal class RomanceDebugCommand
         public string Name => "divorce";
 
         public string Description => "Divorces a player hero and NPC hero.";
+
+        public CoopCommandSide Side => CoopCommandSide.Server;
 
         public IExpectedArgs[] ExpectedArgs { get; } = CreatePairArguments();
 

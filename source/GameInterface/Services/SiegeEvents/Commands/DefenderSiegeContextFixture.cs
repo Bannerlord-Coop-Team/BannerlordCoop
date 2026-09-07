@@ -330,6 +330,7 @@ internal sealed class DefenderSiegeContextFixture : IDefenderSiegeContextFixture
         public string Prefix => "coop.debug.siege";
         public string Name => "defender_context_capture";
         public string Description => "Capture the AI besieger before staging the siege.";
+        public CoopCommandSide Side => CoopCommandSide.Server;
         public IExpectedArgs[] ExpectedArgs { get; } = Array.Empty<IExpectedArgs>();
         public CaptureCoopCommand(IDefenderSiegeContextFixture fixture) => this.fixture = fixture;
         public CoopCommandResult ProcessCommand(ICoopCommandArgs args) => fixture.Capture();
@@ -341,6 +342,7 @@ internal sealed class DefenderSiegeContextFixture : IDefenderSiegeContextFixture
         public string Prefix => "coop.debug.siege";
         public string Name => "defender_context_start";
         public string Description => "Start the captured AI siege context.";
+        public CoopCommandSide Side => CoopCommandSide.Server;
         public IExpectedArgs[] ExpectedArgs { get; } = Array.Empty<IExpectedArgs>();
         public StartCoopCommand(IDefenderSiegeContextFixture fixture) => this.fixture = fixture;
         public CoopCommandResult ProcessCommand(ICoopCommandArgs args) => fixture.Start();
@@ -352,6 +354,7 @@ internal sealed class DefenderSiegeContextFixture : IDefenderSiegeContextFixture
         public string Prefix => "coop.debug.siege";
         public string Name => "defender_context_end_missions";
         public string Description => "Exit the captured defenders before releasing their assault.";
+        public CoopCommandSide Side => CoopCommandSide.Server;
         public IExpectedArgs[] ExpectedArgs { get; } = Array.Empty<IExpectedArgs>();
         public EndMissionsCoopCommand(IDefenderSiegeContextFixture fixture) => this.fixture = fixture;
         public CoopCommandResult ProcessCommand(ICoopCommandArgs args) => fixture.EndMissions();
@@ -363,6 +366,7 @@ internal sealed class DefenderSiegeContextFixture : IDefenderSiegeContextFixture
         public string Prefix => "coop.debug.siege";
         public string Name => "defender_context_restore";
         public string Description => "Restore the captured AI siege context.";
+        public CoopCommandSide Side => CoopCommandSide.Server;
         public IExpectedArgs[] ExpectedArgs { get; } = Array.Empty<IExpectedArgs>();
         public RestoreCoopCommand(IDefenderSiegeContextFixture fixture) => this.fixture = fixture;
         public CoopCommandResult ProcessCommand(ICoopCommandArgs args) => fixture.Restore();
@@ -374,6 +378,7 @@ internal sealed class DefenderSiegeContextFixture : IDefenderSiegeContextFixture
         public string Prefix => "coop.debug.siege";
         public string Name => "defender_context_verify_restore";
         public string Description => "Verify the captured AI siege context.";
+        public CoopCommandSide Side => CoopCommandSide.Server;
         public IExpectedArgs[] ExpectedArgs { get; } = Array.Empty<IExpectedArgs>();
         public VerifyCoopCommand(IDefenderSiegeContextFixture fixture) => this.fixture = fixture;
         public CoopCommandResult ProcessCommand(ICoopCommandArgs args) => fixture.Verify();

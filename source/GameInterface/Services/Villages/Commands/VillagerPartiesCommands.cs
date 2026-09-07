@@ -30,6 +30,8 @@ internal class VillagerPartiesCommands
 
         public string Description => "Shows interacted villagers for co-op debugging.";
 
+        public CoopCommandSide Side => CoopCommandSide.Both;
+
         public IExpectedArgs[] ExpectedArgs { get; } = System.Array.Empty<IExpectedArgs>();
 
         public CoopCommandResult ProcessCommand(ICoopCommandArgs strings)
@@ -76,6 +78,8 @@ internal class VillagerPartiesCommands
         public string Name => "view_looted_villagers";
 
         public string Description => "Shows looted villagers for co-op debugging.";
+
+        public CoopCommandSide Side => CoopCommandSide.Both;
 
         public IExpectedArgs[] ExpectedArgs { get; } = System.Array.Empty<IExpectedArgs>();
 

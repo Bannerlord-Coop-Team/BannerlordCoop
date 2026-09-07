@@ -49,6 +49,8 @@ public static class JoinDebugCommands
 
         public string Description => "Reports the current campaign join state.";
 
+        public CoopCommandSide Side => CoopCommandSide.Both;
+
         public IExpectedArgs[] ExpectedArgs { get; } = Array.Empty<IExpectedArgs>();
 
         public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
@@ -89,6 +91,7 @@ public static class JoinDebugCommands
         public string Prefix => "coop.debug.connection";
         public string Name => "player_party_readiness";
         public string Description => "Reports synchronized defender party readiness.";
+        public CoopCommandSide Side => CoopCommandSide.Server;
         public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
             new ExpectedArgs("controller_id", "The connected player controller id."),
@@ -227,6 +230,8 @@ public static class JoinDebugCommands
 
         public string Description => "Arms the next client join baseline to omit an inactive party.";
 
+        public CoopCommandSide Side => CoopCommandSide.Client;
+
         public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
             new ExpectedArgs("party_string_id", "The inactive party StringId."),
@@ -254,6 +259,8 @@ public static class JoinDebugCommands
         public string Name => "stage_inactive_party";
 
         public string Description => "Stages an isolated server party as inactive for join testing.";
+
+        public CoopCommandSide Side => CoopCommandSide.Server;
 
         public IExpectedArgs[] ExpectedArgs { get; } = Array.Empty<IExpectedArgs>();
 
@@ -302,6 +309,8 @@ public static class JoinDebugCommands
 
         public string Description => "Restores the staged inactive server party.";
 
+        public CoopCommandSide Side => CoopCommandSide.Server;
+
         public IExpectedArgs[] ExpectedArgs { get; } = Array.Empty<IExpectedArgs>();
 
         public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
@@ -331,6 +340,8 @@ public static class JoinDebugCommands
         public string Name => "disconnect";
 
         public string Description => "Disconnects the active client session.";
+
+        public CoopCommandSide Side => CoopCommandSide.Client;
 
         public IExpectedArgs[] ExpectedArgs { get; } = Array.Empty<IExpectedArgs>();
 

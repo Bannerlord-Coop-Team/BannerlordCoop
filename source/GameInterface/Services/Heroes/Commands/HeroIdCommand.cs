@@ -29,6 +29,8 @@ public sealed class HeroIdCommand : IHeroIdCommand
 
     public string Description => "Finds registered ids for heroes with an exact display name.";
 
+    public CoopCommandSide Side => CoopCommandSide.Both;
+
     public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
     {
         new ExpectedArgs(

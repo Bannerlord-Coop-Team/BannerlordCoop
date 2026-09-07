@@ -1,4 +1,5 @@
-﻿#if DEBUG
+#if DEBUG
+using Autofac;
 using Common;
 using Common.LiveTesting;
 using Common.Logging;
@@ -8,6 +9,7 @@ using Coop.Core.Common.Commands;
 using Coop.Core.Server;
 using GameInterface;
 using GameInterface.Services.LiveTesting;
+using GameInterface.Services.UI.CoopOptions;
 using GameInterface.Services.Players;
 using Serilog;
 using System;
@@ -24,10 +26,17 @@ using TaleWorlds.Engine;
 using TaleWorlds.MountAndBlade;
 using TaleWorlds.ScreenSystem;
 
+[assembly: System.Reflection.AssemblyMetadata("CoopLiveTestProtocol", "1")]
+[assembly: System.Reflection.AssemblyMetadata("CoopLiveTestCapabilities", "staged-ui-capture-v1")]
+
 namespace Coop.LiveTesting
 {
     internal sealed class LiveTestControlServer : IDisposable
     {
+        private CoopOptionsUI optionsMenu;
+        private readonly IContainer uiContainer;
+        private readonly ILiveTestUi ui;
+
         private const string EndpointDirectoryName = "BannerlordCoop.LiveTest.v1";
         private const int MaximumScreenshotObservations = 120;
         private static readonly TimeSpan ScreenshotCaptureTimeout = TimeSpan.FromMinutes(1);
@@ -69,6 +78,10 @@ namespace Coop.LiveTesting
             if (string.IsNullOrWhiteSpace(logFilePath)) throw new ArgumentException("A log file path is required.", nameof(logFilePath));
             if (startAsClient == null) throw new ArgumentNullException(nameof(startAsClient));
 
+            var uiBuilder = new ContainerBuilder();
+            uiBuilder.RegisterModule<LiveTestUiModule>();
+            uiContainer = uiBuilder.Build();
+            ui = uiContainer.Resolve<ILiveTestUi>();
             this.isServer = isServer;
             this.logFilePath = logFilePath;
             this.deferredClientJoinEnabled = deferredClientJoinEnabled;
@@ -131,6 +144,7 @@ namespace Coop.LiveTesting
         {
             DeleteEndpointRegistration();
             pipeServer.Dispose();
+            uiContainer.Dispose();
         }
 
         private LiveTestResponse Handle(LiveTestRequest request)
@@ -154,6 +168,11 @@ namespace Coop.LiveTesting
                     return HandleRenderStatus(request);
                 case "render-toggle":
                     return HandleRenderToggle(request);
+                case "ui-inspect":
+                case "ui-action":
+                    return HandleUi(request);
+                case "options-menu":
+                    return HandleOptionsMenu(request);
                 case "join":
                     return HandleDeferredClientJoin(request);
                 case "shutdown":
@@ -165,6 +184,100 @@ namespace Coop.LiveTesting
                         $"Unknown live-test method '{request.Method}'.",
                         false);
             }
+        }
+
+        private LiveTestResponse HandleUi(LiveTestRequest request)
+        {
+            bool mutation = request.Method == "ui-action";
+            return ExecuteOnGameThread(request, () =>
+            {
+                if (processInfo.Role != "client")
+                    return Failure(request.Id, "client_only", "UI automation is client-only.", false);
+                try
+                {
+                    string snapshot = ReadUiString(request.Parameters, "snapshot");
+                    if (!mutation)
+                    {
+                        int offset = 0;
+                        if (request.Parameters.TryGetProperty("offset", out var offsetValue) && !offsetValue.TryGetInt32(out offset))
+                            return Failure(request.Id, "invalid_parameters", "offset must be an integer.", false);
+                        return Success(request.Id, ui.Inspect(snapshot, offset));
+                    }
+                    string element = ReadUiString(request.Parameters, "element");
+                    string action = ReadUiString(request.Parameters, "action");
+                    string text = ReadUiString(request.Parameters, "text", 512);
+                    double? value = null;
+                    if (request.Parameters.TryGetProperty("value", out var number) && number.ValueKind != JsonValueKind.Null)
+                    {
+                        if (number.ValueKind != JsonValueKind.Number || !number.TryGetDouble(out double parsed))
+                            return Failure(request.Id, "invalid_parameters", "value must be numeric.", false);
+                        value = parsed;
+                    }
+                    return Success(request.Id, ui.Act(snapshot, element, action, text, value));
+                }
+                catch (UiAutomationException exception)
+                {
+                    return Failure(request.Id, exception.Code, exception.Message, false);
+                }
+            }, mutation);
+        }
+
+        private string ReadUiString(JsonElement parameters, string name, int maximum = 64)
+        {
+            if (!parameters.TryGetProperty(name, out var value) || value.ValueKind == JsonValueKind.Null) return null;
+            if (value.ValueKind != JsonValueKind.String || value.GetString().Length > maximum)
+                throw new UiAutomationException("invalid_parameters", "Invalid UI parameter: " + name);
+            return value.GetString();
+        }
+
+        private LiveTestResponse HandleOptionsMenu(LiveTestRequest request)
+        {
+            if (!request.Parameters.TryGetProperty("action", out var actionValue) || actionValue.ValueKind != JsonValueKind.String)
+                return Failure(request.Id, "invalid_parameters", "Expected action: open, select, inspect, or close.", false);
+            string action = actionValue.GetString();
+            if (action != "open" && action != "select" && action != "inspect" && action != "close")
+                return Failure(request.Id, "invalid_parameters", "Expected action: open, select, inspect, or close.", false);
+            string tab = null;
+            if (request.Parameters.TryGetProperty("tab", out var tabValue) && tabValue.ValueKind == JsonValueKind.String)
+                tab = tabValue.GetString();
+            if ((action == "select" && string.IsNullOrEmpty(tab)) || (tab != null && tab.Length > 64))
+                return Failure(request.Id, "invalid_parameters", "Expected a co-op options tab id (maximum 64 characters).", false);
+
+            return ExecuteOnGameThread(request, () =>
+            {
+                if (processInfo.Role != "client")
+                    return Failure(request.Id, "client_only", "Options navigation is client-only.", false);
+                bool active = optionsMenu != null && ScreenManager.TopScreen == optionsMenu;
+                if (action == "inspect")
+                    return Success(request.Id, active ? optionsMenu.InspectDebugMenu() : new { open = false });
+                bool opened = false;
+                if (action == "open" && !active)
+                {
+                    if (Campaign.Current == null || !(ScreenManager.TopScreen is SandBox.View.Map.MapScreen))
+                        return Failure(request.Id, "not_ready", "Open options from the campaign map only.", false);
+                    optionsMenu = new CoopOptionsUI();
+                    ScreenManager.PushScreen(optionsMenu);
+                    active = opened = true;
+                }
+                if (!active)
+                    return Failure(request.Id, "menu_not_active", "The MCP-opened options screen is not on top; no screen was closed or selected.", false);
+                if (action == "close")
+                {
+                    ScreenManager.PopScreen();
+                    optionsMenu = null;
+                    return Success(request.Id, new { open = false, applied = false });
+                }
+                if (!string.IsNullOrEmpty(tab) && !optionsMenu.TrySelectDebugTab(tab))
+                {
+                    if (opened)
+                    {
+                        ScreenManager.PopScreen();
+                        optionsMenu = null;
+                    }
+                    return Failure(request.Id, "unknown_tab", "Unknown co-op options tab; no tab was selected.", false);
+                }
+                return Success(request.Id, optionsMenu.InspectDebugMenu());
+            }, action != "inspect");
         }
 
         private LiveTestResponse HandleCommandCatalog(LiveTestRequest request)
@@ -242,6 +355,8 @@ namespace Coop.LiveTesting
                     arguments,
                     found = true,
                     output = result.Output,
+                    succeeded = result.Succeeded,
+                    errorCode = result.ErrorCode,
                     hasStructuredResult,
                     structuredResult,
                 });
@@ -753,6 +868,9 @@ namespace Coop.LiveTesting
                 topScreen,
                 activeMenu,
                 campaignLoaded,
+                requestedSaveName = ReadArgument(Environment.GetCommandLineArgs(), "/coopsave"),
+                loadedCampaignId = Campaign.Current?.UniqueGameId,
+                loadedSaveNameConfirmed = false,
                 missionActive,
                 coopRunning,
                 coopState,

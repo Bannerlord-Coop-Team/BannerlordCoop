@@ -127,6 +127,8 @@ public class SiegeDebugCommand
 
         public string Description => "Runs prompt fixture start for co-op debugging.";
 
+        public CoopCommandSide Side => CoopCommandSide.Server;
+
         public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
             new ExpectedArgs("controllerId", "The controller id."),
@@ -275,6 +277,8 @@ public class SiegeDebugCommand
 
         public string Description => "Runs prompt fixture state for co-op debugging.";
 
+        public CoopCommandSide Side => CoopCommandSide.Server;
+
         public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
             new ExpectedArgs("controllerId", "The controller id."),
@@ -326,6 +330,8 @@ public class SiegeDebugCommand
         public string Name => "prisoner_prompt_fixture_restore";
 
         public string Description => "Runs prompt fixture restore for co-op debugging.";
+
+        public CoopCommandSide Side => CoopCommandSide.Server;
 
         public IExpectedArgs[] ExpectedArgs { get; } = System.Array.Empty<IExpectedArgs>();
 
@@ -856,6 +862,8 @@ public class SiegeDebugCommand
 
         public string Description => "Starts army relief for co-op debugging.";
 
+        public CoopCommandSide Side => CoopCommandSide.Server;
+
         public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
             new ExpectedArgs("controllerId", "The controller id."),
@@ -977,6 +985,8 @@ public class SiegeDebugCommand
 
         public string Description => "Runs relief state for co-op debugging.";
 
+        public CoopCommandSide Side => CoopCommandSide.Both;
+
         public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
             new ExpectedArgs("controllerId", "The controller id."),
@@ -1021,6 +1031,8 @@ public class SiegeDebugCommand
 
         public string Description => "Requests besiege for co-op debugging.";
 
+        public CoopCommandSide Side => CoopCommandSide.Client;
+
         public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
             new ExpectedArgs("settlementId", "The settlement id."),
@@ -1054,6 +1066,8 @@ public class SiegeDebugCommand
 
         public string Description => "Requests assault for co-op debugging.";
 
+        public CoopCommandSide Side => CoopCommandSide.Client;
+
         public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
             new ExpectedArgs("settlementId", "The settlement id."),
@@ -1086,6 +1100,8 @@ public class SiegeDebugCommand
         public string Name => "join_active_assault";
 
         public string Description => "Joins active assault for co-op debugging.";
+
+        public CoopCommandSide Side => CoopCommandSide.Client;
 
         public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
@@ -1161,6 +1177,8 @@ public class SiegeDebugCommand
         public string Name => "assault_entry_state";
 
         public string Description => "Runs entry state for co-op debugging.";
+
+        public CoopCommandSide Side => CoopCommandSide.Client;
 
         public IExpectedArgs[] ExpectedArgs { get; } = System.Array.Empty<IExpectedArgs>();
 
@@ -1259,6 +1277,8 @@ public class SiegeDebugCommand
 
         public string Description => "Leaves the relevant state for co-op debugging.";
 
+        public CoopCommandSide Side => CoopCommandSide.Client;
+
         public IExpectedArgs[] ExpectedArgs { get; } = System.Array.Empty<IExpectedArgs>();
 
         public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
@@ -1287,6 +1307,8 @@ public class SiegeDebugCommand
         public string Name => "leave_settlement";
 
         public string Description => "Leaves settlement for co-op debugging.";
+
+        public CoopCommandSide Side => CoopCommandSide.Client;
 
         public IExpectedArgs[] ExpectedArgs { get; } = System.Array.Empty<IExpectedArgs>();
 
@@ -1330,6 +1352,8 @@ public class SiegeDebugCommand
         public string Name => "start";
 
         public string Description => "Starts the relevant state for co-op debugging.";
+
+        public CoopCommandSide Side => CoopCommandSide.Server;
 
         public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
@@ -1446,6 +1470,8 @@ public class SiegeDebugCommand
 
         public string Description => "Stops the relevant state for co-op debugging.";
 
+        public CoopCommandSide Side => CoopCommandSide.Server;
+
         public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
             new ExpectedArgs("settlementId", "The settlement id."),
@@ -1538,6 +1564,8 @@ public class SiegeDebugCommand
         public string Name => "join_players";
 
         public string Description => "Joins players for co-op debugging.";
+
+        public CoopCommandSide Side => CoopCommandSide.Server;
 
         public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
@@ -1641,6 +1669,8 @@ public class SiegeDebugCommand
 
         public string Description => "Runs state for co-op debugging.";
 
+        public CoopCommandSide Side => CoopCommandSide.Both;
+
         public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
             new ExpectedArgs("partyId", "The party id."),
@@ -1681,6 +1711,8 @@ public class SiegeDebugCommand
         public string Name => "prepare_ladders_only";
 
         public string Description => "Prepares ladders only for co-op debugging.";
+
+        public CoopCommandSide Side => CoopCommandSide.Server;
 
         public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
@@ -1771,6 +1803,8 @@ public class SiegeDebugCommand
         public string Name => "stage_machines";
 
         public string Description => "Stages machines for co-op debugging.";
+
+        public CoopCommandSide Side => CoopCommandSide.Server;
 
         public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
@@ -1879,6 +1913,8 @@ public class SiegeDebugCommand
 
         public string Description => "Runs the relevant state for co-op debugging.";
 
+        public CoopCommandSide Side => CoopCommandSide.Server;
+
         public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
             new ExpectedArgs("settlementId", "The settlement id."),
@@ -1953,6 +1989,8 @@ public class SiegeDebugCommand
 
         public string Description => "Runs status for co-op debugging.";
 
+        public CoopCommandSide Side => CoopCommandSide.Both;
+
         public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
             new ExpectedArgs("settlementId", "The settlement id."),
@@ -2023,6 +2061,8 @@ public class SiegeDebugCommand
 
         public string Description => "Resolves starvation for co-op debugging.";
 
+        public CoopCommandSide Side => CoopCommandSide.Server;
+
         public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
             new ExpectedArgs("settlementId", "The settlement id."),
@@ -2075,6 +2115,8 @@ public class SiegeDebugCommand
 
         public string Description => "Lists the relevant state for co-op debugging.";
 
+        public CoopCommandSide Side => CoopCommandSide.Both;
+
         public IExpectedArgs[] ExpectedArgs { get; } = System.Array.Empty<IExpectedArgs>();
 
         public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
@@ -2111,6 +2153,8 @@ public class SiegeDebugCommand
         public string Name => "graph";
 
         public string Description => "Runs the relevant state for co-op debugging.";
+
+        public CoopCommandSide Side => CoopCommandSide.Both;
 
         public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
@@ -2178,6 +2222,8 @@ public class SiegeDebugCommand
 
         public string Description => "Focuses the relevant state for co-op debugging.";
 
+        public CoopCommandSide Side => CoopCommandSide.Client;
+
         public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
             new ExpectedArgs("settlementId", "The settlement id."),
@@ -2229,6 +2275,8 @@ public class SiegeDebugCommand
         public string Name => "dump_party";
 
         public string Description => "Dumps party for co-op debugging.";
+
+        public CoopCommandSide Side => CoopCommandSide.Both;
 
         public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
@@ -2299,6 +2347,8 @@ public class SiegeDebugCommand
         public string Name => "dump_engines";
 
         public string Description => "Dumps engines for co-op debugging.";
+
+        public CoopCommandSide Side => CoopCommandSide.Both;
 
         public IExpectedArgs[] ExpectedArgs { get; } = System.Array.Empty<IExpectedArgs>();
 
@@ -2383,6 +2433,8 @@ public class SiegeDebugCommand
         public string Name => "dump_machines";
 
         public string Description => "Dumps machines for co-op debugging.";
+
+        public CoopCommandSide Side => CoopCommandSide.Both;
 
         public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {

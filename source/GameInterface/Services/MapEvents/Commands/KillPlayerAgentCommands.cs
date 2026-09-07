@@ -27,6 +27,8 @@ internal class KillPlayerAgentCommands
 
         public string Description => "Runs the kms debug operation.";
 
+        public CoopCommandSide Side => CoopCommandSide.Both;
+
         public IExpectedArgs[] ExpectedArgs { get; } = Array.Empty<IExpectedArgs>();
 
         public CoopCommandResult ProcessCommand(ICoopCommandArgs args)

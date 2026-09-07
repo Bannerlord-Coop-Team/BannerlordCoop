@@ -12,6 +12,16 @@ public sealed class CoopCommandDescriptor
         string name,
         string description,
         IExpectedArgs[] expectedArgs)
+        : this(prefix, name, description, expectedArgs, CoopCommandSide.Both)
+    {
+    }
+
+    internal CoopCommandDescriptor(
+        string prefix,
+        string name,
+        string description,
+        IExpectedArgs[] expectedArgs,
+        CoopCommandSide side)
     {
         if (expectedArgs == null) throw new ArgumentNullException(nameof(expectedArgs));
 
@@ -19,6 +29,7 @@ public sealed class CoopCommandDescriptor
         Name = name;
         FullName = $"{prefix}.{name}";
         Description = description;
+        Side = side;
         this.expectedArgs = (IExpectedArgs[])expectedArgs.Clone();
         Usage = BuildUsage();
     }
@@ -32,6 +43,8 @@ public sealed class CoopCommandDescriptor
     public string Usage { get; }
 
     public string Description { get; }
+
+    public CoopCommandSide Side { get; }
 
     public IExpectedArgs[] ExpectedArgs => (IExpectedArgs[])expectedArgs.Clone();
 

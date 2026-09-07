@@ -38,6 +38,8 @@ public class ArmyDebugCommand
 
         public string Description => "Lists registered armies.";
 
+        public CoopCommandSide Side => CoopCommandSide.Both;
+
         public IExpectedArgs[] ExpectedArgs { get; } = System.Array.Empty<IExpectedArgs>();
 
         public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
@@ -80,6 +82,8 @@ public class ArmyDebugCommand
         public string Name => "create";
 
         public string Description => "Creates an army on the server.";
+
+        public CoopCommandSide Side => CoopCommandSide.Server;
 
         public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
@@ -163,6 +167,8 @@ public class ArmyDebugCommand
 
         public string Description => "Destroys an army on the server.";
 
+        public CoopCommandSide Side => CoopCommandSide.Server;
+
         public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
             new ExpectedArgs("army_id", "The registered army id."),
@@ -230,6 +236,8 @@ public class ArmyDebugCommand
 
         public string Description => "Lists parties in an army.";
 
+        public CoopCommandSide Side => CoopCommandSide.Both;
+
         public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
             new ExpectedArgs("army_id", "The registered army id."),
@@ -273,6 +281,8 @@ public class ArmyDebugCommand
         public string Name => "mobile_party_add";
 
         public string Description => "Adds a mobile party to an army.";
+
+        public CoopCommandSide Side => CoopCommandSide.Both;
 
         public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
@@ -324,6 +334,8 @@ public class ArmyDebugCommand
 
         public string Description => "Removes a mobile party from an army.";
 
+        public CoopCommandSide Side => CoopCommandSide.Both;
+
         public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
             new ExpectedArgs("army_id", "The registered army id."),
@@ -372,6 +384,8 @@ public class ArmyDebugCommand
         public string Name => "info";
 
         public string Description => "Reports state for an army.";
+
+        public CoopCommandSide Side => CoopCommandSide.Both;
 
         public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {

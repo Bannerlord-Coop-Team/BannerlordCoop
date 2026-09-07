@@ -35,6 +35,7 @@ internal static class DefenderSiegeFixtureCommands
         public string Prefix => "coop.debug.siege";
         public string Name => "defender_fixture_capture";
         public string Description => "Captures both defender parties before staging.";
+        public CoopCommandSide Side => CoopCommandSide.Server;
         public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
             new ExpectedArgs("first_controller_id", "First defender controller."),
@@ -53,6 +54,7 @@ internal static class DefenderSiegeFixtureCommands
         public string Prefix => "coop.debug.siege";
         public string Name => "defender_roster_fixture_capture";
         public string Description => "Captures the defender roster before normalization.";
+        public CoopCommandSide Side => CoopCommandSide.Server;
         public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
             new ExpectedArgs("first_controller_id", "First defender controller."),
@@ -71,6 +73,7 @@ internal static class DefenderSiegeFixtureCommands
         public string Prefix => "coop.debug.siege";
         public string Name => "defender_roster_fixture_normalize";
         public string Description => "Normalizes the captured defender roster.";
+        public CoopCommandSide Side => CoopCommandSide.Server;
         public IExpectedArgs[] ExpectedArgs { get; } = Array.Empty<IExpectedArgs>();
         public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
         {
@@ -85,6 +88,7 @@ internal static class DefenderSiegeFixtureCommands
         public string Prefix => "coop.debug.siege";
         public string Name => "defender_roster_fixture_restore";
         public string Description => "Restores the captured defender roster.";
+        public CoopCommandSide Side => CoopCommandSide.Server;
         public IExpectedArgs[] ExpectedArgs { get; } = Array.Empty<IExpectedArgs>();
         public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
         {
@@ -99,6 +103,7 @@ internal static class DefenderSiegeFixtureCommands
         public string Prefix => "coop.debug.siege";
         public string Name => "defender_roster_fixture_verify_restore";
         public string Description => "Verifies defender roster restoration.";
+        public CoopCommandSide Side => CoopCommandSide.Server;
         public IExpectedArgs[] ExpectedArgs { get; } = Array.Empty<IExpectedArgs>();
         public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
         {
@@ -113,6 +118,7 @@ internal static class DefenderSiegeFixtureCommands
         public string Prefix => "coop.debug.siege";
         public string Name => "defender_fixture_stage";
         public string Description => "Stages both defenders inside the castle.";
+        public CoopCommandSide Side => CoopCommandSide.Server;
         public IExpectedArgs[] ExpectedArgs { get; } = Array.Empty<IExpectedArgs>();
         public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
         {
@@ -127,6 +133,7 @@ internal static class DefenderSiegeFixtureCommands
         public string Prefix => "coop.debug.siege";
         public string Name => "defender_fixture_restore";
         public string Description => "Restores both captured defender parties.";
+        public CoopCommandSide Side => CoopCommandSide.Server;
         public IExpectedArgs[] ExpectedArgs { get; } = Array.Empty<IExpectedArgs>();
         public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
         {
@@ -141,6 +148,7 @@ internal static class DefenderSiegeFixtureCommands
         public string Prefix => "coop.debug.siege";
         public string Name => "defender_fixture_verify_restore";
         public string Description => "Verifies defender party restoration.";
+        public CoopCommandSide Side => CoopCommandSide.Server;
         public IExpectedArgs[] ExpectedArgs { get; } = Array.Empty<IExpectedArgs>();
         public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
         {
@@ -155,6 +163,7 @@ internal static class DefenderSiegeFixtureCommands
         public string Prefix => "coop.debug.siege";
         public string Name => "defender_preassault_ack";
         public string Description => "Reports replicated inside-castle defender readiness.";
+        public CoopCommandSide Side => CoopCommandSide.Both;
         public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
             new ExpectedArgs("first_controller_id", "First defender controller."),
