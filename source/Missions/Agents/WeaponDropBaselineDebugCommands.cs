@@ -37,6 +37,27 @@ internal static class WeaponDropBaselineDebugCommands
         public WeaponState Weapon { get; set; }
     }
 
+    private sealed class WeaponSlotState
+    {
+        public int EquipmentSlot { get; set; }
+        public string EquipmentSlotName { get; set; }
+        public WeaponState Weapon { get; set; }
+    }
+
+    private sealed class LocalAgentState
+    {
+        public bool Success { get; set; }
+        public string LocalRole { get; set; }
+        public string LocalControllerId { get; set; }
+        public string BattleInstanceId { get; set; }
+        public string AgentId { get; set; }
+        public int AgentIndex { get; set; }
+        public bool LocallyControlled { get; set; }
+        public string CurrentAuthority { get; set; }
+        public string OriginalOwner { get; set; }
+        public WeaponSlotState[] WeaponSlots { get; set; }
+    }
+
     private sealed class SnapshotState
     {
         public bool Success { get; set; }
@@ -114,6 +135,67 @@ internal static class WeaponDropBaselineDebugCommands
             }
 
             return Succeeded("LIVE_TEST_JSON=" + JsonConvert.SerializeObject(snapshot));
+        }
+    }
+
+    public sealed class LocalCoopCommand : ICoopCommand
+    {
+        public string Prefix => "coop.debug.weapon_drop";
+
+        public string Name => "local";
+
+        public string Description => "Reports the locally controlled main agent and weapon slots.";
+
+        public CoopCommandSide Side => CoopCommandSide.Client;
+
+        public IExpectedArgs[] ExpectedArgs { get; } = Array.Empty<IExpectedArgs>();
+
+        public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
+        {
+            if (!TryGetActiveBattle(out Mission mission, out CoopBattleController controller, out string error))
+                return Failed(error);
+            if (!ContainerProvider.TryResolve<INetworkAgentRegistry>(out var agentRegistry) ||
+                !ContainerProvider.TryResolve<IObjectManager>(out var objectManager))
+            {
+                return Failed("WEAPON_DROP_LOCAL required mission services are unavailable");
+            }
+
+            Agent agent = Agent.Main;
+            if (agent == null || !agent.IsActive() || agent.Mission != mission || agent.Equipment == null)
+                return Failed("WEAPON_DROP_LOCAL no active main agent");
+            if (!agentRegistry.TryGetAgentInfo(agent, out CoopAgentInfo agentInfo) ||
+                !agentRegistry.IsLocallyControlled(agentInfo.AgentId))
+            {
+                return Failed("WEAPON_DROP_LOCAL main agent is not locally controlled");
+            }
+
+            var state = new LocalAgentState
+            {
+                Success = true,
+                LocalRole = ModInformation.IsServer ? "server" : "client",
+                LocalControllerId = controller.Session.OwnControllerId,
+                BattleInstanceId = Convert.ToString(controller.Session.InstanceId, CultureInfo.InvariantCulture),
+                AgentId = agentInfo.AgentId.ToString("D"),
+                AgentIndex = agent.Index,
+                LocallyControlled = true,
+                CurrentAuthority = agentInfo.CurrentAuthority,
+                OriginalOwner = agentInfo.OriginalOwner,
+                WeaponSlots = Enumerable.Range(
+                        (int)EquipmentIndex.WeaponItemBeginSlot,
+                        (int)EquipmentIndex.NumAllWeaponSlots - (int)EquipmentIndex.WeaponItemBeginSlot)
+                    .Select(index =>
+                    {
+                        EquipmentIndex equipmentIndex = (EquipmentIndex)index;
+                        return new WeaponSlotState
+                        {
+                            EquipmentSlot = index,
+                            EquipmentSlotName = equipmentIndex.ToString(),
+                            Weapon = CaptureWeapon(agent.Equipment[equipmentIndex], objectManager),
+                        };
+                    })
+                    .ToArray(),
+            };
+            return Succeeded("LIVE_TEST_JSON=" + JsonConvert.SerializeObject(state));
         }
     }
 
