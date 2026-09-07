@@ -1,4 +1,4 @@
-﻿using Common;
+using Common;
 using Common.Commands;
 using System;
 using System.Collections;
@@ -127,7 +127,7 @@ public class LiveTestCommandDispatcher : ILiveTestCommandDispatcher
                 {
                     ICoopCommandArgs commandArgs = argsFactory.FromValues(arguments);
                     CoopCommandResult commandResult = commandRegistry.ProcessCommand(command, commandArgs);
-                    result = new LiveTestCommandResult(true, commandResult.Output);
+                    result = new LiveTestCommandResult(true, commandResult.Output, commandResult.Succeeded, commandResult.ErrorCode);
                     return;
                 }
 
@@ -155,13 +155,19 @@ public class LiveTestCommandDispatcher : ILiveTestCommandDispatcher
 
 public class LiveTestCommandResult
 {
-    public LiveTestCommandResult(bool found, string output)
+    public LiveTestCommandResult(bool found, string output, bool? succeeded = null, string errorCode = null)
     {
         Found = found;
         Output = output;
+        Succeeded = succeeded;
+        ErrorCode = errorCode;
     }
 
     public bool Found { get; }
 
     public string Output { get; }
+
+    public bool? Succeeded { get; }
+
+    public string ErrorCode { get; }
 }
