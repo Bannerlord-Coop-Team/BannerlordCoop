@@ -6,6 +6,7 @@ using GameInterface.Services.Alleys.Interfaces;
 using GameInterface.Services.Alleys.Messages;
 using GameInterface.Services.Heroes.Extensions;
 using GameInterface.Services.ObjectManager;
+using GameInterface.Services.Clans.Messages;
 using GameInterface.Services.TroopRosters.Data;
 using Serilog;
 using System;
@@ -339,6 +340,9 @@ internal class AlleyManagementHandler : IHandler
             data.OverseerId,
             data.Garrison,
             data.LastRecruitTimeTicks));
+        if (objectManager.TryGetObjectWithLogging<Alley>(alleyId, out var alley))
+            messageBroker.Publish(this, new ClanManagementChanged(alley.Owner?.Clan,
+                ClanManagementRefresh.Income | ClanManagementRefresh.Members));
     }
 
     private void Handle_NetworkAlleyManagementRemoved(MessagePayload<NetworkAlleyManagementRemoved> payload)

@@ -17,6 +17,7 @@ using WarehouseOwnerChangedEvent = GameInterface.Services.Workshops.Messages.Wor
 using System.Collections.Generic;
 using System.Linq;
 using TaleWorlds.CampaignSystem;
+using TaleWorlds.CampaignSystem.Actions;
 using TaleWorlds.CampaignSystem.CampaignBehaviors;
 using TaleWorlds.CampaignSystem.Roster;
 using TaleWorlds.CampaignSystem.Settlements;
@@ -80,7 +81,7 @@ public class WorkshopPurchaseConversationTests : IDisposable
         }
 
         AssertClanWorkshopDataReadyForClanMenu(client, state);
-        AssertWorkshopRefreshesFor(state.SellerId, state.BuyerId);
+        AssertWorkshopRefreshesFor(state.BuyerId);
     }
 
     [Fact]
@@ -139,6 +140,27 @@ public class WorkshopPurchaseConversationTests : IDisposable
         }
 
         AssertClanWorkshopDataReadyForClanMenu(client, state);
+        AssertWorkshopRefreshesFor(state.BuyerId);
+    }
+
+    [Fact]
+    public void ServerConfiscatesWorkshop_RefreshesFormerOwnersClanWithoutPurchaseRequest()
+    {
+        var state = CreatePurchaseState(workshopOwnedByBuyer: true, buyerGold: 600, sellerGold: 400);
+        Server.Call(() =>
+        {
+            var workshop = Server.GetRegisteredObject<Workshop>(state.WorkshopId);
+            var newOwner = Server.GetRegisteredObject<Hero>(state.SellerId);
+            ChangeOwnerOfWorkshopAction.ApplyByWar(workshop, newOwner, workshop.WorkshopType);
+        });
+
+        AssertWorkshopRefreshesFor(state.BuyerId);
+        Assert.Empty(Server.NetworkSentMessages.GetMessages<ChangeWorkshopOwner>());
+        foreach (var client in Clients)
+        {
+            client.Call(() => Assert.Same(client.GetRegisteredObject<Hero>(state.SellerId),
+                client.GetRegisteredObject<Workshop>(state.WorkshopId).Owner));
+        }
     }
 
     private static void ObserveOwnerChangeDispatch(Workshop workshop, Hero oldOwner)
@@ -217,7 +239,7 @@ public class WorkshopPurchaseConversationTests : IDisposable
             AssertHeroGold(environmentClient, secondBuyerId, 1000);
         }
 
-        AssertWorkshopRefreshesFor(state.SellerId, state.BuyerId, state.BuyerId, secondBuyerId);
+        AssertWorkshopRefreshesFor(state.BuyerId, secondBuyerId);
     }
 
     [Fact]
@@ -344,14 +366,15 @@ public class WorkshopPurchaseConversationTests : IDisposable
         instance.Call(() =>
         {
             instance.Resolve<IControllerIdProvider>().SetControllerId(controllerId);
+            Assert.True(instance.ObjectManager.TryGetObject<Hero>(buyerId, out var buyer));
+            Assert.True(instance.ObjectManager.TryGetId(buyer.Clan, out var clanId));
             Assert.True(instance.Resolve<IPlayerManager>().AddPlayer(new Player(
                 controllerId,
                 buyerId,
                 string.Empty,
-                string.Empty,
+                clanId,
                 string.Empty)));
 
-            Assert.True(instance.ObjectManager.TryGetObject<Hero>(buyerId, out var buyer));
             using (new AllowedThread())
             {
                 Game.Current.PlayerTroop = buyer.CharacterObject;
@@ -404,6 +427,8 @@ public class WorkshopPurchaseConversationTests : IDisposable
 
     private void AssertWorkshopRefreshesFor(params string[] heroIds)
     {
+        Server.PumpGameThread();
+        foreach (var client in Clients) client.PumpGameThread();
         Server.Call(() =>
         {
             var expectedClanIds = heroIds.Select(heroId =>
@@ -412,10 +437,12 @@ public class WorkshopPurchaseConversationTests : IDisposable
                 Assert.True(Server.ObjectManager.TryGetId(hero.Clan, out var clanId));
                 return clanId;
             }).OrderBy(id => id).ToArray();
-            var actualClanIds = Server.NetworkSentMessages.GetMessages<NetworkRefreshWorkshopsList>()
+            var actualClanIds = Server.NetworkSentMessages.GetMessages<NetworkRefreshClanManagement>()
+                .Where(message => (message.Sections & ClanManagementRefresh.Income) != 0)
                 .Select(message => message.ClanId).OrderBy(id => id).ToArray();
 
             Assert.Equal(expectedClanIds, actualClanIds);
+            Assert.Empty(Server.NetworkSentMessages.GetMessages<NetworkRefreshWorkshopsList>());
         });
     }
 

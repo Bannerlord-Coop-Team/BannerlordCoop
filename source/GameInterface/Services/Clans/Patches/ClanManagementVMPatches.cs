@@ -1,4 +1,5 @@
 ﻿using HarmonyLib;
+using SandBox.GauntletUI;
 using SandBox.View.Map;
 using System;
 using TaleWorlds.CampaignSystem;
@@ -32,6 +33,27 @@ internal static class ClanManagementVMPatches
         __instance.PlayerCanChangeClanName = canManage &&
             __instance.GetPlayerCanChangeClanNameWithReason(out disabledReason);
         __instance.ChangeClanNameHint = new HintViewModel(disabledReason);
+    }
+
+    [HarmonyPatch(typeof(ClanManagementVM), nameof(ClanManagementVM.RefreshDailyValues))]
+    [HarmonyPostfix]
+    public static void RefreshDailyValuesPostfix(ClanManagementVM __instance)
+    {
+        // Use clan leader's gold for clan finances
+        __instance.CurrentGold = __instance._clan.Leader.Gold;
+        __instance.ExpectedGold = __instance.CurrentGold + __instance.DailyChange;
+    }
+
+    [HarmonyPatch(typeof(GauntletClanScreen), nameof(GauntletClanScreen.OnFrameTick))]
+    [HarmonyPrefix]
+    public static bool OnFrameTickPrefix(GauntletClanScreen __instance)
+    {
+        var vm = __instance._dataSource;
+        if (vm == null || vm._clan == Hero.MainHero.Clan) return true;
+
+        // The viewed clan is no longer this client's clan. Close the VM
+        vm.ExecuteClose();
+        return false;
     }
 
     [HarmonyPatch(typeof(ClanManagementVM), nameof(ClanManagementVM.ExecuteOpenBannerEditor))]

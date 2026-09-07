@@ -83,21 +83,13 @@ internal class ChangeOwnerOfWorkshopHandler : IHandler
                 return;
             }
 
-            ChangeOwnerOfWorkshopActionPatches.ApplyInternalOverride(workshop, newOwner, workshopType, data.Capital, data.Cost,
-                () =>
-                {
-                    SendWorkshopRefresh(currentOwner);
-                    SendWorkshopRefresh(newOwner);
-                });
+            ChangeOwnerOfWorkshopActionPatches.ApplyInternalOverride(workshop, newOwner, workshopType, data.Capital, data.Cost);
         }, context: nameof(ChangeOwnerOfWorkshopHandler));
     }
 
     private void SendWorkshopRefresh(Hero owner)
     {
         if (owner.Clan == null) return;
-        if (!objectManager.TryGetIdWithLogging(owner.Clan, out var clanId)) return;
-
-        // ClanManagementVM when selling a workshop, also used when changing type of workshop
-        network.SendAll(new NetworkRefreshWorkshopsList(clanId));
+        messageBroker.Publish(this, new ClanManagementChanged(owner.Clan, ClanManagementRefresh.Income));
     }
 }

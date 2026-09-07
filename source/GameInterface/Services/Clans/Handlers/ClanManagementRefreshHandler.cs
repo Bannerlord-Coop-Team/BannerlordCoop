@@ -1,10 +1,16 @@
 ﻿using Common;
 using Common.Messaging;
+using Common.Network;
+using Common.Network.Coalescing;
+using GameInterface.Services.Clans.Extensions;
 using GameInterface.Services.Clans.Messages;
 using GameInterface.Services.ObjectManager;
 using SandBox.GauntletUI;
+using System.Collections.Generic;
+using System.Linq;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Party;
+using TaleWorlds.CampaignSystem.ViewModelCollection;
 using TaleWorlds.ScreenSystem;
 
 namespace GameInterface.Services.Clans.Handlers;
@@ -13,12 +19,24 @@ internal class ClanManagementRefreshHandler : IHandler
 {
     private readonly IMessageBroker messageBroker;
     private readonly IObjectManager objectManager;
+    private readonly INetwork network;
+    private readonly ISendCoalescer sendCoalescer;
+    private readonly Dictionary<Clan, ClanManagementRefresh> pendingRefreshes = new();
 
-    public ClanManagementRefreshHandler(IMessageBroker messageBroker, IObjectManager objectManager)
+    public ClanManagementRefreshHandler(
+        IMessageBroker messageBroker,
+        IObjectManager objectManager,
+        INetwork network,
+        ISendCoalescer sendCoalescer = null)
     {
         this.messageBroker = messageBroker;
         this.objectManager = objectManager;
+        this.network = network;
+        this.sendCoalescer = sendCoalescer;
 
+        messageBroker.Subscribe<ClanManagementChanged>(Handle_ClanManagementChanged);
+
+        messageBroker.Subscribe<NetworkRefreshClanManagement>(Handle_NetworkRefreshClanManagement);
         messageBroker.Subscribe<NetworkRefreshPartiesList>(Handle_NetworkRefreshPartiesList);
         messageBroker.Subscribe<NetworkRefreshWorkshopsList>(Handle_NetworkRefreshWorkshopsList);
         messageBroker.Subscribe<NetworkRefreshClanMembersList>(Handle_NetworkRefreshClanMembersList);
@@ -27,42 +45,125 @@ internal class ClanManagementRefreshHandler : IHandler
 
     public void Dispose()
     {
+        pendingRefreshes.Clear();
+        messageBroker.Unsubscribe<ClanManagementChanged>(Handle_ClanManagementChanged);
+
+        messageBroker.Unsubscribe<NetworkRefreshClanManagement>(Handle_NetworkRefreshClanManagement);
         messageBroker.Unsubscribe<NetworkRefreshPartiesList>(Handle_NetworkRefreshPartiesList);
         messageBroker.Unsubscribe<NetworkRefreshWorkshopsList>(Handle_NetworkRefreshWorkshopsList);
         messageBroker.Unsubscribe<NetworkRefreshClanMembersList>(Handle_NetworkRefreshClanMembersList);
         messageBroker.Unsubscribe<NetworkRefreshAfterRoleAssignment>(Handle_NetworkRefreshAfterRoleAssignment);
     }
 
-    private void Handle_NetworkRefreshPartiesList(MessagePayload<NetworkRefreshPartiesList> obj)
+    private void Handle_ClanManagementChanged(MessagePayload<ClanManagementChanged> obj)
     {
+        if (ModInformation.IsClient) return;
+
         GameThread.RunSafe(() =>
         {
-            if (!CheckClanAndTopScreen(obj.What.ClanId, out var clanScreen)) return;
+            var clan = obj.What.Clan;
+            if (!clan.IsPlayerClan()) return;
 
-            clanScreen._dataSource?.ClanParties?.RefreshPartiesList();
-            clanScreen._dataSource?.ClanMembers?.RefreshMembersList(); // Needed to refresh clan members who can be party leaders
-        }, context: "ClanRefresh.Parties");
+            bool scheduleRefresh = pendingRefreshes.Count == 0;
+            pendingRefreshes.TryGetValue(clan, out var sections);
+
+            // Optimisation: Combines refresh categories for each clan to avoid duplicate messages
+            pendingRefreshes[clan] = sections | obj.What.Sections;
+
+            // Enqueuing means the refresh messages are sent after the current queue is complete
+            // This allows pending actions to be completed before clients get updated VMs
+            if (scheduleRefresh)
+                GameThread.EnqueueSafe(SendPendingRefreshes);
+        });
+    }
+
+    private void SendPendingRefreshes()
+    {
+        if (pendingRefreshes.Count == 0) return;
+        var refreshes = pendingRefreshes.ToArray();
+        pendingRefreshes.Clear();
+
+        // Send buffered changes before the UI reads the resulting state
+        sendCoalescer?.Flush(network);
+
+        foreach (var refresh in refreshes)
+        {
+            if (objectManager.TryGetIdWithLogging(refresh.Key, out var clanId))
+                network.SendAll(new NetworkRefreshClanManagement(clanId, refresh.Value));
+        }
+    }
+
+    private void Handle_NetworkRefreshClanManagement(MessagePayload<NetworkRefreshClanManagement> obj)
+    {
+        Refresh(obj.What.ClanId, obj.What.Sections);
+    }
+
+    private void Handle_NetworkRefreshPartiesList(MessagePayload<NetworkRefreshPartiesList> obj)
+    {
+        Refresh(obj.What.ClanId, ClanManagementRefresh.Parties | ClanManagementRefresh.Members);
     }
 
     private void Handle_NetworkRefreshWorkshopsList(MessagePayload<NetworkRefreshWorkshopsList> obj)
     {
-        GameThread.RunSafe(() =>
-        {
-            if (!CheckClanAndTopScreen(obj.What.ClanId, out var clanScreen)) return;
-
-            clanScreen._dataSource?.ClanIncome?.RefreshList();
-        }, context: "ClanRefresh.Workshops");
+        Refresh(obj.What.ClanId, ClanManagementRefresh.Income);
     }
 
     private void Handle_NetworkRefreshClanMembersList(MessagePayload<NetworkRefreshClanMembersList> obj)
     {
+        Refresh(obj.What.ClanId, ClanManagementRefresh.Members);
+    }
+
+    private void Refresh(string clanId, ClanManagementRefresh sections)
+    {
         GameThread.RunSafe(() =>
         {
-            if (!CheckClanAndTopScreen(obj.What.ClanId, out var clanScreen)) return;
+            // Check this client is looking at the updated clan
+            if (!CheckClanAndTopScreen(clanId, out var clanScreen)) return;
+            var vm = clanScreen._dataSource;
+            if (vm == null) return;
 
-            clanScreen._dataSource?.ClanMembers?.RefreshMembersList();
-            clanScreen._dataSource?.ClanFiefs?.RefreshAllLists(); // Needed to refresh governors
-        }, context: "ClanRefresh.Members");
+            // Close the VM if the client is no longer a part of this clan
+            if (vm._clan != Hero.MainHero.Clan)
+            {
+                vm.ExecuteClose();
+                return;
+            }
+
+            var selectedParty = vm.ClanParties.CurrentSelectedParty?.Party;
+
+            if ((sections & ClanManagementRefresh.Identity) != 0)
+            {
+                vm.Leader = new HeroVM(vm._clan.Leader);
+                vm.UpdateKingdomRelatedProperties();
+            }
+            if ((sections & ClanManagementRefresh.Members) != 0)
+            {
+                var selectedHero = vm.ClanMembers.CurrentSelectedMember?.GetHero();
+                vm.ClanMembers.RefreshMembersList();
+                vm.ClanFiefs.RefreshAllLists();
+                if (selectedHero != null) vm.ClanMembers.SelectMember(selectedHero);
+            }
+            if ((sections & ClanManagementRefresh.Parties) != 0)
+            {
+                vm.ClanParties.RefreshPartiesList();
+            }
+            if ((sections & (ClanManagementRefresh.Parties | ClanManagementRefresh.Identity)) != 0)
+            {
+                var partyItem = vm.ClanParties.Parties.Concat(vm.ClanParties.Caravans)
+                    .Concat(vm.ClanParties.Garrisons).FirstOrDefault(item => item.Party == selectedParty);
+                if (partyItem != null) vm.ClanParties.OnPartySelection(partyItem);
+            }
+            if ((sections & ClanManagementRefresh.Income) != 0)
+            {
+                var selectedWorkshop = vm.ClanIncome.CurrentSelectedIncome?.Workshop;
+                var selectedAlley = vm.ClanIncome.CurrentSelectedAlley?.Alley;
+                vm.ClanIncome.RefreshList();
+                if (selectedWorkshop != null) vm.ClanIncome.SelectWorkshop(selectedWorkshop);
+                if (selectedAlley != null) vm.ClanIncome.SelectAlley(selectedAlley);
+            }
+
+            vm.RefreshDailyValues();
+        }, context: "ClanRefresh.Management");
     }
 
     private void Handle_NetworkRefreshAfterRoleAssignment(MessagePayload<NetworkRefreshAfterRoleAssignment> obj)
@@ -90,7 +191,7 @@ internal class ClanManagementRefreshHandler : IHandler
         if (clanScreen == null) return false;
 
         if (!objectManager.TryGetObjectWithLogging<Clan>(clanId, out var clan)) return false;
-        if (clan != Clan.PlayerClan) return false;
+        if (clan != clanScreen._dataSource?._clan && clan != Clan.PlayerClan) return false;
 
         return true;
     }
