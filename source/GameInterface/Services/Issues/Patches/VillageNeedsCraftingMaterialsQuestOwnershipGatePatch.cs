@@ -5,10 +5,7 @@ using GameInterface.Services.Issues.Generic.Migrated.VillageNeedsCraftingMateria
 using GameInterface.Services.Issues.Interfaces;
 using GameInterface.Services.Issues.Messages;
 using HarmonyLib;
-using Helpers;
 using TaleWorlds.CampaignSystem.Issues;
-using TaleWorlds.CampaignSystem.MapEvents;
-using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.Localization;
 
 namespace GameInterface.Services.Issues.Patches;
@@ -20,17 +17,6 @@ internal class VillageNeedsCraftingMaterialsQuestFailBranchObserverPatches
     [HarmonyPrefix]
     private static void OnTimedOutPrefix(VillageNeedsCraftingMaterialsIssueBehavior.VillageNeedsCraftingMaterialsIssueQuest __instance) =>
         VillageNeedsCraftingMaterialsQuestType.ObserveQuestFail(__instance, VillageNeedsCraftingMaterialsQuestType.ProofFailTimeout);
-
-    [HarmonyPatch("OnMapEventStarted")]
-    [HarmonyPrefix]
-    private static void OnMapEventStartedPrefix(
-        VillageNeedsCraftingMaterialsIssueBehavior.VillageNeedsCraftingMaterialsIssueQuest __instance, MapEvent mapEvent, PartyBase attackerParty)
-    {
-        if (QuestHelper.CheckMinorMajorCoercion(__instance, mapEvent, attackerParty))
-        {
-            VillageNeedsCraftingMaterialsQuestType.ObserveQuestFail(__instance, VillageNeedsCraftingMaterialsQuestType.ProofFailCoercion);
-        }
-    }
 }
 
 [HarmonyPatch(typeof(VillageNeedsCraftingMaterialsIssueBehavior.VillageNeedsCraftingMaterialsIssueQuest), "CompleteQuestClickableConditions")]

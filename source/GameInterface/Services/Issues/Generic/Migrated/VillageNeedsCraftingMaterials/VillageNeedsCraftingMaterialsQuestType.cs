@@ -285,6 +285,16 @@ internal static class VillageNeedsCraftingMaterialsQuestType
         }
     }
 
+    private static void ApplyQuestFailLocalOwnerConsequence(Quest quest, byte proof)
+    {
+        if (proof != ProofFailCoercion) return;
+
+        TraitLevelingHelper.OnIssueSolvedThroughAlternativeSolution(Hero.MainHero, new Tuple<TraitObject, int>[1]
+        {
+            new Tuple<TraitObject, int>(DefaultTraits.Honor, -50)
+        });
+    }
+
     static VillageNeedsCraftingMaterialsQuestType()
     {
         var descriptor = QuestDescriptorBuilder.For<Issue, Quest>("VillageNeedsCraftingMaterials")
@@ -298,6 +308,7 @@ internal static class VillageNeedsCraftingMaterialsQuestType
             .WithQuestFailValidation(ValidateQuestFail)
             .WithQuestFailProofCapture(CaptureQuestFailProof)
             .WithQuestFailConsequence(ApplyQuestFailConsequence)
+            .WithQuestFailLocalOwnerConsequence(ApplyQuestFailLocalOwnerConsequence)
             .Build();
 
         QuestTypeRegistry.Register(descriptor);

@@ -207,7 +207,7 @@ internal class IssueFinalizationHandler : IHandler
             return;
         }
 
-        if (owner.Issue?.IssueQuest is not { IsOngoing: true })
+        if (owner.Issue?.IssueQuest is not { IsOngoing: true } quest)
         {
             Logger.Error("Rejecting the host's own {Message} claiming {Reason} for owner {Owner} - no ongoing quest to finalize",
                 nameof(QuestTerminalOutcomeTriggered), reason, ownerId);
@@ -240,7 +240,12 @@ internal class IssueFinalizationHandler : IHandler
             return;
         }
 
-        FinalizeAndBroadcast(owner, ownerId, player, reason, proof);
+        if (!FinalizeAndBroadcast(owner, ownerId, player, reason, proof)) return;
+
+        if (reason == IssueFinalizeReason.QuestFail)
+        {
+            descriptor?.ApplyQuestFailLocalOwnerConsequence?.Invoke(quest, proof);
+        }
     }
 
     private bool FinalizeAndBroadcast(Hero owner, string ownerId, Player player, IssueFinalizeReason reason, byte proof = 0)
@@ -511,6 +516,10 @@ internal class IssueFinalizationHandler : IHandler
             if (isLocalPeerOwner && reason == IssueFinalizeReason.QuestSuccess && quest != null)
             {
                 descriptor?.ApplyQuestSuccessLocalOwnerConsequence?.Invoke(quest);
+            }
+            else if (isLocalPeerOwner && reason == IssueFinalizeReason.QuestFail && quest != null)
+            {
+                descriptor?.ApplyQuestFailLocalOwnerConsequence?.Invoke(quest, proof);
             }
         });
     }
