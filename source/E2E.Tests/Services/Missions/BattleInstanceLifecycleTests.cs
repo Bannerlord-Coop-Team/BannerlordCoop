@@ -10,6 +10,7 @@ using Missions.Agents;
 using Missions.Battles;
 using Missions.Messages;
 using Missions.Services.Network;
+using Moq;
 using TaleWorlds.MountAndBlade;
 using Xunit;
 using Xunit.Abstractions;
@@ -39,13 +40,15 @@ public class BattleInstanceLifecycleTests : MissionTestEnvironment
                 client.Resolve<IBattleHostRegistry>());
             session.TryBegin(mapEventId);
             var worldItemRegistry = new RecordingWorldItemRegistry();
+            var missionComponent = new Mock<ICoopMissionComponent>();
+            missionComponent.SetupGet(c => c.AgentRegistry).Returns(Mock.Of<INetworkAgentRegistry>());
 
             using var lifecycle = new BattleInstanceLifecycle(
                 client.Resolve<IBattleNetwork>(),
                 client.Resolve<INetwork>(),
                 broker,
                 objectManager: null,
-                coopMissionComponent: null,
+                coopMissionComponent: missionComponent.Object,
                 worldItemRegistry: worldItemRegistry,
                 session: session,
                 missionContext: context);

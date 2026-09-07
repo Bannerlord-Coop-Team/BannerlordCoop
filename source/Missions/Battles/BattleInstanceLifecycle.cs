@@ -24,8 +24,8 @@ public interface IBattleInstanceLifecycle : IDisposable
 {
     /// <summary>
     /// Tear the instance down on mission end: end the spawn gate, clear this battle's troop suppliers,
-    /// announce MissionLeft over the relay, stop the mesh socket, and clear the local mission-membership
-    /// mirror so a stale roster cannot survive into a later re-entry.
+    /// announce MissionLeft over the relay, stop the mesh socket, clear the world-item and agent registries,
+    /// and clear the local mission-membership mirror so a stale roster cannot survive into a later re-entry.
     /// </summary>
     void Leave();
 }
@@ -120,6 +120,11 @@ public class BattleInstanceLifecycle : IBattleInstanceLifecycle
 
         network.Stop();
         worldItemRegistry.Clear();
+
+        // Release this battle's agents here rather than leaving them to the next mission's entry path, because
+        // the registry outlives the mission and would otherwise keep wrappers around destroyed native agents
+        // reachable while the client is back on the campaign map.
+        coopMissionComponent.AgentRegistry.Clear();
 
         // Wipe the local membership mirror on our way out. Stopping the socket clears only the direct peer
         // mappings; the server-announced membership set (which the absent-controller sweep consults) would
