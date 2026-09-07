@@ -295,8 +295,10 @@ public class ServerMissionMembershipHandlerTests
         var request = new NetworkRequestMissionIntroduction(InstanceId, Guid.NewGuid());
 
         broker.Publish(unknownPeer, request);
+        DrainGameThread();
         Assert.Empty(network.SentNetworkMessages);
         broker.Publish(peer, request);
+        DrainGameThread();
 
         var reply = Assert.Single(network.GetPeerMessagesFromType<NetworkMissionIntroductionAuthorized>(peer));
         Assert.Equal(request.InstanceId, reply.InstanceId);
@@ -317,6 +319,7 @@ public class ServerMissionMembershipHandlerTests
         missionManager.HandleDisconnect(peer);
 
         broker.Publish(peer, new NetworkRequestMissionIntroduction(InstanceId, Guid.NewGuid()));
+        DrainGameThread();
 
         Assert.Empty(network.SentNetworkMessages);
     }

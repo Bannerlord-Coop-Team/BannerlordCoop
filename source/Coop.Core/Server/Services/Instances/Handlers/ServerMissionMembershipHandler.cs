@@ -66,12 +66,19 @@ public class ServerMissionMembershipHandler : IHandler
 
     private void Handle_RequestMissionIntroduction(MessagePayload<NetworkRequestMissionIntroduction> payload)
     {
+        if (payload.Who is not NetPeer peer)
+            return;
+
         var request = payload.What;
-        if (payload.Who is NetPeer peer && TryGetCurrentController(peer, out var controllerId) &&
-            missionManager.TryAuthorizeIntroduction(peer, controllerId, request.InstanceId, request.RequestId, out var token))
+        // Keep a previous visit's queued leave ahead of the next visit's authorization.
+        GameThread.RunSafe(() =>
         {
-            network.Send(peer, new NetworkMissionIntroductionAuthorized(request.InstanceId, request.RequestId, token));
-        }
+            if (TryGetCurrentController(peer, out var controllerId) &&
+                missionManager.TryAuthorizeIntroduction(peer, controllerId, request.InstanceId, request.RequestId, out var token))
+            {
+                network.Send(peer, new NetworkMissionIntroductionAuthorized(request.InstanceId, request.RequestId, token));
+            }
+        }, context: nameof(Handle_RequestMissionIntroduction));
     }
 
     private void Handle_MissionEntered(MessagePayload<NetworkMissionEntered> payload)

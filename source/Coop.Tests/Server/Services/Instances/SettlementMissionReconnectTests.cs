@@ -17,6 +17,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Net;
 using System.Reflection;
+using System.Threading;
 using Xunit;
 
 namespace Coop.Tests.Server.Services.Instances;
@@ -153,6 +154,62 @@ public class SettlementMissionReconnectTests
             CapturedIntroductions.Clear();
             harmony.Unpatch(natIntroduce, HarmonyPatchType.Prefix, harmony.Id);
         }
+    }
+
+    [Fact]
+    public void SameInstanceReentry_AuthorizationSurvivesQueuedPreviousLeave()
+    {
+        var peer = CreatePeer(4);
+        var messageBroker = new TestMessageBroker();
+        var network = new TestNetwork();
+        var playerManager = new Mock<IPlayerManager>();
+        RegisterIdentity(playerManager, peer, "A");
+        var missionManager = new MissionManager(playerManager.Object);
+        using var handler = new ServerMissionMembershipHandler(
+            messageBroker, missionManager, network, playerManager.Object);
+        var oldRequestId = Guid.NewGuid();
+        messageBroker.Publish(peer, new NetworkRequestMissionIntroduction(InstanceId, oldRequestId));
+        messageBroker.Publish(peer, new NetworkMissionEntered("A", InstanceId));
+        DrainGameThread();
+        var oldAuthorization = Assert.Single(
+            network.GetPeerMessagesFromType<NetworkMissionIntroductionAuthorized>(peer));
+
+        using var gameThreadBlocked = new ManualResetEventSlim(false);
+        using var releaseGameThread = new ManualResetEventSlim(false);
+        var newRequestId = Guid.NewGuid();
+        try
+        {
+            GameThread.Run(() =>
+            {
+                gameThreadBlocked.Set();
+                releaseGameThread.Wait();
+            });
+            Assert.True(gameThreadBlocked.Wait(TimeSpan.FromSeconds(10)));
+            messageBroker.Publish(peer, new NetworkMissionLeft("A", InstanceId));
+            messageBroker.Publish(peer, new NetworkRequestMissionIntroduction(InstanceId, newRequestId));
+            messageBroker.Publish(peer, new NetworkMissionEntered("A", InstanceId));
+        }
+        finally
+        {
+            releaseGameThread.Set();
+            DrainGameThread();
+        }
+
+        var newAuthorization = Assert.Single(
+            network.GetPeerMessagesFromType<NetworkMissionIntroductionAuthorized>(peer),
+            message => message.RequestId == newRequestId);
+        var nat = new NetManager(null).NatPunchModule;
+        var endpoint = Endpoint("198.51.100.4", 40004);
+        var instances = (Dictionary<string, MissionInstance>)typeof(MissionManager)
+            .GetField("byInstanceId", BindingFlags.NonPublic | BindingFlags.Instance)!
+            .GetValue(missionManager)!;
+        missionManager.HandleIntroductionRequest(nat, endpoint, endpoint, oldAuthorization.Token);
+        Assert.Empty(instances[InstanceId].PunchEndpoints);
+        missionManager.HandleIntroductionRequest(nat, endpoint, endpoint, newAuthorization.Token);
+        var punch = Assert.Single(instances[InstanceId].PunchEndpoints);
+        Assert.Equal(endpoint, punch.External);
+        Assert.True(missionManager.TryGetControllers(InstanceId, out var controllers));
+        Assert.Equal(new[] { "A" }, controllers);
     }
 
     private static bool CaptureNatIntroduction(
