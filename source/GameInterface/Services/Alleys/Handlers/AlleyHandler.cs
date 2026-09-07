@@ -6,6 +6,7 @@ using Common.Util;
 using GameInterface.Services.Alleys.Commands;
 using GameInterface.Services.Alleys.Interfaces;
 using GameInterface.Services.Alleys.Messages;
+using GameInterface.Services.Heroes.Extensions;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.TroopRosters.Data;
 using Serilog;
@@ -103,6 +104,27 @@ internal class AlleyHandler : IHandler
         if (data.NewOwner != null && !objectManager.TryGetIdWithLogging(data.NewOwner, out newOwnerId)) return;
 
         network.SendAll(new ChangeAlleyOwner(alleyId, newOwnerId));
+
+        if (data.NewOwner == null || !data.NewOwner.IsPlayerHero() ||
+            !sessionInterface.TryGetManagementData(alleyId, out var management)) return;
+
+        // Ownership changes between players need to update client data
+        var updateMessage = new NetworkAlleyManagementUpdated(
+            alleyId,
+            management.OverseerId,
+            management.Garrison,
+            management.LastRecruitTimeTicks);
+        network.SendAll(updateMessage);
+
+        if (management.UnderAttackByAlleyId != null)
+        {
+            var underAttackMessage = new NetworkAlleyUnderAttack(
+                alleyId,
+                management.UnderAttackByAlleyId,
+                management.AttackResponseDueDate,
+                showNotification: false);
+            network.SendAll(underAttackMessage);
+        }
     }
 
     private void Handle_ChangeAlleyOwner(MessagePayload<ChangeAlleyOwner> payload)

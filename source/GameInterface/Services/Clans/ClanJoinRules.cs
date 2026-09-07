@@ -5,6 +5,8 @@ using GameInterface.Services.Players;
 using System.Collections.Generic;
 using System.Linq;
 using TaleWorlds.CampaignSystem;
+using TaleWorlds.CampaignSystem.Actions;
+using TaleWorlds.CampaignSystem.Party.PartyComponents;
 using TaleWorlds.Core;
 using TaleWorlds.Localization;
 
@@ -74,10 +76,26 @@ public class ClanJoinRules : IClanJoinRules
 
     public void Apply(Hero joiningHero, Clan targetClan)
     {
-        // TODO: Apply asset and family rules on the server before changing the hero's clan.
+        var sourceClan = joiningHero.Clan;
+        if (sourceClan == targetClan) return;
+
+        var newLeader = targetClan.Leader;
+        var heroes = sourceClan.Heroes.ToArray();
+        var parties = sourceClan.WarPartyComponents.ToArray();
+
+        TransferFamilyMembers(sourceClan, targetClan, joiningHero);
+        TransferCompanions(sourceClan, targetClan);
+        TransferWorkshops(heroes, newLeader);
+        TransferCaravans(heroes, newLeader);
+        TransferParties(parties, targetClan);
+        TransferAlleys(heroes, newLeader);
+        TransferSupporters(sourceClan, targetClan);
+
         joiningHero.Clan = targetClan;
         if (joiningHero.PartyBelongedTo != null)
+        {
             joiningHero.PartyBelongedTo.ActualClan = targetClan;
+        }
 
         messageBroker.Publish(this, new PlayerBannerChanged(targetClan));
     }
@@ -86,5 +104,64 @@ public class ClanJoinRules : IClanJoinRules
     {
         if (count > 0)
             warnings.Add(GameTexts.FindText(textId).SetTextVariable("COUNT", count));
+    }
+
+    private void TransferFamilyMembers(Clan sourceClan, Clan targetClan, Hero joiningHero)
+    {
+        foreach (var familyMember in sourceClan.AliveLords.ToArray())
+        {
+            if (familyMember == joiningHero) continue;
+
+            familyMember.Clan = targetClan;
+        }
+    }
+
+    private void TransferCompanions(Clan sourceClan, Clan targetClan)
+    {
+        foreach (var companion in sourceClan.Companions.ToArray())
+        {
+            companion.CompanionOf = targetClan;
+        }
+    }
+
+    private void TransferWorkshops(Hero[] heroes, Hero newLeader)
+    {
+        foreach (var workshop in heroes.SelectMany(hero => hero.OwnedWorkshops).ToArray())
+        {
+            ChangeOwnerOfWorkshopAction.ApplyInternal(workshop, newLeader, workshop.WorkshopType, workshop.Capital, 0);
+            // TODO: Transfer warehouse player data
+        }
+    }
+
+    private void TransferCaravans(Hero[] heroes, Hero newLeader)
+    {
+        foreach (var caravan in heroes.SelectMany(hero => hero.OwnedCaravans).ToArray())
+        {
+            CaravanPartyComponent.TransferCaravanOwnership(caravan.MobileParty, newLeader, caravan.HomeSettlement);
+        }
+    }
+
+    private void TransferParties(WarPartyComponent[] parties, Clan targetClan)
+    {
+        foreach (var party in parties)
+        {
+            party.MobileParty.ActualClan = targetClan;
+        }
+    }
+
+    private void TransferAlleys(Hero[] heroes, Hero newLeader)
+    {
+        foreach (var alley in heroes.SelectMany(hero => hero.OwnedAlleys).ToArray())
+        {
+            alley.SetOwner(newLeader);
+        }
+    }
+
+    private void TransferSupporters(Clan sourceClan, Clan targetClan)
+    {
+        foreach (var supporter in sourceClan.SupporterNotables.ToArray())
+        {
+            supporter.SupporterOf = targetClan;
+        }
     }
 }
