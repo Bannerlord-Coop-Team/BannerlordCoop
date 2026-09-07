@@ -178,6 +178,18 @@ internal static class VillageNeedsCraftingMaterialsQuestType
         ObservedFailProof.Add(quest, proof);
     }
 
+    internal static void PublishTerminalOutcome(Hero owner, IssueFinalizeReason reason)
+    {
+        ContainerProvider.TryResolve<IControllerIdProvider>(out var controllerIdProvider);
+        MessageBroker.Instance.Publish(owner, new QuestTerminalOutcomeTriggered(owner, controllerIdProvider?.ControllerId, reason));
+    }
+
+    internal static void PublishQuestFail(Quest quest, byte proof)
+    {
+        ObserveQuestFail(quest, proof);
+        PublishTerminalOutcome(quest.QuestGiver, IssueFinalizeReason.QuestFail);
+    }
+
     private static byte CaptureQuestFailProof(Issue issue)
         => issue.IssueQuest is Quest quest && ObservedFailProof.TryGetValue(quest, out var proof) ? (byte)proof : (byte)0;
 

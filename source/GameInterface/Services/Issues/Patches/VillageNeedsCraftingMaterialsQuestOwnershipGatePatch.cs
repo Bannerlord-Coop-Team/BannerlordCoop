@@ -31,11 +31,6 @@ internal class VillageNeedsCraftingMaterialsQuestFailBranchObserverPatches
             VillageNeedsCraftingMaterialsQuestType.ObserveQuestFail(__instance, VillageNeedsCraftingMaterialsQuestType.ProofFailCoercion);
         }
     }
-
-    [HarmonyPatch("OnWarDeclared")]
-    [HarmonyPrefix]
-    private static void OnWarDeclaredPrefix(VillageNeedsCraftingMaterialsIssueBehavior.VillageNeedsCraftingMaterialsIssueQuest __instance) =>
-        VillageNeedsCraftingMaterialsQuestType.ObserveQuestFail(__instance, VillageNeedsCraftingMaterialsQuestType.ProofFailWar);
 }
 
 [HarmonyPatch(typeof(VillageNeedsCraftingMaterialsIssueBehavior.VillageNeedsCraftingMaterialsIssueQuest), "CompleteQuestClickableConditions")]

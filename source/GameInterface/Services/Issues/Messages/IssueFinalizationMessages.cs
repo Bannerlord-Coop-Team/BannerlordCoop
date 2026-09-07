@@ -40,6 +40,20 @@ public readonly struct QuestSuccessTriggered : IEvent
     }
 }
 
+public readonly struct QuestTerminalOutcomeTriggered : IEvent
+{
+    public readonly Hero Owner;
+    public readonly string ControllerId;
+    public readonly IssueFinalizeReason Reason;
+
+    public QuestTerminalOutcomeTriggered(Hero owner, string controllerId, IssueFinalizeReason reason)
+    {
+        Owner = owner;
+        ControllerId = controllerId;
+        Reason = reason;
+    }
+}
+
 [ProtoContract(SkipConstructor = true)]
 public readonly struct RequestIssueRemoved : ICommand
 {
