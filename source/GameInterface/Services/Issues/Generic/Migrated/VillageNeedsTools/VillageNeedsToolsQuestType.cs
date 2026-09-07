@@ -236,6 +236,57 @@ internal static class VillageNeedsToolsQuestType
         return objectManager.TryGetObjectWithLogging<Hero>(player.HeroId, out trueOwnerHero);
     }
 
+    internal const byte ProofFailWar = 1;
+
+    internal static void PublishTerminalOutcome(Hero owner, IssueFinalizeReason reason)
+    {
+        ContainerProvider.TryResolve<IControllerIdProvider>(out var controllerIdProvider);
+        MessageBroker.Instance.Publish(owner, new QuestTerminalOutcomeTriggered(owner, controllerIdProvider?.ControllerId, reason));
+    }
+
+    internal static void PublishQuestFail(Hero owner, byte proof)
+    {
+        QuestFailProofContext.Set(proof);
+        try
+        {
+            PublishTerminalOutcome(owner, IssueFinalizeReason.QuestFail);
+        }
+        finally
+        {
+            QuestFailProofContext.Set(0);
+        }
+    }
+
+    private static bool IsAtWarWithRecordedOwner(Issue issue)
+    {
+        if (!TryResolveTrueOwnerHero(issue.IssueOwner, out var trueOwnerHero)) return false;
+
+        var giverFaction = issue.IssueOwner.MapFaction;
+        var ownerFaction = trueOwnerHero.MapFaction;
+        return giverFaction != null && ownerFaction != null && giverFaction.IsAtWarWith(ownerFaction);
+    }
+
+    private static bool ValidateQuestFail(Issue issue) => QuestFailProofContext.Current switch
+    {
+        ProofFailWar => IsAtWarWithRecordedOwner(issue),
+        _ => false,
+    };
+
+    private static byte CaptureQuestFailProof(Issue issue) => QuestFailProofContext.Current;
+
+    private static void ApplyQuestFailConsequence(Quest quest)
+    {
+        switch (QuestFailProofContext.Current)
+        {
+            case ProofFailWar:
+                quest.CompleteQuestWithFail(quest.PlayerDeclaredWarQuestLogText);
+                return;
+            default:
+                quest.CompleteQuestWithFail();
+                return;
+        }
+    }
+
     private static void ApplyQuestSuccessLocalOwnerConsequence(Quest quest)
     {
         TraitLevelingHelper.OnIssueSolvedThroughQuest(Hero.MainHero, new Tuple<TraitObject, int>[1]
@@ -280,7 +331,9 @@ internal static class VillageNeedsToolsQuestType
             .WithQuestSuccessConsequence(ApplyQuestSuccessConsequence)
             .WithQuestSuccessLocalOwnerConsequence(ApplyQuestSuccessLocalOwnerConsequence)
             .WithQuestCancelValidation(ValidateQuestCancel)
-            .WithQuestFailValidation(issue => true)
+            .WithQuestFailValidation(ValidateQuestFail)
+            .WithQuestFailProofCapture(CaptureQuestFailProof)
+            .WithQuestFailConsequence(ApplyQuestFailConsequence)
             .Build();
 
         QuestTypeRegistry.Register(descriptor);

@@ -2,8 +2,10 @@ using Common.Messaging;
 using Common.Util;
 using E2E.Tests.Environment;
 using E2E.Tests.Environment.Instance;
+using E2E.Tests.Util;
 using GameInterface.Services.Entity;
 using GameInterface.Services.Issues.Generic;
+using GameInterface.Services.Issues.Generic.Migrated.VillageNeedsTools;
 using GameInterface.Services.Issues.Interfaces;
 using GameInterface.Services.Issues.Messages;
 using GameInterface.Services.Issues.Patches;
@@ -13,6 +15,7 @@ using GameInterface.Services.Players.Data;
 using HarmonyLib;
 using System.Reflection;
 using TaleWorlds.CampaignSystem;
+using TaleWorlds.CampaignSystem.Actions;
 using TaleWorlds.CampaignSystem.CharacterDevelopment;
 using TaleWorlds.CampaignSystem.Encyclopedia;
 using TaleWorlds.CampaignSystem.GameComponents;
@@ -34,6 +37,8 @@ public class VillageNeedsToolsIssueTests : IDisposable
         AccessTools.Property(typeof(GameModels), nameof(GameModels.CharacterDevelopmentModel));
     private static readonly PropertyInfo PlayerTraitDeveloperProperty =
         AccessTools.Property(typeof(Campaign), nameof(Campaign.PlayerTraitDeveloper));
+    private static readonly PropertyInfo DiplomacyModelProperty =
+        AccessTools.Property(typeof(GameModels), nameof(GameModels.DiplomacyModel));
 
     private static void InstallCharacterDevelopmentModel()
     {
@@ -46,6 +51,18 @@ public class VillageNeedsToolsIssueTests : IDisposable
 
         CharacterDevelopmentModelProperty.SetValue(models, new DefaultCharacterDevelopmentModel());
         PlayerTraitDeveloperProperty.SetValue(Campaign.Current, Campaign.Current.PlayerTraitDeveloper ?? new PropertyOwner<PropertyObject>());
+    }
+
+    private static void InstallDiplomacyModel()
+    {
+        var models = (GameModels)GameModelsField.GetValue(Campaign.Current);
+        if (models == null)
+        {
+            models = ObjectHelper.SkipConstructor<GameModels>();
+            GameModelsField.SetValue(Campaign.Current, models);
+        }
+
+        DiplomacyModelProperty.SetValue(models, new DefaultDiplomacyModel());
     }
 
     private E2ETestEnvironment TestEnvironment { get; }
@@ -560,16 +577,17 @@ public class VillageNeedsToolsIssueTests : IDisposable
     }
 
     [Fact]
-    public void RequestIssueRemoved_QuestFail_ClaimingThePlayerDeclaredWar_IsAccepted()
+    public void RequestIssueRemoved_QuestFail_ClaimingThePlayerDeclaredWar_IsAcceptedWhenGenuinelyAtWar()
     {
         var fixture = SetupVillageOwner();
         CreateIssueOnServer(fixture);
+        var ownerHeroId = CreateDistinctOwnerHero(fixture);
 
         var partyId = TestEnvironment.CreateRegisteredObject<MobileParty>();
         Server.Call(() =>
         {
             var playerManager = Server.Resolve<IPlayerManager>();
-            Assert.True(playerManager.AddPlayer(new Player("player-A", fixture.HeroId, partyId, "", "")));
+            Assert.True(playerManager.AddPlayer(new Player("player-A", ownerHeroId, partyId, "", "")));
         });
         TestEnvironment.ConnectRegisteredPlayer(Client, "player-A");
 
@@ -583,12 +601,14 @@ public class VillageNeedsToolsIssueTests : IDisposable
             Server.Resolve<IIssueOwnershipRegistry>().SetOwner(owner, "player-A");
         });
 
+        DeclareWarBetweenGiverAndOwner(Server, fixture, ownerHeroId);
+
         Server.Call(() =>
         {
             Assert.True(Server.ObjectManager.TryGetObject<Hero>(fixture.HeroId, out var owner));
             Assert.True(Server.Resolve<IIssueGenerationRegistry>().TryGetGeneration(owner, out var generation));
             Server.Resolve<IMessageBroker>().Publish(Client.NetPeer,
-                new RequestIssueRemoved(fixture.HeroId, IssueFinalizeReason.QuestFail, generation));
+                new RequestIssueRemoved(fixture.HeroId, IssueFinalizeReason.QuestFail, generation, VillageNeedsToolsQuestType.ProofFailWar));
         });
 
         var removed = Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkIssueRemoved>());
@@ -684,7 +704,7 @@ public class VillageNeedsToolsIssueTests : IDisposable
         }
     }
 
-    private string AcceptQuestFromClient(VillageFixture fixture, string ownerControllerId)
+    private string AcceptQuestFromClient(VillageFixture fixture, string ownerControllerId, string ownerHeroId = null)
     {
         var partyId = TestEnvironment.CreateRegisteredObject<MobileParty>();
         Server.Call(() =>
@@ -695,7 +715,7 @@ public class VillageNeedsToolsIssueTests : IDisposable
             {
                 party.CurrentSettlement = settlement;
             }
-            Assert.True(Server.Resolve<IPlayerManager>().AddPlayer(new Player(ownerControllerId, fixture.HeroId, partyId, "", "")));
+            Assert.True(Server.Resolve<IPlayerManager>().AddPlayer(new Player(ownerControllerId, ownerHeroId ?? fixture.HeroId, partyId, "", "")));
         });
         TestEnvironment.ConnectRegisteredPlayer(Client, ownerControllerId);
         Client.Resolve<IControllerIdProvider>().SetControllerId(ownerControllerId);
@@ -735,6 +755,181 @@ public class VillageNeedsToolsIssueTests : IDisposable
         var mapEvent = ObjectHelper.SkipConstructor<MapEvent>();
         mapEvent.MapEventSettlement = settlement;
         return new RaidEventComponent(mapEvent);
+    }
+
+    private string CreateDistinctOwnerHero(VillageFixture fixture)
+    {
+        var ownerHeroId = TestEnvironment.CreateRegisteredObject<Hero>();
+        var giverClanId = TestEnvironment.CreateRegisteredObject<Clan>();
+        var ownerClanId = TestEnvironment.CreateRegisteredObject<Clan>();
+
+        foreach (var instance in AllInstances)
+        {
+            instance.Call(() =>
+            {
+                Assert.True(instance.ObjectManager.TryGetObject<Hero>(fixture.HeroId, out var giver));
+                Assert.True(instance.ObjectManager.TryGetObject<Hero>(ownerHeroId, out var ownerHero));
+                Assert.True(instance.ObjectManager.TryGetObject<Clan>(giverClanId, out var giverClan));
+                Assert.True(instance.ObjectManager.TryGetObject<Clan>(ownerClanId, out var ownerClan));
+                Assert.True(instance.ObjectManager.TryGetObject<Settlement>(fixture.SettlementId, out var settlement));
+                using (new AllowedThread())
+                {
+                    giver.Clan = giverClan;
+                    ownerHero.Clan = ownerClan;
+
+                    var boundTown = GameObjectCreator.CreateInitializedObject<Town>();
+                    settlement.Village.Bound.SetSettlementComponent(boundTown);
+                    boundTown.OwnerClan = giverClan;
+                }
+                Assert.Equal(giverClan, settlement.MapFaction);
+            });
+        }
+
+        return ownerHeroId;
+    }
+
+    private void DeclareWarBetweenGiverAndOwner(EnvironmentInstance instance, VillageFixture fixture, string ownerHeroId)
+    {
+        instance.Call(() =>
+        {
+            InstallDiplomacyModel();
+            Assert.True(instance.ObjectManager.TryGetObject<Hero>(fixture.HeroId, out var giver));
+            Assert.True(instance.ObjectManager.TryGetObject<Hero>(ownerHeroId, out var ownerHero));
+            using (new AllowedThread())
+            {
+                FactionManager.DeclareWar(giver.MapFaction, ownerHero.MapFaction);
+            }
+            Assert.True(giver.MapFaction.IsAtWarWith(ownerHero.MapFaction));
+        });
+    }
+
+    [Fact]
+    public void OnWarDeclared_PlayerCausedWar_FailsOnlyViaTheOwningClient_ServerAndNonOwnerNeverActLocally()
+    {
+        var fixture = SetupVillageOwner();
+        CreateIssueOnServer(fixture);
+        var ownerHeroId = CreateDistinctOwnerHero(fixture);
+        AcceptQuestFromClient(fixture, "player-A", ownerHeroId);
+
+        Client.Call(() =>
+        {
+            Assert.True(Client.ObjectManager.TryGetObject<Hero>(ownerHeroId, out var ownerHero));
+            Game.Current.PlayerTroop = ownerHero.CharacterObject;
+        });
+
+        DeclareWarBetweenGiverAndOwner(Server, fixture, ownerHeroId);
+        DeclareWarBetweenGiverAndOwner(Client, fixture, ownerHeroId);
+
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject<Hero>(fixture.HeroId, out var giver));
+            Assert.True(Server.ObjectManager.TryGetObject<Hero>(ownerHeroId, out var ownerHero));
+            CampaignEventDispatcher.Instance.OnWarDeclared(giver.MapFaction, ownerHero.MapFaction, DeclareWarAction.DeclareWarDetail.CausedByPlayerHostility);
+            Assert.NotNull(giver.Issue);
+            Assert.True(giver.Issue.IssueQuest.IsOngoing);
+        });
+        Assert.Empty(Server.NetworkSentMessages.GetMessages<NetworkIssueRemoved>());
+
+        OtherClient.Call(() =>
+        {
+            Assert.True(OtherClient.ObjectManager.TryGetObject<Hero>(fixture.HeroId, out var giver));
+            Assert.True(OtherClient.ObjectManager.TryGetObject<Hero>(ownerHeroId, out var ownerHero));
+            CampaignEventDispatcher.Instance.OnWarDeclared(giver.MapFaction, ownerHero.MapFaction, DeclareWarAction.DeclareWarDetail.CausedByPlayerHostility);
+            Assert.NotNull(giver.Issue);
+        });
+        Assert.Empty(OtherClient.NetworkSentMessages.GetMessages<RequestIssueRemoved>());
+
+        Client.Call(() =>
+        {
+            Assert.True(Client.ObjectManager.TryGetObject<Hero>(fixture.HeroId, out var giver));
+            Assert.True(Client.ObjectManager.TryGetObject<Hero>(ownerHeroId, out var ownerHero));
+            CampaignEventDispatcher.Instance.OnWarDeclared(giver.MapFaction, ownerHero.MapFaction, DeclareWarAction.DeclareWarDetail.CausedByPlayerHostility);
+        });
+
+        var removed = Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkIssueRemoved>());
+        Assert.Equal(fixture.HeroId, removed.OwnerId);
+        Assert.Equal(IssueFinalizeReason.QuestFail, removed.Reason);
+
+        foreach (var instance in AllInstances)
+        {
+            instance.Call(() =>
+            {
+                Assert.True(instance.ObjectManager.TryGetObject<Hero>(fixture.HeroId, out var giver));
+                Assert.Null(giver.Issue);
+                Assert.False(Campaign.Current.IssueManager.Issues.ContainsKey(giver));
+            });
+        }
+    }
+
+    [Fact]
+    public void OnWarDeclared_WarDeclaredOnTheOwner_CancelsInsteadOfFailing_WithNoExtraPenalty()
+    {
+        var fixture = SetupVillageOwner();
+        CreateIssueOnServer(fixture);
+        var ownerHeroId = CreateDistinctOwnerHero(fixture);
+        AcceptQuestFromClient(fixture, "player-A", ownerHeroId);
+
+        Client.Call(() =>
+        {
+            Assert.True(Client.ObjectManager.TryGetObject<Hero>(ownerHeroId, out var ownerHero));
+            Game.Current.PlayerTroop = ownerHero.CharacterObject;
+        });
+
+        DeclareWarBetweenGiverAndOwner(Server, fixture, ownerHeroId);
+        DeclareWarBetweenGiverAndOwner(Client, fixture, ownerHeroId);
+
+        float powerBefore = 0f;
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject<Hero>(fixture.HeroId, out var giver));
+            powerBefore = giver.Power;
+        });
+
+        Client.Call(() =>
+        {
+            Assert.True(Client.ObjectManager.TryGetObject<Hero>(fixture.HeroId, out var giver));
+            Assert.True(Client.ObjectManager.TryGetObject<Hero>(ownerHeroId, out var ownerHero));
+            CampaignEventDispatcher.Instance.OnWarDeclared(giver.MapFaction, ownerHero.MapFaction, DeclareWarAction.DeclareWarDetail.CausedByRebellion);
+        });
+
+        var removed = Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkIssueRemoved>());
+        Assert.Equal(IssueFinalizeReason.QuestCancel, removed.Reason);
+
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject<Hero>(fixture.HeroId, out var giver));
+            Assert.Null(giver.Issue);
+            Assert.Equal(powerBefore, giver.Power);
+        });
+    }
+
+    [Fact]
+    public void RequestIssueRemoved_ClaimingPlayerDeclaredWar_WithoutARealWarState_IsRejected()
+    {
+        var fixture = SetupVillageOwner();
+        CreateIssueOnServer(fixture);
+        var ownerHeroId = CreateDistinctOwnerHero(fixture);
+        AcceptQuestFromClient(fixture, "player-A", ownerHeroId);
+
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject<Hero>(fixture.HeroId, out var giver));
+            Assert.True(Server.ObjectManager.TryGetObject<Hero>(ownerHeroId, out var ownerHero));
+            Assert.False(giver.MapFaction.IsAtWarWith(ownerHero.MapFaction));
+
+            Assert.True(Server.Resolve<IIssueGenerationRegistry>().TryGetGeneration(giver, out var generation));
+            Server.Resolve<IMessageBroker>().Publish(Client.NetPeer,
+                new RequestIssueRemoved(fixture.HeroId, IssueFinalizeReason.QuestFail, generation, VillageNeedsToolsQuestType.ProofFailWar));
+        });
+
+        Assert.Empty(Server.NetworkSentMessages.GetMessages<NetworkIssueRemoved>());
+
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject<Hero>(fixture.HeroId, out var giver));
+            Assert.NotNull(giver.Issue);
+            Assert.True(giver.Issue.IssueQuest.IsOngoing);
+        });
     }
 
     [Fact]
