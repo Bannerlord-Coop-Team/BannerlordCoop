@@ -10,6 +10,10 @@ using Missions.Agents.Packets;
 using Newtonsoft.Json;
 #if DEBUG
 using Missions.Diagnostics;
+using Missions.Messages;
+using Common.Network;
+using GameInterface.Services.Players;
+using LiteNetLib;
 #endif
 using System;
 using System.Collections.Generic;
@@ -35,6 +39,163 @@ internal static class BattleDebugCommands
 
     private static CoopCommandResult Failed(string output) =>
         new CoopCommandResult(false, output, "command_failed");
+
+#if DEBUG
+    public sealed class SiegeInteractionObserveCoopCommand : ICoopCommand
+    {
+        public string Prefix => "coop.debug.battle";
+        public string Name => "siege_interaction_observe";
+        public string Description => "Reads native focus, use and input lifecycle on this client.";
+        public IExpectedArgs[] ExpectedArgs { get; } = Array.Empty<IExpectedArgs>();
+
+        public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
+        {
+            var observer = Mission.Current?.GetMissionBehavior<SiegeInteractionDebugBehavior>();
+            if (ModInformation.IsServer || observer == null)
+                return Failed("A rendered client battle with its DEBUG observer is required.");
+            return Succeeded("LIVE_TEST_JSON=" + JsonConvert.SerializeObject(observer.Observe()));
+        }
+    }
+
+    public sealed class SiegeInteractionTargetCoopCommand : ICoopCommand
+    {
+        public string Prefix => "coop.debug.battle";
+        public string Name => "siege_interaction_target";
+        public string Description => "Finds an existing visible machine without changing its eligibility.";
+        public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
+        {
+            new ExpectedArgs("type_name", "Exact concrete type from dump_machines all.")
+        };
+
+        public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
+        {
+            var mission = Mission.Current;
+            if (ModInformation.IsServer || mission?.IsSiegeBattle != true || args.Count != 1)
+                return Failed("A client siege mission and a concrete machine type are required.");
+            var machine = mission.MissionObjects.OfType<UsableMachine>()
+                .Where(candidate => candidate.GetType().Name == args[0] &&
+                    candidate.GameEntity.IsVisibleIncludeParents() && candidate.StandingPoints.Count > 0)
+                .OrderBy(candidate => candidate.Id.Id).FirstOrDefault();
+            if (machine == null) return Failed("The required machine type is absent from this siege scene.");
+            return Succeeded("LIVE_TEST_JSON=" + JsonConvert.SerializeObject(new
+            {
+                success = true, id = machine.Id.Id, type = machine.GetType().Name,
+                standingPointIndex = machine.StandingPoints.ToList().IndexOf(
+                    machine is RangedSiegeWeapon ranged ? ranged.PilotStandingPoint :
+                    machine is StonePile stones ? stones.AmmoPickUpPoints.FirstOrDefault() :
+                    machine.StandingPoints[0]),
+                standingPointCount = machine.StandingPoints.Count
+            }));
+        }
+    }
+
+    public sealed class SiegeInteractionRequestCoopCommand : ICoopCommand
+    {
+        private readonly IPlayerManager players;
+        private readonly IObjectManager objects;
+        private readonly INetwork network;
+
+        public string Prefix => "coop.debug.battle";
+        public string Name => "siege_interaction_request";
+        public string Description => "Routes one ordinary use press to a defender's real client.";
+        public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
+        {
+            new ExpectedArgs("controller_id", "Connected defender controller."),
+            new ExpectedArgs("request_id", "Unique native input request."),
+            new ExpectedArgs("machine_id", "Native mission object id from dump_machines."),
+            new ExpectedArgs("action", "capture, stage, watch, use, fire, attack, stop or restore."),
+            new ExpectedArgs("standing_point", "Existing standing point index.", isRequired: false)
+        };
+
+        public SiegeInteractionRequestCoopCommand(IPlayerManager players, IObjectManager objects,
+            INetwork network)
+        {
+            this.players = players;
+            this.objects = objects;
+            this.network = network;
+        }
+
+        public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
+        {
+            if (ModInformation.IsClient) return Failed("Run this command on the server.");
+            if ((args.Count != 4 && args.Count != 5) || string.IsNullOrWhiteSpace(args[1]) ||
+                !int.TryParse(args[2], NumberStyles.Integer, CultureInfo.InvariantCulture, out int machineId))
+                return Failed("Expected controller_id, unique request_id, machine_id, action and optional standing_point.");
+            int standingPoint = 0;
+            if ((args[3] != "capture" && args[3] != "stage" && args[3] != "watch" && args[3] != "use" &&
+                 args[3] != "fire" && args[3] != "attack" && args[3] != "stop" && args[3] != "restore") ||
+                (args.Count == 5 && !int.TryParse(args[4], out standingPoint)))
+                return Failed("Invalid action or standing point.");
+            if (!players.TryGetPlayer(args[0], out var player) ||
+                !players.TryGetPeer(args[0], out var peer) || peer == null || peer.ConnectionState != ConnectionState.Connected ||
+                !players.TryGetPlayer(peer, out var boundPlayer) || !ReferenceEquals(player, boundPlayer) ||
+                !objects.TryGetObject<MobileParty>(player.MobilePartyId, out var party) ||
+                party.MapEvent?.IsSiegeAssault != true || party.MapEventSide?.MissionSide != BattleSideEnum.Defender ||
+                !objects.TryGetId(party.MapEvent, out string mapEventId))
+                return Failed("The controller must be a connected defender in the active siege assault.");
+            network.Send(peer, new NetworkSiegeInteractionDebugRequest(mapEventId, args[0], args[1], machineId, args[3], standingPoint));
+            return Succeeded("LIVE_TEST_JSON=" + JsonConvert.SerializeObject(new
+            {
+                success = true, status = "routed_outcome_pending", controllerId = args[0],
+                requestId = args[1], mapEventId, machineId
+            }));
+        }
+    }
+
+    public sealed class DefenderMissionAcknowledgementCoopCommand : ICoopCommand
+    {
+        public string Prefix => "coop.debug.battle";
+        public string Name => "defender_mission_ack";
+        public string Description => "Reports committed defender siege mission readiness.";
+        public IExpectedArgs[] ExpectedArgs { get; } = Array.Empty<IExpectedArgs>();
+        public CoopCommandResult ProcessCommand(ICoopCommandArgs args) =>
+            Succeeded(DefenderMissionAcknowledgement(args.ToList()));
+    }
+
+    private static string DefenderMissionAcknowledgement(List<string> args)
+    {
+        if (args.Count != 0)
+        {
+            return "Usage: coop.debug.battle.defender_mission_ack";
+        }
+
+        var mission = Mission.Current;
+        var controller = mission?.GetMissionBehavior<CoopBattleController>();
+        var playerTeam = mission?.PlayerTeam;
+        var localMainAgent = Agent.Main;
+        bool missionActive = mission != null;
+        bool activeCoopSiegeAssault = missionActive && controller != null &&
+            MobileParty.MainParty?.MapEvent?.IsSiegeAssault == true;
+        bool localMainAgentActive = localMainAgent != null && localMainAgent.IsActive() &&
+            localMainAgent.Mission == mission && localMainAgent.Team == playerTeam;
+        // The commit latch survives removal of the native deployment controller.
+        bool deploymentCommitted = controller?.Deployment.IsCommitted == true;
+        bool controllerReady = controller?.Session.HasInstance == true && controller.Deployment.IsActivated;
+        BattleSideEnum battleSide = playerTeam?.Side ?? BattleSideEnum.None;
+        bool success = DefenderMissionAcknowledgementContract.IsReady(
+            ModInformation.IsClient,
+            missionActive,
+            activeCoopSiegeAssault,
+            battleSide,
+            localMainAgentActive,
+            deploymentCommitted,
+            controllerReady);
+
+        return "LIVE_TEST_JSON=" + JsonConvert.SerializeObject(new
+        {
+            success,
+            role = ModInformation.IsServer ? "server" : "client",
+            missionActive,
+            missionKind = activeCoopSiegeAssault ? "siege-assault" : "none",
+            activeCoopSiegeAssault,
+            battleSide = battleSide.ToString(),
+            localMainAgent = localMainAgentActive,
+            deploymentCommitted,
+            controllerReady,
+            sessionId = controller?.Session.InstanceId
+        });
+    }
+#endif
 
     private static readonly Dictionary<int, Vec3> EnemyPositions = new Dictionary<int, Vec3>();
     private static int ownDamageEvents;
@@ -1840,4 +2001,19 @@ internal sealed class DebugReplicationFixtureAgentOrigin : CoopAgentOrigin
         : base(troop, party, rank, banner, descriptor)
     {
     }
+}
+
+internal static class DefenderMissionAcknowledgementContract
+{
+    internal static bool IsReady(
+        bool isClient,
+        bool missionActive,
+        bool activeCoopSiegeAssault,
+        BattleSideEnum battleSide,
+        bool localMainAgent,
+        bool deploymentCommitted,
+        bool controllerReady) =>
+        isClient && missionActive && activeCoopSiegeAssault &&
+        battleSide == BattleSideEnum.Defender && localMainAgent &&
+        deploymentCommitted && controllerReady;
 }

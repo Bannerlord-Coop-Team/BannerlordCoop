@@ -1,4 +1,4 @@
-<Project Sdk="Microsoft.NET.Sdk">
+﻿<Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
     <Configuration Condition=" '$(Configuration)' == '' ">Debug</Configuration>
     <Platform Condition=" '$(Platform)' == '' ">AnyCPU</Platform>
@@ -179,6 +179,9 @@
     <AssemblyAttribute Include="System.Runtime.CompilerServices.InternalsVisibleTo">
       <_Parameter1>E2E.Tests</_Parameter1>
     </AssemblyAttribute>
+    <AssemblyAttribute Include="System.Runtime.CompilerServices.InternalsVisibleTo">
+      <_Parameter1>Coop.Tests</_Parameter1>
+    </AssemblyAttribute>
   </ItemGroup>
   <ItemGroup>
     <EmbeddedResource Include="Agents\Voice\vanilla_order_voice_manifest.json" />
@@ -208,6 +211,7 @@
     <Publicize Include="TaleWorlds.GauntletUI" />
     <Publicize Include="TaleWorlds.GauntletUI.Data" />
     <Publicize Include="TaleWorlds.MountAndBlade" />
+    <Publicize Include="TaleWorlds.MountAndBlade.View:TaleWorlds.MountAndBlade.View.MissionViews.MissionMainAgentInteractionComponent._currentInteractableObject" />
     <Publicize Include="TaleWorlds.ObjectSystem" />
     <Publicize Include="TaleWorlds.SaveSystem" />
     <Publicize Include="TaleWorlds.MountAndBlade.Mission" />

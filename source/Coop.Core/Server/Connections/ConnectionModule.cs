@@ -1,4 +1,5 @@
-using Autofac;
+﻿using Autofac;
+using GameInterface.Services.Players;
 
 namespace Coop.Core.Server.Connections;
 
@@ -11,7 +12,7 @@ internal class ConnectionModule : Module
         builder.RegisterType<ExistingPlayerSender>().As<IExistingPlayerSender>().InstancePerLifetimeScope();
         builder.RegisterType<ConnectionContext>().AsSelf().InstancePerLifetimeScope();
         builder.RegisterType<ConnectionLogic>().As<IConnectionLogic>().AsSelf();
-        builder.RegisterType<ConnectionCollection>().As<IConnectionCollection>().AsSelf().InstancePerLifetimeScope().AutoActivate();
+        builder.RegisterType<ConnectionCollection>().As<IConnectionCollection>().As<ICampaignSynchronization>().AsSelf().InstancePerLifetimeScope().AutoActivate();
 
         base.Load(builder);
     }

@@ -1,0 +1,926 @@
+﻿#if DEBUG
+using Autofac;
+using Common;
+using Common.Util;
+using Coop.Tests.Mocks;
+using GameInterface.Services.MobileParties.Data;
+using GameInterface.Services.ObjectManager;
+using GameInterface.Services.PartyBases.Extensions;
+using GameInterface.Services.Players;
+using GameInterface.Services.Players.Data;
+using GameInterface.Services.SiegeEvents.Commands;
+using GameInterface.Tests.Bootstrap;
+using HarmonyLib;
+using LiteNetLib;
+using Moq;
+using Newtonsoft.Json.Linq;
+using SandBox.View.Map.Visuals;
+using Serilog;
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Reflection;
+using TaleWorlds.CampaignSystem;
+using TaleWorlds.CampaignSystem.CampaignBehaviors;
+using TaleWorlds.CampaignSystem.LogEntries;
+using TaleWorlds.CampaignSystem.Map;
+using TaleWorlds.CampaignSystem.Naval;
+using TaleWorlds.CampaignSystem.Party;
+using TaleWorlds.CampaignSystem.Party.PartyComponents;
+using TaleWorlds.CampaignSystem.Roster;
+using TaleWorlds.CampaignSystem.Settlements;
+using TaleWorlds.Library;
+using Xunit;
+
+namespace GameInterface.Tests.Services.SiegeEvents;
+
+[Collection(nameof(CampaignCurrentCollection))]
+public sealed class DefenderSiegeFixtureCommandsTests : IDisposable
+{
+    private static readonly FieldInfo RosterFixture = AccessTools.Field(typeof(DefenderSiegeFixtureCommands), "rosterFixture");
+    private static readonly Dictionary<PartyBase, MobilePartyVisual> Visuals = new();
+    private static readonly List<LogEntry> Logs = new();
+    private readonly Harmony harmony = new("Coop.Tests.DefenderRosterFixture");
+    private readonly Campaign previousCampaign;
+    private readonly bool previousServer;
+    private readonly ILifetimeScope previousContainer;
+    private readonly IContainer container;
+    private readonly Dictionary<FieldInfo, object> previousFixtures = new();
+    private readonly Dictionary<string, Player> registrations = new();
+    private readonly Dictionary<string, NetPeer> peers = new();
+    private readonly Dictionary<NetPeer, Player> peerPlayers = new();
+    private readonly global::GameInterface.Services.ObjectManager.ObjectManager objects = new(Mock.Of<ILogger>());
+    private readonly Mock<IPlayerManager> players = new();
+    private readonly Mock<ICampaignSynchronization> synchronization = new(MockBehavior.Strict);
+    private readonly Mock<IMobilePartyBehaviorSnapshot> snapshots = new();
+    private readonly Mock<IDefenderFixtureCaptivityActions> actions = new(MockBehavior.Strict);
+    private readonly Captive[] captives;
+    private readonly List<string> actionCalls = new();
+    private MobileParty replacementParty;
+    private int synchronizationResolutions;
+    private bool synchronized = true;
+    private bool connected = true;
+    private Action<Hero> afterRelease;
+    private Action<Hero> afterRecapture;
+
+    public DefenderSiegeFixtureCommandsTests()
+    {
+        GameBootStrap.Initialize();
+        previousCampaign = Campaign.Current;
+        previousServer = ModInformation.IsServer;
+        ContainerProvider.TryGetContainer(out previousContainer);
+        foreach (string name in new[] { "rosterFixture", "pendingCapture", "activeFixture", "restoredFixture" })
+        {
+            var field = AccessTools.Field(typeof(DefenderSiegeFixtureCommands), name);
+            previousFixtures.Add(field, field.GetValue(null));
+            field.SetValue(null, null);
+        }
+        try
+        {
+            ModInformation.IsServer = true;
+            // Supply only the scene's visual lookup; all command guards read real game objects.
+            harmony.Patch(AccessTools.Method(typeof(PartyBaseExtensions), nameof(PartyBaseExtensions.GetPartyVisual)),
+                prefix: new HarmonyMethod(typeof(DefenderSiegeFixtureCommandsTests), nameof(ReadVisual)));
+            captives = new[] { CreateCaptive("testclient"), CreateCaptive("testclient2") };
+            players.SetupGet(manager => manager.Players).Returns(() => registrations.Values.ToArray());
+            players.Setup(manager => manager.IsConnected(It.IsAny<Player>())).Returns(() => connected);
+            players.Setup(manager => manager.TryGetPlayer(It.IsAny<string>(), out It.Ref<Player>.IsAny))
+                .Returns((string id, out Player player) => registrations.TryGetValue(id, out player));
+            players.Setup(manager => manager.TryGetPeer(It.IsAny<string>(), out It.Ref<NetPeer>.IsAny))
+                .Returns((string id, out NetPeer peer) => peers.TryGetValue(id, out peer));
+            players.Setup(manager => manager.TryGetPlayer(It.IsAny<NetPeer>(), out It.Ref<Player>.IsAny))
+                .Returns((NetPeer peer, out Player player) => peerPlayers.TryGetValue(peer, out player));
+            synchronization.Setup(service => service.HasCompletedCampaignSynchronization(It.IsAny<NetPeer>()))
+                .Returns(() => synchronized);
+            snapshots.Setup(service => service.TryCreate(It.IsAny<MobileParty>(), out It.Ref<PartyBehaviorUpdateData>.IsAny))
+                .Returns((MobileParty party, out PartyBehaviorUpdateData data) =>
+                {
+                    data = new PartyBehaviorUpdateData { PartyPosition = party.Position };
+                    return true;
+                });
+            snapshots.Setup(service => service.CanApply(It.IsAny<MobileParty>(), It.IsAny<PartyBehaviorUpdateData>())).Returns(true);
+            snapshots.Setup(service => service.TryApply(It.IsAny<MobileParty>(), It.IsAny<PartyBehaviorUpdateData>(), out It.Ref<IInteractablePoint>.IsAny))
+                .Returns((MobileParty party, PartyBehaviorUpdateData data, out IInteractablePoint point) =>
+                {
+                    point = null;
+                    party._position = data.PartyPosition;
+                    return true;
+                });
+            actions.Setup(service => service.Release(It.IsAny<Hero>())).Callback<Hero>(hero =>
+            {
+                actionCalls.Add("release:" + hero.StringId);
+                SetReleased(captives.Single(player => player.Hero == hero));
+                afterRelease?.Invoke(hero);
+            });
+            actions.Setup(service => service.Recapture(It.IsAny<PartyBase>(), It.IsAny<Hero>()))
+                .Callback<PartyBase, Hero>((captor, hero) =>
+                {
+                    var player = captives.Single(player => player.Hero == hero);
+                    Assert.Same(player.Captor.Party, captor);
+                    actionCalls.Add("recapture:" + hero.StringId);
+                    SetCaptured(player);
+                    afterRecapture?.Invoke(hero);
+                });
+            var builder = new ContainerBuilder();
+            builder.RegisterInstance(objects).As<IObjectManager>();
+            builder.RegisterType<DefenderFixtureBehaviorIdentity>().As<IDefenderFixtureBehaviorIdentity>().InstancePerDependency();
+            builder.RegisterInstance(players.Object).As<IPlayerManager>();
+            builder.Register(_ =>
+            {
+                synchronizationResolutions++;
+                return synchronization.Object;
+            }).As<ICampaignSynchronization>();
+            builder.RegisterInstance(snapshots.Object).As<IMobilePartyBehaviorSnapshot>();
+            builder.RegisterInstance(actions.Object).As<IDefenderFixtureCaptivityActions>();
+            container = builder.Build();
+            ContainerProvider.SetContainer(container);
+        }
+        catch
+        {
+            Dispose();
+            throw;
+        }
+    }
+
+    [Theory]
+    [InlineData(false, "player-removed")]
+    [InlineData(true, "player-removed")]
+    [InlineData(false, "player-replaced")]
+    [InlineData(true, "player-replaced")]
+    [InlineData(false, "hero-removed")]
+    [InlineData(true, "hero-removed")]
+    [InlineData(false, "hero-rebound")]
+    [InlineData(true, "hero-rebound")]
+    [InlineData(false, "party-removed")]
+    [InlineData(true, "party-removed")]
+    [InlineData(false, "party-rebound")]
+    [InlineData(true, "party-rebound")]
+    public void Restore_RegistryDrift_RefusesWithoutActionsAndRetainsCapture(bool normalize, string drift)
+    {
+        Capture();
+        if (normalize) Normalize();
+        object captured = RosterFixture.GetValue(null);
+        Drift(drift);
+        object[] originalStates = captives.Select(ReadState).ToArray();
+        object replacementState = replacementParty == null ? null : ReadPartyState(replacementParty);
+        actionCalls.Clear();
+        snapshots.Invocations.Clear();
+
+        AssertRefusal(Restore(), captured);
+        Assert.Equal(originalStates, captives.Select(ReadState).ToArray());
+        Assert.Equal(replacementState, replacementParty == null ? null : ReadPartyState(replacementParty));
+        Assert.Empty(actionCalls);
+        AssertNoSnapshotReplay();
+        Assert.False((bool)Restore()["restoredPendingVerification"]);
+    }
+
+    [Theory]
+    [InlineData("player-replaced")]
+    [InlineData("hero-removed")]
+    [InlineData("hero-rebound")]
+    [InlineData("party-removed")]
+    [InlineData("party-rebound")]
+    public void Verify_RegistryDriftAfterRestore_RetainsPendingFixture(string drift)
+    {
+        Capture();
+        Normalize();
+        AssertSuccess(Restore());
+        object captured = RosterFixture.GetValue(null);
+        Drift(drift);
+        actionCalls.Clear();
+        snapshots.Invocations.Clear();
+
+        JObject result = Verify();
+        AssertRefusal(result, captured, pending: true);
+        Assert.True((bool)result["restoredPendingVerification"]);
+        Assert.Empty(actionCalls);
+        AssertNoSnapshotReplay();
+    }
+
+    [Fact]
+    public void Restore_IdentityChangesDuringFirstRecapture_StopsBeforeReplayAndSecondRecapture()
+    {
+        Capture();
+        Normalize();
+        object captured = RosterFixture.GetValue(null);
+        actionCalls.Clear();
+        snapshots.Invocations.Clear();
+        afterRecapture = _ => Drift("party-rebound");
+
+        AssertRefusal(Restore(), captured);
+        Assert.Equal(new[] { "recapture:hero_testclient" }, actionCalls);
+        AssertNoSnapshotReplay();
+        Assert.False(captives[1].Hero.IsPrisoner);
+    }
+
+    [Fact]
+    public void Normalize_ReleaseThrowsAfterRegistryDrift_RollbackRefusesStaleObjects()
+    {
+        Capture();
+        object captured = RosterFixture.GetValue(null);
+        afterRelease = hero =>
+        {
+            if (hero != captives[1].Hero) return;
+            Drift("hero-rebound");
+            throw new InvalidOperationException("release callback failed");
+        };
+
+        JObject result = Parse(DefenderSiegeFixtureCommands.NormalizeRosterFixture(new()));
+        AssertRefusal(result, captured);
+        Assert.Contains("rollback", ((string)result["reason"]).ToLowerInvariant());
+        Assert.Equal(new[] { "release:hero_testclient", "release:hero_testclient2" }, actionCalls);
+        AssertNoSnapshotReplay();
+    }
+
+    [Fact]
+    public void Normalize_LastReleaseChangesIdentity_DoesNotReportSuccess()
+    {
+        Capture();
+        object captured = RosterFixture.GetValue(null);
+        afterRelease = hero =>
+        {
+            if (hero == captives[1].Hero) Drift("player-removed");
+        };
+
+        AssertRefusal(Parse(DefenderSiegeFixtureCommands.NormalizeRosterFixture(new())), captured);
+        Assert.Equal(2, actionCalls.Count);
+        Assert.All(actionCalls, call => Assert.StartsWith("release:", call));
+        AssertNoSnapshotReplay();
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void RestoreAndVerify_ChangedCampaign_RefuseWithoutActions(bool clear)
+    {
+        Capture();
+        Normalize();
+        AssertSuccess(Restore());
+        object captured = RosterFixture.GetValue(null);
+        Campaign.Current = clear ? null : ObjectHelper.SkipConstructor<Campaign>();
+        actionCalls.Clear();
+        snapshots.Invocations.Clear();
+
+        AssertRefusal(Restore(), captured, pending: true);
+        AssertRefusal(Verify(), captured, pending: true);
+        Assert.Empty(actionCalls);
+        AssertNoSnapshotReplay();
+    }
+
+    [Fact]
+    public void Capture_NoCampaign_RefusesWithoutActions()
+    {
+        Campaign.Current = null;
+        Assert.False((bool)CaptureResult()["success"]);
+        Assert.Null(RosterFixture.GetValue(null));
+        Assert.Empty(actionCalls);
+    }
+
+    [Fact]
+    public void Capture_LoadingPeer_RefusesBeforeSnapshotOrActions()
+    {
+        synchronized = false;
+        Assert.False((bool)CaptureResult()["success"]);
+        Assert.Null(RosterFixture.GetValue(null));
+        Assert.Empty(actionCalls);
+        snapshots.Verify(service => service.TryCreate(It.IsAny<MobileParty>(), out It.Ref<PartyBehaviorUpdateData>.IsAny), Times.Never);
+    }
+
+    [Fact]
+    public void Normalize_PeerStartsLoading_RefusesAndRetainsCapture()
+    {
+        Capture();
+        object captured = RosterFixture.GetValue(null);
+        synchronized = false;
+        AssertRefusal(Parse(DefenderSiegeFixtureCommands.NormalizeRosterFixture(new())), captured);
+        Assert.Empty(actionCalls);
+        Assert.False((bool)Restore()["normalized"]);
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void CaptureOrNormalize_MobileCaptorAtSea_RefusesWithoutRelease(bool capturedFirst)
+    {
+        if (capturedFirst) Capture();
+        captives[0].Captor._isCurrentlyAtSea = true;
+        JObject result = capturedFirst
+            ? Parse(DefenderSiegeFixtureCommands.NormalizeRosterFixture(new()))
+            : CaptureResult();
+        Assert.False((bool)result["success"]);
+        Assert.Empty(actionCalls);
+        Assert.Equal(capturedFirst, RosterFixture.GetValue(null) != null);
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void Lifecycle_UnchangedIdentities_RestoresAndClearsOnlyAfterVerification(bool disconnect)
+    {
+        Capture();
+        Normalize();
+        object captured = RosterFixture.GetValue(null);
+        if (disconnect)
+        {
+            connected = false;
+            peers.Clear();
+            peerPlayers.Clear();
+            foreach (Captive player in captives)
+            {
+                player.Party.IsActive = false;
+                player.Party._isVisible = false;
+                Visuals.Remove(player.Party.Party);
+            }
+        }
+        int resolutionsBeforeRestore = synchronizationResolutions;
+        synchronization.Invocations.Clear();
+        AssertSuccess(Restore());
+        Assert.Same(captured, RosterFixture.GetValue(null));
+        Assert.All(captives, player =>
+        {
+            Assert.True(player.Hero.IsPrisoner);
+            Assert.Same(player.Captor.Party, player.Hero.PartyBelongedToAsPrisoner);
+            Assert.False(player.Party.IsActive);
+            Assert.False(player.Party.IsVisible);
+        });
+        AssertSuccess(Verify());
+        Assert.Null(RosterFixture.GetValue(null));
+        Assert.Equal(new[] { "release:hero_testclient", "release:hero_testclient2",
+            "recapture:hero_testclient", "recapture:hero_testclient2" }, actionCalls);
+        synchronization.Verify(service => service.HasCompletedCampaignSynchronization(It.IsAny<NetPeer>()), Times.Never);
+        Assert.Equal(resolutionsBeforeRestore, synchronizationResolutions);
+    }
+
+    [Fact]
+    public void Restore_ConnectedPartyWithParkedShape_StillRefuses()
+    {
+        Capture();
+        Normalize();
+        object captured = RosterFixture.GetValue(null);
+        captives[0].Party.IsActive = false;
+        captives[0].Party._isVisible = false;
+        Visuals.Remove(captives[0].Party.Party);
+        actionCalls.Clear();
+
+        AssertRefusal(Restore(), captured);
+        Assert.Empty(actionCalls);
+        AssertNoSnapshotReplay();
+    }
+
+    [Fact]
+    public void CaptivityLogs_SuppressOnlyMatchingCallbackInsideFixtureAction()
+    {
+        InstallLogPatches();
+        var behavior = new DefaultLogsCampaignBehavior();
+        afterRelease = hero => AssertScopedLogs(behavior, hero, release: true);
+        afterRecapture = hero => AssertScopedLogs(behavior, hero, release: false);
+        Capture();
+        Normalize();
+        AssertSuccess(Restore());
+        AssertSuccess(Verify());
+
+        Logs.Clear();
+        behavior.OnPrisonerTaken(captives[0].Captor.Party, captives[0].Hero);
+        behavior.OnHeroPrisonerReleased(captives[0].Hero, captives[0].Captor.Party, null, default, true);
+        Assert.IsType<TakePrisonerLogEntry>(Logs[0]);
+        Assert.IsType<EndCaptivityLogEntry>(Logs[1]);
+        Assert.Equal(2, Logs.Count);
+    }
+
+    [Fact]
+    public void CaptivityLogs_ThrowingFixtureAction_RestoresLoggingScope()
+    {
+        InstallLogPatches();
+        var behavior = new DefaultLogsCampaignBehavior();
+        afterRelease = hero =>
+        {
+            behavior.OnHeroPrisonerReleased(hero, captives[0].Captor.Party, null, default, true);
+            Assert.Empty(Logs);
+            throw new InvalidOperationException("callback failed");
+        };
+        Capture();
+        Assert.False((bool)Parse(DefenderSiegeFixtureCommands.NormalizeRosterFixture(new()))["success"]);
+
+        behavior.OnHeroPrisonerReleased(captives[0].Hero, captives[0].Captor.Party, null, default, true);
+        Assert.IsType<EndCaptivityLogEntry>(Assert.Single(Logs));
+    }
+
+    [Theory]
+    [InlineData("stage", "campaign-null")]
+    [InlineData("stage", "campaign-replaced")]
+    [InlineData("stage", "settlement-removed")]
+    [InlineData("stage", "settlement-rebound")]
+    [InlineData("stage", "player-removed")]
+    [InlineData("stage", "player-replaced")]
+    [InlineData("stage", "party-removed")]
+    [InlineData("stage", "party-rebound")]
+    [InlineData("restore", "campaign-null")]
+    [InlineData("restore", "campaign-replaced")]
+    [InlineData("restore", "settlement-removed")]
+    [InlineData("restore", "settlement-rebound")]
+    [InlineData("restore", "player-removed")]
+    [InlineData("restore", "player-replaced")]
+    [InlineData("restore", "party-removed")]
+    [InlineData("restore", "party-rebound")]
+    [InlineData("verify", "campaign-null")]
+    [InlineData("verify", "campaign-replaced")]
+    [InlineData("verify", "settlement-removed")]
+    [InlineData("verify", "settlement-rebound")]
+    [InlineData("verify", "player-removed")]
+    [InlineData("verify", "player-replaced")]
+    [InlineData("verify", "party-removed")]
+    [InlineData("verify", "party-rebound")]
+    public void StagingFixture_IdentityDrift_RefusesWithoutReplayAndRetainsCapture(string phase, string drift)
+    {
+        Settlement settlement = CaptureStagingFixture();
+        if (phase != "stage") AssertSuccess(Parse(DefenderSiegeFixtureCommands.Stage(new())));
+        if (phase == "verify") AssertSuccess(Parse(DefenderSiegeFixtureCommands.Restore(new())));
+        string fieldName = phase == "stage" ? "pendingCapture" : phase == "restore" ? "activeFixture" : "restoredFixture";
+        var field = AccessTools.Field(typeof(DefenderSiegeFixtureCommands), fieldName);
+        object captured = field.GetValue(null);
+        switch (drift)
+        {
+            case "campaign-null": Campaign.Current = null; break;
+            case "campaign-replaced": Campaign.Current = ObjectHelper.SkipConstructor<Campaign>(); break;
+            case "settlement-removed": Assert.True(objects.Remove(settlement)); break;
+            case "settlement-rebound":
+                Assert.True(objects.Remove(settlement));
+                Assert.True(objects.AddExisting("castle_ES1", ObjectHelper.SkipConstructor<Settlement>()));
+                break;
+            default: Drift(drift); break;
+        }
+        object[] originalStates = captives.Select(ReadState).ToArray();
+        snapshots.Invocations.Clear();
+        actionCalls.Clear();
+        JObject result = Parse(phase == "stage" ? DefenderSiegeFixtureCommands.Stage(new()) :
+            phase == "restore" ? DefenderSiegeFixtureCommands.Restore(new()) :
+            DefenderSiegeFixtureCommands.VerifyRestore(new()));
+
+        Assert.False((bool)result["success"], result.ToString());
+        Assert.Same(captured, field.GetValue(null));
+        Assert.Equal(originalStates, captives.Select(ReadState).ToArray());
+        Assert.Empty(actionCalls);
+        AssertNoSnapshotReplay();
+    }
+
+    [Fact]
+    public void StagingFixture_UnchangedIdentities_ClearsOnlyAfterRestoreVerification()
+    {
+        CaptureStagingFixture();
+        AssertSuccess(Parse(DefenderSiegeFixtureCommands.Stage(new())));
+        AssertSuccess(Parse(DefenderSiegeFixtureCommands.Restore(new())));
+        var field = AccessTools.Field(typeof(DefenderSiegeFixtureCommands), "restoredFixture");
+        Assert.NotNull(field.GetValue(null));
+        AssertSuccess(Parse(DefenderSiegeFixtureCommands.VerifyRestore(new())));
+        Assert.Null(field.GetValue(null));
+        snapshots.Verify(service => service.TryApply(It.IsAny<MobileParty>(),
+            It.IsAny<PartyBehaviorUpdateData>(), out It.Ref<IInteractablePoint>.IsAny), Times.Exactly(2));
+    }
+
+    [Theory]
+    [InlineData("anchor", "removed")]
+    [InlineData("anchor", "rebound")]
+    [InlineData("anchor", "anchor-replaced")]
+    [InlineData("anchor", "unchanged")]
+    [InlineData("interactable", "removed")]
+    [InlineData("interactable", "rebound")]
+    [InlineData("interactable", "unchanged")]
+    [InlineData("target-party", "removed")]
+    [InlineData("target-party", "rebound")]
+    [InlineData("target-party", "unchanged")]
+    [InlineData("target-settlement", "removed")]
+    [InlineData("target-settlement", "rebound")]
+    [InlineData("target-settlement", "unchanged")]
+    [InlineData("move-target-party", "removed")]
+    [InlineData("move-target-party", "rebound")]
+    [InlineData("move-target-party", "unchanged")]
+    public void StagingFixture_BehaviorReferenceDrift_PreservesIdentityBeforeMutation(string reference, string drift)
+    {
+        var target = ObjectHelper.SkipConstructor<MobileParty>();
+        target.Party = ObjectHelper.SkipConstructor<PartyBase>();
+        target.Party.MobileParty = target;
+        target.Anchor = new AnchorPoint(target);
+        string id = reference == "interactable" ? "PartyBase_behavior-target" :
+            reference == "target-settlement" ? "Settlement_behavior-target" : "MobileParty_behavior-target";
+        object capturedTarget = reference == "interactable" ? target.Party :
+            reference == "target-settlement" ? ObjectHelper.SkipConstructor<Settlement>() : target;
+        Assert.True(objects.AddExisting(id, capturedTarget));
+        snapshots.Setup(service => service.TryCreate(It.IsAny<MobileParty>(), out It.Ref<PartyBehaviorUpdateData>.IsAny))
+            .Returns((MobileParty party, out PartyBehaviorUpdateData data) =>
+            {
+                data = new PartyBehaviorUpdateData(
+                    null, default, reference == "anchor" || reference == "interactable" ? "behavior-target" : null,
+                    default, party.Position, default, default, default);
+                if (reference == "anchor")
+                {
+                    party.Ai.AiBehaviorInteractable = target.Anchor;
+                    data.IsInteractableAnchor = true;
+                }
+                else if (reference == "interactable")
+                {
+                    party.Ai.AiBehaviorInteractable = target.Party;
+                }
+                else if (reference == "target-party")
+                {
+                    party.TargetParty = target;
+                    data.TargetPartyId = "behavior-target";
+                }
+                else if (reference == "target-settlement")
+                {
+                    party._targetSettlement = (Settlement)capturedTarget;
+                    data.TargetSettlementId = "behavior-target";
+                }
+                else
+                {
+                    party.MoveTargetParty = target;
+                    data.MoveTargetPartyId = "behavior-target";
+                }
+                return true;
+            });
+        CaptureStagingFixture();
+        AssertSuccess(Parse(DefenderSiegeFixtureCommands.Stage(new())));
+        if (drift == "unchanged")
+        {
+            AssertSuccess(Parse(DefenderSiegeFixtureCommands.Restore(new())));
+            AssertSuccess(Parse(DefenderSiegeFixtureCommands.VerifyRestore(new())));
+            return;
+        }
+        if (drift == "anchor-replaced") target.Anchor = new AnchorPoint(target);
+        else Assert.True(objects.Remove(capturedTarget));
+        if (drift == "rebound")
+        {
+            object replacement = reference == "interactable" ? ObjectHelper.SkipConstructor<PartyBase>() :
+                reference == "target-settlement" ? ObjectHelper.SkipConstructor<Settlement>() :
+                ObjectHelper.SkipConstructor<MobileParty>();
+            Assert.True(objects.AddExisting(id, replacement));
+        }
+        var field = AccessTools.Field(typeof(DefenderSiegeFixtureCommands), "activeFixture");
+        object capture = field.GetValue(null);
+        // Make a failed late lookup observable even when the original and staged settlement agree.
+        captives[0].Party.Bearing = new Vec2(0.5f, 0.75f);
+        captives[0].Party.LastVisitedSettlement = null;
+        object[] before = captives.Select(ReadState).ToArray();
+        snapshots.Invocations.Clear();
+
+        Assert.False((bool)Parse(DefenderSiegeFixtureCommands.Restore(new()))["success"]);
+        Assert.Equal(before, captives.Select(ReadState).ToArray());
+        Assert.Same(capture, field.GetValue(null));
+        AssertNoSnapshotReplay();
+    }
+
+    [Theory]
+    [InlineData(1)]
+    [InlineData(2)]
+    public void StagingFixture_AfterAssaultDisconnect_RestoresWorldStateAndKeepsOfflinePartyParked(int disconnectedCount)
+    {
+        Settlement settlement = CaptureStagingFixture();
+        AssertSuccess(Parse(DefenderSiegeFixtureCommands.Stage(new())));
+        using var context = new DefenderSiegeContextFixtureTests.AssaultFixture(
+            settlement, captives.Select(value => value.Party).ToArray(), objects, registrations);
+        players.Setup(manager => manager.IsConnected(It.IsAny<Player>()))
+            .Returns((Player player) => !context.Disconnected.Contains(player.ControllerId));
+        foreach (var captive in captives) Visuals.Remove(captive.Party.Party);
+        foreach (string id in registrations.Keys.Take(disconnectedCount)) context.Disconnect(id);
+        Assert.All(captives, captive => Assert.True(captive.Party.IsActive));
+
+        Assert.True(context.Fixture.EndMissions().Succeeded);
+        Assert.True(context.Fixture.Restore().Succeeded);
+        Assert.True(context.Fixture.Verify().Succeeded);
+        foreach (var captive in captives.Take(disconnectedCount))
+        {
+            Assert.False(captive.Party.IsActive);
+            Assert.False(captive.Party.IsVisible);
+            captive.Party.Bearing = new Vec2(0.5f, 0.75f);
+        }
+        AssertSuccess(Parse(DefenderSiegeFixtureCommands.Restore(new())));
+        AssertSuccess(Parse(DefenderSiegeFixtureCommands.VerifyRestore(new())));
+        Assert.Null(AccessTools.Field(typeof(DefenderSiegeFixtureCommands), "activeFixture").GetValue(null));
+        foreach (var captive in captives.Take(disconnectedCount))
+        {
+            Assert.False(captive.Party.IsActive);
+            Assert.False(captive.Party.IsVisible);
+        }
+        snapshots.Verify(service => service.TryApply(It.IsAny<MobileParty>(),
+            It.IsAny<PartyBehaviorUpdateData>(), out It.Ref<IInteractablePoint>.IsAny), Times.Exactly(2));
+    }
+
+    [Fact]
+    public void StagingFixture_InactiveConnectedParty_StillRefusesRestoration()
+    {
+        CaptureStagingFixture();
+        AssertSuccess(Parse(DefenderSiegeFixtureCommands.Stage(new())));
+        captives[0].Party.IsActive = false;
+        captives[0].Party.IsVisible = false;
+        snapshots.Invocations.Clear();
+
+        Assert.False((bool)Parse(DefenderSiegeFixtureCommands.Restore(new()))["success"]);
+        Assert.NotNull(AccessTools.Field(typeof(DefenderSiegeFixtureCommands), "activeFixture").GetValue(null));
+        AssertNoSnapshotReplay();
+    }
+
+    [Theory]
+    [InlineData(true, true)]
+    [InlineData(true, false)]
+    [InlineData(false, true)]
+    public void StagingFixture_DisconnectedPartyNotParked_RefusesRestoreAndVerify(bool active, bool visible)
+    {
+        CaptureStagingFixture();
+        AssertSuccess(Parse(DefenderSiegeFixtureCommands.Stage(new())));
+        players.Setup(manager => manager.IsConnected(It.IsAny<Player>()))
+            .Returns((Player player) => !ReferenceEquals(player, captives[0].Player));
+        captives[0].Party.IsActive = active;
+        captives[0].Party.IsVisible = visible;
+        object[] before = captives.Select(ReadState).ToArray();
+        snapshots.Invocations.Clear();
+
+        Assert.False((bool)Parse(DefenderSiegeFixtureCommands.Restore(new()))["success"]);
+        Assert.False((bool)Parse(DefenderSiegeFixtureCommands.VerifyRestore(new()))["success"]);
+        Assert.Equal(before, captives.Select(ReadState).ToArray());
+        Assert.NotNull(AccessTools.Field(typeof(DefenderSiegeFixtureCommands), "activeFixture").GetValue(null));
+        AssertNoSnapshotReplay();
+    }
+
+    [Theory]
+    [InlineData(true, true)]
+    [InlineData(true, false)]
+    [InlineData(false, true)]
+    public void StagingFixture_DisconnectedPartyDriftsAfterRestore_RefusesVerification(bool active, bool visible)
+    {
+        CaptureStagingFixture();
+        AssertSuccess(Parse(DefenderSiegeFixtureCommands.Stage(new())));
+        AssertSuccess(Parse(DefenderSiegeFixtureCommands.Restore(new())));
+        var field = AccessTools.Field(typeof(DefenderSiegeFixtureCommands), "restoredFixture");
+        object capture = field.GetValue(null);
+        Assert.NotNull(capture);
+        players.Setup(manager => manager.IsConnected(It.IsAny<Player>()))
+            .Returns((Player player) => !ReferenceEquals(player, captives[0].Player));
+        captives[0].Party.IsActive = active;
+        captives[0].Party.IsVisible = visible;
+        snapshots.Invocations.Clear();
+
+        Assert.False((bool)Parse(DefenderSiegeFixtureCommands.VerifyRestore(new()))["success"]);
+        Assert.Same(capture, field.GetValue(null));
+        AssertNoSnapshotReplay();
+    }
+
+    [Fact]
+    public void StagingCapture_LoadingPeer_RefusesBeforeSnapshot()
+    {
+        PrepareStagingParties();
+        synchronized = false;
+        snapshots.Invocations.Clear();
+
+        var result = Parse(DefenderSiegeFixtureCommands.Capture(new() { "testclient", "testclient2" }));
+
+        Assert.False((bool)result["success"]);
+        Assert.Contains("synchronization", (string)result["reason"]);
+        Assert.Null(AccessTools.Field(typeof(DefenderSiegeFixtureCommands), "pendingCapture").GetValue(null));
+        snapshots.Verify(service => service.TryCreate(It.IsAny<MobileParty>(), out It.Ref<PartyBehaviorUpdateData>.IsAny), Times.Never);
+    }
+
+    [Fact]
+    public void Stage_PeerStartsLoading_RefusesAndRetainsPendingCapture()
+    {
+        CaptureStagingFixture();
+        var field = AccessTools.Field(typeof(DefenderSiegeFixtureCommands), "pendingCapture");
+        object captured = field.GetValue(null);
+        synchronized = false;
+        snapshots.Invocations.Clear();
+
+        var result = Parse(DefenderSiegeFixtureCommands.Stage(new()));
+
+        Assert.False((bool)result["success"]);
+        Assert.Contains("synchronization", (string)result["reason"]);
+        Assert.Same(captured, field.GetValue(null));
+        Assert.Null(AccessTools.Field(typeof(DefenderSiegeFixtureCommands), "activeFixture").GetValue(null));
+        AssertNoSnapshotReplay();
+        synchronized = true;
+        AssertSuccess(Parse(DefenderSiegeFixtureCommands.Stage(new())));
+    }
+
+    private Settlement CaptureStagingFixture()
+    {
+        Settlement settlement = PrepareStagingParties();
+        AssertSuccess(Parse(DefenderSiegeFixtureCommands.Capture(new() { "testclient", "testclient2" })));
+        return settlement;
+    }
+
+    private Settlement PrepareStagingParties()
+    {
+        var settlement = ObjectHelper.SkipConstructor<Settlement>();
+        settlement.StringId = "castle_ES1";
+        settlement.Party = ObjectHelper.SkipConstructor<PartyBase>();
+        settlement.Party.Settlement = settlement;
+        settlement.Party.ItemRoster = new ItemRoster();
+        var town = ObjectHelper.SkipConstructor<Town>();
+        town.Owner = settlement.Party;
+        settlement.Town = town;
+        settlement.SettlementComponent = town;
+        Assert.True(objects.AddExisting("castle_ES1", settlement));
+        foreach (var captive in captives)
+        {
+            SetReleased(captive);
+            captive.Party.PartyMoveMode = MoveModeType.Hold;
+            captive.Party._currentSettlement = settlement;
+        }
+        return settlement;
+    }
+
+    private void InstallLogPatches()
+    {
+        foreach (string name in new[] { "FixturePrisonerTakenLogPatch", "FixturePrisonerReleasedLogPatch" })
+        {
+            Type patch = typeof(DefenderSiegeFixtureCommands).GetNestedType(name, BindingFlags.NonPublic);
+            Assert.NotNull(patch);
+            harmony.CreateClassProcessor(patch).Patch();
+        }
+        harmony.Patch(AccessTools.Method(typeof(LogEntry), nameof(LogEntry.AddLogEntry), new[] { typeof(LogEntry) }),
+            prefix: new HarmonyMethod(typeof(DefenderSiegeFixtureCommandsTests), nameof(CaptureLog)));
+    }
+
+    private void AssertScopedLogs(DefaultLogsCampaignBehavior behavior, Hero hero, bool release)
+    {
+        Captive current = captives.Single(player => player.Hero == hero);
+        Captive other = captives.Single(player => player.Hero != hero);
+        Logs.Clear();
+        if (release)
+        {
+            behavior.OnHeroPrisonerReleased(hero, current.Captor.Party, null, default, true);
+            Assert.Empty(Logs);
+            behavior.OnHeroPrisonerReleased(other.Hero, current.Captor.Party, null, default, true);
+            behavior.OnHeroPrisonerReleased(hero, other.Captor.Party, null, default, true);
+            behavior.OnPrisonerTaken(current.Captor.Party, hero);
+            Assert.IsType<TakePrisonerLogEntry>(Logs[2]);
+        }
+        else
+        {
+            behavior.OnPrisonerTaken(current.Captor.Party, hero);
+            Assert.Empty(Logs);
+            behavior.OnPrisonerTaken(current.Captor.Party, other.Hero);
+            behavior.OnPrisonerTaken(other.Captor.Party, hero);
+            behavior.OnHeroPrisonerReleased(hero, current.Captor.Party, null, default, true);
+            Assert.IsType<EndCaptivityLogEntry>(Logs[2]);
+        }
+        Assert.Equal(3, Logs.Count);
+    }
+
+    private static bool CaptureLog(LogEntry logEntry)
+    {
+        Logs.Add(logEntry);
+        return false;
+    }
+
+    private void Drift(string drift)
+    {
+        Captive player = captives[0];
+        switch (drift)
+        {
+            case "player-removed": registrations.Remove(player.Player.ControllerId); break;
+            case "player-replaced":
+                replacementParty = CreateParty("replacement-party");
+                Assert.True(objects.AddExisting(replacementParty.StringId, replacementParty));
+                registrations[player.Player.ControllerId] = new Player(player.Player.ControllerId,
+                    player.Player.HeroId, replacementParty.StringId, "clan", "character");
+                break;
+            case "hero-removed": Assert.True(objects.Remove(player.Hero)); break;
+            case "hero-rebound":
+                Assert.True(objects.Remove(player.Hero));
+                Assert.True(objects.AddExisting(player.Player.HeroId, ObjectHelper.SkipConstructor<Hero>()));
+                break;
+            case "party-removed": Assert.True(objects.Remove(player.Party)); break;
+            case "party-rebound":
+                Assert.True(objects.Remove(player.Party));
+                replacementParty = CreateParty("replacement");
+                Assert.True(objects.AddExisting(player.Player.MobilePartyId, replacementParty));
+                break;
+            default: throw new ArgumentOutOfRangeException(nameof(drift));
+        }
+    }
+
+    private Captive CreateCaptive(string id)
+    {
+        var hero = ObjectHelper.SkipConstructor<Hero>();
+        hero.StringId = "hero_" + id;
+        hero._health = 100;
+        hero._characterObject = ObjectHelper.SkipConstructor<CharacterObject>();
+        hero.CharacterObject.HeroObject = hero;
+        var player = new Captive(new Player(id, hero.StringId, "party_" + id, "clan_" + id, "character_" + id),
+            hero, CreateParty("party_" + id), CreateParty("captor_" + id));
+        player.Captor.IsActive = true;
+        SetCaptured(player);
+        Assert.True(objects.AddExisting(player.Player.HeroId, hero));
+        Assert.True(objects.AddExisting(player.Player.MobilePartyId, player.Party));
+        registrations.Add(id, player.Player);
+        var peer = new TestNetwork().CreatePeer($"127.0.0.{peers.Count + 1}");
+        Assert.Equal(ConnectionState.Connected, peer.ConnectionState);
+        peers.Add(id, peer);
+        peerPlayers.Add(peer, player.Player);
+        return player;
+    }
+
+    private static MobileParty CreateParty(string id)
+    {
+        var party = ObjectHelper.SkipConstructor<MobileParty>();
+        party.StringId = id;
+        party.Party = ObjectHelper.SkipConstructor<PartyBase>();
+        party.Party.MobileParty = party;
+        party._actualClan = ObjectHelper.SkipConstructor<Clan>();
+        party.Party.MemberRoster = new TroopRoster();
+        party.Party.PrisonRoster = new TroopRoster();
+        party._position = new CampaignVec2(new Vec2(12f, 34f), isOnLand: true);
+        party.NavigationTransitionStartTime = CampaignTime.Zero;
+        party.Ai = new MobilePartyAi(party);
+        return party;
+    }
+
+    private static void SetCaptured(Captive player)
+    {
+        player.Hero._heroState = Hero.CharacterStates.Prisoner;
+        player.Hero._partyBelongedTo = null;
+        player.Hero.PartyBelongedToAsPrisoner = player.Captor.Party;
+        player.Party.IsActive = false;
+        player.Party._isVisible = false;
+        player.Party._partyComponent = null;
+        player.Party.Party.MemberRoster = new TroopRoster();
+        player.Captor.Party.PrisonRoster = new TroopRoster();
+        player.Captor.PrisonRoster.AddToCounts(player.Hero.CharacterObject, 1);
+        Visuals.Remove(player.Party.Party);
+    }
+
+    private static void SetReleased(Captive player)
+    {
+        player.Hero._heroState = Hero.CharacterStates.Active;
+        player.Hero._partyBelongedTo = player.Party;
+        player.Hero.PartyBelongedToAsPrisoner = null;
+        player.Party.IsActive = true;
+        player.Party._isVisible = true;
+        var component = ObjectHelper.SkipConstructor<LordPartyComponent>();
+        component._leader = player.Hero;
+        component.MobileParty = player.Party;
+        player.Party._partyComponent = component;
+        player.Party.MemberRoster.AddToCounts(player.Hero.CharacterObject, 1);
+        player.Captor.Party.PrisonRoster = new TroopRoster();
+        Visuals[player.Party.Party] = ObjectHelper.SkipConstructor<MobilePartyVisual>();
+    }
+
+    private static bool ReadVisual(PartyBase partyBase, ref MobilePartyVisual __result)
+    {
+        Visuals.TryGetValue(partyBase, out __result);
+        return false;
+    }
+
+    private void Capture() => AssertSuccess(CaptureResult());
+    private void Normalize() => AssertSuccess(Parse(DefenderSiegeFixtureCommands.NormalizeRosterFixture(new())));
+    private static JObject CaptureResult() => Parse(DefenderSiegeFixtureCommands.CaptureRosterFixture(new() { "testclient", "testclient2" }));
+    private static JObject Restore() => Parse(DefenderSiegeFixtureCommands.RestoreRosterFixture(new()));
+    private static JObject Verify() => Parse(DefenderSiegeFixtureCommands.VerifyRosterFixtureRestore(new()));
+    private static JObject Parse(string result)
+    {
+        Assert.StartsWith("LIVE_TEST_JSON=", result);
+        return JObject.Parse(result.Substring("LIVE_TEST_JSON=".Length));
+    }
+    private static void AssertSuccess(JObject result) => Assert.True((bool)result["success"], result.ToString());
+    private static void AssertRefusal(JObject result, object captured, bool pending = false)
+    {
+        Assert.False((bool)result["success"], result.ToString());
+        Assert.Same(captured, RosterFixture.GetValue(null));
+        Assert.Equal(pending, (bool)result["restoredPendingVerification"]);
+    }
+
+    private static object ReadState(Captive player) => new
+    {
+        player.Hero.HeroState,
+        player.Hero.PartyBelongedTo,
+        player.Hero.PartyBelongedToAsPrisoner,
+        player.Hero.CaptivityStartTime,
+        PartyState = ReadPartyState(player.Party)
+    };
+
+    private static object ReadPartyState(MobileParty party) => new
+    {
+        party.IsActive,
+        party.IsVisible,
+        party.Position,
+        party.Bearing,
+        party.LeaderHero,
+        Members = party.MemberRoster.TotalManCount,
+        Prisoners = party.PrisonRoster.TotalManCount
+    };
+    private void AssertNoSnapshotReplay() => snapshots.Verify(service => service.TryApply(
+        It.IsAny<MobileParty>(), It.IsAny<PartyBehaviorUpdateData>(), out It.Ref<IInteractablePoint>.IsAny), Times.Never);
+
+    public void Dispose()
+    {
+        harmony.UnpatchAll(harmony.Id);
+        Visuals.Clear();
+        Logs.Clear();
+        foreach (var previous in previousFixtures) previous.Key.SetValue(null, previous.Value);
+        ContainerProvider.SetContainer(previousContainer);
+        container?.Dispose();
+        Campaign.Current = previousCampaign;
+        ModInformation.IsServer = previousServer;
+    }
+
+    private sealed record Captive(Player Player, Hero Hero, MobileParty Party, MobileParty Captor);
+}
+#endif

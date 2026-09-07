@@ -42,7 +42,12 @@ public class MissionModule : Module
 
     protected override void Load(ContainerBuilder builder)
     {
+#if DEBUG
+        builder.RegisterType<SiegeInteractionDebugBehavior>().AsSelf()
+            .As<ISiegeInteractionDebugBehavior>().InstancePerDependency();
+#endif
         builder.RegisterType<ReceivePathDiagnostics>().As<IReceivePathDiagnostics>().InstancePerDependency();
+        builder.RegisterType<SiegeGateHitApplier>().As<ISiegeGateHitApplier>().InstancePerDependency();
         base.Load(builder);
 
         foreach (HarmonyPatchCategoryRegistration registration in CreatePatchCategoryRegistrations())
