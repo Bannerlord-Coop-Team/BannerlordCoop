@@ -82,6 +82,18 @@
     <Reference Include="TaleWorlds.CampaignSystem.ViewModelCollection">
       <HintPath>..\..\mb2\bin\Win64_Shipping_Client\TaleWorlds.CampaignSystem.ViewModelCollection.dll</HintPath>
     </Reference>
+    <Reference Include="TaleWorlds.GauntletUI">
+      <HintPath>..\..\mb2\bin\Win64_Shipping_Client\TaleWorlds.GauntletUI.dll</HintPath>
+    </Reference>
+    <Reference Include="TaleWorlds.Engine.GauntletUI">
+      <HintPath>..\..\mb2\bin\Win64_Shipping_Client\TaleWorlds.Engine.GauntletUI.dll</HintPath>
+    </Reference>
+    <Reference Include="TaleWorlds.InputSystem">
+      <HintPath>..\..\mb2\bin\Win64_Shipping_Client\TaleWorlds.InputSystem.dll</HintPath>
+    </Reference>
+    <Reference Include="TaleWorlds.TwoDimension">
+      <HintPath>..\..\mb2\bin\Win64_Shipping_Client\TaleWorlds.TwoDimension.dll</HintPath>
+    </Reference>
     <Reference Include="TaleWorlds.Core">
       <HintPath>..\..\mb2\bin\Win64_Shipping_Client\TaleWorlds.Core.dll</HintPath>
     </Reference>
@@ -140,6 +152,9 @@
     <Publicize Include="TaleWorlds.Core" />
     <Publicize Include="TaleWorlds.Engine" />
     <Publicize Include="TaleWorlds.Library" />
+    <Publicize Include="TaleWorlds.GauntletUI" IncludeCompilerGeneratedMembers="false" />
+    <Publicize Include="TaleWorlds.Engine.GauntletUI" />
+    <Publicize Include="TaleWorlds.ScreenSystem" />
     <Publicize Include="TaleWorlds.Localization" />
     <Publicize Include="TaleWorlds.ModuleManager" />
     <Publicize Include="TaleWorlds.MountAndBlade" />
