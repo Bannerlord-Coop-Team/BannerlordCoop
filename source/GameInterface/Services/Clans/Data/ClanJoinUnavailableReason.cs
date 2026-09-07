@@ -11,5 +11,8 @@ public enum ClanJoinUnavailableReason
     Mercenary,
     Vassal,
     OwnsFiefs,
-    IncompatibleWars
+    IncompatibleWars,
+    TooManyCompanions,
+    TooManyWorkshops,
+    TooManyParties
 }

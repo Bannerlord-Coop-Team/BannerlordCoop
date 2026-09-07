@@ -1,6 +1,7 @@
 ﻿using Common.Messaging;
 using GameInterface.Services.Banners.Messages;
 using GameInterface.Services.Clans.Data;
+using GameInterface.Services.MobileParties.Extensions;
 using GameInterface.Services.Players;
 using System.Collections.Generic;
 using System.Linq;
@@ -52,6 +53,15 @@ public class ClanJoinRules : IClanJoinRules
         if (clan.Fiefs.Count > 0) return ClanJoinUnavailableReason.OwnsFiefs;
         if (clan.FactionsAtWarWith.Any(faction => !targetClan.IsAtWarWith(faction)))
             return ClanJoinUnavailableReason.IncompatibleWars;
+        if (clan.Companions.Count + targetClan.Companions.Count > targetClan.CompanionLimit)
+            return ClanJoinUnavailableReason.TooManyCompanions;
+        int workshopCount = clan.Heroes.Sum(hero => hero.OwnedWorkshops.Count) +
+            targetClan.Heroes.Sum(hero => hero.OwnedWorkshops.Count);
+        if (workshopCount > Campaign.Current.Models.WorkshopModel.GetMaxWorkshopCountForClanTier(targetClan.Tier))
+            return ClanJoinUnavailableReason.TooManyWorkshops;
+        int incomingParties = clan.WarPartyComponents.Count(party => !party.MobileParty.IsPlayerParty());
+        if (targetClan.WarPartyComponents.Count + incomingParties > targetClan.WarPartyLimit)
+            return ClanJoinUnavailableReason.TooManyParties;
 
         return ClanJoinUnavailableReason.None;
     }

@@ -151,6 +151,9 @@ public static class PlayerPartyInteractionDialogState
             ClanJoinUnavailableReason.Vassal => "str_coop_clan_join_vassal",
             ClanJoinUnavailableReason.OwnsFiefs => "str_coop_clan_join_owns_fiefs",
             ClanJoinUnavailableReason.IncompatibleWars => "str_coop_clan_join_incompatible_wars",
+            ClanJoinUnavailableReason.TooManyCompanions => "str_coop_clan_join_too_many_companions",
+            ClanJoinUnavailableReason.TooManyWorkshops => "str_coop_clan_join_too_many_workshops",
+            ClanJoinUnavailableReason.TooManyParties => "str_coop_clan_join_too_many_parties",
             _ => null
         };
         explanation = textId == null ? null : GameTexts.FindText(textId);
