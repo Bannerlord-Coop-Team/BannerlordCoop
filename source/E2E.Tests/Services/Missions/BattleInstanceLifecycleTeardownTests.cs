@@ -22,10 +22,38 @@ public class BattleInstanceLifecycleTeardownTests
 {
     private const string OwnController = "me";
     private const string PeerController = "peer";
+    private const string OtherController = "other";
     private const string InstanceId = "map-event-1";
 
     [Fact]
     public void Leave_ClearsEveryAgentRegistryIndex()
+    {
+        var registry = NewRegistry();
+        var peerAgent = ObjectHelper.SkipConstructor<Agent>();
+        var otherAgent = ObjectHelper.SkipConstructor<Agent>();
+        var peerAgentId = Guid.NewGuid();
+        var otherAgentId = Guid.NewGuid();
+        Assert.True(registry.TryRegisterAgent(
+            PeerController, PeerController, PeerController, peerAgentId, 42, peerAgent));
+        Assert.True(registry.TryRegisterAgent(
+            OtherController, OtherController, OtherController, otherAgentId, 43, otherAgent));
+
+        using var lifecycle = NewLifecycle(registry);
+        lifecycle.Leave();
+
+        Assert.Empty(registry.GetControllerIds());
+        Assert.Empty(registry.GetAgents(PeerController));
+        Assert.Empty(registry.GetAgents(OtherController));
+        Assert.False(registry.TryGetAgentInfo(peerAgent, out _));
+        Assert.False(registry.TryGetAgentInfo(otherAgent, out _));
+        Assert.False(registry.TryGetAgentInfo(peerAgentId, out _));
+        Assert.False(registry.TryGetAgentInfo(otherAgentId, out _));
+        Assert.False(registry.TryGetAgentInfo(PeerController, 42, out _));
+        Assert.False(registry.TryGetAgentInfo(OtherController, 43, out _));
+    }
+
+    [Fact]
+    public void Leave_ClearsTheAgentRegistry_WhenTheLeaveAnnouncementThrows()
     {
         var registry = NewRegistry();
         var agent = ObjectHelper.SkipConstructor<Agent>();
@@ -33,14 +61,86 @@ public class BattleInstanceLifecycleTeardownTests
         Assert.True(registry.TryRegisterAgent(
             PeerController, PeerController, PeerController, agentId, 42, agent));
 
-        using var lifecycle = NewLifecycle(registry);
-        lifecycle.Leave();
+        var relay = new Mock<INetwork>();
+        relay.Setup(n => n.SendAll(It.IsAny<IMessage>()))
+            .Throws(new InvalidOperationException("leave announcement failed"));
+
+        using var lifecycle = NewLifecycle(registry, relay.Object);
+
+        Assert.Throws<InvalidOperationException>(() => lifecycle.Leave());
 
         Assert.Empty(registry.GetControllerIds());
-        Assert.Empty(registry.GetAgents(PeerController));
         Assert.False(registry.TryGetAgentInfo(agent, out _));
         Assert.False(registry.TryGetAgentInfo(agentId, out _));
         Assert.False(registry.TryGetAgentInfo(PeerController, 42, out _));
+    }
+
+    [Fact]
+    public void Leave_ClearsTheAgentRegistry_WhenAStepAfterTheSocketStopThrows()
+    {
+        var registry = NewRegistry();
+        var agent = ObjectHelper.SkipConstructor<Agent>();
+        var agentId = Guid.NewGuid();
+        Assert.True(registry.TryRegisterAgent(
+            PeerController, PeerController, PeerController, agentId, 42, agent));
+
+        var worldItems = new Mock<INetworkWorldItemRegistry>();
+        worldItems.Setup(w => w.Clear())
+            .Throws(new InvalidOperationException("world item teardown failed"));
+
+        using var lifecycle = NewLifecycle(registry, worldItemRegistry: worldItems.Object);
+
+        Assert.Throws<InvalidOperationException>(() => lifecycle.Leave());
+
+        Assert.Empty(registry.GetControllerIds());
+        Assert.False(registry.TryGetAgentInfo(agent, out _));
+        Assert.False(registry.TryGetAgentInfo(agentId, out _));
+        Assert.False(registry.TryGetAgentInfo(PeerController, 42, out _));
+    }
+
+    [Fact]
+    public void Leave_CalledTwice_LeavesTheRegistryEmpty()
+    {
+        var registry = NewRegistry();
+        Assert.True(registry.TryRegisterAgent(
+            PeerController, Guid.NewGuid(), ObjectHelper.SkipConstructor<Agent>()));
+
+        using var lifecycle = NewLifecycle(registry);
+        lifecycle.Leave();
+        lifecycle.Leave();
+
+        Assert.Empty(registry.GetControllerIds());
+    }
+
+    [Fact]
+    public void SecondBattle_DoesNotSeeTheAgentsOfTheFirst()
+    {
+        var registry = NewRegistry();
+        var firstAgent = ObjectHelper.SkipConstructor<Agent>();
+        var firstAgentId = Guid.NewGuid();
+        Assert.True(registry.TryRegisterAgent(
+            PeerController, PeerController, PeerController, firstAgentId, 42, firstAgent));
+
+        using (var firstBattle = NewLifecycle(registry))
+        {
+            firstBattle.Leave();
+        }
+
+        var secondAgent = ObjectHelper.SkipConstructor<Agent>();
+        var secondAgentId = Guid.NewGuid();
+        Assert.True(registry.TryRegisterAgent(
+            PeerController, PeerController, PeerController, secondAgentId, 42, secondAgent));
+
+        Assert.True(registry.TryGetAgentInfo(PeerController, 42, out var resolved));
+        Assert.Same(secondAgent, resolved.Agent);
+        Assert.Equal(secondAgentId, resolved.AgentId);
+        Assert.False(registry.TryGetAgentInfo(firstAgent, out _));
+        Assert.False(registry.TryGetAgentInfo(firstAgentId, out _));
+
+        using var secondBattle = NewLifecycle(registry);
+        secondBattle.Leave();
+
+        Assert.Empty(registry.GetControllerIds());
     }
 
     private static NetworkAgentRegistry NewRegistry()
@@ -50,7 +150,10 @@ public class BattleInstanceLifecycleTeardownTests
         return new NetworkAgentRegistry(provider.Object);
     }
 
-    private static BattleInstanceLifecycle NewLifecycle(INetworkAgentRegistry registry)
+    private static BattleInstanceLifecycle NewLifecycle(
+        INetworkAgentRegistry registry,
+        INetwork relayNetwork = null,
+        INetworkWorldItemRegistry worldItemRegistry = null)
     {
         var component = new Mock<ICoopMissionComponent>();
         component.SetupGet(c => c.AgentRegistry).Returns(registry);
@@ -62,11 +165,11 @@ public class BattleInstanceLifecycleTeardownTests
 
         return new BattleInstanceLifecycle(
             Mock.Of<IBattleNetwork>(),
-            Mock.Of<INetwork>(),
+            relayNetwork ?? Mock.Of<INetwork>(),
             Mock.Of<IMessageBroker>(),
             Mock.Of<IObjectManager>(),
             component.Object,
-            Mock.Of<INetworkWorldItemRegistry>(),
+            worldItemRegistry ?? Mock.Of<INetworkWorldItemRegistry>(),
             session.Object,
             Mock.Of<IMissionContext>());
     }

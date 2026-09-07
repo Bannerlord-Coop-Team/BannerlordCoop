@@ -24,8 +24,9 @@ public interface IBattleInstanceLifecycle : IDisposable
 {
     /// <summary>
     /// Tear the instance down on mission end: end the spawn gate, clear this battle's troop suppliers,
-    /// announce MissionLeft over the relay, stop the mesh socket, clear the world-item and agent registries,
-    /// and clear the local mission-membership mirror so a stale roster cannot survive into a later re-entry.
+    /// announce MissionLeft over the relay, stop the mesh socket, clear the world-item registry and the local
+    /// mission-membership mirror so a stale roster cannot survive into a later re-entry, and clear the agent
+    /// registry from a finally so a throw in any of those steps cannot leave the battle's agents behind.
     /// </summary>
     void Leave();
 }
@@ -109,29 +110,35 @@ public class BattleInstanceLifecycle : IBattleInstanceLifecycle
 
     public void Leave()
     {
-        BattleSpawnGate.EndBattle();
-
-        if (session.HasInstance)
+        try
         {
-            CoopTroopSupplierRegistry.ClearBattle(session.InstanceId);
-            relayNetwork.SendAll(new NetworkMissionLeft(session.OwnControllerId, session.InstanceId));
-            Logger.Information("[Relay] Announced MissionLeft for battle instance {Instance}", session.InstanceId);
+            BattleSpawnGate.EndBattle();
+
+            if (session.HasInstance)
+            {
+                CoopTroopSupplierRegistry.ClearBattle(session.InstanceId);
+                relayNetwork.SendAll(new NetworkMissionLeft(session.OwnControllerId, session.InstanceId));
+                Logger.Information("[Relay] Announced MissionLeft for battle instance {Instance}", session.InstanceId);
+            }
+
+            network.Stop();
+            worldItemRegistry.Clear();
+
+            // Wipe the local membership mirror on our way out. Stopping the socket clears only the direct peer
+            // mappings; the server-announced membership set (which the absent-controller sweep consults) would
+            // otherwise persist, and once we have left the server no longer fans this instance's churn to us — so
+            // a controller that drops while we are away would keep looking present. On re-entry (BR-054) the
+            // server re-announces the current members, so the mirror is rebuilt fresh.
+            missionContext.EndInstance();
         }
-
-        network.Stop();
-        worldItemRegistry.Clear();
-
-        // Release this battle's agents here rather than leaving them to the next mission's entry path, because
-        // the registry outlives the mission and would otherwise keep wrappers around destroyed native agents
-        // reachable while the client is back on the campaign map.
-        coopMissionComponent.AgentRegistry.Clear();
-
-        // Wipe the local membership mirror on our way out. Stopping the socket clears only the direct peer
-        // mappings; the server-announced membership set (which the absent-controller sweep consults) would
-        // otherwise persist, and once we have left the server no longer fans this instance's churn to us — so
-        // a controller that drops while we are away would keep looking present. On re-entry (BR-054) the
-        // server re-announces the current members, so the mirror is rebuilt fresh.
-        missionContext.EndInstance();
+        finally
+        {
+            // Release this battle's agents from the finally so a throw in any step above still empties the
+            // registry, because the registry outlives the mission and would otherwise keep wrappers around
+            // destroyed native agents reachable while the client is back on the campaign map. Clear is
+            // idempotent, and the socket is already stopped above on the path that does not throw.
+            coopMissionComponent.AgentRegistry.Clear();
+        }
     }
 
     private void Handle_LeaveMission(MessagePayload<NetworkMissionLeft> payload)
