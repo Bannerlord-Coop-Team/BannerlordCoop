@@ -2110,4 +2110,59 @@ public class VillageNeedsCraftingMaterialsIssueTests : IDisposable
             });
         }
     }
+
+    [Fact]
+    public void OnClanChangedKingdom_CancelsOnlyViaTheOwningClient_WhenTheGiverSettlementIsNowAtWarWithTheOwner()
+    {
+        var fixture = SetupIssueOwner();
+        CreateIssueOnServer(fixture.HeroId);
+        ForcePromisedPaymentEverywhere(fixture.HeroId);
+        var ownerHeroId = CreateDistinctOwnerHero(fixture);
+        AcceptQuestFromClient(fixture, "player-A", ownerHeroId);
+
+        foreach (var instance in AllInstances)
+        {
+            DeclareWarBetweenGiverAndOwner(instance, fixture, ownerHeroId);
+        }
+        PutTheServersOwnMainHeroAtWarWithTheGiver(fixture);
+
+        float powerBefore = 0f;
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject<Hero>(fixture.HeroId, out var giver));
+            powerBefore = giver.Power;
+        });
+
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject<Hero>(fixture.HeroId, out var giver));
+            CampaignEventDispatcher.Instance.OnClanChangedKingdom(
+                giver.Clan, oldKingdom: null, newKingdom: null,
+                actionDetail: ChangeKingdomAction.ChangeKingdomActionDetail.JoinKingdomByDefection, showNotification: false);
+        });
+
+        var removed = Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkIssueRemoved>());
+        Assert.Equal(fixture.HeroId, removed.OwnerId);
+        Assert.Equal(IssueFinalizeReason.QuestCancel, removed.Reason);
+
+        foreach (var instance in AllInstances)
+        {
+            instance.Call(() =>
+            {
+                Assert.True(instance.ObjectManager.TryGetObject<Hero>(fixture.HeroId, out var giver));
+                Assert.Null(giver.Issue);
+                Assert.False(Campaign.Current.IssueManager.Issues.ContainsKey(giver));
+            });
+        }
+
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject<Hero>(fixture.HeroId, out var giver));
+            Assert.Equal(powerBefore, giver.Power);
+        });
+
+        Assert.Empty(OtherClient.NetworkSentMessages.GetMessages<RequestIssueRemoved>());
+        Assert.Single(Client.InternalMessages.GetMessages<QuestTerminalOutcomeTriggered>());
+        Assert.Single(Client.NetworkSentMessages.GetMessages<RequestIssueRemoved>());
+    }
 }

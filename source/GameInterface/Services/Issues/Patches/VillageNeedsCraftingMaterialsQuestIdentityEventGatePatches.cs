@@ -43,3 +43,28 @@ internal class VillageNeedsCraftingMaterialsQuestWarDeclaredGatePatch
         }
     }
 }
+
+[HarmonyPatch(typeof(Quest), "OnClanChangedKingdom")]
+internal class VillageNeedsCraftingMaterialsQuestClanChangedKingdomGatePatch
+{
+    [HarmonyPrefix]
+    private static bool Prefix(
+        Quest __instance, Clan clan, Kingdom oldKingdom, Kingdom newKingdom, ChangeKingdomAction.ChangeKingdomActionDetail detail, bool showNotification)
+    {
+        if (CallOriginalPolicy.IsOriginalAllowed()) return true;
+
+        if (ContainerProvider.TryResolve<IIssueOwnershipRegistry>(out var registry) && registry.IsLocalPeerOwner(__instance.QuestGiver))
+        {
+            Evaluate(__instance);
+        }
+
+        return false;
+    }
+
+    private static void Evaluate(Quest quest)
+    {
+        if (!quest.QuestGiver.CurrentSettlement.MapFaction.IsAtWarWith(Hero.MainHero.MapFaction)) return;
+
+        VillageNeedsCraftingMaterialsQuestType.PublishTerminalOutcome(quest.QuestGiver, IssueFinalizeReason.QuestCancel);
+    }
+}
