@@ -986,6 +986,136 @@ public class VillageNeedsToolsIssueTests : IDisposable
     }
 
     [Fact]
+    public void OnMapEventStarted_CoercionByTheOwnersOwnParty_FailsOnlyViaTheOwningClient_HonorPenaltyLandsOnlyThere()
+    {
+        var fixture = SetupVillageOwner();
+        CreateIssueOnServer(fixture);
+        var ownerHeroId = CreateDistinctOwnerHero(fixture);
+        var partyId = AcceptQuestFromClient(fixture, "player-A", ownerHeroId);
+
+        foreach (var instance in AllInstances)
+        {
+            instance.Call(() =>
+            {
+                Assert.True(instance.ObjectManager.TryGetObject<Hero>(fixture.HeroId, out var giver));
+                Assert.True(instance.ObjectManager.TryGetObject<Settlement>(fixture.SettlementId, out var settlement));
+                using (new AllowedThread())
+                {
+                    settlement.Party ??= new PartyBase(settlement);
+                    giver.Occupation = Occupation.RuralNotable;
+                    settlement.CollectNotablesToCache();
+                }
+                Assert.Contains(giver, settlement.Notables);
+            });
+        }
+
+        MapEvent clientMapEvent = null;
+        foreach (var instance in new[] { Server, Client })
+        {
+            instance.Call(() =>
+            {
+                Assert.True(instance.ObjectManager.TryGetObject<MobileParty>(partyId, out var party));
+                Assert.True(instance.ObjectManager.TryGetObject<Settlement>(fixture.SettlementId, out var settlement));
+                MapEvent mapEvent;
+                using (new AllowedThread())
+                {
+                    mapEvent = new MapEvent();
+                    mapEvent._mapEventType = MapEvent.BattleTypes.IsForcingSupplies;
+                    mapEvent.MapEventSettlement = settlement;
+                    mapEvent._sides[0] = new MapEventSide(mapEvent, BattleSideEnum.Defender, settlement.Party);
+                    mapEvent._sides[1] = new MapEventSide(mapEvent, BattleSideEnum.Attacker, party.Party);
+                    settlement.Party._mapEventSide = mapEvent.DefenderSide;
+                }
+                Assert.True(mapEvent.IsForcingSupplies);
+                Assert.Same(mapEvent, settlement.Party.MapEvent);
+                if (instance == Client) clientMapEvent = mapEvent;
+            });
+        }
+
+        float powerBefore = 0f;
+        int relationBefore = 0;
+        int serverHonorXpBefore = 0;
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject<Hero>(fixture.HeroId, out var giver));
+            Assert.True(Server.ObjectManager.TryGetObject<Hero>(ownerHeroId, out var ownerHero));
+            powerBefore = giver.Power;
+            relationBefore = giver.GetRelation(ownerHero);
+            serverHonorXpBefore = Campaign.Current.PlayerTraitDeveloper.GetPropertyValue(DefaultTraits.Honor);
+        });
+        int clientHonorXpBefore = 0;
+        Client.Call(() => clientHonorXpBefore = Campaign.Current.PlayerTraitDeveloper.GetPropertyValue(DefaultTraits.Honor));
+
+        OtherClient.Call(() =>
+        {
+            Assert.True(OtherClient.ObjectManager.TryGetObject<Hero>(fixture.HeroId, out var giver));
+            Assert.True(OtherClient.ObjectManager.TryGetObject<Settlement>(fixture.SettlementId, out var settlement));
+            var quest = Assert.IsType<VillageNeedsToolsIssueBehavior.VillageNeedsToolsIssueQuest>(giver.Issue.IssueQuest);
+            quest.OnMapEventStarted(null, settlement.Party, settlement.Party);
+            Assert.NotNull(giver.Issue);
+        });
+        Assert.Empty(OtherClient.NetworkSentMessages.GetMessages<RequestIssueRemoved>());
+
+        Client.Call(() =>
+        {
+            Assert.True(Client.ObjectManager.TryGetObject<Hero>(fixture.HeroId, out var giver));
+            Assert.True(Client.ObjectManager.TryGetObject<MobileParty>(partyId, out var party));
+            var quest = Assert.IsType<VillageNeedsToolsIssueBehavior.VillageNeedsToolsIssueQuest>(giver.Issue.IssueQuest);
+            quest.OnMapEventStarted(clientMapEvent, party.Party, PartyBase.MainParty);
+        });
+
+        var removed = Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkIssueRemoved>());
+        Assert.Equal(fixture.HeroId, removed.OwnerId);
+        Assert.Equal(IssueFinalizeReason.QuestFail, removed.Reason);
+        Assert.Equal(VillageNeedsToolsQuestType.ProofFailCoercion, removed.Proof);
+
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject<Hero>(fixture.HeroId, out var giver));
+            Assert.True(Server.ObjectManager.TryGetObject<Hero>(ownerHeroId, out var ownerHero));
+            Assert.Equal(powerBefore - 20f, giver.Power);
+            Assert.Equal(relationBefore - 10, giver.GetRelation(ownerHero));
+            Assert.Equal(serverHonorXpBefore, Campaign.Current.PlayerTraitDeveloper.GetPropertyValue(DefaultTraits.Honor));
+        });
+        Client.Call(() => Assert.Equal(clientHonorXpBefore - 50, Campaign.Current.PlayerTraitDeveloper.GetPropertyValue(DefaultTraits.Honor)));
+
+        foreach (var instance in AllInstances)
+        {
+            instance.Call(() =>
+            {
+                Assert.True(instance.ObjectManager.TryGetObject<Hero>(fixture.HeroId, out var giver));
+                Assert.Null(giver.Issue);
+            });
+        }
+    }
+
+    [Fact]
+    public void RequestIssueRemoved_ClaimingCoercion_WithoutARealMapEvent_IsRejected()
+    {
+        var fixture = SetupVillageOwner();
+        CreateIssueOnServer(fixture);
+        var ownerHeroId = CreateDistinctOwnerHero(fixture);
+        AcceptQuestFromClient(fixture, "player-A", ownerHeroId);
+
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject<Hero>(fixture.HeroId, out var giver));
+            Assert.True(Server.Resolve<IIssueGenerationRegistry>().TryGetGeneration(giver, out var generation));
+            Server.Resolve<IMessageBroker>().Publish(Client.NetPeer,
+                new RequestIssueRemoved(fixture.HeroId, IssueFinalizeReason.QuestFail, generation, VillageNeedsToolsQuestType.ProofFailCoercion));
+        });
+
+        Assert.Empty(Server.NetworkSentMessages.GetMessages<NetworkIssueRemoved>());
+
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject<Hero>(fixture.HeroId, out var giver));
+            Assert.NotNull(giver.Issue);
+            Assert.True(giver.Issue.IssueQuest.IsOngoing);
+        });
+    }
+
+    [Fact]
     public void RaidCompletedOnTheGiverVillage_ServerFinalizesTheRealQuestUnderAuthority_ClientsNeverRunTheHandlerThemselves()
     {
         var fixture = SetupVillageOwner();

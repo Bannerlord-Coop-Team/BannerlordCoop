@@ -9,6 +9,7 @@ using GameInterface.Services.Issues.Messages;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Players;
 using HarmonyLib;
+using Helpers;
 using ProtoBuf;
 using System;
 using System.Reflection;
@@ -237,6 +238,7 @@ internal static class VillageNeedsToolsQuestType
     }
 
     internal const byte ProofFailWar = 1;
+    internal const byte ProofFailCoercion = 2;
 
     internal static void PublishTerminalOutcome(Hero owner, IssueFinalizeReason reason)
     {
@@ -266,9 +268,31 @@ internal static class VillageNeedsToolsQuestType
         return giverFaction != null && ownerFaction != null && giverFaction.IsAtWarWith(ownerFaction);
     }
 
+    private static bool TryResolveRecordedOwnerParty(Hero issueOwnerHero, out MobileParty ownerParty)
+    {
+        ownerParty = null;
+
+        if (!ContainerProvider.TryResolve<IIssueOwnershipRegistry>(out var ownershipRegistry)) return false;
+        if (!ownershipRegistry.TryGetOwnerControllerId(issueOwnerHero, out var controllerId)) return false;
+        if (!ContainerProvider.TryResolve<IPlayerManager>(out var playerManager)) return false;
+        if (!playerManager.TryGetPlayer(controllerId, out var player) || player.MobilePartyId == null) return false;
+        if (!ContainerProvider.TryResolve<IObjectManager>(out var objectManager)) return false;
+
+        return objectManager.TryGetObjectWithLogging<MobileParty>(player.MobilePartyId, out ownerParty);
+    }
+
+    private static bool IsBeingCoercedByRecordedOwner(Issue issue)
+    {
+        if (!TryResolveRecordedOwnerParty(issue.IssueOwner, out var ownerParty) || ownerParty == null) return false;
+
+        var mapEvent = issue.IssueOwner.CurrentSettlement?.Party?.MapEvent;
+        return mapEvent != null && (mapEvent.IsForcingSupplies || mapEvent.IsForcingVolunteers) && mapEvent.AttackerSide.LeaderParty == ownerParty.Party;
+    }
+
     private static bool ValidateQuestFail(Issue issue) => QuestFailProofContext.Current switch
     {
         ProofFailWar => IsAtWarWithRecordedOwner(issue),
+        ProofFailCoercion => IsBeingCoercedByRecordedOwner(issue),
         _ => false,
     };
 
@@ -281,10 +305,28 @@ internal static class VillageNeedsToolsQuestType
             case ProofFailWar:
                 quest.CompleteQuestWithFail(quest.PlayerDeclaredWarQuestLogText);
                 return;
+            case ProofFailCoercion:
+                var accusedLog = new TextObject("{=tWZ4a8Ih}You are accused in {SETTLEMENT} of a crime and {QUEST_GIVER.LINK} no longer trusts you in this matter.");
+                accusedLog.SetTextVariable("SETTLEMENT", quest.QuestGiver.CurrentSettlement.EncyclopediaLinkWithName);
+                StringHelpers.SetCharacterProperties("QUEST_GIVER", quest.QuestGiver.CharacterObject, accusedLog);
+                quest.CompleteQuestWithFail(accusedLog);
+                ChangeRelationAction.ApplyPlayerRelation(quest.QuestGiver, -5);
+                quest.QuestGiver.AddPower(-10f);
+                return;
             default:
                 quest.CompleteQuestWithFail();
                 return;
         }
+    }
+
+    private static void ApplyQuestFailLocalOwnerConsequence(Quest quest, byte proof)
+    {
+        if (proof != ProofFailCoercion) return;
+
+        TraitLevelingHelper.OnIssueSolvedThroughAlternativeSolution(Hero.MainHero, new Tuple<TraitObject, int>[1]
+        {
+            new Tuple<TraitObject, int>(DefaultTraits.Honor, -50)
+        });
     }
 
     private static void ApplyQuestSuccessLocalOwnerConsequence(Quest quest)
@@ -334,6 +376,7 @@ internal static class VillageNeedsToolsQuestType
             .WithQuestFailValidation(ValidateQuestFail)
             .WithQuestFailProofCapture(CaptureQuestFailProof)
             .WithQuestFailConsequence(ApplyQuestFailConsequence)
+            .WithQuestFailLocalOwnerConsequence(ApplyQuestFailLocalOwnerConsequence)
             .Build();
 
         QuestTypeRegistry.Register(descriptor);

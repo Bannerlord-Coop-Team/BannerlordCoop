@@ -9,6 +9,8 @@ using Helpers;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Actions;
 using TaleWorlds.CampaignSystem.Issues;
+using TaleWorlds.CampaignSystem.MapEvents;
+using TaleWorlds.CampaignSystem.Party;
 
 namespace GameInterface.Services.Issues.Patches;
 
@@ -67,5 +69,29 @@ internal class VillageNeedsToolsQuestClanChangedKingdomGatePatch
         if (!quest.QuestGiver.CurrentSettlement.MapFaction.IsAtWarWith(Hero.MainHero.MapFaction)) return;
 
         VillageNeedsToolsQuestType.PublishTerminalOutcome(quest.QuestGiver, IssueFinalizeReason.QuestCancel);
+    }
+}
+
+[HarmonyPatch(typeof(Quest), "OnMapEventStarted")]
+internal class VillageNeedsToolsQuestMapEventStartedGatePatch
+{
+    [HarmonyPrefix]
+    private static bool Prefix(Quest __instance, MapEvent mapEvent, PartyBase attackerParty, PartyBase defenderParty)
+    {
+        if (CallOriginalPolicy.IsOriginalAllowed()) return true;
+
+        if (ContainerProvider.TryResolve<IIssueOwnershipRegistry>(out var registry) && registry.IsLocalPeerOwner(__instance.QuestGiver))
+        {
+            Evaluate(__instance, mapEvent, attackerParty);
+        }
+
+        return false;
+    }
+
+    private static void Evaluate(Quest quest, MapEvent mapEvent, PartyBase attackerParty)
+    {
+        if (!QuestHelper.CheckMinorMajorCoercion(quest, mapEvent, attackerParty)) return;
+
+        VillageNeedsToolsQuestType.PublishQuestFail(quest.QuestGiver, VillageNeedsToolsQuestType.ProofFailCoercion);
     }
 }
