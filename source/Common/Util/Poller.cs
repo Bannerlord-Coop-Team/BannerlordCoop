@@ -24,14 +24,16 @@ public class Poller
     private TimeSpan pollingInterval;
 
     /// <summary>
-    /// Guards the loop ownership below, so Start, Stop and StopAndWait never interleave
+    /// Serializes Start, Stop and StopAndWait so they never see a half-swapped source and task
     /// </summary>
     private readonly object lifecycleLock = new object();
 
     /// <summary>
-    /// The loop this poller owns right now, or null while nothing is polling
+    /// A cancellation token source to stop the polling
     /// </summary>
-    private PollLoop currentLoop;
+    private CancellationTokenSource cts;
+
+    private Task pollingTask;
 
     [ThreadStatic]
     private static Poller activePoller;
@@ -39,17 +41,7 @@ public class Poller
     /// <summary>
     /// Returns true if task is running otherwise false
     /// </summary>
-    public bool IsRunning
-    {
-        get
-        {
-            lock (lifecycleLock)
-            {
-                return currentLoop != null && !currentLoop.Token.IsCancellationRequested;
-            }
-        }
-    }
-
+    public bool IsRunning => !cts?.IsCancellationRequested ?? false;
     public bool IsPollingThread => ReferenceEquals(activePoller, this);
 
     /// <summary>
@@ -70,31 +62,30 @@ public class Poller
     }
 
     /// <summary>
-    /// Starts the polling task in the background. On an already started poller this cancels the running loop and
-    /// queues the replacement behind it, because both loops would otherwise call the polling function at the same time.
+    /// Starts the polling task in the background. Restarting cancels the current source and queues the replacement
+    /// behind the running task, because both loops would otherwise call the polling function at the same time.
     /// </summary>
     public void Start()
     {
         lock (lifecycleLock)
         {
-            // Read the task before cancelling: cancellation can finish the loop right here, which clears currentLoop.
-            var previous = currentLoop?.Task;
-            currentLoop?.Cancellation.Cancel();
+            var previousTask = pollingTask;
+            cts?.Cancel();
 
-            var loop = new PollLoop(new CancellationTokenSource());
-            currentLoop = loop;
-            loop.Task = Task.Run(() => RunLoopAsync(loop, previous));
+            var source = new CancellationTokenSource();
+            cts = source;
+            pollingTask = Task.Run(() => RunAsync(previousTask, source));
         }
     }
 
-    private async Task RunLoopAsync(PollLoop loop, Task previous)
+    private async Task RunAsync(Task previousTask, CancellationTokenSource source)
     {
-        if (previous != null)
+        if (previousTask != null)
         {
             try
             {
-                // Let the loop this one replaces finish first, otherwise two loops poll the same state side by side.
-                await previous;
+                // Wait out the loop this one replaces, otherwise both poll the same state side by side.
+                await previousTask;
             }
             catch (Exception ex)
             {
@@ -104,24 +95,24 @@ public class Poller
 
         try
         {
-            await PollAsync(loop);
+            await PollAsync(source.Token);
         }
         finally
         {
             lock (lifecycleLock)
             {
-                if (ReferenceEquals(currentLoop, loop))
+                // Only clear the field when a restart hasn't already put a newer source there.
+                if (ReferenceEquals(cts, source))
                 {
-                    currentLoop = null;
+                    cts = null;
                 }
-            }
 
-            // Nothing can reach this source once the loop above has given up ownership, so its handles can go.
-            loop.Cancellation.Dispose();
+                source.Dispose();
+            }
         }
     }
 
-    private async Task PollAsync(PollLoop loop)
+    private async Task PollAsync(CancellationToken token)
     {
         // Setup initial start time
         var startTime = DateTime.Now;
@@ -130,7 +121,7 @@ public class Poller
         string lastError = null;
         long repeatCount = 0;
 
-        while (loop.Token.IsCancellationRequested == false)
+        while (token.IsCancellationRequested == false)
         {
             // Calculate the delta time span
             var delta = DateTime.Now - startTime;
@@ -166,7 +157,7 @@ public class Poller
             // Wait for the specified interval to elapse before continuing the loop
             try
             {
-                await Task.Delay(pollingInterval, loop.Token);
+                await Task.Delay(pollingInterval, token);
             }
             catch (OperationCanceledException)
             {
@@ -183,7 +174,7 @@ public class Poller
     public void Stop()
     {
         // Cancel the cancellation token
-        CancelCurrentLoop();
+        CancelAndCaptureTask();
     }
 
     /// <summary>
@@ -198,7 +189,7 @@ public class Poller
     /// </returns>
     public bool StopAndWait(TimeSpan timeout)
     {
-        var task = CancelCurrentLoop();
+        var task = CancelAndCaptureTask();
 
         if (IsPollingThread)
         {
@@ -222,41 +213,14 @@ public class Poller
     }
 
     /// <summary>
-    /// Cancels the loop this poller owns and hands its task back, so the caller can wait outside the lifecycle lock.
+    /// Cancels the current source and hands back the tracked task, so the caller waits outside the lifecycle lock.
     /// </summary>
-    private Task CancelCurrentLoop()
+    private Task CancelAndCaptureTask()
     {
         lock (lifecycleLock)
         {
-            var loop = currentLoop;
-            if (loop == null)
-            {
-                return null;
-            }
-
-            // Read the task before cancelling: cancellation can finish the loop right here, which clears currentLoop.
-            var task = loop.Task;
-            loop.Cancellation.Cancel();
-            return task;
+            cts?.Cancel();
+            return pollingTask;
         }
-    }
-
-    /// <summary>
-    /// One polling loop and the cancellation it owns. A loop only ever reads its own token, so a restart cannot
-    /// hand the previous loop the new loop's cancellation and leave it running.
-    /// </summary>
-    private sealed class PollLoop
-    {
-        public PollLoop(CancellationTokenSource cancellation)
-        {
-            Cancellation = cancellation;
-            Token = cancellation.Token;
-        }
-
-        public CancellationTokenSource Cancellation { get; }
-
-        public CancellationToken Token { get; }
-
-        public Task Task { get; set; }
     }
 }

@@ -265,4 +265,58 @@ public sealed class PollerTests
             poller.StopAndWait(TimeSpan.FromSeconds(5));
         }
     }
+
+    [Fact]
+    public void Start_CalledFromThePollingFunction_RunsTheReplacementLoopOnItsOwn()
+    {
+        using var restartRequested = new ManualResetEventSlim(false);
+        using var releaseFirstTick = new ManualResetEventSlim(false);
+        using var laterTickEntered = new ManualResetEventSlim(false);
+        var sync = new object();
+        int ticksEntered = 0;
+        int ticksInFlight = 0;
+        int mostTicksInFlight = 0;
+        Poller poller = null!;
+        poller = new Poller(_ =>
+        {
+            bool isFirstTick;
+            lock (sync)
+            {
+                isFirstTick = ++ticksEntered == 1;
+                ticksInFlight++;
+                if (ticksInFlight > mostTicksInFlight) mostTicksInFlight = ticksInFlight;
+            }
+
+            if (isFirstTick)
+            {
+                poller.Start();
+                restartRequested.Set();
+                releaseFirstTick.Wait();
+            }
+            else
+            {
+                laterTickEntered.Set();
+            }
+
+            lock (sync) ticksInFlight--;
+        }, TimeSpan.FromSeconds(1));
+
+        try
+        {
+            poller.Start();
+            Assert.True(restartRequested.Wait(TimeSpan.FromSeconds(5)));
+
+            Assert.False(laterTickEntered.Wait(TimeSpan.FromSeconds(1)));
+
+            releaseFirstTick.Set();
+
+            Assert.True(laterTickEntered.Wait(TimeSpan.FromSeconds(5)));
+            lock (sync) Assert.Equal(1, mostTicksInFlight);
+        }
+        finally
+        {
+            releaseFirstTick.Set();
+            poller.StopAndWait(TimeSpan.FromSeconds(5));
+        }
+    }
 }
