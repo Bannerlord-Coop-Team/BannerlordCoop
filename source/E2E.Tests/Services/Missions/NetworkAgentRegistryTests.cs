@@ -11,7 +11,8 @@ namespace E2E.Tests.Services.Missions;
 
 /// <summary>
 /// Unit tests for <see cref="NetworkAgentRegistry.TryTransferAuthority"/> — the per-agent authority move that
-/// underpins host migration (a successor adopting the old host's agents) and control transfer. Uses an
+/// underpins host migration (a successor adopting the old host's agents) and control transfer. Also covers the
+/// per-agent removal that shares the same controller bookkeeping. Uses an
 /// uninitialized <see cref="Agent"/> as a registry key; no agent behaviour is exercised, so no live mission
 /// is needed.
 /// </summary>
@@ -219,6 +220,22 @@ public class NetworkAgentRegistryTests
         Assert.True(registry.TryRegisterAgent(
             "host", "host", "host:epoch-2", Guid.NewGuid(), 7,
             ObjectHelper.SkipConstructor<Agent>()));
+    }
+
+    [Fact]
+    public void RemoveAgent_DropsTheControllerEntryWithItsLastAgent()
+    {
+        var registry = NewRegistry(localControllerId: "me");
+        var first = Guid.NewGuid();
+        var second = Guid.NewGuid();
+        Assert.True(registry.TryRegisterAgent("host", first, ObjectHelper.SkipConstructor<Agent>()));
+        Assert.True(registry.TryRegisterAgent("host", second, ObjectHelper.SkipConstructor<Agent>()));
+
+        Assert.True(registry.RemoveAgent(first));
+        Assert.Contains("host", registry.GetControllerIds());
+
+        Assert.True(registry.RemoveAgent(second));
+        Assert.DoesNotContain("host", registry.GetControllerIds());
     }
 
     [Fact]
