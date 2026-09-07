@@ -933,6 +933,59 @@ public class VillageNeedsToolsIssueTests : IDisposable
     }
 
     [Fact]
+    public void OnClanChangedKingdom_CancelsOnlyViaTheOwningClient_WhenTheGiverSettlementIsNowAtWarWithTheOwner()
+    {
+        var fixture = SetupVillageOwner();
+        CreateIssueOnServer(fixture);
+        var ownerHeroId = CreateDistinctOwnerHero(fixture);
+        AcceptQuestFromClient(fixture, "player-A", ownerHeroId);
+
+        Client.Call(() =>
+        {
+            Assert.True(Client.ObjectManager.TryGetObject<Hero>(ownerHeroId, out var ownerHero));
+            Game.Current.PlayerTroop = ownerHero.CharacterObject;
+        });
+
+        DeclareWarBetweenGiverAndOwner(Server, fixture, ownerHeroId);
+        DeclareWarBetweenGiverAndOwner(Client, fixture, ownerHeroId);
+
+        var hostClanId = TestEnvironment.CreateRegisteredObject<Clan>();
+        Server.Call(() =>
+        {
+            InstallDiplomacyModel();
+            Assert.True(Server.ObjectManager.TryGetObject<Clan>(hostClanId, out var hostClan));
+            Assert.True(Server.ObjectManager.TryGetObject<Hero>(fixture.HeroId, out var giver));
+            using (new AllowedThread())
+            {
+                Hero.MainHero.Clan = hostClan;
+                FactionManager.DeclareWar(giver.MapFaction, hostClan.MapFaction);
+            }
+            Assert.True(giver.MapFaction.IsAtWarWith(Hero.MainHero.MapFaction));
+        });
+
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject<Hero>(fixture.HeroId, out var giver));
+            CampaignEventDispatcher.Instance.OnClanChangedKingdom(
+                giver.Clan, oldKingdom: null, newKingdom: null,
+                actionDetail: ChangeKingdomAction.ChangeKingdomActionDetail.JoinKingdomByDefection, showNotification: false);
+        });
+
+        var removed = Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkIssueRemoved>());
+        Assert.Equal(fixture.HeroId, removed.OwnerId);
+        Assert.Equal(IssueFinalizeReason.QuestCancel, removed.Reason);
+
+        foreach (var instance in AllInstances)
+        {
+            instance.Call(() =>
+            {
+                Assert.True(instance.ObjectManager.TryGetObject<Hero>(fixture.HeroId, out var giver));
+                Assert.Null(giver.Issue);
+            });
+        }
+    }
+
+    [Fact]
     public void RaidCompletedOnTheGiverVillage_ServerFinalizesTheRealQuestUnderAuthority_ClientsNeverRunTheHandlerThemselves()
     {
         var fixture = SetupVillageOwner();
