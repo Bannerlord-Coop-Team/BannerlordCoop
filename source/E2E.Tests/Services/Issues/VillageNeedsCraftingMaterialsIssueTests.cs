@@ -2289,4 +2289,59 @@ public class VillageNeedsCraftingMaterialsIssueTests : IDisposable
 
         Assert.Single(Client.InternalMessages.GetMessages<QuestTerminalOutcomeTriggered>());
     }
+
+    private static RaidEventComponent CreateCompletedRaidOn(Settlement settlement)
+    {
+        var mapEvent = ObjectHelper.SkipConstructor<MapEvent>();
+        mapEvent.MapEventSettlement = settlement;
+        return new RaidEventComponent(mapEvent);
+    }
+
+    [Fact]
+    public void OnRaidCompleted_ServerFinalizesTheRealQuestUnderAuthority_ClientsNeverRunTheHandlerThemselves()
+    {
+        var fixture = SetupIssueOwner();
+        CreateIssueOnServer(fixture.HeroId);
+        ForcePromisedPaymentEverywhere(fixture.HeroId);
+        var ownerHeroId = CreateDistinctOwnerHero(fixture);
+        AcceptQuestFromClient(fixture, "player-A", ownerHeroId);
+
+        Client.Call(() =>
+        {
+            Assert.True(Client.ObjectManager.TryGetObject<Hero>(fixture.HeroId, out var giver));
+            Assert.True(Client.ObjectManager.TryGetObject<Settlement>(fixture.SettlementId, out var settlement));
+
+            CampaignEventDispatcher.Instance.RaidCompleted(BattleSideEnum.Attacker, CreateCompletedRaidOn(settlement));
+
+            Assert.NotNull(giver.Issue);
+            Assert.True(giver.Issue.IssueQuest.IsOngoing);
+        });
+        Assert.Empty(Client.NetworkSentMessages.GetMessages<RequestIssueRemoved>());
+        Assert.Empty(Server.NetworkSentMessages.GetMessages<NetworkIssueRemoved>());
+
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject<Hero>(fixture.HeroId, out var giver));
+            Assert.True(Server.ObjectManager.TryGetObject<Settlement>(fixture.SettlementId, out var settlement));
+
+            CampaignEventDispatcher.Instance.RaidCompleted(BattleSideEnum.Attacker, CreateCompletedRaidOn(settlement));
+
+            Assert.Null(giver.Issue);
+            Assert.False(Campaign.Current.IssueManager.Issues.ContainsKey(giver));
+        });
+
+        var removed = Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkIssueRemoved>());
+        Assert.Equal(fixture.HeroId, removed.OwnerId);
+        Assert.Equal(IssueFinalizeReason.QuestCancel, removed.Reason);
+
+        foreach (var instance in AllInstances)
+        {
+            instance.Call(() =>
+            {
+                Assert.True(instance.ObjectManager.TryGetObject<Hero>(fixture.HeroId, out var giver));
+                Assert.Null(giver.Issue);
+                Assert.False(Campaign.Current.IssueManager.Issues.ContainsKey(giver));
+            });
+        }
+    }
 }

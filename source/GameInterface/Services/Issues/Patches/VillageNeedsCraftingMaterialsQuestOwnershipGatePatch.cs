@@ -1,4 +1,6 @@
+using Common;
 using Common.Messaging;
+using GameInterface.Policies;
 using GameInterface.Services.Entity;
 using GameInterface.Services.Issues.Generic;
 using GameInterface.Services.Issues.Generic.Migrated.VillageNeedsCraftingMaterials;
@@ -68,4 +70,22 @@ internal class VillageNeedsCraftingMaterialsQuestSuccessTriggerPatch
         ContainerProvider.TryResolve<IControllerIdProvider>(out var controllerIdProvider);
         MessageBroker.Instance.Publish(owner, new QuestSuccessTriggered(owner, controllerIdProvider?.ControllerId));
     }
+}
+
+[HarmonyPatch(typeof(VillageNeedsCraftingMaterialsIssueBehavior.VillageNeedsCraftingMaterialsIssueQuest), "OnRaidCompleted")]
+internal class VillageNeedsCraftingMaterialsQuestRaidCompletedAuthorityPatch
+{
+    [HarmonyPrefix]
+    private static bool Prefix(out IssueFinalizeAuthorityGuard __state)
+    {
+        __state = null;
+        if (CallOriginalPolicy.IsOriginalAllowed()) return true;
+        if (!ModInformation.IsServer) return false;
+
+        __state = new IssueFinalizeAuthorityGuard();
+        return true;
+    }
+
+    [HarmonyFinalizer]
+    private static void Finalizer(IssueFinalizeAuthorityGuard __state) => __state?.Dispose();
 }
