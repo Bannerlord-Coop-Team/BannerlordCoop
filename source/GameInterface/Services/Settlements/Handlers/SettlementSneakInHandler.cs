@@ -7,6 +7,7 @@ using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Settlements.Messages;
 using Serilog;
 using TaleWorlds.CampaignSystem;
+using TaleWorlds.CampaignSystem.Actions;
 using TaleWorlds.CampaignSystem.Settlements;
 
 namespace GameInterface.Services.Settlements.Handlers;
@@ -33,12 +34,18 @@ internal class SettlementSneakInHandler : IHandler
 
         messageBroker.Subscribe<AddSettlementAsSneakedIn>(Handle_AddSettlementAsSneakedIn);
         messageBroker.Subscribe<NetworkAddSettlementAsSneakedIn>(Handle_NetworkAddSettlementAsSneakedIn);
+
+        messageBroker.Subscribe<TakenPrisonerDuringSneakIn>(Handle_TakenPrisonerDuringSneakIn);
+        messageBroker.Subscribe<NetworkTakenPrisonerDuringSneakIn>(Handle_NetworkTakenPrisonerDuringSneakIn);
     }
 
     public void Dispose()
     {
         messageBroker.Unsubscribe<AddSettlementAsSneakedIn>(Handle_AddSettlementAsSneakedIn);
         messageBroker.Unsubscribe<NetworkAddSettlementAsSneakedIn>(Handle_NetworkAddSettlementAsSneakedIn);
+
+        messageBroker.Unsubscribe<TakenPrisonerDuringSneakIn>(Handle_TakenPrisonerDuringSneakIn);
+        messageBroker.Unsubscribe<NetworkTakenPrisonerDuringSneakIn>(Handle_NetworkTakenPrisonerDuringSneakIn);
     }
 
     private void Handle_AddSettlementAsSneakedIn(MessagePayload<AddSettlementAsSneakedIn> obj)
@@ -63,6 +70,30 @@ internal class SettlementSneakInHandler : IHandler
             if (!objectManager.TryGetObjectWithLogging<Settlement>(data.CurrentSettlementId, out var _)) return;
 
             sessionInteractionsPlayerDataInterface.AddSettlementSneakedIn(data.MainHeroId, data.CurrentSettlementId);
+        });
+    }
+
+    private void Handle_TakenPrisonerDuringSneakIn(MessagePayload<TakenPrisonerDuringSneakIn> obj)
+    {
+        var data = obj.What;
+
+        if (!objectManager.TryGetIdWithLogging(data.MainHero, out var mainHeroId)) return;
+        if (!objectManager.TryGetIdWithLogging(data.CurrentSettlement, out var currentSettlementId)) return;
+
+        var message = new NetworkTakenPrisonerDuringSneakIn(mainHeroId, currentSettlementId);
+        network.SendAll(message);
+    }
+
+    private void Handle_NetworkTakenPrisonerDuringSneakIn(MessagePayload<NetworkTakenPrisonerDuringSneakIn> obj)
+    {
+        var data = obj.What;
+
+        GameThread.RunSafe(() =>
+        {
+            if (!objectManager.TryGetObjectWithLogging<Hero>(data.MainHeroId, out var mainHero)) return;
+            if (!objectManager.TryGetObjectWithLogging<Settlement>(data.CurrentSettlementId, out var currentSettlement)) return;
+
+            TakePrisonerAction.Apply(currentSettlement.Party, mainHero);
         });
     }
 }
