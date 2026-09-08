@@ -200,6 +200,207 @@ public class ActionEquipmentSyncTests : MissionTestEnvironment
         });
     }
 
+    [Fact]
+    public void UnchangedEquipment_UsesRevisionReferenceOnSubsequentActions()
+    {
+        RunScenario(context =>
+        {
+            context.Spawn("peer", out MirrorAgent mirror, out _);
+            mirror.Equipment[EquipmentIndex.Weapon0] = Weapon("sword");
+            mirror.PrimaryWieldedItemIndex = EquipmentIndex.Weapon0;
+            context.Component.AgentActionHandler.PollActionsAfterNativeTick();
+            AgentActionData baseline = Assert.Single(Assert.Single(
+                context.Network.NetworkSentPackets.GetPackets<AgentActionPacket>()).Actions);
+            Assert.NotNull(baseline.Equipment);
+            Assert.True(baseline.EquipmentRevision > 0);
+            context.Network.NetworkSentPackets.Packets.Clear();
+            mirror.Action0Index = 1001;
+            mirror.Action0CodeType = Agent.ActionCodeType.ReleaseMelee;
+            context.Component.AgentActionHandler.PollActionsAfterNativeTick();
+            AgentActionData reference = Assert.Single(Assert.Single(
+                context.Network.NetworkSentPackets.GetPackets<AgentActionPacket>()).Actions);
+            Assert.Null(reference.Equipment);
+            Assert.Equal(baseline.EquipmentRevision, reference.EquipmentRevision);
+        });
+    }
+
+    [Fact]
+    public void NewerReference_RetainsMissingEquipmentBaselineWhileReplacingPendingAction()
+    {
+        RunScenario(context =>
+        {
+            Agent owner = context.Spawn("owner", out MirrorAgent ownerMirror, out _);
+            context.Spawn("owner", out MirrorAgent puppet, out Guid id);
+            ownerMirror.Equipment[EquipmentIndex.Weapon0] = Weapon("sword");
+            ownerMirror.PrimaryWieldedItemIndex = EquipmentIndex.Weapon0;
+            ownerMirror.Action0Index = 1001;
+            context.Receive(RevisionPacket(owner, id, 1, 1, true));
+            ownerMirror.Action0Index = 1002;
+            context.Receive(RevisionPacket(owner, id, 2, 1, false));
+            Assert.Equal(0, puppet.SetActionChannelCalls);
+
+            puppet.Equipment[EquipmentIndex.Weapon0] = ownerMirror.Equipment[EquipmentIndex.Weapon0];
+            context.Component.AgentActionHandler.ApplyRemoteGuardStates();
+            Assert.Equal(1002, puppet.Action0Index);
+            Assert.DoesNotContain(1001, puppet.SetActionChannelIndices);
+            Assert.Equal(EquipmentIndex.Weapon0, puppet.PrimaryWieldedItemIndex);
+        });
+    }
+
+    [Fact]
+    public void BaselineBeforeRegistration_SurvivesNewerReference()
+    {
+        RunScenario(context =>
+        {
+            Agent owner = context.Spawn("owner", out MirrorAgent ownerMirror, out _);
+            ownerMirror.Action0Index = 1001;
+            Guid id = Guid.NewGuid();
+            context.Receive(RevisionPacket(owner, id, 1, 1, true));
+            ownerMirror.Action0Index = 1002;
+            context.Receive(RevisionPacket(owner, id, 2, 1, false));
+            Agent puppet = context.Mission.SpawnAgent(new AgentBuildData(Game.Current.PlayerTroop)
+                .Controller(AgentControllerType.None));
+            Assert.True(AgentMirror.TryGet(puppet, out MirrorAgent mirror));
+            Assert.True(context.Registry.TryRegisterAgent("owner", id, puppet));
+            context.Component.AgentActionHandler.ApplyRemoteGuardStates();
+            Assert.Equal(1002, mirror.Action0Index);
+        });
+    }
+
+    [Fact]
+    public void UnknownRevision_WaitsForMatchingBaseline()
+    {
+        RunScenario(context =>
+        {
+            Agent owner = context.Spawn("owner", out MirrorAgent ownerMirror, out _);
+            context.Spawn("owner", out MirrorAgent puppet, out Guid id);
+            ownerMirror.Action0Index = 1001;
+            context.Receive(RevisionPacket(owner, id, 1, 1, true));
+            ownerMirror.Action0Index = 1002;
+            context.Receive(RevisionPacket(owner, id, 2, 2, false));
+            Assert.Equal(1001, puppet.Action0Index);
+            context.Receive(RevisionPacket(owner, id, 3, 2, true));
+            Assert.Equal(1002, puppet.Action0Index);
+        });
+    }
+
+    [Fact]
+    public void NewAuthority_CannotResolveReferenceAgainstPreviousOwnersBaseline()
+    {
+        RunScenario(context =>
+        {
+            Agent owner = context.Spawn("owner", out MirrorAgent ownerMirror, out _);
+            context.Spawn("owner", out MirrorAgent puppet, out Guid id);
+            ownerMirror.Action0Index = 1001;
+            context.Receive(RevisionPacket(owner, id, 1, 1, true));
+            Assert.True(context.Registry.TryTransferAuthority("next-owner", id));
+            ownerMirror.Action0Index = 1002;
+            context.Receive(RevisionPacket(owner, id, 2, 1, false, "next-owner"));
+            Assert.Equal(1001, puppet.Action0Index);
+            context.Receive(RevisionPacket(owner, id, 3, 1, true, "next-owner"));
+            Assert.Equal(1002, puppet.Action0Index);
+        });
+    }
+
+    [Fact]
+    public void ChangedAuthorityRevision_PublishesFreshBaselineWithoutActionChange()
+    {
+        RunScenario(context =>
+        {
+            context.Spawn("peer", out MirrorAgent mirror, out Guid id);
+            mirror.Equipment[EquipmentIndex.Weapon0] = Weapon("sword");
+            mirror.PrimaryWieldedItemIndex = EquipmentIndex.Weapon0;
+            context.Component.AgentActionHandler.PollActionsAfterNativeTick();
+            AgentActionData initial = Assert.Single(Assert.Single(
+                context.Network.NetworkSentPackets.GetPackets<AgentActionPacket>()).Actions);
+            context.Network.NetworkSentPackets.Packets.Clear();
+            Assert.True(context.Registry.TryTransferAuthority("peer", id, 1));
+            context.Component.AgentActionHandler.PollActionsAfterNativeTick();
+            AgentActionData refreshed = Assert.Single(Assert.Single(
+                context.Network.NetworkSentPackets.GetPackets<AgentActionPacket>()).Actions);
+            Assert.NotNull(refreshed.Equipment);
+            Assert.True(refreshed.EquipmentRevision > initial.EquipmentRevision);
+        });
+    }
+
+    [Fact]
+    public void CatchUpChangedEquipment_DoesNotConsumeBaselineNeededByExistingPeers()
+    {
+        RunScenario(context =>
+        {
+            context.Spawn("peer", out MirrorAgent mirror, out _);
+            mirror.Equipment[EquipmentIndex.Weapon0] = Weapon("sword");
+            mirror.Equipment[EquipmentIndex.Weapon1] = Weapon("axe");
+            mirror.PrimaryWieldedItemIndex = EquipmentIndex.Weapon0;
+            context.Component.AgentActionHandler.PollActionsAfterNativeTick();
+            context.Network.NetworkSentPackets.Packets.Clear();
+            mirror.PrimaryWieldedItemIndex = EquipmentIndex.Weapon1;
+            context.Component.AgentActionHandler.CatchUpJoiner("joiner");
+            Drain();
+            AgentActionData catchUp = Assert.Single(Assert.IsType<AgentActionPacket>(
+                Assert.Single(context.Network.DirectPacketSends).Packet).Actions);
+            context.Network.NetworkSentPackets.Packets.Clear();
+            context.Component.AgentActionHandler.PollActionsAfterNativeTick();
+            AgentActionData broadcast = Assert.Single(Assert.Single(
+                context.Network.NetworkSentPackets.GetPackets<AgentActionPacket>()).Actions);
+            Assert.NotNull(catchUp.Equipment);
+            Assert.NotNull(broadcast.Equipment);
+            Assert.Equal(catchUp.EquipmentRevision, broadcast.EquipmentRevision);
+        });
+    }
+
+    [Fact]
+    public void CatchUpUnarmedAgent_SendsBaselineForLaterReferences()
+    {
+        RunScenario(context =>
+        {
+            context.Spawn("peer", out MirrorAgent mirror, out _);
+            mirror.Action0Index = 1001;
+            mirror.Action0CodeType = Agent.ActionCodeType.ReleaseMelee;
+            context.Component.AgentActionHandler.PollActionsAfterNativeTick();
+            context.Network.NetworkSentPackets.Packets.Clear();
+            context.Component.AgentActionHandler.CatchUpJoiner("joiner");
+            Drain();
+            AgentActionData baseline = Assert.Single(Assert.IsType<AgentActionPacket>(
+                Assert.Single(context.Network.DirectPacketSends).Packet).Actions);
+            Assert.NotNull(baseline.Equipment);
+            context.Network.NetworkSentPackets.Packets.Clear();
+            mirror.Action0Index = 1002;
+            context.Component.AgentActionHandler.PollActionsAfterNativeTick();
+            AgentActionData reference = Assert.Single(Assert.Single(
+                context.Network.NetworkSentPackets.GetPackets<AgentActionPacket>()).Actions);
+            Assert.Null(reference.Equipment);
+            Assert.Equal(baseline.EquipmentRevision, reference.EquipmentRevision);
+        });
+    }
+
+    [Fact]
+    public void RevisionReference_RoundTripsWithoutFullEquipmentAndAddsThreeBytes()
+    {
+        RunScenario(context =>
+        {
+            Agent owner = context.Spawn("owner", out _, out Guid id);
+            var serializer = new ProtoBufSerializer(new SerializableTypeMapper());
+            AgentActionPacket reference = RevisionPacket(owner, id, 1, 1, false);
+            var legacy = new AgentActionPacket("owner", new[] { id },
+                new[] { new AgentActionData(owner).WithEquipment(0, null) }, new[] { 1L });
+            byte[] wire = serializer.Serialize(reference);
+            var roundTrip = Assert.IsType<AgentActionPacket>(serializer.Deserialize<IPacket>(wire));
+            Assert.Null(roundTrip.Actions[0].Equipment);
+            Assert.Equal(1L, roundTrip.Actions[0].EquipmentRevision);
+            Assert.Equal(3, wire.Length - serializer.Serialize(legacy).Length);
+        });
+    }
+
+    private static AgentActionPacket RevisionPacket(Agent owner, Guid id, long sequence,
+        long revision, bool includeEquipment, string controller = "owner", int epoch = 0)
+    {
+        var data = new AgentActionData(owner);
+        return new AgentActionPacket(controller, new[] { id },
+            new[] { data.WithEquipment(revision, includeEquipment ? data.Equipment : null) },
+            new[] { sequence }, epoch);
+    }
+
     private static MissionWeapon Weapon(string itemId, int usages = 1)
     {
         using var allowed = new AllowedThread();
@@ -218,7 +419,7 @@ public class ActionEquipmentSyncTests : MissionTestEnvironment
     private static AgentActionPacket Packet(Agent owner, Guid id, long sequence)
     {
         return new AgentActionPacket("owner", new[] { id },
-            new[] { new AgentActionData(owner) }, new[] { sequence });
+            new[] { new AgentActionData(owner).WithEquipment(sequence, new AgentEquipmentData(owner)) }, new[] { sequence });
     }
 
     private static void Drain() => GameThread.Run(() => { }, blocking: true);

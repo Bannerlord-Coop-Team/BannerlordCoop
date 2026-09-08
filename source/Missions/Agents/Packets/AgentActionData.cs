@@ -752,7 +752,18 @@ namespace Missions.Agents.Packets
         [ProtoMember(14)]
         public float? Action1Speed { get; }
         [ProtoMember(15)]
-        public AgentEquipmentData? Equipment { get; }
+        public AgentEquipmentData? Equipment { get; private set; }
+        [ProtoMember(16)]
+        public long EquipmentRevision { get; private set; }
+
+        internal AgentActionData WithEquipment(long revision, AgentEquipmentData? equipment)
+        {
+            var snapshot = (AgentActionData)MemberwiseClone();
+            snapshot.EquipmentRevision = revision;
+            snapshot.Equipment = equipment;
+            return snapshot;
+        }
+
         [ProtoIgnore]
         public bool CrouchMode
         {

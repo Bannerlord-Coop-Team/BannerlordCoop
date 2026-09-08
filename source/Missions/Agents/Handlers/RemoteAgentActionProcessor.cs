@@ -60,12 +60,28 @@ public class RemoteAgentActionProcessor : IRemoteAgentActionProcessor
         public RemoteActionSequence? LastSequence;
         public Dictionary<string, RemoteAction> PendingByController;
         public MigratedActionAuthority? MigratedAuthority;
+        public Dictionary<string, EquipmentBaseline> EquipmentByController;
 
         public bool IsEmpty =>
             RetainedGuard == null
             && !LastSequence.HasValue
             && (PendingByController == null || PendingByController.Count == 0)
-            && !MigratedAuthority.HasValue;
+            && !MigratedAuthority.HasValue
+            && (EquipmentByController == null || EquipmentByController.Count == 0);
+    }
+
+    private readonly struct EquipmentBaseline
+    {
+        public readonly int HostEpoch;
+        public readonly long Revision;
+        public readonly AgentEquipmentData Equipment;
+
+        public EquipmentBaseline(int hostEpoch, long revision, AgentEquipmentData equipment)
+        {
+            HostEpoch = hostEpoch;
+            Revision = revision;
+            Equipment = equipment;
+        }
     }
 
     private enum RemoteActionApplyResult
@@ -439,7 +455,7 @@ public class RemoteAgentActionProcessor : IRemoteAgentActionProcessor
                 {
                     Guid agentId = packet.AgentIds[i];
                     long sequence = packet.Sequences[i];
-                    if (sequence <= 0)
+                    if (sequence <= 0 || packet.Actions[i] == null)
                         continue;
 
                     var action = new RemoteAction(
@@ -454,6 +470,7 @@ public class RemoteAgentActionProcessor : IRemoteAgentActionProcessor
                         continue;
                     }
 
+                    RetainEquipmentBaseline(agentId, action);
                     if (!agentRegistry.TryGetAgentInfo(agentId, out var info))
                     {
                         BufferPendingRemoteAction(agentId, action);
@@ -725,6 +742,23 @@ public class RemoteAgentActionProcessor : IRemoteAgentActionProcessor
         Agent agent = info.Agent;
         if (agent == null || agent.Mission != Mission.Current || !agent.IsActive())
             return RemoteActionApplyResult.AgentNotReady;
+
+        if (action.Data.EquipmentRevision > 0)
+        {
+            RemoteAgentActionState state = GetOrCreateAgentState(agentId);
+            if (state.EquipmentByController == null
+                || !state.EquipmentByController.TryGetValue(action.ControllerId, out EquipmentBaseline baseline)
+                || baseline.HostEpoch != action.BattleHostEpoch
+                || baseline.Revision < action.Data.EquipmentRevision)
+            {
+                return RemoteActionApplyResult.AgentNotReady;
+            }
+            if (baseline.Revision > action.Data.EquipmentRevision)
+                return RemoteActionApplyResult.Stale;
+            action = new RemoteAction(action.ControllerId,
+                action.Data.WithEquipment(baseline.Revision, baseline.Equipment),
+                action.Sequence, action.BattleHostEpoch);
+        }
 
         // Equipment and its dependent action must become visible in the same game-thread apply.
         if (action.Data.Equipment.HasValue)
@@ -1202,6 +1236,20 @@ public class RemoteAgentActionProcessor : IRemoteAgentActionProcessor
     {
         int channel = data.GuardActionChannel;
         return channel >= 0 && channel <= 1 ? channel : -1;
+    }
+
+    private void RetainEquipmentBaseline(Guid agentId, RemoteAction action)
+    {
+        if (action.Data == null || action.Data.EquipmentRevision <= 0 || !action.Data.Equipment.HasValue
+            || IsStaleRemoteAction(agentId, action)) return;
+        RemoteAgentActionState state = GetOrCreateAgentState(agentId);
+        var baselines = state.EquipmentByController ??= new Dictionary<string, EquipmentBaseline>();
+        if (baselines.TryGetValue(action.ControllerId, out EquipmentBaseline previous)
+            && (previous.HostEpoch > action.BattleHostEpoch
+                || (previous.HostEpoch == action.BattleHostEpoch
+                    && previous.Revision >= action.Data.EquipmentRevision))) return;
+        baselines[action.ControllerId] = new EquipmentBaseline(
+            action.BattleHostEpoch, action.Data.EquipmentRevision, action.Data.Equipment.Value);
     }
 
     private void BufferPendingRemoteAction(Guid agentId, RemoteAction action)
