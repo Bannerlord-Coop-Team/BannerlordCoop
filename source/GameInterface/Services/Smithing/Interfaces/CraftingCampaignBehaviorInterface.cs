@@ -75,20 +75,29 @@ public class CraftingCampaignBehaviorInterface : ICraftingCampaignBehaviorInterf
         int heroCraftingStamina = craftingBehavior.GetHeroCraftingStamina(craftingHero);
 
         ItemRoster itemRoster = craftingHero.PartyBelongedTo.ItemRoster;
+        ItemObject craftingMaterialItem = null;
+        ItemObject craftingMaterialItem2 = null;
+
+        // Validate every input before changing the roster.
         if (formula.Input1Count > 0)
         {
-            ItemObject craftingMaterialItem = Campaign.Current.Models.SmithingModel.GetCraftingMaterialItem(formula.Input1);
-
-            // Needed to prevent spam clicking to refine more than actually available
-            if (itemRoster.FindIndexOfElement(new EquipmentElement(craftingMaterialItem, null, null, false)) < 0) return heroCraftingStamina;
-            itemRoster.AddToCounts(craftingMaterialItem, -formula.Input1Count);
+            craftingMaterialItem = Campaign.Current.Models.SmithingModel.GetCraftingMaterialItem(formula.Input1);
+            if (itemRoster.GetItemNumber(craftingMaterialItem) < formula.Input1Count) return heroCraftingStamina;
         }
         if (formula.Input2Count > 0)
         {
-            ItemObject craftingMaterialItem2 = Campaign.Current.Models.SmithingModel.GetCraftingMaterialItem(formula.Input2);
+            craftingMaterialItem2 = Campaign.Current.Models.SmithingModel.GetCraftingMaterialItem(formula.Input2);
+            int requiredCount = formula.Input2Count;
+            if (craftingMaterialItem == craftingMaterialItem2) requiredCount += formula.Input1Count;
+            if (itemRoster.GetItemNumber(craftingMaterialItem2) < requiredCount) return heroCraftingStamina;
+        }
 
-            // Needed to prevent spam clicking to refine more than actually available
-            if (itemRoster.FindIndexOfElement(new EquipmentElement(craftingMaterialItem2, null, null, false)) < 0) return heroCraftingStamina;
+        if (craftingMaterialItem != null)
+        {
+            itemRoster.AddToCounts(craftingMaterialItem, -formula.Input1Count);
+        }
+        if (craftingMaterialItem2 != null)
+        {
             itemRoster.AddToCounts(craftingMaterialItem2, -formula.Input2Count);
         }
         if (formula.OutputCount > 0)
