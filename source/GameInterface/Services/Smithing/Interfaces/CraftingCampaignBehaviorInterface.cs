@@ -20,7 +20,7 @@ public interface ICraftingCampaignBehaviorInterface : IGameAbstraction
 {
     int DoSmelting(CraftingCampaignBehavior craftingBehavior, Hero craftingHero, EquipmentElement equipmentElement, out bool succeeded);
     int DoRefinement(CraftingCampaignBehavior craftingBehavior, Hero craftingHero, Crafting.RefiningFormula formula);
-    int CreateCraftedWeaponInternal(CraftingCampaignBehavior craftingBehavior, Hero craftingHero, CraftingTemplate craftingTemplate, ItemModifierGroup itemModifierGroup, WeaponDesignElement[] usedPieces, ItemModifier weaponModifier, CultureObject culture, bool isFreeMode, TextObject name, string weaponName, string nextCraftedItemI);
+    int CreateCraftedWeaponInternal(CraftingCampaignBehavior craftingBehavior, Hero craftingHero, CraftingTemplate craftingTemplate, ItemModifierGroup itemModifierGroup, WeaponDesignElement[] usedPieces, ItemModifier weaponModifier, CultureObject culture, bool isFreeMode, TextObject name, string weaponName, string nextCraftedItemId, out bool succeeded);
     ItemObject CreateAndRegisterCraftedItem(WeaponDesign weaponDesign, TextObject name, CultureObject culture, ItemModifierGroup itemModifierGroup, string craftedItemId);
     void AddCraftedItemToRoster(ItemRoster itemRoster, ItemModifier weaponModifier, ItemObject craftedItemObject);
     void DailyTickSettlement(CraftingCampaignBehavior craftingBehavior, Settlement settlement);
@@ -133,8 +133,10 @@ public class CraftingCampaignBehaviorInterface : ICraftingCampaignBehaviorInterf
         bool isFreeMode,
         TextObject name,
         string weaponName,
-        string nextCraftedItemId)
+        string nextCraftedItemId,
+        out bool succeeded)
     {
+        succeeded = false;
         WeaponDesign weaponDesign = new WeaponDesign(craftingTemplate, new TextObject(weaponName), usedPieces);
         if (isFreeMode)
         {
@@ -144,6 +146,17 @@ public class CraftingCampaignBehaviorInterface : ICraftingCampaignBehaviorInterf
         // Implement CraftingCampaignBehavior.SpendMaterials(weaponDesign) here as it needs the party roster, MainParty on server won't be correct
         ItemRoster itemRoster = craftingHero.PartyBelongedTo.ItemRoster;
         int[] smithingCostsForWeaponDesign = Campaign.Current.Models.SmithingModel.GetSmithingCostsForWeaponDesign(weaponDesign);
+        for (int i = 8; i >= 0; i--)
+        {
+            if (smithingCostsForWeaponDesign[i] >= 0) continue;
+
+            ItemObject craftingMaterialItem = Campaign.Current.Models.SmithingModel.GetCraftingMaterialItem((CraftingMaterials)i);
+            if (itemRoster.GetItemNumber(craftingMaterialItem) < -smithingCostsForWeaponDesign[i])
+            {
+                return craftingBehavior.GetHeroCraftingStamina(craftingHero);
+            }
+        }
+
         for (int i = 8; i >= 0; i--)
         {
             if (smithingCostsForWeaponDesign[i] != 0)
@@ -160,6 +173,7 @@ public class CraftingCampaignBehaviorInterface : ICraftingCampaignBehaviorInterf
 
         CampaignEventDispatcher.Instance.OnNewItemCrafted(craftedItemObject, weaponModifier, !isFreeMode);
 
+        succeeded = true;
         return newHeroCraftingStamina;
     }
 

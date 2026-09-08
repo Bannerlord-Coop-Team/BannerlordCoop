@@ -49,9 +49,6 @@ internal class CreateCraftedWeaponInternalPatch
         // Need to return the ItemObject for client's CraftingVM
         __result = craftedItemObject;
 
-        // Patched separately for sending to server
-        __instance.AddResearchPoints(weaponDesign.Template, Campaign.Current.Models.SmithingModel.GetPartResearchGainForSmithingItem(craftedItemObject, crafterHero, isFreeMode));
-
         // Publish message with data. Local ClientVisual not sent.
         // Actual item created on server and all clients in CraftingCampaignBehaviorCraftingHandler.
         var message = new CreatedCraftedWeaponInternal(
@@ -76,10 +73,6 @@ internal class CreateCraftedWeaponInternalPatch
     public static bool CreateCraftedWeaponInCraftingOrderModePrefix(CraftingCampaignBehavior __instance, ref ItemObject __result, Hero crafterHero, CraftingOrder craftingOrder, WeaponDesign weaponDesign)
     {
         ItemObject itemObject = __instance.CreateCraftedWeaponInternal(false, crafterHero, weaponDesign, null);
-        float xpAmount = craftingOrder.GetOrderExperience(itemObject, __instance._currentItemModifier) + (float)Campaign.Current.Models.SmithingModel.GetSkillXpForSmithingInCraftingOrderMode(itemObject);
-
-        var message = new AddSkillXpFromCrafting(crafterHero, xpAmount);
-        MessageBroker.Instance.Publish(__instance, message);
 
         __result = itemObject;
         return false;
@@ -90,12 +83,6 @@ internal class CreateCraftedWeaponInternalPatch
     public static bool CreateCraftedWeaponInFreeBuildModePrefix(CraftingCampaignBehavior __instance, ref ItemObject __result, Hero hero, WeaponDesign weaponDesign, ItemModifier weaponModifier = null)
     {
         ItemObject itemObject = __instance.CreateCraftedWeaponInternal(true, hero, weaponDesign, weaponModifier);
-        int skillXpForSmithingInFreeBuildMode = Campaign.Current.Models.SmithingModel.GetSkillXpForSmithingInFreeBuildMode(itemObject);
-
-        var message = new AddSkillXpFromCrafting(hero, (float)skillXpForSmithingInFreeBuildMode);
-        MessageBroker.Instance.Publish(__instance, message);
-        
-        __instance.AddItemToHistory(itemObject);
 
         __result = itemObject;
         return false;

@@ -259,7 +259,10 @@ internal class CraftingCampaignBehaviorCraftingHandler : IHandler
                 data.IsFreeMode,
                 data.Name,
                 data.WeaponName,
-                nextCraftedItemId);
+                nextCraftedItemId,
+                out var succeeded);
+
+            if (!succeeded) return;
 
             // Update stamina on clients
             network.SendAll(new NetworkSetHeroCraftingStamina(data.CraftingHeroId, newHeroCraftingStamina));
@@ -292,28 +295,29 @@ internal class CraftingCampaignBehaviorCraftingHandler : IHandler
 
         GameThread.RunSafe(() =>
         {
+            if (!craftingCampaignBehaviorInterface.TryGetCraftingBehavior(out var craftingBehavior)) return;
+            if (!objectManager.TryGetObjectWithLogging(data.CraftingTemplateId, out CraftingTemplate craftingTemplate)) return;
+            if (!objectManager.TryGetObjectWithLogging(data.PlayerHeroId, out Hero playerHero)) return;
+            if (!objectManager.TryGetObjectWithLogging(data.CraftingHeroId, out Hero craftingHero)) return;
+            if (!objectManager.TryGetObjectWithLogging(data.CurrentSettlementId, out Settlement currentSettlement)) return;
+
+            ItemModifierGroup itemModifierGroup = null;
+            if (data.ItemModifierGroupId != null && !objectManager.TryGetObjectWithLogging(data.ItemModifierGroupId, out itemModifierGroup)) return;
+
+            if (!GetUsedPieces(data.WeaponDesignElementCraftingPieceIds, data.WeaponDesignElementScalePercentages, out WeaponDesignElement[] usedPieces)) return;
+
+            ItemModifier weaponModifier = null;
+            if (data.WeaponModifierId != "" && !objectManager.TryGetObjectWithLogging(data.WeaponModifierId, out weaponModifier)) return;
+
+            CultureObject culture = null;
+            if (data.CultureId != null && !objectManager.TryGetObjectWithLogging(data.CultureId, out culture)) return;
+
+            CraftingOrder craftingOrder = null;
+            if (data.CraftingOrderId != null && !objectManager.TryGetObjectWithLogging(data.CraftingOrderId, out craftingOrder)) return;
+
+            ItemObject craftedItemObject;
             using (new AllowedThread())
             {
-                if (!craftingCampaignBehaviorInterface.TryGetCraftingBehavior(out var craftingBehavior)) return;
-                if (!objectManager.TryGetObjectWithLogging(data.CraftingTemplateId, out CraftingTemplate craftingTemplate)) return;
-                if (!objectManager.TryGetObjectWithLogging(data.PlayerHeroId, out Hero playerHero)) return;
-                if (!objectManager.TryGetObjectWithLogging(data.CraftingHeroId, out Hero craftingHero)) return;
-                if (!objectManager.TryGetObjectWithLogging(data.CurrentSettlementId, out Settlement currentSettlement)) return;
-
-                ItemModifierGroup itemModifierGroup = null;
-                if (data.ItemModifierGroupId != null && !objectManager.TryGetObjectWithLogging(data.ItemModifierGroupId, out itemModifierGroup)) return;
-
-                if (!GetUsedPieces(data.WeaponDesignElementCraftingPieceIds, data.WeaponDesignElementScalePercentages, out WeaponDesignElement[] usedPieces)) return;
-
-                ItemModifier weaponModifier = null;
-                if (data.WeaponModifierId != "" && !objectManager.TryGetObjectWithLogging(data.WeaponModifierId, out weaponModifier)) return;
-
-                CultureObject culture = null;
-                if (data.CultureId != null && !objectManager.TryGetObjectWithLogging(data.CultureId, out culture)) return;
-
-                CraftingOrder craftingOrder = null;
-                if (data.CraftingOrderId != null && !objectManager.TryGetObjectWithLogging(data.CraftingOrderId, out craftingOrder)) return;
-
                 // Replace original TaleWorlds implementation
                 string nextCraftedItemId = data.NextCraftedItemId;
                 WeaponDesign weaponDesign = new WeaponDesign(craftingTemplate, new TextObject(data.WeaponName), usedPieces);
@@ -322,7 +326,7 @@ internal class CraftingCampaignBehaviorCraftingHandler : IHandler
                     weaponDesign = new WeaponDesign(weaponDesign.Template, weaponDesign.WeaponName, weaponDesign.UsedPieces, nextCraftedItemId);
                 }
 
-                var craftedItemObject = craftingCampaignBehaviorInterface.CreateAndRegisterCraftedItem(weaponDesign, data.Name, culture, itemModifierGroup, nextCraftedItemId);
+                craftedItemObject = craftingCampaignBehaviorInterface.CreateAndRegisterCraftedItem(weaponDesign, data.Name, culture, itemModifierGroup, nextCraftedItemId);
                 CampaignEventDispatcher.Instance.OnNewItemCrafted(craftedItemObject, weaponModifier, !data.IsFreeMode);
 
                 // Only run on crafting client
@@ -338,17 +342,29 @@ internal class CraftingCampaignBehaviorCraftingHandler : IHandler
 
                     AddItemToHistoryPatch.OverrideAddItemToHistory(ref craftingBehavior, craftedItemObject);
                 }
-
-                if (!objectManager.TryGetIdWithLogging(craftedItemObject, out var craftedItemId)) return;
-
-                // Add to item rosters after the item has finished being created on clients
-                // Won't resolve on clients when running AddToCounts otherwise
-                if (data.IsFreeMode)
-                {
-                    var message = new NetworkAddCraftedItemToRoster(craftedItemId, data.PlayerHeroId, data.WeaponModifierId);
-                    network.SendAll(message);
-                }
             }
+
+            if (!objectManager.TryGetIdWithLogging(craftedItemObject, out var craftedItemId)) return;
+
+            // Add to item rosters after the item has finished being created on clients
+            // Won't resolve on clients when running AddToCounts otherwise
+            if (data.IsFreeMode)
+            {
+                var message = new NetworkAddCraftedItemToRoster(craftedItemId, data.PlayerHeroId, data.WeaponModifierId);
+                network.SendAll(message);
+            }
+
+            if (playerHero != Hero.MainHero) return;
+
+            craftingBehavior.AddResearchPoints(
+                craftedItemObject.WeaponDesign.Template,
+                Campaign.Current.Models.SmithingModel.GetPartResearchGainForSmithingItem(craftedItemObject, craftingHero, data.IsFreeMode));
+
+            float xpAmount = data.IsFreeMode
+                ? Campaign.Current.Models.SmithingModel.GetSkillXpForSmithingInFreeBuildMode(craftedItemObject)
+                : craftingOrder.GetOrderExperience(craftedItemObject, craftingBehavior._currentItemModifier) + Campaign.Current.Models.SmithingModel.GetSkillXpForSmithingInCraftingOrderMode(craftedItemObject);
+
+            messageBroker.Publish(this, new AddSkillXpFromCrafting(craftingHero, xpAmount));
         });
     }
 
