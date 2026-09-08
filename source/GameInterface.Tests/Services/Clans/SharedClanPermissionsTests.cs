@@ -151,15 +151,16 @@ public class SharedClanPermissionsTests : IDisposable
     [InlineData(false, true)]
     [InlineData(true, false)]
     [InlineData(true, true)]
-    public void KingdomServiceOptionsRequireLeaderAndKeepVanillaRestrictions(bool asLeader, bool initiallyAvailable)
+    public void ClanManagementOptionsRequireLeaderAndKeepVanillaRestrictions(bool asLeader, bool initiallyAvailable)
     {
         SetViewer(asLeader ? leader : member);
         foreach (var patch in new ConditionPatch[]
         {
-            SharedClanDialoguePatches.JoinKingdomServiceOnConditionPostfix,
-            SharedClanDialoguePatches.EndMercenaryServiceOnConditionPostfix,
-            SharedClanDialoguePatches.LeaveKingdomServiceOnConditionPostfix,
-            SharedClanDialoguePatches.BecomeVassalWhileMercenaryOnConditionPostfix,
+            SharedClanDialoguePatches.CompanionFireConditionPostfix,
+            SharedClanDialoguePatches.LeadAPartyClickableConditionPostfix,
+            SharedClanDialoguePatches.ConversationHeroHireOnConditionPostfix,
+            SharedClanDialoguePatches.ConversationCaravanBuildOnConditionPostfix,
+            SharedClanDialoguePatches.CanPlayerBuyWorkshopClickableConditionPostfix,
         })
         {
             bool result = initiallyAvailable;
