@@ -74,7 +74,24 @@ public readonly struct RefreshWeaponDesignVM : IEvent
 public readonly struct RefreshCraftingVM : IEvent {}
 
 [ProtoContract(SkipConstructor = true)]
-public readonly struct NetworkRefreshSmelting : ICommand {}
+public readonly struct NetworkRefreshSmelting : ICommand
+{
+    [ProtoMember(1)]
+    public readonly string CraftingHeroId;
+
+    [ProtoMember(2)]
+    public readonly EquipmentElement EquipmentElement;
+
+    [ProtoMember(3)]
+    public readonly bool SmeltingSucceeded;
+
+    public NetworkRefreshSmelting(string craftingHeroId, EquipmentElement equipmentElement, bool smeltingSucceeded)
+    {
+        CraftingHeroId = craftingHeroId;
+        EquipmentElement = equipmentElement;
+        SmeltingSucceeded = smeltingSucceeded;
+    }
+}
 
 [ProtoContract(SkipConstructor = true)]
 public readonly struct NetworkRefreshRefinement : ICommand

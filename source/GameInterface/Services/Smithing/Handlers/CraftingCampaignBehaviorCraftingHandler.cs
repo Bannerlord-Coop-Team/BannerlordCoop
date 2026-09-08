@@ -48,6 +48,7 @@ internal class CraftingCampaignBehaviorCraftingHandler : IHandler
 
         messageBroker.Subscribe<DoSmelting>(Handle_DoSmelting);
         messageBroker.Subscribe<NetworkDoSmelting>(Handle_NetworkDoSmelting);
+        messageBroker.Subscribe<NetworkRefreshSmelting>(Handle_NetworkRefreshSmelting);
 
         messageBroker.Subscribe<DoRefinement>(Handle_DoRefinement);
         messageBroker.Subscribe<NetworkDoRefinement>(Handle_NetworkDoRefinement);
@@ -67,6 +68,7 @@ internal class CraftingCampaignBehaviorCraftingHandler : IHandler
     {
         messageBroker.Unsubscribe<DoSmelting>(Handle_DoSmelting);
         messageBroker.Unsubscribe<NetworkDoSmelting>(Handle_NetworkDoSmelting);
+        messageBroker.Unsubscribe<NetworkRefreshSmelting>(Handle_NetworkRefreshSmelting);
 
         messageBroker.Unsubscribe<DoRefinement>(Handle_DoRefinement);
         messageBroker.Unsubscribe<NetworkDoRefinement>(Handle_NetworkDoRefinement);
@@ -101,14 +103,34 @@ internal class CraftingCampaignBehaviorCraftingHandler : IHandler
             if (!objectManager.TryGetObjectWithLogging(data.CraftingHeroId, out Hero craftingHero)) return;
 
             // Replace original TaleWorlds implementation
-            var newHeroCraftingStamina = craftingCampaignBehaviorInterface.DoSmelting(craftingCampaignBehavior, craftingHero, data.EquipmentElement);
+            var newHeroCraftingStamina = craftingCampaignBehaviorInterface.DoSmelting(
+                craftingCampaignBehavior,
+                craftingHero,
+                data.EquipmentElement,
+                out var smeltingSucceeded);
 
             // Update stamina on clients
             network.SendAll(new NetworkSetHeroCraftingStamina(data.CraftingHeroId, newHeroCraftingStamina));
 
             // Refresh client view model
             FlushCoalescer(craftingHero.PartyBelongedTo.ItemRoster);
-            network.Send(obj.Who as NetPeer, new NetworkRefreshSmelting());
+            network.Send(obj.Who as NetPeer, new NetworkRefreshSmelting(data.CraftingHeroId, data.EquipmentElement, smeltingSucceeded));
+        });
+    }
+
+    private void Handle_NetworkRefreshSmelting(MessagePayload<NetworkRefreshSmelting> obj)
+    {
+        if (!obj.What.SmeltingSucceeded) return;
+
+        GameThread.RunSafe(() =>
+        {
+            if (!craftingCampaignBehaviorInterface.TryGetCraftingBehavior(out var craftingCampaignBehavior)) return;
+            if (!objectManager.TryGetObjectWithLogging(obj.What.CraftingHeroId, out Hero craftingHero)) return;
+
+            var equipmentElement = obj.What.EquipmentElement;
+            craftingCampaignBehavior.AddResearchPoints(
+                equipmentElement.Item.WeaponDesign.Template,
+                Campaign.Current.Models.SmithingModel.GetPartResearchGainForSmeltingItem(equipmentElement.Item, craftingHero));
         });
     }
 

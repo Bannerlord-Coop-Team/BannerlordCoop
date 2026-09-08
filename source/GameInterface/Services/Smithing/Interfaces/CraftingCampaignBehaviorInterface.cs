@@ -18,7 +18,7 @@ namespace GameInterface.Services.Smithing.Interfaces;
 
 public interface ICraftingCampaignBehaviorInterface : IGameAbstraction
 {
-    int DoSmelting(CraftingCampaignBehavior craftingBehavior, Hero craftingHero, EquipmentElement equipmentElement);
+    int DoSmelting(CraftingCampaignBehavior craftingBehavior, Hero craftingHero, EquipmentElement equipmentElement, out bool succeeded);
     int DoRefinement(CraftingCampaignBehavior craftingBehavior, Hero craftingHero, Crafting.RefiningFormula formula);
     int CreateCraftedWeaponInternal(CraftingCampaignBehavior craftingBehavior, Hero craftingHero, CraftingTemplate craftingTemplate, ItemModifierGroup itemModifierGroup, WeaponDesignElement[] usedPieces, ItemModifier weaponModifier, CultureObject culture, bool isFreeMode, TextObject name, string weaponName, string nextCraftedItemI);
     ItemObject CreateAndRegisterCraftedItem(WeaponDesign weaponDesign, TextObject name, CultureObject culture, ItemModifierGroup itemModifierGroup, string craftedItemId);
@@ -38,8 +38,9 @@ public class CraftingCampaignBehaviorInterface : ICraftingCampaignBehaviorInterf
         this.objectManager = objectManager;
     }
 
-    public int DoSmelting(CraftingCampaignBehavior craftingBehavior, Hero craftingHero, EquipmentElement equipmentElement)
+    public int DoSmelting(CraftingCampaignBehavior craftingBehavior, Hero craftingHero, EquipmentElement equipmentElement, out bool succeeded)
     {
+        succeeded = false;
         int heroCraftingStamina = craftingBehavior.GetHeroCraftingStamina(craftingHero);
 
         ItemRoster itemRoster = craftingHero.PartyBelongedTo.ItemRoster;
@@ -47,6 +48,7 @@ public class CraftingCampaignBehaviorInterface : ICraftingCampaignBehaviorInterf
 
         // Needed to prevent spam clicking to smelt more than actually available
         if (itemRoster.FindIndexOfElement(equipmentElement) < 0) return heroCraftingStamina;
+        succeeded = true;
         itemRoster.AddToCounts(equipmentElement, -1);
 
         for (int i = 8; i >= 0; i--)
