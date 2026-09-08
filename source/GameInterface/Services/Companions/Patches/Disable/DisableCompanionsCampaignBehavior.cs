@@ -12,6 +12,7 @@ using TaleWorlds.CampaignSystem.Actions;
 using TaleWorlds.CampaignSystem.CampaignBehaviors;
 using TaleWorlds.CampaignSystem.Settlements;
 using TaleWorlds.Core;
+using TaleWorlds.Library;
 using TaleWorlds.LinQuick;
 
 namespace GameInterface.Services.Companions.Patches.Disable;
@@ -68,6 +69,69 @@ internal class CompanionsCampaignBehaviorPatches
         }
 
         __result = total;
+        return false;
+    }
+
+    /// <summary>
+    /// Replace vanilla's single-player <see cref="Hero.MainHero"/> settlement check with all player heroes
+    /// before removing an unhired wanderer on the server.
+    /// </summary>
+    [HarmonyPatch(nameof(CompanionsCampaignBehavior.TryKillCompanion))]
+    [HarmonyPrefix]
+    public static bool TryKillCompanionPrefix(CompanionsCampaignBehavior __instance)
+    {
+        if (ModInformation.IsClient) return false;
+
+        return TryKillCompanionPrefix(
+            __instance,
+            MBRandom.RandomFloat,
+            () => Hero.AllAliveHeroes,
+            () => Campaign.Current.CampaignObjectManager.GetPlayerHeroes(),
+            hero => KillCharacterAction.ApplyByRemove(hero));
+    }
+
+    internal static bool TryKillCompanionPrefix(
+        CompanionsCampaignBehavior behavior,
+        float randomFloat,
+        Func<IEnumerable<Hero>> getAliveHeroes,
+        Func<IEnumerable<Hero>> getPlayerHeroes,
+        Action<Hero> removeWanderer)
+    {
+        if (randomFloat > 0.1f || behavior._aliveCompanionTemplates.Count <= 0)
+            return false;
+
+        CharacterObject template = behavior._aliveCompanionTemplates.GetRandomElementInefficiently();
+        Hero candidate = null;
+        foreach (Hero hero in getAliveHeroes())
+        {
+            if (hero.Template != template || !hero.IsWanderer) continue;
+            candidate = hero;
+            break;
+        }
+
+        if (candidate == null || candidate.CompanionOf != null)
+            return false;
+
+        // Vanilla keeps a wanderer eligible when it has no current settlement. Only a real shared
+        // settlement makes the candidate visible to a player and therefore protected from culling.
+        if (candidate.CurrentSettlement != null &&
+            IsAnyPlayerAtSettlement(candidate.CurrentSettlement, getPlayerHeroes()))
+            return false;
+
+        removeWanderer(candidate);
+
+        return false;
+    }
+
+    internal static bool IsAnyPlayerAtSettlement(
+        Settlement settlement,
+        IEnumerable<Hero> playerHeroes)
+    {
+        foreach (Hero playerHero in playerHeroes)
+        {
+            if (playerHero.CurrentSettlement == settlement) return true;
+        }
+
         return false;
     }
 

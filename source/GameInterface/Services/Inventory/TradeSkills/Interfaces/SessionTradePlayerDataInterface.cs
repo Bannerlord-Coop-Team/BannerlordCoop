@@ -20,6 +20,7 @@ public interface ISessionTradePlayerDataInterface : IGameAbstraction
 {
     void UpdatePlayerInventory(Hero playerHero, List<ValueTuple<ItemRosterElement, int>> purchasedItems, List<ValueTuple<ItemRosterElement, int>> soldItems, bool isTrading);
     void UpdatePlayerTradeRumors(string playerHeroId, List<TradeRumorData> tradeRumorsData, Dictionary<string, long> enteredSettlements);
+    void UpdateSettlementBribePaid(string playerHeroId, string settlementId, int gold);
     bool TryGetTradeSkillBehavior(out TradeSkillCampaignBehavior tradeSkillBehavior);
     void AddPlayerKeys(string playerHeroId);
 }
@@ -150,6 +151,20 @@ public class SessionTradePlayerDataInterface : ISessionTradePlayerDataInterface
         return result;
     }
 
+    public void UpdateSettlementBribePaid(string playerHeroId, string settlementId, int gold)
+    {
+        if (!IsPlayerHeroIdValid(playerHeroId)) return;
+
+        if (!TradePlayerData.PlayerSettlementBribePaid[playerHeroId].ContainsKey(settlementId))
+        {
+            TradePlayerData.PlayerSettlementBribePaid[playerHeroId][settlementId] = gold;
+        }
+        else
+        {
+            TradePlayerData.PlayerSettlementBribePaid[playerHeroId][settlementId] += gold;
+        }
+    }
+
     public bool TryGetTradeSkillBehavior(out TradeSkillCampaignBehavior tradeSkillBehavior)
     {
         tradeSkillBehavior = Campaign.Current?.GetCampaignBehavior<TradeSkillCampaignBehavior>();
@@ -178,6 +193,10 @@ public class SessionTradePlayerDataInterface : ISessionTradePlayerDataInterface
         if (!TradePlayerData.PlayerEnteredSettlements.ContainsKey(playerHeroId))
         {
             TradePlayerData.PlayerEnteredSettlements[playerHeroId] = new Dictionary<string, long>();
+        }
+        if (!TradePlayerData.PlayerSettlementBribePaid.ContainsKey(playerHeroId))
+        {
+            TradePlayerData.PlayerSettlementBribePaid[playerHeroId] = new Dictionary<string, int>();
         }
     }
 

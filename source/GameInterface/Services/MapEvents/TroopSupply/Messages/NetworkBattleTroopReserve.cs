@@ -19,8 +19,14 @@ public class NetworkBattleTroopReserve : IEvent
     public readonly string MapEventId;
     [ProtoMember(2)]
     public readonly int Side;
+    private PartyReserve[] parties;
+
     [ProtoMember(3)]
-    public readonly PartyReserve[] Parties = Array.Empty<PartyReserve>();
+    public PartyReserve[] Parties
+    {
+        get => parties ?? Array.Empty<PartyReserve>();
+        private set => parties = value;
+    }
 
     /// <summary>
     /// The server needs the receiver's FINAL supplied pointers for every party this REPLACE takes away
@@ -74,7 +80,7 @@ public class NetworkBattleTroopReserve : IEvent
     {
         MapEventId = mapEventId;
         Side = side;
-        Parties = parties;
+        Parties = parties ?? Array.Empty<PartyReserve>();
         FlushRequested = flushRequested;
         SideTotalTroops = sideTotalTroops;
         PlayerOwnedPartyCount = playerOwnedPartyCount;

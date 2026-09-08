@@ -265,6 +265,7 @@ public class CampaignState : ClientStateBase
     {
         messageBroker.Publish(this, new PlayerKillFeedColorResendRequested());
         loadingInterface.HideLoadingScreen();
+        messageBroker.Publish(this, new ClientCampaignReady());
     }
 
     internal void Handle_MissionStateEntered(MessagePayload<MissionStateEntered> obj)

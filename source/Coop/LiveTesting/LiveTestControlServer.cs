@@ -1,12 +1,15 @@
-﻿#if DEBUG
+#if DEBUG
+using Autofac;
 using Common;
 using Common.LiveTesting;
 using Common.Logging;
 using Common.LogicStates;
 using Coop.Core.Client;
+using Coop.Core.Common.Commands;
 using Coop.Core.Server;
 using GameInterface;
 using GameInterface.Services.LiveTesting;
+using GameInterface.Services.UI.CoopOptions;
 using GameInterface.Services.Players;
 using Serilog;
 using System;
@@ -23,11 +26,20 @@ using TaleWorlds.Engine;
 using TaleWorlds.MountAndBlade;
 using TaleWorlds.ScreenSystem;
 
+[assembly: System.Reflection.AssemblyMetadata("CoopLiveTestProtocol", "1")]
+[assembly: System.Reflection.AssemblyMetadata("CoopLiveTestCapabilities", "staged-ui-capture-v1")]
+
 namespace Coop.LiveTesting
 {
     internal sealed class LiveTestControlServer : IDisposable
     {
+        private CoopOptionsUI optionsMenu;
+        private readonly IContainer uiContainer;
+        private readonly ILiveTestUi ui;
+
         private const string EndpointDirectoryName = "BannerlordCoop.LiveTest.v1";
+        private const int MaximumScreenshotObservations = 120;
+        private static readonly TimeSpan ScreenshotCaptureTimeout = TimeSpan.FromMinutes(1);
 
         private static readonly ILogger Logger;
 
@@ -38,15 +50,19 @@ namespace Coop.LiveTesting
         private readonly LiveTestProcessInfo processInfo;
         private readonly DateTime processStartedUtc;
         private readonly NamedPipeLiveTestServer pipeServer;
+        private readonly IBmpScreenshotInspector screenshotInspector;
         private readonly object screenshotGate = new object();
-        private readonly Dictionary<string, ScreenshotCapture> screenshotCaptures =
-            new Dictionary<string, ScreenshotCapture>(StringComparer.Ordinal);
+        private readonly Dictionary<string, ScreenshotCaptureState> screenshotCaptures =
+            new Dictionary<string, ScreenshotCaptureState>(StringComparer.Ordinal);
         private readonly HashSet<string> screenshotPaths =
             new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         private readonly string endpointDirectory;
         private readonly string endpointRegistrationPath;
         private int shutdownScheduled;
         private int deferredClientJoinAttempted;
+        private bool trackedRenderingEnabled = true;
+        private bool renderStateTrackable = true;
+        private int renderToggleCount;
         
         static LiveTestControlServer()
         {
@@ -62,10 +78,15 @@ namespace Coop.LiveTesting
             if (string.IsNullOrWhiteSpace(logFilePath)) throw new ArgumentException("A log file path is required.", nameof(logFilePath));
             if (startAsClient == null) throw new ArgumentNullException(nameof(startAsClient));
 
+            var uiBuilder = new ContainerBuilder();
+            uiBuilder.RegisterModule<LiveTestUiModule>();
+            uiContainer = uiBuilder.Build();
+            ui = uiContainer.Resolve<ILiveTestUi>();
             this.isServer = isServer;
             this.logFilePath = logFilePath;
             this.deferredClientJoinEnabled = deferredClientJoinEnabled;
             this.startAsClient = startAsClient;
+            screenshotInspector = new BmpScreenshotInspector();
 
             int processId;
             using (Process process = Process.GetCurrentProcess())
@@ -77,6 +98,7 @@ namespace Coop.LiveTesting
             processInfo = new LiveTestProcessInfo
             {
                 Pid = processId,
+                ProcessStartedUtc = processStartedUtc,
                 Role = isServer ? "server" : "client",
                 PlatformId = ReadArgument(arguments, "/platformId"),
                 RunToken = NormalizeRunToken(ReadArgument(arguments, "/cooptestrun")),
@@ -122,6 +144,7 @@ namespace Coop.LiveTesting
         {
             DeleteEndpointRegistration();
             pipeServer.Dispose();
+            uiContainer.Dispose();
         }
 
         private LiveTestResponse Handle(LiveTestRequest request)
@@ -141,6 +164,15 @@ namespace Coop.LiveTesting
                     return HandleScreenshot(request);
                 case "screenshot-status":
                     return HandleScreenshotStatus(request);
+                case "render-status":
+                    return HandleRenderStatus(request);
+                case "render-toggle":
+                    return HandleRenderToggle(request);
+                case "ui-inspect":
+                case "ui-action":
+                    return HandleUi(request);
+                case "options-menu":
+                    return HandleOptionsMenu(request);
                 case "join":
                     return HandleDeferredClientJoin(request);
                 case "shutdown":
@@ -152,6 +184,100 @@ namespace Coop.LiveTesting
                         $"Unknown live-test method '{request.Method}'.",
                         false);
             }
+        }
+
+        private LiveTestResponse HandleUi(LiveTestRequest request)
+        {
+            bool mutation = request.Method == "ui-action";
+            return ExecuteOnGameThread(request, () =>
+            {
+                if (processInfo.Role != "client")
+                    return Failure(request.Id, "client_only", "UI automation is client-only.", false);
+                try
+                {
+                    string snapshot = ReadUiString(request.Parameters, "snapshot");
+                    if (!mutation)
+                    {
+                        int offset = 0;
+                        if (request.Parameters.TryGetProperty("offset", out var offsetValue) && !offsetValue.TryGetInt32(out offset))
+                            return Failure(request.Id, "invalid_parameters", "offset must be an integer.", false);
+                        return Success(request.Id, ui.Inspect(snapshot, offset));
+                    }
+                    string element = ReadUiString(request.Parameters, "element");
+                    string action = ReadUiString(request.Parameters, "action");
+                    string text = ReadUiString(request.Parameters, "text", 512);
+                    double? value = null;
+                    if (request.Parameters.TryGetProperty("value", out var number) && number.ValueKind != JsonValueKind.Null)
+                    {
+                        if (number.ValueKind != JsonValueKind.Number || !number.TryGetDouble(out double parsed))
+                            return Failure(request.Id, "invalid_parameters", "value must be numeric.", false);
+                        value = parsed;
+                    }
+                    return Success(request.Id, ui.Act(snapshot, element, action, text, value));
+                }
+                catch (UiAutomationException exception)
+                {
+                    return Failure(request.Id, exception.Code, exception.Message, false);
+                }
+            }, mutation);
+        }
+
+        private string ReadUiString(JsonElement parameters, string name, int maximum = 64)
+        {
+            if (!parameters.TryGetProperty(name, out var value) || value.ValueKind == JsonValueKind.Null) return null;
+            if (value.ValueKind != JsonValueKind.String || value.GetString().Length > maximum)
+                throw new UiAutomationException("invalid_parameters", "Invalid UI parameter: " + name);
+            return value.GetString();
+        }
+
+        private LiveTestResponse HandleOptionsMenu(LiveTestRequest request)
+        {
+            if (!request.Parameters.TryGetProperty("action", out var actionValue) || actionValue.ValueKind != JsonValueKind.String)
+                return Failure(request.Id, "invalid_parameters", "Expected action: open, select, inspect, or close.", false);
+            string action = actionValue.GetString();
+            if (action != "open" && action != "select" && action != "inspect" && action != "close")
+                return Failure(request.Id, "invalid_parameters", "Expected action: open, select, inspect, or close.", false);
+            string tab = null;
+            if (request.Parameters.TryGetProperty("tab", out var tabValue) && tabValue.ValueKind == JsonValueKind.String)
+                tab = tabValue.GetString();
+            if ((action == "select" && string.IsNullOrEmpty(tab)) || (tab != null && tab.Length > 64))
+                return Failure(request.Id, "invalid_parameters", "Expected a co-op options tab id (maximum 64 characters).", false);
+
+            return ExecuteOnGameThread(request, () =>
+            {
+                if (processInfo.Role != "client")
+                    return Failure(request.Id, "client_only", "Options navigation is client-only.", false);
+                bool active = optionsMenu != null && ScreenManager.TopScreen == optionsMenu;
+                if (action == "inspect")
+                    return Success(request.Id, active ? optionsMenu.InspectDebugMenu() : new { open = false });
+                bool opened = false;
+                if (action == "open" && !active)
+                {
+                    if (Campaign.Current == null || !(ScreenManager.TopScreen is SandBox.View.Map.MapScreen))
+                        return Failure(request.Id, "not_ready", "Open options from the campaign map only.", false);
+                    optionsMenu = new CoopOptionsUI();
+                    ScreenManager.PushScreen(optionsMenu);
+                    active = opened = true;
+                }
+                if (!active)
+                    return Failure(request.Id, "menu_not_active", "The MCP-opened options screen is not on top; no screen was closed or selected.", false);
+                if (action == "close")
+                {
+                    ScreenManager.PopScreen();
+                    optionsMenu = null;
+                    return Success(request.Id, new { open = false, applied = false });
+                }
+                if (!string.IsNullOrEmpty(tab) && !optionsMenu.TrySelectDebugTab(tab))
+                {
+                    if (opened)
+                    {
+                        ScreenManager.PopScreen();
+                        optionsMenu = null;
+                    }
+                    return Failure(request.Id, "unknown_tab", "Unknown co-op options tab; no tab was selected.", false);
+                }
+                return Success(request.Id, optionsMenu.InspectDebugMenu());
+            }, action != "inspect");
         }
 
         private LiveTestResponse HandleCommandCatalog(LiveTestRequest request)
@@ -177,22 +303,22 @@ namespace Coop.LiveTesting
                 return Failure(request.Id, "invalid_parameters", error, false);
             }
 
-            if (!command.StartsWith("coop.debug.", StringComparison.Ordinal))
-            {
-                return Failure(
-                    request.Id,
-                    "command_not_allowed",
-                    "Only coop.debug.* commands may be run through live testing.",
-                    false);
-            }
-
             return ExecuteOnGameThread(request, () =>
             {
                 if (!ContainerProvider.TryResolve<ILiveTestCommandDispatcher>(out var dispatcher))
                 {
+                    string output = null;
                     if (string.Equals(command, "coop.debug.connection.start", StringComparison.Ordinal))
                     {
-                        string output = Coop.JoinFixtureCommands.Start(arguments);
+                        output = Coop.JoinFixtureCommands.Start(arguments);
+                    }
+                    else if (string.Equals(command, "coop.debug.connection.reconnect", StringComparison.Ordinal))
+                    {
+                        output = JoinDebugCommands.Reconnect(arguments);
+                    }
+
+                    if (output != null)
+                    {
                         bool hasFallbackStructuredResult = TryParseStructuredResult(
                             output,
                             out var fallbackStructuredResult);
@@ -229,6 +355,8 @@ namespace Coop.LiveTesting
                     arguments,
                     found = true,
                     output = result.Output,
+                    succeeded = result.Succeeded,
+                    errorCode = result.ErrorCode,
                     hasStructuredResult,
                     structuredResult,
                 });
@@ -272,6 +400,13 @@ namespace Coop.LiveTesting
                         false);
                 }
 
+                var capture = new ScreenshotCaptureState(
+                    captureId,
+                    screenshotPath,
+                    DateTime.UtcNow,
+                    Utilities.EngineFrameNo,
+                    MaximumScreenshotObservations,
+                    ScreenshotCaptureTimeout);
                 lock (screenshotGate)
                 {
                     if (!screenshotPaths.Add(screenshotPath))
@@ -283,9 +418,7 @@ namespace Coop.LiveTesting
                             false);
                     }
 
-                    screenshotCaptures.Add(
-                        captureId,
-                        new ScreenshotCapture(screenshotPath));
+                    screenshotCaptures.Add(captureId, capture);
                 }
 
                 try
@@ -313,6 +446,8 @@ namespace Coop.LiveTesting
                     captureId,
                     path = screenshotPath,
                     captureRequested = true,
+                    captureRequestedUtc = capture.CaptureRequestedUtc,
+                    captureRequestEngineFrame = capture.CaptureRequestEngineFrame,
                 });
             }, true);
         }
@@ -330,7 +465,7 @@ namespace Coop.LiveTesting
                     false);
             }
 
-            ScreenshotCapture capture;
+            ScreenshotCaptureState capture;
             lock (screenshotGate)
             {
                 if (!screenshotCaptures.TryGetValue(captureId, out capture))
@@ -343,48 +478,193 @@ namespace Coop.LiveTesting
                 }
             }
 
-            ScreenshotFileObservation observation = ObserveScreenshot(capture.Path);
-            bool stable;
-            bool complete;
-            lock (screenshotGate)
+            if (!TryReadEngineObservation(
+                request,
+                out var observationUtc,
+                out var observationEngineFrame,
+                out var observationFailure))
             {
-                if (!screenshotCaptures.TryGetValue(captureId, out var currentCapture) ||
-                    !ReferenceEquals(capture, currentCapture))
+                return observationFailure;
+            }
+
+            lock (capture.Gate)
+            {
+                BmpScreenshotObservation observation = screenshotInspector.ObserveFile(capture.Path);
+                ScreenshotCaptureAdvanceResult advance = capture.Advance(
+                    observationUtc,
+                    observationEngineFrame,
+                    observation,
+                    screenshotInspector);
+                if (advance.Status == ScreenshotCaptureStatus.TimedOut)
                 {
                     return Failure(
                         request.Id,
-                        "capture_not_found",
-                        $"Screenshot capture '{captureId}' was superseded.",
+                        "screenshot_timeout",
+                        $"Screenshot capture '{captureId}' did not stabilize within {capture.MaximumObservations} observations or {capture.CaptureTimeout.TotalSeconds:0} seconds.",
                         false);
                 }
 
-                stable = observation.Exists &&
-                    observation.IsBmp &&
-                    observation.DeclaredLength == observation.Length &&
-                    observation.Length > 0 &&
-                    capture.HasObservation &&
-                    capture.LastLength == observation.Length &&
-                    capture.LastWriteUtc == observation.LastWriteUtc;
-                capture.HasObservation = observation.Exists;
-                capture.LastLength = observation.Length;
-                capture.LastWriteUtc = observation.LastWriteUtc;
-                capture.Complete |= stable;
-                complete = capture.Complete;
-            }
+                if (advance.Status == ScreenshotCaptureStatus.QualityRejected)
+                {
+                    return CreateScreenshotQualityFailure(request.Id, capture);
+                }
 
-            return Success(request.Id, new
+                return CreateScreenshotStatusResponse(request.Id, capture, advance.Stable);
+            }
+        }
+
+        private LiveTestResponse CreateScreenshotQualityFailure(
+            string requestId,
+            ScreenshotCaptureState capture)
+        {
+            return Failure(
+                requestId,
+                "screenshot_quality_rejected",
+                $"Screenshot capture '{capture.CaptureId}' was rejected as {capture.Evidence.QualityVerdict}: {capture.Evidence.QualityReason}",
+                false);
+        }
+
+        private LiveTestResponse CreateScreenshotStatusResponse(
+            string requestId,
+            ScreenshotCaptureState capture,
+            bool stable)
+        {
+            BmpScreenshotObservation observation = capture.LastObservation ?? BmpScreenshotObservation.Missing;
+            BmpScreenshotEvidence evidence = capture.Evidence;
+            return Success(requestId, new
             {
-                captureId,
+                captureId = capture.CaptureId,
                 path = capture.Path,
                 exists = observation.Exists,
-                isBmp = observation.IsBmp,
+                isBmp = observation.HeaderValid,
+                headerValid = observation.HeaderValid,
                 stable,
-                complete,
+                complete = capture.Complete,
                 length = observation.Length,
                 declaredLength = observation.DeclaredLength,
                 lengthMatchesHeader = observation.LengthMatchesHeader,
+                width = evidence?.Width ?? observation.Width,
+                height = evidence?.Height ?? observation.Height,
+                bitsPerPixel = evidence?.BitsPerPixel ?? observation.BitsPerPixel,
                 lastWriteUtc = observation.LastWriteUtc,
+                captureRequestedUtc = capture.CaptureRequestedUtc,
+                captureRequestEngineFrame = capture.CaptureRequestEngineFrame,
+                observationUtc = capture.LastObservationUtc,
+                observationEngineFrame = capture.LastObservationEngineFrame,
+                observationCount = capture.ObservationCount,
+                maximumObservations = capture.MaximumObservations,
+                captureDeadlineUtc = capture.CaptureRequestedUtc + capture.CaptureTimeout,
+                sha256 = evidence?.Sha256,
+                basicQualityPassed = evidence?.PassesBasicQuality,
+                qualityVerdict = evidence?.QualityVerdict.ToString(),
+                qualityReason = evidence?.QualityReason,
+                qualityScope = "basic_pixel_sanity_only",
+                semanticVisualCorrectnessEvaluated = false,
             });
+        }
+
+        private LiveTestResponse HandleRenderStatus(LiveTestRequest request)
+        {
+            if (isServer)
+            {
+                return Failure(
+                    request.Id,
+                    "method_not_allowed",
+                    "Render status is only available in a client process.",
+                    false);
+            }
+
+            return ExecuteOnGameThread(request, () =>
+            {
+                long privateBytes;
+                using (Process process = Process.GetCurrentProcess())
+                {
+                    privateBytes = process.PrivateMemorySize64;
+                }
+
+                return Success(request.Id, new
+                {
+                    experimental = true,
+                    nativeRenderStateConfirmed = false,
+                    engineFrame = Utilities.EngineFrameNo,
+                    mainFps = Utilities.GetMainFps(),
+                    rendererFps = Utilities.GetRendererFps(),
+                    processPrivateBytes = privateBytes,
+                    gameThreadQueueDepth = GameThread.Instance.QueueLength,
+                    activeState = GameStateManager.Current?.ActiveState?.GetType().FullName,
+                    topScreen = ScreenManager.TopScreen?.GetType().FullName,
+                    activeMenu = Campaign.Current?.CurrentMenuContext?.GameMenu?.StringId,
+                    missionScene = Mission.Current?.SceneName,
+                    campaignLoaded = Campaign.Current != null,
+                    missionActive = Mission.Current != null,
+                    trackedRenderingEnabled,
+                    renderStateTrackable,
+                    renderToggleCount,
+                    trackingBasis = "assumed_enabled_at_live_test_start_then_requested_transitions",
+                });
+            }, false);
+        }
+
+        private LiveTestResponse HandleRenderToggle(LiveTestRequest request)
+        {
+            if (isServer)
+            {
+                return Failure(
+                    request.Id,
+                    "method_not_allowed",
+                    "Render toggling is only available in a client process.",
+                    false);
+            }
+
+            if (!TryReadBoolean(request.Parameters, "enabled", out var requestedEnabled))
+            {
+                return Failure(
+                    request.Id,
+                    "invalid_parameters",
+                    "Render toggle parameters require a boolean 'enabled'.",
+                    false);
+            }
+
+            return ExecuteOnGameThread(request, () =>
+            {
+                if (!renderStateTrackable)
+                {
+                    return Failure(
+                        request.Id,
+                        "render_state_untrackable",
+                        "A prior experimental native render transition failed, so another toggle would be unsafe.",
+                        true);
+                }
+
+                bool toggleInvoked = requestedEnabled != trackedRenderingEnabled;
+                if (toggleInvoked)
+                {
+                    try
+                    {
+                        // Native semantics are unknown; live canaries must prove frame, network, and screenshot behavior.
+                        Utilities.ToggleRender();
+                        trackedRenderingEnabled = requestedEnabled;
+                        renderToggleCount++;
+                    }
+                    catch
+                    {
+                        renderStateTrackable = false;
+                        throw;
+                    }
+                }
+
+                return Success(request.Id, new
+                {
+                    experimental = true,
+                    requestedEnabled,
+                    trackedRenderingEnabled,
+                    renderStateTrackable,
+                    toggleInvoked,
+                    renderToggleCount,
+                    nativeRenderStateConfirmed = false,
+                    trackingBasis = "assumed_enabled_at_live_test_start_then_requested_transitions",
+                });
+            }, true);
         }
 
         private LiveTestResponse HandleShutdown(LiveTestRequest request)
@@ -588,6 +868,9 @@ namespace Coop.LiveTesting
                 topScreen,
                 activeMenu,
                 campaignLoaded,
+                requestedSaveName = ReadArgument(Environment.GetCommandLineArgs(), "/coopsave"),
+                loadedCampaignId = Campaign.Current?.UniqueGameId,
+                loadedSaveNameConfirmed = false,
                 missionActive,
                 coopRunning,
                 coopState,
@@ -597,6 +880,9 @@ namespace Coop.LiveTesting
                 registeredControllerIds,
                 connectedControllerIds,
                 deferredClientJoinEnabled,
+                readyForClientJoin = !isServer && deferredClientJoinEnabled &&
+                    Volatile.Read(ref deferredClientJoinAttempted) == 0 &&
+                    GameStateManager.Current?.ActiveState is InitialState && !campaignLoaded,
                 deferredClientJoinAttempted = Volatile.Read(ref deferredClientJoinAttempted) != 0,
                 readyForCampaignTests,
                 readyForMissionTests = readyForCampaignTests && missionActive,
@@ -652,6 +938,53 @@ namespace Coop.LiveTesting
                 timeoutOutcomeUncertain);
         }
 
+        private bool TryReadEngineObservation(
+            LiveTestRequest request,
+            out DateTime observationUtc,
+            out int observationEngineFrame,
+            out LiveTestResponse failure)
+        {
+            DateTime observedUtc = default(DateTime);
+            int observedFrame = 0;
+            try
+            {
+                GameThread.Run(() =>
+                {
+                    observedUtc = DateTime.UtcNow;
+                    observedFrame = Utilities.EngineFrameNo;
+                }, blocking: true, label: "LiveTestControl." + request.Method + ".frame");
+            }
+            catch (TimeoutException exception)
+            {
+                Logger.Error(exception, "[LiveTest] Game-thread timeout for {Method} request {RequestId}", request.Method, request.Id);
+                observationUtc = default(DateTime);
+                observationEngineFrame = 0;
+                failure = Failure(
+                    request.Id,
+                    "game_thread_timeout",
+                    "The game thread did not provide a screenshot observation frame within 30 seconds.",
+                    false);
+                return false;
+            }
+            catch (Exception exception)
+            {
+                Logger.Error(exception, "[LiveTest] Could not read screenshot observation frame for request {RequestId}", request.Id);
+                observationUtc = default(DateTime);
+                observationEngineFrame = 0;
+                failure = Failure(
+                    request.Id,
+                    "operation_failed",
+                    exception.Message,
+                    false);
+                return false;
+            }
+
+            observationUtc = observedUtc;
+            observationEngineFrame = observedFrame;
+            failure = null;
+            return true;
+        }
+
         private LiveTestResponse Success(string id, object result)
         {
             return LiveTestResponse.Success(id, GetProcessInfo(), result);
@@ -674,6 +1007,7 @@ namespace Coop.LiveTesting
             return new LiveTestProcessInfo
             {
                 Pid = processInfo.Pid,
+                ProcessStartedUtc = processStartedUtc,
                 Role = processInfo.Role,
                 PlatformId = processInfo.PlatformId,
                 RunToken = processInfo.RunToken,
@@ -775,54 +1109,6 @@ namespace Coop.LiveTesting
             }
         }
 
-        private static ScreenshotFileObservation ObserveScreenshot(string path)
-        {
-            if (!File.Exists(path)) return ScreenshotFileObservation.Missing;
-
-            try
-            {
-                using (var stream = new FileStream(
-                    path,
-                    FileMode.Open,
-                    FileAccess.Read,
-                    FileShare.Read))
-                {
-                    long length = stream.Length;
-                    var header = new byte[6];
-                    int headerLength = 0;
-                    while (headerLength < header.Length)
-                    {
-                        int bytesRead = stream.Read(
-                            header,
-                            headerLength,
-                            header.Length - headerLength);
-                        if (bytesRead == 0) break;
-                        headerLength += bytesRead;
-                    }
-                    bool isBmp = headerLength == header.Length &&
-                        header[0] == 'B' &&
-                        header[1] == 'M';
-                    long? declaredLength = isBmp
-                        ? (long?)BitConverter.ToUInt32(header, 2)
-                        : null;
-                    return new ScreenshotFileObservation(
-                        true,
-                        isBmp,
-                        length,
-                        declaredLength,
-                        File.GetLastWriteTimeUtc(path));
-                }
-            }
-            catch (IOException)
-            {
-                return new ScreenshotFileObservation(true, false, 0, null, null);
-            }
-            catch (UnauthorizedAccessException)
-            {
-                return new ScreenshotFileObservation(true, false, 0, null, null);
-            }
-        }
-
         private static bool IsLowerHexadecimal(char character) =>
             (character >= '0' && character <= '9') ||
             (character >= 'a' && character <= 'f');
@@ -873,6 +1159,19 @@ namespace Coop.LiveTesting
                 (value = element.GetString()) != null;
         }
 
+        private static bool TryReadBoolean(JsonElement parameters, string propertyName, out bool value)
+        {
+            value = false;
+            if (!parameters.TryGetProperty(propertyName, out var element) ||
+                (element.ValueKind != JsonValueKind.True && element.ValueKind != JsonValueKind.False))
+            {
+                return false;
+            }
+
+            value = element.GetBoolean();
+            return true;
+        }
+
         private static string ReadArgument(string[] arguments, string name)
         {
             int index = Array.FindIndex(arguments, argument =>
@@ -893,46 +1192,6 @@ namespace Coop.LiveTesting
                 : null;
         }
 
-        private sealed class ScreenshotCapture
-        {
-            public string Path { get; }
-            public bool HasObservation { get; set; }
-            public long LastLength { get; set; }
-            public DateTime? LastWriteUtc { get; set; }
-            public bool Complete { get; set; }
-
-            public ScreenshotCapture(string path)
-            {
-                Path = path;
-            }
-        }
-
-        private readonly struct ScreenshotFileObservation
-        {
-            public static readonly ScreenshotFileObservation Missing =
-                new ScreenshotFileObservation(false, false, 0, null, null);
-
-            public bool Exists { get; }
-            public bool IsBmp { get; }
-            public long Length { get; }
-            public long? DeclaredLength { get; }
-            public bool LengthMatchesHeader => DeclaredLength == Length;
-            public DateTime? LastWriteUtc { get; }
-
-            public ScreenshotFileObservation(
-                bool exists,
-                bool isBmp,
-                long length,
-                long? declaredLength,
-                DateTime? lastWriteUtc)
-            {
-                Exists = exists;
-                IsBmp = isBmp;
-                Length = length;
-                DeclaredLength = declaredLength;
-                LastWriteUtc = lastWriteUtc;
-            }
-        }
     }
 }
 #endif

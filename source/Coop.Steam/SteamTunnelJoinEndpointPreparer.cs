@@ -18,6 +18,13 @@ public class SteamTunnelJoinEndpointPreparer : IJoinEndpointPreparer
 
     private readonly object gate = new object();
     private SteamTunnelClient tunnel;
+    private readonly Func<IReceivePathDiagnostics> diagnosticsFactory;
+
+    public SteamTunnelJoinEndpointPreparer(Func<IReceivePathDiagnostics> diagnosticsFactory)
+    {
+        if (diagnosticsFactory == null) throw new ArgumentNullException(nameof(diagnosticsFactory));
+        this.diagnosticsFactory = diagnosticsFactory;
+    }
 
     public Task<SessionJoinInfo> PrepareAsync(SessionJoinInfo info)
     {
@@ -28,7 +35,7 @@ public class SteamTunnelJoinEndpointPreparer : IJoinEndpointPreparer
             SteamTunnelClient client = null;
             try
             {
-                client = new SteamTunnelClient(new SteamNetworkingTunnelTransport());
+                client = new SteamTunnelClient(new SteamNetworkingTunnelTransport(), diagnosticsFactory());
                 client.Start(info.HostSteamId);
             }
             catch (Exception ex)
