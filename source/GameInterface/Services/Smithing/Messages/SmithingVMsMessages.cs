@@ -51,16 +51,6 @@ public readonly struct WeaponDesignVMCreated : IEvent
     }
 }
 
-public readonly struct WeaponDesignResultPopupVMCreated : IEvent
-{
-    public readonly WeaponDesignResultPopupVM WeaponDesignResultPopupVM;
-
-    public WeaponDesignResultPopupVMCreated(WeaponDesignResultPopupVM weaponDesignResultPopupVM)
-    {
-        WeaponDesignResultPopupVM = weaponDesignResultPopupVM;
-    }
-}
-
 public readonly struct RefreshWeaponDesignVM : IEvent
 {
     public readonly Town Town;
@@ -68,6 +58,20 @@ public readonly struct RefreshWeaponDesignVM : IEvent
     public RefreshWeaponDesignVM(Town town)
     {
         Town = town;
+    }
+}
+
+public readonly struct CreateCraftingResultPopup : IEvent
+{
+    public readonly ItemObject CraftedItem;
+    public readonly bool Success;
+
+    public CreateCraftingResultPopup(
+        ItemObject craftedItem,
+        bool success)
+    {
+        CraftedItem = craftedItem;
+        Success = success;
     }
 }
 

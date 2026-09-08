@@ -5,12 +5,15 @@ using Common.Util;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Smithing.Interfaces;
 using GameInterface.Services.Smithing.Messages;
+using GameInterface.Services.Smithing.Patches;
 using Serilog;
 using System.Linq;
 using TaleWorlds.CampaignSystem;
+using TaleWorlds.CampaignSystem.GameState;
 using TaleWorlds.CampaignSystem.Settlements;
 using TaleWorlds.CampaignSystem.ViewModelCollection.WeaponCrafting.Smelting;
 using TaleWorlds.CampaignSystem.ViewModelCollection.WeaponCrafting.WeaponDesign.Order;
+using TaleWorlds.Core;
 using TaleWorlds.Library;
 
 namespace GameInterface.Services.Smithing.Handlers;
@@ -41,6 +44,8 @@ internal class SmithingVMsHandler : IHandler
         messageBroker.Subscribe<NetworkRefreshSmelting>(Handle_NetworkRefreshSmelting);
         messageBroker.Subscribe<NetworkRefreshRefinement>(Handle_NetworkRefreshRefinement);
         messageBroker.Subscribe<RefreshCraftingVM>(Handle_RefreshCraftingVM);
+
+        messageBroker.Subscribe<CreateCraftingResultPopup>(Handle_CreateCraftingResultPopup);
     }
 
     public void Dispose()
@@ -54,6 +59,8 @@ internal class SmithingVMsHandler : IHandler
         messageBroker.Unsubscribe<NetworkRefreshSmelting>(Handle_NetworkRefreshSmelting);
         messageBroker.Unsubscribe<NetworkRefreshRefinement>(Handle_NetworkRefreshRefinement);
         messageBroker.Unsubscribe<RefreshCraftingVM>(Handle_RefreshCraftingVM);
+
+        messageBroker.Unsubscribe<CreateCraftingResultPopup>(Handle_CreateCraftingResultPopup);
     }
 
     private void Handle_SmeltingVMCreated(MessagePayload<SmeltingVMCreated> obj)
@@ -122,6 +129,31 @@ internal class SmithingVMsHandler : IHandler
         GameThread.RunSafe(() =>
         {
             RefreshCraftingVM();
+        });
+    }
+
+    private void Handle_CreateCraftingResultPopup(MessagePayload<CreateCraftingResultPopup> obj)
+    {
+        GameThread.RunSafe(() =>
+        {
+            var currentWeaponDesignVM = smithingVMsProvider.GetCurrentWeaponDesignVM();
+            var currentCraftingVM = smithingVMsProvider.GetCurrentCraftingVM();
+            if (currentWeaponDesignVM == null || currentCraftingVM == null) return;
+            if (!CreateCraftedWeaponInternalPatch.ClearPendingCraftedItem(currentWeaponDesignVM)) return;
+
+            if (obj.What.Success)
+            {
+                if (GameStateManager.Current.ActiveState is not CraftingState) return;
+
+                currentWeaponDesignVM.CraftedItemObject = obj.What.CraftedItem;
+                currentWeaponDesignVM.IsInFinalCraftingStage = true;
+                currentWeaponDesignVM.CreateCraftingResultPopup();
+                currentCraftingVM._onWeaponCrafted?.Invoke();
+            }
+            else
+            {
+                RefreshCraftingVM();
+            }
         });
     }
 

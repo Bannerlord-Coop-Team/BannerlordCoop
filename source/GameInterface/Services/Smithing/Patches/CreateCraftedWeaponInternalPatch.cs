@@ -6,11 +6,14 @@ using GameInterface.Services.Smithing.Interfaces;
 using GameInterface.Services.Smithing.Messages;
 using HarmonyLib;
 using Serilog;
+using System;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.CampaignBehaviors;
 using TaleWorlds.CampaignSystem.CraftingSystem;
 using TaleWorlds.CampaignSystem.GameState;
 using TaleWorlds.CampaignSystem.Settlements;
+using TaleWorlds.CampaignSystem.ViewModelCollection.WeaponCrafting;
+using TaleWorlds.CampaignSystem.ViewModelCollection.WeaponCrafting.WeaponDesign;
 using TaleWorlds.Core;
 using TaleWorlds.ObjectSystem;
 
@@ -19,6 +22,7 @@ namespace GameInterface.Services.Smithing.Patches;
 [HarmonyPatch(typeof(CraftingCampaignBehavior))]
 internal class CreateCraftedWeaponInternalPatch
 {
+    private const string ClientVisualPrefix = "ClientVisual_";
     private static readonly ILogger Logger = LogManager.GetLogger<CraftingCampaignBehavior>();
 
     [HarmonyPatch(nameof(CraftingCampaignBehavior.CreateCraftedWeaponInternal))]
@@ -32,7 +36,7 @@ internal class CreateCraftedWeaponInternalPatch
         // This isn't sent to the server, won't matter after the item is crafted and won't persist across save games.
         // If the server uses this string id, two clients crafting at the same time can cause mismatched ids/crafted item counts.
         // Probable old cause of issue reported that gave crafted items to other players when two clients crafted at the same time.
-        string nextCraftedItemId = $"ClientVisual_{__instance.GetNextCraftedItemId()}";
+        string nextCraftedItemId = $"{ClientVisualPrefix}{__instance.GetNextCraftedItemId()}";
         ItemObject craftedItemObject;
         using (new AllowedThread())
         {
@@ -66,6 +70,51 @@ internal class CreateCraftedWeaponInternalPatch
 
         // Skip original to override original client saving
         return false;
+    }
+
+    [HarmonyPatch(typeof(WeaponDesignVM), nameof(WeaponDesignVM.CreateCraftingResultPopup))]
+    [HarmonyPrefix]
+    public static bool CreateCraftingResultPopupPrefix(ref WeaponDesignVM __instance)
+    {
+        if (!IsPendingCraftedItem(__instance.CraftedItemObject)) return true;
+
+        __instance.IsInFinalCraftingStage = false;
+        return false;
+    }
+
+    [HarmonyPatch(typeof(CraftingVM), nameof(CraftingVM.ExecuteMainAction))]
+    [HarmonyPrefix]
+    public static bool ExecuteMainActionPrefix(CraftingVM __instance)
+    {
+        return !IsPendingCraftedItem(__instance.WeaponDesign?.CraftedItemObject);
+    }
+
+    [HarmonyPatch(typeof(WeaponDesignVM), nameof(WeaponDesignVM.OnFinalize))]
+    [HarmonyPrefix]
+    public static void WeaponDesignVMOnFinalizePrefix(WeaponDesignVM __instance)
+    {
+        ClearPendingCraftedItem(__instance);
+    }
+
+    private static bool IsPendingCraftedItem(ItemObject craftedItem)
+        => craftedItem?.StringId?.StartsWith(ClientVisualPrefix, StringComparison.Ordinal) == true;
+
+    public static bool ClearPendingCraftedItem(WeaponDesignVM weaponDesignVM)
+    {
+        if (weaponDesignVM == null || !IsPendingCraftedItem(weaponDesignVM.CraftedItemObject)) return false;
+
+        var pendingCraftedItem = weaponDesignVM.CraftedItemObject;
+        MBObjectManager.Instance.UnregisterObject(pendingCraftedItem);
+
+        if (GameStateManager.Current.ActiveState is CraftingState craftingState &&
+            ReferenceEquals(craftingState.CraftingLogic._craftedItemObject, pendingCraftedItem))
+        {
+            craftingState.CraftingLogic._craftedItemObject = null;
+        }
+
+        weaponDesignVM.CraftedItemObject = null;
+        weaponDesignVM.IsInFinalCraftingStage = false;
+        return true;
     }
 
     [HarmonyPatch(nameof(CraftingCampaignBehavior.CreateCraftedWeaponInCraftingOrderMode))]

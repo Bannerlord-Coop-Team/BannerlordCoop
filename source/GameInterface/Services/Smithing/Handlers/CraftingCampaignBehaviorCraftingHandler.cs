@@ -58,9 +58,6 @@ internal class CraftingCampaignBehaviorCraftingHandler : IHandler
         messageBroker.Subscribe<NetworkCreateCraftedWeaponInternalClients>(Handle_NetworkCreateCraftedWeaponInternalClients);
 
         messageBroker.Subscribe<NetworkSetHeroCraftingStamina>(Handle_NetworkSetHeroCraftingStamina);
-
-        messageBroker.Subscribe<AddSkillXpFromCrafting>(Handle_AddSkillXpFromCrafting);
-        messageBroker.Subscribe<NetworkAddSkillXpFromCrafting>(Handle_NetworkAddSkillXpFromCrafting);
     }
 
     public void Dispose()
@@ -77,9 +74,6 @@ internal class CraftingCampaignBehaviorCraftingHandler : IHandler
         messageBroker.Unsubscribe<NetworkCreateCraftedWeaponInternalClients>(Handle_NetworkCreateCraftedWeaponInternalClients);
 
         messageBroker.Unsubscribe<NetworkSetHeroCraftingStamina>(Handle_NetworkSetHeroCraftingStamina);
-
-        messageBroker.Unsubscribe<AddSkillXpFromCrafting>(Handle_AddSkillXpFromCrafting);
-        messageBroker.Unsubscribe<NetworkAddSkillXpFromCrafting>(Handle_NetworkAddSkillXpFromCrafting);
     }
 
     private void Handle_DoSmelting(MessagePayload<DoSmelting> obj)
@@ -260,22 +254,29 @@ internal class CraftingCampaignBehaviorCraftingHandler : IHandler
                 nextCraftedItemId,
                 out var succeeded);
 
-            if (!succeeded) return;
+            if (!succeeded)
+            {
+                network.Send(obj.Who as NetPeer, new NetworkCreateCraftedWeaponInternalClients(data, nextCraftedItemId, false));
+                return;
+            }
 
             // Update stamina on clients
             network.SendAll(new NetworkSetHeroCraftingStamina(data.CraftingHeroId, newHeroCraftingStamina));
 
             // Create weapon on all clients
-            NetworkCreateCraftedWeaponInternalClients message = new(data, nextCraftedItemId);
+            NetworkCreateCraftedWeaponInternalClients message = new(data, nextCraftedItemId, true);
             network.SendAll(message);
 
             if (!objectManager.TryGetObjectWithLogging<ItemObject>(nextCraftedItemId, out var craftedItem)) return;
             if (!objectManager.TryGetObjectWithLogging<Hero>(data.PlayerHeroId, out var playerHero)) return;
 
+            float gainedXp = 0;
             if (data.IsFreeMode)
             {
                 craftingCampaignBehaviorInterface.AddCraftedItemToRoster(playerHero.PartyBelongedTo.ItemRoster, weaponModifier, craftedItem);
                 FlushCoalescer(playerHero.PartyBelongedTo.ItemRoster);
+
+                gainedXp = Campaign.Current.Models.SmithingModel.GetSkillXpForSmithingInFreeBuildMode(craftedItem);
             }
             else
             {
@@ -289,7 +290,11 @@ internal class CraftingCampaignBehaviorCraftingHandler : IHandler
                     craftedItem,
                     craftingHero,
                     playerHero));
+
+                gainedXp = craftingOrder.GetOrderExperience(craftedItem, craftingCampaignBehavior._currentItemModifier) + Campaign.Current.Models.SmithingModel.GetSkillXpForSmithingInCraftingOrderMode(craftedItem);
             }
+
+            craftingHero.AddSkillXp(DefaultSkills.Crafting, gainedXp);
         });
     }
 
@@ -299,6 +304,12 @@ internal class CraftingCampaignBehaviorCraftingHandler : IHandler
 
         GameThread.RunSafe(() =>
         {
+            if (!data.Success)
+            {
+                messageBroker.Publish(this, new CreateCraftingResultPopup(null, false));
+                return;
+            }
+
             if (!craftingCampaignBehaviorInterface.TryGetCraftingBehavior(out var craftingBehavior)) return;
             if (!objectManager.TryGetObjectWithLogging(data.CraftingTemplateId, out CraftingTemplate craftingTemplate)) return;
             if (!objectManager.TryGetObjectWithLogging(data.PlayerHeroId, out Hero playerHero)) return;
@@ -315,9 +326,6 @@ internal class CraftingCampaignBehaviorCraftingHandler : IHandler
 
             CultureObject culture = null;
             if (data.CultureId != null && !objectManager.TryGetObjectWithLogging(data.CultureId, out culture)) return;
-
-            CraftingOrder craftingOrder = null;
-            if (data.CraftingOrderId != null && !objectManager.TryGetObjectWithLogging(data.CraftingOrderId, out craftingOrder)) return;
 
             ItemObject craftedItemObject;
             using (new AllowedThread())
@@ -341,24 +349,16 @@ internal class CraftingCampaignBehaviorCraftingHandler : IHandler
                         currentState.CraftingLogic._craftedItemObject = craftedItemObject;
                     }
 
-                    // Update client's WeaponDesignVM to be referencing this crafted item instead
-                    messageBroker.Publish(this, new UpdateCraftedItem(craftedItemObject));
-
                     AddItemToHistoryPatch.OverrideAddItemToHistory(ref craftingBehavior, craftedItemObject);
                 }
             }
 
             if (playerHero != Hero.MainHero) return;
 
-            craftingBehavior.AddResearchPoints(
-                craftedItemObject.WeaponDesign.Template,
-                Campaign.Current.Models.SmithingModel.GetPartResearchGainForSmithingItem(craftedItemObject, craftingHero, data.IsFreeMode));
+            int researchPoints = Campaign.Current.Models.SmithingModel.GetPartResearchGainForSmithingItem(craftedItemObject, craftingHero, data.IsFreeMode);
+            craftingBehavior.AddResearchPoints(craftedItemObject.WeaponDesign.Template, researchPoints);
 
-            float xpAmount = data.IsFreeMode
-                ? Campaign.Current.Models.SmithingModel.GetSkillXpForSmithingInFreeBuildMode(craftedItemObject)
-                : craftingOrder.GetOrderExperience(craftedItemObject, craftingBehavior._currentItemModifier) + Campaign.Current.Models.SmithingModel.GetSkillXpForSmithingInCraftingOrderMode(craftedItemObject);
-
-            messageBroker.Publish(this, new AddSkillXpFromCrafting(craftingHero, xpAmount));
+            messageBroker.Publish(this, new CreateCraftingResultPopup(craftedItemObject, true));
         });
     }
 
@@ -372,23 +372,6 @@ internal class CraftingCampaignBehaviorCraftingHandler : IHandler
             if (!objectManager.TryGetObjectWithLogging(data.CraftingHeroId, out Hero craftingHero)) return;
 
             craftingBehavior.GetRecordForCompanion(craftingHero).CraftingStamina = MathF.Max(0, data.Value);
-        });
-    }
-
-    private void Handle_AddSkillXpFromCrafting(MessagePayload<AddSkillXpFromCrafting> obj)
-    {
-        if (!objectManager.TryGetIdWithLogging(obj.What.CraftingHero, out var craftingHeroId)) return;
-
-        network.SendAll(new NetworkAddSkillXpFromCrafting(craftingHeroId, obj.What.Xp));
-    }
-
-    private void Handle_NetworkAddSkillXpFromCrafting(MessagePayload<NetworkAddSkillXpFromCrafting> obj)
-    {
-        GameThread.RunSafe(() =>
-        {
-            if (!objectManager.TryGetObjectWithLogging<Hero>(obj.What.CraftingHeroId, out var craftingHero)) return;
-
-            craftingHero.AddSkillXp(DefaultSkills.Crafting, obj.What.Xp);
         });
     }
 
