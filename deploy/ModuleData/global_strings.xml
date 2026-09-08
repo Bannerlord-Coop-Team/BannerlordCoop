@@ -14,6 +14,7 @@
     <string id="str_coop_clan_player_party_wages_disabled" text="{=str_coop_clan_player_party_wages_disabled}Wage limits cannot be set for player parties." />
     <string id="str_coop_clan_identity_leader_only" text="{=str_coop_clan_identity_leader_only}Only the clan leader can change the clan's name or banner." />
     <string id="str_coop_clan_assets_leader_only" text="{=str_coop_clan_assets_leader_only}Only the clan leader can manage clan assets." />
+    <string id="str_coop_clan_hero_recall_restricted" text="{=str_coop_clan_hero_recall_restricted}Only the clan leader can recall heroes assigned to a party or governorship. Heroes in another player's party cannot be recalled." />
     <string id="str_coop_clan_join_title" text="{=str_coop_clan_join_title}Join {CLAN_NAME}?" />
     <string id="str_coop_clan_experimental_warning" text="{=str_coop_clan_experimental_warning}EXPERIMENTAL: Use of this feature may cause unexpected issues." />
     <string id="str_coop_clan_join_description" text="{=str_coop_clan_join_description}You are asking to join {CLAN_NAME}, led by {LEADER_NAME}. The clan leader will manage the shared clan and its assets." />

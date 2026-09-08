@@ -74,7 +74,7 @@ internal class ClanPartiesVMHandler : IHandler
             if (!objectManager.TryGetObjectWithLogging<Hero>(data.MainHeroId, out var mainHero)) return;
             if (!objectManager.TryGetObjectWithLogging<Hero>(data.NewLeaderId, out var newLeader)) return;
             if (!objectManager.TryGetObjectWithLogging<Clan>(data.TargetClanId, out var targetClan)) return;
-            if (!permissions.CanManageClan(mainHero, targetClan) || newLeader.Clan != targetClan) return;
+            if (!permissions.CanManageClan(mainHero, targetClan) || !permissions.CanManageHero(mainHero, newLeader)) return;
 
             // Don't create a party for a hero a player controls.
             if (newLeader.IsPlayerHero())
@@ -131,7 +131,7 @@ internal class ClanPartiesVMHandler : IHandler
 
             if (!objectManager.TryGetObjectWithLogging<MobileParty>(data.SelectedPartyId, out var selectedParty)) return;
             if (!permissions.CanManageParty(mainHero, selectedParty)) return;
-            if (newLeader != null && newLeader.Clan != mainHero.Clan) return;
+            if (newLeader != null && !permissions.CanManageHero(mainHero, newLeader)) return;
 
             // Block changing leader if party is a player party
             if (selectedParty.IsPlayerParty())

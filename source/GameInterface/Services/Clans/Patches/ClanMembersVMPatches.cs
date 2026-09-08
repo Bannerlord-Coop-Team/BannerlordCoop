@@ -1,5 +1,6 @@
 ﻿using GameInterface.Services.Heroes.Extensions;
 using HarmonyLib;
+using Helpers;
 using System;
 using System.Collections.Generic;
 using System.Reflection.Emit;
@@ -8,6 +9,7 @@ using TaleWorlds.CampaignSystem.ViewModelCollection;
 using TaleWorlds.CampaignSystem.ViewModelCollection.ClanManagement;
 using TaleWorlds.CampaignSystem.ViewModelCollection.ClanManagement.Categories;
 using TaleWorlds.Core;
+using TaleWorlds.Localization;
 
 namespace GameInterface.Services.Clans.Patches;
 
@@ -17,7 +19,7 @@ internal static class ClanMembersVMPatches
     [HarmonyPatch(typeof(ClanManagementVM), MethodType.Constructor,
         typeof(Action), typeof(Action<Hero>), typeof(Action<Hero>), typeof(Action))]
     [HarmonyTranspiler]
-    internal static IEnumerable<CodeInstruction> ConstructorTranspiler(IEnumerable<CodeInstruction> instructions)
+    public static IEnumerable<CodeInstruction> ConstructorTranspiler(IEnumerable<CodeInstruction> instructions)
     {
         var constructor = AccessTools.Constructor(typeof(ClanMembersVM), new[] { typeof(Action), typeof(Action<Hero>) });
         int replacements = 0;
@@ -47,21 +49,21 @@ internal static class ClanMembersVMPatches
 
     [HarmonyPatch(typeof(ClanMembersVM), nameof(ClanMembersVM.RefreshMembersList))]
     [HarmonyPostfix]
-    private static void RefreshMembersListPostfix(ClanMembersVM __instance)
+    public static void RefreshMembersListPostfix(ClanMembersVM __instance)
     {
         if (__instance is SharedClanMembersVM shared) shared.RegroupMembers();
     }
 
     [HarmonyPatch(typeof(ClanMembersVM), nameof(ClanMembersVM.SelectMember))]
     [HarmonyPrefix]
-    private static bool SelectMemberPrefix(ClanMembersVM __instance, Hero hero)
+    public static bool SelectMemberPrefix(ClanMembersVM __instance, Hero hero)
     {
         return !(__instance is SharedClanMembersVM shared && shared.SelectAdditionalMember(hero));
     }
 
     [HarmonyPatch(typeof(ClanLordItemVM), nameof(ClanLordItemVM.UpdateProperties))]
     [HarmonyPostfix]
-    internal static void UpdatePropertiesPostfix(ClanLordItemVM __instance)
+    public static void UpdatePropertiesPostfix(ClanLordItemVM __instance)
     {
         var hero = __instance.GetHero();
         __instance.IsFamilyMember = SharedClanPermissions.CanRenameHero(hero);
@@ -82,6 +84,26 @@ internal static class ClanMembersVMPatches
             __instance.RelationToMainHeroText = CampaignUIHelper.GetHeroRelationToHeroText(hero, leader, true).ToString();
         }
     }
+
+    [HarmonyPatch(typeof(FactionHelper), nameof(FactionHelper.IsMainClanMemberAvailableForRelocate))]
+    [HarmonyPostfix]
+    public static void IsMainClanMemberAvailableForRelocatePostfix(Hero hero, ref bool __result, ref TextObject explanation)
+    {
+        if (!__result || SharedClanPermissions.CanRecallHero(hero)) return;
+
+        __result = false;
+        explanation = GameTexts.FindText("str_coop_clan_hero_recall_restricted");
+    }
+
+    [HarmonyPatch(typeof(ClanMembersVM), nameof(ClanMembersVM.OnRequestRecall))]
+    [HarmonyPrefix]
+    public static bool OnRequestRecallPrefix(ClanMembersVM __instance)
+        => SharedClanPermissions.CanRecallHero(__instance.CurrentSelectedMember?.GetHero());
+
+    [HarmonyPatch(typeof(ClanMembersVM), nameof(ClanMembersVM.OnConfirmRecall))]
+    [HarmonyPrefix]
+    public static bool OnConfirmRecallPrefix(ClanMembersVM __instance)
+        => SharedClanPermissions.CanRecallHero(__instance.CurrentSelectedMember?.GetHero());
 
     [HarmonyPatch(typeof(ClanLordItemVM), nameof(ClanLordItemVM.ExecuteRename))]
     [HarmonyPrefix]

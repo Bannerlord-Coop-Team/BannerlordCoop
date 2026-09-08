@@ -1,5 +1,6 @@
 ﻿using Common;
 using Common.Messaging;
+using GameInterface.Services.Clans;
 using GameInterface.Services.Companions.Messages;
 using HarmonyLib;
 using TaleWorlds.CampaignSystem;
@@ -46,6 +47,8 @@ internal class PerkResetCampaignBehaviorPatches
     [HarmonyPrefix]
     public static bool ConversationArenaPlayerAcceptPerkResetOnConsequencePrefix(PerkResetCampaignBehavior __instance)
     {
+        if (!SharedClanPermissions.CanManageHero(__instance._heroForPerkReset)) return false;
+
         var message = new ResetPerksByArenaMaster(
             Hero.MainHero,
             __instance.PerkResetCost,

@@ -70,6 +70,8 @@ internal class ClanPartiesVMPatches
             return false;
         }
 
+        if (!SharedClanPermissions.CanManageHero(newLeader)) return false;
+
         if (newLeader.PartyBelongedTo == MobileParty.MainParty)
         {
             __instance._openPartyAsManage(newLeader);
@@ -135,6 +137,8 @@ internal class ClanPartiesVMPatches
         }
 
         // Change clan party leader on the server
+        if (newLeader != null && !SharedClanPermissions.CanManageHero(newLeader)) return false;
+
         var message = new ClanPartyLeaderChanged(Hero.MainHero, newLeader, selectedParty, MobileParty.MainParty);
         MessageBroker.Instance.Publish(__instance, message);
 
@@ -161,24 +165,23 @@ internal class ClanPartiesVMPatches
     [HarmonyPostfix]
     public static void GetNewPartyLeaderCandidatesPostfix(ref IEnumerable<ClanCardSelectionItemInfo> __result)
     {
-        // Remove player heroes from card selection
-        __result = WithoutPlayerHeroes(__result);
+        __result = WithManageableHeroes(__result);
     }
 
     [HarmonyPatch(nameof(ClanPartiesVM.GetChangeLeaderCandidates))]
     [HarmonyPostfix]
     public static void GetChangeLeaderCandidatesPostfix(ref IEnumerable<ClanCardSelectionItemInfo> __result)
     {
-        // Remove player heroes from card selection
-        __result = WithoutPlayerHeroes(__result);
+        __result = WithManageableHeroes(__result);
     }
 
-    private static IEnumerable<ClanCardSelectionItemInfo> WithoutPlayerHeroes(IEnumerable<ClanCardSelectionItemInfo> candidates)
+    private static IEnumerable<ClanCardSelectionItemInfo> WithManageableHeroes(IEnumerable<ClanCardSelectionItemInfo> candidates)
     {
         if (candidates == null) return candidates;
 
         return candidates
-            .Where(candidate => !(candidate.Identifier is Hero hero && hero.IsPlayerHero()))
+            .Where(candidate => !(candidate.Identifier is Hero hero) ||
+                (!hero.IsPlayerHero() && SharedClanPermissions.CanManageHero(hero)))
             .ToList();
     }
 }
