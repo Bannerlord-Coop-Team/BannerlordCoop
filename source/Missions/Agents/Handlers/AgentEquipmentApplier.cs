@@ -49,7 +49,7 @@ public class AgentEquipmentApplier : IAgentEquipmentApplier
                             equipment.IdentityScopeId, equipment.AgentIds[i], out var compactInfo)
                         : agentRegistry.TryGetAgentInfo(
                             equipment.AgentGuids[i], out compactInfo);
-                    if (!found) continue;
+                    if (!found || compactInfo.UsesActionEquipment) continue;
 
                     Agent agent = compactInfo.Agent;
                     if (agent == null || agent.Mission != Mission.Current ||

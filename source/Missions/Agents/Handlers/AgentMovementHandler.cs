@@ -101,7 +101,6 @@ public class AgentMovementHandler : IAgentMovementHandler
     private readonly IMovementRateController movementRateController;
     private readonly IMovementPriorityScheduler movementPriorityScheduler;
     private readonly IMissionContext missionContext;
-    private readonly Dictionary<Guid, AgentEquipmentData> lastEquipment = new Dictionary<Guid, AgentEquipmentData>();
     // A puppet's horse, remembered when its owner dismounts, so a later re-mount can put it back on the
     // same one. Touched only on the game thread (inside HandlePacket's apply), so no lock; per-mission
     // (this handler is transient), so it can't leak across missions.
@@ -699,8 +698,6 @@ public class AgentMovementHandler : IAgentMovementHandler
         float prioritySampleElapsed)
     {
         var capturedMovements = new List<CapturedMovement>();
-        var equipmentGroups = new Dictionary<string, MovementBatch<AgentEquipmentData>>();
-        MovementBatch<AgentEquipmentData> legacyEquipment = null;
         var broadcastAgentIds = new HashSet<Guid>();
         int activeLocallyControlledAgents = 0;
 
@@ -777,32 +774,6 @@ public class AgentMovementHandler : IAgentMovementHandler
                 capturedMovements.Add(
                     new CapturedMovement(agentInfo, agentData, isPriority));
 
-                // SpawnMonster also creates non-mountable livestock. Those agents use this movement path but
-                // have no native wield-state pointers, so equipment capture is only valid for humans.
-                if (!AgentEquipmentData.TryCapture(agent, out var equipment))
-                    continue;
-
-                if (!lastEquipment.TryGetValue(agentInfo.AgentId, out var previousEquipment))
-                {
-                    lastEquipment[agentInfo.AgentId] = equipment;
-
-                    // Battle spawn/catch-up records already carry the current wield state. Compact ids are
-                    // battle-only, so seeding their cache here avoids immediately resending every agent's
-                    // equipment on the first 40 Hz poll. Legacy Guid registrations still need an initial update.
-                    if (agentInfo.MovementId != 0)
-                        continue;
-                }
-                else if (previousEquipment.Equals(equipment))
-                {
-                    continue;
-                }
-
-                lastEquipment[agentInfo.AgentId] = equipment;
-                AddToBatch(
-                    equipmentGroups,
-                    ref legacyEquipment,
-                    agentInfo,
-                    equipment);
             }
         }
 
@@ -812,8 +783,6 @@ public class AgentMovementHandler : IAgentMovementHandler
                 activeLocallyControlledAgents);
         if (includeAuthoritativeAgents)
             RemoveStaleLocalState(broadcastAgentIds);
-        SendEquipment(equipmentGroups.Values);
-        SendEquipment(legacyEquipment);
 
         var traffic = new MovementTrafficFrame();
         var recipientIds = new List<string>();
@@ -1276,14 +1245,6 @@ public class AgentMovementHandler : IAgentMovementHandler
             }
         }
 
-        var staleEquipmentAgentIds = new List<Guid>();
-        foreach (Guid agentId in lastEquipment.Keys)
-        {
-            if (!broadcastAgentIds.Contains(agentId))
-                staleEquipmentAgentIds.Add(agentId);
-        }
-        foreach (Guid agentId in staleEquipmentAgentIds)
-            lastEquipment.Remove(agentId);
     }
 
     public void ReplaySyntheticMountTurnAnimationsAfterNativeTick()
@@ -1631,39 +1592,6 @@ public class AgentMovementHandler : IAgentMovementHandler
         }
 
         batch.Add(agentInfo, data, priority);
-    }
-
-    private void SendEquipment(IEnumerable<MovementBatch<AgentEquipmentData>> batches)
-    {
-        foreach (var batch in batches)
-            SendEquipment(batch);
-    }
-
-    private void SendEquipment(MovementBatch<AgentEquipmentData> batch)
-    {
-        if (batch == null) return;
-
-        const int maxEquipmentPerPacket = 64;
-        for (int start = 0; start < batch.Data.Count; start += maxEquipmentPerPacket)
-        {
-            int count = Math.Min(maxEquipmentPerPacket, batch.Data.Count - start);
-            var equipment = new AgentEquipmentData[count];
-            batch.Data.CopyTo(start, equipment, 0, count);
-
-            if (batch.IdentityScopeId == null)
-            {
-                var ids = new Guid[count];
-                batch.CanonicalIds.CopyTo(start, ids, 0, count);
-                client.SendAll(new AgentEquipmentPacket(ids, equipment));
-            }
-            else
-            {
-                var ids = new ushort[count];
-                batch.CompactIds.CopyTo(start, ids, 0, count);
-                client.SendAll(new AgentEquipmentPacket(
-                    batch.IdentityScopeId, ids, equipment));
-            }
-        }
     }
 
     private static IPacket CreateMovementPacket(

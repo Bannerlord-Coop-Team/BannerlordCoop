@@ -200,6 +200,7 @@ public sealed class MissionEngineFixture : IDisposable
         Prefix(typeof(Agent), nameof(Agent.GetMaximumForwardUnlimitedSpeed), nameof(Agent_GetMaximumForwardUnlimitedSpeed));
         Prefix(typeof(Agent), nameof(Agent.GetMaximumSpeedLimit), nameof(Agent_GetMaximumSpeedLimit));
         Prefix(typeof(Agent), nameof(Agent.SetMaximumSpeedLimit), nameof(Agent_SetMaximumSpeedLimit));
+        Prefix(typeof(Agent), nameof(Agent.SetWieldedItemIndexAsClient), nameof(Agent_SetWieldedItemIndexAsClient));
         Prefix(typeof(Agent), nameof(Agent.GetPrimaryWieldedItemIndex), nameof(Agent_GetPrimaryWieldedItemIndex));
         Prefix(typeof(Agent), nameof(Agent.GetOffhandWieldedItemIndex), nameof(Agent_GetOffhandWieldedItemIndex));
         Prefix(typeof(Agent), "get_MovementInputVector", nameof(Agent_get_MovementInputVector));
@@ -1016,6 +1017,28 @@ public sealed class MissionEngineFixture : IDisposable
         m.MaximumSpeedLimit = __0;
         m.LastMaximumSpeedLimitIsMultiplier = __1;
         m.SetMaximumSpeedLimitCalls++;
+        return false;
+    }
+
+    private static bool Agent_SetWieldedItemIndexAsClient(
+        Agent __instance, Agent.HandIndex __0, EquipmentIndex __1, int __4)
+    {
+        if (!AgentMirror.TryGet(__instance, out var mirror)) return true;
+        if (__0 == Agent.HandIndex.MainHand)
+        {
+            mirror.PrimaryWieldedItemIndex = __1;
+            if (__1 >= EquipmentIndex.WeaponItemBeginSlot && __1 < EquipmentIndex.NumAllWeaponSlots)
+            {
+                MissionWeapon weapon = mirror.Equipment[__1];
+                weapon.CurrentUsageIndex = __4;
+                mirror.Equipment[__1] = weapon;
+            }
+        }
+        else
+        {
+            mirror.OffhandWieldedItemIndex = __1;
+        }
+        mirror.ActionAndGuardCallOrder.Add("wield");
         return false;
     }
 

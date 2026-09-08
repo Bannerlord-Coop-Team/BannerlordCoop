@@ -84,6 +84,7 @@ public class AgentActionHandler : IAgentActionHandler
     private struct LocalAgentActionState
     {
         public bool HasObservation;
+        public AgentEquipmentData? Equipment;
         public int Action0;
         public int Action1;
         public float Action0Speed;
@@ -233,6 +234,13 @@ public class AgentActionHandler : IAgentActionHandler
         int action1 = agent.GetCurrentAction(1).Index;
         _localAgentStates.TryGetValue(info.AgentId, out var state);
         bool hadState = state.HasObservation;
+        AgentEquipmentData? equipment = AgentEquipmentData.TryCapture(agent, out var capturedEquipment)
+            ? capturedEquipment : (AgentEquipmentData?)null;
+        bool equipmentChanged = hadState
+            ? !Nullable.Equals(state.Equipment, equipment)
+            : equipment.HasValue
+                && (equipment.Value.MainHandIndex != (int)EquipmentIndex.None
+                    || equipment.Value.OffHandIndex != (int)EquipmentIndex.None);
         bool isPlayerControlled =
             agent.Controller == AgentControllerType.Player;
         bool retainInputBoundary =
@@ -385,7 +393,8 @@ public class AgentActionHandler : IAgentActionHandler
             && !action0SpeedChanged && !action1SpeedChanged
             && !defendChanged && !guardChanged
             && !guardedMountStateChanged
-            && !guardedControllerRoleChanged)
+            && !guardedControllerRoleChanged
+            && !equipmentChanged)
         {
             if (hadState)
             {
@@ -456,8 +465,10 @@ public class AgentActionHandler : IAgentActionHandler
             || guardChanged
             || guardedMountStateChanged
             || guardedControllerRoleChanged
-            || discreteActionChanged;
+            || discreteActionChanged
+            || equipmentChanged;
         state.HasObservation = true;
+        state.Equipment = equipment;
         state.Action0 = action0;
         state.Action1 = action1;
         UpdateActionSpeedObservation(
@@ -573,7 +584,10 @@ public class AgentActionHandler : IAgentActionHandler
                         || agent.GetCurrentAction(1) != ActionIndexCache.act_none);
                 if (defendFlags == Agent.MovementControlFlag.None
                     && !AgentActionData.IsGuardMode(guardMode)
-                    && !locationAmbient)
+                    && !locationAmbient
+                    && (!AgentEquipmentData.TryCapture(agent, out var equipment)
+                        || (equipment.MainHandIndex == (int)EquipmentIndex.None
+                            && equipment.OffHandIndex == (int)EquipmentIndex.None)))
                     continue;
 
                 (ids ??= new List<Guid>()).Add(info.AgentId);

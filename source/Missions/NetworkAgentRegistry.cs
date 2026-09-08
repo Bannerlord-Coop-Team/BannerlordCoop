@@ -502,6 +502,8 @@ public class CoopAgentInfo
     private AgentEquipmentData authoritativeEquipment;
     private bool hasAuthoritativeEquipment;
 
+    internal bool UsesActionEquipment { get; set; }
+
     public Agent Agent { get; }
     public Guid AgentId { get; }
     public ushort MovementId { get; }
@@ -526,6 +528,7 @@ public class CoopAgentInfo
     {
         authoritativeEquipment = default;
         hasAuthoritativeEquipment = false;
+        UsesActionEquipment = false;
     }
 
     internal CoopAgentInfo(

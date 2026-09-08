@@ -338,6 +338,13 @@ public class RemoteAgentActionProcessor : IRemoteAgentActionProcessor
                     continue;
                 }
                 RemoteGuardState guardState = state.RetainedGuard;
+                if (guardState.Action.Data.Equipment.HasValue
+                    && !guardState.Action.Data.Equipment.Value.Matches(agent))
+                {
+                    ClearRemoteDefendState(agent, guardState);
+                    (staleIds ??= new List<Guid>()).Add(agentId);
+                    continue;
+                }
                 if (!IsCurrentActionAuthority(
                     info,
                     guardState.Action.ControllerId,
@@ -718,6 +725,16 @@ public class RemoteAgentActionProcessor : IRemoteAgentActionProcessor
         Agent agent = info.Agent;
         if (agent == null || agent.Mission != Mission.Current || !agent.IsActive())
             return RemoteActionApplyResult.AgentNotReady;
+
+        // Equipment and its dependent action must become visible in the same game-thread apply.
+        if (action.Data.Equipment.HasValue)
+        {
+            AgentEquipmentData equipment = action.Data.Equipment.Value;
+            if (!equipment.TryApplyForAction(agent))
+                return RemoteActionApplyResult.AgentNotReady;
+            info.RecordAuthoritativeEquipment(equipment);
+            info.UsesActionEquipment = true;
+        }
 
         if (removePendingBeforeApply)
             RemovePendingRemoteAction(agentId, action);
