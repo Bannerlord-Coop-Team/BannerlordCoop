@@ -7,7 +7,7 @@ using TaleWorlds.GauntletUI.PrefabSystem;
 namespace GameInterface.Services.Clans.Patches;
 
 [HarmonyPatch]
-public static class ClanPrefabPatches
+internal static class ClanPrefabPatches
 {
     [HarmonyPatch(typeof(ScrollablePanelFixedHeaderWidget), nameof(ScrollablePanelFixedHeaderWidget.IsRelevant), MethodType.Setter)]
     [HarmonyPostfix]
@@ -36,10 +36,12 @@ public static class ClanPrefabPatches
     public static void LoadTemplatePrefix(XmlNode node)
     {
         bool members = node.Attributes?["Id"]?.Value == "ClanMembersWidget";
+        bool screen = node.Attributes?["Id"]?.Value == "ClanScreenWidget";
         bool income = node.SelectSingleNode(".//*[@Id='ManageWorkshopButton' or @Id='ManageAlleyButton']") != null;
-        if ((members || income) && ContainerProvider.TryResolve<IClanPrefabEditor>(out var editor))
+        if ((members || screen || income) && ContainerProvider.TryResolve<IClanPrefabEditor>(out var editor))
         {
             if (members) editor.AddMemberGroups(node);
+            if (members || screen) editor.AddMembershipActions(node);
             if (income) editor.ApplyIncomePermissions(node);
         }
     }

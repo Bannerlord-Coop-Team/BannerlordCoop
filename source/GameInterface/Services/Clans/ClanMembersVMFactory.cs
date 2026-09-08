@@ -1,4 +1,5 @@
-﻿using System;
+﻿using Common.Messaging;
+using System;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.ViewModelCollection.ClanManagement.Categories;
 
@@ -12,14 +13,18 @@ public interface IClanMembersVMFactory : IGameAbstraction
 public class ClanMembersVMFactory : IClanMembersVMFactory
 {
     private readonly IClanMemberGrouping grouping;
+    private readonly IClanLeaveRules leaveRules;
+    private readonly IMessageBroker messageBroker;
 
-    public ClanMembersVMFactory(IClanMemberGrouping grouping)
+    public ClanMembersVMFactory(IClanMemberGrouping grouping, IClanLeaveRules leaveRules, IMessageBroker messageBroker)
     {
         this.grouping = grouping;
+        this.leaveRules = leaveRules;
+        this.messageBroker = messageBroker;
     }
 
     public ClanMembersVM Create(Action onRefresh, Action<Hero> showHeroOnMap)
     {
-        return new SharedClanMembersVM(onRefresh, showHeroOnMap, grouping);
+        return new SharedClanMembersVM(onRefresh, showHeroOnMap, grouping, leaveRules, messageBroker);
     }
 }

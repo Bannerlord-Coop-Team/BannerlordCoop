@@ -61,6 +61,13 @@ internal static class ClanMembersVMPatches
         return !(__instance is SharedClanMembersVM shared && shared.SelectAdditionalMember(hero));
     }
 
+    [HarmonyPatch(typeof(ClanMembersVM), nameof(ClanMembersVM.CurrentSelectedMember), MethodType.Setter)]
+    [HarmonyPostfix]
+    public static void CurrentSelectedMemberPostfix(ClanMembersVM __instance)
+    {
+        if (__instance is SharedClanMembersVM shared) shared.RefreshPlayerActions();
+    }
+
     [HarmonyPatch(typeof(ClanLordItemVM), nameof(ClanLordItemVM.UpdateProperties))]
     [HarmonyPostfix]
     public static void UpdatePropertiesPostfix(ClanLordItemVM __instance)

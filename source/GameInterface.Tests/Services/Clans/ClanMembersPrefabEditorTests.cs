@@ -3,6 +3,7 @@ using System;
 using System.IO;
 using System.Linq;
 using System.Xml;
+using TaleWorlds.GauntletUI.PrefabSystem;
 using Xunit;
 
 namespace GameInterface.Tests.Services.Clans;
@@ -69,10 +70,50 @@ public class ClanMembersPrefabEditorTests
         Assert.Equal(original, root.OuterXml);
     }
 
+    [Theory]
+    [InlineData("ClanScreen.xml", "LeaveClanButton", "{ClanMembers}", "@CanLeaveClan", "ExecuteLeaveClan")]
+    [InlineData("ClanMembers.xml", "ManagePlayerButton", "{..}", "@CanManagePlayer", "ExecuteManagePlayer")]
+    public void MembershipButtons_BindToMembersVmAndAreOnlyAddedOnce(string file, string id,
+        string dataSource, string visibility, string command)
+    {
+        var document = new XmlDocument();
+        document.Load(Path.Combine(AppContext.BaseDirectory, file));
+        var root = document.SelectSingleNode("/Prefab/Window/*")!;
+        var editor = new ClanPrefabEditor();
+        editor.AddMembershipActions(root);
+        editor.AddMembershipActions(root);
+
+        var button = Assert.Single(root.SelectNodes($".//*[@Id='{id}']")!.Cast<XmlElement>());
+        Assert.Equal(dataSource, button.GetAttribute("DataSource"));
+        Assert.Equal(visibility, button.GetAttribute("IsVisible"));
+        Assert.Equal(command, button.GetAttribute("Command.Click"));
+        Assert.NotNull(typeof(SharedClanMembersVM).GetMethod(command));
+
+        if (file == "ClanMembers.xml")
+            Assert.NotNull(button.SelectSingleNode("ancestor::*[@DataSource='{CurrentSelectedMember}']"));
+        else
+            Assert.Null(button.SelectSingleNode("ancestor::*[@DataSource]"));
+    }
+
     private static XmlDocument LoadPrefab()
     {
         var document = new XmlDocument();
         document.Load(Path.Combine(AppContext.BaseDirectory, "ClanMembers.xml"));
         return document;
+    }
+
+    [Theory]
+    [InlineData("ClanScreen.xml")]
+    [InlineData("ClanMembers.xml")]
+    public void MembershipButtons_LoadWithGauntletPrefabParser(string file)
+    {
+        var document = new XmlDocument();
+        using var reader = XmlReader.Create(Path.Combine(AppContext.BaseDirectory, file),
+            new XmlReaderSettings { IgnoreComments = true, IgnoreWhitespace = true });
+        document.Load(reader);
+        var root = document.SelectSingleNode("/Prefab/Window/*")!;
+        new ClanPrefabEditor().AddMembershipActions(root);
+
+        Assert.NotNull(WidgetTemplate.LoadFrom(new PrefabExtensionContext(), new WidgetAttributeContext(), root));
     }
 }

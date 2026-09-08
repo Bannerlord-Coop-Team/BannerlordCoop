@@ -6,10 +6,56 @@ public interface IClanPrefabEditor : IGameAbstraction
 {
     void AddMemberGroups(XmlNode root);
     void ApplyIncomePermissions(XmlNode root);
+    void AddMembershipActions(XmlNode root);
 }
 
 public class ClanPrefabEditor : IClanPrefabEditor
 {
+    public void AddMembershipActions(XmlNode root)
+    {
+        var fragment = root.OwnerDocument.CreateDocumentFragment();
+        XmlNode previous;
+        if (root.Attributes?["Id"]?.Value == "ClanScreenWidget" &&
+            root.SelectSingleNode(".//*[@Id='LeaveClanButton']") == null)
+        {
+            fragment.InnerXml = @"
+                <NavigationScopeTargeter ScopeID='ClanLeaveScope' ScopeParent='..\LeaveClanButton' ScopeMovements='Horizontal' />
+                <ButtonWidget Id='LeaveClanButton' DataSource='{ClanMembers}' IsVisible='@CanLeaveClan'
+                    WidthSizePolicy='Fixed' HeightSizePolicy='Fixed' SuggestedWidth='250' SuggestedHeight='60'
+                    HorizontalAlignment='Right' MarginRight='300' MarginTop='25' Brush='Popup.Delete.Button'
+                    DoNotPassEventsToChildren='true' Command.Click='ExecuteLeaveClan' GamepadNavigationIndex='0'>
+                    <Children>
+                        <TextWidget WidthSizePolicy='StretchToParent' HeightSizePolicy='StretchToParent'
+                            Brush='Popup.Button.Text' Text='@LeaveClanText' />
+                    </Children>
+                </ButtonWidget>";
+            previous = root.SelectSingleNode(".//*[@Id='TopPanel']/Children").LastChild;
+        }
+        else if (root.Attributes?["Id"]?.Value == "ClanMembersWidget" &&
+            root.SelectSingleNode(".//*[@Id='ManagePlayerButton']") == null)
+        {
+            fragment.InnerXml = @"
+                <NavigationScopeTargeter ScopeID='ClanManagePlayerScope' ScopeParent='..\ManagePlayerButton' ScopeMovements='Horizontal' />
+                <ButtonWidget Id='ManagePlayerButton' DataSource='{..}' IsVisible='@CanManagePlayer'
+                    WidthSizePolicy='Fixed' HeightSizePolicy='Fixed' SuggestedWidth='250' SuggestedHeight='50'
+                    HorizontalAlignment='Center' Brush='Popup.Cancel.Button' Command.Click='ExecuteManagePlayer'
+                    DoNotPassEventsToChildren='true' GamepadNavigationIndex='0'>
+                    <Children>
+                        <TextWidget WidthSizePolicy='StretchToParent' HeightSizePolicy='StretchToParent'
+                            Brush='Popup.Button.Text' Text='@ManagePlayerText' />
+                    </Children>
+                </ButtonWidget>";
+            previous = root.SelectSingleNode(".//*[@Id='LastSeenLocationParent']");
+        }
+        else return;
+
+        // Gauntlet treats indentation retained by InnerXml as widgets with null attributes.
+        foreach (XmlNode whitespace in fragment.SelectNodes(".//text()[normalize-space(.)='']"))
+            whitespace.ParentNode.RemoveChild(whitespace);
+
+        previous.ParentNode.InsertAfter(fragment, previous);
+    }
+
     public void ApplyIncomePermissions(XmlNode root)
     {
         foreach (XmlElement button in root.SelectNodes(".//*[@Id='ManageWorkshopButton' or @Id='ManageAlleyButton']"))

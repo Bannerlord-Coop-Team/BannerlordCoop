@@ -511,7 +511,7 @@ internal class PlayerPartyInteractionHandler : IHandler
         var allowed = actor?.Clan != null && actor.Clan == other?.Clan &&
             (option == PlayerPartyInteractionOption.LeaveClan ? clanLeaveRules.CanLeave(actor) : clanLeaveRules.CanRemove(actor, other));
         var memberParty = option == PlayerPartyInteractionOption.LeaveClan ? actorParty : otherParty;
-        if (!allowed || !clanLeaveRules.TryApply(memberParty.LeaderHero, memberParty.MobileParty))
+        if (!allowed || !clanLeaveRules.TryApply(memberParty.LeaderHero))
         {
             EndSession(session, PlayerPartyInteractionOutcomeType.Rejected);
             return true;
