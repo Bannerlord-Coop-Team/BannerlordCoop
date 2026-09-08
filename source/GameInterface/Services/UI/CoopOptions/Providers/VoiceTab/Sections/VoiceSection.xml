@@ -140,6 +140,11 @@
                         <TextWidget WidthSizePolicy="StretchToParent" HeightSizePolicy="StretchToParent" Brush="Clan.TabControl.Text" Brush.FontSize="22" Brush.TextHorizontalAlignment="Center" Brush.TextVerticalAlignment="Center" Text="@TestText" />
                     </Children>
                 </ButtonWidget>
+                <ButtonWidget WidthSizePolicy="Fixed" SuggestedWidth="245" HeightSizePolicy="Fixed" SuggestedHeight="42" VerticalAlignment="Center" Brush="ButtonBrush1" Command.Click="ExecuteRetry">
+                    <Children>
+                        <TextWidget WidthSizePolicy="StretchToParent" HeightSizePolicy="StretchToParent" Brush="Clan.TabControl.Text" Brush.FontSize="22" Brush.TextHorizontalAlignment="Center" Brush.TextVerticalAlignment="Center" Text="@RetryText" />
+                    </Children>
+                </ButtonWidget>
             </Children>
         </ListPanel>
         <TextWidget WidthSizePolicy="StretchToParent" HeightSizePolicy="Fixed" SuggestedHeight="48" Brush="Clan.TabControl.Text" Brush.FontSize="20" Brush.TextVerticalAlignment="Center" Text="@StatusText" />

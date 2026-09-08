@@ -57,6 +57,7 @@ public sealed class VoiceSection : CoopOptionsSectionVM
     public string InputText => "Input";
     public string PlaybackText => "Playback";
     public string MicrophoneTestText => "Microphone test";
+    public string RetryText => "Retry / Refresh";
     public string ActivationLabel => "Speaking mode";
     public string MicrophoneLabel => "Microphone";
     public string MuteLabel => "Mute microphone";

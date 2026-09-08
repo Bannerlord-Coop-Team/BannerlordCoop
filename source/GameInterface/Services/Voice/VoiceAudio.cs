@@ -469,7 +469,14 @@ public sealed class VoiceAudio : IVoiceAudio
             }
             if (!current.Position.CanHear || options.Deafened || testing || now - current.SampledAt > 100) continue;
             if (!pair.Value.Buffer.TryRead(now, out var audio)) continue;
-            var samples = pair.Value.Decoder.Decode(audio);
+            short[] samples;
+            try { samples = pair.Value.Decoder.Decode(audio); }
+            catch (Exception ex)
+            {
+                expired.Add(pair.Key);
+                Logger.Warning(ex, "Voice decoding failed for {Speaker}; discarding stream", pair.Key);
+                continue;
+            }
             double energy = 0;
             for (int i = 0; i < samples.Length; i++)
             {

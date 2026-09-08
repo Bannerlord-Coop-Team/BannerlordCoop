@@ -12,7 +12,7 @@ namespace GameInterface.Tests.Services.Voice;
 
 public partial class VoiceAudioTests
 {
-    private sealed class WorkerHarness : IDisposable
+    internal sealed class WorkerHarness : IDisposable
     {
         public readonly Mock<IVoiceDeviceFactory> Output = new();
         public readonly Mock<IVoiceDevice> Device = new();
@@ -107,10 +107,10 @@ public partial class VoiceAudioTests
         public void Dispose() => Audio.Dispose();
     }
 
-    private static void Wait(Func<bool> condition)
+    internal static void Wait(Func<bool> condition)
         => Assert.True(SpinWait.SpinUntil(condition, 3000), "Voice worker did not reach the expected state");
 
-    private static byte[] Pcm(short value)
+    internal static byte[] Pcm(short value)
     {
         var pcm = Enumerable.Repeat(value, 960).ToArray();
         var bytes = new byte[1920];
