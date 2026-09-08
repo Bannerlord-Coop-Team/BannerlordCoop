@@ -409,4 +409,28 @@
   <string
     id="generic_backstory.coop_wanderer_ddba5c65"
     text="{=!}I&apos;m just an unfortunate wretch cursed with a desire for lemons. I was supposed to be a soldier but I was more adept at the forge working metal. This deviance displeased my lord and so I was cursed. Now I wander, plying my trade as I go." />
+  <string
+    id="prebackstory.coop_wanderer_f992e349"
+    text="{=!}Yes, hello. Allow me to be honest: I need a job" />
+  <string
+    id="backstory_a.coop_wanderer_f992e349"
+    text="{=!}You might not believe it by looking at me but I used to be the sole ruler of a faction. But now!? For it not these rags I would have nothing. Tricked by the wicked wiles of the Western Empire: reduced to only what you see now. I am broke sir, I own nothing and I am not happy. I sold everything and still owe over 2.5 Million denars to the Western Empire." />
+  <string
+    id="backstory_b.coop_wanderer_f992e349"
+    text="{=!}How could something like this happen one might ask. I was in my Smithy producing Polearms the likes of which have never been seen selling for 10&apos;s of thousands of denars. You see I had big plans to expand my faction and take over the map until there in that smithy I heard the news." />
+  <string
+    id="backstory_c.coop_wanderer_f992e349"
+    text="{=!}What thieving snakes remained in the Western Empire. They in their last remaining town, Rhotae repaid my magnanimity with a dagger to mine softest sack. They claim I agreed to an alliance, to paying millions of denars to call them to war. Rubbish. To this day I do not understand the mechanism of force employed. But all my monies were gone. With all my monies amiss my army, my faction, my dignity, my gravitas disappeared like spit in soup." />
+  <string
+    id="response_1.coop_wanderer_f992e349"
+    text="{=!}That must have been really difficult, I hope that doesn&apos;t happen to me." />
+  <string
+    id="response_2.coop_wanderer_f992e349"
+    text="{=!}Many such cases, annnyway.." />
+  <string
+    id="backstory_d.coop_wanderer_f992e349"
+    text="{=!}Yes Yes very good very good. So I just need a job, what do you say. By the way my name is F. Charles but you can call me Chuck." />
+  <string
+    id="generic_backstory.coop_wanderer_f992e349"
+    text="{=!}A man relegated to the outdoors. Once a King now a servile vagabond." />
 </strings>
