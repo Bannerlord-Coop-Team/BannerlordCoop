@@ -19,6 +19,10 @@ public class MessageBroker : IMessageBroker
     private static readonly ILogger Logger = LogManager.GetLogger<MessageBroker>();
     protected static MessageBroker instance;
     protected readonly Dictionary<Type, List<WeakDelegate>> subscribers;
+    // Guards the two lists below. They replace an Interlocked counter, and a counter cannot be left
+    // unbalanced by an interleaving, while a lost list update would mark a list as walked for good
+    // and stop pruning it for the lifetime of the broker
+    private readonly object bookkeepingLock = new object();
     // Subscriber lists a publish is currently walking, one entry per running publish, so pruning a
     // list holds off while a loop is stepping through it by index
     private readonly List<List<WeakDelegate>> walkedByPublish = new List<List<WeakDelegate>>();
@@ -50,7 +54,10 @@ public class MessageBroker : IMessageBroker
         var delegates = subscribers[typeof(T)];
         if (delegates == null || delegates.Count == 0) return;
         var payload = new MessagePayload<T>(source, message);
-        walkedByPublish.Add(delegates);
+        lock (bookkeepingLock)
+        {
+            walkedByPublish.Add(delegates);
+        }
         try
         {
             for (int i = 0; i < delegates.Count; i++)
@@ -81,12 +88,15 @@ public class MessageBroker : IMessageBroker
         }
         finally
         {
-            walkedByPublish.Remove(delegates);
-            if (!walkedByPublish.Contains(delegates) && prunePending.Remove(delegates))
+            lock (bookkeepingLock)
             {
-                delegates.RemoveAll(weakDelegate => !weakDelegate.IsAlive);
-                if (delegates.Count == 0 && subscribers.TryGetValue(typeof(T), out var current) && current == delegates)
-                    subscribers.Remove(typeof(T));
+                walkedByPublish.Remove(delegates);
+                if (!walkedByPublish.Contains(delegates) && prunePending.Remove(delegates))
+                {
+                    delegates.RemoveAll(weakDelegate => !weakDelegate.IsAlive);
+                    if (delegates.Count == 0 && subscribers.TryGetValue(typeof(T), out var current) && current == delegates)
+                        subscribers.Remove(typeof(T));
+                }
             }
         }
     }
@@ -120,13 +130,16 @@ public class MessageBroker : IMessageBroker
     // so that list is noted here and pruned in the finally of that publish instead.
     private void RemoveDeadSubscribers(List<WeakDelegate> delegates)
     {
-        if (walkedByPublish.Contains(delegates))
+        lock (bookkeepingLock)
         {
-            if (!prunePending.Contains(delegates))
-                prunePending.Add(delegates);
-            return;
+            if (walkedByPublish.Contains(delegates))
+            {
+                if (!prunePending.Contains(delegates))
+                    prunePending.Add(delegates);
+                return;
+            }
+            delegates.RemoveAll(weakDelegate => !weakDelegate.IsAlive);
         }
-        delegates.RemoveAll(weakDelegate => !weakDelegate.IsAlive);
     }
 
     public virtual void Dispose()
