@@ -119,10 +119,10 @@ internal class CraftingCampaignBehaviorCraftingHandler : IHandler
             if (!craftingCampaignBehaviorInterface.TryGetCraftingBehavior(out var craftingCampaignBehavior)) return;
             if (!objectManager.TryGetObjectWithLogging(obj.What.CraftingHeroId, out Hero craftingHero)) return;
 
-            var equipmentElement = obj.What.EquipmentElement;
-            craftingCampaignBehavior.AddResearchPoints(
-                equipmentElement.Item.WeaponDesign.Template,
-                Campaign.Current.Models.SmithingModel.GetPartResearchGainForSmeltingItem(equipmentElement.Item, craftingHero));
+            var item = obj.What.EquipmentElement.Item;
+
+            int researchPoints = Campaign.Current.Models.SmithingModel.GetPartResearchGainForSmeltingItem(item, craftingHero);
+            craftingCampaignBehavior.AddResearchPoints(item.WeaponDesign.Template, researchPoints);
         });
     }
 

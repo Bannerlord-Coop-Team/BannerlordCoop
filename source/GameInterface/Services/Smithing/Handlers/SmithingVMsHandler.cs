@@ -35,10 +35,7 @@ internal class SmithingVMsHandler : IHandler
         this.objectManager = objectManager;
         this.smithingVMsProvider = smithingVMsProvider;
 
-        messageBroker.Subscribe<SmeltingVMCreated>(Handle_SmeltingVMCreated);
-        messageBroker.Subscribe<RefinementVMCreated>(Handle_RefinementVMCreated);
         messageBroker.Subscribe<CraftingVMCreated>(Handle_CraftingVMCreated);
-        messageBroker.Subscribe<WeaponDesignVMCreated>(Handle_WeaponDesignVMCreated);
 
         messageBroker.Subscribe<RefreshWeaponDesignVM>(Handle_RefreshWeaponDesignVM);
         messageBroker.Subscribe<NetworkRefreshSmelting>(Handle_NetworkRefreshSmelting);
@@ -50,10 +47,7 @@ internal class SmithingVMsHandler : IHandler
 
     public void Dispose()
     {
-        messageBroker.Unsubscribe<SmeltingVMCreated>(Handle_SmeltingVMCreated);
-        messageBroker.Unsubscribe<RefinementVMCreated>(Handle_RefinementVMCreated);
         messageBroker.Unsubscribe<CraftingVMCreated>(Handle_CraftingVMCreated);
-        messageBroker.Unsubscribe<WeaponDesignVMCreated>(Handle_WeaponDesignVMCreated);
 
         messageBroker.Unsubscribe<RefreshWeaponDesignVM>(Handle_RefreshWeaponDesignVM);
         messageBroker.Unsubscribe<NetworkRefreshSmelting>(Handle_NetworkRefreshSmelting);
@@ -63,24 +57,9 @@ internal class SmithingVMsHandler : IHandler
         messageBroker.Unsubscribe<CreateCraftingResultPopup>(Handle_CreateCraftingResultPopup);
     }
 
-    private void Handle_SmeltingVMCreated(MessagePayload<SmeltingVMCreated> obj)
-    {
-        smithingVMsProvider.SetCurrentSmeltingVM(obj.What.SmeltingVM);
-    }
-
-    private void Handle_RefinementVMCreated(MessagePayload<RefinementVMCreated> obj)
-    {
-        smithingVMsProvider.SetCurrentRefinementVM(obj.What.RefinementVM);
-    }
-
     private void Handle_CraftingVMCreated(MessagePayload<CraftingVMCreated> obj)
     {
         smithingVMsProvider.SetCurrentCraftingVM(obj.What.CraftingVM);
-    }
-
-    private void Handle_WeaponDesignVMCreated(MessagePayload<WeaponDesignVMCreated> obj)
-    {
-        smithingVMsProvider.SetCurrentWeaponDesignVM(obj.What.WeaponDesignVM);
     }
 
     private void Handle_RefreshWeaponDesignVM(MessagePayload<RefreshWeaponDesignVM> obj)
