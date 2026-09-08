@@ -294,12 +294,13 @@ internal static class GangLeaderNeedsToOffloadStolenGoodsQuestType
 
     internal static bool BlockAndReportTerminalOutcome(Quest quest, IssueFinalizeReason reason)
     {
-        if (CallOriginalPolicy.IsOriginalAllowed()) return true;
-
         var owner = quest.QuestGiver;
-        if (owner != null &&
-            ContainerProvider.TryResolve<IIssueOwnershipRegistry>(out var ownershipRegistry) &&
-            ownershipRegistry.IsLocalPeerOwner(owner) &&
+        if (owner == null || !ContainerProvider.TryResolve<IIssueOwnershipRegistry>(out var ownershipRegistry))
+        {
+            return CallOriginalPolicy.IsOriginalAllowedForOwnershipGate();
+        }
+
+        if (ownershipRegistry.IsLocalPeerOwner(owner) &&
             ContainerProvider.TryResolve<IControllerIdProvider>(out var controllerIdProvider))
         {
             MessageBroker.Instance.Publish(owner, new QuestTerminalOutcomeTriggered(owner, controllerIdProvider.ControllerId, reason));
