@@ -84,5 +84,4 @@ internal class CraftingCampaignBehaviorWeaponNameHandler : IHandler
             }
         });
     }
-
 }
