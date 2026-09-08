@@ -18,6 +18,13 @@ public class MessageBrokerTests
     }
 
     /// <summary>
+    /// Second message type, so a test can publish one type while another type is subscribed to.
+    /// </summary>
+    private sealed class OtherProbeMessage : IMessage
+    {
+    }
+
+    /// <summary>
     /// Subscriber whose instance method records what it received.
     /// </summary>
     private sealed class Subscriber
@@ -38,6 +45,12 @@ public class MessageBrokerTests
         public int Received { get; private set; }
 
         public void Handle(MessagePayload<ProbeMessage> payload)
+        {
+            Received++;
+            log?.Add(name);
+        }
+
+        public void HandleOther(MessagePayload<OtherProbeMessage> payload)
         {
             Received++;
             log?.Add(name);
@@ -91,6 +104,48 @@ public class MessageBrokerTests
             earlier[0] = null;
             Collect();
             broker.Subscribe<ProbeMessage>(joiner.Handle);
+        }
+    }
+
+    /// <summary>
+    /// Subscriber that subscribes a listener for a second message type while the first type is being published.
+    /// </summary>
+    private sealed class ForeignTypeSubscriber
+    {
+        private readonly MessageBroker broker;
+        private readonly Subscriber joiner;
+
+        public ForeignTypeSubscriber(MessageBroker broker, Subscriber joiner)
+        {
+            this.broker = broker;
+            this.joiner = joiner;
+        }
+
+        public void Handle(MessagePayload<ProbeMessage> payload)
+        {
+            broker.Subscribe<OtherProbeMessage>(joiner.HandleOther);
+        }
+    }
+
+    /// <summary>
+    /// Subscriber that unsubscribes itself from inside its own callback, the way a state drops its
+    /// subscriptions while handling the message that ends it.
+    /// </summary>
+    private sealed class SelfUnsubscribingSubscriber
+    {
+        private readonly MessageBroker broker;
+        private readonly List<string> log;
+
+        public SelfUnsubscribingSubscriber(MessageBroker broker, List<string> log)
+        {
+            this.broker = broker;
+            this.log = log;
+        }
+
+        public void Handle(MessagePayload<ProbeMessage> payload)
+        {
+            log.Add("teardown");
+            broker.Unsubscribe<ProbeMessage>(Handle);
         }
     }
 
@@ -239,6 +294,64 @@ public class MessageBrokerTests
     }
 
     [Fact]
+    public void Subscribe_ForAnotherTypeWhileAPublishRuns_RemovesThatTypesDeadEntry()
+    {
+        var broker = new ProbeBroker();
+        var collected = SubscribeCollectableOtherSubscriber(broker);
+        Collect();
+        Assert.False(collected.IsAlive);
+        var joiner = new Subscriber();
+        var driver = new ForeignTypeSubscriber(broker, joiner);
+        broker.Subscribe<ProbeMessage>(driver.Handle);
+
+        broker.Publish(this, new ProbeMessage());
+
+        Assert.Equal(1, broker.EntryCountFor<OtherProbeMessage>());
+        GC.KeepAlive(joiner);
+        GC.KeepAlive(driver);
+    }
+
+    [Fact]
+    public void Unsubscribe_FromInsideAPublishOfThatType_RemovesTheDeadEntryOnceThePublishEnds()
+    {
+        var broker = new ProbeBroker();
+        var order = new List<string>();
+        var live = new Subscriber("live", order);
+        broker.Subscribe<ProbeMessage>(live.Handle);
+        var teardown = new SelfUnsubscribingSubscriber(broker, order);
+        broker.Subscribe<ProbeMessage>(teardown.Handle);
+        var collected = SubscribeCollectableSubscriber(broker);
+        Collect();
+        Assert.False(collected.IsAlive);
+        Assert.Equal(3, broker.EntryCountFor<ProbeMessage>());
+
+        broker.Publish(this, new ProbeMessage());
+
+        Assert.Equal(new[] { "live", "teardown" }, order);
+        Assert.Equal(1, broker.EntryCountFor<ProbeMessage>());
+        GC.KeepAlive(live);
+        GC.KeepAlive(teardown);
+    }
+
+    [Fact]
+    public void Unsubscribe_FromInsideAPublishThatLeavesOnlyDeadEntries_RemovesTheMessageTypeKey()
+    {
+        var broker = new ProbeBroker();
+        var order = new List<string>();
+        var teardown = new SelfUnsubscribingSubscriber(broker, order);
+        broker.Subscribe<ProbeMessage>(teardown.Handle);
+        var collected = SubscribeCollectableSubscriber(broker);
+        Collect();
+        Assert.False(collected.IsAlive);
+
+        broker.Publish(this, new ProbeMessage());
+
+        Assert.Equal(0, broker.EntryCountFor<ProbeMessage>());
+        Assert.False(broker.HasEntriesFor<ProbeMessage>());
+        GC.KeepAlive(teardown);
+    }
+
+    [Fact]
     public void Unsubscribe_RemovesOnlyTheGivenTargetAndMethod()
     {
         var broker = new ProbeBroker();
@@ -319,6 +432,15 @@ public class MessageBrokerTests
     {
         var subscriber = new Subscriber();
         broker.Subscribe<ProbeMessage>(subscriber.Handle);
+        return new WeakReference(subscriber);
+    }
+
+    // Subscribes for the second message type from its own stack frame, so nothing roots the target.
+    [MethodImpl(MethodImplOptions.NoInlining)]
+    private static WeakReference SubscribeCollectableOtherSubscriber(MessageBroker broker)
+    {
+        var subscriber = new Subscriber();
+        broker.Subscribe<OtherProbeMessage>(subscriber.HandleOther);
         return new WeakReference(subscriber);
     }
 

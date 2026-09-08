@@ -2,7 +2,6 @@
 using Serilog;
 using System;
 using System.Collections.Generic;
-using System.Threading;
 
 namespace Common.Messaging;
 
@@ -20,8 +19,11 @@ public class MessageBroker : IMessageBroker
     private static readonly ILogger Logger = LogManager.GetLogger<MessageBroker>();
     protected static MessageBroker instance;
     protected readonly Dictionary<Type, List<WeakDelegate>> subscribers;
-    // Publishes currently running on this broker, counted with Interlocked because the network thread and the game thread both publish
-    private int publishDepth;
+    // Subscriber lists a publish is currently walking, one entry per running publish, so pruning a
+    // list holds off while a loop is stepping through it by index
+    private readonly List<List<WeakDelegate>> walkedByPublish = new List<List<WeakDelegate>>();
+    // Lists whose pruning was skipped for that reason, caught up by the publish that leaves last
+    private readonly List<List<WeakDelegate>> prunePending = new List<List<WeakDelegate>>();
     public static MessageBroker Instance { 
         get
         {
@@ -48,7 +50,7 @@ public class MessageBroker : IMessageBroker
         var delegates = subscribers[typeof(T)];
         if (delegates == null || delegates.Count == 0) return;
         var payload = new MessagePayload<T>(source, message);
-        Interlocked.Increment(ref publishDepth);
+        walkedByPublish.Add(delegates);
         try
         {
             for (int i = 0; i < delegates.Count; i++)
@@ -79,7 +81,13 @@ public class MessageBroker : IMessageBroker
         }
         finally
         {
-            Interlocked.Decrement(ref publishDepth);
+            walkedByPublish.Remove(delegates);
+            if (!walkedByPublish.Contains(delegates) && prunePending.Remove(delegates))
+            {
+                delegates.RemoveAll(weakDelegate => !weakDelegate.IsAlive);
+                if (delegates.Count == 0 && subscribers.TryGetValue(typeof(T), out var current) && current == delegates)
+                    subscribers.Remove(typeof(T));
+            }
         }
     }
 
@@ -108,11 +116,16 @@ public class MessageBroker : IMessageBroker
     }
 
     // Entries whose target was collected otherwise sit here until this message type is published again.
-    // A running publish walks its list by index, so removing an entry it already passed would make it
-    // skip the next live subscriber; that list is left alone until the publish is done.
+    // Pruning a list that a publish is stepping through by index would move entries past its position,
+    // so that list is noted here and pruned in the finally of that publish instead.
     private void RemoveDeadSubscribers(List<WeakDelegate> delegates)
     {
-        if (publishDepth > 0) return;
+        if (walkedByPublish.Contains(delegates))
+        {
+            if (!prunePending.Contains(delegates))
+                prunePending.Add(delegates);
+            return;
+        }
         delegates.RemoveAll(weakDelegate => !weakDelegate.IsAlive);
     }
 
