@@ -60,14 +60,14 @@ public class RemoteAgentActionProcessor : IRemoteAgentActionProcessor
         public RemoteActionSequence? LastSequence;
         public Dictionary<string, RemoteAction> PendingByController;
         public MigratedActionAuthority? MigratedAuthority;
-        public Dictionary<string, EquipmentBaseline> EquipmentByController;
+        public Dictionary<(string ControllerId, bool IsBattleHost), EquipmentBaseline> EquipmentByAuthority;
 
         public bool IsEmpty =>
             RetainedGuard == null
             && !LastSequence.HasValue
             && (PendingByController == null || PendingByController.Count == 0)
             && !MigratedAuthority.HasValue
-            && (EquipmentByController == null || EquipmentByController.Count == 0);
+            && (EquipmentByAuthority == null || EquipmentByAuthority.Count == 0);
     }
 
     private readonly struct EquipmentBaseline
@@ -746,8 +746,9 @@ public class RemoteAgentActionProcessor : IRemoteAgentActionProcessor
         if (action.Data.EquipmentRevision > 0)
         {
             RemoteAgentActionState state = GetOrCreateAgentState(agentId);
-            if (state.EquipmentByController == null
-                || !state.EquipmentByController.TryGetValue(action.ControllerId, out EquipmentBaseline baseline)
+            if (state.EquipmentByAuthority == null
+                || !state.EquipmentByAuthority.TryGetValue(
+                    (action.ControllerId, action.BattleHostEpoch > 0), out EquipmentBaseline baseline)
                 || baseline.HostEpoch != action.BattleHostEpoch
                 || baseline.Revision < action.Data.EquipmentRevision)
             {
@@ -1243,12 +1244,15 @@ public class RemoteAgentActionProcessor : IRemoteAgentActionProcessor
         if (action.Data == null || action.Data.EquipmentRevision <= 0 || !action.Data.Equipment.HasValue
             || IsStaleRemoteAction(agentId, action)) return;
         RemoteAgentActionState state = GetOrCreateAgentState(agentId);
-        var baselines = state.EquipmentByController ??= new Dictionary<string, EquipmentBaseline>();
-        if (baselines.TryGetValue(action.ControllerId, out EquipmentBaseline previous)
+        // Epoch zero is an ordinary sender role, not an older host generation.
+        var authority = (action.ControllerId, action.BattleHostEpoch > 0);
+        var baselines = state.EquipmentByAuthority ??=
+            new Dictionary<(string ControllerId, bool IsBattleHost), EquipmentBaseline>();
+        if (baselines.TryGetValue(authority, out EquipmentBaseline previous)
             && (previous.HostEpoch > action.BattleHostEpoch
                 || (previous.HostEpoch == action.BattleHostEpoch
                     && previous.Revision >= action.Data.EquipmentRevision))) return;
-        baselines[action.ControllerId] = new EquipmentBaseline(
+        baselines[authority] = new EquipmentBaseline(
             action.BattleHostEpoch, action.Data.EquipmentRevision, action.Data.Equipment.Value);
     }
 

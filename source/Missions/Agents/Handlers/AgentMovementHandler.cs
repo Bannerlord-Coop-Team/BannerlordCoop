@@ -773,7 +773,6 @@ public class AgentMovementHandler : IAgentMovementHandler
 
                 capturedMovements.Add(
                     new CapturedMovement(agentInfo, agentData, isPriority));
-
             }
         }
 
@@ -1244,7 +1243,6 @@ public class AgentMovementHandler : IAgentMovementHandler
                 recipient.MovementPendingSince.Remove(agentId);
             }
         }
-
     }
 
     public void ReplaySyntheticMountTurnAnimationsAfterNativeTick()
