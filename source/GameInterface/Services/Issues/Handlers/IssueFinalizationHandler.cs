@@ -161,10 +161,11 @@ internal class IssueFinalizationHandler : IHandler
         {
             validated = reason switch
             {
-                IssueFinalizeReason.QuestSuccess => descriptor?.ValidateQuestSuccess?.Invoke(owner.Issue, hostParty) ?? true,
-                IssueFinalizeReason.QuestBetrayal => descriptor?.ValidateQuestBetrayal?.Invoke(owner.Issue) ?? true,
-                IssueFinalizeReason.QuestFail => descriptor?.ValidateQuestFail?.Invoke(owner.Issue) ?? true,
-                _ => true,
+                IssueFinalizeReason.QuestSuccess => descriptor?.ValidateQuestSuccess?.Invoke(owner.Issue, hostParty) ?? false,
+                IssueFinalizeReason.QuestCancel => descriptor?.ValidateQuestCancel?.Invoke(owner.Issue) ?? false,
+                IssueFinalizeReason.QuestBetrayal => descriptor?.ValidateQuestBetrayal?.Invoke(owner.Issue) ?? false,
+                IssueFinalizeReason.QuestFail => descriptor?.ValidateQuestFail?.Invoke(owner.Issue) ?? false,
+                _ => false,
             };
         }
         finally

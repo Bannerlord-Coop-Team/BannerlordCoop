@@ -1070,4 +1070,40 @@ public class GangLeaderNeedsToOffloadStolenGoodsIssueTests : IDisposable
         var requests = Client.NetworkSentMessages.GetMessages<RequestAlternativeSolutionCompletion>();
         Assert.Single(requests);
     }
+
+    [Fact]
+    public void QuestTerminalOutcomeTriggered_FromTheHostItself_ClaimingAnUnvalidatableReason_IsRejectedNotAutoApproved()
+    {
+        var fixture = SetupIssueOwner();
+        CreateIssueOnServer(fixture);
+
+        Server.Resolve<IControllerIdProvider>().SetControllerId("host-controller");
+        Server.Call(() =>
+        {
+            var playerManager = Server.Resolve<IPlayerManager>();
+            Assert.True(playerManager.AddPlayer(new Player("host-controller", fixture.HeroId, null, "", "")));
+        });
+
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject<Hero>(fixture.HeroId, out var owner));
+            Assert.True(Campaign.Current.IssueManager.StartIssueQuest(owner));
+        });
+
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject<Hero>(fixture.HeroId, out var owner));
+            Server.Resolve<IMessageBroker>().Publish(owner,
+                new QuestTerminalOutcomeTriggered(owner, "host-controller", IssueFinalizeReason.QuestTimeout));
+        });
+
+        Assert.Empty(Server.NetworkSentMessages.GetMessages<NetworkIssueRemoved>());
+
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject<Hero>(fixture.HeroId, out var owner));
+            Assert.NotNull(owner.Issue);
+            Assert.True(owner.Issue.IssueQuest.IsOngoing);
+        });
+    }
 }
