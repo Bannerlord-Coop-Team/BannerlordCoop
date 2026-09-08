@@ -24,6 +24,7 @@ Joining peers receive full baselines, including for unarmed agents. Sending one 
 - Unknown revisions waiting, and controller/host-epoch changes requiring the matching baseline.
 - Targeted catch-up preserving the baseline still owed to existing peers.
 - Fresh baselines after authority revision changes.
+- A deferred former-host action being replaced by the validated ordinary authority before the pending sweep, then replaying its latest action when the missing weapon arrives.
 
 `BattleBlockingSyncTests` covers a former host retaining or regaining ordinary authority, including references arriving before the fresh baseline and rejection of delayed traffic from the former host epoch. Existing blocking, movement, equipment, pickup and authority-transfer tests cover the neighboring paths. The tests use the managed mission fixture; they do not execute native combat or reproduce the captured divide-by-zero.
 

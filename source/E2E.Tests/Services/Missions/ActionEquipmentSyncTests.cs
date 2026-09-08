@@ -3,13 +3,16 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
 using Common;
+using Common.Messaging;
 using Common.Util;
 using Common.PacketHandlers;
 using Common.Serialization;
 using E2E.Tests.Environment.Instance;
 using E2E.Tests.Environment.Mock;
 using E2E.Tests.Environment.MockEngine;
+using GameInterface.Services.MapEvents;
 using Missions;
+using Missions.Messages;
 using Missions.Agents.Handlers;
 using Missions.Agents.Packets;
 using TaleWorlds.Core;
@@ -399,6 +402,79 @@ public class ActionEquipmentSyncTests : MissionTestEnvironment
         return new AgentActionPacket(controller, new[] { id },
             new[] { data.WithEquipment(revision, includeEquipment ? data.Equipment : null) },
             new[] { sequence }, epoch);
+    }
+
+    [Theory]
+    [InlineData(false, false)]
+    [InlineData(false, true)]
+    [InlineData(true, false)]
+    [InlineData(true, true)]
+    public void FormerHost_PendingOrdinaryActionReplaysWhenEquipmentArrives(
+        bool regainAuthority, bool latestIsReference)
+    {
+        RunScenario(context =>
+        {
+            const string mapEventId = "mapEvent1";
+            BattleSpawnGate.BeginBattle(mapEventId);
+            try
+            {
+                var broker = context.Instance.Resolve<IMessageBroker>();
+                var hosts = context.Instance.Resolve<IBattleHostRegistry>();
+                broker.Publish(this, new NetworkMissionPeerEntered("A", mapEventId));
+                broker.Publish(this, new NetworkMissionPeerEntered("B", mapEventId));
+
+                void AssignHost(string controller, int epoch)
+                {
+                    hosts.Set(mapEventId, new BattleHostAssignment(controller, Array.Empty<string>(), epoch));
+                    broker.Publish(this, new NetworkBattleHostAssigned(
+                        mapEventId, controller, Array.Empty<string>(), epoch));
+                    Drain();
+                }
+
+                void ReceiveWithoutSweep(AgentActionPacket packet)
+                {
+                    context.Component.AgentActionHandler.HandlePacket(null, packet);
+                    Drain();
+                }
+
+                AssignHost("A", 1);
+                Agent owner = context.Spawn("A", out MirrorAgent ownerMirror, out _);
+                context.Spawn("A", out MirrorAgent puppet, out Guid id);
+                ownerMirror.Equipment[EquipmentIndex.Weapon0] = Weapon("sword");
+                ownerMirror.PrimaryWieldedItemIndex = EquipmentIndex.Weapon0;
+                ownerMirror.Action0Index = 1001;
+                ownerMirror.Action0CodeType = Agent.ActionCodeType.ReleaseMelee;
+                ReceiveWithoutSweep(RevisionPacket(owner, id, 1, 1, true, "A", 1));
+                Assert.Equal(0, puppet.SetActionChannelCalls);
+
+                AssignHost("B", 2);
+                if (regainAuthority)
+                {
+                    Assert.True(context.Registry.TryTransferAuthority("B", id));
+                    Assert.True(context.Registry.TryTransferAuthority("A", id));
+                }
+                ownerMirror.Action0Index = 1002;
+                ReceiveWithoutSweep(RevisionPacket(owner, id, 2, 2, true, "A", 0));
+                ownerMirror.Action0Index = 1003;
+                ReceiveWithoutSweep(RevisionPacket(owner, id, 3, 2, !latestIsReference, "A", 0));
+                ownerMirror.Action0Index = 1004;
+                ReceiveWithoutSweep(RevisionPacket(owner, id, 4, 99, true, "A", 1));
+                context.Component.AgentActionHandler.ApplyRemoteGuardStates();
+                Assert.Equal(0, puppet.SetActionChannelCalls);
+
+                puppet.Equipment[EquipmentIndex.Weapon0] = ownerMirror.Equipment[EquipmentIndex.Weapon0];
+                context.Component.AgentActionHandler.ApplyRemoteGuardStates();
+                Assert.Equal(1003, puppet.Action0Index);
+                Assert.Equal(EquipmentIndex.Weapon0, puppet.PrimaryWieldedItemIndex);
+                int calls = puppet.SetActionChannelCalls;
+                context.Component.AgentActionHandler.ApplyRemoteGuardStates();
+                Assert.Equal(calls, puppet.SetActionChannelCalls);
+            }
+            finally
+            {
+                BattleSpawnGate.EndBattle();
+            }
+        });
     }
 
     private static MissionWeapon Weapon(string itemId, int usages = 1)

@@ -1278,7 +1278,14 @@ public class RemoteAgentActionProcessor : IRemoteAgentActionProcessor
         if (actionsByController.TryGetValue(action.ControllerId, out var existing))
         {
             if (existing.BattleHostEpoch > action.BattleHostEpoch)
-                return;
+            {
+                bool replacesFormerHost = action.BattleHostEpoch == 0
+                    && agentRegistry.TryGetAgentInfo(agentId, out var info)
+                    && IsCurrentActionAuthority(info, action.ControllerId, action.BattleHostEpoch)
+                    && !IsCurrentActionAuthority(info, existing.ControllerId, existing.BattleHostEpoch);
+                if (!replacesFormerHost)
+                    return;
+            }
             if (existing.BattleHostEpoch == action.BattleHostEpoch
                 && existing.Sequence >= action.Sequence)
                 return;
