@@ -76,14 +76,16 @@ internal class VillageNeedsCraftingMaterialsQuestSuccessTriggerPatch
 internal class VillageNeedsCraftingMaterialsQuestRaidCompletedAuthorityPatch
 {
     [HarmonyPrefix]
-    private static bool Prefix(out IssueFinalizeAuthorityGuard __state)
+    internal static bool Prefix(out IssueFinalizeAuthorityGuard __state)
     {
-        __state = null;
-        if (CallOriginalPolicy.IsOriginalAllowed()) return true;
-        if (!ModInformation.IsServer) return false;
+        if (ModInformation.IsServer)
+        {
+            __state = new IssueFinalizeAuthorityGuard();
+            return true;
+        }
 
-        __state = new IssueFinalizeAuthorityGuard();
-        return true;
+        __state = null;
+        return CallOriginalPolicy.IsOriginalAllowedForOwnershipGate();
     }
 
     [HarmonyFinalizer]
