@@ -42,6 +42,7 @@ public class CraftingCampaignBehaviorInterface : ICraftingCampaignBehaviorInterf
     {
         succeeded = false;
         int heroCraftingStamina = craftingBehavior.GetHeroCraftingStamina(craftingHero);
+        if (heroCraftingStamina <= 10) return heroCraftingStamina;
 
         ItemRoster itemRoster = craftingHero.PartyBelongedTo.ItemRoster;
         int[] smeltingOutputForItem = Campaign.Current.Models.SmithingModel.GetSmeltingOutputForItem(equipmentElement.Item);
@@ -73,6 +74,7 @@ public class CraftingCampaignBehaviorInterface : ICraftingCampaignBehaviorInterf
     public int DoRefinement(CraftingCampaignBehavior craftingBehavior, Hero craftingHero, Crafting.RefiningFormula formula)
     {
         int heroCraftingStamina = craftingBehavior.GetHeroCraftingStamina(craftingHero);
+        if (heroCraftingStamina <= 10) return heroCraftingStamina;
 
         ItemRoster itemRoster = craftingHero.PartyBelongedTo.ItemRoster;
         ItemObject craftingMaterialItem = null;
@@ -137,6 +139,10 @@ public class CraftingCampaignBehaviorInterface : ICraftingCampaignBehaviorInterf
         out bool succeeded)
     {
         succeeded = false;
+
+        int heroCraftingStamina = craftingBehavior.GetHeroCraftingStamina(craftingHero);
+        if (heroCraftingStamina <= 10) return heroCraftingStamina;
+
         WeaponDesign weaponDesign = new WeaponDesign(craftingTemplate, new TextObject(weaponName), usedPieces);
         if (isFreeMode)
         {
@@ -168,7 +174,7 @@ public class CraftingCampaignBehaviorInterface : ICraftingCampaignBehaviorInterf
         var craftedItemObject = CreateAndRegisterCraftedItem(weaponDesign, name, culture, itemModifierGroup, nextCraftedItemId);
 
         int energyCostForSmithing = Campaign.Current.Models.SmithingModel.GetEnergyCostForSmithing(craftedItemObject, craftingHero);
-        int newHeroCraftingStamina = craftingBehavior.GetHeroCraftingStamina(craftingHero) - energyCostForSmithing;
+        int newHeroCraftingStamina = heroCraftingStamina - energyCostForSmithing;
         craftingBehavior.SetHeroCraftingStamina(craftingHero, newHeroCraftingStamina);
 
         CampaignEventDispatcher.Instance.OnNewItemCrafted(craftedItemObject, weaponModifier, !isFreeMode);

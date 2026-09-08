@@ -139,7 +139,7 @@ internal class SmithingVMsHandler : IHandler
             var currentWeaponDesignVM = smithingVMsProvider.GetCurrentWeaponDesignVM();
             var currentCraftingVM = smithingVMsProvider.GetCurrentCraftingVM();
             if (currentWeaponDesignVM == null || currentCraftingVM == null) return;
-            if (!CreateCraftedWeaponInternalPatch.ClearPendingCraftedItem(currentWeaponDesignVM)) return;
+            if (!CreateCraftedWeaponInternalPatch.ClearPendingCraftedItem(currentWeaponDesignVM, obj.What.ClientRequestId)) return;
 
             if (obj.What.Success)
             {

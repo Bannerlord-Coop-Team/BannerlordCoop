@@ -65,13 +65,16 @@ public readonly struct CreateCraftingResultPopup : IEvent
 {
     public readonly ItemObject CraftedItem;
     public readonly bool Success;
+    public readonly string ClientRequestId;
 
     public CreateCraftingResultPopup(
         ItemObject craftedItem,
-        bool success)
+        bool success,
+        string clientRequestId)
     {
         CraftedItem = craftedItem;
         Success = success;
+        ClientRequestId = clientRequestId;
     }
 }
 

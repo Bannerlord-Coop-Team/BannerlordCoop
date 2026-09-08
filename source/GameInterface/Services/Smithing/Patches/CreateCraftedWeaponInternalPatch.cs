@@ -32,11 +32,9 @@ internal class CreateCraftedWeaponInternalPatch
         // Call original if we call this function
         if (CallOriginalPolicy.IsOriginalAllowed()) return true;
 
-        // Locally create string id. Without a string id, the result popup will not render new weapons.
-        // This isn't sent to the server, won't matter after the item is crafted and won't persist across save games.
-        // If the server uses this string id, two clients crafting at the same time can cause mismatched ids/crafted item counts.
-        // Probable old cause of issue reported that gave crafted items to other players when two clients crafted at the same time.
-        string nextCraftedItemId = $"{ClientVisualPrefix}{__instance.GetNextCraftedItemId()}";
+        // The unique client request id also gives the temporary item the string id needed to render the result.
+        string clientRequestId = Guid.NewGuid().ToString("N");
+        string nextCraftedItemId = $"{ClientVisualPrefix}{clientRequestId}";
         ItemObject craftedItemObject;
         using (new AllowedThread())
         {
@@ -65,7 +63,8 @@ internal class CreateCraftedWeaponInternalPatch
             Hero.MainHero,
             craftingLogic,
             activeCraftingOrder,
-            Settlement.CurrentSettlement);
+            Settlement.CurrentSettlement,
+            clientRequestId);
         MessageBroker.Instance.Publish(__instance, message);
 
         // Skip original to override original client saving
@@ -99,9 +98,21 @@ internal class CreateCraftedWeaponInternalPatch
     private static bool IsPendingCraftedItem(ItemObject craftedItem)
         => craftedItem?.StringId?.StartsWith(ClientVisualPrefix, StringComparison.Ordinal) == true;
 
+    private static bool IsPendingCraftedItem(ItemObject craftedItem, string clientRequestId)
+        => IsPendingCraftedItem(craftedItem) &&
+           string.Equals(craftedItem.StringId, $"{ClientVisualPrefix}{clientRequestId}", StringComparison.Ordinal);
+
     public static bool ClearPendingCraftedItem(WeaponDesignVM weaponDesignVM)
     {
         if (weaponDesignVM == null || !IsPendingCraftedItem(weaponDesignVM.CraftedItemObject)) return false;
+
+        string clientRequestId = weaponDesignVM.CraftedItemObject.StringId.Substring(ClientVisualPrefix.Length);
+        return ClearPendingCraftedItem(weaponDesignVM, clientRequestId);
+    }
+
+    public static bool ClearPendingCraftedItem(WeaponDesignVM weaponDesignVM, string clientRequestId)
+    {
+        if (weaponDesignVM == null || !IsPendingCraftedItem(weaponDesignVM.CraftedItemObject, clientRequestId)) return false;
 
         var pendingCraftedItem = weaponDesignVM.CraftedItemObject;
         MBObjectManager.Instance.UnregisterObject(pendingCraftedItem);

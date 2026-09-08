@@ -91,7 +91,7 @@ internal class CraftingCampaignBehaviorCraftingHandler : IHandler
         GameThread.RunSafe(() =>
         {
             // Get required objects using interface & objectManager
-            craftingCampaignBehaviorInterface.TryGetCraftingBehavior(out var craftingCampaignBehavior);
+            if (!craftingCampaignBehaviorInterface.TryGetCraftingBehavior(out var craftingCampaignBehavior)) return;
             if (!objectManager.TryGetObjectWithLogging(data.CraftingHeroId, out Hero craftingHero)) return;
 
             // Replace original TaleWorlds implementation
@@ -154,7 +154,7 @@ internal class CraftingCampaignBehaviorCraftingHandler : IHandler
         GameThread.RunSafe(() =>
         {
             // Get required objects using interface & objectManager
-            craftingCampaignBehaviorInterface.TryGetCraftingBehavior(out var craftingCampaignBehavior);
+            if (!craftingCampaignBehaviorInterface.TryGetCraftingBehavior(out var craftingCampaignBehavior)) return;
             if (!objectManager.TryGetObjectWithLogging(data.CraftingHeroId, out Hero craftingHero)) return;
 
             // Rebuild formula on server
@@ -180,26 +180,39 @@ internal class CraftingCampaignBehaviorCraftingHandler : IHandler
     {
         var data = obj.What;
 
-        if (!objectManager.TryGetIdWithLogging(data.CraftingHero, out var craftingHeroId)) return;
-        if (!objectManager.TryGetIdWithLogging(data.WeaponDesign.Template, out var craftingTemplateId)) return;
-        if (!objectManager.TryGetIdWithLogging(data.PlayerHero, out var playerHeroId)) return;
-        if (!objectManager.TryGetIdWithLogging(data.CurrentSettlement, out var currentSettlementId)) return;
+        if (!TryCreateCraftingRequest(data, out var message))
+        {
+            messageBroker.Publish(this, new CreateCraftingResultPopup(null, false, data.ClientRequestId));
+            return;
+        }
+
+        network.SendAll(message);
+    }
+
+    private bool TryCreateCraftingRequest(CreatedCraftedWeaponInternal data, out NetworkCreateCraftedWeaponInternalServer message)
+    {
+        message = default;
+
+        if (!objectManager.TryGetIdWithLogging(data.CraftingHero, out var craftingHeroId)) return false;
+        if (!objectManager.TryGetIdWithLogging(data.WeaponDesign.Template, out var craftingTemplateId)) return false;
+        if (!objectManager.TryGetIdWithLogging(data.PlayerHero, out var playerHeroId)) return false;
+        if (!objectManager.TryGetIdWithLogging(data.CurrentSettlement, out var currentSettlementId)) return false;
 
         string itemModifierGroupId = null;
-        if (data.CraftingLogic.CurrentItemModifierGroup != null && !objectManager.TryGetIdWithLogging(data.CraftingLogic.CurrentItemModifierGroup, out itemModifierGroupId)) return;
+        if (data.CraftingLogic.CurrentItemModifierGroup != null && !objectManager.TryGetIdWithLogging(data.CraftingLogic.CurrentItemModifierGroup, out itemModifierGroupId)) return false;
 
         string cultureId = null;
-        if (data.CultureObject != null && !objectManager.TryGetIdWithLogging(data.CultureObject, out cultureId)) return;
+        if (data.CultureObject != null && !objectManager.TryGetIdWithLogging(data.CultureObject, out cultureId)) return false;
 
-        if (!PackUsedPieces(data.WeaponDesign, out var craftingPieceIds, out var scalePercentages)) return;
+        if (!PackUsedPieces(data.WeaponDesign, out var craftingPieceIds, out var scalePercentages)) return false;
 
         var weaponModifierId = "";
-        if (data.WeaponModifier != null && !objectManager.TryGetIdWithLogging(data.WeaponModifier, out weaponModifierId)) return;
+        if (data.WeaponModifier != null && !objectManager.TryGetIdWithLogging(data.WeaponModifier, out weaponModifierId)) return false;
 
         string craftingOrderId = null;
-        if (data.CraftingOrder != null && !objectManager.TryGetIdWithLogging(data.CraftingOrder, out craftingOrderId)) return;
+        if (data.CraftingOrder != null && !objectManager.TryGetIdWithLogging(data.CraftingOrder, out craftingOrderId)) return false;
 
-        NetworkCreateCraftedWeaponInternalServer message = new(
+        message = new NetworkCreateCraftedWeaponInternalServer(
             data.IsFreeMode,
             craftingHeroId,
             data.Name,
@@ -212,90 +225,108 @@ internal class CraftingCampaignBehaviorCraftingHandler : IHandler
             playerHeroId,
             itemModifierGroupId,
             craftingOrderId,
-            currentSettlementId
-        );
-        network.SendAll(message);
+            currentSettlementId,
+            data.ClientRequestId);
+        return true;
     }
 
     private void Handle_NetworkCreateCraftedWeaponInternalServer(MessagePayload<NetworkCreateCraftedWeaponInternalServer> obj)
     {
         var data = obj.What;
+        var peer = obj.Who as NetPeer;
 
         GameThread.RunSafe(() =>
         {
-            craftingCampaignBehaviorInterface.TryGetCraftingBehavior(out var craftingCampaignBehavior);
-            if (!objectManager.TryGetObjectWithLogging(data.CraftingHeroId, out Hero craftingHero)) return;
-            if (!objectManager.TryGetObjectWithLogging(data.CraftingTemplateId, out CraftingTemplate craftingTemplate)) return;
-
-            ItemModifierGroup itemModifierGroup = null;
-            if (data.ItemModifierGroupId != null && !objectManager.TryGetObjectWithLogging(data.ItemModifierGroupId, out itemModifierGroup)) return;
-
-            if (!GetUsedPieces(data.WeaponDesignElementCraftingPieceIds, data.WeaponDesignElementScalePercentages, out WeaponDesignElement[] usedPieces)) return;
-
-            ItemModifier weaponModifier = null;
-            if (data.WeaponModifierId != "" && !objectManager.TryGetObjectWithLogging(data.WeaponModifierId, out weaponModifier)) return;
-
-            CultureObject culture = null;
-            if (data.CultureId != null && !objectManager.TryGetObjectWithLogging(data.CultureId, out culture)) return;
-
-            // Replace original TaleWorlds implementation
-            string nextCraftedItemId = craftingCampaignBehavior.GetNextCraftedItemId();
-            var newHeroCraftingStamina = craftingCampaignBehaviorInterface.CreateCraftedWeaponInternal(
-                craftingCampaignBehavior,
-                craftingHero,
-                craftingTemplate,
-                itemModifierGroup,
-                usedPieces,
-                weaponModifier,
-                culture,
-                data.IsFreeMode,
-                data.Name,
-                data.WeaponName,
-                nextCraftedItemId,
-                out var succeeded);
-
-            if (!succeeded)
+            if (!TryCreateCraftedWeapon(data))
             {
-                network.Send(obj.Who as NetPeer, new NetworkCreateCraftedWeaponInternalClients(data, nextCraftedItemId, false));
-                return;
+                network.Send(peer, new NetworkCreateCraftedWeaponInternalClients(data, null, false));
             }
-
-            // Update stamina on clients
-            network.SendAll(new NetworkSetHeroCraftingStamina(data.CraftingHeroId, newHeroCraftingStamina));
-
-            // Create weapon on all clients
-            NetworkCreateCraftedWeaponInternalClients message = new(data, nextCraftedItemId, true);
-            network.SendAll(message);
-
-            if (!objectManager.TryGetObjectWithLogging<ItemObject>(nextCraftedItemId, out var craftedItem)) return;
-            if (!objectManager.TryGetObjectWithLogging<Hero>(data.PlayerHeroId, out var playerHero)) return;
-
-            float gainedXp = 0;
-            if (data.IsFreeMode)
-            {
-                craftingCampaignBehaviorInterface.AddCraftedItemToRoster(playerHero.PartyBelongedTo.ItemRoster, weaponModifier, craftedItem);
-                FlushCoalescer(playerHero.PartyBelongedTo.ItemRoster);
-
-                gainedXp = Campaign.Current.Models.SmithingModel.GetSkillXpForSmithingInFreeBuildMode(craftedItem);
-            }
-            else
-            {
-                // Complete order on server and send result to clients
-                if (!objectManager.TryGetObjectWithLogging<Settlement>(data.CurrentSettlementId, out var currentSettlement)) return;
-                if (!objectManager.TryGetObjectWithLogging<CraftingOrder>(data.CraftingOrderId, out var craftingOrder)) return;
-
-                messageBroker.Publish(this, new CompleteOrderServer(
-                    currentSettlement.Town,
-                    craftingOrder,
-                    craftedItem,
-                    craftingHero,
-                    playerHero));
-
-                gainedXp = craftingOrder.GetOrderExperience(craftedItem, craftingCampaignBehavior._currentItemModifier) + Campaign.Current.Models.SmithingModel.GetSkillXpForSmithingInCraftingOrderMode(craftedItem);
-            }
-
-            craftingHero.AddSkillXp(DefaultSkills.Crafting, gainedXp);
         });
+    }
+
+    private bool TryCreateCraftedWeapon(NetworkCreateCraftedWeaponInternalServer data)
+    {
+        if (!craftingCampaignBehaviorInterface.TryGetCraftingBehavior(out var craftingCampaignBehavior)) return false;
+        if (!objectManager.TryGetObjectWithLogging(data.CraftingHeroId, out Hero craftingHero)) return false;
+        if (!objectManager.TryGetObjectWithLogging(data.CraftingTemplateId, out CraftingTemplate craftingTemplate)) return false;
+
+        ItemModifierGroup itemModifierGroup = null;
+        if (data.ItemModifierGroupId != null && !objectManager.TryGetObjectWithLogging(data.ItemModifierGroupId, out itemModifierGroup)) return false;
+
+        if (!GetUsedPieces(data.WeaponDesignElementCraftingPieceIds, data.WeaponDesignElementScalePercentages, out WeaponDesignElement[] usedPieces)) return false;
+
+        ItemModifier weaponModifier = null;
+        if (data.WeaponModifierId != "" && !objectManager.TryGetObjectWithLogging(data.WeaponModifierId, out weaponModifier)) return false;
+
+        CultureObject culture = null;
+        if (data.CultureId != null && !objectManager.TryGetObjectWithLogging(data.CultureId, out culture)) return false;
+
+        CraftingOrder craftingOrder = null;
+        if (!data.IsFreeMode && (!objectManager.TryGetObjectWithLogging(data.CraftingOrderId, out craftingOrder) || !craftingOrder.IsReady)) return false;
+
+        // Replace original TaleWorlds implementation
+        string nextCraftedItemId = craftingCampaignBehavior.GetNextCraftedItemId();
+        var newHeroCraftingStamina = craftingCampaignBehaviorInterface.CreateCraftedWeaponInternal(
+            craftingCampaignBehavior,
+            craftingHero,
+            craftingTemplate,
+            itemModifierGroup,
+            usedPieces,
+            weaponModifier,
+            culture,
+            data.IsFreeMode,
+            data.Name,
+            data.WeaponName,
+            nextCraftedItemId,
+            out var succeeded);
+
+        if (!succeeded) return false;
+
+        // Update stamina on clients
+        network.SendAll(new NetworkSetHeroCraftingStamina(data.CraftingHeroId, newHeroCraftingStamina));
+
+        // Create weapon on all clients
+        NetworkCreateCraftedWeaponInternalClients message = new(data, nextCraftedItemId, true);
+        network.SendAll(message);
+
+        ApplyCraftingRewards(data, craftingHero, weaponModifier, craftingOrder, nextCraftedItemId);
+        return true;
+    }
+
+    private void ApplyCraftingRewards(
+        NetworkCreateCraftedWeaponInternalServer data,
+        Hero craftingHero,
+        ItemModifier weaponModifier,
+        CraftingOrder craftingOrder,
+        string craftedItemId)
+    {
+        if (!objectManager.TryGetObjectWithLogging<ItemObject>(craftedItemId, out var craftedItem)) return;
+        if (!objectManager.TryGetObjectWithLogging<Hero>(data.PlayerHeroId, out var playerHero)) return;
+
+        float gainedXp;
+        if (data.IsFreeMode)
+        {
+            craftingCampaignBehaviorInterface.AddCraftedItemToRoster(playerHero.PartyBelongedTo.ItemRoster, weaponModifier, craftedItem);
+            FlushCoalescer(playerHero.PartyBelongedTo.ItemRoster);
+
+            gainedXp = Campaign.Current.Models.SmithingModel.GetSkillXpForSmithingInFreeBuildMode(craftedItem);
+        }
+        else
+        {
+            // Complete order on server and send result to clients
+            if (!objectManager.TryGetObjectWithLogging<Settlement>(data.CurrentSettlementId, out var currentSettlement)) return;
+
+            messageBroker.Publish(this, new CompleteOrderServer(
+                currentSettlement.Town,
+                craftingOrder,
+                craftedItem,
+                craftingHero,
+                playerHero));
+
+            gainedXp = craftingOrder.GetOrderExperience(craftedItem, weaponModifier) + Campaign.Current.Models.SmithingModel.GetSkillXpForSmithingInCraftingOrderMode(craftedItem);
+        }
+
+        craftingHero.AddSkillXp(DefaultSkills.Crafting, gainedXp);
     }
 
     private void Handle_NetworkCreateCraftedWeaponInternalClients(MessagePayload<NetworkCreateCraftedWeaponInternalClients> obj)
@@ -304,62 +335,67 @@ internal class CraftingCampaignBehaviorCraftingHandler : IHandler
 
         GameThread.RunSafe(() =>
         {
-            if (!data.Success)
+            if (!TryApplyCraftingResult(data))
             {
-                messageBroker.Publish(this, new CreateCraftingResultPopup(null, false));
-                return;
+                messageBroker.Publish(this, new CreateCraftingResultPopup(null, false, data.ClientRequestId));
             }
-
-            if (!craftingCampaignBehaviorInterface.TryGetCraftingBehavior(out var craftingBehavior)) return;
-            if (!objectManager.TryGetObjectWithLogging(data.CraftingTemplateId, out CraftingTemplate craftingTemplate)) return;
-            if (!objectManager.TryGetObjectWithLogging(data.PlayerHeroId, out Hero playerHero)) return;
-            if (!objectManager.TryGetObjectWithLogging(data.CraftingHeroId, out Hero craftingHero)) return;
-            if (!objectManager.TryGetObjectWithLogging(data.CurrentSettlementId, out Settlement currentSettlement)) return;
-
-            ItemModifierGroup itemModifierGroup = null;
-            if (data.ItemModifierGroupId != null && !objectManager.TryGetObjectWithLogging(data.ItemModifierGroupId, out itemModifierGroup)) return;
-
-            if (!GetUsedPieces(data.WeaponDesignElementCraftingPieceIds, data.WeaponDesignElementScalePercentages, out WeaponDesignElement[] usedPieces)) return;
-
-            ItemModifier weaponModifier = null;
-            if (data.WeaponModifierId != "" && !objectManager.TryGetObjectWithLogging(data.WeaponModifierId, out weaponModifier)) return;
-
-            CultureObject culture = null;
-            if (data.CultureId != null && !objectManager.TryGetObjectWithLogging(data.CultureId, out culture)) return;
-
-            ItemObject craftedItemObject;
-            using (new AllowedThread())
-            {
-                // Replace original TaleWorlds implementation
-                string nextCraftedItemId = data.NextCraftedItemId;
-                WeaponDesign weaponDesign = new WeaponDesign(craftingTemplate, new TextObject(data.WeaponName), usedPieces);
-                if (data.IsFreeMode)
-                {
-                    weaponDesign = new WeaponDesign(weaponDesign.Template, weaponDesign.WeaponName, weaponDesign.UsedPieces, nextCraftedItemId);
-                }
-
-                craftedItemObject = craftingCampaignBehaviorInterface.CreateAndRegisterCraftedItem(weaponDesign, data.Name, culture, itemModifierGroup, nextCraftedItemId);
-                CampaignEventDispatcher.Instance.OnNewItemCrafted(craftedItemObject, weaponModifier, !data.IsFreeMode);
-
-                // Only run on crafting client
-                if (playerHero == Hero.MainHero)
-                {
-                    if (GameStateManager.Current.ActiveState is CraftingState currentState)
-                    {
-                        currentState.CraftingLogic._craftedItemObject = craftedItemObject;
-                    }
-
-                    AddItemToHistoryPatch.OverrideAddItemToHistory(ref craftingBehavior, craftedItemObject);
-                }
-            }
-
-            if (playerHero != Hero.MainHero) return;
-
-            int researchPoints = Campaign.Current.Models.SmithingModel.GetPartResearchGainForSmithingItem(craftedItemObject, craftingHero, data.IsFreeMode);
-            craftingBehavior.AddResearchPoints(craftedItemObject.WeaponDesign.Template, researchPoints);
-
-            messageBroker.Publish(this, new CreateCraftingResultPopup(craftedItemObject, true));
         });
+    }
+
+    private bool TryApplyCraftingResult(NetworkCreateCraftedWeaponInternalClients data)
+    {
+        if (!data.Success) return false;
+
+        if (!craftingCampaignBehaviorInterface.TryGetCraftingBehavior(out var craftingBehavior)) return false;
+        if (!objectManager.TryGetObjectWithLogging(data.CraftingTemplateId, out CraftingTemplate craftingTemplate)) return false;
+        if (!objectManager.TryGetObjectWithLogging(data.PlayerHeroId, out Hero playerHero)) return false;
+        if (!objectManager.TryGetObjectWithLogging(data.CraftingHeroId, out Hero craftingHero)) return false;
+        if (!objectManager.TryGetObjectWithLogging(data.CurrentSettlementId, out Settlement currentSettlement)) return false;
+
+        ItemModifierGroup itemModifierGroup = null;
+        if (data.ItemModifierGroupId != null && !objectManager.TryGetObjectWithLogging(data.ItemModifierGroupId, out itemModifierGroup)) return false;
+
+        if (!GetUsedPieces(data.WeaponDesignElementCraftingPieceIds, data.WeaponDesignElementScalePercentages, out WeaponDesignElement[] usedPieces)) return false;
+
+        ItemModifier weaponModifier = null;
+        if (data.WeaponModifierId != "" && !objectManager.TryGetObjectWithLogging(data.WeaponModifierId, out weaponModifier)) return false;
+
+        CultureObject culture = null;
+        if (data.CultureId != null && !objectManager.TryGetObjectWithLogging(data.CultureId, out culture)) return false;
+
+        ItemObject craftedItemObject;
+        using (new AllowedThread())
+        {
+            // Replace original TaleWorlds implementation
+            string nextCraftedItemId = data.NextCraftedItemId;
+            WeaponDesign weaponDesign = new WeaponDesign(craftingTemplate, new TextObject(data.WeaponName), usedPieces);
+            if (data.IsFreeMode)
+            {
+                weaponDesign = new WeaponDesign(weaponDesign.Template, weaponDesign.WeaponName, weaponDesign.UsedPieces, nextCraftedItemId);
+            }
+
+            craftedItemObject = craftingCampaignBehaviorInterface.CreateAndRegisterCraftedItem(weaponDesign, data.Name, culture, itemModifierGroup, nextCraftedItemId);
+            CampaignEventDispatcher.Instance.OnNewItemCrafted(craftedItemObject, weaponModifier, !data.IsFreeMode);
+
+            // Only run on crafting client
+            if (playerHero == Hero.MainHero)
+            {
+                if (GameStateManager.Current.ActiveState is CraftingState currentState)
+                {
+                    currentState.CraftingLogic._craftedItemObject = craftedItemObject;
+                }
+
+                AddItemToHistoryPatch.OverrideAddItemToHistory(ref craftingBehavior, craftedItemObject);
+            }
+        }
+
+        if (playerHero != Hero.MainHero) return true;
+
+        int researchPoints = Campaign.Current.Models.SmithingModel.GetPartResearchGainForSmithingItem(craftedItemObject, craftingHero, data.IsFreeMode);
+        craftingBehavior.AddResearchPoints(craftedItemObject.WeaponDesign.Template, researchPoints);
+
+        messageBroker.Publish(this, new CreateCraftingResultPopup(craftedItemObject, true, data.ClientRequestId));
+        return true;
     }
 
     private void Handle_NetworkSetHeroCraftingStamina(MessagePayload<NetworkSetHeroCraftingStamina> obj)
