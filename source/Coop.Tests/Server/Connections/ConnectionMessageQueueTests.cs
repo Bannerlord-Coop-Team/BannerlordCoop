@@ -51,6 +51,11 @@ public class ConnectionMessageQueueTests
 
     private bool NothingSentTo(NetPeer peer) => network.SentPayloads.ContainsKey(peer.Id) == false;
 
+    private void Drain(NetPeer peer)
+    {
+        while (queue.FlushBatch(peer).HasMore) { }
+    }
+
     [Fact]
     public void PeerVisibleBeforePlayerConnected_DropsWorldBroadcasts()
     {
@@ -94,7 +99,7 @@ public class ConnectionMessageQueueTests
         // Held, not sent, while the peer loads.
         Assert.True(NothingSentTo(peer));
 
-        queue.FlushBatch(peer);
+        Drain(peer);
 
         Assert.Equal(new IPacket[] { first, second, third }, network.GetPeerPackets(peer));
 
@@ -130,7 +135,7 @@ public class ConnectionMessageQueueTests
         Assert.True(queue.TryGetCatchUpPacketsRemaining(peer, out int queued));
         Assert.Equal(7, queued);
 
-        queue.FlushBatch(peer);
+        Drain(peer);
         Assert.True(queue.TryGetCatchUpPacketsRemaining(peer, out int draining));
         Assert.Equal(5, draining);
 

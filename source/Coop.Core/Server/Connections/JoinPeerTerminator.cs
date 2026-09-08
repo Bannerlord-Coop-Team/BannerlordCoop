@@ -1,4 +1,5 @@
 ﻿using LiteNetLib;
+using LiteNetLib.Utils;
 
 namespace Coop.Core.Server.Connections;
 
@@ -11,5 +12,10 @@ public interface IJoinPeerTerminator
 /// <inheritdoc cref="IJoinPeerTerminator"/>
 internal sealed class JoinPeerTerminator : IJoinPeerTerminator
 {
-    public void Disconnect(NetPeer peer, string reason) => peer.Disconnect();
+    public void Disconnect(NetPeer peer, string reason)
+    {
+        var data = new NetDataWriter();
+        data.Put(reason);
+        peer.Disconnect(data);
+    }
 }
