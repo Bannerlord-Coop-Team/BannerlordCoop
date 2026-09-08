@@ -56,7 +56,6 @@ internal class CraftingCampaignBehaviorCraftingHandler : IHandler
         messageBroker.Subscribe<CreatedCraftedWeaponInternal>(Handle_CreatedCraftedWeaponInternal);
         messageBroker.Subscribe<NetworkCreateCraftedWeaponInternalServer>(Handle_NetworkCreateCraftedWeaponInternalServer);
         messageBroker.Subscribe<NetworkCreateCraftedWeaponInternalClients>(Handle_NetworkCreateCraftedWeaponInternalClients);
-        messageBroker.Subscribe<NetworkAddCraftedItemToRoster>(Handle_NetworkAddCraftedItemToRoster);
 
         messageBroker.Subscribe<NetworkSetHeroCraftingStamina>(Handle_NetworkSetHeroCraftingStamina);
 
@@ -76,7 +75,6 @@ internal class CraftingCampaignBehaviorCraftingHandler : IHandler
         messageBroker.Unsubscribe<CreatedCraftedWeaponInternal>(Handle_CreatedCraftedWeaponInternal);
         messageBroker.Unsubscribe<NetworkCreateCraftedWeaponInternalServer>(Handle_NetworkCreateCraftedWeaponInternalServer);
         messageBroker.Unsubscribe<NetworkCreateCraftedWeaponInternalClients>(Handle_NetworkCreateCraftedWeaponInternalClients);
-        messageBroker.Unsubscribe<NetworkAddCraftedItemToRoster>(Handle_NetworkAddCraftedItemToRoster);
 
         messageBroker.Unsubscribe<NetworkSetHeroCraftingStamina>(Handle_NetworkSetHeroCraftingStamina);
 
@@ -271,13 +269,19 @@ internal class CraftingCampaignBehaviorCraftingHandler : IHandler
             NetworkCreateCraftedWeaponInternalClients message = new(data, nextCraftedItemId);
             network.SendAll(message);
 
-            // Complete order on server and send result to clients
-            if (!data.IsFreeMode)
+            if (!objectManager.TryGetObjectWithLogging<ItemObject>(nextCraftedItemId, out var craftedItem)) return;
+            if (!objectManager.TryGetObjectWithLogging<Hero>(data.PlayerHeroId, out var playerHero)) return;
+
+            if (data.IsFreeMode)
             {
+                craftingCampaignBehaviorInterface.AddCraftedItemToRoster(playerHero.PartyBelongedTo.ItemRoster, weaponModifier, craftedItem);
+                FlushCoalescer(playerHero.PartyBelongedTo.ItemRoster);
+            }
+            else
+            {
+                // Complete order on server and send result to clients
                 if (!objectManager.TryGetObjectWithLogging<Settlement>(data.CurrentSettlementId, out var currentSettlement)) return;
                 if (!objectManager.TryGetObjectWithLogging<CraftingOrder>(data.CraftingOrderId, out var craftingOrder)) return;
-                if (!objectManager.TryGetObjectWithLogging<ItemObject>(nextCraftedItemId, out var craftedItem)) return;
-                if (!objectManager.TryGetObjectWithLogging<Hero>(data.PlayerHeroId, out var playerHero)) return;
 
                 messageBroker.Publish(this, new CompleteOrderServer(
                     currentSettlement.Town,
@@ -344,16 +348,6 @@ internal class CraftingCampaignBehaviorCraftingHandler : IHandler
                 }
             }
 
-            if (!objectManager.TryGetIdWithLogging(craftedItemObject, out var craftedItemId)) return;
-
-            // Add to item rosters after the item has finished being created on clients
-            // Won't resolve on clients when running AddToCounts otherwise
-            if (data.IsFreeMode)
-            {
-                var message = new NetworkAddCraftedItemToRoster(craftedItemId, data.PlayerHeroId, data.WeaponModifierId);
-                network.SendAll(message);
-            }
-
             if (playerHero != Hero.MainHero) return;
 
             craftingBehavior.AddResearchPoints(
@@ -365,25 +359,6 @@ internal class CraftingCampaignBehaviorCraftingHandler : IHandler
                 : craftingOrder.GetOrderExperience(craftedItemObject, craftingBehavior._currentItemModifier) + Campaign.Current.Models.SmithingModel.GetSkillXpForSmithingInCraftingOrderMode(craftedItemObject);
 
             messageBroker.Publish(this, new AddSkillXpFromCrafting(craftingHero, xpAmount));
-        });
-    }
-
-    private void Handle_NetworkAddCraftedItemToRoster(MessagePayload<NetworkAddCraftedItemToRoster> obj)
-    {
-        var data = obj.What;
-
-        GameThread.RunSafe(() =>
-        {
-            if (!objectManager.TryGetObjectWithLogging(data.CraftedItemId, out ItemObject craftedItemObject)) return;
-            if (!objectManager.TryGetObjectWithLogging(data.PlayerHeroId, out Hero playerHero)) return;
-
-            ItemModifier weaponModifier = null;
-            if (data.WeaponModifierId != "" && !objectManager.TryGetObjectWithLogging(data.WeaponModifierId, out weaponModifier)) return;
-
-            if (playerHero.PartyBelongedTo.ItemRoster.FindIndexOfItem(craftedItemObject) == -1)
-            {
-                craftingCampaignBehaviorInterface.AddCraftedItemToRoster(playerHero.PartyBelongedTo.ItemRoster, weaponModifier, craftedItemObject);
-            }
         });
     }
 
