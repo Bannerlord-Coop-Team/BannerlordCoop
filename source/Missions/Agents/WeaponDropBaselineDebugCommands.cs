@@ -86,14 +86,53 @@ internal static class WeaponDropBaselineDebugCommands
         public bool NativeDropInvoked { get; set; }
     }
 
+    private sealed class ControllerRegistryState
+    {
+        public string ControllerId { get; set; }
+        public int AgentCount { get; set; }
+    }
+
+    private sealed class RegistryDiagnosticState
+    {
+        public bool Success { get; set; }
+        public string LocalRole { get; set; }
+        public bool MissionPresent { get; set; }
+        public bool CoopBattlePresent { get; set; }
+        public string BattleInstanceId { get; set; }
+        public string LocalControllerId { get; set; }
+        public bool DeploymentActivated { get; set; }
+        public bool DeploymentCommitted { get; set; }
+        public bool DeploymentControllerPresent { get; set; }
+        public bool DeploymentReady { get; set; }
+        public bool MainAgentPresent { get; set; }
+        public bool MainAgentRegistered { get; set; }
+        public string QueriedAgentId { get; set; }
+        public bool QueryIdValid { get; set; }
+        public bool AgentRegistryAvailable { get; set; }
+        public bool AgentRegistered { get; set; }
+        public bool AgentActive { get; set; }
+        public bool AgentInCurrentMission { get; set; }
+        public bool AgentIsMainAgent { get; set; }
+        public bool AgentLocallyControlled { get; set; }
+        public int AgentIndex { get; set; }
+        public string CurrentAuthority { get; set; }
+        public string OriginalOwner { get; set; }
+        public string MovementScopeId { get; set; }
+        public int MovementId { get; set; }
+        public long AuthorityRevision { get; set; }
+        public string[] RegisteredControllerIds { get; set; }
+        public ControllerRegistryState[] ControllerRegistry { get; set; }
+    }
+
     private sealed class CapturedDropState
     {
         public string BattleInstanceId { get; set; }
         public Guid AgentId { get; set; }
         public EquipmentIndex EquipmentIndex { get; set; }
+        public string OriginControllerId { get; set; }
         public NetworkWeaponDropped Message { get; set; }
-        public bool CapturedFromNetworkPeer { get; set; }
-        public int CapturedNetworkCount { get; set; }
+        public bool CapturedAtOrigin { get; set; }
+        public int CapturedOutgoingCount { get; set; }
         public int ReplaySendCount { get; set; }
     }
 
@@ -114,12 +153,13 @@ internal static class WeaponDropBaselineDebugCommands
         public string CapturedBattleInstanceId { get; set; }
         public bool CapturedCurrentBattle { get; set; }
         public bool CapturedValidNetworkMessage { get; set; }
-        public bool CapturedFromNetworkPeer { get; set; }
+        public bool CapturedAtOrigin { get; set; }
+        public string CapturedOriginControllerId { get; set; }
         public string CapturedDropId { get; set; }
         public string CapturedWorldItemId { get; set; }
         public string CapturedAgentId { get; set; }
         public int CapturedEquipmentSlot { get; set; }
-        public int CapturedNetworkCount { get; set; }
+        public int CapturedOutgoingCount { get; set; }
         public int ReplaySendCount { get; set; }
         public string ExpectedDropId { get; set; }
         public string ExpectedWorldItemId { get; set; }
@@ -250,6 +290,87 @@ internal static class WeaponDropBaselineDebugCommands
         }
     }
 
+    public sealed class DiagnosticCoopCommand : ICoopCommand
+    {
+        public string Prefix => "coop.debug.weapon_drop";
+
+        public string Name => "diagnostic";
+
+        public string Description => "Reports mission, deployment, and registry state for one agent id.";
+
+        public CoopCommandSide Side => CoopCommandSide.Both;
+
+        public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
+        {
+            new ExpectedArgs("agent_id", "The agent id to inspect without requiring registration."),
+        };
+
+        public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
+        {
+            Mission mission = Mission.Current;
+            CoopBattleController controller = mission?.GetMissionBehavior<CoopBattleController>();
+            var state = new RegistryDiagnosticState
+            {
+                Success = true,
+                LocalRole = ModInformation.IsServer ? "server" : "client",
+                MissionPresent = mission != null,
+                CoopBattlePresent = controller != null,
+                BattleInstanceId = controller == null
+                    ? null
+                    : Convert.ToString(controller.Session.InstanceId, CultureInfo.InvariantCulture),
+                LocalControllerId = controller?.Session.OwnControllerId,
+                DeploymentActivated = controller?.Deployment.IsActivated == true,
+                DeploymentCommitted = controller?.Deployment.IsCommitted == true,
+                DeploymentControllerPresent = mission?.GetMissionBehavior<DeploymentMissionController>() != null,
+                DeploymentReady = mission?.GetMissionBehavior<DeploymentMissionController>()?.TeamSetupOver == true,
+                MainAgentPresent = Agent.Main != null,
+                AgentIndex = -1,
+                QueriedAgentId = args[0],
+                RegisteredControllerIds = Array.Empty<string>(),
+                ControllerRegistry = Array.Empty<ControllerRegistryState>(),
+            };
+
+            if (!Guid.TryParse(args[0], out Guid agentId) || agentId == Guid.Empty)
+                return Succeeded("LIVE_TEST_JSON=" + JsonConvert.SerializeObject(state));
+
+            state.QueryIdValid = true;
+            if (!ContainerProvider.TryResolve<INetworkAgentRegistry>(out var agentRegistry))
+                return Succeeded("LIVE_TEST_JSON=" + JsonConvert.SerializeObject(state));
+
+            state.AgentRegistryAvailable = true;
+            string[] controllerIds = agentRegistry.GetControllerIds()
+                .OrderBy(controllerId => controllerId, StringComparer.Ordinal)
+                .ToArray();
+            state.RegisteredControllerIds = controllerIds;
+            state.ControllerRegistry = controllerIds
+                .Select(controllerId => new ControllerRegistryState
+                {
+                    ControllerId = controllerId,
+                    AgentCount = agentRegistry.GetAgents(controllerId).Count,
+                })
+                .ToArray();
+
+            if (Agent.Main != null && agentRegistry.TryGetAgentInfo(Agent.Main, out _))
+                state.MainAgentRegistered = true;
+            if (!agentRegistry.TryGetAgentInfo(agentId, out CoopAgentInfo agentInfo))
+                return Succeeded("LIVE_TEST_JSON=" + JsonConvert.SerializeObject(state));
+
+            Agent agent = agentInfo.Agent;
+            state.AgentRegistered = true;
+            state.AgentActive = agent != null && agent.IsActive();
+            state.AgentInCurrentMission = agent != null && agent.Mission == mission;
+            state.AgentIsMainAgent = ReferenceEquals(agent, Agent.Main);
+            state.AgentLocallyControlled = agentRegistry.IsLocallyControlled(agentId);
+            state.AgentIndex = agent?.Index ?? -1;
+            state.CurrentAuthority = agentInfo.CurrentAuthority;
+            state.OriginalOwner = agentInfo.OriginalOwner;
+            state.MovementScopeId = agentInfo.MovementScopeId;
+            state.MovementId = agentInfo.MovementId;
+            state.AuthorityRevision = agentInfo.AuthorityRevision;
+            return Succeeded("LIVE_TEST_JSON=" + JsonConvert.SerializeObject(state));
+        }
+    }
+
     public sealed class DropLocalCoopCommand : ICoopCommand
     {
         public string Prefix => "coop.debug.weapon_drop";
@@ -316,7 +437,7 @@ internal static class WeaponDropBaselineDebugCommands
 
         public string Description => "Captures the next real network drop for one active battle agent slot.";
 
-        public CoopCommandSide Side => CoopCommandSide.Server;
+        public CoopCommandSide Side => CoopCommandSide.Client;
 
         public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
@@ -326,8 +447,8 @@ internal static class WeaponDropBaselineDebugCommands
 
         public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
         {
-            if (ModInformation.IsClient)
-                return Failed("WEAPON_DROP_ARM_CAPTURE must run on the server");
+            if (ModInformation.IsServer)
+                return Failed("WEAPON_DROP_ARM_CAPTURE must run on the natural origin client");
             if (!TryGetActiveBattle(out Mission mission, out CoopBattleController controller, out string error))
                 return Failed(error);
             if (!Guid.TryParse(args[0], out Guid agentId) ||
@@ -339,9 +460,11 @@ internal static class WeaponDropBaselineDebugCommands
                 !agentRegistry.TryGetAgentInfo(agentId, out CoopAgentInfo agentInfo) ||
                 agentInfo.Agent == null ||
                 !agentInfo.Agent.IsActive() ||
-                agentInfo.Agent.Mission != mission)
+                agentInfo.Agent.Mission != mission ||
+                !ReferenceEquals(agentInfo.Agent, Agent.Main) ||
+                !agentRegistry.IsLocallyControlled(agentId))
             {
-                return Failed("WEAPON_DROP_ARM_CAPTURE target agent is unavailable");
+                return Failed("WEAPON_DROP_ARM_CAPTURE target agent is not the local natural origin");
             }
 
             string battleInstanceId = Convert.ToString(controller.Session.InstanceId, CultureInfo.InvariantCulture);
@@ -352,6 +475,7 @@ internal static class WeaponDropBaselineDebugCommands
                     BattleInstanceId = battleInstanceId,
                     AgentId = agentId,
                     EquipmentIndex = equipmentIndex,
+                    OriginControllerId = controller.Session.OwnControllerId,
                 };
                 DuplicateDrops.Clear();
             }
@@ -368,7 +492,7 @@ internal static class WeaponDropBaselineDebugCommands
 
         public string Description => "Replays the captured real network drop through the battle network.";
 
-        public CoopCommandSide Side => CoopCommandSide.Server;
+        public CoopCommandSide Side => CoopCommandSide.Client;
 
         public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
@@ -377,8 +501,8 @@ internal static class WeaponDropBaselineDebugCommands
 
         public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
         {
-            if (ModInformation.IsClient)
-                return Failed("WEAPON_DROP_REPLAY_CAPTURED must run on the server");
+            if (ModInformation.IsServer)
+                return Failed("WEAPON_DROP_REPLAY_CAPTURED must run on the captured origin client");
             if (!TryGetActiveBattle(out _, out CoopBattleController controller, out string error))
                 return Failed(error);
             if (!int.TryParse(args[0], NumberStyles.Integer, CultureInfo.InvariantCulture, out int sendCount) ||
@@ -396,7 +520,11 @@ internal static class WeaponDropBaselineDebugCommands
             {
                 if (capturedDrop == null ||
                     capturedDrop.Message == null ||
-                    !string.Equals(capturedDrop.BattleInstanceId, battleInstanceId, StringComparison.Ordinal))
+                    !string.Equals(capturedDrop.BattleInstanceId, battleInstanceId, StringComparison.Ordinal) ||
+                    !string.Equals(
+                        capturedDrop.OriginControllerId,
+                        controller.Session.OwnControllerId,
+                        StringComparison.Ordinal))
                 {
                     return Failed("WEAPON_DROP_REPLAY_CAPTURED has no captured drop for the active battle");
                 }
@@ -450,7 +578,7 @@ internal static class WeaponDropBaselineDebugCommands
         }
     }
 
-    internal static void RecordObservedNetworkDrop(NetworkWeaponDropped message, object source)
+    internal static void RecordOutgoingNaturalDrop(NetworkWeaponDropped message)
     {
         if (message == null ||
             message.IsCatchUp ||
@@ -458,8 +586,7 @@ internal static class WeaponDropBaselineDebugCommands
             message.WorldItemId == Guid.Empty ||
             message.AgentId == Guid.Empty ||
             string.IsNullOrEmpty(message.OriginControllerId) ||
-            string.IsNullOrEmpty(message.ItemObjectId) ||
-            source == null)
+            string.IsNullOrEmpty(message.ItemObjectId))
         {
             return;
         }
@@ -469,14 +596,18 @@ internal static class WeaponDropBaselineDebugCommands
             if (capturedDrop == null ||
                 capturedDrop.Message != null ||
                 capturedDrop.AgentId != message.AgentId ||
-                capturedDrop.EquipmentIndex != message.EquipmentIndex)
+                capturedDrop.EquipmentIndex != message.EquipmentIndex ||
+                !string.Equals(
+                    capturedDrop.OriginControllerId,
+                    message.OriginControllerId,
+                    StringComparison.Ordinal))
             {
                 return;
             }
 
             capturedDrop.Message = message;
-            capturedDrop.CapturedFromNetworkPeer = true;
-            capturedDrop.CapturedNetworkCount++;
+            capturedDrop.CapturedAtOrigin = true;
+            capturedDrop.CapturedOutgoingCount++;
         }
     }
 
@@ -533,8 +664,9 @@ internal static class WeaponDropBaselineDebugCommands
                     battleInstanceId,
                     StringComparison.Ordinal);
                 status.CapturedValidNetworkMessage = capturedDrop.Message != null;
-                status.CapturedFromNetworkPeer = capturedDrop.CapturedFromNetworkPeer;
-                status.CapturedNetworkCount = capturedDrop.CapturedNetworkCount;
+                status.CapturedAtOrigin = capturedDrop.CapturedAtOrigin;
+                status.CapturedOriginControllerId = capturedDrop.OriginControllerId;
+                status.CapturedOutgoingCount = capturedDrop.CapturedOutgoingCount;
                 status.ReplaySendCount = capturedDrop.ReplaySendCount;
                 if (capturedDrop.Message != null)
                 {

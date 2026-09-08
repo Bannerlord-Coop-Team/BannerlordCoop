@@ -289,6 +289,9 @@ public class WeaponDropHandler : IWeaponDropHandler
             RetryPendingResyncRequests(message.WorldItemId);
         }
 
+#if DEBUG
+        WeaponDropBaselineDebugCommands.RecordOutgoingNaturalDrop(message);
+#endif
         network.SendAll(message);
         Logger.Debug(
             "[WeaponDrop] Sent drop={DropId} origin={OriginControllerId} agent={AgentId} slot={EquipmentIndex} " +
@@ -304,9 +307,6 @@ public class WeaponDropHandler : IWeaponDropHandler
     private void HandleNetworkWeaponDropped(MessagePayload<NetworkWeaponDropped> payload)
     {
         NetworkWeaponDropped message = payload.What;
-#if DEBUG
-        WeaponDropBaselineDebugCommands.RecordObservedNetworkDrop(message, payload.Who);
-#endif
         GameThread.RunSafe(
             () => ApplyNetworkDrop(message),
             context: nameof(HandleNetworkWeaponDropped));
