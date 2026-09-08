@@ -1,4 +1,4 @@
-﻿using Common.Logging;
+using Common.Logging;
 using Common.Messaging;
 using Common.Network;
 using Common.Network.Messages;
@@ -202,7 +202,7 @@ internal sealed class ConnectionMessageQueue : IConnectionMessageQueue, IDisposa
     public bool TryHandleBroadcast(NetPeer peer, IPacket packet)
     {
         if (packet.PacketType == PacketType.CampaignTime ||
-            packet is MessagePacket lobby && lobby.MessageType == typeof(NetworkSessionLobbyChanged))
+            (packet is MessagePacket lobby && lobby.MessageType == typeof(NetworkSessionLobbyChanged)))
             return false;
 
         if (!channels.TryGetValue(peer, out var channel)) return true;

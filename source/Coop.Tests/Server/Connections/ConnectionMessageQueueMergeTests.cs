@@ -1,4 +1,4 @@
-﻿using Common.Messaging;
+using Common.Messaging;
 using Common.Network;
 using Common.Network.Messages;
 using Common.PacketHandlers;
@@ -126,7 +126,6 @@ public class ConnectionMessageQueueMergeTests
         Assert.Equal(tail, network.GetPeerPayloads(peer).Last());
         Assert.False(queue.TryHandleBroadcast(peer, Item(5)));
     }
-
 
     [Fact]
     public void AbortDisconnectAndSnapshotCuts_DiscardMergeCandidates()
