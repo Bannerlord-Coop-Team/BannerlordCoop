@@ -14,7 +14,7 @@ namespace GameInterface.Services.Issues.Patches;
 internal class VillageNeedsToolsQuestSuccessGatePatch
 {
     [HarmonyPrefix]
-    private static bool Prefix() => CallOriginalPolicy.IsOriginalAllowed() || IssueFinalizeAuthorityGuard.IsActive;
+    private static bool Prefix() => IssueFinalizeAuthorityGuard.IsActive;
 }
 
 [HarmonyPatch(typeof(VillageNeedsToolsIssueBehavior.VillageNeedsToolsIssueQuest), "FinishQuestSuccess1")]
@@ -23,7 +23,7 @@ internal class VillageNeedsToolsQuestSuccessTriggerPatch
     [HarmonyPostfix]
     private static void Postfix(VillageNeedsToolsIssueBehavior.VillageNeedsToolsIssueQuest __instance)
     {
-        if (CallOriginalPolicy.IsOriginalAllowed() || IssueFinalizeAuthorityGuard.IsActive) return;
+        if (IssueFinalizeAuthorityGuard.IsActive) return;
 
         var owner = __instance.QuestGiver;
         if (owner == null) return;
@@ -37,14 +37,16 @@ internal class VillageNeedsToolsQuestSuccessTriggerPatch
 internal class VillageNeedsToolsQuestRaidCompletedAuthorityPatch
 {
     [HarmonyPrefix]
-    private static bool Prefix(out IssueFinalizeAuthorityGuard __state)
+    internal static bool Prefix(out IssueFinalizeAuthorityGuard __state)
     {
-        __state = null;
-        if (CallOriginalPolicy.IsOriginalAllowed()) return true;
-        if (!ModInformation.IsServer) return false;
+        if (ModInformation.IsServer)
+        {
+            __state = new IssueFinalizeAuthorityGuard();
+            return true;
+        }
 
-        __state = new IssueFinalizeAuthorityGuard();
-        return true;
+        __state = null;
+        return CallOriginalPolicy.IsOriginalAllowedForOwnershipGate();
     }
 
     [HarmonyFinalizer]

@@ -20,16 +20,19 @@ using Quest = VillageNeedsToolsIssueBehavior.VillageNeedsToolsIssueQuest;
 internal class VillageNeedsToolsQuestWarDeclaredGatePatch
 {
     [HarmonyPrefix]
-    private static bool Prefix(Quest __instance, IFaction faction1, IFaction faction2, DeclareWarAction.DeclareWarDetail detail)
+    internal static bool Prefix(Quest __instance, IFaction faction1, IFaction faction2, DeclareWarAction.DeclareWarDetail detail)
     {
-        if (CallOriginalPolicy.IsOriginalAllowed()) return true;
-
-        if (ContainerProvider.TryResolve<IIssueOwnershipRegistry>(out var registry) && registry.IsLocalPeerOwner(__instance.QuestGiver))
+        if (ContainerProvider.TryResolve<IIssueOwnershipRegistry>(out var registry))
         {
-            Evaluate(__instance, faction1, faction2, detail);
+            if (registry.IsLocalPeerOwner(__instance.QuestGiver))
+            {
+                Evaluate(__instance, faction1, faction2, detail);
+            }
+
+            return false;
         }
 
-        return false;
+        return CallOriginalPolicy.IsOriginalAllowedForOwnershipGate();
     }
 
     private static void Evaluate(Quest quest, IFaction faction1, IFaction faction2, DeclareWarAction.DeclareWarDetail detail)
@@ -51,17 +54,20 @@ internal class VillageNeedsToolsQuestWarDeclaredGatePatch
 internal class VillageNeedsToolsQuestClanChangedKingdomGatePatch
 {
     [HarmonyPrefix]
-    private static bool Prefix(
+    internal static bool Prefix(
         Quest __instance, Clan clan, Kingdom oldKingdom, Kingdom newKingdom, ChangeKingdomAction.ChangeKingdomActionDetail detail, bool showNotification)
     {
-        if (CallOriginalPolicy.IsOriginalAllowed()) return true;
-
-        if (ContainerProvider.TryResolve<IIssueOwnershipRegistry>(out var registry) && registry.IsLocalPeerOwner(__instance.QuestGiver))
+        if (ContainerProvider.TryResolve<IIssueOwnershipRegistry>(out var registry))
         {
-            Evaluate(__instance);
+            if (registry.IsLocalPeerOwner(__instance.QuestGiver))
+            {
+                Evaluate(__instance);
+            }
+
+            return false;
         }
 
-        return false;
+        return CallOriginalPolicy.IsOriginalAllowedForOwnershipGate();
     }
 
     private static void Evaluate(Quest quest)
@@ -76,16 +82,19 @@ internal class VillageNeedsToolsQuestClanChangedKingdomGatePatch
 internal class VillageNeedsToolsQuestMapEventStartedGatePatch
 {
     [HarmonyPrefix]
-    private static bool Prefix(Quest __instance, MapEvent mapEvent, PartyBase attackerParty, PartyBase defenderParty)
+    internal static bool Prefix(Quest __instance, MapEvent mapEvent, PartyBase attackerParty, PartyBase defenderParty)
     {
-        if (CallOriginalPolicy.IsOriginalAllowed()) return true;
-
-        if (ContainerProvider.TryResolve<IIssueOwnershipRegistry>(out var registry) && registry.IsLocalPeerOwner(__instance.QuestGiver))
+        if (ContainerProvider.TryResolve<IIssueOwnershipRegistry>(out var registry))
         {
-            Evaluate(__instance, mapEvent, attackerParty);
+            if (registry.IsLocalPeerOwner(__instance.QuestGiver))
+            {
+                Evaluate(__instance, mapEvent, attackerParty);
+            }
+
+            return false;
         }
 
-        return false;
+        return CallOriginalPolicy.IsOriginalAllowedForOwnershipGate();
     }
 
     private static void Evaluate(Quest quest, MapEvent mapEvent, PartyBase attackerParty)
