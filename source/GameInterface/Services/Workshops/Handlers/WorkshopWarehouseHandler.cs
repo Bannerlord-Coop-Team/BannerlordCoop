@@ -8,6 +8,7 @@ using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Workshops.Interfaces;
 using GameInterface.Services.Workshops.Messages;
 using Serilog;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using TaleWorlds.CampaignSystem;
@@ -50,6 +51,7 @@ internal class WorkshopWarehouseHandler : IHandler
 
         messageBroker.Subscribe<WarehouseRosterManaged>(Handle_WarehouseRosterManaged);
         messageBroker.Subscribe<ManageWarehouseRoster>(Handle_ManageWarehouseRoster);
+        messageBroker.Subscribe<TransferWarehouseRoster>(Handle_TransferWarehouseRoster);
 
         messageBroker.Subscribe<TownWorkshopRun>(Handle_TownWorkshopRun);
     }
@@ -65,6 +67,7 @@ internal class WorkshopWarehouseHandler : IHandler
 
         messageBroker.Unsubscribe<WarehouseRosterManaged>(Handle_WarehouseRosterManaged);
         messageBroker.Unsubscribe<ManageWarehouseRoster>(Handle_ManageWarehouseRoster);
+        messageBroker.Unsubscribe<TransferWarehouseRoster>(Handle_TransferWarehouseRoster);
 
         messageBroker.Unsubscribe<TownWorkshopRun>(Handle_TownWorkshopRun);
     }
@@ -86,7 +89,10 @@ internal class WorkshopWarehouseHandler : IHandler
             if (owner.IsPlayerHero())
             {
                 sessionWorkshopPlayerDataInterface.AddNewWarehouseDataIfNeeded(ownerId, settlementId);
-                workshopsBehavior.AddNewWorkshopData(workshop);
+                if (workshopsBehavior.GetDataOfWorkshop(workshop) == null)
+                {
+                    workshopsBehavior.AddNewWorkshopData(workshop);
+                }  
             }
             else if (oldOwner.IsPlayerHero())
             {
@@ -266,6 +272,38 @@ internal class WorkshopWarehouseHandler : IHandler
                         warehouseRosters[i].Value.Clear();
                         warehouseRosters[i].Value.Add(obj.What.NewWarehouseRosterData);
                     }
+                }
+            }
+        }, context: nameof(WorkshopWarehouseHandler));
+    }
+
+    private void Handle_TransferWarehouseRoster(MessagePayload<TransferWarehouseRoster> obj)
+    {
+        GameThread.RunSafe(() =>
+        {
+            if (!objectManager.TryGetObjectWithLogging<Hero>(obj.What.OldOwnerId, out var oldOwner)) return;
+            if (!objectManager.TryGetObjectWithLogging<Hero>(obj.What.NewOwnerId, out var newOwner)) return;
+            if (!objectManager.TryGetObjectWithLogging<Settlement>(obj.What.SettlementId, out var settlement)) return;
+
+            if (oldOwner != Hero.MainHero && newOwner != Hero.MainHero) return;
+
+            var transferedElements = obj.What.WarehouseRoster?.Select(sessionWorkshopPlayerDataInterface.GetItemRosterElementFromData)
+                .Where(item => item.EquipmentElement.Item != null).ToArray() ?? Array.Empty<ItemRosterElement>();
+
+            using (new AllowedThread())
+            {
+                var behavior = GetWorkshopsBehavior();
+                if (oldOwner == Hero.MainHero)
+                {
+                    behavior.RemoveWarehouseData(settlement);
+                }
+                else if (newOwner == Hero.MainHero)
+                {
+                    behavior.EnsureBehaviorDataSize();
+                    behavior.AddNewWarehouseDataIfNeeded(settlement);
+                    var localRoster = behavior.GetWarehouseRoster(settlement);
+                    localRoster.Clear();
+                    localRoster.Add(transferedElements);
                 }
             }
         }, context: nameof(WorkshopWarehouseHandler));

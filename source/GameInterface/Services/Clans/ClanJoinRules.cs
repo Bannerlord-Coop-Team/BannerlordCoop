@@ -3,6 +3,7 @@ using GameInterface.Services.Banners.Messages;
 using GameInterface.Services.Clans.Data;
 using GameInterface.Services.MobileParties.Extensions;
 using GameInterface.Services.Players;
+using GameInterface.Services.Workshops.Interfaces;
 using System.Collections.Generic;
 using System.Linq;
 using TaleWorlds.CampaignSystem;
@@ -25,11 +26,13 @@ public class ClanJoinRules : IClanJoinRules
 {
     private readonly IPlayerManager playerManager;
     private readonly IMessageBroker messageBroker;
+    private readonly ISessionWorkshopPlayerDataInterface workshopPlayerData;
 
-    public ClanJoinRules(IPlayerManager playerManager, IMessageBroker messageBroker)
+    public ClanJoinRules(IPlayerManager playerManager, IMessageBroker messageBroker, ISessionWorkshopPlayerDataInterface workshopPlayerData)
     {
         this.playerManager = playerManager;
         this.messageBroker = messageBroker;
+        this.workshopPlayerData = workshopPlayerData;
     }
 
     public bool CanOfferServices(Hero joiningHero, Clan targetClan)
@@ -136,10 +139,12 @@ public class ClanJoinRules : IClanJoinRules
 
     private void TransferWorkshops(Hero[] heroes, Hero newLeader)
     {
-        foreach (var workshop in heroes.SelectMany(hero => hero.OwnedWorkshops).ToArray())
+        foreach (var hero in heroes)
         {
-            ChangeOwnerOfWorkshopAction.ApplyInternal(workshop, newLeader, workshop.WorkshopType, workshop.Capital, 0);
-            // TODO: Transfer warehouse player data
+            foreach (var workshop in hero.OwnedWorkshops.ToArray())
+                ChangeOwnerOfWorkshopAction.ApplyInternal(workshop, newLeader, workshop.WorkshopType, workshop.Capital, 0);
+
+            workshopPlayerData.TransferWarehouseData(hero, newLeader);
         }
     }
 
