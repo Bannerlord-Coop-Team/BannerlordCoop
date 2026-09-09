@@ -1,4 +1,4 @@
-using Common.Messaging;
+﻿using Common.Messaging;
 using Common.Network;
 using GameInterface.Services.Chat.Messages;
 using GameInterface.Services.Entity;
@@ -14,6 +14,7 @@ namespace GameInterface.Services.Chat;
 
 public interface IChatService : IGameAbstraction
 {
+    bool IsTyping { get; }
     void Initialize();
     void Receive(NetworkChatMessage message);
     void ReceiveParticipants(NetworkChatParticipants participants);
@@ -49,6 +50,8 @@ public sealed class ChatService : IChatService, IDisposable
         overlay = new ChatOverlay(viewModel, RequestParticipants, showChat);
         messageBroker.Subscribe<ChatVisibilitySelected>(HandleChatVisibilitySelected);
     }
+
+    public bool IsTyping => viewModel.IsOpen;
 
     public void Initialize()
     {

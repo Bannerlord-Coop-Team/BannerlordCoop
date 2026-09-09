@@ -21,7 +21,7 @@ internal readonly struct NetworkLoadModConfig : IEvent
     }
 }
 
-internal readonly struct ModConfigApplied : IEvent
+public readonly struct ModConfigApplied : IEvent
 {
     public readonly ModOptions ModOptions;
 

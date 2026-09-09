@@ -137,8 +137,9 @@ public class CoopClient : CoopNetworkBase, ICoopClient
         if (isConnected == true)
         {
             isConnected = false;
+            var serverReason = ReadDisconnectReason(disconnectInfo);
             messageBroker.Publish(this, new SendInformationMessage(disconnectInfo.Reason.ToString()));
-            messageBroker.Publish(this, new NetworkDisconnected(disconnectInfo));
+            messageBroker.Publish(this, new NetworkDisconnected(disconnectInfo, serverReason));
         }
         else
         {
@@ -147,6 +148,27 @@ public class CoopClient : CoopNetworkBase, ICoopClient
             Logger.Warning("Connection attempt failed ({Reason}), retrying in 3 seconds...", disconnectInfo.Reason);
             reconnectPending = true;
             reconnectAfter = DateTime.UtcNow.AddSeconds(3);
+        }
+    }
+
+    private static string ReadDisconnectReason(DisconnectInfo disconnectInfo)
+    {
+        var data = disconnectInfo.AdditionalData;
+        if (data == null || data.IsNull) return null;
+
+        try
+        {
+            if (disconnectInfo.Reason != DisconnectReason.RemoteConnectionClose) return null;
+            string reason = data.GetString(128);
+            return data.EndOfData ? reason : null;
+        }
+        catch (Exception)
+        {
+            return null;
+        }
+        finally
+        {
+            data.Recycle();
         }
     }
 
