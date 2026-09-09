@@ -169,6 +169,10 @@ public sealed class PollerTests
     [Fact]
     public async Task RepeatedRestarts_KeepASingleTickInFlightAndStopCompletely()
     {
+        const int restarts = 20;
+        using var tickEntered = new SemaphoreSlim(0);
+        using var releaseTick = new SemaphoreSlim(0);
+        using var stopStarted = new ManualResetEventSlim(false);
         var sync = new object();
         int ticksEntered = 0;
         int ticksInFlight = 0;
@@ -182,33 +186,57 @@ public sealed class PollerTests
                 if (ticksInFlight > mostTicksInFlight) mostTicksInFlight = ticksInFlight;
             }
 
-            Thread.Sleep(1);
+            tickEntered.Release();
+            releaseTick.Wait();
 
             lock (sync) ticksInFlight--;
         }, TimeSpan.FromMilliseconds(1));
 
         try
         {
-            for (int restart = 0; restart < 200; restart++)
+            poller.Start();
+            Assert.True(tickEntered.Wait(TimeSpan.FromSeconds(5)));
+
+            for (int restart = 1; restart <= restarts; restart++)
             {
                 poller.Start();
+
+                // The replacement loop has to wait out the tick that is still running, so nothing enters here.
+                Assert.False(tickEntered.Wait(TimeSpan.FromMilliseconds(100)), $"restart {restart} started a second tick next to the one in flight");
+
+                releaseTick.Release();
+
+                // A restart only counts as a handoff once the replacement loop has run a tick of its own.
+                Assert.True(tickEntered.Wait(TimeSpan.FromSeconds(5)), $"restart {restart} never reached its replacement tick");
             }
 
-            Assert.True(poller.StopAndWait(TimeSpan.FromSeconds(10)));
+            Task<bool> stopTask = Task.Run(() =>
+            {
+                stopStarted.Set();
+                return poller.StopAndWait(TimeSpan.FromSeconds(10));
+            });
+            Assert.True(stopStarted.Wait(TimeSpan.FromSeconds(5)));
+            Task firstCompleted = await Task.WhenAny(stopTask, Task.Delay(TimeSpan.FromMilliseconds(100)));
+            Assert.NotSame(stopTask, firstCompleted);
 
-            int ticksWhenStopped;
-            lock (sync) ticksWhenStopped = ticksEntered;
+            releaseTick.Release();
+
+            Assert.True(await stopTask);
 
             await Task.Delay(TimeSpan.FromMilliseconds(200));
 
             lock (sync)
             {
-                Assert.Equal(ticksWhenStopped, ticksEntered);
-                Assert.True(mostTicksInFlight <= 1, $"{mostTicksInFlight} ticks ran at the same time");
+                // Every restart handed over to exactly one replacement tick, and nothing ticked after the stop.
+                Assert.Equal(restarts + 1, ticksEntered);
+                Assert.Equal(1, mostTicksInFlight);
             }
         }
         finally
         {
+            // Cancel before releasing, so the freed ticks end their loops instead of starting another round.
+            poller.Stop();
+            releaseTick.Release(restarts + 2);
             poller.StopAndWait(TimeSpan.FromSeconds(5));
         }
     }
