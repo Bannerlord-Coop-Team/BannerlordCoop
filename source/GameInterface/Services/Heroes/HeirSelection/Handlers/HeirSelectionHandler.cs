@@ -2,6 +2,7 @@
 using Common.Logging;
 using Common.Messaging;
 using Common.Network;
+using Common.Util;
 using GameInterface.CoopSessionData;
 using GameInterface.Services.CampaignService.Messages;
 using GameInterface.Services.Heroes.Extensions;
@@ -264,16 +265,28 @@ internal class HeirSelectionHandler : IHandler
 
             if (!heir.IsControlledByThisInstance()) return;
 
-            // Ensure client doesn't create a local player party when heir is a prisoner
-            Campaign.Current.MainParty = heirParty;
-            heir.PartyBelongedTo = heirParty;
-
-            ChangePlayerCharacterAction.Apply(heir);
-
-            // Restore prisoner status after player character changed
-            if (heir.PartyBelongedToAsPrisoner != null)
+            var isPrisoner = heir.PartyBelongedToAsPrisoner != null;
+            if (isPrisoner)
             {
-                heir.PartyBelongedTo = null;
+                using (new AllowedThread())
+                {
+                    heir.PartyBelongedTo = heirParty;
+                }
+            }
+
+            try
+            {
+                ChangePlayerCharacterAction.Apply(heir);
+            }
+            finally
+            {
+                if (isPrisoner)
+                {
+                    using (new AllowedThread())
+                    {
+                        heir.PartyBelongedTo = null;
+                    }
+                }
             }
         });
     }
