@@ -51,10 +51,11 @@ internal class GenericQuestTypeQuestSolutionAcceptTriggerPatch
 internal class GenericQuestTypeQuestSolutionStartOwnershipGatePatch
 {
     [HarmonyPrefix]
-    private static bool Prefix(IssueBase __instance, ref bool __result)
+    internal static bool Prefix(IssueBase __instance, ref bool __result)
     {
         if (QuestTypeRegistry.Get(__instance)?.SupportsQuestSolutionAccept != true) return true;
         if (QuestSolutionStartAuthorityGuard.IsActive) return true;
+        if (CallOriginalPolicy.IsOriginalAllowedForOwnershipGate()) return true;
 
         __result = true;
         return false;
@@ -98,10 +99,10 @@ internal class GenericQuestTypeAlternativeSolutionOwnershipGatePatch
 internal class GenericQuestTypeAlternativeSolutionStartOwnershipGatePatch
 {
     [HarmonyPrefix]
-    private static bool Prefix(IssueBase __instance)
+    internal static bool Prefix(IssueBase __instance)
     {
         if (QuestTypeRegistry.Get(__instance)?.SupportsAlternativeAccept != true) return true;
 
-        return AlternativeSolutionStartAuthorityGuard.IsActive;
+        return AlternativeSolutionStartAuthorityGuard.IsActive || CallOriginalPolicy.IsOriginalAllowedForOwnershipGate();
     }
 }

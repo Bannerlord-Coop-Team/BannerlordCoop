@@ -40,11 +40,11 @@ internal class IssueManagerQuestCompletedReasonCapture
 internal class IssueFinalizedOwnershipGatePatch
 {
     [HarmonyPrefix]
-    private static bool Prefix(IssueBase __instance)
+    internal static bool Prefix(IssueBase __instance)
     {
         if (!DisableAllIssueBehaviorsExceptAllowlist.IsAllowlisted(__instance)) return true;
 
-        return IssueFinalizeAuthorityGuard.IsActive;
+        return IssueFinalizeAuthorityGuard.IsActive || CallOriginalPolicy.IsOriginalAllowedForOwnershipGate();
     }
 }
 

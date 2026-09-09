@@ -1,3 +1,4 @@
+using GameInterface.Policies;
 using GameInterface.Services.Entity;
 using GameInterface.Services.Issues.Generic;
 using GameInterface.Services.Issues.Generic.Migrated.GangLeaderNeedsToOffloadStolenGoods;
@@ -11,11 +12,12 @@ namespace GameInterface.Services.Issues.Patches;
 internal class GangLeaderNeedsToOffloadStolenGoodsOwnershipGatePatches
 {
     private static bool IsLocalPeerOwner(TaleWorlds.CampaignSystem.Hero questGiver) =>
-        ContainerProvider.TryResolve<IIssueOwnershipRegistry>(out var ownershipRegistry) && ownershipRegistry.IsLocalPeerOwner(questGiver);
+        (ContainerProvider.TryResolve<IIssueOwnershipRegistry>(out var ownershipRegistry) && ownershipRegistry.IsLocalPeerOwner(questGiver))
+        || CallOriginalPolicy.IsOriginalAllowedForOwnershipGate();
 
     [HarmonyPatch("SucceedQuestByPayingAndKeepingTheGoods")]
     [HarmonyPrefix]
-    private static bool SucceedQuestByPayingAndKeepingTheGoodsPrefix(
+    internal static bool SucceedQuestByPayingAndKeepingTheGoodsPrefix(
         GangLeaderNeedsToOffloadStolenGoodsIssueBehavior.GangLeaderNeedsToOffloadStolenGoodsIssueQuest __instance) =>
         IsLocalPeerOwner(__instance.QuestGiver);
 
