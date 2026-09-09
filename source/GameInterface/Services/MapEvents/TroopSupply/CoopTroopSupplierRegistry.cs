@@ -105,29 +105,50 @@ public static class CoopTroopSupplierRegistry
                     continue;
 
                 CoopTroopSupplier supplier = pair.Value;
-                CoopTroopSupplier.AllocationSnapshot allocation = supplier.CaptureAllocationSnapshot();
-                var side = new CoopTroopSupplierDebugSideState
+                try
                 {
-                    Side = supplier.Side.ToString(),
-                    Populated = supplier.IsPopulated,
-                    PlayerPartyId = supplier.PlayerPartyId,
-                    ReserveRevision = supplier.ReserveRevision,
-                    AllocationRevision = allocation.Revision,
-                    BattleSize = allocation.BattleSize,
-                    SideTotalTroops = allocation.SideTotalTroops,
-                    OwnedTotalTroops = allocation.TotalTroops,
-                    OwnedSuppliedTroops = allocation.SuppliedTroops,
-                    OwnedRemainingTroops = supplier.NumTroopsNotSupplied,
-                };
-                foreach (var party in supplier.GetRemainingByParty())
-                {
-                    side.Parties.Add(new CoopTroopSupplierDebugPartyState
+                    CoopTroopSupplier.DebugSnapshot snapshot = supplier.CaptureDebugSnapshot();
+                    var side = new CoopTroopSupplierDebugSideState
                     {
-                        PartyId = party.partyId,
-                        RemainingTroops = party.remaining,
+                        Side = supplier.Side.ToString(),
+                        Populated = snapshot.Populated,
+                        PlayerPartyId = snapshot.PlayerPartyId,
+                        ReserveRevision = snapshot.ReserveRevision,
+                        AllocationRevision = snapshot.AllocationRevision,
+                        BattleSize = snapshot.BattleSize,
+                        SideTotalTroops = snapshot.SideTotalTroops,
+                        OwnedTotalTroops = snapshot.EntryCount,
+                        OwnedSuppliedTroops = snapshot.SuppliedCount,
+                        OwnedRemainingTroops = snapshot.RemainingCount,
+                        EntryCount = snapshot.EntryCount,
+                        SuppliedCount = snapshot.SuppliedCount,
+                        RemainingCount = snapshot.RemainingCount,
+                    };
+                    foreach (CoopTroopSupplier.DebugPartySnapshot party in snapshot.Parties)
+                    {
+                        side.Parties.Add(new CoopTroopSupplierDebugPartyState
+                        {
+                            Side = side.Side,
+                            PartyId = party.PartyId,
+                            EntryCount = party.EntryCount,
+                            SuppliedCount = party.SuppliedCount,
+                            RemainingCount = party.RemainingCount,
+                            RemainingTroops = party.RemainingCount,
+                            ReserveRevision = side.ReserveRevision,
+                            AllocationRevision = side.AllocationRevision,
+                        });
+                    }
+                    state.Suppliers.Add(side);
+                }
+                catch (Exception e)
+                {
+                    state.Errors.Add(new CoopTroopSupplierDebugError
+                    {
+                        Side = supplier.Side.ToString(),
+                        Source = "supplier",
+                        Error = e.GetType().Name + ": " + e.Message,
                     });
                 }
-                state.Suppliers.Add(side);
             }
 
             foreach (var pair in Pending)
@@ -138,25 +159,108 @@ public static class CoopTroopSupplierRegistry
                     continue;
                 }
 
-                int entryCount = 0;
-                foreach (PartyReserve party in pair.Value.Reserve ?? Array.Empty<PartyReserve>())
-                    entryCount += party.Entries?.Length ?? 0;
-                state.Pending.Add(new CoopTroopSupplierDebugPendingState
+                var pending = new CoopTroopSupplierDebugPendingState
                 {
                     Side = ((BattleSideEnum)sideValue).ToString(),
                     PartyCount = pair.Value.Reserve?.Length ?? 0,
-                    EntryCount = entryCount,
+                    ReserveRevision = null,
+                    ReserveRevisionError = "supplier-unavailable",
                     SideTotalTroops = pair.Value.SideTotal,
                     PlayerOwnedPartyCount = pair.Value.PlayerParties,
                     AllocationRevision = pair.Value.AllocationRevision,
                     BattleSize = pair.Value.BattleSize,
-                });
+                };
+                int entryCount = 0;
+                int suppliedCount = 0;
+                foreach (PartyReserve party in pair.Value.Reserve ?? Array.Empty<PartyReserve>())
+                {
+                    var entries = party.Entries ?? Array.Empty<TroopReserveEntry>();
+                    int effectiveSuppliedCount = Math.Min(Math.Max(0, party.SuppliedCount), entries.Length);
+                    entryCount += entries.Length;
+                    suppliedCount += effectiveSuppliedCount;
+                    pending.Parties.Add(new CoopTroopSupplierDebugPendingPartyState
+                    {
+                        Side = pending.Side,
+                        PartyId = party.PartyId,
+                        EntryCount = entries.Length,
+                        RawSuppliedCount = party.SuppliedCount,
+                        EffectiveSuppliedCount = effectiveSuppliedCount,
+                        RemainingCount = entries.Length - effectiveSuppliedCount,
+                        LocalSuppliedCount = null,
+                        LocalSuppliedCountError = "supplier-unavailable",
+                        AllocationRevision = pair.Value.AllocationRevision,
+                    });
+                }
+                pending.EntryCount = entryCount;
+                pending.SuppliedCount = suppliedCount;
+                pending.RemainingCount = entryCount - suppliedCount;
+                state.Pending.Add(pending);
             }
         }
 
         state.Suppliers.Sort((left, right) => string.CompareOrdinal(left.Side, right.Side));
         state.Pending.Sort((left, right) => string.CompareOrdinal(left.Side, right.Side));
         return state;
+    }
+
+    /// <summary>Read-only supplier evidence for a specific returning party, retaining partial state on failures.</summary>
+    public static CoopTroopSupplierDebugObservation CaptureDebugObservation(string mapEventId, string returningPartyId)
+    {
+        var observation = new CoopTroopSupplierDebugObservation
+        {
+            MapEventId = mapEventId,
+            ReturningPartyId = returningPartyId,
+        };
+
+        if (string.IsNullOrWhiteSpace(mapEventId))
+        {
+            observation.SupplierStateError = "map-event-id-unavailable";
+            return observation;
+        }
+
+        try
+        {
+            observation.SupplierState = CaptureDebugState(mapEventId);
+        }
+        catch (Exception e)
+        {
+            observation.SupplierStateError = e.GetType().Name + ": " + e.Message;
+            return observation;
+        }
+
+        if (observation.SupplierState == null)
+        {
+            observation.SupplierStateError = "supplier-state-unavailable";
+            return observation;
+        }
+
+        if (string.IsNullOrWhiteSpace(returningPartyId))
+        {
+            observation.ReturningPartyError = "returning-party-id-unavailable";
+            return observation;
+        }
+
+        CoopTroopSupplierDebugPartyState match = null;
+        foreach (CoopTroopSupplierDebugSideState side in observation.SupplierState.Suppliers)
+        {
+            foreach (CoopTroopSupplierDebugPartyState party in side.Parties)
+            {
+                if (!string.Equals(party.PartyId, returningPartyId, StringComparison.Ordinal))
+                    continue;
+
+                if (match != null)
+                {
+                    observation.ReturningPartyError = "returning-party-supplier-entry-ambiguous";
+                    return observation;
+                }
+                match = party;
+            }
+        }
+
+        observation.ReturningParty = match;
+        if (match == null)
+            observation.ReturningPartyError = "returning-party-supplier-entry-unavailable";
+        return observation;
     }
 #endif
 }
@@ -167,6 +271,24 @@ public sealed class CoopTroopSupplierDebugState
     public string MapEventId { get; set; }
     public List<CoopTroopSupplierDebugSideState> Suppliers { get; } = new List<CoopTroopSupplierDebugSideState>();
     public List<CoopTroopSupplierDebugPendingState> Pending { get; } = new List<CoopTroopSupplierDebugPendingState>();
+    public List<CoopTroopSupplierDebugError> Errors { get; } = new List<CoopTroopSupplierDebugError>();
+}
+
+public sealed class CoopTroopSupplierDebugObservation
+{
+    public string MapEventId { get; set; }
+    public string ReturningPartyId { get; set; }
+    public CoopTroopSupplierDebugState SupplierState { get; set; }
+    public string SupplierStateError { get; set; }
+    public CoopTroopSupplierDebugPartyState ReturningParty { get; set; }
+    public string ReturningPartyError { get; set; }
+}
+
+public sealed class CoopTroopSupplierDebugError
+{
+    public string Side { get; set; }
+    public string Source { get; set; }
+    public string Error { get; set; }
 }
 
 public sealed class CoopTroopSupplierDebugSideState
@@ -181,13 +303,22 @@ public sealed class CoopTroopSupplierDebugSideState
     public int OwnedTotalTroops { get; set; }
     public int OwnedSuppliedTroops { get; set; }
     public int OwnedRemainingTroops { get; set; }
+    public int EntryCount { get; set; }
+    public int SuppliedCount { get; set; }
+    public int RemainingCount { get; set; }
     public List<CoopTroopSupplierDebugPartyState> Parties { get; } = new List<CoopTroopSupplierDebugPartyState>();
 }
 
 public sealed class CoopTroopSupplierDebugPartyState
 {
+    public string Side { get; set; }
     public string PartyId { get; set; }
+    public int EntryCount { get; set; }
+    public int SuppliedCount { get; set; }
+    public int RemainingCount { get; set; }
     public int RemainingTroops { get; set; }
+    public int ReserveRevision { get; set; }
+    public long AllocationRevision { get; set; }
 }
 
 public sealed class CoopTroopSupplierDebugPendingState
@@ -195,9 +326,27 @@ public sealed class CoopTroopSupplierDebugPendingState
     public string Side { get; set; }
     public int PartyCount { get; set; }
     public int EntryCount { get; set; }
+    public int SuppliedCount { get; set; }
+    public int RemainingCount { get; set; }
+    public List<CoopTroopSupplierDebugPendingPartyState> Parties { get; } = new List<CoopTroopSupplierDebugPendingPartyState>();
+    public int? ReserveRevision { get; set; }
+    public string ReserveRevisionError { get; set; }
     public int SideTotalTroops { get; set; }
     public int PlayerOwnedPartyCount { get; set; }
     public long AllocationRevision { get; set; }
     public int BattleSize { get; set; }
+}
+
+public sealed class CoopTroopSupplierDebugPendingPartyState
+{
+    public string Side { get; set; }
+    public string PartyId { get; set; }
+    public int EntryCount { get; set; }
+    public int RawSuppliedCount { get; set; }
+    public int EffectiveSuppliedCount { get; set; }
+    public int RemainingCount { get; set; }
+    public int? LocalSuppliedCount { get; set; }
+    public string LocalSuppliedCountError { get; set; }
+    public long AllocationRevision { get; set; }
 }
 #endif

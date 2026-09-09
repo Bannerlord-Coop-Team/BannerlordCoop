@@ -67,6 +67,12 @@ public class CoopBattleController : CoopMissionController
     {
         return puppetSpawner.CapturePendingPuppetState(controllerId);
     }
+
+    /// <summary>Copies the first local returning-hero catch-up records without draining or replaying them.</summary>
+    public ReturningHeroCatchUpDebugState CaptureReturningHeroCatchUpState(string controllerId)
+    {
+        return puppetSpawner.CaptureReturningHeroCatchUpState(controllerId);
+    }
 #endif
 
     private readonly IBattleInstanceLifecycle lifecycle;

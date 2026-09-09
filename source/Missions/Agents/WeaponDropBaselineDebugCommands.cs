@@ -175,6 +175,10 @@ internal static class WeaponDropBaselineDebugCommands
         public CoopTroopSupplierDebugState SupplierState { get; set; }
         public PendingPuppetDebugState PendingPuppetState { get; set; }
         public string PendingPuppetStateError { get; set; }
+        public ReturningHeroCatchUpDebugState CatchUpState { get; set; }
+        public string CatchUpStateError { get; set; }
+        public RejoinSizingDebugState SizingState { get; set; }
+        public string SizingStateError { get; set; }
     }
 
     private sealed class CapturedDropState
@@ -478,6 +482,34 @@ internal static class WeaponDropBaselineDebugCommands
                 {
                     state.PendingPuppetStateError = e.GetType().Name + ": " + e.Message;
                     unavailableReasons.Add("pending-puppet-state-unavailable");
+                }
+                try
+                {
+                    state.CatchUpState = controller.CaptureReturningHeroCatchUpState(args[0]);
+                }
+                catch (Exception e)
+                {
+                    state.CatchUpStateError = e.GetType().Name + ": " + e.Message;
+                    unavailableReasons.Add("returning-hero-catch-up-state-unavailable");
+                }
+
+                var spawnHandler = mission.GetMissionBehavior<CoopBattleMissionSpawnHandler>();
+                if (spawnHandler == null)
+                {
+                    state.SizingStateError = "coop-battle-spawn-handler-unavailable";
+                    unavailableReasons.Add("coop-battle-spawn-handler-unavailable");
+                }
+                else
+                {
+                    try
+                    {
+                        state.SizingState = spawnHandler.CaptureRejoinSizingState();
+                    }
+                    catch (Exception e)
+                    {
+                        state.SizingStateError = e.GetType().Name + ": " + e.Message;
+                        unavailableReasons.Add("rejoin-sizing-state-unavailable");
+                    }
                 }
             }
 
