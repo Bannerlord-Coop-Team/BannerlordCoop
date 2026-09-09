@@ -240,18 +240,23 @@ internal static class VillageNeedsToolsQuestType
     internal const byte ProofFailWar = 1;
     internal const byte ProofFailCoercion = 2;
 
-    internal static void PublishTerminalOutcome(Hero owner, IssueFinalizeReason reason)
+    internal static void PublishTerminalOutcome(Hero owner, IssueFinalizeReason reason, string controllerId = null)
     {
-        ContainerProvider.TryResolve<IControllerIdProvider>(out var controllerIdProvider);
-        MessageBroker.Instance.Publish(owner, new QuestTerminalOutcomeTriggered(owner, controllerIdProvider?.ControllerId, reason));
+        if (controllerId == null)
+        {
+            ContainerProvider.TryResolve<IControllerIdProvider>(out var controllerIdProvider);
+            controllerId = controllerIdProvider?.ControllerId;
+        }
+
+        MessageBroker.Instance.Publish(owner, new QuestTerminalOutcomeTriggered(owner, controllerId, reason));
     }
 
-    internal static void PublishQuestFail(Hero owner, byte proof)
+    internal static void PublishQuestFail(Hero owner, byte proof, string controllerId = null)
     {
         QuestFailProofContext.Set(proof);
         try
         {
-            PublishTerminalOutcome(owner, IssueFinalizeReason.QuestFail);
+            PublishTerminalOutcome(owner, IssueFinalizeReason.QuestFail, controllerId);
         }
         finally
         {

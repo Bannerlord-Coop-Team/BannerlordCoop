@@ -28,6 +28,11 @@ internal class VillageNeedsToolsQuestWarDeclaredGatePatch
             {
                 Evaluate(__instance, faction1, faction2, detail);
             }
+            else
+            {
+                DisconnectedOwnerEvaluationSupport.TryEvaluateOnBehalfOfDisconnectedOwner(
+                    __instance.QuestGiver, controllerId => Evaluate(__instance, faction1, faction2, detail, controllerId));
+            }
 
             return false;
         }
@@ -35,17 +40,17 @@ internal class VillageNeedsToolsQuestWarDeclaredGatePatch
         return CallOriginalPolicy.IsOriginalAllowedForOwnershipGate();
     }
 
-    private static void Evaluate(Quest quest, IFaction faction1, IFaction faction2, DeclareWarAction.DeclareWarDetail detail)
+    private static void Evaluate(Quest quest, IFaction faction1, IFaction faction2, DeclareWarAction.DeclareWarDetail detail, string controllerId = null)
     {
         if (!quest.QuestGiver.MapFaction.IsAtWarWith(Hero.MainHero.MapFaction)) return;
 
         if (DiplomacyHelper.IsWarCausedByPlayer(faction1, faction2, detail))
         {
-            VillageNeedsToolsQuestType.PublishQuestFail(quest.QuestGiver, VillageNeedsToolsQuestType.ProofFailWar);
+            VillageNeedsToolsQuestType.PublishQuestFail(quest.QuestGiver, VillageNeedsToolsQuestType.ProofFailWar, controllerId);
         }
         else
         {
-            VillageNeedsToolsQuestType.PublishTerminalOutcome(quest.QuestGiver, IssueFinalizeReason.QuestCancel);
+            VillageNeedsToolsQuestType.PublishTerminalOutcome(quest.QuestGiver, IssueFinalizeReason.QuestCancel, controllerId);
         }
     }
 }
@@ -63,6 +68,11 @@ internal class VillageNeedsToolsQuestClanChangedKingdomGatePatch
             {
                 Evaluate(__instance);
             }
+            else
+            {
+                DisconnectedOwnerEvaluationSupport.TryEvaluateOnBehalfOfDisconnectedOwner(
+                    __instance.QuestGiver, controllerId => Evaluate(__instance, controllerId));
+            }
 
             return false;
         }
@@ -70,11 +80,11 @@ internal class VillageNeedsToolsQuestClanChangedKingdomGatePatch
         return CallOriginalPolicy.IsOriginalAllowedForOwnershipGate();
     }
 
-    private static void Evaluate(Quest quest)
+    private static void Evaluate(Quest quest, string controllerId = null)
     {
         if (!quest.QuestGiver.CurrentSettlement.MapFaction.IsAtWarWith(Hero.MainHero.MapFaction)) return;
 
-        VillageNeedsToolsQuestType.PublishTerminalOutcome(quest.QuestGiver, IssueFinalizeReason.QuestCancel);
+        VillageNeedsToolsQuestType.PublishTerminalOutcome(quest.QuestGiver, IssueFinalizeReason.QuestCancel, controllerId);
     }
 }
 
@@ -90,6 +100,11 @@ internal class VillageNeedsToolsQuestMapEventStartedGatePatch
             {
                 Evaluate(__instance, mapEvent, attackerParty);
             }
+            else
+            {
+                DisconnectedOwnerEvaluationSupport.TryEvaluateOnBehalfOfDisconnectedOwner(
+                    __instance.QuestGiver, controllerId => Evaluate(__instance, mapEvent, attackerParty, controllerId));
+            }
 
             return false;
         }
@@ -97,10 +112,10 @@ internal class VillageNeedsToolsQuestMapEventStartedGatePatch
         return CallOriginalPolicy.IsOriginalAllowedForOwnershipGate();
     }
 
-    private static void Evaluate(Quest quest, MapEvent mapEvent, PartyBase attackerParty)
+    private static void Evaluate(Quest quest, MapEvent mapEvent, PartyBase attackerParty, string controllerId = null)
     {
         if (!QuestHelper.CheckMinorMajorCoercion(quest, mapEvent, attackerParty)) return;
 
-        VillageNeedsToolsQuestType.PublishQuestFail(quest.QuestGiver, VillageNeedsToolsQuestType.ProofFailCoercion);
+        VillageNeedsToolsQuestType.PublishQuestFail(quest.QuestGiver, VillageNeedsToolsQuestType.ProofFailCoercion, controllerId);
     }
 }
