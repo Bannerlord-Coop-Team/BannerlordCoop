@@ -930,6 +930,96 @@ public class GangLeaderNeedsToOffloadStolenGoodsIssueTests : IDisposable
     }
 
     [Fact]
+    public void RequestAlternativeSolutionCompletion_AppliesTheFrozenGoldAndItemPayout()
+    {
+        var fixture = SetupIssueOwner();
+        CreateIssueOnServer(fixture);
+
+        var partyId = TestEnvironment.CreateRegisteredObject<MobileParty>();
+        var escortTroopId = TestEnvironment.CreateRegisteredObject<CharacterObject>();
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject<MobileParty>(partyId, out var party));
+            Assert.True(Server.ObjectManager.TryGetObject<Settlement>(fixture.OwnerSettlementId, out var settlement));
+            Assert.True(Server.ObjectManager.TryGetObject<CharacterObject>(escortTroopId, out var escortTroop));
+            Assert.True(Server.ObjectManager.TryGetObject<Hero>(fixture.CounterOfferHeroId, out var companion));
+            using (new AllowedThread())
+            {
+                party.CurrentSettlement = settlement;
+                party.MemberRoster.AddToCounts(companion.CharacterObject, 1);
+                escortTroop.Level = 15;
+                party.MemberRoster.AddToCounts(escortTroop, 20);
+            }
+
+            var playerManager = Server.Resolve<IPlayerManager>();
+            Assert.True(playerManager.AddPlayer(new Player("player-A", fixture.HeroId, partyId, "", "")));
+        });
+        TestEnvironment.ConnectRegisteredPlayer(Client, "player-A");
+        Client.Resolve<IControllerIdProvider>().SetControllerId("player-A");
+        OpenConversation(Client, fixture.HeroId, "player-A");
+        OtherClient.Call(() => Assert.True(OtherClient.ObjectManager.TryGetObject<CharacterObject>(escortTroopId, out _)));
+
+        Client.Call(() =>
+        {
+            Assert.True(Client.ObjectManager.TryGetObject<Hero>(fixture.HeroId, out var owner));
+            Assert.True(Client.ObjectManager.TryGetObject<Hero>(fixture.CounterOfferHeroId, out var companion));
+            Assert.True(Client.ObjectManager.TryGetObject<CharacterObject>(escortTroopId, out var escortTroop));
+            using (new AllowedThread())
+            {
+                owner.Issue.AlternativeSolutionSentTroops.AddToCounts(companion.CharacterObject, 1);
+                owner.Issue.AlternativeSolutionSentTroops.AddToCounts(escortTroop, 20);
+            }
+            owner.Issue.StartIssueWithAlternativeSolution();
+        });
+
+        var accepted = Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkQuestTypeAlternativeAccepted>());
+        var acceptedPayload = GenericAcceptFieldsSerializer.Deserialize<GangLeaderStolenGoodsAlternativeAcceptPayload>(accepted.FieldsBytes);
+        Assert.True(acceptedPayload.StolenTradeGoodAmount > 0);
+        Assert.True(acceptedPayload.RewardGold > 0);
+
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject<Hero>(fixture.HeroId, out var owner));
+            using (new AllowedThread())
+            {
+                owner.Issue.AlternativeSolutionReturnTimeForTroops = CampaignTime.Now - CampaignTime.Days(1f);
+            }
+        });
+
+        int ownerGoldBefore = 0;
+        int ownerRosterBefore = 0;
+        ItemObject stolenGood = null;
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject<Hero>(fixture.HeroId, out var owner));
+            Assert.True(Server.ObjectManager.TryGetObject<MobileParty>(partyId, out var party));
+            var issue = Assert.IsType<GangLeaderNeedsToOffloadStolenGoodsIssueBehavior.GangLeaderNeedsToOffloadStolenGoodsIssue>(owner.Issue);
+            stolenGood = issue.StolenTradeGood;
+            ownerGoldBefore = owner.Gold;
+            ownerRosterBefore = party.ItemRoster.GetItemNumber(stolenGood);
+        });
+
+        Server.Call(() =>
+        {
+            Server.Resolve<IMessageBroker>().Publish(Client.NetPeer, new RequestAlternativeSolutionCompletion(fixture.HeroId));
+        });
+
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject<Hero>(fixture.HeroId, out var owner));
+            Assert.True(Server.ObjectManager.TryGetObject<MobileParty>(partyId, out var party));
+
+            Assert.Null(owner.Issue);
+            Assert.False(Campaign.Current.IssueManager.Issues.ContainsKey(owner));
+            Assert.Equal(ownerGoldBefore + 2 * acceptedPayload.RewardGold, owner.Gold);
+            Assert.Equal(ownerRosterBefore + acceptedPayload.StolenTradeGoodAmount, party.ItemRoster.GetItemNumber(stolenGood));
+            Assert.False(GangLeaderNeedsToOffloadStolenGoodsQuestType.AlternativeSolutionFreeze.TryGetFrozen(owner, out _));
+        });
+
+        Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkIssueRemoved>());
+    }
+
+    [Fact]
     public void RequestIssueRemoved_FinalizesTheRealQuestAndBroadcastsRemovalToEveryPeer()
     {
         var fixture = SetupIssueOwner();
