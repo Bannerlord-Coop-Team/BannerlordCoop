@@ -13,13 +13,11 @@ internal class CommentOnCharacterKilledPatches
 {
     [HarmonyPatch(nameof(CommentOnCharacterKilledBehavior.OnBeforeHeroKilled))]
     [HarmonyPrefix]
-    public static bool OnBeforeHeroKilledPrefix(CommentOnCharacterKilledBehavior __instance, Hero victim, Hero killer, KillCharacterAction.KillCharacterActionDetail detail)
+    public static void OnBeforeHeroKilledPrefix(CommentOnCharacterKilledBehavior __instance, Hero victim, Hero killer, KillCharacterAction.KillCharacterActionDetail detail)
     {
-        if (ModInformation.IsClient) return true;
+        if (ModInformation.IsClient) return;
 
         var message = new CommentHeroKilled(victim, killer, detail);
         MessageBroker.Instance.Publish(__instance, message);
-
-        return false;
     }
 }

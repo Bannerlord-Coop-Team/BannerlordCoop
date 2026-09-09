@@ -264,7 +264,17 @@ internal class HeirSelectionHandler : IHandler
 
             if (!heir.IsControlledByThisInstance()) return;
 
+            // Ensure client doesn't create a local player party when heir is a prisoner
+            Campaign.Current.MainParty = heirParty;
+            heir.PartyBelongedTo = heirParty;
+
             ChangePlayerCharacterAction.Apply(heir);
+
+            // Restore prisoner status after player character changed
+            if (heir.PartyBelongedToAsPrisoner != null)
+            {
+                heir.PartyBelongedTo = null;
+            }
         });
     }
 
