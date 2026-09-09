@@ -26,7 +26,18 @@ public class DisconnectHandlerTests
         RunDisconnect(DisconnectReason.ConnectionFailed, "You have been Disconnected");
     }
 
-    private static void RunDisconnect(DisconnectReason reason, string expectedMessage)
+    [Theory]
+    [InlineData("JoinReplayAppliedTimeout", "Joining the campaign timed out while synchronizing.\nThe server stopped this join to keep the campaign responsive. Please try again.")]
+    [InlineData("JoinReplayQueueLimit", "Joining the campaign stopped because its synchronization queue exceeded the safety limit.\nPlease try again.")]
+    [InlineData("JoinCampaignEntryTimeout", "Joining the campaign timed out while loading the transferred save.\nThe server stopped this join to keep the campaign responsive. Please try again.")]
+    [InlineData("UnknownReason", "You have been Disconnected")]
+    [InlineData("", "You have been Disconnected")]
+    public void ServerDisconnect_ReturnsToMainMenuThenExplainsJoinFailure(string serverReason, string expected)
+    {
+        RunDisconnect(DisconnectReason.RemoteConnectionClose, expected, serverReason);
+    }
+
+    private static void RunDisconnect(DisconnectReason reason, string expectedMessage, string? serverReason = null)
     {
         var messageBroker = new TestMessageBroker();
         var finalizer = new Mock<ICoopFinalizer>(MockBehavior.Strict);
@@ -45,7 +56,7 @@ public class DisconnectHandlerTests
 
         messageBroker.Publish(
             handler,
-            new NetworkDisconnected(new DisconnectInfo { Reason = reason }));
+            new NetworkDisconnected(new DisconnectInfo { Reason = reason }, serverReason));
 
         gameState.Verify(value => value.GoToMainMenu(), Times.Once);
         finalizer.Verify(value => value.Finalize(expectedMessage), Times.Once);

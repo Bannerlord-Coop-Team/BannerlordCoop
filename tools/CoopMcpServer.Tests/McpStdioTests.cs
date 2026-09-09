@@ -1,4 +1,4 @@
-﻿using ModelContextProtocol.Client;
+using ModelContextProtocol.Client;
 using System.Text.Json;
 
 namespace CoopMcpServer.Tests;
@@ -55,9 +55,12 @@ public sealed class McpStdioTests
             using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(30));
             await using var client = await McpClient.CreateAsync(transport, cancellationToken: timeout.Token);
             var tools = await client.ListToolsAsync(cancellationToken: timeout.Token);
-            string[] expected = { "start_run", "get_run", "wait_for_state", "list_commands", "execute_command",
-                "join_client", "read_logs", "screenshot", "screenshot_status", "options_menu", "stop_run" };
+            string[] expected = { "list_saves", "start_run", "start_client", "preflight_run", "capture_screenshot", "get_run", "wait_for_state", "list_commands", "execute_command",
+                "join_client", "read_logs", "screenshot", "screenshot_status", "options_menu", "ui_inspect", "ui_action", "stop_run" };
             Assert.Equal(expected.Order(), tools.Select(t => t.Name).Order());
+            var schema = tools.Single(t => t.Name == "start_run").JsonSchema;
+            Assert.True(schema.GetProperty("properties").TryGetProperty("save_name", out _));
+            Assert.DoesNotContain(schema.GetProperty("required").EnumerateArray(), p => p.GetString() == "save_name");
             var result = await client.CallToolAsync("get_run", new Dictionary<string, object> { ["run_id"] = "missing" }, cancellationToken: timeout.Token);
             Assert.True(result.IsError);
         }
