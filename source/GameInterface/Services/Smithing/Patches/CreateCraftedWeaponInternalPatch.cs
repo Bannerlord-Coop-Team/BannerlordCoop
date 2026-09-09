@@ -132,7 +132,7 @@ internal class CreateCraftedWeaponInternalPatch
     [HarmonyPrefix]
     public static bool CreateCraftedWeaponInCraftingOrderModePrefix(CraftingCampaignBehavior __instance, ref ItemObject __result, Hero crafterHero, CraftingOrder craftingOrder, WeaponDesign weaponDesign)
     {
-        ItemObject itemObject = __instance.CreateCraftedWeaponInternal(false, crafterHero, weaponDesign, null);
+        ItemObject itemObject = __instance.CreateCraftedWeaponInternal(false, crafterHero, weaponDesign, __instance._currentItemModifier);
 
         __result = itemObject;
         return false;
