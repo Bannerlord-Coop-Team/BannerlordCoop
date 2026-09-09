@@ -7,7 +7,7 @@ namespace GameInterface.Services.UI.CoopOptions;
 public class CoopOptionsUI : ScreenBase
 {
     private CoopOptionsVM _dataSource;
-    private GauntletLayer _gauntletLayer;
+    private CoopOptionsGauntletLayer _gauntletLayer;
     private GauntletMovieIdentifier _gauntletMovie;
 
 #if DEBUG
@@ -37,7 +37,7 @@ public class CoopOptionsUI : ScreenBase
         if (!ContainerProvider.TryResolve<ICoopOptionsVMFactory>(out var factory))
             throw new InvalidOperationException("Coop options view-model factory is unavailable.");
         _dataSource = factory.Create(ScreenManager.PopScreen);
-        _gauntletLayer = new GauntletLayer("CoopOptionsUI", 100)
+        _gauntletLayer = new CoopOptionsGauntletLayer(this, _dataSource)
         {
             IsFocusLayer = true
         };
@@ -62,6 +62,7 @@ public class CoopOptionsUI : ScreenBase
     protected override void OnFinalize()
     {
         base.OnFinalize();
+        _gauntletLayer.CloseKeybinding();
         RemoveLayer(_gauntletLayer);
         _dataSource?.OnFinalize();
         _dataSource = null;

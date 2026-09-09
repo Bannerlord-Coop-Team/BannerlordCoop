@@ -61,8 +61,18 @@ public readonly struct ModOptions
     [ProtoMember(20)]
     public readonly bool PlayerWoundedBattleEntry { get; } = true;
 
+    [ProtoMember(21)]
+    public bool VoiceEnabled { get; } = true;
+
+    public ModOptions(ModOptions previous, bool voiceEnabled)
+    {
+        this = previous;
+        VoiceEnabled = voiceEnabled;
+    }
+
     public ModOptions(ModOptionsData modOptionsData)
     {
+        VoiceEnabled = modOptionsData.VoiceEnabled ?? VoiceEnabled;
         FastForwardEnabled = modOptionsData.FastForwardEnabled ?? FastForwardEnabled;
         AutoPauseEnabled = modOptionsData.AutoPauseEnabled ?? AutoPauseEnabled;
         ClientsCanUseCheats = modOptionsData.ClientsCanUseCheats ?? ClientsCanUseCheats;
