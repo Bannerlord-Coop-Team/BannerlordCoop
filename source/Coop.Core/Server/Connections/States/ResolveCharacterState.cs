@@ -33,6 +33,7 @@ public class ResolveCharacterState : ConnectionStateBase
     private readonly IObjectManager objectManager;
     private readonly IModuleInfoProvider moduleInfoProvider;
     private readonly IExistingPlayerSender existingPlayerSender;
+    private readonly ISteamBanList steamBanList;
 
     public ResolveCharacterState(IConnectionLogic connectionLogic,
         IMessageBroker messageBroker,
@@ -42,7 +43,8 @@ public class ResolveCharacterState : ConnectionStateBase
         IPlayerPartyRestorer playerPartyRestorer,
         IObjectManager objectManager,
         IModuleInfoProvider moduleInfoProvider,
-        IExistingPlayerSender existingPlayerSender)
+        IExistingPlayerSender existingPlayerSender,
+        ISteamBanList steamBanList)
         : base(connectionLogic)
     {
         this.messageBroker = messageBroker;
@@ -53,6 +55,7 @@ public class ResolveCharacterState : ConnectionStateBase
         this.objectManager = objectManager;
         this.moduleInfoProvider = moduleInfoProvider;
         this.existingPlayerSender = existingPlayerSender;
+        this.steamBanList = steamBanList;
 
         messageBroker.Subscribe<NetworkClientValidate>(Handle_ClientValidate);
         messageBroker.Subscribe<NetworkModuleVersionsValidate>(Handle_ModuleVersionsValidate);
@@ -129,6 +132,15 @@ public class ResolveCharacterState : ConnectionStateBase
 
         try
         {
+            if (steamBanList.IsBanned(obj.What.PlayerId))
+            {
+                Logger.Warning(
+                    "Controller {ControllerId} is banned; disconnecting the joining peer",
+                    obj.What.PlayerId);
+                peer.Disconnect();
+                return;
+            }
+
             ResolveCharacter(peer, obj.What.PlayerId);
         }
         catch (Exception e)

@@ -3,6 +3,7 @@ using Common.Messaging;
 using Common.Network;
 using Common.Serialization;
 using Common.Tests.Utils;
+using Coop.Core.Server.Connections;
 using Coop.Core.Server.Services.Kingdoms;
 using Coop.Core.Server.Services.MobileParties;
 using Coop.Tests.Mocks;
@@ -141,6 +142,7 @@ internal abstract class TestComponentBase
         RegisterMock<ITacticalUnitSymbolsConfigInterface>(builder);
         RegisterMock<IVillageHostileActionInterface>(builder);
         RegisterMock<IServerOptionsProvider>(builder);
+        RegisterMock<ISteamBanList>(builder);
         RegisterMock<ISaveNotificationInterface>(builder);
 
         // ISaveInterface is consumed by TransferSaveState's constructor, which packages a save the
