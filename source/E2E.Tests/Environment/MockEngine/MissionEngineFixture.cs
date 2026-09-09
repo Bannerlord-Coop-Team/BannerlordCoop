@@ -725,7 +725,17 @@ public sealed class MissionEngineFixture : IDisposable
 
         registrationMock?.RegisteredBlow?.Invoke(__instance, blow);
 
-        victim.Health -= blow.InflictedDamage;
+        // Agent.HandleBlow ignores non-damaging blows and clamps damage under local death guards.
+        if (blow.InflictedDamage <= 0) return false;
+        float damage = Math.Min(blow.InflictedDamage, victim.Health);
+        if (__instance.CurrentMortalityState == Agent.MortalityState.Immortal
+            || victim.Mission.DisableDying
+            || Mission.Current.Mode == MissionMode.Conversation
+            || Mission.Current.Mode == MissionMode.CutScene)
+        {
+            damage = 0f;
+        }
+        victim.Health = Math.Max(0f, victim.Health - damage);
         if (TryActiveMock(out var activeMock)
             && activeMock.DismountRiderOnNextBlow)
         {

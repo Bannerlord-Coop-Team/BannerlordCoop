@@ -576,6 +576,8 @@ namespace Coop
 
             if (ModInformation.IsClient && ContainerProvider.TryResolve<IChatService>(out var chatService))
                 chatService.Initialize();
+            if (ModInformation.IsClient && ContainerProvider.TryResolve<GameInterface.Services.Voice.IVoiceSpeakingOverlay>(out var voiceOverlay))
+                voiceOverlay.Initialize();
 
             if (gameStarterObject is CampaignGameStarter campaignGameStarter)
             {
@@ -666,6 +668,9 @@ namespace Coop
 
             TimeSpan frameTime = TimeSpan.FromSeconds(dt);
             Updateables.UpdateAll(frameTime);
+            if (ModInformation.IsClient && Coop.Running &&
+                ContainerProvider.TryResolve<GameInterface.Services.Voice.IVoiceClient>(out var voiceClient))
+                voiceClient.Tick();
 
             TryManagedServerAutoStart();
 
