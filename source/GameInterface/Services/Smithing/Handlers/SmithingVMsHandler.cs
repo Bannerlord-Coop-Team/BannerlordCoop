@@ -126,7 +126,19 @@ internal class SmithingVMsHandler : IHandler
 
                 currentWeaponDesignVM.CraftedItemObject = obj.What.CraftedItem;
                 currentWeaponDesignVM.IsInFinalCraftingStage = true;
-                currentWeaponDesignVM.CreateCraftingResultPopup();
+                var activeCraftingOrder = currentWeaponDesignVM.ActiveCraftingOrder;
+
+                try
+                {
+                    currentWeaponDesignVM.ActiveCraftingOrder = currentWeaponDesignVM.CraftingOrderPopup.CraftingOrders.FirstOrDefault(x => x.CraftingOrder == obj.What.CraftingOrder);
+
+                    currentWeaponDesignVM.CreateCraftingResultPopup();
+                }
+                finally
+                {
+                    currentWeaponDesignVM.ActiveCraftingOrder = activeCraftingOrder;
+                }
+                
                 currentCraftingVM._onWeaponCrafted?.Invoke();
             }
             else

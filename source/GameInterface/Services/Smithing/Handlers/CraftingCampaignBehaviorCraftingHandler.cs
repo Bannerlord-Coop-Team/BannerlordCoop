@@ -182,7 +182,7 @@ internal class CraftingCampaignBehaviorCraftingHandler : IHandler
 
         if (!TryCreateCraftingRequest(data, out var message))
         {
-            messageBroker.Publish(this, new CreateCraftingResultPopup(null, false, data.ClientRequestId));
+            messageBroker.Publish(this, new CreateCraftingResultPopup(null, null, false, data.ClientRequestId));
             return;
         }
 
@@ -337,7 +337,7 @@ internal class CraftingCampaignBehaviorCraftingHandler : IHandler
         {
             if (!TryApplyCraftingResult(data))
             {
-                messageBroker.Publish(this, new CreateCraftingResultPopup(null, false, data.ClientRequestId));
+                messageBroker.Publish(this, new CreateCraftingResultPopup(null, null, false, data.ClientRequestId));
             }
         });
     }
@@ -351,6 +351,9 @@ internal class CraftingCampaignBehaviorCraftingHandler : IHandler
         if (!objectManager.TryGetObjectWithLogging(data.PlayerHeroId, out Hero playerHero)) return false;
         if (!objectManager.TryGetObjectWithLogging(data.CraftingHeroId, out Hero craftingHero)) return false;
         if (!objectManager.TryGetObjectWithLogging(data.CurrentSettlementId, out Settlement currentSettlement)) return false;
+
+        CraftingOrder craftingOrder = null;
+        if (!data.IsFreeMode && !objectManager.TryGetObjectWithLogging(data.CraftingOrderId, out craftingOrder)) return false;
 
         ItemModifierGroup itemModifierGroup = null;
         if (data.ItemModifierGroupId != null && !objectManager.TryGetObjectWithLogging(data.ItemModifierGroupId, out itemModifierGroup)) return false;
@@ -394,7 +397,7 @@ internal class CraftingCampaignBehaviorCraftingHandler : IHandler
         int researchPoints = Campaign.Current.Models.SmithingModel.GetPartResearchGainForSmithingItem(craftedItemObject, craftingHero, data.IsFreeMode);
         craftingBehavior.AddResearchPoints(craftedItemObject.WeaponDesign.Template, researchPoints);
 
-        messageBroker.Publish(this, new CreateCraftingResultPopup(craftedItemObject, true, data.ClientRequestId));
+        messageBroker.Publish(this, new CreateCraftingResultPopup(craftedItemObject, craftingOrder, true, data.ClientRequestId));
         return true;
     }
 

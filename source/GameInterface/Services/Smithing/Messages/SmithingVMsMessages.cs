@@ -1,5 +1,6 @@
 ﻿using Common.Messaging;
 using ProtoBuf;
+using TaleWorlds.CampaignSystem.CraftingSystem;
 using TaleWorlds.CampaignSystem.Settlements;
 using TaleWorlds.CampaignSystem.ViewModelCollection.WeaponCrafting;
 using TaleWorlds.Core;
@@ -29,15 +30,18 @@ public readonly struct RefreshWeaponDesignVM : IEvent
 public readonly struct CreateCraftingResultPopup : IEvent
 {
     public readonly ItemObject CraftedItem;
+    public readonly CraftingOrder CraftingOrder;
     public readonly bool Success;
     public readonly string ClientRequestId;
 
     public CreateCraftingResultPopup(
         ItemObject craftedItem,
+        CraftingOrder craftingOrder,
         bool success,
         string clientRequestId)
     {
         CraftedItem = craftedItem;
+        CraftingOrder = craftingOrder;
         Success = success;
         ClientRequestId = clientRequestId;
     }
