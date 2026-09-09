@@ -27,6 +27,11 @@ internal class VillageNeedsCraftingMaterialsQuestWarDeclaredGatePatch
             {
                 Evaluate(__instance, faction1, faction2, detail);
             }
+            else
+            {
+                DisconnectedOwnerEvaluationSupport.TryEvaluateOnBehalfOfDisconnectedOwner(
+                    __instance.QuestGiver, controllerId => Evaluate(__instance, faction1, faction2, detail, controllerId));
+            }
 
             return false;
         }
@@ -34,17 +39,17 @@ internal class VillageNeedsCraftingMaterialsQuestWarDeclaredGatePatch
         return CallOriginalPolicy.IsOriginalAllowedForOwnershipGate();
     }
 
-    private static void Evaluate(Quest quest, IFaction faction1, IFaction faction2, DeclareWarAction.DeclareWarDetail detail)
+    private static void Evaluate(Quest quest, IFaction faction1, IFaction faction2, DeclareWarAction.DeclareWarDetail detail, string controllerId = null)
     {
         if (!quest.QuestGiver.MapFaction.IsAtWarWith(Hero.MainHero.MapFaction)) return;
 
         if (DiplomacyHelper.IsWarCausedByPlayer(faction1, faction2, detail))
         {
-            VillageNeedsCraftingMaterialsQuestType.PublishQuestFail(quest, VillageNeedsCraftingMaterialsQuestType.ProofFailWar);
+            VillageNeedsCraftingMaterialsQuestType.PublishQuestFail(quest, VillageNeedsCraftingMaterialsQuestType.ProofFailWar, controllerId);
         }
         else
         {
-            VillageNeedsCraftingMaterialsQuestType.PublishTerminalOutcome(quest.QuestGiver, IssueFinalizeReason.QuestCancel);
+            VillageNeedsCraftingMaterialsQuestType.PublishTerminalOutcome(quest.QuestGiver, IssueFinalizeReason.QuestCancel, controllerId);
         }
     }
 }
@@ -62,6 +67,11 @@ internal class VillageNeedsCraftingMaterialsQuestClanChangedKingdomGatePatch
             {
                 Evaluate(__instance);
             }
+            else
+            {
+                DisconnectedOwnerEvaluationSupport.TryEvaluateOnBehalfOfDisconnectedOwner(
+                    __instance.QuestGiver, controllerId => Evaluate(__instance, controllerId));
+            }
 
             return false;
         }
@@ -69,11 +79,11 @@ internal class VillageNeedsCraftingMaterialsQuestClanChangedKingdomGatePatch
         return CallOriginalPolicy.IsOriginalAllowedForOwnershipGate();
     }
 
-    private static void Evaluate(Quest quest)
+    private static void Evaluate(Quest quest, string controllerId = null)
     {
         if (!quest.QuestGiver.CurrentSettlement.MapFaction.IsAtWarWith(Hero.MainHero.MapFaction)) return;
 
-        VillageNeedsCraftingMaterialsQuestType.PublishTerminalOutcome(quest.QuestGiver, IssueFinalizeReason.QuestCancel);
+        VillageNeedsCraftingMaterialsQuestType.PublishTerminalOutcome(quest.QuestGiver, IssueFinalizeReason.QuestCancel, controllerId);
     }
 }
 
@@ -89,6 +99,11 @@ internal class VillageNeedsCraftingMaterialsQuestMapEventStartedGatePatch
             {
                 Evaluate(__instance, mapEvent, attackerParty);
             }
+            else
+            {
+                DisconnectedOwnerEvaluationSupport.TryEvaluateOnBehalfOfDisconnectedOwner(
+                    __instance.QuestGiver, controllerId => Evaluate(__instance, mapEvent, attackerParty, controllerId));
+            }
 
             return false;
         }
@@ -96,10 +111,10 @@ internal class VillageNeedsCraftingMaterialsQuestMapEventStartedGatePatch
         return CallOriginalPolicy.IsOriginalAllowedForOwnershipGate();
     }
 
-    private static void Evaluate(Quest quest, MapEvent mapEvent, PartyBase attackerParty)
+    private static void Evaluate(Quest quest, MapEvent mapEvent, PartyBase attackerParty, string controllerId = null)
     {
         if (!QuestHelper.CheckMinorMajorCoercion(quest, mapEvent, attackerParty)) return;
 
-        VillageNeedsCraftingMaterialsQuestType.PublishQuestFail(quest, VillageNeedsCraftingMaterialsQuestType.ProofFailCoercion);
+        VillageNeedsCraftingMaterialsQuestType.PublishQuestFail(quest, VillageNeedsCraftingMaterialsQuestType.ProofFailCoercion, controllerId);
     }
 }
