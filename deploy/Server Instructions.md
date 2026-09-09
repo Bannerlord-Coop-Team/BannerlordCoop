@@ -45,7 +45,7 @@ From the main menu:
 3. Load into the campaign map.
 4. Save the game.
 5. Exit back to the main menu.
-6. Select **Host Coop Campaign**.
+6. Select **Host Co-op Sandbox**.
 
 ---
 

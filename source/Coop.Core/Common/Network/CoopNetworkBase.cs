@@ -17,7 +17,7 @@ using System.Threading;
 namespace Coop.Core.Common.Network;
 
 /// <inheritdoc cref="INetwork"/>
-public abstract class CoopNetworkBase : INetwork, INetEventListener
+public abstract class CoopNetworkBase : INetwork, IBufferedNetwork, INetEventListener
 {
     public INetworkConfig Config { get; }
     public abstract int Priority { get; }
@@ -230,7 +230,8 @@ public abstract class CoopNetworkBase : INetwork, INetEventListener
     /// </summary>
     public const byte BulkChannel = 1;
 
-    private static byte GetChannel(IPacket packet) => packet is GameSaveDataPacket or GameSaveDataChunkPacket ? BulkChannel : (byte)0;
+    internal static byte GetChannel(IPacket packet) =>
+        packet is GameSaveDataPacket or GameSaveDataChunkPacket ? BulkChannel : (byte)0;
 
     /// <summary>
     /// Sends every peer's buffered messages and prunes buffers of disconnected peers. Normally called
@@ -242,6 +243,8 @@ public abstract class CoopNetworkBase : INetwork, INetEventListener
             peer => peer.ConnectionState == ConnectionState.Connected,
             SendReliableMessagePayload);
     }
+
+    public void DiscardPendingMessages(NetPeer peer) => reliableMessageBatcher.Remove(peer);
 
     private void RecordAggregateSent(AggregateMessagePacket packet, int framingOverhead)
     {

@@ -21,6 +21,7 @@ public abstract class CommonModule : Module
 {
     protected override void Load(ContainerBuilder builder)
     {
+        builder.RegisterType<ReceivePathDiagnostics>().As<IReceivePathDiagnostics>().InstancePerDependency();
         builder.RegisterType<TaleWorldsModuleInfoProvider>().As<IModuleInfoProvider>().SingleInstance();
         builder.RegisterInstance(new CoopLogFile(null)).As<ICoopLogFile>().SingleInstance();
 

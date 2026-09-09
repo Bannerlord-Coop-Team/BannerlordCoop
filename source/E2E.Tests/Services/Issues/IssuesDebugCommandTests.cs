@@ -1,3 +1,4 @@
+﻿using Common.Commands;
 using Common.Util;
 using E2E.Tests.Environment;
 using E2E.Tests.Environment.Instance;
@@ -41,7 +42,7 @@ public class IssuesDebugCommandTests : IDisposable
             Assert.True(Server.ObjectManager.TryGetObject<Settlement>(settlementId, out var settlement));
             setupHero.StayingInSettlement = settlement;
 
-            var giveResult = IssuesDebugCommand.Give(new List<string> { heroId, "BettingFraud" });
+            var giveResult = Give(new List<string> { heroId, "BettingFraud" });
             Assert.True(giveResult.Contains("Gave quest type 'BettingFraud'"), giveResult);
 
             Assert.True(Server.ObjectManager.TryGetObject<Hero>(heroId, out var hero));
@@ -49,7 +50,7 @@ public class IssuesDebugCommandTests : IDisposable
             Assert.NotNull(issue.IssueQuest);
             Assert.True(Campaign.Current.IssueManager.Issues.ContainsKey(hero));
 
-            var completeResult = IssuesDebugCommand.Complete(new List<string> { heroId });
+            var completeResult = Complete(new List<string> { heroId });
             Assert.Contains("Completed quest for hero", completeResult);
 
             Assert.Null(hero.Issue);
@@ -69,9 +70,9 @@ public class IssuesDebugCommandTests : IDisposable
             Assert.True(Server.ObjectManager.TryGetObject<Settlement>(settlementId, out var settlement));
             setupHero.StayingInSettlement = settlement;
 
-            Assert.Contains("Gave quest type", IssuesDebugCommand.Give(new List<string> { heroId, "BettingFraud" }));
+            Assert.Contains("Gave quest type", Give(new List<string> { heroId, "BettingFraud" }));
 
-            var secondResult = IssuesDebugCommand.Give(new List<string> { heroId, "BettingFraud" });
+            var secondResult = Give(new List<string> { heroId, "BettingFraud" });
 
             Assert.Contains("already has an active issue", secondResult);
         });
@@ -95,14 +96,14 @@ public class IssuesDebugCommandTests : IDisposable
             village.Hearth = 650f;
             hero.StayingInSettlement = settlement;
 
-            var giveResult = IssuesDebugCommand.Give(new List<string> { heroId, "VillageNeedsTools" });
+            var giveResult = Give(new List<string> { heroId, "VillageNeedsTools" });
             Assert.True(giveResult.Contains("Gave quest type 'VillageNeedsTools'"), giveResult);
 
             var issue = Assert.IsType<VillageNeedsToolsIssueBehavior.VillageNeedsToolsIssue>(hero.Issue);
             Assert.NotNull(issue.IssueQuest);
             Assert.Same(DefaultItems.Tools, issue._requestedItem);
 
-            var completeResult = IssuesDebugCommand.Complete(new List<string> { heroId, "cancel" });
+            var completeResult = Complete(new List<string> { heroId, "cancel" });
             Assert.Contains("outcome 'cancel'", completeResult);
 
             Assert.Null(hero.Issue);
@@ -129,13 +130,13 @@ public class IssuesDebugCommandTests : IDisposable
             boundTown.Culture = ObjectHelper.SkipConstructor<CultureObject>();
             hero.StayingInSettlement = settlement;
 
-            var giveResult = IssuesDebugCommand.Give(new List<string> { heroId, "RuralNotableInnAndOut" });
+            var giveResult = Give(new List<string> { heroId, "RuralNotableInnAndOut" });
             Assert.Contains("Gave quest type 'RuralNotableInnAndOut'", giveResult);
 
             var issue = Assert.IsType<RuralNotableInnAndOutIssueBehavior.RuralNotableInnAndOutIssue>(hero.Issue);
             Assert.NotNull(issue.IssueQuest);
 
-            var completeResult = IssuesDebugCommand.Complete(new List<string> { heroId, "fail" });
+            var completeResult = Complete(new List<string> { heroId, "fail" });
             Assert.Contains("outcome 'fail'", completeResult);
 
             Assert.Null(hero.Issue);
@@ -155,7 +156,7 @@ public class IssuesDebugCommandTests : IDisposable
 
             Assert.Null(hero.CurrentSettlement);
 
-            var giveResult = IssuesDebugCommand.Give(new List<string> { heroId, "NotableWantsDaughterFound" });
+            var giveResult = Give(new List<string> { heroId, "NotableWantsDaughterFound" });
 
             Assert.Contains("NotableWantsDaughterFound", giveResult);
             Assert.Contains("StartIssueQuest threw", giveResult);
@@ -165,7 +166,7 @@ public class IssuesDebugCommandTests : IDisposable
 
             hero.StayingInSettlement = settlement;
 
-            var retryResult = IssuesDebugCommand.Give(new List<string> { heroId, "BettingFraud" });
+            var retryResult = Give(new List<string> { heroId, "BettingFraud" });
             Assert.Contains("Gave quest type 'BettingFraud'", retryResult);
         });
     }
@@ -173,11 +174,30 @@ public class IssuesDebugCommandTests : IDisposable
     [Fact]
     public void ListTypes_ReportsAllFortyThreeVanillaIssueTypes_WithExactlyOneNotWired()
     {
-        var result = IssuesDebugCommand.ListTypes(new List<string>());
+        var result = ListTypes(new List<string>());
         var lines = result.Split('\n', StringSplitOptions.RemoveEmptyEntries);
 
         Assert.Equal(43, lines.Length);
         Assert.Single(lines, line => line.Contains("[not wired"));
         Assert.Contains(lines, line => line.StartsWith("ProdigalSon ") && line.Contains("[not wired"));
     }
+
+    private static string Give(List<string> args)
+    {
+        var command = new IssuesDebugCommand.IssuesGiveCoopCommand();
+        return command.ProcessCommand(new CoopCommandArgsFactory().FromValues(args)).Output;
+    }
+
+    private static string Complete(List<string> args)
+    {
+        var command = new IssuesDebugCommand.IssuesCompleteCoopCommand();
+        return command.ProcessCommand(new CoopCommandArgsFactory().FromValues(args)).Output;
+    }
+
+    private static string ListTypes(List<string> args)
+    {
+        var command = new IssuesDebugCommand.IssuesListTypesCoopCommand();
+        return command.ProcessCommand(new CoopCommandArgsFactory().FromValues(args)).Output;
+    }
+
 }

@@ -1,5 +1,6 @@
 ﻿using Autofac;
 using Common.Messaging;
+using Common.Network;
 using Common.Network.Messages;
 using Coop.Core.Server.Connections;
 using Coop.Core.Server.Connections.Messages;
@@ -146,7 +147,7 @@ public class OverloadedPeerManagerTests
     }
 
     [Fact]
-    public void InitialJoinCatchUp_PausesAfterTwentySecondsRegardlessOfPacketCount()
+    public void InitialJoinCatchUp_DoesNotPauseAfterTwentySeconds()
     {
         var timeControlMock = serverComponent.Container.Resolve<Mock<ITimeControlInterface>>();
         var pauseLeaseMock = new Mock<IAutomaticPauseLease>();
@@ -161,24 +162,21 @@ public class OverloadedPeerManagerTests
 
         manager.CheckForOverloadedPeers(startedUtc);
         manager.CheckForOverloadedPeers(
-            startedUtc + OverloadedPeerManager.JoinCatchUpPauseDelay - TimeSpan.FromTicks(1));
+            startedUtc + TimeSpan.FromSeconds(20) - TimeSpan.FromTicks(1));
 
         timeControlMock.Verify(
             t => t.ServerAcquireAutomaticPause(),
             Times.Never());
 
-        manager.CheckForOverloadedPeers(startedUtc + OverloadedPeerManager.JoinCatchUpPauseDelay);
+        manager.CheckForOverloadedPeers(startedUtc + TimeSpan.FromSeconds(20));
 
         timeControlMock.Verify(
             t => t.ServerAcquireAutomaticPause(),
-            Times.Once());
-        Assert.Contains(
-            serverComponent.TestMessageBroker.GetMessagesFromType<SendInformationMessage>(),
-            message => message.Text == "Game paused; a joining client needs to catch up");
+            Times.Never());
     }
 
     [Fact]
-    public void FinalJoinCatchUp_RemainsPausedUntilCatchUpCompletes()
+    public void FinalJoinCatchUp_DoesNotPauseWhileCatchingUp()
     {
         var timeControlMock = serverComponent.Container.Resolve<Mock<ITimeControlInterface>>();
         var pauseLeaseMock = new Mock<IAutomaticPauseLease>();
@@ -194,11 +192,11 @@ public class OverloadedPeerManagerTests
 
         peer.SetQueueLength(100);
         manager.CheckForOverloadedPeers(startedUtc);
-        manager.CheckForOverloadedPeers(startedUtc + OverloadedPeerManager.JoinCatchUpPauseDelay);
+        manager.CheckForOverloadedPeers(startedUtc + TimeSpan.FromSeconds(20));
 
         peer.SetQueueLength(0);
         manager.CheckForOverloadedPeers(
-            startedUtc + OverloadedPeerManager.JoinCatchUpPauseDelay + TimeSpan.FromSeconds(1));
+            startedUtc + TimeSpan.FromSeconds(20) + TimeSpan.FromSeconds(1));
 
         pauseLeaseMock.Verify(lease => lease.TryRelease(), Times.Never());
 
@@ -206,13 +204,13 @@ public class OverloadedPeerManagerTests
         SendAndDrain(state, peer, JoinSyncSignal.FinalBaselineApplied);
         SendAndDrain(state, peer, JoinSyncSignal.CatchUpApplied);
         manager.CheckForOverloadedPeers(
-            startedUtc + OverloadedPeerManager.JoinCatchUpPauseDelay + TimeSpan.FromSeconds(2));
+            startedUtc + TimeSpan.FromSeconds(20) + TimeSpan.FromSeconds(2));
 
-        pauseLeaseMock.Verify(lease => lease.TryRelease(), Times.Once());
+        pauseLeaseMock.Verify(lease => lease.TryRelease(), Times.Never());
     }
 
     [Fact]
-    public void FinalJoinCatchUp_DisconnectResumesPause()
+    public void FinalJoinCatchUp_DisconnectDoesNotChangeTime()
     {
         var timeControlMock = serverComponent.Container.Resolve<Mock<ITimeControlInterface>>();
         var pauseLeaseMock = new Mock<IAutomaticPauseLease>();
@@ -227,15 +225,15 @@ public class OverloadedPeerManagerTests
         peer.SetQueueLength(NetworkJoinSync.CompletionPacketThreshold + 1);
         DateTime startedUtc = DateTime.UtcNow;
         manager.CheckForOverloadedPeers(startedUtc);
-        manager.CheckForOverloadedPeers(startedUtc + OverloadedPeerManager.JoinCatchUpPauseDelay);
+        manager.CheckForOverloadedPeers(startedUtc + TimeSpan.FromSeconds(20));
 
         serverComponent.TestMessageBroker.Publish(
             this,
             new PlayerDisconnected(peer, default));
         manager.CheckForOverloadedPeers(
-            startedUtc + OverloadedPeerManager.JoinCatchUpPauseDelay + TimeSpan.FromSeconds(1));
+            startedUtc + TimeSpan.FromSeconds(20) + TimeSpan.FromSeconds(1));
 
-        pauseLeaseMock.Verify(lease => lease.TryRelease(), Times.Once());
+        pauseLeaseMock.Verify(lease => lease.TryRelease(), Times.Never());
     }
 
     [Fact]
@@ -252,16 +250,143 @@ public class OverloadedPeerManagerTests
 
         manager.CheckForOverloadedPeers(startedUtc);
         manager.CheckForOverloadedPeers(
-            startedUtc + OverloadedPeerManager.JoinCatchUpPauseDelay + TimeSpan.FromSeconds(1));
+            startedUtc + TimeSpan.FromSeconds(20) + TimeSpan.FromSeconds(1));
 
         timeControlMock.Verify(
             t => t.ServerAcquireAutomaticPause(),
             Times.Never());
     }
 
+    [Fact]
+    public void StalledJoin_AbortsAndDiscardsReplayWithoutPausingLivePlayer()
+    {
+        var connections = serverComponent.Container.Resolve<ConnectionCollection>();
+        var manager = (OverloadedPeerManager)serverComponent.Container.Resolve<IOverloadedPeerManager>();
+        var time = serverComponent.Container.Resolve<Mock<ITimeControlInterface>>();
+        var peer = AddConnectedPeer(connections);
+        var state = StartInitialCatchUp(connections, peer);
+        var started = DateTime.UtcNow;
+        manager.CheckForOverloadedPeers(started);
+        manager.CheckForOverloadedPeers(started + NetworkJoinLimits.ReplayAppliedTimeout);
+
+        Assert.True(state.IsAborted);
+        Assert.Contains(peer, TestNetwork.DiscardedPeers);
+        Assert.False(serverComponent.Container.Resolve<IConnectionMessageQueue>()
+            .TryGetCatchUpPacketsRemaining(peer, out _));
+        time.Verify(value => value.ServerAcquireAutomaticPause(), Times.Never());
+        SendAndDrain(state, peer, JoinSyncSignal.BaselineRequested);
+        Assert.True(state.IsAborted);
+    }
+
+    [Fact]
+    public void JoinApplicationProgress_RenewsOnlyThatPeersWatchdog()
+    {
+        var connections = serverComponent.Container.Resolve<ConnectionCollection>();
+        var manager = (OverloadedPeerManager)serverComponent.Container.Resolve<IOverloadedPeerManager>();
+        var first = AddConnectedPeer(connections);
+        var second = AddConnectedPeer(connections);
+        var progressing = StartInitialCatchUp(connections, first);
+        var stalled = StartInitialCatchUp(connections, second);
+        var started = DateTime.UtcNow;
+        manager.CheckForOverloadedPeers(started);
+        SendAndDrain(progressing, first, JoinSyncSignal.BaselineRequested);
+        manager.CheckForOverloadedPeers(started + NetworkJoinLimits.ReplayAppliedTimeout - TimeSpan.FromSeconds(1));
+        manager.CheckForOverloadedPeers(started + NetworkJoinLimits.ReplayAppliedTimeout);
+        Assert.False(progressing.IsAborted);
+        Assert.True(stalled.IsAborted);
+        serverComponent.Container.Resolve<Mock<ITimeControlInterface>>()
+            .Verify(value => value.ServerAcquireAutomaticPause(), Times.Never());
+    }
+
+    [Fact]
+    public void LoadingJoin_DoesNotPreventLiveOverloadPauseFromReleasing()
+    {
+        var connections = serverComponent.Container.Resolve<ConnectionCollection>();
+        var manager = (OverloadedPeerManager)serverComponent.Container.Resolve<IOverloadedPeerManager>();
+        var time = serverComponent.Container.Resolve<Mock<ITimeControlInterface>>();
+        var lease = new Mock<IAutomaticPauseLease>();
+        lease.Setup(value => value.TryRelease()).Returns(true);
+        time.Setup(value => value.ServerAcquireAutomaticPause()).Returns(lease.Object);
+        var joining = AddConnectedPeer(connections);
+        var live = AddConnectedPeer(connections);
+        StartInitialCatchUp(connections, joining);
+        live.SetQueueLength(AbovePauseThreshold);
+        var started = DateTime.UtcNow;
+        manager.CheckForOverloadedPeers(started);
+        live.SetQueueLength(BelowResumeThreshold);
+        manager.CheckForOverloadedPeers(started + TimeSpan.FromSeconds(25));
+        time.Verify(value => value.ServerAcquireAutomaticPause(), Times.Once());
+        lease.Verify(value => value.TryRelease(), Times.Once());
+    }
+
+    [Fact]
+    public void PreEntryBacklog_ExpiresAtDeadlineWithoutPausingAndRejectsLateEntry()
+    {
+        var connections = serverComponent.Container.Resolve<ConnectionCollection>();
+        var peer = AddConnectedPeer(connections);
+        var state = connections.ConnectionStates[peer].SetState<LoadingState>();
+        var queue = new Mock<IConnectionMessageQueue>();
+        int heldPackets = AbovePauseThreshold;
+        queue.Setup(value => value.TryGetCatchUpPacketsRemaining(peer, out heldPackets)).Returns(true);
+        var terminator = new Mock<IJoinPeerTerminator>();
+        using var manager = CreateWatchdog(queue.Object, terminator.Object);
+        var started = DateTime.UtcNow;
+        manager.CheckForOverloadedPeers(started);
+        manager.CheckForOverloadedPeers(started + NetworkJoinLimits.CampaignEntryTimeout - TimeSpan.FromTicks(1));
+        Assert.False(state.IsAborted);
+        terminator.Verify(value => value.Disconnect(peer, It.IsAny<string>()), Times.Never());
+        manager.CheckForOverloadedPeers(started + NetworkJoinLimits.CampaignEntryTimeout);
+        AssertAbortedBeforeEntry(state, peer);
+        queue.Verify(value => value.AbortCatchUp(peer), Times.Once());
+        terminator.Verify(value => value.Disconnect(peer, "JoinCampaignEntryTimeout"), Times.Once());
+    }
+
+    [Theory]
+    [InlineData(true, false)]
+    [InlineData(false, true)]
+    public void PreEntrySafetyLimit_AbortsImmediatelyAndRejectsLateEntry(bool overflowed, bool bytesExceeded)
+    {
+        var connections = serverComponent.Container.Resolve<ConnectionCollection>();
+        var peer = AddConnectedPeer(connections);
+        var state = connections.ConnectionStates[peer].SetState<LoadingState>();
+        var queue = new Mock<IConnectionMessageQueue>();
+        int heldPackets = 1;
+        long pendingBytes = bytesExceeded ? NetworkJoinLimits.MaxReplayPendingBytes + 1 : 16;
+        queue.Setup(value => value.TryGetCatchUpPacketsRemaining(peer, out heldPackets)).Returns(true);
+        queue.Setup(value => value.TryGetCatchUpPendingBytes(peer, out pendingBytes)).Returns(true);
+        queue.Setup(value => value.HasCatchUpOverflowed(peer)).Returns(overflowed);
+        var terminator = new Mock<IJoinPeerTerminator>();
+        using var manager = CreateWatchdog(queue.Object, terminator.Object);
+        manager.CheckForOverloadedPeers(DateTime.UtcNow);
+        AssertAbortedBeforeEntry(state, peer);
+        queue.Verify(value => value.AbortCatchUp(peer), Times.Once());
+        terminator.Verify(value => value.Disconnect(peer, "JoinReplayQueueLimit"), Times.Once());
+    }
+
+    private OverloadedPeerManager CreateWatchdog(IConnectionMessageQueue queue, IJoinPeerTerminator terminator) =>
+        new(serverComponent.Container.Resolve<INetworkConfig>(), TestMessageBroker,
+            new Lazy<INetwork>(() => TestNetwork),
+            serverComponent.Container.Resolve<ITimeControlInterface>(),
+            serverComponent.Container.Resolve<IConnectionCollection>(), queue, terminator);
+
+    private IMessageBroker TestMessageBroker => serverComponent.TestMessageBroker;
+
+    private void AssertAbortedBeforeEntry(LoadingState state, LiteNetLib.NetPeer peer)
+    {
+        Assert.True(state.IsAborted);
+        state.PlayerCampaignEnteredHandler(
+            new MessagePayload<NetworkPlayerCampaignEntered>(peer, new NetworkPlayerCampaignEntered()));
+        DrainGameThread();
+        Assert.True(state.IsAborted);
+        Assert.Empty(serverComponent.TestMessageBroker.GetMessagesFromType<PlayerCampaignEntered>());
+        serverComponent.Container.Resolve<Mock<ITimeControlInterface>>()
+            .Verify(value => value.ServerAcquireAutomaticPause(), Times.Never());
+    }
+
     private LiteNetLib.NetPeer AddConnectedPeer(ConnectionCollection connections)
     {
         var peer = TestNetwork.CreatePeer();
+        peer.Setup(peer.Id, $"127.0.0.{connections.ConnectionStates.Count + 1}");
         connections.PlayerJoiningHandler(new MessagePayload<PlayerConnected>(this, new PlayerConnected(peer)));
         return peer;
     }

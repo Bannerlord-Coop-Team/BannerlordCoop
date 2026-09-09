@@ -1,4 +1,5 @@
 ﻿using Autofac;
+using Common.Commands;
 using Common.LogicStates;
 using Common.Messaging;
 using Common.Network;
@@ -9,6 +10,9 @@ using Coop.Core.Client.Services.Kingdoms;
 using Coop.Core.Client.Services.MobileParties;
 using Coop.Core.Common;
 using Coop.Core.Common.Configuration;
+#if DEBUG
+using Coop.Core.Common.Commands;
+#endif
 using Coop.Core.Common.Session;
 using Coop.Core.Server.Connections;
 using Coop.Core.Server.Policies;
@@ -41,6 +45,12 @@ public class ServerModule : CommonModule
 
         builder.RegisterModule<ConnectionModule>();
 
+#if DEBUG
+        builder.RegisterType<JoinDebugCommands.JoinStateCoopCommand>().As<ICoopCommand>().InstancePerDependency();
+        builder.RegisterType<JoinDebugCommands.StageInactivePartyCoopCommand>().As<ICoopCommand>().InstancePerDependency();
+        builder.RegisterType<JoinDebugCommands.RestoreInactivePartyCoopCommand>().As<ICoopCommand>().InstancePerDependency();
+#endif
+
         // The mission/P2P stack is composed into the server container too (it is also in ClientModule) so the
         // server-authoritative battle classes — notably BattleHostHandler, which elects the battle host — run
         // here. The client-only pieces (mesh client, location/battle controllers) stay lazy: nothing on the
@@ -71,6 +81,7 @@ public class ServerModule : CommonModule
         // Withholds world broadcasts from a peer until it has the transfer save and has entered the
         // campaign. AutoActivate so it subscribes to connection lifecycle events before any peer joins.
         builder.RegisterType<ConnectionMessageQueue>().As<IConnectionMessageQueue>().InstancePerLifetimeScope().AutoActivate();
+        builder.RegisterType<SteamBanList>().As<ISteamBanList>().InstancePerDependency();
 
         builder.RegisterType<MissionManager>()
             .As<IMissionManager>()
@@ -82,6 +93,7 @@ public class ServerModule : CommonModule
             .InstancePerDependency();
         // Pauses time while a peer's packet queue is overloaded (slow client catching up). Constructed
         // as a CoopServer dependency, so it registers its unpause policy when the server is built.
+        builder.RegisterType<JoinPeerTerminator>().As<IJoinPeerTerminator>().InstancePerDependency();
         builder.RegisterType<OverloadedPeerManager>().As<IOverloadedPeerManager>().InstancePerLifetimeScope().AutoActivate();
 
         builder.RegisterType<ServerTelemetryUploader>()
