@@ -38,3 +38,24 @@ public readonly struct NetworkGangLeaderStolenGoodsIssueCreated : IServerToClien
         Generation = generation;
     }
 }
+
+[ProtoContract(SkipConstructor = true)]
+public readonly struct GangLeaderStolenGoodsStateSync : ICommand
+{
+    [ProtoMember(1)]
+    public readonly string OwnerId;
+    [ProtoMember(2)]
+    public readonly bool IsPayingForGoods;
+    [ProtoMember(3)]
+    public readonly bool IsFightingForGoods;
+    [ProtoMember(4)]
+    public readonly bool PlayerHasTheGoods;
+
+    public GangLeaderStolenGoodsStateSync(string ownerId, bool isPayingForGoods, bool isFightingForGoods, bool playerHasTheGoods)
+    {
+        OwnerId = ownerId;
+        IsPayingForGoods = isPayingForGoods;
+        IsFightingForGoods = isFightingForGoods;
+        PlayerHasTheGoods = playerHasTheGoods;
+    }
+}

@@ -1020,6 +1020,72 @@ public class GangLeaderNeedsToOffloadStolenGoodsIssueTests : IDisposable
     }
 
     [Fact]
+    public void OwnerClientNormalPathStateChanges_ReplicateToTheServersQuestForSaveReloadFidelity()
+    {
+        var fixture = SetupIssueOwner();
+        CreateIssueOnServer(fixture);
+
+        var partyId = TestEnvironment.CreateRegisteredObject<MobileParty>();
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject<MobileParty>(partyId, out var party));
+            Assert.True(Server.ObjectManager.TryGetObject<Settlement>(fixture.OwnerSettlementId, out var settlement));
+            using (new AllowedThread())
+            {
+                party.CurrentSettlement = settlement;
+            }
+
+            var playerManager = Server.Resolve<IPlayerManager>();
+            Assert.True(playerManager.AddPlayer(new Player("player-A", fixture.HeroId, partyId, "", "")));
+        });
+        TestEnvironment.ConnectRegisteredPlayer(Client, "player-A");
+        Client.Resolve<IControllerIdProvider>().SetControllerId("player-A");
+        OpenConversation(Client, fixture.HeroId, "player-A");
+
+        Client.Call(() =>
+        {
+            Assert.True(Client.ObjectManager.TryGetObject<Hero>(fixture.HeroId, out var owner));
+            Assert.True(Campaign.Current.IssueManager.StartIssueQuest(owner));
+        });
+
+        Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkQuestTypeQuestAccepted>());
+
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject<Hero>(fixture.HeroId, out var owner));
+            var quest = Assert.IsType<GangLeaderNeedsToOffloadStolenGoodsIssueBehavior.GangLeaderNeedsToOffloadStolenGoodsIssueQuest>(owner.Issue.IssueQuest);
+            Assert.False(quest._isPayingForGoods);
+            Assert.False(quest._playerHasTheGoods);
+            Assert.False(quest._isFightingForGoods);
+        });
+
+        Client.Call(() =>
+        {
+            new IssuesCampaignBehavior().RegisterEvents();
+
+            Assert.True(Client.ObjectManager.TryGetObject<Hero>(fixture.HeroId, out var owner));
+            Assert.True(Client.Resolve<IIssueOwnershipRegistry>().IsLocalPeerOwner(owner));
+            var quest = Assert.IsType<GangLeaderNeedsToOffloadStolenGoodsIssueBehavior.GangLeaderNeedsToOffloadStolenGoodsIssueQuest>(owner.Issue.IssueQuest);
+
+            quest._isPayingForGoods = true;
+            quest._playerHasTheGoods = true;
+
+            CampaignEventDispatcher.Instance.OnConversationEnded(Array.Empty<CharacterObject>());
+        });
+
+        Assert.Single(Client.NetworkSentMessages.GetMessages<GangLeaderStolenGoodsStateSync>());
+
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject<Hero>(fixture.HeroId, out var owner));
+            var quest = Assert.IsType<GangLeaderNeedsToOffloadStolenGoodsIssueBehavior.GangLeaderNeedsToOffloadStolenGoodsIssueQuest>(owner.Issue.IssueQuest);
+            Assert.True(quest._isPayingForGoods);
+            Assert.True(quest._playerHasTheGoods);
+            Assert.False(quest._isFightingForGoods);
+        });
+    }
+
+    [Fact]
     public void RequestIssueRemoved_FinalizesTheRealQuestAndBroadcastsRemovalToEveryPeer()
     {
         var fixture = SetupIssueOwner();

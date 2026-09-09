@@ -1,3 +1,4 @@
+using Common;
 using Common.Messaging;
 using Common.Network;
 using Common.Util;
@@ -248,6 +249,17 @@ internal static class GangLeaderNeedsToOffloadStolenGoodsQuestType
         if (!objectManager.TryGetIdWithLogging(owner, out var ownerId)) return;
 
         network.SendAll(new RequestAlternativeSolutionCompletion(ownerId));
+    }
+
+    internal static void SyncStateToServer(Hero owner, Quest quest)
+    {
+        if (ModInformation.IsServer) return;
+        if (!ContainerProvider.TryResolve<IIssueOwnershipRegistry>(out var ownershipRegistry) || !ownershipRegistry.IsLocalPeerOwner(owner)) return;
+        if (!ContainerProvider.TryResolve<IObjectManager>(out var objectManager)) return;
+        if (!ContainerProvider.TryResolve<INetwork>(out var network)) return;
+        if (!objectManager.TryGetIdWithLogging(owner, out var ownerId)) return;
+
+        network.SendAll(new GangLeaderStolenGoodsStateSync(ownerId, quest._isPayingForGoods, quest._isFightingForGoods, quest._playerHasTheGoods));
     }
 
     private static bool ValidateQuestCancel(Issue issue) => true;

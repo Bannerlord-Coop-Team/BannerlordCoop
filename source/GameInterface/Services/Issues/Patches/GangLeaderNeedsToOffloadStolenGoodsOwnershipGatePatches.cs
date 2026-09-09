@@ -81,11 +81,27 @@ internal class GangLeaderNeedsToOffloadStolenGoodsOwnershipGatePatches
         GangLeaderNeedsToOffloadStolenGoodsIssueBehavior.GangLeaderNeedsToOffloadStolenGoodsIssueQuest __instance) =>
         IsLocalPeerOwner(__instance.QuestGiver);
 
+    [HarmonyPatch("OnMapEventStarted")]
+    [HarmonyPostfix]
+    private static void OnMapEventStartedPostfix(
+        GangLeaderNeedsToOffloadStolenGoodsIssueBehavior.GangLeaderNeedsToOffloadStolenGoodsIssueQuest __instance)
+    {
+        GangLeaderNeedsToOffloadStolenGoodsQuestType.SyncStateToServer(__instance.QuestGiver, __instance);
+    }
+
     [HarmonyPatch("OnHideoutBattleCompleted")]
     [HarmonyPrefix]
     private static bool OnHideoutBattleCompletedPrefix(
         GangLeaderNeedsToOffloadStolenGoodsIssueBehavior.GangLeaderNeedsToOffloadStolenGoodsIssueQuest __instance) =>
         IsLocalPeerOwner(__instance.QuestGiver);
+
+    [HarmonyPatch("OnHideoutBattleCompleted")]
+    [HarmonyPostfix]
+    private static void OnHideoutBattleCompletedPostfix(
+        GangLeaderNeedsToOffloadStolenGoodsIssueBehavior.GangLeaderNeedsToOffloadStolenGoodsIssueQuest __instance)
+    {
+        GangLeaderNeedsToOffloadStolenGoodsQuestType.SyncStateToServer(__instance.QuestGiver, __instance);
+    }
 }
 
 [HarmonyPatch]
