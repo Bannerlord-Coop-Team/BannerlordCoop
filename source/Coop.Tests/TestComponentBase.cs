@@ -14,6 +14,7 @@ using GameInterface.Registry;
 using GameInterface.Registry.Auto;
 using GameInterface.Services.CampaignService.Interfaces;
 using GameInterface.Services.Chat;
+using GameInterface.Services.Voice;
 using GameInterface.Services.GameState.Interfaces;
 using GameInterface.Services.Heroes.Interaces;
 using GameInterface.Services.Heroes.Interfaces;
@@ -98,7 +99,10 @@ internal abstract class TestComponentBase
 
         RegisterMock<ILogger>(builder);
         RegisterMock<IGameInterface>(builder);
-        RegisterMock<IModConfig>(builder);
+        var modConfig = new Mock<IModConfig>();
+        modConfig.SetupGet(config => config.Data).Returns(new ModConfigData());
+        builder.RegisterInstance(modConfig).AsSelf().SingleInstance();
+        builder.RegisterInstance(modConfig.Object).As<IModConfig>().SingleInstance();
         RegisterMock<IAutoSyncPatchCollector>(builder);
         RegisterMock<IHeroInterface>(builder);
         RegisterMock<IModuleInfoProvider>(builder);
@@ -126,6 +130,7 @@ internal abstract class TestComponentBase
         RegisterMock<IMapEventInitializationBarrier>(builder);
         RegisterMock<IConnectedPlayerCountService>(builder);
         RegisterMock<IChatService>(builder);
+        RegisterMock<IVoiceClient>(builder);
         RegisterMock<IChatPlayerNameResolver>(builder);
         // BattleHostHandler (MissionModule, auto-activated) needs the registry and the troop ledger,
         // which the real containers get from GameInterfaceModule — not loaded here.
