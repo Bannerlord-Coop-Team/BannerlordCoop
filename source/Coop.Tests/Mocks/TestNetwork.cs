@@ -11,7 +11,7 @@ using System.Threading;
 
 namespace Coop.Tests.Mocks;
 
-public class TestNetwork : INetwork
+public class TestNetwork : INetwork, IBufferedNetwork
 {
     public INetworkConfig Config => throw new NotImplementedException();
 
@@ -117,6 +117,9 @@ public class TestNetwork : INetwork
             Send(peer, message);
         }
     }
+
+    public List<NetPeer> DiscardedPeers { get; } = new();
+    public void DiscardPendingMessages(NetPeer peer) => DiscardedPeers.Add(peer);
 
     public void FlushPendingMessages()
     {
