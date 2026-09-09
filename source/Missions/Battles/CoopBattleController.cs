@@ -60,6 +60,15 @@ public class CoopBattleController : CoopMissionController
 
     /// <summary>Reports final siege engine state before the shared result is applied.</summary>
     public ISiegeEngineStateReporter SiegeEngineStateReporter { get; }
+
+#if DEBUG
+    /// <summary>Copies pending spawn state for the baseline diagnostic without draining it.</summary>
+    public PendingPuppetDebugState CapturePendingPuppetState(string controllerId)
+    {
+        return puppetSpawner.CapturePendingPuppetState(controllerId);
+    }
+#endif
+
     private readonly IBattleInstanceLifecycle lifecycle;
     private readonly IOwnedAgentReplicator replicator;
     private readonly IAgentDeathReporter deathReporter;

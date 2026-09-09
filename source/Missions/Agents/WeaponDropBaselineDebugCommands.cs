@@ -2,7 +2,9 @@
 using Common;
 using Common.Commands;
 using GameInterface;
+using GameInterface.Services.MapEvents.TroopSupply;
 using GameInterface.Services.ObjectManager;
+using GameInterface.Services.Players;
 using Missions.Agents.Messages;
 using Missions.Battles;
 using Newtonsoft.Json;
@@ -10,6 +12,9 @@ using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.Linq;
+using TaleWorlds.CampaignSystem;
+using TaleWorlds.CampaignSystem.AgentOrigins;
+using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.Core;
 using TaleWorlds.MountAndBlade;
 
@@ -122,6 +127,54 @@ internal static class WeaponDropBaselineDebugCommands
         public long AuthorityRevision { get; set; }
         public string[] RegisteredControllerIds { get; set; }
         public ControllerRegistryState[] ControllerRegistry { get; set; }
+    }
+
+    private sealed class ReturningHeroObservationState
+    {
+        public bool Success { get; set; }
+        public bool ObservationAvailable { get; set; }
+        public string[] UnavailableReasons { get; set; } = Array.Empty<string>();
+        public bool MissionPresent { get; set; }
+        public bool CoopBattlePresent { get; set; }
+        public bool CampaignServicesAvailable { get; set; }
+        public string LocalControllerId { get; set; }
+        public string BattleInstanceId { get; set; }
+        public string RequestedControllerId { get; set; }
+        public bool DeploymentActivated { get; set; }
+        public bool DeploymentCommitted { get; set; }
+        public bool DeploymentControllerPresent { get; set; }
+        public bool DeploymentTeamSetupOver { get; set; }
+        public bool PlayerRegistered { get; set; }
+        public bool PlayerConnected { get; set; }
+        public string RegisteredHeroId { get; set; }
+        public string RegisteredPartyId { get; set; }
+        public bool HeroResolved { get; set; }
+        public bool HeroControlled { get; set; }
+        public string HeroStringId { get; set; }
+        public bool PartyResolved { get; set; }
+        public bool PartyControlled { get; set; }
+        public string PartyStringId { get; set; }
+        public bool PartyActive { get; set; }
+        public string PartyMapEventId { get; set; }
+        public string PartyMapEventStringId { get; set; }
+        public bool AgentRegistryAvailable { get; set; }
+        public bool HeroAgentRegistered { get; set; }
+        public string AgentId { get; set; }
+        public bool AgentActive { get; set; }
+        public bool AgentInCurrentMission { get; set; }
+        public bool AgentIsMainAgent { get; set; }
+        public int AgentIndex { get; set; }
+        public float AgentHealth { get; set; }
+        public string CurrentAuthority { get; set; }
+        public string OriginalOwner { get; set; }
+        public string MovementScopeId { get; set; }
+        public int MovementId { get; set; }
+        public long AuthorityRevision { get; set; }
+        public string OriginPartyId { get; set; }
+        public int? OriginSeed { get; set; }
+        public CoopTroopSupplierDebugState SupplierState { get; set; }
+        public PendingPuppetDebugState PendingPuppetState { get; set; }
+        public string PendingPuppetStateError { get; set; }
     }
 
     private sealed class CapturedDropState
@@ -367,6 +420,144 @@ internal static class WeaponDropBaselineDebugCommands
             state.MovementScopeId = agentInfo.MovementScopeId;
             state.MovementId = agentInfo.MovementId;
             state.AuthorityRevision = agentInfo.AuthorityRevision;
+            return Succeeded("LIVE_TEST_JSON=" + JsonConvert.SerializeObject(state));
+        }
+    }
+
+    public sealed class ReturningHeroObservationCoopCommand : ICoopCommand
+    {
+        public string Prefix => "coop.debug.weapon_drop";
+
+        public string Name => "returning_hero_observation";
+
+        public string Description => "Reports the current client view of one returning hero without mutating battle state.";
+
+        public CoopCommandSide Side => CoopCommandSide.Client;
+
+        public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
+        {
+            new ExpectedArgs("controller_id", "The returning player controller id."),
+        };
+
+        public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
+        {
+            if (ModInformation.IsServer)
+                return Failed("WEAPON_DROP_RETURNING_HERO_OBSERVATION must run on a mission client");
+
+            Mission mission = Mission.Current;
+            CoopBattleController controller = mission?.GetMissionBehavior<CoopBattleController>();
+            var unavailableReasons = new List<string>();
+            var state = new ReturningHeroObservationState
+            {
+                Success = true,
+                RequestedControllerId = args[0],
+                AgentIndex = -1,
+                MissionPresent = mission != null,
+                CoopBattlePresent = controller != null,
+                ObservationAvailable = mission != null && controller != null,
+            };
+            if (mission == null)
+                unavailableReasons.Add("mission-unavailable");
+            if (controller == null)
+                unavailableReasons.Add("coop-battle-controller-unavailable");
+            else
+            {
+                state.LocalControllerId = controller.Session.OwnControllerId;
+                state.BattleInstanceId = controller.Session.InstanceId;
+                state.DeploymentActivated = controller.Deployment.IsActivated;
+                state.DeploymentCommitted = controller.Deployment.IsCommitted;
+                var deploymentController = mission.GetMissionBehavior<DeploymentMissionController>();
+                state.DeploymentControllerPresent = deploymentController != null;
+                state.DeploymentTeamSetupOver = deploymentController?.TeamSetupOver ?? false;
+                state.SupplierState = CoopTroopSupplierRegistry.CaptureDebugState(controller.Session.InstanceId);
+                try
+                {
+                    state.PendingPuppetState = controller.CapturePendingPuppetState(args[0]);
+                }
+                catch (Exception e)
+                {
+                    state.PendingPuppetStateError = e.GetType().Name + ": " + e.Message;
+                    unavailableReasons.Add("pending-puppet-state-unavailable");
+                }
+            }
+
+            if (!ContainerProvider.TryResolve<IPlayerManager>(out var playerManager) ||
+                !ContainerProvider.TryResolve<IObjectManager>(out var objectManager))
+            {
+                state.ObservationAvailable = false;
+                unavailableReasons.Add("campaign-services-unavailable");
+                state.UnavailableReasons = unavailableReasons.ToArray();
+                return Succeeded("LIVE_TEST_JSON=" + JsonConvert.SerializeObject(state));
+            }
+
+            state.CampaignServicesAvailable = true;
+            if (!playerManager.TryGetPlayer(args[0], out var player))
+            {
+                unavailableReasons.Add("returning-player-unregistered");
+                state.UnavailableReasons = unavailableReasons.ToArray();
+                return Succeeded("LIVE_TEST_JSON=" + JsonConvert.SerializeObject(state));
+            }
+
+            state.PlayerRegistered = true;
+            state.PlayerConnected = playerManager.IsConnected(player);
+            state.RegisteredHeroId = player.HeroId;
+            state.RegisteredPartyId = player.MobilePartyId;
+            Hero hero = null;
+            if (objectManager.TryGetObject(player.HeroId, out hero))
+            {
+                state.HeroResolved = true;
+                state.HeroControlled = playerManager.Contains(hero);
+                state.HeroStringId = hero.StringId;
+            }
+            if (objectManager.TryGetObject(player.MobilePartyId, out MobileParty party))
+            {
+                state.PartyResolved = true;
+                state.PartyControlled = playerManager.Contains(party);
+                state.PartyStringId = party.StringId;
+                state.PartyActive = party.IsActive;
+                if (party.MapEvent != null)
+                {
+                    state.PartyMapEventStringId = party.MapEvent.StringId;
+                    if (objectManager.TryGetId(party.MapEvent, out string mapEventId))
+                        state.PartyMapEventId = mapEventId;
+                }
+            }
+
+            if (!ContainerProvider.TryResolve<INetworkAgentRegistry>(out var agentRegistry))
+            {
+                unavailableReasons.Add("agent-registry-unavailable");
+                state.UnavailableReasons = unavailableReasons.ToArray();
+                return Succeeded("LIVE_TEST_JSON=" + JsonConvert.SerializeObject(state));
+            }
+
+            state.AgentRegistryAvailable = true;
+            if (hero == null || !agentRegistry.TryGetHeroAgentInfo(hero, out CoopAgentInfo agentInfo))
+            {
+                unavailableReasons.Add("returning-hero-agent-unregistered");
+                state.UnavailableReasons = unavailableReasons.ToArray();
+                return Succeeded("LIVE_TEST_JSON=" + JsonConvert.SerializeObject(state));
+            }
+
+            Agent agent = agentInfo.Agent;
+            state.HeroAgentRegistered = true;
+            state.AgentId = agentInfo.AgentId.ToString("D");
+            state.AgentActive = agent != null && agent.IsActive();
+            state.AgentInCurrentMission = mission != null && agent != null && agent.Mission == mission;
+            state.AgentIsMainAgent = ReferenceEquals(agent, Agent.Main);
+            state.AgentIndex = agent?.Index ?? -1;
+            state.AgentHealth = agent?.Health ?? 0f;
+            state.CurrentAuthority = agentInfo.CurrentAuthority;
+            state.OriginalOwner = agentInfo.OriginalOwner;
+            state.MovementScopeId = agentInfo.MovementScopeId;
+            state.MovementId = agentInfo.MovementId;
+            state.AuthorityRevision = agentInfo.AuthorityRevision;
+            if (agent?.Origin is PartyAgentOrigin origin)
+            {
+                state.OriginSeed = origin.Seed;
+                if (origin.Party != null && objectManager.TryGetId(origin.Party, out string originPartyId))
+                    state.OriginPartyId = originPartyId;
+            }
+            state.UnavailableReasons = unavailableReasons.ToArray();
             return Succeeded("LIVE_TEST_JSON=" + JsonConvert.SerializeObject(state));
         }
     }

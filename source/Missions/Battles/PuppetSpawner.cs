@@ -20,6 +20,38 @@ using TaleWorlds.MountAndBlade;
 
 namespace Missions.Battles;
 
+#if DEBUG
+public sealed class PendingPuppetDebugRecord
+{
+    public string AgentId { get; set; }
+    public string OwnerControllerId { get; set; }
+    public string OriginalOwnerControllerId { get; set; }
+    public string CharacterId { get; set; }
+    public string MapEventPartyId { get; set; }
+    public int TroopSeed { get; set; }
+    public string Side { get; set; }
+    public bool MatchesRequestedOwner { get; set; }
+    public bool MatchesRequestedHero { get; set; }
+    public bool IsOwnAgent { get; set; }
+    public bool DeploymentBlocked { get; set; }
+    public string DeploymentBlockReason { get; set; }
+}
+
+public sealed class PendingPuppetDebugState
+{
+    public string BattleInstanceId { get; set; }
+    public string RequestedControllerId { get; set; }
+    public bool MissionPresent { get; set; }
+    public bool DeploymentCommitted { get; set; }
+    public bool DeploymentControllerPresent { get; set; }
+    public bool TeamSetupOver { get; set; }
+    public int PendingRecordCount { get; set; }
+    public int MatchingRecordCount { get; set; }
+    public bool ReturningHeroRecordPresent { get; set; }
+    public List<PendingPuppetDebugRecord> MatchingRecords { get; } = new List<PendingPuppetDebugRecord>();
+}
+#endif
+
 /// <summary>
 /// Peer-side spawn application for a coop battle: spawns the agents other owners replicate over the mesh
 /// (<see cref="NetworkSpawnBattleAgents"/>) as local puppets driven by their owner's movement. Spawns that
@@ -33,6 +65,11 @@ public interface IPuppetSpawner : IDisposable
     /// [Game thread] Drain puppets whose teams and party identities now exist, retaining local records until commit.
     /// </summary>
     void DrainPendingPuppets();
+
+#if DEBUG
+    /// <summary>[Game thread] Copy pending records for one returning player without changing their queue.</summary>
+    PendingPuppetDebugState CapturePendingPuppetState(string controllerId);
+#endif
 }
 
 /// <inheritdoc cref="IPuppetSpawner"/>
@@ -503,6 +540,92 @@ public class PuppetSpawner : IPuppetSpawner
         var controller = Mission.Current?.GetMissionBehavior<DeploymentMissionController>();
         return controller != null && (isOwnAgent || !controller.TeamSetupOver);
     }
+
+#if DEBUG
+    public PendingPuppetDebugState CapturePendingPuppetState(string controllerId)
+    {
+        Mission mission = Mission.Current;
+        DeploymentMissionController deploymentController = mission?.GetMissionBehavior<DeploymentMissionController>();
+        string returningCharacterId = null;
+        if (playerManager.TryGetPlayer(controllerId, out var returningPlayer))
+            returningCharacterId = returningPlayer.CharacterObjectId;
+
+        var state = new PendingPuppetDebugState
+        {
+            BattleInstanceId = session.InstanceId,
+            RequestedControllerId = controllerId,
+            MissionPresent = mission != null,
+            DeploymentCommitted = deployment.IsCommitted,
+            DeploymentControllerPresent = deploymentController != null,
+            TeamSetupOver = deploymentController?.TeamSetupOver ?? false,
+        };
+
+        lock (pendingPuppetLock)
+        {
+            state.PendingRecordCount = pendingPuppets.Count;
+            foreach (BattleAgentSpawnData data in pendingPuppets)
+            {
+                bool matchesRequestedOwner = string.Equals(
+                    data.OwnerControllerId,
+                    controllerId,
+                    StringComparison.Ordinal);
+                bool matchesRequestedHero = !string.IsNullOrEmpty(returningCharacterId)
+                    && string.Equals(data.CharacterId, returningCharacterId, StringComparison.Ordinal);
+                if (!matchesRequestedOwner && !matchesRequestedHero)
+                    continue;
+
+                bool isOwnAgent = session.IsOwn(data.OwnerControllerId);
+                bool deploymentBlocked = !deployment.IsCommitted
+                    && deploymentController != null
+                    && (isOwnAgent || !deploymentController.TeamSetupOver);
+                state.MatchingRecords.Add(new PendingPuppetDebugRecord
+                {
+                    AgentId = data.AgentId.ToString("D"),
+                    OwnerControllerId = data.OwnerControllerId,
+                    OriginalOwnerControllerId = data.OriginalOwnerControllerId,
+                    CharacterId = data.CharacterId,
+                    MapEventPartyId = data.MapEventPartyId,
+                    TroopSeed = data.TroopSeed,
+                    Side = data.Side.ToString(),
+                    MatchesRequestedOwner = matchesRequestedOwner,
+                    MatchesRequestedHero = matchesRequestedHero,
+                    IsOwnAgent = isOwnAgent,
+                    DeploymentBlocked = deploymentBlocked,
+                    DeploymentBlockReason = DescribeDeploymentBlock(
+                        mission,
+                        deploymentController,
+                        isOwnAgent,
+                        deploymentBlocked),
+                });
+                if (matchesRequestedHero)
+                    state.ReturningHeroRecordPresent = true;
+            }
+        }
+
+        state.MatchingRecords.Sort((left, right) => string.CompareOrdinal(left.AgentId, right.AgentId));
+        state.MatchingRecordCount = state.MatchingRecords.Count;
+        return state;
+    }
+
+    private string DescribeDeploymentBlock(
+        Mission mission,
+        DeploymentMissionController deploymentController,
+        bool isOwnAgent,
+        bool deploymentBlocked)
+    {
+        if (deployment.IsCommitted)
+            return "deployment-committed";
+        if (mission == null)
+            return "mission-unavailable";
+        if (deploymentController == null)
+            return "deployment-controller-unavailable";
+        if (!deploymentBlocked)
+            return "deployment-does-not-block-record";
+        return isOwnAgent
+            ? "own-agent-awaiting-deployment-commit"
+            : "remote-agent-awaiting-team-setup";
+    }
+#endif
 
     public void DrainPendingPuppets()
     {
