@@ -1011,7 +1011,7 @@ public class GangLeaderNeedsToOffloadStolenGoodsIssueTests : IDisposable
 
             Assert.Null(owner.Issue);
             Assert.False(Campaign.Current.IssueManager.Issues.ContainsKey(owner));
-            Assert.Equal(ownerGoldBefore + 2 * acceptedPayload.RewardGold, owner.Gold);
+            Assert.Equal(ownerGoldBefore + (2 * acceptedPayload.RewardGold), owner.Gold);
             Assert.Equal(ownerRosterBefore + acceptedPayload.StolenTradeGoodAmount, party.ItemRoster.GetItemNumber(stolenGood));
             Assert.False(GangLeaderNeedsToOffloadStolenGoodsQuestType.AlternativeSolutionFreeze.TryGetFrozen(owner, out _));
         });
