@@ -12,6 +12,7 @@ using GameInterface.Services.Players.Messages;
 using LiteNetLib;
 using System;
 using Xunit;
+using Moq;
 
 namespace Coop.Tests.Server.Connections;
 
@@ -23,7 +24,9 @@ public class ConnectionMessageQueueTests
 
     public ConnectionMessageQueueTests()
     {
-        queue = new ConnectionMessageQueue(new Lazy<INetwork>(() => network), messageBroker);
+        var serializer = new Mock<ICommonSerializer>();
+        serializer.Setup(value => value.Serialize(It.IsAny<object>())).Returns(new byte[16]);
+        queue = new ConnectionMessageQueue(new Lazy<INetwork>(() => network), messageBroker, serializer.Object);
     }
 
     /// <summary>Minimal broadcast packet stub.</summary>
@@ -49,6 +52,11 @@ public class ConnectionMessageQueueTests
 
     private bool NothingSentTo(NetPeer peer) => network.SentPayloads.ContainsKey(peer.Id) == false;
 
+    private void Drain(NetPeer peer)
+    {
+        while (queue.FlushBatch(peer).HasMore) { }
+    }
+
     [Fact]
     public void PeerVisibleBeforePlayerConnected_DropsWorldBroadcasts()
     {
@@ -70,7 +78,7 @@ public class ConnectionMessageQueueTests
         // Dropping phase: the queue takes the packet (true) but discards it — it is already in the save.
         Assert.True(queue.TryHandleBroadcast(peer, new FakePacket()));
 
-        queue.Flush(peer);
+        queue.FlushBatch(peer);
 
         // The dropped packet is never replayed.
         Assert.True(NothingSentTo(peer));
@@ -92,7 +100,7 @@ public class ConnectionMessageQueueTests
         // Held, not sent, while the peer loads.
         Assert.True(NothingSentTo(peer));
 
-        queue.Flush(peer);
+        Drain(peer);
 
         Assert.Equal(new IPacket[] { first, second, third }, network.GetPeerPackets(peer));
 
@@ -109,7 +117,7 @@ public class ConnectionMessageQueueTests
 
         Assert.False(queue.TryHandleBroadcast(peer, new FakeCampaignTimePacket()));
 
-        queue.Flush(peer);
+        queue.FlushBatch(peer);
         Assert.True(NothingSentTo(peer));
     }
 
@@ -140,11 +148,11 @@ public class ConnectionMessageQueueTests
         Assert.True(queue.TryGetCatchUpPacketsRemaining(peer, out int queued));
         Assert.Equal(7, queued);
 
-        queue.Flush(peer);
+        Drain(peer);
         Assert.True(queue.TryGetCatchUpPacketsRemaining(peer, out int draining));
         Assert.Equal(5, draining);
 
-        queue.OpenWithTail(peer, new NetworkJoinSync(JoinSyncSignal.WorldReady));
+        queue.OpenWithTailBatch(peer, new NetworkJoinSync(JoinSyncSignal.WorldReady), () => true);
         Assert.True(queue.TryGetCatchUpPacketsRemaining(peer, out int opened));
         Assert.Equal(5, opened);
 
@@ -176,7 +184,7 @@ public class ConnectionMessageQueueTests
         Assert.True(queue.TryHandleBroadcast(peer, held));
         Assert.True(NothingSentTo(peer));
 
-        queue.Flush(peer);
+        queue.FlushBatch(peer);
         Assert.Equal(new IPacket[] { held }, network.GetPeerPackets(peer));
     }
 
@@ -185,14 +193,14 @@ public class ConnectionMessageQueueTests
     {
         var peer = Connect();
         queue.BeginQueueing(peer);
-        queue.Flush(peer);
+        queue.FlushBatch(peer);
 
         var held = new FakePacket();
         Assert.True(queue.TryHandleBroadcast(peer, held));
         Assert.True(NothingSentTo(peer));
 
         var marker = new NetworkJoinSync(JoinSyncSignal.WorldReady);
-        queue.OpenWithTail(peer, marker);
+        queue.OpenWithTailBatch(peer, marker, () => true);
 
         Assert.Equal(new object[] { held, marker }, network.GetPeerPayloads(peer));
         Assert.False(queue.TryHandleBroadcast(peer, new FakePacket()));
@@ -206,13 +214,13 @@ public class ConnectionMessageQueueTests
 
         var beforeFlush = new FakePacket();
         queue.TryHandleBroadcast(peer, beforeFlush);
-        queue.Flush(peer);
+        queue.FlushBatch(peer);
 
         var afterFlush = new FakePacket();
         queue.TryHandleBroadcast(peer, afterFlush);
 
         var marker = new NetworkJoinSync(JoinSyncSignal.WorldReady);
-        queue.OpenWithTail(peer, marker);
+        queue.OpenWithTailBatch(peer, marker, () => true);
 
         var live = new FakePacket();
         Assert.False(queue.TryHandleBroadcast(peer, live));
@@ -234,7 +242,7 @@ public class ConnectionMessageQueueTests
 
         // A late send cannot revive or replay the disconnected peer's held world stream.
         Assert.True(queue.TryHandleBroadcast(peer, new FakePacket()));
-        queue.Flush(peer);
+        queue.FlushBatch(peer);
         Assert.True(NothingSentTo(peer));
     }
 
@@ -245,10 +253,10 @@ public class ConnectionMessageQueueTests
         queue.BeginQueueing(disconnected);
         messageBroker.Publish(this, new PlayerDisconnected(disconnected, default));
 
-        queue.OpenWithTail(disconnected, new NetworkJoinSync(JoinSyncSignal.WorldReady));
+        queue.OpenWithTailBatch(disconnected, new NetworkJoinSync(JoinSyncSignal.WorldReady), () => true);
 
         var reconnected = Connect();
-        queue.OpenWithTail(disconnected, new NetworkJoinSync(JoinSyncSignal.WorldReady));
+        queue.OpenWithTailBatch(disconnected, new NetworkJoinSync(JoinSyncSignal.WorldReady), () => true);
 
         Assert.True(queue.TryHandleBroadcast(reconnected, new FakePacket()));
         Assert.True(NothingSentTo(disconnected));
@@ -288,7 +296,7 @@ public class ConnectionMessageQueueTests
 
         var joined = Connect();
         queue.BeginQueueing(joined);
-        queue.OpenWithTail(joined, new NetworkJoinSync(JoinSyncSignal.WorldReady));
+        queue.OpenWithTailBatch(joined, new NetworkJoinSync(JoinSyncSignal.WorldReady), () => true);
         queue.CompleteCatchUp(joined);
 
         Assert.True(queue.TryHandleBroadcast(loading, new FakePacket()));  // held

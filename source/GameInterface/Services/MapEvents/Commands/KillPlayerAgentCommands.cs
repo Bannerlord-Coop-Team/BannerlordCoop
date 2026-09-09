@@ -27,6 +27,8 @@ internal class KillPlayerAgentCommands
 
         public string Description => "Removes the main agent using the current survival roll, or forces death during an active co-op battle.";
 
+        public CoopCommandSide Side => CoopCommandSide.Both;
+
         public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
             new ExpectedArgs("force", "Use force to guarantee a killed result during an active co-op battle.", false),

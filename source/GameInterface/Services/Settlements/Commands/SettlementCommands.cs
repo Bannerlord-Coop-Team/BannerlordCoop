@@ -52,6 +52,8 @@ internal class SettlementCommands
 
         public string Description => "Enters random castle for co-op debugging.";
 
+        public CoopCommandSide Side => CoopCommandSide.Client;
+
         public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
             new ExpectedArgs("castleId", "The castle id.", isRequired: false),
@@ -84,6 +86,8 @@ internal class SettlementCommands
         public string Name => "teleport_main_party_to_castle";
 
         public string Description => "Runs main party to castle for co-op debugging.";
+
+        public CoopCommandSide Side => CoopCommandSide.Client;
 
         public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
@@ -140,6 +144,8 @@ internal class SettlementCommands
         public string Name => "restore_main_party_castle_teleport";
 
         public string Description => "Restores main party castle teleport for co-op debugging.";
+
+        public CoopCommandSide Side => CoopCommandSide.Client;
 
         public IExpectedArgs[] ExpectedArgs { get; } = System.Array.Empty<IExpectedArgs>();
 
@@ -207,6 +213,8 @@ internal class SettlementCommands
 
         public string Description => "Gets town name for co-op debugging.";
 
+        public CoopCommandSide Side => CoopCommandSide.Both;
+
         public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
             new ExpectedArgs("settlementId", "The settlement id."),
@@ -244,6 +252,8 @@ internal class SettlementCommands
         public string Name => "set_enemies_spotted";
 
         public string Description => "Sets enemies spotted for co-op debugging.";
+
+        public CoopCommandSide Side => CoopCommandSide.Server;
 
         public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
@@ -293,6 +303,8 @@ internal class SettlementCommands
 
         public string Description => "Sets allies spotted for co-op debugging.";
 
+        public CoopCommandSide Side => CoopCommandSide.Server;
+
         public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
             new ExpectedArgs("settlementId", "The settlement id."),
@@ -337,6 +349,8 @@ internal class SettlementCommands
         public string Name => "set_bribe_paid";
 
         public string Description => "Sets bribe paid for co-op debugging.";
+
+        public CoopCommandSide Side => CoopCommandSide.Server;
 
         public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
@@ -383,6 +397,8 @@ internal class SettlementCommands
 
         public string Description => "Sets hit points for co-op debugging.";
 
+        public CoopCommandSide Side => CoopCommandSide.Server;
+
         public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
             new ExpectedArgs("settlementId", "The settlement id."),
@@ -427,6 +443,8 @@ internal class SettlementCommands
         public string Name => "last_attacker";
 
         public string Description => "Runs attacker for co-op debugging.";
+
+        public CoopCommandSide Side => CoopCommandSide.Server;
 
         public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
@@ -475,6 +493,8 @@ internal class SettlementCommands
 
         public string Description => "Lists siege state for co-op debugging.";
 
+        public CoopCommandSide Side => CoopCommandSide.Both;
+
         public IExpectedArgs[] ExpectedArgs { get; } = System.Array.Empty<IExpectedArgs>();
 
         public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
@@ -503,6 +523,8 @@ internal class SettlementCommands
         public string Name => "set_siege_state";
 
         public string Description => "Sets siege state for co-op debugging.";
+
+        public CoopCommandSide Side => CoopCommandSide.Server;
 
         public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
@@ -553,6 +575,8 @@ internal class SettlementCommands
 
         public string Description => "Sets militia for co-op debugging.";
 
+        public CoopCommandSide Side => CoopCommandSide.Server;
+
         public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
             new ExpectedArgs("settlementId", "The settlement id."),
@@ -600,6 +624,8 @@ internal class SettlementCommands
         public string Name => "set_garrison_pay_limit";
 
         public string Description => "Sets garrison pay limit for co-op debugging.";
+
+        public CoopCommandSide Side => CoopCommandSide.Server;
 
         public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
@@ -649,6 +675,8 @@ internal class SettlementCommands
 
         public string Description => "Collects cache notables for co-op debugging.";
 
+        public CoopCommandSide Side => CoopCommandSide.Server;
+
         public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
             new ExpectedArgs("settlementId", "The settlement id."),
@@ -694,6 +722,8 @@ internal class SettlementCommands
         public string Name => "info";
 
         public string Description => "Shows the relevant state for co-op debugging.";
+
+        public CoopCommandSide Side => CoopCommandSide.Both;
 
         public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
@@ -753,6 +783,8 @@ internal class SettlementCommands
 
         public string Description => "Sets owner for co-op debugging.";
 
+        public CoopCommandSide Side => CoopCommandSide.Server;
+
         public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
             new ExpectedArgs("settlementComponentId", "The settlement component id."),
@@ -806,6 +838,8 @@ internal class SettlementCommands
         public string Name => "capture_by_siege";
 
         public string Description => "Captures by siege for co-op debugging.";
+
+        public CoopCommandSide Side => CoopCommandSide.Server;
 
         public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
@@ -870,6 +904,8 @@ internal class SettlementCommands
 
         public string Description => "Shows state for co-op debugging.";
 
+        public CoopCommandSide Side => CoopCommandSide.Both;
+
         public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
             new ExpectedArgs("settlementNameOrId", "The exact settlement name or id; quote names containing spaces."),
@@ -920,6 +956,8 @@ internal class SettlementCommands
 
         public string Description => "Sets gold for co-op debugging.";
 
+        public CoopCommandSide Side => CoopCommandSide.Server;
+
         public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
             new ExpectedArgs("settlementComponentId", "The settlement component id."),
@@ -963,6 +1001,8 @@ internal class SettlementCommands
 
         public string Description => "Sets is owner unassigned for co-op debugging.";
 
+        public CoopCommandSide Side => CoopCommandSide.Server;
+
         public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
             new ExpectedArgs("settlementComponentId", "The settlement component id."),
@@ -1003,6 +1043,8 @@ internal class SettlementCommands
         public string Name => "set_owner_clan";
 
         public string Description => "Sets owner clan for co-op debugging.";
+
+        public CoopCommandSide Side => CoopCommandSide.Server;
 
         public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {

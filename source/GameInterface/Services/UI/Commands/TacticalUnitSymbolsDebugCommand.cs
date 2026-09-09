@@ -24,6 +24,8 @@ public class TacticalUnitSymbolsDebugCommand
 
         public string Description => "Runs the tactical symbols debug operation.";
 
+        public CoopCommandSide Side => CoopCommandSide.Server;
+
         public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
             new ExpectedArgs("mode", "on, off, toggle, or status.", isRequired: true),

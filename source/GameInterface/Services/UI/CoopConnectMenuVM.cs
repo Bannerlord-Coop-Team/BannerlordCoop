@@ -613,7 +613,7 @@ public class CoopConnectMenuVM : ViewModel, IDisposable
         }
     }
 
-    internal static bool TryParseServerAddress(string enteredAddress, out string host, out int port)
+    public static bool TryParseServerAddress(string enteredAddress, out string host, out int port)
     {
         host = string.Empty;
         port = DefaultConnectionPort;

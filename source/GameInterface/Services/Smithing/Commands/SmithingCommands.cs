@@ -50,6 +50,8 @@ internal class SmithingCommands
 
         public string Description => "Runs the give supplies debug operation.";
 
+        public CoopCommandSide Side => CoopCommandSide.Server;
+
         public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
             new ExpectedArgs("hero_name", "The exact hero display name.", isRequired: true),
@@ -120,6 +122,8 @@ internal class SmithingCommands
 
         public string Description => "Runs the unlock all crafting pieces debug operation.";
 
+        public CoopCommandSide Side => CoopCommandSide.Client;
+
         public IExpectedArgs[] ExpectedArgs { get; } = Array.Empty<IExpectedArgs>();
 
         public CoopCommandResult ProcessCommand(ICoopCommandArgs strings)
@@ -157,6 +161,8 @@ internal class SmithingCommands
         public string Name => "town_orders";
 
         public string Description => "Runs the town orders debug operation.";
+
+        public CoopCommandSide Side => CoopCommandSide.Both;
 
         public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
@@ -202,6 +208,8 @@ internal class SmithingCommands
 
         public string Description => "Runs the add town order debug operation.";
 
+        public CoopCommandSide Side => CoopCommandSide.Server;
+
         public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
             new ExpectedArgs("hero_name", "The exact hero display name.", isRequired: true),
@@ -246,6 +254,8 @@ internal class SmithingCommands
         public string Name => "add_crafted_items";
 
         public string Description => "Runs the add crafted items debug operation.";
+
+        public CoopCommandSide Side => CoopCommandSide.Server;
 
         public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
@@ -303,6 +313,8 @@ internal class SmithingCommands
 
         public string Description => "Runs the stamina debug operation.";
 
+        public CoopCommandSide Side => CoopCommandSide.Both;
+
         public IExpectedArgs[] ExpectedArgs { get; } = Array.Empty<IExpectedArgs>();
 
         public CoopCommandResult ProcessCommand(ICoopCommandArgs strings)
@@ -337,6 +349,8 @@ internal class SmithingCommands
         public string Name => "crafted_item_history";
 
         public string Description => "Runs the crafted item history debug operation.";
+
+        public CoopCommandSide Side => CoopCommandSide.Both;
 
         public IExpectedArgs[] ExpectedArgs { get; } = Array.Empty<IExpectedArgs>();
 
@@ -385,6 +399,8 @@ internal class SmithingCommands
 
         public string Description => "Runs the crafting pieces xp debug operation.";
 
+        public CoopCommandSide Side => CoopCommandSide.Both;
+
         public IExpectedArgs[] ExpectedArgs { get; } = Array.Empty<IExpectedArgs>();
 
         public CoopCommandResult ProcessCommand(ICoopCommandArgs strings)
@@ -431,6 +447,8 @@ internal class SmithingCommands
         public string Name => "unlocked_crafting_pieces";
 
         public string Description => "Runs the unlocked crafting pieces debug operation.";
+
+        public CoopCommandSide Side => CoopCommandSide.Both;
 
         public IExpectedArgs[] ExpectedArgs { get; } = Array.Empty<IExpectedArgs>();
 

@@ -47,6 +47,8 @@ internal class BattleTeamKillCommands
 
         public string Description => "Runs the click deployment ready debug operation.";
 
+        public CoopCommandSide Side => CoopCommandSide.Both;
+
         public IExpectedArgs[] ExpectedArgs { get; } = Array.Empty<IExpectedArgs>();
 
         public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
@@ -78,6 +80,8 @@ internal class BattleTeamKillCommands
 
         public string Description => "Reports deployment state.";
 
+        public CoopCommandSide Side => CoopCommandSide.Both;
+
         public IExpectedArgs[] ExpectedArgs { get; } = Array.Empty<IExpectedArgs>();
 
         public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
@@ -100,6 +104,8 @@ internal class BattleTeamKillCommands
         public string Name => "finish_deployment";
 
         public string Description => "Runs the finish deployment debug operation.";
+
+        public CoopCommandSide Side => CoopCommandSide.Both;
 
         public IExpectedArgs[] ExpectedArgs { get; } = Array.Empty<IExpectedArgs>();
 
@@ -131,6 +137,8 @@ internal class BattleTeamKillCommands
         public string Name => "toggle_scoreboard";
 
         public string Description => "Runs the toggle scoreboard debug operation.";
+
+        public CoopCommandSide Side => CoopCommandSide.Both;
 
         public IExpectedArgs[] ExpectedArgs { get; } = Array.Empty<IExpectedArgs>();
 
@@ -164,6 +172,8 @@ internal class BattleTeamKillCommands
         public string Name => "collapse_scoreboard_parties";
 
         public string Description => "Runs the collapse scoreboard parties debug operation.";
+
+        public CoopCommandSide Side => CoopCommandSide.Both;
 
         public IExpectedArgs[] ExpectedArgs { get; } = Array.Empty<IExpectedArgs>();
 
@@ -201,6 +211,8 @@ internal class BattleTeamKillCommands
         public string Name => "scoreboard_state";
 
         public string Description => "Reports scoreboard state.";
+
+        public CoopCommandSide Side => CoopCommandSide.Both;
 
         public IExpectedArgs[] ExpectedArgs { get; } = Array.Empty<IExpectedArgs>();
 
@@ -349,6 +361,8 @@ internal class BattleTeamKillCommands
 
         public string Description => "Runs the leave battle debug operation.";
 
+        public CoopCommandSide Side => CoopCommandSide.Both;
+
         public IExpectedArgs[] ExpectedArgs { get; } = Array.Empty<IExpectedArgs>();
 
         public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
@@ -372,6 +386,8 @@ internal class BattleTeamKillCommands
         public string Name => "kill_enemy";
 
         public string Description => "Runs the kill enemy debug operation.";
+
+        public CoopCommandSide Side => CoopCommandSide.Both;
 
         public IExpectedArgs[] ExpectedArgs { get; } = Array.Empty<IExpectedArgs>();
 
@@ -408,6 +424,8 @@ internal class BattleTeamKillCommands
 
         public string Description => "Runs the kill enemy team debug operation.";
 
+        public CoopCommandSide Side => CoopCommandSide.Both;
+
         public IExpectedArgs[] ExpectedArgs { get; } = Array.Empty<IExpectedArgs>();
 
         public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
@@ -433,6 +451,8 @@ internal class BattleTeamKillCommands
         public string Name => "kill_own_team";
 
         public string Description => "Runs the kill own team debug operation.";
+
+        public CoopCommandSide Side => CoopCommandSide.Both;
 
         public IExpectedArgs[] ExpectedArgs { get; } = Array.Empty<IExpectedArgs>();
 

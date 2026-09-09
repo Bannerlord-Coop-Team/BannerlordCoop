@@ -50,6 +50,8 @@ public class HeroDebugCommand
 
         public string Description => "Lists registered heroes, optionally filtered by display-name prefix.";
 
+        public CoopCommandSide Side => CoopCommandSide.Both;
+
         public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
             new ExpectedArgs("name_prefix", "The optional display-name prefix. Quote multi-word values.", false),
@@ -98,6 +100,8 @@ public class HeroDebugCommand
         public string Name => "home_settlement_snapshot";
 
         public string Description => "Reports registered hero home-settlement state.";
+
+        public CoopCommandSide Side => CoopCommandSide.Both;
 
         public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
@@ -173,6 +177,8 @@ public class HeroDebugCommand
 
         public string Description => "Dumps fields for a registered hero.";
 
+        public CoopCommandSide Side => CoopCommandSide.Both;
+
         public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
             new ExpectedArgs("hero_id", "The registered hero id."),
@@ -216,6 +222,8 @@ public class HeroDebugCommand
         public string Name => "create_hero";
 
         public string Description => "Creates a hero from a character template on the server.";
+
+        public CoopCommandSide Side => CoopCommandSide.Server;
 
         public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
@@ -264,6 +272,8 @@ public class HeroDebugCommand
 
         public string Description => "Audits registered hero state.";
 
+        public CoopCommandSide Side => CoopCommandSide.Both;
+
         public IExpectedArgs[] ExpectedArgs { get; } = System.Array.Empty<IExpectedArgs>();
 
         public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
@@ -284,6 +294,8 @@ public class HeroDebugCommand
         public string Name => "add_power";
 
         public string Description => "Adds power to a registered hero on the server.";
+
+        public CoopCommandSide Side => CoopCommandSide.Server;
 
         public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
@@ -326,6 +338,8 @@ public class HeroDebugCommand
         public string Name => "set_gold";
 
         public string Description => "Sets gold for every hero with an exact display name on the server.";
+
+        public CoopCommandSide Side => CoopCommandSide.Server;
 
         public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
@@ -370,6 +384,8 @@ public class HeroDebugCommand
 
         public string Description => "Reports gold for a registered hero.";
 
+        public CoopCommandSide Side => CoopCommandSide.Both;
+
         public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
             new ExpectedArgs("hero_id", "The registered hero id."),
@@ -393,6 +409,8 @@ public class HeroDebugCommand
         public string Name => "set_gold_state";
 
         public string Description => "Sets non-negative gold for a registered hero on the server.";
+
+        public CoopCommandSide Side => CoopCommandSide.Server;
 
         public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
@@ -424,6 +442,8 @@ public class HeroDebugCommand
         public string Name => "set_age";
 
         public string Description => "Sets the age of heroes matching a display name or registered id on the server.";
+
+        public CoopCommandSide Side => CoopCommandSide.Server;
 
         public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
@@ -480,6 +500,8 @@ public class HeroDebugCommand
 
         public string Description => "Kills a living registered player hero on the server.";
 
+        public CoopCommandSide Side => CoopCommandSide.Server;
+
         public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
             new ExpectedArgs("hero_id", "The registered player hero id."),
@@ -533,6 +555,8 @@ public class HeroDebugCommand
         public string Name => "ill_days";
 
         public string Description => "Reports the local player's illness duration on clients or matching heroes on the server.";
+
+        public CoopCommandSide Side => CoopCommandSide.Both;
 
         public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
@@ -594,6 +618,8 @@ public class HeroDebugCommand
 
         public string Description => "Sets hit points for a registered hero on the server.";
 
+        public CoopCommandSide Side => CoopCommandSide.Server;
+
         public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
             new ExpectedArgs("hero_id", "The registered hero id."),
@@ -640,6 +666,8 @@ public class HeroDebugCommand
         public string Name => "set_banneritem";
 
         public string Description => "Sets the banner item for a registered hero on the server.";
+
+        public CoopCommandSide Side => CoopCommandSide.Server;
 
         public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
@@ -688,6 +716,8 @@ public class HeroDebugCommand
 
         public string Description => "Lists available banner items.";
 
+        public CoopCommandSide Side => CoopCommandSide.Both;
+
         public IExpectedArgs[] ExpectedArgs { get; } = System.Array.Empty<IExpectedArgs>();
 
         public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
@@ -715,6 +745,8 @@ public class HeroDebugCommand
         public string Name => "get_banneritem";
 
         public string Description => "Reports the banner item for a registered hero.";
+
+        public CoopCommandSide Side => CoopCommandSide.Both;
 
         public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
@@ -750,6 +782,8 @@ public class HeroDebugCommand
 
         public string Description => "Lists heroes with active issues.";
 
+        public CoopCommandSide Side => CoopCommandSide.Both;
+
         public IExpectedArgs[] ExpectedArgs { get; } = System.Array.Empty<IExpectedArgs>();
 
         public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
@@ -784,6 +818,8 @@ public class HeroDebugCommand
         public string Name => "set_issue";
 
         public string Description => "Sets an issue for a registered hero on the server.";
+
+        public CoopCommandSide Side => CoopCommandSide.Server;
 
         public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
@@ -834,6 +870,8 @@ public class HeroDebugCommand
 
         public string Description => "Reports the issue for a registered hero.";
 
+        public CoopCommandSide Side => CoopCommandSide.Both;
+
         public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
             new ExpectedArgs("hero_id", "The registered hero id."),
@@ -865,6 +903,8 @@ public class HeroDebugCommand
         public string Name => "volunteers";
 
         public string Description => "Lists volunteers for a hero.";
+
+        public CoopCommandSide Side => CoopCommandSide.Both;
 
         public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
@@ -911,6 +951,8 @@ public class HeroDebugCommand
 
         public string Description => "Refreshes volunteers for a settlement on the server.";
 
+        public CoopCommandSide Side => CoopCommandSide.Server;
+
         public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
             new ExpectedArgs("settlement_id", "The optional settlement StringId; defaults to town_ES1.", false),
@@ -941,6 +983,8 @@ public class HeroDebugCommand
         public string Name => "set_relation";
 
         public string Description => "Sets the base relation between two registered heroes.";
+
+        public CoopCommandSide Side => CoopCommandSide.Server;
 
         public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
@@ -997,6 +1041,8 @@ public class HeroDebugCommand
 
         public string Description => "Reports the base relation between two registered heroes.";
 
+        public CoopCommandSide Side => CoopCommandSide.Both;
+
         public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
             new ExpectedArgs("hero1_id", "The first registered hero id."),
@@ -1031,6 +1077,8 @@ public class HeroDebugCommand
         public string Name => "get_effective_relation";
 
         public string Description => "Reports the effective relation between two registered heroes.";
+
+        public CoopCommandSide Side => CoopCommandSide.Both;
 
         public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
@@ -1083,6 +1131,8 @@ public class HeroDebugCommand
         public string Name => "set_effective_relation";
 
         public string Description => "Sets effective relation between two registered heroes.";
+
+        public CoopCommandSide Side => CoopCommandSide.Server;
 
         public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {

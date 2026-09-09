@@ -8,6 +8,7 @@ using GameInterface.Services.Heroes.Interfaces;
 using GameInterface.Services.Players;
 using GameInterface.Services.UI.BugReporting;
 using Moq;
+using Serilog;
 using System;
 using System.IO;
 using System.IO.Compression;
@@ -63,6 +64,7 @@ public class CoopLogBugReportTests : IDisposable
         var logBytes = Compress("client diagnostic\n");
         var serverLogBytes = Compress("server diagnostic\n");
         var serverSaveBytes = Encoding.UTF8.GetBytes("server save data");
+        var serverSaveSidecarBytes = Encoding.UTF8.GetBytes("{\"players\":[]}");
         var requestId = Guid.NewGuid().ToString("N");
         using var builder = new BugReportArchiveBuilder(tempRoot);
         var contents = new BugReportArchiveContents(
@@ -76,7 +78,11 @@ public class CoopLogBugReportTests : IDisposable
             new CollectedBugReportServerLog(
                 serverLogBytes,
                 Encoding.UTF8.GetByteCount("server diagnostic\n")),
-            new CollectedBugReportServerSave("coop_bug_report.sav", serverSaveBytes),
+            new CollectedBugReportServerSave(
+                "coop_bug_report.sav",
+                serverSaveBytes,
+                "coop_bug_report.json",
+                serverSaveSidecarBytes),
             DateTimeOffset.UtcNow,
             new[] { new CollectedBugReportLog(2, logBytes, Encoding.UTF8.GetByteCount("client diagnostic\n")) },
             expectedClients: 3,
@@ -96,6 +102,7 @@ public class CoopLogBugReportTests : IDisposable
             Assert.Contains("Commit: " + ModInformation.Commit, manifest);
             Assert.Contains("Build version: " + ModInformation.BuildVersion, manifest);
             Assert.Contains("Triggers: player-submitted", manifest);
+            Assert.Contains("Server save sidecar included: yes", manifest);
         }
         var reportEntry = Assert.Single(archive.Entries, entry => entry.FullName.StartsWith("reports/"));
         using (var reportReader = new StreamReader(reportEntry.Open()))
@@ -115,6 +122,14 @@ public class CoopLogBugReportTests : IDisposable
             using var saveStream = serverSaveEntry.Open();
             saveStream.CopyTo(saveData);
             Assert.Equal(serverSaveBytes, saveData.ToArray());
+        }
+        var serverSaveSidecarEntry = Assert.IsType<ZipArchiveEntry>(
+            archive.GetEntry("server/coop_bug_report.json"));
+        using (var sidecarData = new MemoryStream())
+        {
+            using var sidecarStream = serverSaveSidecarEntry.Open();
+            sidecarStream.CopyTo(sidecarData);
+            Assert.Equal(serverSaveSidecarBytes, sidecarData.ToArray());
         }
         var logEntry = Assert.Single(archive.Entries, entry => entry.FullName.StartsWith("clients/"));
         Assert.Equal("clients/client-02.log", logEntry.FullName);
@@ -182,10 +197,14 @@ public class CoopLogBugReportTests : IDisposable
     public void ServerSaveProvider_PersistsAndReturnsTheCampaignSave()
     {
         var saveData = Encoding.UTF8.GetBytes("campaign save");
+        var sidecarData = Encoding.UTF8.GetBytes("{\"players\":[]}");
         var saveInterface = new Mock<ISaveInterface>();
         saveInterface
             .Setup(value => value.SaveCurrentGameToFile(BugReportServerSaveProvider.SaveName))
             .Returns(new SaveResults(true, saveData, "campaign-id"));
+        saveInterface
+            .Setup(value => value.ReadSaveFile("coop_bug_report.json"))
+            .Returns(sidecarData);
         var provider = new BugReportServerSaveProvider(saveInterface.Object, Mock.Of<Serilog.ILogger>());
 
         var captured = provider.TryCapture(out var save);
@@ -193,9 +212,30 @@ public class CoopLogBugReportTests : IDisposable
         Assert.True(captured);
         Assert.Equal("coop_bug_report.sav", save.FileName);
         Assert.Equal(saveData, save.Data);
+        Assert.Equal("coop_bug_report.json", save.SidecarFileName);
+        Assert.Equal(sidecarData, save.SidecarData);
         saveInterface.Verify(
             value => value.SaveCurrentGameToFile(BugReportServerSaveProvider.SaveName),
             Times.Once);
+    }
+
+    [Fact]
+    public void ServerSaveProvider_MissingSidecarStillReturnsCampaignSave()
+    {
+        var saveData = Encoding.UTF8.GetBytes("campaign save");
+        var saveInterface = new Mock<ISaveInterface>();
+        saveInterface
+            .Setup(value => value.SaveCurrentGameToFile(BugReportServerSaveProvider.SaveName))
+            .Returns(new SaveResults(true, saveData, "campaign-id"));
+        using var logger = new LoggerConfiguration().CreateLogger();
+        var provider = new BugReportServerSaveProvider(saveInterface.Object, logger);
+
+        var captured = provider.TryCapture(out var save);
+
+        Assert.True(captured);
+        Assert.Equal(saveData, save.Data);
+        Assert.Null(save.SidecarFileName);
+        Assert.Null(save.SidecarData);
     }
 
     [Fact]
@@ -308,6 +348,7 @@ public class CoopLogBugReportTests : IDisposable
         var serverLog = Compress("server diagnostic\n");
         var clientLog = Compress("client diagnostic\n");
         var serverSave = Encoding.UTF8.GetBytes("server campaign save");
+        var serverSaveSidecar = Encoding.UTF8.GetBytes("{\"players\":[]}");
         var report = new BugReportArchiveContents(
             Guid.NewGuid().ToString("N"),
             "network-client-1",
@@ -319,7 +360,11 @@ public class CoopLogBugReportTests : IDisposable
             new CollectedBugReportServerLog(
                 serverLog,
                 Encoding.UTF8.GetByteCount("server diagnostic\n")),
-            new CollectedBugReportServerSave("coop_bug_report.sav", serverSave),
+            new CollectedBugReportServerSave(
+                "coop_bug_report.sav",
+                serverSave,
+                "coop_bug_report.json",
+                serverSaveSidecar),
             DateTimeOffset.UtcNow,
             new[] { new CollectedBugReportLog(
                 1,
@@ -342,6 +387,7 @@ public class CoopLogBugReportTests : IDisposable
         Assert.Equal(serverLog, handler.ServerLogBody);
         Assert.Equal(clientLog, handler.ClientLogBody);
         Assert.Equal(serverSave, handler.ServerSaveBody);
+        Assert.Equal(serverSaveSidecar, handler.ServerSaveSidecarBody);
         using var json = JsonDocument.Parse(handler.Body);
         var root = json.RootElement;
         Assert.Equal("network-client-1", root.GetProperty("reportingClientNetworkId").GetString());
@@ -358,6 +404,12 @@ public class CoopLogBugReportTests : IDisposable
         Assert.False(root.GetProperty("clientLogs")[0].TryGetProperty("data", out _));
         Assert.Equal("server-save", root.GetProperty("serverSave").GetProperty("artifact").GetString());
         Assert.Equal(serverSave.Length, root.GetProperty("serverSave").GetProperty("length").GetInt64());
+        Assert.Equal(
+            "coop_bug_report.json",
+            root.GetProperty("serverSave").GetProperty("sidecarFileName").GetString());
+        Assert.Equal(
+            serverSaveSidecar.Length,
+            root.GetProperty("serverSave").GetProperty("sidecarLength").GetInt64());
     }
 
     [Fact]
@@ -426,6 +478,10 @@ public class CoopLogBugReportTests : IDisposable
             BugReportUploader.MaximumServerSaveBytes));
         Assert.False(BugReportUploader.IsWithinServerSaveLimit(
             (long)BugReportUploader.MaximumServerSaveBytes + 1));
+        Assert.True(BugReportUploader.IsWithinServerSaveSidecarLimit(
+            BugReportUploader.MaximumServerSaveSidecarBytes));
+        Assert.False(BugReportUploader.IsWithinServerSaveSidecarLimit(
+            (long)BugReportUploader.MaximumServerSaveSidecarBytes + 1));
     }
 
     public void Dispose()
@@ -490,6 +546,7 @@ public class CoopLogBugReportTests : IDisposable
         public byte[] ServerLogBody { get; private set; }
         public byte[] ClientLogBody { get; private set; }
         public byte[] ServerSaveBody { get; private set; }
+        public byte[] ServerSaveSidecarBody { get; private set; }
         public bool FailUpload { get; set; }
 
         protected override async Task<HttpResponseMessage> SendAsync(
@@ -512,6 +569,8 @@ public class CoopLogBugReportTests : IDisposable
                 if (name == "report") Body = await part.ReadAsStringAsync();
                 else if (name == "serverLog") ServerLogBody = await part.ReadAsByteArrayAsync();
                 else if (name == "serverSave") ServerSaveBody = await part.ReadAsByteArrayAsync();
+                else if (name == "serverSaveSidecar")
+                    ServerSaveSidecarBody = await part.ReadAsByteArrayAsync();
                 else if (name == BugReportUploader.GetClientLogPartName(1))
                     ClientLogBody = await part.ReadAsByteArrayAsync();
             }

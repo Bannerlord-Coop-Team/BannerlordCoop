@@ -25,6 +25,8 @@ public class PartySyncPerformanceLogsCommand
 
         public string Description => "Runs the party sync performance logs debug operation.";
 
+        public CoopCommandSide Side => CoopCommandSide.Client;
+
         public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
             new ExpectedArgs("mode", "on, off, or status.", isRequired: true),
