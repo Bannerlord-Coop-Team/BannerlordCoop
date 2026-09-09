@@ -93,6 +93,7 @@ internal class SettlementSneakInHandler : IHandler
             if (!objectManager.TryGetObjectWithLogging<Hero>(data.MainHeroId, out var mainHero)) return;
             if (!objectManager.TryGetObjectWithLogging<Settlement>(data.CurrentSettlementId, out var currentSettlement)) return;
 
+            mainHero.PartyBelongedTo?.Party.AddElementToMemberRoster(mainHero.CharacterObject, -1, true);
             TakePrisonerAction.Apply(currentSettlement.Party, mainHero);
         });
     }
