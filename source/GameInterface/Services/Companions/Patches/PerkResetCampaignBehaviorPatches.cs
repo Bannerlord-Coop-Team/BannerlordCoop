@@ -47,7 +47,7 @@ internal class PerkResetCampaignBehaviorPatches
     [HarmonyPrefix]
     public static bool ConversationArenaPlayerAcceptPerkResetOnConsequencePrefix(PerkResetCampaignBehavior __instance)
     {
-        if (!SharedClanPermissions.CanManageHero(__instance._heroForPerkReset)) return false;
+        if (!CoopClanPermissions.CanManageHero(__instance._heroForPerkReset)) return false;
 
         var message = new ResetPerksByArenaMaster(
             Hero.MainHero,

@@ -26,13 +26,13 @@ internal class ClanPartiesVMHandler : IHandler
     private readonly IObjectManager objectManager;
     private readonly INetwork network;
     private readonly ISendCoalescer sendCoalescer;
-    private readonly ISharedClanPermissions permissions;
+    private readonly ICoopClanPermissions permissions;
 
     public ClanPartiesVMHandler(
         IMessageBroker messageBroker,
         IObjectManager objectManager,
         INetwork network,
-        ISharedClanPermissions permissions,
+        ICoopClanPermissions permissions,
         ISendCoalescer sendCoalescer = null)
     {
         this.messageBroker = messageBroker;

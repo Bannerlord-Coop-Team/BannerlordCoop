@@ -13,7 +13,7 @@ internal static class ClanPartyWagePermissionsPatches
     [HarmonyPostfix]
     public static void RefreshValuesPostfix(ClanFinanceExpenseItemVM __instance)
     {
-        if (ModInformation.IsServer || SharedClanPermissions.CanManageParty(__instance._mobileParty)) return;
+        if (ModInformation.IsServer || CoopClanPermissions.CanManageParty(__instance._mobileParty)) return;
 
         __instance.IsEnabled = false;
         __instance.WageLimitHint.HintText = GameTexts.FindText(__instance._mobileParty?.IsPlayerParty() == true
@@ -31,6 +31,6 @@ internal static class ClanPartyWagePermissionsPatches
     private static bool CanChangeWages(ClanFinanceExpenseItemVM instance)
     {
         if (ModInformation.IsServer || instance.WageLimitHint == null) return true;
-        return instance.IsEnabled && SharedClanPermissions.CanManageParty(instance._mobileParty);
+        return instance.IsEnabled && CoopClanPermissions.CanManageParty(instance._mobileParty);
     }
 }

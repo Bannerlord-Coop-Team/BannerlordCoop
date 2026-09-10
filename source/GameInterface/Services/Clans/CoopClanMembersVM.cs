@@ -12,7 +12,7 @@ using TaleWorlds.Library;
 
 namespace GameInterface.Services.Clans;
 
-public class SharedClanMembersVM : ClanMembersVM
+public class CoopClanMembersVM : ClanMembersVM
 {
     private readonly IClanMemberGrouping grouping;
     private readonly IClanLeaveRules leaveRules;
@@ -50,7 +50,7 @@ public class SharedClanMembersVM : ClanMembersVM
     [DataSourceProperty]
     public string OtherFamiliesText => GetGroupText("str_coop_clan_other_families", OtherFamilies.Count);
 
-    public SharedClanMembersVM(Action onRefresh, Action<Hero> showHeroOnMap, IClanMemberGrouping grouping,
+    public CoopClanMembersVM(Action onRefresh, Action<Hero> showHeroOnMap, IClanMemberGrouping grouping,
         IClanLeaveRules leaveRules, IMessageBroker messageBroker)
         : base(onRefresh, showHeroOnMap)
     {

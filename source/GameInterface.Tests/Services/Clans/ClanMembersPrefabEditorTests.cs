@@ -34,8 +34,8 @@ public class ClanMembersPrefabEditorTests
             Assert.Equal(toggle.Attributes["WidgetToClose"]!.Value, toggle.Attributes["ListPanel"]!.Value);
             Assert.NotNull(toggle.SelectSingleNode($".//*[@Text='@{group}Text']"));
             Assert.NotNull(root.SelectSingleNode($".//NavigationAutoScrollWidget[@TrackedWidget='..\\{group}Header']"));
-            Assert.NotNull(typeof(SharedClanMembersVM).GetProperty(group));
-            Assert.NotNull(typeof(SharedClanMembersVM).GetProperty(group + "Text"));
+            Assert.NotNull(typeof(CoopClanMembersVM).GetProperty(group));
+            Assert.NotNull(typeof(CoopClanMembersVM).GetProperty(group + "Text"));
 
             if (group == "Players" || group == "OtherFamilies")
             {
@@ -43,7 +43,7 @@ public class ClanMembersPrefabEditorTests
                 Assert.Equal("@Has" + group, toggle.Attributes["IsRelevant"]!.Value);
                 Assert.Equal("@Has" + group, root.SelectSingleNode(
                     $".//NavigationAutoScrollWidget[@TrackedWidget='..\\{group}Header']/@IsVisible")!.Value);
-                Assert.NotNull(typeof(SharedClanMembersVM).GetProperty("Has" + group));
+                Assert.NotNull(typeof(CoopClanMembersVM).GetProperty("Has" + group));
             }
         }
 
@@ -87,7 +87,7 @@ public class ClanMembersPrefabEditorTests
         Assert.Equal(dataSource, button.GetAttribute("DataSource"));
         Assert.Equal(visibility, button.GetAttribute("IsVisible"));
         Assert.Equal(command, button.GetAttribute("Command.Click"));
-        Assert.NotNull(typeof(SharedClanMembersVM).GetMethod(command));
+        Assert.NotNull(typeof(CoopClanMembersVM).GetMethod(command));
 
         if (file == "ClanMembers.xml")
             Assert.NotNull(button.SelectSingleNode("ancestor::*[@DataSource='{CurrentSelectedMember}']"));

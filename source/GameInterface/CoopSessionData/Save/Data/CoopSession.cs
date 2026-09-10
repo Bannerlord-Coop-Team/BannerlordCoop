@@ -1,5 +1,6 @@
 ﻿using GameInterface.Services.Alleys;
 using GameInterface.Services.Caravans;
+using GameInterface.Services.Clans;
 using GameInterface.Services.Heroes;
 using GameInterface.Services.Inventory;
 using GameInterface.Services.Inventory.TradeSkills;
@@ -9,6 +10,7 @@ using GameInterface.Services.Smithing;
 using GameInterface.Services.Workshops;
 using ProtoBuf;
 using System;
+using System.Collections.Generic;
 
 namespace GameInterface.CoopSessionData.Save.Data;
 
@@ -28,6 +30,7 @@ public interface ICoopSession
     TradePlayerData TradePlayerData { get; }
     InventoryPlayerData InventoryPlayerData { get; }
     HeroMeetingData HeroMeetingData { get; }
+    Dictionary<string, ClanFinanceSettings> ClanFinance { get; }
 }
 
 /// <inheritdoc cref="ICoopSession"/>
@@ -69,6 +72,8 @@ public class CoopSession : ICoopSession
     public InventoryPlayerData InventoryPlayerData { get; }
     [ProtoMember(10)]
     public HeroMeetingData HeroMeetingData { get; }
+    [ProtoMember(11)]
+    public Dictionary<string, ClanFinanceSettings> ClanFinance { get; }
 
     public CoopSession(
         string uniqueGameId,
@@ -80,7 +85,8 @@ public class CoopSession : ICoopSession
         InteractionsPlayerData interactionsPlayerData,
         TradePlayerData tradePlayerData,
         InventoryPlayerData inventoryPlayerData,
-        HeroMeetingData heroMeetingData)
+        HeroMeetingData heroMeetingData,
+        Dictionary<string, ClanFinanceSettings> clanFinance = null)
     {
         UniqueGameId = uniqueGameId;
         Players = players;
@@ -92,5 +98,6 @@ public class CoopSession : ICoopSession
         TradePlayerData = tradePlayerData;
         InventoryPlayerData = inventoryPlayerData;
         HeroMeetingData = heroMeetingData;
+        ClanFinance = clanFinance ?? new();
     }
 }

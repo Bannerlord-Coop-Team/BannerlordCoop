@@ -14,7 +14,7 @@ namespace GameInterface.Tests.Services.Clans;
 public class ClanMembersVMPatchesTests
 {
     [Fact]
-    public void InstalledClanScreen_UsesSharedMemberFactory()
+    public void InstalledClanScreen_UsesCoopClanMemberFactory()
     {
         var constructor = AccessTools.Constructor(typeof(ClanManagementVM), new[]
         {

@@ -24,9 +24,10 @@ internal class ClanPartyItemVMPatches
     public static void UpdatePropertiesPostfix(ClanPartyItemVM __instance)
     {
         var party = __instance.Party?.MobileParty;
-        bool canManage = SharedClanPermissions.CanManageParty(party);
-        bool canAssignRoles = SharedClanPermissions.CanAssignRoles(party);
+        bool canManage = CoopClanPermissions.CanManageParty(party);
+        bool canAssignRoles = CoopClanPermissions.CanAssignRoles(party);
         bool isPlayerParty = party?.IsPlayerParty() == true;
+        if (isPlayerParty) __instance.ShouldPartyHaveExpense = false;
         var managementHint = GameTexts.FindText(isPlayerParty
             ? "str_coop_clan_player_party_protected" : "str_coop_clan_party_leader_only");
 
@@ -60,7 +61,7 @@ internal class ClanPartyItemVMPatches
     [HarmonyPrefix]
     public static bool ExecuteChangeLeaderPrefix(ClanPartyItemVM __instance)
     {
-        return SharedClanPermissions.CanManageParty(__instance.Party?.MobileParty);
+        return CoopClanPermissions.CanManageParty(__instance.Party?.MobileParty);
     }
 
     [HarmonyPatch(nameof(ClanPartyItemVM.UpdateProperties))]
@@ -204,7 +205,7 @@ internal class ClanPartyItemVMPatches
     [HarmonyPrefix]
     public static bool UpdatePartyBehaviorSelectionUpdatePrefix(ref ClanPartyItemVM __instance, SelectorVM<SelectorItemVM> s)
     {
-        if (!SharedClanPermissions.CanManageParty(__instance.Party?.MobileParty)) return false;
+        if (!CoopClanPermissions.CanManageParty(__instance.Party?.MobileParty)) return false;
 
         if (s.SelectedIndex != (int)__instance.Party.MobileParty.Objective)
         {
@@ -220,7 +221,7 @@ internal class ClanPartyItemVMPatches
     [HarmonyPrefix]
     public static bool OnAutoRecruitChangedPrefix(ref ClanPartyItemVM __instance, bool value)
     {
-        if (!SharedClanPermissions.CanManageParty(__instance.Party?.MobileParty)) return false;
+        if (!CoopClanPermissions.CanManageParty(__instance.Party?.MobileParty)) return false;
 
         if (__instance.Party.IsMobile && __instance.Party.MobileParty.IsGarrison)
         {

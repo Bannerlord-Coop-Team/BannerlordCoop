@@ -6,7 +6,7 @@ using TaleWorlds.CampaignSystem.Party;
 namespace GameInterface.Services.Clans.Patches;
 
 [HarmonyPatch]
-internal class SharedClanDialoguePatches
+internal class CoopClanDialoguePatches
 {
     [HarmonyPatch(typeof(CompanionRolesCampaignBehavior), nameof(CompanionRolesCampaignBehavior.companion_fire_condition))]
     [HarmonyPostfix]
@@ -45,7 +45,7 @@ internal class SharedClanDialoguePatches
 
     private static void CheckCanManageClan(ref bool __result)
     {
-        if (!SharedClanPermissions.CanManageClan(Hero.MainHero.Clan))
+        if (!CoopClanPermissions.CanManageClan(Hero.MainHero.Clan))
         {
             __result = false;
         }
@@ -53,7 +53,7 @@ internal class SharedClanDialoguePatches
 
     private static void CheckCanManageParty(ref bool __result)
     {
-        if (!SharedClanPermissions.CanManageParty(MobileParty.ConversationParty))
+        if (!CoopClanPermissions.CanManageParty(MobileParty.ConversationParty))
         {
             __result = false;
         }

@@ -4,6 +4,7 @@ using Coop.Core.Server.Services.Save.Messages;
 using GameInterface.Services.Alleys.Messages;
 using GameInterface.Services.CampaignService.Messages;
 using GameInterface.Services.Caravans.Messages;
+using GameInterface.Services.Clans.Messages;
 using GameInterface.Services.Heroes.Messages;
 using GameInterface.Services.Inventory.Messages;
 using GameInterface.Services.Inventory.TradeSkills.Messages;
@@ -65,6 +66,7 @@ internal class SaveDataHandler : IHandler
         messageBroker.Publish(this, new InitializeClientTradeData(saveDataMessage.TradePlayerData));
         messageBroker.Publish(this, new InitializeClientInventoryData(saveDataMessage.InventoryPlayerData));
         messageBroker.Publish(this, new InitializeClientHeroMeetingData(saveDataMessage.HeroMeetingData));
+        messageBroker.Publish(this, new InitializeClientClanFinance(saveDataMessage.ClanFinance));
         messageBroker.Publish(this, new InitializeClientAttachmentIdMap(saveDataMessage.AttachmentIdMap));
         // Add any other CoopSession data initialisations for clients here
     }

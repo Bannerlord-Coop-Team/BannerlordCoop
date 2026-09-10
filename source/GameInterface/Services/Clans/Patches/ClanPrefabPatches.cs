@@ -37,12 +37,14 @@ internal static class ClanPrefabPatches
     {
         bool members = node.Attributes?["Id"]?.Value == "ClanMembersWidget";
         bool screen = node.Attributes?["Id"]?.Value == "ClanScreenWidget";
+        bool parties = node.SelectSingleNode(".//*[@Id='PartiesWageCapParent']") != null;
         bool income = node.SelectSingleNode(".//*[@Id='ManageWorkshopButton' or @Id='ManageAlleyButton']") != null;
-        if ((members || screen || income) && ContainerProvider.TryResolve<IClanPrefabEditor>(out var editor))
+        if ((members || screen || income || parties) && ContainerProvider.TryResolve<IClanPrefabEditor>(out var editor))
         {
             if (members) editor.AddMemberGroups(node);
             if (members || screen) editor.AddMembershipActions(node);
             if (income) editor.ApplyIncomePermissions(node);
+            if (screen || parties) editor.AddFinanceControls(node);
         }
     }
 }

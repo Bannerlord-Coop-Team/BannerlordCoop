@@ -61,7 +61,7 @@ internal class AlleyManagementPatches
     private static bool AbandonAlleyFromClanMenuPrefix(Alley alley)
     {
         if (ModInformation.IsServer) return true;
-        if (!SharedClanPermissions.CanManageClan(alley.Owner?.Clan)) return false;
+        if (!CoopClanPermissions.CanManageClan(alley.Owner?.Clan)) return false;
 
         MessageBroker.Instance.Publish(alley, new AbandonAlleyRequested(alley, fromClanScreen: true));
         return false;

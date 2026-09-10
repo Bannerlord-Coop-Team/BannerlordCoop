@@ -32,12 +32,12 @@ public static class ClanIncomeVMPatches
             {
                 if (constructor.DeclaringType == typeof(ClanFinanceWorkshopItemVM))
                 {
-                    instruction.operand = AccessTools.Constructor(typeof(SharedClanWorkshopItemVM),
+                    instruction.operand = AccessTools.Constructor(typeof(CoopClanWorkshopItemVM),
                         constructor.GetParameters().Select(parameter => parameter.ParameterType).ToArray());
                 }
                 else if (constructor.DeclaringType == typeof(ClanFinanceAlleyItemVM))
                 {
-                    instruction.operand = AccessTools.Constructor(typeof(SharedClanAlleyItemVM),
+                    instruction.operand = AccessTools.Constructor(typeof(CoopClanAlleyItemVM),
                         constructor.GetParameters().Select(parameter => parameter.ParameterType).ToArray());
                 }
             }

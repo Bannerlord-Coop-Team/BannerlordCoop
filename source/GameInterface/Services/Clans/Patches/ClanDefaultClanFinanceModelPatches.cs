@@ -1,12 +1,7 @@
-﻿using Common;
-using Common.Messaging;
-using GameInterface.Configuration;
+﻿using Common.Messaging;
 using GameInterface.Services.Clans.Extensions;
 using GameInterface.Services.Clans.Interfaces;
-using GameInterface.Services.Heroes.Extensions;
-using GameInterface.Services.MapEvents.Patches;
 using GameInterface.Services.MobileParties.Extensions;
-using GameInterface.Services.Players;
 using GameInterface.Services.UI.Notifications.Messages;
 using HarmonyLib;
 using System;
@@ -22,7 +17,7 @@ internal class DefaultClanFinanceModelPatches
 {
     [HarmonyPatch(nameof(DefaultClanFinanceModel.AddExpenseFromLeaderParty))]
     [HarmonyPrefix]
-    private static bool AddExpenseFromLeaderPartyPrefix(DefaultClanFinanceModel __instance, Clan clan, ExplainedNumber goldChange, bool applyWithdrawals, ref int __result)
+    public static bool AddExpenseFromLeaderPartyPrefix(DefaultClanFinanceModel __instance, Clan clan, ExplainedNumber goldChange, bool applyWithdrawals, ref int __result)
     {
         ContainerProvider.TryResolve<IDefaultClanFinanceModelInterface>(out var financeModelInterface);
 
@@ -80,6 +75,13 @@ internal class DefaultClanFinanceModelPatches
     [HarmonyPrefix]
     public static bool AddPartyExpensePrefix(DefaultClanFinanceModel __instance, ref int __result, MobileParty party, Clan clan, ExplainedNumber goldChange, bool applyWithdrawals)
     {
+        // Coop clan members pay their own wages, without NPC party gold top-ups.
+        if (party.IsPlayerParty())
+        {
+            __result = 0;
+            return false;
+        }
+
         ContainerProvider.TryResolve<IDefaultClanFinanceModelInterface>(out var financeModelInterface);
 
         __result = financeModelInterface.AddPartyExpense(__instance, party, clan, goldChange, applyWithdrawals);
@@ -91,33 +93,20 @@ internal class DefaultClanFinanceModelPatches
     [HarmonyPrefix]
     public static bool CalculateClanGoldChangePrefix(Clan clan)
     {
-        // Calculate gold change for AI led clans normally
-        if (clan.Leader == null || !clan.Leader.IsPlayerHero()) return true;
+        if (clan.Leader?.Clan != clan) return false;
 
-        ContainerProvider.TryResolve<IPlayerManager>(out var playerManager);
+        ContainerProvider.TryResolve<IClanFinance>(out var finance);
 
-        // Don't tick gold change for disconnected players based on config
-        if (ModInformation.IsServer
-            && !ModConfigProvider.ModOptions.GoldFoodInfluenceChangeForDisconnectedPlayers
-            && playerManager.IsOwnerOfHeroDisconnected(clan.Leader)) return false;
+        return finance.CanChangeGold(clan.Leader);
+    }
 
-        // Don't tick gold change when clan leader is in a settlement based on config
-        if (clan.Leader.CurrentSettlement != null
-            && !ModConfigProvider.ModOptions.GoldFoodInfluenceChangeInSettlements) return false;
+    [HarmonyPatch(nameof(DefaultClanFinanceModel.AddIncomeFromParty))]
+    [HarmonyPrefix]
+    public static bool AddIncomeFromPartyPrefix(MobileParty party, ref int __result)
+    {
+        if (!party.IsPlayerParty()) return true;
 
-        var clanLeaderMapEvent = clan.Leader.PartyBelongedTo?.MapEvent;
-
-        // Clan leader not in a map event, calculate gold change normally
-        if (clanLeaderMapEvent == null) return true;
-
-        // Gold change is disabled in battles, skip this tick
-        if (ModConfigProvider.ModOptions.GoldFoodInfluenceChangeInBattles == GoldFoodChangeMode.Disabled) return false;
-
-        // Use gold food consumption window to determine if the gold change should be calculated based on config.
-        // This way players only have a gold change at most once during a map event when set to OneDayMax.
-        if (ModConfigProvider.ModOptions.GoldFoodInfluenceChangeInBattles == GoldFoodChangeMode.OneDayMax
-            && !InteractionPatches.IsWithinGoldFoodConsumptionWindow(clanLeaderMapEvent)) return false;
-
-        return true;
+        __result = 0;
+        return false;
     }
 }

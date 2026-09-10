@@ -2,6 +2,8 @@
 using GameInterface.Services.Alleys;
 using GameInterface.Services.CampaignService.Data;
 using GameInterface.Services.Caravans;
+using GameInterface.Services.Clans;
+using System.Collections.Generic;
 using GameInterface.Services.Heroes;
 using GameInterface.Services.Inventory;
 using GameInterface.Services.Inventory.TradeSkills;
@@ -70,6 +72,9 @@ public readonly struct GameSaveDataPacket : IPacket
     [ProtoMember(12)]
     public readonly ServerOptions ServerOptions;
 
+    [ProtoMember(13)]
+    public readonly Dictionary<string, ClanFinanceSettings> ClanFinance;
+
     public GameSaveDataPacket(
         byte[] gameSaveData,
         string campaignID,
@@ -82,7 +87,8 @@ public readonly struct GameSaveDataPacket : IPacket
         InventoryPlayerData inventoryPlayerData,
         HeroMeetingData heroMeetingData,
         AttachmentIdMap attachmentIdMap,
-        ServerOptions serverOptions)
+        ServerOptions serverOptions,
+        Dictionary<string, ClanFinanceSettings> clanFinance = null)
     {
         GameSaveData = gameSaveData;
         CampaignID = campaignID;
@@ -96,5 +102,6 @@ public readonly struct GameSaveDataPacket : IPacket
         HeroMeetingData = heroMeetingData;
         AttachmentIdMap = attachmentIdMap;
         ServerOptions = serverOptions;
+        ClanFinance = clanFinance;
     }
 }

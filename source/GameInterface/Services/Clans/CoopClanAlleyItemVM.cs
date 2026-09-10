@@ -7,12 +7,12 @@ using TaleWorlds.Library;
 
 namespace GameInterface.Services.Clans;
 
-public class SharedClanAlleyItemVM : ClanFinanceAlleyItemVM
+public class CoopClanAlleyItemVM : ClanFinanceAlleyItemVM
 {
     [DataSourceProperty]
-    public bool CanManageAsset => SharedClanPermissions.CanManageClan(Alley.Owner?.Clan);
+    public bool CanManageAsset => CoopClanPermissions.CanManageClan(Alley.Owner?.Clan);
 
-    public SharedClanAlleyItemVM(Alley alley, Action<ClanCardSelectionInfo> openPopup,
+    public CoopClanAlleyItemVM(Alley alley, Action<ClanCardSelectionInfo> openPopup,
         Action<ClanFinanceAlleyItemVM> onSelection, Action onRefresh)
         : base(alley, openPopup, onSelection, onRefresh)
     {

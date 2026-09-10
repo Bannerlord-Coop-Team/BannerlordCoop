@@ -20,9 +20,9 @@ using Xunit;
 namespace GameInterface.Tests.Services.Clans;
 
 [Collection(nameof(CampaignCurrentCollection))]
-public class SharedClanPermissionsTests : IDisposable
+public class CoopClanPermissionsTests : IDisposable
 {
-    private readonly SharedClanPermissions permissions = new(Mock.Of<IClanMemberGrouping>());
+    private readonly CoopClanPermissions permissions = new(Mock.Of<IClanMemberGrouping>());
     private readonly Clan clan = ObjectHelper.SkipConstructor<Clan>();
     private readonly Hero leader;
     private readonly Hero member;
@@ -36,7 +36,7 @@ public class SharedClanPermissionsTests : IDisposable
     private readonly ConditionalWeakTable<object, ControlledObjectInfo> playerObjects =
         (ConditionalWeakTable<object, ControlledObjectInfo>)AccessTools.Field(typeof(PlayerManager), "PlayerObjects").GetValue(null);
 
-    public SharedClanPermissionsTests()
+    public CoopClanPermissionsTests()
     {
         leader = CreateHero(leaderParty);
         member = CreateHero(memberParty);
@@ -49,7 +49,7 @@ public class SharedClanPermissionsTests : IDisposable
 
         ContainerProvider.TryGetContainer(out previousContainer);
         var builder = new ContainerBuilder();
-        builder.RegisterInstance(permissions).As<ISharedClanPermissions>();
+        builder.RegisterInstance(permissions).As<ICoopClanPermissions>();
         container = builder.Build();
         ContainerProvider.SetContainer(container);
         Game.Current = ObjectHelper.SkipConstructor<Game>();
@@ -156,11 +156,11 @@ public class SharedClanPermissionsTests : IDisposable
         SetViewer(asLeader ? leader : member);
         foreach (var patch in new ConditionPatch[]
         {
-            SharedClanDialoguePatches.CompanionFireConditionPostfix,
-            SharedClanDialoguePatches.LeadAPartyClickableConditionPostfix,
-            SharedClanDialoguePatches.ConversationHeroHireOnConditionPostfix,
-            SharedClanDialoguePatches.ConversationCaravanBuildOnConditionPostfix,
-            SharedClanDialoguePatches.CanPlayerBuyWorkshopClickableConditionPostfix,
+            CoopClanDialoguePatches.CompanionFireConditionPostfix,
+            CoopClanDialoguePatches.LeadAPartyClickableConditionPostfix,
+            CoopClanDialoguePatches.ConversationHeroHireOnConditionPostfix,
+            CoopClanDialoguePatches.ConversationCaravanBuildOnConditionPostfix,
+            CoopClanDialoguePatches.CanPlayerBuyWorkshopClickableConditionPostfix,
         })
         {
             bool result = initiallyAvailable;
@@ -197,7 +197,7 @@ public class SharedClanPermissionsTests : IDisposable
 
     private void RegisterPlayerObject(object obj)
     {
-        playerObjects.Add(obj, new ControlledObjectInfo("shared-clan-test", null));
+        playerObjects.Add(obj, new ControlledObjectInfo("coop-clan-test", null));
         registeredObjects.Add(obj);
     }
 

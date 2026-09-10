@@ -51,8 +51,8 @@ internal class CompanionRolesPatches
     {
         // Call original if we call this function
         if (CallOriginalPolicy.IsOriginalAllowed()) return true;
-        if (!SharedClanPermissions.CanManageClan(Hero.MainHero.Clan) ||
-            !SharedClanPermissions.CanManageHero(Hero.OneToOneConversationHero)) return false;
+        if (!CoopClanPermissions.CanManageClan(Hero.MainHero.Clan) ||
+            !CoopClanPermissions.CanManageHero(Hero.OneToOneConversationHero)) return false;
 
         var message = new CompanionFired(Hero.OneToOneConversationHero);
         MessageBroker.Instance.Publish(__instance, message);
@@ -66,7 +66,7 @@ internal class CompanionRolesPatches
     {
         // Call original if we call this function
         if (CallOriginalPolicy.IsOriginalAllowed()) return true;
-        if (!SharedClanPermissions.CanRecallHero(Hero.OneToOneConversationHero)) return false;
+        if (!CoopClanPermissions.CanRecallHero(Hero.OneToOneConversationHero)) return false;
 
         var message = new CompanionRejoinAfterEmprisonment(
             Hero.OneToOneConversationHero,
@@ -119,7 +119,7 @@ internal class CompanionRolesPatches
     [HarmonyPrefix]
     public static bool TurnCompanionToLordOnConditionPrefix(ref bool __result)
     {
-        if (!SharedClanPermissions.CanManageHero(Hero.OneToOneConversationHero))
+        if (!CoopClanPermissions.CanManageHero(Hero.OneToOneConversationHero))
         {
             __result = false;
             return false;

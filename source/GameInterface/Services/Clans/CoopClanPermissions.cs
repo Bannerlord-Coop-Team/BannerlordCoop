@@ -5,7 +5,7 @@ using TaleWorlds.CampaignSystem.Party;
 
 namespace GameInterface.Services.Clans;
 
-public interface ISharedClanPermissions : IGameAbstraction
+public interface ICoopClanPermissions : IGameAbstraction
 {
     bool CanManageClan(Hero actor, Clan clan);
     bool CanManageParty(Hero actor, MobileParty party);
@@ -15,48 +15,48 @@ public interface ISharedClanPermissions : IGameAbstraction
     bool CanRenameHero(Hero actor, Hero hero);
 }
 
-public class SharedClanPermissions : ISharedClanPermissions
+public class CoopClanPermissions : ICoopClanPermissions
 {
     private readonly IClanMemberGrouping grouping;
 
-    public SharedClanPermissions(IClanMemberGrouping grouping)
+    public CoopClanPermissions(IClanMemberGrouping grouping)
     {
         this.grouping = grouping;
     }
 
     public static bool CanManageClan(Clan clan)
     {
-        return ContainerProvider.TryResolve<ISharedClanPermissions>(out var permissions) &&
+        return ContainerProvider.TryResolve<ICoopClanPermissions>(out var permissions) &&
             permissions.CanManageClan(Hero.MainHero, clan);
     }
 
     public static bool CanManageParty(MobileParty party)
     {
-        return ContainerProvider.TryResolve<ISharedClanPermissions>(out var permissions) &&
+        return ContainerProvider.TryResolve<ICoopClanPermissions>(out var permissions) &&
             permissions.CanManageParty(Hero.MainHero, party);
     }
 
     public static bool CanAssignRoles(MobileParty party)
     {
-        return ContainerProvider.TryResolve<ISharedClanPermissions>(out var permissions) &&
+        return ContainerProvider.TryResolve<ICoopClanPermissions>(out var permissions) &&
             permissions.CanAssignRoles(Hero.MainHero, party);
     }
 
     public static bool CanRenameHero(Hero hero)
     {
-        return ContainerProvider.TryResolve<ISharedClanPermissions>(out var permissions) &&
+        return ContainerProvider.TryResolve<ICoopClanPermissions>(out var permissions) &&
             permissions.CanRenameHero(Hero.MainHero, hero);
     }
 
     public static bool CanManageHero(Hero hero)
     {
-        return ContainerProvider.TryResolve<ISharedClanPermissions>(out var permissions) &&
+        return ContainerProvider.TryResolve<ICoopClanPermissions>(out var permissions) &&
             permissions.CanManageHero(Hero.MainHero, hero);
     }
 
     public static bool CanRecallHero(Hero hero)
     {
-        return ContainerProvider.TryResolve<ISharedClanPermissions>(out var permissions) &&
+        return ContainerProvider.TryResolve<ICoopClanPermissions>(out var permissions) &&
             permissions.CanRecallHero(Hero.MainHero, hero);
     }
 

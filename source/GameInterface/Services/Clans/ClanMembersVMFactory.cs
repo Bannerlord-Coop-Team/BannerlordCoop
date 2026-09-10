@@ -25,6 +25,6 @@ public class ClanMembersVMFactory : IClanMembersVMFactory
 
     public ClanMembersVM Create(Action onRefresh, Action<Hero> showHeroOnMap)
     {
-        return new SharedClanMembersVM(onRefresh, showHeroOnMap, grouping, leaveRules, messageBroker);
+        return new CoopClanMembersVM(onRefresh, showHeroOnMap, grouping, leaveRules, messageBroker);
     }
 }

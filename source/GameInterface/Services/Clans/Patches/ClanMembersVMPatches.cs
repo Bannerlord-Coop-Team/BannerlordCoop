@@ -51,21 +51,21 @@ internal static class ClanMembersVMPatches
     [HarmonyPostfix]
     public static void RefreshMembersListPostfix(ClanMembersVM __instance)
     {
-        if (__instance is SharedClanMembersVM shared) shared.RegroupMembers();
+        if (__instance is CoopClanMembersVM coop) coop.RegroupMembers();
     }
 
     [HarmonyPatch(typeof(ClanMembersVM), nameof(ClanMembersVM.SelectMember))]
     [HarmonyPrefix]
     public static bool SelectMemberPrefix(ClanMembersVM __instance, Hero hero)
     {
-        return !(__instance is SharedClanMembersVM shared && shared.SelectAdditionalMember(hero));
+        return !(__instance is CoopClanMembersVM coop && coop.SelectAdditionalMember(hero));
     }
 
     [HarmonyPatch(typeof(ClanMembersVM), nameof(ClanMembersVM.CurrentSelectedMember), MethodType.Setter)]
     [HarmonyPostfix]
     public static void CurrentSelectedMemberPostfix(ClanMembersVM __instance)
     {
-        if (__instance is SharedClanMembersVM shared) shared.RefreshPlayerActions();
+        if (__instance is CoopClanMembersVM coop) coop.RefreshPlayerActions();
     }
 
     [HarmonyPatch(typeof(ClanLordItemVM), nameof(ClanLordItemVM.UpdateProperties))]
@@ -73,7 +73,7 @@ internal static class ClanMembersVMPatches
     public static void UpdatePropertiesPostfix(ClanLordItemVM __instance)
     {
         var hero = __instance.GetHero();
-        __instance.IsFamilyMember = SharedClanPermissions.CanRenameHero(hero);
+        __instance.IsFamilyMember = CoopClanPermissions.CanRenameHero(hero);
         if (hero.IsPlayerHero())
         {
             __instance.IsRecallVisible = false;
@@ -96,7 +96,7 @@ internal static class ClanMembersVMPatches
     [HarmonyPostfix]
     public static void IsMainClanMemberAvailableForRelocatePostfix(Hero hero, ref bool __result, ref TextObject explanation)
     {
-        if (!__result || SharedClanPermissions.CanRecallHero(hero)) return;
+        if (!__result || CoopClanPermissions.CanRecallHero(hero)) return;
 
         __result = false;
         explanation = GameTexts.FindText("str_coop_clan_hero_recall_restricted");
@@ -105,24 +105,24 @@ internal static class ClanMembersVMPatches
     [HarmonyPatch(typeof(ClanMembersVM), nameof(ClanMembersVM.OnRequestRecall))]
     [HarmonyPrefix]
     public static bool OnRequestRecallPrefix(ClanMembersVM __instance)
-        => SharedClanPermissions.CanRecallHero(__instance.CurrentSelectedMember?.GetHero());
+        => CoopClanPermissions.CanRecallHero(__instance.CurrentSelectedMember?.GetHero());
 
     [HarmonyPatch(typeof(ClanMembersVM), nameof(ClanMembersVM.OnConfirmRecall))]
     [HarmonyPrefix]
     public static bool OnConfirmRecallPrefix(ClanMembersVM __instance)
-        => SharedClanPermissions.CanRecallHero(__instance.CurrentSelectedMember?.GetHero());
+        => CoopClanPermissions.CanRecallHero(__instance.CurrentSelectedMember?.GetHero());
 
     [HarmonyPatch(typeof(ClanLordItemVM), nameof(ClanLordItemVM.ExecuteRename))]
     [HarmonyPrefix]
     public static bool ExecuteRenamePrefix(ClanLordItemVM __instance)
     {
-        return SharedClanPermissions.CanRenameHero(__instance.GetHero());
+        return CoopClanPermissions.CanRenameHero(__instance.GetHero());
     }
 
     [HarmonyPatch(typeof(ClanLordItemVM), nameof(ClanLordItemVM.OnNamingHeroOver))]
     [HarmonyPrefix]
     public static bool OnNamingHeroOverPrefix(ClanLordItemVM __instance)
     {
-        return SharedClanPermissions.CanRenameHero(__instance.GetHero());
+        return CoopClanPermissions.CanRenameHero(__instance.GetHero());
     }
 }

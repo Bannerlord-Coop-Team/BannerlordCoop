@@ -29,6 +29,6 @@ public static class ClanIncomePermissionsPatches
     {
         var owner = __instance is ClanFinanceWorkshopItemVM workshop ? workshop.Workshop.Owner
             : ((ClanFinanceAlleyItemVM)__instance).Alley.Owner;
-        return SharedClanPermissions.CanManageClan(owner?.Clan);
+        return CoopClanPermissions.CanManageClan(owner?.Clan);
     }
 }

@@ -54,7 +54,7 @@ public class AlleyCampaignBehaviorInterface : IAlleyCampaignBehaviorInterface
 
     private static AlleyCampaignBehavior Behavior => Campaign.Current?.GetCampaignBehavior<AlleyCampaignBehavior>();
 
-    // Shared clan views read this data without adding entries to the local player's managed alleys.
+    // Coop clan views read this data without adding entries to the local player's managed alleys.
     public Dictionary<string, AlleyManagementData> ClientAlleyData { get; set; } = new();
 
     public void AddOrUpdatePlayerAlleyData(Alley alley, Hero overseer, TroopRoster garrison, CampaignTime lastRecruitTime)

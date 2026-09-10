@@ -8,12 +8,12 @@ using TaleWorlds.Library;
 
 namespace GameInterface.Services.Clans;
 
-public class SharedClanWorkshopItemVM : ClanFinanceWorkshopItemVM
+public class CoopClanWorkshopItemVM : ClanFinanceWorkshopItemVM
 {
     [DataSourceProperty]
-    public bool CanManageAsset => SharedClanPermissions.CanManageClan(Workshop.Owner?.Clan);
+    public bool CanManageAsset => CoopClanPermissions.CanManageClan(Workshop.Owner?.Clan);
 
-    public SharedClanWorkshopItemVM(Workshop workshop, Action<ClanFinanceWorkshopItemVM> onSelection,
+    public CoopClanWorkshopItemVM(Workshop workshop, Action<ClanFinanceWorkshopItemVM> onSelection,
         Action onRefresh, Action<ClanCardSelectionInfo> openPopup)
         : base(workshop, onSelection, onRefresh, openPopup)
     {

@@ -54,7 +54,7 @@ internal class WageChangesSettlementPatch
     {
         // Constructor property setters initialize the display; opening a screen must not change wages.
         if (viewModel.WageLimitHint == null) return;
-        if (ModInformation.IsClient && !SharedClanPermissions.CanManageParty(instance)) return;
+        if (ModInformation.IsClient && !CoopClanPermissions.CanManageParty(instance)) return;
 
         if (ModInformation.IsServer || CallOriginalPolicy.IsOriginalAllowed())
         {

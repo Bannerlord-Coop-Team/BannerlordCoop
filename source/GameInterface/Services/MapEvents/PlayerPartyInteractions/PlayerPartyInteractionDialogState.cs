@@ -104,7 +104,7 @@ public static class PlayerPartyInteractionDialogState
         if (option == PlayerPartyInteractionOption.OfferServices &&
             currentState.ClanJoinUnavailableReason == ClanJoinUnavailableReason.OtherPlayersInClan)
         {
-            explanation = GameTexts.FindText("str_coop_clan_offer_services_shared_leader");
+            explanation = GameTexts.FindText("str_coop_clan_offer_services_coop_leader");
             return false;
         }
 

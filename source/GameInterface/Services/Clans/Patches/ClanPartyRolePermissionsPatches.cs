@@ -10,13 +10,13 @@ internal static class ClanPartyRolePermissionsPatches
     [HarmonyPrefix]
     public static bool ToggleRoleSelectionPrefix(ClanRoleItemVM __instance)
     {
-        return __instance.IsEnabled && SharedClanPermissions.CanAssignRoles(__instance._party);
+        return __instance.IsEnabled && CoopClanPermissions.CanAssignRoles(__instance._party);
     }
 
     [HarmonyPatch(typeof(ClanRoleMemberItemVM), nameof(ClanRoleMemberItemVM.ExecuteAssignHeroToRole))]
     [HarmonyPrefix]
     public static bool AssignHeroToRolePrefix(ClanRoleMemberItemVM __instance)
     {
-        return SharedClanPermissions.CanAssignRoles(__instance._party);
+        return CoopClanPermissions.CanAssignRoles(__instance._party);
     }
 }

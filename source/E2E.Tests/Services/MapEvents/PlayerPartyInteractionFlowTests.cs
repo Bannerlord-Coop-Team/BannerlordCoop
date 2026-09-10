@@ -535,7 +535,7 @@ public class PlayerPartyInteractionFlowTests : MapEventTestBase
     }
 
     [Fact]
-    public void OfferServices_SharedClanLeader_IsDisabledWithExplanation()
+    public void OfferServices_CoopClanLeader_IsDisabledWithExplanation()
     {
         var (client1, _, initiatorPartyId, responderPartyId) = CreateTwoPlayerParties();
         SetupResponderKingdomLeader(initiatorPartyId, responderPartyId, initiatorClanTier: 2);

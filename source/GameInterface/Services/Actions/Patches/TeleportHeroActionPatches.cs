@@ -23,8 +23,8 @@ internal class TeleportHeroActionPatches
     {
         if (ModInformation.IsServer) return true;
         // Sending a member out of the player's own party is still allowed.
-        if (!SharedClanPermissions.CanRecallHero(hero) &&
-            !(targetSettlement != null && targetParty == null && SharedClanPermissions.CanManageHero(hero))) return false;
+        if (!CoopClanPermissions.CanRecallHero(hero) &&
+            !(targetSettlement != null && targetParty == null && CoopClanPermissions.CanManageHero(hero))) return false;
 
         // Send message to server to manage teleported hero
         var message = new HeroTeleported(hero, targetSettlement, targetParty, detail);

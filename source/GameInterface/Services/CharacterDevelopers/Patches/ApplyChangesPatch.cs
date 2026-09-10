@@ -22,14 +22,14 @@ internal class ApplyChangesPatch
     [HarmonyPostfix]
     public static void GetApplicableHeroesPostfix(List<Hero> __result)
     {
-        __result.RemoveAll(hero => !SharedClanPermissions.CanManageHero(hero));
+        __result.RemoveAll(hero => !CoopClanPermissions.CanManageHero(hero));
     }
 
     [HarmonyPatch(typeof(CharacterDeveloperHeroItemVM), nameof(CharacterDeveloperHeroItemVM.ApplyChanges))]
     [HarmonyPrefix]
     public static bool ApplyChangesPrefix(ref CharacterDeveloperHeroItemVM __instance)
     {
-        if (!SharedClanPermissions.CanManageHero(__instance.Hero)) return false;
+        if (!CoopClanPermissions.CanManageHero(__instance.Hero)) return false;
 
         // Get data from CharacterDeveloperHeroItemVM
         HeroDeveloper heroDeveloper = __instance.HeroDeveloper;

@@ -17,7 +17,7 @@
     <string id="str_coop_clan_hero_recall_restricted" text="{=str_coop_clan_hero_recall_restricted}Only the clan leader can recall heroes assigned to a party or governorship. Heroes in another player's party cannot be recalled." />
     <string id="str_coop_clan_join_title" text="{=str_coop_clan_join_title}Join {CLAN_NAME}?" />
     <string id="str_coop_clan_experimental_warning" text="{=str_coop_clan_experimental_warning}EXPERIMENTAL: Use of this feature may cause unexpected issues." />
-    <string id="str_coop_clan_join_description" text="{=str_coop_clan_join_description}You are asking to join {CLAN_NAME}, led by {LEADER_NAME}. The clan leader will manage the shared clan and its assets." />
+    <string id="str_coop_clan_join_description" text="{=str_coop_clan_join_description}You are asking to join {CLAN_NAME}, led by {LEADER_NAME}. The clan leader will manage the Coop clan and its assets." />
 	<string id="str_coop_clan_join_companions" text="{=str_coop_clan_join_companions}Companions: {COUNT}" />
     <string id="str_coop_clan_join_workshops" text="{=str_coop_clan_join_workshops}Workshops: {COUNT}" />
     <string id="str_coop_clan_join_caravans" text="{=str_coop_clan_join_caravans}Caravans: {COUNT}" />
@@ -26,7 +26,7 @@
     <string id="str_coop_clan_join_supporters" text="{=str_coop_clan_join_supporters}Supporters: {COUNT}" />
     <string id="str_coop_clan_join_forfeit_warning" text="{=str_coop_clan_join_forfeit_warning}On joining the clan, you give up ownership and control of the companions, assets and supporters listed above to the new clan leader. They will not be returned to you if you leave the clan later." />
     <string id="str_coop_clan_join_confirm" text="{=str_coop_clan_join_confirm}Send join request" />
-    <string id="str_coop_clan_offer_services_shared_leader" text="{=str_coop_clan_offer_services_shared_leader}You cannot offer services while leading a clan with other players." />
+    <string id="str_coop_clan_offer_services_coop_leader" text="{=str_coop_clan_offer_services_coop_leader}You cannot offer services while leading a clan with other players." />
     <string id="str_coop_clan_join_other_players" text="{=str_coop_clan_join_other_players}You cannot join another clan while other players belong to your clan." />
     <string id="str_coop_clan_join_target_not_leader" text="{=str_coop_clan_join_target_not_leader}You must speak to the clan leader to request membership." />
     <string id="str_coop_clan_join_rules_kingdom" text="{=str_coop_clan_join_rules_kingdom}You cannot join another clan while ruling a kingdom." />
@@ -65,5 +65,15 @@
     <string id="str_coop_marriage_acceptance_description" text="{=str_coop_marriage_acceptance_description}If you accept {LEADER_NAME}'s marriage proposal, you will marry them and join {CLAN_NAME}. They will remain clan leader and manage its shared assets." />
     <string id="str_coop_marriage_clan_commitment" text="{=str_coop_marriage_clan_commitment}While married to another player, you cannot leave the clan or be removed from it." />
     <string id="str_coop_marriage_forfeit_warning" text="{=str_coop_marriage_forfeit_warning}On joining the clan through marriage, you permanently give up ownership and control of the companions, assets and supporters listed above to the clan leader. You cannot leave the clan or be removed while married to another player." />
+    <string id="str_coop_clan_daily_payment" text="{=str_coop_clan_daily_payment}Daily Payment" />
+    <string id="str_coop_clan_send_tribute" text="{=str_coop_clan_send_tribute}Send Tribute" />
+    <string id="str_coop_clan_daily_payment_amount" text="{=str_coop_clan_daily_payment_amount}Daily Payment: {AMOUNT}" />
+    <string id="str_coop_clan_payment_description" text="{=str_coop_clan_payment_description}Gold to send to {HERO} each day, after clan expenses. They pay their own party wages. Enter 0 to stop payments. If funds are insufficient, only the available gold is sent." />
+    <string id="str_coop_clan_tribute_description" text="{=str_coop_clan_tribute_description}Send a one-time payment to clan leader {HERO}. Available gold: {GOLD}. This payment does not repeat. If your gold changes before the transfer, only the available amount is sent." />
+    <string id="str_coop_clan_invalid_payment" text="{=str_coop_clan_invalid_payment}Enter a whole number from {MIN} to {MAX}." />
+    <string id="str_coop_clan_no_tribute_gold" text="{=str_coop_clan_no_tribute_gold}You have no gold available to send." />
+    <string id="str_coop_clan_tribute_received" text="{=str_coop_clan_tribute_received}You received {AMOUNT} gold in tribute from clan member {HERO}." />
+    <string id="str_coop_clan_payment_to" text="{=str_coop_clan_payment_to}Daily Payment To {HERO}" />
+    <string id="str_coop_clan_payment_from_leader" text="{=str_coop_clan_payment_from_leader}Daily Payment From Clan Leader" />
     <!-- Add other custom text here in the future-->
 </strings>

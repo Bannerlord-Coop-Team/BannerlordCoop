@@ -7,10 +7,60 @@ public interface IClanPrefabEditor : IGameAbstraction
     void AddMemberGroups(XmlNode root);
     void ApplyIncomePermissions(XmlNode root);
     void AddMembershipActions(XmlNode root);
+    void AddFinanceControls(XmlNode root);
 }
 
 public class ClanPrefabEditor : IClanPrefabEditor
 {
+    public void AddFinanceControls(XmlNode root)
+    {
+        XmlNode anchor;
+        string id, attributes, visible, text, command;
+        bool screen = root.Attributes?["Id"]?.Value == "ClanScreenWidget";
+        if (screen)
+        {
+            anchor = root.SelectSingleNode("./Children/ClanCardSelectionPopup");
+            id = "SendTributeButton";
+            attributes = "VisualDefinition='RightPanel' PositionXOffset='300'";
+            visible = "CanSendTribute";
+            text = "SendTributeText";
+            command = "ExecuteSendTribute";
+        }
+        else
+        {
+            anchor = root.SelectSingleNode(".//*[@IsHidden='@ShouldPartyHaveExpense']");
+            id = "PlayerPaymentButton";
+            attributes = "DataSource='{..\\..}'";
+            visible = "CanSetPlayerPayment";
+            text = "PlayerPaymentText";
+            command = "ExecuteSetPlayerPayment";
+        }
+        if (anchor == null || root.SelectSingleNode($".//*[@Id='{id}']") != null) return;
+
+        var fragment = root.OwnerDocument.CreateDocumentFragment();
+        fragment.InnerXml = $@"
+            <Widget {attributes} WidthSizePolicy='Fixed' HeightSizePolicy='Fixed' SuggestedWidth='265' SuggestedHeight='60'
+                HorizontalAlignment='{(screen ? "Right" : "Center")}' VerticalAlignment='{(screen ? "Center" : "Top")}'
+                MarginRight='{(screen ? 10 : 0)}' PositionYOffset='{(screen ? 235 : 0)}' IsVisible='@{visible}'>
+                <Children>
+                    <NavigationScopeTargeter ScopeID='{id}Scope' ScopeParent='..\{id}' ScopeMovements='Horizontal' />
+                    <ButtonWidget Id='{id}' WidthSizePolicy='Fixed' HeightSizePolicy='StretchToParent' SuggestedWidth='250'
+                        HorizontalAlignment='Center' Brush='Popup.Cancel.Button' Command.Click='{command}'
+                        DoNotPassEventsToChildren='true' GamepadNavigationIndex='0'>
+                        <Children>
+                            <TextWidget WidthSizePolicy='StretchToParent' HeightSizePolicy='StretchToParent'
+                                Brush='Popup.Button.Text' Text='@{text}' />
+                        </Children>
+                    </ButtonWidget>
+                </Children>
+            </Widget>";
+        foreach (XmlNode whitespace in fragment.SelectNodes(".//text()[normalize-space(.)='']"))
+            whitespace.ParentNode.RemoveChild(whitespace);
+        // Keep tribute inside the screen's hit area and above tab content, but below popups.
+        if (screen) anchor.ParentNode.InsertBefore(fragment, anchor);
+        else anchor.ParentNode.InsertAfter(fragment, anchor);
+    }
+
     public void AddMembershipActions(XmlNode root)
     {
         var fragment = root.OwnerDocument.CreateDocumentFragment();

@@ -104,7 +104,7 @@ internal class AlleyCampaignBehaviorPatches
     [HarmonyPrefix]
     public static bool GetAssignedClanMemberPrefix(Alley alley, ref Hero __result)
     {
-        if (!TryGetSharedAlleyData(alley, out var data, out var objectManager)) return true;
+        if (!TryGetCoopClanAlleyData(alley, out var data, out var objectManager)) return true;
         __result = data?.OverseerId != null && objectManager.TryGetObject<Hero>(data.OverseerId, out var overseer)
             ? overseer : alley.Owner;
         return false;
@@ -114,7 +114,7 @@ internal class AlleyCampaignBehaviorPatches
     [HarmonyPrefix]
     public static bool GetTroopCountPrefix(Alley alley, ref int __result)
     {
-        if (!TryGetSharedAlleyData(alley, out var data, out var objectManager)) return true;
+        if (!TryGetCoopClanAlleyData(alley, out var data, out var objectManager)) return true;
         __result = 0;
         if (data?.Garrison == null) return false;
         foreach (var troop in data.Garrison)
@@ -129,7 +129,7 @@ internal class AlleyCampaignBehaviorPatches
     [HarmonyPrefix]
     public static bool GetIsUnderAttackPrefix(Alley alley, ref bool __result)
     {
-        if (!TryGetSharedAlleyData(alley, out var data, out _)) return true;
+        if (!TryGetCoopClanAlleyData(alley, out var data, out _)) return true;
         __result = data?.UnderAttackByAlleyId != null;
         return false;
     }
@@ -138,12 +138,12 @@ internal class AlleyCampaignBehaviorPatches
     [HarmonyPrefix]
     public static bool GetResponseTimePrefix(Alley alley, ref int __result)
     {
-        if (!TryGetSharedAlleyData(alley, out var data, out _)) return true;
+        if (!TryGetCoopClanAlleyData(alley, out var data, out _)) return true;
         __result = data == null ? 0 : (int)data.AttackResponseDueDate.RemainingDaysFromNow;
         return false;
     }
 
-    private static bool TryGetSharedAlleyData(Alley alley, out AlleyManagementData data, out IObjectManager objectManager)
+    private static bool TryGetCoopClanAlleyData(Alley alley, out AlleyManagementData data, out IObjectManager objectManager)
     {
         data = null;
         objectManager = null;
