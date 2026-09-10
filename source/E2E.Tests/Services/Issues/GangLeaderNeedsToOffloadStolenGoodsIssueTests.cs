@@ -1295,6 +1295,81 @@ public class GangLeaderNeedsToOffloadStolenGoodsIssueTests : IDisposable
     }
 
     [Fact]
+    public void DailyTickOnServer_StillValidIssue_DoesNotRemoveIt()
+    {
+        var fixture = SetupIssueOwner();
+        CreateIssueOnServer(fixture);
+
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject<Hero>(fixture.HeroId, out var owner));
+
+            Campaign.Current.IssueManager.DailyTick();
+
+            Assert.NotNull(owner.Issue);
+            Assert.True(owner.Issue.IsOngoingWithoutQuest);
+        });
+
+        Assert.Empty(Server.NetworkSentMessages.GetMessages<NetworkIssueRemoved>());
+    }
+
+    [Fact]
+    public void DailyTickOnServer_HideoutNoLongerInfested_GenuinelyRemovesTheIssueThroughTheRealVanillaTick()
+    {
+        var fixture = SetupIssueOwner();
+        CreateIssueOnServer(fixture);
+
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject<Hero>(fixture.HeroId, out var owner));
+            Assert.True(Server.ObjectManager.TryGetObject<Settlement>(fixture.IssueHideoutSettlementId, out var issueHideoutSettlement));
+            Assert.True(owner.Issue.IsOngoingWithoutQuest);
+
+            using (new AllowedThread())
+            {
+                foreach (var party in issueHideoutSettlement.Parties.ToList())
+                {
+                    if (party.IsBandit) party.CurrentSettlement = null;
+                }
+            }
+
+            Campaign.Current.IssueManager.DailyTick();
+
+            Assert.Null(owner.Issue);
+        });
+
+        Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkIssueRemoved>());
+    }
+
+    [Fact]
+    public void DailyTickOnServer_OverdueIssue_EventuallyTimesOutThroughTheRealVanillaTick()
+    {
+        var fixture = SetupIssueOwner();
+        CreateIssueOnServer(fixture);
+
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject<Hero>(fixture.HeroId, out var owner));
+            Assert.True(owner.Issue.IsOngoingWithoutQuest);
+
+            using (new AllowedThread())
+            {
+                owner.Issue.IssueDueTime = CampaignTime.Now - CampaignTime.Days(1f);
+            }
+            Assert.True(owner.Issue.IssueDueTime.IsPast);
+
+            for (var i = 0; i < 100 && owner.Issue != null; i++)
+            {
+                Campaign.Current.IssueManager.DailyTick();
+            }
+
+            Assert.Null(owner.Issue);
+        });
+
+        Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkIssueRemoved>());
+    }
+
+    [Fact]
     public void OnHourlyTick_OneDueOwnedIssue_SendsExactlyOneCompletionRequest()
     {
         var fixture = SetupIssueOwner();
