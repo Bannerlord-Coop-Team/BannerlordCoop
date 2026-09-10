@@ -319,15 +319,9 @@ internal static class GangLeaderNeedsToOffloadStolenGoodsQuestType
         return CallOriginalPolicy.IsOriginalAllowedForOwnershipGate();
     }
 
-    private static bool IsLocalPeerOwner(Hero owner) =>
-        ContainerProvider.TryResolve<IIssueOwnershipRegistry>(out var ownershipRegistry) && ownershipRegistry.IsLocalPeerOwner(owner);
-
     private static void ApplySucceedByPayingAndKeepingTheGoods(Quest quest)
     {
-        if (!IsLocalPeerOwner(quest.QuestGiver))
-        {
-            GiveGoldAction.ApplyBetweenCharacters(Hero.MainHero, null, quest._stolenTradeGoodPrice);
-        }
+        GiveGoldAction.ApplyBetweenCharacters(Hero.MainHero, null, quest._stolenTradeGoodPrice);
         quest.AddLog(quest.SuccessQuestLogText);
         TraitLevelingHelper.OnIssueSolvedThroughQuest(Hero.MainHero, new Tuple<TraitObject, int>[1]
         {
@@ -346,10 +340,7 @@ internal static class GangLeaderNeedsToOffloadStolenGoodsQuestType
 
     private static void ApplySucceedByPayingAndGivingTheGoodsBack(Quest quest)
     {
-        if (!IsLocalPeerOwner(quest.QuestGiver))
-        {
-            GiveGoldAction.ApplyBetweenCharacters(Hero.MainHero, null, quest._stolenTradeGoodPrice);
-        }
+        GiveGoldAction.ApplyBetweenCharacters(Hero.MainHero, null, quest._stolenTradeGoodPrice);
         quest.AddLog(quest.SuccessByGivingBackTheGoodsQuestLogText);
         GiveGoldAction.ApplyBetweenCharacters(null, Hero.MainHero, quest._counterOfferGold);
         TraitLevelingHelper.OnIssueSolvedThroughQuest(Hero.MainHero, new Tuple<TraitObject, int>[1]
