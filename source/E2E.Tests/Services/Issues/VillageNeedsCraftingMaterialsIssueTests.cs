@@ -37,6 +37,10 @@ public class VillageNeedsCraftingMaterialsIssueTests : IDisposable
         AccessTools.Property(typeof(GameModels), nameof(GameModels.CharacterDevelopmentModel));
     private static readonly PropertyInfo PlayerTraitDeveloperProperty =
         AccessTools.Property(typeof(Campaign), nameof(Campaign.PlayerTraitDeveloper));
+    private static readonly PropertyInfo OccupationProperty =
+        AccessTools.Property(typeof(Hero), nameof(Hero.Occupation));
+    private static readonly FieldInfo NotablesCacheField =
+        AccessTools.Field(typeof(Settlement), "_notablesCache");
 
     private static void InstallCharacterDevelopmentModel()
     {
@@ -207,6 +211,51 @@ public class VillageNeedsCraftingMaterialsIssueTests : IDisposable
 
                 Assert.True(client.ObjectManager.TryGetObject<ItemObject>(created.RequestedItemId, out var requestedItem));
                 Assert.Same(requestedItem, mirrored._requestedItem);
+            });
+        }
+    }
+
+    [Fact]
+    public void DailyTickSettlementFromVanillaCampaignFlow_NaturallyCreatesAndReplicatesACraftingMaterialsIssue()
+    {
+        var fixture = SetupIssueOwner();
+
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject<Hero>(fixture.HeroId, out var giver));
+            Assert.True(Server.ObjectManager.TryGetObject<Settlement>(fixture.SettlementId, out var settlement));
+
+            OccupationProperty.SetValue(giver, Occupation.RuralNotable);
+
+            var notablesCache = (MBList<Hero>)NotablesCacheField.GetValue(settlement);
+            if (!notablesCache.Contains(giver)) notablesCache.Add(giver);
+
+            if (!Server.ObjectManager.Contains(DefaultItems.IronIngot1))
+            {
+                Assert.True(Server.ObjectManager.AddExisting(DefaultItems.IronIngot1.StringId, DefaultItems.IronIngot1));
+            }
+            if (!Server.ObjectManager.Contains(DefaultItems.IronIngot2))
+            {
+                Assert.True(Server.ObjectManager.AddExisting(DefaultItems.IronIngot2.StringId, DefaultItems.IronIngot2));
+            }
+
+            new IssuesCampaignBehavior().RegisterEvents();
+            new VillageNeedsCraftingMaterialsIssueBehavior().RegisterEvents();
+
+            CampaignEventDispatcher.Instance.DailyTickSettlement(settlement);
+
+            Assert.IsType<VillageNeedsCraftingMaterialsIssueBehavior.VillageNeedsCraftingMaterialsIssue>(giver.Issue);
+        });
+
+        var created = Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkVillageCraftingIssueCreated>());
+        Assert.Equal(fixture.HeroId, created.OwnerId);
+
+        foreach (var client in TestEnvironment.Clients)
+        {
+            client.Call(() =>
+            {
+                Assert.True(client.ObjectManager.TryGetObject<Hero>(fixture.HeroId, out var owner));
+                Assert.IsType<VillageNeedsCraftingMaterialsIssueBehavior.VillageNeedsCraftingMaterialsIssue>(owner.Issue);
             });
         }
     }
