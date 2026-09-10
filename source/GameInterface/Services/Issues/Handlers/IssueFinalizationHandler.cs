@@ -255,11 +255,13 @@ internal class IssueFinalizationHandler : IHandler
             return;
         }
 
+        var isLocalPeerOwner = ownershipRegistry.IsLocalPeerOwner(owner);
+
         if (!FinalizeAndBroadcast(owner, ownerId, player, reason, proof)) return;
 
         if (reason == IssueFinalizeReason.QuestFail && descriptor?.ApplyQuestFailLocalOwnerConsequence != null)
         {
-            if (ownershipRegistry.IsLocalPeerOwner(owner))
+            if (isLocalPeerOwner)
             {
                 descriptor.ApplyQuestFailLocalOwnerConsequence(quest, proof);
             }
