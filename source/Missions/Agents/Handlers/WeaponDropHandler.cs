@@ -751,8 +751,11 @@ public class WeaponDropHandler : IWeaponDropHandler
     private void ApplyReadyNetworkDrop(NetworkWeaponDropped message, bool deferred = false)
     {
         if (disposed || !TryBuildCanonicalWeapon(message, out MissionWeapon canonical)) return;
-        if (deferred && message.HasLifeTime && message.RemainingLifeTime <= 0f &&
-            message.WorldItemId != Guid.Empty)
+        bool expiredWhileDeferred = deferred && message.HasLifeTime &&
+            message.RemainingLifeTime <= 0f && message.WorldItemId != Guid.Empty &&
+            !retiredWorldItemIds.Contains(message.WorldItemId) &&
+            !consumedWorldItemIds.Contains(message.WorldItemId);
+        if (expiredWhileDeferred)
             RetireExpiredWorldItem(message.WorldItemId);
 
         WorldItemTransitionState transitionState = null;
@@ -823,7 +826,9 @@ public class WeaponDropHandler : IWeaponDropHandler
                     "retired-before-drop");
                 ResolveObservedWorldItemIdentity(retiredObservation, message.WorldItemId);
             }
-            if (hasAgent && transitionState != null && transitionState.IsPreDrop)
+            if (hasAgent &&
+                ((transitionState != null && transitionState.IsPreDrop) ||
+                 (expiredWhileDeferred && transitionState == null)))
                 ApplyRetiredDropTransition(message, agentInfo);
             TrackAppliedDropId(message.DropId);
             TrackConsumedDropId(message.DropId);

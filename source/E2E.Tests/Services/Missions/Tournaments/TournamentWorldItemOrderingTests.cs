@@ -115,6 +115,51 @@ public class TournamentWorldItemOrderingTests : MissionTestEnvironment
         }, remainingLifeTime: 0f);
     }
 
+    [Fact]
+    public void LoadingLiveDrop_ExpiryClearsRegisteredSourceSlotWithoutSpawning()
+    {
+        RunWithAgentShims(observer =>
+        {
+            var objectManager = observer.Resolve<IObjectManager>();
+            ItemObject item = RegisterItem(objectManager, out string itemId);
+            try
+            {
+                Agent agent = ObjectHelper.SkipConstructor<Agent>();
+                MissionWeapon weapon = CreateWeapon(item);
+                MissionEquipment equipment = CreateEquipment(weapon);
+                AgentEquipmentShim.Track(agent, equipment);
+                Guid agentId = Guid.NewGuid();
+                var agentRegistry = observer.Resolve<INetworkAgentRegistry>();
+                Assert.True(agentRegistry.TryRegisterAgent("fighter", agentId, agent));
+                using var broker = new MessageBroker();
+                var registry = new NetworkWorldItemRegistry();
+                var spawner = new RecordingWorldItemSpawner { IsReady = false };
+                using var handler = CreateHandler(observer, agentRegistry, registry,
+                    objectManager, spawner, broker);
+                NetworkWeaponDropped drop = CreateDropMessage(agentId, Guid.NewGuid(),
+                    itemId, weapon, isCatchUp: false, remainingLifeTime: 0f);
+
+                broker.Publish(this, drop);
+                Assert.False(equipment[EquipmentIndex.Weapon0].IsEmpty);
+                spawner.IsReady = true;
+                handler.Tick(0f);
+                Assert.True(equipment[EquipmentIndex.Weapon0].IsEmpty);
+                Assert.Equal(1, AgentEquipmentShim.GetRemoveCount(agent));
+                Assert.Equal(0, spawner.SpawnCount);
+                Assert.False(registry.TryGet(drop.WorldItemId, out _));
+
+                broker.Publish(this, drop);
+                handler.Tick(0f);
+                Assert.Equal(1, AgentEquipmentShim.GetRemoveCount(agent));
+                Assert.Equal(0, spawner.SpawnCount);
+            }
+            finally
+            {
+                objectManager.Remove(item);
+            }
+        });
+    }
+
     private void RunWithLoadingCatchUp(
         Action<WeaponDropHandler, MessageBroker, RecordingWorldItemSpawner,
             NetworkWorldItemRegistry, NetworkWeaponDropped> test,
