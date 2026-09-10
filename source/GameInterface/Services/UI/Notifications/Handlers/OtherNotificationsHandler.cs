@@ -72,6 +72,12 @@ internal class OtherNotificationsHandler : IHandler
         messageBroker.Subscribe<NotifyTributePaymentEnded>(Handle_NotifyTributePaymentEnded);
         messageBroker.Subscribe<NetworkNotifyTributePaymentEnded>(Handle_NetworkNotifyTributePaymentEnded);
 
+        messageBroker.Subscribe<NotifyStillbornDelivery>(Handle_NotifyStillbornDelivery);
+        messageBroker.Subscribe<NetworkNotifyStillbornDelivery>(Handle_NetworkNotifyStillbornDelivery);
+
+        messageBroker.Subscribe<NotifyCaughtIllness>(Handle_NotifyCaughtIllness);
+        messageBroker.Subscribe<NetworkNotifyCaughtIllness>(Handle_NetworkNotifyCaughtIllness);
+
         messageBroker.Subscribe<NetworkNotifyRemovedSupporter>(Handle_NetworkNotifyRemovedSupporter);
     }
 
@@ -109,6 +115,12 @@ internal class OtherNotificationsHandler : IHandler
 
         messageBroker.Unsubscribe<NotifyTributePaymentEnded>(Handle_NotifyTributePaymentEnded);
         messageBroker.Unsubscribe<NetworkNotifyTributePaymentEnded>(Handle_NetworkNotifyTributePaymentEnded);
+
+        messageBroker.Unsubscribe<NotifyStillbornDelivery>(Handle_NotifyStillbornDelivery);
+        messageBroker.Unsubscribe<NetworkNotifyStillbornDelivery>(Handle_NetworkNotifyStillbornDelivery);
+
+        messageBroker.Unsubscribe<NotifyCaughtIllness>(Handle_NotifyCaughtIllness);
+        messageBroker.Unsubscribe<NetworkNotifyCaughtIllness>(Handle_NetworkNotifyCaughtIllness);
 
         messageBroker.Unsubscribe<NetworkNotifyRemovedSupporter>(Handle_NetworkNotifyRemovedSupporter);
     }
@@ -419,6 +431,50 @@ internal class OtherNotificationsHandler : IHandler
             IFaction faction = flag ? clan.MapFaction : payerFaction;
             textObject.SetTextVariable("ENEMY_FACTION", faction.Name);
             Campaign.Current.CampaignInformationManager.NewMapNoticeAdded(new TributeFinishedMapNotification(textObject, faction));
+        });
+    }
+
+    private void Handle_NotifyStillbornDelivery(MessagePayload<NotifyStillbornDelivery> obj)
+    {
+        GameThread.RunSafe(() =>
+        {
+            if (!objectManager.TryGetIdWithLogging(obj.What.MotherCharacter, out var motherCharacterId)) return;
+
+            network.SendAll(new NetworkNotifyStillbornDelivery(motherCharacterId));
+        });
+    }
+
+    private void Handle_NetworkNotifyStillbornDelivery(MessagePayload<NetworkNotifyStillbornDelivery> obj)
+    {
+        GameThread.RunSafe(() =>
+        {
+            if (!objectManager.TryGetObjectWithLogging<CharacterObject>(obj.What.MotherCharacterId, out var motherCharacter)) return;
+
+            TextObject textObject = new TextObject("{=pw4cUPEn}{MOTHER.LINK} has delivered stillborn.", null);
+            StringHelpers.SetCharacterProperties("MOTHER", motherCharacter, textObject, false);
+            InformationManager.DisplayMessage(new InformationMessage(textObject.ToString()));
+        });
+    }
+
+    private void Handle_NotifyCaughtIllness(MessagePayload<NotifyCaughtIllness> obj)
+    {
+        GameThread.RunSafe(() =>
+        {
+            if (!objectManager.TryGetIdWithLogging(obj.What.PlayerHero, out var playerHeroId)) return;
+
+            network.SendAll(new NetworkNotifyCaughtIllness(playerHeroId));
+        });
+    }
+
+    private void Handle_NetworkNotifyCaughtIllness(MessagePayload<NetworkNotifyCaughtIllness> obj)
+    {
+        GameThread.RunSafe(() =>
+        {
+            if (!objectManager.TryGetObjectWithLogging<Hero>(obj.What.PlayerHeroId, out var playerHero)) return;
+
+            if (playerHero != Hero.MainHero) return;
+
+            InformationManager.ShowInquiry(new InquiryData(new TextObject("{=2duoimiP}Caught Illness", null).ToString(), new TextObject("{=vo3MqtMn}You are at death's door, wracked by fever, drifting in and out of consciousness. The healers do not believe that you can recover. You should resolve your final affairs and determine a heir for your clan while you still have the strength to speak.", null).ToString(), true, false, new TextObject("{=yQtzabbe}Close", null).ToString(), "", null, null, "event:/ui/notification/quest_fail", 0f, null, null, null), false, false);
         });
     }
 

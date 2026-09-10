@@ -107,6 +107,9 @@ internal class PlayerStartCaptivityPatches
                 continue;
             }
 
+            if (!playerHero.IsAlive || playerHero.DeathMark != KillCharacterAction.KillCharacterActionDetail.None)
+                continue;
+
             // The capture can be reached more than once for the same battle (e.g. a surrender applies the
             // victory immediately and the client's battle-state relay then re-applies the same state). Skip
             // a hero already taken prisoner on the first pass to avoid a duplicate capture.
