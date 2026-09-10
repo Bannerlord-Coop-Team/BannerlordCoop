@@ -57,11 +57,13 @@ public readonly struct ModOptions
     [ProtoMember(18)]
     public readonly bool EnablePlayerClanMemberExecutions { get; } = false;
     [ProtoMember(19)]
-    public readonly bool ShowPlayerNameplates { get; } = true;
+    public readonly bool EnablePlayerExecutions { get; } = false;
     [ProtoMember(20)]
+    public readonly bool ShowPlayerNameplates { get; } = true;
+    [ProtoMember(21)]
     public readonly bool PlayerWoundedBattleEntry { get; } = true;
 
-    [ProtoMember(21)]
+    [ProtoMember(22)]
     public bool VoiceEnabled { get; } = true;
 
     public ModOptions(ModOptions previous, bool voiceEnabled)
@@ -91,6 +93,7 @@ public readonly struct ModOptions
         LordDefectionRetries = modOptionsData.LordDefectionRetries ?? LordDefectionRetries;
         EnableHeroExecutions = modOptionsData.EnableHeroExecutions ?? EnableHeroExecutions;
         EnablePlayerClanMemberExecutions = modOptionsData.EnablePlayerClanMemberExecutions ?? EnablePlayerClanMemberExecutions;
+        EnablePlayerExecutions = modOptionsData.EnablePlayerExecutions ?? EnablePlayerExecutions;
         ShowPlayerNameplates = modOptionsData.ShowPlayerNameplates ?? ShowPlayerNameplates;
         PlayerWoundedBattleEntry = modOptionsData.PlayerWoundedBattleEntry ?? PlayerWoundedBattleEntry;
     }
