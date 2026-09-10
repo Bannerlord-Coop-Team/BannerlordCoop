@@ -2529,6 +2529,7 @@ public class VillageNeedsCraftingMaterialsIssueTests : IDisposable
             Assert.True(Server.Resolve<IPlayerManager>().TryGetPlayer("player-A", out var player));
             Assert.True(Server.Resolve<IPlayerManager>().IsConnected(player));
 
+            new IssuesCampaignBehavior().RegisterEvents();
             CampaignEvents.Instance.HourlyTick();
         });
 

@@ -2,7 +2,6 @@ using Common;
 using Common.Logging;
 using Common.Messaging;
 using Common.Network;
-using GameInterface.Services.Entity;
 using GameInterface.Services.Heroes.Patches;
 using GameInterface.Services.Issues.Generic;
 using GameInterface.Services.Issues.Messages;
@@ -50,8 +49,6 @@ internal class IssueFinalizationHandler : IHandler
         messageBroker.Subscribe<RequestIssueRemoved>(Handle_RequestIssueRemoved);
         messageBroker.Subscribe<NetworkIssueRemoved>(Handle_NetworkIssueRemoved);
         messageBroker.Subscribe<NetworkApplyPendingQuestFailConsequence>(Handle_NetworkApplyPendingQuestFailConsequence);
-
-        CampaignEvents.HourlyTickEvent.AddNonSerializedListener(this, OnHourlyTick);
     }
 
     public void Dispose()
@@ -62,25 +59,6 @@ internal class IssueFinalizationHandler : IHandler
         messageBroker.Unsubscribe<RequestIssueRemoved>(Handle_RequestIssueRemoved);
         messageBroker.Unsubscribe<NetworkIssueRemoved>(Handle_NetworkIssueRemoved);
         messageBroker.Unsubscribe<NetworkApplyPendingQuestFailConsequence>(Handle_NetworkApplyPendingQuestFailConsequence);
-
-        CampaignEvents.HourlyTickEvent.ClearListeners(this);
-    }
-
-    private static void OnHourlyTick()
-    {
-        if (ModInformation.IsClient) return;
-        if (!ContainerProvider.TryResolve<IPlayerManager>(out var currentPlayerManager)) return;
-
-        PendingLocalOwnerConsequenceRegistry.FlushConnected(currentPlayerManager, DeliverPendingQuestFailConsequence);
-    }
-
-    private static void DeliverPendingQuestFailConsequence(string controllerId, string questTypeKey, byte proof)
-    {
-        if (!ContainerProvider.TryResolve<IPlayerManager>(out var currentPlayerManager) ||
-            !ContainerProvider.TryResolve<INetwork>(out var currentNetwork)) return;
-        if (!currentPlayerManager.TryGetPeer(controllerId, out var peer)) return;
-
-        currentNetwork.Send(peer, new NetworkApplyPendingQuestFailConsequence(questTypeKey, proof));
     }
 
     private void Handle_NetworkApplyPendingQuestFailConsequence(MessagePayload<NetworkApplyPendingQuestFailConsequence> payload)
