@@ -68,6 +68,25 @@ internal static class DefenderSiegeFixtureCommands
         }
     }
 
+    public sealed class ObserveRosterFixtureReadinessCoopCommand : ICoopCommand
+    {
+        public string Prefix => "coop.debug.siege";
+        public string Name => "defender_roster_fixture_readiness";
+        public string Description => "Reports defender roster capture readiness without changing fixture state.";
+        public CoopCommandSide Side => CoopCommandSide.Server;
+        public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
+        {
+            new ExpectedArgs("first_controller_id", "First defender controller."),
+            new ExpectedArgs("second_controller_id", "Second defender controller.")
+        };
+        public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
+        {
+            string output = ObserveRosterFixtureReadiness(args.ToList());
+            bool success = Newtonsoft.Json.Linq.JObject.Parse(output.Substring("LIVE_TEST_JSON=".Length)).Value<bool>("success");
+            return new CoopCommandResult(success, output, success ? null : "fixture_failed");
+        }
+    }
+
     public sealed class NormalizeRosterFixtureCoopCommand : ICoopCommand
     {
         public string Prefix => "coop.debug.siege";
@@ -239,6 +258,151 @@ internal static class DefenderSiegeFixtureCommands
 
         rosterFixture = fixture;
         return RosterFixtureResult(fixture, "capture", success: true, reason: null);
+    }
+
+    public static string ObserveRosterFixtureReadiness(List<string> args)
+    {
+        if (ModInformation.IsClient)
+            return RosterFixtureFailure("readiness", "Command can only be run on the server.");
+        if (!TryGetExpectedControllerIds(args, out string[] expectedControllerIds, out _))
+        {
+            return RosterFixtureFailure("readiness",
+                "Usage: coop.debug.siege.defender_roster_fixture_readiness <firstControllerId> <secondControllerId>");
+        }
+        if (!ContainerProvider.TryResolve<IObjectManager>(out var objectManager) ||
+            !ContainerProvider.TryResolve<IPlayerManager>(out var playerManager))
+        {
+            return RosterFixtureFailure("readiness", "The defender roster fixture services are unavailable.");
+        }
+
+        bool campaignPresent = Campaign.Current != null;
+        bool lifecycleClear = rosterFixture == null && pendingCapture == null &&
+            activeFixture == null && restoredFixture == null;
+        bool synchronizedControllers = HasExpectedSynchronizedControllers(playerManager, expectedControllerIds);
+        bool observationComplete = true;
+        var players = new List<object>(ExpectedPlayerCount);
+        foreach (string controllerId in expectedControllerIds)
+        {
+            Player player = null;
+            Hero hero = null;
+            MobileParty party = null;
+            string partyId = null;
+            bool playerResolved = playerManager.TryGetPlayer(controllerId, out player);
+            bool heroResolved = playerResolved && objectManager.TryGetObject<Hero>(player.HeroId, out hero);
+            bool partyResolved = playerResolved && objectManager.TryGetObject<MobileParty>(player.MobilePartyId, out party);
+            bool partyIdentityCurrent = partyResolved && objectManager.TryGetId(party, out partyId) &&
+                partyId == player.MobilePartyId;
+            if (!playerResolved || !heroResolved || !partyIdentityCurrent || party.Party == null)
+            {
+                observationComplete = false;
+                players.Add(new
+                {
+                    controllerId,
+                    playerResolved,
+                    heroResolved,
+                    partyResolved,
+                    partyIdentityCurrent,
+                    partyBaseResolved = partyResolved && party?.Party != null,
+                    captureReady = (bool?)null
+                });
+                continue;
+            }
+
+            bool heroIsPrisoner = hero.IsPrisoner;
+            bool heroHasCaptor = hero.PartyBelongedToAsPrisoner != null;
+            bool heroBelongsToPlayerParty = ReferenceEquals(hero.PartyBelongedTo, party);
+            bool heroStateIsActive = hero.HeroState == Hero.CharacterStates.Active;
+            bool partyActive = party.IsActive;
+            bool partyVisible = party.IsVisible;
+            bool partyHasVisual = party.Party.GetPartyVisual() != null;
+            bool partyLeaderIsHero = ReferenceEquals(party.LeaderHero, hero);
+            bool partyHasMapEvent = party.MapEvent != null;
+            bool partyHasBesiegerCamp = party.BesiegerCamp != null;
+            bool partyIsTransitioning = party.IsTransitionInProgress;
+            bool partyHasArmy = party.Army != null;
+            bool partyHasAttachedTo = party.AttachedTo != null;
+            bool partyHasAttachedParties = party.AttachedParties?.Count > 0;
+            bool partyIsAtSea = party.IsCurrentlyAtSea;
+            bool captureReady = DefenderRosterFixtureContract.IsUncapturedPlayerReady(
+                heroIsPrisoner,
+                heroHasCaptor,
+                heroBelongsToPlayerParty,
+                heroStateIsActive,
+                partyActive,
+                partyVisible,
+                partyHasVisual,
+                partyLeaderIsHero,
+                partyHasMapEvent,
+                partyHasBesiegerCamp,
+                partyIsTransitioning,
+                partyHasArmy,
+                partyHasAttachedTo,
+                partyHasAttachedParties,
+                partyIsAtSea);
+            string[] failedConditions = new[]
+            {
+                heroIsPrisoner ? "heroIsPrisoner" : null,
+                heroHasCaptor ? "heroHasCaptor" : null,
+                !heroBelongsToPlayerParty ? "heroBelongsToPlayerParty" : null,
+                !heroStateIsActive ? "heroStateIsActive" : null,
+                !partyActive ? "partyActive" : null,
+                !partyVisible ? "partyVisible" : null,
+                !partyHasVisual ? "partyHasVisual" : null,
+                !partyLeaderIsHero ? "partyLeaderIsHero" : null,
+                partyHasMapEvent ? "partyHasMapEvent" : null,
+                partyHasBesiegerCamp ? "partyHasBesiegerCamp" : null,
+                partyIsTransitioning ? "partyIsTransitioning" : null,
+                partyHasArmy ? "partyHasArmy" : null,
+                partyHasAttachedTo ? "partyHasAttachedTo" : null,
+                partyHasAttachedParties ? "partyHasAttachedParties" : null,
+                partyIsAtSea ? "partyIsAtSea" : null
+            }.Where(condition => condition != null).ToArray();
+            players.Add(new
+            {
+                controllerId,
+                playerResolved,
+                heroResolved,
+                partyResolved,
+                partyIdentityCurrent,
+                partyBaseResolved = true,
+                heroId = player.HeroId,
+                partyId,
+                heroIsPrisoner,
+                heroHasCaptor,
+                heroBelongsToPlayerParty,
+                heroStateIsActive,
+                partyActive,
+                partyVisible,
+                partyHasVisual,
+                partyLeaderIsHero,
+                partyHasMapEvent,
+                partyHasBesiegerCamp,
+                partyIsTransitioning,
+                partyHasArmy,
+                partyHasAttachedTo,
+                partyHasAttachedParties,
+                partyIsAtSea,
+                uncapturedGuardApplicable = !heroIsPrisoner && !heroHasCaptor,
+                captureReady,
+                failedConditions
+            });
+        }
+
+        return JsonResult(new
+        {
+            success = true,
+            phase = "readiness",
+            expectedPlayerCount = ExpectedPlayerCount,
+            expectedControllerIds,
+            requiresReadinessRecheck = true,
+            campaignPresent,
+            lifecycleClear,
+            synchronizedControllers,
+            observationComplete,
+            capturePreconditionsCurrent = campaignPresent && lifecycleClear &&
+                synchronizedControllers && observationComplete,
+            players = players.ToArray()
+        });
     }
 
     public static string NormalizeRosterFixture(List<string> args)

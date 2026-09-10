@@ -24,11 +24,13 @@ using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.CampaignBehaviors;
 using TaleWorlds.CampaignSystem.LogEntries;
 using TaleWorlds.CampaignSystem.Map;
+using TaleWorlds.CampaignSystem.MapEvents;
 using TaleWorlds.CampaignSystem.Naval;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Party.PartyComponents;
 using TaleWorlds.CampaignSystem.Roster;
 using TaleWorlds.CampaignSystem.Settlements;
+using TaleWorlds.CampaignSystem.Siege;
 using TaleWorlds.Library;
 using Xunit;
 
@@ -40,6 +42,7 @@ public sealed class DefenderSiegeFixtureCommandsTests : IDisposable
     private static readonly FieldInfo RosterFixture = AccessTools.Field(typeof(DefenderSiegeFixtureCommands), "rosterFixture");
     private static readonly Dictionary<PartyBase, MobilePartyVisual> Visuals = new();
     private static readonly List<LogEntry> Logs = new();
+    private static readonly Dictionary<Hero, bool> PrisonerOverrides = new();
     private readonly Harmony harmony = new("Coop.Tests.DefenderRosterFixture");
     private readonly Campaign previousCampaign;
     private readonly bool previousServer;
@@ -81,6 +84,8 @@ public sealed class DefenderSiegeFixtureCommandsTests : IDisposable
             // Supply only the scene's visual lookup; all command guards read real game objects.
             harmony.Patch(AccessTools.Method(typeof(PartyBaseExtensions), nameof(PartyBaseExtensions.GetPartyVisual)),
                 prefix: new HarmonyMethod(typeof(DefenderSiegeFixtureCommandsTests), nameof(ReadVisual)));
+            harmony.Patch(AccessTools.PropertyGetter(typeof(Hero), nameof(Hero.IsPrisoner)),
+                prefix: new HarmonyMethod(typeof(DefenderSiegeFixtureCommandsTests), nameof(ReadHeroIsPrisoner)));
             captives = new[] { CreateCaptive("testclient"), CreateCaptive("testclient2") };
             players.SetupGet(manager => manager.Players).Returns(() => registrations.Values.ToArray());
             players.Setup(manager => manager.IsConnected(It.IsAny<Player>())).Returns(() => connected);
@@ -698,6 +703,241 @@ public sealed class DefenderSiegeFixtureCommandsTests : IDisposable
         AssertSuccess(Parse(DefenderSiegeFixtureCommands.Stage(new())));
     }
 
+    [Fact]
+    public void ObserveRosterFixtureReadiness_ReleasedPlayersReportEveryGuardReady()
+    {
+        PrepareReadinessObservation();
+
+        JObject result = ObserveReadiness();
+
+        AssertSuccess(result);
+        Assert.Equal("readiness", result.Value<string>("phase"));
+        Assert.True(result.Value<bool>("observationComplete"));
+        Assert.True(result.Value<bool>("capturePreconditionsCurrent"));
+        JArray rows = Assert.IsType<JArray>(result["players"]);
+        Assert.Equal(2, rows.Count);
+        foreach (JObject row in rows.Values<JObject>())
+        {
+            Assert.True(row.Value<bool>("captureReady"));
+            Assert.Empty(row["failedConditions"].Values<string>());
+            Assert.True(row.Value<bool>("playerResolved"));
+            Assert.True(row.Value<bool>("heroResolved"));
+            Assert.True(row.Value<bool>("partyResolved"));
+            Assert.True(row.Value<bool>("partyIdentityCurrent"));
+            Assert.True(row.Value<bool>("partyBaseResolved"));
+        }
+        AssertReadinessObservationIsNonMutating();
+    }
+
+    [Theory]
+    [InlineData("heroIsPrisoner", false)]
+    [InlineData("heroHasCaptor", false)]
+    [InlineData("heroBelongsToPlayerParty", true)]
+    [InlineData("heroStateIsActive", true)]
+    [InlineData("partyActive", true)]
+    [InlineData("partyVisible", true)]
+    [InlineData("partyHasVisual", true)]
+    [InlineData("partyLeaderIsHero", true)]
+    [InlineData("partyHasMapEvent", false)]
+    [InlineData("partyHasBesiegerCamp", false)]
+    [InlineData("partyIsTransitioning", false)]
+    [InlineData("partyHasArmy", false)]
+    [InlineData("partyHasAttachedTo", false)]
+    [InlineData("partyHasAttachedParties", false)]
+    [InlineData("partyIsAtSea", false)]
+    public void ObserveRosterFixtureReadiness_ReportsEachGuardFailureWithItsExactPolarity(
+        string guardName,
+        bool requiredValue)
+    {
+        PrepareReadinessObservation();
+        SetReadinessGuardFailure(guardName);
+
+        JObject result = ObserveReadiness();
+        JObject row = ReadinessRow(result, captives[0].Player.ControllerId);
+
+        AssertSuccess(result);
+        Assert.True(result.Value<bool>("observationComplete"));
+        Assert.False(row.Value<bool>("captureReady"));
+        Assert.Equal(!requiredValue, row.Value<bool>(guardName));
+        Assert.Equal(new[] { guardName }, row["failedConditions"].Values<string>().ToArray());
+        AssertReadinessObservationIsNonMutating();
+    }
+
+    [Theory]
+    [InlineData("missing-player", false, false, false, false, false)]
+    [InlineData("missing-hero", true, false, true, true, true)]
+    [InlineData("missing-party", true, true, false, false, false)]
+    [InlineData("reverse-party-identity", true, true, true, false, true)]
+    [InlineData("missing-party-base", true, true, true, true, false)]
+    public void ObserveRosterFixtureReadiness_IncompleteIdentityIsNonReady(
+        string missingIdentity,
+        bool playerResolved,
+        bool heroResolved,
+        bool partyResolved,
+        bool partyIdentityCurrent,
+        bool partyBaseResolved)
+    {
+        PrepareReadinessObservation();
+        IObjectManager observationObjects = objects;
+        switch (missingIdentity)
+        {
+            case "missing-player":
+                registrations.Remove(captives[0].Player.ControllerId);
+                break;
+            case "missing-hero":
+                Assert.True(objects.Remove(captives[0].Hero));
+                break;
+            case "missing-party":
+                Assert.True(objects.Remove(captives[0].Party));
+                break;
+            case "reverse-party-identity":
+                observationObjects = CreateReversePartyIdentityObjectManager();
+                break;
+            case "missing-party-base":
+                captives[0].Party.Party = null;
+                break;
+            default:
+                throw new ArgumentOutOfRangeException(nameof(missingIdentity));
+        }
+
+        JObject result = observationObjects == objects
+            ? ObserveReadiness()
+            : ObserveReadiness(observationObjects);
+        JObject row = ReadinessRow(result, captives[0].Player.ControllerId);
+
+        AssertSuccess(result);
+        Assert.False(result.Value<bool>("observationComplete"));
+        Assert.False(result.Value<bool>("capturePreconditionsCurrent"));
+        Assert.Equal(playerResolved, row.Value<bool>("playerResolved"));
+        Assert.Equal(heroResolved, row.Value<bool>("heroResolved"));
+        Assert.Equal(partyResolved, row.Value<bool>("partyResolved"));
+        Assert.Equal(partyIdentityCurrent, row.Value<bool>("partyIdentityCurrent"));
+        Assert.Equal(partyBaseResolved, row.Value<bool>("partyBaseResolved"));
+        Assert.Equal(JTokenType.Null, row["captureReady"].Type);
+        AssertReadinessObservationIsNonMutating();
+    }
+
+    private void PrepareReadinessObservation()
+    {
+        if (Campaign.Current == null) Campaign.Current = ObjectHelper.SkipConstructor<Campaign>();
+        foreach (Captive captive in captives) SetReleased(captive);
+        PrisonerOverrides.Clear();
+        actionCalls.Clear();
+        snapshots.Invocations.Clear();
+    }
+
+    private void SetReadinessGuardFailure(string guardName)
+    {
+        Captive captive = captives[0];
+        switch (guardName)
+        {
+            case "heroIsPrisoner":
+                PrisonerOverrides[captive.Hero] = true;
+                break;
+            case "heroHasCaptor":
+                captive.Hero.PartyBelongedToAsPrisoner = captive.Captor.Party;
+                break;
+            case "heroBelongsToPlayerParty":
+                captive.Hero._partyBelongedTo = CreateParty("other-player-party");
+                break;
+            case "heroStateIsActive":
+                captive.Hero._heroState = Hero.CharacterStates.Released;
+                break;
+            case "partyActive":
+                captive.Party.IsActive = false;
+                break;
+            case "partyVisible":
+                captive.Party._isVisible = false;
+                break;
+            case "partyHasVisual":
+                Visuals.Remove(captive.Party.Party);
+                break;
+            case "partyLeaderIsHero":
+                captive.Party._partyComponent = null;
+                break;
+            case "partyHasMapEvent":
+                var side = ObjectHelper.SkipConstructor<MapEventSide>();
+                AccessTools.Field(typeof(MapEventSide), "_mapEvent").SetValue(side, ObjectHelper.SkipConstructor<MapEvent>());
+                captive.Party.Party._mapEventSide = side;
+                break;
+            case "partyHasBesiegerCamp":
+                captive.Party._besiegerCamp = ObjectHelper.SkipConstructor<BesiegerCamp>();
+                break;
+            case "partyIsTransitioning":
+                captive.Party.NavigationTransitionStartTime = CampaignTime.Hours(1f);
+                break;
+            case "partyHasArmy":
+                captive.Party._army = ObjectHelper.SkipConstructor<Army>();
+                break;
+            case "partyHasAttachedTo":
+                captive.Party._attachedTo = CreateParty("attached-to-party");
+                break;
+            case "partyHasAttachedParties":
+                captive.Party._attachedParties = new MBList<MobileParty> { CreateParty("attached-party") };
+                break;
+            case "partyIsAtSea":
+                captive.Party._isCurrentlyAtSea = true;
+                break;
+            default:
+                throw new ArgumentOutOfRangeException(nameof(guardName));
+        }
+    }
+
+    private JObject ObserveReadiness() => Parse(DefenderSiegeFixtureCommands.ObserveRosterFixtureReadiness(
+        new() { "testclient", "testclient2" }));
+
+    private JObject ObserveReadiness(IObjectManager observationObjects)
+    {
+        var builder = new ContainerBuilder();
+        builder.RegisterInstance(observationObjects).As<IObjectManager>();
+        builder.RegisterInstance(players.Object).As<IPlayerManager>();
+        builder.RegisterInstance(synchronization.Object).As<ICampaignSynchronization>();
+        IContainer observationContainer = builder.Build();
+        ContainerProvider.SetContainer(observationContainer);
+        try
+        {
+            return ObserveReadiness();
+        }
+        finally
+        {
+            ContainerProvider.SetContainer(container);
+            observationContainer.Dispose();
+        }
+    }
+
+    private IObjectManager CreateReversePartyIdentityObjectManager()
+    {
+        var reverseObjects = new Mock<IObjectManager>(MockBehavior.Strict);
+        reverseObjects.Setup(manager => manager.TryGetObject<Hero>(It.IsAny<string>(), out It.Ref<Hero>.IsAny))
+            .Returns((string id, out Hero hero) => objects.TryGetObject(id, out hero));
+        reverseObjects.Setup(manager => manager.TryGetObject<MobileParty>(It.IsAny<string>(), out It.Ref<MobileParty>.IsAny))
+            .Returns((string id, out MobileParty party) => objects.TryGetObject(id, out party));
+        reverseObjects.Setup(manager => manager.TryGetId(It.IsAny<object>(), out It.Ref<string>.IsAny))
+            .Returns((object value, out string id) =>
+            {
+                if (ReferenceEquals(value, captives[0].Party))
+                {
+                    id = "reverse-party-identity";
+                    return true;
+                }
+                return objects.TryGetId(value, out id);
+            });
+        return reverseObjects.Object;
+    }
+
+    private static JObject ReadinessRow(JObject result, string controllerId) =>
+        result["players"].Values<JObject>().Single(row => row.Value<string>("controllerId") == controllerId);
+
+    private void AssertReadinessObservationIsNonMutating()
+    {
+        Assert.Empty(actionCalls);
+        Assert.Null(RosterFixture.GetValue(null));
+        foreach (string fieldName in new[] { "pendingCapture", "activeFixture", "restoredFixture" })
+            Assert.Null(AccessTools.Field(typeof(DefenderSiegeFixtureCommands), fieldName).GetValue(null));
+        snapshots.Verify(service => service.TryCreate(It.IsAny<MobileParty>(), out It.Ref<PartyBehaviorUpdateData>.IsAny), Times.Never);
+        AssertNoSnapshotReplay();
+    }
+
     private Settlement CaptureStagingFixture()
     {
         Settlement settlement = PrepareStagingParties();
@@ -869,6 +1109,13 @@ public sealed class DefenderSiegeFixtureCommandsTests : IDisposable
         return false;
     }
 
+    private static bool ReadHeroIsPrisoner(Hero __instance, ref bool __result)
+    {
+        if (!PrisonerOverrides.TryGetValue(__instance, out bool isPrisoner)) return true;
+        __result = isPrisoner;
+        return false;
+    }
+
     private void Capture() => AssertSuccess(CaptureResult());
     private void Normalize() => AssertSuccess(Parse(DefenderSiegeFixtureCommands.NormalizeRosterFixture(new())));
     private static JObject CaptureResult() => Parse(DefenderSiegeFixtureCommands.CaptureRosterFixture(new() { "testclient", "testclient2" }));
@@ -914,6 +1161,7 @@ public sealed class DefenderSiegeFixtureCommandsTests : IDisposable
         harmony.UnpatchAll(harmony.Id);
         Visuals.Clear();
         Logs.Clear();
+        PrisonerOverrides.Clear();
         foreach (var previous in previousFixtures) previous.Key.SetValue(null, previous.Value);
         ContainerProvider.SetContainer(previousContainer);
         container?.Dispose();
