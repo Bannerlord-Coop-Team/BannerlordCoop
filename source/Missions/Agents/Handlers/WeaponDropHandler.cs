@@ -9,6 +9,7 @@ using Missions.Agents.Packets;
 using Serilog;
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
@@ -142,6 +143,8 @@ public class WeaponDropHandler : IWeaponDropHandler
     private readonly Dictionary<Guid, PendingResyncRequest> pendingResyncRequests =
         new Dictionary<Guid, PendingResyncRequest>();
     private readonly Queue<Guid> pendingResyncRequestOrder = new Queue<Guid>();
+    private readonly Queue<(NetworkWeaponDropped Message, long ReceivedAt)> deferredMissionDrops =
+        new Queue<(NetworkWeaponDropped Message, long ReceivedAt)>();
     private readonly CancellationTokenSource expiryCancellation = new CancellationTokenSource();
     private Func<bool> isLocalHost = () => false;
     private float pruneElapsedSeconds;
@@ -210,6 +213,7 @@ public class WeaponDropHandler : IWeaponDropHandler
         messageBroker.Unsubscribe<WeaponPickedup>(HandleWeaponPickedup);
         messageBroker.Unsubscribe<WeaponPickupApplied>(HandleWeaponPickupApplied);
         messageBroker.Unsubscribe<PendingWorldItemPickupsRejected>(HandlePendingWorldItemPickupsRejected);
+        deferredMissionDrops.Clear();
         pendingDrops.Clear();
         activeDrops.Clear();
         activeDropRemainingLifeTime.Clear();
@@ -255,6 +259,8 @@ public class WeaponDropHandler : IWeaponDropHandler
 
     public void Tick(float dt)
     {
+        if (disposed) return;
+        DrainDeferredMissionDrops();
         float elapsed = MathF.Max(0f, dt);
         AdvanceActiveDropLifeTimes(elapsed);
         pruneElapsedSeconds += elapsed;
@@ -693,7 +699,61 @@ public class WeaponDropHandler : IWeaponDropHandler
 
     private void ApplyNetworkDrop(NetworkWeaponDropped message)
     {
-        if (!TryBuildCanonicalWeapon(message, out MissionWeapon canonical)) return;
+        if (disposed || message == null) return;
+        if (!worldItemSpawner.IsReady)
+        {
+            deferredMissionDrops.Enqueue((message, Stopwatch.GetTimestamp()));
+            return;
+        }
+
+        DrainDeferredMissionDrops();
+        ApplyReadyNetworkDrop(message);
+    }
+
+    private void DrainDeferredMissionDrops()
+    {
+        while (!disposed && worldItemSpawner.IsReady && deferredMissionDrops.Count > 0)
+        {
+            var pending = deferredMissionDrops.Dequeue();
+            float elapsed = (float)((Stopwatch.GetTimestamp() - pending.ReceivedAt) /
+                (double)Stopwatch.Frequency);
+            NetworkWeaponDropped message = AgeDeferredDrop(pending.Message, elapsed);
+            try
+            {
+                ApplyReadyNetworkDrop(message, deferred: true);
+            }
+            catch (Exception exception)
+            {
+                Logger.Error(exception, "[WeaponDrop] Failed deferred drop={DropId}", message.DropId);
+            }
+        }
+    }
+
+    private NetworkWeaponDropped AgeDeferredDrop(NetworkWeaponDropped message, float elapsed)
+    {
+        if (!message.HasLifeTime ||
+            float.IsNaN(message.RemainingLifeTime) ||
+            float.IsInfinity(message.RemainingLifeTime) ||
+            message.RemainingLifeTime < 0f ||
+            message.RemainingLifeTime > MaxDropLifeTimeSeconds)
+            return message;
+
+        float remaining = MathF.Max(0f, message.RemainingLifeTime - elapsed);
+        return new NetworkWeaponDropped(
+            message.DropId, message.AgentId, message.EquipmentIndex, message.WorldItemId,
+            message.OriginControllerId, message.ItemObjectId, message.ItemModifierId,
+            message.BannerCode, message.DataValue, message.Position, message.Rotation,
+            message.SpawnFlags, message.HasLifeTime, remaining,
+            message.HasCurrentEquipment ? message.CurrentEquipment : (AgentEquipmentData?)null,
+            message.IsCatchUp);
+    }
+
+    private void ApplyReadyNetworkDrop(NetworkWeaponDropped message, bool deferred = false)
+    {
+        if (disposed || !TryBuildCanonicalWeapon(message, out MissionWeapon canonical)) return;
+        if (deferred && message.HasLifeTime && message.RemainingLifeTime <= 0f &&
+            message.WorldItemId != Guid.Empty)
+            RetireExpiredWorldItem(message.WorldItemId);
 
         WorldItemTransitionState transitionState = null;
         if (message.WorldItemId != Guid.Empty &&
@@ -1623,7 +1683,7 @@ public class WeaponDropHandler : IWeaponDropHandler
 
     private void ApplyAcceptedWorldItemState(NetworkWeaponDropStateResponse response)
     {
-        if (response == null || response.WorldItemId == Guid.Empty) return;
+        if (disposed || response == null || response.WorldItemId == Guid.Empty) return;
         if (worldItemTransitionStates.TryGetValue(
                 response.WorldItemId,
                 out WorldItemTransitionState currentState) &&

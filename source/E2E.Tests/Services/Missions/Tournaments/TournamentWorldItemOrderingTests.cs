@@ -27,6 +27,122 @@ public class TournamentWorldItemOrderingTests : MissionTestEnvironment
     public TournamentWorldItemOrderingTests(ITestOutputHelper output) : base(output) { }
 
     [Fact]
+    public void LoadingCatchUp_WaitsThenSpawnsOnceWithoutResettingLifetime()
+    {
+        RunWithLoadingCatchUp((handler, broker, spawner, registry, drop) =>
+        {
+            broker.Publish(this, drop);
+            broker.Publish(this, drop);
+            handler.Tick(0f);
+            Assert.Equal(0, spawner.SpawnCount);
+            Assert.False(registry.TryGet(drop.WorldItemId, out _));
+            Thread.Sleep(20);
+
+            spawner.IsReady = true;
+            handler.Tick(0f);
+            broker.Publish(this, drop);
+            handler.Tick(0f);
+            Assert.Equal(1, spawner.SpawnCount);
+            Assert.True(registry.TryGet(drop.WorldItemId, out var item));
+            Assert.Same(spawner.LastSpawnedItem, item);
+            Assert.InRange(spawner.LastRemainingLifeTime, 0f, drop.RemainingLifeTime);
+            Assert.True(spawner.LastRemainingLifeTime < drop.RemainingLifeTime);
+        });
+    }
+
+    [Fact]
+    public void LoadingCatchUp_ConsumedStatePreventsDeferredResurrection()
+    {
+        RunWithLoadingCatchUp((handler, broker, spawner, registry, drop) =>
+        {
+            broker.Publish(this, drop);
+            broker.Publish(this, new NetworkWeaponDropStateResponse(
+                Guid.Empty, drop.WorldItemId, 1, true, null, Array.Empty<Guid>()));
+            spawner.IsReady = true;
+            handler.Tick(0f);
+            broker.Publish(this, drop);
+            Assert.Equal(0, spawner.SpawnCount);
+            Assert.False(registry.TryGet(drop.WorldItemId, out _));
+        });
+    }
+
+    [Fact]
+    public void LoadingCatchUp_LatestPartialStateAppliesBeforeDeferredSpawn()
+    {
+        RunWithLoadingCatchUp((handler, broker, spawner, registry, drop) =>
+        {
+            broker.Publish(this, drop);
+            broker.Publish(this, new NetworkWeaponDropStateResponse(
+                Guid.Empty, drop.WorldItemId, 2, false, drop, Array.Empty<Guid>(), true, 4));
+            broker.Publish(this, new NetworkWeaponDropStateResponse(
+                Guid.Empty, drop.WorldItemId, 1, false, drop, Array.Empty<Guid>(), true, 7));
+            Assert.Equal(0, spawner.SpawnCount);
+            spawner.IsReady = true;
+            handler.Tick(0f);
+            Assert.Equal(1, spawner.SpawnCount);
+            Assert.True(registry.TryGet(drop.WorldItemId, out var item));
+            Assert.Equal(4, item.WeaponCopy.Amount);
+        });
+    }
+
+    [Fact]
+    public void LoadingCatchUp_DisposalDiscardsPendingAndLaterDelivery()
+    {
+        RunWithLoadingCatchUp((handler, broker, spawner, registry, drop) =>
+        {
+            broker.Publish(this, drop);
+            handler.Dispose();
+            spawner.IsReady = true;
+            handler.Tick(0f);
+            broker.Publish(this, drop);
+            Common.GameThread.Instance.Update(TimeSpan.Zero);
+            Assert.Equal(0, spawner.SpawnCount);
+            Assert.False(registry.TryGet(drop.WorldItemId, out _));
+        });
+    }
+
+    [Fact]
+    public void LoadingCatchUp_ExpiredItemStaysRetiredAfterStartup()
+    {
+        RunWithLoadingCatchUp((handler, broker, spawner, registry, drop) =>
+        {
+            broker.Publish(this, drop);
+            spawner.IsReady = true;
+            handler.Tick(0f);
+            broker.Publish(this, drop);
+            Assert.Equal(0, spawner.SpawnCount);
+            Assert.False(registry.TryGet(drop.WorldItemId, out _));
+        }, remainingLifeTime: 0f);
+    }
+
+    private void RunWithLoadingCatchUp(
+        Action<WeaponDropHandler, MessageBroker, RecordingWorldItemSpawner,
+            NetworkWorldItemRegistry, NetworkWeaponDropped> test,
+        float remainingLifeTime = 180f)
+    {
+        RunWithAgentShims(observer =>
+        {
+            var objectManager = observer.Resolve<IObjectManager>();
+            ItemObject item = RegisterItem(objectManager, out string itemId);
+            try
+            {
+                using var broker = new MessageBroker();
+                var registry = new NetworkWorldItemRegistry();
+                var spawner = new RecordingWorldItemSpawner { IsReady = false };
+                using var handler = CreateHandler(observer,
+                    observer.Resolve<INetworkAgentRegistry>(), registry, objectManager, spawner, broker);
+                NetworkWeaponDropped drop = CreateDropMessage(Guid.NewGuid(), Guid.NewGuid(),
+                    itemId, CreateWeapon(item), isCatchUp: true, remainingLifeTime: remainingLifeTime);
+                test(handler, broker, spawner, registry, drop);
+            }
+            finally
+            {
+                objectManager.Remove(item);
+            }
+        });
+    }
+
+    [Fact]
     public void ObservedDrop_PendingIdentityClearsWhenCanonicalDropArrives()
     {
         RunWithAgentShims(observer =>
@@ -5021,7 +5137,8 @@ public class TournamentWorldItemOrderingTests : MissionTestEnvironment
         EquipmentIndex equipmentIndex = EquipmentIndex.Weapon0,
         bool isCatchUp = false,
         AgentEquipmentData? currentEquipment = null,
-        Guid? dropId = null) =>
+        Guid? dropId = null,
+        float remainingLifeTime = 180f) =>
         new NetworkWeaponDropped(
             dropId ?? worldItemId,
             agentId,
@@ -5036,7 +5153,7 @@ public class TournamentWorldItemOrderingTests : MissionTestEnvironment
             Mat3.Identity,
             (int)Mission.WeaponSpawnFlags.WithPhysics,
             hasLifeTime: true,
-            remainingLifeTime: 180f,
+            remainingLifeTime,
             currentEquipment,
             isCatchUp);
 
@@ -5213,8 +5330,10 @@ public class TournamentWorldItemOrderingTests : MissionTestEnvironment
     {
         private readonly List<SpawnedItemEntity> presentItems = new();
 
+        public bool IsReady { get; set; } = true;
         public int SpawnCount { get; private set; }
         public SpawnedItemEntity LastSpawnedItem { get; private set; }
+        public float LastRemainingLifeTime { get; private set; }
         public bool FailRemovals { get; set; }
         public int PresentCount => presentItems.Count;
 
@@ -5252,6 +5371,7 @@ public class TournamentWorldItemOrderingTests : MissionTestEnvironment
             item._hasLifeTime = hasLifeTime;
             item.SpawnFlags = spawnFlags;
             LastSpawnedItem = item;
+            LastRemainingLifeTime = remainingLifeTime;
             return true;
         }
 

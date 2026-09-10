@@ -36,6 +36,7 @@ public interface IOwnedAgentReplicator : IDisposable
     /// troops it spawns natively).
     /// </summary>
     void ReplicateCurrentAgentsTo(string controllerId);
+    void RecoverRetainedPlayerHandoffs(float dt);
 
     /// <summary>[Owner, game thread] Send newly captured agents as bounded batches once per mission tick.</summary>
     void FlushPendingSpawns();
@@ -63,6 +64,8 @@ public class OwnedAgentReplicator : IOwnedAgentReplicator
     private readonly IBattleDeploymentCoordinator deployment;
     private readonly IBattleAgentSpawnBatchCodec spawnBatchCodec;
     private readonly IMissionWeaponDataMapper missionWeaponDataMapper;
+    private readonly IBattleAuthorityMigrator authorityMigrator;
+    private float retainedHeroRecoverySeconds;
     private readonly List<BattleAgentSpawnData> pendingSpawns = new List<BattleAgentSpawnData>();
 
     // The horse each of our riders SPAWNED with (rider id → mount id), so a record built while the rider is
@@ -83,8 +86,10 @@ public class OwnedAgentReplicator : IOwnedAgentReplicator
         ICasualtyAttributionMap casualties,
         IBattleDeploymentCoordinator deployment,
         IBattleAgentSpawnBatchCodec spawnBatchCodec,
-        IMissionWeaponDataMapper missionWeaponDataMapper)
+        IMissionWeaponDataMapper missionWeaponDataMapper,
+        IBattleAuthorityMigrator authorityMigrator = null)
     {
+        this.authorityMigrator = authorityMigrator;
         this.network = network;
         this.messageBroker = messageBroker;
         this.objectManager = objectManager;
@@ -115,7 +120,9 @@ public class OwnedAgentReplicator : IOwnedAgentReplicator
             if (Mission.Current == null) return;
 
             // A joiner catches up on everything we own (our own party AND, on the host, the AI it drives).
+            authorityMigrator?.ReplayPlayerHandoff(controllerId);
             var records = BuildOwnedAgentRecords(ownPartyOnly: false);
+            records.RemoveAll(data => authorityMigrator?.TrySurrenderPlayerHero(controllerId, data) == true);
             if (records.Count == 0) return;
 
             IReadOnlyList<NetworkSpawnBattleAgents> batches =
@@ -125,6 +132,17 @@ public class OwnedAgentReplicator : IOwnedAgentReplicator
 
             LogBatchSend("Replayed", records.Count, batches, controllerId);
         }, context: nameof(ReplicateCurrentAgentsTo));
+    }
+
+    // A successor reconstructs the surrendered hero request even when the returner already joined.
+    public void RecoverRetainedPlayerHandoffs(float dt)
+    {
+        if (!session.IsLocalHost || authorityMigrator == null || Mission.Current == null) return;
+        retainedHeroRecoverySeconds += dt;
+        if (retainedHeroRecoverySeconds < 0.5f) return;
+        retainedHeroRecoverySeconds = 0;
+        foreach (var data in BuildOwnedAgentRecords(ownPartyOnly: false, retainedPlayerHeroesOnly: true))
+            authorityMigrator.TrySurrenderPlayerHero(data.OriginalOwnerControllerId, data);
     }
 
     public void FlushPendingSpawns()
@@ -166,13 +184,15 @@ public class OwnedAgentReplicator : IOwnedAgentReplicator
     // commit, which withholds those until they are placed; the joiner catch-up passes false to replay all we own.
     // Registered MOUNTS get no record of their own — a horse spawns implicitly with its rider on the receiver,
     // so its id rides on the rider's record instead (MountAgentId).
-    private List<BattleAgentSpawnData> BuildOwnedAgentRecords(bool ownPartyOnly)
+    private List<BattleAgentSpawnData> BuildOwnedAgentRecords(bool ownPartyOnly, bool retainedPlayerHeroesOnly = false)
     {
         var records = new List<BattleAgentSpawnData>();
         foreach (var info in coopMissionComponent.AgentRegistry.GetAgents(session.OwnControllerId))
         {
             var agent = info.Agent;
             if (agent == null || !agent.IsActive() || agent.IsMount || !(agent.Character is CharacterObject character)) continue;
+
+            if (retainedPlayerHeroesOnly && (!character.IsHero || session.IsOwn(info.OriginalOwner))) continue;
 
             bool isOwnParty = IsOwnPartyAgent(agent, character);
             if (ownPartyOnly && !isOwnParty) continue;

@@ -1,4 +1,5 @@
 ﻿using System.Collections.Generic;
+using System.Reflection;
 using System.Runtime.CompilerServices;
 using Common.Util;
 using SandBox.Missions.MissionLogics;
@@ -22,15 +23,36 @@ public sealed class MockMission
     public Mission Shell { get; }
 
     public Agent MainAgent { get; set; }
+    public bool TrackInitialPlayerAgent { get; set; }
+    public Agent InitialPlayerAgent { get; private set; }
+    public int InitialPlayerBuildCount { get; private set; }
     public PartyBase MainParty { get; set; }
     public float DamageToPlayerMultiplier { get; set; } = 1f;
     public bool EndMissionCalled { get; set; }
     public int AgentFleeingCalls { get; set; }
     public Agent LastFleeingAgent { get; set; }
-    public bool DeploymentInProgress { get; set; }
+    private bool deploymentInProgress;
+    public bool DeploymentInProgress
+    {
+        get => deploymentInProgress;
+        set
+        {
+            deploymentInProgress = value;
+            SetBehaviorPresent(DeploymentController, value);
+        }
+    }
     public DeploymentMissionController DeploymentController { get; }
         = ObjectHelper.SkipConstructor<BattleDeploymentMissionController>();
-    public bool LocationPopulationBoundaryEnabled { get; set; }
+    private bool locationPopulationBoundaryEnabled;
+    public bool LocationPopulationBoundaryEnabled
+    {
+        get => locationPopulationBoundaryEnabled;
+        set
+        {
+            locationPopulationBoundaryEnabled = value;
+            SetBehaviorPresent(LocationAgentHandler, value);
+        }
+    }
     public MissionAgentHandler LocationAgentHandler { get; }
         = ObjectHelper.SkipConstructor<MissionAgentHandler>();
     public Action? NativeLocationPopulation { get; set; }
@@ -67,8 +89,18 @@ public sealed class MockMission
     public MockMission()
     {
         Shell = ObjectHelper.SkipConstructor<Mission>();
+        typeof(Mission).GetField("<MissionBehaviors>k__BackingField", BindingFlags.Instance | BindingFlags.NonPublic)
+            .SetValue(Shell, new List<MissionBehavior>());
         Teams = new Mission.TeamCollection(Shell);
         ByShell.AddOrUpdate(Shell, this);
+    }
+
+    // Keep the real generic lookup; patching one closed reference type aliases the other lookups.
+    private void SetBehaviorPresent(MissionBehavior behavior, bool present)
+    {
+        var behaviors = Shell.MissionBehaviors;
+        behaviors.Remove(behavior);
+        if (present) behaviors.Add(behavior);
     }
 
     public Team AddTeam(BattleSideEnum side)
@@ -130,6 +162,12 @@ public sealed class MockMission
         };
         AgentMirror.Bind(agent, mirror);
         agentsByIndex[mirror.Index] = agent;
+        // Model Mission.BuildAgent assigning the initial field only after a Player build.
+        if (TrackInitialPlayerAgent && buildData.AgentController == AgentControllerType.Player)
+        {
+            InitialPlayerAgent = agent;
+            InitialPlayerBuildCount++;
+        }
         if (SpawnMounted) SpawnMount(agent);
         return agent;
     }
