@@ -27,6 +27,7 @@ internal class IssueFinalizationHandler : IHandler
     private readonly IPlayerManager playerManager;
     private readonly IIssueOwnershipRegistry ownershipRegistry;
     private readonly IIssueGenerationRegistry generationRegistry;
+    private readonly IPendingLocalOwnerConsequenceRegistry pendingConsequenceRegistry;
 
     public IssueFinalizationHandler(
         IMessageBroker messageBroker,
@@ -34,7 +35,8 @@ internal class IssueFinalizationHandler : IHandler
         INetwork network,
         IPlayerManager playerManager,
         IIssueOwnershipRegistry ownershipRegistry,
-        IIssueGenerationRegistry generationRegistry)
+        IIssueGenerationRegistry generationRegistry,
+        IPendingLocalOwnerConsequenceRegistry pendingConsequenceRegistry)
     {
         this.messageBroker = messageBroker;
         this.objectManager = objectManager;
@@ -42,6 +44,7 @@ internal class IssueFinalizationHandler : IHandler
         this.playerManager = playerManager;
         this.ownershipRegistry = ownershipRegistry;
         this.generationRegistry = generationRegistry;
+        this.pendingConsequenceRegistry = pendingConsequenceRegistry;
 
         messageBroker.Subscribe<IssueFinalizedTriggered>(Handle_IssueFinalizedTriggered);
         messageBroker.Subscribe<QuestSuccessTriggered>(Handle_QuestSuccessTriggered);
@@ -256,17 +259,19 @@ internal class IssueFinalizationHandler : IHandler
             return;
         }
 
+        var isLocalPeerOwner = ownershipRegistry.IsLocalPeerOwner(owner);
+
         if (!FinalizeAndBroadcast(owner, ownerId, player, reason, proof)) return;
 
         if (reason == IssueFinalizeReason.QuestFail && descriptor?.ApplyQuestFailLocalOwnerConsequence != null)
         {
-            if (ownershipRegistry.IsLocalPeerOwner(owner))
+            if (isLocalPeerOwner)
             {
                 descriptor.ApplyQuestFailLocalOwnerConsequence(quest, proof);
             }
             else
             {
-                PendingLocalOwnerConsequenceRegistry.DeferQuestFail(player.ControllerId, descriptor.DisplayName, proof);
+                pendingConsequenceRegistry.DeferQuestFail(player.ControllerId, descriptor.DisplayName, proof);
             }
         }
     }

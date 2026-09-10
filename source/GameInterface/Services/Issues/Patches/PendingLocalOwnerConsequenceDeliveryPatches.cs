@@ -29,8 +29,9 @@ internal class PendingLocalOwnerConsequenceDeliveryPatches
     {
         if (ModInformation.IsClient) return;
         if (!ContainerProvider.TryResolve<IPlayerManager>(out var playerManager)) return;
+        if (!ContainerProvider.TryResolve<IPendingLocalOwnerConsequenceRegistry>(out var pendingConsequenceRegistry)) return;
 
-        PendingLocalOwnerConsequenceRegistry.FlushConnected(playerManager, DeliverPendingQuestFailConsequence);
+        pendingConsequenceRegistry.FlushReady(playerManager, DeliverPendingQuestFailConsequence);
     }
 
     private static void DeliverPendingQuestFailConsequence(string controllerId, string questTypeKey, byte proof)

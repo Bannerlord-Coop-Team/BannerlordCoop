@@ -13,7 +13,6 @@ using E2E.Tests.Environment.Instance;
 using E2E.Tests.Util;
 using GameInterface;
 using GameInterface.AutoSync;
-using GameInterface.Services.Issues.Generic;
 using GameInterface.Services.MapEvents;
 using GameInterface.Services.MapEvents.PlayerPartyInteractions;
 using GameInterface.Services.Players;
@@ -68,7 +67,6 @@ public class E2ETestEnvironment : IDisposable
         PlayerPartyInteractionDialogState.Clear();
         PlayerPartyTradeContext.End();
         ResetBattleModeState();
-        PendingLocalOwnerConsequenceRegistry.ClearAllForTests();
 
         IntegrationEnvironment = new TestEnvironment(output, numClients, registerGameInterface: true);
 
