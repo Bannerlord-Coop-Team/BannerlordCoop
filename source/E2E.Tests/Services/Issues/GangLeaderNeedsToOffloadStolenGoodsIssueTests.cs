@@ -18,6 +18,7 @@ using System;
 using System.Collections.Generic;
 using System.Reflection;
 using TaleWorlds.CampaignSystem;
+using TaleWorlds.CampaignSystem.Actions;
 using TaleWorlds.CampaignSystem.CampaignBehaviors;
 using TaleWorlds.CampaignSystem.ComponentInterfaces;
 using TaleWorlds.CampaignSystem.Encyclopedia;
@@ -563,6 +564,108 @@ public class GangLeaderNeedsToOffloadStolenGoodsIssueTests : IDisposable
             Assert.Null(owner.Issue);
             Assert.False(Campaign.Current.IssueManager.Issues.ContainsKey(owner));
             Assert.True(PartyBase.MainParty.ItemRoster.GetItemNumber(quest._stolenTradeGood) > 0);
+        });
+    }
+
+    [Fact]
+    public void HostOwnedSuccessByPayingAndKeepingTheGoods_DeductsThePurchasePriceExactlyOnce()
+    {
+        var fixture = SetupIssueOwner();
+        CreateIssueOnServer(fixture);
+
+        Server.Resolve<IControllerIdProvider>().SetControllerId("host-controller");
+        Server.Call(() =>
+        {
+            var playerManager = Server.Resolve<IPlayerManager>();
+            Assert.True(playerManager.AddPlayer(new Player("host-controller", fixture.HeroId, null, "", "")));
+        });
+
+        GangLeaderNeedsToOffloadStolenGoodsIssueBehavior.GangLeaderNeedsToOffloadStolenGoodsIssueQuest quest = null;
+        int goldBefore = 0;
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject<Hero>(fixture.HeroId, out var owner));
+            Assert.True(Campaign.Current.IssueManager.StartIssueQuest(owner));
+            quest = Assert.IsType<GangLeaderNeedsToOffloadStolenGoodsIssueBehavior.GangLeaderNeedsToOffloadStolenGoodsIssueQuest>(owner.Issue.IssueQuest);
+
+            SetResolvedMainHero(owner);
+
+            using (new AllowedThread())
+            {
+                Game.Current.PlayerTroop = owner.CharacterObject;
+                owner.Gold = quest._stolenTradeGoodPrice + 1000;
+                goldBefore = owner.Gold;
+
+                GiveGoldAction.ApplyBetweenCharacters(Hero.MainHero, null, quest._stolenTradeGoodPrice);
+                quest._isPayingForGoods = true;
+                quest._playerHasTheGoods = true;
+            }
+        });
+
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject<Hero>(fixture.HeroId, out var owner));
+
+            using (new AllowedThread())
+            using (new IssueFinalizeAuthorityGuard())
+            {
+                quest.SucceedQuestByPayingAndKeepingTheGoods();
+            }
+
+            Assert.Null(owner.Issue);
+            Assert.False(Campaign.Current.IssueManager.Issues.ContainsKey(owner));
+            Assert.Equal(goldBefore - quest._stolenTradeGoodPrice, owner.Gold);
+        });
+    }
+
+    [Fact]
+    public void HostOwnedSuccessByPayingAndGivingTheGoodsBack_DeductsThePurchasePriceExactlyOnce()
+    {
+        var fixture = SetupIssueOwner();
+        CreateIssueOnServer(fixture);
+
+        Server.Resolve<IControllerIdProvider>().SetControllerId("host-controller");
+        Server.Call(() =>
+        {
+            var playerManager = Server.Resolve<IPlayerManager>();
+            Assert.True(playerManager.AddPlayer(new Player("host-controller", fixture.HeroId, null, "", "")));
+        });
+
+        GangLeaderNeedsToOffloadStolenGoodsIssueBehavior.GangLeaderNeedsToOffloadStolenGoodsIssueQuest quest = null;
+        int goldBefore = 0;
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject<Hero>(fixture.HeroId, out var owner));
+            Assert.True(Campaign.Current.IssueManager.StartIssueQuest(owner));
+            quest = Assert.IsType<GangLeaderNeedsToOffloadStolenGoodsIssueBehavior.GangLeaderNeedsToOffloadStolenGoodsIssueQuest>(owner.Issue.IssueQuest);
+
+            SetResolvedMainHero(owner);
+
+            using (new AllowedThread())
+            {
+                Game.Current.PlayerTroop = owner.CharacterObject;
+                owner.Gold = quest._stolenTradeGoodPrice + 1000;
+                goldBefore = owner.Gold;
+
+                GiveGoldAction.ApplyBetweenCharacters(Hero.MainHero, null, quest._stolenTradeGoodPrice);
+                quest._isPayingForGoods = true;
+                quest._playerHasTheGoods = true;
+            }
+        });
+
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject<Hero>(fixture.HeroId, out var owner));
+
+            using (new AllowedThread())
+            using (new IssueFinalizeAuthorityGuard())
+            {
+                quest.SucceedQuestByPayingAndGivingTheGoodsBack();
+            }
+
+            Assert.Null(owner.Issue);
+            Assert.False(Campaign.Current.IssueManager.Issues.ContainsKey(owner));
+            Assert.Equal(goldBefore - quest._stolenTradeGoodPrice + quest._counterOfferGold, owner.Gold);
         });
     }
 

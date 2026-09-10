@@ -307,23 +307,27 @@ internal static class GangLeaderNeedsToOffloadStolenGoodsQuestType
     internal static bool BlockAndReportTerminalOutcome(Quest quest, IssueFinalizeReason reason)
     {
         var owner = quest.QuestGiver;
-        if (owner == null || !ContainerProvider.TryResolve<IIssueOwnershipRegistry>(out var ownershipRegistry))
-        {
-            return CallOriginalPolicy.IsOriginalAllowedForOwnershipGate();
-        }
-
-        if (ownershipRegistry.IsLocalPeerOwner(owner) &&
+        if (owner != null &&
+            ContainerProvider.TryResolve<IIssueOwnershipRegistry>(out var ownershipRegistry) &&
+            ownershipRegistry.IsLocalPeerOwner(owner) &&
             ContainerProvider.TryResolve<IControllerIdProvider>(out var controllerIdProvider))
         {
             MessageBroker.Instance.Publish(owner, new QuestTerminalOutcomeTriggered(owner, controllerIdProvider.ControllerId, reason));
+            return false;
         }
 
-        return false;
+        return CallOriginalPolicy.IsOriginalAllowedForOwnershipGate();
     }
+
+    private static bool IsLocalPeerOwner(Hero owner) =>
+        ContainerProvider.TryResolve<IIssueOwnershipRegistry>(out var ownershipRegistry) && ownershipRegistry.IsLocalPeerOwner(owner);
 
     private static void ApplySucceedByPayingAndKeepingTheGoods(Quest quest)
     {
-        GiveGoldAction.ApplyBetweenCharacters(Hero.MainHero, null, quest._stolenTradeGoodPrice);
+        if (!IsLocalPeerOwner(quest.QuestGiver))
+        {
+            GiveGoldAction.ApplyBetweenCharacters(Hero.MainHero, null, quest._stolenTradeGoodPrice);
+        }
         quest.AddLog(quest.SuccessQuestLogText);
         TraitLevelingHelper.OnIssueSolvedThroughQuest(Hero.MainHero, new Tuple<TraitObject, int>[1]
         {
@@ -342,7 +346,10 @@ internal static class GangLeaderNeedsToOffloadStolenGoodsQuestType
 
     private static void ApplySucceedByPayingAndGivingTheGoodsBack(Quest quest)
     {
-        GiveGoldAction.ApplyBetweenCharacters(Hero.MainHero, null, quest._stolenTradeGoodPrice);
+        if (!IsLocalPeerOwner(quest.QuestGiver))
+        {
+            GiveGoldAction.ApplyBetweenCharacters(Hero.MainHero, null, quest._stolenTradeGoodPrice);
+        }
         quest.AddLog(quest.SuccessByGivingBackTheGoodsQuestLogText);
         GiveGoldAction.ApplyBetweenCharacters(null, Hero.MainHero, quest._counterOfferGold);
         TraitLevelingHelper.OnIssueSolvedThroughQuest(Hero.MainHero, new Tuple<TraitObject, int>[1]

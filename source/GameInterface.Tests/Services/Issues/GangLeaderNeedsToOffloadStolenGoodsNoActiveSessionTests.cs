@@ -4,6 +4,7 @@ using GameInterface.Services.Entity;
 using GameInterface.Services.Issues.Generic;
 using GameInterface.Services.Issues.Generic.Dispatch;
 using GameInterface.Services.Issues.Generic.Migrated.GangLeaderNeedsToOffloadStolenGoods;
+using GameInterface.Services.Issues.Messages;
 using GameInterface.Services.Issues.Patches;
 using GameInterface.Tests;
 using System;
@@ -69,6 +70,22 @@ public class GangLeaderNeedsToOffloadStolenGoodsNoActiveSessionTests : IDisposab
         ContainerProvider.SetContainer(new ContainerBuilder().Build());
 
         var result = IssueFinalizedOwnershipGatePatch.Prefix(NewIssue());
+
+        Assert.True(result);
+    }
+
+    [Fact]
+    public void BlockAndReportTerminalOutcome_WithARegisteredRegistryButNoRecordedOwner_LetsTheRealMethodRunInstead()
+    {
+        var builder = new ContainerBuilder();
+        builder.RegisterType<IssueOwnershipRegistry>().As<IIssueOwnershipRegistry>();
+        ContainerProvider.SetContainer(builder.Build());
+
+        var questGiver = ObjectHelper.SkipConstructor<Hero>();
+        var quest = NewQuest();
+        quest._questGiver = questGiver;
+
+        var result = GangLeaderNeedsToOffloadStolenGoodsQuestType.BlockAndReportTerminalOutcome(quest, IssueFinalizeReason.QuestSuccess);
 
         Assert.True(result);
     }
