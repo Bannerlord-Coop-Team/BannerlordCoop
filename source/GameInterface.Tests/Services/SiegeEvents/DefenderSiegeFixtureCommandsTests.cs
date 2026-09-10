@@ -15,6 +15,7 @@ using LiteNetLib;
 using Moq;
 using Newtonsoft.Json.Linq;
 using SandBox.View.Map.Visuals;
+using SandBox.View.Map.Managers;
 using Serilog;
 using System;
 using System.Collections.Generic;
@@ -41,6 +42,7 @@ public sealed class DefenderSiegeFixtureCommandsTests : IDisposable
 {
     private static readonly FieldInfo RosterFixture = AccessTools.Field(typeof(DefenderSiegeFixtureCommands), "rosterFixture");
     private static readonly Dictionary<PartyBase, MobilePartyVisual> Visuals = new();
+    private static MobilePartyVisualManager visualManager;
     private static readonly List<LogEntry> Logs = new();
     private static readonly Dictionary<Hero, bool> PrisonerOverrides = new();
     private readonly Harmony harmony = new("Coop.Tests.DefenderRosterFixture");
@@ -81,6 +83,9 @@ public sealed class DefenderSiegeFixtureCommandsTests : IDisposable
         try
         {
             ModInformation.IsServer = true;
+            visualManager = ObjectHelper.SkipConstructor<MobilePartyVisualManager>();
+            harmony.Patch(AccessTools.PropertyGetter(typeof(MobilePartyVisualManager), nameof(MobilePartyVisualManager.Current)),
+                postfix: new HarmonyMethod(typeof(DefenderSiegeFixtureCommandsTests), nameof(ReadVisualManager)));
             // Supply only the scene's visual lookup; all command guards read real game objects.
             harmony.Patch(AccessTools.Method(typeof(PartyBaseExtensions), nameof(PartyBaseExtensions.GetPartyVisual)),
                 prefix: new HarmonyMethod(typeof(DefenderSiegeFixtureCommandsTests), nameof(ReadVisual)));
@@ -730,6 +735,79 @@ public sealed class DefenderSiegeFixtureCommandsTests : IDisposable
     }
 
     [Theory]
+    [InlineData(true, true, true)]
+    [InlineData(true, false, false)]
+    [InlineData(false, false, true)]
+    public void RosterReadinessAndCapture_UseTheServerVisualManagerRequirement(
+        bool managerPresent, bool visualPresent, bool expectedReady)
+    {
+        if (!managerPresent) visualManager = null;
+        PrepareReadinessObservation();
+        if (!visualPresent) Visuals.Clear();
+
+        JObject result = ObserveReadiness();
+        foreach (JObject row in result["players"].Values<JObject>())
+        {
+            Assert.Equal(managerPresent, row.Value<bool>("visualManagerPresent"));
+            Assert.Equal(visualPresent, row.Value<bool>("partyHasVisual"));
+            Assert.Equal(expectedReady, row.Value<bool>("captureReady"));
+            Assert.Equal(expectedReady ? Array.Empty<string>() : new[] { "partyHasVisual" },
+                row["failedConditions"].Values<string>().ToArray());
+        }
+        AssertReadinessObservationIsNonMutating();
+        SetCaptured(captives[1]);
+        JObject capture = CaptureResult();
+        Assert.Equal(expectedReady, capture.Value<bool>("success"));
+        if (expectedReady)
+        {
+            AssertSuccess(Restore());
+            AssertSuccess(Verify());
+        }
+    }
+
+    [Fact]
+    public void HeadlessRosterFixture_NormalizesAndRestoresCaptivesWithoutVisuals()
+    {
+        visualManager = null;
+        Capture();
+        Normalize();
+        Assert.Empty(Visuals);
+        AssertSuccess(Restore());
+        AssertSuccess(Verify());
+        Assert.Null(RosterFixture.GetValue(null));
+    }
+
+    [Theory]
+    [InlineData("heroIsPrisoner", false)]
+    [InlineData("heroHasCaptor", false)]
+    [InlineData("heroBelongsToPlayerParty", true)]
+    [InlineData("heroStateIsActive", true)]
+    [InlineData("partyActive", true)]
+    [InlineData("partyVisible", true)]
+    [InlineData("partyLeaderIsHero", true)]
+    [InlineData("partyHasMapEvent", false)]
+    [InlineData("partyHasBesiegerCamp", false)]
+    [InlineData("partyIsTransitioning", false)]
+    [InlineData("partyHasArmy", false)]
+    [InlineData("partyHasAttachedTo", false)]
+    [InlineData("partyHasAttachedParties", false)]
+    [InlineData("partyIsAtSea", false)]
+    public void HeadlessRosterReadiness_PreservesEveryNonvisualGuard(string guardName, bool requiredValue)
+    {
+        visualManager = null;
+        PrepareReadinessObservation();
+        SetReadinessGuardFailure(guardName);
+        JObject row = ReadinessRow(ObserveReadiness(), captives[0].Player.ControllerId);
+        Assert.False(row.Value<bool>("captureReady"));
+        Assert.Equal(!requiredValue, row.Value<bool>(guardName));
+        Assert.Equal(new[] { guardName }, row["failedConditions"].Values<string>().ToArray());
+        AssertReadinessObservationIsNonMutating();
+        SetCaptured(captives[1]);
+        Assert.False(CaptureResult().Value<bool>("success"));
+        Assert.Null(RosterFixture.GetValue(null));
+    }
+
+    [Theory]
     [InlineData("heroIsPrisoner", false)]
     [InlineData("heroHasCaptor", false)]
     [InlineData("heroBelongsToPlayerParty", true)]
@@ -1100,8 +1178,11 @@ public sealed class DefenderSiegeFixtureCommandsTests : IDisposable
         player.Party._partyComponent = component;
         player.Party.MemberRoster.AddToCounts(player.Hero.CharacterObject, 1);
         player.Captor.Party.PrisonRoster = new TroopRoster();
-        Visuals[player.Party.Party] = ObjectHelper.SkipConstructor<MobilePartyVisual>();
+        if (visualManager != null)
+            Visuals[player.Party.Party] = ObjectHelper.SkipConstructor<MobilePartyVisual>();
     }
+
+    private static void ReadVisualManager(ref MobilePartyVisualManager __result) => __result = visualManager;
 
     private static bool ReadVisual(PartyBase partyBase, ref MobilePartyVisual __result)
     {
@@ -1160,6 +1241,7 @@ public sealed class DefenderSiegeFixtureCommandsTests : IDisposable
     {
         harmony.UnpatchAll(harmony.Id);
         Visuals.Clear();
+        visualManager = null;
         Logs.Clear();
         PrisonerOverrides.Clear();
         foreach (var previous in previousFixtures) previous.Key.SetValue(null, previous.Value);

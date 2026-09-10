@@ -13,6 +13,7 @@ using GameInterface.Services.Players.Data;
 using GameInterface.Services.UI;
 using HarmonyLib;
 using Newtonsoft.Json;
+using SandBox.View.Map.Managers;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -314,6 +315,7 @@ internal static class DefenderSiegeFixtureCommands
             bool heroStateIsActive = hero.HeroState == Hero.CharacterStates.Active;
             bool partyActive = party.IsActive;
             bool partyVisible = party.IsVisible;
+            bool visualManagerPresent = MobilePartyVisualManager.Current != null;
             bool partyHasVisual = party.Party.GetPartyVisual() != null;
             bool partyLeaderIsHero = ReferenceEquals(party.LeaderHero, hero);
             bool partyHasMapEvent = party.MapEvent != null;
@@ -330,6 +332,7 @@ internal static class DefenderSiegeFixtureCommands
                 heroStateIsActive,
                 partyActive,
                 partyVisible,
+                visualManagerPresent,
                 partyHasVisual,
                 partyLeaderIsHero,
                 partyHasMapEvent,
@@ -347,7 +350,7 @@ internal static class DefenderSiegeFixtureCommands
                 !heroStateIsActive ? "heroStateIsActive" : null,
                 !partyActive ? "partyActive" : null,
                 !partyVisible ? "partyVisible" : null,
-                !partyHasVisual ? "partyHasVisual" : null,
+                visualManagerPresent && !partyHasVisual ? "partyHasVisual" : null,
                 !partyLeaderIsHero ? "partyLeaderIsHero" : null,
                 partyHasMapEvent ? "partyHasMapEvent" : null,
                 partyHasBesiegerCamp ? "partyHasBesiegerCamp" : null,
@@ -373,6 +376,7 @@ internal static class DefenderSiegeFixtureCommands
                 heroStateIsActive,
                 partyActive,
                 partyVisible,
+                visualManagerPresent,
                 partyHasVisual,
                 partyLeaderIsHero,
                 partyHasMapEvent,
@@ -1196,6 +1200,7 @@ internal static class DefenderSiegeFixtureCommands
                     hero.HeroState == Hero.CharacterStates.Active,
                     party.IsActive,
                     party.IsVisible,
+                    MobilePartyVisualManager.Current != null,
                     party.Party.GetPartyVisual() != null,
                     ReferenceEquals(party.LeaderHero, hero),
                     party.MapEvent != null,
@@ -1462,6 +1467,7 @@ internal static class DefenderSiegeFixtureCommands
             player.Hero.HeroState == Hero.CharacterStates.Active,
             player.Party.IsActive,
             player.Party.IsVisible,
+            MobilePartyVisualManager.Current != null,
             player.Party.Party.GetPartyVisual() != null,
             ReferenceEquals(player.Party.LeaderHero, player.Hero),
             player.Party.MemberRoster.GetTroopCount(player.Hero.CharacterObject));
@@ -1474,6 +1480,7 @@ internal static class DefenderSiegeFixtureCommands
             player.Hero.HeroState == Hero.CharacterStates.Active,
             player.Party.IsActive,
             player.Party.IsVisible,
+            MobilePartyVisualManager.Current != null,
             player.Party.Party.GetPartyVisual() != null,
             ReferenceEquals(player.Party.LeaderHero, player.Hero),
             player.Party.CurrentSettlement != null,
@@ -1742,6 +1749,7 @@ internal static class DefenderSiegeFixtureCommands
             player.Hero.HeroState == Hero.CharacterStates.Active,
             player.Party.IsActive,
             player.Party.IsVisible,
+            MobilePartyVisualManager.Current != null,
             player.Party.Party.GetPartyVisual() != null,
             ReferenceEquals(player.Party.LeaderHero, player.Hero),
             player.Party.MapEvent != null,
@@ -2697,6 +2705,7 @@ internal static class DefenderRosterFixtureContract
         bool heroStateIsActive,
         bool partyActive,
         bool partyVisible,
+        bool visualManagerPresent,
         bool partyHasVisual,
         bool partyLeaderIsHero,
         bool partyHasMapEvent,
@@ -2707,7 +2716,7 @@ internal static class DefenderRosterFixtureContract
         bool partyHasAttachedParties,
         bool partyIsAtSea) =>
         !heroIsPrisoner && !heroHasCaptor && heroBelongsToPlayerParty && heroStateIsActive && partyActive &&
-        partyVisible && partyHasVisual && partyLeaderIsHero &&
+        partyVisible && (!visualManagerPresent || partyHasVisual) && partyLeaderIsHero &&
         !partyHasMapEvent && !partyHasBesiegerCamp && !partyIsTransitioning &&
         !partyHasArmy && !partyHasAttachedTo && !partyHasAttachedParties && !partyIsAtSea;
 
@@ -2718,11 +2727,12 @@ internal static class DefenderRosterFixtureContract
         bool heroStateIsActive,
         bool partyActive,
         bool partyVisible,
+        bool visualManagerPresent,
         bool partyHasVisual,
         bool partyLeaderIsHero,
         int partyHeroMemberCount) =>
         !heroIsPrisoner && !heroHasCaptor && heroBelongsToPlayerParty && heroStateIsActive && partyActive &&
-        partyVisible && partyHasVisual && partyLeaderIsHero && partyHeroMemberCount == 1;
+        partyVisible && (!visualManagerPresent || partyHasVisual) && partyLeaderIsHero && partyHeroMemberCount == 1;
 
     internal static bool IsReleasedForRestoration(
         bool heroIsPrisoner,
@@ -2731,6 +2741,7 @@ internal static class DefenderRosterFixtureContract
         bool heroStateIsActive,
         bool partyActive,
         bool partyVisible,
+        bool visualManagerPresent,
         bool partyHasVisual,
         bool partyLeaderIsHero,
         bool partyHasCurrentSettlement,
@@ -2748,7 +2759,7 @@ internal static class DefenderRosterFixtureContract
         int captorHeroPrisonerCount,
         bool playerDisconnected = false) =>
         !heroIsPrisoner && !heroHasCaptor && heroBelongsToPlayerParty && heroStateIsActive &&
-        ((partyActive && partyVisible && partyHasVisual) ||
+        ((partyActive && partyVisible && (!visualManagerPresent || partyHasVisual)) ||
             (playerDisconnected && !partyActive && !partyVisible && !partyHasVisual)) && partyLeaderIsHero &&
         !partyHasCurrentSettlement && !partyHasMapEvent && !partyHasBesiegerCamp &&
         !partyIsTransitioning && !partyHasArmy && !partyHasAttachedTo &&

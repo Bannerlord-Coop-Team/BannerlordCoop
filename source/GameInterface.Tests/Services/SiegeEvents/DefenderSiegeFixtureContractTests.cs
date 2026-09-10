@@ -369,6 +369,35 @@ public class DefenderSiegeFixtureContractTests
             captorPositionIsOnLand: false));
     }
 
+    [Theory]
+    [InlineData(true, true, true)]
+    [InlineData(true, false, false)]
+    [InlineData(false, false, true)]
+    public void ActiveRosterParty_RequiresVisualOnlyWhenVisualManagerExists(
+        bool visualManagerPresent, bool partyHasVisual, bool expected)
+    {
+        Assert.Equal(expected, UncapturedRosterMember(
+            visualManagerPresent: visualManagerPresent, partyHasVisual: partyHasVisual));
+        Assert.Equal(expected, ReleasedRosterReadiness(
+            visualManagerPresent: visualManagerPresent, partyHasVisual: partyHasVisual));
+        Assert.Equal(expected, ReleasedRosterRestore(
+            visualManagerPresent: visualManagerPresent, partyHasVisual: partyHasVisual));
+    }
+
+    [Fact]
+    public void HeadlessRosterParty_StillRequiresActiveVisibleLedPartyAndExactRestorationRoster()
+    {
+        Assert.False(UncapturedRosterMember(visualManagerPresent: false, partyHasVisual: false, partyActive: false));
+        Assert.False(UncapturedRosterMember(visualManagerPresent: false, partyHasVisual: false, partyVisible: false));
+        Assert.False(UncapturedRosterMember(visualManagerPresent: false, partyHasVisual: false, partyLeaderIsHero: false));
+        Assert.False(ReleasedRosterReadiness(visualManagerPresent: false, partyHasVisual: false, partyActive: false));
+        Assert.False(ReleasedRosterReadiness(visualManagerPresent: false, partyHasVisual: false, partyHeroMemberCount: 0));
+        Assert.False(ReleasedRosterRestore(visualManagerPresent: false, partyHasVisual: false, partyActive: false));
+        Assert.False(ReleasedRosterRestore(visualManagerPresent: false, partyHasVisual: false, partyVisible: false));
+        Assert.False(ReleasedRosterRestore(visualManagerPresent: false, partyHasVisual: false, partyMemberCount: 2));
+        Assert.False(ReleasedRosterRestore(visualManagerPresent: false, partyHasVisual: false, captorHeroPrisonerCount: 1));
+    }
+
     [Fact]
     public void UncapturedRosterMember_RequiresItsNormalVisiblePlayerParty()
     {
@@ -472,6 +501,7 @@ public class DefenderSiegeFixtureContractTests
         bool heroStateIsActive = true,
         bool partyActive = true,
         bool partyVisible = true,
+        bool visualManagerPresent = true,
         bool partyHasVisual = true,
         bool partyLeaderIsHero = true,
         bool partyHasMapEvent = false,
@@ -488,6 +518,7 @@ public class DefenderSiegeFixtureContractTests
             heroStateIsActive,
             partyActive,
             partyVisible,
+            visualManagerPresent,
             partyHasVisual,
             partyLeaderIsHero,
             partyHasMapEvent,
@@ -505,6 +536,7 @@ public class DefenderSiegeFixtureContractTests
         bool heroStateIsActive = true,
         bool partyActive = true,
         bool partyVisible = true,
+        bool visualManagerPresent = true,
         bool partyHasVisual = true,
         bool partyLeaderIsHero = true,
         int partyHeroMemberCount = 1) =>
@@ -515,6 +547,7 @@ public class DefenderSiegeFixtureContractTests
             heroStateIsActive,
             partyActive,
             partyVisible,
+            visualManagerPresent,
             partyHasVisual,
             partyLeaderIsHero,
             partyHeroMemberCount);
@@ -526,6 +559,7 @@ public class DefenderSiegeFixtureContractTests
         bool heroStateIsActive = true,
         bool partyActive = true,
         bool partyVisible = true,
+        bool visualManagerPresent = true,
         bool partyHasVisual = true,
         bool partyLeaderIsHero = true,
         bool partyHasCurrentSettlement = false,
@@ -548,6 +582,7 @@ public class DefenderSiegeFixtureContractTests
             heroStateIsActive,
             partyActive,
             partyVisible,
+            visualManagerPresent,
             partyHasVisual,
             partyLeaderIsHero,
             partyHasCurrentSettlement,
