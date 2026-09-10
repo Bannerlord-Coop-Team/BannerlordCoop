@@ -75,7 +75,7 @@ public readonly struct GameSaveDataPacket : IPacket
     [ProtoMember(13)]
     public readonly ServerOptions ServerOptions;
 
-    [ProtoMember(13)]
+    [ProtoMember(14)]
     public readonly Dictionary<string, ClanFinanceSettings> ClanFinance;
 
     public GameSaveDataPacket(

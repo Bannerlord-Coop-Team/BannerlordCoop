@@ -49,7 +49,7 @@ public record NetworkGameSaveDataReceived : IEvent
     public AttachmentIdMap AttachmentIdMap { get; }
     [ProtoMember(13)]
     public ServerOptions ServerOptions { get; }
-    [ProtoMember(13)]
+    [ProtoMember(14)]
     public Dictionary<string, ClanFinanceSettings> ClanFinance { get; }
 
     public NetworkGameSaveDataReceived(

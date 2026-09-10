@@ -82,7 +82,7 @@ public readonly struct GameSaveDataChunkPacket : IPacket
     [ProtoMember(18)]
     public readonly ServerOptions ServerOptions;
 
-    [ProtoMember(18)]
+    [ProtoMember(19)]
     public readonly Dictionary<string, ClanFinanceSettings> ClanFinance;
 
     public GameSaveDataChunkPacket(
