@@ -2682,8 +2682,19 @@ public class VillageNeedsCraftingMaterialsIssueTests : IDisposable
         {
             Assert.True(Server.Resolve<IPlayerManager>().TryGetPlayer("player-A", out var player));
             Assert.True(Server.Resolve<IPlayerManager>().IsConnected(player));
+            Assert.False(Server.Resolve<IPlayerManager>().IsCampaignReady(player));
 
             new IssuesCampaignBehavior().RegisterEvents();
+            CampaignEvents.Instance.HourlyTick();
+        });
+        Assert.Empty(Server.NetworkSentMessages.GetMessages<NetworkApplyPendingQuestFailConsequence>());
+
+        Server.Resolve<IPlayerManager>().MarkCampaignReady("player-A");
+        Server.Call(() =>
+        {
+            Assert.True(Server.Resolve<IPlayerManager>().TryGetPlayer("player-A", out var player));
+            Assert.True(Server.Resolve<IPlayerManager>().IsCampaignReady(player));
+
             CampaignEvents.Instance.HourlyTick();
         });
 
@@ -2698,5 +2709,100 @@ public class VillageNeedsCraftingMaterialsIssueTests : IDisposable
 
         Server.Call(() =>
             Assert.Equal(hostHonorXpBefore, Campaign.Current.PlayerTraitDeveloper.GetPropertyValue(DefaultTraits.Honor)));
+    }
+
+    private sealed class TestDataStore : IDataStore
+    {
+        private readonly Dictionary<string, object> records;
+
+        public bool IsSaving { get; }
+        public bool IsLoading => !IsSaving;
+
+        internal TestDataStore(bool isSaving, Dictionary<string, object> records)
+        {
+            IsSaving = isSaving;
+            this.records = records;
+        }
+
+        public bool SyncData<T>(string key, ref T data)
+        {
+            if (IsSaving)
+            {
+                records[key] = data;
+                return true;
+            }
+
+            if (!records.TryGetValue(key, out var value)) return false;
+            data = (T)value;
+            return true;
+        }
+    }
+
+    [Fact]
+    public void PendingLocalOwnerConsequence_SurvivesASaveReloadRoundTrip_AndStillDeliversAfterRestartOnReconnect()
+    {
+        var fixture = SetupIssueOwner();
+        CreateIssueOnServer(fixture.HeroId);
+        ForcePromisedPaymentEverywhere(fixture.HeroId);
+        var ownerHeroId = CreateDistinctOwnerHero(fixture);
+        var partyId = AcceptQuestFromClient(fixture, "player-A", ownerHeroId);
+
+        Server.Resolve<IPlayerManager>().ClearPeer(Client.NetPeer);
+
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject<Hero>(fixture.HeroId, out var giver));
+            Assert.True(Server.ObjectManager.TryGetObject<MobileParty>(partyId, out var ownerParty));
+            Assert.True(Server.ObjectManager.TryGetObject<Settlement>(fixture.SettlementId, out var settlement));
+            Assert.True(Server.Resolve<IPlayerManager>().TryGetPlayer("player-A", out var player));
+            Assert.False(Server.Resolve<IPlayerManager>().IsConnected(player));
+
+            var quest = Assert.IsType<VillageNeedsCraftingMaterialsIssueBehavior.VillageNeedsCraftingMaterialsIssueQuest>(giver.Issue.IssueQuest);
+            MapEvent mapEvent;
+            using (new AllowedThread())
+            {
+                mapEvent = CreateForcedSuppliesMapEvent(settlement, ownerParty);
+            }
+
+            quest.OnMapEventStarted(mapEvent, ownerParty.Party, settlement.Party);
+        });
+
+        Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkIssueRemoved>());
+        Assert.Empty(Server.NetworkSentMessages.GetMessages<NetworkApplyPendingQuestFailConsequence>());
+
+        Server.Call(() =>
+        {
+            var pendingConsequenceRegistry = Server.Resolve<IPendingLocalOwnerConsequenceRegistry>();
+            var behavior = new IssuesCampaignBehavior();
+            var records = new Dictionary<string, object>();
+
+            behavior.SyncData(new TestDataStore(isSaving: true, records));
+
+            pendingConsequenceRegistry.ClearAll();
+            Assert.Empty(pendingConsequenceRegistry.Snapshot());
+
+            behavior.SyncData(new TestDataStore(isSaving: false, records));
+
+            var restored = Assert.Single(pendingConsequenceRegistry.Snapshot());
+            Assert.Equal("player-A", restored.ControllerId);
+            Assert.Equal(VillageNeedsCraftingMaterialsQuestType.ProofFailCoercion, restored.Proof);
+        });
+
+        int ownerHonorXpBeforeRejoin = 0;
+        Client.Call(() => ownerHonorXpBeforeRejoin = Campaign.Current.PlayerTraitDeveloper.GetPropertyValue(DefaultTraits.Honor));
+
+        Server.Resolve<IPlayerManager>().SetPeer("player-A", Client.NetPeer);
+        Server.Resolve<IPlayerManager>().MarkCampaignReady("player-A");
+        Server.Call(() =>
+        {
+            new IssuesCampaignBehavior().RegisterEvents();
+            CampaignEvents.Instance.HourlyTick();
+        });
+
+        var delivered = Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkApplyPendingQuestFailConsequence>());
+        Assert.Equal(VillageNeedsCraftingMaterialsQuestType.ProofFailCoercion, delivered.Proof);
+
+        Client.Call(() =>
+            Assert.Equal(ownerHonorXpBeforeRejoin - 50, Campaign.Current.PlayerTraitDeveloper.GetPropertyValue(DefaultTraits.Honor)));
     }
 }
