@@ -9,6 +9,7 @@ using Serilog;
 using System;
 using System.Collections.Generic;
 using TaleWorlds.CampaignSystem;
+using TaleWorlds.CampaignSystem.Actions;
 using TaleWorlds.CampaignSystem.MapEvents;
 using TaleWorlds.Core;
 
@@ -154,7 +155,12 @@ internal class MapEventPartyHandler : IHandler
 
                 if (ModInformation.IsServer)
                 {
+                    var troop = mapEventParty.GetTroop(troopDescriptor);
                     mapEventParty.OnTroopKilled(troopDescriptor);
+
+                    // Native mission origins only run on the client
+                    if (troop.IsHero)
+                        KillCharacterAction.ApplyByBattle(troop.HeroObject, null, false);
                 }
                 else
                 {
