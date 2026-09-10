@@ -1,13 +1,18 @@
 using Common.Util;
 using E2E.Tests.Environment;
 using E2E.Tests.Environment.Instance;
+using GameInterface.Services.Issues.Generic;
 using GameInterface.Services.Issues.Messages;
+using GameInterface.Services.Issues.Patches;
+using GameInterface.Services.Players;
+using GameInterface.Services.Players.Data;
 using HarmonyLib;
 using System;
 using System.Linq;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Encyclopedia;
 using TaleWorlds.CampaignSystem.Issues;
+using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Settlements;
 using TaleWorlds.Core;
 using Xunit.Abstractions;
@@ -123,6 +128,51 @@ public class IssueExpiryServerAuthorityTests : IDisposable
 
             Assert.Null(owner.Issue);
             Assert.False(Campaign.Current.IssueManager.Issues.ContainsKey(owner));
+        });
+
+        Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkIssueRemoved>());
+    }
+
+    [Fact]
+    public void HourlyTickOnServer_AcceptedQuestTimedOut_AppliesTheOwnersRelationPenaltyToTheRealOwnerOnly()
+    {
+        var issue = CreateOwnedIssueOnServer();
+
+        var ownerHeroId = TestEnvironment.CreateRegisteredObject<Hero>();
+        var ownerPartyId = TestEnvironment.CreateRegisteredObject<MobileParty>();
+
+        int hostRelationBefore = 0;
+        int ownerRelationBefore = 0;
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject<Hero>(issue.HeroId, out var giver));
+            Assert.True(Server.ObjectManager.TryGetObject<Hero>(ownerHeroId, out var ownerHero));
+
+            using (new QuestSolutionStartAuthorityGuard())
+            {
+                Assert.True(Campaign.Current.IssueManager.StartIssueQuest(giver));
+            }
+            using (new AllowedThread())
+            {
+                giver.Issue.IssueQuest.StartQuest();
+            }
+            Server.Resolve<IIssueOwnershipRegistry>().SetOwner(giver, "owner-controller");
+            Assert.True(Server.Resolve<IPlayerManager>().AddPlayer(new Player("owner-controller", ownerHeroId, ownerPartyId, "", "")));
+
+            hostRelationBefore = giver.GetRelation(Hero.MainHero);
+            ownerRelationBefore = giver.GetRelation(ownerHero);
+
+            var quest = giver.Issue.IssueQuest;
+            Assert.NotNull(quest);
+            quest.ChangeQuestDueTime(CampaignTime.Now - CampaignTime.Days(1f));
+            Assert.True(quest.QuestDueTime.IsPast);
+
+            Campaign.Current.QuestManager.HourlyTick();
+
+            Assert.Null(giver.Issue);
+            Assert.False(Campaign.Current.IssueManager.Issues.ContainsKey(giver));
+            Assert.Equal(hostRelationBefore, giver.GetRelation(Hero.MainHero));
+            Assert.Equal(ownerRelationBefore - 5, giver.GetRelation(ownerHero));
         });
 
         Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkIssueRemoved>());
