@@ -233,7 +233,11 @@ public sealed class QuestTypeDescriptor<TIssue, TQuest> : QuestTypeDescriptor
         => action == null ? null : quest => { if (quest is TQuest typed) action(typed); };
 
     private static Action<QuestBase, byte> NarrowQuestByteAction(Action<TQuest, byte> action)
-        => action == null ? null : (quest, proof) => { if (quest is TQuest typed) action(typed, proof); };
+        => action == null ? null : (quest, proof) =>
+        {
+            if (quest == null) action(null, proof);
+            else if (quest is TQuest typed) action(typed, proof);
+        };
 
     public IRaceArbitratedAcceptMirrorStrategy<TFields> GetQuestSolutionAcceptMirror<TFields>()
         => _questSolutionAcceptMirrorStrategy as IRaceArbitratedAcceptMirrorStrategy<TFields>;

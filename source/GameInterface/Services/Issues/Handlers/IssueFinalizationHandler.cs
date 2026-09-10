@@ -2,6 +2,7 @@ using Common;
 using Common.Logging;
 using Common.Messaging;
 using Common.Network;
+using GameInterface.Services.Entity;
 using GameInterface.Services.Heroes.Patches;
 using GameInterface.Services.Issues.Generic;
 using GameInterface.Services.Issues.Messages;
@@ -48,6 +49,9 @@ internal class IssueFinalizationHandler : IHandler
         messageBroker.Subscribe<QuestTerminalOutcomeTriggered>(Handle_QuestTerminalOutcomeTriggered);
         messageBroker.Subscribe<RequestIssueRemoved>(Handle_RequestIssueRemoved);
         messageBroker.Subscribe<NetworkIssueRemoved>(Handle_NetworkIssueRemoved);
+        messageBroker.Subscribe<NetworkApplyPendingQuestFailConsequence>(Handle_NetworkApplyPendingQuestFailConsequence);
+
+        CampaignEvents.HourlyTickEvent.AddNonSerializedListener(this, OnHourlyTick);
     }
 
     public void Dispose()
@@ -57,6 +61,37 @@ internal class IssueFinalizationHandler : IHandler
         messageBroker.Unsubscribe<QuestTerminalOutcomeTriggered>(Handle_QuestTerminalOutcomeTriggered);
         messageBroker.Unsubscribe<RequestIssueRemoved>(Handle_RequestIssueRemoved);
         messageBroker.Unsubscribe<NetworkIssueRemoved>(Handle_NetworkIssueRemoved);
+        messageBroker.Unsubscribe<NetworkApplyPendingQuestFailConsequence>(Handle_NetworkApplyPendingQuestFailConsequence);
+
+        CampaignEvents.HourlyTickEvent.ClearListeners(this);
+    }
+
+    private static void OnHourlyTick()
+    {
+        if (ModInformation.IsClient) return;
+        if (!ContainerProvider.TryResolve<IPlayerManager>(out var currentPlayerManager)) return;
+
+        PendingLocalOwnerConsequenceRegistry.FlushConnected(currentPlayerManager, DeliverPendingQuestFailConsequence);
+    }
+
+    private static void DeliverPendingQuestFailConsequence(string controllerId, string questTypeKey, byte proof)
+    {
+        if (!ContainerProvider.TryResolve<IPlayerManager>(out var currentPlayerManager) ||
+            !ContainerProvider.TryResolve<INetwork>(out var currentNetwork)) return;
+        if (!currentPlayerManager.TryGetPeer(controllerId, out var peer)) return;
+
+        currentNetwork.Send(peer, new NetworkApplyPendingQuestFailConsequence(questTypeKey, proof));
+    }
+
+    private void Handle_NetworkApplyPendingQuestFailConsequence(MessagePayload<NetworkApplyPendingQuestFailConsequence> payload)
+    {
+        if (ModInformation.IsServer) return;
+
+        var data = payload.What;
+        GameThread.RunSafe(() =>
+        {
+            QuestTypeRegistry.GetByDisplayName(data.QuestTypeKey)?.ApplyQuestFailLocalOwnerConsequence?.Invoke(null, data.Proof);
+        });
     }
 
     private static byte CaptureProof(IssueBase issue, IssueFinalizeReason reason)
@@ -140,7 +175,7 @@ internal class IssueFinalizationHandler : IHandler
             return;
         }
 
-        if (owner.Issue?.IssueQuest is not { IsOngoing: true })
+        if (owner.Issue?.IssueQuest is not { IsOngoing: true } quest)
         {
             Logger.Error("Rejecting the host's own {Message} for owner {Owner} - no ongoing quest to finalize",
                 nameof(QuestSuccessTriggered), ownerId);
@@ -177,7 +212,9 @@ internal class IssueFinalizationHandler : IHandler
             }
         }
 
-        FinalizeAndBroadcast(owner, ownerId, player, IssueFinalizeReason.QuestSuccess, successProof);
+        if (!FinalizeAndBroadcast(owner, ownerId, player, IssueFinalizeReason.QuestSuccess, successProof)) return;
+
+        descriptor?.ApplyQuestSuccessLocalOwnerConsequence?.Invoke(quest);
     }
 
     private void Handle_QuestTerminalOutcomeTriggered(MessagePayload<QuestTerminalOutcomeTriggered> payload)
@@ -242,9 +279,16 @@ internal class IssueFinalizationHandler : IHandler
 
         if (!FinalizeAndBroadcast(owner, ownerId, player, reason, proof)) return;
 
-        if (reason == IssueFinalizeReason.QuestFail)
+        if (reason == IssueFinalizeReason.QuestFail && descriptor?.ApplyQuestFailLocalOwnerConsequence != null)
         {
-            descriptor?.ApplyQuestFailLocalOwnerConsequence?.Invoke(quest, proof);
+            if (ownershipRegistry.IsLocalPeerOwner(owner))
+            {
+                descriptor.ApplyQuestFailLocalOwnerConsequence(quest, proof);
+            }
+            else
+            {
+                PendingLocalOwnerConsequenceRegistry.DeferQuestFail(player.ControllerId, descriptor.DisplayName, proof);
+            }
         }
     }
 

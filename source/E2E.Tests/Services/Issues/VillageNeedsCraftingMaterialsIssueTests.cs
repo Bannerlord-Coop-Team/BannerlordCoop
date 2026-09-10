@@ -1777,6 +1777,84 @@ public class VillageNeedsCraftingMaterialsIssueTests : IDisposable
     }
 
     [Fact]
+    public void ListenHostLocalSuccessClick_GrantsHonorToTheHostAndNoOtherPeer()
+    {
+        var fixture = SetupIssueOwner();
+        CreateIssueOnServer(fixture.HeroId);
+        ForcePromisedPaymentEverywhere(fixture.HeroId, 500);
+
+        var villageId = TestEnvironment.CreateRegisteredObject<Village>();
+        foreach (var instance in AllInstances)
+        {
+            instance.Call(() =>
+            {
+                Assert.True(instance.ObjectManager.TryGetObject<Settlement>(fixture.SettlementId, out var settlement));
+                Assert.True(instance.ObjectManager.TryGetObject<Village>(villageId, out var village));
+                using (new AllowedThread())
+                {
+                    settlement.SetSettlementComponent(village);
+                    village.Bound = settlement;
+                    village.Hearth = 650f;
+                }
+            });
+        }
+
+        var hostPartyId = TestEnvironment.CreateRegisteredObject<MobileParty>();
+        Server.Resolve<IControllerIdProvider>().SetControllerId("host-controller");
+
+        VillageNeedsCraftingMaterialsIssueBehavior.VillageNeedsCraftingMaterialsIssueQuest quest = null;
+        ItemObject requestedItem = null;
+        int requestedItemAmount = 0;
+        Server.Call(() =>
+        {
+            Assert.True(Server.Resolve<IPlayerManager>().AddPlayer(new Player("host-controller", fixture.HeroId, hostPartyId, "", "")));
+
+            Assert.True(Server.ObjectManager.TryGetObject<Hero>(fixture.HeroId, out var owner));
+            using (new QuestSolutionStartAuthorityGuard())
+            {
+                Assert.True(Campaign.Current.IssueManager.StartIssueQuest(owner));
+            }
+            Server.Resolve<IIssueOwnershipRegistry>().SetOwner(owner, "host-controller");
+
+            quest = Assert.IsType<VillageNeedsCraftingMaterialsIssueBehavior.VillageNeedsCraftingMaterialsIssueQuest>(owner.Issue.IssueQuest);
+            requestedItem = quest._requestedItem;
+            requestedItemAmount = quest._requestedItemAmount;
+
+            Assert.True(Server.ObjectManager.TryGetObject<MobileParty>(hostPartyId, out var hostParty));
+            using (new AllowedThread())
+            {
+                Campaign.Current.MainParty = hostParty;
+                hostParty.ItemRoster.AddToCounts(requestedItem, requestedItemAmount);
+            }
+        });
+
+        var goldBefore = 0;
+        int hostHonorXpBefore = 0;
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject<Hero>(fixture.HeroId, out var owner));
+            goldBefore = owner.Gold;
+            hostHonorXpBefore = Campaign.Current.PlayerTraitDeveloper.GetPropertyValue(DefaultTraits.Honor);
+        });
+        int otherClientHonorXpBefore = 0;
+        OtherClient.Call(() => otherClientHonorXpBefore = Campaign.Current.PlayerTraitDeveloper.GetPropertyValue(DefaultTraits.Honor));
+
+        Server.Call(() => quest.Success());
+
+        Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkIssueRemoved>());
+
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject<Hero>(fixture.HeroId, out var owner));
+            Assert.Null(owner.Issue);
+            Assert.Equal(goldBefore + 500, owner.Gold);
+            Assert.Equal(hostHonorXpBefore + 30, Campaign.Current.PlayerTraitDeveloper.GetPropertyValue(DefaultTraits.Honor));
+        });
+        OtherClient.Call(() =>
+            Assert.Equal(otherClientHonorXpBefore, Campaign.Current.PlayerTraitDeveloper.GetPropertyValue(DefaultTraits.Honor)));
+    }
+
+    [Fact]
     public void RequestVillageIssueRemoved_WithNoQuestYet_FallsBackToBareIssueFinalizedWithoutOrphaning()
     {
         var fixture = SetupIssueOwner();
@@ -2380,5 +2458,90 @@ public class VillageNeedsCraftingMaterialsIssueTests : IDisposable
             Assert.Null(giver.Issue);
             Assert.False(Campaign.Current.IssueManager.Issues.ContainsKey(giver));
         });
+    }
+
+    [Fact]
+    public void OnMapEventStarted_CoercionWhileTheOwnerIsDisconnected_DefersThePenaltyAndDeliversItOnRejoin_WithoutTouchingTheHostsTracker()
+    {
+        var fixture = SetupIssueOwner();
+        CreateIssueOnServer(fixture.HeroId);
+        ForcePromisedPaymentEverywhere(fixture.HeroId);
+        var ownerHeroId = CreateDistinctOwnerHero(fixture);
+        var partyId = AcceptQuestFromClient(fixture, "player-A", ownerHeroId);
+
+        float powerBefore = 0f;
+        int ownerRelationBefore = 0;
+        int hostHonorXpBefore = 0;
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject<Hero>(fixture.HeroId, out var giver));
+            Assert.True(Server.ObjectManager.TryGetObject<Hero>(ownerHeroId, out var ownerHero));
+            powerBefore = giver.Power;
+            ownerRelationBefore = giver.GetRelation(ownerHero);
+            hostHonorXpBefore = Campaign.Current.PlayerTraitDeveloper.GetPropertyValue(DefaultTraits.Honor);
+        });
+
+        Server.Resolve<IPlayerManager>().ClearPeer(Client.NetPeer);
+
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject<Hero>(fixture.HeroId, out var giver));
+            Assert.True(Server.ObjectManager.TryGetObject<MobileParty>(partyId, out var ownerParty));
+            Assert.True(Server.ObjectManager.TryGetObject<Settlement>(fixture.SettlementId, out var settlement));
+            Assert.True(Server.Resolve<IPlayerManager>().TryGetPlayer("player-A", out var player));
+            Assert.False(Server.Resolve<IPlayerManager>().IsConnected(player));
+
+            var quest = Assert.IsType<VillageNeedsCraftingMaterialsIssueBehavior.VillageNeedsCraftingMaterialsIssueQuest>(giver.Issue.IssueQuest);
+            MapEvent mapEvent;
+            using (new AllowedThread())
+            {
+                mapEvent = CreateForcedSuppliesMapEvent(settlement, ownerParty);
+            }
+
+            quest.OnMapEventStarted(mapEvent, ownerParty.Party, settlement.Party);
+        });
+
+        var removed = Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkIssueRemoved>());
+        Assert.Equal(fixture.HeroId, removed.OwnerId);
+        Assert.Equal(IssueFinalizeReason.QuestFail, removed.Reason);
+        Assert.Equal(VillageNeedsCraftingMaterialsQuestType.ProofFailCoercion, removed.Proof);
+
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject<Hero>(fixture.HeroId, out var giver));
+            Assert.True(Server.ObjectManager.TryGetObject<Hero>(ownerHeroId, out var ownerHero));
+            Assert.Null(giver.Issue);
+            Assert.False(Campaign.Current.IssueManager.Issues.ContainsKey(giver));
+            Assert.Equal(powerBefore - 10f, giver.Power);
+            Assert.Equal(ownerRelationBefore - 5, giver.GetRelation(ownerHero));
+
+            Assert.Equal(hostHonorXpBefore, Campaign.Current.PlayerTraitDeveloper.GetPropertyValue(DefaultTraits.Honor));
+        });
+
+        Assert.Empty(Server.NetworkSentMessages.GetMessages<NetworkApplyPendingQuestFailConsequence>());
+
+        int ownerHonorXpBeforeRejoin = 0;
+        Client.Call(() => ownerHonorXpBeforeRejoin = Campaign.Current.PlayerTraitDeveloper.GetPropertyValue(DefaultTraits.Honor));
+
+        Server.Resolve<IPlayerManager>().SetPeer("player-A", Client.NetPeer);
+        Server.Call(() =>
+        {
+            Assert.True(Server.Resolve<IPlayerManager>().TryGetPlayer("player-A", out var player));
+            Assert.True(Server.Resolve<IPlayerManager>().IsConnected(player));
+
+            CampaignEvents.Instance.HourlyTick();
+        });
+
+        var delivered = Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkApplyPendingQuestFailConsequence>());
+        Assert.Equal(VillageNeedsCraftingMaterialsQuestType.ProofFailCoercion, delivered.Proof);
+
+        Client.Call(() =>
+            Assert.Equal(ownerHonorXpBeforeRejoin - 50, Campaign.Current.PlayerTraitDeveloper.GetPropertyValue(DefaultTraits.Honor)));
+
+        Server.Call(() => CampaignEvents.Instance.HourlyTick());
+        Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkApplyPendingQuestFailConsequence>());
+
+        Server.Call(() =>
+            Assert.Equal(hostHonorXpBefore, Campaign.Current.PlayerTraitDeveloper.GetPropertyValue(DefaultTraits.Honor)));
     }
 }
