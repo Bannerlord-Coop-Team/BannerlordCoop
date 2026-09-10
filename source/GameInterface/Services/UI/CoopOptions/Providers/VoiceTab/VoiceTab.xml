@@ -1,0 +1,11 @@
+<ListPanel DataSource="{VoiceTab}" IsVisible="@IsSelected" WidthSizePolicy="StretchToParent" HeightSizePolicy="CoverChildren"
+           LayoutImp.LayoutMethod="VerticalTopToBottom">
+    <Children>
+        <ListPanel DataSource="{Sections}" WidthSizePolicy="StretchToParent" HeightSizePolicy="CoverChildren"
+                   LayoutImp.LayoutMethod="VerticalTopToBottom">
+            <ItemTemplate>
+                <!-- COOP_OPTIONS_SECTION:Sections/VoiceSection.xml -->
+            </ItemTemplate>
+        </ListPanel>
+    </Children>
+</ListPanel>

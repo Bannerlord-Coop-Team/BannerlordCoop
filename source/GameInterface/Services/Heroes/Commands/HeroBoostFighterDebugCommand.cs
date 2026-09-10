@@ -43,6 +43,8 @@ public class HeroBoostFighterDebugCommand
 
         public string Description => "Boosts a registered hero for fighter fixture testing.";
 
+        public CoopCommandSide Side => CoopCommandSide.Server;
+
         public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
             new ExpectedArgs("hero_registry_id", "The registered hero id to boost."),

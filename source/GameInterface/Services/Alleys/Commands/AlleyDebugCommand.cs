@@ -59,6 +59,8 @@ public class AlleyDebugCommand
 
         public string Description => "Lists alleys in a settlement.";
 
+        public CoopCommandSide Side => CoopCommandSide.Both;
+
         public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
             new ExpectedArgs("settlement_id", "The settlement StringId."),
@@ -90,6 +92,8 @@ public class AlleyDebugCommand
 
         public string Description => "Reports the local main hero registry id.";
 
+        public CoopCommandSide Side => CoopCommandSide.Both;
+
         public IExpectedArgs[] ExpectedArgs { get; } = System.Array.Empty<IExpectedArgs>();
 
         public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
@@ -109,6 +113,8 @@ public class AlleyDebugCommand
         public string Name => "set_owner";
 
         public string Description => "Sets an alley owner on the server.";
+
+        public CoopCommandSide Side => CoopCommandSide.Server;
 
         public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
@@ -155,6 +161,8 @@ public class AlleyDebugCommand
 
         public string Description => "Abandons a player-owned alley on the server.";
 
+        public CoopCommandSide Side => CoopCommandSide.Server;
+
         public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
             new ExpectedArgs("settlement_id", "The settlement StringId."),
@@ -186,6 +194,8 @@ public class AlleyDebugCommand
 
         public string Description => "Runs one authoritative alley daily tick.";
 
+        public CoopCommandSide Side => CoopCommandSide.Server;
+
         public IExpectedArgs[] ExpectedArgs { get; } = System.Array.Empty<IExpectedArgs>();
 
         public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
@@ -206,6 +216,8 @@ public class AlleyDebugCommand
         public string Name => "attack";
 
         public string Description => "Starts an AI attack against a player-owned alley.";
+
+        public CoopCommandSide Side => CoopCommandSide.Server;
 
         public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
@@ -234,6 +246,8 @@ public class AlleyDebugCommand
         public string Name => "info";
 
         public string Description => "Reports state for an alley.";
+
+        public CoopCommandSide Side => CoopCommandSide.Both;
 
         public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {

@@ -140,6 +140,8 @@ internal static class BattleDebugCommands
 
         public string Description => "Runs the replication fixture debug operation.";
 
+        public CoopCommandSide Side => CoopCommandSide.Both;
+
         public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
             new ExpectedArgs("mode", "The mode.", true),
@@ -282,6 +284,8 @@ internal static class BattleDebugCommands
         public string Name => "column_reinforcement_fixture";
 
         public string Description => "Runs the column reinforcement fixture debug operation.";
+
+        public CoopCommandSide Side => CoopCommandSide.Both;
 
         public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
@@ -500,6 +504,8 @@ internal static class BattleDebugCommands
 
         public string Description => "Runs the action performance debug operation.";
 
+        public CoopCommandSide Side => CoopCommandSide.Both;
+
         public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
             new ExpectedArgs("action", "The action.", true),
@@ -539,6 +545,8 @@ internal static class BattleDebugCommands
 
         public string Description => "Runs the animation trace debug operation.";
 
+        public CoopCommandSide Side => CoopCommandSide.Both;
+
         public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
             new ExpectedArgs("action", "The action.", true),
@@ -577,6 +585,8 @@ internal static class BattleDebugCommands
         public string Name => "wield_test";
 
         public string Description => "Runs the wield test debug operation.";
+
+        public CoopCommandSide Side => CoopCommandSide.Both;
 
         public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
@@ -693,6 +703,8 @@ internal static class BattleDebugCommands
 
         public string Description => "Reports item modifier state.";
 
+        public CoopCommandSide Side => CoopCommandSide.Both;
+
         public IExpectedArgs[] ExpectedArgs { get; } = Array.Empty<IExpectedArgs>();
 
         public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
@@ -785,6 +797,8 @@ internal static class BattleDebugCommands
 
         public string Description => "Reports state.";
 
+        public CoopCommandSide Side => CoopCommandSide.Both;
+
         public IExpectedArgs[] ExpectedArgs { get; } = Array.Empty<IExpectedArgs>();
 
         public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
@@ -856,6 +870,8 @@ internal static class BattleDebugCommands
 
         public string Description => "Reports size state.";
 
+        public CoopCommandSide Side => CoopCommandSide.Both;
+
         public IExpectedArgs[] ExpectedArgs { get; } = Array.Empty<IExpectedArgs>();
 
         public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
@@ -903,6 +919,8 @@ internal static class BattleDebugCommands
 
         public string Description => "Runs the charge owned formations debug operation.";
 
+        public CoopCommandSide Side => CoopCommandSide.Both;
+
         public IExpectedArgs[] ExpectedArgs { get; } = Array.Empty<IExpectedArgs>();
 
         public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
@@ -943,6 +961,8 @@ internal static class BattleDebugCommands
         public string Name => "mount_state";
 
         public string Description => "Reports mount state.";
+
+        public CoopCommandSide Side => CoopCommandSide.Both;
 
         public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
@@ -1045,6 +1065,8 @@ internal static class BattleDebugCommands
 
         public string Description => "Runs the capture mount pose debug operation.";
 
+        public CoopCommandSide Side => CoopCommandSide.Both;
+
         public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
             new ExpectedArgs("mount_agent_id", "The mount agent id.", true),
@@ -1089,6 +1111,8 @@ internal static class BattleDebugCommands
         public string Name => "mount_pose_samples";
 
         public string Description => "Runs the mount pose samples debug operation.";
+
+        public CoopCommandSide Side => CoopCommandSide.Both;
 
         public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
@@ -1194,6 +1218,8 @@ internal static class BattleDebugCommands
 
         public string Description => "Runs the move cavalry debug operation.";
 
+        public CoopCommandSide Side => CoopCommandSide.Both;
+
         public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
             new ExpectedArgs("distance", "The distance.", true),
@@ -1269,6 +1295,8 @@ internal static class BattleDebugCommands
 
         public string Description => "Runs the hold cavalry debug operation.";
 
+        public CoopCommandSide Side => CoopCommandSide.Both;
+
         public IExpectedArgs[] ExpectedArgs { get; } = Array.Empty<IExpectedArgs>();
 
         public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
@@ -1321,6 +1349,8 @@ internal static class BattleDebugCommands
         public string Name => "turn_cavalry";
 
         public string Description => "Runs the turn cavalry debug operation.";
+
+        public CoopCommandSide Side => CoopCommandSide.Both;
 
         public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
@@ -1494,6 +1524,8 @@ internal static class BattleDebugCommands
 
         public string Description => "Runs the focus mount debug operation.";
 
+        public CoopCommandSide Side => CoopCommandSide.Both;
+
         public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
             new ExpectedArgs("mount_agent_id", "The mount agent id.", true),
@@ -1565,6 +1597,8 @@ internal static class BattleDebugCommands
 
         public string Description => "Reports mount camera state.";
 
+        public CoopCommandSide Side => CoopCommandSide.Both;
+
         public IExpectedArgs[] ExpectedArgs { get; } = Array.Empty<IExpectedArgs>();
 
         public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
@@ -1631,6 +1665,8 @@ internal static class BattleDebugCommands
 
         public string Description => "Restores or clears release mount camera.";
 
+        public CoopCommandSide Side => CoopCommandSide.Both;
+
         public IExpectedArgs[] ExpectedArgs { get; } = Array.Empty<IExpectedArgs>();
 
         public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
@@ -1669,6 +1705,8 @@ internal static class BattleDebugCommands
         public string Name => "ladder_state";
 
         public string Description => "Reports ladder state.";
+
+        public CoopCommandSide Side => CoopCommandSide.Both;
 
         public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
@@ -1753,6 +1791,8 @@ internal static class BattleDebugCommands
 
         public string Description => "Runs the focus ladder debug operation.";
 
+        public CoopCommandSide Side => CoopCommandSide.Both;
+
         public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
             new ExpectedArgs("machine_id", "The machine id.", true),
@@ -1801,6 +1841,8 @@ internal static class BattleDebugCommands
         public string Name => "release_ladder_camera";
 
         public string Description => "Restores or clears release ladder camera.";
+
+        public CoopCommandSide Side => CoopCommandSide.Both;
 
         public IExpectedArgs[] ExpectedArgs { get; } = Array.Empty<IExpectedArgs>();
 

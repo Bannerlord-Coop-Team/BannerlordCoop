@@ -28,11 +28,24 @@ internal class DisconnectHandler : IHandler
     private void Handle(MessagePayload<NetworkDisconnected> obj)
     {
         gameStateInterface.GoToMainMenu();
-        coopFinalizer.Finalize(GetDisconnectMessage(obj.What.DisconnectInfo.Reason));
+        coopFinalizer.Finalize(GetDisconnectMessage(obj.What.DisconnectInfo.Reason, obj.What.ServerReason));
     }
 
-    private static string GetDisconnectMessage(DisconnectReason reason)
+    private static string GetDisconnectMessage(DisconnectReason reason, string serverReason)
     {
+        switch (serverReason)
+        {
+            case "JoinReplayAppliedTimeout":
+                return "Joining the campaign timed out while synchronizing.\n" +
+                       "The server stopped this join to keep the campaign responsive. Please try again.";
+            case "JoinReplayQueueLimit":
+                return "Joining the campaign stopped because its synchronization queue exceeded the safety limit.\n" +
+                       "Please try again.";
+            case "JoinCampaignEntryTimeout":
+                return "Joining the campaign timed out while loading the transferred save.\n" +
+                       "The server stopped this join to keep the campaign responsive. Please try again.";
+        }
+
         return reason == DisconnectReason.Timeout
             ? "Connection to the co-op server timed out.\nCheck your internet connection and try joining again."
             : "You have been Disconnected";

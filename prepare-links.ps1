@@ -1,3 +1,6 @@
+$ErrorActionPreference = 'Stop'
+$setupSucceeded = $false
+
 Write-Output "*** prepare-links.ps1 ***"
 Write-Output ""
 
@@ -22,7 +25,7 @@ While ($processes.Count -eq 0)
 }
 
 #extract game path
-$path = Select-Object -InputObject $processes -First 1 -ExpandProperty FileName
+$path = $processes | Select-Object -First 1 -ExpandProperty FileName
 $path = Split-Path -Path $path -Parent
 $path = Split-Path -Path $path -Parent
 $path = Split-Path -Path $path -Parent
@@ -40,11 +43,12 @@ While ($key -eq 0)
 	if (@(89,13,32).Where({$_ -eq $key}, 'First'))
 	{
 		#create junction link for game in project directory
-		New-Item -ItemType Junction -Path .\mb2 -Target $path
+		New-Item -ItemType Junction -Path (Join-Path $PSScriptRoot 'mb2') -Target $path
 		$COOPLOGdir = $PSScriptRoot + "\COOP_LOG"
-		New-Item -ItemType "directory" -Path $COOPLOGdir
+		New-Item -ItemType "directory" -Path $COOPLOGdir -Force
 		[Environment]::SetEnvironmentVariable('COOP_LOG',$COOPLOGdir,[System.EnvironmentVariableTarget]::User)
 		Write-Output "*** Link to the game path succesfully created ***" | Green
+        $setupSucceeded = $true
 	}
 	elseif ($key -eq 78)
 	{
@@ -57,3 +61,6 @@ While ($key -eq 0)
 }
 Write-Output "*** press any key... ***"
 $key = $Host.UI.RawUI.ReadKey('NoEcho,IncludeKeyDown')
+
+if (!$setupSucceeded) { exit 1 }
+exit 0

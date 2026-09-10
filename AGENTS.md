@@ -96,6 +96,12 @@ A freshly-created worktree has **no `mb2` junction** (only the main checkout doe
 
 If a local Release restore fails with Scriban's `NU1902` advisory promoted to an error, build-time flags can't undo it — it is baked into `obj/project.assets.json`. Delete the SDK projects' `obj/` and re-restore with `-p:NuGetAudit=false`. CI doesn't hit this.
 
+### Local MCP Tools (Pi and Codex)
+
+`runmefirst.cmd` includes the standalone MCP setup after game-path setup succeeds. See [repo-local MCP setup](doc/automated-testing/mcp-setup.md) for existing-developer refresh, local profiles and client prerequisites. Start Pi/Codex at the repo root, or use `tools/mcp/start-pi.cmd` / `start-codex.cmd` from a subdirectory; these wrappers select their own checkout, not an ancestor.
+
+Use the `bannerlord-coop` MCP tools directly for authorized live tests, not shell/file IPC loops. Pi can initialize its uncached direct tools with `mcp({ connect: "bannerlord-coop" })`, which does not launch games. Setup and initialization do not authorize a deployment or live run. Always call `stop_run` and confirm cleanup before exiting/reloading/reconnecting the client; idle keep-alive is not a substitute for cleanup.
+
 ### Runtime Logs (check these first when debugging)
 
 The live mod writes Serilog output next to the game executable, under the `mb2` junction's `bin\Win64_Shipping_Client` folder. **When debugging a crash, desync, or `Failed to get id` error, read the relevant log before theorizing** — it captures the actual run and is reachable from WSL through the junction:

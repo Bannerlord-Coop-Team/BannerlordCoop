@@ -115,6 +115,7 @@ internal class GameSaveDataPacketHandler : IPacketHandler
             completedTransfer.TradePlayerData,
             completedTransfer.InventoryPlayerData,
             completedTransfer.HeroMeetingData,
+            completedTransfer.AgingPlayerData,
             completedTransfer.AttachmentIdMap,
             completedTransfer.ServerOptions,
             completedTransfer.ClanFinance));
@@ -139,6 +140,7 @@ internal class GameSaveDataPacketHandler : IPacketHandler
             TradePlayerData = firstChunk.TradePlayerData;
             InventoryPlayerData = firstChunk.InventoryPlayerData;
             HeroMeetingData = firstChunk.HeroMeetingData;
+            AgingPlayerData = firstChunk.AgingPlayerData;
             AttachmentIdMap = firstChunk.AttachmentIdMap;
             ServerOptions = firstChunk.ServerOptions;
             ClanFinance = firstChunk.ClanFinance;
@@ -156,6 +158,7 @@ internal class GameSaveDataPacketHandler : IPacketHandler
         public TradePlayerData TradePlayerData { get; }
         public InventoryPlayerData InventoryPlayerData { get; }
         public HeroMeetingData HeroMeetingData { get; }
+        public AgingPlayerData AgingPlayerData { get; }
         public AttachmentIdMap AttachmentIdMap { get; }
         public ServerOptions ServerOptions { get; }
         public Dictionary<string, ClanFinanceSettings> ClanFinance { get; }

@@ -17,7 +17,7 @@ public struct TradeActionLogData
     public int SellPrice { get; set; }
 
     [ProtoMember(4)]
-    public ItemRosterElement ItemRosterElement { get; set; }
+    public CaravanTradeItemData ItemRosterElement { get; set; }
 
     [ProtoMember(5)]
     public string SoldSettlementId { get; set; }
@@ -36,8 +36,30 @@ public struct TradeActionLogData
         BoughtSettlementId = boughtSettlementId;
         BuyPrice = buyPrice;
         SellPrice = sellPrice;
-        ItemRosterElement = itemRosterElement;
+        ItemRosterElement = new CaravanTradeItemData
+        {
+            ItemObjectId = itemRosterElement.EquipmentElement.Item?.StringId,
+            Amount = itemRosterElement.Amount,
+            ItemModifierId = itemRosterElement.EquipmentElement.ItemModifier?.StringId,
+        };
         SoldSettlementId = soldSettlementId;
         BoughtTime = boughtTime;
     }
+}
+
+/// <summary>
+/// Retains native item identities until the caravan update reaches the game thread.
+/// Field numbers match the existing ItemRosterElement surrogate wire contract.
+/// </summary>
+[ProtoContract(SkipConstructor = true)]
+public struct CaravanTradeItemData
+{
+    [ProtoMember(1)]
+    public string ItemObjectId { get; set; }
+
+    [ProtoMember(2)]
+    public int Amount { get; set; }
+
+    [ProtoMember(3)]
+    public string ItemModifierId { get; set; }
 }

@@ -44,6 +44,8 @@ internal class InventoryCommands
 
         public string Description => "Runs the item ids debug operation.";
 
+        public CoopCommandSide Side => CoopCommandSide.Both;
+
         public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
             new ExpectedArgs("hero_name", "The exact hero display name.", isRequired: true),
@@ -85,6 +87,8 @@ internal class InventoryCommands
 
         public string Description => "Runs the item values debug operation.";
 
+        public CoopCommandSide Side => CoopCommandSide.Both;
+
         public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
             new ExpectedArgs("hero_name", "The exact hero display name.", isRequired: true),
@@ -125,6 +129,8 @@ internal class InventoryCommands
         public string Name => "hero_equipment";
 
         public string Description => "Runs the hero equipment debug operation.";
+
+        public CoopCommandSide Side => CoopCommandSide.Both;
 
         public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
@@ -171,6 +177,8 @@ internal class InventoryCommands
         public string Name => "give_animals";
 
         public string Description => "Runs the give animals debug operation.";
+
+        public CoopCommandSide Side => CoopCommandSide.Server;
 
         public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
@@ -235,6 +243,8 @@ internal class InventoryCommands
         public string Name => "give_warhorses";
 
         public string Description => "Runs the give warhorses debug operation.";
+
+        public CoopCommandSide Side => CoopCommandSide.Server;
 
         public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {

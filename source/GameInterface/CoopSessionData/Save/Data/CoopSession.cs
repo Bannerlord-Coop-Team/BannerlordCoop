@@ -30,11 +30,11 @@ public interface ICoopSession
     TradePlayerData TradePlayerData { get; }
     InventoryPlayerData InventoryPlayerData { get; }
     HeroMeetingData HeroMeetingData { get; }
+    AgingPlayerData AgingPlayerData { get; }
     Dictionary<string, ClanFinanceSettings> ClanFinance { get; }
 }
 
-/// <inheritdoc cref="ICoopSession"/>
-[ProtoContract]
+[ProtoContract(SkipConstructor = true)]
 public class CoopSession : ICoopSession
 {
     // Shared "no data yet" shape for a fresh session (before any GameSaved/GameLoaded). A property,
@@ -50,7 +50,8 @@ public class CoopSession : ICoopSession
         new InteractionsPlayerData(new(), new(), new(), new(), new(), new(), new(), new(), new(), new(), new()),
         new TradePlayerData(new(), new(), new(), new()),
         new InventoryPlayerData(new(), new()),
-        new HeroMeetingData(new()));
+        new HeroMeetingData(new()),
+        new AgingPlayerData(new()));
 
     [ProtoMember(1)]
     public string UniqueGameId { get; }
@@ -73,6 +74,8 @@ public class CoopSession : ICoopSession
     [ProtoMember(10)]
     public HeroMeetingData HeroMeetingData { get; }
     [ProtoMember(11)]
+    public AgingPlayerData AgingPlayerData { get; }
+    [ProtoMember(12)]
     public Dictionary<string, ClanFinanceSettings> ClanFinance { get; }
 
     public CoopSession(
@@ -86,6 +89,7 @@ public class CoopSession : ICoopSession
         TradePlayerData tradePlayerData,
         InventoryPlayerData inventoryPlayerData,
         HeroMeetingData heroMeetingData,
+        AgingPlayerData agingPlayerData,
         Dictionary<string, ClanFinanceSettings> clanFinance = null)
     {
         UniqueGameId = uniqueGameId;
@@ -98,6 +102,7 @@ public class CoopSession : ICoopSession
         TradePlayerData = tradePlayerData;
         InventoryPlayerData = inventoryPlayerData;
         HeroMeetingData = heroMeetingData;
+        AgingPlayerData = agingPlayerData;
         ClanFinance = clanFinance ?? new();
     }
 }

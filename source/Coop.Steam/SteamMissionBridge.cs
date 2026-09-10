@@ -1,4 +1,4 @@
-using Common;
+﻿using Common;
 using Common.Logging;
 using Common.Network.Session;
 using Serilog;
@@ -23,6 +23,7 @@ public class SteamMissionBridge : ISteamMissionBridge
     private readonly object gate = new object();
     private readonly object lifecycleGate = new object();
     private readonly ISteamTunnelTransport hostTransport;
+    private readonly Func<IReceivePathDiagnostics> diagnosticsFactory;
     private readonly SteamTunnelHost host;
     private readonly Func<ISteamTunnelTransport> clientTransportFactory;
     private readonly Action<Action> retiredCleanupScheduler;
@@ -31,11 +32,12 @@ public class SteamMissionBridge : ISteamMissionBridge
     private bool started;
     private bool disposed;
 
-    public SteamMissionBridge() : this(
+    public SteamMissionBridge(Func<IReceivePathDiagnostics> diagnosticsFactory) : this(
         SteamUser.GetSteamID().m_SteamID,
         new SteamNetworkingTunnelTransport(),
         () => new SteamNetworkingTunnelTransport(),
-        ScheduleRetiredCleanup)
+        ScheduleRetiredCleanup,
+        diagnosticsFactory)
     {
     }
 
@@ -43,15 +45,18 @@ public class SteamMissionBridge : ISteamMissionBridge
         ulong localSteamId,
         ISteamTunnelTransport hostTransport,
         Func<ISteamTunnelTransport> clientTransportFactory,
-        Action<Action> retiredCleanupScheduler)
+        Action<Action> retiredCleanupScheduler,
+        Func<IReceivePathDiagnostics> diagnosticsFactory)
     {
         LocalSteamId = localSteamId;
+        if (diagnosticsFactory == null) throw new ArgumentNullException(nameof(diagnosticsFactory));
+        this.diagnosticsFactory = diagnosticsFactory;
         this.hostTransport = hostTransport ?? throw new ArgumentNullException(nameof(hostTransport));
         this.clientTransportFactory = clientTransportFactory
             ?? throw new ArgumentNullException(nameof(clientTransportFactory));
         this.retiredCleanupScheduler = retiredCleanupScheduler
             ?? throw new ArgumentNullException(nameof(retiredCleanupScheduler));
-        host = new SteamTunnelHost(hostTransport);
+        host = new SteamTunnelHost(hostTransport, diagnosticsFactory);
         host.PeerDisconnected += HandlePeerDisconnected;
     }
 
@@ -104,7 +109,7 @@ public class SteamMissionBridge : ISteamMissionBridge
                 }
             }
 
-            client = new SteamTunnelClient(clientTransportFactory());
+            client = new SteamTunnelClient(clientTransportFactory(), diagnosticsFactory());
             client.Closed += () => HandleClientClosed(remoteSteamId, client);
 
             bool cannotStart;

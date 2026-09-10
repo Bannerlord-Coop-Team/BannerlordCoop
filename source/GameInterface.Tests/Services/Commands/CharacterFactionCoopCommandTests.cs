@@ -38,9 +38,9 @@ public class CharacterFactionCoopCommandTests
         Type[] commandTypes = GetCommandTypes();
 
 #if DEBUG
-        Assert.Equal(134, commandTypes.Length);
+        Assert.Equal(138, commandTypes.Length);
 #else
-        Assert.Equal(129, commandTypes.Length);
+        Assert.Equal(133, commandTypes.Length);
 #endif
         Assert.All(commandTypes, type =>
         {
@@ -132,18 +132,27 @@ public class CharacterFactionCoopCommandTests
     [Fact]
     public void Registry_RejectsInvalidArgumentCountBeforeCommandLogic()
     {
-        ICoopCommand command = CreateCommand("coop.debug.hero", "set_gold");
-        var registry = new CoopCommandRegistry(
-            new[] { command },
-            new LoggerConfiguration().CreateLogger());
+        bool originalIsServer = ModInformation.IsServer;
+        try
+        {
+            ModInformation.IsServer = true;
+            ICoopCommand command = CreateCommand("coop.debug.hero", "set_gold");
+            var registry = new CoopCommandRegistry(
+                new[] { command },
+                new LoggerConfiguration().CreateLogger());
 
-        CoopCommandResult result = registry.ProcessCommand(
-            $"{command.Prefix}.{command.Name}",
-            new TestArgs(Array.Empty<string>()));
+            CoopCommandResult result = registry.ProcessCommand(
+                $"{command.Prefix}.{command.Name}",
+                new TestArgs(Array.Empty<string>()));
 
-        Assert.False(result.Succeeded);
-        Assert.Equal("invalid_arguments", result.ErrorCode);
-        Assert.Contains("<hero_name>", result.Output);
+            Assert.False(result.Succeeded);
+            Assert.Equal("invalid_arguments", result.ErrorCode);
+            Assert.Contains("<hero_name>", result.Output);
+        }
+        finally
+        {
+            ModInformation.IsServer = originalIsServer;
+        }
     }
 
     [Theory]

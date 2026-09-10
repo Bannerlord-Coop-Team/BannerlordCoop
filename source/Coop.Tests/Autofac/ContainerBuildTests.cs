@@ -9,6 +9,7 @@ using Coop.Core.Server;
 using Coop.Core.Server.Services.Telemetry;
 using Coop.Tests.Mocks;
 using GameInterface;
+using GameInterface.Services.Voice;
 using Missions;
 using System.Collections.Generic;
 using System.Linq;
@@ -30,6 +31,11 @@ namespace Coop.Tests.Autofac
 
             var client = container.Resolve<INetwork>();
             Assert.NotNull(client);
+            Assert.NotNull(container.Resolve<IVoiceClient>());
+            Assert.NotNull(container.Resolve<global::GameInterface.Services.UI.CoopOptions.ICoopOptionsKeybinding>());
+            Assert.NotNull(container.Resolve<global::GameInterface.Services.UI.CoopOptions.ICoopKeybindingPopupFactory>());
+            Assert.NotNull(container.Resolve<IVoiceWindowFocus>());
+            Assert.Equal("Not started", container.Resolve<IVoiceAudio>().Status);
 
             var logic = container.Resolve<ILogic>();
             Assert.NotNull(logic);
@@ -44,6 +50,9 @@ namespace Coop.Tests.Autofac
                 .Where(command => command.GetType().Assembly == typeof(MissionModule).Assembly)
                 .ToArray();
 #if DEBUG
+            Assert.Same(container.Resolve<IVoiceClient>(), container.Resolve<IVoiceSyntheticTest>());
+            Assert.Equal(CoopCommandSide.Client, Assert.Single(registeredCommands,
+                command => $"{command.Prefix}.{command.Name}" == "coop.debug.voice.synthetic").Side);
             Assert.Equal(26, missionCommands.Length);
             Assert.Equal(
                 new[] { "arm_inactive_party_deficit", "disconnect", "join_state" },
@@ -69,12 +78,16 @@ namespace Coop.Tests.Autofac
 
             var server = container.Resolve<INetwork>();
             Assert.NotNull(server);
+            Assert.False(container.IsRegistered<IVoiceClient>());
+            Assert.False(container.IsRegistered<IVoiceAudio>());
 
             var logic = container.Resolve<ILogic>();
             Assert.NotNull(logic);
 
 #if DEBUG
+            Assert.False(container.IsRegistered<IVoiceSyntheticTest>());
             ICoopCommand[] registeredCommands = container.Resolve<IEnumerable<ICoopCommand>>().ToArray();
+            Assert.DoesNotContain(registeredCommands, command => $"{command.Prefix}.{command.Name}" == "coop.debug.voice.synthetic");
             Assert.Equal(
                 new[] { "join_state", "restore_inactive_party", "stage_inactive_party" },
                 registeredCommands

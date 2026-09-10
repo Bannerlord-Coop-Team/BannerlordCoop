@@ -32,6 +32,8 @@ internal class CharacterDeveloperCommands
 
         public string Description => "Reports stats.";
 
+        public CoopCommandSide Side => CoopCommandSide.Both;
+
         public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
             new ExpectedArgs("hero_name", "The exact hero display name.", isRequired: true),

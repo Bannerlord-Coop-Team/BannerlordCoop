@@ -67,9 +67,12 @@ public readonly struct GameSaveDataPacket : IPacket
     public readonly HeroMeetingData HeroMeetingData;
 
     [ProtoMember(11)]
-    public readonly AttachmentIdMap AttachmentIdMap;
+    public readonly AgingPlayerData AgingPlayerData;
 
     [ProtoMember(12)]
+    public readonly AttachmentIdMap AttachmentIdMap;
+
+    [ProtoMember(13)]
     public readonly ServerOptions ServerOptions;
 
     [ProtoMember(13)]
@@ -86,6 +89,7 @@ public readonly struct GameSaveDataPacket : IPacket
         TradePlayerData tradePlayerData,
         InventoryPlayerData inventoryPlayerData,
         HeroMeetingData heroMeetingData,
+        AgingPlayerData agingPlayerData,
         AttachmentIdMap attachmentIdMap,
         ServerOptions serverOptions,
         Dictionary<string, ClanFinanceSettings> clanFinance = null)
@@ -100,6 +104,7 @@ public readonly struct GameSaveDataPacket : IPacket
         TradePlayerData = tradePlayerData;
         InventoryPlayerData = inventoryPlayerData;
         HeroMeetingData = heroMeetingData;
+        AgingPlayerData = agingPlayerData;
         AttachmentIdMap = attachmentIdMap;
         ServerOptions = serverOptions;
         ClanFinance = clanFinance;

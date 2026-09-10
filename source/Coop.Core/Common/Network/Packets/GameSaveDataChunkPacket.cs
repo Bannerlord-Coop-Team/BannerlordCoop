@@ -74,9 +74,12 @@ public readonly struct GameSaveDataChunkPacket : IPacket
     public readonly HeroMeetingData HeroMeetingData;
 
     [ProtoMember(16)]
-    public readonly AttachmentIdMap AttachmentIdMap;
+    public readonly AgingPlayerData AgingPlayerData;
 
     [ProtoMember(17)]
+    public readonly AttachmentIdMap AttachmentIdMap;
+
+    [ProtoMember(18)]
     public readonly ServerOptions ServerOptions;
 
     [ProtoMember(18)]
@@ -98,6 +101,7 @@ public readonly struct GameSaveDataChunkPacket : IPacket
         TradePlayerData tradePlayerData,
         InventoryPlayerData inventoryPlayerData,
         HeroMeetingData heroMeetingData,
+        AgingPlayerData agingPlayerData,
         AttachmentIdMap attachmentIdMap,
         ServerOptions serverOptions,
         Dictionary<string, ClanFinanceSettings> clanFinance = null)
@@ -117,6 +121,7 @@ public readonly struct GameSaveDataChunkPacket : IPacket
         TradePlayerData = tradePlayerData;
         InventoryPlayerData = inventoryPlayerData;
         HeroMeetingData = heroMeetingData;
+        AgingPlayerData = agingPlayerData;
         AttachmentIdMap = attachmentIdMap;
         ServerOptions = serverOptions;
         ClanFinance = clanFinance;

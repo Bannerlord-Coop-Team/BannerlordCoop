@@ -139,14 +139,20 @@ namespace Coop.Tests.Client.States
             var validateState = clientLogic.SetState<ValidateModuleState>();
             var gameStateInterface = clientComponent.Container.Resolve<Mock<IGameStateInterface>>();
             IClientState? stateWhenGameStarted = null;
+            bool loadingScreenHidden = false;
+            bool loadingScreenHiddenWhenGameStarted = false;
             int startThreadId = 0;
             int gameThreadId = 0;
 
+            clientComponent.Container.Resolve<Mock<ILoadingInterface>>()
+                .Setup(x => x.HideLoadingScreen())
+                .Callback(() => loadingScreenHidden = true);
             gameStateInterface
                 .Setup(x => x.StartNewGame())
                 .Callback(() =>
                 {
                     stateWhenGameStarted = clientLogic.State;
+                    loadingScreenHiddenWhenGameStarted = loadingScreenHidden;
                     startThreadId = Environment.CurrentManagedThreadId;
                 });
             GameThread.Run(() => gameThreadId = Environment.CurrentManagedThreadId, blocking: true);
@@ -160,6 +166,7 @@ namespace Coop.Tests.Client.States
             GameThread.Run(() => { }, blocking: true);
 
             Assert.IsType<CharacterCreationState>(stateWhenGameStarted);
+            Assert.True(loadingScreenHiddenWhenGameStarted);
             Assert.IsType<CharacterCreationState>(clientLogic.State);
             Assert.Equal(gameThreadId, startThreadId);
             gameStateInterface.Verify(x => x.StartNewGame(), Times.Once);
@@ -418,6 +425,10 @@ namespace Coop.Tests.Client.States
             clientComponent.TestMessageBroker.Publish(this, new CharacterCreationStarted());
 
             Assert.IsType<ValidateModuleState>(clientLogic.State);
+            clientComponent.Container.Resolve<Mock<ILoadingInterface>>()
+                .Verify(x => x.HideLoadingScreen(), Times.Never);
+            clientComponent.Container.Resolve<Mock<IGameStateInterface>>()
+                .Verify(x => x.StartNewGame(), Times.Never);
         }
 
         [Fact]

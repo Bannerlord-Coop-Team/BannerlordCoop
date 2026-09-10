@@ -93,6 +93,7 @@ public class DirectMigratedCommandTests
             new[]
             {
                 "battle_reward_fixture_start",
+                "kms",
                 "start_nearest_bandit_attack",
                 "upgrade_party_screen_troop",
             },
@@ -102,20 +103,29 @@ public class DirectMigratedCommandTests
     [Fact]
     public void Registry_RejectsInvalidArgumentCountBeforeCommandLogic()
     {
-        ICoopCommand command = Assert.Single(
-            CreateCommands(),
-            candidate => candidate.Name == "set_troop_state");
-        var registry = new CoopCommandRegistry(
-            new[] { command },
-            new LoggerConfiguration().CreateLogger());
+        bool originalIsServer = ModInformation.IsServer;
+        try
+        {
+            ModInformation.IsServer = true;
+            ICoopCommand command = Assert.Single(
+                CreateCommands(),
+                candidate => candidate.Name == "set_troop_state");
+            var registry = new CoopCommandRegistry(
+                new[] { command },
+                new LoggerConfiguration().CreateLogger());
 
-        CoopCommandResult result = registry.ProcessCommand(
-            $"{command.Prefix}.{command.Name}",
-            new TestArgs(Array.Empty<string>()));
+            CoopCommandResult result = registry.ProcessCommand(
+                $"{command.Prefix}.{command.Name}",
+                new TestArgs(Array.Empty<string>()));
 
-        Assert.False(result.Succeeded);
-        Assert.Equal("invalid_arguments", result.ErrorCode);
-        Assert.Contains("<party_id>", result.Output);
+            Assert.False(result.Succeeded);
+            Assert.Equal("invalid_arguments", result.ErrorCode);
+            Assert.Contains("<party_id>", result.Output);
+        }
+        finally
+        {
+            ModInformation.IsServer = originalIsServer;
+        }
     }
 
     [Theory]

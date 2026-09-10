@@ -30,6 +30,8 @@ internal class TradeSkillCommands
 
         public string Description => "Reports view player trade data.";
 
+        public CoopCommandSide Side => CoopCommandSide.Both;
+
         public IExpectedArgs[] ExpectedArgs { get; } = Array.Empty<IExpectedArgs>();
 
         public CoopCommandResult ProcessCommand(ICoopCommandArgs strings)
@@ -78,6 +80,8 @@ internal class TradeSkillCommands
         public string Name => "view_player_trade_rumors";
 
         public string Description => "Reports view player trade rumors.";
+
+        public CoopCommandSide Side => CoopCommandSide.Both;
 
         public IExpectedArgs[] ExpectedArgs { get; } = Array.Empty<IExpectedArgs>();
 
@@ -131,6 +135,8 @@ internal class TradeSkillCommands
         public string Name => "view_entered_settlements";
 
         public string Description => "Reports view entered settlements.";
+
+        public CoopCommandSide Side => CoopCommandSide.Both;
 
         public IExpectedArgs[] ExpectedArgs { get; } = Array.Empty<IExpectedArgs>();
 

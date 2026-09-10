@@ -20,6 +20,8 @@ public sealed class ModConfigData
 
     public ModOptionsData ModOptions { get; set; } = new ModOptionsData();
 
+    public VoiceConfigData Voice { get; set; } = new VoiceConfigData();
+
     [JsonExtensionData]
     public IDictionary<string, JToken> UnknownKeys { get; set; }
 }
@@ -66,6 +68,8 @@ public enum DifficultyLevel
 
 public sealed class ModOptionsData
 {
+    public bool? VoiceEnabled { get; set; }
+
     public int? BattleSize { get; set; }
 
     public bool? FastForwardEnabled { get; set; }
@@ -103,6 +107,8 @@ public sealed class ModOptionsData
     public bool? EnableHeroExecutions { get; set; }
 
     public bool? EnablePlayerClanMemberExecutions { get; set; }
+
+    public bool? EnablePlayerExecutions { get; set; }
     
     public bool? PlayerWoundedBattleEntry { get; set; }
 

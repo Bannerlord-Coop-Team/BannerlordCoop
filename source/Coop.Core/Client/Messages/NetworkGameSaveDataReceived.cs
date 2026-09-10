@@ -44,8 +44,10 @@ public record NetworkGameSaveDataReceived : IEvent
     [ProtoMember(10)]
     public HeroMeetingData HeroMeetingData { get; }
     [ProtoMember(11)]
-    public AttachmentIdMap AttachmentIdMap { get; }
+    public AgingPlayerData AgingPlayerData { get; }
     [ProtoMember(12)]
+    public AttachmentIdMap AttachmentIdMap { get; }
+    [ProtoMember(13)]
     public ServerOptions ServerOptions { get; }
     [ProtoMember(13)]
     public Dictionary<string, ClanFinanceSettings> ClanFinance { get; }
@@ -61,6 +63,7 @@ public record NetworkGameSaveDataReceived : IEvent
         TradePlayerData tradePlayerData,
         InventoryPlayerData inventoryPlayerData,
         HeroMeetingData heroMeetingData,
+        AgingPlayerData agingPlayerData,
         AttachmentIdMap attachmentIdMap,
         ServerOptions serverOptions,
         Dictionary<string, ClanFinanceSettings> clanFinance = null)
@@ -75,6 +78,7 @@ public record NetworkGameSaveDataReceived : IEvent
         TradePlayerData = tradePlayerData;
         InventoryPlayerData = inventoryPlayerData;
         HeroMeetingData = heroMeetingData;
+        AgingPlayerData = agingPlayerData;
         AttachmentIdMap = attachmentIdMap;
         ServerOptions = serverOptions;
         ClanFinance = clanFinance;

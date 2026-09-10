@@ -49,6 +49,8 @@ public class AlleyRecruitDebugCommand
 
         public string Description => "Starts the alley recruitment fixture.";
 
+        public CoopCommandSide Side => CoopCommandSide.Server;
+
         public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
             new ExpectedArgs("settlement_id", "The settlement StringId."),
@@ -122,6 +124,8 @@ public class AlleyRecruitDebugCommand
 
         public string Description => "Reports alley recruitment fixture state.";
 
+        public CoopCommandSide Side => CoopCommandSide.Both;
+
         public IExpectedArgs[] ExpectedArgs { get; } = System.Array.Empty<IExpectedArgs>();
 
         public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
@@ -142,6 +146,8 @@ public class AlleyRecruitDebugCommand
         public string Name => "recruit_roster";
 
         public string Description => "Reports the recruit roster for a hero party.";
+
+        public CoopCommandSide Side => CoopCommandSide.Both;
 
         public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
@@ -179,6 +185,8 @@ public class AlleyRecruitDebugCommand
         public string Name => "recruit_fixture_restore";
 
         public string Description => "Restores the alley recruitment fixture.";
+
+        public CoopCommandSide Side => CoopCommandSide.Server;
 
         public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
@@ -406,6 +414,8 @@ public class AlleyRecruitDebugCommand
 
         public string Description => "Reports the alley overseer mission state.";
 
+        public CoopCommandSide Side => CoopCommandSide.Client;
+
         public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
             new ExpectedArgs("settlement_id", "The settlement StringId."),
@@ -437,6 +447,8 @@ public class AlleyRecruitDebugCommand
         public string Name => "recruit_conversation_start";
 
         public string Description => "Starts a conversation with the alley overseer.";
+
+        public CoopCommandSide Side => CoopCommandSide.Client;
 
         public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
@@ -476,6 +488,8 @@ public class AlleyRecruitDebugCommand
         public string Name => "recruit_conversation";
 
         public string Description => "Drives or inspects the alley recruitment conversation.";
+
+        public CoopCommandSide Side => CoopCommandSide.Client;
 
         public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
@@ -517,6 +531,8 @@ public class AlleyRecruitDebugCommand
         public string Name => "recruit_inventory";
 
         public string Description => "Drives or inspects the alley recruitment inventory screen.";
+
+        public CoopCommandSide Side => CoopCommandSide.Client;
 
         public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
@@ -565,6 +581,8 @@ public class AlleyRecruitDebugCommand
         public string Name => "recruit_start_looter_battle";
 
         public string Description => "Starts the alley recruitment looter battle fixture.";
+
+        public CoopCommandSide Side => CoopCommandSide.Server;
 
         public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {

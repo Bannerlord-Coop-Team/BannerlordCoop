@@ -28,6 +28,7 @@ public class BugReportUploader : IBugReportUploader, IDisposable
         "https://wfvqnijwuyqjibhlcrhz.supabase.co/functions/v1/create-github-issue-bug-report";
     internal const int MaximumCompressedReportBytes = 10 * 1024 * 1024;
     internal const int MaximumServerSaveBytes = 48 * 1024 * 1024;
+    internal const int MaximumServerSaveSidecarBytes = 8 * 1024 * 1024;
 
     private static readonly JsonSerializerOptions JsonOptions = new JsonSerializerOptions
     {
@@ -84,11 +85,7 @@ public class BugReportUploader : IBugReportUploader, IDisposable
 
         if (report.ServerSave != null)
         {
-            if (string.IsNullOrWhiteSpace(report.ServerSave.FileName) ||
-                !string.Equals(
-                    Path.GetFileName(report.ServerSave.FileName),
-                    report.ServerSave.FileName,
-                    StringComparison.Ordinal))
+            if (!IsValidFileName(report.ServerSave.FileName))
             {
                 return new BugReportUploadResult(false, true, "The server campaign save had an invalid file name.");
             }
@@ -99,6 +96,31 @@ public class BugReportUploader : IBugReportUploader, IDisposable
                     false,
                     true,
                     "The server campaign save exceeds the upload size limit.");
+            }
+
+            var hasSidecarFileName = report.ServerSave.SidecarFileName != null;
+            var hasSidecarData = report.ServerSave.SidecarData != null;
+            if (hasSidecarFileName != hasSidecarData ||
+                (hasSidecarFileName &&
+                 (!IsValidFileName(report.ServerSave.SidecarFileName) ||
+                  !string.Equals(
+                      Path.ChangeExtension(report.ServerSave.FileName, ".json"),
+                      report.ServerSave.SidecarFileName,
+                      StringComparison.OrdinalIgnoreCase))))
+            {
+                return new BugReportUploadResult(
+                    false,
+                    true,
+                    "The server campaign save sidecar was invalid.");
+            }
+
+            if (hasSidecarData &&
+                !IsWithinServerSaveSidecarLimit(report.ServerSave.SidecarData.LongLength))
+            {
+                return new BugReportUploadResult(
+                    false,
+                    true,
+                    "The server campaign save sidecar exceeds the upload size limit.");
             }
         }
 
@@ -139,6 +161,17 @@ public class BugReportUploader : IBugReportUploader, IDisposable
         return saveBytes > 0 && saveBytes <= MaximumServerSaveBytes;
     }
 
+    internal static bool IsWithinServerSaveSidecarLimit(long sidecarBytes)
+    {
+        return sidecarBytes > 0 && sidecarBytes <= MaximumServerSaveSidecarBytes;
+    }
+
+    private static bool IsValidFileName(string fileName)
+    {
+        return !string.IsNullOrWhiteSpace(fileName) &&
+               string.Equals(Path.GetFileName(fileName), fileName, StringComparison.Ordinal);
+    }
+
     private static MultipartFormDataContent CreateMultipartContent(
         BugReportArchiveContents report,
         string json)
@@ -168,6 +201,14 @@ public class BugReportUploader : IBugReportUploader, IDisposable
                 CreateBinaryContent(report.ServerSave.Data, "application/octet-stream"),
                 "serverSave",
                 report.ServerSave.FileName);
+
+            if (report.ServerSave.SidecarData != null)
+            {
+                content.Add(
+                    CreateBinaryContent(report.ServerSave.SidecarData, "application/json"),
+                    "serverSaveSidecar",
+                    report.ServerSave.SidecarFileName);
+            }
         }
 
         return content;
@@ -226,7 +267,9 @@ public class BugReportUploader : IBugReportUploader, IDisposable
             ? null
             : new BugReportJsonServerSave(
                 report.ServerSave.FileName,
-                report.ServerSave.Data.LongLength);
+                report.ServerSave.Data.LongLength,
+                report.ServerSave.SidecarFileName,
+                report.ServerSave.SidecarData?.LongLength);
 
         return new BugReportJsonRequest(
             report.RequestId,
@@ -345,17 +388,25 @@ internal sealed class BugReportJsonLog
     }
 }
 
-/// <summary>Describes the raw server-save artifact uploaded before the JSON report.</summary>
+/// <summary>Describes the server-save pair uploaded before the JSON report.</summary>
 internal sealed class BugReportJsonServerSave
 {
     public string FileName { get; }
     public string Artifact => "server-save";
     public long Length { get; }
+    public string SidecarFileName { get; }
+    public long? SidecarLength { get; }
 
-    public BugReportJsonServerSave(string fileName, long length)
+    public BugReportJsonServerSave(
+        string fileName,
+        long length,
+        string sidecarFileName,
+        long? sidecarLength)
     {
         FileName = fileName;
         Length = length;
+        SidecarFileName = sidecarFileName;
+        SidecarLength = sidecarLength;
     }
 }
 

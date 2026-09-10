@@ -93,7 +93,9 @@ namespace Coop.Tests.Server.Connections.States
                 null!,
                 null!,
                 null!,
-                heroMeetingData);
+                heroMeetingData,
+                null!);
+
             session.ClanFinance["Hero_Player"] = new ClanFinanceSettings("Clan_Coop", "Hero_Leader", 600);
             serverComponent.Container.Resolve<Mock<ICoopSessionProvider>>()
                 .SetupGet(provider => provider.CoopSession)

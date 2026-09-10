@@ -35,6 +35,7 @@ public sealed class MirrorAgent
     public bool LastMaximumSpeedLimitIsMultiplier { get; set; }
     public EquipmentIndex PrimaryWieldedItemIndex { get; set; } = EquipmentIndex.None;
     public EquipmentIndex OffhandWieldedItemIndex { get; set; } = EquipmentIndex.None;
+    public MissionEquipment Equipment { get; set; }
     public BasicCharacterObject Character { get; set; }
     public Equipment SpawnEquipment { get; set; }
     public BodyProperties BodyProperties { get; set; }

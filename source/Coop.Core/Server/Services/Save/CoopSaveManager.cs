@@ -1,5 +1,7 @@
-﻿using Common.Serialization;
+﻿using Common.Logging;
+using Common.Serialization;
 using GameInterface.CoopSessionData.Save.Data;
+using Serilog;
 using System;
 using System.IO;
 using TaleWorlds.Library;
@@ -17,6 +19,8 @@ namespace Coop.Core.Server.Services.Save
 
     internal class CoopSaveManager : ICoopSaveManager
     {
+        private static readonly ILogger Logger = LogManager.GetLogger<CoopSaveManager>();
+
         public string DefaultPath { get; } = ResolveDefaultPath();
         public string FileType { get; } = ".json";
 
@@ -72,6 +76,8 @@ namespace Coop.Core.Server.Services.Save
                 }
             }
 
+            Logger.Warning("Co-op session JSON was not found at {FilePath}; saved player registrations will not be restored",
+                Path.GetFullPath(filePath));
             return null;
         }
 

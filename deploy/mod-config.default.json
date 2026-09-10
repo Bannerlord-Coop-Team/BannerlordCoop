@@ -1,4 +1,10 @@
 ﻿{
+  "voice": {
+    "mapFullVolumeDistance": 5,
+    "mapMaximumDistance": 20,
+    "sceneFullVolumeDistance": 10,
+    "sceneMaximumDistance": 50
+  },
   // Bannerlord Coop gameplay configuration — owned by the Coop mod itself and
   // applied wherever the coop server runs (dedicated server or player-hosted
   // session). Settings for how a dedicated server PROCESS runs (save name,
@@ -65,15 +71,17 @@
     // Realistic: Enable battle death for all heroes
     "battleDeath": "VeryEasy",
 
-    // (Not currently supported) Toggle aging, births and natural deaths.
+    // Toggle aging, births and natural deaths.
     // NOTE: Having this off doesn't necessarily disable battle deaths
     // To disable battle deaths change "battleDeath" and "clanMemberDeathChance" instead
-    "birthAndDeath": false,
+    "birthAndDeath": true,
 
     // Toggle auto allocation of perks for members of player clans.
     "autoAllocateClanMemberPerks": false
   },
   "modOptions": {
+    // Enables proximity voice for every player. Runtime changes are session-only.
+    "voiceEnabled": true,
     // Total human troops initially allocated across both sides of a battle.
     // Valid range: 200-1000. Default is 1000.
     "battleSize": 1000,
@@ -179,6 +187,11 @@
     // This includes player companions and family members.
     // Default is false and won't have any effect if enableHeroExecutions is false.
     "enablePlayerClanMemberExecutions": false,
+
+    // Toggle players being able to execute each other.
+    // WARNING: The only requirement for doing this is having another player as prisoner.
+    // Default is false and won't have any effect if enableHeroExecutions is false.
+    "enablePlayerExecutions": false,
 
     // Toggle player nameplates in co-op missions.
     // (Default) true: Clients may show nameplates above allied remote players.

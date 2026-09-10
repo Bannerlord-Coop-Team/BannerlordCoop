@@ -90,6 +90,7 @@ public class TransferSaveState : ConnectionStateBase
                     Clone(coopSessionProvider.CoopSession?.TradePlayerData),
                     Clone(coopSessionProvider.CoopSession?.InventoryPlayerData),
                     Clone(coopSessionProvider.CoopSession?.HeroMeetingData),
+                    Clone(coopSessionProvider.CoopSession?.AgingPlayerData),
                     attachmentIdMapper.BuildServerMap(),
                     serverOptionsProvider.GetServerOptions(),
                     Clone(coopSessionProvider.CoopSession?.ClanFinance));
@@ -160,6 +161,7 @@ public class TransferSaveState : ConnectionStateBase
                 chunkIndex == 0 ? snapshot.TradePlayerData : null,
                 chunkIndex == 0 ? snapshot.InventoryPlayerData : null,
                 chunkIndex == 0 ? snapshot.HeroMeetingData : null,
+                chunkIndex == 0 ? snapshot.AgingPlayerData : null,
                 chunkIndex == 0 ? snapshot.AttachmentIdMap : null,
                 chunkIndex == 0 ? snapshot.ServerOptions : null,
                 chunkIndex == 0 ? snapshot.ClanFinance : null);

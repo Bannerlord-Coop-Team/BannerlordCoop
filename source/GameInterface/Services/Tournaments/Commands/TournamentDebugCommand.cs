@@ -46,6 +46,8 @@ public class TournamentDebugCommand
 
         public string Description => "Adds tournament to town for co-op debugging.";
 
+        public CoopCommandSide Side => CoopCommandSide.Server;
+
         public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
             new ExpectedArgs("townNameOrId", "The exact town name or id; quote names containing spaces."),
@@ -91,6 +93,8 @@ public class TournamentDebugCommand
         public string Name => "danustica_fixture_begin";
 
         public string Description => "Runs fixture begin for co-op debugging.";
+
+        public CoopCommandSide Side => CoopCommandSide.Server;
 
         public IExpectedArgs[] ExpectedArgs { get; } = System.Array.Empty<IExpectedArgs>();
 
@@ -147,6 +151,8 @@ public class TournamentDebugCommand
 
         public string Description => "Runs fixture state for co-op debugging.";
 
+        public CoopCommandSide Side => CoopCommandSide.Both;
+
         public IExpectedArgs[] ExpectedArgs { get; } = System.Array.Empty<IExpectedArgs>();
 
         public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
@@ -185,6 +191,8 @@ public class TournamentDebugCommand
         public string Name => "danustica_fixture_restore";
 
         public string Description => "Runs fixture restore for co-op debugging.";
+
+        public CoopCommandSide Side => CoopCommandSide.Server;
 
         public IExpectedArgs[] ExpectedArgs { get; } = System.Array.Empty<IExpectedArgs>();
 
@@ -232,6 +240,8 @@ public class TournamentDebugCommand
         public string Name => "danustica_fixture_abort";
 
         public string Description => "Runs fixture abort for co-op debugging.";
+
+        public CoopCommandSide Side => CoopCommandSide.Server;
 
         public IExpectedArgs[] ExpectedArgs { get; } = System.Array.Empty<IExpectedArgs>();
 
@@ -281,6 +291,8 @@ public class TournamentDebugCommand
 
         public string Description => "Runs request join for co-op debugging.";
 
+        public CoopCommandSide Side => CoopCommandSide.Client;
+
         public IExpectedArgs[] ExpectedArgs { get; } = System.Array.Empty<IExpectedArgs>();
 
         public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
@@ -315,6 +327,8 @@ public class TournamentDebugCommand
 
         public string Description => "Runs request start for co-op debugging.";
 
+        public CoopCommandSide Side => CoopCommandSide.Client;
+
         public IExpectedArgs[] ExpectedArgs { get; } = System.Array.Empty<IExpectedArgs>();
 
         public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
@@ -341,6 +355,8 @@ public class TournamentDebugCommand
         public string Name => "danustica_request_choice";
 
         public string Description => "Runs request choice for co-op debugging.";
+
+        public CoopCommandSide Side => CoopCommandSide.Client;
 
         public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
@@ -382,6 +398,8 @@ public class TournamentDebugCommand
 
         public string Description => "Runs request leave for co-op debugging.";
 
+        public CoopCommandSide Side => CoopCommandSide.Client;
+
         public IExpectedArgs[] ExpectedArgs { get; } = System.Array.Empty<IExpectedArgs>();
 
         public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
@@ -407,6 +425,8 @@ public class TournamentDebugCommand
         public string Name => "danustica_observe";
 
         public string Description => "Runs observe for co-op debugging.";
+
+        public CoopCommandSide Side => CoopCommandSide.Both;
 
         public IExpectedArgs[] ExpectedArgs { get; } = System.Array.Empty<IExpectedArgs>();
 

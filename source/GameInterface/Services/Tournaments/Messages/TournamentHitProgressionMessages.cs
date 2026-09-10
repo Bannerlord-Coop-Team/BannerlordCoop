@@ -1,4 +1,4 @@
-using Common.Messaging;
+﻿using Common.Messaging;
 using ProtoBuf;
 using System;
 
@@ -11,7 +11,7 @@ public sealed class TournamentHitProgressionData
     [ProtoMember(2)] public readonly string MatchId;
     [ProtoMember(3)] public readonly long Revision;
     [ProtoMember(4)] public readonly long BracketRevision;
-    [ProtoMember(5)] public readonly string DamageOriginControllerId;
+    [ProtoMember(5)] public readonly string AttackerControllerId;
     [ProtoMember(6)] public readonly long DamageSequence;
     [ProtoMember(7)] public readonly Guid AttackerAgentId;
     [ProtoMember(8)] public readonly Guid VictimAgentId;
@@ -27,12 +27,14 @@ public sealed class TournamentHitProgressionData
     [ProtoMember(18)] public readonly bool Fatal;
     [ProtoMember(19)] public readonly bool Charging;
     [ProtoMember(20)] public readonly bool SneakAttack;
+    [ProtoMember(21)] public readonly string DamageOriginControllerId;
 
     public TournamentHitProgressionData(
         string sessionId,
         string matchId,
         long revision,
         long bracketRevision,
+        string attackerControllerId,
         string damageOriginControllerId,
         long damageSequence,
         Guid attackerAgentId,
@@ -54,6 +56,7 @@ public sealed class TournamentHitProgressionData
         MatchId = matchId;
         Revision = revision;
         BracketRevision = bracketRevision;
+        AttackerControllerId = attackerControllerId;
         DamageOriginControllerId = damageOriginControllerId;
         DamageSequence = damageSequence;
         AttackerAgentId = attackerAgentId;

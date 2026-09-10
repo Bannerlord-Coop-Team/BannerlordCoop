@@ -1,4 +1,5 @@
 ﻿using Common.Logging;
+using Coop.Core.Server.Connections.Messages;
 using Common.Messaging;
 using Common.Network;
 using Coop.Core.Server.Connections;
@@ -21,6 +22,13 @@ public interface IOverloadedPeerManager : IDisposable
 
 internal class OverloadedPeerManager : IOverloadedPeerManager
 {
+    /// <summary>Tracks the last acknowledged application progress for one joining connection.</summary>
+    private sealed class JoinProgress
+    {
+        public long Version;
+        public DateTime LastProgressUtc;
+    }
+
     private static readonly ILogger Logger = LogManager.GetLogger<OverloadedPeerManager>();
     private readonly INetworkConfig config;
     private readonly IMessageBroker messageBroker;
@@ -31,16 +39,18 @@ internal class OverloadedPeerManager : IOverloadedPeerManager
     private readonly IConnectionCollection connectionCollection;
     private readonly IConnectionMessageQueue connectionMessageQueue;
 
+    private readonly IJoinPeerTerminator joinPeerTerminator;
+    private readonly Dictionary<NetPeer, JoinProgress> joinCatchUpProgress = new(ReferenceComparer<NetPeer>.Instance);
+    private readonly Dictionary<NetPeer, DateTime> preEntryBackpressureStartedUtc = new(ReferenceComparer<NetPeer>.Instance);
+
     private IAutomaticPauseLease automaticPauseLease;
     private volatile NetPeer[] cachedOverloadedPeers = Array.Empty<NetPeer>();
-    private readonly Dictionary<NetPeer, DateTime> joinCatchUpStartedUtc = new Dictionary<NetPeer, DateTime>();
 
     // Diagnostics for the catch-up pause: when it started and when depths were last logged, so a
     // long pause leaves periodic evidence in the log instead of only an in-game message.
     private DateTime pauseStartedUtc;
     private DateTime lastPauseDepthLogUtc;
     private static readonly TimeSpan PauseDepthLogInterval = TimeSpan.FromSeconds(5);
-    internal static readonly TimeSpan JoinCatchUpPauseDelay = TimeSpan.FromSeconds(20);
 
     public OverloadedPeerManager(
         INetworkConfig config,
@@ -48,7 +58,8 @@ internal class OverloadedPeerManager : IOverloadedPeerManager
         Lazy<INetwork> network,
         ITimeControlInterface timeControlInterface,
         IConnectionCollection connectionCollection,
-        IConnectionMessageQueue connectionMessageQueue
+        IConnectionMessageQueue connectionMessageQueue,
+        IJoinPeerTerminator joinPeerTerminator
     )
     {
         this.config = config;
@@ -57,6 +68,7 @@ internal class OverloadedPeerManager : IOverloadedPeerManager
         this.timeControlInterface = timeControlInterface;
         this.connectionCollection = connectionCollection;
         this.connectionMessageQueue = connectionMessageQueue;
+        this.joinPeerTerminator = joinPeerTerminator;
 
         timeControlInterface.AddUnpausePolicy(PlayersOverloadedPolicy);
     }
@@ -64,7 +76,8 @@ internal class OverloadedPeerManager : IOverloadedPeerManager
     public void Dispose()
     {
         timeControlInterface.RemoveUnpausePolicy(PlayersOverloadedPolicy);
-        joinCatchUpStartedUtc.Clear();
+        joinCatchUpProgress.Clear();
+        preEntryBackpressureStartedUtc.Clear();
     }
 
     private static int GetQueueDepth(NetPeer peer)
@@ -85,34 +98,176 @@ internal class OverloadedPeerManager : IOverloadedPeerManager
             .ToList();
     }
 
-    private List<NetPeer> UpdateJoinCatchUpPeers(DateTime utcNow)
+    private void AbortStalledJoiners(DateTime utcNow)
     {
-        var peers = connectionCollection
-            .Where(logic => logic.State is LoadingState { IsJoinCatchUpPending: true })
-            .Select(logic => logic.Peer)
-            .ToList();
-        var activePeers = new HashSet<NetPeer>(peers);
+        var joining = connectionCollection
+            .Select(logic => (logic.Peer, State: logic.State as LoadingState))
+            .Where(entry => entry.State?.IsJoinCatchUpPending == true)
+            .Select(entry => (entry.Peer, State: entry.State!))
+            .ToArray();
+        var activePeers = new HashSet<NetPeer>(
+            joining.Select(entry => entry.Peer),
+            ReferenceComparer<NetPeer>.Instance);
 
-        foreach (var peer in joinCatchUpStartedUtc.Keys.Where(peer => !activePeers.Contains(peer)).ToArray())
+        foreach (var peer in joinCatchUpProgress.Keys
+                     .Where(peer => !activePeers.Contains(peer))
+                     .ToArray())
         {
-            joinCatchUpStartedUtc.Remove(peer);
+            joinCatchUpProgress.Remove(peer);
         }
 
-        foreach (var peer in peers)
+        foreach (var entry in joining)
         {
-            if (!joinCatchUpStartedUtc.ContainsKey(peer))
+            long progressVersion = entry.State.JoinProgressVersion;
+            if (!joinCatchUpProgress.TryGetValue(entry.Peer, out var progress))
             {
-                joinCatchUpStartedUtc.Add(peer, utcNow);
+                progress = new JoinProgress
+                {
+                    Version = progressVersion,
+                    LastProgressUtc = utcNow,
+                };
+                joinCatchUpProgress.Add(entry.Peer, progress);
             }
-        }
+            else if (progress.Version != progressVersion)
+            {
+                progress.Version = progressVersion;
+                progress.LastProgressUtc = utcNow;
+            }
 
-        return peers;
+            TimeSpan elapsed = utcNow - progress.LastProgressUtc;
+            int queueDepth = GetReportedQueueDepth(entry.Peer);
+            connectionMessageQueue.TryGetCatchUpPendingBytes(entry.Peer, out long pendingBytes);
+            bool timedOut = elapsed >= NetworkJoinLimits.ReplayAppliedTimeout;
+            bool queueExceeded = queueDepth > NetworkJoinLimits.MaxReplayPackets ||
+                                 connectionMessageQueue.HasCatchUpOverflowed(entry.Peer);
+            bool bytesExceeded = pendingBytes > NetworkJoinLimits.MaxReplayPendingBytes;
+            if (!timedOut && !queueExceeded && !bytesExceeded) continue;
+
+            // Make the join terminal before disconnecting. Network receive is polled after this
+            // check, so an acknowledgement already in flight cannot restart synchronization.
+            if (!entry.State.TryAbortJoinCatchUp()) continue;
+
+            string queueDescription = connectionMessageQueue.DescribeCatchUp(entry.Peer);
+            int clearedPackets = connectionMessageQueue.AbortCatchUp(entry.Peer);
+            string disconnectCode = timedOut
+                ? "JoinReplayAppliedTimeout"
+                : "JoinReplayQueueLimit";
+
+            joinCatchUpProgress.Remove(entry.Peer);
+
+            Logger.Warning(
+                "Aborting stalled campaign join for peer {Peer}: reason={Reason} phase={Phase} " +
+                "stalled={ElapsedSeconds:0.0}s timeout={TimeoutSeconds:0.0}s " +
+                "queue={QueueDepth} queueLimit={QueueLimit} pendingBytes={PendingBytes} " +
+                "pendingByteLimit={PendingByteLimit} cleared={ClearedPackets} {QueueDescription}",
+                entry.Peer.Id,
+                disconnectCode,
+                entry.State.JoinPhaseName,
+                elapsed.TotalSeconds,
+                NetworkJoinLimits.ReplayAppliedTimeout.TotalSeconds,
+                queueDepth,
+                NetworkJoinLimits.MaxReplayPackets,
+                pendingBytes,
+                NetworkJoinLimits.MaxReplayPendingBytes,
+                clearedPackets,
+                queueDescription);
+
+            joinPeerTerminator.Disconnect(entry.Peer, disconnectCode);
+        }
     }
 
-    private List<NetPeer> GetStalledJoiningPeers(IEnumerable<NetPeer> joinCatchUpPeers, DateTime utcNow) =>
-        joinCatchUpPeers
-            .Where(peer => utcNow - joinCatchUpStartedUtc[peer] >= JoinCatchUpPauseDelay)
-            .ToList();
+    private void AbortStalledPreEntryJoiners(DateTime utcNow)
+    {
+        var joining = connectionCollection
+            .Select(logic => (logic.Peer, State: logic.State as LoadingState))
+            .Where(entry => entry.State?.IsPreEntryPending == true)
+            .Select(entry => (entry.Peer, State: entry.State!))
+            .ToArray();
+        var activePeers = new HashSet<NetPeer>(
+            joining.Select(entry => entry.Peer),
+            ReferenceComparer<NetPeer>.Instance);
+
+        foreach (var peer in preEntryBackpressureStartedUtc.Keys
+                     .Where(peer => !activePeers.Contains(peer))
+                     .ToArray())
+        {
+            preEntryBackpressureStartedUtc.Remove(peer);
+        }
+
+        foreach (var entry in joining)
+        {
+            if (!connectionMessageQueue.TryGetCatchUpPacketsRemaining(
+                    entry.Peer,
+                    out int queueDepth))
+            {
+                preEntryBackpressureStartedUtc.Remove(entry.Peer);
+                continue;
+            }
+
+            connectionMessageQueue.TryGetCatchUpPendingBytes(entry.Peer, out long pendingBytes);
+            bool queueExceeded = queueDepth > NetworkJoinLimits.MaxReplayPackets ||
+                                 connectionMessageQueue.HasCatchUpOverflowed(entry.Peer);
+            bool bytesExceeded = pendingBytes > NetworkJoinLimits.MaxReplayPendingBytes;
+            bool safetyLimitExceeded = queueExceeded || bytesExceeded;
+            TimeSpan elapsed = TimeSpan.Zero;
+            bool timedOut = false;
+
+            if (!safetyLimitExceeded)
+            {
+                // Keep one watchdog window while the join queue remains above the lower threshold.
+                if (queueDepth <= config.ResumePacketsInQueue)
+                {
+                    preEntryBackpressureStartedUtc.Remove(entry.Peer);
+                    continue;
+                }
+
+                if (!preEntryBackpressureStartedUtc.TryGetValue(entry.Peer, out var startedUtc))
+                {
+                    if (queueDepth <= config.MaxPacketsInQueue) continue;
+
+                    startedUtc = utcNow;
+                    preEntryBackpressureStartedUtc.Add(entry.Peer, startedUtc);
+                }
+
+                elapsed = utcNow - startedUtc;
+                timedOut = elapsed >= NetworkJoinLimits.CampaignEntryTimeout;
+                if (!timedOut) continue;
+            }
+            else if (preEntryBackpressureStartedUtc.TryGetValue(entry.Peer, out var safetyStartedUtc))
+            {
+                elapsed = utcNow - safetyStartedUtc;
+            }
+
+            if (!entry.State.TryAbortPreEntryJoin()) continue;
+
+            string queueDescription = connectionMessageQueue.DescribeCatchUp(entry.Peer);
+            int clearedPackets = connectionMessageQueue.AbortCatchUp(entry.Peer);
+            string disconnectCode = timedOut
+                ? "JoinCampaignEntryTimeout"
+                : "JoinReplayQueueLimit";
+
+            preEntryBackpressureStartedUtc.Remove(entry.Peer);
+
+            Logger.Warning(
+                "Aborting stalled pre-entry campaign join for peer {Peer}: reason={Reason} phase={Phase} " +
+                "elapsed={ElapsedSeconds:0.0}s timeout={TimeoutSeconds:0.0}s " +
+                "queue={QueueDepth} queueLimit={QueueLimit} pendingBytes={PendingBytes} " +
+                "pendingByteLimit={PendingByteLimit} cleared={ClearedPackets} {QueueDescription}",
+                entry.Peer.Id,
+                disconnectCode,
+                entry.State.JoinPhaseName,
+                elapsed.TotalSeconds,
+                NetworkJoinLimits.CampaignEntryTimeout.TotalSeconds,
+                queueDepth,
+                NetworkJoinLimits.MaxReplayPackets,
+                pendingBytes,
+                NetworkJoinLimits.MaxReplayPendingBytes,
+                clearedPackets,
+                queueDescription);
+
+            joinPeerTerminator.Disconnect(entry.Peer, disconnectCode);
+        }
+    }
 
     private int GetReportedQueueDepth(NetPeer peer) =>
         connectionMessageQueue.TryGetCatchUpPacketsRemaining(peer, out int packetsRemaining)
@@ -131,8 +286,8 @@ internal class OverloadedPeerManager : IOverloadedPeerManager
 
     internal void CheckForOverloadedPeers(DateTime utcNow)
     {
-        var joinCatchUpPeers = UpdateJoinCatchUpPeers(utcNow);
-        var stalledJoiningPeers = GetStalledJoiningPeers(joinCatchUpPeers, utcNow);
+        AbortStalledPreEntryJoiners(utcNow);
+        AbortStalledJoiners(utcNow);
 
         // While paused for overload, hold until every peer has drained below the (lower) resume
         // threshold, not just back under the pause threshold. The gap between the two thresholds is
@@ -140,7 +295,6 @@ internal class OverloadedPeerManager : IOverloadedPeerManager
         if (automaticPauseLease != null)
         {
             var stillDraining = GetLivePeersAboveThreshold(config.ResumePacketsInQueue)
-                .Concat(stalledJoiningPeers)
                 .Distinct()
                 .ToArray();
             cachedOverloadedPeers = stillDraining;
@@ -162,15 +316,6 @@ internal class OverloadedPeerManager : IOverloadedPeerManager
         }
 
         var overloadedPeers = GetLivePeersAboveThreshold(config.MaxPacketsInQueue);
-        if (stalledJoiningPeers.Count > 0)
-        {
-            PauseTime(
-                overloadedPeers.Concat(stalledJoiningPeers).Distinct().ToArray(),
-                utcNow,
-                "Game paused; a joining client needs to catch up");
-            return;
-        }
-
         if (overloadedPeers.Count == 0) return;
 
         PauseTime(
