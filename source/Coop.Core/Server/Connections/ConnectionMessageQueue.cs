@@ -1,4 +1,4 @@
-using Common.Logging;
+﻿using Common.Logging;
 using Common.Messaging;
 using Common.Network;
 using Common.Network.Messages;
@@ -6,6 +6,7 @@ using Common.PacketHandlers;
 using Common.Serialization;
 using Coop.Core.Common.Session.Messages;
 using Coop.Core.Server.Connections.Messages;
+using GameInterface.Services.Players.Messages;
 using LiteNetLib;
 using Serilog;
 using System;
@@ -17,12 +18,12 @@ using System.Threading;
 namespace Coop.Core.Server.Connections;
 
 /// <summary>
-/// Server-side, per-peer gate that withholds world broadcasts from a client while it is still loading,
-/// so it is not flooded with deltas it has no campaign to apply. Every <c>SendAll</c>/<c>SendAllBut</c>
+/// Server-side, per-peer gate that withholds world broadcasts while a client loads or views death statistics.
+/// Every <c>SendAll</c>/<c>SendAllBut</c>
 /// runs through here per peer; single-peer handshake and save sends bypass it.
 /// </summary>
 /// <remarks>
-/// Each peer's channel moves through four phases:
+/// Each peer's channel uses these phases:
 /// <list type="bullet">
 /// <item><b>Dropping</b> (on <see cref="PlayerConnected"/>): pre-save broadcasts are discarded — they
 /// are already in the save the peer is about to load.</item>
@@ -32,6 +33,7 @@ namespace Coop.Core.Server.Connections;
 /// is appended, and later broadcasts pass through while the client applies the tail.</item>
 /// <item><b>Live</b> (after <see cref="CompleteCatchUp"/>): the retained channel keeps passing broadcasts
 /// through until disconnect.</item>
+/// <item><b>Stopped</b> (on deletion): world updates are discarded until the peer disconnects.</item>
 /// </list>
 /// Unknown peers drop world broadcasts: LiteNetLib can expose an accepted peer to fan-out before
 /// raising <see cref="PlayerConnected"/>. Campaign time and lobby membership bypass this gate.
@@ -134,6 +136,7 @@ internal sealed class ConnectionMessageQueue : IConnectionMessageQueue, IDisposa
         Queueing,
         Open,
         Live,
+        Stopped,
     }
 
     private sealed class PeerChannel
@@ -191,23 +194,28 @@ internal sealed class ConnectionMessageQueue : IConnectionMessageQueue, IDisposa
 
         messageBroker.Subscribe<PlayerConnected>(Handle_PlayerConnected);
         messageBroker.Subscribe<PlayerDisconnected>(Handle_PlayerDisconnected);
+        messageBroker.Subscribe<PlayerDeletionStarted>(Handle_PlayerDeletionStarted);
     }
 
     public void Dispose()
     {
         messageBroker.Unsubscribe<PlayerConnected>(Handle_PlayerConnected);
         messageBroker.Unsubscribe<PlayerDisconnected>(Handle_PlayerDisconnected);
+        messageBroker.Unsubscribe<PlayerDeletionStarted>(Handle_PlayerDeletionStarted);
     }
 
     public bool TryHandleBroadcast(NetPeer peer, IPacket packet)
     {
-        if (packet.PacketType == PacketType.CampaignTime ||
-            (packet is MessagePacket lobby && lobby.MessageType == typeof(NetworkSessionLobbyChanged)))
-            return false;
+        bool bypassLoadingQueue = ShouldBypassLoadingQueue(packet);
 
-        if (!channels.TryGetValue(peer, out var channel)) return true;
+        // LiteNetLib exposes an accepted peer to SendAll before OnPeerConnected installs its channel.
+        // Fail closed for world updates during that gap, while safe bypass packets still pass through.
+        if (channels.TryGetValue(peer, out var channel) == false) return !bypassLoadingQueue;
+
         lock (channel.Gate)
         {
+            if (channel.Phase == Phase.Stopped) return true;
+            if (bypassLoadingQueue) return false;
             if (channel.Phase == Phase.Dropping) return true;
             if (channel.Phase != Phase.Queueing) return false;
 
@@ -253,6 +261,32 @@ internal sealed class ConnectionMessageQueue : IConnectionMessageQueue, IDisposa
         }
     }
 
+    private static bool ShouldBypassLoadingQueue(IPacket packet)
+    {
+        // Campaign time is a periodic current-state sample, not history to replay after loading.
+        if (packet.PacketType == PacketType.CampaignTime) return true;
+
+        // Lobby membership is connection metadata, not campaign state contained in the save.
+        return packet is MessagePacket messagePacket &&
+               messagePacket.MessageType == typeof(NetworkSessionLobbyChanged);
+    }
+
+    private void Handle_PlayerDeletionStarted(MessagePayload<PlayerDeletionStarted> payload)
+    {
+        // Stop world replication for deleted player.
+        // Game state at game over should be preserved for statistics screen when supported
+        var channel = channels.GetOrAdd(payload.What.Peer, _ => new PeerChannel());
+        lock (channel.Gate)
+        {
+            channel.Pending.Clear();
+            channel.PendingMerge = null;
+            Interlocked.Exchange(ref channel.PendingCount, 0);
+            Interlocked.Exchange(ref channel.PendingBytes, 0);
+            channel.Overflowed = false;
+            channel.Phase = Phase.Stopped;
+        }
+    }
+
     public void BeginQueueing(NetPeer peer)
     {
         // GetOrAdd guards the (not expected) case where BeginQueueing runs before PlayerConnected was
@@ -261,6 +295,7 @@ internal sealed class ConnectionMessageQueue : IConnectionMessageQueue, IDisposa
 
         lock (channel.Gate)
         {
+            if (channel.Phase == Phase.Stopped) return;
             channel.Phase = Phase.Queueing;
             channel.PendingMerge = null;
             channel.FinalBaselineCoverageActive = true;
@@ -325,7 +360,7 @@ internal sealed class ConnectionMessageQueue : IConnectionMessageQueue, IDisposa
         packetsRemaining = 0;
         if (channels.TryGetValue(peer, out var channel) == false) return false;
 
-        if (channel.Phase is Phase.Dropping or Phase.Live) return false;
+        if (channel.Phase is Phase.Dropping or Phase.Live or Phase.Stopped) return false;
 
         packetsRemaining = Volatile.Read(ref channel.PendingCount) +
                            peer.GetPacketsCountInReliableQueue(0, true) +
@@ -337,7 +372,7 @@ internal sealed class ConnectionMessageQueue : IConnectionMessageQueue, IDisposa
     {
         pendingBytes = 0;
         if (channels.TryGetValue(peer, out var channel) == false) return false;
-        if (channel.Phase is Phase.Dropping or Phase.Live) return false;
+        if (channel.Phase is Phase.Dropping or Phase.Live or Phase.Stopped) return false;
 
         pendingBytes = Interlocked.Read(ref channel.PendingBytes);
         return true;
@@ -377,6 +412,8 @@ internal sealed class ConnectionMessageQueue : IConnectionMessageQueue, IDisposa
         JoinReplayBatchResult result;
         lock (channel.Gate)
         {
+            if (channel.Phase == Phase.Stopped) return default;
+
             result = DrainBatch(peer, channel);
             if (result.Overflowed) return result;
             if (result.HasMore) return result;
@@ -418,13 +455,14 @@ internal sealed class ConnectionMessageQueue : IConnectionMessageQueue, IDisposa
         int cleared;
         lock (channel.Gate)
         {
+            bool stopped = channel.Phase == Phase.Stopped;
             cleared = channel.Pending.Count;
             channel.Pending.Clear();
             channel.PendingMerge = null;
             Interlocked.Exchange(ref channel.PendingCount, 0);
             Interlocked.Exchange(ref channel.PendingBytes, 0);
             channel.Overflowed = false;
-            channel.Phase = Phase.Dropping;
+            channel.Phase = stopped ? Phase.Stopped : Phase.Dropping;
             channel.FinalBaselineCoverageActive = true;
         }
 
