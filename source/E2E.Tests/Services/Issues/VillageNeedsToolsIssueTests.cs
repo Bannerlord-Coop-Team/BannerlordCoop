@@ -16,6 +16,7 @@ using HarmonyLib;
 using System.Reflection;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Actions;
+using TaleWorlds.CampaignSystem.CampaignBehaviors;
 using TaleWorlds.CampaignSystem.CharacterDevelopment;
 using TaleWorlds.CampaignSystem.Encyclopedia;
 using TaleWorlds.CampaignSystem.GameComponents;
@@ -1524,5 +1525,110 @@ public class VillageNeedsToolsIssueTests : IDisposable
             Assert.Null(giver.Issue);
             Assert.False(Campaign.Current.IssueManager.Issues.ContainsKey(giver));
         });
+    }
+
+    [Fact]
+    public void OnMapEventStarted_CoercionWhileTheOwnerIsDisconnected_DefersThePenaltyAndDeliversItOnRejoin_WithoutTouchingTheHostsTracker()
+    {
+        var fixture = SetupVillageOwner();
+        CreateIssueOnServer(fixture);
+        var ownerHeroId = CreateDistinctOwnerHero(fixture);
+        var partyId = AcceptQuestFromClient(fixture, "player-A", ownerHeroId);
+
+        foreach (var instance in AllInstances)
+        {
+            instance.Call(() =>
+            {
+                Assert.True(instance.ObjectManager.TryGetObject<Hero>(fixture.HeroId, out var giver));
+                Assert.True(instance.ObjectManager.TryGetObject<Settlement>(fixture.SettlementId, out var settlement));
+                using (new AllowedThread())
+                {
+                    settlement.Party ??= new PartyBase(settlement);
+                    giver.Occupation = Occupation.RuralNotable;
+                    settlement.CollectNotablesToCache();
+                }
+                Assert.Contains(giver, settlement.Notables);
+            });
+        }
+
+        float powerBefore = 0f;
+        int ownerRelationBefore = 0;
+        int hostHonorXpBefore = 0;
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject<Hero>(fixture.HeroId, out var giver));
+            Assert.True(Server.ObjectManager.TryGetObject<Hero>(ownerHeroId, out var ownerHero));
+            powerBefore = giver.Power;
+            ownerRelationBefore = giver.GetRelation(ownerHero);
+            hostHonorXpBefore = Campaign.Current.PlayerTraitDeveloper.GetPropertyValue(DefaultTraits.Honor);
+        });
+
+        Server.Resolve<IPlayerManager>().ClearPeer(Client.NetPeer);
+
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject<Hero>(fixture.HeroId, out var giver));
+            Assert.True(Server.ObjectManager.TryGetObject<MobileParty>(partyId, out var ownerParty));
+            Assert.True(Server.ObjectManager.TryGetObject<Settlement>(fixture.SettlementId, out var settlement));
+            Assert.True(Server.Resolve<IPlayerManager>().TryGetPlayer("player-A", out var player));
+            Assert.False(Server.Resolve<IPlayerManager>().IsConnected(player));
+
+            var quest = Assert.IsType<VillageNeedsToolsIssueBehavior.VillageNeedsToolsIssueQuest>(giver.Issue.IssueQuest);
+            MapEvent mapEvent;
+            using (new AllowedThread())
+            {
+                mapEvent = new MapEvent();
+                mapEvent._mapEventType = MapEvent.BattleTypes.IsForcingSupplies;
+                mapEvent.MapEventSettlement = settlement;
+                mapEvent._sides[0] = new MapEventSide(mapEvent, BattleSideEnum.Defender, settlement.Party);
+                mapEvent._sides[1] = new MapEventSide(mapEvent, BattleSideEnum.Attacker, ownerParty.Party);
+                settlement.Party._mapEventSide = mapEvent.DefenderSide;
+            }
+
+            quest.OnMapEventStarted(mapEvent, ownerParty.Party, settlement.Party);
+        });
+
+        var removed = Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkIssueRemoved>());
+        Assert.Equal(fixture.HeroId, removed.OwnerId);
+        Assert.Equal(IssueFinalizeReason.QuestFail, removed.Reason);
+        Assert.Equal(VillageNeedsToolsQuestType.ProofFailCoercion, removed.Proof);
+
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject<Hero>(fixture.HeroId, out var giver));
+            Assert.True(Server.ObjectManager.TryGetObject<Hero>(ownerHeroId, out var ownerHero));
+            Assert.Null(giver.Issue);
+            Assert.False(Campaign.Current.IssueManager.Issues.ContainsKey(giver));
+            Assert.Equal(powerBefore - 20f, giver.Power);
+            Assert.Equal(ownerRelationBefore - 10, giver.GetRelation(ownerHero));
+            Assert.Equal(hostHonorXpBefore, Campaign.Current.PlayerTraitDeveloper.GetPropertyValue(DefaultTraits.Honor));
+        });
+
+        Assert.Empty(Server.NetworkSentMessages.GetMessages<NetworkApplyPendingQuestFailConsequence>());
+
+        int ownerHonorXpBeforeRejoin = 0;
+        Client.Call(() => ownerHonorXpBeforeRejoin = Campaign.Current.PlayerTraitDeveloper.GetPropertyValue(DefaultTraits.Honor));
+
+        Server.Resolve<IPlayerManager>().SetPeer("player-A", Client.NetPeer);
+        Server.Call(() =>
+        {
+            Assert.True(Server.Resolve<IPlayerManager>().TryGetPlayer("player-A", out var player));
+            Assert.True(Server.Resolve<IPlayerManager>().IsConnected(player));
+
+            new IssuesCampaignBehavior().RegisterEvents();
+            CampaignEvents.Instance.HourlyTick();
+        });
+
+        var delivered = Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkApplyPendingQuestFailConsequence>());
+        Assert.Equal(VillageNeedsToolsQuestType.ProofFailCoercion, delivered.Proof);
+
+        Client.Call(() =>
+            Assert.Equal(ownerHonorXpBeforeRejoin - 50, Campaign.Current.PlayerTraitDeveloper.GetPropertyValue(DefaultTraits.Honor)));
+
+        Server.Call(() => CampaignEvents.Instance.HourlyTick());
+        Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkApplyPendingQuestFailConsequence>());
+
+        Server.Call(() =>
+            Assert.Equal(hostHonorXpBefore, Campaign.Current.PlayerTraitDeveloper.GetPropertyValue(DefaultTraits.Honor)));
     }
 }

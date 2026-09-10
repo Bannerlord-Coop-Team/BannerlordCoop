@@ -48,6 +48,7 @@ internal class IssueFinalizationHandler : IHandler
         messageBroker.Subscribe<QuestTerminalOutcomeTriggered>(Handle_QuestTerminalOutcomeTriggered);
         messageBroker.Subscribe<RequestIssueRemoved>(Handle_RequestIssueRemoved);
         messageBroker.Subscribe<NetworkIssueRemoved>(Handle_NetworkIssueRemoved);
+        messageBroker.Subscribe<NetworkApplyPendingQuestFailConsequence>(Handle_NetworkApplyPendingQuestFailConsequence);
     }
 
     public void Dispose()
@@ -57,6 +58,18 @@ internal class IssueFinalizationHandler : IHandler
         messageBroker.Unsubscribe<QuestTerminalOutcomeTriggered>(Handle_QuestTerminalOutcomeTriggered);
         messageBroker.Unsubscribe<RequestIssueRemoved>(Handle_RequestIssueRemoved);
         messageBroker.Unsubscribe<NetworkIssueRemoved>(Handle_NetworkIssueRemoved);
+        messageBroker.Unsubscribe<NetworkApplyPendingQuestFailConsequence>(Handle_NetworkApplyPendingQuestFailConsequence);
+    }
+
+    private void Handle_NetworkApplyPendingQuestFailConsequence(MessagePayload<NetworkApplyPendingQuestFailConsequence> payload)
+    {
+        if (ModInformation.IsServer) return;
+
+        var data = payload.What;
+        GameThread.RunSafe(() =>
+        {
+            QuestTypeRegistry.GetByDisplayName(data.QuestTypeKey)?.ApplyQuestFailLocalOwnerConsequence?.Invoke(null, data.Proof);
+        });
     }
 
     private static byte CaptureProof(IssueBase issue, IssueFinalizeReason reason)
@@ -245,9 +258,16 @@ internal class IssueFinalizationHandler : IHandler
 
         if (!FinalizeAndBroadcast(owner, ownerId, player, reason, proof)) return;
 
-        if (reason == IssueFinalizeReason.QuestFail)
+        if (reason == IssueFinalizeReason.QuestFail && descriptor?.ApplyQuestFailLocalOwnerConsequence != null)
         {
-            descriptor?.ApplyQuestFailLocalOwnerConsequence?.Invoke(quest, proof);
+            if (ownershipRegistry.IsLocalPeerOwner(owner))
+            {
+                descriptor.ApplyQuestFailLocalOwnerConsequence(quest, proof);
+            }
+            else
+            {
+                PendingLocalOwnerConsequenceRegistry.DeferQuestFail(player.ControllerId, descriptor.DisplayName, proof);
+            }
         }
     }
 
