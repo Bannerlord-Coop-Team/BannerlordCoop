@@ -171,6 +171,8 @@ internal class SmithingVMsHandler : IHandler
             using (new AllowedThread())
             {
                 currentWeaponDesignVM?.CraftingOrderPopup?.RefreshOrders();
+                if (currentWeaponDesignVM?.IsInFinalCraftingStage == true) return;
+
                 if (!(bool)(currentWeaponDesignVM?.IsInOrderMode))
                 {
                     currentWeaponDesignVM?.RefreshValues();

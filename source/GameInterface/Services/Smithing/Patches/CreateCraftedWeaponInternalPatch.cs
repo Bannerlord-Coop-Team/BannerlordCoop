@@ -88,6 +88,27 @@ internal class CreateCraftedWeaponInternalPatch
         return !IsPendingCraftedItem(__instance.WeaponDesign?.CraftedItemObject);
     }
 
+    [HarmonyPatch(typeof(WeaponDesignVM), nameof(WeaponDesignVM.ExecuteOpenOrderPopup))]
+    [HarmonyPrefix]
+    public static bool ExecuteOpenOrderPopupPrefix(WeaponDesignVM __instance)
+    {
+        return CanChangeCraftingSelection(__instance);
+    }
+
+    [HarmonyPatch(typeof(WeaponDesignVM), nameof(WeaponDesignVM.ExecuteOpenOrdersTab))]
+    [HarmonyPrefix]
+    public static bool ExecuteOpenOrdersTabPrefix(WeaponDesignVM __instance)
+    {
+        return CanChangeCraftingSelection(__instance);
+    }
+
+    [HarmonyPatch(typeof(WeaponDesignVM), nameof(WeaponDesignVM.ExecuteOpenFreeBuildTab))]
+    [HarmonyPrefix]
+    public static bool ExecuteOpenFreeBuildTabPrefix(WeaponDesignVM __instance)
+    {
+        return CanChangeCraftingSelection(__instance);
+    }
+
     [HarmonyPatch(typeof(WeaponDesignVM), nameof(WeaponDesignVM.OnFinalize))]
     [HarmonyPrefix]
     public static void WeaponDesignVMOnFinalizePrefix(WeaponDesignVM __instance)
@@ -101,6 +122,10 @@ internal class CreateCraftedWeaponInternalPatch
     private static bool IsPendingCraftedItem(ItemObject craftedItem, string clientRequestId)
         => IsPendingCraftedItem(craftedItem) &&
            string.Equals(craftedItem.StringId, $"{ClientVisualPrefix}{clientRequestId}", StringComparison.Ordinal);
+
+    internal static bool CanChangeCraftingSelection(WeaponDesignVM weaponDesignVM)
+        => weaponDesignVM == null ||
+           (!weaponDesignVM.IsInFinalCraftingStage && !IsPendingCraftedItem(weaponDesignVM.CraftedItemObject));
 
     public static bool ClearPendingCraftedItem(WeaponDesignVM weaponDesignVM)
     {
