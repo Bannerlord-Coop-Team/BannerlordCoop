@@ -3,6 +3,7 @@ using Common.Messaging;
 using Common.Util;
 using GameInterface.Services.Heroes;
 using GameInterface.Services.Party.Messages;
+using GameInterface.Services.Villages;
 using HarmonyLib;
 using Serilog;
 using System;
@@ -76,6 +77,7 @@ internal class PartyScreenLogicPatches
                 partyScreenMode = partyState.PartyScreenMode;
             }
 
+            ForceTransferScreenTracker.TryClaimForceTransferId(__instance.MemberRosters[0], out var forceTransferId);
             var message = new PartyDoneLogicAttempted(
                 Hero.MainHero,
                 releasedPrisonersRoster,
@@ -99,7 +101,8 @@ internal class PartyScreenLogicPatches
                 partyScreenMode,
                 applyReleasedAndTakenPrisonerActions,
                 donationSettlement,
-                donatedPrisonersRoster
+                donatedPrisonersRoster,
+                forceTransferId
             );
 
             MessageBroker.Instance.Publish(__instance, message);
