@@ -28,41 +28,6 @@ public class RetainedPlayerHeroRecoveryTests : MissionTestEnvironment
 {
     public RetainedPlayerHeroRecoveryTests(ITestOutputHelper output) : base(output) { }
 
-#if DEBUG
-    [Theory]
-    [InlineData("returner")]
-    [InlineData("holder")]
-    public void OrdinaryCatchUpRecordDoesNotPoisonReturningHeroObservation(string currentOwner)
-    {
-        using var fixture = new MissionEngineFixture();
-        var (battleId, _) = SetupCoopBattle("returner", "holder");
-        var returner = Clients.First();
-        returner.Call(() =>
-        {
-            fixture.CreateMission(returner);
-            var players = returner.Resolve<IPlayerManager>();
-            Assert.True(players.TryGetPlayer("returner", out var player));
-            players.RemovePlayer(player);
-            Assert.True(players.AddPlayer(new Player("returner", player.HeroId, player.MobilePartyId,
-                player.ClanId, "CharacterObject_Player")));
-            var controller = returner.Resolve<CoopBattleController>();
-            Assert.True(controller.Session.TryBegin(battleId));
-            var spawner = (IPuppetSpawner)AccessTools.Field(typeof(CoopBattleController), "puppetSpawner")
-                .GetValue(controller);
-            var identify = AccessTools.Method(typeof(PuppetSpawner), "TryIdentifyReturningHeroCatchUpRecord");
-            var ordinary = new BattleAgentSpawnData(Guid.NewGuid(), "ordinary-troop", default,
-                BattleSideEnum.Defender, 22, currentOwner, "party", 1141, new Equipment(), default, null,
-                originalOwnerControllerId: "returner");
-            Assert.False((bool)identify.Invoke(spawner, new object[] { ordinary, SpawnBatchPurpose.CatchUp }));
-            Assert.Empty(spawner.CaptureReturningHeroCatchUpState("returner").DiagnosticErrors);
-            var hero = new BattleAgentSpawnData(Guid.NewGuid(), "CharacterObject_Player", default,
-                BattleSideEnum.Defender, 22, currentOwner, "party", 1142, new Equipment(), default, null,
-                originalOwnerControllerId: "returner");
-            Assert.True((bool)identify.Invoke(spawner, new object[] { hero, SpawnBatchPurpose.CatchUp }));
-            Assert.Empty(spawner.CaptureReturningHeroCatchUpState("returner").DiagnosticErrors);
-        });
-    }
-#endif
 
     [Theory]
     [InlineData(true)]

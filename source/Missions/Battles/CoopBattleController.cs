@@ -62,25 +62,6 @@ public class CoopBattleController : CoopMissionController
     /// <summary>Reports final siege engine state before the shared result is applied.</summary>
     public ISiegeEngineStateReporter SiegeEngineStateReporter { get; }
 
-#if DEBUG
-    /// <summary>Copies pending spawn state for the baseline diagnostic without draining it.</summary>
-    public PendingPuppetDebugState CapturePendingPuppetState(string controllerId)
-    {
-        return puppetSpawner.CapturePendingPuppetState(controllerId);
-    }
-
-    /// <summary>Copies the first local returning-hero catch-up records without draining or replaying them.</summary>
-    public ReturningHeroCatchUpDebugState CaptureReturningHeroCatchUpState(string controllerId)
-    {
-        return puppetSpawner.CaptureReturningHeroCatchUpState(controllerId);
-    }
-
-    /// <summary>Copies one target world-item lifecycle state without changing weapon-drop handling.</summary>
-    public WeaponDropWorldItemDebugState CaptureWeaponDropWorldItemState(Guid worldItemId)
-    {
-        return coopMissionComponent.WeaponDropHandler.CaptureDebugWorldItemState(worldItemId);
-    }
-#endif
 
     private readonly IBattleInstanceLifecycle lifecycle;
     private readonly IOwnedAgentReplicator replicator;
