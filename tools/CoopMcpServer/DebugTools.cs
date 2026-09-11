@@ -16,6 +16,9 @@ public interface IDebugTools
     Task<LiveTestResponse> Screenshot(string run_id, string instance, CancellationToken cancellationToken);
     Task<LiveTestResponse> ScreenshotStatus(string run_id, string instance, string capture_id, CancellationToken cancellationToken);
     Task<LiveTestResponse> OptionsMenu(string run_id, string instance, string action, CancellationToken cancellationToken, string tab = null);
+    Task<LiveTestResponse> UiLayers(string run_id, string instance, CancellationToken cancellationToken);
+    Task<LiveTestResponse> UiInspect(string run_id, string instance, CancellationToken cancellationToken, string snapshot = null, int offset = 0, string layer = null);
+    Task<LiveTestResponse> UiAction(string run_id, string instance, string snapshot, string element, string action, CancellationToken cancellationToken, string text = null, double? value = null);
     Task<RunView> StopRun(string run_id);
 }
 
@@ -68,6 +71,32 @@ public sealed class DebugTools : IDebugTools
         if ((action == "select" && string.IsNullOrEmpty(tab)) || (tab != null && tab.Length > 64))
             throw new ArgumentException("tab must contain 1..64 characters", nameof(tab));
         return runs.RequestAsync(run_id, instance, "options-menu", new { action, tab }, action != "inspect", cancellationToken);
+    }
+
+    [McpServerTool(Name = "ui_layers", ReadOnly = true, UseStructuredContent = true), Description("Discover up to 128 client UI layers without traversing widget descendants. Returns opaque layer handles in ascending stack order (last is highest). Handles expire after 30 seconds or layer/modal-root changes. Discovery invalidates previous widget snapshots. Selectable does not promise an actionable domain; inspect the selected layer next. Requires bridge uiCapability bounded-ui-layers-v1.")]
+    public Task<LiveTestResponse> UiLayers(string run_id, string instance, CancellationToken cancellationToken) =>
+        runs.RequestAsync(run_id, instance, "ui-layers", new { }, false, cancellationToken);
+
+    [McpServerTool(Name = "ui_inspect", ReadOnly = true, UseStructuredContent = true), Description("Inspect native client UI, pages of 128, maximum 16384 widgets/depth 48. Omit snapshot and layer for compatible all-layer inspection. To scope explicitly, pass a fresh opaque layer from ui_layers on a new snapshot; the complete UIContext root plus relevant upper-layer blocking domains must fit the shared widget budget. Page with snapshot and nextOffset. ScopeComplete=false or truncated=true disables actions. Passwords are redacted. Snapshots expire after 30 seconds, selection/screen/modal changes or one action.")]
+    public Task<LiveTestResponse> UiInspect(string run_id, string instance, CancellationToken cancellationToken, string snapshot = null, int offset = 0, string layer = null)
+    {
+        if (offset < 0 || offset > 16384 || (snapshot == null && offset != 0) ||
+            (snapshot != null && snapshot.Length != 32) || (layer != null && layer.Length != 32))
+            throw new ArgumentException("Use an observed snapshot/layer handle and a valid page offset.");
+        return runs.RequestAsync(run_id, instance, "ui-inspect", new { snapshot, offset, layer }, false, cancellationToken);
+    }
+
+    [McpServerTool(Name = "ui_action", UseStructuredContent = true), Description("One-shot native client UI action on a freshly revalidated snapshot/element. click is semantic ButtonWidget.HandleClick activation, NOT physical mouse press/release, hover, focus or controller input. Exact ButtonWidget only (toggle value 0/1); unknown subclasses rejected. Selected-layer snapshots support only click/toggle. All-layer snapshots also retain text (max 512), slider (native range), scroll_vertical/scroll_horizontal (0..1). Use only advertised actions. Bounds cover bridge preflight, not native gameplay callbacks. Native callbacks may replace modals; no bridge tree read or cancellation follows activation. References consumed; never retry outcomeUncertain. Re-inspect and capture afterward. No selectors, VM calls or OS input.")]
+    public Task<LiveTestResponse> UiAction(string run_id, string instance, string snapshot, string element, string action, CancellationToken cancellationToken, string text = null, double? value = null)
+    {
+        if (snapshot == null || snapshot.Length != 32 || element == null || element.Length > 16 ||
+            !element.StartsWith("e", StringComparison.Ordinal) || !int.TryParse(element.Substring(1), out int index) || index < 0 ||
+            (text != null && text.Length > 512) || (value.HasValue && !double.IsFinite(value.Value)))
+            throw new ArgumentException("Use observed snapshot/element references and bounded text or finite value.");
+        if (action != "click" && action != "toggle" && action != "text" && action != "slider" &&
+            action != "scroll_vertical" && action != "scroll_horizontal")
+            throw new ArgumentException("Unsupported UI action.", nameof(action));
+        return runs.RequestAsync(run_id, instance, "ui-action", new { snapshot, element, action, text, value }, true, cancellationToken);
     }
 
     [McpServerTool(Name = "stop_run", UseStructuredContent = true), Description("Shutdown only owned processes, then force-stop those still alive after bounded grace. Archive endpoint-reported logs and retain all run artifacts. Idempotent; cleanup failures remain inspectable and can be retried.")]

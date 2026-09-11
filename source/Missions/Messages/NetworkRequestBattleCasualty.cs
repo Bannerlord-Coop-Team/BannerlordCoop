@@ -1,4 +1,4 @@
-using Common.Messaging;
+﻿using Common.Messaging;
 using ProtoBuf;
 
 namespace Missions.Messages;
@@ -28,10 +28,14 @@ public class NetworkRequestBattleCasualty : IEvent
     [ProtoMember(3)]
     public readonly bool Wounded;
 
-    public NetworkRequestBattleCasualty(string mapEventPartyId, string troopCharacterId, bool wounded)
+    [ProtoMember(4)]
+    public readonly string InstanceId;
+
+    public NetworkRequestBattleCasualty(string mapEventPartyId, string troopCharacterId, bool wounded, string instanceId = null)
     {
         MapEventPartyId = mapEventPartyId;
         TroopCharacterId = troopCharacterId;
         Wounded = wounded;
+        InstanceId = instanceId;
     }
 }

@@ -62,6 +62,9 @@ internal class BattleHostHandler : IHandler
     private readonly IBattleTroopReserveBuilder reserveBuilder;
     private readonly IBattleTroopLedger ledger;
     private readonly IBattleSizeProvider battleSizeProvider;
+#if DEBUG
+    private readonly INavalLabSessionStore navalLab;
+#endif
 
     // [Server] Highest host epoch ever issued per battle instance (BR-102), retained across assignment
     // removal: clients keep their last assignment when a battle is fully abandoned (only the server's entry
@@ -126,7 +129,11 @@ internal class BattleHostHandler : IHandler
         IControllerIdProvider controllerIdProvider,
         IBattleTroopReserveBuilder reserveBuilder,
         IBattleTroopLedger ledger,
-        IBattleSizeProvider battleSizeProvider)
+        IBattleSizeProvider battleSizeProvider
+#if DEBUG
+        , INavalLabSessionStore navalLab = null
+#endif
+        )
     {
         this.messageBroker = messageBroker;
         this.network = network;
@@ -137,6 +144,9 @@ internal class BattleHostHandler : IHandler
         this.reserveBuilder = reserveBuilder;
         this.ledger = ledger;
         this.battleSizeProvider = battleSizeProvider;
+#if DEBUG
+        this.navalLab = navalLab;
+#endif
 
         messageBroker.Subscribe<PlayerEnteredBattle>(Handle_PlayerEnteredBattle);
         messageBroker.Subscribe<BattleMissionReady>(Handle_BattleMissionReady);
@@ -211,6 +221,15 @@ internal class BattleHostHandler : IHandler
         // append in arrival (= mission-ready) order, so concurrent requests cannot double-elect.
         GameThread.RunSafe(() =>
         {
+#if DEBUG
+            if (navalLab?.Contains(mapEventId) == true)
+            {
+                if (navalLab.IsParticipant(mapEventId, requesterId) && requester != null
+                    && playerManager.TryGetPlayer(requester, out var player) && player.ControllerId == requesterId)
+                    ElectMissionReady(mapEventId, requesterId, requester);
+                return;
+            }
+#endif
             if (!objectManager.TryGetObjectWithLogging<MapEvent>(mapEventId, out var mapEvent))
                 return;
 
@@ -223,32 +242,7 @@ internal class BattleHostHandler : IHandler
 
             MarkPresent(mapEventId, requesterId);
 
-            if (hostRegistry.TryGet(mapEventId, out var existing))
-            {
-                // Host already elected. Record this player in the successor line in join order (idempotent),
-                // so migration can promote the earliest joiner still present. A mid-battle joiner lands here too.
-                if (TryAppendSuccessor(existing, requesterId, out var updated))
-                {
-                    SetServerAssignment(mapEventId, updated);
-                    Logger.Information("[BattleHost] {Requester} joined battle {MapEventId}; successor line: {Successors}",
-                        requesterId, mapEventId, string.Join(", ", updated.SuccessorControllerIds));
-                }
-                else if (requester != null)
-                {
-                    network.Send(requester, ToMessage(mapEventId, existing));
-                }
-            }
-            else
-            {
-                // BR-102: the election issues the battle's next hosting generation — epoch 1 for a fresh
-                // battle, or one past the last generation if this map event was abandoned and re-entered.
-                var epoch = NextEpoch(mapEventId);
-                var assignment = new BattleHostAssignment(requesterId, Array.Empty<string>(), epoch);
-                SetServerAssignment(mapEventId, assignment);
-
-                Logger.Information("[BattleHost] Elected host {Host} (first mission-ready) for battle {MapEventId} at epoch {Epoch}",
-                    requesterId, mapEventId, epoch);
-            }
+            ElectMissionReady(mapEventId, requesterId, requester);
 
             // A request from a member that had DROPPED is its return: re-scope the reserves (its parties
             // leave the host's scope) before serving, and refresh the shrunk holder. Normally a no-op here —
@@ -268,6 +262,36 @@ internal class BattleHostHandler : IHandler
             // sizing can proceed. Buffered client-side until the supplier exists.
             SendOwnedReserves(mapEventId, mapEvent, requester, requesterId, includeEmptySides: true);
         });
+    }
+
+    private void ElectMissionReady(string mapEventId, string requesterId, NetPeer requester)
+    {
+        if (hostRegistry.TryGet(mapEventId, out var existing))
+        {
+            // Host already elected. Record this player in the successor line in join order (idempotent),
+            // so migration can promote the earliest joiner still present. A mid-battle joiner lands here too.
+            if (TryAppendSuccessor(existing, requesterId, out var updated))
+            {
+                SetServerAssignment(mapEventId, updated);
+                Logger.Information("[BattleHost] {Requester} joined battle {MapEventId}; successor line: {Successors}",
+                    requesterId, mapEventId, string.Join(", ", updated.SuccessorControllerIds));
+            }
+            else if (requester != null)
+            {
+                network.Send(requester, ToMessage(mapEventId, existing));
+            }
+        }
+        else
+        {
+            // BR-102: the election issues the battle's next hosting generation — epoch 1 for a fresh
+            // battle, or one past the last generation if this map event was abandoned and re-entered.
+            var epoch = NextEpoch(mapEventId);
+            var assignment = new BattleHostAssignment(requesterId, Array.Empty<string>(), epoch);
+            SetServerAssignment(mapEventId, assignment);
+
+            Logger.Information("[BattleHost] Elected host {Host} (first mission-ready) for battle {MapEventId} at epoch {Epoch}",
+                requesterId, mapEventId, epoch);
+        }
     }
 
     /// <summary>[Server] A client asks for the reserves it currently owns: at battle ENTRY (feed its own

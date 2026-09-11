@@ -33,6 +33,9 @@ public interface IAgentMovementHandler : IPacketHandler, IDisposable
     int AvailableOutgoingMovementBytes { get; }
 
     void Configure(MovementCadenceProfile profile);
+#if DEBUG
+    void ConfigureNavalLab();
+#endif
 
     bool TrySetForcedBulkHz(int? hz, out string error);
 
@@ -75,6 +78,10 @@ public class AgentMovementHandler : IAgentMovementHandler
 #endif
 {
     private static readonly ILogger Logger = LogManager.GetLogger<AgentMovementHandler>();
+#if DEBUG
+    private volatile bool navalLab;
+    public void ConfigureNavalLab() => navalLab = true;
+#endif
 
     // Preserve the former 80-poll window at 40 Hz as a cadence-independent two-second animation.
     private const float SyntheticMountTurnDurationSeconds = 2f;
@@ -2085,6 +2092,10 @@ public class AgentMovementHandler : IAgentMovementHandler
         // BattleAuthorityMigrator owns battle withdrawal because it can distinguish the player's party from
         // NPC forces the departed host was running. Skip this location-style all-controller cleanup.
         if (BattleSpawnGate.IsCoopBattleActive) return;
+#if DEBUG
+        // Synthetic crew belong to this handler's fixture, not a stale location party.
+        if (navalLab) return;
+#endif
 
         // Same fork for settlement missions (SR-015): LocationAuthorityMigrator despawns only the departed
         // controller's player and companion agents; its host-owned NPC puppets survive for migration,

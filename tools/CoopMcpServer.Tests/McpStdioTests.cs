@@ -56,7 +56,7 @@ public sealed class McpStdioTests
             await using var client = await McpClient.CreateAsync(transport, cancellationToken: timeout.Token);
             var tools = await client.ListToolsAsync(cancellationToken: timeout.Token);
             string[] expected = { "start_run", "get_run", "wait_for_state", "list_commands", "execute_command",
-                "join_client", "read_logs", "screenshot", "screenshot_status", "options_menu", "stop_run" };
+                "join_client", "read_logs", "screenshot", "screenshot_status", "options_menu", "ui_layers", "ui_inspect", "ui_action", "stop_run" };
             Assert.Equal(expected.Order(), tools.Select(t => t.Name).Order());
             var result = await client.CallToolAsync("get_run", new Dictionary<string, object> { ["run_id"] = "missing" }, cancellationToken: timeout.Token);
             Assert.True(result.IsError);

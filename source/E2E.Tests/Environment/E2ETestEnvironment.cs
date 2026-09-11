@@ -48,7 +48,8 @@ public class E2ETestEnvironment : IDisposable
     private readonly SemaphoreSlim disposeSemiphore = new(1, 1);
     private bool disposed = false;
 
-    public E2ETestEnvironment(ITestOutputHelper output, int numClients = 2)
+    public E2ETestEnvironment(ITestOutputHelper output, int numClients = 2,
+        Action<Autofac.ContainerBuilder>? configureDependencies = null)
     {
         TestOutputCallback = (logMessage) => output.WriteLine(logMessage);
 
@@ -68,7 +69,7 @@ public class E2ETestEnvironment : IDisposable
         PlayerPartyTradeContext.End();
         ResetBattleModeState();
 
-        IntegrationEnvironment = new TestEnvironment(output, numClients, registerGameInterface: true);
+        IntegrationEnvironment = new TestEnvironment(output, numClients, registerGameInterface: true, configureDependencies);
 
         StopCampaignTimeHeartbeat();
 

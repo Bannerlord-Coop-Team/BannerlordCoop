@@ -41,9 +41,32 @@ namespace CoopMcpServer.Tests
             Assert.True(dispatcher.Execute("coop.debug.legacy", new List<string>()).Found);
         }
 
+        [Fact]
+        public void FrameworkRejectionsKeepStructuredCodeAndSuccessState()
+        {
+            using var logger = new LoggerConfiguration().CreateLogger();
+            var registry = new CoopCommandRegistry(new[] { new CaptureCommand("coop") }, logger);
+            var dispatcher = new LiveTestCommandDispatcher(registry, new CoopCommandArgsFactory());
+            var result = dispatcher.Execute("coop.capture", new List<string>());
+            Assert.True(result.Found);
+            Assert.False(result.Succeeded);
+            Assert.Equal("invalid_arguments", result.ErrorCode);
+            Assert.NotEmpty(result.Output);
+        }
+
+        [Fact]
+        public void LegacyTextDoesNotInventSuccessOrRejectionReason()
+        {
+            var result = new LiveTestCommandDispatcher().Execute("coop.debug.legacy", new List<string>());
+            Assert.True(result.Found);
+            Assert.Null(result.Succeeded);
+            Assert.Null(result.ErrorCode);
+        }
+
         private sealed class CaptureCommand(string prefix) : ICoopCommand
         {
             public string Prefix => prefix;
+            public CoopCommandSide Side => CoopCommandSide.Both;
             public string Name => "capture";
             public string Description => "Capture arguments.";
             public IExpectedArgs[] ExpectedArgs => new IExpectedArgs[] { new ExpectedArgs("first", "First value."), new ExpectedArgs("second", "Second value.") };

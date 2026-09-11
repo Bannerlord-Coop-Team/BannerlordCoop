@@ -7,6 +7,27 @@ public static class ModInformation
 {
     public static bool IsServer { get; set; } = false;
     public static bool IsClient => !IsServer;
+#if DEBUG
+    public const string NavalLabCapabilityPrefix = "Coop.Debug.NavalLab.v1.";
+    public static string NavalLabCapability { get; private set; }
+    public static bool IsNavalLab => NavalLabCapability != null;
+
+    public static void ConfigureNavalLab(string optIn, string runToken, bool navalDlcActive)
+    {
+        if (optIn == null) return;
+        const string prefix = "new-campaign:";
+        if (!optIn.StartsWith(prefix, StringComparison.Ordinal)
+            || !Guid.TryParseExact(optIn.Substring(prefix.Length).Trim(), "D", out var nonce)
+            || nonce == Guid.Empty || string.IsNullOrWhiteSpace(runToken) || runToken.Length > 64
+            || !System.Linq.Enumerable.All(runToken, c => char.IsLetterOrDigit(c) || c == '-' || c == '_')
+            || !navalDlcActive)
+            throw new InvalidOperationException("Naval lab opt-in requires new-campaign:<nonce UUID>, a valid /cooptestrun scope and active NavalDLC.");
+        var capability = NavalLabCapabilityPrefix + nonce.ToString("N") + "." + runToken;
+        if (NavalLabCapability != null && NavalLabCapability != capability)
+            throw new InvalidOperationException("The process already belongs to another naval lab run.");
+        NavalLabCapability = capability;
+    }
+#endif
 
     /// <summary>
     /// The mod build stamped on this assembly. Its semantic version comes from the same build

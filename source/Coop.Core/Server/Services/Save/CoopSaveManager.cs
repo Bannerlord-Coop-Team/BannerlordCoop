@@ -89,6 +89,9 @@ namespace Coop.Core.Server.Services.Save
         /// <param name="session">Session to save</param>
         public void SaveCoopSession(string saveName, ICoopSession session)
         {
+#if DEBUG
+            if (global::Common.ModInformation.IsNavalLab) return;
+#endif
             string filePath = string.Concat(DefaultPath, saveName, FileType);
 
             var fileIO = new JsonFileIO();

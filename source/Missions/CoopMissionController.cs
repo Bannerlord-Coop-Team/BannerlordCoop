@@ -151,6 +151,14 @@ public abstract class CoopMissionController : MissionBehavior, IDisposable
 
     public override void OnEndMissionInternal()
     {
+        DisposeMissionHandlers();
+        OnLeaving();
+        base.OnEndMission();
+        Dispose();
+    }
+
+    protected void DisposeMissionHandlers()
+    {
         // Detach the per-mission agent handlers FIRST, before mission state and native agents are freed. Both
         // detach deterministically here instead of leaking their packet-handler registration until the GC
         // finalizer runs.
@@ -164,10 +172,5 @@ public abstract class CoopMissionController : MissionBehavior, IDisposable
         coopMissionComponent.ShieldDamageHandler.Dispose();
         coopMissionComponent.CombatHitPresentationHandler.Dispose();
         coopMissionComponent.AgentDeathHandler.Dispose();
-
-        OnLeaving();
-
-        base.OnEndMission();
-        Dispose();
     }
 }

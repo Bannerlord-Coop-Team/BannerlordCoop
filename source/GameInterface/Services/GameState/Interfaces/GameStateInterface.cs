@@ -94,10 +94,10 @@ internal class GameStateInterface : IGameStateInterface
     public void StartNewGame()
     {
         messageBroker.Publish(this, new GameLoadStarted());
-        GameThread.Run(() =>
+        GameThread.RunSafe(() =>
         {
             MBGameManager.StartNewGame(new SandBoxGameManager(() => new Campaign(CampaignGameMode.Campaign)));
-        });
+        }, context: nameof(StartNewGame));
     }
 
     public void LoadGame(string saveName)

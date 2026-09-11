@@ -11,6 +11,9 @@ using GameInterface.Services.PlayerCaptivityService.Messages;
 using GameInterface.Services.Players;
 using LiteNetLib;
 using Missions.Messages;
+#if DEBUG
+using Missions.Battles;
+#endif
 using Serilog;
 using System;
 using System.Collections.Generic;
@@ -32,6 +35,9 @@ public class ServerBattleCompletionHandler : IHandler
     private readonly IPlayerManager playerManager;
     private readonly IBattleHostRegistry hostRegistry;
     private readonly IBattleCompletionTracker completionTracker;
+#if DEBUG
+    private readonly INavalLabSessionStore navalLab;
+#endif
     private readonly object pendingJoinersGate = new object();
     private readonly Dictionary<string, Dictionary<Guid, (string ControllerId, NetPeer Peer, DateTime ExpiresUtc)>> pendingJoiners = new();
     private readonly Dictionary<string, DateTime> conclusionRetries = new();
@@ -45,7 +51,11 @@ public class ServerBattleCompletionHandler : IHandler
         IObjectManager objectManager,
         IPlayerManager playerManager,
         IBattleHostRegistry hostRegistry,
-        IBattleCompletionTracker completionTracker)
+        IBattleCompletionTracker completionTracker
+#if DEBUG
+        , INavalLabSessionStore navalLab = null
+#endif
+        )
     {
         this.messageBroker = messageBroker;
         this.missionManager = missionManager;
@@ -53,6 +63,9 @@ public class ServerBattleCompletionHandler : IHandler
         this.playerManager = playerManager;
         this.hostRegistry = hostRegistry;
         this.completionTracker = completionTracker;
+#if DEBUG
+        this.navalLab = navalLab;
+#endif
 
         messageBroker.Subscribe<NetworkBattleResultReady>(Handle_NetworkBattleResultReady);
         messageBroker.Subscribe<MissionMemberDeparted>(Handle_MissionMemberDeparted);
@@ -99,6 +112,13 @@ public class ServerBattleCompletionHandler : IHandler
         lock (pendingJoinersGate)
         {
             var instanceId = result.InstanceId;
+#if DEBUG
+            if (navalLab?.Contains(instanceId) == true)
+            {
+                navalLab.RejectCampaignWrite("result");
+                return;
+            }
+#endif
             if (!missionManager.TryGetControllers(instanceId, out var currentMembers))
             {
                 Logger.Information("Ignoring battle result report from {Controller} for inactive instance {Instance}",
@@ -183,6 +203,9 @@ public class ServerBattleCompletionHandler : IHandler
 
     private void TryConcludeReportedBattle(string instanceId)
     {
+#if DEBUG
+        if (navalLab?.Contains(instanceId) == true) return;
+#endif
         lock (pendingJoinersGate)
         {
             if (!missionManager.TryGetControllers(instanceId, out var currentMembers))
@@ -449,6 +472,13 @@ public class ServerBattleCompletionHandler : IHandler
 
     private void PublishConclusion(string instanceId, int memberCount, BattleState concludedState, int hostEpoch)
     {
+#if DEBUG
+        if (navalLab?.Contains(instanceId) == true)
+        {
+            navalLab.RejectCampaignWrite("conclusion");
+            return;
+        }
+#endif
         Logger.Information("All {Count} mission member(s) reconciled {State} for battle {Instance}; concluding at host epoch {Epoch}",
             memberCount, concludedState, instanceId, hostEpoch);
         if (concludedState == BattleState.DefenderPullBack)

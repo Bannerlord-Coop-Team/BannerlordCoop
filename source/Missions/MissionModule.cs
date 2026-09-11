@@ -206,6 +206,15 @@ public class MissionModule : Module
         // Battle host election: elects on the server, stores the broadcast on clients, AutoActivated so it
         // subscribes up front on both. The assignment store itself (IBattleHostRegistry) is registered by
         // GameInterfaceModule — its handlers gate finalizes/conclusions on it too.
+#if DEBUG
+        builder.RegisterType<Diagnostics.MissionInspection>().As<Diagnostics.IMissionInspection>().InstancePerDependency();
+        builder.RegisterType<NavalLabSessionStore>().As<INavalLabSessionStore>().InstancePerLifetimeScope();
+        builder.RegisterType<NavalMissionAdapterLoader>().As<INavalMissionAdapterLoader>().InstancePerDependency();
+        builder.RegisterType<NavalLabNativeState>().As<INavalLabNativeState>().InstancePerDependency();
+        builder.RegisterType<NavalLabMeasurement>().As<INavalLabMeasurement>().InstancePerDependency();
+        builder.RegisterType<NavalLabController>().As<INavalLabController>().InstancePerDependency();
+        builder.RegisterType<NavalLabCoordinator>().As<INavalLabCoordinator>().InstancePerLifetimeScope().AutoActivate();
+#endif
         builder.RegisterType<BattleHostHandler>()
             .AsSelf()
             .InstancePerLifetimeScope()

@@ -36,14 +36,17 @@ public class TestEnvironment
     private readonly MeshNetworkRouter meshOrchestrator;
 
     private readonly bool registerGameInterface;
+    private readonly Action<ContainerBuilder>? configureDependencies;
 
     /// <summary>
     /// Constructor for TestEnvironment
     /// </summary>
     /// <param name="numClients">Number of clients to create, defaults to 2 clients</param>
-    public TestEnvironment(ITestOutputHelper output, int numClients = 2, bool registerGameInterface = false)
+    public TestEnvironment(ITestOutputHelper output, int numClients = 2, bool registerGameInterface = false,
+        Action<ContainerBuilder>? configureDependencies = null)
     {
         this.registerGameInterface = registerGameInterface;
+        this.configureDependencies = configureDependencies;
         meshOrchestrator = new MeshNetworkRouter(meshScheduler);
 
         Server = CreateServer(output);
@@ -76,6 +79,7 @@ public class TestEnvironment
 
         AddSharedDependencies(builder);
 
+        configureDependencies?.Invoke(builder);
         container = builder.Build();
 
         var instance = container.Resolve<ClientInstance>()!;
@@ -100,6 +104,7 @@ public class TestEnvironment
             .As<IBattlesFoughtUploader>()
             .SingleInstance();
 
+        configureDependencies?.Invoke(builder);
         container = builder.Build();
 
         var instance = container.Resolve<ServerInstance>()!;

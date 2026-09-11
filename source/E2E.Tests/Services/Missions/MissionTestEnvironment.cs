@@ -27,10 +27,9 @@ namespace E2E.Tests.Services.Missions;
 /// helpers to stand up a coop battle (a <see cref="MapEvent"/> whose sides hold one player party per
 /// controller id) and to drive + inspect server-authoritative host election.
 /// <para>
-/// Scope: host election and (future) migration travel the campaign <c>INetwork</c>, which the E2E mock
-/// router replicates, so they are testable here. Troop spawning and control transfer travel the P2P mesh
-/// (<c>IBattleNetwork</c>) and also need a live <see cref="TaleWorlds.MountAndBlade.Mission"/> — neither
-/// exists in this headless harness — so those mechanisms are exercised by targeted unit tests instead.
+/// Host election and migration travel the campaign router. Connected mock missions also route serialized
+/// spawning, control and movement traffic through the mission mesh. <see cref="MissionEngineFixture"/>
+/// replaces the native mission/agent boundaries, not co-op handlers or authority decisions.
 /// </para>
 /// </summary>
 public class MissionTestEnvironment : E2ETestEnvironment
@@ -38,7 +37,8 @@ public class MissionTestEnvironment : E2ETestEnvironment
     /// <summary>Methods to suppress when constructing a <see cref="MapEvent"/> headlessly.</summary>
     protected IReadOnlyList<MethodBase> MapEventDisabledMethods { get; }
 
-    public MissionTestEnvironment(ITestOutputHelper output, int numClients = 2) : base(output, numClients)
+    public MissionTestEnvironment(ITestOutputHelper output, int numClients = 2,
+        Action<Autofac.ContainerBuilder>? configureDependencies = null) : base(output, numClients, configureDependencies)
     {
         MapEventDisabledMethods = new List<MethodBase>
         {

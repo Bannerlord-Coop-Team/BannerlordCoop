@@ -42,6 +42,11 @@ public class TaleWorldsModuleInfoProvider : IModuleInfoProvider
             bool isDlc = moduleInfo.Type == TaleWorlds.ModuleManager.ModuleType.OfficialOptional;
             yield return new ModuleInfo(moduleInfo.Id, moduleInfo.IsOfficial, isDlc, moduleInfo.Version);
         }
+#if DEBUG
+        if (Common.ModInformation.IsNavalLab)
+            yield return new ModuleInfo(Common.ModInformation.NavalLabCapability, false, false,
+                new ApplicationVersion(ApplicationVersionType.Development, 1, 0, 0, 0));
+#endif
     }
 }
 public class CompatibilityInfo

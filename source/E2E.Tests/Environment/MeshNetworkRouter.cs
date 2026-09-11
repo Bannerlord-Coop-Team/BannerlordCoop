@@ -24,6 +24,8 @@ public class MeshNetworkRouter
         this.scheduler = scheduler;
     }
 
+    public TestNetworkReceiveContext ReceiveContext { get; set; } = TestNetworkReceiveContext.GameThread;
+
     public void AddClient(ClientInstance instance, MockBattleNetwork mesh)
     {
         ArgumentNullException.ThrowIfNull(instance);
@@ -133,7 +135,8 @@ public class MeshNetworkRouter
             sender,
             recipient.Mesh,
             ReliableOrderedChannel,
-            () => Deliver(() => recipient.Instance.SimulateMessage(sender.NetPeer, wireCopy)));
+            () => Deliver(() => recipient.Instance.SimulateMessage(sender.NetPeer, wireCopy,
+                markGameThread: ReceiveContext == TestNetworkReceiveContext.GameThread)));
         scheduler.DrainReady();
     }
 
@@ -147,7 +150,8 @@ public class MeshNetworkRouter
             sender,
             recipient.Mesh,
             $"packet:{packet.DeliveryMethod}",
-            () => Deliver(() => recipient.Instance.SimulatePacket(sender.NetPeer, wireCopy)));
+            () => Deliver(() => recipient.Instance.SimulatePacket(sender.NetPeer, wireCopy,
+                markGameThread: ReceiveContext == TestNetworkReceiveContext.GameThread)));
         scheduler.DrainReady();
     }
 
@@ -162,7 +166,8 @@ public class MeshNetworkRouter
             sender,
             recipient.Mesh,
             $"packet:{packet.DeliveryMethod}",
-            () => Deliver(() => recipient.Instance.SimulatePacket(sender.NetPeer, wireCopy)));
+            () => Deliver(() => recipient.Instance.SimulatePacket(sender.NetPeer, wireCopy,
+                markGameThread: ReceiveContext == TestNetworkReceiveContext.GameThread)));
         scheduler.DrainReady();
     }
 

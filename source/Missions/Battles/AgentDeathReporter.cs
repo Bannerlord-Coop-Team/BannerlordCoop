@@ -134,7 +134,7 @@ public class AgentDeathReporter : IAgentDeathReporter
             // map-event party roster. The server-side mission accounting is suppressed during a coop battle
             // (MapEventPartyPatches), so this is the single source. On a client, SendAll targets the server.
             if (attribution.MapEventPartyId != null)
-                relayNetwork.SendAll(new NetworkRequestBattleCasualty(attribution.MapEventPartyId, attribution.TroopCharacterId, wounded));
+                relayNetwork.SendAll(new NetworkRequestBattleCasualty(attribution.MapEventPartyId, attribution.TroopCharacterId, wounded, session.InstanceId));
 
             casualties.Forget(info.AgentId);
             registry.RemoveAgent(info.AgentId);

@@ -81,7 +81,8 @@ public class InitialServerState : ServerStateBase
     {
 #if DEBUG
         loadingInterface.ShowLoadingScreen();
-        gameStateInterface.LoadGame("MP");
+        if (global::Common.ModInformation.IsNavalLab) gameStateInterface.StartNewGame();
+        else gameStateInterface.LoadGame("MP");
 #endif
     }
 
