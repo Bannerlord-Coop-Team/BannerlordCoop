@@ -24,7 +24,9 @@ using System.Collections.Generic;
 using System.Linq;
 using TaleWorlds.CampaignSystem.Map;
 using TaleWorlds.CampaignSystem.MapEvents;
+using TaleWorlds.CampaignSystem.Actions;
 using TaleWorlds.CampaignSystem.Party;
+using TaleWorlds.CampaignSystem.Party.PartyComponents;
 using TaleWorlds.CampaignSystem.Settlements;
 using TaleWorlds.CampaignSystem.Siege;
 using TaleWorlds.Core;
@@ -38,6 +40,13 @@ namespace GameInterface.Tests.Services.SiegeEvents;
 [Collection(nameof(CampaignCurrentCollection))]
 public class DefenderSiegeContextFixtureTests
 {
+    private static bool failCreatedBesiegerCompanionRemoval;
+    private static global::GameInterface.Services.ObjectManager.ObjectManager createdBesiegerObjects;
+    private static MobileParty createdBesiegerCandidate;
+    private static Hero createdBesiegerHero;
+    private static Clan createdBesiegerClan;
+    private static bool postCreationSnapshotAttempted;
+
     [Fact]
     public void RestoredBehavior_PreservesCapturedRoutingPositionAndNavigation()
     {
@@ -67,6 +76,172 @@ public class DefenderSiegeContextFixtureTests
         changed.IsTargetingPort = false;
         Assert.False(DefenderSiegeContextFixture.SameBehavior(expected, changed));
     }
+
+    [Fact]
+    public void CreatedBesiegerCleanup_RequiresDestroyedPartyDetachedCompanionAndRemovedHero()
+    {
+        var removed = KillCharacterAction.KillCharacterActionDetail.Lost;
+        Assert.True(DefenderSiegeContextFixture.IsCreatedBesiegerRestored(
+            partyActive: false,
+            companionAttached: false,
+            deathMark: removed));
+        Assert.False(DefenderSiegeContextFixture.IsCreatedBesiegerRestored(
+            partyActive: true,
+            companionAttached: false,
+            deathMark: removed));
+        Assert.False(DefenderSiegeContextFixture.IsCreatedBesiegerRestored(
+            partyActive: false,
+            companionAttached: true,
+            deathMark: removed));
+        Assert.False(DefenderSiegeContextFixture.IsCreatedBesiegerRestored(
+            partyActive: false,
+            companionAttached: false,
+            deathMark: KillCharacterAction.KillCharacterActionDetail.None));
+    }
+
+    [Fact]
+    public void CreatedBesiegerPostCreationException_RollsBackRetainedOwnership()
+    {
+        using var test = new AssaultFixture();
+        test.PrepareCreatedBesiegerPostCreationException();
+
+        var harmony = new Harmony("created-besieger-post-creation-" + Guid.NewGuid().ToString("N"));
+        try
+        {
+            harmony.Patch(
+                AccessTools.Method(typeof(DefenderSiegeContextFixture), "FindRestorableBesieger"),
+                prefix: new HarmonyMethod(typeof(DefenderSiegeContextFixtureTests), nameof(FindNoRestorableBesiegerPrefix)));
+            harmony.Patch(
+                AccessTools.Method(typeof(DefenderSiegeContextFixture), "TryCreateFixtureBesieger"),
+                prefix: new HarmonyMethod(typeof(DefenderSiegeContextFixtureTests), nameof(CreatePostCreationBesiegerPrefix)));
+            harmony.Patch(
+                AccessTools.PropertyGetter(typeof(Settlement), nameof(Settlement.IsCastle)),
+                prefix: new HarmonyMethod(typeof(DefenderSiegeContextFixtureTests), nameof(IsCastlePrefix)));
+            harmony.Patch(
+                AccessTools.Method(typeof(DestroyPartyAction), nameof(DestroyPartyAction.Apply),
+                    new[] { typeof(PartyBase), typeof(MobileParty) }),
+                prefix: new HarmonyMethod(typeof(DefenderSiegeContextFixtureTests), nameof(DestroyCreatedBesiegerPartyPrefix)));
+            harmony.Patch(
+                AccessTools.Method(typeof(RemoveCompanionAction), nameof(RemoveCompanionAction.ApplyByFire)),
+                prefix: new HarmonyMethod(typeof(DefenderSiegeContextFixtureTests), nameof(RemoveCreatedBesiegerCompanionPrefix)));
+            harmony.Patch(
+                AccessTools.Method(typeof(KillCharacterAction), nameof(KillCharacterAction.ApplyByRemove),
+                    new[] { typeof(Hero), typeof(bool), typeof(bool) }),
+                prefix: new HarmonyMethod(typeof(DefenderSiegeContextFixtureTests), nameof(RemoveCreatedBesiegerHeroPrefix)));
+            createdBesiegerObjects = test.Objects;
+
+            Assert.False(test.Fixture.Capture().Succeeded);
+            Assert.True(postCreationSnapshotAttempted);
+            Assert.False(test.HasCreatedBesiegerOwnership);
+            Assert.Null(test.CapturedBesieger);
+            Assert.False(test.Objects.TryGetObject<MobileParty>(createdBesiegerCandidate.StringId, out _));
+            Assert.Null(createdBesiegerHero.CompanionOf);
+            Assert.DoesNotContain(createdBesiegerHero, createdBesiegerClan.Companions);
+        }
+        finally
+        {
+            createdBesiegerObjects = null;
+            createdBesiegerCandidate = null;
+            createdBesiegerHero = null;
+            createdBesiegerClan = null;
+            postCreationSnapshotAttempted = false;
+            harmony.UnpatchAll(harmony.Id);
+        }
+    }
+
+    [Fact]
+    public void CreatedBesiegerCleanupRetry_DoesNotRequireDestroyedPartyRegistration()
+    {
+        using var test = new AssaultFixture();
+        int companionBaseline = test.PrepareCreatedBesiegerCleanupRetry();
+
+        var harmony = new Harmony("created-besieger-cleanup-retry-" + Guid.NewGuid().ToString("N"));
+        try
+        {
+            harmony.Patch(
+                AccessTools.Method(typeof(DestroyPartyAction), nameof(DestroyPartyAction.Apply),
+                    new[] { typeof(PartyBase), typeof(MobileParty) }),
+                prefix: new HarmonyMethod(typeof(DefenderSiegeContextFixtureTests), nameof(DestroyCreatedBesiegerPartyPrefix)));
+            harmony.Patch(
+                AccessTools.Method(typeof(RemoveCompanionAction), nameof(RemoveCompanionAction.ApplyByFire)),
+                prefix: new HarmonyMethod(typeof(DefenderSiegeContextFixtureTests), nameof(RemoveCreatedBesiegerCompanionPrefix)));
+            harmony.Patch(
+                AccessTools.Method(typeof(KillCharacterAction), nameof(KillCharacterAction.ApplyByRemove),
+                    new[] { typeof(Hero), typeof(bool), typeof(bool) }),
+                prefix: new HarmonyMethod(typeof(DefenderSiegeContextFixtureTests), nameof(RemoveCreatedBesiegerHeroPrefix)));
+            createdBesiegerObjects = test.Objects;
+            failCreatedBesiegerCompanionRemoval = true;
+
+            Assert.False(test.Fixture.Restore().Succeeded);
+            Assert.True(test.HasCreatedBesiegerOwnership);
+            Assert.False(test.Objects.TryGetObject<MobileParty>("destroyed-created-besieger", out _));
+            Assert.True(test.Fixture.Restore().Succeeded);
+            Assert.True(test.Fixture.Verify().Succeeded);
+            Assert.Equal(companionBaseline, test.CreatedBesiegerClan.Companions.Count());
+            Assert.DoesNotContain(test.CreatedBesiegerHero, test.CreatedBesiegerClan.Companions);
+            Assert.Null(test.CreatedBesiegerHero.CompanionOf);
+        }
+        finally
+        {
+            failCreatedBesiegerCompanionRemoval = false;
+            createdBesiegerObjects = null;
+            harmony.UnpatchAll(harmony.Id);
+        }
+    }
+
+    private static bool DestroyCreatedBesiegerPartyPrefix(PartyBase __0, MobileParty __1)
+    {
+        Assert.NotNull(createdBesiegerObjects);
+        Assert.True(createdBesiegerObjects.Remove(__1));
+        __1.IsActive = false;
+        return false;
+    }
+
+    private static bool RemoveCreatedBesiegerCompanionPrefix(Clan __0, Hero __1)
+    {
+        if (failCreatedBesiegerCompanionRemoval)
+        {
+            failCreatedBesiegerCompanionRemoval = false;
+            throw new InvalidOperationException("fixture companion removal failed once");
+        }
+        __1._companionOf = null;
+        __0._companionsCache.Remove(__1);
+        return false;
+    }
+
+    private static bool RemoveCreatedBesiegerHeroPrefix(Hero __0)
+    {
+        __0.DeathMark = KillCharacterAction.KillCharacterActionDetail.Lost;
+        return false;
+    }
+
+    private static bool FindNoRestorableBesiegerPrefix(ref MobileParty __result)
+    {
+        __result = null;
+        return false;
+    }
+
+    private static bool CreatePostCreationBesiegerPrefix(
+        ref MobileParty candidate,
+        ref Hero fixtureHero,
+        ref Clan fixtureClan,
+        ref bool cleanupFailed,
+        ref bool __result)
+    {
+        candidate = createdBesiegerCandidate;
+        fixtureHero = createdBesiegerHero;
+        fixtureClan = createdBesiegerClan;
+        cleanupFailed = false;
+        __result = true;
+        return false;
+    }
+
+    private static bool IsCastlePrefix(ref bool __result)
+    {
+        __result = true;
+        return false;
+    }
+
     [Theory]
     [InlineData(0)]
     [InlineData(1)]
@@ -198,6 +373,10 @@ public class DefenderSiegeContextFixtureTests
         public readonly MapEvent Assault;
         public readonly Mock<ISiegeEventInterface> Siege = new();
         public bool StartAttempted => Read<bool>("startAttempted");
+        public bool HasCreatedBesiegerOwnership => Read<bool>("createdBesieger");
+        public MobileParty CapturedBesieger => Read<MobileParty>("besieger");
+        public Hero CreatedBesiegerHero => Read<Hero>("createdBesiegerHero");
+        public Clan CreatedBesiegerClan => Read<Clan>("createdBesiegerClan");
         public int FinalizeRequests;
         public int BreakRequests;
 
@@ -366,6 +545,78 @@ public class DefenderSiegeContextFixtureTests
             NetPeer peer = PeerOwners.Single(entry => entry.Value == controllerId).Key;
             broker.Publish(this, new PlayerDisconnected(peer, default));
             GameThread.Run(() => { }, blocking: true);
+        }
+
+        public void PrepareCreatedBesiegerPostCreationException()
+        {
+            if (Campaign.Current == null) Campaign.Current = ObjectHelper.SkipConstructor<Campaign>();
+            Settlement.SiegeEvent = null;
+            Settlement.Party._mapEventSide = null;
+            foreach (var defender in Defenders)
+            {
+                defender._currentSettlement = Settlement;
+                defender.Party._mapEventSide = null;
+                defender._actualClan = ObjectHelper.SkipConstructor<Clan>();
+            }
+            Write("campaign", null);
+            Write("settlement", null);
+            Write("besieger", null);
+            Write("partyId", null);
+            Write("createdBesieger", false);
+            Write("createdBesiegerCleanupStarted", false);
+            Write("createdBesiegerHero", null);
+            Write("createdBesiegerClan", null);
+            Write("startAttempted", false);
+            Write("restored", false);
+
+            var party = CreateParty("created-post-creation-besieger");
+            var hero = ObjectHelper.SkipConstructor<Hero>();
+            var clan = new Clan();
+            clan._companionsCache.Add(hero);
+            hero._companionOf = clan;
+            hero.DeathMark = KillCharacterAction.KillCharacterActionDetail.None;
+            var component = ObjectHelper.SkipConstructor<LordPartyComponent>();
+            component._leader = hero;
+            party._partyComponent = component;
+            party._actualClan = clan;
+            Assert.True(Objects.AddExisting(party.StringId, party));
+            behavior.Setup(value => value.TryCreate(party, out It.Ref<PartyBehaviorUpdateData>.IsAny))
+                .Callback(() => postCreationSnapshotAttempted = true)
+                .Throws<InvalidOperationException>();
+            createdBesiegerCandidate = party;
+            createdBesiegerHero = hero;
+            createdBesiegerClan = clan;
+            postCreationSnapshotAttempted = false;
+        }
+
+        public int PrepareCreatedBesiegerCleanupRetry()
+        {
+            var party = CreateParty("destroyed-created-besieger");
+            var hero = ObjectHelper.SkipConstructor<Hero>();
+            var clan = new Clan();
+            var existingCompanion = ObjectHelper.SkipConstructor<Hero>();
+            clan._companionsCache.Add(existingCompanion);
+            existingCompanion._companionOf = clan;
+            int companionBaseline = clan.Companions.Count();
+            clan._companionsCache.Add(hero);
+            hero._companionOf = clan;
+            hero.DeathMark = KillCharacterAction.KillCharacterActionDetail.None;
+            var component = ObjectHelper.SkipConstructor<LordPartyComponent>();
+            component._leader = hero;
+            party._partyComponent = component;
+            party._actualClan = clan;
+            Assert.True(Objects.AddExisting(party.StringId, party));
+            Settlement.SiegeEvent = null;
+            Settlement.Party._mapEventSide = null;
+            Write("besieger", party);
+            Write("partyId", party.StringId);
+            Write("createdBesieger", true);
+            Write("createdBesiegerCleanupStarted", true);
+            Write("createdBesiegerHero", hero);
+            Write("createdBesiegerClan", clan);
+            Write("relationRestored", true);
+            Write("restored", false);
+            return companionBaseline;
         }
 
         private static void AddParty(MapEventSide side, PartyBase party)
