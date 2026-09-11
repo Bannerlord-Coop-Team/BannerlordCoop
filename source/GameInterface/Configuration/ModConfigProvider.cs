@@ -63,7 +63,7 @@ public readonly struct ModOptions
     [ProtoMember(21)]
     public readonly bool PlayerWoundedBattleEntry { get; } = true;
 
-    [ProtoMember(21)]
+    [ProtoMember(22)]
     public bool VoiceEnabled { get; } = true;
 
     public ModOptions(ModOptions previous, bool voiceEnabled)
