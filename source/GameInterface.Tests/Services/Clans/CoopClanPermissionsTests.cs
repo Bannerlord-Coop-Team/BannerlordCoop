@@ -1,5 +1,6 @@
 ﻿using Autofac;
 using Common.Util;
+using Common;
 using GameInterface.Services.Clans;
 using GameInterface.Services.Clans.Patches;
 using GameInterface.Services.Players;
@@ -15,6 +16,7 @@ using TaleWorlds.CampaignSystem.Settlements;
 using TaleWorlds.CampaignSystem.ViewModelCollection.ClanManagement;
 using TaleWorlds.CampaignSystem.ViewModelCollection.ClanManagement.Categories;
 using TaleWorlds.Core;
+using TaleWorlds.Localization;
 using Xunit;
 
 namespace GameInterface.Tests.Services.Clans;
@@ -30,6 +32,8 @@ public class CoopClanPermissionsTests : IDisposable
     private readonly MobileParty leaderParty = ObjectHelper.SkipConstructor<MobileParty>();
     private readonly MobileParty memberParty = ObjectHelper.SkipConstructor<MobileParty>();
     private readonly Game previousGame = Game.Current;
+    private readonly bool wasServer = ModInformation.IsServer;
+    private readonly GameTextManager previousTexts = GameTexts._gameTextManager;
     private readonly ILifetimeScope previousContainer;
     private readonly IContainer container;
     private readonly List<object> registeredObjects = new();
@@ -38,6 +42,7 @@ public class CoopClanPermissionsTests : IDisposable
 
     public CoopClanPermissionsTests()
     {
+        ModInformation.IsServer = false;
         leader = CreateHero(leaderParty);
         member = CreateHero(memberParty);
         companion = CreateHero();
@@ -53,6 +58,7 @@ public class CoopClanPermissionsTests : IDisposable
         container = builder.Build();
         ContainerProvider.SetContainer(container);
         Game.Current = ObjectHelper.SkipConstructor<Game>();
+        GameTexts._gameTextManager = new GameTextManager();
         SetViewer(member);
     }
 
@@ -161,6 +167,12 @@ public class CoopClanPermissionsTests : IDisposable
             CoopClanDialoguePatches.ConversationHeroHireOnConditionPostfix,
             CoopClanDialoguePatches.ConversationCaravanBuildOnConditionPostfix,
             CoopClanDialoguePatches.CanPlayerBuyWorkshopClickableConditionPostfix,
+            CoopClanDialoguePatches.JoinKingdomConditionPostfix,
+            CoopClanDialoguePatches.BecomeVassalConditionPostfix,
+            CoopClanDialoguePatches.LeaveKingdomConditionPostfix,
+            CoopClanDialoguePatches.EndMercenaryServiceConditionPostfix,
+            CoopClanDialoguePatches.MercenaryOfferConditionPostfix,
+            CoopClanDialoguePatches.CreateKingdomConditionPostfix,
         })
         {
             bool result = initiallyAvailable;
@@ -183,6 +195,35 @@ public class CoopClanPermissionsTests : IDisposable
         Assert.False(ClanMembersVMPatches.OnConfirmRecallPrefix(vm));
     }
 
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void GovernorAndKingdomControlsRequireClanLeader(bool asLeader)
+    {
+        SetViewer(asLeader ? leader : member);
+        bool governorAllowed = true;
+        bool kingdomAllowed = true;
+        var originalReason = new TextObject("existing restriction");
+        var governorReason = originalReason;
+        var kingdomReason = originalReason;
+
+        Assert.Equal(asLeader, CoopClanGovernorPatches.GetCanChangeGovernorPrefix(ref governorAllowed, ref governorReason));
+        Assert.Equal(asLeader, CoopClanKingdomPermissionsPatches.CanManageKingdomPrefix(ref kingdomAllowed, ref kingdomReason));
+        Assert.Equal(asLeader, CoopClanKingdomActionsPatches.ManageKingdomPrefix());
+        Assert.Equal(asLeader, governorAllowed);
+        Assert.Equal(asLeader, kingdomAllowed);
+        if (asLeader)
+        {
+            Assert.Same(originalReason, governorReason);
+            Assert.Same(originalReason, kingdomReason);
+        }
+        else
+        {
+            Assert.NotSame(originalReason, governorReason);
+            Assert.NotSame(originalReason, kingdomReason);
+        }
+    }
+
     private Hero CreateHero(MobileParty party = null)
     {
         var hero = ObjectHelper.SkipConstructor<Hero>();
@@ -192,6 +233,27 @@ public class CoopClanPermissionsTests : IDisposable
         hero._characterObject._heroObject = hero;
         return hero;
     }
+
+    [Fact]
+    public void GovernorPickerExcludesPlayersAndHeroesInOtherPlayersParties()
+    {
+        SetViewer(leader);
+        var unavailableCompanion = CreateHero(memberParty);
+        var noGovernor = new ClanCardSelectionItemInfo(new TextObject("None"), false, null, null);
+        var eligibleCompanion = CreateGovernorCandidate(companion);
+        IEnumerable<ClanCardSelectionItemInfo> candidates = new[]
+        {
+            noGovernor, CreateGovernorCandidate(leader), CreateGovernorCandidate(member),
+            CreateGovernorCandidate(unavailableCompanion), eligibleCompanion,
+        };
+
+        CoopClanGovernorPatches.GetGovernorCandidatesPostfix(ref candidates);
+
+        Assert.Equal(new[] { noGovernor, eligibleCompanion }, candidates);
+    }
+
+    private static ClanCardSelectionItemInfo CreateGovernorCandidate(Hero hero)
+        => new(hero, new TextObject("Hero"), null, default, null, null, null, false, null, null);
 
     private static void SetViewer(Hero hero) => Game.Current.PlayerTroop = hero.CharacterObject;
 
@@ -205,6 +267,8 @@ public class CoopClanPermissionsTests : IDisposable
     {
         foreach (var obj in registeredObjects) playerObjects.Remove(obj);
         Game.Current = previousGame;
+        ModInformation.IsServer = wasServer;
+        GameTexts._gameTextManager = previousTexts;
         if (previousContainer != null) ContainerProvider.SetContainer(previousContainer);
         else ContainerProvider.Clear();
         container.Dispose();
