@@ -57,6 +57,35 @@ namespace GameInterface.Tests.Services.MapEvents
         }
 
         [Fact]
+        public void ExcludedParties_AreRemovedAndRestoredAtOriginalPositions()
+        {
+            MapEventParty firstDefender = CreateResolvedParty();
+            MapEventParty excludedDefender = CreateResolvedParty();
+            MapEventParty lastDefender = CreateResolvedParty();
+            MapEventParty excludedAttacker = CreateResolvedParty();
+            MapEventParty includedAttacker = CreateResolvedParty();
+            MapEvent mapEvent = CreateMapEvent(
+                CreateSide(firstDefender, excludedDefender, lastDefender),
+                CreateSide(excludedAttacker, includedAttacker));
+
+            var removedParties = MapEventPatches.RemoveParties(
+                mapEvent,
+                party => party == excludedDefender || party == excludedAttacker);
+
+            Assert.Equal(new[] { firstDefender, lastDefender }, mapEvent.DefenderSide.Parties);
+            Assert.Equal(new[] { includedAttacker }, mapEvent.AttackerSide.Parties);
+
+            MapEventPatches.RestoreParties(removedParties);
+
+            Assert.Equal(
+                new[] { firstDefender, excludedDefender, lastDefender },
+                mapEvent.DefenderSide.Parties);
+            Assert.Equal(
+                new[] { excludedAttacker, includedAttacker },
+                mapEvent.AttackerSide.Parties);
+        }
+
+        [Fact]
         public void PartyInvalidatedDuringXp_RemovesBeforeRenown()
         {
             MapEventParty defender = CreateResolvedParty();
@@ -102,6 +131,30 @@ namespace GameInterface.Tests.Services.MapEvents
             Assert.Equal(1, removedPartyCount);
             Assert.Equal(new[] { firstDefender, attacker }, committedParties);
             Assert.Collection(mapEvent.DefenderSide.Parties, party => Assert.Same(firstDefender, party));
+            Assert.Collection(mapEvent.AttackerSide.Parties, party => Assert.Same(attacker, party));
+        }
+
+        [Fact]
+        public void IneligibleParty_IsSkippedAcrossEveryCommitPhase()
+        {
+            MapEventParty includedDefender = CreateResolvedParty();
+            MapEventParty excludedDefender = CreateResolvedParty();
+            MapEventParty attacker = CreateResolvedParty();
+            MapEvent mapEvent = CreateMapEvent(CreateSide(includedDefender, excludedDefender), CreateSide(attacker));
+
+            var committedParties = new List<MapEventParty>();
+            Action<MapEventParty>[] commitPhases =
+            {
+                party => committedParties.Add(party),
+                party => committedParties.Add(party)
+            };
+
+            int removedPartyCount = MapEventPatches.CommitCalculatedMapEventResults(mapEvent, commitPhases, party => party != excludedDefender);
+
+            Assert.Equal(0, removedPartyCount);
+            Assert.Equal(new[] { includedDefender, includedDefender, attacker, attacker }, committedParties);
+
+            Assert.Collection(mapEvent.DefenderSide.Parties, party => Assert.Same(includedDefender, party), party => Assert.Same(excludedDefender, party));
             Assert.Collection(mapEvent.AttackerSide.Parties, party => Assert.Same(attacker, party));
         }
 

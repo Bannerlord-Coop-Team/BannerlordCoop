@@ -1,5 +1,6 @@
 ﻿using Common;
 using Common.Messaging;
+using Common.Network;
 using Missions.Battles;
 using Missions.Messages;
 using Moq;
@@ -31,7 +32,8 @@ public class BattleResultReadyLogicTests
             siegeReporter.Object,
             new MessageBroker(),
             Mock.Of<IBattleSession>(),
-            Mock.Of<IBattleDeploymentCoordinator>());
+            Mock.Of<IBattleDeploymentCoordinator>(),
+            Mock.Of<INetwork>());
         logic.OnMissionResultReady(result);
 
         siegeReporter.VerifyAll();
@@ -52,7 +54,8 @@ public class BattleResultReadyLogicTests
             siegeReporter.Object,
             new MessageBroker(),
             Mock.Of<IBattleSession>(),
-            Mock.Of<IBattleDeploymentCoordinator>());
+            Mock.Of<IBattleDeploymentCoordinator>(),
+            Mock.Of<INetwork>());
         logic.OnMissionResultReady(result);
 
         siegeReporter.VerifyNoOtherCalls();
@@ -87,7 +90,8 @@ public class BattleResultReadyLogicTests
             siegeReporter.Object,
             messageBroker,
             session.Object,
-            deployment.Object);
+            deployment.Object,
+            Mock.Of<INetwork>());
 
         logic.OnMissionResultReady(result);
         messageBroker.Publish(this, new BattleHostAuthorityAcquired("battle"));
@@ -113,12 +117,60 @@ public class BattleResultReadyLogicTests
             siegeReporter.Object,
             messageBroker,
             session.Object,
-            deployment.Object);
+            deployment.Object,
+            Mock.Of<INetwork>());
 
         messageBroker.Publish(this, new BattleHostAuthorityAcquired("battle"));
         GameThread.Run(() => { }, blocking: true);
 
         siegeReporter.VerifyNoOtherCalls();
         resultCommitter.VerifyNoOtherCalls();
+    }
+
+    [Fact]
+    public void UnresolvedRetreatMission_ReportsCurrentBattleRetreat()
+    {
+        var session = new Mock<IBattleSession>(MockBehavior.Strict);
+        session.SetupGet(value => value.HasInstance).Returns(true);
+        session.SetupGet(value => value.InstanceId).Returns("battle");
+        
+        var relayNetwork = new Mock<INetwork>(MockBehavior.Strict);
+        relayNetwork.Setup(network => network.SendAll(It.Is<NetworkBattleRetreated>(message => message.InstanceId == "battle")));
+        
+        var logic = new BattleResultReadyLogic(
+            Mock.Of<IBattleResultCommitter>(),
+            Mock.Of<ISiegeEngineStateReporter>(),
+            new MessageBroker(),
+            session.Object,
+            Mock.Of<IBattleDeploymentCoordinator>(),
+            relayNetwork.Object);
+
+        logic.OnRetreatMission();
+
+        relayNetwork.VerifyAll();
+    }
+
+    [Fact]
+    public void ResolvedResultFollowedByRetreatCallback_DoesNotReportRetreat()
+    {
+        var result = new MissionResult(BattleState.AttackerVictory, playerVictory: true, playerDefeated: false,
+            enemyRetreated: false);
+        
+        var resultCommitter = new Mock<IBattleResultCommitter>(MockBehavior.Strict);
+        resultCommitter.Setup(committer => committer.ReportResolvedResult(result));
+        
+        var siegeReporter = new Mock<ISiegeEngineStateReporter>(MockBehavior.Strict);
+        siegeReporter.Setup(reporter => reporter.ReportConcludedIfHost());
+        
+        var relayNetwork = new Mock<INetwork>(MockBehavior.Strict);
+        
+        var logic = new BattleResultReadyLogic(resultCommitter.Object, siegeReporter.Object, new MessageBroker(), Mock.Of<IBattleSession>(), Mock.Of<IBattleDeploymentCoordinator>(), relayNetwork.Object);
+        
+        logic.OnMissionResultReady(result);
+        logic.OnRetreatMission();
+        
+        resultCommitter.VerifyAll();
+        siegeReporter.VerifyAll();
+        relayNetwork.VerifyNoOtherCalls();
     }
 }
