@@ -121,6 +121,9 @@ public sealed class NavalMissionAdapter : INavalMissionAdapter, INavalNativeMiss
     public Missions.Messages.NetworkNavalLabSailState[] ReadSailStates() => behavior.ReadSailStates();
     public void ApplySailFeedback(Missions.Messages.NetworkNavalLabFrames frames) => behavior.ApplySailFeedback(frames);
     public void ClearSailFeedback() => behavior.ClearSailFeedback();
+    public string RequestAxesPulse(Guid operationId, int ship, float lateral, bool row, long deadlineUtcTicks)
+        => behavior?.RequestAxesPulse(operationId, ship, lateral, row, deadlineUtcTicks) ?? "rejected:no_fixture";
+    public object InspectControlStatus() => behavior?.InspectControlStatus() ?? new { unavailable = "no_fixture" };
     public object InspectSailStatus() => behavior?.InspectSailStatus() ?? new { unavailable = "no_fixture" };
     public string RequestSail(int state) => behavior?.RequestSail(state) ?? "rejected:no_fixture";
     public string RequestNativeHelm(Guid operationId, int ship, bool take) =>
@@ -852,6 +855,7 @@ internal sealed partial class NavalLabBehavior : MissionLogic
     public void TickAgentControl(float dt)
     {
         TickNativeHelm();
+        TickAxesPulse();
         if (heldHelmAgent != null && (ControlNow >= heldHelmDeadline || Blocker != null)) ReleaseHeldHelm();
         if (controlledAgent == null) return;
         if (ControlNow >= controlDeadline || Blocker != null || float.IsNaN(dt) || float.IsInfinity(dt) || dt < 0) { CancelAgentControl(); return; }
@@ -898,6 +902,7 @@ internal sealed partial class NavalLabBehavior : MissionLogic
 
     public void CancelControls()
     {
+        CancelAxesPulse("cancelled_safety_stop");
         CancelPendingNativeHelm();
         CancelAgentControl();
         ReleaseHeldHelm();

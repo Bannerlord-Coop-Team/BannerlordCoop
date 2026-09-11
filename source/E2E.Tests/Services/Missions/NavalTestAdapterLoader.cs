@@ -51,6 +51,13 @@ public sealed class NavalTestAdapter : INavalMissionAdapter, INavalNativeMission
     public int SailClears { get; private set; }
     public List<int> SailRequests { get; } = new();
     public List<(Guid operationId, int ship, bool take)> NativeHelmRequests { get; } = new();
+    public List<(Guid operationId, int ship, float lateral, bool row, long deadline)> AxesPulses { get; } = new();
+    public string RequestAxesPulse(Guid operationId, int ship, float lateral, bool row, long deadlineUtcTicks)
+    {
+        AxesPulses.Add((operationId, ship, lateral, row, deadlineUtcTicks));
+        return "requested:simulated_native_boundary";
+    }
+    public object InspectControlStatus() => new { simulated = true, requests = AxesPulses.ToArray() };
     public object InspectHelmStatus() => new { simulated = true, requests = NativeHelmRequests.ToArray() };
     public string RequestNativeHelm(Guid operationId, int ship, bool take)
     {

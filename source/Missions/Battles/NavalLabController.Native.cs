@@ -12,6 +12,7 @@ public interface INavalNativeController
     void ApplyStations(NetworkNavalLabStations stations);
     void ReleaseNativeControls();
     void ReceiveNativeInput(NetworkNavalLabHelmInput input, bool readyAtReceive);
+    object NativeControlStatus();
     bool NativeControlsReady { get; }
     bool NativeInputIngressReady { get; }
 }
@@ -29,6 +30,15 @@ public sealed partial class NavalLabController : INavalNativeController
     public bool NativeInputIngressReady => nativeControlsReleased && released && factoryHydrated && !factoryTerminal;
     public bool NativeControlsReady => IsTwoClientNative && nativeControlsReleased && released && factoryHydrated
         && FactoryAssignmentValid && adapter.Blocker == null && NativeAgentAuthoritiesValid;
+
+    public object NativeControlStatus() => new
+    {
+        epoch = session.HostEpoch, localControllerCallback = callback,
+        lastReceivedFrameSequence = lastReceived, lastAppliedFrameSequence = lastApplied,
+        hostAcceptedInputSequences = nativeInputSequences.ToArray(),
+        hostInputRemainingSeconds = nativeInputDeadlines.Select(deadline => Math.Max(0, deadline - Now)).ToArray(),
+        ready = NativeControlsReady
+    };
 
     private bool NativeAgentAuthoritiesValid => manifest.Combatants.All(id =>
         coopMissionComponent.AgentRegistry.TryGetAgentInfo(id, out var info)

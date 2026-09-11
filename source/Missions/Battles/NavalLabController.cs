@@ -182,10 +182,20 @@ public sealed partial class NavalLabController : CoopMissionController, INavalLa
             ReleaseNativeControls();
             return NativeControlsReady ? "controls_ready" : "failed:native_release";
         }
-        if (!IsTwoClientNative && (action.Kind == "native-take-helm" || action.Kind == "native-release-helm"))
+        if (!IsTwoClientNative && (action.Kind == "native-axes-pulse" || action.Kind == "native-take-helm" || action.Kind == "native-release-helm"))
             return "rejected:wrong_mode";
         if (IsTwoClientNative)
         {
+            if (action.Kind == "native-axes-pulse")
+            {
+                if (action.Ship < 0 || action.Ship >= 2 || manifest.Controllers[action.Ship] != session.OwnControllerId
+                    || !NativeControlsReady) return "rejected:owner_not_ready";
+                if (float.IsNaN(action.Rudder) || float.IsInfinity(action.Rudder) || Math.Abs(action.Rudder) > 1)
+                    return "rejected:invalid_control";
+                if (action.DeadlineUtcTicks <= DateTime.UtcNow.Ticks || action.DeadlineUtcTicks > DateTime.UtcNow.AddSeconds(1).Ticks)
+                    return "rejected:expired_control";
+                return NativeAdapter.RequestAxesPulse(action.OperationId, action.Ship, action.Rudder, action.Row, action.DeadlineUtcTicks);
+            }
             if (action.Kind == "native-take-helm" || action.Kind == "native-release-helm")
             {
                 if (action.Ship < 0 || action.Ship >= 2 || manifest.Controllers[action.Ship] != session.OwnControllerId

@@ -42,6 +42,8 @@ public interface INavalNativeMissionAdapter
     string RequestSail(int state);
     string RequestNativeHelm(Guid operationId, int ship, bool take);
     object InspectHelmStatus();
+    string RequestAxesPulse(Guid operationId, int ship, float lateral, bool row, long deadlineUtcTicks);
+    object InspectControlStatus();
 }
 
 public enum NavalLabMode { Activation, HeldHelm, SingleClientNative, FactoryAuthorityProbe, TwoClientNative }

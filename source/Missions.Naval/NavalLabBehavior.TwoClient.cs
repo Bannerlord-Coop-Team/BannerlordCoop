@@ -54,10 +54,22 @@ internal sealed partial class NavalLabBehavior
     internal void RouteNativeAxes(MissionShipControlView view)
     {
         bool permission = HasNativeInputPermission(view);
+        if (pulsePending && (Mission != Mission.Current || !permission || view != pulseView))
+        {
+            CancelAxesPulse("permission_lost_safety_stop");
+            return;
+        }
+        if (pulsePending && ControlNow >= pulseDeadline)
+        {
+            pulsePending = false;
+            pulseCompleting = true;
+            nextNativeInput = 0;
+        }
         var input = ShipInputRecord.Stop();
         if (permission)
         {
-            var axes = new Vec2(view.Input.GetGameKeyAxis("MovementAxisX"), view.Input.GetGameKeyAxis("MovementAxisY"));
+            var axes = pulsePending ? pulseAxes : new Vec2(view.Input.GetGameKeyAxis("MovementAxisX"), view.Input.GetGameKeyAxis("MovementAxisY"));
+            if (pulseCompleting) axes = Vec2.Zero;
             if (Math.Abs(axes.x) <= 0.2f) axes.x = 0;
             if (Math.Abs(axes.y) <= 0.2f) axes.y = 0;
             view.TickRowerInput(axes, out var longitudinal, out var doubleTap, out var lateral);
@@ -66,9 +78,32 @@ internal sealed partial class NavalLabBehavior
         if (ControlNow < nextNativeInput && permission == lastHelmPermission) return;
         nextNativeInput = ControlNow + 0.05;
         lastHelmPermission = permission;
-        SendNativeInput?.Invoke(new NetworkNavalLabHelmInput(manifest.IncarnationId, 1, OwnSlot, ++nativeInputSequence,
-            DateTime.UtcNow.AddSeconds(1).Ticks, permission, (int)input.RowerLateral, (int)input.RowerLongitudinal,
-            (int)input.RowerLongitudinalDoubleTap, input.RudderLateral, (int)input.Sail));
+        var message = new NetworkNavalLabHelmInput(manifest.IncarnationId, 1, OwnSlot, ++nativeInputSequence,
+            pulsePending ? pulseDeadlineUtcTicks : DateTime.UtcNow.AddSeconds(1).Ticks, permission,
+            (int)input.RowerLateral, (int)input.RowerLongitudinal,
+            (int)input.RowerLongitudinalDoubleTap, input.RudderLateral, (int)input.Sail);
+        try { SendNativeInput?.Invoke(message); }
+        catch
+        {
+            if (pulsePending || pulseCompleting)
+            {
+                pulsePending = pulseCompleting = false;
+                pulsePhase = "failed_dispatch_safety_hold";
+            }
+            throw;
+        }
+        lastSentNativeInput = message;
+        if (pulsePending)
+        {
+            if (pulseFirstInputSequence == 0) pulseFirstInputSequence = message.Sequence;
+            pulseLastInputSequence = message.Sequence;
+        }
+        if (pulseCompleting)
+        {
+            pulseNeutralInputSequence = message.Sequence;
+            pulsePhase = "completed_axes_neutral_requested";
+        }
+        pulseCompleting = false;
     }
 
     internal void ApplyNativeInput(NetworkNavalLabHelmInput input)
