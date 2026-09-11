@@ -10,6 +10,7 @@ public interface IWeaponDropWorldItemSpawner
 {
     bool IsReady { get; }
     bool IsPresent(SpawnedItemEntity item);
+    bool IsRemoved(SpawnedItemEntity item);
     bool TryGetState(
         SpawnedItemEntity item,
         out MatrixFrame frame,
@@ -39,6 +40,9 @@ public sealed class WeaponDropWorldItemSpawner : IWeaponDropWorldItemSpawner
         (!item.IsDeactivated ||
          (item.WeaponCopy.Item != null &&
           item.WeaponCopy.Item.ItemFlags.HasAnyFlag(ItemFlags.CannotBePickedUp)));
+
+    public bool IsRemoved(SpawnedItemEntity item) =>
+        item != null && item.IsRemoved;
 
     public bool TryGetState(
         SpawnedItemEntity item,

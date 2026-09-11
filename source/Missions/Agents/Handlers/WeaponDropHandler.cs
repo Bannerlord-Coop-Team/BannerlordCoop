@@ -1217,6 +1217,12 @@ public class WeaponDropHandler : IWeaponDropHandler
             return false;
         }
 
+        if (TryRetireRemovedWorldItem(message.WorldItemId, registered))
+        {
+            blocked = true;
+            return false;
+        }
+
         if (worldItemSpawner.IsPresent(registered) && WeaponMatches(registered.WeaponCopy, canonical))
         {
             item = registered;
@@ -1567,6 +1573,26 @@ public class WeaponDropHandler : IWeaponDropHandler
             RetryPendingResyncRequests(worldItemId);
     }
 
+    private bool TryRetireRemovedWorldItem(
+        Guid worldItemId,
+        SpawnedItemEntity item,
+        bool retryPending = true)
+    {
+        if (disposed || !isLocalHost() || !worldItemSpawner.IsReady ||
+            !activeDrops.ContainsKey(worldItemId) || !worldItemSpawner.IsRemoved(item))
+            return false;
+
+        // Keep the terminal identity before discarding the removed canonical entity.
+        WorldItemTransitionState state = GetOrCreateWorldItemTransitionState(worldItemId);
+        state.Revision++;
+        RetireWorldItem(worldItemId, retryPending: false, removalReason: "authority-removed");
+        network.SendAll(new NetworkWeaponDropStateResponse(
+            Guid.Empty, worldItemId, state.Revision, true, null, Array.Empty<Guid>()));
+        if (retryPending)
+            RetryPendingResyncRequests(worldItemId);
+        return true;
+    }
+
     private void RetireExpiredWorldItem(Guid worldItemId, bool retryPending = true)
     {
         if (!consumedWorldItemIds.Contains(worldItemId) &&
@@ -1704,12 +1730,24 @@ public class WeaponDropHandler : IWeaponDropHandler
         NetworkWeaponDropped source,
         out NetworkWeaponDropped message)
     {
+        if (!worldItemSpawner.IsReady)
+        {
+            message = null;
+            return false;
+        }
+
         if (worldItemRegistry.TryGet(
                 source.WorldItemId,
                 out SpawnedItemEntity item) &&
             worldItemSpawner.IsPresent(item))
         {
             return TryCreateCatchUp(source, item, out message);
+        }
+
+        if (TryRetireRemovedWorldItem(source.WorldItemId, item, retryPending: false))
+        {
+            message = null;
+            return false;
         }
 
         if (IsActiveDropExpired(source.WorldItemId))
@@ -1988,6 +2026,8 @@ public class WeaponDropHandler : IWeaponDropHandler
 
     private void PruneUnavailableWorldItems()
     {
+        if (!worldItemSpawner.IsReady) return;
+
         PrunePreDropStates();
         PrunePendingResyncRequests();
         var snapshot = new List<KeyValuePair<Guid, NetworkWeaponDropped>>(activeDrops);
@@ -2008,6 +2048,9 @@ public class WeaponDropHandler : IWeaponDropHandler
             {
                 continue;
             }
+
+            if (TryRetireRemovedWorldItem(pair.Key, item))
+                continue;
 
             if (IsActiveDropExpired(pair.Key))
             {
@@ -2192,6 +2235,8 @@ public class WeaponDropHandler : IWeaponDropHandler
 
     private void SendCatchUp(string controllerId)
     {
+        if (disposed || !worldItemSpawner.IsReady) return;
+
         int sent = 0;
         var snapshot = new List<KeyValuePair<Guid, NetworkWeaponDropped>>(activeDrops);
         foreach (KeyValuePair<Guid, NetworkWeaponDropped> pair in snapshot)
