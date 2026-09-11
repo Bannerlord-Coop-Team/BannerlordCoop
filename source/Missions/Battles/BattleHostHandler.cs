@@ -149,6 +149,7 @@ internal class BattleHostHandler : IHandler
         messageBroker.Subscribe<MapEventInvolvedPartiesAdded>(Handle_MapEventInvolvedPartiesAdded);
         messageBroker.Subscribe<BattleResolvedStateRecorded>(Handle_BattleResolvedStateRecorded);
         messageBroker.Subscribe<CampaignTick>(Handle_CampaignTick);
+        messageBroker.Subscribe<NetworkRequestRetainedPlayerHero>(Handle_RetainedPlayerHero);
     }
 
     public void Dispose()
@@ -164,6 +165,43 @@ internal class BattleHostHandler : IHandler
         messageBroker.Unsubscribe<MapEventInvolvedPartiesAdded>(Handle_MapEventInvolvedPartiesAdded);
         messageBroker.Unsubscribe<BattleResolvedStateRecorded>(Handle_BattleResolvedStateRecorded);
         messageBroker.Unsubscribe<CampaignTick>(Handle_CampaignTick);
+        messageBroker.Unsubscribe<NetworkRequestRetainedPlayerHero>(Handle_RetainedPlayerHero);
+    }
+
+    // Forward only the current holder's surrender for a present player and an already-supplied hero.
+    private void Handle_RetainedPlayerHero(MessagePayload<NetworkRequestRetainedPlayerHero> payload)
+    {
+        if (ModInformation.IsClient) return;
+        var handoff = payload.What.Handoff;
+        var sender = payload.Who as NetPeer;
+        GameThread.RunSafe(() =>
+        {
+            if (sender == null || handoff == null || !handoff.HasValidAuthorityTransition
+                || !playerManager.TryGetPlayer(sender, out var holder)
+                || holder.ControllerId != handoff.Previous.OwnerControllerId
+                || !hostRegistry.TryGet(handoff.BattleInstanceId, out var assignment)
+                || assignment.HostControllerId != holder.ControllerId || assignment.Epoch != handoff.HostEpoch
+                || !battleRuntimeStates.TryGetValue(handoff.BattleInstanceId, out var state)
+                || !state.PresentControllers.Contains(holder.ControllerId)
+                || !state.PresentControllers.Contains(handoff.ReturningControllerId)
+                || state.ResolvedState != BattleState.None
+                || !playerManager.TryGetPlayer(handoff.ReturningControllerId, out var player)
+                || player.CharacterObjectId != handoff.Previous.CharacterId
+                || !objectManager.TryGetObject<MobileParty>(player.MobilePartyId, out var party)
+                || !objectManager.TryGetObject<MapEventParty>(handoff.Previous.MapEventPartyId, out var eventParty)
+                || eventParty?.Party != party?.Party
+                || !ledger.TryGetReserve(handoff.BattleInstanceId, handoff.Previous.MapEventPartyId,
+                    out var entries, out int supplied)) return;
+            for (int i = 0; i < Math.Min(supplied, entries.Count); i++)
+            {
+                if (entries[i].CharacterId != handoff.Previous.CharacterId
+                    || entries[i].Seed != handoff.Previous.TroopSeed) continue;
+                // Entry can precede mission-ready, so the grant needs its host assignment first.
+                network.SendAll(ToMessage(handoff.BattleInstanceId, assignment));
+                network.SendAll(handoff);
+                return;
+            }
+        }, context: nameof(Handle_RetainedPlayerHero));
     }
 
     /// <summary>[Client] Entering a battle (still loading): request only the reserves we already OWN, so our
@@ -844,8 +882,11 @@ internal class BattleHostHandler : IHandler
     {
         if (ModInformation.IsServer) return;
 
-        var message = payload.What;
+        GameThread.RunSafe(() => ApplyHostAssignment(payload.What), context: nameof(Handle_NetworkBattleHostAssigned));
+    }
 
+    private void ApplyHostAssignment(NetworkBattleHostAssigned message)
+    {
         // Capture the host we knew before applying the update, so we can detect a migration TO us.
         string previousHost = null;
         bool wasLocalHost = false;
@@ -870,6 +911,7 @@ internal class BattleHostHandler : IHandler
             message.SuccessorControllerIds ?? Array.Empty<string>(),
             message.Epoch);
         hostRegistry.Set(message.MapEventId, assignment);
+        messageBroker.Publish(this, new BattleHostAssignmentApplied(message));
 
         bool isLocalHost = message.HostControllerId == controllerIdProvider.ControllerId;
         if (isLocalHost && (!wasLocalHost || previous?.Epoch != message.Epoch))

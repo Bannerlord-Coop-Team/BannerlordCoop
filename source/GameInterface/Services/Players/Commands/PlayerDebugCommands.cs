@@ -1,11 +1,16 @@
 ﻿using Common.Commands;
 using Common;
 using GameInterface.Services.Entity;
+using GameInterface.Services.MapEvents;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.PartyBases.Extensions;
 using Newtonsoft.Json;
+using System;
+using System.Collections.Generic;
+using System.Linq;
 using System.Text;
 using TaleWorlds.CampaignSystem;
+using TaleWorlds.CampaignSystem.MapEvents;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.Localization;
 
@@ -124,6 +129,7 @@ internal class PlayerDebugCommands
                 $"\nLIVE_TEST_JSON={structuredState}");
         }
     }
+
 
     /// <summary>
     /// Reports one of a player's controlled ids: whether it resolves and whether it is in the
