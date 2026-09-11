@@ -1,7 +1,9 @@
 ﻿using Common;
 using Common.Logging;
 using Common.Messaging;
+using GameInterface.Policies;
 using GameInterface.Services.Actions.Messages;
+using GameInterface.Services.Clans;
 using HarmonyLib;
 using Serilog;
 using TaleWorlds.CampaignSystem;
@@ -20,6 +22,8 @@ internal class ChangeGovernorActionPatches
     public static bool ApplyInternalPrefix(Town fortification, Hero governor)
     {
         if (ModInformation.IsServer) return true;
+        if (CallOriginalPolicy.IsOriginalAllowed()) return true;
+        if (!CoopClanPermissions.CanManageClan(fortification.OwnerClan)) return false;
 
         // Send message to server to manage changed governor
         var message = new GovernorChanged(fortification, governor);
@@ -38,6 +42,8 @@ internal class ChangeGovernorActionPatches
         if (governor?.GovernorOf == null) return false;
 
         if (ModInformation.IsServer) return true;
+        if (CallOriginalPolicy.IsOriginalAllowed()) return true;
+        if (!CoopClanPermissions.CanManageClan(governor.GovernorOf.OwnerClan)) return false;
 
         // Send message to server to manage removed governor
         var message = new GovernorRemoved(governor);
