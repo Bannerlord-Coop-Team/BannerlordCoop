@@ -46,6 +46,7 @@ public sealed record PreflightReport(bool Allowed, string Code, string Message, 
 public interface IBridgeBuildInspector
 {
     BridgeBuild Inspect(LaunchProfile profile);
+    BridgeBuild InspectPath(string path);
 }
 
 public sealed class BridgeBuildInspector : IBridgeBuildInspector
@@ -54,6 +55,11 @@ public sealed class BridgeBuildInspector : IBridgeBuildInspector
     {
         string gameRoot = Path.GetFullPath(Path.Combine(Path.GetDirectoryName(profile.Executable), "..", ".."));
         string path = Path.Combine(gameRoot, "Modules", "Coop", "bin", "Win64_Shipping_Client", "Coop.dll");
+        return InspectPath(path);
+    }
+
+    public BridgeBuild InspectPath(string path)
+    {
         using var stream = File.OpenRead(path);
         using var pe = new PEReader(stream);
         var reader = pe.GetMetadataReader();
