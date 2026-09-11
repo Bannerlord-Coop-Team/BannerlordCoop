@@ -49,6 +49,35 @@ public class DefenderSiegeContextFixtureTests
     private static bool postCreationSnapshotAttempted;
 
     [Fact]
+    public void FixtureClan_UsesLeaderlessHostileBanditWithoutChangingDiplomacy()
+    {
+        using var test = new AssaultFixture();
+        var defender = new Clan();
+        var bandits = new Clan();
+        bandits.IsBanditFaction = true;
+        bandits._defaultPartyTemplate = ObjectHelper.SkipConstructor<PartyTemplateObject>();
+        var templateClan = new Clan();
+        templateClan._defaultPartyTemplate = ObjectHelper.SkipConstructor<PartyTemplateObject>();
+        var templateHero = ObjectHelper.SkipConstructor<Hero>();
+        templateHero._characterObject = ObjectHelper.SkipConstructor<CharacterObject>();
+        templateClan._leader = templateHero;
+        var originalWar = bandits.MapFaction.IsAtWarWith(defender);
+        Assert.True(originalWar);
+        var selected = DefenderSiegeContextFixture.FindFixtureClan(
+            new[] { templateClan, bandits }, defender, new[] { defender }, out var template);
+        Assert.Same(bandits, selected);
+        Assert.Same(templateHero.CharacterObject, template);
+        Assert.Null(bandits.Leader);
+        Assert.Equal(originalWar, bandits.MapFaction.IsAtWarWith(defender));
+        Assert.Null(DefenderSiegeContextFixture.FindFixtureClan(
+            new[] { templateClan, bandits }, defender, new[] { bandits }, out _));
+        bandits._leader = templateHero;
+        Assert.Same(bandits, DefenderSiegeContextFixture.FindFixtureClan(
+            new[] { templateClan, bandits }, defender, new[] { defender }, out template));
+        Assert.Same(templateHero.CharacterObject, template);
+    }
+
+    [Fact]
     public void RestoredBehavior_PreservesCapturedRoutingPositionAndNavigation()
     {
         var expected = new PartyBehaviorUpdateData("besieger", AiBehavior.Hold, "anchor", default,
@@ -155,11 +184,13 @@ public class DefenderSiegeContextFixtureTests
         }
     }
 
-    [Fact]
-    public void CreatedBesiegerCleanupRetry_DoesNotRequireDestroyedPartyRegistration()
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void CreatedBesiegerCleanupRetry_DoesNotRequireDestroyedPartyRegistration(bool ownsClanLeader)
     {
         using var test = new AssaultFixture();
-        int companionBaseline = test.PrepareCreatedBesiegerCleanupRetry();
+        int companionBaseline = test.PrepareCreatedBesiegerCleanupRetry(ownsClanLeader);
 
         var harmony = new Harmony("created-besieger-cleanup-retry-" + Guid.NewGuid().ToString("N"));
         try
@@ -186,6 +217,13 @@ public class DefenderSiegeContextFixtureTests
             Assert.Equal(companionBaseline, test.CreatedBesiegerClan.Companions.Count());
             Assert.DoesNotContain(test.CreatedBesiegerHero, test.CreatedBesiegerClan.Companions);
             Assert.Null(test.CreatedBesiegerHero.CompanionOf);
+            if (ownsClanLeader)
+            {
+                Assert.Null(test.CreatedBesiegerClan.Leader);
+                Assert.Null(test.CreatedBesiegerHero.Clan);
+                Assert.DoesNotContain(test.CreatedBesiegerHero, test.CreatedBesiegerClan.Heroes);
+                Assert.True(test.Fixture.Restore().Succeeded);
+            }
         }
         finally
         {
@@ -193,6 +231,22 @@ public class DefenderSiegeContextFixtureTests
             createdBesiegerObjects = null;
             harmony.UnpatchAll(harmony.Id);
         }
+    }
+
+    [Fact]
+    public void CreatedBesiegerCleanup_RefusesAnotherLeaderWithoutDestroyingOwnedParty()
+    {
+        using var test = new AssaultFixture();
+        test.PrepareCreatedBesiegerCleanupRetry(ownsClanLeader: true);
+        var replacement = ObjectHelper.SkipConstructor<Hero>();
+        test.CreatedBesiegerClan._leader = replacement;
+
+        Assert.False(test.Fixture.Restore().Succeeded);
+        Assert.True(test.HasCreatedBesiegerOwnership);
+        Assert.True(test.Objects.TryGetObject<MobileParty>("destroyed-created-besieger", out var party));
+        Assert.True(party.IsActive);
+        Assert.Same(replacement, test.CreatedBesiegerClan.Leader);
+        Assert.Same(test.CreatedBesiegerClan, test.CreatedBesiegerHero.CompanionOf);
     }
 
     private static bool DestroyCreatedBesiegerPartyPrefix(PartyBase __0, MobileParty __1)
@@ -232,6 +286,7 @@ public class DefenderSiegeContextFixtureTests
         ref Hero fixtureHero,
         ref Clan fixtureClan,
         ref bool cleanupFailed,
+        ref bool ownsClanLeader,
         ref string failureDetail,
         ref bool __result)
     {
@@ -239,6 +294,7 @@ public class DefenderSiegeContextFixtureTests
         fixtureHero = createdBesiegerHero;
         fixtureClan = createdBesiegerClan;
         cleanupFailed = false;
+        ownsClanLeader = false;
         failureDetail = null;
         __result = true;
         return false;
@@ -597,7 +653,7 @@ public class DefenderSiegeContextFixtureTests
             postCreationSnapshotAttempted = false;
         }
 
-        public int PrepareCreatedBesiegerCleanupRetry()
+        public int PrepareCreatedBesiegerCleanupRetry(bool ownsClanLeader = false)
         {
             var party = CreateParty("destroyed-created-besieger");
             var hero = ObjectHelper.SkipConstructor<Hero>();
@@ -624,6 +680,12 @@ public class DefenderSiegeContextFixtureTests
             Write("createdBesiegerClan", clan);
             Write("relationRestored", true);
             Write("restored", false);
+            if (ownsClanLeader)
+            {
+                clan.IsBanditFaction = true;
+                clan.SetLeader(hero);
+                Write("createdBesiegerOwnsClanLeader", true);
+            }
             return companionBaseline;
         }
 

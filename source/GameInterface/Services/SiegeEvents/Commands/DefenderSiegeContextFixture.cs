@@ -67,6 +67,7 @@ internal sealed class DefenderSiegeContextFixture : IDefenderSiegeContextFixture
     private bool createdBesiegerCleanupStarted;
     private Hero createdBesiegerHero;
     private Clan createdBesiegerClan;
+    private bool createdBesiegerOwnsClanLeader;
     private string partyId;
     private CampaignVec2 position;
     private Vec2 bearing;
@@ -123,6 +124,7 @@ internal sealed class DefenderSiegeContextFixture : IDefenderSiegeContextFixture
         Hero fixtureHero = null;
         Clan fixtureClan = null;
         bool fixtureCleanupFailed = false;
+        bool fixtureOwnsClanLeader = false;
         bool usesCreatedBesieger = candidate == null;
         if (usesCreatedBesieger)
         {
@@ -133,6 +135,7 @@ internal sealed class DefenderSiegeContextFixture : IDefenderSiegeContextFixture
                     out fixtureHero,
                     out fixtureClan,
                     out fixtureCleanupFailed,
+                    out fixtureOwnsClanLeader,
                     out captureFailureDetail))
             {
                 if (fixtureCleanupFailed)
@@ -141,6 +144,7 @@ internal sealed class DefenderSiegeContextFixture : IDefenderSiegeContextFixture
                     createdBesiegerCleanupStarted = true;
                     createdBesiegerHero = fixtureHero;
                     createdBesiegerClan = fixtureClan;
+                    createdBesiegerOwnsClanLeader = fixtureOwnsClanLeader;
                     besieger = candidate;
                 }
                 return Result(false, fixtureCleanupFailed
@@ -154,6 +158,7 @@ internal sealed class DefenderSiegeContextFixture : IDefenderSiegeContextFixture
             createdBesiegerCleanupStarted = false;
             createdBesiegerHero = fixtureHero;
             createdBesiegerClan = fixtureClan;
+            createdBesiegerOwnsClanLeader = fixtureOwnsClanLeader;
             besieger = candidate;
         }
         try
@@ -383,6 +388,8 @@ internal sealed class DefenderSiegeContextFixture : IDefenderSiegeContextFixture
             behaviorIdentity.IsCurrent(originalBehaviorReferences) && restored &&
             settlement.SiegeEvent == null && settlement.Party.MapEvent == null &&
             (createdBesiegerRestored || ordinaryBesiegerRestored) &&
+            (!createdBesiegerOwnsClanLeader || (createdBesiegerClan.Leader == null &&
+                createdBesiegerHero.Clan == null && !createdBesiegerClan.Heroes.Contains(createdBesiegerHero))) &&
             (createdBesieger ? relationRestored :
                 relationFirst == null || CharacterRelationManager.GetHeroRelation(relationFirst, relationSecond) == originalRelation);
         return Result(success, success ? "restore_verified" : "restore_not_verified");
@@ -450,6 +457,26 @@ internal sealed class DefenderSiegeContextFixture : IDefenderSiegeContextFixture
         party.MapFaction?.IsAtWarWith(target.MapFaction) == true &&
         defenders.All(defender => party.MapFaction.IsAtWarWith(defender.MapFaction));
 
+    internal static Clan FindFixtureClan(IEnumerable<Clan> clans, IFaction target,
+        IEnumerable<IFaction> defenders, out CharacterObject heroTemplate)
+    {
+        var candidates = clans.ToArray();
+        var hostile = candidates.Where(clan => clan != null && clan != Clan.PlayerClan &&
+            !clan.IsEliminated && clan.DefaultPartyTemplate != null && clan.MapFaction != null && target != null &&
+            clan.MapFaction.IsAtWarWith(target) &&
+            defenders.All(defender => clan.MapFaction.IsAtWarWith(defender))).ToArray();
+        var selected = hostile.Where(clan => clan.Leader?.CharacterObject != null)
+            .OrderByDescending(clan => clan.Tier).FirstOrDefault();
+        heroTemplate = selected?.Leader.CharacterObject;
+        if (selected != null) return selected;
+        selected = hostile.Where(clan => clan.IsBanditFaction && clan.Leader == null)
+            .OrderByDescending(clan => clan.Tier).FirstOrDefault();
+        if (selected != null)
+            heroTemplate = candidates.Where(clan => clan?.Leader?.CharacterObject != null && !clan.IsEliminated)
+                .OrderByDescending(clan => clan.Tier).Select(clan => clan.Leader.CharacterObject).FirstOrDefault();
+        return selected;
+    }
+
     private static bool TryCreateFixtureBesieger(
         Settlement target,
         IEnumerable<MobileParty> defenders,
@@ -457,26 +484,28 @@ internal sealed class DefenderSiegeContextFixture : IDefenderSiegeContextFixture
         out Hero fixtureHero,
         out Clan fixtureClan,
         out bool cleanupFailed,
+        out bool ownsClanLeader,
         out string failureDetail)
     {
         candidate = null;
         fixtureHero = null;
         cleanupFailed = false;
+        ownsClanLeader = false;
         failureDetail = "no_eligible_hostile_clan";
-        fixtureClan = Clan.All
-            .Where(clan => clan != null && clan != Clan.PlayerClan && clan.Leader?.CharacterObject != null &&
-                clan.DefaultPartyTemplate != null && clan.MapFaction != null && target.MapFaction != null &&
-                clan.MapFaction.IsAtWarWith(target.MapFaction) &&
-                defenders.All(defender => clan.MapFaction.IsAtWarWith(defender.MapFaction)))
-            .OrderByDescending(clan => clan.Tier)
-            .FirstOrDefault();
+        fixtureClan = FindFixtureClan(Clan.All, target.MapFaction,
+            defenders.Select(defender => defender.MapFaction), out var heroTemplate);
         if (fixtureClan == null) return false;
+        if (heroTemplate == null)
+        {
+            failureDetail = "fixture_hero_template_unavailable";
+            return false;
+        }
 
         MobileParty fixtureParty = null;
         try
         {
             failureDetail = "create_fixture_hero";
-            fixtureHero = HeroCreator.CreateSpecialHero(fixtureClan.Leader.CharacterObject, target, age: 30);
+            fixtureHero = HeroCreator.CreateSpecialHero(heroTemplate, target, age: 30);
             failureDetail = "configure_fixture_hero";
             var fixtureName = new TextObject("Defender context fixture besieger");
             fixtureHero.SetName(fixtureName, fixtureName);
@@ -485,6 +514,12 @@ internal sealed class DefenderSiegeContextFixture : IDefenderSiegeContextFixture
             AddCompanionAction.Apply(fixtureClan, fixtureHero);
             failureDetail = "fixture_companion_clan_mismatch";
             if (!ReferenceEquals(fixtureHero.CompanionOf, fixtureClan)) return false;
+            if (fixtureClan.IsBanditFaction && fixtureClan.Leader == null)
+            {
+                failureDetail = "assign_fixture_clan_leader";
+                ownsClanLeader = true;
+                fixtureClan.SetLeader(fixtureHero);
+            }
             failureDetail = "create_fixture_party";
             fixtureParty = LordPartyComponent.CreateLordParty(
                 "defender_context_fixture_" + Guid.NewGuid().ToString("N"),
@@ -529,7 +564,7 @@ internal sealed class DefenderSiegeContextFixture : IDefenderSiegeContextFixture
         {
             if (candidate == null)
             {
-                cleanupFailed = !TryCleanupCreatedBesieger(fixtureParty, fixtureHero, fixtureClan);
+                cleanupFailed = !TryCleanupCreatedBesieger(fixtureParty, fixtureHero, fixtureClan, ownsClanLeader);
                 if (cleanupFailed) candidate = fixtureParty;
             }
         }
@@ -544,30 +579,36 @@ internal sealed class DefenderSiegeContextFixture : IDefenderSiegeContextFixture
     }
 
     private bool TryRemoveCreatedBesieger() =>
-        TryCleanupCreatedBesieger(besieger, createdBesiegerHero, createdBesiegerClan);
+        TryCleanupCreatedBesieger(besieger, createdBesiegerHero, createdBesiegerClan, createdBesiegerOwnsClanLeader);
 
-    private static bool TryCleanupCreatedBesieger(MobileParty party, Hero hero, Clan clan)
+    private static bool TryCleanupCreatedBesieger(MobileParty party, Hero hero, Clan clan, bool ownsClanLeader)
     {
         if (hero == null) return party?.IsActive != true;
         if (clan == null) return false;
         try
         {
+            if (ownsClanLeader && (!clan.IsBanditFaction ||
+                (clan.Leader != null && !ReferenceEquals(clan.Leader, hero)) ||
+                (hero.Clan != null && !ReferenceEquals(hero.Clan, clan)))) return false;
             if (party?.IsActive == true)
             {
                 if (!ReferenceEquals(party.LeaderHero, hero) || !ReferenceEquals(party.ActualClan, clan)) return false;
                 DestroyPartyAction.Apply(null, party);
             }
+            if (ownsClanLeader && ReferenceEquals(clan.Leader, hero)) clan.SetLeader(null);
             if (hero.CompanionOf != null)
             {
                 if (!ReferenceEquals(hero.CompanionOf, clan)) return false;
                 RemoveCompanionAction.ApplyByFire(clan, hero);
             }
+            if (ownsClanLeader && hero.Clan == clan) hero.Clan = null;
             if (hero.DeathMark == KillCharacterAction.KillCharacterActionDetail.None)
                 KillCharacterAction.ApplyByRemove(hero, false, true);
             return IsCreatedBesiegerRestored(
                 party?.IsActive == true,
                 hero.CompanionOf != null,
-                hero.DeathMark);
+                hero.DeathMark) && (!ownsClanLeader || (clan.Leader == null && hero.Clan == null &&
+                    !clan.Heroes.Contains(hero)));
         }
         catch (Exception)
         {
@@ -581,6 +622,7 @@ internal sealed class DefenderSiegeContextFixture : IDefenderSiegeContextFixture
         createdBesiegerCleanupStarted = false;
         createdBesiegerHero = null;
         createdBesiegerClan = null;
+        createdBesiegerOwnsClanLeader = false;
         besieger = null;
         partyId = null;
     }
