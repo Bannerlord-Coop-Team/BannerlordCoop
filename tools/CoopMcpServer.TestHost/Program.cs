@@ -14,6 +14,7 @@ builder.Services.AddSingleton(runs);
 builder.Services.AddTransient<IScreenshotImageEncoder, ScreenshotImageEncoder>();
 builder.Services.AddTransient<IScreenshotCapture, ScreenshotCapture>();
 builder.Services.AddTransient<IDebugTools, DebugTools>();
-builder.Services.AddMcpServer().WithStdioServerTransport().WithTools<DebugTools>();
+builder.Services.AddTransient<IModDeploymentService, DeploymentSchemaFixture>();
+builder.Services.AddMcpServer().WithStdioServerTransport().WithTools<DebugTools>().WithTools<DeploymentTools>();
 using var host = builder.Build();
 await host.RunAsync();
