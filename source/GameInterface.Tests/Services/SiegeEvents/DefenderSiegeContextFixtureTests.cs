@@ -19,6 +19,7 @@ using GameInterface.Tests.Bootstrap;
 using HarmonyLib;
 using LiteNetLib;
 using Moq;
+using Newtonsoft.Json.Linq;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -130,7 +131,12 @@ public class DefenderSiegeContextFixtureTests
                 prefix: new HarmonyMethod(typeof(DefenderSiegeContextFixtureTests), nameof(RemoveCreatedBesiegerHeroPrefix)));
             createdBesiegerObjects = test.Objects;
 
-            Assert.False(test.Fixture.Capture().Succeeded);
+            var result = test.Fixture.Capture();
+            Assert.False(result.Succeeded);
+            var evidence = JObject.Parse(result.Output.Substring("LIVE_TEST_JSON=".Length));
+            Assert.Equal("created_besieger_capture_exception", (string)evidence["status"]);
+            Assert.StartsWith("besieger_behavior_snapshot: System.InvalidOperationException:",
+                (string)evidence["captureFailureDetail"]);
             Assert.True(postCreationSnapshotAttempted);
             Assert.False(test.HasCreatedBesiegerOwnership);
             Assert.Null(test.CapturedBesieger);
@@ -226,12 +232,14 @@ public class DefenderSiegeContextFixtureTests
         ref Hero fixtureHero,
         ref Clan fixtureClan,
         ref bool cleanupFailed,
+        ref string failureDetail,
         ref bool __result)
     {
         candidate = createdBesiegerCandidate;
         fixtureHero = createdBesiegerHero;
         fixtureClan = createdBesiegerClan;
         cleanupFailed = false;
+        failureDetail = null;
         __result = true;
         return false;
     }

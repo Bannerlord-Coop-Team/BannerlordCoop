@@ -74,6 +74,7 @@ internal sealed class DefenderSiegeContextFixture : IDefenderSiegeContextFixture
     private SiegeEvent createdSiege;
     private bool startAttempted;
     private bool restored;
+    private string captureFailureDetail;
 
     public DefenderSiegeContextFixture(IObjectManager objects, IPlayerManager players,
         IMobilePartyBehaviorSnapshot behavior, ISiegeEventInterface siege, IMessageBroker broker, INetwork network,
@@ -97,6 +98,7 @@ internal sealed class DefenderSiegeContextFixture : IDefenderSiegeContextFixture
             ReleaseCreatedBesiegerOwnership();
         }
         if (campaign != null) return Result(false, "fixture_already_captured");
+        captureFailureDetail = null;
         if (Campaign.Current == null || !objects.TryGetObject<Settlement>(SettlementId, out var target) ||
             !target.IsCastle || target.SiegeEvent != null || target.Party.MapEvent != null)
             return Result(false, "castle_not_clean");
@@ -130,7 +132,8 @@ internal sealed class DefenderSiegeContextFixture : IDefenderSiegeContextFixture
                     out candidate,
                     out fixtureHero,
                     out fixtureClan,
-                    out fixtureCleanupFailed))
+                    out fixtureCleanupFailed,
+                    out captureFailureDetail))
             {
                 if (fixtureCleanupFailed)
                 {
@@ -155,9 +158,13 @@ internal sealed class DefenderSiegeContextFixture : IDefenderSiegeContextFixture
         }
         try
         {
-            if (!objects.TryGetId(candidate, out string candidateId) ||
-                !behavior.TryCreate(candidate, out var snapshot))
+            captureFailureDetail = "besieger_registry_lookup";
+            if (!objects.TryGetId(candidate, out string candidateId))
                 return CaptureFailure("no_restorable_hostile_besieger");
+            captureFailureDetail = "besieger_behavior_snapshot";
+            if (!behavior.TryCreate(candidate, out var snapshot))
+                return CaptureFailure("no_restorable_hostile_besieger");
+            captureFailureDetail = "besieger_capture_state";
             var references = behaviorIdentity.Capture(candidate, snapshot);
             if (!behaviorIdentity.IsCurrent(references))
                 return CaptureFailure("besieger_behavior_identity_unavailable");
@@ -196,11 +203,13 @@ internal sealed class DefenderSiegeContextFixture : IDefenderSiegeContextFixture
             stagedRelation = capturedOriginalRelation;
             campaign = Campaign.Current;
             settlement = target;
+            captureFailureDetail = null;
             return Result(true, "captured");
         }
-        catch
+        catch (Exception exception)
         {
             if (!createdBesieger) throw;
+            captureFailureDetail += ": " + exception.GetType().FullName + ": " + exception.Message;
             return CaptureFailure("created_besieger_capture_exception");
         }
     }
@@ -447,11 +456,13 @@ internal sealed class DefenderSiegeContextFixture : IDefenderSiegeContextFixture
         out MobileParty candidate,
         out Hero fixtureHero,
         out Clan fixtureClan,
-        out bool cleanupFailed)
+        out bool cleanupFailed,
+        out string failureDetail)
     {
         candidate = null;
         fixtureHero = null;
         cleanupFailed = false;
+        failureDetail = "no_eligible_hostile_clan";
         fixtureClan = Clan.All
             .Where(clan => clan != null && clan != Clan.PlayerClan && clan.Leader?.CharacterObject != null &&
                 clan.DefaultPartyTemplate != null && clan.MapFaction != null && target.MapFaction != null &&
@@ -464,12 +475,17 @@ internal sealed class DefenderSiegeContextFixture : IDefenderSiegeContextFixture
         MobileParty fixtureParty = null;
         try
         {
+            failureDetail = "create_fixture_hero";
             fixtureHero = HeroCreator.CreateSpecialHero(fixtureClan.Leader.CharacterObject, target, age: 30);
+            failureDetail = "configure_fixture_hero";
             var fixtureName = new TextObject("Defender context fixture besieger");
             fixtureHero.SetName(fixtureName, fixtureName);
             fixtureHero.SetNewOccupation(Occupation.Wanderer);
+            failureDetail = "attach_fixture_companion";
             AddCompanionAction.Apply(fixtureClan, fixtureHero);
+            failureDetail = "fixture_companion_clan_mismatch";
             if (!ReferenceEquals(fixtureHero.CompanionOf, fixtureClan)) return false;
+            failureDetail = "create_fixture_party";
             fixtureParty = LordPartyComponent.CreateLordParty(
                 "defender_context_fixture_" + Guid.NewGuid().ToString("N"),
                 fixtureHero,
@@ -477,12 +493,36 @@ internal sealed class DefenderSiegeContextFixture : IDefenderSiegeContextFixture
                 2f,
                 null,
                 fixtureHero);
-            if (!IsRestorableBesieger(fixtureParty, target, defenders)) return false;
+            failureDetail = "created_party_not_restorable";
+            if (!IsRestorableBesieger(fixtureParty, target, defenders))
+            {
+                failureDetail += ": " + JsonConvert.SerializeObject(new
+                {
+                    active = fixtureParty?.IsActive,
+                    player = fixtureParty?.IsPlayerParty(),
+                    leader = fixtureParty?.LeaderHero != null,
+                    settlement = fixtureParty?.CurrentSettlement != null,
+                    mapEvent = fixtureParty?.MapEvent != null,
+                    siege = fixtureParty?.BesiegerCamp != null,
+                    army = fixtureParty?.Army != null,
+                    attached = fixtureParty?.AttachedTo != null,
+                    attachedCount = fixtureParty?.AttachedParties.Count,
+                    land = fixtureParty?.Position.IsOnLand,
+                    sea = fixtureParty?.IsCurrentlyAtSea,
+                    transition = fixtureParty?.IsTransitionInProgress,
+                    hostileToCastle = fixtureParty?.MapFaction?.IsAtWarWith(target.MapFaction),
+                    hostileToDefenders = defenders.Select(defender =>
+                        fixtureParty?.MapFaction?.IsAtWarWith(defender.MapFaction)).ToArray()
+                });
+                return false;
+            }
+            failureDetail = null;
             candidate = fixtureParty;
             return true;
         }
-        catch (Exception)
+        catch (Exception exception)
         {
+            failureDetail += ": " + exception.GetType().FullName + ": " + exception.Message;
             return false;
         }
         finally
@@ -568,7 +608,7 @@ internal sealed class DefenderSiegeContextFixture : IDefenderSiegeContextFixture
         {
             success, status, settlementId = SettlementId, besiegerPartyId = partyId,
             startAttempted, missionExitRequested, restored, captured = campaign != null,
-            originalRelation, stagedRelation
+            originalRelation, stagedRelation, captureFailureDetail
         }), success ? null : "defender_context_failed");
 
     public sealed class CaptureCoopCommand : ICoopCommand
