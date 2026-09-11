@@ -1,7 +1,6 @@
 ﻿using HarmonyLib;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.CampaignBehaviors;
-using TaleWorlds.CampaignSystem.Party;
 
 namespace GameInterface.Services.Clans.Patches;
 
@@ -43,6 +42,36 @@ internal class CoopClanDialoguePatches
     public static void CanPlayerBuyWorkshopClickableConditionPostfix(ref bool __result)
         => CheckCanManageClan(ref __result);
 
+    [HarmonyPatch(typeof(LordConversationsCampaignBehavior), nameof(LordConversationsCampaignBehavior.conversation_player_want_to_join_faction_as_mercenary_or_vassal_on_condition))]
+    [HarmonyPostfix]
+    public static void JoinKingdomConditionPostfix(ref bool __result)
+        => CheckCanManageClan(ref __result);
+
+    [HarmonyPatch(typeof(LordConversationsCampaignBehavior), nameof(LordConversationsCampaignBehavior.conversation_player_is_offering_vassalage_while_at_mercenary_service_on_condition))]
+    [HarmonyPostfix]
+    public static void BecomeVassalConditionPostfix(ref bool __result)
+        => CheckCanManageClan(ref __result);
+
+    [HarmonyPatch(typeof(LordConversationsCampaignBehavior), nameof(LordConversationsCampaignBehavior.conversation_player_is_leaving_faction_on_condition))]
+    [HarmonyPostfix]
+    public static void LeaveKingdomConditionPostfix(ref bool __result)
+        => CheckCanManageClan(ref __result);
+
+    [HarmonyPatch(typeof(LordConversationsCampaignBehavior), nameof(LordConversationsCampaignBehavior.conversation_player_want_to_end_service_as_mercenary_on_condition))]
+    [HarmonyPostfix]
+    public static void EndMercenaryServiceConditionPostfix(ref bool __result)
+        => CheckCanManageClan(ref __result);
+
+    [HarmonyPatch(typeof(LordConversationsCampaignBehavior), nameof(LordConversationsCampaignBehavior.conversation_lord_request_mission_ask_on_condition))]
+    [HarmonyPostfix]
+    public static void MercenaryOfferConditionPostfix(ref bool __result)
+        => CheckCanManageClan(ref __result);
+
+    [HarmonyPatch(typeof(GovernorCampaignBehavior), nameof(GovernorCampaignBehavior.governor_talk_kingdom_creation_start_on_condition))]
+    [HarmonyPostfix]
+    public static void CreateKingdomConditionPostfix(ref bool __result)
+        => CheckCanManageClan(ref __result);
+
     private static void CheckCanManageClan(ref bool __result)
     {
         if (!CoopClanPermissions.CanManageClan(Hero.MainHero.Clan))
@@ -53,7 +82,7 @@ internal class CoopClanDialoguePatches
 
     private static void CheckCanManageParty(ref bool __result)
     {
-        if (!CoopClanPermissions.CanManageParty(MobileParty.ConversationParty))
+        if (!CoopClanPermissions.CanManageParty(Hero.OneToOneConversationHero?.PartyBelongedTo))
         {
             __result = false;
         }

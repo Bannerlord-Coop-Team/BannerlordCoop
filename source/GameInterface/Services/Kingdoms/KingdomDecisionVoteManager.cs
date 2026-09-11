@@ -1529,6 +1529,7 @@ namespace GameInterface.Services.Kingdoms
         private bool IsLocalPlayerEligible(KingdomDecision decision)
         {
             if (decision == null || Clan.PlayerClan == null) return false;
+            if (Hero.MainHero != Clan.PlayerClan.Leader) return false;
             if (Clan.PlayerClan.Kingdom != decision.Kingdom) return false;
 
             if (DecisionStates.TryGetValue(decision, out KingdomDecisionVoteState state) && state.HasRoundSnapshot)
