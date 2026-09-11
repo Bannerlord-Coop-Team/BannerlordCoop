@@ -11,6 +11,7 @@ using Missions.Messages;
 using System;
 using System.Collections.Generic;
 using System.Reflection;
+using System.Reflection.Emit;
 using System.Runtime.Serialization;
 using TaleWorlds.MountAndBlade;
 using Xunit;
@@ -262,7 +263,6 @@ public class SiegeMachineSimulationTests : IDisposable
         var gate = Uninitialized<CastleGate>();
         var pull = Uninitialized<StandingPoint>();
         ramMovePoint = Uninitialized<StandingPoint>();
-        ramScene = Uninitialized<Scene>();
         ramMovementArrived = false;
         ramStrikeReads = 0;
         ramDisabledNavMesh = 0;
@@ -272,24 +272,22 @@ public class SiegeMachineSimulationTests : IDisposable
         AccessTools.Property(typeof(BatteringRam), nameof(BatteringRam.MovementComponent)).SetValue(ram, movement);
         AccessTools.Field(typeof(BatteringRam), "_gate").SetValue(ram, gate);
         ram.DisabledNavMeshID = 8;
-        var patchType = typeof(BattleSpawnGate).Assembly
-            .GetType("GameInterface.Services.MapEvents.Patches.SiegeMachineAuthorityPatches");
         var tick = AccessTools.DeclaredMethod(typeof(BatteringRam), "OnTick");
         Stub(AccessTools.Method(typeof(SiegeWeapon), "OnTick"), nameof(SkipScriptComponentCache));
         Stub(AccessTools.PropertyGetter(typeof(ScriptComponentBehavior), "GameEntity"), nameof(RamEntity));
         Stub(AccessTools.Method(typeof(WeakGameEntity), "IsVisibleIncludeParents"), nameof(RamVisible));
         Stub(AccessTools.Method(typeof(WeakGameEntity), "HasTag"), nameof(RamTag));
         Stub(AccessTools.PropertyGetter(typeof(WeakGameEntity), "Scene"), nameof(RamScene));
-        Stub(AccessTools.Method(typeof(Scene), "SetAbilityOfFacesWithId"), nameof(RamNavigation));
         Stub(AccessTools.PropertySetter(typeof(UsableMissionObject), "IsDeactivated"), nameof(RamPointActivation));
-        Stub(AccessTools.PropertyGetter(typeof(CastleGate), "IsDestroyed"), nameof(RamGateIntact));
+        Stub(AccessTools.PropertyGetter(typeof(UsableMachine), "IsDestroyed"), nameof(RamGateIntact));
         Stub(AccessTools.PropertyGetter(typeof(CastleGate), "IsGateOpen"), nameof(RamGateIntact));
         Stub(AccessTools.PropertyGetter(typeof(UsableMachine), "UserCountNotInStruckAction"), nameof(RamStrikeCount));
         Stub(AccessTools.PropertyGetter(typeof(SiegeWeaponMovementComponent), "HasArrivedAtTarget"), nameof(RamMovementArrived));
         Stub(AccessTools.Method(typeof(SiegeWeaponMovementComponent), "GetTotalDistanceTraveledForPathTracker"), nameof(RamDistance));
         Stub(AccessTools.Method(typeof(SiegeWeaponMovementComponent), "SetDestinationNavMeshIdState"), nameof(SkipScriptComponentCache));
         Stub(AccessTools.Method(typeof(SiegeWeaponMovementComponent), "MoveToTargetAsClient"), nameof(RamMoveToTarget));
-        harmony.Patch(tick, transpiler: new HarmonyMethod(AccessTools.Method(patchType, "RamOnTickTranspiler")));
+        harmony.Patch(tick, transpiler: new HarmonyMethod(AccessTools.Method(
+            typeof(SiegeMachineSimulationTests), nameof(RamTickWithoutNativeNavigation))));
 
         bool oldHost = SiegeMissionAuthorityGate.IsLocalAuthority;
         bool oldKnown = SiegeMissionAuthorityGate.IsAuthorityKnown;
@@ -355,7 +353,6 @@ public class SiegeMachineSimulationTests : IDisposable
             SiegeMissionAuthorityGate.IsAuthorityKnown = oldKnown;
             SiegeMissionAuthorityGate.ResetClaimedMachines();
             ramMovePoint = null;
-            ramScene = null;
             ramEntityOwner = null;
         }
     }
@@ -371,7 +368,6 @@ public class SiegeMachineSimulationTests : IDisposable
 #pragma warning restore SYSLIB0050
     private static StandingPoint ramMovePoint;
     private static ScriptComponentBehavior ramEntityOwner;
-    private static Scene ramScene;
     private static bool ramMovementArrived;
     private static int ramStrikeReads;
     private static int ramDisabledNavMesh;
@@ -388,12 +384,37 @@ public class SiegeMachineSimulationTests : IDisposable
         __result = __0 == "move" && ReferenceEquals(ramEntityOwner, ramMovePoint);
         return false;
     }
-    private static bool RamScene(ref Scene __result) { __result = ramScene; return false; }
-    private static bool RamNavigation(int __0, bool __1)
+    private static bool RamScene(ref Scene __result) { __result = null; return false; }
+    private static IEnumerable<CodeInstruction> RamTickWithoutNativeNavigation(
+        IEnumerable<CodeInstruction> instructions, ILGenerator generator)
     {
-        Assert.False(__1);
-        ramDisabledNavMesh = __0;
-        return false;
+        var patchType = typeof(BattleSpawnGate).Assembly
+            .GetType("GameInterface.Services.MapEvents.Patches.SiegeMachineAuthorityPatches");
+        var patched = (IEnumerable<CodeInstruction>)AccessTools.Method(patchType, "RamOnTickTranspiler")
+            .Invoke(null, new object[] { instructions, generator });
+        var navigation = AccessTools.Method(typeof(Scene), "SetAbilityOfFacesWithId");
+        var observer = AccessTools.Method(typeof(SiegeMachineSimulationTests), nameof(RamNavigation));
+        Assert.Equal(navigation.ReturnType, observer.ReturnType);
+        int replacements = 0;
+        foreach (var instruction in patched)
+        {
+            if (instruction.Calls(navigation))
+            {
+                // Observe the native boundary without constructing an engine-owned Scene.
+                instruction.opcode = OpCodes.Call;
+                instruction.operand = observer;
+                replacements++;
+            }
+            yield return instruction;
+        }
+        Assert.Equal(1, replacements);
+    }
+    private static int RamNavigation(Scene scene, int navMeshId, bool enabled)
+    {
+        Assert.Null(scene);
+        Assert.False(enabled);
+        ramDisabledNavMesh = navMeshId;
+        return 0;
     }
     private static bool RamPointActivation(UsableMissionObject __instance, bool __0)
     {
