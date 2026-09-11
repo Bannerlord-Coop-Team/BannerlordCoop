@@ -261,6 +261,11 @@ internal static class DefenderSiegeFixtureCommands
     [ThreadStatic]
     private static DefenderRosterFixturePlayer captivityLogPlayer;
     [ThreadStatic]
+    private static MobileParty capturedVisibilityRestoreParty;
+
+    internal static bool IsRestoringCapturedVisibility(MobileParty party) =>
+        ModInformation.IsServer && ReferenceEquals(capturedVisibilityRestoreParty, party);
+    [ThreadStatic]
     private static bool captivityLogRelease;
 #endif
 
@@ -1803,7 +1808,7 @@ internal static class DefenderSiegeFixtureCommands
         DefenderRosterFixturePlayer player,
         out string error)
     {
-        bool normallyRecaptured = MatchesNormalRecapture(player);
+        bool normallyRecaptured = MatchesNormalRecapture(player, allowVisibilityRestore: true);
         bool behaviorRestorable = normallyRecaptured &&
             fixture.BehaviorSnapshot.CanApply(player.Party, player.OriginalBehavior);
         bool attackProtectionsCurrent = normallyRecaptured &&
@@ -1939,16 +1944,12 @@ internal static class DefenderSiegeFixtureCommands
 
             if (!HasCurrentRosterRegistryIdentities(fixture, out error))
                 return false;
-            if (!RestoreCapturedPartyVisibility(player, out error) &&
-                !IsRecapturedSnapshotReplaySafe(fixture, player, out _))
-            {
-                return false;
-            }
-
             if (!IsRecapturedSnapshotReplaySafe(fixture, player, out error))
                 return false;
         }
 
+        if (!RestoreCapturedPartyVisibility(player, out error))
+            return false;
         if (!TryRestoreRecapturedPartySnapshot(fixture, player, out error))
             return false;
         return HasCurrentRosterRegistryIdentities(fixture, out error);
@@ -2038,6 +2039,8 @@ internal static class DefenderSiegeFixtureCommands
     private static bool RestoreCapturedPartyVisibility(DefenderRosterFixturePlayer player, out string error)
     {
         error = null;
+        MobileParty previousParty = capturedVisibilityRestoreParty;
+        capturedVisibilityRestoreParty = player.Party;
         try
         {
             player.Party.IsVisible = player.OriginalIsVisible;
@@ -2048,6 +2051,10 @@ internal static class DefenderSiegeFixtureCommands
                 player.ControllerId + ": " + exception.GetType().Name + ": " + exception.Message;
             return false;
         }
+        finally
+        {
+            capturedVisibilityRestoreParty = previousParty;
+        }
 
         if (player.Party.IsVisible == player.OriginalIsVisible)
             return true;
@@ -2057,7 +2064,7 @@ internal static class DefenderSiegeFixtureCommands
         return false;
     }
 
-    private static bool MatchesNormalRecapture(DefenderRosterFixturePlayer player) =>
+    private static bool MatchesNormalRecapture(DefenderRosterFixturePlayer player, bool allowVisibilityRestore = false) =>
         TryGetCaptorHeroPrisonerElement(player.CaptorParty, player.Hero, out TroopRosterElement captorHeroElement) &&
         DefenderRosterFixtureContract.IsCaptiveBaselineRestorable(
             player.Hero.IsPrisoner,
@@ -2069,7 +2076,7 @@ internal static class DefenderSiegeFixtureCommands
             captorHeroElement.WoundedNumber,
             captorHeroElement.Xp,
             player.Party.IsActive,
-            player.Party.IsVisible,
+            player.Party.IsVisible || (allowVisibilityRestore && player.OriginalIsVisible),
             player.Party.Party.GetPartyVisual() != null,
             player.Party.LeaderHero != null,
             player.Party.MemberRoster.GetTroopCount(player.Hero.CharacterObject),

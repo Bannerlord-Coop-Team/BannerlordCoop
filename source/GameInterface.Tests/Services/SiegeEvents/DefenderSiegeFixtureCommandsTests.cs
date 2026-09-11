@@ -459,6 +459,58 @@ public sealed class DefenderSiegeFixtureCommandsTests : IDisposable
         }, actionCalls);
     }
 
+    [Theory]
+    [InlineData(false, false)]
+    [InlineData(true, false)]
+    [InlineData(false, true)]
+    public void PreparedCaptiveBaseline_RestoresCapturedVisibilityWithServerPolicy(bool failSnapshot, bool throwAfterRecapture)
+    {
+        visualManager = null;
+        PrepareReadinessObservation();
+        Captive target = captives[0];
+        object[] before = captives.Select(ReadState).ToArray();
+        harmony.Patch(AccessTools.PropertySetter(typeof(MobileParty), nameof(MobileParty.IsVisible)),
+            prefix: new HarmonyMethod(typeof(global::GameInterface.Services.MobileParties.Patches.PartyVisibilityOnServerPatch),
+                "PrefixIsVisible"));
+        AssertSuccess(PrepareCaptiveBaseline());
+        Assert.True(target.Party.IsVisible);
+        Capture();
+        Normalize();
+        afterRecapture = _ =>
+        {
+            target.Party.IsVisible = true;
+            Assert.False(target.Party.IsVisible);
+            if (throwAfterRecapture) throw new InvalidOperationException("recapture callback failed");
+        };
+        failNextSnapshotApply = failSnapshot;
+        if (failSnapshot || throwAfterRecapture)
+        {
+            JObject partial = Restore();
+            Assert.False((bool)partial["success"]);
+            Assert.False((bool)partial["normalizationUnsafe"]);
+            Assert.True(target.Hero.IsPrisoner);
+            Assert.False(target.Party.IsActive);
+        }
+        AssertSuccess(Restore());
+        Assert.True(target.Hero.IsPrisoner);
+        Assert.False(target.Party.IsActive);
+        Assert.True(target.Party.IsVisible);
+        Assert.Equal(1, captives[1].Party.PrisonRoster.GetTroopCount(target.Hero.CharacterObject));
+        AssertSuccess(Restore());
+        AssertSuccess(Verify());
+        AssertSuccess(RestoreCaptiveBaseline());
+        AssertSuccess(RestoreCaptiveBaseline());
+        AssertSuccess(VerifyCaptiveBaseline());
+        Assert.Equal(before, captives.Select(ReadState).ToArray());
+        Assert.Equal(0, captives[1].Party.PrisonRoster.TotalManCount);
+        AssertNoAttackProtection(captives[1].Party, target.Party);
+        Assert.Equal(new[] { "recapture:hero_testclient", "release:hero_testclient",
+            "recapture:hero_testclient", "release:hero_testclient" }, actionCalls);
+        target.Party.IsActive = false;
+        target.Party.IsVisible = true;
+        Assert.False(target.Party.IsVisible);
+    }
+
     [Fact]
     public void PreparedCaptiveBaseline_RestoreRetriesAfterRecaptureSnapshotFailure()
     {
