@@ -48,6 +48,8 @@ internal readonly struct CompleteTrade : ICommand
     public readonly (ItemRosterElementData, int)[] BoughtItems;
     [ProtoMember(19)]
     public readonly (ItemRosterElementData, int)[] SoldItems;
+    [ProtoMember(20)]
+    public readonly string ForceTransferId;
 
     public CompleteTrade(
         string fromItemRosterId,
@@ -68,7 +70,8 @@ internal readonly struct CompleteTrade : ICommand
         bool isSettlementComponentNull,
         string currentSettlementComponentId,
         (ItemRosterElementData, int)[] boughtItems,
-        (ItemRosterElementData, int)[] soldItems)
+        (ItemRosterElementData, int)[] soldItems,
+        string forceTransferId = null)
     {
         FromItemRosterId = fromItemRosterId;
         IsFromItemRosterNull = isFromItemRosterNull;
@@ -89,5 +92,6 @@ internal readonly struct CompleteTrade : ICommand
         CurrentSettlementComponentId = currentSettlementComponentId;
         BoughtItems = boughtItems;
         SoldItems = soldItems;
+        ForceTransferId = forceTransferId;
     }
 }

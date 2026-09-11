@@ -3,10 +3,12 @@ using Common.Logging;
 using Common.Messaging;
 using Common.Network;
 using Common.Util;
+using GameInterface.Services.GameDebug.Messages;
 using GameInterface.Services.Inventory.Data;
 using GameInterface.Services.Inventory.Interfaces;
 using GameInterface.Services.Inventory.Messages;
 using GameInterface.Services.ObjectManager;
+using GameInterface.Services.Villages.Interfaces;
 using GameInterface.Services.Workshops.Messages;
 using HarmonyLib;
 using Helpers;
@@ -30,17 +32,20 @@ internal class TradeHandler : IHandler
     private readonly IMessageBroker messageBroker;
     private readonly IObjectManager objectManager;
     private readonly INetwork network;
+    private readonly IVillageHostileActionInterface villageHostileActionInterface;
 
     public TradeHandler(
         IInventoryLogicInterface inventoryLogicInterface,
         IMessageBroker messageBroker,
         IObjectManager objectManager,
-        INetwork network)
+        INetwork network,
+        IVillageHostileActionInterface villageHostileActionInterface)
     {
         this.inventoryLogicInterface = inventoryLogicInterface;
         this.messageBroker = messageBroker;
         this.objectManager = objectManager;
         this.network = network;
+        this.villageHostileActionInterface = villageHostileActionInterface;
 
         messageBroker.Subscribe<TradeAttempted>(Handle_TradeAttempted);
         messageBroker.Subscribe<CompleteTrade>(Handle_CompleteTrade);
@@ -108,7 +113,8 @@ internal class TradeHandler : IHandler
             currentSettlementComponentId is null,
             currentSettlementComponentId,
             boughtItems,
-            soldItems
+            soldItems,
+            what.ForceTransferId
         );
 
         network.SendAll(message);
@@ -139,6 +145,24 @@ internal class TradeHandler : IHandler
             var boughtItems = ResolveTradeItems(message.BoughtItems);
             var soldItems = ResolveTradeItems(message.SoldItems);
             ResolveCharacterEquipmentsData(message.CharacterIdEquipmentsData, out var characterEquipmentsData);
+
+            if (ModInformation.IsServer && !message.IsTrading)
+            {
+                if (message.ForceTransferId != null)
+                {
+                    if (!TryValidateForceTransfer(message, peer))
+                        return;
+                }
+                else if (villageHostileActionInterface.HasPendingForceTransferForParty(message.OwnerPartyId))
+                {
+                    // Attribution missed (see ForceTransferScreenTracker): the cap cannot
+                    // be enforced on this commit. Logged so live runs prove attribution
+                    // works; still applied under the trusted-client model.
+                    logger.Warning(
+                        "ForceTransfer loot commit without attribution while a pool is pending (Party={PartyId})",
+                        message.OwnerPartyId);
+                }
+            }
 
             var fromItemRosterData = message.FromItemRosterData;
             var toItemRosterData = message.ToItemRosterData;
@@ -180,8 +204,98 @@ internal class TradeHandler : IHandler
         });
     }
 
-    private void Handle_UpdateEquipmentClients(MessagePayload<UpdateEquipmentClients> obj)
+    private bool TryValidateForceTransfer(CompleteTrade message, NetPeer peer)
     {
+        if (!TryResolveLeftRemainder(message.FromItemRosterData, out var leftRemainder, out var remainderError))
+        {
+            logger.Warning(
+                "Rejected force supplies transfer with unverifiable left roster (Party={PartyId}, Request={RequestId}, Reason={Reason})",
+                message.OwnerPartyId,
+                message.ForceTransferId,
+                remainderError);
+        }
+        else if (!villageHostileActionInterface.TryPeekForceTransfer(message.ForceTransferId, message.OwnerPartyId, out var pool))
+        {
+            logger.Warning(
+                "Rejected force supplies transfer with stale or consumed pool (Party={PartyId}, Request={RequestId})",
+                message.OwnerPartyId,
+                message.ForceTransferId);
+        }
+        else if (!VillageHostileActionInterface.TryValidateSuppliesTakeAndRemainder(pool.SuppliesItems, message.BoughtItems, leftRemainder, out var error))
+        {
+            // The pool is deliberately left intact: a rejection must not mutate
+            // pool state, so a false positive never destroys the reward.
+            logger.Warning(
+                "Rejected force supplies transfer exceeding the authorized pool (Party={PartyId}, Request={RequestId}, Reason={Reason})",
+                message.OwnerPartyId,
+                message.ForceTransferId,
+                error);
+        }
+        else if (!villageHostileActionInterface.TryConsumeForceTransfer(message.ForceTransferId, message.OwnerPartyId, out _))
+        {
+            logger.Warning(
+                "Rejected force supplies transfer with stale or consumed pool (Party={PartyId}, Request={RequestId})",
+                message.OwnerPartyId,
+                message.ForceTransferId);
+        }
+        else
+        {
+            logger.Information(
+                "ForceTransfer supplies commit accepted (Party={PartyId}, Request={RequestId})",
+                message.OwnerPartyId,
+                message.ForceTransferId);
+            return true;
+        }
+
+        if (peer != null)
+            network.Send(peer, new SendInformationMessage("The village has nothing left to give."));
+        return false;
+    }
+
+    internal bool TryResolveLeftRemainder(ItemRosterElement[] leftRosterData, out List<(string itemId, string modifierId, int amount)> remainder, out string error)
+    {
+        remainder = new List<(string itemId, string modifierId, int amount)>();
+        error = null;
+        if (leftRosterData == null)
+            return true;
+
+        for (var i = 0; i < leftRosterData.Length; i++)
+        {
+            var element = leftRosterData[i];
+            var item = element.EquipmentElement.Item;
+            if (item == null && element.Amount == 0)
+            {
+                // Vanilla leaves empty tombstone slots behind when a kind is fully
+                // taken. They carry no outflow, so they are skipped, not rejected.
+                // A null item with any other amount is corrupt and rejected below.
+                continue;
+            }
+            if (!objectManager.TryGetId(item, out var itemId))
+            {
+                // Either a corrupt slot (null item, positive amount) or a real item
+                // the server cannot resolve.
+                error = $"left remainder element [{i}/{leftRosterData.Length}] without registry id " +
+                    $"(Amount={element.Amount}, ItemNull={item == null}, StringId={item?.StringId ?? "<null>"})";
+                return false;
+            }
+
+            string modifierId = null;
+            var modifier = element.EquipmentElement.ItemModifier;
+            if (modifier != null &&
+                !objectManager.TryGetId(modifier, out modifierId))
+            {
+                error = $"left remainder element [{i}/{leftRosterData.Length}] modifier without registry id " +
+                    $"(Amount={element.Amount}, StringId={modifier?.StringId ?? "<null>"})";
+                return false;
+            }
+
+            remainder.Add((itemId, modifierId, element.Amount));
+        }
+
+        return true;
+    }
+
+    private void Handle_UpdateEquipmentClients(MessagePayload<UpdateEquipmentClients> obj)    {
         GameThread.RunSafe(() =>
         {
             using (new AllowedThread())

@@ -78,6 +78,9 @@ internal readonly struct NetworkCompleteDoneLogic : ICommand
     [ProtoMember(22)]
     public readonly FlattenedTroop[] DonatedPrisonersRoster;
 
+    [ProtoMember(23)]
+    public readonly string ForceTransferId;
+
     public NetworkCompleteDoneLogic(
         string mainHeroId,
         FlattenedTroop[] releasedPrisonersRoster,
@@ -100,7 +103,8 @@ internal readonly struct NetworkCompleteDoneLogic : ICommand
         TroopRosterOrderData rightMemberOrderData,
         bool applyReleasedAndTakenPrisonerActions = false,
         string donationSettlementId = null,
-        FlattenedTroop[] donatedPrisonersRoster = null)
+        FlattenedTroop[] donatedPrisonersRoster = null,
+        string forceTransferId = null)
     {
         MainHeroId = mainHeroId;
         ReleasedPrisonersRoster = releasedPrisonersRoster;
@@ -124,5 +128,6 @@ internal readonly struct NetworkCompleteDoneLogic : ICommand
         ApplyReleasedAndTakenPrisonerActions = applyReleasedAndTakenPrisonerActions;
         DonationSettlementId = donationSettlementId;
         DonatedPrisonersRoster = donatedPrisonersRoster;
+        ForceTransferId = forceTransferId;
     }
 }
