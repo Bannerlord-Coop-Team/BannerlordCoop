@@ -1007,14 +1007,6 @@ public class PuppetSpawner : IPuppetSpawner
 
             if (!string.Equals(data.CharacterId, returningPlayer.CharacterObjectId, StringComparison.Ordinal))
             {
-                if (currentOwnerIsLocal || originalOwnerIsLocal)
-                {
-                    RecordReturningHeroCatchUpDiagnosticError(
-                        "returning-hero-identity-mismatch",
-                        data,
-                        purpose,
-                        "catch-up-record-character-does-not-match-local-returning-hero");
-                }
                 return false;
             }
 
