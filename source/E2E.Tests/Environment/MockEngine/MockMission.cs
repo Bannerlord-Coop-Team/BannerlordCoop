@@ -1,5 +1,6 @@
 ﻿using System.Collections.Generic;
 using System.Reflection;
+using System;
 using System.Runtime.CompilerServices;
 using Common.Util;
 using SandBox.Missions.MissionLogics;
@@ -41,6 +42,9 @@ public sealed class MockMission
             SetBehaviorPresent(DeploymentController, value);
         }
     }
+    public Blow LastRegisteredBlow { get; set; }
+    public Action<Agent, Blow> RegisteredBlow { get; set; } = (_, _) => { };
+    public float ShootDifficulty { get; set; } = 7.5f;
     public DeploymentMissionController DeploymentController { get; }
         = ObjectHelper.SkipConstructor<BattleDeploymentMissionController>();
     private bool locationPopulationBoundaryEnabled;
@@ -83,7 +87,20 @@ public sealed class MockMission
 
     public IReadOnlyCollection<Agent> Agents => agentsByIndex.Values;
 
-    public void RegisterMissile(int index) => missiles.Add(index);
+    public void RegisterMissile(int index, Agent shooter, MissionWeapon weapon)
+    {
+        Shell._missilesDictionary ??= new Dictionary<int, Mission.Missile>();
+        Shell._missilesDictionary[index] =
+            new Mission.Missile(Shell, index, null, shooter, weapon, null);
+        missiles.Add(index);
+    }
+
+    public void RemoveMissile(int index)
+    {
+        Shell._missilesDictionary?.Remove(index);
+        missiles.Remove(index);
+    }
+
     public bool HasMissile(int index) => missiles.Contains(index);
 
     public MockMission()

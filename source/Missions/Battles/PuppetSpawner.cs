@@ -753,6 +753,16 @@ public class PuppetSpawner : IPuppetSpawner
         // player's party on the game thread, while leaving NPC parties from the old host available to migrate.
         GameThread.RunSafe(() =>
         {
+            var withdrawnHandoffs = new List<Guid>();
+            foreach (var pair in playerHandoffs)
+                if (pair.Value.ReturningControllerId == controllerId)
+                    withdrawnHandoffs.Add(pair.Key);
+            foreach (var agentId in withdrawnHandoffs)
+            {
+                playerHandoffs.Remove(agentId);
+                appliedPlayerHandoffs.Remove(agentId);
+            }
+
             var retainedAgentIds = new List<Guid>();
             lock (pendingPuppetLock)
             {

@@ -111,6 +111,85 @@ public class RetainedPlayerHeroRecoveryTests : MissionTestEnvironment
         });
     }
     [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void DisconnectedReturnerDoesNotBlockNewHostSnapshot(bool hostMigrates)
+    {
+        using var fixture = new MissionEngineFixture();
+        var (battleId, partyIds) = SetupCoopBattle("observer", "returner");
+        var observer = Clients.First();
+        observer.Call(() =>
+        {
+            var mission = fixture.CreateMission(observer);
+            mission.DeploymentInProgress = true;
+            var players = observer.Resolve<IPlayerManager>();
+            Assert.True(players.TryGetPlayer("returner", out var player));
+            Assert.True(observer.ObjectManager.TryGetObject<Hero>(player.HeroId, out var hero));
+            Assert.True(observer.ObjectManager.TryGetId(hero.CharacterObject, out var characterId));
+            players.RemovePlayer(player);
+            Assert.True(players.AddPlayer(new Player("returner", player.HeroId, partyIds[1], player.ClanId, characterId)));
+            Assert.True(observer.ObjectManager.TryGetObject<MobileParty>(partyIds[1], out var party));
+            var eventParty = party.MapEvent.DefenderSide.Parties.Single(value => value.Party == party.Party);
+            Assert.True(observer.ObjectManager.TryGetId(eventParty, out var eventPartyId));
+            var controller = observer.Resolve<CoopBattleController>();
+            Assert.True(controller.Session.TryBegin(battleId));
+            observer.Resolve<IBattleHostRegistry>().Set(battleId,
+                new BattleHostAssignment("holder", new[] { "observer", "returner" }, 1));
+            AccessTools.Field(typeof(Mission), "<MissionBehaviors>k__BackingField").SetValue(mission.Shell,
+                new List<MissionBehavior> { controller, mission.DeploymentController });
+            var spawner = (IPuppetSpawner)AccessTools.Field(typeof(CoopBattleController), "puppetSpawner")
+                .GetValue(controller);
+            var migrator = (IBattleAuthorityMigrator)AccessTools.Field(typeof(CoopBattleController), "authorityMigrator")
+                .GetValue(controller);
+            var broker = observer.Resolve<IMessageBroker>();
+            broker.Publish(this, new NetworkMissionPeerEntered("holder", battleId));
+            broker.Publish(this, new NetworkMissionPeerEntered("returner", battleId));
+            var previous = new BattleAgentSpawnData(Guid.NewGuid(), characterId, default, BattleSideEnum.Defender,
+                22, "holder", eventPartyId, 1141, new Equipment(), default, null, movementId: 7,
+                originalOwnerControllerId: "returner", movementScopeId: "returner:first-mission", authorityRevision: 1);
+            var grant = new NetworkRetainedPlayerHero(battleId, 1, "returner", previous);
+            Assert.True(migrator.IsCurrentPlayerHandoff(grant));
+            broker.Publish(this, grant);
+            spawner.DrainPendingPuppets();
+            Assert.Empty(mission.Agents);
+
+            broker.Publish(this, new MissionPeerDisconnected("returner", battleId));
+            Assert.False(migrator.IsPlayerHandoffIdentityValid(grant));
+            if (hostMigrates)
+            {
+                broker.Publish(this, new MissionPeerDisconnected("holder", battleId));
+                broker.Publish(this, new NetworkBattleHostAssigned(battleId, "successor", new[] { "observer" }, 2));
+            }
+            broker.Publish(this, grant);
+            var hostSnapshot = new BattleAgentSpawnData(previous.AgentId, characterId, default, BattleSideEnum.Defender,
+                17, "holder", eventPartyId, 1141, new Equipment(), default, null, movementId: 7,
+                originalOwnerControllerId: "returner", movementScopeId: "returner:first-mission", authorityRevision: 3);
+            broker.Publish(this, new NetworkSpawnBattleAgents(new[] { hostSnapshot }));
+            spawner.DrainPendingPuppets();
+            Assert.Empty(mission.Agents);
+            mission.DeploymentController.TeamSetupOver = true;
+            spawner.DrainPendingPuppets();
+
+            var registry = observer.Resolve<INetworkAgentRegistry>();
+            Assert.True(registry.TryGetAgentInfo(previous.AgentId, out var info));
+            Assert.Single(mission.Agents);
+            Assert.Equal(hostMigrates ? "successor" : "holder", info.CurrentAuthority);
+            Assert.Equal(hostMigrates ? 4 : 3, info.AuthorityRevision);
+            Assert.Equal("returner", info.OriginalOwner);
+            Assert.Equal("returner:first-mission", info.MovementScopeId);
+            Assert.Equal(7, info.MovementId);
+            Assert.Equal(17, info.Agent.Health);
+            Assert.False(controller.Deployment.IsCommitted);
+            broker.Publish(this, new NetworkSpawnBattleAgents(new[] { hostSnapshot }));
+            spawner.DrainPendingPuppets();
+            Assert.Single(mission.Agents);
+            Assert.True(registry.TryGetAgentInfo(previous.AgentId, out var duplicate));
+            Assert.Same(info.Agent, duplicate.Agent);
+            Assert.Equal(hostMigrates ? 4 : 3, duplicate.AuthorityRevision);
+        });
+    }
+
+    [Theory]
     [InlineData(true, true)]
     [InlineData(true, false)]
     [InlineData(false, true)]
