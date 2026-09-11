@@ -25,8 +25,43 @@ public interface IWeaponDropHandler : IHandler
     void CatchUpJoiner(string controllerId);
     void ConfigureLocalHostProvider(Func<bool> provider);
     bool IsWorldItemIdentityPending(SpawnedItemEntity item);
+#if DEBUG
+    WeaponDropWorldItemDebugState CaptureDebugWorldItemState(Guid worldItemId);
+#endif
     void Tick(float dt);
 }
+
+#if DEBUG
+/// <summary>Copies target world-item lifecycle state for the bounded baseline observation.</summary>
+public sealed class WeaponDropWorldItemDebugState
+{
+    public string WorldItemId { get; set; }
+    public bool ActiveDropPresent { get; set; }
+    public bool ActiveDropIsCatchUp { get; set; }
+    public bool HasLifeTime { get; set; }
+    public bool RemainingLifeTimeKnown { get; set; }
+    public float RemainingLifeTime { get; set; }
+    public bool Expired { get; set; }
+    public bool Retired { get; set; }
+    public bool Consumed { get; set; }
+    public bool RegistryContainsWorldItem { get; set; }
+    public bool RegistryItemPresent { get; set; }
+    public string FirstRemovalReason { get; set; }
+    public DateTime? FirstRemovalUtc { get; set; }
+}
+
+internal sealed class WeaponDropWorldItemRemovalDebugState
+{
+    public string Reason { get; }
+    public DateTime RecordedAtUtc { get; }
+
+    public WeaponDropWorldItemRemovalDebugState(string reason)
+    {
+        Reason = reason;
+        RecordedAtUtc = DateTime.UtcNow;
+    }
+}
+#endif
 
 /// <inheritdoc cref="IWeaponDropHandler"/>
 public class WeaponDropHandler : IWeaponDropHandler
@@ -136,6 +171,11 @@ public class WeaponDropHandler : IWeaponDropHandler
     private readonly HashSet<Guid> consumedWorldItemIds = new HashSet<Guid>();
     private readonly HashSet<Guid> retiredWorldItemIds = new HashSet<Guid>();
     private readonly Queue<Guid> retiredWorldItemOrder = new Queue<Guid>();
+#if DEBUG
+    private readonly Dictionary<Guid, WeaponDropWorldItemRemovalDebugState> debugWorldItemRemovals =
+        new Dictionary<Guid, WeaponDropWorldItemRemovalDebugState>();
+    private readonly Queue<Guid> debugWorldItemRemovalOrder = new Queue<Guid>();
+#endif
     private readonly Dictionary<Guid, WorldItemTransitionState> worldItemTransitionStates =
         new Dictionary<Guid, WorldItemTransitionState>();
     private readonly Queue<Guid> preDropStateOrder = new Queue<Guid>();
@@ -224,6 +264,10 @@ public class WeaponDropHandler : IWeaponDropHandler
         consumedWorldItemIds.Clear();
         retiredWorldItemIds.Clear();
         retiredWorldItemOrder.Clear();
+#if DEBUG
+        debugWorldItemRemovals.Clear();
+        debugWorldItemRemovalOrder.Clear();
+#endif
         worldItemTransitionStates.Clear();
         preDropStateOrder.Clear();
         liveDropAppliedWorldItemIds.Clear();
@@ -256,6 +300,45 @@ public class WeaponDropHandler : IWeaponDropHandler
         return pendingDrops.Values.Any(queue =>
             queue.Any(observed => ReferenceEquals(observed.Item, item)));
     }
+
+#if DEBUG
+    public WeaponDropWorldItemDebugState CaptureDebugWorldItemState(Guid worldItemId)
+    {
+        var state = new WeaponDropWorldItemDebugState
+        {
+            WorldItemId = worldItemId.ToString("D"),
+            Retired = retiredWorldItemIds.Contains(worldItemId),
+            Consumed = consumedWorldItemIds.Contains(worldItemId),
+            Expired = IsActiveDropExpired(worldItemId),
+        };
+        if (activeDrops.TryGetValue(worldItemId, out NetworkWeaponDropped drop))
+        {
+            state.ActiveDropPresent = true;
+            state.ActiveDropIsCatchUp = drop.IsCatchUp;
+            state.HasLifeTime = drop.HasLifeTime;
+            state.RemainingLifeTime = drop.RemainingLifeTime;
+            if (drop.HasLifeTime &&
+                activeDropRemainingLifeTime.TryGetValue(worldItemId, out float remainingLifeTime))
+            {
+                state.RemainingLifeTimeKnown = true;
+                state.RemainingLifeTime = remainingLifeTime;
+            }
+        }
+        if (worldItemRegistry.TryGet(worldItemId, out SpawnedItemEntity item))
+        {
+            state.RegistryContainsWorldItem = true;
+            state.RegistryItemPresent = worldItemSpawner.IsPresent(item);
+        }
+        if (debugWorldItemRemovals.TryGetValue(
+                worldItemId,
+                out WeaponDropWorldItemRemovalDebugState removal))
+        {
+            state.FirstRemovalReason = removal.Reason;
+            state.FirstRemovalUtc = removal.RecordedAtUtc;
+        }
+        return state;
+    }
+#endif
 
     public void Tick(float dt)
     {
@@ -434,7 +517,7 @@ public class WeaponDropHandler : IWeaponDropHandler
         if (pickedup.WorldItemConsumed)
         {
             GameThread.EnqueueSafe(
-                () => RetireWorldItem(worldItemId),
+                () => RetireWorldItem(worldItemId, removalReason: "pickup-consumed"),
                 context: nameof(HandleWeaponPickedup));
         }
         else
@@ -458,7 +541,7 @@ public class WeaponDropHandler : IWeaponDropHandler
                 applied.SlotTransitionApplied);
 
             if (applied.WorldItemConsumed)
-                RetireWorldItem(applied.WorldItemId);
+                RetireWorldItem(applied.WorldItemId, removalReason: "pickup-applied-consumed");
             else
             {
                 if (worldItemRegistry.TryGet(
@@ -858,7 +941,7 @@ public class WeaponDropHandler : IWeaponDropHandler
                         ApplyCurrentEquipment(message, agentInfo);
                     TrackAppliedDropId(message.DropId);
                     MarkLiveDropApplied(message.WorldItemId);
-                    RetireWorldItem(message.WorldItemId);
+                    RetireWorldItem(message.WorldItemId, removalReason: "observed-pickup-consumed");
                     ResolveObservedWorldItemIdentity(observedDrop, message.WorldItemId);
                     ForwardAcceptedDrop(message);
                     return;
@@ -1149,6 +1232,7 @@ public class WeaponDropHandler : IWeaponDropHandler
             blocked = true;
             return false;
         }
+        RecordDebugWorldItemRemoval(message.WorldItemId, "registered-item-replaced");
         worldItemRegistry.Remove(message.WorldItemId);
 
         Logger.Warning(
@@ -1195,7 +1279,10 @@ public class WeaponDropHandler : IWeaponDropHandler
         string reason)
     {
         if (worldItemRegistry.TryGetId(item, out Guid existingId))
+        {
+            RecordDebugWorldItemRemoval(existingId, "observed-item-removed-" + reason);
             worldItemRegistry.Remove(existingId);
+        }
         if (worldItemSpawner.TryRemove(item)) return true;
 
         Logger.Error(
@@ -1307,7 +1394,10 @@ public class WeaponDropHandler : IWeaponDropHandler
     {
         if (observed?.Item == null || !worldItemSpawner.IsPresent(observed.Item)) return;
         if (worldItemRegistry.TryGetId(observed.Item, out Guid existingId))
+        {
+            RecordDebugWorldItemRemoval(existingId, "observed-drop-discarded-" + reason);
             worldItemRegistry.Remove(existingId);
+        }
         if (worldItemSpawner.TryRemove(observed.Item)) return;
 
         Logger.Error(
@@ -1449,7 +1539,10 @@ public class WeaponDropHandler : IWeaponDropHandler
         RetryPendingResyncRequests(message.WorldItemId);
     }
 
-    private void RetireWorldItem(Guid worldItemId, bool retryPending = true)
+    private void RetireWorldItem(
+        Guid worldItemId,
+        bool retryPending = true,
+        string removalReason = "retired")
     {
         if (worldItemId == Guid.Empty) return;
 
@@ -1458,6 +1551,7 @@ public class WeaponDropHandler : IWeaponDropHandler
             out NetworkWeaponDropped drop)
                 ? drop.DropId
                 : worldItemId;
+        RecordDebugWorldItemRemoval(worldItemId, removalReason);
         TrackConsumedDropId(dropId);
         TrackConsumedWorldItemId(worldItemId);
         TrackRetiredWorldItem(worldItemId);
@@ -1483,7 +1577,7 @@ public class WeaponDropHandler : IWeaponDropHandler
             state.Revision++;
         }
 
-        RetireWorldItem(worldItemId, retryPending);
+        RetireWorldItem(worldItemId, retryPending, removalReason: "expired");
     }
 
     private void RecordWorldItemPickup(
@@ -1625,6 +1719,7 @@ public class WeaponDropHandler : IWeaponDropHandler
             return false;
         }
 
+        RecordDebugWorldItemRemoval(source.WorldItemId, "registry-unavailable-before-catch-up");
         worldItemRegistry.Remove(source.WorldItemId);
         return TryCreateStoredCatchUp(source, out message);
     }
@@ -1856,10 +1951,31 @@ public class WeaponDropHandler : IWeaponDropHandler
             consumedWorldItemIds.Add(worldItemId);
     }
 
+    private void RecordDebugWorldItemRemoval(Guid worldItemId, string reason)
+    {
+#if DEBUG
+        if (worldItemId == Guid.Empty ||
+            string.IsNullOrWhiteSpace(reason) ||
+            debugWorldItemRemovals.ContainsKey(worldItemId))
+            return;
+
+        debugWorldItemRemovals[worldItemId] =
+            new WeaponDropWorldItemRemovalDebugState(reason);
+        debugWorldItemRemovalOrder.Enqueue(worldItemId);
+        while (debugWorldItemRemovalOrder.Count > MaxRetiredWorldItemIds)
+        {
+            Guid expiredWorldItemId = debugWorldItemRemovalOrder.Dequeue();
+            debugWorldItemRemovals.Remove(expiredWorldItemId);
+        }
+#endif
+    }
+
     private void RemoveActiveWorldItemState(
         Guid worldItemId,
-        bool clearPickupTransitions = true)
+        bool clearPickupTransitions = true,
+        string removalReason = "active-state-removed")
     {
+        RecordDebugWorldItemRemoval(worldItemId, removalReason);
         activeDrops.Remove(worldItemId);
         activeDropRemainingLifeTime.Remove(worldItemId);
         if (clearPickupTransitions)
@@ -1880,7 +1996,10 @@ public class WeaponDropHandler : IWeaponDropHandler
             if (retiredWorldItemIds.Contains(pair.Key) ||
                 consumedWorldItemIds.Contains(pair.Key))
             {
-                RemoveActiveWorldItemState(pair.Key, clearPickupTransitions: false);
+                RemoveActiveWorldItemState(
+                    pair.Key,
+                    clearPickupTransitions: false,
+                    removalReason: "pruned-retired-or-consumed");
                 continue;
             }
 
@@ -1896,6 +2015,7 @@ public class WeaponDropHandler : IWeaponDropHandler
                 continue;
             }
 
+            RecordDebugWorldItemRemoval(pair.Key, "pruned-unavailable");
             worldItemRegistry.Remove(pair.Key);
         }
     }

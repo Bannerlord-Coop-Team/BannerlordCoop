@@ -5,6 +5,7 @@ using GameInterface;
 using GameInterface.Services.MapEvents.TroopSupply;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Players;
+using Missions.Agents.Handlers;
 using Missions.Agents.Messages;
 using Missions.Battles;
 using Newtonsoft.Json;
@@ -42,6 +43,9 @@ internal static class WeaponDropBaselineDebugCommands
         public bool IsRemoved { get; set; }
         public bool IsDeactivated { get; set; }
         public bool GameEntityValid { get; set; }
+        public bool HasLifeTime { get; set; }
+        public bool RemainingLifeTimeKnown { get; set; }
+        public float RemainingLifeTime { get; set; }
         public WeaponState Weapon { get; set; }
     }
 
@@ -89,6 +93,25 @@ internal static class WeaponDropBaselineDebugCommands
         public int RegisteredWorldItemCount { get; set; }
         public WorldItemState[] WorldItems { get; set; }
         public bool NativeDropInvoked { get; set; }
+    }
+
+    private sealed class WorldItemObservationState
+    {
+        public bool Success { get; set; }
+        public bool ObservationAvailable { get; set; }
+        public string[] UnavailableReasons { get; set; } = Array.Empty<string>();
+        public string ObservationUtc { get; set; }
+        public float MissionTime { get; set; }
+        public string LocalRole { get; set; }
+        public string LocalControllerId { get; set; }
+        public string BattleInstanceId { get; set; }
+        public string WorldItemId { get; set; }
+        public bool RegistryAvailable { get; set; }
+        public bool RegistryContainsWorldItem { get; set; }
+        public bool TargetItemPresent { get; set; }
+        public WorldItemState TargetItem { get; set; }
+        public WeaponDropWorldItemDebugState HandlerState { get; set; }
+        public string HandlerStateError { get; set; }
     }
 
     private sealed class ControllerRegistryState
@@ -283,6 +306,88 @@ internal static class WeaponDropBaselineDebugCommands
             }
 
             return Succeeded("LIVE_TEST_JSON=" + JsonConvert.SerializeObject(snapshot));
+        }
+    }
+
+    public sealed class WorldItemObservationCoopCommand : ICoopCommand
+    {
+        public string Prefix => "coop.debug.weapon_drop";
+
+        public string Name => "world_item_observation";
+
+        public string Description => "Reports bounded target world-item lifetime and removal state without changing it.";
+
+        public CoopCommandSide Side => CoopCommandSide.Both;
+
+        public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
+        {
+            new ExpectedArgs("world_item_id", "The registered target world item id."),
+        };
+
+        public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
+        {
+            if (!TryGetActiveBattle(out Mission mission, out CoopBattleController controller, out string error))
+                return Failed(error);
+
+            var state = new WorldItemObservationState
+            {
+                Success = true,
+                ObservationUtc = DateTime.UtcNow.ToString("O", CultureInfo.InvariantCulture),
+                MissionTime = mission.CurrentTime,
+                LocalRole = ModInformation.IsServer ? "server" : "client",
+                LocalControllerId = controller.Session.OwnControllerId,
+                BattleInstanceId = Convert.ToString(controller.Session.InstanceId, CultureInfo.InvariantCulture),
+                WorldItemId = args[0],
+            };
+            var unavailableReasons = new List<string>();
+            if (!Guid.TryParse(args[0], out Guid worldItemId))
+            {
+                unavailableReasons.Add("invalid-world-item-id");
+            }
+            else
+            {
+                if (ContainerProvider.TryResolve<INetworkWorldItemRegistry>(out var worldItemRegistry))
+                {
+                    state.RegistryAvailable = true;
+                    if (worldItemRegistry.TryGet(worldItemId, out SpawnedItemEntity item))
+                    {
+                        state.RegistryContainsWorldItem = true;
+                        IObjectManager objectManager = null;
+                        if (!ContainerProvider.TryResolve<IObjectManager>(out objectManager))
+                            unavailableReasons.Add("object-manager-unavailable");
+                        state.TargetItem = CaptureWorldItem(
+                            mission,
+                            worldItemId,
+                            item,
+                            objectManager);
+                        state.TargetItemPresent = !state.TargetItem.IsRemoved &&
+                            !state.TargetItem.IsDeactivated &&
+                            state.TargetItem.GameEntityValid;
+                        if (!state.TargetItemPresent)
+                            unavailableReasons.Add("target-world-item-not-present");
+                    }
+                    else
+                        unavailableReasons.Add("target-world-item-not-registered");
+                }
+                else
+                {
+                    unavailableReasons.Add("world-item-registry-unavailable");
+                }
+
+                try
+                {
+                    state.HandlerState = controller.CaptureWeaponDropWorldItemState(worldItemId);
+                }
+                catch (Exception exception)
+                {
+                    state.HandlerStateError = exception.GetType().FullName + ": " + exception.Message;
+                    unavailableReasons.Add("weapon-drop-handler-observation-failed");
+                }
+            }
+
+            state.ObservationAvailable = unavailableReasons.Count == 0;
+            state.UnavailableReasons = unavailableReasons.ToArray();
+            return Succeeded("LIVE_TEST_JSON=" + JsonConvert.SerializeObject(state));
         }
     }
 
@@ -980,7 +1085,7 @@ internal static class WeaponDropBaselineDebugCommands
                 .ToArray(),
             WorldItems = worldItemRegistry.GetAll()
                 .OrderBy(pair => pair.Key)
-                .Select(pair => CaptureWorldItem(pair.Key, pair.Value, objectManager))
+                .Select(pair => CaptureWorldItem(mission, pair.Key, pair.Value, objectManager))
                 .ToArray(),
         };
         snapshot.RegisteredWorldItemCount = snapshot.WorldItems.Length;
@@ -1007,6 +1112,7 @@ internal static class WeaponDropBaselineDebugCommands
     }
 
     private static WorldItemState CaptureWorldItem(
+        Mission mission,
         Guid worldItemId,
         SpawnedItemEntity item,
         IObjectManager objectManager)
@@ -1019,7 +1125,7 @@ internal static class WeaponDropBaselineDebugCommands
             };
         }
 
-        return new WorldItemState
+        var state = new WorldItemState
         {
             WorldItemId = worldItemId.ToString("D"),
             MissionObjectId = item.Id.Id,
@@ -1029,11 +1135,21 @@ internal static class WeaponDropBaselineDebugCommands
             GameEntityValid = item.GameEntity != null && item.GameEntity.IsValid,
             Weapon = CaptureWeapon(item.WeaponCopy, objectManager),
         };
+        if (item.HasLifeTime && mission != null)
+        {
+            state.HasLifeTime = true;
+            state.RemainingLifeTimeKnown = true;
+            state.RemainingLifeTime = Math.Max(
+                0f,
+                item._deletionTimer.Duration -
+                (mission.CurrentTime - item._deletionTimer.StartTime));
+        }
+        return state;
     }
 
     private static string TryGetObjectId(IObjectManager objectManager, object value)
     {
-        return value != null && objectManager.TryGetId(value, out string id)
+        return value != null && objectManager != null && objectManager.TryGetId(value, out string id)
             ? id
             : null;
     }

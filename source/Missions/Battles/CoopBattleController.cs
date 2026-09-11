@@ -8,6 +8,7 @@ using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Players;
 using LiteNetLib;
 using Missions.Agents;
+using Missions.Agents.Handlers;
 using Missions.Data;
 using Missions.Messages;
 using Missions.Services.Network;
@@ -72,6 +73,12 @@ public class CoopBattleController : CoopMissionController
     public ReturningHeroCatchUpDebugState CaptureReturningHeroCatchUpState(string controllerId)
     {
         return puppetSpawner.CaptureReturningHeroCatchUpState(controllerId);
+    }
+
+    /// <summary>Copies one target world-item lifecycle state without changing weapon-drop handling.</summary>
+    public WeaponDropWorldItemDebugState CaptureWeaponDropWorldItemState(Guid worldItemId)
+    {
+        return coopMissionComponent.WeaponDropHandler.CaptureDebugWorldItemState(worldItemId);
     }
 #endif
 
