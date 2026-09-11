@@ -115,12 +115,7 @@ internal sealed partial class NavalLabBehavior
         if (take && point.UserAgent == agent) return "already_occupied_by_owner";
         if (!take && point.UserAgent == null) return "already_clear";
         var controller = Mission.GetMissionBehavior<MissionMainAgentController>();
-        var screen = controller?.MissionScreen;
-        if (screen == null || !controller._activated || controller.IsDisabled || !ScreenManager._isWindowFocused
-            || ScreenManager.TopScreen != screen || screen.IsCheatGhostMode || screen.IsPhotoModeEnabled
-            || screen.IsRadialMenuActive || Mission.IsOrderMenuOpen || !Mission.IsMainAgentItemInteractionEnabled
-            || Mission.GetMissionBehavior<MissionShipControlView>()?.IsDisplayingADialog != false)
-            return "native_interaction_view_unavailable";
+        if (NativeInteractionViewBlocker() != null) return "native_interaction_view_unavailable";
         if (!take) return null;
         if (!Mission.IsMainAgentObjectInteractionEnabled || agent.HasMount || !agent.IsAbleToUseMachine()
             || !point.IsFocusable || !agent.ObjectHasVacantPosition(point) || !agent.CanUseObject(point)
@@ -130,6 +125,26 @@ internal sealed partial class NavalLabBehavior
         if (controller.InteractionComponent.CurrentFocusedObject != point
             || controller.InteractionComponent._currentInteractableObject != point) return "native_helm_not_focused";
         return null;
+    }
+
+    private string NativeInteractionViewBlocker()
+    {
+        var controller = Mission?.GetMissionBehavior<MissionMainAgentController>();
+        if (controller == null) return "main_agent_controller_missing";
+        if (controller.InteractionComponent == null) return "interaction_component_missing";
+        var screen = controller.MissionScreen;
+        if (screen == null) return "mission_screen_missing";
+        if (!controller._activated || controller.IsDisabled) return "main_agent_controller_inactive";
+        if (!ScreenManager._isWindowFocused) return "window_not_focused";
+        if (ScreenManager.TopScreen != screen) return "mission_screen_not_on_top";
+        if (screen.IsCheatGhostMode) return "cheat_ghost_mode";
+        if (screen.IsPhotoModeEnabled) return "photo_mode";
+        if (screen.IsRadialMenuActive) return "radial_menu_active";
+        if (Mission.IsOrderMenuOpen) return "order_menu_open";
+        if (!Mission.IsMainAgentItemInteractionEnabled) return "item_interaction_disabled";
+        var view = Mission.GetMissionBehavior<MissionShipControlView>();
+        if (view == null) return "ship_control_view_missing";
+        return view.IsDisplayingADialog ? "ship_control_dialog" : null;
     }
 
     private void FailNativeHelm(string reason)
@@ -203,8 +218,10 @@ internal sealed partial class NavalLabBehavior
                 interactionDistance = agent.GetInteractionDistanceToUsable(point),
                 nativeReachableOwnPoint = agent.CurrentlyUsedGameObject == null
                     && LocalShip.ShipControllerMachine.GetValidVacantReachableStandingPointForAgent(agent) == point.GameEntity,
-                focusedPointId = (controller?.InteractionComponent.CurrentFocusedObject as UsableMissionObject)?.Id.Id,
-                interactablePointId = (controller?.InteractionComponent._currentInteractableObject as UsableMissionObject)?.Id.Id,
+                focusedPointId = (controller?.InteractionComponent?.CurrentFocusedObject as UsableMissionObject)?.Id.Id,
+                interactablePointId = (controller?.InteractionComponent?._currentInteractableObject as UsableMissionObject)?.Id.Id,
+                interactionComponentPresent = controller?.InteractionComponent != null,
+                interactionViewBlocker = NativeInteractionViewBlocker(),
                 controllerActive = controller != null && controller._activated && !controller.IsDisabled,
                 windowFocused = ScreenManager._isWindowFocused,
                 missionScreenOnTop = controller?.MissionScreen != null && ScreenManager.TopScreen == controller.MissionScreen

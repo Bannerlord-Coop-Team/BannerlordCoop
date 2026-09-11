@@ -73,6 +73,73 @@ public sealed class NavalLabTwoClientNativeTests : IDisposable
         AccessTools.PropertySetter(typeof(MissionBehavior), nameof(MissionBehavior.Mission)).Invoke(fixture, new object[] { scope.Instance });
         return fixture;
     }
+    [Theory]
+    [InlineData("wrong_mode")]
+    [InlineData("not_game_thread")]
+    [InlineData("deployment")]
+    [InlineData("terminal")]
+    [InlineData("mission")]
+    public void CrewSpatial_DoesNotReadNativeActorsOutsideLifetime(string condition)
+    {
+        Patch(AccessTools.PropertyGetter(typeof(Common.GameThread), nameof(Common.GameThread.IsGameThread)),
+            condition == "not_game_thread" ? nameof(False) : nameof(True));
+        var fixture = Fixture(condition == "wrong_mode" ? NavalLabMode.SingleClientNative : NavalLabMode.TwoClientNative);
+        fixture.nativeDeploymentComplete = condition != "deployment";
+        fixture.factoryTerminal = condition == "terminal";
+        if (condition == "mission") AccessTools.PropertySetter(typeof(MissionBehavior), nameof(MissionBehavior.Mission)).Invoke(fixture, new object?[] { null });
+        var json = Newtonsoft.Json.Linq.JObject.Parse(Newtonsoft.Json.JsonConvert.SerializeObject(fixture.InspectCrewSpatial()));
+        Assert.Equal(condition == "wrong_mode" || condition == "not_game_thread" ? condition : "mission_lifetime_or_deployment",
+            (string?)json["unavailable"]);
+        Assert.Null(json["rows"]);
+    }
+
+    [Fact]
+    public void CrewSpatial_NoCommitHasNoInventedStations_AndMissingActorPreservesComparisonIdentity()
+    {
+        Patch(AccessTools.PropertyGetter(typeof(Common.GameThread), nameof(Common.GameThread.IsGameThread)), nameof(True));
+        var fixture = Fixture(NavalLabMode.TwoClientNative);
+        fixture.nativeDeploymentComplete = true;
+        var json = Newtonsoft.Json.Linq.JObject.Parse(Newtonsoft.Json.JsonConvert.SerializeObject(fixture.InspectCrewSpatial()));
+        Assert.Empty(json["rows"]!);
+        Assert.Equal(8, (int)json["rowLimit"]!);
+        fixture.Ships = new[] { Shell<MissionShip>() };
+        fixture.Agents = new Agent[10];
+        var machine = Shell<ShipOarMachine>();
+        var row = Newtonsoft.Json.Linq.JObject.Parse(Newtonsoft.Json.JsonConvert.SerializeObject(fixture.InspectCrewStation(0, 1, "station", machine)));
+        Assert.Equal("station", (string?)row["key"]);
+        Assert.NotEqual(Guid.Empty, (Guid)row["combatantId"]!);
+        Assert.Equal("agent_or_station_lifetime", (string?)row["unavailable"]);
+        Assert.Null(row["visualPosition"]);
+        Assert.Equal(0, stopped + assigned);
+    }
+
+    [Fact]
+    public void CrewSpatial_VisitsOnlyEightCommittedKeysInSlotOrder()
+    {
+        Patch(AccessTools.PropertyGetter(typeof(Common.GameThread), nameof(Common.GameThread.IsGameThread)), nameof(True));
+        Patch(AccessTools.Method(typeof(NavalLabBehavior), "StationInventory"), nameof(Inventory));
+        Patch(AccessTools.Method(typeof(NavalLabBehavior), "InspectCrewStation"), nameof(SpatialRow));
+        var fixture = Fixture(NavalLabMode.TwoClientNative);
+        fixture.nativeDeploymentComplete = true;
+        var keys = new[] { "left0", "left1", "right0", "right1" };
+        stationInventory = keys.ToDictionary(key => key, _ => Shell<ShipOarMachine>());
+        for (int slot = 0; slot < 2; slot++)
+            fixture.appliedStations.Add(slot, new global::Missions.Messages.NetworkNavalLabStations(
+                Guid.NewGuid(), 1, slot, "commit", new Guid[4], keys));
+        var json = Newtonsoft.Json.Linq.JObject.Parse(Newtonsoft.Json.JsonConvert.SerializeObject(fixture.InspectCrewSpatial()));
+        Assert.Equal(8, json["rows"]!.Count());
+        Assert.Equal(8, (int)json["rowLimit"]!);
+        Assert.Equal(keys.Concat(keys), json["rows"]!.Select(row => (string)row["key"]!));
+        Assert.Equal(new[] { 0, 0, 0, 0, 1, 1, 1, 1 }, json["rows"]!.Select(row => (int)row["slot"]!));
+        Assert.Equal(0, stopped + assigned);
+    }
+
+    private static bool SpatialRow(int slot, int crew, string key, ref object __result)
+    {
+        __result = new { slot, crew, key };
+        return false;
+    }
+
     private ShipOrder Order(bool weapon)
     {
         var ship = Shell<MissionShip>();

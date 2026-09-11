@@ -37,6 +37,28 @@ internal sealed class NavalLabFrameSnapshot
     }
 }
 
+internal sealed class NavalLabActionSnapshot
+{
+    public int Channel { get; }
+    public int ActionIndex { get; }
+    public string ActionType { get; }
+    public float Progress { get; }
+    public float Weight { get; }
+    public string AnimationFlags { get; }
+
+    public NavalLabActionSnapshot(int channel, int actionIndex, string actionType, float progress, float weight, string animationFlags)
+    {
+        if (float.IsNaN(progress) || float.IsInfinity(progress) || float.IsNaN(weight) || float.IsInfinity(weight))
+            throw new ArgumentOutOfRangeException(nameof(progress), "Non-finite diagnostic action state.");
+        Channel = channel;
+        ActionIndex = actionIndex;
+        ActionType = actionType;
+        Progress = progress;
+        Weight = weight;
+        AnimationFlags = animationFlags;
+    }
+}
+
 internal sealed class NavalLabShipSnapshot
 {
     [JsonProperty("id")] public Guid Id { get; }

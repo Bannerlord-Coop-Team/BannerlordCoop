@@ -75,6 +75,28 @@ public sealed class NavalLabSnapshotTests
     }
 
     [Fact]
+    public void CrewActionSnapshot_SerializesNativeChannelsWithoutEngineObjects()
+    {
+        var value = new NavalLabActionSnapshot(1, 42, "Stand", 0.25f, 0.75f, "None");
+        var json = JObject.Parse(JsonConvert.SerializeObject(value));
+        Assert.Equal(1, (int)json["Channel"]!);
+        Assert.Equal(42, (int)json["ActionIndex"]!);
+        Assert.Equal(0.25f, (float)json["Progress"]!);
+        Assert.Equal(0.75f, (float)json["Weight"]!);
+        Assert.Equal("None", (string?)json["AnimationFlags"]);
+    }
+
+    [Theory]
+    [InlineData(float.NaN)]
+    [InlineData(float.PositiveInfinity)]
+    [InlineData(float.NegativeInfinity)]
+    public void CrewActionSnapshot_RejectsNonFiniteProgressAndWeight(float invalid)
+    {
+        Assert.Throws<ArgumentOutOfRangeException>(() => new NavalLabActionSnapshot(0, 1, "Stand", invalid, 1, "None"));
+        Assert.Throws<ArgumentOutOfRangeException>(() => new NavalLabActionSnapshot(0, 1, "Stand", 0, invalid, "None"));
+    }
+
+    [Fact]
     public void UnavailableSnapshot_PreservesIdentityWithoutFabricatedZeroMeasurements()
     {
         var id = Guid.NewGuid();

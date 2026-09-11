@@ -263,6 +263,8 @@ public sealed class NavalLabNativeHelmTests : IDisposable
     [InlineData("focus")]
     [InlineData("availability")]
     [InlineData("screen")]
+    [InlineData("window")]
+    [InlineData("missing_component")]
     public void ActualPreflightPreservesNativeRangeFocusAvailabilityAndViewGates(string condition)
     {
         bypassPrecondition = false;
@@ -296,7 +298,13 @@ public sealed class NavalLabNativeHelmTests : IDisposable
         bool originalFocus = ScreenManager._isWindowFocused;
         try
         {
-            ScreenManager._isWindowFocused = true;
+            ScreenManager._isWindowFocused = condition != "window";
+            if (condition == "missing_component") Set(controller, "InteractionComponent", null);
+            Assert.Equal(condition switch
+            {
+                "window" => "window_not_focused", "screen" => "mission_screen_not_on_top",
+                "missing_component" => "interaction_component_missing", _ => null
+            }, fixture.NativeInteractionViewBlocker());
             if (condition == "allowed" || condition == "range" || condition == "focus")
                 Assert.Equal(condition != "range", machine.GetValidVacantReachableStandingPointForAgent(agent) == point.GameEntity);
             string result = fixture.RequestNativeHelm(Guid.NewGuid(), 0, true);

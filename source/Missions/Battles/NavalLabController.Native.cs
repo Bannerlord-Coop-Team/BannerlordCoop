@@ -23,6 +23,8 @@ public sealed partial class NavalLabController : INavalNativeController
     private volatile bool nativeControlsReleased;
     private readonly Dictionary<int, NetworkNavalLabStations> pendingStations = new();
     private readonly HashSet<int> acknowledgedStations = new();
+    private long lastAppliedFrameSourceCallback;
+    private long lastAppliedFrameUtcTicks;
     private readonly long[] nativeInputSequences = new long[2];
     private readonly double[] nativeInputDeadlines = new double[2];
     private INavalNativeMissionAdapter NativeAdapter => adapter as INavalNativeMissionAdapter;
@@ -35,6 +37,9 @@ public sealed partial class NavalLabController : INavalNativeController
     {
         epoch = session.HostEpoch, localControllerCallback = callback,
         lastReceivedFrameSequence = lastReceived, lastAppliedFrameSequence = lastApplied,
+        hostSentFrameSequence = session.IsLocalHost ? (long?)sequence : null,
+        lastAppliedSourceCallback = lastApplied > 0 ? (long?)lastAppliedFrameSourceCallback : null,
+        lastAppliedUtcTicks = lastApplied > 0 ? (long?)lastAppliedFrameUtcTicks : null,
         hostAcceptedInputSequences = nativeInputSequences.ToArray(),
         hostInputRemainingSeconds = nativeInputDeadlines.Select(deadline => Math.Max(0, deadline - Now)).ToArray(),
         ready = NativeControlsReady

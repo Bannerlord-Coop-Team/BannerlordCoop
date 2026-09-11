@@ -124,6 +124,7 @@ internal sealed partial class NavalLabBehavior
                         sail = (int)input.Value.Sail } : null;
             }).ToArray() : null,
             localObservedShips = ready ? Ships.Select(InspectShip).ToArray() : null,
+            crewSpatial = InspectCrewSpatial(),
             forceApplications = Interlocked.Read(ref ForceApplications), fixedTicks = Interlocked.Read(ref FixedTicks),
             activeFixedTicks = Interlocked.Read(ref ActiveFixedTicks),
             activeParallelFixedEntries = Interlocked.Read(ref factoryActiveParallelEntries),

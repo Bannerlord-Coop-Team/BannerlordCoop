@@ -442,6 +442,8 @@ public sealed partial class NavalLabController : CoopMissionController, INavalLa
             lastApplied = message.Sequence;
             if (IsTwoClientNative)
             {
+                lastAppliedFrameSourceCallback = message.SourceCallback;
+                lastAppliedFrameUtcTicks = DateTime.UtcNow.Ticks;
                 if (sailReadyAtReceive && NativeControlsReady) NativeAdapter.ApplySailFeedback(message);
                 else NativeAdapter.ClearSailFeedback();
             }

@@ -25,6 +25,30 @@ public sealed class NavalLabTwoClientNativeTests : NavalMissionTestEnvironment
         new(Manifest.IncarnationId, epoch, slot, sequence, deadline ?? DateTime.UtcNow.AddSeconds(1).Ticks,
             helm, 1, 1, 0, 0.35f, 2);
 
+    [Fact]
+    public void ControlStatus_FrameTimingAdvancesOnlyAfterSuccessfulFollowerApply()
+    {
+        Start(); Execute("complete-deployment"); Tick(First); Tick(Second);
+        Newtonsoft.Json.Linq.JObject Status() => Newtonsoft.Json.Linq.JObject.FromObject(
+            ((INavalNativeController)Adapter(Second).Controller!).NativeControlStatus());
+        var values = new float[24];
+        SendFrames(First, new NetworkNavalLabFrames(Manifest.IncarnationId, 1, 100, values, 700));
+        var observed = Status();
+        Assert.Equal(100, (long)observed["lastAppliedFrameSequence"]!);
+        Assert.Equal(700, (long)observed["lastAppliedSourceCallback"]!);
+        Assert.True((long)observed["lastAppliedUtcTicks"]! > 0);
+        Assert.Equal(Newtonsoft.Json.Linq.JTokenType.Null, observed["hostSentFrameSequence"]!.Type);
+        SendFrames(First, new NetworkNavalLabFrames(Manifest.IncarnationId, 1, 99, values, 701));
+        Assert.Equal(observed["lastAppliedUtcTicks"], Status()["lastAppliedUtcTicks"]);
+        Adapter(Second).FailApply = true;
+        SendFrames(First, new NetworkNavalLabFrames(Manifest.IncarnationId, 1, 101, values, 702));
+        var failed = Status();
+        Assert.Equal(101, (long)failed["lastReceivedFrameSequence"]!);
+        Assert.Equal(100, (long)failed["lastAppliedFrameSequence"]!);
+        Assert.Equal(observed["lastAppliedSourceCallback"], failed["lastAppliedSourceCallback"]);
+        Assert.Equal(observed["lastAppliedUtcTicks"], failed["lastAppliedUtcTicks"]);
+    }
+
     [Theory]
     [InlineData(false)]
     [InlineData(true)]
