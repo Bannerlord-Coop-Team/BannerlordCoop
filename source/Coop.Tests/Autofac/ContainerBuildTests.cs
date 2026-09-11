@@ -5,6 +5,7 @@ using Common.Network;
 using Common.Network.Session;
 using Coop.Core.Common.Configuration;
 using Coop.Core.Client;
+using Coop.Core.Client.Services.Discord;
 using Coop.Core.Server;
 using Coop.Core.Server.Services.Telemetry;
 using Coop.Tests.Mocks;
@@ -79,6 +80,7 @@ namespace Coop.Tests.Autofac
             var server = container.Resolve<INetwork>();
             Assert.NotNull(server);
             Assert.False(container.IsRegistered<IVoiceClient>());
+            Assert.False(container.IsRegistered<IDiscordPresenceClient>());
             Assert.False(container.IsRegistered<IVoiceAudio>());
 
             var logic = container.Resolve<ILogic>();

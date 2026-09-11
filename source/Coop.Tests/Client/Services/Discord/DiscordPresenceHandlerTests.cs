@@ -87,7 +87,7 @@ public class DiscordPresenceHandlerTests : IDisposable
     [InlineData("disconnect")]
     [InlineData("end")]
     [InlineData("menu")]
-    public void SessionEnd_ClearsBattleAndIgnoresLateEventsUntilNewConnection(string reason)
+    public void SessionEnd_RestoresMainMenuAndIgnoresLateEventsUntilNewConnection(string reason)
     {
         EnterCampaign();
         broker.Publish(this, new BattleMissionReady("battle"));
@@ -97,7 +97,7 @@ public class DiscordPresenceHandlerTests : IDisposable
             case "end": broker.Publish(this, new EndCoopMode()); break;
             case "menu": broker.Publish(this, new MainMenuEntered()); break;
         }
-        client.Verify(c => c.ClearPresence(), Times.Once);
+        client.Verify(c => c.SetMainMenu(), Times.Once);
         client.Invocations.Clear();
         broker.Publish(this, new NetworkConnectedPlayersChanged(8));
         broker.Publish(this, new BattleMissionEnded("battle"));
@@ -111,7 +111,7 @@ public class DiscordPresenceHandlerTests : IDisposable
     }
 
     [Fact]
-    public void DisconnectAndDispose_ClearOnlyOnceAndUnsubscribe()
+    public void DisconnectAndDispose_RestoreMainMenuOnlyOnceAndUnsubscribe()
     {
         EnterCampaign();
         broker.Publish(this, new NetworkDisconnected(default));
@@ -121,24 +121,25 @@ public class DiscordPresenceHandlerTests : IDisposable
         EnterCampaign();
         broker.Publish(this, new BattleMissionReady("battle"));
 
-        client.Verify(c => c.ClearPresence(), Times.Once);
+        client.Verify(c => c.SetMainMenu(), Times.Once);
         client.Verify(c => c.SetPresence("In a co-op campaign", "1 player", startedAt), Times.Once);
         client.VerifyNoOtherCalls();
     }
 
     [Fact]
-    public void DisposeActiveSession_ClearsPresence()
+    public void DisposeActiveSession_RestoresMainMenu()
     {
         EnterCampaign();
         handler.Dispose();
-        client.Verify(c => c.ClearPresence(), Times.Once);
+        client.Verify(c => c.SetMainMenu(), Times.Once);
     }
 
     [Fact]
-    public void DisposeFailedJoin_DoesNotStartDiscord()
+    public void DisposeFailedJoin_RestoresMainMenu()
     {
         broker.Publish(this, new NetworkConnected());
         handler.Dispose();
+        client.Verify(c => c.SetMainMenu(), Times.Once);
         client.VerifyNoOtherCalls();
     }
 

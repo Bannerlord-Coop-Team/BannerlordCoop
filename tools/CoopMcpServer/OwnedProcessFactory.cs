@@ -124,7 +124,7 @@ public sealed class OwnedProcessFactory : IOwnedProcessFactory
         }
     }
 
-    private static class Native
+    internal static class Native
     {
         [StructLayout(LayoutKind.Sequential)] internal struct ProcessInformation
         { public IntPtr Process, Thread; public uint ProcessId, ThreadId; }
