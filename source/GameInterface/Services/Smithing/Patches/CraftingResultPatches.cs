@@ -2,9 +2,11 @@
 using GameInterface.Policies;
 using HarmonyLib;
 using Serilog;
+using System.Linq;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.GameState;
 using TaleWorlds.CampaignSystem.ViewModelCollection.WeaponCrafting.WeaponDesign;
+using TaleWorlds.CampaignSystem.ViewModelCollection.WeaponCrafting.WeaponDesign.Order;
 using TaleWorlds.Core;
 using TaleWorlds.Localization;
 
@@ -26,10 +28,21 @@ internal class CraftingResultPatches
         {
             if (GameStateManager.Current.ActiveState is CraftingState)
             {
-                // CompleteOrder and refreshing handled elsewhere
                 if (IsFinalizingOrder(__instance))
                 {
                     __instance.CraftedItemObject = null;
+                    __instance.CraftingOrderPopup.RefreshOrders();
+
+                    CraftingOrderItemVM craftingOrderItemVM = __instance.CraftingOrderPopup.CraftingOrders.FirstOrDefault(x => x.IsEnabled);
+                    if (craftingOrderItemVM != null)
+                    {
+                        __instance.CraftingOrderPopup.SelectOrder(craftingOrderItemVM);
+                    }
+                    else
+                    {
+                        __instance.IsInFinalCraftingStage = false;
+                        __instance.ExecuteOpenFreeBuildTab();
+                    }
                 }
                 else
                 {

@@ -18,9 +18,9 @@ namespace GameInterface.Services.Smithing.Interfaces;
 
 public interface ICraftingCampaignBehaviorInterface : IGameAbstraction
 {
-    int DoSmelting(CraftingCampaignBehavior craftingBehavior, Hero craftingHero, EquipmentElement equipmentElement);
+    int DoSmelting(CraftingCampaignBehavior craftingBehavior, Hero craftingHero, EquipmentElement equipmentElement, out bool succeeded);
     int DoRefinement(CraftingCampaignBehavior craftingBehavior, Hero craftingHero, Crafting.RefiningFormula formula);
-    int CreateCraftedWeaponInternal(CraftingCampaignBehavior craftingBehavior, Hero craftingHero, CraftingTemplate craftingTemplate, ItemModifierGroup itemModifierGroup, WeaponDesignElement[] usedPieces, ItemModifier weaponModifier, CultureObject culture, bool isFreeMode, TextObject name, string weaponName, string nextCraftedItemI);
+    int CreateCraftedWeaponInternal(CraftingCampaignBehavior craftingBehavior, Hero craftingHero, CraftingTemplate craftingTemplate, ItemModifierGroup itemModifierGroup, WeaponDesignElement[] usedPieces, ItemModifier weaponModifier, CultureObject culture, bool isFreeMode, TextObject name, string weaponName, string nextCraftedItemId, out bool succeeded);
     ItemObject CreateAndRegisterCraftedItem(WeaponDesign weaponDesign, TextObject name, CultureObject culture, ItemModifierGroup itemModifierGroup, string craftedItemId);
     void AddCraftedItemToRoster(ItemRoster itemRoster, ItemModifier weaponModifier, ItemObject craftedItemObject);
     void DailyTickSettlement(CraftingCampaignBehavior craftingBehavior, Settlement settlement);
@@ -38,15 +38,18 @@ public class CraftingCampaignBehaviorInterface : ICraftingCampaignBehaviorInterf
         this.objectManager = objectManager;
     }
 
-    public int DoSmelting(CraftingCampaignBehavior craftingBehavior, Hero craftingHero, EquipmentElement equipmentElement)
+    public int DoSmelting(CraftingCampaignBehavior craftingBehavior, Hero craftingHero, EquipmentElement equipmentElement, out bool succeeded)
     {
+        succeeded = false;
         int heroCraftingStamina = craftingBehavior.GetHeroCraftingStamina(craftingHero);
+        if (heroCraftingStamina <= 10) return heroCraftingStamina;
 
         ItemRoster itemRoster = craftingHero.PartyBelongedTo.ItemRoster;
         int[] smeltingOutputForItem = Campaign.Current.Models.SmithingModel.GetSmeltingOutputForItem(equipmentElement.Item);
 
         // Needed to prevent spam clicking to smelt more than actually available
         if (itemRoster.FindIndexOfElement(equipmentElement) < 0) return heroCraftingStamina;
+        succeeded = true;
         itemRoster.AddToCounts(equipmentElement, -1);
 
         for (int i = 8; i >= 0; i--)
@@ -71,22 +74,32 @@ public class CraftingCampaignBehaviorInterface : ICraftingCampaignBehaviorInterf
     public int DoRefinement(CraftingCampaignBehavior craftingBehavior, Hero craftingHero, Crafting.RefiningFormula formula)
     {
         int heroCraftingStamina = craftingBehavior.GetHeroCraftingStamina(craftingHero);
+        if (heroCraftingStamina <= 10) return heroCraftingStamina;
 
         ItemRoster itemRoster = craftingHero.PartyBelongedTo.ItemRoster;
+        ItemObject craftingMaterialItem = null;
+        ItemObject craftingMaterialItem2 = null;
+
+        // Validate every input before changing the roster.
         if (formula.Input1Count > 0)
         {
-            ItemObject craftingMaterialItem = Campaign.Current.Models.SmithingModel.GetCraftingMaterialItem(formula.Input1);
-
-            // Needed to prevent spam clicking to refine more than actually available
-            if (itemRoster.FindIndexOfElement(new EquipmentElement(craftingMaterialItem, null, null, false)) < 0) return heroCraftingStamina;
-            itemRoster.AddToCounts(craftingMaterialItem, -formula.Input1Count);
+            craftingMaterialItem = Campaign.Current.Models.SmithingModel.GetCraftingMaterialItem(formula.Input1);
+            if (itemRoster.GetItemNumber(craftingMaterialItem) < formula.Input1Count) return heroCraftingStamina;
         }
         if (formula.Input2Count > 0)
         {
-            ItemObject craftingMaterialItem2 = Campaign.Current.Models.SmithingModel.GetCraftingMaterialItem(formula.Input2);
+            craftingMaterialItem2 = Campaign.Current.Models.SmithingModel.GetCraftingMaterialItem(formula.Input2);
+            int requiredCount = formula.Input2Count;
+            if (craftingMaterialItem == craftingMaterialItem2) requiredCount += formula.Input1Count;
+            if (itemRoster.GetItemNumber(craftingMaterialItem2) < requiredCount) return heroCraftingStamina;
+        }
 
-            // Needed to prevent spam clicking to refine more than actually available
-            if (itemRoster.FindIndexOfElement(new EquipmentElement(craftingMaterialItem2, null, null, false)) < 0) return heroCraftingStamina;
+        if (craftingMaterialItem != null)
+        {
+            itemRoster.AddToCounts(craftingMaterialItem, -formula.Input1Count);
+        }
+        if (craftingMaterialItem2 != null)
+        {
             itemRoster.AddToCounts(craftingMaterialItem2, -formula.Input2Count);
         }
         if (formula.OutputCount > 0)
@@ -122,8 +135,14 @@ public class CraftingCampaignBehaviorInterface : ICraftingCampaignBehaviorInterf
         bool isFreeMode,
         TextObject name,
         string weaponName,
-        string nextCraftedItemId)
+        string nextCraftedItemId,
+        out bool succeeded)
     {
+        succeeded = false;
+
+        int heroCraftingStamina = craftingBehavior.GetHeroCraftingStamina(craftingHero);
+        if (heroCraftingStamina <= 10) return heroCraftingStamina;
+
         WeaponDesign weaponDesign = new WeaponDesign(craftingTemplate, new TextObject(weaponName), usedPieces);
         if (isFreeMode)
         {
@@ -135,6 +154,17 @@ public class CraftingCampaignBehaviorInterface : ICraftingCampaignBehaviorInterf
         int[] smithingCostsForWeaponDesign = Campaign.Current.Models.SmithingModel.GetSmithingCostsForWeaponDesign(weaponDesign);
         for (int i = 8; i >= 0; i--)
         {
+            if (smithingCostsForWeaponDesign[i] >= 0) continue;
+
+            ItemObject craftingMaterialItem = Campaign.Current.Models.SmithingModel.GetCraftingMaterialItem((CraftingMaterials)i);
+            if (itemRoster.GetItemNumber(craftingMaterialItem) < -smithingCostsForWeaponDesign[i])
+            {
+                return craftingBehavior.GetHeroCraftingStamina(craftingHero);
+            }
+        }
+
+        for (int i = 8; i >= 0; i--)
+        {
             if (smithingCostsForWeaponDesign[i] != 0)
             {
                 itemRoster.AddToCounts(Campaign.Current.Models.SmithingModel.GetCraftingMaterialItem((CraftingMaterials)i), smithingCostsForWeaponDesign[i]);
@@ -144,11 +174,12 @@ public class CraftingCampaignBehaviorInterface : ICraftingCampaignBehaviorInterf
         var craftedItemObject = CreateAndRegisterCraftedItem(weaponDesign, name, culture, itemModifierGroup, nextCraftedItemId);
 
         int energyCostForSmithing = Campaign.Current.Models.SmithingModel.GetEnergyCostForSmithing(craftedItemObject, craftingHero);
-        int newHeroCraftingStamina = craftingBehavior.GetHeroCraftingStamina(craftingHero) - energyCostForSmithing;
+        int newHeroCraftingStamina = heroCraftingStamina - energyCostForSmithing;
         craftingBehavior.SetHeroCraftingStamina(craftingHero, newHeroCraftingStamina);
 
         CampaignEventDispatcher.Instance.OnNewItemCrafted(craftedItemObject, weaponModifier, !isFreeMode);
 
+        succeeded = true;
         return newHeroCraftingStamina;
     }
 

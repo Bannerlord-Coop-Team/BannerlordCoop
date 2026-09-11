@@ -5,12 +5,15 @@ using Common.Util;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Smithing.Interfaces;
 using GameInterface.Services.Smithing.Messages;
+using GameInterface.Services.Smithing.Patches;
 using Serilog;
 using System.Linq;
 using TaleWorlds.CampaignSystem;
+using TaleWorlds.CampaignSystem.GameState;
 using TaleWorlds.CampaignSystem.Settlements;
 using TaleWorlds.CampaignSystem.ViewModelCollection.WeaponCrafting.Smelting;
 using TaleWorlds.CampaignSystem.ViewModelCollection.WeaponCrafting.WeaponDesign.Order;
+using TaleWorlds.Core;
 using TaleWorlds.Library;
 
 namespace GameInterface.Services.Smithing.Handlers;
@@ -32,48 +35,31 @@ internal class SmithingVMsHandler : IHandler
         this.objectManager = objectManager;
         this.smithingVMsProvider = smithingVMsProvider;
 
-        messageBroker.Subscribe<SmeltingVMCreated>(Handle_SmeltingVMCreated);
-        messageBroker.Subscribe<RefinementVMCreated>(Handle_RefinementVMCreated);
         messageBroker.Subscribe<CraftingVMCreated>(Handle_CraftingVMCreated);
-        messageBroker.Subscribe<WeaponDesignVMCreated>(Handle_WeaponDesignVMCreated);
 
         messageBroker.Subscribe<RefreshWeaponDesignVM>(Handle_RefreshWeaponDesignVM);
         messageBroker.Subscribe<NetworkRefreshSmelting>(Handle_NetworkRefreshSmelting);
         messageBroker.Subscribe<NetworkRefreshRefinement>(Handle_NetworkRefreshRefinement);
         messageBroker.Subscribe<RefreshCraftingVM>(Handle_RefreshCraftingVM);
+
+        messageBroker.Subscribe<CreateCraftingResultPopup>(Handle_CreateCraftingResultPopup);
     }
 
     public void Dispose()
     {
-        messageBroker.Unsubscribe<SmeltingVMCreated>(Handle_SmeltingVMCreated);
-        messageBroker.Unsubscribe<RefinementVMCreated>(Handle_RefinementVMCreated);
         messageBroker.Unsubscribe<CraftingVMCreated>(Handle_CraftingVMCreated);
-        messageBroker.Unsubscribe<WeaponDesignVMCreated>(Handle_WeaponDesignVMCreated);
 
         messageBroker.Unsubscribe<RefreshWeaponDesignVM>(Handle_RefreshWeaponDesignVM);
         messageBroker.Unsubscribe<NetworkRefreshSmelting>(Handle_NetworkRefreshSmelting);
         messageBroker.Unsubscribe<NetworkRefreshRefinement>(Handle_NetworkRefreshRefinement);
         messageBroker.Unsubscribe<RefreshCraftingVM>(Handle_RefreshCraftingVM);
-    }
 
-    private void Handle_SmeltingVMCreated(MessagePayload<SmeltingVMCreated> obj)
-    {
-        smithingVMsProvider.SetCurrentSmeltingVM(obj.What.SmeltingVM);
-    }
-
-    private void Handle_RefinementVMCreated(MessagePayload<RefinementVMCreated> obj)
-    {
-        smithingVMsProvider.SetCurrentRefinementVM(obj.What.RefinementVM);
+        messageBroker.Unsubscribe<CreateCraftingResultPopup>(Handle_CreateCraftingResultPopup);
     }
 
     private void Handle_CraftingVMCreated(MessagePayload<CraftingVMCreated> obj)
     {
         smithingVMsProvider.SetCurrentCraftingVM(obj.What.CraftingVM);
-    }
-
-    private void Handle_WeaponDesignVMCreated(MessagePayload<WeaponDesignVMCreated> obj)
-    {
-        smithingVMsProvider.SetCurrentWeaponDesignVM(obj.What.WeaponDesignVM);
     }
 
     private void Handle_RefreshWeaponDesignVM(MessagePayload<RefreshWeaponDesignVM> obj)
@@ -125,6 +111,46 @@ internal class SmithingVMsHandler : IHandler
         });
     }
 
+    private void Handle_CreateCraftingResultPopup(MessagePayload<CreateCraftingResultPopup> obj)
+    {
+        GameThread.RunSafe(() =>
+        {
+            var currentWeaponDesignVM = smithingVMsProvider.GetCurrentWeaponDesignVM();
+            var currentCraftingVM = smithingVMsProvider.GetCurrentCraftingVM();
+            if (currentWeaponDesignVM == null || currentCraftingVM == null) return;
+            if (!CreateCraftedWeaponInternalPatch.ClearPendingCraftedItem(currentWeaponDesignVM, obj.What.ClientRequestId)) return;
+
+            if (obj.What.Success)
+            {
+                if (GameStateManager.Current.ActiveState is not CraftingState) return;
+
+                currentWeaponDesignVM.CraftedItemObject = obj.What.CraftedItem;
+                currentWeaponDesignVM.IsInFinalCraftingStage = true;
+                var activeCraftingOrder = currentWeaponDesignVM.ActiveCraftingOrder;
+                var isInOrderMode = currentWeaponDesignVM.IsInOrderMode;
+
+                try
+                {
+                    currentWeaponDesignVM.ActiveCraftingOrder = currentWeaponDesignVM.CraftingOrderPopup.CraftingOrders.FirstOrDefault(x => x.CraftingOrder == obj.What.CraftingOrder);
+                    currentWeaponDesignVM.IsInOrderMode = obj.What.CraftingOrder != null;
+
+                    currentWeaponDesignVM.CreateCraftingResultPopup();
+                }
+                finally
+                {
+                    currentWeaponDesignVM.ActiveCraftingOrder = activeCraftingOrder;
+                    currentWeaponDesignVM.IsInOrderMode = isInOrderMode;
+                }
+                
+                currentCraftingVM._onWeaponCrafted?.Invoke();
+            }
+            else
+            {
+                RefreshCraftingVM();
+            }
+        });
+    }
+
     private void RefreshCraftingVM()
     {
         var currentCraftingVM = smithingVMsProvider.GetCurrentCraftingVM();
@@ -145,13 +171,27 @@ internal class SmithingVMsHandler : IHandler
             using (new AllowedThread())
             {
                 currentWeaponDesignVM?.CraftingOrderPopup?.RefreshOrders();
+                if (currentWeaponDesignVM?.IsInFinalCraftingStage == true) return;
+
                 if (!(bool)(currentWeaponDesignVM?.IsInOrderMode))
                 {
                     currentWeaponDesignVM?.RefreshValues();
                     return;
                 }
 
-                CraftingOrderItemVM craftingOrderItemVM = currentWeaponDesignVM?.CraftingOrderPopup?.CraftingOrders?.FirstOrDefault((CraftingOrderItemVM x) => x.IsEnabled);
+                // Keep the player on the order they picked. Selecting a different order switches the crafting template
+                var craftingOrders = currentWeaponDesignVM?.CraftingOrderPopup?.CraftingOrders;
+                var activeOrder = currentWeaponDesignVM?.ActiveCraftingOrder?.CraftingOrder;
+
+                if (activeOrder != null && craftingOrders?.Any(x => x.CraftingOrder == activeOrder && x.IsEnabled) == true)
+                {
+                    // Current order survived change, don't change current selection
+                    currentWeaponDesignVM?.RefreshValues();
+                    return;
+                }
+
+                // Unavoidable switch because the order is no longer available
+                CraftingOrderItemVM craftingOrderItemVM = craftingOrders?.FirstOrDefault((CraftingOrderItemVM x) => x.IsEnabled);
                 if (craftingOrderItemVM != null)
                 {
                     currentWeaponDesignVM?.CraftingOrderPopup?.SelectOrder(craftingOrderItemVM);

@@ -47,6 +47,9 @@ public readonly struct NetworkCreateCraftedWeaponInternalServer : ICommand
     [ProtoMember(13)]
     public readonly string CurrentSettlementId;
 
+    [ProtoMember(14)]
+    public readonly string ClientRequestId;
+
     public NetworkCreateCraftedWeaponInternalServer(
         bool isFreeMode,
         string craftingHeroId,
@@ -60,7 +63,8 @@ public readonly struct NetworkCreateCraftedWeaponInternalServer : ICommand
         string playerHeroId,
         string itemModifierGroupId,
         string craftingOrderId,
-        string currentSettlementId)
+        string currentSettlementId,
+        string clientRequestId)
     {
         IsFreeMode = isFreeMode;
         CraftingHeroId = craftingHeroId;
@@ -75,6 +79,7 @@ public readonly struct NetworkCreateCraftedWeaponInternalServer : ICommand
         ItemModifierGroupId = itemModifierGroupId;
         CraftingOrderId = craftingOrderId;
         CurrentSettlementId = currentSettlementId;
+        ClientRequestId = clientRequestId;
     }
 }
 
@@ -123,7 +128,16 @@ public readonly struct NetworkCreateCraftedWeaponInternalClients : ICommand
     [ProtoMember(14)]
     public readonly string CurrentSettlementId;
 
-    public NetworkCreateCraftedWeaponInternalClients(NetworkCreateCraftedWeaponInternalServer cloneObject, string nextCraftedItemId)
+    [ProtoMember(15)]
+    public readonly bool Success;
+
+    [ProtoMember(16)]
+    public readonly string ClientRequestId;
+
+    public NetworkCreateCraftedWeaponInternalClients(
+        NetworkCreateCraftedWeaponInternalServer cloneObject,
+        string nextCraftedItemId,
+        bool success)
     {
         Name = cloneObject.Name;
         CultureId = cloneObject.CultureId;
@@ -139,5 +153,7 @@ public readonly struct NetworkCreateCraftedWeaponInternalClients : ICommand
         CraftingHeroId = cloneObject.CraftingHeroId;
         CraftingOrderId = cloneObject.CraftingOrderId;
         CurrentSettlementId = cloneObject.CurrentSettlementId;
+        Success = success;
+        ClientRequestId = cloneObject.ClientRequestId;
     }
 }
