@@ -1650,13 +1650,11 @@ public class SiegeMachineStateReplicator : ISiegeMachineStateReplicator
                     movement.SetDistanceTraveledAsClient(state.MoveDistance);
                 }
 
-                // Distance first, then the arrival flag whose setter flips the navmesh; MoveToTargetAsClient
-                // puts the tracker exactly at the path end so arrival-gated logic (ladders, gates) sees
-                // HasReachedEnd, mirroring vanilla's client arrival.
+                // Finish the tracker before the native arrival logic updates interaction and navigation.
                 if (state.HasArrived)
                 {
-                    if (machine is BatteringRam ram && !ram.HasArrivedAtTarget) ram.HasArrivedAtTarget = true;
-                    else if (machine is SiegeTower tower && !tower.HasArrivedAtTarget) tower.HasArrivedAtTarget = true;
+                    // The ram tick must complete arrival itself so its standing points and navigation change too.
+                    if (machine is SiegeTower tower && !tower.HasArrivedAtTarget) tower.HasArrivedAtTarget = true;
                     movement.MoveToTargetAsClient();
                 }
             }

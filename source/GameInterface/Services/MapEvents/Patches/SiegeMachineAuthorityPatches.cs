@@ -35,7 +35,37 @@ internal class SiegeMachineAuthorityPatches
     [HarmonyTranspiler]
     private static IEnumerable<CodeInstruction> RamOnTickTranspiler(
         IEnumerable<CodeInstruction> instructions,
-        MethodBase __originalMethod) => MachineOnTickTranspiler(instructions, __originalMethod);
+        ILGenerator generator)
+    {
+        var userCountGetter = AccessTools.PropertyGetter(typeof(UsableMachine), nameof(UsableMachine.UserCountNotInStruckAction));
+        var authorityCheck = AccessTools.Method(typeof(SiegeMachineAuthorityPatches), nameof(IsClientForMachine));
+        int replacements = 0;
+
+        foreach (var instruction in instructions)
+        {
+            if (instruction.Calls(userCountGetter))
+            {
+                // Arrival, standing points and gate navigation run on every peer; strikes have one owner.
+                var check = new CodeInstruction(OpCodes.Ldarg_0);
+                check.MoveLabelsFrom(instruction);
+                yield return check;
+                yield return new CodeInstruction(OpCodes.Call, authorityCheck);
+                var simulate = generator.DefineLabel();
+                yield return new CodeInstruction(OpCodes.Brfalse, simulate);
+                yield return new CodeInstruction(OpCodes.Pop);
+                yield return new CodeInstruction(OpCodes.Ret);
+                instruction.labels.Add(simulate);
+                replacements++;
+            }
+
+            yield return instruction;
+        }
+
+        if (replacements != 1)
+        {
+            throw new InvalidOperationException($"Failed to patch ram strike authority: found {replacements} user-count checks.");
+        }
+    }
 
     [HarmonyPatch(typeof(StonePile), "OnTick")]
     [HarmonyTranspiler]
