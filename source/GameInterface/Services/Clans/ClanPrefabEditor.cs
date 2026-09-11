@@ -8,10 +8,27 @@ public interface IClanPrefabEditor : IGameAbstraction
     void ApplyIncomePermissions(XmlNode root);
     void AddMembershipActions(XmlNode root);
     void AddFinanceControls(XmlNode root);
+    void AddDisabledGovernorTooltip(XmlNode root);
 }
 
 public class ClanPrefabEditor : IClanPrefabEditor
 {
+    public void AddDisabledGovernorTooltip(XmlNode root)
+    {
+        var tooltip = root.SelectSingleNode("./Children/*[@Id='GovernorSelectionButton']/Children/HintWidget[@DataSource='{CurrentGovernorTooltip}']");
+        if (tooltip == null || root.SelectSingleNode("./Children/*[@Id='DisabledGovernorTooltip']") != null) return;
+
+        // Keep the hover target outside the disabled button without covering an enabled selector.
+        var overlay = root.OwnerDocument.CreateElement("Widget");
+        overlay.SetAttribute("Id", "DisabledGovernorTooltip");
+        overlay.SetAttribute("WidthSizePolicy", "StretchToParent");
+        overlay.SetAttribute("HeightSizePolicy", "StretchToParent");
+        overlay.SetAttribute("IsHidden", "@IsGovernorSelectionEnabled");
+        overlay.InnerXml = "<Children><Widget WidthSizePolicy='StretchToParent' HeightSizePolicy='StretchToParent' IsVisible='@HasGovernor'><Children/></Widget></Children>";
+        overlay.SelectSingleNode("./Children/Widget/Children").AppendChild(tooltip.CloneNode(true));
+        root.SelectSingleNode("./Children").AppendChild(overlay);
+    }
+
     public void AddFinanceControls(XmlNode root)
     {
         XmlNode anchor;

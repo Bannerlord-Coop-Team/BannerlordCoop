@@ -27,8 +27,8 @@ internal static class ClanPrefabPatches
     [HarmonyPrefix]
     public static void LoadMoviePrefix(string movieName, ref bool doNotUseGeneratedPrefabs)
     {
-        // Generated prefabs cannot bind the additional member collections.
-        if (movieName == "ClanScreen") doNotUseGeneratedPrefabs = true;
+        // Load XML so the prefab edits below take effect.
+        if (movieName == "ClanScreen" || movieName == "TownManagement") doNotUseGeneratedPrefabs = true;
     }
 
     [HarmonyPatch(typeof(WidgetTemplate), nameof(WidgetTemplate.LoadFrom))]
@@ -37,14 +37,16 @@ internal static class ClanPrefabPatches
     {
         bool members = node.Attributes?["Id"]?.Value == "ClanMembersWidget";
         bool screen = node.Attributes?["Id"]?.Value == "ClanScreenWidget";
+        bool governor = node.Attributes?["Id"]?.Value == "GovernorSelectionButtonParent";
         bool parties = node.SelectSingleNode(".//*[@Id='PartiesWageCapParent']") != null;
         bool income = node.SelectSingleNode(".//*[@Id='ManageWorkshopButton' or @Id='ManageAlleyButton']") != null;
-        if ((members || screen || income || parties) && ContainerProvider.TryResolve<IClanPrefabEditor>(out var editor))
+        if ((members || screen || income || parties || governor) && ContainerProvider.TryResolve<IClanPrefabEditor>(out var editor))
         {
             if (members) editor.AddMemberGroups(node);
             if (members || screen) editor.AddMembershipActions(node);
             if (income) editor.ApplyIncomePermissions(node);
             if (screen || parties) editor.AddFinanceControls(node);
+            if (governor) editor.AddDisabledGovernorTooltip(node);
         }
     }
 }

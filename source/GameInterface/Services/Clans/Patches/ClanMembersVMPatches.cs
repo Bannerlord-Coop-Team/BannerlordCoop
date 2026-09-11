@@ -3,6 +3,7 @@ using HarmonyLib;
 using Helpers;
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Reflection.Emit;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.ViewModelCollection;
@@ -54,6 +55,13 @@ internal static class ClanMembersVMPatches
         if (__instance is CoopClanMembersVM coop) coop.RegroupMembers();
     }
 
+    [HarmonyPatch(typeof(ClanFiefsVM), nameof(ClanFiefsVM.GetSendMembersCandidates))]
+    [HarmonyPostfix]
+    public static void GetSendMembersCandidatesPostfix(ref IEnumerable<ClanCardSelectionItemInfo> __result)
+    {
+        __result = __result.Where(candidate => !(candidate.Identifier is Hero hero) || !hero.IsPlayerHero()).ToList();
+    }
+
     [HarmonyPatch(typeof(ClanMembersVM), nameof(ClanMembersVM.SelectMember))]
     [HarmonyPrefix]
     public static bool SelectMemberPrefix(ClanMembersVM __instance, Hero hero)
@@ -96,7 +104,8 @@ internal static class ClanMembersVMPatches
     [HarmonyPostfix]
     public static void IsMainClanMemberAvailableForRelocatePostfix(Hero hero, ref bool __result, ref TextObject explanation)
     {
-        if (!__result || CoopClanPermissions.CanRecallHero(hero)) return;
+        if (!__result || CoopClanPermissions.CanRecallHero(hero) ||
+            (!hero.IsPlayerHero() && CoopClanPermissions.CanManageHero(hero))) return;
 
         __result = false;
         explanation = GameTexts.FindText("str_coop_clan_hero_recall_restricted");

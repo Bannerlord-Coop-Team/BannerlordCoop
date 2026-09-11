@@ -4,6 +4,7 @@ using Common.Messaging;
 using GameInterface.Policies;
 using GameInterface.Services.Actions.Messages;
 using GameInterface.Services.Clans;
+using GameInterface.Services.Heroes.Extensions;
 using HarmonyLib;
 using Serilog;
 using TaleWorlds.CampaignSystem;
@@ -21,7 +22,18 @@ internal class ChangeGovernorActionPatches
     [HarmonyPrefix]
     public static bool ApplyInternalPrefix(Town fortification, Hero governor)
     {
-        if (ModInformation.IsServer) return true;
+        if (ModInformation.IsServer)
+        {
+            if (governor == null || !governor.IsPlayerHero()) return true;
+            if (governor.Clan != fortification.OwnerClan || governor.GovernorOf != null ||
+                !Campaign.Current.Models.ClanPoliticsModel.CanHeroBeGovernor(governor)) return false;
+
+            // Player governors keep their party and roles instead of teleporting to the settlement.
+            var oldGovernor = fortification.Governor;
+            fortification.Governor = governor;
+            CampaignEventDispatcher.Instance.OnGovernorChanged(fortification, oldGovernor, governor);
+            return false;
+        }
         if (CallOriginalPolicy.IsOriginalAllowed()) return true;
         if (!CoopClanPermissions.CanManageClan(fortification.OwnerClan)) return false;
 

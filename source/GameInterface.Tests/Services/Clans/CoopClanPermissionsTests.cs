@@ -3,14 +3,20 @@ using Common.Util;
 using Common;
 using GameInterface.Services.Clans;
 using GameInterface.Services.Clans.Patches;
+using GameInterface.Services.Actions.Patches;
+using GameInterface.Services.MobileParties.Patches.Disable;
 using GameInterface.Services.Players;
 using GameInterface.Tests.Services.SiegeEvents;
 using HarmonyLib;
+using Helpers;
 using Moq;
 using System;
 using System.Collections.Generic;
 using System.Runtime.CompilerServices;
 using TaleWorlds.CampaignSystem;
+using TaleWorlds.CampaignSystem.Actions;
+using TaleWorlds.CampaignSystem.CharacterDevelopment;
+using TaleWorlds.CampaignSystem.GameComponents;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Settlements;
 using TaleWorlds.CampaignSystem.ViewModelCollection.ClanManagement;
@@ -235,21 +241,22 @@ public class CoopClanPermissionsTests : IDisposable
     }
 
     [Fact]
-    public void GovernorPickerExcludesPlayersAndHeroesInOtherPlayersParties()
+    public void GovernorPickerAllowsPlayerMembersButStillProtectsTheirCompanions()
     {
         SetViewer(leader);
         var unavailableCompanion = CreateHero(memberParty);
         var noGovernor = new ClanCardSelectionItemInfo(new TextObject("None"), false, null, null);
         var eligibleCompanion = CreateGovernorCandidate(companion);
+        var eligiblePlayer = CreateGovernorCandidate(member);
         IEnumerable<ClanCardSelectionItemInfo> candidates = new[]
         {
-            noGovernor, CreateGovernorCandidate(leader), CreateGovernorCandidate(member),
+            noGovernor, CreateGovernorCandidate(leader), eligiblePlayer,
             CreateGovernorCandidate(unavailableCompanion), eligibleCompanion,
         };
 
         CoopClanGovernorPatches.GetGovernorCandidatesPostfix(ref candidates);
 
-        Assert.Equal(new[] { noGovernor, eligibleCompanion }, candidates);
+        Assert.Equal(new[] { noGovernor, eligiblePlayer, eligibleCompanion }, candidates);
     }
 
     private static ClanCardSelectionItemInfo CreateGovernorCandidate(Hero hero)
