@@ -25,6 +25,7 @@ using TaleWorlds.CampaignSystem.MapEvents;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Settlements;
 using TaleWorlds.Core;
+using TaleWorlds.Localization;
 using Xunit.Abstractions;
 
 namespace E2E.Tests.Services.Issues;
@@ -181,6 +182,64 @@ public class VillageNeedsToolsIssueTests : IDisposable
                 Assert.Equal(created.NumberOfRequestedItem, mirrored._numberOfRequestedItem);
                 Assert.Equal(created.NumberOfExchangeItem, mirrored._numberOfExchangeItem);
                 Assert.Equal(created.Payment, mirrored._payment);
+            });
+        }
+    }
+
+    [Fact]
+    public void DailyTickSettlementFromVanillaCampaignFlow_NaturallyCreatesAndReplicatesAToolsIssue()
+    {
+        var fixture = SetupVillageOwner();
+
+        foreach (var instance in AllInstances)
+        {
+            instance.Call(() =>
+            {
+                if (!instance.ObjectManager.Contains(DefaultItems.Tools))
+                {
+                    Assert.True(instance.ObjectManager.AddExisting(DefaultItems.Tools.StringId, DefaultItems.Tools));
+                }
+                if (!instance.ObjectManager.Contains(DefaultItems.Grain))
+                {
+                    Assert.True(instance.ObjectManager.AddExisting(DefaultItems.Grain.StringId, DefaultItems.Grain));
+                }
+            });
+        }
+
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject<Hero>(fixture.HeroId, out var giver));
+            Assert.True(Server.ObjectManager.TryGetObject<Settlement>(fixture.SettlementId, out var settlement));
+
+            using (new AllowedThread())
+            {
+                settlement.Party ??= new PartyBase(settlement);
+                giver.Occupation = Occupation.Headman;
+                settlement.Village.Hearth = 100f;
+                settlement.Village.VillageType = new VillageType("e2e_village_type").Initialize(
+                    TextObject.GetEmpty(), null, null, null,
+                    new (ItemObject, float)[] { (DefaultItems.Grain, 1f) });
+                settlement.CollectNotablesToCache();
+            }
+            Assert.Contains(giver, settlement.Notables);
+
+            new IssuesCampaignBehavior().RegisterEvents();
+            new VillageNeedsToolsIssueBehavior().RegisterEvents();
+
+            CampaignEventDispatcher.Instance.DailyTickSettlement(settlement);
+
+            Assert.IsType<VillageNeedsToolsIssueBehavior.VillageNeedsToolsIssue>(giver.Issue);
+        });
+
+        var created = Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkVillageIssueCreated>());
+        Assert.Equal(fixture.HeroId, created.OwnerId);
+
+        foreach (var client in TestEnvironment.Clients)
+        {
+            client.Call(() =>
+            {
+                Assert.True(client.ObjectManager.TryGetObject<Hero>(fixture.HeroId, out var owner));
+                Assert.IsType<VillageNeedsToolsIssueBehavior.VillageNeedsToolsIssue>(owner.Issue);
             });
         }
     }
