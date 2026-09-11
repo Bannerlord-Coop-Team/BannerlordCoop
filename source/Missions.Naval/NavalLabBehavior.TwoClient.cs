@@ -210,6 +210,32 @@ internal sealed partial class NavalLabBehavior
         if (!ObserveStations(value)) throw new InvalidOperationException("native.station_apply_not_observed");
     }
 
+    internal bool IsCommittedOarMovement(Guid incarnationId, Guid combatantId, Agent agent)
+    {
+        if (!IsTwoClientNative || incarnationId != manifest.IncarnationId || Mission == null || Mission != Mission.Current
+            || factoryTerminal || nativeTerminalHold || !nativeDeploymentComplete || Blocker != null
+            || OwnSlot < 0 || OwnSlot >= Ships.Length || !appliedStations.TryGetValue(OwnSlot, out var stations)
+            || stations.IncarnationId != incarnationId || stations.Epoch != 1 || stations.Phase != "commit") return false;
+        int crew = Array.IndexOf(stations.Combatants, combatantId);
+        int index = (OwnSlot * NavalLabManifest.CrewPerShip) + crew + 1;
+        if (crew < 0 || crew >= 4 || stations.Keys == null || stations.Keys.Length != 4
+            || index >= Agents.Length || manifest.Combatants[index] != combatantId || Agents[index] != agent
+            || agent == null || agent.Pointer == UIntPtr.Zero || agent.Mission != Mission || !agent.IsActive()
+            || agent == Mission.MainAgent || agent.IsMainAgent || !agent.IsHuman || !agent.IsAIControlled
+            || agent.MountAgent != null || agent.IsMount) return false;
+        Dictionary<string, ShipOarMachine> inventory;
+        try { inventory = StationInventory(OwnSlot); }
+        catch (InvalidOperationException) { return false; }
+        if (!inventory.TryGetValue(stations.Keys[crew], out var machine)) return false;
+        var point = machine.PilotStandingPoint;
+        var ship = Ships[OwnSlot];
+        return ship.GameEntity.IsValid && machine.GameEntity.IsValid && point != null && point.GameEntity.IsValid
+            && !point.IsDeactivated && ship.Captain != agent && agent.Formation == ship.Formation
+            && machine._oar?.OwnerShip == ship && machine.PilotAgent == agent && point.UserAgent == agent
+            && agent.CurrentlyUsedGameObject == point && machine._isPilotSitting && machine._lastPilotAgent == agent
+            && point.LockUserFrames && agent.MovementLockedState == AgentMovementLockedState.FrameLocked;
+    }
+
     internal bool ObserveStations(NetworkNavalLabStations value)
     {
         var inventory = StationInventory(value.Ship);

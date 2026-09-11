@@ -8,6 +8,7 @@ public sealed class NavalLabBuildConfigurationTests
     public void Debug_IncludesNavalScenariosAndProductionHandlers()
     {
         Assert.NotNull(typeof(global::Missions.MissionModule).Assembly.GetType("Missions.Battles.NavalLabCoordinator"));
+        Assert.NotNull(typeof(global::Missions.Agents.Handlers.IAgentMovementHandler).GetMethod("ConfigureNavalStationMovement"));
         Assert.NotNull(typeof(NavalLabBuildConfigurationTests).Assembly.GetType(
             "E2E.Tests.Services.Missions.NavalLabRoutingTests"));
         Assert.NotNull(typeof(NavalLabBuildConfigurationTests).Assembly.GetType(
@@ -18,6 +19,9 @@ public sealed class NavalLabBuildConfigurationTests
     public void Release_ExcludesNavalScenariosAndProductionHandlers_NotNavalScenarioCoverage()
     {
         Assert.Null(typeof(global::Missions.MissionModule).Assembly.GetType("Missions.Battles.NavalLabCoordinator"));
+        Assert.Null(typeof(global::Missions.Agents.Handlers.IAgentMovementHandler).GetMethod("ConfigureNavalStationMovement"));
+        Assert.Null(typeof(global::Missions.Agents.Handlers.AgentMovementHandler).GetMethod("InspectNavalStationMovement"));
+        Assert.Null(typeof(MovementTrafficTests).GetMethod("NavalStationSuppression_DropsOnlyDueRecipientActorHistory_ExitSendsCurrentCapture"));
         Assert.Null(typeof(NavalLabBuildConfigurationTests).Assembly.GetType(
             "E2E.Tests.Services.Missions.NavalLabRoutingTests"));
         Assert.Null(typeof(NavalLabBuildConfigurationTests).Assembly.GetType(

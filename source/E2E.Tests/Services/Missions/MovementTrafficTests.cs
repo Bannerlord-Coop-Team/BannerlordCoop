@@ -37,6 +37,117 @@ public class MovementTrafficTests : MissionTestEnvironment
         this.output = output;
     }
 
+#if DEBUG
+    [Theory]
+    [InlineData("main")]
+    [InlineData("mounted")]
+    [InlineData("mount")]
+    public void NavalStationSuppression_NeverAdmitsMainOrMountsToStationPredicate(string kind)
+    {
+        using var fixture = new MissionEngineFixture();
+        var peer = Clients.First();
+        SetControllerId(peer, "peer");
+        peer.Call(() =>
+        {
+            var mock = CreateMovementMission(fixture, peer);
+            var agent = SpawnRider(mock);
+            if (kind == "main") mock.MainAgent = agent;
+            if (kind == "mounted") mock.SpawnMount(agent);
+            if (kind == "mount")
+            {
+                Assert.True(AgentMirror.TryGet(agent, out var mirror));
+                mirror.IsMount = true; mirror.IsHuman = false;
+            }
+            Assert.True(peer.Resolve<INetworkAgentRegistry>().TryRegisterAgent("peer", Guid.NewGuid(), 1, agent));
+            var handler = peer.Resolve<ICoopMissionComponent>().AgentMovementHandler;
+            handler.ConfigureNavalStationMovement(_ => throw new InvalidOperationException("excluded actor reached station predicate"));
+            handler.PollMovement(0f);
+            var network = Assert.IsType<MockBattleNetwork>(peer.Resolve<IBattleNetwork>());
+            if (kind == "mount") Assert.Single(network.NetworkSentPackets.GetPackets<MountMovementPacket>());
+            else Assert.Single(network.NetworkSentPackets.GetPackets<MovementPacket>());
+        });
+    }
+
+    [Fact]
+    public void NavalStationSuppression_DropsOnlyDueRecipientActorHistory_ExitSendsCurrentCapture()
+    {
+        using var fixture = new MissionEngineFixture();
+        var peer = Clients.First();
+        SetControllerId(peer, "owner");
+        peer.Call(() =>
+        {
+            var mock = fixture.CreateMission(peer);
+            var broker = peer.Resolve<IMessageBroker>();
+            broker.Publish(this, new NetworkMissionPeerEntered("fast", "battle"));
+            broker.Publish(this, new NetworkMissionPeerEntered("slow", "battle"));
+            var registry = peer.Resolve<INetworkAgentRegistry>();
+            var component = peer.Resolve<ICoopMissionComponent>();
+            var handler = Assert.IsType<AgentMovementHandler>(component.AgentMovementHandler);
+            var network = Assert.IsType<MockBattleNetwork>(peer.Resolve<IBattleNetwork>());
+            var rowerId = Guid.NewGuid(); var otherId = Guid.NewGuid();
+            var rower = SpawnRider(mock); var other = SpawnRider(mock);
+            Assert.True(AgentMirror.TryGet(rower, out var mirror));
+            Assert.True(AgentMirror.TryGet(other, out var otherMirror));
+            Assert.True(registry.TryRegisterAgent("owner", rowerId, 1, rower));
+            Assert.True(registry.TryRegisterAgent("owner", otherId, 2, other));
+            bool occupied = false;
+            handler.ConfigureNavalStationMovement(info => occupied && info.AgentId == rowerId);
+            handler.Configure(MovementCadenceProfile.Battle);
+            broker.Publish(this, new NetworkMovementReceiverCap("slow", 10, 1));
+            handler.PollMovement(0f);
+            component.AgentActionHandler.PollActionsAfterNativeTick();
+            var states = (IDictionary)typeof(AgentMovementHandler).GetField("recipientMovementStates", BindingFlags.Instance | BindingFlags.NonPublic)!.GetValue(handler)!;
+            IDictionary History(string recipient, string name) => (IDictionary)states[recipient]!.GetType().GetField(name)!.GetValue(states[recipient])!;
+            var equipment = (IDictionary)typeof(AgentMovementHandler).GetField("lastEquipment", BindingFlags.Instance | BindingFlags.NonPublic)!.GetValue(handler)!;
+            network.MaxUnreliablePayloadBytes = 0;
+            mirror.Position = new Vec3(10, 0, 0); otherMirror.Position = new Vec3(20, 0, 0);
+            handler.PollMovement(0.1f);
+            Assert.True(History("fast", "MovementPendingSince").Contains(rowerId));
+            Assert.True(History("slow", "MovementPendingSince").Contains(rowerId));
+            object otherBaseline = History("fast", "LastSentMovement")[otherId]!;
+            occupied = true;
+            mirror.PrimaryWieldedItemIndex = EquipmentIndex.Weapon2;
+            mirror.Action0Index = 123; mirror.Action0CodeType = Agent.ActionCodeType.ReleaseMelee;
+            network.NetworkSentPackets.Packets.Clear(); network.DirectPacketSends.Clear();
+            handler.PollMovement(0.025f);
+            component.AgentActionHandler.PollActionsAfterNativeTick();
+            Assert.False(History("fast", "LastSentMovement").Contains(rowerId));
+            Assert.False(History("fast", "MovementPendingSince").Contains(rowerId));
+            Assert.True(History("slow", "LastSentMovement").Contains(rowerId));
+            Assert.True(History("slow", "MovementPendingSince").Contains(rowerId));
+            Assert.Same(otherBaseline, History("fast", "LastSentMovement")[otherId]);
+            Assert.True(History("fast", "MovementPendingSince").Contains(otherId));
+            Assert.True(equipment.Contains(rowerId));
+            Assert.Contains(network.NetworkSentPackets.GetPackets<AgentEquipmentPacket>(), packet => packet.AgentIds.Contains((ushort)1));
+            Assert.Contains(network.NetworkSentPackets.GetPackets<AgentActionPacket>(), packet => packet.AgentIds.Contains(rowerId));
+            handler.PollMovement(0.075f);
+            Assert.False(History("slow", "LastSentMovement").Contains(rowerId));
+            Assert.False(History("slow", "MovementPendingSince").Contains(rowerId));
+            network.MaxUnreliablePayloadBytes = 1200;
+            handler.PollMovement(0.025f);
+            Assert.All(network.NetworkSentPackets.GetPackets<MovementPacket>(), packet => Assert.DoesNotContain((ushort)1, packet.AgentIds));
+            Assert.Contains(network.NetworkSentPackets.GetPackets<MovementPacket>(), packet => packet.AgentIds.Contains((ushort)2));
+            Assert.Equal(0, mirror.TeleportToPositionCalls + mirror.SetTargetPositionAndDirectionCalls + mirror.SetActionChannelCalls);
+            occupied = false;
+            mirror.Position = new Vec3(30, 0, 0);
+            network.DirectPacketSends.Clear();
+            handler.PollMovement(0.025f);
+            Assert.Contains(network.DirectPacketSends, send => send.ControllerId == "fast" && send.Packet is MovementPacket packet
+                && packet.AgentIds.Contains((ushort)1) && packet.Agents[Array.IndexOf(packet.AgentIds, (ushort)1)].Position.X == 30);
+            Assert.DoesNotContain(network.DirectPacketSends, send => send.ControllerId == "slow" && send.Packet is MovementPacket);
+            mirror.Position = new Vec3(40, 0, 0);
+            handler.PollMovement(0.05f);
+            Assert.Contains(network.DirectPacketSends, send => send.ControllerId == "slow" && send.Packet is MovementPacket packet
+                && packet.AgentIds.Contains((ushort)1) && packet.Agents[Array.IndexOf(packet.AgentIds, (ushort)1)].Position.X == 40);
+            var status = Newtonsoft.Json.Linq.JObject.FromObject(handler.InspectNavalStationMovement());
+            Assert.All(status["rows"]!, row => Assert.Equal(0, (int)row["EligibleSent"]!));
+            Assert.Contains(status["rows"]!, row => (Guid)row["CombatantId"]! == rowerId && (int)row["Withheld"]! > 0);
+            handler.ConfigureNavalStationMovement(null);
+            Assert.Empty(Newtonsoft.Json.Linq.JObject.FromObject(handler.InspectNavalStationMovement())["rows"]!);
+        });
+    }
+#endif
+
     [Fact]
     public void PollMovement_UsesFortyHertzCadenceAndSkipsUnchangedAgents()
     {

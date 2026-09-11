@@ -116,6 +116,8 @@ public sealed class NavalMissionAdapter : INavalMissionAdapter, INavalNativeMiss
     public Missions.Messages.NetworkNavalLabStations CreateStations() => behavior.CreateStations();
     public void ApplyStations(Missions.Messages.NetworkNavalLabStations stations) => behavior.ApplyStations(stations);
     public bool ObserveStations(Missions.Messages.NetworkNavalLabStations stations) => behavior.ObserveStations(stations);
+    public bool IsCommittedOarMovement(Guid incarnationId, Guid combatantId, Agent agent) =>
+        behavior?.IsCommittedOarMovement(incarnationId, combatantId, agent) == true;
     public void ApplyNativeInput(Missions.Messages.NetworkNavalLabHelmInput input) => behavior.ApplyNativeInput(input);
     public void NeutralizeNativeInput(int ship) => behavior.NeutralizeNativeInput(ship);
     public Missions.Messages.NetworkNavalLabSailState[] ReadSailStates() => behavior.ReadSailStates();

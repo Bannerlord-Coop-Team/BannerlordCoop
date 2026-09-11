@@ -33,6 +33,7 @@ public interface INavalNativeMissionAdapter
     Missions.Messages.NetworkNavalLabStations CreateStations();
     void ApplyStations(Missions.Messages.NetworkNavalLabStations stations);
     bool ObserveStations(Missions.Messages.NetworkNavalLabStations stations);
+    bool IsCommittedOarMovement(Guid incarnationId, Guid combatantId, Agent agent);
     void ApplyNativeInput(Missions.Messages.NetworkNavalLabHelmInput input);
     void NeutralizeNativeInput(int ship);
     Missions.Messages.NetworkNavalLabSailState[] ReadSailStates();

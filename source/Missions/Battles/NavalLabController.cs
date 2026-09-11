@@ -464,6 +464,7 @@ public sealed partial class NavalLabController : CoopMissionController, INavalLa
     protected override void HandleJoinInfo(NetPeer peer, NetworkMissionJoinInfo joinInfo) { }
     protected override void OnLeaving()
     {
+        coopMissionComponent.AgentMovementHandler.ConfigureNavalStationMovement(null);
         if (IsFactoryProbe) HoldFactoryProbe("leaving");
         else
         {
@@ -512,6 +513,7 @@ public sealed partial class NavalLabController : CoopMissionController, INavalLa
     {
         if (disposed) return;
         disposed = true;
+        coopMissionComponent.AgentMovementHandler.ConfigureNavalStationMovement(null);
         if (IsFactoryProbe) HoldFactoryProbe("disposed");
         else
         {

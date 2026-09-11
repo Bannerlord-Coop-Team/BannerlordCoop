@@ -42,7 +42,8 @@ public sealed partial class NavalLabController : INavalNativeController
         lastAppliedUtcTicks = lastApplied > 0 ? (long?)lastAppliedFrameUtcTicks : null,
         hostAcceptedInputSequences = nativeInputSequences.ToArray(),
         hostInputRemainingSeconds = nativeInputDeadlines.Select(deadline => Math.Max(0, deadline - Now)).ToArray(),
-        ready = NativeControlsReady
+        ready = NativeControlsReady,
+        stationMovement = coopMissionComponent.AgentMovementHandler.InspectNavalStationMovement()
     };
 
     private bool NativeAgentAuthoritiesValid => manifest.Combatants.All(id =>
@@ -55,10 +56,25 @@ public sealed partial class NavalLabController : INavalNativeController
     {
         if (!IsTwoClientNative) return;
         if (NativeAdapter == null) throw new InvalidOperationException("native.adapter_unavailable");
+        coopMissionComponent.AgentMovementHandler.ConfigureNavalStationMovement(IsCommittedOarMovement);
         NativeAdapter.ConfigureNative(() => NativeControlsReady, input =>
         {
             if (NativeControlsReady) relay.SendAll(input);
         });
+    }
+
+    private bool IsCommittedOarMovement(CoopAgentInfo info)
+    {
+        if (!IsTwoClientNative || !released || !factoryHydrated || !FactoryAssignmentValid
+            || adapter.Blocker != null || Mission == null || Mission != TaleWorlds.MountAndBlade.Mission.Current
+            || !NativeAgentAuthoritiesValid || info == null || info.OriginalOwner != session.OwnControllerId
+            || info.CurrentAuthority != info.OriginalOwner || info.AuthorityRevision != 1) return false;
+        int index = Array.IndexOf(manifest.Combatants, info.AgentId);
+        if (index < 0 || index % NavalLabManifest.CrewPerShip == 0 || adapter.Agents[index] != info.Agent
+            || !pendingStations.TryGetValue(index / NavalLabManifest.CrewPerShip, out var station)
+            || station.Phase != "commit" || station.IncarnationId != manifest.IncarnationId || station.Epoch != 1)
+            return false;
+        return NativeAdapter.IsCommittedOarMovement(manifest.IncarnationId, info.AgentId, info.Agent);
     }
 
     public NetworkNavalLabStations CreateStations()

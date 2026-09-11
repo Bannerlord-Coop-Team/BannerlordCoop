@@ -299,6 +299,84 @@ public sealed class NavalLabTwoClientNativeTests : IDisposable
             manifest.IncarnationId, 1, 0, "commit", value.Combatants, value.Keys.Reverse().ToArray())));
         Assert.Equal(4, uses); Assert.Equal(4, spawnCallbacks);
     }
+    [Theory]
+    [InlineData("matching")]
+    [InlineData("wrong_mode")]
+    [InlineData("stale_incarnation")]
+    [InlineData("stale_commit")]
+    [InlineData("stale_epoch")]
+    [InlineData("not_committed")]
+    [InlineData("missing_commit")]
+    [InlineData("missing_key")]
+    [InlineData("foreign_actor")]
+    [InlineData("captain")]
+    [InlineData("main_agent")]
+    [InlineData("mounted")]
+    [InlineData("mount")]
+    [InlineData("inactive")]
+    [InlineData("mission")]
+    [InlineData("terminal")]
+    [InlineData("native_hold")]
+    [InlineData("deployment")]
+    [InlineData("point_user")]
+    [InlineData("used_object")]
+    [InlineData("pilot")]
+    [InlineData("last_pilot")]
+    [InlineData("sitting")]
+    [InlineData("point_lock")]
+    [InlineData("frame_lock")]
+    [InlineData("point_lifetime")]
+    public void CommittedOarMovement_RequiresExactLiveCommittedOwnerStation(string condition)
+    {
+        var fixture = Fixture(condition == "wrong_mode" ? NavalLabMode.FactoryAuthorityProbe : NavalLabMode.TwoClientNative);
+        Patch(AccessTools.Method(typeof(NavalLabBehavior), "StationInventory"), nameof(Inventory));
+        Patch(AccessTools.Method(typeof(Agent), nameof(Agent.IsActive)), condition == "inactive" ? nameof(False) : nameof(True));
+        Patch(AccessTools.PropertyGetter(typeof(Agent), nameof(Agent.IsHuman)), nameof(True));
+        Patch(AccessTools.PropertyGetter(typeof(Agent), nameof(Agent.IsMainAgent)), condition == "main_agent" ? nameof(True) : nameof(False));
+        Patch(AccessTools.PropertyGetter(typeof(Agent), nameof(Agent.IsMount)), condition == "mount" ? nameof(True) : nameof(False));
+        Patch(AccessTools.PropertyGetter(typeof(Agent), nameof(Agent.MountAgent)), condition == "mounted" ? nameof(Main) : nameof(NoMount));
+        Patch(AccessTools.PropertyGetter(typeof(Agent), nameof(Agent.MovementLockedState)), condition == "frame_lock" ? nameof(Unlocked) : nameof(FrameLocked));
+        fixture.nativeDeploymentComplete = condition != "deployment";
+        fixture.factoryTerminal = condition == "terminal";
+        fixture.nativeTerminalHold = condition == "native_hold";
+        var agent = Shell<Agent>(); localMain = Shell<Agent>();
+        Set(agent, "_pointer", new UIntPtr(456));
+        Set(agent, "<Mission>k__BackingField", condition == "mission" ? null : scope.Instance);
+        fixture.Agents = new Agent[10]; fixture.Agents[1] = agent;
+        var ship = Shell<MissionShip>(); var machine = Shell<ShipOarMachine>(); var point = Shell<StandingPoint>();
+        void Entity(ScriptComponentBehavior target, ulong pointer) => Set(target, "_gameEntity",
+            Activator.CreateInstance(typeof(WeakGameEntity), BindingFlags.Instance | BindingFlags.NonPublic, null, new object[] { new UIntPtr(pointer) }, null));
+        Entity(ship, 10); Entity(machine, 11); Entity(point, condition == "point_lifetime" ? 0UL : 12UL);
+        fixture.Ships = new[] { ship, Shell<MissionShip>() };
+        Set(machine, "<PilotStandingPoint>k__BackingField", point);
+        var oar = FormatterServices.GetUninitializedObject(AccessTools.Field(typeof(ShipOarMachine), "_oar").FieldType);
+        Set(oar, "<OwnerShip>k__BackingField", ship); Set(machine, "_oar", oar);
+        Set(point, "_userAgent", condition == "point_user" ? localMain : agent);
+        Set(agent, "<CurrentlyUsedGameObject>k__BackingField", condition == "used_object" ? Shell<StandingPoint>() : point);
+        Set(machine, "_lastPilotAgent", condition == "last_pilot" ? localMain : agent);
+        Set(machine, "_isPilotSitting", condition != "sitting");
+        point.LockUserFrames = condition != "point_lock";
+        if (condition == "captain")
+        {
+            localMain = agent;
+            Patch(AccessTools.PropertyGetter(typeof(MissionShip), nameof(MissionShip.Captain)), nameof(Main));
+        }
+        if (condition == "pilot") Patch(AccessTools.PropertyGetter(typeof(UsableMachine), nameof(UsableMachine.PilotAgent)), nameof(NoMount));
+        stationInventory = new Dictionary<string, ShipOarMachine> { ["fixed-key"] = machine };
+        var id = fixture.manifest.Combatants[1]; var incarnation = fixture.manifest.IncarnationId;
+        var commit = new global::Missions.Messages.NetworkNavalLabStations(condition == "stale_commit" ? Guid.NewGuid() : incarnation,
+            condition == "stale_epoch" ? 2 : 1, 0, condition == "not_committed" ? "offer" : "commit",
+            fixture.manifest.Combatants.Skip(1).Take(4).ToArray(), new[] { condition == "missing_key" ? "other-key" : "fixed-key", "b", "c", "d" });
+        if (condition != "missing_commit") fixture.appliedStations.Add(0, commit);
+        Assert.Equal(condition == "matching", fixture.IsCommittedOarMovement(
+            condition == "stale_incarnation" ? Guid.NewGuid() : incarnation,
+            condition == "foreign_actor" ? fixture.manifest.Combatants[6] : id, agent));
+        Assert.Equal(0, stopped + assigned);
+    }
+    private static bool NoMount(ref Agent? __result) { __result = null; return false; }
+    private static bool FrameLocked(ref AgentMovementLockedState __result) { __result = AgentMovementLockedState.FrameLocked; return false; }
+    private static bool Unlocked(ref AgentMovementLockedState __result) { __result = AgentMovementLockedState.None; return false; }
+
     private static bool Inventory(ref Dictionary<string, ShipOarMachine> __result) { __result = stationInventory; return false; }
     private static bool Use(Agent __instance, UsableMissionObject usedObject)
     {

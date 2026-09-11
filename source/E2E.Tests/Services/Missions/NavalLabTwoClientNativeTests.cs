@@ -25,6 +25,93 @@ public sealed class NavalLabTwoClientNativeTests : NavalMissionTestEnvironment
         new(Manifest.IncarnationId, epoch, slot, sequence, deadline ?? DateTime.UtcNow.AddSeconds(1).Ticks,
             helm, 1, 1, 0, 0.35f, 2);
 
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void StationMovement_BothOriginalOwnersWithholdOnlyCommittedCrew_AndTeardownClearsExperiment(bool secondFirst)
+    {
+        Start(secondFirst);
+        var manifest = Manifest;
+        foreach (var client in Clients)
+        {
+            Adapter(client).CommittedOarMovement = (incarnation, id, agent) =>
+            {
+                Assert.Equal(manifest.IncarnationId, incarnation);
+                int index = Array.IndexOf(manifest.Combatants, id);
+                Assert.NotEqual(0, index % 5);
+                Assert.Same(Adapter(client).Agents[index], agent);
+                return true; // Native occupancy is substituted, not claimed by this harness.
+            };
+        }
+        Execute("complete-deployment"); Tick(First); Tick(Second);
+        foreach (var client in Clients)
+        {
+            client.Call(() => client.Resolve<E2E.Tests.Environment.Mock.MockBattleNetwork>().NetworkSentPackets.Packets.Clear());
+            Tick(client);
+            client.Call(() =>
+            {
+                var rows = Newtonsoft.Json.Linq.JObject.FromObject(Adapter(client).Controller!.NativeControlStatus())["stationMovement"]!["rows"]!;
+                Assert.Equal(4, rows.Count(row => (bool)row["LastEligible"]!));
+                Assert.All(rows.Where(row => (bool)row["LastEligible"]!), row =>
+                {
+                    Assert.True((long)row["Withheld"]! > 0);
+                    Assert.Equal(0, (long)row["EligibleSent"]!);
+                });
+                var packets = client.Resolve<E2E.Tests.Environment.Mock.MockBattleNetwork>().NetworkSentPackets
+                    .GetPackets<global::Missions.Agents.Packets.MovementPacket>();
+                Assert.All(packets.SelectMany(packet => packet.AgentIds), id => Assert.Equal(1, id % 5));
+                Assert.Contains(rows, row => !(bool)row["LastEligible"]! && (long)row["Sent"]! > 0);
+            });
+        }
+        Execute("stop");
+        foreach (var client in Clients)
+            client.Call(() =>
+            {
+                Adapter(client).Controller!.AbortStart();
+                var status = Newtonsoft.Json.Linq.JObject.FromObject(Adapter(client).Controller!.NativeControlStatus())["stationMovement"]!;
+                Assert.False((bool)status["enabled"]!);
+                Assert.Empty(status["rows"]!);
+            });
+    }
+
+    [Theory]
+    [InlineData("authority")]
+    [InlineData("revision")]
+    [InlineData("epoch")]
+    [InlineData("mission")]
+    [InlineData("hold")]
+    public void StationMovement_ControllerRejectsStaleLifetimeBeforeNativeRead(string condition)
+    {
+        Start();
+        var manifest = Manifest;
+        int nativeReads = 0;
+        Adapter(First).CommittedOarMovement = (_, _, _) => { nativeReads++; return true; };
+        bool Eligible(int index)
+        {
+            var registry = First.Resolve<INetworkAgentRegistry>();
+            Assert.True(registry.TryGetAgentInfo(manifest.Combatants[index], out var info));
+            return (bool)HarmonyLib.AccessTools.Method(typeof(NavalLabController), "IsCommittedOarMovement")
+                .Invoke(Adapter(First).Controller, new object[] { info })!;
+        }
+        First.Call(() => Assert.False(Eligible(1)));
+        Assert.Equal(0, nativeReads);
+        Execute("complete-deployment"); Tick(First); Tick(Second);
+        First.Call(() =>
+        {
+            Assert.True(Eligible(1));
+            nativeReads = 0;
+            Assert.False(Eligible(0)); Assert.False(Eligible(6));
+            Assert.Equal(0, nativeReads);
+            if (condition == "authority" || condition == "revision")
+                Assert.True(First.Resolve<INetworkAgentRegistry>().TryTransferAuthority(condition == "authority" ? "naval-B" : "naval-A", manifest.Combatants[1], 2));
+            if (condition == "epoch") First.Resolve<IBattleHostRegistry>().Set(manifest.InstanceId, new BattleHostAssignment("naval-A", new[] { "naval-B" }, 2));
+            if (condition == "mission") Adapter(First).Controller!.Mission = null;
+            if (condition == "hold") Adapter(First).Controller!.Apply(new NetworkNavalLabAction(manifest.IncarnationId, Guid.NewGuid(), 1, "hold", 0, 0, false));
+            Assert.False(Eligible(1));
+            Assert.Equal(0, nativeReads);
+        });
+    }
+
     [Fact]
     public void ControlStatus_FrameTimingAdvancesOnlyAfterSuccessfulFollowerApply()
     {

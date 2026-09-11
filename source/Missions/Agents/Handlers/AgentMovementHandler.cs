@@ -35,6 +35,8 @@ public interface IAgentMovementHandler : IPacketHandler, IDisposable
     void Configure(MovementCadenceProfile profile);
 #if DEBUG
     void ConfigureNavalLab();
+    void ConfigureNavalStationMovement(Func<CoopAgentInfo, bool> eligibility);
+    object InspectNavalStationMovement();
 #endif
 
     bool TrySetForcedBulkHz(int? hz, out string error);
@@ -72,7 +74,7 @@ internal interface IAgentMovementDebugControl
 }
 #endif
 
-public class AgentMovementHandler : IAgentMovementHandler
+public partial class AgentMovementHandler : IAgentMovementHandler
 #if DEBUG
     , IAgentMovementDebugControl
 #endif
@@ -497,6 +499,9 @@ public class AgentMovementHandler : IAgentMovementHandler
         _dismountedHorses.Clear();
         resolvedMountIdentities.Clear();
         recipientMovementStates.Clear();
+#if DEBUG
+        ConfigureNavalStationMovement(null);
+#endif
 
         movementBatchSender.Clear();
         movementRateController.Dispose();
@@ -1020,6 +1025,9 @@ public class AgentMovementHandler : IAgentMovementHandler
             }
 
             Guid agentId = captured.AgentInfo.AgentId;
+#if DEBUG
+            if (WithholdNavalStationMovement(controllerId, recipient, captured)) continue;
+#endif
             bool shouldSend = captured.IsMount
                 ? ShouldSendMovement(recipient, agentId, captured.MountData)
                 : ShouldSendMovement(recipient, agentId, captured.AgentData);
@@ -1175,6 +1183,9 @@ public class AgentMovementHandler : IAgentMovementHandler
             sentState = new LastSentMovementState();
             recipient.LastSentMovement.Add(agentId, sentState);
         }
+#if DEBUG
+        RecordNavalStationMovementSent(recipient, agentId);
+#endif
         sentState.AgentData = current;
         sentState.MountData = null;
         sentState.IsMount = false;
