@@ -69,6 +69,55 @@ internal static class DefenderSiegeFixtureCommands
         }
     }
 
+    public sealed class PrepareRosterCaptiveBaselineCoopCommand : ICoopCommand
+    {
+        public string Prefix => "coop.debug.siege";
+        public string Name => "defender_roster_fixture_prepare_captive_baseline";
+        public string Description => "Creates one reversible captive baseline for defender roster verification.";
+        public CoopCommandSide Side => CoopCommandSide.Server;
+        public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
+        {
+            new ExpectedArgs("first_controller_id", "First defender controller."),
+            new ExpectedArgs("second_controller_id", "Second defender controller.")
+        };
+        public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
+        {
+            string output = PrepareRosterCaptiveBaseline(args.ToList());
+            bool success = Newtonsoft.Json.Linq.JObject.Parse(output.Substring("LIVE_TEST_JSON=".Length)).Value<bool>("success");
+            return new CoopCommandResult(success, output, success ? null : "fixture_failed");
+        }
+    }
+
+    public sealed class RestoreRosterCaptiveBaselineCoopCommand : ICoopCommand
+    {
+        public string Prefix => "coop.debug.siege";
+        public string Name => "defender_roster_fixture_restore_captive_baseline";
+        public string Description => "Restores the pre-setup defender roster baseline.";
+        public CoopCommandSide Side => CoopCommandSide.Server;
+        public IExpectedArgs[] ExpectedArgs { get; } = Array.Empty<IExpectedArgs>();
+        public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
+        {
+            string output = RestoreRosterCaptiveBaseline(args.ToList());
+            bool success = Newtonsoft.Json.Linq.JObject.Parse(output.Substring("LIVE_TEST_JSON=".Length)).Value<bool>("success");
+            return new CoopCommandResult(success, output, success ? null : "fixture_failed");
+        }
+    }
+
+    public sealed class VerifyRosterCaptiveBaselineRestoreCoopCommand : ICoopCommand
+    {
+        public string Prefix => "coop.debug.siege";
+        public string Name => "defender_roster_fixture_verify_captive_baseline_restore";
+        public string Description => "Verifies restoration of the pre-setup defender roster baseline.";
+        public CoopCommandSide Side => CoopCommandSide.Server;
+        public IExpectedArgs[] ExpectedArgs { get; } = Array.Empty<IExpectedArgs>();
+        public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
+        {
+            string output = VerifyRosterCaptiveBaselineRestore(args.ToList());
+            bool success = Newtonsoft.Json.Linq.JObject.Parse(output.Substring("LIVE_TEST_JSON=".Length)).Value<bool>("success");
+            return new CoopCommandResult(success, output, success ? null : "fixture_failed");
+        }
+    }
+
     public sealed class ObserveRosterFixtureReadinessCoopCommand : ICoopCommand
     {
         public string Prefix => "coop.debug.siege";
@@ -207,6 +256,7 @@ internal static class DefenderSiegeFixtureCommands
 
 #if DEBUG
     private static DefenderRosterFixture rosterFixture;
+    private static DefenderRosterCaptiveBaselineFixture rosterCaptiveBaselineFixture;
 
     [ThreadStatic]
     private static DefenderRosterFixturePlayer captivityLogPlayer;
@@ -254,11 +304,222 @@ internal static class DefenderSiegeFixtureCommands
             return RosterFixtureFailure("capture",
                 "A defender roster or siege fixture lifecycle is already active.");
         }
-        if (!TryCreateRosterFixture(expectedControllerIds, out DefenderRosterFixture fixture, out string error))
+        if (rosterCaptiveBaselineFixture != null)
+        {
+            if (!rosterCaptiveBaselineFixture.HasExpectedControllers(expectedControllerIds))
+            {
+                return RosterFixtureFailure("capture",
+                    "The prepared captive baseline is stale or belongs to other controllers.");
+            }
+            if (!IsPreparedRosterCaptiveBaselineCurrent(rosterCaptiveBaselineFixture, out string baselineError))
+            {
+                return RosterFixtureFailure("capture",
+                    baselineError ?? "The prepared captive baseline is stale or belongs to other controllers.");
+            }
+        }
+        if (!TryCreateRosterFixture(
+                expectedControllerIds,
+                requireCaptive: true,
+                out DefenderRosterFixture fixture,
+                out string error))
             return RosterFixtureFailure("capture", error);
 
         rosterFixture = fixture;
         return RosterFixtureResult(fixture, "capture", success: true, reason: null);
+    }
+
+    public static string PrepareRosterCaptiveBaseline(List<string> args)
+    {
+        if (ModInformation.IsClient)
+            return RosterCaptiveBaselineFailure("prepare", "Command can only be run on the server.");
+        if (!TryGetExpectedControllerIds(args, out string[] expectedControllerIds, out _))
+        {
+            return RosterCaptiveBaselineFailure("prepare",
+                "Usage: coop.debug.siege.defender_roster_fixture_prepare_captive_baseline <firstControllerId> <secondControllerId>");
+        }
+        if (rosterCaptiveBaselineFixture != null)
+        {
+            if (!rosterCaptiveBaselineFixture.HasExpectedControllers(expectedControllerIds))
+            {
+                return RosterCaptiveBaselineResult(
+                    rosterCaptiveBaselineFixture,
+                    "prepare",
+                    success: false,
+                    reason: "The prepared captive baseline is stale or belongs to other controllers.");
+            }
+            if (!IsPreparedRosterCaptiveBaselineCurrent(rosterCaptiveBaselineFixture, out string currentError))
+            {
+                return RosterCaptiveBaselineResult(
+                    rosterCaptiveBaselineFixture,
+                    "prepare",
+                    success: false,
+                    reason: currentError ?? "The prepared captive baseline is stale or belongs to other controllers.");
+            }
+
+            return RosterCaptiveBaselineResult(rosterCaptiveBaselineFixture, "prepare", success: true, reason: null);
+        }
+        if (rosterFixture != null || pendingCapture != null || activeFixture != null || restoredFixture != null)
+        {
+            return RosterCaptiveBaselineFailure("prepare",
+                "A defender roster or siege fixture lifecycle is already active.");
+        }
+        if (!TryCreateRosterFixture(
+                expectedControllerIds,
+                requireCaptive: false,
+                out DefenderRosterFixture fixture,
+                out string error))
+        {
+            return RosterCaptiveBaselineFailure("prepare", error);
+        }
+        if (fixture.Players.Any(player => player.WasCaptive))
+        {
+            return RosterCaptiveBaselineFailure("prepare",
+                "The selected roster already has a captive baseline; do not create a second captivity setup.");
+        }
+
+        DefenderRosterFixturePlayer captive = fixture.Players[0];
+        DefenderRosterFixturePlayer captor = fixture.Players[1];
+        if (!CanPrepareRosterCaptiveBaseline(fixture, captive, captor, out error))
+            return RosterCaptiveBaselineFailure("prepare", error);
+
+        captive.CaptorParty = captor.Party.Party;
+        var baseline = new DefenderRosterCaptiveBaselineFixture(fixture, captive, captor);
+        rosterCaptiveBaselineFixture = baseline;
+        baseline.CaptureAttempted = true;
+        try
+        {
+            RunFixtureCaptivityAction(captive, release: false);
+        }
+        catch (Exception exception)
+        {
+            if (IsRosterCaptiveBaselineRestored(baseline, out _))
+            {
+                rosterCaptiveBaselineFixture = null;
+                return RosterCaptiveBaselineFailure(
+                    "prepare",
+                    "The authoritative captivity setup for " + captive.ControllerId + " threw " +
+                    exception.GetType().Name + " before changing the prepared baseline.");
+            }
+
+            return RosterCaptiveBaselineResult(
+                baseline,
+                "prepare",
+                success: false,
+                reason: "The authoritative captivity setup for " + captive.ControllerId + " threw " +
+                        exception.GetType().Name + "; preserve the retained baseline for explicit recovery.");
+        }
+
+        if (!IsPreparedRosterCaptiveBaselineCurrent(baseline, out error))
+        {
+            if (IsRosterCaptiveBaselineRestored(baseline, out _))
+            {
+                rosterCaptiveBaselineFixture = null;
+                return RosterCaptiveBaselineFailure(
+                    "prepare",
+                    "The authoritative captivity setup did not create a captive baseline.");
+            }
+
+            return RosterCaptiveBaselineResult(
+                baseline,
+                "prepare",
+                success: false,
+                reason: error ?? "The authoritative captivity setup left an ambiguous baseline.");
+        }
+
+        return RosterCaptiveBaselineResult(baseline, "prepare", success: true, reason: null);
+    }
+
+    public static string RestoreRosterCaptiveBaseline(List<string> args)
+    {
+        if (ModInformation.IsClient)
+            return RosterCaptiveBaselineFailure("restore", "Command can only be run on the server.");
+        if (args.Count != 0)
+        {
+            return RosterCaptiveBaselineFailure("restore",
+                "Usage: coop.debug.siege.defender_roster_fixture_restore_captive_baseline");
+        }
+        if (rosterCaptiveBaselineFixture == null)
+        {
+            return RosterCaptiveBaselineFailure("restore",
+                "No prepared defender captive baseline is active.");
+        }
+        if (rosterFixture != null || pendingCapture != null || activeFixture != null || restoredFixture != null)
+        {
+            return RosterCaptiveBaselineResult(
+                rosterCaptiveBaselineFixture,
+                "restore",
+                success: false,
+                reason: "Restore and verify the defender roster and siege fixture before restoring the prepared baseline.");
+        }
+
+        DefenderRosterCaptiveBaselineFixture baseline = rosterCaptiveBaselineFixture;
+        if (!HasCurrentRosterIdentities(baseline.Fixture, out string error))
+            return RosterCaptiveBaselineResult(baseline, "restore", success: false, reason: error);
+        if (baseline.RestoredPendingVerification)
+        {
+            bool restored = IsRosterCaptiveBaselineRestored(baseline, out error);
+            return RosterCaptiveBaselineResult(baseline, "restore", restored, error);
+        }
+
+        if (IsPreparedRosterCaptiveBaselineCurrent(baseline, out _))
+        {
+            try
+            {
+                RunFixtureCaptivityAction(baseline.Captive, release: true);
+            }
+            catch (Exception exception)
+            {
+                if (!IsReleasedForRestoration(baseline.Captive))
+                {
+                    return RosterCaptiveBaselineResult(
+                        baseline,
+                        "restore",
+                        success: false,
+                        reason: "The authoritative captivity restore for " + baseline.Captive.ControllerId + " threw " +
+                                exception.GetType().Name + "; the prepared baseline remains retained.");
+                }
+            }
+        }
+        else if (!IsReleasedForRestoration(baseline.Captive))
+        {
+            return RosterCaptiveBaselineResult(
+                baseline,
+                "restore",
+                success: false,
+                reason: "The prepared captive baseline is no longer safe to restore.");
+        }
+
+        if (!TryRestoreRecapturedPartySnapshot(baseline.Fixture, baseline.Captive, out error) ||
+            !RestoreCapturedPartyVisibility(baseline.Captive, out error) ||
+            !IsRosterCaptiveBaselineRestored(baseline, out error))
+        {
+            return RosterCaptiveBaselineResult(baseline, "restore", success: false, reason: error);
+        }
+
+        baseline.RestoredPendingVerification = true;
+        return RosterCaptiveBaselineResult(baseline, "restore", success: true, reason: null);
+    }
+
+    public static string VerifyRosterCaptiveBaselineRestore(List<string> args)
+    {
+        if (ModInformation.IsClient)
+            return RosterCaptiveBaselineFailure("verify-restore", "Command can only be run on the server.");
+        if (args.Count != 0)
+        {
+            return RosterCaptiveBaselineFailure("verify-restore",
+                "Usage: coop.debug.siege.defender_roster_fixture_verify_captive_baseline_restore");
+        }
+        if (rosterCaptiveBaselineFixture == null || !rosterCaptiveBaselineFixture.RestoredPendingVerification)
+        {
+            return RosterCaptiveBaselineFailure("verify-restore",
+                "No restored defender captive baseline is awaiting verification.");
+        }
+
+        DefenderRosterCaptiveBaselineFixture baseline = rosterCaptiveBaselineFixture;
+        bool restored = IsRosterCaptiveBaselineRestored(baseline, out string error);
+        if (restored)
+            rosterCaptiveBaselineFixture = null;
+        return RosterCaptiveBaselineResult(baseline, "verify-restore", restored, error);
     }
 
     public static string ObserveRosterFixtureReadiness(List<string> args)
@@ -403,6 +664,8 @@ internal static class DefenderSiegeFixtureCommands
             lifecycleClear,
             synchronizedControllers,
             observationComplete,
+            preparedCaptiveBaselineActive = rosterCaptiveBaselineFixture != null,
+            preparedCaptiveControllerId = rosterCaptiveBaselineFixture?.Captive.ControllerId,
             capturePreconditionsCurrent = campaignPresent && lifecycleClear &&
                 synchronizedControllers && observationComplete,
             players = players.ToArray()
@@ -1057,6 +1320,7 @@ internal static class DefenderSiegeFixtureCommands
 #if DEBUG
     private static bool TryCreateRosterFixture(
         string[] expectedControllerIds,
+        bool requireCaptive,
         out DefenderRosterFixture fixture,
         out string error)
     {
@@ -1079,6 +1343,18 @@ internal static class DefenderSiegeFixtureCommands
         {
             error = "Exactly the two expected player controllers must be connected and campaign-synchronized before roster capture.";
             return false;
+        }
+
+        DefenderRosterCaptiveBaselineFixture preparedBaseline = rosterCaptiveBaselineFixture;
+        if (preparedBaseline != null)
+        {
+            if (!preparedBaseline.HasExpectedControllers(expectedControllerIds) ||
+                !IsPreparedRosterCaptiveBaselineCurrent(preparedBaseline, out error))
+            {
+                if (error == null)
+                    error = "The prepared captive baseline is stale or belongs to other controllers.";
+                return false;
+            }
         }
 
         var players = new List<DefenderRosterFixturePlayer>(ExpectedPlayerCount);
@@ -1189,7 +1465,8 @@ internal static class DefenderSiegeFixtureCommands
                     party.PrisonRoster.TotalManCount,
                     protections,
                     factionProtections,
-                    wasCaptive: true));
+                    wasCaptive: true,
+                    ownedCaptiveDeltaHero: null));
                 continue;
             }
 
@@ -1216,7 +1493,19 @@ internal static class DefenderSiegeFixtureCommands
                 return false;
             }
 
-            players.Add(new DefenderRosterFixturePlayer(
+            PartyBehaviorUpdateData nonCaptiveBehavior = default;
+            if (!requireCaptive && !behaviorSnapshot.TryCreate(party, out nonCaptiveBehavior))
+            {
+                error = "The original movement state for player " + controllerId +
+                    " could not be captured for a reversible captive baseline.";
+                return false;
+            }
+
+            Hero ownedCaptiveDeltaHero = preparedBaseline != null &&
+                ReferenceEquals(player, preparedBaseline.Captor.Player)
+                ? preparedBaseline.Captive.Hero
+                : null;
+            var fixturePlayer = new DefenderRosterFixturePlayer(
                 controllerId,
                 player,
                 hero,
@@ -1228,7 +1517,7 @@ internal static class DefenderSiegeFixtureCommands
                 partyState,
                 party.LastVisitedSettlement,
                 party.Bearing,
-                default,
+                nonCaptiveBehavior,
                 hero.HeroState,
                 hero.CaptivityStartTime,
                 party._ignoredUntilTime,
@@ -1240,16 +1529,105 @@ internal static class DefenderSiegeFixtureCommands
                 party.PrisonRoster.TotalManCount,
                 CaptureAttackProtections(party),
                 CaptureFactionAttackProtections(party),
-                wasCaptive: false));
+                wasCaptive: false,
+                ownedCaptiveDeltaHero: ownedCaptiveDeltaHero);
+            if (ownedCaptiveDeltaHero != null &&
+                !MatchesUncapturedBaselineWithOwnedCaptive(fixturePlayer, ownedCaptiveDeltaHero))
+            {
+                error = "The selected captive baseline no longer owns exactly its authorized prisoner delta.";
+                return false;
+            }
+
+            players.Add(fixturePlayer);
         }
 
-        if (!players.Any(player => player.WasCaptive))
+        if (requireCaptive && !players.Any(player => player.WasCaptive))
         {
             error = "The selected roster has no captive player to normalize.";
             return false;
         }
+        if (preparedBaseline != null &&
+            (!players.Any(player => player.WasCaptive &&
+                                    ReferenceEquals(player.Hero, preparedBaseline.Captive.Hero)) ||
+             !players.Any(player => ReferenceEquals(player.Player, preparedBaseline.Captor.Player) &&
+                                    ReferenceEquals(player.OwnedCaptiveDeltaHero, preparedBaseline.Captive.Hero))))
+        {
+            error = "The prepared captive baseline no longer maps to the selected player roster.";
+            return false;
+        }
 
         fixture = new DefenderRosterFixture(expectedControllerIds, players.ToArray(), behaviorSnapshot);
+        return true;
+    }
+
+    private static bool CanPrepareRosterCaptiveBaseline(
+        DefenderRosterFixture fixture,
+        DefenderRosterFixturePlayer captive,
+        DefenderRosterFixturePlayer captor,
+        out string error)
+    {
+        if (!HasCurrentRosterIdentities(fixture, out error))
+            return false;
+        if (fixture.Players.Any(player => player.WasCaptive || !MatchesUncapturedBaseline(player)))
+        {
+            error = "Every selected player must be in the exact uncaptured baseline before captive setup.";
+            return false;
+        }
+        if (ReferenceEquals(captive, captor) || captor.Party?.Party == null ||
+            !IsCaptorReadyForRelease(captor.Party.Party))
+        {
+            error = "The selected captive and its mobile captor must be distinct and on land.";
+            return false;
+        }
+        if (captive.OriginalHeroMemberCount != 1 || captive.OriginalMemberCount != 1 ||
+            captive.OriginalPrisonerCount != 0 || captor.OriginalPrisonerCount != 0)
+        {
+            error = "The selected captive baseline must contain only its player hero and no prisoners.";
+            return false;
+        }
+
+        error = null;
+        return true;
+    }
+
+    private static bool IsPreparedRosterCaptiveBaselineCurrent(
+        DefenderRosterCaptiveBaselineFixture baseline,
+        out string error)
+    {
+        if (!HasCurrentRosterIdentities(baseline.Fixture, out error))
+            return false;
+        if (!ReferenceEquals(baseline.Captive.CaptorParty, baseline.Captor.Party.Party) ||
+            !MatchesNormalRecapture(baseline.Captive))
+        {
+            error = "The prepared captive player state is no longer current.";
+            return false;
+        }
+        if (!MatchesUncapturedBaselineWithOwnedCaptiveDelta(baseline.Captor, baseline.Captive.Hero))
+        {
+            error = "The prepared captor player no longer owns exactly the authorized captive delta.";
+            return false;
+        }
+
+        error = null;
+        return true;
+    }
+
+    private static bool IsRosterCaptiveBaselineRestored(
+        DefenderRosterCaptiveBaselineFixture baseline,
+        out string error)
+    {
+        if (!HasCurrentRosterIdentities(baseline.Fixture, out error))
+            return false;
+        foreach (DefenderRosterFixturePlayer player in baseline.Fixture.Players)
+        {
+            if (MatchesUncapturedBaseline(player))
+                continue;
+
+            error = "The pre-setup player baseline for " + player.ControllerId + " was not restored.";
+            return false;
+        }
+
+        error = null;
         return true;
     }
 
@@ -1270,7 +1648,7 @@ internal static class DefenderSiegeFixtureCommands
                 error = "The captive baseline for " + player.ControllerId + " changed before normalization.";
                 return false;
             }
-            if (!player.WasCaptive && !MatchesUncapturedBaseline(player))
+            if (!player.WasCaptive && !MatchesCapturedRosterNonCaptiveBaseline(player))
             {
                 error = "The non-captive baseline for " + player.ControllerId + " changed before normalization.";
                 return false;
@@ -1291,7 +1669,7 @@ internal static class DefenderSiegeFixtureCommands
             {
                 return false;
             }
-            if (!player.WasCaptive && !MatchesUncapturedBaseline(player))
+            if (!player.WasCaptive && !MatchesNormalizedNonCaptiveBaseline(fixture, player))
             {
                 error = "The non-captive baseline for " + player.ControllerId + " changed during normalization.";
                 return false;
@@ -1351,19 +1729,8 @@ internal static class DefenderSiegeFixtureCommands
     {
         if (!HasCurrentRosterRegistryIdentities(fixture, out error))
             return false;
-        foreach (DefenderRosterFixturePlayer player in fixture.Players)
+        foreach (DefenderRosterFixturePlayer player in fixture.Players.Where(player => player.WasCaptive))
         {
-            if (!player.WasCaptive)
-            {
-                if (!MatchesUncapturedBaseline(player))
-                {
-                    error = "The non-captive player baseline for " + player.ControllerId + " changed.";
-                    return false;
-                }
-
-                continue;
-            }
-
             bool capturedBaseline = MatchesCapturedCaptivityBaseline(player);
             bool recapturedSnapshotReplaySafe = IsRecapturedSnapshotReplaySafe(
                 fixture,
@@ -1380,6 +1747,15 @@ internal static class DefenderSiegeFixtureCommands
             }
             if (capturedBaseline || recapturedSnapshotReplaySafe)
                 continue;
+        }
+
+        foreach (DefenderRosterFixturePlayer player in fixture.Players.Where(player => !player.WasCaptive))
+        {
+            if (MatchesRestorableNonCaptiveBaseline(fixture, player))
+                continue;
+
+            error = "The non-captive player baseline for " + player.ControllerId + " changed.";
+            return false;
         }
 
         return true;
@@ -1742,6 +2118,106 @@ internal static class DefenderSiegeFixtureCommands
         HasExpectedAttackProtections(player);
 
     private static bool MatchesUncapturedBaseline(DefenderRosterFixturePlayer player) =>
+        MatchesUncapturedBaselineWithPrisonerCount(
+            player,
+            player.OriginalPrisonerCount,
+            expectedPrisoner: null,
+            expectedPrisonerPresent: false,
+            attackProtectionsCurrent: HasExpectedAttackProtections(player));
+
+    private static bool MatchesUncapturedBaselineWithOwnedCaptiveDelta(
+        DefenderRosterFixturePlayer player,
+        Hero captive) =>
+        player.OriginalPrisonerCount == 0 &&
+        MatchesUncapturedBaselineWithPrisonerCount(
+            player,
+            player.OriginalPrisonerCount + 1,
+            captive,
+            expectedPrisonerPresent: true,
+            attackProtectionsCurrent: HasExpectedAttackProtections(player));
+
+    private static bool MatchesUncapturedBaselineWithOwnedCaptive(
+        DefenderRosterFixturePlayer player,
+        Hero captive) =>
+        MatchesUncapturedBaselineWithPrisonerCount(
+            player,
+            player.OriginalPrisonerCount,
+            captive,
+            expectedPrisonerPresent: true,
+            attackProtectionsCurrent: HasExpectedAttackProtections(player));
+
+    private static bool MatchesCapturedRosterNonCaptiveBaseline(DefenderRosterFixturePlayer player) =>
+        player.OwnedCaptiveDeltaHero == null
+            ? MatchesUncapturedBaseline(player)
+            : MatchesUncapturedBaselineWithOwnedCaptive(player, player.OwnedCaptiveDeltaHero);
+
+    private static bool MatchesNormalizedNonCaptiveBaseline(
+        DefenderRosterFixture fixture,
+        DefenderRosterFixturePlayer player)
+    {
+        if (player.OwnedCaptiveDeltaHero == null)
+            return MatchesUncapturedBaseline(player);
+
+        DefenderRosterFixturePlayer ownedCaptive = FindOwnedCaptiveFixturePlayer(fixture, player);
+        return player.OriginalPrisonerCount == 1 && ownedCaptive != null &&
+            MatchesUncapturedBaselineWithPrisonerCount(
+                player,
+                player.OriginalPrisonerCount - 1,
+                player.OwnedCaptiveDeltaHero,
+                expectedPrisonerPresent: false,
+                attackProtectionsCurrent: HasExpectedOwnedCaptiveReleaseAttackProtections(player, ownedCaptive));
+    }
+
+    private static bool MatchesRestorableNonCaptiveBaseline(
+        DefenderRosterFixture fixture,
+        DefenderRosterFixturePlayer player)
+    {
+        if (player.OwnedCaptiveDeltaHero == null)
+            return MatchesNormalizedNonCaptiveBaseline(fixture, player);
+
+        DefenderRosterFixturePlayer ownedCaptive = FindOwnedCaptiveFixturePlayer(fixture, player);
+        if (ownedCaptive == null)
+            return false;
+        if (MatchesCapturedCaptivityBaseline(ownedCaptive))
+            return MatchesCapturedRosterNonCaptiveBaseline(player);
+        if (IsRecapturedSnapshotReplaySafe(fixture, ownedCaptive, out _))
+        {
+            return MatchesUncapturedBaselineWithPrisonerCount(
+                player,
+                player.OriginalPrisonerCount,
+                player.OwnedCaptiveDeltaHero,
+                expectedPrisonerPresent: true,
+                attackProtectionsCurrent: HasExpectedOwnedCaptiveReleaseAttackProtections(player, ownedCaptive));
+        }
+
+        return IsReleasedRosterRestorable(fixture, ownedCaptive, out _) &&
+            MatchesNormalizedNonCaptiveBaseline(fixture, player);
+    }
+
+    private static DefenderRosterFixturePlayer FindOwnedCaptiveFixturePlayer(
+        DefenderRosterFixture fixture,
+        DefenderRosterFixturePlayer player)
+    {
+        DefenderRosterFixturePlayer ownedCaptive = null;
+        foreach (DefenderRosterFixturePlayer candidate in fixture.Players)
+        {
+            if (!candidate.WasCaptive || !ReferenceEquals(candidate.Hero, player.OwnedCaptiveDeltaHero))
+                continue;
+            if (ownedCaptive != null)
+                return null;
+
+            ownedCaptive = candidate;
+        }
+
+        return ownedCaptive;
+    }
+
+    private static bool MatchesUncapturedBaselineWithPrisonerCount(
+        DefenderRosterFixturePlayer player,
+        int expectedPrisonerCount,
+        Hero expectedPrisoner,
+        bool expectedPrisonerPresent,
+        bool attackProtectionsCurrent) =>
         DefenderRosterFixtureContract.IsUncapturedPlayerReady(
             player.Hero.IsPrisoner,
             player.Hero.PartyBelongedToAsPrisoner != null,
@@ -1769,9 +2245,27 @@ internal static class DefenderSiegeFixtureCommands
         (player.Party.Party.GetPartyVisual() != null) == player.OriginalVisualPresent &&
         player.Party.MemberRoster.GetTroopCount(player.Hero.CharacterObject) == player.OriginalHeroMemberCount &&
         player.Party.MemberRoster.TotalManCount == player.OriginalMemberCount &&
-        player.Party.PrisonRoster.TotalManCount == player.OriginalPrisonerCount &&
+        player.Party.PrisonRoster.TotalManCount == expectedPrisonerCount &&
+        (expectedPrisoner == null || HasExpectedOwnedCaptivePrisoner(
+            player.Party.Party,
+            expectedPrisoner,
+            expectedPrisonerPresent)) &&
         player.OriginalPartyState.Equals(ReadPartyState(player.PartyId, player.Party)) &&
-        HasExpectedAttackProtections(player);
+        attackProtectionsCurrent;
+
+    private static bool HasExpectedOwnedCaptivePrisoner(
+        PartyBase captorParty,
+        Hero captive,
+        bool expectedPresent)
+    {
+        int index = captorParty.PrisonRoster.FindIndexOfTroop(captive.CharacterObject);
+        if (!expectedPresent)
+            return index < 0;
+        if (!TryGetCaptorHeroPrisonerElement(captorParty, captive, out TroopRosterElement element))
+            return false;
+
+        return element.Number == 1 && element.WoundedNumber == 0 && element.Xp == 0;
+    }
 
     private static bool IsRosterFixtureRestored(DefenderRosterFixture fixture, out string error)
     {
@@ -1781,7 +2275,7 @@ internal static class DefenderSiegeFixtureCommands
         {
             bool restored = player.WasCaptive
                 ? MatchesCapturedCaptivityBaseline(player)
-                : MatchesUncapturedBaseline(player);
+                : MatchesCapturedRosterNonCaptiveBaseline(player);
             if (restored) continue;
 
             error = "The roster fixture did not restore the captured state for " + player.ControllerId + ".";
@@ -1829,6 +2323,34 @@ internal static class DefenderSiegeFixtureCommands
             hasAtMostOneReleaseProtection,
             HasExpectedFactionAttackProtections(player.Party, player.OriginalFactionAttackProtections));
     }
+
+    private static bool HasExpectedOwnedCaptiveReleaseAttackProtections(
+        DefenderRosterFixturePlayer player,
+        DefenderRosterFixturePlayer ownedCaptive)
+    {
+        if (ownedCaptive == null || !ReferenceEquals(ownedCaptive.Hero, player.OwnedCaptiveDeltaHero))
+            return false;
+
+        AttackProtectionSnapshot[] actual = CaptureAttackProtections(player.Party);
+        bool originalPartyProtectionsCurrent = player.OriginalAttackProtections.All(expected =>
+            actual.Any(candidate => expected.Equals(candidate)));
+        bool hasOnlyOriginalAndOwnedReleaseProtection = actual.All(protection =>
+            player.OriginalAttackProtections.Any(expected => expected.Equals(protection)) ||
+            IsOwnedCaptiveReleaseAttackProtection(player, ownedCaptive, protection));
+        bool hasExactlyOneOwnedReleaseProtection = actual.Count(protection =>
+            IsOwnedCaptiveReleaseAttackProtection(player, ownedCaptive, protection)) == 1;
+        return actual.Length == player.OriginalAttackProtections.Length + 1 &&
+            originalPartyProtectionsCurrent && hasOnlyOriginalAndOwnedReleaseProtection &&
+            hasExactlyOneOwnedReleaseProtection &&
+            HasExpectedFactionAttackProtections(player.Party, player.OriginalFactionAttackProtections);
+    }
+
+    private static bool IsOwnedCaptiveReleaseAttackProtection(
+        DefenderRosterFixturePlayer player,
+        DefenderRosterFixturePlayer ownedCaptive,
+        AttackProtectionSnapshot protection) =>
+        ReferenceEquals(protection.AttackerParty, player.Party) &&
+        ReferenceEquals(protection.TargetParty, ownedCaptive.Party) && protection.DisabledUntil.IsFuture;
 
     private static bool HasExpectedAttackProtections(DefenderRosterFixturePlayer player) =>
         DefenderRosterFixtureContract.HasExactAttackProtectionRestoration(
@@ -2200,6 +2722,45 @@ internal static class DefenderSiegeFixtureCommands
             captorPartyId = GetPartyId(player.CaptorParty)
         }).ToArray()
     });
+
+    private static string RosterCaptiveBaselineFailure(string phase, string reason) => JsonResult(new
+    {
+        success = false,
+        phase,
+        reason,
+        expectedPlayerCount = ExpectedPlayerCount,
+        requiresReadinessRecheck = true
+    });
+
+    private static string RosterCaptiveBaselineResult(
+        DefenderRosterCaptiveBaselineFixture baseline,
+        string phase,
+        bool success,
+        string reason) => JsonResult(new
+    {
+        success,
+        phase,
+        reason,
+        expectedPlayerCount = ExpectedPlayerCount,
+        expectedControllerIds = baseline.Fixture.ExpectedControllerIds,
+        captiveControllerId = baseline.Captive.ControllerId,
+        captorControllerId = baseline.Captor.ControllerId,
+        captureAttempted = baseline.CaptureAttempted,
+        restoreRequired = !baseline.RestoredPendingVerification,
+        restoredPendingVerification = baseline.RestoredPendingVerification,
+        requiresReadinessRecheck = true,
+        players = baseline.Fixture.Players.Select(player => new
+        {
+            controllerId = player.ControllerId,
+            heroId = player.Hero.StringId,
+            partyId = player.PartyId,
+            partyStringId = player.Party.StringId,
+            heroIsPrisoner = player.Hero.IsPrisoner,
+            heroHasCaptor = player.Hero.PartyBelongedToAsPrisoner != null,
+            partyActive = player.Party.IsActive,
+            partyVisible = player.Party.IsVisible
+        }).ToArray()
+    });
 #endif
 
     private static string GetPartyId(PartyBase party) =>
@@ -2300,6 +2861,29 @@ internal static class DefenderSiegeFixtureCommands
         }
     }
 
+    private sealed class DefenderRosterCaptiveBaselineFixture
+    {
+        public DefenderRosterFixture Fixture { get; }
+        public DefenderRosterFixturePlayer Captive { get; }
+        public DefenderRosterFixturePlayer Captor { get; }
+        public bool CaptureAttempted { get; set; }
+        public bool RestoredPendingVerification { get; set; }
+
+        public DefenderRosterCaptiveBaselineFixture(
+            DefenderRosterFixture fixture,
+            DefenderRosterFixturePlayer captive,
+            DefenderRosterFixturePlayer captor)
+        {
+            Fixture = fixture;
+            Captive = captive;
+            Captor = captor;
+        }
+
+        public bool HasExpectedControllers(IEnumerable<string> controllerIds) =>
+            DefenderSiegeFixtureContract.HasExactControllerIds(
+                Fixture.ExpectedControllerIds, controllerIds);
+    }
+
     private sealed class DefenderRosterFixturePlayer
     {
         public string ControllerId { get; }
@@ -2307,7 +2891,7 @@ internal static class DefenderSiegeFixtureCommands
         public Hero Hero { get; }
         public string PartyId { get; }
         public MobileParty Party { get; }
-        public PartyBase CaptorParty { get; }
+        public PartyBase CaptorParty { get; set; }
         public MobileParty OriginalHeroParty { get; }
         public Hero OriginalLeaderHero { get; }
         public DefenderFixturePartyState OriginalPartyState { get; }
@@ -2326,6 +2910,7 @@ internal static class DefenderSiegeFixtureCommands
         public AttackProtectionSnapshot[] OriginalAttackProtections { get; }
         public FactionAttackProtectionSnapshot[] OriginalFactionAttackProtections { get; }
         public bool WasCaptive { get; }
+        public Hero OwnedCaptiveDeltaHero { get; }
         public bool RestoreCompleted { get; set; }
 
         public DefenderRosterFixturePlayer(
@@ -2352,7 +2937,8 @@ internal static class DefenderSiegeFixtureCommands
             int originalPrisonerCount,
             AttackProtectionSnapshot[] originalAttackProtections,
             FactionAttackProtectionSnapshot[] originalFactionAttackProtections,
-            bool wasCaptive)
+            bool wasCaptive,
+            Hero ownedCaptiveDeltaHero)
         {
             ControllerId = controllerId;
             Player = player;
@@ -2378,6 +2964,7 @@ internal static class DefenderSiegeFixtureCommands
             OriginalAttackProtections = originalAttackProtections;
             OriginalFactionAttackProtections = originalFactionAttackProtections;
             WasCaptive = wasCaptive;
+            OwnedCaptiveDeltaHero = ownedCaptiveDeltaHero;
         }
     }
 

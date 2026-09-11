@@ -83,6 +83,7 @@ public class SiegeMachineStateReplicator : ISiegeMachineStateReplicator
     // States that arrived before their MissionObject registered (catch-up during a peer's scene load);
     // re-applied once the object appears. Keyed by machine id, latest state wins.
     private readonly Dictionary<int, NetworkSiegeMachineState> pendingByMachineId = new Dictionary<int, NetworkSiegeMachineState>();
+    private readonly Dictionary<int, NetworkSiegeMachineAuthority> pendingStoneHandoffs = new();
     private readonly Dictionary<int, NetworkSiegeLadderAnimationState> pendingLadderAnimationsById =
         new Dictionary<int, NetworkSiegeLadderAnimationState>();
     // Peer-side: last RangedSiegeWeapon.WeaponState applied per machine, so the wind-up/reload animation fires
@@ -185,6 +186,7 @@ public class SiegeMachineStateReplicator : ISiegeMachineStateReplicator
             lastSentLadderAnimations.Clear();
             deactivated.Clear();
             pendingByMachineId.Clear();
+            pendingStoneHandoffs.Clear();
             pendingLadderAnimationsById.Clear();
             peerWeaponState.Clear();
             claimedMachines.Clear();
@@ -1020,6 +1022,15 @@ public class SiegeMachineStateReplicator : ISiegeMachineStateReplicator
         NormalizeAuthorityForCurrentHost(machineId, initializeIfMissing: false);
         int hostEpoch = session.HostEpoch;
         if (GetAuthorityEpoch(machineId) > hostEpoch) return;
+        int stoneAmmo = -1;
+        if (!string.IsNullOrEmpty(controllerId)
+            && controllerId != session.OwnControllerId
+            && SiegeMissionAuthorityGate.IsMachineSimulatedLocally(machineId)
+            && machinesById.TryGetValue(machineId, out var machine)
+            && machine is StonePile stonePile)
+        {
+            stoneAmmo = stonePile.AmmoCount;
+        }
         int authorityRevision = GetAuthorityEpoch(machineId) == hostEpoch
             ? GetAuthorityRevision(machineId) + 1
             : 1;
@@ -1046,7 +1057,8 @@ public class SiegeMachineStateReplicator : ISiegeMachineStateReplicator
             controllerId ?? string.Empty,
             hostEpoch,
             authorityRevision,
-            session.OwnControllerId));
+            session.OwnControllerId,
+            stoneAmmo));
         AuthorityChanged?.Invoke(machineId);
         RefreshMachineGates();
     }
@@ -1103,6 +1115,12 @@ public class SiegeMachineStateReplicator : ISiegeMachineStateReplicator
             }
 
             pendingClaimSeconds.Remove(obj.MachineId);
+            if (authorityOrder > 0)
+            {
+                pendingStoneHandoffs.Remove(obj.MachineId);
+                if (obj.HasStoneAmmo) pendingStoneHandoffs[obj.MachineId] = obj;
+            }
+            DrainPendingMachineStates();
             PushClaimsToGate();
             if (authorityOrder > 0 && SiegeMissionAuthorityGate.IsMachineSimulatedLocally(obj.MachineId))
             {
@@ -1147,7 +1165,7 @@ public class SiegeMachineStateReplicator : ISiegeMachineStateReplicator
         var remotelyClaimed = new HashSet<int>();
         foreach (var claim in claimedMachines)
         {
-            if (claim.Value == session.OwnControllerId)
+            if (claim.Value == session.OwnControllerId && !pendingStoneHandoffs.ContainsKey(claim.Key))
             {
                 locallyClaimed.Add(claim.Key);
             }
@@ -1206,8 +1224,39 @@ public class SiegeMachineStateReplicator : ISiegeMachineStateReplicator
     // buffer only fills from received states, so a client that receives none skips it.
     private void DrainPendingMachineStates()
     {
+        DrainPendingStoneHandoffs();
         DrainPendingGeneralMachineStates();
         DrainPendingLadderAnimationStates();
+        PushClaimsToGate();
+    }
+
+    private void DrainPendingStoneHandoffs()
+    {
+        foreach (var entry in new List<KeyValuePair<int, NetworkSiegeMachineAuthority>>(pendingStoneHandoffs))
+        {
+            var handoff = entry.Value;
+            if (handoff.HostEpoch != GetAuthorityEpoch(entry.Key)
+                || handoff.AuthorityRevision != GetAuthorityRevision(entry.Key)
+                || handoff.SenderControllerId != GetAuthorityHostController(entry.Key))
+            {
+                pendingStoneHandoffs.Remove(entry.Key);
+                continue;
+            }
+            if (!machinesById.TryGetValue(entry.Key, out var machine)) continue;
+
+            bool wasSuppressed = SiegeMissionAuthorityGate.SuppressCapture;
+            SiegeMissionAuthorityGate.SuppressCapture = true;
+            try
+            {
+                // Apply the baseline before any buffered pickup from the new simulator.
+                if (machine is StonePile pile) pile.SetAmmo(handoff.StoneAmmo);
+                pendingStoneHandoffs.Remove(entry.Key);
+            }
+            finally
+            {
+                SiegeMissionAuthorityGate.SuppressCapture = wasSuppressed;
+            }
+        }
     }
 
     private void DrainPendingGeneralMachineStates()
@@ -1386,6 +1435,7 @@ public class SiegeMachineStateReplicator : ISiegeMachineStateReplicator
                 }
             }
 
+            DrainPendingStoneHandoffs();
             var stateToApply = ReconcilePendingMachineStateForLiveApply(obj);
             SiegeMissionAuthorityGate.SuppressCapture = true;
             try
@@ -1397,6 +1447,7 @@ public class SiegeMachineStateReplicator : ISiegeMachineStateReplicator
                 SiegeMissionAuthorityGate.SuppressCapture = false;
             }
 
+            PushClaimsToGate();
             // A machine we simulate runs its own weapon state machine; a stale pre-claim broadcast
             // must not drive its arm animation or aim.
             if (!SiegeMissionAuthorityGate.IsMachineSimulatedLocally(obj.MachineId))

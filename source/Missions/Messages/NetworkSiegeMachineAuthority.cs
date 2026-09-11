@@ -29,17 +29,25 @@ public class NetworkSiegeMachineAuthority : IEvent
     [ProtoMember(5)]
     public readonly string SenderControllerId;
 
+    [ProtoMember(6)]
+    public readonly int StoneAmmo;
+    [ProtoMember(7)]
+    public readonly bool HasStoneAmmo;
+
     public NetworkSiegeMachineAuthority(
         int machineId,
         string controllerId,
         int hostEpoch = 0,
         int authorityRevision = 0,
-        string senderControllerId = null)
+        string senderControllerId = null,
+        int stoneAmmo = -1)
     {
         MachineId = machineId;
         ControllerId = controllerId;
         HostEpoch = hostEpoch;
         AuthorityRevision = authorityRevision;
         SenderControllerId = senderControllerId;
+        StoneAmmo = stoneAmmo;
+        HasStoneAmmo = stoneAmmo >= 0;
     }
 }
