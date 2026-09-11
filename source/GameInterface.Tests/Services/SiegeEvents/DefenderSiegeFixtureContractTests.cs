@@ -113,13 +113,13 @@ public class DefenderSiegeFixtureContractTests
 
 #if DEBUG
     [Fact]
-    public void CaptiveRosterBaseline_RequiresTheNormalParkedPlayerState()
+    public void CaptiveRosterBaseline_RequiresTheAuthoritativePostCapturePlayerState()
     {
         Assert.True(CaptiveRosterBaseline());
         Assert.False(CaptiveRosterBaseline(heroStateIsPrisoner: false));
         Assert.False(CaptiveRosterBaseline(captorPartyIsActive: false));
         Assert.False(CaptiveRosterBaseline(partyActive: true));
-        Assert.False(CaptiveRosterBaseline(partyVisible: true));
+        Assert.False(CaptiveRosterBaseline(partyVisible: false));
         Assert.False(CaptiveRosterBaseline(partyHasVisual: true));
         Assert.False(CaptiveRosterBaseline(partyPrisonerCount: 1));
         Assert.False(CaptiveRosterBaseline(captorHeroWoundedNumber: 1));
@@ -453,7 +453,7 @@ public class DefenderSiegeFixtureContractTests
         int captorHeroWoundedNumber = 0,
         int captorHeroXp = 0,
         bool partyActive = false,
-        bool partyVisible = false,
+        bool partyVisible = true,
         bool partyHasVisual = false,
         bool partyHasLeader = false,
         int partyHeroMemberCount = 0,

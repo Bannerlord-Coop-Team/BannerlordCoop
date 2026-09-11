@@ -3279,7 +3279,7 @@ internal static class DefenderRosterFixtureContract
         heroIsPrisoner && heroHasCaptor && captorPartyIsActive && !heroHasParty && heroStateIsPrisoner &&
         captorHeroCount == 1 &&
         captorHeroWoundedNumber == 0 && captorHeroXp == 0 &&
-        !partyActive && !partyVisible && !partyHasVisual && !partyHasLeader &&
+        !partyActive && partyVisible && !partyHasVisual && !partyHasLeader &&
         partyHeroMemberCount == 0 && partyMemberCount == 0 && partyPrisonerCount == 0 &&
         !partyHasCurrentSettlement && !partyHasMapEvent && !partyHasBesiegerCamp &&
         !partyIsTransitioning && !partyHasArmy && !partyHasAttachedTo &&

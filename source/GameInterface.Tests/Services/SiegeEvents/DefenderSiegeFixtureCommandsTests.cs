@@ -368,7 +368,7 @@ public sealed class DefenderSiegeFixtureCommandsTests : IDisposable
             Assert.True(player.Hero.IsPrisoner);
             Assert.Same(player.Captor.Party, player.Hero.PartyBelongedToAsPrisoner);
             Assert.False(player.Party.IsActive);
-            Assert.False(player.Party.IsVisible);
+            Assert.True(player.Party.IsVisible);
         });
         AssertSuccess(Verify());
         Assert.Null(RosterFixture.GetValue(null));
@@ -406,6 +406,8 @@ public sealed class DefenderSiegeFixtureCommandsTests : IDisposable
         AssertSuccess(PrepareCaptiveBaseline());
         Assert.NotNull(RosterCaptiveBaselineFixture.GetValue(null));
         Assert.True(captives[0].Hero.IsPrisoner);
+        Assert.False(captives[0].Party.IsActive);
+        Assert.True(captives[0].Party.IsVisible);
         Assert.False(captives[1].Hero.IsPrisoner);
         Assert.Equal(1, captives[1].Party.PrisonRoster.GetTroopCount(target.Hero.CharacterObject));
         Assert.Equal(1, captives[1].Party.PrisonRoster.TotalManCount);
@@ -1362,7 +1364,7 @@ public sealed class DefenderSiegeFixtureCommandsTests : IDisposable
         player.Hero._partyBelongedTo = null;
         player.Hero.PartyBelongedToAsPrisoner = captor.Party;
         player.Party.IsActive = false;
-        player.Party._isVisible = false;
+        player.Party._isVisible = true;
         player.Party._partyComponent = null;
         player.Party.Party.MemberRoster = new TroopRoster();
         captor.Party.PrisonRoster = new TroopRoster();
