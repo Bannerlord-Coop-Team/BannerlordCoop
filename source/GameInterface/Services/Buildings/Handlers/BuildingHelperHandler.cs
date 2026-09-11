@@ -137,26 +137,30 @@ internal class BuildingHelperHandler : IHandler
 
     private void Handle_BoostBuildingProcessWithGold(MessagePayload<BoostBuildingProcessWithGold> obj)
     {
-        var data = obj.What;
-
         GameThread.RunSafe(() =>
         {
-            if (!objectManager.TryGetObjectWithLogging<Town>(data.TownId, out var town)) return;
-            if (!objectManager.TryGetObjectWithLogging<Hero>(data.HeroId, out var hero)) return;
-
-            int difference = 0;
-            if (data.Gold < town.BoostBuildingProcess)
-            {
-                difference = town.BoostBuildingProcess - data.Gold;
-                GiveGoldAction.ApplyBetweenCharacters(null, hero, difference, false);
-            }
-            else if (data.Gold > town.BoostBuildingProcess)
-            {
-                difference = data.Gold - town.BoostBuildingProcess;
-                GiveGoldAction.ApplyBetweenCharacters(hero, null, difference, false);
-            }
-            town.BoostBuildingProcess = data.Gold;
+            // Keep the town.BoostBuildingProcess field write in a named method so TownSync can register it
+            ApplyBoostBuildingProcessWithGold(obj.What);
         });
+    }
+    
+    internal void ApplyBoostBuildingProcessWithGold(BoostBuildingProcessWithGold data)
+    {
+        if (!objectManager.TryGetObjectWithLogging<Town>(data.TownId, out var town)) return;
+        if (!objectManager.TryGetObjectWithLogging<Hero>(data.HeroId, out var hero)) return;
+
+        int difference = 0;
+        if (data.Gold < town.BoostBuildingProcess)
+        {
+            difference = town.BoostBuildingProcess - data.Gold;
+            GiveGoldAction.ApplyBetweenCharacters(null, hero, difference, false);
+        }
+        else if (data.Gold > town.BoostBuildingProcess)
+        {
+            difference = data.Gold - town.BoostBuildingProcess;
+            GiveGoldAction.ApplyBetweenCharacters(hero, null, difference, false);
+        }
+        town.BoostBuildingProcess = data.Gold;
     }
 
     private void Handle_RefreshPlayerSettlementManagementVM(MessagePayload<RefreshPlayerSettlementManagementVM> obj)
