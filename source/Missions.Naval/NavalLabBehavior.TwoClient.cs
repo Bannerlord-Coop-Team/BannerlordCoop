@@ -236,18 +236,46 @@ internal sealed partial class NavalLabBehavior
             && point.LockUserFrames && agent.MovementLockedState == AgentMovementLockedState.FrameLocked;
     }
 
-    internal bool ObserveStations(NetworkNavalLabStations value)
+    internal void RefreshFollowerStationTargets()
+    {
+        if (!IsTwoClientNative || factoryHost || !factoryReleased || factoryTerminal || nativeTerminalHold
+            || Mission == null || Mission != Mission.Current)
+            throw new InvalidOperationException("native.station_target_lifecycle");
+        foreach (var stations in appliedStations.Values)
+        {
+            if (stations.IncarnationId != manifest.IncarnationId || stations.Epoch != 1 || stations.Phase != "commit"
+                || !ObserveStations(stations, refreshTargets: true))
+                throw new InvalidOperationException("native.station_occupancy_lost");
+        }
+    }
+
+    internal bool ObserveStations(NetworkNavalLabStations value) => ObserveStations(value, refreshTargets: false);
+
+    private bool ObserveStations(NetworkNavalLabStations value, bool refreshTargets)
     {
         var inventory = StationInventory(value.Ship);
         for (int i = 0; i < 4; i++)
         {
             if (!inventory.TryGetValue(value.Keys[i], out var machine)) return false;
             var agent = Agents[(value.Ship * 5) + i + 1];
+            var point = machine.PilotStandingPoint;
+            var ship = Ships[value.Ship];
+            if (refreshTargets && (agent == null || agent.Pointer == UIntPtr.Zero || agent.Mission != Mission
+                || agent == Mission.MainAgent || agent.IsMainAgent || !agent.IsHuman || agent.MountAgent != null || agent.IsMount
+                || !ship.GameEntity.IsValid || !machine.GameEntity.IsValid || point == null || !point.GameEntity.IsValid
+                || point.IsDeactivated || ship.Captain == agent || agent.Formation != ship.Formation
+                || machine._oar?.OwnerShip != ship || !point.LockUserFrames
+                || agent.MovementLockedState != AgentMovementLockedState.FrameLocked)) return false;
             if (agent == null || !agent.IsActive()
                 || (manifest.Controllers[value.Ship] == ownControllerId ? !agent.IsAIControlled : agent.Controller != AgentControllerType.None)
                 || machine.PilotAgent != agent || machine.PilotStandingPoint.UserAgent != agent
                 || agent.CurrentlyUsedGameObject != machine.PilotStandingPoint || !machine._isPilotSitting || machine._lastPilotAgent != agent)
                 return false;
+            if (refreshTargets)
+            {
+                var frame = point.GetUserFrameForAgent(agent);
+                agent.SetTargetPositionAndDirection(frame.Origin.AsVec2, in frame.Rotation.f);
+            }
         }
         return true;
     }

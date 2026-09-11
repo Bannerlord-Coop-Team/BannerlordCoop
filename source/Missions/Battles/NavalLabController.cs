@@ -52,7 +52,7 @@ public sealed partial class NavalLabController : CoopMissionController, INavalLa
     private long supersededSamples;
     private long rejectedSamples;
     private long pendingReceivedCallback;
-    private long pendingAppliedCallback;
+    private long? pendingAppliedCallback;
     private NetworkNavalLabFrames pendingSample;
     private double nextSample;
     private bool probeDriving;
@@ -274,6 +274,7 @@ public sealed partial class NavalLabController : CoopMissionController, INavalLa
 
     private void CancelControls(string reason)
     {
+        ClearHullTargets();
         measurement.Cancel(reason);
         probeDriving = false;
         nativeControlsReleased = false;
@@ -285,6 +286,7 @@ public sealed partial class NavalLabController : CoopMissionController, INavalLa
     private void CompletePending(string error = null)
     {
         if (pendingSample == null) return;
+        if (error == null && IsTwoClientNative && !pendingAppliedCallback.HasValue) return;
         var sample = pendingSample;
         pendingSample = null;
         measurement.Add(sample.Sequence, sample.SourceCallback, pendingReceivedCallback, pendingAppliedCallback,
@@ -294,6 +296,7 @@ public sealed partial class NavalLabController : CoopMissionController, INavalLa
     private object CaptureNative() => new
     {
         observed = adapter.Inspect(),
+        hullInterpolation = IsTwoClientNative ? HullInterpolationStatus() : null,
         authorities = manifest.Combatants.Select(id =>
         {
             bool found = coopMissionComponent.AgentRegistry.TryGetAgentInfo(id, out var info);
@@ -340,6 +343,7 @@ public sealed partial class NavalLabController : CoopMissionController, INavalLa
             released = false;
             relay.SendAll(new NetworkNavalLabFault(manifest.IncarnationId, adapter.Blocker));
         }
+        TickFollowerHull(dt);
         if (probeDriving) adapter.SetHelm(probeShip, probeRudder, probeRow);
         if (inputDeadline > 0 && Now >= inputDeadline)
         {
@@ -414,7 +418,7 @@ public sealed partial class NavalLabController : CoopMissionController, INavalLa
             receivedGaps += Math.Max(0, message.Sequence - lastReceived - 1);
             lastReceived = message.Sequence;
             bool applied;
-            try { applied = adapter.ApplyFrames(frames); }
+            try { applied = IsTwoClientNative ? AcceptHullTarget(message, frames) : adapter.ApplyFrames(frames); }
             catch (Exception exception)
             {
                 CompletePending("interrupted_by_failed_apply");
@@ -437,13 +441,12 @@ public sealed partial class NavalLabController : CoopMissionController, INavalLa
             if (pendingSample != null)
             {
                 supersededSamples++;
-                CompletePending("superseded_before_next_mission_callback");
+                CompletePending(IsTwoClientNative && !pendingAppliedCallback.HasValue
+                    ? "superseded_before_interpolation_endpoint" : "superseded_before_next_mission_callback");
             }
-            lastApplied = message.Sequence;
+            if (!IsTwoClientNative) lastApplied = message.Sequence;
             if (IsTwoClientNative)
             {
-                lastAppliedFrameSourceCallback = message.SourceCallback;
-                lastAppliedFrameUtcTicks = DateTime.UtcNow.Ticks;
                 if (sailReadyAtReceive && NativeControlsReady) NativeAdapter.ApplySailFeedback(message);
                 else NativeAdapter.ClearSailFeedback();
             }
@@ -453,7 +456,7 @@ public sealed partial class NavalLabController : CoopMissionController, INavalLa
                 {
                     pendingSample = message;
                     pendingReceivedCallback = receivedCallback;
-                    pendingAppliedCallback = callback;
+                    pendingAppliedCallback = !IsTwoClientNative || lastApplied == message.Sequence ? callback : (long?)null;
                 }
                 else rejectedSamples++;
             }

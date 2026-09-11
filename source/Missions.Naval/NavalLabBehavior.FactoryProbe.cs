@@ -181,7 +181,7 @@ internal sealed partial class NavalLabBehavior
         parallelFixedEntries = Interlocked.Read(ref factoryParallelEntries), activeParallelFixedEntries = Interlocked.Read(ref factoryActiveParallelEntries),
         trace = factoryTrace.ToArray(), traceLimit = 16,
         unobserved = "native prefab/body creation before managed NavalPhysics callbacks; native solver and other force APIs; no parallel barrier",
-        followerFrameSemantics = "SetGlobalFrame(isTeleportation:true) plus navmesh; experimental contact, no support correction"
+        followerFrameSemantics = IsTwoClientNative ? "Hull lerp, SetGlobalFrame(isTeleportation:false), navmesh and committed oar user target refresh; no native position lock guarantee" : "SetGlobalFrame(isTeleportation:true) plus navmesh; experimental contact, no support correction"
     };
 }
 #endif

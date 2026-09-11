@@ -62,11 +62,11 @@ public sealed class NavalLabFactoryAuthorityProbeTests : IDisposable
         finally { field.SetValue(null, previous); }
     }
 
-    private MissionShip Prepare(bool host)
+    private MissionShip Prepare(bool host, NavalLabMode mode = NavalLabMode.FactoryAuthorityProbe)
     {
         var id = Guid.NewGuid();
         var manifest = new NavalLabManifest("naval-lab:" + id.ToString("N"), id, new[] { "A", "B" },
-            Enumerable.Range(0, 10).Select(_ => Guid.NewGuid()).ToArray(), new[] { Guid.NewGuid(), Guid.NewGuid() }, NavalLabMode.FactoryAuthorityProbe);
+            Enumerable.Range(0, 10).Select(_ => Guid.NewGuid()).ToArray(), new[] { Guid.NewGuid(), Guid.NewGuid() }, mode);
         behavior = new NavalLabBehavior(manifest, "A", null!, null!);
         AccessTools.PropertySetter(typeof(MissionBehavior), nameof(MissionBehavior.Mission)).Invoke(behavior, new object[] { Shell<Mission>() });
         behavior.Ships = new MissionShip[2];
@@ -95,6 +95,57 @@ public sealed class NavalLabFactoryAuthorityProbeTests : IDisposable
         AccessTools.PropertySetter(typeof(MissionShip), nameof(MissionShip.ShipsLogic)).Invoke(ship, new object[] { shipsLogic });
         activeBodies.Add(new UIntPtr(41));
         return ship;
+    }
+
+    private readonly List<(UIntPtr entity, bool teleportation, float x)> frameWrites = new();
+    private readonly List<UIntPtr> navigationUpdates = new();
+    private static bool FrameWrite(WeakGameEntity __instance, in TaleWorlds.Library.MatrixFrame frame, bool isTeleportation)
+    {
+        current.frameWrites.Add((__instance.Pointer, isTeleportation, frame.origin.x));
+        return false;
+    }
+    private static bool NavigationUpdate(WeakGameEntity __instance)
+    {
+        current.navigationUpdates.Add(__instance.Pointer);
+        return false;
+    }
+
+    [Theory]
+    [InlineData(NavalLabMode.TwoClientNative, false)]
+    [InlineData(NavalLabMode.FactoryAuthorityProbe, true)]
+    [InlineData(NavalLabMode.Activation, true)]
+    [InlineData(NavalLabMode.HeldHelm, true)]
+    public void ApplyFrames_UpdatesBothHullAndNavmesh_OnlyTwoClientNativeUsesFalse(NavalLabMode mode, bool teleportation)
+    {
+        var first = Prepare(false, mode);
+        var second = Shell<MissionShip>();
+        var entity = Activator.CreateInstance(typeof(WeakGameEntity), BindingFlags.Instance | BindingFlags.NonPublic,
+            null, new object[] { new UIntPtr(42) }, null);
+        typeof(ScriptComponentBehavior).GetField("_gameEntity", BindingFlags.NonPublic | BindingFlags.Instance)!.SetValue(second, entity);
+        behavior.Ships = new[] { first, second };
+        behavior.completedFactoryHulls = behavior.Ships;
+        behavior.factoryMaterialized = true;
+        activeBodies.Clear();
+        harmony.Patch(AccessTools.Method(typeof(WeakGameEntity), nameof(WeakGameEntity.SetGlobalFrame)),
+            prefix: new HarmonyMethod(GetType(), nameof(FrameWrite)));
+        harmony.Patch(AccessTools.Method(typeof(WeakGameEntity), nameof(WeakGameEntity.UpdateAttachedNavigationMeshFaces)),
+            prefix: new HarmonyMethod(GetType(), nameof(NavigationUpdate)));
+        var adapter = new NavalMissionAdapter();
+        AccessTools.Field(typeof(NavalMissionAdapter), "behavior").SetValue(adapter, behavior);
+        var frames = new[] { TaleWorlds.Library.MatrixFrame.Identity, TaleWorlds.Library.MatrixFrame.Identity };
+        frames[0].origin.x = 3; frames[1].origin.x = 7;
+        Assert.True(adapter.ApplyFrames(frames));
+        Assert.Equal(new[] { (new UIntPtr(41), teleportation, 3f), (new UIntPtr(42), teleportation, 7f) }, frameWrites);
+        Assert.Equal(new[] { new UIntPtr(41), new UIntPtr(42) }, navigationUpdates);
+        Assert.Equal(0, enables);
+        Assert.Empty(activeBodies);
+        if (mode == NavalLabMode.TwoClientNative)
+        {
+            behavior.factoryTerminal = true;
+            Assert.False(adapter.ApplyFrames(frames));
+            Assert.Equal(2, frameWrites.Count);
+            Assert.Equal(2, navigationUpdates.Count);
+        }
     }
 
     [Theory]

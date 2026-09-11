@@ -119,7 +119,9 @@ public sealed class NavalLabTwoClientNativeTests : NavalMissionTestEnvironment
         Newtonsoft.Json.Linq.JObject Status() => Newtonsoft.Json.Linq.JObject.FromObject(
             ((INavalNativeController)Adapter(Second).Controller!).NativeControlStatus());
         var values = new float[24];
+        values[0] = values[4] = values[8] = values[12] = values[16] = values[20] = 1;
         SendFrames(First, new NetworkNavalLabFrames(Manifest.IncarnationId, 1, 100, values, 700));
+        Tick(Second); // Accepted targets only become applied endpoints after the interpolation window.
         var observed = Status();
         Assert.Equal(100, (long)observed["lastAppliedFrameSequence"]!);
         Assert.Equal(700, (long)observed["lastAppliedSourceCallback"]!);
@@ -129,6 +131,7 @@ public sealed class NavalLabTwoClientNativeTests : NavalMissionTestEnvironment
         Assert.Equal(observed["lastAppliedUtcTicks"], Status()["lastAppliedUtcTicks"]);
         Adapter(Second).FailApply = true;
         SendFrames(First, new NetworkNavalLabFrames(Manifest.IncarnationId, 1, 101, values, 702));
+        Tick(Second);
         var failed = Status();
         Assert.Equal(101, (long)failed["lastReceivedFrameSequence"]!);
         Assert.Equal(100, (long)failed["lastAppliedFrameSequence"]!);

@@ -90,11 +90,13 @@ public sealed class NavalMissionAdapter : INavalMissionAdapter, INavalNativeMiss
         if (behavior.IsFactoryProbe && !behavior.CanApplyFactoryFrames()) return false;
         for (int i = 0; i < frames.Length; i++)
         {
+            if (behavior.IsTwoClientNative && !behavior.CanApplyFactoryFrames()) return false;
             var entity = behavior.Ships[i].GameEntity;
-            entity.SetGlobalFrame(frames[i], isTeleportation: true);
+            entity.SetGlobalFrame(frames[i], isTeleportation: !behavior.IsTwoClientNative);
             entity.UpdateAttachedNavigationMeshFaces();
         }
         if (behavior.IsFactoryProbe && !behavior.CanApplyFactoryFrames()) return false;
+        if (behavior.IsTwoClientNative) behavior.RefreshFollowerStationTargets();
         return true;
     }
     public void SetHelm(int ship, float rudder, bool row)

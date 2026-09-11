@@ -40,6 +40,7 @@ public sealed partial class NavalLabController : INavalNativeController
         hostSentFrameSequence = session.IsLocalHost ? (long?)sequence : null,
         lastAppliedSourceCallback = lastApplied > 0 ? (long?)lastAppliedFrameSourceCallback : null,
         lastAppliedUtcTicks = lastApplied > 0 ? (long?)lastAppliedFrameUtcTicks : null,
+        hullInterpolation = HullInterpolationStatus(),
         hostAcceptedInputSequences = nativeInputSequences.ToArray(),
         hostInputRemainingSeconds = nativeInputDeadlines.Select(deadline => Math.Max(0, deadline - Now)).ToArray(),
         ready = NativeControlsReady,
