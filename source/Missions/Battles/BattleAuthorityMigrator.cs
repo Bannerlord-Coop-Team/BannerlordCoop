@@ -67,6 +67,7 @@ public class BattleAuthorityMigrator : IBattleAuthorityMigrator
     private readonly HashSet<string> withdrawnHosts = new HashSet<string>();
     private readonly Dictionary<string, NetworkRetainedPlayerHero> playerHandoffs = new();
     private readonly HashSet<Guid> confirmedPlayerHandoffs = new();
+    private readonly Dictionary<Guid, (Agent Agent, AgentControllerType Controller)> provisionalPlayerControllers = new();
     private float playerHandoffRetrySeconds;
 
     public BattleAuthorityMigrator(
@@ -116,7 +117,7 @@ public class BattleAuthorityMigrator : IBattleAuthorityMigrator
         withdrawnHosts.Remove(payload.What.ControllerId);
     }
 
-    // The holder surrenders before the server announces the grant, so two clients never drive the hero.
+    // Suspend the holder locally; only the server grant may advance the shared authority revision.
     public bool TrySurrenderPlayerHero(string controllerId, BattleAgentSpawnData data)
     {
         var handoff = new NetworkRetainedPlayerHero(session.InstanceId, session.HostEpoch, controllerId, data);
@@ -124,12 +125,33 @@ public class BattleAuthorityMigrator : IBattleAuthorityMigrator
         var registry = coopMissionComponent.AgentRegistry;
         if (!registry.TryGetAgentInfo(data.AgentId, out var info)
             || info.CurrentAuthority != session.OwnControllerId || info.AuthorityRevision != data.AuthorityRevision
+            || info.OriginalOwner != data.OriginalOwnerControllerId
+            || info.MovementScopeId != data.MovementScopeId || info.MovementId != data.MovementId
             || info.Agent == null || !info.Agent.IsActive()) return false;
-        if (!ApplyPlayerHandoff(handoff)) return false;
+        if (data.MountAgentId != Guid.Empty
+            && (!registry.TryGetAgentInfo(data.MountAgentId, out var mount)
+                || mount.CurrentAuthority != session.OwnControllerId
+                || mount.AuthorityRevision != data.MountAuthorityRevision
+                || mount.Agent == null || !mount.Agent.IsActive())) return false;
+        if (playerHandoffs.TryGetValue(controllerId, out var pending)
+            && pending.Previous.AgentId == data.AgentId
+            && pending.Previous.AuthorityRevision == data.AuthorityRevision
+            && pending.HostEpoch == handoff.HostEpoch) return true;
         playerHandoffs[controllerId] = handoff;
         confirmedPlayerHandoffs.Remove(data.AgentId);
+        Suspend(data.AgentId);
+        if (data.MountAgentId != Guid.Empty) Suspend(data.MountAgentId);
         relayNetwork.SendAll(new NetworkRequestRetainedPlayerHero(handoff));
         return true;
+
+        void Suspend(Guid agentId)
+        {
+            if (!registry.TryGetAgentInfo(agentId, out var suspended)) return;
+            if (!provisionalPlayerControllers.TryGetValue(agentId, out var original)
+                || original.Agent != suspended.Agent)
+                provisionalPlayerControllers[agentId] = (suspended.Agent, suspended.Agent.Controller);
+            suspended.Agent.Controller = AgentControllerType.None;
+        }
     }
 
     public void ReplayPlayerHandoff(string controllerId)
@@ -137,8 +159,10 @@ public class BattleAuthorityMigrator : IBattleAuthorityMigrator
         if (!playerHandoffs.TryGetValue(controllerId, out var handoff)
             || !IsCurrentPlayerHandoff(handoff)) return;
         if (coopMissionComponent.AgentRegistry.TryGetAgentInfo(handoff.Previous.AgentId, out var info)
-            && info.CurrentAuthority == controllerId
-            && info.AuthorityRevision == handoff.Previous.AuthorityRevision + 1)
+            && ((info.CurrentAuthority == handoff.Previous.OwnerControllerId
+                    && info.AuthorityRevision == handoff.Previous.AuthorityRevision)
+                || (info.CurrentAuthority == controllerId
+                    && info.AuthorityRevision == handoff.Previous.AuthorityRevision + 1)))
             relayNetwork.SendAll(new NetworkRequestRetainedPlayerHero(handoff));
     }
 
@@ -199,6 +223,8 @@ public class BattleAuthorityMigrator : IBattleAuthorityMigrator
         bool wasLocal = session.IsOwn(info.CurrentAuthority);
         if (!registry.TryReturnRetainedPlayer(data.OwnerControllerId, handoff.ReturningControllerId,
                 data.AgentId, data.AuthorityRevision, data.MountAgentId, data.MountAuthorityRevision)) return false;
+        provisionalPlayerControllers.Remove(data.AgentId);
+        provisionalPlayerControllers.Remove(data.MountAgentId);
         if (playerHandoffs.TryGetValue(handoff.ReturningControllerId, out var sent)
             && sent.Previous.AgentId == data.AgentId && sent.Previous.AuthorityRevision == data.AuthorityRevision)
             confirmedPlayerHandoffs.Add(data.AgentId);
@@ -219,6 +245,29 @@ public class BattleAuthorityMigrator : IBattleAuthorityMigrator
         }
     }
 
+    private void CancelProvisionalPlayerHandoff(string controllerId)
+    {
+        GameThread.RunSafe(() =>
+        {
+            if (!playerHandoffs.TryGetValue(controllerId, out var handoff)) return;
+            playerHandoffs.Remove(controllerId);
+            confirmedPlayerHandoffs.Remove(handoff.Previous.AgentId);
+            Restore(handoff.Previous.AgentId, handoff.Previous.AuthorityRevision);
+            Restore(handoff.Previous.MountAgentId, handoff.Previous.MountAuthorityRevision);
+        }, context: nameof(CancelProvisionalPlayerHandoff));
+
+        void Restore(Guid agentId, long revision)
+        {
+            if (!provisionalPlayerControllers.TryGetValue(agentId, out var suspended)) return;
+            provisionalPlayerControllers.Remove(agentId);
+            if (coopMissionComponent.AgentRegistry.TryGetAgentInfo(agentId, out var info)
+                && session.IsLocalHost && info.CurrentAuthority == session.OwnControllerId
+                && info.AuthorityRevision == revision && info.Agent == suspended.Agent
+                && info.Agent != null && info.Agent.IsActive())
+                info.Agent.Controller = suspended.Controller;
+        }
+    }
+
     // A graceful leave withdraws the player's party on every client.
     private void Handle_PeerLeft(MessagePayload<MissionPeerLeft> payload)
     {
@@ -231,6 +280,7 @@ public class BattleAuthorityMigrator : IBattleAuthorityMigrator
     {
         var controllerId = payload.What.ControllerId;
         if (payload.What.InstanceId != null && payload.What.InstanceId != session.InstanceId) return;
+        CancelProvisionalPlayerHandoff(controllerId);
         if (session.IsHostController(controllerId)) return;
         if (!session.IsLocalHost)
         {
@@ -245,6 +295,7 @@ public class BattleAuthorityMigrator : IBattleAuthorityMigrator
     private void HandlePartyWithdrawal(string controllerId, string instanceId, string reason)
     {
         if (instanceId != null && instanceId != session.InstanceId) return;
+        CancelProvisionalPlayerHandoff(controllerId);
 
         // A departed HOST's own party withdraws, while the promoted successor adopts only the NPC forces it
         // ran. Marking this before the migration message arrives keeps the despawn and adoption sets disjoint.

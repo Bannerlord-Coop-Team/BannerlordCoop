@@ -125,8 +125,8 @@ public class RetainedPlayerHeroRecoveryTests : MissionTestEnvironment
             Assert.Equal("returner", info.OriginalOwner);
             Assert.Equal("returner:first-mission", info.MovementScopeId);
             Assert.Equal(7, info.MovementId);
-            Assert.Equal(returnerPresent ? "returner" : "successor", info.CurrentAuthority);
-            Assert.Equal(returnerPresent ? 3 : 2, info.AuthorityRevision);
+            Assert.Equal("successor", info.CurrentAuthority);
+            Assert.Equal(2, info.AuthorityRevision);
             if (!returnerPresent) return;
 
             var handoff = requests[0].Handoff;
