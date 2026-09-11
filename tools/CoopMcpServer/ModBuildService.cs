@@ -13,6 +13,9 @@ public interface IModBuildService
 
 public sealed class ModBuildService : IModBuildService
 {
+    private readonly IBuildProcessRunner runner;
+    public ModBuildService(IBuildProcessRunner runner) { this.runner = runner; }
+
     public async Task BuildAsync(string repository, DeploymentSettings settings, string artifacts, CancellationToken cancellationToken, string configuration = "Release")
     {
         if (!OperatingSystem.IsWindows()) throw new PlatformNotSupportedException("Deployment builds require Windows MSBuild.");
@@ -26,42 +29,8 @@ public sealed class ModBuildService : IModBuildService
         }
     }
 
-    internal async Task RunBuildAsync(ProcessStartInfo info, string artifacts, string project, CancellationToken cancellationToken)
-    {
-        using var stdout = new FileStream(Path.Combine(artifacts, project + "-stdout.log"), FileMode.CreateNew);
-        using var stderr = new FileStream(Path.Combine(artifacts, project + "-stderr.log"), FileMode.CreateNew);
-        using var process = new Process { StartInfo = info };
-        Task output = Task.CompletedTask;
-        Task errors = Task.CompletedTask;
-        process.Start();
-        try
-        {
-            output = process.StandardOutput.BaseStream.CopyToAsync(stdout);
-            errors = process.StandardError.BaseStream.CopyToAsync(stderr);
-            using var timeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
-            timeout.CancelAfter(TimeSpan.FromMinutes(20));
-            await process.WaitForExitAsync(timeout.Token);
-            await Task.WhenAll(output, errors);
-            if (process.ExitCode != 0) throw new InvalidOperationException($"{project} build failed ({process.ExitCode}); inspect {artifacts}.");
-        }
-        finally
-        {
-            // Do not release the deployment lease while an owned build can still write outputs.
-            try
-            {
-                if (!process.HasExited)
-                {
-                    try { process.Kill(entireProcessTree: true); }
-                    catch (InvalidOperationException) when (process.HasExited) { }
-                }
-            }
-            finally
-            {
-                await process.WaitForExitAsync(CancellationToken.None);
-                await Task.WhenAll(output, errors);
-            }
-        }
-    }
+    internal Task RunBuildAsync(ProcessStartInfo info, string artifacts, string project, CancellationToken cancellationToken) =>
+        runner.RunAsync(info, artifacts, project, cancellationToken);
 
     public static ProcessStartInfo CreateStartInfo(string repository, string msbuild, string artifacts, string project, string configuration = "Release")
     {

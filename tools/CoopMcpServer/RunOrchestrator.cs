@@ -43,6 +43,7 @@ public sealed class RunOrchestrator : IRunOrchestrator, IDeploymentRunGuard
     private readonly ILaunchPreflight preflight;
     private readonly ISaveCatalog saves;
     private readonly IDeploymentLease deploymentLease;
+    private readonly IBuildCleanupRecovery buildCleanup;
     private readonly SemaphoreSlim lifecycle = new(1, 1);
     private readonly ConcurrentDictionary<string, Run> runs = new();
     private static readonly JsonSerializerOptions JsonOptions = new() { PropertyNamingPolicy = JsonNamingPolicy.CamelCase, WriteIndented = true };
@@ -77,7 +78,7 @@ public sealed class RunOrchestrator : IRunOrchestrator, IDeploymentRunGuard
     }
 
     public RunOrchestrator(CoopMcpServerSettings settings, IGameProcessLauncher launcher,
-        ILiveTestPipeClient pipe, IIncrementalLogReader logs, ILaunchPreflight preflight, ISaveCatalog saves, IDeploymentLease deploymentLease = null)
+        ILiveTestPipeClient pipe, IIncrementalLogReader logs, ILaunchPreflight preflight, ISaveCatalog saves, IDeploymentLease deploymentLease = null, IBuildCleanupRecovery buildCleanup = null)
     {
         this.settings = settings;
         this.launcher = launcher;
@@ -86,6 +87,7 @@ public sealed class RunOrchestrator : IRunOrchestrator, IDeploymentRunGuard
         this.preflight = preflight;
         this.saves = saves;
         this.deploymentLease = deploymentLease;
+        this.buildCleanup = buildCleanup;
     }
 
     public async Task<DeploymentReport> DeployAsync(Func<Task<DeploymentReport>> action, CancellationToken cancellationToken)
@@ -93,6 +95,7 @@ public sealed class RunOrchestrator : IRunOrchestrator, IDeploymentRunGuard
         if (!await lifecycle.WaitAsync(0, cancellationToken)) throw new InvalidOperationException("A launch, stop or deployment is already in progress.");
         try
         {
+            if (buildCleanup != null) await buildCleanup.RecoverAsync();
             if (runs.Values.Any(r => r.State != "stopped" && r.State != "launch_failed" && r.State != "preflight_failed"))
                 throw new InvalidOperationException("Stop the owned run and confirm cleanup before deploying.");
             return await action();
@@ -105,6 +108,7 @@ public sealed class RunOrchestrator : IRunOrchestrator, IDeploymentRunGuard
         await lifecycle.WaitAsync(cancellationToken);
         try
         {
+            if (buildCleanup != null) await buildCleanup.RecoverAsync();
             if (runs.Values.Any(r => r.State != "stopped" && r.State != "launch_failed" && r.State != "preflight_failed"))
                 throw new InvalidOperationException("Stop the active run before starting another run.");
             if (!settings.Profiles.TryGetValue(profile, out var launchProfile))
@@ -168,6 +172,7 @@ public sealed class RunOrchestrator : IRunOrchestrator, IDeploymentRunGuard
         await lifecycle.WaitAsync(cancellationToken);
         try
         {
+            if (buildCleanup != null) await buildCleanup.RecoverAsync();
             var run = FindRun(runId);
             string name = "client" + clientIndex;
             var profile = settings.Profiles[run.Profile];

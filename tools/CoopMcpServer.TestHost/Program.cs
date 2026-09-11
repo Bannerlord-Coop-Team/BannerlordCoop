@@ -4,6 +4,12 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 
+if (args.Length == 4 && args[0] == "build-tree")
+{
+    await new BuildTreeFixture().RunAsync(args[1], int.Parse(args[2]), int.Parse(args[3]));
+    return;
+}
+
 // Harmless protocol fixtures: no OS game launcher, game dependencies, or registration access.
 var builder = Host.CreateApplicationBuilder();
 builder.Logging.ClearProviders();

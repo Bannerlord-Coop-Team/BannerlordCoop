@@ -93,7 +93,7 @@ public sealed class ModDeploymentService : IModDeploymentService
         foreach (string path in new[] { layout.Repository, layout.DurableRoot, Path.GetTempPath(),
             Environment.GetEnvironmentVariable("NUGET_PACKAGES") ?? Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), ".nuget", "packages") })
             environment.RequireSpace(path, buildSpace);
-        using var lease = leases.Acquire(launch);
+        using var lease = new TransferableLease(leases.Acquire(launch));
         var report = new DeploymentReport { DeploymentId = Guid.NewGuid().ToString("N"), Solution = layout.Solution, Module = layout.Module, Configuration = layout.Configuration };
         report.ArtifactDirectory = Path.Combine(layout.DurableRoot, report.DeploymentId);
         Directory.CreateDirectory(report.ArtifactDirectory);
@@ -147,9 +147,10 @@ public sealed class ModDeploymentService : IModDeploymentService
         }
         catch (Exception error)
         {
+            if (error is BuildCleanupException cleanup) lease.TransferTo(cleanup);
             report.Error = error.ToString();
             if (mutationStarted) Rollback(report);
-            report.State = report.UnresolvedRestoration.Count > 0 ? "rollback_failed" : mutationStarted ? "rolled_back" : "failed_before_apply";
+            report.State = error is BuildCleanupException ? "build_cleanup_required" : report.UnresolvedRestoration.Count > 0 ? "rollback_failed" : mutationStarted ? "rolled_back" : "failed_before_apply";
             try
             {
                 Save(report);
@@ -162,6 +163,18 @@ public sealed class ModDeploymentService : IModDeploymentService
             }
             return report;
         }
+    }
+
+    private sealed class TransferableLease : IDisposable
+    {
+        private IDisposable lease;
+        public TransferableLease(IDisposable lease) { this.lease = lease; }
+        public void TransferTo(BuildCleanupException cleanup)
+        {
+            cleanup.RetainLease(lease);
+            lease = null;
+        }
+        public void Dispose() => lease?.Dispose();
     }
 
     private void Prepare(DeploymentReport report, DeploymentInput input)

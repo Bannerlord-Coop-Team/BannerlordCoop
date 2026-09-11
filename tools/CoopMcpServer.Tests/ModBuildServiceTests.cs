@@ -20,7 +20,7 @@ public sealed class ModBuildServiceTests : IDisposable
         string marker = Path.Combine(root, "started.txt");
         var info = PowerShell($"[IO.File]::WriteAllText('{Quote(marker)}', 'started')");
 
-        await Assert.ThrowsAsync<IOException>(() => new ModBuildService().RunBuildAsync(info, root, "Coop", default));
+        await Assert.ThrowsAsync<IOException>(() => new ModBuildService(new WindowsJobBuildProcessRunner(new BuildCleanupRecovery())).RunBuildAsync(info, root, "Coop", default));
 
         await Task.Delay(1500);
         Assert.False(File.Exists(marker));
@@ -34,7 +34,7 @@ public sealed class ModBuildServiceTests : IDisposable
         string marker = Path.Combine(root, "pid.txt");
         var info = PowerShell($"[IO.File]::WriteAllText('{Quote(marker)}', $PID.ToString()); Start-Sleep -Seconds 30");
         using var cancellation = new CancellationTokenSource();
-        Task build = new ModBuildService().RunBuildAsync(info, root, "Coop", cancellation.Token);
+        Task build = new ModBuildService(new WindowsJobBuildProcessRunner(new BuildCleanupRecovery())).RunBuildAsync(info, root, "Coop", cancellation.Token);
         Process child = null;
         try
         {
@@ -64,14 +64,14 @@ public sealed class ModBuildServiceTests : IDisposable
     }
 
     [Fact]
-    public async Task PostStartSetupFailureStopsTheOwnedChild()
+    public async Task InvalidRedirectionDoesNotStartTheChild()
     {
         if (!OperatingSystem.IsWindows()) return;
         string marker = Path.Combine(root, "escaped.txt");
         var info = PowerShell($"Start-Sleep -Seconds 1; [IO.File]::WriteAllText('{Quote(marker)}', 'escaped')");
         info.RedirectStandardError = false;
 
-        await Assert.ThrowsAsync<InvalidOperationException>(() => new ModBuildService().RunBuildAsync(info, root, "Coop", default));
+        await Assert.ThrowsAsync<InvalidOperationException>(() => new ModBuildService(new WindowsJobBuildProcessRunner(new BuildCleanupRecovery())).RunBuildAsync(info, root, "Coop", default));
 
         await Task.Delay(3000);
         Assert.False(File.Exists(marker));
@@ -83,7 +83,7 @@ public sealed class ModBuildServiceTests : IDisposable
         if (!OperatingSystem.IsWindows()) return;
         var info = PowerShell("[Console]::Out.Write('build output'); [Console]::Error.Write('build error')");
 
-        await new ModBuildService().RunBuildAsync(info, root, "Coop", default);
+        await new ModBuildService(new WindowsJobBuildProcessRunner(new BuildCleanupRecovery())).RunBuildAsync(info, root, "Coop", default);
 
         Assert.Equal("build output", File.ReadAllText(Path.Combine(root, "Coop-stdout.log")));
         Assert.Equal("build error", File.ReadAllText(Path.Combine(root, "Coop-stderr.log")));
@@ -91,7 +91,7 @@ public sealed class ModBuildServiceTests : IDisposable
 
     private ProcessStartInfo PowerShell(string script)
     {
-        var info = new ProcessStartInfo("powershell.exe")
+        var info = new ProcessStartInfo(Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.System), "WindowsPowerShell", "v1.0", "powershell.exe"))
         {
             WorkingDirectory = root, UseShellExecute = false, CreateNoWindow = true,
             RedirectStandardOutput = true, RedirectStandardError = true,

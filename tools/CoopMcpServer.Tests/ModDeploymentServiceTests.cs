@@ -1,4 +1,5 @@
-﻿using System.Text.Json;
+﻿using System.Diagnostics;
+using System.Text.Json;
 
 namespace CoopMcpServer.Tests;
 
@@ -11,6 +12,7 @@ public sealed class ModDeploymentServiceTests : IDisposable
     private readonly BuildFixture build = new();
     private readonly FileFixture files = new();
     private readonly RunOrchestrator runs;
+    private readonly BuildCleanupRecovery cleanup = new();
     private readonly string solution;
     private readonly string module;
     private readonly string durable;
@@ -41,12 +43,108 @@ public sealed class ModDeploymentServiceTests : IDisposable
         Write(msbuild, "fake never executed");
         settings.Profiles["fixture"] = new LaunchProfile { Executable = exe,
             Deployment = new DeploymentSettings { DurableRoot = durable, MsbuildPath = msbuild } };
-        runs = new RunOrchestrator(settings, null, null, null, null, null, new DeploymentLease(paths));
+        runs = new RunOrchestrator(settings, null, null, null, null, null, new DeploymentLease(paths), cleanup);
         build.Action = CreateOutputs;
     }
 
     private ModDeploymentService Service() => new(settings, runs, new DeploymentLease(paths), environment,
         new DeploymentPlan(paths, files), build, files, new BridgeBuildInspector(), paths);
+
+    [Fact]
+    public async Task DelayedLogFinalizationRetainsLeaseAndReusesDisposalTasksUntilRecovery()
+    {
+        if (!OperatingSystem.IsWindows()) return;
+        var releaseFinalization = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var logs = new List<DelayedFinalizationFileStream>();
+        var runner = new WindowsJobBuildProcessRunner(cleanup, TimeSpan.FromSeconds(20), TimeSpan.FromMilliseconds(250), path =>
+        {
+            var log = new DelayedFinalizationFileStream(path, releaseFinalization.Task);
+            logs.Add(log);
+            return log;
+        });
+        var info = new ProcessStartInfo(Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.System), "WindowsPowerShell", "v1.0", "powershell.exe"))
+        {
+            UseShellExecute = false, RedirectStandardOutput = true, RedirectStandardError = true, WorkingDirectory = root,
+        };
+        foreach (string arg in new[] { "-NoProfile", "-NonInteractive", "-Command",
+            "[Console]::Out.Write('buffered stdout'); [Console]::Error.Write('buffered stderr')" }) info.ArgumentList.Add(arg);
+        build.RunBuild = (artifacts, token) => runner.RunAsync(info, artifacts, "Coop", token);
+        try
+        {
+            var report = await Service().DeployAsync(solution, "fixture", default).WaitAsync(TimeSpan.FromSeconds(10));
+            Assert.Equal("build_cleanup_required", report.State);
+            Assert.Empty(report.Files);
+            Assert.Equal(2, logs.Count);
+            await Task.WhenAll(logs.Select(log => log.FinalizationStarted.Task)).WaitAsync(TimeSpan.FromSeconds(5));
+            Assert.Throws<IOException>(() => new DeploymentLease(paths).Acquire(settings.Profiles["fixture"]));
+            await Assert.ThrowsAsync<BuildCleanupException>(() => Service().DeployAsync(solution, "fixture", default).WaitAsync(TimeSpan.FromSeconds(5)));
+            await Assert.ThrowsAsync<BuildCleanupException>(() => runs.StartAsync("fixture", 0, default).WaitAsync(TimeSpan.FromSeconds(5)));
+            await Assert.ThrowsAsync<BuildCleanupException>(() => runs.StartClientAsync("absent", 1, default).WaitAsync(TimeSpan.FromSeconds(5)));
+            Assert.Equal(1, build.Calls);
+            foreach (var log in logs)
+            {
+                Assert.Equal(1, log.DisposalCalls);
+                Assert.False(log.FinalizationFinished.Task.IsCompleted);
+                Assert.Throws<IOException>(() => File.Open(log.Name, FileMode.Open, FileAccess.ReadWrite, FileShare.None));
+            }
+            releaseFinalization.SetResult();
+            await Task.WhenAll(logs.Select(log => log.FinalizationFinished.Task)).WaitAsync(TimeSpan.FromSeconds(5));
+            build.RunBuild = null;
+            Assert.Equal("deployed", (await Service().DeployAsync(solution, "fixture", default)).State);
+            using var available = new DeploymentLease(paths).Acquire(settings.Profiles["fixture"]);
+            foreach (var log in logs)
+            {
+                Assert.Equal(1, log.DisposalCalls);
+                using (File.Open(log.Name, FileMode.Open, FileAccess.ReadWrite, FileShare.None)) { }
+                Assert.Equal(log.Name.EndsWith("stdout.log") ? "buffered stdout" : "buffered stderr", File.ReadAllText(log.Name));
+            }
+        }
+        finally
+        {
+            releaseFinalization.TrySetResult();
+            await Task.WhenAll(logs.Select(log => log.FinalizationFinished.Task)).WaitAsync(TimeSpan.FromSeconds(5));
+            await cleanup.RecoverAsync();
+        }
+    }
+
+    [Fact]
+    public async Task UnconfirmedBuildCleanupRetainsLeaseAndBlocksStartsUntilRecovery()
+    {
+        bool treeAlive = true;
+        int cleanupAttempts = 0;
+        build.Action = _ =>
+        {
+            cleanup.Retain(() =>
+            {
+                cleanupAttempts++;
+                if (treeAlive) throw new IOException("injected unconfirmed tree termination");
+                return Task.CompletedTask;
+            });
+            throw new BuildCleanupException(cleanup, new IOException("injected cleanup deadline"));
+        };
+        try
+        {
+            var report = await Service().DeployAsync(solution, "fixture", default).WaitAsync(TimeSpan.FromSeconds(5));
+            Assert.Equal("build_cleanup_required", report.State);
+            Assert.Empty(report.Files);
+            Assert.Throws<IOException>(() => new DeploymentLease(paths).Acquire(settings.Profiles["fixture"]));
+            await Assert.ThrowsAsync<BuildCleanupException>(() => Service().DeployAsync(solution, "fixture", default));
+            await Assert.ThrowsAsync<BuildCleanupException>(() => runs.StartAsync("fixture", 0, default));
+            await Assert.ThrowsAsync<BuildCleanupException>(() => runs.StartClientAsync("absent", 1, default));
+            Assert.Equal(1, build.Calls);
+            Assert.Equal(3, cleanupAttempts);
+            treeAlive = false;
+            build.Action = CreateOutputs;
+            Assert.Equal("deployed", (await Service().DeployAsync(solution, "fixture", default)).State);
+            using var available = new DeploymentLease(paths).Acquire(settings.Profiles["fixture"]);
+            Assert.Equal(4, cleanupAttempts);
+        }
+        finally
+        {
+            treeAlive = false;
+            await cleanup.RecoverAsync();
+        }
+    }
 
     [Fact]
     public async Task DeploysBoundedOutputsWithFreshVerifiedBackupsAndLeavesConfigurationsUntouched()
@@ -356,9 +454,34 @@ public sealed class ModDeploymentServiceTests : IDisposable
     private static void Write(string path, string text) { Directory.CreateDirectory(Path.GetDirectoryName(path)); File.WriteAllText(path, text); }
     private static void CopyAssembly(string source, string target) { Directory.CreateDirectory(Path.GetDirectoryName(target)); File.Copy(source, target, true); }
 
+    private sealed class DelayedFinalizationFileStream : FileStream
+    {
+        private readonly Task release;
+        private int disposalCalls;
+        public int DisposalCalls => Volatile.Read(ref disposalCalls);
+        public TaskCompletionSource FinalizationStarted { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        public TaskCompletionSource FinalizationFinished { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        public DelayedFinalizationFileStream(string path, Task release)
+            : base(path, FileMode.CreateNew, FileAccess.Write, FileShare.None, 4096, true)
+        {
+            this.release = release;
+        }
+
+        public override async ValueTask DisposeAsync()
+        {
+            Interlocked.Increment(ref disposalCalls);
+            FinalizationStarted.TrySetResult();
+            await release;
+            await base.DisposeAsync();
+            FinalizationFinished.TrySetResult();
+        }
+    }
+
     private sealed class BuildFixture : IModBuildService
     {
         public Action<string> Action;
+        public Func<string, CancellationToken, Task> RunBuild;
         public int Calls;
         public string Configuration;
         public TaskCompletionSource Block;
@@ -368,6 +491,7 @@ public sealed class ModDeploymentServiceTests : IDisposable
             Configuration = configuration;
             Calls++; Entered.TrySetResult();
             if (Block != null) await Block.Task.WaitAsync(cancellationToken);
+            if (RunBuild != null) await RunBuild(artifacts, cancellationToken);
             Action(repository);
         }
     }
