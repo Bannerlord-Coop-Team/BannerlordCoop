@@ -81,6 +81,23 @@ public class RetainedPlayerHeroBootstrapTests : MissionTestEnvironment
             Assert.Empty(mission.Agents);
             Assert.Null(Mission.Current.InitialPlayerAgent);
             broker.Publish(this, grant);
+#if DEBUG
+            var observation = spawner.CaptureReturningHeroCatchUpState("returner");
+            Assert.Empty(observation.DiagnosticErrors);
+            var captured = observation.FirstCatchUpBeforeDefer;
+            Assert.NotNull(captured);
+            Assert.Equal(previous.AgentId.ToString("D"), captured.AgentId);
+            Assert.Equal(battleId, captured.BattleInstanceId);
+            Assert.Equal(eventPartyId, captured.MapEventPartyId);
+            Assert.Equal(1141, captured.TroopSeed);
+            Assert.Equal("first-returning-hero-catch-up-before-defer", captured.Phase);
+            Assert.Equal("holder", captured.OwnerControllerId);
+            Assert.Equal("returner", captured.OriginalOwnerControllerId);
+            Assert.True(captured.OriginalOwnerIsLocal);
+            Assert.False(captured.CurrentOwnerIsLocal);
+            Assert.True(captured.ReturningHeroIdentityMatched);
+            Assert.Equal(System.Diagnostics.Process.GetCurrentProcess().Id, captured.ProcessId);
+#endif
             broker.Publish(this, new NetworkBattleHostAssigned(battleId, "successor", new[] { "returner" }, 2));
             if (!catchUpFirst) broker.Publish(this, new NetworkSpawnBattleAgents(new[] { previous }));
             spawner.DrainPendingPuppets();

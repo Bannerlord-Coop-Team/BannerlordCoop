@@ -370,6 +370,12 @@ public class PuppetSpawner : IPuppetSpawner
                     appliedPlayerHandoffs.Add(pair.Key);
                 continue;
             }
+#if DEBUG
+            // The accepted grant can bootstrap the hero without a spawn-batch record.
+            if (session.IsOwn(pair.Value.ReturningControllerId)
+                && TryIdentifyReturningHeroCatchUpRecord(pair.Value.Previous, SpawnBatchPurpose.CatchUp))
+                TryRecordFirstReturningHeroCatchUpBeforeDefer(pair.Value.Previous, SpawnBatchPurpose.CatchUp);
+#endif
             var returned = pair.Value.CreateReturnedRecord();
             lock (pendingPuppetLock)
             {
