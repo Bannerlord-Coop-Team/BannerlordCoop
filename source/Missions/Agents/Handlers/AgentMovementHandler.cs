@@ -35,7 +35,8 @@ public interface IAgentMovementHandler : IPacketHandler, IDisposable
     void Configure(MovementCadenceProfile profile);
 #if DEBUG
     void ConfigureNavalLab();
-    void ConfigureNavalStationMovement(Func<CoopAgentInfo, bool> eligibility);
+    void ConfigureNavalStationMovement(Func<CoopAgentInfo, bool> eligibility, Func<CoopAgentInfo, bool> helmEligibility = null,
+        Func<CoopAgentInfo, long?> helmRevision = null, Func<CoopAgentInfo, long, bool> acceptHelmMovement = null);
     object InspectNavalStationMovement();
 #endif
 
@@ -1684,12 +1685,15 @@ public partial class AgentMovementHandler : IAgentMovementHandler
         }
     }
 
-    private static IPacket CreateMovementPacket(
+    private IPacket CreateMovementPacket(
         string identityScopeId,
         ushort[] compactIds,
         Guid[] canonicalIds,
         AgentData[] data)
     {
+#if DEBUG
+        StampNavalHelmMovement(identityScopeId, compactIds, canonicalIds, data);
+#endif
         return identityScopeId == null
             ? new MovementPacket(canonicalIds, data)
             : new MovementPacket(identityScopeId, compactIds, data);
@@ -1820,6 +1824,13 @@ public partial class AgentMovementHandler : IAgentMovementHandler
                 if (agentRegistry.IsLocallyControlled(agent))
                     continue;
 
+#if DEBUG
+                if (acceptNavalHelmMovement?.Invoke(agentInfo, data.NavalHelmRevision) == false)
+                {
+                    _interpolator.Forget(agent);
+                    continue;
+                }
+#endif
                 Agent previousMount = agent.MountAgent;
                 SyncMountState(
                     agent,

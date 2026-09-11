@@ -25,7 +25,7 @@ using TaleWorlds.ObjectSystem;
 
 namespace Missions.Naval;
 
-public sealed class NavalMissionAdapter : INavalMissionAdapter, INavalNativeMissionAdapter
+public sealed class NavalMissionAdapter : INavalMissionAdapter, INavalNativeMissionAdapter, INavalHelmReplicationAdapter, INavalDriftAdapter, INavalPresentationAdapter
 {
     private NavalLabBehavior behavior;
     private readonly Harmony harmony = new Harmony("coop.warsails.lab.physics");
@@ -118,8 +118,14 @@ public sealed class NavalMissionAdapter : INavalMissionAdapter, INavalNativeMiss
     public Missions.Messages.NetworkNavalLabStations CreateStations() => behavior.CreateStations();
     public void ApplyStations(Missions.Messages.NetworkNavalLabStations stations) => behavior.ApplyStations(stations);
     public bool ObserveStations(Missions.Messages.NetworkNavalLabStations stations) => behavior.ObserveStations(stations);
+    public void ConfigureHelmReplication(Action<Missions.Messages.NetworkNavalLabHelmOccupancy> send, Action<Agent> forgetMovement)
+    { behavior.SendHelmOccupancy = send; behavior.ForgetHelmMovement = forgetMovement; }
+    public void ApplyHelmOccupancy(Missions.Messages.NetworkNavalLabHelmOccupancy value) => behavior.ApplyHelmOccupancy(value);
+    public long HelmMovementRevision(Guid combatantId, Agent agent) => behavior.HelmMovementRevision(combatantId, agent);
     public bool IsCommittedOarMovement(Guid incarnationId, Guid combatantId, Agent agent) =>
         behavior?.IsCommittedOarMovement(incarnationId, combatantId, agent) == true;
+    public bool IsOccupiedHelmMovement(Guid incarnationId, Guid combatantId, Agent agent) =>
+        behavior?.IsOccupiedHelmMovement(incarnationId, combatantId, agent) == true;
     public void ApplyNativeInput(Missions.Messages.NetworkNavalLabHelmInput input) => behavior.ApplyNativeInput(input);
     public void NeutralizeNativeInput(int ship) => behavior.NeutralizeNativeInput(ship);
     public Missions.Messages.NetworkNavalLabSailState[] ReadSailStates() => behavior.ReadSailStates();
@@ -127,12 +133,22 @@ public sealed class NavalMissionAdapter : INavalMissionAdapter, INavalNativeMiss
     public void ClearSailFeedback() => behavior.ClearSailFeedback();
     public string RequestAxesPulse(Guid operationId, int ship, float lateral, bool row, long deadlineUtcTicks)
         => behavior?.RequestAxesPulse(operationId, ship, lateral, row, deadlineUtcTicks) ?? "rejected:no_fixture";
+    public object StartDrift(Guid operationId, int seconds) => behavior?.StartDrift(operationId, seconds) ?? new { unavailable = "no_fixture" };
+    public object InspectDrift() => behavior?.InspectDrift() ?? new { unavailable = "no_fixture" };
     public object InspectControlStatus() => behavior?.InspectControlStatus() ?? new { unavailable = "no_fixture" };
     public object InspectSailStatus() => behavior?.InspectSailStatus() ?? new { unavailable = "no_fixture" };
     public string RequestSail(int state) => behavior?.RequestSail(state) ?? "rejected:no_fixture";
     public string RequestNativeHelm(Guid operationId, int ship, bool take) =>
         behavior?.RequestNativeHelm(operationId, ship, take) ?? "rejected:no_fixture";
     public object InspectHelmStatus() => behavior?.InspectHelmStatus() ?? new { unavailable = "no_fixture" };
+    public Missions.Messages.NetworkNavalLabPresentation[] CapturePresentation(long sequence) => behavior.CapturePresentation(sequence);
+    public bool ValidatePresentation(Missions.Messages.NetworkNavalLabFrames frames) => behavior.ValidatePresentation(frames);
+    public void AcceptPresentation(Missions.Messages.NetworkNavalLabFrames frames) => behavior.AcceptPresentation(frames);
+    public void TickPresentation(float dt) => behavior.TickPresentation(dt);
+    public void ClearPresentation() => behavior.ClearPresentation();
+    public object InspectPresentationStatus() => behavior.InspectPresentationStatus();
+    public string RequestPresentationPulse(Guid operationId, int ship, float lateral, string kind, long deadlineUtcTicks)
+        => behavior.RequestPresentationPulse(operationId, ship, lateral, kind, deadlineUtcTicks);
     public void Dispose()
     {
         if (behavior?.IsSingleClientNative == true || behavior?.IsFactoryProbe == true) behavior.Hold();
@@ -508,6 +524,7 @@ internal sealed partial class NavalLabBehavior : MissionLogic
 
     public void Hold()
     {
+        ClearPresentation();
         if (IsFactoryProbe) { HoldFactoryProbe(); return; }
         if (IsSingleClientNative)
         {
@@ -686,7 +703,8 @@ internal sealed partial class NavalLabBehavior : MissionLogic
     internal bool SuppressHeldCapture(ShipControllerMachine machine)
     {
         if (!RequiresProcessExit || machine == null) return false;
-        int slot = Array.IndexOf(manifest.Controllers, ownControllerId);
+        int slot = IsTwoClientNative ? Array.FindIndex(Ships, candidate => candidate?.ShipControllerMachine == machine)
+            : Array.IndexOf(manifest.Controllers, ownControllerId);
         if (slot < 0 || slot >= Ships.Length) return false;
         var ship = Ships[slot];
         if (ship == null || ship.ShipControllerMachine != machine || machine.AttachedShip != ship) return false;
@@ -859,6 +877,7 @@ internal sealed partial class NavalLabBehavior : MissionLogic
     public void TickAgentControl(float dt)
     {
         TickNativeHelm();
+        TickHelmOccupancy();
         TickAxesPulse();
         if (heldHelmAgent != null && (ControlNow >= heldHelmDeadline || Blocker != null)) ReleaseHeldHelm();
         if (controlledAgent == null) return;

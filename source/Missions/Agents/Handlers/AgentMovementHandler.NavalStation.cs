@@ -2,23 +2,44 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using Missions.Agents.Packets;
 
 namespace Missions.Agents.Handlers;
 
 public partial class AgentMovementHandler
 {
     private Func<CoopAgentInfo, bool> navalStationEligibility;
+    private Func<CoopAgentInfo, bool> navalHelmEligibility;
+    private Func<CoopAgentInfo, long?> navalHelmRevision;
+    private Func<CoopAgentInfo, long, bool> acceptNavalHelmMovement;
     private readonly Dictionary<RecipientMovementState, Dictionary<Guid, NavalStationMovementCounts>> navalStationMovement = new();
 
-    public void ConfigureNavalStationMovement(Func<CoopAgentInfo, bool> eligibility)
+    public void ConfigureNavalStationMovement(Func<CoopAgentInfo, bool> eligibility, Func<CoopAgentInfo, bool> helmEligibility = null,
+        Func<CoopAgentInfo, long?> helmRevision = null, Func<CoopAgentInfo, long, bool> acceptHelmMovement = null)
     {
         navalStationEligibility = eligibility;
+        navalHelmEligibility = helmEligibility;
+        navalHelmRevision = helmRevision;
+        acceptNavalHelmMovement = acceptHelmMovement;
         navalStationMovement.Clear();
+    }
+
+    private void StampNavalHelmMovement(string scope, ushort[] compactIds, Guid[] canonicalIds, AgentData[] data)
+    {
+        if (navalHelmRevision == null) return;
+        for (int i = 0; i < data.Length; i++)
+        {
+            CoopAgentInfo info;
+            bool found = scope == null ? agentRegistry.TryGetAgentInfo(canonicalIds[i], out info)
+                : agentRegistry.TryGetAgentInfo(scope, compactIds[i], out info);
+            // Stamp at packet construction, not capture; unrelated actors always keep the default field.
+            data[i].NavalHelmRevision = found ? navalHelmRevision(info) ?? 0 : 0;
+        }
     }
 
     public object InspectNavalStationMovement() => new
     {
-        enabled = navalStationEligibility != null,
+        enabled = navalStationEligibility != null || navalHelmEligibility != null,
         sampledUtcTicks = DateTime.UtcNow.Ticks,
         rows = navalStationMovement.Values.SelectMany(rows => rows.Values).ToArray(),
         measurement = "Per-recipient cadence-admitted captures and successful send callbacks, not receive or native target observations."
@@ -39,9 +60,11 @@ public partial class AgentMovementHandler
 
     private bool WithholdNavalStationMovement(string controllerId, RecipientMovementState recipient, CapturedMovement captured)
     {
-        if (navalStationEligibility == null) return false;
-        bool eligible = !captured.IsMount && !captured.IsPriority && captured.AgentData.MountData == null
-            && navalStationEligibility(captured.AgentInfo);
+        if (navalStationEligibility == null && navalHelmEligibility == null) return false;
+        bool eligible = !captured.IsMount && captured.AgentData.MountData == null
+            && (captured.IsPriority ? navalHelmEligibility?.Invoke(captured.AgentInfo) == true
+                || navalHelmRevision?.Invoke(captured.AgentInfo) < 0
+                : navalStationEligibility?.Invoke(captured.AgentInfo) == true);
         // The fixture has two participants and ten fixed actors; diagnostics never grow beyond that inventory.
         if (!navalStationMovement.TryGetValue(recipient, out var rows) && navalStationMovement.Count < 2)
         {

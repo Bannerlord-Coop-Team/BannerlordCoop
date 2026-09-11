@@ -19,7 +19,7 @@ internal static class NavalLabPhysicsPatches
     internal static volatile NavalLabBehavior Active;
 
     private static bool NativeInputAllowed(Mission mission) => Active == null || !Active.HasNativeViews
-        || Active.Mission != mission || Active.CanUseNativeControls;
+        || Active.Mission != mission || Active.CanUseNativeInput;
 
     [HarmonyPatch(typeof(TaleWorlds.MountAndBlade.View.MissionViews.MissionMainAgentController), "OnPreMissionTick")]
     private static class SingleMainAgentInput
@@ -71,7 +71,7 @@ internal static class NavalLabPhysicsPatches
         {
             var active = Active;
             if (active == null || !active.HasNativeViews || !active.Agents.Contains(__instance)) return true;
-            return active.CanUseNativeControls && active.LocalCaptain == __instance
+            return active.CanUseNativeInput && active.LocalCaptain == __instance
                 && active.LocalShip.ShipControllerMachine.PilotStandingPoint == targetObject;
         }
     }

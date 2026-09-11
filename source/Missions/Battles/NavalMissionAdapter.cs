@@ -27,6 +27,24 @@ public interface INavalMissionAdapter : IDisposable
     object Inspect();
 }
 
+public interface INavalPresentationAdapter
+{
+    Missions.Messages.NetworkNavalLabPresentation[] CapturePresentation(long sequence);
+    bool ValidatePresentation(Missions.Messages.NetworkNavalLabFrames frames);
+    void AcceptPresentation(Missions.Messages.NetworkNavalLabFrames frames);
+    void TickPresentation(float dt);
+    void ClearPresentation();
+    object InspectPresentationStatus();
+    string RequestPresentationPulse(Guid operationId, int ship, float lateral, string kind, long deadlineUtcTicks);
+}
+
+public interface INavalHelmReplicationAdapter
+{
+    void ConfigureHelmReplication(Action<Missions.Messages.NetworkNavalLabHelmOccupancy> send, Action<Agent> forgetMovement);
+    void ApplyHelmOccupancy(Missions.Messages.NetworkNavalLabHelmOccupancy value);
+    long HelmMovementRevision(Guid combatantId, Agent agent);
+}
+
 public interface INavalNativeMissionAdapter
 {
     void ConfigureNative(Func<bool> authority, Action<Missions.Messages.NetworkNavalLabHelmInput> sendInput);
@@ -34,6 +52,7 @@ public interface INavalNativeMissionAdapter
     void ApplyStations(Missions.Messages.NetworkNavalLabStations stations);
     bool ObserveStations(Missions.Messages.NetworkNavalLabStations stations);
     bool IsCommittedOarMovement(Guid incarnationId, Guid combatantId, Agent agent);
+    bool IsOccupiedHelmMovement(Guid incarnationId, Guid combatantId, Agent agent);
     void ApplyNativeInput(Missions.Messages.NetworkNavalLabHelmInput input);
     void NeutralizeNativeInput(int ship);
     Missions.Messages.NetworkNavalLabSailState[] ReadSailStates();

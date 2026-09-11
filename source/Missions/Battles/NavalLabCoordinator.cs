@@ -27,6 +27,8 @@ public interface INavalLabCoordinator
     object SailStatus();
     object HelmStatus();
     object ControlStatus();
+    object StartDrift(Guid operationId, int seconds);
+    object InspectDrift();
 }
 
 public sealed partial class NavalLabCoordinator : INavalLabCoordinator, IHandler
@@ -64,6 +66,7 @@ public sealed partial class NavalLabCoordinator : INavalLabCoordinator, IHandler
         this.controllerFactory = controllerFactory;
         this.nativeState = nativeState;
         broker.Subscribe<NetworkNavalLabStations>(ReceiveStations);
+        broker.Subscribe<NetworkNavalLabHelmOccupancy>(ReceiveHelmOccupancy);
         broker.Subscribe<NetworkNavalLabHelmInput>(ReceiveNativeInput);
         broker.Subscribe<NetworkNavalLabStart>(ReceiveStart);
         broker.Subscribe<NetworkNavalLabAction>(ReceiveAction);
@@ -116,7 +119,9 @@ public sealed partial class NavalLabCoordinator : INavalLabCoordinator, IHandler
         if (store.Current == null) throw new InvalidOperationException("No lab exists.");
         bool single = store.Current.Mode == NavalLabMode.SingleClientNative || IsTwoClientNative;
         bool deployment = kind == "complete-deployment";
-        bool pulse = kind == "native-axes-pulse";
+        bool pulse = kind == "native-axes-pulse" || kind == "native-axes-backward" || kind == "native-axes-neutral" || kind == "native-row-stop";
+        if (pulse && kind != "native-axes-pulse" && (row || (kind != "native-axes-backward" && rudder != 0)))
+            throw new ArgumentException("Backward requires row=false; neutral/row-stop also require rudder=0.");
         if (pulse && !IsTwoClientNative) throw new ArgumentException("Axes pulses require two-client-native.");
         bool nativeHelm = kind == "native-take-helm" || kind == "native-release-helm";
         if (nativeHelm && (!IsTwoClientNative || rudder != 0 || row))
@@ -163,6 +168,19 @@ public sealed partial class NavalLabCoordinator : INavalLabCoordinator, IHandler
         return store.InspectOperation(operationId);
     }
 
+    public object StartDrift(Guid operationId, int seconds)
+    {
+        if (!GameThread.Instance.IsGameThread) throw new InvalidOperationException("Drift recording requires the game thread.");
+        if (!IsTwoClientNative || adapter is not INavalDriftAdapter drift) throw new InvalidOperationException("No native client drift adapter.");
+        return drift.StartDrift(operationId, seconds);
+    }
+
+    public object InspectDrift()
+    {
+        if (!GameThread.Instance.IsGameThread) throw new InvalidOperationException("Drift inspection requires the game thread.");
+        return (adapter as INavalDriftAdapter)?.InspectDrift() ?? new { unavailable = "no_native_drift_adapter" };
+    }
+
     public object HelmStatus()
     {
         if (!GameThread.Instance.IsGameThread) throw new InvalidOperationException("Read helm status on the game thread.");
@@ -184,6 +202,7 @@ public sealed partial class NavalLabCoordinator : INavalLabCoordinator, IHandler
                 ? new { assignment.HostControllerId, assignment.Epoch } : null,
             status = IsTwoClientNative ? (adapter as INavalNativeMissionAdapter)?.InspectControlStatus() : null,
             transport = IsTwoClientNative ? (controller as INavalNativeController)?.NativeControlStatus() : null,
+            presentation = IsTwoClientNative ? (adapter as INavalPresentationAdapter)?.InspectPresentationStatus() : null,
             unavailable = !IsTwoClientNative ? "wrong_mode_or_no_fixture" : adapter == null ? "no_local_native_view" : null
         };
     }
@@ -367,6 +386,7 @@ public sealed partial class NavalLabCoordinator : INavalLabCoordinator, IHandler
     public void Dispose()
     {
         broker.Unsubscribe<NetworkNavalLabStations>(ReceiveStations);
+        broker.Unsubscribe<NetworkNavalLabHelmOccupancy>(ReceiveHelmOccupancy);
         broker.Unsubscribe<NetworkNavalLabHelmInput>(ReceiveNativeInput);
         broker.Unsubscribe<NetworkNavalLabStart>(ReceiveStart);
         broker.Unsubscribe<NetworkNavalLabAction>(ReceiveAction);

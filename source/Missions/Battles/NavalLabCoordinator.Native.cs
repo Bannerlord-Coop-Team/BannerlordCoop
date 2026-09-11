@@ -85,7 +85,7 @@ public sealed partial class NavalLabCoordinator
                 (controller as INavalNativeController)?.ReceiveNativeInput(payload.What, readyAtReceive);
                 return;
             }
-            if (!NativeAssignmentValid || payload.Who is not NetPeer peer || !players.TryGetPlayer(peer, out var player)
+            if (!NativeAssignmentValid || !HelmReplicasReady || payload.Who is not NetPeer peer || !players.TryGetPlayer(peer, out var player)
                 || !nativeState.AcceptInput(player.ControllerId, payload.What, DateTime.UtcNow.Ticks)) return;
             if (hosts.TryGet(store.Current.InstanceId, out var host) && players.TryGetPeer(host.HostControllerId, out var target))
                 network.Send(target, payload.What);

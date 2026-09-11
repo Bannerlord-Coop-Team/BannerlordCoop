@@ -82,6 +82,9 @@ namespace Missions.Agents.Packets
             float? mountAction0TurnProgress = null,
             bool? mountAction0IsSyntheticTurn = null)
         {
+#if DEBUG
+            NavalHelmRevision = 0;
+#endif
             Position = agent.Position;
             MovementDirection = agent.GetMovementDirection();
             LookDirection = agent.LookDirection;
@@ -187,5 +190,10 @@ namespace Missions.Agents.Packets
         /// <summary>The owner's current translation and turn inputs.</summary>
         [ProtoMember(9)]
         public uint MovementFlag { get; }
+#if DEBUG
+        // Fixed-fixture helm fence only; absent from the production Release schema.
+        [ProtoMember(10)]
+        public long NavalHelmRevision { get; set; }
+#endif
     }
 }

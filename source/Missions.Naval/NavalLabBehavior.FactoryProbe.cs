@@ -123,6 +123,7 @@ internal sealed partial class NavalLabBehavior
 
     private void HoldFactoryProbe()
     {
+        ClearPresentation();
         if (factoryTerminal) return;
         factoryTerminal = true;
         factoryObserving = false;

@@ -129,9 +129,10 @@ public sealed partial class NavalLabController : CoopMissionController, INavalLa
         coopMissionComponent.AgentRegistry.Clear();
         for (int i = 0; i < adapter.Agents.Length; i++)
         {
+            string owner = manifest.Controllers[i / NavalLabManifest.CrewPerShip];
+            string movementScope = IsTwoClientNative ? manifest.InstanceId + ":" + owner : owner;
             if (!coopMissionComponent.AgentRegistry.TryRegisterAgent(
-                manifest.Controllers[i / NavalLabManifest.CrewPerShip], manifest.Combatants[i],
-                (ushort)(i + 1), adapter.Agents[i], 1))
+                owner, owner, movementScope, manifest.Combatants[i], (ushort)(i + 1), adapter.Agents[i], 1))
                 throw new InvalidOperationException("Cannot register a synthetic combatant.");
         }
     }
@@ -182,11 +183,12 @@ public sealed partial class NavalLabController : CoopMissionController, INavalLa
             ReleaseNativeControls();
             return NativeControlsReady ? "controls_ready" : "failed:native_release";
         }
-        if (!IsTwoClientNative && (action.Kind == "native-axes-pulse" || action.Kind == "native-take-helm" || action.Kind == "native-release-helm"))
+        bool presentationPulse = action.Kind == "native-axes-backward" || action.Kind == "native-axes-neutral" || action.Kind == "native-row-stop";
+        if (!IsTwoClientNative && (presentationPulse || action.Kind == "native-axes-pulse" || action.Kind == "native-take-helm" || action.Kind == "native-release-helm"))
             return "rejected:wrong_mode";
         if (IsTwoClientNative)
         {
-            if (action.Kind == "native-axes-pulse")
+            if (action.Kind == "native-axes-pulse" || presentationPulse)
             {
                 if (action.Ship < 0 || action.Ship >= 2 || manifest.Controllers[action.Ship] != session.OwnControllerId
                     || !NativeControlsReady) return "rejected:owner_not_ready";
@@ -194,6 +196,12 @@ public sealed partial class NavalLabController : CoopMissionController, INavalLa
                     return "rejected:invalid_control";
                 if (action.DeadlineUtcTicks <= DateTime.UtcNow.Ticks || action.DeadlineUtcTicks > DateTime.UtcNow.AddSeconds(1).Ticks)
                     return "rejected:expired_control";
+                if (presentationPulse)
+                {
+                    if (action.Row || (action.Kind != "native-axes-backward" && action.Rudder != 0)) return "rejected:invalid_control";
+                    return (adapter as INavalPresentationAdapter)?.RequestPresentationPulse(action.OperationId, action.Ship,
+                        action.Rudder, action.Kind, action.DeadlineUtcTicks) ?? "rejected:presentation_adapter_unavailable";
+                }
                 return NativeAdapter.RequestAxesPulse(action.OperationId, action.Ship, action.Rudder, action.Row, action.DeadlineUtcTicks);
             }
             if (action.Kind == "native-take-helm" || action.Kind == "native-release-helm")
@@ -344,6 +352,7 @@ public sealed partial class NavalLabController : CoopMissionController, INavalLa
             relay.SendAll(new NetworkNavalLabFault(manifest.IncarnationId, adapter.Blocker));
         }
         TickFollowerHull(dt);
+        if (IsTwoClientNative) (adapter as INavalPresentationAdapter)?.TickPresentation(dt);
         if (probeDriving) adapter.SetHelm(probeShip, probeRudder, probeRow);
         if (inputDeadline > 0 && Now >= inputDeadline)
         {
@@ -373,7 +382,8 @@ public sealed partial class NavalLabController : CoopMissionController, INavalLa
             var message = new NetworkNavalLabFrames(manifest.IncarnationId, session.HostEpoch, ++sequence,
                 values, callback, sample ? measurement.OperationId : Guid.Empty,
                 IsTwoClientNative && NativeControlsReady ? NativeAdapter.ReadSailStates() : null,
-                IsTwoClientNative && NativeControlsReady ? DateTime.UtcNow.AddSeconds(1).Ticks : 0);
+                IsTwoClientNative && NativeControlsReady ? DateTime.UtcNow.AddSeconds(1).Ticks : 0,
+                IsTwoClientNative && NativeControlsReady ? (adapter as INavalPresentationAdapter)?.CapturePresentation(sequence) : null);
             if (sample)
             {
                 nextSample = Now + 0.5;
@@ -415,6 +425,9 @@ public sealed partial class NavalLabController : CoopMissionController, INavalLa
                 }
                 frames[i] = new MatrixFrame(new Mat3(vectors[0], vectors[1], vectors[2]), vectors[3]);
             }
+            if (IsTwoClientNative && message.Presentation != null
+                && (!sailReadyAtReceive || !NativeControlsReady || adapter is not INavalPresentationAdapter presentation
+                    || !presentation.ValidatePresentation(message))) { rejectedFrames++; return; }
             receivedGaps += Math.Max(0, message.Sequence - lastReceived - 1);
             lastReceived = message.Sequence;
             bool applied;
@@ -447,7 +460,11 @@ public sealed partial class NavalLabController : CoopMissionController, INavalLa
             if (!IsTwoClientNative) lastApplied = message.Sequence;
             if (IsTwoClientNative)
             {
-                if (sailReadyAtReceive && NativeControlsReady) NativeAdapter.ApplySailFeedback(message);
+                if (sailReadyAtReceive && NativeControlsReady)
+                {
+                    NativeAdapter.ApplySailFeedback(message);
+                    (adapter as INavalPresentationAdapter)?.AcceptPresentation(message);
+                }
                 else NativeAdapter.ClearSailFeedback();
             }
             if (message.ProbeOperationId != Guid.Empty)

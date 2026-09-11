@@ -96,6 +96,21 @@ public sealed class NavalLabControlPulseTests : IDisposable
         Assert.True(message.DeadlineUtcTicks <= DateTime.UtcNow.AddSeconds(1).Ticks);
     }
 
+    [Theory]
+    [InlineData("native-axes-backward", -1)]
+    [InlineData("native-axes-neutral", 0)]
+    [InlineData("native-row-stop", 2)]
+    public void PresentationPulsesKeepExistingOwnerRelayAndSail(string kind, int expectedLongitudinal)
+    {
+        Assert.StartsWith("requested:synthetic", fixture.RequestPresentationPulse(Guid.NewGuid(), 1, 0, kind, DateTime.UtcNow.AddSeconds(1).Ticks));
+        var message = Assert.Single(sent);
+        Assert.Equal(expectedLongitudinal, message.Longitudinal);
+        Assert.Equal(2, message.Sail);
+        Assert.True(message.HasHelm);
+        Assert.Equal(1, message.Ship);
+        Assert.True(message.DeadlineUtcTicks <= DateTime.UtcNow.AddSeconds(1).Ticks);
+    }
+
     [Fact]
     public void DuplicateDoesNotRestartOrExtendAndConflictDoesNotReplacePendingPulse()
     {
@@ -194,6 +209,8 @@ public sealed class NavalLabControlPulseTests : IDisposable
     {
         harmony.Unpatch(AccessTools.Method(typeof(NavalLabBehavior), "HasNativeInputPermission"), HarmonyPatchType.Prefix, harmony.Id);
         Patch(AccessTools.PropertyGetter(typeof(NavalLabBehavior), "CanUseNativeControls"), nameof(True));
+        fixture.nativeAutoHelmObserved = true;
+        Patch(AccessTools.PropertyGetter(typeof(NavalLabBehavior), "HelmReplicasReady"), nameof(True));
         Patch(AccessTools.PropertyGetter(typeof(Mission), nameof(Mission.MainAgent)), nameof(Main));
         Patch(AccessTools.PropertyGetter(typeof(Agent), nameof(Agent.IsPlayerControlled)), nameof(True));
         Patch(AccessTools.PropertyGetter(typeof(MissionShipControlView), "IsDisplayingADialog"), nameof(Dialog));

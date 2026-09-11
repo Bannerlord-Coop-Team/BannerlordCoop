@@ -38,9 +38,10 @@ public sealed class NetworkNavalLabFrames : IEvent
     [ProtoMember(6)] public readonly Guid ProbeOperationId;
     [ProtoMember(7)] public readonly NetworkNavalLabSailState[] SailStates;
     [ProtoMember(8)] public readonly long SailDeadlineUtcTicks;
+    [ProtoMember(9)] public readonly NetworkNavalLabPresentation[] Presentation;
     public NetworkNavalLabFrames(Guid incarnationId, int epoch, long sequence, float[] frames,
         long sourceCallback = 0, Guid probeOperationId = default,
-        NetworkNavalLabSailState[] sailStates = null, long sailDeadlineUtcTicks = 0)
+        NetworkNavalLabSailState[] sailStates = null, long sailDeadlineUtcTicks = 0, NetworkNavalLabPresentation[] presentation = null)
     {
         IncarnationId = incarnationId;
         Epoch = epoch;
@@ -50,6 +51,7 @@ public sealed class NetworkNavalLabFrames : IEvent
         ProbeOperationId = probeOperationId;
         SailStates = sailStates;
         SailDeadlineUtcTicks = sailDeadlineUtcTicks;
+        Presentation = presentation;
     }
 }
 

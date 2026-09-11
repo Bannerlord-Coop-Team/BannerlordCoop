@@ -205,6 +205,7 @@ public sealed class NavalTestAdapter : INavalMissionAdapter, INavalNativeMission
     public Func<Guid, Guid, Agent, bool>? CommittedOarMovement;
     public bool IsCommittedOarMovement(Guid incarnationId, Guid combatantId, Agent agent) =>
         CommittedOarMovement?.Invoke(incarnationId, combatantId, agent) == true;
+    public bool IsOccupiedHelmMovement(Guid incarnationId, Guid combatantId, Agent agent) => false;
     public void ApplyNativeInput(NetworkNavalLabHelmInput input)
     { Assert.True(FactoryHost); Assert.True(InputAuthority!()); NativeInputs.Add(input); }
     public void NeutralizeNativeInput(int ship) { Assert.True(FactoryHost); Neutralized.Add(ship); }

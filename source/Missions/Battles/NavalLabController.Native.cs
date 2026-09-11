@@ -12,6 +12,7 @@ public interface INavalNativeController
     void ApplyStations(NetworkNavalLabStations stations);
     void ReleaseNativeControls();
     void ReceiveNativeInput(NetworkNavalLabHelmInput input, bool readyAtReceive);
+    void ReceiveHelmOccupancy(NetworkNavalLabHelmOccupancy value);
     object NativeControlStatus();
     bool NativeControlsReady { get; }
     bool NativeInputIngressReady { get; }
@@ -57,11 +58,54 @@ public sealed partial class NavalLabController : INavalNativeController
     {
         if (!IsTwoClientNative) return;
         if (NativeAdapter == null) throw new InvalidOperationException("native.adapter_unavailable");
-        coopMissionComponent.AgentMovementHandler.ConfigureNavalStationMovement(IsCommittedOarMovement);
+        if (adapter is not INavalHelmReplicationAdapter helm) throw new InvalidOperationException("native.helm_adapter_unavailable");
+        coopMissionComponent.AgentMovementHandler.ConfigureNavalStationMovement(IsCommittedOarMovement, IsOccupiedHelmMovement,
+            NativeHelmMovementRevision, AcceptNativeHelmMovement);
+        helm.ConfigureHelmReplication(value =>
+        {
+            if (!NativeControlsReady || !NativeAgentAuthoritiesValid)
+                throw new InvalidOperationException("native.helm_send_without_authority");
+            if (value.Phase == "offer" && manifest.Controllers[value.Ship] != session.OwnControllerId)
+                throw new InvalidOperationException("native.helm_send_not_owner");
+            relay.SendAll(value);
+        }, agent => coopMissionComponent.AgentMovementHandler.Interpolator.Forget(agent));
         NativeAdapter.ConfigureNative(() => NativeControlsReady, input =>
         {
             if (NativeControlsReady) relay.SendAll(input);
         });
+    }
+
+    private long? NativeHelmMovementRevision(CoopAgentInfo info)
+    {
+        if (!IsTwoClientNative || info == null) return null;
+        int index = Array.IndexOf(manifest.Combatants, info.AgentId);
+        if (index < 0 || index % NavalLabManifest.CrewPerShip != 0) return null;
+        if (!NativeControlsReady || Mission == null || Mission != TaleWorlds.MountAndBlade.Mission.Current
+            || info.OriginalOwner != manifest.Controllers[index / NavalLabManifest.CrewPerShip]
+            || info.CurrentAuthority != info.OriginalOwner || info.AuthorityRevision != 1
+            || info.MovementScopeId != manifest.InstanceId + ":" + info.OriginalOwner || adapter.Agents[index] != info.Agent)
+            return -1;
+        return ((INavalHelmReplicationAdapter)adapter).HelmMovementRevision(info.AgentId, info.Agent);
+    }
+
+    private bool AcceptNativeHelmMovement(CoopAgentInfo info, long revision)
+    {
+        var expected = NativeHelmMovementRevision(info);
+        return !expected.HasValue || (expected.Value >= 0 && revision == expected.Value);
+    }
+
+    public void ReceiveHelmOccupancy(NetworkNavalLabHelmOccupancy value)
+    {
+        try
+        {
+            if (!NativeControlsReady || !NativeAgentAuthoritiesValid || value.IncarnationId != manifest.IncarnationId
+                || value.Epoch != session.HostEpoch || value.Epoch != 1 || value.Ship < 0 || value.Ship >= 2
+                || value.ShipId != manifest.Ships[value.Ship]
+                || value.CombatantId != manifest.Combatants[value.Ship * NavalLabManifest.CrewPerShip])
+                throw new InvalidOperationException("native.helm_receive_without_identity_or_readiness");
+            ((INavalHelmReplicationAdapter)adapter).ApplyHelmOccupancy(value);
+        }
+        catch (Exception exception) { FailFactoryProbe(exception.ToString()); }
     }
 
     private bool IsCommittedOarMovement(CoopAgentInfo info)
@@ -76,6 +120,19 @@ public sealed partial class NavalLabController : INavalNativeController
             || station.Phase != "commit" || station.IncarnationId != manifest.IncarnationId || station.Epoch != 1)
             return false;
         return NativeAdapter.IsCommittedOarMovement(manifest.IncarnationId, info.AgentId, info.Agent);
+    }
+
+    private bool IsOccupiedHelmMovement(CoopAgentInfo info)
+    {
+        if (!IsTwoClientNative || !NativeControlsReady || Mission == null || Mission != TaleWorlds.MountAndBlade.Mission.Current
+            || info == null || info.OriginalOwner != session.OwnControllerId || info.CurrentAuthority != info.OriginalOwner
+            || info.AuthorityRevision != 1) return false;
+        int slot = Array.IndexOf(manifest.Controllers, session.OwnControllerId);
+        int index = slot * NavalLabManifest.CrewPerShip;
+        if (slot < 0 || index >= adapter.Agents.Length || manifest.Combatants[index] != info.AgentId
+            || adapter.Agents[index] != info.Agent || info.Agent != Mission.MainAgent || info.Agent != Mission.InitialPlayerAgent)
+            return false;
+        return NativeAdapter.IsOccupiedHelmMovement(manifest.IncarnationId, info.AgentId, info.Agent);
     }
 
     public NetworkNavalLabStations CreateStations()

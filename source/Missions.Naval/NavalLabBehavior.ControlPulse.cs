@@ -16,6 +16,7 @@ internal sealed partial class NavalLabBehavior
     private Guid pulseOperation;
     private Vec2 pulseAxes;
     private bool pulsePending;
+    private bool pulseRowStop;
     private bool pulseCompleting;
     private double pulseDeadline;
     private long pulseDeadlineUtcTicks;
@@ -28,22 +29,31 @@ internal sealed partial class NavalLabBehavior
     private long pulseNeutralInputSequence;
     private const string PulseReceipt = "requested:synthetic_axes_not_keyboard_or_propulsion_proof";
 
-    internal string RequestAxesPulse(Guid operationId, int slot, float lateral, bool row, long deadlineUtcTicks)
+    internal string RequestPresentationPulse(Guid operationId, int slot, float lateral, string kind, long deadlineUtcTicks)
+    {
+        if (kind != "native-axes-backward" && kind != "native-axes-neutral" && kind != "native-row-stop") return "rejected:invalid_pulse_kind";
+        return RequestAxesPulse(operationId, slot, lateral, false, deadlineUtcTicks,
+            kind == "native-axes-backward" ? -1 : 0, kind == "native-row-stop");
+    }
+
+    internal string RequestAxesPulse(Guid operationId, int slot, float lateral, bool row, long deadlineUtcTicks, float? forward = null, bool rowStop = false)
     {
         if (!GameThread.Instance.IsGameThread) return "rejected:not_game_thread";
         if (!IsTwoClientNative) return "rejected:wrong_mode";
         if (operationId == Guid.Empty || slot != OwnSlot || float.IsNaN(lateral) || float.IsInfinity(lateral) || Math.Abs(lateral) > 1)
             return "rejected:operation_owner_or_axes";
-        var axes = new Vec2(lateral, row ? 1 : 0);
-        if (pulseOperation == operationId) return pulseAxes == axes ? pulseReceipt : "rejected:conflicting_operation";
+        var axes = new Vec2(lateral, forward ?? (row ? 1 : 0));
+        if (float.IsNaN(axes.y) || float.IsInfinity(axes.y) || Math.Abs(axes.y) > 1) return "rejected:invalid_forward_axis";
+        if (pulseOperation == operationId) return pulseAxes == axes && pulseRowStop == rowStop ? pulseReceipt : "rejected:conflicting_operation";
         if (pulsePending) return "rejected:axes_pulse_pending";
         long now = DateTime.UtcNow.Ticks;
         if (deadlineUtcTicks <= now || deadlineUtcTicks > now + TimeSpan.TicksPerSecond) return "rejected:expired_control";
         var view = Mission?.GetMissionBehavior<MissionGauntletShipControlView>();
         if (Mission != Mission.Current || view == null || !HasNativeInputPermission(view))
-            return "rejected:owner_helm_or_input_unavailable";
+            return "rejected:" + NativeInputBlocker(view);
         pulseOperation = operationId;
         pulseAxes = axes;
+        pulseRowStop = rowStop;
         pulseView = view;
         pulseDeadlineUtcTicks = deadlineUtcTicks;
         pulseDeadline = ControlNow + TimeSpan.FromTicks(deadlineUtcTicks - now).TotalSeconds;
@@ -104,11 +114,15 @@ internal sealed partial class NavalLabBehavior
         if (!GameThread.Instance.IsGameThread) return new { unavailable = "not_game_thread" };
         if (!IsTwoClientNative) return new { unavailable = "wrong_mode" };
         bool ready = !factoryTerminal && CanUseNativeControls;
+        var view = Mission?.GetMissionBehavior<MissionGauntletShipControlView>();
         return new
         {
             manifest.IncarnationId, epoch = 1, owner = ownControllerId, ship = OwnSlot,
             shipId = OwnSlot >= 0 ? (Guid?)manifest.Ships[OwnSlot] : null, electedSimulator = factoryHost,
             ready, terminal = factoryTerminal, blocked = Blocker != null,
+            inputBlocker = NativeInputBlocker(view),
+            sailToggleEligible = ready && view?._playerControlledShip != null && HasNativeInputPermission(view) && view.GetCanToggleSail(),
+            pulseRowStop,
             operationId = pulseOperation, phase = pulsePhase, pulseSynthetic = true,
             pulseFirstInputSequence, pulseLastInputSequence, pulseNeutralInputSequence,
             requestedLateralAxis = pulseAxes.x, requestedForwardAxis = pulseAxes.y,

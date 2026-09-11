@@ -46,10 +46,18 @@ internal sealed partial class NavalLabBehavior
             && captain.CurrentlyUsedGameObject == point && point.UserAgent == captain ? LocalShip : null;
     }
 
-    private bool HasNativeInputPermission(MissionShipControlView view) => CanUseNativeControls && GetLocalControlledShip() != null
-            && view.ControllerMachine == LocalShip.ShipControllerMachine && view.MissionScreen != null
-            && ScreenManager._isWindowFocused && ScreenManager.TopScreen == view.MissionScreen
-            && !view.MissionScreen.IsCheatGhostMode && !view.MissionScreen.IsPhotoModeEnabled && !view.IsDisplayingADialog;
+    private bool HasNativeInputPermission(MissionShipControlView view) => NativeInputBlocker(view) == null;
+
+    private string NativeInputBlocker(MissionShipControlView view)
+    {
+        if (Mission == null || Mission != Mission.Current || !CanUseNativeInput) return "native_input_not_ready";
+        if (view == null || GetLocalControlledShip() == null || view.ControllerMachine != LocalShip.ShipControllerMachine)
+            return "owner_helm_or_view_unavailable";
+        if (view.MissionScreen == null || ScreenManager.TopScreen != view.MissionScreen) return "mission_screen_not_top";
+        if (!ScreenManager._isWindowFocused) return "window_not_focused";
+        if (view.MissionScreen.IsCheatGhostMode || view.MissionScreen.IsPhotoModeEnabled || view.IsDisplayingADialog) return "modal_photo_or_ghost";
+        return null;
+    }
 
     internal void RouteNativeAxes(MissionShipControlView view)
     {
@@ -73,6 +81,7 @@ internal sealed partial class NavalLabBehavior
             if (Math.Abs(axes.x) <= 0.2f) axes.x = 0;
             if (Math.Abs(axes.y) <= 0.2f) axes.y = 0;
             view.TickRowerInput(axes, out var longitudinal, out var doubleTap, out var lateral);
+            if (pulsePending && pulseRowStop) { longitudinal = RowerLongitudinalInput.Stop; doubleTap = RowerLongitudinalInput.None; }
             input = new ShipInputRecord(lateral, longitudinal, doubleTap, view.TickRudderInput(axes), view.SailControl);
         }
         if (ControlNow < nextNativeInput && permission == lastHelmPermission) return;
@@ -122,7 +131,7 @@ internal sealed partial class NavalLabBehavior
         player.SetInput(in stop);
     }
 
-    private string StationKey(ShipOarMachine machine, MissionShip ship)
+    private string StationKey(UsableMachine machine, MissionShip ship)
     {
         // Named child paths are content identities, never process-local native pointers.
         var entity = machine.PilotStandingPoint.GameEntity;
@@ -247,6 +256,8 @@ internal sealed partial class NavalLabBehavior
                 || !ObserveStations(stations, refreshTargets: true))
                 throw new InvalidOperationException("native.station_occupancy_lost");
         }
+        RefreshFollowerHelmTarget();
+        RefreshReplicatedFollowerHelmTarget();
     }
 
     internal bool ObserveStations(NetworkNavalLabStations value) => ObserveStations(value, refreshTargets: false);

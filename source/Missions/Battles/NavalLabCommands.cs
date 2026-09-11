@@ -67,7 +67,7 @@ public sealed class NavalLabActionCommand : ICoopCommand
     public IExpectedArgs[] ExpectedArgs { get; } =
     {
         new ExpectedArgs("operation_id", "Idempotent operation UUID.", true),
-        new ExpectedArgs("kind", "helm (1s), probe (30s helm + samples), walk/turn/crew (1s), jump (edge), take-helm (30s held use), release-helm, complete-deployment (native UI modes), sail-full/sail-raised/sail-square-raised, native-axes-pulse (<=1s synthetic native axes, rudder argument is lateral axis; row selects forward axis; not propulsion proof), native-take-helm/native-release-helm (two-client synthetic tests, not keyboard evidence; await helm-status observation), stop.", true),
+        new ExpectedArgs("kind", "helm (1s), probe (30s helm + samples), walk/turn/crew (1s), jump (edge), take-helm (30s held use), release-helm, complete-deployment (native UI modes), sail-full/sail-raised/sail-square-raised, native-axes-pulse (<=1s, rudder=lateral, row=forward), native-axes-backward (<=1s, rudder=lateral, row=false), native-axes-neutral/native-row-stop (<=1s, rudder=0,row=false; preserve sail), native-take-helm/native-release-helm (two-client synthetic tests, not keyboard evidence; await helm-status observation), stop.", true),
         new ExpectedArgs("ship", "Manifest ship index, 0 or 1.", true),
         new ExpectedArgs("rudder", "Finite [-1,1]: helm/probe rudder, walk forward input, turn radians/sec; jump/crew/take-helm/release-helm require 0.", true),
         new ExpectedArgs("row", "Oars for helm/probe; agent actions require false.", true)
@@ -135,7 +135,7 @@ public sealed class NavalLabControlStatusCommand : ICoopCommand
     public NavalLabControlStatusCommand(INavalLabCoordinator coordinator) => this.coordinator = coordinator;
     public string Prefix => "coop.debug.naval_lab";
     public string Name => "control-status";
-    public string Description => "Read bounded synthetic axes, input delivery and local native motion/counters; not synchronized physics or propulsion proof.";
+    public string Description => "Read input eligibility, host captured/follower accepted/displayed/native-observed sail/oar presentation for both slots, and safety counters. Not rendered or propulsion proof.";
     public CoopCommandSide Side => CoopCommandSide.Both;
     public IExpectedArgs[] ExpectedArgs => Array.Empty<IExpectedArgs>();
     public CoopCommandResult ProcessCommand(ICoopCommandArgs args)

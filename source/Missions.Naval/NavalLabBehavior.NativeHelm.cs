@@ -2,8 +2,10 @@
 using System;
 using Common;
 using Missions.Battles;
+using NavalDLC.Missions.MissionLogics;
 using NavalDLC.View.MissionViews;
 using NavalDLC.Missions.Objects;
+using TaleWorlds.Core;
 using TaleWorlds.MountAndBlade;
 using TaleWorlds.MountAndBlade.View.MissionViews;
 using TaleWorlds.ScreenSystem;
@@ -12,6 +14,10 @@ namespace Missions.Naval;
 
 internal sealed partial class NavalLabBehavior
 {
+    private bool nativeAutoHelmAttempted;
+    private bool nativeAutoHelmObserved;
+    internal bool CanUseNativeInput => CanUseNativeControls && (!IsTwoClientNative || (nativeAutoHelmObserved && HelmReplicasReady));
+
     private Guid nativeHelmOperation;
     private bool nativeHelmTake;
     private bool nativeHelmDispatched;
@@ -40,6 +46,8 @@ internal sealed partial class NavalLabBehavior
             return take == nativeHelmTake ? nativeHelmReceipt : "rejected:conflicting_operation";
         if (nativeHelmPhase == "pending") return "rejected:native_helm_pending";
         if (nativeHelmPhase == "failed" || factoryTerminal) return "rejected:terminal_hold";
+        if (!nativeAutoHelmObserved) return "rejected:auto_helm_setup_incomplete";
+        if (!HelmReplicasReady) return "rejected:helm_replicas_pending";
         nativeHelmOperation = operationId;
         nativeHelmTake = take;
         nativeHelmPhase = "requested";
@@ -79,6 +87,59 @@ internal sealed partial class NavalLabBehavior
         }
     }
 
+    private void TrySeatNativeHelmAfterDeployment()
+    {
+        if (!IsTwoClientNative || nativeAutoHelmAttempted || !nativeDeploymentComplete
+            || factoryTerminal || nativeTerminalHold || Blocker != null || NativeAuthority?.Invoke() != true) return;
+        nativeAutoHelmAttempted = true;
+        nativeHelmTake = true;
+        nativeHelmShip = LocalShip;
+        nativeHelmAgent = LocalCaptain;
+        nativeHelmPoint = LocalShip?.ShipControllerMachine?.PilotStandingPoint;
+        try
+        {
+            var blocker = NativeHelmIdentityBlocker();
+            if (blocker != null) { FailNativeHelm(blocker); return; }
+            var machine = nativeHelmShip.ShipControllerMachine;
+            var agent = nativeHelmAgent;
+            var point = nativeHelmPoint;
+            if (!GameThread.Instance.IsGameThread || GameNetwork.IsClientOrReplay
+                || nativeAfterDeploymentCallbacks != 1 || !Mission.IsDeploymentFinished || Mission.Mode != MissionMode.Battle
+                || !nativeHelmShip.IsInitialized || !machine.GameEntity.IsValid
+                || machine._navalShipsLogic == null || machine._navalShipsLogic != Mission.GetMissionBehavior<NavalShipsLogic>()
+                || machine._navalAgentsLogic == null || machine._navalAgentsLogic != Mission.GetMissionBehavior<NavalAgentsLogic>()
+                || point.GetComponent<ResetAnimationOnStopUsageComponent>() == null)
+            {
+                FailNativeHelm("auto_spawn_not_initialized");
+                return;
+            }
+            if (point.UserAgent != null || machine.PilotAgent != null || agent.CurrentlyUsedGameObject != null
+                || point.MovingAgent != null || point.HasAIMovingTo || point.IsDeactivated
+                || !agent.IsAbleToUseMachine() || !agent.CanUseObject(point) || machine.IsAttachedShipVacant())
+            {
+                FailNativeHelm("auto_spawn_occupied_or_ineligible");
+                return;
+            }
+            // Only lab setup uses native spawn placement; normal take still requires focus and reachability.
+            nativeHelmPhase = "pending";
+            nativeHelmDispatched = true;
+            nativeHelmDispatchTick = nativeHelmTicks;
+            nativeHelmDeadline = ControlNow + 2;
+            nativeHelmReceipt = "dispatched:automatic_native_spawn_pending_observation";
+            agent.UseGameObject(point);
+            if (point.UserAgent != agent || agent.CurrentlyUsedGameObject != point || machine.PilotAgent != agent)
+            {
+                FailNativeHelm("auto_spawn_use_identity_missing");
+                return;
+            }
+            machine.OnPilotAssignedDuringSpawn();
+        }
+        catch (Exception exception)
+        {
+            FailNativeHelm("auto_spawn_exception:" + exception.GetType().FullName);
+        }
+    }
+
     private string NativeHelmIdentityBlocker()
     {
         if (Mission == null || Mission != Mission.Current || !CanUseNativeControls || factoryTerminal)
@@ -86,7 +147,9 @@ internal sealed partial class NavalLabBehavior
         var ship = LocalShip;
         var machine = ship?.ShipControllerMachine;
         if (nativeHelmAgent == null || nativeHelmAgent != LocalCaptain || nativeHelmAgent != Mission.MainAgent
-            || nativeHelmAgent.Pointer == UIntPtr.Zero || !nativeHelmAgent.IsActive() || !nativeHelmAgent.IsPlayerControlled)
+            || nativeHelmAgent != Mission.InitialPlayerAgent || nativeHelmAgent.Mission != Mission
+            || nativeHelmAgent.Pointer == UIntPtr.Zero || !nativeHelmAgent.IsActive() || !nativeHelmAgent.IsPlayerControlled
+            || !nativeHelmAgent.IsHuman || nativeHelmAgent.HasMount || nativeHelmAgent.IsMount)
             return "native_helm_agent_identity";
         if (ship == null || ship != nativeHelmShip || ship.ShipOrigin is not NavalLabShipOrigin
             || ship.ShipOrigin.Hull != hull || !ship.IsDeployed || nativeDeploymentCallbacks != 1 || !ship.GameEntity.IsValid
@@ -95,6 +158,28 @@ internal sealed partial class NavalLabBehavior
             || nativeHelmAgent.Formation != ship.Formation)
             return "native_helm_ship_or_point_identity";
         return null;
+    }
+
+    private bool HasOccupiedLocalHelm()
+    {
+        if (!IsTwoClientNative || !nativeAutoHelmObserved || nativeHelmPhase == "pending" || nativeHelmPhase == "failed"
+            || NativeHelmIdentityBlocker() != null) return false;
+        var machine = nativeHelmShip.ShipControllerMachine;
+        return machine.GameEntity.IsValid && !nativeHelmPoint.IsDeactivated
+            && nativeHelmPoint.UserAgent == nativeHelmAgent && machine.PilotAgent == nativeHelmAgent
+            && nativeHelmAgent.CurrentlyUsedGameObject == nativeHelmPoint;
+    }
+
+    internal bool IsOccupiedHelmMovement(Guid incarnationId, Guid combatantId, Agent agent) =>
+        incarnationId == manifest.IncarnationId && HasOccupiedLocalHelm()
+        && manifest.Combatants[OwnSlot * NavalLabManifest.CrewPerShip] == combatantId && agent == nativeHelmAgent;
+
+    private void RefreshFollowerHelmTarget()
+    {
+        if (factoryHost || !HasOccupiedLocalHelm() || !nativeHelmPoint.LockUserFrames) return;
+        // Refresh the native target after follower hull writes, without moving the actor directly.
+        var frame = nativeHelmPoint.GetUserFrameForAgent(nativeHelmAgent);
+        nativeHelmAgent.SetTargetPositionAndDirection(frame.Origin.AsVec2, in frame.Rotation.f);
     }
 
     private string NativeHelmPrecondition(bool take)
@@ -163,6 +248,7 @@ internal sealed partial class NavalLabBehavior
     private void TickNativeHelm()
     {
         nativeHelmTicks++;
+        TrySeatNativeHelmAfterDeployment();
         if (!IsTwoClientNative || nativeHelmPhase != "pending" || nativeHelmTicks <= nativeHelmDispatchTick) return;
         string blocker = NativeHelmIdentityBlocker();
         if (blocker != null) { FailNativeHelm(blocker); return; }
@@ -174,8 +260,11 @@ internal sealed partial class NavalLabBehavior
             return;
         }
         if (ControlNow >= nativeHelmDeadline) { FailNativeHelm("observation_timeout"); return; }
-        bool complete = nativeHelmTake ? user == nativeHelmAgent && used == nativeHelmPoint : user == null && used == null;
+        bool complete = nativeHelmTake ? user == nativeHelmAgent && used == nativeHelmPoint
+            && nativeHelmShip.ShipControllerMachine.PilotAgent == nativeHelmAgent
+            : user == null && used == null && nativeHelmShip.ShipControllerMachine.PilotAgent == null;
         if (!complete) return;
+        if (nativeAutoHelmAttempted && nativeHelmOperation == Guid.Empty) nativeAutoHelmObserved = true;
         nativeHelmPhase = nativeHelmTake ? "observed_taken" : "observed_released";
         nativeHelmObservedTick = nativeHelmTicks;
         CaptureNativeHelmOutcome();
@@ -237,6 +326,7 @@ internal sealed partial class NavalLabBehavior
         return new
         {
             incarnation = manifest.IncarnationId, epoch = 1, owner = ownControllerId, slot = OwnSlot,
+            autoSpawnAttempted = nativeAutoHelmAttempted, autoSpawnObserved = nativeAutoHelmObserved,
             operationId = nativeHelmOperation, requested = nativeHelmOperation != Guid.Empty,
             action = nativeHelmOperation == Guid.Empty ? null : nativeHelmTake ? "native-take-helm" : "native-release-helm",
             dispatched = nativeHelmDispatched, phase = nativeHelmPhase, pending = nativeHelmPhase == "pending",
@@ -251,7 +341,7 @@ internal sealed partial class NavalLabBehavior
             viewMatchesOwnHelm = view != null && LocalShip?.ShipControllerMachine != null
                 && view.ControllerMachine == LocalShip.ShipControllerMachine,
             inputPermitted = view != null && HasNativeInputPermission(view),
-            remotePilotReplication = "unimplemented", keyboardAcceptance = false, terminal = factoryTerminal,
+            remotePilotReplication = InspectHelmOccupancy(), keyboardAcceptance = false, terminal = factoryTerminal,
             observation = "Operation completion is a past tick observation; identity is the current read. Receipt is dispatch only."
         };
     }
