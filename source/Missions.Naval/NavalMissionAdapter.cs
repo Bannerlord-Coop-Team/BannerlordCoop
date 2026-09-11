@@ -123,6 +123,9 @@ public sealed class NavalMissionAdapter : INavalMissionAdapter, INavalNativeMiss
     public void ClearSailFeedback() => behavior.ClearSailFeedback();
     public object InspectSailStatus() => behavior?.InspectSailStatus() ?? new { unavailable = "no_fixture" };
     public string RequestSail(int state) => behavior?.RequestSail(state) ?? "rejected:no_fixture";
+    public string RequestNativeHelm(Guid operationId, int ship, bool take) =>
+        behavior?.RequestNativeHelm(operationId, ship, take) ?? "rejected:no_fixture";
+    public object InspectHelmStatus() => behavior?.InspectHelmStatus() ?? new { unavailable = "no_fixture" };
     public void Dispose()
     {
         if (behavior?.IsSingleClientNative == true || behavior?.IsFactoryProbe == true) behavior.Hold();
@@ -755,12 +758,14 @@ internal sealed partial class NavalLabBehavior : MissionLogic
     {
         RecordHelmTrace(userAgent, usableGameObject, "use:callback");
         if (userAgent == heldHelmAgent && usableGameObject == heldHelmPoint) helmUseCallbacks++;
+        if (IsTwoClientNative && userAgent == nativeHelmAgent && usableGameObject == nativeHelmPoint) nativeHelmUseCallbacks++;
     }
 
     public override void OnObjectStoppedBeingUsed(Agent userAgent, UsableMissionObject usableGameObject)
     {
         RecordHelmTrace(userAgent, usableGameObject, "stop:callback");
         if (userAgent == heldHelmAgent && usableGameObject == heldHelmPoint) helmStopCallbacks++;
+        if (IsTwoClientNative && userAgent == nativeHelmAgent && usableGameObject == nativeHelmPoint) nativeHelmStopCallbacks++;
     }
 
     private object InspectHeldHelm() => new
@@ -846,6 +851,7 @@ internal sealed partial class NavalLabBehavior : MissionLogic
 
     public void TickAgentControl(float dt)
     {
+        TickNativeHelm();
         if (heldHelmAgent != null && (ControlNow >= heldHelmDeadline || Blocker != null)) ReleaseHeldHelm();
         if (controlledAgent == null) return;
         if (ControlNow >= controlDeadline || Blocker != null || float.IsNaN(dt) || float.IsInfinity(dt) || dt < 0) { CancelAgentControl(); return; }
@@ -892,6 +898,7 @@ internal sealed partial class NavalLabBehavior : MissionLogic
 
     public void CancelControls()
     {
+        CancelPendingNativeHelm();
         CancelAgentControl();
         ReleaseHeldHelm();
         if ((IsSingleClientNative && !nativeTerminalHold) || IsTwoClientNative) CancelNativeControls();

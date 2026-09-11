@@ -182,8 +182,18 @@ public sealed partial class NavalLabController : CoopMissionController, INavalLa
             ReleaseNativeControls();
             return NativeControlsReady ? "controls_ready" : "failed:native_release";
         }
+        if (!IsTwoClientNative && (action.Kind == "native-take-helm" || action.Kind == "native-release-helm"))
+            return "rejected:wrong_mode";
         if (IsTwoClientNative)
         {
+            if (action.Kind == "native-take-helm" || action.Kind == "native-release-helm")
+            {
+                if (action.Ship < 0 || action.Ship >= 2 || manifest.Controllers[action.Ship] != session.OwnControllerId
+                    || action.Rudder != 0 || action.Row || !NativeControlsReady) return "rejected:owner_not_ready";
+                if (action.DeadlineUtcTicks <= DateTime.UtcNow.Ticks || action.DeadlineUtcTicks > DateTime.UtcNow.AddSeconds(2).Ticks)
+                    return "rejected:expired_control";
+                return NativeAdapter.RequestNativeHelm(action.OperationId, action.Ship, action.Kind == "native-take-helm");
+            }
             if (action.Kind == "sail-full" || action.Kind == "sail-raised" || action.Kind == "sail-square-raised")
             {
                 if (action.Ship < 0 || action.Ship >= 2 || manifest.Controllers[action.Ship] != session.OwnControllerId

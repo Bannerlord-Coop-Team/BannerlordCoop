@@ -40,6 +40,8 @@ public interface INavalNativeMissionAdapter
     void ClearSailFeedback();
     object InspectSailStatus();
     string RequestSail(int state);
+    string RequestNativeHelm(Guid operationId, int ship, bool take);
+    object InspectHelmStatus();
 }
 
 public enum NavalLabMode { Activation, HeldHelm, SingleClientNative, FactoryAuthorityProbe, TwoClientNative }

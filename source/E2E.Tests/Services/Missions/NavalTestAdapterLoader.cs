@@ -50,6 +50,13 @@ public sealed class NavalTestAdapter : INavalMissionAdapter, INavalNativeMission
     public List<NetworkNavalLabFrames> SailFeedback { get; } = new();
     public int SailClears { get; private set; }
     public List<int> SailRequests { get; } = new();
+    public List<(Guid operationId, int ship, bool take)> NativeHelmRequests { get; } = new();
+    public object InspectHelmStatus() => new { simulated = true, requests = NativeHelmRequests.ToArray() };
+    public string RequestNativeHelm(Guid operationId, int ship, bool take)
+    {
+        NativeHelmRequests.Add((operationId, ship, take));
+        return "dispatched:synthetic_native_helm_pending_observation";
+    }
     public object InspectSailStatus() => new { simulated = true, requests = SailRequests.ToArray() };
     public string RequestSail(int state) { SailRequests.Add(state); return "requested:simulated_native_boundary"; }
     public NetworkNavalLabSailState[] ReadSailStates() => SailStates;

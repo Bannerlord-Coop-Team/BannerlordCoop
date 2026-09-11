@@ -76,6 +76,9 @@
     <Reference Include="NavalDLC.ViewModelCollection"><HintPath>..\..\mb2\Modules\NavalDLC\bin\Win64_Shipping_Client\NavalDLC.ViewModelCollection.dll</HintPath></Reference>
     <Reference Include="TaleWorlds.DotNet"><HintPath>../../mb2/bin/Win64_Shipping_Client/TaleWorlds.DotNet.dll</HintPath></Reference>
     <Publicize Include="Missions.Naval" />
+    <Reference Include="TaleWorlds.ScreenSystem"><HintPath>../../mb2/bin/Win64_Shipping_Client/TaleWorlds.ScreenSystem.dll</HintPath></Reference>
+    <Publicize Include="TaleWorlds.ScreenSystem" />
+    <Publicize Include="TaleWorlds.MountAndBlade.View" />
     <Reference Include="TaleWorlds.GauntletUI.ExtraWidgets"><HintPath>../../mb2/bin/Win64_Shipping_Client/TaleWorlds.GauntletUI.ExtraWidgets.dll</HintPath></Reference>
     <Reference Include="TaleWorlds.MountAndBlade.View"><HintPath>../../mb2/Modules/Native/bin/Win64_Shipping_Client/TaleWorlds.MountAndBlade.View.dll</HintPath></Reference>
     <Reference Include="TaleWorlds.Engine.GauntletUI"><HintPath>../../mb2/bin/Win64_Shipping_Client/TaleWorlds.Engine.GauntletUI.dll</HintPath></Reference>

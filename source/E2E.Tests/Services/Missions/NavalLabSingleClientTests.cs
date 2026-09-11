@@ -53,6 +53,19 @@ public sealed class NavalLabSingleClientTests : NavalMissionTestEnvironment
     }
 
     [Theory]
+    [InlineData("native-take-helm")]
+    [InlineData("native-release-helm")]
+    public void SingleClientModeRejectsTwoClientSyntheticHelmCommands(string kind)
+    {
+        CreateSingle(); Ready(First);
+        Assert.Throws<ArgumentException>(() => Execute(kind));
+        var operation = Guid.NewGuid();
+        SendAction(First, new NetworkNavalLabAction(Manifest.IncarnationId, operation, 1, kind, 0, 0, false));
+        Assert.Equal("rejected:wrong_mode", Receipt(First, operation));
+        Assert.Empty(Adapter(First).NativeHelmRequests);
+    }
+
+    [Theory]
     [InlineData("helm")]
     [InlineData("probe")]
     [InlineData("walk")]

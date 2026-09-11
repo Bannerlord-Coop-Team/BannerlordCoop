@@ -188,7 +188,9 @@ internal sealed partial class NavalLabBehavior
         var point = LocalShip?.ShipControllerMachine?.PilotStandingPoint;
         if (main != null && main.Pointer != UIntPtr.Zero && main.IsActive())
         {
-            if (point != null && point.GameEntity.IsValid && main.CurrentlyUsedGameObject == point && point.UserAgent == main)
+            // An uncertain synthetic dispatch is never retried as terminal cleanup.
+            if (!HasUncertainNativeHelmDispatch && point != null && point.GameEntity.IsValid
+                && main.CurrentlyUsedGameObject == point && point.UserAgent == main)
                 main.StopUsingGameObject();
             main.MovementInputVector = TaleWorlds.Library.Vec2.Zero;
         }
