@@ -141,7 +141,22 @@ public class BattleNonHostRetreatDespawnTests : MissionTestEnvironment
                         100f, "A", null, 106, new Equipment(), new BodyProperties(), new(new()), default),
                 }));
                 Assert.False(registry.TryGetAgentInfo(lateReplayId, out _),
-                    "a non-host's late replay must be dropped even when its party attribution is missing");
+                    "a late replay without resolvable party attribution must wait before spawning");
+
+                var mapEventParty = disconnectedParty.Party.MapEventSide.Parties.Single(
+                    party => party.Party == disconnectedParty.Party);
+                Assert.True(remaining.ObjectManager.TryGetId(mapEventParty, out var mapEventPartyId));
+                broker.Publish(this, new NetworkSpawnBattleAgents(new[]
+                {
+                    new BattleAgentSpawnData(lateReplayId, replayCharacterId, default, BattleSideEnum.Attacker,
+                        100f, "A", mapEventPartyId, 106, new Equipment(), new BodyProperties(), new(new()), default),
+                }));
+                Assert.True(registry.TryGetAgentInfo(lateReplayId, out var replay));
+                Assert.Equal("B", replay.CurrentAuthority);
+                Assert.Equal(1, replay.AuthorityRevision);
+                Assert.True(AgentMirror.TryGet(replay.Agent, out var replayMirror));
+                Assert.True(replayMirror.IsActive);
+                Assert.Equal(AgentControllerType.AI, replayMirror.Controller);
 
                 GC.KeepAlive(controller);
             });
@@ -152,9 +167,11 @@ public class BattleNonHostRetreatDespawnTests : MissionTestEnvironment
         }
     }
 
-    [Fact]
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
     [Trait("Requirement", "BR-051")]
-    public void Disconnect_LateReplayDropsPlayerParty_ButKeepsHostNpcForces()
+    public void HostDeparture_LateReplayMatchesWithdrawalPolicy_AndAllowsFreshReentry(bool disconnected)
     {
         using var fixture = new MissionEngineFixture();
         var (mapEventId, partyIds) = SetupCoopBattle("A", "B");
@@ -173,7 +190,7 @@ public class BattleNonHostRetreatDespawnTests : MissionTestEnvironment
                 var registry = successor.Resolve<INetworkAgentRegistry>();
 
                 controller.Session.TryBegin(mapEventId);
-                successor.Resolve<IBattleHostRegistry>().Set(mapEventId, new BattleHostAssignment("A", new[] { "B" }));
+                successor.Resolve<IBattleHostRegistry>().Set(mapEventId, new BattleHostAssignment("A", new[] { "B" }, epoch: 1));
                 BattleSpawnGate.BeginBattle(mapEventId);
                 mock.PlayerTeam = mock.DefenderTeam;
 
@@ -187,7 +204,10 @@ public class BattleNonHostRetreatDespawnTests : MissionTestEnvironment
                 Assert.True(successor.ObjectManager.TryGetId(npcMapEventParty, out var npcMapEventPartyId));
 
                 var broker = successor.Resolve<IMessageBroker>();
-                broker.Publish(this, new MissionPeerDisconnected("A", mapEventId));
+                if (disconnected)
+                    broker.Publish(this, new MissionPeerDisconnected("A", mapEventId));
+                else
+                    broker.Publish(this, new MissionPeerLeft("A", mapEventId));
                 broker.Publish(this, new NetworkSpawnBattleAgents(new[]
                 {
                     new BattleAgentSpawnData(playerAgentId, characterId, default, BattleSideEnum.Attacker, 100f,
@@ -196,10 +216,24 @@ public class BattleNonHostRetreatDespawnTests : MissionTestEnvironment
                         "A", npcMapEventPartyId, 103, new Equipment(), new BodyProperties(), new(new()), default),
                 }));
 
-                Assert.False(registry.TryGetAgentInfo(playerAgentId, out _),
-                    "a late replay must not restore the disconnected player's withdrawn party");
+                Assert.Equal(disconnected, registry.TryGetAgentInfo(playerAgentId, out _));
                 Assert.True(registry.TryGetAgentInfo(npcAgentId, out _),
                     "a departed host's NPC forces must remain available for successor adoption");
+
+                broker.Publish(this, new NetworkBattleHostAssigned(mapEventId, "B", Array.Empty<string>(), epoch: 2));
+                var retainedIds = disconnected ? new[] { playerAgentId, npcAgentId } : new[] { npcAgentId };
+                foreach (var id in retainedIds)
+                {
+                    Assert.True(registry.TryGetAgentInfo(id, out var info));
+                    Assert.Equal("B", info.CurrentAuthority);
+                    Assert.Equal(1, info.AuthorityRevision);
+                    Assert.True(AgentMirror.TryGet(info.Agent, out var mirror));
+                    Assert.True(mirror.IsActive);
+                    Assert.Equal(AgentControllerType.AI, mirror.Controller);
+                }
+                if (!disconnected)
+                    Assert.False(registry.TryGetAgentInfo(playerAgentId, out _),
+                        "a late replay must not restore the gracefully withdrawn player's party");
 
                 broker.Publish(this, new NetworkMissionPeerEntered("A", mapEventId));
                 broker.Publish(this, new NetworkSpawnBattleAgents(new[]
@@ -208,8 +242,16 @@ public class BattleNonHostRetreatDespawnTests : MissionTestEnvironment
                         "A", disconnectedMapEventPartyId, 104, new Equipment(), new BodyProperties(), new(new()), default),
                 }));
 
-                Assert.True(registry.TryGetAgentInfo(freshPlayerAgentId, out _),
+                Assert.True(registry.TryGetAgentInfo(freshPlayerAgentId, out var freshPlayer),
                     "rejoining must clear the withdrawal guard so the player's freshly spawned party can return");
+                Assert.Equal("A", freshPlayer.CurrentAuthority);
+                Assert.Equal(0, freshPlayer.AuthorityRevision);
+                foreach (var id in retainedIds)
+                {
+                    Assert.True(registry.TryGetAgentInfo(id, out var retained));
+                    Assert.Equal("B", retained.CurrentAuthority);
+                    Assert.Equal(1, retained.AuthorityRevision);
+                }
 
                 GC.KeepAlive(controller);
             });

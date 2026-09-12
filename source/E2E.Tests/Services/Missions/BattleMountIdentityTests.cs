@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Linq;
 using Common.Messaging;
+using E2E.Tests.Environment.Extensions;
 using E2E.Tests.Environment.Mock;
 using E2E.Tests.Environment.MockEngine;
 using GameInterface.Services.MapEvents;
@@ -12,6 +13,7 @@ using Missions.Agents.Handlers;
 using Missions.Agents.Packets;
 using Missions.Battles;
 using Missions.Messages;
+using Missions.Services.Network;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.Core;
@@ -653,6 +655,11 @@ public class BattleMountIdentityTests : MissionTestEnvironment
             var component = peer.Resolve<ICoopMissionComponent>();
             var registry = peer.Resolve<INetworkAgentRegistry>();
 
+            var sender = NetPeerExtensions.CreatePeer();
+            peer.Resolve<IMessageBroker>().Publish(
+                this, new NetworkMissionPeerEntered("owner", "movement-test"));
+            peer.Resolve<IMissionContext>().MapPeer("owner", sender);
+
             // Our local copy of another owner's masterless horse.
             var puppetHorse = mock.SpawnMount();
             Assert.True(registry.TryRegisterAgent("owner", horseId, puppetHorse));
@@ -668,8 +675,9 @@ public class BattleMountIdentityTests : MissionTestEnvironment
             remoteMirror.InputVector = new Vec2(0.3f, 0.7f);
             remoteMirror.RealGlobalVelocity = new Vec3(3f, 4f, 0f);
 
-            var packet = new MountMovementPacket(new[] { horseId }, new[] { new AgentMountData(remoteHorse) });
-            component.AgentMovementHandler.MountMovementApplier.HandlePacket(null, packet);
+            var packet = new MountMovementPacket(
+                new[] { horseId }, new[] { new AgentMountData(remoteHorse) }, "owner", new long[] { 0 });
+            component.AgentMovementHandler.MountMovementApplier.HandlePacket(sender, packet);
 
             // The packet's movement input landed on the puppet horse (position itself is reconciled per-frame
             // by the interpolator, which this packet also fed).

@@ -142,6 +142,8 @@ public class BattleAgentSpawnData
     public readonly long AuthorityRevision;
     [ProtoMember(25)]
     public readonly long MountAuthorityRevision;
+    [ProtoMember(26)]
+    public readonly string MountOwnerControllerId;
 
     public BattleAgentSpawnData(
         Guid agentId,
@@ -166,7 +168,8 @@ public class BattleAgentSpawnData
         string mountMovementScopeId = null,
         bool isRunningAway = false,
         long authorityRevision = 0,
-        long mountAuthorityRevision = 0)
+        long mountAuthorityRevision = 0,
+        string mountOwnerControllerId = null)
     {
         AgentId = agentId;
         CharacterId = characterId;
@@ -193,5 +196,6 @@ public class BattleAgentSpawnData
         IsRunningAway = isRunningAway;
         AuthorityRevision = authorityRevision;
         MountAuthorityRevision = mountAuthorityRevision;
+        MountOwnerControllerId = mountOwnerControllerId ?? ownerControllerId;
     }
 }

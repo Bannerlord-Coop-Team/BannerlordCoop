@@ -8,6 +8,7 @@ using LiteNetLib;
 using Missions;
 using Missions.Agents.Packets;
 using Missions.Messages;
+using Missions.Services.Network;
 using System;
 using Xunit.Abstractions;
 using AgentData = Missions.Agents.Packets.AgentData;
@@ -23,6 +24,32 @@ public class BattleMeshNetworkTests : MissionTestEnvironment
 
     private static NetworkSpawnBattleAgents EmptySpawn() =>
         new NetworkSpawnBattleAgents(Array.Empty<BattleAgentSpawnData>());
+
+    [Fact]
+    public void Mesh_Stop_RemovesOnlyTheStoppedPeerMapping()
+    {
+        EnvironmentInstance[] clients = Clients.ToArray();
+        Connect(clients[0], "ctrl-A", "instance-1");
+        Connect(clients[1], "ctrl-B", "instance-1");
+        Connect(clients[2], "ctrl-C", "instance-1");
+        var contextA = clients[0].Resolve<IMissionContext>();
+        var contextC = clients[2].Resolve<IMissionContext>();
+
+        Assert.True(contextA.TryGetPeer("ctrl-B", out var peerB));
+        Assert.Same(Mesh(clients[1]).NetPeer, peerB);
+        Assert.True(contextA.TryGetPeer("ctrl-C", out var peerC));
+        Assert.Same(Mesh(clients[2]).NetPeer, peerC);
+        Assert.NotEqual(peerB, peerC);
+
+        Mesh(clients[1]).Stop();
+
+        Assert.False(contextA.TryGetPeer("ctrl-B", out _));
+        Assert.False(contextC.TryGetPeer("ctrl-B", out _));
+        Assert.True(contextA.TryGetPeer("ctrl-C", out peerC));
+        Assert.Same(Mesh(clients[2]).NetPeer, peerC);
+        Assert.True(contextC.TryGetPeer("ctrl-A", out var peerA));
+        Assert.Same(Mesh(clients[0]).NetPeer, peerA);
+    }
 
     [Fact]
     public void Mesh_SendAll_DeliversToOtherMembers_ButNotSender()

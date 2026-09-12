@@ -1,14 +1,20 @@
 ﻿using System;
 using System.Linq;
 using System.Reflection;
+using Common.Messaging;
 using Common.PacketHandlers;
 using Common.Serialization;
+using E2E.Tests.Environment.Extensions;
+using E2E.Tests.Environment.Instance;
 using E2E.Tests.Environment.Mock;
 using E2E.Tests.Environment.MockEngine;
+using LiteNetLib;
 using Missions;
 using Missions.Agents;
 using Missions.Agents.Handlers;
 using Missions.Agents.Packets;
+using Missions.Messages;
+using Missions.Services.Network;
 using TaleWorlds.Core;
 using TaleWorlds.Library;
 using TaleWorlds.MountAndBlade;
@@ -32,6 +38,7 @@ public class MountedPuppetMovementTests : MissionTestEnvironment
         peer.Call(() =>
         {
             var mock = CreateMovementMission(fixture, peer);
+            NetPeer sender = RegisterMovementSender(peer, "owner");
             var registry = peer.Resolve<INetworkAgentRegistry>();
             var component = peer.Resolve<ICoopMissionComponent>();
             var riderId = Guid.NewGuid();
@@ -60,7 +67,7 @@ public class MountedPuppetMovementTests : MissionTestEnvironment
                 riderLookDirection: new Vec3(-1f, 0f, 0f));
 
             component.AgentMovementHandler.HandlePacket(
-                null,
+                sender,
                 new MovementPacket(new[] { riderId }, new[] { data }));
 
             Assert.Equal(AgentControllerType.None, puppetHorseMirror.Controller);
@@ -87,6 +94,7 @@ public class MountedPuppetMovementTests : MissionTestEnvironment
         peer.Call(() =>
         {
             var mock = CreateMovementMission(fixture, peer);
+            NetPeer sender = RegisterMovementSender(peer, "owner");
             var registry = peer.Resolve<INetworkAgentRegistry>();
             var component = peer.Resolve<ICoopMissionComponent>();
             var riderId = Guid.NewGuid();
@@ -130,7 +138,7 @@ public class MountedPuppetMovementTests : MissionTestEnvironment
                 turnData.MountData.MountAction0TurnActionIndex);
 
             component.AgentMovementHandler.HandlePacket(
-                null,
+                sender,
                 new MovementPacket(
                     new[] { riderId },
                     new[] { turnData }));
@@ -169,7 +177,7 @@ public class MountedPuppetMovementTests : MissionTestEnvironment
                 ProtoBuf.Serializer.DeepClone(settledData.MountData)
                     .MountAction0TurnActionIndex);
             component.AgentMovementHandler.HandlePacket(
-                null,
+                sender,
                 new MovementPacket(
                     new[] { riderId },
                     new[] { settledData }));
@@ -186,7 +194,7 @@ public class MountedPuppetMovementTests : MissionTestEnvironment
                     mountAction0TurnProgress: 0.1f,
                     mountAction0IsSyntheticTurn: true));
             component.AgentMovementHandler.HandlePacket(
-                null,
+                sender,
                 new MovementPacket(
                     new[] { riderId },
                     new[] { resumedTurnData }));
@@ -200,7 +208,7 @@ public class MountedPuppetMovementTests : MissionTestEnvironment
                 precision: 3);
 
             component.AgentMovementHandler.HandlePacket(
-                null,
+                sender,
                 new MovementPacket(
                     new[] { riderId },
                     new[] { settledData }));
@@ -228,7 +236,7 @@ public class MountedPuppetMovementTests : MissionTestEnvironment
                 puppetHorseMirror.InstallAgentVisualActionCalls);
 
             component.AgentMovementHandler.HandlePacket(
-                null,
+                sender,
                 new MovementPacket(
                     new[] { riderId },
                     new[] { turnData }));
@@ -1660,6 +1668,7 @@ public class MountedPuppetMovementTests : MissionTestEnvironment
         peer.Call(() =>
         {
             var mock = CreateMovementMission(fixture, peer);
+            NetPeer sender = RegisterMovementSender(peer, "owner");
             var registry = peer.Resolve<INetworkAgentRegistry>();
             var component = peer.Resolve<ICoopMissionComponent>();
             var riderId = Guid.NewGuid();
@@ -1680,7 +1689,7 @@ public class MountedPuppetMovementTests : MissionTestEnvironment
                 mountData: new AgentMountData(sourceHorse, horseId));
 
             component.AgentMovementHandler.HandlePacket(
-                null,
+                sender,
                 new MovementPacket(new[] { riderId }, new[] { data }));
 
             Assert.Equal(AgentControllerType.AI, horseMirror.Controller);
@@ -1890,6 +1899,7 @@ public class MountedPuppetMovementTests : MissionTestEnvironment
         peer.Call(() =>
         {
             var mock = CreateMovementMission(fixture, peer);
+            NetPeer sender = RegisterMovementSender(peer, "owner");
             var registry = peer.Resolve<INetworkAgentRegistry>();
             var component = peer.Resolve<ICoopMissionComponent>();
             var riderId = Guid.NewGuid();
@@ -1909,7 +1919,7 @@ public class MountedPuppetMovementTests : MissionTestEnvironment
                 ownerSpeed: 0f,
                 mountData: null);
             component.AgentMovementHandler.HandlePacket(
-                null,
+                sender,
                 new MovementPacket(new[] { riderId }, new[] { data }));
 
             Assert.Null(rider.MountAgent);
@@ -1930,6 +1940,7 @@ public class MountedPuppetMovementTests : MissionTestEnvironment
         peer.Call(() =>
         {
             var mock = CreateMovementMission(fixture, peer);
+            NetPeer sender = RegisterMovementSender(peer, "owner");
             var registry = peer.Resolve<INetworkAgentRegistry>();
             var component = peer.Resolve<ICoopMissionComponent>();
             var riderId = Guid.NewGuid();
@@ -1947,7 +1958,7 @@ public class MountedPuppetMovementTests : MissionTestEnvironment
                 ownerSpeed: 0f,
                 mountData: null);
             component.AgentMovementHandler.HandlePacket(
-                null,
+                sender,
                 new MovementPacket(new[] { riderId }, new[] { data }));
 
             Assert.Null(rider.MountAgent);
@@ -1968,6 +1979,7 @@ public class MountedPuppetMovementTests : MissionTestEnvironment
         peer.Call(() =>
         {
             var mock = CreateMovementMission(fixture, peer);
+            NetPeer sender = RegisterMovementSender(peer, "owner");
             var registry = peer.Resolve<INetworkAgentRegistry>();
             var component = peer.Resolve<ICoopMissionComponent>();
             var riderId = Guid.NewGuid();
@@ -1985,7 +1997,7 @@ public class MountedPuppetMovementTests : MissionTestEnvironment
                 ownerSpeed: 0f,
                 mountData: null);
             component.AgentMovementHandler.HandlePacket(
-                null,
+                sender,
                 new MovementPacket(new[] { riderId }, new[] { data }));
 
             Assert.Null(rider.MountAgent);
@@ -2006,6 +2018,7 @@ public class MountedPuppetMovementTests : MissionTestEnvironment
         peer.Call(() =>
         {
             var mock = CreateMovementMission(fixture, peer);
+            NetPeer sender = RegisterMovementSender(peer, "owner");
             var registry = peer.Resolve<INetworkAgentRegistry>();
             var component = peer.Resolve<ICoopMissionComponent>();
             var riderId = Guid.NewGuid();
@@ -2030,7 +2043,7 @@ public class MountedPuppetMovementTests : MissionTestEnvironment
                 ownerSpeed: 0f,
                 mountData: new AgentMountData(newHorse, newHorseId));
             component.AgentMovementHandler.HandlePacket(
-                null,
+                sender,
                 new MovementPacket(new[] { riderId }, new[] { data }));
 
             Assert.Same(newHorse, rider.MountAgent);
@@ -2053,6 +2066,7 @@ public class MountedPuppetMovementTests : MissionTestEnvironment
         {
             const string movementScopeId = "owner-movement-scope";
             var mock = CreateMovementMission(fixture, peer);
+            NetPeer sender = RegisterMovementSender(peer, "owner");
             var registry = peer.Resolve<INetworkAgentRegistry>();
             var component = peer.Resolve<ICoopMissionComponent>();
             Guid riderId = Guid.NewGuid();
@@ -2071,7 +2085,7 @@ public class MountedPuppetMovementTests : MissionTestEnvironment
                 ownerSpeed: 0f,
                 mountData: new AgentMountData(horse, 2));
             component.AgentMovementHandler.HandlePacket(
-                null,
+                sender,
                 new MovementPacket(new[] { riderId }, new[] { data }));
 
             Assert.Same(horse, rider.MountAgent);
@@ -2157,6 +2171,7 @@ public class MountedPuppetMovementTests : MissionTestEnvironment
         peer.Call(() =>
         {
             var mock = CreateMovementMission(fixture, peer);
+            NetPeer sender = RegisterMovementSender(peer, "owner");
             var registry = peer.Resolve<INetworkAgentRegistry>();
             var component = peer.Resolve<ICoopMissionComponent>();
             var riderId = Guid.NewGuid();
@@ -2182,10 +2197,10 @@ public class MountedPuppetMovementTests : MissionTestEnvironment
             var riderPacket = new MovementPacket(new[] { riderId }, new[] { riderData });
 
             if (!masterlessPacketArrivesLast)
-                component.AgentMovementHandler.MountMovementApplier.HandlePacket(null, mountPacket);
-            component.AgentMovementHandler.HandlePacket(null, riderPacket);
+                component.AgentMovementHandler.MountMovementApplier.HandlePacket(sender, mountPacket);
+            component.AgentMovementHandler.HandlePacket(sender, riderPacket);
             if (masterlessPacketArrivesLast)
-                component.AgentMovementHandler.MountMovementApplier.HandlePacket(null, mountPacket);
+                component.AgentMovementHandler.MountMovementApplier.HandlePacket(sender, mountPacket);
 
             Assert.Same(horse, rider.MountAgent);
             component.AgentMovementHandler.Interpolator.Tick(1f / 60f);
@@ -2205,6 +2220,7 @@ public class MountedPuppetMovementTests : MissionTestEnvironment
         peer.Call(() =>
         {
             var mock = CreateMovementMission(fixture, peer);
+            NetPeer sender = RegisterMovementSender(peer, "owner");
             var registry = peer.Resolve<INetworkAgentRegistry>();
             var component = peer.Resolve<ICoopMissionComponent>();
             var horseId = Guid.NewGuid();
@@ -2220,7 +2236,7 @@ public class MountedPuppetMovementTests : MissionTestEnvironment
             var packet = new MountMovementPacket(
                 new[] { horseId },
                 new[] { new AgentMountData(sourceHorse, horseId) });
-            component.AgentMovementHandler.MountMovementApplier.HandlePacket(null, packet);
+            component.AgentMovementHandler.MountMovementApplier.HandlePacket(sender, packet);
 
             Assert.Equal(AgentControllerType.None, puppetHorseMirror.Controller);
             Assert.Equal(1f, puppetHorseMirror.MaximumSpeedLimit);
@@ -2229,7 +2245,7 @@ public class MountedPuppetMovementTests : MissionTestEnvironment
             Assert.NotNull(puppetHorse.CommonAIComponent);
 
             puppetHorse.CommonAIComponent.OnMountReserved(47);
-            component.AgentMovementHandler.MountMovementApplier.HandlePacket(null, packet);
+            component.AgentMovementHandler.MountMovementApplier.HandlePacket(sender, packet);
             Assert.Equal(47, puppetHorse.CommonAIComponent.ReservedRiderAgentIndex);
         });
     }
@@ -2244,6 +2260,7 @@ public class MountedPuppetMovementTests : MissionTestEnvironment
         peer.Call(() =>
         {
             var mock = CreateMovementMission(fixture, peer);
+            NetPeer sender = RegisterMovementSender(peer, "owner");
             var registry = peer.Resolve<INetworkAgentRegistry>();
             var component = peer.Resolve<ICoopMissionComponent>();
             var horseId = Guid.NewGuid();
@@ -2269,7 +2286,7 @@ public class MountedPuppetMovementTests : MissionTestEnvironment
                 mountAction0TurnProgress: 0.25f,
                 mountAction0IsSyntheticTurn: true);
             component.AgentMovementHandler.MountMovementApplier.HandlePacket(
-                null,
+                sender,
                 new MountMovementPacket(
                     new[] { horseId },
                     new[] { turnData }));
@@ -2299,6 +2316,7 @@ public class MountedPuppetMovementTests : MissionTestEnvironment
         peer.Call(() =>
         {
             var mock = CreateMovementMission(fixture, peer);
+            NetPeer sender = RegisterMovementSender(peer, "owner");
             var registry = peer.Resolve<INetworkAgentRegistry>();
             var component = peer.Resolve<ICoopMissionComponent>();
             var horseId = Guid.NewGuid();
@@ -2313,7 +2331,7 @@ public class MountedPuppetMovementTests : MissionTestEnvironment
             Assert.True(AgentMirror.TryGet(sourceHorse, out var sourceHorseMirror));
             sourceHorseMirror.MovementDirection = new Vec2(1f, 0f);
             component.AgentMovementHandler.MountMovementApplier.HandlePacket(
-                null,
+                sender,
                 new MountMovementPacket(
                     new[] { horseId },
                     new[] { new AgentMountData(sourceHorse, horseId) }));
@@ -2326,6 +2344,16 @@ public class MountedPuppetMovementTests : MissionTestEnvironment
             Assert.Equal(0, horseMirror.SetTargetPositionAndDirectionCalls);
             Assert.Equal(0, horseMirror.TeleportToPositionCalls);
         });
+    }
+
+    private static NetPeer RegisterMovementSender(EnvironmentInstance receiver, string controllerId)
+    {
+        NetPeer sender = NetPeerExtensions.CreatePeer();
+        receiver.Resolve<IMessageBroker>().Publish(
+            typeof(MountedPuppetMovementTests),
+            new NetworkMissionPeerEntered(controllerId, "movement-test"));
+        receiver.Resolve<IMissionContext>().MapPeer(controllerId, sender);
+        return sender;
     }
 
     private static Agent SpawnRider(MockMission mock)

@@ -1,6 +1,10 @@
 ﻿#if DEBUG
 using System;
 using Common.Commands;
+using GameInterface;
+using Missions.Battles;
+using Missions.Services.Network;
+using Newtonsoft.Json;
 using System.Collections.Generic;
 using System.Globalization;
 using System.Linq;
@@ -15,6 +19,122 @@ internal static class MovementDebugCommands
 
     private static CoopCommandResult Failed(string output) =>
         new CoopCommandResult(false, output, "command_failed");
+
+    public sealed class PeerStateCoopCommand : ICoopCommand
+    {
+        public string Prefix => "coop.debug.movement";
+
+        public string Name => "peer_state";
+
+        public string Description => "Reports peer route state.";
+
+        public CoopCommandSide Side => CoopCommandSide.Client;
+
+        public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
+        {
+            new ExpectedArgs("controller_id", "The controller id."),
+        };
+
+        public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
+        {
+            if (!ContainerProvider.TryResolve<IBattleNetwork>(out var network))
+                return Failed("No active co-op mission peer network.");
+            var client = network as LiteNetP2PClient;
+            if (client == null)
+                return Failed("No active co-op mission peer network.");
+
+            bool known = client.TryGetPeerRouteState(
+                args[0],
+                out bool credentialAnnounced,
+                out bool routeExists,
+                out bool credentialMatched,
+                out bool steamIdentityMatched,
+                out bool mapped);
+            string structuredState = JsonConvert.SerializeObject(new
+            {
+                success = known && mapped && credentialMatched && steamIdentityMatched,
+                controllerId = args[0],
+                credentialAnnounced,
+                routeExists,
+                credentialMatched,
+                steamIdentityMatched,
+                mapped,
+            });
+
+            return Succeeded($"MISSION_PEER_STATE controller={args[0]}|mapped={mapped}|" +
+                $"credentialAnnounced={credentialAnnounced}|credentialMatched={credentialMatched}|" +
+                $"steamIdentityMatched={steamIdentityMatched}\nLIVE_TEST_JSON={structuredState}");
+        }
+    }
+
+    public sealed class ControllerAgentsCoopCommand : ICoopCommand
+    {
+        public string Prefix => "coop.debug.movement";
+
+        public string Name => "controller_agents";
+
+        public string Description => "Reports agents currently controlled by a controller and local battle authority.";
+
+        public CoopCommandSide Side => CoopCommandSide.Client;
+
+        public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
+        {
+            new ExpectedArgs("controller_id", "The controller id."),
+        };
+
+        public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
+        {
+            if (!ContainerProvider.TryResolve<INetworkAgentRegistry>(out var registry))
+                return Failed("Network agent registry is unavailable.");
+
+            IBattleSession session = Mission.Current?.GetMissionBehavior<CoopBattleController>()?.Session;
+            var agents = registry.GetAgents(args[0])
+                .OrderBy(info => info.AgentId)
+                .Select(info => new
+                {
+                    agentId = info.AgentId.ToString("D"),
+                    info.OriginalOwner,
+                    info.CurrentAuthority,
+                    info.MovementScopeId,
+                    info.MovementId,
+                    info.AuthorityRevision,
+                    isHuman = info.Agent?.IsHuman ?? false,
+                    isLocalMainAgent = info.Agent != null && ReferenceEquals(info.Agent, Mission.Current?.MainAgent),
+                    teamSide = info.Agent?.Team?.Side.ToString(),
+                    active = info.Agent != null && info.Agent.IsActive(),
+                    position = info.Agent == null ? null : new
+                    {
+                        x = info.Agent.Position.x,
+                        y = info.Agent.Position.y,
+                        z = info.Agent.Position.z,
+                    },
+                    velocity = info.Agent == null ? null : new
+                    {
+                        x = info.Agent.GetRealGlobalVelocity().x,
+                        y = info.Agent.GetRealGlobalVelocity().y,
+                        z = info.Agent.GetRealGlobalVelocity().z,
+                    },
+                })
+                .ToArray();
+            string structuredState = JsonConvert.SerializeObject(new
+            {
+                success = agents.Length > 0,
+                controllerId = args[0],
+                sampledAtUtc = DateTime.UtcNow,
+                missionInstanceId = session?.InstanceId,
+                localControllerId = session?.OwnControllerId,
+                localIsHost = session?.IsLocalHost,
+                hostControllerId = session?.HostControllerId,
+                hostEpoch = session?.HostEpoch,
+                expectedLocalActionEpoch = session == null ? (int?)null : session.IsLocalHost ? session.HostEpoch : 0,
+                agentCount = agents.Length,
+                agents,
+            });
+
+            return Succeeded($"CONTROLLER_AGENTS controller={args[0]}|count={agents.Length}\n" +
+                $"LIVE_TEST_JSON={structuredState}");
+        }
+    }
 
     public sealed class StateCoopCommand : ICoopCommand
     {

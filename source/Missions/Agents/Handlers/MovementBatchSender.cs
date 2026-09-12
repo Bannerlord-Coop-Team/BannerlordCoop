@@ -2,6 +2,7 @@
 using Common.PacketHandlers;
 using GameInterface.Services.Entity;
 using Missions.Services.Network;
+using Missions.Agents.Packets;
 using Serilog;
 using System;
 using System.Collections.Generic;
@@ -121,6 +122,7 @@ public sealed class MovementBatch<T>
     public List<ushort> CompactIds { get; } = new List<ushort>();
     public List<Guid> CanonicalIds { get; } = new List<Guid>();
     public List<T> Data { get; } = new List<T>();
+    public List<long> AuthorityRevisions { get; } = new List<long>();
     public List<MovementPriorityKey> Priorities { get; } = new List<MovementPriorityKey>();
 
     public bool HasPriorities => Priorities.Count == Data.Count && Data.Count > 0;
@@ -137,6 +139,7 @@ public sealed class MovementBatch<T>
         if (IdentityScopeId != null)
             CompactIds.Add(info.MovementId);
         Data.Add(data);
+        AuthorityRevisions.Add(info.AuthorityRevision);
     }
 
     public void Add(CoopAgentInfo info, T data, MovementPriorityKey priority)
@@ -150,6 +153,7 @@ public sealed class MovementBatch<T>
         CompactIds.Clear();
         CanonicalIds.Clear();
         Data.Clear();
+        AuthorityRevisions.Clear();
         Priorities.Clear();
     }
 }
@@ -819,6 +823,8 @@ public sealed class MovementBatchSender : IMovementBatchSender
             if (batch.IdentityScopeId != null)
                 ordered.CompactIds.Add(batch.CompactIds[source]);
             ordered.Data.Add(batch.Data[source]);
+            if (batch.AuthorityRevisions.Count > 0)
+                ordered.AuthorityRevisions.Add(batch.AuthorityRevisions[source]);
             ordered.Priorities.Add(batch.Priorities[source]);
         }
         return ordered;
@@ -1069,6 +1075,19 @@ public sealed class MovementBatchSender : IMovementBatchSender
             var ids = new ushort[count];
             CopyCircular(batch.CompactIds, offset, start, ids);
             packet = createPacket(batch.IdentityScopeId, ids, null, data);
+        }
+
+        if (packet is MovementPacket || packet is MountMovementPacket)
+        {
+            if (batch.AuthorityRevisions.Count != batch.Data.Count)
+                throw new InvalidOperationException("Movement authority revisions must match the snapshot count.");
+
+            // Apply the same ordering and fragment offset as the snapshot ids and data.
+            var revisions = new long[count];
+            CopyCircular(batch.AuthorityRevisions, offset, start, revisions);
+            packet = packet is MovementPacket movement
+                ? movement.WithAuthorityRevisions(revisions)
+                : ((MountMovementPacket)packet).WithAuthorityRevisions(revisions);
         }
 
         return new SerializedMovementBatch(

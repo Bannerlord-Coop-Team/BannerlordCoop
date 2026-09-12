@@ -26,20 +26,33 @@ namespace Missions.Agents.Packets
         [ProtoMember(4)]
         public Guid[] AgentGuids { get; }
 
-        public MovementPacket(string identityScopeId, ushort[] agentIds, AgentData[] agents)
+        [ProtoMember(5)]
+        public string SenderControllerId { get; }
+
+        [ProtoMember(6, IsPacked = true)]
+        public long[] AuthorityRevisions { get; }
+
+        public MovementPacket(string identityScopeId, ushort[] agentIds, AgentData[] agents, string senderControllerId = null, long[] authorityRevisions = null)
         {
+            SenderControllerId = senderControllerId;
+            AuthorityRevisions = authorityRevisions;
             IdentityScopeId = identityScopeId;
             AgentIds = agentIds;
             Agents = agents;
             AgentGuids = null;
         }
 
-        public MovementPacket(Guid[] agentGuids, AgentData[] agents)
+        public MovementPacket(Guid[] agentGuids, AgentData[] agents, string senderControllerId = null, long[] authorityRevisions = null)
         {
+            SenderControllerId = senderControllerId;
+            AuthorityRevisions = authorityRevisions;
             IdentityScopeId = null;
             AgentIds = null;
             AgentGuids = agentGuids;
             Agents = agents;
         }
+        internal MovementPacket WithAuthorityRevisions(long[] revisions) => AgentIds == null
+            ? new MovementPacket(AgentGuids, Agents, SenderControllerId, revisions)
+            : new MovementPacket(IdentityScopeId, AgentIds, Agents, SenderControllerId, revisions);
     }
 }

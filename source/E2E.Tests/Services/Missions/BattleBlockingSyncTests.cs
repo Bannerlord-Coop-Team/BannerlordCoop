@@ -975,6 +975,81 @@ public class BattleBlockingSyncTests : MissionTestEnvironment
     }
 
     [Fact]
+    public void PollActions_HostMigration_StampsFormerHostsOwnAgentWithEpochZero()
+    {
+        const string mapEventId = "mapEvent1";
+        using var fixture = new MissionEngineFixture();
+        EnvironmentInstance formerHost = Clients.First();
+        EnvironmentInstance successor = Clients.Last();
+        SetControllerId(formerHost, "A");
+        SetControllerId(successor, "B");
+        var formerHostAgentId = Guid.NewGuid();
+        var successorAgentId = Guid.NewGuid();
+        BlockingSyncContext formerHostContext = null;
+        BlockingSyncContext successorContext = null;
+        MirrorAgent formerHostMirror = null;
+        MirrorAgent successorMirror = null;
+
+        formerHost.Call(() => RunInBattle(mapEventId, () =>
+        {
+            formerHostContext = new BlockingSyncContext(fixture, formerHost);
+            AssignBattleHost(formerHostContext, mapEventId, "A", new[] { "B" }, epoch: 1);
+            SpawnRegisteredAgent(
+                formerHostContext, "A", formerHostAgentId, AgentControllerType.Player,
+                out formerHostMirror);
+            formerHostContext.Component.AgentActionHandler.PollActions();
+            formerHostMirror.GuardMode = Agent.GuardMode.Right;
+            formerHostMirror.MovementFlags = Agent.MovementControlFlag.DefendRight;
+            formerHostContext.Component.AgentActionHandler.PollActions();
+
+            AgentActionPacket packet = Assert.Single(
+                formerHostContext.Network.NetworkSentPackets.GetPackets<AgentActionPacket>());
+            Assert.Equal("A", packet.ControllerId);
+            Assert.Equal(1, packet.BattleHostEpoch);
+            Assert.Equal(formerHostAgentId, Assert.Single(packet.AgentIds));
+            Assert.Equal(1L, Assert.Single(packet.Sequences));
+            formerHostContext.Network.NetworkSentPackets.Packets.Clear();
+        }));
+
+        successor.Call(() => RunInBattle(mapEventId, () =>
+        {
+            successorContext = new BlockingSyncContext(fixture, successor);
+            AssignBattleHost(successorContext, mapEventId, "A", new[] { "B" }, epoch: 1);
+            SpawnRegisteredAgent(
+                successorContext, "B", successorAgentId, AgentControllerType.Player,
+                out successorMirror);
+            successorContext.Component.AgentActionHandler.PollActions();
+
+            AssignBattleHost(successorContext, mapEventId, "B", new[] { "A" }, epoch: 2);
+            successorMirror.GuardMode = Agent.GuardMode.Left;
+            successorMirror.MovementFlags = Agent.MovementControlFlag.DefendLeft;
+            successorContext.Component.AgentActionHandler.PollActions();
+
+            AgentActionPacket packet = Assert.Single(
+                successorContext.Network.NetworkSentPackets.GetPackets<AgentActionPacket>());
+            Assert.Equal("B", packet.ControllerId);
+            Assert.Equal(2, packet.BattleHostEpoch);
+            Assert.Equal(successorAgentId, Assert.Single(packet.AgentIds));
+        }));
+
+        formerHost.Call(() => RunInBattle(mapEventId, () =>
+        {
+            AssignBattleHost(formerHostContext, mapEventId, "B", new[] { "A" }, epoch: 2);
+            formerHostMirror.GuardMode = Agent.GuardMode.Left;
+            formerHostMirror.MovementFlags = Agent.MovementControlFlag.DefendLeft;
+            formerHostContext.Component.AgentActionHandler.PollActions();
+
+            AgentActionPacket packet = Assert.Single(
+                formerHostContext.Network.NetworkSentPackets.GetPackets<AgentActionPacket>());
+            Assert.Equal("A", packet.ControllerId);
+            Assert.Equal(0, packet.BattleHostEpoch);
+            Assert.Equal(formerHostAgentId, Assert.Single(packet.AgentIds));
+            Assert.Equal(2L, Assert.Single(packet.Sequences));
+            Assert.True(formerHostContext.Registry.IsLocallyControlled(formerHostAgentId));
+        }));
+    }
+
+    [Fact]
     public void CatchUpJoiner_HeldGuard_SendsCurrentStateToJoiningPeer()
     {
         RunScenario("owner", context =>
