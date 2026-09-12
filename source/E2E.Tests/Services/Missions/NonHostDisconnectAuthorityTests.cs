@@ -183,6 +183,7 @@ public class NonHostDisconnectAuthorityTests : MissionTestEnvironment
         {
             Assert.True(state.Registry.TryGetAgentInfo(agentId, out var info));
             GetMirror(state, agentId).MovementDirection = new Vec2(1f, 0f);
+            GetMirror(state, mountId).MovementDirection = new Vec2(1f, 0f);
             packet = new MovementPacket(new[] { agentId }, new[] { new AgentData(info.Agent) },
                 state.Id, new[] { info.AuthorityRevision });
         });
