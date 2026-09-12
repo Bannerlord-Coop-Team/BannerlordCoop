@@ -7,11 +7,13 @@ namespace GameInterface.Tests.Services.UI;
 public class BugReportVMTests
 {
     [Theory]
-    [InlineData(true, false, false, true)]
-    [InlineData(true, true, false, false)]
-    [InlineData(true, false, true, false)]
-    [InlineData(false, false, false, false)]
-    public void OverlayVisibility_OnlyRequiresUnblockedGameplay(
+    [InlineData(true, true, false, false, true)]
+    [InlineData(false, true, false, false, false)]
+    [InlineData(true, true, true, false, false)]
+    [InlineData(true, true, false, true, false)]
+    [InlineData(true, false, false, false, false)]
+    public void OverlayVisibility_RequiresEnabledUnblockedGameplay(
+        bool showBugReportButton,
         bool isGameplayScreen,
         bool isLoading,
         bool isConversationActive,
@@ -20,6 +22,7 @@ public class BugReportVMTests
         Assert.Equal(
             expected,
             BugReportOverlay.ShouldShowPresentation(
+                showBugReportButton,
                 isGameplayScreen,
                 isLoading,
                 isConversationActive));

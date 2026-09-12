@@ -14,6 +14,6 @@ public class ClientInstance : EnvironmentInstance
 
     public override void Dispose()
     {
-        Container.Dispose();
+        DisposeContainer();
     }
 }

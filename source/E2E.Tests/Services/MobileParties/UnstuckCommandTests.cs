@@ -1,4 +1,5 @@
-﻿using Common.Util;
+﻿using Common.Commands;
+using Common.Util;
 using E2E.Tests.Environment.Instance;
 using E2E.Tests.Services.MapEvents;
 using E2E.Tests.Util;
@@ -20,6 +21,16 @@ using Xunit.Abstractions;
 
 namespace E2E.Tests.Services.MobileParties;
 
+/// <summary>Skips unstuck bug-report tests while the feature is disabled.</summary>
+public sealed class UnstuckCommandReportingFactAttribute : FactAttribute
+{
+    public UnstuckCommandReportingFactAttribute()
+    {
+        if (!BugReportConfig.UnstuckCommandReportsEnabled)
+            Skip = "Automatic unstuck bug reports are disabled.";
+    }
+}
+
 /// <summary>
 /// Verifies the dedicated unstuck flow: coop.debug.mobileparty.unstuck forwards a
 /// <see cref="NetworkRequestPlayerUnstuck"/> to the server, the server force-applies each exit
@@ -39,7 +50,7 @@ public class UnstuckCommandTests : MapEventTestBase
         string output = null;
         Server.Call(() =>
         {
-            output = UnstuckCommand.Unstuck(new List<string>());
+            output = ExecuteUnstuck();
         });
 
         Assert.Equal("Command can only be run on a client.", output);
@@ -54,7 +65,7 @@ public class UnstuckCommandTests : MapEventTestBase
         string output = null;
         Client.Call(() =>
         {
-            output = UnstuckCommand.Unstuck(new List<string>());
+            output = ExecuteUnstuck();
         });
 
         Assert.Contains("Unstuck request sent", output);
@@ -65,7 +76,7 @@ public class UnstuckCommandTests : MapEventTestBase
         Assert.Equal(player.HeroId, request.HeroId);
     }
 
-    [Fact]
+    [UnstuckCommandReportingFact]
     public void ServerUnstuckRequest_RequestsDiagnosticLogsFromEveryConnectedClient()
     {
         var requester = SetupRegisteredMainHeroAndParty();
@@ -368,4 +379,11 @@ public class UnstuckCommandTests : MapEventTestBase
 
         return new PlayerIds(heroId, characterId, partyId);
     }
+
+    private static string ExecuteUnstuck()
+    {
+        var command = new UnstuckCommand.UnstuckCoopCommand();
+        return command.ProcessCommand(new CoopCommandArgsFactory().FromValues(Array.Empty<string>())).Output;
+    }
+
 }

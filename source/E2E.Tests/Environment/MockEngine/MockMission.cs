@@ -1,6 +1,8 @@
 ﻿using System.Collections.Generic;
+using System;
 using System.Runtime.CompilerServices;
 using Common.Util;
+using SandBox.Missions.MissionLogics;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.Core;
 using TaleWorlds.MountAndBlade;
@@ -27,8 +29,17 @@ public sealed class MockMission
     public int AgentFleeingCalls { get; set; }
     public Agent LastFleeingAgent { get; set; }
     public bool DeploymentInProgress { get; set; }
+    public Blow LastRegisteredBlow { get; set; }
+    public Action<Agent, Blow> RegisteredBlow { get; set; } = (_, _) => { };
+    public float ShootDifficulty { get; set; } = 7.5f;
     public DeploymentMissionController DeploymentController { get; }
         = ObjectHelper.SkipConstructor<BattleDeploymentMissionController>();
+    public bool LocationPopulationBoundaryEnabled { get; set; }
+    public MissionAgentHandler LocationAgentHandler { get; }
+        = ObjectHelper.SkipConstructor<MissionAgentHandler>();
+    public Action? NativeLocationPopulation { get; set; }
+    public int NativeLocationPopulationCalls { get; set; }
+    public int NativeLocationAnimalPopulationCalls { get; set; }
 
     /// <summary>Per-side teams, returned by the <c>Mission.AttackerTeam</c>/<c>DefenderTeam</c> shims so the
     /// reinforcement spawn (which resolves the team by side) can field troops into them headless.</summary>
@@ -54,7 +65,20 @@ public sealed class MockMission
 
     public IReadOnlyCollection<Agent> Agents => agentsByIndex.Values;
 
-    public void RegisterMissile(int index) => missiles.Add(index);
+    public void RegisterMissile(int index, Agent shooter, MissionWeapon weapon)
+    {
+        Shell._missilesDictionary ??= new Dictionary<int, Mission.Missile>();
+        Shell._missilesDictionary[index] =
+            new Mission.Missile(Shell, index, null, shooter, weapon, null);
+        missiles.Add(index);
+    }
+
+    public void RemoveMissile(int index)
+    {
+        Shell._missilesDictionary?.Remove(index);
+        missiles.Remove(index);
+    }
+
     public bool HasMissile(int index) => missiles.Contains(index);
 
     public MockMission()

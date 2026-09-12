@@ -20,33 +20,34 @@ namespace GameInterface.Services.MobileParties.Patches;
 ///                                 neither AGE nor SUCCESS, so a single prior attempt blocks forever, and
 ///                                 it returns before CanAttemptToPersuade is ever consulted.
 ///   <c>CanAttemptToPersuade</c> - the GATE. Refuses while a matching unsuccessful attempt is less than
-///                                 ONE WEEK old.
+///                                 ONE WEEK old. The active persuasion also reuses it to choose the failed
+///                                 task whose final refusal line is shown.
 ///   <c>RemoveOldAttempts</c>    - housekeeping on the daily tick, dropping records over a YEAR old. The
 ///                                 only thing that ever removes an attempt, so it is what eventually
 ///                                 releases the pre-gate.
 ///
 /// Patching the gate alone cannot work, because the pre-gate already answered. AlwaysRetry therefore has
-/// to drop this lord's attempt records as well - and it must drop ALL of them, not just the unsuccessful
-/// ones, because the pre-gate's predicate ignores success and every persuasion OPTION records its own
-/// attempt, so a failed persuasion leaves successes behind that would keep refusing on their own.
+/// to drop this lord's attempt records before a new conversation - and it must drop ALL of them, not just
+/// the unsuccessful ones, because the pre-gate's predicate ignores success and every persuasion OPTION
+/// records its own attempt. The gate itself must keep running so a fresh failure can select its refusal line.
 ///
 ///   Vanilla     - unchanged: vanilla's own week/year rules apply (default, matches singleplayer)
 ///   NeverExpire - the gate blocks while ANY unsuccessful attempt survives, and the prune is suppressed
 ///                 so one always does
-///   AlwaysRetry - the pre-gate's record is cleared and the gate never blocks, so the lord can be asked
-///                 again at once
+///   AlwaysRetry - the pre-gate's records are cleared before each conversation, so the lord can be asked
+///                 again at once while fresh failures still complete normally
 /// </remarks>
 internal static class LordDefectionRetryPatches
 {
     /// <summary>
-    /// The gate vanilla consults before offering the persuasion option.
+    /// Keeps unsuccessful attempts blocking indefinitely for <see cref="LordDefectionRetryMode.NeverExpire"/>.
     /// </summary>
     [HarmonyPatch(typeof(LordDefectionCampaignBehavior), "CanAttemptToPersuade",
         new[] { typeof(Hero), typeof(int) })]
     internal class CanAttemptToPersuadePatch
     {
         [HarmonyPrefix]
-        private static bool Prefix(
+        internal static bool Prefix(
             LordDefectionCampaignBehavior __instance, Hero targetHero, int reservationType, ref bool __result)
         {
             switch (ModConfigProvider.ModOptions.LordDefectionRetries)
@@ -56,11 +57,8 @@ internal static class LordDefectionRetryPatches
                     __result = !HasUnsuccessfulAttempt(__instance, targetHero, reservationType);
                     return false;
 
-                case LordDefectionRetryMode.AlwaysRetry:
-                    __result = true;
-                    return false;
-
                 default:
+                    // Vanilla also uses this check to select the current attempt's failure line.
                     return true;
             }
         }

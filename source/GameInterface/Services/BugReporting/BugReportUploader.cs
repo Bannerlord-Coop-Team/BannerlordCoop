@@ -12,7 +12,7 @@ using System.Threading.Tasks;
 
 namespace GameInterface.Services.BugReporting;
 
-/// <summary>Uploads the server save as a raw artifact, then posts diagnostic report metadata as JSON.</summary>
+/// <summary>Uploads diagnostic metadata, logs, and the server save in one multipart request.</summary>
 public interface IBugReportUploader
 {
     bool IsConfigured { get; }
@@ -24,12 +24,11 @@ public interface IBugReportUploader
 /// <inheritdoc />
 public class BugReportUploader : IBugReportUploader, IDisposable
 {
-    public const string Endpoint = "https://bug-reports.bannerlordcoop.invalid/api/v1/reports";
-    public const string EndpointEnvironmentVariable = "BANNERLORDCOOP_BUG_REPORT_ENDPOINT";
-    public const string PublishableKeyEnvironmentVariable = "BANNERLORDCOOP_BUG_REPORT_PUBLISHABLE_KEY";
-    public const string AuthorizationTokenEnvironmentVariable = "BANNERLORDCOOP_BUG_REPORT_TOKEN";
+    public const string Endpoint =
+        "https://wfvqnijwuyqjibhlcrhz.supabase.co/functions/v1/create-github-issue-bug-report";
     internal const int MaximumCompressedReportBytes = 10 * 1024 * 1024;
     internal const int MaximumServerSaveBytes = 48 * 1024 * 1024;
+    internal const int MaximumServerSaveSidecarBytes = 8 * 1024 * 1024;
 
     private static readonly JsonSerializerOptions JsonOptions = new JsonSerializerOptions
     {
@@ -38,21 +37,14 @@ public class BugReportUploader : IBugReportUploader, IDisposable
 
     private readonly HttpClient httpClient;
     private readonly string endpoint;
-    private readonly string supabasePublishableKey;
-    private readonly string authorizationToken;
     private readonly bool ownsClient;
 
     public bool IsConfigured =>
-        !new Uri(endpoint).Host.EndsWith(".invalid", StringComparison.OrdinalIgnoreCase) &&
-        !string.IsNullOrWhiteSpace(supabasePublishableKey) &&
-        !string.IsNullOrWhiteSpace(authorizationToken) &&
-        !string.Equals(authorizationToken, supabasePublishableKey, StringComparison.Ordinal);
+        !new Uri(endpoint).Host.EndsWith(".invalid", StringComparison.OrdinalIgnoreCase);
 
     public BugReportUploader() : this(
         new HttpClient { Timeout = TimeSpan.FromMinutes(2) },
-        Environment.GetEnvironmentVariable(EndpointEnvironmentVariable) ?? Endpoint,
-        Environment.GetEnvironmentVariable(PublishableKeyEnvironmentVariable),
-        Environment.GetEnvironmentVariable(AuthorizationTokenEnvironmentVariable),
+        Endpoint,
         true)
     {
     }
@@ -60,8 +52,6 @@ public class BugReportUploader : IBugReportUploader, IDisposable
     internal BugReportUploader(
         HttpClient httpClient,
         string endpoint = Endpoint,
-        string supabasePublishableKey = null,
-        string authorizationToken = null,
         bool ownsClient = false)
     {
         if (httpClient == null) throw new ArgumentNullException(nameof(httpClient));
@@ -69,8 +59,6 @@ public class BugReportUploader : IBugReportUploader, IDisposable
             throw new ArgumentException("Endpoint cannot be empty.", nameof(endpoint));
         this.httpClient = httpClient;
         this.endpoint = endpoint;
-        this.supabasePublishableKey = supabasePublishableKey;
-        this.authorizationToken = authorizationToken;
         this.ownsClient = ownsClient;
     }
 
@@ -84,7 +72,7 @@ public class BugReportUploader : IBugReportUploader, IDisposable
             return new BugReportUploadResult(
                 false,
                 false,
-                "Bug-report upload authorization is not configured.");
+                "The bug-report upload endpoint is not configured.");
         }
 
         if (!IsWithinCompressedLogLimit(GetCompressedLogBytes(report)))
@@ -97,11 +85,7 @@ public class BugReportUploader : IBugReportUploader, IDisposable
 
         if (report.ServerSave != null)
         {
-            if (string.IsNullOrWhiteSpace(report.ServerSave.FileName) ||
-                !string.Equals(
-                    Path.GetFileName(report.ServerSave.FileName),
-                    report.ServerSave.FileName,
-                    StringComparison.Ordinal))
+            if (!IsValidFileName(report.ServerSave.FileName))
             {
                 return new BugReportUploadResult(false, true, "The server campaign save had an invalid file name.");
             }
@@ -114,14 +98,37 @@ public class BugReportUploader : IBugReportUploader, IDisposable
                     "The server campaign save exceeds the upload size limit.");
             }
 
-            var saveUpload = await UploadServerSaveAsync(report, cancellationToken).ConfigureAwait(false);
-            if (!saveUpload.Uploaded) return saveUpload;
+            var hasSidecarFileName = report.ServerSave.SidecarFileName != null;
+            var hasSidecarData = report.ServerSave.SidecarData != null;
+            if (hasSidecarFileName != hasSidecarData ||
+                (hasSidecarFileName &&
+                 (!IsValidFileName(report.ServerSave.SidecarFileName) ||
+                  !string.Equals(
+                      Path.ChangeExtension(report.ServerSave.FileName, ".json"),
+                      report.ServerSave.SidecarFileName,
+                      StringComparison.OrdinalIgnoreCase))))
+            {
+                return new BugReportUploadResult(
+                    false,
+                    true,
+                    "The server campaign save sidecar was invalid.");
+            }
+
+            if (hasSidecarData &&
+                !IsWithinServerSaveSidecarLimit(report.ServerSave.SidecarData.LongLength))
+            {
+                return new BugReportUploadResult(
+                    false,
+                    true,
+                    "The server campaign save sidecar exceeds the upload size limit.");
+            }
         }
 
         var json = JsonSerializer.Serialize(CreateRequest(report), JsonOptions);
-        using var request = new HttpRequestMessage(HttpMethod.Post, endpoint)
+        using var content = CreateMultipartContent(report, json);
+        using var request = new HttpRequestMessage(HttpMethod.Put, endpoint)
         {
-            Content = new StringContent(json, Encoding.UTF8, "application/json"),
+            Content = content,
         };
         AddRequestHeaders(request, report.RequestId);
         using var response = await httpClient.SendAsync(request, cancellationToken).ConfigureAwait(false);
@@ -154,38 +161,73 @@ public class BugReportUploader : IBugReportUploader, IDisposable
         return saveBytes > 0 && saveBytes <= MaximumServerSaveBytes;
     }
 
-    private async Task<BugReportUploadResult> UploadServerSaveAsync(
-        BugReportArchiveContents report,
-        CancellationToken cancellationToken)
+    internal static bool IsWithinServerSaveSidecarLimit(long sidecarBytes)
     {
-        using var request = new HttpRequestMessage(HttpMethod.Put, endpoint)
-        {
-            Content = new ByteArrayContent(report.ServerSave.Data),
-        };
-        request.Content.Headers.ContentType = new System.Net.Http.Headers.MediaTypeHeaderValue(
-            "application/octet-stream");
-        request.Headers.TryAddWithoutValidation("X-Bug-Report-Artifact", "server-save");
-        request.Headers.TryAddWithoutValidation("X-Bug-Report-Id", report.RequestId);
-        request.Headers.TryAddWithoutValidation("X-Bug-Report-File-Name", report.ServerSave.FileName);
-        AddRequestHeaders(request, report.RequestId + "-server-save");
-
-        using var response = await httpClient.SendAsync(request, cancellationToken).ConfigureAwait(false);
-        var details = await response.Content.ReadAsStringAsync().ConfigureAwait(false);
-        if (response.IsSuccessStatusCode)
-            return new BugReportUploadResult(true, true, details);
-
-        return new BugReportUploadResult(
-            false,
-            true,
-            string.IsNullOrWhiteSpace(details)
-                ? "The server-save endpoint returned " + ((int)response.StatusCode).ToString(CultureInfo.InvariantCulture) + "."
-                : details);
+        return sidecarBytes > 0 && sidecarBytes <= MaximumServerSaveSidecarBytes;
     }
 
-    private void AddRequestHeaders(HttpRequestMessage request, string idempotencyKey)
+    private static bool IsValidFileName(string fileName)
     {
-        request.Headers.TryAddWithoutValidation("apikey", supabasePublishableKey);
-        request.Headers.TryAddWithoutValidation("Authorization", "Bearer " + authorizationToken);
+        return !string.IsNullOrWhiteSpace(fileName) &&
+               string.Equals(Path.GetFileName(fileName), fileName, StringComparison.Ordinal);
+    }
+
+    private static MultipartFormDataContent CreateMultipartContent(
+        BugReportArchiveContents report,
+        string json)
+    {
+        var content = new MultipartFormDataContent();
+        content.Add(new StringContent(json, Encoding.UTF8, "application/json"), "report");
+
+        if (report.ServerLog != null)
+        {
+            content.Add(
+                CreateBinaryContent(report.ServerLog.CompressedData, "application/gzip"),
+                "serverLog",
+                "Coop_server.log.gz");
+        }
+
+        foreach (var log in report.Logs.OrderBy(item => item.ClientNumber))
+        {
+            content.Add(
+                CreateBinaryContent(log.CompressedData, "application/gzip"),
+                GetClientLogPartName(log.ClientNumber),
+                "client-" + log.ClientNumber.ToString("D2", CultureInfo.InvariantCulture) + ".log.gz");
+        }
+
+        if (report.ServerSave != null)
+        {
+            content.Add(
+                CreateBinaryContent(report.ServerSave.Data, "application/octet-stream"),
+                "serverSave",
+                report.ServerSave.FileName);
+
+            if (report.ServerSave.SidecarData != null)
+            {
+                content.Add(
+                    CreateBinaryContent(report.ServerSave.SidecarData, "application/json"),
+                    "serverSaveSidecar",
+                    report.ServerSave.SidecarFileName);
+            }
+        }
+
+        return content;
+    }
+
+    private static ByteArrayContent CreateBinaryContent(byte[] data, string mediaType)
+    {
+        var content = new ByteArrayContent(data);
+        content.Headers.ContentType = new System.Net.Http.Headers.MediaTypeHeaderValue(mediaType);
+        return content;
+    }
+
+    internal static string GetClientLogPartName(int clientNumber)
+    {
+        return "clientLog-" + clientNumber.ToString(CultureInfo.InvariantCulture);
+    }
+
+    private static void AddRequestHeaders(HttpRequestMessage request, string idempotencyKey)
+    {
         request.Headers.TryAddWithoutValidation("Idempotency-Key", idempotencyKey);
     }
 
@@ -225,7 +267,9 @@ public class BugReportUploader : IBugReportUploader, IDisposable
             ? null
             : new BugReportJsonServerSave(
                 report.ServerSave.FileName,
-                report.ServerSave.Data.LongLength);
+                report.ServerSave.Data.LongLength,
+                report.ServerSave.SidecarFileName,
+                report.ServerSave.SidecarData?.LongLength);
 
         return new BugReportJsonRequest(
             report.RequestId,
@@ -267,7 +311,7 @@ public sealed class BugReportUploadResult
 /// <summary>Defines the versioned JSON payload posted to the bug-report endpoint.</summary>
 internal sealed class BugReportJsonRequest
 {
-    public int SchemaVersion => 2;
+    public int SchemaVersion => 3;
     public string ReportId { get; }
     public string ReportingClientNetworkId { get; }
     public string Summary { get; }
@@ -328,50 +372,58 @@ internal sealed class BugReportJsonRequest
     }
 }
 
-/// <summary>Contains one gzip-compressed log encoded as JSON base64.</summary>
+/// <summary>Describes one gzip-compressed log included as a multipart field.</summary>
 internal sealed class BugReportJsonLog
 {
     public string FileName { get; }
-    public string ContentEncoding => "gzip+base64";
+    public string ContentEncoding => "gzip";
+    public int CompressedLength { get; }
     public int UncompressedLength { get; }
-    public byte[] Data { get; }
 
     public BugReportJsonLog(string fileName, int uncompressedLength, byte[] data)
     {
         FileName = fileName;
+        CompressedLength = data?.Length ?? 0;
         UncompressedLength = uncompressedLength;
-        Data = data;
     }
 }
 
-/// <summary>Describes the raw server-save artifact uploaded before the JSON report.</summary>
+/// <summary>Describes the server-save pair uploaded before the JSON report.</summary>
 internal sealed class BugReportJsonServerSave
 {
     public string FileName { get; }
     public string Artifact => "server-save";
     public long Length { get; }
+    public string SidecarFileName { get; }
+    public long? SidecarLength { get; }
 
-    public BugReportJsonServerSave(string fileName, long length)
+    public BugReportJsonServerSave(
+        string fileName,
+        long length,
+        string sidecarFileName,
+        long? sidecarLength)
     {
         FileName = fileName;
         Length = length;
+        SidecarFileName = sidecarFileName;
+        SidecarLength = sidecarLength;
     }
 }
 
-/// <summary>Contains one pseudonymous client log in the JSON payload.</summary>
+/// <summary>Describes one pseudonymous client log included as a multipart field.</summary>
 internal sealed class BugReportJsonClientLog
 {
     public int ClientNumber { get; }
     public string FileName => "client-" + ClientNumber.ToString("D2", CultureInfo.InvariantCulture) + ".log";
-    public string ContentEncoding => "gzip+base64";
+    public string ContentEncoding => "gzip";
+    public int CompressedLength { get; }
     public int UncompressedLength { get; }
-    public byte[] Data { get; }
 
     public BugReportJsonClientLog(int clientNumber, int uncompressedLength, byte[] data)
     {
         ClientNumber = clientNumber;
+        CompressedLength = data?.Length ?? 0;
         UncompressedLength = uncompressedLength;
-        Data = data;
     }
 }
 
