@@ -1330,7 +1330,9 @@ public class MovementTrafficTests : MissionTestEnvironment
             var movement = new MovementPacket(
                 "76561198000000042",
                 new ushort[] { 1, 2, 3 },
-                agents);
+                agents,
+                senderControllerId: "76561198000000042",
+                authorityRevisions: new long[] { 1, 2, 3 });
 
             byte[] original = serializer.Serialize(movement);
             byte[] wire = compressor.Serialize(movement);
@@ -1345,6 +1347,8 @@ public class MovementTrafficTests : MissionTestEnvironment
 
             var roundTripped = Assert.IsType<MovementPacket>(restored);
             Assert.Equal(movement.IdentityScopeId, roundTripped.IdentityScopeId);
+            Assert.Equal(movement.SenderControllerId, roundTripped.SenderControllerId);
+            Assert.Equal(movement.AuthorityRevisions, roundTripped.AuthorityRevisions);
             Assert.Equal(movement.AgentIds, roundTripped.AgentIds);
             Assert.Equal(movement.Agents.Length, roundTripped.Agents.Length);
             for (int i = 0; i < agents.Length; i++)
@@ -1403,12 +1407,20 @@ public class MovementTrafficTests : MissionTestEnvironment
 
             var serializer = new ProtoBufSerializer(new SerializableTypeMapper());
             var compressor = new MovementPacketCompressor(serializer);
+            const string senderControllerId = "76561198000000042";
+            var authorityRevisions = new long[] { 1, 2, 3 };
+            peer.Resolve<IMessageBroker>().Publish(
+                this, new NetworkMissionPeerEntered(senderControllerId, "movement-test"));
             var restoredRiders = Assert.IsType<MovementPacket>(
-                AssertFitsAndDispatchesThroughRelay(serializer, compressor, packetManager, peer.NetPeer,
-                    new MovementPacket("76561198000000042", ids, riders)));
+                AssertFitsAndDispatchesThroughRelay(serializer, compressor, packetManager, Server.NetPeer,
+                    new MovementPacket(senderControllerId, ids, riders, senderControllerId, authorityRevisions)));
             var restoredMounts = Assert.IsType<MountMovementPacket>(
-                AssertFitsAndDispatchesThroughRelay(serializer, compressor, packetManager, peer.NetPeer,
-                    new MountMovementPacket("76561198000000042", ids, mounts)));
+                AssertFitsAndDispatchesThroughRelay(serializer, compressor, packetManager, Server.NetPeer,
+                    new MountMovementPacket(senderControllerId, ids, mounts, senderControllerId, authorityRevisions)));
+            Assert.Equal(senderControllerId, restoredRiders.SenderControllerId);
+            Assert.Equal(senderControllerId, restoredMounts.SenderControllerId);
+            Assert.Equal(authorityRevisions, restoredRiders.AuthorityRevisions);
+            Assert.Equal(authorityRevisions, restoredMounts.AuthorityRevisions);
 
             for (int i = 0; i < ids.Length; i++)
             {

@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Linq;
 using Common.Messaging;
+using E2E.Tests.Environment.Extensions;
 using E2E.Tests.Environment.Mock;
 using E2E.Tests.Environment.MockEngine;
 using GameInterface.Services.MapEvents;
@@ -12,6 +13,7 @@ using Missions.Agents.Handlers;
 using Missions.Agents.Packets;
 using Missions.Battles;
 using Missions.Messages;
+using Missions.Services.Network;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.Core;
@@ -668,8 +670,12 @@ public class BattleMountIdentityTests : MissionTestEnvironment
             remoteMirror.InputVector = new Vec2(0.3f, 0.7f);
             remoteMirror.RealGlobalVelocity = new Vec3(3f, 4f, 0f);
 
+            var sender = NetPeerExtensions.CreatePeer();
+            peer.Resolve<IMessageBroker>().Publish(
+                this, new NetworkMissionPeerEntered("owner", "movement-test"));
+            peer.Resolve<IMissionContext>().MapPeer("owner", sender);
             var packet = new MountMovementPacket(new[] { horseId }, new[] { new AgentMountData(remoteHorse) });
-            component.AgentMovementHandler.MountMovementApplier.HandlePacket(null, packet);
+            component.AgentMovementHandler.MountMovementApplier.HandlePacket(sender, packet);
 
             // The packet's movement input landed on the puppet horse (position itself is reconciled per-frame
             // by the interpolator, which this packet also fed).

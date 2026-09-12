@@ -5,7 +5,9 @@ using Common.Network.Session;
 using Common.PacketHandlers;
 using Common.Serialization;
 using Common.Tests.Utils;
+using Coop.Core.Server.Services.Instances;
 using GameInterface.Services.Entity;
+using GameInterface.Services.Players;
 using LiteNetLib;
 using Missions.Messages;
 using Missions.Services.Network;
@@ -30,6 +32,86 @@ public class MissionPeerCredentialMappingTests
         binder: null,
         new[] { typeof(NetManager), typeof(IPEndPoint), typeof(int) },
         modifiers: null)!;
+
+    [Fact]
+    public void OpaqueNatAuthorization_IntroducesBothClientsWithTheirMembershipCredentials()
+    {
+        using var introducer = new NatIntroductionFixture();
+        using var first = new Fixture(controllerId: "first", isTunneled: false,
+            rendezvousEndpoint: introducer.Endpoint);
+        using var second = new Fixture(controllerId: "second", isTunneled: false,
+            rendezvousEndpoint: introducer.Endpoint);
+        first.StartForManualPolling();
+        second.StartForManualPolling();
+        Assert.Empty(first.IntroductionRequests);
+        Assert.Empty(second.IntroductionRequests);
+        Assert.True(introducer.Manager.TryEnterMission(introducer.FirstPeer, "first", InstanceId, out var firstEntry));
+        first.IssueLocalCredential(firstEntry.PeerCredential);
+        var firstToken = introducer.Authorize(first, introducer.FirstPeer, "first");
+        introducer.PollUntil(() => introducer.ReceivedTokens.Count == 1, first, second);
+
+        Assert.True(introducer.Manager.TryEnterMission(introducer.SecondPeer, "second", InstanceId, out var secondEntry));
+        second.IssueLocalCredential(secondEntry.PeerCredential);
+        first.Announce("second", steamId: 0, secondEntry.PeerCredential);
+        second.Announce("first", steamId: 0, firstEntry.PeerCredential);
+        var secondToken = introducer.Authorize(second, introducer.SecondPeer, "second");
+        introducer.PollUntil(() => first.MappedPeers.Count == 1 && second.MappedPeers.Count == 1, first, second);
+
+        Assert.Equal(new[] { firstToken, secondToken }, introducer.ReceivedTokens);
+        Assert.All(introducer.ReceivedTokens, token => Assert.True(Guid.TryParseExact(token, "N", out _)));
+        var firstRoute = Assert.Single(first.MappedPeers);
+        var secondRoute = Assert.Single(second.MappedPeers);
+        Assert.Equal("second", firstRoute.Value);
+        Assert.Equal("first", secondRoute.Value);
+        Assert.Equal(secondEntry.PeerCredential, first.GetPeerCredential(firstRoute.Key));
+        Assert.Equal(firstEntry.PeerCredential, second.GetPeerCredential(secondRoute.Key));
+        first.MissionContext.Verify(context => context.MapPeer("second", firstRoute.Key), Times.Once);
+        second.MissionContext.Verify(context => context.MapPeer("first", secondRoute.Key), Times.Once);
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void SupersededIntroductionAuthorization_CannotConsumeTheCurrentRequest(bool reenter)
+    {
+        using var introducer = new NatIntroductionFixture();
+        using var fixture = new Fixture(controllerId: "first", isTunneled: false,
+            rendezvousEndpoint: introducer.Endpoint);
+        fixture.StartForManualPolling();
+        Assert.True(introducer.Manager.TryEnterMission(introducer.FirstPeer, "first", InstanceId, out var entry));
+        fixture.IssueLocalCredential(entry.PeerCredential);
+        var oldRequest = Assert.Single(fixture.IntroductionRequests);
+        Assert.True(introducer.Manager.TryAuthorizeIntroduction(
+            introducer.FirstPeer, "first", InstanceId, oldRequest.RequestId, out var oldToken));
+
+        if (reenter)
+        {
+            fixture.Client.DisconnectPeers();
+            Assert.True(introducer.Manager.TryLeaveMission(introducer.FirstPeer, "first", InstanceId, out _));
+            fixture.Client.ConnectToInstance(InstanceId);
+            Assert.True(introducer.Manager.TryEnterMission(introducer.FirstPeer, "first", InstanceId, out entry));
+        }
+        else
+        {
+            Assert.True(introducer.Manager.TryEnterMission(introducer.SecondPeer, "first", InstanceId, out _));
+            Assert.True(introducer.Manager.TryEnterMission(introducer.FirstPeer, "first", InstanceId, out entry));
+        }
+        fixture.IssueLocalCredential(entry.PeerCredential);
+        Assert.Equal(2, fixture.IntroductionRequests.Count);
+        var currentRequest = fixture.IntroductionRequests[1];
+        Assert.NotEqual(oldRequest.RequestId, currentRequest.RequestId);
+
+        fixture.AuthorizeIntroduction(oldRequest, oldToken);
+        Assert.Equal(currentRequest.RequestId, fixture.IntroductionRequestId);
+        var currentToken = introducer.Authorize(fixture, introducer.FirstPeer, "first");
+        Assert.Equal(Guid.Empty, fixture.IntroductionRequestId);
+        fixture.AuthorizeIntroduction(currentRequest, currentToken);
+        introducer.PollUntil(() => introducer.ReceivedTokens.Count > 0, fixture);
+
+        Assert.Equal(currentToken, Assert.Single(introducer.ReceivedTokens));
+        fixture.IssueLocalCredential(entry.PeerCredential);
+        Assert.Equal(2, fixture.IntroductionRequests.Count);
+    }
 
     [Fact]
     public void ConnectionRequestWithoutCredential_IsRejected()
@@ -705,6 +787,70 @@ public class MissionPeerCredentialMappingTests
         Assert.False(fixture.PendingPeers.ContainsKey(peer));
     }
 
+    private sealed class NatIntroductionFixture : INatPunchListener, IDisposable
+    {
+        private readonly NetManager netManager = new(null) { NatPunchEnabled = true };
+
+        public MissionManager Manager { get; }
+        public NetPeer FirstPeer { get; }
+        public NetPeer SecondPeer { get; }
+        public List<string> ReceivedTokens { get; } = new();
+        public IPEndPoint Endpoint => new(IPAddress.Loopback, netManager.LocalPort);
+
+        public NatIntroductionFixture()
+        {
+            FirstPeer = CreateCampaignPeer(1);
+            SecondPeer = CreateCampaignPeer(2);
+            var players = new Mock<IPlayerManager>();
+            var firstPeer = FirstPeer;
+            var secondPeer = SecondPeer;
+            players.Setup(manager => manager.TryGetPeer("first", out firstPeer)).Returns(true);
+            players.Setup(manager => manager.TryGetPeer("second", out secondPeer)).Returns(true);
+            Manager = new MissionManager(players.Object);
+            netManager.NatPunchModule.Init(this);
+            Assert.True(netManager.Start());
+        }
+
+        public string Authorize(Fixture fixture, NetPeer campaignPeer, string controllerId)
+        {
+            var request = fixture.IntroductionRequests.Last();
+            Assert.True(Manager.TryAuthorizeIntroduction(
+                campaignPeer, controllerId, request.InstanceId, request.RequestId, out var token));
+            fixture.AuthorizeIntroduction(request, token);
+            return token;
+        }
+
+        public void PollUntil(Func<bool> completed, params Fixture[] clients)
+        {
+            var timeout = Stopwatch.StartNew();
+            while (timeout.Elapsed < TimeSpan.FromSeconds(5) && !completed())
+            {
+                netManager.PollEvents();
+                netManager.NatPunchModule.PollEvents();
+                foreach (var client in clients) client.Client.Update(TimeSpan.Zero);
+                Thread.Sleep(2);
+            }
+            Assert.True(completed(), "The loopback NAT handshake did not reach its expected state.");
+        }
+
+        public void OnNatIntroductionRequest(IPEndPoint localEndPoint, IPEndPoint remoteEndPoint, string token)
+        {
+            ReceivedTokens.Add(token);
+            Manager.HandleIntroductionRequest(netManager.NatPunchModule, localEndPoint, remoteEndPoint, token);
+        }
+
+        public void OnNatIntroductionSuccess(IPEndPoint targetEndPoint, NatAddressType type, string token) { }
+
+        public void Dispose() => netManager.Stop();
+
+        private NetPeer CreateCampaignPeer(int id) => (NetPeer)PeerConstructor.Invoke(new object[]
+        {
+            netManager,
+            new IPEndPoint(IPAddress.Loopback, 54000 + id),
+            id,
+        });
+    }
+
     private sealed class Fixture : IDisposable
     {
         private readonly TestMessageBroker messageBroker = new();
@@ -713,21 +859,31 @@ public class MissionPeerCredentialMappingTests
 
         public Mock<IMissionContext> MissionContext { get; } = new();
         public Mock<ISteamMissionBridge> SteamBridge { get; } = new();
+        public Mock<IRelayNetwork> RelayNetwork { get; } = new();
+        public List<NetworkRequestMissionIntroduction> IntroductionRequests { get; } = new();
         public Mock<ICommonSerializer> Serializer { get; } = new();
         public ConcurrentQueue<int> ReceivedPayloads { get; } = new();
         public LiteNetP2PClient Client { get; }
         public Dictionary<NetPeer, string> PendingPeers { get; }
         public Dictionary<NetPeer, string> MappedPeers { get; }
 
-        public Fixture(bool startNetwork = false, ulong authenticatedSteamId = 0)
+        public Fixture(bool startNetwork = false, ulong authenticatedSteamId = 0,
+            string controllerId = "local", bool isTunneled = true, IPEndPoint? rendezvousEndpoint = null)
         {
             var config = new Mock<INetworkConfig>();
             config.SetupGet(value => value.DisconnectTimeout).Returns(TimeSpan.FromSeconds(5));
             config.SetupGet(value => value.PingInterval).Returns(TimeSpan.FromSeconds(1));
             config.SetupGet(value => value.ReconnectDelay).Returns(TimeSpan.FromMilliseconds(500));
-            config.SetupGet(value => value.IsTunneled).Returns(true);
+            config.SetupGet(value => value.IsTunneled).Returns(isTunneled);
+            RelayNetwork.SetupGet(network => network.ServerEndpoint).Returns(rendezvousEndpoint!);
+            RelayNetwork.Setup(network => network.SendAll(It.IsAny<IMessage>()))
+                .Callback<IMessage>(message =>
+                {
+                    if (message is NetworkRequestMissionIntroduction request)
+                        IntroductionRequests.Add(request);
+                });
             var controllerIdProvider = new Mock<IControllerIdProvider>();
-            controllerIdProvider.SetupGet(provider => provider.ControllerId).Returns("local");
+            controllerIdProvider.SetupGet(provider => provider.ControllerId).Returns(controllerId);
             if (authenticatedSteamId != 0)
             {
                 ulong resolvedSteamId = authenticatedSteamId;
@@ -749,7 +905,7 @@ public class MissionPeerCredentialMappingTests
 
             Client = new LiteNetP2PClient(
                 config.Object,
-                new Mock<IRelayNetwork>().Object,
+                RelayNetwork.Object,
                 MissionContext.Object,
                 Serializer.Object,
                 messageBroker,
@@ -768,6 +924,19 @@ public class MissionPeerCredentialMappingTests
                 .GetValue(Client)!;
             PendingPeers = GetDictionary<NetPeer, string>("pendingPeerControllers");
             MappedPeers = GetDictionary<NetPeer, string>("mappedPeerControllers");
+        }
+
+        public Guid IntroductionRequestId =>
+            (Guid)typeof(LiteNetP2PClient)
+                .GetField("introductionRequestId", BindingFlags.NonPublic | BindingFlags.Instance)!
+                .GetValue(Client)!;
+
+        public void StartForManualPolling() => Assert.True(netManager.Start());
+
+        public void AuthorizeIntroduction(NetworkRequestMissionIntroduction request, string token)
+        {
+            messageBroker.Publish(this,
+                new NetworkMissionIntroductionAuthorized(request.InstanceId, request.RequestId, token));
         }
 
         public NetPeer TrackPending(string controllerId, Guid credential, ulong actualSteamId)

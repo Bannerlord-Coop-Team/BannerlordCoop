@@ -69,6 +69,8 @@ public class LiteNetP2PClientTests
         try
         {
             client.ConnectToInstance("town_ES1|tavern");
+            Assert.Empty(requests);
+            broker.Publish(this, new NetworkMissionCredentialIssued("town_ES1|tavern", Guid.NewGuid()));
             var firstRequest = Assert.Single(requests);
             client.DisconnectPeers();
             broker.Publish(this, new NetworkMissionIntroductionAuthorized(
@@ -76,6 +78,8 @@ public class LiteNetP2PClientTests
             Assert.Equal(Guid.Empty, requestField.GetValue(client));
 
             client.ConnectToInstance(firstRequest.InstanceId);
+            Assert.Single(requests);
+            broker.Publish(this, new NetworkMissionCredentialIssued(firstRequest.InstanceId, Guid.NewGuid()));
             Assert.Equal(2, requests.Count);
             var currentRequest = requests[1];
             Assert.NotEqual(firstRequest.RequestId, currentRequest.RequestId);

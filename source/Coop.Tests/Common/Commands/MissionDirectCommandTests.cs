@@ -22,7 +22,7 @@ public class MissionDirectCommandTests
     {
         Type[] commandTypes = GetCommandTypes();
 #if DEBUG
-        Assert.Equal(29, commandTypes.Length);
+        Assert.Equal(31, commandTypes.Length);
 #else
         Assert.Equal(15, commandTypes.Length);
 #endif
@@ -36,6 +36,8 @@ public class MissionDirectCommandTests
         Assert.Contains(commands, command => command.Name == "peer_state");
         Assert.Contains(commands, command => command.Name == "controller_agents");
         Assert.Contains(commands, command => command.Name == "drive_owned_agents");
+        Assert.Contains(commands, command => command.Name == "cancel_owned_agent_drive");
+        Assert.Contains(commands, command => command.Name == "owned_agent_drive_state");
 #endif
         Assert.All(commandTypes, type =>
         {

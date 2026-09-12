@@ -54,10 +54,12 @@ namespace Coop.Tests.Autofac
             Assert.Same(container.Resolve<IVoiceClient>(), container.Resolve<IVoiceSyntheticTest>());
             Assert.Equal(CoopCommandSide.Client, Assert.Single(registeredCommands,
                 command => $"{command.Prefix}.{command.Name}" == "coop.debug.voice.synthetic").Side);
-            Assert.Equal(29, missionCommands.Length);
+            Assert.Equal(31, missionCommands.Length);
             Assert.Contains(missionCommands, command => command.Name == "peer_state");
             Assert.Contains(missionCommands, command => command.Name == "controller_agents");
             Assert.Contains(missionCommands, command => command.Name == "drive_owned_agents");
+            Assert.Contains(missionCommands, command => command.Name == "cancel_owned_agent_drive");
+            Assert.Contains(missionCommands, command => command.Name == "owned_agent_drive_state");
             Assert.Equal(
                 new[] { "arm_inactive_party_deficit", "disconnect", "join_state" },
                 registeredCommands

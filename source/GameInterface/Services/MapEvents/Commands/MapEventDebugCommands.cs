@@ -2723,6 +2723,8 @@ public class MapEventDebugCommands
 
         public string Description => "Reports late join mode fixture state.";
 
+        public CoopCommandSide Side => CoopCommandSide.Server;
+
         public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
             new ExpectedArgs("first_controller_id", "The first controller id."),
@@ -2771,6 +2773,17 @@ public class MapEventDebugCommands
                 joiningInMission = missionMembership.IsControllerInMission(args[1]);
             }
 
+            string instanceId = lateJoinModeFixture?.MapEventId ?? firstMapEventId ?? joiningMapEventId;
+            string hostControllerId = null;
+            int hostEpoch = 0;
+            if (instanceId != null &&
+                ContainerProvider.TryResolve<IBattleHostRegistry>(out var hostRegistry) &&
+                hostRegistry.TryGet(instanceId, out var assignment))
+            {
+                hostControllerId = assignment.HostControllerId;
+                hostEpoch = assignment.Epoch;
+            }
+
             bool restored = !fixtureActive && firstMapEventId == null && joiningMapEventId == null &&
                 !firstInMission && !joiningInMission;
             string structuredState = JsonConvert.SerializeObject(new
@@ -2781,6 +2794,9 @@ public class MapEventDebugCommands
                 joiningControllerId = args[1],
                 firstMapEventId,
                 joiningMapEventId,
+                instanceId,
+                hostControllerId,
+                hostEpoch,
                 firstInMission,
                 joiningInMission,
                 restored,
@@ -2970,9 +2986,9 @@ public class MapEventDebugCommands
 
             mission.DisableDying = true;
             var playerProtected = ProtectLateJoinModeFixturePlayer(mission);
-            return Failed(playerProtected
-                ? "Dying disabled for the local fixture mission; the local player is protected."
-                : "Dying disabled for the local fixture mission; the local player is not assigned yet.");
+            return playerProtected
+                ? Succeeded("Dying disabled for the local fixture mission; the local player is protected.")
+                : Failed("Dying disabled for the local fixture mission; the local player is not assigned yet.");
         }
     }
 

@@ -75,7 +75,6 @@ public class LiteNetP2PClient : INatPunchListener, INetEventListener, IUpdateabl
 
     private string instanceId = null;
     private Guid localPeerCredential;
-    private Guid introductionRequestId;
     private int instanceGeneration;
     private Guid introductionRequestId;
 
