@@ -52,6 +52,7 @@ internal sealed class SiegeInteractionDebugBehavior : MissionBehavior, ISiegeInt
     private Camera stagingCamera;
     private bool fixtureRestored;
     private string captureFailureReason;
+    private Agent dismountAgent;
 
     public override MissionBehaviorType BehaviorType => MissionBehaviorType.Other;
 
@@ -67,6 +68,7 @@ internal sealed class SiegeInteractionDebugBehavior : MissionBehavior, ISiegeInt
     public override void OnPreDisplayMissionTick(float dt)
     {
         tick++;
+        UpdateDismount();
         BindObserver();
         if (!pressInvoked || edgeCleared || inputSamples.Count >= 300) return;
         var screen = ScreenManager.TopScreen as MissionScreen;
@@ -178,9 +180,15 @@ internal sealed class SiegeInteractionDebugBehavior : MissionBehavior, ISiegeInt
         if (requests.Count >= 256) return;
         requests.Add(request.RequestId);
         requestId = request.RequestId;
+        if (status == "fixture_dismount_pending") status = "unexercised";
         BindObserver();
         var screen = ScreenManager.TopScreen as MissionScreen;
         var agent = Mission.MainAgent;
+        if (request.Action == "dismount")
+        {
+            Dismount(agent);
+            return;
+        }
         if (request.Action == "capture")
         {
             Capture(screen, agent);
@@ -244,6 +252,39 @@ internal sealed class SiegeInteractionDebugBehavior : MissionBehavior, ISiegeInt
         status = "press_invoked_outcome_pending";
         pressInvoked = true;
         Input.PressKey(key.KeyboardKey.InputKey);
+    }
+
+    private void Dismount(Agent agent)
+    {
+        dismountAgent = null;
+        if (agent == null || !agent.IsActive() || agent.IsUsingGameObject)
+        {
+            status = "fixture_dismount_rejected";
+            return;
+        }
+        if (agent.MountAgent == null)
+        {
+            status = "fixture_dismounted";
+            return;
+        }
+        agent.Mount(agent.MountAgent);
+        dismountAgent = agent;
+        status = "fixture_dismount_pending";
+    }
+
+    private void UpdateDismount()
+    {
+        if (dismountAgent == null) return;
+        if (!dismountAgent.IsActive() || dismountAgent.IsUsingGameObject)
+        {
+            if (status == "fixture_dismount_pending") status = "fixture_dismount_rejected";
+            dismountAgent = null;
+        }
+        else if (dismountAgent.MountAgent == null)
+        {
+            if (status == "fixture_dismount_pending") status = "fixture_dismounted";
+            dismountAgent = null;
+        }
     }
 
     private void Capture(MissionScreen screen, Agent agent)

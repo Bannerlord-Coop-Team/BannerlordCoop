@@ -106,7 +106,7 @@ internal static class BattleDebugCommands
             new ExpectedArgs("controller_id", "Connected defender controller."),
             new ExpectedArgs("request_id", "Unique native input request."),
             new ExpectedArgs("machine_id", "Native mission object id from dump_machines."),
-            new ExpectedArgs("action", "capture, stage, watch, use, fire, attack, stop or restore."),
+            new ExpectedArgs("action", "capture, dismount, stage, watch, use, fire, attack, stop or restore."),
             new ExpectedArgs("standing_point", "Existing standing point index.", isRequired: false)
         };
 
@@ -125,7 +125,7 @@ internal static class BattleDebugCommands
                 !int.TryParse(args[2], NumberStyles.Integer, CultureInfo.InvariantCulture, out int machineId))
                 return Failed("Expected controller_id, unique request_id, machine_id, action and optional standing_point.");
             int standingPoint = 0;
-            if ((args[3] != "capture" && args[3] != "stage" && args[3] != "watch" && args[3] != "use" &&
+            if ((args[3] != "capture" && args[3] != "dismount" && args[3] != "stage" && args[3] != "watch" && args[3] != "use" &&
                  args[3] != "fire" && args[3] != "attack" && args[3] != "stop" && args[3] != "restore") ||
                 (args.Count == 5 && !int.TryParse(args[4], out standingPoint)))
                 return Failed("Invalid action or standing point.");
