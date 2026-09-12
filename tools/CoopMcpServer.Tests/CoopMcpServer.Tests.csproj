@@ -17,6 +17,7 @@
     <Compile Include="../../source/Common/Commands/*.cs" Link="Commands/%(Filename)%(Extension)" />
     <Compile Include="../../source/GameInterface/Services/LiveTesting/LiveTestCommandDispatcher.cs" Link="LiveTestCommandDispatcher.cs" />
     <Compile Include="../../source/Common.Tests/LiveTesting/LiveTestProtocolTests.cs" Link="LiveTestProtocolTests.cs" />
+    <None Update="Data/DebugTools-5192afea.json" CopyToOutputDirectory="PreserveNewest" />
     <Using Include="Xunit" />
   </ItemGroup>
 </Project>

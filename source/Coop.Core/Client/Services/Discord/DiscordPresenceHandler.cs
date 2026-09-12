@@ -119,13 +119,14 @@ internal sealed class DiscordPresenceHandler : IHandler
     {
         lock (gate)
         {
-            if (lastDetails != null) presenceClient.ClearPresence();
+            if (disposed) return;
+            if (lastState != "Main Menu") presenceClient.SetMainMenu();
             connectedAtUtc = null;
             campaignReady = false;
             battleId = null;
             playerCount = 1;
             lastDetails = null;
-            lastState = null;
+            lastState = "Main Menu";
         }
     }
 
@@ -134,8 +135,8 @@ internal sealed class DiscordPresenceHandler : IHandler
         lock (gate)
         {
             if (disposed) return;
-            disposed = true;
             ClearSession();
+            disposed = true;
         }
         messageBroker.Unsubscribe<NetworkConnected>(Handle_Connected);
         messageBroker.Unsubscribe<ClientCampaignReady>(Handle_CampaignReady);
