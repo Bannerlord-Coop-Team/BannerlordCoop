@@ -267,9 +267,9 @@ internal sealed class SiegeInteractionDebugBehavior : MissionBehavior, ISiegeInt
             status = "fixture_dismounted";
             return;
         }
-        agent.Mount(agent.MountAgent);
         dismountAgent = agent;
         status = "fixture_dismount_pending";
+        UpdateDismount();
     }
 
     private void UpdateDismount()
@@ -282,8 +282,17 @@ internal sealed class SiegeInteractionDebugBehavior : MissionBehavior, ISiegeInt
         }
         else if (dismountAgent.MountAgent == null)
         {
+            dismountAgent.MovementInputVector = Vec2.Zero;
             if (status == "fixture_dismount_pending") status = "fixture_dismounted";
             dismountAgent = null;
+        }
+        else if (dismountAgent.GetCurrentVelocity().y >= Agent.DismountVelocityLimit)
+        {
+            dismountAgent.MovementInputVector = new Vec2(0f, -1f);
+        }
+        else
+        {
+            dismountAgent.Mount(dismountAgent.MountAgent);
         }
     }
 
