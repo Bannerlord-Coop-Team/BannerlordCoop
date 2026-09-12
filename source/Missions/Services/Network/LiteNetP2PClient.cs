@@ -75,7 +75,9 @@ public class LiteNetP2PClient : INatPunchListener, INetEventListener, IUpdateabl
 
     private string instanceId = null;
     private Guid localPeerCredential;
+    private Guid introductionRequestId;
     private int instanceGeneration;
+    private Guid introductionRequestId;
 
     private sealed class PendingReliablePayloads
     {
@@ -144,6 +146,7 @@ public class LiteNetP2PClient : INatPunchListener, INetEventListener, IUpdateabl
         netManager.NatPunchModule.Init(this);
 
         messageBroker.Subscribe<NetworkMissionCredentialIssued>(Handle_MissionCredentialIssued);
+        messageBroker.Subscribe<NetworkMissionIntroductionAuthorized>(Handle_IntroductionAuthorized);
         messageBroker.Subscribe<NetworkMissionPeerEntered>(Handle_MissionPeerEntered);
         messageBroker.Subscribe<MissionPeerLeft>(Handle_MissionPeerLeft);
         messageBroker.Subscribe<MissionPeerDisconnected>(Handle_MissionPeerDisconnected);
@@ -156,6 +159,7 @@ public class LiteNetP2PClient : INatPunchListener, INetEventListener, IUpdateabl
         disposed = true;
 
         messageBroker.Unsubscribe<NetworkMissionCredentialIssued>(Handle_MissionCredentialIssued);
+        messageBroker.Unsubscribe<NetworkMissionIntroductionAuthorized>(Handle_IntroductionAuthorized);
         messageBroker.Unsubscribe<NetworkMissionPeerEntered>(Handle_MissionPeerEntered);
         messageBroker.Unsubscribe<MissionPeerLeft>(Handle_MissionPeerLeft);
         messageBroker.Unsubscribe<MissionPeerDisconnected>(Handle_MissionPeerDisconnected);
@@ -200,6 +204,7 @@ public class LiteNetP2PClient : INatPunchListener, INetEventListener, IUpdateabl
             EndDiagnostics("disconnect-all");
             instanceId = null;
             localPeerCredential = Guid.Empty;
+            introductionRequestId = Guid.Empty;
             instanceGeneration++;
             ClearPendingReliablePayloads();
         }
@@ -283,6 +288,7 @@ public class LiteNetP2PClient : INatPunchListener, INetEventListener, IUpdateabl
             localPeerCredential = Guid.Empty;
             instanceGeneration++;
             ClearPendingReliablePayloads();
+            introductionRequestId = Guid.Empty;
         }
         steamBridge.Start(netManager.LocalPort);
     }
@@ -292,6 +298,7 @@ public class LiteNetP2PClient : INatPunchListener, INetEventListener, IUpdateabl
         var issued = payload.What;
         if (issued.PeerCredential == Guid.Empty) return;
 
+        Guid requestId;
         NetPeer[] trackedPeers = Array.Empty<NetPeer>();
         NetPeer[] mappedPeers = Array.Empty<NetPeer>();
         lock (peerGate)
@@ -309,6 +316,8 @@ public class LiteNetP2PClient : INatPunchListener, INetEventListener, IUpdateabl
             }
 
             localPeerCredential = issued.PeerCredential;
+            requestId = Config.IsTunneled ? Guid.Empty : Guid.NewGuid();
+            introductionRequestId = requestId;
         }
 
         foreach (var peer in mappedPeers) missionContext.RemovePeer(peer);
@@ -318,9 +327,22 @@ public class LiteNetP2PClient : INatPunchListener, INetEventListener, IUpdateabl
         // endpoints. Steam peer announcements can still establish the direct mission link.
         if (Config.IsTunneled) return;
 
-        Logger.Verbose("Attempting NAT Punch");
-        var token = new ConnectionToken(ControllerId, issued.InstanceId, issued.PeerCredential);
-        netManager.NatPunchModule.SendNatIntroduceRequest(relayNetwork.ServerEndpoint, token);
+        relayNetwork.SendAll(new NetworkRequestMissionIntroduction(issued.InstanceId, requestId));
+    }
+
+    private void Handle_IntroductionAuthorized(MessagePayload<NetworkMissionIntroductionAuthorized> payload)
+    {
+        var authorization = payload.What;
+        lock (peerGate)
+        {
+            // A request id distinguishes even a leave and re-entry into the same location.
+            if (introductionRequestId == Guid.Empty || authorization.RequestId != introductionRequestId ||
+                authorization.InstanceId != instanceId)
+                return;
+
+            introductionRequestId = Guid.Empty;
+            netManager.NatPunchModule.SendNatIntroduceRequest(relayNetwork.ServerEndpoint, authorization.Token);
+        }
     }
 
     public void OnNatIntroductionRequest(IPEndPoint localEndPoint, IPEndPoint remoteEndPoint, string token)

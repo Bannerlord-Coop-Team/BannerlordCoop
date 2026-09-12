@@ -23,6 +23,8 @@ internal class CameraReset
 
         public string Description => "Runs the fix camera debug operation.";
 
+        public CoopCommandSide Side => CoopCommandSide.Both;
+
         public IExpectedArgs[] ExpectedArgs { get; } = Array.Empty<IExpectedArgs>();
 
         public CoopCommandResult ProcessCommand(ICoopCommandArgs strings)
@@ -39,6 +41,8 @@ internal class CameraReset
         public string Name => "focus_main_party";
 
         public string Description => "Runs the focus main party debug operation.";
+
+        public CoopCommandSide Side => CoopCommandSide.Both;
 
         public IExpectedArgs[] ExpectedArgs { get; } = Array.Empty<IExpectedArgs>();
 
@@ -63,6 +67,8 @@ internal class CameraReset
         public string Name => "state";
 
         public string Description => "Reports state.";
+
+        public CoopCommandSide Side => CoopCommandSide.Both;
 
         public IExpectedArgs[] ExpectedArgs { get; } = Array.Empty<IExpectedArgs>();
 

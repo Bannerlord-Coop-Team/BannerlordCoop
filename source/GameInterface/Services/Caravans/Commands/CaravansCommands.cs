@@ -47,6 +47,8 @@ internal class CaravansCommands
 
         public string Description => "Reports view prohibited kingdoms.";
 
+        public CoopCommandSide Side => CoopCommandSide.Both;
+
         public IExpectedArgs[] ExpectedArgs { get; } = Array.Empty<IExpectedArgs>();
 
         public CoopCommandResult ProcessCommand(ICoopCommandArgs strings)
@@ -95,6 +97,8 @@ internal class CaravansCommands
         public string Name => "view_interacted_caravans";
 
         public string Description => "Reports view interacted caravans.";
+
+        public CoopCommandSide Side => CoopCommandSide.Both;
 
         public IExpectedArgs[] ExpectedArgs { get; } = Array.Empty<IExpectedArgs>();
 
@@ -145,6 +149,8 @@ internal class CaravansCommands
 
         public string Description => "Reports view taken trade rumors.";
 
+        public CoopCommandSide Side => CoopCommandSide.Both;
+
         public IExpectedArgs[] ExpectedArgs { get; } = Array.Empty<IExpectedArgs>();
 
         public CoopCommandResult ProcessCommand(ICoopCommandArgs strings)
@@ -191,6 +197,8 @@ internal class CaravansCommands
 
         public string Description => "Reports view trade action logs.";
 
+        public CoopCommandSide Side => CoopCommandSide.Both;
+
         public IExpectedArgs[] ExpectedArgs { get; } = Array.Empty<IExpectedArgs>();
 
         public CoopCommandResult ProcessCommand(ICoopCommandArgs strings)
@@ -230,6 +238,8 @@ internal class CaravansCommands
         public string Name => "view_looted_caravans";
 
         public string Description => "Reports view looted caravans.";
+
+        public CoopCommandSide Side => CoopCommandSide.Both;
 
         public IExpectedArgs[] ExpectedArgs { get; } = Array.Empty<IExpectedArgs>();
 

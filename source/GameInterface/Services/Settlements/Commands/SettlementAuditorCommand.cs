@@ -21,6 +21,8 @@ internal class SettlementAuditorCommand
 
         public string Description => "Audits the relevant state for co-op debugging.";
 
+        public CoopCommandSide Side => CoopCommandSide.Client;
+
         public IExpectedArgs[] ExpectedArgs { get; } = System.Array.Empty<IExpectedArgs>();
 
         public CoopCommandResult ProcessCommand(ICoopCommandArgs args)

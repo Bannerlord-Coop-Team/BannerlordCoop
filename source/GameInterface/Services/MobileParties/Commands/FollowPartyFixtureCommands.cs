@@ -31,6 +31,8 @@ internal static class FollowPartyFixtureCommands
 
         public string Description => "Runs fixture setup for co-op debugging.";
 
+        public CoopCommandSide Side => CoopCommandSide.Server;
+
         public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
             new ExpectedArgs("playerPartyId", "The player party id."),
@@ -101,6 +103,8 @@ internal static class FollowPartyFixtureCommands
 
         public string Description => "Runs fixture follow for co-op debugging.";
 
+        public CoopCommandSide Side => CoopCommandSide.Client;
+
         public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
             new ExpectedArgs("targetPartyId", "The target party id."),
@@ -136,6 +140,8 @@ internal static class FollowPartyFixtureCommands
         public string Name => "follow_fixture_move_target";
 
         public string Description => "Runs fixture move target for co-op debugging.";
+
+        public CoopCommandSide Side => CoopCommandSide.Server;
 
         public IExpectedArgs[] ExpectedArgs { get; } = System.Array.Empty<IExpectedArgs>();
 
@@ -174,6 +180,8 @@ internal static class FollowPartyFixtureCommands
 
         public string Description => "Runs fixture state for co-op debugging.";
 
+        public CoopCommandSide Side => CoopCommandSide.Both;
+
         public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
             new ExpectedArgs("playerPartyId", "The player party id."),
@@ -209,6 +217,8 @@ internal static class FollowPartyFixtureCommands
         public string Name => "follow_fixture_restore";
 
         public string Description => "Runs fixture restore for co-op debugging.";
+
+        public CoopCommandSide Side => CoopCommandSide.Server;
 
         public IExpectedArgs[] ExpectedArgs { get; } = System.Array.Empty<IExpectedArgs>();
 

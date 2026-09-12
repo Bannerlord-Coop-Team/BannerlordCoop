@@ -44,6 +44,8 @@ internal class UiDebugCommands
 
         public string Description => "Runs the close screen debug operation.";
 
+        public CoopCommandSide Side => CoopCommandSide.Both;
+
         public IExpectedArgs[] ExpectedArgs { get; } = Array.Empty<IExpectedArgs>();
 
         public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
@@ -71,6 +73,8 @@ internal class UiDebugCommands
         public string Name => "prepare_evidence_map";
 
         public string Description => "Runs the prepare evidence map debug operation.";
+
+        public CoopCommandSide Side => CoopCommandSide.Client;
 
         public IExpectedArgs[] ExpectedArgs { get; } = Array.Empty<IExpectedArgs>();
 
@@ -110,6 +114,8 @@ internal class UiDebugCommands
         public string Name => "evidence_map_state";
 
         public string Description => "Reports evidence map state.";
+
+        public CoopCommandSide Side => CoopCommandSide.Client;
 
         public IExpectedArgs[] ExpectedArgs { get; } = Array.Empty<IExpectedArgs>();
 
@@ -160,6 +166,8 @@ internal class UiDebugCommands
 
         public string Description => "Runs the leave settlement encounter debug operation.";
 
+        public CoopCommandSide Side => CoopCommandSide.Client;
+
         public IExpectedArgs[] ExpectedArgs { get; } = Array.Empty<IExpectedArgs>();
 
         public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
@@ -206,6 +214,8 @@ internal class UiDebugCommands
         public string Name => "map_click_offset";
 
         public string Description => "Runs the map click offset debug operation.";
+
+        public CoopCommandSide Side => CoopCommandSide.Client;
 
         public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
@@ -275,6 +285,8 @@ internal class UiDebugCommands
 
         public string Description => "Reports map movement state.";
 
+        public CoopCommandSide Side => CoopCommandSide.Client;
+
         public IExpectedArgs[] ExpectedArgs { get; } = Array.Empty<IExpectedArgs>();
 
         public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
@@ -303,6 +315,8 @@ internal class UiDebugCommands
         public string Name => "switch_menu";
 
         public string Description => "Runs the switch menu debug operation.";
+
+        public CoopCommandSide Side => CoopCommandSide.Client;
 
         public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
@@ -339,6 +353,8 @@ internal class UiDebugCommands
 
         public string Description => "Reports pop state.";
 
+        public CoopCommandSide Side => CoopCommandSide.Both;
+
         public IExpectedArgs[] ExpectedArgs { get; } = Array.Empty<IExpectedArgs>();
 
         public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
@@ -364,6 +380,8 @@ internal class UiDebugCommands
 
         public string Description => "Reports active state.";
 
+        public CoopCommandSide Side => CoopCommandSide.Both;
+
         public IExpectedArgs[] ExpectedArgs { get; } = Array.Empty<IExpectedArgs>();
 
         public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
@@ -381,6 +399,8 @@ internal class UiDebugCommands
 
         public string Description => "Reports loading window state.";
 
+        public CoopCommandSide Side => CoopCommandSide.Both;
+
         public IExpectedArgs[] ExpectedArgs { get; } = Array.Empty<IExpectedArgs>();
 
         public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
@@ -397,6 +417,8 @@ internal class UiDebugCommands
         public string Name => "saving_overlay_state";
 
         public string Description => "Reports saving overlay state.";
+
+        public CoopCommandSide Side => CoopCommandSide.Both;
 
         public IExpectedArgs[] ExpectedArgs { get; } = Array.Empty<IExpectedArgs>();
 

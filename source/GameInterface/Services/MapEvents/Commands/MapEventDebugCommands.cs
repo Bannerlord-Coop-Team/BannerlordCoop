@@ -74,6 +74,8 @@ public class MapEventDebugCommands
 
         public string Description => "Reports prisoner prompt state.";
 
+        public CoopCommandSide Side => CoopCommandSide.Client;
+
         public IExpectedArgs[] ExpectedArgs { get; } = Array.Empty<IExpectedArgs>();
 
         public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
@@ -90,6 +92,8 @@ public class MapEventDebugCommands
         public string Name => "prisoner_prompt";
 
         public string Description => "Runs the prisoner prompt debug operation.";
+
+        public CoopCommandSide Side => CoopCommandSide.Client;
 
         public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
@@ -292,6 +296,8 @@ public class MapEventDebugCommands
 
         public string Description => "Runs the start player field battle debug operation.";
 
+        public CoopCommandSide Side => CoopCommandSide.Server;
+
         public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
             new ExpectedArgs("attacker_mobile_party_id", "The attacker mobile party id.", true),
@@ -404,6 +410,8 @@ public class MapEventDebugCommands
 
         public string Description => "Restores or clears restore player field battle.";
 
+        public CoopCommandSide Side => CoopCommandSide.Server;
+
         public IExpectedArgs[] ExpectedArgs { get; } = Array.Empty<IExpectedArgs>();
 
         public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
@@ -441,6 +449,8 @@ public class MapEventDebugCommands
         public string Name => "request_player_field_battle";
 
         public string Description => "Runs the request player field battle debug operation.";
+
+        public CoopCommandSide Side => CoopCommandSide.Client;
 
         public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
@@ -508,6 +518,8 @@ public class MapEventDebugCommands
 
         public string Description => "Reports player interaction state.";
 
+        public CoopCommandSide Side => CoopCommandSide.Both;
+
         public IExpectedArgs[] ExpectedArgs { get; } = Array.Empty<IExpectedArgs>();
 
         public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
@@ -528,6 +540,8 @@ public class MapEventDebugCommands
         public string Name => "submit_player_interaction";
 
         public string Description => "Runs the submit player interaction debug operation.";
+
+        public CoopCommandSide Side => CoopCommandSide.Client;
 
         public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
@@ -577,6 +591,8 @@ public class MapEventDebugCommands
         public string Name => "start_attack_mission";
 
         public string Description => "Runs the start attack mission debug operation.";
+
+        public CoopCommandSide Side => CoopCommandSide.Client;
 
         public IExpectedArgs[] ExpectedArgs { get; } = Array.Empty<IExpectedArgs>();
 
@@ -631,6 +647,8 @@ public class MapEventDebugCommands
 
         public string Description => "Runs the start looter debug operation.";
 
+        public CoopCommandSide Side => CoopCommandSide.Both;
+
         public IExpectedArgs[] ExpectedArgs { get; } = Array.Empty<IExpectedArgs>();
 
         public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
@@ -663,6 +681,8 @@ public class MapEventDebugCommands
         public string Name => "start_nearest_looter";
 
         public string Description => "Runs the start nearest looter debug operation.";
+
+        public CoopCommandSide Side => CoopCommandSide.Both;
 
         public IExpectedArgs[] ExpectedArgs { get; } = Array.Empty<IExpectedArgs>();
 
@@ -711,6 +731,8 @@ public class MapEventDebugCommands
         public string Name => "start_nearest_bandit_attack";
 
         public string Description => "Runs the start nearest bandit attack debug operation.";
+
+        public CoopCommandSide Side => CoopCommandSide.Server;
 
         public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
@@ -797,6 +819,8 @@ public class MapEventDebugCommands
         public string Name => "bandit_attack_fixture_prepare";
 
         public string Description => "Runs the bandit attack fixture prepare debug operation.";
+
+        public CoopCommandSide Side => CoopCommandSide.Server;
 
         public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
@@ -935,6 +959,8 @@ public class MapEventDebugCommands
 
         public string Description => "Runs the bandit attack fixture start debug operation.";
 
+        public CoopCommandSide Side => CoopCommandSide.Server;
+
         public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
             new ExpectedArgs("controller_id", "The controller id.", true),
@@ -1016,6 +1042,8 @@ public class MapEventDebugCommands
 
         public string Description => "Reports bandit attack fixture state.";
 
+        public CoopCommandSide Side => CoopCommandSide.Both;
+
         public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
             new ExpectedArgs("controller_id", "The controller id.", true),
@@ -1068,6 +1096,8 @@ public class MapEventDebugCommands
         public string Name => "bandit_attack_fixture_restore";
 
         public string Description => "Restores or clears bandit attack fixture restore.";
+
+        public CoopCommandSide Side => CoopCommandSide.Server;
 
         public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
@@ -1151,6 +1181,8 @@ public class MapEventDebugCommands
 
         public string Description => "Runs the finish non battle encounter debug operation.";
 
+        public CoopCommandSide Side => CoopCommandSide.Client;
+
         public IExpectedArgs[] ExpectedArgs { get; } = Array.Empty<IExpectedArgs>();
 
         public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
@@ -1175,6 +1207,8 @@ public class MapEventDebugCommands
         public string Name => "join_existing";
 
         public string Description => "Runs the join existing debug operation.";
+
+        public CoopCommandSide Side => CoopCommandSide.Client;
 
         public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
@@ -1242,6 +1276,8 @@ public class MapEventDebugCommands
 
         public string Description => "Runs the battle reward fixture prepare debug operation.";
 
+        public CoopCommandSide Side => CoopCommandSide.Server;
+
         public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
             new ExpectedArgs("initiator_controller_id", "The initiator controller id.", true),
@@ -1306,6 +1342,8 @@ public class MapEventDebugCommands
         public string Name => "battle_reward_fixture_start";
 
         public string Description => "Runs the battle reward fixture start debug operation.";
+
+        public CoopCommandSide Side => CoopCommandSide.Server;
 
         public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
@@ -1516,6 +1554,8 @@ public class MapEventDebugCommands
 
         public string Description => "Runs the battle reward fixture reinforce debug operation.";
 
+        public CoopCommandSide Side => CoopCommandSide.Server;
+
         public IExpectedArgs[] ExpectedArgs { get; } = Array.Empty<IExpectedArgs>();
 
         public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
@@ -1565,6 +1605,8 @@ public class MapEventDebugCommands
         public string Name => "battle_reward_fixture_join";
 
         public string Description => "Runs the battle reward fixture join debug operation.";
+
+        public CoopCommandSide Side => CoopCommandSide.Server;
 
         public IExpectedArgs[] ExpectedArgs { get; } = Array.Empty<IExpectedArgs>();
 
@@ -1626,6 +1668,8 @@ public class MapEventDebugCommands
 
         public string Description => "Runs the battle reward fixture begin rout debug operation.";
 
+        public CoopCommandSide Side => CoopCommandSide.Server;
+
         public IExpectedArgs[] ExpectedArgs { get; } = Array.Empty<IExpectedArgs>();
 
         public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
@@ -1664,6 +1708,8 @@ public class MapEventDebugCommands
         public string Name => "battle_reward_fixture_route_enemies";
 
         public string Description => "Runs the battle reward fixture route enemies debug operation.";
+
+        public CoopCommandSide Side => CoopCommandSide.Server;
 
         public IExpectedArgs[] ExpectedArgs { get; } = Array.Empty<IExpectedArgs>();
 
@@ -1704,6 +1750,8 @@ public class MapEventDebugCommands
 
         public string Description => "Reports battle reward fixture state.";
 
+        public CoopCommandSide Side => CoopCommandSide.Server;
+
         public IExpectedArgs[] ExpectedArgs { get; } = Array.Empty<IExpectedArgs>();
 
         public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
@@ -1743,6 +1791,8 @@ public class MapEventDebugCommands
 
         public string Description => "Reports battle reward client state.";
 
+        public CoopCommandSide Side => CoopCommandSide.Client;
+
         public IExpectedArgs[] ExpectedArgs { get; } = Array.Empty<IExpectedArgs>();
 
         public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
@@ -1779,6 +1829,8 @@ public class MapEventDebugCommands
         public string Name => "battle_reward_fixture_restore";
 
         public string Description => "Restores or clears battle reward fixture restore.";
+
+        public CoopCommandSide Side => CoopCommandSide.Server;
 
         public IExpectedArgs[] ExpectedArgs { get; } = Array.Empty<IExpectedArgs>();
 
@@ -2015,6 +2067,8 @@ public class MapEventDebugCommands
 
         public string Description => "Runs the wounded allied fixture start debug operation.";
 
+        public CoopCommandSide Side => CoopCommandSide.Server;
+
         public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
             new ExpectedArgs("controller_id", "The controller id.", true),
@@ -2134,6 +2188,8 @@ public class MapEventDebugCommands
 
         public string Description => "Reports wounded allied fixture state.";
 
+        public CoopCommandSide Side => CoopCommandSide.Both;
+
         public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
             new ExpectedArgs("controller_id", "The controller id.", true),
@@ -2190,6 +2246,8 @@ public class MapEventDebugCommands
         public string Name => "wounded_allied_fixture_restore";
 
         public string Description => "Restores or clears wounded allied fixture restore.";
+
+        public CoopCommandSide Side => CoopCommandSide.Server;
 
         public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
@@ -2329,6 +2387,8 @@ public class MapEventDebugCommands
 
         public string Description => "Runs the leave settlement debug operation.";
 
+        public CoopCommandSide Side => CoopCommandSide.Server;
+
         public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
             new ExpectedArgs("controller_id", "The controller id.", true),
@@ -2369,6 +2429,8 @@ public class MapEventDebugCommands
 
         public string Description => "Runs the finish current encounter debug operation.";
 
+        public CoopCommandSide Side => CoopCommandSide.Client;
+
         public IExpectedArgs[] ExpectedArgs { get; } = Array.Empty<IExpectedArgs>();
 
         public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
@@ -2391,6 +2453,8 @@ public class MapEventDebugCommands
         public string Name => "enter_current_battle";
 
         public string Description => "Runs the enter current battle debug operation.";
+
+        public CoopCommandSide Side => CoopCommandSide.Client;
 
         public IExpectedArgs[] ExpectedArgs { get; } = Array.Empty<IExpectedArgs>();
 
@@ -2429,6 +2493,8 @@ public class MapEventDebugCommands
         public string Name => "finish_player_encounter";
 
         public string Description => "Runs the finish player encounter debug operation.";
+
+        public CoopCommandSide Side => CoopCommandSide.Server;
 
         public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
@@ -2477,6 +2543,8 @@ public class MapEventDebugCommands
 
         public string Description => "Reports conversation hold state.";
 
+        public CoopCommandSide Side => CoopCommandSide.Server;
+
         public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
             new ExpectedArgs("party_base_id", "The party base id.", true),
@@ -2506,6 +2574,8 @@ public class MapEventDebugCommands
         public string Name => "late_join_mode_fixture";
 
         public string Description => "Runs the late join mode fixture debug operation.";
+
+        public CoopCommandSide Side => CoopCommandSide.Server;
 
         public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
@@ -2731,6 +2801,8 @@ public class MapEventDebugCommands
 
         public string Description => "Runs the late join mode join debug operation.";
 
+        public CoopCommandSide Side => CoopCommandSide.Server;
+
         public IExpectedArgs[] ExpectedArgs { get; } = Array.Empty<IExpectedArgs>();
 
         public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
@@ -2793,6 +2865,8 @@ public class MapEventDebugCommands
 
         public string Description => "Runs the late join mode enter debug operation.";
 
+        public CoopCommandSide Side => CoopCommandSide.Server;
+
         public IExpectedArgs[] ExpectedArgs { get; } = Array.Empty<IExpectedArgs>();
 
         public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
@@ -2841,6 +2915,8 @@ public class MapEventDebugCommands
 
         public string Description => "Runs the late join mode begin field battle debug operation.";
 
+        public CoopCommandSide Side => CoopCommandSide.Client;
+
         public IExpectedArgs[] ExpectedArgs { get; } = Array.Empty<IExpectedArgs>();
 
         public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
@@ -2878,6 +2954,8 @@ public class MapEventDebugCommands
         public string Name => "late_join_mode_disable_dying";
 
         public string Description => "Runs the late join mode disable dying debug operation.";
+
+        public CoopCommandSide Side => CoopCommandSide.Client;
 
         public IExpectedArgs[] ExpectedArgs { get; } = Array.Empty<IExpectedArgs>();
 
@@ -2918,6 +2996,8 @@ public class MapEventDebugCommands
         public string Name => "late_join_mode_exit_missions";
 
         public string Description => "Runs the late join mode exit missions debug operation.";
+
+        public CoopCommandSide Side => CoopCommandSide.Server;
 
         public IExpectedArgs[] ExpectedArgs { get; } = Array.Empty<IExpectedArgs>();
 
@@ -2966,6 +3046,8 @@ public class MapEventDebugCommands
 
         public string Description => "Restores or clears late join mode restore.";
 
+        public CoopCommandSide Side => CoopCommandSide.Server;
+
         public IExpectedArgs[] ExpectedArgs { get; } = Array.Empty<IExpectedArgs>();
 
         public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
@@ -2995,6 +3077,8 @@ public class MapEventDebugCommands
         public string Name => "late_join_mode_state";
 
         public string Description => "Reports late join mode state.";
+
+        public CoopCommandSide Side => CoopCommandSide.Both;
 
         public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
@@ -3053,6 +3137,8 @@ public class MapEventDebugCommands
         public string Name => "late_join_mode_cleanup";
 
         public string Description => "Runs the late join mode cleanup debug operation.";
+
+        public CoopCommandSide Side => CoopCommandSide.Server;
 
         public IExpectedArgs[] ExpectedArgs { get; } = Array.Empty<IExpectedArgs>();
 
@@ -3155,6 +3241,8 @@ public class MapEventDebugCommands
 
         public string Description => "Runs the peace pursuit fixture debug operation.";
 
+        public CoopCommandSide Side => CoopCommandSide.Server;
+
         public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
             new ExpectedArgs("controller_id", "The controller id.", true),
@@ -3194,6 +3282,8 @@ public class MapEventDebugCommands
 
         public string Description => "Reports peace pursuit state.";
 
+        public CoopCommandSide Side => CoopCommandSide.Both;
+
         public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
             new ExpectedArgs("controller_id", "The controller id.", true),
@@ -3228,6 +3318,8 @@ public class MapEventDebugCommands
         public string Name => "test_peace_stops_pursuit";
 
         public string Description => "Runs the test peace stops pursuit debug operation.";
+
+        public CoopCommandSide Side => CoopCommandSide.Server;
 
         public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
@@ -3390,6 +3482,8 @@ public class MapEventDebugCommands
 
         public string Description => "Runs the kill random troop debug operation.";
 
+        public CoopCommandSide Side => CoopCommandSide.Both;
+
         public IExpectedArgs[] ExpectedArgs { get; } = Array.Empty<IExpectedArgs>();
 
         public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
@@ -3461,6 +3555,8 @@ public class MapEventDebugCommands
         public string Name => "kill_all_but_one";
 
         public string Description => "Runs the kill all but one debug operation.";
+
+        public CoopCommandSide Side => CoopCommandSide.Both;
 
         public IExpectedArgs[] ExpectedArgs { get; } = Array.Empty<IExpectedArgs>();
 
@@ -3552,6 +3648,8 @@ public class MapEventDebugCommands
 
         public string Description => "Reports player encounter.";
 
+        public CoopCommandSide Side => CoopCommandSide.Both;
+
         public IExpectedArgs[] ExpectedArgs { get; } = Array.Empty<IExpectedArgs>();
 
         public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
@@ -3588,6 +3686,8 @@ public class MapEventDebugCommands
         public string Name => "encounter_state";
 
         public string Description => "Reports encounter state.";
+
+        public CoopCommandSide Side => CoopCommandSide.Both;
 
         public IExpectedArgs[] ExpectedArgs { get; } = Array.Empty<IExpectedArgs>();
 
@@ -3635,6 +3735,8 @@ public class MapEventDebugCommands
         public string Name => "retreat_confirmation";
 
         public string Description => "Runs the retreat confirmation debug operation.";
+
+        public CoopCommandSide Side => CoopCommandSide.Client;
 
         public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
@@ -3689,6 +3791,8 @@ public class MapEventDebugCommands
 
         public string Description => "Runs the complete encounter meeting debug operation.";
 
+        public CoopCommandSide Side => CoopCommandSide.Client;
+
         public IExpectedArgs[] ExpectedArgs { get; } = Array.Empty<IExpectedArgs>();
 
         public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
@@ -3716,6 +3820,8 @@ public class MapEventDebugCommands
         public string Name => "choose_battle_mode";
 
         public string Description => "Runs the choose battle mode debug operation.";
+
+        public CoopCommandSide Side => CoopCommandSide.Client;
 
         public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
@@ -3767,6 +3873,8 @@ public class MapEventDebugCommands
 
         public string Description => "Reports events.";
 
+        public CoopCommandSide Side => CoopCommandSide.Both;
+
         public IExpectedArgs[] ExpectedArgs { get; } = Array.Empty<IExpectedArgs>();
 
         public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
@@ -3813,6 +3921,8 @@ public class MapEventDebugCommands
         public string Name => "get_event";
 
         public string Description => "Reports event.";
+
+        public CoopCommandSide Side => CoopCommandSide.Both;
 
         public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {

@@ -143,6 +143,8 @@ public class KingdomDebugCommand
 
         public string Description => "Opens the kingdom screen on a client.";
 
+        public CoopCommandSide Side => CoopCommandSide.Client;
+
         public IExpectedArgs[] ExpectedArgs { get; } = System.Array.Empty<IExpectedArgs>();
 
         public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
@@ -166,6 +168,8 @@ public class KingdomDebugCommand
         public string Name => "open_decision";
 
         public string Description => "Opens one queued kingdom decision.";
+
+        public CoopCommandSide Side => CoopCommandSide.Client;
 
         public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
@@ -232,6 +236,8 @@ public class KingdomDebugCommand
 
         public string Description => "Closes the kingdom screen on a client.";
 
+        public CoopCommandSide Side => CoopCommandSide.Client;
+
         public IExpectedArgs[] ExpectedArgs { get; } = System.Array.Empty<IExpectedArgs>();
 
         public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
@@ -252,6 +258,8 @@ public class KingdomDebugCommand
         public string Name => "screen_state";
 
         public string Description => "Reports kingdom screen state.";
+
+        public CoopCommandSide Side => CoopCommandSide.Client;
 
         public IExpectedArgs[] ExpectedArgs { get; } = System.Array.Empty<IExpectedArgs>();
 
@@ -276,6 +284,8 @@ public class KingdomDebugCommand
         public string Name => "policy_timeout_capture";
 
         public string Description => "Captures the kingdom policy-timeout fixture.";
+
+        public CoopCommandSide Side => CoopCommandSide.Server;
 
         public IExpectedArgs[] ExpectedArgs { get; } = System.Array.Empty<IExpectedArgs>();
 
@@ -326,6 +336,8 @@ public class KingdomDebugCommand
         public string Name => "policy_timeout_stage";
 
         public string Description => "Stages the kingdom policy-timeout fixture.";
+
+        public CoopCommandSide Side => CoopCommandSide.Server;
 
         public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
@@ -386,6 +398,8 @@ public class KingdomDebugCommand
 
         public string Description => "Reports kingdom policy-timeout fixture state.";
 
+        public CoopCommandSide Side => CoopCommandSide.Client;
+
         public IExpectedArgs[] ExpectedArgs { get; } = System.Array.Empty<IExpectedArgs>();
 
         public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
@@ -416,6 +430,8 @@ public class KingdomDebugCommand
         public string Name => "policy_timeout_restore";
 
         public string Description => "Restores the kingdom policy-timeout fixture.";
+
+        public CoopCommandSide Side => CoopCommandSide.Server;
 
         public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
@@ -467,6 +483,8 @@ public class KingdomDebugCommand
         public string Name => "policy_timeout_verify";
 
         public string Description => "Verifies the kingdom policy-timeout fixture.";
+
+        public CoopCommandSide Side => CoopCommandSide.Server;
 
         public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
@@ -577,6 +595,8 @@ public class KingdomDebugCommand
 
         public string Description => "Creates a kingdom for a clan leader on the server.";
 
+        public CoopCommandSide Side => CoopCommandSide.Server;
+
         public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
             new ExpectedArgs("leader_hero_name", "The exact leader display name or id. Quote multi-word names."),
@@ -656,6 +676,8 @@ public class KingdomDebugCommand
 
         public string Description => "Lists campaign kingdoms.";
 
+        public CoopCommandSide Side => CoopCommandSide.Both;
+
         public IExpectedArgs[] ExpectedArgs { get; } = System.Array.Empty<IExpectedArgs>();
 
         public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
@@ -683,6 +705,8 @@ public class KingdomDebugCommand
         public string Name => "info";
 
         public string Description => "Reports state for a registered kingdom.";
+
+        public CoopCommandSide Side => CoopCommandSide.Both;
 
         public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
@@ -716,6 +740,8 @@ public class KingdomDebugCommand
         public string Name => "force_player_join_kingdom";
 
         public string Description => "Moves a player clan into a kingdom.";
+
+        public CoopCommandSide Side => CoopCommandSide.Server;
 
         public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
@@ -803,6 +829,8 @@ public class KingdomDebugCommand
 
         public string Description => "Requests player vassalage in a kingdom.";
 
+        public CoopCommandSide Side => CoopCommandSide.Server;
+
         public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
             new ExpectedArgs("controller_id", "The player controller id."),
@@ -863,6 +891,8 @@ public class KingdomDebugCommand
 
         public string Description => "Lists supported kingdom decision arguments.";
 
+        public CoopCommandSide Side => CoopCommandSide.Both;
+
         public IExpectedArgs[] ExpectedArgs { get; } = System.Array.Empty<IExpectedArgs>();
 
         public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
@@ -900,6 +930,8 @@ public class KingdomDebugCommand
 
         public string Description => "Describes kingdom decision removal arguments.";
 
+        public CoopCommandSide Side => CoopCommandSide.Both;
+
         public IExpectedArgs[] ExpectedArgs { get; } = System.Array.Empty<IExpectedArgs>();
 
         public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
@@ -925,6 +957,8 @@ public class KingdomDebugCommand
         public string Name => "list_kingdom_decisions";
 
         public string Description => "Lists queued decisions for a kingdom.";
+
+        public CoopCommandSide Side => CoopCommandSide.Both;
 
         public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
@@ -970,6 +1004,8 @@ public class KingdomDebugCommand
         public string Name => "decisions";
 
         public string Description => "Lists queued decisions and client votes for a kingdom.";
+
+        public CoopCommandSide Side => CoopCommandSide.Both;
 
         public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
@@ -1057,6 +1093,8 @@ public class KingdomDebugCommand
 
         public string Description => "Lists possible outcomes for a kingdom decision.";
 
+        public CoopCommandSide Side => CoopCommandSide.Both;
+
         public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
             new ExpectedArgs("kingdom_id", "The registered kingdom id."),
@@ -1102,6 +1140,8 @@ public class KingdomDebugCommand
         public string Name => "vote_decision";
 
         public string Description => "Requests a client vote on a kingdom decision.";
+
+        public CoopCommandSide Side => CoopCommandSide.Both;
 
         public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
@@ -1171,6 +1211,8 @@ public class KingdomDebugCommand
 
         public string Description => "Resolves a queued kingdom decision.";
 
+        public CoopCommandSide Side => CoopCommandSide.Both;
+
         public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
             new ExpectedArgs("kingdom_id", "The registered kingdom id."),
@@ -1209,6 +1251,8 @@ public class KingdomDebugCommand
         public string Name => "list_policies";
 
         public string Description => "Lists active policies for a kingdom.";
+
+        public CoopCommandSide Side => CoopCommandSide.Both;
 
         public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
@@ -1259,6 +1303,8 @@ public class KingdomDebugCommand
         public string Name => "collection_list";
 
         public string Description => "Lists a synced kingdom collection.";
+
+        public CoopCommandSide Side => CoopCommandSide.Both;
 
         public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
@@ -1321,6 +1367,8 @@ public class KingdomDebugCommand
         public string Name => "collection_add";
 
         public string Description => "Adds a value to a synced kingdom collection.";
+
+        public CoopCommandSide Side => CoopCommandSide.Server;
 
         public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
@@ -1412,6 +1460,8 @@ public class KingdomDebugCommand
 
         public string Description => "Removes a value from a synced kingdom collection.";
 
+        public CoopCommandSide Side => CoopCommandSide.Server;
+
         public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
             new ExpectedArgs("collection", "The kingdom collection name."),
@@ -1490,6 +1540,8 @@ public class KingdomDebugCommand
 
         public string Description => "Declares war between two factions on the server.";
 
+        public CoopCommandSide Side => CoopCommandSide.Both;
+
         public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
             new ExpectedArgs("faction1_id", "The first registered faction id."),
@@ -1532,6 +1584,8 @@ public class KingdomDebugCommand
 
         public string Description => "Makes peace between two factions on the server.";
 
+        public CoopCommandSide Side => CoopCommandSide.Both;
+
         public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
             new ExpectedArgs("faction1_id", "The first registered faction id."),
@@ -1568,47 +1622,63 @@ public class KingdomDebugCommand
     /// </summary>
     /// <param name="args">kingdom1Id, kingdom2Id</param>
     /// <returns>result message</returns>
-    [CommandLineArgumentFunction("force_ally", "coop.debug.kingdom")]
-    public static string ForceAlly(List<string> args)
+    public sealed class KingdomForceAllyCoopCommand : ICoopCommand
     {
-        if (ModInformation.IsClient)
-        {
-            return "Command is only available to run on the server";
-        }
+        public string Prefix => "coop.debug.kingdom";
 
-        if (args.Count < 2)
-        {
-            return "Usage: coop.debug.kingdom.force_ally <kingdom1Id> <kingdom2Id> (run on the server)";
-        }
+        public string Name => "force_ally";
 
-        if (TryGetObjectManager(out var objectManager) == false)
-        {
-            return "Unable to resolve ObjectManager";
-        }
+        public string Description => "Forms an alliance between two kingdoms on the server.";
 
-        if (TryGetKingdomPair(objectManager, args, out var kingdom1, out var kingdom2, out var pairError) == false)
-        {
-            return pairError;
-        }
+        public CoopCommandSide Side => CoopCommandSide.Server;
 
-        var behavior = Campaign.Current.GetCampaignBehavior<AllianceCampaignBehavior>();
-        if (behavior == null)
+        public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
-            return "AllianceCampaignBehavior is not available.";
-        }
+            new ExpectedArgs("kingdom1_id", "The first registered kingdom id."),
+            new ExpectedArgs("kingdom2_id", "The second registered kingdom id."),
+        };
 
-        if (behavior.IsAllyWithKingdom(kingdom1, kingdom2))
+        public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
         {
-            return $"'{kingdom1.Name}' and '{kingdom2.Name}' are already allied.";
-        }
+            if (ModInformation.IsClient)
+            {
+                return Failed("Command is only available to run on the server");
+            }
 
-        if (kingdom1.IsAtWarWith(kingdom2))
-        {
-            MakePeaceAction.Apply(kingdom1, kingdom2);
-        }
+            if (args.Count < 2)
+            {
+                return Failed("Usage: coop.debug.kingdom.force_ally <kingdom1Id> <kingdom2Id> (run on the server)");
+            }
 
-        behavior.StartAlliance(kingdom1, kingdom2);
-        return $"Forced alliance between '{kingdom1.Name}' and '{kingdom2.Name}'.";
+            if (TryGetObjectManager(out var objectManager) == false)
+            {
+                return Failed("Unable to resolve ObjectManager");
+            }
+
+            if (TryGetKingdomPair(objectManager, args, out var kingdom1, out var kingdom2, out var pairError) == false)
+            {
+                return Failed(pairError);
+            }
+
+            var behavior = Campaign.Current.GetCampaignBehavior<AllianceCampaignBehavior>();
+            if (behavior == null)
+            {
+                return Failed("AllianceCampaignBehavior is not available.");
+            }
+
+            if (behavior.IsAllyWithKingdom(kingdom1, kingdom2))
+            {
+                return Succeeded($"'{kingdom1.Name}' and '{kingdom2.Name}' are already allied.");
+            }
+
+            if (kingdom1.IsAtWarWith(kingdom2))
+            {
+                MakePeaceAction.Apply(kingdom1, kingdom2);
+            }
+
+            behavior.StartAlliance(kingdom1, kingdom2);
+            return Succeeded($"Forced alliance between '{kingdom1.Name}' and '{kingdom2.Name}'.");
+        }
     }
 
     // coop.debug.kingdom.force_trade_agreement
@@ -1618,54 +1688,70 @@ public class KingdomDebugCommand
     /// </summary>
     /// <param name="args">kingdom1Id, kingdom2Id</param>
     /// <returns>result message</returns>
-    [CommandLineArgumentFunction("force_trade_agreement", "coop.debug.kingdom")]
-    public static string ForceTradeAgreement(List<string> args)
+    public sealed class KingdomForceTradeAgreementCoopCommand : ICoopCommand
     {
-        if (ModInformation.IsClient)
+        public string Prefix => "coop.debug.kingdom";
+
+        public string Name => "force_trade_agreement";
+
+        public string Description => "Forms a trade agreement between two kingdoms on the server.";
+
+        public CoopCommandSide Side => CoopCommandSide.Server;
+
+        public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
-            return "Command is only available to run on the server";
-        }
+            new ExpectedArgs("kingdom1_id", "The first registered kingdom id."),
+            new ExpectedArgs("kingdom2_id", "The second registered kingdom id."),
+        };
 
-        if (args.Count < 2)
+        public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
         {
-            return "Usage: coop.debug.kingdom.force_trade_agreement <kingdom1Id> <kingdom2Id> (run on the server)";
+            if (ModInformation.IsClient)
+            {
+                return Failed("Command is only available to run on the server");
+            }
+
+            if (args.Count < 2)
+            {
+                return Failed("Usage: coop.debug.kingdom.force_trade_agreement <kingdom1Id> <kingdom2Id> (run on the server)");
+            }
+
+            if (TryGetObjectManager(out var objectManager) == false)
+            {
+                return Failed("Unable to resolve ObjectManager");
+            }
+
+            if (TryGetKingdomPair(objectManager, args, out var kingdom1, out var kingdom2, out var pairError) == false)
+            {
+                return Failed(pairError);
+            }
+
+            var behavior = Campaign.Current.GetCampaignBehavior<TradeAgreementsCampaignBehavior>();
+            if (behavior == null)
+            {
+                return Failed("TradeAgreementsCampaignBehavior is not available.");
+            }
+
+            if (behavior.HasTradeAgreement(kingdom1, kingdom2, out _))
+            {
+                return Succeeded($"'{kingdom1.Name}' and '{kingdom2.Name}' already have a trade agreement.");
+            }
+
+            if (kingdom1.IsAtWarWith(kingdom2))
+            {
+                MakePeaceAction.Apply(kingdom1, kingdom2);
+            }
+
+            behavior.MakeTradeAgreement(
+                kingdom1,
+                kingdom2,
+                Campaign.Current.Models.TradeAgreementModel.GetTradeAgreementDurationInYears(kingdom1, kingdom2));
+
+            return Succeeded($"Forced trade agreement between '{kingdom1.Name}' and '{kingdom2.Name}'.");
         }
-
-        if (TryGetObjectManager(out var objectManager) == false)
-        {
-            return "Unable to resolve ObjectManager";
-        }
-
-        if (TryGetKingdomPair(objectManager, args, out var kingdom1, out var kingdom2, out var pairError) == false)
-        {
-            return pairError;
-        }
-
-        var behavior = Campaign.Current.GetCampaignBehavior<TradeAgreementsCampaignBehavior>();
-        if (behavior == null)
-        {
-            return "TradeAgreementsCampaignBehavior is not available.";
-        }
-
-        if (behavior.HasTradeAgreement(kingdom1, kingdom2, out _))
-        {
-            return $"'{kingdom1.Name}' and '{kingdom2.Name}' already have a trade agreement.";
-        }
-
-        if (kingdom1.IsAtWarWith(kingdom2))
-        {
-            MakePeaceAction.Apply(kingdom1, kingdom2);
-        }
-
-        behavior.MakeTradeAgreement(
-            kingdom1,
-            kingdom2,
-            Campaign.Current.Models.TradeAgreementModel.GetTradeAgreementDurationInYears(kingdom1, kingdom2));
-
-        return $"Forced trade agreement between '{kingdom1.Name}' and '{kingdom2.Name}'.";
     }
 
-    internal static bool TryGetKingdomPair(IObjectManager objectManager, List<string> args, out Kingdom kingdom1, out Kingdom kingdom2, out string error)
+    internal static bool TryGetKingdomPair(IObjectManager objectManager, IReadOnlyList<string> args, out Kingdom kingdom1, out Kingdom kingdom2, out string error)
     {
         kingdom2 = null;
         error = null;
@@ -2071,6 +2157,8 @@ public class KingdomDebugCommand
 
         public string Description => "Adds a supported decision to a kingdom.";
 
+        public CoopCommandSide Side => CoopCommandSide.Both;
+
         public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
             new ExpectedArgs("kingdom_id", "The registered kingdom id."),
@@ -2136,6 +2224,8 @@ public class KingdomDebugCommand
         public string Name => "remove_decision";
 
         public string Description => "Removes a queued decision from a kingdom.";
+
+        public CoopCommandSide Side => CoopCommandSide.Both;
 
         public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {

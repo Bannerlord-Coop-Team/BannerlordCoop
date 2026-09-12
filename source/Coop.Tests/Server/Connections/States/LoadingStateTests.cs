@@ -2,14 +2,14 @@
 using Common;
 using Common.Messaging;
 using Common.Network;
-using Common.Network.Coalescing;
 using Common.Network.Messages;
+using Common.Network.Coalescing;
 using Coop.Core.Server.Connections;
 using Coop.Core.Server.Connections.Messages;
 using Coop.Core.Server.Connections.States;
+using Coop.Core.Server.Services.MobileParties;
 using Coop.Core.Server.Services.Kingdoms;
 using Coop.Core.Server.Services.Kingdoms.Messages;
-using Coop.Core.Server.Services.MobileParties;
 using Coop.Core.Server.Services.MobileParties.Messages;
 using Coop.Tests.Extensions;
 using Coop.Tests.Mocks;
@@ -18,8 +18,10 @@ using GameInterface.Services.MobileParties.Data;
 using LiteNetLib;
 using Moq;
 using System;
+using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
+using System.Threading.Tasks;
 using Xunit;
 using Xunit.Abstractions;
 
@@ -108,12 +110,8 @@ namespace Coop.Tests.Server.Connections.States
             Assert.Equal(0, SignalCount(JoinSyncSignal.WorldReady));
             SendAndDrain(state, JoinSyncSignal.FinalBaselineApplied);
             Assert.Equal(1, SignalCount(JoinSyncSignal.WorldReady));
-            Assert.Empty(serverComponent.TestMessageBroker.GetMessagesFromType<PlayerCampaignSynchronized>());
             Assert.IsType<LoadingState>(connectionLogic.State);
             SendAndDrain(state, JoinSyncSignal.CatchUpApplied);
-            var synchronized = Assert.Single(
-                serverComponent.TestMessageBroker.GetMessagesFromType<PlayerCampaignSynchronized>());
-            Assert.Same(playerPeer, synchronized.PlayerId);
             Assert.IsType<CampaignState>(connectionLogic.State);
         }
 
@@ -135,6 +133,45 @@ namespace Coop.Tests.Server.Connections.States
 
             Assert.False(serverComponent.TestNetwork.SentNetworkMessages.ContainsKey(playerPeer.Id));
             Assert.IsType<LoadingState>(connectionLogic.State);
+        }
+
+        [Fact]
+        public void PlayerCampaignEntered_ReusedPeerIdentityCannotAdvanceOldConnection()
+        {
+            var currentState = connectionLogic.SetState<LoadingState>();
+            var replacementPeer = serverComponent.TestNetwork.CreatePeer();
+            replacementPeer.SetId(playerPeer.Id);
+            Assert.NotSame(playerPeer, replacementPeer);
+            Assert.Equal(playerPeer, replacementPeer);
+
+            currentState.PlayerCampaignEnteredHandler(
+                new MessagePayload<NetworkPlayerCampaignEntered>(
+                    replacementPeer,
+                    new NetworkPlayerCampaignEntered()));
+            DrainGameThread();
+
+            Assert.True(currentState.IsPreEntryPending);
+            Assert.Empty(serverComponent.TestMessageBroker.GetMessagesFromType<PlayerCampaignEntered>());
+        }
+
+        [Fact]
+        public void JoinSync_ReusedPeerIdentityCannotAdvanceOldConnection()
+        {
+            var currentState = connectionLogic.SetState<LoadingState>();
+            StartReplay(currentState);
+            var replacementPeer = serverComponent.TestNetwork.CreatePeer();
+            replacementPeer.SetId(playerPeer.Id);
+            Assert.NotSame(playerPeer, replacementPeer);
+            Assert.Equal(playerPeer, replacementPeer);
+
+            currentState.JoinSyncHandler(
+                new MessagePayload<NetworkJoinSync>(
+                    replacementPeer,
+                    new NetworkJoinSync(JoinSyncSignal.ReplayApplied)));
+            DrainGameThread();
+
+            Assert.True(currentState.IsWaitingForReplayApplied);
+            baselineSender.Verify(sender => sender.Send(playerPeer), Times.Never);
         }
 
         [Fact]
@@ -161,51 +198,206 @@ namespace Coop.Tests.Server.Connections.States
         }
 
         [Fact]
-        public void ReplayApplied_SendsKingdomBaselineAfterReplayMarker()
+        public void OversizedReplayBatch_WaitsForMatchingClientApplicationAcknowledgement()
         {
-            var state = connectionLogic.SetState<LoadingState>();
-            kingdomBaselineSender
-                .Setup(sender => sender.Send(playerPeer))
-                .Callback(() => serverComponent.TestNetwork.SendImmediate(
-                    playerPeer,
-                    new NetworkJoinCampaignKingdomBaseline(Array.Empty<PendingAllianceOfferBaseline>(), Array.Empty<PendingPeaceOfferBaseline>())));
-            StartReplay(state);
-            var beforeAck = serverComponent.TestNetwork.GetPeerMessages(playerPeer).ToArray();
-            Assert.DoesNotContain(beforeAck, message => message is NetworkJoinCampaignKingdomBaseline);
-            SendAndDrain(state, JoinSyncSignal.ReplayApplied);
-            Assert.Contains(
-                serverComponent.TestNetwork.GetPeerMessages(playerPeer),
-                message => message is NetworkJoinCampaignKingdomBaseline);
+            var connectionLogicMock = new Mock<IConnectionLogic>();
+            var networkMock = new Mock<INetwork>();
+            var queueMock = new Mock<IConnectionMessageQueue>();
+            var coalescerMock = new Mock<ISendCoalescer>();
+            var sentSignals = new List<NetworkJoinSync>();
+            connectionLogicMock.SetupGet(logic => logic.Peer).Returns(playerPeer);
+            queueMock
+                .SetupSequence(queue => queue.FlushBatch(playerPeer))
+                .Returns(new JoinReplayBatchResult(1, NetworkJoinLimits.MaxReplayBatchBytes + 1, hasMore: true))
+                .Returns(new JoinReplayBatchResult(5, 500, hasMore: false));
+            networkMock
+                .Setup(network => network.SendImmediate(playerPeer, It.IsAny<IMessage>()))
+                .Callback<NetPeer, IMessage>((_, message) =>
+                {
+                    if (message is NetworkJoinSync signal) sentSignals.Add(signal);
+                });
+
+            var state = new LoadingState(
+                connectionLogicMock.Object,
+                serverComponent.TestMessageBroker,
+                networkMock.Object,
+                baselineSender.Object,
+                kingdomBaselineSender.Object,
+                queueMock.Object,
+                coalescerMock.Object);
+            connectionLogicMock.SetupGet(logic => logic.State).Returns(state);
+
+            CampaignEntered(state);
+            DrainGameThread();
+
+            NetworkJoinSync firstBatch = Assert.Single(
+                sentSignals,
+                signal => signal.Signal == JoinSyncSignal.ReplayBatchComplete);
+            Assert.True(firstBatch.ReplayBatchId > 0);
+            Assert.DoesNotContain(
+                sentSignals,
+                signal => signal.Signal == JoinSyncSignal.ReplayComplete);
+            long progressBeforeAcknowledgement = state.JoinProgressVersion;
+
+            Signal(state, JoinSyncSignal.ReplayBatchApplied, firstBatch.ReplayBatchId + 1);
+            DrainGameThread();
+            queueMock.Verify(queue => queue.FlushBatch(playerPeer), Times.Once);
+            Assert.Equal(progressBeforeAcknowledgement, state.JoinProgressVersion);
+
+            Signal(state, JoinSyncSignal.ReplayBatchApplied, firstBatch.ReplayBatchId);
+            DrainGameThread();
+
+            queueMock.Verify(queue => queue.FlushBatch(playerPeer), Times.Exactly(2));
+            Assert.Equal(progressBeforeAcknowledgement + 1, state.JoinProgressVersion);
+            Assert.Single(sentSignals, signal => signal.Signal == JoinSyncSignal.ReplayComplete);
+
+            Signal(state, JoinSyncSignal.ReplayBatchApplied, firstBatch.ReplayBatchId);
+            DrainGameThread();
+            queueMock.Verify(queue => queue.FlushBatch(playerPeer), Times.Exactly(2));
+            Assert.Equal(progressBeforeAcknowledgement + 1, state.JoinProgressVersion);
+            state.Dispose();
         }
 
         [Fact]
-        public void KingdomBaseline_SentAlongsidePartyBaselineThroughFullJoinHandshake()
+        public void ReplayBatchReplyDuringMarkerSend_DoesNotContinueRecursively()
         {
-            var state = connectionLogic.SetState<LoadingState>();
-            StartReplay(state);
-            kingdomBaselineSender.Verify(sender => sender.Send(playerPeer), Times.Never);
+            var connectionLogicMock = new Mock<IConnectionLogic>();
+            var networkMock = new Mock<INetwork>();
+            var queueMock = new Mock<IConnectionMessageQueue>();
+            var coalescerMock = new Mock<ISendCoalescer>();
+            int flushCalls = 0;
+            connectionLogicMock.SetupGet(logic => logic.Peer).Returns(playerPeer);
+            queueMock
+                .SetupSequence(queue => queue.FlushBatch(playerPeer))
+                .Returns(() =>
+                {
+                    flushCalls++;
+                    return new JoinReplayBatchResult(10, 1000, hasMore: true);
+                })
+                .Returns(() =>
+                {
+                    flushCalls++;
+                    return new JoinReplayBatchResult(5, 500, hasMore: false);
+                });
 
-            SendAndDrain(state, JoinSyncSignal.ReplayApplied);
-            baselineSender.Verify(sender => sender.Send(playerPeer), Times.Once);
-            kingdomBaselineSender.Verify(sender => sender.Send(playerPeer), Times.Once);
+            LoadingState state = null!;
+            networkMock
+                .Setup(network => network.SendImmediate(playerPeer, It.IsAny<IMessage>()))
+                .Callback<NetPeer, IMessage>((_, message) =>
+                {
+                    if (message is NetworkJoinSync
+                        {
+                            Signal: JoinSyncSignal.ReplayBatchComplete,
+                        } batch)
+                    {
+                        Signal(state, JoinSyncSignal.ReplayBatchApplied, batch.ReplayBatchId);
+                        Assert.Equal(1, flushCalls);
+                    }
+                });
+            state = new LoadingState(
+                connectionLogicMock.Object,
+                serverComponent.TestMessageBroker,
+                networkMock.Object,
+                baselineSender.Object,
+                kingdomBaselineSender.Object,
+                queueMock.Object,
+                coalescerMock.Object);
+            connectionLogicMock.SetupGet(logic => logic.State).Returns(state);
 
-            Signal(state, JoinSyncSignal.BaselineApplied);
-            Signal(state, JoinSyncSignal.FinalBaselineApplied);
+            CampaignEntered(state);
             DrainGameThread();
-            SendAndDrain(state, JoinSyncSignal.BaselineRequested);
-            SendAndDrain(state, JoinSyncSignal.BaselineRequested);
-            baselineSender.Verify(sender => sender.Send(playerPeer), Times.Exactly(3));
-            kingdomBaselineSender.Verify(sender => sender.Send(playerPeer), Times.Exactly(3));
 
+            DrainGameThread();
+            Assert.Equal(2, flushCalls);
+            networkMock.Verify(
+                network => network.SendImmediate(
+                    playerPeer,
+                    It.Is<NetworkJoinSync>(message => message.Signal == JoinSyncSignal.ReplayComplete)),
+                Times.Once);
+            state.Dispose();
+        }
+
+        [Fact]
+        public void ReplayBatches_GateFinalBaselineAndWorldReadyContinuations()
+        {
+            var connectionLogicMock = new Mock<IConnectionLogic>();
+            var networkMock = new Mock<INetwork>();
+            var queueMock = new Mock<IConnectionMessageQueue>();
+            var coalescerMock = new Mock<ISendCoalescer>();
+            var senderMock = new Mock<IJoinCampaignBaselineSender>();
+            var sentSignals = new List<NetworkJoinSync>();
+            int openCalls = 0;
+            connectionLogicMock.SetupGet(logic => logic.Peer).Returns(playerPeer);
+            queueMock
+                .SetupSequence(queue => queue.FlushBatch(playerPeer))
+                .Returns(default(JoinReplayBatchResult)) // initial replay
+                .Returns(default(JoinReplayBatchResult)) // first baseline
+                .Returns(default(JoinReplayBatchResult)) // refreshed baseline
+                .Returns(new JoinReplayBatchResult(1, NetworkJoinLimits.MaxReplayBatchBytes + 1, hasMore: true))
+                .Returns(default(JoinReplayBatchResult));
+            queueMock
+                .Setup(queue => queue.OpenWithTailBatch(
+                    playerPeer,
+                    It.IsAny<IMessage>(),
+                    It.IsAny<Func<bool>>()))
+                .Returns((NetPeer _, IMessage marker, Func<bool> tryBeginOpen) =>
+                {
+                    if (++openCalls == 1)
+                        return new JoinReplayBatchResult(1, NetworkJoinLimits.MaxReplayBatchBytes + 1, hasMore: true);
+                    if (tryBeginOpen()) networkMock.Object.SendImmediate(playerPeer, marker);
+                    return default;
+                });
+            networkMock
+                .Setup(network => network.SendImmediate(playerPeer, It.IsAny<IMessage>()))
+                .Callback<NetPeer, IMessage>((_, message) =>
+                {
+                    if (message is NetworkJoinSync signal) sentSignals.Add(signal);
+                });
+            var state = new LoadingState(
+                connectionLogicMock.Object,
+                serverComponent.TestMessageBroker,
+                networkMock.Object,
+                senderMock.Object,
+                kingdomBaselineSender.Object,
+                queueMock.Object,
+                coalescerMock.Object);
+            connectionLogicMock.SetupGet(logic => logic.State).Returns(state);
+
+            CampaignEntered(state);
+            DrainGameThread();
+            SendAndDrain(state, JoinSyncSignal.ReplayApplied);
+            SendAndDrain(state, JoinSyncSignal.BaselineRequested);
             SendAndDrain(state, JoinSyncSignal.BaselineApplied);
-            baselineSender.Verify(sender => sender.Send(playerPeer), Times.Exactly(4));
-            kingdomBaselineSender.Verify(sender => sender.Send(playerPeer), Times.Exactly(4));
+            Assert.Equal(2, senderMock.Invocations.Count);
+            NetworkJoinSync finalBaselineBatch = sentSignals.Last(
+                signal => signal.Signal == JoinSyncSignal.ReplayBatchComplete);
 
+            Signal(
+                state,
+                JoinSyncSignal.ReplayBatchApplied,
+                finalBaselineBatch.ReplayBatchId);
+            DrainGameThread();
+
+            senderMock.Verify(sender => sender.Send(playerPeer), Times.Exactly(3));
+            queueMock.Verify(queue => queue.EndFinalBaselineCoverage(playerPeer), Times.Once);
             SendAndDrain(state, JoinSyncSignal.FinalBaselineApplied);
-            // both senders must have fired the same number of times at every step above —
-            // if a future change moves one call out of QueueBaseline, this diverges here.
-            baselineSender.Verify(sender => sender.Send(playerPeer), Times.Exactly(4));
-            kingdomBaselineSender.Verify(sender => sender.Send(playerPeer), Times.Exactly(4));
+            Assert.DoesNotContain(
+                sentSignals,
+                signal => signal.Signal == JoinSyncSignal.WorldReady);
+            NetworkJoinSync worldReadyBatch = sentSignals
+                .Where(signal => signal.Signal == JoinSyncSignal.ReplayBatchComplete)
+                .Last();
+            Assert.NotEqual(finalBaselineBatch.ReplayBatchId, worldReadyBatch.ReplayBatchId);
+
+            Signal(state, JoinSyncSignal.ReplayBatchApplied, worldReadyBatch.ReplayBatchId);
+            DrainGameThread();
+
+            Assert.Contains(sentSignals, signal => signal.Signal == JoinSyncSignal.WorldReady);
+            queueMock.Verify(queue => queue.OpenWithTailBatch(
+                playerPeer,
+                It.IsAny<IMessage>(),
+                It.IsAny<Func<bool>>()), Times.Exactly(2));
+            state.Dispose();
         }
 
         [Fact]
@@ -214,7 +406,6 @@ namespace Coop.Tests.Server.Connections.States
             var connectionLogicMock = new Mock<IConnectionLogic>();
             var networkMock = new Mock<INetwork>();
             var baselineSender = new Mock<IJoinCampaignBaselineSender>();
-            var kingdomBaselineSender = new Mock<IJoinCampaignKingdomBaseLineSender>();
             connectionLogicMock.SetupGet(logic => logic.Peer).Returns(playerPeer);
 
             var state = new LoadingState(
@@ -254,6 +445,53 @@ namespace Coop.Tests.Server.Connections.States
         }
 
         [Fact]
+        public void FinalBaseline_EndsCoverageAfterReplayAndImmediatelyBeforeCapture()
+        {
+            var connectionLogicMock = new Mock<IConnectionLogic>();
+            var networkMock = new Mock<INetwork>();
+            var queueMock = new Mock<IConnectionMessageQueue>();
+            var coalescerMock = new Mock<ISendCoalescer>();
+            var senderMock = new Mock<IJoinCampaignBaselineSender>();
+            var calls = new List<string>();
+            connectionLogicMock.SetupGet(logic => logic.Peer).Returns(playerPeer);
+            queueMock
+                .Setup(queue => queue.EndFinalBaselineCoverage(playerPeer))
+                .Callback(() => calls.Add("cut"));
+            queueMock
+                .Setup(queue => queue.FlushBatch(playerPeer))
+                .Callback(() => calls.Add("flush"))
+                .Returns(default(JoinReplayBatchResult));
+            senderMock
+                .Setup(sender => sender.Send(playerPeer))
+                .Callback(() => calls.Add("send"));
+
+            var state = new LoadingState(
+                connectionLogicMock.Object,
+                serverComponent.TestMessageBroker,
+                networkMock.Object,
+                senderMock.Object,
+                kingdomBaselineSender.Object,
+                queueMock.Object,
+                coalescerMock.Object);
+            connectionLogicMock.SetupGet(logic => logic.State).Returns(state);
+
+            StartBaseline(state);
+            SendAndDrain(state, JoinSyncSignal.BaselineRequested);
+            queueMock.Verify(
+                queue => queue.EndFinalBaselineCoverage(playerPeer),
+                Times.Never);
+
+            calls.Clear();
+            SendAndDrain(state, JoinSyncSignal.BaselineApplied);
+
+            Assert.Equal(new[] { "flush", "cut", "send" }, calls);
+            queueMock.Verify(
+                queue => queue.EndFinalBaselineCoverage(playerPeer),
+                Times.Once);
+            state.Dispose();
+        }
+
+        [Fact]
         public void BaselineRefreshRequestDuringInitialBaselineSend_IsAccepted()
         {
             var state = connectionLogic.SetState<LoadingState>();
@@ -268,6 +506,56 @@ namespace Coop.Tests.Server.Connections.States
             StartBaseline(state);
             DrainGameThread();
             baselineSender.Verify(sender => sender.Send(playerPeer), Times.Exactly(2));
+        }
+
+        [Fact]
+        public void BaselineRequestLimit_BoundsFlushAndSendWorkForBrokenClients()
+        {
+            var connectionLogicMock = new Mock<IConnectionLogic>();
+            var networkMock = new Mock<INetwork>();
+            var queueMock = new Mock<IConnectionMessageQueue>();
+            var coalescerMock = new Mock<ISendCoalescer>();
+            var senderMock = new Mock<IJoinCampaignBaselineSender>();
+            connectionLogicMock.SetupGet(logic => logic.Peer).Returns(playerPeer);
+            var state = new LoadingState(
+                connectionLogicMock.Object,
+                serverComponent.TestMessageBroker,
+                networkMock.Object,
+                senderMock.Object,
+                kingdomBaselineSender.Object,
+                queueMock.Object,
+                coalescerMock.Object);
+            connectionLogicMock.SetupGet(logic => logic.State).Returns(state);
+
+            StartBaseline(state);
+            for (int sent = 1; sent < LoadingState.MaxBaselinesPerJoin; sent++)
+            {
+                SendAndDrain(state, JoinSyncSignal.BaselineRequested);
+            }
+
+            senderMock.Verify(
+                sender => sender.Send(playerPeer),
+                Times.Exactly(LoadingState.MaxBaselinesPerJoin));
+            coalescerMock.Verify(
+                coalescer => coalescer.Flush(networkMock.Object),
+                Times.Exactly(LoadingState.MaxBaselinesPerJoin + 1));
+            queueMock.Verify(
+                queue => queue.FlushBatch(playerPeer),
+                Times.Exactly(LoadingState.MaxBaselinesPerJoin + 1));
+
+            SendAndDrain(state, JoinSyncSignal.BaselineRequested);
+
+            senderMock.Verify(
+                sender => sender.Send(playerPeer),
+                Times.Exactly(LoadingState.MaxBaselinesPerJoin));
+            coalescerMock.Verify(
+                coalescer => coalescer.Flush(networkMock.Object),
+                Times.Exactly(LoadingState.MaxBaselinesPerJoin + 1));
+            queueMock.Verify(
+                queue => queue.FlushBatch(playerPeer),
+                Times.Exactly(LoadingState.MaxBaselinesPerJoin + 1));
+            Assert.True(state.IsJoinCatchUpPending);
+            state.Dispose();
         }
 
         [Fact]
@@ -293,6 +581,106 @@ namespace Coop.Tests.Server.Connections.States
             Assert.IsType<LoadingState>(connectionLogic.State);
             SendAndDrain(state, JoinSyncSignal.CatchUpApplied);
             Assert.IsType<CampaignState>(connectionLogic.State);
+        }
+
+        [Fact]
+        public void FinalReplayOverflow_DoesNotOpenOrEmitWorldReady()
+        {
+            var connectionLogicMock = new Mock<IConnectionLogic>();
+            var networkMock = new Mock<INetwork>();
+            var queueMock = new Mock<IConnectionMessageQueue>();
+            var coalescerMock = new Mock<ISendCoalescer>();
+            var senderMock = new Mock<IJoinCampaignBaselineSender>();
+            connectionLogicMock.SetupGet(logic => logic.Peer).Returns(playerPeer);
+            queueMock
+                .Setup(queue => queue.OpenWithTailBatch(
+                    playerPeer,
+                    It.IsAny<IMessage>(),
+                    It.IsAny<Func<bool>>()))
+                .Returns(new JoinReplayBatchResult(
+                    packetsSent: 0,
+                    bytesSent: 0,
+                    hasMore: false,
+                    overflowed: true));
+            var state = new LoadingState(
+                connectionLogicMock.Object,
+                serverComponent.TestMessageBroker,
+                networkMock.Object,
+                senderMock.Object,
+                kingdomBaselineSender.Object,
+                queueMock.Object,
+                coalescerMock.Object);
+            connectionLogicMock.SetupGet(logic => logic.State).Returns(state);
+
+            StartBaseline(state);
+            SendAndDrain(state, JoinSyncSignal.BaselineRequested);
+            SendAndDrain(state, JoinSyncSignal.BaselineApplied);
+            SendAndDrain(state, JoinSyncSignal.FinalBaselineApplied);
+
+            networkMock.Verify(
+                network => network.SendImmediate(
+                    playerPeer,
+                    It.Is<NetworkJoinSync>(message => message.Signal == JoinSyncSignal.WorldReady)),
+                Times.Never);
+            connectionLogicMock.Verify(logic => logic.EnterCampaign(), Times.Never);
+            Assert.True(state.IsJoinCatchUpPending);
+            state.Dispose();
+        }
+
+        [Fact]
+        public void PlayerCampaignSynchronized_IsPublishedOnlyAtTheTerminalJoinPhase()
+        {
+            // The trap this guards: the message named PlayerCampaignEntered is published at CampaignEntryQueued,
+            // the SECOND of eleven join phases — before the replay flush and both baselines. Anything that needs the
+            // peer's world to be consistent (resuming a battle it dropped out of) must key off the terminal phase
+            // instead, or it fires five phases early against an unreplicated world.
+            var completions = new List<NetPeer>();
+            serverComponent.TestMessageBroker.Subscribe<PlayerCampaignSynchronized>(
+                payload => completions.Add(payload.What.PlayerId));
+
+            var state = connectionLogic.SetState<LoadingState>();
+
+            CampaignEntered(state);
+            DrainGameThread();
+            Assert.Empty(completions);
+
+            SendAndDrain(state, JoinSyncSignal.ReplayApplied);
+            Assert.Empty(completions);
+
+            SendAndDrain(state, JoinSyncSignal.BaselineRequested);
+            Assert.Empty(completions);
+
+            SendAndDrain(state, JoinSyncSignal.BaselineApplied);
+            Assert.Empty(completions);
+
+            SendAndDrain(state, JoinSyncSignal.FinalBaselineApplied);
+            Assert.Empty(completions);
+
+            SendAndDrain(state, JoinSyncSignal.CatchUpApplied);
+
+            Assert.Equal(new[] { playerPeer }, completions);
+            Assert.IsType<CampaignState>(connectionLogic.State);
+        }
+
+        [Fact]
+        public void PlayerCampaignSynchronized_IsNotPublishedWhenTheJoinIsAbandoned()
+        {
+            var completions = new List<NetPeer>();
+            serverComponent.TestMessageBroker.Subscribe<PlayerCampaignSynchronized>(
+                payload => completions.Add(payload.What.PlayerId));
+
+            var state = connectionLogic.SetState<LoadingState>();
+            StartReplay(state);
+            SendAndDrain(state, JoinSyncSignal.ReplayApplied);
+            SendAndDrain(state, JoinSyncSignal.BaselineRequested);
+            SendAndDrain(state, JoinSyncSignal.BaselineApplied);
+            SendAndDrain(state, JoinSyncSignal.FinalBaselineApplied);
+
+            // The peer drops out of the loading state before the terminal phase applies.
+            connectionLogic.SetState<CampaignState>();
+            SendAndDrain(state, JoinSyncSignal.CatchUpApplied);
+
+            Assert.Empty(completions);
         }
 
         [Fact]
@@ -340,9 +728,114 @@ namespace Coop.Tests.Server.Connections.States
                 connectionLogic.Dispose();
             });
 
-            Assert.Empty(
-                serverComponent.TestMessageBroker.GetMessagesFromType<PlayerCampaignSynchronized>());
             Assert.Null(connectionLogic.State);
+        }
+
+        [Fact]
+        public void AbortedJoin_DoesNotSendQueuedBaseline()
+        {
+            var state = connectionLogic.SetState<LoadingState>();
+            StartReplay(state);
+
+            WhileGameThreadBlocked(() =>
+            {
+                Signal(state, JoinSyncSignal.ReplayApplied);
+                Assert.True(state.TryAbortJoinCatchUp());
+            });
+
+            Assert.True(state.IsAborted);
+            baselineSender.Verify(sender => sender.Send(playerPeer), Times.Never);
+        }
+
+        [Fact]
+        public void PreEntryAbort_CannotAbortAfterReplayPhaseStarts()
+        {
+            var state = connectionLogic.SetState<LoadingState>();
+
+            Assert.True(state.IsPreEntryPending);
+            StartReplay(state);
+
+            Assert.False(state.IsPreEntryPending);
+            Assert.True(state.IsWaitingForReplayApplied);
+            Assert.False(state.TryAbortPreEntryJoin());
+            Assert.False(state.IsAborted);
+        }
+
+        [Fact]
+        public void AbortedJoin_DoesNotOpenQueuedWorldTail()
+        {
+            var state = connectionLogic.SetState<LoadingState>();
+            StartBaseline(state);
+            SendAndDrain(state, JoinSyncSignal.BaselineRequested);
+            SendAndDrain(state, JoinSyncSignal.BaselineApplied);
+
+            WhileGameThreadBlocked(() =>
+            {
+                Signal(state, JoinSyncSignal.FinalBaselineApplied);
+                Assert.True(state.TryAbortJoinCatchUp());
+            });
+
+            Assert.True(state.IsAborted);
+            Assert.Equal(0, SignalCount(JoinSyncSignal.WorldReady));
+        }
+
+        [Fact]
+        public async Task WorldTailOpen_AndConcurrentAbortAreSerialized()
+        {
+            var connectionLogicMock = new Mock<IConnectionLogic>();
+            var networkMock = new Mock<INetwork>();
+            var queueMock = new Mock<IConnectionMessageQueue>();
+            var coalescerMock = new Mock<ISendCoalescer>();
+            connectionLogicMock.SetupGet(logic => logic.Peer).Returns(playerPeer);
+            var state = new LoadingState(
+                connectionLogicMock.Object,
+                serverComponent.TestMessageBroker,
+                networkMock.Object,
+                baselineSender.Object,
+                kingdomBaselineSender.Object,
+                queueMock.Object,
+                coalescerMock.Object);
+            connectionLogicMock.SetupGet(logic => logic.State).Returns(state);
+            using var worldReadyFlushEntered = new ManualResetEventSlim(false);
+            using var releaseWorldReadyFlush = new ManualResetEventSlim(false);
+            int blockWorldReadyFlush = 0;
+            coalescerMock
+                .Setup(value => value.Flush(networkMock.Object))
+                .Callback(() =>
+                {
+                    if (Volatile.Read(ref blockWorldReadyFlush) == 0) return;
+                    worldReadyFlushEntered.Set();
+                    releaseWorldReadyFlush.Wait();
+                });
+
+            StartBaseline(state);
+            SendAndDrain(state, JoinSyncSignal.BaselineRequested);
+            SendAndDrain(state, JoinSyncSignal.BaselineApplied);
+            Volatile.Write(ref blockWorldReadyFlush, 1);
+            Signal(state, JoinSyncSignal.FinalBaselineApplied);
+            Assert.True(worldReadyFlushEntered.Wait(TimeSpan.FromSeconds(5)));
+
+            Task<bool> abortTask = Task.Run(state.TryAbortJoinCatchUp);
+            try
+            {
+                Assert.False(await abortTask.WaitAsync(TimeSpan.FromSeconds(5)));
+            }
+            finally
+            {
+                releaseWorldReadyFlush.Set();
+            }
+
+            DrainGameThread();
+            Assert.True(state.TryAbortJoinCatchUp());
+            Assert.True(state.IsAborted);
+            queueMock.Verify(
+                value => value.OpenWithTailBatch(
+                    playerPeer,
+                    It.IsAny<IMessage>(),
+                    It.IsAny<Func<bool>>()),
+                Times.Once);
+            connectionLogicMock.Verify(value => value.EnterCampaign(), Times.Never);
+            state.Dispose();
         }
 
         [Fact]
@@ -395,6 +888,54 @@ namespace Coop.Tests.Server.Connections.States
             SendAndDrain(state, JoinSyncSignal.ReplayApplied);
         }
 
+        [Fact]
+        public void ReplayApplied_SendsKingdomBaselineAfterReplayMarker()
+        {
+            var state = connectionLogic.SetState<LoadingState>();
+            kingdomBaselineSender
+                .Setup(sender => sender.Send(playerPeer))
+                .Callback(() => serverComponent.TestNetwork.SendImmediate(
+                    playerPeer,
+                    new NetworkJoinCampaignKingdomBaseline(Array.Empty<PendingAllianceOfferBaseline>(), Array.Empty<PendingPeaceOfferBaseline>())));
+            StartReplay(state);
+            var beforeAck = serverComponent.TestNetwork.GetPeerMessages(playerPeer).ToArray();
+            Assert.DoesNotContain(beforeAck, message => message is NetworkJoinCampaignKingdomBaseline);
+            SendAndDrain(state, JoinSyncSignal.ReplayApplied);
+            Assert.Contains(
+                serverComponent.TestNetwork.GetPeerMessages(playerPeer),
+                message => message is NetworkJoinCampaignKingdomBaseline);
+        }
+
+        [Fact]
+        public void KingdomBaseline_SentAlongsidePartyBaselineThroughFullJoinHandshake()
+        {
+            var state = connectionLogic.SetState<LoadingState>();
+            StartReplay(state);
+            kingdomBaselineSender.Verify(sender => sender.Send(playerPeer), Times.Never);
+
+            SendAndDrain(state, JoinSyncSignal.ReplayApplied);
+            baselineSender.Verify(sender => sender.Send(playerPeer), Times.Once);
+            kingdomBaselineSender.Verify(sender => sender.Send(playerPeer), Times.Once);
+
+            Signal(state, JoinSyncSignal.BaselineApplied);
+            Signal(state, JoinSyncSignal.FinalBaselineApplied);
+            DrainGameThread();
+            SendAndDrain(state, JoinSyncSignal.BaselineRequested);
+            SendAndDrain(state, JoinSyncSignal.BaselineRequested);
+            baselineSender.Verify(sender => sender.Send(playerPeer), Times.Exactly(3));
+            kingdomBaselineSender.Verify(sender => sender.Send(playerPeer), Times.Exactly(3));
+
+            SendAndDrain(state, JoinSyncSignal.BaselineApplied);
+            baselineSender.Verify(sender => sender.Send(playerPeer), Times.Exactly(4));
+            kingdomBaselineSender.Verify(sender => sender.Send(playerPeer), Times.Exactly(4));
+
+            SendAndDrain(state, JoinSyncSignal.FinalBaselineApplied);
+            // both senders must have fired the same number of times at every step above —
+            // if a future change moves one call out of QueueBaseline, this diverges here.
+            baselineSender.Verify(sender => sender.Send(playerPeer), Times.Exactly(4));
+            kingdomBaselineSender.Verify(sender => sender.Send(playerPeer), Times.Exactly(4));
+        }
+
         private void StartReplay(LoadingState state)
         {
             CampaignEntered(state);
@@ -407,15 +948,17 @@ namespace Coop.Tests.Server.Connections.States
             DrainGameThread();
         }
 
-        private void CampaignEntered(LoadingState state, NetPeer peer = null) =>
+        private void CampaignEntered(LoadingState state, NetPeer? peer = null) =>
             state.PlayerCampaignEnteredHandler(
                 new MessagePayload<NetworkPlayerCampaignEntered>(
                     peer ?? playerPeer,
                     new NetworkPlayerCampaignEntered()));
 
-        private void Signal(LoadingState state, JoinSyncSignal signal) =>
+        private void Signal(LoadingState state, JoinSyncSignal signal, int replayBatchId = 0) =>
             state.JoinSyncHandler(
-                new MessagePayload<NetworkJoinSync>(playerPeer, new NetworkJoinSync(signal)));
+                new MessagePayload<NetworkJoinSync>(
+                    playerPeer,
+                    new NetworkJoinSync(signal, replayBatchId)));
 
         private int SignalCount(JoinSyncSignal signal) =>
             serverComponent.TestNetwork

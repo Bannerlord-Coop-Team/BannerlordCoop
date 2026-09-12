@@ -35,6 +35,8 @@ namespace GameInterface.Services.ItemObjects.Commands
 
             public string Description => "Reports data.";
 
+            public CoopCommandSide Side => CoopCommandSide.Both;
+
             public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
             {
                 new ExpectedArgs("item_id", "The registered item object id.", isRequired: true),

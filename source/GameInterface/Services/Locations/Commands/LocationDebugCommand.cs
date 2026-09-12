@@ -34,6 +34,8 @@ public class LocationDebugCommand
 
         public string Description => "Enters the relevant state for co-op debugging.";
 
+        public CoopCommandSide Side => CoopCommandSide.Client;
+
         public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
             new ExpectedArgs("locationId", "The location id."),
@@ -90,6 +92,8 @@ public class LocationDebugCommand
 
         public string Description => "Leaves the relevant state for co-op debugging.";
 
+        public CoopCommandSide Side => CoopCommandSide.Client;
+
         public IExpectedArgs[] ExpectedArgs { get; } = System.Array.Empty<IExpectedArgs>();
 
         public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
@@ -118,6 +122,8 @@ public class LocationDebugCommand
         public string Name => "list";
 
         public string Description => "Lists the relevant state for co-op debugging.";
+
+        public CoopCommandSide Side => CoopCommandSide.Both;
 
         public IExpectedArgs[] ExpectedArgs { get; } = System.Array.Empty<IExpectedArgs>();
 
@@ -159,6 +165,8 @@ public class LocationDebugCommand
 
         public string Description => "Shows the relevant state for co-op debugging.";
 
+        public CoopCommandSide Side => CoopCommandSide.Both;
+
         public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
             new ExpectedArgs("locationId", "The location id."),
@@ -190,6 +198,8 @@ public class LocationDebugCommand
         public string Name => "list_characters";
 
         public string Description => "Lists characters for co-op debugging.";
+
+        public CoopCommandSide Side => CoopCommandSide.Both;
 
         public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
@@ -225,6 +235,8 @@ public class LocationDebugCommand
 
         public string Description => "Lists special items for co-op debugging.";
 
+        public CoopCommandSide Side => CoopCommandSide.Both;
+
         public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
             new ExpectedArgs("locationId", "The location id."),
@@ -258,6 +270,8 @@ public class LocationDebugCommand
         public string Name => "add_character";
 
         public string Description => "Adds character for co-op debugging.";
+
+        public CoopCommandSide Side => CoopCommandSide.Server;
 
         public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
@@ -307,6 +321,8 @@ public class LocationDebugCommand
 
         public string Description => "Removes character for co-op debugging.";
 
+        public CoopCommandSide Side => CoopCommandSide.Server;
+
         public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
             new ExpectedArgs("locationId", "The location id."),
@@ -349,6 +365,8 @@ public class LocationDebugCommand
 
         public string Description => "Removes all characters for co-op debugging.";
 
+        public CoopCommandSide Side => CoopCommandSide.Server;
+
         public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
             new ExpectedArgs("locationId", "The location id."),
@@ -382,6 +400,8 @@ public class LocationDebugCommand
         public string Name => "add_special_item";
 
         public string Description => "Adds special item for co-op debugging.";
+
+        public CoopCommandSide Side => CoopCommandSide.Server;
 
         public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
@@ -419,6 +439,8 @@ public class LocationDebugCommand
         public string Name => "remove_special_item";
 
         public string Description => "Removes special item for co-op debugging.";
+
+        public CoopCommandSide Side => CoopCommandSide.Server;
 
         public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
@@ -465,6 +487,8 @@ public class LocationDebugCommand
         public string Name => "populate";
 
         public string Description => "Runs the relevant state for co-op debugging.";
+
+        public CoopCommandSide Side => CoopCommandSide.Server;
 
         public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {

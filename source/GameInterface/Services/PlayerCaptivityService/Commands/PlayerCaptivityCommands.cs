@@ -56,6 +56,8 @@ internal class PlayerCaptivityCommands
 
         public string Description => "Runs the random capture player debug operation.";
 
+        public CoopCommandSide Side => CoopCommandSide.Server;
+
         public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
             new ExpectedArgs("hero_id", "The registered player hero id.", isRequired: true),
@@ -95,6 +97,8 @@ internal class PlayerCaptivityCommands
         public string Name => "capture_player";
 
         public string Description => "Runs the capture player debug operation.";
+
+        public CoopCommandSide Side => CoopCommandSide.Server;
 
         public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
@@ -140,6 +144,8 @@ internal class PlayerCaptivityCommands
         public string Name => "capture_player_fixture";
 
         public string Description => "Runs the capture player fixture debug operation.";
+
+        public CoopCommandSide Side => CoopCommandSide.Server;
 
         public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
@@ -236,6 +242,8 @@ internal class PlayerCaptivityCommands
 
         public string Description => "Runs the restore roster fixture debug operation.";
 
+        public CoopCommandSide Side => CoopCommandSide.Server;
+
         public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
             new ExpectedArgs("hero_id", "The registered player hero id.", isRequired: true),
@@ -324,6 +332,8 @@ internal class PlayerCaptivityCommands
 
         public string Description => "Runs the release player debug operation.";
 
+        public CoopCommandSide Side => CoopCommandSide.Server;
+
         public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
             new ExpectedArgs("hero_id", "The registered player hero id.", isRequired: true),
@@ -378,6 +388,8 @@ internal class PlayerCaptivityCommands
         public string Name => "prepare_visual_test_fixture";
 
         public string Description => "Runs the prepare visual test fixture debug operation.";
+
+        public CoopCommandSide Side => CoopCommandSide.Server;
 
         public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
@@ -478,6 +490,8 @@ internal class PlayerCaptivityCommands
 
         public string Description => "Runs the restore visual test fixture debug operation.";
 
+        public CoopCommandSide Side => CoopCommandSide.Server;
+
         public IExpectedArgs[] ExpectedArgs { get; } = Array.Empty<IExpectedArgs>();
 
         public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
@@ -555,6 +569,8 @@ internal class PlayerCaptivityCommands
 
         public string Description => "Runs the liberate prisoner debug operation.";
 
+        public CoopCommandSide Side => CoopCommandSide.Client;
+
         public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
             new ExpectedArgs("hero_id", "The registered player hero id.", isRequired: true),
@@ -613,6 +629,8 @@ internal class PlayerCaptivityCommands
 
         public string Description => "Reports status.";
 
+        public CoopCommandSide Side => CoopCommandSide.Both;
+
         public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
             new ExpectedArgs("hero_id", "The registered player hero id.", isRequired: true),
@@ -650,6 +668,8 @@ internal class PlayerCaptivityCommands
         public string Name => "discard_player_from_party_screen";
 
         public string Description => "Runs the discard player from party screen debug operation.";
+
+        public CoopCommandSide Side => CoopCommandSide.Client;
 
         public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
@@ -770,6 +790,8 @@ internal class PlayerCaptivityCommands
 
         public string Description => "Runs the observe player debug operation.";
 
+        public CoopCommandSide Side => CoopCommandSide.Both;
+
         public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
             new ExpectedArgs("hero_id", "The registered player hero id.", isRequired: true),
@@ -838,6 +860,8 @@ internal class PlayerCaptivityCommands
         public string Name => "ransom_player_at_settlement";
 
         public string Description => "Runs the ransom player at settlement debug operation.";
+
+        public CoopCommandSide Side => CoopCommandSide.Server;
 
         public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
@@ -917,6 +941,8 @@ internal class PlayerCaptivityCommands
 
         public string Description => "Reports captivity state.";
 
+        public CoopCommandSide Side => CoopCommandSide.Both;
+
         public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
             new ExpectedArgs("hero_id", "The registered player hero id.", isRequired: true),
@@ -963,6 +989,8 @@ internal class PlayerCaptivityCommands
 
         public string Description => "Reports party fixture state.";
 
+        public CoopCommandSide Side => CoopCommandSide.Both;
+
         public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
             new ExpectedArgs("party_id", "The registered mobile party id.", isRequired: true),
@@ -988,6 +1016,8 @@ internal class PlayerCaptivityCommands
         public string Name => "restore_party_fixture_state";
 
         public string Description => "Reports restore party fixture state.";
+
+        public CoopCommandSide Side => CoopCommandSide.Server;
 
         public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
