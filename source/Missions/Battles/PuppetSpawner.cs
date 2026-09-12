@@ -189,6 +189,7 @@ public class PuppetSpawner : IPuppetSpawner
         var registry = coopMissionComponent.AgentRegistry;
 
         if (Mission.Current == null) return true;                       // no mission — drop
+        if (!MergeSpawnAuthority(data)) return true;
         if (IsWithdrawnPlayerParty(data)) return true;                  // stale replay after leave/drop — drop
         if (registry.TryGetAgentInfo(data.AgentId, out _)) return true; // already spawned — dedupe
         PendingAuthority pendingAuthority;
@@ -198,8 +199,9 @@ public class PuppetSpawner : IPuppetSpawner
             pendingAuthority = GetPendingAuthority(data.AgentId, data.AuthorityRevision);
             pendingMountAuthority = GetPendingAuthority(data.MountAgentId, data.MountAuthorityRevision);
         }
-        bool isRetainedFormerHostRecord = pendingAuthority != null || IsRetainedFormerHostRecord(data);
         string riderControllerId = pendingAuthority?.ControllerId ?? data.OwnerControllerId;
+        bool isRetainedFormerHostRecord = IsRetainedFormerHostRecord(data)
+            || (riderControllerId != data.OwnerControllerId && session.IsHostController(riderControllerId));
         string mountControllerId = pendingMountAuthority?.ControllerId ?? data.MountOwnerControllerId ?? data.OwnerControllerId;
 
         bool isOwnAgent = session.IsOwn(riderControllerId);
@@ -380,6 +382,10 @@ public class PuppetSpawner : IPuppetSpawner
                 Logger.Warning("[BattleSync] Spawn record for {AgentId} carries mount {MountId} but the puppet spawned unmounted", data.AgentId, data.MountAgentId);
         }
 
+        // Key the casualty on the troop's CHARACTER through the object manager (never a raw StringId).
+        objectManager.TryGetId(character, out var troopCharacterId);
+        casualties.Record(data.AgentId, data.MapEventPartyId, data.TroopSeed, troopCharacterId);
+
         // A retained record of a departed host can drain after the migration sweep. Every peer moves
         // the late registry entries to the current host; only that host revives the rider as battle AI.
         if (isRetainedFormerHostRecord && agentRegistered)
@@ -393,11 +399,95 @@ public class PuppetSpawner : IPuppetSpawner
                 adoptMount ? data.MountAgentId : Guid.Empty);
         }
 
-        // Key the casualty on the troop's CHARACTER through the object manager (never a raw StringId).
-        objectManager.TryGetId(character, out var troopCharacterId);
-        casualties.Record(data.AgentId, data.MapEventPartyId, data.TroopSeed, troopCharacterId);
         Logger.Information("[BattleSync] Spawned puppet {Char} (agent {AgentId}, ownAgent={Own})", data.CharacterId, data.AgentId, isOwnAgent);
         slotsAvailable -= slotsNeeded;
+        return true;
+    }
+
+    // Reliable refreshes can arrive on either side of the original catch-up or local departure action.
+    private bool MergeSpawnAuthority(BattleAgentSpawnData data)
+    {
+        string originalOwner = data.OriginalOwnerControllerId ?? data.OwnerControllerId;
+        string movementScope = data.MovementScopeId ?? originalOwner;
+        string mountOwner = data.MountOwnerControllerId ?? data.OwnerControllerId;
+        string mountOriginalOwner = data.MountOriginalOwnerControllerId ?? originalOwner;
+        string mountScope = data.MountMovementScopeId ?? movementScope;
+        if (!CanMergeAgentAuthority(data.AgentId, data.OwnerControllerId, data.AuthorityRevision,
+                originalOwner, movementScope, data.MovementId)
+            || !CanMergeAgentAuthority(data.MountAgentId, mountOwner, data.MountAuthorityRevision,
+                mountOriginalOwner, mountScope, data.MountMovementId)) return false;
+
+        return MergeAgentAuthority(data.AgentId, data.OwnerControllerId, data.AuthorityRevision,
+                originalOwner, movementScope, data.MovementId)
+            && MergeAgentAuthority(data.MountAgentId, mountOwner, data.MountAuthorityRevision,
+                mountOriginalOwner, mountScope, data.MountMovementId);
+    }
+
+    private bool CanMergeAgentAuthority(
+        Guid agentId, string controllerId, long revision, string originalOwner, string movementScopeId, ushort movementId)
+    {
+        if (agentId == Guid.Empty) return true;
+        if (string.IsNullOrEmpty(controllerId) || revision < 0) return false;
+        if (coopMissionComponent.AgentRegistry.TryGetAgentInfo(agentId, out var info))
+            return info.OriginalOwner == originalOwner && info.MovementScopeId == movementScopeId
+                && info.MovementId == movementId
+                && (revision != info.AuthorityRevision || controllerId == info.CurrentAuthority);
+        lock (pendingPuppetLock)
+            return !pendingAuthorities.TryGetValue(agentId, out var authority)
+                || (authority.OriginalOwner == originalOwner && authority.MovementScopeId == movementScopeId
+                    && authority.MovementId == movementId
+                    && (revision != authority.Revision || controllerId == authority.ControllerId));
+    }
+
+    private bool MergeAgentAuthority(
+        Guid agentId, string controllerId, long revision, string originalOwner, string movementScopeId, ushort movementId)
+    {
+        if (agentId == Guid.Empty) return true;
+        if (string.IsNullOrEmpty(controllerId) || revision < 0) return false;
+        var registry = coopMissionComponent.AgentRegistry;
+        if (registry.TryGetAgentInfo(agentId, out var info))
+        {
+            if (info.OriginalOwner != originalOwner || info.MovementScopeId != movementScopeId || info.MovementId != movementId)
+                return false;
+            if (revision == info.AuthorityRevision) return controllerId == info.CurrentAuthority;
+            if (revision < info.AuthorityRevision) return true;
+            bool wasOwn = session.IsOwn(info.CurrentAuthority);
+            if (!registry.TryTransferAuthority(controllerId, agentId, revision)) return false;
+
+            Agent agent = info.Agent;
+            if (agent == null || !agent.IsActive()) return true;
+            coopMissionComponent.AgentMovementHandler.Interpolator.Forget(agent);
+            if (wasOwn && !session.IsOwn(controllerId) && !agent.IsMount)
+            {
+                agent.Controller = AgentControllerType.None;
+                agent.SetIsAIPaused(false);
+            }
+            else if (!wasOwn && session.IsOwn(controllerId) && session.IsLocalHost && !agent.IsMount)
+            {
+                authorityMigrator?.ApplyLateSpawnedPuppet(agent, agentId, null, Guid.Empty);
+            }
+            return true;
+        }
+
+        lock (pendingPuppetLock)
+        {
+            if (pendingAuthorities.TryGetValue(agentId, out var authority))
+            {
+                if (authority.OriginalOwner != originalOwner || authority.MovementScopeId != movementScopeId
+                    || authority.MovementId != movementId) return false;
+                if (revision == authority.Revision && controllerId != authority.ControllerId) return false;
+                if (revision > authority.Revision)
+                {
+                    authority.ControllerId = controllerId;
+                    authority.Revision = revision;
+                }
+            }
+            else
+            {
+                pendingAuthorities.Add(agentId,
+                    new PendingAuthority(controllerId, revision, originalOwner, movementScopeId, movementId));
+            }
+        }
         return true;
     }
 
@@ -466,11 +556,7 @@ public class PuppetSpawner : IPuppetSpawner
         var authority = GetPendingAuthority(agentId, revision);
         string currentController = authority?.ControllerId ?? controllerId;
         if (currentController == newController || !previousControllers.Contains(currentController)) return;
-        if (authority == null)
-        {
-            authority = new PendingAuthority(controllerId, revision);
-            pendingAuthorities[agentId] = authority;
-        }
+        if (authority == null) return;
         authority.ControllerId = newController;
         authority.Revision++;
     }
@@ -498,12 +584,24 @@ public class PuppetSpawner : IPuppetSpawner
                 if (wasHost) withdrawnHostControllers.Add(controllerId);
             }
             var retainedAgentIds = new List<Guid>();
+            var withdrawnMountOwners = !disconnected && !wasHost
+                ? new HashSet<string> { controllerId }
+                : null;
             lock (pendingPuppetLock)
             {
                 pendingPuppets.RemoveAll(data =>
                 {
                     var authority = GetPendingAuthority(data.AgentId, data.AuthorityRevision);
-                    if ((authority?.ControllerId ?? data.OwnerControllerId) != controllerId) return false;
+                    string riderController = authority?.ControllerId ?? data.OwnerControllerId;
+                    if (riderController != controllerId)
+                    {
+                        // A retreater's horse stays with the foreign rider, matching registered mount cleanup.
+                        if (withdrawnMountOwners != null)
+                            TransferPendingAgentAuthority(data.MountAgentId,
+                                data.MountOwnerControllerId ?? data.OwnerControllerId,
+                                data.MountAuthorityRevision, withdrawnMountOwners, riderController);
+                        return false;
+                    }
                     bool remove = !disconnected && (!wasHost || IsPlayerPartyRecord(data, controllerId));
                     if (!remove) retainedAgentIds.Add(data.AgentId);
                     return remove;
@@ -580,11 +678,18 @@ public class PuppetSpawner : IPuppetSpawner
     {
         public string ControllerId;
         public long Revision;
+        public readonly string OriginalOwner;
+        public readonly string MovementScopeId;
+        public readonly ushort MovementId;
 
-        public PendingAuthority(string controllerId, long revision)
+        public PendingAuthority(
+            string controllerId, long revision, string originalOwner, string movementScopeId, ushort movementId)
         {
             ControllerId = controllerId;
             Revision = revision;
+            OriginalOwner = originalOwner;
+            MovementScopeId = movementScopeId;
+            MovementId = movementId;
         }
     }
 

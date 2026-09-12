@@ -51,6 +51,7 @@ public class BattleAuthorityMigrator : IBattleAuthorityMigrator
     private readonly IAgentFormationAssigner formationAssigner;
     private readonly IMissionContext missionContext;
     private readonly IReinforcementFielder reinforcementFielder;
+    private readonly Action<IReadOnlyCollection<Guid>> authorityChanged;
 
     // Hosts whose own party withdrew — read when the promotion lands so the adoption knows to leave those
     // troops to the despawn instead of adopting them. Only touched from broker handlers,
@@ -69,7 +70,8 @@ public class BattleAuthorityMigrator : IBattleAuthorityMigrator
         IBattleDeploymentCoordinator deployment,
         IAgentFormationAssigner formationAssigner,
         IMissionContext missionContext,
-        IReinforcementFielder reinforcementFielder)
+        IReinforcementFielder reinforcementFielder,
+        Action<IReadOnlyCollection<Guid>> authorityChanged = null)
     {
         this.relayNetwork = relayNetwork;
         this.messageBroker = messageBroker;
@@ -82,6 +84,7 @@ public class BattleAuthorityMigrator : IBattleAuthorityMigrator
         this.formationAssigner = formationAssigner;
         this.missionContext = missionContext;
         this.reinforcementFielder = reinforcementFielder;
+        this.authorityChanged = authorityChanged;
 
         messageBroker.Subscribe<NetworkMissionPeerEntered>(Handle_PeerEntered);
         messageBroker.Subscribe<MissionPeerLeft>(Handle_PeerLeft);
@@ -270,6 +273,7 @@ public class BattleAuthorityMigrator : IBattleAuthorityMigrator
 
         int removed = 0;
         int transferred = 0;
+        var changedIds = new List<Guid>();
         foreach (var info in registry.GetAgents(controllerId))
         {
             var agent = info.Agent;
@@ -289,6 +293,7 @@ public class BattleAuthorityMigrator : IBattleAuthorityMigrator
                 && registry.TryTransferAuthority(riderInfo.CurrentAuthority, info.AgentId))
             {
                 transferred++;
+                changedIds.Add(info.AgentId);
                 continue;
             }
 
@@ -299,6 +304,7 @@ public class BattleAuthorityMigrator : IBattleAuthorityMigrator
             removed++;
         }
 
+        if (changedIds.Count > 0) authorityChanged?.Invoke(changedIds);
         if (removed > 0 || transferred > 0)
             Logger.Information("[BattleSync] Cleaned up registered mount(s) of departed {Controller}: {Removed} removed, {Transferred} transferred to their riders' owners",
                 controllerId, removed, transferred);
@@ -388,13 +394,16 @@ public class BattleAuthorityMigrator : IBattleAuthorityMigrator
         var registry = coopMissionComponent.AgentRegistry;
         GameThread.RunSafe(() =>
         {
+            var changedIds = new List<Guid>();
             foreach (var controllerId in absentControllers)
             {
                 foreach (var info in registry.GetAgents(controllerId))
                 {
-                    registry.TryTransferAuthority(newHost, info.AgentId);
+                    if (info.CurrentAuthority != newHost && registry.TryTransferAuthority(newHost, info.AgentId))
+                        changedIds.Add(info.AgentId);
                 }
             }
+            if (changedIds.Count > 0) authorityChanged?.Invoke(changedIds);
         }, context: nameof(TransferRemoteAuthority));
     }
 
@@ -409,10 +418,12 @@ public class BattleAuthorityMigrator : IBattleAuthorityMigrator
         string hostControllerId = session.HostControllerId;
         if (string.IsNullOrEmpty(hostControllerId)) return;
 
-        var registry = coopMissionComponent.AgentRegistry;
+        var changedIds = new List<Guid>();
         if (mount != null && mountAgentId != Guid.Empty &&
-            !registry.TryTransferAuthority(hostControllerId, mountAgentId)) return;
-        if (!registry.TryTransferAuthority(hostControllerId, agentId)) return;
+            !TransferLateAuthority(hostControllerId, mountAgentId, changedIds)) return;
+        if (!TransferLateAuthority(hostControllerId, agentId, changedIds)) return;
+        if (changedIds.Count > 0) authorityChanged?.Invoke(changedIds);
+        var registry = coopMissionComponent.AgentRegistry;
         if (!session.IsLocalHost || Mission.Current == null || !agent.IsActive()) return;
 
         bool activateAi = deployment.IsActivated;
@@ -433,6 +444,16 @@ public class BattleAuthorityMigrator : IBattleAuthorityMigrator
             registry.TryGetAgentInfo(agentId, out CoopAgentInfo info)
                 ? info.AuthorityRevision
                 : -1L);
+    }
+
+    private bool TransferLateAuthority(string controllerId, Guid agentId, List<Guid> changedIds)
+    {
+        var registry = coopMissionComponent.AgentRegistry;
+        if (!registry.TryGetAgentInfo(agentId, out var info)) return false;
+        bool changed = info.CurrentAuthority != controllerId;
+        if (!registry.TryTransferAuthority(controllerId, agentId)) return false;
+        if (changed) changedIds.Add(agentId);
+        return true;
     }
 
     // Take over the agents owned by the departed controller: move authority to us (so the movement poller
@@ -479,6 +500,9 @@ public class BattleAuthorityMigrator : IBattleAuthorityMigrator
 
                 adopted = transferred;
                 if (adopted.Count == 0) return;
+                var changedIds = new List<Guid>();
+                foreach (var info in adopted) changedIds.Add(info.AgentId);
+                authorityChanged?.Invoke(changedIds);
                 if (Mission.Current == null) return;
 
                 // Keep an adoption during Order of Battle behind the same activation gate as every other NPC.

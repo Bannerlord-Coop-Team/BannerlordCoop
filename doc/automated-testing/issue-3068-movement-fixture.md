@@ -439,7 +439,11 @@ section does not authorize launching any game or server process.
   rejection and after the buffered agents finally spawn. Include catch-up for
   a rider using another connected player's horse, preserving the horse's own
   authority and revision through rider departure and accepting the horse's
-  current-authority movement after dismount.
+  current-authority movement after dismount. Cover graceful horse-owner leave,
+  disconnect, and host migration while spawn is buffered. Hold the original
+  catch-up across departure and re-entry, then deliver it before and after the
+  actual refreshed authority snapshot; both orders must converge on the newer
+  authority without changing the agent's stable movement identity.
 - Run the appropriate broader non-live mission/network suite on the same final
   tree. Record exact commands, result counts, failures/skips, and artifact hashes
   externally with the source identities above. Do not insert unexecuted pass

@@ -8,6 +8,7 @@ using Missions.Agents.Packets;
 using Missions.Battles;
 using Missions.Messages;
 using TaleWorlds.CampaignSystem;
+using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.Core;
 using TaleWorlds.Library;
 using TaleWorlds.MountAndBlade;
@@ -28,12 +29,12 @@ public class NonHostDisconnectAuthorityTests : MissionTestEnvironment
     public void NonHostDisconnect_ConvergesMovementAuthorityAcrossObserversRejoinsAndLaterMigrations()
     {
         using var engine = new MissionEngineFixture();
-        var (mapEventId, _) = SetupCoopBattle("A", "B", "C");
+        var (mapEventId, partyIds) = SetupCoopBattle("A", "B", "C");
         string characterId = CreateRegisteredObject<CharacterObject>();
         var clients = Clients.ToArray();
-        var a = CreateState(engine, clients[0], "A", mapEventId, characterId);
-        var b = CreateState(engine, clients[1], "B", mapEventId, characterId);
-        var c = CreateState(engine, clients[2], "C", mapEventId, characterId);
+        var a = CreateState(engine, clients[0], "A", mapEventId, characterId, partyIds[1]);
+        var b = CreateState(engine, clients[1], "B", mapEventId, characterId, partyIds[1]);
+        var c = CreateState(engine, clients[2], "C", mapEventId, characterId, partyIds[1]);
         try
         {
             foreach (var state in new[] { a, b, c })
@@ -88,7 +89,8 @@ public class NonHostDisconnectAuthorityTests : MissionTestEnvironment
         EnvironmentInstance instance,
         string id,
         string mapEventId,
-        string characterId)
+        string characterId,
+        string partyId)
     {
         ClientState state = null;
         instance.Call(() =>
@@ -99,16 +101,19 @@ public class NonHostDisconnectAuthorityTests : MissionTestEnvironment
             BattleSpawnGate.BeginBattle(mapEventId);
             instance.Resolve<IBattleHostRegistry>().Set(
                 mapEventId, new BattleHostAssignment("A", new[] { "B", "C" }, 1));
-            Assert.True(instance.ObjectManager.TryGetObject(characterId, out CharacterObject character));
-            Agent agent = mission.SpawnAgent(new AgentBuildData(character)
-                .Controller(id == "B" ? AgentControllerType.AI : AgentControllerType.None)
-                .Team(mission.DefenderTeam.Shell)
-                .Equipment(new Equipment()));
-            Agent mount = mission.SpawnMount(agent);
-            var registry = instance.Resolve<INetworkAgentRegistry>();
-            Assert.True(registry.TryRegisterAgent("B", agentId, 1, agent, InitialRevision));
-            Assert.True(registry.TryRegisterAgent("B", mountId, 2, mount, InitialRevision));
+            Assert.True(instance.ObjectManager.TryGetObject(partyId, out MobileParty party));
+            var mapEventParty = party.Party.MapEventSide.Parties.Single(value => value.Party == party.Party);
+            Assert.True(instance.ObjectManager.TryGetId(mapEventParty, out var mapEventPartyId));
+            mission.SpawnMounted = true;
+            var spawn = new BattleAgentSpawnData(
+                agentId, characterId, Vec3.Zero, BattleSideEnum.Defender, 100f, "B",
+                mapEventPartyId, 0, new Equipment(), default, null,
+                mountAgentId: mountId, movementId: 1, mountMovementId: 2,
+                authorityRevision: InitialRevision, mountAuthorityRevision: InitialRevision);
+            instance.Resolve<IMessageBroker>().Publish(this, new NetworkSpawnBattleAgents(new[] { spawn }));
             state = new ClientState(id, instance, mission, controller);
+            AssertAuthority(state, "B", InitialRevision,
+                id == "B" ? AgentControllerType.AI : AgentControllerType.None);
         });
         return state;
     }

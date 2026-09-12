@@ -47,6 +47,9 @@ public interface IOwnedAgentReplicator : IDisposable
     /// call, before the native un-pause moves the troops, so the captured positions are the deployed ones.
     /// </summary>
     void BroadcastOwnDeployedTroops();
+
+    /// <summary>[Game thread] Refresh owned riders affected by an authority change, including their horses.</summary>
+    void BroadcastAuthorityRefresh(IReadOnlyCollection<Guid> changedAgentIds);
 }
 
 /// <inheritdoc cref="IOwnedAgentReplicator"/>
@@ -159,6 +162,20 @@ public class OwnedAgentReplicator : IOwnedAgentReplicator
             network.SendAll(batch);
 
         LogBatchSend("Committed deployment", records.Count, batches, null);
+    }
+
+    public void BroadcastAuthorityRefresh(IReadOnlyCollection<Guid> changedAgentIds)
+    {
+        if (Mission.Current == null || changedAgentIds.Count == 0) return;
+        var changedIds = new HashSet<Guid>(changedAgentIds);
+        var records = BuildOwnedAgentRecords(ownPartyOnly: false);
+        records.RemoveAll(record => !changedIds.Contains(record.AgentId) && !changedIds.Contains(record.MountAgentId));
+        if (records.Count == 0) return;
+
+        var batches = spawnBatchCodec.Encode(records, SpawnBatchPurpose.CatchUp);
+        foreach (var batch in batches)
+            network.SendAll(batch);
+        LogBatchSend("Refreshed authority for", records.Count, batches, null);
     }
 
     // [Game thread] Build spawn records for the battle agents WE currently own, at their CURRENT positions.
