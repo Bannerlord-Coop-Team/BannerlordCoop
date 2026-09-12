@@ -186,7 +186,7 @@ internal sealed class SiegeInteractionDebugBehavior : MissionBehavior, ISiegeInt
         var agent = Mission.MainAgent;
         if (request.Action == "dismount")
         {
-            Dismount(agent);
+            Dismount(screen, agent);
             return;
         }
         if (request.Action == "capture")
@@ -254,7 +254,7 @@ internal sealed class SiegeInteractionDebugBehavior : MissionBehavior, ISiegeInt
         Input.PressKey(key.KeyboardKey.InputKey);
     }
 
-    private void Dismount(Agent agent)
+    private void Dismount(MissionScreen screen, Agent agent)
     {
         dismountAgent = null;
         if (agent == null || !agent.IsActive() || agent.IsUsingGameObject)
@@ -267,9 +267,19 @@ internal sealed class SiegeInteractionDebugBehavior : MissionBehavior, ISiegeInt
             status = "fixture_dismounted";
             return;
         }
+        const int dismountGameKeyId = 15;
+        var key = HotKeyManager.GetCategory("Generic")?.GetGameKey(dismountGameKeyId);
+        if (screen?.SceneLayer?.Input == null || key?.KeyboardKey == null ||
+            screen.SceneLayer.Input.IsGameKeyDown(dismountGameKeyId) ||
+            screen.SceneLayer.Input.IsGameKeyPressed(dismountGameKeyId))
+        {
+            status = "fixture_dismount_rejected";
+            return;
+        }
         dismountAgent = agent;
         status = "fixture_dismount_pending";
-        UpdateDismount();
+        // Let the player controller own braking and the dismount control flag.
+        Input.PressKey(key.KeyboardKey.InputKey);
     }
 
     private void UpdateDismount()
@@ -282,17 +292,8 @@ internal sealed class SiegeInteractionDebugBehavior : MissionBehavior, ISiegeInt
         }
         else if (dismountAgent.MountAgent == null)
         {
-            dismountAgent.MovementInputVector = Vec2.Zero;
             if (status == "fixture_dismount_pending") status = "fixture_dismounted";
             dismountAgent = null;
-        }
-        else if (dismountAgent.GetCurrentVelocity().y >= Agent.DismountVelocityLimit)
-        {
-            dismountAgent.MovementInputVector = new Vec2(0f, -1f);
-        }
-        else
-        {
-            dismountAgent.Mount(dismountAgent.MountAgent);
         }
     }
 
