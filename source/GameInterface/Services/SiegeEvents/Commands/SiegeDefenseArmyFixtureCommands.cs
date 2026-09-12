@@ -631,8 +631,8 @@ internal static class SiegeDefenseArmyFixtureCommands
                 }
             }
             if (observed.Value<bool?>("siegeActive") != false || observed.Value<bool?>("settlementMapEventActive") != false
-                || observed.Value<bool?>("encounterActive") != false)
-                error = "The fixture siege, map event, or local encounter remains active";
+                || observed.Value<bool?>("encounterActive") != false || observed.Value<string>("menu") != null)
+                error = "The fixture siege, map event, or local encounter/menu remains active";
             return error == null;
         }
 
@@ -676,8 +676,8 @@ internal static class SiegeDefenseArmyFixtureCommands
                     && observed.Value<string>("battleType") != MapEvent.BattleTypes.SiegeOutside.ToString()))
                 error = "The staged siege identity or defending battle type changed";
         }
-        else if (observed.Value<bool?>("encounterActive") != false)
-            error = "The client's encounter remains active after unstuck";
+        else if (observed.Value<bool?>("encounterActive") != false || observed.Value<string>("menu") != null)
+            error = "The client's encounter remains active or its menu remains open after unstuck";
         return error == null;
     }
 
@@ -688,6 +688,7 @@ internal static class SiegeDefenseArmyFixtureCommands
     {
         ContainerProvider.TryResolve<IMobilePartyBehaviorSnapshot>(out var behaviors);
         var ids = expected != null ? GetExpectedPartyIds(expected) : new[] { GetId(manager, player) };
+        bool isLocalPlayer = ModInformation.IsClient && MobileParty.MainParty == player;
         return JObject.FromObject(new
         {
             buildVersion = ModInformation.BuildVersion,
@@ -704,8 +705,8 @@ internal static class SiegeDefenseArmyFixtureCommands
             armyId = GetId(manager, player.Army),
             armyLeaderPartyId = GetId(manager, player.Army?.LeaderParty),
             armyPartyIds = player.Army?.Parties.Select(p => GetId(manager, p)).ToArray() ?? Array.Empty<string>(),
-            encounterActive = ModInformation.IsClient && PlayerEncounter.Current != null,
-            menu = ModInformation.IsClient ? Campaign.Current?.CurrentMenuContext?.GameMenu?.StringId : null,
+            encounterActive = isLocalPlayer && PlayerEncounter.Current != null,
+            menu = isLocalPlayer ? Campaign.Current?.CurrentMenuContext?.GameMenu?.StringId : null,
             ownedArmyRegistered = IsOwnedRegistered(manager, expected, "armyId", fixture?.Army),
             ownedSiegeRegistered = IsOwnedRegistered(manager, expected, "siegeEventId", fixture?.SiegeEvent),
             ownedMapEventRegistered = IsOwnedRegistered(manager, expected, "mapEventId", fixture?.MapEvent),

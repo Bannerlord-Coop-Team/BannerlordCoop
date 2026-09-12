@@ -149,6 +149,17 @@ public class SiegeDefenseArmyFixtureCommandsTests
         AssertFailure(Expected(), actual, "restored", "remains registered");
     }
 
+    [Theory]
+    [InlineData("unstuck")]
+    [InlineData("restored")]
+    public void ClearedEncounter_WithMenuStillOpen_Fails(string state)
+    {
+        var actual = Observed(state);
+        actual["encounterActive"] = false;
+        actual["menu"] = "join_siege_event";
+        AssertFailure(Expected(), actual, state, "menu");
+    }
+
     [Fact]
     public void Restored_BesiegerMovementChanged_Fails()
     {
