@@ -136,7 +136,13 @@ internal class PartyScreenHelperPatches
         // PartyDoneLogicAttempted carries both histories with the authoritative roster deltas. The server
         // applies those deltas first, then runs the vanilla release/take side effects. Sending a second command
         // here made the semantic action mutate the roster before the same PartyDone delta was applied.
-        _releasedAndTakenPrisonerActionsRequested = true;
+        // Vanilla DefaultDoneHandler calls this unconditionally, so only flag actual moves;
+        // otherwise every loot Done (e.g. force volunteers) looks like a prisoner action.
+        if ((takenPrisonerRoster != null && !takenPrisonerRoster.IsEmpty<FlattenedTroopRosterElement>()) ||
+            (releasedPrisonerRoster != null && !releasedPrisonerRoster.IsEmpty<FlattenedTroopRosterElement>()))
+        {
+            _releasedAndTakenPrisonerActionsRequested = true;
+        }
         return false;
     }
 }
