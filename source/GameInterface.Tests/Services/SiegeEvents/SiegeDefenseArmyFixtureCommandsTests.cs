@@ -283,6 +283,179 @@ public class SiegeDefenseArmyFixtureCommandsTests
         Assert.Contains("identities", result.Output);
     }
 
+    [Fact]
+    public void UntouchedStagedBaseline_CannotPassUnstuck()
+    {
+        AssertFailure(Expected(), Observed("baseline"), "unstuck", "completed real recovery");
+    }
+
+    [Fact]
+    public void RecoveryProof_RequiresJoinedBeforeRequestAndNormalHandlerReturn()
+    {
+        using var proof = new SiegeDefenseArmyFixtureCommands.RecoveryProof(Expected());
+        var prior = proof.BeginRequest("player");
+        Assert.False(proof.MarkJoined());
+        proof.RecordCompletion("player");
+        Assert.False(proof.CompleteRequest(prior, true, true));
+        Assert.Null(proof.GetReceipt());
+        Assert.True(proof.MarkJoined());
+        Assert.False(proof.CompleteRequest(prior, true, true));
+        var request = proof.BeginRequest("player");
+        Assert.False(proof.CompleteRequest(request, true, true));
+        proof.RecordCompletion("player");
+        Assert.True(proof.CompleteRequest(request, true, true));
+        Assert.Equal(1, proof.GetReceipt().Value<long>("requestSequence"));
+    }
+
+    [Fact]
+    public void RecoveryProof_WrongPlayerOrFailedTopologyCannotCreateReceipt()
+    {
+        using var proof = new SiegeDefenseArmyFixtureCommands.RecoveryProof(Expected());
+        Assert.True(proof.MarkJoined());
+        var wrong = proof.BeginRequest("other-player");
+        proof.RecordCompletion("other-player");
+        Assert.False(proof.CompleteRequest(wrong, true, true));
+        var correct = proof.BeginRequest("player");
+        proof.RecordCompletion("player");
+        Assert.False(proof.CompleteRequest(correct, false, true));
+        Assert.False(proof.CompleteRequest(correct, true, false));
+        Assert.Null(proof.GetReceipt());
+    }
+
+    [Fact]
+    public void RecoveryProof_NewRequestInvalidatesPriorReceiptAndCountsRealRepeats()
+    {
+        using var proof = new SiegeDefenseArmyFixtureCommands.RecoveryProof(Expected());
+        Assert.True(proof.MarkJoined());
+        var first = proof.BeginRequest("player");
+        proof.RecordCompletion("player");
+        Assert.True(proof.CompleteRequest(first, true, true));
+        Assert.Equal(1, proof.GetReceipt().Value<long>("requestSequence"));
+        var second = proof.BeginRequest("player");
+        Assert.Null(proof.GetReceipt());
+        Assert.False(proof.CompleteRequest(first, true, true));
+        Assert.False(proof.CompleteRequest(second, true, true));
+        proof.RecordCompletion("player");
+        Assert.True(proof.CompleteRequest(second, true, true));
+        Assert.Equal(2, proof.GetReceipt().Value<long>("requestSequence"));
+    }
+
+    [Fact]
+    public void ClientRecoveryProof_SynchronousReplyBeforeRequestSubscriberStillCorrelates()
+    {
+        using var proof = new SiegeDefenseArmyFixtureCommands.RecoveryProof(Expected());
+        Assert.True(proof.MarkJoined());
+        proof.RecordCompletion("player");
+        Assert.Equal(0, proof.RequestCountAfterJoin);
+        Assert.Equal(1, proof.CompletionCountAfterJoin);
+        proof.BeginRequest("player");
+        Assert.Equal(1, proof.RequestCountAfterJoin);
+        Assert.Equal(1, proof.CompletionCountAfterJoin);
+        var observed = Observed("unstuck");
+        observed["authoritative"] = false;
+        observed["isLocalPlayer"] = true;
+        observed["localRecoveryRequests"] = proof.RequestCountAfterJoin;
+        observed["localRecoveryCompletions"] = proof.CompletionCountAfterJoin;
+        Assert.True(SiegeDefenseArmyFixtureCommands.EvaluateState(Expected(), observed, "unstuck", out var error), error);
+    }
+
+    [Fact]
+    public void RecoveryProof_DisposalInvalidatesQueuedCompletionAndReceipt()
+    {
+        var proof = new SiegeDefenseArmyFixtureCommands.RecoveryProof(Expected());
+        Assert.True(proof.MarkJoined());
+        var request = proof.BeginRequest("player");
+        proof.Dispose();
+        proof.RecordCompletion("player");
+        Assert.False(proof.CompleteRequest(request, true, true));
+        Assert.False(proof.MarkJoined());
+        Assert.Null(proof.GetReceipt());
+    }
+
+    [Theory]
+    [InlineData("fixtureToken")]
+    [InlineData("controllerId")]
+    [InlineData("playerPartyId")]
+    [InlineData("buildVersion")]
+    [InlineData("commit")]
+    [InlineData("armyId")]
+    [InlineData("mapEventId")]
+    public void Unstuck_RejectsReceiptForAnotherFixtureSourceOrIdentity(string field)
+    {
+        var observed = Observed("unstuck");
+        observed["recoveryReceipt"][field] = "other-value";
+        AssertFailure(Expected(), observed, "unstuck", field);
+    }
+
+    [Theory]
+    [InlineData("joinedObserved")]
+    [InlineData("handlerCompleted")]
+    [InlineData("topologyPassed")]
+    public void Unstuck_RejectsIncompleteServerReceipt(string field)
+    {
+        var observed = Observed("unstuck");
+        observed["recoveryReceipt"][field] = false;
+        AssertFailure(Expected(), observed, "unstuck", "completed real recovery");
+    }
+
+    [Fact]
+    public void ObserverClient_RejectsReceiptMissingSequenceOrServerSource()
+    {
+        var observed = Observed("unstuck");
+        observed["authoritative"] = false;
+        observed["recoveryReceipt"]["requestSequence"] = null;
+        AssertFailure(Expected(), observed, "unstuck", "completed real recovery");
+        observed["recoveryReceipt"] = Receipt();
+        observed["recoveryReceipt"]["source"] = "client";
+        AssertFailure(Expected(), observed, "unstuck", "completed real recovery");
+    }
+
+    [Fact]
+    public void RepeatedServerAssertion_RequiresNewRecoveryAfterPreviousReceipt()
+    {
+        var observed = Observed("unstuck");
+        observed["previousRecoverySequence"] = 1;
+        AssertFailure(Expected(), observed, "unstuck", "No new completed");
+        observed["recoveryReceipt"]["requestSequence"] = 2;
+        Assert.True(SiegeDefenseArmyFixtureCommands.EvaluateState(Expected(), observed, "unstuck", out var error), error);
+    }
+
+    [Fact]
+    public void OwningClient_RequiresItsActualRequestAndCompletionForServerReceipt()
+    {
+        var observed = Observed("unstuck");
+        observed["authoritative"] = false;
+        observed["isLocalPlayer"] = true;
+        observed["localRecoveryRequests"] = 1;
+        observed["localRecoveryCompletions"] = 0;
+        AssertFailure(Expected(), observed, "unstuck", "owning client");
+        observed["localRecoveryCompletions"] = 1;
+        Assert.True(SiegeDefenseArmyFixtureCommands.EvaluateState(Expected(), observed, "unstuck", out var error), error);
+        observed["localRecoveryRequests"] = 2;
+        AssertFailure(Expected(), observed, "unstuck", "owning client");
+    }
+
+    [Fact]
+    public void ObserverClient_RequiresServerReceiptButNoOtherPlayersLocalCompletion()
+    {
+        var observed = Observed("unstuck");
+        observed["authoritative"] = false;
+        observed["isLocalPlayer"] = false;
+        Assert.True(SiegeDefenseArmyFixtureCommands.EvaluateState(Expected(), observed, "unstuck", out var error), error);
+        observed["recoveryReceipt"] = null;
+        AssertFailure(Expected(), observed, "unstuck", "completed real recovery");
+    }
+
+    private static JObject Receipt()
+    {
+        using var proof = new SiegeDefenseArmyFixtureCommands.RecoveryProof(Expected());
+        proof.MarkJoined();
+        var request = proof.BeginRequest("player");
+        proof.RecordCompletion("player");
+        proof.CompleteRequest(request, true, true);
+        return proof.GetReceipt();
+    }
+
     private static void AssertFailure(JObject expected, JObject actual, string state, string diagnostic)
     {
         Assert.False(SiegeDefenseArmyFixtureCommands.EvaluateState(expected, actual, state, out var error));
@@ -331,6 +504,9 @@ public class SiegeDefenseArmyFixtureCommandsTests
         {
             buildVersion = "1.0.0+fixture-commit",
             commit = "fixture-commit",
+            authoritative = true,
+            isLocalPlayer = false,
+            recoveryReceipt = state == "unstuck" ? Receipt() : null,
             paused = true,
             playerPartyId = "player",
             settlementNetworkId = "town_ES1",

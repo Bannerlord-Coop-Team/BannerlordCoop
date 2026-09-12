@@ -57,7 +57,7 @@ without the preceding label.
 | `capture_defense_army_fixture` | Server | Controller ID from `players.list`, `town_ES1`. Save result as **capture**. |
 | `stage_defense_army_fixture` | Server | **capture**. Save successful result as **staged**. |
 | `defense_army_fixture_state` | Either | Same controller ID, `town_ES1`. Read-only diagnostics. |
-| `defense_army_state` | Either | Same controller ID, `town_ES1`, requested state, **staged**. |
+| `defense_army_state` | Either | Same controller ID, `town_ES1`, requested state, **staged**. Client `unstuck` checks instead use the successful server **recovered** result described below. |
 | `restore_defense_army_fixture` | Server | **capture**. Retain result, including any failure. |
 | `verify_defense_army_fixture` | Server | **capture**. Releases the fixture only after restoration checks pass. |
 
@@ -108,8 +108,19 @@ client, run the real player command **`coop.unstuck`** once and save its result.
 The request must travel to the dedicated server. Wait for its normal reply and
 client menu cleanup before inspecting state.
 
-Run `defense_army_state` with `unstuck` and **staged** on the server and both
-clients. Require all of the following:
+Run `defense_army_state` with `unstuck` and **staged** on the server. Save its
+successful result as **recovered**. Its `serverRecoveryReceipt` must identify the
+same fixture token, build/commit, controller, party, army, and map event, with
+`requestSequence: 1`. The fixture records this only after the successful server
+`joined` observation and a normal return from the real recovery handler, followed
+by the detached-party and intact-army checks. An untouched baseline, a request
+before `joined`, or merely waiting for replicated state cannot produce this receipt.
+
+On both clients, run `defense_army_state` with `unstuck` and **recovered**, not
+**staged**. Both verify that receipt against their current state. The designated
+client must also have observed its own real request and `PlayerUnstuckCompleted`
+after the joined observation; the second client does not own that local cleanup.
+Require all of the following:
 
 - The original army ID, player leader ID, two follower IDs, and attachment
   relationships still match **staged**.
@@ -117,7 +128,10 @@ clients. Require all of the following:
   camp; the designated client's encounter/menu has closed.
 - No replacement army or loss of a member is accepted as preservation.
 
-Run `coop.unstuck` a second time and repeat the same read-only assertion. It must
+Run `coop.unstuck` a second time. On the server, pass the previous **recovered**
+JSON to `defense_army_state unstuck`; this requires a newer request than the prior
+receipt. Require `requestSequence: 2`, retain the new **recovered** JSON, and pass
+that new result to both clients' `unstuck` assertions. The second invocation must
 leave the preserved army intact. The ordinary follower recovery path is covered
 separately by non-live regression tests; this fixture concerns a player-led army.
 
@@ -133,7 +147,9 @@ IDs to be absent from each registry, before starting another capture. If staging
 failed before producing **staged**, retain **capture** and use server restore
 and verify; do not invent a staged identity for client checks.
 
-A failed cleanup keeps its token and evidence for retry. Do not clear its state
+Recovery observation is disposed when cleanup starts, verification succeeds, a new
+fixture is captured, or the campaign exits/reloads. A failed cleanup keeps its
+token and evidence for retry. Do not clear its state
 or operate on a replacement army. If a participant was destroyed, the campaign
 advanced, casualties occurred, the process restarted, or verification cannot
 finish, preserve the logs and reload the untouched disposable seed. This
@@ -141,7 +157,8 @@ in-memory fixture does not restore campaign history, battle rewards, losses, or
 the entire save. Restore any seed preparation and original time mode, or use the
 seed reload as the complete reset. Do not save the staged campaign over it.
 
-For a failure, retain **capture**, **staged**, each peer's fixture state, both
+For a failure, retain **capture**, **staged**, every server **recovered** receipt,
+each peer's fixture state, both
 assertion results, controller IDs, exact menu screenshots, source identities,
 and server/client logs. Diagnose `Failed to get id`, missing membership, wrong
 canonical side, unexpected army destruction/removal, and failed finalization

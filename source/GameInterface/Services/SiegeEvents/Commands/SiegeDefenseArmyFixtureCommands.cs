@@ -3,15 +3,19 @@ using Common;
 using Common.Commands;
 using Common.Messaging;
 using GameInterface.Services.Armies;
+using GameInterface.Services.GameState.Messages;
 using GameInterface.Services.Heroes.Enum;
 using GameInterface.Services.Heroes.Interaces;
 using GameInterface.Services.MapEvents.Messages.Leave;
 using GameInterface.Services.MobileParties.Data;
 using GameInterface.Services.MobileParties.Extensions;
+using GameInterface.Services.MobileParties.Handlers;
+using GameInterface.Services.MobileParties.Messages.Unstuck;
 using GameInterface.Services.MobileParties.Messages.Behavior;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Players;
 using GameInterface.Services.SiegeEvents.Interfaces;
+using HarmonyLib;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 using System;
@@ -29,11 +33,13 @@ using TaleWorlds.Library;
 
 namespace GameInterface.Services.SiegeEvents.Commands;
 
-// Commands share one captured campaign fixture; JSON carries immutable expectations between peers.
+/// <summary>Stages one captured campaign fixture and checks its identities and recovery evidence on both peers.</summary>
 internal static class SiegeDefenseArmyFixtureCommands
 {
     private static FixtureState fixture;
+    private static RecoveryObserver recoveryObserver;
 
+    /// <summary>Reports the current fixture identities.</summary>
     public sealed class FixtureStateCoopCommand : ICoopCommand
     {
         public string Prefix => "coop.debug.siege";
@@ -53,6 +59,7 @@ internal static class SiegeDefenseArmyFixtureCommands
         }
     }
 
+    /// <summary>Captures the clean fixture participants.</summary>
     public sealed class CaptureFixtureCoopCommand : ICoopCommand
     {
         public string Prefix => "coop.debug.siege";
@@ -73,6 +80,7 @@ internal static class SiegeDefenseArmyFixtureCommands
         }
     }
 
+    /// <summary>Stages the captured army and siege.</summary>
     public sealed class StageFixtureCoopCommand : ICoopCommand
     {
         public string Prefix => "coop.debug.siege";
@@ -92,6 +100,7 @@ internal static class SiegeDefenseArmyFixtureCommands
         }
     }
 
+    /// <summary>Checks the requested fixture state and recovery proof.</summary>
     public sealed class DefenseArmyStateCoopCommand : ICoopCommand
     {
         public string Prefix => "coop.debug.siege";
@@ -103,7 +112,7 @@ internal static class SiegeDefenseArmyFixtureCommands
             new ExpectedArgs("controllerId", "The connected player controller id."),
             new ExpectedArgs("settlementId", "The settlement id."),
             new ExpectedArgs("state", "baseline, joined, unstuck, or restored."),
-            new ExpectedArgs("expectedState", "The complete staged LIVE_TEST_JSON object, including for restored."),
+            new ExpectedArgs("expectedState", "Staged JSON; clients checking unstuck require the successful server unstuck JSON."),
         };
 
         public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
@@ -113,6 +122,7 @@ internal static class SiegeDefenseArmyFixtureCommands
         }
     }
 
+    /// <summary>Restores the captured fixture topology and movement.</summary>
     public sealed class RestoreFixtureCoopCommand : ICoopCommand
     {
         public string Prefix => "coop.debug.siege";
@@ -132,6 +142,7 @@ internal static class SiegeDefenseArmyFixtureCommands
         }
     }
 
+    /// <summary>Verifies restoration before releasing the fixture.</summary>
     public sealed class VerifyFixtureCoopCommand : ICoopCommand
     {
         public string Prefix => "coop.debug.siege";
@@ -200,6 +211,7 @@ internal static class SiegeDefenseArmyFixtureCommands
             .Select(p => CaptureParty(p, manager, behaviors)).ToArray();
         if (snapshots.Any(p => p == null) || snapshots.Select(p => p.Id).Distinct().Count() != 4)
             return Failed("Every fixture participant must have a distinct registered id and a movement snapshot");
+        recoveryObserver?.Dispose();
         fixture = new FixtureState(Guid.NewGuid().ToString("N"), args[0], settlement, settlementId, snapshots);
         fixture.CapturedExpectation = CreateExpectation(fixture, manager);
         return FormatState("Captured siege defense army fixture", player, settlement, manager, fixture.CapturedExpectation);
@@ -270,6 +282,7 @@ internal static class SiegeDefenseArmyFixtureCommands
                 throw new InvalidOperationException("The registered hostile AI wall assault could not be created.");
             fixture.StagedExpectation = CreateExpectation(fixture, manager);
             fixture.Staged = true;
+            recoveryObserver = CreateRecoveryObserver(player, settlement, manager, fixture.StagedExpectation);
             var result = FormatOwnedState("Staged siege defense army fixture", fixture.StagedExpectation, "baseline");
             if (!result.Succeeded) throw new InvalidOperationException(result.Output);
             return result;
@@ -340,7 +353,31 @@ internal static class SiegeDefenseArmyFixtureCommands
         if (ModInformation.IsServer && !TryValidateToken(args[3], out error)) return Failed(error);
         if (!TryResolveContext(args[0], args[1], out var player, out var settlement, out var manager, out error))
             return Failed(error);
-        return FormatState($"Siege defense army {args[2]} state", player, settlement, manager, expected, args[2]);
+        if (recoveryObserver != null && !recoveryObserver.Matches(Campaign.Current, expected))
+            recoveryObserver.Dispose();
+        var supplied = JObject.Parse(args[3]);
+        var receipt = supplied["serverRecoveryReceipt"] as JObject;
+        var observed = Observe(player, settlement, manager, expected);
+        if (args[2] == "unstuck")
+        {
+            if (ModInformation.IsClient)
+            {
+                if (supplied.Value<bool?>("success") != true || supplied.Value<string>("expectedState") != "unstuck")
+                    return Failed("Client unstuck assertions require the successful server unstuck result JSON");
+                observed["recoveryReceipt"] = receipt;
+            }
+            else
+                observed["previousRecoverySequence"] = receipt?.Value<long?>("requestSequence") ?? 0;
+        }
+        var result = FormatStateResult($"Siege defense army {args[2]} state", expected, observed, args[2]);
+        if (args[2] == "joined" && result.Succeeded)
+        {
+            recoveryObserver ??= CreateRecoveryObserver(player, settlement, manager, expected);
+            if (!recoveryObserver.Proof.MarkJoined())
+                return Failed("A recovery request is already pending; re-stage before recording the joined phase");
+        }
+        if (args[2] == "restored" && result.Succeeded) recoveryObserver?.Dispose();
+        return result;
     }
 
     private static CoopCommandResult RestoreFixture(ICoopCommandArgs args)
@@ -369,11 +406,13 @@ internal static class SiegeDefenseArmyFixtureCommands
         if (!fixture.Restored) return Failed("Restore the siege defense army fixture before verifying it");
         var result = FormatOwnedState("Verified siege defense army fixture restoration", fixture.CapturedExpectation, "restored");
         fixture.Verified = result.Succeeded;
+        if (result.Succeeded) recoveryObserver?.Dispose();
         return result;
     }
 
     private static void RestoreFixtureState()
     {
+        recoveryObserver?.Dispose();
         if (!TryRequirePause(out var error)) throw new InvalidOperationException(error);
         if (!ContainerProvider.TryResolve<ISiegeEventInterface>(out var sieges)
             || !ContainerProvider.TryResolve<IMobilePartyBehaviorSnapshot>(out var behaviors)
@@ -589,6 +628,12 @@ internal static class SiegeDefenseArmyFixtureCommands
 
     internal static bool EvaluateState(JObject expected, JObject observed, string state, out string error)
     {
+        if (!EvaluateTopology(expected, observed, state, out error)) return false;
+        return state != "unstuck" || ValidateRecoveryReceipt(expected, observed, out error);
+    }
+
+    private static bool EvaluateTopology(JObject expected, JObject observed, string state, out string error)
+    {
         error = null;
         if (state != "baseline" && state != "joined" && state != "unstuck" && state != "restored")
             error = $"Unknown defense army state '{state}'";
@@ -693,6 +738,11 @@ internal static class SiegeDefenseArmyFixtureCommands
         {
             buildVersion = ModInformation.BuildVersion,
             commit = ModInformation.Commit,
+            authoritative = ModInformation.IsServer,
+            isLocalPlayer,
+            recoveryReceipt = ModInformation.IsServer ? recoveryObserver?.Proof.GetReceipt() : null,
+            localRecoveryRequests = isLocalPlayer ? recoveryObserver?.Proof.RequestCountAfterJoin ?? 0 : 0,
+            localRecoveryCompletions = isLocalPlayer ? recoveryObserver?.Proof.CompletionCountAfterJoin ?? 0 : 0,
             paused = TryRequirePause(out _),
             playerPartyId = GetId(manager, player),
             settlementNetworkId = GetId(manager, settlement),
@@ -778,6 +828,7 @@ internal static class SiegeDefenseArmyFixtureCommands
             success, label, expectedState = state, error, expectation = expected, observed,
             fixtureTopologyRestored = state == "restored" && success,
             saveBaselineRestored = false,
+            serverRecoveryReceipt = success && state == "unstuck" ? observed["recoveryReceipt"] : null,
         };
         return new CoopCommandResult(success, label + Environment.NewLine + "LIVE_TEST_JSON="
             + JsonConvert.SerializeObject(result), success ? null : "fixture_assertion_failed");
@@ -829,6 +880,267 @@ internal static class SiegeDefenseArmyFixtureCommands
     };
 
 
+    internal static bool ValidateRecoveryReceipt(JObject expected, JObject observed, out string error)
+    {
+        error = "Unstuck requires a completed real recovery after a successful joined observation";
+        var receipt = observed["recoveryReceipt"] as JObject;
+        if (receipt == null || receipt.Value<string>("source") != "server"
+            || receipt.Value<bool?>("joinedObserved") != true || receipt.Value<bool?>("handlerCompleted") != true
+            || receipt.Value<bool?>("topologyPassed") != true || (receipt.Value<long?>("requestSequence") ?? 0) <= 0)
+            return false;
+        foreach (var name in new[] { "fixtureToken", "buildVersion", "commit", "controllerId", "playerPartyId", "armyId", "mapEventId" })
+        {
+            if (!JToken.DeepEquals(receipt[name], expected[name]))
+            {
+                error = $"The recovery receipt {name} does not match the staged fixture";
+                return false;
+            }
+        }
+        long sequence = receipt.Value<long>("requestSequence");
+        if (observed.Value<bool?>("authoritative") == true
+            && sequence <= (observed.Value<long?>("previousRecoverySequence") ?? 0))
+        {
+            error = "No new completed recovery request followed the previous server receipt";
+            return false;
+        }
+        if (observed.Value<bool?>("isLocalPlayer") == true
+            && (observed.Value<long?>("localRecoveryRequests") != sequence
+                || observed.Value<long?>("localRecoveryCompletions") != sequence))
+        {
+            error = "The owning client has not completed the recovery request identified by the server receipt";
+            return false;
+        }
+        error = null;
+        return true;
+    }
+
+    private static RecoveryObserver CreateRecoveryObserver(MobileParty player, Settlement settlement,
+        IObjectManager manager, JObject expected)
+    {
+        if (!ContainerProvider.TryResolve<IMessageBroker>(out var broker))
+            throw new InvalidOperationException("Unable to resolve the fixture recovery message broker.");
+        recoveryObserver?.Dispose();
+        return new RecoveryObserver(broker, player, settlement, manager, expected);
+    }
+
+    /// <summary>Observes completion of the existing network-request handler without changing its recovery behavior.</summary>
+    [HarmonyPatch(typeof(PlayerUnstuckHandler), "ApplyServerUnstuck")]
+    private static class ObserveServerUnstuckCompletionPatch
+    {
+        [HarmonyPrefix]
+        private static void Prefix(string partyId, out ServerRecoveryCall __state)
+        {
+            var observer = recoveryObserver;
+            __state = default;
+            try
+            {
+                if (ModInformation.IsServer && observer?.MatchesCurrentCampaign() == true)
+                    __state = new ServerRecoveryCall(observer, observer.BeginServerRequest(partyId));
+            }
+            catch (Exception exception)
+            {
+                observer?.Proof.Dispose();
+                Common.Logging.LogManager.GetLogger(typeof(SiegeDefenseArmyFixtureCommands))
+                    .Error(exception, "Unable to observe the siege defense fixture recovery request");
+            }
+        }
+
+        [HarmonyPostfix]
+        private static void Postfix(ServerRecoveryCall __state)
+        {
+            if (__state.Request.Sequence == 0) return;
+            // The only caller is the network-request handler; postfix proves its apply returned normally.
+            GameThread.RunSafe(() => __state.Observer.CompleteServerRequest(__state.Request),
+                context: nameof(SiegeDefenseArmyFixtureCommands));
+        }
+    }
+
+    private readonly struct ServerRecoveryCall
+    {
+        public RecoveryObserver Observer { get; }
+        public RecoveryRequest Request { get; }
+        public ServerRecoveryCall(RecoveryObserver observer, RecoveryRequest request)
+        {
+            Observer = observer;
+            Request = request;
+        }
+    }
+
+    internal readonly struct RecoveryRequest
+    {
+        public long Sequence { get; }
+        public bool FollowedJoin { get; }
+        public RecoveryRequest(long sequence, bool followedJoin)
+        {
+            Sequence = sequence;
+            FollowedJoin = followedJoin;
+        }
+    }
+
+    /// <summary>Pairs ordered network requests with actual handler returns for one captured fixture.</summary>
+    internal sealed class RecoveryProof : IDisposable
+    {
+        private readonly object gate = new object();
+        private readonly JObject expected;
+        private long requests;
+        private long completions;
+        private long joinedAfterRequest;
+        private bool joined;
+        private bool disposed;
+        private JObject receipt;
+
+        public RecoveryProof(JObject expected) => this.expected = (JObject)expected.DeepClone();
+
+        public long RequestCountAfterJoin { get { lock (gate) return joined ? requests - joinedAfterRequest : 0; } }
+        public long CompletionCountAfterJoin { get { lock (gate) return joined ? completions - joinedAfterRequest : 0; } }
+
+        public bool MarkJoined()
+        {
+            lock (gate)
+            {
+                if (disposed) return false;
+                if (joined) return true;
+                if (requests != completions) return false;
+                joinedAfterRequest = requests;
+                joined = true;
+                return true;
+            }
+        }
+
+        public RecoveryRequest BeginRequest(string partyId)
+        {
+            lock (gate)
+            {
+                if (disposed || partyId != expected.Value<string>("playerPartyId")) return default;
+                receipt = null;
+                return new RecoveryRequest(++requests, joined);
+            }
+        }
+
+        public void RecordCompletion(string partyId)
+        {
+            lock (gate)
+            {
+                if (!disposed && partyId == expected.Value<string>("playerPartyId")) completions++;
+            }
+        }
+
+        public bool CompleteRequest(RecoveryRequest request, bool ownerMatches, bool topologyPassed)
+        {
+            lock (gate)
+            {
+                if (disposed || !joined || !request.FollowedJoin || !ownerMatches || !topologyPassed
+                    || request.Sequence <= joinedAfterRequest || request.Sequence != requests
+                    || completions < request.Sequence) return false;
+                receipt = new JObject
+                {
+                    ["source"] = "server",
+                    ["joinedObserved"] = true,
+                    ["handlerCompleted"] = true,
+                    ["topologyPassed"] = true,
+                    ["requestSequence"] = request.Sequence - joinedAfterRequest,
+                };
+                foreach (var name in new[] { "fixtureToken", "buildVersion", "commit", "controllerId", "playerPartyId", "armyId", "mapEventId" })
+                    receipt[name] = expected[name]?.DeepClone();
+                return true;
+            }
+        }
+
+        public JObject GetReceipt() { lock (gate) return receipt == null ? null : (JObject)receipt.DeepClone(); }
+        public void Dispose() { lock (gate) { disposed = true; receipt = null; } }
+    }
+
+    /// <summary>Owns one campaign fixture receipt and the requesting client completion subscriptions.</summary>
+    private sealed class RecoveryObserver : IDisposable
+    {
+        private readonly IMessageBroker broker;
+        private readonly Campaign campaign;
+        private readonly MobileParty player;
+        private readonly Settlement settlement;
+        private readonly IObjectManager manager;
+        private readonly JObject expected;
+        private readonly bool authoritative;
+        private bool disposed;
+        public RecoveryProof Proof { get; }
+
+        public RecoveryObserver(IMessageBroker broker, MobileParty player, Settlement settlement,
+            IObjectManager manager, JObject expected)
+        {
+            this.broker = broker;
+            this.player = player;
+            this.settlement = settlement;
+            this.manager = manager;
+            this.expected = (JObject)expected.DeepClone();
+            campaign = Campaign.Current;
+            authoritative = ModInformation.IsServer;
+            Proof = new RecoveryProof(expected);
+            broker.Subscribe<PlayerUnstuckRequested>(OnLocalRequest);
+            broker.Subscribe<PlayerUnstuckCompleted>(OnLocalCompleted);
+            broker.Subscribe<GameExited>(OnGameExited);
+            broker.Subscribe<GameLoadStarted>(OnGameLoadStarted);
+        }
+
+        public bool Matches(Campaign current, JObject identity) => !disposed && campaign == current
+            && expected.Value<string>("fixtureToken") == identity.Value<string>("fixtureToken");
+        public bool MatchesCurrentCampaign() => !disposed && campaign == Campaign.Current;
+
+        public RecoveryRequest BeginServerRequest(string partyId)
+        {
+            if (!authoritative || !MatchesCurrentCampaign()
+                || !ContainerProvider.TryResolve<IPlayerManager>(out var players)
+                || !players.TryGetPlayer(expected.Value<string>("controllerId"), out var requester)
+                || !players.IsConnected(requester) || requester.MobilePartyId != partyId)
+                return default;
+            return Proof.BeginRequest(partyId);
+        }
+
+        public void CompleteServerRequest(RecoveryRequest request)
+        {
+            if (!MatchesCurrentCampaign()) { Dispose(); return; }
+            Proof.RecordCompletion(expected.Value<string>("playerPartyId"));
+            var observed = Observe(player, settlement, manager, expected);
+            Proof.CompleteRequest(request, true, EvaluateTopology(expected, observed, "unstuck", out _));
+        }
+
+        private void OnLocalRequest(MessagePayload<PlayerUnstuckRequested> payload)
+        {
+            if (!authoritative && payload.What.Party == player)
+                Proof.BeginRequest(expected.Value<string>("playerPartyId"));
+        }
+
+        private void OnLocalCompleted(MessagePayload<PlayerUnstuckCompleted> payload)
+        {
+            if (authoritative || payload.Who is not PlayerUnstuckHandler) return;
+            GameThread.RunSafe(() =>
+            {
+                if (!MatchesCurrentCampaign()) { ScheduleDispose(); return; }
+                Proof.RecordCompletion(payload.What.PartyId);
+            }, context: nameof(SiegeDefenseArmyFixtureCommands));
+        }
+
+        private void OnGameExited(MessagePayload<GameExited> payload) => ScheduleDispose();
+        private void OnGameLoadStarted(MessagePayload<GameLoadStarted> payload) => ScheduleDispose();
+        private void ScheduleDispose()
+        {
+            Proof.Dispose();
+            // Dispose after publication so removing this subscription cannot skip another listener.
+            GameThread.EnqueueSafe(Dispose, context: nameof(SiegeDefenseArmyFixtureCommands));
+        }
+
+        public void Dispose()
+        {
+            if (disposed) return;
+            disposed = true;
+            Proof.Dispose();
+            broker.Unsubscribe<PlayerUnstuckRequested>(OnLocalRequest);
+            broker.Unsubscribe<PlayerUnstuckCompleted>(OnLocalCompleted);
+            broker.Unsubscribe<GameExited>(OnGameExited);
+            broker.Unsubscribe<GameLoadStarted>(OnGameLoadStarted);
+            if (ReferenceEquals(recoveryObserver, this)) recoveryObserver = null;
+        }
+    }
+
+    /// <summary>Retains the captured campaign and exact objects owned by fixture cleanup.</summary>
     private sealed class FixtureState
     {
         public Campaign Campaign { get; }
@@ -865,6 +1177,7 @@ internal static class SiegeDefenseArmyFixtureCommands
         }
     }
 
+    /// <summary>Retains one party identity and its pre-fixture movement state.</summary>
     private sealed class PartySnapshot
     {
         public MobileParty Party { get; }
