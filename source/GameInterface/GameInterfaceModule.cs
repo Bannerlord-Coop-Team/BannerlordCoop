@@ -86,6 +86,10 @@ public class GameInterfaceModule : Module
         builder.RegisterType<CoopCommandArgsFactory>().As<ICoopCommandArgsFactory>().InstancePerDependency();
         builder.RegisterType<RglCommandLineRegistry>().As<IRglCommandLineRegistry>().InstancePerDependency();
         builder.RegisterType<CoopCommandRegistry>().As<ICoopCommandRegistry>().InstancePerLifetimeScope();
+#if DEBUG
+        builder.RegisterType<Services.MobileParties.Commands.AutoSyncAttachmentFixture>()
+            .As<Services.MobileParties.Commands.IAutoSyncAttachmentFixture>().InstancePerDependency();
+#endif
         builder.RegisterAssemblyTypes(typeof(GameInterfaceModule).Assembly)
             .Where(type => type.IsClass &&
                            !type.IsAbstract &&
