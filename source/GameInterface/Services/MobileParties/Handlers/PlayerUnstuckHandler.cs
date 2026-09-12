@@ -29,9 +29,9 @@ using TaleWorlds.Library;
 namespace GameInterface.Services.MobileParties.Handlers;
 
 /// <summary>
-/// Dedicated recovery flow behind coop.debug.mobileparty.unstuck. The client forwards
+/// Dedicated recovery flow behind coop.unstuck. The client forwards
 /// <see cref="PlayerUnstuckRequested"/> to the server as <see cref="NetworkRequestPlayerUnstuck"/>;
-/// the server force-applies every applicable exit (captivity, map event, army, siege camp,
+/// the server force-applies every applicable exit (captivity, map event, follower army, siege camp,
 /// settlement) with each step guarded independently, so one broken exit flow cannot block the
 /// others; the
 /// <see cref="NetworkPlayerUnstuckResult"/> reply then lets the requesting client clear the
@@ -164,7 +164,16 @@ internal class PlayerUnstuckHandler : IHandler
         }
 
         var army = party.Army;
-        if (army != null)
+        var preservesArmy = army?.LeaderParty == party;
+        var battle = party.MapEvent;
+        var attachedBattleParties = preservesArmy && battle != null
+            ? party.AttachedParties.Where(member => member.Army == army && member.MapEvent == battle).ToArray()
+            : Array.Empty<MobileParty>();
+        if (preservesArmy)
+        {
+            actions.Add("Preserved the player-led army and its attached parties.");
+        }
+        else if (army != null)
         {
             TryStep(actions, "army removal", () =>
             {
@@ -198,18 +207,13 @@ internal class PlayerUnstuckHandler : IHandler
             });
         }
 
-        if (party.Party?.MapEvent != null)
+        // A leader's single-party battle leave does not release its attached army members.
+        foreach (var attachedParty in attachedBattleParties)
         {
-            TryStep(actions, "map event removal", () =>
-            {
-                // Reuse the normal authoritative leave flow so the removal and client cleanup are broadcast.
-                messageBroker.Publish(party, new PlayerLeaveBattleAttempted(party.Party));
-                if (party.Party.MapEvent != null)
-                    throw new InvalidOperationException("The battle leave flow did not remove the party from its map event.");
-
-                return "Removed the party from its map event.";
-            });
+            if (attachedParty.MapEvent == battle)
+                RemoveFromMapEvent(attachedParty, actions);
         }
+        RemoveFromMapEvent(party, actions);
 
         if (actions.Count == 0)
         {
@@ -217,6 +221,20 @@ internal class PlayerUnstuckHandler : IHandler
         }
 
         network.SendAll(new NetworkPlayerUnstuckResult(partyId, actions.ToArray()));
+    }
+
+    private void RemoveFromMapEvent(MobileParty party, List<string> actions)
+    {
+        if (party.Party?.MapEvent == null) return;
+
+        TryStep(actions, "map event removal", () =>
+        {
+            messageBroker.Publish(party, new PlayerLeaveBattleAttempted(party.Party));
+            if (party.Party.MapEvent != null)
+                throw new InvalidOperationException("The battle leave flow did not remove the party from its map event.");
+
+            return $"Removed party {party.StringId} from its map event.";
+        });
     }
 
     /// <summary>
