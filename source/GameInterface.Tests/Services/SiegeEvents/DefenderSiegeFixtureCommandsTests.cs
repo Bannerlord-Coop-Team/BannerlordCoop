@@ -459,6 +459,36 @@ public sealed class DefenderSiegeFixtureCommandsTests : IDisposable
         }, actionCalls);
     }
 
+    [Fact]
+    public void PreparedCaptiveBaseline_AcceptsAResidualCapturedPartyComponentAndRestoresExactly()
+    {
+        PrepareReadinessObservation();
+        Captive target = captives[0];
+        object[] before = captives.Select(ReadState).ToArray();
+        int recaptureCount = 0;
+        afterRecapture = _ =>
+        {
+            recaptureCount++;
+            if (recaptureCount != 1) return;
+
+            var component = ObjectHelper.SkipConstructor<LordPartyComponent>();
+            component._leader = target.Hero;
+            component.MobileParty = target.Party;
+            target.Party._partyComponent = component;
+        };
+
+        AssertSuccess(PrepareCaptiveBaseline());
+        Assert.True(target.Hero.IsPrisoner);
+        Assert.Same(target.Hero, target.Party.LeaderHero);
+        Capture();
+        Normalize();
+        AssertSuccess(Restore());
+        AssertSuccess(Verify());
+        AssertSuccess(RestoreCaptiveBaseline());
+        AssertSuccess(VerifyCaptiveBaseline());
+        Assert.Equal(before, captives.Select(ReadState).ToArray());
+    }
+
     [Theory]
     [InlineData(false, false)]
     [InlineData(true, false)]

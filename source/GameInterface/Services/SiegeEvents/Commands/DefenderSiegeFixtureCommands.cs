@@ -734,7 +734,8 @@ internal static class DefenderSiegeFixtureCommands
             }
             catch (Exception exception)
             {
-                bool captured = MatchesCapturedCaptivityBaseline(player);
+                bool captured = MatchesCapturedCaptivityBaseline(player) ||
+                    IsCurrentPreparedRosterCaptivity(player);
                 bool released = IsReleasedForRestoration(player);
                 bool releasedStateRestorable = released &&
                     IsReleasedRosterRestorable(rosterFixture, player, out _);
@@ -1386,6 +1387,10 @@ internal static class DefenderSiegeFixtureCommands
             DefenderFixturePartyState partyState = ReadPartyState(partyId, party);
             if (wasCaptive)
             {
+                bool preparedBaselineCaptive = preparedBaseline != null &&
+                    ReferenceEquals(preparedBaseline.Captive.Hero, hero) &&
+                    ReferenceEquals(preparedBaseline.Captive.Party, party) &&
+                    ReferenceEquals(preparedBaseline.Captor.Party.Party, captorParty);
                 if (!IsCaptorReadyForRelease(captorParty))
                 {
                     error = "The mobile captor for " + controllerId + " must be on land before roster capture.";
@@ -1398,7 +1403,7 @@ internal static class DefenderSiegeFixtureCommands
                     return false;
                 }
 
-                if (!DefenderRosterFixtureContract.IsCaptiveBaselineRestorable(
+                if (!preparedBaselineCaptive && !DefenderRosterFixtureContract.IsCaptiveBaselineRestorable(
                         hero.IsPrisoner,
                         hero.PartyBelongedToAsPrisoner != null,
                         captorParty.IsActive,
@@ -1601,8 +1606,7 @@ internal static class DefenderSiegeFixtureCommands
     {
         if (!HasCurrentRosterIdentities(baseline.Fixture, out error))
             return false;
-        if (!ReferenceEquals(baseline.Captive.CaptorParty, baseline.Captor.Party.Party) ||
-            !MatchesNormalRecapture(baseline.Captive))
+        if (!MatchesOwnedPreparedCaptivity(baseline))
         {
             error = "The prepared captive player state is no longer current.";
             return false;
@@ -1640,6 +1644,27 @@ internal static class DefenderSiegeFixtureCommands
         captor != null && (!captor.IsMobile ||
             captor.MobileParty != null && !captor.MobileParty.IsCurrentlyAtSea && captor.Position.IsOnLand);
 
+    private static bool MatchesOwnedPreparedCaptivity(DefenderRosterCaptiveBaselineFixture baseline)
+    {
+        DefenderRosterFixturePlayer captive = baseline.Captive;
+        return ReferenceEquals(captive.CaptorParty, baseline.Captor.Party.Party) &&
+            captive.Hero.IsPrisoner &&
+            ReferenceEquals(captive.Hero.PartyBelongedToAsPrisoner, baseline.Captor.Party.Party) &&
+            baseline.Captor.Party.IsActive &&
+            TryGetCaptorHeroPrisonerElement(baseline.Captor.Party.Party, captive.Hero,
+                out TroopRosterElement captorHeroElement) &&
+            captorHeroElement.Number == 1 && captorHeroElement.WoundedNumber == 0 && captorHeroElement.Xp == 0;
+    }
+
+    private static bool IsCurrentPreparedRosterCaptivity(DefenderRosterFixturePlayer player)
+    {
+        DefenderRosterCaptiveBaselineFixture baseline = rosterCaptiveBaselineFixture;
+        return baseline != null && ReferenceEquals(baseline.Captive.Hero, player.Hero) &&
+            ReferenceEquals(baseline.Captive.Party, player.Party) &&
+            ReferenceEquals(baseline.Captor.Party.Party, player.CaptorParty) &&
+            MatchesOwnedPreparedCaptivity(baseline);
+    }
+
     private static bool IsRosterCaptureCurrent(DefenderRosterFixture fixture, out string error)
     {
         if (!HasCurrentRosterIdentities(fixture, out error))
@@ -1648,7 +1673,7 @@ internal static class DefenderSiegeFixtureCommands
         foreach (DefenderRosterFixturePlayer player in fixture.Players)
         {
             if (player.WasCaptive && (!IsCaptorReadyForRelease(player.CaptorParty) ||
-                !MatchesCapturedCaptivityBaseline(player)))
+                !(MatchesCapturedCaptivityBaseline(player) || IsCurrentPreparedRosterCaptivity(player))))
             {
                 error = "The captive baseline for " + player.ControllerId + " changed before normalization.";
                 return false;
@@ -2281,7 +2306,7 @@ internal static class DefenderSiegeFixtureCommands
         foreach (DefenderRosterFixturePlayer player in fixture.Players)
         {
             bool restored = player.WasCaptive
-                ? MatchesCapturedCaptivityBaseline(player)
+                ? MatchesCapturedCaptivityBaseline(player) || IsCurrentPreparedRosterCaptivity(player)
                 : MatchesCapturedRosterNonCaptiveBaseline(player);
             if (restored) continue;
 
