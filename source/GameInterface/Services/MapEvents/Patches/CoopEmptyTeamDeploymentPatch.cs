@@ -1,8 +1,9 @@
 ﻿using System;
 #if DEBUG
 using System.Collections.Generic;
+using Common;
+using Common.Commands;
 using Newtonsoft.Json;
-using static TaleWorlds.Library.CommandLineFunctionality;
 #endif
 using HarmonyLib;
 using TaleWorlds.MountAndBlade;
@@ -38,6 +39,10 @@ internal class CoopEmptyTeamDeploymentPatch
     private static readonly List<WeakReference> observedMissions = new List<WeakReference>();
     private static int observedTeamCount;
     private static int observedMissionCount;
+    private static long overrideCalls;
+    private static long emptyTeamOverrideCalls;
+    private static string lastOverrideSide;
+    private static int lastOverrideActiveAgents;
 #endif
 
     [HarmonyPatch(typeof(DefaultBattleMissionAgentSpawnLogic), "MakeTeamPlans")]
@@ -65,36 +70,87 @@ internal class CoopEmptyTeamDeploymentPatch
     }
 
 #if DEBUG
-    [CommandLineArgumentFunction("deployment_retention_state", "coop.debug.mapevent")]
-    public static string DeploymentRetentionState(List<string> args)
+    /// <summary>Reports non-owning deployment observations without changing campaign state.</summary>
+    public sealed class DeploymentRetentionStateCoopCommand : ICoopCommand
     {
-        if (args.Count > 1 ||
-            (args.Count == 1 && !string.Equals(args[0], "collect", StringComparison.OrdinalIgnoreCase)))
+        public string Prefix => "coop.debug.map_event";
+        public string Name => "deployment_retention_state";
+        public string Description => "Reports deployment overrides and weak-reference survival; collect/reset require mission exit.";
+        public CoopCommandSide Side => CoopCommandSide.Both;
+        public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
-            return "Usage: coop.debug.mapevent.deployment_retention_state [collect]";
-        }
+            new ExpectedArgs("action", "status (default), collect, or reset", false),
+        };
 
-        if (args.Count == 1)
+        public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
         {
-            GC.Collect();
-            GC.WaitForPendingFinalizers();
-            GC.Collect();
-        }
+            string action = args.Count == 0 ? "status" : args[0];
+            if (args.Count > 1 ||
+                (!string.Equals(action, "status", StringComparison.OrdinalIgnoreCase) &&
+                 !string.Equals(action, "collect", StringComparison.OrdinalIgnoreCase) &&
+                 !string.Equals(action, "reset", StringComparison.OrdinalIgnoreCase)))
+            {
+                return new CoopCommandResult(false,
+                    "Usage: coop.debug.map_event.deployment_retention_state [status|collect|reset]",
+                    "invalid_arguments");
+            }
 
-        RemoveCollectedReferences(observedTeams);
-        RemoveCollectedReferences(observedMissions);
-        return "LIVE_TEST_JSON=" + JsonConvert.SerializeObject(new
-        {
-            totalObservedTeams = observedTeamCount,
-            aliveTeams = observedTeams.Count,
-            totalObservedMissions = observedMissionCount,
-            aliveMissions = observedMissions.Count,
-            currentMissionActive = Mission.Current != null,
-        });
+            bool collect = string.Equals(action, "collect", StringComparison.OrdinalIgnoreCase);
+            bool reset = string.Equals(action, "reset", StringComparison.OrdinalIgnoreCase);
+            if ((collect || reset) && (Mission.Current != null || BattleSpawnGate.IsCoopBattleActive))
+                return new CoopCommandResult(false, "Leave the mission and co-op battle before collecting or resetting observations.", "battle_active");
+
+            if (collect)
+            {
+                // DEBUG probe only: collection tests reachability; it is never a teardown mechanism.
+                GC.Collect();
+                GC.WaitForPendingFinalizers();
+                GC.Collect();
+            }
+
+            RemoveCollectedReferences(observedTeams);
+            RemoveCollectedReferences(observedMissions);
+            if (reset)
+            {
+                if (observedTeams.Count != 0 || observedMissions.Count != 0)
+                    return new CoopCommandResult(false, "Observed teams or missions are still alive; capture status and roots before resetting.", "observations_alive");
+
+                observedTeamCount = 0;
+                observedMissionCount = 0;
+                overrideCalls = 0;
+                emptyTeamOverrideCalls = 0;
+                lastOverrideSide = null;
+                lastOverrideActiveAgents = 0;
+            }
+
+            return new CoopCommandResult(true, "LIVE_TEST_JSON=" + JsonConvert.SerializeObject(new
+            {
+                schemaVersion = 1,
+                collectionRequested = collect,
+                resetPerformed = reset,
+                sourceModuleVersionId = typeof(CoopEmptyTeamDeploymentPatch).Assembly.ManifestModule.ModuleVersionId,
+                role = ModInformation.IsServer ? "server" : "client",
+                totalObservedTeams = observedTeamCount,
+                aliveTeams = observedTeams.Count,
+                totalObservedMissions = observedMissionCount,
+                aliveMissions = observedMissions.Count,
+                currentMissionActive = Mission.Current != null,
+                coopBattleActive = BattleSpawnGate.IsCoopBattleActive,
+                overrideCalls,
+                emptyTeamOverrideCalls,
+                lastOverrideSide,
+                lastOverrideActiveAgents,
+            }));
+        }
     }
 
     private static void TrackOverride(Team team)
     {
+        overrideCalls++;
+        lastOverrideSide = team.Side.ToString();
+        lastOverrideActiveAgents = team.ActiveAgents.Count;
+        if (lastOverrideActiveAgents == 0)
+            emptyTeamOverrideCalls++;
         RemoveCollectedReferences(observedTeams);
         RemoveCollectedReferences(observedMissions);
 
@@ -104,7 +160,7 @@ internal class CoopEmptyTeamDeploymentPatch
             observedTeamCount++;
         }
 
-        var mission = Mission.Current;
+        var mission = team.Mission;
         if (mission != null && !ContainsTarget(observedMissions, mission))
         {
             observedMissions.Add(new WeakReference(mission));
