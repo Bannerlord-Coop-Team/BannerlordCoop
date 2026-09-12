@@ -309,7 +309,7 @@ internal static class BattleDebugCommands
                 ownDamageEvents++;
         }
 
-        protected override void OnEndMission()
+        public override void OnEndMission()
         {
             ClearDebugBehavior();
         }
