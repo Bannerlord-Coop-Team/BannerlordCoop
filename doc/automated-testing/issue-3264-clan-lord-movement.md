@@ -106,8 +106,10 @@ Retain the restore result and repeat the command to check its idempotent result.
 
 The fixture must select a registered, eligible lord in the selected player's
 clan, print the actual identities, stage movement and place a real caravan within
-normal interaction range. Selection or setup failure is an unexercised test,
-never a pass. The server performs setup and restoration with synchronization
+normal interaction range. Staging checks the selected caravan distance against
+the current land encounter model and searches only inside that radius. It does
+not require the player to already target the caravan. Selection or setup failure
+is an unexercised test, never a pass. The server performs setup and restoration with synchronization
 patches active. Clients use observation commands and the normal conversation UI.
 
 Capture all of these phases:

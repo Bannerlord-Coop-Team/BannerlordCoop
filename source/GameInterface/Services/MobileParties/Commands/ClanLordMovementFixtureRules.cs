@@ -8,6 +8,8 @@ public interface IClanLordMovementFixtureRules
 {
     int LordPriority(string heroId);
 
+    bool IsWithinInteractionRange(float distance, float maximumDistance);
+
     string ValidateMovement(double baselineTicks, double nowTicks,
         float startX, float startY, float currentX, float currentY,
         float targetX, float targetY, float actualTargetX, float actualTargetY,
@@ -27,6 +29,9 @@ public sealed class ClanLordMovementFixtureRules : IClanLordMovementFixtureRules
             default: return 3;
         }
     }
+
+    public bool IsWithinInteractionRange(float distance, float maximumDistance) =>
+        IsFinite(distance) && IsFinite(maximumDistance) && distance >= 0f && distance < maximumDistance;
 
     public string ValidateMovement(double baselineTicks, double nowTicks,
         float startX, float startY, float currentX, float currentY,

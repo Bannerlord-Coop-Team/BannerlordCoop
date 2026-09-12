@@ -3,11 +3,11 @@ using GameInterface.Services.MobileParties.Data;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Tests.Services.SiegeEvents;
 using HarmonyLib;
-using Helpers;
 using Moq;
 using System;
 using System.Collections.Generic;
 using TaleWorlds.CampaignSystem;
+using TaleWorlds.CampaignSystem.Map;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Settlements;
 using TaleWorlds.Library;
@@ -383,6 +383,11 @@ public class MobilePartyBehaviorSnapshotTests
             Settlements = new MBReadOnlyList<Settlement>(new List<Settlement>()),
         };
         clientCampaign.CampaignObjectManager._mobileParties.Add(clientParty);
+        // No map scene exists; keep navigation validity at the scene boundary even when callers inline it.
+        var mapScene = new Mock<IMapScene>();
+        mapScene.Setup(scene => scene.GetFaceIndex(in It.Ref<CampaignVec2>.IsAny))
+            .Returns(PathFaceRecord.NullFaceRecord);
+        clientCampaign._mapSceneWrapper = mapScene.Object;
 
         Campaign previousCampaign = Campaign.Current;
         var harmony = new Harmony($"{nameof(MobilePartyBehaviorSnapshotTests)}.{Guid.NewGuid():N}");
@@ -394,15 +399,6 @@ public class MobilePartyBehaviorSnapshotTests
                 prefix: new HarmonyMethod(AccessTools.Method(
                     typeof(MobilePartyBehaviorSnapshotTests),
                     nameof(NavigationCapabilityPrefix))));
-            // Navigation validity needs a map scene; the behavior and navigation setters remain real.
-            harmony.Patch(
-                AccessTools.Method(
-                    typeof(NavigationHelper),
-                    nameof(NavigationHelper.IsPositionValidForNavigationType),
-                    new[] { typeof(CampaignVec2), typeof(MobileParty.NavigationType) }),
-                prefix: new HarmonyMethod(AccessTools.Method(
-                    typeof(MobilePartyBehaviorSnapshotTests),
-                    nameof(IsPositionValidForNavigationTypePrefix))));
 
             int beforeApplyCount = 0;
             for (int attempt = 0; attempt < 2; attempt++)
@@ -435,12 +431,6 @@ public class MobilePartyBehaviorSnapshotTests
             harmony.UnpatchAll(harmony.Id);
             Campaign.Current = previousCampaign;
         }
-    }
-
-    private static bool IsPositionValidForNavigationTypePrefix(ref bool __result)
-    {
-        __result = true;
-        return false;
     }
 
     private static bool NavigationCapabilityPrefix(ref MobileParty.NavigationType __result)

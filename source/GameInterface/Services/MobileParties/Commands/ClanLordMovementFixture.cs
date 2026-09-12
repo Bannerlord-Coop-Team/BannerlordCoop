@@ -74,11 +74,15 @@ internal sealed class ClanLordMovementFixture : IClanLordMovementFixture
         var candidateEvidence = candidates.Select(p => new { party = Describe(p), rejected = EligibleAi(p) }).ToArray();
         if (lord == null) return Result(false, "no eligible registered lord in this player's clan", candidateEvidence);
         MobileParty caravan = MobileParty.All.Where(p => p.IsCaravan && EligibleAi(p) == null &&
-                p.MapFaction != null && player.MapFaction != null && !p.MapFaction.IsAtWarWith(player.MapFaction))
+                !p.ShouldBeIgnored && p.MapFaction != null && player.MapFaction != null && !p.MapFaction.IsAtWarWith(player.MapFaction))
             .OrderBy(p => p.Position.DistanceSquared(player.Position))
             .ThenBy(p => p.StringId, StringComparer.Ordinal).FirstOrDefault();
         if (caravan == null) return Result(false, "no eligible registered peaceful caravan", candidateEvidence);
-        if (!TryPoint(player.Position, new[] { 0.3f, 0.6f, 0.9f }, out CampaignVec2 caravanPoint) ||
+        float interactionRange = campaign.Models.EncounterModel.NeededMaximumLandDistanceForEncounteringMobileParty;
+        if (!rules.IsWithinInteractionRange(0f, interactionRange))
+            return Result(false, "land interaction range is unavailable; nothing changed");
+        var caravanRadii = new[] { interactionRange * 0.6f, interactionRange * 0.4f, interactionRange * 0.2f };
+        if (!TryPoint(player.Position, caravanRadii, out CampaignVec2 caravanPoint) ||
             !TryPoint(lord.Position, new[] { 24f, 20f, 16f }, out CampaignVec2 target))
             return Result(false, "no deterministic navigable staging point or lord route; nothing changed", candidateEvidence);
         if (!snapshots.TryCreate(lord, out var lordState) || !snapshots.CanApply(lord, lordState) ||
@@ -95,7 +99,8 @@ internal sealed class ClanLordMovementFixture : IClanLordMovementFixture
             caravan.SetMoveModeHold();
             caravan.SetNavigationModeHold();
             caravan.Ai.SetDoNotMakeNewDecisions(true);
-            if (!((IInteractablePoint)caravan.Party).CanPartyInteract(player, 0f))
+            // CanPartyInteract reads the player's current target, which need not be this caravan.
+            if (!rules.IsWithinInteractionRange(player.Position.Distance(caravan.Position), interactionRange))
                 throw new InvalidOperationException("staged caravan is outside the real vanilla interaction range");
             lordCapture.Modified = true;
             lord.Ai.SetDoNotMakeNewDecisions(true);
@@ -114,7 +119,7 @@ internal sealed class ClanLordMovementFixture : IClanLordMovementFixture
         return Result(true, "ready: speak to the named caravan through the normal client UI", new
         {
             token = observation.Token, player = Describe(player), lord = Describe(lord), caravan = Describe(caravan),
-            interactionRangeVerified = true, distance = player.Position.Distance(caravan.Position), candidateEvidence,
+            interactionRangeVerified = true, interactionRange, distance = player.Position.Distance(caravan.Position), candidateEvidence,
             before = Command("before", lord.Position, CampaignTime.Now.NumTicks),
             during = Command("during", lord.Position, CampaignTime.Now.NumTicks),
             released = Command("released", lord.Position, CampaignTime.Now.NumTicks),

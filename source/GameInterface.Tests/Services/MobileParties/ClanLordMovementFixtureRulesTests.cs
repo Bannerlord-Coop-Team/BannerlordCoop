@@ -23,6 +23,23 @@ public class ClanLordMovementFixtureRulesTests
     }
 
     [Theory]
+    [InlineData(0.3f, 0.5f, true)]
+    [InlineData(0.499f, 0.5f, true)]
+    [InlineData(0.5f, 0.5f, false)]
+    [InlineData(0.6f, 0.5f, false)]
+    [InlineData(0.9f, 0.5f, false)]
+    [InlineData(0.3f, 0.25f, false)]
+    [InlineData(0f, 0f, false)]
+    [InlineData(-0.1f, 0.5f, false)]
+    [InlineData(float.NaN, 0.5f, false)]
+    [InlineData(0.3f, float.PositiveInfinity, false)]
+    public void IsWithinInteractionRange_RequiresFiniteDistanceStrictlyInsideModelRange(
+        float distance, float maximumDistance, bool expected)
+    {
+        Assert.Equal(expected, rules.IsWithinInteractionRange(distance, maximumDistance));
+    }
+
+    [Theory]
     [InlineData(0.1f, 0f, 5f, 0f)]
     [InlineData(0f, 0.1f, 0f, 5f)]
     [InlineData(0.08f, 0.08f, 5f, 5f)]
