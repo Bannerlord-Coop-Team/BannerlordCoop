@@ -51,6 +51,7 @@ internal sealed class SiegeInteractionDebugBehavior : MissionBehavior, ISiegeInt
     private Camera capturedCamera;
     private Camera stagingCamera;
     private bool fixtureRestored;
+    private string captureFailureReason;
 
     public override MissionBehaviorType BehaviorType => MissionBehaviorType.Other;
 
@@ -247,12 +248,13 @@ internal sealed class SiegeInteractionDebugBehavior : MissionBehavior, ISiegeInt
 
     private void Capture(MissionScreen screen, Agent agent)
     {
-        if (capturedAgent != null || screen?.CombatCamera == null || agent == null ||
-            !agent.IsActive() || agent.IsUsingGameObject || agent.MountAgent != null)
-        {
-            status = "fixture_capture_rejected";
-            return;
-        }
+        captureFailureReason = null;
+        if (RejectCapture(capturedAgent != null, "already_captured") ||
+            RejectCapture(screen?.CombatCamera == null, "combat_camera_missing") ||
+            RejectCapture(agent == null, "agent_missing") ||
+            RejectCapture(!agent.IsActive(), "agent_inactive") ||
+            RejectCapture(agent.IsUsingGameObject, "agent_using_object") ||
+            RejectCapture(agent.MountAgent != null, "agent_mounted")) return;
         capturedAgent = agent;
         capturedPosition = agent.Position;
         capturedLookDirection = agent.LookDirection;
@@ -260,6 +262,14 @@ internal sealed class SiegeInteractionDebugBehavior : MissionBehavior, ISiegeInt
         capturedCamera = screen.CustomCamera;
         fixtureRestored = false;
         status = "fixture_captured";
+    }
+
+    internal bool RejectCapture(bool rejected, string reason)
+    {
+        if (!rejected) return false;
+        captureFailureReason = reason;
+        status = "fixture_capture_rejected";
+        return true;
     }
 
     private void Stage(MissionScreen screen, Agent agent, int machineId, int pointIndex, bool watchOnly)
@@ -341,7 +351,7 @@ internal sealed class SiegeInteractionDebugBehavior : MissionBehavior, ISiegeInt
             usedObject = Describe(agent?.CurrentlyUsedGameObject),
             requestId, status, pressInvoked, edgeObserved, edgeCleared, inputGameKeyId, tick,
             fixtureActive = capturedAgent != null,
-            fixtureRestored,
+            fixtureRestored, captureFailureReason,
             stagingCameraActive = stagingCamera != null && ReferenceEquals(screen?.CustomCamera, stagingCamera),
             inputSamples = inputSamples.ToArray(),
             receivedStates, localShots, receivedShots,
