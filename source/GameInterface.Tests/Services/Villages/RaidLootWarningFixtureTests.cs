@@ -185,6 +185,20 @@ public class RaidLootWarningFixtureTests
         Assert.False(RaidLootWarningFixture.IsUnexpectedOccupant(visitor, player, militia, settlement));
     }
 
+    [Fact]
+    public void RejectedParticipantSet_CannotSeedOrRepeatPreparation()
+    {
+        var session = CreateSession();
+        var mapEvent = ObjectHelper.SkipConstructor<MapEvent>();
+        session.Prepare(() => { });
+        session.Capture(session.Campaign, session.Party, session.Settlement, mapEvent, "raid");
+        session.Reject();
+        int seeds = 0;
+        session.Seed(session.Campaign, mapEvent, session.Party, () => seeds++);
+        Assert.Equal(0, seeds);
+        Assert.False(session.CanRepeat(session.Campaign, session.ControllerId, session.Party, session.Settlement));
+    }
+
     private static RaidLootWarningFixture.FixtureSession CreateSession() => new(
         ObjectHelper.SkipConstructor<Campaign>(), "fixture-controller",
         ObjectHelper.SkipConstructor<MobileParty>(), ObjectHelper.SkipConstructor<Settlement>());

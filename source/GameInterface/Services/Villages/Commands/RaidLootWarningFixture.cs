@@ -201,6 +201,11 @@ public sealed class RaidLootWarningFixture : IRaidLootWarningFixture
             mapEvent.AttackerSide?.LeaderParty != fixture.Party.Party ||
             mapEvent.DefenderSide?.LeaderParty != fixture.Settlement.Party ||
             !objectManager.TryGetId(mapEvent, out var eventId)) return;
+        if (!HasExpectedParticipants(mapEvent))
+        {
+            fixture.Reject();
+            return;
+        }
         fixture.Capture(Campaign.Current, fixture.Party, fixture.Settlement, mapEvent, eventId);
     }
 
@@ -209,6 +214,11 @@ public sealed class RaidLootWarningFixture : IRaidLootWarningFixture
         if (ModInformation.IsClient || fixture?.Campaign != Campaign.Current ||
             fixture.Party.MapEvent != mapEvent || mapEvent.BattleState != BattleState.AttackerVictory ||
             mapEvent.MapEventSettlement != fixture.Settlement || !mapEvent.IsRaidHostileAction()) return;
+        if (!HasExpectedParticipants(mapEvent))
+        {
+            fixture.Reject();
+            return;
+        }
         var winner = mapEvent.AttackerSide.Parties.FirstOrDefault(x => x.Party == fixture.Party.Party);
         if (winner == null || !playerLootRosters.TryGetValue(winner, out var roster)) return;
         fixture.Seed(Campaign.Current, mapEvent, winner.Party.MobileParty, () =>
@@ -218,6 +228,15 @@ public sealed class RaidLootWarningFixture : IRaidLootWarningFixture
             roster.AddToCounts(DefaultItems.Grain, 1);
             fixture.SeededLoot = roster;
         });
+    }
+
+    private bool HasExpectedParticipants(MapEvent mapEvent)
+    {
+        var militia = fixture.Settlement.MilitiaPartyComponent?.MobileParty;
+        return mapEvent.AttackerSide.Parties.Count == 1 &&
+            mapEvent.AttackerSide.Parties[0].Party == fixture.Party.Party &&
+            mapEvent.DefenderSide.Parties.All(x => x.Party == fixture.Settlement.Party || x.Party == militia?.Party) &&
+            (militia?.MemberRoster.TotalManCount ?? 0) == 0;
     }
 
     public CoopCommandResult ReadState(string controllerId)
@@ -269,6 +288,8 @@ public sealed class RaidLootWarningFixture : IRaidLootWarningFixture
             mapEventId = eventId,
             mapEventState = currentEvent?.BattleState.ToString(),
             mapEventType = currentEvent?.Component?.GetType().Name,
+            attackerParties = currentEvent?.AttackerSide.Parties.Select(x => new { id = x.Party.Id, members = RosterState(x.Party.MemberRoster) }).ToArray(),
+            defenderParties = currentEvent?.DefenderSide.Parties.Select(x => new { id = x.Party.Id, members = RosterState(x.Party.MemberRoster) }).ToArray(),
             mapEventSettlementId = currentEvent?.MapEventSettlement?.StringId,
             settlementId = settlement.StringId,
             settlementName = settlement.Name.ToString(),
@@ -353,6 +374,8 @@ public sealed class RaidLootWarningFixture : IRaidLootWarningFixture
 
         internal bool CanRepeat(Campaign campaign, string controllerId, MobileParty party, Settlement settlement) =>
             Phase == "prepared" && Campaign == campaign && ControllerId == controllerId && Party == party && Settlement == settlement;
+
+        internal void Reject() => Phase = "failed-reload-baseline";
 
         internal void Prepare(Action stage)
         {
