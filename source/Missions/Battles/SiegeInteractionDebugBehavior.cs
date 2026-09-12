@@ -242,7 +242,7 @@ internal sealed class SiegeInteractionDebugBehavior : MissionBehavior, ISiegeInt
             status = "unexercised_input_busy";
             return;
         }
-        var key = HotKeyManager.GetCategory("Generic")?.GetGameKey(inputGameKeyId);
+        var key = HotKeyManager.GetCategory(CombatHotKeyCategory.CategoryId)?.GetGameKey(inputGameKeyId);
         if (key?.KeyboardKey == null)
         {
             status = "unexercised_unbound_key";
@@ -268,7 +268,7 @@ internal sealed class SiegeInteractionDebugBehavior : MissionBehavior, ISiegeInt
             return;
         }
         const int dismountGameKeyId = 15;
-        var key = HotKeyManager.GetCategory("Generic")?.GetGameKey(dismountGameKeyId);
+        var key = HotKeyManager.GetCategory(CombatHotKeyCategory.CategoryId)?.GetGameKey(dismountGameKeyId);
         if (screen?.SceneLayer?.Input == null || key?.KeyboardKey == null ||
             screen.SceneLayer.Input.IsGameKeyDown(dismountGameKeyId) ||
             screen.SceneLayer.Input.IsGameKeyPressed(dismountGameKeyId))
