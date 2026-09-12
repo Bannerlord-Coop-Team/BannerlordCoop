@@ -6,7 +6,7 @@ namespace GameInterface.Services.MapEvents;
 /// Cross-assembly state for the siege mission patches. The mission host is the default authority for
 /// the shared siege scenery — engine deployment placement and the machines themselves (rams, towers,
 /// ballistas, gates, ladders) — because their vanilla simulation is driven by whatever agents each
-/// machine happens to man locally, which diverges per client. A client that mans a ranged machine can
+/// machine happens to man locally, which diverges per client. A client interacting with a machine can
 /// claim its simulation per machine (see SiegeMachineStateReplicator). The Missions battle controller
 /// keeps <see cref="IsLocalAuthority"/> current, and the appliers raise <see cref="SuppressCapture"/>
 /// around a received change so the capture patches don't echo.
@@ -30,7 +30,7 @@ public static class SiegeMissionAuthorityGate
     private static volatile HashSet<int> remotelyClaimedMachines = new HashSet<int>();
 
     /// <summary>Whether this client runs the vanilla simulation of a machine: the mission host for
-    /// everything except the machines a client claimed by manning them.</summary>
+    /// everything except the machines claimed by a client interacting with them.</summary>
     public static bool IsMachineSimulatedLocally(int machineId)
     {
         return IsLocalAuthority

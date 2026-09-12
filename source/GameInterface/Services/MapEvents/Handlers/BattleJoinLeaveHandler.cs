@@ -167,6 +167,9 @@ internal class BattleJoinLeaveHandler : IHandler
         if (MobileParty.MainParty?.MapEvent != mapEvent)
             return;
 
+        if (PlayerEncounter.Current == null)
+            return;
+
         var encounterMapEvent = PlayerEncounter.Battle ?? PlayerEncounter.EncounteredBattle ?? MapEvent.PlayerMapEvent;
         if (encounterMapEvent != mapEvent)
             return;

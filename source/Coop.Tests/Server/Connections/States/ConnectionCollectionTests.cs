@@ -6,6 +6,7 @@ using Coop.Core.Server.Connections.Messages;
 using Coop.Core.Server.Connections.States;
 using Coop.Tests.Mocks;
 using LiteNetLib;
+using GameInterface.Services.Players;
 using Moq;
 using Xunit;
 using Xunit.Abstractions;
@@ -28,6 +29,20 @@ namespace Coop.Tests.Server.Connections.States
             playerPeer = network.CreatePeer();
 
             connectionCollection = container.Resolve<ConnectionCollection>();
+        }
+
+        [Fact]
+        public void CampaignSynchronization_ResolvesTheLiveConnectionCollection()
+        {
+            var synchronization = serverComponent.Container.Resolve<ICampaignSynchronization>();
+            Assert.Same(connectionCollection, synchronization);
+            Assert.Same(serverComponent.Container.Resolve<IConnectionCollection>(), synchronization);
+
+            connectionCollection.PlayerJoiningHandler(new MessagePayload<PlayerConnected>(this, new PlayerConnected(playerPeer)));
+            connectionCollection.ConnectionStates[playerPeer].SetState<LoadingState>();
+            Assert.False(synchronization.HasCompletedCampaignSynchronization(playerPeer));
+            connectionCollection.ConnectionStates[playerPeer].SetState<CampaignState>();
+            Assert.True(synchronization.HasCompletedCampaignSynchronization(playerPeer));
         }
 
         [Fact]

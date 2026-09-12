@@ -1809,6 +1809,9 @@ public class SiegeDebugCommand
         public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
             new ExpectedArgs("settlementId", "The settlement id."),
+#if DEBUG
+            new ExpectedArgs("profile", "Optional defender_interactables profile.", isRequired: false),
+#endif
         };
 
         public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
@@ -1819,6 +1822,10 @@ public class SiegeDebugCommand
                 return Failed("This command can only be used by the server");
             }
 
+#if DEBUG
+            if (args.Count > 1 && args[1] != "defender_interactables")
+                return Failed("Unknown siege machine staging profile.");
+#endif
             if (!ContainerProvider.TryResolve<IObjectManager>(out var objectManager)
                 || !ContainerProvider.TryResolve<ISiegeEventInterface>(out var siegeEventInterface))
             {
@@ -1843,12 +1850,16 @@ public class SiegeDebugCommand
                 siegeEvent.CreateSiegeObject(attacker.SiegeEngines.SiegePreparations, attacker);
             }
 
-            var machines = new[]
+            var machines = new List<(BattleSideEnum Side, SiegeEngineType Type, int Index)>
             {
                 (Side: BattleSideEnum.Attacker, Type: DefaultSiegeEngineTypes.Ram, Index: 0),
                 (Side: BattleSideEnum.Attacker, Type: DefaultSiegeEngineTypes.Onager, Index: 0),
                 (Side: BattleSideEnum.Defender, Type: DefaultSiegeEngineTypes.Ballista, Index: 0),
             };
+#if DEBUG
+            if (args.Count > 1)
+                machines.Add((BattleSideEnum.Defender, DefaultSiegeEngineTypes.Catapult, 1));
+#endif
             var staged = new List<string>();
             foreach (var machine in machines)
             {

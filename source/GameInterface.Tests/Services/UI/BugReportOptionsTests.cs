@@ -14,6 +14,7 @@ using Xunit;
 
 namespace GameInterface.Tests.Services.UI;
 
+[Collection(nameof(CoopOptionsViewModelCollection))]
 public class BugReportOptionsTests
 {
     [Fact]

@@ -105,7 +105,8 @@ public class CoopBattleController : CoopMissionController
         IPuppetMountStateRepairer puppetMountStateRepairer,
         IBattleAgentSpawnBatchCodec spawnBatchCodec,
         IBattleDamageDataMapper battleDamageDataMapper,
-        IMissionWeaponDataMapper missionWeaponDataMapper)
+        IMissionWeaponDataMapper missionWeaponDataMapper,
+        ISiegeGateHitApplier siegeGateHitApplier)
         : base(
             network,
             messageBroker,
@@ -179,7 +180,7 @@ public class CoopBattleController : CoopMissionController
         // per-battle transient (see MissionModule), so this controller's per-battle lifetime resets it.
         siegeEngineDeployment = new SiegeEngineDeploymentReplicator(network, messageBroker, session, hostEpochPolicy);
         siegeMachineState = new SiegeMachineStateReplicator(network, messageBroker, session, coopMissionComponent.AgentRegistry, hostEpochPolicy);
-        siegeWeaponFire = new SiegeWeaponFireReplicator(network, messageBroker, coopMissionComponent.AgentRegistry);
+        siegeWeaponFire = new SiegeWeaponFireReplicator(network, messageBroker, coopMissionComponent.AgentRegistry, session, siegeMachineState, siegeGateHitApplier, hostEpochPolicy);
         supplyReporter = new SupplyProgressReporter(relayNetwork, session);
 
         hostRegistryRef = hostRegistry;
@@ -302,6 +303,7 @@ public class CoopBattleController : CoopMissionController
 
         siegeEngineDeployment.DrainPending(dt);
         siegeMachineState.Tick(dt);
+        siegeWeaponFire.Tick(dt);
         diagnostics.Tick(dt);
         supplyReporter.Tick(dt);
 

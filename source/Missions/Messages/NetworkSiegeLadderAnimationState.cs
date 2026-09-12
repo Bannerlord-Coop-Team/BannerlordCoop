@@ -29,6 +29,10 @@ public class NetworkSiegeLadderAnimationState : IEvent
     public readonly int AnimationIndex;
     [ProtoMember(8)]
     public readonly int HostEpoch;
+    [ProtoMember(9)]
+    public readonly string SenderControllerId;
+    [ProtoMember(10)]
+    public readonly int AuthorityRevision;
 
     public NetworkSiegeLadderAnimationState(
         int ladderId,
@@ -38,7 +42,9 @@ public class NetworkSiegeLadderAnimationState : IEvent
         float fallAngularSpeed,
         MatrixFrame frame,
         int animationIndex,
-        int hostEpoch = 0)
+        int hostEpoch = 0,
+        string senderControllerId = null,
+        int authorityRevision = 0)
     {
         LadderId = ladderId;
         AnimationSpeed = animationSpeed;
@@ -48,5 +54,7 @@ public class NetworkSiegeLadderAnimationState : IEvent
         Frame = frame;
         AnimationIndex = animationIndex;
         HostEpoch = hostEpoch;
+        SenderControllerId = senderControllerId;
+        AuthorityRevision = authorityRevision;
     }
 }
