@@ -91,12 +91,21 @@ public class GangLeaderNeedsToOffloadStolenGoodsGateBypassTests : IDisposable
         SetUpNonOwningPeer(owner, "player-A", "player-B");
         var issue = NewIssueFor(owner);
 
-        bool result;
-        using (new AllowedThread())
+        var previousDescriptor = QuestTypeRegistry.Get(typeof(Issue));
+        QuestTypeRegistry.Register(QuestDescriptorBuilder.For<Issue, Quest>("GangLeaderStolenGoods").WithAlternativeAccept().Build());
+        try
         {
-            result = GenericQuestTypeAlternativeSolutionOwnershipGatePatch.Prefix(issue);
-        }
+            bool result;
+            using (new AllowedThread())
+            {
+                result = GenericQuestTypeAlternativeSolutionOwnershipGatePatch.Prefix(issue);
+            }
 
-        Assert.False(result);
+            Assert.False(result);
+        }
+        finally
+        {
+            if (previousDescriptor != null) QuestTypeRegistry.Register(previousDescriptor);
+        }
     }
 }
