@@ -186,7 +186,7 @@ internal sealed class SiegeInteractionDebugBehavior : MissionBehavior, ISiegeInt
         var agent = Mission.MainAgent;
         if (request.Action == "dismount")
         {
-            Dismount(screen, agent);
+            Dismount(agent);
             return;
         }
         if (request.Action == "capture")
@@ -254,7 +254,7 @@ internal sealed class SiegeInteractionDebugBehavior : MissionBehavior, ISiegeInt
         Input.PressKey(key.KeyboardKey.InputKey);
     }
 
-    private void Dismount(MissionScreen screen, Agent agent)
+    private void Dismount(Agent agent)
     {
         dismountAgent = null;
         if (agent == null || !agent.IsActive() || agent.IsUsingGameObject)
@@ -267,19 +267,16 @@ internal sealed class SiegeInteractionDebugBehavior : MissionBehavior, ISiegeInt
             status = "fixture_dismounted";
             return;
         }
-        const int dismountGameKeyId = 15;
-        var key = HotKeyManager.GetCategory(CombatHotKeyCategory.CategoryId)?.GetGameKey(dismountGameKeyId);
-        if (screen?.SceneLayer?.Input == null || key?.KeyboardKey == null ||
-            screen.SceneLayer.Input.IsGameKeyDown(dismountGameKeyId) ||
-            screen.SceneLayer.Input.IsGameKeyPressed(dismountGameKeyId))
+        var controller = Mission?.GetMissionBehavior<MissionMainAgentController>();
+        if (controller == null)
         {
             status = "fixture_dismount_rejected";
             return;
         }
         dismountAgent = agent;
         status = "fixture_dismount_pending";
-        // Let the player controller own braking and the dismount control flag.
-        Input.PressKey(key.KeyboardKey.InputKey);
+        // Let the player controller retain braking until it can dismount.
+        controller._autoDismountModeActive = true;
     }
 
     private void UpdateDismount()

@@ -31,6 +31,19 @@ public class SiegeInteractionDebugBehaviorTests
     }
 
     [Fact]
+    public void DismountWithoutAgent_RejectsWithoutCapturingFixture()
+    {
+        var behavior = new SiegeInteractionDebugBehavior(Mock.Of<IMessageBroker>());
+        AccessTools.Method(typeof(SiegeInteractionDebugBehavior), "Dismount")
+            .Invoke(behavior, new object[] { null });
+
+        Assert.Equal("fixture_dismount_rejected",
+            AccessTools.Field(typeof(SiegeInteractionDebugBehavior), "status").GetValue(behavior));
+        Assert.Null(AccessTools.Field(typeof(SiegeInteractionDebugBehavior), "dismountAgent").GetValue(behavior));
+        Assert.Null(AccessTools.Field(typeof(SiegeInteractionDebugBehavior), "capturedAgent").GetValue(behavior));
+    }
+
+    [Fact]
     public void PassingCaptureGuard_DoesNotOverwritePriorDiagnostic()
     {
         var behavior = new SiegeInteractionDebugBehavior(Mock.Of<IMessageBroker>());
