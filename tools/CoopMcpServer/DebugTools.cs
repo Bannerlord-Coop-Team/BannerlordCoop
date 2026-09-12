@@ -55,7 +55,7 @@ public sealed class DebugTools : IDebugTools
     [McpServerTool(Name = "get_run", ReadOnly = true, UseStructuredContent = true), Description("Refresh owned instances: process alive is distinct from endpoint readiness, campaign readiness and mission readiness. Includes endpoint status and diagnostic errors.")]
     public Task<RunView> GetRun(string run_id, CancellationToken cancellationToken) => runs.GetAsync(run_id, cancellationToken);
 
-    [McpServerTool(Name = "wait_for_state", ReadOnly = true, UseStructuredContent = true), Description("Bounded wait, 1..300 seconds, for one instance state: controlReady, readyToJoin, commandRegistryReady, readyForCampaignTests, readyForMissionTests, exited. Returns reached=false and diagnostics on timeout or early exit. No mutation retries.")]
+    [McpServerTool(Name = "wait_for_state", UseStructuredContent = true), Description("Bounded wait, 1..300 seconds, for one instance state: controlReady, readyToJoin, commandRegistryReady, readyForCampaignTests, readyForMissionTests, exited. Client readyForCampaignTests waits also try closing only the English War Sails Call of the Oceans startup popup on the naval map, observing for up to 3 seconds within the deadline. instance.startupPopup reports the outcome independently of reached; dismissed requires fresh closure evidence. Requires bounded-ui-layers-v1. At most one native click attempt per client/run, never replayed after uncertainty. Other waits do not mutate. Returns reached=false and diagnostics on timeout or early exit.")]
     public Task<object> WaitForState(string run_id, string instance, string state, int timeout_seconds, CancellationToken cancellationToken) =>
         runs.WaitAsync(run_id, instance, state, timeout_seconds, cancellationToken);
 
