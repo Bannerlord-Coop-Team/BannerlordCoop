@@ -199,8 +199,10 @@ public class PuppetSpawner : IPuppetSpawner
             pendingMountAuthority = GetPendingAuthority(data.MountAgentId, data.MountAuthorityRevision);
         }
         bool isRetainedFormerHostRecord = pendingAuthority != null || IsRetainedFormerHostRecord(data);
+        string riderControllerId = pendingAuthority?.ControllerId ?? data.OwnerControllerId;
+        string mountControllerId = pendingMountAuthority?.ControllerId ?? data.MountOwnerControllerId ?? data.OwnerControllerId;
 
-        bool isOwnAgent = session.IsOwn(pendingAuthority?.ControllerId ?? data.OwnerControllerId);
+        bool isOwnAgent = session.IsOwn(riderControllerId);
         if (LocalDeploymentBlocksSpawn(isOwnAgent)) return false;
 
         // BR-110: the engine renders at most a fixed number of agents. At capacity the puppet is deferred, not
@@ -314,7 +316,7 @@ public class PuppetSpawner : IPuppetSpawner
         }
 
         bool agentRegistered = registry.TryRegisterAgent(
-            pendingAuthority?.ControllerId ?? data.OwnerControllerId,
+            riderControllerId,
             data.OriginalOwnerControllerId,
             data.MovementScopeId,
             data.AgentId,
@@ -351,7 +353,7 @@ public class PuppetSpawner : IPuppetSpawner
             if (agent.MountAgent is Agent mount)
             {
                 bool mountRegistered = registry.TryRegisterAgent(
-                    pendingMountAuthority?.ControllerId ?? data.OwnerControllerId,
+                    mountControllerId,
                     data.MountOriginalOwnerControllerId,
                     data.MountMovementScopeId,
                     data.MountAgentId,
@@ -382,11 +384,13 @@ public class PuppetSpawner : IPuppetSpawner
         // the late registry entries to the current host; only that host revives the rider as battle AI.
         if (isRetainedFormerHostRecord && agentRegistered)
         {
+            // A retained rider may be using a horse whose separate authority is still present.
+            bool adoptMount = mountControllerId == riderControllerId;
             authorityMigrator?.ApplyLateSpawnedPuppet(
                 agent,
                 data.AgentId,
-                agent.MountAgent,
-                data.MountAgentId);
+                adoptMount ? agent.MountAgent : null,
+                adoptMount ? data.MountAgentId : Guid.Empty);
         }
 
         // Key the casualty on the troop's CHARACTER through the object manager (never a raw StringId).
@@ -448,8 +452,8 @@ public class PuppetSpawner : IPuppetSpawner
                 {
                     TransferPendingAgentAuthority(data.AgentId, data.OwnerControllerId, data.AuthorityRevision,
                         previousControllers, newController);
-                    TransferPendingAgentAuthority(data.MountAgentId, data.OwnerControllerId, data.MountAuthorityRevision,
-                        previousControllers, newController);
+                    TransferPendingAgentAuthority(data.MountAgentId, data.MountOwnerControllerId ?? data.OwnerControllerId,
+                        data.MountAuthorityRevision, previousControllers, newController);
                 }
             }
         }, context: nameof(TransferPendingAuthority));

@@ -195,7 +195,9 @@ public class BattleAgentRenderCapTests : MissionTestEnvironment
                     mountMirror.MovementDirection = Vec2.Zero;
                     receiver.SimulatePacket(peer, riderPacket);
                     receiver.SimulatePacket(peer, mountPacket);
-                    receiver.Resolve<ICoopMissionComponent>().AgentMovementHandler.Interpolator.Tick(1f / 60f);
+                    var interpolator = controller.AgentMovementHandler.Interpolator;
+                    Assert.True(interpolator.TryGetTargetFrame(info.Agent, out _, out _, out _));
+                    interpolator.Tick(1f / 60f);
                     Assert.Equal(new Vec2(1f, 0f), riderMirror.MovementDirection);
                     Assert.Equal(new Vec2(1f, 0f), mountMirror.MovementDirection);
                 }

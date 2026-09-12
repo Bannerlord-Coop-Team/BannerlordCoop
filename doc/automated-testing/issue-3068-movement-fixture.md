@@ -436,7 +436,10 @@ section does not authorize launching any game or server process.
   afterward. Include a non-host disconnect observed by a third client, plus a
   capped spawn buffer retained across two host migrations with different rider
   and mount revisions. Verify current-revision movement still applies after the
-  rejection and after the buffered agents finally spawn.
+  rejection and after the buffered agents finally spawn. Include catch-up for
+  a rider using another connected player's horse, preserving the horse's own
+  authority and revision through rider departure and accepting the horse's
+  current-authority movement after dismount.
 - Run the appropriate broader non-live mission/network suite on the same final
   tree. Record exact commands, result counts, failures/skips, and artifact hashes
   externally with the source identities above. Do not insert unexecuted pass
