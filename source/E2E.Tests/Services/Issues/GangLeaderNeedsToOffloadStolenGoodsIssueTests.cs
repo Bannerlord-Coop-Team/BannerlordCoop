@@ -513,6 +513,69 @@ public class GangLeaderNeedsToOffloadStolenGoodsIssueTests : IDisposable
     }
 
     [Fact]
+    public void RequestQuestTypeAcceptQuest_GenuineAccept_StartsTheQuestForRealSoTheHourlyTickCanExpireIt()
+    {
+        var fixture = SetupIssueOwner();
+        CreateIssueOnServer(fixture);
+
+        var partyId = TestEnvironment.CreateRegisteredObject<MobileParty>();
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject<MobileParty>(partyId, out var party));
+            Assert.True(Server.ObjectManager.TryGetObject<Settlement>(fixture.OwnerSettlementId, out var settlement));
+            using (new AllowedThread())
+            {
+                party.CurrentSettlement = settlement;
+            }
+
+            Assert.True(Server.Resolve<IPlayerManager>().AddPlayer(new Player("player-A", fixture.HeroId, partyId, "", "")));
+        });
+        TestEnvironment.ConnectRegisteredPlayer(Client, "player-A");
+        OpenConversation(Client, fixture.HeroId, "player-A");
+
+        var generation = 0;
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject<Hero>(fixture.HeroId, out var owner));
+            Assert.True(Server.Resolve<IIssueGenerationRegistry>().TryGetGeneration(owner, out generation));
+            Server.Resolve<IMessageBroker>().Publish(Client.NetPeer, new RequestQuestTypeAcceptQuest(fixture.HeroId, generation));
+        });
+
+        Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkQuestTypeQuestAccepted>());
+
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject<Hero>(fixture.HeroId, out var owner));
+            var quest = Assert.IsType<GangLeaderNeedsToOffloadStolenGoodsIssueBehavior.GangLeaderNeedsToOffloadStolenGoodsIssueQuest>(owner.Issue.IssueQuest);
+            Assert.Contains(quest, Campaign.Current.QuestManager.Quests);
+            Assert.NotNull(quest._playerStartsQuestLog);
+
+            using (new AllowedThread())
+            {
+                quest.ChangeQuestDueTime(CampaignTime.Now - CampaignTime.Days(1f));
+            }
+            Assert.True(quest.QuestDueTime.IsPast);
+
+            Campaign.Current.QuestManager.HourlyTick();
+
+            Assert.Null(owner.Issue);
+        });
+
+        var removed = Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkIssueRemoved>());
+        Assert.Equal(fixture.HeroId, removed.OwnerId);
+        Assert.Equal(IssueFinalizeReason.QuestTimeout, removed.Reason);
+
+        foreach (var client in TestEnvironment.Clients)
+        {
+            client.Call(() =>
+            {
+                Assert.True(client.ObjectManager.TryGetObject<Hero>(fixture.HeroId, out var owner));
+                Assert.Null(owner.Issue);
+            });
+        }
+    }
+
+    [Fact]
     public void RequestQuestTypeAcceptQuest_FromUnregisteredRequester_IsRejectedWithoutMutatingTheIssue()
     {
         var fixture = SetupIssueOwner();

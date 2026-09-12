@@ -128,6 +128,11 @@ internal static class GangLeaderNeedsToOffloadStolenGoodsQuestType
             using (new Dispatch.IssueDispatchReplayGuard())
             {
                 Campaign.Current.IssueManager.StartIssueQuest(owner);
+
+                if (owner.Issue.IssueQuest is Quest quest && quest._playerStartsQuestLog == null)
+                {
+                    quest.QuestAcceptedConsequences();
+                }
             }
         }
 
@@ -160,6 +165,11 @@ internal static class GangLeaderNeedsToOffloadStolenGoodsQuestType
                 }
 
                 if (issue.IssueQuest is not Quest quest) return;
+
+                if (quest._playerStartsQuestLog == null)
+                {
+                    quest.QuestAcceptedConsequences();
+                }
 
                 StolenTradeGoodAmountField.SetValue(quest, fields.StolenTradeGoodAmount);
                 StolenTradeGoodPriceField.SetValue(quest, fields.StolenTradeGoodPrice);
