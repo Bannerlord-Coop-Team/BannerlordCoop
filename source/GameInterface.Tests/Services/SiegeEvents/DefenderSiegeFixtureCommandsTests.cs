@@ -1311,17 +1311,30 @@ public sealed class DefenderSiegeFixtureCommandsTests : IDisposable
         return settlement;
     }
 
+    [Fact]
+    public void SelectStagingSettlement_PrefersOdrysaAndSkipsUnregisteredFallbacks()
+    {
+        Settlement preferred = CreateStagingCastle("castle_ES1");
+        Settlement unregisteredFallback = CreateStagingCastle("castle_A1");
+        Settlement firstFallback = CreateStagingCastle("castle_B1");
+        Settlement secondFallback = CreateStagingCastle("castle_Z1");
+        MobileParty[] parties = captives.Select(captive => captive.Party).ToArray();
+        Assert.True(objects.AddExisting(preferred.StringId, preferred));
+        Assert.True(objects.AddExisting(firstFallback.StringId, firstFallback));
+        Assert.True(objects.AddExisting(secondFallback.StringId, secondFallback));
+
+        preferred.SiegeEvent = ObjectHelper.SkipConstructor<SiegeEvent>();
+        Assert.Same(firstFallback, DefenderSiegeFixtureCommands.SelectStagingSettlement(
+            objects, new[] { secondFallback, preferred, unregisteredFallback, firstFallback }, parties));
+
+        preferred.SiegeEvent = null;
+        Assert.Same(preferred, DefenderSiegeFixtureCommands.SelectStagingSettlement(
+            objects, new[] { secondFallback, firstFallback, preferred }, parties));
+    }
+
     private Settlement PrepareStagingParties()
     {
-        var settlement = ObjectHelper.SkipConstructor<Settlement>();
-        settlement.StringId = "castle_ES1";
-        settlement.Party = ObjectHelper.SkipConstructor<PartyBase>();
-        settlement.Party.Settlement = settlement;
-        settlement.Party.ItemRoster = new ItemRoster();
-        var town = ObjectHelper.SkipConstructor<Town>();
-        town.Owner = settlement.Party;
-        settlement.Town = town;
-        settlement.SettlementComponent = town;
+        Settlement settlement = CreateStagingCastle("castle_ES1");
         Assert.True(objects.AddExisting("castle_ES1", settlement));
         foreach (var captive in captives)
         {
@@ -1329,6 +1342,21 @@ public sealed class DefenderSiegeFixtureCommandsTests : IDisposable
             captive.Party.PartyMoveMode = MoveModeType.Hold;
             captive.Party._currentSettlement = settlement;
         }
+        return settlement;
+    }
+
+    private static Settlement CreateStagingCastle(string id)
+    {
+        var settlement = ObjectHelper.SkipConstructor<Settlement>();
+        settlement.StringId = id;
+        settlement.Party = ObjectHelper.SkipConstructor<PartyBase>();
+        settlement.Party.Settlement = settlement;
+        settlement.Party.ItemRoster = new ItemRoster();
+        var town = ObjectHelper.SkipConstructor<Town>();
+        town._isCastle = true;
+        town.Owner = settlement.Party;
+        settlement.Town = town;
+        settlement.SettlementComponent = town;
         return settlement;
     }
 

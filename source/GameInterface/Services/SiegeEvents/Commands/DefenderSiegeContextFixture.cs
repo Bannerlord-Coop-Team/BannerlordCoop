@@ -41,7 +41,6 @@ public interface IDefenderSiegeContextFixture
 
 internal sealed class DefenderSiegeContextFixture : IDefenderSiegeContextFixture
 {
-    private const string SettlementId = "castle_ES1";
     private readonly IObjectManager objects;
     private readonly IPlayerManager players;
     private readonly IMobilePartyBehaviorSnapshot behavior;
@@ -100,9 +99,7 @@ internal sealed class DefenderSiegeContextFixture : IDefenderSiegeContextFixture
         }
         if (campaign != null) return Result(false, "fixture_already_captured");
         captureFailureDetail = null;
-        if (Campaign.Current == null || !objects.TryGetObject<Settlement>(SettlementId, out var target) ||
-            !target.IsCastle || target.SiegeEvent != null || target.Party.MapEvent != null)
-            return Result(false, "castle_not_clean");
+        if (Campaign.Current == null) return Result(false, "campaign_required");
         var defenders = players.Players.Where(players.IsConnected).ToArray();
         if (defenders.Length != 2 ||
             !defenders.Any(player => player.ControllerId == "testclient") ||
@@ -110,9 +107,16 @@ internal sealed class DefenderSiegeContextFixture : IDefenderSiegeContextFixture
             return Result(false, "two_expected_defenders_required");
         var defenderParties = defenders.Select(player =>
             objects.TryGetObject<MobileParty>(player.MobilePartyId, out var party) ? party : null).ToArray();
-        if (defenderParties.Any(party => party == null || party.CurrentSettlement != target ||
-                party.MapEvent != null || party.MapFaction == null))
+        if (defenderParties.Any(party => party == null || party.MapEvent != null || party.MapFaction == null))
             return Result(false, "inside_defenders_required");
+        Settlement target = defenderParties[0].CurrentSettlement;
+        if (target == null || defenderParties.Any(party => party.CurrentSettlement != target))
+            return Result(false, "inside_defenders_required");
+        if (!target.IsCastle || target.Party == null || target.SiegeEvent != null || target.Party.MapEvent != null)
+            return Result(false, "castle_not_clean");
+        if (!objects.TryGetObject<Settlement>(target.StringId, out var registeredTarget) ||
+            !ReferenceEquals(registeredTarget, target))
+            return Result(false, "castle_identity_unavailable");
         var peers = new Dictionary<string, NetPeer>();
         for (int index = 0; index < defenders.Length; index++)
         {
@@ -440,7 +444,8 @@ internal sealed class DefenderSiegeContextFixture : IDefenderSiegeContextFixture
     }
 
     private bool ContextIdentityCurrent() => campaign != null && campaign == Campaign.Current && DefenderIdentitiesCurrent() &&
-        objects.TryGetObject<Settlement>(SettlementId, out var currentSettlement) && currentSettlement == settlement;
+        settlement != null && objects.TryGetObject<Settlement>(settlement.StringId, out var currentSettlement) &&
+        currentSettlement == settlement;
 
     private bool IdentityCurrent() => ContextIdentityCurrent() &&
         objects.TryGetObject<MobileParty>(partyId, out var currentParty) && currentParty == besieger;
@@ -648,7 +653,7 @@ internal sealed class DefenderSiegeContextFixture : IDefenderSiegeContextFixture
     private CoopCommandResult Result(bool success, string status) => new CoopCommandResult(success,
         "LIVE_TEST_JSON=" + JsonConvert.SerializeObject(new
         {
-            success, status, settlementId = SettlementId, besiegerPartyId = partyId,
+            success, status, settlementId = settlement?.StringId, besiegerPartyId = partyId,
             startAttempted, missionExitRequested, restored, captured = campaign != null,
             originalRelation, stagedRelation, captureFailureDetail
         }), success ? null : "defender_context_failed");

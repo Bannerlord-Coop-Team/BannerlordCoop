@@ -27,7 +27,7 @@ using TaleWorlds.Library;
 
 namespace GameInterface.Services.SiegeEvents.Commands;
 
-/// <summary>Stages two connected defender parties inside Odrysa Castle for a restorable siege fixture.</summary>
+/// <summary>Stages two connected defender parties inside an available castle for a restorable siege fixture.</summary>
 internal static class DefenderSiegeFixtureCommands
 {
 #if DEBUG
@@ -247,7 +247,7 @@ internal static class DefenderSiegeFixtureCommands
     }
 #endif
 
-    private const string SettlementId = "castle_ES1";
+    private const string PreferredSettlementId = "castle_ES1";
     private const int ExpectedPlayerCount = 2;
 
     private static DefenderSiegeFixture pendingCapture;
@@ -1065,13 +1065,6 @@ internal static class DefenderSiegeFixtureCommands
                 reason: "The player or object registry is unavailable.", settlement: null,
                 playerManager: null);
         }
-        if (!objectManager.TryGetObject<Settlement>(SettlementId, out var settlement))
-        {
-            return PreAssaultResult(expectedControllerIds, success: false,
-                reason: "Odrysa Castle is unavailable from the object registry.", settlement: null,
-                playerManager: playerManager);
-        }
-
         Player[] expectedPlayers = expectedControllerIds
             .Select(controllerId => playerManager.TryGetPlayer(controllerId, out Player player)
                 ? player
@@ -1085,6 +1078,9 @@ internal static class DefenderSiegeFixtureCommands
             .ToArray();
         bool expectedPlayersResolved = expectedPlayers.All(player => player != null) &&
             expectedParties.All(party => party != null);
+        Settlement settlement = expectedPlayersResolved
+            ? expectedParties[0].CurrentSettlement
+            : null;
         string[] registeredControllerIds = playerManager.Players
             .Select(player => player.ControllerId)
             .OrderBy(controllerId => controllerId, StringComparer.Ordinal)
@@ -1135,11 +1131,12 @@ internal static class DefenderSiegeFixtureCommands
             : null;
         bool localPartyReady = isServer || IsExpectedLocalParty(
             localControllerId, localParty, expectedControllerIds, expectedPlayers, expectedParties);
-        bool noMapEvent = settlement.Party.MapEvent == null &&
+        bool noMapEvent = settlement?.Party?.MapEvent == null &&
             expectedParties.All(party => party?.MapEvent == null);
-        bool noBesiegerCamp = settlement.SiegeEvent?.BesiegerCamp == null &&
+        bool noBesiegerCamp = settlement?.SiegeEvent?.BesiegerCamp == null &&
             expectedParties.All(party => party?.BesiegerCamp == null);
-        bool insideSettlement = expectedParties.All(party => party?.CurrentSettlement == settlement);
+        bool insideSettlement = settlement != null && settlement.IsCastle &&
+            expectedParties.All(party => party?.CurrentSettlement == settlement);
         bool fixtureStaged = !isServer || activeFixture != null &&
             activeFixture.HasExpectedControllers(expectedControllerIds) && IsStaged(activeFixture);
         bool connectionReady = DefenderSiegeFixtureContract.IsConnectionReadinessSatisfied(
@@ -1163,7 +1160,7 @@ internal static class DefenderSiegeFixtureCommands
             success,
             reason,
             role = isServer ? "server" : "client",
-            settlementId = settlement.StringId,
+            settlementId = settlement?.StringId,
             expectedPlayerCount = ExpectedPlayerCount,
             expectedControllerIds,
             registeredPlayerCount = registeredControllerIds.Length,
@@ -1233,16 +1230,9 @@ internal static class DefenderSiegeFixtureCommands
             error = "The defender fixture services are unavailable.";
             return false;
         }
-        if (Campaign.Current == null ||
-            !objectManager.TryGetObject<Settlement>(SettlementId, out var settlement) ||
-            !settlement.IsFortification)
+        if (Campaign.Current == null)
         {
-            error = "Odrysa Castle is not available as a fortification.";
-            return false;
-        }
-        if (settlement.Party.MapEvent != null || settlement.SiegeEvent != null)
-        {
-            error = "Odrysa Castle already has a map event or besieger camp.";
+            error = "A campaign is required before defender capture.";
             return false;
         }
 
@@ -1264,12 +1254,6 @@ internal static class DefenderSiegeFixtureCommands
             if (!objectManager.TryGetId(party, out string partyId) || partyId != player.MobilePartyId)
             {
                 error = "The player party for " + controllerId + " is not registered under its player identity.";
-                return false;
-            }
-            if (WouldUpdateOwnerVisit(party, settlement))
-            {
-                error = "The player party for " + controllerId +
-                    " would mutate Odrysa Castle's owner visit timestamp.";
                 return false;
             }
             if (party.CurrentSettlement != null &&
@@ -1314,6 +1298,17 @@ internal static class DefenderSiegeFixtureCommands
                 behavior,
                 behaviorIdentity.Capture(party, behavior),
                 state));
+        }
+
+        MobileParty[] playerParties = parties.Select(party => party.Party).ToArray();
+        Settlement settlement = objectManager.TryGetObject<Settlement>(PreferredSettlementId, out var preferredSettlement)
+            ? SelectStagingSettlement(objectManager, new[] { preferredSettlement }, playerParties)
+            : null;
+        settlement ??= SelectStagingSettlement(objectManager, Settlement.All, playerParties);
+        if (settlement == null)
+        {
+            error = "No clean castle is available for defender staging.";
+            return false;
         }
 
         fixture = new DefenderSiegeFixture(expectedControllerIds, settlement, parties.ToArray());
@@ -2460,7 +2455,7 @@ internal static class DefenderSiegeFixtureCommands
             !ContainerProvider.TryResolve<IObjectManager>(out var objects) ||
             !ContainerProvider.TryResolve<IPlayerManager>(out var players) ||
             !ContainerProvider.TryResolve<IDefenderFixtureBehaviorIdentity>(out var behaviorIdentity) ||
-            !objects.TryGetObject<Settlement>(SettlementId, out var settlement) ||
+            !objects.TryGetObject<Settlement>(fixture.Settlement.StringId, out var settlement) ||
             !ReferenceEquals(settlement, fixture.Settlement)) return false;
         foreach (var party in fixture.Parties)
         {
@@ -2515,7 +2510,7 @@ internal static class DefenderSiegeFixtureCommands
         }
         if (fixture.Parties.Any(party => WouldUpdateOwnerVisit(party.Party, fixture.Settlement)))
         {
-            error = "A defender party would mutate Odrysa Castle's owner visit timestamp.";
+            error = "A defender party would mutate the selected castle's owner visit timestamp.";
             return false;
         }
         if (fixture.Parties.Any(party => party.OriginalSettlement != null &&
@@ -2538,7 +2533,7 @@ internal static class DefenderSiegeFixtureCommands
         }
         if (fixture.Settlement.Party.MapEvent != null || fixture.Settlement.SiegeEvent != null)
         {
-            error = "Odrysa Castle has a map event or besieger camp; fixture restore is unsafe.";
+            error = "The selected castle has a map event or besieger camp; fixture restore is unsafe.";
             return false;
         }
         if (fixture.Parties.Any(party => !HasRestorableConnectionState(party) ||
@@ -2610,6 +2605,24 @@ internal static class DefenderSiegeFixtureCommands
             partyLeaderIsSettlementOwner);
     }
 
+    internal static Settlement SelectStagingSettlement(
+        IObjectManager objects,
+        IEnumerable<Settlement> settlements,
+        IEnumerable<MobileParty> parties)
+    {
+        if (objects == null || settlements == null || parties == null) return null;
+        MobileParty[] partyArray = parties.ToArray();
+        return settlements
+            .Where(settlement => settlement != null && settlement.IsCastle && settlement.Party != null &&
+                objects.TryGetObject<Settlement>(settlement.StringId, out var registeredSettlement) &&
+                ReferenceEquals(registeredSettlement, settlement) &&
+                settlement.Party.MapEvent == null && settlement.SiegeEvent == null &&
+                partyArray.All(party => !WouldUpdateOwnerVisit(party, settlement)))
+            .OrderBy(settlement => settlement.StringId == PreferredSettlementId ? 0 : 1)
+            .ThenBy(settlement => settlement.StringId, StringComparer.Ordinal)
+            .FirstOrDefault();
+    }
+
     private static bool IsRestored(DefenderSiegeFixture fixture) =>
         HasCurrentFixtureIdentities(fixture) && fixture.Settlement.Party.MapEvent == null && fixture.Settlement.SiegeEvent == null &&
         fixture.Parties.All(party => HasRestorableConnectionState(party) &&
@@ -2659,7 +2672,7 @@ internal static class DefenderSiegeFixtureCommands
             success,
             reason,
             role = ModInformation.IsServer ? "server" : "client",
-            settlementId = settlement?.StringId ?? SettlementId,
+            settlementId = settlement?.StringId,
             expectedPlayerCount = ExpectedPlayerCount,
             expectedControllerIds = expectedControllerIds ?? Array.Empty<string>(),
             registeredPlayerCount = playerManager?.Players.Count ?? 0,
@@ -2711,7 +2724,7 @@ internal static class DefenderSiegeFixtureCommands
         success = false,
         phase,
         reason,
-        settlementId = SettlementId
+        settlementId = (string)null
     });
 
 #if DEBUG
