@@ -234,7 +234,7 @@ internal static class SiegeDefenseArmyFixtureCommands
             }
             if (fixture.Army?.LeaderParty != player || !TryGetId(manager, fixture.Army, out _))
                 throw new InvalidOperationException("The registered player-led fixture army could not be created.");
-            var position = new CampaignVec2(new Vec2(settlement.GatePosition.X, settlement.GatePosition.Y - 1.5f), true);
+            var position = settlement.GatePosition;
             StageAtHold(player, position);
             foreach (var follower in fixture.Followers)
             {
@@ -285,7 +285,9 @@ internal static class SiegeDefenseArmyFixtureCommands
             {
                 return Failed($"Fixture staging failed: {exception.Message}. Cleanup failed: {cleanupException.Message}. Keep the captured JSON for retry or reload the disposable save.");
             }
-            return Failed($"Fixture staging failed: {exception.Message}. Cleanup completed; verify the captured JSON before recapturing.");
+            return Failed(fixture.Restored
+                ? $"Fixture staging failed: {exception.Message}. Cleanup completed; verify the captured JSON before recapturing."
+                : $"Fixture staging failed: {exception.Message}. Cleanup verification failed; retry restore with the captured JSON or reload the disposable save.");
         }
     }
 
