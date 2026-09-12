@@ -32,7 +32,6 @@ public class RaidDebugCommands
 
         public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
         {
-
             var value = args[0].ToLowerInvariant();
             switch (value)
             {
@@ -51,7 +50,6 @@ public class RaidDebugCommands
                 default:
                     return Failed("Invalid action. Use on, off, toggle, or status.");
             }
-
         }
     }
 
