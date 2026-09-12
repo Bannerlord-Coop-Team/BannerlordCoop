@@ -13,6 +13,7 @@ using Xunit;
 
 namespace GameInterface.Tests.Services.SiegeEvents;
 
+/// <summary>Checks fixture identities, assertion failures, and command registration without a live campaign.</summary>
 [Collection(global::GameInterface.Tests.ModInformationRoleCollection.Name)]
 public class SiegeDefenseArmyFixtureCommandsTests
 {

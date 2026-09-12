@@ -310,10 +310,11 @@ internal static class SiegeDefenseArmyFixtureCommands
             return false;
         }
         kingdom = player.MapFaction as Kingdom;
+        var capturedKingdom = kingdom;
         if (kingdom == null || settlement.MapFaction != kingdom || settlement.SiegeEvent != null
             || settlement.Party.MapEvent != null || player.LeaderHero == null
             || fixture.Besieger.Party.MapFaction?.IsAtWarWith(kingdom) != true
-            || fixture.Followers.Any(p => p.Party.MapFaction != kingdom || p.Party.LeaderHero == null)
+            || fixture.Followers.Any(p => p.Party.MapFaction != capturedKingdom || p.Party.LeaderHero == null)
             || fixture.Besieger.Party.LeaderHero == null)
         {
             error = "The captured settlement or participant factions are no longer ready";
@@ -538,8 +539,11 @@ internal static class SiegeDefenseArmyFixtureCommands
             var captured = expected["capturedParties"] as JArray;
             if (captured?.Count != 4 || captured.Any(p => p["behavior"] is not JObject)
                 || !SameIds(ids, captured.Select(p => p.Value<string>("partyId")))) return false;
-            if (staged && new[] { "armyId", "siegeEventId", "mapEventId" }
-                .Any(name => string.IsNullOrWhiteSpace(expected.Value<string>(name)))) return false;
+            if (staged)
+            {
+                foreach (var name in new[] { "armyId", "siegeEventId", "mapEventId" })
+                    if (string.IsNullOrWhiteSpace(expected.Value<string>(name))) return false;
+            }
             error = null;
             return true;
         }
