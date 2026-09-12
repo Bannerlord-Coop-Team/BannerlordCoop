@@ -178,7 +178,7 @@ public class NonHostDisconnectAuthorityTests : MissionTestEnvironment
 
     private MovementPacket CaptureMovement(ClientState state)
     {
-        MovementPacket packet = null;
+        MovementPacket packet = default;
         state.Instance.Call(() =>
         {
             Assert.True(state.Registry.TryGetAgentInfo(agentId, out var info));
@@ -192,7 +192,7 @@ public class NonHostDisconnectAuthorityTests : MissionTestEnvironment
     private void AssertMovementArrives(ClientState sender, params ClientState[] recipients)
     {
         MovementPacket riderPacket = CaptureMovement(sender);
-        MountMovementPacket mountPacket = null;
+        MountMovementPacket mountPacket = default;
         sender.Instance.Call(() =>
         {
             Assert.True(sender.Registry.TryGetAgentInfo(mountId, out var info));
