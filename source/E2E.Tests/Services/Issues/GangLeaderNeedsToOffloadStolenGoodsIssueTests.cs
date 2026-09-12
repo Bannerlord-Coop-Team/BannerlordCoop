@@ -116,6 +116,18 @@ public class GangLeaderNeedsToOffloadStolenGoodsIssueTests : IDisposable
         }
     }
 
+    private static readonly FieldInfo CampaignHideoutsField =
+        AccessTools.Field(typeof(Campaign), "_hideouts");
+
+    private static void RegisterHideoutWithCampaign(Hideout hideout)
+    {
+        var hideouts = (MBList<Hideout>)CampaignHideoutsField.GetValue(Campaign.Current);
+        if (!hideouts.Contains(hideout))
+        {
+            hideouts.Add(hideout);
+        }
+    }
+
     private const string StolenGoodId = "jewelry";
 
     private record GangLeaderFixture(
@@ -269,6 +281,48 @@ public class GangLeaderNeedsToOffloadStolenGoodsIssueTests : IDisposable
                 Assert.Same(issueHideoutSettlement, mirrored._issueHideout);
                 Assert.Equal(0, mirrored._randomForStolenTradeGood);
                 Assert.Same(counterOfferHero, mirrored.CounterOfferHero);
+            });
+        }
+    }
+
+    [Fact]
+    public void DailyTickSettlementFromVanillaCampaignFlow_NaturallyCreatesAndReplicatesAGangLeaderStolenGoodsIssue()
+    {
+        var fixture = SetupIssueOwner();
+
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject<Hero>(fixture.HeroId, out var giver));
+            Assert.True(Server.ObjectManager.TryGetObject<Settlement>(fixture.OwnerSettlementId, out var settlement));
+            Assert.True(Server.ObjectManager.TryGetObject<Settlement>(fixture.IssueHideoutSettlementId, out var issueHideoutSettlement));
+
+            using (new AllowedThread())
+            {
+                settlement.Town.Security = 50f;
+                settlement.CollectNotablesToCache();
+                RegisterHideoutWithCampaign(issueHideoutSettlement.Hideout);
+            }
+            Assert.True(giver.IsGangLeader);
+            Assert.Same(settlement, giver.CurrentSettlement);
+            Assert.Contains(settlement.Notables, h => h.IsMerchant);
+
+            new IssuesCampaignBehavior().RegisterEvents();
+            new GangLeaderNeedsToOffloadStolenGoodsIssueBehavior().RegisterEvents();
+
+            CampaignEventDispatcher.Instance.DailyTickSettlement(settlement);
+
+            Assert.IsType<GangLeaderNeedsToOffloadStolenGoodsIssueBehavior.GangLeaderNeedsToOffloadStolenGoodsIssue>(giver.Issue);
+        });
+
+        var created = Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkGangLeaderStolenGoodsIssueCreated>());
+        Assert.Equal(fixture.HeroId, created.OwnerId);
+
+        foreach (var client in TestEnvironment.Clients)
+        {
+            client.Call(() =>
+            {
+                Assert.True(client.ObjectManager.TryGetObject<Hero>(fixture.HeroId, out var owner));
+                Assert.IsType<GangLeaderNeedsToOffloadStolenGoodsIssueBehavior.GangLeaderNeedsToOffloadStolenGoodsIssue>(owner.Issue);
             });
         }
     }
