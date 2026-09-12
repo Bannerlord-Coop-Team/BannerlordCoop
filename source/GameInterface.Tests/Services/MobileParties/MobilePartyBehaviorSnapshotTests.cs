@@ -389,6 +389,11 @@ public class MobilePartyBehaviorSnapshotTests
         try
         {
             Campaign.Current = clientCampaign;
+            harmony.Patch(
+                AccessTools.PropertyGetter(typeof(MobileParty), nameof(MobileParty.NavigationCapability)),
+                prefix: new HarmonyMethod(AccessTools.Method(
+                    typeof(MobilePartyBehaviorSnapshotTests),
+                    nameof(NavigationCapabilityPrefix))));
             // Navigation validity needs a map scene; the behavior and navigation setters remain real.
             harmony.Patch(
                 AccessTools.Method(
@@ -435,6 +440,12 @@ public class MobilePartyBehaviorSnapshotTests
     private static bool IsPositionValidForNavigationTypePrefix(ref bool __result)
     {
         __result = true;
+        return false;
+    }
+
+    private static bool NavigationCapabilityPrefix(ref MobileParty.NavigationType __result)
+    {
+        __result = MobileParty.NavigationType.Default;
         return false;
     }
 
