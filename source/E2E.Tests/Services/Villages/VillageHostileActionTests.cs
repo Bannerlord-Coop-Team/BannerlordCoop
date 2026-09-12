@@ -980,7 +980,7 @@ public class VillageHostileActionTests : MapEventTestBase
             .Append(AccessTools.Method(typeof(GameMenu), nameof(GameMenu.SwitchToMenu)))
             .ToList();
 
-        client.Call(() => PlayerEncounter.Update(), disabledMethods);
+        client.Call(() => Assert.False(PlayerEncounterPatches.UpdatePrefix()), disabledMethods);
 
         var reset = Server.NetworkSentMessages.GetMessages<NetworkRaidBattleResetToVillage>().Single();
         Assert.Equal(target.SettlementId, reset.SettlementId);

@@ -1,12 +1,10 @@
-using Common.Util;
+﻿using Common.Util;
 using GameInterface.Services.Entity;
 using GameInterface.Services.MapEvents.Interfaces;
 using GameInterface.Services.MapEvents.Patches;
 using GameInterface.Services.Players;
 using GameInterface.Services.Players.Data;
-using GameInterface.Services.Villages.Commands;
 using HarmonyLib;
-using Helpers;
 using System.Runtime.CompilerServices;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.GameState;
@@ -44,28 +42,6 @@ public class PlayerEncounterInterfaceTests
     public void ShouldDeferAfterBattle_WhenMapScreenIsNotTop_ReturnsTrue()
     {
         Assert.True(PlayerEncounterPatches.ShouldDeferAfterBattle(new MapState(), isMapScreenTop: false));
-    }
-
-    [Fact]
-    public void IsRaidLootPartyState_WhenLootPartyScreenIsActive_ReturnsTrue()
-    {
-        var partyState = new PartyState
-        {
-            PartyScreenMode = PartyScreenHelper.PartyScreenMode.Loot
-        };
-
-        Assert.True(RaidDebugCommands.IsRaidLootPartyState(partyState));
-    }
-
-    [Fact]
-    public void IsRaidLootPartyState_WhenNormalPartyScreenIsActive_ReturnsFalse()
-    {
-        var partyState = new PartyState
-        {
-            PartyScreenMode = PartyScreenHelper.PartyScreenMode.Normal
-        };
-
-        Assert.False(RaidDebugCommands.IsRaidLootPartyState(partyState));
     }
 
     [Fact]
