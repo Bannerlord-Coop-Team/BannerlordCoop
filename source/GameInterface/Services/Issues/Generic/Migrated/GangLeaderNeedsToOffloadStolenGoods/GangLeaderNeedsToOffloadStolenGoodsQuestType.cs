@@ -21,6 +21,7 @@ using TaleWorlds.CampaignSystem.CharacterDevelopment;
 using TaleWorlds.CampaignSystem.Issues;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Settlements;
+using TaleWorlds.Core;
 using TaleWorlds.LinQuick;
 
 namespace GameInterface.Services.Issues.Generic.Migrated.GangLeaderNeedsToOffloadStolenGoods;
@@ -329,14 +330,28 @@ internal static class GangLeaderNeedsToOffloadStolenGoodsQuestType
         return CallOriginalPolicy.IsOriginalAllowedForOwnershipGate();
     }
 
+    private static readonly ConditionalWeakTable<Hero, PropertyOwner<PropertyObject>> OwnerTraitXpProgress = new();
+
+    private static void ApplyOwnerTraitXp(Hero owner, TraitObject trait, int xpValue)
+    {
+        if (owner == null) return;
+
+        var progress = OwnerTraitXpProgress.GetValue(owner, _ => new PropertyOwner<PropertyObject>());
+        var traitLevelBefore = owner.GetTraitLevel(trait);
+        Campaign.Current.Models.CharacterDevelopmentModel.GetTraitLevelForTraitXp(
+            owner, trait, xpValue + progress.GetPropertyValue(trait), out var traitLevel, out var traitXp);
+        progress.SetPropertyValue(trait, traitXp);
+        if (traitLevel != traitLevelBefore)
+        {
+            owner.SetTraitLevel(trait, traitLevel);
+        }
+    }
+
     private static void ApplySucceedByPayingAndKeepingTheGoods(Quest quest)
     {
         GiveGoldAction.ApplyBetweenCharacters(Hero.MainHero, null, quest._stolenTradeGoodPrice);
         quest.AddLog(quest.SuccessQuestLogText);
-        TraitLevelingHelper.OnIssueSolvedThroughQuest(Hero.MainHero, new Tuple<TraitObject, int>[1]
-        {
-            new Tuple<TraitObject, int>(DefaultTraits.Calculating, 100)
-        });
+        ApplyOwnerTraitXp(Hero.MainHero, DefaultTraits.Calculating, 100);
         MobileParty.MainParty.ItemRoster.AddToCounts(quest._stolenTradeGood, quest._stolenTradeGoodAmount);
         quest.QuestGiver.AddPower(5f);
         quest._counterOfferHero.AddPower(-5f);
@@ -353,10 +368,7 @@ internal static class GangLeaderNeedsToOffloadStolenGoodsQuestType
         GiveGoldAction.ApplyBetweenCharacters(Hero.MainHero, null, quest._stolenTradeGoodPrice);
         quest.AddLog(quest.SuccessByGivingBackTheGoodsQuestLogText);
         GiveGoldAction.ApplyBetweenCharacters(null, Hero.MainHero, quest._counterOfferGold);
-        TraitLevelingHelper.OnIssueSolvedThroughQuest(Hero.MainHero, new Tuple<TraitObject, int>[1]
-        {
-            new Tuple<TraitObject, int>(DefaultTraits.Calculating, 150)
-        });
+        ApplyOwnerTraitXp(Hero.MainHero, DefaultTraits.Calculating, 150);
         quest.QuestGiver.AddPower(5f);
         quest._counterOfferHero.AddPower(5f);
         ChangeRelationAction.ApplyPlayerRelation(quest.QuestGiver, 10);
@@ -384,10 +396,7 @@ internal static class GangLeaderNeedsToOffloadStolenGoodsQuestType
     {
         quest.QuestGiver.AddPower(-5f);
         quest._counterOfferHero.AddPower(-5f);
-        TraitLevelingHelper.OnIssueSolvedThroughQuest(Hero.MainHero, new Tuple<TraitObject, int>[1]
-        {
-            new Tuple<TraitObject, int>(DefaultTraits.Calculating, 100)
-        });
+        ApplyOwnerTraitXp(Hero.MainHero, DefaultTraits.Calculating, 100);
         MobileParty.MainParty.ItemRoster.AddToCounts(quest._stolenTradeGood, quest._stolenTradeGoodAmount);
         ChangeRelationAction.ApplyPlayerRelation(quest.QuestGiver, -5);
         foreach (var notable in quest.QuestGiver.CurrentSettlement.Notables.WhereQ(notable => notable.IsMerchant))
@@ -402,10 +411,7 @@ internal static class GangLeaderNeedsToOffloadStolenGoodsQuestType
         GiveGoldAction.ApplyBetweenCharacters(null, Hero.MainHero, quest._counterOfferGold);
         quest.QuestGiver.AddPower(-5f);
         quest._counterOfferHero.AddPower(5f);
-        TraitLevelingHelper.OnIssueSolvedThroughQuest(Hero.MainHero, new Tuple<TraitObject, int>[1]
-        {
-            new Tuple<TraitObject, int>(DefaultTraits.Honor, 100)
-        });
+        ApplyOwnerTraitXp(Hero.MainHero, DefaultTraits.Honor, 100);
         ChangeRelationAction.ApplyPlayerRelation(quest.QuestGiver, -5);
         foreach (var notable in quest.QuestGiver.CurrentSettlement.Notables.WhereQ(notable => notable != quest.QuestGiver))
         {

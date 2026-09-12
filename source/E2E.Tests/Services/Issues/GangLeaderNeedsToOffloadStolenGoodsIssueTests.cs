@@ -20,6 +20,7 @@ using System.Reflection;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Actions;
 using TaleWorlds.CampaignSystem.CampaignBehaviors;
+using TaleWorlds.CampaignSystem.CharacterDevelopment;
 using TaleWorlds.CampaignSystem.ComponentInterfaces;
 using TaleWorlds.CampaignSystem.Encyclopedia;
 using TaleWorlds.CampaignSystem.GameMenus;
@@ -752,6 +753,7 @@ public class GangLeaderNeedsToOffloadStolenGoodsIssueTests : IDisposable
             Assert.False(Campaign.Current.IssueManager.Issues.ContainsKey(owner));
             Assert.Equal(goldBefore - stolenTradeGoodPrice, owner.Gold);
             Assert.Equal(stolenTradeGoodAmount, party.ItemRoster.GetItemNumber(stolenGood));
+            Assert.Equal(0, Campaign.Current.PlayerTraitDeveloper.GetPropertyValue(DefaultTraits.Calculating));
         });
     }
 
