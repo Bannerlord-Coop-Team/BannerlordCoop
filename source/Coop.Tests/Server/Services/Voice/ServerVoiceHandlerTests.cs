@@ -40,13 +40,14 @@ public partial class ServerVoiceHandlerTests : IDisposable
     private readonly PacketManager packets = new();
     private readonly Mock<IObjectManager> objects = new();
     private readonly PlayerManager players;
-    private readonly MissionManager missions = new();
+    private readonly MissionManager missions;
     private readonly ServerVoiceHandler handler;
     private long now = 1000;
 
     public ServerVoiceHandlerTests()
     {
         players = new PlayerManager(Mock.Of<ILogger>(), objects.Object, Mock.Of<IControllerIdProvider>());
+        missions = new MissionManager(players);
         var clock = new Mock<IVoiceClock>();
         clock.SetupGet(x => x.Milliseconds).Returns(() => now);
         var config = new Mock<IModConfig>();

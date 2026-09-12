@@ -29,6 +29,8 @@ builder.Services.AddTransient<IDeploymentLease, DeploymentLease>();
 builder.Services.AddTransient<IDeploymentEnvironment, DeploymentEnvironment>();
 builder.Services.AddTransient<IDeploymentPlan, DeploymentPlan>();
 builder.Services.AddTransient<IDeploymentFiles, DeploymentFiles>();
+builder.Services.AddSingleton<IBuildCleanupRecovery, BuildCleanupRecovery>();
+builder.Services.AddTransient<IBuildProcessRunner, WindowsJobBuildProcessRunner>();
 builder.Services.AddTransient<IModBuildService, ModBuildService>();
 builder.Services.AddTransient<IModDeploymentService, ModDeploymentService>();
 builder.Services.AddTransient<IDeploymentTools, DeploymentTools>();
