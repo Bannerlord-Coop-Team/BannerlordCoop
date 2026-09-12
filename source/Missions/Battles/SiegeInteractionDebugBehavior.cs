@@ -340,13 +340,21 @@ internal sealed class SiegeInteractionDebugBehavior : MissionBehavior, ISiegeInt
             stagingCamera.FillParametersFrom(screen.CombatCamera);
         }
         if (!watchOnly) agent.TeleportToPosition(position);
-        var target = point.GameEntity.GlobalPosition;
+        var target = GetStagingTarget(machine, point.GameEntity.GlobalPosition, watchOnly);
         var eye = watchOnly ? target + new Vec3(3f, 3f, 2f) : position + (Vec3.Up * 1.6f);
         var up = Math.Abs(Vec3.DotProduct((target - eye).NormalizedCopy(), Vec3.Up)) > 0.99f
             ? new Vec3(0f, 1f, 0f) : Vec3.Up;
         stagingCamera.LookAt(eye, target, up);
         screen.CustomCamera = stagingCamera;
         status = watchOnly ? "fixture_observer_camera_staged" : "fixture_staged_native_focus_pending";
+    }
+
+    internal Vec3 GetStagingTarget(UsableMachine machine, Vec3 standingPointPosition, bool watchOnly)
+    {
+        if (watchOnly || !(machine is CastleGate gate)) return standingPointPosition;
+        // Gate standing-point origins can lie directly beneath the player's feet.
+        var bounds = gate.ComputeGlobalPhysicsBoundingBoxMinMax();
+        return (bounds.Item1 + bounds.Item2) * 0.5f;
     }
 
     private void Restore(MissionScreen screen, Agent agent)
