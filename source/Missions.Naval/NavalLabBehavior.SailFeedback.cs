@@ -21,7 +21,6 @@ internal sealed partial class NavalLabBehavior
         if (!IsTwoClientNative || state < 0 || state > 2 || view == null || !HasNativeInputPermission(view) || !view.GetCanToggleSail())
             return "rejected:owner_helm_or_input_unavailable";
         view.SailControl = (SailInput)state;
-        nextNativeInput = 0;
         RouteNativeAxes(view);
         return "requested:synthetic_input_not_keyboard_evidence";
     }
@@ -39,13 +38,13 @@ internal sealed partial class NavalLabBehavior
             shipId = OwnSlot >= 0 ? (Guid?)manifest.Ships[OwnSlot] : null, electedSimulator = factoryHost,
             ready, terminal = factoryTerminal, blocked = Blocker != null, feedbackFresh = fresh, ownerView,
             requested = view == null ? (int?)null : (int)view.SailControl,
-            hostObserved = ready && factoryHost ? ReadSailStates() : null,
-            hostReceivedInput = factoryHost ? lastReceivedNativeInput.Select(input => input == null ? null : new
-            { input.Ship, input.Sequence, input.Sail, input.DeadlineUtcTicks }).ToArray() : null,
+            ownerObserved = ready ? ReadSailStates() : null,
+            ownerReceivedInput = lastReceivedNativeInput.Select(input => input == null ? null : new
+            { input.Ship, input.Sequence, input.Sail, input.DeadlineUtcTicks }).ToArray(),
             received = fresh ? sailFeedback : null, sequence = sailFeedbackSequence,
             remainingSeconds = fresh ? Math.Max(0, sailFeedbackDeadline - ControlNow) : 0,
             presentation = view?._dataSource?.SailState, presentationType = view?._dataSource?.SailType,
-            unavailable = factoryHost ? (ready ? null : "not_ready") : fresh ? (ownerView ? null : "owner_helm_or_view_unavailable") : "missing_stale_or_not_ready",
+            unavailable = ready ? null : "not_ready", presentationSource = "owned_native",
             unavailableLabelVisible = sailUnavailableLabel?.IsVisible == true,
             nativeInputSequence, lastHelmPermission
         };
@@ -59,8 +58,8 @@ internal sealed partial class NavalLabBehavior
 
     internal NetworkNavalLabSailState[] ReadSailStates()
     {
-        if (!IsTwoClientNative || !factoryHost || factoryTerminal || !CanUseNativeControls) return null;
-        var states = Ships.Select((ship, slot) => ReadSailState(ship, manifest.Ships[slot])).ToArray();
+        if (!IsTwoClientNative || factoryTerminal || !CanUseNativeControls) return null;
+        var states = new[] { ReadSailState(LocalShip, manifest.Ships[OwnSlot]) };
         return states.Any(state => state == null) ? null : states;
     }
 
@@ -90,7 +89,7 @@ internal sealed partial class NavalLabBehavior
     {
         ClearSailFeedback();
         long now = DateTime.UtcNow.Ticks;
-        if (!IsTwoClientNative || factoryHost || factoryTerminal || !CanUseNativeControls
+        if (IsTwoClientNative || factoryHost || factoryTerminal || !CanUseNativeControls
             || frames.IncarnationId != manifest.IncarnationId || frames.Epoch != 1
             || frames.Sequence <= sailFeedbackSequence || frames.SailStates == null || frames.SailStates.Length != 2
             || frames.SailDeadlineUtcTicks <= now || frames.SailDeadlineUtcTicks > now + TimeSpan.TicksPerSecond
@@ -111,7 +110,7 @@ internal sealed partial class NavalLabBehavior
     internal void UpdateSailPresentation(MissionGauntletShipControlView view)
     {
         if (!IsTwoClientNative || view.Mission != Mission || view._dataSource == null) return;
-        if (factoryHost) { DetachSailPresentation(view); return; }
+        if (IsTwoClientNative || factoryHost) { DetachSailPresentation(view); return; }
         AttachSailPresentation(view);
         if (factoryTerminal || !CanUseNativeControls || ControlNow >= sailFeedbackDeadline) ClearSailFeedback();
         bool available = sailFeedback != null && view._playerControlledShip == LocalShip && GetLocalControlledShip() == LocalShip;

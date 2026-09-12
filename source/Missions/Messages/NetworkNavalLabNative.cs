@@ -1,5 +1,6 @@
 ﻿#if DEBUG
 using System;
+using System.Linq;
 using Common.Messaging;
 using ProtoBuf;
 
@@ -25,12 +26,24 @@ public sealed class NetworkNavalLabStations : IEvent
     [ProtoMember(4)] public string Phase { get; private set; }
     [ProtoMember(5)] public Guid[] Combatants { get; private set; }
     [ProtoMember(6)] public string[] Keys { get; private set; }
-    public NetworkNavalLabStations(Guid incarnation, int epoch, int ship, string phase, Guid[] combatants, string[] keys)
+    [ProtoMember(7)] public string[] SailKeys { get; private set; }
+    [ProtoMember(8)] public string[] OarKeys { get; private set; }
+    [ProtoMember(9)] public int[] OarSides { get; private set; }
+    public bool HasPresentationInventory => SailKeys != null && SailKeys.Length > 0 && SailKeys.Length <= 16
+        && System.Linq.Enumerable.All(SailKeys, NetworkNavalLabPresentation.ValidKey)
+        && System.Linq.Enumerable.Distinct(SailKeys).Count() == SailKeys.Length
+        && OarKeys != null && OarKeys.Length > 0 && OarKeys.Length <= 128
+        && System.Linq.Enumerable.All(OarKeys, NetworkNavalLabPresentation.ValidKey)
+        && System.Linq.Enumerable.Distinct(OarKeys).Count() == OarKeys.Length
+        && OarSides != null && OarSides.Length == OarKeys.Length && System.Linq.Enumerable.All(OarSides, side => side == 0 || side == 1);
+    public NetworkNavalLabStations(Guid incarnation, int epoch, int ship, string phase, Guid[] combatants, string[] keys,
+        string[] sailKeys = null, string[] oarKeys = null, int[] oarSides = null)
     {
         IncarnationId = incarnation; Epoch = epoch; Ship = ship; Phase = phase;
+        SailKeys = sailKeys; OarKeys = oarKeys; OarSides = oarSides;
         Combatants = (Guid[])combatants.Clone(); Keys = (string[])keys.Clone();
     }
-    public NetworkNavalLabStations WithPhase(string phase) => new(IncarnationId, Epoch, Ship, phase, Combatants, Keys);
+    public NetworkNavalLabStations WithPhase(string phase) => new(IncarnationId, Epoch, Ship, phase, Combatants, Keys, SailKeys, OarKeys, OarSides);
 }
 
 [ProtoContract(SkipConstructor = true)]

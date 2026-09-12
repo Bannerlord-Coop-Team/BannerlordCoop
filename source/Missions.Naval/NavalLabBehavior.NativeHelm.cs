@@ -176,7 +176,7 @@ internal sealed partial class NavalLabBehavior
 
     private void RefreshFollowerHelmTarget()
     {
-        if (factoryHost || !HasOccupiedLocalHelm() || !nativeHelmPoint.LockUserFrames) return;
+        if (IsTwoClientNative || factoryHost || !HasOccupiedLocalHelm() || !nativeHelmPoint.LockUserFrames) return;
         // Refresh the native target after follower hull writes, without moving the actor directly.
         var frame = nativeHelmPoint.GetUserFrameForAgent(nativeHelmAgent);
         nativeHelmAgent.SetTargetPositionAndDirection(frame.Origin.AsVec2, in frame.Rotation.f);

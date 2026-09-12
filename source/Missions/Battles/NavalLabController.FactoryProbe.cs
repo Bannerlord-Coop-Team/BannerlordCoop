@@ -9,6 +9,8 @@ namespace Missions.Battles;
 public sealed partial class NavalLabController
 {
     private static readonly ILogger FactoryProbeLogger = LogManager.GetLogger<NavalLabController>();
+    private string factoryTerminalReason;
+    private long factoryTerminalCallback;
     private string factoryControlCleanupFailure;
     private string factoryHoldFailure;
     private bool IsFactoryProbe => manifest?.Mode == NavalLabMode.FactoryAuthorityProbe || IsTwoClientNative;
@@ -54,8 +56,19 @@ public sealed partial class NavalLabController
         }
     }
 
+    public object TerminalStatus() => new
+    {
+        terminal = factoryTerminal, reason = factoryTerminalReason, localCallback = factoryTerminalCallback,
+        adapterBlocker = adapter?.Blocker, faultReported, factoryControlCleanupFailure, factoryHoldFailure
+    };
+
     private void HoldFactoryProbe(string reason)
     {
+        if (!factoryTerminal)
+        {
+            factoryTerminalReason = reason;
+            factoryTerminalCallback = callback;
+        }
         factoryTerminal = true;
         released = false;
         try { CancelControls(reason); }

@@ -148,14 +148,14 @@ internal sealed partial class NavalLabBehavior
             Mission.OnAfterDeploymentFinished();
             Mission.SetMissionMode(MissionMode.Battle, true);
             if (IsSingleClientNative) Ships[0].SetController(ShipControllerType.None, autoUpdateController: true);
-            else foreach (var ship in Ships) ship.SetController(factoryHost || ship == LocalShip
+            else foreach (var ship in Ships) ship.SetController(ship == LocalShip
                 ? ShipControllerType.Player : ShipControllerType.None, autoUpdateController: false);
             if (Blocker != null || nativeDeploymentCallbacks != 1 || nativeAfterDeploymentCallbacks != 1
                 || !Mission.IsDeploymentFinished || Ships.Any(ship => !ship.IsDeployed
-                    || ship.GameEntity.HasDynamicRigidBodyAndActiveSimulation() != (IsSingleClientNative || factoryHost)))
+                    || ship.GameEntity.HasDynamicRigidBodyAndActiveSimulation() != (IsSingleClientNative || FactoryBodyExpectedActive(Array.IndexOf(Ships, ship)))))
                 throw new InvalidOperationException("Native deployment or active factory body was not confirmed.");
             nativeDeploymentComplete = true;
-            Simulating = IsSingleClientNative || factoryHost;
+            Simulating = IsSingleClientNative || IsTwoClientNative || factoryHost;
             return "deployed";
         }
         catch (Exception exception)

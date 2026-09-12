@@ -66,9 +66,11 @@ public sealed class NetworkNavalLabAction : IEvent
     [ProtoMember(6)] public readonly float Rudder;
     [ProtoMember(7)] public readonly bool Row;
     [ProtoMember(8)] public readonly long DeadlineUtcTicks;
+    [ProtoMember(9)] public readonly int RopeTargetStation;
     public NetworkNavalLabAction(Guid incarnationId, Guid operationId, int epoch, string kind, int ship, float rudder, bool row,
-        long deadlineUtcTicks = 0)
+        long deadlineUtcTicks = 0, int ropeTargetStation = -1)
     {
+        RopeTargetStation = ropeTargetStation;
         IncarnationId = incarnationId;
         OperationId = operationId;
         Epoch = epoch;

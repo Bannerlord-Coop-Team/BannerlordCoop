@@ -14,7 +14,7 @@ public sealed partial class NavalLabCoordinator
     private readonly INavalLabNativeState nativeState;
     private bool stationsCommitted;
     private volatile bool nativeReleaseSent;
-    private bool IsTwoClientNative => store.Current?.Mode == NavalLabMode.TwoClientNative;
+    private bool IsTwoClientNative => store.Current?.IsTwoClientNative == true;
     private bool UsesFactoryLifecycle => IsTwoClientNative || store.Current?.Mode == NavalLabMode.FactoryAuthorityProbe;
 
     private bool NativeAssignmentValid => IsTwoClientNative && failure == null && ready.Count == 2
@@ -37,6 +37,7 @@ public sealed partial class NavalLabCoordinator
                 }
                 if (!NativeAssignmentValid || payload.Who is not NetPeer peer || !players.TryGetPlayer(peer, out var player))
                     throw new InvalidOperationException("native.stations_without_authority");
+                CheckStationPresentation(payload.What);
                 if (payload.What.Phase == "offer")
                 {
                     nativeState.Offer(player.ControllerId, payload.What);
@@ -74,22 +75,5 @@ public sealed partial class NavalLabCoordinator
                 if (players.TryGetPeer(owner, out var target)) network.Send(target, stations.WithPhase("commit"));
     }
 
-    private void ReceiveNativeInput(MessagePayload<NetworkNavalLabHelmInput> payload)
-    {
-        bool readyAtReceive = ModInformation.IsServer ? nativeReleaseSent : (controller as INavalNativeController)?.NativeInputIngressReady == true;
-        GameThread.RunSafe(() =>
-        {
-            if (!IsTwoClientNative || payload.What.IncarnationId != store.Current.IncarnationId || !readyAtReceive) return;
-            if (ModInformation.IsClient)
-            {
-                (controller as INavalNativeController)?.ReceiveNativeInput(payload.What, readyAtReceive);
-                return;
-            }
-            if (!NativeAssignmentValid || !HelmReplicasReady || payload.Who is not NetPeer peer || !players.TryGetPlayer(peer, out var player)
-                || !nativeState.AcceptInput(player.ControllerId, payload.What, DateTime.UtcNow.Ticks)) return;
-            if (hosts.TryGet(store.Current.InstanceId, out var host) && players.TryGetPeer(host.HostControllerId, out var target))
-                network.Send(target, payload.What);
-        }, context: nameof(ReceiveNativeInput));
-    }
 }
 #endif

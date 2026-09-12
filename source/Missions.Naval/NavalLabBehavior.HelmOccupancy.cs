@@ -175,7 +175,7 @@ internal sealed partial class NavalLabBehavior
 
     private void RefreshReplicatedFollowerHelmTarget()
     {
-        if (factoryHost || !IsTwoClientNative || factoryTerminal || Blocker != null) return;
+        if (!IsTwoClientNative || factoryTerminal || Blocker != null) return;
         int slot = 1 - OwnSlot;
         var state = replicatedHelms[slot];
         if (state?.Occupied != true || observedHelmRevisions[slot] != state.Revision) return;

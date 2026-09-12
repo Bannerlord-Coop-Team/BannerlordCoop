@@ -65,9 +65,9 @@ public sealed partial class NavalLabCoordinator : INavalLabCoordinator, IHandler
         this.loader = loader;
         this.controllerFactory = controllerFactory;
         this.nativeState = nativeState;
+        broker.Subscribe<NetworkNavalLabShipSample>(ReceiveShipSample);
         broker.Subscribe<NetworkNavalLabStations>(ReceiveStations);
         broker.Subscribe<NetworkNavalLabHelmOccupancy>(ReceiveHelmOccupancy);
-        broker.Subscribe<NetworkNavalLabHelmInput>(ReceiveNativeInput);
         broker.Subscribe<NetworkNavalLabStart>(ReceiveStart);
         broker.Subscribe<NetworkNavalLabAction>(ReceiveAction);
         broker.Subscribe<NetworkNavalLabReceipt>(ReceiveReceipt);
@@ -105,7 +105,7 @@ public sealed partial class NavalLabCoordinator : INavalLabCoordinator, IHandler
             Enumerable.Range(0, controllers.Length * NavalLabManifest.CrewPerShip).Select(_ => Guid.NewGuid()).ToArray(),
             controllers.Select(_ => Guid.NewGuid()).ToArray(), mode);
         store.Install(manifest);
-        if (manifest.Mode == NavalLabMode.TwoClientNative) nativeState.Initialize(manifest);
+        if (manifest.IsTwoClientNative) nativeState.Initialize(manifest);
         store.BeginOperation(incarnation, "activation");
         startOperation = operationId;
         var message = new NetworkNavalLabStart(manifest.InstanceId, incarnation, manifest.Controllers, manifest.Combatants, manifest.Ships, manifest.Mode);
@@ -113,12 +113,19 @@ public sealed partial class NavalLabCoordinator : INavalLabCoordinator, IHandler
         return new { manifest, operation = store.InspectOperation(operationId) };
     }
 
-    public object Execute(Guid operationId, string kind, int ship, float rudder, bool row)
+    public object Execute(Guid operationId, string kind, int ship, float rudder, bool row) =>
+        ExecuteCore(operationId, kind, ship, rudder, row);
+
+    private object ExecuteCore(Guid operationId, string kind, int ship, float rudder, bool row, int ropeTargetStation = -1)
     {
         if (ModInformation.IsClient) throw new InvalidOperationException("Run actions on the authoritative server.");
         if (store.Current == null) throw new InvalidOperationException("No lab exists.");
         bool single = store.Current.Mode == NavalLabMode.SingleClientNative || IsTwoClientNative;
         bool deployment = kind == "complete-deployment";
+        bool rope = kind == "rope-throw" || kind == "rope-miss" || kind == "rope-cut";
+        if (rope && (store.Current.Mode != NavalLabMode.TwoClientNative || row || rudder < 0 || rudder >= 32
+            || rudder != Math.Truncate(rudder) || (kind == "rope-throw" ? ropeTargetStation < 0 || ropeTargetStation >= NetworkNavalLabRopeState.MaxTargetStations : ropeTargetStation != -1)))
+            throw new ArgumentException("Ropes require normal two-client-native and valid station indexes.");
         bool pulse = kind == "native-axes-pulse" || kind == "native-axes-backward" || kind == "native-axes-neutral" || kind == "native-row-stop";
         if (pulse && kind != "native-axes-pulse" && (row || (kind != "native-axes-backward" && rudder != 0)))
             throw new ArgumentException("Backward requires row=false; neutral/row-stop also require rudder=0.");
@@ -129,7 +136,7 @@ public sealed partial class NavalLabCoordinator : INavalLabCoordinator, IHandler
         bool sail = kind == "sail-full" || kind == "sail-raised" || kind == "sail-square-raised";
         if (sail && (!IsTwoClientNative || rudder != 0 || row))
             throw new ArgumentException("Sail test actions require two-client-native, rudder=0 and row=false.");
-        if ((single && kind != "stop" && !deployment && !sail && !nativeHelm && !pulse) || (deployment && !single))
+        if ((single && kind != "stop" && !deployment && !sail && !nativeHelm && !pulse && !rope) || (deployment && !single))
             throw new InvalidOperationException("Single-client native controls use keyboard/orders; only complete-deployment and stop are commands.");
         if (deployment && (ship != 0 || rudder != 0 || row)) throw new ArgumentException("Deployment requires ship=0, rudder=0, row=false.");
         bool heldHelm = kind == "take-helm" || kind == "release-helm";
@@ -137,15 +144,16 @@ public sealed partial class NavalLabCoordinator : INavalLabCoordinator, IHandler
             throw new InvalidOperationException("Held-helm mode supports only take-helm, release-helm and stop; activation mode is unchanged.");
         if (heldHelm && (rudder != 0 || row)) throw new ArgumentException("Held helm actions require rudder=0 and row=false.");
         bool agentControl = kind == "walk" || kind == "turn" || kind == "jump" || kind == "crew";
-        if (kind != "helm" && kind != "stop" && kind != "probe" && !agentControl && !heldHelm && !deployment && !sail && !nativeHelm && !pulse)
+        if (kind != "helm" && kind != "stop" && kind != "probe" && !agentControl && !heldHelm && !deployment && !sail && !nativeHelm && !pulse && !rope)
             throw new ArgumentException("Supported actions: helm, probe, walk, turn, jump, crew, stop.");
         if (agentControl && (row || ((kind == "jump" || kind == "crew") && rudder != 0)))
             throw new ArgumentException("Agent actions require row=false; jump and crew also require rudder=0.");
-        if (ship < 0 || ship >= store.Current.Ships.Length || float.IsNaN(rudder) || float.IsInfinity(rudder) || Math.Abs(rudder) > 1)
-            throw new ArgumentException("Ship must be 0 or 1 and rudder must be finite in [-1,1].");
+        if (ship < 0 || ship >= store.Current.Ships.Length || float.IsNaN(rudder) || float.IsInfinity(rudder) || (!rope && Math.Abs(rudder) > 1))
+            throw new ArgumentException("Invalid ship or control value.");
         string contents = kind + ":" + ship + ":" + rudder.ToString("R", CultureInfo.InvariantCulture) + ":" + row;
+        if (rope) contents += ":" + ropeTargetStation;
         if (kind != "stop" && store.TryInspectOperation(operationId, contents, out var existingReceipt)) return existingReceipt;
-        if ((nativeHelm || pulse) && !nativeReleaseSent) throw new InvalidOperationException("Native stations are not ready.");
+        if ((nativeHelm || pulse || rope) && !nativeReleaseSent) throw new InvalidOperationException("Native stations are not ready.");
         if (!hosts.TryGet(store.Current.InstanceId, out var host) && kind != "stop")
             throw new InvalidOperationException("The fixture has no elected mission-ready host.");
         if (kind != "stop" && (host.Epoch != 1 || ready.Count != store.Current.Controllers.Length || failure != null
@@ -160,9 +168,10 @@ public sealed partial class NavalLabCoordinator : INavalLabCoordinator, IHandler
         }
         else if (!store.BeginOperation(operationId, contents)) return store.InspectOperation(operationId);
         var action = new NetworkNavalLabAction(store.Current.IncarnationId, operationId, host?.Epoch ?? 0, kind, ship, rudder, row,
-            heldHelm ? DateTime.UtcNow.AddSeconds(30).Ticks : nativeHelm ? DateTime.UtcNow.AddSeconds(2).Ticks : (sail || pulse) ? DateTime.UtcNow.AddSeconds(1).Ticks : 0);
+            heldHelm ? DateTime.UtcNow.AddSeconds(30).Ticks : (nativeHelm || rope) ? DateTime.UtcNow.AddSeconds(2).Ticks : (sail || pulse) ? DateTime.UtcNow.AddSeconds(1).Ticks : 0,
+            ropeTargetStation);
         var targets = kind == "stop" || kind == "probe" || (deployment && IsTwoClientNative) ? store.Current.Controllers
-            : new[] { agentControl || heldHelm || sail || nativeHelm || pulse ? store.Current.Controllers[ship] : host.HostControllerId };
+            : new[] { agentControl || heldHelm || sail || nativeHelm || pulse || rope ? store.Current.Controllers[ship] : host.HostControllerId };
         foreach (var target in targets)
             if (players.TryGetPeer(target, out var peer)) network.Send(peer, action);
         return store.InspectOperation(operationId);
@@ -188,6 +197,7 @@ public sealed partial class NavalLabCoordinator : INavalLabCoordinator, IHandler
         {
             incarnation = store.Current?.IncarnationId, mode = store.Current?.Mode.ToString(),
             status = IsTwoClientNative ? (adapter as INavalNativeMissionAdapter)?.InspectHelmStatus() : null,
+            terminalState = (controller as NavalLabController)?.TerminalStatus(),
             unavailable = !IsTwoClientNative ? "wrong_mode_or_no_fixture" : adapter == null ? "no_local_native_view" : null
         };
     }
@@ -202,6 +212,8 @@ public sealed partial class NavalLabCoordinator : INavalLabCoordinator, IHandler
                 ? new { assignment.HostControllerId, assignment.Epoch } : null,
             status = IsTwoClientNative ? (adapter as INavalNativeMissionAdapter)?.InspectControlStatus() : null,
             transport = IsTwoClientNative ? (controller as INavalNativeController)?.NativeControlStatus() : null,
+            expectedBothBodiesActive = store.Current?.AllPhysicsProbe == true,
+            serverShipSequences = shipSampleSequences, serverShipLastReject = shipSampleRejections,
             presentation = IsTwoClientNative ? (adapter as INavalPresentationAdapter)?.InspectPresentationStatus() : null,
             unavailable = !IsTwoClientNative ? "wrong_mode_or_no_fixture" : adapter == null ? "no_local_native_view" : null
         };
@@ -253,7 +265,7 @@ public sealed partial class NavalLabCoordinator : INavalLabCoordinator, IHandler
                 adapter = loader.Load();
                 adapter.Preflight();
                 store.Install(manifest);
-                if (manifest.Mode == NavalLabMode.TwoClientNative) nativeState.Initialize(manifest);
+                if (manifest.IsTwoClientNative) nativeState.Initialize(manifest);
                 controller = controllerFactory();
                 Logger.Information("[NavalLabStartup] {Incarnation} open begin missionsMvid={MissionsMvid} adapterMvid={AdapterMvid}",
                     manifest.IncarnationId, typeof(NavalLabCoordinator).Assembly.ManifestModule.ModuleVersionId,
@@ -292,6 +304,7 @@ public sealed partial class NavalLabCoordinator : INavalLabCoordinator, IHandler
             var action = payload.What;
             if (store.Current?.IncarnationId != action.IncarnationId || controller == null) return;
             string contents = action.Kind + ":" + action.Ship + ":" + action.Rudder.ToString("R", CultureInfo.InvariantCulture) + ":" + action.Row;
+            if (action.Kind.StartsWith("rope-", StringComparison.Ordinal)) contents += ":" + action.RopeTargetStation;
             bool first = action.Kind == "hold" || action.Kind == "stop"
                 ? store.BeginEmergencyOperation(action.OperationId, action.Kind)
                 : store.BeginOperation(action.OperationId, contents);
@@ -385,9 +398,9 @@ public sealed partial class NavalLabCoordinator : INavalLabCoordinator, IHandler
 
     public void Dispose()
     {
+        broker.Unsubscribe<NetworkNavalLabShipSample>(ReceiveShipSample);
         broker.Unsubscribe<NetworkNavalLabStations>(ReceiveStations);
         broker.Unsubscribe<NetworkNavalLabHelmOccupancy>(ReceiveHelmOccupancy);
-        broker.Unsubscribe<NetworkNavalLabHelmInput>(ReceiveNativeInput);
         broker.Unsubscribe<NetworkNavalLabStart>(ReceiveStart);
         broker.Unsubscribe<NetworkNavalLabAction>(ReceiveAction);
         broker.Unsubscribe<NetworkNavalLabReceipt>(ReceiveReceipt);

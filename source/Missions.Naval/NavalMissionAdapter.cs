@@ -25,7 +25,7 @@ using TaleWorlds.ObjectSystem;
 
 namespace Missions.Naval;
 
-public sealed class NavalMissionAdapter : INavalMissionAdapter, INavalNativeMissionAdapter, INavalHelmReplicationAdapter, INavalDriftAdapter, INavalPresentationAdapter
+public sealed class NavalMissionAdapter : INavalMissionAdapter, INavalNativeMissionAdapter, INavalHelmReplicationAdapter, INavalDriftAdapter, INavalPresentationAdapter, INavalLabShipAdapter, INavalRopeAdapter
 {
     private NavalLabBehavior behavior;
     private readonly Harmony harmony = new Harmony("coop.warsails.lab.physics");
@@ -68,7 +68,7 @@ public sealed class NavalMissionAdapter : INavalMissionAdapter, INavalNativeMiss
                 new NavalShipsLogic(), new NavalAgentsLogic(), new WaveParametersComputerLogic(),
                 new AgentHumanAILogic(), new MissionOptionsComponent(), behavior, controller
             };
-            if (manifest.Mode == NavalLabMode.SingleClientNative || manifest.Mode == NavalLabMode.TwoClientNative)
+            if (manifest.Mode == NavalLabMode.SingleClientNative || manifest.IsTwoClientNative)
             {
                 behaviors.Add(new NavalLabBattlePowerCalculationLogic(behavior));
                 behaviors.Add(new NavalTrajectoryPlanningLogic());
@@ -78,6 +78,13 @@ public sealed class NavalMissionAdapter : INavalMissionAdapter, INavalNativeMiss
         });
     }
 
+    public Missions.Messages.NetworkNavalLabShipSample CaptureOwnedShip(long sequence, long callback) => behavior.CaptureOwnedShip(sequence, callback);
+    public bool ValidateForeignShip(Missions.Messages.NetworkNavalLabShipSample sample) => behavior.ValidateForeignShip(sample);
+    public void AcceptForeignShip(Missions.Messages.NetworkNavalLabShipSample sample) => behavior.AcceptForeignShip(sample);
+    public bool ApplyForeignShipFrame(int slot, MatrixFrame frame) => behavior.ApplyForeignShipFrame(slot, frame);
+    public object InspectShipAuthority() => behavior.InspectShipAuthority();
+    public string RequestRope(Missions.Messages.NetworkNavalLabAction action) => behavior?.RequestRope(action) ?? "rejected:no_rope_fixture";
+    public object InspectRopes() => behavior?.InspectRopes();
     public void SetAuthority(bool simulate) => behavior?.SetAuthority(simulate);
     public void MaterializeFactoryProbe(bool electedHost, Func<bool> authorityValid) =>
         behavior.MaterializeFactoryProbe(electedHost, authorityValid);
@@ -86,7 +93,7 @@ public sealed class NavalMissionAdapter : INavalMissionAdapter, INavalNativeMiss
     public MatrixFrame[] ReadFrames() => behavior?.Ships.Where(ship => ship != null).Select(ship => ship.GlobalFrame).ToArray() ?? Array.Empty<MatrixFrame>();
     public bool ApplyFrames(MatrixFrame[] frames)
     {
-        if (behavior == null || behavior.Blocker != null || behavior.IsSingleClientNative || behavior.Simulating || frames.Length != behavior.Ships.Length) return false;
+        if (behavior == null || behavior.Blocker != null || behavior.IsSingleClientNative || behavior.IsTwoClientNative || behavior.Simulating || frames.Length != behavior.Ships.Length) return false;
         if (behavior.IsFactoryProbe && !behavior.CanApplyFactoryFrames()) return false;
         for (int i = 0; i < frames.Length; i++)
         {
@@ -178,7 +185,7 @@ internal sealed partial class NavalLabBehavior : MissionLogic
     public bool Simulating { get; private set; }
     internal bool IsHeldHelm => manifest.Mode == NavalLabMode.HeldHelm;
     internal bool IsSingleClientNative => manifest.Mode == NavalLabMode.SingleClientNative;
-    internal bool IsTwoClientNative => manifest.Mode == NavalLabMode.TwoClientNative;
+    internal bool IsTwoClientNative => manifest.IsTwoClientNative;
     internal bool HasNativeViews => IsSingleClientNative || IsTwoClientNative;
     internal bool IsFactoryProbe => manifest.Mode == NavalLabMode.FactoryAuthorityProbe || IsTwoClientNative;
     internal bool RequiresProcessExit => IsHeldHelm || IsSingleClientNative || IsFactoryProbe;
@@ -318,6 +325,7 @@ internal sealed partial class NavalLabBehavior : MissionLogic
     {
         this.manifest = manifest;
         this.ownControllerId = ownControllerId;
+        originalOwnerHullRoles = manifest.Controllers.Select(owner => owner == ownControllerId).ToArray();
         this.hull = hull;
         this.troop = troop;
     }
@@ -930,7 +938,7 @@ internal sealed partial class NavalLabBehavior : MissionLogic
         CancelAgentControl();
         ReleaseHeldHelm();
         if ((IsSingleClientNative && !nativeTerminalHold) || IsTwoClientNative) CancelNativeControls();
-        foreach (var ship in Ships.Where(ship => ship?.Controller is PlayerShipController && (!IsTwoClientNative || factoryHost)))
+        foreach (var ship in Ships.Where(ship => ship?.Controller is PlayerShipController && (!IsTwoClientNative || OwnsFactoryHull(Array.IndexOf(Ships, ship)))))
         {
             var input = ShipInputRecord.None();
             input.SetRudderLateral(0);
@@ -970,6 +978,7 @@ internal sealed partial class NavalLabBehavior : MissionLogic
         singleClientNative = IsSingleClientNative ? InspectNativeControls() : null,
         twoClientNative = IsTwoClientNative ? InspectNativeControls() : null,
         factoryAuthorityProbe = InspectFactoryProbe(),
+        shipAuthority = IsTwoClientNative ? InspectShipAuthority() : null,
         heldHelm = InspectHeldHelm(),
         syntheticCrew = true,
         agentControl = controlledAgent == null ? "inactive" : controlKind,

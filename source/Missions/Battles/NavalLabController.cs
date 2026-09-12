@@ -64,6 +64,7 @@ public sealed partial class NavalLabController : CoopMissionController, INavalLa
     public object Samples(long afterSequence) => new
     {
         incarnationId = manifest?.IncarnationId, controller = session.OwnControllerId,
+        ships = IsTwoClientNative ? ShipStreamStatus() : null,
         nativeControls = IsTwoClientNative ? new { nativeControlsReleased, nativeInputSequences, nativeInputDeadlines, stationsAcknowledged = acknowledgedStations.Count } : null,
         currentEpoch = session.HostEpoch, localCallback = callback, lastReceivedSequence = lastReceived, lastAppliedSequence = lastApplied,
         receivedGaps, rejectedFrames, supersededSamples, rejectedSamples, measurement = measurement.Read(afterSequence),
@@ -188,6 +189,15 @@ public sealed partial class NavalLabController : CoopMissionController, INavalLa
             return "rejected:wrong_mode";
         if (IsTwoClientNative)
         {
+            if (action.Kind == "rope-throw" || action.Kind == "rope-miss" || action.Kind == "rope-cut")
+            {
+                if (manifest.Mode != NavalLabMode.TwoClientNative || action.Ship < 0 || action.Ship >= 2
+                    || manifest.Controllers[action.Ship] != session.OwnControllerId || !NativeControlsReady)
+                    return "rejected:rope_owner_not_ready";
+                if (action.DeadlineUtcTicks <= DateTime.UtcNow.Ticks || action.DeadlineUtcTicks > DateTime.UtcNow.AddSeconds(2).Ticks)
+                    return "rejected:expired_rope_command";
+                return (adapter as INavalRopeAdapter)?.RequestRope(action) ?? "rejected:rope_adapter_unavailable";
+            }
             if (action.Kind == "native-axes-pulse" || presentationPulse)
             {
                 if (action.Ship < 0 || action.Ship >= 2 || manifest.Controllers[action.Ship] != session.OwnControllerId
@@ -337,7 +347,7 @@ public sealed partial class NavalLabController : CoopMissionController, INavalLa
         }
         measurement.Active(Now);
         // Activation can discover an inactive native body in this same callback.
-        adapter.SetAuthority(fixtureReady && session.IsLocalHost && manifest.Mode != NavalLabMode.HeldHelm);
+        adapter.SetAuthority(fixtureReady && (IsTwoClientNative || session.IsLocalHost) && manifest.Mode != NavalLabMode.HeldHelm);
         if (manifest.Mode == NavalLabMode.SingleClientNative && (adapter.Blocker != null
             || (released && !HasSingleClientAuthority))) adapter.Hold();
         if (adapter.Blocker != null)
@@ -363,7 +373,12 @@ public sealed partial class NavalLabController : CoopMissionController, INavalLa
         adapter.TickAgentControl(dt);
         if (IsFactoryProbe && adapter.Blocker != null) throw new InvalidOperationException(adapter.Blocker);
         sendTime += dt;
-        if (fixtureReady && (manifest.Mode == NavalLabMode.Activation || IsFactoryProbe) && session.IsLocalHost && sendTime >= 0.05f)
+        if (IsTwoClientNative && fixtureReady && NativeControlsReady && sendTime >= 0.05f)
+        {
+            sendTime = 0;
+            SendOwnedShip();
+        }
+        if (!IsTwoClientNative && fixtureReady && (manifest.Mode == NavalLabMode.Activation || IsFactoryProbe) && session.IsLocalHost && sendTime >= 0.05f)
         {
             sendTime = 0;
             var frames = adapter.ReadFrames();
@@ -380,10 +395,7 @@ public sealed partial class NavalLabController : CoopMissionController, INavalLa
             }
             bool sample = measurement.Active(Now) && Now >= nextSample;
             var message = new NetworkNavalLabFrames(manifest.IncarnationId, session.HostEpoch, ++sequence,
-                values, callback, sample ? measurement.OperationId : Guid.Empty,
-                IsTwoClientNative && NativeControlsReady ? NativeAdapter.ReadSailStates() : null,
-                IsTwoClientNative && NativeControlsReady ? DateTime.UtcNow.AddSeconds(1).Ticks : 0,
-                IsTwoClientNative && NativeControlsReady ? (adapter as INavalPresentationAdapter)?.CapturePresentation(sequence) : null);
+                values, callback, sample ? measurement.OperationId : Guid.Empty);
             if (sample)
             {
                 nextSample = Now + 0.5;
@@ -398,18 +410,16 @@ public sealed partial class NavalLabController : CoopMissionController, INavalLa
     {
         long receivedCallback = Interlocked.Read(ref callback);
         bool probeReadyAtReceive = !IsFactoryProbe || (factoryHydrated && released && !factoryTerminal);
-        bool sailReadyAtReceive = NativeInputIngressReady;
         GameThread.RunSafe(() =>
         {
             var message = payload.What;
-            if (disposed || !released || adapter.Blocker != null || manifest == null
+            if (IsTwoClientNative || disposed || !released || adapter.Blocker != null || manifest == null
                 || (manifest.Mode != NavalLabMode.Activation && !IsFactoryProbe)
                 || !probeReadyAtReceive || (IsFactoryProbe && (!factoryHydrated || factoryTerminal || !FactoryAssignmentValid)) || !OriginalOwnersReady
                 || message.IncarnationId != manifest.IncarnationId || session.IsLocalHost
                 || session.HostEpoch != 1 || message.Epoch != session.HostEpoch || message.Sequence <= lastReceived
                 || message.SourceCallback <= 0 || message.Frames == null || message.Frames.Length != 24)
             {
-                if (IsTwoClientNative && !session.IsLocalHost) NativeAdapter.ClearSailFeedback();
                 rejectedFrames++; return;
             }
             foreach (var value in message.Frames)
@@ -425,13 +435,10 @@ public sealed partial class NavalLabController : CoopMissionController, INavalLa
                 }
                 frames[i] = new MatrixFrame(new Mat3(vectors[0], vectors[1], vectors[2]), vectors[3]);
             }
-            if (IsTwoClientNative && message.Presentation != null
-                && (!sailReadyAtReceive || !NativeControlsReady || adapter is not INavalPresentationAdapter presentation
-                    || !presentation.ValidatePresentation(message))) { rejectedFrames++; return; }
             receivedGaps += Math.Max(0, message.Sequence - lastReceived - 1);
             lastReceived = message.Sequence;
             bool applied;
-            try { applied = IsTwoClientNative ? AcceptHullTarget(message, frames) : adapter.ApplyFrames(frames); }
+            try { applied = adapter.ApplyFrames(frames); }
             catch (Exception exception)
             {
                 CompletePending("interrupted_by_failed_apply");
@@ -458,15 +465,6 @@ public sealed partial class NavalLabController : CoopMissionController, INavalLa
                     ? "superseded_before_interpolation_endpoint" : "superseded_before_next_mission_callback");
             }
             if (!IsTwoClientNative) lastApplied = message.Sequence;
-            if (IsTwoClientNative)
-            {
-                if (sailReadyAtReceive && NativeControlsReady)
-                {
-                    NativeAdapter.ApplySailFeedback(message);
-                    (adapter as INavalPresentationAdapter)?.AcceptPresentation(message);
-                }
-                else NativeAdapter.ClearSailFeedback();
-            }
             if (message.ProbeOperationId != Guid.Empty)
             {
                 if (message.ProbeOperationId == measurement.OperationId && measurement.Active(Now))

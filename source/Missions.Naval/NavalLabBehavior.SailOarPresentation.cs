@@ -73,7 +73,7 @@ internal sealed partial class NavalLabBehavior
     private volatile DisplayedPresentation displayedPresentation;
     private NetworkNavalLabPresentation[] presentationTarget;
     private NetworkNavalLabPresentation[] presentationStart;
-    private NetworkNavalLabPresentation[] hostCapturedPresentation;
+    private NetworkNavalLabPresentation[] ownedCapturedPresentation;
     private long presentationSequence, presentationSourceCallback, presentationCapturedSequence;
     private double presentationDeadline;
     private float presentationElapsed;
@@ -133,12 +133,13 @@ internal sealed partial class NavalLabBehavior
         return true;
     }
 
-    private NetworkNavalLabPresentation[] ObservePresentation()
+    private NetworkNavalLabPresentation[] ObservePresentation(bool ownedOnly = false)
     {
         if (!PresentationReady || presentationInventory == null) return null;
         var result = new NetworkNavalLabPresentation[2];
         for (int slot = 0; slot < 2; slot++)
         {
+            if (ownedOnly && !OwnsFactoryHull(slot)) continue;
             var entry = presentationInventory[slot];
             if (!entry.Ship.GameEntity.IsValid || entry.Ship != Ships[slot]) return null;
             var sails = entry.SailObservations.Select(observation => observation.Value).Select(value =>
@@ -149,29 +150,30 @@ internal sealed partial class NavalLabBehavior
                 .SelectMany(side => new[] { side.Phase, side.VisualPhase, side.PhaseRate, side.CycleArcSizeMult, side.NeededRevolutionRate }).ToArray();
             result[slot] = new NetworkNavalLabPresentation(manifest.Ships[slot], sails, oars, sides);
         }
-        return result.All(ship => ship.IsValid) ? result : null;
+        return result.Where(ship => ship != null).All(ship => ship.IsValid) ? result : null;
     }
 
     internal NetworkNavalLabPresentation[] CapturePresentation(long sequence)
     {
-        if (!GameThread.Instance.IsGameThread || !factoryHost || !PreparePresentationInventory()) return null;
-        hostCapturedPresentation = ObservePresentation();
+        if (!GameThread.Instance.IsGameThread || !PreparePresentationInventory()) return null;
+        ownedCapturedPresentation = ObservePresentation(ownedOnly: true);
         presentationCapturedSequence = sequence;
         presentationCapturedUtcTicks = DateTime.UtcNow.Ticks;
-        presentationUnavailable = hostCapturedPresentation == null ? "native_capture_missing_stale_or_invalid" : null;
-        return hostCapturedPresentation;
+        presentationUnavailable = ownedCapturedPresentation == null ? "native_capture_missing_stale_or_invalid" : null;
+        return ownedCapturedPresentation;
     }
 
     internal bool ValidatePresentation(NetworkNavalLabFrames frames)
     {
         if (frames.Presentation == null) return true;
-        if (!GameThread.Instance.IsGameThread || factoryHost || frames.IncarnationId != manifest.IncarnationId
+        if (!GameThread.Instance.IsGameThread || frames.IncarnationId != manifest.IncarnationId
             || frames.Epoch != 1 || frames.Sequence <= presentationSequence || frames.Presentation.Length != 2
-            || frames.Presentation.Any(value => value == null || !value.IsValid)
+            || frames.Presentation[OwnSlot] != null || frames.Presentation[1 - OwnSlot]?.IsValid != true
             || frames.SailDeadlineUtcTicks <= DateTime.UtcNow.Ticks || frames.SailDeadlineUtcTicks > DateTime.UtcNow.AddSeconds(1).Ticks
             || !PreparePresentationInventory()) return false;
         for (int slot = 0; slot < 2; slot++)
         {
+            if (OwnsFactoryHull(slot)) continue;
             var value = frames.Presentation[slot];
             var inventory = presentationInventory[slot];
             if (value == null || !value.IsValid || value.ShipId != manifest.Ships[slot]
@@ -186,7 +188,7 @@ internal sealed partial class NavalLabBehavior
 
     internal void AcceptPresentation(NetworkNavalLabFrames frames)
     {
-        if (frames.Presentation == null || frames.Sequence <= presentationSequence || !PresentationReady
+        if (!ValidatePresentation(frames) || frames.Presentation == null || frames.Sequence <= presentationSequence || !PresentationReady
             || frames.IncarnationId != manifest.IncarnationId || frames.Epoch != 1
             || frames.SailDeadlineUtcTicks <= DateTime.UtcNow.Ticks) return;
         presentationStart = displayedPresentation?.Ships;
@@ -207,11 +209,11 @@ internal sealed partial class NavalLabBehavior
     {
         if (!PresentationReady) { ClearPresentation(); return; }
         if (!PreparePresentationInventory()) return;
-        if (factoryHost || presentationTarget == null || presentationElapsed >= 0.05f || ControlNow >= presentationDeadline
+        if (presentationTarget == null || presentationElapsed >= 0.05f || ControlNow >= presentationDeadline
             || float.IsNaN(dt) || float.IsInfinity(dt) || dt <= 0) return;
         presentationElapsed = Math.Min(0.05f, presentationElapsed + Math.Min(dt, 0.05f));
         float alpha = presentationElapsed / 0.05f;
-        displayedPresentation = new DisplayedPresentation(presentationTarget.Select((ship, slot) => ship.BlendFrom(presentationStart[slot], alpha)).ToArray(), presentationSequence);
+        displayedPresentation = new DisplayedPresentation(presentationTarget.Select((ship, slot) => ship?.BlendFrom(presentationStart[slot], alpha)).ToArray(), presentationSequence);
     }
 
     internal void ClearPresentation()
@@ -227,25 +229,35 @@ internal sealed partial class NavalLabBehavior
     internal NetworkNavalLabSailPresentation FindSailPresentation(SailVisual visual, out long sequence)
     {
         var shown = displayedPresentation;
-        sequence = shown?.Sequence ?? 0;
+        sequence = 0;
         var inventory = presentationInventory;
         if (shown == null || inventory == null) return null;
         for (int slot = 0; slot < inventory.Length; slot++)
             for (int i = 0; i < inventory[slot].Sails.Length; i++)
-                if (inventory[slot].Sails[i]._sailVisual == visual) return shown.Ships[slot].Sails[i];
+                if (inventory[slot].Sails[i]._sailVisual == visual)
+                {
+                    if (OwnsFactoryHull(slot)) return null;
+                    sequence = shown.Sequence;
+                    return shown.Ships[slot]?.Sails[i];
+                }
         return null;
     }
 
     internal NetworkNavalLabOarPresentation FindOarPresentation(ShipOarMachine machine, out long sequence)
     {
         var shown = displayedPresentation;
-        sequence = shown?.Sequence ?? 0;
+        sequence = 0;
         var inventory = presentationInventory;
         if (shown == null || inventory == null) return null;
         for (int slot = 0; slot < inventory.Length; slot++)
         {
             int index = Array.IndexOf(inventory[slot].Machines, machine);
-            if (index >= 0) return shown.Ships[slot].Oars[index];
+            if (index >= 0)
+            {
+                if (OwnsFactoryHull(slot)) return null;
+                sequence = shown.Sequence;
+                return shown.Ships[slot]?.Oars[index];
+            }
         }
         return null;
     }
@@ -326,7 +338,7 @@ internal sealed partial class NavalLabBehavior
 
     private NetworkNavalLabPresentation[] RebaseSailTransitions(NetworkNavalLabPresentation[] start, NetworkNavalLabPresentation[] target)
     {
-        return start.Select((ship, slot) => new NetworkNavalLabPresentation(ship.ShipId,
+        return start.Select((ship, slot) => ship == null ? null : new NetworkNavalLabPresentation(ship.ShipId,
             ship.Sails.Select((sail, i) =>
             {
                 var next = target[slot].Sails[i];
@@ -366,7 +378,7 @@ internal sealed partial class NavalLabBehavior
     private bool IsPresentationSample(int slot, string key) => appliedStations.TryGetValue(slot, out var stations)
         && stations.Keys.Contains(key);
 
-    private object[] PresentationSummary(NetworkNavalLabPresentation[] states) => states?.Select((ship, slot) => (object)new
+    private object[] PresentationSummary(NetworkNavalLabPresentation[] states) => states?.Select((ship, slot) => ship == null ? null : (object)new
     {
         ship.ShipId, ship.Sails, ship.Sides, oarCount = ship.Oars.Length,
         occupiedOars = ship.Oars.Where(oar => IsPresentationSample(slot, oar.Key)).Take(4).ToArray()
@@ -381,7 +393,7 @@ internal sealed partial class NavalLabBehavior
         {
             manifest.IncarnationId, epoch = 1, electedSimulator = factoryHost, ready, supportedSails = "square_only",
             unavailable = ready ? presentationUnavailable : "not_ready_or_terminal",
-            capturedSequence = presentationCapturedSequence, capturedUtcTicks = presentationCapturedUtcTicks, captured = PresentationSummary(hostCapturedPresentation),
+            capturedSequence = presentationCapturedSequence, capturedUtcTicks = presentationCapturedUtcTicks, captured = PresentationSummary(ownedCapturedPresentation),
             acceptedSequence = presentationSequence, sourceCallback = presentationSourceCallback, accepted = PresentationSummary(presentationTarget),
             displayedSequence = shown?.Sequence, displayed = PresentationSummary(shown?.Ships),
             fresh = shown != null && ControlNow < presentationDeadline,

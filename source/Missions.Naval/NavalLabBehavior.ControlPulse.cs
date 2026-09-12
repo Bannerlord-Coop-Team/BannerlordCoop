@@ -60,7 +60,6 @@ internal sealed partial class NavalLabBehavior
         pulsePending = true;
         pulsePhase = "pending_synthetic_axes";
         pulseFirstInputSequence = pulseLastInputSequence = pulseNeutralInputSequence = 0;
-        nextNativeInput = 0;
         try
         {
             RouteNativeAxes(view);
@@ -84,7 +83,7 @@ internal sealed partial class NavalLabBehavior
             CancelAxesPulse("permission_lost_safety_stop");
             return;
         }
-        RouteNativeAxes(view);
+        // The native input callback owns axis processing; the mission tick only enforces safety.
     }
 
     private void CancelAxesPulse(string reason)
@@ -92,7 +91,6 @@ internal sealed partial class NavalLabBehavior
         if (!pulsePending) return;
         pulsePending = pulseCompleting = false;
         pulsePhase = reason;
-        nextNativeInput = 0;
         // Safety loss retains the existing complete Stop semantics, including raised sails.
         var stop = new NetworkNavalLabHelmInput(manifest.IncarnationId, 1, OwnSlot, ++nativeInputSequence,
             DateTime.UtcNow.AddSeconds(1).Ticks, false, 0, 0, 0, 0, 0);
@@ -118,6 +116,7 @@ internal sealed partial class NavalLabBehavior
         return new
         {
             manifest.IncarnationId, epoch = 1, owner = ownControllerId, ship = OwnSlot,
+            nativeInputApplyCallback, presentationSource = "owned_native",
             shipId = OwnSlot >= 0 ? (Guid?)manifest.Ships[OwnSlot] : null, electedSimulator = factoryHost,
             ready, terminal = factoryTerminal, blocked = Blocker != null,
             inputBlocker = NativeInputBlocker(view),
@@ -128,8 +127,8 @@ internal sealed partial class NavalLabBehavior
             requestedLateralAxis = pulseAxes.x, requestedForwardAxis = pulseAxes.y,
             remainingSeconds = pulsePending ? Math.Max(0, pulseDeadline - ControlNow) : 0,
             pulseDeadlineUtcTicks, lastSent = lastSentNativeInput?.IsValid == true ? lastSentNativeInput : null,
-            hostLastAppliedHelmInput = factoryHost ? lastReceivedNativeInput : null,
-            currentHostApplication = ready && factoryHost ? Ships.Select(ship =>
+            ownerLastAppliedHelmInput = lastReceivedNativeInput,
+            currentOwnerApplication = ready ? Ships.Select(ship =>
             {
                 var input = ship?.PlayerController?._inputRecord;
                 return input.HasValue && !float.IsNaN(input.Value.RudderLateral) && !float.IsInfinity(input.Value.RudderLateral)

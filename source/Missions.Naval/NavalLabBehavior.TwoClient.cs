@@ -28,7 +28,6 @@ internal sealed partial class NavalLabBehavior
     internal Action<NetworkNavalLabHelmInput> SendNativeInput;
     private long nativeInputSequence;
     private readonly NetworkNavalLabHelmInput[] lastReceivedNativeInput = new NetworkNavalLabHelmInput[2];
-    private double nextNativeInput;
     private bool lastHelmPermission;
     private readonly Dictionary<int, NetworkNavalLabStations> appliedStations = new();
     internal bool CanPrepareTwoClientDeployment => IsTwoClientNative && factoryMaterialized && factoryReleased
@@ -71,7 +70,6 @@ internal sealed partial class NavalLabBehavior
         {
             pulsePending = false;
             pulseCompleting = true;
-            nextNativeInput = 0;
         }
         var input = ShipInputRecord.Stop();
         if (permission)
@@ -84,8 +82,7 @@ internal sealed partial class NavalLabBehavior
             if (pulsePending && pulseRowStop) { longitudinal = RowerLongitudinalInput.Stop; doubleTap = RowerLongitudinalInput.None; }
             input = new ShipInputRecord(lateral, longitudinal, doubleTap, view.TickRudderInput(axes), view.SailControl);
         }
-        if (ControlNow < nextNativeInput && permission == lastHelmPermission) return;
-        nextNativeInput = ControlNow + 0.05;
+        nativeInputCallback++;
         lastHelmPermission = permission;
         var message = new NetworkNavalLabHelmInput(manifest.IncarnationId, 1, OwnSlot, ++nativeInputSequence,
             pulsePending ? pulseDeadlineUtcTicks : DateTime.UtcNow.AddSeconds(1).Ticks, permission,
@@ -117,24 +114,27 @@ internal sealed partial class NavalLabBehavior
 
     internal void ApplyNativeInput(NetworkNavalLabHelmInput input)
     {
-        if (!IsTwoClientNative || !CanUseNativeControls || !factoryHost || !input.IsValid) return;
+        if (!IsTwoClientNative || !CanUseNativeInput || input.Ship != OwnSlot || !input.IsValid) return;
         var record = new ShipInputRecord((RowerLateralInput)input.Lateral, (RowerLongitudinalInput)input.Longitudinal,
             (RowerLongitudinalInput)input.DoubleTap, input.Rudder, (SailInput)input.Sail);
         Ships[input.Ship].PlayerController.SetInput(in record);
+        nativeInputApplyCallback = nativeInputCallback;
         lastReceivedNativeInput[input.Ship] = input;
     }
 
     internal void NeutralizeNativeInput(int slot)
     {
-        if (!IsTwoClientNative || !factoryHost || slot < 0 || slot >= Ships.Length || Ships[slot]?.Controller is not PlayerShipController player) return;
+        if (!IsTwoClientNative || slot != OwnSlot || slot < 0 || slot >= Ships.Length || Ships[slot]?.Controller is not PlayerShipController player) return;
         var stop = ShipInputRecord.Stop();
         player.SetInput(in stop);
+        nativeInputApplyCallback = nativeInputCallback;
     }
 
-    private string StationKey(UsableMachine machine, MissionShip ship)
+    private string StationKey(UsableMachine machine, MissionShip ship) => EntityKey(machine.PilotStandingPoint.GameEntity, ship);
+
+    private string EntityKey(WeakGameEntity entity, MissionShip ship)
     {
         // Named child paths are content identities, never process-local native pointers.
-        var entity = machine.PilotStandingPoint.GameEntity;
         var parts = new List<string>();
         while (entity.IsValid && entity != ship.GameEntity && parts.Count < 16)
         {
@@ -175,19 +175,27 @@ internal sealed partial class NavalLabBehavior
 
     internal NetworkNavalLabStations CreateStations()
     {
-        StationInventory(OwnSlot);
+        var inventory = StationInventory(OwnSlot).OrderBy(pair => pair.Key, StringComparer.Ordinal).ToArray();
         if (LocalShip.LeftSideShipOarMachines.Count < 2 || LocalShip.RightSideShipOarMachines.Count < 2)
             throw new InvalidOperationException("native.insufficient_paired_oars");
         // Fixed initial crew only; automatic weapon/helm detachment allocation is disabled in this mode.
         return new NetworkNavalLabStations(manifest.IncarnationId, 1, OwnSlot, "offer",
             manifest.Combatants.Skip((OwnSlot * 5) + 1).Take(4).ToArray(),
             LocalShip.LeftSideShipOarMachines.Take(2).Concat(LocalShip.RightSideShipOarMachines.Take(2))
-                .Select(machine => StationKey(machine, LocalShip)).ToArray());
+                .Select(machine => StationKey(machine, LocalShip)).ToArray(),
+            LocalShip.Sails.Select(sail => SailKey(sail, LocalShip)).ToArray(),
+            inventory.Select(pair => pair.Key).ToArray(), inventory.Select(pair => (int)pair.Value._oar._sidePhaseData.Side).ToArray());
     }
 
     internal void ApplyStations(NetworkNavalLabStations value)
     {
         var inventory = StationInventory(value.Ship);
+        var ordered = inventory.OrderBy(pair => pair.Key, StringComparer.Ordinal).ToArray();
+        if (!value.HasPresentationInventory || !value.SailKeys.SequenceEqual(Ships[value.Ship].Sails.Select(sail => SailKey(sail, Ships[value.Ship])))
+            || Ships[value.Ship].Sails.Any(sail => (int)sail.SailObject.Type != 0)
+            || !value.OarKeys.SequenceEqual(ordered.Select(pair => pair.Key))
+            || !value.OarSides.SequenceEqual(ordered.Select(pair => (int)pair.Value._oar._sidePhaseData.Side)))
+            throw new InvalidOperationException("native.presentation_inventory_mismatch");
         if (value.IncarnationId != manifest.IncarnationId || value.Epoch != 1 || value.Phase != "commit"
             || value.Combatants == null || value.Keys == null || value.Keys.Length != 4 || value.Combatants.Length != 4
             || value.Keys.Distinct().Count() != 4
@@ -245,19 +253,19 @@ internal sealed partial class NavalLabBehavior
             && point.LockUserFrames && agent.MovementLockedState == AgentMovementLockedState.FrameLocked;
     }
 
-    internal void RefreshFollowerStationTargets()
+    internal void RefreshFollowerStationTargets(int slot = -1)
     {
-        if (!IsTwoClientNative || factoryHost || !factoryReleased || factoryTerminal || nativeTerminalHold
+        if (!IsTwoClientNative || !factoryReleased || factoryTerminal || nativeTerminalHold
             || Mission == null || Mission != Mission.Current)
             throw new InvalidOperationException("native.station_target_lifecycle");
-        foreach (var stations in appliedStations.Values)
+        foreach (var stations in appliedStations.Values.Where(stations => stations.Ship == slot && !OwnsFactoryHull(stations.Ship)))
         {
             if (stations.IncarnationId != manifest.IncarnationId || stations.Epoch != 1 || stations.Phase != "commit"
                 || !ObserveStations(stations, refreshTargets: true))
                 throw new InvalidOperationException("native.station_occupancy_lost");
         }
-        RefreshFollowerHelmTarget();
-        RefreshReplicatedFollowerHelmTarget();
+        if (slot != OwnSlot) RefreshReplicatedFollowerHelmTarget();
+        if (slot >= 0) shipTargetRefreshes[slot]++;
     }
 
     internal bool ObserveStations(NetworkNavalLabStations value) => ObserveStations(value, refreshTargets: false);

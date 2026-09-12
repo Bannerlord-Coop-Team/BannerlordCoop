@@ -66,11 +66,13 @@ public interface INavalNativeMissionAdapter
     object InspectControlStatus();
 }
 
-public enum NavalLabMode { Activation, HeldHelm, SingleClientNative, FactoryAuthorityProbe, TwoClientNative }
+public enum NavalLabMode { Activation, HeldHelm, SingleClientNative, FactoryAuthorityProbe, TwoClientNative, TwoClientNativeAllPhysics }
 
 public sealed class NavalLabManifest
 {
     public NavalLabMode Mode { get; }
+    public bool IsTwoClientNative => Mode == NavalLabMode.TwoClientNative || AllPhysicsProbe;
+    public bool AllPhysicsProbe => Mode == NavalLabMode.TwoClientNativeAllPhysics;
     public string InstanceId { get; }
     public Guid IncarnationId { get; }
     private readonly string[] controllers;

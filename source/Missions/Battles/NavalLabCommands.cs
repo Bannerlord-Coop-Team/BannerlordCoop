@@ -12,22 +12,23 @@ public sealed class NavalLabCreateCommand : ICoopCommand
     public NavalLabCreateCommand(INavalLabCoordinator coordinator) => this.coordinator = coordinator;
     public string Prefix => "coop.debug.naval_lab";
     public string Name => "create";
-    public string Description => "Start the isolated two-client lab: activation (default), held-helm, factory-authority-probe or two-client-native (experimental follower contact).";
+    public string Description => "Start the isolated two-client lab: activation (default), held-helm, factory-authority-probe or two-client-native; two-client-native-all-physics deliberately combines native physics and network corrections on foreign hulls.";
     public CoopCommandSide Side => CoopCommandSide.Server;
     public IExpectedArgs[] ExpectedArgs { get; } =
     {
         new ExpectedArgs("operation_id", "Idempotent operation UUID.", true),
         new ExpectedArgs("first_controller", "First connected client controller id.", true),
         new ExpectedArgs("second_controller", "Second distinct connected client controller id.", true),
-        new ExpectedArgs("mode", "activation (default), held-helm, factory-authority-probe or two-client-native; one incarnation per run.", false)
+        new ExpectedArgs("mode", "activation (default), held-helm, factory-authority-probe or two-client-native or two-client-native-all-physics (disposable diagnostic); one incarnation per run.", false)
     };
     private static NavalLabMode ParseMode(ICoopCommandArgs args)
     {
         if (args.Count == 3 || args[3] == "activation") return NavalLabMode.Activation;
         if (args[3] == "held-helm") return NavalLabMode.HeldHelm;
         if (args[3] == "two-client-native") return NavalLabMode.TwoClientNative;
+        if (args[3] == "two-client-native-all-physics") return NavalLabMode.TwoClientNativeAllPhysics;
         if (args[3] == "factory-authority-probe") return NavalLabMode.FactoryAuthorityProbe;
-        throw new ArgumentException("Mode must be activation, held-helm factory-authority-probe or two-client-native.");
+        throw new ArgumentException("Mode must be activation, held-helm, factory-authority-probe, two-client-native or two-client-native-all-physics.");
     }
     public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
     {

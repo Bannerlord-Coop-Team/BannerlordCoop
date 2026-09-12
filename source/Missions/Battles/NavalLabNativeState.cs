@@ -31,7 +31,7 @@ public sealed class NavalLabNativeState : INavalLabNativeState
 
     public void Initialize(NavalLabManifest value)
     {
-        if (manifest != null || value.Mode != NavalLabMode.TwoClientNative) throw new InvalidOperationException("native.invalid_session");
+        if (manifest != null || !value.IsTwoClientNative) throw new InvalidOperationException("native.invalid_session");
         manifest = value;
     }
 

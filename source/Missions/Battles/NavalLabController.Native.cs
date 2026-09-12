@@ -20,12 +20,10 @@ public interface INavalNativeController
 
 public sealed partial class NavalLabController : INavalNativeController
 {
-    private bool IsTwoClientNative => manifest?.Mode == NavalLabMode.TwoClientNative;
+    private bool IsTwoClientNative => manifest?.IsTwoClientNative == true;
     private volatile bool nativeControlsReleased;
     private readonly Dictionary<int, NetworkNavalLabStations> pendingStations = new();
     private readonly HashSet<int> acknowledgedStations = new();
-    private long lastAppliedFrameSourceCallback;
-    private long lastAppliedFrameUtcTicks;
     private readonly long[] nativeInputSequences = new long[2];
     private readonly double[] nativeInputDeadlines = new double[2];
     private INavalNativeMissionAdapter NativeAdapter => adapter as INavalNativeMissionAdapter;
@@ -37,13 +35,12 @@ public sealed partial class NavalLabController : INavalNativeController
     public object NativeControlStatus() => new
     {
         epoch = session.HostEpoch, localControllerCallback = callback,
-        lastReceivedFrameSequence = lastReceived, lastAppliedFrameSequence = lastApplied,
-        hostSentFrameSequence = session.IsLocalHost ? (long?)sequence : null,
-        lastAppliedSourceCallback = lastApplied > 0 ? (long?)lastAppliedFrameSourceCallback : null,
-        lastAppliedUtcTicks = lastApplied > 0 ? (long?)lastAppliedFrameUtcTicks : null,
+        ownerSentFrameSequence = shipSentSequences[Array.IndexOf(manifest.Controllers, session.OwnControllerId)],
         hullInterpolation = HullInterpolationStatus(),
-        hostAcceptedInputSequences = nativeInputSequences.ToArray(),
-        hostInputRemainingSeconds = nativeInputDeadlines.Select(deadline => Math.Max(0, deadline - Now)).ToArray(),
+        ships = ShipStreamStatus(),
+        nativeShips = (adapter as INavalLabShipAdapter)?.InspectShipAuthority(),
+        ownerAppliedInputSequences = nativeInputSequences.ToArray(),
+        ownerInputRemainingSeconds = nativeInputDeadlines.Select(deadline => Math.Max(0, deadline - Now)).ToArray(),
         ready = NativeControlsReady,
         stationMovement = coopMissionComponent.AgentMovementHandler.InspectNavalStationMovement()
     };
@@ -69,10 +66,8 @@ public sealed partial class NavalLabController : INavalNativeController
                 throw new InvalidOperationException("native.helm_send_not_owner");
             relay.SendAll(value);
         }, agent => coopMissionComponent.AgentMovementHandler.Interpolator.Forget(agent));
-        NativeAdapter.ConfigureNative(() => NativeControlsReady, input =>
-        {
-            if (NativeControlsReady) relay.SendAll(input);
-        });
+        if (adapter is not INavalLabShipAdapter) throw new InvalidOperationException("native.ship_adapter_unavailable");
+        NativeAdapter.ConfigureNative(() => NativeControlsReady, input => ReceiveNativeInput(input, NativeControlsReady));
     }
 
     private long? NativeHelmMovementRevision(CoopAgentInfo info)
@@ -184,8 +179,9 @@ public sealed partial class NavalLabController : INavalNativeController
 
     public void ReceiveNativeInput(NetworkNavalLabHelmInput input, bool readyAtReceive)
     {
-        if (!readyAtReceive || !NativeControlsReady || !session.IsLocalHost || input.IncarnationId != manifest.IncarnationId
-            || input.Epoch != session.HostEpoch || input.Ship < 0 || input.Ship >= 2 || !input.IsValid
+        if (!readyAtReceive || !NativeControlsReady || input.IncarnationId != manifest.IncarnationId
+            || input.Epoch != session.HostEpoch || input.Ship < 0 || input.Ship >= 2
+            || manifest.Controllers[input.Ship] != session.OwnControllerId || !input.IsValid
             || input.Sequence <= nativeInputSequences[input.Ship] || input.DeadlineUtcTicks <= DateTime.UtcNow.Ticks
             || input.DeadlineUtcTicks > DateTime.UtcNow.AddSeconds(1).Ticks) return;
         try

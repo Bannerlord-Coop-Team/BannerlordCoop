@@ -213,7 +213,7 @@ public class MissionModule : Module
         builder.RegisterType<NavalLabNativeState>().As<INavalLabNativeState>().InstancePerDependency();
         builder.RegisterType<NavalLabMeasurement>().As<INavalLabMeasurement>().InstancePerDependency();
         builder.RegisterType<NavalLabController>().As<INavalLabController>().InstancePerDependency();
-        builder.RegisterType<NavalLabCoordinator>().As<INavalLabCoordinator>().InstancePerLifetimeScope().AutoActivate();
+        builder.RegisterType<NavalLabCoordinator>().As<INavalLabCoordinator>().As<INavalRopeCoordinator>().InstancePerLifetimeScope().AutoActivate();
 #endif
         builder.RegisterType<BattleHostHandler>()
             .AsSelf()

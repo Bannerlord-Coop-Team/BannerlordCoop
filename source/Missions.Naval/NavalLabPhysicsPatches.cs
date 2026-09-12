@@ -72,7 +72,7 @@ internal static class NavalLabPhysicsPatches
             var active = Active;
             if (active == null || !active.HasNativeViews || !active.Agents.Contains(__instance)) return true;
             return active.CanUseNativeInput && active.LocalCaptain == __instance
-                && active.LocalShip.ShipControllerMachine.PilotStandingPoint == targetObject;
+                && (active.LocalShip.ShipControllerMachine.PilotStandingPoint == targetObject || active.AllowRopeUse(__instance, targetObject));
         }
     }
 
@@ -310,7 +310,7 @@ internal static class NavalLabPhysicsPatches
         private static void Prefix(NavalPhysics __instance)
         {
             var active = Active;
-            if (active?.IsFactoryProbe == true) { active.ObserveFactoryForce(); return; }
+            if (active?.IsFactoryProbe == true) { active.ObserveFactoryForce(__instance); return; }
             if (active != null && active.Ships.Any(ship => ship?.Physics == __instance))
                 Interlocked.Increment(ref active.ForceApplications);
         }

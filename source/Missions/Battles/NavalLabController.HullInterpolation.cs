@@ -1,121 +1,116 @@
 ﻿#if DEBUG
 using System;
 using System.Linq;
-using TaleWorlds.Library;
 using Missions.Messages;
+using TaleWorlds.Library;
 
 namespace Missions.Battles;
 
 public sealed partial class NavalLabController
 {
     private const float HullInterpolationSeconds = 0.05f;
-    private MatrixFrame[] hullStartFrames;
-    private MatrixFrame[] hullTargetFrames;
-    private MatrixFrame[] hullWrittenFrames;
-    private MatrixFrame[] hullObservedFrames;
-    private float hullElapsed;
-    private long hullTargetSequence;
-    private long hullTargetSourceCallback;
-    private long hullTargetAcceptedCallback;
-    private long hullTargetAcceptedUtcTicks;
-    private long hullApplicationOrdinal;
-    private long hullApplicationSequence;
-    private long hullApplicationSourceCallback;
-    private long hullApplicationCallback;
-    private long hullApplicationUtcTicks;
-    private float hullApplicationAlpha;
-
-    private bool CanWriteFollowerHull => IsTwoClientNative && !disposed && released && factoryHydrated
-        && FactoryAssignmentValid && !session.IsLocalHost && adapter.Blocker == null && NativeAgentAuthoritiesValid
+    private sealed class HullStream
+    {
+        internal NetworkNavalLabShipSample Target;
+        internal MatrixFrame Start, Written, Observed;
+        internal bool HasWritten;
+        internal float Elapsed, Alpha;
+        internal long Accepted, Applied, AcceptedCallback, AppliedCallback, ApplicationOrdinal, OwnerWriteRejects;
+        internal string LastReject;
+    }
+    private readonly HullStream[] hullStreams = { new HullStream(), new HullStream() };
+    private readonly long[] shipSentSequences = new long[2];
+    private INavalLabShipAdapter ShipAdapter => adapter as INavalLabShipAdapter;
+    private bool CanWriteFollowerHull => NativeControlsReady && !disposed
         && Mission != null && Mission == TaleWorlds.MountAndBlade.Mission.Current;
 
     private void ClearHullTargets()
     {
-        hullStartFrames = null;
-        hullTargetFrames = null;
-        hullElapsed = 0;
+        foreach (var stream in hullStreams) stream.Target = null;
     }
 
-    private bool AcceptHullTarget(NetworkNavalLabFrames message, MatrixFrame[] frames)
+    private void SendOwnedShip()
     {
-        if (!CanWriteFollowerHull) { ClearHullTargets(); return false; }
-        hullStartFrames = hullWrittenFrames;
-        hullTargetFrames = frames;
-        hullTargetSequence = message.Sequence;
-        hullTargetSourceCallback = message.SourceCallback;
-        hullTargetAcceptedCallback = callback;
-        hullTargetAcceptedUtcTicks = DateTime.UtcNow.Ticks;
-        hullElapsed = 0;
-        // Hydration has no preceding authoritative pose to blend from.
-        return hullStartFrames != null || WriteFollowerHull(frames, 1);
+        int slot = Array.IndexOf(manifest.Controllers, session.OwnControllerId);
+        var sample = ShipAdapter.CaptureOwnedShip(shipSentSequences[slot] + 1, callback);
+        if (sample == null) return;
+        shipSentSequences[slot] = sample.Sequence;
+        relay.SendAll(sample);
+    }
+
+    public void ReceiveShipSample(NetworkNavalLabShipSample sample)
+    {
+        if (!IsTwoClientNative || sample.Slot < 0 || sample.Slot >= 2) return;
+        var stream = hullStreams[sample.Slot];
+        if (manifest.Controllers[sample.Slot] == session.OwnControllerId)
+        {
+            stream.OwnerWriteRejects++;
+            stream.LastReject = "owner_incoming_write";
+            return;
+        }
+        if (!CanWriteFollowerHull || sample.InstanceId != manifest.InstanceId || sample.IncarnationId != manifest.IncarnationId
+            || sample.ShipId != manifest.Ships[sample.Slot] || sample.OriginalOwner != manifest.Controllers[sample.Slot]
+            || sample.AuthorityRevision != 1 || sample.Sequence <= stream.Accepted || !sample.IsValid
+            || sample.DeadlineUtcTicks <= DateTime.UtcNow.Ticks || sample.DeadlineUtcTicks > DateTime.UtcNow.AddSeconds(1).Ticks)
+        { stream.LastReject = "identity_readiness_sequence_or_expiry"; return; }
+        try
+        {
+            if (!ShipAdapter.ValidateForeignShip(sample)) { stream.LastReject = "presentation_inventory_or_lifecycle"; return; }
+            ShipAdapter.AcceptForeignShip(sample);
+            stream.Start = stream.HasWritten ? stream.Written : adapter.ReadFrames()[sample.Slot];
+            stream.Target = sample;
+            stream.Accepted = sample.Sequence;
+            stream.AcceptedCallback = callback;
+            stream.Elapsed = 0;
+            stream.LastReject = null;
+        }
+        catch (Exception exception) { FailFactoryProbe(exception.ToString()); }
     }
 
     private void TickFollowerHull(float dt)
     {
         if (!IsTwoClientNative) return;
         if (!CanWriteFollowerHull) { ClearHullTargets(); return; }
-        if (hullTargetFrames == null || hullElapsed >= HullInterpolationSeconds || float.IsNaN(dt) || float.IsInfinity(dt) || dt <= 0) return;
-        hullElapsed = Math.Min(HullInterpolationSeconds, hullElapsed + Math.Min(dt, HullInterpolationSeconds));
-        float alpha = Math.Min(1, Math.Max(0, hullElapsed / HullInterpolationSeconds));
-        var frames = alpha >= 1 ? hullTargetFrames : new[]
+        if (float.IsNaN(dt) || float.IsInfinity(dt) || dt <= 0) return;
+        for (int slot = 0; slot < hullStreams.Length; slot++)
         {
-            MatrixFrame.Lerp(hullStartFrames[0], hullTargetFrames[0], alpha),
-            MatrixFrame.Lerp(hullStartFrames[1], hullTargetFrames[1], alpha)
-        };
-        if (!WriteFollowerHull(frames, alpha)) throw new InvalidOperationException("native.hull_frame_apply_refused");
-    }
-
-    private bool WriteFollowerHull(MatrixFrame[] frames, float alpha)
-    {
-        if (!CanWriteFollowerHull) { ClearHullTargets(); return false; }
-        if (!FiniteHullFrames(frames)) throw new InvalidOperationException("native.hull_interpolation_nonfinite");
-        if (!adapter.ApplyFrames(frames)) return false;
-        if (!CanWriteFollowerHull) { ClearHullTargets(); return false; }
-        var observed = adapter.ReadFrames();
-        if (!FiniteHullFrames(observed)) throw new InvalidOperationException("native.hull_readback_nonfinite");
-        hullWrittenFrames = frames;
-        hullObservedFrames = observed;
-        hullApplicationOrdinal++;
-        hullApplicationSequence = hullTargetSequence;
-        hullApplicationSourceCallback = hullTargetSourceCallback;
-        hullApplicationCallback = callback;
-        hullApplicationUtcTicks = DateTime.UtcNow.Ticks;
-        hullApplicationAlpha = alpha;
-        if (alpha >= 1)
-        {
-            lastApplied = hullTargetSequence;
-            lastAppliedFrameSourceCallback = hullTargetSourceCallback;
-            lastAppliedFrameUtcTicks = hullApplicationUtcTicks;
-            if (pendingSample?.Sequence == hullTargetSequence) pendingAppliedCallback = callback;
-            hullElapsed = HullInterpolationSeconds;
-            hullStartFrames = null;
+            var stream = hullStreams[slot];
+            var target = stream.Target;
+            if (target == null) continue;
+            if (target.DeadlineUtcTicks <= DateTime.UtcNow.Ticks)
+            { stream.Target = null; stream.LastReject = "expired"; continue; }
+            if (stream.Elapsed >= HullInterpolationSeconds) continue;
+            stream.Elapsed = Math.Min(HullInterpolationSeconds, stream.Elapsed + Math.Min(dt, HullInterpolationSeconds));
+            stream.Alpha = stream.Elapsed / HullInterpolationSeconds;
+            var frame = MatrixFrame.Lerp(stream.Start, NetworkNavalLabOarPresentation.ToFrame(target.Frame), stream.Alpha);
+            if (!NetworkNavalLabOarPresentation.ValidFrame(NetworkNavalLabOarPresentation.FromFrame(frame))
+                || !ShipAdapter.ApplyForeignShipFrame(slot, frame))
+                throw new InvalidOperationException("native.foreign_frame_apply_refused:" + slot);
+            stream.Written = frame;
+            stream.HasWritten = true;
+            stream.Observed = adapter.ReadFrames()[slot];
+            stream.ApplicationOrdinal++;
+            stream.Applied = target.Sequence;
+            stream.AppliedCallback = callback;
         }
-        return true;
     }
 
-    private static bool FiniteHullFrames(MatrixFrame[] frames) => frames != null && frames.Length == 2
-        && HullFrameScalars(frames).All(value => !float.IsNaN(value) && !float.IsInfinity(value));
-
-    private static float[] HullFrameScalars(MatrixFrame[] frames) => frames?.SelectMany(frame => new[]
+    private object[] ShipStreamStatus() => manifest.Ships.Select((id, slot) =>
     {
-        frame.rotation.s.x, frame.rotation.s.y, frame.rotation.s.z,
-        frame.rotation.f.x, frame.rotation.f.y, frame.rotation.f.z,
-        frame.rotation.u.x, frame.rotation.u.y, frame.rotation.u.z,
-        frame.origin.x, frame.origin.y, frame.origin.z
+        var stream = hullStreams[slot];
+        return (object)new
+        {
+            slot, shipId = id, originalOwner = manifest.Controllers[slot], revision = 1,
+            localRole = manifest.Controllers[slot] == session.OwnControllerId ? "owner" : "foreign",
+            sentSequence = shipSentSequences[slot], acceptedSequence = stream.Accepted, appliedSequence = stream.Applied,
+            sourceCallback = stream.Target?.SourceCallback, stream.AcceptedCallback, stream.AppliedCallback,
+            stream.ApplicationOrdinal, stream.Alpha, stream.OwnerWriteRejects, stream.LastReject,
+            targetFrame = stream.Target?.Frame,
+            writtenFrame = stream.HasWritten ? NetworkNavalLabOarPresentation.FromFrame(stream.Written) : null,
+            observedFrame = stream.HasWritten ? NetworkNavalLabOarPresentation.FromFrame(stream.Observed) : null
+        };
     }).ToArray();
 
-    private object HullInterpolationStatus() => new
-    {
-        windowSeconds = HullInterpolationSeconds, isTeleportation = false,
-        pending = hullTargetFrames != null && hullElapsed < HullInterpolationSeconds,
-        acceptedTargetSequence = hullTargetSequence, acceptedSourceCallback = hullTargetSourceCallback,
-        acceptedLocalCallback = hullTargetAcceptedCallback, acceptedUtcTicks = hullTargetAcceptedUtcTicks,
-        targetFrames = HullFrameScalars(hullTargetFrames),
-        applicationOrdinal = hullApplicationOrdinal, applicationTargetSequence = hullApplicationSequence,
-        applicationSourceCallback = hullApplicationSourceCallback, applicationLocalCallback = hullApplicationCallback,
-        applicationUtcTicks = hullApplicationUtcTicks, applicationAlpha = hullApplicationAlpha,
-        applicationCompletedTarget = hullApplicationOrdinal > 0 && hullApplicationAlpha >= 1,
-        lastWrittenFrames = HullFrameScalars(hullWrittenFrames), lastNativeReadbackFrames = HullFrameScalars(hullObservedFrames)
-    };
+    private object HullInterpolationStatus() => new { windowSeconds = HullInterpolationSeconds, isTeleportation = false, ships = ShipStreamStatus() };
 }
 #endif
