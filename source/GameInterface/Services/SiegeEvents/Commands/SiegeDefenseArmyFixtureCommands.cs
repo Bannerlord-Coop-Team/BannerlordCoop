@@ -103,7 +103,7 @@ internal static class SiegeDefenseArmyFixtureCommands
             new ExpectedArgs("controllerId", "The connected player controller id."),
             new ExpectedArgs("settlementId", "The settlement id."),
             new ExpectedArgs("state", "baseline, joined, unstuck, or restored."),
-            new ExpectedArgs("expectedState", "The complete staged LIVE_TEST_JSON object, or capture for restored."),
+            new ExpectedArgs("expectedState", "The complete staged LIVE_TEST_JSON object, including for restored."),
         };
 
         public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
@@ -167,7 +167,7 @@ internal static class SiegeDefenseArmyFixtureCommands
         if (!TryRequirePause(out error)) return Failed(error);
         if (fixture != null && fixture.Campaign == Campaign.Current && !fixture.Verified)
         {
-            if (fixture.ControllerId != args[0] || fixture.Settlement != settlement)
+            if (fixture.ControllerId != args[0] || fixture.Settlement != settlement || fixture.Player.Party != player)
                 return Failed("A different siege defense army fixture is already active");
             return FormatState("Captured siege defense army fixture", player, settlement, manager, fixture.CapturedExpectation);
         }
@@ -230,6 +230,7 @@ internal static class SiegeDefenseArmyFixtureCommands
             {
                 fixture.Army = kingdom.Armies.Except(originalArmies).SingleOrDefault(a => a.LeaderParty == player)
                     ?? player.Army;
+                fixture.ArmyId = GetId(manager, fixture.Army);
             }
             if (fixture.Army?.LeaderParty != player || !TryGetId(manager, fixture.Army, out _))
                 throw new InvalidOperationException("The registered player-led fixture army could not be created.");
@@ -250,6 +251,7 @@ internal static class SiegeDefenseArmyFixtureCommands
             finally
             {
                 fixture.SiegeEvent = settlement.SiegeEvent ?? besieger.BesiegerCamp?.SiegeEvent;
+                fixture.SiegeEventId = GetId(manager, fixture.SiegeEvent);
             }
             if (fixture.SiegeEvent?.BesiegerCamp?.LeaderParty != besieger
                 || !TryGetId(manager, fixture.SiegeEvent, out _))
@@ -261,6 +263,7 @@ internal static class SiegeDefenseArmyFixtureCommands
             finally
             {
                 fixture.MapEvent = settlement.Party.MapEvent ?? besieger.MapEvent;
+                fixture.MapEventId = GetId(manager, fixture.MapEvent);
                 fixture.InitialEventParties = fixture.MapEvent?.InvolvedParties.ToArray();
             }
             if (fixture.MapEvent?.IsSiegeAssault != true || !TryGetId(manager, fixture.MapEvent, out _))
@@ -329,7 +332,7 @@ internal static class SiegeDefenseArmyFixtureCommands
 
     private static CoopCommandResult DefenseArmyState(ICoopCommandArgs args)
     {
-        if (!TryReadExpectation(args[3], args[0], args[1], args[2] != "restored", out var expected, out var error))
+        if (!TryReadExpectation(args[3], args[0], args[1], true, out var expected, out var error))
             return Failed(error);
         if (ModInformation.IsServer && !TryValidateToken(args[3], out error)) return Failed(error);
         if (!TryResolveContext(args[0], args[1], out var player, out var settlement, out var manager, out error))
@@ -391,7 +394,7 @@ internal static class SiegeDefenseArmyFixtureCommands
             if (fixture.Settlement.SiegeEvent == fixture.SiegeEvent)
                 fixture.SiegeEvent.FinalizeSiegeEvent();
         }
-        if (fixture.Army != null && fixture.Army.Parties.Count > 0)
+        if (fixture.Army != null && (fixture.Army.Parties.Count > 0 || manager.Contains(fixture.Army)))
             armies.Disband(fixture.Army, Army.ArmyDispersionReason.ObjectiveFinished);
         foreach (var snapshot in fixture.AllParties)
         {
@@ -411,8 +414,8 @@ internal static class SiegeDefenseArmyFixtureCommands
             || (fixture.Settlement.Party.MapEvent != null && fixture.Settlement.Party.MapEvent != fixture.MapEvent))
             throw new InvalidOperationException("The settlement now belongs to a different siege or map event.");
         var allies = new[] { fixture.Player }.Concat(fixture.Followers).Select(p => p.Party).ToArray();
-        if (fixture.Army != null && (fixture.Army.LeaderParty != fixture.Player.Party
-            || fixture.Army.Parties.Any(p => !allies.Contains(p))))
+        if (fixture.Army != null && fixture.Army.Parties.Count > 0
+            && (fixture.Army.LeaderParty != fixture.Player.Party || fixture.Army.Parties.Any(p => !allies.Contains(p))))
             throw new InvalidOperationException("The fixture army acquired an unrelated leader or party.");
         if (fixture.SiegeEvent?.BesiegerCamp?._besiegerParties.Any(p => p != fixture.Besieger.Party) == true)
             throw new InvalidOperationException("The fixture siege acquired an unrelated besieger.");
@@ -507,9 +510,9 @@ internal static class SiegeDefenseArmyFixtureCommands
         playerPartyId = state.Player.Id,
         besiegerPartyId = state.Besieger.Id,
         followerPartyIds = state.Followers.Select(p => p.Id).OrderBy(id => id, StringComparer.Ordinal).ToArray(),
-        armyId = GetId(manager, state.Army),
-        siegeEventId = GetId(manager, state.SiegeEvent),
-        mapEventId = GetId(manager, state.MapEvent),
+        armyId = state.ArmyId,
+        siegeEventId = state.SiegeEventId,
+        mapEventId = state.MapEventId,
         capturedParties = state.AllParties.Select(p => new { partyId = p.Id, behavior = GetBehaviorProof(p.Behavior) }).ToArray(),
     });
 
@@ -596,13 +599,20 @@ internal static class SiegeDefenseArmyFixtureCommands
         var records = observed["parties"] as JArray;
         var ids = GetExpectedPartyIds(expected);
         if (records == null || records.Count != 4 || !SameIds(ids, records.Select(p => p.Value<string>("partyId")))
-            || records.Any(p => p.Value<bool?>("exists") != true))
+            || records.Any(p => p.Value<bool?>("exists") != true || p.Value<bool?>("active") != true))
         {
             error = "A captured fixture participant is missing or has a different identity";
             return false;
         }
         if (state == "restored")
         {
+            if (observed.Value<bool?>("ownedArmyRegistered") != false
+                || observed.Value<bool?>("ownedSiegeRegistered") != false
+                || observed.Value<bool?>("ownedMapEventRegistered") != false)
+            {
+                error = "A fixture-owned army, siege, or map event remains registered";
+                return false;
+            }
             foreach (var record in records)
             {
                 var original = expected["capturedParties"].Single(p => p.Value<string>("partyId") == record.Value<string>("partyId"));
@@ -655,8 +665,10 @@ internal static class SiegeDefenseArmyFixtureCommands
         {
             if (observed.Value<string>("siegeEventId") != expected.Value<string>("siegeEventId")
                 || observed.Value<string>("settlementMapEventId") != expected.Value<string>("mapEventId")
-                || observed.Value<bool?>("siegeAssault") != true)
-                error = "The staged siege assault identity changed";
+                || (state == "baseline" && observed.Value<bool?>("siegeAssault") != true)
+                || (state == "joined" && observed.Value<string>("battleType") != MapEvent.BattleTypes.Siege.ToString()
+                    && observed.Value<string>("battleType") != MapEvent.BattleTypes.SiegeOutside.ToString()))
+                error = "The staged siege identity or defending battle type changed";
         }
         else if (observed.Value<bool?>("encounterActive") != false)
             error = "The client's encounter remains active after unstuck";
@@ -682,13 +694,25 @@ internal static class SiegeDefenseArmyFixtureCommands
             settlementMapEventActive = settlement.Party.MapEvent != null,
             settlementMapEventId = GetId(manager, settlement.Party.MapEvent),
             siegeAssault = settlement.Party.MapEvent?.IsSiegeAssault == true,
+            battleType = settlement.Party.MapEvent?.EventType.ToString(),
             armyId = GetId(manager, player.Army),
             armyLeaderPartyId = GetId(manager, player.Army?.LeaderParty),
             armyPartyIds = player.Army?.Parties.Select(p => GetId(manager, p)).ToArray() ?? Array.Empty<string>(),
             encounterActive = ModInformation.IsClient && PlayerEncounter.Current != null,
             menu = ModInformation.IsClient ? Campaign.Current?.CurrentMenuContext?.GameMenu?.StringId : null,
+            ownedArmyRegistered = IsOwnedRegistered(manager, expected, "armyId", fixture?.Army),
+            ownedSiegeRegistered = IsOwnedRegistered(manager, expected, "siegeEventId", fixture?.SiegeEvent),
+            ownedMapEventRegistered = IsOwnedRegistered(manager, expected, "mapEventId", fixture?.MapEvent),
             parties = ids.Select(id => ObserveParty(id, manager, behaviors)).ToArray(),
         });
+    }
+
+    private static bool IsOwnedRegistered(IObjectManager manager, JObject expected, string idField, object owned)
+    {
+        var id = expected?.Value<string>(idField);
+        if (!string.IsNullOrWhiteSpace(id) && manager.Contains(id)) return true;
+        return ModInformation.IsServer && fixture?.Campaign == Campaign.Current
+            && fixture.Token == expected?.Value<string>("fixtureToken") && owned != null && manager.Contains(owned);
     }
 
     private static object ObserveParty(string id, IObjectManager manager, IMobilePartyBehaviorSnapshot behaviors)
@@ -698,6 +722,7 @@ internal static class SiegeDefenseArmyFixtureCommands
         {
             partyId = id,
             exists = party != null && GetId(manager, party) == id,
+            active = party?.IsActive == true,
             name = party?.Name?.ToString(),
             armyActive = party?.Army != null,
             armyId = GetId(manager, party?.Army),
@@ -720,6 +745,13 @@ internal static class SiegeDefenseArmyFixtureCommands
     private static CoopCommandResult FormatOwnedState(string label, JObject expected, string state)
     {
         if (!ContainerProvider.TryResolve<IObjectManager>(out var manager)) return Failed("Unable to resolve object manager");
+        if (state == "restored")
+        {
+            expected = (JObject)fixture.CapturedExpectation.DeepClone();
+            expected["armyId"] = fixture.ArmyId;
+            expected["siegeEventId"] = fixture.SiegeEventId;
+            expected["mapEventId"] = fixture.MapEventId;
+        }
         return FormatState(label, fixture.Player.Party, fixture.Settlement, manager, expected, state);
     }
 
@@ -727,6 +759,11 @@ internal static class SiegeDefenseArmyFixtureCommands
         IObjectManager manager, JObject expected, string state = null)
     {
         var observed = Observe(player, settlement, manager, expected);
+        return FormatStateResult(label, expected, observed, state);
+    }
+
+    internal static CoopCommandResult FormatStateResult(string label, JObject expected, JObject observed, string state)
+    {
         string error = null;
         bool success = state == null || EvaluateState(expected, observed, state, out error);
         var result = new
@@ -796,6 +833,9 @@ internal static class SiegeDefenseArmyFixtureCommands
         public PartySnapshot Player => AllParties[0];
         public PartySnapshot Besieger => AllParties[1];
         public IEnumerable<PartySnapshot> Followers => AllParties.Skip(2);
+        public string ArmyId { get; set; }
+        public string SiegeEventId { get; set; }
+        public string MapEventId { get; set; }
         public Army Army { get; set; }
         public SiegeEvent SiegeEvent { get; set; }
         public MapEvent MapEvent { get; set; }

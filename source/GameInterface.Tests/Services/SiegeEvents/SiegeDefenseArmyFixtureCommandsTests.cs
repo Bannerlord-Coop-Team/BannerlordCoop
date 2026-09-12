@@ -38,6 +38,38 @@ public class SiegeDefenseArmyFixtureCommandsTests
         AssertFailure(Expected(), actual, state, "paused");
     }
 
+    [Theory]
+    [InlineData("SiegeOutside")]
+    [InlineData("Siege")]
+    public void Joined_AcceptsReliefTransitionAndInsideDefenderBattle(string battleType)
+    {
+        var actual = Observed("joined");
+        actual["battleType"] = battleType;
+        actual["siegeAssault"] = battleType == "Siege";
+        Assert.True(SiegeDefenseArmyFixtureCommands.EvaluateState(Expected(), actual, "joined", out var error), error);
+    }
+
+    [Fact]
+    public void Joined_RejectsUnrelatedBattleType()
+    {
+        var actual = Observed("joined");
+        actual["battleType"] = "FieldBattle";
+        AssertFailure(Expected(), actual, "joined", "battle type");
+    }
+
+    [Fact]
+    public void FailedAssertion_ProducesFailureResultAndDiagnosticJson()
+    {
+        var actual = Observed("joined");
+        Party(actual, "follower-b")["canonicalSide"] = "Attacker";
+        var result = SiegeDefenseArmyFixtureCommands.FormatStateResult("joined", Expected(), actual, "joined");
+        Assert.False(result.Succeeded);
+        Assert.Equal("fixture_assertion_failed", result.ErrorCode);
+        var json = JObject.Parse(result.Output.Split(new[] { "LIVE_TEST_JSON=" }, StringSplitOptions.None)[1]);
+        Assert.False(json.Value<bool>("success"));
+        Assert.Contains("follower-b", json.Value<string>("error"));
+    }
+
     [Fact]
     public void Joined_AlliedFollowerOnAttackerSide_FailsDespiteCorrectLeaderAndCount()
     {
@@ -103,6 +135,17 @@ public class SiegeDefenseArmyFixtureCommandsTests
         var actual = Observed("unstuck");
         actual["encounterActive"] = true;
         AssertFailure(Expected(), actual, "unstuck", "encounter remains");
+    }
+
+    [Theory]
+    [InlineData("ownedArmyRegistered")]
+    [InlineData("ownedSiegeRegistered")]
+    [InlineData("ownedMapEventRegistered")]
+    public void Restored_RejectsRegisteredOrphanDespiteCleanPartyPointers(string registeredField)
+    {
+        var actual = Observed("restored");
+        actual[registeredField] = true;
+        AssertFailure(Expected(), actual, "restored", "remains registered");
     }
 
     [Fact]
@@ -283,15 +326,20 @@ public class SiegeDefenseArmyFixtureCommandsTests
             siegeEventId = restored ? null : "siege-captured",
             settlementMapEventActive = !restored,
             settlementMapEventId = restored ? null : "event-captured",
-            siegeAssault = !restored,
+            siegeAssault = !restored && !joined,
+            battleType = joined ? "SiegeOutside" : "Siege",
             armyId = restored ? null : "army-captured",
             armyLeaderPartyId = restored ? null : "player",
             armyPartyIds = restored ? Array.Empty<string>() : armyIds,
             encounterActive = joined,
+            ownedArmyRegistered = !restored,
+            ownedSiegeRegistered = !restored,
+            ownedMapEventRegistered = !restored,
             parties = new[] { "player", "besieger", "follower-a", "follower-b" }.Select(id => new
             {
                 partyId = id,
                 exists = true,
+                active = true,
                 armyActive = !restored && id != "besieger",
                 armyId = restored || id == "besieger" ? null : "army-captured",
                 attachedToActive = !restored && id.StartsWith("follower-", StringComparison.Ordinal),

@@ -57,7 +57,7 @@ without the preceding label.
 | `capture_defense_army_fixture` | Server | Controller ID from `players.list`, `town_ES1`. Save result as **capture**. |
 | `stage_defense_army_fixture` | Server | **capture**. Save successful result as **staged**. |
 | `defense_army_fixture_state` | Either | Same controller ID, `town_ES1`. Read-only diagnostics. |
-| `defense_army_state` | Either | Same controller ID, `town_ES1`, requested state, **staged** (or **capture** for `restored`). |
+| `defense_army_state` | Either | Same controller ID, `town_ES1`, requested state, **staged**. |
 | `restore_defense_army_fixture` | Server | **capture**. Retain result, including any failure. |
 | `verify_defense_army_fixture` | Server | **capture**. Releases the fixture only after restoration checks pass. |
 
@@ -82,6 +82,11 @@ Require the same three army members to belong to the staged map event's canonica
 **Defender** side. None may appear on the attacker side. Save a screenshot of the
 selected route and of the resulting player/allied army listing, together with
 the JSON. A locally displayed side alone is not a pass.
+
+The outside relief join normally changes the battle type from `Siege` to
+`SiegeOutside`. This is accepted only with the same recorded event and correct
+defender membership; continuing to require `IsSiegeAssault` would reject the
+correct relief route.
 
 The issue does not specify which siege-help option was used. **Break in to help
 the defenders** (`join_siege_event_break_in`) is a different route. For coverage
@@ -121,9 +126,12 @@ separately by non-live regression tests; this fixture concerns a player-led army
 Always attempt server `restore_defense_army_fixture` with **capture**, including
 after an assertion fails. It finalizes only the fixture event, breaks only its
 siege, disbands only its created army, and restores captured movement. Save its
-result, then run `defense_army_state restored` with **capture** on all peers and
+result, then run `defense_army_state restored` with **staged** on all peers and
 server `verify_defense_army_fixture` with **capture**. Require every captured
-party and settlement to be restored before starting another capture.
+party and settlement to be restored, and the fixture's army, siege, and map event
+IDs to be absent from each registry, before starting another capture. If staging
+failed before producing **staged**, retain **capture** and use server restore
+and verify; do not invent a staged identity for client checks.
 
 A failed cleanup keeps its token and evidence for retry. Do not clear its state
 or operate on a replacement army. If a participant was destroyed, the campaign

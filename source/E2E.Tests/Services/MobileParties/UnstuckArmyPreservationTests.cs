@@ -166,7 +166,7 @@ public class UnstuckArmyPreservationTests : MapEventTestBase
                 member.AttachedTo = leader;
             }
             Assert.True(Server.ObjectManager.TryGetId(army, out armyId));
-            Campaign.Current.MainParty = null;
+            Assert.DoesNotContain(MobileParty.MainParty, army.Parties);
         }, MapEventDisabledMethods);
         Assert.NotNull(armyId);
 
