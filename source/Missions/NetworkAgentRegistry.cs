@@ -270,6 +270,10 @@ public class NetworkAgentRegistry : INetworkAgentRegistry
         var succeeded = true;
 
         succeeded &= controlledAgents.Remove(agentInfo);
+        // Drop the controller key with its last agent, the same pruning TryTransferAuthority does, because
+        // GetControllerIds promises only controllers that still hold an agent.
+        if (controlledAgents.Count == 0)
+            ControllerAgentMap.Remove(agentInfo.CurrentAuthority);
         succeeded &= IdToInfo.Remove(agentInfo.AgentId);
         succeeded &= AgentToInfo.Remove(agentInfo.Agent);
         if (agentInfo.MovementId != 0)

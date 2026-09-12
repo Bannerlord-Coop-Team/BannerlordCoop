@@ -151,23 +151,39 @@ public abstract class CoopMissionController : MissionBehavior, IDisposable
 
     public override void OnEndMissionInternal()
     {
-        // Detach the per-mission agent handlers FIRST, before mission state and native agents are freed. Both
-        // detach deterministically here instead of leaking their packet-handler registration until the GC
-        // finalizer runs.
-        coopMissionComponent.AgentMovementHandler.Dispose();
-        coopMissionComponent.AgentActionHandler.Dispose();
-        coopMissionComponent.AgentVoiceHandler.Dispose();
+        try
+        {
+            // Detach the per-mission agent handlers FIRST, before mission state and native agents are freed. Both
+            // detach deterministically here instead of leaking their packet-handler registration until the GC
+            // finalizer runs.
+            coopMissionComponent.AgentMovementHandler.Dispose();
+            coopMissionComponent.AgentActionHandler.Dispose();
+            coopMissionComponent.AgentVoiceHandler.Dispose();
 
-        coopMissionComponent.MissileHandler.Dispose();
-        coopMissionComponent.WeaponDropHandler.Dispose();
-        coopMissionComponent.WeaponPickupHandler.Dispose();
-        coopMissionComponent.ShieldDamageHandler.Dispose();
-        coopMissionComponent.CombatHitPresentationHandler.Dispose();
-        coopMissionComponent.AgentDeathHandler.Dispose();
+            coopMissionComponent.MissileHandler.Dispose();
+            coopMissionComponent.WeaponDropHandler.Dispose();
+            coopMissionComponent.WeaponPickupHandler.Dispose();
+            coopMissionComponent.ShieldDamageHandler.Dispose();
+            coopMissionComponent.CombatHitPresentationHandler.Dispose();
+            coopMissionComponent.AgentDeathHandler.Dispose();
 
-        OnLeaving();
+            OnLeaving();
 
-        base.OnEndMission();
-        Dispose();
+            base.OnEndMission();
+        }
+        finally
+        {
+            // Detach and clear on every exit path, because the registry outlives the mission and a throw in a
+            // step above would otherwise keep wrappers around destroyed native agents reachable from the
+            // campaign map. Detach first: the services that register agents are torn down in Dispose.
+            try
+            {
+                Dispose();
+            }
+            finally
+            {
+                coopMissionComponent.AgentRegistry.Clear();
+            }
+        }
     }
 }
