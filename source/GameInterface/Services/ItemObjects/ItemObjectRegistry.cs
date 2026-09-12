@@ -13,6 +13,8 @@ namespace GameInterface.Services.ItemObjects;
 
 public class ItemObjectRegistry : AutoRegistryBase<ItemObject>
 {
+    private const string IdPrefix = nameof(ItemObject) + "_";
+
     public ItemObjectRegistry(ILogger logger, IAutoRegistryFactory autoRegistryFactory, IObjectManager objectManager)
         : base(logger, autoRegistryFactory, objectManager)
     {
@@ -29,6 +31,40 @@ public class ItemObjectRegistry : AutoRegistryBase<ItemObject>
         {
             RegisterExistingObject(item.StringId, item);
         }
+    }
+
+    public bool TryRegisterExistingItem(ItemObject item, out string itemId)
+    {
+        itemId = null;
+
+        if (item == null)
+            return false;
+
+        if (objectManager.TryGetId(item, out itemId))
+            return true;
+
+        if (string.IsNullOrEmpty(item.StringId))
+            return false;
+
+        itemId = IdPrefix + item.StringId;
+        if (objectManager.Contains(itemId))
+        {
+            if (objectManager.TryGetObject<ItemObject>(itemId, out var registeredItem) &&
+                registeredItem != item &&
+                registeredItem.StringId == item.StringId)
+            {
+                objectManager.Remove(registeredItem);
+                if (objectManager.AddExisting(itemId, item))
+                    return objectManager.TryGetId(item, out itemId);
+            }
+
+            return objectManager.TryGetId(item, out itemId);
+        }
+
+        if (!objectManager.AddExisting(itemId, item))
+            return false;
+
+        return objectManager.TryGetId(item, out itemId);
     }
 
     public override void OnClientCreated(ItemObject obj, string id)

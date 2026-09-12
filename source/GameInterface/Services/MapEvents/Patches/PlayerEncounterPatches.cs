@@ -452,6 +452,16 @@ internal class PlayerEncounterPatches
         MessageBroker.Instance.Publish(party.Ai, new PartyBehaviorChangeAttempted(party));
     }
 
+    [HarmonyPatch(nameof(PlayerEncounter.DoApplyMapEventResults))]
+    [HarmonyPrefix]
+    private static bool WaitForHideoutResults(PlayerEncounter __instance)
+    {
+        if (ModInformation.IsServer || __instance._mapEvent?.IsHideoutBattle != true) return true;
+        // The server advances this encounter after delivering its loot; native would generate it again locally.
+        __instance._stateHandled = true;
+        return false;
+    }
+
     [HarmonyPatch(nameof(PlayerEncounter.Update))]
     [HarmonyPrefix]
     public static bool UpdatePrefix()

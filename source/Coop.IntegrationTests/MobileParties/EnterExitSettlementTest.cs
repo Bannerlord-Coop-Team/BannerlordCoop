@@ -385,7 +385,7 @@ namespace Coop.IntegrationTests.MobileParties
         }
 
         [Fact]
-        public void EnterHideout_OnlyOnePlayerCanBeInsideUntilFirstPlayerLeaves()
+        public void EnterHideout_PlayersCanEnterTogetherAndLeaveIndependently()
         {
             var clients = TestEnvironment.Clients.ToArray();
             var firstClient = clients[0];
@@ -421,22 +421,17 @@ namespace Coop.IntegrationTests.MobileParties
                     this,
                     new StartSettlementEncounterAttempted(secondParty, hideout)));
 
-            Assert.Null(secondParty.CurrentSettlement);
+            Assert.Same(hideout, secondParty.CurrentSettlement);
             Assert.Equal(
-                1,
+                0,
                 TestEnvironment.Server.NetworkSentMessages.GetMessageCount<NetworkSettlementEncounterRejected>());
 
             GameThreadTestRunner.Run(() =>
                 firstClient.SimulateMessage(this, new EndSettlementEncounterAttempted(firstParty)));
-            GameThreadTestRunner.Run(() =>
-                secondClient.SimulateMessage(
-                    this,
-                    new StartSettlementEncounterAttempted(secondParty, hideout)));
-
             Assert.Null(firstParty.CurrentSettlement);
             Assert.Same(hideout, secondParty.CurrentSettlement);
             Assert.Equal(
-                2,
+                1,
                 secondClient.NetworkSentMessages.GetMessageCount<NetworkRequestStartSettlementEncounter>());
         }
 

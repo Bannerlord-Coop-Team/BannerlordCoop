@@ -115,6 +115,7 @@ public class ReinforcementFielder : IReinforcementFielder
 
     public void Tick()
     {
+        if (Mission.Current?.GetMissionBehavior<Missions.Hideouts.CoopHideoutMissionLogic>() != null) return;
         if (!session.IsLocalHost || Mission.Current == null) return;
 
         try

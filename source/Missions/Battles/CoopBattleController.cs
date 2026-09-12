@@ -10,6 +10,7 @@ using LiteNetLib;
 using Missions.Agents;
 using Missions.Data;
 using Missions.Messages;
+using Missions.Hideouts;
 using Missions.Services.Network;
 using SandBox.Missions.MissionLogics.Hideout;
 using Serilog;
@@ -490,6 +491,7 @@ public class CoopBattleController : CoopMissionController
             siegeEngineDeployment.CatchUpJoiner(controllerId);
             siegeMachineState.CatchUpJoiner(controllerId);
             Deployment.CatchUpJoiner(controllerId);
+            Mission?.GetMissionBehavior<CoopHideoutMissionLogic>()?.CatchUpJoiner(controllerId);
             if (Session.IsLocalHost)
                 coopMissionComponent.WeaponDropHandler.CatchUpJoiner(controllerId);
 

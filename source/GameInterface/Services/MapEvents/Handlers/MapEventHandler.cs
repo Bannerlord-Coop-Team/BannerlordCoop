@@ -212,7 +212,8 @@ internal class MapEventHandler : IHandler
         if (!objectManager.TryGetIdWithLogging(payload.What.MapEvent, out var mapEventId))
             return;
 
-        network.SendAll(new NetworkMapEventSurrender(mapEventId, payload.What.Side));
+        int epoch = hostRegistry.TryGet(mapEventId, out var assignment) ? assignment.Epoch : 0;
+        network.SendAll(new NetworkMapEventSurrender(mapEventId, payload.What.Side, epoch));
     }
 
     private void Handle_NetworkMapEventSurrender(MessagePayload<NetworkMapEventSurrender> payload)
@@ -234,6 +235,20 @@ internal class MapEventHandler : IHandler
             {
                 if (!objectManager.TryGetObjectWithLogging<MapEvent>(mapEventId, out var mapEvent))
                     return;
+
+                if (mapEvent.IsHideoutBattle &&
+                    (ServerBattleModeArbiter.IsMissionClaimed(mapEventId) || payload.What.HostEpoch > 0))
+                {
+                    if (side != BattleSideEnum.Defender || mapEvent.BattleState != BattleState.None ||
+                        payload.Who is not NetPeer peer || !playerManager.TryGetPlayer(peer, out var player) ||
+                        !hostRegistry.TryGet(mapEventId, out var assignment) ||
+                        assignment.HostControllerId != player.ControllerId || assignment.Epoch != payload.What.HostEpoch)
+                        return;
+
+                    // A won boss duel surrenders the guards; the mission completion barrier commits the victory.
+                    mapEvent.DefenderSide.IsSurrendered = true;
+                    return;
+                }
 
                 // Skip if this side already surrendered — another pipeline (e.g. a PvP loser's
                 // NetworkPlayerSurrendered) may have already applied it.

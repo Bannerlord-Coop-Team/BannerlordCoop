@@ -203,6 +203,8 @@ public class MapEventResultsInterface : IMapEventResultsInterface
                     CaptureDefeatedPartyMembers(mapEvent, winnerParties, defeatedParties, playerLootData.LootedPrisoners);
                 }
 
+                SplitHideoutLoot(mapEvent, playerLootData);
+
                 // Need to patch the gold change to display plunder message
                 mapEvent.CommitCalculatedMapEventResults();
             }
@@ -210,6 +212,63 @@ public class MapEventResultsInterface : IMapEventResultsInterface
         });
 
         networkPlayerLootData = PackPlayerLootData(playerLootData);
+    }
+
+    internal void SplitHideoutLoot(MapEvent mapEvent, PlayerLootData loot)
+    {
+        if (!mapEvent.IsHideoutBattle || mapEvent.WinningSide != BattleSideEnum.Attacker) return;
+        var parties = mapEvent.AttackerSide.Parties.Where(loot.LootedItems.ContainsKey).ToArray();
+        if (parties.Length < 2) return;
+
+        var gold = parties.Sum(party => party.PlunderedGold);
+        var pooledItems = new ItemRoster();
+        for (var index = 0; index < parties.Length; index++)
+        {
+            var party = parties[index];
+            party.PlunderedGold = gold / parties.Length + (index < gold % parties.Length ? 1 : 0);
+            pooledItems.Add(loot.LootedItems[party]);
+            loot.LootedItems[party].Clear();
+        }
+
+        var values = new long[parties.Length];
+        var counts = new int[parties.Length];
+        foreach (var item in pooledItems.OrderByDescending(item => item.EquipmentElement.ItemValue))
+        {
+            for (var count = 0; count < item.Amount; count++)
+            {
+                var receiver = 0;
+                for (var index = 1; index < parties.Length; index++)
+                    if (values[index] < values[receiver] ||
+                        (values[index] == values[receiver] && counts[index] < counts[receiver]))
+                        receiver = index;
+                loot.LootedItems[parties[receiver]].AddToCounts(item.EquipmentElement, 1);
+                values[receiver] += item.EquipmentElement.ItemValue;
+                counts[receiver]++;
+            }
+        }
+
+        SplitHideoutTroops(parties, loot.LootedMembers);
+        SplitHideoutTroops(parties, loot.LootedPrisoners);
+    }
+
+    private void SplitHideoutTroops(MapEventParty[] parties, Dictionary<MapEventParty, TroopRoster> rosters)
+    {
+        var pooled = TroopRoster.CreateDummyTroopRoster();
+        foreach (var party in parties)
+        {
+            pooled.Add(rosters[party]);
+            rosters[party].Clear();
+        }
+
+        var receiver = 0;
+        foreach (var troop in pooled.GetTroopRoster().OrderByDescending(troop => troop.Character.Tier))
+            for (var count = 0; count < troop.Number; count++)
+            {
+                rosters[parties[receiver]].AddToCounts(troop.Character, 1, false,
+                    count < troop.WoundedNumber ? 1 : 0,
+                    troop.Xp / troop.Number + (count < troop.Xp % troop.Number ? 1 : 0));
+                receiver = (receiver + 1) % parties.Length;
+            }
     }
 
     // Needs extra arguments because vanilla seems to only allow the player to loot items from enemy casualties
