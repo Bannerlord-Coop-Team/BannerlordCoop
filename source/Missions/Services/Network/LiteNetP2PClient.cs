@@ -1174,10 +1174,21 @@ public class LiteNetP2PClient : INatPunchListener, INetEventListener, IUpdateabl
     {
         if (packet is MessagePacket messagePacket)
         {
-            reliableMessageBatcher.Send(
-                controllerId,
-                messagePacket.Data,
-                SendReliableMessagePayload);
+            // Spawn admission must see a bare message before later authority changes reach the game thread.
+            if (messagePacket.MessageType == typeof(NetworkSpawnBattleAgents))
+            {
+                reliableMessageBatcher.SendImmediate(
+                    controllerId,
+                    messagePacket.Data,
+                    SendReliableMessagePayload);
+            }
+            else
+            {
+                reliableMessageBatcher.Send(
+                    controllerId,
+                    messagePacket.Data,
+                    SendReliableMessagePayload);
+            }
             return;
         }
 
@@ -1467,12 +1478,25 @@ public class LiteNetP2PClient : INatPunchListener, INetEventListener, IUpdateabl
     internal void HandleReceivedPayload(NetPeer peer, byte[] serializedPacket, int? generation = null)
     {
         object received = serializer.Deserialize(serializedPacket);
-        if (generation.HasValue)
+        lock (peerGate)
         {
-            lock (peerGate)
+            if (generation.HasValue &&
+                (instanceId == null || generation.Value != instanceGeneration ||
+                    !mappedPeerControllers.ContainsKey(peer))) return;
+
+            if (received is NetworkSpawnBattleAgents spawn)
             {
-                if (instanceId == null || generation.Value != instanceGeneration ||
-                    !mappedPeerControllers.ContainsKey(peer)) return;
+                // Reserve the spawn's queue position before a departure can invalidate this peer.
+                int admittedGeneration = instanceGeneration;
+                GameThread.EnqueueSafe(() =>
+                {
+                    lock (peerGate)
+                    {
+                        if (admittedGeneration != instanceGeneration) return;
+                    }
+                    messagePacketHandler.PublishEvent(peer, spawn);
+                });
+                return;
             }
         }
 

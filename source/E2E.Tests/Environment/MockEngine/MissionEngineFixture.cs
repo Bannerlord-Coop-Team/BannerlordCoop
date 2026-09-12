@@ -152,6 +152,7 @@ public sealed class MissionEngineFixture : IDisposable
         // Team / Formation — host-migration adoption (ConvertPuppetToHostAi + the Charge order).
         Prefix(typeof(Agent), "get_Formation", nameof(Agent_get_Formation));
         Prefix(typeof(Agent), "set_Formation", nameof(Agent_set_Formation));
+        Prefix(typeof(Agent), "get_IsPaused", nameof(Agent_get_IsPaused));
         Prefix(typeof(Agent), nameof(Agent.SetIsAIPaused), nameof(Agent_SetIsAIPaused));
         Prefix(typeof(Agent), nameof(Agent.SetAlarmState), nameof(Agent_SetAlarmState));
         Prefix(typeof(Agent), nameof(Agent.ResetEnemyCaches), nameof(Agent_ResetEnemyCaches));
@@ -784,6 +785,13 @@ public sealed class MissionEngineFixture : IDisposable
         if (!AgentMirror.TryGet(__instance, out var mirror)) return true;
         mirror.OnFleeingCalls++;
         __instance.Formation = null;
+        return false;
+    }
+
+    private static bool Agent_get_IsPaused(Agent __instance, ref bool __result)
+    {
+        if (!AgentMirror.TryGet(__instance, out var mirror)) return true;
+        __result = mirror.IsAiPaused;
         return false;
     }
 

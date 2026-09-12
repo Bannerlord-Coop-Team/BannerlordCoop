@@ -167,12 +167,6 @@ public class PuppetSpawner : IPuppetSpawner
             {
                 if (!TrySpawnPuppetNow(data, ref slotsAvailable))
                     lock (pendingPuppetLock) pendingPuppets.Add(data);
-                else
-                    lock (pendingPuppetLock)
-                    {
-                        pendingAuthorities.Remove(data.AgentId);
-                        pendingAuthorities.Remove(data.MountAgentId);
-                    }
             }
             catch (Exception e)
             {
@@ -180,6 +174,7 @@ public class PuppetSpawner : IPuppetSpawner
             }
         }
 
+        PrunePendingAuthorities();
         Logger.Information(
             "[BattleTraffic] Applied spawn transfer {TransferId} batch {BatchIndex}/{BatchCount} on the game thread",
             message.TransferId,
@@ -503,10 +498,10 @@ public class PuppetSpawner : IPuppetSpawner
             {
                 pendingPuppets.RemoveAll(data =>
                 {
-                    if (data.OwnerControllerId != controllerId) return false;
+                    var authority = GetPendingAuthority(data.AgentId, data.AuthorityRevision);
+                    if ((authority?.ControllerId ?? data.OwnerControllerId) != controllerId) return false;
                     bool remove = !disconnected && (!wasHost || IsPlayerPartyRecord(data, controllerId));
                     if (!remove) retainedAgentIds.Add(data.AgentId);
-                    else pendingAuthorities.Remove(data.AgentId);
                     return remove;
                 });
             }
@@ -516,22 +511,25 @@ public class PuppetSpawner : IPuppetSpawner
                 lock (withdrawnControllerLock)
                     retainedFormerHostAgentIds.UnionWith(retainedAgentIds);
             }
+            PrunePendingAuthorities();
         });
     }
 
-    // [Game thread] A replay from the old host can already be buffered when its disconnect arrives. Drop only
-    // records for that player's own party; NPC parties the host ran still belong to the successor migration.
+    // [Game thread] Withdraw only the current holder's own party; disconnected troops remain adopted.
     private bool IsWithdrawnPlayerParty(BattleAgentSpawnData data)
     {
+        string controllerId;
+        lock (pendingPuppetLock)
+            controllerId = GetPendingAuthority(data.AgentId, data.AuthorityRevision)?.ControllerId ?? data.OwnerControllerId;
         bool wasHost;
         lock (withdrawnControllerLock)
         {
-            if (!withdrawnControllers.Contains(data.OwnerControllerId)) return false;
-            if (disconnectedControllers.Contains(data.OwnerControllerId)) return false;
-            wasHost = withdrawnHostControllers.Contains(data.OwnerControllerId);
+            if (!withdrawnControllers.Contains(controllerId)) return false;
+            if (disconnectedControllers.Contains(controllerId)) return false;
+            wasHost = withdrawnHostControllers.Contains(controllerId);
         }
 
-        return !wasHost || IsPlayerPartyRecord(data, data.OwnerControllerId);
+        return !wasHost || IsPlayerPartyRecord(data, controllerId);
     }
 
     private bool IsRetainedFormerHostRecord(BattleAgentSpawnData data)
@@ -627,17 +625,28 @@ public class PuppetSpawner : IPuppetSpawner
             {
                 if (!TrySpawnPuppetNow(data, ref slotsAvailable))
                     lock (pendingPuppetLock) pendingPuppets.Add(data);
-                else
-                    lock (pendingPuppetLock)
-                    {
-                        pendingAuthorities.Remove(data.AgentId);
-                        pendingAuthorities.Remove(data.MountAgentId);
-                    }
             }
             catch (Exception e)
             {
                 Logger.Error(e, "[BattleSync] Failed to spawn buffered puppet {AgentId}; dropping it", data.AgentId);
             }
+        }
+        PrunePendingAuthorities();
+    }
+
+    private void PrunePendingAuthorities()
+    {
+        lock (pendingPuppetLock)
+        {
+            if (pendingAuthorities.Count == 0) return;
+            var pendingIds = new HashSet<Guid>();
+            foreach (var data in pendingPuppets)
+            {
+                pendingIds.Add(data.AgentId);
+                pendingIds.Add(data.MountAgentId);
+            }
+            foreach (Guid agentId in new List<Guid>(pendingAuthorities.Keys))
+                if (!pendingIds.Contains(agentId)) pendingAuthorities.Remove(agentId);
         }
     }
 

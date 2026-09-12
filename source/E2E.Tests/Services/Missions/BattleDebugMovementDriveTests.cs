@@ -49,7 +49,8 @@ public class BattleDebugMovementDriveTests
         Agent.MovementControlFlag originalLocomotion =
             mirror.MovementFlags & Agent.MovementControlFlag.MoveMask;
         Vec2 originalInput = mirror.InputVector;
-        bool originalIsAiPaused = mirror.IsAiPaused;
+        bool originalIsAiPaused = agent.IsPaused;
+        Assert.True(originalIsAiPaused);
         AgentMovementLockedState originalMovementLockedState = mirror.MovementLockedState;
 
         BattleDebugCommands.ApplyOwnedAgentMovementDrive(agent, applyAiDrive: true);
@@ -66,6 +67,7 @@ public class BattleDebugMovementDriveTests
         Assert.Equal(0f, mirror.LastAcceleration.Z);
         Assert.Equal(AgentControllerType.AI, mirror.Controller);
         Assert.False(mirror.IsAiPaused);
+        Assert.False(agent.IsPaused);
         Assert.Equal(0.75f, mirror.MaximumSpeedLimit);
         Assert.True(mirror.LastMaximumSpeedLimitIsMultiplier);
         Assert.Equal(0, mirror.SetMaximumSpeedLimitCalls);
@@ -95,6 +97,7 @@ public class BattleDebugMovementDriveTests
         Assert.Equal(originalInput.Y, mirror.InputVector.Y);
         Assert.Equal(AgentControllerType.AI, mirror.Controller);
         Assert.Equal(originalIsAiPaused, mirror.IsAiPaused);
+        Assert.Equal(originalIsAiPaused, agent.IsPaused);
         Assert.Equal(0.75f, mirror.MaximumSpeedLimit);
         Assert.True(mirror.LastMaximumSpeedLimitIsMultiplier);
         Assert.Equal(0, mirror.SetMaximumSpeedLimitCalls);
@@ -496,8 +499,12 @@ public class BattleDebugMovementDriveTests
 
         public void Begin(INetworkAgentRegistry registry = null)
         {
+            var agents = Registry.GetAgents("A");
             Behavior.BeginOwnedAgentMovementDrive(
-                Mission.Shell, registry ?? Registry, Session.Object, Registry.GetAgents("A"), 3f);
+                Mission.Shell, registry ?? Registry, Session.Object, agents, 3f);
+            Assert.Equal(agents.Count, Behavior.OwnedAgentMovementDriveAgentCount);
+            Assert.Equal(0, (int)Status["failedAgents"]);
+            Assert.Equal(0, (int)Status["invalidatedAgents"]);
         }
 
         public void SetSuccessorState()

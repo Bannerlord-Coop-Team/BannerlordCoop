@@ -163,6 +163,7 @@ public class BattleAgentRenderCapTests : MissionTestEnvironment
                 receiver.Resolve<IMessageBroker>().Publish(
                     this,
                     new NetworkMissionPeerEntered("A", mapEventId));
+                receiver.Resolve<IMessageBroker>().Publish(this, new MissionPeerLeft("A", mapEventId));
 
                 DeleteAgents(mock, 2);
                 mock.SpawnMounted = true;
@@ -194,6 +195,7 @@ public class BattleAgentRenderCapTests : MissionTestEnvironment
                     mountMirror.MovementDirection = Vec2.Zero;
                     receiver.SimulatePacket(peer, riderPacket);
                     receiver.SimulatePacket(peer, mountPacket);
+                    receiver.Resolve<ICoopMissionComponent>().AgentMovementHandler.Interpolator.Tick(1f / 60f);
                     Assert.Equal(new Vec2(1f, 0f), riderMirror.MovementDirection);
                     Assert.Equal(new Vec2(1f, 0f), mountMirror.MovementDirection);
                 }
@@ -202,6 +204,7 @@ public class BattleAgentRenderCapTests : MissionTestEnvironment
                 // A fresh record for the returning player's own party stays under that player at revision 0.
                 DeleteAgents(mock, 1);
                 mock.SpawnMounted = false;
+                receiver.Resolve<IMessageBroker>().Publish(this, new NetworkMissionPeerEntered("A", mapEventId));
 
                 Assert.True(receiver.ObjectManager.TryGetObject<MobileParty>(partyIds[0], out var returningParty));
                 var returningMapEventParty = returningParty.MapEvent.AttackerSide.Parties.Single(

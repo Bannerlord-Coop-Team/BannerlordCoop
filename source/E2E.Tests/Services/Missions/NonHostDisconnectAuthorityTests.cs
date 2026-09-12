@@ -62,9 +62,18 @@ public class NonHostDisconnectAuthorityTests : MissionTestEnvironment
             AssertAuthority(a, "B", 7, AgentControllerType.None);
             AssertAuthority(b, "B", 7, AgentControllerType.AI);
 
-            a.Instance.Call(() => GetMirror(a, agentId).MovementDirection = Vec2.Zero);
+            a.Instance.Call(() =>
+            {
+                GetMirror(a, agentId).MovementDirection = Vec2.Zero;
+                Assert.True(a.Registry.TryGetAgentInfo(agentId, out var info));
+                a.Instance.Resolve<ICoopMissionComponent>().AgentMovementHandler.Interpolator.Forget(info.Agent);
+            });
             b.Instance.Call(() => b.Network.Send("A", originalPacket));
-            a.Instance.Call(() => Assert.Equal(Vec2.Zero, GetMirror(a, agentId).MovementDirection));
+            a.Instance.Call(() =>
+            {
+                a.Instance.Resolve<ICoopMissionComponent>().AgentMovementHandler.Interpolator.Tick(1f / 60f);
+                Assert.Equal(Vec2.Zero, GetMirror(a, agentId).MovementDirection);
+            });
             AssertMovementArrives(b, a);
         }
         finally
@@ -205,6 +214,7 @@ public class NonHostDisconnectAuthorityTests : MissionTestEnvironment
             });
             recipient.Instance.Call(() =>
             {
+                recipient.Instance.Resolve<ICoopMissionComponent>().AgentMovementHandler.Interpolator.Tick(1f / 60f);
                 Assert.Equal(new Vec2(1f, 0f), GetMirror(recipient, agentId).MovementDirection);
                 Assert.Equal(new Vec2(1f, 0f), GetMirror(recipient, mountId).MovementDirection);
             });
