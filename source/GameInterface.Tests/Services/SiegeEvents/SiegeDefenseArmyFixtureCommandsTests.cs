@@ -1,7 +1,9 @@
 ﻿#if DEBUG
 using Common;
 using Common.Commands;
+using Common.Messaging;
 using Common.Util;
+using GameInterface.Services.GameState.Messages;
 using GameInterface.Services.SiegeEvents.Commands;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
@@ -341,22 +343,28 @@ public class SiegeDefenseArmyFixtureCommandsTests
     }
 
     [Fact]
-    public void ClientRecoveryProof_SynchronousReplyBeforeRequestSubscriberStillCorrelates()
+    public void ClientRecoveryProof_IgnoresCompletionWithoutOutstandingRequest()
     {
         using var proof = new SiegeDefenseArmyFixtureCommands.RecoveryProof(Expected());
         Assert.True(proof.MarkJoined());
         proof.RecordCompletion("player");
         Assert.Equal(0, proof.RequestCountAfterJoin);
-        Assert.Equal(1, proof.CompletionCountAfterJoin);
+        Assert.Equal(0, proof.CompletionCountAfterJoin);
         proof.BeginRequest("player");
         Assert.Equal(1, proof.RequestCountAfterJoin);
-        Assert.Equal(1, proof.CompletionCountAfterJoin);
+        Assert.Equal(0, proof.CompletionCountAfterJoin);
         var observed = Observed("unstuck");
         observed["authoritative"] = false;
         observed["isLocalPlayer"] = true;
         observed["localRecoveryRequests"] = proof.RequestCountAfterJoin;
         observed["localRecoveryCompletions"] = proof.CompletionCountAfterJoin;
-        Assert.True(SiegeDefenseArmyFixtureCommands.EvaluateState(Expected(), observed, "unstuck", out var error), error);
+        Assert.False(SiegeDefenseArmyFixtureCommands.EvaluateState(Expected(), observed, "unstuck", out var error));
+        Assert.Contains("owning client", error);
+        proof.RecordCompletion("player");
+        proof.RecordCompletion("player");
+        Assert.Equal(1, proof.CompletionCountAfterJoin);
+        observed["localRecoveryCompletions"] = proof.CompletionCountAfterJoin;
+        Assert.True(SiegeDefenseArmyFixtureCommands.EvaluateState(Expected(), observed, "unstuck", out error), error);
     }
 
     [Fact]
@@ -370,6 +378,58 @@ public class SiegeDefenseArmyFixtureCommandsTests
         Assert.False(proof.CompleteRequest(request, true, true));
         Assert.False(proof.MarkJoined());
         Assert.Null(proof.GetReceipt());
+    }
+
+    [Theory]
+    [InlineData(false, false)]
+    [InlineData(true, false)]
+    [InlineData(true, true)]
+    public void FixtureLifetime_LoadReleasesCaptureOnlyAndRestoredState(bool restored, bool verified)
+    {
+        using var broker = new MessageBroker();
+        var deferred = new System.Collections.Generic.List<Action>();
+        try
+        {
+            SiegeDefenseArmyFixtureCommands.SetFixtureForLifecycleTesting(broker, "captured", restored, verified,
+                action => deferred.Add(action));
+            Assert.True(SiegeDefenseArmyFixtureCommands.HasFixtureForLifecycleTesting("captured"));
+
+            broker.Publish(this, new GameLoadStarted());
+
+            Assert.False(SiegeDefenseArmyFixtureCommands.HasFixtureForLifecycleTesting("captured"));
+            Assert.Single(deferred);
+            deferred.Single()();
+            broker.Publish(this, new GameLoadStarted());
+            Assert.Single(deferred);
+        }
+        finally
+        {
+            SiegeDefenseArmyFixtureCommands.ResetFixtureForLifecycleTesting();
+        }
+    }
+
+    [Fact]
+    public void FixtureLifetime_DeferredOldCleanupDoesNotClearReplacementCapture()
+    {
+        using var broker = new MessageBroker();
+        var deferred = new System.Collections.Generic.List<Action>();
+        try
+        {
+            SiegeDefenseArmyFixtureCommands.SetFixtureForLifecycleTesting(broker, "old", false, false,
+                action => deferred.Add(action));
+            broker.Publish(this, new GameExited());
+            Assert.False(SiegeDefenseArmyFixtureCommands.HasFixtureForLifecycleTesting("old"));
+
+            SiegeDefenseArmyFixtureCommands.SetFixtureForLifecycleTesting(broker, "new", false, false,
+                action => deferred.Add(action));
+            deferred.Single()();
+
+            Assert.True(SiegeDefenseArmyFixtureCommands.HasFixtureForLifecycleTesting("new"));
+        }
+        finally
+        {
+            SiegeDefenseArmyFixtureCommands.ResetFixtureForLifecycleTesting();
+        }
     }
 
     [Theory]

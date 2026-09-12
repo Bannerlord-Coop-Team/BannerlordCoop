@@ -37,6 +37,7 @@ namespace GameInterface.Services.SiegeEvents.Commands;
 internal static class SiegeDefenseArmyFixtureCommands
 {
     private static FixtureState fixture;
+    private static FixtureLifetime fixtureLifetime;
     private static RecoveryObserver recoveryObserver;
 
     /// <summary>Reports the current fixture identities.</summary>
@@ -189,8 +190,9 @@ internal static class SiegeDefenseArmyFixtureCommands
         if (player.MapFaction is not Kingdom kingdom || settlement.MapFaction != kingdom)
             return Failed("The player party and settlement must belong to the same kingdom");
         if (!TryGetId(manager, settlement, out var settlementId)
-            || !ContainerProvider.TryResolve<IMobilePartyBehaviorSnapshot>(out var behaviors))
-            return Failed("Unable to resolve the registered settlement or fixture snapshot service");
+            || !ContainerProvider.TryResolve<IMobilePartyBehaviorSnapshot>(out var behaviors)
+            || !ContainerProvider.TryResolve<IMessageBroker>(out var broker))
+            return Failed("Unable to resolve the registered settlement or fixture capture services");
 
         var followers = MobileParty.AllLordParties
             .Where(p => p != player && p.MapFaction == kingdom && p.LeaderHero != null
@@ -211,8 +213,10 @@ internal static class SiegeDefenseArmyFixtureCommands
             .Select(p => CaptureParty(p, manager, behaviors)).ToArray();
         if (snapshots.Any(p => p == null) || snapshots.Select(p => p.Id).Distinct().Count() != 4)
             return Failed("Every fixture participant must have a distinct registered id and a movement snapshot");
+        fixtureLifetime?.Dispose();
         recoveryObserver?.Dispose();
         fixture = new FixtureState(Guid.NewGuid().ToString("N"), args[0], settlement, settlementId, snapshots);
+        fixtureLifetime = new FixtureLifetime(broker, fixture.Token, ReleaseFixture);
         fixture.CapturedExpectation = CreateExpectation(fixture, manager);
         return FormatState("Captured siege defense army fixture", player, settlement, manager, fixture.CapturedExpectation);
     }
@@ -914,6 +918,42 @@ internal static class SiegeDefenseArmyFixtureCommands
         return true;
     }
 
+    private static void ReleaseFixture(string token)
+    {
+        if (fixture?.Token != token) return;
+        fixture = null;
+
+        var observer = recoveryObserver;
+        if (observer?.FixtureToken != token) return;
+        observer.Proof.Dispose();
+        recoveryObserver = null;
+        GameThread.EnqueueSafe(observer.Dispose, context: nameof(SiegeDefenseArmyFixtureCommands));
+    }
+
+    internal static void SetFixtureForLifecycleTesting(IMessageBroker broker, string token, bool restored,
+        bool verified, Action<Action> defer)
+    {
+        fixtureLifetime?.Dispose();
+        recoveryObserver?.Dispose();
+        fixture = new FixtureState(token, null, null, null, Array.Empty<PartySnapshot>())
+        {
+            Restored = restored,
+            Verified = verified,
+        };
+        fixtureLifetime = new FixtureLifetime(broker, token, ReleaseFixture, defer);
+    }
+
+    internal static bool HasFixtureForLifecycleTesting(string token) => fixture?.Token == token;
+
+    internal static void ResetFixtureForLifecycleTesting()
+    {
+        fixtureLifetime?.Dispose();
+        recoveryObserver?.Dispose();
+        fixtureLifetime = null;
+        recoveryObserver = null;
+        fixture = null;
+    }
+
     private static RecoveryObserver CreateRecoveryObserver(MobileParty player, Settlement settlement,
         IObjectManager manager, JObject expected)
     {
@@ -1021,7 +1061,8 @@ internal static class SiegeDefenseArmyFixtureCommands
         {
             lock (gate)
             {
-                if (!disposed && partyId == expected.Value<string>("playerPartyId")) completions++;
+                if (!disposed && partyId == expected.Value<string>("playerPartyId") && completions < requests)
+                    completions++;
             }
         }
 
@@ -1062,6 +1103,7 @@ internal static class SiegeDefenseArmyFixtureCommands
         private readonly bool authoritative;
         private bool disposed;
         public RecoveryProof Proof { get; }
+        public string FixtureToken => expected.Value<string>("fixtureToken");
 
         public RecoveryObserver(IMessageBroker broker, MobileParty player, Settlement settlement,
             IObjectManager manager, JObject expected)
@@ -1137,6 +1179,51 @@ internal static class SiegeDefenseArmyFixtureCommands
             broker.Unsubscribe<GameExited>(OnGameExited);
             broker.Unsubscribe<GameLoadStarted>(OnGameLoadStarted);
             if (ReferenceEquals(recoveryObserver, this)) recoveryObserver = null;
+        }
+    }
+
+    /// <summary>Releases a captured fixture when its campaign exits or a new campaign load begins.</summary>
+    internal sealed class FixtureLifetime : IDisposable
+    {
+        private readonly IMessageBroker broker;
+        private readonly string token;
+        private readonly Action<string> release;
+        private readonly Action<Action> defer;
+        private bool releaseScheduled;
+        private bool disposed;
+
+        public FixtureLifetime(IMessageBroker broker, string token, Action<string> release,
+            Action<Action> defer = null)
+        {
+            this.broker = broker;
+            this.token = token;
+            this.release = release;
+            this.defer = defer ?? (action => GameThread.EnqueueSafe(action,
+                context: nameof(SiegeDefenseArmyFixtureCommands)));
+            broker.Subscribe<GameExited>(OnGameExited);
+            broker.Subscribe<GameLoadStarted>(OnGameLoadStarted);
+        }
+
+        private void OnGameExited(MessagePayload<GameExited> payload) => ScheduleRelease();
+        private void OnGameLoadStarted(MessagePayload<GameLoadStarted> payload) => ScheduleRelease();
+
+        private void ScheduleRelease()
+        {
+            if (disposed || releaseScheduled) return;
+            releaseScheduled = true;
+            if (ReferenceEquals(fixtureLifetime, this)) fixtureLifetime = null;
+            release(token);
+            // Unsubscribe after publication so the broker's subscriber list is not changed while it is iterating.
+            defer(Dispose);
+        }
+
+        public void Dispose()
+        {
+            if (disposed) return;
+            disposed = true;
+            broker.Unsubscribe<GameExited>(OnGameExited);
+            broker.Unsubscribe<GameLoadStarted>(OnGameLoadStarted);
+            if (ReferenceEquals(fixtureLifetime, this)) fixtureLifetime = null;
         }
     }
 

@@ -147,9 +147,11 @@ IDs to be absent from each registry, before starting another capture. If staging
 failed before producing **staged**, retain **capture** and use server restore
 and verify; do not invent a staged identity for client checks.
 
-Recovery observation is disposed when cleanup starts, verification succeeds, a new
-fixture is captured, or the campaign exits/reloads. A failed cleanup keeps its
-token and evidence for retry. Do not clear its state
+Recovery observation is disposed when cleanup starts, verification succeeds, or a
+new fixture is captured. The captured fixture also owns a campaign-lifetime listener
+from capture, so exit/reload releases its campaign objects even when recovery was
+never staged or was already disposed. A failed cleanup keeps its token and evidence
+for retry while that campaign remains active. Do not clear its state
 or operate on a replacement army. If a participant was destroyed, the campaign
 advanced, casualties occurred, the process restarted, or verification cannot
 finish, preserve the logs and reload the untouched disposable seed. This
