@@ -1637,11 +1637,12 @@ public class VillageNeedsCraftingMaterialsIssueTests : IDisposable
         CreateIssueOnServer(fixture.HeroId);
         ForcePromisedPaymentEverywhere(fixture.HeroId);
 
+        var ownerHeroId = CreateDistinctOwnerHero(fixture);
         var partyId = TestEnvironment.CreateRegisteredObject<MobileParty>();
         Server.Call(() =>
         {
             var playerManager = Server.Resolve<IPlayerManager>();
-            Assert.True(playerManager.AddPlayer(new Player("player-A", fixture.HeroId, partyId, "", "")));
+            Assert.True(playerManager.AddPlayer(new Player("player-A", ownerHeroId, partyId, "", "")));
         });
         TestEnvironment.ConnectRegisteredPlayer(Client, "player-A");
 
@@ -1678,12 +1679,16 @@ public class VillageNeedsCraftingMaterialsIssueTests : IDisposable
 
         float powerBefore = 0f;
         float hearthBefore = 0f;
+        int ownerRelationBefore = 0;
         Server.Call(() =>
         {
             Assert.True(Server.ObjectManager.TryGetObject<Hero>(fixture.HeroId, out var owner));
+            Assert.True(Server.ObjectManager.TryGetObject<Hero>(ownerHeroId, out var ownerHero));
             powerBefore = owner.Power;
             hearthBefore = owner.CurrentSettlement.Village.Hearth;
+            ownerRelationBefore = owner.GetRelation(ownerHero);
 
+            new IssuesCampaignBehavior().RegisterEvents();
             Campaign.Current.QuestManager.HourlyTick();
         });
 
@@ -1694,11 +1699,13 @@ public class VillageNeedsCraftingMaterialsIssueTests : IDisposable
         Server.Call(() =>
         {
             Assert.True(Server.ObjectManager.TryGetObject<Hero>(fixture.HeroId, out var owner));
+            Assert.True(Server.ObjectManager.TryGetObject<Hero>(ownerHeroId, out var ownerHero));
             Assert.Null(owner.Issue);
             Assert.False(Campaign.Current.IssueManager.Issues.ContainsKey(owner));
             Assert.DoesNotContain(serverQuest, Campaign.Current.QuestManager.Quests);
             Assert.Equal(powerBefore - 10f, owner.Power);
             Assert.Equal(-5, serverQuest.RelationshipChangeWithQuestGiver);
+            Assert.Equal(ownerRelationBefore - 5, owner.GetRelation(ownerHero));
             Assert.Equal(hearthBefore - 40f, owner.CurrentSettlement.Village.Hearth);
         });
 

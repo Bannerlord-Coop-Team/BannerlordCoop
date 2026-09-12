@@ -1,14 +1,17 @@
 using Common;
 using Common.Messaging;
 using GameInterface.Policies;
+using GameInterface.Services.Heroes.Patches;
 using GameInterface.Services.Issues.Generic;
 using GameInterface.Services.Issues.Interfaces;
 using GameInterface.Services.Issues.Messages;
 using GameInterface.Services.ObjectManager;
+using GameInterface.Services.Players;
 using HarmonyLib;
 using System.Collections.Generic;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Issues;
+using TaleWorlds.CampaignSystem.Party;
 
 namespace GameInterface.Services.Issues.Patches;
 
@@ -98,6 +101,33 @@ internal class QuestTimeoutFinalizeAuthorityPatch
 
     [HarmonyFinalizer]
     private static void Finalizer(IssueFinalizeAuthorityGuard __state)
+    {
+        __state?.Dispose();
+    }
+}
+
+[HarmonyPatch(typeof(QuestBase), nameof(QuestBase.CompleteQuestWithTimeOut))]
+internal class QuestTimeoutOwnerSubstitutionPatch
+{
+    [HarmonyPrefix]
+    private static void Prefix(QuestBase __instance, out MainHeroSubstitutionScope __state)
+    {
+        __state = null;
+        if (!CallOriginalPolicy.IsOriginalAllowed() && !ModInformation.IsServer) return;
+        if (__instance.QuestGiver == null) return;
+        if (!ContainerProvider.TryResolve<IIssueOwnershipRegistry>(out var ownershipRegistry) ||
+            !ownershipRegistry.TryGetOwnerControllerId(__instance.QuestGiver, out var controllerId)) return;
+        if (!ContainerProvider.TryResolve<IPlayerManager>(out var playerManager) ||
+            !playerManager.TryGetPlayer(controllerId, out var player)) return;
+        if (!ContainerProvider.TryResolve<IObjectManager>(out var objectManager) ||
+            !objectManager.TryGetObjectWithLogging<Hero>(player.HeroId, out var ownerHero)) return;
+
+        objectManager.TryGetObjectWithLogging<MobileParty>(player.MobilePartyId, out var ownerParty);
+        __state = new MainHeroSubstitutionScope(ownerHero, ownerParty);
+    }
+
+    [HarmonyFinalizer]
+    private static void Finalizer(MainHeroSubstitutionScope __state)
     {
         __state?.Dispose();
     }
