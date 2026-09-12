@@ -1,4 +1,4 @@
-using GameInterface.Services.UI.CoopOptions.Providers;
+﻿using GameInterface.Services.UI.CoopOptions.Providers;
 using System;
 using System.Collections.Generic;
 using TaleWorlds.Library;
@@ -57,6 +57,12 @@ public class CoopOptionsTabVM : ViewModel
             isSelected = value;
             OnPropertyChanged(nameof(IsSelected));
         }
+    }
+
+    public override void OnFinalize()
+    {
+        foreach (var section in Sections) section.OnFinalize();
+        base.OnFinalize();
     }
 
     public void ExecuteSelection()

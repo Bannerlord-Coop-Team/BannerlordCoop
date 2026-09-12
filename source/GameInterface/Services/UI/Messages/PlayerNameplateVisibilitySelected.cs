@@ -1,13 +1,14 @@
 ﻿using Common.Messaging;
+using GameInterface.Services.UI.CoopOptions.Providers.PlayerNameplatesTab;
 
 namespace GameInterface.Services.UI.Messages;
 
 public readonly struct PlayerNameplateVisibilitySelected : IEvent
 {
-    public readonly bool ShowPlayerNameplates;
+    public readonly PlayerNameplatesDisplayMode DisplayMode;
 
-    public PlayerNameplateVisibilitySelected(bool showPlayerNameplates)
+    public PlayerNameplateVisibilitySelected(PlayerNameplatesDisplayMode displayMode)
     {
-        ShowPlayerNameplates = showPlayerNameplates;
+        DisplayMode = displayMode;
     }
 }

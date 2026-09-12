@@ -538,7 +538,8 @@ public class SiegeInteractionBattleTests : MissionTestEnvironment
             .Count(party => party.PartyId == defenderReinforcement));
 
         var nonHostReserves = LatestReserveSnapshot(nonHost, battle.MapEventId);
-        Assert.DoesNotContain(nonHostReserves.SelectMany(message => message.Parties),
+        Assert.DoesNotContain(nonHostReserves.SelectMany(
+                message => message.Parties ?? Array.Empty<PartyReserve>()),
             party => party.PartyId == attackerReinforcement || party.PartyId == defenderReinforcement);
     }
 

@@ -1,5 +1,6 @@
 ﻿using Common.Messaging;
 using Common.Network;
+using Common.PacketHandlers;
 using Common.Serialization;
 using Common.Util;
 using E2E.Tests.Environment;
@@ -269,17 +270,10 @@ public class SiegeEventLifetimeTests : IDisposable
 
     private sealed class SiegeGraphAutoSyncBlocker : IDisposable
     {
-        private static readonly MethodInfo[] DeliveryMethods =
-        {
-            AccessTools.Method(
-                typeof(TestNetworkRouter),
-                nameof(TestNetworkRouter.Send),
-                new[] { typeof(LiteNetLib.NetPeer), typeof(LiteNetLib.NetPeer), typeof(IMessage) }),
-            AccessTools.Method(
-                typeof(TestNetworkRouter),
-                nameof(TestNetworkRouter.SendAll),
-                new[] { typeof(LiteNetLib.NetPeer), typeof(IMessage) }),
-        };
+        private static readonly MethodInfo DeliveryMethod = AccessTools.Method(
+            typeof(TestNetworkRouter),
+            nameof(TestNetworkRouter.SendReliablePayload),
+            new[] { typeof(LiteNetLib.NetPeer), typeof(LiteNetLib.NetPeer), typeof(byte[]) });
 
         private static readonly HashSet<string> BlockedMessages = new()
         {
@@ -298,22 +292,40 @@ public class SiegeEventLifetimeTests : IDisposable
         public SiegeGraphAutoSyncBlocker()
         {
             var prefix = new HarmonyMethod(typeof(SiegeGraphAutoSyncBlocker), nameof(AllowDelivery));
-            foreach (var method in DeliveryMethods)
-            {
-                harmony.Patch(method, prefix: prefix);
-            }
+            harmony.Patch(DeliveryMethod, prefix: prefix);
         }
 
         public void Dispose()
         {
-            foreach (var method in DeliveryMethods)
-            {
-                harmony.Unpatch(method, HarmonyPatchType.Prefix, harmony.Id);
-            }
+            harmony.Unpatch(DeliveryMethod, HarmonyPatchType.Prefix, harmony.Id);
         }
 
-        private static bool AllowDelivery(IMessage message) =>
-            !BlockedMessages.Contains(message.GetType().Name) && !IsBlockedCreate(message.GetType());
+        private static bool AllowDelivery(ref byte[] payload)
+        {
+            if (!GameInterface.ContainerProvider.TryResolve<ICommonSerializer>(out var serializer))
+                return true;
+
+            object received = serializer.Deserialize(payload);
+            if (received is IMessage message)
+                return ShouldDeliver(message);
+            if (received is not AggregateMessagePacket aggregate || aggregate.Messages == null)
+                return true;
+
+            byte[][] deliverable = aggregate.Messages
+                .Where(inner => ShouldDeliver(serializer.Deserialize<IMessage>(inner)))
+                .ToArray();
+            if (deliverable.Length == 0)
+                return false;
+
+            payload = deliverable.Length == 1
+                ? deliverable[0]
+                : serializer.Serialize(new AggregateMessagePacket(deliverable));
+            return true;
+        }
+
+        private static bool ShouldDeliver(IMessage message) =>
+            !BlockedMessages.Contains(message.GetType().Name) &&
+            !IsBlockedCreate(message.GetType());
 
         private static bool IsBlockedCreate(Type messageType)
         {

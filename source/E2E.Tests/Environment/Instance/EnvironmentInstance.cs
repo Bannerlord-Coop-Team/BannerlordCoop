@@ -43,6 +43,11 @@ public abstract class EnvironmentInstance : IDisposable
     private readonly TestMessageBroker messageBroker;
     private readonly MockNetworkBase mockNetwork;
     private readonly ILifetimeScope container;
+    private readonly GameThread.QueueContext gameThreadQueue = new();
+    private int disposeStarted;
+
+    public int PendingGameThreadActionCount => gameThreadQueue.Count;
+    public int RejectedGameThreadActionCount => gameThreadQueue.RejectedAfterCloseCount;
 
     public EnvironmentInstance(
         TestMessageBroker messageBroker,
@@ -52,6 +57,7 @@ public abstract class EnvironmentInstance : IDisposable
         this.messageBroker = messageBroker;
         this.mockNetwork = mockNetwork;
         this.container = container;
+        gameThreadQueue.WaitPump = mockNetwork.FlushNetworkTick;
     }
 
     /// <summary>
@@ -65,6 +71,21 @@ public abstract class EnvironmentInstance : IDisposable
         using (new StaticScope(this, markGameThread))
         {
             messageBroker.Publish(source, message);
+            mockNetwork.FlushNetworkTick();
+        }
+    }
+
+    /// <summary>Simulates the real receive path by deserializing the exact transmitted bytes.</summary>
+    public void SimulateMessage(object source, byte[] serializedMessage, bool markGameThread = true)
+    {
+        ArgumentNullException.ThrowIfNull(serializedMessage);
+
+        using (new StaticScope(this, markGameThread))
+        {
+            var serializer = Container.Resolve<ICommonSerializer>();
+            IMessage message = serializer.Deserialize<IMessage>(serializedMessage);
+            messageBroker.Publish(source, message);
+            mockNetwork.FlushNetworkTick();
         }
     }
 
@@ -80,6 +101,7 @@ public abstract class EnvironmentInstance : IDisposable
         {
             EnsureSerializable(packet);
             mockNetwork.ReceiveFromNetwork(source, packet);
+            mockNetwork.FlushNetworkTick();
         }
     }
 
@@ -93,6 +115,41 @@ public abstract class EnvironmentInstance : IDisposable
             var serializer = Container.Resolve<ICommonSerializer>();
             IPacket packet = serializer.Deserialize<IPacket>(serializedPacket);
             mockNetwork.ReceiveFromNetwork(source, packet);
+            mockNetwork.FlushNetworkTick();
+        }
+    }
+
+    /// <summary>Runs the production receive discriminator over one exact network payload.</summary>
+    public void SimulateNetworkPayload(
+        NetPeer source,
+        byte[] payload,
+        bool markGameThread = true,
+        bool flushNetworkTick = true)
+    {
+        ArgumentNullException.ThrowIfNull(payload);
+
+        using (new StaticScope(this, markGameThread))
+        {
+            var serializer = Container.Resolve<ICommonSerializer>();
+            object received = serializer.Deserialize(payload);
+            if (received is IPacket packet)
+            {
+                mockNetwork.ReceiveFromNetwork(source, packet);
+                if (flushNetworkTick)
+                    mockNetwork.FlushNetworkTick();
+                return;
+            }
+
+            if (received is IMessage message)
+            {
+                Container.Resolve<IMessagePacketHandler>().PublishEvent(source, message);
+                if (flushNetworkTick)
+                    mockNetwork.FlushNetworkTick();
+                return;
+            }
+
+            throw new InvalidOperationException(
+                $"Network payload deserialized to unsupported type {received?.GetType().FullName ?? "(null)"}.");
         }
     }
 
@@ -120,6 +177,7 @@ public abstract class EnvironmentInstance : IDisposable
                 using (new StaticScope(this))
                 {
                     callFunction();
+                    mockNetwork.FlushNetworkTick();
                 }
             }
         }
@@ -162,6 +220,108 @@ public abstract class EnvironmentInstance : IDisposable
         return obj;
     }
 
+    /// <summary>
+    /// Drains game-thread work for this recipient with its process statics installed.
+    /// </summary>
+    public int PumpGameThread(int maximumPasses = 100)
+    {
+        if (maximumPasses <= 0)
+            throw new ArgumentOutOfRangeException(nameof(maximumPasses));
+
+        int passes = 0;
+        using (new StaticScope(this))
+        using (AllowedThread.Suspend())
+        {
+            while (true)
+            {
+                while (PendingGameThreadActionCount > 0)
+                {
+                    if (passes >= maximumPasses)
+                    {
+                        throw new InvalidOperationException(
+                            $"Game-thread work did not drain within {maximumPasses} pass(es).");
+                    }
+
+                    GameThread.Instance.Update(TimeSpan.Zero);
+                    passes++;
+                }
+
+                mockNetwork.FlushNetworkTick();
+                if (PendingGameThreadActionCount == 0) break;
+
+                if (passes >= maximumPasses)
+                {
+                    throw new InvalidOperationException(
+                        $"Game-thread work did not drain within {maximumPasses} pass(es).");
+                }
+            }
+        }
+
+        return passes;
+    }
+
+    /// <summary>
+    /// Releases work owned by this simulated process and reports any apply that the test never pumped.
+    /// </summary>
+    internal void ReleasePendingGameThreadActions()
+    {
+        int discarded = GameThread.Instance.CloseAndDiscardQueuedActions(gameThreadQueue);
+        if (discarded == 0) return;
+
+        throw new InvalidOperationException(
+            $"{GetType().Name} {NetPeer.Id} discarded {discarded} unpumped game-thread action(s) during teardown.");
+    }
+
+    protected void DisposeContainer()
+    {
+        if (Interlocked.Exchange(ref disposeStarted, 1) != 0) return;
+
+        CloseGameThreadQueueAndDispose(container.Dispose);
+    }
+
+    internal void CloseGameThreadQueueAndDispose(Action disposeResources)
+    {
+        if (disposeResources == null) throw new ArgumentNullException(nameof(disposeResources));
+
+        // PumpGameThread holds this lock across dequeue and execution. Waiting here prevents an
+        // already-dequeued apply from resuming after its instance dependencies have been disposed.
+        lock (GameInstance.@lock)
+        {
+            CloseGameThreadQueueAndDisposeLocked(disposeResources);
+        }
+    }
+
+    private void CloseGameThreadQueueAndDisposeLocked(Action disposeResources)
+    {
+        Exception? queueFailure = null;
+        try
+        {
+            // Release blocked callers and reject silently lost applies before their dependencies disappear.
+            ReleasePendingGameThreadActions();
+        }
+        catch (Exception e)
+        {
+            queueFailure = e;
+        }
+
+        Exception? containerFailure = null;
+        try
+        {
+            disposeResources();
+        }
+        catch (Exception e)
+        {
+            containerFailure = e;
+        }
+
+        if (queueFailure != null && containerFailure != null)
+            throw new AggregateException(queueFailure, containerFailure);
+        if (queueFailure != null)
+            throw queueFailure;
+        if (containerFailure != null)
+            throw containerFailure;
+    }
+
     private class StaticScope : IDisposable
     {
         private readonly ILifetimeScope previousContainer;
@@ -172,8 +332,9 @@ public abstract class EnvironmentInstance : IDisposable
         private readonly TaleWorlds.MountAndBlade.Module previousModule;
         private readonly TestMessageBroker previousMessageBroker;
         private readonly bool wasServer;
-        private readonly bool markedGameThread;
+        private readonly bool changedGameThreadRegistration;
         private readonly int previousGameThreadId;
+        private readonly IDisposable gameThreadQueueScope;
 
         public StaticScope(EnvironmentInstance instance, bool markGameThread = true)
         {
@@ -185,6 +346,12 @@ public abstract class EnvironmentInstance : IDisposable
             // recycled) thread forever and every later scope or GameInstance build deadlocks.
             try
             {
+                gameThreadQueueScope = GameThread.ActivateQueue(instance.gameThreadQueue);
+
+                // A nested poller receive can run on the fixture's already-marked test thread. Clear the
+                // registration explicitly so GameThread.Run queues exactly as it does on LiteNetLib's poller.
+                changedGameThreadRegistration = true;
+                previousGameThreadId = GameThread.Instance.GameThreadId;
                 if (markGameThread)
                 {
                     // xUnit can move a test from its fixture-constructor thread before the next scoped call.
@@ -192,9 +359,11 @@ public abstract class EnvironmentInstance : IDisposable
                     // Task.Run(() => Server.Call(...))) must not leave the game-thread mark on that thread —
                     // every later GameThread.RunSafe from the real test thread would silently enqueue onto
                     // a queue nobody pumps instead of running inline.
-                    markedGameThread = true;
-                    previousGameThreadId = GameThread.Instance.GameThreadId;
                     GameThread.Instance.MarkGameThread();
+                }
+                else
+                {
+                    GameThread.Instance.UnmarkGameThread();
                 }
 
                 // Save previous static values
@@ -229,15 +398,16 @@ public abstract class EnvironmentInstance : IDisposable
                     {
                         RestorePreviousStatics();
                     }
-                    else if (markedGameThread)
+                    else if (changedGameThreadRegistration)
                     {
-                        // The mark is set before the statics are saved, so a throw in between must
+                        // The registration is changed before the statics are saved, so a throw in between must
                         // still put it back (RestorePreviousStatics is not reachable yet here).
                         GameThread.Instance.RestoreGameThread(previousGameThreadId);
                     }
                 }
                 finally
                 {
+                    gameThreadQueueScope?.Dispose();
                     Monitor.Exit(GameInstance.@lock);
                 }
                 throw;
@@ -252,7 +422,14 @@ public abstract class EnvironmentInstance : IDisposable
             }
             finally
             {
-                Monitor.Exit(GameInstance.@lock);
+                try
+                {
+                    gameThreadQueueScope.Dispose();
+                }
+                finally
+                {
+                    Monitor.Exit(GameInstance.@lock);
+                }
             }
         }
 
@@ -266,7 +443,7 @@ public abstract class EnvironmentInstance : IDisposable
             ModInformation.IsServer = wasServer;
             GameInterface.ContainerProvider.SetContainer(previousContainer);
             previousMessageBroker.SetStaticInstance();
-            if (markedGameThread)
+            if (changedGameThreadRegistration)
             {
                 GameThread.Instance.RestoreGameThread(previousGameThreadId);
             }
@@ -311,7 +488,7 @@ public abstract class EnvironmentInstance : IDisposable
         static bool Disable() => false;
     }
 
-    public T EnsureSerializable<T>(T obj)
+    public byte[] SerializeForWire<T>(T obj)
     {
         if (RuntimeTypeModel.Default.CanSerialize(obj?.GetType()) == false)
         {
@@ -320,9 +497,23 @@ public abstract class EnvironmentInstance : IDisposable
 
         var serializer = Container.Resolve<ICommonSerializer>();
 
-        byte[] bytes = serializer.Serialize(obj);
+        return serializer.Serialize(obj);
+    }
+
+    public T DeserializeFromWire<T>(byte[] bytes)
+    {
+        ArgumentNullException.ThrowIfNull(bytes);
+
+        var serializer = Container.Resolve<ICommonSerializer>();
 
         return serializer.Deserialize<T>(bytes);
+    }
+
+    public T EnsureSerializable<T>(T obj)
+    {
+        byte[] bytes = SerializeForWire(obj);
+
+        return DeserializeFromWire<T>(bytes);
     }
 
     public abstract void Dispose();

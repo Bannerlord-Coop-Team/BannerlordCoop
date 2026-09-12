@@ -1,4 +1,4 @@
-using Common;
+﻿using Common;
 using Common.Util;
 using E2E.Tests.Environment;
 using E2E.Tests.Util;
@@ -8,6 +8,7 @@ using TaleWorlds.CampaignSystem.Settlements;
 using TaleWorlds.Core;
 using TaleWorlds.Library;
 using TaleWorlds.Localization;
+using TaleWorlds.ObjectSystem;
 using Xunit.Abstractions;
 
 namespace E2E.Tests.Services.Heroes;
@@ -71,11 +72,13 @@ public class HeroCreationTests : IDisposable
         Hero? serverHero = null;
         CharacterObject? serverTemplate = null;
         Clan? serverClan = null;
-        string? expectedBattleItemId = null;
+        const string BattleItemId = "linen";
 
         server.Call(() =>
         {
             Assert.True(ModInformation.IsServer);
+            var battleItem = MBObjectManager.Instance.GetObject<ItemObject>(BattleItemId);
+            Assert.NotNull(battleItem);
             var template = GameObjectCreator.CreateInitializedObject<CharacterObject>();
             using (new AllowedThread())
                 template.StringId = ConfiguredMinorFactionHeroSpawner.ConfiguredLordPrefix + "test";
@@ -87,13 +90,13 @@ public class HeroCreationTests : IDisposable
                 GameObjectCreator.CreateInitializedObject<MBEquipmentRoster>();
             template.Culture.DefaultStealthEquipmentRoster =
                 GameObjectCreator.CreateInitializedObject<MBEquipmentRoster>();
+            template.FirstBattleEquipment[EquipmentIndex.Body] = new EquipmentElement(battleItem);
             template.Culture.DefaultStealthEquipmentRoster.AllEquipments[0]._itemSlots[0].Item =
                 GameObjectCreator.CreateInitializedObject<ItemObject>();
 
             var clan = GameObjectCreator.CreateInitializedObject<Clan>();
             serverTemplate = template;
             serverClan = clan;
-            expectedBattleItemId = template.FirstBattleEquipment[EquipmentIndex.Body].Item.StringId;
             serverHero = ConfiguredMinorFactionHeroSpawner.CreateHeroFromTemplate(template, clan);
         });
 
@@ -107,7 +110,7 @@ public class HeroCreationTests : IDisposable
         Assert.Equal(Occupation.Lord, serverHero.Occupation);
         Assert.Same(serverTemplate!.Culture, serverHero.Culture);
         Assert.Equal(
-            expectedBattleItemId,
+            BattleItemId,
             serverHero.BattleEquipment[EquipmentIndex.Body].Item.StringId);
         Assert.True(serverHero.IsMinorFactionHero);
 
@@ -120,7 +123,7 @@ public class HeroCreationTests : IDisposable
             Assert.Equal(Occupation.Lord, clientHero.Occupation);
             Assert.Equal(serverTemplate.Culture.StringId, clientHero.Culture.StringId);
             Assert.Equal(
-                expectedBattleItemId,
+                BattleItemId,
                 clientHero.BattleEquipment[EquipmentIndex.Body].Item.StringId);
             Assert.True(clientHero.IsMinorFactionHero);
         }

@@ -30,7 +30,7 @@ public sealed class PlayerNameplatesVM : ViewModel
         }
     }
 
-    public override void OnFinalize()
+    public void ClearTargets()
     {
         foreach (var target in Targets)
         {
@@ -38,6 +38,11 @@ public sealed class PlayerNameplatesVM : ViewModel
         }
 
         Targets.Clear();
+    }
+
+    public override void OnFinalize()
+    {
+        ClearTargets();
         base.OnFinalize();
     }
 }

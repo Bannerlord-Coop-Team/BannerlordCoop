@@ -22,9 +22,8 @@ internal class CharacterCreationIntroPatch
     {
         Logger.Information("Game State is changing to {state}", __instance.GetType().Name);
 
-        // GameLoadingState and MapState also activate while an existing player is validating or
-        // loading the transferred save. Publishing for either one moves the client out of
-        // ValidateModuleState before the server's existing-player response can arrive.
+        // DEBUG automation must only run after the real character-creation state activates.
+        // GameLoadingState and MapState also activate during ordinary joins.
         if (IsCharacterCreationState(__instance.GetType()))
         {
             MessageBroker.Instance.Publish(__instance, new CharacterCreationStarted());

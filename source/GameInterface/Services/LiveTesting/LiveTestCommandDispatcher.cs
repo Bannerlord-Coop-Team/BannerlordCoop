@@ -1,4 +1,5 @@
-﻿using Common;
+using Common;
+using Common.Commands;
 using System;
 using System.Collections;
 using System.Collections.Generic;
@@ -20,9 +21,27 @@ public interface ILiveTestCommandDispatcher
 
 public class LiveTestCommandDispatcher : ILiveTestCommandDispatcher
 {
-    private const string AllowedCommandPrefix = "coop.debug.";
+    private const string LegacyDebugCommandPrefix = "coop.debug.";
 
     private static bool functionsCollected;
+
+    private readonly ICoopCommandRegistry commandRegistry;
+    private readonly ICoopCommandArgsFactory argsFactory;
+
+    public LiveTestCommandDispatcher()
+    {
+    }
+
+    public LiveTestCommandDispatcher(
+        ICoopCommandRegistry commandRegistry,
+        ICoopCommandArgsFactory argsFactory)
+    {
+        if (commandRegistry == null) throw new ArgumentNullException(nameof(commandRegistry));
+        if (argsFactory == null) throw new ArgumentNullException(nameof(argsFactory));
+
+        this.commandRegistry = commandRegistry;
+        this.argsFactory = argsFactory;
+    }
 
     public bool EnsureReady()
     {
@@ -63,9 +82,14 @@ public class LiveTestCommandDispatcher : ILiveTestCommandDispatcher
                     throw new InvalidOperationException("Unable to read the Bannerlord command registry");
                 }
 
+                IEnumerable<string> registeredCommands = commandRegistry == null
+                    ? Enumerable.Empty<string>()
+                    : commandRegistry.Commands.Select(command => command.FullName);
                 commandNames = allFunctions.Keys
                     .Cast<string>()
-                    .Where(command => command.StartsWith(AllowedCommandPrefix, StringComparison.Ordinal))
+                    .Where(command => command.StartsWith(LegacyDebugCommandPrefix, StringComparison.Ordinal))
+                    .Concat(registeredCommands)
+                    .Distinct(StringComparer.Ordinal)
                     .OrderBy(command => command, StringComparer.Ordinal)
                     .ToArray();
             }
@@ -82,9 +106,10 @@ public class LiveTestCommandDispatcher : ILiveTestCommandDispatcher
     public LiveTestCommandResult Execute(string command, List<string> arguments)
     {
         if (string.IsNullOrEmpty(command) ||
-            command.StartsWith(AllowedCommandPrefix, StringComparison.Ordinal) == false)
+            (!(commandRegistry?.Contains(command) ?? false) &&
+             !command.StartsWith(LegacyDebugCommandPrefix, StringComparison.Ordinal)))
         {
-            return new LiveTestCommandResult(false, $"Only {AllowedCommandPrefix} commands may be run through live testing");
+            return new LiveTestCommandResult(false, "Only registered co-op commands and legacy coop.debug.* commands may be run through live testing");
         }
 
         if (arguments == null) throw new ArgumentNullException(nameof(arguments));
@@ -97,6 +122,14 @@ public class LiveTestCommandDispatcher : ILiveTestCommandDispatcher
             try
             {
                 EnsureFunctionsCollected();
+
+                if (commandRegistry != null && commandRegistry.Contains(command))
+                {
+                    ICoopCommandArgs commandArgs = argsFactory.FromValues(arguments);
+                    CoopCommandResult commandResult = commandRegistry.ProcessCommand(command, commandArgs);
+                    result = new LiveTestCommandResult(true, commandResult.Output, commandResult.Succeeded, commandResult.ErrorCode);
+                    return;
+                }
 
                 string output = CommandLineFunctionality.CallFunction(command, arguments, out bool found);
                 result = new LiveTestCommandResult(found, output);
@@ -122,13 +155,19 @@ public class LiveTestCommandDispatcher : ILiveTestCommandDispatcher
 
 public class LiveTestCommandResult
 {
-    public LiveTestCommandResult(bool found, string output)
+    public LiveTestCommandResult(bool found, string output, bool? succeeded = null, string errorCode = null)
     {
         Found = found;
         Output = output;
+        Succeeded = succeeded;
+        ErrorCode = errorCode;
     }
 
     public bool Found { get; }
 
     public string Output { get; }
+
+    public bool? Succeeded { get; }
+
+    public string ErrorCode { get; }
 }
