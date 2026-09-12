@@ -54,7 +54,7 @@ public class ClientLogic : IClientLogic
         }
     }
 
-    public bool RunningState => RunningStates.Contains(_state.GetType());
+    public bool RunningState => _state != null && RunningStates.Contains(_state.GetType());
 
     private IClientState _state;
 

@@ -38,9 +38,9 @@ public class CharacterFactionCoopCommandTests
         Type[] commandTypes = GetCommandTypes();
 
 #if DEBUG
-        Assert.Equal(136, commandTypes.Length);
+        Assert.Equal(140, commandTypes.Length);
 #else
-        Assert.Equal(131, commandTypes.Length);
+        Assert.Equal(135, commandTypes.Length);
 #endif
         Assert.All(commandTypes, type =>
         {
@@ -130,18 +130,27 @@ public class CharacterFactionCoopCommandTests
     [Fact]
     public void Registry_RejectsInvalidArgumentCountBeforeCommandLogic()
     {
-        ICoopCommand command = CreateCommand("coop.debug.hero", "set_gold");
-        var registry = new CoopCommandRegistry(
-            new[] { command },
-            new LoggerConfiguration().CreateLogger());
+        bool originalIsServer = ModInformation.IsServer;
+        try
+        {
+            ModInformation.IsServer = true;
+            ICoopCommand command = CreateCommand("coop.debug.hero", "set_gold");
+            var registry = new CoopCommandRegistry(
+                new[] { command },
+                new LoggerConfiguration().CreateLogger());
 
-        CoopCommandResult result = registry.ProcessCommand(
-            $"{command.Prefix}.{command.Name}",
-            new TestArgs(Array.Empty<string>()));
+            CoopCommandResult result = registry.ProcessCommand(
+                $"{command.Prefix}.{command.Name}",
+                new TestArgs(Array.Empty<string>()));
 
-        Assert.False(result.Succeeded);
-        Assert.Equal("invalid_arguments", result.ErrorCode);
-        Assert.Contains("<hero_name>", result.Output);
+            Assert.False(result.Succeeded);
+            Assert.Equal("invalid_arguments", result.ErrorCode);
+            Assert.Contains("<hero_name>", result.Output);
+        }
+        finally
+        {
+            ModInformation.IsServer = originalIsServer;
+        }
     }
 
     [Theory]
@@ -162,6 +171,34 @@ public class CharacterFactionCoopCommandTests
 
             Assert.False(result.Succeeded);
             Assert.Equal("command_failed", result.ErrorCode);
+        }
+        finally
+        {
+            ModInformation.IsServer = originalIsServer;
+        }
+    }
+
+    [Theory]
+    [InlineData("force_ally")]
+    [InlineData("force_trade_agreement")]
+    public void KingdomForceCommands_RegistryRejectsClientExecution(string name)
+    {
+        bool originalIsServer = ModInformation.IsServer;
+        try
+        {
+            ModInformation.IsServer = false;
+            ICoopCommand command = CreateCommand("coop.debug.kingdom", name);
+            Assert.Equal(CoopCommandSide.Server, command.Side);
+            var registry = new CoopCommandRegistry(
+                new[] { command },
+                new LoggerConfiguration().CreateLogger());
+
+            CoopCommandResult result = registry.ProcessCommand(
+                $"{command.Prefix}.{command.Name}",
+                new TestArgs(new[] { "empire", "empire_s" }));
+
+            Assert.False(result.Succeeded);
+            Assert.Equal("command_wrong_side", result.ErrorCode);
         }
         finally
         {

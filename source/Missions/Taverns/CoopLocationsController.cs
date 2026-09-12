@@ -49,6 +49,7 @@ public class CoopLocationsController : CoopMissionController, ILocationMissionBe
     //private readonly BoardGameManager boardGameManager;
 
     private string instanceId;
+    public string VoiceInstanceId => instanceId;
     public CoopLocationsController(
         IBattleNetwork network,
         INetwork relayNetwork,

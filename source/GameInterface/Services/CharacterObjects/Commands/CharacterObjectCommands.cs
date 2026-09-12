@@ -31,6 +31,8 @@ internal class CharacterObjectCommands
 
         public string Description => "Reports info.";
 
+        public CoopCommandSide Side => CoopCommandSide.Both;
+
         public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
             new ExpectedArgs("character_id", "The registered character id.", isRequired: true),
@@ -61,6 +63,8 @@ internal class CharacterObjectCommands
         public string Name => "list";
 
         public string Description => "Reports list.";
+
+        public CoopCommandSide Side => CoopCommandSide.Both;
 
         public IExpectedArgs[] ExpectedArgs { get; } = Array.Empty<IExpectedArgs>();
 

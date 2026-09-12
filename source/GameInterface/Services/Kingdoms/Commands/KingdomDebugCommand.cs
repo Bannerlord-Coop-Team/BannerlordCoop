@@ -143,6 +143,8 @@ public class KingdomDebugCommand
 
         public string Description => "Opens the kingdom screen on a client.";
 
+        public CoopCommandSide Side => CoopCommandSide.Client;
+
         public IExpectedArgs[] ExpectedArgs { get; } = System.Array.Empty<IExpectedArgs>();
 
         public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
@@ -166,6 +168,8 @@ public class KingdomDebugCommand
         public string Name => "open_decision";
 
         public string Description => "Opens one queued kingdom decision.";
+
+        public CoopCommandSide Side => CoopCommandSide.Client;
 
         public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
@@ -232,6 +236,8 @@ public class KingdomDebugCommand
 
         public string Description => "Closes the kingdom screen on a client.";
 
+        public CoopCommandSide Side => CoopCommandSide.Client;
+
         public IExpectedArgs[] ExpectedArgs { get; } = System.Array.Empty<IExpectedArgs>();
 
         public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
@@ -252,6 +258,8 @@ public class KingdomDebugCommand
         public string Name => "screen_state";
 
         public string Description => "Reports kingdom screen state.";
+
+        public CoopCommandSide Side => CoopCommandSide.Client;
 
         public IExpectedArgs[] ExpectedArgs { get; } = System.Array.Empty<IExpectedArgs>();
 
@@ -276,6 +284,8 @@ public class KingdomDebugCommand
         public string Name => "policy_timeout_capture";
 
         public string Description => "Captures the kingdom policy-timeout fixture.";
+
+        public CoopCommandSide Side => CoopCommandSide.Server;
 
         public IExpectedArgs[] ExpectedArgs { get; } = System.Array.Empty<IExpectedArgs>();
 
@@ -326,6 +336,8 @@ public class KingdomDebugCommand
         public string Name => "policy_timeout_stage";
 
         public string Description => "Stages the kingdom policy-timeout fixture.";
+
+        public CoopCommandSide Side => CoopCommandSide.Server;
 
         public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
@@ -386,6 +398,8 @@ public class KingdomDebugCommand
 
         public string Description => "Reports kingdom policy-timeout fixture state.";
 
+        public CoopCommandSide Side => CoopCommandSide.Client;
+
         public IExpectedArgs[] ExpectedArgs { get; } = System.Array.Empty<IExpectedArgs>();
 
         public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
@@ -416,6 +430,8 @@ public class KingdomDebugCommand
         public string Name => "policy_timeout_restore";
 
         public string Description => "Restores the kingdom policy-timeout fixture.";
+
+        public CoopCommandSide Side => CoopCommandSide.Server;
 
         public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
@@ -467,6 +483,8 @@ public class KingdomDebugCommand
         public string Name => "policy_timeout_verify";
 
         public string Description => "Verifies the kingdom policy-timeout fixture.";
+
+        public CoopCommandSide Side => CoopCommandSide.Server;
 
         public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
@@ -577,6 +595,8 @@ public class KingdomDebugCommand
 
         public string Description => "Creates a kingdom for a clan leader on the server.";
 
+        public CoopCommandSide Side => CoopCommandSide.Server;
+
         public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
             new ExpectedArgs("leader_hero_name", "The exact leader display name or id. Quote multi-word names."),
@@ -656,6 +676,8 @@ public class KingdomDebugCommand
 
         public string Description => "Lists campaign kingdoms.";
 
+        public CoopCommandSide Side => CoopCommandSide.Both;
+
         public IExpectedArgs[] ExpectedArgs { get; } = System.Array.Empty<IExpectedArgs>();
 
         public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
@@ -683,6 +705,8 @@ public class KingdomDebugCommand
         public string Name => "info";
 
         public string Description => "Reports state for a registered kingdom.";
+
+        public CoopCommandSide Side => CoopCommandSide.Both;
 
         public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
@@ -716,6 +740,8 @@ public class KingdomDebugCommand
         public string Name => "force_player_join_kingdom";
 
         public string Description => "Moves a player clan into a kingdom.";
+
+        public CoopCommandSide Side => CoopCommandSide.Server;
 
         public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
@@ -803,6 +829,8 @@ public class KingdomDebugCommand
 
         public string Description => "Requests player vassalage in a kingdom.";
 
+        public CoopCommandSide Side => CoopCommandSide.Server;
+
         public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
             new ExpectedArgs("controller_id", "The player controller id."),
@@ -863,6 +891,8 @@ public class KingdomDebugCommand
 
         public string Description => "Lists supported kingdom decision arguments.";
 
+        public CoopCommandSide Side => CoopCommandSide.Both;
+
         public IExpectedArgs[] ExpectedArgs { get; } = System.Array.Empty<IExpectedArgs>();
 
         public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
@@ -900,6 +930,8 @@ public class KingdomDebugCommand
 
         public string Description => "Describes kingdom decision removal arguments.";
 
+        public CoopCommandSide Side => CoopCommandSide.Both;
+
         public IExpectedArgs[] ExpectedArgs { get; } = System.Array.Empty<IExpectedArgs>();
 
         public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
@@ -925,6 +957,8 @@ public class KingdomDebugCommand
         public string Name => "list_kingdom_decisions";
 
         public string Description => "Lists queued decisions for a kingdom.";
+
+        public CoopCommandSide Side => CoopCommandSide.Both;
 
         public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
@@ -970,6 +1004,8 @@ public class KingdomDebugCommand
         public string Name => "decisions";
 
         public string Description => "Lists queued decisions and client votes for a kingdom.";
+
+        public CoopCommandSide Side => CoopCommandSide.Both;
 
         public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
@@ -1057,6 +1093,8 @@ public class KingdomDebugCommand
 
         public string Description => "Lists possible outcomes for a kingdom decision.";
 
+        public CoopCommandSide Side => CoopCommandSide.Both;
+
         public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
             new ExpectedArgs("kingdom_id", "The registered kingdom id."),
@@ -1102,6 +1140,8 @@ public class KingdomDebugCommand
         public string Name => "vote_decision";
 
         public string Description => "Requests a client vote on a kingdom decision.";
+
+        public CoopCommandSide Side => CoopCommandSide.Both;
 
         public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
@@ -1171,6 +1211,8 @@ public class KingdomDebugCommand
 
         public string Description => "Resolves a queued kingdom decision.";
 
+        public CoopCommandSide Side => CoopCommandSide.Both;
+
         public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
             new ExpectedArgs("kingdom_id", "The registered kingdom id."),
@@ -1209,6 +1251,8 @@ public class KingdomDebugCommand
         public string Name => "list_policies";
 
         public string Description => "Lists active policies for a kingdom.";
+
+        public CoopCommandSide Side => CoopCommandSide.Both;
 
         public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
@@ -1259,6 +1303,8 @@ public class KingdomDebugCommand
         public string Name => "collection_list";
 
         public string Description => "Lists a synced kingdom collection.";
+
+        public CoopCommandSide Side => CoopCommandSide.Both;
 
         public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
@@ -1321,6 +1367,8 @@ public class KingdomDebugCommand
         public string Name => "collection_add";
 
         public string Description => "Adds a value to a synced kingdom collection.";
+
+        public CoopCommandSide Side => CoopCommandSide.Server;
 
         public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
@@ -1412,6 +1460,8 @@ public class KingdomDebugCommand
 
         public string Description => "Removes a value from a synced kingdom collection.";
 
+        public CoopCommandSide Side => CoopCommandSide.Server;
+
         public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
             new ExpectedArgs("collection", "The kingdom collection name."),
@@ -1490,6 +1540,8 @@ public class KingdomDebugCommand
 
         public string Description => "Declares war between two factions on the server.";
 
+        public CoopCommandSide Side => CoopCommandSide.Both;
+
         public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
             new ExpectedArgs("faction1_id", "The first registered faction id."),
@@ -1531,6 +1583,8 @@ public class KingdomDebugCommand
         public string Name => "make_peace";
 
         public string Description => "Makes peace between two factions on the server.";
+
+        public CoopCommandSide Side => CoopCommandSide.Both;
 
         public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
@@ -1575,6 +1629,8 @@ public class KingdomDebugCommand
         public string Name => "force_ally";
 
         public string Description => "Forms an alliance between two kingdoms on the server.";
+
+        public CoopCommandSide Side => CoopCommandSide.Server;
 
         public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
@@ -1639,6 +1695,8 @@ public class KingdomDebugCommand
         public string Name => "force_trade_agreement";
 
         public string Description => "Forms a trade agreement between two kingdoms on the server.";
+
+        public CoopCommandSide Side => CoopCommandSide.Server;
 
         public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
@@ -2099,6 +2157,8 @@ public class KingdomDebugCommand
 
         public string Description => "Adds a supported decision to a kingdom.";
 
+        public CoopCommandSide Side => CoopCommandSide.Both;
+
         public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
             new ExpectedArgs("kingdom_id", "The registered kingdom id."),
@@ -2164,6 +2224,8 @@ public class KingdomDebugCommand
         public string Name => "remove_decision";
 
         public string Description => "Removes a queued decision from a kingdom.";
+
+        public CoopCommandSide Side => CoopCommandSide.Both;
 
         public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {

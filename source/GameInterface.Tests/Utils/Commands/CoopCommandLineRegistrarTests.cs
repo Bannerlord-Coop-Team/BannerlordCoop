@@ -171,6 +171,8 @@ public class CoopCommandLineRegistrarTests
 
         public string Description => "Captures arguments for the command framework test.";
 
+        public CoopCommandSide Side => CoopCommandSide.Both;
+
         public IExpectedArgs[] ExpectedArgs => new IExpectedArgs[]
         {
             new ExpectedArgs("first", "The first value."),

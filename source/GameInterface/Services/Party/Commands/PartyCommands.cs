@@ -88,6 +88,8 @@ internal class PartyCommands
 
         public string Description => "Runs the whoami debug operation.";
 
+        public CoopCommandSide Side => CoopCommandSide.Client;
+
         public IExpectedArgs[] ExpectedArgs { get; } = Array.Empty<IExpectedArgs>();
 
         public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
@@ -113,6 +115,8 @@ internal class PartyCommands
         public string Name => "position";
 
         public string Description => "Runs the position debug operation.";
+
+        public CoopCommandSide Side => CoopCommandSide.Both;
 
         public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
@@ -149,6 +153,8 @@ internal class PartyCommands
         public string Name => "move_offset";
 
         public string Description => "Runs the move offset debug operation.";
+
+        public CoopCommandSide Side => CoopCommandSide.Client;
 
         public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
@@ -189,6 +195,8 @@ internal class PartyCommands
         public string Name => "restore_position";
 
         public string Description => "Restores a party to a campaign-map position and hold state.";
+
+        public CoopCommandSide Side => CoopCommandSide.Server;
 
         public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
@@ -237,6 +245,8 @@ internal class PartyCommands
         public string Name => "move_to_settlement";
 
         public string Description => "Runs the move to settlement debug operation.";
+
+        public CoopCommandSide Side => CoopCommandSide.Server;
 
         public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
@@ -288,6 +298,8 @@ internal class PartyCommands
         public string Name => "character_ids";
 
         public string Description => "Runs the characterids debug operation.";
+
+        public CoopCommandSide Side => CoopCommandSide.Both;
 
         public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
@@ -355,6 +367,8 @@ internal class PartyCommands
 
         public string Description => "Runs the set troop wounded debug operation.";
 
+        public CoopCommandSide Side => CoopCommandSide.Server;
+
         public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
             new ExpectedArgs("party_id", "The party id.", true),
@@ -399,6 +413,8 @@ internal class PartyCommands
         public string Name => "set_troop_state";
 
         public string Description => "Reports set troop state.";
+
+        public CoopCommandSide Side => CoopCommandSide.Server;
 
         public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
@@ -496,6 +512,8 @@ internal class PartyCommands
 
         public string Description => "Runs the select party screen troop debug operation.";
 
+        public CoopCommandSide Side => CoopCommandSide.Client;
+
         public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
             new ExpectedArgs("character_id", "The character id.", true),
@@ -533,6 +551,8 @@ internal class PartyCommands
         public string Name => "upgrade_party_screen_troop";
 
         public string Description => "Runs the upgrade party screen troop debug operation.";
+
+        public CoopCommandSide Side => CoopCommandSide.Client;
 
         public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
@@ -594,6 +614,8 @@ internal class PartyCommands
 
         public string Description => "Runs the stage party screen transfer debug operation.";
 
+        public CoopCommandSide Side => CoopCommandSide.Client;
+
         public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
             new ExpectedArgs("character_id", "The character id.", true),
@@ -631,6 +653,8 @@ internal class PartyCommands
         public string Name => "party_screen_troop_state";
 
         public string Description => "Reports party screen troop state.";
+
+        public CoopCommandSide Side => CoopCommandSide.Client;
 
         public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
@@ -687,6 +711,8 @@ internal class PartyCommands
 
         public string Description => "Runs the addtroopxp debug operation.";
 
+        public CoopCommandSide Side => CoopCommandSide.Server;
+
         public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
             new ExpectedArgs("hero_name", "The hero name.", true),
@@ -728,6 +754,8 @@ internal class PartyCommands
         public string Name => "add_troops";
 
         public string Description => "Runs the addtroops debug operation.";
+
+        public CoopCommandSide Side => CoopCommandSide.Server;
 
         public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
@@ -790,6 +818,8 @@ internal class PartyCommands
 
         public string Description => "Runs the siege buff debug operation.";
 
+        public CoopCommandSide Side => CoopCommandSide.Server;
+
         public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
             new ExpectedArgs("party_id", "The party id.", true),
@@ -837,6 +867,8 @@ internal class PartyCommands
 
         public string Description => "Runs the declare war debug operation.";
 
+        public CoopCommandSide Side => CoopCommandSide.Server;
+
         public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
             new ExpectedArgs("party_id", "The party id.", true),
@@ -871,6 +903,8 @@ internal class PartyCommands
         public string Name => "add_prisoners";
 
         public string Description => "Runs the addprisoners debug operation.";
+
+        public CoopCommandSide Side => CoopCommandSide.Server;
 
         public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
@@ -930,6 +964,8 @@ internal class PartyCommands
 
         public string Description => "Runs the removeprisoners debug operation.";
 
+        public CoopCommandSide Side => CoopCommandSide.Server;
+
         public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
             new ExpectedArgs("hero_name", "The hero name.", true),
@@ -975,6 +1011,8 @@ internal class PartyCommands
         public string Name => "imprison_companion";
 
         public string Description => "Runs the imprison companion debug operation.";
+
+        public CoopCommandSide Side => CoopCommandSide.Server;
 
         public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
@@ -1024,6 +1062,8 @@ internal class PartyCommands
         public string Name => "snapshot_prison";
 
         public string Description => "Runs the snapshot prison debug operation.";
+
+        public CoopCommandSide Side => CoopCommandSide.Server;
 
         public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {

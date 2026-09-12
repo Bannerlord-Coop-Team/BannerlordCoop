@@ -43,6 +43,8 @@ public class BesiegerCampDebugCommand
 
         public string Description => "Sets number of troops killed on side for co-op debugging.";
 
+        public CoopCommandSide Side => CoopCommandSide.Both;
+
         public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
             new ExpectedArgs("besiegerCampId", "The besieger camp id."),
@@ -91,6 +93,8 @@ public class BesiegerCampDebugCommand
 
         public string Description => "Sets progress for co-op debugging.";
 
+        public CoopCommandSide Side => CoopCommandSide.Both;
+
         public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
             new ExpectedArgs("besiegerCampId", "The besieger camp id."),
@@ -138,6 +142,8 @@ public class BesiegerCampDebugCommand
         public string Name => "set_siege_strategy";
 
         public string Description => "Sets siege strategy for co-op debugging.";
+
+        public CoopCommandSide Side => CoopCommandSide.Both;
 
         public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
@@ -193,6 +199,8 @@ public class BesiegerCampDebugCommand
 
         public string Description => "Sets leader party for co-op debugging.";
 
+        public CoopCommandSide Side => CoopCommandSide.Both;
+
         public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
             new ExpectedArgs("besiegerCampId", "The besieger camp id."),
@@ -241,6 +249,8 @@ public class BesiegerCampDebugCommand
 
         public string Description => "Adds besieger party for co-op debugging.";
 
+        public CoopCommandSide Side => CoopCommandSide.Both;
+
         public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
             new ExpectedArgs("besiegerCampId", "The besieger camp id."),
@@ -288,6 +298,8 @@ public class BesiegerCampDebugCommand
         public string Name => "remove_party";
 
         public string Description => "Removes party for co-op debugging.";
+
+        public CoopCommandSide Side => CoopCommandSide.Both;
 
         public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {

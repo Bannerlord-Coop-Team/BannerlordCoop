@@ -27,6 +27,8 @@ public static class IssuesDebugCommand
 
         public string Description => "Runs the give debug operation.";
 
+        public CoopCommandSide Side => CoopCommandSide.Server;
+
         public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
             new ExpectedArgs("hero_id", "The registered hero id.", isRequired: true),
@@ -129,6 +131,8 @@ public static class IssuesDebugCommand
 
         public string Description => "Runs the complete debug operation.";
 
+        public CoopCommandSide Side => CoopCommandSide.Server;
+
         public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
             new ExpectedArgs("hero_id", "The registered issue owner hero id.", isRequired: true),
@@ -198,6 +202,8 @@ public static class IssuesDebugCommand
         public string Name => "list_types";
 
         public string Description => "Reports list types.";
+
+        public CoopCommandSide Side => CoopCommandSide.Both;
 
         public IExpectedArgs[] ExpectedArgs { get; } = Array.Empty<IExpectedArgs>();
 
