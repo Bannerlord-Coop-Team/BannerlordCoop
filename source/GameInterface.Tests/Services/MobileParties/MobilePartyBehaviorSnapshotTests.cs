@@ -2,6 +2,8 @@
 using GameInterface.Services.MobileParties.Data;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Tests.Services.SiegeEvents;
+using HarmonyLib;
+using Helpers;
 using Moq;
 using System;
 using System.Collections.Generic;
@@ -343,6 +345,97 @@ public class MobilePartyBehaviorSnapshotTests
 
         Assert.False(created);
         Assert.Equal("party AI is unavailable", failure);
+    }
+
+    [Fact]
+    public void TryApplyJoinBaseline_CapturedStaleTargets_AppliesPointNavigationWithoutMutatingServer()
+    {
+        var serverParty = CreateParty();
+        var removedServerTarget = CreatePartyWithPartyBase();
+        SetPartyTargets(serverParty, removedServerTarget);
+        var serverRegistry = new Mock<IObjectManager>();
+        string partyId = "MobileParty_Created_1";
+        serverRegistry.Setup(m => m.TryGetId(serverParty, out partyId)).Returns(true);
+        var serverSnapshot = new MobilePartyBehaviorSnapshot(serverRegistry.Object);
+
+        Assert.True(TryCreateJoinStateWithCampaign(
+            serverSnapshot,
+            serverParty,
+            LiveParties(serverParty),
+            LiveSettlements(),
+            out MobilePartyJoinState state,
+            out string failure), failure);
+        AssertPartyTargetsUnchanged(serverParty, removedServerTarget);
+
+        var clientParty = CreatePartyWithPartyBase();
+        var removedClientTarget = CreatePartyWithPartyBase();
+        SetPartyTargets(clientParty, removedClientTarget);
+        clientParty._targetSettlement = ObjectHelper.SkipConstructor<Settlement>();
+        clientParty._pathMode = true;
+        clientParty._aiPathNotFound = true;
+        clientParty.PathBegin = 7;
+        var clientRegistry = new Mock<IObjectManager>();
+        clientRegistry.Setup(m => m.TryGetObject("Created_1", out clientParty)).Returns(true);
+        var clientSnapshot = new MobilePartyBehaviorSnapshot(clientRegistry.Object);
+        var clientCampaign = ObjectHelper.SkipConstructor<Campaign>();
+        clientCampaign.CampaignObjectManager = new CampaignObjectManager
+        {
+            Settlements = new MBReadOnlyList<Settlement>(new List<Settlement>()),
+        };
+        clientCampaign.CampaignObjectManager._mobileParties.Add(clientParty);
+
+        Campaign previousCampaign = Campaign.Current;
+        var harmony = new Harmony($"{nameof(MobilePartyBehaviorSnapshotTests)}.{Guid.NewGuid():N}");
+        try
+        {
+            Campaign.Current = clientCampaign;
+            // Navigation validity needs a map scene; the behavior and navigation setters remain real.
+            harmony.Patch(
+                AccessTools.Method(
+                    typeof(NavigationHelper),
+                    nameof(NavigationHelper.IsPositionValidForNavigationType),
+                    new[] { typeof(CampaignVec2), typeof(MobileParty.NavigationType) }),
+                prefix: new HarmonyMethod(AccessTools.Method(
+                    typeof(MobilePartyBehaviorSnapshotTests),
+                    nameof(IsPositionValidForNavigationTypePrefix))));
+
+            int beforeApplyCount = 0;
+            for (int attempt = 0; attempt < 2; attempt++)
+            {
+                Assert.True(clientSnapshot.TryApplyJoinBaseline(
+                    new[] { state },
+                    () => beforeApplyCount++), clientSnapshot.LastJoinBaselineFailure);
+                Assert.Equal(AiBehavior.GoToPoint, clientParty.DefaultBehavior);
+                Assert.Equal(AiBehavior.GoToPoint, clientParty.ShortTermBehavior);
+                Assert.Equal(MoveModeType.Point, clientParty.PartyMoveMode);
+                Assert.Null(clientParty.TargetParty);
+                Assert.Null(clientParty.TargetSettlement);
+                Assert.Null(clientParty.MoveTargetParty);
+                Assert.Null(clientParty.Ai.AiBehaviorInteractable);
+                Assert.Equal(removedServerTarget.Position, clientParty.MoveTargetPoint);
+                Assert.Equal(removedServerTarget.Position, clientParty.TargetPosition);
+                Assert.Equal(removedServerTarget.Position, clientParty.Ai.BehaviorTarget);
+                Assert.Equal(MobileParty.NavigationType.Default, clientParty.DesiredAiNavigationType);
+                Assert.False(clientParty._pathMode);
+                Assert.False(clientParty._aiPathNotFound);
+                Assert.Equal(0, clientParty.PathBegin);
+                Assert.Equal(clientParty.Position, clientParty.NextTargetPosition);
+                Assert.True(clientParty.Party.IsVisualDirty);
+                AssertPartyTargetsUnchanged(serverParty, removedServerTarget);
+            }
+            Assert.Equal(2, beforeApplyCount);
+        }
+        finally
+        {
+            harmony.UnpatchAll(harmony.Id);
+            Campaign.Current = previousCampaign;
+        }
+    }
+
+    private static bool IsPositionValidForNavigationTypePrefix(ref bool __result)
+    {
+        __result = true;
+        return false;
     }
 
     [Fact]
