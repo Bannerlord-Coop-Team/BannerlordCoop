@@ -1,7 +1,10 @@
-﻿using E2E.Tests.Environment.Instance;
+﻿using Common.Commands;
+using Common.Util;
+using E2E.Tests.Environment.Instance;
 using E2E.Tests.Services.MapEvents;
 using E2E.Tests.Util;
 using GameInterface.Services.Armies.Messages;
+using GameInterface.Services.GameDebug.Commands;
 using GameInterface.Services.MapEvents.Messages.Leave;
 using GameInterface.Services.MobileParties.Extensions;
 using GameInterface.Services.MobileParties.Messages.Unstuck;
@@ -9,6 +12,7 @@ using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.MapEvents;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Settlements;
+using TaleWorlds.Core;
 using Xunit.Abstractions;
 
 namespace E2E.Tests.Services.MobileParties;
@@ -21,7 +25,7 @@ public class UnstuckArmyPreservationTests : MapEventTestBase
     [Fact]
     public void PlayerLeaderWithThreeParties_RepeatedUnstuckPreservesArmyOnEveryPeer()
     {
-        var player = CreatePlayerHeroParty("unstuck-army-leader");
+        var player = CreateRequester("unstuck-army-leader");
         var army = CreateArmy(player.partyId);
         AssertArmy(army, army.PartyIds);
 
@@ -38,7 +42,7 @@ public class UnstuckArmyPreservationTests : MapEventTestBase
     [Fact]
     public void PlayerLeaderWithThreeParties_UnstuckLeavesBattleAndPreservesArmyOnEveryPeer()
     {
-        var player = CreatePlayerHeroParty("unstuck-battle-leader");
+        var player = CreateRequester("unstuck-battle-leader");
         var battle = CreateServerMapEvent();
         JoinBattle(player.partyId, battle.MapEventId);
         var army = CreateArmy(player.partyId);
@@ -52,14 +56,14 @@ public class UnstuckArmyPreservationTests : MapEventTestBase
         AssertBattle(army.PartyIds, null);
         AssertBattle(new[] { battle.AttackerPartyId, battle.DefenderPartyId }, battle.MapEventId);
         Assert.Empty(Server.NetworkSentMessages.GetMessages<NetworkRemovePartyInArmy>());
-        Assert.Equal(3, Server.NetworkSentMessages.GetMessages<NetworkPartyLeftBattle>().Count());
+        Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkPartyLeftBattle>());
         AssertSuccessfulResults();
     }
 
     [Fact]
     public void PlayerLeaderWithThreeParties_UnstuckLeavesSettlementAndPreservesArmyOnEveryPeer()
     {
-        var player = CreatePlayerHeroParty("unstuck-settlement-leader");
+        var player = CreateRequester("unstuck-settlement-leader");
         var army = CreateArmy(player.partyId);
         var settlementId = TestEnvironment.CreateRegisteredObject<Settlement>();
         var townId = TestEnvironment.CreateRegisteredObject<Town>();
@@ -96,7 +100,7 @@ public class UnstuckArmyPreservationTests : MapEventTestBase
     [Fact]
     public void PlayerFollower_RepeatedUnstuckRemovesOnlyRequesterFromArmyAndBattle()
     {
-        var player = CreatePlayerHeroParty("unstuck-army-follower");
+        var player = CreateRequester("unstuck-army-follower");
         var battle = CreateServerMapEvent();
         var army = CreateArmy(battle.DefenderPartyId, player.partyId);
         AssertArmy(army, army.PartyIds);
@@ -119,8 +123,29 @@ public class UnstuckArmyPreservationTests : MapEventTestBase
             });
         }
         Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkRemovePartyInArmy>());
-        Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkPartyLeftBattle>());
+        Assert.Empty(Server.NetworkSentMessages.GetMessages<NetworkPartyLeftBattle>());
         AssertSuccessfulResults();
+    }
+
+    private (string heroId, string partyId) CreateRequester(string controllerId)
+    {
+        var player = CreatePlayerHeroParty(controllerId);
+        var characterId = TestEnvironment.CreateRegisteredObject<CharacterObject>();
+        var client = Clients.First();
+        client.Call(() =>
+        {
+            var hero = client.GetRegisteredObject<Hero>(player.heroId);
+            var character = client.GetRegisteredObject<CharacterObject>(characterId);
+            var party = client.GetRegisteredObject<MobileParty>(player.partyId);
+            using (new AllowedThread())
+            {
+                character.HeroObject = hero;
+                hero.PartyBelongedTo = party;
+                Game.Current.PlayerTroop = character;
+                Campaign.Current.MainParty = party;
+            }
+        });
+        return player;
     }
 
     private ArmyState CreateArmy(string leaderPartyId, string firstFollowerId = null)
@@ -162,8 +187,17 @@ public class UnstuckArmyPreservationTests : MapEventTestBase
 
     private void RequestUnstuck(string partyId, string heroId)
     {
-        Server.SimulateMessage(this, new NetworkRequestPlayerUnstuck(partyId, heroId));
+        var client = Clients.First();
+        client.Call(() =>
+        {
+            var command = new UnstuckCommand.UnstuckCoopCommand();
+            var result = command.ProcessCommand(new CoopCommandArgsFactory().FromValues(Array.Empty<string>()));
+            Assert.True(result.Succeeded, result.Output);
+        });
         TestEnvironment.FlushCoalescer();
+        var request = client.NetworkSentMessages.GetMessages<NetworkRequestPlayerUnstuck>().Last();
+        Assert.Equal(partyId, request.PartyId);
+        Assert.Equal(heroId, request.HeroId);
     }
 
     private void AssertArmy(ArmyState expected, string[] expectedPartyIds)
@@ -210,6 +244,9 @@ public class UnstuckArmyPreservationTests : MapEventTestBase
 
     private void AssertSuccessfulResults()
     {
+        Assert.Equal(2, Clients.First().InternalMessages.GetMessages<PlayerUnstuckCompleted>().Count());
+        foreach (var otherClient in Clients.Skip(1))
+            Assert.Empty(otherClient.InternalMessages.GetMessages<PlayerUnstuckCompleted>());
         foreach (var result in Server.NetworkSentMessages.GetMessages<NetworkPlayerUnstuckResult>())
             Assert.DoesNotContain(result.Actions, action => action.StartsWith("Failed "));
     }
