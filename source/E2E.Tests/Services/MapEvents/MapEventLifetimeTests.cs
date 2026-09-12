@@ -82,6 +82,23 @@ public class MapEventLifetimeTests : MapEventTestBase
     }
 
     [Fact]
+    public void ServerLocalFinalize_WithoutPlayerParties_CompletesLocally()
+    {
+        var mapEventCtx = CreateServerMapEvent();
+        Server.InternalMessages.Clear();
+
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject<MapEvent>(mapEventCtx.MapEventId, out var mapEvent));
+            Server.Resolve<IMessageBroker>().Publish(this, new MapEventFinalizeAttempted(mapEvent));
+        }, MapEventDisabledMethods);
+
+        Assert.False(Server.ObjectManager.TryGetObject<MapEvent>(mapEventCtx.MapEventId, out _));
+        Assert.Empty(Server.InternalMessages.GetMessages<NetworkMapEventFinalized>());
+        Assert.Empty(Server.NetworkSentMessages.GetMessages<NetworkMapEventFinalized>());
+    }
+
+    [Fact]
     public void ClientFinalize_AlreadyFinalizedMapEventDoesNotSendAnotherRequest()
     {
         var mapEventCtx = CreateServerMapEvent();

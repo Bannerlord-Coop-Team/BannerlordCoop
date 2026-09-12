@@ -746,7 +746,7 @@ public class KingdomDebugCommand
         public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
             new ExpectedArgs("controller_id", "The player controller id."),
-            new ExpectedArgs("kingdom_id", "The registered kingdom id."),
+            new ExpectedArgs("kingdom_id", "The registered kingdom id, or none to restore a kingdomless clan."),
         };
 
         public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
@@ -789,7 +789,9 @@ public class KingdomDebugCommand
                 return Failed($"Clan not found for player {controllerId} with clan id: {player.ClanId}");
             }
 
-            if (!objectManager.TryGetObject(kingdomId, out Kingdom kingdom))
+            bool restoreKingdomlessState = string.Equals(kingdomId, "none", StringComparison.OrdinalIgnoreCase);
+            Kingdom kingdom = null;
+            if (!restoreKingdomlessState && !objectManager.TryGetObject(kingdomId, out kingdom))
             {
                 return Failed($"Kingdom not found with id: {kingdomId}");
             }
@@ -797,7 +799,9 @@ public class KingdomDebugCommand
             Kingdom previousKingdom = clan.Kingdom;
             if (previousKingdom == kingdom)
             {
-                return Succeeded($"Player {controllerId}'s clan {clan.StringId} is already in kingdom {kingdom.StringId}.");
+                return Succeeded(restoreKingdomlessState
+                    ? $"Player {controllerId}'s clan {clan.StringId} is already kingdomless."
+                    : $"Player {controllerId}'s clan {clan.StringId} is already in kingdom {kingdom.StringId}.");
             }
 
             // Server-authoritative apply: run with patches live (no AllowedThread) so membership
@@ -811,10 +815,13 @@ public class KingdomDebugCommand
             if (clan.Kingdom != kingdom)
             {
                 string currentKingdomId = clan.Kingdom?.StringId ?? "<none>";
-                return Succeeded($"Tried to force player {controllerId}'s clan {clan.StringId} to join {kingdom.StringId}, but current kingdom is {currentKingdomId}.");
+                return Failed($"Tried to move player {controllerId}'s clan {clan.StringId} to {kingdomId}, but current kingdom is {currentKingdomId}.");
             }
 
             string previousKingdomId = previousKingdom?.StringId ?? "<none>";
+            if (restoreKingdomlessState)
+                return Succeeded($"Restored player {controllerId}'s clan {clan.StringId} to kingdomless state. Previous kingdom: {previousKingdomId}.");
+
             return Succeeded($"Forced player {controllerId}'s clan {clan.StringId} to join kingdom {kingdom.StringId}. Previous kingdom: {previousKingdomId}.");
         }
     }
