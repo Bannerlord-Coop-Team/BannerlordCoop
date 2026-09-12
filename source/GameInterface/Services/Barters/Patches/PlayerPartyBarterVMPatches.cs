@@ -142,6 +142,17 @@ internal class PlayerPartyBarterItemVMPatches
         => PlayerPartyTradeContext.CanOffer(__instance?.Barterable);
 }
 
+[HarmonyPatch(typeof(BarterItemVM), nameof(BarterItemVM.CurrentOfferedAmount), MethodType.Setter)]
+internal class PlayerPartyBarterItemAmountPatches
+{
+    [HarmonyPrefix]
+    static bool SetCurrentOfferedAmountPrefix(BarterItemVM __instance, int value)
+        => PlayerPartyTradeContext.CanSetOfferedAmount(
+            __instance?.Barterable,
+            __instance?.CurrentOfferedAmount ?? 0,
+            value);
+}
+
 [HarmonyPatch(typeof(BarterManager))]
 internal class PlayerPartyBarterManagerPatches
 {

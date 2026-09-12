@@ -1,19 +1,36 @@
 ﻿using Autofac;
+using Common.Commands;
 using Common.LogicStates;
 using Common.Messaging;
 using Common.Network;
 using Common.Network.Coalescing;
+using Common.Network.Session;
 using Common.PacketHandlers;
+using Coop.Core.Client.Services.Kingdoms;
+using Coop.Core.Client.Services.MobileParties;
 using Coop.Core.Common;
+using Coop.Core.Common.Configuration;
+#if DEBUG
+using Coop.Core.Common.Commands;
+#endif
+using Coop.Core.Common.Session;
 using Coop.Core.Server.Connections;
 using Coop.Core.Server.Policies;
 using Coop.Core.Server.Services.Instances;
+using Coop.Core.Server.Services.Kingdoms;
+using Coop.Core.Server.Services.MobileParties;
 using Coop.Core.Server.Services.Save;
+using Coop.Core.Server.Services.Session;
+using Coop.Core.Server.Services.Settlements;
+using Coop.Core.Server.Services.Telemetry;
 using Coop.Core.Server.Services.Time;
 using Coop.Core.Server.States;
+using Coop.Steam;
 using GameInterface.Policies;
+using GameInterface.Services.Missions;
 using LiteNetLib;
 using Missions;
+using System.Runtime.CompilerServices;
 
 namespace Coop.Core.Server;
 
@@ -28,6 +45,12 @@ public class ServerModule : CommonModule
 
         builder.RegisterModule<ConnectionModule>();
 
+#if DEBUG
+        builder.RegisterType<JoinDebugCommands.JoinStateCoopCommand>().As<ICoopCommand>().InstancePerDependency();
+        builder.RegisterType<JoinDebugCommands.StageInactivePartyCoopCommand>().As<ICoopCommand>().InstancePerDependency();
+        builder.RegisterType<JoinDebugCommands.RestoreInactivePartyCoopCommand>().As<ICoopCommand>().InstancePerDependency();
+#endif
+
         // The mission/P2P stack is composed into the server container too (it is also in ClientModule) so the
         // server-authoritative battle classes — notably BattleHostHandler, which elects the battle host — run
         // here. The client-only pieces (mesh client, location/battle controllers) stay lazy: nothing on the
@@ -39,20 +62,114 @@ public class ServerModule : CommonModule
         builder.RegisterType<CoopServer>().As<ICoopServer>().As<INetwork>().As<INetEventListener>().InstancePerLifetimeScope();
         builder.RegisterType<SendCoalescer>().As<ISendCoalescer>().InstancePerLifetimeScope();
         builder.RegisterType<CoopSaveManager>().As<ICoopSaveManager>().InstancePerLifetimeScope();
+        builder.RegisterType<JoinCampaignBaselineSender>()
+            .As<IJoinCampaignBaselineSender>()
+            .InstancePerDependency();
+        builder.RegisterType<JoinCampaignKingdomBaseLineSender>()
+            .As<IJoinCampaignKingdomBaseLineSender>()
+            .InstancePerDependency();
+        builder.RegisterType<PlayerPartyTroopXpBaselineProvider>()
+            .As<IPlayerPartyTroopXpBaselineProvider>()
+            .InstancePerDependency();
+        builder.RegisterType<AllianceOfferPendingCapturer>()
+            .As<IAllianceOfferPendingCapturer>()
+            .InstancePerDependency();
+        builder.RegisterType<PeaceOfferPendingCapturer>()
+            .As<IPeaceOfferPendingCapturer>()
+            .InstancePerDependency();
 
         // Withholds world broadcasts from a peer until it has the transfer save and has entered the
         // campaign. AutoActivate so it subscribes to connection lifecycle events before any peer joins.
         builder.RegisterType<ConnectionMessageQueue>().As<IConnectionMessageQueue>().InstancePerLifetimeScope().AutoActivate();
+        builder.RegisterType<SteamBanList>().As<ISteamBanList>().InstancePerDependency();
 
-        builder.RegisterType<MissionManager>().As<IMissionManager>().InstancePerLifetimeScope();
+        builder.RegisterType<MissionManager>()
+            .As<IMissionManager>()
+            .As<IMissionMembershipRegistry>()
+            .InstancePerLifetimeScope();
+        builder.RegisterType<BattleCompletionTracker>().As<IBattleCompletionTracker>().InstancePerDependency();
+        builder.RegisterType<SettlementEncounterDistanceValidator>()
+            .As<ISettlementEncounterDistanceValidator>()
+            .InstancePerDependency();
         // Pauses time while a peer's packet queue is overloaded (slow client catching up). Constructed
         // as a CoopServer dependency, so it registers its unpause policy when the server is built.
+        builder.RegisterType<JoinPeerTerminator>().As<IJoinPeerTerminator>().InstancePerDependency();
         builder.RegisterType<OverloadedPeerManager>().As<IOverloadedPeerManager>().InstancePerLifetimeScope().AutoActivate();
+
+        builder.RegisterType<ServerTelemetryUploader>()
+            .As<IServerTelemetryUploader>()
+            .As<IBattlesFoughtUploader>()
+            .InstancePerLifetimeScope();
+        builder.RegisterType<ServerTelemetryReporter>()
+            .As<IServerTelemetryReporter>()
+            .InstancePerLifetimeScope()
+            .AutoActivate();
+        builder.RegisterType<BattlesFoughtReporter>()
+            .As<IBattlesFoughtReporter>()
+            .InstancePerLifetimeScope()
+            .AutoActivate();
 
         // Policies
         builder.RegisterType<ServerSyncPolicy>().As<ISyncPolicy>().InstancePerLifetimeScope();
 
+        // The standalone server logs into Steam itself and advertises with the host-selected lobby
+        // visibility, so eligible players can join without port forwarding while the owner never
+        // plays. Same guard as ClientModule: only touch Steam types when the boot probe found Steam.
+        if (SessionDiscovery.SteamAvailable)
+        {
+            RegisterSteamSessionServices(builder);
+        }
+        else
+        {
+            builder.RegisterType<NoopSessionAdvertiser>().As<ISessionAdvertiser>().InstancePerLifetimeScope();
+            builder.RegisterType<NoopSessionTunnelHost>()
+                .As<ISessionTunnelHost>()
+                .As<ISessionTunnelIdentityResolver>()
+                .InstancePerLifetimeScope();
+        }
+
+        builder.RegisterType<SessionAdvertisementConfig>().AsSelf().InstancePerLifetimeScope();
+
         RegisterAllTypesWithInterface<ServerModule, IHandler>(builder, autoInstantiate: true);
         RegisterAllTypesWithInterface<ServerModule, IPacketHandler>(builder, autoInstantiate: true);
+    }
+
+    // Non-inlined so referencing the Steam tunnel transport (its layout embeds Steamworks value
+    // types) never pulls Steamworks.NET into Load's JIT on a non-Steam install.
+    [MethodImpl(MethodImplOptions.NoInlining)]
+    private static void RegisterSteamSessionServices(ContainerBuilder builder)
+    {
+        builder.RegisterType<SteamLobbyApi>()
+            .As<ISteamLobbyApi>()
+            .As<ISteamPublicLobbyApi>()
+            .InstancePerLifetimeScope();
+        builder.RegisterType<SteamLobbyLeaseRenewer>()
+            .As<ISteamLobbyLeaseRenewer>()
+            .InstancePerDependency();
+        // Debug servers remain joinable through steam but are excluded from the public discovery
+        // Release builds continue to use the configured visibility.
+        builder.Register(context =>
+            {
+                var visibility = context.Resolve<SessionAdvertisementConfig>().Visibility;
+
+#if DEBUG
+                visibility = ServerVisibility.None;
+#endif
+
+                return new SteamPublicLobbyAdvertiser(
+                    context.Resolve<ISteamPublicLobbyApi>(),
+                    visibility,
+                    context.Resolve<ISteamLobbyLeaseRenewer>());
+            })
+            .As<ISessionAdvertiser>()
+            .As<ISteamLobbyOwner>()
+            .InstancePerLifetimeScope();
+        builder.RegisterType<SteamGameServerNetworkingTunnelTransport>().As<ISteamTunnelTransport>().InstancePerLifetimeScope();
+        builder.RegisterType<SteamTunnelHost>()
+            .As<ISessionTunnelHost>()
+            .As<ISessionTunnelIdentityResolver>()
+            .InstancePerLifetimeScope();
+        builder.RegisterType<ServerSessionJoinInfoSource>().As<ISessionJoinInfoSource>().InstancePerLifetimeScope();
+        builder.RegisterType<ServerSessionAdvertisementHandler>().AsSelf().InstancePerLifetimeScope().AutoActivate();
     }
 }

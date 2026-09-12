@@ -6,7 +6,7 @@ using GameInterface.AutoSync;
 using GameInterface.Registry;
 using GameInterface.Serialization;
 using GameInterface.Services.Entity;
-using GameInterface.Services.GuantletMapEventVisuals;
+using GameInterface.Services.MapEvents.Initialization;
 using GameInterface.Services.ObjectManager;
 using Moq;
 using Serilog;
@@ -30,7 +30,7 @@ namespace GameInterface.Tests.Bootstrap.Modules
             builder.RegisterInstance(new Mock<IAutoSyncPatchCollector>().Object).As<IAutoSyncPatchCollector>();
             builder.RegisterInstance(new Mock<ISerializableTypeMapper>().Object).As<ISerializableTypeMapper>();
             builder.RegisterInstance(new Mock<IControllerIdProvider>().Object).As<IControllerIdProvider>();
-            builder.RegisterInstance(new Mock<IMapEventBattleSizeCorrection>().Object).As<IMapEventBattleSizeCorrection>();
+            builder.RegisterInstance(new Mock<IMapEventInitializationBarrier>().Object).As<IMapEventInitializationBarrier>();
             builder.RegisterModule<RegistryModule>();
         }
     }

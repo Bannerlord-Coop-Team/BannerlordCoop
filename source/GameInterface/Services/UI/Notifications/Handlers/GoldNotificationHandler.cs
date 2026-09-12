@@ -135,6 +135,10 @@ internal class GoldNotificationHandler : IHandler
             if (clan != Clan.PlayerClan) return;
 
             var goldChange = data.GoldChange;
+
+            // Don't notify client of daily gold change if there is no change
+            if (goldChange == 0) return;
+
             TextObject textObject = new TextObject("{=dPD5zood}Daily Gold Change: {CHANGE}{GOLD_ICON}", null);
             textObject.SetTextVariable("CHANGE", goldChange);
             textObject.SetTextVariable("GOLD_ICON", "{=!}<img src=\"General\\Icons\\Coin@2x\" extend=\"6\">");

@@ -2,6 +2,7 @@
 using Common.Logging;
 using Common.Messaging;
 using GameInterface.Policies;
+using GameInterface.Services.Clans.Messages;
 using GameInterface.Services.Settlements.Messages;
 using HarmonyLib;
 using Serilog;
@@ -31,10 +32,18 @@ namespace GameInterface.Services.Settlements.Patches
                 return false;
             }
 
+            if (detail == ChangeOwnerOfSettlementDetail.ByRebellion)
+            {
+                var rebelClan = newOwner.Clan;
+                MessageBroker.Instance.Publish(rebelClan, new SettlementRebelClanInitialized(rebelClan));
+            }
+
+            var previousOwnerId = settlement.OwnerClan?.Leader?.StringId;
             MessageBroker.Instance.Publish(settlement,
                 new SettlementOwnershipChanged(
                     settlement.StringId,
                     newOwner?.StringId,
+                    previousOwnerId,
                     capturerHero?.StringId,
                     Convert.ToInt32(detail)));
 

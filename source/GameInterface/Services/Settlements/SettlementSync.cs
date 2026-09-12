@@ -18,7 +18,6 @@ internal class SettlementSync : IAutoSync
         AutoSyncRegistry.AddField(AccessTools.Field(typeof(Settlement), nameof(Settlement.MilitiaPartyComponent)));
         AutoSyncRegistry.AddField(AccessTools.Field(typeof(Settlement), nameof(Settlement.Town)));
         AutoSyncRegistry.AddField(AccessTools.Field(typeof(Settlement), nameof(Settlement.Village)));
-        AutoSyncRegistry.AddField(AccessTools.Field(typeof(Settlement), nameof(Settlement._isVisible)));
         AutoSyncRegistry.AddField(AccessTools.Field(typeof(Settlement), nameof(Settlement._lastAttackerParty)));
         AutoSyncRegistry.AddField(AccessTools.Field(typeof(Settlement), nameof(Settlement._name)));
         AutoSyncRegistry.AddField(AccessTools.Field(typeof(Settlement), nameof(Settlement._nextLocatable)));
@@ -33,25 +32,28 @@ internal class SettlementSync : IAutoSync
         //AutoSyncRegistry.AddField(AccessTools.Field(typeof(Settlement), nameof(Settlement._notablesCache)));
         //AutoSyncRegistry.AddField(AccessTools.Field(typeof(Settlement), nameof(Settlement._partiesCache)));
         //AutoSyncRegistry.AddField(AccessTools.Field(typeof(Settlement), nameof(Settlement._settlementWallSectionHitPointsRatioList)));
-        //AutoSyncRegistry.AddField(AccessTools.Field(typeof(Settlement), nameof(Settlement._siegeEngineMissiles)));
         //AutoSyncRegistry.AddProperty(AccessTools.Property(typeof(Settlement), nameof(Settlement.Alleys)));
 
         //AutoSyncRegistry.AddField(AccessTools.Field(typeof(Settlement), nameof(Settlement.Stash))); // readonly
 
         //// Properties
         AutoSyncRegistry.AddProperty(AccessTools.Property(typeof(Settlement), nameof(Settlement.Party)));
-        AutoSyncRegistry.AddProperty(AccessTools.Property(typeof(Settlement), nameof(Settlement.BribePaid)));
+        //AutoSyncRegistry.AddProperty(AccessTools.Property(typeof(Settlement), nameof(Settlement.BribePaid))); // Unique per player
         AutoSyncRegistry.AddProperty(AccessTools.Property(typeof(Settlement), nameof(Settlement.SiegeEvent)));
         AutoSyncRegistry.AddProperty(AccessTools.Property(typeof(Settlement), nameof(Settlement.IsActive)));
-        //AutoSyncRegistry.AddProperty(AccessTools.Property(typeof(Settlement), nameof(Settlement.IsVisible)));
+        // Native recomputes visibility from the process-local MainParty position
         AutoSyncRegistry.AddProperty(AccessTools.Property(typeof(Settlement), nameof(Settlement.CurrentSiegeState)));
+        // Defender-side ISiegeEventSide state; the attacker copies live on BesiegerCamp and are synced there.
+        AutoSyncRegistry.AddProperty(AccessTools.Property(typeof(Settlement), nameof(Settlement.SiegeEngines)));
+        AutoSyncRegistry.AddProperty(AccessTools.Property(typeof(Settlement), nameof(Settlement.SiegeStrategy)));
+        AutoSyncRegistry.AddProperty(AccessTools.Property(typeof(Settlement), nameof(Settlement.NumberOfTroopsKilledOnSide)));
         AutoSyncRegistry.AddProperty(AccessTools.Property(typeof(Settlement), nameof(Settlement.GatePosition)));
         AutoSyncRegistry.AddProperty(AccessTools.Property(typeof(Settlement), nameof(Settlement.LocationComplex))); // Might not be needed
 
-        AutoSyncRegistry.AddProperty(AccessTools.Property(typeof(Settlement), nameof(Settlement.NearbyLandThreatIntensity)));
-        AutoSyncRegistry.AddProperty(AccessTools.Property(typeof(Settlement), nameof(Settlement.NearbyNavalThreatIntensity)));
-        AutoSyncRegistry.AddProperty(AccessTools.Property(typeof(Settlement), nameof(Settlement.NearbyLandAllyIntensity)));
-        AutoSyncRegistry.AddProperty(AccessTools.Property(typeof(Settlement), nameof(Settlement.NearbyNavalAllyIntensity)));
+        AutoSyncRegistry.AddProperty(AccessTools.Property(typeof(Settlement), nameof(Settlement.NearbyLandThreatIntensity)), coalesce: true);
+        AutoSyncRegistry.AddProperty(AccessTools.Property(typeof(Settlement), nameof(Settlement.NearbyNavalThreatIntensity)), coalesce: true);
+        AutoSyncRegistry.AddProperty(AccessTools.Property(typeof(Settlement), nameof(Settlement.NearbyLandAllyIntensity)), coalesce: true);
+        AutoSyncRegistry.AddProperty(AccessTools.Property(typeof(Settlement), nameof(Settlement.NearbyNavalAllyIntensity)), coalesce: true);
 
         //// Target Methods
         AutoSyncRegistry.AddTargetMethod(typeof(Settlement), AccessTools.Method(typeof(SettlementClaimantCampaignBehavior), nameof(SettlementClaimantCampaignBehavior.OnSettlementOwnerChanged)));

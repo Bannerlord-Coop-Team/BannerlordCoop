@@ -1,7 +1,21 @@
 ﻿using Common.Messaging;
+using GameInterface.Services.TroopRosters.Data;
 using ProtoBuf;
 
 namespace GameInterface.Services.Companions.Messages;
+
+internal enum CompanionRescueRequestKind
+{
+    JoinParty = 1,
+    LeadParty = 2,
+}
+
+internal enum CompanionRescueCompletionStatus
+{
+    Accepted = 1,
+    AlreadyCompleted = 2,
+    Rejected = 3,
+}
 
 [ProtoContract(SkipConstructor = true)]
 internal readonly struct DoClanNameSelection : ICommand
@@ -40,11 +54,66 @@ internal readonly struct DoClanNameSelection : ICommand
 public readonly struct FireCompanion : IEvent
 {
     [ProtoMember(1)]
+    public readonly string RequestId;
+
+    [ProtoMember(2)]
     public readonly string OneToOneConversationHeroId;
 
-    public FireCompanion(string oneToOneConversationHeroId)
+    [ProtoMember(3)]
+    public readonly string ExpectedClanId;
+
+    [ProtoMember(4)]
+    public readonly string ExpectedPartyId;
+
+    public FireCompanion(string requestId, string oneToOneConversationHeroId,
+        string expectedClanId, string expectedPartyId)
     {
+        RequestId = requestId;
         OneToOneConversationHeroId = oneToOneConversationHeroId;
+        ExpectedClanId = expectedClanId;
+        ExpectedPartyId = expectedPartyId;
+    }
+}
+
+[ProtoContract(SkipConstructor = true)]
+internal readonly struct FireCompanionCompleted : ICommand
+{
+    [ProtoMember(1)]
+    public readonly string RequestId;
+
+    [ProtoMember(2)]
+    public readonly string OneToOneConversationHeroId;
+
+    [ProtoMember(3)]
+    public readonly bool Success;
+
+    [ProtoMember(4)]
+    public readonly string Error;
+
+    public FireCompanionCompleted(string requestId, string oneToOneConversationHeroId,
+        bool success, string error)
+    {
+        RequestId = requestId;
+        OneToOneConversationHeroId = oneToOneConversationHeroId;
+        Success = success;
+        Error = error;
+    }
+}
+
+internal readonly struct CompanionDismissalCompleted : IEvent
+{
+    public readonly string RequestId;
+    public readonly string OneToOneConversationHeroId;
+    public readonly bool Success;
+    public readonly string Error;
+
+    public CompanionDismissalCompleted(string requestId, string oneToOneConversationHeroId,
+        bool success, string error)
+    {
+        RequestId = requestId;
+        OneToOneConversationHeroId = oneToOneConversationHeroId;
+        Success = success;
+        Error = error;
     }
 }
 
@@ -88,37 +157,55 @@ public readonly struct DoCompanionJoinedPartyByRescue : IEvent
 public readonly struct DoPartyScreenClosedFromRescuing : IEvent
 {
     [ProtoMember(1)]
-    public readonly string LeftOwnerPartyId;
+    public readonly TroopRosterData LeftMemberRosterData;
 
     [ProtoMember(2)]
-    public readonly string LeftMemberRosterId;
+    public readonly TroopRosterData LeftPrisonRosterData;
 
     [ProtoMember(3)]
-    public readonly string LeftPrisonRosterId;
-
-    [ProtoMember(4)]
     public readonly string RightOwnerPartyId;
 
-    [ProtoMember(5)]
-    public readonly string RightMemberRosterId;
-
-    [ProtoMember(6)]
-    public readonly string RightPrisonRosterId;
+    [ProtoMember(4)]
+    public readonly string CompanionHeroId;
 
     public DoPartyScreenClosedFromRescuing(
-        string leftOwnerPartyId,
-        string leftMemberRosterId,
-        string leftPrisonRosterId,
+        TroopRosterData leftMemberRosterData,
+        TroopRosterData leftPrisonRosterData,
         string rightOwnerPartyId,
-        string rightMemberRosterId,
-        string rightPrisonRosterId)
+        string companionHeroId)
     {
-        LeftOwnerPartyId = leftOwnerPartyId;
-        LeftMemberRosterId = leftMemberRosterId;
-        LeftPrisonRosterId = leftPrisonRosterId;
+        LeftMemberRosterData = leftMemberRosterData;
+        LeftPrisonRosterData = leftPrisonRosterData;
         RightOwnerPartyId = rightOwnerPartyId;
-        RightMemberRosterId = rightMemberRosterId;
-        RightPrisonRosterId = rightPrisonRosterId;
+        CompanionHeroId = companionHeroId;
+    }
+}
+
+[ProtoContract(SkipConstructor = true)]
+internal readonly struct CompanionRescueCompleted : ICommand
+{
+    [ProtoMember(1)]
+    public readonly string CompanionHeroId;
+
+    [ProtoMember(2)]
+    public readonly CompanionRescueRequestKind Kind;
+
+    [ProtoMember(3)]
+    public readonly CompanionRescueCompletionStatus Status;
+
+    [ProtoMember(4)]
+    public readonly string Error;
+
+    public CompanionRescueCompleted(
+        string companionHeroId,
+        CompanionRescueRequestKind kind,
+        CompanionRescueCompletionStatus status,
+        string error)
+    {
+        CompanionHeroId = companionHeroId;
+        Kind = kind;
+        Status = status;
+        Error = error;
     }
 }
 

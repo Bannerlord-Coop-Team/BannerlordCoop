@@ -51,7 +51,11 @@ public class MessageBroker : IMessageBroker
             var weakDelegate = delegates[i];
             if (weakDelegate.IsAlive == false)
             {
-                // Remove dead delegates
+                // Subscriptions are weak by design, but a collected target means this message is
+                // silently not handled — name it, because a lost handler is otherwise invisible
+                // (the classic trap: a closure/lambda subscription nothing kept alive).
+                Logger.Warning("Dropping dead subscriber {Method} for {MessageType}: its target was garbage collected",
+                    weakDelegate.Method?.Name ?? "<unknown>", typeof(T).Name);
                 delegates.RemoveAt(i--);
                 continue;
             }

@@ -1,4 +1,4 @@
-using E2E.Tests.Environment;
+﻿using E2E.Tests.Environment;
 using E2E.Tests.Environment.Instance;
 using E2E.Tests.Util;
 using TaleWorlds.CampaignSystem;
@@ -60,6 +60,7 @@ public class TroopRosterTransferSyncTests : IDisposable
             Assert.True(Server.ObjectManager.TryGetId(leftHero.CharacterObject, out leftHeroCharacterId));
             Assert.True(Server.ObjectManager.TryGetId(regular, out regularCharacterId));
         });
+        TestEnvironment.FlushCoalescer();
 
         // Sanity: clients mirror the initial split (regulars only on the right party).
         AssertTroopCountOnClients(rightPartyId, regularCharacterId, expectedCount: 5);
@@ -75,6 +76,7 @@ public class TroopRosterTransferSyncTests : IDisposable
             rightParty.MemberRoster.AddToCounts(regular, -3);
             leftParty.MemberRoster.AddToCounts(regular, 3);
         });
+        TestEnvironment.FlushCoalescer();
 
         // Assert: the regulars moved on every client, and each party's hero is still present at 1.
         AssertTroopCountOnClients(rightPartyId, regularCharacterId, expectedCount: 2);

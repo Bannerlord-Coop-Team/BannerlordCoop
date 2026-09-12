@@ -5,12 +5,17 @@ using Common.Serialization;
 using Common.Tests.Utils;
 using Coop.Core.Client;
 using Coop.Core.Server;
+using Coop.Core.Server.Services.Telemetry;
 using E2E.Tests.Environment.Instance;
 using E2E.Tests.Environment.Mock;
+using E2E.Tests.Environment.MockEngine;
 using GameInterface;
 using GameInterface.Policies;
 using Missions;
+using Missions.Agents.Handlers;
+using Missions.Battles;
 using Xunit.Abstractions;
+using MockServerTelemetryUploader = Coop.IntegrationTests.Environment.Mock.MockServerTelemetryUploader;
 
 namespace E2E.Tests.Environment;
 
@@ -27,7 +32,8 @@ public class TestEnvironment
     public IContainer Container => container;
 
     private readonly TestNetworkRouter networkOrchestrator = new();
-    private readonly MeshNetworkRouter meshOrchestrator = new();
+    private readonly VirtualNetworkScheduler meshScheduler = new();
+    private readonly MeshNetworkRouter meshOrchestrator;
 
     private readonly bool registerGameInterface;
 
@@ -38,6 +44,7 @@ public class TestEnvironment
     public TestEnvironment(ITestOutputHelper output, int numClients = 2, bool registerGameInterface = false)
     {
         this.registerGameInterface = registerGameInterface;
+        meshOrchestrator = new MeshNetworkRouter(meshScheduler);
 
         Server = CreateServer(output);
 
@@ -88,6 +95,10 @@ public class TestEnvironment
         builder.RegisterType<ServerInstance>().AsSelf();
 
         AddSharedDependencies(builder);
+        builder.RegisterType<MockServerTelemetryUploader>()
+            .As<IServerTelemetryUploader>()
+            .As<IBattlesFoughtUploader>()
+            .SingleInstance();
 
         container = builder.Build();
 
@@ -106,6 +117,18 @@ public class TestEnvironment
         }
 
         builder.RegisterInstance(networkOrchestrator).AsSelf().SingleInstance();
+        builder.RegisterInstance(meshScheduler)
+            .AsSelf()
+            .As<IVirtualNetworkScheduler>()
+            .SingleInstance();
+        builder.RegisterType<MockAgentVisualActionAccessor>()
+            .As<IAgentVisualActionAccessor>()
+            .InstancePerDependency();
+        builder.RegisterType<MockGuardReactionActionResolver>()
+            .As<IGuardReactionActionResolver>()
+            .InstancePerDependency();
+        builder.RegisterInstance(new FixedBattleSizeProvider(1000))
+            .As<IBattleSizeProvider>();
 
         builder.RegisterType<TestMessageBroker>().AsSelf().As<IMessageBroker>().InstancePerLifetimeScope();
         builder.RegisterType<TestPolicy>().As<ISyncPolicy>().InstancePerLifetimeScope();
@@ -113,6 +136,18 @@ public class TestEnvironment
         //builder.RegisterType<SurrogateCollection>().As<ISurrogateCollection>().InstancePerLifetimeScope().AutoActivate();
 
         return builder;
+    }
+
+    private sealed class FixedBattleSizeProvider : IBattleSizeProvider
+    {
+        private readonly int battleSize;
+
+        public FixedBattleSizeProvider(int battleSize)
+        {
+            this.battleSize = battleSize;
+        }
+
+        public int GetBattleSize() => battleSize;
     }
 }
 

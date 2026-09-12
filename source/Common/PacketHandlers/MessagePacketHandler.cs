@@ -1,4 +1,5 @@
-﻿using Common.Logging;
+﻿using Common;
+using Common.Logging;
 using Common.Messaging;
 using Common.Serialization;
 using LiteNetLib;
@@ -58,6 +59,13 @@ public class MessagePacketHandler : IMessagePacketHandler
         if (message is null)
             throw new ArgumentNullException(nameof(message));
 
+        if (ModInformation.IsServer && message is IServerToClientCommand)
+        {
+            Logger.Warning("Rejected server-to-client-only message {MessageType} received while running as server",
+                message.GetType());
+            return;
+        }
+
         var messageType = message.GetType();
         var publishInvoker = GetPublishInvoker(messageType);
 
@@ -110,6 +118,7 @@ public class MessagePacketHandler : IMessagePacketHandler
 [ProtoContract(SkipConstructor = true)]
 public readonly struct MessagePacket : IPacket
 {
+    private const int MaxJoinCatchUpMergedBytes = 4096;
     public DeliveryMethod DeliveryMethod => DeliveryMethod.ReliableOrdered;
 
     public PacketType PacketType => PacketType.Message;
@@ -123,10 +132,41 @@ public readonly struct MessagePacket : IPacket
     /// </summary>
     public readonly Type MessageType;
 
-    private MessagePacket(byte[] data, Type messageType)
+    // Send-side metadata only; the packet wire format is unchanged.
+    public readonly string JoinCatchUpMergeKey;
+
+    private MessagePacket(byte[] data, Type messageType, string joinCatchUpMergeKey)
     {
         Data = data;
         MessageType = messageType;
+        JoinCatchUpMergeKey = joinCatchUpMergeKey;
+    }
+
+    public bool TryMergeForJoinCatchUp(
+        MessagePacket next,
+        ICommonSerializer serializer,
+        out MessagePacket merged)
+    {
+        merged = default;
+        if (string.IsNullOrEmpty(JoinCatchUpMergeKey) ||
+            MessageType != next.MessageType ||
+            JoinCatchUpMergeKey != next.JoinCatchUpMergeKey ||
+            Data.Length > MaxJoinCatchUpMergedBytes || next.Data.Length > MaxJoinCatchUpMergedBytes)
+            return false;
+
+        // Read the frozen wire payload, never a caller-owned message or mutable operation array.
+        if (serializer.Deserialize<IMessage>(Data) is not IJoinCatchUpMergeMessage previous ||
+            !previous.TryMerge(serializer.Deserialize<IMessage>(next.Data), out var combined))
+            return false;
+
+        var candidate = Create(combined, serializer);
+        // Bound receive work and never trade fewer queue entries for more retained bytes.
+        if (candidate.Data.Length > MaxJoinCatchUpMergedBytes ||
+            candidate.Data.Length > (long)Data.Length + next.Data.Length)
+            return false;
+
+        merged = candidate;
+        return true;
     }
 
     /// <summary>
@@ -141,6 +181,7 @@ public readonly struct MessagePacket : IPacket
             throw new ArgumentException($"Type {message.GetType().Name} is not serializable.");
         }
 
-        return new MessagePacket(serializer.Serialize(message), message.GetType());
+        return new MessagePacket(serializer.Serialize(message), message.GetType(),
+            (message as IJoinCatchUpMergeMessage)?.JoinCatchUpMergeKey);
     }
 }

@@ -1,11 +1,9 @@
-using Common;
-using Common.Logging;
+﻿using Common;
 using Common.Messaging;
 using GameInterface.Policies;
 using GameInterface.Services.Heroes.Extensions;
 using GameInterface.Services.PlayerCaptivityService.Messages;
 using HarmonyLib;
-using Serilog;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Actions;
 
@@ -14,11 +12,9 @@ namespace GameInterface.Services.PlayerCaptivityService.Patches;
 [HarmonyPatch]
 internal class EndCaptivityActionPatches
 {
-    private static readonly ILogger Logger = LogManager.GetLogger<EndCaptivityActionPatches>();
-
     [HarmonyPatch(typeof(EndCaptivityAction), nameof(EndCaptivityAction.ApplyInternal))]
     [HarmonyPrefix]
-    private static bool Prefix(Hero prisoner, EndCaptivityDetail detail, Hero facilitatior)
+    private static bool Prefix(Hero prisoner, EndCaptivityDetail detail, Hero facilitatior, bool showNotification)
     {
         if (CallOriginalPolicy.IsOriginalAllowed()) return true;
 
@@ -40,10 +36,13 @@ internal class EndCaptivityActionPatches
             return true;
         }
 
-        // Clients only act for their own hero; every other hero's captivity is server-driven.
+        // A local release of another hero is player intent, so ask the authoritative server to apply it.
         if (prisoner != Hero.MainHero)
         {
-            Logger.Error("Client attempted to end captivity for non-controlled hero {HeroId}", prisoner?.StringId);
+            PlayerCaptivityLogger.Debug("EndCaptivityAction.ApplyInternal intercepted for non-controlled hero {HeroId}: detail={Detail} facilitator={FacilitatorId}, publishing EndCaptivityAttempted",
+                prisoner?.StringId, detail, facilitatior?.StringId);
+
+            MessageBroker.Instance.Publish(prisoner, new EndCaptivityAttempted(prisoner, detail, facilitatior, showNotification));
             return false;
         }
 

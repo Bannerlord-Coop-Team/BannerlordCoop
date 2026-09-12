@@ -61,11 +61,13 @@
   </ItemGroup>
   <ItemGroup>
     <PackageReference Include="Autofac" Version="8.2.0" />
+    <PackageReference Include="DiscordRichPresence" Version="1.6.1.70" />
     <PackageReference Include="Krafs.Publicizer" Version="2.3.0">
       <PrivateAssets>all</PrivateAssets>
       <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
     </PackageReference>
     <PackageReference Include="Lib.Harmony" Version="2.4.2" />
+    <PackageReference Include="protobuf-net" Version="3.2.56" />
     <PackageReference Include="Scriban" Version="7.2.0" />
     <PackageReference Include="System.Collections.Immutable" Version="9.0.2" />
     <PackageReference Include="System.Reflection.Primitives" Version="4.3.0" />
@@ -103,11 +105,17 @@
   </ItemGroup>
   <ItemGroup>
     <Compile Include="Server\Services\Kingdoms\Messages\NetworkAddDecision.cs" />
+    <Compile Include="Server\Services\Kingdoms\Messages\NetworkAllianceOfferPendingStatusChanged.cs" />
+    <Compile Include="Server\Services\Kingdoms\Messages\NetworkJoinCampaignKingdomBaseline.cs" />
+    <Compile Include="Server\Services\Kingdoms\Messages\NetworkKingdomNameChanged.cs" />
+    <Compile Include="Server\Services\Kingdoms\Messages\NetworkPeaceOfferPendingStatusChanged.cs" />
     <Compile Include="Server\Services\Kingdoms\Messages\NetworkRemoveDecision.cs" />
     <Compile Include="Server\Services\Kingdoms\Messages\NetworkChangeKingdomPolicy.cs" />
+    <Compile Include="Server\Services\Kingdoms\Messages\NetworkRequestChangeKingdomName.cs" />
     <Compile Include="Server\Services\Kingdoms\Messages\NetworkRequestKingdomDecisionVote.cs" />
     <Compile Include="Server\Services\Kingdoms\Messages\NetworkChangeKingdomDecisionVote.cs" />
     <Compile Include="Server\Services\Kingdoms\Messages\NetworkKingdomDecisionResolved.cs" />
+    <Compile Include="Server\Services\Kingdoms\Messages\NetworkKingdomDecisionRoundStatus.cs" />
     <Compile Include="Server\Services\Kingdoms\Messages\NetworkRequestCreateKingdom.cs" />
     <Compile Include="Server\Services\Kingdoms\Messages\NetworkPlayerKingdomCreated.cs" />
   </ItemGroup>
@@ -115,6 +123,9 @@
 	  <Reference Include="SandBox.View">
 	    <HintPath>..\..\mb2\Modules\SandBox\bin\Win64_Shipping_Client\SandBox.View.dll</HintPath>
 	  </Reference>
+      <Reference Include="SandBox.GauntletUI">
+          <HintPath>..\..\mb2\Modules\SandBox\bin\Win64_Shipping_Client\SandBox.GauntletUI.dll</HintPath>
+      </Reference>
 	  <Reference Include="TaleWorlds.CampaignSystem">
 	    <HintPath>..\..\mb2\bin\Win64_Shipping_Client\TaleWorlds.CampaignSystem.dll</HintPath>
 	  </Reference>
@@ -133,6 +144,9 @@
 	  <Reference Include="TaleWorlds.MountAndBlade">
 	    <HintPath>..\..\mb2\bin\Win64_Shipping_Client\TaleWorlds.MountAndBlade.dll</HintPath>
 	  </Reference>
+      <Reference Include="TaleWorlds.ScreenSystem">
+          <HintPath>..\..\mb2\bin\Win64_Shipping_Client\TaleWorlds.ScreenSystem.dll</HintPath>
+      </Reference>
 	  <Reference Include="TaleWorlds.ObjectSystem">
 	    <HintPath>..\..\mb2\bin\Win64_Shipping_Client\TaleWorlds.ObjectSystem.dll</HintPath>
 	  </Reference>

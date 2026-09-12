@@ -58,10 +58,11 @@ public class FoodConsumptionBehaviorInterface : IFoodConsumptionBehaviorInterfac
         GameThread.RunSafe(() =>
         {
             behavior.CheckAnimalBreeding(mobileParty);
-            if (Campaign.Current.Models.MobilePartyFoodConsumptionModel.DoesPartyConsumeFood(mobileParty))
+            bool doesPartyConsumeFood = Campaign.Current.Models.MobilePartyFoodConsumptionModel.DoesPartyConsumeFood(mobileParty);
+
+            if (doesPartyConsumeFood)
             {
-                // Check for a player party starving here instead of OnTick
-                behavior.PartyConsumeFood(mobileParty, mobileParty.IsPlayerParty() && mobileParty.Party.IsStarving);
+                behavior.PartyConsumeFood(mobileParty, false);
             }
         });
     }

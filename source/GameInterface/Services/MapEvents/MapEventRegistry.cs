@@ -1,11 +1,14 @@
 ﻿using Common;
 using Common.Util;
 using GameInterface.Registry.Auto;
+using GameInterface.Services.MapEvents.Initialization;
+using GameInterface.Services.MapEvents.Extensions;
 using GameInterface.Services.ObjectManager;
 using HarmonyLib;
 using Serilog;
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Reflection;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Encounters;
@@ -24,24 +27,24 @@ namespace GameInterface.Services.MapEvents;
 /// </summary>
 internal class MapEventRegistry : AutoRegistryBase<MapEvent>
 {
+    private readonly IMapEventInitializationBarrier initializationBarrier;
+
     public override bool Debug => true;
-    public MapEventRegistry(ILogger logger, IAutoRegistryFactory autoRegistryFactory, IObjectManager objectManager)
+    public MapEventRegistry(
+        ILogger logger,
+        IAutoRegistryFactory autoRegistryFactory,
+        IObjectManager objectManager,
+        IMapEventInitializationBarrier initializationBarrier)
         : base(logger, autoRegistryFactory, objectManager)
     {
+        this.initializationBarrier = initializationBarrier;
     }
 
     public override IEnumerable<MethodBase> Constructors => AccessTools.GetDeclaredConstructors(typeof(MapEvent));
 
-    // Watch FinalizeEventAux, not FinishBattle: every way a battle ends on the server funnels through
-    // FinalizeEventAux (FinishBattle -> FinalizeEventAux, FinalizeEvent -> FinalizeEventAux, and the
-    // finalize-on-request handler calls it directly), whereas FinishBattle is a tiny wrapper the JIT
-    // inlines into MapEvent.Update, so a postfix on it never runs and the destroy is never replicated.
-    public override IEnumerable<MethodBase> DestroyMethods => new MethodBase[]
-    {
-        AccessTools.Method(typeof(MapEvent), nameof(MapEvent.FinishBattle)),
-        AccessTools.Method(typeof(MapEvent), nameof(MapEvent.FinalizeEvent)),
-        AccessTools.Method(typeof(MapEvent), nameof(MapEvent.FinalizeEventAux))
-    };
+    // FinalizeEventAux re-enters during siege teardown, so MapEventPatches publishes destruction
+    // only after the outer call completes.
+    public override IEnumerable<MethodBase> DestroyMethods => Array.Empty<MethodBase>();
 
     public override void RegisterAllObjects()
     {
@@ -50,6 +53,7 @@ internal class MapEventRegistry : AutoRegistryBase<MapEvent>
             if (mapEvent.StringId == null) continue;
 
             RegisterExistingObject(mapEvent.StringId, mapEvent);
+            initializationBarrier.Register(mapEvent, committed: true);
         }
     }
 
@@ -60,72 +64,48 @@ internal class MapEventRegistry : AutoRegistryBase<MapEvent>
             obj.StringId = id;
             obj._sides = new MapEventSide[2];
             obj.WonRounds = new MBList<BattleSideEnum>();
+            obj.RetreatingSide = BattleSideEnum.None;
+            obj.PursuitRoundNumber = 0;
         }
 
-        // OnMapEventCreated adds to MapEventManager._mapEvents, the list the main-thread map tick
-        // (MapEventManager.Tick) walks every frame. This callback runs on the network thread, so defer
-        // the add to the main thread — matching OnClientDestroyed — so it can't race that iteration and
-        // leave a torn/null slot the tick dereferences.
-        GameThread.RunSafe(() =>
-        {
-            using (new AllowedThread())
-            {
-                Campaign.Current.MapEventManager.OnMapEventCreated(obj);
-            }
-        });
+        initializationBarrier.Register(obj);
     }
 
     public override void OnClientDestroyed(MapEvent obj, string id)
     {
-        GameThread.RunSafe(() =>
+        if (Campaign.Current == null) return;
+
+        bool localBattleSimulationWasInvolved = PlayerEncounter.Current?.BattleSimulation?.MapEvent == obj;
+        bool localPartyWasInvolved = IsLocalPartyInMapEvent(obj);
+        if (localPartyWasInvolved) CaptureMainPartyBattleRewards(obj);
+        var preservedParty = localPartyWasInvolved &&
+            (IsBattlePresentationActive() || localBattleSimulationWasInvolved)
+            ? MobileParty.MainParty?.Party
+            : null;
+        initializationBarrier.DestroyGraph(obj, preservedParty);
+        if (localBattleSimulationWasInvolved)
         {
-            // The action is deferred, so the campaign can be torn down (disconnect, save-load) before it runs.
-            if (Campaign.Current == null)
-            {
-                return;
-            }
+            initializationBarrier.CompleteDeferredEncounterCleanup();
+            return;
+        }
 
-            // Captured before FinishBattle clears it; used as a last-resort client close when the server close
-            // message fails to unwind the native encounter menu before the event disappears underneath it.
-            bool localPartyWasInvolved = IsLocalPartyInMapEvent(obj);
+        CloseDestroyedMapEventEncounterIfNeeded(id, localPartyWasInvolved);
+    }
 
-            using (new AllowedThread())
-            {
-                // Clear each involved party's battle state directly: the event's own FinalizeEventAux
-                // short-circuits on IsFinalized, and PartyBase.MapEventSide isn't synced. Nulling MapEventSide
-                // makes MobileParty.MapEvent null and SetVisualAsDirty re-marks the figure, dropping it out of
-                // the fighting animation. The full vanilla finalize is deliberately not re-run — the server
-                // already replicated the battle results.
+    private void CaptureMainPartyBattleRewards(MapEvent mapEvent)
+    {
+        try
+        {
+            var mapEventParty = mapEvent.FindMapEventParty(PartyBase.MainParty, out var side);
+            if (mapEventParty == null ||
+                !ContainerProvider.TryResolve<IMainPartyBattleRewardsCache>(out var cache)) return;
 
-                // Mark finalized first so clearing a side's last party (which re-enters FinalizeEvent via
-                // RemovePartyInternal) no-ops on IsFinalized instead of depending on the State sync arriving first.
-                obj.State = MapEventState.WaitingRemoval;
-
-                foreach (var side in obj._sides)
-                {
-                    if (side == null) continue;
-
-                    // Nulling MapEventSide removes the party from the side, so snapshot before iterating.
-                    foreach (var mapEventParty in new List<MapEventParty>(side.Parties))
-                    {
-                        var party = mapEventParty?.Party;
-                        if (party == null) continue;
-
-                        party.MapEventSide = null;
-                        party.SetVisualAsDirty();
-                    }
-                }
-
-                // Stop the battle icon and sound. The visual is also torn down through its own registry, and
-                // OnMapEventEnd is idempotent, so this is just a belt-and-suspenders stop on this client.
-                obj.MapEventVisual?.OnMapEventEnd();
-
-                // Drop the finalized event from the manager's tick list.
-                Campaign.Current.MapEventManager.Tick();
-            }
-
-            CloseDestroyedMapEventEncounterIfNeeded(id, localPartyWasInvolved);
-        }, context: nameof(OnClientDestroyed));
+            cache.Capture(mapEvent, mapEventParty, side.GetPartyContributionRate(mapEventParty));
+        }
+        catch (Exception ex)
+        {
+            Logger.Debug(ex, "Skipped MainParty reward snapshot during map event teardown");
+        }
     }
 
     private bool IsLocalPartyInMapEvent(MapEvent mapEvent)
@@ -140,7 +120,10 @@ internal class MapEventRegistry : AutoRegistryBase<MapEvent>
         var encounter = PlayerEncounter.Current;
         var battle = GetPlayerEncounterBattle();
         var encounteredBattle = GetPlayerEncounterEncounteredBattle();
-        if (encounter?._mapEvent == mapEvent || battle == mapEvent || encounteredBattle == mapEvent)
+        if (encounter?._mapEvent == mapEvent ||
+            encounter?.BattleSimulation?.MapEvent == mapEvent ||
+            battle == mapEvent ||
+            encounteredBattle == mapEvent)
             return true;
 
         var party = mainParty.Party;
@@ -166,7 +149,7 @@ internal class MapEventRegistry : AutoRegistryBase<MapEvent>
             return;
         }
 
-        if (MissionState.Current != null)
+        if (IsBattlePresentationActive())
         {
             return;
         }
@@ -202,6 +185,15 @@ internal class MapEventRegistry : AutoRegistryBase<MapEvent>
         }
 
         ForceCloseCurrentEncounterMenu();
+    }
+
+    private static bool IsBattlePresentationActive()
+    {
+        if (MissionState.Current != null || Mission.Current != null) return true;
+
+        return Game.Current?.GameStateManager?.GameStates
+            .OfType<MapState>()
+            .Any(state => state.IsSimulationActive) == true;
     }
 
     private static bool HasEncounterMenuToClose()
@@ -279,9 +271,11 @@ internal class MapEventRegistry : AutoRegistryBase<MapEvent>
 
     public override void OnServerCreated(MapEvent obj, string id)
     {
+        initializationBarrier.Register(obj);
     }
 
     public override void OnServerDestroyed(MapEvent obj, string id)
     {
+        initializationBarrier.DestroyGraph(obj);
     }
 }

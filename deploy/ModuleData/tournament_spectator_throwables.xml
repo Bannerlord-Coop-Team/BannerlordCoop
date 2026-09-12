@@ -1,0 +1,41 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Items>
+  <Item
+    id="coop_spectator_orange"
+    name="{=!}Orange"
+    is_merchandise="false"
+    body_name="bo_throwing_stone_01"
+    mesh="foods_orange_a"
+    flying_mesh="foods_orange_a"
+    value="0"
+    weight="0.1"
+    appearance="0.1"
+    Type="Thrown"
+    item_holsters="">
+    <ItemComponent>
+      <Weapon
+        weapon_class="Stone"
+        ammo_class="Stone"
+        stack_amount="10"
+        physics_material="missile"
+        accuracy="50"
+        thrust_speed="102"
+        speed_rating="102"
+        missile_speed="40"
+        weapon_length="10"
+        thrust_damage="0"
+        item_usage="stone"
+        rotation="100,30,20"
+        passby_sound_code=""
+        rotation_speed="0, -3.0, 0">
+        <WeaponFlags
+          RangedWeapon="true"
+          Consumable="true"
+          AutoReload="true"
+          UnloadWhenSheathed="true"
+          UseHandAsThrowBase="true" />
+      </Weapon>
+    </ItemComponent>
+    <Flags />
+  </Item>
+</Items>

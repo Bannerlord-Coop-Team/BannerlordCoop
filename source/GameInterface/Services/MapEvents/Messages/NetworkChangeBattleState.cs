@@ -11,10 +11,59 @@ public readonly struct NetworkChangeBattleState : ICommand
     public readonly string MapEventId;
     [ProtoMember(2)]
     public readonly BattleState BattleState;
+    /// <summary>
+    /// BR-102: the sender's host epoch for this battle — a victory report is a host-authority message, so
+    /// the server refuses one stamped by a stale hosting generation. 0 = unstamped (no host assignment is
+    /// known for the map event, e.g. a battle without a coop mission).
+    /// </summary>
+    [ProtoMember(3)]
+    public readonly int HostEpoch;
 
-    public NetworkChangeBattleState(string mapEventId, BattleState battleState)
+    public NetworkChangeBattleState(string mapEventId, BattleState battleState, int hostEpoch = 0)
     {
         MapEventId = mapEventId;
         BattleState = battleState;
+        HostEpoch = hostEpoch;
+    }
+}
+
+/// <summary>[Local] Requests the server to commit a battle conclusion reconciled from mission members.</summary>
+public readonly struct AuthoritativeBattleConclusionRequested : IEvent
+{
+    public readonly string MapEventId;
+    public readonly BattleState BattleState;
+    public readonly int HostEpoch;
+
+    public AuthoritativeBattleConclusionRequested(string mapEventId, BattleState battleState, int hostEpoch)
+    {
+        MapEventId = mapEventId;
+        BattleState = battleState;
+        HostEpoch = hostEpoch;
+    }
+}
+
+/// <summary>[Local] Requests no-victory finalization after every siege-ambush mission member completes.</summary>
+public readonly struct AuthoritativeSiegeAmbushCompletionRequested : IEvent
+{
+    public readonly string MapEventId;
+
+    public AuthoritativeSiegeAmbushCompletionRequested(string mapEventId)
+    {
+        MapEventId = mapEventId;
+    }
+}
+
+/// <summary>[Local] Reports whether an authoritative battle conclusion reached the map event.</summary>
+public readonly struct BattleStateChangeProcessed : IEvent
+{
+    public readonly string MapEventId;
+    public readonly BattleState BattleState;
+    public readonly bool Applied;
+
+    public BattleStateChangeProcessed(string mapEventId, BattleState battleState, bool applied)
+    {
+        MapEventId = mapEventId;
+        BattleState = battleState;
+        Applied = applied;
     }
 }

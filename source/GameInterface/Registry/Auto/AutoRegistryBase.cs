@@ -152,6 +152,9 @@ public abstract class AutoRegistryBase<T> : IAutoRegistry<T> where T : class
         if (idRemapOverride != null && idRemapOverride.TryGetValue(id, out var overrideId))
             id = overrideId;
 
+        if (objectManager.TryGetId(obj, out _))
+            return;
+
         EnsureObjectManagerCounter(id, obj);
 
         objectManager.AddExisting(id, obj);

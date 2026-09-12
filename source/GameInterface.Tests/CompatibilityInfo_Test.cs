@@ -126,8 +126,8 @@ namespace GameInterface.Tests
             package1.Pack();
             package2.Pack();
 
-            byte[] bytes1 = BinaryFormatterSerializer.Serialize(package1);
-            byte[] bytes2 = BinaryFormatterSerializer.Serialize(package2);
+            byte[] bytes1 = BinaryPackageSerializer.Serialize(package1);
+            byte[] bytes2 = BinaryPackageSerializer.Serialize(package2);
 
             Assert.NotEmpty(bytes1);
             Assert.NotEmpty(bytes2);
@@ -148,14 +148,14 @@ namespace GameInterface.Tests
             package1.Pack();
             package2.Pack();
 
-            byte[] bytes1 = BinaryFormatterSerializer.Serialize(package1);
-            byte[] bytes2 = BinaryFormatterSerializer.Serialize(package2);
+            byte[] bytes1 = BinaryPackageSerializer.Serialize(package1);
+            byte[] bytes2 = BinaryPackageSerializer.Serialize(package2);
 
             Assert.NotEmpty(bytes1);
             Assert.NotEmpty(bytes2);
 
-            object obj1 = BinaryFormatterSerializer.Deserialize(bytes1);
-            object obj2 = BinaryFormatterSerializer.Deserialize(bytes2);
+            object obj1 = BinaryPackageSerializer.Deserialize(bytes1);
+            object obj2 = BinaryPackageSerializer.Deserialize(bytes2);
 
             Assert.IsType<CompatibilityInfoBinaryPackage>(obj1);
             Assert.IsType<CompatibilityInfoBinaryPackage>(obj2);

@@ -1,4 +1,12 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
+  <ItemGroup>
+    <Reference Include="TaleWorlds.MountAndBlade.ViewModelCollection">
+      <HintPath>..\..\mb2\bin\Win64_Shipping_Client\TaleWorlds.MountAndBlade.ViewModelCollection.dll</HintPath>
+    </Reference>
+    <Reference Include="TaleWorlds.InputSystem">
+      <HintPath>..\..\mb2\bin\Win64_Shipping_Client\TaleWorlds.InputSystem.dll</HintPath>
+    </Reference>
+  </ItemGroup>
   <PropertyGroup>
     <Nullable>enable</Nullable>
     <IsPackable>false</IsPackable>
@@ -33,6 +41,15 @@
     <None Remove="Services\Parties\**" />
   </ItemGroup>
   <ItemGroup>
+    <!-- The real shipped mod-config template, so the seeding tests exercise the
+         file operators actually receive. ModConfig walks up from its assembly to
+         find it, and in this build that assembly's own output dir is the hit. -->
+    <Content Include="..\..\deploy\mod-config.default.json">
+      <Link>mod-config.default.json</Link>
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+  </ItemGroup>
+  <ItemGroup>
     <PackageReference Include="Autofac" Version="8.2.0" />
     <PackageReference Include="Krafs.Publicizer" Version="2.3.0">
       <PrivateAssets>all</PrivateAssets>
@@ -42,6 +59,7 @@
     <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.13.0" />
     <PackageReference Include="MonoMod.RuntimeDetour" Version="25.2.3" />
     <PackageReference Include="MonoMod.Utils" Version="25.0.8" />
+    <PackageReference Include="protobuf-net" Version="3.2.56" />
     <PackageReference Include="Scriban" Version="7.2.0" />
     <PackageReference Include="System.Reflection.Primitives" Version="4.3.0" />
     <PackageReference Include="xunit" Version="2.9.3" />
@@ -62,12 +80,33 @@
     <Reference Include="SandBox.View">
       <HintPath>..\..\mb2\Modules\SandBox\bin\Win64_Shipping_Client\SandBox.View.dll</HintPath>
     </Reference>
+    <Reference Include="SandBox.ViewModelCollection">
+      <HintPath>..\..\mb2\Modules\SandBox\bin\Win64_Shipping_Client\SandBox.ViewModelCollection.dll</HintPath>
+    </Reference>
     <Reference Include="TaleWorlds.CampaignSystem, Version=1.0.0.0, Culture=neutral, processorArchitecture=AMD64">
       <SpecificVersion>False</SpecificVersion>
       <HintPath>..\..\mb2\bin\Win64_Shipping_Client\TaleWorlds.CampaignSystem.dll</HintPath>
     </Reference>
+    <Reference Include="TaleWorlds.CampaignSystem.ViewModelCollection">
+      <HintPath>..\..\mb2\bin\Win64_Shipping_Client\TaleWorlds.CampaignSystem.ViewModelCollection.dll</HintPath>
+    </Reference>
+    <Reference Include="TaleWorlds.GauntletUI">
+      <HintPath>..\..\mb2\bin\Win64_Shipping_Client\TaleWorlds.GauntletUI.dll</HintPath>
+    </Reference>
+    <Reference Include="TaleWorlds.Engine.GauntletUI">
+      <HintPath>..\..\mb2\bin\Win64_Shipping_Client\TaleWorlds.Engine.GauntletUI.dll</HintPath>
+    </Reference>
+    <Reference Include="TaleWorlds.InputSystem">
+      <HintPath>..\..\mb2\bin\Win64_Shipping_Client\TaleWorlds.InputSystem.dll</HintPath>
+    </Reference>
+    <Reference Include="TaleWorlds.TwoDimension">
+      <HintPath>..\..\mb2\bin\Win64_Shipping_Client\TaleWorlds.TwoDimension.dll</HintPath>
+    </Reference>
     <Reference Include="TaleWorlds.Core">
       <HintPath>..\..\mb2\bin\Win64_Shipping_Client\TaleWorlds.Core.dll</HintPath>
+    </Reference>
+    <Reference Include="TaleWorlds.Core.ViewModelCollection">
+      <HintPath>..\..\mb2\bin\Win64_Shipping_Client\TaleWorlds.Core.ViewModelCollection.dll</HintPath>
     </Reference>
     <Reference Include="TaleWorlds.DotNet">
       <HintPath>..\..\mb2\bin\Win64_Shipping_Client\TaleWorlds.DotNet.dll</HintPath>
@@ -99,6 +138,9 @@
     <Reference Include="TaleWorlds.SaveSystem">
       <HintPath>..\..\mb2\bin\Win64_Shipping_Client\TaleWorlds.SaveSystem.dll</HintPath>
     </Reference>
+    <Reference Include="TaleWorlds.ScreenSystem">
+      <HintPath>..\..\mb2\bin\Win64_Shipping_Client\TaleWorlds.ScreenSystem.dll</HintPath>
+    </Reference>
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\Common\Common.csproj">
@@ -114,18 +156,19 @@
   <ItemGroup>
     <Publicize Include="SandBox" />
     <Publicize Include="TaleWorlds.CampaignSystem" />
+    <Publicize Include="TaleWorlds.CampaignSystem.ViewModelCollection" />
     <Publicize Include="TaleWorlds.Core" />
     <Publicize Include="TaleWorlds.Engine" />
     <Publicize Include="TaleWorlds.Library" />
+    <Publicize Include="TaleWorlds.GauntletUI" IncludeCompilerGeneratedMembers="false" />
+    <Publicize Include="TaleWorlds.Engine.GauntletUI" />
+    <Publicize Include="TaleWorlds.ScreenSystem" />
     <Publicize Include="TaleWorlds.Localization" />
     <Publicize Include="TaleWorlds.ModuleManager" />
     <Publicize Include="TaleWorlds.MountAndBlade" />
     <Publicize Include="TaleWorlds.MountAndBlade.Launcher.Library" />
     <Publicize Include="TaleWorlds.ObjectSystem" />
     <Publicize Include="TaleWorlds.SaveSystem" />
-  </ItemGroup>
-  <ItemGroup>
-    <Compile Include="..\ServerHeadless\Bootstrap\Patches\RaidPatches.cs" Link="Services\ServerHeadless\RaidPatches.cs" />
   </ItemGroup>
   <ItemGroup>
     <Folder Include="AutoSync\Snapshots\" />

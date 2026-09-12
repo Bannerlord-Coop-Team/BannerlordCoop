@@ -1,4 +1,22 @@
-﻿using TaleWorlds.CampaignSystem.MapEvents;
+﻿using Common;
+using Common.PacketHandlers;
+using Common.Serialization;
+using Common.Util;
+using Common.Network.Messages;
+using Common.Util;
+using Coop.Core.Server.Connections.Messages;
+using E2E.Tests.Environment.Instance;
+using E2E.Tests.Util;
+using GameInterface.Services.Players;
+using GameInterface.Services.MapEventSides.Messages;
+using GameInterface.Services.MapEvents.Initialization;
+using GameInterface.Services.MapEvents.Messages;
+using GameInterface.Services.MapEvents.Messages.Start;
+using GameInterface.Services.MapEvents.Patches;
+using TaleWorlds.CampaignSystem;
+using TaleWorlds.CampaignSystem.MapEvents;
+using TaleWorlds.CampaignSystem.Party;
+using TaleWorlds.Library;
 using Xunit.Abstractions;
 
 namespace E2E.Tests.Services.MapEvents;
@@ -7,42 +25,391 @@ public class MapEventCollectionTests : MapEventTestBase
 {
     public MapEventCollectionTests(ITestOutputHelper output) : base(output) { }
 
-    [Fact(Skip = "MapEvent._sides is a fixed-size MapEventSide[2] array, not a dynamic collection; AssertCollectionReferenceField does not apply")]
+    [Fact(Skip = "MapEvent._sides is a fixed-size MapEventSide[2] array")]
     public void Server_MapEvent_Sides_IsFixedArray() { }
 
     [Fact]
-    public void Server_MapEvent_Initialize_SyncsSidesToClients()
+    public void Server_MapEvent_CommitPublishesCompleteLockedGraph()
     {
-        // Act
-        var mapEventCtx = CreateServerMapEvent();
+        Server.NetworkSentMessages.Clear();
+        var staged = CreateServerMapEvent(commit: false);
+        Assert.Empty(Server.NetworkSentMessages.GetMessages<NetworkMapEventInitialized>());
+        Assert.Equal(2, Server.NetworkSentMessages.GetMessages<NetworkMapEventPartyPending>().Count());
+        var messages = Server.NetworkSentMessages.Messages.ToList();
+        Assert.True(messages.FindLastIndex(x => x is NetworkMapEventPartyPending) <
+            messages.FindIndex(x => x is NetworkAssignMapEventSide));
+        Server.Call(() => Assert.False(PendingMapEventPartyMovementPatch.CanAdvancePosition(
+            Get<MobileParty>(Server, staged.DefenderPartyId).Party)));
+        foreach (var client in Clients) AssertPending(client, staged, true);
 
-        // Resolve the side IDs from the server
-        string? attackerSideId = null;
-        string? defenderSideId = null;
-        string? attackerMapEventPartyId = null;
-        string? defenderMapEventPartyId = null;
+        Server.Call(() => Campaign.Current.MapEventManager.OnMapEventCreated(
+            Get<MapEvent>(Server, staged.MapEventId)), MapEventDisabledMethods);
+
+        var marker = Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkMapEventInitialized>());
+        Assert.False(marker.IsTerminal);
+        Assert.NotNull(marker.TroopUpgradeTrackerId);
+        Assert.NotNull(marker.ComponentId);
+        foreach (var instance in AllInstances) AssertCommitted(instance, staged);
+        foreach (var client in Clients) AssertPending(client, staged, false);
+    }
+
+    [Fact]
+    public void ConnectedClients_FieldBattleReinforcement_ReceivesEventPositionAdder()
+    {
+        var battle = CreateServerMapEvent();
+        string reinforcementId = null;
+        Vec2 expectedOffset = default;
 
         Server.Call(() =>
         {
-            Assert.True(Server.ObjectManager.TryGetObject<MapEvent>(mapEventCtx.MapEventId, out var mapEvent));
-            Assert.True(Server.ObjectManager.TryGetId(mapEvent.AttackerSide, out attackerSideId));
-            Assert.True(Server.ObjectManager.TryGetId(mapEvent.DefenderSide, out defenderSideId));
-            Assert.True(Server.ObjectManager.TryGetId(mapEvent.AttackerSide.Parties[0], out attackerMapEventPartyId));
-            Assert.True(Server.ObjectManager.TryGetId(mapEvent.DefenderSide.Parties[0], out defenderMapEventPartyId));
-        });
+            var mapEvent = Get<MapEvent>(Server, battle.MapEventId);
+            var reinforcement = GameObjectCreator.CreateInitializedObject<MobileParty>();
+            reinforcement.Position = new CampaignVec2(new Vec2(25f, 15f), true);
+            reinforcement.Party.MapEventSide = mapEvent.AttackerSide;
 
-        Assert.NotNull(attackerSideId);
-        Assert.NotNull(defenderSideId);
-        Assert.NotNull(attackerMapEventPartyId);
-        Assert.NotNull(defenderMapEventPartyId);
+            Assert.True(Server.ObjectManager.TryGetId(reinforcement, out reinforcementId));
+            expectedOffset = reinforcement.EventPositionAdder;
+        }, MapEventDisabledMethods);
 
-        // Assert — sides and parties propagated to all clients
+        Assert.NotEqual(Vec2.Zero, expectedOffset);
         foreach (var client in Clients)
         {
-            Assert.True(client.ObjectManager.TryGetObject<MapEventSide>(attackerSideId, out _));
-            Assert.True(client.ObjectManager.TryGetObject<MapEventSide>(defenderSideId, out _));
-            Assert.True(client.ObjectManager.TryGetObject<MapEventParty>(attackerMapEventPartyId, out _));
-            Assert.True(client.ObjectManager.TryGetObject<MapEventParty>(defenderMapEventPartyId, out _));
+            client.Call(() =>
+            {
+                var reinforcement = Get<MobileParty>(client, reinforcementId);
+                Assert.Equal(expectedOffset, reinforcement.EventPositionAdder);
+                Assert.Same(Get<MapEvent>(client, battle.MapEventId), reinforcement.MapEvent);
+            });
         }
     }
+
+    [Fact]
+    public void Client_RunAfterCommit_RunsAfterPartySidesAreAssigned()
+    {
+        var staged = CreateServerMapEvent(commit: false);
+        var callbacksRan = Clients.ToDictionary(client => client, _ => false);
+
+        foreach (var client in Clients)
+        {
+            client.Call(() =>
+            {
+                var mapEvent = Get<MapEvent>(client, staged.MapEventId);
+                client.Resolve<IMapEventInitializationBarrier>().RunAfterCommit(mapEvent, () =>
+                {
+                    Assert.All(mapEvent.InvolvedParties, party => Assert.Same(mapEvent, party.MapEvent));
+                    callbacksRan[client] = true;
+                });
+                Assert.False(callbacksRan[client]);
+            });
+        }
+
+        Server.Call(() => Campaign.Current.MapEventManager.OnMapEventCreated(
+            Get<MapEvent>(Server, staged.MapEventId)), MapEventDisabledMethods);
+
+        foreach (var client in Clients)
+        {
+            client.Call(() =>
+            {
+                Assert.True(callbacksRan[client]);
+                var mapEvent = Get<MapEvent>(client, staged.MapEventId);
+                bool immediateCallbackRan = false;
+                client.Resolve<IMapEventInitializationBarrier>()
+                    .RunAfterCommit(mapEvent, () => immediateCallbackRan = true);
+                Assert.True(immediateCallbackRan);
+            });
+        }
+    }
+
+    [Fact]
+    public void Client_InvolvedPartiesSnapshotWaitsForMapEventCommit()
+    {
+        var staged = CreateServerMapEvent(commit: false);
+        var client = Clients.First();
+        var initialPosition = new CampaignVec2(new Vec2(4f, 5f), true);
+        var authoritativePosition = new CampaignVec2(new Vec2(42f, 24f), true);
+        string mapEventPartyId = null;
+
+        Server.Call(() =>
+        {
+            var mapEvent = Get<MapEvent>(Server, staged.MapEventId);
+            var attacker = Get<MobileParty>(Server, staged.AttackerPartyId);
+            var mapEventParty = Assert.Single(mapEvent.AttackerSide.Parties,
+                party => ReferenceEquals(party.Party, attacker.Party));
+            Assert.True(Server.ObjectManager.TryGetId(mapEventParty, out mapEventPartyId));
+        });
+
+        client.Call(() =>
+        {
+            using (new AllowedThread())
+                Get<MobileParty>(client, staged.AttackerPartyId).Position = initialPosition;
+        });
+
+        client.SimulateMessage(Server.NetPeer, new NetworkAddInvolvedParties(
+            staged.MapEventId,
+            new[] { mapEventPartyId },
+            new[] { authoritativePosition }));
+
+        client.Call(() => Assert.Equal(initialPosition,
+            Get<MobileParty>(client, staged.AttackerPartyId).Position));
+
+        Server.Call(() => Campaign.Current.MapEventManager.OnMapEventCreated(
+            Get<MapEvent>(Server, staged.MapEventId)), MapEventDisabledMethods);
+
+        client.Call(() => Assert.Equal(authoritativePosition,
+            Get<MobileParty>(client, staged.AttackerPartyId).Position));
+    }
+
+    [Fact]
+    public void Client_AddBattlePartyRestoresPartyReferenceBeforeAttachment()
+    {
+        var staged = CreateServerMapEvent();
+        string mapEventSideId = null;
+        string mapEventPartyId = null;
+        string partyId = null;
+
+        Server.Call(() =>
+        {
+            var mapEvent = Get<MapEvent>(Server, staged.MapEventId);
+            var mapEventParty = Assert.Single(mapEvent.AttackerSide.Parties,
+                candidate => ReferenceEquals(candidate.Party, Get<MobileParty>(Server, staged.AttackerPartyId).Party));
+            Assert.True(Server.ObjectManager.TryGetId(mapEvent.AttackerSide, out mapEventSideId));
+            Assert.True(Server.ObjectManager.TryGetId(mapEventParty, out mapEventPartyId));
+            Assert.True(Server.ObjectManager.TryGetId(mapEventParty.Party, out partyId));
+        });
+
+        var client = Clients.First();
+        client.Call(() =>
+        {
+            var mapEventParty = Get<MapEventParty>(client, mapEventPartyId);
+            using (new AllowedThread()) mapEventParty.Party = null;
+        });
+
+        client.SimulateMessage(Server.NetPeer,
+            new NetworkAddBattleParty(mapEventSideId, mapEventPartyId, partyId));
+
+        client.Call(() => Assert.Same(
+            Get<PartyBase>(client, partyId),
+            Get<MapEventParty>(client, mapEventPartyId).Party));
+    }
+
+    [Fact]
+    public void Server_RejectsNetworkAddBattlePartyPacket()
+    {
+        var message = new NetworkAddBattleParty("side", "map-event-party", "party");
+        var serializer = Server.Resolve<ICommonSerializer>();
+        var packet = MessagePacket.Create(message, serializer);
+
+        Server.SimulatePacket(Clients.First().NetPeer, packet);
+
+        Assert.Equal(0, Server.InternalMessages.GetMessageCount<NetworkAddBattleParty>());
+    }
+
+    [Fact]
+    public void Server_NetworkAddBattlePartyHandlerDoesNotRebindParty()
+    {
+        var staged = CreateServerMapEvent();
+        string mapEventSideId = null;
+        string mapEventPartyId = null;
+        string defenderPartyId = null;
+
+        Server.Call(() =>
+        {
+            var mapEvent = Get<MapEvent>(Server, staged.MapEventId);
+            var attackerParty = Get<MobileParty>(Server, staged.AttackerPartyId).Party;
+            var mapEventParty = Assert.Single(mapEvent.AttackerSide.Parties,
+                candidate => ReferenceEquals(candidate.Party, attackerParty));
+            Assert.True(Server.ObjectManager.TryGetId(mapEvent.AttackerSide, out mapEventSideId));
+            Assert.True(Server.ObjectManager.TryGetId(mapEventParty, out mapEventPartyId));
+            Assert.True(Server.ObjectManager.TryGetId(
+                Get<MobileParty>(Server, staged.DefenderPartyId).Party,
+                out defenderPartyId));
+        });
+
+        Server.SimulateMessage(Clients.First().NetPeer,
+            new NetworkAddBattleParty(mapEventSideId, mapEventPartyId, defenderPartyId));
+
+        Server.Call(() => Assert.Same(
+            Get<MobileParty>(Server, staged.AttackerPartyId).Party,
+            Get<MapEventParty>(Server, mapEventPartyId).Party));
+    }
+
+    [Fact]
+    public void Client_CommitRestoresAuthoritativeComponentLinks()
+    {
+        var staged = CreateServerMapEvent(commit: false);
+        string componentId = null;
+        Server.Call(() => Assert.True(Server.ObjectManager.TryGetId(
+            Get<MapEvent>(Server, staged.MapEventId).Component, out componentId)));
+        Assert.NotNull(componentId);
+
+        foreach (var client in Clients)
+        {
+            client.Call(() =>
+            {
+                var mapEvent = Get<MapEvent>(client, staged.MapEventId);
+                var component = Get<FieldBattleEventComponent>(client, componentId);
+                using (new AllowedThread())
+                {
+                    mapEvent.Component = null;
+                    component.MapEvent = null;
+                }
+            });
+        }
+
+        Server.Call(() => Campaign.Current.MapEventManager.OnMapEventCreated(
+            Get<MapEvent>(Server, staged.MapEventId)), MapEventDisabledMethods);
+
+        foreach (var client in Clients)
+        {
+            client.Call(() =>
+            {
+                var mapEvent = Get<MapEvent>(client, staged.MapEventId);
+                var component = Get<FieldBattleEventComponent>(client, componentId);
+                Assert.Same(component, mapEvent.Component);
+                Assert.Same(mapEvent, component.MapEvent);
+            });
+        }
+    }
+
+    [Fact]
+    public void Server_MapEvent_AbortDestroysStagedGraph()
+    {
+        Server.NetworkSentMessages.Clear();
+        var staged = CreateServerMapEvent(commit: false);
+        PartyBase defender = null;
+
+        Server.Call(() =>
+        {
+            var mapEvent = Get<MapEvent>(Server, staged.MapEventId);
+            defender = Get<MobileParty>(Server, staged.DefenderPartyId).Party;
+            Server.Resolve<IMapEventInitializationBarrier>().AbortServer(mapEvent);
+            Assert.True(PendingMapEventPartyMovementPatch.CanAdvancePosition(defender));
+        }, MapEventDisabledMethods);
+
+        Assert.True(Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkMapEventInitialized>()).IsTerminal);
+        foreach (var instance in AllInstances) instance.Call(() =>
+        {
+            Assert.False(instance.ObjectManager.Contains(staged.MapEventId));
+            Assert.Null(Get<MobileParty>(instance, staged.AttackerPartyId).MapEvent);
+            Assert.Null(Get<MobileParty>(instance, staged.DefenderPartyId).MapEvent);
+        });
+    }
+
+    [Fact]
+    public void PendingMovementBinding_IsIsolatedPerLifetimeScope()
+    {
+        var staged = CreateServerMapEvent(commit: false);
+        PartyBase serverDefender = null;
+
+        Server.Call(() =>
+        {
+            serverDefender = Get<MobileParty>(Server, staged.DefenderPartyId).Party;
+            Assert.False(PendingMapEventPartyMovementPatch.CanAdvancePosition(serverDefender));
+        });
+
+        foreach (var client in Clients)
+        {
+            client.Call(() =>
+                Assert.True(PendingMapEventPartyMovementPatch.CanAdvancePosition(serverDefender)));
+        }
+    }
+
+    [Fact]
+    public void Client_PendingPartyCancellationUnblocksMovement()
+    {
+        var staged = CreateServerMapEvent(commit: false);
+        var client = Clients.First();
+        string defenderPartyBaseId = null;
+
+        client.Call(() =>
+        {
+            var defender = Get<MobileParty>(client, staged.DefenderPartyId).Party;
+            Assert.True(client.ObjectManager.TryGetId(defender, out defenderPartyBaseId));
+        });
+
+        client.SimulateMessage(Server.NetPeer, new NetworkMapEventPartyPending(
+            staged.MapEventId,
+            defenderPartyBaseId,
+            isCancellation: true));
+
+        client.Call(() =>
+        {
+            var defender = Get<MobileParty>(client, staged.DefenderPartyId).Party;
+            Assert.False(client.Resolve<IMapEventInitializationBarrier>().IsPartyPending(defender));
+            Assert.True(PendingMapEventPartyMovementPatch.CanAdvancePosition(defender));
+        });
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void PlayerDisconnect_MapEventParkingFollowsReconnectState(bool reconnectBeforeMapEventEnds)
+    {
+        var mapEvent = CreateServerMapEvent();
+        var client = Clients.First();
+        var heroId = TestEnvironment.CreateRegisteredObject<Hero>();
+        RegisterAsPlayerParty("PlayerOne", heroId, mapEvent.AttackerPartyId);
+
+        Server.Call(() =>
+        {
+            Get<MobileParty>(Server, mapEvent.AttackerPartyId).IsActive = true;
+            Server.Resolve<IPlayerManager>().SetPeer("PlayerOne", client.NetPeer);
+        });
+
+        Server.SimulateMessage(this, new PlayerDisconnected(client.NetPeer, default));
+
+        Server.Call(() =>
+        {
+            var party = Get<MobileParty>(Server, mapEvent.AttackerPartyId);
+            Assert.True(party.IsActive);
+            Assert.NotNull(party.MapEvent);
+        });
+
+        if (reconnectBeforeMapEventEnds)
+        {
+            Server.Call(() => Server.Resolve<IPlayerManager>().SetPeer("PlayerOne", client.NetPeer));
+            Server.SimulateMessage(this, new PlayerCampaignEntered(client.NetPeer));
+        }
+
+        DestroyServerMapEvent(mapEvent.MapEventId);
+
+        Server.Call(() =>
+        {
+            var party = Get<MobileParty>(Server, mapEvent.AttackerPartyId);
+            Assert.Equal(reconnectBeforeMapEventEnds, party.IsActive);
+            Assert.Null(party.MapEvent);
+        });
+    }
+
+    private static void AssertCommitted(EnvironmentInstance instance, MapEventContext staged) => instance.Call(() =>
+    {
+        var mapEvent = Get<MapEvent>(instance, staged.MapEventId);
+        var attacker = Get<MobileParty>(instance, staged.AttackerPartyId);
+        var defender = Get<MobileParty>(instance, staged.DefenderPartyId);
+        Assert.Contains(mapEvent, Campaign.Current.MapEventManager.MapEvents);
+        Assert.All(new[] { attacker, defender }, party => Assert.Same(mapEvent, party.MapEvent));
+        Assert.Equal(2, mapEvent.TroopUpgradeTracker._mapEventParties.Count);
+    });
+
+    private static void AssertPending(EnvironmentInstance instance, MapEventContext staged, bool expected) =>
+        instance.Call(() =>
+        {
+            var barrier = instance.Resolve<IMapEventInitializationBarrier>();
+            var attacker = Get<MobileParty>(instance, staged.AttackerPartyId).Party;
+            var defender = Get<MobileParty>(instance, staged.DefenderPartyId).Party;
+            foreach (var party in new[] { attacker, defender })
+            {
+                Assert.Equal(expected, barrier.IsPartyPending(party));
+                Assert.Equal(expected, party.MapEventSide == null);
+            }
+            Assert.Equal(!expected, PendingMapEventPartyMovementPatch.CanAdvancePosition(defender));
+        });
+
+    private static T Get<T>(EnvironmentInstance instance, string id) where T : class
+    {
+        Assert.True(instance.ObjectManager.TryGetObject<T>(id, out var value));
+        return value;
+    }
+
+    private IEnumerable<EnvironmentInstance> AllInstances => Clients.Prepend(Server);
 }

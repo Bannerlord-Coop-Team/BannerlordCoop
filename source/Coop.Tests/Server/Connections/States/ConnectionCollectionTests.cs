@@ -6,6 +6,7 @@ using Coop.Core.Server.Connections.Messages;
 using Coop.Core.Server.Connections.States;
 using Coop.Tests.Mocks;
 using LiteNetLib;
+using Moq;
 using Xunit;
 using Xunit.Abstractions;
 
@@ -77,6 +78,35 @@ namespace Coop.Tests.Server.Connections.States
         }
 
         [Fact]
+        public void ConnectedPlayers_BroadcastsAfterSuccessfulChangesOnly()
+        {
+            var connectPayload = new MessagePayload<PlayerConnected>(this, new PlayerConnected(playerPeer));
+            var disconnectPayload = new MessagePayload<PlayerDisconnected>(this,
+                new PlayerDisconnected(playerPeer, default));
+            serverComponent.TestMessageBroker.Messages.Clear();
+
+            connectionCollection.PlayerJoiningHandler(connectPayload);
+
+            var connected = Assert.Single(
+                serverComponent.TestMessageBroker.GetMessagesFromType<ConnectedPlayersChanged>());
+            Assert.Equal(1, connected.ConnectedPlayers);
+
+            serverComponent.TestMessageBroker.Messages.Clear();
+            connectionCollection.PlayerJoiningHandler(connectPayload);
+            Assert.Empty(serverComponent.TestMessageBroker.GetMessagesFromType<ConnectedPlayersChanged>());
+
+            serverComponent.TestMessageBroker.Messages.Clear();
+            connectionCollection.PlayerDisconnectedHandler(disconnectPayload);
+            var disconnected = Assert.Single(
+                serverComponent.TestMessageBroker.GetMessagesFromType<ConnectedPlayersChanged>());
+            Assert.Equal(0, disconnected.ConnectedPlayers);
+
+            serverComponent.TestMessageBroker.Messages.Clear();
+            connectionCollection.PlayerDisconnectedHandler(disconnectPayload);
+            Assert.Empty(serverComponent.TestMessageBroker.GetMessagesFromType<ConnectedPlayersChanged>());
+        }
+
+        [Fact]
         public void PlayersLoading_BlockedUntilPlayerEntersCampaign()
         {
             // Arrange
@@ -102,6 +132,34 @@ namespace Coop.Tests.Server.Connections.States
 
             connectionLogic.SetState<CampaignState>();
             Assert.Empty(connectionCollection.LoadingPeers);
+        }
+
+        [Fact]
+        public void HasCompletedCampaignSynchronization_ReadsStateOnce()
+        {
+            var connectPayload = new MessagePayload<PlayerConnected>(this, new PlayerConnected(playerPeer));
+            connectionCollection.PlayerJoiningHandler(connectPayload);
+            var missionState = connectionCollection.ConnectionStates[playerPeer].SetState<MissionState>();
+            var connection = new Mock<IConnectionLogic>();
+            connection.SetupGet(logic => logic.State).Returns(missionState);
+            connectionCollection.ConnectionStates[playerPeer] = connection.Object;
+
+            Assert.True(connectionCollection.HasCompletedCampaignSynchronization(playerPeer));
+            connection.VerifyGet(logic => logic.State, Times.Once);
+        }
+
+        [Fact]
+        public void HasCompletedCampaignSynchronization_AcceptsCampaignAndMissionStates()
+        {
+            var connectPayload = new MessagePayload<PlayerConnected>(this, new PlayerConnected(playerPeer));
+            connectionCollection.PlayerJoiningHandler(connectPayload);
+            var connection = connectionCollection.ConnectionStates[playerPeer];
+
+            connection.SetState<CampaignState>();
+            Assert.True(connectionCollection.HasCompletedCampaignSynchronization(playerPeer));
+
+            connection.SetState<MissionState>();
+            Assert.True(connectionCollection.HasCompletedCampaignSynchronization(playerPeer));
         }
 
         [Fact]

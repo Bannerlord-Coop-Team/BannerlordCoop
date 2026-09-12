@@ -1,17 +1,51 @@
-﻿using Autofac;
+﻿using Common.Commands;
+using Autofac;
+using Common;
+using Common.Messaging;
 using Common.Logging;
+using GameInterface.Serialization.External;
+using GameInterface.Services.Companions.Messages;
+using GameInterface.Services.MobileParties.Messages.Roles;
 using GameInterface.Services.ObjectManager;
+using GameInterface.Services.Players;
+using GameInterface.Services.Players.Data;
+using GameInterface.Utils.Commands;
 using Serilog;
+using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Text;
 using TaleWorlds.CampaignSystem;
-using static TaleWorlds.Library.CommandLineFunctionality;
+using TaleWorlds.CampaignSystem.Actions;
+using TaleWorlds.CampaignSystem.CampaignBehaviors;
+using TaleWorlds.CampaignSystem.Conversation;
+using TaleWorlds.CampaignSystem.Encounters;
+using TaleWorlds.CampaignSystem.GameState;
+using TaleWorlds.CampaignSystem.Party;
+using TaleWorlds.Core;
+using TaleWorlds.Library;
+using TaleWorlds.Localization;
+using Helpers;
 
 namespace GameInterface.Services.Companions.Commands;
 
 internal class CompanionsCommands
 {
+    private static CoopCommandResult Succeeded(string output) =>
+
+        new CoopCommandResult(true, output);
+
+    private static CoopCommandResult Failed(string output) =>
+
+        new CoopCommandResult(false, output, "command_failed");
+
+    private const string RoleFixtureName = "Issue 2583 Role Companion";
     private static readonly ILogger Logger = LogManager.GetLogger<CompanionsCommands>();
+    private static CompanionRoleFixture pendingRoleFixture;
+    private static CompanionDismissalFixture pendingDismissalFixture;
+    private static CompanionDismissalCompleted? lastDismissalCompletion;
+    private static DismissalEncounterObservation lastDismissalEncounterObservation;
+    private static Action<MessagePayload<CompanionDismissalCompleted>> dismissalCompletionHandler;
 
     /// <summary>
     /// Attempts to get the ObjectManager
@@ -27,23 +61,987 @@ internal class CompanionsCommands
     /// <summary>
     /// View a list of all wanderers in the game
     /// </summary>
-    [CommandLineArgumentFunction("listwanderers", "coop.debug.companions")]
-    public static string ListWanderersCommand(List<string> strings)
+
+    public sealed class CompanionListWanderersCoopCommand : ICoopCommand
     {
-        StringBuilder stringBuilder = new StringBuilder();
-        foreach (var hero in Hero.AllAliveHeroes)
+        public string Prefix => "coop.debug.companions";
+
+        public string Name => "list_wanderers";
+
+        public string Description => "Lists available wanderer heroes.";
+
+        public CoopCommandSide Side => CoopCommandSide.Both;
+
+        public IExpectedArgs[] ExpectedArgs { get; } = System.Array.Empty<IExpectedArgs>();
+
+        public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
         {
-            if (hero.IsWanderer)
+            if (!TryGetObjectManager(out var objectManager)) return Failed("Unable to resolve ObjectManager.");
+
+            StringBuilder stringBuilder = new StringBuilder();
+            foreach (var hero in Hero.AllAliveHeroes)
             {
-                stringBuilder.AppendLine(hero.CurrentSettlement + " (" + hero.Name.ToString() + ")");
+                if (hero.IsWanderer)
+                {
+                    if (!objectManager.TryGetIdWithLogging(hero, out var heroId))
+                    {
+                        stringBuilder.AppendLine($"Failed to resolve hero id for wanderer with name {hero.Name}");
+                        continue;
+                    }
+
+                    stringBuilder.AppendLine($"{hero.Name} (ID: {heroId}) Current Settlement: {hero.CurrentSettlement}");
+                }
+            }
+
+            string result = stringBuilder.ToString();
+            if (result.Length > 0)
+            {
+                return Succeeded(result);
+            }
+            return Failed("No wanderers found.");
+        }
+    }
+
+    /// <summary>
+    /// Clear the wanderers from the map to roll new ones
+    /// </summary>
+
+    public sealed class CompanionClearWanderersCoopCommand : ICoopCommand
+    {
+        public string Prefix => "coop.debug.companions";
+
+        public string Name => "clear_wanderers";
+
+        public string Description => "Clears available wanderer heroes.";
+
+        public CoopCommandSide Side => CoopCommandSide.Server;
+
+        public IExpectedArgs[] ExpectedArgs { get; } = System.Array.Empty<IExpectedArgs>();
+
+        public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
+        {
+            if (ModInformation.IsClient) return Failed("This command can only be run on the server.");
+
+            foreach (var hero in Hero.AllAliveHeroes.ToList())
+            {
+                if (hero.IsWanderer && hero.CompanionOf == null)
+                {
+                    KillCharacterAction.ApplyByRemove(hero, false, true);
+                }
+            }
+
+            return Succeeded("All wanderers removed.");
+        }
+    }
+
+    public sealed class CompanionRoleFixtureSetupCoopCommand : ICoopCommand
+    {
+        public string Prefix => "coop.debug.companions";
+
+        public string Name => "role_fixture_setup";
+
+        public string Description => "Starts the companion-role fixture.";
+
+        public CoopCommandSide Side => CoopCommandSide.Server;
+
+        public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
+        {
+            new ExpectedArgs("controller_id", "The player controller id."),
+        };
+
+        public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
+        {
+            if (ModInformation.IsClient) return Failed("Command can only be run on the server.");
+            string error;
+            if (pendingRoleFixture != null) return Failed("A companion-role fixture is already active.");
+
+            if (!TryResolvePlayer(args[0], out _, out var objectManager, out var player,
+                out var playerHero, out var playerClan, out var playerParty, out error))
+                return Failed("Failed to set up companion-role fixture: " + error);
+
+            var template = Hero.AllAliveHeroes.FirstOrDefault(hero => hero.IsWanderer && hero != playerHero);
+            if (template == null)
+                return Failed("Failed to set up companion-role fixture: no living wanderer template is available.");
+
+            int originalMemberCount = playerParty.MemberRoster.TotalManCount;
+            int originalCompanionCount = playerClan.Companions.Count();
+            var originalScout = playerParty.GetRoleHolder(PartyRole.Scout);
+            var roleCompanion = CreateFixtureCompanion(
+                template, playerHero.HomeSettlement, RoleFixtureName);
+            if (!objectManager.TryGetIdWithLogging(roleCompanion, out var roleCompanionId))
+                return Failed("Failed to set up companion-role fixture: generated hero was not registered.");
+
+            AddCompanionAction.Apply(playerClan, roleCompanion);
+            AddHeroToPartyAction.Apply(roleCompanion, playerParty, true);
+
+            pendingRoleFixture = new CompanionRoleFixture(
+                player.ControllerId,
+                player.MobilePartyId,
+                roleCompanion,
+                roleCompanionId,
+                originalScout,
+                originalMemberCount,
+                originalCompanionCount);
+
+            string originalScoutId = "none";
+            if (originalScout != null && objectManager.TryGetIdWithLogging(originalScout, out var resolvedScoutId))
+                originalScoutId = resolvedScoutId;
+
+            return Succeeded($"ROLE_FIXTURE_READY controller={player.ControllerId} party={player.MobilePartyId} " +
+                $"companion={roleCompanionId} originalScout={originalScoutId} " +
+                $"members={playerParty.MemberRoster.TotalManCount} companions={playerClan.Companions.Count()}");
+        }
+    }
+
+    public sealed class CompanionRoleFixtureOpenConversationCoopCommand : ICoopCommand
+    {
+        public string Prefix => "coop.debug.companions";
+
+        public string Name => "role_fixture_open_conversation";
+
+        public string Description => "Opens the companion-role fixture conversation.";
+
+        public CoopCommandSide Side => CoopCommandSide.Client;
+
+        public IExpectedArgs[] ExpectedArgs { get; } = System.Array.Empty<IExpectedArgs>();
+
+        public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
+        {
+            if (!ModInformation.IsClient) return Failed("Command can only be run on a client.");
+            var companion = FindRoleFixtureCompanion();
+            if (companion == null) return Failed("The companion-role fixture hero was not found.");
+            if (companion.Clan != Clan.PlayerClan || companion.PartyBelongedTo != MobileParty.MainParty)
+                return Failed("The fixture companion is not in the local player's clan and main party.");
+            if (PlayerEncounter.Current != null) return Failed("A player encounter is already active.");
+            if (Campaign.Current.ConversationManager.IsConversationInProgress)
+                return Failed("A conversation is already active.");
+            if (!Campaign.Current.Models.ClanMemberPartyRoleModel.IsHeroAssignableForPartyRoleInParty(
+                PartyRole.Scout, companion, MobileParty.MainParty))
+                return Failed("The fixture companion is not eligible for the Scout role.");
+
+            try
+            {
+                Campaign.Current.CurrentConversationContext = ConversationContext.PartyEncounter;
+                CampaignMapConversation.OpenConversation(
+                    new ConversationCharacterData(CharacterObject.PlayerCharacter, PartyBase.MainParty, noHorse: true),
+                    new ConversationCharacterData(companion.CharacterObject, PartyBase.MainParty, noHorse: true));
+                if (Hero.OneToOneConversationHero != companion)
+                    throw new InvalidOperationException("The live conversation did not select the fixture companion.");
+
+                return Succeeded($"ROLE_CONVERSATION_OPEN companion={companion.StringId} conversationHeroMatched=True");
+            }
+            catch (Exception exception)
+            {
+                if (Campaign.Current.ConversationManager.IsConversationInProgress)
+                    Campaign.Current.ConversationManager.EndConversation();
+                return Failed("Failed to open the live role conversation: " + exception.Message);
             }
         }
+    }
 
-        string result = stringBuilder.ToString();
-        if (result.Length > 0)
+    public sealed class CompanionRoleFixtureConversationStateCoopCommand : ICoopCommand
+    {
+        public string Prefix => "coop.debug.companions";
+
+        public string Name => "role_fixture_conversation_state";
+
+        public string Description => "Reports companion-role conversation state.";
+
+        public CoopCommandSide Side => CoopCommandSide.Client;
+
+        public IExpectedArgs[] ExpectedArgs { get; } = System.Array.Empty<IExpectedArgs>();
+
+        public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
         {
-            return result;
+            if (!ModInformation.IsClient) return Failed("Command can only be run on a client.");
+
+            var companion = FindRoleFixtureCompanion();
+            var mapState = Game.Current?.GameStateManager?.ActiveState as MapState;
+            bool conversationActive = Campaign.Current?.ConversationManager?.IsConversationInProgress == true;
+            bool mapConversationActive = mapState?.MapConversationActive == true;
+            bool conversationHeroMatched = companion != null && Hero.OneToOneConversationHero == companion;
+            return Succeeded($"ROLE_CONVERSATION_STATE active={conversationActive} mapActive={mapConversationActive} " +
+                $"companion={companion?.StringId ?? "none"} conversationHeroMatched={conversationHeroMatched}");
         }
-        return "Hero not found.";
+    }
+
+    public sealed class CompanionRoleFixturePrepareClientCoopCommand : ICoopCommand
+    {
+        public string Prefix => "coop.debug.companions";
+
+        public string Name => "role_fixture_prepare_client";
+
+        public string Description => "Prepares the client for the companion-role fixture.";
+
+        public CoopCommandSide Side => CoopCommandSide.Client;
+
+        public IExpectedArgs[] ExpectedArgs { get; } = System.Array.Empty<IExpectedArgs>();
+
+        public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
+        {
+            if (!ModInformation.IsClient) return Failed("Command can only be run on a client.");
+            var companion = FindRoleFixtureCompanion();
+            if (companion == null) return Failed("The companion-role fixture hero was not found.");
+            if (Hero.MainHero == null) return Failed("The local main hero is unavailable.");
+
+            bool initializedExSpouses = companion.ExSpouses == null;
+            if (initializedExSpouses)
+            {
+                HeroBinaryPackage.Hero_ExSpouses.SetValue(companion, new MBList<Hero>());
+            }
+
+            string relation = ConversationHelper.GetHeroRelationToHeroTextShort(
+                companion, Hero.MainHero, uppercaseFirst: true);
+            return Succeeded($"ROLE_FIXTURE_CLIENT_READY companion={companion.StringId} " +
+                $"mainHero={Hero.MainHero.StringId} initializedExSpouses={initializedExSpouses} " +
+                $"relation={relation}");
+        }
+    }
+
+    public sealed class CompanionRoleFixtureAssignScoutCoopCommand : ICoopCommand
+    {
+        public string Prefix => "coop.debug.companions";
+
+        public string Name => "role_fixture_assign_scout";
+
+        public string Description => "Assigns the fixture companion as scout.";
+
+        public CoopCommandSide Side => CoopCommandSide.Client;
+
+        public IExpectedArgs[] ExpectedArgs { get; } = System.Array.Empty<IExpectedArgs>();
+
+        public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
+        {
+            if (!ModInformation.IsClient) return Failed("Command can only be run on a client.");
+            var companion = Hero.OneToOneConversationHero;
+            if (!Campaign.Current.ConversationManager.IsConversationInProgress ||
+                companion?.Name?.ToString() != RoleFixtureName)
+                return Failed("The fixture companion conversation is not active.");
+
+            var behavior = Campaign.Current.GetCampaignBehavior<CompanionRolesCampaignBehavior>();
+            if (behavior == null) return Failed("CompanionRolesCampaignBehavior is unavailable.");
+
+            try
+            {
+                behavior.companion_becomes_scout_on_consequence();
+                Campaign.Current.ConversationManager.EndConversation();
+                return Succeeded($"ROLE_CONVERSATION_ASSIGNED companion={companion.StringId} role=Scout conversationHeroMatched=True");
+            }
+            catch (Exception exception)
+            {
+                if (Campaign.Current.ConversationManager.IsConversationInProgress)
+                    Campaign.Current.ConversationManager.EndConversation();
+                return Failed("Failed to assign the live conversation role: " + exception.Message);
+            }
+        }
+    }
+
+    public sealed class CompanionRoleFixtureStateCoopCommand : ICoopCommand
+    {
+        public string Prefix => "coop.debug.companions";
+
+        public string Name => "role_fixture_state";
+
+        public string Description => "Reports companion-role fixture state.";
+
+        public CoopCommandSide Side => CoopCommandSide.Both;
+
+        public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
+        {
+            new ExpectedArgs("party_id", "The registered mobile party id."),
+        };
+
+        public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
+        {
+            if (!TryGetObjectManager(out var objectManager)) return Failed("Unable to resolve ObjectManager.");
+            if (!objectManager.TryGetObject(args[0], out MobileParty party))
+                return Failed($"Party '{args[0]}' not found.");
+            var companion = FindRoleFixtureCompanion();
+            if (companion == null) return Failed("The companion-role fixture hero was not found.");
+
+            var scout = party.GetRoleHolder(PartyRole.Scout);
+            string scoutId = "none";
+            if (scout != null && objectManager.TryGetIdWithLogging(scout, out var resolvedScoutId))
+                scoutId = resolvedScoutId;
+            string roles = string.Join(",", party.GetHeroPartyRoles(companion));
+
+            return Succeeded($"ROLE_FIXTURE_STATE party={args[0]} companion={companion.StringId} " +
+                $"roster={party.MemberRoster.GetTroopCount(companion.CharacterObject)} " +
+                $"scout={scoutId} assigned={scout == companion} roles={roles}");
+        }
+    }
+
+    public sealed class CompanionScoutRoleStateCoopCommand : ICoopCommand
+    {
+        public string Prefix => "coop.debug.companions";
+
+        public string Name => "scout_role_state";
+
+        public string Description => "Reports the scout assigned to a party.";
+
+        public CoopCommandSide Side => CoopCommandSide.Both;
+
+        public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
+        {
+            new ExpectedArgs("party_id", "The registered mobile party id."),
+        };
+
+        public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
+        {
+            if (!TryGetObjectManager(out var objectManager)) return Failed("Unable to resolve ObjectManager.");
+            if (!objectManager.TryGetObject(args[0], out MobileParty party))
+                return Failed($"Party '{args[0]}' not found.");
+
+            var scout = party.GetRoleHolder(PartyRole.Scout);
+            string scoutId = "none";
+            if (scout != null && objectManager.TryGetIdWithLogging(scout, out var resolvedScoutId))
+                scoutId = resolvedScoutId;
+
+            return Succeeded($"SCOUT_ROLE_STATE party={args[0]} scout={scoutId}");
+        }
+    }
+
+    public sealed class CompanionRoleFixtureRestoreCoopCommand : ICoopCommand
+    {
+        public string Prefix => "coop.debug.companions";
+
+        public string Name => "role_fixture_restore";
+
+        public string Description => "Restores the companion-role fixture.";
+
+        public CoopCommandSide Side => CoopCommandSide.Server;
+
+        public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
+        {
+            new ExpectedArgs("controller_id", "The player controller id."),
+        };
+
+        public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
+        {
+            if (ModInformation.IsClient) return Failed("Command can only be run on the server.");
+            string error;
+            if (pendingRoleFixture == null) return Failed("No companion-role fixture is active.");
+            if (pendingRoleFixture.ControllerId != args[0])
+                return Failed($"The active companion-role fixture belongs to '{pendingRoleFixture.ControllerId}'.");
+            if (!TryResolvePlayer(args[0], out var playerManager, out var objectManager,
+                out _, out _, out var clan, out var party, out error))
+                return Failed("Failed to restore companion-role fixture: " + error);
+            if (!playerManager.TryGetPeer(args[0], out var peer))
+                return Failed($"Failed to restore companion-role fixture: player '{args[0]}' is not connected.");
+
+            var fixture = pendingRoleFixture;
+            if (fixture.RoleCompanion.CompanionOf != null)
+            {
+                MessageBroker.Instance.Publish(peer, CreateCleanupDismissalRequest(
+                    objectManager, fixture.RoleCompanion, fixture.RoleCompanionId));
+            }
+
+            if (party.GetRoleHolder(PartyRole.Scout) != fixture.OriginalScout)
+            {
+                party.SetPartyScout(fixture.OriginalScout);
+                MessageBroker.Instance.Publish(party, new SetPartyScout(fixture.OriginalScout, party));
+            }
+
+            int roleCompanionCount = party.MemberRoster.GetTroopCount(fixture.RoleCompanion.CharacterObject);
+            int memberCount = party.MemberRoster.TotalManCount;
+            int companionCount = clan.Companions.Count();
+            if (roleCompanionCount != 0 || memberCount != fixture.OriginalMemberCount ||
+                companionCount != fixture.OriginalCompanionCount ||
+                party.GetRoleHolder(PartyRole.Scout) != fixture.OriginalScout)
+            {
+                return Failed($"ROLE_FIXTURE_RESTORE_FAILED roleCompanion={roleCompanionCount} " +
+                    $"members={memberCount}/{fixture.OriginalMemberCount} " +
+                    $"companions={companionCount}/{fixture.OriginalCompanionCount}");
+            }
+
+            pendingRoleFixture = null;
+            return Succeeded($"ROLE_FIXTURE_RESTORED party={fixture.PlayerPartyId} roleCompanion=0 " +
+                $"members={memberCount} companions={companionCount}");
+        }
+    }
+
+    public sealed class CompanionDismissalFixtureSetupCoopCommand : ICoopCommand
+    {
+        public string Prefix => "coop.debug.companions";
+
+        public string Name => "dismissal_fixture_setup";
+
+        public string Description => "Starts the companion-dismissal fixture.";
+
+        public CoopCommandSide Side => CoopCommandSide.Server;
+
+        public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
+        {
+            new ExpectedArgs("controller_id", "The player controller id."),
+        };
+
+        public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
+        {
+            if (ModInformation.IsClient) return Failed("Command can only be run on the server.");
+            string error;
+            if (pendingDismissalFixture != null) return Failed("A companion-dismissal fixture is already active.");
+
+            if (!TryResolvePlayer(args[0], out var playerManager, out var objectManager, out var player,
+                out var playerHero, out var playerClan, out var playerParty, out error))
+                return Failed("Failed to set up companion-dismissal fixture: " + error);
+
+            var template = Hero.AllAliveHeroes.FirstOrDefault(hero => hero.IsWanderer && hero != playerHero);
+            if (template == null)
+                return Failed("Failed to set up companion-dismissal fixture: no living wanderer template is available.");
+
+            int originalMemberCount = playerParty.MemberRoster.TotalManCount;
+            int originalCompanionCount = playerClan.Companions.Count();
+            var dismissed = CreateFixtureCompanion(template, playerHero.HomeSettlement, "Issue 2280 Dismissed");
+            var replacement = CreateFixtureCompanion(template, playerHero.HomeSettlement, "Issue 2280 Replacement");
+
+            if (!objectManager.TryGetIdWithLogging(dismissed, out var dismissedHeroId) ||
+                !objectManager.TryGetIdWithLogging(replacement, out var replacementHeroId))
+                return Failed("Failed to set up companion-dismissal fixture: generated heroes were not registered.");
+
+            AddCompanionAction.Apply(playerClan, dismissed);
+            AddHeroToPartyAction.Apply(dismissed, playerParty, true);
+
+            pendingDismissalFixture = new CompanionDismissalFixture(
+                player.ControllerId,
+                player.HeroId,
+                player.ClanId,
+                player.MobilePartyId,
+                dismissed,
+                dismissedHeroId,
+                replacement,
+                replacementHeroId,
+                originalMemberCount,
+                originalCompanionCount);
+
+            return Succeeded($"FIXTURE_READY controller={player.ControllerId} hero={player.HeroId} " +
+                $"clan={player.ClanId} party={player.MobilePartyId} " +
+                $"dismissedHero={dismissedHeroId} replacementHero={replacementHeroId} " +
+                $"dismissedCount={playerParty.MemberRoster.GetTroopCount(dismissed.CharacterObject)}");
+        }
+    }
+
+    public sealed class CompanionDismissalFixturePrepareDismissCoopCommand : ICoopCommand
+    {
+        public string Prefix => "coop.debug.companions";
+
+        public string Name => "dismissal_fixture_prepare_dismiss";
+
+        public string Description => "Prepares the fixture companion dismissal.";
+
+        public CoopCommandSide Side => CoopCommandSide.Server;
+
+        public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
+        {
+            new ExpectedArgs("controller_id", "The player controller id."),
+            new ExpectedArgs("initial_copies", "The positive initial roster count."),
+        };
+
+        public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
+        {
+            if (ModInformation.IsClient) return Failed("Command can only be run on the server.");
+            string error;
+            if (!int.TryParse(args[1], out var initialCopies) || initialCopies < 1)
+                return Failed("Initial copies must be a positive integer.");
+            if (!TryGetFixture(args[0], out var fixture, out error)) return Failed(error);
+            if (!TryResolvePlayer(args[0], out _, out _, out _, out _, out _, out var party, out error))
+                return Failed("Failed to prepare fixture dismissal: " + error);
+
+            int current = party.MemberRoster.GetTroopCount(fixture.Dismissed.CharacterObject);
+            if (current < 1)
+                return Failed("Failed to prepare fixture dismissal: the companion is not in the player party.");
+            if (current != initialCopies)
+            {
+                party.MemberRoster.AddToCounts(fixture.Dismissed.CharacterObject, initialCopies - current);
+            }
+
+            return Succeeded($"DISMISSAL_PREPARED hero={fixture.DismissedHeroId} requestedCopies={initialCopies} " +
+                $"count={party.MemberRoster.GetTroopCount(fixture.Dismissed.CharacterObject)}");
+        }
+    }
+
+    public sealed class CompanionDismissalFixtureTriggerConsequenceCoopCommand : ICoopCommand
+    {
+        public string Prefix => "coop.debug.companions";
+
+        public string Name => "dismissal_fixture_trigger_consequence";
+
+        public string Description => "Triggers the companion dismissal consequence.";
+
+        public CoopCommandSide Side => CoopCommandSide.Client;
+
+        public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
+        {
+            new ExpectedArgs("dismissed_hero_id", "The registered dismissed hero id."),
+        };
+
+        public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
+        {
+            if (!ModInformation.IsClient) return Failed("Command can only be run on a client.");
+            if (!TryGetObjectManager(out var objectManager)) return Failed("Unable to resolve ObjectManager.");
+            if (!objectManager.TryGetObject(args[0], out Hero dismissed)) return Failed($"Hero '{args[0]}' not found.");
+            if (PlayerEncounter.Current != null) return Failed("A player encounter is already active.");
+            if (Campaign.Current.ConversationManager.IsConversationInProgress)
+                return Failed("A conversation is already active.");
+
+            var behavior = Campaign.Current.GetCampaignBehavior<CompanionRolesCampaignBehavior>();
+            if (behavior == null) return Failed("CompanionRolesCampaignBehavior is unavailable.");
+
+            lastDismissalCompletion = null;
+            lastDismissalEncounterObservation = new DismissalEncounterObservation();
+            if (dismissalCompletionHandler != null)
+            {
+                MessageBroker.Instance.Unsubscribe(dismissalCompletionHandler);
+            }
+            dismissalCompletionHandler = payload =>
+            {
+                if (payload.What.OneToOneConversationHeroId != args[0]) return;
+                lastDismissalCompletion = payload.What;
+                lastDismissalEncounterObservation.EncounterActiveAtCompletion = PlayerEncounter.Current != null;
+                lastDismissalEncounterObservation.LeaveAtCompletion =
+                    PlayerEncounter.Current != null && PlayerEncounter.LeaveEncounter;
+                MessageBroker.Instance.Unsubscribe(dismissalCompletionHandler);
+                dismissalCompletionHandler = null;
+            };
+            MessageBroker.Instance.Subscribe(dismissalCompletionHandler);
+
+            try
+            {
+                PlayerEncounter.Start();
+                Campaign.Current.CurrentConversationContext = ConversationContext.PartyEncounter;
+                CampaignMapConversation.OpenConversation(
+                    new ConversationCharacterData(CharacterObject.PlayerCharacter, PartyBase.MainParty, noHorse: true),
+                    new ConversationCharacterData(dismissed.CharacterObject, PartyBase.MainParty, noHorse: true));
+
+                lastDismissalEncounterObservation.EncounterActiveAtTrigger = PlayerEncounter.Current != null;
+                lastDismissalEncounterObservation.LeaveBeforeConsequence = PlayerEncounter.LeaveEncounter;
+                lastDismissalEncounterObservation.ConversationHeroMatched = Hero.OneToOneConversationHero == dismissed;
+                if (!lastDismissalEncounterObservation.ConversationHeroMatched)
+                    throw new InvalidOperationException("The live conversation did not select the dismissed companion.");
+
+                behavior.companion_fire_on_consequence();
+                lastDismissalEncounterObservation.LeaveAfterConsequence =
+                    PlayerEncounter.Current != null && PlayerEncounter.LeaveEncounter;
+
+                // The real farewell line ends at close_window after running this consequence. Close the synthetic
+                // map conversation too, while leaving its encounter held until the correlated acknowledgement.
+                Campaign.Current.ConversationManager.EndConversation();
+
+                return Succeeded($"DISMISSAL_CONSEQUENCE_TRIGGERED hero={args[0]} " +
+                    $"encounterActive={lastDismissalEncounterObservation.EncounterActiveAtTrigger} " +
+                    $"conversationHeroMatched={lastDismissalEncounterObservation.ConversationHeroMatched} " +
+                    $"leaveBefore={lastDismissalEncounterObservation.LeaveBeforeConsequence} " +
+                    $"leaveAfter={lastDismissalEncounterObservation.LeaveAfterConsequence}");
+            }
+            catch (Exception exception)
+            {
+                MessageBroker.Instance.Unsubscribe(dismissalCompletionHandler);
+                dismissalCompletionHandler = null;
+                if (Campaign.Current.ConversationManager.IsConversationInProgress)
+                    Campaign.Current.ConversationManager.EndConversation();
+                Campaign.Current.PlayerEncounter = null;
+                return Failed("Failed to trigger the live dismissal consequence: " + exception.Message);
+            }
+        }
+    }
+
+    public sealed class CompanionDismissalFixtureCompletionCoopCommand : ICoopCommand
+    {
+        public string Prefix => "coop.debug.companions";
+
+        public string Name => "dismissal_fixture_completion";
+
+        public string Description => "Reports companion dismissal completion.";
+
+        public CoopCommandSide Side => CoopCommandSide.Client;
+
+        public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
+        {
+            new ExpectedArgs("dismissed_hero_id", "The registered dismissed hero id."),
+        };
+
+        public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
+        {
+            if (!ModInformation.IsClient) return Failed("Command can only be run on a client.");
+            if (lastDismissalCompletion == null ||
+                lastDismissalCompletion.Value.OneToOneConversationHeroId != args[0])
+                return Succeeded($"DISMISSAL_PENDING hero={args[0]}");
+
+            var completion = lastDismissalCompletion.Value;
+            var observation = lastDismissalEncounterObservation;
+            return Succeeded($"DISMISSAL_COMPLETED hero={args[0]} request={completion.RequestId} " +
+                $"success={completion.Success} error={completion.Error ?? "none"} " +
+                $"encounterAtTrigger={observation?.EncounterActiveAtTrigger} " +
+                $"conversationHeroMatched={observation?.ConversationHeroMatched} " +
+                $"leaveBefore={observation?.LeaveBeforeConsequence} " +
+                $"leaveAfterConsequence={observation?.LeaveAfterConsequence} " +
+                $"encounterAtCompletion={observation?.EncounterActiveAtCompletion} " +
+                $"leaveAtCompletion={observation?.LeaveAtCompletion}");
+        }
+    }
+
+    public sealed class CompanionDismissalFixtureReleaseEncounterCoopCommand : ICoopCommand
+    {
+        public string Prefix => "coop.debug.companions";
+
+        public string Name => "dismissal_fixture_release_encounter";
+
+        public string Description => "Releases the dismissal fixture encounter.";
+
+        public CoopCommandSide Side => CoopCommandSide.Client;
+
+        public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
+        {
+            new ExpectedArgs("dismissed_hero_id", "The registered dismissed hero id."),
+        };
+
+        public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
+        {
+            if (!ModInformation.IsClient) return Failed("Command can only be run on a client.");
+            if (lastDismissalCompletion == null ||
+                lastDismissalCompletion.Value.OneToOneConversationHeroId != args[0])
+                return Failed($"Dismissal completion for hero '{args[0]}' has not arrived.");
+            if (lastDismissalEncounterObservation?.LeaveAtCompletion != true)
+                return Failed("The dismissal encounter was not released by the correlated completion.");
+
+            bool wasActive = PlayerEncounter.Current != null;
+            Campaign.Current.PlayerEncounter = null;
+            return Succeeded($"DISMISSAL_ENCOUNTER_RELEASED hero={args[0]} wasActive={wasActive} leaveAcknowledged=True");
+        }
+    }
+
+    public sealed class CompanionDismissalFixtureRequestReplacementCoopCommand : ICoopCommand
+    {
+        public string Prefix => "coop.debug.companions";
+
+        public string Name => "dismissal_fixture_request_replacement";
+
+        public string Description => "Requests the dismissal fixture replacement.";
+
+        public CoopCommandSide Side => CoopCommandSide.Client;
+
+        public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
+        {
+            new ExpectedArgs("replacement_hero_id", "The registered replacement hero id."),
+        };
+
+        public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
+        {
+            if (!ModInformation.IsClient) return Failed("Command can only be run on a client.");
+            if (!TryGetObjectManager(out var objectManager)) return Failed("Unable to resolve ObjectManager.");
+            if (!objectManager.TryGetObject(args[0], out Hero replacement)) return Failed($"Hero '{args[0]}' not found.");
+            if (Hero.MainHero?.Clan == null || MobileParty.MainParty == null)
+                return Failed("The local player hero, clan, or main party is unavailable.");
+
+            MessageBroker.Instance.Publish(null,
+                new CompanionHired(Hero.MainHero, replacement, 0, Hero.MainHero.Clan, MobileParty.MainParty));
+            return Succeeded($"REPLACEMENT_REQUESTED hero={args[0]}");
+        }
+    }
+
+    public sealed class CompanionDismissalFixtureStateCoopCommand : ICoopCommand
+    {
+        public string Prefix => "coop.debug.companions";
+
+        public string Name => "dismissal_fixture_state";
+
+        public string Description => "Reports companion dismissal fixture state.";
+
+        public CoopCommandSide Side => CoopCommandSide.Both;
+
+        public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
+        {
+            new ExpectedArgs("party_id", "The registered mobile party id."),
+            new ExpectedArgs("dismissed_hero_id", "The registered dismissed hero id."),
+            new ExpectedArgs("replacement_hero_id", "The registered replacement hero id."),
+        };
+
+        public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
+        {
+            if (!TryGetObjectManager(out var objectManager)) return Failed("Unable to resolve ObjectManager.");
+            if (!objectManager.TryGetObject(args[0], out MobileParty party)) return Failed($"Party '{args[0]}' not found.");
+            if (!objectManager.TryGetObject(args[1], out Hero dismissed)) return Failed($"Hero '{args[1]}' not found.");
+            if (!objectManager.TryGetObject(args[2], out Hero replacement)) return Failed($"Hero '{args[2]}' not found.");
+
+            return Succeeded("COMPANION_STATE " + FormatHeroState("dismissed", party, dismissed) + " " +
+                FormatHeroState("replacement", party, replacement));
+        }
+    }
+
+    public sealed class CompanionDismissalFixtureRestoreCoopCommand : ICoopCommand
+    {
+        public string Prefix => "coop.debug.companions";
+
+        public string Name => "dismissal_fixture_restore";
+
+        public string Description => "Restores the companion-dismissal fixture.";
+
+        public CoopCommandSide Side => CoopCommandSide.Server;
+
+        public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
+        {
+            new ExpectedArgs("controller_id", "The player controller id."),
+        };
+
+        public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
+        {
+            if (ModInformation.IsClient) return Failed("Command can only be run on the server.");
+            string error;
+            if (!TryGetFixture(args[0], out var fixture, out error)) return Failed(error);
+            if (!TryResolvePlayer(args[0], out var playerManager, out var objectManager,
+                out _, out _, out var clan, out var party, out error))
+                return Failed("Failed to restore companion-dismissal fixture: " + error);
+            if (!playerManager.TryGetPeer(args[0], out var peer))
+                return Failed($"Failed to restore companion-dismissal fixture: player '{args[0]}' is not connected.");
+
+            if (fixture.Dismissed.CompanionOf != null)
+            {
+                MessageBroker.Instance.Publish(peer, CreateCleanupDismissalRequest(
+                    objectManager, fixture.Dismissed, fixture.DismissedHeroId));
+            }
+            if (fixture.Replacement.CompanionOf != null)
+            {
+                MessageBroker.Instance.Publish(peer, CreateCleanupDismissalRequest(
+                    objectManager, fixture.Replacement, fixture.ReplacementHeroId));
+            }
+
+            int dismissedCount = party.MemberRoster.GetTroopCount(fixture.Dismissed.CharacterObject);
+            int replacementCount = party.MemberRoster.GetTroopCount(fixture.Replacement.CharacterObject);
+            int memberCount = party.MemberRoster.TotalManCount;
+            int companionCount = clan.Companions.Count();
+            if (dismissedCount != 0 || replacementCount != 0 ||
+                memberCount != fixture.OriginalMemberCount || companionCount != fixture.OriginalCompanionCount)
+            {
+                return Failed($"RESTORE_FAILED dismissed={dismissedCount} replacement={replacementCount} " +
+                    $"members={memberCount}/{fixture.OriginalMemberCount} companions={companionCount}/{fixture.OriginalCompanionCount}");
+            }
+
+            pendingDismissalFixture = null;
+            return Succeeded($"FIXTURE_RESTORED party={fixture.PlayerPartyId} dismissed=0 replacement=0 " +
+                $"members={memberCount} companions={companionCount}");
+        }
+    }
+
+    public sealed class CompanionOpenPartyScreenCoopCommand : ICoopCommand
+    {
+        public string Prefix => "coop.debug.companions";
+
+        public string Name => "open_party_screen";
+
+        public string Description => "Opens the companion party screen.";
+
+        public CoopCommandSide Side => CoopCommandSide.Client;
+
+        public IExpectedArgs[] ExpectedArgs { get; } = System.Array.Empty<IExpectedArgs>();
+
+        public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
+        {
+            if (!ModInformation.IsClient) return Failed("Command can only be run on a client.");
+            if (Hero.MainHero?.PartyBelongedTo == null) return Failed("The local player hero has no party.");
+
+            PartyScreenHelper.OpenScreenAsNormal();
+            return Succeeded("PARTY_SCREEN_OPENED");
+        }
+    }
+
+    public sealed class CompanionClosePartyScreenCoopCommand : ICoopCommand
+    {
+        public string Prefix => "coop.debug.companions";
+
+        public string Name => "close_party_screen";
+
+        public string Description => "Closes the companion party screen.";
+
+        public CoopCommandSide Side => CoopCommandSide.Client;
+
+        public IExpectedArgs[] ExpectedArgs { get; } = System.Array.Empty<IExpectedArgs>();
+
+        public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
+        {
+            if (!ModInformation.IsClient) return Failed("Command can only be run on a client.");
+
+            PartyScreenHelper.CloseScreen(true, true);
+            return Succeeded("PARTY_SCREEN_CLOSED");
+        }
+    }
+
+    public sealed class CompanionCommitPartyScreenCoopCommand : ICoopCommand
+    {
+        public string Prefix => "coop.debug.companions";
+
+        public string Name => "commit_party_screen";
+
+        public string Description => "Commits changes on the companion party screen.";
+
+        public CoopCommandSide Side => CoopCommandSide.Client;
+
+        public IExpectedArgs[] ExpectedArgs { get; } = System.Array.Empty<IExpectedArgs>();
+
+        public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
+        {
+            if (!ModInformation.IsClient) return Failed("Command can only be run on a client.");
+            if (!(Game.Current?.GameStateManager?.ActiveState is PartyState))
+                return Failed("No active party screen.");
+
+            PartyScreenHelper.CloseScreen(false);
+            return Game.Current?.GameStateManager?.ActiveState is PartyState
+                ? Failed("PARTY_SCREEN_COMMIT_REJECTED")
+                : Succeeded("PARTY_SCREEN_COMMITTED");
+        }
+    }
+
+    private static Hero CreateFixtureCompanion(Hero template,
+        TaleWorlds.CampaignSystem.Settlements.Settlement homeSettlement, string name)
+    {
+        var hero = HeroCreator.CreateSpecialHero(template.CharacterObject, homeSettlement, age: 30);
+        var heroName = new TextObject(name);
+        hero.SetName(heroName, heroName);
+        hero.SetNewOccupation(Occupation.Wanderer);
+        return hero;
+    }
+
+    private static Hero FindRoleFixtureCompanion()
+    {
+        return Hero.AllAliveHeroes.FirstOrDefault(hero =>
+            hero.Name?.ToString() == RoleFixtureName && hero.CompanionOf != null);
+    }
+
+    private static FireCompanion CreateCleanupDismissalRequest(
+        IObjectManager objectManager, Hero companion, string heroId)
+    {
+        if (!objectManager.TryGetIdWithLogging(companion.CompanionOf, out var clanId))
+            throw new InvalidOperationException($"Could not resolve the owning clan for fixture hero '{heroId}'.");
+
+        string partyId = null;
+        if (companion.PartyBelongedTo != null &&
+            !objectManager.TryGetIdWithLogging(companion.PartyBelongedTo, out partyId))
+            throw new InvalidOperationException($"Could not resolve the party for fixture hero '{heroId}'.");
+
+        return new FireCompanion(Guid.NewGuid().ToString("N"), heroId, clanId, partyId);
+    }
+
+    private static bool TryResolvePlayer(
+        string controllerId,
+        out IPlayerManager playerManager,
+        out IObjectManager objectManager,
+        out Player player,
+        out Hero hero,
+        out Clan clan,
+        out MobileParty party,
+        out string error)
+    {
+        playerManager = null;
+        objectManager = null;
+        player = null;
+        hero = null;
+        clan = null;
+        party = null;
+        error = null;
+
+        if (!ContainerProvider.TryResolve(out playerManager) || !ContainerProvider.TryResolve(out objectManager))
+        {
+            error = "could not resolve player services.";
+            return false;
+        }
+        if (!playerManager.TryGetPlayer(controllerId, out player))
+        {
+            error = $"no registered player has controller id '{controllerId}'.";
+            return false;
+        }
+        if (!objectManager.TryGetObject(player.HeroId, out hero) ||
+            !objectManager.TryGetObject(player.ClanId, out clan) ||
+            !objectManager.TryGetObject(player.MobilePartyId, out party))
+        {
+            error = $"player '{controllerId}' has unresolved hero, clan, or party objects.";
+            return false;
+        }
+        return true;
+    }
+
+    private static bool TryGetFixture(string controllerId, out CompanionDismissalFixture fixture, out string error)
+    {
+        fixture = pendingDismissalFixture;
+        if (fixture == null)
+        {
+            error = "No companion-dismissal fixture is active.";
+            return false;
+        }
+        if (fixture.ControllerId != controllerId)
+        {
+            error = $"The active companion-dismissal fixture belongs to '{fixture.ControllerId}'.";
+            return false;
+        }
+        error = null;
+        return true;
+    }
+
+    private static string FormatHeroState(string label, MobileParty party, Hero hero)
+    {
+        return $"{label}.id={hero.StringId} {label}.count={party.MemberRoster.GetTroopCount(hero.CharacterObject)} " +
+            $"{label}.state={hero.HeroState} {label}.companion={(hero.CompanionOf?.StringId ?? "none")} " +
+            $"{label}.party={(hero.PartyBelongedTo?.StringId ?? "none")}";
+    }
+
+    private sealed class CompanionRoleFixture
+    {
+        public string ControllerId { get; }
+        public string PlayerPartyId { get; }
+        public Hero RoleCompanion { get; }
+        public string RoleCompanionId { get; }
+        public Hero OriginalScout { get; }
+        public int OriginalMemberCount { get; }
+        public int OriginalCompanionCount { get; }
+
+        public CompanionRoleFixture(string controllerId, string playerPartyId,
+            Hero roleCompanion, string roleCompanionId, Hero originalScout,
+            int originalMemberCount, int originalCompanionCount)
+        {
+            ControllerId = controllerId;
+            PlayerPartyId = playerPartyId;
+            RoleCompanion = roleCompanion;
+            RoleCompanionId = roleCompanionId;
+            OriginalScout = originalScout;
+            OriginalMemberCount = originalMemberCount;
+            OriginalCompanionCount = originalCompanionCount;
+        }
+    }
+
+    private sealed class CompanionDismissalFixture
+    {
+        public string ControllerId { get; }
+        public string PlayerHeroId { get; }
+        public string PlayerClanId { get; }
+        public string PlayerPartyId { get; }
+        public Hero Dismissed { get; }
+        public string DismissedHeroId { get; }
+        public Hero Replacement { get; }
+        public string ReplacementHeroId { get; }
+        public int OriginalMemberCount { get; }
+        public int OriginalCompanionCount { get; }
+
+        public CompanionDismissalFixture(string controllerId, string playerHeroId, string playerClanId,
+            string playerPartyId, Hero dismissed, string dismissedHeroId, Hero replacement,
+            string replacementHeroId, int originalMemberCount, int originalCompanionCount)
+        {
+            ControllerId = controllerId;
+            PlayerHeroId = playerHeroId;
+            PlayerClanId = playerClanId;
+            PlayerPartyId = playerPartyId;
+            Dismissed = dismissed;
+            DismissedHeroId = dismissedHeroId;
+            Replacement = replacement;
+            ReplacementHeroId = replacementHeroId;
+            OriginalMemberCount = originalMemberCount;
+            OriginalCompanionCount = originalCompanionCount;
+        }
+    }
+
+    private sealed class DismissalEncounterObservation
+    {
+        public bool EncounterActiveAtTrigger { get; set; }
+        public bool ConversationHeroMatched { get; set; }
+        public bool LeaveBeforeConsequence { get; set; }
+        public bool LeaveAfterConsequence { get; set; }
+        public bool EncounterActiveAtCompletion { get; set; }
+        public bool LeaveAtCompletion { get; set; }
     }
 }

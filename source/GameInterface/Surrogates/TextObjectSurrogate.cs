@@ -14,22 +14,37 @@ internal struct TextObjectSurrogate
     // These need to be sent over the network to have the same name
     // An example of this is PartyBase.CustomName, which uses a CLAN_NAME TextObject attribute
     [ProtoMember(2)]
-    public Dictionary<string, TextObjectSurrogate> Attributes { get; set; }
+    public Dictionary<string, TextObjectSurrogate> TextObjectAttributes { get; set; }
+
+    [ProtoMember(3)]
+    public Dictionary<string, int> IntAttributes { get; set; }
+
+    [ProtoMember(4)]
+    public Dictionary<string, string> StringAttributes { get; set; }
 
     public TextObjectSurrogate(TextObject textObject)
     {
         Text = textObject?.Value;
-        Attributes = null;
+        TextObjectAttributes = new();
+        IntAttributes = new();
+        StringAttributes = new();
 
         if (textObject?.Attributes == null)
             return;
 
-        Attributes = new();
         foreach (var attribute in textObject.Attributes)
         {
             if (attribute.Value is TextObject textVariable)
             {
-                Attributes[attribute.Key] = new TextObjectSurrogate(textVariable);
+                TextObjectAttributes[attribute.Key] = new TextObjectSurrogate(textVariable);
+            }
+            else if (attribute.Value is int integerVariable)
+            {
+                IntAttributes[attribute.Key] = integerVariable;
+            }
+            else if (attribute.Value is string stringVariable)
+            {
+                StringAttributes[attribute.Key] = stringVariable;
             }
         }
     }
@@ -41,14 +56,34 @@ internal struct TextObjectSurrogate
 
     public static implicit operator TextObject(TextObjectSurrogate surrogate)
     {
-        if (surrogate.Attributes == null)
+        // Keep null attributes instead of initializing an empty dictionary
+        if (surrogate.TextObjectAttributes == null 
+            && surrogate.IntAttributes == null
+            && surrogate.StringAttributes == null)
             return new TextObject(surrogate.Text);
 
         var attributes = new Dictionary<string, object>();
-        foreach (var attribute in surrogate.Attributes)
+        if (surrogate.TextObjectAttributes != null)
         {
-            TextObject converted = attribute.Value;
-            attributes[attribute.Key] = converted;
+            foreach (var textObjectAttribute in surrogate.TextObjectAttributes)
+            {
+                TextObject converted = textObjectAttribute.Value;
+                attributes[textObjectAttribute.Key] = converted;
+            }
+        }
+        if (surrogate.IntAttributes != null)
+        {
+            foreach (var integerAttribute in surrogate.IntAttributes)
+            {
+                attributes[integerAttribute.Key] = integerAttribute.Value;
+            }
+        }
+        if (surrogate.StringAttributes != null)
+        {
+            foreach (var stringAttribute in surrogate.StringAttributes)
+            {
+                attributes[stringAttribute.Key] = stringAttribute.Value;
+            }
         }
 
         return new TextObject(surrogate.Text, attributes);

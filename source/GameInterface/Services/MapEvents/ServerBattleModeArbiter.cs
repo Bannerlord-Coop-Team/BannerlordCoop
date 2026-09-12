@@ -1,3 +1,4 @@
+﻿using GameInterface.Services.MapEvents.Handlers;
 using System.Collections.Generic;
 
 namespace GameInterface.Services.MapEvents;
@@ -24,16 +25,68 @@ internal static class ServerBattleModeArbiter
     /// Try to claim the event for a live mission. Succeeds if the event is unclaimed or already a mission (another
     /// player joining the same mission); fails only if an auto-resolve simulation already owns the event.
     /// </summary>
-    public static bool TryClaimMission(string mapEventId) => TryClaim(mapEventId, Mode.Mission);
+    public static bool TryClaimMission(string mapEventId) => TryClaimMission(mapEventId, out _);
+
+    /// <summary>
+    /// Try to claim the event for a live mission and report whether this request created the claim rather than
+    /// joining an existing mission.
+    /// </summary>
+    public static bool TryClaimMission(string mapEventId, out bool isNewClaim) =>
+        TryClaim(mapEventId, Mode.Mission, out isNewClaim);
 
     /// <summary>
     /// Try to claim the event for an auto-resolve simulation. Succeeds if the event is unclaimed or already a
     /// simulation; fails only if a live mission already owns the event.
     /// </summary>
-    public static bool TryClaimSimulation(string mapEventId) => TryClaim(mapEventId, Mode.Simulation);
+    public static bool TryClaimSimulation(string mapEventId) => TryClaim(mapEventId, Mode.Simulation, out _);
 
-    private static bool TryClaim(string mapEventId, Mode mode)
+    /// <summary>
+    /// True while either resolution mode owns the event. Read-only: lets side-effectful actions that would
+    /// conclude the battle under the mode's players (e.g. a menu surrender) be refused without disturbing
+    /// the claim.
+    /// </summary>
+    public static bool IsClaimed(string mapEventId)
     {
+        if (mapEventId == null) return false;
+
+        lock (lockObj)
+        {
+            return modes.ContainsKey(mapEventId);
+        }
+    }
+
+    /// <summary>Read the current mode without changing its claim.</summary>
+    public static bool TryGetMode(string mapEventId, out BattleStartMode mode)
+    {
+        mode = BattleStartMode.Unclaimed;
+        if (mapEventId == null) return false;
+
+        lock (lockObj)
+        {
+            if (!modes.TryGetValue(mapEventId, out var current))
+                return false;
+
+            mode = current == Mode.Mission
+                ? BattleStartMode.Mission
+                : BattleStartMode.Simulation;
+            return true;
+        }
+    }
+
+    /// <summary>True while the event has been accepted for live-mission resolution.</summary>
+    public static bool IsMissionClaimed(string mapEventId)
+    {
+        if (mapEventId == null) return false;
+
+        lock (lockObj)
+        {
+            return modes.TryGetValue(mapEventId, out var mode) && mode == Mode.Mission;
+        }
+    }
+
+    private static bool TryClaim(string mapEventId, Mode mode, out bool isNewClaim)
+    {
+        isNewClaim = false;
         if (mapEventId == null) return true;
 
         lock (lockObj)
@@ -42,6 +95,7 @@ internal static class ServerBattleModeArbiter
                 return current == mode;
 
             modes[mapEventId] = mode;
+            isNewClaim = true;
             return true;
         }
     }
@@ -72,6 +126,34 @@ internal static class ServerBattleModeArbiter
         lock (lockObj)
         {
             modes.Remove(mapEventId);
+        }
+    }
+
+    /// <summary>
+    /// Drops every claim. For session/test-environment boundaries: object-manager ids restart
+    /// there, so a claim held under a stale id would gate an unrelated future battle that reuses it.
+    /// </summary>
+    public static void Reset()
+    {
+        lock (lockObj)
+        {
+            modes.Clear();
+        }
+    }
+
+    /// <summary>
+    /// Prevents cancellation cleanup from accidentally releasing a different battle mode.
+    /// </summary>
+    public static bool ReleaseSimulation(string mapEventId)
+    {
+        if (mapEventId == null) return false;
+
+        lock (lockObj)
+        {
+            if (!modes.TryGetValue(mapEventId, out var current) || current != Mode.Simulation) return false;
+            
+            modes.Remove(mapEventId);
+            return true;
         }
     }
 }

@@ -1,115 +1,132 @@
 ﻿using Common.Messaging;
 using ProtoBuf;
 using System.Collections.Generic;
+using TaleWorlds.Localization;
 
 namespace GameInterface.Services.Smithing.Messages;
 
 [ProtoContract(SkipConstructor = true)]
-public class NetworkCreateCraftedWeaponInternalServer : ICommand
+public readonly struct NetworkCreateCraftedWeaponInternalServer : ICommand
 {
     [ProtoMember(1)]
-    public string CraftingCampaignBehaviorId;
+    public readonly bool IsFreeMode;
 
     [ProtoMember(2)]
-    public bool IsFreeMode;
+    public readonly string CraftingHeroId;
 
     [ProtoMember(3)]
-    public string CraftingHeroId;
+    public readonly TextObject Name;
 
     [ProtoMember(4)]
-    public byte[] CraftedItemObjectData;
+    public readonly string CultureId;
 
     [ProtoMember(5)]
-    public string CraftingTemplateId;
+    public readonly string CraftingTemplateId;
 
     [ProtoMember(6)]
-    public string WeaponName;
+    public readonly string WeaponName;
 
     [ProtoMember(7)]
-    public List<string> WeaponDesignElementCraftingPieceIds;
+    public readonly List<string> WeaponDesignElementCraftingPieceIds;
 
     [ProtoMember(8)]
-    public List<int> WeaponDesignElementScalePercentages;
+    public readonly List<int> WeaponDesignElementScalePercentages;
 
     [ProtoMember(9)]
-    public string WeaponModifierId;
+    public readonly string WeaponModifierId;
 
     [ProtoMember(10)]
-    public string NextCraftedItemId;
+    public readonly string PlayerHeroId;
 
     [ProtoMember(11)]
-    public string PlayerHeroId;
+    public readonly string ItemModifierGroupId;
 
     [ProtoMember(12)]
-    public string ItemModifierGroupId;
+    public readonly string CraftingOrderId;
+
+    [ProtoMember(13)]
+    public readonly string CurrentSettlementId;
 
     public NetworkCreateCraftedWeaponInternalServer(
-        string craftingCampaignBehaviorId,
         bool isFreeMode,
         string craftingHeroId,
-        byte[] craftedItemObjectData,
+        TextObject name,
+        string cultureId,
         string craftingTemplateId,
         string weaponName,
         List<string> weaponDesignElementCraftingPieceIds,
         List<int> weaponDesignElementScalePercentages,
         string weaponModifierId,
-        string nextCraftedItemId,
         string playerHeroId,
-        string itemModifierGroupId)
+        string itemModifierGroupId,
+        string craftingOrderId,
+        string currentSettlementId)
     {
-        CraftingCampaignBehaviorId = craftingCampaignBehaviorId;
         IsFreeMode = isFreeMode;
         CraftingHeroId = craftingHeroId;
-        CraftedItemObjectData = craftedItemObjectData;
+        Name = name;
+        CultureId = cultureId;
         CraftingTemplateId = craftingTemplateId;
         WeaponName = weaponName;
         WeaponDesignElementCraftingPieceIds = weaponDesignElementCraftingPieceIds;
         WeaponDesignElementScalePercentages = weaponDesignElementScalePercentages;
         WeaponModifierId = weaponModifierId;
-        NextCraftedItemId = nextCraftedItemId;
         PlayerHeroId = playerHeroId;
         ItemModifierGroupId = itemModifierGroupId;
+        CraftingOrderId = craftingOrderId;
+        CurrentSettlementId = currentSettlementId;
     }
 }
 
 [ProtoContract(SkipConstructor = true)]
-public class NetworkCreateCraftedWeaponInternalClients : ICommand
+public readonly struct NetworkCreateCraftedWeaponInternalClients : ICommand
 {
     [ProtoMember(1)]
-    public string CraftingCampaignBehaviorId;
+    public readonly TextObject Name;
 
     [ProtoMember(2)]
-    public byte[] CraftedItemObjectData;
+    public readonly string CultureId;
 
     [ProtoMember(3)]
-    public string NextCraftedItemId;
+    public readonly string WeaponModifierId;
 
     [ProtoMember(4)]
-    public string WeaponModifierId;
+    public readonly bool IsFreeMode;
 
     [ProtoMember(5)]
-    public bool IsFreeMode;
+    public readonly string CraftingTemplateId;
 
     [ProtoMember(6)]
-    public string CraftingTemplateId;
+    public readonly string WeaponName;
 
     [ProtoMember(7)]
-    public string WeaponName;
+    public readonly List<string> WeaponDesignElementCraftingPieceIds;
 
     [ProtoMember(8)]
-    public List<string> WeaponDesignElementCraftingPieceIds;
+    public readonly List<int> WeaponDesignElementScalePercentages;
 
     [ProtoMember(9)]
-    public List<int> WeaponDesignElementScalePercentages;
+    public readonly string ItemModifierGroupId;
 
     [ProtoMember(10)]
-    public string ItemModifierGroupId;
+    public readonly string PlayerHeroId;
 
-    public NetworkCreateCraftedWeaponInternalClients(NetworkCreateCraftedWeaponInternalServer cloneObject)
+    [ProtoMember(11)]
+    public readonly string NextCraftedItemId;
+
+    [ProtoMember(12)]
+    public readonly string CraftingHeroId;
+
+    [ProtoMember(13)]
+    public readonly string CraftingOrderId;
+
+    [ProtoMember(14)]
+    public readonly string CurrentSettlementId;
+
+    public NetworkCreateCraftedWeaponInternalClients(NetworkCreateCraftedWeaponInternalServer cloneObject, string nextCraftedItemId)
     {
-        CraftingCampaignBehaviorId = cloneObject.CraftingCampaignBehaviorId;
-        CraftedItemObjectData = cloneObject.CraftedItemObjectData;
-        NextCraftedItemId = cloneObject.NextCraftedItemId;
+        Name = cloneObject.Name;
+        CultureId = cloneObject.CultureId;
         WeaponModifierId = cloneObject.WeaponModifierId;
         IsFreeMode = cloneObject.IsFreeMode;
         CraftingTemplateId = cloneObject.CraftingTemplateId;
@@ -117,5 +134,10 @@ public class NetworkCreateCraftedWeaponInternalClients : ICommand
         WeaponDesignElementCraftingPieceIds = cloneObject.WeaponDesignElementCraftingPieceIds;
         WeaponDesignElementScalePercentages = cloneObject.WeaponDesignElementScalePercentages;
         ItemModifierGroupId = cloneObject.ItemModifierGroupId;
+        PlayerHeroId = cloneObject.PlayerHeroId;
+        NextCraftedItemId = nextCraftedItemId;
+        CraftingHeroId = cloneObject.CraftingHeroId;
+        CraftingOrderId = cloneObject.CraftingOrderId;
+        CurrentSettlementId = cloneObject.CurrentSettlementId;
     }
 }

@@ -1,6 +1,7 @@
-using Common.Logging;
+﻿using Common.Logging;
 using Common.Messaging;
 using GameInterface.Services.MapEvents;
+using GameInterface.Services.MapEvents.Extensions;
 using GameInterface.Services.MapEvents.Messages;
 using GameInterface.Services.MapEvents.TroopSupply;
 using GameInterface.Services.ObjectManager;
@@ -43,15 +44,18 @@ internal class CoopFieldBattleLauncher : ICoopFieldBattleLauncher
     private readonly IMessageBroker messageBroker;
     private readonly IObjectManager objectManager;
     private readonly ICoopBattleBehaviorAttacher behaviorAttacher;
+    private readonly IBattleAgentBudget agentBudget;
 
     public CoopFieldBattleLauncher(
         IMessageBroker messageBroker,
         IObjectManager objectManager,
-        ICoopBattleBehaviorAttacher behaviorAttacher)
+        ICoopBattleBehaviorAttacher behaviorAttacher,
+        IBattleAgentBudget agentBudget)
     {
         this.messageBroker = messageBroker;
         this.objectManager = objectManager;
         this.behaviorAttacher = behaviorAttacher;
+        this.agentBudget = agentBudget;
     }
 
     public Mission OpenCoopFieldBattle(MissionInitializerRecord rec)
@@ -64,10 +68,12 @@ internal class CoopFieldBattleLauncher : ICoopFieldBattleLauncher
         }
 
         var mission = CreateCoopFieldBattle(rec, mapEventId);
+        if (mission == null) return null;
 
         // Same post-open coop entry the native path drove via BattleMissionEntryPatch: the controller requests
-        // the P2P instance and the host handler requests election + this client's troop reserves. The reserves
-        // reach the (already-registered) suppliers during scene load, before AfterStart sizes them.
+        // the P2P instance and the host handler requests this client's OWN troop reserves, which reach the
+        // (already-registered) suppliers during scene load. The host election follows at mission-ready
+        // (CoopBattleController.AfterStart, once loading finishes) and delivers the remaining sides.
         messageBroker.Publish(mapEvent, new PlayerEnteredBattle(mapEvent));
         return mission;
     }
@@ -95,8 +101,10 @@ internal class CoopFieldBattleLauncher : ICoopFieldBattleLauncher
         {
             // Each client fields only what it OWNS. Registered so the server reserve (requested below via
             // PlayerEnteredBattle) feeds these during scene load; the spawn handler then sizes each side.
-            var defenderSupplier = new CoopTroopSupplier(mapEventId, BattleSideEnum.Defender, objectManager);
-            var attackerSupplier = new CoopTroopSupplier(mapEventId, BattleSideEnum.Attacker, objectManager);
+            var defenderSupplier = new CoopTroopSupplier(mapEventId, BattleSideEnum.Defender, objectManager,
+                agentBudget);
+            var attackerSupplier = new CoopTroopSupplier(mapEventId, BattleSideEnum.Attacker, objectManager,
+                agentBudget);
             CoopTroopSupplierRegistry.Register(defenderSupplier);
             CoopTroopSupplierRegistry.Register(attackerSupplier);
 
@@ -112,7 +120,8 @@ internal class CoopFieldBattleLauncher : ICoopFieldBattleLauncher
                 spawnLogic,
                 new BattlePowerCalculationLogic(),
                 new BattleSpawnLogic("battle_set"),
-                new CoopBattleMissionSpawnHandler(defenderSupplier, attackerSupplier),
+                new CoopBattleMissionSpawnHandler(defenderSupplier, attackerSupplier, messageBroker,
+                    PartyBase.MainParty.Side),
                 new CampaignMissionComponent(),
                 new BattleAgentLogic(),
                 new MountAgentLogic(),
@@ -168,8 +177,8 @@ internal class CoopFieldBattleLauncher : ICoopFieldBattleLauncher
     // The local player's own deployable heroes (its party leader + any companion heroes in the party), highest
     // sergeant-score first — the coop-scoped replacement for HeroHelper.OrderHeroesOnPlayerSideByPriority, which
     // spans the whole side. Carried as CharacterObject string ids, matching the native list that
-    // AssignPlayerRoleInTeamMissionController consumes.
-    private static List<string> OwnPartyHeroesByPriority()
+    // AssignPlayerRoleInTeamMissionController consumes. Shared with the siege launcher.
+    internal static List<string> OwnPartyHeroesByPriority()
     {
         var heroes = new List<Hero>();
         foreach (var member in MobileParty.MainParty.MemberRoster.GetTroopRoster())

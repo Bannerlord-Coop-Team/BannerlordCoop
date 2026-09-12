@@ -36,11 +36,9 @@ public class TaleWorldsModuleInfoProvider : IModuleInfoProvider
 {
     public IEnumerable<ModuleInfo> GetModuleInfos()
     {
-        var modules = TaleWorlds.ModuleManager.ModuleHelper.GetModules();
+        var modules = TaleWorlds.ModuleManager.ModuleHelper.GetActiveModules();
         foreach (TaleWorlds.ModuleManager.ModuleInfo moduleInfo in modules)
         {
-            if (!moduleInfo.IsSelected)
-                continue;
             bool isDlc = moduleInfo.Type == TaleWorlds.ModuleManager.ModuleType.OfficialOptional;
             yield return new ModuleInfo(moduleInfo.Id, moduleInfo.IsOfficial, isDlc, moduleInfo.Version);
         }

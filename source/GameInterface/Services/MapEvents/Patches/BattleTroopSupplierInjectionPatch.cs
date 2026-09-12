@@ -37,15 +37,16 @@ internal class BattleTroopSupplierInjectionPatch
         // for any spawn logic the native path constructs while a coop battle is active.
         if (suppliers.Length > 0 && suppliers[0] is CoopTroopSupplier) return;
 
-        // No DI here (static patch), so resolve the object manager ONCE and hand it to the suppliers (they no
-        // longer hit the service locator per agent on the supply path).
+        // No DI here (static patch), so resolve the object manager and BR-110 agent budget ONCE and hand them
+        // to the suppliers (they no longer hit the service locator per agent on the supply path).
         ContainerProvider.TryResolve<IObjectManager>(out var objectManager);
+        ContainerProvider.TryResolve<IBattleAgentBudget>(out var agentBudget);
 
         // The array is indexed by BattleSideEnum (0 = Defender, 1 = Attacker), matching how the campaign and
         // the constructor build/consume it.
         for (int i = 0; i < suppliers.Length; i++)
         {
-            var supplier = new CoopTroopSupplier(mapEventId, (BattleSideEnum)i, objectManager);
+            var supplier = new CoopTroopSupplier(mapEventId, (BattleSideEnum)i, objectManager, agentBudget);
             suppliers[i] = supplier;
             CoopTroopSupplierRegistry.Register(supplier);
             Logger.Information("[TroopSupply] Installed CoopTroopSupplier for {MapEvent} side {Side}", mapEventId, (BattleSideEnum)i);

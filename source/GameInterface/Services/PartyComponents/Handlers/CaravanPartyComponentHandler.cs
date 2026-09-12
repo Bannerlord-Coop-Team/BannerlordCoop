@@ -1,12 +1,10 @@
-using Common;
-using Common.Logging;
+﻿using Common;
 using Common.Messaging;
 using Common.Network;
 using Common.Util;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.PartyComponents.Messages;
-using Serilog;
-using System;
+using System.Linq;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Party.PartyComponents;
@@ -20,8 +18,6 @@ internal class CaravanPartyComponentHandler : IHandler
     private readonly IMessageBroker messageBroker;
     private readonly INetwork network;
     private readonly IObjectManager objectManager;
-
-    private static readonly ILogger Logger = LogManager.GetLogger<CaravanPartyComponentHandler>();
 
     public CaravanPartyComponentHandler(IMessageBroker messageBroker, INetwork network, IObjectManager objectManager)
     {
@@ -122,14 +118,12 @@ internal class CaravanPartyComponentHandler : IHandler
         string caravanLeaderId = null;
         if (initArgs.CaravanLeader != null && !objectManager.TryGetIdWithLogging(initArgs.CaravanLeader, out caravanLeaderId)) return;
 
-        string caravanItemRosterId = null;
-        if (initArgs.CaravanItems != null && !objectManager.TryGetIdWithLogging(initArgs.CaravanItems, out caravanItemRosterId)) return;
         if (!objectManager.TryGetIdWithLogging(initArgs.PartyTemplateObject, out var partyTemplateObjectId)) return;
 
         network.SendAll(new NetworkUpdateCaravanPartyComponentInitArgs(
             caravanPartyComponentId,
             caravanLeaderId,
-            caravanItemRosterId,
+            initArgs.CaravanItems?.ToArray(),
             partyTemplateObjectId
         ));
     }
@@ -146,7 +140,14 @@ internal class CaravanPartyComponentHandler : IHandler
             if (message.CaravanLeaderId != null && !objectManager.TryGetObjectWithLogging<Hero>(message.CaravanLeaderId, out caravanLeader)) return;
 
             ItemRoster caravanItems = null;
-            if (message.CaravanItemRosterId != null && !objectManager.TryGetObjectWithLogging<ItemRoster>(message.CaravanItemRosterId, out caravanItems)) return;
+            if (message.CaravanItems != null)
+            {
+                caravanItems = new ItemRoster();
+                foreach (var item in message.CaravanItems)
+                {
+                    caravanItems.Add(item);
+                }
+            }
             if (!objectManager.TryGetObjectWithLogging<PartyTemplateObject>(message.PartyTemplateObjectId, out var partyTemplateObject)) return;
 
             using (new AllowedThread())

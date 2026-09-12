@@ -1,22 +1,16 @@
 ﻿using Common;
-using Common.Logging;
 using Common.Messaging;
 using GameInterface.Services.Heroes.Messages;
 using GameInterface.Services.Heroes.Patches;
 using GameInterface.Services.ObjectManager;
 using SandBox.GauntletUI;
-using Serilog;
-using System;
 using TaleWorlds.CampaignSystem;
-using TaleWorlds.Library;
 using TaleWorlds.Localization;
 using TaleWorlds.ScreenSystem;
 
 namespace GameInterface.Services.Heroes.Handlers;
 internal class HeroDataHandler : IHandler
 {
-    private static readonly ILogger Logger = LogManager.GetLogger<HeroDataHandler>();
-
     private readonly IMessageBroker messageBroker;
     private readonly IObjectManager objectManager;
 
@@ -38,32 +32,22 @@ internal class HeroDataHandler : IHandler
     {
         var data = payload.What.Data;
 
-        if (objectManager.TryGetObject<Hero>(data.HeroStringId, out var hero) == false)
+        // Resolve the hero on the game-loop thread, in queue order with the marshaled hero
+        // creation — a network-thread lookup races a creation still waiting in the game-thread
+        // queue and permanently drops this one-shot name, leaving a name-less hero. The clan
+        // screen refresh must also run on the main thread.
+        GameThread.RunSafe(() =>
         {
-            Logger.Error("Unable to get {type} from id {stringId}", typeof(Hero), data.HeroStringId);
-            return;
-        }
+            if (!objectManager.TryGetObjectWithLogging<Hero>(data.HeroStringId, out var hero)) return;
 
-        // The refresh touches the clan screen UI, which must run on the main thread.
-        GameThread.Run(() =>
-        {
-            try
+            var fullName = new TextObject(data.FullName);
+            var firstName = new TextObject(data.FirstName);
+
+            HeroDataPatches.SetNameOverride(hero, fullName, firstName);
+
+            if (ScreenManager.TopScreen is GauntletClanScreen clanScreen)
             {
-                var fullName = new TextObject(data.FullName);
-                var firstName = new TextObject(data.FirstName);
-
-                HeroDataPatches.SetNameOverride(hero, fullName, firstName);
-
-                InformationManager.DisplayMessage(new InformationMessage($"Changed hero name to {fullName}"));
-
-                if (ScreenManager.TopScreen is GauntletClanScreen clanScreen)
-                {
-                    clanScreen._dataSource?.RefreshValues();
-                }
-            }
-            catch (Exception e)
-            {
-                Logger.Error(e, "Failed to apply hero name change for {stringId}", data.HeroStringId);
+                clanScreen._dataSource?.RefreshValues();
             }
         });
     }

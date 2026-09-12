@@ -1,19 +1,29 @@
 ﻿using Autofac;
+using Common;
 using Common.Messaging;
 using Coop.Core.Client;
 using Coop.Core.Client.States;
+using Coop.Core.Common;
 using Coop.Core.Common.Services.Connection.Messages;
 using Coop.Core.Server.Connections.Messages;
 using GameInterface.Services.CharacterCreation.Messages;
+using GameInterface.Services.Entity;
 using GameInterface.Services.GameDebug.Messages;
+using GameInterface.Services.GameState.Interfaces;
+using GameInterface.Services.Modules;
 using GameInterface.Services.Players.Data;
+using GameInterface.Services.UI.Interfaces;
 using LiteNetLib;
+using Moq;
+using System;
+using System.Linq;
+using System.Threading;
 using Xunit;
 using Xunit.Abstractions;
 
 namespace Coop.Tests.Client.States
 {
-    public class ValidateModuleStateTests
+    public class ValidateModuleStateTests : IDisposable
     {
         private readonly IClientLogic clientLogic;
         private readonly NetPeer serverPeer;
@@ -28,6 +38,14 @@ namespace Coop.Tests.Client.States
             clientLogic = container.Resolve<IClientLogic>()!;
         }
 
+        public void Dispose()
+        {
+            // Every test enters ValidateModuleState, which arms a 30s validation-timeout Timer. Dispose
+            // the logic (and thus the current state) so that timer is torn down with the test instead of
+            // lingering and firing TimeoutValidation on a stale state after the test has finished.
+            clientLogic.Dispose();
+        }
+
         [Fact]
         public void ValidateModuleState_EntryEvents()
         {
@@ -38,7 +56,8 @@ namespace Coop.Tests.Client.States
             Assert.NotEmpty(clientComponent.TestNetwork.Peers);
 
             var message = Assert.Single(clientComponent.TestNetwork.GetPeerMessages(serverPeer));
-            Assert.IsType<NetworkModuleVersionsValidate>(message);
+            var validateMessage = Assert.IsType<NetworkModuleVersionsValidate>(message);
+            Assert.Equal(Common.ModInformation.BuildVersion, validateMessage.CoopBuildVersion);
         }
 
         [Fact]
@@ -55,6 +74,46 @@ namespace Coop.Tests.Client.States
 
             // Assert
             Assert.IsType<ValidateModuleState>(clientLogic.State);
+        }
+
+        [Fact]
+        public void NetworkModuleVersionsValidated_UnsupportedCoop_ContinuesValidation()
+        {
+            // Arrange
+            var validateState = clientLogic.SetState<ValidateModuleState>();
+
+            var payload = new MessagePayload<NetworkModuleVersionsValidated>(
+                this, new NetworkModuleVersionsValidated(false, "Server does not support module 'Coop'."));
+
+            // Act
+            validateState.Handle_NetworkModuleVersionsValidated(payload);
+
+            // Assert
+            Assert.Single(clientComponent.TestNetwork.GetPeerMessages(serverPeer).OfType<NetworkClientValidate>());
+            Assert.Empty(clientComponent.TestMessageBroker.GetMessagesFromType<EndCoopMode>());
+        }
+
+        [Theory]
+        [InlineData(null)]
+        [InlineData("")]
+        [InlineData("different-build")]
+        public void NetworkModuleVersionsValidated_IncompatibleBuild_ShowsReasonAndDisconnects(
+            string? serverBuildVersion)
+        {
+            var validateState = clientLogic.SetState<ValidateModuleState>();
+            var payload = new MessagePayload<NetworkModuleVersionsValidated>(
+                this,
+                new NetworkModuleVersionsValidated(true, null, serverBuildVersion));
+
+            validateState.Handle_NetworkModuleVersionsValidated(payload);
+
+            Assert.Empty(
+                clientComponent.TestNetwork.GetPeerMessages(serverPeer).OfType<NetworkClientValidate>());
+            Assert.Single(clientComponent.TestMessageBroker.GetMessagesFromType<EndCoopMode>());
+            var popup = Assert.Single(
+                clientComponent.TestMessageBroker.GetMessagesFromType<SendPopupMessage>());
+            Assert.Contains("Incompatible co-op mod build", popup.Text);
+            Assert.Contains("Update the co-op mod on both sides", popup.Text);
         }
 
         [Fact]
@@ -75,21 +134,233 @@ namespace Coop.Tests.Client.States
         }
 
         [Fact]
-        public void NetworkClientValidated_Publishes_StartCharacterCreation()
+        public void NetworkClientValidated_NewPlayer_EntersCharacterCreationBeforeStartingNewGame()
+        {
+            var validateState = clientLogic.SetState<ValidateModuleState>();
+            var gameStateInterface = clientComponent.Container.Resolve<Mock<IGameStateInterface>>();
+            IClientState? stateWhenGameStarted = null;
+            bool loadingScreenHidden = false;
+            bool loadingScreenHiddenWhenGameStarted = false;
+            int startThreadId = 0;
+            int gameThreadId = 0;
+
+            clientComponent.Container.Resolve<Mock<ILoadingInterface>>()
+                .Setup(x => x.HideLoadingScreen())
+                .Callback(() => loadingScreenHidden = true);
+            gameStateInterface
+                .Setup(x => x.StartNewGame())
+                .Callback(() =>
+                {
+                    stateWhenGameStarted = clientLogic.State;
+                    loadingScreenHiddenWhenGameStarted = loadingScreenHidden;
+                    startThreadId = Environment.CurrentManagedThreadId;
+                });
+            GameThread.Run(() => gameThreadId = Environment.CurrentManagedThreadId, blocking: true);
+
+            var payload = new MessagePayload<NetworkClientValidated>(
+                this, new NetworkClientValidated(
+                    false,
+                    new Player("12345", "111", "12345", "12345", "12345")));
+
+            validateState.Handle_NetworkClientValidated(payload);
+            GameThread.Run(() => { }, blocking: true);
+
+            Assert.IsType<CharacterCreationState>(stateWhenGameStarted);
+            Assert.True(loadingScreenHiddenWhenGameStarted);
+            Assert.IsType<CharacterCreationState>(clientLogic.State);
+            Assert.Equal(gameThreadId, startThreadId);
+            gameStateInterface.Verify(x => x.StartNewGame(), Times.Once);
+            clientComponent.Container
+                .Resolve<Mock<ILoadingInterface>>()
+                .Verify(x => x.HideLoadingScreen(), Times.Once);
+        }
+
+        [Fact]
+        public void NetworkClientValidated_NewPlayer_DisconnectBeforeGameThreadApply_CancelsCharacterCreation()
+        {
+            var coopFinalizer = new Mock<ICoopFinalizer>();
+            var gameStateInterface = clientComponent.Container.Resolve<Mock<IGameStateInterface>>();
+            var validateState = new ValidateModuleState(
+                clientLogic,
+                clientComponent.TestMessageBroker,
+                clientComponent.TestNetwork,
+                clientComponent.Container.Resolve<IControllerIdProvider>(),
+                coopFinalizer.Object,
+                gameStateInterface.Object,
+                clientComponent.Container.Resolve<IModuleInfoProvider>());
+            ((ClientLogic)clientLogic).State = validateState;
+
+            using var gameThreadBlocked = new ManualResetEventSlim(false);
+            using var releaseGameThread = new ManualResetEventSlim(false);
+
+            try
+            {
+                GameThread.Run(() =>
+                {
+                    gameThreadBlocked.Set();
+                    releaseGameThread.Wait();
+                });
+                Assert.True(gameThreadBlocked.Wait(TimeSpan.FromSeconds(5)));
+
+                var payload = new MessagePayload<NetworkClientValidated>(
+                    this,
+                    new NetworkClientValidated(
+                        false,
+                        new Player("12345", "111", "12345", "12345", "12345")));
+
+                validateState.Handle_NetworkClientValidated(payload);
+                clientLogic.Disconnect();
+
+                releaseGameThread.Set();
+                GameThread.Run(() => { }, blocking: true);
+
+                coopFinalizer.Verify(x => x.Finalize("Client has been stopped"), Times.Once);
+                Assert.Same(validateState, clientLogic.State);
+                gameStateInterface.Verify(x => x.StartNewGame(), Times.Never);
+            }
+            finally
+            {
+                releaseGameThread.Set();
+            }
+        }
+
+        [Fact]
+        public void NetworkClientValidated_StartNewGameFailure_StopsCoop()
+        {
+            var validateState = clientLogic.SetState<ValidateModuleState>();
+            clientComponent.Container
+                .Resolve<Mock<IGameStateInterface>>()
+                .Setup(x => x.StartNewGame())
+                .Throws<InvalidOperationException>();
+
+            var payload = new MessagePayload<NetworkClientValidated>(
+                this, new NetworkClientValidated(
+                    false,
+                    new Player("12345", "111", "12345", "12345", "12345")));
+
+            validateState.Handle_NetworkClientValidated(payload);
+            GameThread.Run(() => { }, blocking: true);
+
+            Assert.Single(clientComponent.TestMessageBroker.GetMessagesFromType<EndCoopMode>());
+            var popup = Assert.Single(
+                clientComponent.TestMessageBroker.GetMessagesFromType<SendPopupMessage>());
+            Assert.Equal("Failed to start character creation.", popup.Text);
+        }
+
+        [Fact]
+        public void NetworkModuleVersionsValidated_Denied_HidesLoadingScreenAndShowsReason()
         {
             // Arrange
             var validateState = clientLogic.SetState<ValidateModuleState>();
 
-            var heroExists = false;
-            var payload = new MessagePayload<NetworkClientValidated>(
-                this, new NetworkClientValidated(heroExists, new Player("12345", "111", "12345", "12345", "12345")));
+            var payload = new MessagePayload<NetworkModuleVersionsValidated>(
+                this, new NetworkModuleVersionsValidated(false, "Wrong version of module 'Coop'"));
 
             // Act
-            validateState.Handle_NetworkClientValidated(payload);
+            validateState.Handle_NetworkModuleVersionsValidated(payload);
+
+            // Assert — the denial must tear coop down AND release the forced loading window; the
+            // reason must reach the pop-up (the information message lands in the chat log, which is
+            // hidden behind the loading screen the player is looking at).
+            Assert.Single(clientComponent.TestMessageBroker.GetMessagesFromType<EndCoopMode>());
+
+            clientComponent.Container
+                .Resolve<Mock<ILoadingInterface>>()
+                .Verify(li => li.HideLoadingScreen(), Times.Once);
+
+            var popup = Assert.Single(clientComponent.TestMessageBroker.GetMessagesFromType<SendPopupMessage>());
+            Assert.Contains("Wrong version of module 'Coop'", popup.Text);
+        }
+
+        [Fact]
+        public void ValidationTimeout_DisconnectsWithReason()
+        {
+            // Arrange
+            var validateState = clientLogic.SetState<ValidateModuleState>();
+
+            // Act — invoke the deadline logic directly (the Timer -> GameThread marshaling is glue).
+            validateState.TimeoutValidation();
+
+            // Assert — a server that never answers (validation crashed server-side, incompatible
+            // build) must not leave the player on the loading screen forever.
+            Assert.Single(clientComponent.TestMessageBroker.GetMessagesFromType<EndCoopMode>());
+
+            clientComponent.Container
+                .Resolve<Mock<ILoadingInterface>>()
+                .Verify(li => li.HideLoadingScreen(), Times.Once);
+
+            var popup = Assert.Single(clientComponent.TestMessageBroker.GetMessagesFromType<SendPopupMessage>());
+            Assert.Contains("Timed out", popup.Text);
+        }
+
+        [Fact]
+        public void ValidationTimeout_AfterStateLeft_DoesNothing()
+        {
+            // Arrange
+            var validateState = clientLogic.SetState<ValidateModuleState>();
+            clientLogic.LoadSavedData(); // transitions away, disposing the state
+
+            clientComponent.TestMessageBroker.Messages.Clear();
+
+            // Act — a timer callback that was already in flight when the state was left must no-op.
+            validateState.TimeoutValidation();
 
             // Assert
-            var message = Assert.Single(clientComponent.TestMessageBroker.Messages);
-            Assert.IsType<StartCharacterCreation>(message);
+            Assert.Empty(clientComponent.TestMessageBroker.GetMessagesFromType<EndCoopMode>());
+        }
+
+        [Fact]
+        public void Disconnect_CalledTwice_FinalizesCoopOnce()
+        {
+            // Arrange
+            var validateState = clientLogic.SetState<ValidateModuleState>();
+
+            // Act — teardown can be raced by the timeout timer (game thread) and a denied/late
+            // response (poller thread); a second entry must be idempotent.
+            validateState.Disconnect();
+            validateState.Disconnect();
+
+            // Assert — the latch means CoopFinalizer runs exactly once, not once per caller.
+            Assert.Single(clientComponent.TestMessageBroker.GetMessagesFromType<EndCoopMode>());
+            clientComponent.Container
+                .Resolve<Mock<ILoadingInterface>>()
+                .Verify(li => li.HideLoadingScreen(), Times.Once);
+        }
+
+        [Fact]
+        public void ValidationTimeout_AfterDenial_DoesNotFinalizeAgain()
+        {
+            // Arrange
+            var validateState = clientLogic.SetState<ValidateModuleState>();
+            var denial = new MessagePayload<NetworkModuleVersionsValidated>(
+                this, new NetworkModuleVersionsValidated(false, "Wrong version of module 'Coop'"));
+            validateState.Handle_NetworkModuleVersionsValidated(denial); // tears coop down
+
+            // Act — a timeout callback that fires just after the denial already tore coop down must no-op.
+            validateState.TimeoutValidation();
+
+            // Assert — still a single teardown; the timeout did not tear down again.
+            Assert.Single(clientComponent.TestMessageBroker.GetMessagesFromType<EndCoopMode>());
+        }
+
+        [Fact]
+        public void NetworkClientValidated_AfterTimeout_DoesNotTransition()
+        {
+            // Arrange — the timeout (game thread) wins the completion race and tears coop down.
+            var validateState = clientLogic.SetState<ValidateModuleState>();
+            validateState.TimeoutValidation();
+
+            var payload = new MessagePayload<NetworkClientValidated>(
+                this, new NetworkClientValidated(true, new Player("12345", "111", "12345", "12345", "12345")));
+
+            // Act — the server's terminal validation response lands just after the timeout claimed
+            // completion. It must observe the claim and no-op, NOT drive LoadSavedData forward.
+            validateState.Handle_NetworkClientValidated(payload);
+
+            // Assert — no forward transition (which in production would resolve ReceivingSavedDataState
+            // from the container the timeout already tore down), and still exactly one teardown.
+            Assert.IsType<ValidateModuleState>(clientLogic.State);
+            Assert.Single(clientComponent.TestMessageBroker.GetMessagesFromType<EndCoopMode>());
         }
 
         [Fact]
@@ -147,19 +418,17 @@ namespace Coop.Tests.Client.States
         }
 
         [Fact]
-        public void CharacterCreationStarted_Transitions_CharacterCreationState()
+        public void CharacterCreationStarted_WithoutServerApproval_DoesNotLeaveValidation()
         {
-            // Arrange
-            var validateState = clientLogic.SetState<ValidateModuleState>();
+            clientLogic.SetState<ValidateModuleState>();
 
-            var payload = new MessagePayload<CharacterCreationStarted>(
-                this, new CharacterCreationStarted());
+            clientComponent.TestMessageBroker.Publish(this, new CharacterCreationStarted());
 
-            // Act
-            validateState.Handle_CharacterCreationStarted(payload);
-
-            // Assert
-            Assert.IsType<CharacterCreationState>(clientLogic.State);
+            Assert.IsType<ValidateModuleState>(clientLogic.State);
+            clientComponent.Container.Resolve<Mock<ILoadingInterface>>()
+                .Verify(x => x.HideLoadingScreen(), Times.Never);
+            clientComponent.Container.Resolve<Mock<IGameStateInterface>>()
+                .Verify(x => x.StartNewGame(), Times.Never);
         }
 
         [Fact]

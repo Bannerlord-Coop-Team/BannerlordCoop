@@ -186,11 +186,14 @@ namespace GameInterface.AutoSync.Builders
                 }
             }
 
+            var declaringTypeName = AutoSyncUtils.GetSimpleTypeName(declaringType).Replace(".", "_");
             var patchTemplate = TemplateParser.Parse("Patches.DynamicPatchTemplate", new
             {
                 Libraries = usings.Distinct(),
                 DeclaringType = AutoSyncUtils.GetSimpleTypeName(declaringType),
-                DeclaringTypeName = AutoSyncUtils.GetSimpleTypeName(declaringType).Replace(".", "_"),
+                PatchClassName = $"{declaringTypeName}_DynamicPatches",
+                PatchCategory = (string)null,
+                IncludeDeclaredMethods = true,
                 TargetMethods = dynamicRegistryItem.TargetMethods,
                 Prefixes = prefixes,
                 Transpilers = transpilers,
@@ -209,6 +212,25 @@ namespace GameInterface.AutoSync.Builders
             AutoSyncConfiguration.ExportFile($"{declaringType.Name}/{declaringType.Name}_Handler.cs", handlerTemplate);
 
             syntaxTrees.Add(CSharpSyntaxTree.ParseText(patchTemplate));
+            var categoryIndex = 0;
+            foreach (var categorizedTargets in dynamicRegistryItem.CategorizedTargetMethods)
+            {
+                var categoryPatchTemplate = TemplateParser.Parse("Patches.DynamicPatchTemplate", new
+                {
+                    Libraries = usings.Distinct(),
+                    DeclaringType = AutoSyncUtils.GetSimpleTypeName(declaringType),
+                    PatchClassName = $"{declaringTypeName}_Category{categoryIndex}_DynamicPatches",
+                    PatchCategory = categorizedTargets.Key,
+                    IncludeDeclaredMethods = false,
+                    TargetMethods = categorizedTargets.Value,
+                    Prefixes = Enumerable.Empty<string>(),
+                    Transpilers = transpilers,
+                });
+
+                AutoSyncConfiguration.ExportFile($"{declaringType.Name}/{declaringType.Name}_Category{categoryIndex}_DynamicPatches.cs", categoryPatchTemplate);
+                syntaxTrees.Add(CSharpSyntaxTree.ParseText(categoryPatchTemplate));
+                categoryIndex++;
+            }
             syntaxTrees.AddRange(messages.Select(m => CSharpSyntaxTree.ParseText(m)));
             syntaxTrees.Add(CSharpSyntaxTree.ParseText(handlerTemplate));
             return syntaxTrees;

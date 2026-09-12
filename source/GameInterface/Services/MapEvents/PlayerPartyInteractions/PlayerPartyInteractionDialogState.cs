@@ -73,8 +73,33 @@ public static class PlayerPartyInteractionDialogState
             return false;
         }
 
+        if (option == PlayerPartyInteractionOption.Vassal && TryGetVassalUnavailableExplanation(out explanation))
+            return false;
+
         explanation = new TextObject("{=coop_player_party_interaction_disabled}This option is not available.");
         return false;
+    }
+
+    private static bool TryGetVassalUnavailableExplanation(out TextObject explanation)
+    {
+        switch (currentState.VassalUnavailableReason)
+        {
+            case PlayerPartyInteractionVassalUnavailableReason.TargetIsNotKingdomLeader:
+                explanation = new TextObject("{=coop_player_party_interaction_vassal_target_not_ruler}The other player must rule a kingdom.");
+                return true;
+            case PlayerPartyInteractionVassalUnavailableReason.InitiatorHasNoClan:
+                explanation = new TextObject("{=coop_player_party_interaction_vassal_requires_clan}You must lead a clan to swear allegiance.");
+                return true;
+            case PlayerPartyInteractionVassalUnavailableReason.InitiatorIsInKingdom:
+                explanation = new TextObject("{=coop_player_party_interaction_vassal_already_in_kingdom}You must leave your current kingdom first.");
+                return true;
+            case PlayerPartyInteractionVassalUnavailableReason.InitiatorClanTierTooLow:
+                explanation = new TextObject("{=coop_player_party_interaction_vassal_requires_tier_two}Your clan must be at least tier 2 to swear allegiance.");
+                return true;
+            default:
+                explanation = null;
+                return false;
+        }
     }
 
     public static string GetDialogText()
@@ -153,7 +178,8 @@ public static class PlayerPartyInteractionDialogState
             currentState.PartyItems,
             currentState.OtherPartyItems,
             GetLocalServiceEnabledOptions(),
-            currentState.IsHostile);
+            currentState.IsHostile,
+            currentState.VassalUnavailableReason);
 
         RefreshConversation();
     }

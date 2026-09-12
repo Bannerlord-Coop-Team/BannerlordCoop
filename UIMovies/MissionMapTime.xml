@@ -1,0 +1,32 @@
+<Prefab>
+  <Window>
+    <Widget WidthSizePolicy="StretchToParent"
+            HeightSizePolicy="StretchToParent">
+      <Children>
+        <Widget WidthSizePolicy="Fixed"
+                SuggestedWidth="320"
+                HeightSizePolicy="Fixed"
+                SuggestedHeight="48"
+                HorizontalAlignment="Left"
+                VerticalAlignment="Top"
+                PositionXOffset="-40"
+                PositionYOffset="0"
+                Sprite="BlankWhiteSquare_9"
+                Color="#000000FF"
+                AlphaFactor="0.55">
+          <Children>
+            <TextWidget WidthSizePolicy="StretchToParent"
+                        HeightSizePolicy="StretchToParent"
+                        MarginLeft="12"
+                        MarginRight="12"
+                        Brush="Clan.TabControl.Text"
+                        Brush.FontSize="22"
+                        Brush.TextHorizontalAlignment="Center"
+                        Brush.TextVerticalAlignment="Center"
+                        Text="@MapTimeText"/>
+          </Children>
+        </Widget>
+      </Children>
+    </Widget>
+  </Window>
+</Prefab>

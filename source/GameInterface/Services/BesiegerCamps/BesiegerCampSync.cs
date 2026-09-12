@@ -9,7 +9,8 @@ namespace GameInterface.Services.BesiegerCamps
         public BesiegerCampSync(AutoSyncRegistry AutoSyncRegistry)
         {
             // Fields
-            AutoSyncRegistry.AddField(AccessTools.Field(typeof(BesiegerCamp), nameof(BesiegerCamp._leaderParty)));  
+            AutoSyncRegistry.AddField(AccessTools.Field(typeof(BesiegerCamp), nameof(BesiegerCamp._leaderParty)));
+            AutoSyncRegistry.AddField(AccessTools.Field(typeof(BesiegerCamp), nameof(BesiegerCamp._faction)));
 
             // Properties
             AutoSyncRegistry.AddProperty(AccessTools.Property(typeof(BesiegerCamp), nameof(BesiegerCamp.NumberOfTroopsKilledOnSide)));

@@ -4,7 +4,7 @@ using TaleWorlds.CampaignSystem.Settlements;
 namespace GameInterface.Services.Settlements.Messages;
 
 /// <summary>
-/// Notify server of militia value change
+/// Notify server of the ready militia reserve after native troop conversion.
 /// </summary>
 public readonly struct SettlementChangedMilitia : IEvent
 {

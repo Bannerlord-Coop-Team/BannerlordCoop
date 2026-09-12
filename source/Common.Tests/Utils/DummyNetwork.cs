@@ -54,6 +54,10 @@ internal class DummyNetwork : INetwork
         throw new NotImplementedException();
     }
 
+    public void FlushPendingMessages()
+    {
+    }
+
     public void Start()
     {
         throw new NotImplementedException();

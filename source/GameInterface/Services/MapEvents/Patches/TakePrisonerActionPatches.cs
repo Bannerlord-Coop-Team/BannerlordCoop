@@ -30,6 +30,16 @@ internal class TakePrisonerActionPatches
             return false;
         }
 
+        if (!CanCaptureHero(prisonerCharacter))
+        {
+            Logger.Warning(
+                "Skipped prisoner capture for hero {HeroId} in state {HeroState} with death mark {DeathMark}",
+                prisonerCharacter?.StringId,
+                prisonerCharacter?.HeroState,
+                prisonerCharacter?.DeathMark);
+            return false;
+        }
+
         // The capture runs with patches live, so each side effect of the native body replicates as its
         // own message: the member-roster removal and the captor's prison-roster add as roster deltas,
         // hero state and PartyBelongedToAsPrisoner through their auto-synced setters. Clients apply the
@@ -44,6 +54,10 @@ internal class TakePrisonerActionPatches
 
         return true;
     }
+
+    internal static bool CanCaptureHero(Hero hero) =>
+        hero?.IsAlive == true &&
+        hero.DeathMark == KillCharacterAction.KillCharacterActionDetail.None;
 
     [HarmonyPatch(nameof(TakePrisonerAction.ApplyInternal))]
     [HarmonyPostfix]

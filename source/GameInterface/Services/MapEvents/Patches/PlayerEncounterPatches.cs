@@ -3,7 +3,10 @@ using Common;
 using Common.Logging;
 using Common.Messaging;
 using GameInterface.Policies;
+using GameInterface.Services.MapEvents;
+using GameInterface.Services.MapEvents.Extensions;
 using GameInterface.Services.MapEvents.Handlers;
+using GameInterface.Services.MapEvents.Initialization;
 using GameInterface.Services.MapEvents.Interfaces;
 using GameInterface.Services.MapEvents.Messages.Conversation;
 using GameInterface.Services.MapEvents.Messages.Leave;
@@ -11,13 +14,16 @@ using GameInterface.Services.MobileParties.Messages.Behavior;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.PlayerCaptivityService.Messages;
 using HarmonyLib;
+using Helpers;
 using Serilog;
 using System;
+using System.Collections.Generic;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.CampaignBehaviors;
 using TaleWorlds.CampaignSystem.Encounters;
 using TaleWorlds.CampaignSystem.GameMenus;
 using TaleWorlds.CampaignSystem.MapEvents;
+using TaleWorlds.CampaignSystem.Naval;
 using TaleWorlds.CampaignSystem.Party;
 
 namespace GameInterface.Services.MapEvents.Patches;
@@ -26,6 +32,9 @@ namespace GameInterface.Services.MapEvents.Patches;
 internal class PlayerEncounterPatches
 {
     private static readonly ILogger Logger = LogManager.GetLogger<PlayerEncounterPatches>();
+    private static readonly object rejectedEncounterRecoveryLock = new object();
+    private static readonly HashSet<PlayerEncounter> pendingRejectedEncounterRecoveries =
+        new HashSet<PlayerEncounter>();
 
     [HarmonyPatch(nameof(PlayerEncounter.RestartPlayerEncounter))]
     [HarmonyPrefix]
@@ -34,13 +43,17 @@ internal class PlayerEncounterPatches
         // Our own server-approved re-run (AllowedThread) runs the real RestartPlayerEncounter.
         if (CallOriginalPolicy.IsOriginalAllowed()) return true;
 
+        if (EncounterManagerPatches.IsPendingParty(attackerParty) ||
+            EncounterManagerPatches.IsPendingParty(defenderParty))
+            return false;
+
         // The server runs RestartPlayerEncounter locally (authoritative).
         if (ModInformation.IsServer) return true;
 
         // Client: gate the encounter restart behind server approval. The send is rate-limited in
         // ConversationRequestHandler (max 1 request / 500ms) so a retried restart does not spam the server. On
         // approval the handler re-runs RestartPlayerEncounter under an AllowedThread; rejected requests never re-run it.
-        MessageBroker.Instance.Publish(null, new ConversationRequested(defenderParty, attackerParty, forcePlayerOutFromSettlement, ConversationRestartSource.PlayerEncounter));
+        MessageBroker.Instance.Publish(null, new ConversationRequested(defenderParty, attackerParty, forcePlayerOutFromSettlement, ConversationRestartSource.PlayerEncounter, false));
 
         return false;
     }
@@ -49,20 +62,23 @@ internal class PlayerEncounterPatches
     [HarmonyPrefix]
     public static bool StartBattleInternalPrefix(PlayerEncounter __instance, ref MapEvent __result)
     {
-        // Our own handler / replication path (AllowedThread) runs the real creation.
-        if (CallOriginalPolicy.IsOriginalAllowed()) return true;
-
         // The server is authoritative and creates the MapEvent locally.
         if (ModInformation.IsServer) return true;
 
-        // Client: every participant must end up with the *same* server-authoritative MapEvent object (same
-        // object-manager id). Instead of creating one locally (which would desync ids), block and ask the server
-        // to create it, then adopt the synced MapEvent once it resolves on this client.
+        // Approved restarts run under AllowedThread, but clients must still adopt the same server-authoritative
+        // MapEvent and id instead of creating an unregistered local copy.
 
         // If a MapEvent is already attached (e.g. the player joined an existing battle), keep vanilla behavior.
         if (__instance._mapEvent != null)
         {
             __result = __instance._mapEvent;
+            return false;
+        }
+
+        // The encounter menus can retry StartBattle before deferred rejected-encounter recovery runs.
+        if (IsRejectedEncounterRecoveryPending(__instance))
+        {
+            __result = null;
             return false;
         }
 
@@ -83,18 +99,119 @@ internal class PlayerEncounterPatches
             forceBlockadeSallyOutAttack: __instance.ForceBlockadeSallyOutAttack,
             forceHideoutSendTroops: __instance.ForceHideoutSendTroops);
 
-        var mapEvent = coordinator.RequestBlocking(__instance._attackerParty, __instance._defenderParty, flags);
+        var creationResult = coordinator.RequestBlocking(__instance._attackerParty, __instance._defenderParty, flags);
+        var mapEvent = creationResult.MapEvent;
 
         if (mapEvent == null)
         {
-            // Abort: the server did not produce a MapEvent within the timeout. Do not fall back to a local create.
-            Logger.Error("Aborting client battle start: server did not create a map event in time");
+            if (creationResult.Outcome == MapEventCreationOutcome.Rejected)
+            {
+                Logger.Warning("Server rejected client battle start; returning the pending encounter to the map");
+                QueueRejectedEncounterRecovery(__instance);
+            }
+            else
+            {
+                // The server may still have created the event. Keep the encounter until later sync reconciles it.
+                Logger.Error("Aborting client battle start: authoritative map event creation was not resolved");
+            }
+
             __result = null;
             return false;
         }
 
         __instance._mapEvent = mapEvent;
         __result = mapEvent;
+        return false;
+    }
+
+    private static void QueueRejectedEncounterRecovery(PlayerEncounter rejectedEncounter)
+    {
+        lock (rejectedEncounterRecoveryLock)
+        {
+            if (!pendingRejectedEncounterRecoveries.Add(rejectedEncounter))
+                return;
+        }
+
+        GameThread.EnqueueSafe(
+            () =>
+            {
+                try
+                {
+                    RecoverEncounterWithoutMapEvent(rejectedEncounter);
+                }
+                finally
+                {
+                    lock (rejectedEncounterRecoveryLock)
+                    {
+                        pendingRejectedEncounterRecoveries.Remove(rejectedEncounter);
+                    }
+                }
+            },
+            nameof(QueueRejectedEncounterRecovery));
+    }
+
+    private static bool IsRejectedEncounterRecoveryPending(PlayerEncounter encounter)
+    {
+        lock (rejectedEncounterRecoveryLock)
+        {
+            return pendingRejectedEncounterRecoveries.Contains(encounter);
+        }
+    }
+
+    private static bool RecoverEncounterWithoutMapEvent(
+        PlayerEncounter encounter,
+        bool forcePlayerOutFromSettlement = true)
+    {
+        if (encounter == null || !ReferenceEquals(PlayerEncounter.Current, encounter))
+            return false;
+
+        if (encounter._mapEvent != null || MobileParty.MainParty?.MapEvent != null)
+            return false;
+
+        PlayerEncounter.LeaveEncounter = true;
+        PlayerEncounter.Finish(forcePlayerOutFromSettlement);
+        return true;
+    }
+
+    // Vanilla dereferences Battle ?? EncounteredBattle before its own null check. A rejected creation leaves
+    // both absent, so let Leave perform the same recovery as the deferred rejection path.
+    [HarmonyPatch(typeof(MenuHelper), nameof(MenuHelper.EncounterLeaveConsequence))]
+    [HarmonyPrefix]
+    private static bool EncounterLeaveWithoutMapEventPrefix()
+    {
+        if (CallOriginalPolicy.IsOriginalAllowed()) return true;
+        if (ModInformation.IsServer) return true;
+
+        var encounter = PlayerEncounter.Current;
+        if (encounter == null)
+        {
+            if (MobileParty.MainParty?.BesiegerCamp != null)
+                return true;
+
+            GameMenu.ExitToLast();
+            return false;
+        }
+
+        var encounteredParty = encounter._encounteredParty;
+        var encounteredBattle = encounteredParty?.MapEvent;
+        if (encounteredBattle == null && encounteredParty?.IsSettlement == true)
+            encounteredBattle = encounteredParty.SiegeEvent?.BesiegerCamp?.LeaderParty?.MapEvent;
+
+        if (encounter._mapEvent != null || encounteredBattle != null)
+            return true;
+
+        var mainParty = MobileParty.MainParty;
+        if (mainParty.BesiegerCamp != null)
+        {
+            if (mainParty.BesiegerCamp.SiegeEvent != null)
+                return true;
+
+            mainParty._besiegerCamp = null;
+        }
+
+        RecoverEncounterWithoutMapEvent(
+            encounter,
+            forcePlayerOutFromSettlement: mainParty.CurrentSettlement == null);
         return false;
     }
 
@@ -105,6 +222,10 @@ internal class PlayerEncounterPatches
         if (CallOriginalPolicy.IsOriginalAllowed()) return true;
 
         if (ModInformation.IsServer) return true;
+
+        // Preserve vanilla's local pending state so a delayed server response cannot enqueue duplicate surrender requests.
+        if (__instance._playerSurrender) return false;
+        __instance._playerSurrender = true;
 
         Logger.Information(
             "[PvPBattleEncounterTrace] Battle encounter option clicked: surrender; party={PartyId} mapEvent={MapEventId} menu={Menu} encounter={Encounter}",
@@ -127,6 +248,44 @@ internal class PlayerEncounterPatches
         return false;
     }
 
+    // Vanilla looks up MainParty's MapEventParty via PartiesOnSide(PlayerSide), which indexes _sides by
+    // (int)PlayerSide and throws once a teardown nulls MainParty's MapEventSide (PlayerSide becomes
+    // BattleSideEnum.None). Search both sides for MainParty directly, and read its loot rate off the side it's
+    // on — never via PlayerSide. If teardown already removed it from both, fall back to the OnClientDestroyed snapshot.
+    [HarmonyPatch(nameof(PlayerEncounter.GetBattleRewards))]
+    [HarmonyPrefix]
+    private static bool GetBattleRewardsPrefix(PlayerEncounter __instance, out ExplainedNumber renownChange,
+        out ExplainedNumber influenceChange, out ExplainedNumber moraleChange, out float playerEarnedLootRate,
+        out Figurehead playerEarnedFigurehead)
+    {
+        var mapEvent = __instance._mapEvent;
+        playerEarnedFigurehead = __instance.PlayerLootedFigurehead;
+
+        var mapEventParty = mapEvent.FindMapEventParty(PartyBase.MainParty, out var mainPartySide);
+
+        if (mapEventParty != null)
+        {
+            renownChange = mapEventParty.GainedRenownExplained;
+            influenceChange = mapEventParty.GainedInfluenceExplained;
+            moraleChange = mapEventParty.GainedMoraleExplained;
+            playerEarnedLootRate = mainPartySide.GetPartyContributionRate(mapEventParty);
+            return false;
+        }
+
+        if (ContainerProvider.TryResolve<IMainPartyBattleRewardsCache>(out var cache)
+            && cache.TryGet(mapEvent, out renownChange, out influenceChange, out moraleChange, out playerEarnedLootRate))
+        {
+            return false;
+        }
+
+        renownChange = default;
+        influenceChange = default;
+        moraleChange = default;
+        playerEarnedLootRate = 0f;
+        Logger.Warning("GetBattleRewards: MainParty not found on either side of {MapEvent} and no cached snapshot; defaulting rewards to zero", mapEvent);
+        return false;
+    }
+
     // When an open-map encounter finishes on a client (e.g. you close a conversation with a lord party), the
     // player party is usually still engaging that party. PlayerEncounter.Current then becomes null, so on the next
     // tick EncounterManager.HandleEncounterForMobileParty re-fires RestartPlayerEncounter, which we gate and the
@@ -138,12 +297,12 @@ internal class PlayerEncounterPatches
     {
         if (ModInformation.IsServer) return;
 
+        // The server holds the AI party this player was conversing with; tell it the encounter is over.
+        MessageBroker.Instance.Publish(null, new ConversationEnded());
+
         // Skip our own server-approved restart: RestartPlayerEncounter calls Finish internally, and we run that
         // under an AllowedThread. Holding there would fight the restart we just asked the server to authorize.
         if (CallOriginalPolicy.IsOriginalAllowed()) return;
-
-        // The server holds the AI party this player was conversing with; tell it the encounter is over.
-        MessageBroker.Instance.Publish(null, new ConversationEnded());
 
         var mainParty = MobileParty.MainParty;
 
@@ -160,7 +319,7 @@ internal class PlayerEncounterPatches
         // So also publish the hold through the gated AI-behavior channel — the one client-initiated path the
         // server applies and re-broadcasts (with its position snapshot) to every client, including this one.
         // That makes the hold authoritative everywhere and clears the stale engage order at its source.
-        MessageBroker.Instance.Publish(mainParty.Ai, new PartyBehaviorChangeAttempted(mainParty.Ai, AiBehavior.Hold, null, mainParty.Position));
+        MessageBroker.Instance.Publish(mainParty.Ai, new PartyBehaviorChangeAttempted(mainParty));
     }
 
     // Native blocks defender-side parties from leaving; allow a joiner (a non-leader of its side) to leave,
@@ -290,14 +449,19 @@ internal class PlayerEncounterPatches
     private static void ClearEngageOrder(MobileParty party)
     {
         party.SetMoveModeHold();
-        MessageBroker.Instance.Publish(party.Ai, new PartyBehaviorChangeAttempted(party.Ai, AiBehavior.Hold, null, party.Position));
+        MessageBroker.Instance.Publish(party.Ai, new PartyBehaviorChangeAttempted(party));
     }
 
     [HarmonyPatch(nameof(PlayerEncounter.Update))]
     [HarmonyPrefix]
     public static bool UpdatePrefix()
     {
+        if (ContainerProvider.TryResolve<IMapEventInitializationBarrier>(out var initializationBarrier))
+            initializationBarrier.CompleteDeferredEncounterCleanup();
+
+        if (PlayerEncounter.Current == null) return false;
         if (MapEvent.PlayerMapEvent != null) return true;
+        if (PlayerCaptivity.IsCaptive) return false;
 
         if (ContainerProvider.TryGetContainer(out var container) == false) return true;
 

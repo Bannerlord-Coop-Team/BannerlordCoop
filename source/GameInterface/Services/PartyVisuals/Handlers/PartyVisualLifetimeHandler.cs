@@ -1,5 +1,4 @@
 ﻿using Common;
-using Common.Logging;
 using Common.Messaging;
 using Common.Network;
 using Common.Util;
@@ -9,20 +8,17 @@ using GameInterface.Services.PartyVisuals.Extensions;
 using GameInterface.Services.PartyVisuals.Messages;
 using SandBox.View.Map.Managers;
 using SandBox.View.Map.Visuals;
-using Serilog;
-using System;
+using System.Runtime.CompilerServices;
 using TaleWorlds.CampaignSystem.Party;
 
 namespace GameInterface.Services.PartyVisuals.Handlers;
 
 public class PartyVisualLifetimeHandler : IHandler
 {
-    private static readonly ILogger Logger = LogManager.GetLogger<PartyVisualLifetimeHandler>();
-
     private readonly IMessageBroker messageBroker;
     private readonly INetwork network;
     private readonly IObjectManager objectManager;
-
+    private readonly ConditionalWeakTable<MobilePartyVisual, string> skippedVisualIds = new();
 
     public PartyVisualLifetimeHandler(IMessageBroker messageBroker, INetwork network, IObjectManager objectManager)
     {
@@ -43,12 +39,8 @@ public class PartyVisualLifetimeHandler : IHandler
         messageBroker.Unsubscribe<NetworkDestroyPartyVisual>(Handle);
     }
 
-
     private void Handle(MessagePayload<PartyVisualCreated> payload)
     {
-        if (!objectManager.AddNewObject(payload.What.MobilePartyVisual, out var visualId))
-            return;
-
         // The visual is keyed off the mobile party. Replicate the mobile party id (always present on
         // the server) rather than the party base id, whose MobileParty back-link the client syncs
         // separately and may not have applied yet when the create arrives.
@@ -56,7 +48,21 @@ public class PartyVisualLifetimeHandler : IHandler
         if (mobileParty == null)
             return;
 
-        if (!objectManager.TryGetIdWithLogging(mobileParty, out string mobilePartyId))
+        // Save loading builds visuals before InitialServerState registers campaign objects. Those
+        // visuals are registered by PartyVisualRegistry after loading, so skip this live-create path.
+        if (!objectManager.TryGetId(mobileParty, out string mobilePartyId))
+        {
+            if (!string.IsNullOrEmpty(mobileParty.StringId))
+            {
+                skippedVisualIds.Remove(payload.What.MobilePartyVisual);
+                skippedVisualIds.Add(
+                    payload.What.MobilePartyVisual,
+                    $"{nameof(MobilePartyVisual)}_{mobileParty.StringId}");
+            }
+            return;
+        }
+
+        if (!objectManager.AddNewObject(payload.What.MobilePartyVisual, out var visualId))
             return;
 
         network.SendAll(new NetworkCreatePartyVisual(visualId, mobilePartyId));
@@ -93,41 +99,45 @@ public class PartyVisualLifetimeHandler : IHandler
 
     private void Handle(MessagePayload<PartyVisualDestroyed> payload)
     {
-        if (!objectManager.TryGetIdWithLogging(payload.What.MobilePartyVisual, out string visualId))
+        var partyVisual = payload.What.MobilePartyVisual;
+        var isRegistered = objectManager.TryGetId(partyVisual, out string partyVisualId);
+        if (!isRegistered && !skippedVisualIds.TryGetValue(partyVisual, out partyVisualId))
+        {
+            objectManager.TryGetIdWithLogging(partyVisual, out _);
+            return;
+        }
+
+        if (!objectManager.TryGetIdWithLogging(payload.What.MobileParty, out string mobilePartyId))
             return;
 
-        objectManager.Remove(payload.What.MobilePartyVisual);
+        skippedVisualIds.Remove(partyVisual);
+        if (isRegistered)
+            objectManager.Remove(partyVisual);
 
-        network.SendAll(new NetworkDestroyPartyVisual(visualId));
+        network.SendAll(new NetworkDestroyPartyVisual(partyVisualId, mobilePartyId));
     }
 
     private void Handle(MessagePayload<NetworkDestroyPartyVisual> payload)
     {
         var partyVisualId = payload.What.PartyVisualId;
+        var mobilePartyId = payload.What.MobilePartyId;
 
-        // Defer the whole removal onto the main thread so it runs in network order relative to the
-        // create handler (which also defers). Resolving and removing the visual here, on the network
-        // thread, would race a create whose registration is still queued: the lookup would miss the
-        // not-yet-registered id, the destroy would be dropped, and the queued create would then leave
-        // a zombie visual on the map.
-        GameThread.Run(() =>
+        GameThread.RunSafe(() =>
         {
+            if (objectManager.TryGetObject<MobilePartyVisual>(partyVisualId, out var registeredPartyVisual))
+                objectManager.Remove(registeredPartyVisual);
+
+            if (!objectManager.TryGetObjectWithLogging<MobileParty>(mobilePartyId, out var mobileParty))
+                return;
+
             using (new AllowedThread())
             {
-                try
-                {
-                    if (!objectManager.TryGetObjectWithLogging(partyVisualId, out MobilePartyVisual partyVisual))
-                        return;
-
-                    // Deregister first so the id is freed even if the native removal below throws.
+                var partyVisual = mobileParty.Party.GetPartyVisual();
+                if (partyVisual != null)
                     objectManager.Remove(partyVisual);
-                    MobilePartyVisualManager.Current?.RemovePartyVisualForParty(partyVisual.MapEntity.MobileParty);
-                }
-                catch (Exception ex)
-                {
-                    Logger.Error(ex, "Failed to destroy party visual {VisualId}", partyVisualId);
-                }
+
+                MobilePartyVisualManager.Current?.RemovePartyVisualForParty(mobileParty);
             }
-        });
+        }, context: $"destroy party visual {mobilePartyId}");
     }
 }

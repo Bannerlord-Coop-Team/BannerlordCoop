@@ -1,4 +1,4 @@
-using HarmonyLib;
+﻿using HarmonyLib;
 using TaleWorlds.Library;
 using TaleWorlds.MountAndBlade;
 using TaleWorlds.MountAndBlade.Source.Missions.Handlers;
@@ -18,6 +18,7 @@ internal class DisableRetreatConfirmationPausePatch
 
         __instance._isSurrender = false;
         InformationManager.ShowInquiry(__instance.GetRetreatPopUpData());
+        __instance.IsWarningWidgetOpened = true;
         return false;
     }
 }

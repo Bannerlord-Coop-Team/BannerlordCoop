@@ -15,6 +15,7 @@ internal sealed class PlayerPartyInteractionSession
     public NetPeer InitiatorPeer { get; }
     public NetPeer ResponderPeer { get; set; }
     public bool IsHostile { get; }
+    public PlayerPartyInteractionVassalUnavailableReason VassalUnavailableReason { get; set; }
     public PlayerPartyInteractionProposal Proposal { get; set; }
     public bool HostileDemandConfirmed { get; set; }
     public bool InitiatorAcceptedTrade { get; set; }

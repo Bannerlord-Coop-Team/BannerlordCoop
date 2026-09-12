@@ -1,0 +1,167 @@
+<Prefab>
+  <Window>
+    <Widget WidthSizePolicy="StretchToParent" HeightSizePolicy="StretchToParent" DoNotAcceptEvents="true">
+      <Children>
+        <Widget Id="CoopChatRibbon" WidthSizePolicy="Fixed" SuggestedWidth="150"
+                HeightSizePolicy="Fixed" SuggestedHeight="58"
+                HorizontalAlignment="Right" VerticalAlignment="Bottom" MarginBottom="187"
+                IsVisible="@IsRibbonVisible">
+          <Children>
+            <ButtonWidget Id="CoopChatRibbonButton" DoNotPassEventsToChildren="true"
+                          UpdateChildrenStates="true" WidthSizePolicy="StretchToParent"
+                          HeightSizePolicy="StretchToParent" Brush="Header.Tab.Center"
+                          Command.Click="ActionOpen">
+              <Children>
+                <TextWidget WidthSizePolicy="StretchToParent" HeightSizePolicy="StretchToParent"
+                            MarginLeft="18" MarginRight="10" Brush="Clan.TabControl.Text"
+                            Brush.FontSize="22" Brush.TextHorizontalAlignment="Center"
+                            Brush.TextVerticalAlignment="Center" Text="@RibbonText"/>
+              </Children>
+            </ButtonWidget>
+            <Widget Id="CoopChatUnreadBadge" WidthSizePolicy="Fixed" SuggestedWidth="34"
+                    HeightSizePolicy="Fixed" SuggestedHeight="28" HorizontalAlignment="Left"
+                    VerticalAlignment="Top" PositionXOffset="-8" PositionYOffset="-8"
+                    Sprite="BlankWhiteSquare_9" Color="#B52D24FF"
+                    IsVisible="@HasUnreadNotification" DoNotAcceptEvents="true">
+              <Children>
+                <TextWidget WidthSizePolicy="StretchToParent" HeightSizePolicy="StretchToParent"
+                            Brush="Clan.TabControl.Text" Brush.FontSize="17"
+                            Brush.TextHorizontalAlignment="Center" Brush.TextVerticalAlignment="Center"
+                            Text="@UnreadNotificationText"/>
+              </Children>
+            </Widget>
+          </Children>
+        </Widget>
+
+        <Widget Id="CoopChatRoot" WidthSizePolicy="Fixed" SuggestedWidth="780"
+                HeightSizePolicy="Fixed" SuggestedHeight="400"
+                HorizontalAlignment="Right" VerticalAlignment="Bottom"
+                MarginRight="36" MarginBottom="92" IsVisible="@IsOpen">
+          <Children>
+            <Widget WidthSizePolicy="StretchToParent" HeightSizePolicy="StretchToParent"
+                    Sprite="BlankWhiteSquare_9" Color="#17130FFF" AlphaFactor="0.86"
+                    IsVisible="@IsOpen"/>
+
+            <ListPanel WidthSizePolicy="StretchToParent" HeightSizePolicy="StretchToParent"
+                       MarginLeft="12" MarginRight="12" MarginTop="12" MarginBottom="12"
+                       StackLayout.LayoutMethod="HorizontalLeftToRight">
+              <Children>
+                <Widget WidthSizePolicy="Fixed" SuggestedWidth="178" HeightSizePolicy="StretchToParent"
+                        MarginRight="12" IsVisible="@IsOpen">
+                  <Children>
+                    <Widget WidthSizePolicy="StretchToParent" HeightSizePolicy="StretchToParent"
+                            Sprite="BlankWhiteSquare_9" Color="#2D241BFF" AlphaFactor="0.9"/>
+                    <ScrollablePanel Id="ChatChannelScrollablePanel" WidthSizePolicy="StretchToParent"
+                                     HeightSizePolicy="StretchToParent" MarginRight="8"
+                                     AutoHideScrollBars="true" ClipRect="ChatChannelClipRect"
+                                     InnerPanel="ChatChannelClipRect\ChatChannelList"
+                                     VerticalScrollbar="..\ChatChannelScrollbar">
+                      <Children>
+                        <Widget Id="ChatChannelClipRect" WidthSizePolicy="StretchToParent"
+                                HeightSizePolicy="StretchToParent" ClipContents="true">
+                          <Children>
+                            <ListPanel Id="ChatChannelList" DataSource="{Channels}"
+                                       WidthSizePolicy="StretchToParent" HeightSizePolicy="CoverChildren"
+                                       StackLayout.LayoutMethod="VerticalTopToBottom">
+                              <ItemTemplate>
+                                <ButtonWidget DoNotPassEventsToChildren="true" UpdateChildrenStates="true"
+                                              WidthSizePolicy="StretchToParent" HeightSizePolicy="Fixed"
+                                              SuggestedHeight="42" MarginBottom="4" Brush="Header.Tab.Center"
+                                              Command.Click="ExecuteSelection" IsSelected="@IsSelected">
+                                  <Children>
+                                    <TextWidget WidthSizePolicy="StretchToParent" HeightSizePolicy="StretchToParent"
+                                                MarginLeft="8" MarginRight="8" Brush="Clan.TabControl.Text"
+                                                Brush.FontSize="20" Brush.TextHorizontalAlignment="Left"
+                                                Brush.TextVerticalAlignment="Center" ClipContents="true"
+                                                Text="@Name"/>
+                                  </Children>
+                                </ButtonWidget>
+                              </ItemTemplate>
+                            </ListPanel>
+                          </Children>
+                        </Widget>
+                      </Children>
+                    </ScrollablePanel>
+                    <ScrollbarWidget Id="ChatChannelScrollbar" WidthSizePolicy="Fixed" SuggestedWidth="6"
+                                     HeightSizePolicy="StretchToParent" HorizontalAlignment="Right"
+                                     AlignmentAxis="Vertical" Handle="ChatChannelScrollbarHandle"
+                                     MaxValue="100" MinValue="0">
+                      <Children>
+                        <ImageWidget Id="ChatChannelScrollbarHandle" WidthSizePolicy="Fixed" SuggestedWidth="4"
+                                     HeightSizePolicy="Fixed" SuggestedHeight="10" HorizontalAlignment="Center"
+                                     Brush="FaceGen.Scrollbar.Handle" Brush.AlphaFactor="0.7"/>
+                      </Children>
+                    </ScrollbarWidget>
+                  </Children>
+                </Widget>
+
+                <ListPanel WidthSizePolicy="StretchToParent" HeightSizePolicy="StretchToParent"
+                           StackLayout.LayoutMethod="VerticalTopToBottom">
+                  <Children>
+                    <Widget Id="CoopChatHeader" WidthSizePolicy="StretchToParent" HeightSizePolicy="Fixed"
+                            SuggestedHeight="42" MarginBottom="4" IsVisible="@IsOpen">
+                      <Children>
+                        <TextWidget WidthSizePolicy="StretchToParent" HeightSizePolicy="StretchToParent"
+                                    MarginRight="150" Brush="Clan.TabControl.Text" Brush.FontSize="25"
+                                    Brush.TextHorizontalAlignment="Left" Brush.TextVerticalAlignment="Center"
+                                    Text="@ActiveChannelText"/>
+                        <Standard.Button Id="CoopChatMuteButton" WidthSizePolicy="Fixed" SuggestedWidth="98"
+                                         HeightSizePolicy="Fixed" SuggestedHeight="36" HorizontalAlignment="Right"
+                                         VerticalAlignment="Top" MarginRight="44" Command.Click="ActionToggleMute"
+                                         Parameter.Text="@MuteButtonText" IsVisible="@IsMuteButtonVisible"/>
+                        <ButtonWidget Id="CoopChatCloseButton" DoNotPassEventsToChildren="true"
+                                      UpdateChildrenStates="true" WidthSizePolicy="Fixed" SuggestedWidth="36"
+                                      HeightSizePolicy="Fixed" SuggestedHeight="36" HorizontalAlignment="Right"
+                                      VerticalAlignment="Top" Brush="CloseButton.Flat" Command.Click="ActionClose"/>
+                      </Children>
+                    </Widget>
+
+                    <Widget WidthSizePolicy="StretchToParent" HeightSizePolicy="Fixed" SuggestedHeight="238"
+                            ClipContents="true">
+                      <Children>
+                        <Widget WidthSizePolicy="StretchToParent" HeightSizePolicy="StretchToParent"
+                                Sprite="BlankWhiteSquare_9" Color="#000000FF" AlphaFactor="0.48"/>
+                        <TextWidget WidthSizePolicy="StretchToParent" HeightSizePolicy="StretchToParent"
+                                    MarginLeft="10" MarginRight="10" MarginTop="8" MarginBottom="8"
+                                    Brush="Clan.TabControl.Text" Brush.FontSize="20"
+                                    Brush.TextHorizontalAlignment="Left" Brush.TextVerticalAlignment="Bottom"
+                                    Text="@TranscriptText"/>
+                      </Children>
+                    </Widget>
+
+                    <ListPanel WidthSizePolicy="StretchToParent" HeightSizePolicy="Fixed" SuggestedHeight="52"
+                               MarginTop="8" StackLayout.LayoutMethod="HorizontalLeftToRight"
+                               IsVisible="@IsOpen">
+                      <Children>
+                        <BrushWidget WidthSizePolicy="StretchToParent" HeightSizePolicy="StretchToParent"
+                                     Brush="SaveLoad.Search.Button" UpdateChildrenStates="true">
+                          <Children>
+                            <EditableTextWidget Id="CoopChatMessageInput" UpdateChildrenStates="true"
+                                                WidthSizePolicy="StretchToParent" HeightSizePolicy="StretchToParent"
+                                                MarginLeft="10" MarginRight="10" MarginTop="6" MarginBottom="6"
+                                                Brush="SaveLoad.Search.InputText" Brush.FontSize="21"
+                                                Text="@WrittenText" MaxLength="@MaxMessageLength"
+                                                KeyboardInfoText="@ActiveChannelText"/>
+                          </Children>
+                        </BrushWidget>
+                        <Standard.Button WidthSizePolicy="Fixed" SuggestedWidth="94"
+                                         HeightSizePolicy="StretchToParent" MarginLeft="8"
+                                         Command.Click="ActionSend" Parameter.Text="@SendButtonText"/>
+                      </Children>
+                    </ListPanel>
+
+                    <TextWidget WidthSizePolicy="StretchToParent" HeightSizePolicy="Fixed" SuggestedHeight="28"
+                                MarginTop="2" Brush="Clan.TabControl.Text" Brush.FontSize="17"
+                                Brush.FontColor="#B9AB9BFF" Brush.TextHorizontalAlignment="Right"
+                                Brush.TextVerticalAlignment="Center" Text="@InputHintText"
+                                IsVisible="@IsOpen"/>
+                  </Children>
+                </ListPanel>
+              </Children>
+            </ListPanel>
+          </Children>
+        </Widget>
+      </Children>
+    </Widget>
+  </Window>
+</Prefab>

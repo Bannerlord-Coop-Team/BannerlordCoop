@@ -20,5 +20,7 @@ public interface INetwork : IDisposable
     void SendImmediate(NetPeer netPeer, IMessage message);
     void SendAll(IMessage message);
     void SendAllBut(NetPeer excludedPeer, IMessage message);
+    /// <summary>Flushes buffered message aggregates to their peers.</summary>
+    void FlushPendingMessages();
     void Start();
 }

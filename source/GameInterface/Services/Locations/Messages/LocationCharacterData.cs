@@ -30,6 +30,14 @@ public class LocationCharacterData
     public bool FixedLocation { get; }
     [ProtoMember(10)]
     public bool UseCivilianEquipment { get; }
+    // Bone-attached carry props (baskets, pitchers, carried goods): LocationCharacter.PrefabNamesForBones
+    // as parallel arrays. Natively the AgentNavigator attaches these at spawn; puppets have no navigator,
+    // so the receiver attaches them straight from this data — without it every carrier plays its carry
+    // action set with empty hands.
+    [ProtoMember(11)]
+    public int[] PrefabBones { get; }
+    [ProtoMember(12)]
+    public string[] PrefabNames { get; }
 
     public LocationCharacterData(
         string locationId,
@@ -41,7 +49,9 @@ public class LocationCharacterData
         string behaviorsMethodName,
         int characterRelation,
         bool fixedLocation,
-        bool useCivilianEquipment)
+        bool useCivilianEquipment,
+        int[] prefabBones = null,
+        string[] prefabNames = null)
     {
         LocationId = locationId;
         CharacterId = characterId;
@@ -53,5 +63,7 @@ public class LocationCharacterData
         CharacterRelation = characterRelation;
         FixedLocation = fixedLocation;
         UseCivilianEquipment = useCivilianEquipment;
+        PrefabBones = prefabBones;
+        PrefabNames = prefabNames;
     }
 }

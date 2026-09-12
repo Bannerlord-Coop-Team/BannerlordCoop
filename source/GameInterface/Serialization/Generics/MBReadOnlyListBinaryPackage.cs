@@ -1,16 +1,21 @@
 ﻿using Common.Extensions;
+using Common.Logging;
 using GameInterface.Serialization.Native;
+using Serilog;
 using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
 using System.Runtime.Serialization;
+using TaleWorlds.Library;
 
 namespace GameInterface.Serialization.Generics
 {
     [Serializable]
     public class MBReadOnlyListBinaryPackage : IEnumerableBinaryPackage
     {
+        private static readonly ILogger Logger = LogManager.GetLogger<MBReadOnlyListBinaryPackage>();
+
         [NonSerialized]
         private bool IsUnpacked = false;
 
@@ -23,17 +28,19 @@ namespace GameInterface.Serialization.Generics
         protected Dictionary<string, IBinaryPackage> StoredFields = new Dictionary<string, IBinaryPackage>();
 
         string ObjectType;
+        private Type ResolvedType => SerializedTypeResolver.ResolveType(
+            ObjectType, typeof(MBReadOnlyList<>), typeof(MBList<>));
 
         public MBReadOnlyListBinaryPackage(object obj, IBinaryPackageFactory binaryPackageFactory)
         {
             BinaryPackageFactory = binaryPackageFactory;
-            ObjectType = obj.GetType().AssemblyQualifiedName;
+            ObjectType = SerializedTypeResolver.Encode(obj.GetType());
             Object = obj;
         }
 
         public void Pack()
         {
-            var type = Type.GetType(ObjectType);
+            var type = ResolvedType;
             foreach (FieldInfo field in type.GetAllInstanceFields().GroupBy(o => o.Name).Select(g => g.First()))
             {
                 object obj = field.GetValue(Object);
@@ -48,13 +55,22 @@ namespace GameInterface.Serialization.Generics
             BinaryPackageFactory = binaryPackageFactory;
 
             IsUnpacked = true;
-            var type = Type.GetType(ObjectType);
+            var type = ResolvedType;
             Object = FormatterServices.GetUninitializedObject(type);
             var fields = type.GetAllInstanceFields();
 
             foreach (string fieldName in StoredFields.Keys)
             {
                 var field = fields.FirstOrDefault(f => f.Name.Equals(fieldName));
+
+                // Cross-runtime field skew (see BinaryPackageBase.UnpackFields): a net472 sender
+                // packs List<T>._syncRoot, which does not exist on the net6 dedicated server —
+                // the null SetValue here was the join-time hero-transfer fatal. Skip unknowns.
+                if (field == null)
+                {
+                    Logger.Warning("[FieldSkew] {Type} has no field '{Field}' on this runtime; skipping packed value", type.Name, fieldName);
+                    continue;
+                }
 
                 if (type.IsValueType)
                 {

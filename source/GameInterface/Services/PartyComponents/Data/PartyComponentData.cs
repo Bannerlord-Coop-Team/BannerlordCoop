@@ -12,10 +12,8 @@ public record PartyComponentData(int TypeIndex, string Id)
     public string Id { get; } = Id;
 
     /// <summary>
-    /// Optional: the StringId of the home Settlement for a <c>PatrolPartyComponent</c>.
-    /// Null for all other component types. Bundled with creation so the client can call
-    /// <c>InitializePartyComponentProperties</c> immediately without waiting for a
-    /// separate AutoSync field message (which may arrive in any order).
+    /// Optional constructor Settlement for party components whose home is stored in a field.
+    /// Bundled with creation so the client can restore the field before the component is used.
     /// </summary>
     [ProtoMember(3)]
     public string HomeSettlementId { get; set; } = null;

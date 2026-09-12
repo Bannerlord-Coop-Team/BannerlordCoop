@@ -39,6 +39,22 @@ public class GameThreadPumpTests
     }
 
     [Fact]
+    public void EnqueueSafe_CalledOnTheGameLoopThread_RunsOnALaterUpdate()
+    {
+        using var executed = new ManualResetEventSlim(false);
+        bool ranInline = true;
+
+        GameThread.Run(() =>
+        {
+            GameThread.EnqueueSafe(executed.Set);
+            ranInline = executed.IsSet;
+        }, blocking: true);
+
+        Assert.False(ranInline);
+        Assert.True(executed.Wait(TimeSpan.FromSeconds(5)), "the deferred action was not drained");
+    }
+
+    [Fact]
     public void WaitWhilePumping_ThrowsWhenCalledOffTheGameLoopThread()
     {
         // The xUnit worker thread is not the game-loop thread, so it can't pump; the wait refuses to run.

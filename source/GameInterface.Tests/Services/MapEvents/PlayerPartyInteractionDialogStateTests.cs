@@ -1,5 +1,6 @@
 using GameInterface.Services.MapEvents.Messages.Conversation;
 using GameInterface.Services.MapEvents.PlayerPartyInteractions;
+using System;
 using Xunit;
 
 namespace GameInterface.Tests.Services.MapEvents;
@@ -41,7 +42,7 @@ public class PlayerPartyInteractionDialogStateTests
                 "RandomPlayer",
                 PlayerPartyInteractionPhase.WaitingForResponse,
                 PlayerPartyInteractionProposal.Trade,
-                new PlayerPartyInteractionOption[0],
+                Array.Empty<PlayerPartyInteractionOption>(),
                 isInitiator: true));
 
             Assert.Equal("Awaiting response from RandomPlayer...", PlayerPartyInteractionDialogState.GetDialogText());
@@ -76,6 +77,38 @@ public class PlayerPartyInteractionDialogStateTests
             Assert.False(PlayerPartyInteractionDialogState.IsOptionEnabled(PlayerPartyInteractionOption.OfferServices, out var explanation));
             Assert.Equal("Not available while hostile", explanation.ToString());
             Assert.True(PlayerPartyInteractionDialogState.IsOptionEnabled(PlayerPartyInteractionOption.TradeProposal));
+        }
+        finally
+        {
+            PlayerPartyInteractionDialogState.Clear("session-1");
+        }
+    }
+
+    [Theory]
+    [InlineData(PlayerPartyInteractionVassalUnavailableReason.TargetIsNotKingdomLeader, "The other player must rule a kingdom.")]
+    [InlineData(PlayerPartyInteractionVassalUnavailableReason.InitiatorHasNoClan, "You must lead a clan to swear allegiance.")]
+    [InlineData(PlayerPartyInteractionVassalUnavailableReason.InitiatorIsInKingdom, "You must leave your current kingdom first.")]
+    [InlineData(PlayerPartyInteractionVassalUnavailableReason.InitiatorClanTierTooLow, "Your clan must be at least tier 2 to swear allegiance.")]
+    public void DisabledVassal_UsesServerUnavailableReason(
+        PlayerPartyInteractionVassalUnavailableReason unavailableReason,
+        string expectedExplanation)
+    {
+        try
+        {
+            PlayerPartyInteractionDialogState.Apply(new NetworkPlayerPartyInteractionState(
+                "session-1",
+                "party-1",
+                "party-2",
+                "RandomPlayer",
+                PlayerPartyInteractionPhase.OfferServices,
+                PlayerPartyInteractionProposal.None,
+                new[] { PlayerPartyInteractionOption.Vassal },
+                isInitiator: true,
+                enabledOptions: Array.Empty<PlayerPartyInteractionOption>(),
+                vassalUnavailableReason: unavailableReason));
+
+            Assert.False(PlayerPartyInteractionDialogState.IsOptionEnabled(PlayerPartyInteractionOption.Vassal, out var explanation));
+            Assert.Equal(expectedExplanation, explanation.ToString());
         }
         finally
         {

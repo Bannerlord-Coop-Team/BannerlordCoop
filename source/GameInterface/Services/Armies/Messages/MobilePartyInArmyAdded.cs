@@ -11,10 +11,12 @@ public readonly struct MobilePartyInArmyAdded : IEvent
 {
     public readonly Army Army;
     public readonly MobileParty MobileParty;
+    public readonly bool AddPartyToMergedPartiesBool;
 
-    public MobilePartyInArmyAdded(Army army, MobileParty mobileParty)
+    public MobilePartyInArmyAdded(Army army, MobileParty mobileParty, bool addPartyToMergedPartiesBool)
     {
         Army = army;
         MobileParty = mobileParty;
+        AddPartyToMergedPartiesBool = addPartyToMergedPartiesBool;
     }
 }

@@ -73,6 +73,9 @@ public class MobilePartyPropertyTests : SyncTestBase
             party.PartyTradeGold = 500;
         });
 
+        // Lord-party trade gold is the leader hero's Gold, which is coalesced; drain it before reading clients.
+        TestEnvironment.FlushCoalescer();
+
         foreach (var client in Clients)
         {
             Assert.True(client.ObjectManager.TryGetObject<MobileParty>(LordPartyId, out var clientParty));

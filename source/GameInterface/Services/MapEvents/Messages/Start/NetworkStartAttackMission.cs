@@ -1,5 +1,6 @@
 ﻿using Common.Messaging;
 using ProtoBuf;
+using TaleWorlds.Core;
 using TaleWorlds.Library;
 
 namespace GameInterface.Services.MapEvents.Messages.Start;
@@ -16,10 +17,19 @@ internal readonly struct NetworkStartAttackMission : ICommand
     [ProtoMember(3)]
     public readonly AtmosphereInfo AtmosphereOnCampaign;
 
-    public NetworkStartAttackMission(string mapEventId, int randomTerrainSeed, AtmosphereInfo atmosphereOnCampaign)
+    [ProtoMember(4)]
+    public readonly string InitiatingPartyId;
+
+    [ProtoMember(5)]
+    public readonly MissionInitializerRecord MissionInitializer;
+
+    public NetworkStartAttackMission(string mapEventId, MissionInitializerRecord missionInitializer,
+        string initiatingPartyId)
     {
         MapEventId = mapEventId;
-        RandomTerrainSeed = randomTerrainSeed;
-        AtmosphereOnCampaign = atmosphereOnCampaign;
+        RandomTerrainSeed = missionInitializer.RandomTerrainSeed;
+        AtmosphereOnCampaign = missionInitializer.AtmosphereOnCampaign;
+        InitiatingPartyId = initiatingPartyId;
+        MissionInitializer = missionInitializer;
     }
 }

@@ -1,7 +1,8 @@
-using Common.Logging;
+﻿using Common.Logging;
 using Common.Messaging;
 using Common.Network;
-using Coop.Core.Server.Services.Time.Messages;
+using Coop.Core.Common.Network.Packets;
+using Coop.Core.Server.Connections;
 using GameInterface.Services.Time.Interfaces;
 using Serilog;
 using System;
@@ -13,24 +14,36 @@ namespace Coop.Core.Server.Services.Time.Handlers;
 /// Periodically broadcasts the authoritative campaign time to all clients.
 /// </summary>
 /// <remarks>
-/// Once per second the server reads the current <c>MapTimeTracker</c> tick value and
-/// sends a <see cref="CampaignTimeUpdated"/> message to every connected client.
+/// Four times per second the server reads the current <c>MapTimeTracker</c> tick value and sends a
+/// <see cref="CampaignTimePacket"/> to every connected client. It goes as a Sequenced packet — not a
+/// reliable message — so the clock heartbeat stays live even while the reliable world-sync stream is
+/// congested (see the packet's remarks).
 /// </remarks>
-public class CampaignTimeSyncHandler : IHandler
+public class CampaignTimeSyncHandler : IHandler, IDisposable
 {
     private static readonly ILogger Logger = LogManager.GetLogger<CampaignTimeSyncHandler>();
 
-    private const double PublishIntervalMs = 1000d;
+    private const double PublishIntervalMs = 250d;
 
     private readonly INetwork network;
     private readonly IMapTimeTrackerInterface mapTimeTrackerInterface;
+    private readonly IConnectionCollection connectionCollection;
+    private readonly IConnectionMessageQueue connectionMessageQueue;
 
+    private readonly object publishGate = new object();
     private readonly Timer publishTimer;
+    private bool disposed;
 
-    public CampaignTimeSyncHandler(INetwork network, IMapTimeTrackerInterface mapTimeTrackerInterface)
+    public CampaignTimeSyncHandler(
+        INetwork network,
+        IMapTimeTrackerInterface mapTimeTrackerInterface,
+        IConnectionCollection connectionCollection,
+        IConnectionMessageQueue connectionMessageQueue)
     {
         this.network = network;
         this.mapTimeTrackerInterface = mapTimeTrackerInterface;
+        this.connectionCollection = connectionCollection;
+        this.connectionMessageQueue = connectionMessageQueue;
 
         // Each broadcast re-arms the timer when it finishes instead of auto-resetting, so at most
         // one callback is ever in flight: a send stalled on a slow consumer delays the next tick
@@ -42,33 +55,48 @@ public class CampaignTimeSyncHandler : IHandler
 
     public void Dispose()
     {
-        publishTimer.Elapsed -= PublishCampaignTime;
-        publishTimer.Stop();
-        publishTimer.Dispose();
+        lock (publishGate)
+        {
+            if (disposed) return;
+
+            disposed = true;
+            publishTimer.Elapsed -= PublishCampaignTime;
+            publishTimer.Stop();
+            publishTimer.Dispose();
+        }
     }
 
     private void PublishCampaignTime(object sender, ElapsedEventArgs e)
     {
-        try
+        lock (publishGate)
         {
-            // No campaign loaded yet, nothing authoritative to broadcast.
-            if (mapTimeTrackerInterface.TryGetCurrentTicks(out long currentTicks) == false) return;
+            if (disposed) return;
 
-            network.SendAll(new CampaignTimeUpdated(currentTicks));
-        }
-        catch (Exception ex)
-        {
-            Logger.Error(ex, "Failed to broadcast {message}", nameof(CampaignTimeUpdated));
-        }
-        finally
-        {
             try
             {
-                publishTimer.Start();
+                // No campaign loaded yet, nothing authoritative to broadcast.
+                if (mapTimeTrackerInterface.TryGetCurrentTicks(out long currentTicks) == false) return;
+
+                foreach (var connection in connectionCollection)
+                {
+                    int joinPacketsRemaining = connectionMessageQueue.TryGetCatchUpPacketsRemaining(
+                        connection.Peer,
+                        out int packetsRemaining)
+                        ? packetsRemaining
+                        : -1;
+
+                    network.Send(
+                        connection.Peer,
+                        new CampaignTimePacket(currentTicks, joinPacketsRemaining));
+                }
             }
-            catch (ObjectDisposedException)
+            catch (Exception ex)
             {
-                // Disposed while this broadcast was in flight; no further ticks.
+                Logger.Error(ex, "Failed to broadcast {message}", nameof(CampaignTimePacket));
+            }
+            finally
+            {
+                if (!disposed) publishTimer.Start();
             }
         }
     }

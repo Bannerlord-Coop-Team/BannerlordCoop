@@ -1,4 +1,4 @@
-using Autofac;
+﻿using Autofac;
 using Common.Messaging;
 using Coop.Core.Client;
 using Coop.Core.Client.Messages;
@@ -15,6 +15,10 @@ using Moq;
 using System;
 using Xunit;
 using Xunit.Abstractions;
+using GameInterface.Services.Inventory.TradeSkills;
+using GameInterface.Services.CampaignService.Data;
+using GameInterface.Services.Inventory;
+using GameInterface.Services.Heroes;
 
 namespace Coop.Tests.Client.States
 {
@@ -36,7 +40,20 @@ namespace Coop.Tests.Client.States
         }
 
         private static NetworkGameSaveDataReceived SaveData(byte[] data, string campaignId) =>
-            new NetworkGameSaveDataReceived(data, campaignId, new CraftingPlayerData(new(), new(), new()), new WorkshopPlayerData(new()), new CaravansPlayerData(new(), new()), new AlleyPlayerData(new()), new InteractionsPlayerData(new(), new(), new(), new()), new AttachmentIdMap(new()));
+            new NetworkGameSaveDataReceived(
+                data,
+                campaignId,
+                new CraftingPlayerData(new(), new(), new()),
+                new WorkshopPlayerData(new()),
+                new CaravansPlayerData(new(), new()),
+                new AlleyPlayerData(new()),
+                new InteractionsPlayerData(new(), new(), new(), new(), new(), new(), new(), new(), new(), new(), new()),
+                new TradePlayerData(new(), new(), new(), new()),
+                new InventoryPlayerData(new(), new()),
+                new HeroMeetingData(new()),
+                new AgingPlayerData(new()),
+                new AttachmentIdMap(new()),
+                new ServerOptions(new()));
 
         [Fact]
         public void StateEntered_Shows_LoadingProgressMessage()
@@ -71,6 +88,22 @@ namespace Coop.Tests.Client.States
             loadingInterfaceMock.Verify(x => x.SetLoadingMessage(
                 "Loading Host Campaign",
                 "Loading host save data..."), Times.Once);
+        }
+
+        [Fact]
+        public void NetworkGameSaveDataProgress_UpdatesPacketsRemaining()
+        {
+            // Arrange
+            var currentState = clientLogic.SetState<ReceivingSavedDataState>();
+
+            // Act
+            currentState.Handle_NetworkGameSaveDataProgress(
+                new MessagePayload<NetworkGameSaveDataProgress>(this, new NetworkGameSaveDataProgress(12345)));
+
+            // Assert
+            loadingInterfaceMock.Verify(x => x.SetLoadingMessage(
+                "Joining Coop Campaign",
+                "Waiting for host save data... 12,345 save packets remaining"), Times.Once);
         }
 
         [Fact]

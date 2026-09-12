@@ -4,6 +4,7 @@ using GameInterface.CoopSessionData;
 using GameInterface.Services.Inventory.Data;
 using GameInterface.Services.ObjectManager;
 using Serilog;
+using System;
 using System.Collections.Generic;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.Core;
@@ -182,16 +183,34 @@ public class SessionWorkshopPlayerDataInterface : ISessionWorkshopPlayerDataInte
 
     public void AddPlayerKeys(string playerHeroId)
     {
-        if (WorkshopPlayerData == null)
+        GameThread.RunSafe(() =>
         {
-            Logger.Error("WorkshopPlayerData was null");
-            return;
-        }
+            if (WorkshopPlayerData == null)
+            {
+                Logger.Error("WorkshopPlayerData was null");
+                return;
+            }
 
-        if (!WorkshopPlayerData.PlayerWarehouseRosterPerSettlement.ContainsKey(playerHeroId))
-        {
-            WorkshopPlayerData.PlayerWarehouseRosterPerSettlement[playerHeroId] = new KeyValuePair<string, List<ItemRosterElementData>>[Campaign.Current.Models.ClanTierModel.MaxClanTier + 1];
-        }
+            // A player can own up to MaximumWorkshopsPlayerCanHave workshops (patched to the map-wide
+            // workshop count), so the vanilla-derived MaxClanTier + 1 slot count silently dropped
+            // warehouse data for the settlements past that cap.
+            int slotCapacity = Math.Max(
+                Campaign.Current.Models.ClanTierModel.MaxClanTier + 1,
+                Campaign.Current.Models.WorkshopModel.MaximumWorkshopsPlayerCanHave);
+
+            if (!WorkshopPlayerData.PlayerWarehouseRosterPerSettlement.TryGetValue(playerHeroId, out var slots))
+            {
+                WorkshopPlayerData.PlayerWarehouseRosterPerSettlement[playerHeroId] = new KeyValuePair<string, List<ItemRosterElementData>>[slotCapacity];
+                return;
+            }
+
+            if (slots.Length < slotCapacity)
+            {
+                var grownSlots = new KeyValuePair<string, List<ItemRosterElementData>>[slotCapacity];
+                Array.Copy(slots, grownSlots, slots.Length);
+                WorkshopPlayerData.PlayerWarehouseRosterPerSettlement[playerHeroId] = grownSlots;
+            }
+        });
     }
 
     public ItemRosterElement GetItemRosterElementFromData(ItemRosterElementData itemRosterElementData)

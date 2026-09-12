@@ -1,9 +1,10 @@
 ﻿using Common;
 using Common.Logging;
 using Common.Messaging;
+using Common.Util;
 using Missions.Agents.Messages;
 using Serilog;
-using System.Reflection;
+using TaleWorlds.Core;
 using TaleWorlds.MountAndBlade;
 
 namespace Missions.Agents.Handlers
@@ -55,26 +56,46 @@ namespace Missions.Agents.Handlers
             NetworkShieldDamaged message = new NetworkShieldDamaged(agentInfo.AgentId, payload.What.EquipmentIndex, payload.What.InflictedDamage);
             network.SendAll(message);
         }
-        private static readonly MethodInfo OnShieldDamaged = typeof(Agent).GetMethod("OnShieldDamaged", BindingFlags.NonPublic | BindingFlags.Instance);
         private void ShieldDamageReceive(MessagePayload<NetworkShieldDamaged> payload)
         {
-            if (!networkAgentRegistry.TryGetAgentInfo(payload.What.AgentId, out var agentInfo))
-            {
-                Logger.Warning("No agent found at {guid} in {class}", payload.What.AgentId, typeof(ShieldDamageHandler));
-                return;
-            }
-
-            var agent = agentInfo.Agent;
-            if (agent.Equipment[payload.What.EquipmentIndex].IsEmpty)
-            {
-                Logger.Warning("Equipment Index for {agent} is already empty in {class}", agent, typeof(ShieldDamageHandler));
-                return;
-            }
-
+            NetworkShieldDamaged message = payload.What;
             GameThread.RunSafe(() =>
             {
-                OnShieldDamaged.Invoke(agent, new object[] { payload.What.EquipmentIndex, payload.What.InflictedDamage });
-            });
+                if (!networkAgentRegistry.TryGetAgentInfo(message.AgentId, out var agentInfo))
+                {
+                    Logger.Warning("No agent found at {guid} in {class}", message.AgentId, typeof(ShieldDamageHandler));
+                    return;
+                }
+
+                Mission mission = Mission.Current;
+                Agent agent = agentInfo.Agent;
+                if (mission == null || agent == null || agent.Mission != mission)
+                {
+                    Logger.Warning("Agent {guid} is not in the active mission in {class}", message.AgentId, typeof(ShieldDamageHandler));
+                    return;
+                }
+
+                int slotIndex = (int)message.EquipmentIndex;
+                if (slotIndex < 0 || slotIndex >= (int)EquipmentIndex.NumAllWeaponSlots ||
+                    agent.Equipment[message.EquipmentIndex].IsEmpty)
+                {
+                    Logger.Warning("Equipment Index for {agent} is already empty or invalid in {class}", agent, typeof(ShieldDamageHandler));
+                    return;
+                }
+
+                ApplyShieldDamage(agent, message.EquipmentIndex, message.InflictedDamage);
+            }, context: nameof(ShieldDamageReceive));
+        }
+
+        internal static void ApplyShieldDamage(
+            Agent agent,
+            EquipmentIndex equipmentIndex,
+            int inflictedDamage)
+        {
+            using (new AllowedThread())
+            {
+                agent.OnShieldDamaged(equipmentIndex, inflictedDamage);
+            }
         }
     }
 }

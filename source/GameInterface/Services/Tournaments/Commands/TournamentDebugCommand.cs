@@ -1,0 +1,611 @@
+﻿using Common.Commands;
+using Common;
+using Common.Messaging;
+using Common.Network;
+using GameInterface.Services.ObjectManager;
+using GameInterface.Services.Tournaments.Data;
+using GameInterface.Services.Tournaments.Messages;
+using GameInterface.Services.Tournaments.UI;
+using SandBox.Tournaments.MissionLogics;
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Text;
+using TaleWorlds.CampaignSystem;
+using TaleWorlds.CampaignSystem.Encounters;
+using TaleWorlds.CampaignSystem.Settlements;
+using TaleWorlds.CampaignSystem.TournamentGames;
+using TaleWorlds.MountAndBlade;
+namespace GameInterface.Services.Tournaments.Commands;
+
+public class TournamentDebugCommand
+{
+    private static CoopCommandResult Succeeded(string output) =>
+        new CoopCommandResult(true, output);
+
+    private static CoopCommandResult Failed(string output) =>
+        new CoopCommandResult(false, output, "command_failed");
+
+#if DEBUG
+    private const string DanusticaSettlementId = "town_ES1";
+    private static DanusticaTournamentFixture fixture;
+
+    private sealed class DanusticaTournamentFixture
+    {
+        public Campaign Campaign;
+        public TournamentManager Manager;
+        public TournamentGame CreatedGame;
+    }
+#endif
+
+    public sealed class AddTournamentToTownCoopCommand : ICoopCommand
+    {
+        public string Prefix => "coop.debug.tournaments";
+
+        public string Name => "add_tournament_to_town";
+
+        public string Description => "Adds tournament to town for co-op debugging.";
+
+        public CoopCommandSide Side => CoopCommandSide.Server;
+
+        public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
+        {
+            new ExpectedArgs("townNameOrId", "The exact town name or id; quote names containing spaces."),
+        };
+
+        public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
+        {
+            if (ModInformation.IsClient)
+                return Failed("This function can only be used by the server");
+
+
+            if (Campaign.Current?.TournamentManager is not TournamentManager tournamentManager)
+                return Failed("No campaign is currently loaded");
+
+            if (!TryResolveTown(args[0], out var town))
+                return Failed($"Town '{args[0]}' not found");
+
+            if (tournamentManager.GetTournamentGame(town) != null)
+                return Failed($"{town.Name} already has an active tournament");
+
+            bool tournamentAdded = false;
+            GameThread.RunSafe(
+                () =>
+                {
+                    tournamentManager.AddTournament(new FightTournamentGame(town));
+                    tournamentAdded = true;
+                },
+                blocking: true,
+                context: nameof(AddTournamentToTownCoopCommand));
+
+            return tournamentAdded
+                ? Succeeded($"Added a tournament to {town.Name}")
+                : Failed($"Failed to add a tournament to {town.Name}; check the log for details");
+
+        }
+    }
+
+#if DEBUG
+    public sealed class BeginDanusticaFixtureCoopCommand : ICoopCommand
+    {
+        public string Prefix => "coop.debug.tournaments";
+
+        public string Name => "danustica_fixture_begin";
+
+        public string Description => "Runs fixture begin for co-op debugging.";
+
+        public CoopCommandSide Side => CoopCommandSide.Server;
+
+        public IExpectedArgs[] ExpectedArgs { get; } = System.Array.Empty<IExpectedArgs>();
+
+        public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
+        {
+            if (ModInformation.IsClient)
+                return Failed("Run this command on the server.");
+            if (fixture != null)
+                return Failed("A Danustica tournament fixture is already pending restoration.");
+            if (!TryResolveDanusticaContext(out var town, out var townId, out var error))
+                return Failed(error);
+            if (Campaign.Current?.TournamentManager is not TournamentManager tournamentManager)
+                return Failed("No campaign is currently loaded.");
+            if (!ContainerProvider.TryResolve<ITournamentSessionRegistry>(out var registry))
+                return Failed("Unable to resolve the tournament session registry.");
+            if (registry.TryGetByTown(townId, out var openSession))
+            {
+                return Failed($"Danustica already has coop session {openSession.SessionId} in phase {openSession.Phase}.");
+            }
+
+            TournamentGame tournamentGame = tournamentManager.GetTournamentGame(town);
+            if (tournamentGame != null &&
+                !CoopTournamentCampaignBehavior.IsSupportedTournament(tournamentGame))
+            {
+                return Failed($"Danustica has unsupported tournament type {tournamentGame.GetType().Name}.");
+            }
+
+            TournamentGame createdGame = null;
+            if (tournamentGame == null)
+            {
+                createdGame = new FightTournamentGame(town);
+                tournamentManager.AddTournament(createdGame);
+                tournamentGame = createdGame;
+            }
+
+            fixture = new DanusticaTournamentFixture
+            {
+                Campaign = Campaign.Current,
+                Manager = tournamentManager,
+                CreatedGame = createdGame,
+            };
+
+            return Succeeded($"DANUSTICA_TOURNAMENT_FIXTURE_STARTED townId={townId}|" +
+                $"nativeType={tournamentGame.GetType().Name}|created={createdGame != null}");
+
+        }
+    }
+
+    public sealed class DanusticaFixtureStateCoopCommand : ICoopCommand
+    {
+        public string Prefix => "coop.debug.tournaments";
+
+        public string Name => "danustica_fixture_state";
+
+        public string Description => "Runs fixture state for co-op debugging.";
+
+        public CoopCommandSide Side => CoopCommandSide.Both;
+
+        public IExpectedArgs[] ExpectedArgs { get; } = System.Array.Empty<IExpectedArgs>();
+
+        public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
+        {
+
+            string fixtureState;
+            if (fixture == null)
+            {
+                fixtureState = "none";
+            }
+            else if (fixture.Campaign != Campaign.Current)
+            {
+                fixtureState = "stale-campaign";
+            }
+            else
+            {
+                bool createdGameActive =
+                    fixture.CreatedGame != null &&
+                    fixture.Manager._activeTournaments.Contains(fixture.CreatedGame);
+                fixtureState =
+                    $"active|created={fixture.CreatedGame != null}|createdGameActive={createdGameActive}";
+            }
+
+            if (!TryObserveDanustica(out var observation))
+                return Failed(observation);
+
+            return Succeeded($"DANUSTICA_TOURNAMENT_FIXTURE state={fixtureState}\n" + observation);
+
+        }
+    }
+
+    public sealed class RestoreDanusticaFixtureCoopCommand : ICoopCommand
+    {
+        public string Prefix => "coop.debug.tournaments";
+
+        public string Name => "danustica_fixture_restore";
+
+        public string Description => "Runs fixture restore for co-op debugging.";
+
+        public CoopCommandSide Side => CoopCommandSide.Server;
+
+        public IExpectedArgs[] ExpectedArgs { get; } = System.Array.Empty<IExpectedArgs>();
+
+        public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
+        {
+            if (ModInformation.IsClient)
+                return Failed("Run this command on the server.");
+            if (fixture == null)
+                return Failed("No Danustica tournament fixture is pending restoration.");
+
+            DanusticaTournamentFixture activeFixture = fixture;
+            if (activeFixture.Campaign != Campaign.Current)
+            {
+                fixture = null;
+                return Succeeded("The Danustica tournament fixture belonged to a previous campaign and was discarded.");
+            }
+            if (!TryResolveDanusticaContext(out _, out var townId, out var error))
+                return Failed(error);
+            if (!ContainerProvider.TryResolve<ITournamentSessionRegistry>(out var registry))
+                return Failed("Unable to resolve the tournament session registry.");
+            if (registry.TryGetByTown(townId, out var openSession))
+            {
+                return Failed($"Cannot restore while coop session {openSession.SessionId} is open in phase {openSession.Phase}.");
+            }
+
+            TournamentGame createdGame = activeFixture.CreatedGame;
+            if (createdGame != null &&
+                activeFixture.Manager._activeTournaments.Contains(createdGame))
+            {
+                activeFixture.Manager.RemoveTournament(createdGame);
+                if (activeFixture.Manager._activeTournaments.Contains(createdGame))
+                    return Failed("The fixture-created Danustica tournament could not be removed.");
+            }
+
+            fixture = null;
+            return Succeeded($"DANUSTICA_TOURNAMENT_FIXTURE_RESTORED removedCreatedTournament={createdGame != null}");
+
+        }
+    }
+
+    public sealed class AbortDanusticaFixtureCoopCommand : ICoopCommand
+    {
+        public string Prefix => "coop.debug.tournaments";
+
+        public string Name => "danustica_fixture_abort";
+
+        public string Description => "Runs fixture abort for co-op debugging.";
+
+        public CoopCommandSide Side => CoopCommandSide.Server;
+
+        public IExpectedArgs[] ExpectedArgs { get; } = System.Array.Empty<IExpectedArgs>();
+
+        public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
+        {
+            if (ModInformation.IsClient)
+                return Failed("Run this command on the server.");
+            if (fixture == null)
+                return Failed("No Danustica tournament fixture is pending restoration.");
+            if (fixture.Campaign != Campaign.Current)
+            {
+                fixture = null;
+                return Succeeded("The Danustica tournament fixture belonged to a previous campaign and was discarded.");
+            }
+            if (fixture.CreatedGame == null)
+                return Failed("Refusing to abort a tournament that was not created by the fixture.");
+            if (!TryResolveDanusticaContext(out _, out var townId, out var error))
+                return Failed(error);
+            if (!ContainerProvider.TryResolve<ITournamentSessionRegistry>(out var registry) ||
+                !ContainerProvider.TryResolve<INetwork>(out var network) ||
+                !ContainerProvider.TryResolve<IMessageBroker>(out var messageBroker))
+            {
+                return Failed("Unable to resolve the tournament fixture cleanup services.");
+            }
+
+            if (!registry.TryGetByTown(townId, out var session))
+                return Failed("The fixture has no active Danustica session to abort.");
+            if (!registry.Remove(session.SessionId))
+                return Failed($"Unable to remove Danustica session {session.SessionId}.");
+
+            var removal = new NetworkTournamentSessionRemoved(session.SessionId, townId);
+            network.SendAll(removal);
+            messageBroker.Publish(
+                typeof(TournamentDebugCommand),
+                new TournamentSessionRemoved(session.SessionId, townId));
+            return Succeeded($"DANUSTICA_TOURNAMENT_FIXTURE_ABORTED sessionId={session.SessionId}|" +
+                $"phase={session.Phase}|createdTournamentPreservedForRestore=True");
+
+        }
+    }
+
+    public sealed class RequestDanusticaJoinCoopCommand : ICoopCommand
+    {
+        public string Prefix => "coop.debug.tournaments";
+
+        public string Name => "danustica_request_join";
+
+        public string Description => "Runs request join for co-op debugging.";
+
+        public CoopCommandSide Side => CoopCommandSide.Client;
+
+        public IExpectedArgs[] ExpectedArgs { get; } = System.Array.Empty<IExpectedArgs>();
+
+        public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
+        {
+            if (ModInformation.IsServer)
+                return Failed("Run this command on a client.");
+            if (!TryResolveDanusticaController(out var controller, out _, out var townId, out var error))
+                return Failed(error);
+
+            if (!controller.TryGetTownSession(townId, out var snapshot) || snapshot.IsCompleted)
+            {
+                controller.RequestJoin(townId, null, 0);
+                return Succeeded($"DANUSTICA_TOURNAMENT_JOIN_REQUESTED townId={townId}|sessionId=none|revision=0");
+            }
+            if (snapshot.Phase != TournamentSessionPhase.Preparation)
+            {
+                return Failed($"Danustica session {snapshot.SessionId} is in phase {snapshot.Phase}, not Preparation.");
+            }
+
+            controller.RequestJoin(townId, snapshot.SessionId, snapshot.Revision);
+            return Succeeded($"DANUSTICA_TOURNAMENT_JOIN_REQUESTED townId={townId}|" +
+                $"sessionId={snapshot.SessionId}|revision={snapshot.Revision}");
+
+        }
+    }
+
+    public sealed class RequestDanusticaStartCoopCommand : ICoopCommand
+    {
+        public string Prefix => "coop.debug.tournaments";
+
+        public string Name => "danustica_request_start";
+
+        public string Description => "Runs request start for co-op debugging.";
+
+        public CoopCommandSide Side => CoopCommandSide.Client;
+
+        public IExpectedArgs[] ExpectedArgs { get; } = System.Array.Empty<IExpectedArgs>();
+
+        public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
+        {
+            if (ModInformation.IsServer)
+                return Failed("Run this command on a client.");
+            if (!TryResolveDanusticaController(out var controller, out _, out var townId, out var error))
+                return Failed(error);
+            if (!controller.TryGetTownSession(townId, out var snapshot))
+                return Failed("The client has no Danustica tournament session snapshot.");
+            if (snapshot.Phase != TournamentSessionPhase.Preparation)
+                return Failed($"Danustica session {snapshot.SessionId} is in phase {snapshot.Phase}, not Preparation.");
+
+            controller.RequestStart(townId);
+            return Succeeded($"DANUSTICA_TOURNAMENT_START_REQUESTED sessionId={snapshot.SessionId}|revision={snapshot.Revision}");
+
+        }
+    }
+
+    public sealed class RequestDanusticaChoiceCoopCommand : ICoopCommand
+    {
+        public string Prefix => "coop.debug.tournaments";
+
+        public string Name => "danustica_request_choice";
+
+        public string Description => "Runs request choice for co-op debugging.";
+
+        public CoopCommandSide Side => CoopCommandSide.Client;
+
+        public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
+        {
+            new ExpectedArgs("choice", "The choice."),
+        };
+
+        public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
+        {
+            if (ModInformation.IsServer)
+                return Failed("Run this command on a client.");
+            if (!Enum.TryParse(args[0], true, out TournamentPlayerChoice choice) ||
+                choice == TournamentPlayerChoice.None)
+            {
+                return Failed("Invalid choice. Use Join, Watch, or Skip.");
+            }
+            if (!TryResolveDanusticaController(out var controller, out _, out var townId, out var error))
+                return Failed(error);
+            if (!controller.TryGetTownSession(townId, out var snapshot))
+                return Failed("The client has no Danustica tournament session snapshot.");
+            if (snapshot.Phase != TournamentSessionPhase.AwaitingChoices ||
+                string.IsNullOrEmpty(snapshot.CurrentMatchId))
+            {
+                return Failed($"Danustica session {snapshot.SessionId} is not awaiting a match choice; " +
+                    $"phase={snapshot.Phase}|matchId={snapshot.CurrentMatchId ?? "none"}.");
+            }
+
+            controller.RequestChoice(snapshot, choice);
+            return Succeeded($"DANUSTICA_TOURNAMENT_CHOICE_REQUESTED sessionId={snapshot.SessionId}|" +
+                $"revision={snapshot.Revision}|matchId={snapshot.CurrentMatchId}|choice={choice}");
+
+        }
+    }
+
+    public sealed class RequestDanusticaLeaveCoopCommand : ICoopCommand
+    {
+        public string Prefix => "coop.debug.tournaments";
+
+        public string Name => "danustica_request_leave";
+
+        public string Description => "Runs request leave for co-op debugging.";
+
+        public CoopCommandSide Side => CoopCommandSide.Client;
+
+        public IExpectedArgs[] ExpectedArgs { get; } = System.Array.Empty<IExpectedArgs>();
+
+        public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
+        {
+            if (ModInformation.IsServer)
+                return Failed("Run this command on a client.");
+            if (!TryResolveDanusticaController(out var controller, out _, out var townId, out var error))
+                return Failed(error);
+            if (!controller.TryGetTownSession(townId, out var snapshot))
+                return Failed("The client has no Danustica tournament session snapshot.");
+
+            controller.RequestLeaveActive(snapshot);
+            return Succeeded($"DANUSTICA_TOURNAMENT_LEAVE_REQUESTED sessionId={snapshot.SessionId}|" +
+                $"revision={snapshot.Revision}|phase={snapshot.Phase}");
+
+        }
+    }
+
+    public sealed class ObserveDanusticaCommandCoopCommand : ICoopCommand
+    {
+        public string Prefix => "coop.debug.tournaments";
+
+        public string Name => "danustica_observe";
+
+        public string Description => "Runs observe for co-op debugging.";
+
+        public CoopCommandSide Side => CoopCommandSide.Both;
+
+        public IExpectedArgs[] ExpectedArgs { get; } = System.Array.Empty<IExpectedArgs>();
+
+        public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
+        {
+            if (!TryObserveDanustica(out var observation))
+                return Failed(observation);
+
+            return Succeeded(observation);
+
+        }
+    }
+
+    private static bool TryObserveDanustica(out string observation)
+    {
+        if (!TryResolveDanusticaContext(out var town, out var townId, out observation))
+            return false;
+
+        TournamentGame nativeGame = Campaign.Current?.TournamentManager?.GetTournamentGame(town);
+        TournamentSessionSnapshot snapshot = null;
+        string sessionSource;
+        string localControllerId = null;
+        if (ModInformation.IsServer)
+        {
+            sessionSource = "server-registry";
+            if (ContainerProvider.TryResolve<ITournamentSessionRegistry>(out var registry))
+                registry.TryGetByTown(townId, out snapshot);
+        }
+        else
+        {
+            sessionSource = "client-ui";
+            if (ContainerProvider.TryResolve<TournamentUIController>(out var controller))
+            {
+                localControllerId = controller.LocalControllerId;
+                controller.TryGetTownSession(townId, out snapshot);
+            }
+        }
+
+        var output = new StringBuilder();
+        output.AppendLine(
+            $"DANUSTICA_TOURNAMENT_OBSERVATION role={(ModInformation.IsServer ? "server" : "client")}|" +
+            $"townId={townId}|nativeType={nativeGame?.GetType().Name ?? "none"}|" +
+            $"sessionSource={sessionSource}|localControllerId={localControllerId ?? "none"}|" +
+            $"encounterSettlement={PlayerEncounter.EncounterSettlement?.StringId ?? "none"}");
+        AppendSessionState(output, snapshot, localControllerId);
+        AppendMissionState(output);
+        observation = output.ToString().TrimEnd();
+        return true;
+    }
+
+    private static void AppendSessionState(
+        StringBuilder output,
+        TournamentSessionSnapshot snapshot,
+        string localControllerId)
+    {
+        if (snapshot == null)
+        {
+            output.AppendLine("session=none");
+            return;
+        }
+
+        string localChoice = "none";
+        if (!string.IsNullOrEmpty(localControllerId))
+        {
+            CoopTournamentVM.UIState state = CoopTournamentVM.CalculateUIState(
+                snapshot,
+                localControllerId,
+                false);
+            if (state.CanJoin)
+                localChoice = TournamentPlayerChoice.Join.ToString();
+            else if (state.CanWatch)
+                localChoice = TournamentPlayerChoice.Watch.ToString();
+        }
+
+        int humans = snapshot.Contestants.Count(contestant =>
+            contestant.IsHuman && !contestant.IsReplaced);
+        string choices = string.Join(
+            ",",
+            snapshot.Choices
+                .OrderBy(value => value.ControllerId, StringComparer.Ordinal)
+                .Select(value => $"{value.ControllerId}:{value.Choice}"));
+        output.AppendLine(
+            $"session={snapshot.SessionId}|phase={snapshot.Phase}|revision={snapshot.Revision}|" +
+            $"bracketRevision={snapshot.BracketRevision}|matchId={snapshot.CurrentMatchId ?? "none"}|" +
+            $"host={snapshot.HostControllerId ?? "none"}|localChoice={localChoice}|humans={humans}|" +
+            $"spectators={snapshot.SpectatorControllerIds.Length}|ready={snapshot.ReadyCount}|" +
+            $"skip={snapshot.SkipCount}|voters={snapshot.VoterCount}|choices={choices}");
+    }
+
+    private static void AppendMissionState(StringBuilder output)
+    {
+        Mission mission = Mission.Current ?? MissionState.Current?.CurrentMission;
+        if (mission == null)
+        {
+            output.AppendLine("mission=none");
+            return;
+        }
+
+        string tournamentBehaviors = string.Join(
+            ",",
+            mission.MissionBehaviors
+                .Select(behavior => behavior.GetType().Name)
+                .Where(name => name.IndexOf("Tournament", StringComparison.OrdinalIgnoreCase) >= 0)
+                .OrderBy(name => name, StringComparer.Ordinal));
+        TournamentBehavior tournamentBehavior = mission.GetMissionBehavior<TournamentBehavior>();
+        output.AppendLine(
+            $"mission=active|scene={mission.SceneName}|mode={mission.Mode}|" +
+            $"ending={mission.IsMissionEnding}|agents={mission.Agents.Count}|" +
+            $"mainAgent={mission.MainAgent?.Name ?? "none"}|" +
+            $"nativeBracketReady={IsNativeBracketReady(tournamentBehavior)}|" +
+            $"tournamentBehaviors={tournamentBehaviors}");
+    }
+
+    private static bool IsNativeBracketReady(TournamentBehavior behavior)
+    {
+        if (behavior?.Rounds == null ||
+            behavior.CurrentRoundIndex < 0 ||
+            behavior.CurrentRoundIndex >= behavior.Rounds.Length)
+        {
+            return false;
+        }
+
+        TournamentRound round = behavior.Rounds[behavior.CurrentRoundIndex];
+        return round?.Matches != null &&
+               round.CurrentMatchIndex >= 0 &&
+               round.CurrentMatchIndex < round.Matches.Length &&
+               round.Matches[round.CurrentMatchIndex] != null;
+    }
+
+    private static bool TryResolveDanusticaController(
+        out TournamentUIController controller,
+        out Town town,
+        out string townId,
+        out string error)
+    {
+        controller = null;
+        if (!TryResolveDanusticaContext(out town, out townId, out error))
+            return false;
+        if (!ContainerProvider.TryResolve(out controller))
+        {
+            error = "Unable to resolve the tournament UI controller.";
+            return false;
+        }
+
+        return true;
+    }
+
+    private static bool TryResolveDanusticaContext(
+        out Town town,
+        out string townId,
+        out string error)
+    {
+        townId = null;
+        if (!TryResolveTown(DanusticaSettlementId, out town))
+        {
+            error = "Unable to resolve Danustica (town_ES1).";
+            return false;
+        }
+        if (!ContainerProvider.TryResolve<IObjectManager>(out var objectManager) ||
+            !objectManager.TryGetId(town, out townId))
+        {
+            error = "Unable to resolve Danustica's registered town id.";
+            return false;
+        }
+
+        error = null;
+        return true;
+    }
+#endif
+
+    private static bool TryResolveTown(string townIdentifier, out Town town)
+    {
+        town = Campaign.Current?.CampaignObjectManager?.Settlements
+            .Where(settlement => settlement.IsTown)
+            .FirstOrDefault(settlement =>
+                string.Equals(settlement.StringId, townIdentifier, StringComparison.OrdinalIgnoreCase) ||
+                string.Equals(settlement.Town?.StringId, townIdentifier, StringComparison.OrdinalIgnoreCase) ||
+                string.Equals(settlement.Name?.ToString(), townIdentifier, StringComparison.OrdinalIgnoreCase))
+            ?.Town;
+        return town != null;
+    }
+}

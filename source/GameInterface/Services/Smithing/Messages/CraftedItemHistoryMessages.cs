@@ -6,12 +6,12 @@ using TaleWorlds.Core;
 
 namespace GameInterface.Services.Smithing.Messages;
 
-public record CraftedItemHistoryUpdated : IEvent
+public readonly struct UpdateCraftedItemHistory : IEvent
 {
-    public Hero MainHero;
-    public List<ItemObject> CraftedItemHistory;
+    public readonly Hero MainHero;
+    public readonly List<ItemObject> CraftedItemHistory;
 
-    public CraftedItemHistoryUpdated(Hero mainHero, List<ItemObject> craftedItemHistory)
+    public UpdateCraftedItemHistory(Hero mainHero, List<ItemObject> craftedItemHistory)
     {
         MainHero = mainHero;
         CraftedItemHistory = craftedItemHistory;
@@ -19,13 +19,13 @@ public record CraftedItemHistoryUpdated : IEvent
 }
 
 [ProtoContract(SkipConstructor = true)]
-public class NetworkUpdateCraftedItemHistory : ICommand
+internal readonly struct NetworkUpdateCraftedItemHistory : ICommand
 {
     [ProtoMember(1)]
-    public string PlayerHeroId;
+    public readonly string PlayerHeroId;
 
     [ProtoMember(2)]
-    public List<string> CraftedItemHistoryIds;
+    public readonly List<string> CraftedItemHistoryIds;
 
     public NetworkUpdateCraftedItemHistory(string playerHeroId, List<string> craftedItemHistoryIds)
     {

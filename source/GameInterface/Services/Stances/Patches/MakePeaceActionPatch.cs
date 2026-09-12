@@ -2,6 +2,7 @@ using Common;
 using Common.Logging;
 using Common.Messaging;
 using GameInterface.Policies;
+using GameInterface.Services.Entity;
 using GameInterface.Services.Stances.Messages;
 using HarmonyLib;
 using Serilog;
@@ -32,9 +33,29 @@ namespace GameInterface.Services.Stances.Patches
                 return false;
             }
 
+            return true;
+        }
+
+        public static void Postfix(
+            IFaction faction1,
+            IFaction faction2,
+            int dailyTributeFrom1To2,
+            int dailyTributeDuration,
+            MakePeaceAction.MakePeaceDetail detail)
+        {
+            if (ModInformation.IsClient || CallOriginalPolicy.IsOriginalAllowed())
+                return;
+
             MessageBroker.Instance.Publish(faction1,
                 new FactionPeaceMade(faction1, faction2, dailyTributeFrom1To2, dailyTributeDuration, (int)detail));
-            return true;
+
+            if (!ContainerProvider.TryResolve<IPeacePursuitCleaner>(out var pursuitCleaner))
+            {
+                Logger.Error("Unable to resolve {Service} after peace was made", nameof(IPeacePursuitCleaner));
+                return;
+            }
+
+            pursuitCleaner.HoldAiPartiesPursuingEachOther(faction1, faction2);
         }
     }
 }

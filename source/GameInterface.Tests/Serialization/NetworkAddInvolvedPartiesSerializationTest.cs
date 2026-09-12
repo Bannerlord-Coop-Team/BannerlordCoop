@@ -1,4 +1,5 @@
-﻿using GameInterface.Services.MapEvents.Messages;
+﻿using Common.Messaging;
+using GameInterface.Services.MapEvents.Messages;
 using GameInterface.Surrogates;
 using ProtoBuf.Meta;
 using System.IO;
@@ -20,6 +21,12 @@ public class NetworkAddInvolvedPartiesSerializationTest
         // Registers all surrogates (including CampaignVec2) with RuntimeTypeModel.
         // The lock inside SurrogateCollection makes repeated calls safe across tests.
         new SurrogateCollection();
+    }
+
+    [Fact]
+    public void Message_IsServerToClientOnly()
+    {
+        Assert.IsAssignableFrom<IServerToClientCommand>(default(NetworkAddInvolvedParties));
     }
 
     [Fact]

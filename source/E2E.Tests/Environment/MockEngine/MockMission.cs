@@ -1,6 +1,9 @@
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
+using System;
 using System.Runtime.CompilerServices;
 using Common.Util;
+using SandBox.Missions.MissionLogics;
+using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.Core;
 using TaleWorlds.MountAndBlade;
 
@@ -20,11 +23,31 @@ public sealed class MockMission
     public Mission Shell { get; }
 
     public Agent MainAgent { get; set; }
+    public PartyBase MainParty { get; set; }
+    public float DamageToPlayerMultiplier { get; set; } = 1f;
+    public bool EndMissionCalled { get; set; }
+    public int AgentFleeingCalls { get; set; }
+    public Agent LastFleeingAgent { get; set; }
+    public bool DeploymentInProgress { get; set; }
+    public Blow LastRegisteredBlow { get; set; }
+    public Action<Agent, Blow> RegisteredBlow { get; set; } = (_, _) => { };
+    public float ShootDifficulty { get; set; } = 7.5f;
+    public DeploymentMissionController DeploymentController { get; }
+        = ObjectHelper.SkipConstructor<BattleDeploymentMissionController>();
+    public bool LocationPopulationBoundaryEnabled { get; set; }
+    public MissionAgentHandler LocationAgentHandler { get; }
+        = ObjectHelper.SkipConstructor<MissionAgentHandler>();
+    public Action? NativeLocationPopulation { get; set; }
+    public int NativeLocationPopulationCalls { get; set; }
+    public int NativeLocationAnimalPopulationCalls { get; set; }
 
     /// <summary>Per-side teams, returned by the <c>Mission.AttackerTeam</c>/<c>DefenderTeam</c> shims so the
     /// reinforcement spawn (which resolves the team by side) can field troops into them headless.</summary>
     public MockTeam AttackerTeam { get; } = new MockTeam(BattleSideEnum.Attacker);
     public MockTeam DefenderTeam { get; } = new MockTeam(BattleSideEnum.Defender);
+    public MockTeam AttackerAllyTeam => attackerAllyTeam;
+    public MockTeam DefenderAllyTeam => defenderAllyTeam;
+    public Mission.TeamCollection Teams { get; }
 
     /// <summary>The local player's team, returned by the <c>Mission.PlayerTeam</c> shim (the non-host retreat
     /// despawn filters by its side). Null until a test assigns one of the side teams.</summary>
@@ -32,6 +55,8 @@ public sealed class MockMission
 
     private readonly Dictionary<int, Agent> agentsByIndex = new();
     private int nextIndex;
+    private MockTeam attackerAllyTeam;
+    private MockTeam defenderAllyTeam;
 
     // Mirror of Mission._missilesDictionary keys. Mission.OnAgentHit indexes that dictionary for missile blows
     // (the lookup that threw KeyNotFound when an unsynced projectile's index was applied on the owner). The
@@ -40,13 +65,49 @@ public sealed class MockMission
 
     public IReadOnlyCollection<Agent> Agents => agentsByIndex.Values;
 
-    public void RegisterMissile(int index) => missiles.Add(index);
+    public void RegisterMissile(int index, Agent shooter, MissionWeapon weapon)
+    {
+        Shell._missilesDictionary ??= new Dictionary<int, Mission.Missile>();
+        Shell._missilesDictionary[index] =
+            new Mission.Missile(Shell, index, null, shooter, weapon, null);
+        missiles.Add(index);
+    }
+
+    public void RemoveMissile(int index)
+    {
+        Shell._missilesDictionary?.Remove(index);
+        missiles.Remove(index);
+    }
+
     public bool HasMissile(int index) => missiles.Contains(index);
 
     public MockMission()
     {
         Shell = ObjectHelper.SkipConstructor<Mission>();
+        Teams = new Mission.TeamCollection(Shell);
         ByShell.AddOrUpdate(Shell, this);
+    }
+
+    public Team AddTeam(BattleSideEnum side)
+    {
+        if (side == BattleSideEnum.Attacker)
+            return AddTeam(AttackerTeam, ref attackerAllyTeam);
+        if (side == BattleSideEnum.Defender)
+            return AddTeam(DefenderTeam, ref defenderAllyTeam);
+        return null;
+    }
+
+    private Team AddTeam(MockTeam mainTeam, ref MockTeam allyTeam)
+    {
+        var team = mainTeam;
+        if (Teams.Contains(mainTeam.Shell))
+        {
+            allyTeam ??= new MockTeam(mainTeam.Side);
+            team = allyTeam;
+        }
+        if (!Teams.Contains(team.Shell))
+            ((List<Team>)Teams).Add(team.Shell);
+        return team.Shell;
     }
 
     /// <summary>Resolve the mock that owns a given Mission shell (used by the Mission member shims).</summary>
@@ -56,10 +117,18 @@ public sealed class MockMission
     /// spawning a cavalry rider's mount implicitly (from its equipment) inside the same SpawnAgent call.</summary>
     public bool SpawnMounted { get; set; }
 
+    /// <summary>While true, mirrors the engine's clone of overridden equipment inside SpawnAgent.</summary>
+    public bool CloneSpawnEquipmentOnSpawn { get; set; }
+
+    public bool DismountRiderOnNextBlow { get; set; }
+
     /// <summary>Headless replacement for <see cref="Mission.SpawnAgent"/>: mints a skip-ctor agent, mirrors the
     /// build data, assigns a mission-local index, and tracks it.</summary>
     public Agent SpawnAgent(AgentBuildData buildData)
     {
+        Equipment spawnEquipment = CloneSpawnEquipmentOnSpawn
+            ? buildData.AgentOverridenSpawnEquipment?.Clone()
+            : buildData.AgentOverridenSpawnEquipment;
         var agent = ObjectHelper.SkipConstructor<Agent>();
         var mirror = new MirrorAgent
         {
@@ -68,7 +137,12 @@ public sealed class MockMission
             Character = buildData.AgentCharacter,
             Team = buildData.AgentTeam,
             Position = buildData.AgentInitialPosition ?? default,
+            MovementDirection = buildData.AgentInitialDirection ?? default,
             Origin = buildData.AgentOrigin,
+            SpawnEquipment = spawnEquipment,
+            BodyProperties = buildData.BodyPropertiesOverriden ? buildData.AgentBodyProperties : default,
+            ClothingColor1 = buildData.AgentClothingColor1,
+            ClothingColor2 = buildData.AgentClothingColor2,
             Mission = Shell,
         };
         AgentMirror.Bind(agent, mirror);
@@ -102,4 +176,10 @@ public sealed class MockMission
     }
 
     public Agent FindAgentWithIndex(int index) => agentsByIndex.TryGetValue(index, out var a) ? a : null;
+
+    public void DeleteAgent(Agent agent)
+    {
+        if (AgentMirror.TryGet(agent, out var mirror))
+            agentsByIndex.Remove(mirror.Index);
+    }
 }

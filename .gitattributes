@@ -4,6 +4,9 @@
 # corrupted by line-ending conversion.
 * text=auto eol=crlf
 
+# Shell scripts must keep LF line endings so POSIX shells can execute them.
+*.sh text eol=lf
+
 # Binary files: never apply text/line-ending conversion (it would corrupt them).
 *.png  binary
 *.jpg  binary

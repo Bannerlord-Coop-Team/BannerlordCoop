@@ -1,4 +1,5 @@
-﻿using GameInterface.Extentions;
+﻿using Common.Util;
+using GameInterface.Extentions;
 using GameInterface.Services.Clans.Extensions;
 using HarmonyLib;
 using System.Linq;
@@ -32,6 +33,15 @@ namespace GameInterface.Services.Heroes.Patches
         {
             __result = __instance.CompanionOf != null && __instance.CompanionOf.IsPlayerClan();
             return false;
+        }
+
+        [HarmonyPatch("OnLoad")]
+        [HarmonyPostfix]
+        private static void OnLoadPostfix(Hero __instance)
+        {
+            if (!ContainerProvider.TryResolve<IDeadHeroCaptivityRepairer>(out var repairer)) return;
+
+            repairer.TryRestoreDeadState(__instance);
         }
     }
 }

@@ -1,4 +1,5 @@
 ﻿using ProtoBuf;
+using ProtoBuf.Meta;
 using System;
 using System.IO;
 
@@ -14,6 +15,32 @@ public interface ICommonSerializer
 public class ProtoBufSerializer : ICommonSerializer
 {
     private readonly ISerializableTypeMapper typeMapper;
+
+    // Proton reports Windows, so its managed runtime is the reliable discriminator.
+    public static bool IsMonoRuntime { get; } = Type.GetType("Mono.Runtime") != null;
+    public static bool AutoCompileEnabled => RuntimeTypeModel.Default.AutoCompile;
+    public static bool StructFactoryWorkaroundEnabled => IsMonoRuntime;
+
+    public static void ConfigureRuntimeModel()
+    {
+        ConfigureRuntimeModel(RuntimeTypeModel.Default, IsMonoRuntime);
+    }
+
+    internal static void ConfigureRuntimeModel(RuntimeTypeModel model, bool isMonoRuntime)
+    {
+        model.AfterApplyDefaultBehaviour -= ConfigureMonoValueType;
+        if (isMonoRuntime) model.AfterApplyDefaultBehaviour += ConfigureMonoValueType;
+        model.AutoCompile = true;
+    }
+
+    private static void ConfigureMonoValueType(object sender, TypeAddedEventArgs args)
+    {
+        if (!args.Type.IsValueType || args.MetaType.UseConstructor) return;
+
+        // Wine-Mono rejects protobuf-net's uninitialized-object factory IL for value types.
+        // Its no-factory path returns the same zero-initialized default value.
+        args.MetaType.UseConstructor = true;
+    }
 
     public ProtoBufSerializer(ISerializableTypeMapper typeMapper)
     {

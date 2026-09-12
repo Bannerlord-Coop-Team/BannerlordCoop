@@ -1,0 +1,36 @@
+﻿using Common.Messaging;
+using ProtoBuf;
+
+namespace Coop.Core.Server.Connections.Messages;
+
+public enum JoinSyncSignal
+{
+    ReplayComplete,
+    ReplayApplied,
+    BaselineRequested,
+    BaselineApplied,
+    FinalBaselineApplied,
+    WorldReady,
+    CatchUpApplied,
+    ReplayBatchComplete,
+    ReplayBatchApplied,
+}
+
+/// <summary>Coordinates the ordered replay and baseline barriers for a joining client.</summary>
+[ProtoContract(SkipConstructor = true)]
+public readonly struct NetworkJoinSync : IMessage
+{
+    public const int CompletionPacketThreshold = 500;
+
+    [ProtoMember(1)]
+    public readonly JoinSyncSignal Signal;
+
+    [ProtoMember(2)]
+    public readonly int ReplayBatchId;
+
+    public NetworkJoinSync(JoinSyncSignal signal, int replayBatchId = 0)
+    {
+        Signal = signal;
+        ReplayBatchId = replayBatchId;
+    }
+}

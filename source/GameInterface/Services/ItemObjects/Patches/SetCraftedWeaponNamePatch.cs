@@ -7,30 +7,29 @@ using Serilog;
 using TaleWorlds.Core;
 using TaleWorlds.Localization;
 
-namespace GameInterface.Services.ItemObjects.Patches
+namespace GameInterface.Services.ItemObjects.Patches;
+
+[HarmonyPatch(typeof(ItemObject))]
+internal class SetCraftedWeaponNamePatch
 {
-    [HarmonyPatch(typeof(ItemObject))]
-    internal class SetCraftedWeaponNamePatch
+    private static readonly ILogger Logger = LogManager.GetLogger<ItemObject>();
+
+    [HarmonyPatch(nameof(ItemObject.SetCraftedWeaponName))]
+    [HarmonyPrefix]
+    public static bool SetCraftedWeaponName(ref ItemObject __instance, TextObject weaponName)
     {
-        private static readonly ILogger Logger = LogManager.GetLogger<ItemObject>();
+        // Call original if we call this function
+        if (CallOriginalPolicy.IsOriginalAllowed()) return true;
 
-        [HarmonyPatch("SetCraftedWeaponName")]
-        [HarmonyPrefix]
-        public static bool SetCraftedWeaponName(ref ItemObject __instance, TextObject weaponName)
-        {
-            // Call original if we call this function
-            if (CallOriginalPolicy.IsOriginalAllowed()) return true;
+        var message = new SetCraftedWeaponName(__instance, weaponName);
+        MessageBroker.Instance.Publish(__instance, message);
 
-            var message = new CraftedWeaponNameSet(__instance, weaponName);
-            MessageBroker.Instance.Publish(__instance, message);
+        return false;
+    }
 
-            return false;
-        }
-
-        public static void SetCraftedWeaponNameOverride(ref ItemObject __instance, string StringName)
-        {
-            __instance.Name = new TextObject(StringName);
-            __instance.WeaponDesign?.SetWeaponName(__instance.Name);
-        }
+    public static void SetCraftedWeaponNameOverride(ref ItemObject __instance, string StringName)
+    {
+        __instance.Name = new TextObject(StringName);
+        __instance.WeaponDesign?.SetWeaponName(__instance.Name);
     }
 }

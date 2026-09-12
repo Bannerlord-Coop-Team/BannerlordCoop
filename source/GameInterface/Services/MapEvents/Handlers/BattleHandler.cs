@@ -2,8 +2,10 @@
 using Common.Logging;
 using Common.Messaging;
 using Common.Network;
+using Common.Network.Messages;
 using Common.Util;
 using Coop.Core.Server.Services.Time.Messages;
+using GameInterface.Configuration;
 using GameInterface.Services.GameDebug.Messages;
 using GameInterface.Services.Heroes.Enum;
 using GameInterface.Services.Heroes.Interaces;
@@ -17,6 +19,7 @@ using GameInterface.Services.MapEvents.Messages.Start;
 using GameInterface.Services.MobileParties.Extensions;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Players;
+using GameInterface.Services.Players.Data;
 using LiteNetLib;
 using Serilog;
 using System;
@@ -67,6 +70,7 @@ internal class BattleHandler : IHandler
         this.playerRegistry = playerRegistry;
         this.timeControlInterface = timeControlInterface;
         messageBroker.Subscribe<PlayerJoinedBattle>(Handle_PlayerJoinedBattle);
+        messageBroker.Subscribe<PlayerReconnectedToMapEvent>(Handle_PlayerReconnectedToMapEvent);
 
         messageBroker.Subscribe<MapEventInvolvedPartiesAdded>(Handle_MapEventInvolvedPartiesAdded);
 
@@ -74,6 +78,7 @@ internal class BattleHandler : IHandler
 
         messageBroker.Subscribe<MapEventFinalized>(Handle_MapEventFinalized);
         messageBroker.Subscribe<TimeSpeedChangedAttempted>(Handle_TimeSpeedChangedAttempted);
+        messageBroker.Subscribe<PlayerDisconnected>(Handle_PlayerDisconnected);
 
         timeControlInterface.AddFastForwardPolicy(FastForwardWhilePlayerInMapEventPolicy);
     }
@@ -81,6 +86,7 @@ internal class BattleHandler : IHandler
     public void Dispose()
     {
         messageBroker.Unsubscribe<PlayerJoinedBattle>(Handle_PlayerJoinedBattle);
+        messageBroker.Unsubscribe<PlayerReconnectedToMapEvent>(Handle_PlayerReconnectedToMapEvent);
 
         messageBroker.Unsubscribe<MapEventInvolvedPartiesAdded>(Handle_MapEventInvolvedPartiesAdded);
 
@@ -88,6 +94,7 @@ internal class BattleHandler : IHandler
 
         messageBroker.Unsubscribe<MapEventFinalized>(Handle_MapEventFinalized);
         messageBroker.Unsubscribe<TimeSpeedChangedAttempted>(Handle_TimeSpeedChangedAttempted);
+        messageBroker.Unsubscribe<PlayerDisconnected>(Handle_PlayerDisconnected);
 
         timeControlInterface.RemoveFastForwardPolicy(FastForwardWhilePlayerInMapEventPolicy);
     }
@@ -208,6 +215,12 @@ internal class BattleHandler : IHandler
         RefreshFastForwardState();
     }
 
+    private void Handle_PlayerReconnectedToMapEvent(MessagePayload<PlayerReconnectedToMapEvent> payload)
+    {
+        CapFastForwardForMapEvent();
+        RefreshFastForwardState();
+    }
+
     private void Handle_MapEventFinalized(MessagePayload<MapEventFinalized> payload)
     {
         // A map event ended; its parties have left it, so re-evaluate whether
@@ -233,6 +246,15 @@ internal class BattleHandler : IHandler
             MapEventTimeControlMessages.FastForwardBlocked(playersInMapEvent)));
     }
 
+    private void Handle_PlayerDisconnected(MessagePayload<PlayerDisconnected> payload)
+    {
+        if (ModInformation.IsClient) return;
+
+        // PlayerPartyVisibilityHandler clears the peer association during the same broker publish. Queue the
+        // recount behind all disconnect subscribers so IsConnected observes the cleared association.
+        GameThread.RunSafe(() => RefreshFastForwardState());
+    }
+
     /// <summary>
     /// Recomputes how many players are in a map event and, when that crosses the
     /// 0 / non-0 boundary, announces it locally and informs clients. Server only.
@@ -240,7 +262,7 @@ internal class BattleHandler : IHandler
     /// <param name="finalizedMapEvent">A map event being finalized, excluded from the count.</param>
     private void RefreshFastForwardState(MapEvent finalizedMapEvent = null)
     {
-        if (ModInformation.IsClient)
+        if (ModInformation.IsClient || !ModConfigProvider.ModOptions.SpeedLimitWhilePlayersInBattle)
             return;
 
         var count = CountPlayersInMapEvents(finalizedMapEvent);
@@ -266,7 +288,7 @@ internal class BattleHandler : IHandler
     /// </summary>
     private void CapFastForwardForMapEvent()
     {
-        if (ModInformation.IsClient)
+        if (ModInformation.IsClient || !ModConfigProvider.ModOptions.SpeedLimitWhilePlayersInBattle)
             return;
 
         if (AnyPlayerInMapEvent() && timeControlInterface.GetTimeControl() == TimeControlEnum.Play_2x)
@@ -281,7 +303,7 @@ internal class BattleHandler : IHandler
     /// <returns>True if fast-forwarding is allowed, otherwise false</returns>
     private bool FastForwardWhilePlayerInMapEventPolicy()
     {
-        return AnyPlayerInMapEvent() == false;
+        return !ModConfigProvider.ModOptions.SpeedLimitWhilePlayersInBattle || AnyPlayerInMapEvent() == false;
     }
 
     private bool AnyPlayerInMapEvent() => CountPlayersInMapEvents() > 0;
@@ -291,13 +313,19 @@ internal class BattleHandler : IHandler
         // Backs the fast-forward policy and messaging, which are evaluated on every
         // time-control change, so this uses the non-logging lookup to avoid spamming
         // the log when a party is momentarily unresolved.
-        return playerRegistry.Players.Count(player =>
+        return CountConnectedPlayersInMapEvents(playerRegistry.Players, playerRegistry.IsConnected, player =>
         {
             if (!objectManager.TryGetObject<MobileParty>(player.MobilePartyId, out var playerParty))
                 return false;
 
             return IsFastForwardBlockingMapEvent(playerParty.MapEvent, excluding);
         });
+    }
+
+    internal static int CountConnectedPlayersInMapEvents(IEnumerable<Player> players,
+        Func<Player, bool> isConnected, Func<Player, bool> isInBlockingMapEvent)
+    {
+        return players.Count(player => isConnected(player) && isInBlockingMapEvent(player));
     }
 
     private static bool IsFastForwardBlockingMapEvent(MapEvent mapEvent, MapEvent excluding = null)

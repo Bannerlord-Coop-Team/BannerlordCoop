@@ -1,0 +1,34 @@
+<Prefab>
+  <Window>
+    <Widget WidthSizePolicy="StretchToParent" HeightSizePolicy="StretchToParent">
+      <Children>
+        <Widget WidthSizePolicy="StretchToParent" HeightSizePolicy="StretchToParent"
+                Sprite="BlankWhiteSquare_9" Color="#000000FF" AlphaFactor="0.45"/>
+
+        <Widget WidthSizePolicy="Fixed" SuggestedWidth="680" HeightSizePolicy="CoverChildren"
+                HorizontalAlignment="Center" VerticalAlignment="Center"
+                Sprite="BlankWhiteSquare_9" Color="#6E5A3AFF">
+          <Children>
+            <ListPanel WidthSizePolicy="StretchToParent" HeightSizePolicy="CoverChildren"
+                       MarginTop="3" MarginBottom="3" MarginLeft="3" MarginRight="3"
+                       Sprite="BlankWhiteSquare_9" Color="#1C1712FF"
+                       StackLayout.LayoutMethod="VerticalTopToBottom">
+              <Children>
+                <TextWidget WidthSizePolicy="StretchToParent" HeightSizePolicy="Fixed" SuggestedHeight="58"
+                            MarginTop="24" MarginLeft="32" MarginRight="32"
+                            Brush="Clan.TabControl.Text" Brush.FontSize="27"
+                            Brush.TextHorizontalAlignment="Center" Brush.TextVerticalAlignment="Center"
+                            Text="INTERACTION"/>
+                <TextWidget WidthSizePolicy="StretchToParent" HeightSizePolicy="CoverChildren"
+                            MarginTop="8" MarginLeft="48" MarginRight="48" MarginBottom="30"
+                            Brush="Clan.TabControl.Text" Brush.FontSize="24"
+                            Brush.TextHorizontalAlignment="Center" Brush.TextVerticalAlignment="Center"
+                            Text="@WaitingText"/>
+              </Children>
+            </ListPanel>
+          </Children>
+        </Widget>
+      </Children>
+    </Widget>
+  </Window>
+</Prefab>

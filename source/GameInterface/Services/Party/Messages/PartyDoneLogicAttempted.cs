@@ -1,17 +1,19 @@
 ﻿using Common.Messaging;
+using Helpers;
 using System;
 using System.Collections.Generic;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Roster;
+using TaleWorlds.CampaignSystem.Settlements;
 
 namespace GameInterface.Services.Party.Messages;
 
 public readonly struct PartyDoneLogicAttempted : IEvent
 {
     public readonly Hero MainHero;
+    public readonly FlattenedTroopRoster ReleasedPrisonersRoster;
     public readonly FlattenedTroopRoster TakenPrisonersRoster;
-    public readonly FlattenedTroopRoster DonatedPrisonersRoster;
     public readonly FlattenedTroopRoster RecruitedPrisonersRoster;
     public readonly TroopRoster LeftMemberRoster;
     public readonly TroopRoster LeftPrisonerRoster;
@@ -30,11 +32,15 @@ public readonly struct PartyDoneLogicAttempted : IEvent
     public readonly int PartyInfluenceChangeAmount;
     public readonly int PartyMoraleChangeAmount;
     public readonly bool DoNotApplyGoldTransactions;
+    public readonly PartyScreenHelper.PartyScreenMode PartyScreenMode;
+    public readonly bool ApplyReleasedAndTakenPrisonerActions;
+    public readonly Settlement DonationSettlement;
+    public readonly FlattenedTroopRoster DonatedPrisonersRoster;
 
     public PartyDoneLogicAttempted(
         Hero mainHero,
+        FlattenedTroopRoster releasedPrisonersRoster,
         FlattenedTroopRoster takenPrisonersRoster,
-        FlattenedTroopRoster donatedPrisonersRoster,
         FlattenedTroopRoster recruitedPrisonersRoster,
         TroopRoster leftMemberRoster,
         TroopRoster leftPrisonerRoster,
@@ -50,11 +56,15 @@ public readonly struct PartyDoneLogicAttempted : IEvent
         int partyGoldChangeAmount,
         int partyInfluenceChangeAmount,
         int partyMoraleChangeAmount,
-        bool doNotApplyGoldTransactions)
+        bool doNotApplyGoldTransactions,
+        PartyScreenHelper.PartyScreenMode partyScreenMode,
+        bool applyReleasedAndTakenPrisonerActions = false,
+        Settlement donationSettlement = null,
+        FlattenedTroopRoster donatedPrisonersRoster = null)
     {
         MainHero = mainHero;
+        ReleasedPrisonersRoster = releasedPrisonersRoster;
         TakenPrisonersRoster = takenPrisonersRoster;
-        DonatedPrisonersRoster = donatedPrisonersRoster;
         RecruitedPrisonersRoster = recruitedPrisonersRoster;
         LeftMemberRoster = leftMemberRoster;
         LeftPrisonerRoster = leftPrisonerRoster;
@@ -71,5 +81,9 @@ public readonly struct PartyDoneLogicAttempted : IEvent
         PartyInfluenceChangeAmount = partyInfluenceChangeAmount;
         PartyMoraleChangeAmount = partyMoraleChangeAmount;
         DoNotApplyGoldTransactions = doNotApplyGoldTransactions;
+        PartyScreenMode = partyScreenMode;
+        ApplyReleasedAndTakenPrisonerActions = applyReleasedAndTakenPrisonerActions;
+        DonationSettlement = donationSettlement;
+        DonatedPrisonersRoster = donatedPrisonersRoster;
     }
 }

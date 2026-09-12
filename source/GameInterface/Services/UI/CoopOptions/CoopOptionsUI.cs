@@ -1,4 +1,5 @@
-using TaleWorlds.Engine.GauntletUI;
+﻿using TaleWorlds.Engine.GauntletUI;
+using System;
 using TaleWorlds.ScreenSystem;
 
 namespace GameInterface.Services.UI.CoopOptions;
@@ -6,14 +7,37 @@ namespace GameInterface.Services.UI.CoopOptions;
 public class CoopOptionsUI : ScreenBase
 {
     private CoopOptionsVM _dataSource;
-    private GauntletLayer _gauntletLayer;
+    private CoopOptionsGauntletLayer _gauntletLayer;
     private GauntletMovieIdentifier _gauntletMovie;
+
+#if DEBUG
+    public bool TrySelectDebugTab(string tabId)
+    {
+        foreach (var tab in _dataSource.Tabs)
+        {
+            if (tab.Id != tabId) continue;
+            tab.ExecuteSelection();
+            return true;
+        }
+        return false;
+    }
+
+    public object InspectDebugMenu() => new
+    {
+        open = true,
+        selectedTab = _dataSource.SelectedTab?.Id,
+        tabs = System.Linq.Enumerable.ToArray(System.Linq.Enumerable.Select(_dataSource.Tabs, tab => new { tab.Id, tab.Name })),
+        appliesChanges = false,
+    };
+#endif
 
     protected override void OnInitialize()
     {
         base.OnInitialize();
-        _dataSource = new CoopOptionsVM();
-        _gauntletLayer = new GauntletLayer("CoopOptionsUI", 100)
+        if (!ContainerProvider.TryResolve<ICoopOptionsVMFactory>(out var factory))
+            throw new InvalidOperationException("Coop options view-model factory is unavailable.");
+        _dataSource = factory.Create(ScreenManager.PopScreen);
+        _gauntletLayer = new CoopOptionsGauntletLayer(this, _dataSource)
         {
             IsFocusLayer = true
         };
@@ -38,7 +62,9 @@ public class CoopOptionsUI : ScreenBase
     protected override void OnFinalize()
     {
         base.OnFinalize();
+        _gauntletLayer.CloseKeybinding();
         RemoveLayer(_gauntletLayer);
+        _dataSource?.OnFinalize();
         _dataSource = null;
         _gauntletLayer = null;
     }

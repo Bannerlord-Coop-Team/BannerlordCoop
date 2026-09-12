@@ -1,4 +1,6 @@
-﻿using E2E.Tests.Environment;
+﻿using Common.Messaging;
+using E2E.Tests.Environment;
+using GameInterface.Services.PartyVisuals.Messages;
 using SandBox.View.Map.Visuals;
 using TaleWorlds.CampaignSystem.Party;
 using Xunit.Abstractions;
@@ -45,6 +47,37 @@ namespace E2E.Tests.Services.PartyVisuals
             {
                 Assert.False(client.ObjectManager.TryGetObject<MobilePartyVisual>(visualId, out var _));
             }
+        }
+
+        [Fact]
+        public void ServerCreatePartyVisual_UnregisteredOwner_SkipsCreateAndPreservesDestroyIdentity()
+        {
+            var server = TestEnvironment.Server;
+            var client = TestEnvironment.Clients.First();
+            NetworkDestroyPartyVisual? destroyed = null;
+            string? expectedVisualId = null;
+            client.Resolve<IMessageBroker>().Subscribe<NetworkDestroyPartyVisual>(payload => destroyed = payload.What);
+
+            server.Call(() =>
+            {
+                var mobileParty = new MobileParty();
+                var partyBase = new PartyBase(mobileParty);
+                mobileParty.StringId = "mountain_bandits_24";
+                expectedVisualId = $"MobilePartyVisual_{mobileParty.StringId}";
+                Assert.True(server.ObjectManager.TryGetId(mobileParty, out string mobilePartyId));
+                Assert.True(server.ObjectManager.Remove(mobileParty));
+
+                var mobilePartyVisual = new MobilePartyVisual(partyBase);
+
+                Assert.False(server.ObjectManager.TryGetId(mobilePartyVisual, out _));
+                Assert.True(server.ObjectManager.AddExisting(mobilePartyId, mobileParty));
+                server.Resolve<IMessageBroker>().Publish(
+                    this,
+                    new PartyVisualDestroyed(mobilePartyVisual, mobileParty));
+            });
+
+            Assert.NotNull(destroyed);
+            Assert.Equal(expectedVisualId, destroyed.PartyVisualId);
         }
 
         [Fact]

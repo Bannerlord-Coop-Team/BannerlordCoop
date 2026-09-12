@@ -4,7 +4,6 @@ using Common.Messaging;
 using GameInterface.Services.GameMenus.Messages;
 using GameInterface.Services.ObjectManager;
 using Serilog;
-using System;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.GameMenus;
 
@@ -12,7 +11,7 @@ namespace GameInterface.Services.GameMenus.Handlers;
 
 internal class GameMenuRefreshHandler : IHandler
 {
-    private static readonly ILogger logger = LogManager.GetLogger<GameMenuRefreshHandler>();
+    private static readonly ILogger Logger = LogManager.GetLogger<GameMenuRefreshHandler>();
 
     private readonly IMessageBroker messageBroker;
     private readonly IObjectManager objectManager;
@@ -34,20 +33,13 @@ internal class GameMenuRefreshHandler : IHandler
 
     private void Handle_RefreshGameMenu(MessagePayload<RefreshGameMenu> obj)
     {
-        if (!objectManager.TryGetObjectWithLogging<Hero>(obj.What.TargetHeroId, out var targetHero) || targetHero != Hero.MainHero) return;
-
         var menuName = obj.What.MenuName;
-        // SwitchToMenu changes the active menu/screen, which is only safe on the main thread.
-        GameThread.Run(() =>
+
+        GameThread.RunSafe(() =>
         {
-            try
-            {
-                GameMenu.SwitchToMenu(menuName);
-            }
-            catch (Exception e)
-            {
-                logger.Error(e, "Failed to refresh game menu to {MenuName}", menuName);
-            }
+            if (!objectManager.TryGetObjectWithLogging<Hero>(obj.What.TargetHeroId, out var targetHero) || targetHero != Hero.MainHero) return;
+
+            GameMenu.SwitchToMenu(menuName);
         });
     }
 }

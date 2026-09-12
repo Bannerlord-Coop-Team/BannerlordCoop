@@ -1,4 +1,4 @@
-using Common;
+﻿using Common;
 using GameInterface.Policies;
 using HarmonyLib;
 using System.Collections.Generic;
@@ -29,8 +29,11 @@ internal class RaidJoinEncounterConditionPatch
         if (!mapEvent.IsActiveSlowVillageRaid())
             return;
 
-        if (!RaidJoinEncounterPatch.TryGetJoinSide(__originalMethod, out _))
+        if (!RaidJoinEncounterPatch.TryGetJoinSide(__originalMethod, out var side) ||
+            side == BattleSideEnum.Defender)
+        {
             return;
+        }
 
         __result = false;
         args.IsEnabled = false;
@@ -58,14 +61,14 @@ internal class RaidJoinEncounterPatch
         if (!mapEvent.IsRaidHostileAction() || mainParty == null)
             return true;
 
-        if (mapEvent.IsActiveSlowVillageRaid())
+        if (!TryGetJoinSide(__originalMethod, out var side))
+            return true;
+
+        if (mapEvent.IsActiveSlowVillageRaid() && side == BattleSideEnum.Attacker)
         {
             GameMenu.SwitchToMenu("raid_occupied");
             return false;
         }
-
-        if (!TryGetJoinSide(__originalMethod, out var side))
-            return true;
 
         PlayerEncounter.JoinBattle(side);
         SwitchToJoinedEncounterMenu(mapEvent, side);

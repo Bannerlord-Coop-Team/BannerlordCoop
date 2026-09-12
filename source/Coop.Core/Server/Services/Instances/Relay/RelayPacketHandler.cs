@@ -1,4 +1,4 @@
-using Common.Logging;
+﻿using Common.Logging;
 using Common.Network;
 using Common.PacketHandlers;
 using LiteNetLib;
@@ -36,7 +36,7 @@ internal class RelayPacketHandler : IPacketHandler
     {
         RelayPacket relayPacket = (RelayPacket)packet;
 
-        if (!missionManager.TryGetRelayTarget(relayPacket.InstanceId, relayPacket.ControllerId, out var target))
+        if (!missionManager.TryGetRelayTarget(peer, relayPacket.InstanceId, relayPacket.ControllerId, out var target))
         {
             Logger.Error("Failed to get peer for instance ({InstanceId}) controller ({ControllerId})", relayPacket.InstanceId, relayPacket.ControllerId);
             return;

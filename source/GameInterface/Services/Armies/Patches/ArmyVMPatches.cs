@@ -3,15 +3,15 @@ using Common.Messaging;
 using Common.Util;
 using GameInterface.Policies;
 using GameInterface.Services.Armies.Messages;
+using GameInterface.Services.MobileParties.Extensions;
 using HarmonyLib;
-using NetworkMessages.FromClient;
 using System.Linq;
 using TaleWorlds.CampaignSystem;
-using TaleWorlds.CampaignSystem.Actions;
+using TaleWorlds.CampaignSystem.GameComponents;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.ViewModelCollection.ArmyManagement;
 using TaleWorlds.CampaignSystem.ViewModelCollection.GameMenu.Overlay;
-using TaleWorlds.CampaignSystem.ViewModelCollection.Party;
+using TaleWorlds.Localization;
 
 namespace GameInterface.Services.Armies.Patches;
 
@@ -67,7 +67,8 @@ internal class ArmyManagementVMPatch
                     {
                         MessageBroker.Instance.Publish(__instance, new MobilePartyInArmyAdded(
                         MobileParty.MainParty.Army,
-                        party));
+                        party,
+                        false));
                         using (new AllowedThread())
                         {
                             ArmyPatches.AddMobilePartyInArmy(party, MobileParty.MainParty.Army);
@@ -132,8 +133,10 @@ public class GameMenuOverlayArmyDismissPatch
         if (party?.Army == null) return true;
         var army = party.Army;
         MessageBroker.Instance.Publish(__instance, new MobilePartyInArmyRemoved(army, party, MobileParty.MainParty));
-
-        ArmyPatches.RemoveMobilePartyInArmy(party, MobileParty.MainParty.Army, MobileParty.MainParty);
+        using (new AllowedThread())
+        {
+            ArmyPatches.RemoveMobilePartyInArmy(party, MobileParty.MainParty.Army, MobileParty.MainParty);
+        }
         // cleanup
         if (!__instance._closedHandled)
         {
@@ -141,5 +144,30 @@ public class GameMenuOverlayArmyDismissPatch
             __instance._closedHandled = true;
         }
         return false;
+    }
+}
+/// <summary>
+/// Patch for preventing players inviting players via the ArmyManagementScreen
+/// </summary>
+[HarmonyPatch(typeof(DefaultArmyManagementCalculationModel))]
+public class DefaultArmyManagementCalculationModelPatches
+{
+    [HarmonyPatch(nameof(DefaultArmyManagementCalculationModel.CheckPartyEligibility))]
+    [HarmonyPrefix]
+    public static bool CheckPartyEligibilityPrefix(MobileParty party, out TextObject explanation, ref bool __result)
+    {
+        if (party == null)
+        {
+            explanation = null;
+            return true;
+        }
+        if (party.IsPlayerParty())
+        {
+            __result = false;
+            explanation = new TextObject("You cannot invite a player to your army.", null);
+            return false;
+        }
+        explanation = null;
+        return true;
     }
 }

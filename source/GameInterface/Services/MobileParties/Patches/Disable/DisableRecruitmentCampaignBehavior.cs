@@ -6,7 +6,7 @@ using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.CampaignBehaviors;
 using TaleWorlds.CampaignSystem.Party;
 
-namespace GameInterface.Services.MobileParties.Patches;
+namespace GameInterface.Services.MobileParties.Patches.Disable;
 
 [HarmonyPatch(typeof(RecruitmentCampaignBehavior))]
 internal class DisableRecruitmentCampaignBehavior

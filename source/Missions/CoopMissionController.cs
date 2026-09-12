@@ -1,7 +1,12 @@
-using Common.Logging;
+﻿using Common.Logging;
 using Common.Messaging;
 using GameInterface.Services.ObjectManager;
 using LiteNetLib;
+using Missions.Agents.Handlers;
+using Missions.Battles;
+#if DEBUG
+using Missions.Diagnostics;
+#endif
 using Missions.Messages;
 using Serilog;
 using System; 
@@ -28,19 +33,35 @@ public abstract class CoopMissionController : MissionBehavior, IDisposable
     protected readonly IObjectManager objectManager;
     protected readonly ICoopMissionComponent coopMissionComponent;
 
+    internal IAgentMovementHandler AgentMovementHandler =>
+        coopMissionComponent.AgentMovementHandler;
+
     protected CoopMissionController(
         IBattleNetwork network,
         IMessageBroker messageBroker,
         IObjectManager objectManager,
-        ICoopMissionComponent coopMissionComponent)
+        ICoopMissionComponent coopMissionComponent,
+        MovementCadenceProfile movementCadenceProfile)
     {
         this.network = network;
         this.messageBroker = messageBroker;
         this.objectManager = objectManager;
         this.coopMissionComponent = coopMissionComponent;
+        coopMissionComponent.AgentMovementHandler.Configure(movementCadenceProfile);
 
         messageBroker.Subscribe<NetworkMissionPeerEntered>(Handle_MissionPeerEntered);
         messageBroker.Subscribe<NetworkMissionJoinInfo>(Handle_JoinInfo);
+    }
+
+    public override void OnPreMissionTick(float dt)
+    {
+        base.OnPreMissionTick(dt);
+
+        // Agent ticking follows OnMissionTick and can replace the retained look before the next collision window.
+        // Restore the owner frame before its guard so native collision reads one coherent input.
+        coopMissionComponent.AgentMovementHandler.Interpolator
+            .ReplayLookDirections();
+        coopMissionComponent.AgentActionHandler.ApplyRemoteGuardStates();
     }
 
     public override void OnMissionTick(float dt)
@@ -53,15 +74,47 @@ public abstract class CoopMissionController : MissionBehavior, IDisposable
         coopMissionComponent.AgentMovementHandler.PollMovement(dt);
 
         // Smoothly reconcile received puppets toward their owners' last-reported positions every frame; the
-        // per-packet correction was bound to the bursty ~10ms poll cadence and looked stepped. Subclasses that
+        // per-packet correction was bound to the bursty movement-poll cadence and looked stepped. Subclasses that
         // override OnMissionTick call base (CoopBattleController does), and CoopLocationsController does not
         // override it, so this runs for both battle and location missions.
         coopMissionComponent.AgentMovementHandler.Interpolator.Tick(dt);
 
-        // Capture discrete action changes on the GAME thread (attacks, jumps, gestures...): a one-frame action
-        // transition can't be observed reliably off-thread, so actions are event-synced from here instead of
-        // polled with movement.
+        // Continuous movement setters can replace defend input after the mission boundary. Restore the held
+        // flags without restarting the guard command so native animation keeps its own timeline.
+        coopMissionComponent.AgentActionHandler.RefreshRemoteGuardStatesAfterMovement();
+
+        // Capture the main player's raw defend input before native Agent processing can rewrite it.
         coopMissionComponent.AgentActionHandler.PollActions();
+
+        coopMissionComponent.AgentVoiceHandler.PollVoices();
+        coopMissionComponent.MissileHandler.DrainPendingShots();
+        coopMissionComponent.WeaponPickupHandler.Tick(dt);
+        coopMissionComponent.WeaponDropHandler.Tick(dt);
+    }
+
+    public override void OnPreDisplayMissionTick(float dt)
+    {
+        base.OnPreDisplayMissionTick(dt);
+
+        // Native Agent processing can rewrite a puppet's look after OnMissionTick replayed it.
+        // Restore only that display input here; movement setters can consume the active guard flags.
+        coopMissionComponent.AgentMovementHandler.Interpolator
+            .ReplayLookDirections();
+
+        // Native Agent processing realizes authoritative AI and player actions after the input boundary.
+        // Diff them here so peers receive the displayed action instead of retaining an earlier pose.
+        // A headless mission participant would need an equivalent non-display boundary for AI action sync.
+        coopMissionComponent.AgentActionHandler.PollActionsAfterNativeTick(dt);
+
+        coopMissionComponent.AgentMovementHandler
+            .ReplaySyntheticMountTurnAnimationsAfterNativeTick();
+
+        // Keep short remote guard reactions visible for this frame without driving held guard actions.
+        coopMissionComponent.AgentActionHandler.ReplayRemoteGuardReactions();
+#if DEBUG
+        MissionActionDiagnostics.SampleAnimations(
+            coopMissionComponent.AgentRegistry);
+#endif
     }
 
     public virtual void Dispose()
@@ -74,7 +127,9 @@ public abstract class CoopMissionController : MissionBehavior, IDisposable
     {
         // Server-mediated replacement for PeerConnected: a controller entered our instance (the notification
         // arrived over the campaign/relay connection), so send it our join info over the mesh.
-        SendJoinInfo(payload.What.ControllerId);
+        string controllerId = payload.What.ControllerId;
+        SendJoinInfo(controllerId);
+        coopMissionComponent.AgentActionHandler.CatchUpJoiner(controllerId);
     }
 
     private void Handle_JoinInfo(MessagePayload<NetworkMissionJoinInfo> payload)
@@ -101,11 +156,13 @@ public abstract class CoopMissionController : MissionBehavior, IDisposable
         // finalizer runs.
         coopMissionComponent.AgentMovementHandler.Dispose();
         coopMissionComponent.AgentActionHandler.Dispose();
+        coopMissionComponent.AgentVoiceHandler.Dispose();
 
         coopMissionComponent.MissileHandler.Dispose();
         coopMissionComponent.WeaponDropHandler.Dispose();
         coopMissionComponent.WeaponPickupHandler.Dispose();
         coopMissionComponent.ShieldDamageHandler.Dispose();
+        coopMissionComponent.CombatHitPresentationHandler.Dispose();
         coopMissionComponent.AgentDeathHandler.Dispose();
 
         OnLeaving();

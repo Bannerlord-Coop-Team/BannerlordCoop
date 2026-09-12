@@ -9,6 +9,8 @@ namespace Common.Network.Data;
 /// </summary>
 public class ConnectionToken
 {
+    public const int MaxSerializedLength = 1024;
+
     private static readonly ILogger Logger = LogManager.GetLogger<ConnectionToken>();
 
     public string ControllerId { get; }
@@ -33,6 +35,11 @@ public class ConnectionToken
             throw new ArgumentException("InstanceName cannot be null or empty", nameof(instanceName));
         }
 
+        if (peerId.Length + instanceName.Length + 1 > MaxSerializedLength)
+        {
+            throw new ArgumentException("The serialized connection token is too long");
+        }
+
         ControllerId = peerId;
         InstanceId = instanceName;
     }
@@ -40,6 +47,8 @@ public class ConnectionToken
     public static bool TryParse(string stringToken, out ConnectionToken connectionToken)
     {
         connectionToken = null;
+        if (string.IsNullOrEmpty(stringToken) || stringToken.Length > MaxSerializedLength) return false;
+
         try
         {
             connectionToken = stringToken;

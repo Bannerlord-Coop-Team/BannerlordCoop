@@ -9,6 +9,7 @@ internal class MapEventSync : IAutoSync
     public MapEventSync(AutoSyncRegistry autoSyncBuilder)
     {
         autoSyncBuilder.AddProperty(AccessTools.Property(typeof(MapEvent), nameof(MapEvent.RetreatingSide)));
+        autoSyncBuilder.AddProperty(AccessTools.Property(typeof(MapEvent), nameof(MapEvent.PursuitRoundNumber)));
         autoSyncBuilder.AddProperty(AccessTools.Property(typeof(MapEvent), nameof(MapEvent.BattleState)));
         autoSyncBuilder.AddProperty(AccessTools.Property(typeof(MapEvent), nameof(MapEvent.Component)));
         autoSyncBuilder.AddProperty(AccessTools.Property(typeof(MapEvent), nameof(MapEvent.IsInvulnerable)));

@@ -8,6 +8,7 @@ namespace Coop.Core.Common.Session;
 public class NoopSessionAdvertiser : ISessionAdvertiser
 {
     public bool IsAdvertising => false;
+    public bool CanInviteFriends => false;
 
     public void Advertise(SessionJoinInfo info)
     {

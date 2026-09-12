@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Tiered compilation background-promotes a method after ~30 calls and republishes its native
+  code. On Linux CI that republish intermittently drops a live Harmony detour (MonoMod loses the
+  re-apply race), so a MissionEngineFixture shim that provably fired for sibling calls suddenly
+  stops and the RAW game method runs — e.g. MountMovementPacket_RoundTripsHorizontalMountSpeed
+  NRE'ing inside the real Agent.GetCurrentAction (clean stack frame, no _PatchN suffix).
+
+  Disabling CALL COUNTING keeps tiering's initial Tier-0 quick-JIT exactly as it is today but
+  never promotes, so published code never changes and detours stay valid for the process
+  lifetime. (A blanket TieredCompilation=false is NOT equivalent: full-opt first-call JIT
+  deterministically broke AutoSync-dependent tests on every OS — WorkshopPurchaseConversation
+  ClientPrediction and MapEventEnvironment DuplicateEscapeRequests.)
+-->
+<RunSettings>
+  <RunConfiguration>
+    <EnvironmentVariables>
+      <DOTNET_TC_CallCounting>0</DOTNET_TC_CallCounting>
+    </EnvironmentVariables>
+  </RunConfiguration>
+</RunSettings>

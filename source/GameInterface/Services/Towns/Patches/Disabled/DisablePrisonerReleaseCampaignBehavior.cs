@@ -1,4 +1,5 @@
-﻿using HarmonyLib;
+﻿using Common;
+using HarmonyLib;
 using TaleWorlds.CampaignSystem.CampaignBehaviors;
 
 namespace GameInterface.Services.Towns.Patches.Disabled;
@@ -7,5 +8,5 @@ namespace GameInterface.Services.Towns.Patches.Disabled;
 internal class DisablePrisonerReleaseCampaignBehavior
 {
     [HarmonyPatch(nameof(PrisonerReleaseCampaignBehavior.RegisterEvents))]
-    static bool Prefix() => false;
+    static bool Prefix() => ModInformation.IsServer;
 }

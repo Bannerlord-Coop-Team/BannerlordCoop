@@ -1,4 +1,4 @@
-using Common.Logging;
+﻿using Common.Logging;
 using Common.LogicStates;
 using Coop.Core.Client.States;
 using GameInterface.Services.Players.Data;
@@ -54,7 +54,7 @@ public class ClientLogic : IClientLogic
         }
     }
 
-    public bool RunningState => RunningStates.Contains(_state.GetType());
+    public bool RunningState => _state != null && RunningStates.Contains(_state.GetType());
 
     private IClientState _state;
 
@@ -75,12 +75,12 @@ public class ClientLogic : IClientLogic
     private IReadOnlyDictionary<Type, Func<IClientState>> CreateStateFactories() =>
         new Dictionary<Type, Func<IClientState>>
         {
-            [typeof(MainMenuState)] = () => new MainMenuState(this, context.MessageBroker, context.Network, context.GameInterface, context.GameStateInterface, context.LoadingInterface),
+            [typeof(MainMenuState)] = () => new MainMenuState(this, context.MessageBroker, context.Network, context.GameInterface, context.GameStateInterface, context.LoadingInterface, context.JoinAttemptOverlay, context.JoinAttempt, context.CoopFinalizer),
             [typeof(ValidateModuleState)] = () => new ValidateModuleState(this, context.MessageBroker, context.Network, context.ControllerIdProvider, context.CoopFinalizer, context.GameStateInterface, context.ModuleInfoProvider),
             [typeof(CharacterCreationState)] = () => new CharacterCreationState(this, context.MessageBroker, context.Network, context.HeroInterface, context.RegistryManager, context.ControllerIdProvider, context.LoadingInterface, context.PlayerManager, context.GameStateInterface, context.CoopFinalizer),
             [typeof(ReceivingSavedDataState)] = () => new ReceivingSavedDataState(this, context.MessageBroker, context.LoadingInterface, context.GameStateInterface),
             [typeof(LoadingState)] = () => new LoadingState(this, context.MessageBroker, context.RegistryManager, context.HeroInterface, context.ControllerIdProvider, context.PlayerManager, context.GameStateInterface, context.LoadingInterface),
-            [typeof(CampaignState)] = () => new CampaignState(this, context.MessageBroker, context.Network, context.LoadingInterface, context.GameStateInterface, context.CoopFinalizer),
+            [typeof(CampaignState)] = () => new CampaignState(this, context.MessageBroker, context.Network, context.LoadingInterface, context.GameStateInterface, context.CoopFinalizer, context.MapTimeTrackerInterface),
             [typeof(MissionState)] = () => new MissionState(this, context.MessageBroker, context.GameStateInterface, context.CoopFinalizer),
         };
 

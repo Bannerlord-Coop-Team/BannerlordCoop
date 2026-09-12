@@ -37,7 +37,7 @@ public class ItemRosterMessageHandler : IHandler
     {
         var message = payload.What;
 
-        if (!objectManager.TryGetIdWithLogging(message.Instance, out var itemRosterId)) return;
+        if (!objectManager.TryGetId(message.Instance, out var itemRosterId)) return;
         if (!objectManager.TryGetIdWithLogging(message.Item, out var itemId)) return;
 
         string itemModifierId = null;
@@ -63,7 +63,7 @@ public class ItemRosterMessageHandler : IHandler
     {
         var message = payload.What;
 
-        if (!objectManager.TryGetIdWithLogging(message.ItemRoster, out var itemRosterId)) return;
+        if (!objectManager.TryGetId(message.ItemRoster, out var itemRosterId)) return;
         itemRosterId = Compact(itemRosterId, typeof(ItemRoster));
 
         // A clear supersedes this roster's pending updates; drop them so the clear isn't trailed by a stale update.

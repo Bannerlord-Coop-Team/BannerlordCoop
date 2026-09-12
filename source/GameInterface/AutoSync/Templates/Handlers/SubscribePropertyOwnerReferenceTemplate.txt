@@ -1,13 +1,37 @@
-﻿Subscribe<{{ElementType}}, {{ MemberDeclaringTypeName}}_{{ MemberName }}_SetLocalMessage>((instanceId, data) => 
+Subscribe<{{ElementType}}, {{ MemberDeclaringTypeName}}_{{ MemberName }}_SetLocalMessage>((instanceId, data) =>
 {
     if (!objectManager.TryGetId(data.Value, out string id)) return;
     network.SendAll(new {{ MemberDeclaringTypeName}}_{{ MemberName }}_SetNetworkMessage(instanceId, id, data.PropertyValue));
 });
-SubscribeNetwork<{{ElementType}}, {{ MemberDeclaringTypeName}}_{{ MemberName }}_SetNetworkMessage>((instance, data) => 
+SubscribeNetwork<{{ElementType}}, {{ MemberDeclaringTypeName}}_{{ MemberName }}_SetNetworkMessage>((instance, data) =>
 {
     if (!objectManager.TryGetObject<{{ElementType}}>(data.ValueId, out {{ElementType}} element)) return;
     using (new AllowedThread())
     {
         instance.{{MemberName}}.SetPropertyValue(element, data.PropertyValue);
     }
+});
+
+// Clear mutates the existing PropertyOwner instance in place
+SubscribeTracked((MessagePayload<Local_{{ MemberDeclaringTypeName}}_{{ MemberName }}_PropertyOwnerClear> payload) =>
+{
+    var data = payload.What;
+
+    if (!objectManager.TryGetIdWithLogging(data.Instance, out var instanceId))
+        return;
+
+    network.SendAll(new Network_{{ MemberDeclaringTypeName}}_{{ MemberName }}_PropertyOwnerClear(instanceId));
+});
+
+SubscribeTracked((MessagePayload<Network_{{ MemberDeclaringTypeName}}_{{ MemberName }}_PropertyOwnerClear> payload) =>
+{
+    var data = payload.What;
+
+    MarshalApply(() =>
+    {
+        if (!objectManager.TryGetObjectWithLogging(data.InstanceId, out {{ MemberDeclaringType }} instance))
+            return;
+
+        instance.{{ MemberName }}.ClearAllProperty();
+    });
 });

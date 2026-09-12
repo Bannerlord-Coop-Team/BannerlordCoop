@@ -12,13 +12,21 @@ internal class MobilePartyFoodConsumptionModelPatches
     [HarmonyPrefix]
     public static bool DoesPartyConsumeFoodPrefix(DefaultMobilePartyFoodConsumptionModel __instance, ref bool __result, MobileParty mobileParty)
     {
-        // Override PlayerClan check
-        if (mobileParty.IsActive && (mobileParty.LeaderHero == null || mobileParty.LeaderHero.Clan.IsPlayerClan()))
-        {
-            __result = true;
-            return false;
-        }
+        var leaderHero = mobileParty.LeaderHero;
 
-        return true;
+        // Match vanilla eligibility while recognizing every co-op player clan.
+        __result = mobileParty.IsActive &&
+                   (leaderHero == null ||
+                    leaderHero.IsLord ||
+                    leaderHero.Clan?.IsPlayerClan() == true ||
+                    leaderHero.IsMinorFactionHero) &&
+                   !mobileParty.IsGarrison &&
+                   !mobileParty.IsCaravan &&
+                   !mobileParty.IsBandit &&
+                   !mobileParty.IsMilitia &&
+                   !mobileParty.IsPatrolParty &&
+                   !mobileParty.IsVillager;
+
+        return false;
     }
 }

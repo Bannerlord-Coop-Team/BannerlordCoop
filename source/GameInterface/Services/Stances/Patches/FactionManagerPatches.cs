@@ -20,14 +20,6 @@ namespace GameInterface.Services.Stances.Patches
     {
         private static readonly ILogger Logger = LogManager.GetLogger<FactionManagerPatches>();
 
-        // Faction-elimination stance cleanup (RemoveFactionsFromCampaignWars) is not yet synced.
-        [HarmonyPatch("RemoveStance")]
-        [HarmonyPrefix]
-        private static bool RemoveStancePrefix()
-        {
-            return false;
-        }
-
         [HarmonyPatch("SetStance")]
         [HarmonyPrefix]
         private static bool SetStancePrefix(MethodBase __originalMethod)

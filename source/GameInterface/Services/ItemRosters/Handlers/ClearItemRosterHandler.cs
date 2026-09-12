@@ -4,6 +4,7 @@ using Common.Messaging;
 using GameInterface.Services.ItemRosters.Messages;
 using GameInterface.Services.ItemRosters.Patches;
 using GameInterface.Services.ObjectManager;
+using GameInterface.Services.Party;
 using Serilog;
 using System;
 using TaleWorlds.CampaignSystem.Roster;
@@ -18,10 +19,15 @@ namespace GameInterface.Services.ItemRosters.Handlers
         private static readonly ILogger Logger = LogManager.GetLogger<ClearItemRosterHandler>();
         private readonly IMessageBroker messageBroker;
         private readonly IObjectManager objectManager;
+        private readonly IPartyScreenRosterRefresher partyScreenRosterRefresher;
 
-        public ClearItemRosterHandler(IMessageBroker messageBroker, IObjectManager objectManager) {
+        public ClearItemRosterHandler(
+            IMessageBroker messageBroker,
+            IObjectManager objectManager,
+            IPartyScreenRosterRefresher partyScreenRosterRefresher) {
             this.messageBroker = messageBroker;
             this.objectManager = objectManager;
+            this.partyScreenRosterRefresher = partyScreenRosterRefresher;
 
             messageBroker.Subscribe<ClearItemRoster>(Handle);
         }
@@ -36,7 +42,10 @@ namespace GameInterface.Services.ItemRosters.Handlers
                 {
                     if (!objectManager.TryGetObjectWithLogging<ItemRoster>(data.ItemRosterId, out var itemRoster)) return;
 
-                    ItemRosterPatch.ClearOverride(itemRoster);
+                    if (!partyScreenRosterRefresher.TryApply(itemRoster, ItemRosterPatch.ClearOverride))
+                    {
+                        ItemRosterPatch.ClearOverride(itemRoster);
+                    }
                 }
                 catch (Exception e)
                 {

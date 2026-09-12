@@ -2,6 +2,7 @@
 using Coop.IntegrationTests.Environment;
 using Coop.IntegrationTests.Environment.Instance;
 using Coop.IntegrationTests.Kingdoms;
+using GameInterface.Services.Stances;
 using GameInterface.Services.Stances.Messages;
 using GameInterface.Services.Stances.Patches;
 using TaleWorlds.CampaignSystem;
@@ -54,15 +55,27 @@ namespace Coop.IntegrationTests.Stances
             var kingdom2 = server.CreateRegisteredObject<Kingdom>("kingdom2");
 
             // Act
+            var disabledMethods = new[]
+            {
+                typeof(PeacePursuitCleaner).GetMethod(nameof(PeacePursuitCleaner.HoldAiPartiesPursuingEachOther))!
+            };
+
             server.Call(() =>
             {
-                MakePeaceActionPatch.Prefix(
+                Assert.True(MakePeaceActionPatch.Prefix(
+                    kingdom1,
+                    kingdom2,
+                    dailyTributeFrom1To2: 50,
+                    dailyTributeDuration: 30,
+                    detail: MakePeaceAction.MakePeaceDetail.ByKingdomDecision));
+
+                MakePeaceActionPatch.Postfix(
                     kingdom1,
                     kingdom2,
                     dailyTributeFrom1To2: 50,
                     dailyTributeDuration: 30,
                     detail: MakePeaceAction.MakePeaceDetail.ByKingdomDecision);
-            });
+            }, disabledMethods);
 
             // Assert
             Assert.Single(server.NetworkSentMessages.GetMessages<NetworkMakePeace>(),

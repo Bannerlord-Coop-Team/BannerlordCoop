@@ -30,6 +30,7 @@ public class SurrogateCollection : ISurrogateCollection
             AddSurrogate<ItemModifier, ItemModifierSurrogate>();
             AddSurrogate<TextObject, TextObjectSurrogate>();
             AddSurrogate<EquipmentElement, EquipmentElementSurrogate>();
+            AddSurrogate<Equipment, EquipmentSurrogate>();
             AddSurrogate<PropertyOwner<TraitObject>, PropertyOwnerSurrogate>();
             AddSurrogate<ItemRosterElement, ItemRosterElementSurrogate>();
             AddSurrogate<ItemData, ItemDataSurrogate>();
@@ -40,6 +41,7 @@ public class SurrogateCollection : ISurrogateCollection
 
             AddSurrogate<Vec3, Vec3Surrogate>();
             AddSurrogate<Mat3, Mat3Surrogate>();
+            AddSurrogate<MatrixFrame, MatrixFrameSurrogate>();
             AddSurrogate<Blow, BlowSurrogate>();
             AddSurrogate<AttackCollisionData, AttackCollisionDataSurrogate>();
             AddSurrogate<SunInformation, SunInformationSurrogate>();
@@ -54,6 +56,12 @@ public class SurrogateCollection : ISurrogateCollection
             AddSurrogate<PostProcessInformation, PostProcessInformationSurrogate>();
             AddSurrogate<AtmosphereInfo, AtmosphereInfoSurrogate>();
             AddSurrogate<MissionInitializerRecord, MissionInitializerRecordSurrogate>();
+            AddSurrogate<WeaponComponentData, WeaponComponentDataSurrogate>();
+            AddSurrogate<Track, TrackSurrogate>();
+
+            AddSurrogate<BodyProperties, BodyPropertiesSurrogate>();
+            AddSurrogate<DynamicBodyProperties, DynamicBodyPropertiesSurrogate>();
+            AddSurrogate<StaticBodyProperties, StaticBodyPropertiesSurrogate>();
         }
     }
 

@@ -1,10 +1,15 @@
-using E2E.Tests.Environment.Instance;
+﻿using E2E.Tests.Environment.Instance;
+using Common.Messaging;
+using Common.Util;
 using GameInterface.Services.Entity;
+using GameInterface.Services.MapEventParties.Messages;
 using GameInterface.Services.MobileParties.Extensions;
+using GameInterface.Services.MobilePartyAIs.Patches;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Encounters;
 using TaleWorlds.CampaignSystem.MapEvents;
 using TaleWorlds.CampaignSystem.Party;
+using TaleWorlds.Core;
 using Xunit.Abstractions;
 
 namespace E2E.Tests.Services.MapEvents;
@@ -17,6 +22,47 @@ namespace E2E.Tests.Services.MapEvents;
 public class MapEventEnvironmentTests : MapEventTestBase
 {
     public MapEventEnvironmentTests(ITestOutputHelper output) : base(output) { }
+
+    [Fact]
+    public void NewMapEvent_ClientReplicaStartsWithNoRetreatState()
+    {
+        var ctx = CreateServerMapEvent();
+
+        foreach (var client in Clients)
+        {
+            client.Call(() =>
+            {
+                Assert.True(client.ObjectManager.TryGetObject<MapEvent>(ctx.MapEventId, out var mapEvent));
+                Assert.Equal(BattleSideEnum.None, mapEvent.RetreatingSide);
+                Assert.Equal(0, mapEvent.PursuitRoundNumber);
+                Assert.False(mapEvent.EndedByRetreat);
+            });
+        }
+    }
+
+    [Fact]
+    public void ServerRetreatState_SyncsPursuitRound_ToAllClients()
+    {
+        var ctx = CreateServerMapEvent();
+
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject<MapEvent>(ctx.MapEventId, out var mapEvent));
+            mapEvent.RetreatingSide = BattleSideEnum.Defender;
+            mapEvent.PursuitRoundNumber = 2;
+        });
+
+        foreach (var client in Clients)
+        {
+            client.Call(() =>
+            {
+                Assert.True(client.ObjectManager.TryGetObject<MapEvent>(ctx.MapEventId, out var mapEvent));
+                Assert.Equal(BattleSideEnum.Defender, mapEvent.RetreatingSide);
+                Assert.Equal(2, mapEvent.PursuitRoundNumber);
+                Assert.False(mapEvent.EndedByRetreat);
+            });
+        }
+    }
 
     [Fact]
     public void ServerJoinParty_ToSide_SyncAllClients()
@@ -273,6 +319,7 @@ public class MapEventEnvironmentTests : MapEventTestBase
         // Arrange — the player loses a battle and is taken prisoner by the captor party. Capture parks the
         // player party (emptied + deactivated) and makes the hero the captor's prisoner.
         var (heroId, partyId) = CreatePlayerHeroParty("MyControllerId");
+        TestEnvironment.ConnectRegisteredPlayer(Clients.First(), "MyControllerId");
         var captorPartyId = TestEnvironment.CreateRegisteredObject<MobileParty>();
         DefeatPlayerPartyInBattle(heroId, partyId, captorPartyId);
 
@@ -304,10 +351,20 @@ public class MapEventEnvironmentTests : MapEventTestBase
     [Fact]
     public void EscapeFromCaptivity_RestoresExactlyOneMan_OnServerAndAllClients()
     {
-        // Arrange — a player alone in their party (just the hero) loses a battle and is captured.
+        // Arrange — a player party (hero + its spawned roster) loses a battle and is captured. BR-061:
+        // the heroes AND the regular troops become the captor's prisoners, so snapshot the counts first —
+        // harness parties spawn with nondeterministic rosters (the lord party includes its own bootstrap
+        // lord hero, captured via the companion capture). The player hero itself is added by
+        // DefeatPlayerPartyInBattle AFTER this snapshot, hence the explicit +1 below.
         var (heroId, partyId) = CreatePlayerHeroParty("MyControllerId");
+        TestEnvironment.ConnectRegisteredPlayer(Clients.First(), "MyControllerId");
         var captorPartyId = TestEnvironment.CreateRegisteredObject<MobileParty>();
+        var capturedTroops = GetPartyNonHeroManCount(Server, partyId);
+        var capturedRidingHeroes = GetPartyLiveHeroCount(Server, partyId);
         DefeatPlayerPartyInBattle(heroId, partyId, captorPartyId);
+
+        // The troop transfer replicates as coalesced roster deltas; drain them before reading client state.
+        TestEnvironment.FlushCoalescer();
 
         AssertCaptivity(Server, heroId, captorPartyId);
 
@@ -320,29 +377,61 @@ public class MapEventEnvironmentTests : MapEventTestBase
             AssertPartyManCount(client, partyId, 0);
         }
 
-        // ...and the captor holds the prisoner exactly once everywhere (a replicated prison-roster
-        // add applied on top of a locally derived one used to double the count on clients).
-        AssertPartyPrisonerCount(Server, captorPartyId, 1);
+        // ...and the captor holds the player hero (+1), every riding hero AND the party's troops as
+        // prisoners (BR-061), counted once everywhere (a replicated prison-roster add applied on top of a
+        // locally derived one used to double the count on clients).
+        AssertPartyPrisonerCount(Server, captorPartyId, capturedTroops + capturedRidingHeroes + 1);
         foreach (var client in Clients)
         {
-            AssertPartyPrisonerCount(client, captorPartyId, 1);
+            AssertPartyPrisonerCount(client, captorPartyId, capturedTroops + capturedRidingHeroes + 1);
         }
 
         // Act — the player escapes ("you were able to get away"): the owning client requests the
         // release and the server applies it authoritatively.
         ReleasePlayerByEscapeRequest(Clients.First(), heroId, partyId);
 
-        // Assert — the player is free and the restored party counts exactly one man everywhere,
-        // and no phantom prisoner is left behind in the captor's roster.
+        // Assert — the player is free and the restored party counts exactly one man everywhere, and
+        // exactly the hero's element left the captor's prison roster: the captured troops AND the other
+        // captured riding heroes remain the captor's prisoners (escape frees the hero, not the army).
         AssertCaptivity(Server, heroId, null);
         AssertPlayerPartyRestored(Server, heroId, partyId);
-        AssertPartyPrisonerCount(Server, captorPartyId, 0);
+        AssertPartyPrisonerCount(Server, captorPartyId, capturedTroops + capturedRidingHeroes);
         foreach (var client in Clients)
         {
             AssertCaptivity(client, heroId, null);
             AssertHeroInPartyRoster(client, heroId, partyId);
-            AssertPartyPrisonerCount(client, captorPartyId, 0);
+            AssertPartyPrisonerCount(client, captorPartyId, capturedTroops + capturedRidingHeroes);
         }
+    }
+
+    [Fact]
+    public void EscapeFromCaptivity_ProtectsPlayerFromFormerCaptorForTwelveHours()
+    {
+        var (heroId, partyId) = CreatePlayerHeroParty("MyControllerId");
+        TestEnvironment.ConnectRegisteredPlayer(Clients.First(), "MyControllerId");
+        var captorPartyId = TestEnvironment.CreateRegisteredObject<MobileParty>();
+        DefeatPlayerPartyInBattle(heroId, partyId, captorPartyId);
+
+        ReleasePlayerByEscapeRequest(Clients.First(), heroId, partyId);
+
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject<MobileParty>(partyId, out var playerParty));
+            Assert.True(Server.ObjectManager.TryGetObject<MobileParty>(captorPartyId, out var captorParty));
+            Assert.True(DefaultMobilePartyAIModelPatches.DisablePlayerAttackTimes.TryGetValue(captorParty.Ai, out var disabledAttackTimes));
+            Assert.True(disabledAttackTimes.ContainsKey(playerParty));
+
+            // The test bootstrap stubs HoursFromNow to Zero, so replace only the deadline before exercising IsPast.
+            var disabledUntil = Campaign.Current.MapTimeTracker.Now + CampaignTime.Hours(12);
+            DefaultMobilePartyAIModelPatches.PreventAttacksUntil(captorParty, playerParty, disabledUntil);
+            Assert.InRange(disabledUntil.RemainingHoursFromNow, 11.9f, 12.1f);
+
+            playerParty.IgnoreByOtherPartiesTill(CampaignTime.Now);
+            captorParty.RecentEventsMorale = 100f;
+
+            Assert.True(captorParty.Morale > 0f);
+            Assert.False(Campaign.Current.Models.MobilePartyAIModel.ShouldConsiderAttacking(captorParty, playerParty));
+        });
     }
 
     [Fact]
@@ -391,6 +480,7 @@ public class MapEventEnvironmentTests : MapEventTestBase
     {
         // Arrange — the player party holds the hero plus a stack of regular troops on every instance.
         var (heroId, partyId) = CreatePlayerHeroParty("MyControllerId");
+        TestEnvironment.ConnectRegisteredPlayer(Clients.First(), "MyControllerId");
         var troopCharacterId = TestEnvironment.CreateRegisteredObject<CharacterObject>();
         SeedPartyTroopOnAll(partyId, troopCharacterId, 5);
         var captorPartyId = TestEnvironment.CreateRegisteredObject<MobileParty>();
@@ -418,10 +508,35 @@ public class MapEventEnvironmentTests : MapEventTestBase
     }
 
     [Fact]
+    public void CaptureWithDepletedHeroElement_RecalculatesEmptyRosterTotal()
+    {
+        var (heroId, partyId) = CreatePlayerHeroParty("MyControllerId");
+        var captorPartyId = TestEnvironment.CreateRegisteredObject<MobileParty>();
+
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject<Hero>(heroId, out var hero));
+            Assert.True(Server.ObjectManager.TryGetObject<MobileParty>(partyId, out var playerParty));
+            Assert.True(Server.ObjectManager.TryGetObject<MobileParty>(captorPartyId, out var captorParty));
+
+            using (new AllowedThread())
+            {
+                playerParty.MemberRoster.AddNewElement(hero.CharacterObject, -1);
+            }
+
+            Server.Resolve<IMessageBroker>().Publish(this, new PrisonerTaken(captorParty.Party, hero, playerParty));
+
+            Assert.Equal(0, playerParty.MemberRoster.Count);
+            Assert.Equal(0, playerParty.MemberRoster.TotalManCount);
+        });
+    }
+
+    [Fact]
     public void DuplicateEscapeRequests_ReleaseOnlyOnce()
     {
         // Arrange — a troopless player is captured.
         var (heroId, partyId) = CreatePlayerHeroParty("MyControllerId");
+        TestEnvironment.ConnectRegisteredPlayer(Clients.First(), "MyControllerId");
         var captorPartyId = TestEnvironment.CreateRegisteredObject<MobileParty>();
         DefeatPlayerPartyInBattle(heroId, partyId, captorPartyId);
 
@@ -435,6 +550,112 @@ public class MapEventEnvironmentTests : MapEventTestBase
         foreach (var client in Clients)
         {
             AssertHeroInPartyRoster(client, heroId, partyId);
+        }
+    }
+
+    [Fact]
+    public void PartyScreenDiscard_DuplicatedPlayerPrisoner_ClearsEveryCopyAndRestoresPartyOnce()
+    {
+        // Arrange — create both player parties and attach the captor hero to its authoritative party so
+        // NetworkCompleteDoneLogic resolves the Party screen's right-hand owner and rosters.
+        var (playerHeroId, playerPartyId) = CreatePlayerHeroParty("CaptiveControllerId");
+        TestEnvironment.ConnectRegisteredPlayer(Clients.First(), "CaptiveControllerId");
+        var (captorHeroId, captorPartyId) = CreatePlayerHeroParty("CaptorControllerId");
+
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject<Hero>(captorHeroId, out var captorHero));
+            Assert.True(Server.ObjectManager.TryGetObject<MobileParty>(captorPartyId, out var captorParty));
+
+            using (new AllowedThread())
+            {
+                captorParty.MemberRoster.AddToCounts(captorHero.CharacterObject, 1);
+                captorHero.PartyBelongedTo = captorParty;
+            }
+        });
+
+        DefeatPlayerPartyInBattle(playerHeroId, playerPartyId, captorPartyId);
+        TestEnvironment.FlushCoalescer();
+
+        // Reproduce both possible forms of the malformed live state: a duplicated authoritative count and
+        // a client with one additional stale copy. A relative removal cannot reconcile both states.
+        SeedPartyPrisoner(Server, captorPartyId, playerHeroId, 1);
+        foreach (var client in Clients)
+        {
+            SeedPartyPrisoner(client, captorPartyId, playerHeroId, 2);
+        }
+        int unrelatedPrisoners = GetPartyPrisonerCount(Server, captorPartyId) - 2;
+        Assert.True(unrelatedPrisoners >= 0);
+
+        AssertPlayerPrisonerCount(Server, captorPartyId, playerHeroId, 2);
+        foreach (var client in Clients)
+        {
+            AssertPlayerPrisonerCount(client, captorPartyId, playerHeroId, 3);
+        }
+
+        // Act — the captor moves the player to the normal Party screen's dummy left dismissal roster.
+        ReleasePlayerByPartyScreenDiscard(captorHeroId, captorPartyId, playerHeroId);
+
+        // Assert — one dismissal clears every stale copy while preserving every unrelated prisoner and
+        // restoring the released party exactly once on the server and clients.
+        AssertCaptivity(Server, playerHeroId, null);
+        AssertPlayerPrisonerCount(Server, captorPartyId, playerHeroId, 0);
+        AssertPartyPrisonerCount(Server, captorPartyId, unrelatedPrisoners);
+        AssertPlayerPartyRestored(Server, playerHeroId, playerPartyId);
+
+        foreach (var client in Clients)
+        {
+            AssertCaptivity(client, playerHeroId, null);
+            AssertPlayerPrisonerCount(client, captorPartyId, playerHeroId, 0);
+            AssertPartyPrisonerCount(client, captorPartyId, unrelatedPrisoners);
+            AssertHeroInPartyRoster(client, playerHeroId, playerPartyId);
+        }
+    }
+
+    [Fact]
+    public void PartyScreenDiscard_ServerMissingPlayerPrisoner_ClearsStaleClientCopy()
+    {
+        // Arrange — capture a player normally, then reproduce the live divergence: the server has already
+        // lost the prison-roster element while the captor client still displays it and captivity is active.
+        var (playerHeroId, playerPartyId) = CreatePlayerHeroParty("CaptiveControllerId");
+        TestEnvironment.ConnectRegisteredPlayer(Clients.First(), "CaptiveControllerId");
+        var (captorHeroId, captorPartyId) = CreatePlayerHeroParty("CaptorControllerId");
+
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject<Hero>(captorHeroId, out var captorHero));
+            Assert.True(Server.ObjectManager.TryGetObject<MobileParty>(captorPartyId, out var captorParty));
+
+            using (new AllowedThread())
+            {
+                captorParty.MemberRoster.AddToCounts(captorHero.CharacterObject, 1);
+                captorHero.PartyBelongedTo = captorParty;
+            }
+        });
+
+        DefeatPlayerPartyInBattle(playerHeroId, playerPartyId, captorPartyId);
+        TestEnvironment.FlushCoalescer();
+        RemovePartyPrisonerLocally(Server, captorPartyId, playerHeroId);
+
+        AssertPlayerPrisonerCount(Server, captorPartyId, playerHeroId, 0);
+        foreach (var client in Clients)
+        {
+            AssertPlayerPrisonerCount(client, captorPartyId, playerHeroId, 1);
+        }
+
+        // Act — the stale captor view submits the real normal Party-screen discard.
+        ReleasePlayerByPartyScreenDiscard(captorHeroId, captorPartyId, playerHeroId);
+
+        // Assert — the authority sends an absolute tombstone even though it had no element to mutate.
+        AssertCaptivity(Server, playerHeroId, null);
+        AssertPlayerPrisonerCount(Server, captorPartyId, playerHeroId, 0);
+        AssertPlayerPartyRestored(Server, playerHeroId, playerPartyId);
+
+        foreach (var client in Clients)
+        {
+            AssertCaptivity(client, playerHeroId, null);
+            AssertPlayerPrisonerCount(client, captorPartyId, playerHeroId, 0);
+            AssertHeroInPartyRoster(client, playerHeroId, playerPartyId);
         }
     }
 

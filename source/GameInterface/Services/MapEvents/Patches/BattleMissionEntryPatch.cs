@@ -38,9 +38,10 @@ internal class BattleMissionEntryPatch
 
     // Engage the spawn gate BEFORE OpenBattleMission builds the mission, because the deployment controller
     // spawns the initial wave during mission setup (inside OpenBattleMission) — earlier than the postfix.
-    // The host is computed locally (deterministic, no server round-trip) so the gate already knows whether to
-    // suppress this client's spawn when the troops spawn. The server's authoritative assignment still arrives
-    // later and reconciles the gate (BattleHostHandler.SetLocalHost).
+    // The gate holds no host/ownership state: which client fields a party is decided server-side by the
+    // troop reserve assignment (BattleTroopReserveBuilder), and the host is elected when the first client
+    // reports mission-ready (BattleHostHandler). BeginBattle only marks the coop battle active for the
+    // spawn/battle patches.
     [HarmonyPrefix]
     private static void Prefix()
     {

@@ -2,6 +2,7 @@
 using GameInterface.Services.MapEventParties;
 using GameInterface.Services.Party.Data;
 using GameInterface.Services.TroopRosters.Data;
+using Helpers;
 using ProtoBuf;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.Core;
@@ -15,10 +16,10 @@ internal readonly struct NetworkCompleteDoneLogic : ICommand
     public readonly string MainHeroId;
 
     [ProtoMember(2)]
-    public readonly FlattenedTroop[] TakenPrisonersRoster;
+    public readonly FlattenedTroop[] ReleasedPrisonersRoster;
 
     [ProtoMember(3)]
-    public readonly FlattenedTroop[] DonatedPrisonersRoster;
+    public readonly FlattenedTroop[] TakenPrisonersRoster;
 
     [ProtoMember(4)]
     public readonly FlattenedTroop[] RecruitedPrisonersRoster;
@@ -62,10 +63,25 @@ internal readonly struct NetworkCompleteDoneLogic : ICommand
     [ProtoMember(17)]
     public readonly CampaignVec2 ReleaserPartyPosition;
 
+    [ProtoMember(18)]
+    public readonly PartyScreenHelper.PartyScreenMode PartyScreenMode;
+
+    [ProtoMember(19)]
+    public readonly TroopRosterOrderData RightMemberOrderData;
+
+    [ProtoMember(20)]
+    public readonly bool ApplyReleasedAndTakenPrisonerActions;
+
+    [ProtoMember(21)]
+    public readonly string DonationSettlementId;
+
+    [ProtoMember(22)]
+    public readonly FlattenedTroop[] DonatedPrisonersRoster;
+
     public NetworkCompleteDoneLogic(
         string mainHeroId,
+        FlattenedTroop[] releasedPrisonersRoster,
         FlattenedTroop[] takenPrisonersRoster,
-        FlattenedTroop[] donatedPrisonersRoster,
         FlattenedTroop[] recruitedPrisonersRoster,
         TroopRosterData leftMemberRosterData,
         TroopRosterData leftPrisonerRosterData,
@@ -79,11 +95,16 @@ internal readonly struct NetworkCompleteDoneLogic : ICommand
         int partyInfluenceChangeAmount,
         int partyMoraleChangeAmount,
         bool doNotApplyGoldTransactions,
-        CampaignVec2 releaserPartyPosition)
+        CampaignVec2 releaserPartyPosition,
+        PartyScreenHelper.PartyScreenMode partyScreenMode,
+        TroopRosterOrderData rightMemberOrderData,
+        bool applyReleasedAndTakenPrisonerActions = false,
+        string donationSettlementId = null,
+        FlattenedTroop[] donatedPrisonersRoster = null)
     {
         MainHeroId = mainHeroId;
+        ReleasedPrisonersRoster = releasedPrisonersRoster;
         TakenPrisonersRoster = takenPrisonersRoster;
-        DonatedPrisonersRoster = donatedPrisonersRoster;
         RecruitedPrisonersRoster = recruitedPrisonersRoster;
         LeftMemberRosterData = leftMemberRosterData;
         LeftPrisonerRosterData = leftPrisonerRosterData;
@@ -98,5 +119,10 @@ internal readonly struct NetworkCompleteDoneLogic : ICommand
         PartyMoraleChangeAmount = partyMoraleChangeAmount;
         DoNotApplyGoldTransactions = doNotApplyGoldTransactions;
         ReleaserPartyPosition = releaserPartyPosition;
+        PartyScreenMode = partyScreenMode;
+        RightMemberOrderData = rightMemberOrderData;
+        ApplyReleasedAndTakenPrisonerActions = applyReleasedAndTakenPrisonerActions;
+        DonationSettlementId = donationSettlementId;
+        DonatedPrisonersRoster = donatedPrisonersRoster;
     }
 }

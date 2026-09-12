@@ -1,14 +1,16 @@
-using Common;
+﻿using Common;
 using Common.Logging;
 using Common.Messaging;
 using Common.Network;
 using Common.Network.Messages;
 using Common.Util;
+using GameInterface.Services.MapEvents.Extensions;
 using GameInterface.Services.MapEvents.Logging;
 using GameInterface.Services.MapEvents.Messages.Start;
 using GameInterface.Services.MobileParties.Extensions;
 using GameInterface.Services.MapEventSides.Messages;
 using GameInterface.Services.ObjectManager;
+using GameInterface.Services.Players;
 using LiteNetLib;
 using Serilog;
 using System;
@@ -50,6 +52,7 @@ internal class BattleSimulationRunHandler : IHandler
     private readonly INetwork network;
     private readonly IObjectManager objectManager;
     private readonly IMapEventLogger mapEventLogger;
+    private readonly IPlayerManager playerManager;
 
     private sealed class ActiveSimulation
     {
@@ -66,19 +69,24 @@ internal class BattleSimulationRunHandler : IHandler
         IMessageBroker messageBroker,
         INetwork network,
         IObjectManager objectManager,
-        IMapEventLogger mapEventLogger)
+        IMapEventLogger mapEventLogger,
+        IPlayerManager playerManager)
     {
         this.messageBroker = messageBroker;
         this.network = network;
         this.objectManager = objectManager;
         this.mapEventLogger = mapEventLogger;
+        this.playerManager = playerManager;
 
         messageBroker.Subscribe<RequestAdvanceBattleSimulation>(Handle_RequestAdvanceBattleSimulation);
+        messageBroker.Subscribe<RequestCancelBattleSimulation>(Handle_RequestCancelBattleSimulation);
         messageBroker.Subscribe<NetworkBattleStartRequest>(Handle_NetworkBattleStartRequest);
         messageBroker.Subscribe<NetworkAdvanceBattleSimulation>(Handle_NetworkAdvanceBattleSimulation);
         messageBroker.Subscribe<NetworkBattleSimulationRound>(Handle_NetworkBattleSimulationRound);
         messageBroker.Subscribe<NetworkBattleSimulationLoot>(Handle_NetworkBattleSimulationLoot);
         messageBroker.Subscribe<NetworkBattleSimulationFinished>(Handle_NetworkBattleSimulationFinished);
+        messageBroker.Subscribe<NetworkBattleSimulationCancelled>(Handle_NetworkBattleSimulationCancelled);
+        messageBroker.Subscribe<NetworkCancelBattleSimulation>(Handle_NetworkCancelBattleSimulation);
         messageBroker.Subscribe<NetworkOpenBattleSimulation>(Handle_NetworkOpenBattleSimulation);
         messageBroker.Subscribe<PlayerDisconnected>(Handle_PlayerDisconnected);
         messageBroker.Subscribe<MapEventPartyBattlePartyAdded>(Handle_MapEventPartyBattlePartyAdded);
@@ -87,11 +95,14 @@ internal class BattleSimulationRunHandler : IHandler
     public void Dispose()
     {
         messageBroker.Unsubscribe<RequestAdvanceBattleSimulation>(Handle_RequestAdvanceBattleSimulation);
+        messageBroker.Unsubscribe<RequestCancelBattleSimulation>(Handle_RequestCancelBattleSimulation);
         messageBroker.Unsubscribe<NetworkBattleStartRequest>(Handle_NetworkBattleStartRequest);
         messageBroker.Unsubscribe<NetworkAdvanceBattleSimulation>(Handle_NetworkAdvanceBattleSimulation);
         messageBroker.Unsubscribe<NetworkBattleSimulationRound>(Handle_NetworkBattleSimulationRound);
         messageBroker.Unsubscribe<NetworkBattleSimulationLoot>(Handle_NetworkBattleSimulationLoot);
         messageBroker.Unsubscribe<NetworkBattleSimulationFinished>(Handle_NetworkBattleSimulationFinished);
+        messageBroker.Unsubscribe<NetworkBattleSimulationCancelled>(Handle_NetworkBattleSimulationCancelled);
+        messageBroker.Unsubscribe<NetworkCancelBattleSimulation>(Handle_NetworkCancelBattleSimulation);
         messageBroker.Unsubscribe<NetworkOpenBattleSimulation>(Handle_NetworkOpenBattleSimulation);
         messageBroker.Unsubscribe<PlayerDisconnected>(Handle_PlayerDisconnected);
         messageBroker.Unsubscribe<MapEventPartyBattlePartyAdded>(Handle_MapEventPartyBattlePartyAdded);
@@ -101,6 +112,14 @@ internal class BattleSimulationRunHandler : IHandler
     private void Handle_RequestAdvanceBattleSimulation(MessagePayload<RequestAdvanceBattleSimulation> payload)
     {
         network.SendAll(new NetworkAdvanceBattleSimulation(payload.What.MapEventId, payload.What.Rounds));
+    }
+
+    /// Forwards local simulation cancellation to the server.
+    private void Handle_RequestCancelBattleSimulation(MessagePayload<RequestCancelBattleSimulation> payload)
+    {
+        if (ModInformation.IsServer) return;
+        
+        network.SendAll(new NetworkCancelBattleSimulation(payload.What.MapEventId));
     }
 
     /// <summary>[Server] Handle a battle-start request for the auto-resolve mode: gate it, set the simulation up
@@ -120,60 +139,61 @@ internal class BattleSimulationRunHandler : IHandler
         }
 
         var mapEventId = payload.What.MapEventId;
-
-        if (!objectManager.TryGetObjectWithLogging<MapEvent>(mapEventId, out var mapEvent))
-            return;
-
-        if (mapEvent.HasWinner)
-        {
-            mapEventLogger.DebugMapEvent(mapEvent, "Battle simulation requested for an already finished map event; rejecting");
-            network.Send(requestingPeer, new NetworkBattleStartReply(payload.What.RequestId, false));
-            return;
-        }
-        if (mapEvent.IsUnsupportedMultiPlayerHostileAction())
-        {
-            Logger.Warning("Rejecting battle simulation for map event {MapEventId}: this hostile action does not support multiple player parties", mapEventId);
-            network.Send(requestingPeer, new NetworkBattleSimulationFinished(mapEventId));
-            return;
-        }
-
-        // Server-authoritative mode gate: accept the auto-resolve only if no live mission already owns this event.
-        // On reject the requesting client never opened its scoreboard (the prefix deferred it), so there is nothing
-        // to tear down — the request is simply dropped.
-        if (!ServerBattleModeArbiter.TryClaimSimulation(mapEventId))
-        {
-            mapEventLogger.DebugMapEvent(mapEvent, "Rejecting battle simulation: a live mission is already underway for this event");
-            network.Send(requestingPeer, new NetworkBattleStartReply(payload.What.RequestId, false));
-            return;
-        }
-
-        // Guard against a double-start: two clients can both click auto-resolve for the same event inside the
-        // broadcast-latency window, and TryClaimSimulation lets the second through — it only rejects the OTHER
-        // mode, so an already-simulation claim still succeeds. Without this the second request would set the
-        // simulation up again (overwriting the first's activeSimulations entry, orphaning its observer) and its
-        // requester would also become a pacer. Reject the duplicate so the first stays the sole pacer; the
-        // arbiter claim is left intact (the first still owns it). Reliable on the single network thread: the
-        // first request only returns after its blocking GameThread.Run below has populated activeSimulations.
-        lock (simLock)
-        {
-            if (activeSimulations.ContainsKey(mapEventId))
-            {
-                mapEventLogger.DebugMapEvent(mapEvent, "Battle simulation already active for this event; rejecting duplicate start");
-                network.Send(requestingPeer, new NetworkBattleStartReply(payload.What.RequestId, false));
-                return;
-            }
-        }
-
         var observer = new ForwardingBattleObserver(objectManager);
+        MapEvent mapEvent = null;
+        bool setupAccepted = false;
+        bool claimAcquired = false;
+        bool unsupportedHostileAction = false;
 
         GameThread.RunSafe(() =>
         {
+            if (!objectManager.TryGetObjectWithLogging(mapEventId, out mapEvent))
+                return;
+
+            if (mapEvent.HasWinner)
+            {
+                mapEventLogger.DebugMapEvent(mapEvent, "Battle simulation requested for an already finished map event; rejecting");
+                return;
+            }
+            if (mapEvent.IsUnsupportedMultiPlayerHostileAction())
+            {
+                Logger.Warning("Rejecting battle simulation for map event {MapEventId}: this hostile action does not support multiple player parties", mapEventId);
+                unsupportedHostileAction = true;
+                return;
+            }
+
+            // Server-authoritative mode gate: accept the auto-resolve only if no live mission already owns this event.
+            if (!ServerBattleModeArbiter.TryClaimSimulation(mapEventId))
+            {
+                mapEventLogger.DebugMapEvent(mapEvent, "Rejecting battle simulation: a live mission is already underway for this event");
+                return;
+            }
+            claimAcquired = true;
+
+            // An existing simulation owns the arbiter claim, so a duplicate rejection must not release it.
+            lock (simLock)
+            {
+                if (activeSimulations.ContainsKey(mapEventId))
+                {
+                    mapEventLogger.DebugMapEvent(mapEvent, "Battle simulation already active for this event; rejecting duplicate start");
+                    claimAcquired = false;
+                    return;
+                }
+            }
+
+            if (!TryGetRequestingParticipant(requestingPeer, payload.What, mapEvent, out var attackerParty))
+            {
+                Logger.Warning("Rejecting battle simulation start for map event {MapEventId}: requester is not an authoritative participant", mapEventId);
+                return;
+            }
+
+            MapEventHostileActionConsequences.Apply(mapEvent, attackerParty.Party, "battle simulation attack");
+
             // v1: simulate the full participating troop count (null), not the player's selected subset.
-            // Set up before attaching the observer: setup fires +1 TroopNumberChanged calls to populate the
-            // scoreboard, which the client already does for itself and must not receive twice.
             var previousObserver = mapEvent.BattleObserver;
-            mapEvent.SimulateBattleSetup(null);
             mapEvent.BattleObserver = observer;
+            mapEvent.SimulateBattleSetup(null);
+            observer.FlushRound();
 
             lock (simLock)
             {
@@ -185,7 +205,20 @@ internal class BattleSimulationRunHandler : IHandler
                     PreviousObserver = previousObserver,
                 };
             }
+            setupAccepted = true;
         }, blocking: true, context: nameof(Handle_NetworkBattleStartRequest));
+
+        if (!setupAccepted)
+        {
+            if (claimAcquired)
+                ServerBattleModeArbiter.Release(mapEventId);
+
+            if (unsupportedHostileAction)
+                network.Send(requestingPeer, new NetworkBattleSimulationFinished(mapEventId));
+            else
+                network.Send(requestingPeer, new NetworkBattleStartReply(payload.What.RequestId, false));
+            return;
+        }
 
         // Mirror the simulation onto every other client in this map event. Each client opens the window only if its
         // own party is in the event; the requesting client and uninvolved clients ignore it. The requester keeps
@@ -197,6 +230,62 @@ internal class BattleSimulationRunHandler : IHandler
         network.Send(requestingPeer, new NetworkBattleStartReply(payload.What.RequestId, true));
 
         mapEventLogger.DebugMapEvent(mapEvent, "Battle simulation set up; awaiting client-paced advances");
+    }
+
+    /// <summary>
+    ///  Cancels an unfinished simulation when requested by the client currently doing it.
+    /// </summary>
+    private void Handle_NetworkCancelBattleSimulation(MessagePayload<NetworkCancelBattleSimulation> payload)
+    {
+        if (ModInformation.IsClient) return;
+
+        if (!(payload.Who is NetPeer requestingPeer))
+        {
+            Logger.Warning("Received {Message} without an originating peer", nameof(NetworkCancelBattleSimulation));
+            return;
+        }
+        
+        var mapEventId = payload.What.MapEventId;
+        ActiveSimulation simulation;
+
+        lock (simLock)
+        {
+            if (!activeSimulations.TryGetValue(mapEventId, out simulation)) return;
+
+            if (simulation.Peer != requestingPeer)
+            {
+                Logger.Warning("Peer attempted to cancel a battle simulation it does not own. MapEventId={MapEventId}", mapEventId);
+                return;
+            }
+            activeSimulations.Remove(mapEventId);
+        }
+        
+        GameThread.RunSafe(() =>
+        { EndSimulationSession(simulation); }, blocking: true, context: nameof(Handle_NetworkCancelBattleSimulation));
+
+        if (ServerBattleModeArbiter.ReleaseSimulation(mapEventId))
+        {
+            network.SendAll(new NetworkBattleSimulationCancelled(mapEventId));
+            network.SendAll(new NetworkBattleModeSet(mapEventId, (int)BattleStartMode.Unclaimed));
+        }
+        mapEventLogger.DebugMapEvent(simulation.MapEvent, "Battle simulation cancelled by initiating client");
+    }
+    private bool TryGetRequestingParticipant(
+        NetPeer requester,
+        NetworkBattleStartRequest request,
+        MapEvent mapEvent,
+        out MobileParty party)
+    {
+        party = null;
+        if (requester == null ||
+            !playerManager.TryGetPlayer(requester, out var player) ||
+            !string.Equals(player.MobilePartyId, request.AttackerPartyId, StringComparison.Ordinal) ||
+            !objectManager.TryGetObject(player.MobilePartyId, out party))
+        {
+            return false;
+        }
+
+        return mapEvent.FindMapEventParty(party.Party) != null;
     }
 
     /// <summary>
@@ -548,7 +637,7 @@ internal class BattleSimulationRunHandler : IHandler
             if (!objectManager.TryGetObject<PartyBase>(winner.PartyId, out var winnerParty))
                 continue;
 
-            var winnerMapEventParty = FindMapEventParty(mapEvent, winnerParty);
+            var winnerMapEventParty = mapEvent.FindMapEventParty(winnerParty);
             if (winnerMapEventParty != null)
                 winnerMapEventParty._contributionToBattle = winner.ContributionToBattle;
         }
@@ -561,7 +650,7 @@ internal class BattleSimulationRunHandler : IHandler
             if (!objectManager.TryGetObject<PartyBase>(defeated.PartyId, out var party))
                 continue;
 
-            var mapEventParty = FindMapEventParty(mapEvent, party);
+            var mapEventParty = mapEvent.FindMapEventParty(party);
             if (mapEventParty == null)
                 continue;
 
@@ -584,16 +673,6 @@ internal class BattleSimulationRunHandler : IHandler
         }
     }
 
-    private static MapEventParty FindMapEventParty(MapEvent mapEvent, PartyBase party)
-    {
-        foreach (var side in mapEvent._sides)
-            foreach (var mapEventParty in side.Parties)
-                if (mapEventParty.Party == party)
-                    return mapEventParty;
-
-        return null;
-    }
-
     /// <summary>[Client] Server finished simulating: end playback once the queued rounds drain.</summary>
     private void Handle_NetworkBattleSimulationFinished(MessagePayload<NetworkBattleSimulationFinished> payload)
     {
@@ -612,6 +691,36 @@ internal class BattleSimulationRunHandler : IHandler
 
             BattleSimulationReplay.RequestFinish();
         }, context: nameof(Handle_NetworkBattleSimulationFinished));
+    }
+
+    /// <summary>
+    /// Server confirmed that the unfinished simulation was canceled. Discard the matching
+    /// initiating or spectator replay without invoking normal battle-result handling.
+    /// </summary>
+    private void Handle_NetworkBattleSimulationCancelled(MessagePayload<NetworkBattleSimulationCancelled> payload)
+    {
+        if (ModInformation.IsServer) return;
+        
+        GameThread.RunSafe(() =>
+        {
+            if (!BattleSimulationReplay.IsActiveFor(payload.What.MapEventId)) return;
+
+            bool isSpectator = BattleSimulationReplay.IsSpectator;
+            var encounter = PlayerEncounter.Current;
+            var simulation = encounter?.BattleSimulation;
+            
+            BattleSimulationReplay.ConfirmCancellation(payload.What.MapEventId);
+
+            if (!isSpectator) return;
+
+            if (Game.Current?.GameStateManager?.ActiveState is MapState mapState ) 
+                mapState.EndBattleSimulation();
+
+            if (encounter != null && ReferenceEquals(encounter.BattleSimulation, simulation))
+            {
+                encounter.BattleSimulation = null;
+            }
+        }, context: nameof(Handle_NetworkBattleSimulationCancelled));
     }
 
     /// <summary>

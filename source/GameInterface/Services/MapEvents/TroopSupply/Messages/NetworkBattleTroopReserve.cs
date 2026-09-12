@@ -1,4 +1,4 @@
-using Common.Messaging;
+﻿using Common.Messaging;
 using GameInterface.Services.MapEvents.TroopSupply;
 using ProtoBuf;
 using System;
@@ -19,13 +19,72 @@ public class NetworkBattleTroopReserve : IEvent
     public readonly string MapEventId;
     [ProtoMember(2)]
     public readonly int Side;
-    [ProtoMember(3)]
-    public readonly PartyReserve[] Parties = Array.Empty<PartyReserve>();
+    private PartyReserve[] parties;
 
-    public NetworkBattleTroopReserve(string mapEventId, int side, PartyReserve[] parties)
+    [ProtoMember(3)]
+    public PartyReserve[] Parties
+    {
+        get => parties ?? Array.Empty<PartyReserve>();
+        private set => parties = value;
+    }
+
+    /// <summary>
+    /// The server needs the receiver's FINAL supplied pointers for every party this REPLACE takes away
+    /// (BR-033 shrink refresh): the receiver must answer with a <see cref="NetworkBattleSupplyProgress"/>
+    /// whose <c>IsFlush</c> is set — one ack per flagged message — BEFORE the dropped parties can be
+    /// re-issued to their returning owner. The server's ledger lags the holder's true local pointer by up
+    /// to one throttled report interval, so serving the returner without this handshake can re-issue
+    /// descriptors the holder already fielded (duplicate agents sharing one UniqueSeed). Additive and
+    /// default-false, so a legacy peer simply applies the REPLACE and never acks (the server's deadline
+    /// fallback then serves the returner from the ledger, accepting today's race).
+    /// </summary>
+    [ProtoMember(4)]
+    public readonly bool FlushRequested;
+
+    /// <summary>
+    /// Every troop on this side across ALL owners, not just the ones in <see cref="Parties"/>.
+    /// <para>
+    /// The spawn logic splits a fixed battle size between the two sides in proportion to the totals it is
+    /// given, so a client that sizes from what it happens to OWN computes a different split from its peers:
+    /// a side divided between two players is measured at a fraction of its real strength, its opponent gets
+    /// capped against that fraction, and the divided side ends up fielding more men than the larger one.
+    /// Feeding every client the same side totals makes the split identical everywhere; each supplier then
+    /// contributes only its own share of that allocation.
+    /// </para>
+    /// </summary>
+    [ProtoMember(5)]
+    public readonly int SideTotalTroops;
+
+    /// <summary>
+    /// How many parties on this side belong to a player, across ALL owners. One troop of each wave is set
+    /// aside per player-owned party before the proportional split, so no player can be rounded down to
+    /// nothing while the owners' slices still sum to exactly the allocation - see
+    /// <see cref="PartyReserve.PlayerOwnedRank"/>.
+    /// </summary>
+    [ProtoMember(6)]
+    public readonly int PlayerOwnedPartyCount;
+
+    /// <summary>
+    /// Identifies the complete two-side snapshot this message belongs to. Both side messages in one refresh
+    /// carry the same value, so a client never reconciles one side from each of two consecutive refreshes.
+    /// </summary>
+    [ProtoMember(7)]
+    public readonly long AllocationRevision;
+
+    /// <summary>The server's battle-size setting for this battle, shared by every mission owner.</summary>
+    [ProtoMember(8)]
+    public readonly int BattleSize;
+
+    public NetworkBattleTroopReserve(string mapEventId, int side, PartyReserve[] parties, int sideTotalTroops,
+        int playerOwnedPartyCount, long allocationRevision, int battleSize, bool flushRequested = false)
     {
         MapEventId = mapEventId;
         Side = side;
-        Parties = parties;
+        Parties = parties ?? Array.Empty<PartyReserve>();
+        FlushRequested = flushRequested;
+        SideTotalTroops = sideTotalTroops;
+        PlayerOwnedPartyCount = playerOwnedPartyCount;
+        AllocationRevision = allocationRevision;
+        BattleSize = battleSize;
     }
 }

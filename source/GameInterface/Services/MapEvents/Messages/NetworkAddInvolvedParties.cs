@@ -5,7 +5,7 @@ using TaleWorlds.CampaignSystem;
 namespace GameInterface.Services.MapEvents.Messages;
 
 [ProtoContract(SkipConstructor = true)]
-public readonly struct NetworkAddInvolvedParties : ICommand
+public readonly struct NetworkAddInvolvedParties : IServerToClientCommand
 {
     [ProtoMember(1)]
     public readonly string MapEventId;

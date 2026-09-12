@@ -3,13 +3,12 @@ using Common.Logging;
 using GameInterface.Services.Players;
 using Serilog;
 using TaleWorlds.CampaignSystem;
-using TaleWorlds.CampaignSystem.Party;
 
 namespace GameInterface.Services.Clans.Extensions;
 
 internal static class ClanExtensions
 {
-    private static readonly ILogger Logger = LogManager.GetLogger<MobileParty>();
+    private static readonly ILogger Logger = LogManager.GetLogger<Clan>();
 
     /// <summary>
     /// Checks to see if the Clan is controlled by a player.
@@ -18,11 +17,7 @@ internal static class ClanExtensions
     /// <returns>return true if the Clan is player controlled otherwise false.</returns>
     public static bool IsPlayerClan(this Clan clan)
     {
-        if (clan is null)
-        {
-            Logger.Error("{parameterName} was null", nameof(clan));
-            return false;
-        }
+        if (clan is null) return false;
 
         return PlayerManager.TryGetControlledObjectInfo(clan, out var _);
     }

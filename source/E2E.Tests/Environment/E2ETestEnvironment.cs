@@ -1,11 +1,21 @@
-using Common;
+﻿using Common;
 using Common.Logging;
+using Common.Messaging;
+using Common.Network;
+using Common.Network.Coalescing;
 using Common.Tests.Utils;
 using Common.Util;
+using Coop.Core.Server.Connections;
+using Coop.Core.Server.Connections.Messages;
+using Coop.Core.Server.Connections.States;
+using Coop.Core.Server.Services.Time.Handlers;
 using E2E.Tests.Environment.Instance;
 using E2E.Tests.Util;
 using GameInterface;
 using GameInterface.AutoSync;
+using GameInterface.Services.MapEvents;
+using GameInterface.Services.MapEvents.PlayerPartyInteractions;
+using GameInterface.Services.Players;
 using GameInterface.Tests.Bootstrap;
 using GameInterface.Utils;
 using HarmonyLib;
@@ -47,9 +57,20 @@ public class E2ETestEnvironment : IDisposable
 
         GameThread.Instance.MarkGameThread();
 
+        // An action a previous environment queued but never pumped would otherwise execute inside
+        // this environment's first pump, against a torn-down container and the wrong game statics.
+        GameThread.Instance.DiscardQueuedActions();
+
         GameBootStrap.Initialize();
 
+        // Process-wide interaction state must not leak between E2E test environments.
+        PlayerPartyInteractionDialogState.Clear();
+        PlayerPartyTradeContext.End();
+        ResetBattleModeState();
+
         IntegrationEnvironment = new TestEnvironment(output, numClients, registerGameInterface: true);
+
+        StopCampaignTimeHeartbeat();
 
         SetupMainHero();
 
@@ -59,10 +80,64 @@ public class E2ETestEnvironment : IDisposable
 
         SetupAutoSync();
 
-        foreach (var settlement in Campaign.Current.CampaignObjectManager.Settlements)
+        Server.Call(() =>
         {
-            Server.ObjectManager.AddExisting(settlement.StringId, settlement);
-        }
+            foreach (var settlement in Campaign.Current.CampaignObjectManager.Settlements)
+            {
+                Server.ObjectManager.AddExisting(settlement.StringId, settlement);
+            }
+        });
+    }
+
+    /// <summary>
+    /// Stops the server's authoritative campaign-time heartbeat for the lifetime of this environment.
+    /// </summary>
+    private void StopCampaignTimeHeartbeat()
+        => Server.Resolve<CampaignTimeSyncHandler>().Dispose();
+
+    /// <summary>
+    /// Battle-mode gating lives in process-wide statics keyed by object-manager ids, and every
+    /// fresh environment re-mints the same ids (MapEvent_Created_1, ...). A claim leaked by a test
+    /// that never finalized its battle would silently gate joins, updates, and surrender for an
+    /// unrelated later test class that happens to reuse the id.
+    /// </summary>
+    private static void ResetBattleModeState()
+    {
+        ServerBattleModeArbiter.Reset();
+        BattleModeRegistry.End();
+        BattleConclusionGate.IsInCoopBattleMission = false;
+        BattleSpawnGate.EndBattle();
+        BattleSimulationReplay.Reset();
+    }
+
+    /// <summary>
+    /// Associates an already registered player with a connected E2E client peer.
+    /// Use this when a test needs server behavior that depends on a live player,
+    /// such as time-control unpause policies.
+    /// </summary>
+    public void ConnectRegisteredPlayer(EnvironmentInstance client, string controllerId)
+    {
+        Server.Call(() =>
+        {
+            var playerManager = Server.Resolve<IPlayerManager>();
+            Assert.True(
+                playerManager.TryGetPlayer(controllerId, out var player),
+                $"Player '{controllerId}' must be registered before connecting its peer.");
+
+            playerManager.SetPeer(controllerId, client.NetPeer);
+
+            var connections = Server.Resolve<ConnectionCollection>();
+            if (!connections.ConnectionStates.TryGetValue(client.NetPeer, out var connection))
+            {
+                Server.Resolve<IMessageBroker>().Publish(this, new PlayerConnected(client.NetPeer));
+                Assert.True(connections.ConnectionStates.TryGetValue(client.NetPeer, out connection));
+            }
+            connection.SetState<CampaignState>();
+
+            Assert.True(
+                playerManager.IsConnected(player),
+                $"Player '{controllerId}' was not connected to the supplied client peer.");
+        });
     }
 
     public void Dispose()
@@ -73,24 +148,66 @@ public class E2ETestEnvironment : IDisposable
             if (disposed) return;
             disposed = true;
 
-            if (AutoSyncConfiguration.Enabled)
+            // Teardown disposes handlers whose Dispose bodies marshal via GameThread.RunSafe; make
+            // this thread the game thread so that work runs inline here instead of queueing onto a
+            // queue that would only be pumped inside a later test's environment.
+            GameThread.Instance.MarkGameThread();
+
+            var disposalFailures = new List<Exception>();
+            void CaptureDisposal(Action dispose)
             {
-                Server.Resolve<AutoSyncHandler>().Dispose();
-                foreach (var client in Clients)
+                try
                 {
-                    client.Resolve<AutoSyncHandler>().Dispose();
+                    dispose();
+                }
+                catch (Exception e)
+                {
+                    disposalFailures.Add(e);
                 }
             }
 
-            Server.Dispose();
-
-            foreach (var client in Clients)
+            try
             {
-                client.Dispose();
+                if (AutoSyncConfiguration.Enabled)
+                {
+                    CaptureDisposal(() => Server.Resolve<AutoSyncHandler>().Dispose());
+                    foreach (var client in Clients)
+                    {
+                        CaptureDisposal(() => client.Resolve<AutoSyncHandler>().Dispose());
+                    }
+                }
+
+                CaptureDisposal(Server.Dispose);
+
+                foreach (var client in Clients)
+                {
+                    CaptureDisposal(client.Dispose);
+                }
+            }
+            finally
+            {
+                try
+                {
+                    // Must run even when a disposal above throws: a live container left in ContainerProvider
+                    // makes CallOriginalPolicy deny originals for every later environment-less test in the
+                    // process (the shared Harmony patches stay applied), silently corrupting game-object
+                    // construction there.
+                    OutputSinkManager.RemoveLogCallback(TestOutputCallback);
+                    ContainerProvider.Clear();
+                }
+                finally
+                {
+                    // Nothing queued by this environment may survive into the next one.
+                    GameThread.Instance.DiscardQueuedActions();
+                    // Async tests can re-mark their continuation thread; keep it marked through fixture teardown.
+                    GameThread.Instance.UnmarkGameThread();
+                }
             }
 
-            OutputSinkManager.RemoveLogCallback(TestOutputCallback);
-            ContainerProvider.Clear();
+            if (disposalFailures.Count == 1)
+                throw disposalFailures[0];
+            if (disposalFailures.Count > 1)
+                throw new AggregateException(disposalFailures);
         }
         finally
         {
@@ -298,6 +415,39 @@ public class E2ETestEnvironment : IDisposable
     {
         Assert.True(GenericPatchHelpers.DictionaryClearInterceptCache.TryGetValue(member, out var intercept));
         return intercept;
+    }
+
+    /// <summary>
+    /// Gets the PropertyOwner SetPropertyValue intercept from the given <paramref name="member"/>.
+    /// PropertyOwner intercepts take (instance, owner, ...) argument order.
+    /// </summary>
+    /// <param name="member">Member to get intercept from</param>
+    /// <returns>PropertyOwner set intercept as <see cref="MethodInfo"/></returns>
+    public MethodInfo GetPropertyOwnerSetIntercept(MemberInfo member)
+    {
+        Assert.True(GenericPatchHelpers.PropertyOwnerSetInterceptCache.TryGetValue(member, out var intercept));
+        return intercept;
+    }
+
+    /// <summary>
+    /// Gets the PropertyOwner ClearAllProperty intercept from the given <paramref name="member"/>.
+    /// PropertyOwner intercepts take (instance, owner) argument order.
+    /// </summary>
+    /// <param name="member">Member to get intercept from</param>
+    /// <returns>PropertyOwner clear intercept as <see cref="MethodInfo"/></returns>
+    public MethodInfo GetPropertyOwnerClearIntercept(MemberInfo member)
+    {
+        Assert.True(GenericPatchHelpers.PropertyOwnerClearInterceptCache.TryGetValue(member, out var intercept));
+        return intercept;
+    }
+
+    /// <summary>
+    /// Drains the server's per-tick send coalescer the way <c>CoopServer.Update</c> does, delivering any
+    /// coalesced sends (e.g. Hero.Gold) to clients. A no-op when nothing is buffered.
+    /// </summary>
+    public void FlushCoalescer()
+    {
+        Server.Call(() => Server.Resolve<ISendCoalescer>().Flush(Server.Resolve<INetwork>()));
     }
 
     /// <summary>
@@ -981,6 +1131,10 @@ public class E2ETestEnvironment : IDisposable
             propertyInfo.SetValue(serverInstance, serverValue);
         });
 
+        // A coalesced member (e.g. Hero.Gold) buffers its send until the tick flush, so drain it before
+        // reading client state. Inert for non-coalesced members: nothing is buffered.
+        FlushCoalescer();
+
         // Assert
         foreach (var client in Clients)
         {
@@ -1135,7 +1289,8 @@ public class E2ETestEnvironment : IDisposable
         {
             var expectedId = testEnvironment.CreateRegisteredObject<TItem>();
             var fieldInfo = AccessTools.Field(typeof(TDeclaring), fieldName);
-            var intercept = testEnvironment.GetCollectionAddIntercept(fieldInfo);
+            var setIntercept = testEnvironment.GetPropertyOwnerSetIntercept(fieldInfo);
+            var clearIntercept = testEnvironment.GetPropertyOwnerClearIntercept(fieldInfo);
             foreach (var client in Clients)
             {
                 Assert.True(client.ObjectManager.TryGetObject<TInstance>(instanceId, out var clientInstance));
@@ -1149,7 +1304,7 @@ public class E2ETestEnvironment : IDisposable
 
                 var owner = (PropertyOwner<TItem>)fieldInfo.GetValue(serverInstance);
                 Assert.NotNull(owner);
-                intercept.Invoke(null, new object[] { owner, serverTrait, 1, serverInstance });
+                setIntercept.Invoke(null, new object[] { serverInstance, owner, serverTrait, 1 });
 
                 Assert.Equal(1, owner.GetPropertyValue(serverTrait));
             });
@@ -1160,11 +1315,29 @@ public class E2ETestEnvironment : IDisposable
                 Assert.True(client.ObjectManager.TryGetObject<TItem>(expectedId, out var clientTrait));
 
                 var owner = (PropertyOwner<TItem>)fieldInfo.GetValue(clientInstance);
-                Assert.NotNull(clientInstance);
                 Assert.NotNull(owner);
                 Assert.Equal(1, owner.GetPropertyValue(clientTrait));
-                Assert.NotNull(owner);
-                Assert.Equal(1, owner.GetPropertyValue(clientTrait));
+            }
+
+            // Clear propagates through its own message pair and empties the owner in place
+            Server.Call(() =>
+            {
+                Assert.True(Server.ObjectManager.TryGetObject<TInstance>(instanceId, out var serverInstance));
+                Assert.True(Server.ObjectManager.TryGetObject<TItem>(expectedId, out var serverTrait));
+
+                var owner = (PropertyOwner<TItem>)fieldInfo.GetValue(serverInstance);
+                clearIntercept.Invoke(null, new object[] { serverInstance, owner });
+
+                Assert.Equal(0, owner.GetPropertyValue(serverTrait));
+            });
+
+            foreach (var client in Clients)
+            {
+                Assert.True(client.ObjectManager.TryGetObject<TInstance>(instanceId, out var clientInstance));
+                Assert.True(client.ObjectManager.TryGetObject<TItem>(expectedId, out var clientTrait));
+
+                var owner = (PropertyOwner<TItem>)fieldInfo.GetValue(clientInstance);
+                Assert.Equal(0, owner.GetPropertyValue(clientTrait));
             }
         }
 

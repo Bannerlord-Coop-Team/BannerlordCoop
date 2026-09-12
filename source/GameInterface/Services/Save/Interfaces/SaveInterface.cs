@@ -1,14 +1,21 @@
 ﻿using Common.Logging;
 using Serilog;
 using System;
+using System.IO;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.Core;
+using TaleWorlds.Library;
+using TaleWorlds.ModuleManager;
+using TaleWorlds.SaveSystem;
 
 namespace GameInterface.Services.Heroes.Interfaces;
 
 public interface ISaveInterface : IGameAbstraction
 {
     SaveResults SaveCurrentGame();
+    SaveResults SaveCurrentGameToFile(string saveName);
+    byte[] ReadSaveFile(string fileName);
+    void DeleteSaveFile(string fileName);
 }
 
 internal class SaveInterface : ISaveInterface
@@ -17,23 +24,116 @@ internal class SaveInterface : ISaveInterface
 
     public SaveResults SaveCurrentGame()
     {
-        // Validation
+        var saveDriver = new CoopInMemSaveDriver();
+        var result = SaveCurrentGame("TransferSave", saveDriver);
+        return new SaveResults(
+            result.Success,
+            result.Success ? saveDriver.Data : Array.Empty<byte>(),
+            result.CampaignId);
+    }
+
+    public SaveResults SaveCurrentGameToFile(string saveName)
+    {
+        if (string.IsNullOrWhiteSpace(saveName))
+            throw new ArgumentException("Save name cannot be empty.", nameof(saveName));
+
+        var saveDriver = new FileDriver();
+        var result = SaveCurrentGame(saveName, saveDriver);
+        if (!result.Success) return result;
+
+        var data = ReadSaveFile(saveName + ".sav");
+        if (data == null || data.Length == 0) return ReportSaveFailure("saved game file");
+
+        return new SaveResults(true, data, result.CampaignId);
+    }
+
+    public byte[] ReadSaveFile(string fileName)
+    {
+        if (string.IsNullOrWhiteSpace(fileName))
+            throw new ArgumentException("File name cannot be empty.", nameof(fileName));
+
+        return FileHelper.GetFileContent(FileDriver.GetSaveFilePath(fileName));
+    }
+
+    public void DeleteSaveFile(string fileName)
+    {
+        if (string.IsNullOrWhiteSpace(fileName))
+            throw new ArgumentException("File name cannot be empty.", nameof(fileName));
+
+        var path = FileDriver.GetSaveFilePath(fileName);
+        FileHelper.DeleteFile(path);
+        // FileHelper discards the platform helper's deletion result.
+        if (FileHelper.FileExists(path))
+            throw new IOException("Save file could not be deleted: " + fileName);
+    }
+
+    private SaveResults SaveCurrentGame(string saveName, ISaveDriver saveDriver)
+    {
         if (Game.Current == null) return ReportSaveFailure(nameof(Game.Current));
         if (Campaign.Current == null) return ReportSaveFailure(nameof(Campaign.Current));
         if (Campaign.Current.SaveHandler == null) return ReportSaveFailure(nameof(Campaign.Current.SaveHandler));
 
-        // Logic
         var saveHandler = Campaign.Current.SaveHandler;
         var dataArgs = saveHandler.GetSaveMetaData();
         var metaData = MBSaveLoad.GetSaveMetaData(dataArgs);
+        EnsureUsableGameVersion(metaData);
 
-        // Required to properly transfer campaign behaviors
         CampaignEventDispatcher.Instance.OnBeforeSave();
 
-        var saveDriver = new CoopInMemSaveDriver();
-        Game.Current.Save(metaData, "TransferSave", saveDriver, (SaveResult) => { });
+        var saveResult = SaveResult.GeneralFailure;
+        Game.Current.Save(metaData, saveName, saveDriver, result => saveResult = result);
+        return new SaveResults(
+            saveResult == SaveResult.Success,
+            Array.Empty<byte>(),
+            Campaign.Current?.UniqueGameId);
+    }
 
-        return new SaveResults(true, saveDriver.Data, Campaign.Current?.UniqueGameId);
+    /// <summary>
+    /// Headless hosts (the dedicated-server engine) ship no
+    /// Parameters/Version.xml, so MBSaveLoad.CurrentVersion — and with it the
+    /// "ApplicationVersion" this metadata was just stamped with — is Empty
+    /// (i-1.-1.-1.-1). A client loading the transferred save then treats it as
+    /// pre-1.3.0 and runs per-object legacy migration into members that don't
+    /// exist in a modern save (MobileParty.OnLateLoad NRE). Re-stamp unusable
+    /// version entries with the Native module's version, which every host has.
+    /// </summary>
+    private void EnsureUsableGameVersion(MetaData metaData)
+    {
+        if (GetVersion(metaData, "ApplicationVersion").Major > 0) return;
+
+        var nativeVersion = ModuleHelper.GetModuleInfo("Native")?.Version ?? ApplicationVersion.Empty;
+        if (nativeVersion.Major <= 0)
+        {
+            Logger.Error("Save metadata has no usable game version and the Native module version is unusable too; " +
+                "clients will fail to load the transferred save.");
+            return;
+        }
+
+        metaData["ApplicationVersion"] = nativeVersion.ToString();
+        Logger.Information("Repaired transfer-save game version to {Version} (host had none)", nativeVersion);
+
+        // The creation-version entry is only poisoned when the campaign itself was
+        // created on a version-less host; repair it by the same rule.
+        if (GetVersion(metaData, "NewGameVersion").Major <= 0)
+        {
+            metaData["NewGameVersion"] = nativeVersion.ToString();
+        }
+    }
+
+    private static ApplicationVersion GetVersion(MetaData metaData, string key)
+    {
+        try
+        {
+            if (metaData.TryGetValue(key, out string value) && !string.IsNullOrEmpty(value))
+            {
+                return ApplicationVersion.FromString(value);
+            }
+        }
+        catch (Exception)
+        {
+            // unparsable — treat as unusable
+        }
+        return ApplicationVersion.Empty;
     }
 
     /// <summary>

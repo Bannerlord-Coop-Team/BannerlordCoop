@@ -64,7 +64,7 @@ public class SessionAdvertisementHandler : IHandler
             if (!info.HasAddress && !sessionTunnelHost.IsListening)
             {
                 messageBroker.Publish(this, new SendInformationMessage(
-                    "Steam invites are on but no public address is set; friends cannot connect until you set one on the co-op screen"));
+                    "Steam invites are on but no public address or Steam relay is available; friends cannot connect"));
             }
         }, context: "AdvertiseSession");
     }

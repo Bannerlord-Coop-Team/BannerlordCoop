@@ -1,5 +1,6 @@
 ﻿using GameInterface.AutoSync;
 using HarmonyLib;
+using TaleWorlds.CampaignSystem.GameComponents;
 using TaleWorlds.CampaignSystem.Party;
 
 namespace GameInterface.Services.MobileParties;
@@ -8,7 +9,7 @@ internal class MobilePartySync : IAutoSync
     public MobilePartySync(AutoSyncRegistry autoSyncBuilder)
     {
         // Sync Fields
-        //autoSyncBuilder.AddTargetMethod(typeof(MobileParty), AccessTools.Method(typeof(DefaultClanFinanceModel), nameof(DefaultClanFinanceModel.ApplyMoraleEffect)));
+        autoSyncBuilder.AddTargetMethod(typeof(MobileParty), AccessTools.Method(typeof(DefaultClanFinanceModel), nameof(DefaultClanFinanceModel.ApplyMoraleEffect)), GameInterface.HARMONY_GAME_STARTED_CATEGORY);
         autoSyncBuilder.AddTargetMethod(typeof(MobileParty), AccessTools.Method(typeof(MobilePartyAi), nameof(MobilePartyAi.GetFleeBehavior)));
 
         autoSyncBuilder.AddField(AccessTools.Field(typeof(MobileParty), nameof(MobileParty.HasUnpaidWages)));
@@ -21,13 +22,8 @@ internal class MobilePartySync : IAutoSync
         autoSyncBuilder.AddField(AccessTools.Field(typeof(MobileParty), nameof(MobileParty._besiegerCampResetStarted)));
         autoSyncBuilder.AddField(AccessTools.Field(typeof(MobileParty), nameof(MobileParty._partyComponent)));
 
-        // Movement
-        autoSyncBuilder.AddField(AccessTools.Field(typeof(MobileParty), nameof(MobileParty._targetSettlement)));
-        autoSyncBuilder.AddField(AccessTools.Field(typeof(MobileParty), nameof(MobileParty.MoveTargetPoint)));
-        autoSyncBuilder.AddProperty(AccessTools.Property(typeof(MobileParty), nameof(MobileParty.TargetParty)));
-        autoSyncBuilder.AddProperty(AccessTools.Property(typeof(MobileParty), nameof(MobileParty.DefaultBehavior)));
-        autoSyncBuilder.AddProperty(AccessTools.Property(typeof(MobileParty), nameof(MobileParty.ShortTermBehavior)));
-        autoSyncBuilder.AddProperty(AccessTools.Property(typeof(MobileParty), nameof(MobileParty.DesiredAiNavigationType)));
+        // Movement is replicated atomically by NetworkUpdatePartyBehavior. These members are
+        // interdependent, so independent AutoSync messages can apply a behavior before its target.
 
         // Sync Properties
         autoSyncBuilder.AddProperty(AccessTools.Property(typeof(MobileParty), nameof(MobileParty.Ai)));
@@ -41,7 +37,7 @@ internal class MobilePartySync : IAutoSync
         //autoSyncBuilder.AddProperty(AccessTools.Property(typeof(MobileParty), nameof(MobileParty.Army)));
         autoSyncBuilder.AddProperty(AccessTools.Property(typeof(MobileParty), nameof(MobileParty.IsActive)));
         autoSyncBuilder.AddProperty(AccessTools.Property(typeof(MobileParty), nameof(MobileParty.IsPartyTradeActive)));
-        autoSyncBuilder.AddProperty(AccessTools.Property(typeof(MobileParty), nameof(MobileParty.PartyTradeGold)));
+        autoSyncBuilder.AddProperty(AccessTools.Property(typeof(MobileParty), nameof(MobileParty.PartyTradeGold)), coalesce: true);
         //autoSyncBuilder.AddProperty(AccessTools.Property(typeof(MobileParty), nameof(MobileParty.PartyTradeTaxGold)));
         ////StationaryStartTime called on tick so lags out, disregard?
         autoSyncBuilder.AddProperty(AccessTools.Property(typeof(MobileParty), nameof(MobileParty.ShouldJoinPlayerBattles)));

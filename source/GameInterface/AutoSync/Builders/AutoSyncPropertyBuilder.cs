@@ -65,7 +65,8 @@ public class AutoSyncPropertyBuilder : AutoSyncBuilderBase
             SerializeMethod = serializerNames.serialize,
             DeserializeMethod = serializerNames.deserialize,
             Interface = propertyInfo.PropertyType.IsInterface,
-            Debug = propertyItem.Debug
+            Debug = propertyItem.Debug,
+            Coalesce = propertyItem.Coalesce
         };
     }
 }

@@ -1,0 +1,327 @@
+﻿using Common.Messaging;
+using GameInterface.Registry.Auto;
+using GameInterface.Services.Armies;
+using GameInterface.Services.MobileParties.Extensions;
+using GameInterface.Services.MapEvents.Messages.Leave;
+using GameInterface.Services.ObjectManager;
+using GameInterface.Services.Players;
+using Helpers;
+using Serilog;
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using TaleWorlds.CampaignSystem;
+using TaleWorlds.CampaignSystem.Actions;
+using TaleWorlds.CampaignSystem.MapEvents;
+using TaleWorlds.CampaignSystem.Party;
+using TaleWorlds.CampaignSystem.Settlements;
+
+namespace GameInterface.Services.MapEvents;
+
+public interface IMapEventLoadCleaner
+{
+    void FinalizePlayerMapEvents();
+}
+
+internal sealed class MapEventLoadCleaner : IMapEventLoadCleaner
+{
+    private readonly ILogger logger;
+    private readonly IMessageBroker messageBroker;
+    private readonly IPlayerManager playerManager;
+    private readonly IObjectManager objectManager;
+    private readonly IArmyDisbander armyDisbander;
+
+    public MapEventLoadCleaner(
+        ILogger logger,
+        IMessageBroker messageBroker,
+        IPlayerManager playerManager,
+        IObjectManager objectManager,
+        IArmyDisbander armyDisbander)
+    {
+        this.logger = logger;
+        this.messageBroker = messageBroker;
+        this.playerManager = playerManager;
+        this.objectManager = objectManager;
+        this.armyDisbander = armyDisbander;
+    }
+
+    public void FinalizePlayerMapEvents()
+    {
+        if (Campaign.Current?.MapEventManager == null)
+            return;
+
+        var loadedPlayerMapEvents = GetLoadedPlayerMapEvents();
+
+        foreach (var mapEvent in loadedPlayerMapEvents)
+        {
+            RepairPartySideLinks(mapEvent);
+
+            var involvedMobileParties = mapEvent.InvolvedParties
+                .Where(party => party.IsMobile && party.MobileParty.IsActive)
+                .Select(party => party.MobileParty)
+                .ToArray();
+            var playerLedArmies = involvedMobileParties
+                .Select(mobileParty => mobileParty.Army)
+                .Where(army => army != null && army.LeaderParty.IsPlayerParty())
+                .Distinct()
+                .ToArray();
+            var releasedArmyParties = playerLedArmies
+                .SelectMany(army => army.Parties)
+                .Where(mobileParty => mobileParty.IsActive && !mobileParty.IsPlayerParty())
+                .Distinct()
+                .ToArray();
+
+            FinalizeOrRepairEvent(mapEvent);
+
+            foreach (var army in playerLedArmies)
+            {
+                logger.Information(
+                    "Dispersing loaded player-led army {ArmyName} released from map event {MapEventId}",
+                    army.Name,
+                    mapEvent.StringId);
+                armyDisbander.Disband(army, Army.ArmyDispersionReason.Unknown);
+            }
+
+            foreach (var mobileParty in involvedMobileParties.Concat(releasedArmyParties).Distinct())
+            {
+                if (!mobileParty.IsActive || mobileParty.IsPlayerParty())
+                    continue;
+
+                if (releasedArmyParties.Contains(mobileParty) &&
+                    TrySetReleasedPartySettlementObjective(mobileParty, out var settlement))
+                {
+                    logger.Information(
+                        "Sending released army party {PartyId} to {SettlementId} after finalizing map event {MapEventId}",
+                        mobileParty.StringId,
+                        settlement.StringId,
+                        mapEvent.StringId);
+                    continue;
+                }
+
+                mobileParty.ResetNavigationToHold();
+            }
+        }
+    }
+
+    private void RepairPartySideLinks(MapEvent mapEvent)
+    {
+        var repairedLinks = 0;
+        var removedEntries = 0;
+        var sides = (mapEvent._sides ?? Array.Empty<MapEventSide>())
+            .Where(side => side != null)
+            .ToArray();
+        var memberships = new Dictionary<PartyBase, List<MapEventSide>>();
+
+        foreach (var side in sides)
+        {
+            foreach (var mapEventParty in side.Parties)
+            {
+                var party = mapEventParty?.Party;
+                if (party == null)
+                    continue;
+
+                if (!memberships.TryGetValue(party, out var partySides))
+                {
+                    partySides = new List<MapEventSide>();
+                    memberships.Add(party, partySides);
+                }
+
+                if (!partySides.Contains(side))
+                    partySides.Add(side);
+            }
+        }
+
+        var canonicalSides = new Dictionary<PartyBase, MapEventSide>();
+        foreach (var membership in memberships)
+        {
+            var party = membership.Key;
+            var linkedSide = party.MapEventSide;
+
+            if (linkedSide != null && membership.Value.Contains(linkedSide))
+            {
+                canonicalSides.Add(party, linkedSide);
+                continue;
+            }
+
+            // A link to another live map event is authoritative. Drop this loaded event's stale
+            // membership instead of moving the party out of its current event.
+            if (linkedSide != null && !sides.Contains(linkedSide))
+                continue;
+
+            canonicalSides.Add(party, membership.Value[0]);
+        }
+
+        var retainedParties = new HashSet<PartyBase>();
+        foreach (var side in sides)
+        {
+            for (var i = side._battleParties.Count - 1; i >= 0; i--)
+            {
+                var party = side._battleParties[i]?.Party;
+                if (party != null &&
+                    canonicalSides.TryGetValue(party, out var canonicalSide) &&
+                    ReferenceEquals(canonicalSide, side) &&
+                    retainedParties.Add(party))
+                {
+                    continue;
+                }
+
+                side._battleParties.RemoveAt(i);
+                removedEntries++;
+            }
+
+            if (side._battleParties.Count > 0 &&
+                !side._battleParties.Any(entry => ReferenceEquals(entry?.Party, side.LeaderParty)))
+            {
+                side.LeaderParty = side._battleParties[0].Party;
+                side._mapFaction = side.LeaderParty.MapFaction;
+            }
+        }
+
+        foreach (var membership in canonicalSides)
+        {
+            if (ReferenceEquals(membership.Key.MapEventSide, membership.Value))
+                continue;
+
+            membership.Key._mapEventSide = membership.Value;
+            repairedLinks++;
+        }
+
+        if (repairedLinks > 0 || removedEntries > 0)
+        {
+            logger.Warning(
+                "Repaired {RepairedLinkCount} party-side links and removed {RemovedEntryCount} stale or duplicate participants from loaded player map event {MapEventId} before finalization",
+                repairedLinks,
+                removedEntries,
+                mapEvent.StringId);
+        }
+    }
+
+    private void FinalizeOrRepairEvent(MapEvent mapEvent)
+    {
+        if (!mapEvent.IsFinalized)
+        {
+            logger.Information(
+                "Finalizing loaded player map event {MapEventId} with {PartyCount} involved parties",
+                mapEvent.StringId,
+                mapEvent.InvolvedParties.Count());
+            mapEvent.FinalizeEvent();
+            return;
+        }
+
+        logger.Warning(
+            "Detaching {PartyCount} parties from half-finalized loaded player map event {MapEventId}",
+            mapEvent.InvolvedParties.Count(),
+            mapEvent.StringId);
+        mapEvent.AttackerSide?.HandleMapEventEnd();
+        mapEvent.DefenderSide?.HandleMapEventEnd();
+        messageBroker.Publish(mapEvent, new MapEventFinalized(mapEvent));
+
+        if (objectManager.Contains(mapEvent))
+            messageBroker.Publish(mapEvent, new InstanceDestroyed<MapEvent>(mapEvent));
+    }
+
+    private MapEvent[] GetLoadedPlayerMapEvents()
+    {
+        var mapEvents = Campaign.Current.MapEventManager.MapEvents
+            .Where(mapEvent => !mapEvent.IsFinalized && mapEvent.ContainsPlayerParty())
+            .ToList();
+
+        foreach (var player in playerManager.Players)
+        {
+            if (!TryGetSavedPlayerParty(player.MobilePartyId, out var party))
+                continue;
+
+            var mapEvent = party.MapEvent;
+            if (mapEvent == null ||
+                mapEvents.Any(candidate => ReferenceEquals(candidate, mapEvent)))
+            {
+                continue;
+            }
+
+            mapEvents.Add(mapEvent);
+        }
+
+        return mapEvents.ToArray();
+    }
+
+    private bool TryGetSavedPlayerParty(string partyId, out MobileParty party)
+    {
+        if (objectManager.TryGetObject(partyId, out party))
+            return true;
+
+        var partyStringId = global::GameInterface.Services.ObjectManager.ObjectManager.Compact(
+            partyId,
+            typeof(MobileParty));
+        party = string.IsNullOrEmpty(partyStringId)
+            ? null
+            : Campaign.Current.CampaignObjectManager.MobileParties
+                .FirstOrDefault(candidate => candidate.StringId == partyStringId);
+        if (party == null)
+            return objectManager.TryGetObjectWithLogging(partyId, out party);
+
+        logger.Warning(
+            "Resolved saved player party {PartyId} from CampaignObjectManager because it was missing from the network object manager",
+            partyId);
+        return true;
+    }
+
+    private static bool TrySetReleasedPartySettlementObjective(
+        MobileParty mobileParty,
+        out Settlement settlement)
+    {
+        var navigationType = mobileParty.IsCurrentlyAtSea
+            ? MobileParty.NavigationType.Naval
+            : MobileParty.NavigationType.Default;
+
+        settlement = FindDestination(mobileParty, navigationType, requireFriendly: true) ??
+            FindDestination(mobileParty, navigationType, requireFriendly: false);
+        if (settlement == null)
+            return false;
+
+        SetPartyAiAction.GetActionForVisitingSettlement(
+            mobileParty,
+            settlement,
+            navigationType,
+            isFromPort: false,
+            isTargetingPort: mobileParty.IsCurrentlyAtSea);
+        return true;
+    }
+
+    private static Settlement FindDestination(
+        MobileParty mobileParty,
+        MobileParty.NavigationType navigationType,
+        bool requireFriendly)
+    {
+        bool IsEligible(Settlement candidate) =>
+            IsEligibleDestination(mobileParty, candidate, requireFriendly);
+
+        if (IsEligible(mobileParty.HomeSettlement))
+            return mobileParty.HomeSettlement;
+
+        return SettlementHelper.FindNearestSettlementToMobileParty(
+                mobileParty,
+                navigationType,
+                IsEligible) ??
+            SettlementHelper.FindNearestSettlementToPoint(mobileParty.Position, IsEligible);
+    }
+
+    private static bool IsEligibleDestination(
+        MobileParty mobileParty,
+        Settlement settlement,
+        bool requireFriendly)
+    {
+        if (settlement == null ||
+            (!settlement.IsFortification && !settlement.IsVillage) ||
+            settlement.IsUnderSiege ||
+            settlement.IsUnderRaid ||
+            (mobileParty.IsCurrentlyAtSea && !settlement.HasPort))
+        {
+            return false;
+        }
+
+        return !requireFriendly ||
+            mobileParty.MapFaction == null ||
+            settlement.MapFaction == null ||
+            !FactionManager.IsAtWarAgainstFaction(mobileParty.MapFaction, settlement.MapFaction);
+    }
+}

@@ -1,12 +1,12 @@
-using Common.Messaging;
+﻿using Common.Messaging;
 using ProtoBuf;
 
 namespace GameInterface.Services.MapEventParties.Messages;
 
 /// <summary>
 /// Client → server: one of the sender's troops scored a hit; apply it to the authoritative
-/// <c>MapEventParty</c>. Clients never apply this themselves — the resulting contribution reaches them
-/// through the <c>MapEventParty._contributionToBattle</c> autosync and the xp through the roster sync.
+/// <c>MapEventParty</c>. The attacker is keyed by character because battle setup can replace its spawn-time
+/// descriptor before the server applies the hit.
 /// </summary>
 [ProtoContract]
 public readonly struct NetworkTroopScoreHit : ICommand
@@ -14,7 +14,7 @@ public readonly struct NetworkTroopScoreHit : ICommand
     [ProtoMember(1)]
     public readonly string MapEventPartyId;
     [ProtoMember(2)]
-    public readonly int TroopSeed;
+    public readonly string AttackingTroopId;
     [ProtoMember(3)]
     public readonly string AttackedTroopId;
     [ProtoMember(4)]
@@ -24,10 +24,10 @@ public readonly struct NetworkTroopScoreHit : ICommand
     [ProtoMember(6)]
     public readonly bool IsSimulatedHit;
 
-    public NetworkTroopScoreHit(string mapEventPartyId, int troopSeed, string attackedTroopId, int damage, bool isFatal, bool isSimulatedHit)
+    public NetworkTroopScoreHit(string mapEventPartyId, string attackingTroopId, string attackedTroopId, int damage, bool isFatal, bool isSimulatedHit)
     {
         MapEventPartyId = mapEventPartyId;
-        TroopSeed = troopSeed;
+        AttackingTroopId = attackingTroopId;
         AttackedTroopId = attackedTroopId;
         Damage = damage;
         IsFatal = isFatal;

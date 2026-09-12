@@ -6,6 +6,8 @@ using Common.Serialization;
 using Common.Tests.Utils;
 using Coop.Core.Client;
 using Coop.Core.Server;
+using Coop.Core.Server.Services.Settlements;
+using Coop.Core.Server.Services.Telemetry;
 using Coop.IntegrationTests.Environment.Instance;
 using Coop.IntegrationTests.Environment.Mock;
 using GameInterface;
@@ -14,6 +16,8 @@ using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Settlements.Interfaces;
 using Moq;
 using Serilog;
+using TaleWorlds.CampaignSystem.Party;
+using TaleWorlds.CampaignSystem.Settlements;
 
 namespace Coop.IntegrationTests.Environment;
 
@@ -22,6 +26,8 @@ namespace Coop.IntegrationTests.Environment;
 /// </summary>
 public class TestEnvironment
 {
+    private static readonly object ContainerBuildLock = new object();
+
     private readonly TestNetworkRouter networkOrchestrator;
 
     public readonly ILogger Logger = LogManager.GetLogger<TestEnvironment>();
@@ -63,7 +69,7 @@ public class TestEnvironment
 
         AddSharedDependencies(builder);
 
-        var container = builder.Build();
+        var container = BuildContainer(builder);
 
         var instance = container.Resolve<ClientInstance>()!;
 
@@ -81,14 +87,25 @@ public class TestEnvironment
         builder.RegisterType<ServerInstance>().AsSelf();
 
         AddSharedDependencies(builder);
+        builder.RegisterType<MockServerTelemetryUploader>()
+            .As<IServerTelemetryUploader>()
+            .As<IBattlesFoughtUploader>()
+            .SingleInstance();
 
-        var container = builder.Build();
+        var container = BuildContainer(builder);
 
         var instance = container.Resolve<ServerInstance>()!;
 
         networkOrchestrator.AddServer(instance);
 
         return instance;
+    }
+
+    private static IContainer BuildContainer(ContainerBuilder builder)
+    {
+        // TaleWorlds ViewModel metadata initialization is not thread-safe.
+        lock (ContainerBuildLock)
+            return builder.Build();
     }
 
     private ContainerBuilder AddSharedDependencies(ContainerBuilder builder)
@@ -101,6 +118,9 @@ public class TestEnvironment
         builder.RegisterType<TestMessageBroker>().AsSelf().As<IMessageBroker>().InstancePerLifetimeScope();
         builder.RegisterType<TestPolicy>().As<ISyncPolicy>().InstancePerLifetimeScope();
         builder.RegisterType<SerializableTypeMapper>().As<ISerializableTypeMapper>().SingleInstance();
+        builder.RegisterInstance(new AllowSettlementEncounterDistanceValidator())
+            .As<ISettlementEncounterDistanceValidator>()
+            .SingleInstance();
 
         RegisterMock<ISettlementInterface>(builder);
 
@@ -112,6 +132,21 @@ public class TestEnvironment
         var mock = new Mock<T>();
         builder.RegisterInstance(mock).AsSelf().SingleInstance();
         builder.RegisterInstance(mock.Object).As<T>().SingleInstance();
+    }
+
+    /// <summary>
+    /// Bypasses campaign-map geometry in the headless integration environment.
+    /// </summary>
+    private sealed class AllowSettlementEncounterDistanceValidator : ISettlementEncounterDistanceValidator
+    {
+        public bool TryValidate(
+            MobileParty party,
+            Settlement settlement,
+            out string rejectionReason)
+        {
+            rejectionReason = string.Empty;
+            return true;
+        }
     }
 
     public void RegisterObjectInNetwork<T>(T obj, string? stringId = null)

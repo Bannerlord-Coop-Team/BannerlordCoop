@@ -1,5 +1,6 @@
 ﻿using Common.Network.Session;
 using Coop.Steam;
+using System;
 using Xunit;
 
 namespace Coop.Tests.Steam
@@ -7,6 +8,7 @@ namespace Coop.Tests.Steam
     public class SteamLobbyAdvertiserTests
     {
         private readonly FakeSteamLobbyApi api = new FakeSteamLobbyApi();
+        private readonly FakeSteamLobbyLeaseRenewer leaseRenewer = new FakeSteamLobbyLeaseRenewer();
         private readonly SteamLobbyAdvertiser advertiser;
 
         public SteamLobbyAdvertiserTests()
@@ -17,26 +19,274 @@ namespace Coop.Tests.Steam
         private static SessionJoinInfo Info(string address = "203.0.113.7", int port = 4200) =>
             new SessionJoinInfo { Address = address, Port = port };
 
+        private static SessionJoinInfo StandaloneInfo(
+            string address = "203.0.113.7", int port = 4200) =>
+            new SessionJoinInfo
+            {
+                Address = address,
+                Port = port,
+                ServerSteamId = 90100000000000042,
+            };
+
+        private SteamPublicLobbyAdvertiser CreatePublicAdvertiser(
+            ServerVisibility visibility = ServerVisibility.Public)
+            => new SteamPublicLobbyAdvertiser(api, visibility, leaseRenewer);
+
         [Fact]
         public void Advertise_CreatesLobbyWithDataAndRichPresence()
         {
             advertiser.Advertise(Info());
 
             Assert.True(advertiser.IsAdvertising);
+            Assert.False(api.LastCreateWasPublic);
             Assert.Equal("203.0.113.7", api.GetLobbyData(api.NextCreatedLobbyId, LobbyDataCodec.AddressKey));
             Assert.Equal("4200", api.GetLobbyData(api.NextCreatedLobbyId, LobbyDataCodec.PortKey));
+            Assert.Equal(api.PersonaName,
+                api.GetLobbyData(api.NextCreatedLobbyId, LobbyDataCodec.OwnerNameKey));
             Assert.Contains($"{SteamLobbyAdvertiser.ConnectLobbyArgument} {api.NextCreatedLobbyId}", api.RichPresenceConnects);
+        }
+
+        [Fact]
+        public void PublicAdvertiser_CreatesBrowsableLobby()
+        {
+            var publicAdvertiser = CreatePublicAdvertiser();
+
+            publicAdvertiser.Advertise(StandaloneInfo());
+
+            Assert.True(publicAdvertiser.IsAdvertising);
+            Assert.True(api.LastCreateWasPublic);
+            Assert.Equal("public",
+                api.GetLobbyData(api.NextCreatedLobbyId, LobbyDataCodec.VisibilityKey));
+            Assert.Equal(
+                LobbyDataCodec.EncodeAdvertisementExpiry(
+                    api.SteamServerTime + SteamPublicLobbyAdvertiser.AdvertisementLeaseSeconds),
+                api.GetLobbyData(api.NextCreatedLobbyId, LobbyDataCodec.AdvertisementExpiresAtKey));
+            Assert.Equal(LobbyDataCodec.StandaloneLobbyType,
+                api.GetLobbyData(api.NextCreatedLobbyId, LobbyDataCodec.LobbyTypeKey));
+            Assert.True(leaseRenewer.IsRunning);
+        }
+
+        [Fact]
+        public void StandaloneAdvertiser_FriendsOnly_CreatesFriendsOnlyLobby()
+        {
+            var friendsOnlyAdvertiser = CreatePublicAdvertiser(ServerVisibility.FriendsOnly);
+
+            friendsOnlyAdvertiser.Advertise(StandaloneInfo());
+
+            Assert.True(friendsOnlyAdvertiser.IsAdvertising);
+            Assert.False(api.LastCreateWasPublic);
+            Assert.Equal("203.0.113.7",
+                api.GetLobbyData(api.NextCreatedLobbyId, LobbyDataCodec.AddressKey));
+            Assert.Equal("friends_only",
+                api.GetLobbyData(api.NextCreatedLobbyId, LobbyDataCodec.VisibilityKey));
+        }
+
+        [Fact]
+        public void StandaloneAdvertiser_None_CreatesUnlistedSteamLobbyAndRichPresence()
+        {
+            var hiddenAdvertiser = CreatePublicAdvertiser(ServerVisibility.None);
+
+            hiddenAdvertiser.Advertise(StandaloneInfo());
+
+            Assert.True(hiddenAdvertiser.IsAdvertising);
+            Assert.True(api.LastCreateWasPublic);
+            Assert.Null(api.PendingCreateCompletion);
+            Assert.Equal("none",
+                api.GetLobbyData(api.NextCreatedLobbyId, LobbyDataCodec.VisibilityKey));
+            Assert.Equal("203.0.113.7",
+                api.GetLobbyData(api.NextCreatedLobbyId, LobbyDataCodec.AddressKey));
+            Assert.Equal(LobbyDataCodec.HiddenStandaloneLobbyType,
+                api.GetLobbyData(api.NextCreatedLobbyId, LobbyDataCodec.LobbyTypeKey));
+            Assert.Contains($"{SteamLobbyAdvertiser.ConnectLobbyArgument} {api.NextCreatedLobbyId}",
+                api.RichPresenceConnects);
+        }
+
+        [Fact]
+        public void StandaloneAdvertiser_RejectsUnknownVisibility()
+        {
+            Assert.Throws<System.ArgumentOutOfRangeException>(() =>
+                CreatePublicAdvertiser((ServerVisibility)999));
+        }
+
+        [Fact]
+        public void PublicAdvertiser_RenewsAdvertisementLease()
+        {
+            api.SteamServerTime = 1_000;
+            var publicAdvertiser = CreatePublicAdvertiser();
+            publicAdvertiser.Advertise(StandaloneInfo());
+
+            api.SteamServerTime = 1_020;
+            leaseRenewer.Renew();
+
+            Assert.Equal("1080",
+                api.GetLobbyData(api.NextCreatedLobbyId,
+                    LobbyDataCodec.AdvertisementExpiresAtKey));
+        }
+
+        [Fact]
+        public void PublicAdvertiser_UnavailableSteamTimeFailsOpen()
+        {
+            api.SteamServerTime = 0;
+            var publicAdvertiser = CreatePublicAdvertiser();
+
+            publicAdvertiser.Advertise(StandaloneInfo());
+
+            Assert.Equal(uint.MaxValue.ToString(),
+                api.GetLobbyData(api.NextCreatedLobbyId,
+                    LobbyDataCodec.AdvertisementExpiresAtKey));
+        }
+
+        [Fact]
+        public void PublicAdvertiser_UnavailableSteamTimePreservesExistingLease()
+        {
+            api.SteamServerTime = 1_000;
+            var publicAdvertiser = CreatePublicAdvertiser();
+            publicAdvertiser.Advertise(StandaloneInfo());
+            string initialExpiry = api.GetLobbyData(api.NextCreatedLobbyId,
+                LobbyDataCodec.AdvertisementExpiresAtKey);
+
+            api.SteamServerTime = 0;
+            leaseRenewer.Renew();
+
+            Assert.Equal(initialExpiry,
+                api.GetLobbyData(api.NextCreatedLobbyId,
+                    LobbyDataCodec.AdvertisementExpiresAtKey));
+            Assert.True(publicAdvertiser.IsAdvertising);
+        }
+
+        [Fact]
+        public void PublicAdvertiser_UnavailableSteamTimePreservesLeaseDuringMetadataUpdate()
+        {
+            api.SteamServerTime = 1_000;
+            var publicAdvertiser = CreatePublicAdvertiser();
+            var info = StandaloneInfo();
+            publicAdvertiser.Advertise(info);
+            string initialExpiry = api.GetLobbyData(api.NextCreatedLobbyId,
+                LobbyDataCodec.AdvertisementExpiresAtKey);
+
+            api.SteamServerTime = 0;
+            info.ConnectedPlayers = 3;
+            publicAdvertiser.Advertise(info);
+
+            Assert.Equal(initialExpiry,
+                api.GetLobbyData(api.NextCreatedLobbyId,
+                    LobbyDataCodec.AdvertisementExpiresAtKey));
+            Assert.Equal("3",
+                api.GetLobbyData(api.NextCreatedLobbyId,
+                    LobbyDataCodec.ConnectedPlayersKey));
+            Assert.True(publicAdvertiser.IsAdvertising);
+        }
+
+        [Fact]
+        public void PublicAdvertiser_UnavailableTimeMetadataUpdateKeepsRenewalFailureCount()
+        {
+            var publicAdvertiser = CreatePublicAdvertiser();
+            var info = StandaloneInfo();
+            publicAdvertiser.Advertise(info);
+            api.FailedLobbyDataKey = LobbyDataCodec.AdvertisementExpiresAtKey;
+            leaseRenewer.Renew();
+            leaseRenewer.Renew();
+
+            api.SteamServerTime = 0;
+            info.ConnectedPlayers = 3;
+            publicAdvertiser.Advertise(info);
+            api.SteamServerTime = 1_000;
+            leaseRenewer.Renew();
+
+            Assert.False(publicAdvertiser.IsAdvertising);
+            Assert.False(leaseRenewer.IsRunning);
+            Assert.Contains(api.NextCreatedLobbyId, api.LeftLobbies);
+            publicAdvertiser.Dispose();
+        }
+
+        [Fact]
+        public void PublicAdvertiser_RepeatedLeaseRenewalFailuresWithdrawLobby()
+        {
+            var publicAdvertiser = CreatePublicAdvertiser();
+            publicAdvertiser.Advertise(StandaloneInfo());
+            api.FailedLobbyDataKey = LobbyDataCodec.AdvertisementExpiresAtKey;
+
+            leaseRenewer.Renew();
+            leaseRenewer.Renew();
+
+            Assert.True(publicAdvertiser.IsAdvertising);
+            Assert.True(leaseRenewer.IsRunning);
+            Assert.Empty(api.LeftLobbies);
+
+            leaseRenewer.Renew();
+
+            Assert.False(publicAdvertiser.IsAdvertising);
+            Assert.False(leaseRenewer.IsRunning);
+            Assert.Contains(api.NextCreatedLobbyId, api.LeftLobbies);
+            publicAdvertiser.Dispose();
+        }
+
+        [Fact]
+        public void PublicAdvertiser_SuccessfulLeaseRenewalResetsFailureCount()
+        {
+            var publicAdvertiser = CreatePublicAdvertiser();
+            publicAdvertiser.Advertise(StandaloneInfo());
+            api.FailedLobbyDataKey = LobbyDataCodec.AdvertisementExpiresAtKey;
+            leaseRenewer.Renew();
+
+            api.FailedLobbyDataKey = string.Empty;
+            leaseRenewer.Renew();
+            api.FailedLobbyDataKey = LobbyDataCodec.AdvertisementExpiresAtKey;
+            leaseRenewer.Renew();
+            leaseRenewer.Renew();
+
+            Assert.True(publicAdvertiser.IsAdvertising);
+            Assert.True(leaseRenewer.IsRunning);
+            Assert.Empty(api.LeftLobbies);
+        }
+
+        [Fact]
+        public void PublicAdvertiser_StopAdvertisingStopsLeaseRenewal()
+        {
+            api.SteamServerTime = 1_000;
+            var publicAdvertiser = CreatePublicAdvertiser();
+            publicAdvertiser.Advertise(StandaloneInfo());
+            string initialExpiry = api.GetLobbyData(api.NextCreatedLobbyId,
+                LobbyDataCodec.AdvertisementExpiresAtKey);
+
+            publicAdvertiser.StopAdvertising();
+            api.SteamServerTime = 1_020;
+            leaseRenewer.Renew();
+
+            Assert.False(leaseRenewer.IsRunning);
+            Assert.Equal(initialExpiry, api.GetLobbyData(api.NextCreatedLobbyId,
+                LobbyDataCodec.AdvertisementExpiresAtKey));
         }
 
         [Fact]
         public void Advertise_Again_UpdatesDataWithoutSecondLobby()
         {
             advertiser.Advertise(Info());
-            advertiser.Advertise(Info(address: "198.51.100.9"));
+            var updatedInfo = Info(address: "198.51.100.9");
+            updatedInfo.ConnectedPlayers = 3;
+            advertiser.Advertise(updatedInfo);
 
             Assert.Null(api.PendingCreateCompletion);
             Assert.Equal("198.51.100.9", api.GetLobbyData(api.NextCreatedLobbyId, LobbyDataCodec.AddressKey));
+            Assert.Equal("3", api.GetLobbyData(api.NextCreatedLobbyId, LobbyDataCodec.ConnectedPlayersKey));
             Assert.Empty(api.LeftLobbies);
+        }
+
+        [Fact]
+        public void Advertise_WhileCreationInFlight_UsesLatestConnectedPlayerCount()
+        {
+            api.CompleteOperationsImmediately = false;
+            var initialInfo = Info();
+            initialInfo.ConnectedPlayers = 1;
+            var updatedInfo = Info();
+            updatedInfo.ConnectedPlayers = 2;
+
+            advertiser.Advertise(initialInfo);
+            advertiser.Advertise(updatedInfo);
+            api.CompletePendingCreate();
+
+            Assert.Equal("2", api.GetLobbyData(api.NextCreatedLobbyId,
+                LobbyDataCodec.ConnectedPlayersKey));
         }
 
         [Fact]
@@ -60,6 +310,19 @@ namespace Coop.Tests.Steam
             Assert.False(advertiser.IsAdvertising);
             Assert.Contains(api.NextCreatedLobbyId, api.LeftLobbies);
             Assert.Empty(api.RichPresenceConnects);
+        }
+
+        [Fact]
+        public void Advertise_FailedOwnerNameWriteKeepsJoinableLobby()
+        {
+            api.FailedLobbyDataKey = LobbyDataCodec.OwnerNameKey;
+
+            advertiser.Advertise(Info());
+
+            Assert.True(advertiser.IsAdvertising);
+            Assert.Empty(api.LeftLobbies);
+            Assert.Contains($"{SteamLobbyAdvertiser.ConnectLobbyArgument} {api.NextCreatedLobbyId}",
+                api.RichPresenceConnects);
         }
 
         [Fact]
@@ -92,8 +355,43 @@ namespace Coop.Tests.Steam
         {
             advertiser.Advertise(Info());
 
+            Assert.True(advertiser.CanInviteFriends);
             Assert.True(advertiser.InviteFriends());
             Assert.Contains(api.NextCreatedLobbyId, api.InviteDialogsOpened);
+        }
+
+        [Fact]
+        public void Advertise_RaisesLobbyChangedAfterCreation()
+        {
+            ulong changedLobbyId = 0;
+            advertiser.LobbyChanged += lobbyId => changedLobbyId = lobbyId;
+
+            advertiser.Advertise(Info());
+
+            Assert.Equal(api.NextCreatedLobbyId, changedLobbyId);
+        }
+
+        [Fact]
+        public void StopAdvertising_RaisesLobbyChangedWithZero()
+        {
+            ulong changedLobbyId = 1;
+            advertiser.LobbyChanged += lobbyId => changedLobbyId = lobbyId;
+            advertiser.Advertise(Info());
+
+            advertiser.StopAdvertising();
+
+            Assert.Equal(0UL, changedLobbyId);
+        }
+
+        [Fact]
+        public void InviteFriends_AsLobbyMember_OpensOverlayDialog()
+        {
+            var membership = new StubSteamLobbyMembership { LobbyId = 42 };
+            var memberAdvertiser = new SteamLobbyAdvertiser(api, membership);
+
+            Assert.True(memberAdvertiser.CanInviteFriends);
+            Assert.True(memberAdvertiser.InviteFriends());
+            Assert.Contains(42UL, api.InviteDialogsOpened);
         }
 
         [Fact]
@@ -109,6 +407,7 @@ namespace Coop.Tests.Steam
         [Fact]
         public void InviteFriends_WithoutLobby_ReturnsFalse()
         {
+            Assert.False(advertiser.CanInviteFriends);
             Assert.False(advertiser.InviteFriends());
         }
 
@@ -122,6 +421,7 @@ namespace Coop.Tests.Steam
             Assert.False(advertiser.IsAdvertising);
             Assert.Null(api.PendingCreateCompletion);
             Assert.Empty(api.LobbyData);
+            Assert.Equal(0, api.ClearRichPresenceCalls);
         }
 
         [Fact]
@@ -135,6 +435,27 @@ namespace Coop.Tests.Steam
 
             Assert.False(advertiser.IsAdvertising);
             Assert.Contains(api.NextCreatedLobbyId, api.LeftLobbies);
+        }
+
+        private sealed class StubSteamLobbyMembership : ISteamLobbyMembership
+        {
+            public ulong LobbyId { get; set; }
+            public bool IsInLobby => LobbyId != 0;
+
+            public void JoinSessionLobby(ulong lobbyId) => LobbyId = lobbyId;
+            public void LeaveSessionLobby() => LobbyId = 0;
+        }
+
+        private sealed class FakeSteamLobbyLeaseRenewer : ISteamLobbyLeaseRenewer
+        {
+            private Action? renew;
+
+            public bool IsRunning => renew != null;
+
+            public void Start(Action renew) => this.renew = renew;
+            public void Stop() => renew = null;
+            public void Renew() => renew?.Invoke();
+            public void Dispose() => Stop();
         }
     }
 }

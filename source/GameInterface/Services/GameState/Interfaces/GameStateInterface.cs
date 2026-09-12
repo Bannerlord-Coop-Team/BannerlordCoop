@@ -1,6 +1,7 @@
 ﻿using Common;
 using Common.Logging;
 using Common.Messaging;
+using GameInterface.Policies;
 using GameInterface.Services.GameState.Messages;
 using GameInterface.Services.Heroes;
 using SandBox;
@@ -30,10 +31,17 @@ internal class GameStateInterface : IGameStateInterface
     private static readonly ILogger Logger = LogManager.GetLogger<GameStateInterface>();
 
     private readonly IMessageBroker messageBroker;
+    private readonly Action endGame;
 
     public GameStateInterface(IMessageBroker messageBroker)
+        : this(messageBroker, () => GameThread.Run(MBGameManager.EndGame, blocking: true))
+    {
+    }
+
+    internal GameStateInterface(IMessageBroker messageBroker, Action endGame)
     {
         this.messageBroker = messageBroker;
+        this.endGame = endGame;
     }
 
     public void GoToMainMenu()
@@ -60,8 +68,27 @@ internal class GameStateInterface : IGameStateInterface
         }
 
         ISaveDriver driver = new CoopInMemSaveDriver(saveData);
-        LoadResult loadResult = SaveManager.Load("", driver, loadAsLateInitialize: true);
+        LoadResult loadResult;
+
+        // SaveManager fills objects on NativeParallelDriver workers. A normal AllowedThread scope only
+        // affects this game thread, leaving AutoSync patches active on those workers. Keep every
+        // CallOriginalPolicy-gated patch on its original path until the synchronous load joins its workers.
+        using (CallOriginalPolicy.AllowOriginalsOnAllThreads())
+        {
+            loadResult = SaveManager.Load("", driver, loadAsLateInitialize: true);
+        }
+
+        var loadedGame = (Game)loadResult.Root;
+        var loadedCampaign = (Campaign)loadedGame.GameType;
+        ClearTransferredMapNotices(loadedCampaign.CampaignInformationManager);
         MBGameManager.StartNewGame(new SandBoxGameManager(loadResult));
+    }
+
+    internal static void ClearTransferredMapNotices(CampaignInformationManager informationManager)
+    {
+        // A headless server cannot dismiss map notices, so its save contains the campaign's accumulated
+        // UI backlog. Only network-transferred saves use this load path; live notices remain intact.
+        informationManager._mapNotices.Clear();
     }
 
     public void StartNewGame()
@@ -86,8 +113,34 @@ internal class GameStateInterface : IGameStateInterface
                 return;
             }
 
-            SandBoxSaveHelper.TryLoadSave(save, StartGame, null);
+            ForceLoadSave(save);
         }, blocking: true);
+    }
+
+    private void ForceLoadSave(SaveGameFileInfo save)
+    {
+        LogModuleCompatibilityMismatches(save);
+
+        SandBoxSaveHelper.LoadGameAction(save, StartGame, null);
+    }
+
+    private static void LogModuleCompatibilityMismatches(SaveGameFileInfo save)
+    {
+        try
+        {
+            foreach (var mismatch in SandBoxSaveHelper.CheckMetaDataCompatibilityErrors(save.MetaData))
+            {
+                Logger.Warning(
+                    "Save {SaveName} module mismatch: {ModuleId} ({MismatchType}). Forcing load anyway.",
+                    save.Name,
+                    mismatch.ModuleId,
+                    mismatch.Type);
+            }
+        }
+        catch (Exception e)
+        {
+            Logger.Warning(e, "Unable to evaluate module compatibility for save {SaveName}. Forcing load anyway.", save.Name);
+        }
     }
 
     private void StartGame(LoadResult loadResult)
@@ -98,8 +151,8 @@ internal class GameStateInterface : IGameStateInterface
 
     public void EndGame()
     {
-        GameThread.Run(MBGameManager.EndGame, blocking: true);
-
-        messageBroker.Publish(this, new MainMenuEntered());
+        endGame();
+        // MBGameManager.EndGame is async void, so returning here does not mean InitialState is
+        // active yet. MainMenuEnteredPatch publishes once InitialState.OnActivate actually runs.
     }
 }

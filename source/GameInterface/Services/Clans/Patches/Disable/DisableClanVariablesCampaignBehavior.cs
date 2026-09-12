@@ -1,7 +1,9 @@
 ﻿using Common;
+using GameInterface.Services.Clans.Interfaces;
 using HarmonyLib;
 using System.Collections.Generic;
 using System.Reflection;
+using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.CampaignBehaviors;
 
 namespace GameInterface.Services.Clans.Patches.Disable;
@@ -24,4 +26,19 @@ internal class DisableClanVariablesCampaignBehavior
     // Disable on client
     [HarmonyPrefix]
     static bool Prefix() => ModInformation.IsServer;
+}
+
+[HarmonyPatch(typeof(ClanVariablesCampaignBehavior))]
+internal class ClanVariablesCampaignBehaviorPatches
+{
+    [HarmonyPatch(nameof(ClanVariablesCampaignBehavior.DailyTickClan))]
+    [HarmonyPrefix]
+    public static bool DailyTickClanPrefix(ClanVariablesCampaignBehavior __instance, Clan clan)
+    {
+        ContainerProvider.TryResolve<IClanVariablesCampaignBehaviorInterface>(out var clanVariablesCampaignBehaviorInterface);
+
+        clanVariablesCampaignBehaviorInterface.DailyTickClan(__instance, clan);
+
+        return false;
+    }
 }

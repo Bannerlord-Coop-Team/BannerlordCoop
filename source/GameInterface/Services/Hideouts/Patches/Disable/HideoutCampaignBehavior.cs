@@ -1,0 +1,165 @@
+﻿using Common;
+using Common.Logging;
+using Common.Messaging;
+using GameInterface.Services.Hideouts.Handlers;
+using GameInterface.Services.Hideouts.Messages;
+using GameInterface.Services.ObjectManager;
+using GameInterface.Services.Players;
+using HarmonyLib;
+using Serilog;
+using System.Collections.Generic;
+using System.Linq;
+using System.Reflection.Emit;
+using TaleWorlds.CampaignSystem;
+using TaleWorlds.CampaignSystem.CampaignBehaviors;
+using TaleWorlds.CampaignSystem.Encounters;
+using TaleWorlds.CampaignSystem.Party;
+using TaleWorlds.CampaignSystem.Settlements;
+using TaleWorlds.Core;
+
+namespace GameInterface.Services.Hideouts.Patches.Disable;
+
+[HarmonyPatch(typeof(HideoutCampaignBehavior))]
+internal class HideoutCampaignBehaviorPatch
+{
+    private static readonly ILogger Logger = LogManager.GetLogger<HideoutCampaignBehaviorPatch>();
+
+    [HarmonyPatch(nameof(HideoutCampaignBehavior.ArrangeHideoutTroopCountsForMission))]
+    [HarmonyPrefix]
+    private static bool ArrangeHideoutTroopCountsForMission()
+    {
+        return ModInformation.IsServer;
+    }
+
+    [HarmonyPatch("OnTroopRosterManageDone")]
+    [HarmonyPrefix]
+    private static bool OnTroopRosterManageDone(bool isDirectAssault)
+    {
+        if (ModInformation.IsServer)
+            return true;
+
+        var settlement = Settlement.CurrentSettlement;
+        if (settlement?.IsHideout != true)
+        {
+            Logger.Error("Cannot prepare hideout mission because the current settlement is not a hideout");
+            return false;
+        }
+
+        if (!ContainerProvider.TryResolve<HideoutCampaignConsequencesHandler>(out var coordinator))
+        {
+            Logger.Error("Unable to resolve hideout mission preparation coordinator");
+            return false;
+        }
+
+        return coordinator.RequestMissionPreparationBlocking(settlement, isDirectAssault);
+    }
+
+    [HarmonyPatch("OnTroopRosterManageDone")]
+    [HarmonyTranspiler]
+    private static IEnumerable<CodeInstruction> OnTroopRosterManageDoneTranspiler(
+        IEnumerable<CodeInstruction> instructions)
+    {
+        var setNextPossibleAttackTime = AccessTools.Method(
+            typeof(Hideout),
+            nameof(Hideout.SetNextPossibleAttackTime));
+        var setNextPossibleAttackTimeOnServer = AccessTools.Method(
+            typeof(HideoutCampaignBehaviorPatch),
+            nameof(SetNextPossibleAttackTimeOnServer));
+
+        foreach (var instruction in instructions)
+        {
+            if (instruction.Calls(setNextPossibleAttackTime))
+            {
+                instruction.opcode = OpCodes.Call;
+                instruction.operand = setNextPossibleAttackTimeOnServer;
+            }
+
+            yield return instruction;
+        }
+    }
+
+    private static void SetNextPossibleAttackTimeOnServer(Hideout hideout, CampaignTime duration)
+    {
+        if (ModInformation.IsServer)
+            hideout.SetNextPossibleAttackTime(duration);
+    }
+
+    [HarmonyPatch("hideout_send_troops_result_failure_on_init")]
+    [HarmonyPrefix]
+    private static void HideoutSendTroopsResultFailureOnInit()
+    {
+        PublishConsequence(HideoutCampaignConsequence.SetAttackCooldown);
+    }
+
+    [HarmonyPatch("game_menu_hideout_place_on_init")]
+    [HarmonyPrefix]
+    private static void GameMenuHideoutPlaceOnInit()
+    {
+        var encounter = PlayerEncounter.Current;
+        if (encounter == null)
+            return;
+
+        var battle = PlayerEncounter.Battle;
+        if (battle != null && battle.WinningSide == encounter.PlayerSide)
+            PublishConsequence(HideoutCampaignConsequence.GrantClearRewards);
+    }
+
+    [HarmonyPatch("hideout_send_troops_result_success_consequence")]
+    [HarmonyPrefix]
+    private static void HideoutSendTroopsResultSuccessConsequence()
+    {
+        PublishConsequence(HideoutCampaignConsequence.GrantClearRewards);
+    }
+
+    [HarmonyPatch(nameof(HideoutCampaignBehavior.HourlyTickSettlement))]
+    [HarmonyPrefix]
+    public static bool HourlyTickSettlement(Settlement settlement)
+    {
+        if (!ModInformation.IsServer)
+        {
+            return false;
+        }
+
+        if (settlement.IsHideout && settlement.Hideout.IsInfested && !settlement.Hideout.IsSpotted)
+        {
+            float hideoutSpottingDistance = Campaign.Current.Models.MapVisibilityModel.GetHideoutSpottingDistance();
+
+            if (ContainerProvider.TryResolve<IPlayerManager>(out var playerManager) == false)
+                return false;
+
+            if (ContainerProvider.TryResolve<IObjectManager>(out var objectManager) == false)
+                return false;
+
+            foreach (var item in playerManager.Players)
+            {
+                if (objectManager.TryGetObject<MobileParty>(item.MobilePartyId, out var mobileParty) && mobileParty.IsActive)
+                {
+                    float num = mobileParty.Position.DistanceSquared(settlement.Position);
+                    float num2 = 1f - num / (hideoutSpottingDistance * hideoutSpottingDistance);
+                    if (num2 > 0f && settlement.Parties.Count > 0 && MBRandom.RandomFloat < num2 && !settlement.Hideout.IsSpotted)
+                    {
+                        settlement.Hideout.IsSpotted = true;
+                        settlement.IsVisible = true;
+                        CampaignEventDispatcher.Instance.OnHideoutSpotted(mobileParty.Party, settlement.Party);
+                        break;
+                    }
+                }
+            }
+        }
+        return false;
+    }
+
+    private static void PublishConsequence(HideoutCampaignConsequence consequence, Settlement settlement = null)
+    {
+        if (!ModInformation.IsClient)
+            return;
+
+        settlement ??= Settlement.CurrentSettlement;
+        if (settlement?.IsHideout != true)
+            return;
+
+        MessageBroker.Instance.Publish(
+            settlement,
+            new HideoutCampaignConsequenceRequested(settlement, consequence));
+    }
+}

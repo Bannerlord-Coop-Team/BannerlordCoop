@@ -30,6 +30,15 @@ public enum PlayerPartyInteractionOption
     YieldHostileDemand
 }
 
+public enum PlayerPartyInteractionVassalUnavailableReason
+{
+    None,
+    TargetIsNotKingdomLeader,
+    InitiatorHasNoClan,
+    InitiatorIsInKingdom,
+    InitiatorClanTierTooLow
+}
+
 public enum PlayerPartyInteractionProposal
 {
     None,

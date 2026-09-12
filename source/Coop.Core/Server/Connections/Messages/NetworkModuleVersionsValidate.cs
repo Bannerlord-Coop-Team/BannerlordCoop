@@ -1,4 +1,5 @@
-﻿using Common.Messaging;
+﻿using Common;
+using Common.Messaging;
 using GameInterface.Services.Modules;
 using ProtoBuf;
 using System;
@@ -17,9 +18,17 @@ public record NetworkModuleVersionsValidate : ICommand
 {
     [ProtoMember(1)]
     public NetworkModuleInfo[] Modules { get; }
+    [ProtoMember(2)]
+    public string? CoopBuildVersion { get; }
 
     public NetworkModuleVersionsValidate(IEnumerable<ModuleInfo> modules)
+        : this(modules, ModInformation.BuildVersion)
     {
+    }
+
+    public NetworkModuleVersionsValidate(IEnumerable<ModuleInfo> modules, string? coopBuildVersion)
+    {
+        CoopBuildVersion = coopBuildVersion;
         if (modules is null)
         {
             Modules = Array.Empty<NetworkModuleInfo>();

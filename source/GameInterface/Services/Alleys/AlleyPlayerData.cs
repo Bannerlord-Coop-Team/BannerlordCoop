@@ -47,6 +47,9 @@ public class AlleyManagementData
     [ProtoMember(4)]
     public CampaignTime AttackResponseDueDate { get; set; }
 
+    [ProtoMember(5)]
+    public long LastRecruitTimeTicks { get; set; }
+
     public AlleyManagementData(string overseerId, TroopRosterElementData[] garrison)
     {
         OverseerId = overseerId;

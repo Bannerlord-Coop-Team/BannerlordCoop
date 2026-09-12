@@ -9,7 +9,6 @@ namespace Coop.Core.Client.Services.MobileParties.Handlers
     /// <summary>
     /// Handles client communication related to party behavior synchronisation.
     /// </summary>
-    /// <seealso cref="Server.Services.MobileParties.Handlers.ServerMobilePartyBehaviorHandler">Server's Handler</seealso>
     /// <seealso cref="GameInterface.Services.MobileParties.Handlers.MobilePartyBehaviorHandler">Game Interface's Handler</seealso>
     public class ClientMobilePartyBehaviorHandler : IHandler
     {

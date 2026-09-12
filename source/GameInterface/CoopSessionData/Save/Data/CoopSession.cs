@@ -1,5 +1,8 @@
 ﻿using GameInterface.Services.Alleys;
 using GameInterface.Services.Caravans;
+using GameInterface.Services.Heroes;
+using GameInterface.Services.Inventory;
+using GameInterface.Services.Inventory.TradeSkills;
 using GameInterface.Services.MobileParties;
 using GameInterface.Services.Players.Data;
 using GameInterface.Services.Smithing;
@@ -22,10 +25,13 @@ public interface ICoopSession
     CaravansPlayerData CaravansPlayerData { get; }
     AlleyPlayerData AlleyPlayerData { get; }
     InteractionsPlayerData InteractionsPlayerData { get; }
+    TradePlayerData TradePlayerData { get; }
+    InventoryPlayerData InventoryPlayerData { get; }
+    HeroMeetingData HeroMeetingData { get; }
+    AgingPlayerData AgingPlayerData { get; }
 }
 
-/// <inheritdoc cref="ICoopSession"/>
-[ProtoContract]
+[ProtoContract(SkipConstructor = true)]
 public class CoopSession : ICoopSession
 {
     // Shared "no data yet" shape for a fresh session (before any GameSaved/GameLoaded). A property,
@@ -38,7 +44,11 @@ public class CoopSession : ICoopSession
         new WorkshopPlayerData(new()),
         new CaravansPlayerData(new(), new()),
         new AlleyPlayerData(new()),
-        new InteractionsPlayerData(new(), new(), new(), new()));
+        new InteractionsPlayerData(new(), new(), new(), new(), new(), new(), new(), new(), new(), new(), new()),
+        new TradePlayerData(new(), new(), new(), new()),
+        new InventoryPlayerData(new(), new()),
+        new HeroMeetingData(new()),
+        new AgingPlayerData(new()));
 
     [ProtoMember(1)]
     public string UniqueGameId { get; }
@@ -54,6 +64,14 @@ public class CoopSession : ICoopSession
     public AlleyPlayerData AlleyPlayerData { get; }
     [ProtoMember(7)]
     public InteractionsPlayerData InteractionsPlayerData { get; }
+    [ProtoMember(8)]
+    public TradePlayerData TradePlayerData { get; }
+    [ProtoMember(9)]
+    public InventoryPlayerData InventoryPlayerData { get; }
+    [ProtoMember(10)]
+    public HeroMeetingData HeroMeetingData { get; }
+    [ProtoMember(11)]
+    public AgingPlayerData AgingPlayerData { get; }
 
     public CoopSession(
         string uniqueGameId,
@@ -62,7 +80,11 @@ public class CoopSession : ICoopSession
         WorkshopPlayerData workshopPlayerData,
         CaravansPlayerData caravansPlayerData,
         AlleyPlayerData alleyPlayerData,
-        InteractionsPlayerData interactionsPlayerData)
+        InteractionsPlayerData interactionsPlayerData,
+        TradePlayerData tradePlayerData,
+        InventoryPlayerData inventoryPlayerData,
+        HeroMeetingData heroMeetingData,
+        AgingPlayerData agingPlayerData)
     {
         UniqueGameId = uniqueGameId;
         Players = players;
@@ -71,5 +93,9 @@ public class CoopSession : ICoopSession
         CaravansPlayerData = caravansPlayerData;
         AlleyPlayerData = alleyPlayerData;
         InteractionsPlayerData = interactionsPlayerData;
+        TradePlayerData = tradePlayerData;
+        InventoryPlayerData = inventoryPlayerData;
+        HeroMeetingData = heroMeetingData;
+        AgingPlayerData = agingPlayerData;
     }
 }

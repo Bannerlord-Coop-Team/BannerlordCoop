@@ -1,11 +1,13 @@
 ﻿using System;
 using System.Linq;
 using Common.Messaging;
+using E2E.Tests.Environment.Mock;
 using E2E.Tests.Environment.MockEngine;
 using GameInterface.Services.MapEvents;
 using GameInterface.Services.MapEvents.Messages;
 using GameInterface.Services.MapEvents.TroopSupply;
 using Missions;
+using Missions.Agents;
 using Missions.Agents.Handlers;
 using Missions.Agents.Packets;
 using Missions.Battles;
@@ -56,6 +58,7 @@ public class BattleMountIdentityTests : MissionTestEnvironment
         SetControllerId(attacker, "attacker");
         SetControllerId(owner, "owner");
 
+        string missionInstanceId = Guid.NewGuid().ToString();
         var riderId = Guid.NewGuid();
         var horseId = Guid.NewGuid();
         Agent ownerRider = null, ownerHorse = null, puppetHorse = null;
@@ -63,7 +66,7 @@ public class BattleMountIdentityTests : MissionTestEnvironment
 
         owner.Call(() =>
         {
-            var mock = fixture.CreateMission(owner);
+            var mock = CreateConnectedMission(fixture, owner, missionInstanceId);
             ownerController = owner.Resolve<CoopBattleController>();
             (ownerRider, ownerHorse) = RegisterMountedRider(
                 mock, owner.Resolve<INetworkAgentRegistry>(), "owner", riderId, horseId, AgentControllerType.AI);
@@ -71,7 +74,7 @@ public class BattleMountIdentityTests : MissionTestEnvironment
 
         attacker.Call(() =>
         {
-            var mock = fixture.CreateMission(attacker);
+            var mock = CreateConnectedMission(fixture, attacker, missionInstanceId);
             attackerController = attacker.Resolve<CoopBattleController>();
             (_, puppetHorse) = RegisterMountedRider(
                 mock, attacker.Resolve<INetworkAgentRegistry>(), "owner", riderId, horseId, AgentControllerType.None);
@@ -124,8 +127,15 @@ public class BattleMountIdentityTests : MissionTestEnvironment
             riderMirror.MountAgent = horseB;
 
             // The routed hit arrives, addressed to horse A's own id.
+            Blow blow = DamagingBlow();
+            AttackCollisionData collisionData = default;
+            var damageData = owner.Resolve<IBattleDamageDataMapper>().Pack(in blow, in collisionData);
             owner.Resolve<IMessageBroker>().Publish(this,
-                new NetworkApplyBattleDamage(horseAId, Guid.Empty, DamagingBlow(), default));
+                new NetworkApplyBattleDamage(
+                    horseAId,
+                    Guid.Empty,
+                    damageData,
+                    blow.IsMissile));
 
             Assert.True(AgentMirror.TryGet(horseA, out var horseAMirror));
             Assert.Equal(70f, horseAMirror.Health); // the horse that was actually struck
@@ -147,13 +157,14 @@ public class BattleMountIdentityTests : MissionTestEnvironment
         SetControllerId(attacker, "attacker");
         SetControllerId(owner, "owner");
 
+        string missionInstanceId = Guid.NewGuid().ToString();
         var riderId = Guid.NewGuid();
         Agent ownerHorse = null;
         CoopBattleController ownerController = null, attackerController = null;
 
         owner.Call(() =>
         {
-            var mock = fixture.CreateMission(owner);
+            var mock = CreateConnectedMission(fixture, owner, missionInstanceId);
             ownerController = owner.Resolve<CoopBattleController>();
             BasicCharacterObject character = Game.Current.PlayerTroop;
             var rider = mock.SpawnAgent(new AgentBuildData(character).Controller(AgentControllerType.AI));
@@ -163,7 +174,7 @@ public class BattleMountIdentityTests : MissionTestEnvironment
 
         attacker.Call(() =>
         {
-            var mock = fixture.CreateMission(attacker);
+            var mock = CreateConnectedMission(fixture, attacker, missionInstanceId);
             attackerController = attacker.Resolve<CoopBattleController>();
             BasicCharacterObject character = Game.Current.PlayerTroop;
             var riderPuppet = mock.SpawnAgent(new AgentBuildData(character).Controller(AgentControllerType.None));
@@ -190,11 +201,13 @@ public class BattleMountIdentityTests : MissionTestEnvironment
         SetControllerId(owner, "owner");
         SetControllerId(peer, "peer");
 
+        string missionInstanceId = Guid.NewGuid().ToString();
         var characterId = CreateRegisteredObject<CharacterObject>();
 
+        peer.Call(() => CreateConnectedMission(fixture, peer, missionInstanceId));
         owner.Call(() =>
         {
-            var mock = fixture.CreateMission(owner);
+            var mock = CreateConnectedMission(fixture, owner, missionInstanceId);
             mock.SpawnMounted = true; // the engine spawns a cavalry rider's horse inside the same SpawnAgent call
             var controller = owner.Resolve<CoopBattleController>();
             var registry = owner.Resolve<INetworkAgentRegistry>();
@@ -206,16 +219,60 @@ public class BattleMountIdentityTests : MissionTestEnvironment
 
             // What BattleAgentSpawnedPatch publishes when WE spawn a troop into the battle.
             owner.Resolve<IMessageBroker>().Publish(this, new AgentSpawnedInBattle(rider));
+            controller.OnMissionTick(0f);
 
-            // Rider AND horse registered under us, and the broadcast record carries the horse's id so peers
-            // register their puppet's horse under the same identity.
+            // The next tick flushes the bounded spawn batch. Rider AND horse are registered under us, and the
+            // record carries the horse's id so peers register their copy under the same identity.
             Assert.True(registry.TryGetAgentInfo(rider, out var riderInfo));
             Assert.True(registry.TryGetAgentInfo(horse, out var horseInfo));
             Assert.Equal("owner", horseInfo.CurrentAuthority);
 
-            var record = peer.InternalMessages.GetMessages<NetworkSpawnBattleAgents>().Single().Agents.Single();
+            NetworkSpawnBattleAgents message = Assert.Single(
+                peer.InternalMessages.GetMessages<NetworkSpawnBattleAgents>());
+            Assert.Equal(SpawnBatchPurpose.Initial, message.Purpose);
+            BattleAgentSpawnData record = DecodeSpawnBatch(peer, message).Single();
             Assert.Equal(riderInfo.AgentId, record.AgentId);
             Assert.Equal(horseInfo.AgentId, record.MountAgentId);
+
+            GC.KeepAlive(controller);
+        });
+    }
+
+    [Fact]
+    public void DebugFixtureOrigin_FlushesInitialWithoutMapEventCasualtyAttribution()
+    {
+        using var fixture = new MissionEngineFixture();
+        var (_, partyIds) = SetupCoopBattle("owner", "peer");
+        var owner = Clients.First();
+        SetControllerId(owner, "owner");
+        string characterId = CreateRegisteredObject<CharacterObject>();
+
+        owner.Call(() =>
+        {
+            var mock = fixture.CreateMission(owner);
+            var controller = owner.Resolve<CoopBattleController>();
+            var network = owner.Resolve<MockBattleNetwork>();
+            Assert.True(owner.ObjectManager.TryGetObject<CharacterObject>(characterId, out var character));
+            Assert.True(owner.ObjectManager.TryGetObject<MobileParty>(partyIds[0], out var party));
+            Assert.NotNull(party.Party.MapEventSide);
+            Assert.Contains(party.Party, party.Party.MapEventSide.Parties.Select(mapEventParty => mapEventParty.Party));
+
+            network.NetworkSentMessages.Clear();
+            var origin = new DebugReplicationFixtureAgentOrigin(
+                character,
+                party.Party,
+                rank: -1,
+                banner: null,
+                new UniqueTroopDescriptor(int.MaxValue));
+            var agent = mock.SpawnAgent(new AgentBuildData(character)
+                .Controller(AgentControllerType.AI)
+                .TroopOrigin(origin));
+            owner.Resolve<IMessageBroker>().Publish(this, new AgentSpawnedInBattle(agent));
+            controller.OnMissionTick(0f);
+
+            var initial = network.NetworkSentMessages.GetMessages<NetworkSpawnBattleAgents>().Single();
+            Assert.Equal(SpawnBatchPurpose.Initial, initial.Purpose);
+            Assert.Null(initial.Agents.Single().MapEventPartyId);
 
             GC.KeepAlive(controller);
         });
@@ -230,6 +287,7 @@ public class BattleMountIdentityTests : MissionTestEnvironment
         SetControllerId(owner, "owner");
         SetControllerId(peer, "peer");
 
+        string missionInstanceId = Guid.NewGuid().ToString();
         var riderId = Guid.NewGuid();
         var horseId = Guid.NewGuid();
         Agent ownerHorse = null, puppetHorse = null;
@@ -237,7 +295,7 @@ public class BattleMountIdentityTests : MissionTestEnvironment
 
         peer.Call(() =>
         {
-            var mock = fixture.CreateMission(peer);
+            var mock = CreateConnectedMission(fixture, peer, missionInstanceId);
             peerController = peer.Resolve<CoopBattleController>();
             (_, puppetHorse) = RegisterMountedRider(
                 mock, peer.Resolve<INetworkAgentRegistry>(), "owner", riderId, horseId, AgentControllerType.None);
@@ -245,7 +303,7 @@ public class BattleMountIdentityTests : MissionTestEnvironment
 
         owner.Call(() =>
         {
-            var mock = fixture.CreateMission(owner);
+            var mock = CreateConnectedMission(fixture, owner, missionInstanceId);
             ownerController = owner.Resolve<CoopBattleController>();
             (_, ownerHorse) = RegisterMountedRider(
                 mock, owner.Resolve<INetworkAgentRegistry>(), "owner", riderId, horseId, AgentControllerType.AI);
@@ -282,22 +340,25 @@ public class BattleMountIdentityTests : MissionTestEnvironment
         SetControllerId(attacker, "attacker");
         SetControllerId(owner, "owner");
 
+        string missionInstanceId = Guid.NewGuid().ToString();
         var riderId = Guid.NewGuid();
         var horseId = Guid.NewGuid();
-        Agent ownerRider = null, ownerHorse = null, puppetHorse = null;
+        Agent ownerRider = null, ownerHorse = null, puppetRider = null, puppetHorse = null;
         CoopBattleController ownerController = null, attackerController = null;
 
         attacker.Call(() =>
         {
-            var mock = fixture.CreateMission(attacker);
+            var mock = CreateConnectedMission(fixture, attacker, missionInstanceId);
             attackerController = attacker.Resolve<CoopBattleController>();
-            (_, puppetHorse) = RegisterMountedRider(
+            (puppetRider, puppetHorse) = RegisterMountedRider(
                 mock, attacker.Resolve<INetworkAgentRegistry>(), "owner", riderId, horseId, AgentControllerType.None);
+            puppetHorse.AddComponent(new CommonAIComponent(puppetHorse));
+            puppetHorse.CommonAIComponent.OnMountReserved(puppetRider.Index);
         });
 
         owner.Call(() =>
         {
-            var mock = fixture.CreateMission(owner);
+            var mock = CreateConnectedMission(fixture, owner, missionInstanceId);
             ownerController = owner.Resolve<CoopBattleController>();
             var registry = owner.Resolve<INetworkAgentRegistry>();
             (ownerRider, ownerHorse) = RegisterMountedRider(
@@ -313,6 +374,24 @@ public class BattleMountIdentityTests : MissionTestEnvironment
         // standing — the horse lives on masterless at its owner and dies only through its own broadcast.
         Assert.True(AgentMirror.TryGet(puppetHorse, out var puppetHorseMirror));
         Assert.True(puppetHorseMirror.IsActive);
+        Assert.Null(puppetHorseMirror.RiderAgent);
+        Assert.Equal(AgentControllerType.None, puppetHorse.Controller);
+        Assert.NotNull(puppetHorse.CommonAIComponent);
+        Assert.Equal(-1, puppetHorse.CommonAIComponent.ReservedRiderAgentIndex);
+        Assert.Single(puppetHorseMirror.Components.OfType<CommonAIComponent>());
+
+        attacker.Call(() =>
+        {
+            var repairer = attacker.Resolve<IPuppetMountStateRepairer>();
+            repairer.PrepareForAiControl(puppetHorse);
+            puppetHorse.Controller = AgentControllerType.AI;
+            Assert.Single(puppetHorseMirror.Components.OfType<CommonAIComponent>());
+
+            puppetHorse.Controller = AgentControllerType.None;
+            repairer.PreserveRiderlessPuppet(puppetHorse);
+            Assert.NotNull(puppetHorse.CommonAIComponent);
+            Assert.Single(puppetHorseMirror.Components.OfType<CommonAIComponent>());
+        });
 
         // A later hit on the now-masterless puppet horse still routes by the horse's own id.
         attacker.Call(() =>
@@ -328,6 +407,53 @@ public class BattleMountIdentityTests : MissionTestEnvironment
         GC.KeepAlive(attackerController);
     }
 
+    [Fact]
+    public void RiderDeathBeforeFirstMovement_ClearsTheAiHorsesReservation()
+    {
+        using var fixture = new MissionEngineFixture();
+        var owner = Clients.First();
+        var peer = Clients.Skip(1).First();
+        SetControllerId(owner, "owner");
+        SetControllerId(peer, "peer");
+
+        string missionInstanceId = Guid.NewGuid().ToString();
+        var riderId = Guid.NewGuid();
+        var horseId = Guid.NewGuid();
+        Agent puppetHorse = null;
+        CoopBattleController ownerController = null, peerController = null;
+
+        peer.Call(() =>
+        {
+            var mock = CreateConnectedMission(fixture, peer, missionInstanceId);
+            peerController = peer.Resolve<CoopBattleController>();
+            var (puppetRider, horse) = RegisterMountedRider(
+                mock, peer.Resolve<INetworkAgentRegistry>(), "owner", riderId, horseId, AgentControllerType.None);
+            puppetHorse = horse;
+            puppetHorse.Controller = AgentControllerType.AI;
+            puppetHorse.CommonAIComponent.OnMountReserved(puppetRider.Index);
+        });
+
+        owner.Call(() =>
+        {
+            var mock = CreateConnectedMission(fixture, owner, missionInstanceId);
+            ownerController = owner.Resolve<CoopBattleController>();
+            var (rider, _) = RegisterMountedRider(
+                mock, owner.Resolve<INetworkAgentRegistry>(), "owner", riderId, horseId, AgentControllerType.AI);
+            owner.Resolve<IMessageBroker>().Publish(this, new BattleAgentDied(rider, null, wounded: false));
+        });
+
+        Assert.True(AgentMirror.TryGet(puppetHorse, out var horseMirror));
+        Assert.True(horseMirror.IsActive);
+        Assert.Null(horseMirror.RiderAgent);
+        Assert.Equal(AgentControllerType.AI, puppetHorse.Controller);
+        Assert.NotNull(puppetHorse.CommonAIComponent);
+        Assert.Equal(-1, puppetHorse.CommonAIComponent.ReservedRiderAgentIndex);
+        Assert.Single(horseMirror.Components.OfType<CommonAIComponent>());
+
+        GC.KeepAlive(ownerController);
+        GC.KeepAlive(peerController);
+    }
+
     /// <summary>A rider-death broadcast dismounts the puppet and leaves the horse standing, even an unregistered
     /// one, which simply stays a local loose horse.</summary>
     [Fact]
@@ -339,23 +465,25 @@ public class BattleMountIdentityTests : MissionTestEnvironment
         SetControllerId(owner, "owner");
         SetControllerId(peer, "peer");
 
+        string missionInstanceId = Guid.NewGuid().ToString();
         var riderId = Guid.NewGuid();
         Agent riderPuppet = null, puppetHorse = null;
         CoopBattleController ownerController = null, peerController = null;
 
         peer.Call(() =>
         {
-            var mock = fixture.CreateMission(peer);
+            var mock = CreateConnectedMission(fixture, peer, missionInstanceId);
             peerController = peer.Resolve<CoopBattleController>();
             BasicCharacterObject character = Game.Current.PlayerTroop;
             riderPuppet = mock.SpawnAgent(new AgentBuildData(character).Controller(AgentControllerType.None));
             puppetHorse = mock.SpawnMount(riderPuppet); // NOT registered
             Assert.True(peer.Resolve<INetworkAgentRegistry>().TryRegisterAgent("owner", riderId, riderPuppet));
+            Assert.Null(puppetHorse.CommonAIComponent);
         });
 
         owner.Call(() =>
         {
-            var mock = fixture.CreateMission(owner);
+            var mock = CreateConnectedMission(fixture, owner, missionInstanceId);
             ownerController = owner.Resolve<CoopBattleController>();
             BasicCharacterObject character = Game.Current.PlayerTroop;
             var rider = mock.SpawnAgent(new AgentBuildData(character).Controller(AgentControllerType.AI));
@@ -371,6 +499,10 @@ public class BattleMountIdentityTests : MissionTestEnvironment
         Assert.True(AgentMirror.TryGet(puppetHorse, out var horseMirror));
         Assert.True(horseMirror.IsActive);
         Assert.Null(horseMirror.RiderAgent);
+        Assert.Equal(AgentControllerType.None, puppetHorse.Controller);
+        Assert.NotNull(puppetHorse.CommonAIComponent);
+        Assert.Equal(-1, puppetHorse.CommonAIComponent.ReservedRiderAgentIndex);
+        Assert.Single(horseMirror.Components.OfType<CommonAIComponent>());
 
         GC.KeepAlive(ownerController);
         GC.KeepAlive(peerController);
@@ -388,11 +520,13 @@ public class BattleMountIdentityTests : MissionTestEnvironment
         SetControllerId(owner, "owner");
         SetControllerId(joiner, "joiner");
 
+        string missionInstanceId = Guid.NewGuid().ToString();
         var characterId = CreateRegisteredObject<CharacterObject>();
 
+        joiner.Call(() => CreateConnectedMission(fixture, joiner, missionInstanceId));
         owner.Call(() =>
         {
-            var mock = fixture.CreateMission(owner);
+            var mock = CreateConnectedMission(fixture, owner, missionInstanceId);
             mock.SpawnMounted = true;
             var controller = owner.Resolve<CoopBattleController>();
             var registry = owner.Resolve<INetworkAgentRegistry>();
@@ -412,9 +546,63 @@ public class BattleMountIdentityTests : MissionTestEnvironment
             rider.MountAgent = null;
             owner.Resolve<IMessageBroker>().Publish(this, new NetworkMissionPeerEntered("joiner", null));
 
-            var record = joiner.InternalMessages.GetMessages<NetworkSpawnBattleAgents>().Last().Agents.Single();
+            NetworkSpawnBattleAgents message = joiner.InternalMessages
+                .GetMessages<NetworkSpawnBattleAgents>().Last();
+            BattleAgentSpawnData record = DecodeSpawnBatch(joiner, message).Single();
             Assert.Equal(riderInfo.AgentId, record.AgentId);
             Assert.Equal(horseInfo.AgentId, record.MountAgentId);
+
+            GC.KeepAlive(controller);
+        });
+    }
+
+    [Fact]
+    public void JoinerReplay_CarriesTakenMountsSeparateMovementIdentity()
+    {
+        using var fixture = new MissionEngineFixture();
+        var owner = Clients.First();
+        var joiner = Clients.Skip(1).First();
+        SetControllerId(owner, "owner");
+        SetControllerId(joiner, "joiner");
+
+        string missionInstanceId = Guid.NewGuid().ToString();
+        var characterId = CreateRegisteredObject<CharacterObject>();
+        var riderId = Guid.NewGuid();
+        var mountId = Guid.NewGuid();
+
+        joiner.Call(() => CreateConnectedMission(fixture, joiner, missionInstanceId));
+        owner.Call(() =>
+        {
+            var mock = CreateConnectedMission(fixture, owner, missionInstanceId);
+            mock.SpawnMounted = true;
+            var controller = owner.Resolve<CoopBattleController>();
+            var registry = owner.Resolve<INetworkAgentRegistry>();
+
+            Assert.True(owner.ObjectManager.TryGetObject<CharacterObject>(characterId, out var character));
+            var rider = mock.SpawnAgent(new AgentBuildData(character).Controller(AgentControllerType.AI));
+            var mount = rider.MountAgent;
+            Assert.NotNull(mount);
+
+            Assert.True(registry.TryRegisterAgent(
+                "owner", "rider-origin", "rider-origin:epoch-1",
+                riderId, 21, rider));
+            Assert.True(registry.TryRegisterAgent(
+                "owner", "mount-origin", "mount-origin:epoch-4",
+                mountId, 9, mount));
+
+            owner.Resolve<IMessageBroker>().Publish(this, new NetworkMissionPeerEntered("joiner", null));
+
+            NetworkSpawnBattleAgents message = joiner.InternalMessages
+                .GetMessages<NetworkSpawnBattleAgents>().Last();
+            BattleAgentSpawnData record = DecodeSpawnBatch(joiner, message).Single();
+            Assert.Equal(riderId, record.AgentId);
+            Assert.Equal("rider-origin", record.OriginalOwnerControllerId);
+            Assert.Equal("rider-origin:epoch-1", record.MovementScopeId);
+            Assert.Equal((ushort)21, record.MovementId);
+            Assert.Equal(mountId, record.MountAgentId);
+            Assert.Equal("mount-origin", record.MountOriginalOwnerControllerId);
+            Assert.Equal("mount-origin:epoch-4", record.MountMovementScopeId);
+            Assert.Equal((ushort)9, record.MountMovementId);
 
             GC.KeepAlive(controller);
         });
@@ -468,6 +656,8 @@ public class BattleMountIdentityTests : MissionTestEnvironment
             // Our local copy of another owner's masterless horse.
             var puppetHorse = mock.SpawnMount();
             Assert.True(registry.TryRegisterAgent("owner", horseId, puppetHorse));
+            Assert.True(AgentMirror.TryGet(puppetHorse, out var puppetMirror));
+            puppetMirror.Controller = AgentControllerType.AI;
 
             // The owner's copy of that horse, with live movement state — the source of the packet.
             var remoteHorse = mock.SpawnMount();
@@ -476,13 +666,14 @@ public class BattleMountIdentityTests : MissionTestEnvironment
             remoteMirror.LookDirection = new Vec3(0f, 1f, 0f);
             remoteMirror.MovementDirection = new Vec2(0.6f, 0.8f);
             remoteMirror.InputVector = new Vec2(0.3f, 0.7f);
+            remoteMirror.RealGlobalVelocity = new Vec3(3f, 4f, 0f);
 
             var packet = new MountMovementPacket(new[] { horseId }, new[] { new AgentMountData(remoteHorse) });
             component.AgentMovementHandler.MountMovementApplier.HandlePacket(null, packet);
 
             // The packet's movement input landed on the puppet horse (position itself is reconciled per-frame
             // by the interpolator, which this packet also fed).
-            Assert.True(AgentMirror.TryGet(puppetHorse, out var puppetMirror));
+            Assert.Equal(AgentControllerType.None, puppetMirror.Controller);
             Assert.Equal(remoteMirror.LookDirection, puppetMirror.LookDirection);
             Assert.Equal(remoteMirror.MovementDirection, puppetMirror.MovementDirection);
             Assert.Equal(remoteMirror.InputVector, puppetMirror.InputVector);

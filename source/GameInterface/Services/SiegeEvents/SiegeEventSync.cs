@@ -16,8 +16,10 @@ internal class SiegeEventSync : IAutoSync
     public SiegeEventSync(AutoSyncRegistry autoSyncBuilder)
 	{
         // Fields
-        //autoSyncBuilder.AddField(AccessTools.Field(typeof(SiegeEvent), nameof(SiegeEvent.BesiegedSettlement)));// WARNING: BesiegedSettlement is a public field, for AutoSync to work you must also add any methods outside declaring class that change its value
-		//autoSyncBuilder.AddField(AccessTools.Field(typeof(SiegeEvent), nameof(SiegeEvent.BesiegerCamp)));// WARNING: BesiegerCamp is a public field, for AutoSync to work you must also add any methods outside declaring class that change its value
+        // Both are readonly and only written by the SiegeEvent ctor, which the AutoSync transpiler
+        // patches, so client shells get them filled without a hand-written message.
+        autoSyncBuilder.AddField(AccessTools.Field(typeof(SiegeEvent), nameof(SiegeEvent.BesiegedSettlement)));
+        autoSyncBuilder.AddField(AccessTools.Field(typeof(SiegeEvent), nameof(SiegeEvent.BesiegerCamp)));
 		autoSyncBuilder.AddField(AccessTools.Field(typeof(SiegeEvent), nameof(SiegeEvent._isBesiegerDefeated)));
 
 		// Properties

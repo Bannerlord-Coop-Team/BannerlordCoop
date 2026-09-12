@@ -48,6 +48,8 @@ public class ArmyHandler : IHandler
         messageBroker.Subscribe<NetworkChangeClanInfluence>(HandleNetworkInfluencespent);
         messageBroker.Subscribe<SetArmyKingdom>(HandleSetArmyKingdom);
         messageBroker.Subscribe<NetworkSetArmyKingdom>(HandleNetworkSetArmyKingdom);
+        messageBroker.Subscribe<ArmyFullyCreated>(HandleArmyFullyCreated);
+        messageBroker.Subscribe<NetworkArmyFullyCreated>(HandleNetworkArmyFullyCreated);
     }
 
     public void Dispose()
@@ -66,6 +68,8 @@ public class ArmyHandler : IHandler
         messageBroker.Unsubscribe<NetworkChangeClanInfluence>(HandleNetworkInfluencespent);
         messageBroker.Unsubscribe<SetArmyKingdom>(HandleSetArmyKingdom);
         messageBroker.Unsubscribe<NetworkSetArmyKingdom>(HandleNetworkSetArmyKingdom);
+        messageBroker.Unsubscribe<ArmyFullyCreated>(HandleArmyFullyCreated);
+        messageBroker.Unsubscribe<NetworkArmyFullyCreated>(HandleNetworkArmyFullyCreated);
     }
 
     private void HandleAddMobilePartyInArmy(MessagePayload<MobilePartyInArmyAdded> obj)
@@ -74,7 +78,7 @@ public class ArmyHandler : IHandler
 
         if (!objectManager.TryGetIdWithLogging(obj.What.MobileParty, out var mobilePartyId)) return;
 
-        var message = new NetworkAddMobilePartyInArmy(armyId, mobilePartyId);
+        var message = new NetworkAddMobilePartyInArmy(armyId, mobilePartyId, obj.What.AddPartyToMergedPartiesBool);
 
         // Broadcast to all the clients that the state was changed   
         network.SendAll(message);
@@ -87,10 +91,19 @@ public class ArmyHandler : IHandler
         {
             if (objectManager.TryGetObjectWithLogging(obj.MobilePartyId, out MobileParty mobileParty) == false) return;
             if (objectManager.TryGetObjectWithLogging<Army>(obj.ArmyId, out var army) == false) return;
+
             ArmyPatches.AddMobilePartyInArmy(mobileParty, army);
+
+            if (obj.AddPartyToMergedPartiesBool && mobileParty.AttachedTo != army.LeaderParty) 
+            {
+                using (new AllowedThread())
+                {
+                    army.AddPartyToMergedParties(mobileParty);
+                }
+            }
             if (ModInformation.IsServer)
             {
-                network.SendAll(new NetworkAddMobilePartyInArmy(obj.ArmyId, obj.MobilePartyId));
+                network.SendAll(new NetworkAddMobilePartyInArmy(obj.ArmyId, obj.MobilePartyId, obj.AddPartyToMergedPartiesBool));
             }
         });
     }
@@ -148,21 +161,24 @@ public class ArmyHandler : IHandler
     private void HandleNetworkSetArmyAiBehaviorObject(MessagePayload<NetworkSetArmyAiBehaviorObject> payload)
     {
         var obj = payload.What;
-        if (objectManager.TryGetObjectWithLogging<Army>(obj.ArmyId, out var army) == false) return;
-
-        IMapPoint mapPoint;
-        if (obj.IsSettlement)
+        GameThread.RunSafe(() =>
         {
-            if (!objectManager.TryGetObjectWithLogging<Settlement>(obj.AiBehaviorObjectId, out var settlement)) return;
-            mapPoint = settlement;
-        }
-        else
-        {
-            if (!objectManager.TryGetObjectWithLogging<MobileParty>(obj.AiBehaviorObjectId, out var party)) return;
-            mapPoint = party;
-        }
+            if (objectManager.TryGetObjectWithLogging<Army>(obj.ArmyId, out var army) == false) return;
 
-        ArmyPatches.SetAiBehaviorObject(army, mapPoint);
+            IMapPoint mapPoint;
+            if (obj.IsSettlement)
+            {
+                if (!objectManager.TryGetObjectWithLogging<Settlement>(obj.AiBehaviorObjectId, out var settlement)) return;
+                mapPoint = settlement;
+            }
+            else
+            {
+                if (!objectManager.TryGetObjectWithLogging<MobileParty>(obj.AiBehaviorObjectId, out var party)) return;
+                mapPoint = party;
+            }
+
+            ArmyPatches.SetAiBehaviorObject(army, mapPoint);
+        });
     }
     private void HandlePlayerCreatedArmy(MessagePayload<PlayerCreatedArmy> payload)
     {
@@ -267,6 +283,27 @@ public class ArmyHandler : IHandler
             {
                 army.Kingdom = kingdom;
             }
+        });
+    }
+
+    private void HandleArmyFullyCreated(MessagePayload<ArmyFullyCreated> payload)
+    {
+        var obj = payload.What;
+
+        if (!objectManager.TryGetIdWithLogging(obj.Army, out var armyId)) return;
+
+        network.SendAll(new NetworkArmyFullyCreated(armyId));
+    }
+
+    private void HandleNetworkArmyFullyCreated(MessagePayload<NetworkArmyFullyCreated> payload)
+    {
+        var obj = payload.What;
+
+        GameThread.RunSafe(() =>
+        {
+            if (!objectManager.TryGetObject<Army>(obj.ArmyId, out var army)) return;
+
+            CampaignEventDispatcher.Instance.OnArmyCreated(army);
         });
     }
 }

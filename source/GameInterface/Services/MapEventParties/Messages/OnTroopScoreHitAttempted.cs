@@ -1,4 +1,4 @@
-using Common.Messaging;
+﻿using Common.Messaging;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.MapEvents;
 
@@ -13,16 +13,16 @@ namespace GameInterface.Services.MapEventParties.Messages;
 public readonly struct OnTroopScoreHitAttempted : IEvent
 {
     public readonly MapEventParty MapEventParty;
-    public readonly int TroopSeed;
+    public readonly CharacterObject AttackingTroop;
     public readonly CharacterObject AttackedTroop;
     public readonly int Damage;
     public readonly bool IsFatal;
     public readonly bool IsSimulatedHit;
 
-    public OnTroopScoreHitAttempted(MapEventParty mapEventParty, int troopSeed, CharacterObject attackedTroop, int damage, bool isFatal, bool isSimulatedHit)
+    public OnTroopScoreHitAttempted(MapEventParty mapEventParty, CharacterObject attackingTroop, CharacterObject attackedTroop, int damage, bool isFatal, bool isSimulatedHit)
     {
         MapEventParty = mapEventParty;
-        TroopSeed = troopSeed;
+        AttackingTroop = attackingTroop;
         AttackedTroop = attackedTroop;
         Damage = damage;
         IsFatal = isFatal;

@@ -73,6 +73,8 @@ public class HeroCollectionTests : IDisposable
             Assert.Equal(caravan, Hero.OwnedCaravans.Last());
         });
 
+        TestEnvironment.FlushCoalescer();
+
         // Assert
         Assert.True(server.ObjectManager.TryGetObject<Hero>(HeroId, out var Hero));
 

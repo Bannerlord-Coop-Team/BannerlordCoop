@@ -83,6 +83,7 @@ public class KingdomSyncTests : SyncTestBase
         TestEnvironment.AssertProperty<Kingdom, CampaignTime>(nameof(Kingdom.NotAttackableByPlayerUntilTime), new CampaignTime(54));
         TestEnvironment.AssertProperty<Kingdom, uint>(nameof(Kingdom.PrimaryBannerColor), 7);
         TestEnvironment.AssertProperty<Kingdom, uint>(nameof(Kingdom.SecondaryBannerColor), 7);
+        TestEnvironment.AssertProperty<Kingdom, int>(nameof(Kingdom.CallToWarWallet), 200);
     }
 
     private void AssertArmyListSyncs()

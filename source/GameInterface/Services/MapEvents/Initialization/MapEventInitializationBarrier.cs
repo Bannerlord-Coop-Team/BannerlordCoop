@@ -1,0 +1,721 @@
+﻿using Common;
+using Common.Logging;
+using Common.Messaging;
+using Common.Network;
+using Common.Util;
+using GameInterface.Services.GuantletMapEventVisuals;
+using GameInterface.Services.MapEvents.Messages.Start;
+using GameInterface.Services.MobileParties.Messages.Behavior;
+using GameInterface.Services.ObjectManager;
+using GameInterface.Services.PlayerCaptivityService.Messages;
+using GameInterface.Services.SiegeEvents;
+using HarmonyLib;
+using SandBox.GauntletUI.Map;
+using Serilog;
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Threading;
+using TaleWorlds.CampaignSystem;
+using TaleWorlds.CampaignSystem.Encounters;
+using TaleWorlds.CampaignSystem.GameMenus;
+using TaleWorlds.CampaignSystem.GameState;
+using TaleWorlds.CampaignSystem.MapEvents;
+using TaleWorlds.CampaignSystem.Party;
+using TaleWorlds.Core;
+using TaleWorlds.Library;
+using TaleWorlds.MountAndBlade;
+
+namespace GameInterface.Services.MapEvents.Initialization;
+
+public interface IMapEventInitializationBarrier : IGameAbstraction
+{
+    bool IsPending(MapEvent mapEvent);
+    bool IsPartyPending(PartyBase party);
+    void Register(MapEvent mapEvent, bool committed = false);
+    void SetServerPartyPending(MapEvent mapEvent, PartyBase party, bool pending);
+    void CommitServer(MapEvent mapEvent);
+    void AbortServer(MapEvent mapEvent);
+    void AttachClient(MapEventSide side, MapEventParty party, Action afterCommit = null);
+    void RunAfterCommit(MapEvent mapEvent, Action action);
+    void TrackParty(MapEvent mapEvent, MapEventParty party);
+    void DeferVisual(GauntletMapEventVisual visual, CampaignVec2 position);
+    void RetainSimulationDefeat(MapEvent mapEvent, PartyBase party);
+    void DestroyGraph(MapEvent mapEvent, PartyBase preservedParty = null);
+    void CompleteDeferredEncounterCleanup();
+}
+
+internal sealed class MapEventInitializationBarrier : IMapEventInitializationBarrier, IDisposable
+{
+    private static readonly ILogger Logger = LogManager.GetLogger<MapEventInitializationBarrier>();
+    private static readonly AccessTools.FieldRef<MapEvent, TroopUpgradeTracker> TrackerField =
+        AccessTools.FieldRefAccess<MapEvent, TroopUpgradeTracker>("<TroopUpgradeTracker>k__BackingField");
+
+    private readonly IMessageBroker messageBroker;
+    private readonly INetwork network;
+    private readonly IObjectManager objectManager;
+    private readonly ISiegeEventGraphSynchronizer siegeEventGraphSynchronizer;
+    private readonly Dictionary<MapEvent, State> states = new Dictionary<MapEvent, State>();
+    private HashSet<PartyBase> pendingParties = new HashSet<PartyBase>();
+    private DeferredEncounterCleanup deferredEncounterCleanup;
+    private bool disposed;
+
+    public MapEventInitializationBarrier(
+        IMessageBroker messageBroker,
+        INetwork network,
+        IObjectManager objectManager,
+        ISiegeEventGraphSynchronizer siegeEventGraphSynchronizer)
+    {
+        this.messageBroker = messageBroker;
+        this.network = network;
+        this.objectManager = objectManager;
+        this.siegeEventGraphSynchronizer = siegeEventGraphSynchronizer;
+        messageBroker.Subscribe<NetworkMapEventPartyPending>(HandlePendingParty);
+        messageBroker.Subscribe<NetworkMapEventInitialized>(HandleCommit);
+        messageBroker.Subscribe<CampaignTick>(Handle_CampaignTick);
+    }
+
+    public void Dispose()
+    {
+        if (disposed) return;
+        disposed = true;
+        messageBroker.Unsubscribe<NetworkMapEventPartyPending>(HandlePendingParty);
+        messageBroker.Unsubscribe<NetworkMapEventInitialized>(HandleCommit);
+        messageBroker.Unsubscribe<CampaignTick>(Handle_CampaignTick);
+        states.Clear();
+        deferredEncounterCleanup = null;
+        PublishPendingParties();
+    }
+
+    public bool IsPending(MapEvent mapEvent) =>
+        mapEvent != null && states.TryGetValue(mapEvent, out var state) && !state.Committed;
+
+    public bool IsPartyPending(PartyBase party) =>
+        party != null && Volatile.Read(ref pendingParties).Contains(party);
+
+    public void Register(MapEvent mapEvent, bool committed = false)
+    {
+        if (disposed || mapEvent == null) return;
+        if (!states.TryGetValue(mapEvent, out var state)) states.Add(mapEvent, state = new State(mapEvent));
+        if (committed)
+        {
+            Capture(state, mapEvent);
+            state.Committed = true;
+            state.Parties.Clear();
+        }
+        PublishPendingParties();
+    }
+
+    public void SetServerPartyPending(MapEvent mapEvent, PartyBase party, bool pending)
+    {
+        if (mapEvent == null || party == null || !states.TryGetValue(mapEvent, out var state)) return;
+        bool stateChanged = false;
+        if (!state.Committed)
+        {
+            stateChanged = pending ? state.Announced.Add(party) : state.Announced.Remove(party);
+            if (!stateChanged) return;
+        }
+        if (objectManager.TryGetIdWithLogging(mapEvent, out var mapEventId) &&
+            objectManager.TryGetIdWithLogging(party, out var partyId))
+        {
+            if (stateChanged) PublishPendingParties();
+            network.SendAll(new NetworkMapEventPartyPending(mapEventId, partyId, !pending));
+            return;
+        }
+        if (stateChanged)
+        {
+            if (pending) state.Announced.Remove(party); else state.Announced.Add(party);
+            PublishPendingParties();
+        }
+    }
+
+    public void CommitServer(MapEvent mapEvent)
+    {
+        if (mapEvent == null || !states.TryGetValue(mapEvent, out var state) || state.Committed) return;
+        var tracker = GetTracker(mapEvent);
+        if (tracker == null)
+        {
+            mapEvent.TroopUpgradeTracker = tracker = new TroopUpgradeTracker();
+            foreach (var side in mapEvent._sides ?? Array.Empty<MapEventSide>())
+                foreach (var party in side?.Parties ?? Enumerable.Empty<MapEventParty>())
+                    tracker.AddParty(party);
+        }
+        Capture(state, mapEvent);
+        if (!TryResolveCommitIds(mapEvent, tracker,
+                out var mapEventId, out var trackerId, out var componentId, out var visualId))
+        {
+            AbortServer(mapEvent);
+            return;
+        }
+
+        SiegeEventGraphSnapshot siegeGraph = default;
+        if (mapEvent.IsSiegeAssault &&
+            !siegeEventGraphSynchronizer.TryCapture(mapEvent.MapEventSettlement?.SiegeEvent, out siegeGraph))
+        {
+            AbortServer(mapEvent);
+            return;
+        }
+
+        network.SendAll(new NetworkMapEventInitialized(
+            mapEventId, false, trackerId, componentId, visualId, siegeGraph));
+        state.Committed = true;
+        state.Announced.Clear();
+        PublishPendingParties();
+    }
+
+    private bool TryResolveCommitIds(MapEvent mapEvent, TroopUpgradeTracker tracker,
+        out string mapEventId, out string trackerId, out string componentId, out string visualId)
+    {
+        bool hasEventId = TryGetId(mapEvent, out mapEventId);
+        bool hasTrackerId = TryGetId(tracker, out trackerId);
+        bool hasComponentId = TryGetId(mapEvent.Component, out componentId);
+        bool hasVisualId = TryGetId(mapEvent.MapEventVisual as GauntletMapEventVisual, out visualId);
+        if (hasEventId && hasTrackerId && hasComponentId && hasVisualId) return true;
+
+        // The resulting abort destroys the whole battle graph on the server AND every client;
+        // without a named reason its only trace is a generic ObjectManager id-miss line, which has
+        // made this exit the least diagnosable step of battle replication.
+        Logger.Error(
+            "Aborting MapEvent commit: unresolvable id (event={HasEventId}, tracker={HasTrackerId}, " +
+            "component={HasComponentId} [{ComponentType}], visual={HasVisualId} [{VisualType}])",
+            hasEventId, hasTrackerId,
+            hasComponentId, mapEvent.Component?.GetType().Name ?? "null",
+            hasVisualId, mapEvent.MapEventVisual?.GetType().Name ?? "null");
+        return false;
+    }
+
+    public void AbortServer(MapEvent mapEvent)
+    {
+        if (mapEvent == null || !states.TryGetValue(mapEvent, out var state) || state.Committed) return;
+        bool notified = TryGetId(mapEvent, out var id);
+        Logger.Error("Aborting MapEvent {MapEventId}: destroying its graph on the server and every notified client",
+            notified ? id : "<unregistered>");
+        if (notified) network.SendAll(new NetworkMapEventInitialized(id, true));
+        DestroyGraph(mapEvent);
+    }
+
+    private bool TryGetId(object instance, out string id)
+    {
+        id = null;
+        return instance == null || objectManager.TryGetIdWithLogging(instance, out id);
+    }
+
+    private void HandlePendingParty(MessagePayload<NetworkMapEventPartyPending> payload)
+    {
+        var message = payload.What;
+        GameThread.RunSafe(() =>
+        {
+            if (!objectManager.TryGetObjectWithLogging<MapEvent>(message.MapEventId, out var mapEvent) ||
+                !objectManager.TryGetObjectWithLogging<PartyBase>(message.PartyId, out var party)) return;
+            Register(mapEvent);
+            if (message.IsCancellation) states[mapEvent].Parties.Remove(party);
+            else states[mapEvent].Parties.Add(party);
+            PublishPendingParties();
+        }, context: nameof(NetworkMapEventPartyPending));
+    }
+
+    private void HandleCommit(MessagePayload<NetworkMapEventInitialized> payload)
+    {
+        var message = payload.What;
+        GameThread.RunSafe(() =>
+        {
+            if (!objectManager.TryGetObjectWithLogging<MapEvent>(message.MapEventId, out var mapEvent)) return;
+            if (message.IsTerminal)
+            {
+                FinishClient(mapEvent, abort: true);
+                return;
+            }
+
+            if (message.SiegeGraph.IsComplete && !siegeEventGraphSynchronizer.TryApply(message.SiegeGraph))
+            {
+                Logger.Error("Client could not apply the siege graph carried by MapEvent {MapEventId}",
+                    message.MapEventId);
+                FinishClient(mapEvent, abort: true);
+                return;
+            }
+
+            TroopUpgradeTracker tracker = null;
+            bool hasTracker = !string.IsNullOrEmpty(message.TroopUpgradeTrackerId) &&
+                objectManager.TryGetObjectWithLogging<TroopUpgradeTracker>(message.TroopUpgradeTrackerId, out tracker);
+            bool componentMatches = TryBindComponent(message.ComponentId, mapEvent);
+            bool visualMatches = Matches(message.VisualId, mapEvent.MapEventVisual as GauntletMapEventVisual);
+            if (!hasTracker || !componentMatches || !visualMatches)
+            {
+                // Destroying the replica graph over a mismatch must say WHICH member mismatched —
+                // the local-vs-message visual identity in particular separates "the server's null
+                // overwrite never replicated here" from "the commit raced the reference sync".
+                Logger.Error(
+                    "Client destroying MapEvent {MapEventId} graph at commit: tracker={HasTracker}, " +
+                    "componentMatch={ComponentMatches}, visualMatch={VisualMatches} " +
+                    "(message visual id {VisualId}, local visual {LocalVisualType})",
+                    message.MapEventId, hasTracker, componentMatches, visualMatches,
+                    message.VisualId ?? "null", mapEvent.MapEventVisual?.GetType().Name ?? "null");
+                FinishClient(mapEvent, abort: true);
+                return;
+            }
+
+            using (new AllowedThread()) mapEvent.TroopUpgradeTracker = tracker;
+            FinishClient(mapEvent, abort: false);
+        }, context: nameof(NetworkMapEventInitialized));
+    }
+
+    private bool Matches<T>(string id, T actual) where T : class =>
+        id == null ? actual == null :
+        objectManager.TryGetObjectWithLogging<T>(id, out var expected) && ReferenceEquals(expected, actual);
+
+    private bool TryBindComponent(string id, MapEvent mapEvent)
+    {
+        MapEventComponent component = null;
+        if (id != null && !objectManager.TryGetObjectWithLogging(id, out component))
+            return false;
+
+        if (component?.MapEvent != null && !ReferenceEquals(component.MapEvent, mapEvent))
+            return false;
+
+        if (ReferenceEquals(mapEvent.Component, component) &&
+            (component == null || ReferenceEquals(component.MapEvent, mapEvent)))
+        {
+            return true;
+        }
+
+        using (new AllowedThread())
+        {
+            if (component != null)
+                component.MapEvent = mapEvent;
+            mapEvent.Component = component;
+        }
+
+        return true;
+    }
+
+    private void FinishClient(MapEvent mapEvent, bool abort)
+    {
+        Register(mapEvent);
+        if (!states.TryGetValue(mapEvent, out var state)) return;
+        Capture(state, mapEvent);
+        if (abort)
+        {
+            DestroyGraph(mapEvent);
+            return;
+        }
+        if (state.Committed) return;
+        if (!IsComplete(mapEvent, state))
+        {
+            Logger.Error("MapEvent {MapEventId} reached its commit with an incomplete graph", mapEvent.StringId);
+            DestroyGraph(mapEvent);
+            return;
+        }
+
+        try
+        {
+            using (new AllowedThread())
+            {
+                var tracker = GetTracker(mapEvent);
+                foreach (var side in mapEvent._sides)
+                    foreach (var party in side.Parties)
+                    {
+                        party.Party._mapEventSide = side;
+                        tracker.AddParty(party);
+                    }
+
+                var manager = Campaign.Current?.MapEventManager;
+                if (manager != null && !manager.MapEvents.Contains(mapEvent)) manager.OnMapEventCreated(mapEvent);
+            }
+
+            if (state.Visual != null) PublishVisual(state.Visual, state.Position);
+            state.Committed = true;
+            state.Parties.Clear();
+            PublishPendingParties();
+        }
+        catch (Exception ex)
+        {
+            Logger.Error(ex, "Failed to commit MapEvent {MapEventId}; rolling it back", mapEvent.StringId);
+            DestroyGraph(mapEvent);
+            return;
+        }
+
+        var callback = state.Callback;
+        state.Callback = null;
+        if (callback != null) GameThread.RunSafe(callback, context: "MapEvent commit callback");
+    }
+
+    public void AttachClient(MapEventSide side, MapEventParty party, Action afterCommit = null)
+    {
+        if (disposed || side?.MapEvent == null || party == null) return;
+        states.TryGetValue(side.MapEvent, out var state);
+        if (state != null) Capture(state, party);
+        using (new AllowedThread())
+        {
+            if (!side._battleParties.Contains(party)) side._battleParties.Add(party);
+            if (state?.Committed != false && party.Party != null) party.Party._mapEventSide = side;
+        }
+
+        if (state == null || state.Committed)
+        {
+            if (state?.Parties.Remove(party.Party) == true) PublishPendingParties();
+            afterCommit?.Invoke();
+            return;
+        }
+
+        state.Parties.Add(party.Party);
+        PublishPendingParties();
+        state.Callback += afterCommit;
+    }
+
+    public void RunAfterCommit(MapEvent mapEvent, Action action)
+    {
+        if (mapEvent == null) throw new ArgumentNullException(nameof(mapEvent));
+        if (action == null) throw new ArgumentNullException(nameof(action));
+
+        if (!states.TryGetValue(mapEvent, out var state) || state.Committed)
+        {
+            action();
+            return;
+        }
+
+        state.Callback += action;
+    }
+
+    public void TrackParty(MapEvent mapEvent, MapEventParty party)
+    {
+        if (mapEvent != null && party != null && states.TryGetValue(mapEvent, out var state)) Capture(state, party);
+    }
+
+    public void DeferVisual(GauntletMapEventVisual visual, CampaignVec2 position)
+    {
+        if (disposed || visual?.MapEvent == null) return;
+        if (states.TryGetValue(visual.MapEvent, out var state))
+        {
+            state.Owned.Add(visual);
+            if (!state.Committed)
+            {
+                state.Visual = visual;
+                state.Position = position;
+                return;
+            }
+        }
+        PublishVisual(visual, position);
+    }
+
+    private void EndVisual(GauntletMapEventVisual visual)
+    {
+        var creator = Campaign.Current?.VisualCreator?.MapEventVisualCreator as GauntletMapEventVisualCreator;
+        if (visual == null || creator?.GetCurrentEvents().Contains(visual) != true) return;
+        using (new AllowedThread()) visual.OnMapEventEnd();
+    }
+
+    public void RetainSimulationDefeat(MapEvent mapEvent, PartyBase party)
+    {
+        var encounter = PlayerEncounter.Current;
+        if (ModInformation.IsServer || mapEvent == null || party == null || encounter?.BattleSimulation == null)
+            return;
+
+        deferredEncounterCleanup = new DeferredEncounterCleanup(mapEvent, party);
+    }
+
+    public void DestroyGraph(MapEvent mapEvent, PartyBase preservedParty = null)
+    {
+        if (mapEvent == null) return;
+        if (!states.TryGetValue(mapEvent, out var state)) state = new State(mapEvent);
+        Capture(state, mapEvent);
+        if (preservedParty != null)
+            deferredEncounterCleanup = new DeferredEncounterCleanup(mapEvent, preservedParty);
+        else if (ReferenceEquals(deferredEncounterCleanup?.MapEvent, mapEvent))
+            preservedParty = deferredEncounterCleanup.Party;
+        Campaign.Current?.MapEventManager?._mapEvents.Remove(mapEvent);
+        foreach (var mapEventParty in state.Owned.OfType<MapEventParty>())
+        {
+            var party = mapEventParty.Party;
+            if (party == null || (party._mapEventSide != null && party._mapEventSide.MapEvent != mapEvent)) continue;
+            if (party != preservedParty && party._mapEventSide?.MapEvent == mapEvent) party._mapEventSide = null;
+            if (party.MobileParty != null) party.MobileParty.EventPositionAdder = Vec2.Zero;
+            party.SetVisualAsDirty();
+        }
+
+        foreach (var visual in state.Owned.OfType<GauntletMapEventVisual>().ToArray()) EndVisual(visual);
+        states.Remove(mapEvent);
+        PublishPendingParties();
+        foreach (var instance in state.Owned) objectManager.Remove(instance);
+    }
+
+    private void Handle_CampaignTick(MessagePayload<CampaignTick> payload)
+    {
+        CompleteDeferredEncounterCleanup();
+    }
+
+    public void CompleteDeferredEncounterCleanup()
+    {
+        if (ModInformation.IsServer || MissionState.Current != null || Mission.Current != null) return;
+
+        var cleanup = deferredEncounterCleanup;
+        var party = cleanup?.Party ?? MobileParty.MainParty?.Party;
+        var encounter = PlayerEncounter.Current;
+        var mapEvent = cleanup?.MapEvent ?? party?.MapEvent;
+        if (mapEvent == null && !PlayerCaptivity.IsCaptive &&
+            encounter?.EncounterState == PlayerEncounterState.End)
+        {
+            mapEvent = encounter.BattleSimulation?.MapEvent;
+        }
+        if (mapEvent == null || IsPending(mapEvent)) return;
+        if (Campaign.Current?.MapEventManager?.MapEvents.Contains(mapEvent) == true) return;
+        if (IsBattleSimulationActive()) return;
+
+        if (cleanup != null)
+            deferredEncounterCleanup = null;
+        party._mapEventSide = null;
+        bool continuedEncounter = ContinueDestroyedSimulationDefeat(mapEvent, cleanup);
+        if (!continuedEncounter && CloseStaleDestroyedEncounter(mapEvent, cleanup)) return;
+
+        ClearEngageOrder(party.MobileParty);
+    }
+
+    private static bool IsBattleSimulationActive()
+    {
+        var battleSimulation = PlayerEncounter.CurrentBattleSimulation;
+        return battleSimulation != null &&
+               Game.Current?.GameStateManager?.GameStates
+                   .OfType<MapState>()
+                   .Any(state => state._battleSimulation == battleSimulation) == true;
+    }
+
+    private static bool ContinueDestroyedSimulationDefeat(
+        MapEvent mapEvent,
+        DeferredEncounterCleanup cleanup)
+    {
+        var encounter = PlayerEncounter.Current;
+        bool matchesDeferredSimulation = cleanup != null &&
+            ReferenceEquals(encounter, cleanup.Encounter) &&
+            ReferenceEquals(encounter?.BattleSimulation, cleanup.BattleSimulation);
+        if (encounter?.EncounterState != PlayerEncounterState.End ||
+            encounter.BattleSimulation == null ||
+            (!matchesDeferredSimulation &&
+                (mapEvent.WinningSide == encounter.PlayerSide || !References(encounter, mapEvent))))
+        {
+            return false;
+        }
+
+        if (PlayerCaptivity.IsCaptive)
+        {
+            PlayerEncounter.LeaveEncounter = true;
+            encounter.BattleSimulation = null;
+            Campaign.Current.PlayerEncounter = null;
+            Campaign.Current.LocationEncounter = null;
+            ShowCaptivityMenu();
+            return true;
+        }
+
+        // Mirror vanilla's simulated-defeat branch before detaching the destroyed map event.
+        encounter.EncounterState = PlayerEncounterState.Begin;
+        GameMenu.SwitchToMenu("encounter");
+        return true;
+    }
+
+    private static void ShowCaptivityMenu()
+    {
+        var captorParty = PlayerCaptivity.CaptorParty;
+        if (captorParty == null) return;
+
+        var menuId = captorParty.IsSettlement ? "settlement_wait" : "prisoner_wait";
+        if ((Game.Current?.GameStateManager?.ActiveState as MapState)?.AtMenu == true)
+            GameMenu.SwitchToMenu(menuId);
+        else
+            GameMenu.ActivateGameMenu(menuId);
+    }
+
+    private void ClearEngageOrder(MobileParty party)
+    {
+        if (party == null)
+            return;
+
+        party.SetMoveModeHold();
+        messageBroker.Publish(party.Ai, new PartyBehaviorChangeAttempted(party));
+    }
+
+    private bool CloseStaleDestroyedEncounter(MapEvent mapEvent, DeferredEncounterCleanup cleanup)
+    {
+        if (PlayerCaptivity.IsCaptive)
+            return false;
+
+        var encounter = PlayerEncounter.Current;
+        if (encounter == null)
+        {
+            ForceCloseCurrentEncounterMenu();
+            return false;
+        }
+
+        if (!References(encounter, mapEvent) && !ReferenceEquals(encounter, cleanup?.Encounter))
+            return false;
+
+        if (IsBattleResultEncounter(encounter))
+            return false;
+
+        PlayerEncounter.LeaveEncounter = true;
+        try
+        {
+            PlayerEncounter.Finish(true);
+        }
+        catch (Exception ex)
+        {
+            Logger.Error(ex, "[PvPEncounterClose] Deferred map event cleanup failed to finish stale encounter");
+        }
+        finally
+        {
+            Campaign.Current.PlayerEncounter = null;
+        }
+
+        ForceCloseCurrentEncounterMenu();
+        return true;
+    }
+
+    private static bool References(PlayerEncounter encounter, MapEvent mapEvent) =>
+        encounter?._mapEvent == mapEvent ||
+        encounter?.BattleSimulation?.MapEvent == mapEvent ||
+        GetPlayerEncounterBattle() == mapEvent ||
+        GetPlayerEncounterEncounteredBattle() == mapEvent;
+
+    private static bool IsBattleResultEncounter(PlayerEncounter encounter)
+    {
+        switch (encounter.EncounterState)
+        {
+            case PlayerEncounterState.CaptureHeroes:
+            case PlayerEncounterState.FreeHeroes:
+            case PlayerEncounterState.LootParty:
+            case PlayerEncounterState.LootInventory:
+            case PlayerEncounterState.LootShips:
+            case PlayerEncounterState.End:
+                return true;
+            default:
+                return false;
+        }
+    }
+
+    private static MapEvent GetPlayerEncounterBattle()
+    {
+        try
+        {
+            return PlayerEncounter.Battle;
+        }
+        catch (NullReferenceException)
+        {
+            return null;
+        }
+    }
+
+    private static MapEvent GetPlayerEncounterEncounteredBattle()
+    {
+        try
+        {
+            return PlayerEncounter.EncounteredBattle;
+        }
+        catch (NullReferenceException)
+        {
+            return null;
+        }
+    }
+
+    private static void ForceCloseCurrentEncounterMenu()
+    {
+        try
+        {
+            GameMenu.ExitToLast();
+        }
+        catch (Exception ex)
+        {
+            Logger.Warning(ex, "[PvPEncounterClose] Deferred map event cleanup failed to exit current menu");
+        }
+
+        if (Campaign.Current?.MapStateData != null)
+            Campaign.Current.MapStateData.GameMenuId = null;
+    }
+
+    private static void PublishVisual(GauntletMapEventVisual visual, CampaignVec2 position)
+    {
+        var creator = Campaign.Current?.VisualCreator?.MapEventVisualCreator as GauntletMapEventVisualCreator;
+        if (creator != null && !creator.GetCurrentEvents().Contains(visual))
+        {
+            creator.Handlers?.ForEach(handler => handler.OnNewEventStarted(visual));
+            creator._listOfEvents.Add(visual);
+        }
+        using (new AllowedThread()) visual.Initialize(position, visual.MapEvent.IsVisible);
+    }
+
+    private static bool IsComplete(MapEvent mapEvent, State state) =>
+        mapEvent._sides?.Length >= 2 &&
+        mapEvent._sides.All(side => side != null && ReferenceEquals(side.MapEvent, mapEvent) &&
+            side.Parties?.Count > 0 && side.Parties.All(party => party?.Party != null &&
+                party._roster != null && party._woundedInBattle != null &&
+                party._diedInBattle != null && party._routedInBattle != null)) &&
+        (mapEvent.Component == null || ReferenceEquals(mapEvent.Component.MapEvent, mapEvent)) &&
+        GetTracker(mapEvent) != null &&
+        (mapEvent.MapEventVisual is not GauntletMapEventVisual visual || ReferenceEquals(state.Visual, visual));
+
+    internal static TroopUpgradeTracker GetTracker(MapEvent mapEvent) => mapEvent == null ? null : TrackerField(mapEvent);
+
+    private void PublishPendingParties()
+    {
+        var snapshot = new HashSet<PartyBase>();
+        foreach (var state in states.Values)
+        {
+            snapshot.UnionWith(state.Parties);
+            snapshot.UnionWith(state.Announced);
+        }
+        Volatile.Write(ref pendingParties, snapshot);
+    }
+
+    private static void Capture(State state, MapEvent mapEvent)
+    {
+        if (mapEvent == null) return;
+        state.Add(mapEvent);
+        state.Add(mapEvent.Component);
+        state.Add(GetTracker(mapEvent));
+        state.Add(mapEvent.MapEventVisual);
+        foreach (var side in mapEvent._sides ?? Array.Empty<MapEventSide>())
+        {
+            state.Add(side);
+            if (side?.Parties == null) continue;
+            foreach (var party in side.Parties) Capture(state, party);
+        }
+    }
+
+    private static void Capture(State state, MapEventParty party)
+    {
+        state.Add(party);
+        if (party == null) return;
+        state.Add(party._woundedInBattle);
+        state.Add(party._diedInBattle);
+        state.Add(party._routedInBattle);
+    }
+
+    private sealed class State
+    {
+        public readonly HashSet<object> Owned = new HashSet<object>();
+        public readonly HashSet<PartyBase> Parties = new HashSet<PartyBase>();
+        public readonly HashSet<PartyBase> Announced = new HashSet<PartyBase>();
+        public bool Committed;
+        public GauntletMapEventVisual Visual;
+        public CampaignVec2 Position;
+        public Action Callback;
+
+        public State(object instance) => Add(instance);
+        public void Add(object instance)
+        {
+            if (instance != null) Owned.Add(instance);
+        }
+    }
+
+    private sealed class DeferredEncounterCleanup
+    {
+        public readonly MapEvent MapEvent;
+        public readonly PartyBase Party;
+        public readonly PlayerEncounter Encounter;
+        public readonly BattleSimulation BattleSimulation;
+
+        public DeferredEncounterCleanup(MapEvent mapEvent, PartyBase party)
+        {
+            MapEvent = mapEvent;
+            Party = party;
+            Encounter = PlayerEncounter.Current;
+            BattleSimulation = Encounter?.BattleSimulation;
+        }
+    }
+}

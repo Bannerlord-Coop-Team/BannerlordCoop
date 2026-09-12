@@ -33,7 +33,7 @@ namespace GameInterface.Tests.Serialization.SerializerTests
 
             package.Pack();
 
-            byte[] bytes = BinaryFormatterSerializer.Serialize(package);
+            byte[] bytes = BinaryPackageSerializer.Serialize(package);
 
             Assert.NotEmpty(bytes);
         }
@@ -80,12 +80,12 @@ namespace GameInterface.Tests.Serialization.SerializerTests
 
             package.Pack();
 
-            byte[] bytes = BinaryFormatterSerializer.Serialize(package);
+            byte[] bytes = BinaryPackageSerializer.Serialize(package);
 
             Assert.NotEmpty(bytes);
 
             var deserializedFactory = container.Resolve<IBinaryPackageFactory>();
-            var blowBinaryPackage = BinaryFormatterSerializer.Deserialize<BlowBinaryPackage>(bytes);
+            var blowBinaryPackage = BinaryPackageSerializer.Deserialize<BlowBinaryPackage>(bytes);
             blowBinaryPackage.BinaryPackageFactory = deserializedFactory;
 
             var deserializeFactory = container.Resolve<IBinaryPackageFactory>();

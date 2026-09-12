@@ -1,4 +1,5 @@
-using Common.Messaging;
+﻿using Common.Messaging;
+using GameInterface.Services.MapEvents;
 using ProtoBuf;
 
 namespace GameInterface.Services.MapEvents.Messages.Start;
@@ -13,11 +14,17 @@ internal readonly struct NetworkMapEventCreated : ICommand
     [ProtoMember(1)]
     public readonly string RequestId;
     [ProtoMember(2)]
+    public readonly MapEventCreationOutcome Outcome;
+    [ProtoMember(3)]
     public readonly string MapEventId;
 
-    public NetworkMapEventCreated(string requestId, string mapEventId)
+    public NetworkMapEventCreated(
+        string requestId,
+        MapEventCreationOutcome outcome,
+        string mapEventId)
     {
         RequestId = requestId;
+        Outcome = outcome;
         MapEventId = mapEventId;
     }
 }

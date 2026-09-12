@@ -36,6 +36,8 @@ internal readonly struct NetworkPlayerPartyInteractionState : ICommand
     public readonly PlayerPartyInteractionOption[] EnabledOptions;
     [ProtoMember(14)]
     public readonly bool IsHostile;
+    [ProtoMember(15)]
+    public readonly PlayerPartyInteractionVassalUnavailableReason VassalUnavailableReason;
 
     public NetworkPlayerPartyInteractionState(
         string sessionId,
@@ -51,7 +53,8 @@ internal readonly struct NetworkPlayerPartyInteractionState : ICommand
         ItemRosterElementData[] partyItems = null,
         ItemRosterElementData[] otherPartyItems = null,
         PlayerPartyInteractionOption[] enabledOptions = null,
-        bool isHostile = false)
+        bool isHostile = false,
+        PlayerPartyInteractionVassalUnavailableReason vassalUnavailableReason = PlayerPartyInteractionVassalUnavailableReason.None)
     {
         SessionId = sessionId;
         PartyId = partyId;
@@ -67,5 +70,6 @@ internal readonly struct NetworkPlayerPartyInteractionState : ICommand
         OtherPartyItems = otherPartyItems ?? new ItemRosterElementData[0];
         EnabledOptions = enabledOptions ?? Options;
         IsHostile = isHostile;
+        VassalUnavailableReason = vassalUnavailableReason;
     }
 }

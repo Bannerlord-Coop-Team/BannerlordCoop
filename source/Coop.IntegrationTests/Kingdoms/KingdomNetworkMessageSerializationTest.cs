@@ -111,6 +111,29 @@ public class KingdomNetworkMessageSerializationTest
         Assert.Equal("The council has reached a decision.", copy.NotificationText);
     }
 
+    [Fact]
+    public void NetworkRequestChangeKingdomName_RoundTrips()
+    {
+        var original = new NetworkRequestChangeKingdomName(
+            "Kingdom_empire",
+            "New Kingdom");
+        
+        var copy = RoundTrip(original);
+        
+        Assert.Equal("Kingdom_empire", copy.KingdomId);
+        Assert.Equal("New Kingdom", copy.Name);
+    }
+
+    [Fact]
+    public void NetworkKingdomNameChanged_RoundTrips()
+    {
+        var original = new NetworkKingdomNameChanged("Kingdom_empire");
+        
+        var copy = RoundTrip(original);
+        
+        Assert.Equal("Kingdom_empire", copy.KingdomId);
+    }
+
     private static T RoundTrip<T>(T original)
     {
         using var stream = new MemoryStream();

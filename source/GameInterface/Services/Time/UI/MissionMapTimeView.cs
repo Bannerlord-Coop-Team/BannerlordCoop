@@ -1,0 +1,90 @@
+﻿using Common;
+using Common.Messaging;
+using Coop.Core.Server.Services.Time.Messages;
+using GameInterface.Services.UI.CoopOptions;
+using GameInterface.Services.UI.CoopOptions.Providers.MapTimeTab;
+using GameInterface.Services.Heroes.Interaces;
+using GameInterface.Services.Locations;
+using TaleWorlds.Engine.GauntletUI;
+using TaleWorlds.MountAndBlade.View.MissionViews;
+
+namespace GameInterface.Services.Time.UI;
+
+/// <summary>
+/// Displays the current campaign map time control-state while the player is inside a mission
+/// Initializes the overlay from the current time control mode and updates it when the server
+/// broadcasts a new mode. Implementing "ILocationMissionBehavior" allows the view
+/// to be attached to location missions through the existing location behavior composition.
+/// </summary>
+public sealed class MissionMapTimeView : MissionView, ILocationMissionBehavior
+{
+    private const int LayerOrder = 10;
+
+    private readonly IMessageBroker messageBroker;
+    private readonly ITimeControlInterface timeControlInterface;
+    private readonly ICoopOptionsStore optionsStore;
+
+    private MissionMapTimeVM dataSource;
+    private GauntletLayer gauntletLayer;
+    private GauntletMovieIdentifier movie;
+    private bool subscribed;
+
+    public MissionMapTimeView(
+        IMessageBroker messageBroker, 
+        ITimeControlInterface timeControlInterface,
+        ICoopOptionsStore optionsStore)
+    {
+        this.messageBroker = messageBroker;
+        this.timeControlInterface = timeControlInterface;
+        this.optionsStore = optionsStore;
+    }
+
+    public override void OnMissionScreenInitialize()
+    {
+        base.OnMissionScreenInitialize();
+
+        var options = optionsStore.LoadOrDefault();
+        if (!MapTimeOptionsTabProvider.GetShowMapTimeInMissionsOrDefault(options)) return;
+        // Subscribing before the initial snapshot
+        messageBroker.Subscribe<NetworkChangeTimeControlMode>(HandleTimeControlModeChanged);
+        subscribed = true;
+        
+        dataSource = new MissionMapTimeVM(timeControlInterface.GetTimeControl());
+        gauntletLayer = new GauntletLayer("MissionMapTime", LayerOrder);
+        movie = gauntletLayer.LoadMovie("MissionMapTime", dataSource);
+        
+        MissionScreen.AddLayer(gauntletLayer);
+    }
+
+    public override void OnMissionScreenFinalize()
+    {
+        if (subscribed)
+        {
+            messageBroker.Unsubscribe<NetworkChangeTimeControlMode>(HandleTimeControlModeChanged);
+            subscribed = false;
+        }
+
+        if (gauntletLayer != null)
+        {
+            if (movie != null)
+            {
+                gauntletLayer.ReleaseMovie(movie);
+            }
+            MissionScreen.RemoveLayer(gauntletLayer);
+        }
+        
+        dataSource?.OnFinalize();
+        movie = null;
+        gauntletLayer = null;
+        dataSource = null;
+        
+        base.OnMissionScreenFinalize();
+    }
+
+    private void HandleTimeControlModeChanged(MessagePayload<NetworkChangeTimeControlMode> payload)
+    {
+        var newControlMode = payload.What.NewControlMode;
+        // viewModel update gets wrapped in RunSafe()
+        GameThread.RunSafe(() => dataSource?.SetTimeControlMode(newControlMode));
+    }
+}

@@ -8,6 +8,8 @@
     {
         public static class MainLoop
         {
+            public const int SteamCallbacks = 5000;         // Dispatches the standalone server's game-server Steam callbacks, before anything consumes them.
+
             public const int Update = 4000;                 // The update loop of the client.
             public const int PollNetwork = Update - 1;      // Polls all events received over the network connection.
             public const int RailGun = PollNetwork - 1;     // The update loop of the clientside RailGun instance.
@@ -15,6 +17,8 @@
             public const int GameThread = 2000;             // Processes the pending requests in the GameThread. This is processed in the main game loop AFTER the client updates are done
 
             public const int SyncBufferedFields = 1000;     // Processes pending synchronization of buffered field changes.
+
+            public const int Fps = 900;                     // Periodic opt-in FPS reporting.
             
             public const int ApplyAuthoritativeMobilePartyState = 500; // Applies the known serverside state of all MobileParty instances to the local game state.
             

@@ -1,8 +1,10 @@
-using Common.Util;
+﻿using Common.Util;
 using GameInterface.Services.Entity;
 using Missions;
+using Missions.Agents.Packets;
 using Moq;
 using System;
+using TaleWorlds.Core;
 using TaleWorlds.MountAndBlade;
 
 namespace E2E.Tests.Services.Missions;
@@ -40,12 +42,89 @@ public class NetworkAgentRegistryTests
         Assert.True(registry.TryGetAgentInfo(id, out var before));
         Assert.Equal("host", before.CurrentAuthority);
         Assert.Equal("host", before.OriginalOwner);
+        Assert.Equal(0, before.AuthorityRevision);
 
         Assert.True(registry.TryTransferAuthority("me", id));
 
         Assert.True(registry.TryGetAgentInfo(id, out var after));
         Assert.Equal("me", after.CurrentAuthority);   // authority moved to the successor
         Assert.Equal("host", after.OriginalOwner);     // original owner is preserved
+        Assert.Equal(1, after.AuthorityRevision);
+    }
+
+    [Fact]
+    public void CatchUpRegistration_PreservesAuthorityRevisionAcrossNextTransfer()
+    {
+        var registry = NewRegistry(localControllerId: "successor");
+        var agent = ObjectHelper.SkipConstructor<Agent>();
+        Guid agentId = Guid.NewGuid();
+
+        Assert.True(registry.TryRegisterAgent(
+            "current", "origin", "origin:epoch-1", agentId, 42, agent,
+            authorityRevision: 4));
+
+        Assert.True(registry.TryGetAgentInfo(agentId, out var caughtUp));
+        Assert.Equal(4, caughtUp.AuthorityRevision);
+
+        Assert.True(registry.TryTransferAuthority("successor", agentId));
+
+        Assert.True(registry.TryGetAgentInfo(agentId, out var transferred));
+        Assert.Equal("successor", transferred.CurrentAuthority);
+        Assert.Equal(5, transferred.AuthorityRevision);
+    }
+
+    [Fact]
+    public void AuthoritativeMigrationRevision_ConvergesExistingAndRejoinedRegistries()
+    {
+        var existing = NewRegistry(localControllerId: "observer");
+        var rejoined = NewRegistry(localControllerId: "rejoined");
+        Guid agentId = Guid.NewGuid();
+
+        Assert.True(existing.TryRegisterAgent(
+            "host-a", "host-a", "host-a:epoch-1", agentId, 7,
+            ObjectHelper.SkipConstructor<Agent>()));
+        Assert.True(existing.TryTransferAuthority("host-b", agentId, authorityRevision: 1));
+
+        Assert.True(rejoined.TryRegisterAgent(
+            "host-b", "host-a", "host-a:epoch-1", agentId, 7,
+            ObjectHelper.SkipConstructor<Agent>(), authorityRevision: 1));
+
+        Assert.True(existing.TryTransferAuthority("host-c", agentId, authorityRevision: 2));
+        Assert.True(rejoined.TryTransferAuthority("host-c", agentId, authorityRevision: 2));
+
+        Assert.True(existing.TryGetAgentInfo(agentId, out var existingInfo));
+        Assert.True(rejoined.TryGetAgentInfo(agentId, out var rejoinedInfo));
+        Assert.Equal("host-c", existingInfo.CurrentAuthority);
+        Assert.Equal("host-c", rejoinedInfo.CurrentAuthority);
+        Assert.Equal(2, existingInfo.AuthorityRevision);
+        Assert.Equal(2, rejoinedInfo.AuthorityRevision);
+    }
+
+    [Fact]
+    public void DelayedOldHostRecord_AfterTwoMigrations_ConvergesPromotedAndObserverRegistries()
+    {
+        var promoted = NewRegistry(localControllerId: "host-c");
+        var observer = NewRegistry(localControllerId: "observer");
+        Guid agentId = Guid.NewGuid();
+
+        Assert.True(promoted.TryRegisterAgent(
+            "host-b", "host-a", "host-a:epoch-1", agentId, 7,
+            ObjectHelper.SkipConstructor<Agent>(), authorityRevision: 0));
+        Assert.True(observer.TryRegisterAgent(
+            "host-b", "host-a", "host-a:epoch-1", agentId, 7,
+            ObjectHelper.SkipConstructor<Agent>(), authorityRevision: 0));
+
+        Assert.True(promoted.TryTransferAuthority("host-c", agentId, authorityRevision: 2));
+        Assert.True(observer.TryTransferAuthority("host-c", agentId, authorityRevision: 2));
+
+        Assert.True(promoted.TryGetAgentInfo(agentId, out var promotedInfo));
+        Assert.True(observer.TryGetAgentInfo(agentId, out var observerInfo));
+        Assert.Equal("host-c", promotedInfo.CurrentAuthority);
+        Assert.Equal("host-c", observerInfo.CurrentAuthority);
+        Assert.Equal(2, promotedInfo.AuthorityRevision);
+        Assert.Equal(2, observerInfo.AuthorityRevision);
+        Assert.True(promoted.IsLocallyControlled(agentId));
+        Assert.False(observer.IsLocallyControlled(agentId));
     }
 
     [Fact]
@@ -87,10 +166,83 @@ public class NetworkAgentRegistryTests
     }
 
     [Fact]
+    public void TransferAuthority_ClearsEquipmentStateFromPreviousController()
+    {
+        var (registry, _, id) = RegisterAgent(ownerControllerId: "host", localControllerId: "me");
+        Assert.True(registry.TryGetAgentInfo(id, out var info));
+        info.RecordAuthoritativeEquipment(new AgentEquipmentData(
+            EquipmentIndex.Weapon0,
+            EquipmentIndex.Weapon2,
+            0));
+
+        Assert.True(registry.TryTransferAuthority("me", id));
+
+        Assert.False(info.TryGetAuthoritativeEquipment(out _));
+    }
+
+    [Fact]
     public void TransferAuthority_ForUnknownAgent_Fails()
     {
         var registry = NewRegistry(localControllerId: "me");
 
         Assert.False(registry.TryTransferAuthority("me", Guid.NewGuid()));
+    }
+
+    [Fact]
+    public void CompactMovementIdentity_StaysInMovementScopeAfterTransfer()
+    {
+        var registry = NewRegistry(localControllerId: "successor");
+        var agent = ObjectHelper.SkipConstructor<Agent>();
+        Guid agentId = Guid.NewGuid();
+
+        Assert.True(registry.TryRegisterAgent("host", agentId, 42, agent));
+        Assert.True(registry.TryTransferAuthority("successor", agentId));
+
+        Assert.True(registry.TryGetAgentInfo("host", 42, out var resolved));
+        Assert.Same(agent, resolved.Agent);
+        Assert.Equal("host", resolved.OriginalOwner);
+        Assert.Equal("host", resolved.MovementScopeId);
+        Assert.Equal("successor", resolved.CurrentAuthority);
+    }
+
+    [Fact]
+    public void CompactMovementIdentity_IsUniqueWithinMovementScope()
+    {
+        var registry = NewRegistry(localControllerId: "me");
+
+        Assert.True(registry.TryRegisterAgent(
+            "host", "host", "host:epoch-1", Guid.NewGuid(), 7,
+            ObjectHelper.SkipConstructor<Agent>()));
+        Assert.False(registry.TryRegisterAgent(
+            "host", "host", "host:epoch-1", Guid.NewGuid(), 7,
+            ObjectHelper.SkipConstructor<Agent>()));
+        Assert.True(registry.TryRegisterAgent(
+            "host", "host", "host:epoch-2", Guid.NewGuid(), 7,
+            ObjectHelper.SkipConstructor<Agent>()));
+    }
+
+    [Fact]
+    public void CatchUpRegistration_PreservesSeparateRiderAndMountMovementScopes()
+    {
+        var registry = NewRegistry(localControllerId: "observer");
+        var rider = ObjectHelper.SkipConstructor<Agent>();
+        var mount = ObjectHelper.SkipConstructor<Agent>();
+
+        Assert.True(registry.TryRegisterAgent(
+            "successor", "rider-origin", "rider-origin:epoch-1",
+            Guid.NewGuid(), 11, rider));
+        Assert.True(registry.TryRegisterAgent(
+            "successor", "mount-origin", "mount-origin:epoch-4",
+            Guid.NewGuid(), 9, mount));
+
+        Assert.True(registry.TryGetAgentInfo("rider-origin:epoch-1", 11, out var resolvedRider));
+        Assert.Same(rider, resolvedRider.Agent);
+        Assert.Equal("rider-origin", resolvedRider.OriginalOwner);
+        Assert.Equal("successor", resolvedRider.CurrentAuthority);
+
+        Assert.True(registry.TryGetAgentInfo("mount-origin:epoch-4", 9, out var resolvedMount));
+        Assert.Same(mount, resolvedMount.Agent);
+        Assert.Equal("mount-origin", resolvedMount.OriginalOwner);
+        Assert.Equal("successor", resolvedMount.CurrentAuthority);
     }
 }

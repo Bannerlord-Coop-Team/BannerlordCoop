@@ -91,7 +91,14 @@ internal class DefaultNotificationsCampaignBehaviorPatches
         MessageBroker.Instance.Publish(__instance, message);
     }
 
-    // OnCompanionRemoved (managed with RemoveCompanionActionPatch)
+    [HarmonyPatch(nameof(DefaultNotificationsCampaignBehavior.OnCompanionRemoved))]
+    [HarmonyPrefix]
+    public static bool OnCompanionRemovedPrefix()
+    {
+        // Running this notification on the server NREs because Clan.PlayerClan is not part of a kingdom
+        // Actual notification to client comes from RemoveCompanionActionPatch
+        return ModInformation.IsClient;
+    }
 
     // OnIssueUpdated
 
@@ -248,13 +255,14 @@ internal class DefaultNotificationsCampaignBehaviorPatches
     }
 
     [HarmonyPatch(nameof(DefaultNotificationsCampaignBehavior.OnArmyCreated))]
-    [HarmonyPostfix]
-    public static void OnArmyCreatedPostfix(ref DefaultNotificationsCampaignBehavior __instance, Army army)
+    [HarmonyPrefix]
+    public static bool OnArmyCreatedPrefix(ref DefaultNotificationsCampaignBehavior __instance, Army army)
     {
-        if (ModInformation.IsClient) return;
-
-        var message = new NotifyArmyCreated(army);
+        if (!ContainerProvider.TryResolve<IGameInterface>(out _)) return true;
+        if (ModInformation.IsClient) return false;
+        var message = new NotifyArmyCreated(army, army.AiBehaviorObject);
         MessageBroker.Instance.Publish(__instance, message);
+        return false;
     }
 
     [HarmonyPatch(nameof(DefaultNotificationsCampaignBehavior.OnSiegeBombardmentHit))]
@@ -315,7 +323,7 @@ internal class DefaultNotificationsCampaignBehaviorPatches
     {
         if (ModInformation.IsClient) return;
 
-        var message = new NotifyPartyRemovedFromArmy(party);
+        var message = new NotifyPartyRemovedFromArmy(party, party.Army);
         MessageBroker.Instance.Publish(__instance, message);
     }
 

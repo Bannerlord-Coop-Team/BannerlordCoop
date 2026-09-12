@@ -4,14 +4,8 @@ using ProtoBuf;
 namespace Missions.Messages;
 
 /// <summary>
-/// Server → existing instance members: a controller has entered the mission instance. This replaces the
-/// direct <c>PeerConnected</c> trigger — on receiving it, a member sends its
-/// <see cref="NetworkMissionJoinInfo"/> to <see cref="ControllerId"/> over the IBattleNetwork mesh.
-/// <para>
-/// The server fans this out (both directions) when it receives a client's <c>MissionEntered</c>, so the
-/// join-info handshake no longer depends on observing a direct P2P connection. The notification itself
-/// travels over the campaign/relay connection; the join info still flows over the mesh.
-/// </para>
+/// Announces a mission member and optional Steam identity over the campaign connection so both sides
+/// can establish their mesh link and exchange <see cref="NetworkMissionJoinInfo"/>.
 /// </summary>
 [ProtoContract]
 public readonly struct NetworkMissionPeerEntered : IEvent
@@ -22,9 +16,22 @@ public readonly struct NetworkMissionPeerEntered : IEvent
     [ProtoMember(2)]
     public readonly string InstanceId;
 
+    /// <summary>
+    /// Steam identity of <see cref="ControllerId"/>, when the server can resolve one. Zero keeps the
+    /// existing server-relay fallback for direct-IP peers and any Steam identity that is unavailable.
+    /// </summary>
+    [ProtoMember(3)]
+    public readonly ulong SteamId;
+
     public NetworkMissionPeerEntered(string controllerId, string instanceId)
+        : this(controllerId, instanceId, 0)
+    {
+    }
+
+    public NetworkMissionPeerEntered(string controllerId, string instanceId, ulong steamId)
     {
         ControllerId = controllerId;
         InstanceId = instanceId;
+        SteamId = steamId;
     }
 }

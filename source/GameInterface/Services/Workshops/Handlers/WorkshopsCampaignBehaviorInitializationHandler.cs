@@ -9,11 +9,12 @@ using GameInterface.Services.Workshops.Interfaces;
 using GameInterface.Services.Workshops.Messages;
 using Serilog;
 using System.Collections.Generic;
-using System.Linq;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.CampaignBehaviors;
 using TaleWorlds.CampaignSystem.Roster;
 using TaleWorlds.CampaignSystem.Settlements;
+using TaleWorlds.CampaignSystem.Settlements.Workshops;
+using TaleWorlds.Core;
 
 namespace GameInterface.Services.Workshops.Handlers
 {
@@ -24,6 +25,7 @@ namespace GameInterface.Services.Workshops.Handlers
         private readonly IObjectManager objectManager;
         private readonly INetwork network;
         private readonly ISessionWorkshopPlayerDataInterface sessionWorkshopPlayerDataInterface;
+        private readonly IWorkshopRepairer workshopRepairer;
 
         private WorkshopPlayerData workshopPlayerData;
 
@@ -31,12 +33,14 @@ namespace GameInterface.Services.Workshops.Handlers
             IMessageBroker messageBroker,
             IObjectManager objectManager,
             INetwork network,
-            ISessionWorkshopPlayerDataInterface sessionWorkshopPlayerDataInterface)
+            ISessionWorkshopPlayerDataInterface sessionWorkshopPlayerDataInterface,
+            IWorkshopRepairer workshopRepairer)
         {
             this.messageBroker = messageBroker;
             this.objectManager = objectManager;
             this.network = network;
             this.sessionWorkshopPlayerDataInterface = sessionWorkshopPlayerDataInterface;
+            this.workshopRepairer = workshopRepairer;
             messageBroker.Subscribe<InitializeClientWorkshopData>(Handle);
             messageBroker.Subscribe<PlayerHeroChanged>(Handle);
             messageBroker.Subscribe<NetworkInitializeServerWorkshopDataKeys>(Handle);
@@ -57,21 +61,55 @@ namespace GameInterface.Services.Workshops.Handlers
         // Need to load workshop data when the hero changes for the player
         private void Handle(MessagePayload<PlayerHeroChanged> obj)
         {
-            if (!objectManager.TryGetIdWithLogging(obj.What.NewHero, out string playerHeroId)) return;
+            Hero playerHero = obj.What.NewHero;
+            if (!objectManager.TryGetIdWithLogging(playerHero, out string playerHeroId)) return;
 
             WorkshopsCampaignBehavior workshopsCampaignBehavior = Campaign.Current.GetCampaignBehavior<WorkshopsCampaignBehavior>();
 
-            workshopsCampaignBehavior._warehouseRosterPerSettlement = GetWarehouseRosterPerSettlement(playerHeroId).ToArray();
+            workshopsCampaignBehavior._warehouseRosterPerSettlement = GetWarehouseRosterPerSettlement(playerHeroId, playerHero);
+            workshopRepairer.RepairClientWorkshopData(workshopsCampaignBehavior, playerHero);
 
             network.SendAll(new NetworkInitializeServerWorkshopDataKeys(playerHeroId));
         }
 
         private void Handle(MessagePayload<NetworkInitializeServerWorkshopDataKeys> obj)
         {
-            sessionWorkshopPlayerDataInterface.AddPlayerKeys(obj.What.PlayerHeroId);
+            string playerHeroId = obj.What.PlayerHeroId;
+            sessionWorkshopPlayerDataInterface.AddPlayerKeys(playerHeroId);
+
+            if (!objectManager.TryGetObjectWithLogging(playerHeroId, out Hero playerHero)) return;
+
+            workshopRepairer.RepairServerWorkshopData(playerHero, playerHeroId);
         }
 
-        private Dictionary<Settlement, ItemRoster> GetWarehouseRosterPerSettlement(string playerHeroId)
+        internal static IEnumerable<Workshop> GetWorkshopsOwnedBy(Hero playerHero)
+        {
+            // Hero._ownedWorkshops and Workshop._owner can diverge in coop (only the list is
+            // synced mid-session), and the Clan screen lists workshops by Workshop.Owner, so
+            // cover both sources.
+            var ownedWorkshops = new List<Workshop>();
+            if (playerHero.OwnedWorkshops != null)
+            {
+                ownedWorkshops.AddRange(playerHero.OwnedWorkshops);
+            }
+
+            foreach (Town town in Town.AllTowns)
+            {
+                if (town?.Workshops == null) continue;
+
+                foreach (Workshop workshop in town.Workshops)
+                {
+                    if (workshop?.Owner == playerHero && !ownedWorkshops.Contains(workshop))
+                    {
+                        ownedWorkshops.Add(workshop);
+                    }
+                }
+            }
+
+            return ownedWorkshops;
+        }
+
+        private KeyValuePair<Settlement, ItemRoster>[] GetWarehouseRosterPerSettlement(string playerHeroId, Hero playerHero)
         {
             Dictionary<Settlement, ItemRoster> warehouseRosterPerSettlement = new();
             int maxWorkshopCount = 0;
@@ -83,27 +121,64 @@ namespace GameInterface.Services.Workshops.Handlers
                     maxWorkshopCount = Campaign.Current.Models.WorkshopModel.MaximumWorkshopsPlayerCanHave;
                 }
 
-                // Null and key check for players without existing workshop data
-                if (workshopPlayerData?.PlayerWarehouseRosterPerSettlement?.ContainsKey(playerHeroId) != true) return;
-
-                foreach (var settlementRoster in workshopPlayerData.PlayerWarehouseRosterPerSettlement[playerHeroId])
+                if (workshopPlayerData?.PlayerWarehouseRosterPerSettlement?.TryGetValue(playerHeroId, out var savedRosters) == true && savedRosters != null)
                 {
-                    if (settlementRoster.Key == null)
-                        continue;
-
-                    if (!objectManager.TryGetObjectWithLogging<Settlement>(settlementRoster.Key, out var settlement)) continue;
-
-                    var itemRoster = new ItemRoster();
-                    foreach (var elementData in settlementRoster.Value)
+                    foreach (var settlementRoster in savedRosters)
                     {
-                        itemRoster.Add(sessionWorkshopPlayerDataInterface.GetItemRosterElementFromData(elementData));
-                    }
+                        if (settlementRoster.Key == null || settlementRoster.Value == null)
+                            continue;
 
-                    warehouseRosterPerSettlement[settlement] = itemRoster;
+                        if (!objectManager.TryGetObjectWithLogging<Settlement>(settlementRoster.Key, out var settlement)) continue;
+
+                        var itemRoster = new ItemRoster();
+                        foreach (var elementData in settlementRoster.Value)
+                        {
+                            ItemRosterElement rosterElement = sessionWorkshopPlayerDataInterface.GetItemRosterElementFromData(elementData);
+                            if (rosterElement.EquipmentElement.Item == null) continue;
+
+                            itemRoster.Add(rosterElement);
+                        }
+
+                        warehouseRosterPerSettlement[settlement] = itemRoster;
+                    }
                 }
+
+                AddMissingOwnedWorkshopRosters(warehouseRosterPerSettlement, GetWorkshopsOwnedBy(playerHero));
             }, blocking: true);
 
-            return warehouseRosterPerSettlement;
+            return CreateWarehouseRosterSlots(warehouseRosterPerSettlement, maxWorkshopCount);
+        }
+
+        internal static void AddMissingOwnedWorkshopRosters(
+            IDictionary<Settlement, ItemRoster> warehouseRosters,
+            IEnumerable<Workshop> ownedWorkshops)
+        {
+            foreach (var workshop in ownedWorkshops)
+            {
+                Settlement settlement = workshop?.Settlement;
+                if (settlement != null && !warehouseRosters.ContainsKey(settlement))
+                {
+                    warehouseRosters[settlement] = new ItemRoster();
+                }
+            }
+        }
+
+        internal static KeyValuePair<Settlement, ItemRoster>[] CreateWarehouseRosterSlots(
+            IReadOnlyCollection<KeyValuePair<Settlement, ItemRoster>> warehouseRosters,
+            int minimumCapacity)
+        {
+            int capacity = warehouseRosters.Count > minimumCapacity
+                ? warehouseRosters.Count
+                : minimumCapacity;
+            var rosterSlots = new KeyValuePair<Settlement, ItemRoster>[capacity];
+            int index = 0;
+
+            foreach (var warehouseRoster in warehouseRosters)
+            {
+                rosterSlots[index++] = warehouseRoster;
+            }
+
+            return rosterSlots;
         }
     }
 }

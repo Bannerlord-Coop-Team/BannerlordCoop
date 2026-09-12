@@ -1,7 +1,9 @@
 ﻿using Common;
 using Common.Logging;
+using GameInterface.Configuration;
 using GameInterface.Services.Heroes.Extensions;
 using GameInterface.Services.ObjectManager;
+using GameInterface.Services.Players;
 using Serilog;
 using System;
 using System.Collections.Generic;
@@ -29,44 +31,26 @@ internal class WorkshopsCampaignBehaviorInterface : IWorkshopsCampaignBehaviorIn
     static readonly ILogger Logger = LogManager.GetLogger<WorkshopsCampaignBehaviorInterface>();
     private readonly ISessionWorkshopPlayerDataInterface sessionWorkshopPlayerDataInterface;
     private readonly IObjectManager objectManager;
+    private readonly IPlayerManager playerManager;
 
-    public WorkshopsCampaignBehaviorInterface(ISessionWorkshopPlayerDataInterface sessionWorkshopPlayerDataInterface, IObjectManager objectManager)
+    public WorkshopsCampaignBehaviorInterface(
+        ISessionWorkshopPlayerDataInterface sessionWorkshopPlayerDataInterface,
+        IObjectManager objectManager,
+        IPlayerManager playerManager)
     {
         this.sessionWorkshopPlayerDataInterface = sessionWorkshopPlayerDataInterface;
         this.objectManager = objectManager;
+        this.playerManager = playerManager;
     }
 
     public void RunTownWorkshop(Town townComponent, Workshop workshop)
     {
-        GameThread.RunSafe(() =>
-        {
-            try
-            {
-                RunTownWorkshopInternal(townComponent, workshop);
-            }
-            catch (Exception ex)
-            {
-                Logger.Error(ex, "Failed to run {method}", nameof(TickOneProductionCycleForPlayerWorkshop));
-            }
-        });
+        RunTownWorkshopInternal(townComponent, workshop);
     }
 
     public bool TickOneProductionCycleForPlayerWorkshop(Production production, Workshop workshop, bool effectCapital)
     {
-        var result = false;
-        GameThread.RunSafe(() =>
-        {
-            try
-            {
-                result = TickOneProductionCycleForPlayerWorkshopInternal(production, workshop, effectCapital);
-            }
-            catch (Exception ex)
-            {
-                Logger.Error(ex, "Failed to run {method}", nameof(TickOneProductionCycleForPlayerWorkshop));
-                result = false;
-            }
-        });
-        return result;
+        return TickOneProductionCycleForPlayerWorkshopInternal(production, workshop, effectCapital);
     }
 
     private void RunTownWorkshopInternal(Town townComponent, Workshop workshop)
@@ -122,7 +106,12 @@ internal class WorkshopsCampaignBehaviorInterface : IWorkshopsCampaignBehaviorIn
         int inputMaterialCost = 0;
         Town town = workshop.Settlement.Town;
         WorkshopsCampaignBehavior.WorkshopData dataOfWorkshop = workshopsBehavior.GetDataOfWorkshop(workshop);
-        bool useItemsFromWarehouse = dataOfWorkshop.IsGettingInputsFromWarehouse;
+
+        // Don't use items from warehouse while a player is offline based on config
+        bool useItemsFromWarehouse = dataOfWorkshop.IsGettingInputsFromWarehouse
+            && (ModConfigProvider.ModOptions.GoldFoodInfluenceChangeForDisconnectedPlayers
+            || !playerManager.IsOwnerOfHeroDisconnected(workshop.Owner));
+
         if (useItemsFromWarehouse)
         {
             if (!GetWarehouseRoster(workshop.Owner, workshop.Settlement, out var warehouseRoster)) return false;

@@ -1,10 +1,10 @@
-using Common;
+﻿using Common;
 using Common.PacketHandlers;
-using Common.Util;
 using LiteNetLib;
 using Missions.Agents.Packets;
-using System.Collections.Generic;
+using System;
 using TaleWorlds.MountAndBlade;
+using AgentControllerType = TaleWorlds.Core.AgentControllerType;
 
 namespace Missions.Agents.Handlers;
 
@@ -20,11 +20,22 @@ public class MountMovementApplier : IPacketHandler
 {
     private readonly INetworkAgentRegistry agentRegistry;
     private readonly IAgentPositionInterpolator interpolator;
+    private readonly IPuppetMountStateRepairer puppetMountStateRepairer;
+    private readonly Action<Agent, AgentMountData> updateSyntheticTurn;
+    private readonly Action<MountMovementPacket> queueMovement;
 
-    public MountMovementApplier(INetworkAgentRegistry agentRegistry, IAgentPositionInterpolator interpolator)
+    public MountMovementApplier(
+        INetworkAgentRegistry agentRegistry,
+        IAgentPositionInterpolator interpolator,
+        IPuppetMountStateRepairer puppetMountStateRepairer,
+        Action<Agent, AgentMountData> updateSyntheticTurn,
+        Action<MountMovementPacket> queueMovement)
     {
         this.agentRegistry = agentRegistry;
         this.interpolator = interpolator;
+        this.puppetMountStateRepairer = puppetMountStateRepairer;
+        this.updateSyntheticTurn = updateSyntheticTurn;
+        this.queueMovement = queueMovement;
     }
 
     public PacketType PacketType => PacketType.MountMovement;
@@ -35,45 +46,42 @@ public class MountMovementApplier : IPacketHandler
 
     public void HandlePacket(NetPeer peer, IPacket packet)
     {
-        var movement = (MountMovementPacket)packet;
-        if (movement.MountIds == null) return;
+        queueMovement((MountMovementPacket)packet);
+    }
 
-        GameThread.RunSafe(() =>
+    internal void ApplySnapshot(
+        string identityScopeId,
+        ushort compactId,
+        Guid canonicalId,
+        bool usesCompactId,
+        AgentMountData data)
+    {
+        CoopAgentInfo mountInfo;
+        bool found = usesCompactId
+            ? agentRegistry.TryGetAgentInfo(identityScopeId, compactId, out mountInfo)
+            : agentRegistry.TryGetAgentInfo(canonicalId, out mountInfo);
+        if (!found) return;
+
+        Agent horse = mountInfo.Agent;
+        if (horse == null || horse.Mission != Mission.Current || !horse.IsActive())
+            return;
+        if (agentRegistry.IsLocallyControlled(horse))
+            return;
+
+        // A stale loose-horse packet can arrive after a rider packet remounts it. Drop the direct target so
+        // the rider and masterless-mount interpolators cannot fight.
+        if (horse.RiderAgent is Agent rider && rider.IsActive())
         {
-            if (Mission.Current == null) return;
+            interpolator.Forget(horse);
+            return;
+        }
 
-            // Resolve and apply the whole batch in ONE game-thread action, matching
-            // AgentMovementHandler.HandlePacket.
-            var toApply = new List<(Agent horse, AgentMountData data)>();
-            for (int i = 0; i < movement.MountIds.Length; i++)
-            {
-                var mountId = movement.MountIds[i];
-                if (agentRegistry.IsLocallyControlled(mountId)) continue;
-                if (!agentRegistry.TryGetAgentInfo(mountId, out var mountInfo)) continue;
-                toApply.Add((mountInfo.Agent, movement.Mounts[i]));
-            }
+        if (horse.Controller != AgentControllerType.None)
+            horse.Controller = AgentControllerType.None;
+        puppetMountStateRepairer.PreserveRiderlessPuppet(horse);
 
-            if (toApply.Count == 0) return;
-
-            using (new AllowedThread())
-            {
-                foreach (var (horse, data) in toApply)
-                {
-                    // The horse may have become invalid (died, mission torn down) between queueing and
-                    // running; only apply while it is still active in the current mission.
-                    if (horse == null || horse.Mission != Mission.Current || !horse.IsActive())
-                        continue;
-
-                    // Re-check authority ON the game thread: a packet from the previous owner can be queued
-                    // behind a host-migration adoption, and applying it after the transfer would re-pin the
-                    // freshly adopted horse to a stale snapshot.
-                    if (agentRegistry.IsLocallyControlled(horse))
-                        continue;
-
-                    data.ApplyMount(horse);
-                    interpolator.SetMountTarget(horse, data.MountPosition, data.MountMovementDirection);
-                }
-            }
-        });
+        data.ApplyMount(horse);
+        updateSyntheticTurn(horse, data);
+        interpolator.SetMountTarget(horse, data);
     }
 }

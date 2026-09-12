@@ -3,6 +3,7 @@ using Common;
 using GameInterface.Services.ObjectManager;
 using System;
 using System.Collections.Generic;
+using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.ObjectSystem;
 
@@ -140,13 +141,18 @@ internal static class CommandHelpers
         out MobileParty mobileParty,
         out string error)
     {
-        mobileParty = null;
-
-        if (!TryGetMbObject(stringId, out mobileParty, out error))
+        mobileParty = Campaign.Current.CampaignObjectManager.Find<MobileParty>(stringId);
+        if (mobileParty == null)
+        {
+            error = $"No {nameof(MobileParty)} found with string id '{stringId}'.";
             return false;
+        }
 
         if (mobileParty.Party != null)
+        {
+            error = null;
             return true;
+        }
 
         error = $"MobileParty '{mobileParty.StringId}' has no Party.";
         return false;

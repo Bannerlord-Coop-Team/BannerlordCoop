@@ -1,5 +1,8 @@
 ﻿using Common;
 using Common.Logging;
+using Common.Messaging;
+using GameInterface.Policies;
+using GameInterface.Services.MobileParties.Messages.Behavior;
 using GameInterface.Services.Players;
 using Serilog;
 using TaleWorlds.CampaignSystem.Party;
@@ -80,5 +83,10 @@ public static class MobilePartyExtensions
         {
             party.Ai.RethinkAtNextHourlyTick = true;
         }
+
+        if (ModInformation.IsServer &&
+            !CallOriginalPolicy.IsOriginalAllowed() &&
+            party.IsActive)
+            GameThread.RunSafe(() => MessageBroker.Instance.Publish(party, new PartyBehaviorChangeAttempted(party)));
     }
 }

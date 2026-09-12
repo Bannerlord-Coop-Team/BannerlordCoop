@@ -1,0 +1,13 @@
+<Prefab>
+  <Window>
+    <Widget WidthSizePolicy="StretchToParent" HeightSizePolicy="StretchToParent" DoNotAcceptEvents="true">
+      <Children>
+        <Standard.Button Id="JoinCancelButton" WidthSizePolicy="Fixed" SuggestedWidth="220"
+                         HeightSizePolicy="Fixed" SuggestedHeight="64"
+                         HorizontalAlignment="Right" VerticalAlignment="Bottom"
+                         MarginRight="60" MarginBottom="60"
+                         Command.Click="ActionCancel" Parameter.Text="@CancelButtonText"/>
+      </Children>
+    </Widget>
+  </Window>
+</Prefab>

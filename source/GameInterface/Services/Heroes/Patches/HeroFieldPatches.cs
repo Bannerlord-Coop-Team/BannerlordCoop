@@ -5,6 +5,7 @@ using GameInterface.Policies;
 using GameInterface.Services.Heroes.Messages;
 using HarmonyLib;
 using Serilog;
+using System;
 using System.Collections.Generic;
 using System.Reflection;
 using System.Reflection.Emit;
@@ -17,6 +18,25 @@ using TaleWorlds.Localization;
 
 namespace GameInterface.Services.Heroes.Patches
 {
+    [HarmonyPatch(typeof(Hero), nameof(Hero.HomeSettlement), MethodType.Getter)]
+    internal class HeroHomeSettlementGetterPatch
+    {
+        [HarmonyPrefix]
+        internal static void Prefix(Hero __instance, out IDisposable __state)
+        {
+            __state = ModInformation.IsClient && __instance._homeSettlement == null
+                ? CallOriginalPolicy.AllowOriginalsForCurrentOperation()
+                : null;
+        }
+
+        [HarmonyFinalizer]
+        internal static Exception Finalizer(IDisposable __state, Exception __exception)
+        {
+            __state?.Dispose();
+            return __exception;
+        }
+    }
+
     [HarmonyPatch]
     internal class HeroFieldPatches
     {

@@ -1,7 +1,10 @@
-﻿using Common.Serialization;
+﻿using Common.Logging;
+using Common.Serialization;
 using GameInterface.CoopSessionData.Save.Data;
+using Serilog;
 using System;
 using System.IO;
+using TaleWorlds.Library;
 
 namespace Coop.Core.Server.Services.Save
 {
@@ -16,8 +19,39 @@ namespace Coop.Core.Server.Services.Save
 
     internal class CoopSaveManager : ICoopSaveManager
     {
-        public string DefaultPath { get; } = "./saves/";
+        private static readonly ILogger Logger = LogManager.GetLogger<CoopSaveManager>();
+
+        public string DefaultPath { get; } = ResolveDefaultPath();
         public string FileType { get; } = ".json";
+
+        /// <summary>
+        /// The session json (player→hero mappings + per-player session data) must persist next to
+        /// the campaign saves so a save moves or deletes as one folder's &lt;name&gt;.sav +
+        /// &lt;name&gt;.json pair. The graphical host resolves the native save folder through the
+        /// engine's platform helper (Documents\Mount and Blade II Bannerlord\Game Saves — the same
+        /// PlatformFileType.User + "Game Saves" root FileDriver writes .sav files to). Headless and
+        /// container hosts set BANNERLORD_USER_DIR — the persistent data root, mounted as /data in
+        /// Docker — and store the session in ITS "Game Saves" folder: that is where the host's
+        /// redirected FileDriver puts the .sav files, and written CWD-relative instead it lands in
+        /// a container's ephemeral layer, evaporates on recreate, and returning players lose their
+        /// heroes. (The dedicated server migrates jsons from the pre-pairing &lt;root&gt;\saves\
+        /// location at boot — its RepairSave.) Without either (unit tests, engine not booted) the
+        /// CWD-relative ./saves/ is used.
+        /// </summary>
+        private static string ResolveDefaultPath()
+        {
+            var userDir = Environment.GetEnvironmentVariable("BANNERLORD_USER_DIR");
+            if (string.IsNullOrEmpty(userDir) == false)
+                return Path.Combine(userDir, "Game Saves") + Path.DirectorySeparatorChar;
+
+            if (TaleWorlds.Library.Common.PlatformFileHelper is PlatformFileHelperPC fileHelper)
+            {
+                var nativeSaveDir = new PlatformDirectoryPath(PlatformFileType.User, "Game Saves" + Path.DirectorySeparatorChar);
+                return fileHelper.GetDirectoryFullPath(nativeSaveDir);
+            }
+
+            return "./saves/";
+        }
 
         /// <summary>
         /// Loads a CoopSession from the provided file name.
@@ -42,6 +76,8 @@ namespace Coop.Core.Server.Services.Save
                 }
             }
 
+            Logger.Warning("Co-op session JSON was not found at {FilePath}; saved player registrations will not be restored",
+                Path.GetFullPath(filePath));
             return null;
         }
 

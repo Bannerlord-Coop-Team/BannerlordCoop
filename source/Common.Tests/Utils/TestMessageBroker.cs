@@ -1,4 +1,6 @@
-﻿using Common.Messaging;
+﻿using Common.Logging;
+using Common.Messaging;
+using Serilog;
 
 namespace Common.Tests.Utils;
 
@@ -7,6 +9,8 @@ namespace Common.Tests.Utils;
 /// </summary>
 public class TestMessageBroker : MessageBroker
 {
+    private static readonly ILogger Logger = LogManager.GetLogger<TestMessageBroker>();
+
     public readonly MessageCollection Messages = new MessageCollection();
 
     private readonly Dictionary<Type, List<WeakDelegate>> _subscribers = new Dictionary<Type, List<WeakDelegate>>();
@@ -34,7 +38,10 @@ public class TestMessageBroker : MessageBroker
             var weakDelegate = delegates[i];
             if (weakDelegate == null || weakDelegate.IsAlive == false)
             {
-                // Remove dead delegates
+                // A collected subscription target means this message is silently unhandled on the
+                // receiving instance — name it so a lost state-apply is diagnosable from test output.
+                Logger.Warning("Dropping dead subscriber {Method} for {MessageType}: its target was garbage collected",
+                    weakDelegate?.Method?.Name ?? "<unknown>", messageType.Name);
                 delegates.RemoveAt(i--);
                 continue;
             }

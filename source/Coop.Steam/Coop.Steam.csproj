@@ -11,6 +11,16 @@
   </ItemGroup>
 
   <ItemGroup>
+    <AssemblyAttribute Include="System.Runtime.CompilerServices.InternalsVisibleTo">
+      <_Parameter1>Coop.Tests</_Parameter1>
+    </AssemblyAttribute>
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="protobuf-net" Version="3.2.56" />
+  </ItemGroup>
+
+  <ItemGroup>
     <!-- Compile against the vendored Steamworks.NET (same assembly identity as the copy the
          game ships and loads); Private=false so the game's own copy binds at runtime and no
          duplicate wrapper is deployed into the module. -->

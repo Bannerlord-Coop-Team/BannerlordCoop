@@ -8,29 +8,28 @@ using TaleWorlds.CampaignSystem.ViewModelCollection.CharacterDeveloper;
 using TaleWorlds.CampaignSystem.ViewModelCollection.CharacterDeveloper.PerkSelection;
 using TaleWorlds.Library;
 
-namespace GameInterface.Services.CharacterDevelopers.Patches
+namespace GameInterface.Services.CharacterDevelopers.Patches;
+
+[HarmonyPatch(typeof(CharacterDeveloperHeroItemVM))]
+internal class ApplyChangesPatch
 {
-    [HarmonyPatch(typeof(CharacterDeveloperHeroItemVM))]
-    internal class ApplyChangesPatch
+    private static readonly ILogger Logger = LogManager.GetLogger<CharacterDeveloperVM>();
+
+    [HarmonyPatch(nameof(CharacterDeveloperHeroItemVM.ApplyChanges))]
+    [HarmonyPrefix]
+    public static bool ApplyChangesPrefix(ref CharacterDeveloperHeroItemVM __instance)
     {
-        private static readonly ILogger Logger = LogManager.GetLogger<CharacterDeveloperVM>();
+        // Get data from CharacterDeveloperHeroItemVM
+        HeroDeveloper heroDeveloper = __instance.HeroDeveloper;
+        PerkSelectionVM perkSelection = __instance.PerkSelection;
+        MBBindingList<CharacterAttributeItemVM> attributeSelection = __instance.Attributes;
+        MBBindingList<SkillVM> skillSelection = __instance.Skills;
 
-        [HarmonyPatch("ApplyChanges")]
-        [HarmonyPrefix]
-        public static bool ApplyChanges(ref CharacterDeveloperHeroItemVM __instance)
-        {
-            // Get data from CharacterDeveloperHeroItemVM
-            HeroDeveloper heroDeveloper = __instance.HeroDeveloper;
-            PerkSelectionVM perkSelection = __instance.PerkSelection;
-            MBBindingList<CharacterAttributeItemVM> attributeSelection = __instance.Attributes;
-            MBBindingList<SkillVM> skillSelection = __instance.Skills;
+        // Publish message with data
+        var message = new ApplyChanges(heroDeveloper, perkSelection, attributeSelection, skillSelection);
+        MessageBroker.Instance.Publish(__instance, message);
 
-            // Publish message with data
-            var message = new ApplyChangesPressed(heroDeveloper, perkSelection, attributeSelection, skillSelection);
-            MessageBroker.Instance.Publish(__instance, message);
-
-            // Skip original to override original client saving
-            return false;
-        }
+        // Skip original to override original client saving
+        return false;
     }
 }

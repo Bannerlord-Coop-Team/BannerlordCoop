@@ -1,11 +1,9 @@
 using Common;
-using Common.Logging;
 using Common.Messaging;
 using Common.Util;
 using GameInterface.Policies;
 using GameInterface.Registry.Auto;
 using HarmonyLib;
-using Serilog;
 using System;
 using System.Reflection;
 using TaleWorlds.CampaignSystem.Roster;
@@ -15,8 +13,6 @@ namespace GameInterface.Services.TroopRosters.Patches;
 [HarmonyPatch(typeof(TroopRoster))]
 internal class TroopRosterCreateDummyPatch
 {
-    private static readonly ILogger Logger = LogManager.GetLogger<TroopRosterCreateDummyPatch>();
-
     private static readonly ConstructorInfo TroopRosterCtor = AccessTools.Constructor(typeof(TroopRoster), Type.EmptyTypes);
 
     [HarmonyPatch(nameof(TroopRoster.CreateDummyTroopRoster))]
@@ -28,7 +24,9 @@ internal class TroopRosterCreateDummyPatch
 
         if (ModInformation.IsClient)
         {
-            Logger.Error("Client created managed object {Type}", typeof(TroopRoster));
+            // Party, tooltip, battle-tally, and other presentation flows create local scratch rosters on
+            // clients. They deliberately have no network identity; server-created managed rosters arrive
+            // through the object registry instead of this factory.
             return true;
         }
 

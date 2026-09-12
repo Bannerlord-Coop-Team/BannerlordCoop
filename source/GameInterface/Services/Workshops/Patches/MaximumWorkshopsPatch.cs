@@ -18,9 +18,6 @@ internal class MaximumWorkshopsPatch
     [HarmonyPrefix]
     public static bool MaximumWorkshopsPlayerCanHavePrefix(ref int __result)
     {
-        // If called on allowed thread return original value
-        if (CallOriginalPolicy.IsOriginalAllowed()) return true;
-
         int numberOfWorkshops = 0;
         foreach (Town town in Town.AllTowns)
         {

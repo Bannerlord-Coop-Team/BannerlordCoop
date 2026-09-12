@@ -1,19 +1,25 @@
 ﻿using Common.Messaging;
 using ProtoBuf;
+using TaleWorlds.Localization;
 
 namespace GameInterface.Services.Clans.Messages;
 
 [ProtoContract(SkipConstructor = true)]
-internal class NetworkChangeClanName : ICommand
+public readonly struct NetworkChangeClanName : ICommand
 {
     [ProtoMember(1)]
-    public string ClanId { get; }
-    [ProtoMember(2)]
-    public string Name { get; }
-    [ProtoMember(3)]
-    public string InformalName { get; }
+    public readonly string ClanId;
 
-    public NetworkChangeClanName(string clanId, string name, string informalName)
+    [ProtoMember(2)]
+    public readonly TextObject Name;
+
+    [ProtoMember(3)]
+    public readonly TextObject InformalName;
+
+    public NetworkChangeClanName(
+        string clanId,
+        TextObject name,
+        TextObject informalName)
     {
         ClanId = clanId;
         Name = name;

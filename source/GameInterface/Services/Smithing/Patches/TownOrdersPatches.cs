@@ -15,95 +15,81 @@ using TaleWorlds.CampaignSystem.Settlements;
 using TaleWorlds.Core;
 using TaleWorlds.Library;
 
-namespace GameInterface.Services.Smithing.Patches
+namespace GameInterface.Services.Smithing.Patches;
+
+[HarmonyPatch(typeof(CraftingCampaignBehavior))]
+internal class TownOrdersPatches
 {
-    [HarmonyPatch(typeof(CraftingCampaignBehavior))]
-    internal class TownOrdersPatches
+    private static readonly ILogger Logger = LogManager.GetLogger<CraftingCampaignBehavior>();
+
+    [HarmonyPatch(nameof(CraftingCampaignBehavior.CreateTownOrder))]
+    [HarmonyPrefix]
+    public static bool CreateTownOrderPrefix(ref CraftingCampaignBehavior __instance, Hero orderOwner, int orderSlot)
     {
-        private static readonly ILogger Logger = LogManager.GetLogger<CraftingCampaignBehavior>();
+        // Call original if we call this function
+        if (CallOriginalPolicy.IsOriginalAllowed()) return true;
 
-        [HarmonyPatch("CreateTownOrder")]
-        [HarmonyPrefix]
-        public static bool CreateTownOrder(ref CraftingCampaignBehavior __instance, Hero orderOwner, int orderSlot)
+        // Server should create random town orders to be consistent for all clients
+        if (ModInformation.IsClient) return false;
+
+        // Publish message with data for clients
+        var message = new TownOrderCreated(orderOwner, orderSlot);
+        MessageBroker.Instance.Publish(__instance, message);
+
+        // Skip original
+        return false;
+    }
+
+    [HarmonyPatch(nameof(CraftingCampaignBehavior.ReplaceCraftingOrder))]
+    [HarmonyPrefix]
+    public static bool ReplaceCraftingOrderPrefix(ref CraftingCampaignBehavior __instance, Town town, CraftingOrder order)
+    {
+        // Call original if we call this function
+        if (CallOriginalPolicy.IsOriginalAllowed()) return true;
+
+        // Shouldn't ever be true, just in case
+        if (ModInformation.IsClient) return false;
+
+        // Clear existing CraftingOrder on clients
+        int difficultyLevel = order.DifficultyLevel;
+        var message = new CraftingOrderReplaced(town, difficultyLevel);
+        MessageBroker.Instance.Publish(__instance, message);
+
+        CraftingOrder previousOrder = __instance._craftingOrders[town].Slots[difficultyLevel];
+
+        // Replace TaleWorlds implementation
+        MBList<Hero> mblist = new MBList<Hero>();
+        mblist.AddRange(town.Settlement.HeroesWithoutParty);
+        foreach (MobileParty mobileParty in town.Settlement.Parties)
         {
-            // Call original if we call this function
-            if (CallOriginalPolicy.IsOriginalAllowed()) return true;
-
-            // Server should create random town orders to be consistent for all clients
-            if (ModInformation.IsClient) return false;
-
-            // Publish message with data for clients
-            var message = new TownOrderCreated(__instance, orderOwner, orderSlot);
-            MessageBroker.Instance.Publish(__instance, message);
-
-            // Skip original
-            return false;
+            if (mobileParty.LeaderHero != null && !mobileParty.IsMainParty)
+            {
+                mblist.Add(mobileParty.LeaderHero);
+            }
+        }
+        __instance._craftingOrders[town].RemoveTownOrder(order);
+        Hero targetHero = null;
+        if (mblist.Count > 0)
+        {
+            targetHero = mblist.GetRandomElement<Hero>();
+            __instance.CreateTownOrder(targetHero, difficultyLevel); // Call includes TownOrderCreated message from patch to update clients
         }
 
-        [HarmonyPatch("ReplaceCraftingOrder")]
-        [HarmonyPrefix]
-        public static bool ReplaceCraftingOrder(ref CraftingCampaignBehavior __instance, Town town, CraftingOrder order)
+        // Remove previous order from objectManager
+        if (previousOrder is not null)
         {
-            // Call original if we call this function
-            if (CallOriginalPolicy.IsOriginalAllowed()) return true;
-
-            // Shouldn't ever be true, just in case
-            if (ModInformation.IsClient) return false;
-
-            // Clear existing CraftingOrder on clients
-            int difficultyLevel = order.DifficultyLevel;
-            var message = new CraftingOrderReplaced(__instance, town, difficultyLevel);
-            MessageBroker.Instance.Publish(__instance, message);
-
-            CraftingOrder previousOrder = __instance._craftingOrders[town].Slots[difficultyLevel];
-
-            // Replace TaleWorlds implementation
-            MBList<Hero> mblist = new MBList<Hero>();
-            mblist.AddRange(town.Settlement.HeroesWithoutParty);
-            foreach (MobileParty mobileParty in town.Settlement.Parties)
-            {
-                if (mobileParty.LeaderHero != null && !mobileParty.IsMainParty)
-                {
-                    mblist.Add(mobileParty.LeaderHero);
-                }
-            }
-            __instance._craftingOrders[town].RemoveTownOrder(order);
-            Hero targetHero = null;
-            if (mblist.Count > 0)
-            {
-                targetHero = mblist.GetRandomElement<Hero>();
-                __instance.CreateTownOrder(targetHero, difficultyLevel); // Call includes TownOrderCreated message from patch to update clients
-            }
-
-            // Remove previous order from objectManager
-            if (previousOrder is not null)
-            {
-                MessageBroker.Instance.Publish(null, new InstanceDestroyed<CraftingOrder>(previousOrder));
-            }
-
-            // Skip original
-            return false;
+            MessageBroker.Instance.Publish(null, new InstanceDestroyed<CraftingOrder>(previousOrder));
         }
 
-        [HarmonyPatch("CompleteOrder")]
-        [HarmonyPrefix]
-        public static bool CompleteOrder(ref CraftingCampaignBehavior __instance, Town town, CraftingOrder craftingOrder, ItemObject craftedItem, Hero completerHero)
-        {
-            // Call original if we call this function
-            if (CallOriginalPolicy.IsOriginalAllowed()) return true;
+        // Skip original
+        return false;
+    }
 
-            bool flag = false;
-            using (new AllowedThread())
-            {
-                __instance.GetOrderResult(craftingOrder, craftedItem, out flag, out var _, out var _, out var _);
-            }
-
-            // Publish message with data
-            var message = new OrderCompleted(__instance, town, craftingOrder, craftedItem, completerHero, Hero.MainHero, flag);
-            MessageBroker.Instance.Publish(__instance, message);
-
-            // Skip original
-            return false;
-        }
+    [HarmonyPatch(nameof(CraftingCampaignBehavior.CompleteOrder))]
+    [HarmonyPrefix]
+    public static bool CompleteOrderPrefix(ref CraftingCampaignBehavior __instance, Town town, CraftingOrder craftingOrder, ItemObject craftedItem, Hero completerHero)
+    {
+        // Skip original, handled by server
+        return false;
     }
 }

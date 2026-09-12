@@ -1,4 +1,4 @@
-using Common.Messaging;
+﻿using Common.Messaging;
 using ProtoBuf;
 
 namespace GameInterface.Services.MapEvents.Messages.Leave;
@@ -9,9 +9,12 @@ internal readonly struct NetworkRequestLeaveBattle : ICommand
 {
     [ProtoMember(1)]
     public readonly string PartyId;
+    [ProtoMember(2)]
+    public readonly bool FinishLocalMenus;
 
-    public NetworkRequestLeaveBattle(string partyId)
+    public NetworkRequestLeaveBattle(string partyId, bool finishLocalMenus = true)
     {
         PartyId = partyId;
+        FinishLocalMenus = finishLocalMenus;
     }
 }

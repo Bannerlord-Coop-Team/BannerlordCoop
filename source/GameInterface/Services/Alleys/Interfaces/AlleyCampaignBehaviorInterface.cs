@@ -20,7 +20,7 @@ namespace GameInterface.Services.Alleys.Interfaces;
 /// </summary>
 public interface IAlleyCampaignBehaviorInterface : IGameAbstraction
 {
-    void AddOrUpdatePlayerAlleyData(Alley alley, Hero overseer, TroopRoster garrison);
+    void AddOrUpdatePlayerAlleyData(Alley alley, Hero overseer, TroopRoster garrison, CampaignTime lastRecruitTime);
     void RemovePlayerAlleyData(Alley alley);
     bool TryGetCurrentSettlementAlley(out Alley alley);
 
@@ -52,7 +52,7 @@ public class AlleyCampaignBehaviorInterface : IAlleyCampaignBehaviorInterface
 
     private static AlleyCampaignBehavior Behavior => Campaign.Current?.GetCampaignBehavior<AlleyCampaignBehavior>();
 
-    public void AddOrUpdatePlayerAlleyData(Alley alley, Hero overseer, TroopRoster garrison)
+    public void AddOrUpdatePlayerAlleyData(Alley alley, Hero overseer, TroopRoster garrison, CampaignTime lastRecruitTime)
     {
         if (alley == null || garrison == null)
         {
@@ -95,6 +95,7 @@ public class AlleyCampaignBehaviorInterface : IAlleyCampaignBehaviorInterface
                 RemoveByAlley(list, alley);
                 var data = new AlleyCampaignBehavior.PlayerAlleyData(alley, garrison);
                 if (overseer != null) data.AssignedClanMember = overseer;
+                data.LastRecruitTime = lastRecruitTime;
                 if (underAttackBy != null)
                 {
                     data.UnderAttackBy = underAttackBy;

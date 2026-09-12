@@ -21,8 +21,8 @@ namespace GameInterface.Services.MapEvents.Patches;
 /// rejoin (a mid-battle join) is still forced through the OoB — which then hangs. When the hero is absent we force
 /// the gate OFF instead, so native <c>SetupTeams</c> runs <c>FinishDeployment</c> immediately: the player drops
 /// straight into the live battle (spectating / commanding via <c>SetPlayerCanTakeControlOfAnotherAgentWhenDead</c>)
-/// rather than a leaderless deploy screen. This also covers a genuinely wounded hero entering a fresh battle (the
-/// native flatten excludes it, so it likewise never spawns).
+/// rather than a leaderless deploy screen. This also covers a wounded hero who explicitly starts a fresh battle
+/// (the native flatten excludes it, so it likewise never spawns).
 /// </para>
 /// <para>
 /// Timing note: this gate is evaluated at the END of <c>DeploymentMissionController.SetupTeams</c>, i.e. AFTER the
@@ -49,8 +49,8 @@ internal class CoopAllowPlayerDeploymentPatch
     }
 
     // True if the local player's own hero has a live agent in the current mission. False for a hero downed in a
-    // live battle that then rejoins (no longer supplied → never spawns) or a wounded hero entering a fresh battle
-    // (excluded from the flatten) — in both cases there is no Agent.Main to command the Order of Battle.
+    // live battle that then rejoins (no longer supplied → never spawns) or a wounded hero explicitly starting a
+    // fresh battle (excluded from the flatten) — in both cases there is no Agent.Main to command the Order of Battle.
     private static bool LocalPlayerHeroOnField()
     {
         var mission = Mission.Current;

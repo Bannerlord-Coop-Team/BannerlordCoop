@@ -6,6 +6,8 @@ using Common.PacketHandlers;
 using Common.Serialization;
 using Coop.Core.Client.Messages;
 using Coop.Core.Common.Network;
+using Coop.Core.Common.Services.Connection.Messages;
+using Coop.Core.Common.Session.Messages;
 using GameInterface.Services.GameDebug.Messages;
 using LiteNetLib;
 using Serilog;
@@ -13,6 +15,7 @@ using System;
 using System.Linq;
 using System.Net;
 using System.Net.Sockets;
+using System.Threading;
 
 namespace Coop.Core.Client;
 
@@ -43,7 +46,10 @@ public class CoopClient : CoopNetworkBase, ICoopClient
         IMessageBroker messageBroker,
         IPacketManager packetManager,
         IMessagePacketHandler messagePacketHandler,
-        ICommonSerializer serializer) : base(config, serializer)
+        ICommonSerializer serializer,
+        IReliableMessageBatcher<NetPeer> reliableMessageBatcher,
+        CancellationTokenSource sessionCancellation)
+        : base(config, serializer, reliableMessageBatcher, sessionCancellation)
     {
         this.messageBroker = messageBroker;
         this.packetManager = packetManager;
@@ -110,10 +116,30 @@ public class CoopClient : CoopNetworkBase, ICoopClient
 
     public override void OnPeerDisconnected(NetPeer peer, DisconnectInfo disconnectInfo)
     {
+        if (!isConnected && disconnectInfo.Reason == DisconnectReason.ConnectionRejected)
+        {
+            var rejectCode = ReadRejectCode(disconnectInfo);
+            reconnectPending = false;
+
+            string message = rejectCode == ConnectionRejectCode.IncorrectPassword
+                ? "The server password is incorrect."
+                : "The server rejected the connection.";
+
+            Logger.Warning("Connection rejected by server: {Reason}", rejectCode);
+            GameThread.RunSafe(() =>
+            {
+                messageBroker.Publish(this, new SendPopupMessage(message));
+                messageBroker.Publish(this, new EndCoopMode());
+            }, context: "ConnectionRejected");
+            return;
+        }
+
         if (isConnected == true)
         {
+            isConnected = false;
+            var serverReason = ReadDisconnectReason(disconnectInfo);
             messageBroker.Publish(this, new SendInformationMessage(disconnectInfo.Reason.ToString()));
-            messageBroker.Publish(this, new NetworkDisconnected(disconnectInfo));
+            messageBroker.Publish(this, new NetworkDisconnected(disconnectInfo, serverReason));
         }
         else
         {
@@ -125,22 +151,64 @@ public class CoopClient : CoopNetworkBase, ICoopClient
         }
     }
 
+    private static string ReadDisconnectReason(DisconnectInfo disconnectInfo)
+    {
+        var data = disconnectInfo.AdditionalData;
+        if (data == null || data.IsNull) return null;
+
+        try
+        {
+            if (disconnectInfo.Reason != DisconnectReason.RemoteConnectionClose) return null;
+            string reason = data.GetString(128);
+            return data.EndOfData ? reason : null;
+        }
+        catch (Exception)
+        {
+            return null;
+        }
+        finally
+        {
+            data.Recycle();
+        }
+    }
+
+    private static ConnectionRejectCode ReadRejectCode(DisconnectInfo disconnectInfo)
+    {
+        var data = disconnectInfo.AdditionalData;
+        if (data == null || data.IsNull) return ConnectionRejectCode.None;
+
+        try
+        {
+            if (data.TryGetByte(out var raw) && raw == (byte)ConnectionRejectCode.IncorrectPassword)
+            {
+                return ConnectionRejectCode.IncorrectPassword;
+            }
+
+            return ConnectionRejectCode.None;
+        }
+        finally
+        {
+            data.Recycle();
+        }
+    }
+
     public override void Start()
     {
         messageBroker.Publish(this, new SendInformationMessage("Connecting..."));
 
         if (isConnected)
         {
-            Dispose();
+            return;
         }
 
         reconnectPending = false;
         reconnectAfter = DateTime.MinValue;
 
-        netManager.Start();
-
         var ip = ResolveConnectAddress(Config.Address, preferIPv6: false);
         ServerEndpoint = new IPEndPoint(ip, Config.Port);
+
+        netManager.Start();
+        StartNetworkPoller();
 
         Logger.Information("Attempting connection to {Endpoint}...", ServerEndpoint);
         netManager.Connect(ServerEndpoint, Config.Token);
@@ -186,6 +254,9 @@ public class CoopClient : CoopNetworkBase, ICoopClient
     public override void Update(TimeSpan frameTime)
     {
         netManager.PollEvents();
+
+        // Send any sub-budget aggregated messages so nothing waits longer than one poll interval.
+        FlushPendingMessages();
 
         if (reconnectPending && DateTime.UtcNow >= reconnectAfter)
         {

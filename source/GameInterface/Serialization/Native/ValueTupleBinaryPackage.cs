@@ -1,4 +1,6 @@
 ﻿using Common.Extensions;
+using Common.Logging;
+using Serilog;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -10,6 +12,8 @@ namespace GameInterface.Serialization.Native
     [Serializable]
     public class ValueTupleBinaryPackage : IBinaryPackage
     {
+        private static readonly ILogger Logger = LogManager.GetLogger<ValueTupleBinaryPackage>();
+
         [NonSerialized]
         private IBinaryPackageFactory binaryPackageFactory;
         [NonSerialized]
@@ -20,23 +24,23 @@ namespace GameInterface.Serialization.Native
         private Dictionary<string, IBinaryPackage> StoredFields = new Dictionary<string, IBinaryPackage>();
 
         private string ObjectType;
-        protected Type T => Type.GetType(ObjectType);
+        protected Type T => SerializedTypeResolver.ResolveType(ObjectType, typeof(ValueTuple<,>));
 
         public ValueTupleBinaryPackage(object kvp, IBinaryPackageFactory binaryPackageFactory)
         {
-            ObjectType = kvp.GetType().AssemblyQualifiedName;
-            var type = Type.GetType(ObjectType);
+            ObjectType = SerializedTypeResolver.Encode(kvp.GetType());
+            var type = T;
             Object = kvp;
             this.binaryPackageFactory = binaryPackageFactory;
 
             if (type.GetGenericTypeDefinition() != typeof(ValueTuple<,>)) throw new Exception(
-                $"{ObjectType} is not {typeof(ValueTuple<,>)}");
+                $"{type} is not {typeof(ValueTuple<,>)}");
         }
 
         public void Pack()
         {
             // Iterate through all of the instance fields of the object's type
-            var fields = Type.GetType(ObjectType).GetAllInstanceFields().GroupBy(o => o.Name).Select(g => g.First());
+            var fields = T.GetAllInstanceFields().GroupBy(o => o.Name).Select(g => g.First());
             foreach (FieldInfo field in fields)
             {
                 // Get the value of the current field in the object
@@ -49,7 +53,7 @@ namespace GameInterface.Serialization.Native
         public object Unpack(IBinaryPackageFactory binaryPackageFactory)
         {
             if (IsUnpacked) return Object;
-            var type = Type.GetType(ObjectType);
+            var type = T;
             this.binaryPackageFactory = binaryPackageFactory;
             
             Object = FormatterServices.GetUninitializedObject(type);
@@ -72,6 +76,15 @@ namespace GameInterface.Serialization.Native
             foreach (string fieldName in StoredFields.Keys)
             {
                 var field = fields.FirstOrDefault(f => f.Name.Equals(fieldName));
+
+                // Cross-runtime field skew (see BinaryPackageBase.UnpackFields): skip fields the
+                // sender's runtime packed that don't exist on this runtime's type.
+                if (field == null)
+                {
+                    Logger.Warning("[FieldSkew] {Type} has no field '{Field}' on this runtime; skipping packed value", type.Name, fieldName);
+                    continue;
+                }
+
                 field.SetValue((object)Object, StoredFields[fieldName].Unpack(binaryPackageFactory));
             }
         }

@@ -1,0 +1,11 @@
+<ListPanel DataSource="{ChatTab}" IsVisible="@IsSelected" WidthSizePolicy="StretchToParent" HeightSizePolicy="CoverChildren"
+           LayoutImp.LayoutMethod="VerticalTopToBottom">
+    <Children>
+        <ListPanel DataSource="{Sections}" WidthSizePolicy="StretchToParent" HeightSizePolicy="CoverChildren"
+                   LayoutImp.LayoutMethod="VerticalTopToBottom">
+            <ItemTemplate>
+                <!-- COOP_OPTIONS_SECTION:Sections/ChatSection.xml -->
+            </ItemTemplate>
+        </ListPanel>
+    </Children>
+</ListPanel>

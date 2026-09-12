@@ -11,8 +11,8 @@ using TaleWorlds.MountAndBlade.ViewModelCollection.EscapeMenu;
 namespace GameInterface.Services.UI.Patches;
 
 /// <summary>
-/// Adds an "Invite Friends" entry to the campaign-map escape menu on the client that
-/// advertises the session (the hosting player's client).
+/// Adds "Invite Friends" as the second campaign-map escape-menu item for clients
+/// in the session's Steam lobby.
 /// </summary>
 [HarmonyPatch(typeof(MapScreen), "GetEscapeMenuItems")]
 internal class EscapeMenuInviteFriendsPatch
@@ -22,9 +22,9 @@ internal class EscapeMenuInviteFriendsPatch
     {
         if (ModInformation.IsServer) return;
         if (!ContainerProvider.TryResolve<ISessionAdvertiser>(out var advertiser)) return;
-        if (!advertiser.IsAdvertising) return;
+        if (!advertiser.CanInviteFriends) return;
 
-        __result.Add(new EscapeMenuItemVM(
+        __result.Insert(1, new EscapeMenuItemVM(
             new TextObject("Invite Friends"),
             _ =>
             {

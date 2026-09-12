@@ -1,6 +1,7 @@
 using GameInterface.Services.MapEvents;
 using GameInterface.Services.MapEvents.Handlers;
 using GameInterface.Services.MapEvents.Messages.Start;
+using GameInterface.Services.MapEvents.TroopSupply;
 using Xunit.Abstractions;
 
 namespace E2E.Tests.Services.Missions;
@@ -93,5 +94,74 @@ public class HostMigrationTests : MissionTestEnvironment
             Assert.True(ServerBattleModeArbiter.TryClaimSimulation(mapEventId));
             ServerBattleModeArbiter.Release(mapEventId);
         });
+    }
+
+    /// <summary>
+    /// BR-015 Repeated Host Migration: migration walks down the connection order until no players remain. Here
+    /// the host leaves (promoting the sole successor) and that just-promoted successor immediately leaves too,
+    /// so the migration terminates at empty. With no valid host left, the server clears the host assignment and
+    /// (BR-017 handoff) forgets the WHOLE battle's reserves — proven by seeding a reserve the departing
+    /// controllers do not own and asserting it too is dropped (ForgetMapEvent, not just ForgetController).
+    /// </summary>
+    [Fact]
+    [Trait("Requirement", "BR-015")]
+    public void MigrationWalksToEmpty_WhenPromotedSuccessorImmediatelyDeparts_RemovesAssignmentAndForgetsReserves()
+    {
+        var (mapEventId, _) = SetupCoopBattle("ctrl-A", "ctrl-B");
+        var clients = Clients.ToArray();
+        EnterBattle(clients[0], mapEventId); // ctrl-A joins first -> host
+        EnterBattle(clients[1], mapEventId); // ctrl-B -> the sole successor
+        AssertHost(Server, mapEventId, "ctrl-A", "ctrl-B");
+
+        // Seed a reserve keyed by a party neither leaver owns, so only a whole-battle forget (ForgetMapEvent ->
+        // ledger.Remove) — not a per-controller forget — can clear it.
+        Server.Call(() => Server.Resolve<IBattleTroopLedger>()
+            .SetReserve(mapEventId, "reserve-party", new[] { new TroopReserveEntry(9001, "char-x", 0) }));
+        Server.Call(() => Assert.NotEmpty(Server.Resolve<IBattleTroopLedger>().GetParties(mapEventId)));
+
+        // The host leaves: migration promotes the earliest successor still present (the walk continues).
+        DepartBattle("ctrl-A", mapEventId);
+        AssertHost(Server, mapEventId, "ctrl-B");
+        Server.Call(() => Assert.NotEmpty(Server.Resolve<IBattleTroopLedger>().GetParties(mapEventId))); // promotion keeps reserves
+
+        // The just-promoted successor immediately leaves with no one behind it: no valid host remains, so the
+        // migration terminates at empty.
+        DepartBattle("ctrl-B", mapEventId);
+
+        // Server-authoritative outcome: the host assignment is cleared and the battle's reserves are forgotten.
+        Server.Call(() => Assert.False(Server.Resolve<IBattleHostRegistry>().TryGet(mapEventId, out _)));
+        Server.Call(() => Assert.Empty(Server.Resolve<IBattleTroopLedger>().GetParties(mapEventId)));
+    }
+
+    /// <summary>
+    /// BR-035 Reconnection During Host Migration: a reconnecting player shall not interrupt the migration or
+    /// reclaim the host out of order — it may become host only per the host-selection rules. After the host
+    /// departs and the earliest successor is promoted, the departed player reconnects (re-enters the same
+    /// battle) and must land at the END of the successor line (join order), never preempting the migrated host.
+    /// </summary>
+    [Fact]
+    [Trait("Requirement", "BR-035")]
+    public void ReconnectAfterMigration_LandsAtSuccessorTail_WithoutPreemptingHost()
+    {
+        var (mapEventId, _) = SetupCoopBattle("ctrl-A", "ctrl-B", "ctrl-C");
+        var clients = Clients.ToArray();
+        EnterBattle(clients[0], mapEventId); // ctrl-A -> host
+        EnterBattle(clients[1], mapEventId); // ctrl-B -> successor
+        EnterBattle(clients[2], mapEventId); // ctrl-C -> successor
+        AssertHost(Server, mapEventId, "ctrl-A", "ctrl-B", "ctrl-C");
+
+        // The host departs; migration promotes ctrl-B (earliest successor).
+        DepartBattle("ctrl-A", mapEventId);
+        AssertHost(Server, mapEventId, "ctrl-B", "ctrl-C");
+
+        // The departed player reconnects to the same battle. It must NOT preempt the migrated host; per the
+        // join-order host-selection rules it joins at the tail of the successor line, behind ctrl-C.
+        EnterBattle(clients[0], mapEventId);
+
+        AssertHost(Server, mapEventId, "ctrl-B", "ctrl-C", "ctrl-A");
+        foreach (var client in Clients)
+            AssertHost(client, mapEventId, "ctrl-B", "ctrl-C", "ctrl-A");
+        AssertIsLocalHost(clients[0], mapEventId, false); // the reconnector did not become host
+        AssertIsLocalHost(clients[1], mapEventId, true);  // ctrl-B remains the migrated host
     }
 }

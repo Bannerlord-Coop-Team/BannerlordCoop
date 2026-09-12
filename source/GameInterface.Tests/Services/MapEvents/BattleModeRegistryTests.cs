@@ -32,4 +32,25 @@ public class BattleModeRegistryTests
         Assert.True(BattleModeRegistry.End("current-map-event"));
         Assert.False(BattleModeRegistry.IsMission("current-map-event"));
     }
+
+    // BR-104: the client's mode record is scoped to the battle instance id, so a query keyed by a previous or
+    // unrelated battle's map-event id never observes the current mission's mode — a message from a different
+    // battle cannot be mistaken for the current one.
+    [Fact]
+    [Trait("Requirement", "BR-104")]
+    public void IsMission_ForForeignMapEventId_DoesNotSeeTheCurrentMission()
+    {
+        BattleModeRegistry.Begin("current-map-event", BattleStartMode.Mission);
+
+        try
+        {
+            Assert.True(BattleModeRegistry.IsMission("current-map-event"));
+            Assert.False(BattleModeRegistry.IsMission("previous-map-event"));
+            Assert.False(BattleModeRegistry.IsSimulation("previous-map-event"));
+        }
+        finally
+        {
+            BattleModeRegistry.End();
+        }
+    }
 }

@@ -1,0 +1,11 @@
+<ListPanel DataSource="{NetworkTab}" IsVisible="@IsSelected" WidthSizePolicy="StretchToParent" HeightSizePolicy="CoverChildren"
+           LayoutImp.LayoutMethod="VerticalTopToBottom">
+  <Children>
+    <ListPanel DataSource="{Sections}" WidthSizePolicy="StretchToParent" HeightSizePolicy="CoverChildren"
+               LayoutImp.LayoutMethod="VerticalTopToBottom">
+      <ItemTemplate>
+        <!-- COOP_OPTIONS_SECTION:Sections/NetworkSection.xml -->
+      </ItemTemplate>
+    </ListPanel>
+  </Children>
+</ListPanel>

@@ -1,7 +1,6 @@
-﻿using Common.Logging;
-using Common.Messaging;
+﻿using Common;
+using Common.Logging;
 using GameInterface.Policies;
-using GameInterface.Services.HeroDevelopers.Messages;
 using HarmonyLib;
 using Serilog;
 using TaleWorlds.CampaignSystem.CharacterDevelopment;
@@ -14,19 +13,17 @@ namespace GameInterface.Services.HeroDevelopers.Patches
     {
         private static readonly ILogger Logger = LogManager.GetLogger<HeroDeveloper>();
 
-        [HarmonyPatch("ChangeSkillLevelFromXpChange")]
+        [HarmonyPatch(nameof(HeroDeveloper.ChangeSkillLevelFromXpChange))]
         [HarmonyPrefix]
-        public static bool ChangeSkillLevelFromXpChange(ref HeroDeveloper __instance, SkillObject skill, int changeAmount, bool shouldNotify = false)
+        public static bool ChangeSkillLevelFromXpChangePrefix(ref HeroDeveloper __instance, SkillObject skill, int changeAmount, bool shouldNotify = false)
         {
             // Call original if we call this function
             if (CallOriginalPolicy.IsOriginalAllowed()) return true;
 
-            // Publish message with data
-            var message = new SkillLevelChange(__instance, skill, changeAmount, shouldNotify);
-            MessageBroker.Instance.Publish(__instance, message);
+            // Don't allow clients to change skill level
+            if (ModInformation.IsClient) return false;
 
-            // Skip original to override original client saving
-            return false;
+            return true;
         }
     }
 }

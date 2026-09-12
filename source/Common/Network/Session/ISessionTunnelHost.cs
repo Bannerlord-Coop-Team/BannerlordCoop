@@ -66,3 +66,9 @@ public interface ISessionTunnelHost : IDisposable
 
     void Stop();
 }
+
+/// <summary>Optional authenticated-identity capability for session tunnel hosts.</summary>
+public interface ISessionTunnelIdentityResolver
+{
+    bool TryGetRemoteSteamId(IPEndPoint serverPeerEndpoint, out ulong steamId);
+}

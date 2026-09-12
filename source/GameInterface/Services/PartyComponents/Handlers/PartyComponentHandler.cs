@@ -3,6 +3,8 @@ using Common.Logging;
 using Common.Messaging;
 using Common.Network;
 using Common.Util;
+using GameInterface.Services.MobileParties.Extensions;
+using GameInterface.Services.MobileParties.Messages;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.PartyComponents.Data;
 using GameInterface.Services.PartyComponents.Messages;
@@ -65,6 +67,9 @@ internal class PartyComponentHandler : IHandler
         messageBroker.Unsubscribe<PartyComponentCreated>(Handle);
         messageBroker.Unsubscribe<NetworkCreatePartyComponent>(Handle);
 
+        messageBroker.Unsubscribe<PartyComponentMobilePartyUpdated>(Handle_PartyComponentMobilePartyUpdated);
+        messageBroker.Unsubscribe<NetworkPartyComponentMobilePartyUpdated>(Handle_NetworkPartyComponentMobilePartyUpdated);
+
         messageBroker.Unsubscribe<PartyComponentLeaderChanged>(Handle_PartyComponentLeaderChanged);
         messageBroker.Unsubscribe<NetworkPartyComponentLeaderChanged>(Handle_NetworkPartyComponentLeaderChanged);
     }
@@ -91,7 +96,7 @@ internal class PartyComponentHandler : IHandler
         {
             try
             {
-                var obj = (PartyComponent)ObjectHelper.SkipConstructor(partyTypes[data.TypeIndex]);
+                var obj = CreatePartyComponent(data);
 
                 switch (data.TypeIndex)
                 {
@@ -141,6 +146,33 @@ internal class PartyComponentHandler : IHandler
                         break;
                     case 5:
                         objectManager.AddExisting(data.Id, obj);
+
+                        var militiaComponent = (MilitiaPartyComponent)obj;
+
+                        if (data.HomeSettlementId is null) break;
+
+                        // Reconstitute the Settlement link that is normally set in the constructor,
+                        // bundled in the creation message like the garrison's. Without it the militia's
+                        // PartyOwner and MapFaction stay null, and once the settlement is besieged
+                        // vanilla's siege menu paths (Town.GetDefenderParties) throw on the party
+                        // every frame, freezing every client at the siege menus.
+                        if (!objectManager.TryGetObject(data.HomeSettlementId, out Settlement militiaSettlement))
+                        {
+                            Logger.Warning(
+                                "MilitiaPartyComponent {Id}: could not find Settlement '{SettlementId}' in ObjectManager; " +
+                                "Settlement will not be set on client",
+                                data.Id, data.HomeSettlementId);
+                            break;
+                        }
+
+                        using (new AllowedThread())
+                        {
+                            militiaComponent.Settlement = militiaSettlement;
+
+                            // Vanilla OnInitialize sets this back-link so the settlement resolves its militia.
+                            militiaSettlement.MilitiaPartyComponent = militiaComponent;
+                        }
+
                         break;
                     case 6:
                         objectManager.AddExisting(data.Id, obj);
@@ -189,6 +221,24 @@ internal class PartyComponentHandler : IHandler
                 Logger.Error(e, "Failed to apply {Message}", nameof(NetworkCreatePartyComponent));
             }
         });
+    }
+
+    private PartyComponent CreatePartyComponent(PartyComponentData data)
+    {
+        if (data.TypeIndex != 0 || data.HomeSettlementId is null)
+        {
+            return (PartyComponent)ObjectHelper.SkipConstructor(partyTypes[data.TypeIndex]);
+        }
+
+        if (!objectManager.TryGetObjectWithLogging(data.HomeSettlementId, out Settlement relatedSettlement))
+        {
+            return (PartyComponent)ObjectHelper.SkipConstructor(partyTypes[data.TypeIndex]);
+        }
+
+        using (new AllowedThread())
+        {
+            return new BanditPartyComponent(relatedSettlement, null);
+        }
     }
 
     private void Handle_PartyComponentMobilePartyUpdated(MessagePayload<PartyComponentMobilePartyUpdated> payload)
@@ -240,6 +290,13 @@ internal class PartyComponentHandler : IHandler
     private void Handle_PartyComponentLeaderChanged(MessagePayload<PartyComponentLeaderChanged> payload)
     {
         var obj = payload.What;
+
+        var mobileParty = obj.Instance.MobileParty;
+        if (mobileParty != null && mobileParty.IsPlayerParty())
+        {
+            messageBroker.Publish(this, new PartyLeaderChanged(mobileParty, obj.NewLeader));
+            return;
+        }
 
         if (!objectManager.TryGetIdWithLogging(obj.Instance, out var partyComponentId)) return;
 

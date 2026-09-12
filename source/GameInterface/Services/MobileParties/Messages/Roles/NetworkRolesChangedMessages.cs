@@ -5,7 +5,7 @@ using TaleWorlds.CampaignSystem;
 namespace GameInterface.Services.MobileParties.Messages.Roles;
 
 [ProtoContract(SkipConstructor = true)]
-internal readonly struct RemoveAllPartyRolesOfHero : ICommand
+internal readonly struct NetworkRemoveAllPartyRolesOfHero : ICommand
 {
     [ProtoMember(1)]
     public readonly string HeroId;
@@ -13,7 +13,7 @@ internal readonly struct RemoveAllPartyRolesOfHero : ICommand
     [ProtoMember(2)]
     public readonly string MobilePartyId;
 
-    public RemoveAllPartyRolesOfHero(string heroId, string mobilePartyId)
+    public NetworkRemoveAllPartyRolesOfHero(string heroId, string mobilePartyId)
     {
         HeroId = heroId;
         MobilePartyId = mobilePartyId;
@@ -21,7 +21,7 @@ internal readonly struct RemoveAllPartyRolesOfHero : ICommand
 }
 
 [ProtoContract(SkipConstructor = true)]
-internal readonly struct RemovePartyRoleOfHero : ICommand
+internal readonly struct NetworkRemovePartyRoleOfHero : ICommand
 {
     [ProtoMember(1)]
     public readonly string HeroId;
@@ -32,7 +32,7 @@ internal readonly struct RemovePartyRoleOfHero : ICommand
     [ProtoMember(3)]
     public readonly PartyRole PartyRole;
 
-    public RemovePartyRoleOfHero(string heroId, string mobilePartyId, PartyRole partyRole)
+    public NetworkRemovePartyRoleOfHero(string heroId, string mobilePartyId, PartyRole partyRole)
     {
         HeroId = heroId;
         MobilePartyId = mobilePartyId;
@@ -41,7 +41,7 @@ internal readonly struct RemovePartyRoleOfHero : ICommand
 }
 
 [ProtoContract(SkipConstructor = true)]
-internal readonly struct SetPartyScout : ICommand
+internal readonly struct NetworkRemoveOnePartyRoleOfHero : ICommand
 {
     [ProtoMember(1)]
     public readonly string HeroId;
@@ -49,7 +49,7 @@ internal readonly struct SetPartyScout : ICommand
     [ProtoMember(2)]
     public readonly string MobilePartyId;
 
-    public SetPartyScout(string heroId, string mobilePartyId)
+    public NetworkRemoveOnePartyRoleOfHero(string heroId, string mobilePartyId)
     {
         HeroId = heroId;
         MobilePartyId = mobilePartyId;
@@ -57,7 +57,7 @@ internal readonly struct SetPartyScout : ICommand
 }
 
 [ProtoContract(SkipConstructor = true)]
-internal readonly struct SetPartyQuartermaster : ICommand
+internal readonly struct NetworkSetPartyScout : ICommand
 {
     [ProtoMember(1)]
     public readonly string HeroId;
@@ -65,7 +65,7 @@ internal readonly struct SetPartyQuartermaster : ICommand
     [ProtoMember(2)]
     public readonly string MobilePartyId;
 
-    public SetPartyQuartermaster(string heroId, string mobilePartyId)
+    public NetworkSetPartyScout(string heroId, string mobilePartyId)
     {
         HeroId = heroId;
         MobilePartyId = mobilePartyId;
@@ -73,7 +73,7 @@ internal readonly struct SetPartyQuartermaster : ICommand
 }
 
 [ProtoContract(SkipConstructor = true)]
-internal readonly struct SetPartyEngineer : ICommand
+internal readonly struct NetworkSetPartyQuartermaster : ICommand
 {
     [ProtoMember(1)]
     public readonly string HeroId;
@@ -81,7 +81,7 @@ internal readonly struct SetPartyEngineer : ICommand
     [ProtoMember(2)]
     public readonly string MobilePartyId;
 
-    public SetPartyEngineer(string heroId, string mobilePartyId)
+    public NetworkSetPartyQuartermaster(string heroId, string mobilePartyId)
     {
         HeroId = heroId;
         MobilePartyId = mobilePartyId;
@@ -89,7 +89,7 @@ internal readonly struct SetPartyEngineer : ICommand
 }
 
 [ProtoContract(SkipConstructor = true)]
-internal readonly struct SetPartySurgeon : ICommand
+internal readonly struct NetworkSetPartyEngineer : ICommand
 {
     [ProtoMember(1)]
     public readonly string HeroId;
@@ -97,7 +97,55 @@ internal readonly struct SetPartySurgeon : ICommand
     [ProtoMember(2)]
     public readonly string MobilePartyId;
 
-    public SetPartySurgeon(string heroId, string mobilePartyId)
+    public NetworkSetPartyEngineer(string heroId, string mobilePartyId)
+    {
+        HeroId = heroId;
+        MobilePartyId = mobilePartyId;
+    }
+}
+
+[ProtoContract(SkipConstructor = true)]
+internal readonly struct NetworkSetPartySurgeon : ICommand
+{
+    [ProtoMember(1)]
+    public readonly string HeroId;
+
+    [ProtoMember(2)]
+    public readonly string MobilePartyId;
+
+    public NetworkSetPartySurgeon(string heroId, string mobilePartyId)
+    {
+        HeroId = heroId;
+        MobilePartyId = mobilePartyId;
+    }
+}
+
+[ProtoContract(SkipConstructor = true)]
+internal readonly struct NetworkSetPartyFirstMate : ICommand
+{
+    [ProtoMember(1)]
+    public readonly string HeroId;
+
+    [ProtoMember(2)]
+    public readonly string MobilePartyId;
+
+    public NetworkSetPartyFirstMate(string heroId, string mobilePartyId)
+    {
+        HeroId = heroId;
+        MobilePartyId = mobilePartyId;
+    }
+}
+
+[ProtoContract(SkipConstructor = true)]
+internal readonly struct NetworkSetPartyNavigator : ICommand
+{
+    [ProtoMember(1)]
+    public readonly string HeroId;
+
+    [ProtoMember(2)]
+    public readonly string MobilePartyId;
+
+    public NetworkSetPartyNavigator(string heroId, string mobilePartyId)
     {
         HeroId = heroId;
         MobilePartyId = mobilePartyId;

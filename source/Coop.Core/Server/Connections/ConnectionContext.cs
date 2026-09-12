@@ -1,9 +1,10 @@
-using Common.Messaging;
+﻿using Common.Messaging;
 using Common.Network;
 using Common.Network.Coalescing;
+using Coop.Core.Server.Services.Kingdoms;
+using Coop.Core.Server.Services.MobileParties;
 using GameInterface.CoopSessionData;
-using GameInterface.Services.GameState.Interfaces;
-using GameInterface.Services.Heroes.Interaces;
+using GameInterface.Services.CampaignService.Interfaces;
 using GameInterface.Services.Heroes.Interfaces;
 using GameInterface.Services.Modules;
 using GameInterface.Services.Modules.Validators;
@@ -25,32 +26,40 @@ public class ConnectionContext
         IModuleValidator moduleValidator,
         IModuleInfoProvider moduleInfoProvider,
         IPlayerManager playerManager,
+        IPlayerPartyRestorer playerPartyRestorer,
+        IPlayerCreationRollback playerCreationRollback,
         IObjectManager objectManager,
         IHeroInterface heroInterface,
-        IGameStateInterface gameStateInterface,
         ICoopSessionProvider coopSessionProvider,
         ISaveInterface saveInterface,
-        ITimeControlInterface timeControlInterface,
         IConnectionMessageQueue connectionMessageQueue,
         ISendCoalescer coalescer,
         IAttachmentIdMapper attachmentIdMapper,
-        IExistingPlayerSender existingPlayerSender)
+        IExistingPlayerSender existingPlayerSender,
+        ISteamBanList steamBanList,
+        IServerOptionsProvider serverOptionsProvider,
+        IJoinCampaignBaselineSender joinCampaignBaselineSender,
+        IJoinCampaignKingdomBaseLineSender joinCampaignKingdomBaseLineSender)
     {
         MessageBroker = messageBroker;
         Network = network;
         ModuleValidator = moduleValidator;
         ModuleInfoProvider = moduleInfoProvider;
         PlayerManager = playerManager;
+        PlayerPartyRestorer = playerPartyRestorer;
+        PlayerCreationRollback = playerCreationRollback;
         ObjectManager = objectManager;
         HeroInterface = heroInterface;
-        GameStateInterface = gameStateInterface;
         CoopSessionProvider = coopSessionProvider;
         SaveInterface = saveInterface;
-        TimeControlInterface = timeControlInterface;
         ConnectionMessageQueue = connectionMessageQueue;
         Coalescer = coalescer;
         AttachmentIdMapper = attachmentIdMapper;
         ExistingPlayerSender = existingPlayerSender;
+        SteamBanList = steamBanList;
+        ServerOptionsProvider = serverOptionsProvider;
+        JoinCampaignBaselineSender = joinCampaignBaselineSender;
+        JoinCampaignKingdomBaseLineSender = joinCampaignKingdomBaseLineSender;
     }
 
     public IMessageBroker MessageBroker { get; }
@@ -58,14 +67,18 @@ public class ConnectionContext
     public IModuleValidator ModuleValidator { get; }
     public IModuleInfoProvider ModuleInfoProvider { get; }
     public IPlayerManager PlayerManager { get; }
+    public IPlayerPartyRestorer PlayerPartyRestorer { get; }
+    public IPlayerCreationRollback PlayerCreationRollback { get; }
     public IObjectManager ObjectManager { get; }
     public IHeroInterface HeroInterface { get; }
-    public IGameStateInterface GameStateInterface { get; }
     public ICoopSessionProvider CoopSessionProvider { get; }
     public ISaveInterface SaveInterface { get; }
-    public ITimeControlInterface TimeControlInterface { get; }
     public IConnectionMessageQueue ConnectionMessageQueue { get; }
     public ISendCoalescer Coalescer { get; }
     public IAttachmentIdMapper AttachmentIdMapper { get; }
     public IExistingPlayerSender ExistingPlayerSender { get; }
+    public ISteamBanList SteamBanList { get; }
+    public IServerOptionsProvider ServerOptionsProvider { get; }
+    public IJoinCampaignBaselineSender JoinCampaignBaselineSender { get; }
+    public IJoinCampaignKingdomBaseLineSender JoinCampaignKingdomBaseLineSender { get; }
 }

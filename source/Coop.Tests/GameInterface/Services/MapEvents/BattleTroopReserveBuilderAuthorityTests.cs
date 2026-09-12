@@ -1,4 +1,6 @@
-using GameInterface.Services.MapEvents.TroopSupply;
+﻿using GameInterface.Services.MapEvents.TroopSupply;
+using GameInterface.Services.Players.Data;
+using System;
 using Xunit;
 
 namespace Coop.Tests.GameInterface.Services.MapEvents;
@@ -12,6 +14,9 @@ namespace Coop.Tests.GameInterface.Services.MapEvents;
 /// </summary>
 public class BattleTroopReserveBuilderAuthorityTests
 {
+    private static Player CreatePlayer(string controllerId, string partyId)
+        => new Player(controllerId, null, partyId, null, null);
+
     // --- ResolveOwningController: which controller owns the party's reserve (null => host) ---
 
     [Fact]
@@ -46,6 +51,83 @@ public class BattleTroopReserveBuilderAuthorityTests
     {
         // No owning player and no player-led army -> null, i.e. the host fields it (enemy, or independent allied AI).
         Assert.Null(BattleTroopReserveBuilder.ResolveOwningController(partyOwnerController: null, armyLeaderController: null));
+    }
+
+    // --- Absent owners (dropped from the battle, not yet returned): their parties fall to the host ---
+
+    [Fact]
+    [Trait("Requirement", "BR-020")]
+    public void DroppedOwnersParty_FallsToHost_WhileAbsent()
+    {
+        // Player registrations survive a disconnect, so the owner still resolves — the absent set is what
+        // hands its parties to the host (the reserve half of the BR-031 adoption).
+        Assert.Null(BattleTroopReserveBuilder.ResolveOwningController(
+            partyOwnerController: "playerB", armyLeaderController: null, absentControllers: new[] { "playerB" }));
+    }
+
+    [Fact]
+    [Trait("Requirement", "BR-020")]
+    public void AiPartyOfDroppedArmyLeader_FallsToHost_WhileLeaderAbsent()
+    {
+        // An AI party fielded via a player-led army follows its leader out: leader absent -> host fields it.
+        Assert.Null(BattleTroopReserveBuilder.ResolveOwningController(
+            partyOwnerController: null, armyLeaderController: "playerA", absentControllers: new[] { "playerA" }));
+    }
+
+    [Fact]
+    [Trait("Requirement", "BR-033")]
+    public void PresentOwnersParty_IsUntouchedByAnotherOwnersAbsence()
+    {
+        // Isolation: a connected player's scope never changes because someone else dropped or returned.
+        Assert.Equal("playerB", BattleTroopReserveBuilder.ResolveOwningController(
+            partyOwnerController: "playerB", armyLeaderController: null, absentControllers: new[] { "playerC" }));
+    }
+
+    [Fact]
+    public void PresentBattleRegistration_WinsOverStaleOfflineRegistrationForTheSameParty()
+    {
+        var stale = CreatePlayer("stale", "party");
+        var present = CreatePlayer("present", "party");
+
+        var owner = BattleTroopReserveBuilder.ResolvePlayerController(
+            new[] { stale, present }, "party", presentControllers: new[] { "present" });
+
+        Assert.Equal("present", owner);
+    }
+
+    [Fact]
+    public void UnrelatedOfflineRegistration_DoesNotOwnTheParty()
+    {
+        var stale = CreatePlayer("stale", "party");
+
+        var owner = BattleTroopReserveBuilder.ResolvePlayerController(
+            new[] { stale }, "party", presentControllers: new[] { "other" },
+            absentControllers: new[] { "other" });
+
+        Assert.Null(owner);
+    }
+
+    [Fact]
+    public void AbsentBattleMember_IsRetainedForHostRescoping()
+    {
+        var dropped = CreatePlayer("dropped", "party");
+
+        var owner = BattleTroopReserveBuilder.ResolvePlayerController(
+            new[] { dropped }, "party", presentControllers: Array.Empty<string>(),
+            absentControllers: new[] { "dropped" });
+
+        Assert.Equal("dropped", owner);
+        Assert.Null(BattleTroopReserveBuilder.ResolveOwningController(owner, null, new[] { "dropped" }));
+    }
+
+    [Fact]
+    public void RetreatLookup_FindsTheCurrentControllerBehindAStaleSamePartyRegistration()
+    {
+        var stale = CreatePlayer("stale", "party");
+        var retreating = CreatePlayer("retreating", "party");
+
+        Assert.True(BattleTroopReserveBuilder.IsPartyRegisteredToController(
+            new[] { stale, retreating }, "party", "retreating"));
     }
 
     // --- IsOwnedByRequester: does a specific requester field the party ---

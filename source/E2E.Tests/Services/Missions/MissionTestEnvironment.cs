@@ -1,10 +1,13 @@
-using Common.Messaging;
+﻿using Common.Messaging;
 using Common.Util;
 using E2E.Tests.Environment;
 using E2E.Tests.Environment.Instance;
+using E2E.Tests.Environment.Mock;
+using E2E.Tests.Environment.MockEngine;
 using E2E.Tests.Util;
 using GameInterface.Services.Entity;
 using GameInterface.Services.MapEvents.Messages;
+using GameInterface.Services.MapEvents;
 using GameInterface.Services.Players;
 using GameInterface.Services.Players.Data;
 using HarmonyLib;
@@ -50,6 +53,39 @@ public class MissionTestEnvironment : E2ETestEnvironment
         instance.Call(() => instance.Resolve<IControllerIdProvider>().SetControllerId(controllerId));
     }
 
+    protected static MockMission CreateMovementMission(
+        MissionEngineFixture fixture,
+        EnvironmentInstance instance)
+    {
+        MockMission mission = fixture.CreateMission(instance);
+        instance.Resolve<IMessageBroker>().Publish(
+            fixture,
+            new NetworkMissionPeerEntered("movement-receiver", "movement-test"));
+        return mission;
+    }
+
+    /// <summary>Creates a headless mission and joins its client to the deterministic mission mesh.</summary>
+    protected static MockMission CreateConnectedMission(
+        MissionEngineFixture fixture,
+        EnvironmentInstance instance,
+        string instanceId)
+    {
+        MockMission mission = fixture.CreateMission(instance);
+        MockBattleNetwork mesh = instance.Resolve<MockBattleNetwork>();
+        mesh.Start();
+        mesh.ConnectToInstance(instanceId);
+        return mission;
+    }
+
+    /// <summary>Decodes a received battle-agent batch from its actual wire payload.</summary>
+    protected static BattleAgentSpawnData[] DecodeSpawnBatch(
+        EnvironmentInstance instance,
+        NetworkSpawnBattleAgents message)
+    {
+        Assert.True(instance.Resolve<IBattleAgentSpawnBatchCodec>().TryDecode(message, out var agents));
+        return agents;
+    }
+
     /// <summary>
     /// Stands up a coop field battle: one player <see cref="MobileParty"/> per supplied controller id, all in
     /// a single <see cref="MapEvent"/> and registered as players on every instance, with client <c>i</c> given
@@ -80,6 +116,9 @@ public class MissionTestEnvironment : E2ETestEnvironment
             for (int i = 2; i < parties.Length; i++)
                 parties[i].Party.MapEventSide = mapEvent.AttackerSide;
 
+            mapEvent.MapEventVisual = null;
+            Campaign.Current.MapEventManager.OnMapEventCreated(mapEvent);
+
             Assert.True(Server.ObjectManager.TryGetId(mapEvent, out mapEventId));
             for (int i = 0; i < parties.Length; i++)
                 Assert.True(Server.ObjectManager.TryGetId(parties[i], out partyIds[i]));
@@ -97,14 +136,18 @@ public class MissionTestEnvironment : E2ETestEnvironment
     }
 
     /// <summary>Registers a hero/party pair as a player on every instance (controller id → party).</summary>
-    protected void RegisterAsPlayerParty(string controllerId, string heroId, string partyId)
+    protected void RegisterAsPlayerParty(
+        string controllerId,
+        string heroId,
+        string partyId,
+        string characterObjectId = "MyCharacterObjectId")
     {
         void Register(EnvironmentInstance instance)
         {
             instance.Call(() =>
             {
                 var registry = instance.Resolve<IPlayerManager>();
-                registry.AddPlayer(new Player(controllerId, heroId, partyId, "MyClanId", "MyCharacterObjectId"));
+                registry.AddPlayer(new Player(controllerId, heroId, partyId, "MyClanId", characterObjectId));
                 Assert.True(registry.TryGetPlayer(controllerId, out _));
             });
         }
@@ -115,16 +158,35 @@ public class MissionTestEnvironment : E2ETestEnvironment
     }
 
     /// <summary>
-    /// Simulates <paramref name="client"/> opening the battle mission: publishes <see cref="PlayerEnteredBattle"/>,
-    /// which makes its <c>BattleHostHandler</c> request election from the server. The whole round-trip runs
-    /// synchronously through the mock network (GameThread.Run is inline on the test's game thread).
+    /// Simulates <paramref name="client"/> joining the battle. Publishes <see cref="PlayerEnteredBattle"/>
+    /// (opening the mission — its <c>BattleHostHandler</c> requests this client's OWN reserves) and, by
+    /// default, immediately follows with <see cref="MakeMissionReady"/> (finished loading — the handler
+    /// requests host election, BR-010). Pass <paramref name="missionReady"/> = false to model a player still
+    /// on the loading screen (entered but not yet mission-ready). The whole round-trip runs synchronously
+    /// through the mock network (GameThread.Run is inline on the test's game thread).
     /// </summary>
-    protected void EnterBattle(EnvironmentInstance client, string mapEventId)
+    protected void EnterBattle(EnvironmentInstance client, string mapEventId, bool missionReady = true)
     {
         client.Call(() =>
         {
             Assert.True(client.ObjectManager.TryGetObject<MapEvent>(mapEventId, out var mapEvent));
             client.Resolve<IMessageBroker>().Publish(this, new PlayerEnteredBattle(mapEvent));
+        });
+
+        if (missionReady)
+            MakeMissionReady(client, mapEventId);
+    }
+
+    /// <summary>
+    /// Simulates <paramref name="client"/> finishing its battle mission load (MISSION-READY, BR-010):
+    /// publishes <see cref="BattleMissionReady"/> — in the live game <c>CoopBattleController.AfterStart</c>
+    /// does this — which makes its <c>BattleHostHandler</c> request host election from the server.
+    /// </summary>
+    protected void MakeMissionReady(EnvironmentInstance client, string mapEventId)
+    {
+        client.Call(() =>
+        {
+            client.Resolve<IMessageBroker>().Publish(this, new BattleMissionReady(mapEventId));
         });
     }
 
@@ -139,6 +201,18 @@ public class MissionTestEnvironment : E2ETestEnvironment
         {
             Server.Resolve<IMessageBroker>().Publish(this,
                 new MissionMemberDeparted(controllerId, mapEventId, wasRetreat, isInstanceEmpty));
+        });
+    }
+
+    /// <summary>Asserts no host assignment exists for the battle on <paramref name="instance"/> — e.g. every
+    /// participant is still on the loading screen, so no one is mission-ready and no election ran (BR-010).</summary>
+    protected void AssertNoHost(EnvironmentInstance instance, string mapEventId)
+    {
+        instance.Call(() =>
+        {
+            var registry = instance.Resolve<IBattleHostRegistry>();
+            Assert.False(registry.TryGet(mapEventId, out _),
+                $"Expected no host assignment for {mapEventId} on {instance.GetType().Name}");
         });
     }
 

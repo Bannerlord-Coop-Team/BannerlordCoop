@@ -111,6 +111,14 @@ internal static class PlayerPartyTradeContext
         return barterable.OriginalParty == LocalParty;
     }
 
+    public static bool CanSetOfferedAmount(Barterable barterable, int currentAmount, int newAmount)
+    {
+        if (!IsActive || isApplyingServerOffer) return true;
+        if (currentAmount == 0 && newAmount == 1) return true;
+
+        return CanOffer(barterable);
+    }
+
     public static bool CanAccept()
         => !IsActive || !LocalAccepted;
 
@@ -527,24 +535,11 @@ internal static class PlayerPartyTradeContext
 
         if (character == null) return false;
 
-        var hero = character.HeroObject;
-        var isHero = hero != null;
-        string characterId;
-        if (isHero)
-        {
-            if (!objectManager.TryGetId(hero, out characterId)) return false;
-        }
-        else if (!objectManager.TryGetId(character, out characterId)) return false;
-
-        key = GetCharacterKey(characterId, isHero);
-        return true;
+        return objectManager.TryGetId(character, out key);
     }
 
     private static string GetItemKey(ItemObjectData itemObjectData)
         => $"{itemObjectData.ItemObjectId}|{itemObjectData.ItemModifierId}|{itemObjectData.ItemModifierNull}";
-
-    private static string GetCharacterKey(string characterId, bool isHero)
-        => $"{characterId}|{isHero}";
 
     private static TaleWorlds.Library.MBBindingList<BarterItemVM> GetOfferListForItem(BarterVM barterVM, BarterItemVM item)
     {

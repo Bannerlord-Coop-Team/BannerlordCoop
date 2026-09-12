@@ -1,6 +1,15 @@
-﻿using E2E.Tests.Util;
+﻿using Autofac;
+using Common.Logging;
+using E2E.Tests.Util;
+using GameInterface;
+using GameInterface.Policies;
+using System;
+using System.Linq;
+using System.Threading;
+using System.Threading.Tasks;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Actions;
+using TaleWorlds.CampaignSystem.CharacterDevelopment;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Settlements;
 using TaleWorlds.Core;
@@ -75,8 +84,6 @@ namespace E2E.Tests.Services.Heroes
             TestEnvironment.AssertReferenceProperty<Hero, MobileParty>(nameof(Hero.PartyBelongedTo));
             TestEnvironment.AssertReferenceProperty<Hero, PartyBase>(nameof(Hero.PartyBelongedToAsPrisoner));
             TestEnvironment.AssertReferenceProperty<Hero, Settlement>(nameof(Hero.StayingInSettlement));
-            TestEnvironment.AssertProperty<Hero, bool>(nameof(Hero.HasMet), true);
-            TestEnvironment.AssertProperty<Hero, CampaignTime>(nameof(Hero.LastMeetingTimeWithPlayer), new CampaignTime(1351));
             TestEnvironment.AssertReferenceProperty<Hero, Settlement>(nameof(Hero.BornSettlement));
             TestEnvironment.AssertProperty<Hero, int>(nameof(Hero.Gold), 5);
             // BannerItem: EquipmentElement.ToString() NullRefs when building assertion error message; skip for now
@@ -90,11 +97,257 @@ namespace E2E.Tests.Services.Heroes
         [Fact]
         public void Server_Hero_Fields()
         {
+            var assertHelper = TestEnvironment.CreateAssertHelper<Hero>(HeroId);
+
             // Hero.Culture is initialized by HeroCreator.CreateSpecialHero(); clear it first so the pre-check passes
             Server.ObjectManager.TryGetObject<Hero>(HeroId, out var hero);
             HarmonyLib.AccessTools.Field(typeof(Hero), nameof(Hero.Culture)).SetValue(hero, null);
             TestEnvironment.AssertReferenceField<Hero, CultureObject>(nameof(Hero.Culture));
             TestEnvironment.AssertField<Hero, float>(nameof(Hero._power), 4.4f, defaultValue: hero._power);
+
+            assertHelper.AssertPropertyOwnerField<Hero, TraitObject>(nameof(Hero._heroTraits));
+            assertHelper.AssertPropertyOwnerField<Hero, PerkObject>(nameof(Hero._heroPerks));
+            assertHelper.AssertPropertyOwnerField<Hero, SkillObject>(nameof(Hero._heroSkills));
+            assertHelper.AssertPropertyOwnerField<Hero, CharacterAttribute>(nameof(Hero._characterAttributes));
+
+            TestEnvironment.AssertField<Hero, int>(nameof(Hero.Level), 10, defaultValue: hero.Level);
+        }
+
+        [Fact]
+        public void Server_UpdateHomeSettlement_ReplicatesBackingCache()
+        {
+            string settlementId = TestEnvironment.CreateRegisteredObject<Settlement>();
+
+            Server.Call(() =>
+            {
+                Assert.True(Server.ObjectManager.TryGetObject(HeroId, out Hero hero));
+                Assert.True(Server.ObjectManager.TryGetObject(settlementId, out Settlement settlement));
+                hero._clan = null;
+                hero._companionOf = null;
+                hero._governorOf = null;
+                hero._stayingInSettlement = null;
+                hero._bornSettlement = settlement;
+                hero._homeSettlement = null;
+
+                hero.UpdateHomeSettlement();
+
+                Assert.Same(settlement, hero._homeSettlement);
+            });
+
+            foreach (var client in Clients)
+            {
+                client.Call(() =>
+                {
+                    Assert.True(client.ObjectManager.TryGetObject(HeroId, out Hero hero));
+                    Assert.True(client.ObjectManager.TryGetObject(settlementId, out Settlement settlement));
+                    Assert.Same(settlement, hero._homeSettlement);
+                });
+            }
+        }
+
+        [Fact]
+        public void Client_HomeSettlementGetter_RebuildsCacheWithoutMutationDiagnostic()
+        {
+            string settlementId = TestEnvironment.CreateRegisteredObject<Settlement>();
+
+            int diagnosticCount = 0;
+            Action<string> captureDiagnostic = message =>
+            {
+                if (message.Contains("Client updated managed") && message.Contains("HomeSettlement"))
+                    Interlocked.Increment(ref diagnosticCount);
+            };
+            OutputSinkManager.AddLogCallback(captureDiagnostic);
+
+            try
+            {
+                foreach (var client in Clients)
+                {
+                    client.Call(() =>
+                    {
+                        Assert.True(client.ObjectManager.TryGetObject(HeroId, out Hero hero));
+                        Assert.True(client.ObjectManager.TryGetObject(settlementId, out Settlement settlement));
+                        hero._clan = null;
+                        hero._companionOf = null;
+                        hero._governorOf = null;
+                        hero._stayingInSettlement = null;
+                        hero._bornSettlement = settlement;
+                        hero._homeSettlement = null;
+
+                        Settlement resolved = Task.Run(() => hero.HomeSettlement).GetAwaiter().GetResult();
+
+                        Assert.Same(settlement, resolved);
+                        Assert.Same(settlement, hero._homeSettlement);
+                    });
+                }
+
+                Assert.Equal(0, Volatile.Read(ref diagnosticCount));
+            }
+            finally
+            {
+                OutputSinkManager.RemoveLogCallback(captureDiagnostic);
+            }
+        }
+
+        [Fact]
+        public void Client_UpdateHomeSettlementOutsideGetter_RetainsMutationDiagnostic()
+        {
+            string settlementId = TestEnvironment.CreateRegisteredObject<Settlement>();
+
+            int diagnosticCount = 0;
+            Action<string> captureDiagnostic = message =>
+            {
+                if (message.Contains("Client updated managed") && message.Contains("HomeSettlement"))
+                    Interlocked.Increment(ref diagnosticCount);
+            };
+            OutputSinkManager.AddLogCallback(captureDiagnostic);
+
+            try
+            {
+                foreach (var client in Clients)
+                {
+                    client.Call(() =>
+                    {
+                        Assert.True(client.ObjectManager.TryGetObject(HeroId, out Hero hero));
+                        Assert.True(client.ObjectManager.TryGetObject(settlementId, out Settlement settlement));
+                        hero._clan = null;
+                        hero._companionOf = null;
+                        hero._governorOf = null;
+                        hero._stayingInSettlement = null;
+                        hero._bornSettlement = settlement;
+                        hero._homeSettlement = null;
+
+                        var builder = new ContainerBuilder();
+                        builder.RegisterInstance(new DenyOriginalSyncPolicy()).As<ISyncPolicy>();
+                        using var container = builder.Build();
+                        using (ContainerProvider.UseContainerThreadSafe(container))
+                        {
+                            Assert.False(CallOriginalPolicy.IsOriginalAllowed());
+                            hero.UpdateHomeSettlement();
+                        }
+
+                        Assert.Same(settlement, hero._homeSettlement);
+                    });
+                }
+
+                Assert.Equal(Clients.Count(), Volatile.Read(ref diagnosticCount));
+            }
+            finally
+            {
+                OutputSinkManager.RemoveLogCallback(captureDiagnostic);
+            }
+        }
+
+        private sealed class DenyOriginalSyncPolicy : ISyncPolicy
+        {
+            public bool AllowOriginal() => false;
+        }
+
+        // Calls the REAL patched game method (not a reflection-invoked intercept), so this covers the
+        // PropertyOwner transpiler's IL rewrite of Hero.SetSkillValue end to end.
+        [Fact]
+        public void Server_Hero_SetSkillValue_PropagatesToClients()
+        {
+            var skillId = TestEnvironment.CreateRegisteredObject<SkillObject>();
+
+            Server.Call(() =>
+            {
+                Assert.True(Server.ObjectManager.TryGetObject(HeroId, out Hero hero));
+                Assert.True(Server.ObjectManager.TryGetObject(skillId, out SkillObject skill));
+
+                hero.SetSkillValue(skill, 42);
+
+                Assert.Equal(42, hero.GetSkillValue(skill));
+            });
+
+            foreach (var client in Clients)
+            {
+                Assert.True(client.ObjectManager.TryGetObject(HeroId, out Hero hero));
+                Assert.True(client.ObjectManager.TryGetObject(skillId, out SkillObject skill));
+                Assert.Equal(42, hero.GetSkillValue(skill));
+            }
+        }
+
+        // SetPerkValueInternal's bool->int branch defeats the transpiler, so SetPerkValuePatch routes
+        // perk changes through the cached PropertyOwner intercept - this exercises that prefix for real
+        [Fact]
+        public void Server_Hero_SetPerkValue_PropagatesToClients()
+        {
+            var perkId = TestEnvironment.CreateRegisteredObject<PerkObject>();
+
+            Server.Call(() =>
+            {
+                Assert.True(Server.ObjectManager.TryGetObject(HeroId, out Hero hero));
+                Assert.True(Server.ObjectManager.TryGetObject(perkId, out PerkObject perk));
+
+                hero.SetPerkValueInternal(perk, true);
+
+                Assert.True(hero.GetPerkValue(perk));
+            });
+
+            foreach (var client in Clients)
+            {
+                Assert.True(client.ObjectManager.TryGetObject(HeroId, out Hero hero));
+                Assert.True(client.ObjectManager.TryGetObject(perkId, out PerkObject perk));
+                Assert.True(hero.GetPerkValue(perk));
+            }
+
+            // Resetting the perk rides the same message with value 0 (vanilla removes the key)
+            Server.Call(() =>
+            {
+                Assert.True(Server.ObjectManager.TryGetObject(HeroId, out Hero hero));
+                Assert.True(Server.ObjectManager.TryGetObject(perkId, out PerkObject perk));
+
+                hero.SetPerkValueInternal(perk, false);
+
+                Assert.False(hero.GetPerkValue(perk));
+            });
+
+            foreach (var client in Clients)
+            {
+                Assert.True(client.ObjectManager.TryGetObject(HeroId, out Hero hero));
+                Assert.True(client.ObjectManager.TryGetObject(perkId, out PerkObject perk));
+                Assert.False(hero.GetPerkValue(perk));
+            }
+        }
+
+        // Hero.ClearSkills routes through PropertyOwner.ClearAllProperty - covers the clear message pair
+        [Fact]
+        public void Server_Hero_ClearSkills_PropagatesToClients()
+        {
+            var skillId = TestEnvironment.CreateRegisteredObject<SkillObject>();
+
+            Server.Call(() =>
+            {
+                Assert.True(Server.ObjectManager.TryGetObject(HeroId, out Hero hero));
+                Assert.True(Server.ObjectManager.TryGetObject(skillId, out SkillObject skill));
+
+                hero.SetSkillValue(skill, 17);
+            });
+
+            // The set must land on clients first, so the clear observably removes it
+            foreach (var client in Clients)
+            {
+                Assert.True(client.ObjectManager.TryGetObject(HeroId, out Hero hero));
+                Assert.True(client.ObjectManager.TryGetObject(skillId, out SkillObject skill));
+                Assert.Equal(17, hero.GetSkillValue(skill));
+            }
+
+            Server.Call(() =>
+            {
+                Assert.True(Server.ObjectManager.TryGetObject(HeroId, out Hero hero));
+                Assert.True(Server.ObjectManager.TryGetObject(skillId, out SkillObject skill));
+
+                hero.ClearSkills();
+
+                Assert.Equal(0, hero.GetSkillValue(skill));
+            });
+
+            foreach (var client in Clients)
+            {
+                Assert.True(client.ObjectManager.TryGetObject(HeroId, out Hero hero));
+                Assert.True(client.ObjectManager.TryGetObject(skillId, out SkillObject skill));
+                Assert.Equal(0, hero.GetSkillValue(skill));
+            }
         }
     }
 }

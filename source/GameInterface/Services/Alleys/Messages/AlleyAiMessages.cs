@@ -74,11 +74,18 @@ public readonly struct NetworkAlleyUnderAttack : ICommand
     public readonly string AttackerAlleyId;
     [ProtoMember(3)]
     public readonly CampaignTime DueDate;
-    public NetworkAlleyUnderAttack(string alleyId, string attackerAlleyId, CampaignTime dueDate)
+    [ProtoMember(4)]
+    public readonly bool ShowNotification;
+    public NetworkAlleyUnderAttack(
+        string alleyId,
+        string attackerAlleyId,
+        CampaignTime dueDate,
+        bool showNotification)
     {
         AlleyId = alleyId;
         AttackerAlleyId = attackerAlleyId;
         DueDate = dueDate;
+        ShowNotification = showNotification;
     }
 }
 

@@ -1,45 +1,19 @@
 ﻿using Common.Messaging;
 using ProtoBuf;
 using System.Collections.Generic;
-using TaleWorlds.CampaignSystem.CampaignBehaviors;
-using TaleWorlds.CampaignSystem.Settlements;
 
 namespace GameInterface.Services.Smithing.Messages;
 
-public record HourTicked : IEvent
-{
-    public CraftingCampaignBehavior CraftingCampaignBehavior;
-
-    public HourTicked(CraftingCampaignBehavior craftingCampaignBehavior)
-    {
-        CraftingCampaignBehavior = craftingCampaignBehavior;
-    }
-}
-
-public record DailySettlementTick : IEvent
-{
-    public CraftingCampaignBehavior CraftingCampaignBehavior;
-    public Settlement Settlement;
-
-    public DailySettlementTick(CraftingCampaignBehavior craftingCampaignBehavior, Settlement settlement)
-    {
-        CraftingCampaignBehavior = craftingCampaignBehavior;
-        Settlement = settlement;
-    }
-}
+public readonly struct HourTicked : IEvent { }
 
 [ProtoContract(SkipConstructor = true)]
-public class NetworkHourlyTick : ICommand
+internal readonly struct NetworkHourlyTick : ICommand
 {
     [ProtoMember(1)]
-    public string CraftingCampaignBehaviorId;
+    public readonly Dictionary<string, int> HeroIdCraftingRecords;
 
-    [ProtoMember(2)]
-    public Dictionary<string, int> HeroIdCraftingRecords;
-
-    public NetworkHourlyTick(string craftingCampaignBehaviorId, Dictionary<string, int> heroIdCraftingRecords)
+    public NetworkHourlyTick(Dictionary<string, int> heroIdCraftingRecords)
     {
-        CraftingCampaignBehaviorId = craftingCampaignBehaviorId;
         HeroIdCraftingRecords = heroIdCraftingRecords;
     }
 }

@@ -47,6 +47,9 @@ internal class PartyHealHandler : IHandler
         {
             if (!objectManager.TryGetObjectWithLogging<MobileParty>(player.MobilePartyId, out var mobileParty)) continue;
 
+            // Skip healing mobile parties that are in a MapEvent
+            if (mobileParty.MapEvent != null) continue;
+
             obj.What.PartyHealCampaignBehavior.TryHealOrWoundParty(mobileParty.Party, (float)CampaignTime.HoursInDay);
         }
     }
@@ -55,10 +58,7 @@ internal class PartyHealHandler : IHandler
     {
         var mobileParty = obj.What.MobileParty;
 
-        // Vanilla's quarter-daily tick heals every party EXCEPT the main party, which the hourly
-        // tick covers instead. In coop every player party is a "main party" healed by
-        // Handle_PartyHealHourlyTick, so skip them here and heal everyone else — this previously
-        // filtered the wrong way around, leaving all NPC parties' wounded unhealed forever.
+        // Skip null and player parties. Player parties handled by HourlyTick
         if (mobileParty == null || mobileParty.IsPlayerParty()) return;
 
         obj.What.PartyHealCampaignBehavior.TryHealOrWoundParty(mobileParty.Party, 4f);

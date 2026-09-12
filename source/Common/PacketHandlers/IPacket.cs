@@ -16,9 +16,15 @@ namespace Common.PacketHandlers
         FieldAutoSync,
         PropertyAutoSync,
         SaveData,
+        SaveDataChunk,
         Relay,
         AgentAction,
-        MountMovement
+        MountMovement,
+        AggregateMessage,
+        CampaignTime,
+        AgentEquipment,
+        CompressedMovement,
+        Voice
     }
 
     public interface IPacket

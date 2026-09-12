@@ -3,12 +3,12 @@ using TaleWorlds.Core;
 using TaleWorlds.Localization;
 
 namespace GameInterface.Services.ItemObjects.Messages;
-public record CraftedWeaponNameSet : ICommand
+public readonly struct SetCraftedWeaponName : ICommand
 {
-    public ItemObject Weapon;
-    public TextObject Name;
+    public readonly ItemObject Weapon;
+    public readonly TextObject Name;
 
-    public CraftedWeaponNameSet(ItemObject weapon, TextObject name)
+    public SetCraftedWeaponName(ItemObject weapon, TextObject name)
     {
         Weapon = weapon;
         Name = name;

@@ -3,6 +3,7 @@ using Common.Logging;
 using Common.Messaging;
 using GameInterface.Policies;
 using GameInterface.Services.MapEvents;
+using GameInterface.Services.MapEvents.Extensions;
 using GameInterface.Services.MapEvents.Messages.Start;
 using GameInterface.Services.MapEventSides.Messages;
 using GameInterface.Services.MobileParties.Extensions;
@@ -10,10 +11,12 @@ using HarmonyLib;
 using Serilog;
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Reflection;
 using System.Reflection.Emit;
 using TaleWorlds.CampaignSystem.MapEvents;
 using TaleWorlds.CampaignSystem.Party;
+using TaleWorlds.CampaignSystem.Roster;
 using TaleWorlds.Library;
 
 namespace GameInterface.Services.MapEventSides.Patches;
@@ -34,12 +37,7 @@ internal class MapEventSidePatches
             typeof(MapEventSidePatches),
             nameof(AddIntercept));
 
-    // A player joining an existing battle runs PartyBase.MapEventSide setter -> AddPartyInternal on their own client.
-    // That local add is server-only-replicated (see AddIntercept) and would create a divergent, unbroadcast
-    // MapEventParty, so other clients never see the join. Intercept it on the client: ask the server to perform the
-    // join authoritatively (which replicates back to everyone, including this client) and skip the local mutation.
-    // The joining party's PartyBase._mapEventSide back-ref is set by the setter *before* this call, so the local
-    // player still knows it is in the battle while the authoritative add replicates.
+    // Route player joins through the server so every client receives the same MapEventParty.
     [HarmonyPatch(nameof(MapEventSide.AddPartyInternal))]
     [HarmonyPrefix]
     private static bool Prefix_AddPartyInternal(MapEventSide __instance, PartyBase party)
@@ -58,7 +56,19 @@ internal class MapEventSidePatches
         // Client: route a player's join through the server. Non-player client-side adds keep their existing behavior.
         if (party?.MobileParty?.IsPlayerParty() == true && __instance.MapEvent != null)
         {
-            MessageBroker.Instance.Publish(__instance, new PlayerJoinBattleAttempted(party, __instance.MapEvent, __instance.MissionSide));
+            var mapEvent = __instance.MapEvent;
+            var side = __instance.MissionSide;
+
+            if (mapEvent.FindMapEventParty(party, out var existingSide) != null)
+            {
+                party._mapEventSide = existingSide;
+                return false;
+            }
+
+            // The setter assigned this before calling AddPartyInternal. Clear it before publishing so a
+            // synchronous authoritative echo cannot be erased after it attaches the real MapEventParty.
+            party._mapEventSide = null;
+            MessageBroker.Instance.Publish(__instance, new PlayerJoinBattleAttempted(party, mapEvent, side));
             return false;
         }
 
@@ -135,10 +145,42 @@ internal class MapEventSidePatches
         if (isPlayerParty is null)
             throw new MissingMethodException("Failed to find MobilePartyExtensions.IsPlayerParty(MobileParty)");
 
+        var toTroopRosterElementArray = typeof(Enumerable)
+            .GetMethods(BindingFlags.Public | BindingFlags.Static)
+            .Single(method =>
+                method.Name == nameof(Enumerable.ToArray) &&
+                method.IsGenericMethodDefinition &&
+                method.GetParameters().Length == 1)
+            .MakeGenericMethod(typeof(TroopRosterElement));
+
+        var materializedInstructions = new List<CodeInstruction>();
+        var materializedDeathMarkedHeroes = false;
+        foreach (var instruction in instructions)
+        {
+            materializedInstructions.Add(instruction);
+
+            if (materializedDeathMarkedHeroes ||
+                !(instruction.operand is MethodInfo method) ||
+                method.Name != "WhereQ" ||
+                !method.IsGenericMethod ||
+                method.GetGenericArguments()[0] != typeof(TroopRosterElement)) continue;
+
+            // Killing a companion can refresh this roster cache while vanilla is enumerating it
+            materializedInstructions.Add(new CodeInstruction(OpCodes.Call, toTroopRosterElementArray));
+            materializedDeathMarkedHeroes = true;
+        }
+
+        if (!materializedDeathMarkedHeroes)
+        {
+            throw new Exception(
+                "Failed to patch MapEventSide.HandleMapEventEndForPartyInternal: " +
+                "could not find the death-marked hero query.");
+        }
+
         var matcher = new Queue<CodeInstruction>();
         var patched = false;
 
-        foreach (var instruction in instructions)
+        foreach (var instruction in materializedInstructions)
         {
             matcher.Enqueue(instruction);
 

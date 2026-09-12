@@ -1,4 +1,4 @@
-using GameInterface.Services.ObjectManager;
+﻿using GameInterface.Services.ObjectManager;
 using System;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.Library;
@@ -10,17 +10,18 @@ namespace GameInterface.Services.MapEvents;
 /// keeping the bookkeeping in <see cref="ConversationPartyTracker"/> and the party's AI state in step.
 /// </summary>
 /// <remarks>
-/// Holding stops the party's current movement (<see cref="MobileParty.SetMoveModeHold"/>) and freezes its decision
-/// making (<see cref="MobilePartyAi.DisableAi"/>) so it stays in place while campaign time keeps running for the
-/// other players. <c>MobilePartyAi._isDisabled</c> is dynamically synced, so clients see the held state too. A
-/// party whose AI was already disabled (e.g. by a quest) is tracked but left untouched. All methods must run on
-/// the game's main thread.
+/// Holding stops a roaming party's current movement (<see cref="MobileParty.SetMoveModeHold"/>) and freezes its
+/// decision making (<see cref="MobilePartyAi.DisableAi"/>) so it stays in place while campaign time keeps running
+/// for the other players. Besiegers retain their siege movement state because the camp already keeps them stationary.
+/// <c>MobilePartyAi._isDisabled</c> is dynamically synced, so clients see the held state too. A party whose AI was
+/// already disabled (e.g. by a quest) is tracked but left untouched. All methods must run on the game's main thread.
 /// </remarks>
 internal static class ConversationPartyHold
 {
     private static readonly TimeSpan BlockedMessageCooldown = TimeSpan.FromSeconds(5);
 
-    private static DateTime lastBlockedMessageUtc = DateTime.MinValue;
+    private static DateTime lastInteractionBlockedMessageUtc = DateTime.MinValue;
+    private static DateTime lastPlayerUnavailableMessageUtc = DateTime.MinValue;
 
     /// <summary>
     /// Shows the local player why their interaction with an engaged party did nothing, at most once per cooldown
@@ -28,31 +29,57 @@ internal static class ConversationPartyHold
     /// </summary>
     public static void ShowInteractionBlockedMessage()
     {
-        var now = DateTime.UtcNow;
-        if (now - lastBlockedMessageUtc < BlockedMessageCooldown) return;
-        lastBlockedMessageUtc = now;
+        ShowBlockedMessage(
+            ref lastInteractionBlockedMessageUtc,
+            "You cannot interact with the party while another player is interacting with it");
+    }
 
-        InformationManager.DisplayMessage(new InformationMessage(
-            "You cannot interact with the party while another player is interacting with it"));
+    /// <summary>Shows the local player that the targeted player cannot currently be spoken to.</summary>
+    public static void ShowPlayerUnavailableMessage()
+    {
+        ShowBlockedMessage(ref lastPlayerUnavailableMessageUtc, "You cannot speak to this player right now");
+    }
+
+    private static void ShowBlockedMessage(ref DateTime lastMessageUtc, string message)
+    {
+        var now = DateTime.UtcNow;
+        if (now - lastMessageUtc < BlockedMessageCooldown) return;
+        lastMessageUtc = now;
+
+        InformationManager.DisplayMessage(new InformationMessage(message));
     }
 
     /// <summary>
-    /// Marks the party as engaged by the given player and holds it in place. Fails when another player already
-    /// engages the party, or when this player still holds an engagement with a different party (first approval
-    /// wins; that hold is released when its conversation ends).
+    /// Marks the party as engaged and holds it in place. The tracker refuses a party another player already holds,
+    /// so a successful call means this engager owns it alone.
     /// </summary>
-    public static bool TryEngage(ConversationPartyTracker tracker, object engagerKey, string engagerPartyId, MobileParty party, string partyId)
+    public static bool TryEngage(
+        ConversationPartyTracker tracker,
+        object engagerKey,
+        string engagerPartyId,
+        MobileParty party,
+        string partyId,
+        bool engagerIsDefender,
+        string requestId = null)
     {
         if (tracker == null || party == null) return false;
 
         var wasAiDisabled = party.Ai?.IsDisabled != false;
 
-        if (!tracker.TryBeginEngagement(engagerKey, engagerPartyId, partyId, wasAiDisabled))
+        if (!tracker.TryBeginEngagement(
+                engagerKey,
+                engagerPartyId,
+                partyId,
+                wasAiDisabled,
+                engagerIsDefender,
+                requestId))
             return false;
 
         if (!wasAiDisabled)
         {
-            party.SetMoveModeHold();
+            // A besieger is already stationary; SetMoveModeHold clears BesiegeSettlement and vanilla evicts it next tick.
+            if (party.BesiegerCamp == null)
+                party.SetMoveModeHold();
 
             // Certain parties such as caravans are still able to make new decisions even with their AI disabled
             // Setting DoNotMakeNewDecisions to true blocks setting new behaviors for these parties
@@ -65,18 +92,32 @@ internal static class ConversationPartyHold
 
     /// <summary>Ends the given player's engagement and releases the held party, if any.</summary>
     public static void EndEngagement(ConversationPartyTracker tracker, object engagerKey)
+        => EndEngagement(tracker, engagerKey, requestId: null, requireRequestIdMatch: false);
+
+    /// <summary>Ends an engagement only when it is still owned by the supplied conversation request.</summary>
+    public static void EndEngagement(
+        ConversationPartyTracker tracker,
+        object engagerKey,
+        string requestId,
+        bool requireRequestIdMatch)
     {
         if (tracker == null) return;
 
-        if (!tracker.TryEndEngagement(engagerKey, out var partyId, out var engagement))
+        if (!tracker.TryEndEngagement(
+                engagerKey,
+                out var partyId,
+                out var engagement,
+                out var shouldReleaseParty,
+                requestId,
+                requireRequestIdMatch))
             return;
 
-        ReleaseParty(tracker.ObjectManager, partyId, engagement.WasAiDisabled);
+        if (shouldReleaseParty)
+            ReleaseParty(tracker.ObjectManager, partyId, engagement.WasAiDisabled);
     }
 
     /// <summary>
-    /// [Server] True when the target party is held in a player's conversation and the interacting party is not the
-    /// engaging player's own party, so the map interaction must be blocked.
+    /// [Server] True when the target is held and the interacting party is not the single player holding it.
     /// </summary>
     public static bool IsInteractionBlocked(PartyBase targetParty, MobileParty interactor)
     {
@@ -94,9 +135,14 @@ internal static class ConversationPartyHold
         if (interactor?.Party != null)
             objectManager.TryGetId(interactor.Party, out interactorId);
 
-        // AI party held in a conversation: only the engaging player's party may interact.
-        if (tracker.TryGetEngagement(targetPartyId, out var engagement))
-            return interactorId != engagement.EngagerPartyId;
+        // A held party belongs to exactly one player: the tracker now refuses a second engagement on
+        // the same party, so only the holder may interact and everyone else is blocked. This used to
+        // let every contender in a shared hostile encounter through, which meant two players could
+        // each run the same one-shot outcome against one lord. Simultaneous attackers still converge
+        // on one MapEvent - see ConversationRequestHandler, where the contender's retry is approved
+        // once the holder has started the battle.
+        if (tracker.TryGetEngagement(targetPartyId, out _))
+            return !tracker.IsEngagerParty(targetPartyId, interactorId);
 
         // PvP conversation: only the partner (the other player in the conversation) may interact.
         if (tracker.TryGetPvpPartner(targetPartyId, out var partnerId))
@@ -107,8 +153,10 @@ internal static class ConversationPartyHold
 
     /// <summary>True when the party is held in a player's conversation (and not already in a battle).</summary>
     public static bool IsInPlayerConversation(MobileParty party)
+        => IsInPlayerConversation(ConversationPartyTracker.Instance, party);
+
+    internal static bool IsInPlayerConversation(ConversationPartyTracker tracker, MobileParty party)
     {
-        var tracker = ConversationPartyTracker.Instance;
         if (tracker == null || tracker.IsEmpty) return false;
 
         if (party?.Party == null || party.MapEvent != null) return false;

@@ -4,22 +4,36 @@ using Common.Messaging;
 using Common.Network;
 using Common.Network.Messages;
 using Common.Util;
+using Coop.Core.Server.Connections;
 using Coop.Core.Server.Connections.Messages;
+using Coop.Core.Server.Services.Save.Messages;
+using GameInterface.Services.Heroes.HeirSelection.Messages;
+using GameInterface.Services.MapEvents.Messages;
+using GameInterface.Services.MapEvents.Messages.Leave;
+using GameInterface.Services.MapEvents.Messages.Start;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.PartyBases.Extensions;
 using GameInterface.Services.PartyVisuals.Extensions;
+using GameInterface.Services.PartyVisuals.Messages;
+using GameInterface.Services.PlayerCaptivityService.Messages;
 using GameInterface.Services.Players;
+using GameInterface.Services.Players.Data;
+using GameInterface.Services.SiegeEvents.Interfaces;
 using HarmonyLib;
 using LiteNetLib;
 using SandBox.View.Map.Managers;
 using Serilog;
+using System.Collections.Generic;
+using System.Linq;
+using TaleWorlds.CampaignSystem;
+using TaleWorlds.CampaignSystem.MapEvents;
 using TaleWorlds.CampaignSystem.Party;
-using GameInterface.Services.PartyVisuals.Messages;
 
 namespace Coop.Core.Server.Services.Players.Handlers;
 /// <summary>
 /// Server-side: hides a disconnected player's party from the map and stops it being simulated, then
-/// restores it once the peer is back in the campaign.
+/// restores it once the peer has synchronized the campaign. Parties in a MapEvent remain active so reconnect
+/// saves preserve their battle membership.
 /// <see cref="MobileParty.IsActive"/> gates spotting/interaction/ticking (see
 /// PartyVisibilityServerPatches, MobilePartyVisualManagerPatches) and is an AutoSync property, so
 /// changing it syncs automatically. But it does NOT remove the party's rendered map figure.
@@ -33,38 +47,71 @@ internal class PlayerPartyVisibilityHandler : IHandler
 
     private readonly IMessageBroker messageBroker;
     private readonly IPlayerManager playerManager;
+    private readonly IConnectionCollection connectionCollection;
     private readonly IObjectManager objectManager;
     private readonly INetwork network;
+    private readonly ISiegeEventInterface siegeEventInterface;
+    private readonly Dictionary<MobileParty, (MapEvent MapEvent, string ControllerId)> deferredMapEventParking = new();
 
     public PlayerPartyVisibilityHandler(
         IMessageBroker messageBroker,
         IPlayerManager playerManager,
+        IConnectionCollection connectionCollection,
         IObjectManager objectManager,
-        INetwork network)
+        INetwork network,
+        ISiegeEventInterface siegeEventInterface)
     {
         this.messageBroker = messageBroker;
         this.playerManager = playerManager;
+        this.connectionCollection = connectionCollection;
         this.objectManager = objectManager;
         this.network = network;
+        this.siegeEventInterface = siegeEventInterface;
 
         messageBroker.Subscribe<PlayerDisconnected>(Handle_PlayerDisconnected);
-        messageBroker.Subscribe<PlayerCampaignEntered>(Handle_PlayerCampaignEntered);
+        messageBroker.Subscribe<PlayerCampaignSynchronized>(Handle_PlayerCampaignSynchronized);
+        messageBroker.Subscribe<PlayerHeirSelectionRequested>(Handle_PlayerHeirSelectionRequested);
+        messageBroker.Subscribe<PlayerHeirSelectionCompleted>(Handle_PlayerHeirSelectionCompleted);
+        messageBroker.Subscribe<PlayerPartyReleasedFromCaptivity>(Handle_PlayerPartyReleasedFromCaptivity);
+        messageBroker.Subscribe<MapEventFinalized>(Handle_MapEventFinalized);
+        messageBroker.Subscribe<SavedPlayerRegistrationsRestored>(Handle_SavedPlayerRegistrationsRestored);
     }
 
     public void Dispose()
     {
         messageBroker.Unsubscribe<PlayerDisconnected>(Handle_PlayerDisconnected);
-        messageBroker.Unsubscribe<PlayerCampaignEntered>(Handle_PlayerCampaignEntered);
+        messageBroker.Unsubscribe<PlayerCampaignSynchronized>(Handle_PlayerCampaignSynchronized);
+        messageBroker.Unsubscribe<PlayerHeirSelectionRequested>(Handle_PlayerHeirSelectionRequested);
+        messageBroker.Unsubscribe<PlayerHeirSelectionCompleted>(Handle_PlayerHeirSelectionCompleted);
+        messageBroker.Unsubscribe<PlayerPartyReleasedFromCaptivity>(Handle_PlayerPartyReleasedFromCaptivity);
+        messageBroker.Unsubscribe<MapEventFinalized>(Handle_MapEventFinalized);
+        messageBroker.Unsubscribe<SavedPlayerRegistrationsRestored>(Handle_SavedPlayerRegistrationsRestored);
+        deferredMapEventParking.Clear();
     }
 
-    /// <summary> A peer dropped: park its party and remove its map figure.
+    private void Handle_SavedPlayerRegistrationsRestored(
+        MessagePayload<SavedPlayerRegistrationsRestored> payload)
+    {
+        if (ModInformation.IsClient) return;
+
+        foreach (var player in playerManager.Players)
+        {
+            if (playerManager.IsConnected(player)) continue;
+            if (!objectManager.TryGetObjectWithLogging<MobileParty>(player.MobilePartyId, out var party))
+                continue;
+
+            ParkParty(player, party, "its saved player is offline");
+        }
+    }
+
+    /// <summary> A peer dropped: park its party and remove its map figure unless it is in a MapEvent.
     private void Handle_PlayerDisconnected(MessagePayload<PlayerDisconnected> payload)
     {
         if (ModInformation.IsClient) return;
 
         var peer = payload.What.PlayerId;
 
-        if (!TryResolveParty(peer, out var party))
+        if (!TryResolveParty(peer, out var player, out var party))
         {
             // Not every disconnect belongs to a player mid-campaign so a miss can be expected, not an error
             return;
@@ -73,32 +120,93 @@ internal class PlayerPartyVisibilityHandler : IHandler
         // playerManager's peer link is only needed to resolve the party above, drop it now regardless
         // of what happens below, so a stale peer never resolves to the wrong party
         playerManager.ClearPeer(peer);
+        messageBroker.Publish(this, new PlayerConnectionStateChanged());
 
         GameThread.RunSafe(() =>
         {
-            if (!party.IsActive)
-            {
-                Logger.Debug("Party {PartyId} already parked, skipping", party.StringId);
-                return;
-            }
-
-            party.IsActive = false;
-
-            RemoveVisual(party);
-
-            Logger.Information("Parked party {PartyId} for disconnected peer {Peer}", party.StringId, peer.Id);
+            ParkParty(player, party, $"peer {peer.Id} disconnected");
         });
     }
 
-    /// <summary> A peer (re)entered the campaign, un-park its party and rebuild its map figure.
-    private void Handle_PlayerCampaignEntered(MessagePayload<PlayerCampaignEntered> payload)
+    private void ParkParty(Player player, MobileParty party, string reason)
+    {
+        var mapEvent = party.MapEvent;
+        if (mapEvent != null)
+        {
+            deferredMapEventParking[party] = (mapEvent, player.ControllerId);
+            messageBroker.Publish(this, new PlayerDisconnectedFromMapEvent(player.ControllerId, mapEvent));
+            Logger.Information(
+                "Keeping party {PartyId} active in MapEvent {MapEventId} because {Reason}",
+                party.StringId,
+                mapEvent.StringId,
+                reason);
+            return;
+        }
+
+        LeaveSiegeBeforeParking(party);
+
+        var wasActive = party.IsActive;
+        party.IsActive = false;
+        party.IsVisible = false;
+        RemoveVisual(party);
+
+        if (!wasActive)
+        {
+            Logger.Debug("Party {PartyId} already parked because {Reason}", party.StringId, reason);
+            return;
+        }
+
+        Logger.Information("Parked party {PartyId} because {Reason}", party.StringId, reason);
+    }
+
+    private void Handle_PlayerHeirSelectionRequested(MessagePayload<PlayerHeirSelectionRequested> payload)
+    {
+        var hero = payload.What.PlayerHero;
+        if (hero == null || !hero.IsDead) return;
+
+        if (!objectManager.TryGetIdWithLogging(hero, out var heroId)) return;
+
+        var player = playerManager.Players.FirstOrDefault(candidate => candidate.HeroId == heroId);
+        if (player == null)
+        {
+            Logger.Error("Could not find the registered player for dead hero {HeroId}", heroId);
+            return;
+        }
+
+        if (!objectManager.TryGetObjectWithLogging<MobileParty>(player.MobilePartyId, out var party)) return;
+
+        ParkParty(player, party, $"player hero {heroId} died");
+    }
+
+    private void Handle_PlayerHeirSelectionCompleted(MessagePayload<PlayerHeirSelectionCompleted> payload)
+    {
+        var hero = payload.What.PlayerHero;
+        if (hero == null || !hero.IsAlive || hero.IsPrisoner || hero.PartyBelongedToAsPrisoner != null) return;
+
+        if (!objectManager.TryGetIdWithLogging(hero, out var heroId)) return;
+
+        var player = playerManager.Players.FirstOrDefault(candidate => candidate.HeroId == heroId);
+        if (player == null ||
+            !objectManager.TryGetObjectWithLogging<MobileParty>(player.MobilePartyId, out var party) ||
+            party.IsActive)
+        {
+            return;
+        }
+
+        ActivateParty(party, player.MobilePartyId);
+        Logger.Information($"Activated party {party.StringId} after player {heroId} selected an heir");
+    }
+
+    /// <summary> A peer finished campaign synchronization, un-park its party and rebuild its map figure.
+    private void Handle_PlayerCampaignSynchronized(MessagePayload<PlayerCampaignSynchronized> payload)
     {
         if (ModInformation.IsClient) return;
 
-        var peer = payload.What.playerId;
+        var peer = payload.What.PlayerId;
 
         if (!playerManager.TryGetPlayer(peer, out var player) ||
-            !objectManager.TryGetObjectWithLogging<MobileParty>(player.MobilePartyId, out var party))
+            !playerManager.TryGetPeer(player.ControllerId, out var currentPeer) ||
+            !ReferenceEquals(currentPeer, peer))
         {
             Logger.Error("Could not resolve party for peer {Peer} on campaign entry", peer.Id);
             return;
@@ -106,16 +214,115 @@ internal class PlayerPartyVisibilityHandler : IHandler
 
         GameThread.RunSafe(() =>
         {
+            if (!objectManager.TryGetObjectWithLogging<MobileParty>(player.MobilePartyId, out var party)) return;
+            if (!objectManager.TryGetObjectWithLogging<Hero>(player.HeroId, out var hero)) return;
+
+            // Player connected while their hero is already dead.
+            // Instead of restoring party bring up heir selection menu.
+            if (hero.IsDead)
+            {
+                messageBroker.Publish(this, new PlayerHeirSelectionRequested(hero));
+                return;
+            }
+
+            deferredMapEventParking.Remove(party);
+            if (party.MapEvent != null)
+                messageBroker.Publish(this, new PlayerReconnectedToMapEvent());
+
             if (party.IsActive)
             {
                 return; // fresh join, never parked, nothing to restore
             }
 
-            party.IsActive = true;
-            CreateVisual(party, player.MobilePartyId);
-            party.Party.UpdateVisibilityAndInspected(party.Position);
+            // Retrieves the player and outs it to the Hero Object
+            // Checks if the player is prisoner or if they belong there
+            // If they do, the Debug message appears.
+            if (hero.IsPrisoner || hero.PartyBelongedToAsPrisoner != null)
+            {
+                Logger.Debug("Keeping captive party {PartyId} parked for peer {Peer}",
+                    party.StringId,
+                    peer.Id);
+                return;
+            }
+
+            ActivateParty(party, player.MobilePartyId);
             Logger.Information("Restored party {PartyId} for reconnected peer {Peer}", party.StringId, peer.Id);
         });
+    }
+
+    private void Handle_PlayerPartyReleasedFromCaptivity(
+        MessagePayload<PlayerPartyReleasedFromCaptivity> payload)
+    {
+        if (ModInformation.IsClient) return;
+
+        var party = payload.What.PlayerParty;
+        if (party == null) return;
+
+        party.IsActive = false;
+        party.IsVisible = false;
+        RemoveVisual(party);
+
+        if (!TryGetPlayer(party, out var player) ||
+            IsPlayerHeroDead(player) ||
+            !playerManager.IsConnected(player) ||
+            !playerManager.TryGetPeer(player.ControllerId, out var peer) ||
+            !connectionCollection.HasCompletedCampaignSynchronization(peer))
+        {
+            Logger.Information(
+                "Kept released party {PartyId} parked because its player is offline or synchronizing",
+                party.StringId);
+            return;
+        }
+
+        ActivateParty(party, player.MobilePartyId);
+        Logger.Information("Restored released party {PartyId} for peer {Peer}", party.StringId, peer.Id);
+    }
+
+    private void ActivateParty(MobileParty party, string mobilePartyId)
+    {
+        party.IsActive = true;
+        CreateVisual(party, mobilePartyId);
+        party.IsVisible = true;
+        party.IsInspected = true;
+    }
+
+    private void Handle_MapEventFinalized(MessagePayload<MapEventFinalized> payload)
+    {
+        if (ModInformation.IsClient) return;
+
+        foreach (var party in deferredMapEventParking
+            .Where(entry => ReferenceEquals(entry.Value.MapEvent, payload.What.MapEvent))
+            .Select(entry => entry.Key)
+            .ToArray())
+        {
+            if (party.MapEvent != null) continue;
+
+            var controllerId = deferredMapEventParking[party].ControllerId;
+            deferredMapEventParking.Remove(party);
+            if (!playerManager.TryGetPlayer(controllerId, out var player) ||
+                (playerManager.IsConnected(player) && !IsPlayerHeroDead(player)))
+            {
+                continue;
+            }
+
+            LeaveSiegeBeforeParking(party);
+            party.IsActive = false;
+            party.IsVisible = false;
+            RemoveVisual(party);
+            Logger.Information(
+                "Parked party {PartyId} after its MapEvent ended while its player was disconnected or dead",
+                party.StringId);
+        }
+    }
+
+    private void LeaveSiegeBeforeParking(MobileParty party)
+    {
+        if (party.BesiegerCamp == null) return;
+
+        Logger.Information(
+            "Removing disconnected party {PartyId} from its siege camp before parking",
+            party.StringId);
+        siegeEventInterface.BreakSiegeForPartyOnly(party);
     }
 
     /// <summary>
@@ -127,7 +334,9 @@ internal class PlayerPartyVisibilityHandler : IHandler
     {
         var partyVisual = party.Party.GetPartyVisual();
         if (partyVisual == null) return;
-        if (!objectManager.TryGetIdWithLogging(partyVisual, out string visualId))
+        if (!objectManager.TryGetIdWithLogging(partyVisual, out string partyVisualId))
+            return;
+        if (!objectManager.TryGetIdWithLogging(party, out string mobilePartyId))
             return;
         objectManager.Remove(partyVisual);
 
@@ -136,7 +345,7 @@ internal class PlayerPartyVisibilityHandler : IHandler
             AccessTools.Method(typeof(MobilePartyVisualManager), "RemovePartyVisualForParty").Invoke(MobilePartyVisualManager.Current, new object[] { party });
         }
 
-        network.SendAll(new NetworkDestroyPartyVisual(visualId));
+        network.SendAll(new NetworkDestroyPartyVisual(partyVisualId, mobilePartyId));
     }
 
     /// <summary>
@@ -167,11 +376,26 @@ internal class PlayerPartyVisibilityHandler : IHandler
         network.SendAll(new NetworkCreatePartyVisual(visualId, mobilePartyId));
     }
 
-    private bool TryResolveParty(NetPeer peer, out MobileParty party)
+    private bool TryResolveParty(NetPeer peer, out Player player, out MobileParty party)
     {
+        player = null;
         party = null;
 
-        return playerManager.TryGetPlayer(peer, out var player) &&
+        return playerManager.TryGetPlayer(peer, out player) &&
             objectManager.TryGetObjectWithLogging(player.MobilePartyId, out party);
+    }
+
+    private bool TryGetPlayer(MobileParty party, out Player player)
+    {
+        player = null;
+        if (!objectManager.TryGetIdWithLogging(party, out var partyId)) return false;
+
+        player = playerManager.Players.FirstOrDefault(candidate => candidate.MobilePartyId == partyId);
+        return player != null;
+    }
+
+    private bool IsPlayerHeroDead(Player player)
+    {
+        return objectManager.TryGetObject<Hero>(player.HeroId, out var hero) && hero.IsDead;
     }
 }

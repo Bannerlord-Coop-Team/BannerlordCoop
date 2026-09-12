@@ -6,18 +6,25 @@ using Common.Util;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.TroopRosters.Interfaces;
 using GameInterface.Services.UI.Notifications.Messages;
+using Helpers;
 using SandBox.CampaignBehaviors;
 using Serilog;
+using System;
 using System.Collections.Generic;
+using System.Linq;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Actions;
+using TaleWorlds.CampaignSystem.CampaignBehaviors;
 using TaleWorlds.CampaignSystem.Extensions;
+using TaleWorlds.CampaignSystem.Map;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Roster;
+using TaleWorlds.CampaignSystem.SceneInformationPopupTypes;
 using TaleWorlds.CampaignSystem.Settlements;
 using TaleWorlds.CampaignSystem.Settlements.Buildings;
 using TaleWorlds.CampaignSystem.Siege;
 using TaleWorlds.Core;
+using TaleWorlds.Engine;
 using TaleWorlds.Library;
 using TaleWorlds.Localization;
 
@@ -450,6 +457,16 @@ internal class DefaultNotificationsHandler : IHandler
 
             if (clan != Clan.PlayerClan) return;
 
+            // Also show notification if companion leaves because of a quest.
+            // Used for transferring companions between players as there is no vanilla detail for this.
+            // This way is safe because the extra message displayed when quests are supported won't be out of place.
+            if (obj.What.Detail == RemoveCompanionAction.RemoveCompanionDetail.AfterQuest)
+            {
+                TextObject textObject2 = new TextObject("{=4zdyeTGn}{COMPANION.NAME} left your clan.", null);
+                textObject2.SetCharacterProperties("COMPANION", hero.CharacterObject, false);
+                MBInformationManager.AddQuickInformation(textObject2, 0, null, null, "event:/ui/notification/relation");
+            }
+
             notificationsBehavior.OnCompanionRemoved(hero, obj.What.Detail);
         });
     }
@@ -547,12 +564,14 @@ internal class DefaultNotificationsHandler : IHandler
         GameThread.RunSafe(() =>
         {
             if (!objectManager.TryGetIdWithLogging(obj.What.Hero, out var heroId)) return;
-            if (!objectManager.TryGetIdWithLogging(obj.What.Party, out var partyId)) return;
 
-            // Unsure how to send factions over the network
-            string factionStringId = obj.What.CapturerFaction.StringId;
+            string partyId = null;
+            if (obj.What.Party != null && !objectManager.TryGetIdWithLogging(obj.What.Party, out partyId)) return;
 
-            network.SendAll(new NetworkNotifyHeroPrisonerReleased(heroId, partyId, factionStringId, obj.What.Detail, obj.What.ShowNotification));
+            string capturerFactionId = null;
+            if (obj.What.CapturerFaction != null && !objectManager.TryGetIdWithLogging(obj.What.CapturerFaction, out capturerFactionId)) return;
+
+            network.SendAll(new NetworkNotifyHeroPrisonerReleased(heroId, partyId, capturerFactionId, obj.What.Detail, obj.What.ShowNotification));
         });
     }
 
@@ -562,17 +581,12 @@ internal class DefaultNotificationsHandler : IHandler
         {
             if (!TryGetNotificationsBehavior(out var notificationsBehavior)) return;
             if (!objectManager.TryGetObjectWithLogging<Hero>(obj.What.HeroId, out var hero)) return;
-            if (!objectManager.TryGetObjectWithLogging<PartyBase>(obj.What.PartyId, out var party)) return;
+
+            PartyBase party = null;
+            if (obj.What.PartyId != null && !objectManager.TryGetObjectWithLogging<PartyBase>(obj.What.PartyId, out party)) return;
 
             IFaction capturerFaction = null;
-            foreach (var faction in Campaign.Current.Factions)
-            {
-                if (faction.StringId == obj.What.FactionId)
-                {
-                    capturerFaction = faction;
-                    break;
-                }
-            }
+            if (obj.What.FactionId != null && !TryGetFaction(obj.What.FactionId, out capturerFaction)) return;
 
             notificationsBehavior.OnHeroPrisonerReleased(hero, party, capturerFaction, obj.What.Detail, obj.What.ShowNotification);
         });
@@ -714,9 +728,11 @@ internal class DefaultNotificationsHandler : IHandler
         GameThread.RunSafe(() =>
         {
             if (!TryGetNotificationsBehavior(out var notificationsBehavior)) return;
+            if (!TryGetViewDataTrackerBehavior(out var viewDataTrackerBehavior)) return;
             if (!objectManager.TryGetObjectWithLogging<Hero>(obj.What.HeroId, out var hero)) return;
 
             notificationsBehavior.OnHeroLevelledUp(hero, obj.What.ShouldNotify);
+            viewDataTrackerBehavior.OnHeroLevelledUp(hero, obj.What.ShouldNotify);
         });
     }
 
@@ -736,10 +752,12 @@ internal class DefaultNotificationsHandler : IHandler
         GameThread.RunSafe(() =>
         {
             if (!TryGetNotificationsBehavior(out var notificationsBehavior)) return;
+            if (!TryGetViewDataTrackerBehavior(out var viewDataTrackerBehavior)) return;
             if (!objectManager.TryGetObjectWithLogging<Hero>(obj.What.HeroId, out var hero)) return;
             if (!objectManager.TryGetObjectWithLogging<SkillObject>(obj.What.SkillObjectId, out var skillObject)) return;
 
             notificationsBehavior.OnHeroGainedSkill(hero, skillObject, obj.What.Change, obj.What.ShouldNotify);
+            viewDataTrackerBehavior.OnHeroGainedSkill(hero, skillObject, obj.What.Change, obj.What.ShouldNotify);
         });
     }
 
@@ -780,8 +798,14 @@ internal class DefaultNotificationsHandler : IHandler
         GameThread.RunSafe(() =>
         {
             if (!objectManager.TryGetIdWithLogging(obj.What.Clan, out var clanId)) return;
-            if (!objectManager.TryGetIdWithLogging(obj.What.OldKingdom, out var oldKingdomId)) return;
-            if (!objectManager.TryGetIdWithLogging(obj.What.NewKingdom, out var newKingdomId)) return;
+
+            string oldKingdomId = null;
+            if (obj.What.OldKingdom != null &&
+                !objectManager.TryGetIdWithLogging(obj.What.OldKingdom, out oldKingdomId)) return;
+
+            string newKingdomId = null;
+            if (obj.What.NewKingdom != null &&
+                !objectManager.TryGetIdWithLogging(obj.What.NewKingdom, out newKingdomId)) return;
 
             network.SendAll(new NetworkNotifyClanChangedFaction(clanId, oldKingdomId, newKingdomId, obj.What.Detail, obj.What.ShowNotification));
         });
@@ -791,13 +815,42 @@ internal class DefaultNotificationsHandler : IHandler
     {
         GameThread.RunSafe(() =>
         {
-            if (!TryGetNotificationsBehavior(out var notificationsBehavior)) return;
             if (!objectManager.TryGetObjectWithLogging<Clan>(obj.What.ClanId, out var clan)) return;
-            if (!objectManager.TryGetObjectWithLogging<Kingdom>(obj.What.OldKingdomId, out var oldKingdom)) return;
-            if (!objectManager.TryGetObjectWithLogging<Kingdom>(obj.What.NewKingdomId, out var newKingdom)) return;
 
-            notificationsBehavior.OnClanChangedFaction(clan, oldKingdom, newKingdom, obj.What.Detail, obj.What.ShowNotification);
+            Kingdom oldKingdom = null;
+            if (obj.What.OldKingdomId != null &&
+                !objectManager.TryGetObjectWithLogging<Kingdom>(obj.What.OldKingdomId, out oldKingdom)) return;
+
+            Kingdom newKingdom = null;
+            if (obj.What.NewKingdomId != null &&
+                !objectManager.TryGetObjectWithLogging<Kingdom>(obj.What.NewKingdomId, out newKingdom)) return;
+
+            if (TryGetNotificationsBehavior(out var notificationsBehavior))
+                notificationsBehavior.OnClanChangedFaction(clan, oldKingdom, newKingdom, obj.What.Detail, obj.What.ShowNotification);
+
+            ShowJoinKingdomScene(clan, newKingdom, obj.What.Detail, obj.What.ShowNotification);
         });
+    }
+
+    private static void ShowJoinKingdomScene(
+        Clan clan,
+        Kingdom newKingdom,
+        ChangeKingdomAction.ChangeKingdomActionDetail detail,
+        bool showNotification)
+    {
+        if (!showNotification || newKingdom == null) return;
+
+        var shouldShowScene =
+            (clan == Clan.PlayerClan && detail == ChangeKingdomAction.ChangeKingdomActionDetail.JoinKingdom) ||
+            (Clan.PlayerClan?.Kingdom == newKingdom && detail == ChangeKingdomAction.ChangeKingdomActionDetail.JoinKingdomByDefection);
+        if (!shouldShowScene || !TryRestoreSceneCharacterCulture(clan.Leader)) return;
+
+        foreach (var hero in CampaignSceneNotificationHelper.GetMilitaryAudienceForKingdom(newKingdom).Take(5))
+        {
+            if (!TryRestoreSceneCharacterCulture(hero)) return;
+        }
+
+        MBInformationManager.ShowSceneNotification(new JoinKingdomSceneNotificationItem(clan, newKingdom));
     }
 
     private void Handle_NotifyArmyCreated(MessagePayload<NotifyArmyCreated> obj)
@@ -805,8 +858,12 @@ internal class DefaultNotificationsHandler : IHandler
         GameThread.RunSafe(() =>
         {
             if (!objectManager.TryGetIdWithLogging(obj.What.Army, out var armyId)) return;
-
-            network.SendAll(new NetworkNotifyArmyCreated(armyId));
+            string aiBehaviorObjectId = null;
+            if (obj.What.AiBehaviorObject != null)
+            {
+                if (!objectManager.TryGetIdWithLogging(obj.What.AiBehaviorObject, out aiBehaviorObjectId)) return;
+            }
+            network.SendAll(new NetworkNotifyArmyCreated(armyId, aiBehaviorObjectId));
         });
     }
 
@@ -816,11 +873,30 @@ internal class DefaultNotificationsHandler : IHandler
         {
             if (!TryGetNotificationsBehavior(out var notificationsBehavior)) return;
             if (!objectManager.TryGetObjectWithLogging<Army>(obj.What.ArmyId, out var army)) return;
-
-            notificationsBehavior.OnArmyCreated(army);
+            IMapPoint aiBehaviorObject = null;
+            if (obj.What.AiBehaviorObjectId != null)
+            {
+                if (!objectManager.TryGetObjectWithLogging<IMapPoint>(obj.What.AiBehaviorObjectId, out aiBehaviorObject)) return;
+            }
+            OnArmyCreated(army, aiBehaviorObject);
         });
     }
-
+    private void OnArmyCreated(Army army, IMapPoint aiBehaviorObject)
+    {
+        if ((army.Kingdom == MobileParty.MainParty.MapFaction && MobileParty.MainParty.Army == null))
+        {
+            TextObject textObject = new TextObject("{=VEHPTzhO}{LEADER.NAME} is gathering an army near {SETTLEMENT}.");
+            string settlementName = army.AiBehaviorObject?.Name?.ToString();
+            if (string.IsNullOrEmpty(settlementName))
+            {
+                Settlement fallbackSettlement = SettlementHelper.FindNearestSettlementToPoint(army.LeaderParty.Position, null);
+                settlementName = fallbackSettlement?.Name?.ToString() ?? string.Empty;
+            }
+            textObject.SetTextVariable("SETTLEMENT", settlementName);
+            StringHelpers.SetCharacterProperties("LEADER", army.LeaderParty.LeaderHero.CharacterObject, textObject);
+            MBInformationManager.AddQuickInformation(textObject, 0, army.LeaderParty.LeaderHero.CharacterObject);
+        }
+    }
     private void Handle_NotifySiegeBombardmentHit(MessagePayload<NotifySiegeBombardmentHit> obj)
     {
         GameThread.RunSafe(() =>
@@ -943,8 +1019,9 @@ internal class DefaultNotificationsHandler : IHandler
         GameThread.RunSafe(() =>
         {
             if (!objectManager.TryGetIdWithLogging(obj.What.MobileParty, out var mobilePartyId)) return;
+            if (!objectManager.TryGetIdWithLogging(obj.What.Army, out var armyId)) return;
 
-            network.SendAll(new NetworkNotifyPartyRemovedFromArmy(mobilePartyId));
+            network.SendAll(new NetworkNotifyPartyRemovedFromArmy(mobilePartyId, armyId));
         });
     }
 
@@ -954,9 +1031,26 @@ internal class DefaultNotificationsHandler : IHandler
         {
             if (!TryGetNotificationsBehavior(out var notificationsBehavior)) return;
             if (!objectManager.TryGetObjectWithLogging<MobileParty>(obj.What.MobilePartyId, out var mobileParty)) return;
+            if (!objectManager.TryGetObjectWithLogging<Army>(obj.What.ArmyId, out var army)) return;
 
-            notificationsBehavior.OnPartyRemovedFromArmy(mobileParty);
+            OnPartyRemovedFromArmy(notificationsBehavior, mobileParty, army);
         });
+    }
+    private void OnPartyRemovedFromArmy(DefaultNotificationsCampaignBehavior __instance, MobileParty party, Army army)
+    {
+        // MobileParty.MainParty.Army can already be null before this get reached
+        // so check if its the MainParty
+        if (army == MobileParty.MainParty.Army || party == MobileParty.MainParty) 
+        {
+            TextObject textObject = new TextObject("{=ApG1xg7O}{PARTY_NAME} has left {ARMY_NAME}.", null);
+            textObject.SetTextVariable("PARTY_NAME", party.Name);
+            textObject.SetTextVariable("ARMY_NAME", army.Name);
+            InformationManager.DisplayMessage(new InformationMessage(textObject.ToString()));
+        }
+        if (party == MobileParty.MainParty)
+        {
+            __instance.CheckFoodNotifications();
+        }
     }
 
     private void Handle_ArmyDispersed(MessagePayload<ArmyDispersed> obj)
@@ -995,12 +1089,40 @@ internal class DefaultNotificationsHandler : IHandler
     {
         GameThread.RunSafe(() =>
         {
-            if (!TryGetNotificationsBehavior(out var notificationsBehavior)) return;
             if (!objectManager.TryGetObjectWithLogging<Hero>(obj.What.FirstHeroId, out var firstHero)) return;
             if (!objectManager.TryGetObjectWithLogging<Hero>(obj.What.SecondHeroId, out var secondHero)) return;
 
-            notificationsBehavior.OnHeroesMarried(firstHero, secondHero, obj.What.ShowNotification);
+            if (TryGetNotificationsBehavior(out var notificationsBehavior))
+                notificationsBehavior.OnHeroesMarried(firstHero, secondHero, obj.What.ShowNotification);
+
+            var firstHeroHasCulture = TryRestoreSceneCharacterCulture(firstHero);
+            var secondHeroHasCulture = TryRestoreSceneCharacterCulture(secondHero);
+            if (firstHeroHasCulture && secondHeroHasCulture)
+                ShowMarriageSceneForMainHero(firstHero, secondHero);
         });
+    }
+
+    private static void ShowMarriageSceneForMainHero(Hero firstHero, Hero secondHero)
+    {
+        if (firstHero != Hero.MainHero && secondHero != Hero.MainHero) return;
+
+        var husband = firstHero.IsFemale ? secondHero : firstHero;
+        MBInformationManager.ShowSceneNotification(
+            new MarriageSceneNotificationItem(husband, husband.Spouse, CampaignTime.Now, default));
+    }
+
+    private static bool TryRestoreSceneCharacterCulture(Hero hero)
+    {
+        BasicCharacterObject character = hero.CharacterObject;
+        if (character.Culture != null) return true;
+
+        using (new AllowedThread())
+            character.Culture = hero.Culture ?? hero.Clan?.Culture;
+
+        if (character.Culture != null) return true;
+
+        Logger.Warning("Skipping scene notification because hero {heroId} has no character culture", hero.StringId);
+        return false;
     }
 
     private void Handle_NotifyChildConceived(MessagePayload<NotifyChildConceived> obj)
@@ -1066,7 +1188,9 @@ internal class DefaultNotificationsHandler : IHandler
         GameThread.RunSafe(() =>
         {
             if (!objectManager.TryGetIdWithLogging(obj.What.VictimHero, out var victimHeroId)) return;
-            if (!objectManager.TryGetIdWithLogging(obj.What.Killer, out var killerId)) return;
+
+            string killerId = null;
+            if (obj.What.Killer != null && !objectManager.TryGetIdWithLogging(obj.What.Killer, out killerId)) return;
 
             network.SendAll(new NetworkNotifyHeroKilled(victimHeroId, killerId, obj.What.Detail, obj.What.ShowNotification));
         });
@@ -1078,7 +1202,9 @@ internal class DefaultNotificationsHandler : IHandler
         {
             if (!TryGetNotificationsBehavior(out var notificationsBehavior)) return;
             if (!objectManager.TryGetObjectWithLogging<Hero>(obj.What.VictimHeroId, out var victimHero)) return;
-            if (!objectManager.TryGetObjectWithLogging<Hero>(obj.What.KillerId, out var killer)) return;
+
+            Hero killer = null;
+            if (obj.What.KillerId != null && !objectManager.TryGetObjectWithLogging<Hero>(obj.What.KillerId, out killer)) return;
 
             notificationsBehavior.OnHeroKilled(victimHero, killer, obj.What.Detail, obj.What.ShowNotification);
         });
@@ -1300,12 +1426,39 @@ internal class DefaultNotificationsHandler : IHandler
         });
     }
 
+    private bool TryGetFaction(string id, out IFaction faction)
+    {
+        if (objectManager.TryGetObject(id, out Kingdom kingdom))
+        {
+            faction = kingdom;
+            return true;
+        }
+        if (objectManager.TryGetObject(id, out Clan clan))
+        {
+            faction = clan;
+            return true;
+        }
+
+        Logger.Debug("Faction not found in DefaultNotificationsHandler with id: {id}", id);
+        faction = null;
+        return false;
+    }
+
     private bool TryGetNotificationsBehavior(out DefaultNotificationsCampaignBehavior campaignBehavior)
     {
         campaignBehavior = Campaign.Current?.GetCampaignBehavior<DefaultNotificationsCampaignBehavior>();
         if (campaignBehavior != null) return true;
 
         Logger.Debug("Skipping notification because DefaultNotificationsCampaignBehavior is unavailable");
+        return false;
+    }
+
+    private bool TryGetViewDataTrackerBehavior(out ViewDataTrackerCampaignBehavior viewDataTrackerBehavior)
+    {
+        viewDataTrackerBehavior = Campaign.Current?.GetCampaignBehavior<ViewDataTrackerCampaignBehavior>();
+        if (viewDataTrackerBehavior != null) return true;
+
+        Logger.Debug("Skipping view data tracker update because ViewDataTrackerCampaignBehavior is unavailable");
         return false;
     }
 }

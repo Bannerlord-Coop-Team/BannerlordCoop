@@ -34,7 +34,7 @@ namespace GameInterface.Tests.Serialization.SerializerTests
 
             package.Pack();
 
-            byte[] bytes = BinaryFormatterSerializer.Serialize(package);
+            byte[] bytes = BinaryPackageSerializer.Serialize(package);
 
             Assert.NotEmpty(bytes);
         }
@@ -52,11 +52,11 @@ namespace GameInterface.Tests.Serialization.SerializerTests
 
             package.Pack();
 
-            byte[] bytes = BinaryFormatterSerializer.Serialize(package);
+            byte[] bytes = BinaryPackageSerializer.Serialize(package);
 
             Assert.NotEmpty(bytes);
 
-            object obj = BinaryFormatterSerializer.Deserialize(bytes);
+            object obj = BinaryPackageSerializer.Deserialize(bytes);
 
             Assert.IsType<CharacterAttributeBinaryPackage>(obj);
 

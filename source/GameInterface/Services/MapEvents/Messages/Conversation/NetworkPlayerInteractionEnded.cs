@@ -13,9 +13,12 @@ internal readonly struct NetworkPlayerInteractionEnded : ICommand
 {
     [ProtoMember(1)]
     public readonly string DefenderPartyId;
+    [ProtoMember(2)]
+    public readonly bool IsLocationInteraction;
 
-    public NetworkPlayerInteractionEnded(string defenderPartyId)
+    public NetworkPlayerInteractionEnded(string defenderPartyId, bool isLocationInteraction = false)
     {
         DefenderPartyId = defenderPartyId;
+        IsLocationInteraction = isLocationInteraction;
     }
 }

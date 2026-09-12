@@ -30,10 +30,14 @@ public class Poller
 
     private Task pollingTask;
 
+    [ThreadStatic]
+    private static Poller activePoller;
+
     /// <summary>
     /// Returns true if task is running otherwise false
     /// </summary>
     public bool IsRunning => !cts?.IsCancellationRequested ?? false;
+    public bool IsPollingThread => ReferenceEquals(activePoller, this);
 
     /// <summary>
     /// Creates a new poller object to run a periodic task in the background
@@ -85,6 +89,7 @@ public class Poller
             // pump with no trace. Log it instead and keep polling.
             try
             {
+                activePoller = this;
                 pollingFunction(delta);
             }
             catch (Exception ex)
@@ -99,6 +104,10 @@ public class Poller
                 {
                     Logger.Error("Polling function still throwing the same exception ({RepeatCount}x): {Message}", repeatCount, ex.Message);
                 }
+            }
+            finally
+            {
+                activePoller = null;
             }
 
             startTime = DateTime.Now;
@@ -132,10 +141,18 @@ public class Poller
     /// only prevents FUTURE ticks — a tick already running continues concurrently and would race the teardown.
     /// </summary>
     /// <param name="timeout">Upper bound on the wait, so a stuck polling function can never hang the caller.</param>
-    /// <returns>True if the loop stopped within the timeout; false if it was still running when the wait elapsed.</returns>
+    /// <returns>
+    /// True if the loop stopped within the timeout; false when called by its active callback or when
+    /// the wait elapsed before the loop stopped.
+    /// </returns>
     public bool StopAndWait(TimeSpan timeout)
     {
         cts?.Cancel();
+
+        if (IsPollingThread)
+        {
+            return false;
+        }
 
         var task = pollingTask;
         if (task == null)

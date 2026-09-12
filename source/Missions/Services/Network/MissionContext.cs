@@ -18,13 +18,21 @@ public interface IMissionContext : IDisposable
     void MapPeer(string controllerId, NetPeer peer);
     void RemovePeer(NetPeer peer);
     bool TryGetPeer(string controllerId, out NetPeer netPeer);
+
+    /// <summary>
+    /// Drop all mirrored membership and peer mappings for the mission we just left. The membership set
+    /// mirrors server-announced instance membership and is otherwise pruned only per-controller as the
+    /// server reports each departure — but once WE leave the instance the server stops fanning that
+    /// instance's churn to us, so a controller that drops while we are away is never removed and keeps
+    /// looking present. Call this at the local mission-exit chokepoint so the stale mirror does not survive
+    /// into a later re-entry (BR-054), where it is rebuilt from the server's fresh membership re-announce.
+    /// </summary>
+    void EndInstance();
 }
 
 /// <summary>
-/// Client-side mirror of the server's mission-instance membership. The server announces who is in the
-/// instance over the campaign connection via <see cref="NetworkMissionPeerEntered"/> / <see cref="MissionPeerLeft"/>
-/// / <see cref="MissionPeerDisconnected"/>; this tracks that set so <see cref="ControllersInMission"/> stays
-/// equivalent to the server's view (minus the local controller).
+/// Mirrors server-announced mission membership and maps verified direct peers to controller IDs,
+/// excluding the local controller from <see cref="ControllersInMission"/>.
 /// </summary>
 public class MissionContext : IMissionContext, IHandler
 {
@@ -39,10 +47,18 @@ public class MissionContext : IMissionContext, IHandler
 
     private readonly object gate = new();
 
-    public IReadOnlyCollection<string> ControllersInMission =>
-        controllersInMission
-            .Where(controllerId => controllerId != controllerIdProvider.ControllerId)
-            .ToArray();
+    public IReadOnlyCollection<string> ControllersInMission
+    {
+        get
+        {
+            lock (gate)
+            {
+                return controllersInMission
+                    .Where(controllerId => controllerId != controllerIdProvider.ControllerId)
+                    .ToArray();
+            }
+        }
+    }
 
     public MissionContext(
         IMessageBroker messageBroker,
@@ -73,10 +89,18 @@ public class MissionContext : IMissionContext, IHandler
 
     private void Clear()
     {
-        controllersInMission.Clear();
-        idToPeer.Clear();
-        peerToId.Clear();
+        lock (gate)
+        {
+            controllersInMission.Clear();
+            idToPeer.Clear();
+            peerToId.Clear();
+        }
     }
+
+    // Leaving a mission wipes the whole mirror — same effect as leaving a location (Handle_PlayerLeftLocation),
+    // exposed for the battle exit chokepoint (BattleInstanceLifecycle.Leave). A re-entry rebuilds it from the
+    // server's membership re-announce, so this must not leave a stale controller behind.
+    public void EndInstance() => Clear();
 
     public void MapPeer(string controllerId, NetPeer peer)
     {
@@ -110,9 +134,10 @@ public class MissionContext : IMissionContext, IHandler
 
     public bool TryGetPeer(string controllerId, out NetPeer netPeer)
     {
-        netPeer = null;
-
-        return idToPeer.TryGetValue(controllerId, out netPeer);
+        lock (gate)
+        {
+            return idToPeer.TryGetValue(controllerId, out netPeer);
+        }
     }
 
     private void Handle_MissionPeerEntered(MessagePayload<NetworkMissionPeerEntered> payload)
@@ -130,6 +155,7 @@ public class MissionContext : IMissionContext, IHandler
         lock (gate)
         {
             controllersInMission.Remove(controllerId);
+            RemoveControllerMapping(controllerId);
         }
     }
 
@@ -139,7 +165,15 @@ public class MissionContext : IMissionContext, IHandler
         lock (gate)
         {
             controllersInMission.Remove(controllerId);
+            RemoveControllerMapping(controllerId);
         }
+    }
+
+    private void RemoveControllerMapping(string controllerId)
+    {
+        if (!idToPeer.TryGetValue(controllerId, out var peer)) return;
+        idToPeer.Remove(controllerId);
+        peerToId.Remove(peer);
     }
 
     private void Handle_PlayerLeftLocation(MessagePayload<PlayerLeftLocation> payload)

@@ -2,6 +2,6 @@
 
 namespace GameInterface.Services.PlayerCaptivityService.Messages;
 
-internal readonly struct CampaignTick : IEvent
+public readonly struct CampaignTick : IEvent
 {
 }

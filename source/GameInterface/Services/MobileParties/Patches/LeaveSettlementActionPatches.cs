@@ -15,11 +15,18 @@ namespace GameInterface.Services.MobileParties.Patches;
 [HarmonyPatch(typeof(LeaveSettlementAction))]
 public class LeaveSettlementActionPatches
 {
+    // The join-time hero switch runs vanilla's character-change settlement eject while the client
+    // sync policy still allows originals (the client is in LoadingState), which would pop the
+    // reloaded party outside on this client only while the server's save keeps it inside. Set
+    // around ChangePlayerCharacterAction.Apply in HeroInterface.SwitchToPlayer; game-thread only.
+    internal static bool SuppressForPlayerSwitch;
+
     [HarmonyPrefix]
     [HarmonyPatch(nameof(LeaveSettlementAction.ApplyForParty))]
     private static bool Prefix(MobileParty mobileParty)
     {
         if (mobileParty.CurrentSettlement == null) return false;
+        if (SuppressForPlayerSwitch) return false;
         if (CallOriginalPolicy.IsOriginalAllowed()) return true;
 
         var message = new PartyLeaveSettlementAttempted(mobileParty);

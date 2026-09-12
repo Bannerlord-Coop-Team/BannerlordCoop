@@ -1,4 +1,5 @@
-﻿using Common.Logging;
+﻿using Common;
+using Common.Logging;
 using Common.Messaging;
 using Common.Network;
 using Common.Util;
@@ -41,9 +42,11 @@ internal class MobilePartyAiLifetimeHandler : IHandler
 
     private void Handle_MobilePartyAiCreated(MessagePayload<MobilePartyAiCreated> payload)
     {
-        if (!objectManager.AddNewObject(payload.What.Instance, out var partyAiId)) return;
+        // Save loading constructs AI attachments before InitialServerState registers campaign objects.
+        // MobilePartyAiRegistry registers those existing attachments after loading.
+        if (!objectManager.TryGetId(payload.What.Party, out var partyId)) return;
 
-        if (!objectManager.TryGetIdWithLogging(payload.What.Party, out var partyId)) return;
+        if (!objectManager.AddNewObject(payload.What.Instance, out var partyAiId)) return;
 
         network.SendAll(new NetworkCreateMobilePartyAi(partyAiId, partyId));
     }
@@ -54,13 +57,15 @@ internal class MobilePartyAiLifetimeHandler : IHandler
         var partyId = payload.What.PartyId;
         var aiId = payload.What.MobilePartyAiId;
 
-        if (objectManager.TryGetObject<MobileParty>(partyId, out var party) == false) return;
+        GameThread.RunSafe(() =>
+        {
+            if (!objectManager.TryGetObjectWithLogging<MobileParty>(partyId, out var party)) return;
 
-        var newAi = ObjectHelper.SkipConstructor<MobilePartyAi>();
+            var newAi = ObjectHelper.SkipConstructor<MobilePartyAi>();
+            AccessTools.Field(typeof(MobilePartyAi), nameof(MobilePartyAi._mobileParty)).SetValue(newAi, party);
 
-        AccessTools.Field(typeof(MobilePartyAi), nameof(MobilePartyAi._mobileParty)).SetValue(newAi, party);
-
-        objectManager.AddExisting(aiId, newAi);
+            objectManager.AddExisting(aiId, newAi);
+        }, context: nameof(Handle_NetworkCreateMobilePartyAi));
     }
 
     private void Handle_MobilePartyAiDestroyed(MessagePayload<MobilePartyAiDestroyed> payload)
@@ -76,12 +81,14 @@ internal class MobilePartyAiLifetimeHandler : IHandler
     {
         var aiId = payload.What.MobilePartyAiId;
 
-        if (objectManager.TryGetObject<MobilePartyAi>(aiId, out var ai) == false) return;
-
-        if (objectManager.Remove(ai) == false)
+        GameThread.RunSafe(() =>
         {
-            Logger.Error("Failed to remove Ai with id {id} from object manager", aiId);
-            return;
-        }
+            if (!objectManager.TryGetObjectWithLogging<MobilePartyAi>(aiId, out var ai)) return;
+
+            if (!objectManager.Remove(ai))
+            {
+                Logger.Error("Failed to remove Ai with id {id} from object manager", aiId);
+            }
+        }, context: nameof(Handle_NetworkDestroyMobilePartyAi));
     }
 }

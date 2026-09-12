@@ -10,11 +10,12 @@ namespace Coop.Tests.Steam
     /// datagrams, and lets tests raise connection-state events. The pumps poll from a
     /// background thread, so all state is lock-protected.
     /// </summary>
-    public class FakeSteamTunnelTransport : ISteamTunnelTransport
+    public class FakeSteamTunnelTransport : ISteamTunnelTransport, ISteamTunnelConnectionIdentityResolver
     {
         private readonly object gate = new object();
         private readonly List<(uint Connection, byte[] Data)> sentDatagrams = new List<(uint, byte[])>();
         private readonly Dictionary<uint, Queue<byte[]>> pendingReceives = new Dictionary<uint, Queue<byte[]>>();
+        private readonly Dictionary<uint, ulong> remoteSteamIds = new Dictionary<uint, ulong>();
 
         public uint NextConnection = 501;
         public ulong ConnectedHost;
@@ -56,12 +57,31 @@ namespace Coop.Tests.Steam
             }
         }
 
+        public void SetRemoteSteamId(uint connection, ulong steamId)
+        {
+            lock (gate)
+            {
+                if (steamId == 0)
+                {
+                    remoteSteamIds.Remove(connection);
+                }
+                else
+                {
+                    remoteSteamIds[connection] = steamId;
+                }
+            }
+        }
+
         public void EnsureRelayAccess() => RelayAccessCalls++;
 
         public uint ConnectToHost(ulong hostSteamId, int virtualPort)
         {
-            ConnectedHost = hostSteamId;
-            return NextConnection;
+            lock (gate)
+            {
+                ConnectedHost = hostSteamId;
+                remoteSteamIds[NextConnection] = hostSteamId;
+                return NextConnection;
+            }
         }
 
         public void ListenForClients(int virtualPort) => Listening = true;
@@ -70,7 +90,22 @@ namespace Coop.Tests.Steam
 
         public void AcceptConnection(uint connection) => AcceptedConnections.Add(connection);
 
-        public void CloseConnection(uint connection) => ClosedConnections.Add(connection);
+        public void CloseConnection(uint connection)
+        {
+            lock (gate)
+            {
+                remoteSteamIds.Remove(connection);
+                ClosedConnections.Add(connection);
+            }
+        }
+
+        public bool TryGetRemoteSteamId(uint connection, out ulong steamId)
+        {
+            lock (gate)
+            {
+                return remoteSteamIds.TryGetValue(connection, out steamId);
+            }
+        }
 
         public bool SendDatagram(uint connection, byte[] data, int length, bool droppable)
         {
@@ -104,6 +139,13 @@ namespace Coop.Tests.Steam
 
         public string DescribeConnection(uint connection) => "fake";
 
-        public void Dispose() => Disposed = true;
+        public void Dispose()
+        {
+            lock (gate)
+            {
+                remoteSteamIds.Clear();
+                Disposed = true;
+            }
+        }
     }
 }

@@ -1,5 +1,6 @@
 ﻿using Common;
 using Common.Logging;
+using GameInterface.Services.Inventory.TradeSkills.Interfaces;
 using GameInterface.Services.MobileParties.Extensions;
 using Helpers;
 using Serilog;
@@ -42,6 +43,17 @@ namespace GameInterface.Services.Inventory.Interfaces
     internal class InventoryLogicInterface : IInventoryLogicInterface
     {
         static readonly ILogger logger = LogManager.GetLogger<InventoryLogicInterface>();
+
+        private readonly ISessionTradePlayerDataInterface sessionTradePlayerDataInterface;
+        private readonly IDefaultItemDiscardModelInterface defaultItemDiscardModelInterface;
+
+        public InventoryLogicInterface(
+            ISessionTradePlayerDataInterface sessionTradePlayerDataInterface,
+            IDefaultItemDiscardModelInterface defaultItemDiscardModelInterface)
+        {
+            this.sessionTradePlayerDataInterface = sessionTradePlayerDataInterface;
+            this.defaultItemDiscardModelInterface = defaultItemDiscardModelInterface;
+        }
 
         public void ApplyDoneLogic(
             ItemRoster fromRoster,
@@ -130,11 +142,11 @@ namespace GameInterface.Services.Inventory.Interfaces
             }
 
             // Discarding items
-            if (isDiscardDonating)
+            if (isDiscardDonating && ownerHero.PartyBelongedTo != null)
             {
                 foreach (ItemRosterElement rosterElement in soldItems.Select(x => x.Item1))
                 {
-                    int xpBonusForDiscardingItems = Campaign.Current.Models.ItemDiscardModel.GetXpBonusForDiscardingItem(rosterElement.EquipmentElement.Item, rosterElement.Amount);
+                    int xpBonusForDiscardingItems = defaultItemDiscardModelInterface.GetXpBonusForDiscardingItem(ownerHero.PartyBelongedTo, rosterElement.EquipmentElement.Item, rosterElement.Amount);
                     if ((float)xpBonusForDiscardingItems > 0f)
                     {
                         MobilePartyHelper.PartyAddSharedXp(ownerHero.PartyBelongedTo, (float)xpBonusForDiscardingItems);
@@ -142,11 +154,11 @@ namespace GameInterface.Services.Inventory.Interfaces
                 }
             }
 
-            CampaignEventDispatcher.Instance.OnPlayerInventoryExchange(boughtItems, soldItems, isTrading);
+            sessionTradePlayerDataInterface.UpdatePlayerInventory(ownerHero, boughtItems, soldItems, isTrading);
             if (currentSettlementComponent != null && isTrading)
             {
                 // Sets the gold of the other party
-                currentSettlementComponent.Gold += totalAmount;
+                currentSettlementComponent.ChangeGold(totalAmount);
             }
             else if (((currentMobileParty != null) ? currentMobileParty.Party.LeaderHero : null) != null && isTrading)
             {

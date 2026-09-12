@@ -1,0 +1,111 @@
+<?xml version="1.0" encoding="utf-8"?>
+<NPCCharacters>
+  <NPCCharacter
+    id="coop_team_lord_hasted"
+    name="{=!}Hasted"
+    voice="ironic"
+    is_template="true"
+    default_group="Infantry"
+    is_hero="false"
+    is_female="false"
+    culture="Culture.sturgia"
+    skill_template="SkillSet.spc_skolderbrotva_leader_0_skills"
+    occupation="Lord">
+    <face>
+      <face_key_template value="BodyProperty.fighter_sturgia" />
+    </face>
+    <Traits>
+      <Trait id="Honor" value="1" />
+      <Trait id="Valor" value="1" />
+      <Trait id="Mercy" value="-1" />
+      <Trait id="Generosity" value="-1" />
+      <Trait id="Calculating" value="-1" />
+      <Trait id="Commander" value="12" />
+      <Trait id="KnightFightingSkills" value="7" />
+    </Traits>
+    <Equipments>
+      <EquipmentSet id="spc_skolderbrotva_leader_0" />
+      <EquipmentSet
+        id="spc_skolderbrotva_leader_0"
+        equipmentType="Civilian" />
+    </Equipments>
+  </NPCCharacter>
+  <NPCCharacter
+    id="coop_team_lord_another_joke"
+    name="{=!}AnotherJoke"
+    voice="ironic"
+    is_template="true"
+    default_group="Infantry"
+    is_hero="false"
+    is_female="false"
+    culture="Culture.sturgia"
+    skill_template="SkillSet.spc_skolderbrotva_leader_1_skills"
+    occupation="Lord">
+    <face>
+      <face_key_template value="BodyProperty.fighter_sturgia" />
+    </face>
+    <Traits>
+      <Trait id="Calculating" value="1" />
+      <Trait id="Commander" value="12" />
+      <Trait id="KnightFightingSkills" value="5" />
+    </Traits>
+    <Equipments>
+      <EquipmentSet id="spc_skolderbrotva_leader_1" />
+      <EquipmentSet
+        id="spc_skolderbrotva_leader_1"
+        equipmentType="Civilian" />
+    </Equipments>
+  </NPCCharacter>
+  <NPCCharacter
+    id="coop_team_lord_curzek"
+    name="{=!}Curzek"
+    voice="ironic"
+    is_template="true"
+    default_group="Infantry"
+    is_hero="false"
+    is_female="false"
+    culture="Culture.sturgia"
+    skill_template="SkillSet.spc_skolderbrotva_leader_2_skills"
+    occupation="Lord">
+    <face>
+      <face_key_template value="BodyProperty.fighter_sturgia" />
+    </face>
+    <Traits>
+      <Trait id="Calculating" value="1" />
+      <Trait id="Commander" value="12" />
+      <Trait id="KnightFightingSkills" value="5" />
+    </Traits>
+    <Equipments>
+      <EquipmentSet id="spc_skolderbrotva_leader_2" />
+      <EquipmentSet
+        id="spc_skolderbrotva_leader_2"
+        equipmentType="Civilian" />
+    </Equipments>
+  </NPCCharacter>
+  <NPCCharacter
+    id="coop_team_lord_shotup"
+    name="{=!}ShotUp"
+    voice="ironic"
+    is_template="true"
+    default_group="Infantry"
+    is_hero="false"
+    is_female="false"
+    culture="Culture.sturgia"
+    skill_template="SkillSet.spc_skolderbrotva_leader_3_skills"
+    occupation="Lord">
+    <face>
+      <face_key_template value="BodyProperty.fighter_sturgia" />
+    </face>
+    <Traits>
+      <Trait id="Calculating" value="1" />
+      <Trait id="Commander" value="12" />
+      <Trait id="KnightFightingSkills" value="5" />
+    </Traits>
+    <Equipments>
+      <EquipmentSet id="spc_skolderbrotva_leader_3" />
+      <EquipmentSet
+        id="spc_skolderbrotva_leader_3"
+        equipmentType="Civilian" />
+    </Equipments>
+  </NPCCharacter>
+</NPCCharacters>

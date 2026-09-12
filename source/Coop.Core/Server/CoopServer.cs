@@ -7,18 +7,19 @@ using Common.Network.Messages;
 using Common.PacketHandlers;
 using Common.Serialization;
 using Coop.Core.Common.Network;
-using Coop.Core.Common.Session;
 using Coop.Core.Server.Connections;
 using Coop.Core.Server.Connections.Messages;
 using Coop.Core.Server.Services.Instances;
+using Coop.Core.Server.Services.Session.Messages;
 using Coop.Core.Server.Services.Time;
 using GameInterface.Services.Entity;
-using GameInterface.Services.GameState;
 using LiteNetLib;
+using LiteNetLib.Utils;
 using Serilog;
 using System;
 using System.Net;
 using System.Net.Sockets;
+using System.Threading;
 
 namespace Coop.Core.Server;
 
@@ -62,7 +63,10 @@ public class CoopServer : CoopNetworkBase, ICoopServer
         IMissionManager missionManager,
         Lazy<IOverloadedPeerManager> overloadedPeerManager,
         ISendCoalescer coalescer,
-        ICommonSerializer serializer) : base(configuration, serializer)
+        ICommonSerializer serializer,
+        IReliableMessageBatcher<NetPeer> reliableMessageBatcher,
+        CancellationTokenSource sessionCancellation)
+        : base(configuration, serializer, reliableMessageBatcher, sessionCancellation)
     {
         // Dependancy assignment
         this.messageBroker = messageBroker;
@@ -82,8 +86,34 @@ public class CoopServer : CoopNetworkBase, ICoopServer
 
     public override void OnConnectionRequest(ConnectionRequest request)
     {
+        string suppliedPassword;
+        try
+        {
+            suppliedPassword = request.Data.GetString(ConnectionPassword.MaxLength);
+        }
+        catch (Exception)
+        {
+            Logger.Warning("Client connection rejected for {Endpoint}: malformed password data", request.RemoteEndPoint);
+            RejectIncorrectPassword(request);
+            return;
+        }
+
+        if (!ConnectionPassword.IsAccepted(Config.Token, suppliedPassword))
+        {
+            Logger.Warning("Client connection rejected for {Endpoint}: incorrect password", request.RemoteEndPoint);
+            RejectIncorrectPassword(request);
+            return;
+        }
+
         Logger.Information("Client connection accepted for {Endpoint}", request.RemoteEndPoint);
         request.Accept();
+    }
+
+    private static void RejectIncorrectPassword(ConnectionRequest request)
+    {
+        var reason = new NetDataWriter();
+        reason.Put((byte)ConnectionRejectCode.IncorrectPassword);
+        request.Reject(reason);
     }
 
     public void OnNatIntroductionRequest(IPEndPoint localEndPoint, IPEndPoint remoteEndPoint, string token)
@@ -156,22 +186,23 @@ public class CoopServer : CoopNetworkBase, ICoopServer
         {
             GameThread.RunSafe(() => coalescer.Flush(this));
         }
+
+        // Send any sub-budget aggregated messages so nothing waits longer than one poll interval.
+        FlushPendingMessages();
     }
 
     public override void Start()
     {
         Logger.Information("Server starting on port {Port}", Config.Port);
 
-        if (netManager.Start(IPAddress.Any, IPAddress.IPv6Any, Config.Port)) return;
+        if (netManager.Start(IPAddress.Any, IPAddress.IPv6Any, Config.Port))
+        {
+            StartNetworkPoller();
+            messageBroker.Publish(this, new ServerListening());
+            return;
+        }
 
         Logger.Error("Server failed to bind port {Port}; it may already be in use", Config.Port);
-
-        // A managed server that cannot listen is a zombie whose shutdown save would overwrite the
-        // live session's save; quit without saving instead of masquerading as a reachable host.
-        if (ManagedServerConfig.IsManagedServer)
-        {
-            GameThread.RunSafe(ServerShutdown.QuitToDesktop, context: "ServerBindFailed");
-        }
     }
 
     public override void SendAll(IPacket packet)
@@ -186,7 +217,7 @@ public class CoopServer : CoopNetworkBase, ICoopServer
 
     // Every per-peer send funnels through here, so a still-loading peer's world deltas are dropped
     // (pre-save) or held (loading) instead of sent live — broadcasts and direct sends alike. The queue
-    // replays the held ones on campaign entry. Connection-level traffic that must always reach a
+    // replays the held ones during the join barriers. Connection-level traffic that must always reach a
     // mid-join peer (the save, the join handshake) uses SendImmediate to bypass this.
     public override void Send(NetPeer netPeer, IPacket packet)
     {

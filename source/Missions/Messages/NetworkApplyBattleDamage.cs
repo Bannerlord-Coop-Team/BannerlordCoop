@@ -1,23 +1,14 @@
-using Common.Messaging;
+﻿using Common.Messaging;
 using ProtoBuf;
 using System;
+using TaleWorlds.Core;
 using TaleWorlds.MountAndBlade;
 
 namespace Missions.Messages;
 
 /// <summary>
-/// Attacker's node → peers (over the mesh): a local troop hit a PUPPET, so route the WHOLE blow to that
-/// puppet's owner. Only the owner (the node with authority) acts on it — re-applying the blow through
-/// <c>Agent.RegisterBlow</c> so the engine resolves real damage, hit reaction, ragdoll and death (the death
-/// then flows through <c>Agent.Die</c> → the death/casualty sync). Routing the real blow (instead of a bare
-/// damage number + a synthetic kill) keeps combat faithful and removes the fixed-magnitude "fatal blow".
-/// <para>
-/// Agent indices are per-client, so the blow's attacker index can't be used as-is: <see cref="AttackerAgentId"/>
-/// carries the attacker's network id and the owner re-maps it to its local agent's index. Missiles are not
-/// synced (the projectile is simulated only on the shooter), but <c>Agent.RegisterBlow</c> resolves damage
-/// from the blow and never dereferences the projectile index — so a routed missile blow applies cleanly with
-/// no fix-up.
-/// </para>
+/// Attacker's node to peers over the mesh: a local troop hit a puppet, so route the resolved blow to
+/// that puppet's owner. Only the owner replays it through <c>Agent.RegisterBlow</c>.
 /// </summary>
 [ProtoContract(SkipConstructor = true)]
 public class NetworkApplyBattleDamage : IEvent
@@ -28,21 +19,45 @@ public class NetworkApplyBattleDamage : IEvent
     [ProtoMember(2)]
     public Guid AttackerAgentId { get; }
     [ProtoMember(3)]
-    public Blow Blow { get; }
-    [ProtoMember(4)]
-    public AttackCollisionData CollisionData { get; }
-    /// <summary>True when the blow targets <see cref="VictimAgentId"/>'s mount, not the rider itself. Fallback
-    /// path only: a REGISTERED mount is routed by its own id (IsMount stays false); an unregistered horse is
-    /// keyed off its rider's id and the owner resolves the rider's current MountAgent at apply time.</summary>
+    public BattleDamageData DamageData { get; }
+    /// <summary>True when the blow targets <see cref="VictimAgentId"/>'s mount, not the rider itself.</summary>
     [ProtoMember(5)]
     public bool IsMount { get; }
+    /// <summary>Identity of the exact missile launch that produced this blow.</summary>
+    [ProtoMember(6)]
+    public long MissileShotSequence { get; }
+    [ProtoMember(7)]
+    public bool IsMissile { get; }
+    /// <summary>The original missile weapon used by vanilla to select the combat skill reward.</summary>
+    [ProtoMember(8)]
+    public WeaponComponentData AttackerWeapon { get; }
 
-    public NetworkApplyBattleDamage(Guid victimAgentId, Guid attackerAgentId, Blow blow, AttackCollisionData collisionData, bool isMount = false)
+    [ProtoIgnore]
+    public Blow Blow { get; private set; }
+    [ProtoIgnore]
+    public AttackCollisionData CollisionData { get; private set; }
+
+    public NetworkApplyBattleDamage(
+        Guid victimAgentId,
+        Guid attackerAgentId,
+        BattleDamageData damageData,
+        bool isMissile,
+        bool isMount = false,
+        long missileShotSequence = 0,
+        WeaponComponentData attackerWeapon = null)
     {
         VictimAgentId = victimAgentId;
         AttackerAgentId = attackerAgentId;
+        DamageData = damageData;
+        IsMount = isMount;
+        MissileShotSequence = missileShotSequence;
+        IsMissile = isMissile;
+        AttackerWeapon = attackerWeapon;
+    }
+
+    internal void AttachDecodedData(Blow blow, AttackCollisionData collisionData)
+    {
         Blow = blow;
         CollisionData = collisionData;
-        IsMount = isMount;
     }
 }

@@ -82,6 +82,9 @@ internal class VillagerConversationsPatches
     {
         MobileParty encounteredMobileParty = PlayerEncounter.EncounteredMobileParty;
 
+        // EndConversation clears ConversationParty before this consequence runs.
+        __instance.SetPlayerInteraction(encounteredMobileParty, VillagerCampaignBehavior.PlayerInteraction.Hostile);
+
         // Call helper function to implement vanilla open loot screen logic
         ContainerProvider.TryResolve<IItemRosterInterface>(out var itemRosterInterface);
         itemRosterInterface.OpenPartyLootScreen(encounteredMobileParty, out var _, out var itemRosterElements);
@@ -97,13 +100,10 @@ internal class VillagerConversationsPatches
             PartyScreenHelper.OpenScreenAsLoot(TroopRoster.CreateDummyTroopRoster(), troopRoster, encounteredMobileParty.Name, troopRoster.TotalManCount, null);
         }
 
-        // Locally set player interaction, and then save in CoopSession on server
-        __instance.SetPlayerInteraction(MobileParty.ConversationParty, VillagerCampaignBehavior.PlayerInteraction.Hostile);
-
-        PlayerEncounter.LeaveEncounter = true;
-
         var message = new VillagersTookPrisonerOnConsequence(Hero.MainHero, MobileParty.MainParty, encounteredMobileParty, itemRosterElements);
         MessageBroker.Instance.Publish(__instance, message);
+
+        PlayerEncounter.LeaveEncounter = true;
 
         return false;
     }

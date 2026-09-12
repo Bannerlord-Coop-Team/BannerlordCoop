@@ -1,4 +1,4 @@
-using Common.Messaging;
+﻿using Common.Messaging;
 
 namespace Missions.Messages;
 
@@ -8,9 +8,8 @@ namespace Missions.Messages;
 /// message). Battle host election uses it to promote a successor when the departed controller was the host, or
 /// to drop the controller from the successor line otherwise.
 /// <para>
-/// <see cref="WasRetreat"/> distinguishes a graceful leave (retreat — the player's troops despawned, so the
-/// battle reserve must forget its party for a clean re-spawn on rejoin) from an ungraceful drop (disconnect —
-/// the host adopts the troops, so the reserve pointer is kept).
+/// <see cref="WasRetreat"/> means the player's party withdraws and the battle reserve must forget it for a
+/// clean re-spawn on rejoin. Both a graceful retreat and a campaign-server disconnect use that behavior.
 /// </para>
 /// </summary>
 public readonly struct MissionMemberDeparted : IEvent

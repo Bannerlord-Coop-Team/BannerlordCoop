@@ -10,7 +10,7 @@ internal class ClanSync : IAutoSync
     {
         // Fields
         AutoSyncRegistry.AddField(AccessTools.Field(typeof(Clan), nameof(Clan._isEliminated)));
-        AutoSyncRegistry.AddField(AccessTools.Field(typeof(Clan), nameof(Clan._kingdom)));
+        //AutoSyncRegistry.AddField(AccessTools.Field(typeof(Clan), nameof(Clan._kingdom)));
         AutoSyncRegistry.AddField(AccessTools.Field(typeof(Clan), nameof(Clan._influence)));
         AutoSyncRegistry.AddField(AccessTools.Field(typeof(Clan), nameof(Clan._midSettlement)));
         AutoSyncRegistry.AddField(AccessTools.Field(typeof(Clan), nameof(Clan._basicTroop)));
@@ -23,8 +23,8 @@ internal class ClanSync : IAutoSync
         AutoSyncRegistry.AddField(AccessTools.Field(typeof(Clan), nameof(Clan._clanDebtToKingdom)));
 
         // Properties
-        AutoSyncRegistry.AddProperty(AccessTools.Property(typeof(Clan), nameof(Clan.Name)));
-        AutoSyncRegistry.AddProperty(AccessTools.Property(typeof(Clan), nameof(Clan.InformalName)));
+        //AutoSyncRegistry.AddProperty(AccessTools.Property(typeof(Clan), nameof(Clan.Name)));
+        //AutoSyncRegistry.AddProperty(AccessTools.Property(typeof(Clan), nameof(Clan.InformalName)));
         AutoSyncRegistry.AddProperty(AccessTools.Property(typeof(Clan), nameof(Clan.Culture)));
         AutoSyncRegistry.AddProperty(AccessTools.Property(typeof(Clan), nameof(Clan.LastFactionChangeTime)));
         AutoSyncRegistry.AddProperty(AccessTools.Property(typeof(Clan), nameof(Clan.AutoRecruitmentExpenses)));
@@ -38,7 +38,7 @@ internal class ClanSync : IAutoSync
         //AutoSyncRegistry.AddProperty(AccessTools.Property(typeof(Clan), nameof(Clan.LabelColor)));
         //AutoSyncRegistry.AddProperty(AccessTools.Property(typeof(Clan), nameof(Clan.InitialPosition)));
         AutoSyncRegistry.AddProperty(AccessTools.Property(typeof(Clan), nameof(Clan.IsRebelClan)));
-        AutoSyncRegistry.AddProperty(AccessTools.Property(typeof(Clan), nameof(Clan.IsUnderMercenaryService)));
+        //AutoSyncRegistry.AddProperty(AccessTools.Property(typeof(Clan), nameof(Clan.IsUnderMercenaryService)));
         AutoSyncRegistry.AddProperty(AccessTools.Property(typeof(Clan), nameof(Clan.Color)));
         AutoSyncRegistry.AddProperty(AccessTools.Property(typeof(Clan), nameof(Clan.Color2)));
         AutoSyncRegistry.AddProperty(AccessTools.Property(typeof(Clan), nameof(Clan.BannerBackgroundColorPrimary)));

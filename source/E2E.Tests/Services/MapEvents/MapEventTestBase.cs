@@ -1,12 +1,19 @@
+﻿using Common.Messaging;
 using Common.Network;
 using Common.Util;
 using E2E.Tests.Environment;
 using E2E.Tests.Environment.Instance;
 using E2E.Tests.Util;
+using GameInterface.Services.MapEventParties;
+using GameInterface.Services.Party.Data;
+using GameInterface.Services.Party.Messages;
 using GameInterface.Services.PlayerCaptivityService.Messages;
 using GameInterface.Services.Players;
 using GameInterface.Services.Players.Data;
+using GameInterface.Services.TroopRosters.Data;
+using GameInterface.Services.TroopRosters.Interfaces;
 using HarmonyLib;
+using Helpers;
 using Moq;
 using SandBox.GauntletUI.Map;
 using System.Reflection;
@@ -59,7 +66,7 @@ public abstract class MapEventTestBase : IDisposable
     /// Creates and registers a <see cref="MapEvent"/> on the server with two <see cref="MobileParty"/>
     /// participants, returning the IDs of the map event, attacker party, and defender party.
     /// </summary>
-    protected MapEventContext CreateServerMapEvent()
+    protected MapEventContext CreateServerMapEvent(bool commit = true)
     {
         string? mapEventId = null;
         string? attackerPartyId = null;
@@ -78,7 +85,15 @@ public abstract class MapEventTestBase : IDisposable
             // Construction has already replicated the MapEvent to the clients, where the real
             // MapEventRegistry.OnClientCreated runs and allocates their _sides array. The synchronous
             // MapEventSideAssigned replication produced by Initialize therefore lands on a non-null array.
-            mapEvent.Initialize(attackerParty.Party, defenderParty.Party);
+            mapEvent.Initialize(
+                attackerParty.Party,
+                defenderParty.Party,
+                new FieldBattleEventComponent(mapEvent),
+                MapEvent.BattleTypes.FieldBattle);
+            mapEvent.MapEventVisual = null;
+
+            if (commit && !Campaign.Current.MapEventManager.MapEvents.Contains(mapEvent))
+                Campaign.Current.MapEventManager.OnMapEventCreated(mapEvent);
 
             Assert.True(Server.ObjectManager.TryGetId(mapEvent, out mapEventId));
             Assert.True(Server.ObjectManager.TryGetId(attackerParty, out attackerPartyId));
@@ -88,6 +103,16 @@ public abstract class MapEventTestBase : IDisposable
         Assert.NotNull(mapEventId);
         Assert.NotNull(attackerPartyId);
         Assert.NotNull(defenderPartyId);
+
+        // CreateServerMapEvent models a land field battle, so give every replica a valid land position.
+        foreach (var instance in Clients.Append(Server))
+        {
+            instance.Call(() =>
+            {
+                Assert.True(instance.ObjectManager.TryGetObject<MapEvent>(mapEventId, out var mapEvent));
+                mapEvent.Position = new CampaignVec2(default, isOnLand: true);
+            });
+        }
 
         return new MapEventContext(
             mapEventId,
@@ -106,12 +131,10 @@ public abstract class MapEventTestBase : IDisposable
         {
             Assert.True(Server.ObjectManager.TryGetObject<MapEvent>(mapEventId, out var mapEvent));
 
-            // Finalize the way the live server does — through FinalizeEvent, the public path battles take on
-            // the host. The AutoRegistry watches FinalizeEventAux (MapEventRegistry.DestroyMethods), which
-            // FinalizeEvent funnels into, so this drives the same destroy hook the running game does. It must
-            // NOT run inside an AllowedThread: LifetimePatches.DestroyPostfix only broadcasts the removal to
-            // clients when the call is *not* an allowed/original-policy call, so wrapping it would silently
-            // skip the sync.
+            // Finalize the way the live server does through FinalizeEvent, the public path battles take on
+            // the host. FinalizeEvent funnels into the patched FinalizeEventAux, which broadcasts removal
+            // after vanilla teardown completes. It must not run inside an AllowedThread because that makes
+            // the patches stand down and skips the sync.
             mapEvent.FinalizeEvent();
         }, MapEventDisabledMethods);
     }
@@ -183,8 +206,7 @@ public abstract class MapEventTestBase : IDisposable
             // MapEventSide.AddPartyInternal internally. Calling AddPartyInternal directly skips that wiring,
             // leaving Side == None (-1) and throwing IndexOutOfRange in
             // RecalculateRenownAndInfluenceValuesOnPartyInvolved. It is NOT wrapped in AllowedThread: the
-            // collection-add must go through the patched MBList.Add so the server broadcasts the new party to
-            // the clients (MapEventSideCollectionPatches.ListAddOverride).
+            // MapEventSidePatches.AddIntercept broadcasts this collection add to clients.
             party.Party.MapEventSide = side;
 
             var joined = side.Parties.LastOrDefault(p => p?.Party == party.Party);
@@ -194,6 +216,35 @@ public abstract class MapEventTestBase : IDisposable
 
         Assert.NotNull(mapEventPartyId);
         return mapEventPartyId!;
+    }
+
+    /// <summary>
+    /// Creates a new <see cref="MobileParty"/> on the server and joins it to the given side of an existing
+    /// map event through the vanilla reinforcement entry point (see <see cref="JoinPartyToSide"/> for why
+    /// the <see cref="PartyBase.MapEventSide"/> setter is the correct join path). Returns the MOBILE
+    /// PARTY's id — usable with <see cref="SeedPartyTroopOnAll"/> — unlike <see cref="JoinPartyToSide"/>,
+    /// which returns the <see cref="MapEventParty"/> id.
+    /// </summary>
+    protected string JoinNewServerPartyToSide(string mapEventId, BattleSideEnum side)
+    {
+        string? partyId = null;
+        var disabledMethods = MapEventDisabledMethods
+            // Synthetic party visibility has no live campaign feat model.
+            .Append(AccessTools.Method(typeof(CultureObject), nameof(CultureObject.HasFeat)))
+            .ToList();
+
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject<MapEvent>(mapEventId, out var mapEvent));
+
+            var party = GameObjectCreator.CreateInitializedObject<MobileParty>();
+            party.Party.MapEventSide = mapEvent.GetMapEventSide(side);
+
+            Assert.True(Server.ObjectManager.TryGetId(party, out partyId));
+        }, disabledMethods);
+
+        Assert.NotNull(partyId);
+        return partyId!;
     }
 
     /// <summary>
@@ -380,6 +431,21 @@ public abstract class MapEventTestBase : IDisposable
     /// </remarks>
     protected void DefeatPlayerByBattleStateSync(string playerHeroId, string playerPartyId, string captorPartyId)
     {
+        var mapEventId = CreateBattleStateDefeatMapEvent(playerHeroId, playerPartyId, captorPartyId);
+
+        CommitBattleStateDefeat(mapEventId);
+    }
+
+    /// <summary>
+    /// First half of <see cref="DefeatPlayerByBattleStateSync"/>: builds the synced battle the player is
+    /// about to lose (captor attacking, player party defending) and returns its id without committing a
+    /// result. Split out so a test can adjust world state that must exist during the commit but not during
+    /// <see cref="MapEvent.Initialize"/> — e.g. a besieger camp, whose presence makes Initialize walk the
+    /// siege graph's involved parties, which the headless siege fixture (disabled side initializers)
+    /// cannot satisfy.
+    /// </summary>
+    protected string CreateBattleStateDefeatMapEvent(string playerHeroId, string playerPartyId, string captorPartyId)
+    {
         string? mapEventId = null;
 
         Server.Call(() =>
@@ -395,7 +461,7 @@ public abstract class MapEventTestBase : IDisposable
             }
 
             // attacker = captor (winner), defender = player party (loser). Construction replicates the
-            // MapEvent (and its sides) to the clients, so the client below can resolve and finish it.
+            // MapEvent (and its sides) to the clients, so the committing client can resolve and finish it.
             var mapEvent = GameObjectCreator.CreateInitializedObject<MapEvent>();
             mapEvent.MapEventVisual = MockMapEventVisual();
             mapEvent.Initialize(captorParty.Party, playerParty.Party);
@@ -404,7 +470,16 @@ public abstract class MapEventTestBase : IDisposable
         }, MapEventDisabledMethods);
 
         Assert.NotNull(mapEventId);
+        return mapEventId!;
+    }
 
+    /// <summary>
+    /// Second half of <see cref="DefeatPlayerByBattleStateSync"/>: a client commits the captor's victory
+    /// for a battle built by <see cref="CreateBattleStateDefeatMapEvent"/>, which the server applies
+    /// authoritatively — capturing the defeated player there.
+    /// </summary>
+    protected void CommitBattleStateDefeat(string mapEventId)
+    {
         var disabledMethods = MapEventDisabledMethods
             .Append(AccessTools.Method(typeof(DefaultBattleRewardModel), nameof(DefaultBattleRewardModel.GetCaptureMemberChancesForWinnerParties)))
             .Append(AccessTools.Method(typeof(MapEvent), "LootDefeatedPartyCasualties"))
@@ -420,7 +495,7 @@ public abstract class MapEventTestBase : IDisposable
         var client = Clients.First();
         client.Call(() =>
         {
-            Assert.True(client.ObjectManager.TryGetObject<MapEvent>(mapEventId!, out var clientMapEvent));
+            Assert.True(client.ObjectManager.TryGetObject<MapEvent>(mapEventId, out var clientMapEvent));
             clientMapEvent.BattleState = BattleState.AttackerVictory;
         }, disabledMethods);
     }
@@ -574,6 +649,78 @@ public abstract class MapEventTestBase : IDisposable
     }
 
     /// <summary>
+    /// Releases a captured player through the same normal Party-screen command that the captor sends after
+    /// moving the player prisoner into the dummy left-hand dismissal roster.
+    /// </summary>
+    protected void ReleasePlayerByPartyScreenDiscard(string captorHeroId, string captorPartyId, string prisonerHeroId)
+    {
+        var disabledMethods = MapEventDisabledMethods
+            // A release from an active captor separates the restored party with campaign-map pathfinding.
+            // The headless environment has no map scene; the existing escape helper suppresses this same
+            // visual/navigation boundary while retaining the authoritative release state transition.
+            .Append(AccessTools.Method(typeof(MobileParty), nameof(MobileParty.TeleportPartyToOutSideOfEncounterRadius)))
+            .ToList();
+
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject<Hero>(captorHeroId, out var captorHero));
+            Assert.True(Server.ObjectManager.TryGetObject<MobileParty>(captorPartyId, out var captorParty));
+            Assert.True(Server.ObjectManager.TryGetObject<Hero>(prisonerHeroId, out var prisonerHero));
+            Assert.True(Server.ObjectManager.TryGetId(prisonerHero.CharacterObject, out var prisonerCharacterId));
+
+            var emptyRosterDelta = new TroopRosterData(Array.Empty<TroopRosterElementData>());
+            var message = new NetworkCompleteDoneLogic(
+                captorHeroId,
+                Array.Empty<FlattenedTroop>(),
+                Array.Empty<FlattenedTroop>(),
+                Array.Empty<FlattenedTroop>(),
+                emptyRosterDelta,
+                new TroopRosterData(new[]
+                {
+                    new TroopRosterElementData(prisonerCharacterId, 1, 0, 0),
+                }),
+                emptyRosterDelta,
+                new TroopRosterData(new[]
+                {
+                    new TroopRosterElementData(prisonerCharacterId, -1, 0, 0),
+                }),
+                captorParty.ItemRoster.ToArray(),
+                new UpgradedTroopHistoryData(new()),
+                null,
+                null,
+                0,
+                0,
+                0,
+                true,
+                captorParty.Position,
+                PartyScreenHelper.PartyScreenMode.Normal,
+                Server.Resolve<ITroopRosterInterface>().PackTroopRosterOrderData(captorParty.MemberRoster));
+
+            Server.Resolve<IMessageBroker>().Publish(this, message);
+        }, disabledMethods);
+    }
+
+    /// <summary>
+    /// Adds a prisoner count locally to one instance without replication, allowing tests to construct
+    /// malformed and divergent player-prisoner counts.
+    /// </summary>
+    protected void SeedPartyPrisoner(EnvironmentInstance instance, string partyId, string heroId, int count)
+    {
+        instance.Call(() =>
+        {
+            Assert.True(instance.ObjectManager.TryGetObject<MobileParty>(partyId, out var party));
+            Assert.True(instance.ObjectManager.TryGetObject<Hero>(heroId, out var hero));
+
+            using (new AllowedThread())
+            {
+                int index = party.PrisonRoster.FindIndexOfTroop(hero.CharacterObject);
+                Assert.True(index >= 0);
+                party.PrisonRoster.AddToCountsAtIndex(index, count);
+            }
+        });
+    }
+
+    /// <summary>
     /// Asserts the prison roster of the party with <paramref name="partyId"/> holds exactly
     /// <paramref name="expected"/> prisoners on the given <paramref name="instance"/>. Guards the
     /// captor's side of a capture: the prisoner must be counted once everywhere — a replicated add
@@ -589,6 +736,148 @@ public abstract class MapEventTestBase : IDisposable
                 expected == party.PrisonRoster.TotalManCount,
                 $"[{instance.GetType().Name}] party {partyId} should have {expected} prisoners, has {party.PrisonRoster.TotalManCount}");
         });
+    }
+
+    /// <summary>
+    /// Removes one player prisoner only from the selected instance while preserving the hero's captivity
+    /// reference. This reproduces an authority whose roster element is already absent while a client still
+    /// holds the stale prisoner entry.
+    /// </summary>
+    protected void RemovePartyPrisonerLocally(EnvironmentInstance instance, string partyId, string heroId)
+    {
+        instance.Call(() =>
+        {
+            Assert.True(instance.ObjectManager.TryGetObject<MobileParty>(partyId, out var party));
+            Assert.True(instance.ObjectManager.TryGetObject<Hero>(heroId, out var hero));
+
+            using (new AllowedThread())
+            {
+                int index = party.PrisonRoster.FindIndexOfTroop(hero.CharacterObject);
+                Assert.True(index >= 0);
+                party.PrisonRoster.SetElementNumber(index, 0);
+                party.PrisonRoster.RemoveZeroCounts();
+                party.PrisonRoster.InitializeCachedData();
+                hero.PartyBelongedToAsPrisoner = party.Party;
+            }
+        });
+    }
+
+    /// <summary>
+    /// Asserts the exact count of one player hero in a party's prison roster.
+    /// </summary>
+    protected void AssertPlayerPrisonerCount(EnvironmentInstance instance, string partyId, string heroId, int expected)
+    {
+        instance.Call(() =>
+        {
+            Assert.True(instance.ObjectManager.TryGetObject<MobileParty>(partyId, out var party));
+            Assert.True(instance.ObjectManager.TryGetObject<Hero>(heroId, out var hero));
+            Assert.Equal(expected, party.PrisonRoster.GetTroopCount(hero.CharacterObject));
+        });
+    }
+
+    /// <summary>
+    /// Reads the member-roster man count of the party on the given instance. Baseline helper: harness
+    /// parties spawn with nondeterministic rosters, so tests assert relative to a snapshot, never absolute.
+    /// </summary>
+    protected int GetPartyManCount(EnvironmentInstance instance, string partyId)
+    {
+        int count = 0;
+        instance.Call(() =>
+        {
+            Assert.True(instance.ObjectManager.TryGetObject<MobileParty>(partyId, out var party));
+            count = party.MemberRoster.TotalManCount;
+        });
+        return count;
+    }
+
+    /// <summary>
+    /// Reads the member-roster man count of NON-hero elements only (see <see cref="GetPartyManCount"/>).
+    /// The capture/surrender transfer moves regular troops to the captor but never raw hero elements
+    /// (heroes are captured individually via TakePrisonerAction), so prisoner expectations build on this.
+    /// </summary>
+    protected int GetPartyNonHeroManCount(EnvironmentInstance instance, string partyId)
+    {
+        int count = 0;
+        instance.Call(() =>
+        {
+            Assert.True(instance.ObjectManager.TryGetObject<MobileParty>(partyId, out var party));
+            for (int i = 0; i < party.MemberRoster.Count; i++)
+            {
+                var element = party.MemberRoster.GetElementCopyAtIndex(i);
+                if (element.Character?.IsHero != true)
+                    count += Math.Max(element.Number, 0);
+            }
+        });
+        return count;
+    }
+
+    /// <summary>
+    /// Counts the live (alive, non-prisoner, non-depleted) hero elements in the member roster of the party
+    /// with <paramref name="partyId"/> — the heroes a capture takes prisoner individually via
+    /// <c>TakePrisonerAction</c>: the registered player hero through the native defeat path and every other
+    /// rider through the companion capture (BR-061). The harness lord party spawns with its own bootstrap
+    /// lord hero riding in the roster, so hero expectations must be counted, never hard-coded.
+    /// </summary>
+    protected int GetPartyLiveHeroCount(EnvironmentInstance instance, string partyId)
+    {
+        int count = 0;
+        instance.Call(() =>
+        {
+            Assert.True(instance.ObjectManager.TryGetObject<MobileParty>(partyId, out var party));
+            for (int i = 0; i < party.MemberRoster.Count; i++)
+            {
+                var element = party.MemberRoster.GetElementCopyAtIndex(i);
+                if (element.Character?.IsHero != true || element.Number <= 0) continue;
+
+                var hero = element.Character.HeroObject;
+                if (hero?.IsAlive == true && !hero.IsPrisoner)
+                    count++;
+            }
+        });
+        return count;
+    }
+
+    /// <summary>
+    /// Counts the capturable hero elements in the member roster of the party with <paramref name="partyId"/> —
+    /// like <see cref="GetPartyLiveHeroCount"/>, but ALSO excludes heroes carrying a battle
+    /// <see cref="Hero.DeathMark"/> (<c>DiedInBattle</c> / <c>DiedInLabor</c>). During an active map event
+    /// native <see cref="KillCharacterAction"/> defers the kill and only records a DeathMark, so a hero killed
+    /// in the current battle still reports <see cref="Hero.IsAlive"/> == true; those heroes are NOT taken
+    /// prisoner (matching native <c>MapEvent.CaptureDefeatedPartyMembers</c>), so a prisoner expectation must
+    /// exclude them — which <see cref="GetPartyLiveHeroCount"/> (aliveness only) would over-count.
+    /// </summary>
+    protected int GetPartyCapturableHeroCount(EnvironmentInstance instance, string partyId)
+    {
+        int count = 0;
+        instance.Call(() =>
+        {
+            Assert.True(instance.ObjectManager.TryGetObject<MobileParty>(partyId, out var party));
+            for (int i = 0; i < party.MemberRoster.Count; i++)
+            {
+                var element = party.MemberRoster.GetElementCopyAtIndex(i);
+                if (element.Character?.IsHero != true || element.Number <= 0) continue;
+
+                var hero = element.Character.HeroObject;
+                if (hero == null || !hero.IsAlive || hero.IsPrisoner) continue;
+                if (hero.DeathMark == KillCharacterAction.KillCharacterActionDetail.DiedInBattle
+                    || hero.DeathMark == KillCharacterAction.KillCharacterActionDetail.DiedInLabor) continue;
+
+                count++;
+            }
+        });
+        return count;
+    }
+
+    /// <summary>Reads the prison-roster man count of the party on the given instance (see <see cref="GetPartyManCount"/>).</summary>
+    protected int GetPartyPrisonerCount(EnvironmentInstance instance, string partyId)
+    {
+        int count = 0;
+        instance.Call(() =>
+        {
+            Assert.True(instance.ObjectManager.TryGetObject<MobileParty>(partyId, out var party));
+            count = party.PrisonRoster.TotalManCount;
+        });
+        return count;
     }
 
     /// <summary>

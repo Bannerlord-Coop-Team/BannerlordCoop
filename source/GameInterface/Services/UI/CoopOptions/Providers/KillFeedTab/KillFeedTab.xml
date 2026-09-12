@@ -1,4 +1,4 @@
-<ListPanel DataSource="{SelectedTab}" WidthSizePolicy="StretchToParent" HeightSizePolicy="CoverChildren"
+<ListPanel DataSource="{KillFeedTab}" IsVisible="@IsSelected" WidthSizePolicy="StretchToParent" HeightSizePolicy="CoverChildren"
            LayoutImp.LayoutMethod="VerticalTopToBottom">
   <Children>
     <ListPanel DataSource="{Sections}" WidthSizePolicy="StretchToParent" HeightSizePolicy="CoverChildren"

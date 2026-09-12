@@ -13,10 +13,13 @@ public readonly struct NetworkAddMobilePartyInArmy : ICommand
     public readonly string ArmyId;
     [ProtoMember(2)]
     public readonly string MobilePartyId;
+    [ProtoMember(3)]
+    public readonly bool AddPartyToMergedPartiesBool;
 
-    public NetworkAddMobilePartyInArmy(string armyId, string mobilePartyId)
+    public NetworkAddMobilePartyInArmy(string armyId, string mobilePartyId, bool addPartyToMergedPartiesBool)
     {
         ArmyId = armyId;
         MobilePartyId = mobilePartyId;
+        AddPartyToMergedPartiesBool = addPartyToMergedPartiesBool;
     }
 }

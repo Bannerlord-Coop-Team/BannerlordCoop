@@ -32,12 +32,12 @@ internal class ItemObjectInterface : IItemObjectInterface
     public byte[] PackageItemObject(ItemObject itemObject)
     {
         ItemObjectBinaryPackage package = binaryPackageFactory.GetBinaryPackage<ItemObjectBinaryPackage>(itemObject);
-        return BinaryFormatterSerializer.Serialize(package);
+        return BinaryPackageSerializer.Serialize(package);
     }
 
     public ItemObject UnpackItemObject(byte[] bytes)
     {
-        ItemObjectBinaryPackage package = BinaryFormatterSerializer.Deserialize<ItemObjectBinaryPackage>(bytes);
+        ItemObjectBinaryPackage package = BinaryPackageSerializer.Deserialize<ItemObjectBinaryPackage>(bytes);
         return package.Unpack<ItemObject>(binaryPackageFactory);
     }
 }

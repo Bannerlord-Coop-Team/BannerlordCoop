@@ -4,35 +4,44 @@ using Common.Messaging;
 using Common.Util;
 using GameInterface.Policies;
 using GameInterface.Services.Armies.Messages;
+using GameInterface.Services.MobileParties.Extensions;
+using GameInterface.Utils;
 using HarmonyLib;
+using Helpers;
 using Serilog;
+using System;
+using System.Collections.Generic;
 using System.Linq;
+using System.Reflection;
+using System.Runtime.CompilerServices;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Actions;
 using TaleWorlds.CampaignSystem.GameState;
 using TaleWorlds.CampaignSystem.Map;
 using TaleWorlds.CampaignSystem.Party;
+using TaleWorlds.CampaignSystem.Settlements;
 using TaleWorlds.Core;
+using TaleWorlds.Library;
+using TaleWorlds.Localization;
 namespace GameInterface.Services.Armies.Patches;
 
 /// <summary>
-/// Patches for adding and remove party from and army
+/// Patches for Army
 /// </summary>
 [HarmonyPatch(typeof(Army))]
 public class ArmyPatches
 {
     private static ILogger Logger = LogManager.GetLogger<Kingdom>();
+    private static readonly ConditionalWeakTable<Army, object> LongTermBehaviorTextFailures = new();
 
     [HarmonyPatch(nameof(Army.OnAddPartyInternal))]
     [HarmonyPrefix]
     static bool OnAddPartyInternalPrefix(ref Army __instance, MobileParty mobileParty)
     {
-        Logger.Debug($"OnAddPartyInternalPrefix");
         if (CallOriginalPolicy.IsOriginalAllowed()) return true;
 
         if (ModInformation.IsClient) return false;
-
-        var message = new MobilePartyInArmyAdded(__instance, mobileParty);
+        var message = new MobilePartyInArmyAdded(__instance, mobileParty, false);
         MessageBroker.Instance.Publish(mobileParty, message);
 
         return true;
@@ -86,6 +95,115 @@ public class ArmyPatches
         return true;
     }
 
+    [HarmonyPatch(typeof(Army), nameof(Army.Gather))]
+    [HarmonyPrefix]
+    public static bool GatherPrefix(Army __instance, Settlement initialHostileSettlement, MBReadOnlyList<MobileParty> partiesToCallToArmy = null)
+    {
+        Settlement gatheringPoint = null;
+        if (!__instance.LeaderParty.IsPlayerParty())
+        {
+            __instance.FindBestGatheringSettlementAndMoveTheLeader(initialHostileSettlement);
+            if (partiesToCallToArmy == null)
+            {
+                goto IL_93;
+            }
+            using (List<MobileParty>.Enumerator enumerator = partiesToCallToArmy.GetEnumerator())
+            {
+                while (enumerator.MoveNext())
+                {
+                    MobileParty mobileParty = enumerator.Current;
+                    mobileParty.Army = __instance;
+                }
+                goto IL_93;
+            }
+        }
+        Settlement settlement;
+        if ((settlement = SettlementHelper.FindNearestSettlementToMobileParty(__instance.LeaderParty, __instance.LeaderParty.NavigationCapability, (Settlement x) => x.IsFortification || x.IsVillage)) == null)
+        {
+            CampaignVec2 position = __instance.LeaderParty.Position;
+            settlement = SettlementHelper.FindNearestSettlementToPoint(position, null);
+        }
+        gatheringPoint = settlement;
+    IL_93:
+        GatherArmyAction.Apply(__instance.LeaderParty, gatheringPoint);
+        return false;
+    }
+
+    /// <summary>
+    /// Replaces IsMainParty to IsPlayerParty
+    /// </summary>
+    [HarmonyPatch(nameof(Army.GetLongTermBehaviorText))]
+    [HarmonyPrefix]
+    private static bool GetLongTermBehaviorTextPrefix(Army __instance, bool setWithLink, ref TextObject __result)
+    {
+        if (__instance.LeaderParty.IsPlayerParty())
+        {
+            __result = __instance.GetLongTermBehaviorTextForPlayerParty();
+        }
+        else if (ModInformation.IsClient)
+        {
+            try
+            {
+                __result = __instance.GetLongTermBehaviorTextForAILeadedParty(setWithLink);
+            }
+            catch (NullReferenceException)
+            {
+                LongTermBehaviorTextFailures.GetValue(__instance, army =>
+                {
+                    Logger.Error("Unable to render long-term behavior text for army {ArmyName}", army.Name);
+                    return new object();
+                });
+                __result = TextObject.GetEmpty();
+            }
+        }
+        else
+        {
+            return true;
+        }
+        return false;
+    }
+    /// <summary>
+    /// Replaces MobileParty.MainParty to __instance.LeaderParty
+    /// </summary>
+    [HarmonyPatch(nameof(Army.GetLongTermBehaviorTextForPlayerParty))]
+    [HarmonyPrefix]
+    private static bool GetLongTermBehaviorTextForPlayerPartyPrefix(Army __instance, ref TextObject __result)
+    {
+        if (__instance.LeaderParty.TargetSettlement != null && __instance.LeaderParty.CurrentSettlement != __instance.LeaderParty.TargetSettlement)
+        {
+            __result = GameTexts.FindText("str_army_going_to_settlement", null);
+            __result.SetTextVariable("SETTLEMENT_NAME", __instance.LeaderParty.Ai.AiBehaviorPartyBase.Name);
+        }
+        else if (__instance.LeaderParty.CurrentSettlement != null)
+        {
+            __result = GameTexts.FindText("str_army_waiting_in_settlement", null);
+            __result.SetTextVariable("SETTLEMENT_NAME", __instance.LeaderParty.CurrentSettlement.Name);
+        }
+        else if (__instance.LeaderParty.TargetParty != null)
+        {
+            __result = new TextObject("{=P4QFKVSU}Moving to {TARGET_PARTY}.", null);
+            __result.SetTextVariable("TARGET_PARTY", __instance.LeaderParty.TargetParty.Name);
+        }
+        else if (__instance.LeaderParty.IsMoving)
+        {
+            __result = new TextObject("{=b9TbdM9A}Moving to a point.", null);
+        }
+        else
+        {
+            __result = new TextObject("{=RClxLG6N}Holding.", null);
+        }
+        return false;
+    }
+    /// <summary>
+    /// This helps update the army speed
+    /// </summary>
+    [HarmonyPatch(typeof(MobileParty), nameof(MobileParty.AttachedTo), MethodType.Setter)]
+    [HarmonyPostfix]
+    private static void Soasdoasd(MobileParty __instance, MobileParty value)
+    {
+        value?.UpdateVersionNo();
+    }
+
     public static void AddMobilePartyInArmy(MobileParty mobileParty, Army army)
     {
         GameThread.RunSafe(() =>
@@ -94,90 +212,129 @@ public class ArmyPatches
             mobileParty._army = army;
             army._parties.Add(mobileParty);
             mobileParty.Ai.RethinkAtNextHourlyTick = true;
-            CampaignEventDispatcher.Instance.OnPartyJoinedArmy(mobileParty);
+            if (ModInformation.IsServer)
+            {
+                CampaignEventDispatcher.Instance.OnPartyJoinedArmy(mobileParty);
+            }
+            CampaignEventDispatcher.Instance.OnArmyOverlaySetDirty();
+            mobileParty.Party.SetVisualAsDirty();
         });
     }
 
     public static void RemoveMobilePartyInArmy(MobileParty mobileParty, Army army, MobileParty clientMobileParty)
     {
-        GameThread.RunSafe(() =>
+        GameThread.RunSafe(() => RemoveMobilePartyInArmyImmediate(mobileParty, army, clientMobileParty));
+    }
+
+    internal static void RemoveMobilePartyInArmyImmediate(
+        MobileParty mobileParty,
+        Army army,
+        MobileParty clientMobileParty)
+    {
+        if (!army._parties.Contains(mobileParty)) return;
+        army.LeaderParty.UpdateVersionNo();
+        mobileParty.Ai.SetInitiative(1f, 1f, 24f);
+        army._parties.Remove(mobileParty);
+        if (ModInformation.IsServer)
         {
-            if (!army._parties.Contains(mobileParty)) return;
-            mobileParty.Ai.SetInitiative(1f, 1f, 24f);
-            army._parties.Remove(mobileParty);
             CampaignEventDispatcher.Instance.OnPartyRemovedFromArmy(mobileParty);
-            CampaignEventDispatcher.Instance.OnArmyOverlaySetDirty();
-            mobileParty.AttachedTo = null;
-            if (ModInformation.IsServer) // only let the server destroy, autoregistry will then sync destruction to the client
+        }
+        CampaignEventDispatcher.Instance.OnArmyOverlaySetDirty();
+        mobileParty.AttachedTo = null;
+        bool condition = false;
+        if (ModInformation.IsServer) // only let the server destroy, autoregistry will then sync destruction to the client
+        {
+            if (army.LeaderParty == mobileParty && !army._armyIsDispersing)
             {
-                if (army.LeaderParty == mobileParty && !army._armyIsDispersing)
-                {
-                    DisbandArmyAction.ApplyByLeaderPartyRemoved(army);
-                }
-                if (((army != null) ? army.LeaderParty : null) == mobileParty)
+                army.FinishArmyObjective();
+                condition = true;
+                DisbandArmyAction.ApplyByLeaderPartyRemoved(army);
+            }
+            if (((army != null) ? army.LeaderParty : null) == mobileParty)
+            {
+                if (!condition)
                 {
                     army.FinishArmyObjective();
-                    if (!army._armyIsDispersing)
-                    {
-                        Army army2 = mobileParty.Army;
-                        if (((army2 != null) ? army2.LeaderParty.LeaderHero : null) == null)
-                        {
-                            DisbandArmyAction.ApplyByArmyLeaderIsDead(mobileParty.Army);
-                        }
-                        else
-                        {
-                            DisbandArmyAction.ApplyByObjectiveFinished(mobileParty.Army);
-                        }
-                    }
                 }
-                else if (army.Parties.Count == 0 && !army._armyIsDispersing)
+                if (!army._armyIsDispersing)
                 {
-                    if (mobileParty.Army != null && clientMobileParty?.Army != null && mobileParty.Army == clientMobileParty?.Army && (clientMobileParty?.LeaderHero?.IsPrisoner ?? false))
+                    Army army2 = mobileParty.Army;
+                    if (((army2 != null) ? army2.LeaderParty.LeaderHero : null) == null)
                     {
-                        DisbandArmyAction.ApplyByPlayerTakenPrisoner(army);
+                        DisbandArmyAction.ApplyByArmyLeaderIsDead(mobileParty.Army);
                     }
                     else
                     {
-                        DisbandArmyAction.ApplyByNotEnoughParty(army);
+                        DisbandArmyAction.ApplyByObjectiveFinished(mobileParty.Army);
                     }
                 }
-                // Mainplayer cant have an army with only itself
-                if (army.LeaderParty == clientMobileParty && army.Parties.Count <= 1)
+            }
+            else if (army.Parties.Count == 0 && !army._armyIsDispersing)
+            {
+                if (mobileParty.Army != null && clientMobileParty?.Army != null && mobileParty.Army == clientMobileParty?.Army && (clientMobileParty?.LeaderHero?.IsPrisoner ?? false))
+                {
+                    DisbandArmyAction.ApplyByPlayerTakenPrisoner(army);
+                }
+                else
                 {
                     DisbandArmyAction.ApplyByNotEnoughParty(army);
                 }
             }
-            if (mobileParty == MobileParty.MainParty)
+            // Mainplayer cant have an army with only itself
+            if (army.LeaderParty == clientMobileParty && army.Parties.Count <= 1)
             {
-                Campaign.Current.CameraFollowParty = clientMobileParty?.Party;
-                army.StopTrackingTargetSettlement();
+                DisbandArmyAction.ApplyByNotEnoughParty(army);
             }
-            if (mobileParty == clientMobileParty && Game.Current.GameStateManager.ActiveState is MapState)
+        }
+        if (mobileParty == MobileParty.MainParty)
+        {
+            if (Hero.MainHero.IsPrisoner && Hero.MainHero.PartyBelongedToAsPrisoner != null)
             {
-                ((MapState)Game.Current.GameStateManager.ActiveState).OnLeaveArmy();
+                Hero.MainHero.PartyBelongedToAsPrisoner.SetAsCameraFollowParty();
             }
-            mobileParty.Party.SetVisualAsDirty();
-            if (clientMobileParty != null)
+            else
             {
-                mobileParty.Party.UpdateVisibilityAndInspected(clientMobileParty.Position, 0f);
+                Campaign.Current.CameraFollowParty = clientMobileParty?.Party; // This runs after the party was captured. So guard it to only run when its not captured
             }
-            if (clientMobileParty != mobileParty)
-            {
-                mobileParty.Ai.RethinkAtNextHourlyTick = true;
-            }
-            mobileParty._army = null;
-        });
+            army.StopTrackingTargetSettlement();
+        }
+        mobileParty.Party.SetVisualAsDirty();
+        if (clientMobileParty != null)
+        {
+            mobileParty.Party.UpdateVisibilityAndInspected(clientMobileParty.Position, 0f);
+        }
+        if (!mobileParty.IsPlayerParty())
+        {
+            mobileParty.Ai.RethinkAtNextHourlyTick = true;
+        }
+        mobileParty._army = null;
+        if (mobileParty == MobileParty.MainParty && Game.Current.GameStateManager.ActiveState is MapState) // should be done after _army is null since it checks if it is null to remove ui
+        {
+            ((MapState)Game.Current.GameStateManager.ActiveState).OnLeaveArmy();
+        }
+        CampaignEventDispatcher.Instance.OnPartyLeftArmy(mobileParty, army);
     }
     public static void SetAiBehaviorObject(Army army, IMapPoint mapPoint)
     {
-        GameThread.RunSafe(() =>
+        using (new AllowedThread())
         {
-            using (new AllowedThread())
-            {
-                // Set field directly to avoid StopTrackingTargetSettlement/StartTrackingTargetSettlement
-                // which are serverside ai behaviors not needed on client
-                army._aiBehaviorObject = mapPoint;
-            }
-        });
+            // Set field directly to avoid StopTrackingTargetSettlement/StartTrackingTargetSettlement
+            // which are serverside ai behaviors not needed on client
+            army._aiBehaviorObject = mapPoint;
+        }
     }
+}
+[HarmonyPatch]
+internal class ArmyMainPartyComparisonPatch
+{
+    [HarmonyTargetMethods]
+    static IEnumerable<MethodBase> TargetMethods()
+    {
+        yield return AccessTools.Method(typeof(Army), nameof(Army.CheckArmyDispersion));
+        yield return AccessTools.Method(typeof(Army), nameof(Army.HourlyTick));
+    }
+
+    [HarmonyTranspiler]
+    static IEnumerable<CodeInstruction> Transpiler(IEnumerable<CodeInstruction> instructions)
+        => MainPartyComparisonTranspiler.ReplaceMainPartyComparisonsWithIsPlayerParty(instructions);
 }

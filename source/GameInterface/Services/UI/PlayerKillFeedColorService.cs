@@ -1,4 +1,4 @@
-using GameInterface.Services;
+﻿using GameInterface.Services;
 using System.Collections.Generic;
 using System.Linq;
 using TaleWorlds.Library;
@@ -8,6 +8,7 @@ namespace GameInterface.Services.UI;
 public interface IPlayerKillFeedColorService : IGameAbstraction
 {
     Color GetColor(string controllerId);
+    string GetColorString(string controllerId);
     bool TryGetColor(string controllerId, out PlayerKillFeedColor color);
     void SetColor(string controllerId, PlayerKillFeedColor color);
     IReadOnlyDictionary<string, PlayerKillFeedColor> GetColors();
@@ -25,6 +26,11 @@ public class PlayerKillFeedColorService : IPlayerKillFeedColorService
         }
 
         return PlayerColorAssigner.GetColor(controllerId);
+    }
+
+    public string GetColorString(string controllerId)
+    {
+        return "#" + Color.UIntToColorString(GetColor(controllerId).ToUnsignedInteger());
     }
 
     public bool TryGetColor(string controllerId, out PlayerKillFeedColor color)

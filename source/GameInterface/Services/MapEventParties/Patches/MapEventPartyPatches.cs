@@ -25,15 +25,10 @@ internal class MapEventPartyPatches
     [HarmonyPrefix]
     private static bool PrefixOnTroopKilled(MapEventParty __instance, ref UniqueTroopDescriptor troopSeed)
     {
-        // Call original if we call this function
-        if (CallOriginalPolicy.IsOriginalAllowed()) return true;
+        if (ShouldRunTroopStateUpdate(CallOriginalPolicy.IsOriginalAllowed(), ModInformation.IsServer)) return true;
 
-        if (ModInformation.IsServer) return true;
-
-        // Coop battle: casualties flow owner→server (BattleCasualtyHandler); suppress the host's mission
-        // auto-accounting so the troop isn't decremented twice. The server-applied path runs under
-        // AllowedThread, so the IsOriginalAllowed check above already lets it through.
-        if (BattleSpawnConfig.Enabled && BattleSpawnGate.IsCoopBattleActive) return false;
+        // Only apply on clients if not in active coop battle
+        if (!ShouldUseClientTroopStateFallback(BattleSpawnConfig.Enabled, BattleSpawnGate.IsCoopBattleActive)) return false;
 
         __instance._roster.OnTroopKilled(troopSeed);
         MessageBroker.Instance.Publish(__instance, new OnTroopKilledAttempted(__instance, troopSeed.UniqueSeed));
@@ -45,13 +40,10 @@ internal class MapEventPartyPatches
     [HarmonyPrefix]
     private static bool PrefixOnTroopWounded(MapEventParty __instance, ref UniqueTroopDescriptor troopSeed)
     {
-        // Call original if we call this function
-        if (CallOriginalPolicy.IsOriginalAllowed()) return true;
+        if (ShouldRunTroopStateUpdate(CallOriginalPolicy.IsOriginalAllowed(), ModInformation.IsServer)) return true;
 
-        if (ModInformation.IsServer) return true;
-
-        // Coop battle: casualties flow owner→server; suppress the host's mission auto-accounting (see OnTroopKilled).
-        if (BattleSpawnConfig.Enabled && BattleSpawnGate.IsCoopBattleActive) return false;
+        // Only apply on clients if not in active coop battle
+        if (!ShouldUseClientTroopStateFallback(BattleSpawnConfig.Enabled, BattleSpawnGate.IsCoopBattleActive)) return false;
 
         __instance._roster.OnTroopWounded(troopSeed);
         MessageBroker.Instance.Publish(__instance, new OnTroopWoundedAttempted(__instance, troopSeed.UniqueSeed));
@@ -61,20 +53,11 @@ internal class MapEventPartyPatches
 
     [HarmonyPatch(nameof(MapEventParty.OnTroopRouted))]
     [HarmonyPrefix]
-    private static bool PrefixOnTroopRouted(MapEventParty __instance, ref UniqueTroopDescriptor troopSeed)
+    private static bool PrefixOnTroopRouted()
     {
-        // Call original if we call this function
-        if (CallOriginalPolicy.IsOriginalAllowed()) return true;
-
-        if (ModInformation.IsServer) return true;
-
-        // Coop battle: casualties flow owner→server; suppress the host's mission auto-accounting (see OnTroopKilled).
-        if (BattleSpawnConfig.Enabled && BattleSpawnGate.IsCoopBattleActive) return false;
-
-        __instance._roster.OnTroopRouted(troopSeed);
-        MessageBroker.Instance.Publish(__instance, new OnTroopRoutedAttempted(__instance, troopSeed.UniqueSeed));
-
-        return false;
+        // Routed troops are reported from inside the mission and applied through the synchronization path.
+        // Allow server or explicitly synchronized calls, skip locally generated MapEventParty calls on clients.
+        return ShouldRunTroopStateUpdate(CallOriginalPolicy.IsOriginalAllowed(), ModInformation.IsServer);
     }
 
     [HarmonyPatch(nameof(MapEventParty.OnTroopScoreHit))]
@@ -93,9 +76,26 @@ internal class MapEventPartyPatches
         // A teamkill contributes nothing (the original early-outs), so don't bother the server with it.
         if (isTeamKill) return false;
 
-        MessageBroker.Instance.Publish(__instance, new OnTroopScoreHitAttempted(__instance, attackerTroopDesc.UniqueSeed, attackedTroop, damage, isFatal, isSimulatedHit));
+        if (__instance.Troops?._elementDictionary.TryGetValue(attackerTroopDesc, out var attackerElement) != true)
+            return false;
+
+        MessageBroker.Instance.Publish(__instance, new OnTroopScoreHitAttempted(
+            __instance, attackerElement.Troop, attackedTroop, damage, isFatal, isSimulatedHit));
 
         return false;
+    }
+    
+    /// <summary>
+    /// Determines whether a troop state update may execute the original game method.
+    /// </summary>
+    internal static bool ShouldRunTroopStateUpdate(bool isOriginalAllowed, bool isServer)
+    {
+        return isOriginalAllowed || isServer;
+    }
+
+    internal static bool ShouldUseClientTroopStateFallback(bool battleSpawnEnabled, bool isCoopBattleActive)
+    {
+        return !battleSpawnEnabled || !isCoopBattleActive;
     }
 
     [HarmonyPatch(nameof(MapEventParty.CommitXpGain))]

@@ -1,5 +1,4 @@
-using LiteNetLib;
-using System.Collections.Concurrent;
+﻿using LiteNetLib;
 using System.Collections.Generic;
 using System.Linq;
 using System.Net;
@@ -17,16 +16,11 @@ internal class MissionInstance
     public string Id { get; }
 
     /// <summary>
-    /// P2P socket endpoints presented via NAT-introduction requests.
+    /// P2P socket endpoints presented via NAT-introduction requests, keyed by controller and campaign connection.
     /// </summary>
     public List<Endpoints> PunchEndpoints { get; } = new List<Endpoints>();
 
-    // Relay-fallback routing table. When a direct NAT punch fails, members stay connected to the server
-    // and exchange traffic through it. A RelayPacket names its recipients by controller id, so the server
-    // resolves those ids to the live server-side NetPeer connections for THIS instance. Concurrent because
-    // it is read on the network poll thread while the MissionManager mutates instances under its own lock.
-    private readonly ConcurrentDictionary<string, NetPeer> controllerToPeer = new ConcurrentDictionary<string, NetPeer>();
-    private readonly ConcurrentDictionary<NetPeer, string> peerToController = new ConcurrentDictionary<NetPeer, string>();
+    internal HashSet<MissionMembership> Memberships { get; } = new HashSet<MissionMembership>();
 
     public MissionInstance(string id)
     {
@@ -34,66 +28,40 @@ internal class MissionInstance
     }
 
     /// <summary>Controller ids currently routed through this instance (relay-fallback membership).</summary>
-    public IReadOnlyCollection<string> Controllers => controllerToPeer.Keys.ToArray();
+    public IReadOnlyCollection<string> Controllers => Memberships.Select(member => member.ControllerId).ToArray();
 
-    /// <summary>
-    /// Associate a member's controller id with its live server connection. Overwrites any prior mapping
-    /// for the id so a re-joining controller (new NetPeer, same id) replaces its stale entry instead of
-    /// being ignored.
-    /// </summary>
-    public void MapPeer(string controllerId, NetPeer peer)
-    {
-        if (controllerToPeer.TryGetValue(controllerId, out var previous) && previous != peer)
-        {
-            peerToController.TryRemove(previous, out _);
-        }
-
-        controllerToPeer[controllerId] = peer;
-        peerToController[peer] = controllerId;
-    }
-
-    /// <summary>Drop a member by its connection (e.g. on disconnect).</summary>
-    public void RemovePeer(NetPeer peer)
-    {
-        if (peerToController.TryRemove(peer, out var controllerId))
-        {
-            controllerToPeer.TryRemove(controllerId, out _);
-        }
-    }
-
-    /// <summary>Resolve a single member's live connection.</summary>
-    public bool TryGetPeer(string controllerId, out NetPeer peer) =>
-        controllerToPeer.TryGetValue(controllerId, out peer);
-
-    /// <summary>Resolve a member's controller id from its connection (e.g. on disconnect).</summary>
-    public bool TryGetController(NetPeer peer, out string controllerId) =>
-        peerToController.TryGetValue(peer, out controllerId);
-
-    /// <summary>
-    /// Resolve the live connections for a set of controller ids (a RelayPacket's recipients), skipping
-    /// any id with no current mapping (e.g. a member that has already dropped).
-    /// </summary>
-    public IEnumerable<NetPeer> GetPeers(IEnumerable<string> controllerIds)
-    {
-        foreach (var controllerId in controllerIds)
-        {
-            if (controllerToPeer.TryGetValue(controllerId, out var peer))
-            {
-                yield return peer;
-            }
-        }
-    }
-
-    /// <summary>The internal (LAN) and external (WAN) endpoints a peer presents for NAT introduction.</summary>
+    /// <summary>The campaign connection and socket endpoints presented for NAT introduction.</summary>
     public readonly struct Endpoints
     {
+        public readonly string ControllerId;
+        public readonly NetPeer CampaignPeer;
         public readonly IPEndPoint Internal;
         public readonly IPEndPoint External;
 
-        public Endpoints(IPEndPoint @internal, IPEndPoint external)
+        public Endpoints(
+            string controllerId,
+            NetPeer campaignPeer,
+            IPEndPoint @internal,
+            IPEndPoint external)
         {
+            ControllerId = controllerId;
+            CampaignPeer = campaignPeer;
             Internal = @internal;
             External = external;
         }
+    }
+}
+
+internal sealed class MissionMembership
+{
+    public string ControllerId { get; }
+    public NetPeer Peer { get; set; }
+    public MissionInstance Instance { get; }
+
+    public MissionMembership(string controllerId, NetPeer peer, MissionInstance instance)
+    {
+        ControllerId = controllerId;
+        Peer = peer;
+        Instance = instance;
     }
 }

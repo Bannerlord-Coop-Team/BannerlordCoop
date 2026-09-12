@@ -1,11 +1,16 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Reflection;
 using Autofac;
 using E2E.Tests.Environment.Instance;
 using GameInterface;
 using GameInterface.Services.MapEvents;
 using HarmonyLib;
+using Missions.Agents.Packets;
+using SandBox;
+using SandBox.Missions.MissionLogics;
+using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.Core;
 using TaleWorlds.Library;
 using TaleWorlds.MountAndBlade;
@@ -25,6 +30,7 @@ namespace E2E.Tests.Environment.MockEngine;
 /// </summary>
 public sealed class MissionEngineFixture : IDisposable
 {
+    private const int FirstInvalidMockActionIndex = 1000000;
     private readonly Harmony harmony = new("e2e.mockengine");
     private static readonly Dictionary<ILifetimeScope, MockMission> ByContainer = new();
 
@@ -32,24 +38,69 @@ public sealed class MissionEngineFixture : IDisposable
     {
         // Mission statics / members
         Prefix(typeof(Mission), "get_Current", nameof(Mission_get_Current));
+        Prefix(typeof(PartyBase), "get_MainParty", nameof(PartyBase_get_MainParty));
+        Prefix(typeof(Mission), nameof(Mission.GetShootDifficulty), nameof(Mission_GetShootDifficulty));
         Prefix(typeof(Mission), "get_CurrentTime", nameof(Mission_get_CurrentTime));
+        Prefix(typeof(Mission), "get_DamageToPlayerMultiplier", nameof(Mission_get_DamageToPlayerMultiplier));
+        Prefix(typeof(Mission), nameof(Mission.EndMission), nameof(Mission_EndMission));
+        Prefix(typeof(Mission), nameof(Mission.OnAgentFleeing), nameof(Mission_OnAgentFleeing));
         Prefix(typeof(Mission), nameof(Mission.SpawnAgent), nameof(Mission_SpawnAgent));
+        // The BR-110 budget counts native objects until deletion via Mission.AllAgents.
+        Prefix(typeof(Mission), "get_Agents", nameof(Mission_get_Agents));
+        Prefix(typeof(Mission), "get_AllAgents", nameof(Mission_get_AllAgents));
         Prefix(typeof(Mission), "get_MainAgent", nameof(Mission_get_MainAgent));
         Prefix(typeof(Mission), "set_MainAgent", nameof(Mission_set_MainAgent));
         Prefix(typeof(Mission), nameof(Mission.FindAgentWithIndex), nameof(Mission_FindAgentWithIndex));
+        Prefix(typeof(Mission), "get_Teams", nameof(Mission_get_Teams));
         // Per-side teams — the reinforcement spawn resolves the side's team to field a new party into.
         Prefix(typeof(Mission), "get_AttackerTeam", nameof(Mission_get_AttackerTeam));
         Prefix(typeof(Mission), "get_DefenderTeam", nameof(Mission_get_DefenderTeam));
+        Prefix(typeof(Mission), "get_AttackerAllyTeam", nameof(Mission_get_AttackerAllyTeam));
+        Prefix(typeof(Mission), "get_DefenderAllyTeam", nameof(Mission_get_DefenderAllyTeam));
         Prefix(typeof(Mission), "get_PlayerEnemyTeam", nameof(Mission_get_PlayerEnemyTeam));
+        Prefix(typeof(Mission), "get_PlayerAllyTeam", nameof(Mission_get_PlayerAllyTeam));
+        Prefix(typeof(Mission), "get_SceneName", nameof(Mission_get_SceneName));
         // The non-host retreat despawn filters the retreater's troops by the player team's side.
         Prefix(typeof(Mission), "get_PlayerTeam", nameof(Mission_get_PlayerTeam));
+        Prefix(typeof(Mission), "set_PlayerTeam", nameof(Mission_set_PlayerTeam));
         Prefix(typeof(Team), "get_Side", nameof(Team_get_Side));
+        harmony.Patch(
+            AccessTools.Method(typeof(Mission.TeamCollection), nameof(Mission.TeamCollection.Add), new[]
+            {
+                typeof(BattleSideEnum), typeof(uint), typeof(uint), typeof(Banner), typeof(bool), typeof(bool), typeof(bool),
+            }),
+            prefix: new HarmonyMethod(AccessTools.Method(typeof(MissionEngineFixture), nameof(MissionTeamCollection_Add))));
         // GetMissionBehavior<T> walks the mission's behavior list, which a skip-ctor shell doesn't have (NRE).
-        // The spawn-capture and deployment paths probe for DeploymentMissionController — answer "none" for mock
-        // missions. Reference-type instantiations share one method body, so patching this one covers them all.
+        // Tests opt into a deployment-controller shell when they need to exercise pre-commit behavior.
+        // Reference-type instantiations share one method body, so patching this one covers them all.
         harmony.Patch(
             AccessTools.Method(typeof(Mission), nameof(Mission.GetMissionBehavior)).MakeGenericMethod(typeof(DeploymentMissionController)),
             prefix: new HarmonyMethod(AccessTools.Method(typeof(MissionEngineFixture), nameof(Mission_GetMissionBehavior))));
+
+        // Settlement population is a native presentation/AI boundary. The composed location fixture supplies
+        // the roster-driven spawn callback, while these shims let the production director and suppression
+        // patches decide whether the boundary runs.
+        harmony.Patch(
+            AccessTools.Method(typeof(MissionAgentHandler), nameof(MissionAgentHandler.SpawnLocationCharacters)),
+            prefix: new HarmonyMethod(
+                AccessTools.Method(typeof(MissionEngineFixture), nameof(MissionAgentHandler_SpawnLocationCharacters)),
+                Priority.Last));
+        foreach (string methodName in new[]
+        {
+            nameof(SandBoxHelpers.MissionHelper.SpawnHorses),
+            nameof(SandBoxHelpers.MissionHelper.SpawnSheeps),
+            nameof(SandBoxHelpers.MissionHelper.SpawnCows),
+            nameof(SandBoxHelpers.MissionHelper.SpawnHogs),
+            nameof(SandBoxHelpers.MissionHelper.SpawnGeese),
+            nameof(SandBoxHelpers.MissionHelper.SpawnChicken),
+        })
+        {
+            harmony.Patch(
+                AccessTools.Method(typeof(SandBoxHelpers.MissionHelper), methodName),
+                prefix: new HarmonyMethod(
+                    AccessTools.Method(typeof(MissionEngineFixture), nameof(LocationAnimalPopulation)),
+                    Priority.Last));
+        }
 
         // Agent members
         Prefix(typeof(Agent), "get_Controller", nameof(Agent_get_Controller));
@@ -58,14 +109,40 @@ public sealed class MissionEngineFixture : IDisposable
         Prefix(typeof(Agent), "set_Health", nameof(Agent_set_Health));
         Prefix(typeof(Agent), "get_Index", nameof(Agent_get_Index));
         Prefix(typeof(Agent), "get_Character", nameof(Agent_get_Character));
+        Prefix(typeof(BasicCharacterObject), nameof(BasicCharacterObject.GetStepSize), nameof(BasicCharacterObject_GetStepSize));
         Prefix(typeof(Agent), "get_Team", nameof(Agent_get_Team));
         Prefix(typeof(Agent), "get_Position", nameof(Agent_get_Position));
+        Prefix(typeof(Agent), "get_Equipment", nameof(Agent_get_Equipment));
+        Prefix(typeof(Agent), "get_SpawnEquipment", nameof(Agent_get_SpawnEquipment));
+        Prefix(typeof(Agent), "get_BodyPropertiesValue", nameof(Agent_get_BodyPropertiesValue));
+        Prefix(typeof(Agent), "get_ClothingColor1", nameof(Agent_get_ClothingColor1));
+        Prefix(typeof(Agent), "get_ClothingColor2", nameof(Agent_get_ClothingColor2));
+        Prefix(typeof(Agent), "get_CurrentlyUsedGameObject", nameof(Agent_get_CurrentlyUsedGameObject));
+        Prefix(typeof(Agent), nameof(Agent.UseGameObject), nameof(Agent_UseGameObject));
+        Prefix(typeof(Agent), nameof(Agent.StopUsingGameObject), nameof(Agent_StopUsingGameObject));
         Prefix(typeof(Agent), "get_Name", nameof(Agent_get_Name));
         Prefix(typeof(Agent), nameof(Agent.IsActive), nameof(Agent_IsActive));
+        Prefix(typeof(Agent), nameof(Agent.CreateBloodBurstAtLimb), nameof(Agent_CreateBloodBurstAtLimb));
+        Prefix(typeof(Agent), nameof(Agent.OnFleeing), nameof(Agent_OnFleeing));
         // Puppet classification (LocationPvpBlockPatch): human/mount/rider resolve via the mirror.
         Prefix(typeof(Agent), "get_IsHuman", nameof(Agent_get_IsHuman));
         Prefix(typeof(Agent), "get_IsMount", nameof(Agent_get_IsMount));
         Prefix(typeof(Agent), "get_RiderAgent", nameof(Agent_get_RiderAgent));
+        Prefix(typeof(Agent), nameof(Agent.AddComponent), nameof(Agent_AddComponent));
+        Prefix(typeof(Agent), nameof(Agent.RemoveComponent), nameof(Agent_RemoveComponent));
+        // Location puppets attach a dormant CampaignAgentComponent to the mirror after spawning.
+        harmony.Patch(
+            AccessTools.Method(typeof(Agent), nameof(Agent.GetComponent))
+                .MakeGenericMethod(typeof(CampaignAgentComponent)),
+            prefix: new HarmonyMethod(AccessTools.Method(
+                typeof(MissionEngineFixture), nameof(Agent_GetCampaignAgentComponent))));
+        harmony.Patch(
+            AccessTools.Method(typeof(CampaignAgentComponent), nameof(CampaignAgentComponent.CreateAgentNavigator), Type.EmptyTypes),
+            prefix: new HarmonyMethod(AccessTools.Method(
+                typeof(MissionEngineFixture), nameof(CampaignAgentComponent_CreateAgentNavigator))));
+        harmony.Patch(
+            AccessTools.Constructor(typeof(CommonAIComponent), new[] { typeof(Agent) }),
+            prefix: new HarmonyMethod(AccessTools.Method(typeof(MissionEngineFixture), nameof(CommonAIComponent_ctor))));
 
         // RegisterBlow is overloaded — pin the (Blow, in AttackCollisionData) signature.
         harmony.Patch(
@@ -98,6 +175,19 @@ public sealed class MissionEngineFixture : IDisposable
         // headless and would poison the type for the whole process (a failed cctor is cached). Answer
         // "unresolved" (-1) instead so the cctor completes.
         Prefix(typeof(MBAnimation), nameof(MBAnimation.GetActionCodeWithName), nameof(MBAnimation_GetActionCodeWithName));
+        Prefix(typeof(AgentActionData), "GetActionNameWithCode", nameof(AgentActionData_GetActionNameWithCode));
+        Prefix(typeof(AgentActionData), "GetCurrentActionSpeed", nameof(AgentActionData_GetCurrentActionSpeed));
+        Prefix(typeof(MBGlobals), nameof(MBGlobals.GetActionSet), nameof(MBGlobals_GetActionSet));
+        harmony.Patch(
+            AccessTools.Method(typeof(MonsterExtensions), nameof(MonsterExtensions.FillAnimationSystemData), new[]
+            {
+                typeof(Monster), typeof(MBActionSet), typeof(float), typeof(bool),
+            }),
+            prefix: new HarmonyMethod(AccessTools.Method(
+                typeof(MissionEngineFixture), nameof(MonsterExtensions_FillAnimationSystemData))));
+        Prefix(typeof(Agent), "get_ActionSet", nameof(Agent_get_ActionSet));
+        Prefix(typeof(Agent), nameof(Agent.SetActionSet), nameof(Agent_SetActionSet));
+        Prefix(typeof(MBActionSet), nameof(MBActionSet.GetActionAnimationDuration), nameof(MBActionSet_GetActionAnimationDuration));
         // Standalone mount movement: a masterless horse's own AgentMountData capture/apply reads and writes
         // the movement natives, and the apply path's staleness guard compares agent.Mission to Mission.Current.
         Prefix(typeof(Agent), "get_Mission", nameof(Agent_get_Mission));
@@ -105,16 +195,52 @@ public sealed class MissionEngineFixture : IDisposable
         Prefix(typeof(Agent), "set_LookDirection", nameof(Agent_set_LookDirection));
         Prefix(typeof(Agent), nameof(Agent.GetMovementDirection), nameof(Agent_GetMovementDirection));
         Prefix(typeof(Agent), nameof(Agent.SetMovementDirection), nameof(Agent_SetMovementDirection));
+        Prefix(typeof(Agent), nameof(Agent.TeleportToPosition), nameof(Agent_TeleportToPosition));
+        Prefix(typeof(Agent), nameof(Agent.SetTargetPositionAndDirection), nameof(Agent_SetTargetPositionAndDirection));
+        Prefix(typeof(Agent), nameof(Agent.GetRealGlobalVelocity), nameof(Agent_GetRealGlobalVelocity));
+        Prefix(typeof(Agent), nameof(Agent.GetMaximumForwardUnlimitedSpeed), nameof(Agent_GetMaximumForwardUnlimitedSpeed));
+        Prefix(typeof(Agent), nameof(Agent.GetMaximumSpeedLimit), nameof(Agent_GetMaximumSpeedLimit));
+        Prefix(typeof(Agent), nameof(Agent.SetMaximumSpeedLimit), nameof(Agent_SetMaximumSpeedLimit));
+        Prefix(typeof(Agent), nameof(Agent.GetPrimaryWieldedItemIndex), nameof(Agent_GetPrimaryWieldedItemIndex));
+        Prefix(typeof(Agent), nameof(Agent.GetOffhandWieldedItemIndex), nameof(Agent_GetOffhandWieldedItemIndex));
         Prefix(typeof(Agent), "get_MovementInputVector", nameof(Agent_get_MovementInputVector));
         Prefix(typeof(Agent), "set_MovementInputVector", nameof(Agent_set_MovementInputVector));
-        // AgentMountData also snapshots action channel 1; report "no action" so capture works headless (the
-        // apply side's GetActionNameWithCode already returns null headless and skips SetActionChannel).
+        // Action and mount snapshots use these shims so discrete animations can be captured and replayed headless.
         Prefix(typeof(Agent), nameof(Agent.GetCurrentAction), nameof(Agent_GetCurrentAction));
+        Prefix(typeof(Agent), nameof(Agent.GetCurrentActionType), nameof(Agent_GetCurrentActionType));
+        Prefix(typeof(Agent), nameof(Agent.GetCurrentActionStage), nameof(Agent_GetCurrentActionStage));
+        Prefix(typeof(Agent), nameof(Agent.GetCurrentActionDirection), nameof(Agent_GetCurrentActionDirection));
+        Prefix(typeof(Agent), nameof(Agent.GetDefendMovementFlag), nameof(Agent_GetDefendMovementFlag));
         Prefix(typeof(Agent), nameof(Agent.GetCurrentAnimationFlag), nameof(Agent_GetCurrentAnimationFlag));
         Prefix(typeof(Agent), nameof(Agent.GetCurrentActionProgress), nameof(Agent_GetCurrentActionProgress));
+        Prefix(typeof(Agent), nameof(Agent.SetCurrentActionProgress), nameof(Agent_SetCurrentActionProgress));
+        Prefix(typeof(Agent), nameof(Agent.SetCurrentActionSpeed), nameof(Agent_SetCurrentActionSpeed));
+        Prefix(typeof(Agent), nameof(Agent.SetActionChannel), nameof(Agent_SetActionChannel));
+        Prefix(typeof(Agent), "get_MovementFlags", nameof(Agent_get_MovementFlags));
+        Prefix(typeof(Agent), "set_MovementFlags", nameof(Agent_set_MovementFlags));
+        Prefix(typeof(Agent), "get_EventControlFlags", nameof(Agent_get_EventControlFlags));
+        Prefix(typeof(Agent), "set_EventControlFlags", nameof(Agent_set_EventControlFlags));
+        Prefix(typeof(Agent), "get_CrouchMode", nameof(Agent_get_CrouchMode));
+        Prefix(typeof(Agent), "get_CurrentGuardMode", nameof(Agent_get_CurrentGuardMode));
+        Prefix(typeof(Agent), nameof(Agent.SetWeaponGuard), nameof(Agent_SetWeaponGuard));
+        Prefix(typeof(Agent), nameof(Agent.ResetGuard), nameof(Agent_ResetGuard));
         Prefix(typeof(Team), nameof(Team.GetFormation), nameof(Team_GetFormation));
         Prefix(typeof(Formation), nameof(Formation.SetControlledByAI), nameof(Formation_SetControlledByAI));
         Prefix(typeof(Formation), nameof(Formation.SetMovementOrder), nameof(Formation_SetMovementOrder));
+        // The adoption/reclaim bookkeeping keys formations in a HashSet, but the native GetHashCode/Equals
+        // overrides read engine state a skip-ctor shell doesn't have (NRE) — which silently aborted every
+        // MULTI-agent adoption after the first agent's conversion headless (single-agent tests never noticed:
+        // the throw came after that agent was already converted). Mocked shells hash and compare by identity.
+        harmony.Patch(
+            AccessTools.DeclaredMethod(typeof(Formation), nameof(GetHashCode))
+                ?? throw new MissingMethodException(typeof(Formation).FullName, nameof(GetHashCode)),
+            prefix: new HarmonyMethod(AccessTools.Method(typeof(MissionEngineFixture), nameof(Formation_GetHashCode))));
+        var formationEquals = AccessTools.DeclaredMethod(typeof(Formation), nameof(Equals), new[] { typeof(object) });
+        if (formationEquals != null)
+        {
+            harmony.Patch(formationEquals,
+                prefix: new HarmonyMethod(AccessTools.Method(typeof(MissionEngineFixture), nameof(Formation_Equals))));
+        }
         // NOTE: the coop adoption path's final step — Formation.SetMovementOrder(MovementOrder.MovementOrderCharge)
         // — can't run headless: the MovementOrder type initializer builds Timers from Mission.CurrentTime and
         // reads WorldPosition statics (engine-populated natives), so it NREs, and the static constants are
@@ -143,10 +269,24 @@ public sealed class MissionEngineFixture : IDisposable
     }
 
     // ---- Mission shims ----
+    private static bool PartyBase_get_MainParty(ref PartyBase __result)
+    {
+        if (!TryActiveMock(out var mock) || mock.MainParty == null) return true;
+        __result = mock.MainParty;
+        return false;
+    }
+
     private static bool Mission_get_Current(ref Mission __result)
     {
         if (!TryActiveMock(out var mock)) return true;
         __result = mock.Shell;
+        return false;
+    }
+
+    private static bool Mission_GetShootDifficulty(Mission __instance, ref float __result)
+    {
+        if (!MockMission.ForShell(__instance, out var mock)) return true;
+        __result = mock.ShootDifficulty;
         return false;
     }
 
@@ -159,6 +299,29 @@ public sealed class MissionEngineFixture : IDisposable
         return false;
     }
 
+    private static bool Mission_get_DamageToPlayerMultiplier(Mission __instance, ref float __result)
+    {
+        if (!MockMission.ForShell(__instance, out var mock)) return true;
+        __result = mock.DamageToPlayerMultiplier;
+        return false;
+    }
+
+    private static bool Mission_EndMission(Mission __instance)
+    {
+        if (!MockMission.ForShell(__instance, out var mock)) return true;
+        mock.EndMissionCalled = true;
+        return false;
+    }
+
+    private static bool Mission_OnAgentFleeing(Mission __instance, Agent agent)
+    {
+        if (!MockMission.ForShell(__instance, out var mock)) return true;
+        mock.AgentFleeingCalls++;
+        mock.LastFleeingAgent = agent;
+        agent.OnFleeing();
+        return false;
+    }
+
     private static bool Mission_SpawnAgent(Mission __instance, AgentBuildData agentBuildData, ref Agent __result)
     {
         if (!MockMission.ForShell(__instance, out var mock)) return true;
@@ -166,10 +329,51 @@ public sealed class MissionEngineFixture : IDisposable
         return false;
     }
 
-    private static bool Mission_GetMissionBehavior(Mission __instance, ref DeploymentMissionController __result)
+    // Returns ALL minted agents (active and not); Agent.IsActive resolves per agent via its mirror, so
+    // consumers filtering on IsActive (e.g. the BR-110 budget) see the live subset.
+    private static bool Mission_get_Agents(Mission __instance, ref TaleWorlds.MountAndBlade.Missions.AgentReadOnlyList __result)
     {
-        if (!MockMission.ForShell(__instance, out _)) return true;
-        __result = null;
+        if (!MockMission.ForShell(__instance, out var mock)) return true;
+        __result = new TaleWorlds.MountAndBlade.Missions.AgentReadOnlyList(mock.Agents);
+        return false;
+    }
+
+    private static bool Mission_get_AllAgents(Mission __instance, ref TaleWorlds.MountAndBlade.Missions.AgentReadOnlyList __result)
+        => Mission_get_Agents(__instance, ref __result);
+
+    private static bool Mission_GetMissionBehavior(Mission __instance, ref object __result)
+    {
+        if (!MockMission.ForShell(__instance, out var mock)) return true;
+
+        if (mock.LocationPopulationBoundaryEnabled)
+            __result = mock.LocationAgentHandler;
+        else
+            __result = mock.DeploymentInProgress ? mock.DeploymentController : null;
+        return false;
+    }
+
+    private static bool MissionAgentHandler_SpawnLocationCharacters(
+        MissionAgentHandler __instance,
+        bool __runOriginal)
+    {
+        if (!TryActiveMock(out var mock) || !ReferenceEquals(__instance, mock.LocationAgentHandler))
+            return true;
+
+        if (__runOriginal)
+        {
+            mock.NativeLocationPopulationCalls++;
+            mock.NativeLocationPopulation?.Invoke();
+        }
+        return false;
+    }
+
+    private static bool LocationAnimalPopulation(bool __runOriginal)
+    {
+        if (!TryActiveMock(out var mock) || !mock.LocationPopulationBoundaryEnabled)
+            return true;
+
+        if (__runOriginal)
+            mock.NativeLocationAnimalPopulationCalls++;
         return false;
     }
 
@@ -194,6 +398,13 @@ public sealed class MissionEngineFixture : IDisposable
         return false;
     }
 
+    private static bool Mission_get_Teams(Mission __instance, ref Mission.TeamCollection __result)
+    {
+        if (!MockMission.ForShell(__instance, out var mock)) return true;
+        __result = mock.Teams;
+        return false;
+    }
+
     private static bool Mission_get_AttackerTeam(Mission __instance, ref Team __result)
     {
         if (!MockMission.ForShell(__instance, out var mock)) return true;
@@ -208,6 +419,20 @@ public sealed class MissionEngineFixture : IDisposable
         return false;
     }
 
+    private static bool Mission_get_AttackerAllyTeam(Mission __instance, ref Team __result)
+    {
+        if (!MockMission.ForShell(__instance, out var mock)) return true;
+        __result = mock.AttackerAllyTeam?.Shell;
+        return false;
+    }
+
+    private static bool Mission_get_DefenderAllyTeam(Mission __instance, ref Team __result)
+    {
+        if (!MockMission.ForShell(__instance, out var mock)) return true;
+        __result = mock.DefenderAllyTeam?.Shell;
+        return false;
+    }
+
     // ResolveTeam only falls back to PlayerEnemyTeam for BattleSideEnum.None; map it to a real side team so the
     // shim never returns null.
     private static bool Mission_get_PlayerEnemyTeam(Mission __instance, ref Team __result)
@@ -217,10 +442,41 @@ public sealed class MissionEngineFixture : IDisposable
         return false;
     }
 
+    private static bool Mission_get_PlayerAllyTeam(Mission __instance, ref Team __result)
+    {
+        if (!MockMission.ForShell(__instance, out var mock)) return true;
+        __result = mock.DefenderTeam.Shell;
+        return false;
+    }
+
+    private static bool Mission_get_SceneName(Mission __instance, ref string __result)
+    {
+        if (!MockMission.ForShell(__instance, out _)) return true;
+        __result = "mock-scene";
+        return false;
+    }
+
     private static bool Mission_get_PlayerTeam(Mission __instance, ref Team __result)
     {
         if (!MockMission.ForShell(__instance, out var mock)) return true;
         __result = mock.PlayerTeam?.Shell;
+        return false;
+    }
+
+    private static bool Mission_set_PlayerTeam(Mission __instance, Team value)
+    {
+        if (!MockMission.ForShell(__instance, out var mock)) return true;
+        mock.PlayerTeam = value != null && MockTeam.ForShell(value, out var team) ? team : null;
+        return false;
+    }
+
+    private static bool MissionTeamCollection_Add(
+        Mission.TeamCollection __instance,
+        BattleSideEnum __0,
+        ref Team __result)
+    {
+        if (!TryActiveMock(out var mock) || !ReferenceEquals(__instance, mock.Teams)) return true;
+        __result = mock.AddTeam(__0);
         return false;
     }
 
@@ -242,7 +498,17 @@ public sealed class MissionEngineFixture : IDisposable
     private static bool Agent_set_Controller(Agent __instance, AgentControllerType value)
     {
         if (!AgentMirror.TryGet(__instance, out var m)) return true;
+        AgentControllerType oldController = m.Controller;
+        if (value == oldController) return false;
+
         m.Controller = value;
+        if (m.IsActive)
+        {
+            if (value == AgentControllerType.AI)
+                __instance.AddComponent(new CommonAIComponent(__instance));
+            else if (oldController == AgentControllerType.AI && __instance.CommonAIComponent != null)
+                __instance.RemoveComponent(__instance.CommonAIComponent);
+        }
         return false;
     }
 
@@ -274,6 +540,13 @@ public sealed class MissionEngineFixture : IDisposable
         return false;
     }
 
+    private static bool BasicCharacterObject_GetStepSize(ref float __result)
+    {
+        if (!TryActiveMock(out _)) return true;
+        __result = 0.5f;
+        return false;
+    }
+
     private static bool Agent_get_Team(Agent __instance, ref Team __result)
     {
         if (!AgentMirror.TryGet(__instance, out var m)) return true;
@@ -288,10 +561,73 @@ public sealed class MissionEngineFixture : IDisposable
         return false;
     }
 
+    private static bool Agent_get_Equipment(Agent __instance, ref MissionEquipment __result)
+    {
+        if (!AgentMirror.TryGet(__instance, out var mirror)) return true;
+        __result = mirror.Equipment;
+        return false;
+    }
+
+    private static bool Agent_get_SpawnEquipment(Agent __instance, ref Equipment __result)
+    {
+        if (!AgentMirror.TryGet(__instance, out var mirror)) return true;
+        __result = mirror.SpawnEquipment;
+        return false;
+    }
+
+    private static bool Agent_get_BodyPropertiesValue(Agent __instance, ref BodyProperties __result)
+    {
+        if (!AgentMirror.TryGet(__instance, out var mirror)) return true;
+        __result = mirror.BodyProperties;
+        return false;
+    }
+
+    private static bool Agent_get_ClothingColor1(Agent __instance, ref uint __result)
+    {
+        if (!AgentMirror.TryGet(__instance, out var mirror)) return true;
+        __result = mirror.ClothingColor1;
+        return false;
+    }
+
+    private static bool Agent_get_ClothingColor2(Agent __instance, ref uint __result)
+    {
+        if (!AgentMirror.TryGet(__instance, out var mirror)) return true;
+        __result = mirror.ClothingColor2;
+        return false;
+    }
+
+    private static bool Agent_get_CurrentlyUsedGameObject(Agent __instance, ref UsableMissionObject __result)
+    {
+        if (!AgentMirror.TryGet(__instance, out var mirror)) return true;
+        __result = mirror.CurrentlyUsedGameObject;
+        return false;
+    }
+
+    private static bool Agent_UseGameObject(Agent __instance, UsableMissionObject usedObject)
+    {
+        if (!AgentMirror.TryGet(__instance, out var mirror)) return true;
+        mirror.CurrentlyUsedGameObject = usedObject;
+        return false;
+    }
+
+    private static bool Agent_StopUsingGameObject(Agent __instance)
+    {
+        if (!AgentMirror.TryGet(__instance, out var mirror)) return true;
+        mirror.CurrentlyUsedGameObject = null;
+        return false;
+    }
+
     private static bool Agent_IsActive(Agent __instance, ref bool __result)
     {
         if (!AgentMirror.TryGet(__instance, out var m)) return true;
         __result = m.IsActive;
+        return false;
+    }
+
+    private static bool Agent_CreateBloodBurstAtLimb(Agent __instance)
+    {
+        if (!AgentMirror.TryGet(__instance, out var m)) return true;
+        m.BloodBurstCalls++;
         return false;
     }
 
@@ -323,9 +659,50 @@ public sealed class MissionEngineFixture : IDisposable
         return false;
     }
 
+    private static bool CommonAIComponent_ctor(CommonAIComponent __instance, Agent agent)
+    {
+        if (!AgentMirror.TryGet(agent, out _)) return true;
+        __instance.ReservedRiderAgentIndex = -1;
+        return false;
+    }
+
+    private static bool Agent_GetCampaignAgentComponent(
+        Agent __instance,
+        ref CampaignAgentComponent __result)
+    {
+        if (!AgentMirror.TryGet(__instance, out var mirror)) return true;
+        __result = mirror.Components.OfType<CampaignAgentComponent>().FirstOrDefault();
+        return false;
+    }
+
+    private static bool CampaignAgentComponent_CreateAgentNavigator(CampaignAgentComponent __instance)
+    {
+        return __instance?.Agent == null || !AgentMirror.TryGet(__instance.Agent, out _);
+    }
+
+    private static bool Agent_AddComponent(Agent __instance, AgentComponent agentComponent)
+    {
+        if (!AgentMirror.TryGet(__instance, out var mirror)) return true;
+        mirror.Components.Add(agentComponent);
+        if (agentComponent is CommonAIComponent commonAi)
+            __instance.CommonAIComponent = commonAi;
+        return false;
+    }
+
+    private static bool Agent_RemoveComponent(Agent __instance, AgentComponent agentComponent, ref bool __result)
+    {
+        if (!AgentMirror.TryGet(__instance, out var mirror)) return true;
+        __result = mirror.Components.Remove(agentComponent);
+        if (__result && ReferenceEquals(__instance.CommonAIComponent, agentComponent))
+            __instance.CommonAIComponent = null;
+        return false;
+    }
+
     private static bool Agent_RegisterBlow(Agent __instance, Blow blow)
     {
         if (!AgentMirror.TryGet(__instance, out var victim)) return true;
+        if (TryActiveMock(out var registrationMock))
+            registrationMock.LastRegisteredBlow = blow;
 
         // Model Mission.OnAgentHit's missile lookup: for a missile blow it indexes Mission._missilesDictionary
         // by blow.WeaponRecord.AffectorWeaponSlotOrMissileIndex and throws KeyNotFound when that projectile is
@@ -335,7 +712,37 @@ public sealed class MissionEngineFixture : IDisposable
             throw new KeyNotFoundException(
                 $"Missile index {blow.WeaponRecord.AffectorWeaponSlotOrMissileIndex} not in the mock mission's missile set (models Mission.OnAgentHit)");
 
-        victim.Health -= blow.InflictedDamage;
+        int affectorWeaponSlot = blow.WeaponRecord.AffectorWeaponSlotOrMissileIndex;
+        if (!blow.IsMissile
+            && affectorWeaponSlot >= 0
+            && TryActiveMock(out mock)
+            && mock.FindAgentWithIndex(blow.OwnerId) is Agent affectorAgent
+            && AgentMirror.TryGet(affectorAgent, out var affector)
+            && affector.IsMount)
+        {
+            throw new NullReferenceException(
+                "Mount has no equipment for Mission.OnAgentHit's affector weapon lookup");
+        }
+
+        registrationMock?.RegisteredBlow?.Invoke(__instance, blow);
+
+        // Agent.HandleBlow ignores non-damaging blows and clamps damage under local death guards.
+        if (blow.InflictedDamage <= 0) return false;
+        float damage = Math.Min(blow.InflictedDamage, victim.Health);
+        if (__instance.CurrentMortalityState == Agent.MortalityState.Immortal
+            || victim.Mission.DisableDying
+            || Mission.Current.Mode == MissionMode.Conversation
+            || Mission.Current.Mode == MissionMode.CutScene)
+        {
+            damage = 0f;
+        }
+        victim.Health = Math.Max(0f, victim.Health - damage);
+        if (TryActiveMock(out var activeMock)
+            && activeMock.DismountRiderOnNextBlow)
+        {
+            activeMock.DismountRiderOnNextBlow = false;
+            __instance.MountAgent = null;
+        }
         if (victim.Health < 1f)
         {
             victim.Health = 0f;
@@ -366,10 +773,20 @@ public sealed class MissionEngineFixture : IDisposable
         return false;
     }
 
-    private static bool Agent_SetIsAIPaused(Agent __instance)
+    private static bool Agent_OnFleeing(Agent __instance)
     {
-        // No AI loop headless — accept the call so ConvertPuppetToHostAi doesn't deref the native agent.
-        return !AgentMirror.TryGet(__instance, out _);
+        if (!AgentMirror.TryGet(__instance, out var mirror)) return true;
+        mirror.OnFleeingCalls++;
+        __instance.Formation = null;
+        return false;
+    }
+
+    private static bool Agent_SetIsAIPaused(Agent __instance, bool isPaused)
+    {
+        // No AI loop headless — mirror the pause state without dereferencing the native agent.
+        if (!AgentMirror.TryGet(__instance, out var mirror)) return true;
+        mirror.IsAiPaused = isPaused;
+        return false;
     }
 
     private static bool Agent_SetAlarmState(Agent __instance, ref bool __result)
@@ -447,9 +864,68 @@ public sealed class MissionEngineFixture : IDisposable
         return false;
     }
 
-    private static bool MBAnimation_GetActionCodeWithName(ref int __result)
+    private static bool MBAnimation_GetActionCodeWithName(string __0, ref int __result)
     {
-        __result = -1;
+        const string prefix = "mock_action_";
+        __result = __0 != null
+            && __0.StartsWith(prefix, StringComparison.Ordinal)
+            && int.TryParse(__0.AsSpan(prefix.Length), out int actionIndex)
+            && actionIndex < FirstInvalidMockActionIndex
+                ? actionIndex
+                : -1;
+        return false;
+    }
+
+    private static bool AgentActionData_GetActionNameWithCode(int actionCode, ref string __result)
+    {
+        if (!TryActiveMock(out _)) return true;
+        __result = actionCode >= 0
+            && actionCode < FirstInvalidMockActionIndex
+            ? $"mock_action_{actionCode}"
+            : null;
+        return false;
+    }
+
+    private static bool AgentActionData_GetCurrentActionSpeed(
+        Agent agent,
+        int channel,
+        ref float __result)
+    {
+        if (!AgentMirror.TryGet(agent, out var mirror)) return true;
+        mirror.GetCurrentActionSpeedCalls++;
+        __result = channel == 0 ? mirror.Action0Speed : mirror.Action1Speed;
+        return false;
+    }
+
+    private static bool MBGlobals_GetActionSet(ref MBActionSet __result)
+    {
+        if (!TryActiveMock(out _)) return true;
+        __result = MBActionSet.GetActionSetWithIndex(0);
+        return false;
+    }
+
+    private static bool MonsterExtensions_FillAnimationSystemData(ref AnimationSystemData __result)
+    {
+        if (!TryActiveMock(out _)) return true;
+        __result = default;
+        return false;
+    }
+
+    private static bool Agent_get_ActionSet(Agent __instance, ref MBActionSet __result)
+    {
+        if (!AgentMirror.TryGet(__instance, out _)) return true;
+        __result = MBActionSet.GetActionSetWithIndex(0);
+        return false;
+    }
+
+    private static bool Agent_SetActionSet(Agent __instance)
+    {
+        return !AgentMirror.TryGet(__instance, out _);
+    }
+
+    private static bool MBActionSet_GetActionAnimationDuration(ref float __result)
+    {
+        __result = 1f;
         return false;
     }
 
@@ -470,7 +946,11 @@ public sealed class MissionEngineFixture : IDisposable
     private static bool Agent_set_LookDirection(Agent __instance, Vec3 value)
     {
         if (!AgentMirror.TryGet(__instance, out var m)) return true;
+        m.ActionAndGuardCallOrder.Add("continuous-state");
         m.LookDirection = value;
+        m.SetLookDirectionCalls++;
+        if (m.ClearLocomotionFlagsOnContinuousStateWrite)
+            m.MovementFlags &= ~Agent.MovementControlFlag.MoveMask;
         return false;
     }
 
@@ -484,7 +964,83 @@ public sealed class MissionEngineFixture : IDisposable
     private static bool Agent_SetMovementDirection(Agent __instance, Vec2 __0)
     {
         if (!AgentMirror.TryGet(__instance, out var m)) return true;
+        m.ActionAndGuardCallOrder.Add("continuous-state");
         m.MovementDirection = __0;
+        m.SetMovementDirectionCalls++;
+        if (m.ClearLocomotionFlagsOnContinuousStateWrite)
+            m.MovementFlags &= ~Agent.MovementControlFlag.MoveMask;
+        return false;
+    }
+
+    private static bool Agent_TeleportToPosition(Agent __instance, Vec3 position)
+    {
+        if (!AgentMirror.TryGet(__instance, out var m)) return true;
+
+        m.Position = position;
+        m.TeleportToPositionCalls++;
+        if (m.MountAgent != null && AgentMirror.TryGet(m.MountAgent, out var mount))
+            mount.Position = position;
+        if (m.RiderAgent != null && AgentMirror.TryGet(m.RiderAgent, out var rider))
+        {
+            rider.Position = position;
+            rider.MovementDirection = rider.LookDirection.AsVec2;
+        }
+        return false;
+    }
+
+    private static bool Agent_SetTargetPositionAndDirection(
+        Agent __instance,
+        ref Vec2 targetPosition,
+        ref Vec3 targetDirection)
+    {
+        if (!AgentMirror.TryGet(__instance, out var m)) return true;
+        m.SetTargetPositionAndDirectionCalls++;
+        m.LastTargetPosition = targetPosition;
+        m.LastTargetDirection = targetDirection;
+        return false;
+    }
+
+    private static bool Agent_GetRealGlobalVelocity(Agent __instance, ref Vec3 __result)
+    {
+        if (!AgentMirror.TryGet(__instance, out var m)) return true;
+        __result = m.RealGlobalVelocity;
+        return false;
+    }
+
+    private static bool Agent_GetMaximumForwardUnlimitedSpeed(Agent __instance, ref float __result)
+    {
+        if (!AgentMirror.TryGet(__instance, out var m)) return true;
+        __result = m.MaximumForwardUnlimitedSpeed;
+        return false;
+    }
+
+    private static bool Agent_GetMaximumSpeedLimit(Agent __instance, ref float __result)
+    {
+        if (!AgentMirror.TryGet(__instance, out var m)) return true;
+        __result = m.MaximumSpeedLimit;
+        return false;
+    }
+
+    private static bool Agent_SetMaximumSpeedLimit(Agent __instance, float __0, bool __1)
+    {
+        if (!AgentMirror.TryGet(__instance, out var m)) return true;
+        m.MaximumSpeedLimit = __0;
+        m.LastMaximumSpeedLimitIsMultiplier = __1;
+        m.SetMaximumSpeedLimitCalls++;
+        return false;
+    }
+
+    private static bool Agent_GetPrimaryWieldedItemIndex(Agent __instance, ref EquipmentIndex __result)
+    {
+        if (!AgentMirror.TryGet(__instance, out var m)) return true;
+        __result = m.PrimaryWieldedItemIndex;
+        return false;
+    }
+
+    private static bool Agent_GetOffhandWieldedItemIndex(Agent __instance, ref EquipmentIndex __result)
+    {
+        if (!AgentMirror.TryGet(__instance, out var m)) return true;
+        __result = m.OffhandWieldedItemIndex;
         return false;
     }
 
@@ -498,28 +1054,289 @@ public sealed class MissionEngineFixture : IDisposable
     private static bool Agent_set_MovementInputVector(Agent __instance, Vec2 value)
     {
         if (!AgentMirror.TryGet(__instance, out var m)) return true;
+        m.ActionAndGuardCallOrder.Add("continuous-state");
         m.InputVector = value;
+        m.SetMovementInputCalls++;
+        if (m.ClearLocomotionFlagsOnContinuousStateWrite)
+            m.MovementFlags &= ~Agent.MovementControlFlag.MoveMask;
         return false;
     }
 
-    private static bool Agent_GetCurrentAction(Agent __instance, ref ActionIndexCache __result)
+    private static bool Agent_GetCurrentAction(
+        Agent __instance,
+        int channelNo,
+        ref ActionIndexCache __result)
     {
-        if (!AgentMirror.TryGet(__instance, out _)) return true;
-        __result = ActionIndexCache.act_none; // safe: the MBAnimation shim above lets the cctor complete
+        if (!AgentMirror.TryGet(__instance, out var m)) return true;
+        __result = new ActionIndexCache(
+            channelNo == 0 ? m.Action0Index : m.Action1Index);
         return false;
     }
 
-    private static bool Agent_GetCurrentAnimationFlag(Agent __instance, ref AnimFlags __result)
+    private static bool Agent_GetCurrentActionType(
+        Agent __instance,
+        int channelNo,
+        ref Agent.ActionCodeType __result)
     {
-        if (!AgentMirror.TryGet(__instance, out _)) return true;
-        __result = 0;
+        if (!AgentMirror.TryGet(__instance, out var m)) return true;
+        if (channelNo == 0)
+        {
+            __result = m.Action0CodeType;
+        }
+        else
+        {
+            __result = m.Action1CodeType;
+        }
         return false;
     }
 
-    private static bool Agent_GetCurrentActionProgress(Agent __instance, ref float __result)
+    private static bool Agent_GetCurrentActionDirection(
+        Agent __instance,
+        int channelNo,
+        ref Agent.UsageDirection __result)
     {
-        if (!AgentMirror.TryGet(__instance, out _)) return true;
-        __result = 0f;
+        if (!AgentMirror.TryGet(__instance, out var m)) return true;
+        if (channelNo == 0)
+        {
+            __result = m.Action0Direction;
+        }
+        else
+        {
+            __result = m.Action1Direction;
+        }
+        return false;
+    }
+
+    private static bool Agent_GetCurrentActionStage(
+        Agent __instance,
+        int channelNo,
+        ref Agent.ActionStage __result)
+    {
+        if (!AgentMirror.TryGet(__instance, out var m)) return true;
+        __result = channelNo == 0
+            ? m.Action0Stage
+            : m.Action1Stage;
+        return false;
+    }
+
+    private static bool Agent_GetDefendMovementFlag(
+        Agent __instance,
+        ref Agent.MovementControlFlag __result)
+    {
+        if (!AgentMirror.TryGet(__instance, out var m)) return true;
+        __result = m.DefendMovementFlag;
+        return false;
+    }
+
+    private static bool Agent_GetCurrentAnimationFlag(
+        Agent __instance,
+        int channelNo,
+        ref AnimFlags __result)
+    {
+        if (!AgentMirror.TryGet(__instance, out var m)) return true;
+        __result = channelNo == 0 ? m.Action0Flags : m.Action1Flags;
+        return false;
+    }
+
+    private static bool Agent_GetCurrentActionProgress(
+        Agent __instance,
+        int channelNo,
+        ref float __result)
+    {
+        if (!AgentMirror.TryGet(__instance, out var m)) return true;
+        __result = channelNo == 0 ? m.Action0Progress : m.Action1Progress;
+        return false;
+    }
+
+    private static bool Agent_SetCurrentActionProgress(
+        Agent __instance,
+        int channelNo,
+        float progress)
+    {
+        if (!AgentMirror.TryGet(__instance, out var m)) return true;
+        m.SetCurrentActionProgressCalls++;
+        if (channelNo == 0)
+            m.Action0Progress = progress;
+        else
+            m.Action1Progress = progress;
+        return false;
+    }
+
+    private static bool Agent_SetCurrentActionSpeed(
+        Agent __instance,
+        int channelNo,
+        float speed)
+    {
+        if (!AgentMirror.TryGet(__instance, out var m)) return true;
+        if (channelNo == 0)
+            m.Action0Speed = speed;
+        else
+            m.Action1Speed = speed;
+        m.SetCurrentActionSpeedCalls++;
+        return false;
+    }
+
+    private static bool Agent_SetActionChannel(
+        Agent __instance,
+        int channelNo,
+        ref ActionIndexCache actionIndexCache,
+        bool ignorePriority,
+        AnimFlags additionalFlags,
+        float actionSpeed,
+        float blendInPeriod,
+        float startProgress,
+        bool forceFaceMorphRestart,
+        ref bool __result)
+    {
+        if (!AgentMirror.TryGet(__instance, out var m)) return true;
+        m.SetActionChannelCalls++;
+        m.SetActionChannelIndices.Add(actionIndexCache.Index);
+        m.ActionAndGuardCallOrder.Add("set-action");
+        m.LastSetActionChannel = channelNo;
+        m.LastSetActionIgnorePriority = ignorePriority;
+        m.LastSetActionFlags = additionalFlags;
+        m.LastSetActionBlendInPeriod = blendInPeriod;
+        m.LastSetActionStartProgress = startProgress;
+        m.LastSetActionForceFaceMorphRestart =
+            forceFaceMorphRestart;
+        __result =
+            m.SetActionChannelResult
+            && (!m.RejectSetActionChannelWithoutIgnorePriority
+                || ignorePriority);
+        if (!__result)
+        {
+            return false;
+        }
+
+        if (actionIndexCache == ActionIndexCache.act_none)
+        {
+            m.ClearRetainedNativeAction(channelNo);
+        }
+
+        if (m.AcceptedSetActionChannelDeferralsRemaining > 0)
+        {
+            m.AcceptedSetActionChannelDeferralsRemaining--;
+            return false;
+        }
+
+        if (channelNo == 0)
+        {
+            m.Action0Index = actionIndexCache.Index;
+            m.Action0Flags = additionalFlags;
+            m.Action0Progress = startProgress;
+            m.Action0Speed = actionSpeed;
+            if (m.HasVisualSkeleton)
+            {
+                m.SkeletonAction0Index = actionIndexCache.Index;
+                m.RawVisualAction0Index = -1;
+                m.RawVisualAction0Progress = 0f;
+            }
+        }
+        else
+        {
+            m.Action1Index = actionIndexCache.Index;
+            m.Action1Flags = additionalFlags;
+            m.Action1Progress = startProgress;
+            m.Action1Speed = actionSpeed;
+            if (m.HasVisualSkeleton)
+            {
+                m.SkeletonAction1Index = actionIndexCache.Index;
+                m.RawVisualAction1Index = -1;
+                m.RawVisualAction1Progress = 0f;
+            }
+        }
+
+        return false;
+    }
+
+    private static bool Agent_get_MovementFlags(Agent __instance, ref Agent.MovementControlFlag __result)
+    {
+        if (!AgentMirror.TryGet(__instance, out var m)) return true;
+        __result = m.MovementFlags;
+        return false;
+    }
+
+    private static bool Agent_set_MovementFlags(Agent __instance, Agent.MovementControlFlag value)
+    {
+        if (!AgentMirror.TryGet(__instance, out var m)) return true;
+        m.SetMovementFlagsCalls++;
+        m.LastMovementFlagsWriteSequence = ++m.NativeStateWriteSequence;
+        m.MovementFlags = value;
+        return false;
+    }
+
+    private static bool Agent_get_EventControlFlags(Agent __instance, ref Agent.EventControlFlag __result)
+    {
+        if (!AgentMirror.TryGet(__instance, out var m)) return true;
+        __result = m.EventControlFlags;
+        return false;
+    }
+
+    private static bool Agent_set_EventControlFlags(Agent __instance, Agent.EventControlFlag value)
+    {
+        if (!AgentMirror.TryGet(__instance, out var m)) return true;
+        m.EventControlFlags = value;
+        return false;
+    }
+
+    private static bool Agent_get_CrouchMode(Agent __instance, ref bool __result)
+    {
+        if (!AgentMirror.TryGet(__instance, out var m)) return true;
+        __result = m.CrouchMode;
+        return false;
+    }
+
+    private static bool Agent_get_CurrentGuardMode(Agent __instance, ref Agent.GuardMode __result)
+    {
+        if (!AgentMirror.TryGet(__instance, out var m)) return true;
+        __result = m.GuardMode;
+        return false;
+    }
+
+    private static bool Agent_SetWeaponGuard(Agent __instance, Agent.UsageDirection direction)
+    {
+        if (!AgentMirror.TryGet(__instance, out var m)) return true;
+        m.SetWeaponGuardCalls++;
+        m.LastWeaponGuardWriteSequence = ++m.NativeStateWriteSequence;
+        m.ActionAndGuardCallOrder.Add("set-guard");
+        m.LastSetWeaponGuardDirection = direction;
+        if (m.SetWeaponGuardOverwritesDefendFlags)
+        {
+            Agent.MovementControlFlag defendFlags = direction switch
+            {
+                Agent.UsageDirection.AttackUp =>
+                    Agent.MovementControlFlag.DefendUp,
+                Agent.UsageDirection.AttackDown =>
+                    Agent.MovementControlFlag.DefendDown,
+                Agent.UsageDirection.AttackLeft =>
+                    Agent.MovementControlFlag.DefendLeft,
+                Agent.UsageDirection.AttackRight =>
+                    Agent.MovementControlFlag.DefendRight,
+                _ => Agent.MovementControlFlag.None
+            };
+            m.MovementFlags =
+                (m.MovementFlags &
+                    ~(Agent.MovementControlFlag.DefendBlock |
+                      Agent.MovementControlFlag.DefendDirMask)) |
+                Agent.MovementControlFlag.DefendBlock |
+                defendFlags;
+        }
+        switch (direction)
+        {
+            case Agent.UsageDirection.AttackUp: m.GuardMode = Agent.GuardMode.Up; break;
+            case Agent.UsageDirection.AttackDown: m.GuardMode = Agent.GuardMode.Down; break;
+            case Agent.UsageDirection.AttackLeft: m.GuardMode = Agent.GuardMode.Left; break;
+            case Agent.UsageDirection.AttackRight: m.GuardMode = Agent.GuardMode.Right; break;
+        }
+        return false;
+    }
+
+    private static bool Agent_ResetGuard(Agent __instance)
+    {
+        if (!AgentMirror.TryGet(__instance, out var m)) return true;
+        m.ResetGuardCalls++;
+        m.ActionAndGuardCallOrder.Add("reset-guard");
+        m.GuardMode = Agent.GuardMode.None;
         return false;
     }
 
@@ -542,6 +1359,20 @@ public sealed class MissionEngineFixture : IDisposable
         if (!MockFormation.ForShell(__instance, out var f)) return true;
         f.MovementOrderSet = true;
         f.Order = __0.OrderEnum;
+        return false;
+    }
+
+    private static bool Formation_GetHashCode(Formation __instance, ref int __result)
+    {
+        if (!MockFormation.ForShell(__instance, out _)) return true;
+        __result = System.Runtime.CompilerServices.RuntimeHelpers.GetHashCode(__instance);
+        return false;
+    }
+
+    private static bool Formation_Equals(Formation __instance, object __0, ref bool __result)
+    {
+        if (!MockFormation.ForShell(__instance, out _)) return true;
+        __result = ReferenceEquals(__instance, __0);
         return false;
     }
 

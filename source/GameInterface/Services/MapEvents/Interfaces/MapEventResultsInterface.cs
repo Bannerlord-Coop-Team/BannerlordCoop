@@ -26,6 +26,12 @@ public interface IMapEventResultsInterface : IGameAbstraction
 {
     public NetworkPlayerLootData PackPlayerLootData(PlayerLootData playerLootData);
     public PlayerLootData UnpackPlayerLootData(NetworkPlayerLootData playerLootData);
+    public void UnpackPlayerLootDataForParty(
+        NetworkPlayerLootData playerLootData,
+        string mapEventPartyId,
+        out ItemRoster lootedItems,
+        out TroopRoster lootedMembers,
+        out TroopRoster lootedPrisoners);
     public void CalculateAndCommitMapEventResults(MapEvent mapEvent, out NetworkPlayerLootData networkPlayerLootData);
 }
 
@@ -79,11 +85,14 @@ public class MapEventResultsInterface : IMapEventResultsInterface
         var lootedItems = new Dictionary<MapEventParty, ItemRoster>();
         var lootedMembers = new Dictionary<MapEventParty, TroopRoster>();
         var lootedPrisoners = new Dictionary<MapEventParty, TroopRoster>();
+        var networkLootedItems = networkPlayerLootData.LootedItems ?? new();
+        var networkLootedMembers = networkPlayerLootData.LootedMembers ?? new();
+        var networkLootedPrisoners = networkPlayerLootData.LootedPrisoners ?? new();
 
         GameThread.RunSafe(() =>
         {
             // Pack looted items
-            foreach (var playerLootedItems in networkPlayerLootData.LootedItems)
+            foreach (var playerLootedItems in networkLootedItems)
             {
                 if (!objectManager.TryGetObjectWithLogging<MapEventParty>(playerLootedItems.Key, out var mapEventParty)) continue;
 
@@ -95,7 +104,7 @@ public class MapEventResultsInterface : IMapEventResultsInterface
             }
 
             // Pack looted members (prisoners freed from defeated party)
-            foreach (var playerLootedMembers in networkPlayerLootData.LootedMembers)
+            foreach (var playerLootedMembers in networkLootedMembers)
             {
                 if (!objectManager.TryGetObjectWithLogging<MapEventParty>(playerLootedMembers.Key, out var mapEventParty)) continue;
 
@@ -110,7 +119,7 @@ public class MapEventResultsInterface : IMapEventResultsInterface
             }
 
             // Pack looted prisoners (troops taken prisoner from defeated party)
-            foreach (var playerLootedPrisoners in networkPlayerLootData.LootedPrisoners)
+            foreach (var playerLootedPrisoners in networkLootedPrisoners)
             {
                 if (!objectManager.TryGetObjectWithLogging<MapEventParty>(playerLootedPrisoners.Key, out var mapEventParty)) continue;
 
@@ -126,6 +135,36 @@ public class MapEventResultsInterface : IMapEventResultsInterface
         });
 
         return new PlayerLootData(lootedItems, lootedMembers, lootedPrisoners);
+    }
+
+    public void UnpackPlayerLootDataForParty(
+        NetworkPlayerLootData networkPlayerLootData,
+        string mapEventPartyId,
+        out ItemRoster lootedItems,
+        out TroopRoster lootedMembers,
+        out TroopRoster lootedPrisoners)
+    {
+        using (new AllowedThread())
+        {
+            lootedItems = new ItemRoster();
+            lootedMembers = new TroopRoster();
+            lootedPrisoners = new TroopRoster();
+
+            if (networkPlayerLootData.LootedItems?.TryGetValue(mapEventPartyId, out var itemElements) == true)
+                lootedItems.Add(itemElements);
+
+            if (networkPlayerLootData.LootedMembers?.TryGetValue(mapEventPartyId, out var memberData) == true)
+            {
+                foreach (var troopRosterElement in troopRosterInterface.UnpackTroopRosterData(memberData))
+                    lootedMembers.Add(troopRosterElement);
+            }
+
+            if (networkPlayerLootData.LootedPrisoners?.TryGetValue(mapEventPartyId, out var prisonerData) == true)
+            {
+                foreach (var troopRosterElement in troopRosterInterface.UnpackTroopRosterData(prisonerData))
+                    lootedPrisoners.Add(troopRosterElement);
+            }
+        }
     }
 
     public void CalculateAndCommitMapEventResults(MapEvent mapEvent, out NetworkPlayerLootData networkPlayerLootData)
@@ -225,15 +264,17 @@ public class MapEventResultsInterface : IMapEventResultsInterface
                     MapEventParty lootReceiver = MapEvent.FindWinnerPartyToGetCurrentLootObjectBasedOnChances(lootCasualtyChances);
                     if (lootReceiver == null) continue;
 
+                    bool playerReceivesLoot = playerLootRosters.TryGetValue(lootReceiver, out ItemRoster playerLootRoster);
+
                     LootCasualtyCharacter(
                         character,
                         lootReceiver,
                         defeatedParty,
                         aiTradePenalty,
-                        winnerPlayerParties.Contains(lootReceiver)
+                        playerReceivesLoot
                             ? MBRandom.RoundRandomized(playerLootFactors[lootReceiver])
                             : int.MinValue,
-                        playerLootRosters[lootReceiver]);
+                        playerLootRoster);
                 }
             }
 
@@ -248,15 +289,17 @@ public class MapEventResultsInterface : IMapEventResultsInterface
                     MapEventParty lootReceiver = MapEvent.FindWinnerPartyToGetCurrentLootObjectBasedOnChances(lootCasualtyChances);
                     if (lootReceiver == null) continue;
 
+                    bool playerReceivesLoot = playerLootRosters.TryGetValue(lootReceiver, out ItemRoster playerLootRoster);
+
                     LootCasualtyCharacter(
                         character,
                         lootReceiver,
                         defeatedParty,
                         aiTradePenalty,
-                        winnerPlayerParties.Contains(lootReceiver)
+                        playerReceivesLoot
                             ? MBRandom.RoundRandomized(playerLootFactors[lootReceiver])
                             : int.MinValue,
-                        playerLootRosters[lootReceiver]);
+                        playerLootRoster);
                 }
             }
 
@@ -279,8 +322,10 @@ public class MapEventResultsInterface : IMapEventResultsInterface
     private void LootCasualtyCharacter(CharacterObject casualtyCharacter, MapEventParty winnerParty, MapEventParty defeatedParty, float aiTradePenalty, int maxLootedItemsPerBodyForMainParty, ItemRoster mainPartyLootFromCasualties)
     {
         Hero leaderHero = winnerParty.Party.LeaderHero;
+        if (leaderHero == null) return;
+
         float expectedLootedItemValueFromCasualty = Campaign.Current.Models.BattleRewardModel.GetExpectedLootedItemValueFromCasualty(leaderHero, casualtyCharacter);
-        if (leaderHero == null || expectedLootedItemValueFromCasualty.ApproximatelyEqualsTo(0f, 1E-05f)) return;
+        if (expectedLootedItemValueFromCasualty.ApproximatelyEqualsTo(0f, 1E-05f)) return;
 
         if (!leaderHero.IsPlayerHero())
         {
@@ -532,8 +577,7 @@ public class MapEventResultsInterface : IMapEventResultsInterface
                     // Player heroes handled separately
                     if (hero.IsPlayerHero()) continue;
 
-                    bool heroIsDead = hero.DeathMark == KillCharacterAction.KillCharacterActionDetail.DiedInBattle 
-                        || hero.DeathMark == KillCharacterAction.KillCharacterActionDetail.DiedInLabor;
+                    bool heroIsDead = hero.DeathMark != KillCharacterAction.KillCharacterActionDetail.None;
 
                     if (heroIsDead || hero.Occupation == Occupation.Special) continue;
 
@@ -555,9 +599,10 @@ public class MapEventResultsInterface : IMapEventResultsInterface
                         {
                             MapEventParty captorParty = MapEvent.FindWinnerPartyToGetCurrentLootObjectBasedOnChances(captureChances);
 
-                            if (playerLootPrisonerRosters.ContainsKey(captorParty))
+                            if (captorParty != null &&
+                                playerLootPrisonerRosters.TryGetValue(captorParty, out TroopRoster playerLootPrisonerRoster))
                             {
-                                playerLootPrisonerRosters[captorParty].AddToCounts(character, 1, false, 0, 0, true, -1);
+                                playerLootPrisonerRoster.AddToCounts(character, 1, false, 0, 0, true, -1);
                             }
                             else
                             {
@@ -602,9 +647,10 @@ public class MapEventResultsInterface : IMapEventResultsInterface
                             {
                                 MapEventParty captorParty = MapEvent.FindWinnerPartyToGetCurrentLootObjectBasedOnChances(woundedCaptureChances);
 
-                                if (playerLootPrisonerRosters.ContainsKey(captorParty))
+                                if (captorParty != null &&
+                                    playerLootPrisonerRosters.TryGetValue(captorParty, out TroopRoster playerLootPrisonerRoster))
                                 {
-                                    playerLootPrisonerRosters[captorParty].AddToCounts(character, 1, false, 0, 0, true, -1);
+                                    playerLootPrisonerRoster.AddToCounts(character, 1, false, 0, 0, true, -1);
                                 }
                                 else
                                 {
@@ -626,9 +672,10 @@ public class MapEventResultsInterface : IMapEventResultsInterface
                             {
                                 MapEventParty captorParty = MapEvent.FindWinnerPartyToGetCurrentLootObjectBasedOnChances(healthyCaptureChances);
 
-                                if (playerLootPrisonerRosters.ContainsKey(captorParty))
+                                if (captorParty != null &&
+                                    playerLootPrisonerRosters.TryGetValue(captorParty, out TroopRoster playerLootPrisonerRoster))
                                 {
-                                    playerLootPrisonerRosters[captorParty].AddToCounts(character, 1, false, 0, 0, true, -1);
+                                    playerLootPrisonerRoster.AddToCounts(character, 1, false, 0, 0, true, -1);
                                 }
                                 else
                                 {

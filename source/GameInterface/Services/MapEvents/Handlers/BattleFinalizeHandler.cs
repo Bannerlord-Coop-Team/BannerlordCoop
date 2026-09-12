@@ -1,4 +1,4 @@
-using Common;
+﻿using Common;
 using Common.Logging;
 using Common.Messaging;
 using Common.Network;
@@ -12,10 +12,13 @@ using GameInterface.Services.MobileParties.Data;
 using GameInterface.Services.MobileParties.Extensions;
 using GameInterface.Services.MobileParties.Messages.Behavior;
 using GameInterface.Services.ObjectManager;
+using GameInterface.Services.Players;
 using GameInterface.Services.Settlements.Interfaces;
+using GameInterface.Services.SiegeEvents.Patches;
 using LiteNetLib;
 using Serilog;
 using System;
+using System.Collections.Generic;
 using System.Linq;
 using System.Runtime.CompilerServices;
 using TaleWorlds.CampaignSystem;
@@ -51,31 +54,44 @@ internal class BattleFinalizeHandler : IHandler
 
     private readonly IMessageBroker messageBroker;
     private readonly IObjectManager objectManager;
+    private readonly IMobilePartyBehaviorSnapshot mobilePartyBehaviorSnapshot;
     private readonly INetwork network;
     private readonly IMapEventLogger mapEventLogger;
     private readonly IBattleTroopReserveBuilder reserveBuilder;
     private readonly ISettlementInterface settlementInterface;
+    private readonly IBattleHostRegistry hostRegistry;
+    private readonly IPlayerManager playerManager;
+    private readonly ISiegeMapEventLeaderReconciler siegeMapEventLeaderReconciler;
 
     public BattleFinalizeHandler(
         IMessageBroker messageBroker,
         IObjectManager objectManager,
+        IMobilePartyBehaviorSnapshot mobilePartyBehaviorSnapshot,
         INetwork network,
         IMapEventLogger mapEventLogger,
         IBattleTroopReserveBuilder reserveBuilder,
-        ISettlementInterface settlementInterface)
+        ISettlementInterface settlementInterface,
+        IBattleHostRegistry hostRegistry,
+        IPlayerManager playerManager,
+        ISiegeMapEventLeaderReconciler siegeMapEventLeaderReconciler)
     {
         this.messageBroker = messageBroker;
         this.objectManager = objectManager;
+        this.mobilePartyBehaviorSnapshot = mobilePartyBehaviorSnapshot;
         this.network = network;
         this.mapEventLogger = mapEventLogger;
         this.reserveBuilder = reserveBuilder;
         this.settlementInterface = settlementInterface;
+        this.hostRegistry = hostRegistry;
+        this.playerManager = playerManager;
+        this.siegeMapEventLeaderReconciler = siegeMapEventLeaderReconciler;
 
         messageBroker.Subscribe<MapEventFinalizeAttempted>(Handle_MapEventFinalizeAttempted);
         messageBroker.Subscribe<NetworkMapEventFinalizeAttempted>(Handle_NetworkMapEventFinalizeAttempted);
         messageBroker.Subscribe<NetworkMapEventFinalized>(Handle_NetworkMapEventFinalized);
         messageBroker.Subscribe<NetworkRaidBattleResetToVillage>(Handle_NetworkRaidBattleResetToVillage);
         messageBroker.Subscribe<MapEventConcluded>(Handle_MapEventConcluded);
+        messageBroker.Subscribe<AuthoritativeSiegeAmbushCompletionRequested>(Handle_AuthoritativeSiegeAmbushCompletionRequested);
     }
 
     public void Dispose()
@@ -85,6 +101,7 @@ internal class BattleFinalizeHandler : IHandler
         messageBroker.Unsubscribe<NetworkMapEventFinalized>(Handle_NetworkMapEventFinalized);
         messageBroker.Unsubscribe<NetworkRaidBattleResetToVillage>(Handle_NetworkRaidBattleResetToVillage);
         messageBroker.Unsubscribe<MapEventConcluded>(Handle_MapEventConcluded);
+        messageBroker.Unsubscribe<AuthoritativeSiegeAmbushCompletionRequested>(Handle_AuthoritativeSiegeAmbushCompletionRequested);
     }
 
     private void Handle_MapEventFinalizeAttempted(MessagePayload<MapEventFinalizeAttempted> payload)
@@ -108,6 +125,21 @@ internal class BattleFinalizeHandler : IHandler
     private void Handle_NetworkMapEventFinalizeAttempted(MessagePayload<NetworkMapEventFinalizeAttempted> payload)
     {
         var requester = payload.Who as NetPeer;
+
+        // Only the elected battle host may finalize a live shared battle: a client whose local mission
+        // concluded early still runs vanilla's FinalizeEvent back on the map, and applying that here
+        // would tear the battle down under everyone else (forced encounter close mid-mission). No reply
+        // on a refusal — the finalized reply would pull the refused client off the menu vanilla parked
+        // it on. Server-local publishes (requester null) and battles with no elected host pass.
+        if (requester != null && hostRegistry.TryGet(payload.What.MapEventId, out var hostAssignment)
+            && playerManager.TryGetPlayer(requester, out var requestingPlayer)
+            && requestingPlayer.ControllerId != hostAssignment.HostControllerId)
+        {
+            Logger.Information("Refused finalize of {MapEventId} from non-host {ControllerId}",
+                payload.What.MapEventId, requestingPlayer.ControllerId);
+            return;
+        }
+
         if (!objectManager.TryGetObjectWithLogging(payload.What.MapEventId, out MapEvent mapEvent))
         {
             if (requester != null)
@@ -131,7 +163,7 @@ internal class BattleFinalizeHandler : IHandler
         // in live p2p hostile battles when player-party collection races teardown.
         if (playerPartyIds.Length > 0)
         {
-            PvpEncounterCloseSender.Send(network, messageBroker, this, playerPartyIds, mapEventId: payload.What.MapEventId);
+            PvpEncounterCloseSender.Send(network, playerPartyIds, mapEventId: payload.What.MapEventId);
             return;
         }
 
@@ -152,7 +184,7 @@ internal class BattleFinalizeHandler : IHandler
         if (!objectManager.TryGetObjectWithLogging(payload.What.MapEventId, out MapEvent mapEvent))
         {
             if (!closeAlreadySent && knownPlayerPartyIds.Length > 0)
-                PvpEncounterCloseSender.Send(network, messageBroker, this, knownPlayerPartyIds, payload.What.SurrenderedPartyId, payload.What.MapEventId);
+                PvpEncounterCloseSender.Send(network, knownPlayerPartyIds, payload.What.SurrenderedPartyId, payload.What.MapEventId);
 
             return;
         }
@@ -167,11 +199,50 @@ internal class BattleFinalizeHandler : IHandler
             var playerPartyIds = FinalizeAndCollectPlayers(mapEvent, knownPlayerPartyIds);
 
             if (!closeAlreadySent && playerPartyIds.Length > 0)
-                PvpEncounterCloseSender.Send(network, messageBroker, this, playerPartyIds, payload.What.SurrenderedPartyId, payload.What.MapEventId);
+                PvpEncounterCloseSender.Send(network, playerPartyIds, payload.What.SurrenderedPartyId, payload.What.MapEventId);
         }
         catch (Exception e)
         {
             Logger.Error(e, "Failed to auto-finalize concluded map event");
+        }
+    }
+
+    private void Handle_AuthoritativeSiegeAmbushCompletionRequested(
+        MessagePayload<AuthoritativeSiegeAmbushCompletionRequested> payload)
+    {
+        if (ModInformation.IsClient) return;
+
+        var completion = payload.What;
+        bool applied = false;
+        try
+        {
+            if (!objectManager.TryGetObjectWithLogging<MapEvent>(completion.MapEventId, out var mapEvent))
+                return;
+
+            if (mapEvent.IsFinalized)
+            {
+                applied = true;
+                return;
+            }
+
+            if (!mapEvent.IsSiegeAmbush || mapEvent.BattleState != BattleState.None)
+                return;
+
+            var playerPartyIds = FinalizeAndCollectPlayers(mapEvent);
+            applied = mapEvent.IsFinalized;
+            if (applied && playerPartyIds.Length > 0)
+                PvpEncounterCloseSender.Send(network, playerPartyIds, mapEventId: completion.MapEventId);
+        }
+        catch (Exception e)
+        {
+            Logger.Error(e, "Failed to finalize completed siege ambush {MapEventId}", completion.MapEventId);
+        }
+        finally
+        {
+            messageBroker.Publish(this, new BattleStateChangeProcessed(
+                completion.MapEventId,
+                BattleState.DefenderPullBack,
+                applied));
         }
     }
 
@@ -188,21 +259,79 @@ internal class BattleFinalizeHandler : IHandler
         string[] playerPartyIds = null;
         GameThread.RunSafe(() =>
         {
-            playerPartyIds = MapEventPlayerPartyCollector.Combine(
-                knownPlayerPartyIds,
-                MapEventPlayerPartyCollector.CollectPartyIds(mapEvent, objectManager));
-            var raidSettlement = GetRaidFinalizationSettlement(mapEvent);
-            var raidAttackers = GetRaidAttackerPlayerParties(mapEvent);
-
-            // The battle is over — drop its server-side troop reserves (ledger entry + flatten cache) so they
-            // don't leak per battle. Done before FinalizeEventAux clears the parties, so the flatten-cache
-            // cleanup can still enumerate them. No-op on a client (its ledger is never populated).
-            reserveBuilder.ForgetMapEvent(mapEvent);
-
-            mapEvent.FinalizeEventAux();
-            MoveRaidAttackersToSettlementGate(raidAttackers, raidSettlement);
+            try
+            {
+                playerPartyIds = FinalizeOnGameThread(mapEvent, knownPlayerPartyIds);
+            }
+            finally
+            {
+                if (!mapEvent.IsFinalized)
+                    UnmarkFinalized(mapEvent);
+            }
         }, blocking: true, context: nameof(FinalizeAndCollectPlayers));
         return playerPartyIds ?? Array.Empty<string>();
+    }
+
+    private string[] FinalizeOnGameThread(MapEvent mapEvent, string[] knownPlayerPartyIds)
+    {
+        if (siegeMapEventLeaderReconciler.RestoreBeforeFinalize(
+                mapEvent,
+                out var replacedLeader,
+                out var restoredLeader))
+        {
+            Logger.Warning(
+                "Restored siege map event leader before finalization. Replaced={ReplacedLeader}, Restored={RestoredLeader}",
+                replacedLeader?.MobileParty?.StringId ?? replacedLeader?.Settlement?.StringId,
+                restoredLeader?.MobileParty?.StringId ?? restoredLeader?.Settlement?.StringId);
+        }
+
+        var playerPartyIds = MapEventPlayerPartyCollector.Combine(
+            knownPlayerPartyIds,
+            MapEventPlayerPartyCollector.CollectPartyIds(mapEvent, objectManager));
+
+        var excludedIds = CollectExcludedPlayerPartyIds(mapEvent);
+        if (excludedIds.Count > 0)
+            playerPartyIds = playerPartyIds.Where(id => !excludedIds.Contains(id)).ToArray();
+        var raidSettlement = GetRaidFinalizationSettlement(mapEvent);
+        var raidAttackers = GetRaidAttackerPlayerParties(mapEvent);
+
+        // A winning inside defender is kept off the close above, but nothing seats it on the siege-defeated
+        // menu: the server tears the SiegeEvent/MapEvent down via replication, bypassing vanilla's local
+        // siege-end routing, so the winner falls through to the settlement arrival menu. Capture its parties
+        // + settlement now (finalize clears them) and prompt after finalize (below), behind the event destroy.
+        string defenderVictorySettlementId = null;
+        string[] defenderVictoryPartyIds = null;
+        if (mapEvent.IsSiegeAssault && mapEvent.BattleState == BattleState.DefenderVictory)
+        {
+            defenderVictoryPartyIds = CollectWinningInsideDefenderPartyIds(mapEvent);
+            if (defenderVictoryPartyIds.Length > 0)
+                objectManager.TryGetId(mapEvent.MapEventSettlement, out defenderVictorySettlementId);
+        }
+
+        // The battle is over — drop its server-side troop reserves (ledger entry + flatten cache) so they
+        // don't leak per battle. Done before FinalizeEventAux clears the parties, so the flatten-cache
+        // cleanup can still enumerate them. No-op on a client (its ledger is never populated).
+        reserveBuilder.ForgetMapEvent(mapEvent);
+
+        // A siege assault that ends without a victor (attackers retreated or abandoned the fight)
+        // keeps the siege in vanilla; a bare finalize would lift it. Victories finalize normally:
+        // attacker victory captures the settlement, defender victory breaks the siege.
+        if (mapEvent.IsSiegeAssault
+            && mapEvent.BattleState != BattleState.AttackerVictory
+            && mapEvent.BattleState != BattleState.DefenderVictory)
+        {
+            mapEvent._keepSiegeEvent = true;
+            mapEvent.AttackerSide?.LeaderParty?.MobileParty?.RecalculateShortTermBehavior();
+        }
+
+        mapEvent.FinalizeEventAux();
+        MoveRaidAttackersToSettlementGate(raidAttackers, raidSettlement);
+
+        // After the destroy (same game thread, so behind it on the reliable-ordered channel).
+        if (!string.IsNullOrEmpty(defenderVictorySettlementId))
+            network.SendAll(new NetworkPromptSiegeDefenderVictory(defenderVictorySettlementId, defenderVictoryPartyIds));
+
+        return playerPartyIds;
     }
 
     private bool TryMarkFinalized(MapEvent mapEvent)
@@ -225,6 +354,53 @@ internal class BattleFinalizeHandler : IHandler
         return true;
     }
 
+    private void UnmarkFinalized(MapEvent mapEvent)
+    {
+        lock (finalizedMapEventsLock)
+            finalizedMapEvents.Remove(mapEvent);
+    }
+
+    // [Server, game thread] Player parties that must keep their encounter through the finalize:
+    // a capturing leader enters the settlement-taken flow, and a winning inside defender sits on
+    // its vanilla victory menu — the close's Finish + ExitToLast would tear either down.
+    private HashSet<string> CollectExcludedPlayerPartyIds(MapEvent mapEvent)
+    {
+        var excluded = new HashSet<string>();
+        if (mapEvent?.AttackerSide == null || mapEvent.DefenderSide == null) return excluded;
+
+        SiegeAftermathPatches.TryGetPlayerCaptureLeader(mapEvent, out var capturingLeader, out _);
+
+        foreach (var party in mapEvent.InvolvedParties)
+        {
+            bool isCapturingLeader = capturingLeader != null && party?.MobileParty == capturingLeader;
+            bool isWinningInsideDefender = mapEvent.IsSiegeAssault
+                && mapEvent.BattleState == BattleState.DefenderVictory
+                && party?.Side == BattleSideEnum.Defender
+                && party.MobileParty?.CurrentSettlement == mapEvent.MapEventSettlement;
+            if (!isCapturingLeader && !isWinningInsideDefender) continue;
+
+            if (objectManager.TryGetId(party, out var id)) excluded.Add(id);
+        }
+
+        return excluded;
+    }
+
+    // [Server, game thread] The winning inside-defender player parties, for the siege-defeated-menu prompt.
+    private string[] CollectWinningInsideDefenderPartyIds(MapEvent mapEvent)
+    {
+        List<string> ids = null;
+        foreach (var party in mapEvent.InvolvedParties)
+        {
+            if (party?.Side != BattleSideEnum.Defender) continue;
+            if (party.MobileParty?.CurrentSettlement != mapEvent.MapEventSettlement) continue;
+            if (!objectManager.TryGetId(party, out var id)) continue;
+
+            if (ids == null) ids = new List<string>();
+            ids.Add(id);
+        }
+
+        return ids?.ToArray() ?? Array.Empty<string>();
+    }
     private bool TryFinalizeRaidDefenderVictoryToVillage(MapEvent mapEvent)
     {
         var shouldReset = false;
@@ -244,15 +420,23 @@ internal class BattleFinalizeHandler : IHandler
                 if (!TryMarkFinalized(mapEvent))
                     return;
 
-                var involvedParties = CollectInvolvedParties(mapEvent);
-                playerPartyIds = MapEventPlayerPartyCollector.CollectPartyIds(mapEvent, objectManager);
+                try
+                {
+                    var involvedParties = CollectInvolvedParties(mapEvent);
+                    playerPartyIds = MapEventPlayerPartyCollector.CollectPartyIds(mapEvent, objectManager);
 
-                reserveBuilder.ForgetMapEvent(mapEvent);
-                mapEvent.FinalizeEventAux();
-                ClearMapEventBackReferences(involvedParties);
-                ResetRaidSettlementState(settlement);
-                ReturnPlayerPartiesToSettlement(playerPartyIds, settlement);
-                shouldReset = true;
+                    reserveBuilder.ForgetMapEvent(mapEvent);
+                    mapEvent.FinalizeEventAux();
+                    ClearMapEventBackReferences(involvedParties);
+                    ResetRaidSettlementState(settlement);
+                    ReturnPlayerPartiesToSettlement(playerPartyIds, settlement);
+                    shouldReset = true;
+                }
+                finally
+                {
+                    if (!mapEvent.IsFinalized)
+                        UnmarkFinalized(mapEvent);
+                }
             },
             blocking: true,
             context: nameof(TryFinalizeRaidDefenderVictoryToVillage));
@@ -420,8 +604,8 @@ internal class BattleFinalizeHandler : IHandler
             using (new AllowedThread())
             {
                 mobileParty.SetMoveModeHold();
+                mobileParty.ResetNavigationToHold();
             }
-            mobileParty.ResetNavigationToHold();
             PublishPartyBehaviorUpdate(mobileParty);
         }
     }
@@ -443,19 +627,15 @@ internal class BattleFinalizeHandler : IHandler
 
     private void PublishPartyBehaviorUpdate(MobileParty mobileParty)
     {
-        if (!objectManager.TryGetId(mobileParty, out var mobilePartyId))
+        if (!mobilePartyBehaviorSnapshot.TryCreate(
+                mobileParty,
+                out PartyBehaviorUpdateData data))
             return;
 
-        var data = new PartyBehaviorUpdateData(
-            mobilePartyId,
-            mobileParty.DefaultBehavior,
-            null,
-            mobileParty.Position,
-            false,
-            mobileParty.Position,
-            mobileParty.DefaultBehavior,
-            mobileParty.TargetPosition,
-            mobileParty.DesiredAiNavigationType);
+        data.ForcePosition = true;
+        data.ResetMovementToHold = true;
+
+        // The gate reset must reach clients before the encounter close allows another map command.
         messageBroker.Publish(this, new PartyBehaviorUpdated(ref data));
     }
 

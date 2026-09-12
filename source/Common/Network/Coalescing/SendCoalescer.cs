@@ -1,12 +1,54 @@
 ﻿using System;
 using System.Collections.Generic;
+using LiteNetLib;
 
 namespace Common.Network.Coalescing;
 
 /// <inheritdoc cref="ISendCoalescer"/>
 public sealed class SendCoalescer : ISendCoalescer
 {
-    private readonly Dictionary<CoalesceKey, ICoalescedPayload> pending = new();
+    private enum DeliveryMode
+    {
+        Broadcast,
+        Peer,
+        AllButPeer,
+    }
+
+    private sealed class PendingSend
+    {
+        public ICoalescedPayload Payload { get; set; }
+        public DeliveryMode Mode { get; }
+        public NetPeer Peer { get; }
+
+        public PendingSend(ICoalescedPayload payload, DeliveryMode mode, NetPeer peer)
+        {
+            Payload = payload;
+            Mode = mode;
+            Peer = peer;
+        }
+
+        public void Send(INetwork network)
+        {
+            var message = Payload.ToMessage();
+            switch (Mode)
+            {
+                case DeliveryMode.Broadcast:
+                    network.SendAll(message);
+                    break;
+                case DeliveryMode.Peer:
+                    network.Send(Peer, message);
+                    break;
+                case DeliveryMode.AllButPeer:
+                    network.SendAllBut(Peer, message);
+                    break;
+                default:
+                    throw new InvalidOperationException($"Unknown coalesced delivery mode {Mode}.");
+            }
+        }
+    }
+
+    private readonly Dictionary<CoalesceKey, PendingSend> pending = new();
+    private readonly List<CoalesceKey> order = new();
     private readonly object gate = new();
 
     public bool HasPending
@@ -22,13 +64,41 @@ public sealed class SendCoalescer : ISendCoalescer
 
     public void Enqueue(CoalesceKey key, ICoalescedPayload payload)
     {
+        Enqueue(key, payload, DeliveryMode.Broadcast, null);
+    }
+
+    public void EnqueueToPeer(CoalesceKey key, ICoalescedPayload payload, NetPeer peer)
+    {
+        if (peer == null) throw new ArgumentNullException(nameof(peer));
+        Enqueue(key, payload, DeliveryMode.Peer, peer);
+    }
+
+    public void EnqueueToAllBut(CoalesceKey key, ICoalescedPayload payload, NetPeer excludedPeer)
+    {
+        if (excludedPeer == null) throw new ArgumentNullException(nameof(excludedPeer));
+        Enqueue(key, payload, DeliveryMode.AllButPeer, excludedPeer);
+    }
+
+    private void Enqueue(CoalesceKey key, ICoalescedPayload payload, DeliveryMode mode, NetPeer peer)
+    {
         if (payload == null) throw new ArgumentNullException(nameof(payload));
 
         lock (gate)
         {
-            pending[key] = pending.TryGetValue(key, out var existing)
-                ? existing.Merge(payload)
-                : payload;
+            if (pending.TryGetValue(key, out var existing))
+            {
+                if (existing.Mode != mode || !ReferenceEquals(existing.Peer, peer))
+                {
+                    throw new InvalidOperationException(
+                        $"Coalesce key {key} cannot reuse a different delivery route.");
+                }
+
+                existing.Payload = existing.Payload.Merge(payload);
+                return;
+            }
+
+            pending.Add(key, new PendingSend(payload, mode, peer));
+            order.Add(key);
         }
     }
 
@@ -36,19 +106,24 @@ public sealed class SendCoalescer : ISendCoalescer
     {
         if (network == null) throw new ArgumentNullException(nameof(network));
 
-        ICoalescedPayload[] toSend;
+        PendingSend[] toSend;
         lock (gate)
         {
             if (pending.Count == 0) return;
 
-            toSend = new ICoalescedPayload[pending.Count];
-            pending.Values.CopyTo(toSend, 0);
+            toSend = new PendingSend[pending.Count];
+            for (int i = 0; i < order.Count; i++)
+            {
+                toSend[i] = pending[order[i]];
+            }
+
             pending.Clear();
+            order.Clear();
         }
 
-        foreach (var payload in toSend)
+        foreach (var pendingSend in toSend)
         {
-            network.SendAll(payload.ToMessage());
+            pendingSend.Send(network);
         }
     }
 
@@ -56,12 +131,12 @@ public sealed class SendCoalescer : ISendCoalescer
     {
         if (network == null) throw new ArgumentNullException(nameof(network));
 
-        List<ICoalescedPayload> toSend = ExtractInstance(instanceId);
+        List<PendingSend> toSend = ExtractInstance(instanceId);
         if (toSend == null) return;
 
-        foreach (var payload in toSend)
+        foreach (var pendingSend in toSend)
         {
-            network.SendAll(payload.ToMessage());
+            pendingSend.Send(network);
         }
     }
 
@@ -72,26 +147,23 @@ public sealed class SendCoalescer : ISendCoalescer
 
     // Removes and returns every pending payload for the instance, or null if none. The caller decides
     // whether to send them (FlushInstance) or discard them (DropInstance).
-    private List<ICoalescedPayload> ExtractInstance(string instanceId)
+    private List<PendingSend> ExtractInstance(string instanceId)
     {
         lock (gate)
         {
-            List<CoalesceKey> keys = null;
-            foreach (var key in pending.Keys)
+            List<PendingSend> payloads = null;
+            for (int i = 0; i < order.Count;)
             {
+                var key = order[i];
                 if (string.Equals(key.InstanceId, instanceId, StringComparison.Ordinal))
                 {
-                    (keys ??= new List<CoalesceKey>()).Add(key);
+                    (payloads ??= new List<PendingSend>()).Add(pending[key]);
+                    pending.Remove(key);
+                    order.RemoveAt(i);
+                    continue;
                 }
-            }
 
-            if (keys == null) return null;
-
-            var payloads = new List<ICoalescedPayload>(keys.Count);
-            foreach (var key in keys)
-            {
-                payloads.Add(pending[key]);
-                pending.Remove(key);
+                i++;
             }
 
             return payloads;

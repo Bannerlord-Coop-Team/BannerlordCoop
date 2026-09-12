@@ -1,19 +1,18 @@
 ﻿using Common.Messaging;
 using TaleWorlds.CampaignSystem;
-using TaleWorlds.CampaignSystem.CampaignBehaviors;
 using static TaleWorlds.Core.Crafting;
 
 namespace GameInterface.Services.Smithing.Messages;
 
-public record RefinementDone : IEvent
+public readonly struct DoRefinement : IEvent
 {
-    public CraftingCampaignBehavior CraftingCampaignBehavior;
-    public Hero CraftingHero;
-    public RefiningFormula RefiningFormula;
+    public readonly Hero CraftingHero;
+    public readonly RefiningFormula RefiningFormula;
 
-    public RefinementDone(CraftingCampaignBehavior craftingCampaignBehavior, Hero craftingHero, RefiningFormula refiningFormula)
+    public DoRefinement(
+        Hero craftingHero,
+        RefiningFormula refiningFormula)
     {
-        CraftingCampaignBehavior = craftingCampaignBehavior;
         CraftingHero = craftingHero;
         RefiningFormula = refiningFormula;
     }

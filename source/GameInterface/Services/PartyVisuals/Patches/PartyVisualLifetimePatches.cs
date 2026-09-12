@@ -43,7 +43,7 @@ public class PartyVisualLifetimePatches
             return;
         }
 
-        var message = new PartyVisualDestroyed(__instance);
+        var message = new PartyVisualDestroyed(__instance, __instance.MapEntity.MobileParty);
 
         MessageBroker.Instance.Publish(__instance, message);
     }

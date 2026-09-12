@@ -62,7 +62,7 @@ internal struct SunInformationSurrogate
 {
     [ProtoMember(1)] public float Altitude { get; set; }
     [ProtoMember(2)] public float Angle { get; set; }
-    [ProtoMember(3)] public Vec3Surrogate Color { get; set; }
+    [ProtoMember(3)] public ColorSurrogate Color { get; set; }
     [ProtoMember(4)] public float Brightness { get; set; }
     [ProtoMember(5)] public float MaxBrightness { get; set; }
     [ProtoMember(6)] public float Size { get; set; }
@@ -123,7 +123,7 @@ internal struct SnowInformationSurrogate
 internal struct AmbientInformationSurrogate
 {
     [ProtoMember(1)] public float EnvironmentMultiplier { get; set; }
-    [ProtoMember(2)] public Vec3Surrogate AmbientColor { get; set; }
+    [ProtoMember(2)] public ColorSurrogate AmbientColor { get; set; }
     [ProtoMember(3)] public float MieScatterStrength { get; set; }
     [ProtoMember(4)] public float RayleighConstant { get; set; }
 

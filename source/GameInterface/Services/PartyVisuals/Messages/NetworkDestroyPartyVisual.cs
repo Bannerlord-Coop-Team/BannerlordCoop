@@ -9,9 +9,13 @@ namespace GameInterface.Services.PartyVisuals.Messages
         [ProtoMember(1)]
         public string PartyVisualId { get; }
 
-        public NetworkDestroyPartyVisual(string partyVisualId)
+        [ProtoMember(2)]
+        public string MobilePartyId { get; }
+
+        public NetworkDestroyPartyVisual(string partyVisualId, string mobilePartyId)
         {
             PartyVisualId = partyVisualId;
+            MobilePartyId = mobilePartyId;
         }
     }
 }

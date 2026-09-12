@@ -1,45 +1,53 @@
 ﻿using Common;
 using Common.Logging;
+using GameInterface.Services.MobilePartyAIs;
 using HarmonyLib;
 using Serilog;
-using System.Threading.Tasks;
+using System;
+using System.Threading;
 using TaleWorlds.CampaignSystem;
+using TaleWorlds.CampaignSystem.Party;
 
 namespace GameInterface.Services.MobilePartyAIs.Patches;
 
 [HarmonyPatch(typeof(Campaign))]
-internal class PartiesThinkPatch
+internal static class PartiesThinkPatch
 {
-    // TODO move to config
-    private const int UPDATES_PER_TICK = 100;
-    private const int TICK_DELAY_MS = 100;
+    private static readonly ILogger Logger = LogManager.GetLogger(typeof(PartiesThinkPatch));
+    private static IPartyAiBatchRunner runner;
 
-    private static Task delay = Task.CompletedTask;
+    internal static IPartyAiBatchRunner BoundRunner => Volatile.Read(ref runner);
 
-    private static int CurrentStartIdx = 0;
+    internal static void Bind(IPartyAiBatchRunner value) =>
+        Interlocked.Exchange(ref runner, value);
 
-    private static readonly ILogger Logger = LogManager.GetLogger<PartiesThinkPatch>();
+    internal static void Unbind(IPartyAiBatchRunner value) =>
+        Interlocked.CompareExchange(ref runner, null, value);
 
     [HarmonyPatch("PartiesThink")]
     [HarmonyPrefix]
     private static bool PartiesThinkPrefix(Campaign __instance, ref float dt)
     {
-        if (ModInformation.IsClient) return false;
-
-        if (delay.IsCompleted == false) return false;
-
-        delay = Task.Delay(TICK_DELAY_MS);
-
-        for (int i = 0; i < UPDATES_PER_TICK; i++)
+        if (ModInformation.IsClient)
         {
-            var currentIdx = (CurrentStartIdx + i) % __instance.MobileParties.Count;
+            if (MobileParty.MainParty.DefaultBehavior == AiBehavior.EscortParty)
+                MobileParty.MainParty.Ai.Tick(dt);
 
-            var ai = __instance.MobileParties[currentIdx]?.Ai;
-
-            ai.Tick(dt);
+            return false;
         }
 
-        CurrentStartIdx = (CurrentStartIdx + UPDATES_PER_TICK) % __instance.MobileParties.Count;
+        IPartyAiBatchRunner current = BoundRunner;
+        if (current == null)
+            return true;
+
+        try
+        {
+            current.TickBatch(__instance, dt);
+        }
+        catch (Exception ex)
+        {
+            Logger.Error(ex, "Failed to tick mobile-party AI batch");
+        }
 
         return false;
     }

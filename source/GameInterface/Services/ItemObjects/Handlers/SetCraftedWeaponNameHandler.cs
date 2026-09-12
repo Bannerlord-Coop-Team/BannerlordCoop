@@ -6,96 +6,80 @@ using GameInterface.Services.ItemObjects.Messages;
 using GameInterface.Services.ItemObjects.Patches;
 using GameInterface.Services.ObjectManager;
 using Serilog;
-using System;
 using TaleWorlds.Core;
 using TaleWorlds.ObjectSystem;
 
-namespace GameInterface.Services.ItemObjects.Handlers
+namespace GameInterface.Services.ItemObjects.Handlers;
+
+internal class SetCraftedWeaponNameHandler : IHandler
 {
-    internal class SetCraftedWeaponNameHandler : IHandler
+    private static readonly ILogger Logger = LogManager.GetLogger<SetCraftedWeaponNameHandler>();
+
+    private readonly IMessageBroker messageBroker;
+    private readonly IObjectManager objectManager;
+    private readonly INetwork network;
+
+    public SetCraftedWeaponNameHandler(
+        IMessageBroker messageBroker,
+        IObjectManager objectManager,
+        INetwork network)
     {
-        private static readonly ILogger Logger = LogManager.GetLogger<SetCraftedWeaponNameHandler>();
-        private readonly IMessageBroker messageBroker;
-        private readonly IObjectManager objectManager;
-        private readonly INetwork network;
+        this.messageBroker = messageBroker;
+        this.objectManager = objectManager;
+        this.network = network;
 
-        public SetCraftedWeaponNameHandler(
-            IMessageBroker messageBroker,
-            IObjectManager objectManager,
-            INetwork network)
+        messageBroker.Subscribe<SetCraftedWeaponName>(Handle_SetCraftedWeaponName);
+        messageBroker.Subscribe<NetworkSetCraftedWeaponNameServer>(Handle_NetworkSetCraftedWeaponNameServer);
+        messageBroker.Subscribe<NetworkSetCraftedWeaponNameClients>(Handle_NetworkSetCraftedWeaponNameClients);
+    }
+
+    public void Dispose()
+    {
+        messageBroker.Unsubscribe<SetCraftedWeaponName>(Handle_SetCraftedWeaponName);
+        messageBroker.Unsubscribe<NetworkSetCraftedWeaponNameServer>(Handle_NetworkSetCraftedWeaponNameServer);
+        messageBroker.Unsubscribe<NetworkSetCraftedWeaponNameClients>(Handle_NetworkSetCraftedWeaponNameClients);
+    }
+
+    private void Handle_SetCraftedWeaponName(MessagePayload<SetCraftedWeaponName> obj)
+    {
+        if (!objectManager.TryGetIdWithLogging(obj.What.Weapon, out var weaponId)) return;
+
+        // Send to server from client
+        NetworkSetCraftedWeaponNameServer message = new(
+            weaponId,
+            obj.What.Name.ToString() ?? ""
+        );
+        network.SendAll(message);
+    }
+
+    private void Handle_NetworkSetCraftedWeaponNameServer(MessagePayload<NetworkSetCraftedWeaponNameServer> obj)
+    {
+        NetworkSetCraftedWeaponNameClients nameChange = new(obj.What);
+
+        GameThread.RunSafe(() =>
         {
-            this.messageBroker = messageBroker;
-            this.objectManager = objectManager;
-            this.network = network;
-            messageBroker.Subscribe<CraftedWeaponNameSet>(Handle);
-            messageBroker.Subscribe<NetworkSetCraftedWeaponNameServer>(Handle);
-            messageBroker.Subscribe<NetworkSetCraftedWeaponNameClients>(Handle);
-        }
+            SetCraftedWeaponName(nameChange);
 
-        public void Dispose()
+            // Send from server to all clients
+            network.SendAll(nameChange);
+        });
+    }
+
+    private void Handle_NetworkSetCraftedWeaponNameClients(MessagePayload<NetworkSetCraftedWeaponNameClients> obj)
+    {
+        GameThread.RunSafe(() =>
         {
-            messageBroker.Unsubscribe<CraftedWeaponNameSet>(Handle);
-            messageBroker.Unsubscribe<NetworkSetCraftedWeaponNameServer>(Handle);
-            messageBroker.Unsubscribe<NetworkSetCraftedWeaponNameClients>(Handle);
-        }
+            SetCraftedWeaponName(obj.What);
+        });
+    }
 
-        private void Handle(MessagePayload<CraftedWeaponNameSet> obj)
-        {
-            if (!objectManager.TryGetIdWithLogging(obj.What.Weapon, out var weaponId)) return;
+    private void SetCraftedWeaponName(NetworkSetCraftedWeaponNameClients obj)
+    {
+        if (!objectManager.TryGetObjectWithLogging(obj.WeaponId, out ItemObject weapon)) return;
+        ItemObject mbCraftedWeapon = MBObjectManager.Instance.GetObject<ItemObject>(weapon.StringId);
 
-            // Send to server from client
-            NetworkSetCraftedWeaponNameServer message = new(
-                weaponId,
-                obj.What.Name.ToString() ?? ""
-            );
-            network.SendAll(message);
-        }
-
-        private void Handle(MessagePayload<NetworkSetCraftedWeaponNameServer> obj)
-        {
-            NetworkSetCraftedWeaponNameClients nameChange = new(obj.What);
-
-            GameThread.Run(() =>
-            {
-                try
-                {
-                    SetCraftedWeaponName(nameChange);
-
-                    // Send from server to all clients
-                    network.SendAll(nameChange);
-                }
-                catch (Exception e)
-                {
-                    Logger.Error(e, "Failed to apply NetworkSetCraftedWeaponNameServer");
-                }
-            });
-        }
-
-        private void Handle(MessagePayload<NetworkSetCraftedWeaponNameClients> obj)
-        {
-            var data = obj.What;
-
-            GameThread.Run(() =>
-            {
-                try
-                {
-                    SetCraftedWeaponName(data);
-                }
-                catch (Exception e)
-                {
-                    Logger.Error(e, "Failed to apply NetworkSetCraftedWeaponNameClients");
-                }
-            });
-        }
-
-        private void SetCraftedWeaponName(NetworkSetCraftedWeaponNameClients obj)
-        {
-            if (!objectManager.TryGetObjectWithLogging(obj.WeaponId, out ItemObject weapon)) return;
-            ItemObject mbCraftedWeapon = MBObjectManager.Instance.GetObject<ItemObject>(weapon.StringId);
-
-            // Change name on custom and MB object managers
-            SetCraftedWeaponNamePatch.SetCraftedWeaponNameOverride(ref weapon, obj.StringName);
-            SetCraftedWeaponNamePatch.SetCraftedWeaponNameOverride(ref mbCraftedWeapon, obj.StringName);
-        }
+        // Change name on custom and MB object managers
+        SetCraftedWeaponNamePatch.SetCraftedWeaponNameOverride(ref weapon, obj.StringName);
+        SetCraftedWeaponNamePatch.SetCraftedWeaponNameOverride(ref mbCraftedWeapon, obj.StringName);
     }
 }

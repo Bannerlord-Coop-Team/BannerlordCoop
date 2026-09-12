@@ -3,6 +3,7 @@ using Common.Logging;
 using Common.Messaging;
 using Common.Network;
 using Common.Util;
+using GameInterface.Services.Alleys.Commands;
 using GameInterface.Services.Alleys.Interfaces;
 using GameInterface.Services.Alleys.Messages;
 using GameInterface.Services.ObjectManager;
@@ -137,6 +138,7 @@ internal class AlleyHandler : IHandler
         foreach (var alley in behaviorInterface.GetPlayerOwnedAlleys())
         {
             if (!objectManager.TryGetId(alley, out var alleyId)) continue;
+            if (AlleyRecruitDebugCommand.IsFixtureAlley(alleyId)) continue;
             if (!sessionInterface.TryGetManagementData(alleyId, out var data)) continue;
 
             // Isolate per-alley failures so one bad alley doesn't skip the rest of the day's tick.
@@ -241,7 +243,14 @@ internal class AlleyHandler : IHandler
 
         var newGarrison = result.ToArray();
         sessionInterface.SetManagementData(alleyId, data.OverseerId, newGarrison);
-        network.SendAll(new NetworkAlleyManagementUpdated(alleyId, data.OverseerId, newGarrison));
+        if (sessionInterface.TryGetManagementData(alleyId, out var updated))
+        {
+            network.SendAll(new NetworkAlleyManagementUpdated(
+                alleyId,
+                updated.OverseerId,
+                updated.Garrison,
+                updated.LastRecruitTimeTicks));
+        }
     }
 
     /// <summary>
@@ -301,7 +310,7 @@ internal class AlleyHandler : IHandler
             ChangeRelationAction.ApplyRelationChangeBetweenHeroes(alley.Owner, attacker.Owner, -5, showQuickNotification: false);
         }
 
-        network.SendAll(new NetworkAlleyUnderAttack(alleyId, attackerId, dueDate));
+        network.SendAll(new NetworkAlleyUnderAttack(alleyId, attackerId, dueDate, showNotification: true));
     }
 
     /// <summary>
@@ -447,7 +456,7 @@ internal class AlleyHandler : IHandler
             objectManager.TryGetObject<Alley>(data.UnderAttackByAlleyId, out var attacker) && attacker.Owner == victim)
         {
             sessionInterface.ClearUnderAttackByAi(alleyId);
-            network.SendAll(new NetworkAlleyUnderAttack(alleyId, null, default));
+            network.SendAll(new NetworkAlleyUnderAttack(alleyId, null, default, showNotification: false));
         }
     }
 
@@ -472,7 +481,11 @@ internal class AlleyHandler : IHandler
             }
 
             if (!objectManager.TryGetObjectWithLogging<Alley>(data.AttackerAlleyId, out var attacker)) return;
-            behaviorInterface.SetPlayerAlleyUnderAttackByAi(alley, attacker, data.DueDate, showNotification: true);
+            behaviorInterface.SetPlayerAlleyUnderAttackByAi(
+                alley,
+                attacker,
+                data.DueDate,
+                data.ShowNotification);
         });
     }
 
@@ -537,7 +550,14 @@ internal class AlleyHandler : IHandler
         if (garrison != null)
         {
             sessionInterface.SetManagementData(alleyId, overseerId, garrison);
-            network.SendAll(new NetworkAlleyManagementUpdated(alleyId, overseerId, garrison));
+            if (sessionInterface.TryGetManagementData(alleyId, out var updated))
+            {
+                network.SendAll(new NetworkAlleyManagementUpdated(
+                    alleyId,
+                    updated.OverseerId,
+                    updated.Garrison,
+                    updated.LastRecruitTimeTicks));
+            }
         }
 
         if (alley.Owner != null)
