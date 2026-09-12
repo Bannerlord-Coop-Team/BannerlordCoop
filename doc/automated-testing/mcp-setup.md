@@ -30,7 +30,7 @@ Start `pi` **at the repo root**. `.mcp.json` is discovered automatically; no `/m
 
 Plain `pi` in `source` does **not** discover the root `.mcp.json`. The adapter uses active-cwd `.mcp.json` and passes that cwd to stdio children; relative `-File tools/mcp/launch.ps1` resolves there, not beside an arbitrarily supplied config file. Passing only `--mcp-config` from a subdirectory does not fix the launcher path. Higher-precedence `.pi/mcp.json` overrides may disable/change this server; inspect `/mcp` if expected tools are missing.
 
-The shared config requests `directTools: true`, `lifecycle: lazy-keep-alive` and a 360-second request timeout. On the first uncached session, connect once with `mcp({ connect: "bannerlord-coop" })` to initialize/list tools without launching a game. The adapter then hot-loads the seventeen direct tools. Its [README](https://github.com/nicobailon/pi-mcp-adapter#direct-tools) documents cache-first registration and the [lifecycle](https://github.com/nicobailon/pi-mcp-adapter#lifecycle-modes): lazy-keep-alive avoids idle shutdown after connecting. Use direct/proxy calls for 300-second waits, not `mcpScript` with its default 30-second script deadline.
+The shared config requests `directTools: true`, `lifecycle: lazy-keep-alive` and a 360-second request timeout. On the first uncached session, connect once with `mcp({ connect: "bannerlord-coop" })` to initialize/list tools without launching a game. The adapter then hot-loads the nineteen direct tools. Its [README](https://github.com/nicobailon/pi-mcp-adapter#direct-tools) documents cache-first registration and the [lifecycle](https://github.com/nicobailon/pi-mcp-adapter#lifecycle-modes): lazy-keep-alive avoids idle shutdown after connecting. Use direct/proxy calls for 300-second waits, not `mcpScript` with its default 30-second script deadline.
 
 ## Codex
 
@@ -50,7 +50,7 @@ Do **not** infer that MCP `cwd = ".."` is safe from the general relative-path wo
 
 The launcher only starts the already-published MCP process with its local profile. It never auto-builds, installs, deploys or launches Bannerlord. Diagnostics go to stderr; stdout is JSON-RPC only. Missing setup fails with the `runmefirst.cmd`/helper instructions, not a fallback to another checkout.
 
-After initialization, agents can directly use all seventeen tools without developer-managed file IPC. **Do not call `start_run` until a matching DEBUG mod deployment and a live test are separately authorized.** See the [server workflow](../../tools/CoopMcpServer/README.md#agent-workflow) and [UI automation limits](mcp-ui.md). One local MCP session/co-op host at a time; do not run Pi and Codex against the game ports concurrently.
+After initialization, agents can directly use all nineteen tools without developer-managed file IPC. **Do not call `start_run` until a matching DEBUG mod deployment and a live test are separately authorized.** The separate opt-in `deploy_mod` tool also requires explicit deployment permission and `configuration: "Debug"` for live testing (its default is `Release`); see [deployment configuration and recovery](mcp-deployment.md). See the [server workflow](../../tools/CoopMcpServer/README.md#agent-workflow) and [UI automation limits](mcp-ui.md). One local MCP session/co-op host at a time; do not run Pi and Codex against the game ports concurrently.
 
 Always call **`stop_run`**, confirm cleanup succeeded, and only then exit/reload/reconnect Pi or Codex. Lazy-keep-alive retains owned runs across idle, not across client exit or forced process termination. Restarted sessions cannot adopt old runs. Never blindly retry uncertain mutations; inspect state/logs first. Setup-only checks prove no live UI/autoconnect/runtime behavior.
 
@@ -60,7 +60,7 @@ Always call **`stop_run`**, confirm cleanup succeeded, and only then exit/reload
 dotnet test tools\CoopMcpServer.Tests\CoopMcpServer.Tests.csproj -c Release
 ```
 
-`McpSetupTests` copies scripts into temporary paths containing spaces. It stubs SDK publishing and the interactive game-path step, checks real temporary junction resolution, idempotence/profile preservation, failure propagation, wrappers' cwd/quoted arguments/status, and missing-setup stderr. It also uses the real official C# MCP SDK 1.4.1 through the shared launcher to initialize/list seventeen tools with **empty profiles**, then checks EOF/stdout cleanliness. It never invokes the real interactive `runmefirst` workflow or changes the user environment.
+`McpSetupTests` copies scripts into temporary paths containing spaces. It stubs SDK publishing and the interactive game-path step, checks real temporary junction resolution, idempotence/profile preservation, failure propagation, wrappers' cwd/quoted arguments/status, and missing-setup stderr. It also uses the real official C# MCP SDK 1.4.1 through the shared launcher to initialize/list nineteen tools with **empty profiles**, then checks EOF/stdout cleanliness. It never invokes the real interactive `runmefirst` workflow or changes the user environment.
 
 Static client config checks use an existing adapter installation (its TOML parser and Ajv) plus the downloaded [official Codex schema](https://developers.openai.com/codex/config-schema.json):
 
