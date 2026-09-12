@@ -6,6 +6,7 @@ using Common.Messaging;
 using Common.Network;
 using Common.Util;
 using E2E.Tests.Environment.Instance;
+using E2E.Tests.Util;
 using GameInterface.Services.MapEvents;
 using GameInterface.Services.MapEvents.Data;
 using GameInterface.Services.MapEvents.Interfaces;
@@ -13,14 +14,21 @@ using GameInterface.Services.MapEvents.Messages.Leave;
 using GameInterface.Services.Players;
 using GameInterface.Services.TroopRosters.Data;
 using HarmonyLib;
+using Helpers;
 using TaleWorlds.CampaignSystem;
+using TaleWorlds.CampaignSystem.CampaignBehaviors;
 using TaleWorlds.CampaignSystem.Encounters;
 using TaleWorlds.CampaignSystem.GameComponents;
 using TaleWorlds.CampaignSystem.GameMenus;
+using TaleWorlds.CampaignSystem.GameState;
 using TaleWorlds.CampaignSystem.MapEvents;
+using TaleWorlds.CampaignSystem.Naval;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Roster;
 using TaleWorlds.Core;
+using TaleWorlds.ObjectSystem;
+using TaleWorlds.MountAndBlade;
+using TaleWorlds.Localization;
 using Xunit;
 using Xunit.Abstractions;
 
@@ -153,15 +161,37 @@ public class BattleResultDistributionTests : MapEventTestBase
     /// party's prisoners. The receiver-specific server-authored <see cref="MapEventParty"/> id keeps one winner's
     /// loot off another winner without reconstructing identity from <see cref="PartyBase.MainParty"/>.
     /// </summary>
-    [Fact]
+    [Theory]
+    [InlineData(false, false)]
+    [InlineData(true, false)]
+    [InlineData(true, true)]
     [Trait("Requirement", "BR-081")]
-    public void CommittedResults_EachWinnerReceivesOnlyItsOwnPartysPrisoners()
+    public void CommittedResults_EachWinnerReceivesOnlyItsOwnPartysPrisoners(bool replayHideoutResults, bool emptyLoot)
     {
         var (ctx, player2PartyId) = SetupTwoAlliedPlayersOnAttackerSide();
+
+        if (replayHideoutResults)
+        {
+            foreach (var instance in Clients.Prepend(Server))
+                instance.Call(() =>
+                {
+                    Assert.True(instance.ObjectManager.TryGetObject<MapEvent>(ctx.MapEventId, out var mapEvent));
+                    mapEvent._mapEventType = MapEvent.BattleTypes.Hideout;
+                });
+        }
 
         // Distinct prisoners for each winner — the loot content the result messages carry.
         var troopForP1 = TestEnvironment.CreateRegisteredObject<CharacterObject>();
         var troopForP2 = TestEnvironment.CreateRegisteredObject<CharacterObject>();
+        var lootItemId = TestEnvironment.CreateRegisteredObject<ItemObject>();
+        foreach (var instance in Clients.Prepend(Server))
+            instance.Call(() =>
+            {
+                Assert.True(instance.ObjectManager.TryGetObject<ItemObject>(lootItemId, out var item));
+                item.StringId = "hideout_result_loot";
+                // Loot packets resolve authored items through the native catalog, as a loaded campaign does.
+                MBObjectManager.Instance.RegisterObject(item);
+            });
 
         // Each winner sits in its own post-battle encounter to receive its loot.
         SetMockPlayerEncounter(Clients.First(), mapEventId: ctx.MapEventId);
@@ -174,41 +204,166 @@ public class BattleResultDistributionTests : MapEventTestBase
             var mep1Id = ResolveMapEventPartyId(mapEvent.AttackerSide, ctx.AttackerPartyId);
             var mep2Id = ResolveMapEventPartyId(mapEvent.AttackerSide, player2PartyId);
             Assert.NotEqual(mep1Id, mep2Id);
+            Assert.True(Server.ObjectManager.TryGetObject<ItemObject>(lootItemId, out var lootItem));
 
             var lootedPrisoners = new Dictionary<string, TroopRosterData>
             {
                 { mep1Id, new TroopRosterData(new[] { new TroopRosterElementData(troopForP1, 1, 0, 0) }) },
                 { mep2Id, new TroopRosterData(new[] { new TroopRosterElementData(troopForP2, 1, 0, 0) }) },
             };
+            if (emptyLoot) lootedPrisoners.Clear();
 
             var payload = new NetworkPlayerLootData(
-                new Dictionary<string, ItemRosterElement[]>(),
+                emptyLoot ? new Dictionary<string, ItemRosterElement[]>() : new Dictionary<string, ItemRosterElement[]>
+                {
+                    { mep1Id, new[] { new ItemRosterElement(lootItem, 2) } },
+                    { mep2Id, new[] { new ItemRosterElement(lootItem, 3) } },
+                },
                 new Dictionary<string, TroopRosterData>(),
                 lootedPrisoners);
 
             // The authoritative server addresses each result with the receiver's stable map-event party id.
             var network = Server.Resolve<INetwork>();
-            network.Send(
-                Clients.First().NetPeer,
-                new NetworkCommitMapEventResults(
-                    ctx.MapEventId,
-                    BattleSideEnum.Attacker,
-                    BattleSideEnum.Attacker,
-                    mep1Id,
-                    payload));
-            network.Send(
-                Clients.Last().NetPeer,
-                new NetworkCommitMapEventResults(
-                    ctx.MapEventId,
-                    BattleSideEnum.Attacker,
-                    BattleSideEnum.Attacker,
-                    mep2Id,
-                    payload));
+            for (var send = 0; send < (replayHideoutResults ? 2 : 1); send++)
+            {
+                network.Send(
+                    Clients.First().NetPeer,
+                    new NetworkCommitMapEventResults(
+                        ctx.MapEventId,
+                        BattleSideEnum.Attacker,
+                        BattleSideEnum.Attacker,
+                        mep1Id,
+                        payload));
+                network.Send(
+                    Clients.Last().NetPeer,
+                    new NetworkCommitMapEventResults(
+                        ctx.MapEventId,
+                        BattleSideEnum.Attacker,
+                        BattleSideEnum.Attacker,
+                        mep2Id,
+                        payload));
+            }
         }, MapEventDisabledMethods);
 
+        if (replayHideoutResults)
+        {
+            foreach (var client in Clients)
+                client.Call(() =>
+                {
+                    Assert.True(client.ObjectManager.TryGetObject<MapEvent>(ctx.MapEventId, out var mapEvent));
+                    var previousMission = MissionState.Current;
+                    MissionState.Current = ObjectHelper.SkipConstructor<MissionState>();
+                    try
+                    {
+                        client.Resolve<MapEventRegistry>().OnClientDestroyed(mapEvent, ctx.MapEventId);
+                        Assert.NotNull(PlayerEncounter.Current);
+                        Assert.Same(mapEvent, MobileParty.MainParty.MapEvent);
+                    }
+                    finally { MissionState.Current = previousMission; }
+                }, MapEventDisabledMethods);
+        }
+
         // Player 1's encounter received only player 1's prisoner; player 2's received only player 2's.
-        AssertEncounterPrisoners(Clients.First(), ownTroopId: troopForP1, foreignTroopId: troopForP2);
-        AssertEncounterPrisoners(Clients.Last(), ownTroopId: troopForP2, foreignTroopId: troopForP1);
+        if (!emptyLoot)
+        {
+            AssertEncounterPrisoners(Clients.First(), ownTroopId: troopForP1, foreignTroopId: troopForP2);
+            AssertEncounterPrisoners(Clients.Last(), ownTroopId: troopForP2, foreignTroopId: troopForP1);
+        }
+        foreach (var client in Clients)
+            client.Call(() => Assert.Equal(emptyLoot ? 0 : client == Clients.First() ? 2 : 3,
+                PlayerEncounter.Current.RosterToReceiveLootItems.Sum(item => item.Amount)));
+
+        if (replayHideoutResults)
+            foreach (var client in Clients.Reverse())
+                CollectHideoutResultsFromMap(client, hasWaitingMenu: client == Clients.Last(), hasLoot: !emptyLoot);
+    }
+
+    private void CollectHideoutResultsFromMap(EnvironmentInstance client, bool hasWaitingMenu, bool hasLoot)
+    {
+        var harmony = new Harmony($"hideout-loot-ui.{Guid.NewGuid()}");
+        harmony.Patch(AccessTools.Method(typeof(PartyScreenHelper), nameof(PartyScreenHelper.OpenScreenAsLoot)),
+            prefix: new HarmonyMethod(typeof(BattleResultDistributionTests), nameof(OpenLootPartyScreen)));
+        harmony.Patch(AccessTools.Method(typeof(InventoryScreenHelper), nameof(InventoryScreenHelper.OpenScreenAsLoot)),
+            prefix: new HarmonyMethod(typeof(BattleResultDistributionTests), nameof(OpenLootInventoryScreen)));
+        try
+        {
+            client.Call(() =>
+            {
+                var states = Game.Current.GameStateManager;
+                var mapState = states.CreateState<MapState>();
+                states._gameStates.Add(mapState);
+                if (hasWaitingMenu)
+                {
+                    var starter = new CampaignGameStarter(Campaign.Current.GameMenuManager, Campaign.Current.ConversationManager);
+                    starter.AddGameMenu("coop_hideout_waiting", "Waiting for another hero", _ => { });
+                    mapState._menuContext = Game.Current.ObjectManager.CreateObject<MenuContext>();
+                    mapState._menuContext.SwitchToMenu("coop_hideout_waiting");
+                }
+
+                var encounter = PlayerEncounter.Current;
+                encounter._alternativeReceivedLootShips = new List<Ship>();
+                new HideoutCampaignBehavior().game_menu_hideout_place_on_init(new MenuCallbackArgs(mapState, TextObject.GetEmpty()));
+                Assert.Same(encounter, PlayerEncounter.Current);
+                Assert.Null(MobileParty.MainParty.CurrentSettlement);
+                var missionState = ObjectHelper.SkipConstructor<MissionState>();
+                var previousMission = MissionState.Current;
+                MissionState.Current = missionState;
+                states._gameStates.Add(missionState);
+                try
+                {
+                    mapState.OnMapModeTick(0.1f);
+                    Assert.Equal(PlayerEncounterState.CaptureHeroes, encounter.EncounterState);
+                }
+                finally
+                {
+                    states._gameStates.Remove(missionState);
+                    MissionState.Current = previousMission;
+                }
+
+                mapState.OnMapModeTick(0.1f);
+                if (hasLoot)
+                {
+                    Assert.IsType<PartyState>(states.ActiveState);
+                    Assert.Equal(PlayerEncounterState.LootInventory, encounter.EncounterState);
+                    mapState.OnMapModeTick(0.1f);
+                    Assert.Equal(PlayerEncounterState.LootInventory, encounter.EncounterState);
+
+                    states._gameStates.RemoveAt(states._gameStates.Count - 1);
+                    mapState.OnMapModeTick(0.1f);
+                    Assert.IsType<InventoryState>(states.ActiveState);
+                    Assert.Equal(PlayerEncounterState.LootShips, encounter.EncounterState);
+                    mapState.OnMapModeTick(0.1f);
+                    Assert.Equal(PlayerEncounterState.LootShips, encounter.EncounterState);
+
+                    states._gameStates.RemoveAt(states._gameStates.Count - 1);
+                    mapState.OnMapModeTick(0.1f);
+                }
+                Assert.Null(PlayerEncounter.Current);
+                Assert.Null(MobileParty.MainParty.MapEvent);
+                Assert.Null(MobileParty.MainParty.CurrentSettlement);
+                Assert.Null(Campaign.Current.CurrentMenuContext);
+            }, MapEventDisabledMethods.Concat(new[]
+            {
+                AccessTools.Method(typeof(Campaign), nameof(Campaign.RealTick)),
+                AccessTools.Method(typeof(Campaign), nameof(Campaign.Tick)),
+            }).ToArray());
+        }
+        finally { harmony.UnpatchAll(harmony.Id); }
+    }
+
+    private static bool OpenLootPartyScreen()
+    {
+        var states = Game.Current.GameStateManager;
+        states._gameStates.Add(states.CreateState<PartyState>());
+        return false;
+    }
+
+    private static bool OpenLootInventoryScreen(Dictionary<PartyBase, ItemRoster> itemRostersToLoot)
+    {
+        Assert.True(itemRostersToLoot[PartyBase.MainParty].Sum(item => item.Amount) > 0);
+        var states = Game.Current.GameStateManager;
+        states._gameStates.Add(states.CreateState<InventoryState>());
+        return false;
     }
 
     [Fact]
@@ -392,6 +547,84 @@ public class BattleResultDistributionTests : MapEventTestBase
         // ...and each staged its own encounter for the battle-results pass.
         AssertPlayerEncounterState(Clients.First(), PlayerEncounterState.CaptureHeroes);
         AssertPlayerEncounterState(Clients.Last(), PlayerEncounterState.CaptureHeroes);
+    }
+
+    [Fact]
+    public void HideoutResults_WaitForServerWithoutGeneratingLocalLoot()
+    {
+        var (ctx, _) = SetupTwoAlliedPlayersOnAttackerSide();
+        var client = Clients.Last();
+        SetMockPlayerEncounter(client, mapEventId: ctx.MapEventId);
+        client.Call(() =>
+        {
+            Assert.True(client.ObjectManager.TryGetObject<MapEvent>(ctx.MapEventId, out var mapEvent));
+            mapEvent._mapEventType = MapEvent.BattleTypes.Hideout;
+            mapEvent._battleState = BattleState.AttackerVictory;
+            var encounter = PlayerEncounter.Current;
+            encounter.EncounterState = PlayerEncounterState.ApplyResults;
+            encounter._stateHandled = false;
+
+            encounter.DoApplyMapEventResults();
+
+            Assert.Equal(PlayerEncounterState.ApplyResults, encounter.EncounterState);
+            Assert.True(encounter._stateHandled);
+            Assert.False(mapEvent._mapEventResultsApplied);
+            Assert.Empty(encounter.RosterToReceiveLootItems);
+        }, MapEventDisabledMethods.Append(AccessTools.Method(typeof(CampaignEventDispatcher),
+            nameof(CampaignEventDispatcher.OnPlayerBattleEnd))).ToArray());
+    }
+
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public void HideoutLoot_SharesTheExistingPoolEvenWithZeroJoiningContribution_LeavesFieldBattlesUnchanged(bool hideout)
+    {
+        var (ctx, _) = SetupTwoAlliedPlayersOnAttackerSide();
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject<MapEvent>(ctx.MapEventId, out var mapEvent));
+            mapEvent._mapEventType = hideout ? MapEvent.BattleTypes.Hideout : MapEvent.BattleTypes.FieldBattle;
+            mapEvent._battleState = BattleState.AttackerVictory;
+            var parties = mapEvent.AttackerSide.Parties.ToArray();
+            Assert.Equal(2, parties.Length);
+            parties[0]._contributionToBattle = 100;
+            parties[1]._contributionToBattle = 0;
+            parties[0].PlunderedGold = 101;
+            parties[1].PlunderedGold = 0;
+
+            var valuable = GameObjectCreator.CreateInitializedObject<ItemObject>();
+            valuable.Value = 300;
+            var common = GameObjectCreator.CreateInitializedObject<ItemObject>();
+            common.Value = 100;
+            var troop = GameObjectCreator.CreateInitializedObject<CharacterObject>();
+            var loot = new PlayerLootData(
+                parties.ToDictionary(party => party, _ => new ItemRoster()),
+                parties.ToDictionary(party => party, _ => TroopRoster.CreateDummyTroopRoster()),
+                parties.ToDictionary(party => party, _ => TroopRoster.CreateDummyTroopRoster()));
+            loot.LootedItems[parties[0]].AddToCounts(valuable, 1);
+            loot.LootedItems[parties[0]].AddToCounts(common, 3);
+            loot.LootedMembers[parties[0]].AddToCounts(troop, 3);
+            loot.LootedPrisoners[parties[0]].AddToCounts(troop, 5, false, 2, 7);
+
+            var results = (MapEventResultsInterface)Server.Resolve<IMapEventResultsInterface>();
+            results.SplitHideoutLoot(mapEvent, loot);
+
+            Assert.Equal(101, parties.Sum(party => party.PlunderedGold));
+            Assert.Equal(4, loot.LootedItems.Values.Sum(roster => roster.Sum(item => item.Amount)));
+            Assert.Equal(1, loot.LootedItems.Values.Sum(roster => roster.GetItemNumber(valuable)));
+            Assert.Equal(3, loot.LootedItems.Values.Sum(roster => roster.GetItemNumber(common)));
+            Assert.Equal(3, loot.LootedMembers.Values.Sum(roster => roster.TotalManCount));
+            Assert.Equal(5, loot.LootedPrisoners.Values.Sum(roster => roster.TotalManCount));
+            Assert.Equal(2, loot.LootedPrisoners.Values.Sum(roster => roster.TotalWounded));
+            Assert.Equal(7, loot.LootedPrisoners.Values.Sum(roster => roster.GetTroopRoster().Sum(entry => entry.Xp)));
+            Assert.Equal(hideout ? 51 : 101, parties[0].PlunderedGold);
+            Assert.Equal(hideout ? 50 : 0, parties[1].PlunderedGold);
+            Assert.Equal(hideout ? 300 : 0, loot.LootedItems[parties[1]].Sum(item => item.Amount * item.EquipmentElement.ItemValue));
+            Assert.Equal(hideout ? 1 : 0, loot.LootedMembers[parties[1]].TotalManCount);
+            Assert.Equal(hideout ? 2 : 0, loot.LootedPrisoners[parties[1]].TotalManCount);
+            Assert.Equal(100, parties[0].ContributionToBattle);
+            Assert.Equal(0, parties[1].ContributionToBattle);
+        }, MapEventDisabledMethods);
     }
 
     // ------------------------------------------------------------------

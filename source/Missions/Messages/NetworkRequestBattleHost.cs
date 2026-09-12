@@ -1,4 +1,4 @@
-using Common.Messaging;
+﻿using Common.Messaging;
 using ProtoBuf;
 
 namespace Missions.Messages;
@@ -17,10 +17,13 @@ public readonly struct NetworkRequestBattleHost : IEvent
     public readonly string MapEventId;
     [ProtoMember(2)]
     public readonly string ControllerId;
+    [ProtoMember(3)]
+    public readonly bool HideoutStateReady;
 
-    public NetworkRequestBattleHost(string mapEventId, string controllerId)
+    public NetworkRequestBattleHost(string mapEventId, string controllerId, bool hideoutStateReady = false)
     {
         MapEventId = mapEventId;
         ControllerId = controllerId;
+        HideoutStateReady = hideoutStateReady;
     }
 }

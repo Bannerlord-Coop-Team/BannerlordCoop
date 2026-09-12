@@ -1,10 +1,12 @@
-using Common;
+﻿using Common;
 using Common.Logging;
 using Common.Messaging;
 using Common.Network;
 using Common.Network.Coalescing;
 using GameInterface.Services.Barters;
 using GameInterface.Services.Hideouts.Messages;
+using GameInterface.Services.MapEvents.Messages;
+using GameInterface.Services.MapEvents.Messages.Leave;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Players;
 using LiteNetLib;
@@ -13,12 +15,16 @@ using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
+using System.Runtime.CompilerServices;
 using System.Threading;
 using TaleWorlds.CampaignSystem;
+using TaleWorlds.CampaignSystem.Actions;
 using TaleWorlds.CampaignSystem.CampaignBehaviors;
+using TaleWorlds.CampaignSystem.MapEvents;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Roster;
 using TaleWorlds.CampaignSystem.Settlements;
+using TaleWorlds.Core;
 using static GameInterface.Services.ObjectManager.ObjectManager;
 
 namespace GameInterface.Services.Hideouts.Handlers;
@@ -35,6 +41,8 @@ internal sealed class HideoutCampaignConsequencesHandler : IHandler
     private readonly INetworkConfig configuration;
     private readonly ISendCoalescer sendCoalescer;
     private readonly ConcurrentDictionary<string, PendingPreparation> pendingPreparations = new();
+    private readonly Dictionary<MapEvent, ClearRewardSnapshot> pendingClearRewards = new();
+    private readonly ConditionalWeakTable<Settlement, ClearRewardSnapshot> clearRewards = new();
 
     public HideoutCampaignConsequencesHandler(
         IMessageBroker messageBroker,
@@ -54,6 +62,8 @@ internal sealed class HideoutCampaignConsequencesHandler : IHandler
         messageBroker.Subscribe<HideoutCampaignConsequenceRequested>(Handle_HideoutCampaignConsequenceRequested);
         messageBroker.Subscribe<NetworkHideoutCampaignConsequenceRequested>(Handle_NetworkHideoutCampaignConsequenceRequested);
         messageBroker.Subscribe<NetworkHideoutCampaignConsequenceResolved>(Handle_NetworkHideoutCampaignConsequenceResolved);
+        messageBroker.Subscribe<CommitMapEventResults>(Handle_CommitMapEventResults);
+        messageBroker.Subscribe<MapEventFinalized>(Handle_MapEventFinalized);
     }
 
     public void Dispose()
@@ -61,6 +71,9 @@ internal sealed class HideoutCampaignConsequencesHandler : IHandler
         messageBroker.Unsubscribe<HideoutCampaignConsequenceRequested>(Handle_HideoutCampaignConsequenceRequested);
         messageBroker.Unsubscribe<NetworkHideoutCampaignConsequenceRequested>(Handle_NetworkHideoutCampaignConsequenceRequested);
         messageBroker.Unsubscribe<NetworkHideoutCampaignConsequenceResolved>(Handle_NetworkHideoutCampaignConsequenceResolved);
+        messageBroker.Unsubscribe<CommitMapEventResults>(Handle_CommitMapEventResults);
+        messageBroker.Unsubscribe<MapEventFinalized>(Handle_MapEventFinalized);
+        pendingClearRewards.Clear();
     }
 
     /// <summary>
@@ -261,12 +274,76 @@ internal sealed class HideoutCampaignConsequencesHandler : IHandler
                 if (settlement.Hideout.IsInfested)
                     return ConsequenceResult.Rejected;
 
+                var rewards = clearRewards.GetValue(settlement, _ => new ClearRewardSnapshot(settlement));
+                if (rewards.MapEvent != null || !rewards.ClaimedHeroes.Add(playerHero))
+                    return ConsequenceResult.Rejected;
+
                 behavior.SetCleanHideoutRelations(settlement);
                 return ConsequenceResult.AcceptedWithoutParity;
 
             default:
                 Logger.Warning("Rejected unknown hideout consequence {Consequence}", request.Consequence);
                 return ConsequenceResult.Rejected;
+        }
+    }
+
+    private void Handle_CommitMapEventResults(MessagePayload<CommitMapEventResults> payload)
+    {
+        var mapEvent = payload.What.MapEvent;
+        var settlement = mapEvent.MapEventSettlement;
+        if (ModInformation.IsClient || mapEvent.EventType != MapEvent.BattleTypes.Hideout ||
+            settlement?.IsHideout != true ||
+            (clearRewards.TryGetValue(settlement, out var previous) && previous.MapEvent == mapEvent))
+            return;
+
+        var rewards = new ClearRewardSnapshot(settlement) { MapEvent = mapEvent };
+        foreach (var player in playerManager.Players)
+        {
+            if (objectManager.TryGetObject<Hero>(player.HeroId, out var hero) &&
+                objectManager.TryGetObject<MobileParty>(player.MobilePartyId, out var party) &&
+                party.Party.MapEventSide == mapEvent.AttackerSide)
+                rewards.Participants.Add((hero, party));
+        }
+
+        pendingClearRewards[mapEvent] = rewards;
+        clearRewards.Remove(settlement);
+        clearRewards.Add(settlement, rewards);
+    }
+
+    private void Handle_MapEventFinalized(MessagePayload<MapEventFinalized> payload)
+    {
+        if (ModInformation.IsClient || !pendingClearRewards.TryGetValue(payload.What.MapEvent, out var rewards))
+            return;
+
+        pendingClearRewards.Remove(payload.What.MapEvent);
+        if (rewards.MapEvent.BattleState != BattleState.AttackerVictory)
+            return;
+
+        // Native PlayerEncounter.DoEnd clears the hideout; the dedicated server has no player encounter.
+        foreach (var party in rewards.Settlement.Parties.ToArray())
+        {
+            LeaveSettlementAction.ApplyForParty(party);
+            party.Ai.SetDoNotAttackMainParty(3);
+            if (playerManager.Contains(party))
+            {
+                party.Position = rewards.Settlement.GatePosition;
+                party.SetMoveModeHold();
+            }
+        }
+        rewards.Settlement.Hideout.IsSpotted = false;
+        rewards.Settlement.IsVisible = false;
+
+        var behavior = Campaign.Current?.GetCampaignBehavior<HideoutCampaignBehavior>();
+        if (behavior == null)
+            return;
+
+        foreach (var participant in rewards.Participants)
+        {
+            if (!rewards.ClaimedHeroes.Add(participant.Hero))
+                continue;
+
+            using var playerContext = new BarterPlayerContext(participant.Hero, participant.Party);
+            behavior.SetCleanHideoutRelations(rewards.Settlement);
         }
     }
 
@@ -324,6 +401,17 @@ internal sealed class HideoutCampaignConsequencesHandler : IHandler
         return true;
     }
 
+    internal bool TryPrepareRaid(Settlement settlement, bool isDirectAssault)
+    {
+        var behavior = Campaign.Current?.GetCampaignBehavior<HideoutCampaignBehavior>();
+        if (behavior == null || !settlement.Hideout.IsInfested || !settlement.Hideout.NextPossibleAttackTime.IsPast)
+            return false;
+        behavior.ArrangeHideoutTroopCountsForMission();
+        if (isDirectAssault && !EnsureDirectAssaultMinimum(settlement)) return false;
+        FlushDefenderRosters(settlement);
+        return true;
+    }
+
     private void FlushDefenderRosters(Settlement settlement)
     {
         if (sendCoalescer == null)
@@ -366,5 +454,15 @@ internal sealed class HideoutCampaignConsequencesHandler : IHandler
         public ManualResetEventSlim Completed { get; } = new(false);
         public bool Accepted { get; set; }
         public int ExpectedHealthyDefenderCount { get; set; }
+    }
+
+    private sealed class ClearRewardSnapshot
+    {
+        public Settlement Settlement { get; }
+        public MapEvent MapEvent { get; set; }
+        public List<(Hero Hero, MobileParty Party)> Participants { get; } = new();
+        public HashSet<Hero> ClaimedHeroes { get; } = new();
+
+        public ClearRewardSnapshot(Settlement settlement) => Settlement = settlement;
     }
 }

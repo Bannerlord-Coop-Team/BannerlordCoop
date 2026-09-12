@@ -15,8 +15,11 @@ public class NetworkStartAttackMissionSerializationTest
         new SurrogateCollection();
     }
 
-    [Fact]
-    public void RoundTrip_PreservesMissionInitializer()
+    [Theory]
+    [InlineData(false, false)]
+    [InlineData(true, false)]
+    [InlineData(true, true)]
+    public void RoundTrip_PreservesMissionInitializer(bool isHideout, bool isDirectAssault)
     {
         var initializer = new MissionInitializerRecord("battle_terrain_030")
         {
@@ -34,7 +37,7 @@ public class NetworkStartAttackMissionSerializationTest
                 },
             },
         };
-        var original = new NetworkStartAttackMission("map-event-1", initializer, "player-party-1");
+        var original = new NetworkStartAttackMission("map-event-1", initializer, "player-party-1", isHideout, isDirectAssault);
 
         byte[] bytes;
         using (var ms = new MemoryStream())
@@ -52,6 +55,8 @@ public class NetworkStartAttackMissionSerializationTest
         }
 
         Assert.Equal(original.MapEventId, result.MapEventId);
+        Assert.Equal(isHideout, result.IsHideout);
+        Assert.Equal(isDirectAssault, result.IsDirectAssault);
         Assert.Equal(original.RandomTerrainSeed, result.RandomTerrainSeed);
         Assert.Equal(original.AtmosphereOnCampaign.TimeInfo.TimeOfDay, result.AtmosphereOnCampaign.TimeInfo.TimeOfDay);
         Assert.Equal(original.AtmosphereOnCampaign.TimeInfo.NightTimeFactor, result.AtmosphereOnCampaign.TimeInfo.NightTimeFactor);

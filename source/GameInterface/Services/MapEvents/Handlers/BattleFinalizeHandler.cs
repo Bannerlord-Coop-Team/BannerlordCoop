@@ -3,6 +3,7 @@ using Common.Logging;
 using Common.Messaging;
 using Common.Network;
 using Common.Util;
+using GameInterface.Services.Barters;
 using GameInterface.Services.MapEvents;
 using GameInterface.Services.MapEvents.Logging;
 using GameInterface.Services.MapEvents.Messages;
@@ -126,6 +127,9 @@ internal class BattleFinalizeHandler : IHandler
     {
         var requester = payload.Who as NetPeer;
 
+        if (TryLeaveSharedHideout(requester, payload.What.MapEventId))
+            return;
+
         // Only the elected battle host may finalize a live shared battle: a client whose local mission
         // concluded early still runs vanilla's FinalizeEvent back on the map, and applying that here
         // would tear the battle down under everyone else (forced encounter close mid-mission). No reply
@@ -168,6 +172,44 @@ internal class BattleFinalizeHandler : IHandler
         }
 
         network.Send(requester, new NetworkMapEventFinalized());
+    }
+
+    private bool TryLeaveSharedHideout(NetPeer requester, string mapEventId)
+    {
+        if (requester == null)
+            return false;
+
+        var handled = false;
+        GameThread.RunSafe(() =>
+        {
+            if (!objectManager.TryGetObject<MapEvent>(mapEventId, out var mapEvent) ||
+                mapEvent.EventType != MapEvent.BattleTypes.Hideout || mapEvent.BattleState != BattleState.None)
+                return;
+
+            if (!playerManager.TryGetPlayer(requester, out var player) ||
+                !objectManager.TryGetObject<MobileParty>(player.MobilePartyId, out var party) ||
+                party.MapEvent != mapEvent)
+            {
+                handled = true;
+                return;
+            }
+
+            foreach (var participant in playerManager.Players)
+            {
+                if (!playerManager.IsConnected(participant) ||
+                    !objectManager.TryGetObject<MobileParty>(participant.MobilePartyId, out var otherParty) ||
+                    otherParty == party || otherParty.Party.MapEventSide != party.Party.MapEventSide)
+                    continue;
+
+                handled = true;
+                messageBroker.Publish(requester, new PlayerLeaveBattleAttempted(party.Party));
+                return;
+            }
+
+            handled = true;
+            messageBroker.Publish(this, new MapEventFinalizeAttempted(mapEvent));
+        }, blocking: true, context: nameof(TryLeaveSharedHideout));
+        return handled;
     }
 
     /// <summary>
@@ -324,7 +366,8 @@ internal class BattleFinalizeHandler : IHandler
             mapEvent.AttackerSide?.LeaderParty?.MobileParty?.RecalculateShortTermBehavior();
         }
 
-        mapEvent.FinalizeEventAux();
+        using (CreateHideoutFinalizeContext(mapEvent))
+            mapEvent.FinalizeEventAux();
         MoveRaidAttackersToSettlementGate(raidAttackers, raidSettlement);
 
         // After the destroy (same game thread, so behind it on the reliable-ordered channel).
@@ -659,6 +702,21 @@ internal class BattleFinalizeHandler : IHandler
         if (PlayerEncounter.Current?.ForceRaid == true && mainParty?.CurrentSettlement?.Village != null)
             return mainParty.CurrentSettlement;
 
+        return null;
+    }
+
+    private BarterPlayerContext CreateHideoutFinalizeContext(MapEvent mapEvent)
+    {
+        if (mapEvent.EventType != MapEvent.BattleTypes.Hideout)
+            return null;
+
+        foreach (var player in playerManager.Players)
+        {
+            if (objectManager.TryGetObject<Hero>(player.HeroId, out var hero) &&
+                objectManager.TryGetObject<MobileParty>(player.MobilePartyId, out var party) &&
+                party.Party.MapEventSide == mapEvent.AttackerSide)
+                return new BarterPlayerContext(hero, party);
+        }
         return null;
     }
 

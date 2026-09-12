@@ -12,6 +12,8 @@ using GameInterface.Services.MapEventParties.Messages;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Players;
 using Serilog;
+using System.Collections.Generic;
+using System.Runtime.CompilerServices;
 using TaleWorlds.CampaignSystem.Encounters;
 using TaleWorlds.CampaignSystem.MapEvents;
 using TaleWorlds.CampaignSystem.Party;
@@ -30,6 +32,7 @@ internal class MapEventResultsHandler : IHandler
     private readonly IMapEventInitializationBarrier initializationBarrier;
     private readonly IMapEventContributionBarrier contributionBarrier;
     private readonly IPlayerManager playerManager;
+    private readonly ConditionalWeakTable<MapEvent, HashSet<string>> receivedHideoutResults = new();
 
     public MapEventResultsHandler(
         IMessageBroker messageBroker,
@@ -79,6 +82,7 @@ internal class MapEventResultsHandler : IHandler
         GameThread.RunSafe(() =>
         {
             if (!objectManager.TryGetIdWithLogging(mapEvent, out var mapEventId)) return;
+            if (mapEvent.EventType == MapEvent.BattleTypes.Hideout && mapEvent._mapEventResultsApplied) return;
 
             contributionBarrier.Flush(mapEvent);
             mapEventResultsInterface.CalculateAndCommitMapEventResults(mapEvent, out NetworkPlayerLootData networkPlayerLootData);
@@ -118,6 +122,10 @@ internal class MapEventResultsHandler : IHandler
 
             if ((data.PlayerSide != BattleSideEnum.Attacker && data.PlayerSide != BattleSideEnum.Defender) ||
                 string.IsNullOrEmpty(data.PlayerMapEventPartyId))
+                return;
+
+            if (mapEvent.EventType == MapEvent.BattleTypes.Hideout &&
+                !receivedHideoutResults.GetValue(mapEvent, _ => new HashSet<string>()).Add(data.PlayerMapEventPartyId))
                 return;
 
             mapEventResultsInterface.UnpackPlayerLootDataForParty(

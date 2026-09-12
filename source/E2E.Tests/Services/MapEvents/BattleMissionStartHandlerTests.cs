@@ -3,6 +3,7 @@ using Common;
 using Common.Messaging;
 using Common.Network;
 using GameInterface;
+using GameInterface.Services.Hideouts;
 using GameInterface.Services.MapEvents;
 using GameInterface.Services.MapEvents.Handlers;
 using GameInterface.Services.MapEvents.Logging;
@@ -28,10 +29,12 @@ public class BattleMissionStartHandlerTests : MapEventTestBase
     }
 
     [Theory]
-    [InlineData(BattleSideEnum.Attacker, false)]
-    [InlineData(BattleSideEnum.Defender, true)]
+    [InlineData(BattleSideEnum.Attacker, false, false, false)]
+    [InlineData(BattleSideEnum.Defender, true, false, false)]
+    [InlineData(BattleSideEnum.Attacker, false, true, true)]
+    [InlineData(BattleSideEnum.Attacker, true, true, false)]
     public void AttackMissionStart_NonInitiatingClientInitializesJoinedPlayerEncounter(
-        BattleSideEnum localSide, bool startWithStaleBattle)
+        BattleSideEnum localSide, bool startWithStaleBattle, bool isHideout, bool isDirectAssault)
     {
         var staleMapEvent = startWithStaleBattle ? CreateServerMapEvent() : null;
         var mapEvent = CreateServerMapEvent();
@@ -41,17 +44,26 @@ public class BattleMissionStartHandlerTests : MapEventTestBase
         var client = Clients.Last();
         var missionInitializerResolver = new RecordingMissionInitializerResolver();
         var battleLauncher = new Mock<ICoopFieldBattleLauncher>();
+        var hideoutLauncher = new Mock<ICoopHideoutMissionLauncher>();
         MissionInitializerRecord openedInitializer = default;
         battleLauncher.Setup(l => l.OpenCoopFieldBattle(It.IsAny<MissionInitializerRecord>()))
             .Callback<MissionInitializerRecord>(initializer => openedInitializer = initializer)
             .Returns((Mission)null!);
+        hideoutLauncher.Setup(l => l.OpenCoopHideoutMission(It.IsAny<MissionInitializerRecord>(), isDirectAssault))
+            .Callback<MissionInitializerRecord, bool>((initializer, _) => openedInitializer = initializer)
+            .Returns((Mission)null!);
 
         using var launcherScope = client.Container.BeginLifetimeScope(builder =>
-            builder.RegisterInstance(battleLauncher.Object).As<ICoopFieldBattleLauncher>());
+        {
+            builder.RegisterInstance(battleLauncher.Object).As<ICoopFieldBattleLauncher>();
+            builder.RegisterInstance(hideoutLauncher.Object).As<ICoopHideoutMissionLauncher>();
+        });
 
         client.Call(() =>
         {
             Assert.True(client.ObjectManager.TryGetObject<MapEvent>(mapEvent.MapEventId, out var clientBattle));
+            if (isHideout)
+                clientBattle._mapEventType = MapEvent.BattleTypes.Hideout;
             Assert.True(client.ObjectManager.TryGetObject<MobileParty>(nonInitiatingPartyId, out var localParty));
             var previousMainParty = Campaign.Current.MainParty;
             Campaign.Current.MainParty = localParty;
@@ -91,7 +103,8 @@ public class BattleMissionStartHandlerTests : MapEventTestBase
                     PatchEncounterDir = new Vec2(1f, 0f),
                 };
                 messageBroker.Publish(this, new NetworkStartAttackMission(
-                    mapEvent.MapEventId, missionInitializer, mapEvent.AttackerPartyId));
+                    mapEvent.MapEventId, missionInitializer, mapEvent.AttackerPartyId,
+                    isHideout, isDirectAssault));
 
                 Assert.Equal(0, missionInitializerResolver.CallCount);
                 GameThread.Instance.Update(TimeSpan.FromMilliseconds(16));
@@ -121,7 +134,11 @@ public class BattleMissionStartHandlerTests : MapEventTestBase
                     Assert.NotSame(staleEncounter, PlayerEncounter.Current);
                 Assert.NotNull(new SandboxBattleInitializationModel().GetAllAvailableTroopTypes());
                 battleLauncher.Verify(
-                    l => l.OpenCoopFieldBattle(It.IsAny<MissionInitializerRecord>()), Times.Once);
+                    l => l.OpenCoopFieldBattle(It.IsAny<MissionInitializerRecord>()),
+                    isHideout ? Times.Never() : Times.Once());
+                hideoutLauncher.Verify(
+                    l => l.OpenCoopHideoutMission(It.IsAny<MissionInitializerRecord>(), isDirectAssault),
+                    isHideout ? Times.Once() : Times.Never());
                 Assert.False(BattleSpawnGate.IsCoopBattleActive);
             }
             finally

@@ -77,6 +77,8 @@ internal class MapEventRegistry : AutoRegistryBase<MapEvent>
 
         bool localBattleSimulationWasInvolved = PlayerEncounter.Current?.BattleSimulation?.MapEvent == obj;
         bool localPartyWasInvolved = IsLocalPartyInMapEvent(obj);
+        bool hasHideoutResults = obj.IsHideoutBattle && localPartyWasInvolved && PlayerEncounter.Current != null &&
+            MapEventInitializationBarrier.IsBattleResultEncounter(PlayerEncounter.Current);
         if (localPartyWasInvolved) CaptureMainPartyBattleRewards(obj);
         var preservedParty = localPartyWasInvolved &&
             (IsBattlePresentationActive() || localBattleSimulationWasInvolved)
@@ -89,7 +91,9 @@ internal class MapEventRegistry : AutoRegistryBase<MapEvent>
             return;
         }
 
-        CloseDestroyedMapEventEncounterIfNeeded(id, localPartyWasInvolved);
+        // A player who already left the mission still needs to collect the server's staged loot.
+        if (!hasHideoutResults)
+            CloseDestroyedMapEventEncounterIfNeeded(id, localPartyWasInvolved);
     }
 
     private void CaptureMainPartyBattleRewards(MapEvent mapEvent)
