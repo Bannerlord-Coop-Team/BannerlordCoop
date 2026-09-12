@@ -62,13 +62,13 @@ public class CallOriginalPolicyTests
             Assert.True(CallOriginalPolicy.AreOriginalsAllowedForCurrentOperation);
             Assert.True(CallOriginalPolicy.IsOriginalAllowed());
 
-            bool isAllowedOnOtherThread = true;
-            var thread = new Thread(() =>
-                isAllowedOnOtherThread = CallOriginalPolicy.AreOriginalsAllowedForCurrentOperation);
-            thread.Start();
-            thread.Join();
+            bool originalsAllowedOnWorkerThread = true;
+            var workerThread = new Thread(() =>
+                originalsAllowedOnWorkerThread = CallOriginalPolicy.AreOriginalsAllowedForCurrentOperation);
+            workerThread.Start();
+            workerThread.Join();
 
-            Assert.False(isAllowedOnOtherThread);
+            Assert.False(originalsAllowedOnWorkerThread);
         }
 
         Assert.False(CallOriginalPolicy.AreOriginalsAllowedForCurrentOperation);

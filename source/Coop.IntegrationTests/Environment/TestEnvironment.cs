@@ -7,6 +7,7 @@ using Common.Tests.Utils;
 using Coop.Core.Client;
 using Coop.Core.Server;
 using Coop.Core.Server.Services.Settlements;
+using Coop.Core.Server.Services.Telemetry;
 using Coop.IntegrationTests.Environment.Instance;
 using Coop.IntegrationTests.Environment.Mock;
 using GameInterface;
@@ -86,6 +87,10 @@ public class TestEnvironment
         builder.RegisterType<ServerInstance>().AsSelf();
 
         AddSharedDependencies(builder);
+        builder.RegisterType<MockServerTelemetryUploader>()
+            .As<IServerTelemetryUploader>()
+            .As<IBattlesFoughtUploader>()
+            .SingleInstance();
 
         var container = BuildContainer(builder);
 

@@ -37,6 +37,7 @@ using TaleWorlds.Core;
 using TaleWorlds.Library;
 using TaleWorlds.ScreenSystem;
 using static TaleWorlds.Library.CommandLineFunctionality;
+using Common.Commands;
 
 namespace GameInterface.Services.Villages.Commands;
 
@@ -44,32 +45,49 @@ public class RaidDebugCommands
 {
     private static RaidLootWarningFixture raidLootWarningFixture;
     private static InquiryData pendingLootWarningInquiry;
+    private static CoopCommandResult Succeeded(string output) =>
+        new CoopCommandResult(true, output);
 
-    [CommandLineArgumentFunction("allow_raid_ai_intervention", "coop.debug.mapevent")]
-    public static string AllowRaidAiIntervention(List<string> args)
+    private static CoopCommandResult Failed(string output) =>
+        new CoopCommandResult(false, output, "command_failed");
+
+    public sealed class AllowRaidAiInterventionCoopCommand : ICoopCommand
     {
-        if (args.Count != 1)
-        {
-            return "Usage: coop.debug.mapevent.allow_raid_ai_intervention <on|off|toggle|status>";
-        }
+        public string Prefix => "coop.debug.mapevent";
 
-        var value = args[0].ToLowerInvariant();
-        switch (value)
+        public string Name => "allow_raid_ai_intervention";
+
+        public string Description => "Controls raid ai intervention for co-op debugging.";
+
+        public CoopCommandSide Side => CoopCommandSide.Both;
+
+        public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
-            case "on":
-            case "true":
-            case "1":
-                return ApplyRaidAiInterventionConfig(true);
-            case "off":
-            case "false":
-            case "0":
-                return ApplyRaidAiInterventionConfig(false);
-            case "toggle":
-                return ApplyRaidAiInterventionConfig(!MapEventConfig.AllowRaidAiIntervention);
-            case "status":
-                return RaidAiInterventionConfigHandler.StatusText;
-            default:
-                return "Usage: coop.debug.mapevent.allow_raid_ai_intervention <on|off|toggle|status>";
+            new ExpectedArgs("mode", "The mode."),
+        };
+
+        public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
+        {
+
+            var value = args[0].ToLowerInvariant();
+            switch (value)
+            {
+                case "on":
+                case "true":
+                case "1":
+                    return Succeeded(ApplyRaidAiInterventionConfig(true));
+                case "off":
+                case "false":
+                case "0":
+                    return Succeeded(ApplyRaidAiInterventionConfig(false));
+                case "toggle":
+                    return Succeeded(ApplyRaidAiInterventionConfig(!MapEventConfig.AllowRaidAiIntervention));
+                case "status":
+                    return Succeeded(RaidAiInterventionConfigHandler.StatusText);
+                default:
+                    return Failed("Invalid action. Use on, off, toggle, or status.");
+            }
+
         }
     }
 
@@ -90,7 +108,6 @@ public class RaidDebugCommands
 
         return RaidAiInterventionConfigHandler.StatusText + " (server update requested)";
     }
-
     [CommandLineArgumentFunction("raid_loot_warning_capture", "coop.debug.mapevent")]
     public static string CaptureRaidLootWarningFixture(List<string> args)
     {

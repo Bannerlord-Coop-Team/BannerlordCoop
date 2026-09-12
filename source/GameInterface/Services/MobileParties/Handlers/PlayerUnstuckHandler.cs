@@ -118,6 +118,8 @@ internal class PlayerUnstuckHandler : IHandler
 
     private void TryRequestBugReport(string partyId, NetPeer requester)
     {
+        if (!BugReportConfig.UnstuckCommandReportsEnabled) return;
+
         if (requester == null ||
             !playerManager.TryGetPlayer(requester, out var player) ||
             player.MobilePartyId != partyId)

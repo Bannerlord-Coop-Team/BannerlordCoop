@@ -11,10 +11,12 @@ using HarmonyLib;
 using Serilog;
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Reflection;
 using System.Reflection.Emit;
 using TaleWorlds.CampaignSystem.MapEvents;
 using TaleWorlds.CampaignSystem.Party;
+using TaleWorlds.CampaignSystem.Roster;
 using TaleWorlds.Library;
 
 namespace GameInterface.Services.MapEventSides.Patches;
@@ -143,10 +145,42 @@ internal class MapEventSidePatches
         if (isPlayerParty is null)
             throw new MissingMethodException("Failed to find MobilePartyExtensions.IsPlayerParty(MobileParty)");
 
+        var toTroopRosterElementArray = typeof(Enumerable)
+            .GetMethods(BindingFlags.Public | BindingFlags.Static)
+            .Single(method =>
+                method.Name == nameof(Enumerable.ToArray) &&
+                method.IsGenericMethodDefinition &&
+                method.GetParameters().Length == 1)
+            .MakeGenericMethod(typeof(TroopRosterElement));
+
+        var materializedInstructions = new List<CodeInstruction>();
+        var materializedDeathMarkedHeroes = false;
+        foreach (var instruction in instructions)
+        {
+            materializedInstructions.Add(instruction);
+
+            if (materializedDeathMarkedHeroes ||
+                !(instruction.operand is MethodInfo method) ||
+                method.Name != "WhereQ" ||
+                !method.IsGenericMethod ||
+                method.GetGenericArguments()[0] != typeof(TroopRosterElement)) continue;
+
+            // Killing a companion can refresh this roster cache while vanilla is enumerating it
+            materializedInstructions.Add(new CodeInstruction(OpCodes.Call, toTroopRosterElementArray));
+            materializedDeathMarkedHeroes = true;
+        }
+
+        if (!materializedDeathMarkedHeroes)
+        {
+            throw new Exception(
+                "Failed to patch MapEventSide.HandleMapEventEndForPartyInternal: " +
+                "could not find the death-marked hero query.");
+        }
+
         var matcher = new Queue<CodeInstruction>();
         var patched = false;
 
-        foreach (var instruction in instructions)
+        foreach (var instruction in materializedInstructions)
         {
             matcher.Enqueue(instruction);
 

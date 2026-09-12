@@ -74,6 +74,9 @@ namespace Coop.IntegrationTests.Serialization
                 SmithingStaminaRecoveryMultiplier = 2.5f,
                 MaximumLootersMultiplier = 0.25f,
                 LooterPartySizeMultiplier = 0.33f,
+                EnableHeroExecutions = false,
+                EnablePlayerClanMemberExecutions = true,
+                EnablePlayerExecutions = true,
                 ShowPlayerNameplates = true,
                 PlayerWoundedBattleEntry = false,
             });
@@ -90,6 +93,9 @@ namespace Coop.IntegrationTests.Serialization
             Assert.Equal(2.5f, copy.SmithingStaminaRecoveryMultiplier);
             Assert.Equal(0.25f, copy.MaximumLootersMultiplier);
             Assert.Equal(0.33f, copy.LooterPartySizeMultiplier);
+            Assert.False(copy.EnableHeroExecutions);
+            Assert.True(copy.EnablePlayerClanMemberExecutions);
+            Assert.True(copy.EnablePlayerExecutions);
             Assert.False(copy.PlayerWoundedBattleEntry);
 
             // Keys the operator left absent still resolve to the documented defaults, not to zero.
@@ -116,6 +122,9 @@ namespace Coop.IntegrationTests.Serialization
             SmithingStaminaRecoveryMultiplier = 0f,
             MaximumLootersMultiplier = 0f,
             LooterPartySizeMultiplier = 0f,
+            EnableHeroExecutions = false,
+            EnablePlayerClanMemberExecutions = false,
+            EnablePlayerExecutions = false,
             ShowPlayerNameplates = false,
             PlayerWoundedBattleEntry = false,
         });
@@ -137,6 +146,9 @@ namespace Coop.IntegrationTests.Serialization
             Assert.Equal(0f, copy.SmithingStaminaRecoveryMultiplier);
             Assert.Equal(0f, copy.MaximumLootersMultiplier);
             Assert.Equal(0f, copy.LooterPartySizeMultiplier);
+            Assert.False(copy.EnableHeroExecutions);
+            Assert.False(copy.EnablePlayerClanMemberExecutions);
+            Assert.False(copy.EnablePlayerExecutions);
             Assert.False(copy.ShowPlayerNameplates);
             Assert.False(copy.PlayerWoundedBattleEntry);
         }

@@ -1,19 +1,30 @@
 ﻿using Autofac;
+using Common.Commands;
 using Common.LogicStates;
 using Common.Messaging;
 using Common.Network;
 using Common.Network.Session;
 using Common.PacketHandlers;
 using Coop.Core.Client.Policies;
+using Coop.Core.Client.Services.Discord;
 using Coop.Core.Client.Services.Kingdoms;
 using Coop.Core.Client.Services.MobileParties;
 using Coop.Core.Client.Services.Session;
 using Coop.Core.Client.States;
 using Coop.Core.Common;
 using Coop.Core.Common.Configuration;
+#if DEBUG
+using Coop.Core.Client.Services.Voice;
+using Coop.Core.Common.Commands;
+#endif
 using Coop.Core.Common.Session;
 using Coop.Steam;
 using GameInterface.Policies;
+using GameInterface.Services.Voice;
+using GameInterface.Services.UI.CoopOptions.Providers;
+using GameInterface.Services.UI.CoopOptions;
+using GameInterface.Services.UI.CoopOptions.Providers.VoiceTab;
+using Missions.Services.Voice;
 using LiteNetLib;
 using Missions;
 using System.Runtime.CompilerServices;
@@ -30,7 +41,32 @@ public class ClientModule : CommonModule
         base.Load(builder);
 
         builder.RegisterModule<MissionModule>();
+        builder.RegisterType<VoiceSceneSource>().As<IVoiceSceneSource>().InstancePerDependency();
+        builder.RegisterType<VoiceGameInput>().As<IVoiceGameInput>().InstancePerDependency();
+        builder.RegisterType<VoiceWindowFocus>().As<IVoiceWindowFocus>().InstancePerDependency();
+        builder.RegisterType<CoopKeybindingPopupFactory>().As<ICoopKeybindingPopupFactory>().InstancePerDependency();
+        builder.RegisterType<CoopOptionsKeybinding>().As<ICoopOptionsKeybinding>().InstancePerDependency();
+        builder.RegisterType<OpusVoiceCodecFactory>().As<IVoiceCodecFactory>().InstancePerDependency();
+        builder.RegisterType<WindowsVoiceDeviceFactory>().As<IVoiceDeviceFactory>().InstancePerDependency();
+        builder.RegisterType<WindowsVoiceCaptureFactory>().As<IVoiceCaptureFactory>().InstancePerDependency();
+        builder.RegisterType<VoiceAudio>().As<IVoiceAudio>().InstancePerLifetimeScope();
+        builder.RegisterType<VoiceClient>().As<IVoiceClient>()
+#if DEBUG
+            .As<IVoiceSyntheticTest>()
+#endif
+            .InstancePerLifetimeScope();
+        builder.RegisterType<VoiceSpeakerNameResolver>().As<IVoiceSpeakerNameResolver>().InstancePerDependency();
+        builder.RegisterType<VoiceSpeakingOverlay>().As<IVoiceSpeakingOverlay>().InstancePerLifetimeScope();
+        builder.RegisterType<VoiceOptionsTabProvider>().As<ICoopOptionsTabProvider>().InstancePerDependency();
 
+#if DEBUG
+        builder.RegisterType<VoiceSyntheticTestCommand>().As<ICoopCommand>().InstancePerDependency();
+        builder.RegisterType<JoinDebugCommands.JoinStateCoopCommand>().As<ICoopCommand>().InstancePerDependency();
+        builder.RegisterType<JoinDebugCommands.ArmInactivePartyDeficitCoopCommand>().As<ICoopCommand>().InstancePerDependency();
+        builder.RegisterType<JoinDebugCommands.DisconnectCoopCommand>().As<ICoopCommand>().InstancePerDependency();
+#endif
+
+        builder.RegisterModule<DiscordPresenceModule>();
         builder.RegisterType<ClientContext>().AsSelf().InstancePerLifetimeScope();
         builder.RegisterType<ClientLogic>().As<ILogic>().As<IClientLogic>().InstancePerLifetimeScope();
         builder.RegisterType<CoopClient>().As<ICoopClient>().As<INetwork>().As<IRelayNetwork>().As<INetEventListener>().InstancePerLifetimeScope();

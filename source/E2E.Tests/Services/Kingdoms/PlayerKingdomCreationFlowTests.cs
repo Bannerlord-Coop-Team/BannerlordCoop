@@ -1,4 +1,5 @@
 ﻿using Common;
+using Common.Commands;
 using Common.Network;
 using Common.Messaging;
 using Common.Util;
@@ -151,8 +152,10 @@ public class PlayerKingdomCreationFlowTests : IDisposable
         string output = null;
         Server.Call(() =>
         {
-            output = KingdomDebugCommand.CreateKingdomCommand(
-                new List<string> { player.HeroId, "Real", "Kingdom" });
+            output = ExecuteCommand(
+                new KingdomDebugCommand.KingdomCreateCoopCommand(),
+                player.HeroId,
+                KingdomName);
         });
 
         Assert.StartsWith("Created kingdom", output);
@@ -185,8 +188,10 @@ public class PlayerKingdomCreationFlowTests : IDisposable
         string output = null;
         client.Call(() =>
         {
-            output = KingdomDebugCommand.CreateKingdomCommand(
-                new List<string> { player.HeroId, "Real", "Kingdom" });
+            output = ExecuteCommand(
+                new KingdomDebugCommand.KingdomCreateCoopCommand(),
+                player.HeroId,
+                KingdomName);
         });
 
         Assert.Equal("This command can only be run on the server.", output);
@@ -215,8 +220,10 @@ public class PlayerKingdomCreationFlowTests : IDisposable
         string output = null;
         Server.Call(() =>
         {
-            output = KingdomDebugCommand.CreateKingdomCommand(
-                new List<string> { followerId, "Real", "Kingdom" });
+            output = ExecuteCommand(
+                new KingdomDebugCommand.KingdomCreateCoopCommand(),
+                followerId,
+                KingdomName);
         });
 
         Assert.Contains("does not lead clan", output);
@@ -234,7 +241,10 @@ public class PlayerKingdomCreationFlowTests : IDisposable
 
         Server.Call(() =>
         {
-            var result = KingdomDebugCommand.ForcePlayerJoinKingdom(new List<string> { ControllerId, kingdomId });
+            string result = ExecuteCommand(
+                new KingdomDebugCommand.KingdomForcePlayerJoinCoopCommand(),
+                ControllerId,
+                kingdomId);
 
             Assert.Contains("Forced player", result);
             Assert.True(Server.ObjectManager.TryGetObject<Kingdom>(kingdomId, out var kingdom));
@@ -580,7 +590,10 @@ public class PlayerKingdomCreationFlowTests : IDisposable
 
         Server.Call(() =>
         {
-            var result = KingdomDebugCommand.ForcePlayerJoinKingdom(new List<string> { ControllerId, newKingdomId });
+            string result = ExecuteCommand(
+                new KingdomDebugCommand.KingdomForcePlayerJoinCoopCommand(),
+                ControllerId,
+                newKingdomId);
 
             Assert.Contains("Forced player", result);
             Assert.True(Server.ObjectManager.TryGetObject<Kingdom>(previousKingdomId, out var previousKingdom));
@@ -2705,7 +2718,9 @@ public class PlayerKingdomCreationFlowTests : IDisposable
         string output = null;
         client2.Call(() =>
         {
-            output = KingdomDebugCommand.ListKingdomDecisionVotes(new List<string> { kingdomId });
+            output = ExecuteCommand(
+                new KingdomDebugCommand.KingdomDecisionsCoopCommand(),
+                kingdomId);
         });
 
         Assert.Contains("DeclareWarDecision", output);
@@ -2970,6 +2985,9 @@ public class PlayerKingdomCreationFlowTests : IDisposable
     {
         var client1 = Clients.First();
         var client2 = Clients.Skip(1).First();
+        DecisionItemBaseVM submittedDecisionItem = null;
+        KingdomDecisionsVM retryDecisionsVm = null;
+        DecisionItemBaseVM retryDecisionItem = null;
         client1.Resolve<IControllerIdProvider>().SetControllerId(ControllerId);
         client2.Resolve<IControllerIdProvider>().SetControllerId(SecondControllerId);
         var player1 = CreateSyncedPlayerContext(ControllerId, client1);
@@ -3015,6 +3033,7 @@ public class PlayerKingdomCreationFlowTests : IDisposable
             decisionsVm.RefreshWith(decision);
 
             var decisionItem = Assert.IsType<PolicyDecisionItemVM>(decisionsVm.CurrentDecision);
+            submittedDecisionItem = decisionItem;
             DecisionOptionVM option = decisionItem.DecisionOptionsList.Single(candidate =>
                 candidate.Option is KingdomPolicyDecision.PolicyDecisionOutcome outcome &&
                 outcome.ShouldDecisionBeEnforced);
@@ -3027,8 +3046,12 @@ public class PlayerKingdomCreationFlowTests : IDisposable
             Assert.True(decisionItem.IsActive);
             Assert.True(decisionItem._finalSelectionDone);
             Assert.Equal(decisionDescription, decisionItem.DescriptionText);
-            Assert.Contains("Vote submitted", GetVoteManager(client2).RefreshDecisionWaitingStatus(decisionItem));
         });
+
+        client2.Call(() =>
+            Assert.Contains(
+                "Vote submitted",
+                GetVoteManager(client2).RefreshDecisionWaitingStatus(submittedDecisionItem)));
 
         client1.Call(() =>
         {
@@ -3038,6 +3061,8 @@ public class PlayerKingdomCreationFlowTests : IDisposable
             decisionsVm.RefreshWith(decision);
 
             var decisionItem = Assert.IsType<PolicyDecisionItemVM>(decisionsVm.CurrentDecision);
+            retryDecisionsVm = decisionsVm;
+            retryDecisionItem = decisionItem;
             DecisionOptionVM option = decisionItem.DecisionOptionsList.Single(candidate =>
                 candidate.Option is KingdomPolicyDecision.PolicyDecisionOutcome outcome &&
                 outcome.ShouldDecisionBeEnforced);
@@ -3054,9 +3079,12 @@ public class PlayerKingdomCreationFlowTests : IDisposable
 
             RestoreReverseObjectManagerId(client1, kingdom, kingdomId);
             decisionItem.ExecuteFinalSelection();
+        });
 
-            Assert.Null(decisionsVm.CurrentDecision);
-            Assert.False(decisionItem.IsActive);
+        client1.Call(() =>
+        {
+            Assert.Null(retryDecisionsVm.CurrentDecision);
+            Assert.False(retryDecisionItem.IsActive);
         });
 
         Assert.Single(client1.NetworkSentMessages.GetMessages<NetworkRequestKingdomDecisionVote>());
@@ -4268,4 +4296,9 @@ public class PlayerKingdomCreationFlowTests : IDisposable
         string PartyId,
         string CharacterId,
         string CultureId);
+
+    private static string ExecuteCommand(ICoopCommand command, params string[] args)
+    {
+        return command.ProcessCommand(new CoopCommandArgsFactory().FromValues(args)).Output;
+    }
 }

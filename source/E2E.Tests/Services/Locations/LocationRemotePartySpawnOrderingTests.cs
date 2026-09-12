@@ -31,37 +31,34 @@ public class LocationRemotePartySpawnOrderingTests
 
         bool registered = false;
         bool resolvedDuringReplay = false;
-        Thread spawnThread = null;
         int previousGameThreadId = GameThread.Instance.GameThreadId;
+        GameThread.Instance.DiscardQueuedActions();
         GameThread.Instance.MarkGameThread();
         try
         {
-            spawnThread = new Thread(() => GameThread.RunSafe(() =>
+            var producerThread = new Thread(() =>
             {
-                registered = partyPuppetRegistrar.TrySpawnAndRegister(
-                    () => remotePuppet,
-                    registry,
-                    "remote",
-                    agentId,
-                    out _);
-            }, blocking: true));
-            spawnThread.Start();
-            Assert.True(SpinWait.SpinUntil(
-                () => GameThread.Instance.QueueLength == 1,
-                TimeSpan.FromSeconds(2)));
-
-            var replayThread = new Thread(() => GameThread.RunSafe(() =>
-            {
-                resolvedDuringReplay = LocationNpcGate.IsPlayerPartyAgent(remotePuppet);
-            }));
-            replayThread.Start();
-            replayThread.Join();
-            Assert.True(SpinWait.SpinUntil(
-                () => GameThread.Instance.QueueLength == 2,
-                TimeSpan.FromSeconds(2)));
+                GameThread.RunSafe(() =>
+                {
+                    registered = partyPuppetRegistrar.TrySpawnAndRegister(
+                        () => remotePuppet,
+                        registry,
+                        "remote",
+                        agentId,
+                        out _);
+                });
+                GameThread.RunSafe(() =>
+                {
+                    resolvedDuringReplay = LocationNpcGate.IsPlayerPartyAgent(remotePuppet);
+                });
+            });
+            producerThread.Start();
+            Assert.True(
+                producerThread.Join(GameThread.BlockingTimeout),
+                "the producer should enqueue both actions without blocking");
+            Assert.Equal(2, GameThread.Instance.QueueLength);
 
             GameThread.Instance.Update(TimeSpan.Zero);
-            spawnThread.Join();
 
             Assert.True(registered);
             Assert.True(resolvedDuringReplay);
@@ -70,7 +67,6 @@ public class LocationRemotePartySpawnOrderingTests
         {
             if (GameThread.Instance.QueueLength > 0)
                 GameThread.Instance.Update(TimeSpan.Zero);
-            spawnThread?.Join(TimeSpan.FromSeconds(1));
             GameThread.Instance.DiscardQueuedActions();
             GameThread.Instance.RestoreGameThread(previousGameThreadId);
             LocationNpcGate.EndMission();
