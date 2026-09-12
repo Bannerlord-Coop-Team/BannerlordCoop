@@ -86,12 +86,13 @@ internal class GenericQuestTypeAlternativeAcceptTriggerPatch
 internal class GenericQuestTypeAlternativeSolutionOwnershipGatePatch
 {
     [HarmonyPrefix]
-    private static bool Prefix(IssueBase __instance)
+    internal static bool Prefix(IssueBase __instance)
     {
         if (QuestTypeRegistry.Get(__instance)?.SupportsAlternativeAccept != true) return true;
 
         return (ContainerProvider.TryResolve<IIssueOwnershipRegistry>(out var ownershipRegistry) && ownershipRegistry.IsLocalPeerOwner(__instance.IssueOwner))
-            || AlternativeSolutionCompletionAuthorityGuard.IsActive;
+            || AlternativeSolutionCompletionAuthorityGuard.IsActive
+            || CallOriginalPolicy.IsOriginalAllowedForOwnershipGate();
     }
 }
 

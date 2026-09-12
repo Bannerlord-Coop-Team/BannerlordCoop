@@ -3,6 +3,7 @@ using Common.Util;
 using GameInterface.Policies;
 using GameInterface.Services.Entity;
 using GameInterface.Services.Issues.Generic;
+using GameInterface.Services.Issues.Generic.Dispatch;
 using GameInterface.Services.Issues.Generic.Migrated.GangLeaderNeedsToOffloadStolenGoods;
 using GameInterface.Services.Issues.Messages;
 using HarmonyLib;
@@ -15,11 +16,18 @@ using Xunit;
 
 namespace GameInterface.Tests.Services.Issues;
 
+using Issue = GangLeaderNeedsToOffloadStolenGoodsIssueBehavior.GangLeaderNeedsToOffloadStolenGoodsIssue;
 using Quest = GangLeaderNeedsToOffloadStolenGoodsIssueBehavior.GangLeaderNeedsToOffloadStolenGoodsIssueQuest;
 
 public class GangLeaderNeedsToOffloadStolenGoodsGateBypassTests : IDisposable
 {
     private static readonly FieldInfo QuestGiverField = AccessTools.Field(typeof(QuestBase), "_questGiver");
+    private static readonly FieldInfo IssueOwnerField = AccessTools.Field(typeof(IssueBase), "_issueOwner");
+
+    public GangLeaderNeedsToOffloadStolenGoodsGateBypassTests()
+    {
+        _ = GangLeaderNeedsToOffloadStolenGoodsQuestType.AlternativeSolutionFreeze;
+    }
 
     public void Dispose()
     {
@@ -33,6 +41,13 @@ public class GangLeaderNeedsToOffloadStolenGoodsGateBypassTests : IDisposable
         var quest = ObjectHelper.SkipConstructor<Quest>();
         QuestGiverField.SetValue(quest, giver);
         return quest;
+    }
+
+    private static Issue NewIssueFor(Hero owner)
+    {
+        var issue = ObjectHelper.SkipConstructor<Issue>();
+        IssueOwnerField.SetValue(issue, owner);
+        return issue;
     }
 
     private static void SetUpNonOwningPeer(Hero giver, string recordedOwnerControllerId, string localControllerId)
@@ -64,6 +79,22 @@ public class GangLeaderNeedsToOffloadStolenGoodsGateBypassTests : IDisposable
         using (new AllowedThread())
         {
             result = GangLeaderNeedsToOffloadStolenGoodsQuestType.BlockAndReportTerminalOutcome(quest, IssueFinalizeReason.QuestFail);
+        }
+
+        Assert.False(result);
+    }
+
+    [Fact]
+    public void AlternativeSolutionCompletionGate_AnOpenAllowedThreadNeverOverridesAResolvedNonOwner()
+    {
+        var owner = NewHero();
+        SetUpNonOwningPeer(owner, "player-A", "player-B");
+        var issue = NewIssueFor(owner);
+
+        bool result;
+        using (new AllowedThread())
+        {
+            result = GenericQuestTypeAlternativeSolutionOwnershipGatePatch.Prefix(issue);
         }
 
         Assert.False(result);

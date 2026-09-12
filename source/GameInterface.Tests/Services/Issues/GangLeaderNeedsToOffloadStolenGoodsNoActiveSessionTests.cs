@@ -55,6 +55,16 @@ public class GangLeaderNeedsToOffloadStolenGoodsNoActiveSessionTests : IDisposab
     }
 
     [Fact]
+    public void AlternativeSolutionCompletionGate_WithNoActiveCoopSession_LetsTheRealCompletionRunInstead()
+    {
+        ContainerProvider.SetContainer(new ContainerBuilder().Build());
+
+        var result = GenericQuestTypeAlternativeSolutionOwnershipGatePatch.Prefix(NewIssue());
+
+        Assert.True(result);
+    }
+
+    [Fact]
     public void GangLeaderOwnershipGate_WithNoActiveCoopSession_LetsTheRealSuccessMethodRunInstead()
     {
         ContainerProvider.SetContainer(new ContainerBuilder().Build());
