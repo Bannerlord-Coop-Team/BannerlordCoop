@@ -24,7 +24,8 @@ public interface IRunOrchestrator
 public sealed record InstanceView(string Name, InstanceIdentity Identity, bool ProcessAlive,
     [property: JsonIgnore(Condition = JsonIgnoreCondition.Never)] JsonElement? Status,
     [property: JsonIgnore(Condition = JsonIgnoreCondition.Never)] LiveTestError? Error,
-    [property: JsonIgnore(Condition = JsonIgnoreCondition.Never)] bool? ProcessTreeAlive, bool CleanupComplete);
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.Never)] bool? ProcessTreeAlive, bool CleanupComplete,
+    StartupPopupView StartupPopup = null);
 public sealed record RunView(string RunId, string Profile, string ArtifactDirectory, string State,
     [property: JsonIgnore(Condition = JsonIgnoreCondition.Never)] string? Error, InstanceView[] Instances,
     PreflightReport Preflight, IReadOnlyDictionary<int, string> ClientAttempts,
@@ -34,7 +35,7 @@ public sealed record ClientLaunchView(string Outcome, string Instance, RunView R
     [property: JsonIgnore(Condition = JsonIgnoreCondition.Never)] PreflightReport? Preflight);
 #nullable restore annotations
 
-public sealed class RunOrchestrator : IRunOrchestrator, IDeploymentRunGuard
+public sealed partial class RunOrchestrator : IRunOrchestrator, IDeploymentRunGuard
 {
     private readonly CoopMcpServerSettings settings;
     private readonly IGameProcessLauncher launcher;
@@ -59,6 +60,8 @@ public sealed class RunOrchestrator : IRunOrchestrator, IDeploymentRunGuard
         public string ArchivedLogPath;
         public bool Stopped;
         public bool CleanupComplete;
+        public StartupPopupView StartupPopup;
+        public bool StartupPopupActionAttempted;
     }
 
     private sealed class Run
@@ -247,11 +250,14 @@ public sealed class RunOrchestrator : IRunOrchestrator, IDeploymentRunGuard
             {
                 await RefreshAsync(run, target, timeout.Token);
                 reached = Matches(target, state);
+                if (reached && state == "readyForCampaignTests" && target.Identity.Role == "client")
+                    await TryDismissStartupPopupAsync(run, target, timeout.Token);
                 if (reached || !Alive(target)) break;
                 await Task.Delay(500, timeout.Token);
             } while (true);
         }
         catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested) { deadlineExpired = true; }
+        Save(run);
         return new { reached, state, outcome = reached ? "reached" : !Alive(target) ? "process_exited" : deadlineExpired ? "deadline_expired" : "not_ready",
             deadlineExpired, lastError = target.Error, instance = View(target) };
     }
@@ -295,22 +301,27 @@ public sealed class RunOrchestrator : IRunOrchestrator, IDeploymentRunGuard
                     return LocalFailure(target, "ui_capability_unavailable", "Loaded bridge lacks bounded-ui-layers-v1; no UI request was sent.");
             }
             var response = await pipe.SendAsync(target.Identity, method, parameters, mutation, cancellationToken);
-            // Write each result before returning it so uncertain mutations remain inspectable after MCP disconnects.
-            try
-            {
-                File.WriteAllText(Path.Combine(run.Directory, instance + "-" + response.Id + ".json"),
-                    LiveTestProtocol.SerializeResponse(response));
-            }
-            catch (Exception exception) when (exception is IOException || exception is UnauthorizedAccessException)
-            {
-                var failure = LiveTestResponse.Failure(response.Id, response.Process,
-                    new LiveTestError("artifact_write_failed", exception.Message, mutation || (response.Error?.OutcomeUncertain ?? false)));
-                failure.Result = new { bridgeResponse = response };
-                return failure;
-            }
-            return response;
+            return RecordResponse(run, target, response, mutation);
         }
         finally { target.Gate.Release(); }
+    }
+
+    private LiveTestResponse RecordResponse(Run run, Instance target, LiveTestResponse response, bool mutation)
+    {
+        // Write each result before returning it so uncertain mutations remain inspectable after MCP disconnects.
+        try
+        {
+            File.WriteAllText(Path.Combine(run.Directory, target.Name + "-" + response.Id + ".json"),
+                LiveTestProtocol.SerializeResponse(response));
+        }
+        catch (Exception exception) when (exception is IOException || exception is UnauthorizedAccessException)
+        {
+            var failure = LiveTestResponse.Failure(response.Id, response.Process,
+                new LiveTestError("artifact_write_failed", exception.Message, mutation || (response.Error?.OutcomeUncertain ?? false)));
+            failure.Result = new { bridgeResponse = response };
+            return failure;
+        }
+        return response;
     }
 
     public async Task<LogChunk> ReadLogsAsync(string runId, string instance, string cursor, int maxBytes, CancellationToken cancellationToken)
@@ -485,7 +496,7 @@ public sealed class RunOrchestrator : IRunOrchestrator, IDeploymentRunGuard
     private InstanceView View(Instance i)
     {
         bool? treeAlive = TreeAlive(i);
-        return new(i.Name, i.Identity, Alive(i), i.Status, i.Error, treeAlive, i.CleanupComplete);
+        return new(i.Name, i.Identity, Alive(i), i.Status, i.Error, treeAlive, i.CleanupComplete, i.StartupPopup);
     }
     private RunView View(Run run) => new(run.Id, run.Profile, run.Directory, run.State, run.Error, Instances(run).Select(View).ToArray(), run.Preflight, new Dictionary<int, string>(run.ClientAttempts), run.RequestedSave, new Dictionary<int, LiveTestError>(run.ClientLaunchErrors));
     private void Save(Run run)
