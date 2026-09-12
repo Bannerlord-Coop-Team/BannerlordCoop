@@ -3,6 +3,10 @@ using System.Collections.Generic;
 using System.Linq;
 using Common.Messaging;
 using E2E.Tests.Environment.MockEngine;
+using E2E.Tests.Environment.Extensions;
+using Missions.Agents.Packets;
+using Missions.Services.Network;
+using AgentData = Missions.Agents.Packets.AgentData;
 using GameInterface.Services.MapEvents;
 using GameInterface.Services.MapEvents.Patches;
 using GameInterface.Services.MapEvents.TroopSupply;
@@ -87,18 +91,24 @@ public class BattleAgentRenderCapTests : MissionTestEnvironment
         => (IPuppetSpawner)AccessTools.Field(typeof(CoopBattleController), "puppetSpawner").GetValue(controller);
 
     [Theory]
-    [InlineData(true)]
-    [InlineData(false)]
-    public void FormerHostRecord_BufferedBeforeMigration_DrainsUnderCurrentAuthority(bool promotedHost)
+    [InlineData(true, 1, false)]
+    [InlineData(false, 1, false)]
+    [InlineData(true, 2, false)]
+    [InlineData(false, 2, false)]
+    [InlineData(true, 2, true)]
+    [InlineData(false, 2, true)]
+    public void FormerHostRecord_BufferedBeforeMigration_DrainsUnderCurrentAuthority(
+        bool promotedHost, int transfers, bool startsAsNonHost)
     {
         using var fixture = new MissionEngineFixture();
         var (mapEventId, partyIds) = SetupCoopBattle("A", "B", "C");
+        string finalHost = transfers == 1 ? "B" : "D";
         var receiver = promotedHost ? Clients.Skip(1).First() : Clients.First();
-        if (!promotedHost)
-            SetControllerId(receiver, "observer");
+        SetControllerId(receiver, promotedHost ? finalHost : "observer");
 
         var characterId = CreateRegisteredObject<CharacterObject>();
         var agentId = Guid.NewGuid();
+        var mountId = Guid.NewGuid();
 
         try
         {
@@ -110,7 +120,7 @@ public class BattleAgentRenderCapTests : MissionTestEnvironment
                 var hosts = receiver.Resolve<IBattleHostRegistry>();
 
                 controller.Session.TryBegin(mapEventId);
-                hosts.Set(mapEventId, new BattleHostAssignment("A", new[] { "B" }, epoch: 1));
+                hosts.Set(mapEventId, new BattleHostAssignment(startsAsNonHost ? "B" : "A", new[] { "B" }, epoch: 1));
                 BattleSpawnGate.BeginBattle(mapEventId);
 
                 Assert.True(receiver.ObjectManager.TryGetObject<MobileParty>(partyIds[2], out var npcParty));
@@ -130,32 +140,68 @@ public class BattleAgentRenderCapTests : MissionTestEnvironment
                     new Equipment(),
                     new BodyProperties(),
                     new MissionEquipmentData(new()),
-                    authorityRevision: 0);
+                    mountAgentId: mountId,
+                    authorityRevision: 4,
+                    mountAuthorityRevision: 9);
 
-                receiver.Resolve<IMessageBroker>().Publish(this, new NetworkSpawnBattleAgents(new[] { record }));
+                receiver.Resolve<IMessageBroker>().Publish(this, new NetworkSpawnBattleAgents(new[] { record, record }));
                 Assert.False(registry.TryGetAgentInfo(agentId, out _));
 
                 receiver.Resolve<IMessageBroker>().Publish(this, new MissionPeerDisconnected("A", mapEventId));
+                if (!startsAsNonHost)
+                    receiver.Resolve<IMessageBroker>().Publish(
+                        this,
+                        new NetworkBattleHostAssigned(mapEventId, "B", Array.Empty<string>(), epoch: 2));
+                if (transfers == 2)
+                {
+                    receiver.Resolve<IMessageBroker>().Publish(this, new MissionPeerDisconnected("B", mapEventId));
+                    receiver.Resolve<IMessageBroker>().Publish(
+                        this, new NetworkBattleHostAssigned(mapEventId, "D", Array.Empty<string>(), epoch: 3));
+                }
                 receiver.Resolve<IMessageBroker>().Publish(
-                    this,
-                    new NetworkBattleHostAssigned(mapEventId, "B", Array.Empty<string>(), epoch: 2));
+                    this, new BattleHostMigrated(mapEventId, transfers == 1 ? "A" : "B", finalHost));
                 receiver.Resolve<IMessageBroker>().Publish(
                     this,
                     new NetworkMissionPeerEntered("A", mapEventId));
 
-                DeleteAgents(mock, 1);
+                DeleteAgents(mock, 2);
+                mock.SpawnMounted = true;
                 GetPuppetSpawner(controller).DrainPendingPuppets();
 
                 Assert.True(registry.TryGetAgentInfo(agentId, out var info));
-                Assert.Equal("B", info.CurrentAuthority);
-                Assert.Equal(1, info.AuthorityRevision);
+                Assert.Equal(finalHost, info.CurrentAuthority);
+                Assert.Equal(4 + transfers, info.AuthorityRevision);
+                Assert.True(registry.TryGetAgentInfo(mountId, out var mountInfo));
+                Assert.Equal(finalHost, mountInfo.CurrentAuthority);
+                Assert.Equal(9 + transfers, mountInfo.AuthorityRevision);
                 Assert.Equal(
                     promotedHost ? AgentControllerType.AI : AgentControllerType.None,
                     info.Agent.Controller);
+                if (!promotedHost)
+                {
+                    var peer = NetPeerExtensions.CreatePeer(12);
+                    receiver.Resolve<IMessageBroker>().Publish(this, new NetworkMissionPeerEntered(finalHost, mapEventId));
+                    receiver.Resolve<IMissionContext>().MapPeer(finalHost, peer);
+                    Assert.True(AgentMirror.TryGet(info.Agent, out var riderMirror));
+                    Assert.True(AgentMirror.TryGet(mountInfo.Agent, out var mountMirror));
+                    riderMirror.MovementDirection = new Vec2(1f, 0f);
+                    mountMirror.MovementDirection = new Vec2(1f, 0f);
+                    var riderPacket = new MovementPacket(new[] { agentId }, new[] { new AgentData(info.Agent) },
+                        finalHost, new[] { 4L + transfers });
+                    var mountPacket = new MountMovementPacket(new[] { mountId },
+                        new[] { new AgentMountData(mountInfo.Agent, mountId) }, finalHost, new[] { 9L + transfers });
+                    riderMirror.MovementDirection = Vec2.Zero;
+                    mountMirror.MovementDirection = Vec2.Zero;
+                    receiver.SimulatePacket(peer, riderPacket);
+                    receiver.SimulatePacket(peer, mountPacket);
+                    Assert.Equal(new Vec2(1f, 0f), riderMirror.MovementDirection);
+                    Assert.Equal(new Vec2(1f, 0f), mountMirror.MovementDirection);
+                }
 
                 // Re-entry clears the departure state, but the buffered old-host NPC record above stays retained.
                 // A fresh record for the returning player's own party stays under that player at revision 0.
                 DeleteAgents(mock, 1);
+                mock.SpawnMounted = false;
 
                 Assert.True(receiver.ObjectManager.TryGetObject<MobileParty>(partyIds[0], out var returningParty));
                 var returningMapEventParty = returningParty.MapEvent.AttackerSide.Parties.Single(

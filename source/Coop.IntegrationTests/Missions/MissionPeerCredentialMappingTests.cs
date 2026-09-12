@@ -854,6 +854,7 @@ public class MissionPeerCredentialMappingTests
     private sealed class Fixture : IDisposable
     {
         private readonly TestMessageBroker messageBroker = new();
+        private readonly MissionContext membershipContext;
         private readonly NetManager netManager;
         private int nextPeerId;
 
@@ -884,6 +885,9 @@ public class MissionPeerCredentialMappingTests
                 });
             var controllerIdProvider = new Mock<IControllerIdProvider>();
             controllerIdProvider.SetupGet(provider => provider.ControllerId).Returns(controllerId);
+            membershipContext = new MissionContext(messageBroker, controllerIdProvider.Object);
+            MissionContext.SetupGet(context => context.ControllersInMission)
+                .Returns(() => membershipContext.ControllersInMission);
             if (authenticatedSteamId != 0)
             {
                 ulong resolvedSteamId = authenticatedSteamId;
@@ -1035,7 +1039,11 @@ public class MissionPeerCredentialMappingTests
             }
         }
 
-        public void Dispose() => Client.Dispose();
+        public void Dispose()
+        {
+            Client.Dispose();
+            membershipContext.Dispose();
+        }
 
         public void WaitForBufferedPayloads(int expected)
         {

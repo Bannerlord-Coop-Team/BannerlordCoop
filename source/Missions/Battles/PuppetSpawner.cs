@@ -59,8 +59,10 @@ public class PuppetSpawner : IPuppetSpawner
     // agents without that identity later break team ownership and scoreboard attribution.
     private readonly object pendingPuppetLock = new object();
     private readonly List<BattleAgentSpawnData> pendingPuppets = new List<BattleAgentSpawnData>();
+    private readonly Dictionary<Guid, PendingAuthority> pendingAuthorities = new Dictionary<Guid, PendingAuthority>();
     private readonly object withdrawnControllerLock = new object();
     private readonly HashSet<string> withdrawnControllers = new HashSet<string>();
+    private readonly HashSet<string> disconnectedControllers = new HashSet<string>();
     private readonly HashSet<string> withdrawnHostControllers = new HashSet<string>();
     private readonly HashSet<Guid> retainedFormerHostAgentIds = new HashSet<Guid>();
 
@@ -97,6 +99,7 @@ public class PuppetSpawner : IPuppetSpawner
         messageBroker.Subscribe<NetworkMissionPeerEntered>(Handle_PeerEntered);
         messageBroker.Subscribe<MissionPeerLeft>(Handle_PeerLeft);
         messageBroker.Subscribe<MissionPeerDisconnected>(Handle_PeerDisconnected);
+        messageBroker.Subscribe<BattleHostMigrated>(Handle_BattleHostMigrated);
     }
 
     public void Dispose()
@@ -105,6 +108,7 @@ public class PuppetSpawner : IPuppetSpawner
         messageBroker.Unsubscribe<NetworkMissionPeerEntered>(Handle_PeerEntered);
         messageBroker.Unsubscribe<MissionPeerLeft>(Handle_PeerLeft);
         messageBroker.Unsubscribe<MissionPeerDisconnected>(Handle_PeerDisconnected);
+        messageBroker.Unsubscribe<BattleHostMigrated>(Handle_BattleHostMigrated);
     }
 
     // [Peer] Spawn the owner's agents as local puppets, driven by replicated movement.
@@ -163,6 +167,12 @@ public class PuppetSpawner : IPuppetSpawner
             {
                 if (!TrySpawnPuppetNow(data, ref slotsAvailable))
                     lock (pendingPuppetLock) pendingPuppets.Add(data);
+                else
+                    lock (pendingPuppetLock)
+                    {
+                        pendingAuthorities.Remove(data.AgentId);
+                        pendingAuthorities.Remove(data.MountAgentId);
+                    }
             }
             catch (Exception e)
             {
@@ -186,9 +196,16 @@ public class PuppetSpawner : IPuppetSpawner
         if (Mission.Current == null) return true;                       // no mission — drop
         if (IsWithdrawnPlayerParty(data)) return true;                  // stale replay after leave/drop — drop
         if (registry.TryGetAgentInfo(data.AgentId, out _)) return true; // already spawned — dedupe
-        bool isRetainedFormerHostRecord = IsRetainedFormerHostRecord(data);
+        PendingAuthority pendingAuthority;
+        PendingAuthority pendingMountAuthority;
+        lock (pendingPuppetLock)
+        {
+            pendingAuthority = GetPendingAuthority(data.AgentId, data.AuthorityRevision);
+            pendingMountAuthority = GetPendingAuthority(data.MountAgentId, data.MountAuthorityRevision);
+        }
+        bool isRetainedFormerHostRecord = pendingAuthority != null || IsRetainedFormerHostRecord(data);
 
-        bool isOwnAgent = session.IsOwn(data.OwnerControllerId);
+        bool isOwnAgent = session.IsOwn(pendingAuthority?.ControllerId ?? data.OwnerControllerId);
         if (LocalDeploymentBlocksSpawn(isOwnAgent)) return false;
 
         // BR-110: the engine renders at most a fixed number of agents. At capacity the puppet is deferred, not
@@ -302,13 +319,13 @@ public class PuppetSpawner : IPuppetSpawner
         }
 
         bool agentRegistered = registry.TryRegisterAgent(
-            data.OwnerControllerId,
+            pendingAuthority?.ControllerId ?? data.OwnerControllerId,
             data.OriginalOwnerControllerId,
             data.MovementScopeId,
             data.AgentId,
             data.MovementId,
             agent,
-            data.AuthorityRevision);
+            pendingAuthority?.Revision ?? data.AuthorityRevision);
         if (!agentRegistered)
         {
             Logger.Error(
@@ -339,13 +356,13 @@ public class PuppetSpawner : IPuppetSpawner
             if (agent.MountAgent is Agent mount)
             {
                 bool mountRegistered = registry.TryRegisterAgent(
-                    data.OwnerControllerId,
+                    pendingMountAuthority?.ControllerId ?? data.OwnerControllerId,
                     data.MountOriginalOwnerControllerId,
                     data.MountMovementScopeId,
                     data.MountAgentId,
                     data.MountMovementId,
                     mount,
-                    data.MountAuthorityRevision);
+                    pendingMountAuthority?.Revision ?? data.MountAuthorityRevision);
                 if (!mountRegistered)
                 {
                     Logger.Error(
@@ -395,43 +412,101 @@ public class PuppetSpawner : IPuppetSpawner
                 // Re-entry clears current withdrawal, but former-host lineage stays for retained records
                 // that can still drain after the controller returns.
                 withdrawnControllers.Remove(payload.What.ControllerId);
+                disconnectedControllers.Remove(payload.What.ControllerId);
             }
         });
     }
 
     private void Handle_PeerLeft(MessagePayload<MissionPeerLeft> payload)
     {
-        MarkControllerWithdrawn(payload.What.ControllerId, payload.What.InstanceId);
+        MarkControllerWithdrawn(payload.What.ControllerId, payload.What.InstanceId, disconnected: false);
     }
 
     private void Handle_PeerDisconnected(MessagePayload<MissionPeerDisconnected> payload)
     {
-        MarkControllerWithdrawn(payload.What.ControllerId, payload.What.InstanceId);
+        string controllerId = payload.What.ControllerId;
+        MarkControllerWithdrawn(controllerId, payload.What.InstanceId, disconnected: true);
+        if (payload.What.InstanceId != null && payload.What.InstanceId != session.InstanceId) return;
+        if (!session.IsHostController(controllerId))
+            TransferPendingAuthority(controllerId, session.HostControllerId, sweepAbsentControllers: false);
     }
 
-    private void MarkControllerWithdrawn(string controllerId, string instanceId)
+    private void Handle_BattleHostMigrated(MessagePayload<BattleHostMigrated> payload)
+    {
+        if (payload.What.MapEventId != session.InstanceId) return;
+        string newHost = payload.What.NewHostControllerId;
+        if (string.IsNullOrEmpty(newHost)) newHost = session.OwnControllerId;
+        TransferPendingAuthority(payload.What.PreviousHostControllerId, newHost, sweepAbsentControllers: true);
+    }
+
+    private void TransferPendingAuthority(string previousController, string newController, bool sweepAbsentControllers)
+    {
+        if (string.IsNullOrEmpty(newController)) return;
+        GameThread.RunSafe(() =>
+        {
+            var previousControllers = new HashSet<string> { previousController };
+            if (sweepAbsentControllers)
+                lock (withdrawnControllerLock) previousControllers.UnionWith(withdrawnControllers);
+            lock (pendingPuppetLock)
+            {
+                foreach (var data in pendingPuppets)
+                {
+                    TransferPendingAgentAuthority(data.AgentId, data.OwnerControllerId, data.AuthorityRevision,
+                        previousControllers, newController);
+                    TransferPendingAgentAuthority(data.MountAgentId, data.OwnerControllerId, data.MountAuthorityRevision,
+                        previousControllers, newController);
+                }
+            }
+        }, context: nameof(TransferPendingAuthority));
+    }
+
+    private void TransferPendingAgentAuthority(
+        Guid agentId, string controllerId, long revision, HashSet<string> previousControllers, string newController)
+    {
+        if (agentId == Guid.Empty) return;
+        var authority = GetPendingAuthority(agentId, revision);
+        string currentController = authority?.ControllerId ?? controllerId;
+        if (currentController == newController || !previousControllers.Contains(currentController)) return;
+        if (authority == null)
+        {
+            authority = new PendingAuthority(controllerId, revision);
+            pendingAuthorities[agentId] = authority;
+        }
+        authority.ControllerId = newController;
+        authority.Revision++;
+    }
+
+    private PendingAuthority GetPendingAuthority(Guid agentId, long recordRevision)
+    {
+        return pendingAuthorities.TryGetValue(agentId, out var authority) && authority.Revision >= recordRevision
+            ? authority
+            : null;
+    }
+
+    private void MarkControllerWithdrawn(string controllerId, string instanceId, bool disconnected)
     {
         if (string.IsNullOrEmpty(controllerId)) return;
         if (instanceId != null && instanceId != session.InstanceId) return;
         bool wasHost = session.IsHostController(controllerId);
-        lock (withdrawnControllerLock)
-        {
-            withdrawnControllers.Add(controllerId);
-            if (wasHost) withdrawnHostControllers.Add(controllerId);
-        }
-
-        // Records received before the departure may already be sitting in the deployment buffer. Remove the
-        // player's party on the game thread, while leaving NPC parties from the old host available to migrate.
+        // Disconnects retain fielded troops; graceful withdrawals remove the player's own party.
         GameThread.RunSafe(() =>
         {
+            lock (withdrawnControllerLock)
+            {
+                withdrawnControllers.Add(controllerId);
+                if (disconnected) disconnectedControllers.Add(controllerId);
+                else disconnectedControllers.Remove(controllerId);
+                if (wasHost) withdrawnHostControllers.Add(controllerId);
+            }
             var retainedAgentIds = new List<Guid>();
             lock (pendingPuppetLock)
             {
                 pendingPuppets.RemoveAll(data =>
                 {
                     if (data.OwnerControllerId != controllerId) return false;
-                    bool remove = !wasHost || IsPlayerPartyRecord(data, controllerId);
+                    bool remove = !disconnected && (!wasHost || IsPlayerPartyRecord(data, controllerId));
                     if (!remove) retainedAgentIds.Add(data.AgentId);
+                    else pendingAuthorities.Remove(data.AgentId);
                     return remove;
                 });
             }
@@ -452,6 +527,7 @@ public class PuppetSpawner : IPuppetSpawner
         lock (withdrawnControllerLock)
         {
             if (!withdrawnControllers.Contains(data.OwnerControllerId)) return false;
+            if (disconnectedControllers.Contains(data.OwnerControllerId)) return false;
             wasHost = withdrawnHostControllers.Contains(data.OwnerControllerId);
         }
 
@@ -465,10 +541,13 @@ public class PuppetSpawner : IPuppetSpawner
         {
             if (retainedFormerHostAgentIds.Contains(data.AgentId)) return true;
             isDepartedHost = withdrawnControllers.Contains(data.OwnerControllerId)
-                && withdrawnHostControllers.Contains(data.OwnerControllerId);
+                && (withdrawnHostControllers.Contains(data.OwnerControllerId)
+                    || disconnectedControllers.Contains(data.OwnerControllerId));
         }
 
-        if (!isDepartedHost || IsPlayerPartyRecord(data, data.OwnerControllerId)) return false;
+        bool disconnected;
+        lock (withdrawnControllerLock) disconnected = disconnectedControllers.Contains(data.OwnerControllerId);
+        if (!isDepartedHost || (!disconnected && IsPlayerPartyRecord(data, data.OwnerControllerId))) return false;
 
         lock (withdrawnControllerLock)
             retainedFormerHostAgentIds.Add(data.AgentId);
@@ -493,6 +572,18 @@ public class PuppetSpawner : IPuppetSpawner
             && objectManager.TryGetObject<CharacterObject>(data.CharacterId, out var character)
             && character.IsHero
             && character.HeroObject == hero;
+    }
+
+    private sealed class PendingAuthority
+    {
+        public string ControllerId;
+        public long Revision;
+
+        public PendingAuthority(string controllerId, long revision)
+        {
+            ControllerId = controllerId;
+            Revision = revision;
+        }
     }
 
     private bool LocalDeploymentBlocksSpawn(bool isOwnAgent)
@@ -536,6 +627,12 @@ public class PuppetSpawner : IPuppetSpawner
             {
                 if (!TrySpawnPuppetNow(data, ref slotsAvailable))
                     lock (pendingPuppetLock) pendingPuppets.Add(data);
+                else
+                    lock (pendingPuppetLock)
+                    {
+                        pendingAuthorities.Remove(data.AgentId);
+                        pendingAuthorities.Remove(data.MountAgentId);
+                    }
             }
             catch (Exception e)
             {

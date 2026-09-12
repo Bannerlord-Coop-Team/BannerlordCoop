@@ -118,7 +118,11 @@ public class BattleAuthorityMigrator : IBattleAuthorityMigrator
         var controllerId = payload.What.ControllerId;
         if (payload.What.InstanceId != null && payload.What.InstanceId != session.InstanceId) return;
         if (session.IsHostController(controllerId)) return;
-        if (!session.IsLocalHost) return;
+        if (!session.IsLocalHost)
+        {
+            TransferRemoteAuthority(controllerId, session.HostControllerId, sweepAbsentControllers: false);
+            return;
+        }
 
         reinforcementFielder.PrepareForReserveOwnershipExpansion();
         AdoptAgentsFrom(controllerId, "player disconnect", withdrawOwnParty: false);
@@ -360,7 +364,8 @@ public class BattleAuthorityMigrator : IBattleAuthorityMigrator
 
     private void TransferRemoteAuthority(
         string previousHost,
-        string newHost)
+        string newHost,
+        bool sweepAbsentControllers = true)
     {
         if (string.IsNullOrEmpty(newHost)) return;
 
@@ -368,13 +373,16 @@ public class BattleAuthorityMigrator : IBattleAuthorityMigrator
         if (!string.IsNullOrEmpty(previousHost))
             absentControllers.Add(previousHost);
 
-        var present = new HashSet<string>(missionContext.ControllersInMission);
-        foreach (var controllerId in coopMissionComponent.AgentRegistry.GetControllerIds())
+        if (sweepAbsentControllers)
         {
-            if (string.IsNullOrEmpty(controllerId)) continue;
-            if (session.IsOwn(controllerId)) continue;
-            if (present.Contains(controllerId)) continue;
-            absentControllers.Add(controllerId);
+            var present = new HashSet<string>(missionContext.ControllersInMission);
+            foreach (var controllerId in coopMissionComponent.AgentRegistry.GetControllerIds())
+            {
+                if (string.IsNullOrEmpty(controllerId)) continue;
+                if (session.IsOwn(controllerId)) continue;
+                if (present.Contains(controllerId)) continue;
+                absentControllers.Add(controllerId);
+            }
         }
 
         var registry = coopMissionComponent.AgentRegistry;

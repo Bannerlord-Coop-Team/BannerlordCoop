@@ -248,6 +248,30 @@ public class BattleDebugMovementDriveTests
         Assert.Equal(1, (int)fixture.Status["restoredAgents"]);
     }
 
+    [Fact]
+    public void MovementDriveLifecycle_MissionEndRestoresBeforeAgentsAreDeleted()
+    {
+        using var fixture = new MovementDriveFixture();
+        fixture.Mirror.MovementLockedState = AgentMovementLockedState.FrameLocked;
+        fixture.Mirror.LastTargetPosition = new Vec2(12f, 18f);
+        fixture.Mirror.LastTargetDirection = new Vec3(0f, 1f, 0f);
+        fixture.Begin();
+
+        fixture.Behavior.OnEndMissionInternal();
+        fixture.Behavior.OnRemoveBehavior();
+
+        Assert.Equal(Agent.MovementControlFlag.Backward, fixture.Mirror.MovementFlags);
+        Assert.Equal(-0.5f, fixture.Mirror.InputVector.Y);
+        Assert.True(fixture.Mirror.IsAiPaused);
+        Assert.Equal(AgentMovementLockedState.FrameLocked, fixture.Mirror.MovementLockedState);
+        Assert.Equal(12f, fixture.Mirror.LastTargetPosition.X);
+        Assert.Equal(18f, fixture.Mirror.LastTargetPosition.Y);
+        Assert.Equal(1f, fixture.Mirror.LastTargetDirection.Y);
+        Assert.Equal(2, fixture.Mirror.SetTargetPositionAndDirectionCalls);
+        Assert.Equal(0, fixture.Behavior.OwnedAgentMovementDriveAgentCount);
+        Assert.Equal(1, (int)fixture.Status["restoredAgents"]);
+    }
+
     [Theory]
     [InlineData(false)]
     [InlineData(true)]

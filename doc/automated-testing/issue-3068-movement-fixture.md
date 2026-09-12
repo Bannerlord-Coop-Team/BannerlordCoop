@@ -433,7 +433,10 @@ section does not authorize launching any game or server process.
   an old movement packet across A-to-B-to-A authority changes, then verify its
   old revision is rejected even though the controller ID matches again. Cover
   rider and mount packets and a packet queued before a transfer but applied
-  afterward. Verify current-revision movement still applies after the rejection.
+  afterward. Include a non-host disconnect observed by a third client, plus a
+  capped spawn buffer retained across two host migrations with different rider
+  and mount revisions. Verify current-revision movement still applies after the
+  rejection and after the buffered agents finally spawn.
 - Run the appropriate broader non-live mission/network suite on the same final
   tree. Record exact commands, result counts, failures/skips, and artifact hashes
   externally with the source identities above. Do not insert unexecuted pass

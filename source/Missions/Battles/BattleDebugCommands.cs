@@ -309,7 +309,17 @@ internal static class BattleDebugCommands
                 ownDamageEvents++;
         }
 
+        protected override void OnEndMission()
+        {
+            ClearDebugBehavior();
+        }
+
         public override void OnRemoveBehavior()
+        {
+            ClearDebugBehavior();
+        }
+
+        private void ClearDebugBehavior()
         {
 #if DEBUG
             CancelOwnedAgentMovementDrive();
