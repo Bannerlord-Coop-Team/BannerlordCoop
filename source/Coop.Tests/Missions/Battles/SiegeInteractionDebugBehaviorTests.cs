@@ -48,11 +48,15 @@ public class SiegeInteractionDebugBehaviorTests
     }
 
     [Fact]
-    public void FocusDiagnosticsWithoutStaging_DoesNotAccessNativeState()
+    public void FocusDiagnosticsWithoutStaging_ReportsMissingContextWithoutCapturingFixture()
     {
         var behavior = new SiegeInteractionDebugBehavior(Mock.Of<IMessageBroker>());
-        Assert.Null(AccessTools.Method(typeof(SiegeInteractionDebugBehavior), "ReadFocusDiagnostic")
-            .Invoke(behavior, new object[] { null, null }));
+        var result = AccessTools.Method(typeof(SiegeInteractionDebugBehavior), "ReadFocusDiagnostic")
+            .Invoke(behavior, new object[] { null, null });
+        Assert.Equal("camera_agent_or_scene_missing",
+            result.GetType().GetProperty("unavailable").GetValue(result));
+        Assert.Null(AccessTools.Field(typeof(SiegeInteractionDebugBehavior), "capturedAgent").GetValue(behavior));
+        Assert.Null(AccessTools.Field(typeof(SiegeInteractionDebugBehavior), "stagingCamera").GetValue(behavior));
     }
 
     [Theory]

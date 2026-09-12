@@ -425,16 +425,44 @@ internal sealed class SiegeInteractionDebugBehavior : MissionBehavior, ISiegeInt
                 hitPoints = machine.DestructionComponent?.HitPoint,
                 ladderState = machine is SiegeLadder ladder ? (int?)ladder.State : null,
                 rangedState = machine is RangedSiegeWeapon weapon ? (int?)weapon.State : null,
-                standingPoints = machine.StandingPoints.Select((point, index) => new
+                standingPoints = machine.StandingPoints.Select((point, index) =>
                 {
-                    index,
-                    id = point.Id.Id,
-                    point.IsDeactivated,
-                    occupied = point.UserAgent != null,
-                    ownedByMainAgent = point.UserAgent == agent,
-                    x = point.GameEntity.GlobalPosition.X,
-                    y = point.GameEntity.GlobalPosition.Y,
-                    z = point.GameEntity.GlobalPosition.Z
+                    try
+                    {
+                        float? distanceSquared = null;
+                        float? heightDifference = null;
+                        bool? reachable = null;
+                        if (agent != null)
+                        {
+                            var userFrame = point.GetUserFrameForAgent(agent);
+                            distanceSquared = userFrame.Origin.AsVec2.DistanceSquared(agent.Position.AsVec2);
+                            float pointHeight = point.UseOwnPositionInsteadOfWorldPosition
+                                ? point.GameEntity.GlobalPosition.z : userFrame.Origin.GetGroundVec3().z;
+                            heightDifference = Math.Abs(pointHeight - agent.Position.z);
+                            reachable = agent.CanReachAndUseObject(point, distanceSquared.Value);
+                        }
+                        return (object)new
+                        {
+                            index,
+                            id = point.Id.Id,
+                            point.IsDeactivated,
+                            point.IsDisabledForPlayers,
+                            disabledForMainAgent = agent == null ? (bool?)null : point.IsDisabledForAgent(agent),
+                            occupied = point.UserAgent != null,
+                            point.HasAIUser,
+                            vacantForPlayer = !point.HasUser || point.HasAIUser,
+                            ownedByMainAgent = agent != null && point.UserAgent == agent,
+                            distanceSquared, heightDifference, reachable,
+                            heightWithinReach = heightDifference.HasValue ? (bool?)(heightDifference.Value < 1.5f) : null,
+                            x = point.GameEntity.GlobalPosition.X,
+                            y = point.GameEntity.GlobalPosition.Y,
+                            z = point.GameEntity.GlobalPosition.Z
+                        };
+                    }
+                    catch (Exception exception)
+                    {
+                        return new { index, diagnosticError = exception.ToString() };
+                    }
                 }).ToArray()
             }).ToArray()
         };
@@ -442,7 +470,9 @@ internal sealed class SiegeInteractionDebugBehavior : MissionBehavior, ISiegeInt
 
     internal object ReadFocusDiagnostic(MissionScreen screen, Agent agent)
     {
-        if (ReferenceEquals(stagingCamera, null) || ReferenceEquals(capturedAgent, null) || removed) return null;
+        if (removed) return null;
+        if (screen == null || agent == null)
+            return new { tick, requestId, unavailable = "camera_agent_or_scene_missing" };
         object gates = null;
         try
         {
@@ -494,8 +524,10 @@ internal sealed class SiegeInteractionDebugBehavior : MissionBehavior, ISiegeInt
                 agentPosition = new[] { agentPosition.X, agentPosition.Y, agentPosition.Z },
                 cameraPosition = new[] { position.X, position.Y, position.Z },
                 cameraDirection = new[] { direction.X, direction.Y, direction.Z },
-                stagingPosition = new[] { stagingCamera.Position.X, stagingCamera.Position.Y, stagingCamera.Position.Z },
-                stagingDirection = new[] { stagingCamera.Direction.X, stagingCamera.Direction.Y, stagingCamera.Direction.Z },
+                stagingPosition = ReferenceEquals(stagingCamera, null) ? null
+                    : new[] { stagingCamera.Position.X, stagingCamera.Position.Y, stagingCamera.Position.Z },
+                stagingDirection = ReferenceEquals(stagingCamera, null) ? null
+                    : new[] { stagingCamera.Direction.X, stagingCamera.Direction.Y, stagingCamera.Direction.Z },
                 rayOrigin = new[] { origin.X, origin.Y, origin.Z },
                 // These read-only probes do not replace vanilla's agent and wider fallback ray selection.
                 rayProbe = new
