@@ -1,5 +1,5 @@
 ﻿using Common.Logging;
-using GameInterface.Configuration;
+using GameInterface.Services.UI.CoopOptions.Providers.NetworkTab;
 using Serilog;
 using System;
 
@@ -19,23 +19,23 @@ public sealed class MovementNetworkSettings : IMovementNetworkSettings
     private static readonly ILogger Logger = LogManager.GetLogger<MovementNetworkSettings>();
 
     public const int BytesPerMiB = 1024 * 1024;
-    public const double DefaultMiBPerSecond = 1d;
-    private const double MaximumMiBPerSecond = 1024d;
+    public const double DefaultMiBPerSecond = LocalMovementBandwidth.DefaultMiBPerSecond;
+    public const int DefaultBytesPerSecond = (int)(DefaultMiBPerSecond * BytesPerMiB);
+    private const double MaximumMiBPerSecond = LocalMovementBandwidth.MaximumMiBPerSecond;
 
     public int OutgoingBytesPerSecond { get; }
     public int IncomingBytesPerSecond { get; }
     public double OutgoingMiBPerSecond { get; }
     public double IncomingMiBPerSecond { get; }
 
-    public MovementNetworkSettings(IModConfig modConfig)
+    public MovementNetworkSettings(ILocalMovementBandwidth localMovementBandwidth)
     {
-        NetworkConfigData config = modConfig?.Data?.Network;
         OutgoingMiBPerSecond = Validate(
-            config?.MovementOutgoingMiBPerSecond,
-            "movementOutgoingMiBPerSecond");
+            localMovementBandwidth?.UploadMiBPerSecond,
+            "movementUploadMiBPerSecond");
         IncomingMiBPerSecond = Validate(
-            config?.MovementIncomingMiBPerSecond,
-            "movementIncomingMiBPerSecond");
+            localMovementBandwidth?.DownloadMiBPerSecond,
+            "movementDownloadMiBPerSecond");
         OutgoingBytesPerSecond = ToBytes(OutgoingMiBPerSecond);
         IncomingBytesPerSecond = ToBytes(IncomingMiBPerSecond);
     }
@@ -62,7 +62,7 @@ public sealed class MovementNetworkSettings : IMovementNetworkSettings
         if (configured.HasValue)
         {
             Logger.Warning(
-                "mod-config.json: network value for '{Setting}' must be greater than zero and no more than {Maximum}; using {Default}",
+                "Network value for '{Setting}' must be greater than zero and no more than {Maximum}; using {Default}",
                 name,
                 MaximumMiBPerSecond,
                 DefaultMiBPerSecond);

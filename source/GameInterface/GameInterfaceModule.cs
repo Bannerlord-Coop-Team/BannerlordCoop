@@ -2,6 +2,7 @@
 using Autofac.Core;
 using Autofac.Core.Registration;
 using Autofac.Core.Resolving.Pipeline;
+using Common.Commands;
 using Common.Logging;
 using Common.PacketHandlers;
 using GameInterface.AutoSync;
@@ -17,6 +18,7 @@ using GameInterface.Services.Chat;
 using GameInterface.Services.Entity;
 using GameInterface.Services.GameDebug.Metrics;
 using GameInterface.Services.Heroes;
+using GameInterface.Services.Heroes.Commands;
 using GameInterface.Services.Heroes.Interfaces;
 using GameInterface.Services.Issues.Generic;
 using GameInterface.Services.Issues.Interfaces;
@@ -32,6 +34,7 @@ using GameInterface.Services.MapEvents.Initialization;
 using GameInterface.Services.MapEvents.Logging;
 using GameInterface.Services.MobileParties;
 using GameInterface.Services.MobileParties.Data;
+using GameInterface.Services.MobilePartyAIs;
 using GameInterface.Services.Modules;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Party;
@@ -42,14 +45,17 @@ using GameInterface.Services.Time;
 using GameInterface.Services.TroopRosters;
 using GameInterface.Services.TroopRosters.Logging;
 using GameInterface.Services.UI.CoopOptions.Providers;
+using GameInterface.Services.UI.CoopOptions.Providers.BugReportTab;
 using GameInterface.Services.UI.CoopOptions.Providers.ChatTab;
 using GameInterface.Services.UI.CoopOptions.Providers.KillFeedTab;
 using GameInterface.Services.UI.CoopOptions.Providers.MapTimeTab;
+using GameInterface.Services.UI.CoopOptions.Providers.NetworkTab;
 using GameInterface.Services.UI.CoopOptions.Providers.PlayerNameplatesTab;
 using GameInterface.Services.UI.BugReporting;
 using GameInterface.Services.UI.Patches;
 using GameInterface.Services.Workshops;
 using GameInterface.Surrogates;
+using GameInterface.Utils.Commands;
 using HarmonyLib;
 using Serilog;
 using System.Linq;
@@ -77,6 +83,22 @@ public class GameInterfaceModule : Module
 
         builder.RegisterType<SurrogateCollection>().As<ISurrogateCollection>().InstancePerLifetimeScope().AutoActivate();
 
+        builder.RegisterType<CoopCommandArgsFactory>().As<ICoopCommandArgsFactory>().InstancePerDependency();
+        builder.RegisterType<RglCommandLineRegistry>().As<IRglCommandLineRegistry>().InstancePerDependency();
+        builder.RegisterType<CoopCommandRegistry>().As<ICoopCommandRegistry>().InstancePerLifetimeScope();
+        builder.RegisterAssemblyTypes(typeof(GameInterfaceModule).Assembly)
+            .Where(type => type.IsClass &&
+                           !type.IsAbstract &&
+                           typeof(ICoopCommand).IsAssignableFrom(type))
+            .As(type => type.GetInterfaces()
+                .Where(interfaceType => interfaceType != typeof(ICoopCommand)))
+            .As<ICoopCommand>()
+            .InstancePerDependency();
+        builder.RegisterType<CoopCommandLineRegistrar>()
+            .As<ICoopCommandLineRegistrar>()
+            .InstancePerLifetimeScope()
+            .AutoActivate();
+
         builder.RegisterType<GameInterface>().As<IGameInterface>().InstancePerLifetimeScope().AutoActivate();
         // mod-config.json: one lazy read per session container (see IModConfig).
         builder.RegisterType<ModConfig>().As<IModConfig>().InstancePerLifetimeScope();
@@ -87,6 +109,7 @@ public class GameInterfaceModule : Module
         builder.RegisterType<BugReportService>().As<IBugReportService>().InstancePerLifetimeScope().AutoActivate();
         builder.RegisterType<BugReportOverlay>().As<IBugReportOverlay>().InstancePerLifetimeScope();
         builder.RegisterType<CoopLogSnapshotProvider>().As<ICoopLogSnapshotProvider>().InstancePerDependency();
+        builder.RegisterType<BugReportServerSaveProvider>().As<IBugReportServerSaveProvider>().InstancePerDependency();
         builder.RegisterType<BugReportArchiveBuilder>().As<IBugReportArchiveBuilder>().InstancePerDependency();
         builder.RegisterType<BugReportLogValidator>().As<IBugReportLogValidator>().InstancePerDependency();
         builder.RegisterType<BugReportUploader>().As<IBugReportUploader>().InstancePerDependency();
@@ -94,12 +117,16 @@ public class GameInterfaceModule : Module
         builder.RegisterType<BugReportSubmissionConsent>().As<IBugReportSubmissionConsent>().InstancePerDependency();
         builder.RegisterType<KillFeedOptionsTabProvider>().As<ICoopOptionsTabProvider>().InstancePerDependency();
         builder.RegisterType<MapTimeOptionsTabProvider>().As<ICoopOptionsTabProvider>().InstancePerDependency();
+        builder.RegisterType<BugReportOptionsTabProvider>().As<ICoopOptionsTabProvider>().InstancePerDependency();
         builder.RegisterType<ChatOptionsTabProvider>().As<ICoopOptionsTabProvider>().InstancePerDependency();
         builder.RegisterType<PlayerNameplatesOptionsTabProvider>().As<ICoopOptionsTabProvider>().InstancePerDependency();
+        builder.RegisterType<NetworkOptionsTabProvider>().As<ICoopOptionsTabProvider>().InstancePerDependency();
+        builder.RegisterType<LocalMovementBandwidth>().As<ILocalMovementBandwidth>().InstancePerDependency();
         builder.RegisterType<ChatPlayerName>().As<IChatPlayerNameResolver>().InstancePerDependency();
         builder.RegisterType<PlayerPartyRestorer>().As<IPlayerPartyRestorer>().InstancePerDependency();
         builder.RegisterType<PlayerCreationRollback>().As<IPlayerCreationRollback>().InstancePerDependency();
         builder.RegisterType<MobilePartyBehaviorSnapshot>().As<IMobilePartyBehaviorSnapshot>().InstancePerDependency();
+        builder.RegisterType<PartyAiBatchRunner>().As<IPartyAiBatchRunner>().InstancePerLifetimeScope().AutoActivate();
         builder.RegisterType<BarterClientPresentation>().As<IBarterClientPresentation>().InstancePerDependency();
         builder.RegisterType<SafePassagePartyResolver>().AsSelf().As<ISafePassagePartyResolver>().InstancePerDependency();
         builder.RegisterType<PeacePursuitCleaner>().As<IPeacePursuitCleaner>().InstancePerDependency();
@@ -117,6 +144,8 @@ public class GameInterfaceModule : Module
         builder.RegisterType<SiegeMapEventLeaderReconciler>().As<ISiegeMapEventLeaderReconciler>().InstancePerDependency();
         builder.RegisterType<AiSiegeAssaultReadiness>().As<IAiSiegeAssaultReadiness>().InstancePerDependency();
         builder.RegisterType<AiSiegeTerminalPolicy>().As<IAiSiegeTerminalPolicy>().InstancePerLifetimeScope();
+        builder.RegisterType<SiegeEventGraphSynchronizer>().As<ISiegeEventGraphSynchronizer>().InstancePerDependency();
+        builder.RegisterType<SiegeJoinMenuActivationGate>().As<ISiegeJoinMenuActivationGate>().InstancePerLifetimeScope();
         builder.RegisterType<MapEventContributionBarrier>().As<IMapEventContributionBarrier>().InstancePerDependency();
         builder.RegisterType<ArmyDisbander>().As<IArmyDisbander>().InstancePerDependency();
         builder.RegisterType<PlayerSiegeTargetScoring>().As<IPlayerSiegeTargetScoring>().InstancePerDependency();
@@ -142,6 +171,13 @@ public class GameInterfaceModule : Module
         builder.RegisterType<LiveTestCommandDispatcher>().As<ILiveTestCommandDispatcher>().InstancePerDependency();
         builder.RegisterType<CoopModulePathResolver>().As<ICoopModulePathResolver>().InstancePerDependency();
         builder.RegisterType<FixedTownNpcService>().AsSelf().InstancePerLifetimeScope();
+        builder.RegisterType<LocationNpcGateState>().As<ILocationNpcGate>().InstancePerLifetimeScope();
+        builder.RegisterType<LocationConversationClientState>()
+            .As<ILocationConversationClientState>()
+            .InstancePerLifetimeScope();
+        builder.RegisterType<SettlementHeroSpawnPool>()
+            .As<ISettlementHeroSpawnPool>()
+            .InstancePerDependency();
         builder.RegisterType<KingdomCreationSettlementTracker>().AsSelf().As<IKingdomCreationSettlementTracker>().InstancePerLifetimeScope();
         builder.RegisterType<KingdomCreator>().AsSelf().As<IKingdomCreator>().InstancePerLifetimeScope();
         builder.RegisterType<KingdomDecisionOutcomeResolver>().AsSelf().As<IKingdomDecisionOutcomeResolver>().InstancePerLifetimeScope();

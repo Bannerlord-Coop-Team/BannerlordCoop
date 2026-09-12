@@ -4,156 +4,160 @@ using System.Collections.Generic;
 
 namespace GameInterface.Services.Locations.Conversations;
 
-/// <summary>
-/// Server-side registry of which settlement-location NPC each player is currently talking to, so no two
-/// players can hold a conversation with the same NPC at once.
-/// </summary>
-/// <remarks>
-/// Each client runs its own settlement mission, so the "same NPC" is a logical identity - the synced
-/// <see cref="TaleWorlds.CampaignSystem.CharacterObject"/> within a <see cref="TaleWorlds.CampaignSystem.Settlements.Locations.Location"/>,
-/// keyed by their co-op ids - not a shared agent. When a client opens a conversation with such an NPC it
-/// asks the server; the server records the engagement here and refuses any other player's request for the
-/// same NPC until the conversation ends. Engagements are keyed per player by the requesting client's
-/// <see cref="LiteNetLib.NetPeer"/>, so each player holds at most one at a time. Unlike a map-party hold
-/// there is nothing to freeze - this is pure bookkeeping, so it is unit-testable without the game.
-/// </remarks>
-internal sealed class LocationConversationTracker : IHandler
+internal interface ILocationConversationTracker
 {
-    private readonly struct Engagement
-    {
-        public readonly string EngagerNpcKey;
-        public readonly string TargetNpcKey;
+    bool IsEmpty { get; }
+    IObjectManager ObjectManager { get; }
 
-        public Engagement(string engagerNpcKey, string targetNpcKey)
+    bool TryBeginEngagement(object engagerKey, string engagerNpcKey, string targetNpcKey);
+    bool TryBeginEngagement(object engagerKey, object responderKey, string engagerNpcKey, string targetNpcKey);
+    bool TryEndEngagement(object participantKey, out string npcKey);
+    bool TryEndEngagement(object participantKey, out string npcKey, out object engagerKey);
+    bool TryGetEngagement(object participantKey, out string npcKey);
+    bool IsEngagedByOther(string npcKey, object engagerKey);
+}
+
+/// <summary>
+/// Server-side registry of settlement-location conversations. Both logical characters are reserved and
+/// player-to-player sessions are indexed by both peers so either participant can release the lock.
+/// </summary>
+internal sealed class LocationConversationTracker : ILocationConversationTracker, IHandler
+{
+    private sealed class Engagement
+    {
+        public object EngagerKey { get; }
+        public object ResponderKey { get; }
+        public string EngagerNpcKey { get; }
+        public string TargetNpcKey { get; }
+
+        public Engagement(
+            object engagerKey,
+            object responderKey,
+            string engagerNpcKey,
+            string targetNpcKey)
         {
+            EngagerKey = engagerKey;
+            ResponderKey = responderKey;
             EngagerNpcKey = engagerNpcKey;
             TargetNpcKey = targetNpcKey;
         }
     }
 
-    /// <summary>
-    /// DI-wired instance, statically accessible so (static) Harmony patches can reach the object manager.
-    /// Set on construction by the auto-activated handler registration.
-    /// </summary>
-    internal static LocationConversationTracker Instance { get; private set; }
-
     private readonly object stateLock = new object();
-    private readonly Dictionary<string, object> engagerByNpcKey = new Dictionary<string, object>();
-    private readonly Dictionary<object, Engagement> engagementByEngager = new Dictionary<object, Engagement>();
+    private readonly Dictionary<string, Engagement> engagementByNpcKey = new Dictionary<string, Engagement>();
+    private readonly Dictionary<object, Engagement> engagementByParticipant = new Dictionary<object, Engagement>();
 
     private volatile bool isEmpty = true;
 
-    /// <summary>Lock-free fast path: true when no engagements exist.</summary>
     public bool IsEmpty => isEmpty;
-
-    /// <summary>
-    /// Object manager shared with the acquire patch so it can resolve NPC/location ids without resolving
-    /// the container on every interaction. The tracker itself never uses it.
-    /// </summary>
-    internal IObjectManager ObjectManager { get; }
+    public IObjectManager ObjectManager { get; }
 
     public LocationConversationTracker(IObjectManager objectManager)
     {
         ObjectManager = objectManager;
-        Instance = this;
     }
 
     public void Dispose()
     {
         lock (stateLock)
         {
-            engagerByNpcKey.Clear();
-            engagementByEngager.Clear();
+            engagementByNpcKey.Clear();
+            engagementByParticipant.Clear();
             isEmpty = true;
         }
-
-        if (Instance == this) Instance = null;
     }
 
-    /// <summary>
-    /// Composes the per-NPC lock key from the NPC's character id and its location id, so the same
-    /// character template in two different locations is tracked separately.
-    /// </summary>
     public static string ComposeKey(string locationId, string characterId) => $"{locationId}|{characterId}";
 
-    /// <summary>
-    /// Begins (or refreshes) <paramref name="engagerKey"/>'s engagement of the given NPC. Both the
-    /// initiating player's character and the target NPC are reserved so neither participant can enter a
-    /// second location conversation until this one ends.
-    /// </summary>
     public bool TryBeginEngagement(object engagerKey, string engagerNpcKey, string targetNpcKey)
     {
+        return TryBeginEngagement(engagerKey, null, engagerNpcKey, targetNpcKey);
+    }
+
+    public bool TryBeginEngagement(
+        object engagerKey,
+        object responderKey,
+        string engagerNpcKey,
+        string targetNpcKey)
+    {
         if (engagerKey == null || engagerNpcKey == null || targetNpcKey == null) return false;
+        if (responderKey != null && Equals(engagerKey, responderKey)) return false;
 
         lock (stateLock)
         {
-            if (engagementByEngager.TryGetValue(engagerKey, out var currentEngagement))
+            if (engagementByParticipant.TryGetValue(engagerKey, out var current))
             {
-                return currentEngagement.EngagerNpcKey == engagerNpcKey &&
-                       currentEngagement.TargetNpcKey == targetNpcKey;
+                return Equals(current.EngagerKey, engagerKey) &&
+                       Equals(current.ResponderKey, responderKey) &&
+                       current.EngagerNpcKey == engagerNpcKey &&
+                       current.TargetNpcKey == targetNpcKey;
             }
 
-            if (engagerByNpcKey.TryGetValue(engagerNpcKey, out var existingEngager) &&
-                !Equals(existingEngager, engagerKey))
-                return false;
+            if (responderKey != null && engagementByParticipant.ContainsKey(responderKey)) return false;
+            if (engagementByNpcKey.ContainsKey(engagerNpcKey)) return false;
+            if (engagementByNpcKey.ContainsKey(targetNpcKey)) return false;
 
-            if (engagerByNpcKey.TryGetValue(targetNpcKey, out var existingTarget) &&
-                !Equals(existingTarget, engagerKey))
-                return false;
+            var engagement = new Engagement(engagerKey, responderKey, engagerNpcKey, targetNpcKey);
+            engagementByNpcKey[engagerNpcKey] = engagement;
+            engagementByNpcKey[targetNpcKey] = engagement;
+            engagementByParticipant[engagerKey] = engagement;
+            if (responderKey != null)
+                engagementByParticipant[responderKey] = engagement;
 
-            engagerByNpcKey[engagerNpcKey] = engagerKey;
-            engagerByNpcKey[targetNpcKey] = engagerKey;
-            engagementByEngager[engagerKey] = new Engagement(engagerNpcKey, targetNpcKey);
             isEmpty = false;
             return true;
         }
     }
 
-    /// <summary>Ends <paramref name="engagerKey"/>'s engagement, returning the NPC it held.</summary>
-    public bool TryEndEngagement(object engagerKey, out string npcKey)
+    public bool TryEndEngagement(object participantKey, out string npcKey)
+    {
+        return TryEndEngagement(participantKey, out npcKey, out _);
+    }
+
+    public bool TryEndEngagement(object participantKey, out string npcKey, out object engagerKey)
     {
         npcKey = null;
-
-        if (engagerKey == null) return false;
+        engagerKey = null;
+        if (participantKey == null) return false;
 
         lock (stateLock)
         {
-            if (!engagementByEngager.TryGetValue(engagerKey, out var engagement))
-                return false;
+            if (!engagementByParticipant.TryGetValue(participantKey, out var engagement)) return false;
 
             npcKey = engagement.TargetNpcKey;
-            engagementByEngager.Remove(engagerKey);
-            engagerByNpcKey.Remove(engagement.EngagerNpcKey);
-            engagerByNpcKey.Remove(engagement.TargetNpcKey);
+            engagerKey = engagement.EngagerKey;
+            engagementByParticipant.Remove(engagement.EngagerKey);
+            if (engagement.ResponderKey != null)
+                engagementByParticipant.Remove(engagement.ResponderKey);
+            engagementByNpcKey.Remove(engagement.EngagerNpcKey);
+            engagementByNpcKey.Remove(engagement.TargetNpcKey);
 
-            isEmpty = engagementByEngager.Count == 0;
+            isEmpty = engagementByParticipant.Count == 0;
             return true;
         }
     }
 
-    public bool TryGetEngagement(object engagerKey, out string npcKey)
+    public bool TryGetEngagement(object participantKey, out string npcKey)
     {
         npcKey = null;
-        if (engagerKey == null) return false;
+        if (participantKey == null) return false;
 
         lock (stateLock)
         {
-            if (!engagementByEngager.TryGetValue(engagerKey, out var engagement))
-                return false;
-
+            if (!engagementByParticipant.TryGetValue(participantKey, out var engagement)) return false;
             npcKey = engagement.TargetNpcKey;
             return true;
         }
     }
 
-    /// <summary>True when the NPC is engaged by a player other than <paramref name="engagerKey"/>.</summary>
     public bool IsEngagedByOther(string npcKey, object engagerKey)
     {
         if (npcKey == null) return false;
 
         lock (stateLock)
         {
-            return engagerByNpcKey.TryGetValue(npcKey, out var engager) && !Equals(engager, engagerKey);
+            return engagementByNpcKey.TryGetValue(npcKey, out var engagement) &&
+                   !Equals(engagement.EngagerKey, engagerKey);
         }
     }
 }

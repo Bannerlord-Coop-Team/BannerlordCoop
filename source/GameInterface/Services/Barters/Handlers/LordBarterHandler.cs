@@ -1,4 +1,4 @@
-using Common;
+﻿using Common;
 using Common.Logging;
 using Common.Messaging;
 using Common.Network;
@@ -39,7 +39,7 @@ internal sealed partial class LordBarterHandler : IHandler
     private readonly IPlayerManager playerManager;
     private readonly IKingdomMembershipState kingdomMembershipState;
     private readonly ConversationPartyTracker conversationPartyTracker;
-    private readonly LocationConversationTracker locationConversationTracker;
+    private readonly ILocationConversationTracker locationConversationTracker;
     private readonly IBarterClientPresentation presentation;
     private readonly ISafePassagePartyResolver safePassagePartyResolver;
     private readonly ISiegeEventInterface siegeEventInterface;
@@ -56,7 +56,7 @@ internal sealed partial class LordBarterHandler : IHandler
         IPlayerManager playerManager,
         IKingdomMembershipState kingdomMembershipState,
         ConversationPartyTracker conversationPartyTracker,
-        LocationConversationTracker locationConversationTracker,
+        ILocationConversationTracker locationConversationTracker,
         IBarterClientPresentation presentation,
         ISafePassagePartyResolver safePassagePartyResolver,
         ISiegeEventInterface siegeEventInterface,

@@ -1,4 +1,5 @@
 ﻿using Common;
+using Common.Commands;
 using Common.Network;
 using Common.Messaging;
 using Common.Util;
@@ -151,8 +152,10 @@ public class PlayerKingdomCreationFlowTests : IDisposable
         string output = null;
         Server.Call(() =>
         {
-            output = KingdomDebugCommand.CreateKingdomCommand(
-                new List<string> { player.HeroId, "Real", "Kingdom" });
+            output = ExecuteCommand(
+                new KingdomDebugCommand.KingdomCreateCoopCommand(),
+                player.HeroId,
+                KingdomName);
         });
 
         Assert.StartsWith("Created kingdom", output);
@@ -185,8 +188,10 @@ public class PlayerKingdomCreationFlowTests : IDisposable
         string output = null;
         client.Call(() =>
         {
-            output = KingdomDebugCommand.CreateKingdomCommand(
-                new List<string> { player.HeroId, "Real", "Kingdom" });
+            output = ExecuteCommand(
+                new KingdomDebugCommand.KingdomCreateCoopCommand(),
+                player.HeroId,
+                KingdomName);
         });
 
         Assert.Equal("This command can only be run on the server.", output);
@@ -215,8 +220,10 @@ public class PlayerKingdomCreationFlowTests : IDisposable
         string output = null;
         Server.Call(() =>
         {
-            output = KingdomDebugCommand.CreateKingdomCommand(
-                new List<string> { followerId, "Real", "Kingdom" });
+            output = ExecuteCommand(
+                new KingdomDebugCommand.KingdomCreateCoopCommand(),
+                followerId,
+                KingdomName);
         });
 
         Assert.Contains("does not lead clan", output);
@@ -234,7 +241,10 @@ public class PlayerKingdomCreationFlowTests : IDisposable
 
         Server.Call(() =>
         {
-            var result = KingdomDebugCommand.ForcePlayerJoinKingdom(new List<string> { ControllerId, kingdomId });
+            string result = ExecuteCommand(
+                new KingdomDebugCommand.KingdomForcePlayerJoinCoopCommand(),
+                ControllerId,
+                kingdomId);
 
             Assert.Contains("Forced player", result);
             Assert.True(Server.ObjectManager.TryGetObject<Kingdom>(kingdomId, out var kingdom));
@@ -277,7 +287,7 @@ public class PlayerKingdomCreationFlowTests : IDisposable
 
         Server.Call(() =>
         {
-            var joinResult = KingdomDebugCommand.ForcePlayerJoinKingdom(new List<string> { ControllerId, kingdomId });
+            var joinResult = ExecuteCommand(new KingdomDebugCommand.KingdomForcePlayerJoinCoopCommand(), ControllerId, kingdomId);
 
             Assert.Contains("Forced player", joinResult);
         });
@@ -285,7 +295,7 @@ public class PlayerKingdomCreationFlowTests : IDisposable
         Server.NetworkSentMessages.Clear();
         Server.Call(() =>
         {
-            var restoreResult = KingdomDebugCommand.ForcePlayerJoinKingdom(new List<string> { ControllerId, "none" });
+            var restoreResult = ExecuteCommand(new KingdomDebugCommand.KingdomForcePlayerJoinCoopCommand(), ControllerId, "none");
 
             Assert.Contains("Restored player", restoreResult);
             Assert.True(Server.ObjectManager.TryGetObject<Kingdom>(kingdomId, out var kingdom));
@@ -364,15 +374,9 @@ public class PlayerKingdomCreationFlowTests : IDisposable
 
         Server.Call(() => Server.Resolve<IPlayerManager>().SetPeer(ControllerId, client.NetPeer));
 
-        var pendingField = AccessTools.Field(typeof(LocationConversationPatches), "pending");
-        var heldNpcKeyField = AccessTools.Field(typeof(LocationConversationPatches), "heldNpcKey");
         var onAgentInteractionPrefix = AccessTools.Method(typeof(LocationConversationPatches), "OnAgentInteractionPrefix");
         var onConversationEndPostfix = AccessTools.Method(typeof(LocationConversationPatches), "OnConversationEndPostfix");
-        // These are process-wide statics on LocationConversationPatches: in a real game only one client runs
-        // per process, but this harness runs several "clients" in one, so a previous test's leftovers could
-        // otherwise leak in here.
-        pendingField.SetValue(null, null);
-        heldNpcKeyField.SetValue(null, null);
+        ILocationConversationClientState clientConversationState = null;
 
         using var fixture = new MissionEngineFixture();
         var harmony = new Harmony($"e2e.vassal-oath-settlement.{Guid.NewGuid():N}");
@@ -417,8 +421,10 @@ public class PlayerKingdomCreationFlowTests : IDisposable
 
                 var location = ObjectHelper.SkipConstructor<Location>();
                 Assert.True(client.ObjectManager.AddExisting(LocationId, location));
-                CampaignMission.Current = new StubCampaignMission(location);
-                
+                client.CampaignMissionContext = new StubCampaignMission(location);
+                clientConversationState = client.Resolve<ILocationConversationClientState>();
+                Assert.False(clientConversationState.HasPendingOrHeld);
+
                 new LocationConversationTracker(client.ObjectManager);
             });
             
@@ -434,10 +440,11 @@ public class PlayerKingdomCreationFlowTests : IDisposable
             var started = Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkPlayerInteractionStarted>());
             Assert.True(started.IsLocationInteraction);
 
-            // The approval round-trip runs synchronously through the mock network, so StartApprovedConversation
-            // has already consumed `pending` and set `heldNpcKey` for real by the time control returns here.
-            Assert.Null(pendingField.GetValue(null));
-            Assert.Equal(LocationConversationTracker.ComposeKey(LocationId, ruler.CharacterId), heldNpcKeyField.GetValue(null));
+            // The approval round-trip runs synchronously through the mock network, so the scoped client state
+            // has consumed its pending request and now holds the approved target.
+            Assert.Equal(
+                LocationConversationTracker.ComposeKey(LocationId, ruler.CharacterId),
+                clientConversationState.HeldNpcKey);
             Server.Call(() =>
             {
                 Assert.True(Server.Resolve<LocationConversationTracker>().TryGetEngagement(client.NetPeer, out var lockedNpcKey));
@@ -473,7 +480,7 @@ public class PlayerKingdomCreationFlowTests : IDisposable
             Server.NetworkSentMessages.Clear();
             client.Call(() => onConversationEndPostfix.Invoke(null, null));
 
-            Assert.Null(heldNpcKeyField.GetValue(null));
+            Assert.Null(clientConversationState.HeldNpcKey);
             var ended = Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkPlayerInteractionEnded>());
             Assert.True(ended.IsLocationInteraction);
             Server.Call(() =>
@@ -500,9 +507,8 @@ public class PlayerKingdomCreationFlowTests : IDisposable
             harmony.UnpatchAll(harmony.Id);
             MissionConversationLogicOverride = null;
             OneToOneConversationHeroOverride = null;
-            pendingField.SetValue(null, null);
-            heldNpcKeyField.SetValue(null, null);
-            CampaignMission.Current = null;
+            clientConversationState?.Clear();
+            client.CampaignMissionContext = null;
         }
     }
 
@@ -630,7 +636,10 @@ public class PlayerKingdomCreationFlowTests : IDisposable
 
         Server.Call(() =>
         {
-            var result = KingdomDebugCommand.ForcePlayerJoinKingdom(new List<string> { ControllerId, newKingdomId });
+            string result = ExecuteCommand(
+                new KingdomDebugCommand.KingdomForcePlayerJoinCoopCommand(),
+                ControllerId,
+                newKingdomId);
 
             Assert.Contains("Forced player", result);
             Assert.True(Server.ObjectManager.TryGetObject<Kingdom>(previousKingdomId, out var previousKingdom));
@@ -2755,7 +2764,9 @@ public class PlayerKingdomCreationFlowTests : IDisposable
         string output = null;
         client2.Call(() =>
         {
-            output = KingdomDebugCommand.ListKingdomDecisionVotes(new List<string> { kingdomId });
+            output = ExecuteCommand(
+                new KingdomDebugCommand.KingdomDecisionsCoopCommand(),
+                kingdomId);
         });
 
         Assert.Contains("DeclareWarDecision", output);
@@ -3020,6 +3031,9 @@ public class PlayerKingdomCreationFlowTests : IDisposable
     {
         var client1 = Clients.First();
         var client2 = Clients.Skip(1).First();
+        DecisionItemBaseVM submittedDecisionItem = null;
+        KingdomDecisionsVM retryDecisionsVm = null;
+        DecisionItemBaseVM retryDecisionItem = null;
         client1.Resolve<IControllerIdProvider>().SetControllerId(ControllerId);
         client2.Resolve<IControllerIdProvider>().SetControllerId(SecondControllerId);
         var player1 = CreateSyncedPlayerContext(ControllerId, client1);
@@ -3065,6 +3079,7 @@ public class PlayerKingdomCreationFlowTests : IDisposable
             decisionsVm.RefreshWith(decision);
 
             var decisionItem = Assert.IsType<PolicyDecisionItemVM>(decisionsVm.CurrentDecision);
+            submittedDecisionItem = decisionItem;
             DecisionOptionVM option = decisionItem.DecisionOptionsList.Single(candidate =>
                 candidate.Option is KingdomPolicyDecision.PolicyDecisionOutcome outcome &&
                 outcome.ShouldDecisionBeEnforced);
@@ -3077,8 +3092,12 @@ public class PlayerKingdomCreationFlowTests : IDisposable
             Assert.True(decisionItem.IsActive);
             Assert.True(decisionItem._finalSelectionDone);
             Assert.Equal(decisionDescription, decisionItem.DescriptionText);
-            Assert.Contains("Vote submitted", GetVoteManager(client2).RefreshDecisionWaitingStatus(decisionItem));
         });
+
+        client2.Call(() =>
+            Assert.Contains(
+                "Vote submitted",
+                GetVoteManager(client2).RefreshDecisionWaitingStatus(submittedDecisionItem)));
 
         client1.Call(() =>
         {
@@ -3088,6 +3107,8 @@ public class PlayerKingdomCreationFlowTests : IDisposable
             decisionsVm.RefreshWith(decision);
 
             var decisionItem = Assert.IsType<PolicyDecisionItemVM>(decisionsVm.CurrentDecision);
+            retryDecisionsVm = decisionsVm;
+            retryDecisionItem = decisionItem;
             DecisionOptionVM option = decisionItem.DecisionOptionsList.Single(candidate =>
                 candidate.Option is KingdomPolicyDecision.PolicyDecisionOutcome outcome &&
                 outcome.ShouldDecisionBeEnforced);
@@ -3104,9 +3125,12 @@ public class PlayerKingdomCreationFlowTests : IDisposable
 
             RestoreReverseObjectManagerId(client1, kingdom, kingdomId);
             decisionItem.ExecuteFinalSelection();
+        });
 
-            Assert.Null(decisionsVm.CurrentDecision);
-            Assert.False(decisionItem.IsActive);
+        client1.Call(() =>
+        {
+            Assert.Null(retryDecisionsVm.CurrentDecision);
+            Assert.False(retryDecisionItem.IsActive);
         });
 
         Assert.Single(client1.NetworkSentMessages.GetMessages<NetworkRequestKingdomDecisionVote>());
@@ -4318,4 +4342,9 @@ public class PlayerKingdomCreationFlowTests : IDisposable
         string PartyId,
         string CharacterId,
         string CultureId);
+
+    private static string ExecuteCommand(ICoopCommand command, params string[] args)
+    {
+        return command.ProcessCommand(new CoopCommandArgsFactory().FromValues(args)).Output;
+    }
 }

@@ -21,7 +21,7 @@ namespace Missions.Battles;
 public interface IPuppetDeathApplier : IDisposable
 {
     /// <summary>
-    /// [Game thread] Apply deaths that arrived before their deployment-buffered puppets registered.
+    /// [Game thread] Retry deaths awaiting puppet registration or acceptance by the native agent.
     /// </summary>
     void DrainPendingDeaths();
 }
@@ -37,6 +37,7 @@ public class PuppetDeathApplier : IPuppetDeathApplier
     private readonly IPuppetMountStateRepairer puppetMountStateRepairer;
     private readonly Dictionary<Guid, NetworkBattleAgentDied> pendingDeaths =
         new Dictionary<Guid, NetworkBattleAgentDied>();
+    private readonly HashSet<Guid> completedDeaths = new HashSet<Guid>();
 
     public PuppetDeathApplier(
         IMessageBroker messageBroker,
@@ -56,6 +57,7 @@ public class PuppetDeathApplier : IPuppetDeathApplier
     {
         messageBroker.Unsubscribe<NetworkBattleAgentDied>(Handle_NetworkBattleAgentDied);
         pendingDeaths.Clear();
+        completedDeaths.Clear();
     }
 
     private void Handle_NetworkBattleAgentDied(MessagePayload<NetworkBattleAgentDied> payload)
@@ -74,12 +76,16 @@ public class PuppetDeathApplier : IPuppetDeathApplier
             if (!TryApplyDeath(payload.What))
             {
                 pendingDeaths[payload.What.AgentId] = payload.What;
-                string reason = Mission.Current == null ? "mission-unavailable" : "puppet-unregistered";
+                string reason = Mission.Current == null ? "mission-unavailable" : "puppet-unregistered-or-active";
                 Logger.Information(
                     "[BattleDeath] Deferring death: agentId={AgentId} reason={Reason} pendingDeaths={PendingDeaths}",
                     payload.What.AgentId,
                     reason,
                     pendingDeaths.Count);
+            }
+            else
+            {
+                pendingDeaths.Remove(payload.What.AgentId);
             }
         });
     }
@@ -98,12 +104,15 @@ public class PuppetDeathApplier : IPuppetDeathApplier
 
     private bool TryApplyDeath(NetworkBattleAgentDied death)
     {
+        if (completedDeaths.Contains(death.AgentId)) return true;
+
         var registry = coopMissionComponent.AgentRegistry;
         if (!registry.TryGetAgentInfo(death.AgentId, out var info)) return false;
         Mission mission = Mission.Current;
         if (mission == null) return false;
 
         Agent agent = info.Agent;
+        if (agent != null && agent.Mission != mission) return false;
         int agentIndex = -1;
         float healthBefore = -1f;
         float healthAfter = healthBefore;
@@ -122,13 +131,24 @@ public class PuppetDeathApplier : IPuppetDeathApplier
             healthAfter = healthBefore;
             activeBefore = agent.IsActive();
             activeAfter = activeBefore;
-            appliedDeath = activeBefore && healthBefore > 0f;
+            appliedDeath = activeBefore;
         }
         if (appliedDeath)
         {
             mortalityBefore = agent.CurrentMortalityState;
+            // Native guards still allow Die below one health; otherwise avoid repeating hit effects.
+            if (healthBefore >= 1f
+                && (agent.CurrentMortalityState == Agent.MortalityState.Immortal
+                    || disableDying
+                    || missionMode == MissionMode.Conversation
+                    || missionMode == MissionMode.CutScene))
+            {
+                return false;
+            }
+
             Agent mount = agent.MountAgent;
-            LogMountState("before", agent, mount);
+            if (!pendingDeaths.ContainsKey(death.AgentId))
+                LogMountState("before", agent, mount);
 
             Agent affectorAgent = null;
             if (death.AffectorAgentId != Guid.Empty
@@ -141,7 +161,8 @@ public class PuppetDeathApplier : IPuppetDeathApplier
             var killingBlow = death.DeathAction >= 0
                 ? CreateReplicatedKillingBlow(blow, death.DeathAction)
                 : default;
-            blow.InflictedDamage = Math.Max(blow.InflictedDamage, (int)Math.Ceiling(agent.Health));
+            // HandleBlow ignores zero-damage blows even when an active agent already has zero health.
+            blow.InflictedDamage = Math.Max(1, Math.Max(blow.InflictedDamage, (int)Math.Ceiling(agent.Health)));
             appliedDamage = blow.InflictedDamage;
             var agentState = death.Wounded ? AgentState.Unconscious : AgentState.Killed;
 
@@ -158,12 +179,23 @@ public class PuppetDeathApplier : IPuppetDeathApplier
                     }
                 });
 
-            puppetMountStateRepairer.RepairAfterRiderDeath(mount);
-            LogMountState("after", agent, mount);
-
             healthAfter = agent.Health;
             activeAfter = agent.IsActive();
             mortalityAfter = agent.CurrentMortalityState;
+            if (activeAfter)
+            {
+                if (!pendingDeaths.ContainsKey(death.AgentId))
+                {
+                    Logger.Warning(
+                        "[BattleDeath] Retaining rejected death for retry: agentId={AgentId} " +
+                        "health={Health:0.0} mortality={Mortality} disableDying={DisableDying} missionMode={MissionMode}",
+                        death.AgentId, healthAfter, mortalityAfter, disableDying, missionMode);
+                }
+                return false;
+            }
+
+            puppetMountStateRepairer.RepairAfterRiderDeath(mount);
+            LogMountState("after", agent, mount);
         }
 
         // Deregister after the game-thread kill. Removing on the poll thread before the queued apply would
@@ -205,25 +237,6 @@ public class PuppetDeathApplier : IPuppetDeathApplier
                 disableDying,
                 missionMode,
                 deregistered);
-            if (activeAfter && healthAfter > 0f)
-            {
-                Logger.Error(
-                    "[BattleDeath] Replicated death did not kill puppet: agentId={AgentId} " +
-                    "authority={Authority} agentIndex={AgentIndex} healthBefore={HealthBefore:0.0} " +
-                    "healthAfter={HealthAfter:0.0} activeAfter={ActiveAfter} " +
-                    "mortalityBefore={MortalityBefore} mortalityAfter={MortalityAfter} " +
-                    "disableDying={DisableDying} missionMode={MissionMode}",
-                    death.AgentId,
-                    info.CurrentAuthority,
-                    agentIndex,
-                    healthBefore,
-                    healthAfter,
-                    activeAfter,
-                    mortalityBefore,
-                    mortalityAfter,
-                    disableDying,
-                    missionMode);
-            }
         }
         else
         {
@@ -248,6 +261,7 @@ public class PuppetDeathApplier : IPuppetDeathApplier
                 info.CurrentAuthority);
         }
         casualties.Forget(death.AgentId);
+        completedDeaths.Add(death.AgentId);
         return true;
     }
 
@@ -279,11 +293,14 @@ public class PuppetDeathApplier : IPuppetDeathApplier
 
     private static Blow CreateReplicatedBlow(NetworkBattleAgentDied message, int ownerId)
     {
-        return new Blow(ownerId)
+        var blow = new Blow(ownerId)
         {
             InflictedDamage = message.InflictedDamage,
             VictimBodyPart = message.VictimBodyPart,
         };
+        // Death broadcasts carry no weapon. Slot zero makes vanilla dereference a mount's missing equipment.
+        blow.WeaponRecord.AffectorWeaponSlotOrMissileIndex = -1;
+        return blow;
     }
 
     private static KillingBlow CreateReplicatedKillingBlow(Blow blow, int deathAction)

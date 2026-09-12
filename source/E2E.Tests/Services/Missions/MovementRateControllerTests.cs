@@ -52,7 +52,7 @@ public sealed class MovementRateControllerTests
         Assert.Equal(40, state.PriorityHz);
         Assert.Equal("location-fixed", state.Reason);
         Assert.Equal(
-            MovementNetworkSettings.BytesPerMiB,
+            MovementNetworkSettings.DefaultBytesPerSecond,
             Assert.Single(fixture.Advertisements)
                 .MaximumIncomingMovementBytesPerSecondPerSender);
     }

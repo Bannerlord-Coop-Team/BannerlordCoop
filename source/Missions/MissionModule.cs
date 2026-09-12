@@ -1,4 +1,6 @@
 ﻿using Autofac;
+using Common.Commands;
+using Common.Logging;
 using Common.Network.Session;
 using GameInterface;
 using GameInterface.Services.Locations;
@@ -40,10 +42,18 @@ public class MissionModule : Module
 
     protected override void Load(ContainerBuilder builder)
     {
+        builder.RegisterType<ReceivePathDiagnostics>().As<IReceivePathDiagnostics>().InstancePerDependency();
         base.Load(builder);
 
         foreach (HarmonyPatchCategoryRegistration registration in CreatePatchCategoryRegistrations())
             builder.RegisterInstance(registration);
+
+        builder.RegisterAssemblyTypes(typeof(MissionModule).Assembly)
+            .Where(type => type.IsClass &&
+                           !type.IsAbstract &&
+                           typeof(ICoopCommand).IsAssignableFrom(type))
+            .As<ICoopCommand>()
+            .InstancePerDependency();
 
         builder.RegisterType<LiteNetP2PClient>().As<IBattleNetwork>().InstancePerLifetimeScope();
         builder.RegisterType<MovementPacketCompressor>()
@@ -69,6 +79,9 @@ public class MissionModule : Module
             .InstancePerDependency();
         builder.RegisterType<BattleAgentSpawnBatchCodec>()
             .As<IBattleAgentSpawnBatchCodec>()
+            .InstancePerDependency();
+        builder.RegisterType<BattleDamageDataMapper>()
+            .As<IBattleDamageDataMapper>()
             .InstancePerDependency();
         builder.RegisterType<MissionWeaponDataMapper>()
             .As<IMissionWeaponDataMapper>()

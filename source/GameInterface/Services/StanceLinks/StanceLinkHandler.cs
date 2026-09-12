@@ -74,6 +74,7 @@ internal class StanceLinkHandler : IHandler
 
             if (stanceLink == null)
             {
+                if (faction1.IsEliminated || faction2.IsEliminated) return;
                 if (ModInformation.IsServer)
                 {
                     stanceLink = new StanceLink(obj.StanceType, faction1, faction2);
@@ -95,7 +96,6 @@ internal class StanceLinkHandler : IHandler
 
             if (!objectManager.AddExisting($"{typeof(StanceLink).Name}_{id}", stanceLink))
             {
-                Logger.Error("Unable to register StanceLink with id {Id}", id);
                 return;
             }
             if (ModInformation.IsServer)

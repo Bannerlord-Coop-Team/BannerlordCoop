@@ -305,7 +305,8 @@ internal class BattleMissionStartHandler : IHandler
                 !objectManager.TryGetObject<MobileParty>(player.MobilePartyId, out var party) ||
                 mapEvent.FindMapEventParty(party.Party, out var side) is not MapEventParty mapEventParty ||
                 !objectManager.TryGetIdWithLogging(side, out var sideId) ||
-                !objectManager.TryGetIdWithLogging(mapEventParty, out var mapEventPartyId))
+                !objectManager.TryGetIdWithLogging(mapEventParty, out var mapEventPartyId) ||
+                !objectManager.TryGetIdWithLogging(party.Party, out var partyId))
             {
                 continue;
             }
@@ -314,7 +315,8 @@ internal class BattleMissionStartHandler : IHandler
                 player.ControllerId,
                 peer,
                 sideId,
-                mapEventPartyId));
+                mapEventPartyId,
+                partyId));
         }
 
         return participants;
@@ -346,7 +348,8 @@ internal class BattleMissionStartHandler : IHandler
             // idempotent client attachment make it present before the mission-start guard runs.
             network.Send(participant.Peer, new NetworkAddBattleParty(
                 participant.MapEventSideId,
-                participant.MapEventPartyId));
+                participant.MapEventPartyId,
+                participant.PartyId));
             network.Send(participant.Peer, message);
         }
     }
@@ -357,17 +360,20 @@ internal class BattleMissionStartHandler : IHandler
         public NetPeer Peer { get; }
         public string MapEventSideId { get; }
         public string MapEventPartyId { get; }
+        public string PartyId { get; }
 
         public MissionParticipant(
             string controllerId,
             NetPeer peer,
             string mapEventSideId,
-            string mapEventPartyId)
+            string mapEventPartyId,
+            string partyId)
         {
             ControllerId = controllerId;
             Peer = peer;
             MapEventSideId = mapEventSideId;
             MapEventPartyId = mapEventPartyId;
+            PartyId = partyId;
         }
     }
 

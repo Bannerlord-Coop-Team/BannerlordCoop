@@ -51,6 +51,7 @@ namespace GameInterface.AutoSync.Builders
                 ReadOnly = fieldInfo.IsInitOnly,
                 ReadOnlySetterIndex = fieldInfo.IsInitOnly ? GetReadOnlyFieldSetter(fieldInfo) : (int?)null,
                 Debug = fieldItem.Debug,
+                TransientEquipment = fieldInfo.DeclaringType == typeof(TaleWorlds.Core.Equipment),
                 SuppressClientDiagnosticWhenUnregistered = fieldItem.SuppressClientDiagnosticWhenUnregistered
             });
         }

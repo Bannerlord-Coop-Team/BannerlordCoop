@@ -1,12 +1,15 @@
-using GameInterface.Services.Tournaments;
+﻿using GameInterface.Services.Tournaments;
 using GameInterface.Services.Tournaments.Data;
 using GameInterface.Services.Tournaments.UI;
 using SandBox.ViewModelCollection.Tournament;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
+using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.TournamentGames;
 using TaleWorlds.Core;
+using TaleWorlds.Library;
 using TaleWorlds.Localization;
 using Xunit;
 
@@ -143,6 +146,140 @@ public class TournamentBracketRebindTests
     }
 
     [Fact]
+    public void RebindCanonicalBracket_StableSlotReusesPortraitAndPreservesKnockoutState()
+    {
+        CharacterObject character = CreateCharacter("stable-character");
+        TournamentParticipant previousParticipant = CreateParticipant(character, 101, 1);
+        var roundViewModels = CreateRoundViewModels(
+            CreateFourRounds(CreateMatch(0, TournamentMatch.MatchState.Ready, false)));
+        TournamentParticipantVM participantViewModel = roundViewModels[0].Match1.Team1.Participant1;
+        SetParticipantIdentity(participantViewModel, previousParticipant);
+        participantViewModel.IsDead = true;
+        participantViewModel.Name = "stale-name";
+        participantViewModel.State = 2;
+        participantViewModel.IsMainHero = true;
+        var previousCharacter = participantViewModel.Character;
+        var previousVisual = participantViewModel.Visual;
+        var bindingNotifications = new List<string>();
+        participantViewModel.PropertyChangedWithValue += (_, args) =>
+            bindingNotifications.Add(args.PropertyName);
+
+        TournamentParticipant canonicalParticipant = CreateParticipant(character, 101, 9);
+        TournamentMatch canonicalMatch = CreateMatch(
+            new[] { canonicalParticipant },
+            TournamentMatch.MatchState.Finished,
+            0xFF112233,
+            canonicalParticipant);
+        TournamentRound[] canonicalRounds = CreateFourRounds(canonicalMatch);
+
+        TournamentMatchVM currentMatchViewModel = CoopTournamentVM.RebindCanonicalBracket(
+            roundViewModels,
+            canonicalRounds,
+            canonicalMatch,
+            index => new TextObject($"Round {index}"));
+
+        Assert.Same(previousCharacter, participantViewModel.Character);
+        Assert.Same(previousVisual, participantViewModel.Visual);
+        Assert.DoesNotContain(nameof(TournamentParticipantVM.Character), bindingNotifications);
+        Assert.DoesNotContain(nameof(TournamentParticipantVM.Visual), bindingNotifications);
+        Assert.Same(canonicalParticipant, participantViewModel.Participant);
+        Assert.Same(canonicalParticipant, GetLatestParticipant(participantViewModel));
+        Assert.Equal("9", participantViewModel.Score);
+        Assert.True(participantViewModel.IsQualifiedForNextRound);
+        Assert.Equal(Color.FromUint(0xFF112233), participantViewModel.TeamColor);
+        Assert.True(participantViewModel.IsDead);
+        Assert.Equal("stable-character", participantViewModel.Name);
+        Assert.Equal(1, participantViewModel.State);
+        Assert.False(participantViewModel.IsMainHero);
+        Assert.Equal(2, roundViewModels[0].Match1.State);
+        Assert.Same(roundViewModels[0].Match1, currentMatchViewModel);
+    }
+
+    [Theory]
+    [InlineData(true, false)]
+    [InlineData(false, true)]
+    public void CanReuseParticipantPortrait_IdentityChangeReturnsFalse(
+        bool changeCharacter,
+        bool changeDescriptor)
+    {
+        CharacterObject previousCharacterObject = CreateCharacter("previous-character");
+        TournamentParticipant previousParticipant = CreateParticipant(previousCharacterObject, 201, 1);
+        var roundViewModels = CreateRoundViewModels(
+            CreateFourRounds(CreateMatch(0, TournamentMatch.MatchState.Ready, false)));
+        TournamentParticipantVM participantViewModel = roundViewModels[0].Match1.Team1.Participant1;
+        SetParticipantIdentity(participantViewModel, previousParticipant);
+
+        CharacterObject canonicalCharacter = changeCharacter
+            ? CreateCharacter("replacement-character")
+            : previousCharacterObject;
+        int canonicalDescriptor = changeDescriptor ? 202 : 201;
+        TournamentParticipant canonicalParticipant = CreateParticipant(
+            canonicalCharacter,
+            canonicalDescriptor,
+            4);
+
+        Assert.False(CoopTournamentVM.CanReuseParticipantPortrait(
+            participantViewModel,
+            canonicalParticipant));
+    }
+
+    [Fact]
+    public void CanReuseParticipantPortrait_DoesNotSharePortraitAcrossRoundSlots()
+    {
+        CharacterObject character = CreateCharacter("advancing-character");
+        TournamentParticipant previousParticipant = CreateParticipant(character, 301, 1);
+        var roundViewModels = CreateRoundViewModels(
+            CreateFourRounds(CreateMatch(0, TournamentMatch.MatchState.Ready, false)));
+        TournamentParticipantVM firstRoundViewModel = roundViewModels[0].Match1.Team1.Participant1;
+        TournamentParticipantVM secondRoundViewModel = roundViewModels[1].Match1.Team1.Participant1;
+        SetParticipantIdentity(firstRoundViewModel, previousParticipant);
+
+        TournamentParticipant canonicalParticipant = CreateParticipant(character, 301, 5);
+
+        Assert.True(CoopTournamentVM.CanReuseParticipantPortrait(
+            firstRoundViewModel,
+            canonicalParticipant));
+        Assert.False(CoopTournamentVM.CanReuseParticipantPortrait(
+            secondRoundViewModel,
+            canonicalParticipant));
+    }
+
+    [Fact]
+    public void RebindCanonicalBracket_EmptyIntervalClearsIdentityBeforeReuseCheck()
+    {
+        CharacterObject character = CreateCharacter("returning-character");
+        TournamentParticipant previousParticipant = CreateParticipant(character, 401, 1);
+        var roundViewModels = CreateRoundViewModels(
+            CreateFourRounds(CreateMatch(0, TournamentMatch.MatchState.Ready, false)));
+        TournamentParticipantVM participantViewModel = roundViewModels[0].Match1.Team1.Participant1;
+        SetParticipantIdentity(participantViewModel, previousParticipant);
+        participantViewModel.IsDead = true;
+        TournamentMatch emptyMatch = CreateMatch(
+            Array.Empty<TournamentParticipant>(),
+            TournamentMatch.MatchState.Ready,
+            0xFF99AABB);
+        TournamentRound[] emptyRounds = CreateFourRounds(emptyMatch);
+
+        CoopTournamentVM.RebindCanonicalBracket(
+            roundViewModels,
+            emptyRounds,
+            emptyMatch,
+            index => new TextObject($"Round {index}"));
+
+        Assert.False(participantViewModel.IsValid);
+        Assert.True(participantViewModel.IsInitialized);
+        Assert.Null(participantViewModel.Participant);
+        Assert.Null(GetLatestParticipant(participantViewModel));
+        Assert.False(participantViewModel.IsDead);
+
+        TournamentParticipant returningParticipant = CreateParticipant(character, 401, 2);
+
+        Assert.False(CoopTournamentVM.CanReuseParticipantPortrait(
+            participantViewModel,
+            returningParticipant));
+    }
+
+    [Fact]
     public void TryApplyScores_AllowsAuthoritativeLaterRoundScoreToReplaceHydratedScore()
     {
         TournamentMatch match = CreateMatch(5, TournamentMatch.MatchState.Started, false);
@@ -244,6 +381,75 @@ public class TournamentBracketRebindTests
         round.CurrentMatchIndex = matches.Length - 1;
         return round;
     }
+
+    private static CharacterObject CreateCharacter(string stringId)
+    {
+        var character = new CharacterObject { StringId = stringId };
+        character._basicName = new TextObject(stringId);
+        return character;
+    }
+
+    private static TournamentParticipant CreateParticipant(
+        CharacterObject character,
+        int descriptorSeed,
+        int score)
+    {
+        var participant = new TournamentParticipant(
+            character,
+            new UniqueTroopDescriptor(descriptorSeed));
+        participant.Score = score;
+        return participant;
+    }
+
+    private static TournamentMatch CreateMatch(
+        IReadOnlyList<TournamentParticipant> participants,
+        TournamentMatch.MatchState state,
+        uint teamColor,
+        params TournamentParticipant[] winners)
+    {
+        int teamSize = Math.Max(1, participants.Count);
+        var match = new TournamentMatch(
+            teamSize,
+            1,
+            1,
+            TournamentGame.QualificationMode.TeamScore);
+        var team = new TournamentTeam(
+            teamSize,
+            teamColor,
+            Banner.CreateOneColoredEmptyBanner(119));
+        foreach (TournamentParticipant participant in participants)
+            team._participants.Add(participant);
+
+        match._teams[0] = team;
+        match._participants.Clear();
+        match._participants.AddRange(participants);
+        match._winners = winners.ToList();
+        match.State = state;
+        return match;
+    }
+
+    private static void SetParticipantIdentity(
+        TournamentParticipantVM participantViewModel,
+        TournamentParticipant participant)
+    {
+        typeof(TournamentParticipantVM)
+            .GetField("<Participant>k__BackingField", BindingFlags.Instance | BindingFlags.NonPublic)
+            .SetValue(participantViewModel, participant);
+        typeof(TournamentParticipantVM)
+            .GetField("_latestParticipant", BindingFlags.Instance | BindingFlags.NonPublic)
+            .SetValue(participantViewModel, participant);
+        participantViewModel.IsInitialized = true;
+        participantViewModel.IsValid = true;
+        participantViewModel.State = 1;
+        participantViewModel.Name = participant.Character.Name.ToString();
+        participantViewModel.IsMainHero = false;
+    }
+
+    private static TournamentParticipant GetLatestParticipant(
+        TournamentParticipantVM participantViewModel)
+        => (TournamentParticipant)typeof(TournamentParticipantVM)
+            .GetField("_latestParticipant", BindingFlags.Instance | BindingFlags.NonPublic)
+            .GetValue(participantViewModel);
 
     private static TournamentMatch CreateMatch(
         int score,

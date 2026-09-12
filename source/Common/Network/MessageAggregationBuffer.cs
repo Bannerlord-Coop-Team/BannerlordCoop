@@ -1,15 +1,16 @@
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 
 namespace Common.Network;
 
 /// <summary>
-/// Accumulates serialized message payloads destined for one peer until they fill a byte budget,
+/// Accumulates serialized message payloads for one destination until they fill a byte budget,
 /// so many small reliable messages leave as a few full packets instead of one packet each.
 /// </summary>
 /// <remarks>
 /// LiteNetLib's reliable channel caps unacked packets in flight (not bytes), so per-peer throughput
 /// is proportional to packet fullness; this buffer is what keeps world-sync bursts under that cap.
-/// Not thread-safe by itself — the owner locks around each call (see <c>CoopNetworkBase</c>), which
+/// Not thread-safe by itself — the owner locks around each call (see
+/// <see cref="ReliableMessageBatcher{TDestination}"/>), which
 /// also guarantees returned batches are sent in the order they were drained.
 /// </remarks>
 public class MessageAggregationBuffer
@@ -21,8 +22,8 @@ public class MessageAggregationBuffer
 
     /// <param name="budgetBytes">
     /// Combined payload size to aim for per batch. Callers pick it so a batch plus its envelope
-    /// framing fits one datagram at the link's LiteNetLib-negotiated packet size — see
-    /// <c>CoopNetworkBase.AggregationBudgetBytes</c> for the concrete numbers and rationale.
+    /// framing fits one datagram at the link's LiteNetLib-negotiated packet size. The shared
+    /// <see cref="ReliableMessageBatcher{TDestination}"/> supplies the production budget.
     /// </param>
     public MessageAggregationBuffer(int budgetBytes)
     {

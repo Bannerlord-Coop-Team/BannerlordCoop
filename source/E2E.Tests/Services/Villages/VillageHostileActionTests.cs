@@ -1,4 +1,5 @@
 ﻿using Common;
+using Common.Commands;
 using Common.Messaging;
 using Common.Network;
 using Coop.Core.Client.Services.MobileParties.Messages;
@@ -668,8 +669,8 @@ public class VillageHostileActionTests : MapEventTestBase
             .Append(AccessTools.Method(typeof(GameMenu), nameof(GameMenu.SwitchToMenu), new[] { typeof(string) }))
             .Append(AccessTools.Method(
                 typeof(E2E.Tests.Environment.TestNetworkRouter),
-                nameof(E2E.Tests.Environment.TestNetworkRouter.SendAll),
-                new[] { typeof(LiteNetLib.NetPeer), typeof(IMessage) }))
+                nameof(E2E.Tests.Environment.TestNetworkRouter.SendReliablePayload),
+                new[] { typeof(LiteNetLib.NetPeer), typeof(LiteNetLib.NetPeer), typeof(byte[]) }))
             .ToList();
 
         client.NetworkSentMessages.Clear();
@@ -980,6 +981,19 @@ public class VillageHostileActionTests : MapEventTestBase
     [Fact]
     public void RaidFinalizeRequest_EndingSlowRaidMovesRaiderToVillageGate()
     {
+        AssertSlowRaidExit(naturalCompletion: false, lateFinalizeRequest: false);
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void RaidMapEventUpdate_NaturalCompletionMovesRaiderToVillageGate(bool lateFinalizeRequest)
+    {
+        AssertSlowRaidExit(naturalCompletion: true, lateFinalizeRequest);
+    }
+
+    private void AssertSlowRaidExit(bool naturalCompletion, bool lateFinalizeRequest)
+    {
         var client = Clients.First();
         var (_, mobilePartyId) = CreatePlayerHeroParty("PlayerOne");
         var target = CreateVillageTarget();
@@ -1000,7 +1014,10 @@ public class VillageHostileActionTests : MapEventTestBase
                     mobileParty.Position = insidePosition;
                     mobileParty.CurrentSettlement = settlement;
                     mobileParty.ResetNavigationToHold();
+                    mobileParty.PartyMoveMode = MoveModeType.Point;
                 }
+                Assert.NotEqual(MoveModeType.Hold, mobileParty.PartyMoveMode);
+                Assert.Contains(mobileParty, settlement.Parties);
             });
         }
 
@@ -1043,12 +1060,103 @@ public class VillageHostileActionTests : MapEventTestBase
             .Append(AccessTools.Method(typeof(GameMenu), nameof(GameMenu.ExitToLast)))
             .ToList();
 
-        client.Call(() => client.Resolve<INetwork>().SendAll(new NetworkMapEventFinalizeAttempted(mapEventId!)), disabledMethods);
+        var raidCompletedCount = 0;
+        if (naturalCompletion)
+        {
+            var villageTypeId = TestEnvironment.CreateRegisteredObject<VillageType>();
+            Server.Call(() =>
+            {
+                Assert.True(Server.ObjectManager.TryGetObject<MapEvent>(mapEventId!, out var mapEvent));
+                Assert.True(Server.ObjectManager.TryGetObject<MobileParty>(mobilePartyId, out var mobileParty));
+                Assert.True(Server.ObjectManager.TryGetObject<Settlement>(target.SettlementId, out var settlement));
+                Assert.True(Server.ObjectManager.TryGetObject<VillageType>(villageTypeId, out var villageType));
+                villageType._productions = new MBList<(ItemObject, float)>();
+                settlement.Village.VillageType = villageType;
+                // Synthetic factions need distinct ids for vanilla's ordered stance lookup.
+                mobileParty.ActualClan.Id = new MBGUID(1);
+                ((Kingdom)settlement.MapFaction).Id = new MBGUID(2);
+                VillageHostileFactionStanceHelper.ApplyWarStance(mobileParty.MapFaction, settlement.MapFaction);
+                Assert.True(mapEvent.AttackerSide.LeaderParty.MapFaction.IsAtWarWith(mapEvent.DefenderSide.LeaderParty.MapFaction));
+                Assert.True(mapEvent.DefenderSide.LeaderParty.MapFaction.IsAtWarWith(mapEvent.AttackerSide.LeaderParty.MapFaction));
+                Assert.False(mapEvent.DiplomaticallyFinished);
+                Assert.Equal(0, mapEvent.DefenderSide.TroopCount);
+                CampaignEvents.RaidCompletedEvent.AddNonSerializedListener(this, (winner, component) =>
+                {
+                    Assert.True(GameThread.Instance.IsGameThread);
+                    Assert.False(AllowedThread.IsThisThreadAllowed());
+                    Assert.True(mapEvent._isFinishCalled);
+                    Assert.True(Server.ObjectManager.TryGetId(mapEvent, out var completingMapEventId));
+                    Assert.Equal(mapEventId, completingMapEventId);
+                    Assert.Equal(BattleSideEnum.Attacker, winner);
+                    Assert.Same(mapEvent.Component, component);
+                    raidCompletedCount++;
+                });
+
+                // Seed accumulated damage, but let the real update decide when the raid finishes.
+                var raid = Assert.IsType<RaidEventComponent>(mapEvent.Component);
+                settlement.SettlementHitPoints = 1f;
+                raid._nextSettlementDamage = 0.06f;
+                mapEvent.Update();
+                Assert.False(mapEvent.IsFinalized);
+                Assert.True(mapEvent.WasEverInLootingPhase);
+                Assert.True(settlement.SettlementHitPoints < 1f);
+                Assert.Same(settlement, mobileParty.CurrentSettlement);
+                Assert.Empty(Server.NetworkSentMessages.GetMessages<NetworkClosePvpEncounter>());
+
+                settlement.SettlementHitPoints = 0.01f;
+                raid._nextSettlementDamage = 0.06f;
+                mapEvent.Update();
+                Assert.True(mapEvent.IsFinalized);
+                Assert.True(mapEvent._isFinishCalled);
+                Assert.Equal(BattleState.AttackerVictory, mapEvent.BattleState);
+                Assert.Equal(1, raidCompletedCount);
+                mapEvent.Update();
+                Assert.Equal(1, raidCompletedCount);
+            }, disabledMethods);
+
+            Server.Call(() =>
+            {
+                Assert.True(Server.ObjectManager.TryGetObject<Settlement>(target.SettlementId, out var settlement));
+                Assert.Equal(0f, settlement.SettlementHitPoints);
+            });
+            foreach (var instance in Clients.Append(Server))
+            {
+                instance.Call(() =>
+                {
+                    Assert.False(instance.ObjectManager.TryGetObject<MapEvent>(mapEventId!, out _));
+                    Assert.True(instance.ObjectManager.TryGetObject<Village>(target.VillageId, out var village));
+                    Assert.Equal(Village.VillageStates.Looted, village.VillageState);
+                });
+            }
+        }
+        else
+        {
+            client.Call(() => client.Resolve<INetwork>().SendAll(new NetworkMapEventFinalizeAttempted(mapEventId!)), disabledMethods);
+        }
+
+        if (lateFinalizeRequest)
+            client.Call(() => client.Resolve<INetwork>().SendAll(new NetworkMapEventFinalizeAttempted(mapEventId!)), disabledMethods);
+
         AssertRaidPartyMovedToVillageGate(Server, mobilePartyId, target.SettlementId);
         foreach (var syncedClient in Clients)
         {
             AssertRaidPartyMovedToVillageGate(syncedClient, mobilePartyId, target.SettlementId);
         }
+
+        var close = Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkClosePvpEncounter>());
+        Assert.Contains(GetPartyBaseId(mobilePartyId), close.PartyIds);
+        Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkPartyLeaveSettlement>());
+        Assert.Empty(Server.NetworkSentMessages.GetMessages<NetworkRaidBattleResetToVillage>());
+        AssertHasPlayerEncounter(client, expected: false);
+        if (naturalCompletion)
+        {
+            Assert.Equal(1, raidCompletedCount);
+            Assert.Single(Server.InternalMessages.GetMessages<MapEventFinalizeAttempted>());
+        }
+        if (lateFinalizeRequest)
+            Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkMapEventFinalized>());
+        else
+            Assert.Empty(Server.NetworkSentMessages.GetMessages<NetworkMapEventFinalized>());
     }
 
     [Fact]
@@ -1457,8 +1565,11 @@ public class VillageHostileActionTests : MapEventTestBase
 
             client.Call(() =>
             {
-                var result = RaidDebugCommands.AllowRaidAiIntervention(new List<string> { "off" });
-                Assert.Contains("server update requested", result);
+                var command = new RaidDebugCommands.AllowRaidAiInterventionCoopCommand();
+                CoopCommandResult result = command.ProcessCommand(
+                    new CoopCommandArgsFactory().FromValues(new[] { "off" }));
+                Assert.True(result.Succeeded);
+                Assert.Contains("server update requested", result.Output);
             });
 
             var request = client.NetworkSentMessages.GetMessages<NetworkRequestRaidAiInterventionConfigChange>().Single();
@@ -1743,12 +1854,12 @@ public class VillageHostileActionTests : MapEventTestBase
         var disabledMethods = MapEventDisabledMethods
             .Append(AccessTools.Method(typeof(GameMenu), nameof(GameMenu.ActivateGameMenu), new[] { typeof(string) }))
             .Append(AccessTools.Method(typeof(GameMenu), nameof(GameMenu.SwitchToMenu), new[] { typeof(string) }))
-            // The E2E router delivers SendAll synchronously. Keep the outgoing request recorded, but avoid
+            // The E2E router delivers reliable payloads synchronously. Keep the outgoing request recorded, but avoid
             // server-side map-event mutation while native JoinBattleInternal is still building local state.
             .Append(AccessTools.Method(
                 typeof(E2E.Tests.Environment.TestNetworkRouter),
-                nameof(E2E.Tests.Environment.TestNetworkRouter.SendAll),
-                new[] { typeof(LiteNetLib.NetPeer), typeof(IMessage) }))
+                nameof(E2E.Tests.Environment.TestNetworkRouter.SendReliablePayload),
+                new[] { typeof(LiteNetLib.NetPeer), typeof(LiteNetLib.NetPeer), typeof(byte[]) }))
             .ToList();
 
         client.Call(() =>
@@ -1965,6 +2076,9 @@ public class VillageHostileActionTests : MapEventTestBase
 
             Assert.True(Server.NetworkSentMessages.GetMessages<NetworkBattleStartReply>().Single().Accepted);
             Assert.Equal(raidMapEventId, Server.NetworkSentMessages.GetMessages<NetworkStartAttackMission>().Single().MapEventId);
+
+            foreach (var instance in Clients)
+                instance.PumpGameThread();
         }
         finally
         {
@@ -2065,8 +2179,8 @@ public class VillageHostileActionTests : MapEventTestBase
             .Append(AccessTools.Method(typeof(GameMenu), nameof(GameMenu.SwitchToMenu), new[] { typeof(string) }))
             .Append(AccessTools.Method(
                 typeof(E2E.Tests.Environment.TestNetworkRouter),
-                nameof(E2E.Tests.Environment.TestNetworkRouter.SendAll),
-                new[] { typeof(LiteNetLib.NetPeer), typeof(IMessage) }))
+                nameof(E2E.Tests.Environment.TestNetworkRouter.SendReliablePayload),
+                new[] { typeof(LiteNetLib.NetPeer), typeof(LiteNetLib.NetPeer), typeof(byte[]) }))
             .ToList();
 
         client.NetworkSentMessages.Clear();
@@ -2199,6 +2313,9 @@ public class VillageHostileActionTests : MapEventTestBase
             Assert.Equal(
                 raidMapEventId,
                 Server.NetworkSentMessages.GetMessages<NetworkStartAttackMission>().Single().MapEventId);
+
+            foreach (var instance in Clients)
+                instance.PumpGameThread();
         }
         finally
         {
@@ -2753,6 +2870,8 @@ public class VillageHostileActionTests : MapEventTestBase
             Assert.True(instance.ObjectManager.TryGetObject<Settlement>(settlementId, out var settlement));
 
             Assert.Null(mobileParty.CurrentSettlement);
+            Assert.DoesNotContain(mobileParty, settlement.Parties);
+            Assert.Null(mobileParty.MapEvent);
             Assert.True(mobileParty.Position.Distance(settlement.GatePosition) < 0.001f);
             Assert.True(mobileParty.MoveTargetPoint.Distance(mobileParty.Position) < 0.001f);
             Assert.Equal(MoveModeType.Hold, mobileParty.PartyMoveMode);

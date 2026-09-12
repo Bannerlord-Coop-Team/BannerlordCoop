@@ -38,6 +38,18 @@ public static void {{MemberName}}_Intercept({{MemberDeclaringType}} instance, {{
     // Skip if value hasn´t changed
     if (currentValue != null && currentValue.Equals(newValue)) return;
 
+{{~ if TransientEquipment ~}}
+    if (GameInterface.Registry.Auto.TransientEquipmentSyncScope.IsActive)
+    {
+{{~ if ReadOnly ~}}
+        {{MemberName}}FieldInfo.SetValue(instance, newValue);
+{{~ else ~}}
+		instance.{{MemberName}} = newValue;
+{{~ end ~}}
+        return;
+    }
+{{~ end ~}}
+
     if (CallOriginalPolicy.IsOriginalAllowed())
     {
 {{~ if ReadOnly ~}}

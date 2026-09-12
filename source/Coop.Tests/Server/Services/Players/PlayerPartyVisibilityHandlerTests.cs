@@ -161,6 +161,7 @@ public class PlayerPartyVisibilityHandlerTests : IDisposable
         var peer = (NetPeer)FormatterServices.GetUninitializedObject(typeof(NetPeer));
         var player = CreatePlayer();
         var party = CreateParty(isActive: false);
+        var hero = CreateActiveHero();
         var settlement = (Settlement)FormatterServices.GetUninitializedObject(typeof(Settlement));
         party._currentSettlement = settlement;
         var playerManager = new Mock<IPlayerManager>();
@@ -174,6 +175,9 @@ public class PlayerPartyVisibilityHandlerTests : IDisposable
         var objectManager = new Mock<IObjectManager>();
         objectManager
             .Setup(manager => manager.TryGetObjectWithLogging(player.MobilePartyId, out party))
+            .Returns(true);
+        objectManager
+            .Setup(manager => manager.TryGetObjectWithLogging(player.HeroId, out hero))
             .Returns(true);
 
         var broker = new TestMessageBroker();
@@ -306,11 +310,15 @@ public class PlayerPartyVisibilityHandlerTests : IDisposable
     {
         var player = CreatePlayer();
         var party = CreateParty();
+        var hero = CreateActiveHero();
         var peer = (NetPeer)FormatterServices.GetUninitializedObject(typeof(NetPeer));
         var (playerManager, connectionCollection, objectManager) =
             CreateReleaseMocks(player, party, peer, isConnected: true, isSynchronized: false);
         objectManager
             .Setup(manager => manager.TryGetObjectWithLogging(player.MobilePartyId, out party))
+            .Returns(true);
+        objectManager
+            .Setup(manager => manager.TryGetObjectWithLogging(player.HeroId, out hero))
             .Returns(true);
         var broker = new TestMessageBroker();
         using var handler = new PlayerPartyVisibilityHandler(
@@ -429,6 +437,13 @@ public class PlayerPartyVisibilityHandlerTests : IDisposable
 
     private static Player CreatePlayer() =>
         new Player("PlayerOne", "Hero_One", "Party_One", "Clan_One", "Character_One");
+
+    private static Hero CreateActiveHero()
+    {
+        var hero = (Hero)FormatterServices.GetUninitializedObject(typeof(Hero));
+        hero._heroState = Hero.CharacterStates.Active;
+        return hero;
+    }
 
     private static MobileParty CreateParty(bool isActive = true)
     {

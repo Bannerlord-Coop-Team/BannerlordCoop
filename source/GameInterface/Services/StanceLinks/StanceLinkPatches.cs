@@ -23,6 +23,7 @@ internal class StanceLinkPatches
     {
         if (CallOriginalPolicy.IsOriginalAllowed()) return true;
         if (faction1.IsBanditFaction != faction2.IsBanditFaction) return true;
+        if (faction1.IsEliminated || faction2.IsEliminated) return true;
 
         StanceLink stanceLink = __instance._stances.GetStance(faction1, faction2);
         if (stanceLink == null)

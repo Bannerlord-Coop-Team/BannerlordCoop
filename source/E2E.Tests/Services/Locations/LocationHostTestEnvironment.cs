@@ -1,4 +1,4 @@
-using Common.Messaging;
+﻿using Common.Messaging;
 using E2E.Tests.Environment.Instance;
 using E2E.Tests.Services.Missions;
 using E2E.Tests.Util;
@@ -19,9 +19,8 @@ namespace E2E.Tests.Services.Locations;
 /// location instance (a server-side <see cref="Settlement"/> with one player party per controller
 /// inside it) and to drive + inspect the server-authoritative location host election.
 /// <para>
-/// Scope mirrors the battle env: election and migration travel the campaign <c>INetwork</c>, which the
-/// mock router replicates. NPC spawning/replication travel the P2P mesh and need a live Mission —
-/// exercised by unit tests and live checks instead.
+/// This base remains focused on campaign election state. <see cref="SettlementTestEnvironment"/>
+/// composes it with the headless mission engine and P2P mesh for vertical location tests.
 /// </para>
 /// </summary>
 public class LocationHostTestEnvironment : MissionTestEnvironment
@@ -59,7 +58,9 @@ public class LocationHostTestEnvironment : MissionTestEnvironment
         for (int i = 0; i < controllerIds.Length; i++)
         {
             var heroId = CreateRegisteredObject<Hero>();
-            RegisterAsPlayerParty(controllerIds[i], heroId, partyIds[i]);
+            string characterId = GetPlayerCharacterId(heroId, $"{controllerIds[i]}Character");
+            ConfigurePlayerIdentity(heroId, partyIds[i], characterId);
+            RegisterAsPlayerParty(controllerIds[i], heroId, partyIds[i], characterId);
         }
 
         var instanceId = ParkPartiesInNewSettlement(partyIds);
@@ -93,7 +94,52 @@ public class LocationHostTestEnvironment : MissionTestEnvironment
         });
 
         Assert.NotNull(settlementId);
-        return $"{settlementId}|{settlementId}_tavern";
+        string locationId = CreateRegisteredObject<TaleWorlds.CampaignSystem.Settlements.Locations.Location>();
+        return $"{settlementId}|{locationId}";
+    }
+
+    private string GetPlayerCharacterId(string heroId, string fallbackId)
+    {
+        string characterId = null;
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject<Hero>(heroId, out var hero));
+            Assert.NotNull(hero.CharacterObject);
+            if (!Server.ObjectManager.TryGetId(hero.CharacterObject, out characterId))
+            {
+                Assert.True(Server.ObjectManager.AddExisting(fallbackId, hero.CharacterObject));
+                characterId = fallbackId;
+            }
+        });
+        return characterId;
+    }
+
+    private void ConfigurePlayerIdentity(
+        string heroId,
+        string partyId,
+        string characterId)
+    {
+        void Configure(EnvironmentInstance instance)
+        {
+            instance.Call(() =>
+            {
+                Assert.True(instance.ObjectManager.TryGetObject<Hero>(heroId, out var hero));
+                Assert.True(instance.ObjectManager.TryGetObject<MobileParty>(partyId, out var party));
+                Assert.NotNull(hero.CharacterObject);
+
+                if (!instance.ObjectManager.TryGetId(hero.CharacterObject, out _))
+                    Assert.True(instance.ObjectManager.AddExisting(characterId, hero.CharacterObject));
+
+                using (new Common.Util.AllowedThread())
+                {
+                    hero.PartyBelongedTo = party;
+                }
+            });
+        }
+
+        Configure(Server);
+        foreach (var client in Clients)
+            Configure(client);
     }
 
     /// <summary>
