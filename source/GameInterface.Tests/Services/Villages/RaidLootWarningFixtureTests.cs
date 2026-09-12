@@ -170,6 +170,21 @@ public class RaidLootWarningFixtureTests
         Assert.Equal("failed-reload-baseline", session.Phase);
     }
 
+    [Fact]
+    public void OccupantGuard_AllowsOnlyTargetPlayerAndNativeMilitia()
+    {
+        var settlement = ObjectHelper.SkipConstructor<Settlement>();
+        var player = ObjectHelper.SkipConstructor<MobileParty>();
+        var militia = ObjectHelper.SkipConstructor<MobileParty>();
+        var visitor = ObjectHelper.SkipConstructor<MobileParty>();
+        visitor._currentSettlement = settlement;
+        Assert.False(RaidLootWarningFixture.IsUnexpectedOccupant(player, player, militia, settlement));
+        Assert.False(RaidLootWarningFixture.IsUnexpectedOccupant(militia, player, militia, settlement));
+        Assert.True(RaidLootWarningFixture.IsUnexpectedOccupant(visitor, player, militia, settlement));
+        visitor._currentSettlement = null;
+        Assert.False(RaidLootWarningFixture.IsUnexpectedOccupant(visitor, player, militia, settlement));
+    }
+
     private static RaidLootWarningFixture.FixtureSession CreateSession() => new(
         ObjectHelper.SkipConstructor<Campaign>(), "fixture-controller",
         ObjectHelper.SkipConstructor<MobileParty>(), ObjectHelper.SkipConstructor<Settlement>());

@@ -118,8 +118,11 @@ public sealed class RaidLootWarningFixture : IRaidLootWarningFixture
             settlement.Party.MemberRoster.GetTroopRoster().Any(x => x.Character.IsHero) ||
             settlement.Party.PrisonRoster.GetTroopRoster().Any(x => x.Character.IsHero))
             return "Use a baseline without companions or hero prisoners in either fixture roster.";
-        if (MobileParty.All.Any(x => x != party && x.CurrentSettlement == settlement))
-            return "Polisia must contain no other mobile parties.";
+        var militia = settlement.MilitiaPartyComponent?.MobileParty;
+        if (!CanStageMilitia(militia, settlement))
+            return "Polisia's native militia must be active, registered, inside the village and outside battles.";
+        if (MobileParty.All.Any(x => IsUnexpectedOccupant(x, party, militia, settlement)))
+            return "Polisia must contain no visiting mobile parties.";
         if (DefaultItems.Grain == null || !objectManager.TryGetId(DefaultItems.Grain, out _) ||
             !objectManager.TryGetId(hero.Culture.BasicTroop, out _) ||
             !objectManager.TryGetId(settlement.Culture.BasicTroop, out _) ||
@@ -129,6 +132,16 @@ public sealed class RaidLootWarningFixture : IRaidLootWarningFixture
             return "Polisia's gate position must be valid land.";
         return null;
     }
+
+    private bool CanStageMilitia(MobileParty militia, Settlement settlement) =>
+        militia == null || (militia.IsMilitia && militia.IsActive && militia.Party.IsActive &&
+            militia.CurrentSettlement == settlement && militia.MapEvent == null &&
+            objectManager.TryGetId(militia, out _) &&
+            !militia.MemberRoster.GetTroopRoster().Any(x => x.Character.IsHero) &&
+            !militia.PrisonRoster.GetTroopRoster().Any(x => x.Character.IsHero));
+
+    internal static bool IsUnexpectedOccupant(MobileParty occupant, MobileParty player, MobileParty militia, Settlement settlement) =>
+        occupant != player && occupant != militia && occupant.CurrentSettlement == settlement;
 
     private static bool IsIdleLandParty(MobileParty party) =>
         party?.Party != null && party.IsActive && party.Party.IsActive &&
@@ -144,6 +157,7 @@ public sealed class RaidLootWarningFixture : IRaidLootWarningFixture
         party.MemberRoster.TotalManCount == PlayerTroops + 1 &&
         settlement.Party.MemberRoster.TotalManCount == VillageTroops &&
         party.MemberRoster.TotalWounded == 0 && settlement.Party.MemberRoster.TotalWounded == 0 &&
+        (settlement.MilitiaPartyComponent?.MobileParty?.MemberRoster.TotalManCount ?? 0) == 0 &&
         party.MemberRoster.GetTroopCount(party.LeaderHero.Culture.BasicTroop) == PlayerTroops &&
         settlement.Party.MemberRoster.GetTroopCount(settlement.Culture.BasicTroop) == VillageTroops &&
         FactionManager.IsAtWarAgainstFaction(party.MapFaction, settlement.MapFaction);
@@ -165,6 +179,12 @@ public sealed class RaidLootWarningFixture : IRaidLootWarningFixture
         settlement.Party.MemberRoster.AddToCounts(settlement.Culture.BasicTroop, VillageTroops);
         settlement.Party.PrisonRoster.Clear();
         settlement.Party.ItemRoster.Clear();
+        var militia = settlement.MilitiaPartyComponent?.MobileParty;
+        if (militia != null)
+        {
+            militia.MemberRoster.Clear();
+            militia.PrisonRoster.Clear();
+        }
         settlement.SettlementHitPoints = 1f;
         party.Position = settlement.GatePosition;
         party.SetMoveModeHold();
@@ -217,6 +237,9 @@ public sealed class RaidLootWarningFixture : IRaidLootWarningFixture
         var simulation = ((topScreen as MapScreen)?._battleSimulationView as GauntletMapBattleSimulationView)?._dataSource;
         var currentEvent = party.MapEvent;
         var capturedEvent = session?.MapEvent;
+        var militia = settlement.MilitiaPartyComponent?.MobileParty;
+        string militiaId = null;
+        if (militia != null) objectManager.TryGetId(militia, out militiaId);
         objectManager.TryGetId(party, out var partyId);
         string eventId = null;
         if (currentEvent != null) objectManager.TryGetId(currentEvent, out eventId);
@@ -258,6 +281,9 @@ public sealed class RaidLootWarningFixture : IRaidLootWarningFixture
             partyPosition = new { x = party.Position.X, y = party.Position.Y, land = party.Position.IsOnLand },
             playerMembers = RosterState(party.MemberRoster),
             villageMembers = RosterState(settlement.Party.MemberRoster),
+            militiaId,
+            militiaCurrentSettlementId = militia?.CurrentSettlement?.StringId,
+            militiaMembers = militia == null ? null : RosterState(militia.MemberRoster),
             leaderHitPoints = party.LeaderHero?.HitPoints,
             atWar = FactionManager.IsAtWarAgainstFaction(party.MapFaction, settlement.MapFaction),
             allowRaidAiIntervention = MapEventConfig.AllowRaidAiIntervention,
