@@ -395,6 +395,8 @@ namespace Missions.Agents.Packets
             float? action0Speed,
             float? action1Speed)
         {
+            Equipment = AgentEquipmentData.TryCapture(agent, out var equipment)
+                ? equipment : (AgentEquipmentData?)null;
             ActionIndexCache cache0 = agent.GetCurrentAction(0);
             ActionIndexCache cache1 = agent.GetCurrentAction(1);
             bool isPlayerControlled =
@@ -749,6 +751,19 @@ namespace Missions.Agents.Packets
         public float? Action0Speed { get; }
         [ProtoMember(14)]
         public float? Action1Speed { get; }
+        [ProtoMember(15)]
+        public AgentEquipmentData? Equipment { get; private set; }
+        [ProtoMember(16)]
+        public long EquipmentRevision { get; private set; }
+
+        internal AgentActionData WithEquipment(long revision, AgentEquipmentData? equipment)
+        {
+            var snapshot = (AgentActionData)MemberwiseClone();
+            snapshot.EquipmentRevision = revision;
+            snapshot.Equipment = equipment;
+            return snapshot;
+        }
+
         [ProtoIgnore]
         public bool CrouchMode
         {

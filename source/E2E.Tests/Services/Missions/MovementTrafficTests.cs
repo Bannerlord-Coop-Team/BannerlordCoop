@@ -833,17 +833,12 @@ public class MovementTrafficTests : MissionTestEnvironment
             var pending = Assert.IsAssignableFrom<IDictionary>(recipientState.GetType()
                 .GetField("MovementPendingSince", BindingFlags.Instance | BindingFlags.Public)
                 ?.GetValue(recipientState));
-            var equipment = Assert.IsAssignableFrom<IDictionary>(typeof(AgentMovementHandler)
-                .GetField("lastEquipment", BindingFlags.Instance | BindingFlags.NonPublic)
-                ?.GetValue(handler));
             Assert.Single(pending.Keys);
-            Assert.Single(equipment.Keys);
 
             mirror.IsActive = false;
             handler.PollMovement(0.025f);
 
             Assert.Empty(pending.Keys);
-            Assert.Empty(equipment.Keys);
         });
     }
 
@@ -1245,7 +1240,7 @@ public class MovementTrafficTests : MissionTestEnvironment
     }
 
     [Fact]
-    public void PollMovement_SeedsSpawnEquipmentAndOnlySendsChanges()
+    public void PollMovement_DoesNotPublishIndependentEquipmentChanges()
     {
         using var fixture = new MissionEngineFixture();
         var peer = Clients.First();
@@ -1273,15 +1268,12 @@ public class MovementTrafficTests : MissionTestEnvironment
 
             mirror.PrimaryWieldedItemIndex = EquipmentIndex.Weapon2;
             component.AgentMovementHandler.PollMovement(0.025f);
-            var changed = Assert.Single(
-                network.NetworkSentPackets.GetPackets<AgentEquipmentPacket>());
-            Assert.Equal("peer", changed.IdentityScopeId);
-            Assert.Equal(new ushort[] { 1 }, changed.AgentIds);
+            Assert.Empty(network.NetworkSentPackets.GetPackets<AgentEquipmentPacket>());
         });
     }
 
     [Fact]
-    public void PollMovement_SendsInitialEquipmentForLegacyGuidAgents()
+    public void PollMovement_DoesNotPublishIndependentLegacyEquipment()
     {
         using var fixture = new MissionEngineFixture();
         var peer = Clients.First();
@@ -1298,9 +1290,7 @@ public class MovementTrafficTests : MissionTestEnvironment
 
             component.AgentMovementHandler.PollMovement(0f);
 
-            var initial = Assert.Single(
-                network.NetworkSentPackets.GetPackets<AgentEquipmentPacket>());
-            Assert.Equal(new[] { agentId }, initial.AgentGuids);
+            Assert.Empty(network.NetworkSentPackets.GetPackets<AgentEquipmentPacket>());
             var movement = Assert.Single(
                 network.NetworkSentPackets.GetPackets<MovementPacket>());
             Assert.Equal(new[] { agentId }, movement.AgentGuids);

@@ -155,7 +155,12 @@ public class BattleBlockingSyncTests : MissionTestEnvironment
                 Assert.Single(packet.Actions).GuardMode);
 
             context.Component.AgentActionHandler.CatchUpJoiner("joiner");
-            Assert.Empty(context.Network.DirectPacketSends);
+            var catchUp = Assert.IsType<AgentActionPacket>(Assert.Single(context.Network.DirectPacketSends).Packet);
+            Assert.All(catchUp.Actions, action =>
+            {
+                Assert.Equal(Agent.GuardMode.None, action.GuardMode);
+                Assert.NotNull(action.Equipment);
+            });
         });
     }
 
@@ -2446,6 +2451,101 @@ public class BattleBlockingSyncTests : MissionTestEnvironment
             .Controller(controllerType));
         Assert.True(AgentMirror.TryGet(agent, out mirror));
         return agent;
+    }
+
+    [Fact]
+    public void EquipmentReference_NewHostEpochRequiresFreshBaseline()
+    {
+        const string mapEventId = "mapEvent1";
+        RunBattleScenario("observer", mapEventId, context =>
+        {
+            context.Broker.Publish(this, new NetworkMissionPeerEntered("A", mapEventId));
+            AssignBattleHost(context, mapEventId, "A", Array.Empty<string>(), epoch: 1);
+            DrainGameThread();
+            Guid id = Guid.NewGuid();
+            SpawnRegisteredAgent(context, "A", id, AgentControllerType.None, out MirrorAgent puppet);
+            Agent owner = SpawnAgent(context, AgentControllerType.AI, out MirrorAgent ownerMirror);
+            ownerMirror.Action0Index = 1001;
+            var first = new AgentActionData(owner);
+            context.Component.AgentActionHandler.HandlePacket(null, new AgentActionPacket("A",
+                new[] { id }, new[] { first.WithEquipment(1, first.Equipment) }, new[] { 1L }, 1));
+            DrainGameThread();
+            Assert.Equal(1001, puppet.Action0Index);
+
+            AssignBattleHost(context, mapEventId, "A", Array.Empty<string>(), epoch: 2);
+            DrainGameThread();
+            ownerMirror.Action0Index = 1002;
+            var next = new AgentActionData(owner);
+            context.Component.AgentActionHandler.HandlePacket(null, new AgentActionPacket("A",
+                new[] { id }, new[] { next.WithEquipment(1, null) }, new[] { 2L }, 2));
+            DrainGameThread();
+            context.Component.AgentActionHandler.ApplyRemoteGuardStates();
+            Assert.Equal(1001, puppet.Action0Index);
+
+            context.Component.AgentActionHandler.HandlePacket(null, new AgentActionPacket("A",
+                new[] { id }, new[] { next.WithEquipment(1, next.Equipment) }, new[] { 3L }, 2));
+            DrainGameThread();
+            Assert.Equal(1002, puppet.Action0Index);
+        });
+    }
+
+    [Theory]
+    [InlineData(false, false)]
+    [InlineData(false, true)]
+    [InlineData(true, false)]
+    [InlineData(true, true)]
+    public void EquipmentReference_FormerHostUsesOrdinaryBaseline(
+        bool regainAuthority, bool referenceBeforeBaseline)
+    {
+        const string mapEventId = "mapEvent1";
+        RunBattleScenario("observer", mapEventId, context =>
+        {
+            context.Broker.Publish(this, new NetworkMissionPeerEntered("A", mapEventId));
+            context.Broker.Publish(this, new NetworkMissionPeerEntered("B", mapEventId));
+            AssignBattleHost(context, mapEventId, "A", new[] { "B" }, epoch: 1);
+            DrainGameThread();
+            Guid id = Guid.NewGuid();
+            SpawnRegisteredAgent(context, "A", id, AgentControllerType.None, out MirrorAgent puppet);
+            Agent owner = SpawnAgent(context, AgentControllerType.AI, out MirrorAgent ownerMirror);
+
+            void SendAction(int actionIndex, long sequence, long revision, int epoch, bool full)
+            {
+                ownerMirror.Action0Index = actionIndex;
+                var data = new AgentActionData(owner);
+                context.Component.AgentActionHandler.HandlePacket(null, new AgentActionPacket("A",
+                    new[] { id }, new[] { data.WithEquipment(revision, full ? data.Equipment : null) },
+                    new[] { sequence }, epoch));
+                DrainGameThread();
+                context.Component.AgentActionHandler.ApplyRemoteGuardStates();
+            }
+
+            SendAction(1001, sequence: 1, revision: 1, epoch: 1, full: true);
+            Assert.Equal(1001, puppet.Action0Index);
+            AssignBattleHost(context, mapEventId, "B", Array.Empty<string>(), epoch: 2);
+            DrainGameThread();
+            if (regainAuthority)
+            {
+                Assert.True(context.Registry.TryTransferAuthority("B", id));
+                Assert.True(context.Registry.TryTransferAuthority("A", id));
+            }
+
+            if (referenceBeforeBaseline)
+            {
+                SendAction(1002, sequence: 3, revision: 2, epoch: 0, full: false);
+                Assert.Equal(1001, puppet.Action0Index);
+            }
+            SendAction(1002, sequence: 2, revision: 2, epoch: 0, full: true);
+            Assert.Equal(1002, puppet.Action0Index);
+            SendAction(1003, sequence: 4, revision: 2, epoch: 0, full: false);
+            Assert.Equal(1003, puppet.Action0Index);
+
+            SendAction(1004, sequence: 5, revision: 99, epoch: 1, full: true);
+            Assert.Equal(1003, puppet.Action0Index);
+            SendAction(1004, sequence: 6, revision: 99, epoch: 1, full: false);
+            Assert.Equal(1003, puppet.Action0Index);
+            SendAction(1005, sequence: 7, revision: 2, epoch: 0, full: false);
+            Assert.Equal(1005, puppet.Action0Index);
+        });
     }
 
     private static Agent SpawnRegisteredAgent(
