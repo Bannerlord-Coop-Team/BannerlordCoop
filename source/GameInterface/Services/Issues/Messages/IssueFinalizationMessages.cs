@@ -28,15 +28,17 @@ public readonly struct IssueFinalizedTriggered : IEvent
     }
 }
 
-public readonly struct QuestSuccessTriggered : IEvent
+public readonly struct QuestTerminalOutcomeTriggered : IEvent
 {
     public readonly Hero Owner;
     public readonly string ControllerId;
+    public readonly IssueFinalizeReason Reason;
 
-    public QuestSuccessTriggered(Hero owner, string controllerId)
+    public QuestTerminalOutcomeTriggered(Hero owner, string controllerId, IssueFinalizeReason reason)
     {
         Owner = owner;
         ControllerId = controllerId;
+        Reason = reason;
     }
 }
 
