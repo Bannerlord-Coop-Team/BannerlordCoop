@@ -7,11 +7,13 @@ namespace GameInterface.Services.Issues.Generic;
 public static class QuestTypeRegistry
 {
     private static readonly Dictionary<Type, QuestTypeDescriptor> ByIssueType = new();
+    private static readonly Dictionary<string, QuestTypeDescriptor> ByDisplayName = new();
 
     public static void Register(QuestTypeDescriptor descriptor)
     {
         if (descriptor?.IssueType == null) return;
         ByIssueType[descriptor.IssueType] = descriptor;
+        if (!string.IsNullOrEmpty(descriptor.DisplayName)) ByDisplayName[descriptor.DisplayName] = descriptor;
     }
 
     public static QuestTypeDescriptor Get(Type issueType) =>
@@ -19,7 +21,14 @@ public static class QuestTypeRegistry
 
     public static QuestTypeDescriptor Get(IssueBase issue) => issue != null ? Get(issue.GetType()) : null;
 
+    public static QuestTypeDescriptor GetByDisplayName(string displayName) =>
+        !string.IsNullOrEmpty(displayName) && ByDisplayName.TryGetValue(displayName, out var descriptor) ? descriptor : null;
+
     public static bool IsRegistered(Type issueType) => issueType != null && ByIssueType.ContainsKey(issueType);
 
-    internal static void ClearAllForTests() => ByIssueType.Clear();
+    internal static void ClearAllForTests()
+    {
+        ByIssueType.Clear();
+        ByDisplayName.Clear();
+    }
 }

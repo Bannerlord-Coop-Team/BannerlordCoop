@@ -15,6 +15,7 @@ using Coop.Tests.Extensions;
 using Coop.Tests.Mocks;
 using GameInterface.Services.Heroes.Enum;
 using GameInterface.Services.MobileParties.Data;
+using GameInterface.Services.Players;
 using LiteNetLib;
 using Moq;
 using System;
@@ -35,6 +36,7 @@ namespace Coop.Tests.Server.Connections.States
         private readonly ServerTestComponent serverComponent;
         private readonly Mock<IJoinCampaignBaselineSender> baselineSender;
         private readonly Mock<IJoinCampaignKingdomBaseLineSender> kingdomBaselineSender;
+        private readonly IPlayerManager playerManager;
 
         public LoadingStateTests(ITestOutputHelper output)
         {
@@ -50,6 +52,7 @@ namespace Coop.Tests.Server.Connections.States
             container.Resolve<IConnectionMessageQueue>().BeginQueueing(playerPeer);
             baselineSender = container.Resolve<Mock<IJoinCampaignBaselineSender>>();
             kingdomBaselineSender = container.Resolve<Mock<IJoinCampaignKingdomBaseLineSender>>();
+            playerManager = container.Resolve<IPlayerManager>();
 
             differentPeer.SetId(playerPeer.Id + 1);
         }
@@ -224,7 +227,8 @@ namespace Coop.Tests.Server.Connections.States
                 baselineSender.Object,
                 kingdomBaselineSender.Object,
                 queueMock.Object,
-                coalescerMock.Object);
+                coalescerMock.Object,
+                playerManager);
             connectionLogicMock.SetupGet(logic => logic.State).Returns(state);
 
             CampaignEntered(state);
@@ -301,7 +305,8 @@ namespace Coop.Tests.Server.Connections.States
                 baselineSender.Object,
                 kingdomBaselineSender.Object,
                 queueMock.Object,
-                coalescerMock.Object);
+                coalescerMock.Object,
+                playerManager);
             connectionLogicMock.SetupGet(logic => logic.State).Returns(state);
 
             CampaignEntered(state);
@@ -360,7 +365,8 @@ namespace Coop.Tests.Server.Connections.States
                 senderMock.Object,
                 kingdomBaselineSender.Object,
                 queueMock.Object,
-                coalescerMock.Object);
+                coalescerMock.Object,
+                playerManager);
             connectionLogicMock.SetupGet(logic => logic.State).Returns(state);
 
             CampaignEntered(state);
@@ -415,7 +421,8 @@ namespace Coop.Tests.Server.Connections.States
                 baselineSender.Object,
                 kingdomBaselineSender.Object,
                 new Mock<IConnectionMessageQueue>().Object,
-                new Mock<ISendCoalescer>().Object);
+                new Mock<ISendCoalescer>().Object,
+                playerManager);
             connectionLogicMock.SetupGet(logic => logic.State).Returns(state);
             networkMock
                 .Setup(network => network.SendImmediate(playerPeer, It.IsAny<IMessage>()))
@@ -472,7 +479,8 @@ namespace Coop.Tests.Server.Connections.States
                 senderMock.Object,
                 kingdomBaselineSender.Object,
                 queueMock.Object,
-                coalescerMock.Object);
+                coalescerMock.Object,
+                playerManager);
             connectionLogicMock.SetupGet(logic => logic.State).Returns(state);
 
             StartBaseline(state);
@@ -524,7 +532,8 @@ namespace Coop.Tests.Server.Connections.States
                 senderMock.Object,
                 kingdomBaselineSender.Object,
                 queueMock.Object,
-                coalescerMock.Object);
+                coalescerMock.Object,
+                playerManager);
             connectionLogicMock.SetupGet(logic => logic.State).Returns(state);
 
             StartBaseline(state);
@@ -609,7 +618,8 @@ namespace Coop.Tests.Server.Connections.States
                 senderMock.Object,
                 kingdomBaselineSender.Object,
                 queueMock.Object,
-                coalescerMock.Object);
+                coalescerMock.Object,
+                playerManager);
             connectionLogicMock.SetupGet(logic => logic.State).Returns(state);
 
             StartBaseline(state);
@@ -794,7 +804,8 @@ namespace Coop.Tests.Server.Connections.States
                 baselineSender.Object,
                 kingdomBaselineSender.Object,
                 queueMock.Object,
-                coalescerMock.Object);
+                coalescerMock.Object,
+                playerManager);
             connectionLogicMock.SetupGet(logic => logic.State).Returns(state);
             using var worldReadyFlushEntered = new ManualResetEventSlim(false);
             using var releaseWorldReadyFlush = new ManualResetEventSlim(false);

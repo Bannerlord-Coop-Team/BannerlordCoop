@@ -76,6 +76,10 @@ public interface IPlayerManager
     /// </summary>
     bool IsConnected(Player player);
 
+    void MarkCampaignReady(string controllerId);
+
+    bool IsCampaignReady(Player player);
+
     /// <summary>
     /// Checks whether the given mobileParty's owner is disconnected.
     /// </summary>
@@ -97,6 +101,7 @@ public class PlayerManager : IPlayerManager
     private readonly IControllerIdProvider controllerIdProvider;
     private readonly ConcurrentDictionary<NetPeer, Player> peerToPlayer = new();
     private readonly Dictionary<string, NetPeer> controllerToPeer = new();
+    private readonly HashSet<string> campaignReadyControllerIds = new();
 
     // Guards _players and controllerToPeer: registrations mutate on the game thread (e.g. a
     // player deletion) while join handlers read them on the network thread.
@@ -309,6 +314,28 @@ public class PlayerManager : IPlayerManager
             if (controllerToPeer.TryGetValue(player.ControllerId, out var currentPeer) &&
                 ReferenceEquals(currentPeer, peer))
                 controllerToPeer.Remove(player.ControllerId);
+
+            campaignReadyControllerIds.Remove(player.ControllerId);
+        }
+    }
+
+    public void MarkCampaignReady(string controllerId)
+    {
+        if (string.IsNullOrEmpty(controllerId)) return;
+
+        lock (registrySync)
+        {
+            campaignReadyControllerIds.Add(controllerId);
+        }
+    }
+
+    public bool IsCampaignReady(Player player)
+    {
+        if (player == null) return false;
+
+        lock (registrySync)
+        {
+            return campaignReadyControllerIds.Contains(player.ControllerId);
         }
     }
 
@@ -327,6 +354,7 @@ public class PlayerManager : IPlayerManager
 
             _players.Remove(player.ControllerId);
             controllerToPeer.Remove(player.ControllerId);
+            campaignReadyControllerIds.Remove(player.ControllerId);
 
             // A rejoin adds a fresh peer link without clearing the old one, so sweep every peer
             // still mapped to this player, not just the current one.
