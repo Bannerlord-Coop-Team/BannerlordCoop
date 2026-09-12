@@ -213,6 +213,7 @@
     <Publicize Include="TaleWorlds.MountAndBlade" />
     <Publicize Include="TaleWorlds.MountAndBlade.View:TaleWorlds.MountAndBlade.View.MissionViews.MissionMainAgentInteractionComponent._currentInteractableObject" />
     <Publicize Include="TaleWorlds.MountAndBlade.View:TaleWorlds.MountAndBlade.View.MissionViews.MissionMainAgentController._autoDismountModeActive" />
+    <Publicize Include="TaleWorlds.MountAndBlade.View:TaleWorlds.MountAndBlade.View.MissionViews.MissionMainAgentController._activated" />
     <Publicize Include="TaleWorlds.ObjectSystem" />
     <Publicize Include="TaleWorlds.SaveSystem" />
     <Publicize Include="TaleWorlds.MountAndBlade.Mission" />

@@ -44,6 +44,14 @@ public class SiegeInteractionDebugBehaviorTests
     }
 
     [Fact]
+    public void FocusDiagnosticsWithoutStaging_DoesNotAccessNativeState()
+    {
+        var behavior = new SiegeInteractionDebugBehavior(Mock.Of<IMessageBroker>());
+        Assert.Null(AccessTools.Method(typeof(SiegeInteractionDebugBehavior), "ReadFocusDiagnostic")
+            .Invoke(behavior, new object[] { null, null }));
+    }
+
+    [Fact]
     public void PassingCaptureGuard_DoesNotOverwritePriorDiagnostic()
     {
         var behavior = new SiegeInteractionDebugBehavior(Mock.Of<IMessageBroker>());

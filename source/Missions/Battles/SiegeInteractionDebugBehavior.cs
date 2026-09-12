@@ -401,6 +401,7 @@ internal sealed class SiegeInteractionDebugBehavior : MissionBehavior, ISiegeInt
             fixtureActive = capturedAgent != null,
             fixtureRestored, captureFailureReason,
             stagingCameraActive = stagingCamera != null && ReferenceEquals(screen?.CustomCamera, stagingCamera),
+            focusDiagnostic = ReadFocusDiagnostic(screen, agent),
             inputSamples = inputSamples.ToArray(),
             receivedStates, localShots, receivedShots,
             equipment = ReadEquipment(agent),
@@ -429,6 +430,94 @@ internal sealed class SiegeInteractionDebugBehavior : MissionBehavior, ISiegeInt
                 }).ToArray()
             }).ToArray()
         };
+    }
+
+    internal object ReadFocusDiagnostic(MissionScreen screen, Agent agent)
+    {
+        if (ReferenceEquals(stagingCamera, null) || ReferenceEquals(capturedAgent, null) || removed) return null;
+        object gates = null;
+        try
+        {
+            var controller = Mission?.GetMissionBehavior<MissionMainAgentController>();
+            var focusAgent = Agent.Main;
+            gates = new
+            {
+                controllerPresent = controller != null,
+                controllerDisabled = controller?.IsDisabled,
+                controllerActivated = controller?._activated,
+                agentState = agent == null ? (int?)null : (int)agent.State,
+                agentAIControlled = agent?.IsAIControlled,
+                sameFocusAgent = ReferenceEquals(agent, focusAgent),
+                focusAgentPresent = focusAgent != null,
+                ghostMode = screen?.IsCheatGhostMode,
+                photoMode = screen?.IsPhotoModeEnabled,
+                missionMode = Mission == null ? (int?)null : (int)Mission.Mode,
+                itemInteractionEnabled = Mission?.IsMainAgentItemInteractionEnabled,
+                objectInteractionEnabled = Mission?.IsMainAgentObjectInteractionEnabled,
+                focusMountable = interaction?._currentInteractableObject is Agent mount && mount.IsMount,
+                orderMenuOpen = Mission?.IsOrderMenuOpen,
+                key25Down = screen?.SceneLayer?.Input?.IsGameKeyDown(25),
+                ableToUseMachine = focusAgent?.IsAbleToUseMachine()
+            };
+            if (screen?.CombatCamera == null || focusAgent == null || Mission?.Scene == null)
+                return new { tick, requestId, gates, unavailable = "camera_agent_or_scene_missing" };
+            var camera = screen.CombatCamera;
+            var position = camera.Position;
+            var direction = camera.Direction;
+            var agentPosition = focusAgent.Position;
+            float horizontalDistance = new Vec2(position.X, position.Y)
+                .Distance(new Vec2(agentPosition.X, agentPosition.Y));
+            var origin = position + (direction * horizontalDistance);
+            float length = 10f;
+            bool blockerHit = Mission.Scene.FocusRayCastForFixedPhysics(origin, origin + (direction * length),
+                out float blockerDistance, out Vec3 blockerPoint, out WeakGameEntity blocker,
+                0.01f, unchecked((BodyFlags)(-251707585)));
+            if (blockerHit) length = blockerDistance;
+            bool terrainHit = Mission.Scene.RayCastForClosestEntityOrTerrain(origin, origin + (direction * length),
+                out float terrainDistance, out Vec3 terrainPoint, out WeakGameEntity terrain,
+                0.01f, unchecked((BodyFlags)(-251707585)));
+            if (terrainHit && terrainDistance < length) length = terrainDistance;
+            bool focusHit = Mission.Scene.FocusRayCastForFixedPhysics(origin, origin + (direction * (length + 0.1f)),
+                out float focusDistance, out Vec3 focusPoint, out WeakGameEntity hit,
+                0.2f, (BodyFlags)79617);
+            return new
+            {
+                tick, requestId, gates,
+                agentPosition = new[] { agentPosition.X, agentPosition.Y, agentPosition.Z },
+                cameraPosition = new[] { position.X, position.Y, position.Z },
+                cameraDirection = new[] { direction.X, direction.Y, direction.Z },
+                stagingPosition = new[] { stagingCamera.Position.X, stagingCamera.Position.Y, stagingCamera.Position.Z },
+                stagingDirection = new[] { stagingCamera.Direction.X, stagingCamera.Direction.Y, stagingCamera.Direction.Z },
+                rayOrigin = new[] { origin.X, origin.Y, origin.Z },
+                // These read-only probes do not replace vanilla's agent and wider fallback ray selection.
+                rayProbe = new
+                {
+                    length, blockerHit, blockerDistance, blockerAncestors = DescribeAncestors(blocker),
+                    terrainHit, terrainDistance, terrainAncestors = DescribeAncestors(terrain),
+                    focusHit, focusDistance, focusAncestors = DescribeAncestors(hit)
+                }
+            };
+        }
+        catch (Exception exception)
+        {
+            return new { tick, requestId, gates, diagnosticError = exception.ToString() };
+        }
+    }
+
+    private static object[] DescribeAncestors(WeakGameEntity entity)
+    {
+        var ancestors = new List<object>();
+        for (int depth = 0; entity.IsValid && depth < 16; depth++, entity = entity.Parent)
+        {
+            var focus = entity.GetFirstScriptWithInterfaceOfType<IFocusable>();
+            var missionObject = entity.GetFirstScriptOfType<MissionObject>();
+            ancestors.Add(new
+            {
+                depth, id = missionObject?.Id.Id, type = missionObject?.GetType().Name,
+                focus = Describe(focus), isFocusable = focus?.IsFocusable
+            });
+        }
+        return ancestors.ToArray();
     }
 
     private static object[] ReadEquipment(Agent agent)
