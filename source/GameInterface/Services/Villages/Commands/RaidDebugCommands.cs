@@ -1,11 +1,10 @@
-﻿using Common.Commands;
-using Autofac;
-using Common;
+﻿using Common;
+using Common.Commands;
 using Common.Network;
 using GameInterface.Services.MapEvents;
 using GameInterface.Services.MapEvents.Handlers;
 using GameInterface.Services.MapEvents.Messages;
-using System.Collections.Generic;
+
 namespace GameInterface.Services.Villages.Commands;
 
 public class RaidDebugCommands
@@ -33,7 +32,6 @@ public class RaidDebugCommands
 
         public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
         {
-
             var value = args[0].ToLowerInvariant();
             switch (value)
             {
@@ -52,7 +50,6 @@ public class RaidDebugCommands
                 default:
                     return Failed("Invalid action. Use on, off, toggle, or status.");
             }
-
         }
     }
 
@@ -73,4 +70,49 @@ public class RaidDebugCommands
 
         return RaidAiInterventionConfigHandler.StatusText + " (server update requested)";
     }
+
+#if DEBUG
+    public sealed class PrepareRaidLootWarningCoopCommand : ICoopCommand
+    {
+        private readonly IRaidLootWarningFixture fixture;
+
+        public PrepareRaidLootWarningCoopCommand(IRaidLootWarningFixture fixture)
+        {
+            this.fixture = fixture;
+        }
+
+        public string Prefix => "coop.debug.mapevent";
+        public string Name => "raid_loot_warning_prepare";
+        public string Description => "Stages Polisia on an explicitly disposable baseline for issue 3262.";
+        public CoopCommandSide Side => CoopCommandSide.Server;
+        public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
+        {
+            new ExpectedArgs("controllerId", "Registered controller id, or only-connected for a one-client session."),
+            new ExpectedArgs("baseline", "Must be disposable-baseline; reload the copied baseline between cases."),
+        };
+
+        public CoopCommandResult ProcessCommand(ICoopCommandArgs args) => fixture.Prepare(args[0], args[1]);
+    }
+
+    public sealed class RaidLootWarningStateCoopCommand : ICoopCommand
+    {
+        private readonly IRaidLootWarningFixture fixture;
+
+        public RaidLootWarningStateCoopCommand(IRaidLootWarningFixture fixture)
+        {
+            this.fixture = fixture;
+        }
+
+        public string Prefix => "coop.debug.mapevent";
+        public string Name => "raid_loot_warning_state";
+        public string Description => "Reads issue 3262 party, event and native loot UI state without advancing it.";
+        public CoopCommandSide Side => CoopCommandSide.Both;
+        public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
+        {
+            new ExpectedArgs("controllerId", "Registered controller id, or only-connected for a one-client session."),
+        };
+
+        public CoopCommandResult ProcessCommand(ICoopCommandArgs args) => fixture.ReadState(args[0]);
+    }
+#endif
 }
