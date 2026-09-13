@@ -1277,15 +1277,9 @@ public class RemoteAgentActionProcessor : IRemoteAgentActionProcessor
 
         if (actionsByController.TryGetValue(action.ControllerId, out var existing))
         {
-            if (existing.BattleHostEpoch > action.BattleHostEpoch)
-            {
-                bool replacesFormerHost = action.BattleHostEpoch == 0
-                    && agentRegistry.TryGetAgentInfo(agentId, out var info)
-                    && IsCurrentActionAuthority(info, action.ControllerId, action.BattleHostEpoch)
-                    && !IsCurrentActionAuthority(info, existing.ControllerId, existing.BattleHostEpoch);
-                if (!replacesFormerHost)
-                    return;
-            }
+            // A sender's ordinary snapshot can arrive before registration or host assignment.
+            if (action.BattleHostEpoch > 0 && existing.BattleHostEpoch > action.BattleHostEpoch)
+                return;
             if (existing.BattleHostEpoch == action.BattleHostEpoch
                 && existing.Sequence >= action.Sequence)
                 return;

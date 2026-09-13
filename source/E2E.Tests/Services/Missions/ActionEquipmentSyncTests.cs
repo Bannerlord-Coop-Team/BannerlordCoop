@@ -405,12 +405,18 @@ public class ActionEquipmentSyncTests : MissionTestEnvironment
     }
 
     [Theory]
-    [InlineData(false, false)]
-    [InlineData(false, true)]
-    [InlineData(true, false)]
-    [InlineData(true, true)]
+    [InlineData(false, false, false, false)]
+    [InlineData(false, true, false, false)]
+    [InlineData(true, false, false, false)]
+    [InlineData(true, true, false, false)]
+    [InlineData(false, false, true, false)]
+    [InlineData(false, true, true, false)]
+    [InlineData(false, false, false, true)]
+    [InlineData(false, true, false, true)]
+    [InlineData(false, false, true, true)]
+    [InlineData(false, true, true, true)]
     public void FormerHost_PendingOrdinaryActionReplaysWhenEquipmentArrives(
-        bool regainAuthority, bool latestIsReference)
+        bool regainAuthority, bool latestIsReference, bool delayRegistration, bool delayAssignment)
     {
         RunScenario(context =>
         {
@@ -439,7 +445,12 @@ public class ActionEquipmentSyncTests : MissionTestEnvironment
 
                 AssignHost("A", 1);
                 Agent owner = context.Spawn("A", out MirrorAgent ownerMirror, out _);
-                context.Spawn("A", out MirrorAgent puppet, out Guid id);
+                Guid id = Guid.NewGuid();
+                Agent puppetAgent = context.Mission.SpawnAgent(new AgentBuildData(Game.Current.PlayerTroop)
+                    .Controller(AgentControllerType.None));
+                Assert.True(AgentMirror.TryGet(puppetAgent, out MirrorAgent puppet));
+                if (!delayRegistration)
+                    Assert.True(context.Registry.TryRegisterAgent("A", id, puppetAgent));
                 ownerMirror.Equipment[EquipmentIndex.Weapon0] = Weapon("sword");
                 ownerMirror.PrimaryWieldedItemIndex = EquipmentIndex.Weapon0;
                 ownerMirror.Action0Index = 1001;
@@ -447,7 +458,7 @@ public class ActionEquipmentSyncTests : MissionTestEnvironment
                 ReceiveWithoutSweep(RevisionPacket(owner, id, 1, 1, true, "A", 1));
                 Assert.Equal(0, puppet.SetActionChannelCalls);
 
-                AssignHost("B", 2);
+                if (!delayAssignment) AssignHost("B", 2);
                 if (regainAuthority)
                 {
                     Assert.True(context.Registry.TryTransferAuthority("B", id));
@@ -457,6 +468,9 @@ public class ActionEquipmentSyncTests : MissionTestEnvironment
                 ReceiveWithoutSweep(RevisionPacket(owner, id, 2, 2, true, "A", 0));
                 ownerMirror.Action0Index = 1003;
                 ReceiveWithoutSweep(RevisionPacket(owner, id, 3, 2, !latestIsReference, "A", 0));
+                if (delayRegistration)
+                    Assert.True(context.Registry.TryRegisterAgent("A", id, puppetAgent));
+                if (delayAssignment) AssignHost("B", 2);
                 ownerMirror.Action0Index = 1004;
                 ReceiveWithoutSweep(RevisionPacket(owner, id, 4, 99, true, "A", 1));
                 context.Component.AgentActionHandler.ApplyRemoteGuardStates();
