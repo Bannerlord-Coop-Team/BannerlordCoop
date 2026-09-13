@@ -50,7 +50,7 @@ public class SiegeInteractionDebugBehaviorTests
         var userPosition = new Vec3(498.52f, 720.788f, 36.16533f);
         var targetCenter = userPosition + new Vec3(0.5f, 1f, 0.25f);
         var eye = userPosition + (Vec3.Up * eyeHeight);
-        var direction = SiegeInteractionDebugBehavior.GetNativeStoneStagingDirection(userPosition, eyeHeight, targetCenter);
+        var direction = SiegeInteractionDebugBehavior.GetNativeStagingDirection(userPosition, eyeHeight, targetCenter);
 
         Assert.True(direction.z < -0.5f);
         Assert.True(Math.Abs(direction.Length - 1f) < 0.0001f);
@@ -58,6 +58,59 @@ public class SiegeInteractionDebugBehaviorTests
         Assert.True((eye + (direction * targetDistance) - targetCenter).Length < 0.0001f);
         var horizontal = new Vec3(direction.x, direction.y, 0f).NormalizedCopy();
         Assert.True((eye + (horizontal * targetDistance) - targetCenter).Length > 1f);
+    }
+
+    [Theory]
+    [InlineData(0.5f)]
+    [InlineData(3f)]
+    public void NativeBallistaStaging_AimsAtResolvedBodyInsteadOfPilotFacing(float bodyHeight)
+    {
+        var userPosition = new Vec3(448.91153f, 690.1686f, 31.337246f);
+        var eye = userPosition + (Vec3.Up * 2.2f);
+        var target = userPosition + new Vec3(-0.7f, 1.2f, bodyHeight);
+        var direction = SiegeInteractionDebugBehavior.GetNativeStagingDirection(userPosition, 2.2f, target);
+        var distance = (target - eye).Length;
+
+        Assert.True((eye + (direction * distance) - target).Length < 0.0001f);
+        Assert.True(Vec3.DotProduct(direction, new Vec3(0.365059f, -0.918913f, 0f)) < 0f);
+        Assert.Equal(bodyHeight > 2.2f, direction.z > 0f);
+    }
+
+    [Theory]
+    [InlineData(false, false)]
+    [InlineData(true, false)]
+    [InlineData(true, true)]
+    public void NativeBallistaTarget_MissingBodyRejectsOnlyNativeActorStaging(bool nativeCamera, bool watchOnly)
+    {
+        using var mission = new MissionCurrentScope();
+        var harmony = new Harmony("coop.tests.ballista-native-target");
+        try
+        {
+            harmony.Patch(AccessTools.Method(typeof(ScriptComponentBehavior), "CacheEditableFieldsForAllScriptComponents"),
+                prefix: new HarmonyMethod(AccessTools.Method(typeof(SiegeInteractionDebugBehaviorTests),
+                    nameof(SkipScriptComponentCache))));
+#pragma warning disable SYSLIB0050
+            var ballista = (Ballista)FormatterServices.GetUninitializedObject(typeof(Ballista));
+#pragma warning restore SYSLIB0050
+            var behavior = new SiegeInteractionDebugBehavior(Mock.Of<IMessageBroker>());
+            var standingPosition = new Vec3(448.91153f, 690.1686f, 31.337246f);
+            if (nativeCamera && !watchOnly)
+            {
+                var error = Assert.Throws<InvalidOperationException>(() =>
+                    behavior.GetStagingTarget(ballista, standingPosition, watchOnly, nativeCamera));
+                Assert.Contains("no resolved body", error.Message);
+            }
+            else
+            {
+                Assert.Equal(standingPosition, behavior.GetStagingTarget(ballista, standingPosition, watchOnly, nativeCamera));
+            }
+            Assert.Null(AccessTools.Field(typeof(SiegeInteractionDebugBehavior), "capturedAgent").GetValue(behavior));
+            Assert.Null(AccessTools.Field(typeof(SiegeInteractionDebugBehavior), "stagingCamera").GetValue(behavior));
+        }
+        finally
+        {
+            harmony.UnpatchAll(harmony.Id);
+        }
     }
 
     [Fact]
@@ -106,6 +159,33 @@ public class SiegeInteractionDebugBehaviorTests
         var observation = new
         {
             observedMachineId = 142, inputSamples = samples,
+            nativeAimTarget = new
+            {
+                requestId = "ballista-testclient2-stage", tick = 685, recordedUtc = DateTime.UtcNow,
+                machineId = 1410, bodyId = 1409, bodyName = "ballista_body", bodyTag = "BallistaBody",
+                min = new { x = 447f, y = 689f, z = 31f }, max = new { x = 450f, y = 692f, z = 34f },
+                target = new { x = 448.5f, y = 690.5f, z = 32.5f },
+                ancestors = Enumerable.Range(0, 16).Select(depth => new
+                {
+                    depth, id = 1410, type = "SynchedMissionObject",
+                    focus = new { type = "Ballista", id = 1410 }, isFocusable = true
+                }).ToArray()
+            },
+            focusDiagnostic = new { fallbackProbes = new
+            {
+                nearHit = true, nearDistance = 10f,
+                nearAncestors = Enumerable.Range(0, 16).Select(depth => new
+                {
+                    depth, id = 743, type = "DestructableComponent",
+                    focus = new { type = "DestructableComponent", id = 743 }, isFocusable = true
+                }).ToArray(),
+                wideHit = true, wideDistance = 10f,
+                wideAncestors = Enumerable.Range(0, 16).Select(depth => new
+                {
+                    depth, id = 743, type = "DestructableComponent",
+                    focus = new { type = "DestructableComponent", id = 743 }, isFocusable = true
+                }).ToArray()
+            } },
             machines = new[] { new
             {
                 id = 142, type = "StonePile", IsDeactivated = false, IsDisabled = false,

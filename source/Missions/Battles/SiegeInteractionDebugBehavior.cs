@@ -56,6 +56,7 @@ internal sealed class SiegeInteractionDebugBehavior : MissionBehavior, ISiegeInt
     private float capturedCameraBearing;
     private float capturedCameraElevation;
     private bool nativeCameraStaged;
+    private object nativeAimTarget;
     private bool fixtureRestored;
     private string captureFailureReason;
     private Agent dismountAgent;
@@ -362,6 +363,7 @@ internal sealed class SiegeInteractionDebugBehavior : MissionBehavior, ISiegeInt
         capturedCameraBearing = screen.CameraBearing;
         capturedCameraElevation = screen.CameraElevation;
         nativeCameraStaged = false;
+        nativeAimTarget = null;
         fixtureRestored = false;
         status = "fixture_captured";
     }
@@ -377,6 +379,7 @@ internal sealed class SiegeInteractionDebugBehavior : MissionBehavior, ISiegeInt
     private void Stage(MissionScreen screen, Agent agent, int machineId, int pointIndex, bool watchOnly, bool nativeCamera = false)
     {
         observedMachineId = machineId;
+        nativeAimTarget = null;
         var machine = Mission.MissionObjects.OfType<UsableMachine>()
             .FirstOrDefault(candidate => candidate.Id.Id == machineId);
         if (capturedAgent != agent || agent == null || !agent.IsActive() || agent.IsUsingGameObject ||
@@ -401,7 +404,24 @@ internal sealed class SiegeInteractionDebugBehavior : MissionBehavior, ISiegeInt
             {
                 var targetCenter = (machine.GameEntity.GlobalBoxMin + machine.GameEntity.GlobalBoxMax) * 0.5f;
                 var eyeHeight = (agent.Monster.StandingEyeHeight + 0.2f) * agent.AgentScale;
-                direction = GetNativeStoneStagingDirection(position, eyeHeight, targetCenter);
+                direction = GetNativeStagingDirection(position, eyeHeight, targetCenter);
+            }
+            else if (machine is Ballista)
+            {
+                try
+                {
+                    var nativeTarget = GetStagingTarget(machine, position, false, true);
+                    var eyeHeight = (agent.Monster.StandingEyeHeight + 0.2f) * agent.AgentScale;
+                    direction = GetNativeStagingDirection(position, eyeHeight, nativeTarget);
+                    if (!(direction.LengthSquared >= 0.5f))
+                        throw new InvalidOperationException("Ballista target coincides with the player eye.");
+                }
+                catch (Exception exception)
+                {
+                    nativeAimTarget = new { target = nativeAimTarget, error = exception.Message };
+                    status = "fixture_native_target_unavailable";
+                    return;
+                }
             }
             agent.TeleportToPosition(position);
             agent.LookDirection = direction;
@@ -426,13 +446,35 @@ internal sealed class SiegeInteractionDebugBehavior : MissionBehavior, ISiegeInt
         status = watchOnly ? "fixture_observer_camera_staged" : "fixture_staged_native_focus_pending";
     }
 
-    internal static Vec3 GetNativeStoneStagingDirection(Vec3 userPosition, float eyeHeight, Vec3 targetCenter)
+    internal static Vec3 GetNativeStagingDirection(Vec3 userPosition, float eyeHeight, Vec3 targetCenter)
     {
         return (targetCenter - (userPosition + (Vec3.Up * eyeHeight))).NormalizedCopy();
     }
 
-    internal Vec3 GetStagingTarget(UsableMachine machine, Vec3 standingPointPosition, bool watchOnly)
+    internal Vec3 GetStagingTarget(UsableMachine machine, Vec3 standingPointPosition, bool watchOnly, bool nativeCamera = false)
     {
+        if (nativeCamera && !watchOnly && machine is Ballista ballista)
+        {
+            var body = ballista.ballistaBody;
+            if (body == null || !body.GameEntity.IsValid)
+                throw new InvalidOperationException("The current ballista has no resolved body.");
+            var entity = GameEntity.CreateFromWeakEntity(body.GameEntity);
+            var min = entity.GlobalBoxMin;
+            var max = entity.GlobalBoxMax;
+            var target = (min * 0.5f) + (max * 0.5f);
+            nativeAimTarget = new
+            {
+                requestId, tick, recordedUtc = DateTime.UtcNow, machineId = machine.Id.Id, bodyId = body.Id.Id,
+                bodyName = body.GameEntity.Name, bodyTag = ballista.BodyTag,
+                min = DescribePosition(min), max = DescribePosition(max), target = DescribePosition(target),
+                ancestors = DescribeAncestors(body.GameEntity)
+            };
+            if (new[] { min.x, min.y, min.z, max.x, max.y, max.z }
+                    .Any(value => float.IsNaN(value) || float.IsInfinity(value)) ||
+                min.x > max.x || min.y > max.y || min.z > max.z || (max - min).LengthSquared < 0.0001f)
+                throw new InvalidOperationException("The resolved ballista body has invalid world bounds.");
+            return target;
+        }
         if (watchOnly || !(machine is CastleGate gate)) return standingPointPosition;
         // Gate standing-point origins can lie directly beneath the player's feet.
         var bounds = gate.ComputeGlobalPhysicsBoundingBoxMinMax();
@@ -509,7 +551,7 @@ internal sealed class SiegeInteractionDebugBehavior : MissionBehavior, ISiegeInt
             requestId, status, pressInvoked, externalInputArmed, inputVirtualKey, edgeObserved, edgeCleared, inputGameKeyId, tick,
             fixtureActive = capturedAgent != null,
             fixtureRestored, captureFailureReason,
-            nativeCameraStaged,
+            nativeCameraStaged, nativeAimTarget,
             stagingCameraActive = stagingCamera != null && ReferenceEquals(screen?.CustomCamera, stagingCamera),
             focusDiagnostic = ReadFocusDiagnostic(screen, agent),
             inputSamples = inputSamples.ToArray(),
@@ -631,6 +673,19 @@ internal sealed class SiegeInteractionDebugBehavior : MissionBehavior, ISiegeInt
             bool focusHit = Mission.Scene.FocusRayCastForFixedPhysics(origin, origin + (direction * (length + 0.1f)),
                 out float focusDistance, out Vec3 focusPoint, out WeakGameEntity hit,
                 0.2f, (BodyFlags)79617);
+            object fallbackProbes = null;
+            if (nativeAimTarget != null)
+            {
+                bool nearHit = Mission.Scene.RayCastForClosestEntityOrTerrain(origin, origin + (direction * (length + 0.1f)),
+                    out float nearDistance, out WeakGameEntity nearEntity, 0.2f, (BodyFlags)79617);
+                bool wideHit = Mission.Scene.RayCastForClosestEntityOrTerrain(origin + (direction * 0.4f), origin + (direction * (length + 0.1f)),
+                    out float wideDistance, out WeakGameEntity wideEntity, 0.6f, (BodyFlags)79617);
+                fallbackProbes = new
+                {
+                    nearHit, nearDistance, nearAncestors = DescribeAncestors(nearEntity),
+                    wideHit, wideDistance, wideAncestors = DescribeAncestors(wideEntity)
+                };
+            }
             return new
             {
                 tick, requestId, gates,
@@ -643,6 +698,7 @@ internal sealed class SiegeInteractionDebugBehavior : MissionBehavior, ISiegeInt
                     : new[] { stagingCamera.Direction.X, stagingCamera.Direction.Y, stagingCamera.Direction.Z },
                 rayOrigin = new[] { origin.X, origin.Y, origin.Z },
                 // These read-only probes do not replace vanilla's agent and wider fallback ray selection.
+                fallbackProbes,
                 rayProbe = new
                 {
                     length, blockerHit, blockerDistance, blockerAncestors = DescribeAncestors(blocker),
