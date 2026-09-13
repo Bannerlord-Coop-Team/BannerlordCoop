@@ -525,7 +525,6 @@ public class PlayerPartyInteractionFlowTests : MapEventTestBase
         Assert.Equal(PlayerPartyInteractionMercenaryUnavailableReason.IncompatibleWars, initialState.MercenaryUnavailableReason);
         OpenServiceOptions(client1, initialState);
 
-
         client1.Call(() =>
         {
             Assert.True(PlayerPartyInteractionDialogState.HasOption(PlayerPartyInteractionOption.JoinClan));
@@ -583,7 +582,6 @@ public class PlayerPartyInteractionFlowTests : MapEventTestBase
             s.Phase == PlayerPartyInteractionPhase.InitialOptions);
         Assert.Equal(PlayerPartyInteractionMercenaryUnavailableReason.None, initialState.MercenaryUnavailableReason);
         OpenServiceOptions(client1, initialState);
-
 
         client1.Call(() =>
         {
