@@ -282,6 +282,10 @@ public class MissionModule : Module
 
     internal static IEnumerable<HarmonyPatchCategoryRegistration> CreatePatchCategoryRegistrations()
     {
+#if DEBUG
+        yield return new HarmonyPatchCategoryRegistration(
+            typeof(SiegeInteractionDebugBehavior).Assembly, "CoopSiegeInteractionDebug");
+#endif
         yield return new HarmonyPatchCategoryRegistration(
             typeof(AddMissileAuxPatch).Assembly,
             MissilePatchCategory);

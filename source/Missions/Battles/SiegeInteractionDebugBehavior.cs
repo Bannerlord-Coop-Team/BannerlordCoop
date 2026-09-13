@@ -1,5 +1,7 @@
 ﻿#if DEBUG
 using Common;
+using HarmonyLib;
+using System.Reflection;
 using Common.Messaging;
 using GameInterface;
 using Missions.Agents.Packets;
@@ -31,6 +33,15 @@ internal sealed class SiegeInteractionDebugBehavior : MissionBehavior, ISiegeInt
     private readonly HashSet<string> requests = new HashSet<string>();
     private readonly List<object> inputSamples = new List<object>();
     private readonly Dictionary<int, object> receivedStates = new Dictionary<int, object>();
+    private readonly List<object> useDispatchSamples = new List<object>();
+    private StandingPoint useDispatchPoint;
+    private string useDispatchRequestId;
+    private int useDispatchMachineId;
+    private int useDispatchCalls;
+    private int useDispatchPressedCalls;
+    private int useDispatchDropped;
+    private int useDispatchSequence;
+    private int useDispatchThreadId;
     private int stateSequence;
     private int inputGameKeyId = UseGameKeyId;
     private int? observedMachineId;
@@ -114,6 +125,132 @@ internal sealed class SiegeInteractionDebugBehavior : MissionBehavior, ISiegeInt
         inputSamples.Add(new { tick, recordedUtc = DateTime.UtcNow.ToString("O"), pressed, down, released, nativeInput });
         if (edgeCleared) status = "input_edge_cleared";
         else if (inputSamples.Count == 300) status = "unexercised_input_lifecycle";
+    }
+
+    internal object ReadUseDispatch()
+    {
+        lock (useDispatchSamples)
+            return new { handlerCalls = useDispatchCalls, pressedCalls = useDispatchPressedCalls,
+                dropped = useDispatchDropped, samples = useDispatchSamples.ToArray() };
+    }
+
+    internal void AppendUseDispatch(object observation)
+    {
+        lock (useDispatchSamples)
+        {
+            if (useDispatchSamples.Count < 16) useDispatchSamples.Add(observation);
+            else useDispatchDropped++;
+        }
+    }
+
+    internal int ObserveUseDispatch(object instance, string method, object[] args, int call = 0,
+        Exception failure = null, string expectedRequestId = null)
+    {
+        if (removed || Mission == null || useDispatchPoint == null || capturedAgent == null ||
+            useDispatchRequestId != requestId ||
+            (expectedRequestId != null && expectedRequestId != useDispatchRequestId) ||
+            !ReferenceEquals(Mission, TaleWorlds.MountAndBlade.Mission.Current) ||
+            !ReferenceEquals(capturedAgent, Mission.MainAgent) ||
+            (instance is Agent actor ? !ReferenceEquals(actor, capturedAgent) : !ReferenceEquals(instance, interaction))) return 0;
+        bool entry = call == 0;
+        int threadId = System.Threading.Thread.CurrentThread.ManagedThreadId;
+        try
+        {
+            if (threadId != useDispatchThreadId)
+            {
+                if (entry) call = System.Threading.Interlocked.Increment(ref useDispatchSequence);
+                AppendUseDispatch(new { requestId = useDispatchRequestId, call, method,
+                    phase = entry ? "entry" : "exit", tick, recordedUtc = DateTime.UtcNow.ToString("O"),
+                    threadId, observationError = "non_game_thread", exception = failure?.GetType().FullName });
+                return call;
+            }
+            var input = capturedScreen?.SceneLayer?.Input;
+            bool pressed = input?.IsGameKeyPressed(UseGameKeyId) == true;
+            if (entry && method == nameof(MissionMainAgentInteractionComponent.FocusStateCheckTick))
+            {
+                useDispatchCalls++;
+                if (pressed) useDispatchPressedCalls++;
+                if (useDispatchCalls != 1 && !pressed) return 0;
+            }
+            if (entry) call = System.Threading.Interlocked.Increment(ref useDispatchSequence);
+            ContainerProvider.TryResolve<INetworkAgentRegistry>(out var registry);
+            CoopAgentInfo info = null;
+            CoopAgentInfo userInfo = null;
+            registry?.TryGetAgentInfo(capturedAgent, out info);
+            var user = useDispatchPoint.UserAgent;
+            if (user != null) registry?.TryGetAgentInfo(user, out userInfo);
+            var session = Mission.GetMissionBehavior<CoopBattleController>()?.Session;
+            AppendUseDispatch(new
+            {
+                requestId = useDispatchRequestId, call, method, phase = entry ? "entry" : "exit",
+                tick, recordedUtc = DateTime.UtcNow.ToString("O"), threadId, sessionId = session?.InstanceId,
+                identityComplete = info?.AgentId != null && info.AgentId != Guid.Empty &&
+                    ReferenceEquals(info.Agent, capturedAgent) && session != null,
+                inputGameKeyId, inputVirtualKey,
+                inputContextId = input == null ? (int?)null : System.Runtime.CompilerServices.RuntimeHelpers.GetHashCode(input),
+                controllerId = session?.OwnControllerId, actorId = info?.AgentId.ToString("N"),
+                originalOwner = info?.OriginalOwner, currentAuthority = info?.CurrentAuthority,
+                machineId = useDispatchMachineId, pointId = useDispatchPoint.Id.Id,
+                pointUserId = userInfo?.AgentId.ToString("N"), pointHasUser = user != null,
+                pointHasAIUser = useDispatchPoint.HasAIUser, pointUserIsActor = ReferenceEquals(user, capturedAgent),
+                sameFocusAgent = ReferenceEquals(Agent.Main, capturedAgent),
+                nativeClient = GameNetwork.IsClient, nativeClientOrReplay = GameNetwork.IsClientOrReplay,
+                radialMenuActive = capturedScreen?.IsRadialMenuActive,
+                itemInteractionEnabled = Mission.IsMainAgentItemInteractionEnabled,
+                orderMenuOpen = Mission.IsOrderMenuOpen, ableToUseMachine = capturedAgent.IsAbleToUseMachine(),
+                pressed, down = input?.IsGameKeyDown(UseGameKeyId), released = input?.IsGameKeyReleased(UseGameKeyId),
+                focusedObject = Describe(interaction?.CurrentFocusedObject),
+                interactableObject = Describe(interaction?._currentInteractableObject),
+                argumentObject = Describe(args?.OfType<UsableMissionObject>().FirstOrDefault()),
+                usingObject = capturedAgent.IsUsingGameObject, usedObject = Describe(capturedAgent.CurrentlyUsedGameObject),
+                exception = failure?.GetType().FullName
+            });
+        }
+        catch (Exception exception)
+        {
+            AppendUseDispatch(new { requestId = useDispatchRequestId, call, method,
+                phase = entry ? "entry" : "exit", tick, recordedUtc = DateTime.UtcNow.ToString("O"),
+                observationError = exception.GetType().FullName });
+        }
+        return call;
+    }
+
+    [HarmonyPatch]
+    [HarmonyPatchCategory("CoopSiegeInteractionDebug")]
+    internal static class UseDispatchObservationPatch
+    {
+        internal static IEnumerable<MethodBase> TargetMethods() => new MethodBase[]
+        {
+            AccessTools.Method(typeof(MissionMainAgentInteractionComponent), nameof(MissionMainAgentInteractionComponent.FocusStateCheckTick)),
+            AccessTools.Method(typeof(Agent), nameof(Agent.HandleStartUsingAction), new[] { typeof(UsableMissionObject), typeof(int) }),
+            AccessTools.Method(typeof(Agent), nameof(Agent.UseGameObject), new[] { typeof(UsableMissionObject), typeof(int) }),
+            AccessTools.Method(typeof(Agent), nameof(Agent.StopUsingGameObjectAux), new[] { typeof(bool), typeof(Agent.StopUsingGameObjectFlags) })
+        };
+
+        [HarmonyPrefix]
+        internal static void Prefix(object __instance, MethodBase __originalMethod, object[] __args,
+            out (SiegeInteractionDebugBehavior Observer, int Call, string RequestId) __state)
+        {
+            __state = default;
+            try
+            {
+                var observer = TaleWorlds.MountAndBlade.Mission.Current?.GetMissionBehavior<SiegeInteractionDebugBehavior>();
+                int call = observer?.ObserveUseDispatch(__instance, __originalMethod.Name, __args) ?? 0;
+                if (call != 0) __state = (observer, call, observer.useDispatchRequestId);
+            }
+            catch { } // Observation must not interrupt vanilla dispatch.
+        }
+
+        [HarmonyFinalizer]
+        internal static void Finalizer(object __instance, MethodBase __originalMethod, object[] __args,
+            (SiegeInteractionDebugBehavior Observer, int Call, string RequestId) __state, Exception __exception)
+        {
+            try
+            {
+                __state.Observer?.ObserveUseDispatch(__instance, __originalMethod.Name, __args, __state.Call, __exception, __state.RequestId);
+            }
+            catch { } // Keep the original result and exception unchanged.
+        }
     }
 
     public override void OnRemoveBehavior()
@@ -300,6 +437,16 @@ internal sealed class SiegeInteractionDebugBehavior : MissionBehavior, ISiegeInt
         {
             status = "unexercised_unbound_key";
             return;
+        }
+        lock (useDispatchSamples)
+        {
+            useDispatchPoint = inputGameKeyId == UseGameKeyId && machine is Ballista ballista
+                ? ballista.PilotStandingPoint : null;
+            useDispatchRequestId = requestId;
+            useDispatchThreadId = System.Threading.Thread.CurrentThread.ManagedThreadId;
+            useDispatchMachineId = machine?.Id.Id ?? request.MachineId;
+            useDispatchCalls = useDispatchPressedCalls = useDispatchDropped = 0;
+            useDispatchSamples.Clear();
         }
         pressTick = tick;
         externalInputArmed = externalInput;
@@ -563,6 +710,7 @@ internal sealed class SiegeInteractionDebugBehavior : MissionBehavior, ISiegeInt
             stagingCameraActive = stagingCamera != null && ReferenceEquals(screen?.CustomCamera, stagingCamera),
             focusDiagnostic = ReadFocusDiagnostic(screen, agent),
             inputSamples = inputSamples.ToArray(),
+            useDispatch = ReadUseDispatch(),
             receivedStates, localShots, receivedShots,
             equipment = ReadEquipment(agent),
             observedMachineId,

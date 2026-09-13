@@ -21,6 +21,67 @@ namespace Coop.Tests.Missions.Battles;
 [Collection("Mission.Current")]
 public class SiegeInteractionDebugBehaviorTests
 {
+    [Fact]
+    public void UseDispatchHooks_InstallOnImplementedTargetsAndPreserveResultsAndExceptions()
+    {
+        using var mission = new MissionCurrentScope();
+        var patch = typeof(SiegeInteractionDebugBehavior.UseDispatchObservationPatch);
+        var targets = SiegeInteractionDebugBehavior.UseDispatchObservationPatch.TargetMethods().ToArray();
+        Assert.Equal(4, targets.Length);
+        Assert.All(targets, target => Assert.NotNull(target?.GetMethodBody()));
+        Assert.Contains(MissionModule.CreatePatchCategoryRegistrations(), registration =>
+            registration.Assembly == patch.Assembly && registration.Category == "CoopSiegeInteractionDebug");
+        var prefix = AccessTools.Method(patch, "Prefix");
+        var finalizer = AccessTools.Method(patch, "Finalizer");
+        Assert.Equal(typeof(void), prefix.ReturnType);
+        Assert.Equal(typeof(void), finalizer.ReturnType);
+        var harmony = new Harmony("coop.tests.siege-use-dispatch-observer");
+        try
+        {
+            harmony.CreateClassProcessor(patch).Patch();
+            Assert.All(targets, target => Assert.Contains(Harmony.GetPatchInfo(target).Finalizers,
+                installed => installed.owner == harmony.Id));
+            harmony.Patch(AccessTools.Method(typeof(SiegeInteractionDebugBehaviorTests), nameof(DispatchResult)),
+                prefix: new HarmonyMethod(prefix), finalizer: new HarmonyMethod(finalizer));
+            Assert.Equal(42, DispatchResult(null));
+            var failure = new InvalidOperationException("original dispatch failure");
+            Assert.Same(failure, Assert.Throws<InvalidOperationException>(() => DispatchResult(failure)));
+        }
+        finally { harmony.UnpatchAll(harmony.Id); }
+    }
+
+    [System.Runtime.CompilerServices.MethodImpl(System.Runtime.CompilerServices.MethodImplOptions.NoInlining)]
+    private int DispatchResult(Exception failure)
+    {
+        if (failure != null) throw failure;
+        return 42;
+    }
+
+    [Fact]
+    public void UseDispatchObservation_InactiveObserverDoesNotReadNativeStateOrSatisfyInput()
+    {
+        var behavior = new SiegeInteractionDebugBehavior(Mock.Of<IMessageBroker>());
+        Assert.Equal(0, behavior.ObserveUseDispatch(null, "UseGameObject", null));
+        Assert.Empty(JObject.FromObject(behavior.ReadUseDispatch())["samples"]);
+        Assert.False((bool)AccessTools.Field(typeof(SiegeInteractionDebugBehavior), "edgeObserved").GetValue(behavior));
+        Assert.False((bool)AccessTools.Field(typeof(SiegeInteractionDebugBehavior), "edgeCleared").GetValue(behavior));
+    }
+
+    [Fact]
+    public void UseDispatchObservation_BoundsEvidenceAndKeepsTheFirstEntryStopSequence()
+    {
+        var behavior = new SiegeInteractionDebugBehavior(Mock.Of<IMessageBroker>());
+        var phases = new[] { "focus-entry", "use-entry", "stop-entry", "stop-exit", "use-exit", "focus-exit" };
+        foreach (var phase in phases) behavior.AppendUseDispatch(new { phase });
+        var first = JObject.FromObject(behavior.ReadUseDispatch());
+        for (int index = phases.Length; index < 30; index++) behavior.AppendUseDispatch(new { phase = "later" });
+        var result = JObject.FromObject(behavior.ReadUseDispatch());
+        Assert.Equal(phases, result["samples"].Take(phases.Length).Select(sample => sample["phase"].Value<string>()));
+        Assert.Equal(phases.Length, first["samples"].Count());
+        Assert.Equal(16, result["samples"].Count());
+        Assert.Equal(14, result["dropped"].Value<int>());
+    }
+
     [Theory]
     [InlineData("missing")]
     [InlineData("wrong-id")]
@@ -244,10 +305,24 @@ public class SiegeInteractionDebugBehaviorTests
                 rawPressed = false, rawDown = false, rawReleased = false
             });
         }
+        for (int index = 0; index < 16; index++) behavior.AppendUseDispatch(new
+        {
+            requestId = "ballista-testclient2-use", call = index, method = "HandleStartUsingAction", phase = "entry",
+            tick = 830, recordedUtc = DateTime.UtcNow.ToString("O"), sessionId = "MapEvent_Created_1",
+            controllerId = "testclient2", actorId = Guid.NewGuid().ToString("N"),
+            originalOwner = "testclient2", currentAuthority = "testclient2", machineId = 884, pointId = 882,
+            pointUserId = Guid.NewGuid().ToString("N"), pointHasUser = true, pointHasAIUser = true,
+            pointUserIsActor = false, sameFocusAgent = true, nativeClient = false, nativeClientOrReplay = false,
+            radialMenuActive = false, itemInteractionEnabled = true, orderMenuOpen = false, ableToUseMachine = true,
+            pressed = true, down = true, released = false, focusedObject = new { type = "StandingPoint", id = 882 },
+            interactableObject = new { type = "StandingPoint", id = 882 },
+            argumentObject = new { type = "StandingPoint", id = 882 }, usingObject = true,
+            usedObject = new { type = "StandingPoint", id = 882 }, exception = "System.InvalidOperationException"
+        });
         var samples = AccessTools.Field(typeof(SiegeInteractionDebugBehavior), "inputSamples").GetValue(behavior);
         var observation = new
         {
-            observedMachineId = 142, inputSamples = samples,
+            observedMachineId = 142, inputSamples = samples, useDispatch = behavior.ReadUseDispatch(),
             mainAgentId = Guid.NewGuid().ToString("N"),
             observedAgent = new
             {
@@ -316,6 +391,7 @@ public class SiegeInteractionDebugBehaviorTests
         Assert.Equal(output, result.GetProperty("output").GetString());
         Assert.Equal(document.RootElement.GetRawText(), result.GetProperty("structuredResult").GetRawText());
         Assert.Equal(300, result.GetProperty("structuredResult").GetProperty("inputSamples").GetArrayLength());
+        Assert.Equal(16, result.GetProperty("structuredResult").GetProperty("useDispatch").GetProperty("samples").GetArrayLength());
         Assert.Equal(64, result.GetProperty("structuredResult").GetProperty("machines")[0]
             .GetProperty("standingPoints").GetArrayLength());
     }
