@@ -66,6 +66,9 @@ public readonly struct ModOptions
     [ProtoMember(22)]
     public bool VoiceEnabled { get; } = true;
 
+    [ProtoMember(23)]
+    public readonly bool CoopClansEnabled { get; } = true;
+
     public ModOptions(ModOptions previous, bool voiceEnabled)
     {
         this = previous;
@@ -86,6 +89,7 @@ public readonly struct ModOptions
         WandererLimit = modOptionsData.WandererLimit ?? WandererLimit;
         WandererLimitScalesWithPlayers = modOptionsData.WandererLimitScalesWithPlayers ?? WandererLimitScalesWithPlayers;
         PlayerKingdomClanTierRequired = modOptionsData.PlayerKingdomClanTierRequired ?? PlayerKingdomClanTierRequired;
+        CoopClansEnabled = modOptionsData.CoopClansEnabled ?? CoopClansEnabled;
         SmithingStaminaRecoveryOutsideSettlements = modOptionsData.SmithingStaminaRecoveryOutsideSettlements ?? SmithingStaminaRecoveryOutsideSettlements;
         SmithingStaminaRecoveryMultiplier = modOptionsData.SmithingStaminaRecoveryMultiplier ?? SmithingStaminaRecoveryMultiplier;
         MaximumLootersMultiplier = modOptionsData.MaximumLootersMultiplier ?? MaximumLootersMultiplier;

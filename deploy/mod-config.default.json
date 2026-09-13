@@ -142,6 +142,11 @@
     // Vanilla/default allows players to start kingdoms from clan tier 4 onwards.
     "playerKingdomClanTierRequired": 4,
 
+    // Allows players to join another player's clan or propose a player marriage.
+    // Currently only available to testers & supporters.
+    // Disabling this does not dissolve existing coop clans.
+    "coopClansEnabled": true,
+
     // Toggle recovering stamina outside of settlements.
     // In vanilla players have to wait in settlements to regenerate smithing stamina.
     // false: More like vanilla, players have to wait in settlements to get their smithing stamina back.

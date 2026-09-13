@@ -103,6 +103,7 @@ namespace Coop.IntegrationTests.Serialization
             Assert.True(copy.AutoPauseEnabled);
             Assert.True(copy.SpeedLimitWhilePlayersInBattle);
             Assert.True(copy.ShowPlayerNameplates);
+            Assert.True(copy.CoopClansEnabled);
         }
 
         private static ModOptions AllOptionsOff() => new(new ModOptionsData
@@ -127,6 +128,7 @@ namespace Coop.IntegrationTests.Serialization
             EnablePlayerExecutions = false,
             ShowPlayerNameplates = false,
             PlayerWoundedBattleEntry = false,
+            CoopClansEnabled = false,
         });
 
         private static void AssertAllOptionsOff(ModOptions copy)
@@ -151,6 +153,7 @@ namespace Coop.IntegrationTests.Serialization
             Assert.False(copy.EnablePlayerExecutions);
             Assert.False(copy.ShowPlayerNameplates);
             Assert.False(copy.PlayerWoundedBattleEntry);
+            Assert.False(copy.CoopClansEnabled);
         }
 
         private static T RoundTrip<T>(T original)

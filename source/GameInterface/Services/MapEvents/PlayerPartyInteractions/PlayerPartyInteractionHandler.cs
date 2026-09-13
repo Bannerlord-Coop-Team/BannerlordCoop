@@ -4,6 +4,7 @@ using Common.Messaging;
 using Common.Network;
 using Common.Network.Messages;
 using Common.Util;
+using GameInterface.Configuration;
 using GameInterface.Services.Inventory.Data;
 using GameInterface.Services.Clans;
 using GameInterface.Services.Kingdoms;
@@ -868,7 +869,8 @@ internal class PlayerPartyInteractionHandler : IHandler
         session.ResponderClanOptions = GetClanDepartureOptions(responderParty.LeaderHero, initiatorParty.LeaderHero).ToArray();
 
         AddInitiatorOption(session, PlayerPartyInteractionOption.TradeProposal, enabled: true);
-        if (playerMarriageRules.CanMarry(initiatorParty.LeaderHero, responderParty.LeaderHero))
+        if (ModConfigProvider.ModOptions.CoopClansEnabled &&
+            playerMarriageRules.CanMarry(initiatorParty.LeaderHero, responderParty.LeaderHero))
         {
             AddInitiatorOption(session, PlayerPartyInteractionOption.ProposeMarriage, !session.IsHostile);
             AddInitiatorOption(session, PlayerPartyInteractionOption.PatrilinealMarriage,
@@ -884,8 +886,9 @@ internal class PlayerPartyInteractionHandler : IHandler
             var servicesAvailable = !session.IsHostile &&
                 clanJoinRules.CanOfferServices(initiatorParty.LeaderHero, responderParty.LeaderHero.Clan);
             AddInitiatorOption(session, PlayerPartyInteractionOption.OfferServices, servicesAvailable);
-            AddInitiatorOption(session, PlayerPartyInteractionOption.JoinClan,
-                servicesAvailable && session.ClanJoinUnavailableReason == ClanJoinUnavailableReason.None);
+            if (ModConfigProvider.ModOptions.CoopClansEnabled)
+                AddInitiatorOption(session, PlayerPartyInteractionOption.JoinClan,
+                    servicesAvailable && session.ClanJoinUnavailableReason == ClanJoinUnavailableReason.None);
             var vassalAvailable = IsVassalServiceAvailable(initiatorParty, responderParty, out var vassalUnavailableReason);
             session.VassalUnavailableReason = vassalUnavailableReason;
             AddInitiatorOption(session, PlayerPartyInteractionOption.Vassal, servicesAvailable && vassalAvailable);
