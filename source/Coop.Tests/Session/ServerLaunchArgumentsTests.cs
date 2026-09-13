@@ -1,12 +1,70 @@
-﻿using Common.Network;
+using Common.Network;
 using Common.Network.Session;
 using Coop.Core.Common.Session;
 using Xunit;
+using System.Linq;
 
 namespace Coop.Tests.Session;
 
 public class ServerLaunchArgumentsTests
 {
+    [Fact]
+    public void ApplicationTickCallsAutoConnectOutsideDebugGuardAndUsesParsedEndpoint()
+    {
+        string path = System.IO.Path.GetFullPath(System.IO.Path.Combine(System.AppContext.BaseDirectory, "../../../../Coop/CoopMod.cs"));
+        string source = System.IO.File.ReadAllText(path);
+        var lines = System.IO.File.ReadAllLines(path).Where(line => !string.IsNullOrWhiteSpace(line)).Select(line => line.Trim()).ToList();
+        Assert.Equal("TryAutoConnect();", lines[lines.IndexOf("TryManagedServerAutoStart();") + 1]);
+        Assert.Contains("bool started = Coop.StartAsClient(autoConnectConfiguration);", source);
+        Assert.Contains("if (!isServer && isDeferredClientJoin) return;", source);
+        Assert.Contains("if (!autoConnectArgumentsValid)", source);
+    }
+
+    [Theory]
+    [InlineData("localhost", "localhost", 4200)]
+    [InlineData("localhost:4300", "localhost", 4300)]
+    [InlineData("127.0.0.1:4200", "127.0.0.1", 4200)]
+    [InlineData("[::1]:4400", "::1", 4400)]
+    public void AutoConnectUsesSharedAddressParserAndDefaultPort(string endpoint, string host, int port)
+    {
+        Assert.True(ServerLaunchArguments.TryParseAutoConnect(new[] { "Bannerlord.exe", "/AuToCoNnEcT", endpoint }, out bool requested, out var config));
+        Assert.True(requested);
+        Assert.Equal(host, config.Address);
+        Assert.Equal(port, config.Port);
+    }
+
+    [Theory]
+    [InlineData("")]
+    [InlineData("localhost:")]
+    [InlineData("localhost:0")]
+    [InlineData("localhost:65536")]
+    [InlineData("localhost:bad")]
+    [InlineData("a quoted invalid hostname")]
+    [InlineData("https://localhost:4200")]
+    public void AutoConnectInvalidEndpointDoesNotFallBack(string endpoint)
+    {
+        Assert.False(ServerLaunchArguments.TryParseAutoConnect(new[] { "Bannerlord.exe", "/autoconnect", endpoint }, out bool requested, out var config));
+        Assert.True(requested);
+        Assert.Null(config);
+    }
+
+    [Fact]
+    public void BareAutoConnectPreservesServerAndMcpDeferredArguments()
+    {
+        foreach (var args in new[] {
+            new[] { "Bannerlord.exe", "/server", "/autoconnect" },
+            new[] { "Bannerlord.exe", "/client", "/autoconnect", "/platformId", "testclient", "/cooptestmanualjoin" },
+            new[] { "Bannerlord.exe", "/autoconnect", "_MODULES_*Native*Coop*_MODULES_" } })
+        {
+            Assert.True(ServerLaunchArguments.TryParseAutoConnect(args, out bool requested, out var config));
+            Assert.True(requested);
+            Assert.Null(config);
+        }
+        Assert.True(ServerLaunchArguments.TryParseAutoConnect(new[] { "Bannerlord.exe" }, out bool absent, out _));
+        Assert.False(absent);
+        Assert.False(ServerLaunchArguments.TryParseAutoConnect(new[] { "/autoconnect", "localhost", "/autoconnect" }, out _, out _));
+    }
+
     [Fact]
     public void QuoteArgument_LeavesPlainArgumentAlone()
     {
@@ -37,6 +95,19 @@ public class ServerLaunchArgumentsTests
     public void QuoteArgument_DoublesBackslashesBeforeEmbeddedQuote()
     {
         Assert.Equal("\"a\\\\\\\"b\"", ServerLaunchArguments.QuoteArgument("a\\\"b"));
+    }
+
+    [Fact]
+    public void McpSelectedSaveAndAutoConnectParseIndependentlyWithoutAnOwner()
+    {
+        var args = new[] { "Bannerlord.exe", "/singleplayer", "/server", "/autoconnect", "/platformId", "testserver",
+            "/cooptestrun", "run-token", "/coopsave", "Danustica campaign", "_MODULES_*Native*Coop*_MODULES_" };
+        Assert.True(ServerLaunchArguments.TryParse(args, out var saveName, out int owner));
+        Assert.Equal("Danustica campaign", saveName);
+        Assert.Equal(0, owner);
+        Assert.True(ServerLaunchArguments.TryParseAutoConnect(args, out bool requested, out var configuration));
+        Assert.True(requested);
+        Assert.Null(configuration);
     }
 
     [Fact]

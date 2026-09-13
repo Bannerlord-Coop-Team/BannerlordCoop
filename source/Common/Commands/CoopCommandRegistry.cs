@@ -36,13 +36,15 @@ public sealed class CoopCommandRegistry : ICoopCommandRegistry
                 throw new ArgumentException("The command collection cannot contain null values.", nameof(commands));
 
             IExpectedArgs[] expectedArgs = command.ExpectedArgs;
-            ValidateCommand(command, expectedArgs);
+            CoopCommandSide side = command.Side;
+            ValidateCommand(command, expectedArgs, side);
 
             var descriptor = new CoopCommandDescriptor(
                 command.Prefix,
                 command.Name,
                 command.Description,
-                expectedArgs);
+                expectedArgs,
+                side);
             if (commandMap.ContainsKey(descriptor.FullName))
                 throw new InvalidOperationException($"The command '{descriptor.FullName}' is registered more than once.");
 
@@ -65,7 +67,6 @@ public sealed class CoopCommandRegistry : ICoopCommandRegistry
     {
         return fullName != null && commandsByName.ContainsKey(fullName);
     }
-
     public CoopCommandResult ProcessCommand(string fullName, ICoopCommandArgs args)
     {
         if (args == null) throw new ArgumentNullException(nameof(args));
@@ -79,6 +80,11 @@ public sealed class CoopCommandRegistry : ICoopCommandRegistry
         }
 
         CoopCommandDescriptor descriptor = descriptorsByName[fullName];
+        if (descriptor.Side == CoopCommandSide.Server && ModInformation.IsClient)
+            return new CoopCommandResult(false, "This command is only available on the server", "command_wrong_side");
+        if (descriptor.Side == CoopCommandSide.Client && ModInformation.IsServer)
+            return new CoopCommandResult(false, "This command is only available on the client", "command_wrong_side");
+
         if (!ArgumentsAreValid(descriptor.ExpectedArgs, args))
             return new CoopCommandResult(false, descriptor.Usage, "invalid_arguments");
 
@@ -101,8 +107,11 @@ public sealed class CoopCommandRegistry : ICoopCommandRegistry
         }
     }
 
-    private void ValidateCommand(ICoopCommand command, IExpectedArgs[] expectedArgs)
+    private void ValidateCommand(ICoopCommand command, IExpectedArgs[] expectedArgs, CoopCommandSide side)
     {
+        if (!Enum.IsDefined(typeof(CoopCommandSide), side))
+            throw new InvalidOperationException($"The command '{command.Prefix}.{command.Name}' has an invalid command side '{side}'.");
+
         if (string.IsNullOrWhiteSpace(command.Prefix))
             throw new InvalidOperationException($"{command.GetType().Name} has no command prefix.");
         if (!string.Equals(command.Prefix, "coop", StringComparison.Ordinal) &&

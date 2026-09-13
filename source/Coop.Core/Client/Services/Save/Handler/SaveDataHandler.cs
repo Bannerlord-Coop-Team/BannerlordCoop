@@ -65,6 +65,7 @@ internal class SaveDataHandler : IHandler
         messageBroker.Publish(this, new InitializeClientTradeData(saveDataMessage.TradePlayerData));
         messageBroker.Publish(this, new InitializeClientInventoryData(saveDataMessage.InventoryPlayerData));
         messageBroker.Publish(this, new InitializeClientHeroMeetingData(saveDataMessage.HeroMeetingData));
+        messageBroker.Publish(this, new InitializeClientAgingData(saveDataMessage.AgingPlayerData));
         messageBroker.Publish(this, new InitializeClientAttachmentIdMap(saveDataMessage.AttachmentIdMap));
         // Add any other CoopSession data initialisations for clients here
     }

@@ -70,6 +70,8 @@ internal class CompanionsCommands
 
         public string Description => "Lists available wanderer heroes.";
 
+        public CoopCommandSide Side => CoopCommandSide.Both;
+
         public IExpectedArgs[] ExpectedArgs { get; } = System.Array.Empty<IExpectedArgs>();
 
         public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
@@ -112,6 +114,8 @@ internal class CompanionsCommands
 
         public string Description => "Clears available wanderer heroes.";
 
+        public CoopCommandSide Side => CoopCommandSide.Server;
+
         public IExpectedArgs[] ExpectedArgs { get; } = System.Array.Empty<IExpectedArgs>();
 
         public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
@@ -137,6 +141,8 @@ internal class CompanionsCommands
         public string Name => "role_fixture_setup";
 
         public string Description => "Starts the companion-role fixture.";
+
+        public CoopCommandSide Side => CoopCommandSide.Server;
 
         public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
@@ -195,6 +201,8 @@ internal class CompanionsCommands
 
         public string Description => "Opens the companion-role fixture conversation.";
 
+        public CoopCommandSide Side => CoopCommandSide.Client;
+
         public IExpectedArgs[] ExpectedArgs { get; } = System.Array.Empty<IExpectedArgs>();
 
         public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
@@ -239,6 +247,8 @@ internal class CompanionsCommands
 
         public string Description => "Reports companion-role conversation state.";
 
+        public CoopCommandSide Side => CoopCommandSide.Client;
+
         public IExpectedArgs[] ExpectedArgs { get; } = System.Array.Empty<IExpectedArgs>();
 
         public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
@@ -262,6 +272,8 @@ internal class CompanionsCommands
         public string Name => "role_fixture_prepare_client";
 
         public string Description => "Prepares the client for the companion-role fixture.";
+
+        public CoopCommandSide Side => CoopCommandSide.Client;
 
         public IExpectedArgs[] ExpectedArgs { get; } = System.Array.Empty<IExpectedArgs>();
 
@@ -293,6 +305,8 @@ internal class CompanionsCommands
         public string Name => "role_fixture_assign_scout";
 
         public string Description => "Assigns the fixture companion as scout.";
+
+        public CoopCommandSide Side => CoopCommandSide.Client;
 
         public IExpectedArgs[] ExpectedArgs { get; } = System.Array.Empty<IExpectedArgs>();
 
@@ -330,6 +344,8 @@ internal class CompanionsCommands
 
         public string Description => "Reports companion-role fixture state.";
 
+        public CoopCommandSide Side => CoopCommandSide.Both;
+
         public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
             new ExpectedArgs("party_id", "The registered mobile party id."),
@@ -363,6 +379,8 @@ internal class CompanionsCommands
 
         public string Description => "Reports the scout assigned to a party.";
 
+        public CoopCommandSide Side => CoopCommandSide.Both;
+
         public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
             new ExpectedArgs("party_id", "The registered mobile party id."),
@@ -390,6 +408,8 @@ internal class CompanionsCommands
         public string Name => "role_fixture_restore";
 
         public string Description => "Restores the companion-role fixture.";
+
+        public CoopCommandSide Side => CoopCommandSide.Server;
 
         public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
@@ -447,6 +467,8 @@ internal class CompanionsCommands
         public string Name => "dismissal_fixture_setup";
 
         public string Description => "Starts the companion-dismissal fixture.";
+
+        public CoopCommandSide Side => CoopCommandSide.Server;
 
         public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
@@ -506,6 +528,8 @@ internal class CompanionsCommands
 
         public string Description => "Prepares the fixture companion dismissal.";
 
+        public CoopCommandSide Side => CoopCommandSide.Server;
+
         public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
             new ExpectedArgs("controller_id", "The player controller id."),
@@ -542,6 +566,8 @@ internal class CompanionsCommands
         public string Name => "dismissal_fixture_trigger_consequence";
 
         public string Description => "Triggers the companion dismissal consequence.";
+
+        public CoopCommandSide Side => CoopCommandSide.Client;
 
         public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
@@ -626,6 +652,8 @@ internal class CompanionsCommands
 
         public string Description => "Reports companion dismissal completion.";
 
+        public CoopCommandSide Side => CoopCommandSide.Client;
+
         public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
             new ExpectedArgs("dismissed_hero_id", "The registered dismissed hero id."),
@@ -659,6 +687,8 @@ internal class CompanionsCommands
 
         public string Description => "Releases the dismissal fixture encounter.";
 
+        public CoopCommandSide Side => CoopCommandSide.Client;
+
         public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
             new ExpectedArgs("dismissed_hero_id", "The registered dismissed hero id."),
@@ -687,6 +717,8 @@ internal class CompanionsCommands
 
         public string Description => "Requests the dismissal fixture replacement.";
 
+        public CoopCommandSide Side => CoopCommandSide.Client;
+
         public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
             new ExpectedArgs("replacement_hero_id", "The registered replacement hero id."),
@@ -714,6 +746,8 @@ internal class CompanionsCommands
 
         public string Description => "Reports companion dismissal fixture state.";
 
+        public CoopCommandSide Side => CoopCommandSide.Both;
+
         public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
             new ExpectedArgs("party_id", "The registered mobile party id."),
@@ -740,6 +774,8 @@ internal class CompanionsCommands
         public string Name => "dismissal_fixture_restore";
 
         public string Description => "Restores the companion-dismissal fixture.";
+
+        public CoopCommandSide Side => CoopCommandSide.Server;
 
         public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
@@ -793,6 +829,8 @@ internal class CompanionsCommands
 
         public string Description => "Opens the companion party screen.";
 
+        public CoopCommandSide Side => CoopCommandSide.Client;
+
         public IExpectedArgs[] ExpectedArgs { get; } = System.Array.Empty<IExpectedArgs>();
 
         public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
@@ -813,6 +851,8 @@ internal class CompanionsCommands
 
         public string Description => "Closes the companion party screen.";
 
+        public CoopCommandSide Side => CoopCommandSide.Client;
+
         public IExpectedArgs[] ExpectedArgs { get; } = System.Array.Empty<IExpectedArgs>();
 
         public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
@@ -831,6 +871,8 @@ internal class CompanionsCommands
         public string Name => "commit_party_screen";
 
         public string Description => "Commits changes on the companion party screen.";
+
+        public CoopCommandSide Side => CoopCommandSide.Client;
 
         public IExpectedArgs[] ExpectedArgs { get; } = System.Array.Empty<IExpectedArgs>();
 

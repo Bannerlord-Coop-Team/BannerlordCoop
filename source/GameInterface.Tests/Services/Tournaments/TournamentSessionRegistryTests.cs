@@ -1,5 +1,6 @@
 ﻿using GameInterface.Services.Tournaments;
 using GameInterface.Services.Tournaments.Data;
+using GameInterface.Services.Tournaments.Handlers;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -11,6 +12,36 @@ namespace GameInterface.Tests.Services.Tournaments;
 
 public class TournamentSessionRegistryTests
 {
+    [Fact]
+    public void HitProgressionRevision_AcceptsHitStampedBeforeSpectatorEntry()
+    {
+        var registry = new TournamentSessionRegistry();
+        TournamentSessionSnapshot snapshot = CreateLiveSession(registry);
+        long hitRevision = snapshot.Revision;
+
+        Assert.Equal(TournamentMutationStatus.Applied, registry.TryRequestSpectate(
+            snapshot.SessionId,
+            snapshot.Revision,
+            "late-spectator",
+            out snapshot));
+        Assert.Equal(TournamentMutationStatus.Applied, registry.TryEnterMission(
+            snapshot.SessionId,
+            snapshot.Revision,
+            "late-spectator",
+            out snapshot));
+
+        Assert.True(snapshot.Revision > hitRevision);
+        Assert.True(TournamentSessionHandler.IsAcceptedProgressionRevision(
+            snapshot.Revision,
+            hitRevision));
+        Assert.False(TournamentSessionHandler.IsAcceptedProgressionRevision(
+            snapshot.Revision,
+            snapshot.Revision + 1));
+        Assert.False(TournamentSessionHandler.IsAcceptedProgressionRevision(
+            snapshot.Revision,
+            -1));
+    }
+
     [Fact]
     public void Join_ReplacesLowestPriorityNonLordBeforeLord()
     {

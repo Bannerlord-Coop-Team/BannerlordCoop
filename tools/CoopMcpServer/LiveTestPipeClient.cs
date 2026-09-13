@@ -1,4 +1,4 @@
-﻿using Common.LiveTesting;
+using Common.LiveTesting;
 using System.IO.Pipes;
 using System.Text;
 using System.Text.Json;
@@ -20,6 +20,7 @@ public sealed class LiveTestPipeClient : ILiveTestPipeClient
     {
         string id = Guid.NewGuid().ToString("N");
         bool writeStarted = false;
+        string phase = "registration";
         var process = new LiveTestProcessInfo
         {
             Pid = identity.Pid, ProcessStartedUtc = identity.StartedUtc, Role = identity.Role,
@@ -38,7 +39,9 @@ public sealed class LiveTestPipeClient : ILiveTestPipeClient
             timeout.CancelAfter(TimeSpan.FromSeconds(35));
             using var pipe = new NamedPipeClientStream(".", LiveTestProtocol.GetPipeName(identity.Pid),
                 PipeDirection.InOut, PipeOptions.Asynchronous);
+            phase = "connect";
             await pipe.ConnectAsync(1500, timeout.Token);
+            phase = "request";
             writeStarted = true;
             await pipe.WriteAsync(payload, timeout.Token);
             await pipe.FlushAsync(timeout.Token);
@@ -49,7 +52,7 @@ public sealed class LiveTestPipeClient : ILiveTestPipeClient
                 response.Process.ProcessStartedUtc != identity.StartedUtc ||
                 response.Process.Role != identity.Role || response.Process.PlatformId != identity.PlatformId ||
                 response.Process.RunToken != identity.RunToken)
-                throw new IOException("Response identity or request id mismatch.");
+                return LiveTestResponse.Failure(id, process, new LiveTestError("response_identity_mismatch", "Response identity or request id mismatch.", mutation && writeStarted));
             return response;
         }
         catch (Exception exception) when (exception is IOException || exception is TimeoutException ||
@@ -58,7 +61,11 @@ public sealed class LiveTestPipeClient : ILiveTestPipeClient
             exception is KeyNotFoundException || exception is FormatException || exception is ArgumentException)
         {
             return LiveTestResponse.Failure(id, process,
-                new LiveTestError("transport_failed", exception.Message, mutation && writeStarted));
+                new LiveTestError(exception is OperationCanceledException
+                    ? (cancellationToken.IsCancellationRequested ? "operation_cancelled" : "transport_deadline_expired")
+                    : exception is TimeoutException ? "connect_deadline_expired"
+                    : phase == "registration" ? "endpoint_registration_failed" : "transport_failed",
+                    exception.Message, mutation && writeStarted));
         }
     }
 

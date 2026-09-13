@@ -59,6 +59,8 @@ internal static class LargeBattleRosterFixtureCommands
 
         public string Description => "Runs the large battle roster begin debug operation.";
 
+        public CoopCommandSide Side => CoopCommandSide.Server;
+
         public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
             new ExpectedArgs("first_party_or_controller_id", "The first party or controller id.", true),
@@ -133,6 +135,8 @@ internal static class LargeBattleRosterFixtureCommands
 
         public string Description => "Runs the exact battle roster begin debug operation.";
 
+        public CoopCommandSide Side => CoopCommandSide.Server;
+
         public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
             new ExpectedArgs("first_party_or_controller_id", "The first party or controller id.", true),
@@ -161,6 +165,8 @@ internal static class LargeBattleRosterFixtureCommands
         public string Name => "battle_size_roster_begin";
 
         public string Description => "Runs the battle size roster begin debug operation.";
+
+        public CoopCommandSide Side => CoopCommandSide.Server;
 
         public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
@@ -299,6 +305,8 @@ internal static class LargeBattleRosterFixtureCommands
 
         public string Description => "Reports large battle roster status.";
 
+        public CoopCommandSide Side => CoopCommandSide.Server;
+
         public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
             new ExpectedArgs("first_party_or_controller_id", "The first party or controller id.", true),
@@ -350,6 +358,8 @@ internal static class LargeBattleRosterFixtureCommands
 
         public string Description => "Reports exact battle roster status.";
 
+        public CoopCommandSide Side => CoopCommandSide.Server;
+
         public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
             new ExpectedArgs("first_party_or_controller_id", "The first party or controller id.", true),
@@ -369,6 +379,8 @@ internal static class LargeBattleRosterFixtureCommands
         public string Name => "large_battle_roster_restore";
 
         public string Description => "Restores or clears large battle roster restore.";
+
+        public CoopCommandSide Side => CoopCommandSide.Server;
 
         public IExpectedArgs[] ExpectedArgs { get; } = Array.Empty<IExpectedArgs>();
 
@@ -453,6 +465,8 @@ internal static class LargeBattleRosterFixtureCommands
         public string Name => "exact_battle_roster_restore";
 
         public string Description => "Restores or clears exact battle roster restore.";
+
+        public CoopCommandSide Side => CoopCommandSide.Server;
 
         public IExpectedArgs[] ExpectedArgs { get; } = Array.Empty<IExpectedArgs>();
 

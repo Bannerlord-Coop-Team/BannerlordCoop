@@ -48,6 +48,8 @@ public class SteamDebugCommand
 
         public string Description => "Runs the host lobby debug operation.";
 
+        public CoopCommandSide Side => CoopCommandSide.Both;
+
         public IExpectedArgs[] ExpectedArgs { get; } = Array.Empty<IExpectedArgs>();
 
         public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
@@ -78,6 +80,8 @@ public class SteamDebugCommand
         public string Name => "invite";
 
         public string Description => "Runs the invite debug operation.";
+
+        public CoopCommandSide Side => CoopCommandSide.Both;
 
         public IExpectedArgs[] ExpectedArgs { get; } = Array.Empty<IExpectedArgs>();
 
