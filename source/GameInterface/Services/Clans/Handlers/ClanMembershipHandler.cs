@@ -48,7 +48,7 @@ internal class ClanMembershipHandler : IHandler
             if (!objectManager.TryGetObjectWithLogging<Hero>(payload.What.ActorId, out var actor) ||
                 !objectManager.TryGetObjectWithLogging<Hero>(payload.What.MemberId, out var member)) return;
             if (actor == member ? leaveRules.CanLeave(member) : leaveRules.CanRemove(actor, member))
-                leaveRules.TryApply(member);
+                leaveRules.TryApply(member, isRemoval: actor != member);
         });
     }
 }

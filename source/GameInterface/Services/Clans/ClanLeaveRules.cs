@@ -1,7 +1,9 @@
 ﻿using Common.Messaging;
+using Common.Network;
 using GameInterface.Services.Alleys.Interfaces;
 using GameInterface.Services.Alleys.Messages;
 using GameInterface.Services.Banners.Messages;
+using GameInterface.Services.GameDebug.Messages;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Players;
 using GameInterface.Services.Players.Data;
@@ -11,6 +13,7 @@ using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Actions;
 using TaleWorlds.CampaignSystem.CampaignBehaviors;
 using TaleWorlds.CampaignSystem.Party;
+using TaleWorlds.Core;
 
 namespace GameInterface.Services.Clans;
 
@@ -18,7 +21,7 @@ public interface IClanLeaveRules : IGameAbstraction
 {
     bool CanLeave(Hero member);
     bool CanRemove(Hero actor, Hero member);
-    bool TryApply(Hero member);
+    bool TryApply(Hero member, bool isRemoval);
 }
 
 public class ClanLeaveRules : IClanLeaveRules
@@ -28,15 +31,22 @@ public class ClanLeaveRules : IClanLeaveRules
     private readonly IMessageBroker messageBroker;
     private readonly IClanMemberGrouping grouping;
     private readonly ISessionAlleyPlayerDataInterface alleyData;
+    private readonly INetwork network;
 
-    public ClanLeaveRules(IPlayerManager playerManager, IObjectManager objectManager, IMessageBroker messageBroker,
-        IClanMemberGrouping grouping, ISessionAlleyPlayerDataInterface alleyData)
+    public ClanLeaveRules(
+        IPlayerManager playerManager,
+        IObjectManager objectManager,
+        IMessageBroker messageBroker,
+        IClanMemberGrouping grouping,
+        ISessionAlleyPlayerDataInterface alleyData,
+        INetwork network)
     {
         this.playerManager = playerManager;
         this.objectManager = objectManager;
         this.messageBroker = messageBroker;
         this.grouping = grouping;
         this.alleyData = alleyData;
+        this.network = network;
     }
 
     public bool CanLeave(Hero member)
@@ -51,7 +61,7 @@ public class ClanLeaveRules : IClanLeaveRules
         return CanLeave(member) && actor != null && actor.Clan == member.Clan && member.Clan.Leader == actor;
     }
 
-    public bool TryApply(Hero member)
+    public bool TryApply(Hero member, bool isRemoval)
     {
         if (!CanLeave(member)) return false;
 
@@ -102,7 +112,22 @@ public class ClanLeaveRules : IClanLeaveRules
 
         originalClan.SetLeader(member);
         messageBroker.Publish(this, new PlayerBannerChanged(originalClan));
+        NotifyDeparture(member, sourceClan, isRemoval);
         return true;
+    }
+
+    private void NotifyDeparture(Hero member, Clan clan, bool isRemoval)
+    {
+        var message = new SendInformationMessage(GameTexts.FindText(isRemoval
+            ? "str_coop_clan_player_removed" : "str_coop_clan_player_left")
+            .SetTextVariable("HERO", member.Name).ToString());
+
+        foreach (var hero in clan.Heroes.Append(member))
+        {
+            if (PlayerManager.TryGetControlledObjectInfo(hero, out var controller) &&
+                playerManager.TryGetPeer(controller.ObjectControllerId, out var peer))
+                network.Send(peer, message);
+        }
     }
 
     private void RemoveAssignments(Hero hero, MobileParty retainedParty)

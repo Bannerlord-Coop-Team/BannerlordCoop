@@ -584,10 +584,6 @@ internal static class PlayerPartyTradeContext
                 return GameTexts.FindText("str_coop_marriage_accepted").ToString();
             case PlayerPartyInteractionOutcomeType.MarriageDeclined:
                 return GameTexts.FindText("str_coop_marriage_declined").ToString();
-            case PlayerPartyInteractionOutcomeType.ClanLeft:
-                return GameTexts.FindText("str_coop_clan_player_left").ToString();
-            case PlayerPartyInteractionOutcomeType.ClanMemberRemoved:
-                return GameTexts.FindText("str_coop_clan_player_removed").ToString();
             case PlayerPartyInteractionOutcomeType.VassalAccepted:
                 return "Vassalage offer accepted.";
             case PlayerPartyInteractionOutcomeType.VassalDeclined:

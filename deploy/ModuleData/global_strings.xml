@@ -47,8 +47,8 @@
     <string id="str_coop_clan_remove_player_description" text="{=str_coop_clan_remove_player_description}Removing this player returns them to their own clan with their eligible family. Companions and shared assets stay with this clan. The player's approval is not required." />
     <string id="str_coop_clan_leave_dialogue" text="{=str_coop_clan_leave_dialogue}I am leaving the clan." />
     <string id="str_coop_clan_remove_player_dialogue" text="{=str_coop_clan_remove_player_dialogue}You are no longer a member of this clan." />
-    <string id="str_coop_clan_player_left" text="{=str_coop_clan_player_left}The player has left the clan." />
-    <string id="str_coop_clan_player_removed" text="{=str_coop_clan_player_removed}The player has been removed from the clan." />
+    <string id="str_coop_clan_player_left" text="{=str_coop_clan_player_left}{HERO} has left the clan." />
+    <string id="str_coop_clan_player_removed" text="{=str_coop_clan_player_removed}{HERO} has been removed from the clan." />
     <string id="str_coop_marriage_propose" text="{=str_coop_marriage_propose}I would like to propose marriage." />
     <string id="str_coop_marriage_choose" text="{=str_coop_marriage_choose}What kind of marriage do you propose?" />
     <string id="str_coop_marriage_patrilineal" text="{=str_coop_marriage_patrilineal}Patrilineal: the husband leads and the wife joins his clan." />
