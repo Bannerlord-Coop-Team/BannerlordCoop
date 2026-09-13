@@ -9,8 +9,16 @@ internal readonly struct NetworkClientGameOver : ICommand
     [ProtoMember(1)]
     public readonly string PlayerHeroId;
 
-    public NetworkClientGameOver(string playerHeroId)
+    [ProtoMember(2)]
+    public readonly string AppointedLeaderId;
+
+    [ProtoMember(3)]
+    public readonly bool ClanSurvives;
+
+    public NetworkClientGameOver(string playerHeroId, string appointedLeaderId = null, bool clanSurvives = false)
     {
         PlayerHeroId = playerHeroId;
+        AppointedLeaderId = appointedLeaderId;
+        ClanSurvives = clanSurvives;
     }
 }

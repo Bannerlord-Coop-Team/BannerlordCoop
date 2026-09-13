@@ -3,6 +3,7 @@ using GameInterface.Services.Actions.Patches;
 using GameInterface.Services.Heroes.Extensions;
 using GameInterface.Services.Heroes.HeirSelection.Messages;
 using GameInterface.Services.UI.LogEntries.Messages;
+using GameInterface.Services.Workshops.Interfaces;
 using Helpers;
 using System.Linq;
 using TaleWorlds.CampaignSystem;
@@ -18,32 +19,57 @@ namespace GameInterface.Services.Heroes.HeirSelection.Interfaces;
 
 public interface IApplyHeirSelectionActionInterface : IGameAbstraction
 {
-    void ApplyByDeath(Hero originalHero, Hero heir);
+    void ApplyByDeath(Hero originalHero, Hero heir, MobileParty originalParty);
     void ApplyByRetirement(Hero originalHero, Hero heir);
+    void AppointClanLeader(Hero originalHero, Hero successor);
 }
 
 public class ApplyHeirSelectionActionInterface : IApplyHeirSelectionActionInterface
 {
     private readonly IMessageBroker messageBroker;
+    private readonly ISessionWorkshopPlayerDataInterface workshopData;
 
-    public ApplyHeirSelectionActionInterface(IMessageBroker messageBroker)
+    public ApplyHeirSelectionActionInterface(IMessageBroker messageBroker, ISessionWorkshopPlayerDataInterface workshopData)
     {
         this.messageBroker = messageBroker;
+        this.workshopData = workshopData;
     }
 
-    public void ApplyByDeath(Hero originalHero, Hero heir)
+    public void ApplyByDeath(Hero originalHero, Hero heir, MobileParty originalParty)
     {
-        ApplyInternal(originalHero, heir, false);
+        ApplyInternal(originalHero, heir, originalParty);
     }
 
     public void ApplyByRetirement(Hero originalHero, Hero heir)
     {
-        ApplyInternal(originalHero, heir, true);
+        ApplyInternal(originalHero, heir, originalHero.PartyBelongedTo, true);
     }
 
-    private void ApplyInternal(Hero originalHero, Hero heir, bool isRetirement = false)
+    public void AppointClanLeader(Hero originalHero, Hero successor)
     {
-        var originalParty = originalHero.PartyBelongedTo;
+        ChangeClanLeaderAction.ApplyWithSelectedNewLeader(originalHero.Clan, successor);
+        TransferAssets(originalHero, successor);
+        workshopData.TransferWarehouseData(originalHero, successor);
+        KillCharacterActionPatches.HandleKingdomLeaderDeath(originalHero);
+    }
+
+    private void ApplyInternal(Hero originalHero, Hero heir, MobileParty originalParty, bool isRetirement = false)
+    {
+        var heirParty = heir.PartyBelongedTo;
+        if (heirParty != null && !heirParty.IsCaravan)
+        {
+            if (heirParty == originalParty && heirParty.LordPartyComponent != null)
+            {
+                heirParty.LordPartyComponent.ChangePartyOwner(heir);
+                heirParty.ChangePartyLeader(heir);
+            }
+            else if (heirParty.LeaderHero != heir)
+            {
+                // Inheriting a relative must not take over another player's party.
+                heirParty.RemoveAllPartyRolesOfHero(heir);
+                heirParty.MemberRoster.RemoveTroop(heir.CharacterObject);
+            }
+        }
 
         if (heir.PartyBelongedTo != null && heir.PartyBelongedTo.IsCaravan)
         {
@@ -60,11 +86,15 @@ public class ApplyHeirSelectionActionInterface : IApplyHeirSelectionActionInterf
             DestroyPartyAction.Apply(null, heir.PartyBelongedTo);
             TeleportHeroAction.ApplyImmediateTeleportToSettlement(heir, settlement);
         }
-        TransferCaravanOwnerships(originalHero, heir);
-        ChangeClanLeaderAction.ApplyWithSelectedNewLeader(originalHero.Clan, heir);
-        if (!isRetirement)
+        if (originalHero.Clan.Leader == originalHero)
         {
-            KillCharacterActionPatches.HandleKingdomLeaderDeath(originalHero);
+            ChangeClanLeaderAction.ApplyWithSelectedNewLeader(originalHero.Clan, heir);
+            if (!isRetirement) KillCharacterActionPatches.HandleKingdomLeaderDeath(originalHero);
+        }
+        else
+        {
+            if (heir.GovernorOf != null) ChangeGovernorAction.RemoveGovernorOf(heir);
+            GiveGoldAction.ApplyBetweenCharacters(originalHero, heir, originalHero.Gold, disableNotification: true);
         }
         if (isRetirement)
         {
@@ -86,14 +116,7 @@ public class ApplyHeirSelectionActionInterface : IApplyHeirSelectionActionInterf
             LeaveSettlementAction.ApplyForCharacterOnly(heir);
             LeaveSettlementAction.ApplyForParty(heir.PartyBelongedTo);
         }
-        for (int i = originalHero.OwnedWorkshops.Count - 1; i >= 0; i--)
-        {
-            ChangeOwnerOfWorkshopAction.ApplyByDeath(originalHero.OwnedWorkshops[i], heir);
-        }
-        foreach (Alley alley in originalHero.OwnedAlleys.ToList<Alley>())
-        {
-            alley.SetOwner(heir);
-        }
+        TransferAssets(originalHero, heir);
         if (originalParty != null && heir.PartyBelongedTo != originalParty)
         {
             for (int j = originalParty.MemberRoster.Count - 1; j >= 0; j--)
@@ -113,16 +136,15 @@ public class ApplyHeirSelectionActionInterface : IApplyHeirSelectionActionInterf
         messageBroker.Publish(this, new ChangePlayerCharacterAfterHeirSelection(originalHero, heir));
     }
 
-    private void TransferCaravanOwnerships(Hero originalHero, Hero newLeader)
+    private void TransferAssets(Hero originalHero, Hero heir)
     {
-        if (originalHero.Clan == null) return;
+        foreach (var caravan in originalHero.OwnedCaravans.ToArray())
+            CaravanPartyComponent.TransferCaravanOwnership(caravan.MobileParty, heir, caravan.HomeSettlement);
 
-        foreach (Hero hero in originalHero.Clan.Heroes)
-        {
-            if (hero.PartyBelongedTo != null && hero.PartyBelongedTo.IsCaravan)
-            {
-                CaravanPartyComponent.TransferCaravanOwnership(hero.PartyBelongedTo, newLeader, hero.PartyBelongedTo.HomeSettlement);
-            }
-        }
+        for (int i = originalHero.OwnedWorkshops.Count - 1; i >= 0; i--)
+            ChangeOwnerOfWorkshopAction.ApplyByDeath(originalHero.OwnedWorkshops[i], heir);
+
+        foreach (Alley alley in originalHero.OwnedAlleys.ToArray())
+            alley.SetOwner(heir);
     }
 }

@@ -41,7 +41,8 @@ public class ClanLeaveRules : IClanLeaveRules
 
     public bool CanLeave(Hero member)
     {
-        return member?.Clan != null && member.Clan.Leader != member && playerManager.Contains(member) &&
+        return member?.Clan != null && member.IsAlive && member.Clan.Leader != member && playerManager.Contains(member) &&
+            !grouping.AreRelated(member, member.Clan.Leader) &&
             (member.Spouse == null || !playerManager.Contains(member.Spouse));
     }
 

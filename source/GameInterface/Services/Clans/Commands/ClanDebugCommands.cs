@@ -1,6 +1,6 @@
-﻿using Common.Commands;
-using Autofac;
+﻿using Autofac;
 using Common;
+using Common.Commands;
 using Common.Network;
 using GameInterface.Services.Clans.Extensions;
 using GameInterface.Services.Clans.Messages;
@@ -311,6 +311,7 @@ namespace GameInterface.Services.GameDebug.Commands
             {
                 new ExpectedArgs("clan_id", "The registered player clan id."),
                 new ExpectedArgs("count", "The number of heirs to create, from 1 through 10."),
+                new ExpectedArgs("parent", "Optional player hero id or exact name; defaults to the clan leader.", false),
             };
 
             public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
@@ -330,6 +331,13 @@ namespace GameInterface.Services.GameDebug.Commands
                     return Failed("Targeted clan is not a player clan. Only add new heirs to player clans.");
 
                 Hero playerHero = playerClan.Leader;
+                if (args.Count == 3)
+                {
+                    if (!objectManager.TryGetObject(args[2], out playerHero))
+                        playerHero = playerClan.Heroes.FirstOrDefault(hero => hero.IsPlayerHero() && hero.Name.ToString() == args[2]);
+                    if (playerHero == null || !playerHero.IsPlayerHero() || playerHero.Clan != playerClan)
+                        return Failed("The parent must be a player in the selected clan.");
+                }
 
                 var templates = playerHero.Culture?.LordTemplates?
                     .Where(template => template != null)
@@ -353,9 +361,15 @@ namespace GameInterface.Services.GameDebug.Commands
 
                     relative.SetNewOccupation(Occupation.Lord);
                     if (playerHero.IsFemale)
+                    {
                         relative.Mother = playerHero;
+                        relative.Father = playerHero.Spouse;
+                    }
                     else
+                    {
                         relative.Father = playerHero;
+                        relative.Mother = playerHero.Spouse;
+                    }
                     relative.ChangeState(Hero.CharacterStates.Active);
                     createdHeroes.Add(relative);
                 }

@@ -84,5 +84,17 @@
     <string id="str_coop_clan_assign_player_governor" text="{=str_coop_clan_assign_player_governor}Assign {HERO} as governor of {SETTLEMENT}? They will keep their party, and their governor bonuses will remain active while travelling." />
     <string id="str_coop_clan_kingdom_leader_only" text="{=str_coop_clan_kingdom_leader_only}Only the clan leader can manage kingdom affairs." />
     <string id="str_coop_clan_settlement_menu_in_use" text="{=str_coop_clan_settlement_menu_in_use}Another player is using this menu at this settlement." />
+    <string id="str_coop_clan_member_cannot_leave" text="{=str_coop_clan_member_cannot_leave}The clan leader's family and players married to another player cannot leave or be removed from the clan." />
+    <string id="str_coop_succession_heir_title" text="{=str_coop_succession_heir_title}Select Your Heir" />
+    <string id="str_coop_succession_appoint_title" text="{=str_coop_succession_appoint_title}Appoint a New Clan Leader" />
+    <string id="str_coop_succession_appoint_button" text="{=str_coop_succession_appoint_button}Appoint Clan Leader" />
+    <string id="str_coop_succession_appoint_description" text="{=str_coop_succession_appoint_description}Your lineage has no eligible heir. {HERO} will keep their character and take leadership of your clan. Your journey will end, and you will create a new character when you rejoin." />
+    <string id="str_coop_succession_wait_title" text="{=str_coop_succession_wait_title}Inheritance Pending" />
+    <string id="str_coop_succession_wait_description" text="{=str_coop_succession_wait_description}Another player's heir selection must finish before you can continue. This screen will update automatically. You may disconnect and return later." />
+    <string id="str_coop_succession_disconnect" text="{=str_coop_succession_disconnect}Disconnect" />
+    <string id="str_coop_succession_choice_unavailable" text="{=str_coop_succession_choice_unavailable}That choice is no longer available. The available successors have been updated." />
+    <string id="str_coop_succession_game_over_title" text="{=str_coop_succession_game_over_title}Your Lineage Has Ended" />
+    <string id="str_coop_succession_member_game_over" text="{=str_coop_succession_member_game_over}You have no eligible heirs. Your journey has ended, but the clan will continue under its remaining members. You will create a new character when you rejoin." />
+    <string id="str_coop_succession_leader_game_over" text="{=str_coop_succession_leader_game_over}Your lineage has come to an end. {HERO} has taken leadership of {CLAN}. You will create a new character when you rejoin." />
     <!-- Add other custom text here in the future-->
 </strings>

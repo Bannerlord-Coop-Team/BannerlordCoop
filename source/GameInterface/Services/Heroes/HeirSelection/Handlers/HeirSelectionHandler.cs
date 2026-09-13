@@ -2,23 +2,33 @@
 using Common.Logging;
 using Common.Messaging;
 using Common.Network;
+using Common.Network.Coalescing;
+using Common.Network.Messages;
 using Common.Util;
 using GameInterface.CoopSessionData;
 using GameInterface.Services.CampaignService.Messages;
+using GameInterface.Services.GameState.Messages;
 using GameInterface.Services.Heroes.Extensions;
 using GameInterface.Services.Heroes.HeirSelection.Interfaces;
 using GameInterface.Services.Heroes.HeirSelection.Messages;
 using GameInterface.Services.ObjectManager;
+using GameInterface.Services.PlayerCaptivityService.Messages;
 using GameInterface.Services.Players;
 using GameInterface.Services.Players.Data;
+using GameInterface.Services.Players.Handlers;
+using GameInterface.Services.Players.Messages;
 using GameInterface.Services.UI.Cutscenes.Handlers;
 using LiteNetLib;
+using SandBox.View.Map;
 using Serilog;
 using System.Collections.Generic;
+using System.Linq;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Actions;
 using TaleWorlds.CampaignSystem.Encounters;
 using TaleWorlds.CampaignSystem.Party;
+using TaleWorlds.Core;
+using TaleWorlds.Library;
 
 namespace GameInterface.Services.Heroes.HeirSelection.Handlers;
 
@@ -35,6 +45,14 @@ internal class HeirSelectionHandler : IHandler
     private readonly IHeirSelectionCampaignBehaviorInterface heirSelectionCampaignBehaviorInterface;
     private readonly ICoopSessionMigrator coopSessionMigrator;
     private readonly PlayerDeathCutsceneHandler cutscenesHandler;
+    private readonly PlayerDeletionHandler playerDeletionHandler;
+    private readonly ISendCoalescer sendCoalescer;
+    private readonly Dictionary<string, IMessage> sentSelections = new();
+    private double lastCheckDays = -1;
+    private int presentationVersion;
+    private bool showingWaitInquiry;
+
+    public bool IsAppointingClanLeader { get; private set; }
 
     public HeirSelectionHandler(
         IMessageBroker messageBroker,
@@ -45,7 +63,9 @@ internal class HeirSelectionHandler : IHandler
         IApplyHeirSelectionActionInterface applyHeirSelectionActionInterface,
         IHeirSelectionCampaignBehaviorInterface heirSelectionCampaignBehaviorInterface,
         ICoopSessionMigrator coopSessionMigrator,
-        PlayerDeathCutsceneHandler cutscenesHandler)
+        PlayerDeathCutsceneHandler cutscenesHandler,
+        PlayerDeletionHandler playerDeletionHandler,
+        ISendCoalescer sendCoalescer = null)
     {
         this.messageBroker = messageBroker;
         this.objectManager = objectManager;
@@ -56,6 +76,12 @@ internal class HeirSelectionHandler : IHandler
         this.heirSelectionCampaignBehaviorInterface = heirSelectionCampaignBehaviorInterface;
         this.coopSessionMigrator = coopSessionMigrator;
         this.cutscenesHandler = cutscenesHandler;
+        this.playerDeletionHandler = playerDeletionHandler;
+        this.sendCoalescer = sendCoalescer;
+
+        messageBroker.Subscribe<CampaignTick>(Handle_CampaignTick);
+        messageBroker.Subscribe<PlayerConnectionStateChanged>(Handle_PlayerConnectionStateChanged);
+        messageBroker.Subscribe<MainMenuEntered>(Handle_MainMenuEntered);
 
         messageBroker.Subscribe<PlayerHeirSelectionRequested>(Handle_PlayerHeirSelectionRequested);
         messageBroker.Subscribe<NetworkClientSelectHeir>(Handle_NetworkClientSelectHeir);
@@ -72,6 +98,9 @@ internal class HeirSelectionHandler : IHandler
 
     public void Dispose()
     {
+        messageBroker.Unsubscribe<CampaignTick>(Handle_CampaignTick);
+        messageBroker.Unsubscribe<PlayerConnectionStateChanged>(Handle_PlayerConnectionStateChanged);
+        messageBroker.Unsubscribe<MainMenuEntered>(Handle_MainMenuEntered);
         messageBroker.Unsubscribe<PlayerHeirSelectionRequested>(Handle_PlayerHeirSelectionRequested);
         messageBroker.Unsubscribe<NetworkClientSelectHeir>(Handle_NetworkClientSelectHeir);
 
@@ -90,50 +119,188 @@ internal class HeirSelectionHandler : IHandler
         var playerHero = obj.What.PlayerHero;
         if (playerHero == null || !playerHero.IsDead) return;
 
-        if (!objectManager.TryGetIdWithLogging(playerHero, out var playerVictimId)) return;
-        if (!TryGetPeerForHero(playerVictimId, out var peer)) return;
+        if (objectManager.TryGetId(playerHero, out var heroId)) sentSelections.Remove(heroId);
+        // Finish the current batch of deaths before giving either spouse a choice.
+        GameThread.EnqueueSafe(() => RefreshSuccessions(playerHero.Clan));
+    }
 
-        var heirApparents = playerHero.Clan?.GetHeirApparents();
+    private void Handle_CampaignTick(MessagePayload<CampaignTick> obj)
+    {
+        if (ModInformation.IsClient || Campaign.Current == null) return;
+        var days = CampaignTime.Now.ToDays;
+        if (days >= lastCheckDays && days - lastCheckDays < 1d / 24) return;
+        lastCheckDays = days;
+        RefreshSuccessions();
+    }
 
-        // Player has no remaining heirs, send to game over screen and disconnect
-        if (heirApparents == null || heirApparents.Count == 0)
+    private void Handle_PlayerConnectionStateChanged(MessagePayload<PlayerConnectionStateChanged> obj)
+    {
+        if (ModInformation.IsServer) GameThread.EnqueueSafe(() => RefreshSuccessions());
+    }
+
+    private void Handle_MainMenuEntered(MessagePayload<MainMenuEntered> obj)
+    {
+        presentationVersion++;
+        IsAppointingClanLeader = false;
+        showingWaitInquiry = false;
+        sentSelections.Clear();
+        lastCheckDays = -1;
+    }
+
+    private void RefreshSuccessions(Clan clan = null)
+    {
+        foreach (var player in playerManager.Players)
         {
-            network.Send(peer, new NetworkClientGameOver(playerVictimId));
+            if (!objectManager.TryGetObject<Hero>(player.HeroId, out var hero) || !hero.IsDead ||
+                (clan != null && hero.Clan != clan)) continue;
+            RefreshSuccession(player, hero);
+        }
+    }
+
+    private void RefreshSuccession(Player player, Hero hero, bool selectionRejected = false)
+    {
+        heirSelectionCampaignBehaviorInterface.PrepareSuccession(hero);
+        var state = heirSelectionCampaignBehaviorInterface.GetSuccession(hero);
+        if (state == null) return;
+        if (state.GameOver)
+        {
+            CompleteGameOver(player, hero, state);
             return;
         }
 
-        // Resolve heir apparent ids for client's HeirSelectionPopupVM
-        var heirIdApparents = new Dictionary<string, int>();
-        foreach (var heirApparent in heirApparents)
+        var candidates = GetCandidates(hero, out var appoint, out var waiting);
+        bool connected = playerManager.IsConnected(player);
+        if (appoint && !connected)
         {
-            if (!objectManager.TryGetIdWithLogging(heirApparent.Key, out var heirHeroId)) continue;
-
-            heirIdApparents[heirHeroId] = heirApparent.Value;
+            state.AppointmentDeadlineDays ??= CampaignTime.YearsFromNow(1).ToDays;
+            if (candidates.Count > 0 && CampaignTime.Now.ToDays >= state.AppointmentDeadlineDays.Value)
+            {
+                var bestScore = candidates.Values.Max();
+                var tied = candidates.Where(pair => pair.Value == bestScore).Select(pair => pair.Key).ToArray();
+                var leadership = tied.Max(candidate => candidate.GetSkillValue(DefaultSkills.Leadership));
+                var successor = tied.Where(candidate => candidate.GetSkillValue(DefaultSkills.Leadership) == leadership)
+                    .ToList().GetRandomElement();
+                AppointClanLeader(player, hero, successor);
+                return;
+            }
         }
 
-        network.Send(peer, new NetworkClientSelectHeir(heirIdApparents));
+        if (!waiting && candidates.Count == 0)
+        {
+            CompleteGameOver(player, hero, state);
+            return;
+        }
+
+        if (!connected || !playerManager.TryGetPeer(player.ControllerId, out var peer)) return;
+        var ids = new Dictionary<string, int>();
+        foreach (var candidate in candidates)
+            if (objectManager.TryGetIdWithLogging(candidate.Key, out var id)) ids[id] = candidate.Value;
+
+        if (!selectionRejected && sentSelections.TryGetValue(player.HeroId, out var sent) && sent is NetworkClientSelectHeir previous &&
+            previous.AppointClanLeader == appoint && previous.WaitingForHeirSelection == waiting &&
+            previous.HeirIdApparents.SequenceEqual(ids)) return;
+
+        var message = new NetworkClientSelectHeir(ids, appoint, waiting, selectionRejected);
+        sentSelections[player.HeroId] = message;
+        sendCoalescer?.Flush(network);
+        network.Send(peer, message);
+    }
+
+    private Dictionary<Hero, int> GetCandidates(Hero hero, out bool appoint, out bool waiting)
+    {
+        waiting = heirSelectionCampaignBehaviorInterface.IsWaitingForLeader(hero);
+        var candidates = waiting ? new Dictionary<Hero, int>() : heirSelectionCampaignBehaviorInterface.GetHeirs(hero);
+        appoint = !waiting && candidates.Count == 0 && hero.Clan?.Leader == hero;
+        if (!appoint) return candidates;
+
+        candidates = heirSelectionCampaignBehaviorInterface.GetPlayerSuccessors(hero);
+        waiting = candidates.Count == 0 && hero.Clan.Heroes.Any(member => member != hero && playerManager.Contains(member) &&
+            (member.IsDead || member.DeathMark != KillCharacterAction.KillCharacterActionDetail.None) &&
+            heirSelectionCampaignBehaviorInterface.GetSuccession(member)?.GameOver != true &&
+            heirSelectionCampaignBehaviorInterface.GetHeirs(member).Count > 0);
+        return candidates;
+    }
+
+    private void AppointClanLeader(Player player, Hero hero, Hero successor)
+    {
+        if (!objectManager.TryGetIdWithLogging(successor, out var successorId)) return;
+        applyHeirSelectionActionInterface.AppointClanLeader(hero, successor);
+        var state = heirSelectionCampaignBehaviorInterface.GetSuccession(hero);
+        state.AppointedLeaderId = successorId;
+        CompleteGameOver(player, hero, state);
+        GameThread.EnqueueSafe(() => RefreshSuccessions(successor.Clan));
+    }
+
+    private void CompleteGameOver(Player player, Hero hero, PlayerSuccessionData state)
+    {
+        state.GameOver = true;
+        if (!playerManager.IsConnected(player))
+        {
+            playerDeletionHandler.CompleteGameOver(player);
+            sentSelections.Remove(player.HeroId);
+            return;
+        }
+
+        if (sentSelections.TryGetValue(player.HeroId, out var sent) && sent is NetworkClientGameOver) return;
+        if (!playerManager.TryGetPeer(player.ControllerId, out var peer)) return;
+        bool clanSurvives = hero.Clan != null && (hero.Clan.Heroes.Any(member => member.IsAlive && playerManager.Contains(member)) ||
+            hero.Clan.GetHeirApparents().Count > 0);
+        var message = new NetworkClientGameOver(player.HeroId, state.AppointedLeaderId, clanSurvives);
+        sentSelections[player.HeroId] = message;
+        sendCoalescer?.Flush(network);
+        network.Send(peer, message);
     }
 
     private void Handle_NetworkClientSelectHeir(MessagePayload<NetworkClientSelectHeir> obj)
     {
         var data = obj.What;
 
-        GameThread.RunSafe(() => cutscenesHandler.EnqueueDeathPresentation(() =>
+        GameThread.RunSafe(() =>
         {
-            var heirApparents = new Dictionary<Hero, int>();
-            foreach (var heirIdApparent in data.HeirIdApparents)
+            var version = ++presentationVersion;
+            cutscenesHandler.EnqueueDeathPresentation(() =>
             {
-                if (!objectManager.TryGetObjectWithLogging<Hero>(heirIdApparent.Key, out var heirHero)) continue;
+                if (version != presentationVersion || Hero.MainHero?.IsDead != true) return;
+                CloseSelection();
+                IsAppointingClanLeader = data.AppointClanLeader;
 
-                heirApparents[heirHero] = heirIdApparent.Value;
-            }
+                if (data.WaitingForHeirSelection)
+                {
+                    showingWaitInquiry = true;
+                    InformationManager.ShowInquiry(new InquiryData(
+                        GameTexts.FindText("str_coop_succession_wait_title").ToString(),
+                        GameTexts.FindText("str_coop_clan_experimental_warning") + "\n\n" +
+                        GameTexts.FindText("str_coop_succession_wait_description"), true, false,
+                        GameTexts.FindText("str_coop_succession_disconnect").ToString(), string.Empty,
+                        () => messageBroker.Publish(this, new PlayerDisconnectRequested()), null));
+                    return;
+                }
 
-            if (PlayerEncounter.Current != null && (PlayerEncounter.Battle == null || !PlayerEncounter.Battle.IsFinalized))
-            {
-                PlayerEncounter.Finish(true);
-            }
-            CampaignEventDispatcher.Instance.OnHeirSelectionRequested(heirApparents);
-        }));
+                var heirApparents = new Dictionary<Hero, int>();
+                foreach (var pair in data.HeirIdApparents)
+                    if (objectManager.TryGetObjectWithLogging<Hero>(pair.Key, out var heir)) heirApparents[heir] = pair.Value;
+                if (heirApparents.Count == 0) return;
+
+                if (PlayerEncounter.Current != null && (PlayerEncounter.Battle == null || !PlayerEncounter.Battle.IsFinalized))
+                    PlayerEncounter.Finish(true);
+                CampaignEventDispatcher.Instance.OnHeirSelectionRequested(heirApparents);
+                if (data.SelectionRejected)
+                    InformationManager.DisplayMessage(new InformationMessage(GameTexts.FindText("str_coop_succession_choice_unavailable").ToString()));
+            });
+        });
+    }
+
+    public void EndSelection()
+    {
+        presentationVersion++;
+        CloseSelection();
+    }
+
+    private void CloseSelection()
+    {
+        MapScreen.Instance?.OnHeirSelectionOver(null);
+        if (showingWaitInquiry) InformationManager.HideInquiry();
+        showingWaitInquiry = false;
     }
 
     private void Handle_HeirSelectionOver(MessagePayload<HeirSelectionOver> obj)
@@ -143,7 +310,7 @@ internal class HeirSelectionHandler : IHandler
         if (!objectManager.TryGetIdWithLogging(data.OriginalHero, out var originalHeroId)) return;
         if (!objectManager.TryGetIdWithLogging(data.SelectedHeir, out var selectedHeirId)) return;
 
-        network.SendAll(new NetworkHeirSelectionOver(originalHeroId, selectedHeirId));
+        network.SendAll(new NetworkHeirSelectionOver(originalHeroId, selectedHeirId, IsAppointingClanLeader));
     }
 
     private void Handle_NetworkHeirSelectionOver(MessagePayload<NetworkHeirSelectionOver> obj)
@@ -161,19 +328,28 @@ internal class HeirSelectionHandler : IHandler
             }
 
             if (!objectManager.TryGetObjectWithLogging<Hero>(data.OriginalHeroId, out var originalHero)) return;
-            if (!objectManager.TryGetObjectWithLogging<Hero>(data.SelectedHeirId, out var selectedHeir)) return;
-
             if (!originalHero.IsDead ||
                 originalHero.DeathMark == KillCharacterAction.KillCharacterActionDetail.None ||
-                originalHero.Clan == null ||
-                selectedHeir == originalHero ||
-                !originalHero.Clan.GetHeirApparents().ContainsKey(selectedHeir))
+                originalHero.Clan == null) return;
+
+            var candidates = GetCandidates(originalHero, out var appoint, out var waiting);
+            if (waiting || heirSelectionCampaignBehaviorInterface.GetSuccession(originalHero)?.GameOver == true ||
+                data.AppointClanLeader != appoint ||
+                !objectManager.TryGetObject<Hero>(data.SelectedHeirId, out var selectedHeir) || !candidates.ContainsKey(selectedHeir))
             {
-                Logger.Warning($"Ignoring invalid heir {data.SelectedHeirId} for hero {data.OriginalHeroId}");
+                RefreshSuccession(player, originalHero, selectionRejected: true);
                 return;
             }
 
-            applyHeirSelectionActionInterface.ApplyByDeath(originalHero, selectedHeir);
+            if (appoint)
+            {
+                AppointClanLeader(player, originalHero, selectedHeir);
+                return;
+            }
+            // Death clears PartyBelongedTo, but the player's registered party is retained for succession.
+            objectManager.TryGetObject(player.MobilePartyId, out MobileParty originalParty);
+            applyHeirSelectionActionInterface.ApplyByDeath(originalHero, selectedHeir, originalParty);
+            GameThread.EnqueueSafe(() => RefreshSuccessions(selectedHeir.Clan));
         });
     }
 
@@ -185,7 +361,12 @@ internal class HeirSelectionHandler : IHandler
         if (!objectManager.TryGetIdWithLogging(data.Heir, out var heirId)) return;
         if (!objectManager.TryGetIdWithLogging(data.Heir.Clan, out var clanId)) return;
         if (!objectManager.TryGetIdWithLogging(data.Heir.CharacterObject, out var characterObjectId)) return;
-        if (!TryGetPlayerForHero(originalHeroId, out var registeredPlayer)) return;
+        var registeredPlayer = playerManager.Players.FirstOrDefault(player => player.HeroId == originalHeroId);
+        if (registeredPlayer == null)
+        {
+            Logger.Error($"Failed to get player for hero {originalHeroId} during heir selection");
+            return;
+        }
 
         objectManager.TryGetObject(registeredPlayer.MobilePartyId, out MobileParty originalParty);
 
@@ -194,7 +375,8 @@ internal class HeirSelectionHandler : IHandler
             heirId,
             registeredPlayer.MobilePartyId,
             clanId,
-            characterObjectId);
+            characterObjectId,
+            registeredPlayer.OriginalClanId ?? registeredPlayer.ClanId);
 
         if (!playerPartyRestorer.TryRestore(replacementPlayerData, out var replacementPlayer))
         {
@@ -210,12 +392,14 @@ internal class HeirSelectionHandler : IHandler
 
         // Migrate CoopSession data before changed player action calls PlayerHeroChanged
         coopSessionMigrator.MigratePlayerData(data.OriginalHero, data.Heir);
+        sentSelections.Remove(originalHeroId);
 
         heirSelectionCampaignBehaviorInterface.OnBeforePlayerCharacterChanged(data.OriginalHero, originalParty);
 
         Logger.Information($"Transferred controller {registeredPlayer.ControllerId} from hero {originalHeroId} to heir {heirId}");
 
         messageBroker.Publish(this, new PlayerHeirSelectionCompleted(data.Heir));
+        sendCoalescer?.Flush(network);
         network.SendAll(new NetworkChangePlayerCharacterAfterHeirSelection(replacementPlayer, originalHeroId));
 
         // Only disband/destroy party if the selected heir isn't in the same party as the dead/retired player
@@ -314,30 +498,5 @@ internal class HeirSelectionHandler : IHandler
 
             heirSelectionCampaignBehaviorInterface.OnPlayerCharacterChanged(oldPlayerHero, newPlayerHero, newMainParty, data.IsMainPartyChanged);
         });
-    }
-
-    private bool TryGetPeerForHero(string playerHeroId, out NetPeer peer)
-    {
-        peer = null;
-
-        if (!TryGetPlayerForHero(playerHeroId, out var player)) return false;
-
-        return playerManager.TryGetPeer(player.ControllerId, out peer);
-    }
-
-    private bool TryGetPlayerForHero(string playerHeroId, out Player player)
-    {
-        player = null;
-
-        foreach (var candidate in playerManager.Players)
-        {
-            if (candidate.HeroId != playerHeroId) continue;
-
-            player = candidate;
-            return true;
-        }
-
-        Logger.Error($"Failed to get peer for player hero with id {playerHeroId} during heir selection");
-        return false;
     }
 }

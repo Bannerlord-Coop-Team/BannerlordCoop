@@ -272,11 +272,13 @@ public class PlayerManager : IPlayerManager
     /// <inheritdoc cref="IPlayerManager.Contains(object)"/>
     public bool Contains(object obj)
     {
-        return obj != null && PlayerObjects.TryGetValue(obj, out _);
+        return obj != null && TryGetControlledObjectInfo(obj, out _);
     }
 
     public static bool TryGetControlledObjectInfo(object obj, out ControlledObjectInfo info)
     {
+        // A coop clan can outlive its original player's registration after succession.
+        if (obj is Clan clan && clan.Leader != null && PlayerObjects.TryGetValue(clan.Leader, out info)) return true;
         return PlayerObjects.TryGetValue(obj, out info);
     }
     public void SetPeer(string controllerId, NetPeer peer)

@@ -7,6 +7,7 @@ namespace GameInterface.Services.Clans;
 public interface IClanMemberGrouping : IGameAbstraction
 {
     ClanMemberGroup GetGroup(Hero member, Hero viewer);
+    bool AreRelated(Hero first, Hero second);
 }
 
 public class ClanMemberGrouping : IClanMemberGrouping
@@ -22,15 +23,17 @@ public class ClanMemberGrouping : IClanMemberGrouping
     {
         if (member == viewer || playerManager.Contains(member)) return ClanMemberGroup.Players;
 
-        var ancestors = GetAncestors(viewer);
-        if (ancestors.Overlaps(GetAncestors(member)) ||
-            ancestors.Overlaps(GetAncestors(member.Spouse)) ||
-            GetAncestors(viewer.Spouse).Overlaps(GetAncestors(member)))
-        {
-            return ClanMemberGroup.Family;
-        }
+        return AreRelated(member, viewer) ? ClanMemberGroup.Family : ClanMemberGroup.OtherFamilies;
+    }
 
-        return ClanMemberGroup.OtherFamilies;
+    public bool AreRelated(Hero first, Hero second)
+    {
+        if (first == null || second == null) return false;
+
+        var ancestors = GetAncestors(first);
+        return ancestors.Overlaps(GetAncestors(second)) ||
+            ancestors.Overlaps(GetAncestors(second.Spouse)) ||
+            GetAncestors(first.Spouse).Overlaps(GetAncestors(second));
     }
 
     private HashSet<Hero> GetAncestors(Hero hero)

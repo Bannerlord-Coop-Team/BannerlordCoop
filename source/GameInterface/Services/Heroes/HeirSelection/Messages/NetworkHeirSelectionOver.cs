@@ -12,11 +12,15 @@ internal readonly struct NetworkHeirSelectionOver : ICommand
     [ProtoMember(2)]
     public readonly string SelectedHeirId;
 
+    [ProtoMember(3)] public readonly bool AppointClanLeader;
+
     public NetworkHeirSelectionOver(
         string originalHeroId,
-        string selectedHeirId)
+        string selectedHeirId,
+        bool appointClanLeader = false)
     {
         OriginalHeroId = originalHeroId;
         SelectedHeirId = selectedHeirId;
+        AppointClanLeader = appointClanLeader;
     }
 }

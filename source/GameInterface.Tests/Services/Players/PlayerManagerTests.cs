@@ -387,6 +387,43 @@ public class PlayerManagerTests
         Assert.Same(current, Assert.Single(playerManager.Players));
     }
 
+    [Fact]
+    public void RemovingOriginalOwnerKeepsClanControlledByAppointedPlayerLeader()
+    {
+        var manager = CreatePlayerManager(out var objects);
+        var clan = ObjectHelper.SkipConstructor<Clan>();
+        var oldHero = ObjectHelper.SkipConstructor<Hero>();
+        var newLeader = ObjectHelper.SkipConstructor<Hero>();
+        oldHero.OwnedCaravans = new();
+        newLeader.OwnedCaravans = new();
+        objects.Setup(value => value.TryGetObjectWithLogging("clan", out clan)).Returns(true);
+        objects.Setup(value => value.TryGetObject("clan", out clan)).Returns(true);
+        objects.Setup(value => value.TryGetObjectWithLogging("old-hero", out oldHero)).Returns(true);
+        objects.Setup(value => value.TryGetObject("old-hero", out oldHero)).Returns(true);
+        objects.Setup(value => value.TryGetObjectWithLogging("new-leader", out newLeader)).Returns(true);
+        objects.Setup(value => value.TryGetObject("new-leader", out newLeader)).Returns(true);
+        var original = new Player("original", "old-hero", "", "clan", "");
+        var successor = new Player("successor", "new-leader", "", "clan", "", "other-clan");
+        try
+        {
+            clan._leader = oldHero;
+            Assert.True(manager.AddPlayer(original));
+            Assert.True(manager.AddPlayer(successor));
+            clan._leader = newLeader;
+
+            Assert.True(manager.RemovePlayer(original));
+
+            Assert.True(manager.Contains(clan));
+            Assert.True(PlayerManager.TryGetControlledObjectInfo(clan, out var control));
+            Assert.Equal("successor", control.ObjectControllerId);
+        }
+        finally
+        {
+            manager.RemovePlayer(original);
+            manager.RemovePlayer(successor);
+        }
+    }
+
     private static ConditionalWeakTable<object, ControlledObjectInfo> GetPlayerObjects() =>
         (ConditionalWeakTable<object, ControlledObjectInfo>)AccessTools
             .Field(typeof(PlayerManager), "PlayerObjects")
