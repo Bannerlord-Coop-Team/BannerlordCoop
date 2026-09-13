@@ -1,11 +1,26 @@
 ﻿using Common.Messaging;
 using GameInterface.Services.GameDebug.Messages;
 using Missions.Battles;
+using Missions.Diagnostics;
 
 namespace E2E.Tests.Services.Missions;
 
 public class BattleDebugRouteHandlerTests
 {
+    [Fact]
+    public void TakeSnapshotTail_KeepsMostRecentBoundedEvents()
+    {
+        int[] timeline = Enumerable.Range(
+            0,
+            MissionActionDiagnostics.MaximumSnapshotTimelineEvents + 2).ToArray();
+
+        int[] snapshot = MissionActionDiagnostics.TakeSnapshotTail(timeline);
+
+        Assert.Equal(MissionActionDiagnostics.MaximumSnapshotTimelineEvents, snapshot.Length);
+        Assert.Equal(2, snapshot[0]);
+        Assert.Equal(timeline[^1], snapshot[^1]);
+    }
+
     [Fact]
     public void RouteMessage_KeepsWeakSubscriptionAlive()
     {
