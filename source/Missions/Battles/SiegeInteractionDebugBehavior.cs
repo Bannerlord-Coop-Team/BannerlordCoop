@@ -374,9 +374,10 @@ internal sealed class SiegeInteractionDebugBehavior : MissionBehavior, ISiegeInt
             Capture(screen, agent);
             return;
         }
-        if (request.Action == "stage" || request.Action == "watch" || request.Action == "approach")
+        if (request.Action == "stage" || request.Action == "watch" || request.Action == "approach" || request.Action == "aim")
         {
-            Stage(screen, agent, request.MachineId, request.StandingPointIndex, request.Action == "watch", request.Action == "approach");
+            Stage(screen, agent, request.MachineId, request.StandingPointIndex, request.Action == "watch",
+                request.Action == "approach" || request.Action == "aim", request.Action == "aim");
             return;
         }
         if (request.Action == "restore")
@@ -525,8 +526,13 @@ internal sealed class SiegeInteractionDebugBehavior : MissionBehavior, ISiegeInt
         return true;
     }
 
-    private void Stage(MissionScreen screen, Agent agent, int machineId, int pointIndex, bool watchOnly, bool nativeCamera = false)
+    private void Stage(MissionScreen screen, Agent agent, int machineId, int pointIndex, bool watchOnly, bool nativeCamera = false, bool reaimOnly = false)
     {
+        if (reaimOnly && (!nativeCameraStaged || observedMachineId != machineId))
+        {
+            status = "fixture_stage_rejected";
+            return;
+        }
         observedMachineId = machineId;
         nativeAimTarget = null;
         var machine = Mission.MissionObjects.OfType<UsableMachine>()
@@ -540,7 +546,12 @@ internal sealed class SiegeInteractionDebugBehavior : MissionBehavior, ISiegeInt
             return;
         }
         var point = machine.StandingPoints[pointIndex];
-        var position = point.GetUserFrameForAgent(agent).Origin.GetGroundVec3();
+        if (reaimOnly && (!(machine is Ballista ballista) || !ReferenceEquals(point, ballista.PilotStandingPoint)))
+        {
+            status = "fixture_stage_rejected";
+            return;
+        }
+        var position = reaimOnly ? agent.Position : point.GetUserFrameForAgent(agent).Origin.GetGroundVec3();
         if (nativeCamera)
         {
             if (capturedCamera != null || stagingCamera != null || agent.MountAgent != null)
@@ -572,7 +583,7 @@ internal sealed class SiegeInteractionDebugBehavior : MissionBehavior, ISiegeInt
                     return;
                 }
             }
-            agent.TeleportToPosition(position);
+            if (!reaimOnly) agent.TeleportToPosition(position);
             agent.LookDirection = direction;
             screen.CameraBearing = direction.RotationZ;
             screen.CameraElevation = direction.RotationX;

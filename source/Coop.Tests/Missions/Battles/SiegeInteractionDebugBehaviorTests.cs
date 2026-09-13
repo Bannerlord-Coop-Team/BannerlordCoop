@@ -211,6 +211,25 @@ public class SiegeInteractionDebugBehaviorTests
     }
 
     [Theory]
+    [InlineData(false, 1410)]
+    [InlineData(true, 743)]
+    public void NativeBallistaAim_RejectsUnstagedOrDifferentTargetBeforeNativeReads(bool staged, int stagedMachineId)
+    {
+        var behavior = new SiegeInteractionDebugBehavior(Mock.Of<IMessageBroker>());
+        AccessTools.Field(typeof(SiegeInteractionDebugBehavior), "nativeCameraStaged").SetValue(behavior, staged);
+        AccessTools.Field(typeof(SiegeInteractionDebugBehavior), "observedMachineId").SetValue(behavior, stagedMachineId);
+
+        AccessTools.Method(typeof(SiegeInteractionDebugBehavior), "Stage").Invoke(behavior,
+            new object[] { null, null, 1410, 0, false, true, true });
+
+        Assert.Equal("fixture_stage_rejected", AccessTools.Field(typeof(SiegeInteractionDebugBehavior), "status").GetValue(behavior));
+        Assert.Equal(staged, AccessTools.Field(typeof(SiegeInteractionDebugBehavior), "nativeCameraStaged").GetValue(behavior));
+        Assert.Equal(stagedMachineId, AccessTools.Field(typeof(SiegeInteractionDebugBehavior), "observedMachineId").GetValue(behavior));
+        Assert.Null(AccessTools.Field(typeof(SiegeInteractionDebugBehavior), "capturedAgent").GetValue(behavior));
+        Assert.False((bool)AccessTools.Field(typeof(SiegeInteractionDebugBehavior), "externalInputArmed").GetValue(behavior));
+    }
+
+    [Theory]
     [InlineData(0.5f)]
     [InlineData(3f)]
     public void NativeBallistaStaging_AimsAtResolvedBodyInsteadOfPilotFacing(float bodyHeight)
