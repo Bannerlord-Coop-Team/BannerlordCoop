@@ -1,12 +1,15 @@
 ﻿using Common.Messaging;
 using GameInterface.Services.GameDebug.Messages;
 using Missions.Battles;
+#if DEBUG
 using Missions.Diagnostics;
+#endif
 
 namespace E2E.Tests.Services.Missions;
 
 public class BattleDebugRouteHandlerTests
 {
+#if DEBUG
     [Fact]
     public void TakeSnapshotTail_KeepsMostRecentBoundedEvents()
     {
@@ -20,6 +23,8 @@ public class BattleDebugRouteHandlerTests
         Assert.Equal(2, snapshot[0]);
         Assert.Equal(timeline[^1], snapshot[^1]);
     }
+
+#endif
 
     [Fact]
     public void RouteMessage_KeepsWeakSubscriptionAlive()
