@@ -60,6 +60,32 @@ public class SiegeInteractionDebugBehaviorTests
     }
 
     [Fact]
+    public void RawInputEvidence_DoesNotSatisfyGameEdgeOrRelease()
+    {
+        var behavior = new SiegeInteractionDebugBehavior(Mock.Of<IMessageBroker>());
+        var before = DateTime.UtcNow;
+        behavior.RecordInputSample(false, false, false, new
+        {
+            isKeysAllowed = false, registeredGameKeyId = 13, registeredKeyboardKey = "F",
+            rawPressed = true, rawDown = true, rawReleased = false
+        });
+        AccessTools.Field(typeof(SiegeInteractionDebugBehavior), "tick").SetValue(behavior, 1);
+        behavior.RecordInputSample(false, false, false, new
+        {
+            isKeysAllowed = false, registeredGameKeyId = 13, registeredKeyboardKey = "F",
+            rawPressed = false, rawDown = false, rawReleased = true
+        });
+        var samples = JArray.FromObject(AccessTools.Field(typeof(SiegeInteractionDebugBehavior), "inputSamples").GetValue(behavior));
+        Assert.True(samples[0]["nativeInput"]["rawDown"].Value<bool>());
+        Assert.True(samples[1]["nativeInput"]["rawReleased"].Value<bool>());
+        Assert.False(samples[0]["nativeInput"]["isKeysAllowed"].Value<bool>());
+        Assert.Equal(13, samples[0]["nativeInput"]["registeredGameKeyId"].Value<int>());
+        Assert.InRange(samples[0]["recordedUtc"].Value<DateTime>(), before, DateTime.UtcNow);
+        Assert.False((bool)AccessTools.Field(typeof(SiegeInteractionDebugBehavior), "edgeObserved").GetValue(behavior));
+        Assert.False((bool)AccessTools.Field(typeof(SiegeInteractionDebugBehavior), "edgeCleared").GetValue(behavior));
+    }
+
+    [Fact]
     public void ExternalInputObservation_MissedEdgeAllowsOnlyReleasedKeyCleanupStop()
     {
         var behavior = new SiegeInteractionDebugBehavior(Mock.Of<IMessageBroker>());

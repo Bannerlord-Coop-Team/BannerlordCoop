@@ -78,17 +78,36 @@ internal sealed class SiegeInteractionDebugBehavior : MissionBehavior, ISiegeInt
         if ((!pressInvoked && !externalInputArmed) || edgeCleared || inputSamples.Count >= 300) return;
         var screen = ScreenManager.TopScreen as MissionScreen;
         if (screen?.SceneLayer?.Input == null) return;
-        bool pressed = screen.SceneLayer.Input.IsGameKeyPressed(inputGameKeyId);
-        bool down = screen.SceneLayer.Input.IsGameKeyDown(inputGameKeyId);
-        bool released = screen.SceneLayer.Input.IsGameKeyReleased(inputGameKeyId);
-        RecordInputSample(pressed, down, released);
+        var input = screen.SceneLayer.Input;
+        bool pressed = input.IsGameKeyPressed(inputGameKeyId);
+        bool down = input.IsGameKeyDown(inputGameKeyId);
+        bool released = input.IsGameKeyReleased(inputGameKeyId);
+        var registeredKey = inputGameKeyId >= 0 && inputGameKeyId < input._registeredGameKeys.Count
+            ? input._registeredGameKeys[inputGameKeyId] : null;
+        var keyboardKey = registeredKey?.KeyboardKey;
+        RecordInputSample(pressed, down, released, new
+        {
+            contextType = input.GetType().FullName,
+            contextId = System.Runtime.CompilerServices.RuntimeHelpers.GetHashCode(input),
+            layerType = screen.SceneLayer.GetType().FullName,
+            layerId = System.Runtime.CompilerServices.RuntimeHelpers.GetHashCode(screen.SceneLayer),
+            isKeysAllowed = input.IsKeysAllowed,
+            registeredGameKeyId = registeredKey?.Id,
+            registeredCategory = registeredKey?.MainCategoryId,
+            registeredKeyboardKey = keyboardKey?.InputKey.ToString(),
+            registeredVirtualKey = keyboardKey == null ? (int?)null : Input.GetVirtualKeyCode(keyboardKey.InputKey),
+            armedVirtualKey = inputVirtualKey,
+            rawPressed = keyboardKey == null ? (bool?)null : Input.IsKeyPressed(keyboardKey.InputKey),
+            rawDown = keyboardKey == null ? (bool?)null : Input.IsKeyDown(keyboardKey.InputKey),
+            rawReleased = keyboardKey == null ? (bool?)null : Input.IsKeyReleased(keyboardKey.InputKey)
+        });
     }
 
-    internal void RecordInputSample(bool pressed, bool down, bool released)
+    internal void RecordInputSample(bool pressed, bool down, bool released, object nativeInput = null)
     {
         edgeObserved |= pressed || down;
         edgeCleared = edgeObserved && tick > pressTick && !pressed && !down;
-        inputSamples.Add(new { tick, pressed, down, released });
+        inputSamples.Add(new { tick, recordedUtc = DateTime.UtcNow.ToString("O"), pressed, down, released, nativeInput });
         if (edgeCleared) status = "input_edge_cleared";
         else if (inputSamples.Count == 300) status = "unexercised_input_lifecycle";
     }

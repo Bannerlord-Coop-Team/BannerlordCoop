@@ -208,6 +208,7 @@
     <Publicize Include="TaleWorlds.CampaignSystem.ViewModelCollection" />
     <Publicize Include="TaleWorlds.Core" />
     <Publicize Include="TaleWorlds.Engine" />
+    <Publicize Include="TaleWorlds.InputSystem:TaleWorlds.InputSystem.InputContext._registeredGameKeys" />
     <Publicize Include="TaleWorlds.GauntletUI" />
     <Publicize Include="TaleWorlds.GauntletUI.Data" />
     <Publicize Include="TaleWorlds.MountAndBlade" />
