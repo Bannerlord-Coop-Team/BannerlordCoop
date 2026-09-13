@@ -7,6 +7,7 @@ using GameInterface.Services.TroopRosters.Data;
 using Serilog;
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Actions;
 using TaleWorlds.CampaignSystem.Party;
@@ -293,19 +294,18 @@ internal class PlayerPartyInteractionOutcomeHandler
         var initiatorClan = initiatorParty.LeaderHero?.Clan ?? initiatorParty.MobileParty?.ActualClan;
         var responderHero = responderParty.LeaderHero;
         var targetKingdom = responderHero?.Clan?.Kingdom;
-        // Initiator clan must not be at war with anyone the target kingdom is at peace with.
-        var initiatorWars = initiatorClan.MapFaction?.FactionsAtWarWith;
-        bool sameWars = true;
-        if (initiatorWars != null)
+        List<IFaction> playerwars = new List<IFaction>();
+        List<IFaction> warsOfFactionToJoin = new List<IFaction>();
+        float strengthThresholdForNonMutualWarsToBeIgnoredToJoinKingdom = Campaign.Current.Models.DiplomacyModel.GetStrengthThresholdForNonMutualWarsToBeIgnoredToJoinKingdom(targetKingdom);
+        foreach (var kingdom in Kingdom.All)
         {
-            foreach (var enemyFaction in initiatorWars)
+            if (initiatorClan.MapFaction.IsAtWarWith(kingdom) && kingdom.CurrentTotalStrength > strengthThresholdForNonMutualWarsToBeIgnoredToJoinKingdom)
             {
-                if (enemyFaction == null) continue;
-                if (!FactionManager.IsAtWarAgainstFaction(targetKingdom, enemyFaction))
-                {
-                    sameWars = false;
-                    break;
-                }
+                playerwars.Add(kingdom);
+            }
+            if (targetKingdom.IsAtWarWith(kingdom))
+            {
+                warsOfFactionToJoin.Add(kingdom);
             }
         }
 
@@ -317,7 +317,8 @@ internal class PlayerPartyInteractionOutcomeHandler
             || !initiatorClan.Settlements.IsEmpty<Settlement>()
             || initiatorParty.LeaderHero.GetRelation(responderHero) < (float)Campaign.Current.Models.DiplomacyModel.MinimumRelationWithConversationCharacterToJoinKingdom
             || (initiatorClan.MapFaction.IsKingdomFaction && !initiatorClan.IsUnderMercenaryService)
-            || !sameWars
+            || initiatorClan.IsAtWarWith(targetKingdom)
+            || warsOfFactionToJoin.Intersect(playerwars).Count<IFaction>() != playerwars.Count
             || targetKingdom != outcome.TargetKingdom)
         {
             Logger.Warning(

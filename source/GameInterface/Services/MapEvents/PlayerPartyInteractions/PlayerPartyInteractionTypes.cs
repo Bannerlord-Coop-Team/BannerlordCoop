@@ -54,6 +54,7 @@ public enum PlayerPartyInteractionMercenaryUnavailableReason
     NotEnoughRelation,
     ClanIsInKingdom,
     TargetHasNoKingdom,
+    IsAtWarWithTarget,
     IncompatibleWars
 }
 public enum PlayerPartyInteractionProposal

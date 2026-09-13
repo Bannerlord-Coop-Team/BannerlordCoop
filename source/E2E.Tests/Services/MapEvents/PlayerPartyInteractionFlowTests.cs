@@ -62,6 +62,7 @@ using TaleWorlds.Core;
 using TaleWorlds.Core.ImageIdentifiers;
 using TaleWorlds.Library;
 using Xunit.Abstractions;
+using TaleWorlds.ObjectSystem;
 
 namespace E2E.Tests.Services.MapEvents;
 
@@ -464,7 +465,7 @@ public class PlayerPartyInteractionFlowTests : MapEventTestBase
             s.SessionId == sessionId &&
             s.PartyId == initiatorPartyId &&
             s.Phase == PlayerPartyInteractionPhase.InitialOptions);
-        Assert.Equal(PlayerPartyInteractionVassalUnavailableReason.InitiatorClanTierTooLow, initialState.VassalUnavailableReason);
+        Assert.Equal(PlayerPartyInteractionMercenaryUnavailableReason.InitiatorClanTierTooLow, initialState.MercenaryUnavailableReason);
 
         OpenServiceOptions(client1, initialState);
 
@@ -480,6 +481,120 @@ public class PlayerPartyInteractionFlowTests : MapEventTestBase
             Assert.True(PlayerPartyInteractionDialogState.HasOption(PlayerPartyInteractionOption.Mercenary));
             Assert.False(PlayerPartyInteractionDialogState.IsOptionEnabled(PlayerPartyInteractionOption.Mercenary, out var explanation1));
             Assert.Equal("Your clan must be at least tier 1 to join as mercenary.", explanation1.ToString());
+        });
+    }
+
+    [Fact]
+    public void OfferServices_WithStrongWar_DisablesMercenary()
+    {
+        var (client1, _, initiatorPartyId, responderPartyId) = CreateTwoPlayerParties();
+        SetupResponderKingdomLeader(initiatorPartyId, responderPartyId, initiatorClanTier: 2);
+        var enemyKingdomId = TestEnvironment.CreateRegisteredObject<Kingdom>();
+        var enemyPartyId = TestEnvironment.CreateRegisteredObject<PartyBase>();
+
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject<Kingdom>(enemyKingdomId, out var enemyKingdom));
+            Assert.True(Server.ObjectManager.TryGetObject<PartyBase>(responderPartyId, out var responderParty));
+            Assert.True(Server.ObjectManager.TryGetObject<PartyBase>(initiatorPartyId, out var initiatorParty));
+            Assert.True(Server.ObjectManager.TryGetObject<PartyBase>(enemyPartyId, out var enemyParty));
+
+            enemyParty.LeaderHero.Clan.Kingdom = enemyKingdom;
+            enemyKingdom.Id = new MBGUID(2);
+            initiatorParty.LeaderHero.Clan.Id = new MBGUID(3);
+
+            AccessTools.Property(typeof(Clan), "CurrentTotalStrength").SetValue(enemyParty.LeaderHero.Clan, 1000);
+            Assert.Equal(1000, enemyKingdom.CurrentTotalStrength);
+            Assert.Equal(0, responderParty.LeaderHero.Clan.Kingdom.CurrentTotalStrength);
+            Assert.True(enemyKingdom.CurrentTotalStrength > Campaign.Current.Models.DiplomacyModel.GetStrengthThresholdForNonMutualWarsToBeIgnoredToJoinKingdom(responderParty.LeaderHero.Clan.Kingdom));
+
+            FactionManager.DeclareWar(enemyKingdom, initiatorParty.LeaderHero.Clan);
+            Assert.True(enemyKingdom.IsAtWarWith(initiatorParty.LeaderHero.Clan));
+            Assert.True(initiatorParty.LeaderHero.Clan.MapFaction.IsAtWarWith(enemyKingdom));
+
+            Campaign.Current.Kingdoms.Add(enemyKingdom);
+            Assert.Contains(enemyKingdom, Kingdom.All);
+        });
+
+        RequestInteraction(client1, initiatorPartyId, responderPartyId);
+        var sessionId = Server.NetworkSentMessages.GetMessages<NetworkPlayerPartyInteractionStarted>().Single().SessionId;
+        var initialState = Server.NetworkSentMessages.GetMessages<NetworkPlayerPartyInteractionState>().Single(s =>
+            s.SessionId == sessionId &&
+            s.PartyId == initiatorPartyId &&
+            s.Phase == PlayerPartyInteractionPhase.InitialOptions);
+        Assert.Equal(PlayerPartyInteractionMercenaryUnavailableReason.IncompatibleWars, initialState.MercenaryUnavailableReason);
+        OpenServiceOptions(client1, initialState);
+
+
+        client1.Call(() =>
+        {
+            Assert.True(PlayerPartyInteractionDialogState.HasOption(PlayerPartyInteractionOption.JoinClan));
+            Assert.False(PlayerPartyInteractionDialogState.IsOptionEnabled(PlayerPartyInteractionOption.JoinClan));
+            Assert.True(PlayerPartyInteractionDialogState.HasOption(PlayerPartyInteractionOption.Leave));
+            Assert.True(PlayerPartyInteractionDialogState.IsOptionEnabled(PlayerPartyInteractionOption.Leave));
+            Assert.True(PlayerPartyInteractionDialogState.HasOption(PlayerPartyInteractionOption.Vassal));
+            Assert.True(PlayerPartyInteractionDialogState.IsOptionEnabled(PlayerPartyInteractionOption.Vassal));
+            Assert.True(PlayerPartyInteractionDialogState.HasOption(PlayerPartyInteractionOption.Mercenary));
+            Assert.False(PlayerPartyInteractionDialogState.IsOptionEnabled(PlayerPartyInteractionOption.Mercenary, out var explanation1));
+            Assert.Equal("You are at war with a faction the other player's kingdom is not at war with.", explanation1.ToString());
+        });
+    }
+
+    [Fact]
+    public void OfferServices_WithWeakWar_EnablesMercenary()
+    {
+        var (client1, _, initiatorPartyId, responderPartyId) = CreateTwoPlayerParties();
+        SetupResponderKingdomLeader(initiatorPartyId, responderPartyId, initiatorClanTier: 2);
+        var enemyKingdomId = TestEnvironment.CreateRegisteredObject<Kingdom>();
+        var enemyPartyId = TestEnvironment.CreateRegisteredObject<PartyBase>();
+
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject<Kingdom>(enemyKingdomId, out var enemyKingdom));
+            Assert.True(Server.ObjectManager.TryGetObject<PartyBase>(responderPartyId, out var responderParty));
+            Assert.True(Server.ObjectManager.TryGetObject<PartyBase>(initiatorPartyId, out var initiatorParty));
+            Assert.True(Server.ObjectManager.TryGetObject<PartyBase>(enemyPartyId, out var enemyParty));
+
+            // Manually set the id property since this never happens KingdomCreator,
+            // else the GetStance lookup fails since it orders the faction based on id.
+            enemyParty.LeaderHero.Clan.Kingdom = enemyKingdom;
+            enemyKingdom.Id = new MBGUID(2);
+            initiatorParty.LeaderHero.Clan.Id = new MBGUID(3);
+
+            AccessTools.Property(typeof(Clan), "CurrentTotalStrength").SetValue(enemyParty.LeaderHero.Clan, 10);
+            AccessTools.Property(typeof(Clan), "CurrentTotalStrength").SetValue(responderParty.LeaderHero.Clan, 500);
+            Assert.Equal(10, enemyKingdom.CurrentTotalStrength);
+            Assert.Equal(500, responderParty.LeaderHero.Clan.Kingdom.CurrentTotalStrength);
+            Assert.True(enemyKingdom.CurrentTotalStrength < Campaign.Current.Models.DiplomacyModel.GetStrengthThresholdForNonMutualWarsToBeIgnoredToJoinKingdom(responderParty.LeaderHero.Clan.Kingdom));
+
+            FactionManager.DeclareWar(enemyKingdom, initiatorParty.LeaderHero.Clan);
+            Assert.True(enemyKingdom.IsAtWarWith(initiatorParty.LeaderHero.Clan));
+            Assert.True(initiatorParty.LeaderHero.Clan.MapFaction.IsAtWarWith(enemyKingdom));
+
+            Campaign.Current.Kingdoms.Add(enemyKingdom);
+            Assert.Contains(enemyKingdom, Kingdom.All);
+        });
+
+        RequestInteraction(client1, initiatorPartyId, responderPartyId);
+        var sessionId = Server.NetworkSentMessages.GetMessages<NetworkPlayerPartyInteractionStarted>().Single().SessionId;
+        var initialState = Server.NetworkSentMessages.GetMessages<NetworkPlayerPartyInteractionState>().Single(s =>
+            s.SessionId == sessionId &&
+            s.PartyId == initiatorPartyId &&
+            s.Phase == PlayerPartyInteractionPhase.InitialOptions);
+        Assert.Equal(PlayerPartyInteractionMercenaryUnavailableReason.None, initialState.MercenaryUnavailableReason);
+        OpenServiceOptions(client1, initialState);
+
+
+        client1.Call(() =>
+        {
+            Assert.True(PlayerPartyInteractionDialogState.HasOption(PlayerPartyInteractionOption.JoinClan));
+            Assert.False(PlayerPartyInteractionDialogState.IsOptionEnabled(PlayerPartyInteractionOption.JoinClan));
+            Assert.True(PlayerPartyInteractionDialogState.HasOption(PlayerPartyInteractionOption.Leave));
+            Assert.True(PlayerPartyInteractionDialogState.IsOptionEnabled(PlayerPartyInteractionOption.Leave));
+            Assert.True(PlayerPartyInteractionDialogState.HasOption(PlayerPartyInteractionOption.Vassal));
+            Assert.True(PlayerPartyInteractionDialogState.IsOptionEnabled(PlayerPartyInteractionOption.Vassal));
+            Assert.True(PlayerPartyInteractionDialogState.HasOption(PlayerPartyInteractionOption.Mercenary));
+            Assert.True(PlayerPartyInteractionDialogState.IsOptionEnabled(PlayerPartyInteractionOption.Mercenary));
         });
     }
 
@@ -837,6 +952,64 @@ public class PlayerPartyInteractionFlowTests : MapEventTestBase
         Server.NetworkSentMessages.Clear();
         SubmitOption(client2, sessionId, responderPartyId, PlayerPartyInteractionOption.AcceptProposal);
 
+        var ended = Server.NetworkSentMessages.GetMessages<NetworkPlayerPartyInteractionEnded>().Single();
+        Assert.Equal(PlayerPartyInteractionOutcomeType.MercenaryDeclined, ended.OutcomeType);
+
+        // The outcome fires, but ApplyMercenaryJoin's guard should have blocked appliance
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject<PartyBase>(initiatorPartyId, out var initiatorParty));
+            Assert.Null(initiatorParty.LeaderHero.Clan.Kingdom);
+            Assert.False(initiatorParty.LeaderHero.Clan.IsUnderMercenaryService);
+        });
+    }
+
+    [Fact]
+    public void MercenaryProposal_InitiatorLosesEligibilityByNewWarBeforeAcceptance_AcceptDoesNotApplyJoin() ////
+    {
+        var (client1, client2, initiatorPartyId, responderPartyId) = CreateTwoPlayerParties();
+        SetupResponderKingdomLeader(initiatorPartyId, responderPartyId, initiatorClanTier: 2);
+        var enemyKingdomId = TestEnvironment.CreateRegisteredObject<Kingdom>();
+        var enemyPartyId = TestEnvironment.CreateRegisteredObject<PartyBase>();
+
+        RequestInteraction(client1, initiatorPartyId, responderPartyId);
+        var sessionId = Server.NetworkSentMessages.GetMessages<NetworkPlayerPartyInteractionStarted>().Single().SessionId;
+        var initialState = Server.NetworkSentMessages.GetMessages<NetworkPlayerPartyInteractionState>().Single(s =>
+            s.SessionId == sessionId &&
+            s.PartyId == initiatorPartyId &&
+            s.Phase == PlayerPartyInteractionPhase.InitialOptions);
+
+        OpenServiceOptions(client1, initialState);
+        SubmitCurrentDialogOption(client1, PlayerPartyInteractionOption.Mercenary);
+        SubmitCurrentDialogOption(client1, PlayerPartyInteractionOption.ConfirmMercenary);
+
+        // Eligibility changes after confirmation but before the responder accepts;
+        // ApplyMercenaryJoin's own re-check must catch this.
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject<Kingdom>(enemyKingdomId, out var enemyKingdom));
+            Assert.True(Server.ObjectManager.TryGetObject<PartyBase>(responderPartyId, out var responderParty));
+            Assert.True(Server.ObjectManager.TryGetObject<PartyBase>(initiatorPartyId, out var initiatorParty));
+            Assert.True(Server.ObjectManager.TryGetObject<PartyBase>(enemyPartyId, out var enemyParty));
+
+            enemyParty.LeaderHero.Clan.Kingdom = enemyKingdom;
+            enemyKingdom.Id = new MBGUID(2);
+            initiatorParty.LeaderHero.Clan.Id = new MBGUID(3);
+            AccessTools.Property(typeof(Clan), "CurrentTotalStrength").SetValue(enemyParty.LeaderHero.Clan, 1000);
+            Assert.Equal(1000, enemyKingdom.CurrentTotalStrength);
+            Assert.Equal(0, responderParty.LeaderHero.Clan.Kingdom.CurrentTotalStrength);
+            Assert.True(enemyKingdom.CurrentTotalStrength > Campaign.Current.Models.DiplomacyModel.GetStrengthThresholdForNonMutualWarsToBeIgnoredToJoinKingdom(responderParty.LeaderHero.Clan.Kingdom));
+
+            FactionManager.DeclareWar(enemyKingdom, initiatorParty.LeaderHero.Clan);
+            Assert.True(enemyKingdom.IsAtWarWith(initiatorParty.LeaderHero.Clan));
+            Assert.True(initiatorParty.LeaderHero.Clan.MapFaction.IsAtWarWith(enemyKingdom));
+
+            Campaign.Current.Kingdoms.Add(enemyKingdom);
+            Assert.Contains(enemyKingdom, Kingdom.All);
+        });
+        Server.NetworkSentMessages.Clear();
+        SubmitOption(client2, sessionId, responderPartyId, PlayerPartyInteractionOption.AcceptProposal);
+        
         var ended = Server.NetworkSentMessages.GetMessages<NetworkPlayerPartyInteractionEnded>().Single();
         Assert.Equal(PlayerPartyInteractionOutcomeType.MercenaryDeclined, ended.OutcomeType);
 

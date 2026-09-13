@@ -981,18 +981,30 @@ internal class PlayerPartyInteractionHandler : IHandler
             return false;
         }
 
-        var initiatorWars = initiatorClan.MapFaction?.FactionsAtWarWith;
-        if (initiatorWars != null)
+        if (initiatorClan.IsAtWarWith(targetKingdom))
         {
-            foreach (var enemyFaction in initiatorWars)
+            unavailableReason = PlayerPartyInteractionMercenaryUnavailableReason.IsAtWarWithTarget;
+            return false;
+        }
+
+        List<IFaction> playerwars = new List<IFaction>();
+        List<IFaction> warsOfFactionToJoin = new List<IFaction>();
+        float strengthThresholdForNonMutualWarsToBeIgnoredToJoinKingdom = Campaign.Current.Models.DiplomacyModel.GetStrengthThresholdForNonMutualWarsToBeIgnoredToJoinKingdom(targetKingdom);
+        foreach (var kingdom in Kingdom.All)
+        {
+            if (initiatorClan.MapFaction.IsAtWarWith(kingdom) && kingdom.CurrentTotalStrength > strengthThresholdForNonMutualWarsToBeIgnoredToJoinKingdom)
             {
-                if (enemyFaction == null) continue;
-                if (!FactionManager.IsAtWarAgainstFaction(targetKingdom, enemyFaction))
-                {
-                    unavailableReason = PlayerPartyInteractionMercenaryUnavailableReason.IncompatibleWars;
-                    return false;
-                }
+                playerwars.Add(kingdom);
             }
+            if (targetKingdom.IsAtWarWith(kingdom))
+            {
+                warsOfFactionToJoin.Add(kingdom);
+            }
+        }
+        if (warsOfFactionToJoin.Intersect(playerwars).Count<IFaction>() != playerwars.Count)
+        {
+            unavailableReason = PlayerPartyInteractionMercenaryUnavailableReason.IncompatibleWars;
+            return false;
         }
 
         unavailableReason = PlayerPartyInteractionMercenaryUnavailableReason.None;

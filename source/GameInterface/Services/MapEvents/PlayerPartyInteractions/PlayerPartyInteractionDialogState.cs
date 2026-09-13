@@ -135,6 +135,9 @@ public static class PlayerPartyInteractionDialogState
             case PlayerPartyInteractionMercenaryUnavailableReason.TargetHasNoKingdom:
                 explanation = new TextObject("{=coop_player_party_interaction_mercenary_target_has_no_kingdom}The other player must be in a kingdom.");
                 return true;
+            case PlayerPartyInteractionMercenaryUnavailableReason.IsAtWarWithTarget:
+                explanation = new TextObject("{=coop_player_party_interaction_mercenary_is_at_war_with_target}You are at war with this kingdom");
+                return true;
             case PlayerPartyInteractionMercenaryUnavailableReason.IncompatibleWars:
                 explanation = new TextObject("{=coop_player_party_interaction_mercenary_incompatible_wars}You are at war with a faction the other player's kingdom is not at war with.");
                 return true;
