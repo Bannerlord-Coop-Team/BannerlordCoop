@@ -182,7 +182,9 @@ internal class CraftingCampaignBehaviorCraftingHandler : IHandler
 
         if (!TryCreateCraftingRequest(data, out var message))
         {
-            messageBroker.Publish(this, new CreateCraftingResultPopup(null, null, false, data.ClientRequestId));
+            GameThread.EnqueueSafe(
+                () => messageBroker.Publish(this, new CreateCraftingResultPopup(null, null, false, data.ClientRequestId)),
+                context: nameof(Handle_CreatedCraftedWeaponInternal));
             return;
         }
 
