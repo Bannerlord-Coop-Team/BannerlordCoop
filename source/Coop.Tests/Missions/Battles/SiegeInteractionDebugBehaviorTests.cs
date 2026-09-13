@@ -1,5 +1,10 @@
 ﻿#if DEBUG
 using Common.Messaging;
+using Newtonsoft.Json;
+using Newtonsoft.Json.Linq;
+using System;
+using System.Collections.Generic;
+using System.Linq;
 using Missions.Battles;
 using Moq;
 using HarmonyLib;
@@ -14,6 +19,28 @@ namespace Coop.Tests.Missions.Battles;
 [Collection("Mission.Current")]
 public class SiegeInteractionDebugBehaviorTests
 {
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void ObservationPosition_SerializesOnlyUniqueCoordinatesOrNull(bool agentPresent)
+    {
+        Vec3? position = agentPresent ? new Vec3(12.5f, -3.25f, 61f) : (Vec3?)null;
+        var json = JsonConvert.SerializeObject(SiegeInteractionDebugBehavior.DescribePosition(position));
+        if (!agentPresent)
+        {
+            Assert.Equal("null", json);
+            return;
+        }
+
+        var result = JObject.Parse(json);
+        var names = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var property in result.Properties()) Assert.True(names.Add(property.Name));
+        Assert.Equal(new[] { "x", "y", "z" }, result.Properties().Select(property => property.Name));
+        Assert.Equal(12.5f, result["x"].Value<float>());
+        Assert.Equal(-3.25f, result["y"].Value<float>());
+        Assert.Equal(61f, result["z"].Value<float>());
+    }
+
     [Fact]
     public void ExternalInputObservation_MissedEdgeAllowsOnlyReleasedKeyCleanupStop()
     {

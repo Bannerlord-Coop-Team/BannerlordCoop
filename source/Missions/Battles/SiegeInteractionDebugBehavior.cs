@@ -461,7 +461,7 @@ internal sealed class SiegeInteractionDebugBehavior : MissionBehavior, ISiegeInt
             controllerId = session?.OwnControllerId,
             hostControllerId = session?.HostControllerId,
             hostEpoch = session?.HostEpoch,
-            mainAgentPosition = agent == null ? (Vec3?)null : agent.Position,
+            mainAgentPosition = DescribePosition(agent?.Position),
             screenPresent = screen != null,
             inputContextPresent = screen?.SceneLayer?.Input != null,
             mainAgentActive = agent?.IsActive() == true,
@@ -535,6 +535,13 @@ internal sealed class SiegeInteractionDebugBehavior : MissionBehavior, ISiegeInt
                 }).ToArray()
             }).ToArray()
         };
+    }
+
+    internal static object DescribePosition(Vec3? position)
+    {
+        if (!position.HasValue) return null;
+        var value = position.Value;
+        return new { x = value.x, y = value.y, z = value.z };
     }
 
     internal object ReadFocusDiagnostic(MissionScreen screen, Agent agent)
