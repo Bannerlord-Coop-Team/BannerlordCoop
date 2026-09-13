@@ -66,9 +66,7 @@ public class ClientModule : CommonModule
         builder.RegisterType<JoinDebugCommands.DisconnectCoopCommand>().As<ICoopCommand>().InstancePerDependency();
 #endif
 
-        // The presence adapter owns connection disposal on its serialized worker queue.
-        builder.RegisterType<DiscordRpcConnection>().As<IDiscordRpcConnection>().InstancePerDependency().ExternallyOwned();
-        builder.RegisterType<DiscordPresenceClient>().As<IDiscordPresenceClient>().InstancePerLifetimeScope();
+        builder.RegisterModule<DiscordPresenceModule>();
         builder.RegisterType<ClientContext>().AsSelf().InstancePerLifetimeScope();
         builder.RegisterType<ClientLogic>().As<ILogic>().As<IClientLogic>().InstancePerLifetimeScope();
         builder.RegisterType<CoopClient>().As<ICoopClient>().As<INetwork>().As<IRelayNetwork>().As<INetEventListener>().InstancePerLifetimeScope();

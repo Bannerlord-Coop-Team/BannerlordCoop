@@ -1,4 +1,4 @@
-using Common.LiveTesting;
+﻿using Common.LiveTesting;
 using ModelContextProtocol.Server;
 using ModelContextProtocol.Protocol;
 using System.ComponentModel;
@@ -21,7 +21,8 @@ public interface IDebugTools
     Task<LiveTestResponse> Screenshot(string run_id, string instance, CancellationToken cancellationToken);
     Task<LiveTestResponse> ScreenshotStatus(string run_id, string instance, string capture_id, CancellationToken cancellationToken);
     Task<LiveTestResponse> OptionsMenu(string run_id, string instance, string action, CancellationToken cancellationToken, string tab = null);
-    Task<LiveTestResponse> UiInspect(string run_id, string instance, CancellationToken cancellationToken, string snapshot = null, int offset = 0);
+    Task<LiveTestResponse> UiLayers(string run_id, string instance, CancellationToken cancellationToken);
+    Task<LiveTestResponse> UiInspect(string run_id, string instance, CancellationToken cancellationToken, string snapshot = null, int offset = 0, string layer = null);
     Task<LiveTestResponse> UiAction(string run_id, string instance, string snapshot, string element, string action, CancellationToken cancellationToken, string text = null, double? value = null);
     Task<RunView> StopRun(string run_id);
 }
@@ -92,15 +93,23 @@ public sealed class DebugTools : IDebugTools
         return runs.RequestAsync(run_id, instance, "options-menu", new { action, tab }, action != "inspect", cancellationToken);
     }
 
-    [McpServerTool(Name = "ui_inspect", ReadOnly = true, UseStructuredContent = true), Description("DEBUG client Gauntlet widget tree. Omit snapshot for fresh references (expire after 30s). Pages contain up to 128 elements: repeat with snapshot and nextOffset until nextOffset == total. Discover by widget id/type/text and parent index (eN); password fields are redacted. No automatic waits. A new snapshot or any action invalidates previous references. Use screenshot for visual verification. Truncated trees are inspection-only.")]
-    public Task<LiveTestResponse> UiInspect(string run_id, string instance, CancellationToken cancellationToken, string snapshot = null, int offset = 0)
+    [McpServerTool(Name = "ui_layers", ReadOnly = true, UseStructuredContent = true), Description("Discover up to 128 client UI layers without traversing widget descendants. Returns opaque layer handles in ascending stack order (last is highest). Handles expire after 30 seconds or layer/modal-root changes. Discovery invalidates previous widget snapshots. Selectable does not promise an actionable domain; inspect the selected layer next. Requires bridge uiCapability bounded-ui-layers-v1.")]
+    public Task<LiveTestResponse> UiLayers(string run_id, string instance, CancellationToken cancellationToken) =>
+        runs.RequestAsync(run_id, instance, "ui-layers", new { }, false, cancellationToken);
+
+    [McpServerTool(Name = "ui_inspect", ReadOnly = true, UseStructuredContent = true), Description("Inspect native client UI, pages of 128, maximum 16384 widgets/depth 48. Omit snapshot and layer for compatible all-layer inspection. To scope explicitly, pass a fresh opaque layer from ui_layers on a new snapshot; the complete UIContext root plus relevant upper-layer blocking domains must fit the shared widget budget. Page with snapshot and nextOffset. ScopeComplete=false or truncated=true disables actions. Passwords are redacted. Snapshots expire after 30 seconds, selection/screen/modal changes or one action.")]
+    public Task<LiveTestResponse> UiInspect(string run_id, string instance, CancellationToken cancellationToken, string snapshot = null, int offset = 0, string layer = null)
     {
+        if (layer != null && layer.Length != 32)
+            throw new ArgumentException("Use an observed opaque layer handle.", nameof(layer));
         if (offset < 0 || offset > 16384 || (snapshot == null && offset != 0) || snapshot?.Length > 64)
             throw new ArgumentException("Invalid snapshot page.");
-        return runs.RequestAsync(run_id, instance, "ui-inspect", new { snapshot, offset }, false, cancellationToken);
+        // Omission preserves the legacy payload for bridges without selected-layer support.
+        object parameters = layer == null ? new { snapshot, offset } : (object)new { snapshot, offset, layer };
+        return runs.RequestAsync(run_id, instance, "ui-inspect", parameters, false, cancellationToken);
     }
 
-    [McpServerTool(Name = "ui_action", UseStructuredContent = true), Description("DEBUG client UI action on a ui_inspect snapshot/element reference. Allowed: click (native button), toggle (value 0/1), text (replace ordinary non-password text), slider (native numeric value), scroll_vertical/scroll_horizontal (value fraction 0..1). Dropdowns: click opener, inspect again, click visible item. Targets must be visible/enabled/uncovered. All references consumed after dispatch, inspect again and wait for animations. This changes real UI/settings; Apply is a separate button. No gameplay keys/OS input/arbitrary code. Never retry outcomeUncertain mutations.")]
+    [McpServerTool(Name = "ui_action", UseStructuredContent = true), Description("One-shot native client UI action on a freshly revalidated snapshot/element. click is semantic ButtonWidget.HandleClick activation, NOT physical mouse press/release, hover, focus or controller input. Exact ButtonWidget only (toggle value 0/1); unknown subclasses rejected. Selected-layer snapshots support only click/toggle. All-layer snapshots also retain text (max 512), slider (native range), scroll_vertical/scroll_horizontal (0..1). Use only advertised actions. Bounds cover bridge preflight, not native gameplay callbacks. Native callbacks may replace modals; no bridge tree read or cancellation follows activation. References consumed; never retry outcomeUncertain. Re-inspect and capture afterward. No selectors, VM calls or OS input.")]
     public Task<LiveTestResponse> UiAction(string run_id, string instance, string snapshot, string element, string action, CancellationToken cancellationToken, string text = null, double? value = null)
     {
         if (string.IsNullOrEmpty(snapshot) || snapshot.Length > 64 || string.IsNullOrEmpty(element) || element.Length > 16 ||

@@ -105,6 +105,34 @@ public sealed class DebugToolsSchemaTests : IDisposable
         Assert.Equal(JsonValueKind.Null, rejected.GetProperty("preflight").ValueKind);
     }
 
+    [Theory]
+    [InlineData("deployed")]
+    [InlineData("rolled_back")]
+    [InlineData("rollback_failed")]
+    [InlineData("failed_before_apply")]
+    public async Task DeploymentOutputMatchesSchemaIncludingOriginallyAbsentTargets(string state)
+    {
+        await using var client = await Connect("ready");
+        var report = await CallAndValidate(client, "deploy_mod", new() { ["solution_path"] = "fixture source/Coop.sln", ["profile"] = state });
+        Assert.Equal(state, report.GetProperty("state").GetString());
+        Assert.Equal("Release", report.GetProperty("configuration").GetString());
+        if (state != "failed_before_apply") Assert.Equal(JsonValueKind.Null, report.GetProperty("files")[0].GetProperty("original").ValueKind);
+    }
+
+    [Theory]
+    [InlineData("Release")]
+    [InlineData("Debug")]
+    public async Task DeploymentConfigurationMatchesInputAndOutputSchema(string configuration)
+    {
+        await using var client = await Connect("ready");
+        var tools = await client.ListToolsAsync(cancellationToken: timeout.Token);
+        var schema = tools.Single(t => t.Name == "deploy_mod").JsonSchema;
+        Assert.Equal("Release", schema.GetProperty("properties").GetProperty("configuration").GetProperty("default").GetString());
+        Assert.DoesNotContain(schema.GetProperty("required").EnumerateArray(), p => p.GetString() == "configuration");
+        var report = await CallAndValidate(client, "deploy_mod", new() { ["solution_path"] = "fixture source/Coop.sln", ["profile"] = "deployed", ["configuration"] = configuration });
+        Assert.Equal(configuration, report.GetProperty("configuration").GetString());
+    }
+
     private Task<McpClient> Connect(string scenario) => McpClient.CreateAsync(new StdioClientTransport(new StdioClientTransportOptions
     {
         Name = "Harmless launch output-schema fixture",

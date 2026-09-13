@@ -1,4 +1,4 @@
-using System.Text.Json;
+﻿using System.Text.Json;
 
 namespace CoopMcpServer;
 
@@ -17,9 +17,19 @@ public sealed class CoopMcpServerSettings
     }
 }
 
+public sealed class DeploymentSettings
+{
+    public string DurableRoot { get; set; }
+    public string MsbuildPath { get; set; }
+    public string SubModuleXml { get; set; }
+    public long BuildSpaceBytes { get; set; } = 4L * 1024 * 1024 * 1024;
+    public long DiskReserveBytes { get; set; } = 1024L * 1024 * 1024;
+}
+
 public sealed class LaunchProfile
 {
     public string Executable { get; set; }
+    public DeploymentSettings Deployment { get; set; }
     public string[] Modules { get; set; } = { "Native", "SandBoxCore", "SandBox", "StoryMode", "Coop" };
     public string ServerPlatformId { get; set; } = "testserver";
     public string[] ClientPlatformIds { get; set; } = { "testclient1", "testclient2" };

@@ -1,12 +1,12 @@
-using Autofac;
+﻿using Autofac;
 using Common;
+using Common.Commands;
 using Common.Util;
 using GameInterface.Services.Kingdoms.Commands;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Tests.Bootstrap;
 using Moq;
 using System;
-using System.Collections.Generic;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.CampaignBehaviors;
 using Xunit;
@@ -26,9 +26,11 @@ public class KingdomDebugCommandTests
 
         var result = InvokeAsServerWithObjectManager(
             objectManager,
-            () => KingdomDebugCommand.ForceAlly(new List<string> { "alive", "dead" }));
+            () => new KingdomDebugCommand.KingdomForceAllyCoopCommand().ProcessCommand(
+                new CoopCommandArgsFactory().FromValues(new[] { "alive", "dead" })));
 
-        Assert.Contains("has been eliminated", result);
+        Assert.False(result.Succeeded);
+        Assert.Contains("has been eliminated", result.Output);
     }
 
     [Fact]
@@ -41,9 +43,11 @@ public class KingdomDebugCommandTests
 
         var result = InvokeAsServerWithObjectManager(
             objectManager,
-            () => KingdomDebugCommand.ForceTradeAgreement(new List<string> { "alive", "dead" }));
+            () => new KingdomDebugCommand.KingdomForceTradeAgreementCoopCommand().ProcessCommand(
+                new CoopCommandArgsFactory().FromValues(new[] { "alive", "dead" })));
 
-        Assert.Contains("has been eliminated", result);
+        Assert.False(result.Succeeded);
+        Assert.Contains("has been eliminated", result.Output);
     }
 
     [Fact]
@@ -68,10 +72,12 @@ public class KingdomDebugCommandTests
 
         var result = InvokeAsServerWithObjectManager(
             BuildObjectManager(("k1", kingdom1), ("k2", kingdom2)),
-            () => KingdomDebugCommand.ForceTradeAgreement(new List<string> { "k1", "k2" }));
+            () => new KingdomDebugCommand.KingdomForceTradeAgreementCoopCommand().ProcessCommand(
+                new CoopCommandArgsFactory().FromValues(new[] { "k1", "k2" })));
 
         // The raw-list guard would have reported the stale entry and bailed; HasTradeAgreement drops it.
-        Assert.StartsWith("Forced trade agreement", result);
+        Assert.True(result.Succeeded);
+        Assert.StartsWith("Forced trade agreement", result.Output);
         Assert.True(behavior.TryGetTradeAgreement(kingdom1, kingdom2, out var index));
         Assert.True(behavior._tradeAgreements[index].EndTime.NumTicks > 0);
     }
@@ -87,7 +93,7 @@ public class KingdomDebugCommandTests
         return mock.Object;
     }
 
-    private static string InvokeAsServerWithObjectManager(IObjectManager objectManager, Func<string> invoke)
+    private static CoopCommandResult InvokeAsServerWithObjectManager(IObjectManager objectManager, Func<CoopCommandResult> invoke)
     {
         var builder = new ContainerBuilder();
         builder.RegisterInstance(objectManager).As<IObjectManager>();

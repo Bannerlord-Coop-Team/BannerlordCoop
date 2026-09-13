@@ -609,7 +609,7 @@ namespace Coop
 
             if (Coop.Running)
             {
-                Coop.Dispose();
+                Coop.EndSession();
             }
         }
 
