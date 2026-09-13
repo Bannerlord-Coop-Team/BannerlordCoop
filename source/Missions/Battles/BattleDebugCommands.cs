@@ -99,14 +99,25 @@ internal static class BattleDebugCommands
         public string Name => "siege_interaction_observe";
         public string Description => "Reads native focus, use and input lifecycle on this client.";
         public CoopCommandSide Side => CoopCommandSide.Client;
-        public IExpectedArgs[] ExpectedArgs { get; } = Array.Empty<IExpectedArgs>();
+        public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
+        {
+            new ExpectedArgs("agent_id", "Optional exact registered agent id to observe on this client.", false)
+        };
 
         public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
         {
+            Guid? agentId = null;
+            if (args.Count > 1) return Failed("Expected at most one registered agent id.");
+            if (args.Count == 1)
+            {
+                if (!Guid.TryParseExact(args[0], "N", out var parsedId) || parsedId == Guid.Empty)
+                    return Failed("Expected a registered agent id in N format.");
+                agentId = parsedId;
+            }
             var observer = Mission.Current?.GetMissionBehavior<SiegeInteractionDebugBehavior>();
             if (ModInformation.IsServer || observer == null)
                 return Failed("A rendered client battle with its DEBUG observer is required.");
-            return Succeeded("LIVE_TEST_JSON=" + JsonConvert.SerializeObject(observer.Observe()));
+            return Succeeded("LIVE_TEST_JSON=" + JsonConvert.SerializeObject(observer.Observe(agentId)));
         }
     }
 

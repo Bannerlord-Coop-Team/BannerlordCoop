@@ -1,6 +1,8 @@
 ﻿#if DEBUG
 using Common;
 using Common.Messaging;
+using GameInterface;
+using Missions.Agents.Packets;
 using GameInterface.Services.MapEvents.Messages;
 using TaleWorlds.Core;
 using Missions.Messages;
@@ -19,7 +21,7 @@ namespace Missions.Battles;
 
 public interface ISiegeInteractionDebugBehavior
 {
-    object Observe();
+    object Observe(Guid? observedAgentId = null);
 }
 
 internal sealed class SiegeInteractionDebugBehavior : MissionBehavior, ISiegeInteractionDebugBehavior
@@ -524,11 +526,15 @@ internal sealed class SiegeInteractionDebugBehavior : MissionBehavior, ISiegeInt
         stagingCamera = null;
     }
 
-    public object Observe()
+    public object Observe(Guid? observedAgentId = null)
     {
         var screen = ScreenManager.TopScreen as MissionScreen;
         var agent = Mission?.MainAgent;
         var session = Mission?.GetMissionBehavior<CoopBattleController>()?.Session;
+        ContainerProvider.TryResolve<INetworkAgentRegistry>(out var registry);
+        CoopAgentInfo mainInfo = null;
+        if (agent != null) registry?.TryGetAgentInfo(agent, out mainInfo);
+        var selectedAgentId = observedAgentId ?? mainInfo?.AgentId;
         return new
         {
             success = !removed && Mission == TaleWorlds.MountAndBlade.Mission.Current,
@@ -536,6 +542,8 @@ internal sealed class SiegeInteractionDebugBehavior : MissionBehavior, ISiegeInt
             controllerId = session?.OwnControllerId,
             hostControllerId = session?.HostControllerId,
             hostEpoch = session?.HostEpoch,
+            mainAgentId = mainInfo?.AgentId.ToString("N"),
+            observedAgent = selectedAgentId.HasValue ? ReadObservedAgent(selectedAgentId.Value, registry) : null,
             mainAgentPosition = DescribePosition(agent?.Position),
             screenPresent = screen != null,
             inputContextPresent = screen?.SceneLayer?.Input != null,
@@ -573,6 +581,7 @@ internal sealed class SiegeInteractionDebugBehavior : MissionBehavior, ISiegeInt
                 hitPoints = machine.DestructionComponent?.HitPoint,
                 ladderState = machine is SiegeLadder ladder ? (int?)ladder.State : null,
                 rangedState = machine is RangedSiegeWeapon weapon ? (int?)weapon.State : null,
+                rangedStateName = (machine as RangedSiegeWeapon)?.State.ToString(),
                 standingPoints = machine.StandingPoints.Select((point, index) =>
                 {
                     try
@@ -612,6 +621,33 @@ internal sealed class SiegeInteractionDebugBehavior : MissionBehavior, ISiegeInt
                         return new { index, diagnosticError = exception.ToString() };
                     }
                 }).ToArray()
+            }).ToArray()
+        };
+    }
+
+    internal object ReadObservedAgent(Guid agentId, INetworkAgentRegistry registry)
+    {
+        if (removed || Mission == null || !ReferenceEquals(Mission, TaleWorlds.MountAndBlade.Mission.Current) ||
+            registry == null || !registry.TryGetAgentInfo(agentId, out var info) || info?.Agent == null ||
+            info.AgentId != agentId || !ReferenceEquals(info.Agent.Mission, Mission) || !info.Agent.IsActive())
+            return new { agentId = agentId.ToString("N"), available = false };
+
+        var observed = info.Agent;
+        return new
+        {
+            agentId = agentId.ToString("N"), available = true,
+            originalOwner = info.OriginalOwner, currentAuthority = info.CurrentAuthority,
+            tick, recordedUtc = DateTime.UtcNow.ToString("O"),
+            usingObject = observed.IsUsingGameObject,
+            usedObject = Describe(observed.CurrentlyUsedGameObject),
+            actions = Enumerable.Range(0, 2).Select(channel =>
+            {
+                int index = observed.GetCurrentAction(channel).Index;
+                return new
+                {
+                    channel, index, name = AgentActionData.GetActionNameWithCode(index),
+                    type = observed.GetCurrentActionType(channel).ToString()
+                };
             }).ToArray()
         };
     }

@@ -7,6 +7,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using Missions.Battles;
+using Missions;
 using Moq;
 using HarmonyLib;
 using Xunit;
@@ -20,6 +21,94 @@ namespace Coop.Tests.Missions.Battles;
 [Collection("Mission.Current")]
 public class SiegeInteractionDebugBehaviorTests
 {
+    [Theory]
+    [InlineData("missing")]
+    [InlineData("wrong-id")]
+    [InlineData("wrong-mission")]
+    [InlineData("null-agent")]
+    public void ObservedAgent_RejectsIncompleteOrStaleIdentityBeforeNativeReads(string failure)
+    {
+        using var mission = new MissionCurrentScope();
+        var behavior = new SiegeInteractionDebugBehavior(Mock.Of<IMessageBroker>());
+        AccessTools.Property(typeof(MissionBehavior), "Mission").SetValue(behavior, mission.Instance);
+#pragma warning disable SYSLIB0050
+        var agent = (Agent)FormatterServices.GetUninitializedObject(typeof(Agent));
+#pragma warning restore SYSLIB0050
+        if (failure != "wrong-mission") AccessTools.Property(typeof(Agent), "Mission").SetValue(agent, mission.Instance);
+        var id = Guid.NewGuid();
+        var info = new CoopAgentInfo("testclient2", "testclient2", "siege-session",
+            failure == "null-agent" ? null : agent, failure == "wrong-id" ? Guid.NewGuid() : id, 1);
+        var registry = new Mock<INetworkAgentRegistry>(MockBehavior.Strict);
+        registry.Setup(value => value.TryGetAgentInfo(id, out info)).Returns(failure != "missing");
+
+        var result = JObject.FromObject(behavior.ReadObservedAgent(id, registry.Object));
+
+        Assert.False(result["available"].Value<bool>());
+        Assert.Equal(id.ToString("N"), result["agentId"].Value<string>());
+        Assert.Null(result["actions"]);
+        Assert.Null(result["usingObject"]);
+    }
+
+    [Fact]
+    public void ObservedAgent_ReportsBothChannelsForTheExactReplicaWithoutMutation()
+    {
+        using var mission = new MissionCurrentScope();
+        var behavior = new SiegeInteractionDebugBehavior(Mock.Of<IMessageBroker>());
+        AccessTools.Property(typeof(MissionBehavior), "Mission").SetValue(behavior, mission.Instance);
+#pragma warning disable SYSLIB0050
+        var agent = (Agent)FormatterServices.GetUninitializedObject(typeof(Agent));
+#pragma warning restore SYSLIB0050
+        AccessTools.Property(typeof(Agent), "Mission").SetValue(agent, mission.Instance);
+        var id = Guid.NewGuid();
+        var info = new CoopAgentInfo("testclient2", "testclient2", "siege-session", agent, id, 1);
+        var registry = new Mock<INetworkAgentRegistry>(MockBehavior.Strict);
+        registry.Setup(value => value.TryGetAgentInfo(id, out info)).Returns(true);
+        var harmony = new Harmony("coop.tests.siege-observed-agent");
+        try
+        {
+            // ActionIndexCache initializes named actions before the observer reads its indices.
+            harmony.Patch(AccessTools.Method(typeof(MBAnimation), nameof(MBAnimation.GetActionCodeWithName)),
+                prefix: new HarmonyMethod(AccessTools.Method(typeof(SiegeInteractionDebugBehaviorTests), nameof(ObservedActionCode))));
+            harmony.Patch(AccessTools.Method(typeof(Agent), nameof(Agent.IsActive)),
+                prefix: new HarmonyMethod(AccessTools.Method(typeof(SiegeInteractionDebugBehaviorTests), nameof(ObservedAgentActive))));
+            harmony.Patch(AccessTools.DeclaredPropertyGetter(typeof(Agent), nameof(Agent.IsUsingGameObject)),
+                prefix: new HarmonyMethod(AccessTools.Method(typeof(SiegeInteractionDebugBehaviorTests), nameof(ObservedAgentUnused))));
+            harmony.Patch(AccessTools.Method(typeof(Agent), nameof(Agent.GetCurrentAction)),
+                prefix: new HarmonyMethod(AccessTools.Method(typeof(SiegeInteractionDebugBehaviorTests), nameof(ObservedAgentAction))));
+            harmony.Patch(AccessTools.Method(typeof(Agent), nameof(Agent.GetCurrentActionType)),
+                prefix: new HarmonyMethod(AccessTools.Method(typeof(SiegeInteractionDebugBehaviorTests), nameof(ObservedAgentActionType))));
+            var before = DateTime.UtcNow;
+            var result = JObject.FromObject(behavior.ReadObservedAgent(id, registry.Object));
+
+            Assert.True(result["available"].Value<bool>());
+            Assert.Equal(id.ToString("N"), result["agentId"].Value<string>());
+            Assert.Equal("testclient2", result["originalOwner"].Value<string>());
+            Assert.Equal("testclient2", result["currentAuthority"].Value<string>());
+            Assert.Equal(new[] { 0, 1 }, result["actions"].Select(action => action["channel"].Value<int>()));
+            Assert.Equal(new[] { 101, 202 }, result["actions"].Select(action => action["index"].Value<int>()));
+            Assert.InRange(result["recordedUtc"].Value<DateTime>(), before, DateTime.UtcNow);
+            Assert.False(result["usingObject"].Value<bool>());
+            Assert.Null(agent.CurrentlyUsedGameObject);
+            Assert.Same(mission.Instance, agent.Mission);
+            registry.Verify(value => value.TryGetAgentInfo(id, out info), Times.Once);
+            registry.VerifyNoOtherCalls();
+        }
+        finally { harmony.UnpatchAll(harmony.Id); }
+    }
+
+    private static bool ObservedActionCode(ref int __result) { __result = -1; return false; }
+    private static bool ObservedAgentUnused(ref bool __result) { __result = false; return false; }
+    private static bool ObservedAgentActive(ref bool __result) { __result = true; return false; }
+    private static bool ObservedAgentAction(int channelNo, ref ActionIndexCache __result)
+    {
+        object action = default(ActionIndexCache);
+        AccessTools.Field(typeof(ActionIndexCache), "<Index>k__BackingField")
+            .SetValue(action, channelNo == 0 ? 101 : 202);
+        __result = (ActionIndexCache)action;
+        return false;
+    }
+    private static bool ObservedAgentActionType(ref Agent.ActionCodeType __result) { __result = default; return false; }
+
     [Theory]
     [InlineData(false)]
     [InlineData(true)]
@@ -159,6 +248,15 @@ public class SiegeInteractionDebugBehaviorTests
         var observation = new
         {
             observedMachineId = 142, inputSamples = samples,
+            mainAgentId = Guid.NewGuid().ToString("N"),
+            observedAgent = new
+            {
+                agentId = Guid.NewGuid().ToString("N"), available = true,
+                originalOwner = "testclient2", currentAuthority = "testclient2", tick = 300,
+                recordedUtc = DateTime.UtcNow, usingObject = true, usedObject = new { id = 1408, type = "StandingPoint" },
+                actions = new[] { new { channel = 0, index = 101, name = "act_use_ballista", type = "act_none" },
+                    new { channel = 1, index = -1, name = "act_none", type = "act_none" } }
+            },
             nativeAimTarget = new
             {
                 requestId = "ballista-testclient2-stage", tick = 685, recordedUtc = DateTime.UtcNow,
