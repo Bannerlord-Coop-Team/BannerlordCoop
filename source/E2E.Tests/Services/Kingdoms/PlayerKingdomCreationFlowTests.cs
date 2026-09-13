@@ -140,6 +140,8 @@ public class PlayerKingdomCreationFlowTests : IDisposable
         Assert.Equal(created.KingdomName, notification.KingdomName);
         Assert.Equal(created.ClanId, notification.ClanId);
         Assert.Equal(created.CultureId, notification.CultureId);
+
+        Server.PumpGameThread();
     }
 
     [Fact]
@@ -177,6 +179,8 @@ public class PlayerKingdomCreationFlowTests : IDisposable
         Assert.Equal(created.KingdomId, notification.KingdomId);
         Assert.Equal(KingdomName, notification.KingdomName);
         Assert.Equal(player.ClanId, notification.ClanId);
+
+        Server.PumpGameThread();
     }
 
     [Fact]
@@ -228,6 +232,8 @@ public class PlayerKingdomCreationFlowTests : IDisposable
 
         Assert.Contains("does not lead clan", output);
         Assert.Empty(Server.InternalMessages.GetMessages<PlayerKingdomCreated>());
+
+        Server.PumpGameThread();
     }
 
     [Fact]
@@ -312,6 +318,8 @@ public class PlayerKingdomCreationFlowTests : IDisposable
 
         var rejected = Assert.Single(Server.NetworkSentMessages.GetMessages<VassalServiceResult>());
         Assert.False(rejected.Accepted);
+
+        Server.PumpGameThread();
     }
     
     [Fact]
@@ -464,6 +472,8 @@ public class PlayerKingdomCreationFlowTests : IDisposable
             clientConversationState?.Clear();
             client.CampaignMissionContext = null;
         }
+
+        Server.PumpGameThread();
     }
 
     private static MissionConversationLogic MissionConversationLogicOverride;
@@ -3288,6 +3298,8 @@ public class PlayerKingdomCreationFlowTests : IDisposable
 
             Assert.Same(settlement, party.CurrentSettlement);
         });
+
+        Server.PumpGameThread();
     }
 
     [Fact]
@@ -3321,6 +3333,8 @@ public class PlayerKingdomCreationFlowTests : IDisposable
         Assert.Equal(ControllerId, request.ControllerId);
         Assert.Null(request.PartyId);
         Assert.Null(request.SettlementId);
+
+        Server.PumpGameThread();
     }
 
     [Fact]
@@ -3545,6 +3559,8 @@ public class PlayerKingdomCreationFlowTests : IDisposable
 
             Assert.Same(settlement, party.CurrentSettlement);
         });
+
+        Server.PumpGameThread();
     }
 
     [Fact]
@@ -3577,6 +3593,8 @@ public class PlayerKingdomCreationFlowTests : IDisposable
             Assert.Same(settlement, party.CurrentSettlement);
         });
         AssertCompletedSettlementProtectionDisarms(Server, player.PartyId, settlementId);
+
+        Server.PumpGameThread();
     }
 
     [Fact]

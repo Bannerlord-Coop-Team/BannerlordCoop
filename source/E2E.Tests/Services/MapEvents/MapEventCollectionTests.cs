@@ -379,6 +379,8 @@ public class MapEventCollectionTests : MapEventTestBase
             Assert.Equal(reconnectBeforeMapEventEnds, party.IsActive);
             Assert.Null(party.MapEvent);
         });
+
+        Server.PumpGameThread();
     }
 
     private static void AssertCommitted(EnvironmentInstance instance, MapEventContext staged) => instance.Call(() =>

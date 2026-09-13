@@ -5163,9 +5163,6 @@ public class TournamentWorldItemOrderingTests : MissionTestEnvironment
             AccessTools.PropertyGetter(typeof(Mission), nameof(Mission.Current)),
             prefix: Prefix(nameof(AgentEquipmentShim.GetCurrentMission)));
         harmony.Patch(
-            AccessTools.PropertyGetter(typeof(Agent), nameof(Agent.Equipment)),
-            prefix: Prefix(nameof(AgentEquipmentShim.GetEquipment)));
-        harmony.Patch(
             AccessTools.Method(typeof(Agent), nameof(Agent.RemoveEquippedWeapon)),
             prefix: Prefix(nameof(AgentEquipmentShim.RemoveEquippedWeapon)));
         harmony.Patch(
@@ -5289,8 +5286,11 @@ public class TournamentWorldItemOrderingTests : MissionTestEnvironment
 
         public static int WorldItemPickupCount { get; private set; }
 
-        public static void Track(Agent agent, MissionEquipment equipment) =>
+        public static void Track(Agent agent, MissionEquipment equipment)
+        {
+            agent.Equipment = equipment;
             States.Add(agent, new State(equipment));
+        }
 
         public static int GetDropCount(Agent agent) => States[agent].DropCount;
         public static int GetRemoveCount(Agent agent) => States[agent].RemoveCount;
@@ -5310,13 +5310,6 @@ public class TournamentWorldItemOrderingTests : MissionTestEnvironment
         public static bool GetCurrentMission(ref Mission __result)
         {
             __result = null;
-            return false;
-        }
-
-        public static bool GetEquipment(Agent __instance, ref MissionEquipment __result)
-        {
-            if (!States.TryGetValue(__instance, out State state)) return true;
-            __result = state.Equipment;
             return false;
         }
 

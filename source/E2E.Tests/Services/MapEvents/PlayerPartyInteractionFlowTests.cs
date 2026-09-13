@@ -2717,6 +2717,8 @@ public class PlayerPartyInteractionFlowTests : MapEventTestBase
         AssertPeaceMade(Server, playerClanId, targetClanId);
         foreach (var environmentClient in Clients)
             AssertPeaceMade(environmentClient, playerClanId, targetClanId);
+
+        Server.PumpGameThread();
     }
 
     [Fact]
@@ -2780,6 +2782,8 @@ public class PlayerPartyInteractionFlowTests : MapEventTestBase
         var result = Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkPeaceBarterResult>());
         Assert.True(result.Accepted, result.Reason);
         Assert.Equal("besieger-peace-success", result.RequestId);
+
+        Server.PumpGameThread();
     }
 
     [Theory]
@@ -2898,6 +2902,8 @@ public class PlayerPartyInteractionFlowTests : MapEventTestBase
         {
             harmony.UnpatchAll(harmony.Id);
         }
+
+        Server.PumpGameThread();
     }
 
     [Fact]
@@ -2986,6 +2992,8 @@ public class PlayerPartyInteractionFlowTests : MapEventTestBase
         AssertWarDeclared(Server, playerClanId, requestedTargetClanId);
 
         client.Call(() => client.Resolve<INetwork>().SendAll(new NetworkConversationEnded()));
+
+        Server.PumpGameThread();
     }
 
     [Fact]
@@ -3073,6 +3081,8 @@ public class PlayerPartyInteractionFlowTests : MapEventTestBase
         }
 
         client.Call(() => client.Resolve<INetwork>().SendAll(new NetworkLocationConversationEnded()));
+
+        Server.PumpGameThread();
     }
 
     [Fact]
@@ -3148,6 +3158,8 @@ public class PlayerPartyInteractionFlowTests : MapEventTestBase
         AssertWarListsContainEachOther(Server, playerClanId, targetClanId);
 
         client.Call(() => client.Resolve<INetwork>().SendAll(new NetworkLocationConversationEnded()));
+
+        Server.PumpGameThread();
     }
 
     [Fact]
@@ -3291,6 +3303,8 @@ public class PlayerPartyInteractionFlowTests : MapEventTestBase
                     DefaultMobilePartyAIModelPatches.RemoveAttackProtectionsForParty(joiningBanditParty);
             });
         }
+
+        Server.PumpGameThread();
     }
 
     [Theory]
@@ -3425,6 +3439,8 @@ public class PlayerPartyInteractionFlowTests : MapEventTestBase
                     DefaultMobilePartyAIModelPatches.RemoveAttackProtectionsForParty(banditParty);
             });
         }
+
+        Server.PumpGameThread();
     }
 
     [Fact]

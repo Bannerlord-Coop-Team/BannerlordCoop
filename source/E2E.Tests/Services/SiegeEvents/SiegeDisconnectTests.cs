@@ -102,6 +102,8 @@ public class SiegeDisconnectTests : MapEventTestBase
         Assert.Equal(remainingPartyId, prompt.LeaderPartyId);
         Assert.Equal(new[] { remainingPartyId }, prompt.AttackerPartyIds);
         Assert.Empty(prompt.DefenderPartyIds);
+
+        Server.PumpGameThread();
     }
 
     [Fact]
@@ -136,6 +138,8 @@ public class SiegeDisconnectTests : MapEventTestBase
         Assert.Equal(disconnectedPartyId, prompt.LeaderPartyId);
         Assert.Empty(prompt.AttackerPartyIds);
         Assert.Empty(prompt.DefenderPartyIds);
+
+        Server.PumpGameThread();
     }
 
     [Fact]
@@ -173,6 +177,8 @@ public class SiegeDisconnectTests : MapEventTestBase
             AssertBesiegerCamp(client, disconnectedPartyId, expectCamp: false);
             Assert.False(client.ObjectManager.TryGetObject<SiegeEvent>(siege.SiegeEventId, out _));
         }
+
+        Server.PumpGameThread();
     }
 
     [Theory]

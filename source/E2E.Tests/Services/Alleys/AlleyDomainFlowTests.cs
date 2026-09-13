@@ -64,6 +64,8 @@ public class AlleyDomainFlowTests : AlleyTestEnvironment
             Assert.Same(attacker, restored.UnderAttackBy);
             Assert.True(restored.LastRecruitTime.ElapsedDaysUntilNow > CampaignTime.DaysInWeek);
         });
+
+        Server.PumpGameThread();
     }
 
     [Fact]
@@ -125,6 +127,8 @@ public class AlleyDomainFlowTests : AlleyTestEnvironment
         ownerClient.Call(() => Assert.DoesNotContain(
             Campaign.Current.GetCampaignBehavior<AlleyCampaignBehavior>()._playerOwnedCommonAreaData,
             data => data.Alley == ownerClient.GetRegisteredObject<Alley>(scenario.PlayerAlleyId)));
+
+        Server.PumpGameThread();
     }
 
     [Fact]
@@ -171,6 +175,8 @@ public class AlleyDomainFlowTests : AlleyTestEnvironment
             Assert.Equal(4, party.MemberRoster.GetTroopCount(troop));
             Assert.Equal(expectedRecruitTime, GetManagementData(scenario.PlayerAlleyId).LastRecruitTimeTicks);
         });
+
+        Server.PumpGameThread();
     }
 
     [Fact]
@@ -201,6 +207,8 @@ public class AlleyDomainFlowTests : AlleyTestEnvironment
             Assert.True(owner.HeroDeveloper.GetSkillXp(DefaultSkills.Roguery) > ownerXpBefore);
             Assert.True(overseer.HeroDeveloper.GetSkillXp(DefaultSkills.Roguery) > overseerXpBefore);
         });
+
+        Server.PumpGameThread();
     }
 
     [Fact]
@@ -237,6 +245,8 @@ public class AlleyDomainFlowTests : AlleyTestEnvironment
                 scenario.GangLeaderId,
                 GetId(client, client.GetRegisteredObject<Alley>(scenario.PlayerAlleyId).Owner)));
         }
+
+        Server.PumpGameThread();
     }
 
     [Fact]
@@ -281,6 +291,8 @@ public class AlleyDomainFlowTests : AlleyTestEnvironment
             instance.Call(() => Assert.Null(
                 instance.GetRegisteredObject<Alley>(scenario.AttackerAlleyId).Owner));
         }
+
+        Server.PumpGameThread();
     }
 
     [Fact]
@@ -310,6 +322,8 @@ public class AlleyDomainFlowTests : AlleyTestEnvironment
         ownerClient.Call(() => Assert.DoesNotContain(
             Campaign.Current.GetCampaignBehavior<AlleyCampaignBehavior>()._playerOwnedCommonAreaData,
             data => data.Alley == ownerClient.GetRegisteredObject<Alley>(scenario.PlayerAlleyId)));
+
+        Server.PumpGameThread();
     }
 
     [Fact]
@@ -336,6 +350,8 @@ public class AlleyDomainFlowTests : AlleyTestEnvironment
 
         ownerClient.Call(() => Assert.Null(
             GetClientAlleyData(ownerClient, scenario.PlayerAlleyId).UnderAttackBy));
+
+        Server.PumpGameThread();
     }
 
     [Fact]
@@ -365,6 +381,8 @@ public class AlleyDomainFlowTests : AlleyTestEnvironment
             Assert.False(Server.Resolve<ISessionAlleyPlayerDataInterface>()
                 .TryGetManagementData(scenario.PlayerAlleyId, out _));
         });
+
+        Server.PumpGameThread();
     }
 
     [Fact]
@@ -394,6 +412,8 @@ public class AlleyDomainFlowTests : AlleyTestEnvironment
         Assert.Same(
             clients[0].GetRegisteredObject<Alley>(scenario.AttackerAlleyId),
             GetClientAlleyData(clients[0], scenario.PlayerAlleyId).UnderAttackBy);
+
+        Server.PumpGameThread();
     }
 
     private void KillHero(string heroId)
