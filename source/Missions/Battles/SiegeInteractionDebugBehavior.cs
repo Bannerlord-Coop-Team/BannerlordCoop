@@ -31,6 +31,7 @@ internal sealed class SiegeInteractionDebugBehavior : MissionBehavior, ISiegeInt
     private readonly Dictionary<int, object> receivedStates = new Dictionary<int, object>();
     private int stateSequence;
     private int inputGameKeyId = UseGameKeyId;
+    private int? observedMachineId;
     private readonly Dictionary<int, int> localShots = new Dictionary<int, int>();
     private readonly Dictionary<int, int> receivedShots = new Dictionary<int, int>();
     private MissionMainAgentInteractionComponent interaction;
@@ -264,6 +265,7 @@ internal sealed class SiegeInteractionDebugBehavior : MissionBehavior, ISiegeInt
         if (action == "stop" && request.MachineId == 0 && agent?.IsUsingGameObject == true)
             machine = Mission.MissionObjects.OfType<UsableMachine>().FirstOrDefault(candidate =>
                 candidate.StandingPoints.Any(point => ReferenceEquals(point, agent.CurrentlyUsedGameObject)));
+        observedMachineId = machine?.Id.Id ?? request.MachineId;
         bool usingTarget = agent?.IsUsingGameObject == true && machine != null &&
             machine.StandingPoints.Any(point => ReferenceEquals(point, agent.CurrentlyUsedGameObject));
         bool focusedTarget = (focusedMachine?.Id.Id == request.MachineId ||
@@ -374,6 +376,7 @@ internal sealed class SiegeInteractionDebugBehavior : MissionBehavior, ISiegeInt
 
     private void Stage(MissionScreen screen, Agent agent, int machineId, int pointIndex, bool watchOnly, bool nativeCamera = false)
     {
+        observedMachineId = machineId;
         var machine = Mission.MissionObjects.OfType<UsableMachine>()
             .FirstOrDefault(candidate => candidate.Id.Id == machineId);
         if (capturedAgent != agent || agent == null || !agent.IsActive() || agent.IsUsingGameObject ||
@@ -512,7 +515,11 @@ internal sealed class SiegeInteractionDebugBehavior : MissionBehavior, ISiegeInt
             inputSamples = inputSamples.ToArray(),
             receivedStates, localShots, receivedShots,
             equipment = ReadEquipment(agent),
-            machines = Mission?.MissionObjects.OfType<UsableMachine>().Select(machine => new
+            observedMachineId,
+            // Keep every input frame and the requested machine, even after focus is lost.
+            machines = Mission?.MissionObjects.OfType<UsableMachine>()
+                .Where(machine => !observedMachineId.HasValue || machine.Id.Id == observedMachineId.Value)
+                .Select(machine => new
             {
                 id = machine.Id.Id,
                 type = machine.GetType().Name,

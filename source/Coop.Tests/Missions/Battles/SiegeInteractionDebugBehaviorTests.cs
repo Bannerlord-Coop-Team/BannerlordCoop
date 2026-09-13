@@ -1,5 +1,6 @@
 ﻿#if DEBUG
 using Common.Messaging;
+using Common.LiveTesting;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 using System;
@@ -83,6 +84,62 @@ public class SiegeInteractionDebugBehaviorTests
         Assert.InRange(samples[0]["recordedUtc"].Value<DateTime>(), before, DateTime.UtcNow);
         Assert.False((bool)AccessTools.Field(typeof(SiegeInteractionDebugBehavior), "edgeObserved").GetValue(behavior));
         Assert.False((bool)AccessTools.Field(typeof(SiegeInteractionDebugBehavior), "edgeCleared").GetValue(behavior));
+    }
+
+    [Fact]
+    public void InputObservation_WithAllSamplesAndTargetDetailsFitsTheUnchangedWireLimit()
+    {
+        var behavior = new SiegeInteractionDebugBehavior(Mock.Of<IMessageBroker>());
+        for (int frame = 0; frame < 300; frame++)
+        {
+            AccessTools.Field(typeof(SiegeInteractionDebugBehavior), "tick").SetValue(behavior, frame);
+            behavior.RecordInputSample(false, false, false, new
+            {
+                contextType = "TaleWorlds.InputSystem.InputContext", contextId = 20862267,
+                layerType = "TaleWorlds.Engine.Screens.SceneLayer", layerId = 57646574,
+                isKeysAllowed = true, registeredGameKeyId = 13, registeredCategory = "ActionCategory",
+                registeredKeyboardKey = "F", registeredVirtualKey = 70, armedVirtualKey = 70,
+                rawPressed = false, rawDown = false, rawReleased = false
+            });
+        }
+        var samples = AccessTools.Field(typeof(SiegeInteractionDebugBehavior), "inputSamples").GetValue(behavior);
+        var observation = new
+        {
+            observedMachineId = 142, inputSamples = samples,
+            machines = new[] { new
+            {
+                id = 142, type = "StonePile", IsDeactivated = false, IsDisabled = false,
+                gateState = (int?)null, stoneAmmo = 12, stoneItemId = "boulder",
+                hitPoints = (float?)null, ladderState = (int?)null, rangedState = (int?)null,
+                standingPoints = Enumerable.Range(0, 64).Select(index => new
+                {
+                    index, id = 141 + index, IsDeactivated = false, IsDisabledForPlayers = false,
+                    disabledForMainAgent = false, occupied = false, HasAIUser = false,
+                    vacantForPlayer = true, ownedByMainAgent = false, distanceSquared = 0f,
+                    heightDifference = 0f, reachable = true, heightWithinReach = true,
+                    x = 498.52f, y = 720.788f, z = 35.835f
+                }).ToArray()
+            } }
+        };
+        string output = "LIVE_TEST_JSON=" + JsonConvert.SerializeObject(observation);
+        using var document = System.Text.Json.JsonDocument.Parse(output.Substring("LIVE_TEST_JSON=".Length));
+        var response = LiveTestResponse.Success("poll-testclient2", new LiveTestProcessInfo
+        {
+            Pid = 20800, Role = "client", PlatformId = "testclient2",
+            RunToken = "c54012d8ff9f4a76a78699980cdaa9b8", ProcessStartedUtc = DateTime.UtcNow
+        }, new { output, hasStructuredResult = true, structuredResult = document.RootElement.Clone() });
+
+        string wire = LiveTestProtocol.SerializeResponse(response);
+
+        Assert.True(System.Text.Encoding.UTF8.GetByteCount(wire) < LiveTestProtocol.MaximumMessageBytes / 2);
+        Assert.True(LiveTestProtocol.TryDeserializeResponse(wire, out var actual, out var error));
+        Assert.Null(error);
+        var result = Assert.IsType<System.Text.Json.JsonElement>(actual.Result);
+        Assert.Equal(output, result.GetProperty("output").GetString());
+        Assert.Equal(document.RootElement.GetRawText(), result.GetProperty("structuredResult").GetRawText());
+        Assert.Equal(300, result.GetProperty("structuredResult").GetProperty("inputSamples").GetArrayLength());
+        Assert.Equal(64, result.GetProperty("structuredResult").GetProperty("machines")[0]
+            .GetProperty("standingPoints").GetArrayLength());
     }
 
     [Fact]
