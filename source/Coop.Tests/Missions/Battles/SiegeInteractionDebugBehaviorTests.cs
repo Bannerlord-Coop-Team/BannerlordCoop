@@ -41,6 +41,24 @@ public class SiegeInteractionDebugBehaviorTests
         Assert.Equal(61f, result["z"].Value<float>());
     }
 
+    [Theory]
+    [InlineData(1.6f)]
+    [InlineData(2.2f)]
+    public void NativeStoneStaging_AimsAtLowTargetInsteadOfHorizontalStandingFrame(float eyeHeight)
+    {
+        var userPosition = new Vec3(498.52f, 720.788f, 36.16533f);
+        var targetCenter = userPosition + new Vec3(0.5f, 1f, 0.25f);
+        var eye = userPosition + (Vec3.Up * eyeHeight);
+        var direction = SiegeInteractionDebugBehavior.GetNativeStoneStagingDirection(userPosition, eyeHeight, targetCenter);
+
+        Assert.True(direction.z < -0.5f);
+        Assert.True(Math.Abs(direction.Length - 1f) < 0.0001f);
+        var targetDistance = (targetCenter - eye).Length;
+        Assert.True((eye + (direction * targetDistance) - targetCenter).Length < 0.0001f);
+        var horizontal = new Vec3(direction.x, direction.y, 0f).NormalizedCopy();
+        Assert.True((eye + (horizontal * targetDistance) - targetCenter).Length > 1f);
+    }
+
     [Fact]
     public void ExternalInputObservation_MissedEdgeAllowsOnlyReleasedKeyCleanupStop()
     {

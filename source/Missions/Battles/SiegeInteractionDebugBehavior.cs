@@ -375,6 +375,12 @@ internal sealed class SiegeInteractionDebugBehavior : MissionBehavior, ISiegeInt
                 return;
             }
             var direction = point.GetUserFrameForAgent(agent).Rotation.f;
+            if (machine is StonePile)
+            {
+                var targetCenter = (machine.GameEntity.GlobalBoxMin + machine.GameEntity.GlobalBoxMax) * 0.5f;
+                var eyeHeight = (agent.Monster.StandingEyeHeight + 0.2f) * agent.AgentScale;
+                direction = GetNativeStoneStagingDirection(position, eyeHeight, targetCenter);
+            }
             agent.TeleportToPosition(position);
             agent.LookDirection = direction;
             screen.CameraBearing = direction.RotationZ;
@@ -396,6 +402,11 @@ internal sealed class SiegeInteractionDebugBehavior : MissionBehavior, ISiegeInt
         stagingCamera.LookAt(eye, target, up);
         screen.CustomCamera = stagingCamera;
         status = watchOnly ? "fixture_observer_camera_staged" : "fixture_staged_native_focus_pending";
+    }
+
+    internal static Vec3 GetNativeStoneStagingDirection(Vec3 userPosition, float eyeHeight, Vec3 targetCenter)
+    {
+        return (targetCenter - (userPosition + (Vec3.Up * eyeHeight))).NormalizedCopy();
     }
 
     internal Vec3 GetStagingTarget(UsableMachine machine, Vec3 standingPointPosition, bool watchOnly)
