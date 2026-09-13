@@ -63,8 +63,6 @@ namespace GameInterface.Services.Kingdoms.Extentions
             }
         }
 
-        // TODO : If there are multiple clients in the same clan, only the leader of the clan should vote on issues
-        // This logic is intended to support that
         public void ApplyClanVote(Clan clan, int outcomeIndex, Supporter.SupportWeights supportWeight, bool isAbstain)
         {
             Supporter supporter = new Supporter(clan);

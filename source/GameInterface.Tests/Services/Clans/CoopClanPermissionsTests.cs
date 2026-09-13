@@ -173,6 +173,8 @@ public class CoopClanPermissionsTests : IDisposable
             CoopClanDialoguePatches.ConversationHeroHireOnConditionPostfix,
             CoopClanDialoguePatches.ConversationCaravanBuildOnConditionPostfix,
             CoopClanDialoguePatches.CanPlayerBuyWorkshopClickableConditionPostfix,
+            CoopClanDialoguePatches.NotableSupportRequestOnConditionPostfix,
+            CoopClanDialoguePatches.NotableSupportEndOnConditionPostfix,
             CoopClanDialoguePatches.JoinKingdomConditionPostfix,
             CoopClanDialoguePatches.BecomeVassalConditionPostfix,
             CoopClanDialoguePatches.LeaveKingdomConditionPostfix,

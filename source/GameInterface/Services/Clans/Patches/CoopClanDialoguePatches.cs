@@ -42,6 +42,16 @@ internal class CoopClanDialoguePatches
     public static void CanPlayerBuyWorkshopClickableConditionPostfix(ref bool __result)
         => CheckCanManageClan(ref __result);
 
+    [HarmonyPatch(typeof(NotableSupportersCampaignBehavior), nameof(NotableSupportersCampaignBehavior.notable_support_request_on_condition))]
+    [HarmonyPostfix]
+    public static void NotableSupportRequestOnConditionPostfix(ref bool __result)
+        => CheckCanManageClan(ref __result);
+
+    [HarmonyPatch(typeof(NotableSupportersCampaignBehavior), nameof(NotableSupportersCampaignBehavior.notable_support_end_on_condition))]
+    [HarmonyPostfix]
+    public static void NotableSupportEndOnConditionPostfix(ref bool __result)
+        => CheckCanManageClan(ref __result);
+
     [HarmonyPatch(typeof(LordConversationsCampaignBehavior), nameof(LordConversationsCampaignBehavior.conversation_player_want_to_join_faction_as_mercenary_or_vassal_on_condition))]
     [HarmonyPostfix]
     public static void JoinKingdomConditionPostfix(ref bool __result)
