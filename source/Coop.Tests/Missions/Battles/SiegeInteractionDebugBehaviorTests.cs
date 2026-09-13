@@ -14,6 +14,38 @@ namespace Coop.Tests.Missions.Battles;
 [Collection("Mission.Current")]
 public class SiegeInteractionDebugBehaviorTests
 {
+    [Fact]
+    public void ExternalInputObservation_MissedEdgeAllowsOnlyReleasedKeyCleanupStop()
+    {
+        var behavior = new SiegeInteractionDebugBehavior(Mock.Of<IMessageBroker>());
+        AccessTools.Field(typeof(SiegeInteractionDebugBehavior), "externalInputArmed").SetValue(behavior, true);
+        behavior.RecordInputSample(false, false, false);
+        Assert.True(behavior.CanAcceptInputAction("arm-stop", false, false));
+        Assert.False(behavior.CanAcceptInputAction("arm-stop", true, false));
+        Assert.False(behavior.CanAcceptInputAction("arm-stop", false, true));
+        Assert.False(behavior.CanAcceptInputAction("arm-use", false, false));
+        Assert.False(behavior.CanAcceptInputAction("approach", false, false));
+        Assert.True(behavior.CanAcceptInputAction("restore", false, false));
+        Assert.False((bool)AccessTools.Field(typeof(SiegeInteractionDebugBehavior), "edgeCleared").GetValue(behavior));
+    }
+
+    [Fact]
+    public void ExternalInputObservation_RequiresAnObservedEdgeAndLaterReleaseWithoutClaimingInjection()
+    {
+        var behavior = new SiegeInteractionDebugBehavior(Mock.Of<IMessageBroker>());
+        AccessTools.Field(typeof(SiegeInteractionDebugBehavior), "externalInputArmed").SetValue(behavior, true);
+        behavior.RecordInputSample(false, false, false);
+        Assert.False((bool)AccessTools.Field(typeof(SiegeInteractionDebugBehavior), "edgeObserved").GetValue(behavior));
+        Assert.False((bool)AccessTools.Field(typeof(SiegeInteractionDebugBehavior), "edgeCleared").GetValue(behavior));
+        behavior.RecordInputSample(true, true, false);
+        Assert.True((bool)AccessTools.Field(typeof(SiegeInteractionDebugBehavior), "edgeObserved").GetValue(behavior));
+        Assert.False((bool)AccessTools.Field(typeof(SiegeInteractionDebugBehavior), "edgeCleared").GetValue(behavior));
+        AccessTools.Field(typeof(SiegeInteractionDebugBehavior), "tick").SetValue(behavior, 1);
+        behavior.RecordInputSample(false, false, true);
+        Assert.True((bool)AccessTools.Field(typeof(SiegeInteractionDebugBehavior), "edgeCleared").GetValue(behavior));
+        Assert.False((bool)AccessTools.Field(typeof(SiegeInteractionDebugBehavior), "pressInvoked").GetValue(behavior));
+    }
+
     [Theory]
     [InlineData("already_captured")]
     [InlineData("combat_camera_missing")]

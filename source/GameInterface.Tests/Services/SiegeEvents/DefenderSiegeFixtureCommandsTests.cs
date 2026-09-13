@@ -1312,6 +1312,26 @@ public sealed class DefenderSiegeFixtureCommandsTests : IDisposable
     }
 
     [Fact]
+    public void CaptureExactCastle_RejectsUnavailableTargetWithoutSelectingAnotherCastle()
+    {
+        Settlement settlement = PrepareStagingParties();
+        var result = Parse(DefenderSiegeFixtureCommands.Capture(new() { "testclient", "testclient2", "castle_missing" }));
+        Assert.False(result.Value<bool>("success"));
+        Assert.Contains("Requested castle castle_missing is unavailable", result.Value<string>("reason"));
+        Assert.Null(AccessTools.Field(typeof(DefenderSiegeFixtureCommands), "pendingCapture").GetValue(null));
+        Assert.All(captives, captive => Assert.Same(settlement, captive.Party.CurrentSettlement));
+    }
+
+    [Fact]
+    public void CaptureExactCastle_KeepsIdentityOnRepeatedCaptureAndRejectsTargetChange()
+    {
+        PrepareStagingParties();
+        AssertSuccess(Parse(DefenderSiegeFixtureCommands.Capture(new() { "testclient", "testclient2", "castle_ES1" })));
+        AssertSuccess(Parse(DefenderSiegeFixtureCommands.Capture(new() { "testclient", "testclient2", "castle_ES1" })));
+        Assert.False(Parse(DefenderSiegeFixtureCommands.Capture(new() { "testclient", "testclient2", "castle_A1" })).Value<bool>("success"));
+    }
+
+    [Fact]
     public void SelectStagingSettlement_PrefersOdrysaAndSkipsUnregisteredFallbacks()
     {
         Settlement preferred = CreateStagingCastle("castle_ES1");

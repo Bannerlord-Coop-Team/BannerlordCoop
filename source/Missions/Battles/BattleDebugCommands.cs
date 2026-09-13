@@ -41,6 +41,58 @@ internal static class BattleDebugCommands
         new CoopCommandResult(false, output, "command_failed");
 
 #if DEBUG
+    public sealed class CancelFixtureMissionReadyCoopCommand : ICoopCommand
+    {
+        public string Prefix => "coop.debug.battle";
+        public string Name => "cancel_fixture_mission_ready";
+        public string Description => "Clears the owned readiness delay during fixture teardown.";
+        public CoopCommandSide Side => CoopCommandSide.Client;
+        public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
+        {
+            new ExpectedArgs("map_event_id", "The fixture's siege assault.")
+        };
+        public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
+        {
+            return ModInformation.IsClient && args.Count == 1 &&
+                ContainerProvider.TryResolve<BattleHostHandler>(out var handler) &&
+                handler.CancelFixtureMissionReady(args[0])
+                ? Succeeded("Fixture mission readiness delay cleared.")
+                : Failed("The readiness delay belongs to another assault.");
+        }
+    }
+
+    public sealed class DeferFixtureMissionReadyCoopCommand : ICoopCommand
+    {
+        public string Prefix => "coop.debug.battle";
+        public string Name => "defer_fixture_mission_ready";
+        public string Description => "Defers this client's readiness until the named peer is elected at epoch one.";
+        public CoopCommandSide Side => CoopCommandSide.Client;
+        public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
+        {
+            new ExpectedArgs("map_event_id", "Current replicated siege assault."),
+            new ExpectedArgs("host_controller_id", "Connected participant that must become host first.")
+        };
+
+        public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
+        {
+            var mapEvent = MobileParty.MainParty?.MapEvent;
+            if (ModInformation.IsServer || args.Count != 2 || Mission.Current != null ||
+                mapEvent?.IsSiegeAssault != true ||
+                !ContainerProvider.TryResolve<IObjectManager>(out var objects) ||
+                !objects.TryGetId(mapEvent, out string mapEventId) || mapEventId != args[0] ||
+                !ContainerProvider.TryResolve<IPlayerManager>(out var players) ||
+                !players.TryGetPlayer(args[1], out var player) ||
+                !objects.TryGetObject<MobileParty>(player.MobilePartyId, out var party) ||
+                !ReferenceEquals(party.MapEvent, mapEvent) ||
+                !ContainerProvider.TryResolve<BattleHostHandler>(out var handler) ||
+                !handler.DeferFixtureMissionReady(mapEventId, args[1]))
+                return Failed("A fresh siege assault with a different participating host is required.");
+            return Succeeded($"Mission readiness deferred for {mapEventId} until {args[1]} is elected at epoch 1.");
+        }
+    }
+#endif
+
+#if DEBUG
     public sealed class SiegeInteractionObserveCoopCommand : ICoopCommand
     {
         public string Prefix => "coop.debug.battle";
@@ -125,7 +177,7 @@ internal static class BattleDebugCommands
                 !int.TryParse(args[2], NumberStyles.Integer, CultureInfo.InvariantCulture, out int machineId))
                 return Failed("Expected controller_id, unique request_id, machine_id, action and optional standing_point.");
             int standingPoint = 0;
-            if ((args[3] != "capture" && args[3] != "dismount" && args[3] != "stage" && args[3] != "watch" && args[3] != "use" &&
+            if ((args[3] != "capture" && args[3] != "dismount" && args[3] != "stage" && args[3] != "approach" && args[3] != "watch" && args[3] != "arm-use" && args[3] != "arm-stop" && args[3] != "use" &&
                  args[3] != "fire" && args[3] != "attack" && args[3] != "stop" && args[3] != "restore") ||
                 (args.Count == 5 && !int.TryParse(args[4], out standingPoint)))
                 return Failed("Invalid action or standing point.");

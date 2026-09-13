@@ -40,7 +40,8 @@ internal static class DefenderSiegeFixtureCommands
         public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
             new ExpectedArgs("first_controller_id", "First defender controller."),
-            new ExpectedArgs("second_controller_id", "Second defender controller.")
+            new ExpectedArgs("second_controller_id", "Second defender controller."),
+            new ExpectedArgs("settlement_id", "Exact castle; refuses fallback when supplied.", false)
         };
         public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
         {
@@ -273,13 +274,18 @@ internal static class DefenderSiegeFixtureCommands
     {
         if (ModInformation.IsClient)
             return Failure("capture", "Command can only be run on the server.");
-        if (!TryGetExpectedControllerIds(args, out string[] expectedControllerIds, out string error))
+        string requestedSettlementId = args?.Count == 3 ? args[2] : null;
+        var controllerArgs = args?.Count == 3 ? args.Take(2).ToList() : args;
+        if (args?.Count == 3 && string.IsNullOrWhiteSpace(requestedSettlementId))
+            return Failure("capture", "An explicit castle id must not be empty.");
+        if (!TryGetExpectedControllerIds(controllerArgs, out string[] expectedControllerIds, out string error))
             return Failure("capture", error);
         if (activeFixture != null || restoredFixture != null)
             return Failure("capture", "A defender fixture lifecycle is already active.");
         if (pendingCapture != null)
         {
             if (!pendingCapture.HasExpectedControllers(expectedControllerIds) ||
+                (requestedSettlementId != null && pendingCapture.Settlement.StringId != requestedSettlementId) ||
                 !IsCaptureCurrent(pendingCapture))
             {
                 return Failure("capture", "The pending defender fixture capture is stale or belongs to other controllers.");
@@ -287,7 +293,7 @@ internal static class DefenderSiegeFixtureCommands
 
             return FixtureResult(pendingCapture, "capture", success: true, reason: null);
         }
-        if (!TryCreateFixture(expectedControllerIds, out DefenderSiegeFixture fixture, out error))
+        if (!TryCreateFixture(expectedControllerIds, out DefenderSiegeFixture fixture, out error, requestedSettlementId))
             return Failure("capture", error);
 
         pendingCapture = fixture;
@@ -1218,7 +1224,8 @@ internal static class DefenderSiegeFixtureCommands
     private static bool TryCreateFixture(
         string[] expectedControllerIds,
         out DefenderSiegeFixture fixture,
-        out string error)
+        out string error,
+        string requestedSettlementId = null)
     {
         fixture = null;
         error = null;
@@ -1301,10 +1308,19 @@ internal static class DefenderSiegeFixtureCommands
         }
 
         MobileParty[] playerParties = parties.Select(party => party.Party).ToArray();
-        Settlement settlement = objectManager.TryGetObject<Settlement>(PreferredSettlementId, out var preferredSettlement)
+        Settlement settlement = objectManager.TryGetObject<Settlement>(requestedSettlementId ?? PreferredSettlementId, out var preferredSettlement)
             ? SelectStagingSettlement(objectManager, new[] { preferredSettlement }, playerParties)
             : null;
-        settlement ??= SelectStagingSettlement(objectManager, Settlement.All, playerParties);
+        if (requestedSettlementId == null)
+            settlement ??= SelectStagingSettlement(objectManager, Settlement.All, playerParties);
+        else if (settlement == null)
+        {
+            error = $"Requested castle {requestedSettlementId} is unavailable: registered={preferredSettlement != null}, " +
+                $"castle={preferredSettlement?.IsCastle}, mapEvent={preferredSettlement?.Party?.MapEvent != null}, " +
+                $"siege={preferredSettlement?.SiegeEvent != null}, " +
+                $"ownerVisit={playerParties.Any(party => WouldUpdateOwnerVisit(party, preferredSettlement))}.";
+            return false;
+        }
         if (settlement == null)
         {
             error = "No clean castle is available for defender staging.";

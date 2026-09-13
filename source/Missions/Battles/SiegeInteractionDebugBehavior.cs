@@ -39,6 +39,8 @@ internal sealed class SiegeInteractionDebugBehavior : MissionBehavior, ISiegeInt
     private string requestId;
     private string status = "unexercised";
     private bool pressInvoked;
+    private bool externalInputArmed;
+    private int inputVirtualKey;
     private bool edgeObserved;
     private bool edgeCleared;
     private int tick;
@@ -50,6 +52,9 @@ internal sealed class SiegeInteractionDebugBehavior : MissionBehavior, ISiegeInt
     private MissionScreen capturedScreen;
     private Camera capturedCamera;
     private Camera stagingCamera;
+    private float capturedCameraBearing;
+    private float capturedCameraElevation;
+    private bool nativeCameraStaged;
     private bool fixtureRestored;
     private string captureFailureReason;
     private Agent dismountAgent;
@@ -70,12 +75,17 @@ internal sealed class SiegeInteractionDebugBehavior : MissionBehavior, ISiegeInt
         tick++;
         UpdateDismount();
         BindObserver();
-        if (!pressInvoked || edgeCleared || inputSamples.Count >= 300) return;
+        if ((!pressInvoked && !externalInputArmed) || edgeCleared || inputSamples.Count >= 300) return;
         var screen = ScreenManager.TopScreen as MissionScreen;
         if (screen?.SceneLayer?.Input == null) return;
         bool pressed = screen.SceneLayer.Input.IsGameKeyPressed(inputGameKeyId);
         bool down = screen.SceneLayer.Input.IsGameKeyDown(inputGameKeyId);
         bool released = screen.SceneLayer.Input.IsGameKeyReleased(inputGameKeyId);
+        RecordInputSample(pressed, down, released);
+    }
+
+    internal void RecordInputSample(bool pressed, bool down, bool released)
+    {
         edgeObserved |= pressed || down;
         edgeCleared = edgeObserved && tick > pressTick && !pressed && !down;
         inputSamples.Add(new { tick, pressed, down, released });
@@ -170,19 +180,29 @@ internal sealed class SiegeInteractionDebugBehavior : MissionBehavior, ISiegeInt
         GameThread.RunSafe(() => ApplyRequest(payload.What));
     }
 
+    internal bool CanAcceptInputAction(string action, bool keyPressed, bool keyDown)
+    {
+        return (!(pressInvoked || externalInputArmed) || edgeCleared || action == "restore") ||
+            (externalInputArmed && action == "arm-stop" && !keyPressed && !keyDown);
+    }
+
     private void ApplyRequest(NetworkSiegeInteractionDebugRequest request)
     {
         var session = Mission?.GetMissionBehavior<CoopBattleController>()?.Session;
         if (removed || Mission != TaleWorlds.MountAndBlade.Mission.Current || session == null ||
             session.InstanceId != request.MapEventId || session.OwnControllerId != request.ControllerId ||
             string.IsNullOrEmpty(request.RequestId) || requests.Contains(request.RequestId)) return;
-        if (pressInvoked && !edgeCleared && request.Action != "restore") return;
+        var screen = ScreenManager.TopScreen as MissionScreen;
+        var input = screen?.SceneLayer?.Input;
+        if ((pressInvoked || externalInputArmed) && !edgeCleared && request.Action != "restore" &&
+            !CanAcceptInputAction(request.Action,
+                input == null || input.IsGameKeyPressed(inputGameKeyId),
+                input == null || input.IsGameKeyDown(inputGameKeyId))) return;
         if (requests.Count >= 256) return;
         requests.Add(request.RequestId);
         requestId = request.RequestId;
         if (status == "fixture_dismount_pending") status = "unexercised";
         BindObserver();
-        var screen = ScreenManager.TopScreen as MissionScreen;
         var agent = Mission.MainAgent;
         if (request.Action == "dismount")
         {
@@ -194,9 +214,9 @@ internal sealed class SiegeInteractionDebugBehavior : MissionBehavior, ISiegeInt
             Capture(screen, agent);
             return;
         }
-        if (request.Action == "stage" || request.Action == "watch")
+        if (request.Action == "stage" || request.Action == "watch" || request.Action == "approach")
         {
-            Stage(screen, agent, request.MachineId, request.StandingPointIndex, request.Action == "watch");
+            Stage(screen, agent, request.MachineId, request.StandingPointIndex, request.Action == "watch", request.Action == "approach");
             return;
         }
         if (request.Action == "restore")
@@ -204,14 +224,17 @@ internal sealed class SiegeInteractionDebugBehavior : MissionBehavior, ISiegeInt
             Restore(screen, agent);
             return;
         }
-        if (request.Action != "use" && request.Action != "stop" && request.Action != "fire" &&
-            request.Action != "attack")
+        bool externalInput = request.Action == "arm-use" || request.Action == "arm-stop";
+        string action = externalInput ? request.Action.Substring(4) : request.Action;
+        if (action != "use" && action != "stop" && action != "fire" && action != "attack")
         {
             status = "unexercised_unknown_action";
             return;
         }
-        inputGameKeyId = (request.Action == "fire" || request.Action == "attack") ? 9 : UseGameKeyId;
+        inputGameKeyId = (action == "fire" || action == "attack") ? 9 : UseGameKeyId;
         pressInvoked = false;
+        externalInputArmed = false;
+        inputVirtualKey = 0;
         edgeObserved = false;
         edgeCleared = false;
         inputSamples.Clear();
@@ -219,18 +242,18 @@ internal sealed class SiegeInteractionDebugBehavior : MissionBehavior, ISiegeInt
         var focusedObject = interaction?.CurrentFocusedObject as MissionObject;
         var machine = Mission.MissionObjects.OfType<UsableMachine>()
             .FirstOrDefault(candidate => candidate.Id.Id == request.MachineId);
-        if (request.Action == "stop" && request.MachineId == 0 && agent?.IsUsingGameObject == true)
+        if (action == "stop" && request.MachineId == 0 && agent?.IsUsingGameObject == true)
             machine = Mission.MissionObjects.OfType<UsableMachine>().FirstOrDefault(candidate =>
                 candidate.StandingPoints.Any(point => ReferenceEquals(point, agent.CurrentlyUsedGameObject)));
         bool usingTarget = agent?.IsUsingGameObject == true && machine != null &&
             machine.StandingPoints.Any(point => ReferenceEquals(point, agent.CurrentlyUsedGameObject));
         bool focusedTarget = (focusedMachine?.Id.Id == request.MachineId ||
             focusedObject?.Id.Id == request.MachineId) && interaction?._currentInteractableObject != null;
-        bool actionReady = request.Action == "fire"
+        bool actionReady = action == "fire"
             ? usingTarget && machine is RangedSiegeWeapon
-            : request.Action == "attack"
+            : action == "attack"
                 ? capturedAgent == agent && agent != null && !agent.IsUsingGameObject
-                : request.Action == "stop" ? usingTarget : focusedTarget && agent != null && !agent.IsUsingGameObject;
+                : action == "stop" ? usingTarget : focusedTarget && agent != null && !agent.IsUsingGameObject;
         if (screen?.SceneLayer?.Input == null || agent == null || !agent.IsActive() || !actionReady)
         {
             status = "unexercised_no_focus";
@@ -248,10 +271,17 @@ internal sealed class SiegeInteractionDebugBehavior : MissionBehavior, ISiegeInt
             status = "unexercised_unbound_key";
             return;
         }
+        inputVirtualKey = Input.GetVirtualKeyCode(key.KeyboardKey.InputKey);
+        if (externalInput && (inputVirtualKey <= 0 || inputVirtualKey > 255))
+        {
+            status = "unexercised_unbound_key";
+            return;
+        }
         pressTick = tick;
-        status = "press_invoked_outcome_pending";
-        pressInvoked = true;
-        Input.PressKey(key.KeyboardKey.InputKey);
+        externalInputArmed = externalInput;
+        pressInvoked = !externalInput;
+        status = externalInput ? "external_input_armed" : "press_invoked_outcome_pending";
+        if (!externalInput) Input.PressKey(key.KeyboardKey.InputKey);
     }
 
     private void Dismount(Agent agent)
@@ -308,6 +338,9 @@ internal sealed class SiegeInteractionDebugBehavior : MissionBehavior, ISiegeInt
         capturedLookDirection = agent.LookDirection;
         capturedScreen = screen;
         capturedCamera = screen.CustomCamera;
+        capturedCameraBearing = screen.CameraBearing;
+        capturedCameraElevation = screen.CameraElevation;
+        nativeCameraStaged = false;
         fixtureRestored = false;
         status = "fixture_captured";
     }
@@ -320,7 +353,7 @@ internal sealed class SiegeInteractionDebugBehavior : MissionBehavior, ISiegeInt
         return true;
     }
 
-    private void Stage(MissionScreen screen, Agent agent, int machineId, int pointIndex, bool watchOnly)
+    private void Stage(MissionScreen screen, Agent agent, int machineId, int pointIndex, bool watchOnly, bool nativeCamera = false)
     {
         var machine = Mission.MissionObjects.OfType<UsableMachine>()
             .FirstOrDefault(candidate => candidate.Id.Id == machineId);
@@ -334,6 +367,22 @@ internal sealed class SiegeInteractionDebugBehavior : MissionBehavior, ISiegeInt
         }
         var point = machine.StandingPoints[pointIndex];
         var position = point.GetUserFrameForAgent(agent).Origin.GetGroundVec3();
+        if (nativeCamera)
+        {
+            if (capturedCamera != null || stagingCamera != null || agent.MountAgent != null)
+            {
+                status = "fixture_stage_rejected";
+                return;
+            }
+            var direction = point.GetUserFrameForAgent(agent).Rotation.f;
+            agent.TeleportToPosition(position);
+            agent.LookDirection = direction;
+            screen.CameraBearing = direction.RotationZ;
+            screen.CameraElevation = direction.RotationX;
+            nativeCameraStaged = true;
+            status = "fixture_staged_native_focus_pending";
+            return;
+        }
         if (stagingCamera == null)
         {
             stagingCamera = Camera.CreateCamera();
@@ -366,9 +415,25 @@ internal sealed class SiegeInteractionDebugBehavior : MissionBehavior, ISiegeInt
             status = "fixture_restore_rejected";
             return;
         }
+        if (externalInputArmed)
+        {
+            if (screen.SceneLayer.Input.IsGameKeyDown(inputGameKeyId) ||
+                screen.SceneLayer.Input.IsGameKeyPressed(inputGameKeyId))
+            {
+                status = "fixture_restore_rejected_input_held";
+                return;
+            }
+            externalInputArmed = false;
+        }
         agent.TeleportToPosition(capturedPosition);
         agent.LookDirection = capturedLookDirection;
         ReleaseCamera();
+        if (nativeCameraStaged)
+        {
+            screen.CameraBearing = capturedCameraBearing;
+            screen.CameraElevation = capturedCameraElevation;
+            nativeCameraStaged = false;
+        }
         fixtureRestored = (agent.Position - capturedPosition).LengthSquared < 0.01f &&
             ReferenceEquals(screen.CustomCamera, capturedCamera);
         status = fixtureRestored ? "fixture_restored" : "fixture_restore_mismatch";
@@ -394,6 +459,9 @@ internal sealed class SiegeInteractionDebugBehavior : MissionBehavior, ISiegeInt
             success = !removed && Mission == TaleWorlds.MountAndBlade.Mission.Current,
             sessionId = session?.InstanceId,
             controllerId = session?.OwnControllerId,
+            hostControllerId = session?.HostControllerId,
+            hostEpoch = session?.HostEpoch,
+            mainAgentPosition = agent == null ? (Vec3?)null : agent.Position,
             screenPresent = screen != null,
             inputContextPresent = screen?.SceneLayer?.Input != null,
             mainAgentActive = agent?.IsActive() == true,
@@ -405,9 +473,10 @@ internal sealed class SiegeInteractionDebugBehavior : MissionBehavior, ISiegeInt
             focusEventInteractable = eventInteractable,
             usingObject = agent?.IsUsingGameObject == true,
             usedObject = Describe(agent?.CurrentlyUsedGameObject),
-            requestId, status, pressInvoked, edgeObserved, edgeCleared, inputGameKeyId, tick,
+            requestId, status, pressInvoked, externalInputArmed, inputVirtualKey, edgeObserved, edgeCleared, inputGameKeyId, tick,
             fixtureActive = capturedAgent != null,
             fixtureRestored, captureFailureReason,
+            nativeCameraStaged,
             stagingCameraActive = stagingCamera != null && ReferenceEquals(screen?.CustomCamera, stagingCamera),
             focusDiagnostic = ReadFocusDiagnostic(screen, agent),
             inputSamples = inputSamples.ToArray(),
