@@ -44,6 +44,9 @@ public class RemoteAgentActionProcessor : IRemoteAgentActionProcessor
     private readonly List<object> equipmentDelayEvents = new();
     private readonly HashSet<(string, string, int, long)> equipmentDelayEventKeys = new();
     private bool equipmentDelayTruncated;
+    private readonly List<object> equipmentDelaySelection = new();
+    private readonly HashSet<(Guid, bool, bool, bool)> equipmentDelaySelectionKeys = new();
+    private bool equipmentDelaySelectionTruncated;
 
     public string EquipmentDelayObservation(string operation, string controllerId)
     {
@@ -53,6 +56,9 @@ public class RemoteAgentActionProcessor : IRemoteAgentActionProcessor
                 throw new InvalidOperationException("Release the existing observation and supply a controller id.");
             equipmentDelayController = controllerId;
             equipmentDelayAgent = Guid.Empty;
+            equipmentDelaySelection.Clear();
+            equipmentDelaySelectionKeys.Clear();
+            equipmentDelaySelectionTruncated = false;
             equipmentDelayEvents.Clear();
             equipmentDelayEventKeys.Clear();
             delayedEquipment.Clear();
@@ -88,6 +94,8 @@ public class RemoteAgentActionProcessor : IRemoteAgentActionProcessor
             heldBaselines = delayedEquipment.Count,
             truncated = equipmentDelayTruncated,
             events = equipmentDelayEvents,
+            selectionObservations = equipmentDelaySelection,
+            selectionObservationsTruncated = equipmentDelaySelectionTruncated,
         });
     }
 
@@ -125,6 +133,39 @@ public class RemoteAgentActionProcessor : IRemoteAgentActionProcessor
             action1Name = AgentActionData.GetActionNameWithCode(action.Data.Action1Index),
             playerControlled = action.Data.IsPlayerControlled,
             equipmentMatches,
+        });
+    }
+
+    private void ObserveEquipmentDelaySelection(Guid agentId, RemoteAction action)
+    {
+        if (!equipmentDelayArmed || equipmentDelayAgent != Guid.Empty
+            || action.ControllerId != equipmentDelayController) return;
+        bool registered = agentRegistry.TryGetAgentInfo(agentId, out CoopAgentInfo info);
+        bool active = info?.Agent != null && info.Agent.IsActive();
+        bool fullBaseline = action.Data.Equipment.HasValue;
+        var key = (agentId, fullBaseline, registered, active);
+        if (equipmentDelaySelectionKeys.Contains(key)) return;
+        if (equipmentDelaySelection.Count >= 16)
+        {
+            equipmentDelaySelectionTruncated = true;
+            return;
+        }
+        equipmentDelaySelectionKeys.Add(key);
+        EquipmentBaseline? cached = null;
+        if (_agentStates.TryGetValue(agentId, out var state)
+            && state.EquipmentByAuthority != null
+            && state.EquipmentByAuthority.TryGetValue(
+                (action.ControllerId, action.BattleHostEpoch > 0), out var baseline))
+            cached = baseline;
+        equipmentDelaySelection.Add(new
+        {
+            agentId, controllerId = action.ControllerId,
+            epoch = action.BattleHostEpoch, sequence = action.Sequence,
+            revision = action.Data.EquipmentRevision, fullBaseline, registered, active,
+            playerControlled = action.Data.IsPlayerControlled,
+            originalOwner = info?.OriginalOwner, authority = info?.CurrentAuthority,
+            locallyControlled = agentRegistry.IsLocallyControlled(agentId),
+            cachedRevision = cached?.Revision, cachedEpoch = cached?.HostEpoch,
         });
     }
 
@@ -601,6 +642,9 @@ public class RemoteAgentActionProcessor : IRemoteAgentActionProcessor
                         sequence,
                         packet.BattleHostEpoch);
 
+#if DEBUG
+                    ObserveEquipmentDelaySelection(agentId, action);
+#endif
                     if (agentRegistry.IsLocallyControlled(agentId))
                     {
                         RemoveAllPendingRemoteActions(agentId);
@@ -1658,6 +1702,8 @@ public class RemoteAgentActionProcessor : IRemoteAgentActionProcessor
         delayedEquipment.Clear();
         equipmentDelayEvents.Clear();
         equipmentDelayEventKeys.Clear();
+        equipmentDelaySelection.Clear();
+        equipmentDelaySelectionKeys.Clear();
 #endif
         _agentStates.Clear();
         _pendingActionAgentIds.Clear();

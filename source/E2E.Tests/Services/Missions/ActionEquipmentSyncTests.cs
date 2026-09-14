@@ -523,6 +523,56 @@ public class ActionEquipmentSyncTests : MissionTestEnvironment
 
 #if DEBUG
     [Fact]
+    public void EquipmentDelay_ObservesBaselineBeforeRegistrationWithoutChangingApply()
+    {
+        RunScenario(context =>
+        {
+            var processor = context.Component.AgentActionHandler.EquipmentDelayProcessor;
+            Agent owner = context.Spawn("owner", out var source, out _);
+            source.Action0Index = 1001;
+            Guid id = Guid.NewGuid();
+            processor.EquipmentDelayObservation("arm", "owner");
+            context.Receive(RevisionPacket(owner, id, 1, 1, true));
+            Agent puppet = context.Mission.SpawnAgent(new AgentBuildData(Game.Current.PlayerTroop)
+                .Controller(AgentControllerType.None));
+            Assert.True(AgentMirror.TryGet(puppet, out var mirror));
+            Assert.True(context.Registry.TryRegisterAgent("owner", id, puppet));
+            source.Action0Index = 1002;
+            context.Receive(RevisionPacket(owner, id, 2, 1, false));
+            var result = Newtonsoft.Json.Linq.JObject.Parse(processor.EquipmentDelayObservation("snapshot", null));
+            Assert.Equal(Guid.Empty, (Guid)result["agentId"]);
+            Assert.Equal(0, (int)result["heldBaselines"]);
+            Assert.Equal(1002, mirror.Action0Index);
+            Assert.Contains(result["selectionObservations"], e =>
+                (Guid)e["agentId"] == id && !(bool)e["registered"] && (bool)e["fullBaseline"]);
+            Assert.Contains(result["selectionObservations"], e =>
+                (Guid)e["agentId"] == id && (bool)e["registered"] && !(bool)e["fullBaseline"]
+                && (long)e["cachedRevision"] == 1);
+        });
+    }
+
+    [Fact]
+    public void EquipmentDelay_SelectionObservationIsBoundedAndResetsOnArm()
+    {
+        RunScenario(context =>
+        {
+            var processor = context.Component.AgentActionHandler.EquipmentDelayProcessor;
+            Agent owner = context.Spawn("owner", out _, out _);
+            processor.EquipmentDelayObservation("arm", "owner");
+            for (int i = 0; i < 20; i++)
+                context.Receive(RevisionPacket(owner, Guid.NewGuid(), 1, 1, true));
+            var result = Newtonsoft.Json.Linq.JObject.Parse(processor.EquipmentDelayObservation("snapshot", null));
+            Assert.Equal(16, result["selectionObservations"].Count());
+            Assert.True((bool)result["selectionObservationsTruncated"]);
+            Assert.Empty(result["events"]);
+            processor.EquipmentDelayObservation("release", null);
+            result = Newtonsoft.Json.Linq.JObject.Parse(processor.EquipmentDelayObservation("arm", "owner"));
+            Assert.Empty(result["selectionObservations"]);
+            Assert.False((bool)result["selectionObservationsTruncated"]);
+        });
+    }
+
+    [Fact]
     public void EquipmentDelay_LocalPromotionCancelsHeldBaselineAfterPendingSweep()
     {
         RunScenario(context =>
