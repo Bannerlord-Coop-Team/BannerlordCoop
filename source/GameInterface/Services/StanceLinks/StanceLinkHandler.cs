@@ -1,11 +1,9 @@
 ﻿using Common;
-using Common.Logging;
 using Common.Messaging;
 using Common.Network;
 using Common.Util;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.StanceLinks.Messages;
-using Serilog;
 using System.Collections.Generic;
 using TaleWorlds.CampaignSystem;
 
@@ -16,7 +14,6 @@ internal class StanceLinkHandler : IHandler
     private readonly IMessageBroker messageBroker;
     private readonly INetwork network;
     private readonly IObjectManager objectManager;
-    private static readonly ILogger Logger = LogManager.GetLogger<StanceLinkHandler>();
 
     public StanceLinkHandler(IMessageBroker messageBroker, INetwork network, IObjectManager objectManager)
     {
@@ -28,6 +25,18 @@ internal class StanceLinkHandler : IHandler
         messageBroker.Subscribe<StanceLinkConstructed>(HandleStanceLinkConstructed);
         messageBroker.Subscribe<StanceLinkDeconstructed>(Handle_StanceLinkDeconstructed);
         messageBroker.Subscribe<NetworkStanceLinkDeconstructed>(Handle_NetworkStanceLinkDeconstructed);
+        messageBroker.Subscribe<StanceLinkTroopCasualties>(Handle_StanceLinkTroopCasualties);
+        messageBroker.Subscribe<NetworkStanceLinkTroopCasualties1>(Handle_NetworkStanceLinkTroopCasualties1);
+        messageBroker.Subscribe<NetworkStanceLinkTroopCasualties2>(Handle_NetworkStanceLinkTroopCasualties2);
+        messageBroker.Subscribe<StanceLinkSuccessfulSieges>(HandleStanceLinkSuccesfulSieges);
+        messageBroker.Subscribe<NetworkStanceLinkSuccessfulSieges1>(Handle_NetworkStanceLinkSuccessfulSieges1);
+        messageBroker.Subscribe<NetworkStanceLinkSuccessfulSieges2>(Handle_NetworkStanceLinkSuccessfulSieges2);
+        messageBroker.Subscribe<StanceLinkSuccessfulRaids>(HandleStanceLinkSuccessfulRaids);
+        messageBroker.Subscribe<NetworkStanceLinkSuccessfulRaids1>(Handle_NetworkStanceLinkSuccessfulRaids1);
+        messageBroker.Subscribe<NetworkStanceLinkSuccessfulRaids2>(Handle_NetworkStanceLinkSuccessfulRaids2);
+        messageBroker.Subscribe<StanceLinkSuccessfulTownSieges>(HandleStanceLinkSuccesfulTownSieges);
+        messageBroker.Subscribe<NetworkStanceLinkSuccessfulTownSieges1>(Handle_NetworkStanceLinkSuccessfulTownSieges1);
+        messageBroker.Subscribe<NetworkStanceLinkSuccessfulTownSieges2>(Handle_NetworkStanceLinkSuccessfulTownSieges2);
     }
 
     public void Dispose()
@@ -36,6 +45,18 @@ internal class StanceLinkHandler : IHandler
         messageBroker.Unsubscribe<StanceLinkConstructed>(HandleStanceLinkConstructed);
         messageBroker.Unsubscribe<StanceLinkDeconstructed>(Handle_StanceLinkDeconstructed);
         messageBroker.Unsubscribe<NetworkStanceLinkDeconstructed>(Handle_NetworkStanceLinkDeconstructed);
+        messageBroker.Unsubscribe<StanceLinkTroopCasualties>(Handle_StanceLinkTroopCasualties);
+        messageBroker.Unsubscribe<NetworkStanceLinkTroopCasualties1>(Handle_NetworkStanceLinkTroopCasualties1);
+        messageBroker.Unsubscribe<NetworkStanceLinkTroopCasualties2>(Handle_NetworkStanceLinkTroopCasualties2);
+        messageBroker.Unsubscribe<StanceLinkSuccessfulSieges>(HandleStanceLinkSuccesfulSieges);
+        messageBroker.Unsubscribe<NetworkStanceLinkSuccessfulSieges1>(Handle_NetworkStanceLinkSuccessfulSieges1);
+        messageBroker.Unsubscribe<NetworkStanceLinkSuccessfulSieges2>(Handle_NetworkStanceLinkSuccessfulSieges2);
+        messageBroker.Unsubscribe<StanceLinkSuccessfulRaids>(HandleStanceLinkSuccessfulRaids);
+        messageBroker.Unsubscribe<NetworkStanceLinkSuccessfulRaids1>(Handle_NetworkStanceLinkSuccessfulRaids1);
+        messageBroker.Unsubscribe<NetworkStanceLinkSuccessfulRaids2>(Handle_NetworkStanceLinkSuccessfulRaids2);
+        messageBroker.Unsubscribe<StanceLinkSuccessfulTownSieges>(HandleStanceLinkSuccesfulTownSieges);
+        messageBroker.Unsubscribe<NetworkStanceLinkSuccessfulTownSieges1>(Handle_NetworkStanceLinkSuccessfulTownSieges1);
+        messageBroker.Unsubscribe<NetworkStanceLinkSuccessfulTownSieges2>(Handle_NetworkStanceLinkSuccessfulTownSieges2);
     }
 
     private void Handle_RequestStanceLinkConstructed(MessagePayload<RequestStanceLinkConstructed> payload)
@@ -150,6 +171,176 @@ internal class StanceLinkHandler : IHandler
                 faction2.UpdateFactionsAtWarWith();
             }
             faction1.UpdateFactionsAtWarWith();
+        });
+    }
+    
+    public void Handle_StanceLinkTroopCasualties(MessagePayload<StanceLinkTroopCasualties> payload)
+    {
+        var obj = payload.What;
+        if (!objectManager.TryGetIdWithLogging(obj.StanceLink, out var stanceLinkId)) return;
+        if (obj.Side==1)
+        {
+            network.SendAll(new NetworkStanceLinkTroopCasualties1(stanceLinkId, obj.Value));
+        }
+        else
+        {
+            network.SendAll(new NetworkStanceLinkTroopCasualties2(stanceLinkId, obj.Value));
+        }
+    }
+
+    public void Handle_NetworkStanceLinkTroopCasualties1(MessagePayload<NetworkStanceLinkTroopCasualties1> payload)
+    {
+        var obj = payload.What;
+
+        GameThread.RunSafe(() =>
+        {
+            if (!objectManager.TryGetObjectWithLogging<StanceLink>(obj.StanceLinkId, out var stanceLink)) return;
+            using (new AllowedThread())
+            {
+                stanceLink.TroopCasualties1 = obj.Value;
+            }
+        });
+    }
+    public void Handle_NetworkStanceLinkTroopCasualties2(MessagePayload<NetworkStanceLinkTroopCasualties2> payload)
+    {
+        var obj = payload.What;
+
+        GameThread.RunSafe(() =>
+        {
+            if (!objectManager.TryGetObjectWithLogging<StanceLink>(obj.StanceLinkId, out var stanceLink)) return;
+            using (new AllowedThread())
+            {
+                stanceLink.TroopCasualties2 = obj.Value;
+            }
+        });
+    }
+
+    public void HandleStanceLinkSuccesfulSieges(MessagePayload<StanceLinkSuccessfulSieges> payload)
+    {
+        var obj = payload.What;
+
+        if (!objectManager.TryGetIdWithLogging(obj.StanceLink, out var stanceLinkId)) return;
+        if (obj.Side == 1)
+        {
+            network.SendAll(new NetworkStanceLinkSuccessfulSieges1(stanceLinkId, obj.Value));
+        }
+        else
+        {
+            network.SendAll(new NetworkStanceLinkSuccessfulSieges2(stanceLinkId, obj.Value));
+        }
+    }
+
+    public void Handle_NetworkStanceLinkSuccessfulSieges1(MessagePayload<NetworkStanceLinkSuccessfulSieges1> payload)
+    {
+        var obj = payload.What;
+
+        GameThread.RunSafe(() =>
+        {
+            if (!objectManager.TryGetObjectWithLogging<StanceLink>(obj.StanceLinkId, out var stanceLink)) return;
+            using (new AllowedThread())
+            {
+                stanceLink.SuccessfulSieges1 = obj.Value;
+            }
+        });
+    }
+
+    public void Handle_NetworkStanceLinkSuccessfulSieges2(MessagePayload<NetworkStanceLinkSuccessfulSieges2> payload)
+    {
+        var obj = payload.What;
+
+        GameThread.RunSafe(() =>
+        {
+            if (!objectManager.TryGetObjectWithLogging<StanceLink>(obj.StanceLinkId, out var stanceLink)) return;
+            using (new AllowedThread())
+            {
+                stanceLink.SuccessfulSieges2 = obj.Value;
+            }
+        });
+    }
+
+    public void HandleStanceLinkSuccessfulRaids(MessagePayload<StanceLinkSuccessfulRaids> payload)
+    {
+        var obj = payload.What;
+
+        if (!objectManager.TryGetIdWithLogging(obj.StanceLink, out var stanceLinkId)) return;
+        if (obj.Side == 1)
+        {
+            network.SendAll(new NetworkStanceLinkSuccessfulRaids1(stanceLinkId, obj.Value));
+        }
+        else
+        {
+            network.SendAll(new NetworkStanceLinkSuccessfulRaids2(stanceLinkId, obj.Value));
+        }
+    }
+
+    public void Handle_NetworkStanceLinkSuccessfulRaids1(MessagePayload<NetworkStanceLinkSuccessfulRaids1> payload)
+    {
+        var obj = payload.What;
+
+        GameThread.RunSafe(() =>
+        {
+            if (!objectManager.TryGetObjectWithLogging<StanceLink>(obj.StanceLinkId, out var stanceLink)) return;
+            using (new AllowedThread())
+            {
+                stanceLink.SuccessfulRaids1 = obj.Value;
+            }
+        });
+    }
+
+    public void Handle_NetworkStanceLinkSuccessfulRaids2(MessagePayload<NetworkStanceLinkSuccessfulRaids2> payload)
+    {
+        var obj = payload.What;
+
+        GameThread.RunSafe(() =>
+        {
+            if (!objectManager.TryGetObjectWithLogging<StanceLink>(obj.StanceLinkId, out var stanceLink)) return;
+            using (new AllowedThread())
+            {
+                stanceLink.SuccessfulRaids2 = obj.Value;
+            }
+        });
+    }
+
+    public void HandleStanceLinkSuccesfulTownSieges(MessagePayload<StanceLinkSuccessfulTownSieges> payload)
+    {
+        var obj = payload.What;
+
+        if (!objectManager.TryGetIdWithLogging(obj.StanceLink, out var stanceLinkId)) return;
+        if (obj.Side == 1)
+        {
+            network.SendAll(new NetworkStanceLinkSuccessfulTownSieges1(stanceLinkId, obj.Value));
+        }
+        else
+        {
+            network.SendAll(new NetworkStanceLinkSuccessfulTownSieges2(stanceLinkId, obj.Value));
+        }
+    }
+
+    public void Handle_NetworkStanceLinkSuccessfulTownSieges1(MessagePayload<NetworkStanceLinkSuccessfulTownSieges1> payload)
+    {
+        var obj = payload.What;
+
+        GameThread.RunSafe(() =>
+        {
+            if (!objectManager.TryGetObjectWithLogging<StanceLink>(obj.StanceLinkId, out var stanceLink)) return;
+            using (new AllowedThread())
+            {
+                stanceLink.SuccessfulTownSieges1 = obj.Value;
+            }
+        });
+    }
+
+    public void Handle_NetworkStanceLinkSuccessfulTownSieges2(MessagePayload<NetworkStanceLinkSuccessfulTownSieges2> payload)
+    {
+        var obj = payload.What;
+
+        GameThread.RunSafe(() =>
+        {
+            if (!objectManager.TryGetObjectWithLogging<StanceLink>(obj.StanceLinkId, out var stanceLink)) return;
+            using (new AllowedThread())
+            {
+                stanceLink.SuccessfulTownSieges2 = obj.Value;
+            }
         });
     }
 }
