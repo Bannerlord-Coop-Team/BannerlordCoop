@@ -26,11 +26,123 @@ public interface IRemoteAgentActionProcessor : IDisposable
     void AdvanceRemoteGuardStatesAfterNativeTick();
     void Receive(AgentActionPacket packet);
     void HandleBattleHostAssigned(NetworkBattleHostAssigned message);
+#if DEBUG
+    string EquipmentDelayObservation(string operation, string controllerId);
+#endif
 }
 
 public class RemoteAgentActionProcessor : IRemoteAgentActionProcessor
 {
     private const float RetainedGuardReleaseBlendPeriod = 0.4f;
+#if DEBUG
+    private bool equipmentDelayArmed;
+    private bool equipmentDelayExpired;
+    private long equipmentDelayDeadline;
+    private string equipmentDelayController;
+    private Guid equipmentDelayAgent;
+    private readonly Dictionary<bool, RemoteAction> delayedEquipment = new();
+    private readonly List<object> equipmentDelayEvents = new();
+    private readonly HashSet<(string, string, int, long)> equipmentDelayEventKeys = new();
+    private bool equipmentDelayTruncated;
+
+    public string EquipmentDelayObservation(string operation, string controllerId)
+    {
+        if (operation == "arm")
+        {
+            if (equipmentDelayArmed || string.IsNullOrEmpty(controllerId))
+                throw new InvalidOperationException("Release the existing observation and supply a controller id.");
+            equipmentDelayController = controllerId;
+            equipmentDelayAgent = Guid.Empty;
+            equipmentDelayEvents.Clear();
+            equipmentDelayEventKeys.Clear();
+            delayedEquipment.Clear();
+            equipmentDelayTruncated = false;
+            equipmentDelayExpired = false;
+            equipmentDelayDeadline = System.Diagnostics.Stopwatch.GetTimestamp()
+                + (120L * System.Diagnostics.Stopwatch.Frequency);
+            equipmentDelayArmed = true;
+        }
+        else if (operation == "release")
+        {
+            ReleaseDelayedEquipment();
+        }
+        else if (operation != "snapshot")
+        {
+            throw new ArgumentException("Expected arm, snapshot or release.");
+        }
+        return Newtonsoft.Json.JsonConvert.SerializeObject(new
+        {
+            armed = equipmentDelayArmed,
+            expired = equipmentDelayExpired,
+            controllerId = equipmentDelayController,
+            agentId = equipmentDelayAgent,
+            heldBaselines = delayedEquipment.Count,
+            truncated = equipmentDelayTruncated,
+            events = equipmentDelayEvents,
+        });
+    }
+
+    private void ReleaseDelayedEquipment()
+    {
+        equipmentDelayArmed = false;
+        foreach (RemoteAction action in delayedEquipment.Values)
+        {
+            RecordEquipmentDelay("baseline-released", equipmentDelayAgent, action);
+            RetainEquipmentBaseline(equipmentDelayAgent, action);
+        }
+        delayedEquipment.Clear();
+    }
+
+    private void RecordEquipmentDelay(string kind, Guid agentId, RemoteAction action,
+        bool? equipmentMatches = null)
+    {
+        if (agentId != equipmentDelayAgent || agentId == Guid.Empty) return;
+        if (!equipmentDelayEventKeys.Add((kind, action.ControllerId,
+                action.BattleHostEpoch, action.Sequence))) return;
+        if (equipmentDelayEvents.Count >= 64)
+        {
+            equipmentDelayTruncated = true;
+            equipmentDelayEventKeys.Clear();
+            return;
+        }
+        equipmentDelayEvents.Add(new
+        {
+            kind, agentId, controllerId = action.ControllerId,
+            epoch = action.BattleHostEpoch, sequence = action.Sequence,
+            revision = action.Data.EquipmentRevision,
+            fullBaseline = action.Data.Equipment.HasValue,
+            action0 = action.Data.Action0Index, action1 = action.Data.Action1Index,
+            action0Name = AgentActionData.GetActionNameWithCode(action.Data.Action0Index),
+            action1Name = AgentActionData.GetActionNameWithCode(action.Data.Action1Index),
+            playerControlled = action.Data.IsPlayerControlled,
+            equipmentMatches,
+        });
+    }
+
+    private bool DelayEquipmentBaseline(Guid agentId, RemoteAction action)
+    {
+        if (!equipmentDelayArmed || action.ControllerId != equipmentDelayController
+            || action.Data.IsPlayerControlled
+            || !agentRegistry.TryGetAgentInfo(agentId, out CoopAgentInfo info)
+            || info.OriginalOwner != equipmentDelayController
+            || info.Agent == null || !info.Agent.IsActive() || info.Agent.IsMount
+            || agentRegistry.IsLocallyControlled(agentId)
+            || !IsCurrentActionAuthority(info, action.ControllerId, action.BattleHostEpoch)) return false;
+        if (equipmentDelayAgent == Guid.Empty) equipmentDelayAgent = agentId;
+        if (equipmentDelayAgent != agentId) return false;
+        bool hostRole = action.BattleHostEpoch > 0;
+        if (!delayedEquipment.TryGetValue(hostRole, out RemoteAction previous)
+            || action.BattleHostEpoch > previous.BattleHostEpoch
+            || (action.BattleHostEpoch == previous.BattleHostEpoch
+                && action.Data.EquipmentRevision > previous.Data.EquipmentRevision))
+        {
+            delayedEquipment[hostRole] = action;
+            RecordEquipmentDelay("baseline-held", agentId, action);
+        }
+        return true;
+    }
+#endif
+
 
     private readonly INetworkAgentRegistry agentRegistry;
     private readonly IControllerIdProvider controllerIdProvider;
@@ -277,6 +389,9 @@ public class RemoteAgentActionProcessor : IRemoteAgentActionProcessor
         if (!_agentStates.TryGetValue(agentId, out RemoteAgentActionState state))
             return;
 
+#if DEBUG
+        if (agentId == equipmentDelayAgent) delayedEquipment.Clear();
+#endif
         _agentStates.Remove(agentId);
         _pendingActionAgentIds.Remove(agentId);
         _retainedGuardAgentIds.Remove(agentId);
@@ -293,6 +408,14 @@ public class RemoteAgentActionProcessor : IRemoteAgentActionProcessor
     {
         if (_disposed || Mission.Current == null) return;
 
+#if DEBUG
+        if (equipmentDelayArmed
+            && System.Diagnostics.Stopwatch.GetTimestamp() >= equipmentDelayDeadline)
+        {
+            equipmentDelayExpired = true;
+            ReleaseDelayedEquipment();
+        }
+#endif
         ApplyPendingRemoteActions();
         ApplyRetainedRemoteGuardStates(
             RemoteGuardTickPhase.BeforeNativeTick);
@@ -471,6 +594,9 @@ public class RemoteAgentActionProcessor : IRemoteAgentActionProcessor
                     }
 
                     RetainEquipmentBaseline(agentId, action);
+#if DEBUG
+                    RecordEquipmentDelay("received", agentId, action);
+#endif
                     if (!agentRegistry.TryGetAgentInfo(agentId, out var info))
                     {
                         BufferPendingRemoteAction(agentId, action);
@@ -752,6 +878,9 @@ public class RemoteAgentActionProcessor : IRemoteAgentActionProcessor
                 || baseline.HostEpoch != action.BattleHostEpoch
                 || baseline.Revision < action.Data.EquipmentRevision)
             {
+#if DEBUG
+                RecordEquipmentDelay("waiting-baseline", agentId, action);
+#endif
                 return RemoteActionApplyResult.AgentNotReady;
             }
             if (baseline.Revision > action.Data.EquipmentRevision)
@@ -844,6 +973,10 @@ public class RemoteAgentActionProcessor : IRemoteAgentActionProcessor
         {
             appliedGuardState.HasGuardCommand = false;
         }
+#if DEBUG
+        RecordEquipmentDelay("action-applied", agentId, action,
+            action.Data.Equipment.HasValue && action.Data.Equipment.Value.Matches(agent));
+#endif
         RecordRemoteActionSequence(agentId, action);
         UpdateRemoteGuardState(
             agentId,
@@ -1252,6 +1385,9 @@ public class RemoteAgentActionProcessor : IRemoteAgentActionProcessor
             && (previous.HostEpoch > action.BattleHostEpoch
                 || (previous.HostEpoch == action.BattleHostEpoch
                     && previous.Revision >= action.Data.EquipmentRevision))) return;
+#if DEBUG
+        if (DelayEquipmentBaseline(agentId, action)) return;
+#endif
         baselines[authority] = new EquipmentBaseline(
             action.BattleHostEpoch, action.Data.EquipmentRevision, action.Data.Equipment.Value);
     }
@@ -1503,7 +1639,12 @@ public class RemoteAgentActionProcessor : IRemoteAgentActionProcessor
     {
         if (_disposed) return;
         _disposed = true;
-
+#if DEBUG
+        equipmentDelayArmed = false;
+        delayedEquipment.Clear();
+        equipmentDelayEvents.Clear();
+        equipmentDelayEventKeys.Clear();
+#endif
         _agentStates.Clear();
         _pendingActionAgentIds.Clear();
         _retainedGuardAgentIds.Clear();

@@ -537,6 +537,28 @@ internal static class BattleDebugCommands
         }
     }
 
+    public sealed class EquipmentDelayCoopCommand : ICoopCommand
+    {
+        public string Prefix => "coop.debug.battle";
+        public string Name => "equipment_delay";
+        public string Description => "Observes a bounded delay of one AI agent's received equipment baseline.";
+        public CoopCommandSide Side => CoopCommandSide.Both;
+        public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
+        {
+            new ExpectedArgs("operation", "arm, snapshot or release", true),
+            new ExpectedArgs("controller_id", "Original AI owner to observe", false),
+        };
+
+        public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
+        {
+            if (Mission.Current?.GetMissionBehavior<CoopBattleController>() == null
+                || !ContainerProvider.TryResolve<Missions.Agents.Handlers.IRemoteAgentActionProcessor>(out var processor))
+                return Failed("No active coop battle processor");
+            return Succeeded("EQUIPMENT_DELAY " + processor.EquipmentDelayObservation(
+                args[0].ToLowerInvariant(), args.Count > 1 ? args[1] : null));
+        }
+    }
+
     public sealed class AnimationTraceCoopCommand : ICoopCommand
     {
         public string Prefix => "coop.debug.battle";

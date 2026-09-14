@@ -521,6 +521,81 @@ public class ActionEquipmentSyncTests : MissionTestEnvironment
         });
     }
 
+#if DEBUG
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void EquipmentDelay_ReceivedBaselineWaitsAcrossFormerHostTransition(bool expire)
+    {
+        RunScenario(context =>
+        {
+            const string mapEventId = "mapEvent1";
+            BattleSpawnGate.BeginBattle(mapEventId);
+            var processor = context.Instance.Resolve<IRemoteAgentActionProcessor>();
+            try
+            {
+                var hosts = context.Instance.Resolve<IBattleHostRegistry>();
+                var broker = context.Instance.Resolve<IMessageBroker>();
+                broker.Publish(this, new NetworkMissionPeerEntered("A", mapEventId));
+                broker.Publish(this, new NetworkMissionPeerEntered("B", mapEventId));
+                void Assign(string controller, int epoch)
+                {
+                    hosts.Set(mapEventId, new BattleHostAssignment(controller, Array.Empty<string>(), epoch));
+                    broker.Publish(this, new NetworkBattleHostAssigned(mapEventId, controller, Array.Empty<string>(), epoch));
+                    Drain();
+                }
+                Assign("A", 1);
+                Agent owner = context.Spawn("A", out var source, out _);
+                context.Spawn("A", out var puppet, out Guid id);
+                source.Equipment[EquipmentIndex.Weapon0] = Weapon("sword");
+                puppet.Equipment[EquipmentIndex.Weapon0] = source.Equipment[EquipmentIndex.Weapon0];
+                source.PrimaryWieldedItemIndex = EquipmentIndex.Weapon0;
+                source.Action0CodeType = Agent.ActionCodeType.ReleaseMelee;
+                processor.EquipmentDelayObservation("arm", "A");
+                source.Action0Index = 1001;
+                context.Receive(RevisionPacket(owner, id, 1, 1, true, "A", 1));
+                Assert.Equal(0, puppet.SetActionChannelCalls);
+                Assign("B", 2);
+                source.Action0Index = 1002;
+                context.Receive(RevisionPacket(owner, id, 2, 2, true, "A", 0));
+                source.Action0Index = 1003;
+                context.Receive(RevisionPacket(owner, id, 3, 2, false, "A", 0));
+                source.Action0Index = 1004;
+                context.Receive(RevisionPacket(owner, id, 4, 99, true, "A", 1));
+                Assert.Equal(0, puppet.SetActionChannelCalls);
+                var held = Newtonsoft.Json.Linq.JObject.Parse(processor.EquipmentDelayObservation("snapshot", null));
+                Assert.Equal(id, (Guid)held["agentId"]);
+                Assert.Equal(2, (int)held["heldBaselines"]);
+                if (expire)
+                    AccessTools.Field(typeof(RemoteAgentActionProcessor), "equipmentDelayDeadline").SetValue(processor, 0L);
+                else
+                    processor.EquipmentDelayObservation("release", null);
+                context.Component.AgentActionHandler.ApplyRemoteGuardStates();
+                Assert.Equal(1003, puppet.Action0Index);
+                Assert.Equal(EquipmentIndex.Weapon0, puppet.PrimaryWieldedItemIndex);
+                int calls = puppet.SetActionChannelCalls;
+                context.Component.AgentActionHandler.ApplyRemoteGuardStates();
+                Assert.Equal(calls, puppet.SetActionChannelCalls);
+                var result = Newtonsoft.Json.Linq.JObject.Parse(processor.EquipmentDelayObservation("snapshot", null));
+                Assert.False((bool)result["armed"]);
+                Assert.Equal(expire, (bool)result["expired"]);
+                Assert.False((bool)result["truncated"]);
+                var applied = result["events"].Where(e => (string)e["kind"] == "action-applied").ToArray();
+                Assert.Single(applied);
+                Assert.Equal(3, (int)applied[0]["sequence"]);
+                Assert.True((bool)applied[0]["equipmentMatches"]);
+                Assert.Contains(result["events"], e => (string)e["kind"] == "waiting-baseline"
+                    && (int)e["epoch"] == 0 && (int)e["sequence"] == 3);
+            }
+            finally
+            {
+                processor.EquipmentDelayObservation("release", null);
+                BattleSpawnGate.EndBattle();
+            }
+        });
+    }
+#endif
+
     private static MissionWeapon Weapon(string itemId, int usages = 1)
     {
         using var allowed = new AllowedThread();
