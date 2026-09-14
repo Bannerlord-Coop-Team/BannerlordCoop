@@ -210,6 +210,43 @@ public class SiegeInteractionDebugBehaviorTests
         Assert.True((eye + (horizontal * targetDistance) - targetCenter).Length > 1f);
     }
 
+    [Fact]
+    public void NativeStoneTarget_UsesCurrentPhysicsCenterWithoutChangingObserverTarget()
+    {
+        using var mission = new MissionCurrentScope();
+        var harmony = new Harmony("coop.tests.stone-physics-target");
+        try
+        {
+            harmony.Patch(AccessTools.Method(typeof(ScriptComponentBehavior), "CacheEditableFieldsForAllScriptComponents"),
+                prefix: new HarmonyMethod(AccessTools.Method(typeof(SiegeInteractionDebugBehaviorTests),
+                    nameof(SkipScriptComponentCache))));
+            harmony.Patch(AccessTools.Method(typeof(WeakGameEntity), nameof(WeakGameEntity.ComputeGlobalPhysicsBoundingBoxCenter)),
+                prefix: new HarmonyMethod(AccessTools.Method(typeof(SiegeInteractionDebugBehaviorTests),
+                    nameof(StonePhysicsCenter))));
+#pragma warning disable SYSLIB0050
+            var stone = (StonePile)FormatterServices.GetUninitializedObject(typeof(StonePile));
+#pragma warning restore SYSLIB0050
+            var behavior = new SiegeInteractionDebugBehavior(Mock.Of<IMessageBroker>());
+            var standingPosition = new Vec3(498.52f, 720.788f, 36.16533f);
+
+            Assert.Equal(standingPosition, behavior.GetStagingTarget(stone, standingPosition, true, true));
+            Assert.Equal(standingPosition, behavior.GetStagingTarget(stone, standingPosition, false));
+            Assert.Equal(new Vec3(499f, 721f, 36.5f),
+                behavior.GetStagingTarget(stone, standingPosition, false, true));
+            var target = JObject.FromObject(AccessTools.Field(typeof(SiegeInteractionDebugBehavior), "nativeAimTarget").GetValue(behavior));
+            Assert.Equal(499f, target["target"]["x"].Value<float>());
+            Assert.Null(AccessTools.Field(typeof(SiegeInteractionDebugBehavior), "capturedAgent").GetValue(behavior));
+            Assert.Null(AccessTools.Field(typeof(SiegeInteractionDebugBehavior), "stagingCamera").GetValue(behavior));
+        }
+        finally { harmony.UnpatchAll(harmony.Id); }
+    }
+
+    private static bool StonePhysicsCenter(ref Vec3 __result)
+    {
+        __result = new Vec3(499f, 721f, 36.5f);
+        return false;
+    }
+
     [Theory]
     [InlineData(false, 1410)]
     [InlineData(true, 743)]

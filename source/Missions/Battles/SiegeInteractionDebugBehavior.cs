@@ -571,13 +571,7 @@ internal sealed class SiegeInteractionDebugBehavior : MissionBehavior, ISiegeInt
             }
             ReleaseCamera();
             var direction = point.GetUserFrameForAgent(agent).Rotation.f;
-            if (machine is StonePile)
-            {
-                var targetCenter = (machine.GameEntity.GlobalBoxMin + machine.GameEntity.GlobalBoxMax) * 0.5f;
-                var eyeHeight = (agent.Monster.StandingEyeHeight + 0.2f) * agent.AgentScale;
-                direction = GetNativeStagingDirection(position, eyeHeight, targetCenter);
-            }
-            else if (machine is Ballista)
+            if (machine is StonePile || machine is Ballista)
             {
                 try
                 {
@@ -585,7 +579,7 @@ internal sealed class SiegeInteractionDebugBehavior : MissionBehavior, ISiegeInt
                     var eyeHeight = (agent.Monster.StandingEyeHeight + 0.2f) * agent.AgentScale;
                     direction = GetNativeStagingDirection(position, eyeHeight, nativeTarget);
                     if (!(direction.LengthSquared >= 0.5f))
-                        throw new InvalidOperationException("Ballista target coincides with the player eye.");
+                        throw new InvalidOperationException("Native target is invalid or coincides with the player eye.");
                 }
                 catch (Exception exception)
                 {
@@ -680,6 +674,17 @@ internal sealed class SiegeInteractionDebugBehavior : MissionBehavior, ISiegeInt
 
     internal Vec3 GetStagingTarget(UsableMachine machine, Vec3 standingPointPosition, bool watchOnly, bool nativeCamera = false)
     {
+        if (nativeCamera && !watchOnly && machine is StonePile)
+        {
+            // Render bounds can change independently of the pile's focus collision.
+            var target = machine.GameEntity.ComputeGlobalPhysicsBoundingBoxCenter();
+            nativeAimTarget = new
+            {
+                requestId, tick, recordedUtc = DateTime.UtcNow, machineId = machine.Id.Id,
+                target = DescribePosition(target)
+            };
+            return target;
+        }
         if (nativeCamera && !watchOnly && machine is Ballista ballista)
         {
             var body = ballista.ballistaBody;
