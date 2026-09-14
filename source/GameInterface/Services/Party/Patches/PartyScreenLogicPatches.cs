@@ -29,6 +29,26 @@ internal class PartyScreenLogicPatches
         get => _inCommit;
         private set => _inCommit = value;
     }
+
+    [HarmonyPatch(nameof(PartyScreenLogic.ValidateCommand))]
+    [HarmonyPrefix]
+    public static bool ValidateCommandPrefix(PartyScreenLogic.PartyCommand command, ref bool __result)
+    {
+        // Force-transfer loot screens cannot honor troop upgrades: the commit
+        // validation requires zero gold/influence/morale movement, and the
+        // upgrade gold cost would fail it after the screen already reset.
+        // Block the operation up front so the button simply stays disabled.
+        // ValidateCommand is also queried per-frame by the UI, so no message.
+        if (command.Code == PartyScreenLogic.PartyCommandCode.UpgradeTroop &&
+            ForceTransferScreenTracker.HasOpenForceTransferScreen())
+        {
+            __result = false;
+            return false;
+        }
+
+        return true;
+    }
+
     [HarmonyPatch(nameof(PartyScreenLogic.DoneLogic))]
     [HarmonyPrefix]
     public static bool DoneLogicPrefix(PartyScreenLogic __instance, ref bool __result, bool isForced)

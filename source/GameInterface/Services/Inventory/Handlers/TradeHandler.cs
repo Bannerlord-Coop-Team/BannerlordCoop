@@ -221,7 +221,7 @@ internal class TradeHandler : IHandler
                 message.OwnerPartyId,
                 message.ForceTransferId);
         }
-        else if (!VillageHostileActionInterface.TryValidateSuppliesTakeAndRemainder(pool.SuppliesItems, message.BoughtItems, leftRemainder, out var error))
+        else if (!VillageHostileActionInterface.TryValidateSuppliesTakeAndRemainder(pool.SuppliesItems, message.BoughtItems, message.SoldItems, leftRemainder, out var error))
         {
             // The pool is deliberately left intact: a rejection must not mutate
             // pool state, so a false positive never destroys the reward.

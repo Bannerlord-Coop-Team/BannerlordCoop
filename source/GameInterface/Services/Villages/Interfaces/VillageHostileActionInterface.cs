@@ -39,6 +39,14 @@ internal class VillageHostileActionInterface : IVillageHostileActionInterface, I
     private static readonly TimeSpan MapEventStartApprovalTimeout = TimeSpan.FromSeconds(30);
     private static readonly TimeSpan ForceTransferPoolTimeout = TimeSpan.FromMinutes(5);
     private static readonly TimeSpan DeferredDrainMargin = TimeSpan.FromSeconds(60);
+    // Commits attributed to a screen opened just inside the client freshness
+    // margin can land after the server authorization has expired (authorize at
+    // t=0, open at t=240s, Done at t=301s). Expired entries are kept this much
+    // longer and still honor one-shot commits, so an earned reward is never
+    // silently discarded. The client stops attributing 5 minutes after the
+    // screen opens, and screens open no later than 4 minutes after
+    // authorization, so 5 minutes of grace covers every attributed commit.
+    private static readonly TimeSpan ForceTransferExpiredRetention = TimeSpan.FromMinutes(5);
 
     private readonly IMessageBroker messageBroker;
     private readonly IObjectManager objectManager;
@@ -46,6 +54,7 @@ internal class VillageHostileActionInterface : IVillageHostileActionInterface, I
     private readonly ConcurrentDictionary<string, bool> pendingHostileActionSettlements = new ConcurrentDictionary<string, bool>();
     private readonly ConcurrentDictionary<string, CampaignTime> forceActionCooldowns = new ConcurrentDictionary<string, CampaignTime>();
     private readonly ConcurrentDictionary<string, PendingForceTransfer> pendingForceTransfers = new ConcurrentDictionary<string, PendingForceTransfer>();
+    private readonly ConcurrentDictionary<string, ExpiredForceTransfer> expiredForceTransfers = new ConcurrentDictionary<string, ExpiredForceTransfer>();
     private readonly ConditionalWeakTable<MapEvent, AppliedForceActionOutcomeState> appliedForceActionOutcomes = new ConditionalWeakTable<MapEvent, AppliedForceActionOutcomeState>();
     private readonly object deferredForceScreenGate = new object();
     private DeferredForceScreen deferredForceScreen;
@@ -573,22 +582,43 @@ internal class VillageHostileActionInterface : IVillageHostileActionInterface, I
             return false;
 
         PruneExpiredForceTransfers(DateTime.UtcNow);
-        if (!pendingForceTransfers.TryRemove(requestId, out var entry))
-            return false;
-        if (entry.Pool.PartyId != partyId)
+        if (pendingForceTransfers.TryRemove(requestId, out var entry))
         {
-            // Wrong party: restore the entry so the rightful owner can still commit.
-            pendingForceTransfers[requestId] = entry;
-            return false;
+            if (entry.Pool.PartyId != partyId)
+            {
+                // Wrong party: restore the entry so the rightful owner can still commit.
+                pendingForceTransfers[requestId] = entry;
+                return false;
+            }
+
+            pool = entry.Pool;
+            Logger.Information(
+                "ForceTransfer consumed (Request={RequestId}, Party={PartyId}, Pending={PendingCount})",
+                requestId,
+                partyId,
+                pendingForceTransfers.Count);
+            return true;
         }
 
-        pool = entry.Pool;
-        Logger.Information(
-            "ForceTransfer consumed (Request={RequestId}, Party={PartyId}, Pending={PendingCount})",
-            requestId,
-            partyId,
-            pendingForceTransfers.Count);
-        return true;
+        // A commit that lands inside the expiry grace window consumes the
+        // expired entry one-shot, exactly like a pending one.
+        if (expiredForceTransfers.TryRemove(requestId, out var expired))
+        {
+            if (expired.Pool.PartyId != partyId)
+            {
+                expiredForceTransfers[requestId] = expired;
+                return false;
+            }
+
+            pool = expired.Pool;
+            Logger.Information(
+                "ForceTransfer consumed from expiry grace (Request={RequestId}, Party={PartyId})",
+                requestId,
+                partyId);
+            return true;
+        }
+
+        return false;
     }
 
     public bool TryPeekForceTransfer(string requestId, string partyId, out ForceTransferPoolData pool)
@@ -598,13 +628,25 @@ internal class VillageHostileActionInterface : IVillageHostileActionInterface, I
             return false;
 
         PruneExpiredForceTransfers(DateTime.UtcNow);
-        if (!pendingForceTransfers.TryGetValue(requestId, out var entry))
-            return false;
-        if (entry.Pool.PartyId != partyId)
-            return false;
+        if (pendingForceTransfers.TryGetValue(requestId, out var entry))
+        {
+            if (entry.Pool.PartyId != partyId)
+                return false;
 
-        pool = entry.Pool;
-        return true;
+            pool = entry.Pool;
+            return true;
+        }
+
+        if (expiredForceTransfers.TryGetValue(requestId, out var expired))
+        {
+            if (expired.Pool.PartyId != partyId)
+                return false;
+
+            pool = expired.Pool;
+            return true;
+        }
+
+        return false;
     }
 
     public bool HasPendingForceTransferForParty(string partyId)
@@ -614,6 +656,12 @@ internal class VillageHostileActionInterface : IVillageHostileActionInterface, I
 
         PruneExpiredForceTransfers(DateTime.UtcNow);
         foreach (var pair in pendingForceTransfers)
+        {
+            if (pair.Value.Pool.PartyId == partyId)
+                return true;
+        }
+
+        foreach (var pair in expiredForceTransfers)
         {
             if (pair.Value.Pool.PartyId == partyId)
                 return true;
@@ -677,13 +725,34 @@ internal class VillageHostileActionInterface : IVillageHostileActionInterface, I
             if (now - pair.Value.AuthorizedAtUtc <= ForceTransferPoolTimeout)
                 continue;
 
-            if (pendingForceTransfers.TryRemove(pair.Key, out _))
+            // Retire into the grace window instead of deleting: a deferred or
+            // still-open screen can still commit against it one-shot. Grace is
+            // measured from the actual expiry moment so a late prune cannot
+            // extend it.
+            if (pendingForceTransfers.TryRemove(pair.Key, out var entry))
+            {
+                expiredForceTransfers[pair.Key] = new ExpiredForceTransfer(
+                    entry.Pool,
+                    entry.AuthorizedAtUtc + ForceTransferPoolTimeout);
+                Logger.Information(
+                    "ForceTransfer pending entry expired into grace (Request={RequestId}, Party={PartyId}, Pending={PendingCount})",
+                    pair.Key,
+                    entry.Pool.PartyId,
+                    pendingForceTransfers.Count);
+            }
+        }
+
+        foreach (var pair in expiredForceTransfers)
+        {
+            if (now - pair.Value.ExpiredAtUtc <= ForceTransferExpiredRetention)
+                continue;
+
+            if (expiredForceTransfers.TryRemove(pair.Key, out _))
             {
                 Logger.Information(
-                    "ForceTransfer pending entry expired (Request={RequestId}, Party={PartyId}, Pending={PendingCount})",
+                    "ForceTransfer expired entry dropped (Request={RequestId}, Party={PartyId})",
                     pair.Key,
-                    pair.Value.Pool.PartyId,
-                    pendingForceTransfers.Count);
+                    pair.Value.Pool.PartyId);
             }
         }
     }
@@ -1065,20 +1134,27 @@ internal class VillageHostileActionInterface : IVillageHostileActionInterface, I
         return true;
     }
 
-    // Joint bound: take (BoughtItems inflow) plus leftover (left remainder) must
-    // fit inside the pool per (item, modifier) key, so a duplicated take cannot
-    // pass the two independent checks. Sold items (player gifts into the dummy)
-    // are not credited: they inflate the remainder and can only make this
-    // stricter, never looser. This stays honest-client/resend protection, not
-    // anti-cheat: the applied To-roster/equipment snapshots have no server-side
-    // baseline to diff against, so fabricated snapshots beyond the histories
-    // rely on the trusted-client model.
+    // Joint bound: take (BoughtItems inflow) plus leftover (left remainder)
+    // minus player discards (SoldItems outflow into the dummy) must fit inside
+    // the pool per (item, modifier) key, so a duplicated take cannot pass the
+    // two independent checks. Sold items are credited because the loot screen
+    // lets the player discard owned items into the dummy: without the credit,
+    // a legitimate take-plus-discard fails. The take itself is still bounded
+    // by the pool on its own, so fabricated sold entries cannot mask an
+    // over-take. This stays honest-client/resend protection, not anti-cheat:
+    // the applied To-roster/equipment snapshots have no server-side baseline
+    // to diff against, so fabricated snapshots beyond the histories rely on
+    // the trusted-client model.
     internal static bool TryValidateSuppliesTakeAndRemainder(
         ItemRosterElementData[] poolItems,
         IEnumerable<(ItemRosterElementData item, int price)> boughtItems,
+        IEnumerable<(ItemRosterElementData item, int price)> soldItems,
         IEnumerable<(string itemId, string modifierId, int amount)> leftRemainder,
         out string error)
     {
+        if (!TryValidateSuppliesTake(poolItems, boughtItems, out error))
+            return false;
+
         error = null;
         var pool = new Dictionary<string, int>(StringComparer.Ordinal);
         foreach (var poolItem in poolItems ?? Array.Empty<ItemRosterElementData>())
@@ -1115,6 +1191,18 @@ internal class VillageHostileActionInterface : IVillageHostileActionInterface, I
                 var key = GetSuppliesPoolKey(itemId, modifierId);
                 held.TryGetValue(key, out var count);
                 held[key] = count + amount;
+            }
+        }
+
+        if (soldItems != null)
+        {
+            foreach (var (item, _) in soldItems)
+            {
+                if (item.Amount <= 0)
+                    continue;
+                var key = GetSuppliesPoolKey(item);
+                held.TryGetValue(key, out var count);
+                held[key] = count - item.Amount;
             }
         }
 
@@ -1157,15 +1245,29 @@ internal class VillageHostileActionInterface : IVillageHostileActionInterface, I
             return false;
 
         // Left final must stay within the pool: final = pool + delta per troop.
+        // Non-pool troops moved onto the dummy left are player dismissals made
+        // to free party room; the dummy is dropped on apply so they grant
+        // nothing, and the matching right-side loss is already applied. Only
+        // taking troops off the empty dummy (negative final) is rejected.
         if (leftMemberDelta.Data != null)
         {
             foreach (var element in leftMemberDelta.Data)
             {
-                var initial = element.CharacterId == troopId ? troopCount : 0;
-                var final = initial + element.Number;
-                if (final < 0 || final > Math.Max(initial, 0))
+                if (element.CharacterId != troopId)
                 {
-                    error = $"left remainder of {final} x {element.CharacterId} is outside the authorized pool of {initial}";
+                    if (element.Number < 0)
+                    {
+                        error = $"left remainder of {element.Number} x {element.CharacterId} takes troops outside the authorized pool";
+                        return false;
+                    }
+
+                    continue;
+                }
+
+                var final = troopCount + element.Number;
+                if (final < 0 || final > Math.Max(troopCount, 0))
+                {
+                    error = $"left remainder of {final} x {element.CharacterId} is outside the authorized pool of {troopCount}";
                     return false;
                 }
             }
@@ -1189,6 +1291,9 @@ internal class VillageHostileActionInterface : IVillageHostileActionInterface, I
             return false;
         }
 
+        // The loot screen offers no legitimate gold, influence, or morale source:
+        // troop upgrades are blocked up front while a force screen is open (see
+        // the ValidateCommand patch), so any such delta is rejected here.
         if (goldChange != 0 || influenceChange != 0 || moraleChange != 0)
         {
             error = "gold/influence/morale change is not zero";
@@ -1253,6 +1358,18 @@ internal class VillageHostileActionInterface : IVillageHostileActionInterface, I
 
         public ForceTransferPoolData Pool { get; }
         public DateTime AuthorizedAtUtc { get; }
+    }
+
+    private sealed class ExpiredForceTransfer
+    {
+        public ExpiredForceTransfer(ForceTransferPoolData pool, DateTime expiredAtUtc)
+        {
+            Pool = pool;
+            ExpiredAtUtc = expiredAtUtc;
+        }
+
+        public ForceTransferPoolData Pool { get; }
+        public DateTime ExpiredAtUtc { get; }
     }
 
     private static Settlement GetHostileActionSettlement(MapEvent mapEvent)

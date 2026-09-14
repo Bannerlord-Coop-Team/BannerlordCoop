@@ -59,4 +59,31 @@ public class ForceTransferScreenTrackerTests
 
         Assert.False(ForceTransferScreenTracker.TryClaimForceTransferId(new object(), out _));
     }
+
+    [Fact]
+    public void HasOpen_WhileScreenOpen_ReturnsTrueWithoutConsuming()
+    {
+        var roster = new object();
+        try
+        {
+            ForceTransferScreenTracker.NoteLootScreenOpened("req-1", roster);
+
+            Assert.True(ForceTransferScreenTracker.HasOpenForceTransferScreen());
+            // Non-consuming: the Done claim still works afterwards.
+            Assert.True(ForceTransferScreenTracker.TryClaimForceTransferId(roster, out var claimed));
+            Assert.Equal("req-1", claimed);
+        }
+        finally
+        {
+            ForceTransferScreenTracker.Clear();
+        }
+    }
+
+    [Fact]
+    public void HasOpen_Empty_ReturnsFalse()
+    {
+        ForceTransferScreenTracker.Clear();
+
+        Assert.False(ForceTransferScreenTracker.HasOpenForceTransferScreen());
+    }
 }
