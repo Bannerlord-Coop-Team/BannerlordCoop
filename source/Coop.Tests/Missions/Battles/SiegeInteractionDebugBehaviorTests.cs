@@ -82,6 +82,69 @@ public class SiegeInteractionDebugBehaviorTests
         Assert.Equal(14, result["dropped"].Value<int>());
     }
 
+    [Fact]
+    [System.Runtime.CompilerServices.MethodImpl(System.Runtime.CompilerServices.MethodImplOptions.NoInlining)]
+    public void UseDispatchObservation_OffThreadStopRetainsArgumentsAndCallerWithoutNativeReads()
+    {
+        using var mission = new MissionCurrentScope();
+        var behavior = new SiegeInteractionDebugBehavior(Mock.Of<IMessageBroker>());
+#pragma warning disable SYSLIB0050
+        var agent = (Agent)FormatterServices.GetUninitializedObject(typeof(Agent));
+        var otherAgent = (Agent)FormatterServices.GetUninitializedObject(typeof(Agent));
+        var point = (StandingPoint)FormatterServices.GetUninitializedObject(typeof(StandingPoint));
+#pragma warning restore SYSLIB0050
+        AccessTools.Property(typeof(MissionBehavior), "Mission").SetValue(behavior, mission.Instance);
+        AccessTools.Field(typeof(Mission), "_mainAgent").SetValue(mission.Instance, agent);
+        AccessTools.Field(typeof(SiegeInteractionDebugBehavior), "capturedAgent").SetValue(behavior, agent);
+        AccessTools.Field(typeof(SiegeInteractionDebugBehavior), "useDispatchPoint").SetValue(behavior, point);
+        AccessTools.Field(typeof(SiegeInteractionDebugBehavior), "useDispatchThreadId").SetValue(behavior, -1);
+        AccessTools.Field(typeof(SiegeInteractionDebugBehavior), "requestId").SetValue(behavior, "ballista-use");
+        AccessTools.Field(typeof(SiegeInteractionDebugBehavior), "useDispatchRequestId").SetValue(behavior, "ballista-use");
+        var flags = Agent.StopUsingGameObjectFlags.DoNotWieldWeaponAfterStoppingUsingGameObject;
+        var arguments = new object[] { false, flags };
+        string method = "StopUsingGameObjectAux";
+        Assert.Equal(0, behavior.ObserveUseDispatch(otherAgent, method, arguments));
+        Assert.Equal(0, behavior.ObserveUseDispatch(agent, method, arguments, expectedRequestId: "stale"));
+        var before = DateTime.UtcNow;
+
+        int call = behavior.ObserveUseDispatch(agent, method, arguments);
+        var failure = new InvalidOperationException("original stop failure");
+        behavior.ObserveUseDispatch(agent, method, arguments, call, failure, "ballista-use");
+
+        var samples = JObject.FromObject(behavior.ReadUseDispatch())["samples"].ToArray();
+        Assert.Equal(2, samples.Length);
+        Assert.Equal(call, samples[1]["call"].Value<int>());
+        Assert.Equal("non_game_thread", samples[0]["observationError"].Value<string>());
+        Assert.False(samples[0]["stop"]["isSuccessful"].Value<bool>());
+        Assert.Equal((int)flags, samples[0]["stop"]["flags"].Value<int>());
+        var callers = samples[0]["stop"]["callers"].Values<string>().ToArray();
+        Assert.InRange(callers.Length, 1, 8);
+        Assert.All(callers, caller => Assert.InRange(caller.Length, 1, 256));
+        Assert.Contains(callers, caller => caller.Contains(nameof(UseDispatchObservation_OffThreadStopRetainsArgumentsAndCallerWithoutNativeReads)));
+        Assert.InRange(samples[0]["recordedUtc"].Value<DateTime>(), before, DateTime.UtcNow);
+        Assert.Equal(typeof(InvalidOperationException).FullName, samples[1]["exception"].Value<string>());
+        Assert.Equal(JTokenType.Null, samples[1]["stop"].Type);
+        Assert.Null(samples[0]["usingObject"]);
+        Assert.Equal(new object[] { false, flags }, arguments);
+
+        int laterCall = behavior.ObserveUseDispatch(agent, method, new object[] { true, flags });
+        var later = JObject.FromObject(behavior.ReadUseDispatch())["samples"].Last;
+        Assert.Equal(laterCall, later["call"].Value<int>());
+        Assert.True(later["stop"]["isSuccessful"].Value<bool>());
+        Assert.Equal((int)flags, later["stop"]["flags"].Value<int>());
+        Assert.Equal(JTokenType.Null, later["stop"]["callers"].Type);
+
+        AccessTools.Field(typeof(SiegeInteractionDebugBehavior), "requestId").SetValue(behavior, "next-ballista-use");
+        AccessTools.Field(typeof(SiegeInteractionDebugBehavior), "useDispatchRequestId").SetValue(behavior, "next-ballista-use");
+        Assert.Equal(0, behavior.ObserveUseDispatch(agent, method, arguments, expectedRequestId: "ballista-use"));
+        behavior.ObserveUseDispatch(agent, method, arguments);
+        var next = JObject.FromObject(behavior.ReadUseDispatch())["samples"].Last;
+        Assert.Equal("next-ballista-use", next["requestId"].Value<string>());
+        Assert.NotEmpty(next["stop"]["callers"]);
+        Assert.False((bool)AccessTools.Field(typeof(SiegeInteractionDebugBehavior), "edgeObserved").GetValue(behavior));
+        Assert.False((bool)AccessTools.Field(typeof(SiegeInteractionDebugBehavior), "edgeCleared").GetValue(behavior));
+    }
+
     [Theory]
     [InlineData("missing")]
     [InlineData("wrong-id")]
@@ -412,7 +475,9 @@ public class SiegeInteractionDebugBehaviorTests
             pressed = true, down = true, released = false, focusedObject = new { type = "StandingPoint", id = 882 },
             interactableObject = new { type = "StandingPoint", id = 882 },
             argumentObject = new { type = "StandingPoint", id = 882 }, usingObject = true,
-            usedObject = new { type = "StandingPoint", id = 882 }, exception = "System.InvalidOperationException"
+            usedObject = new { type = "StandingPoint", id = 882 }, exception = "System.InvalidOperationException",
+            stop = new { isSuccessful = false, flags = int.MaxValue,
+                callers = index == 0 ? Enumerable.Repeat(new string('c', 256), 8).ToArray() : null }
         });
         var samples = AccessTools.Field(typeof(SiegeInteractionDebugBehavior), "inputSamples").GetValue(behavior);
         var point = new { x = 498.52f, y = 720.788f, z = 35.835f };
@@ -508,7 +573,13 @@ public class SiegeInteractionDebugBehaviorTests
         Assert.Equal(output, result.GetProperty("output").GetString());
         Assert.Equal(document.RootElement.GetRawText(), result.GetProperty("structuredResult").GetRawText());
         Assert.Equal(300, result.GetProperty("structuredResult").GetProperty("inputSamples").GetArrayLength());
-        Assert.Equal(16, result.GetProperty("structuredResult").GetProperty("useDispatch").GetProperty("samples").GetArrayLength());
+        var dispatchSamples = result.GetProperty("structuredResult").GetProperty("useDispatch").GetProperty("samples");
+        Assert.Equal(16, dispatchSamples.GetArrayLength());
+        Assert.Single(dispatchSamples.EnumerateArray().Where(sample =>
+            sample.GetProperty("stop").GetProperty("callers").ValueKind != System.Text.Json.JsonValueKind.Null));
+        Assert.Equal(8, dispatchSamples[0].GetProperty("stop").GetProperty("callers").GetArrayLength());
+        Assert.All(dispatchSamples.EnumerateArray(), sample =>
+            Assert.Equal(int.MaxValue, sample.GetProperty("stop").GetProperty("flags").GetInt32()));
         Assert.Equal(64, result.GetProperty("structuredResult").GetProperty("machines")[0]
             .GetProperty("standingPoints").GetArrayLength());
         var anonymousHit = result.GetProperty("structuredResult").GetProperty("focusDiagnostic")

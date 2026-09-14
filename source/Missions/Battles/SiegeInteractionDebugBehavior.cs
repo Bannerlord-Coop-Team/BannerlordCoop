@@ -37,6 +37,7 @@ internal sealed class SiegeInteractionDebugBehavior : MissionBehavior, ISiegeInt
     private readonly List<object> useDispatchSamples = new List<object>();
     private StandingPoint useDispatchPoint;
     private string useDispatchRequestId;
+    private string useDispatchCallerRequestId;
     private int useDispatchMachineId;
     private int useDispatchCalls;
     private int useDispatchPressedCalls;
@@ -151,9 +152,10 @@ internal sealed class SiegeInteractionDebugBehavior : MissionBehavior, ISiegeInt
     internal int ObserveUseDispatch(object instance, string method, object[] args, int call = 0,
         Exception failure = null, string expectedRequestId = null)
     {
+        string observationRequestId = useDispatchRequestId;
         if (removed || Mission == null || useDispatchPoint == null || capturedAgent == null ||
-            useDispatchRequestId != requestId ||
-            (expectedRequestId != null && expectedRequestId != useDispatchRequestId) ||
+            observationRequestId != requestId ||
+            (expectedRequestId != null && expectedRequestId != observationRequestId) ||
             !ReferenceEquals(Mission, TaleWorlds.MountAndBlade.Mission.Current) ||
             !ReferenceEquals(capturedAgent, Mission.MainAgent) ||
             (instance is Agent actor ? !ReferenceEquals(actor, capturedAgent) : !ReferenceEquals(instance, interaction))) return 0;
@@ -161,13 +163,38 @@ internal sealed class SiegeInteractionDebugBehavior : MissionBehavior, ISiegeInt
         int threadId = System.Threading.Thread.CurrentThread.ManagedThreadId;
         try
         {
-            if (threadId != useDispatchThreadId)
+            object stop = null;
+            lock (useDispatchSamples)
             {
-                if (entry) call = System.Threading.Interlocked.Increment(ref useDispatchSequence);
-                AppendUseDispatch(new { requestId = useDispatchRequestId, call, method,
-                    phase = entry ? "entry" : "exit", tick, recordedUtc = DateTime.UtcNow.ToString("O"),
-                    threadId, observationError = "non_game_thread", exception = failure?.GetType().FullName });
-                return call;
+                if (observationRequestId != useDispatchRequestId || observationRequestId != requestId) return 0;
+                if (entry && method == nameof(Agent.StopUsingGameObjectAux))
+                {
+                    string[] callers = null;
+                    if (threadId != useDispatchThreadId && useDispatchCallerRequestId != observationRequestId)
+                    {
+                        useDispatchCallerRequestId = observationRequestId;
+                        callers = new System.Diagnostics.StackTrace(1, false).GetFrames()?.Take(8).Select(frame =>
+                        {
+                            var caller = frame.GetMethod();
+                            string name = $"{caller?.DeclaringType?.FullName}.{caller?.Name}";
+                            return name.Length <= 256 ? name : name.Substring(0, 256);
+                        }).ToArray();
+                    }
+                    stop = new
+                    {
+                        isSuccessful = args != null && args.Length == 2 && args[0] is bool successful ? (bool?)successful : null,
+                        flags = args != null && args.Length == 2 && args[1] is Agent.StopUsingGameObjectFlags flags ? (int?)flags : null,
+                        callers
+                    };
+                }
+                if (threadId != useDispatchThreadId)
+                {
+                    if (entry) call = System.Threading.Interlocked.Increment(ref useDispatchSequence);
+                    AppendUseDispatch(new { requestId = observationRequestId, call, method,
+                        phase = entry ? "entry" : "exit", tick, recordedUtc = DateTime.UtcNow.ToString("O"),
+                        threadId, stop, observationError = "non_game_thread", exception = failure?.GetType().FullName });
+                    return call;
+                }
             }
             var input = capturedScreen?.SceneLayer?.Input;
             bool pressed = input?.IsGameKeyPressed(UseGameKeyId) == true;
@@ -208,7 +235,7 @@ internal sealed class SiegeInteractionDebugBehavior : MissionBehavior, ISiegeInt
                 interactableObject = Describe(interaction?._currentInteractableObject),
                 argumentObject = Describe(args?.OfType<UsableMissionObject>().FirstOrDefault()),
                 usingObject = capturedAgent.IsUsingGameObject, usedObject = Describe(capturedAgent.CurrentlyUsedGameObject),
-                exception = failure?.GetType().FullName
+                stop, exception = failure?.GetType().FullName
             });
         }
         catch (Exception exception)
