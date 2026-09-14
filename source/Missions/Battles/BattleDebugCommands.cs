@@ -526,6 +526,11 @@ internal static class BattleDebugCommands
                     return Succeeded("ACTION_PERFORMANCE " +
                            MissionActionDiagnostics.SnapshotPerformance(
                                stop: true));
+                case "agents":
+                    var controller = Mission.Current?.GetMissionBehavior<CoopBattleController>();
+                    if (controller == null) return Failed("No active coop battle mission");
+                    return Succeeded("ACTION_AGENTS " + JsonConvert.SerializeObject(
+                        controller.AgentActionHandler.SnapshotLocalActions()));
                 case "status":
                     return Succeeded("Action performance instrumentation is " +
                            (MissionActionDiagnostics.PerformanceEnabled

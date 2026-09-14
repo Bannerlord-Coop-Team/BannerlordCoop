@@ -523,6 +523,52 @@ public class ActionEquipmentSyncTests : MissionTestEnvironment
 
 #if DEBUG
     [Fact]
+    public void LocalActionSnapshot_DoesNotAdvanceObservationOrPublishEquipment()
+    {
+        RunScenario(context =>
+        {
+            context.Spawn("peer", out var mirror, out Guid id);
+            mirror.Equipment[EquipmentIndex.Weapon0] = Weapon("sword");
+            mirror.PrimaryWieldedItemIndex = EquipmentIndex.Weapon0;
+            mirror.IsAiPaused = true;
+            var handler = context.Component.AgentActionHandler;
+            var before = Newtonsoft.Json.Linq.JObject.FromObject(handler.SnapshotLocalActions());
+            var entry = Assert.Single(before["agents"]);
+            Assert.Equal(id, (Guid)entry["agentId"]);
+            Assert.Equal("Paused", (string)entry["aiState"]);
+            Assert.False((bool)entry["observed"]);
+            Assert.Equal(0, (long)entry["equipmentRevision"]);
+            Assert.Empty(context.Network.NetworkSentPackets.GetPackets<AgentActionPacket>());
+            handler.PollActionsAfterNativeTick();
+            Assert.Single(context.Network.NetworkSentPackets.GetPackets<AgentActionPacket>());
+            var after = Newtonsoft.Json.Linq.JObject.FromObject(handler.SnapshotLocalActions());
+            entry = Assert.Single(after["agents"]);
+            Assert.True((bool)entry["observed"]);
+            Assert.Equal(1, (long)entry["equipmentRevision"]);
+            handler.SnapshotLocalActions();
+            handler.PollActionsAfterNativeTick();
+            Assert.Single(context.Network.NetworkSentPackets.GetPackets<AgentActionPacket>());
+        });
+    }
+
+    [Fact]
+    public void LocalActionSnapshot_BoundsOwnedSampleAndExcludesRemoteAgents()
+    {
+        RunScenario(context =>
+        {
+            context.Spawn("remote", out _, out _);
+            for (int i = 0; i < 17; i++) context.Spawn("peer", out _, out _);
+            var value = Newtonsoft.Json.Linq.JObject.FromObject(
+                context.Component.AgentActionHandler.SnapshotLocalActions());
+            Assert.Equal(17, (int)value["eligibleAgents"]);
+            Assert.Equal(16, value["agents"].Count());
+            Assert.True((bool)value["truncated"]);
+            Assert.All(value["agents"], entry => Assert.Equal("peer", (string)entry["originalOwner"]));
+            Assert.Empty(context.Network.NetworkSentPackets.GetPackets<AgentActionPacket>());
+        });
+    }
+
+    [Fact]
     public void EquipmentDelay_ObservesBaselineBeforeRegistrationWithoutChangingApply()
     {
         RunScenario(context =>
