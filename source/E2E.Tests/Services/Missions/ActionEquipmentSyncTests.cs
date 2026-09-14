@@ -328,9 +328,9 @@ public class ActionEquipmentSyncTests : MissionTestEnvironment
             context.Receive(RevisionPacket(owner, id, 1, 1, true));
             Assert.True(context.Registry.TryTransferAuthority("next-owner", id));
             ownerMirror.Action0Index = 1002;
-            context.Receive(RevisionPacket(owner, id, 2, 1, false, "next-owner"));
+            context.Receive(RevisionPacket(owner, id, 2, 1, false, "next-owner", authorityRevision: 1));
             Assert.Equal(1001, puppet.Action0Index);
-            context.Receive(RevisionPacket(owner, id, 3, 1, true, "next-owner"));
+            context.Receive(RevisionPacket(owner, id, 3, 1, true, "next-owner", authorityRevision: 1));
             Assert.Equal(1002, puppet.Action0Index);
         });
     }
