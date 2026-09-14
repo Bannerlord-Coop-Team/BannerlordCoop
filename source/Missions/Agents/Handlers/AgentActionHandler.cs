@@ -20,10 +20,6 @@ namespace Missions.Agents.Handlers;
 
 public interface IAgentActionHandler : IPacketHandler, IDisposable
 {
-#if DEBUG
-    IRemoteAgentActionProcessor EquipmentDelayProcessor { get; }
-    object SnapshotLocalActions();
-#endif
     /// <summary>
     /// [Game thread] Detect discrete action and defend-input changes on the locally authoritative main player.
     /// </summary>
@@ -76,55 +72,6 @@ public class AgentActionHandler : IAgentActionHandler
     private readonly INetworkAgentRegistry agentRegistry;
     private readonly IControllerIdProvider controllerIdProvider;
     private readonly IRemoteAgentActionProcessor remoteActionProcessor;
-#if DEBUG
-    public IRemoteAgentActionProcessor EquipmentDelayProcessor => remoteActionProcessor;
-
-    public object SnapshotLocalActions()
-    {
-        var agents = new List<object>();
-        int eligible = 0;
-        string controllerId = controllerIdProvider.ControllerId;
-        foreach (CoopAgentInfo info in agentRegistry.GetAgents(controllerId))
-        {
-            Agent agent = info.Agent;
-            if (info.OriginalOwner != controllerId || agent == null
-                || agent.Mission != Mission.Current || !agent.IsActive()
-                || agent.Health <= 0 || !agent.IsHuman || agent.IsMount) continue;
-            eligible++;
-            if (agents.Count >= 16) continue;
-            _localAgentStates.TryGetValue(info.AgentId, out var state);
-            agents.Add(new
-            {
-                agentId = info.AgentId,
-                originalOwner = info.OriginalOwner,
-                authorityRevision = info.AuthorityRevision,
-                controller = agent.Controller.ToString(),
-                aiState = agent.AIStateFlags.ToString(),
-                action0 = agent.GetCurrentAction(0).Index,
-                action1 = agent.GetCurrentAction(1).Index,
-                action0Type = agent.GetCurrentActionType(0).ToString(),
-                action1Type = agent.GetCurrentActionType(1).ToString(),
-                equipment = AgentEquipmentData.TryCapture(agent, out var equipment)
-                    ? (AgentEquipmentData?)equipment : null,
-                observed = state.HasObservation,
-                observedAction0 = state.Action0,
-                observedAction1 = state.Action1,
-                observedEquipment = state.Equipment,
-                equipmentRevision = state.EquipmentRevision,
-                broadcastEquipmentRevision = state.BroadcastEquipmentRevision
-            });
-        }
-        return new
-        {
-            controllerId,
-            allowAiTicking = Mission.Current?.AllowAiTicking,
-            eligibleAgents = eligible,
-            truncated = eligible > agents.Count,
-            agents
-        };
-    }
-
-#endif
     private readonly IGuardReactionHandler guardReactionHandler;
 
     // Outbound observation and sequence share one record because both belong to the local agent's action stream.

@@ -10,7 +10,6 @@ using Missions.Agents.Packets;
 using Newtonsoft.Json;
 #if DEBUG
 using Missions.Diagnostics;
-using Missions.Agents.Handlers;
 #endif
 using System;
 using System.Collections.Generic;
@@ -527,11 +526,6 @@ internal static class BattleDebugCommands
                     return Succeeded("ACTION_PERFORMANCE " +
                            MissionActionDiagnostics.SnapshotPerformance(
                                stop: true));
-                case "agents":
-                    var controller = Mission.Current?.GetMissionBehavior<CoopBattleController>();
-                    if (controller == null) return Failed("No active coop battle mission");
-                    return Succeeded("ACTION_AGENTS " + JsonConvert.SerializeObject(
-                        controller.AgentActionHandler.SnapshotLocalActions()));
                 case "status":
                     return Succeeded("Action performance instrumentation is " +
                            (MissionActionDiagnostics.PerformanceEnabled
@@ -540,40 +534,6 @@ internal static class BattleDebugCommands
                 default:
                     return Failed("Invalid command argument value.");
             }
-        }
-    }
-
-    public sealed class EquipmentDelayCoopCommand : ICoopCommand
-    {
-        public string Prefix => "coop.debug.battle";
-        public string Name => "equipment_delay";
-        public string Description => "Observes a bounded delay of one AI agent's received equipment baseline.";
-        public CoopCommandSide Side => CoopCommandSide.Both;
-        public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
-        {
-            new ExpectedArgs("operation", "prepare, arm, snapshot or release", true),
-            new ExpectedArgs("controller_id", "Original AI owner to observe", false),
-        };
-
-        public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
-        {
-            var controller = Mission.Current?.GetMissionBehavior<CoopBattleController>();
-            if (controller == null && Mission.Current == null)
-            {
-                if (args[0] == "prepare" && args.Count == 2)
-                {
-                    RemoteAgentActionProcessor.PrepareEquipmentDelay(args[1]);
-                    return Succeeded("EQUIPMENT_DELAY_PREPARED controller=" + args[1]);
-                }
-                if (args[0] == "release")
-                {
-                    RemoteAgentActionProcessor.CancelPreparedEquipmentDelay();
-                    return Succeeded("EQUIPMENT_DELAY_PREPARATION_CLEARED");
-                }
-            }
-            if (controller == null) return Failed("No active coop battle processor");
-            return Succeeded("EQUIPMENT_DELAY " + controller.AgentActionHandler.EquipmentDelayProcessor.EquipmentDelayObservation(
-                args[0].ToLowerInvariant(), args.Count > 1 ? args[1] : null));
         }
     }
 

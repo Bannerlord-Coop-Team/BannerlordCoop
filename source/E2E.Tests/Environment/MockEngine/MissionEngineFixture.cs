@@ -147,9 +147,6 @@ public sealed class MissionEngineFixture : IDisposable
         Prefix(typeof(Agent), "get_Formation", nameof(Agent_get_Formation));
         Prefix(typeof(Agent), "set_Formation", nameof(Agent_set_Formation));
         Prefix(typeof(Agent), nameof(Agent.SetIsAIPaused), nameof(Agent_SetIsAIPaused));
-#if DEBUG
-        Prefix(typeof(Agent), "get_AIStateFlags", nameof(Agent_get_AIStateFlags));
-#endif
         Prefix(typeof(Agent), nameof(Agent.SetAlarmState), nameof(Agent_SetAlarmState));
         Prefix(typeof(Agent), nameof(Agent.ResetEnemyCaches), nameof(Agent_ResetEnemyCaches));
         Prefix(typeof(Agent), nameof(Agent.FadeIn), nameof(Agent_FadeIn));
@@ -787,15 +784,6 @@ public sealed class MissionEngineFixture : IDisposable
         mirror.IsAiPaused = isPaused;
         return false;
     }
-
-#if DEBUG
-    private static bool Agent_get_AIStateFlags(Agent __instance, ref Agent.AIStateFlag __result)
-    {
-        if (!AgentMirror.TryGet(__instance, out var mirror)) return true;
-        __result = mirror.IsAiPaused ? Agent.AIStateFlag.Paused : default;
-        return false;
-    }
-#endif
 
     private static bool Agent_SetAlarmState(Agent __instance, ref bool __result)
     {
