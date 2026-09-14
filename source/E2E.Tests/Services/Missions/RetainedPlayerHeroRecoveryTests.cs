@@ -28,7 +28,6 @@ public class RetainedPlayerHeroRecoveryTests : MissionTestEnvironment
 {
     public RetainedPlayerHeroRecoveryTests(ITestOutputHelper output) : base(output) { }
 
-
     [Theory]
     [InlineData(true, false)]
     [InlineData(false, false)]
@@ -315,5 +314,4 @@ public class RetainedPlayerHeroRecoveryTests : MissionTestEnvironment
         }
         Server.PumpGameThread();
     }
-
 }

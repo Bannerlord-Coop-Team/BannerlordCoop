@@ -248,7 +248,8 @@ public class AgentActionHandler : IAgentActionHandler
                     || equipment.Value.OffHandIndex != (int)EquipmentIndex.None);
         equipmentChanged |= equipment.HasValue && state.EquipmentRevision > 0
             && (state.EquipmentHostEpoch != remoteActionProcessor.GetOutgoingBattleHostEpoch()
-                || state.EquipmentAuthorityRevision != info.AuthorityRevision);
+                || state.EquipmentAuthorityRevision != info.AuthorityRevision
+                || state.BroadcastEquipmentRevision != state.EquipmentRevision);
         bool isPlayerControlled =
             agent.Controller == AgentControllerType.Player;
         bool retainInputBoundary =
@@ -617,7 +618,10 @@ public class AgentActionHandler : IAgentActionHandler
     private AgentActionData PrepareEquipmentSnapshot(
         CoopAgentInfo info, AgentActionData action, bool catchUp)
     {
-        if (!action.Equipment.HasValue) return action;
+        // Host epochs scope host actions; ordinary senders use the retained agent authority revision.
+        long authorityRevision = remoteActionProcessor.GetOutgoingBattleHostEpoch() == 0
+            ? info.AuthorityRevision : 0;
+        if (!action.Equipment.HasValue) return action.WithEquipment(0, null, authorityRevision);
         _localAgentStates.TryGetValue(info.AgentId, out LocalAgentActionState state);
         int epoch = remoteActionProcessor.GetOutgoingBattleHostEpoch();
         if (state.EquipmentRevision == 0
@@ -634,7 +638,8 @@ public class AgentActionHandler : IAgentActionHandler
         // A baseline sent to one joiner has not been published to the existing peers.
         if (!catchUp) state.BroadcastEquipmentRevision = state.EquipmentRevision;
         _localAgentStates[info.AgentId] = state;
-        return action.WithEquipment(state.EquipmentRevision, includeEquipment ? action.Equipment : null);
+        return action.WithEquipment(state.EquipmentRevision, includeEquipment ? action.Equipment : null,
+            authorityRevision);
     }
 
     private void SendActionPackets(

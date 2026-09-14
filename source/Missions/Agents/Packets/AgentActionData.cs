@@ -756,10 +756,15 @@ namespace Missions.Agents.Packets
         [ProtoMember(16)]
         public long EquipmentRevision { get; private set; }
 
-        internal AgentActionData WithEquipment(long revision, AgentEquipmentData? equipment)
+        [ProtoMember(17)]
+        public long AuthorityRevision { get; private set; }
+
+        internal AgentActionData WithEquipment(long revision, AgentEquipmentData? equipment,
+            long? authorityRevision = null)
         {
             var snapshot = (AgentActionData)MemberwiseClone();
             snapshot.EquipmentRevision = revision;
+            if (authorityRevision.HasValue) snapshot.AuthorityRevision = authorityRevision.Value;
             snapshot.Equipment = equipment;
             return snapshot;
         }

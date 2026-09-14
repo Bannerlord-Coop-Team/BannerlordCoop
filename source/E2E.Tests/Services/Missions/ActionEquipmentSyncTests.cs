@@ -25,7 +25,7 @@ namespace E2E.Tests.Services.Missions;
 
 public class ActionEquipmentSyncTests : MissionTestEnvironment
 {
-    public ActionEquipmentSyncTests(ITestOutputHelper output) : base(output) { }
+    public ActionEquipmentSyncTests(ITestOutputHelper output) : base(output, 3) { }
 
     [Fact]
     public void PreviouslyPatchedEquipmentApply_UsesCurrentMissionWieldBoundary()
@@ -426,11 +426,11 @@ public class ActionEquipmentSyncTests : MissionTestEnvironment
     }
 
     private static AgentActionPacket RevisionPacket(Agent owner, Guid id, long sequence,
-        long revision, bool includeEquipment, string controller = "owner", int epoch = 0)
+        long revision, bool includeEquipment, string controller = "owner", int epoch = 0, long authorityRevision = 0)
     {
         var data = new AgentActionData(owner);
         return new AgentActionPacket(controller, new[] { id },
-            new[] { data.WithEquipment(revision, includeEquipment ? data.Equipment : null) },
+            new[] { data.WithEquipment(revision, includeEquipment ? data.Equipment : null, authorityRevision) },
             new[] { sequence }, epoch);
     }
 
@@ -495,9 +495,9 @@ public class ActionEquipmentSyncTests : MissionTestEnvironment
                     Assert.True(context.Registry.TryTransferAuthority("A", id));
                 }
                 ownerMirror.Action0Index = 1002;
-                ReceiveWithoutSweep(RevisionPacket(owner, id, 2, 2, true, "A", 0));
+                ReceiveWithoutSweep(RevisionPacket(owner, id, 2, 2, true, "A", 0, regainAuthority ? 2 : 0));
                 ownerMirror.Action0Index = 1003;
-                ReceiveWithoutSweep(RevisionPacket(owner, id, 3, 2, !latestIsReference, "A", 0));
+                ReceiveWithoutSweep(RevisionPacket(owner, id, 3, 2, !latestIsReference, "A", 0, regainAuthority ? 2 : 0));
                 if (delayRegistration)
                     Assert.True(context.Registry.TryRegisterAgent("A", id, puppetAgent));
                 if (delayAssignment) AssignHost("B", 2);
@@ -518,6 +518,159 @@ public class ActionEquipmentSyncTests : MissionTestEnvironment
             {
                 BattleSpawnGate.EndBattle();
             }
+        });
+    }
+
+    [Theory]
+    [InlineData(false, false)]
+    [InlineData(true, false)]
+    [InlineData(false, true)]
+    [InlineData(true, true)]
+    public void ReturningSender_FreshRevisionAppliesOnIndependentObserver(bool highOldRevision, bool delayGrant)
+    {
+        using var fixture = new MissionEngineFixture();
+        var clients = Clients.ToArray();
+        string[] owners = { "A", "B", "C" };
+        var id = Guid.NewGuid();
+        var mirrors = new MirrorAgent[3];
+        var handlers = new IAgentActionHandler[3];
+        for (int i = 0; i < clients.Length; i++)
+        {
+            int index = i;
+            SetControllerId(clients[i], owners[i]);
+            clients[i].Call(() =>
+            {
+                var mission = fixture.CreateMission(clients[index]);
+                Agent agent = mission.SpawnAgent(new AgentBuildData(Game.Current.PlayerTroop)
+                    .Controller(index == 0 ? AgentControllerType.AI : AgentControllerType.None));
+                Assert.True(AgentMirror.TryGet(agent, out mirrors[index]));
+                Assert.True(clients[index].Resolve<INetworkAgentRegistry>().TryRegisterAgent("A", id, agent));
+                mirrors[index].Equipment[EquipmentIndex.Weapon0] = Weapon("sword");
+                mirrors[index].Equipment[EquipmentIndex.Weapon1] = Weapon("axe");
+                mirrors[index].PrimaryWieldedItemIndex = EquipmentIndex.Weapon0;
+                mirrors[index].Action0Index = 1001;
+                mirrors[index].Action0CodeType = Agent.ActionCodeType.ReleaseMelee;
+                handlers[index] = clients[index].Resolve<ICoopMissionComponent>().AgentActionHandler;
+            });
+        }
+        AgentActionPacket Send(int index, int action, EquipmentIndex slot)
+        {
+            AgentActionPacket packet = null;
+            clients[index].Call(() =>
+            {
+                var network = clients[index].Resolve<MockBattleNetwork>();
+                network.NetworkSentPackets.Packets.Clear();
+                mirrors[index].PrimaryWieldedItemIndex = slot;
+                mirrors[index].Action0Index = action;
+                handlers[index].PollActionsAfterNativeTick();
+                var serializer = new ProtoBufSerializer(new SerializableTypeMapper());
+                packet = Assert.IsType<AgentActionPacket>(serializer.Deserialize<IPacket>(serializer.Serialize(
+                    Assert.Single(network.NetworkSentPackets.GetPackets<AgentActionPacket>()))));
+            });
+            return packet;
+        }
+        void Receive(AgentActionPacket packet)
+        {
+            clients[2].Call(() =>
+            {
+                handlers[2].HandlePacket(null, packet);
+                Drain();
+                handlers[2].ApplyRemoteGuardStates();
+            });
+        }
+        void Transfer(int index, string owner)
+        {
+            clients[index].Call(() => Assert.True(
+                clients[index].Resolve<INetworkAgentRegistry>().TryTransferAuthority(owner, id)));
+        }
+        AgentActionPacket old = Send(0, 1001, EquipmentIndex.Weapon0);
+        Receive(old);
+        if (highOldRevision)
+        {
+            Receive(Send(0, 1002, EquipmentIndex.Weapon1));
+            old = Send(0, 1003, EquipmentIndex.Weapon0);
+            Receive(old);
+        }
+        AgentActionPacket oldReference = Send(0, 1004, EquipmentIndex.Weapon0);
+        Receive(oldReference);
+        Assert.Equal(highOldRevision ? 3 : 1, old.Actions[0].EquipmentRevision);
+        Assert.Null(oldReference.Actions[0].Equipment);
+        for (int i = 0; i < 3; i++) Transfer(i, "B");
+        Receive(Send(1, 1005, EquipmentIndex.Weapon0));
+        Assert.Equal(1005, mirrors[2].Action0Index);
+        Transfer(0, "A");
+        Transfer(1, "A");
+        clients[0].Call(() =>
+        {
+            handlers[0].Dispose();
+            handlers[0] = clients[0].Resolve<IAgentActionHandler>();
+        });
+        if (!delayGrant) Transfer(2, "A");
+        var fresh = Send(0, 1006, EquipmentIndex.Weapon1);
+        Assert.Equal(1, fresh.Actions[0].EquipmentRevision);
+        Assert.Equal(2, fresh.Actions[0].AuthorityRevision);
+        Assert.Equal(1, fresh.Sequences[0]);
+        Receive(fresh);
+        Receive(old);
+        Receive(oldReference);
+        if (delayGrant)
+        {
+            Assert.Equal(1005, mirrors[2].Action0Index);
+            Transfer(2, "A");
+            clients[2].Call(() => handlers[2].ApplyRemoteGuardStates());
+        }
+        Assert.Equal(1006, mirrors[2].Action0Index);
+        Assert.Equal(EquipmentIndex.Weapon1, mirrors[2].PrimaryWieldedItemIndex);
+        int calls = mirrors[2].SetActionChannelCalls;
+        Receive(fresh);
+        Assert.Equal(calls, mirrors[2].SetActionChannelCalls);
+        var reference = Send(0, 1007, EquipmentIndex.Weapon1);
+        Assert.Null(reference.Actions[0].Equipment);
+        Assert.Equal(2, reference.Actions[0].AuthorityRevision);
+        Receive(reference);
+        Assert.Equal(1007, mirrors[2].Action0Index);
+        calls = mirrors[2].SetActionChannelCalls;
+        Receive(old);
+        Receive(oldReference);
+        Receive(reference);
+        Assert.Equal(calls, mirrors[2].SetActionChannelCalls);
+        Assert.Equal(EquipmentIndex.Weapon1, mirrors[2].PrimaryWieldedItemIndex);
+        clients[0].Call(() => handlers[0].Dispose());
+    }
+
+    [Fact]
+    public void CatchUpAfterHostEpochChange_PublishesRefreshToExistingPeersWithHeldGuard()
+    {
+        RunScenario(context =>
+        {
+            const string battleId = "equipment-epoch";
+            BattleSpawnGate.BeginBattle(battleId);
+            try
+            {
+                var hosts = context.Instance.Resolve<IBattleHostRegistry>();
+                hosts.Set(battleId, new BattleHostAssignment("peer", Array.Empty<string>(), 1));
+                context.Spawn("peer", out var mirror, out _);
+                mirror.Equipment[EquipmentIndex.Weapon0] = Weapon("sword");
+                mirror.PrimaryWieldedItemIndex = EquipmentIndex.Weapon0;
+                mirror.MovementFlags = Agent.MovementControlFlag.DefendLeft | Agent.MovementControlFlag.DefendBlock;
+                context.Component.AgentActionHandler.PollActionsAfterNativeTick();
+                context.Network.NetworkSentPackets.Packets.Clear();
+                hosts.Set(battleId, new BattleHostAssignment("peer", Array.Empty<string>(), 2));
+                context.Component.AgentActionHandler.CatchUpJoiner("joiner");
+                Drain();
+                var catchUp = Assert.IsType<AgentActionPacket>(Assert.Single(context.Network.DirectPacketSends).Packet);
+                context.Network.NetworkSentPackets.Packets.Clear();
+                context.Component.AgentActionHandler.PollActionsAfterNativeTick();
+                var refresh = Assert.Single(context.Network.NetworkSentPackets.GetPackets<AgentActionPacket>());
+                Assert.Equal(2, refresh.BattleHostEpoch);
+                Assert.NotNull(refresh.Actions[0].Equipment);
+                Assert.Equal(catchUp.Actions[0].EquipmentRevision, refresh.Actions[0].EquipmentRevision);
+                Assert.Equal(catchUp.Actions[0].DefendFlags, refresh.Actions[0].DefendFlags);
+                Assert.NotEqual(Agent.MovementControlFlag.None, refresh.Actions[0].DefendFlags);
+                context.Component.AgentActionHandler.PollActionsAfterNativeTick();
+                Assert.Single(context.Network.NetworkSentPackets.GetPackets<AgentActionPacket>());
+            }
+            finally { BattleSpawnGate.EndBattle(); }
         });
     }
 

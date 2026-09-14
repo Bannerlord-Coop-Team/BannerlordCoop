@@ -74,12 +74,14 @@ public class RemoteAgentActionProcessor : IRemoteAgentActionProcessor
     {
         public readonly int HostEpoch;
         public readonly long Revision;
+        public readonly long AuthorityRevision;
         public readonly AgentEquipmentData Equipment;
 
-        public EquipmentBaseline(int hostEpoch, long revision, AgentEquipmentData equipment)
+        public EquipmentBaseline(int hostEpoch, long revision, AgentEquipmentData equipment, long authorityRevision)
         {
             HostEpoch = hostEpoch;
             Revision = revision;
+            AuthorityRevision = authorityRevision;
             Equipment = equipment;
         }
     }
@@ -181,15 +183,18 @@ public class RemoteAgentActionProcessor : IRemoteAgentActionProcessor
     private readonly struct MigratedActionAuthority
     {
         public readonly string ObservedAuthority;
+        public readonly long ObservedAuthorityRevision;
         public readonly string ControllerId;
         public readonly int BattleHostEpoch;
 
         public MigratedActionAuthority(
             string observedAuthority,
+            long observedAuthorityRevision,
             string controllerId,
             int battleHostEpoch)
         {
             ObservedAuthority = observedAuthority;
+            ObservedAuthorityRevision = observedAuthorityRevision;
             ControllerId = controllerId;
             BattleHostEpoch = battleHostEpoch;
         }
@@ -211,6 +216,7 @@ public class RemoteAgentActionProcessor : IRemoteAgentActionProcessor
 
     private readonly struct RemoteActionSequence
     {
+        public readonly long AuthorityRevision;
         public readonly string ControllerId;
         public readonly long Sequence;
         public readonly int BattleHostEpoch;
@@ -218,8 +224,10 @@ public class RemoteAgentActionProcessor : IRemoteAgentActionProcessor
         public RemoteActionSequence(
             string controllerId,
             long sequence,
-            int battleHostEpoch)
+            int battleHostEpoch,
+            long authorityRevision)
         {
+            AuthorityRevision = authorityRevision;
             ControllerId = controllerId;
             Sequence = sequence;
             BattleHostEpoch = battleHostEpoch;
@@ -361,7 +369,9 @@ public class RemoteAgentActionProcessor : IRemoteAgentActionProcessor
                     (staleIds ??= new List<Guid>()).Add(agentId);
                     continue;
                 }
-                if (!IsCurrentActionAuthority(
+                if ((guardState.Action.BattleHostEpoch == 0
+                        && guardState.Action.Data.AuthorityRevision != info.AuthorityRevision)
+                    || !IsCurrentActionAuthority(
                     info,
                     guardState.Action.ControllerId,
                     guardState.Action.BattleHostEpoch))
@@ -455,7 +465,7 @@ public class RemoteAgentActionProcessor : IRemoteAgentActionProcessor
                 {
                     Guid agentId = packet.AgentIds[i];
                     long sequence = packet.Sequences[i];
-                    if (sequence <= 0 || packet.Actions[i] == null)
+                    if (sequence <= 0 || packet.Actions[i] == null || packet.Actions[i].AuthorityRevision < 0)
                         continue;
 
                     var action = new RemoteAction(
@@ -605,6 +615,7 @@ public class RemoteAgentActionProcessor : IRemoteAgentActionProcessor
                     state.MigratedAuthority =
                         new MigratedActionAuthority(
                             observedAuthority,
+                            info.AuthorityRevision,
                             hostControllerId,
                             hostEpoch);
                 }
@@ -620,6 +631,7 @@ public class RemoteAgentActionProcessor : IRemoteAgentActionProcessor
                     state.MigratedAuthority =
                         new MigratedActionAuthority(
                             inherited.ObservedAuthority,
+                            inherited.ObservedAuthorityRevision,
                             hostControllerId,
                             hostEpoch);
                 }
@@ -676,6 +688,7 @@ public class RemoteAgentActionProcessor : IRemoteAgentActionProcessor
                 RemoveExpiredPendingActions(
                     pendingByController,
                     authority,
+                    info.AuthorityRevision,
                     requiredHostEpoch,
                     appliedMigrationEpoch);
 
@@ -726,6 +739,10 @@ public class RemoteAgentActionProcessor : IRemoteAgentActionProcessor
         RemoteAction action,
         bool removePendingBeforeApply)
     {
+        if (action.BattleHostEpoch == 0 && action.Data.AuthorityRevision != info.AuthorityRevision)
+            return action.Data.AuthorityRevision < info.AuthorityRevision
+                ? RemoteActionApplyResult.Stale : RemoteActionApplyResult.AgentNotReady;
+
         if (!IsCurrentActionAuthority(
             info,
             action.ControllerId,
@@ -749,6 +766,7 @@ public class RemoteAgentActionProcessor : IRemoteAgentActionProcessor
             if (state.EquipmentByAuthority == null
                 || !state.EquipmentByAuthority.TryGetValue(
                     (action.ControllerId, action.BattleHostEpoch > 0), out EquipmentBaseline baseline)
+                || baseline.AuthorityRevision != action.Data.AuthorityRevision
                 || baseline.HostEpoch != action.BattleHostEpoch
                 || baseline.Revision < action.Data.EquipmentRevision)
             {
@@ -1004,6 +1022,7 @@ public class RemoteAgentActionProcessor : IRemoteAgentActionProcessor
             state.MigratedAuthority =
                 new MigratedActionAuthority(
                     info.CurrentAuthority,
+                    info.AuthorityRevision,
                     pending.ControllerId,
                     pending.BattleHostEpoch);
         }
@@ -1243,17 +1262,23 @@ public class RemoteAgentActionProcessor : IRemoteAgentActionProcessor
     {
         if (action.Data == null || action.Data.EquipmentRevision <= 0 || !action.Data.Equipment.HasValue
             || IsStaleRemoteAction(agentId, action)) return;
+        if (action.BattleHostEpoch == 0
+            && agentRegistry.TryGetAgentInfo(agentId, out CoopAgentInfo info)
+            && action.Data.AuthorityRevision < info.AuthorityRevision) return;
         RemoteAgentActionState state = GetOrCreateAgentState(agentId);
         // Epoch zero is an ordinary sender role, not an older host generation.
         var authority = (action.ControllerId, action.BattleHostEpoch > 0);
         var baselines = state.EquipmentByAuthority ??=
             new Dictionary<(string ControllerId, bool IsBattleHost), EquipmentBaseline>();
         if (baselines.TryGetValue(authority, out EquipmentBaseline previous)
-            && (previous.HostEpoch > action.BattleHostEpoch
-                || (previous.HostEpoch == action.BattleHostEpoch
-                    && previous.Revision >= action.Data.EquipmentRevision))) return;
+            && (previous.AuthorityRevision > action.Data.AuthorityRevision
+                || (previous.AuthorityRevision == action.Data.AuthorityRevision
+                    && (previous.HostEpoch > action.BattleHostEpoch
+                        || (previous.HostEpoch == action.BattleHostEpoch
+                            && previous.Revision >= action.Data.EquipmentRevision))))) return;
         baselines[authority] = new EquipmentBaseline(
-            action.BattleHostEpoch, action.Data.EquipmentRevision, action.Data.Equipment.Value);
+            action.BattleHostEpoch, action.Data.EquipmentRevision, action.Data.Equipment.Value,
+            action.Data.AuthorityRevision);
     }
 
     private void BufferPendingRemoteAction(Guid agentId, RemoteAction action)
@@ -1277,10 +1302,13 @@ public class RemoteAgentActionProcessor : IRemoteAgentActionProcessor
 
         if (actionsByController.TryGetValue(action.ControllerId, out var existing))
         {
+            if (existing.BattleHostEpoch == 0 && action.BattleHostEpoch == 0
+                && existing.Data.AuthorityRevision > action.Data.AuthorityRevision) return;
             // A sender's ordinary snapshot can arrive before registration or host assignment.
             if (action.BattleHostEpoch > 0 && existing.BattleHostEpoch > action.BattleHostEpoch)
                 return;
-            if (existing.BattleHostEpoch == action.BattleHostEpoch
+            if (existing.Data.AuthorityRevision == action.Data.AuthorityRevision
+                && existing.BattleHostEpoch == action.BattleHostEpoch
                 && existing.Sequence >= action.Sequence)
                 return;
         }
@@ -1294,7 +1322,9 @@ public class RemoteAgentActionProcessor : IRemoteAgentActionProcessor
             && state.LastSequence.HasValue
             && state.LastSequence.Value.ControllerId == action.ControllerId
             && state.LastSequence.Value.BattleHostEpoch == action.BattleHostEpoch
-            && state.LastSequence.Value.Sequence >= action.Sequence;
+            && (state.LastSequence.Value.AuthorityRevision > action.Data.AuthorityRevision
+                || (state.LastSequence.Value.AuthorityRevision == action.Data.AuthorityRevision
+                    && state.LastSequence.Value.Sequence >= action.Sequence));
     }
 
     private bool HasPendingRemoteActionAtOrAfter(
@@ -1307,7 +1337,9 @@ public class RemoteAgentActionProcessor : IRemoteAgentActionProcessor
                 action.ControllerId,
                 out RemoteAction pending)
             && pending.BattleHostEpoch == action.BattleHostEpoch
-            && pending.Sequence >= action.Sequence;
+            && (pending.Data.AuthorityRevision > action.Data.AuthorityRevision
+                || (pending.Data.AuthorityRevision == action.Data.AuthorityRevision
+                    && pending.Sequence >= action.Sequence));
     }
 
     private void RecordRemoteActionSequence(Guid agentId, RemoteAction action)
@@ -1316,7 +1348,8 @@ public class RemoteAgentActionProcessor : IRemoteAgentActionProcessor
             new RemoteActionSequence(
                 action.ControllerId,
                 action.Sequence,
-                action.BattleHostEpoch);
+                action.BattleHostEpoch,
+                action.Data.AuthorityRevision);
     }
 
     private void RemovePendingRemoteAction(Guid agentId, RemoteAction action)
@@ -1355,6 +1388,7 @@ public class RemoteAgentActionProcessor : IRemoteAgentActionProcessor
     private void RemoveExpiredPendingActions(
         Dictionary<string, RemoteAction> actionsByController,
         string currentAuthority,
+        long authorityRevision,
         int requiredHostEpoch,
         int appliedMigrationEpoch)
     {
@@ -1375,6 +1409,7 @@ public class RemoteAgentActionProcessor : IRemoteAgentActionProcessor
                 && (requiredHostEpoch == 0
                     || pending.BattleHostEpoch == requiredHostEpoch);
             if (isCurrentAuthority
+                || (pending.BattleHostEpoch == 0 && pending.Data.AuthorityRevision > authorityRevision)
                 || pending.BattleHostEpoch > appliedMigrationEpoch)
             {
                 continue;
@@ -1424,7 +1459,8 @@ public class RemoteAgentActionProcessor : IRemoteAgentActionProcessor
         {
             MigratedActionAuthority migrated =
                 state.MigratedAuthority.Value;
-            if (migrated.ObservedAuthority == info.CurrentAuthority)
+            if (migrated.ObservedAuthority == info.CurrentAuthority
+                && migrated.ObservedAuthorityRevision == info.AuthorityRevision)
             {
                 requiredHostEpoch = migrated.BattleHostEpoch;
                 return migrated.ControllerId;
