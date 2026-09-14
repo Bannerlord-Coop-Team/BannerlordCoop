@@ -555,7 +555,7 @@ public class ActionEquipmentSyncTests : MissionTestEnvironment
         }
         AgentActionPacket Send(int index, int action, EquipmentIndex slot)
         {
-            AgentActionPacket packet = null;
+            AgentActionPacket packet = default;
             clients[index].Call(() =>
             {
                 var network = clients[index].Resolve<MockBattleNetwork>();

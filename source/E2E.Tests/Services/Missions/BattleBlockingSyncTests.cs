@@ -1644,7 +1644,7 @@ public class BattleBlockingSyncTests : MissionTestEnvironment
             Agent ownerB = SpawnAgent(context, AgentControllerType.Player, out MirrorAgent ownerBMirror);
             ownerBMirror.GuardMode = Agent.GuardMode.Right;
 
-            ApplyOwnerAction(context.Component, "owner-b", 1L, agentId, ownerB);
+            ApplyOwnerAction(context.Component, "owner-b", 1L, agentId, ownerB, authorityRevision: 1);
             context.Component.AgentActionHandler.ApplyRemoteGuardStates();
             Assert.Equal(Agent.GuardMode.Right, puppetMirror.GuardMode);
             Assert.Equal(2, puppetMirror.SetWeaponGuardCalls);
@@ -2524,7 +2524,8 @@ public class BattleBlockingSyncTests : MissionTestEnvironment
                 ownerMirror.Action0Index = actionIndex;
                 var data = new AgentActionData(owner);
                 context.Component.AgentActionHandler.HandlePacket(null, new AgentActionPacket("A",
-                    new[] { id }, new[] { data.WithEquipment(revision, full ? data.Equipment : null) },
+                    new[] { id }, new[] { data.WithEquipment(revision, full ? data.Equipment : null,
+                        epoch == 0 && regainAuthority ? 2 : 0) },
                     new[] { sequence }, epoch));
                 DrainGameThread();
                 context.Component.AgentActionHandler.ApplyRemoteGuardStates();
@@ -2620,13 +2621,15 @@ public class BattleBlockingSyncTests : MissionTestEnvironment
         long sequence,
         Guid agentId,
         Agent owner,
-        int battleHostEpoch = 0)
+        int battleHostEpoch = 0,
+        long authorityRevision = 0)
     {
+        var data = new AgentActionData(owner);
         component.AgentActionHandler.HandlePacket(null,
             new AgentActionPacket(
                 controllerId,
                 new[] { agentId },
-                new[] { new AgentActionData(owner) },
+                new[] { data.WithEquipment(0, data.Equipment, authorityRevision) },
                 new[] { sequence },
                 battleHostEpoch));
     }
