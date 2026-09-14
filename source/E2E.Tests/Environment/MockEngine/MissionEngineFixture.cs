@@ -203,6 +203,9 @@ public sealed class MissionEngineFixture : IDisposable
         Prefix(typeof(Agent), nameof(Agent.SetWieldedItemIndexAsClient), nameof(Agent_SetWieldedItemIndexAsClient));
         Prefix(typeof(Agent), nameof(Agent.GetPrimaryWieldedItemIndex), nameof(Agent_GetPrimaryWieldedItemIndex));
         Prefix(typeof(Agent), nameof(Agent.GetOffhandWieldedItemIndex), nameof(Agent_GetOffhandWieldedItemIndex));
+        // Rebuild callers warmed by earlier tests after their native wield boundaries are patched.
+        harmony.Patch(AccessTools.Method(typeof(AgentEquipmentData), nameof(AgentEquipmentData.Apply)),
+            postfix: new HarmonyMethod(AccessTools.Method(typeof(MissionEngineFixture), nameof(EquipmentApplyPostfix))));
         Prefix(typeof(Agent), "get_MovementInputVector", nameof(Agent_get_MovementInputVector));
         Prefix(typeof(Agent), "set_MovementInputVector", nameof(Agent_set_MovementInputVector));
         // Action and mount snapshots use these shims so discrete animations can be captured and replayed headless.
@@ -261,6 +264,8 @@ public sealed class MissionEngineFixture : IDisposable
         var target = AccessTools.Method(type, method) ?? throw new MissingMethodException(type.FullName, method);
         harmony.Patch(target, prefix: new HarmonyMethod(AccessTools.Method(typeof(MissionEngineFixture), patch)));
     }
+
+    private static void EquipmentApplyPostfix() { }
 
     private static bool TryActiveMock(out MockMission mock)
     {
