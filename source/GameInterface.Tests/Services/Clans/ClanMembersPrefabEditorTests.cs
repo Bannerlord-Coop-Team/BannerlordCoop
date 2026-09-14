@@ -105,7 +105,8 @@ public class ClanMembersPrefabEditorTests
     [Theory]
     [InlineData("ClanScreen.xml")]
     [InlineData("ClanMembers.xml")]
-    public void MembershipButtons_LoadWithGauntletPrefabParser(string file)
+    [InlineData("ClanPartiesRightPanel.xml")]
+    public void ClanControls_LoadWithGauntletPrefabParser(string file)
     {
         var document = new XmlDocument();
         using var reader = XmlReader.Create(Path.Combine(AppContext.BaseDirectory, file),
@@ -113,6 +114,7 @@ public class ClanMembersPrefabEditorTests
         document.Load(reader);
         var root = document.SelectSingleNode("/Prefab/Window/*")!;
         new ClanPrefabEditor().AddMembershipActions(root);
+        new ClanPrefabEditor().AddFinanceControls(root);
 
         Assert.NotNull(WidgetTemplate.LoadFrom(new PrefabExtensionContext(), new WidgetAttributeContext(), root));
     }

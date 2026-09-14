@@ -33,6 +33,7 @@ public class ClanPrefabEditor : IClanPrefabEditor
     {
         XmlNode anchor;
         string id, attributes, visible, text, command;
+        string amountText = string.Empty;
         bool screen = root.Attributes?["Id"]?.Value == "ClanScreenWidget";
         if (screen)
         {
@@ -49,13 +50,24 @@ public class ClanPrefabEditor : IClanPrefabEditor
             id = "PlayerPaymentButton";
             attributes = "DataSource='{..\\..}'";
             visible = "CanSetPlayerPayment";
-            text = "PlayerPaymentText";
+            text = "SetPlayerPaymentText";
             command = "ExecuteSetPlayerPayment";
+            amountText = @"
+                <ListPanel DataSource='{..\..}' WidthSizePolicy='CoverChildren' HeightSizePolicy='CoverChildren'
+                    HorizontalAlignment='Center' MarginBottom='10' IsVisible='@IsPlayerPaymentVisible'>
+                    <Children>
+                        <TextWidget Id='PlayerPaymentAmountText' WidthSizePolicy='CoverChildren' HeightSizePolicy='CoverChildren'
+                            Brush='Clan.PartySize.Text' Brush.TextHorizontalAlignment='Center' Text='@PlayerPaymentText' ClipContents='false' />
+                        <Widget WidthSizePolicy='Fixed' HeightSizePolicy='Fixed' SuggestedWidth='26' SuggestedHeight='26'
+                            Sprite='SPGeneral\InventoryPartyExtension\Extension\gold_icon' />
+                    </Children>
+                </ListPanel>";
         }
         if (anchor == null || root.SelectSingleNode($".//*[@Id='{id}']") != null) return;
 
         var fragment = root.OwnerDocument.CreateDocumentFragment();
         fragment.InnerXml = $@"
+            {amountText}
             <Widget {attributes} WidthSizePolicy='Fixed' HeightSizePolicy='Fixed' SuggestedWidth='265' SuggestedHeight='60'
                 HorizontalAlignment='{(screen ? "Right" : "Center")}' VerticalAlignment='{(screen ? "Center" : "Top")}'
                 MarginRight='{(screen ? 10 : 0)}' PositionYOffset='{(screen ? 235 : 0)}' IsVisible='@{visible}'>

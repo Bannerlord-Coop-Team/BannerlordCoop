@@ -19,7 +19,7 @@
     <string id="str_coop_clan_assets_leader_only" text="{=str_coop_clan_assets_leader_only}Only the clan leader can manage clan assets." />
     <string id="str_coop_clan_hero_recall_restricted" text="{=str_coop_clan_hero_recall_restricted}Only the clan leader can recall heroes assigned to a party or governorship." />
     <string id="str_coop_clan_join_title" text="{=str_coop_clan_join_title}Join {CLAN_NAME}?" />
-    <string id="str_coop_clan_experimental_warning" text="{=str_coop_clan_experimental_warning}EXPERIMENTAL: Use of this feature may cause unexpected issues." />
+    <string id="str_coop_clan_experimental_warning" text="{=str_coop_clan_experimental_warning}EXPERIMENTAL: Use of coop clan features may cause unexpected issues." />
     <string id="str_coop_clan_join_description" text="{=str_coop_clan_join_description}You are asking to join {CLAN_NAME}, led by {LEADER_NAME}. The clan leader will manage the Coop clan and its assets." />
 	<string id="str_coop_clan_join_companions" text="{=str_coop_clan_join_companions}Companions: {COUNT}" />
     <string id="str_coop_clan_join_workshops" text="{=str_coop_clan_join_workshops}Workshops: {COUNT}" />
@@ -43,6 +43,8 @@
     <string id="str_coop_clan_leave" text="{=str_coop_clan_leave}Leave Clan" />
     <string id="str_coop_clan_manage_player" text="{=str_coop_clan_manage_player}Manage Player" />
     <string id="str_coop_clan_manage_player_title" text="{=str_coop_clan_manage_player_title}Manage {HERO}" />
+    <string id="str_coop_clan_manage_player_description" text="{=str_coop_clan_manage_player_description}Choose an action for this player. Hover over an option for details." />
+    <string id="str_coop_clan_manage_player_confirm" text="{=str_coop_clan_manage_player_confirm}Confirm" />
     <string id="str_coop_clan_remove_player" text="{=str_coop_clan_remove_player}Remove from Clan" />
     <string id="str_coop_clan_remove_player_description" text="{=str_coop_clan_remove_player_description}Removing this player returns them to their own clan with their eligible family. Companions and shared assets stay with this clan. The player's approval is not required." />
     <string id="str_coop_clan_leave_dialogue" text="{=str_coop_clan_leave_dialogue}I am leaving the clan." />
@@ -69,6 +71,7 @@
     <string id="str_coop_marriage_clan_commitment" text="{=str_coop_marriage_clan_commitment}While married to another player, you cannot leave the clan or be removed from it." />
     <string id="str_coop_marriage_forfeit_warning" text="{=str_coop_marriage_forfeit_warning}On joining the clan through marriage, you permanently give up ownership and control of the companions, assets and supporters listed above to the clan leader. You cannot leave the clan or be removed while married to another player." />
     <string id="str_coop_clan_daily_payment" text="{=str_coop_clan_daily_payment}Daily Payment" />
+    <string id="str_coop_clan_set_daily_payment" text="{=str_coop_clan_set_daily_payment}Set Daily Payment" />
     <string id="str_coop_clan_send_tribute" text="{=str_coop_clan_send_tribute}Send Tribute" />
     <string id="str_coop_clan_daily_payment_amount" text="{=str_coop_clan_daily_payment_amount}Daily Payment: {AMOUNT}" />
     <string id="str_coop_clan_payment_description" text="{=str_coop_clan_payment_description}Gold to send to {HERO} each day, after clan expenses. They pay their own party wages. Enter 0 to stop payments. If funds are insufficient, only the available gold is sent." />

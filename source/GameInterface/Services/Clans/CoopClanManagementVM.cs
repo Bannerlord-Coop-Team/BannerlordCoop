@@ -26,8 +26,11 @@ public class CoopClanManagementVM : ClanManagementVM
     private Hero SelectedPlayer => ClanParties.CurrentSelectedParty?.Party?.LeaderHero;
 
     [DataSourceProperty]
-    public bool CanSetPlayerPayment => finance?.IsNonLeaderMember(SelectedPlayer) == true &&
-        Hero.MainHero == _clan.Leader && SelectedPlayer.Clan == _clan;
+    public bool IsPlayerPaymentVisible => finance?.IsNonLeaderMember(SelectedPlayer) == true &&
+        SelectedPlayer.Clan == _clan;
+
+    [DataSourceProperty]
+    public bool CanSetPlayerPayment => IsPlayerPaymentVisible && Hero.MainHero == _clan.Leader;
 
     [DataSourceProperty]
     public bool CanSendTribute => finance?.IsNonLeaderMember(Hero.MainHero) == true;
@@ -35,6 +38,9 @@ public class CoopClanManagementVM : ClanManagementVM
     [DataSourceProperty]
     public string PlayerPaymentText => GameTexts.FindText("str_coop_clan_daily_payment_amount")
         .SetTextVariable("AMOUNT", finance?.GetSettings(SelectedPlayer)?.DailyPayment ?? 0).ToString();
+
+    [DataSourceProperty]
+    public string SetPlayerPaymentText => GameTexts.FindText("str_coop_clan_set_daily_payment").ToString();
 
     [DataSourceProperty]
     public string SendTributeText => GameTexts.FindText("str_coop_clan_send_tribute").ToString();
@@ -81,9 +87,11 @@ public class CoopClanManagementVM : ClanManagementVM
 
     public void RefreshFinanceControls()
     {
+        OnPropertyChanged(nameof(IsPlayerPaymentVisible));
         OnPropertyChanged(nameof(CanSetPlayerPayment));
         OnPropertyChanged(nameof(CanSendTribute));
         OnPropertyChanged(nameof(PlayerPaymentText));
+        OnPropertyChanged(nameof(SetPlayerPaymentText));
         OnPropertyChanged(nameof(SendTributeText));
     }
 }
