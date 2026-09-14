@@ -127,7 +127,7 @@ public class AgentActionHandler : IAgentActionHandler
         this.guardReactionHandler = guardReactionHandler;
 
         this.packetManager.RegisterPacketHandler(this);
-        this.messageBroker.Subscribe<NetworkBattleHostAssigned>(Handle_BattleHostAssigned);
+        this.messageBroker.Subscribe<BattleHostAssignmentApplied>(Handle_BattleHostAssigned);
     }
 
     public PacketType PacketType => PacketType.AgentAction;
@@ -673,11 +673,11 @@ public class AgentActionHandler : IAgentActionHandler
     }
 
     private void Handle_BattleHostAssigned(
-        MessagePayload<NetworkBattleHostAssigned> payload)
+        MessagePayload<BattleHostAssignmentApplied> payload)
     {
         if (_disposed) return;
 
-        remoteActionProcessor.HandleBattleHostAssigned(payload.What);
+        remoteActionProcessor.HandleBattleHostAssigned(payload.What.Assignment);
     }
 
     public void HandlePacket(NetPeer peer, IPacket packet)
@@ -1004,7 +1004,7 @@ public class AgentActionHandler : IAgentActionHandler
         if (_disposed) return;
         _disposed = true;
 
-        messageBroker.Unsubscribe<NetworkBattleHostAssigned>(Handle_BattleHostAssigned);
+        messageBroker.Unsubscribe<BattleHostAssignmentApplied>(Handle_BattleHostAssigned);
         packetManager.RemovePacketHandler(this);
         remoteActionProcessor.Dispose();
         guardReactionHandler.Dispose();
