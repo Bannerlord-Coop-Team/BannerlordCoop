@@ -70,8 +70,17 @@ public class RemoteAgentActionProcessor : IRemoteAgentActionProcessor
         {
             throw new ArgumentException("Expected arm, snapshot or release.");
         }
+        agentRegistry.TryGetAgentInfo(equipmentDelayAgent, out CoopAgentInfo observed);
+        Agent agent = observed?.Agent;
         return Newtonsoft.Json.JsonConvert.SerializeObject(new
         {
+            nativeAgent = agent != null && agent.Mission == Mission.Current && agent.IsActive()
+                ? new { authority = observed.CurrentAuthority, observed.AuthorityRevision,
+                    locallyControlled = agentRegistry.IsLocallyControlled(equipmentDelayAgent),
+                    controller = agent.Controller.ToString(), health = agent.Health,
+                    action0 = agent.GetCurrentAction(0).Index, action1 = agent.GetCurrentAction(1).Index,
+                    defendFlags = agent.GetDefendMovementFlag().ToString(),
+                    equipment = new AgentEquipmentData(agent) } : null,
             armed = equipmentDelayArmed,
             expired = equipmentDelayExpired,
             controllerId = equipmentDelayController,
@@ -390,7 +399,12 @@ public class RemoteAgentActionProcessor : IRemoteAgentActionProcessor
             return;
 
 #if DEBUG
-        if (agentId == equipmentDelayAgent) delayedEquipment.Clear();
+        if (agentId == equipmentDelayAgent)
+        {
+            foreach (RemoteAction held in delayedEquipment.Values)
+                RecordEquipmentDelay("cancelled-local-authority", agentId, held);
+            delayedEquipment.Clear();
+        }
 #endif
         _agentStates.Remove(agentId);
         _pendingActionAgentIds.Remove(agentId);
