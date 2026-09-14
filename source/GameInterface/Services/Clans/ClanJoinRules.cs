@@ -16,7 +16,6 @@ namespace GameInterface.Services.Clans;
 
 public interface IClanJoinRules : IGameAbstraction
 {
-    bool CanOfferServices(Hero joiningHero, Clan targetClan);
     ClanJoinUnavailableReason GetUnavailableReason(Hero joiningHero, Hero targetHero);
     IReadOnlyList<TextObject> GetWarnings(Hero joiningHero, Clan targetClan);
     void Apply(Hero joiningHero, Clan targetClan);
@@ -33,13 +32,6 @@ public class ClanJoinRules : IClanJoinRules
         this.playerManager = playerManager;
         this.messageBroker = messageBroker;
         this.workshopPlayerData = workshopPlayerData;
-    }
-
-    public bool CanOfferServices(Hero joiningHero, Clan targetClan)
-    {
-        var clan = joiningHero?.Clan;
-        return clan != null && targetClan != null && clan != targetClan &&
-            (clan.Leader != joiningHero || !HasOtherPlayers(joiningHero));
     }
 
     public ClanJoinUnavailableReason GetUnavailableReason(Hero joiningHero, Hero targetHero)

@@ -883,8 +883,7 @@ internal class PlayerPartyInteractionHandler : IHandler
         if (session.ClanJoinUnavailableReason != ClanJoinUnavailableReason.MissingClan &&
             session.ClanJoinUnavailableReason != ClanJoinUnavailableReason.SameClan)
         {
-            var servicesAvailable = !session.IsHostile &&
-                clanJoinRules.CanOfferServices(initiatorParty.LeaderHero, responderParty.LeaderHero.Clan);
+            var servicesAvailable = !session.IsHostile;
             AddInitiatorOption(session, PlayerPartyInteractionOption.OfferServices, servicesAvailable);
             if (ModConfigProvider.ModOptions.CoopClansEnabled)
                 AddInitiatorOption(session, PlayerPartyInteractionOption.JoinClan,

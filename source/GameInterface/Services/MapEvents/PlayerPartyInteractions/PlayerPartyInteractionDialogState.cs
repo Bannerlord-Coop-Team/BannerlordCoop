@@ -101,13 +101,6 @@ public static class PlayerPartyInteractionDialogState
             return false;
         }
 
-        if (option == PlayerPartyInteractionOption.OfferServices &&
-            currentState.ClanJoinUnavailableReason == ClanJoinUnavailableReason.OtherPlayersInClan)
-        {
-            explanation = GameTexts.FindText("str_coop_clan_offer_services_coop_leader");
-            return false;
-        }
-
         if (option == PlayerPartyInteractionOption.Vassal && TryGetVassalUnavailableExplanation(out explanation))
             return false;
 

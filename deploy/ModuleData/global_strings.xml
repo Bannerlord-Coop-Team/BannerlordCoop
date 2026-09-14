@@ -29,7 +29,6 @@
     <string id="str_coop_clan_join_supporters" text="{=str_coop_clan_join_supporters}Supporters: {COUNT}" />
     <string id="str_coop_clan_join_forfeit_warning" text="{=str_coop_clan_join_forfeit_warning}On joining the clan, you give up ownership and control of the companions, assets and supporters listed above to the new clan leader. They will not be returned to you if you leave the clan later." />
     <string id="str_coop_clan_join_confirm" text="{=str_coop_clan_join_confirm}Send join request" />
-    <string id="str_coop_clan_offer_services_coop_leader" text="{=str_coop_clan_offer_services_coop_leader}You cannot offer services while leading a clan with other players." />
     <string id="str_coop_clan_join_other_players" text="{=str_coop_clan_join_other_players}You cannot join another clan while other players belong to your clan." />
     <string id="str_coop_clan_join_target_not_leader" text="{=str_coop_clan_join_target_not_leader}You must speak to the clan leader to request membership." />
     <string id="str_coop_clan_join_rules_kingdom" text="{=str_coop_clan_join_rules_kingdom}You cannot join another clan while ruling a kingdom." />
