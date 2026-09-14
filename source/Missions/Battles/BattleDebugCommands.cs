@@ -10,6 +10,7 @@ using Missions.Agents.Packets;
 using Newtonsoft.Json;
 #if DEBUG
 using Missions.Diagnostics;
+using Missions.Agents.Handlers;
 #endif
 using System;
 using System.Collections.Generic;
@@ -550,13 +551,26 @@ internal static class BattleDebugCommands
         public CoopCommandSide Side => CoopCommandSide.Both;
         public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
-            new ExpectedArgs("operation", "arm, snapshot or release", true),
+            new ExpectedArgs("operation", "prepare, arm, snapshot or release", true),
             new ExpectedArgs("controller_id", "Original AI owner to observe", false),
         };
 
         public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
         {
             var controller = Mission.Current?.GetMissionBehavior<CoopBattleController>();
+            if (controller == null && Mission.Current == null)
+            {
+                if (args[0] == "prepare" && args.Count == 2)
+                {
+                    RemoteAgentActionProcessor.PrepareEquipmentDelay(args[1]);
+                    return Succeeded("EQUIPMENT_DELAY_PREPARED controller=" + args[1]);
+                }
+                if (args[0] == "release")
+                {
+                    RemoteAgentActionProcessor.CancelPreparedEquipmentDelay();
+                    return Succeeded("EQUIPMENT_DELAY_PREPARATION_CLEARED");
+                }
+            }
             if (controller == null) return Failed("No active coop battle processor");
             return Succeeded("EQUIPMENT_DELAY " + controller.AgentActionHandler.EquipmentDelayProcessor.EquipmentDelayObservation(
                 args[0].ToLowerInvariant(), args.Count > 1 ? args[1] : null));

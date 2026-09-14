@@ -569,7 +569,37 @@ public class ActionEquipmentSyncTests : MissionTestEnvironment
     }
 
     [Fact]
-    public void EquipmentDelay_ObservesBaselineBeforeRegistrationWithoutChangingApply()
+    public void EquipmentDelay_PreparationIsConsumedOnceAndCanBeCancelled()
+    {
+        try
+        {
+            RemoteAgentActionProcessor.PrepareEquipmentDelay("owner");
+            Assert.Throws<InvalidOperationException>(() => RemoteAgentActionProcessor.PrepareEquipmentDelay("other"));
+            RunScenario(context =>
+            {
+                var snapshot = Newtonsoft.Json.Linq.JObject.Parse(context.Component.AgentActionHandler
+                    .EquipmentDelayProcessor.EquipmentDelayObservation("snapshot", null));
+                Assert.True((bool)snapshot["armed"]);
+                Assert.Equal("owner", (string)snapshot["controllerId"]);
+                context.Component.AgentActionHandler.EquipmentDelayProcessor.EquipmentDelayObservation("release", null);
+            });
+            RemoteAgentActionProcessor.PrepareEquipmentDelay("other");
+            RemoteAgentActionProcessor.CancelPreparedEquipmentDelay();
+            RunScenario(context =>
+            {
+                var snapshot = Newtonsoft.Json.Linq.JObject.Parse(context.Component.AgentActionHandler
+                    .EquipmentDelayProcessor.EquipmentDelayObservation("snapshot", null));
+                Assert.False((bool)snapshot["armed"]);
+            });
+        }
+        finally
+        {
+            RemoteAgentActionProcessor.CancelPreparedEquipmentDelay();
+        }
+    }
+
+    [Fact]
+    public void EquipmentDelay_HoldsRealBaselineBeforeRegistrationUntilExplicitRelease()
     {
         RunScenario(context =>
         {
@@ -586,14 +616,38 @@ public class ActionEquipmentSyncTests : MissionTestEnvironment
             source.Action0Index = 1002;
             context.Receive(RevisionPacket(owner, id, 2, 1, false));
             var result = Newtonsoft.Json.Linq.JObject.Parse(processor.EquipmentDelayObservation("snapshot", null));
-            Assert.Equal(Guid.Empty, (Guid)result["agentId"]);
-            Assert.Equal(0, (int)result["heldBaselines"]);
+            Assert.Equal(id, (Guid)result["agentId"]);
+            Assert.Equal(1, (int)result["heldBaselines"]);
+            Assert.NotEqual(1002, mirror.Action0Index);
+            Assert.Contains(result["events"], e => (string)e["kind"] == "waiting-baseline");
+            processor.EquipmentDelayObservation("release", null);
+            context.Component.AgentActionHandler.ApplyRemoteGuardStates();
             Assert.Equal(1002, mirror.Action0Index);
             Assert.Contains(result["selectionObservations"], e =>
                 (Guid)e["agentId"] == id && !(bool)e["registered"] && (bool)e["fullBaseline"]);
-            Assert.Contains(result["selectionObservations"], e =>
-                (Guid)e["agentId"] == id && (bool)e["registered"] && !(bool)e["fullBaseline"]
-                && (long)e["cachedRevision"] == 1);
+        });
+    }
+
+    [Fact]
+    public void EquipmentDelay_PreRegistrationHoldDoesNotAuthorizeAnotherOwner()
+    {
+        RunScenario(context =>
+        {
+            var processor = context.Component.AgentActionHandler.EquipmentDelayProcessor;
+            Agent sender = context.Spawn("owner", out var source, out _);
+            source.Action0Index = 1001;
+            Guid id = Guid.NewGuid();
+            processor.EquipmentDelayObservation("arm", "owner");
+            context.Receive(RevisionPacket(sender, id, 1, 1, true));
+            Agent puppet = context.Mission.SpawnAgent(new AgentBuildData(Game.Current.PlayerTroop)
+                .Controller(AgentControllerType.None));
+            Assert.True(AgentMirror.TryGet(puppet, out var mirror));
+            Assert.True(context.Registry.TryRegisterAgent("different-owner", id, puppet));
+            processor.EquipmentDelayObservation("release", null);
+            context.Component.AgentActionHandler.ApplyRemoteGuardStates();
+            Assert.NotEqual(1001, mirror.Action0Index);
+            var result = Newtonsoft.Json.Linq.JObject.Parse(processor.EquipmentDelayObservation("snapshot", null));
+            Assert.DoesNotContain(result["events"], e => (string)e["kind"] == "action-applied");
         });
     }
 
@@ -606,7 +660,7 @@ public class ActionEquipmentSyncTests : MissionTestEnvironment
             Agent owner = context.Spawn("owner", out _, out _);
             processor.EquipmentDelayObservation("arm", "owner");
             for (int i = 0; i < 20; i++)
-                context.Receive(RevisionPacket(owner, Guid.NewGuid(), 1, 1, true));
+                context.Receive(RevisionPacket(owner, Guid.NewGuid(), 1, 1, false));
             var result = Newtonsoft.Json.Linq.JObject.Parse(processor.EquipmentDelayObservation("snapshot", null));
             Assert.Equal(16, result["selectionObservations"].Count());
             Assert.True((bool)result["selectionObservationsTruncated"]);

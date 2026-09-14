@@ -35,6 +35,27 @@ public class RemoteAgentActionProcessor : IRemoteAgentActionProcessor
 {
     private const float RetainedGuardReleaseBlendPeriod = 0.4f;
 #if DEBUG
+    private static string preparedEquipmentDelayController;
+    private static long preparedEquipmentDelayDeadline;
+
+    internal static void PrepareEquipmentDelay(string controllerId)
+    {
+        if (string.IsNullOrEmpty(controllerId))
+            throw new ArgumentException("Supply a controller id.");
+        if (preparedEquipmentDelayController != null
+            && System.Diagnostics.Stopwatch.GetTimestamp() < preparedEquipmentDelayDeadline)
+            throw new InvalidOperationException("Release the prepared observation first.");
+        preparedEquipmentDelayController = controllerId;
+        preparedEquipmentDelayDeadline = System.Diagnostics.Stopwatch.GetTimestamp()
+            + (120L * System.Diagnostics.Stopwatch.Frequency);
+    }
+
+    internal static void CancelPreparedEquipmentDelay()
+    {
+        preparedEquipmentDelayController = null;
+        preparedEquipmentDelayDeadline = 0;
+    }
+
     private bool equipmentDelayArmed;
     private bool equipmentDelayExpired;
     private long equipmentDelayDeadline;
@@ -172,12 +193,13 @@ public class RemoteAgentActionProcessor : IRemoteAgentActionProcessor
     private bool DelayEquipmentBaseline(Guid agentId, RemoteAction action)
     {
         if (!equipmentDelayArmed || action.ControllerId != equipmentDelayController
-            || action.Data.IsPlayerControlled
-            || !agentRegistry.TryGetAgentInfo(agentId, out CoopAgentInfo info)
-            || info.OriginalOwner != equipmentDelayController
-            || info.Agent == null || !info.Agent.IsActive() || info.Agent.IsMount
-            || agentRegistry.IsLocallyControlled(agentId)
-            || !IsCurrentActionAuthority(info, action.ControllerId, action.BattleHostEpoch)) return false;
+            || action.Data.IsPlayerControlled || agentId == Guid.Empty) return false;
+        // A real baseline can precede the deployment spawn; application still validates the registered authority.
+        if (agentRegistry.TryGetAgentInfo(agentId, out CoopAgentInfo info)
+            && (info.OriginalOwner != equipmentDelayController
+                || info.Agent == null || !info.Agent.IsActive() || info.Agent.IsMount
+                || agentRegistry.IsLocallyControlled(agentId)
+                || !IsCurrentActionAuthority(info, action.ControllerId, action.BattleHostEpoch))) return false;
         if (equipmentDelayAgent == Guid.Empty) equipmentDelayAgent = agentId;
         if (equipmentDelayAgent != agentId) return false;
         bool hostRole = action.BattleHostEpoch > 0;
@@ -400,6 +422,17 @@ public class RemoteAgentActionProcessor : IRemoteAgentActionProcessor
         this.battleHostRegistry = battleHostRegistry;
         this.missionContext = missionContext;
         this.agentVisualActionAccessor = agentVisualActionAccessor;
+#if DEBUG
+        string preparedController = preparedEquipmentDelayController;
+        long preparedDeadline = preparedEquipmentDelayDeadline;
+        CancelPreparedEquipmentDelay();
+        if (preparedController != null
+            && System.Diagnostics.Stopwatch.GetTimestamp() < preparedDeadline)
+        {
+            EquipmentDelayObservation("arm", preparedController);
+            equipmentDelayDeadline = preparedDeadline;
+        }
+#endif
     }
 
     public int GetOutgoingBattleHostEpoch()
