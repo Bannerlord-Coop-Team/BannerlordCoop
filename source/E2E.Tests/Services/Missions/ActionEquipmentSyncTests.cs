@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
 using Common;
+using HarmonyLib;
 using Common.Messaging;
 using Common.Util;
 using Common.PacketHandlers;
@@ -25,6 +26,35 @@ namespace E2E.Tests.Services.Missions;
 public class ActionEquipmentSyncTests : MissionTestEnvironment
 {
     public ActionEquipmentSyncTests(ITestOutputHelper output) : base(output) { }
+
+    [Fact]
+    public void PreviouslyPatchedEquipmentApply_UsesCurrentMissionWieldBoundary()
+    {
+        var warmup = new Harmony("action-equipment-warmup");
+        var method = AccessTools.Method(typeof(AgentEquipmentData), nameof(AgentEquipmentData.Apply));
+        try
+        {
+            warmup.Patch(method, postfix: new HarmonyMethod(
+                AccessTools.Method(typeof(ActionEquipmentSyncTests), nameof(EquipmentWarmupPostfix))));
+            default(AgentEquipmentData).Apply(null);
+        }
+        finally
+        {
+            warmup.UnpatchAll(warmup.Id);
+        }
+        RunScenario(context =>
+        {
+            var agent = context.Spawn("peer", out var mirror, out _);
+            mirror.Equipment[EquipmentIndex.Weapon0] = Weapon("sword");
+            mirror.PrimaryWieldedItemIndex = EquipmentIndex.None;
+            var equipment = new AgentEquipmentData(EquipmentIndex.Weapon0, EquipmentIndex.None, 0);
+            Assert.True(equipment.TryApplyForAction(agent));
+            Assert.Equal(EquipmentIndex.Weapon0, mirror.PrimaryWieldedItemIndex);
+            Assert.Contains("wield", mirror.ActionAndGuardCallOrder);
+        });
+    }
+
+    private static void EquipmentWarmupPostfix() { }
 
     [Fact]
     public void PostNativeWeaponSwitch_IsCapturedWithAttackBeforeNextMovementPoll()
