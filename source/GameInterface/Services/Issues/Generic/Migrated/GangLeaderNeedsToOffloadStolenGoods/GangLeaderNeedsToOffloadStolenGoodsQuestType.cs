@@ -338,6 +338,10 @@ internal static class GangLeaderNeedsToOffloadStolenGoodsQuestType
 
         var progress = OwnerTraitXpProgress.GetValue(owner, _ => new PropertyOwner<PropertyObject>());
         var traitLevelBefore = owner.GetTraitLevel(trait);
+        if (progress.GetPropertyValue(trait) == 0)
+        {
+            progress.SetPropertyValue(trait, Campaign.Current.Models.CharacterDevelopmentModel.GetTraitXpRequiredForTraitLevel(trait, traitLevelBefore));
+        }
         Campaign.Current.Models.CharacterDevelopmentModel.GetTraitLevelForTraitXp(
             owner, trait, xpValue + progress.GetPropertyValue(trait), out var traitLevel, out var traitXp);
         progress.SetPropertyValue(trait, traitXp);
