@@ -50,6 +50,28 @@ internal static class ForceTransferScreenTracker
         }
     }
 
+    // Non-consuming check used to gate screen operations (e.g. troop upgrades)
+    // that the force-transfer commit validation cannot honor.
+    public static bool HasOpenForceTransferScreen()
+    {
+        lock (sync)
+        {
+            if (requestId == null) return false;
+            if (DateTime.UtcNow - notedAtUtc > AttributionTimeout)
+            {
+                ClearLocked();
+                return false;
+            }
+            if (leftRoster == null || !leftRoster.TryGetTarget(out _))
+            {
+                ClearLocked();
+                return false;
+            }
+
+            return true;
+        }
+    }
+
     public static void Clear()
     {
         lock (sync)

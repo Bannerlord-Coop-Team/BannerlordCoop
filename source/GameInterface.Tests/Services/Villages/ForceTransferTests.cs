@@ -171,7 +171,37 @@ public class ForceTransferTests
     }
 
     [Fact]
-    public void ForceTransferPool_Expired_PruneDropsIt()
+    public void ForceTransferPool_Expired_MovedToGraceAndStillConsumable()
+    {
+        var subject = new VillageHostileActionInterface(new MessageBroker(), new StubObjectManager());
+        var pool = subject.AuthorizeForceTransfer(
+            VillageHostileAction.ForceVolunteers, "party", "settlement", null, "imperial_recruit", 8);
+
+        // A deferred screen opened at t=180s with Done at t=301s lands past the
+        // 5-minute authorization but inside the grace window: peek and consume
+        // must still succeed one-shot.
+        subject.PruneExpiredForceTransfers(DateTime.UtcNow + TimeSpan.FromMinutes(6));
+
+        Assert.True(subject.TryPeekForceTransfer(pool.RequestId, "party", out _));
+        Assert.True(subject.TryConsumeForceTransfer(pool.RequestId, "party", out _));
+        Assert.False(subject.TryConsumeForceTransfer(pool.RequestId, "party", out _));
+    }
+
+    [Fact]
+    public void ForceTransferPool_GraceElapsed_Dropped()
+    {
+        var subject = new VillageHostileActionInterface(new MessageBroker(), new StubObjectManager());
+        var pool = subject.AuthorizeForceTransfer(
+            VillageHostileAction.ForceVolunteers, "party", "settlement", null, "imperial_recruit", 8);
+
+        subject.PruneExpiredForceTransfers(DateTime.UtcNow + TimeSpan.FromMinutes(12));
+
+        Assert.False(subject.TryPeekForceTransfer(pool.RequestId, "party", out _));
+        Assert.False(subject.TryConsumeForceTransfer(pool.RequestId, "party", out _));
+    }
+
+    [Fact]
+    public void ForceTransferPool_WrongParty_ExpiredConsumeFailsAndPreservesEntry()
     {
         var subject = new VillageHostileActionInterface(new MessageBroker(), new StubObjectManager());
         var pool = subject.AuthorizeForceTransfer(
@@ -179,7 +209,8 @@ public class ForceTransferTests
 
         subject.PruneExpiredForceTransfers(DateTime.UtcNow + TimeSpan.FromMinutes(6));
 
-        Assert.False(subject.TryConsumeForceTransfer(pool.RequestId, "party", out _));
+        Assert.False(subject.TryConsumeForceTransfer(pool.RequestId, "other-party", out _));
+        Assert.True(subject.TryConsumeForceTransfer(pool.RequestId, "party", out _));
     }
 
     [Fact]
@@ -287,6 +318,7 @@ public class ForceTransferTests
         Assert.False(VillageHostileActionInterface.TryValidateSuppliesTakeAndRemainder(
             peeked.SuppliesItems,
             new[] { (Item("grain", 6), 0) },
+            Array.Empty<(ItemRosterElementData, int)>(),
             Array.Empty<(string, string, int)>(),
             out _));
         Assert.True(subject.TryConsumeForceTransfer(pool.RequestId, "party", out _));
@@ -381,19 +413,54 @@ public class ForceTransferTests
     }
 
     [Fact]
-    public void TryValidateVolunteersCommit_LeftRemainderOutsidePool_Rejects()
+    public void TryValidateVolunteersCommit_LeftPoolPhantom_Rejects()
     {
-        // Gaining phantom troops on the dummy left side (lost on apply, or fabricated).
+        // Gaining phantom pool troops on the dummy left side (lost on apply,
+        // or fabricated).
         Assert.False(VolunteersCommit(
             "imperial_recruit", 8,
             EmptyDelta(),
             Delta(("imperial_recruit", 2)),
             out _));
+    }
+
+    [Fact]
+    public void TryValidateVolunteersCommit_DismissOwnedTroop_Accepts()
+    {
+        // Taking the authorized recruits while moving an existing non-pool
+        // troop onto the dummy left to free party room. The dummy is dropped
+        // on apply, so the dismissal grants nothing; the take stays bounded.
+        Assert.True(VolunteersCommit(
+            "imperial_recruit", 8,
+            Delta(("imperial_recruit", 8), ("vlandian_recruit", -1)),
+            Delta(("imperial_recruit", -8), ("vlandian_recruit", 1)),
+            out var error));
+        Assert.Null(error);
+    }
+
+    [Fact]
+    public void TryValidateVolunteersCommit_TakeFromEmptyDummy_Rejects()
+    {
+        // A negative left delta for a troop the dummy never held.
         Assert.False(VolunteersCommit(
             "imperial_recruit", 8,
             EmptyDelta(),
-            Delta(("vlandian_recruit", 1)),
+            Delta(("vlandian_recruit", -1)),
             out _));
+    }
+
+    [Fact]
+    public void TryValidateVolunteersCommit_UpgradeGoldChange_Rejects()
+    {
+        // Upgrades are blocked up front while a force screen is open, so any
+        // gold movement fails the commit even with recorded upgrade history.
+        var upgrades = new[] { (fromId: "imperial_recruit", toId: "imperial_sergeant", number: 1) };
+        Assert.False(VillageHostileActionInterface.TryValidateVolunteersCommit(
+            "imperial_recruit", 8,
+            Delta(("imperial_recruit", 7), ("imperial_sergeant", 1)),
+            Delta(("imperial_recruit", -8)),
+            EmptyDelta(), EmptyDelta(),
+            0, 0, -100, 0, 0, false, null, upgrades, out _));
     }
 
     [Theory]
@@ -507,6 +574,7 @@ public class ForceTransferTests
         Assert.True(VillageHostileActionInterface.TryValidateSuppliesTakeAndRemainder(
             pool,
             new[] { (Item("grain", 3), 0) },
+            Array.Empty<(ItemRosterElementData, int)>(),
             new[] { ("grain", (string)null, 2) },
             out var error));
         Assert.Null(error);
@@ -522,6 +590,7 @@ public class ForceTransferTests
         Assert.False(VillageHostileActionInterface.TryValidateSuppliesTakeAndRemainder(
             pool,
             new[] { (Item("grain", 5), 0) },
+            Array.Empty<(ItemRosterElementData, int)>(),
             new[] { ("grain", (string)null, 5) },
             out var error));
         Assert.NotNull(error);
@@ -535,6 +604,55 @@ public class ForceTransferTests
         Assert.False(VillageHostileActionInterface.TryValidateSuppliesTakeAndRemainder(
             pool,
             new[] { (Item("iron", 1), 0) },
+            Array.Empty<(ItemRosterElementData, int)>(),
+            Array.Empty<(string, string, int)>(),
+            out _));
+    }
+
+    [Fact]
+    public void TryValidateSuppliesTakeAndRemainder_TakePlusOwnedDiscard_Accepts()
+    {
+        // Pool of 5 grain: take 3, discard 1 owned sword into the dummy. The
+        // left remainder holds 2 grain plus the discarded sword; crediting the
+        // sold sword keeps the net pool outflow at 5 grain.
+        var pool = new[] { Item("grain", 5) };
+
+        Assert.True(VillageHostileActionInterface.TryValidateSuppliesTakeAndRemainder(
+            pool,
+            new[] { (Item("grain", 3), 0) },
+            new[] { (Item("sword", 1), 0) },
+            new[] { ("grain", (string)null, 2), ("sword", (string)null, 1) },
+            out var error));
+        Assert.Null(error);
+    }
+
+    [Fact]
+    public void TryValidateSuppliesTakeAndRemainder_DiscardOwnedPoolItem_Accepts()
+    {
+        // Same-key discard: take 3 pool grain, discard 2 owned grain. Net pool
+        // outflow is still 5.
+        var pool = new[] { Item("grain", 5) };
+
+        Assert.True(VillageHostileActionInterface.TryValidateSuppliesTakeAndRemainder(
+            pool,
+            new[] { (Item("grain", 3), 0) },
+            new[] { (Item("grain", 2), 0) },
+            new[] { ("grain", (string)null, 4) },
+            out var error));
+        Assert.Null(error);
+    }
+
+    [Fact]
+    public void TryValidateSuppliesTakeAndRemainder_SoldCannotMaskOverTake_Rejects()
+    {
+        // Fabricated sold entries cannot cover taking more than the pool: the
+        // take itself is bounded independently of the net check.
+        var pool = new[] { Item("grain", 5) };
+
+        Assert.False(VillageHostileActionInterface.TryValidateSuppliesTakeAndRemainder(
+            pool,
+            new[] { (Item("grain", 6), 0) },
+            new[] { (Item("grain", 1), 0) },
             Array.Empty<(string, string, int)>(),
             out _));
     }
