@@ -130,16 +130,6 @@ public class CoopBattleController : CoopMissionController
             worldItemRegistry,
             session,
             missionContext);
-        replicator = new OwnedAgentReplicator(
-            network,
-            messageBroker,
-            objectManager,
-            coopMissionComponent,
-            session,
-            casualties,
-            deployment,
-            spawnBatchCodec,
-            missionWeaponDataMapper);
         deathReporter = new AgentDeathReporter(network, relayNetwork, messageBroker, objectManager, coopMissionComponent, session, casualties);
         routReporter = new AgentRoutReporter(network, messageBroker, coopMissionComponent, session, casualties);
         puppetRoutApplier = new PuppetRoutApplier(messageBroker, coopMissionComponent, casualties);
@@ -159,6 +149,17 @@ public class CoopBattleController : CoopMissionController
             battleDamageDataMapper);
         reinforcementFielder = new ReinforcementFielder(messageBroker, objectManager, coopMissionComponent, session, deployment, formationAssigner, casualties, agentBudget);
         authorityMigrator = new BattleAuthorityMigrator(relayNetwork, messageBroker, objectManager, playerManager, coopMissionComponent, session, casualties, deployment, formationAssigner, missionContext, reinforcementFielder);
+        replicator = new OwnedAgentReplicator(
+            network,
+            messageBroker,
+            objectManager,
+            coopMissionComponent,
+            session,
+            casualties,
+            deployment,
+            spawnBatchCodec,
+            missionWeaponDataMapper,
+            authorityMigrator);
         puppetSpawner = new PuppetSpawner(
             messageBroker,
             objectManager,
@@ -486,8 +487,8 @@ public class CoopBattleController : CoopMissionController
 
         void ReplayJoinState()
         {
-            replicator.FlushPendingSpawns();
             authorityMigrator.ReturnPartyTo(controllerId);
+            replicator.FlushPendingSpawns();
             replicator.ReplicateCurrentAgentsTo(controllerId);
             siegeEngineDeployment.CatchUpJoiner(controllerId);
             siegeMachineState.CatchUpJoiner(controllerId);

@@ -76,6 +76,7 @@ public class CoopBattleMissionSpawnHandlerSizingTests
             sideInitial: 40,
             ownedTotal: 1,
             ownedInitial: 1,
+            supplied: 0,
             out var total,
             out var initial,
             out var remaining);
@@ -83,6 +84,22 @@ public class CoopBattleMissionSpawnHandlerSizingTests
         Assert.Equal(1, total);
         Assert.Equal(1, initial);
         Assert.Equal(0, remaining);
+        Assert.Equal(total, initial + remaining);
+    }
+
+    [Theory]
+    [InlineData(1, 1, 1, 0, 0, 0)]
+    [InlineData(10, 4, 2, 8, 2, 6)]
+    [InlineData(10, 4, 6, 4, 0, 4)]
+    [InlineData(1, 1, 2, 0, 0, 0)]
+    public void ReturnedSupply_OnlyUnsuppliedQuotaCanBeRequestedFromNativeContexts(
+        int ownedTotal, int ownedInitial, int supplied, int expectedTotal, int expectedInitial, int expectedRemaining)
+    {
+        CoopBattleMissionSpawnHandler.AdjustPhaseToOwnedShare(100, 40, ownedTotal, ownedInitial, supplied,
+            out int total, out int initial, out int remaining);
+        Assert.Equal(expectedTotal, total);
+        Assert.Equal(expectedInitial, initial);
+        Assert.Equal(expectedRemaining, remaining);
         Assert.Equal(total, initial + remaining);
     }
 

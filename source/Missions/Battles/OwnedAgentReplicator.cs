@@ -63,6 +63,7 @@ public class OwnedAgentReplicator : IOwnedAgentReplicator
     private readonly IBattleDeploymentCoordinator deployment;
     private readonly IBattleAgentSpawnBatchCodec spawnBatchCodec;
     private readonly IMissionWeaponDataMapper missionWeaponDataMapper;
+    private readonly IBattleAuthorityMigrator authorityMigrator;
     private readonly List<BattleAgentSpawnData> pendingSpawns = new List<BattleAgentSpawnData>();
 
     // The horse each of our riders SPAWNED with (rider id → mount id), so a record built while the rider is
@@ -83,7 +84,8 @@ public class OwnedAgentReplicator : IOwnedAgentReplicator
         ICasualtyAttributionMap casualties,
         IBattleDeploymentCoordinator deployment,
         IBattleAgentSpawnBatchCodec spawnBatchCodec,
-        IMissionWeaponDataMapper missionWeaponDataMapper)
+        IMissionWeaponDataMapper missionWeaponDataMapper,
+        IBattleAuthorityMigrator authorityMigrator)
     {
         this.network = network;
         this.messageBroker = messageBroker;
@@ -94,6 +96,7 @@ public class OwnedAgentReplicator : IOwnedAgentReplicator
         this.deployment = deployment;
         this.spawnBatchCodec = spawnBatchCodec;
         this.missionWeaponDataMapper = missionWeaponDataMapper;
+        this.authorityMigrator = authorityMigrator;
         movementScopeId =
             session.OwnControllerId + ":" + Guid.NewGuid().ToString("N");
 
@@ -131,6 +134,21 @@ public class OwnedAgentReplicator : IOwnedAgentReplicator
     {
         if (pendingSpawns.Count == 0) return;
 
+        var registry = coopMissionComponent.AgentRegistry;
+        for (int i = pendingSpawns.Count - 1; i >= 0; i--)
+        {
+            var data = pendingSpawns[i];
+            if (!registry.TryGetAgentInfo(data.AgentId, out var info) || !info.Agent.IsActive())
+            {
+                pendingSpawns.RemoveAt(i);
+                continue;
+            }
+            authorityMigrator.ApplyReturnedParties(info.Agent);
+            var mountInfo = ResolveAgentInfo(data.MountAgentId);
+            pendingSpawns[i] = RefreshAuthority(data, info, mountInfo?.AuthorityRevision ?? data.MountAuthorityRevision);
+        }
+        if (pendingSpawns.Count == 0) return;
+
         IReadOnlyList<NetworkSpawnBattleAgents> batches =
             spawnBatchCodec.Encode(pendingSpawns, SpawnBatchPurpose.Initial);
         int recordCount = pendingSpawns.Count;
@@ -140,6 +158,19 @@ public class OwnedAgentReplicator : IOwnedAgentReplicator
             network.SendAll(batch);
 
         LogBatchSend("Broadcast", recordCount, batches, null);
+    }
+
+    internal static BattleAgentSpawnData RefreshAuthority(BattleAgentSpawnData data, CoopAgentInfo info,
+        long mountAuthorityRevision)
+    {
+        if (data.OwnerControllerId == info.CurrentAuthority && data.AuthorityRevision == info.AuthorityRevision
+            && data.MountAuthorityRevision == mountAuthorityRevision) return data;
+        return new BattleAgentSpawnData(data.AgentId, data.CharacterId, data.Position, data.Side, data.Health,
+            info.CurrentAuthority, data.MapEventPartyId, data.TroopSeed, data.SpawnEquipment, data.BodyProperties,
+            data.MissionEquipmentData, data.MountAgentId, data.FormationIndex, data.MovementId, data.MountMovementId,
+            data.OriginalOwnerControllerId, data.HasCurrentEquipment ? data.CurrentEquipment : (AgentEquipmentData?)null,
+            data.MovementScopeId, data.MountOriginalOwnerControllerId, data.MountMovementScopeId, data.IsRunningAway,
+            info.AuthorityRevision, mountAuthorityRevision);
     }
 
     public void BroadcastOwnDeployedTroops()

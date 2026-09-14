@@ -501,6 +501,7 @@ public class CoopBattleMissionSpawnHandler : SandBoxMissionSpawnHandler
                 phase.InitialSpawnNumber,
                 supplier.OwnedShareOf(phase.TotalSpawnNumber),
                 supplier.OwnedShareOf(phase.InitialSpawnNumber),
+                supplier.CaptureAllocationSnapshot().SuppliedTroops,
                 out var total,
                 out var initial,
                 out var remaining);
@@ -515,12 +516,16 @@ public class CoopBattleMissionSpawnHandler : SandBoxMissionSpawnHandler
         int sideInitial,
         int ownedTotal,
         int ownedInitial,
+        int supplied,
         out int total,
         out int initial,
         out int remaining)
     {
         total = ReachableSpawnNumber(sideTotal, ownedTotal);
         initial = Math.Min(total, ReachableSpawnNumber(sideInitial, ownedInitial));
+        // Replayed bodies have already consumed their ledger entries and are outside native spawn contexts.
+        total = Math.Max(0, total - supplied);
+        initial = Math.Min(total, Math.Max(0, initial - supplied));
         remaining = total - initial;
     }
 

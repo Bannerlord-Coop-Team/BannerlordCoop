@@ -81,6 +81,17 @@ public class BattleMigrationMirrorTests : MissionTestEnvironment
                 migrator.ApplyReturnedParties(hero);
             }
             Assert.True(registry.TryGetAgentInfo(heroId, out var info));
+            var captured = new BattleAgentSpawnData(heroId, "hero", default, BattleSideEnum.Defender,
+                75f, "B", "returning-party", 1, new Equipment(), default, null,
+                movementId: info.MovementId, originalOwnerControllerId: "B", movementScopeId: info.MovementScopeId);
+            var pending = OwnedAgentReplicator.RefreshAuthority(captured, info, 0);
+            Assert.Equal(alive ? "A" : "B", pending.OwnerControllerId);
+            Assert.Equal(info.AuthorityRevision, pending.AuthorityRevision);
+            Assert.Equal(heroId, pending.AgentId);
+            Assert.Equal(captured.TroopSeed, pending.TroopSeed);
+            Assert.Equal(captured.MovementScopeId, pending.MovementScopeId);
+            Assert.Equal(captured.Health, pending.Health);
+            Assert.Same(pending, OwnedAgentReplicator.RefreshAuthority(pending, info, 0));
             long revision = info.AuthorityRevision;
             migrator.ReturnPartyTo("A");
             migrator.ApplyReturnedParties(hero);
