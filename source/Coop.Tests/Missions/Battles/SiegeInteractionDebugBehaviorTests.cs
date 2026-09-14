@@ -210,11 +210,13 @@ public class SiegeInteractionDebugBehaviorTests
         Assert.True((eye + (horizontal * targetDistance) - targetCenter).Length > 1f);
     }
 
-    [Fact]
-    public void NativeStoneTarget_UsesCurrentPhysicsCenterWithoutChangingObserverTarget()
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void NativeTarget_UsesCurrentPhysicsCenterWithoutChangingObserverTarget(bool ballistaTarget)
     {
         using var mission = new MissionCurrentScope();
-        var harmony = new Harmony("coop.tests.stone-physics-target");
+        var harmony = new Harmony("coop.tests.native-physics-target");
         try
         {
             harmony.Patch(AccessTools.Method(typeof(ScriptComponentBehavior), "CacheEditableFieldsForAllScriptComponents"),
@@ -222,28 +224,65 @@ public class SiegeInteractionDebugBehaviorTests
                     nameof(SkipScriptComponentCache))));
             harmony.Patch(AccessTools.Method(typeof(WeakGameEntity), nameof(WeakGameEntity.ComputeGlobalPhysicsBoundingBoxCenter)),
                 prefix: new HarmonyMethod(AccessTools.Method(typeof(SiegeInteractionDebugBehaviorTests),
-                    nameof(StonePhysicsCenter))));
+                    nameof(NativePhysicsCenter))));
 #pragma warning disable SYSLIB0050
-            var stone = (StonePile)FormatterServices.GetUninitializedObject(typeof(StonePile));
+            var machine = (UsableMachine)FormatterServices.GetUninitializedObject(
+                ballistaTarget ? typeof(Ballista) : typeof(StonePile));
+            if (ballistaTarget)
+            {
+                var body = (SynchedMissionObject)FormatterServices.GetUninitializedObject(typeof(SynchedMissionObject));
+                var entity = AccessTools.Constructor(typeof(WeakGameEntity), new[] { typeof(UIntPtr) })
+                    .Invoke(new object[] { new UIntPtr(880u) });
+                AccessTools.Field(typeof(ScriptComponentBehavior), "_gameEntity").SetValue(body, entity);
+                AccessTools.Property(typeof(Ballista), "ballistaBody").SetValue(machine, body);
+                harmony.Patch(AccessTools.PropertyGetter(typeof(WeakGameEntity), nameof(WeakGameEntity.Name)),
+                    prefix: new HarmonyMethod(AccessTools.Method(typeof(SiegeInteractionDebugBehaviorTests), nameof(BallistaBodyName))));
+                foreach (var name in new[] { nameof(WeakGameEntity.GlobalBoxMin), nameof(WeakGameEntity.GlobalBoxMax) })
+                    harmony.Patch(AccessTools.PropertyGetter(typeof(WeakGameEntity), name),
+                        prefix: new HarmonyMethod(AccessTools.Method(typeof(SiegeInteractionDebugBehaviorTests), nameof(BallistaRenderBounds))));
+                harmony.Patch(AccessTools.Method(typeof(SiegeInteractionDebugBehavior), "DescribeAncestors"),
+                    prefix: new HarmonyMethod(AccessTools.Method(typeof(SiegeInteractionDebugBehaviorTests), nameof(BallistaAncestors))));
+            }
 #pragma warning restore SYSLIB0050
             var behavior = new SiegeInteractionDebugBehavior(Mock.Of<IMessageBroker>());
             var standingPosition = new Vec3(498.52f, 720.788f, 36.16533f);
 
-            Assert.Equal(standingPosition, behavior.GetStagingTarget(stone, standingPosition, true, true));
-            Assert.Equal(standingPosition, behavior.GetStagingTarget(stone, standingPosition, false));
-            Assert.Equal(new Vec3(499f, 721f, 36.5f),
-                behavior.GetStagingTarget(stone, standingPosition, false, true));
+            Assert.Equal(standingPosition, behavior.GetStagingTarget(machine, standingPosition, true, true));
+            Assert.Equal(standingPosition, behavior.GetStagingTarget(machine, standingPosition, false));
+            var expectedX = ballistaTarget ? 500f : 499f;
+            Assert.Equal(new Vec3(expectedX, 721f, 36.5f),
+                behavior.GetStagingTarget(machine, standingPosition, false, true));
             var target = JObject.FromObject(AccessTools.Field(typeof(SiegeInteractionDebugBehavior), "nativeAimTarget").GetValue(behavior));
-            Assert.Equal(499f, target["target"]["x"].Value<float>());
+            Assert.Equal(expectedX, target["target"]["x"].Value<float>());
             Assert.Null(AccessTools.Field(typeof(SiegeInteractionDebugBehavior), "capturedAgent").GetValue(behavior));
             Assert.Null(AccessTools.Field(typeof(SiegeInteractionDebugBehavior), "stagingCamera").GetValue(behavior));
         }
         finally { harmony.UnpatchAll(harmony.Id); }
     }
 
-    private static bool StonePhysicsCenter(ref Vec3 __result)
+    private static bool NativePhysicsCenter(WeakGameEntity __instance, ref Vec3 __result)
     {
-        __result = new Vec3(499f, 721f, 36.5f);
+        Assert.Contains(__instance.Pointer.ToUInt64(), new ulong[] { 0, 880 });
+        __result = new Vec3(__instance.Pointer == UIntPtr.Zero ? 499f : 500f, 721f, 36.5f);
+        return false;
+    }
+
+    private static bool BallistaBodyName(ref string __result)
+    {
+        __result = "ballista_body";
+        return false;
+    }
+
+    private static bool BallistaRenderBounds(System.Reflection.MethodBase __originalMethod, ref Vec3 __result)
+    {
+        __result = __originalMethod.Name == "get_GlobalBoxMin"
+            ? new Vec3(495f, 710f, 36f) : new Vec3(507f, 728f, 39f);
+        return false;
+    }
+
+    private static bool BallistaAncestors(ref object[] __result)
+    {
+        __result = Array.Empty<object>();
         return false;
     }
 

@@ -690,10 +690,9 @@ internal sealed class SiegeInteractionDebugBehavior : MissionBehavior, ISiegeInt
             var body = ballista.ballistaBody;
             if (body == null || !body.GameEntity.IsValid)
                 throw new InvalidOperationException("The current ballista has no resolved body.");
-            var entity = GameEntity.CreateFromWeakEntity(body.GameEntity);
-            var min = entity.GlobalBoxMin;
-            var max = entity.GlobalBoxMax;
-            var target = (min * 0.5f) + (max * 0.5f);
+            var min = body.GameEntity.GlobalBoxMin;
+            var max = body.GameEntity.GlobalBoxMax;
+            var target = body.GameEntity.ComputeGlobalPhysicsBoundingBoxCenter();
             nativeAimTarget = new
             {
                 requestId, tick, recordedUtc = DateTime.UtcNow, machineId = machine.Id.Id, bodyId = body.Id.Id,
@@ -701,7 +700,7 @@ internal sealed class SiegeInteractionDebugBehavior : MissionBehavior, ISiegeInt
                 min = DescribePosition(min), max = DescribePosition(max), target = DescribePosition(target),
                 ancestors = DescribeAncestors(body.GameEntity)
             };
-            if (new[] { min.x, min.y, min.z, max.x, max.y, max.z }
+            if (new[] { min.x, min.y, min.z, max.x, max.y, max.z, target.x, target.y, target.z }
                     .Any(value => float.IsNaN(value) || float.IsInfinity(value)) ||
                 min.x > max.x || min.y > max.y || min.z > max.z || (max - min).LengthSquared < 0.0001f)
                 throw new InvalidOperationException("The resolved ballista body has invalid world bounds.");
