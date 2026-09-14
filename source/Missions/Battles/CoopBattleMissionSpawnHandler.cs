@@ -6,6 +6,9 @@ using GameInterface.Services.MapEvents;
 using GameInterface.Services.MapEvents.TroopSupply;
 using SandBox.Missions.MissionLogics;
 using Serilog;
+using Missions.Data;
+using TaleWorlds.CampaignSystem;
+using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.Core;
 using TaleWorlds.MountAndBlade;
 
@@ -123,7 +126,7 @@ public class CoopBattleMissionSpawnHandler : SandBoxMissionSpawnHandler
     private bool ShouldContinueHolding(SideSizing sizing)
     {
         return _heldSeconds < ReserveHoldDeadlineSeconds
-            && (!sizing.Ready || !sizing.HasAnyOwnedTroops);
+            && (!sizing.Ready || !sizing.HasAnyOwnedTroops || !HasLocalPlayerOrigin());
     }
 
     private bool HasValidMissionSizing(SideSizing sizing)
@@ -150,7 +153,25 @@ public class CoopBattleMissionSpawnHandler : SandBoxMissionSpawnHandler
 
     private bool HasLocalPlayerOrigin()
     {
-        return HasLocalPlayerOrigin(_playerSide, GetLocalPlayerPartyId(), _defenderSupplier, _attackerSupplier);
+        return HasLocalPlayerOrigin(_playerSide, GetLocalPlayerPartyId(), _defenderSupplier, _attackerSupplier)
+            || HasRestoredPlayerAgent(base.Mission?.InitialPlayerAgent);
+    }
+
+    internal bool CanRestorePlayerAgent(BattleAgentSpawnData data, CharacterObject character)
+    {
+        var supplier = _playerSide == BattleSideEnum.Attacker ? _attackerSupplier : _defenderSupplier;
+        return data.Side == _playerSide && data.Health > 0 && character.IsHero
+            && character.HeroObject == Hero.MainHero && !string.IsNullOrEmpty(supplier.PlayerPartyId)
+            && data.MapEventPartyId == supplier.PlayerPartyId && supplier.ContainsParty(supplier.PlayerPartyId)
+            && supplier.GetRemainingForParty(supplier.PlayerPartyId) == 0;
+    }
+
+    internal bool HasRestoredPlayerAgent(Agent agent)
+    {
+        return agent != null && agent.IsActive() && agent.Health > 0
+            && agent.Character is CharacterObject character && character.IsHero
+            && character.HeroObject == Hero.MainHero && agent.Team?.Side == _playerSide
+            && agent.Origin is CoopAgentOrigin origin && origin.Party == MobileParty.MainParty?.Party;
     }
 
     private string GetLocalPlayerPartyId()

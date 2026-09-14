@@ -189,7 +189,11 @@ public class PuppetSpawner : IPuppetSpawner
         bool isRetainedFormerHostRecord = IsRetainedFormerHostRecord(data);
 
         bool isOwnAgent = session.IsOwn(data.OwnerControllerId);
-        if (LocalDeploymentBlocksSpawn(isOwnAgent)) return false;
+        bool restorePlayer = isOwnAgent
+            && objectManager.TryGetObject<CharacterObject>(data.CharacterId, out var returningCharacter)
+            && Mission.Current.GetMissionBehavior<CoopBattleMissionSpawnHandler>() is CoopBattleMissionSpawnHandler spawnHandler
+            && spawnHandler.CanRestorePlayerAgent(data, returningCharacter);
+        if (!restorePlayer && LocalDeploymentBlocksSpawn(isOwnAgent)) return false;
 
         // BR-110: the engine renders at most a fixed number of agents. At capacity the puppet is deferred, not
         // dropped — buffered and retried by DrainPendingPuppets as removals free slots. A mounted record spawns
@@ -376,6 +380,8 @@ public class PuppetSpawner : IPuppetSpawner
                 agent.MountAgent,
                 data.MountAgentId);
         }
+
+        authorityMigrator?.ApplyReturnedParties(agent);
 
         // Key the casualty on the troop's CHARACTER through the object manager (never a raw StringId).
         objectManager.TryGetId(character, out var troopCharacterId);

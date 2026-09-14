@@ -115,7 +115,7 @@ public class OwnedAgentReplicator : IOwnedAgentReplicator
             if (Mission.Current == null) return;
 
             // A joiner catches up on everything we own (our own party AND, on the host, the AI it drives).
-            var records = BuildOwnedAgentRecords(ownPartyOnly: false);
+            var records = BuildOwnedAgentRecords(ownPartyOnly: false, returningControllerId: controllerId);
             if (records.Count == 0) return;
 
             IReadOnlyList<NetworkSpawnBattleAgents> batches =
@@ -166,10 +166,13 @@ public class OwnedAgentReplicator : IOwnedAgentReplicator
     // commit, which withholds those until they are placed; the joiner catch-up passes false to replay all we own.
     // Registered MOUNTS get no record of their own — a horse spawns implicitly with its rider on the receiver,
     // so its id rides on the rider's record instead (MountAgentId).
-    private List<BattleAgentSpawnData> BuildOwnedAgentRecords(bool ownPartyOnly)
+    private List<BattleAgentSpawnData> BuildOwnedAgentRecords(bool ownPartyOnly, string returningControllerId = null)
     {
         var records = new List<BattleAgentSpawnData>();
-        foreach (var info in coopMissionComponent.AgentRegistry.GetAgents(session.OwnControllerId))
+        var agents = new List<CoopAgentInfo>(coopMissionComponent.AgentRegistry.GetAgents(session.OwnControllerId));
+        if (session.IsLocalHost && !string.IsNullOrEmpty(returningControllerId) && !session.IsOwn(returningControllerId))
+            agents.AddRange(coopMissionComponent.AgentRegistry.GetAgents(returningControllerId));
+        foreach (var info in agents)
         {
             var agent = info.Agent;
             if (agent == null || !agent.IsActive() || agent.IsMount || !(agent.Character is CharacterObject character)) continue;
@@ -199,7 +202,7 @@ public class OwnedAgentReplicator : IOwnedAgentReplicator
 
             records.Add(new BattleAgentSpawnData(
                 info.AgentId, characterId, agent.Position, side, agent.Health,
-                session.OwnControllerId, attribution.MapEventPartyId, attribution.TroopSeed,
+                info.CurrentAuthority, attribution.MapEventPartyId, attribution.TroopSeed,
                 spawnEquipment, bodyProperties, missionEquipmentData,
                 mountAgentId, formationIndex, info.MovementId,
                 mountInfo?.MovementId ?? 0,

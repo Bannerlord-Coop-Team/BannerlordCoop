@@ -33,6 +33,10 @@ public interface IBattleAuthorityMigrator : IDisposable
     /// Every peer corrects its registry; the promoted host also revives battle AI.
     /// </summary>
     void ApplyLateSpawnedPuppet(Agent agent, Guid agentId, Agent mount, Guid mountAgentId);
+
+    void ReturnPartyTo(string controllerId);
+
+    void ApplyReturnedParties(Agent agent);
 }
 
 /// <inheritdoc cref="IBattleAuthorityMigrator"/>
@@ -57,6 +61,7 @@ public class BattleAuthorityMigrator : IBattleAuthorityMigrator
     // which all run on the relay's receive thread, so no locking. Entries are consumed by the promotion and
     // cleared if the controller re-enters (a later drop of the same controller must not be treated as a retreat).
     private readonly HashSet<string> withdrawnHosts = new HashSet<string>();
+    private readonly HashSet<string> returnedControllers = new HashSet<string>();
 
     public BattleAuthorityMigrator(
         INetwork relayNetwork,
@@ -97,17 +102,57 @@ public class BattleAuthorityMigrator : IBattleAuthorityMigrator
         messageBroker.Unsubscribe<BattleHostMigrated>(Handle_BattleHostMigrated);
     }
 
-    // A controller (re-)entered the instance: clear any stale withdrawal marker. Its party is supplied from
-    // the server reserve and spawned fresh; withdrawn agents are never reclaimed.
+    // Return already-fielded troops without replenishing their consumed reserve entries.
     private void Handle_PeerEntered(MessagePayload<NetworkMissionPeerEntered> payload)
     {
         if (payload.What.InstanceId != null && payload.What.InstanceId != session.InstanceId) return;
         withdrawnHosts.Remove(payload.What.ControllerId);
+        GameThread.RunSafe(() => ReturnPartyTo(payload.What.ControllerId), context: nameof(ReturnPartyTo));
+    }
+
+    public void ReturnPartyTo(string controllerId)
+    {
+        if (string.IsNullOrEmpty(controllerId) || string.IsNullOrEmpty(session.HostControllerId)
+            || session.IsHostController(controllerId)) return;
+        if (!TryGetPlayerParty(controllerId, out var party, out var hero)) return;
+
+        returnedControllers.Add(controllerId);
+        foreach (var info in coopMissionComponent.AgentRegistry.GetAgents(session.HostControllerId))
+            ReturnAgentTo(info, controllerId, party, hero);
+    }
+
+    public void ApplyReturnedParties(Agent agent)
+    {
+        var registry = coopMissionComponent.AgentRegistry;
+        if (!registry.TryGetAgentInfo(agent, out var info) || !session.IsHostController(info.CurrentAuthority)) return;
+        foreach (var controllerId in returnedControllers)
+        {
+            if (!TryGetPlayerParty(controllerId, out var party, out var hero)) continue;
+            ReturnAgentTo(info, controllerId, party, hero);
+            if (agent.MountAgent != null && registry.TryGetAgentInfo(agent.MountAgent, out var mountInfo))
+                ReturnAgentTo(mountInfo, controllerId, party, hero);
+        }
+    }
+
+    private void ReturnAgentTo(CoopAgentInfo info, string controllerId, PartyBase party, Hero hero)
+    {
+        var agent = info.Agent;
+        if (agent == null || !agent.IsActive() || !IsRetreatersAgent(agent, party, hero)) return;
+        if (!coopMissionComponent.AgentRegistry.TryTransferAuthority(controllerId, info.AgentId)) return;
+        if (agent.IsMount || session.IsOwn(controllerId)) return;
+
+        // The returning controller now drives this same body and its existing movement identity.
+        agent.Controller = AgentControllerType.None;
+        agent.SetIsAIPaused(false);
+        Logger.Information("[BattleSync] Returned live party agent {AgentId} to {Controller} at revision {Revision}",
+            info.AgentId, controllerId, info.AuthorityRevision);
     }
 
     // A graceful leave withdraws the player's party on every client.
     private void Handle_PeerLeft(MessagePayload<MissionPeerLeft> payload)
     {
+        if (payload.What.InstanceId != null && payload.What.InstanceId != session.InstanceId) return;
+        GameThread.RunSafe(() => returnedControllers.Remove(payload.What.ControllerId));
         HandlePartyWithdrawal(payload.What.ControllerId, payload.What.InstanceId, "retreated");
     }
 
@@ -117,6 +162,7 @@ public class BattleAuthorityMigrator : IBattleAuthorityMigrator
     {
         var controllerId = payload.What.ControllerId;
         if (payload.What.InstanceId != null && payload.What.InstanceId != session.InstanceId) return;
+        GameThread.RunSafe(() => returnedControllers.Remove(controllerId));
         if (session.IsHostController(controllerId)) return;
         if (!session.IsLocalHost) return;
 

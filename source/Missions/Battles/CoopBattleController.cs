@@ -486,6 +486,8 @@ public class CoopBattleController : CoopMissionController
 
         void ReplayJoinState()
         {
+            replicator.FlushPendingSpawns();
+            authorityMigrator.ReturnPartyTo(controllerId);
             replicator.ReplicateCurrentAgentsTo(controllerId);
             siegeEngineDeployment.CatchUpJoiner(controllerId);
             siegeMachineState.CatchUpJoiner(controllerId);

@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Linq;
 using Common.Messaging;
 using E2E.Tests.Environment;
@@ -8,6 +8,10 @@ using GameInterface.Services.MapEvents.TroopSupply;
 using Missions;
 using Missions.Battles;
 using Missions.Messages;
+using Common.Network;
+using GameInterface.Services.Players;
+using Missions.Services.Network;
+using Moq;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.Core;
@@ -27,6 +31,70 @@ namespace E2E.Tests.Services.Missions;
 public class BattleMigrationMirrorTests : MissionTestEnvironment
 {
     public BattleMigrationMirrorTests(ITestOutputHelper output) : base(output) { }
+
+    [Theory]
+    [InlineData(false, true)]
+    [InlineData(true, true)]
+    [InlineData(false, false)]
+    public void ReturningParty_ReclaimsOnlyLiveAgents_WithoutReplayingReserve(bool lateSpawn, bool alive)
+    {
+        using var fixture = new MissionEngineFixture();
+        var (mapEventId, partyIds) = SetupCoopBattle("A", "B");
+        var successor = Clients.Skip(1).First();
+        successor.Call(() =>
+        {
+            var mock = fixture.CreateMission(successor);
+            var controller = successor.Resolve<CoopBattleController>();
+            controller.Session.TryBegin(mapEventId);
+            successor.Resolve<IBattleHostRegistry>().Set(mapEventId,
+                new BattleHostAssignment("B", new[] { "A" }));
+            var registry = successor.Resolve<INetworkAgentRegistry>();
+            Assert.True(successor.ObjectManager.TryGetObject<MobileParty>(partyIds[0], out var party));
+            var character = (CharacterObject)Game.Current.PlayerTroop;
+            var origin = new CoopAgentOrigin(character, party.Party, -1, null, new UniqueTroopDescriptor(1));
+            var hero = mock.SpawnAgent(new AgentBuildData(character).Controller(AgentControllerType.AI)
+                .Team(mock.DefenderTeam.Shell).TroopOrigin(origin));
+            var npc = mock.SpawnAgent(new AgentBuildData(Game.Current.PlayerTroop)
+                .Controller(AgentControllerType.AI).Team(mock.AttackerTeam.Shell));
+            var heroId = Guid.NewGuid();
+            var npcId = Guid.NewGuid();
+            registry.TryRegisterAgent("B", npcId, npc);
+            Assert.True(AgentMirror.TryGet(hero, out var mirror));
+            mirror.IsActive = alive;
+
+            var supplier = new CoopTroopSupplier(mapEventId, BattleSideEnum.Defender,
+                successor.ObjectManager, new BattleAgentBudget());
+            supplier.SetReserve(new[] { new PartyReserve("returning-party", 1,
+                new[] { new TroopReserveEntry(1, "hero", 0) }, isReceiverPlayerParty: true) },
+                sideTotal: 2, playerOwnedParties: 1, authoritativeBattleSize: 1000);
+            using var broker = new MessageBroker();
+            using var migrator = new BattleAuthorityMigrator(Mock.Of<INetwork>(),
+                broker, successor.ObjectManager, successor.Resolve<IPlayerManager>(),
+                successor.Resolve<ICoopMissionComponent>(), controller.Session, new CasualtyAttributionMap(),
+                Mock.Of<IBattleDeploymentCoordinator>(), Mock.Of<IAgentFormationAssigner>(),
+                Mock.Of<IMissionContext>(), Mock.Of<IReinforcementFielder>());
+            if (!lateSpawn) registry.TryRegisterAgent("B", heroId, hero);
+            migrator.ReturnPartyTo("A");
+            if (lateSpawn)
+            {
+                registry.TryRegisterAgent("B", heroId, hero);
+                migrator.ApplyReturnedParties(hero);
+            }
+            Assert.True(registry.TryGetAgentInfo(heroId, out var info));
+            long revision = info.AuthorityRevision;
+            migrator.ReturnPartyTo("A");
+            migrator.ApplyReturnedParties(hero);
+            Assert.Equal(alive ? "A" : "B", info.CurrentAuthority);
+            Assert.Equal(revision, info.AuthorityRevision);
+            Assert.Equal(alive ? AgentControllerType.None : AgentControllerType.AI, mirror.Controller);
+            Assert.True(registry.TryGetAgentInfo(npcId, out var npcInfo));
+            Assert.Equal("B", npcInfo.CurrentAuthority);
+            Assert.Equal(2, registry.GetAgents("A").Count + registry.GetAgents("B").Count);
+            Assert.Equal(0, supplier.GetRemainingForParty("returning-party"));
+            Assert.Equal(1, supplier.GetSuppliedByParty().Single().supplied);
+            Assert.Null(supplier.SupplyOneTroop());
+        });
+    }
 
     [Fact]
     public void HostMigration_AdoptsNpcPuppets_AsAi_InFormation_OrderedToCharge()
