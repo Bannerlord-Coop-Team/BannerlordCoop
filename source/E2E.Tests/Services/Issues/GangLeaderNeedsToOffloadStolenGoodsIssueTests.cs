@@ -427,6 +427,7 @@ public class GangLeaderNeedsToOffloadStolenGoodsIssueTests : IDisposable
                 Assert.Equal(acceptedFields.StolenTradeGoodPrice, mirroredQuest._stolenTradeGoodPrice);
                 Assert.Equal(acceptedFields.RewardGold, mirroredQuest.RewardGold);
                 Assert.Equal(acceptedFields.CounterOfferGold, mirroredQuest._counterOfferGold);
+                Assert.Contains(acceptedFields.StolenTradeGoodAmount.ToString(), mirroredQuest._playerStartsQuestLog.LogText.ToString());
             });
         }
 

@@ -167,15 +167,15 @@ internal static class GangLeaderNeedsToOffloadStolenGoodsQuestType
 
                 if (issue.IssueQuest is not Quest quest) return;
 
-                if (quest._playerStartsQuestLog == null)
-                {
-                    quest.QuestAcceptedConsequences();
-                }
-
                 StolenTradeGoodAmountField.SetValue(quest, fields.StolenTradeGoodAmount);
                 StolenTradeGoodPriceField.SetValue(quest, fields.StolenTradeGoodPrice);
                 RewardGoldField.SetValue(quest, fields.RewardGold);
                 CounterOfferGoldField.SetValue(quest, fields.CounterOfferGold);
+
+                if (quest._playerStartsQuestLog == null)
+                {
+                    quest.QuestAcceptedConsequences();
+                }
             }
         }
 
