@@ -82,6 +82,7 @@ public class StanceLinkLifetimeTests : IDisposable
 
         // Act
         string? clientStanceLinkId = null;
+        StanceLink? clientStanceLink = null;
         StanceType? expectedStanceType = null;
 
         firstClient.Call(() =>
@@ -89,14 +90,15 @@ public class StanceLinkLifetimeTests : IDisposable
             Assert.True(firstClient.ObjectManager.TryGetObject<IFaction>(faction1Id, out var clientFaction1));
             Assert.True(firstClient.ObjectManager.TryGetObject<IFaction>(faction2Id, out var clientFaction2));
 
-            var clientStanceLink = FactionManager.Instance.GetStanceLinkInternal(clientFaction1, clientFaction2);
+            clientStanceLink = FactionManager.Instance.GetStanceLinkInternal(clientFaction1, clientFaction2);
             expectedStanceType = clientStanceLink.StanceType;
 
             Assert.Equal(faction1StringId, clientStanceLink.Faction1.StringId);
             Assert.Equal(faction2StringId, clientStanceLink.Faction2.StringId);
-
-            Assert.True(firstClient.ObjectManager.TryGetId(clientStanceLink, out clientStanceLinkId));
         });
+
+        firstClient.Call(() =>
+            Assert.True(firstClient.ObjectManager.TryGetId(clientStanceLink!, out clientStanceLinkId)));
 
         // Assert
         server.Call(() =>

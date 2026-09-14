@@ -89,5 +89,6 @@ internal class MapTracksCampaignBehaviorPatches
 
         mapTracksCampaignBehaviorInterface.SyncTrackMapFactions(__instance, dataStore);
         mapTracksCampaignBehaviorInterface.SyncPlayerDetectedTracks(__instance, dataStore);
+        mapTracksCampaignBehaviorInterface.SyncTrackSourceParties(__instance, dataStore);
     }
 }

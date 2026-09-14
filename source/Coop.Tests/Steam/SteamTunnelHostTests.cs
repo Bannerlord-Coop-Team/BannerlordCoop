@@ -1,4 +1,7 @@
 ﻿using Coop.Steam;
+using Common.Logging;
+using Moq;
+using System.Threading;
 using System;
 using System.Linq;
 using System.Net;
@@ -14,7 +17,7 @@ namespace Coop.Tests.Steam
 
         public SteamTunnelHostTests()
         {
-            host = new SteamTunnelHost(transport);
+            host = new SteamTunnelHost(transport, () => new Common.Logging.ReceivePathDiagnostics());
         }
 
         public void Dispose() => host.Dispose();
@@ -241,6 +244,29 @@ namespace Coop.Tests.Steam
             // LiteNetLib keys peers by endpoint, so each tunneled client must arrive
             // from its own local port.
             Assert.NotEqual(((IPEndPoint)firstSender).Port, ((IPEndPoint)secondSender).Port);
+        }
+
+        [Fact]
+        public void SteamReceive_RecordsSuccessfulUdpForwardAndPeerTeardown()
+        {
+            var measuredTransport = new FakeSteamTunnelTransport();
+            var diagnostics = new Mock<IReceivePathDiagnostics>();
+            int forwards = 0;
+            diagnostics.Setup(d => d.Record(ReceivePathEvent.UdpForwarded, 3, SocketError.Success))
+                .Callback(() => Interlocked.Increment(ref forwards));
+            using var measuredHost = new SteamTunnelHost(measuredTransport, () => diagnostics.Object);
+            using var serverSocket = CreateServerSocket();
+            measuredHost.Start(((IPEndPoint)serverSocket.LocalEndPoint!).Port);
+            measuredTransport.RaiseConnectionState(7, TunnelConnectionState.Connecting);
+            measuredTransport.RaiseConnectionState(7, TunnelConnectionState.Connected);
+            measuredTransport.EnqueueReceive(7, new byte[] { 1, 2, 3 });
+            byte[] buffer = new byte[16];
+            Assert.Equal(3, serverSocket.Receive(buffer));
+            SteamTunnelClientTests.WaitUntil(() => Volatile.Read(ref forwards) == 1);
+            diagnostics.Verify(d => d.Record(ReceivePathEvent.SteamReceive, 3, SocketError.Success), Times.Once);
+            diagnostics.Verify(d => d.Record(ReceivePathEvent.UdpForwardFailed, It.IsAny<int>(), It.IsAny<SocketError>()), Times.Never);
+            measuredTransport.RaiseConnectionState(7, TunnelConnectionState.Closed);
+            diagnostics.Verify(d => d.End("peer-removed"), Times.Once);
         }
 
         private static Socket CreateServerSocket()

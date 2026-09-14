@@ -70,6 +70,8 @@ namespace GameInterface.Services.Workshops.Commands
 
             public string Description => "Sets workshop custom name for co-op debugging.";
 
+            public CoopCommandSide Side => CoopCommandSide.Both;
+
             public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
             {
                 new ExpectedArgs("settlementId", "The settlement id."),
@@ -117,6 +119,8 @@ namespace GameInterface.Services.Workshops.Commands
             public string Name => "set_workshop_owner";
 
             public string Description => "Sets workshop owner for co-op debugging.";
+
+            public CoopCommandSide Side => CoopCommandSide.Both;
 
             public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
             {
@@ -186,6 +190,8 @@ namespace GameInterface.Services.Workshops.Commands
 
             public string Description => "Runs in settlement for co-op debugging.";
 
+            public CoopCommandSide Side => CoopCommandSide.Both;
+
             public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
             {
                 new ExpectedArgs("settlementId", "The settlement id."),
@@ -228,6 +234,8 @@ namespace GameInterface.Services.Workshops.Commands
 
             public string Description => "Runs owned workshops for co-op debugging.";
 
+            public CoopCommandSide Side => CoopCommandSide.Both;
+
             public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
             {
                 new ExpectedArgs("heroId", "The hero id."),
@@ -269,6 +277,8 @@ namespace GameInterface.Services.Workshops.Commands
             public string Name => "view_warehouse_rosters";
 
             public string Description => "Shows warehouse rosters for co-op debugging.";
+
+            public CoopCommandSide Side => CoopCommandSide.Both;
 
             public IExpectedArgs[] ExpectedArgs { get; } = System.Array.Empty<IExpectedArgs>();
 
@@ -332,6 +342,8 @@ namespace GameInterface.Services.Workshops.Commands
             public string Name => "workshop_info";
 
             public string Description => "Runs info for co-op debugging.";
+
+            public CoopCommandSide Side => CoopCommandSide.Both;
 
             public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
             {

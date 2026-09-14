@@ -1,4 +1,4 @@
-﻿using Common;
+using Common;
 using Common.Commands;
 using System;
 using System.Collections;
@@ -21,7 +21,7 @@ public interface ILiveTestCommandDispatcher
 
 public class LiveTestCommandDispatcher : ILiveTestCommandDispatcher
 {
-    private const string AllowedCommandPrefix = "coop.debug.";
+    private const string LegacyDebugCommandPrefix = "coop.debug.";
 
     private static bool functionsCollected;
 
@@ -87,8 +87,8 @@ public class LiveTestCommandDispatcher : ILiveTestCommandDispatcher
                     : commandRegistry.Commands.Select(command => command.FullName);
                 commandNames = allFunctions.Keys
                     .Cast<string>()
+                    .Where(command => command.StartsWith(LegacyDebugCommandPrefix, StringComparison.Ordinal))
                     .Concat(registeredCommands)
-                    .Where(command => command.StartsWith(AllowedCommandPrefix, StringComparison.Ordinal))
                     .Distinct(StringComparer.Ordinal)
                     .OrderBy(command => command, StringComparer.Ordinal)
                     .ToArray();
@@ -106,9 +106,10 @@ public class LiveTestCommandDispatcher : ILiveTestCommandDispatcher
     public LiveTestCommandResult Execute(string command, List<string> arguments)
     {
         if (string.IsNullOrEmpty(command) ||
-            command.StartsWith(AllowedCommandPrefix, StringComparison.Ordinal) == false)
+            (!(commandRegistry?.Contains(command) ?? false) &&
+             !command.StartsWith(LegacyDebugCommandPrefix, StringComparison.Ordinal)))
         {
-            return new LiveTestCommandResult(false, $"Only {AllowedCommandPrefix} commands may be run through live testing");
+            return new LiveTestCommandResult(false, "Only registered co-op commands and legacy coop.debug.* commands may be run through live testing");
         }
 
         if (arguments == null) throw new ArgumentNullException(nameof(arguments));
@@ -126,7 +127,7 @@ public class LiveTestCommandDispatcher : ILiveTestCommandDispatcher
                 {
                     ICoopCommandArgs commandArgs = argsFactory.FromValues(arguments);
                     CoopCommandResult commandResult = commandRegistry.ProcessCommand(command, commandArgs);
-                    result = new LiveTestCommandResult(true, commandResult.Output);
+                    result = new LiveTestCommandResult(true, commandResult.Output, commandResult.Succeeded, commandResult.ErrorCode);
                     return;
                 }
 
@@ -154,13 +155,19 @@ public class LiveTestCommandDispatcher : ILiveTestCommandDispatcher
 
 public class LiveTestCommandResult
 {
-    public LiveTestCommandResult(bool found, string output)
+    public LiveTestCommandResult(bool found, string output, bool? succeeded = null, string errorCode = null)
     {
         Found = found;
         Output = output;
+        Succeeded = succeeded;
+        ErrorCode = errorCode;
     }
 
     public bool Found { get; }
 
     public string Output { get; }
+
+    public bool? Succeeded { get; }
+
+    public string ErrorCode { get; }
 }

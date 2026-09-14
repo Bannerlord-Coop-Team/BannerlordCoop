@@ -92,7 +92,8 @@ namespace Coop.Tests.Server.Connections.States
                 null!,
                 null!,
                 null!,
-                heroMeetingData);
+                heroMeetingData,
+                null!);
             serverComponent.Container.Resolve<Mock<ICoopSessionProvider>>()
                 .SetupGet(provider => provider.CoopSession)
                 .Returns(session);

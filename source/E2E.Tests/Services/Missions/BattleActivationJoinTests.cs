@@ -155,6 +155,7 @@ public class BattleActivationJoinTests : MissionTestEnvironment
             thread.Join();
             if (failure != null) throw failure;
         });
+        host.PumpGameThread();
 
         int spawnIndex = hostBattleNetwork.NetworkSentMessages.Messages.FindIndex(
             message => message is NetworkSpawnBattleAgents);

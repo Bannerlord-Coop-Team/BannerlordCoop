@@ -33,6 +33,8 @@ internal class HeroConversationDebugCommand
 
         public string Description => "Opens a conversation with a registered hero.";
 
+        public CoopCommandSide Side => CoopCommandSide.Client;
+
         public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
             new ExpectedArgs("hero_id", "The registered hero id to converse with."),
@@ -67,6 +69,8 @@ internal class HeroConversationDebugCommand
 
         public string Description => "Reports the current hero conversation state.";
 
+        public CoopCommandSide Side => CoopCommandSide.Client;
+
         public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
             new ExpectedArgs("hero_id", "The optional registered hero id to compare with the active conversation.", false),
@@ -100,6 +104,8 @@ internal class HeroConversationDebugCommand
 
         public string Description => "Closes the active hero conversation.";
 
+        public CoopCommandSide Side => CoopCommandSide.Client;
+
         public IExpectedArgs[] ExpectedArgs { get; } = System.Array.Empty<IExpectedArgs>();
 
         public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
@@ -122,6 +128,8 @@ internal class HeroConversationDebugCommand
         public string Name => "set_has_met";
 
         public string Description => "Sets whether the local player has met a hero.";
+
+        public CoopCommandSide Side => CoopCommandSide.Both;
 
         public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
@@ -153,6 +161,8 @@ internal class HeroConversationDebugCommand
         public string Name => "meeting_state";
 
         public string Description => "Reports cached meeting state for two heroes.";
+
+        public CoopCommandSide Side => CoopCommandSide.Server;
 
         public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {

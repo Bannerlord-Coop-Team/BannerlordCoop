@@ -1138,7 +1138,7 @@ public class MovementTrafficTests : MissionTestEnvironment
             controllerIdProvider.Object,
             steamBridge.Object,
             compressor,
-            new ReliableMessageBatcher<string>(serializer));
+            new ReliableMessageBatcher<string>(serializer), () => new Common.Logging.ReceivePathDiagnostics());
         client.ConnectToInstance(instanceId);
 
         Assert.Equal(0, client.GetMaxUnreliablePayloadBytes());
@@ -1221,7 +1221,7 @@ public class MovementTrafficTests : MissionTestEnvironment
             controllerIdProvider.Object,
             steamBridge.Object,
             compressor,
-            new ReliableMessageBatcher<string>(serializer));
+            new ReliableMessageBatcher<string>(serializer), () => new Common.Logging.ReceivePathDiagnostics());
         client.ConnectToInstance(instanceId);
 
         client.Send(controllerId, oversizedPacket);

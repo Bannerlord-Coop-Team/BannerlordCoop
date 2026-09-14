@@ -39,6 +39,8 @@ internal class MercenaryStockDebugCommand
 
         public string Description => "Refreshes mercenary stocks for co-op debugging.";
 
+        public CoopCommandSide Side => CoopCommandSide.Server;
+
         public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
             new ExpectedArgs("townName", "The exact town name; quote values containing spaces."),
@@ -94,6 +96,8 @@ internal class MercenaryStockDebugCommand
         public string Name => "request_mercenary_stock";
 
         public string Description => "Requests mercenary stock for co-op debugging.";
+
+        public CoopCommandSide Side => CoopCommandSide.Server;
 
         public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {

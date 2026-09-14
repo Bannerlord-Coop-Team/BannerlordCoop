@@ -74,10 +74,18 @@ public static class HeroExtensions
         // Fallback: Hero is this player's character
         if (hero.IsControlledByThisInstance()) return true;
 
+        // Location fights (such as alleys) use the local LocationEncounter instead of PlayerEncounter.Current
+        if (HasLocationEncounterHealthAuthority(
+            PlayerEncounter.LocationEncounter != null,
+            hero.PartyBelongedTo == MobileParty.MainParty)) return true;
+
         // Allow control for solo encounters where agent authority doesn't exist
         // A solo encounter is where this client is the only involved player
         if (PlayerEncounter.Current != null && PlayerEncounter.Current.IsSoloEncounter()) return true;
 
         return false;
     }
+
+    private static bool HasLocationEncounterHealthAuthority(bool hasLocationEncounter, bool belongsToMainParty)
+        => hasLocationEncounter && belongsToMainParty;
 }

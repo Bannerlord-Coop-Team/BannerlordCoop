@@ -18,6 +18,7 @@ using Xunit;
 
 namespace GameInterface.Tests.Services.Armies;
 
+[Collection("CampaignCurrentCollection")]
 public class PlayerSiegeTargetScoringTests
 {
     private readonly PlayerSiegeTargetScoring scoring = new(Mock.Of<IPlayerManager>());

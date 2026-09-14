@@ -55,6 +55,8 @@ internal class PostBattleFreezeFixtureCommands
 
         public string Description => "Runs the post battle freeze fixture start debug operation.";
 
+        public CoopCommandSide Side => CoopCommandSide.Server;
+
         public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
             new ExpectedArgs("first_controller_id", "The first controller id.", true),
@@ -215,6 +217,8 @@ internal class PostBattleFreezeFixtureCommands
 
         public string Description => "Runs the post battle freeze fixture open debug operation.";
 
+        public CoopCommandSide Side => CoopCommandSide.Server;
+
         public IExpectedArgs[] ExpectedArgs { get; } = Array.Empty<IExpectedArgs>();
 
         public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
@@ -259,6 +263,8 @@ internal class PostBattleFreezeFixtureCommands
 
         public string Description => "Reports post battle freeze fixture state.";
 
+        public CoopCommandSide Side => CoopCommandSide.Server;
+
         public IExpectedArgs[] ExpectedArgs { get; } = Array.Empty<IExpectedArgs>();
 
         public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
@@ -281,6 +287,8 @@ internal class PostBattleFreezeFixtureCommands
         public string Name => "post_battle_freeze_fixture_unpause";
 
         public string Description => "Runs the post battle freeze fixture unpause debug operation.";
+
+        public CoopCommandSide Side => CoopCommandSide.Server;
 
         public IExpectedArgs[] ExpectedArgs { get; } = Array.Empty<IExpectedArgs>();
 
@@ -309,6 +317,8 @@ internal class PostBattleFreezeFixtureCommands
         public string Name => "post_battle_freeze_fixture_restore";
 
         public string Description => "Restores or clears post battle freeze fixture restore.";
+
+        public CoopCommandSide Side => CoopCommandSide.Server;
 
         public IExpectedArgs[] ExpectedArgs { get; } = Array.Empty<IExpectedArgs>();
 

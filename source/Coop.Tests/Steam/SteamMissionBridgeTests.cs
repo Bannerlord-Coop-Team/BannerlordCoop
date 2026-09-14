@@ -1,4 +1,4 @@
-using Coop.Steam;
+﻿using Coop.Steam;
 using System;
 using Xunit;
 
@@ -17,7 +17,7 @@ namespace Coop.Tests.Steam
                 localSteamId: 2,
                 hostTransport,
                 () => clientTransport,
-                scheduledCleanup => cleanup = scheduledCleanup);
+                scheduledCleanup => cleanup = scheduledCleanup, () => new Common.Logging.ReceivePathDiagnostics());
 
             bridge.Start(4200);
             Assert.True(bridge.TryConnect(remoteSteamId: 1, out _));

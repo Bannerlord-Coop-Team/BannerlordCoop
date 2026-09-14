@@ -554,3 +554,6 @@ source/.idea
 
 .pi-subagents/**
 .pi/**
+
+# Repo-local MCP publish, operator profiles and run artifacts
+/.mcp-local/

@@ -32,6 +32,8 @@ public class GameThreadDebugCommand
 
         public string Description => "Runs the instrument debug operation.";
 
+        public CoopCommandSide Side => CoopCommandSide.Both;
+
         public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
             new ExpectedArgs("mode", "on, off, toggle, or status.", isRequired: false),
@@ -74,6 +76,8 @@ public class GameThreadDebugCommand
         public string Name => "stall";
 
         public string Description => "Runs the stall debug operation.";
+
+        public CoopCommandSide Side => CoopCommandSide.Server;
 
         public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {

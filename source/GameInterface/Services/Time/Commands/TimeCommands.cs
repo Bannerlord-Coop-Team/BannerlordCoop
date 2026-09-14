@@ -28,6 +28,8 @@ internal class TimeCommands
 
         public string Description => "Reports get time mode.";
 
+        public CoopCommandSide Side => CoopCommandSide.Both;
+
         public IExpectedArgs[] ExpectedArgs { get; } = Array.Empty<IExpectedArgs>();
 
         public CoopCommandResult ProcessCommand(ICoopCommandArgs strings)
@@ -48,6 +50,8 @@ internal class TimeCommands
             public string Name => "set_time_mode";
 
             public string Description => "Runs the set time mode debug operation.";
+
+            public CoopCommandSide Side => CoopCommandSide.Server;
 
             public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
             {
@@ -101,6 +105,8 @@ internal class TimeCommands
 
         public string Description => "Runs the request time mode debug operation.";
 
+        public CoopCommandSide Side => CoopCommandSide.Client;
+
         public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
             new ExpectedArgs("time_mode", "Pause, Play_1x, or Play_2x.", isRequired: true),
@@ -126,6 +132,8 @@ internal class TimeCommands
         public string Name => "advance_time";
 
         public string Description => "Runs the advance time debug operation.";
+
+        public CoopCommandSide Side => CoopCommandSide.Server;
 
         public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {

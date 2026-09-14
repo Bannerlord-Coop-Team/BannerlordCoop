@@ -1,0 +1,67 @@
+﻿using System.Text.Json;
+
+namespace CoopMcpServer;
+
+public sealed class CoopMcpServerSettings
+{
+    public string ArtifactDirectory { get; set; }
+    public Dictionary<string, LaunchProfile> Profiles { get; set; } = new();
+
+    public static CoopMcpServerSettings Load(string path)
+    {
+        var settings = JsonSerializer.Deserialize<CoopMcpServerSettings>(File.ReadAllText(path),
+            new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
+        if (settings == null || !Path.IsPathFullyQualified(settings.ArtifactDirectory ?? ""))
+            throw new ArgumentException("artifactDirectory must be an absolute path.");
+        return settings;
+    }
+}
+
+public sealed class DeploymentSettings
+{
+    public string DurableRoot { get; set; }
+    public string MsbuildPath { get; set; }
+    public string SubModuleXml { get; set; }
+    public long BuildSpaceBytes { get; set; } = 4L * 1024 * 1024 * 1024;
+    public long DiskReserveBytes { get; set; } = 1024L * 1024 * 1024;
+}
+
+public sealed class LaunchProfile
+{
+    public string Executable { get; set; }
+    public DeploymentSettings Deployment { get; set; }
+    public string[] Modules { get; set; } = { "Native", "SandBoxCore", "SandBox", "StoryMode", "Coop" };
+    public string ServerPlatformId { get; set; } = "testserver";
+    public string[] ClientPlatformIds { get; set; } = { "testclient1", "testclient2" };
+
+    // Conservative estimate from ~6 GiB observed game peaks, with room for loading spikes.
+    public long EstimatedCommitBytesPerProcess { get; set; } = 8L * 1024 * 1024 * 1024;
+    public long CommitReserveBytes { get; set; } = 2L * 1024 * 1024 * 1024;
+
+    public void ValidateBudgets()
+    {
+        if (EstimatedCommitBytesPerProcess <= 0 || EstimatedCommitBytesPerProcess > long.MaxValue / 18 ||
+            CommitReserveBytes <= 0 || CommitReserveBytes > long.MaxValue / 18)
+            throw new ArgumentException("Commit estimate and reserve must be positive bounded byte counts.");
+    }
+
+    public void Validate(int clientCount)
+    {
+        if (clientCount < 0 || clientCount > 16 || ClientPlatformIds == null || clientCount > ClientPlatformIds.Length)
+            throw new ArgumentException("client_count must be 0..16 and fit the profile's clientPlatformIds.");
+        if (!Path.IsPathFullyQualified(Executable ?? "") ||
+            !string.Equals(Path.GetFileName(Executable), "Bannerlord.exe", StringComparison.OrdinalIgnoreCase) ||
+            !File.Exists(Executable))
+            throw new ArgumentException("The in-game profile requires an existing absolute Bannerlord.exe path.");
+        var ids = new[] { ServerPlatformId }.Concat(ClientPlatformIds.Take(clientCount)).ToArray();
+        if (ids.Any(id => string.IsNullOrWhiteSpace(id) || id.Length > 64 ||
+                id.Any(c => !char.IsAsciiLetterOrDigit(c) && c != '-' && c != '_')) ||
+            ids.Distinct(StringComparer.OrdinalIgnoreCase).Count() != ids.Length)
+            throw new ArgumentException("All selected platform IDs must be distinct, 1..64 ASCII letters/digits, '-' or '_'.");
+        if (Modules == null || Modules.Length == 0 || Modules.Length > 32 ||
+            Modules.Any(m => string.IsNullOrWhiteSpace(m) || m.Length > 128 ||
+                m.Any(c => !char.IsAsciiLetterOrDigit(c) && c != '_' && c != '-')) ||
+            !Modules.Contains("Coop", StringComparer.Ordinal))
+            throw new ArgumentException("modules must include Coop and contain only module identifiers.");
+    }
+}

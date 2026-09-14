@@ -31,6 +31,8 @@ namespace GameInterface.Services.Save.Commands
 
             public string Description => "Runs the save as debug operation.";
 
+            public CoopCommandSide Side => CoopCommandSide.Server;
+
             public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
             {
                 new ExpectedArgs("save_name", "A save name using 1 through 64 letters, digits, underscores, or hyphens.", isRequired: true),
@@ -62,6 +64,8 @@ namespace GameInterface.Services.Save.Commands
 
             public string Description => "Reports state.";
 
+            public CoopCommandSide Side => CoopCommandSide.Both;
+
             public IExpectedArgs[] ExpectedArgs { get; } = Array.Empty<IExpectedArgs>();
 
             public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
@@ -86,6 +90,8 @@ namespace GameInterface.Services.Save.Commands
             public string Name => "force_autosave";
 
             public string Description => "Runs the force autosave debug operation.";
+
+            public CoopCommandSide Side => CoopCommandSide.Server;
 
             public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
             {

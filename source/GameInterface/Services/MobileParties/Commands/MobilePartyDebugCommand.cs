@@ -36,6 +36,8 @@ internal class MobilePartyDebugCommand
 
         public string Description => "Shows the relevant state for co-op debugging.";
 
+        public CoopCommandSide Side => CoopCommandSide.Both;
+
         public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
             new ExpectedArgs("partyStringId", "The party string id."),
@@ -89,6 +91,8 @@ internal class MobilePartyDebugCommand
 
         public string Description => "Runs info for co-op debugging.";
 
+        public CoopCommandSide Side => CoopCommandSide.Both;
+
         public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
             new ExpectedArgs("partyStringId", "The party string id."),
@@ -123,6 +127,8 @@ internal class MobilePartyDebugCommand
         public string Name => "attachment_ids";
 
         public string Description => "Runs ids for co-op debugging.";
+
+        public CoopCommandSide Side => CoopCommandSide.Both;
 
         public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
@@ -168,6 +174,8 @@ internal class MobilePartyDebugCommand
         public string Name => "verify_ai_authority";
 
         public string Description => "Verifies ai authority for co-op debugging.";
+
+        public CoopCommandSide Side => CoopCommandSide.Server;
 
         public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
@@ -362,6 +370,8 @@ internal class MobilePartyDebugCommand
 
         public string Description => "Creates party for co-op debugging.";
 
+        public CoopCommandSide Side => CoopCommandSide.Server;
+
         public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
             new ExpectedArgs("heroId", "The hero id."),
@@ -411,6 +421,8 @@ internal class MobilePartyDebugCommand
         public string Name => "spawn_test_parties";
 
         public string Description => "Spawns test parties for co-op debugging.";
+
+        public CoopCommandSide Side => CoopCommandSide.Server;
 
         public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
@@ -481,6 +493,8 @@ internal class MobilePartyDebugCommand
 
         public string Description => "Destroys party for co-op debugging.";
 
+        public CoopCommandSide Side => CoopCommandSide.Server;
+
         public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
             new ExpectedArgs("mobilePartyId", "The mobile party id."),
@@ -523,6 +537,8 @@ internal class MobilePartyDebugCommand
 
         public string Description => "Destroys all bandit parties for co-op debugging.";
 
+        public CoopCommandSide Side => CoopCommandSide.Server;
+
         public IExpectedArgs[] ExpectedArgs { get; } = System.Array.Empty<IExpectedArgs>();
 
         public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
@@ -564,6 +580,8 @@ internal class MobilePartyDebugCommand
 
         public string Description => "Lists the relevant state for co-op debugging.";
 
+        public CoopCommandSide Side => CoopCommandSide.Both;
+
         public IExpectedArgs[] ExpectedArgs { get; } = System.Array.Empty<IExpectedArgs>();
 
         public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
@@ -595,6 +613,8 @@ internal class MobilePartyDebugCommand
         public string Name => "set_wage_limit_updated";
 
         public string Description => "Sets wage limit updated for co-op debugging.";
+
+        public CoopCommandSide Side => CoopCommandSide.Both;
 
         public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
@@ -647,6 +667,8 @@ internal class MobilePartyDebugCommand
 
         public string Description => "Sets wage unlimited for co-op debugging.";
 
+        public CoopCommandSide Side => CoopCommandSide.Both;
+
         public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
             new ExpectedArgs("partyStringId", "The party string id."),
@@ -691,6 +713,8 @@ internal class MobilePartyDebugCommand
         public string Name => "audit";
 
         public string Description => "Audits the relevant state for co-op debugging.";
+
+        public CoopCommandSide Side => CoopCommandSide.Both;
 
         public IExpectedArgs[] ExpectedArgs { get; } = System.Array.Empty<IExpectedArgs>();
 

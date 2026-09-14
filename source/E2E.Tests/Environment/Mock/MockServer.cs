@@ -1,4 +1,6 @@
-﻿using Common.PacketHandlers;
+﻿using Common.Network;
+using Common.PacketHandlers;
+using Common.Serialization;
 using Coop.Core.Server;
 using LiteNetLib;
 using System.Net;
@@ -8,8 +10,12 @@ namespace E2E.Tests.Environment.Mock;
 
 public class MockServer : MockNetworkBase, ICoopServer
 {
-    public MockServer(TestNetworkRouter networkOrchestrator, IPacketManager packetManager) :
-        base(networkOrchestrator, packetManager)
+    public MockServer(
+        TestNetworkRouter networkOrchestrator,
+        IPacketManager packetManager,
+        ICommonSerializer serializer,
+        IReliableMessageBatcher<NetPeer> reliableMessageBatcher) :
+        base(networkOrchestrator, packetManager, serializer, reliableMessageBatcher)
     {
     }
 

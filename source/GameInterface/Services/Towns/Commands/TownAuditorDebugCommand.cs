@@ -47,6 +47,8 @@ public class TownAuditorDebugCommand
 
         public string Description => "Runs the relevant state for co-op debugging.";
 
+        public CoopCommandSide Side => CoopCommandSide.Client;
+
         public IExpectedArgs[] ExpectedArgs { get; } = System.Array.Empty<IExpectedArgs>();
 
         public CoopCommandResult ProcessCommand(ICoopCommandArgs args)

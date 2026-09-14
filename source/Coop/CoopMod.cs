@@ -1,5 +1,6 @@
 ﻿using Common;
 using Common.Logging;
+using Coop.Core.Common.Configuration;
 using Common.Serialization;
 using Coop.Core;
 using Coop.Core.Common.Session;
@@ -94,13 +95,14 @@ namespace Coop
 
         private bool isServer = false;
         private bool isAutoConnect = false;
+        private bool autoConnectArgumentsValid;
+        private NetworkConfig autoConnectConfiguration;
         public override void NoHarmonyInit() 
         {
             AssemblyHellscape.CreateAssemblyBindingRedirects();
             ProtoBufSerializer.ConfigureRuntimeModel();
 
-            var fullCommandLine = Utilities.GetFullCommandLineString();
-            var args = fullCommandLine.Split(' ').ToList();
+            var args = Environment.GetCommandLineArgs();
             
             if (args.Any(a => a.Equals("/server", StringComparison.OrdinalIgnoreCase)))
             {
@@ -111,10 +113,9 @@ namespace Coop
                 isServer = false;
             }
 
-            isAutoConnect = args.Any(a => a.Equals("/autoconnect", StringComparison.OrdinalIgnoreCase));
+            autoConnectArgumentsValid = ServerLaunchArguments.TryParseAutoConnect(
+                args, out isAutoConnect, out autoConnectConfiguration);
 
-            // GetFullCommandLineString splits on spaces, which would cut a quoted save
-            // name apart; the managed-server arguments need real Windows arg parsing.
             if (ServerLaunchArguments.TryParse(Environment.GetCommandLineArgs(), out var managedSaveName,
                 out var ownerProcessId, out var serverPassword, out var serverVisibility))
             {
@@ -499,7 +500,7 @@ namespace Coop
                     isServer,
                     activeLogFilePath,
                     isDeferredClientJoin,
-                    () => Coop.StartAsClient());
+                    () => autoConnectArgumentsValid && Coop.StartAsClient(autoConnectConfiguration));
                 liveTestControlServer.Start();
             }
 #endif
@@ -575,6 +576,8 @@ namespace Coop
 
             if (ModInformation.IsClient && ContainerProvider.TryResolve<IChatService>(out var chatService))
                 chatService.Initialize();
+            if (ModInformation.IsClient && ContainerProvider.TryResolve<GameInterface.Services.Voice.IVoiceSpeakingOverlay>(out var voiceOverlay))
+                voiceOverlay.Initialize();
 
             if (gameStarterObject is CampaignGameStarter campaignGameStarter)
             {
@@ -606,13 +609,14 @@ namespace Coop
 
             if (Coop.Running)
             {
-                Coop.Dispose();
+                Coop.EndSession();
             }
         }
 
         protected override void OnSubModuleUnloaded()
         {
             CrashDiagnostics.SetPhase("module-unloading");
+            Coop?.Dispose();
 #if DEBUG
             liveTestControlServer?.Dispose();
             liveTestControlServer = null;
@@ -664,12 +668,13 @@ namespace Coop
 
             TimeSpan frameTime = TimeSpan.FromSeconds(dt);
             Updateables.UpdateAll(frameTime);
+            if (ModInformation.IsClient && Coop.Running &&
+                ContainerProvider.TryResolve<GameInterface.Services.Voice.IVoiceClient>(out var voiceClient))
+                voiceClient.Tick();
 
             TryManagedServerAutoStart();
 
-#if DEBUG
             TryAutoConnect();
-#endif
         }
 
         private void TryShowCrashReportingConsent(bool isAtMainMenu)
@@ -766,6 +771,11 @@ namespace Coop
                 GameStateManager.Current?.ActiveState is InitialState)
             {
                 _autoStarted = true;
+                if (!autoConnectArgumentsValid)
+                {
+                    Logger.Error("[AutoConnect] Invalid endpoint or duplicate flag. Expected /autoconnect [host[:port]]; no connection attempted.");
+                    return;
+                }
                 try
                 {
                     if (isServer)
@@ -777,7 +787,7 @@ namespace Coop
                     else
                     {
                         Logger.Information("[AutoConnect] InitialState active — auto-starting as client...");
-                        bool started = Coop.StartAsClient();
+                        bool started = Coop.StartAsClient(autoConnectConfiguration);
                         Logger.Information("[AutoConnect] StartAsClient() returned {Started}", started);
                     }
                 }

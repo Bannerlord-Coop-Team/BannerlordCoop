@@ -12,6 +12,8 @@ using GameInterface.Services.Time.Interfaces;
 using GameInterface.Services.UI.Interfaces;
 using GameInterface.Services.UI.Messages;
 using System.Globalization;
+using System;
+using System.Threading;
 
 namespace Coop.Core.Client.States;
 
@@ -28,6 +30,8 @@ public class CampaignState : ClientStateBase
     private readonly IMapTimeTrackerInterface mapTimeTrackerInterface;
     private readonly bool waitingForJoinCatchUp;
     private bool replayAppliedQueued;
+    private int lastReplayBatchId;
+    private IDisposable joinCatchUpDrainBudget;
     private volatile bool baselineResponseExpected;
     private volatile bool finalBaselineResponseExpected;
     private int successfulBaselines;
@@ -83,7 +87,18 @@ public class CampaignState : ClientStateBase
             "Loading Host Campaign",
             "Creating remote player heroes...");
 
-        network.SendAll(new NetworkPlayerCampaignEntered());
+        if (waitingForJoinCatchUp)
+            joinCatchUpDrainBudget = GameThread.Instance.LimitFrameDrain(
+                TimeSpan.FromMilliseconds(8), NetworkJoinLimits.ReplayAppliedTimeout);
+        try
+        {
+            network.SendAll(new NetworkPlayerCampaignEntered());
+        }
+        catch
+        {
+            ReleaseJoinCatchUpDrainBudget();
+            throw;
+        }
 
         if (!waitingForJoinCatchUp)
         {
@@ -93,6 +108,7 @@ public class CampaignState : ClientStateBase
 
     public override void Dispose()
     {
+        ReleaseJoinCatchUpDrainBudget();
         messageBroker.Unsubscribe<MainMenuEntered>(Handle_MainMenuEntered);
         messageBroker.Unsubscribe<MissionStateEntered>(Handle_MissionStateEntered);
         if (waitingForJoinCatchUp)
@@ -105,6 +121,20 @@ public class CampaignState : ClientStateBase
 
     internal void Handle_JoinSync(MessagePayload<NetworkJoinSync> obj)
     {
+        if (obj.What.Signal == JoinSyncSignal.ReplayBatchComplete)
+        {
+            int batchId = obj.What.ReplayBatchId;
+            if (batchId <= 0 || batchId <= lastReplayBatchId) return;
+            lastReplayBatchId = batchId;
+            // The acknowledgement runs after earlier queued applications, even in a nested pump.
+            GameThread.EnqueueSafe(() =>
+            {
+                if (!ReferenceEquals(Logic.State, this)) return;
+                SendJoinSignal(JoinSyncSignal.ReplayBatchApplied, batchId);
+            }, context: nameof(JoinSyncSignal.ReplayBatchComplete));
+            return;
+        }
+
         if (obj.What.Signal == JoinSyncSignal.ReplayComplete)
         {
             if (replayAppliedQueued) return;
@@ -258,13 +288,18 @@ public class CampaignState : ClientStateBase
         }, context: nameof(Handle_CampaignTimeSampleReceived));
     }
 
-    private void SendJoinSignal(JoinSyncSignal signal) =>
-        network.SendAll(new NetworkJoinSync(signal));
+    private void SendJoinSignal(JoinSyncSignal signal, int replayBatchId = 0) =>
+        network.SendAll(new NetworkJoinSync(signal, replayBatchId));
+
+    private void ReleaseJoinCatchUpDrainBudget() =>
+        Interlocked.Exchange(ref joinCatchUpDrainBudget, null)?.Dispose();
 
     private void CompleteCampaignEntry()
     {
+        ReleaseJoinCatchUpDrainBudget();
         messageBroker.Publish(this, new PlayerKillFeedColorResendRequested());
         loadingInterface.HideLoadingScreen();
+        messageBroker.Publish(this, new ClientCampaignReady());
     }
 
     internal void Handle_MissionStateEntered(MessagePayload<MissionStateEntered> obj)

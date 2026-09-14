@@ -1,4 +1,5 @@
-﻿using System;
+﻿using Common.Logging;
+using System;
 using System.Net;
 using System.Net.Sockets;
 
@@ -29,8 +30,11 @@ internal static class TunnelSocket
         {
             socket.IOControl(SioUdpConnReset, new byte[] { 0 }, null);
         }
-        catch (SocketException)
+        catch (SocketException ex)
         {
+            LogManager.GetLogger(typeof(TunnelSocket)).Warning(
+                "[ReceivePath] utc={Utc:O} UDP reset suppression unavailable socketError={SocketError}",
+                DateTime.UtcNow, ex.SocketErrorCode);
         }
         catch (PlatformNotSupportedException)
         {
@@ -43,7 +47,7 @@ internal static class TunnelSocket
     public static EndPoint AnyEndpoint() => new IPEndPoint(IPAddress.Any, 0);
 
     /// <summary>Returns the datagram length, 0 for a transient error worth skipping, -1 when drained.</summary>
-    public static int TryReceiveFrom(Socket socket, byte[] buffer, ref EndPoint sender)
+    public static int TryReceiveFrom(Socket socket, byte[] buffer, ref EndPoint sender, IReceivePathDiagnostics diagnostics)
     {
         try
         {
@@ -53,6 +57,8 @@ internal static class TunnelSocket
         }
         catch (SocketException ex)
         {
+            if (ex.SocketErrorCode != SocketError.WouldBlock)
+                diagnostics.Record(ReceivePathEvent.UdpReceiveError, error: ex.SocketErrorCode);
             return ex.SocketErrorCode == SocketError.WouldBlock ? -1 : 0;
         }
     }

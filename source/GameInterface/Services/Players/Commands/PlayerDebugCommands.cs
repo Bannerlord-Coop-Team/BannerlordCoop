@@ -1,13 +1,18 @@
 ﻿using Common.Commands;
 using Common;
 using GameInterface.Services.Entity;
+using GameInterface.Services.MapEvents;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.PartyBases.Extensions;
 using Newtonsoft.Json;
+using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Text;
 using TaleWorlds.CampaignSystem;
+using TaleWorlds.CampaignSystem.MapEvents;
 using TaleWorlds.CampaignSystem.Party;
+using TaleWorlds.Localization;
 
 namespace GameInterface.Services.Players.Commands;
 
@@ -30,6 +35,8 @@ internal class PlayerDebugCommands
         public string Name => "list";
 
         public string Description => "Lists registered co-op players.";
+
+        public CoopCommandSide Side => CoopCommandSide.Both;
 
         public IExpectedArgs[] ExpectedArgs { get; } = System.Array.Empty<IExpectedArgs>();
 
@@ -56,8 +63,10 @@ internal class PlayerDebugCommands
 
             foreach (var player in players)
             {
+                var heroname = TryGetHeroName(player.HeroId, objectManager);
                 var marker = player.ControllerId == localId ? " (you)" : "";
-                sb.AppendLine($"- ControllerId: {player.ControllerId}{marker}");
+                sb.AppendLine($"- PlayerName: {heroname}{marker}");
+                sb.AppendLine($"    ControllerId: {player.ControllerId}");
                 controlledObjects += AppendObject<Hero>(sb, objectManager, playerManager, "Hero", player.HeroId);
                 controlledObjects += AppendObject<MobileParty>(sb, objectManager, playerManager, "Party", player.MobilePartyId);
                 controlledObjects += AppendObject<Clan>(sb, objectManager, playerManager, "Clan", player.ClanId);
@@ -76,6 +85,8 @@ internal class PlayerDebugCommands
         public string Name => "party_state";
 
         public string Description => "Reports replicated party state for a player.";
+
+        public CoopCommandSide Side => CoopCommandSide.Server;
 
         public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
@@ -119,6 +130,7 @@ internal class PlayerDebugCommands
         }
     }
 
+
     /// <summary>
     /// Reports one of a player's controlled ids: whether it resolves and whether it is in the
     /// PlayerManager's control table. Returns 1 when both hold, otherwise 0.
@@ -145,5 +157,21 @@ internal class PlayerDebugCommands
         bool controlled = playerManager.Contains(obj);
         sb.AppendLine($"    {label}: {id} resolved, controlled={controlled}");
         return controlled ? 1 : 0;
+    }
+    private static string TryGetHeroName(string heroId, IObjectManager objectManager)
+    {
+        if (string.IsNullOrEmpty(heroId))
+        {
+            return $"Hero name could not be found";
+        }
+        if (objectManager.TryGetObject<Hero>(heroId, out var obj) == false)
+        {
+            return $"Hero name could not be resolved";
+        }
+        if (TextObject.IsNullOrEmpty(obj.Name))
+        {
+            return "Hero has no name";
+        }
+        return obj.Name.ToString();
     }
 }
