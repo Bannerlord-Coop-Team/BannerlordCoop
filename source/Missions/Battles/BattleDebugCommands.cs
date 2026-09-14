@@ -551,10 +551,9 @@ internal static class BattleDebugCommands
 
         public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
         {
-            if (Mission.Current?.GetMissionBehavior<CoopBattleController>() == null
-                || !ContainerProvider.TryResolve<Missions.Agents.Handlers.IRemoteAgentActionProcessor>(out var processor))
-                return Failed("No active coop battle processor");
-            return Succeeded("EQUIPMENT_DELAY " + processor.EquipmentDelayObservation(
+            var controller = Mission.Current?.GetMissionBehavior<CoopBattleController>();
+            if (controller == null) return Failed("No active coop battle processor");
+            return Succeeded("EQUIPMENT_DELAY " + controller.AgentActionHandler.EquipmentDelayProcessor.EquipmentDelayObservation(
                 args[0].ToLowerInvariant(), args.Count > 1 ? args[1] : null));
         }
     }

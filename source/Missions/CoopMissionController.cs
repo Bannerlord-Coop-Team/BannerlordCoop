@@ -33,6 +33,10 @@ public abstract class CoopMissionController : MissionBehavior, IDisposable
     protected readonly IObjectManager objectManager;
     protected readonly ICoopMissionComponent coopMissionComponent;
 
+#if DEBUG
+    internal IAgentActionHandler AgentActionHandler => coopMissionComponent.AgentActionHandler;
+#endif
+
     internal IAgentMovementHandler AgentMovementHandler =>
         coopMissionComponent.AgentMovementHandler;
 

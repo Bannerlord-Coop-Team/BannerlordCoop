@@ -531,7 +531,7 @@ public class ActionEquipmentSyncTests : MissionTestEnvironment
         {
             const string mapEventId = "mapEvent1";
             BattleSpawnGate.BeginBattle(mapEventId);
-            var processor = context.Instance.Resolve<IRemoteAgentActionProcessor>();
+            var processor = context.Component.AgentActionHandler.EquipmentDelayProcessor;
             try
             {
                 var hosts = context.Instance.Resolve<IBattleHostRegistry>();

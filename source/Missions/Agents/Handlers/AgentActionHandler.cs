@@ -20,6 +20,9 @@ namespace Missions.Agents.Handlers;
 
 public interface IAgentActionHandler : IPacketHandler, IDisposable
 {
+#if DEBUG
+    IRemoteAgentActionProcessor EquipmentDelayProcessor { get; }
+#endif
     /// <summary>
     /// [Game thread] Detect discrete action and defend-input changes on the locally authoritative main player.
     /// </summary>
@@ -72,6 +75,9 @@ public class AgentActionHandler : IAgentActionHandler
     private readonly INetworkAgentRegistry agentRegistry;
     private readonly IControllerIdProvider controllerIdProvider;
     private readonly IRemoteAgentActionProcessor remoteActionProcessor;
+#if DEBUG
+    public IRemoteAgentActionProcessor EquipmentDelayProcessor => remoteActionProcessor;
+#endif
     private readonly IGuardReactionHandler guardReactionHandler;
 
     // Outbound observation and sequence share one record because both belong to the local agent's action stream.
