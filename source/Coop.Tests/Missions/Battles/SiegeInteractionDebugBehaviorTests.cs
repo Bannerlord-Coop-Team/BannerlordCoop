@@ -339,6 +339,23 @@ public class SiegeInteractionDebugBehaviorTests
             usedObject = new { type = "StandingPoint", id = 882 }, exception = "System.InvalidOperationException"
         });
         var samples = AccessTools.Field(typeof(SiegeInteractionDebugBehavior), "inputSamples").GetValue(behavior);
+        var point = new { x = 498.52f, y = 720.788f, z = 35.835f };
+        var ancestors = Enumerable.Range(0, 16).Select(depth =>
+        {
+            var ancestor = new
+            {
+                depth, entityPointer = "00000123456789AB",
+                id = depth == 0 ? (int?)null : 743, type = depth == 0 ? null : "DestructableComponent",
+                focus = depth == 0 ? null : new { type = "DestructableComponent", id = 743 },
+                isFocusable = depth == 0 ? (bool?)null : true
+            };
+            return depth == 0 ? new
+            {
+                ancestor.depth, ancestor.entityPointer, name = new string('e', 256), bodyFlags = 79617,
+                min = point, max = new { x = 499.52f, y = 721.788f, z = 36.835f },
+                ancestor.id, ancestor.type, ancestor.focus, ancestor.isFocusable
+            } : (object)ancestor;
+        }).ToArray();
         var observation = new
         {
             observedMachineId = 142, inputSamples = samples, useDispatch = behavior.ReadUseDispatch(),
@@ -357,27 +374,23 @@ public class SiegeInteractionDebugBehaviorTests
                 machineId = 1410, bodyId = 1409, bodyName = "ballista_body", bodyTag = "BallistaBody",
                 min = new { x = 447f, y = 689f, z = 31f }, max = new { x = 450f, y = 692f, z = 34f },
                 target = new { x = 448.5f, y = 690.5f, z = 32.5f },
-                ancestors = Enumerable.Range(0, 16).Select(depth => new
-                {
-                    depth, id = 1410, type = "SynchedMissionObject",
-                    focus = new { type = "Ballista", id = 1410 }, isFocusable = true
-                }).ToArray()
+                ancestors
             },
-            focusDiagnostic = new { fallbackProbes = new
+            focusDiagnostic = new
             {
-                nearHit = true, nearDistance = 10f,
-                nearAncestors = Enumerable.Range(0, 16).Select(depth => new
+                fallbackProbes = new
                 {
-                    depth, id = 743, type = "DestructableComponent",
-                    focus = new { type = "DestructableComponent", id = 743 }, isFocusable = true
-                }).ToArray(),
-                wideHit = true, wideDistance = 10f,
-                wideAncestors = Enumerable.Range(0, 16).Select(depth => new
+                    length = 10f, nearHit = true, nearDistance = 10f, nearPoint = point, nearAncestors = ancestors,
+                    wideHit = true, wideDistance = 10f, widePoint = point, wideAncestors = ancestors
+                },
+                rayProbe = new
                 {
-                    depth, id = 743, type = "DestructableComponent",
-                    focus = new { type = "DestructableComponent", id = 743 }, isFocusable = true
-                }).ToArray()
-            } },
+                    length = 10f, blockerHit = true, blockerDistance = 10f, blockerPoint = point,
+                    blockerAncestors = ancestors,
+                    terrainHit = true, terrainDistance = 10f, terrainPoint = point, terrainAncestors = ancestors,
+                    focusHit = true, focusDistance = 10f, focusPoint = point, focusAncestors = ancestors
+                }
+            },
             machines = new[] { new
             {
                 id = 142, type = "StonePile", IsDeactivated = false, IsDisabled = false,
@@ -403,7 +416,9 @@ public class SiegeInteractionDebugBehaviorTests
 
         string wire = LiveTestProtocol.SerializeResponse(response);
 
-        Assert.True(System.Text.Encoding.UTF8.GetByteCount(wire) < LiveTestProtocol.MaximumMessageBytes / 2);
+        int wireBytes = System.Text.Encoding.UTF8.GetByteCount(wire);
+        Assert.True(wireBytes < LiveTestProtocol.MaximumMessageBytes / 2,
+            $"Payload uses {wireBytes} UTF-8 bytes; expected less than {LiveTestProtocol.MaximumMessageBytes / 2}.");
         Assert.True(LiveTestProtocol.TryDeserializeResponse(wire, out var actual, out var error));
         Assert.Null(error);
         var result = Assert.IsType<System.Text.Json.JsonElement>(actual.Result);
@@ -413,6 +428,18 @@ public class SiegeInteractionDebugBehaviorTests
         Assert.Equal(16, result.GetProperty("structuredResult").GetProperty("useDispatch").GetProperty("samples").GetArrayLength());
         Assert.Equal(64, result.GetProperty("structuredResult").GetProperty("machines")[0]
             .GetProperty("standingPoints").GetArrayLength());
+        var anonymousHit = result.GetProperty("structuredResult").GetProperty("focusDiagnostic")
+            .GetProperty("rayProbe").GetProperty("focusAncestors")[0];
+        Assert.Equal(System.Text.Json.JsonValueKind.Null, anonymousHit.GetProperty("id").ValueKind);
+        Assert.Equal("00000123456789AB", anonymousHit.GetProperty("entityPointer").GetString());
+        Assert.Equal(3, anonymousHit.GetProperty("min").EnumerateObject().Count());
+        var parentHit = result.GetProperty("structuredResult").GetProperty("focusDiagnostic")
+            .GetProperty("rayProbe").GetProperty("focusAncestors")[1];
+        Assert.Equal("00000123456789AB", parentHit.GetProperty("entityPointer").GetString());
+        Assert.False(parentHit.TryGetProperty("name", out _));
+        Assert.False(parentHit.TryGetProperty("bodyFlags", out _));
+        Assert.False(parentHit.TryGetProperty("min", out _));
+        Assert.False(parentHit.TryGetProperty("max", out _));
     }
 
     [Fact]

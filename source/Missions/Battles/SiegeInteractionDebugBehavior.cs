@@ -941,16 +941,19 @@ internal sealed class SiegeInteractionDebugBehavior : MissionBehavior, ISiegeInt
                 out float focusDistance, out Vec3 focusPoint, out WeakGameEntity hit,
                 0.2f, (BodyFlags)79617);
             object fallbackProbes = null;
-            if (nativeAimTarget != null)
+            if (observedMachineId.HasValue)
             {
                 bool nearHit = Mission.Scene.RayCastForClosestEntityOrTerrain(origin, origin + (direction * (length + 0.1f)),
-                    out float nearDistance, out WeakGameEntity nearEntity, 0.2f, (BodyFlags)79617);
+                    out float nearDistance, out Vec3 nearPoint, out WeakGameEntity nearEntity, 0.2f, (BodyFlags)79617);
                 bool wideHit = Mission.Scene.RayCastForClosestEntityOrTerrain(origin + (direction * 0.4f), origin + (direction * (length + 0.1f)),
-                    out float wideDistance, out WeakGameEntity wideEntity, 0.6f, (BodyFlags)79617);
+                    out float wideDistance, out Vec3 widePoint, out WeakGameEntity wideEntity, 0.6f, (BodyFlags)79617);
                 fallbackProbes = new
                 {
-                    nearHit, nearDistance, nearAncestors = DescribeAncestors(nearEntity),
-                    wideHit, wideDistance, wideAncestors = DescribeAncestors(wideEntity)
+                    length = length + 0.1f,
+                    nearHit, nearDistance, nearPoint = DescribePosition(nearHit ? nearPoint : (Vec3?)null),
+                    nearAncestors = DescribeAncestors(nearEntity),
+                    wideHit, wideDistance, widePoint = DescribePosition(wideHit ? widePoint : (Vec3?)null),
+                    wideAncestors = DescribeAncestors(wideEntity)
                 };
             }
             return new
@@ -968,9 +971,13 @@ internal sealed class SiegeInteractionDebugBehavior : MissionBehavior, ISiegeInt
                 fallbackProbes,
                 rayProbe = new
                 {
-                    length, blockerHit, blockerDistance, blockerAncestors = DescribeAncestors(blocker),
-                    terrainHit, terrainDistance, terrainAncestors = DescribeAncestors(terrain),
-                    focusHit, focusDistance, focusAncestors = DescribeAncestors(hit)
+                    length, blockerHit, blockerDistance,
+                    blockerPoint = DescribePosition(blockerHit ? blockerPoint : (Vec3?)null),
+                    blockerAncestors = DescribeAncestors(blocker),
+                    terrainHit, terrainDistance, terrainPoint = DescribePosition(terrainHit ? terrainPoint : (Vec3?)null),
+                    terrainAncestors = DescribeAncestors(terrain),
+                    focusHit, focusDistance, focusPoint = DescribePosition(focusHit ? focusPoint : (Vec3?)null),
+                    focusAncestors = DescribeAncestors(hit)
                 }
             };
         }
@@ -987,11 +994,18 @@ internal sealed class SiegeInteractionDebugBehavior : MissionBehavior, ISiegeInt
         {
             var focus = entity.GetFirstScriptWithInterfaceOfType<IFocusable>();
             var missionObject = entity.GetFirstScriptOfType<MissionObject>();
-            ancestors.Add(new
+            var ancestor = new
             {
-                depth, id = missionObject?.Id.Id, type = missionObject?.GetType().Name,
+                depth, entityPointer = entity.Pointer.ToUInt64().ToString("X16"),
+                id = missionObject?.Id.Id, type = missionObject?.GetType().Name,
                 focus = Describe(focus), isFocusable = focus?.IsFocusable
-            });
+            };
+            ancestors.Add(depth == 0 ? new
+            {
+                ancestor.depth, ancestor.entityPointer, name = entity.Name, bodyFlags = (int)entity.BodyFlag,
+                min = DescribePosition(entity.GlobalBoxMin), max = DescribePosition(entity.GlobalBoxMax),
+                ancestor.id, ancestor.type, ancestor.focus, ancestor.isFocusable
+            } : (object)ancestor);
         }
         return ancestors.ToArray();
     }
