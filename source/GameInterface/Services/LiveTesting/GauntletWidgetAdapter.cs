@@ -8,14 +8,16 @@ using TaleWorlds.Engine.GauntletUI;
 using TaleWorlds.GauntletUI;
 using TaleWorlds.GauntletUI.BaseTypes;
 using TaleWorlds.ScreenSystem;
+using TaleWorlds.Library;
 
 namespace GameInterface.Services.LiveTesting;
 
 /// <summary>Native widget boundary, called only on the game thread.</summary>
 public interface IUiWidgetAdapter
 {
-    UiFrame Read();
-    void Act(UiWidget target, string action, string text, double? value);
+    UiLayerStack Discover();
+    UiFrame Read(object selectedLayer = null);
+    void Act(UiWidget target, string action, string text, double? value, bool scoped = false);
 }
 
 /// <summary>Adapts rendered Gauntlet widgets, never VM members or operating-system input.</summary>
@@ -23,32 +25,117 @@ public sealed class GauntletWidgetAdapter : IUiWidgetAdapter
 {
     private const int MaximumWidgets = LiveTestUi.MaximumWidgets;
     private const int MaximumDepth = 48;
+    public const int MaximumLayers = 128;
+    public const int MaximumRoots = 128;
 
-    public UiFrame Read()
+    public UiLayerStack Discover()
     {
         var screen = ScreenManager.TopScreen;
-        var result = new UiFrame { Screen = screen, ScreenName = Limit(screen?.GetType().Name) };
-        if (screen == null) return result;
-        foreach (var layer in ScreenManager.SortedLayers.OfType<GauntletLayer>())
+        var stack = new UiLayerStack { Screen = screen, ScreenName = Limit(screen?.GetType().Name), Focus = ScreenManager.FocusedLayer };
+        // SortedLayers rebuilds and sorts eagerly; bound its inputs before calling the getter.
+        if ((screen?.Layers.Count ?? 0) + (ScreenManager._globalLayers?.Count ?? 0) > MaximumLayers)
         {
-            if (!layer.IsActive || layer.IsFinalized || layer.UIContext?.Root == null) continue;
-            Visit(layer.UIContext.Root, layer, -1, 0, 0, true, true, false, result);
-            if (result.Truncated) break;
+            stack.Truncated = true;
+            return stack;
         }
-        // Native hit testing traverses roots without a budget, so first bound every inspected tree.
-        if (!result.Truncated)
+        var layers = ScreenManager.SortedLayers;
+        if (layers.Count > MaximumLayers) { stack.Truncated = true; return stack; }
+        foreach (var layer in layers)
         {
+            if (layer == null) { stack.Truncated = true; break; }
+            var gauntlet = layer as GauntletLayer;
+            var root = gauntlet?.UIContext?.Root;
+            var state = new UiLayerState
+            {
+                Native = layer, Context = gauntlet?.UIContext, Root = root,
+                Active = layer.IsActive, Finalized = layer.IsFinalized, FocusLayer = layer.IsFocusLayer,
+                InputMask = (int)layer.InputUsageMask, Order = layer.InputRestrictions.Order,
+                Name = Limit(layer.Name), Type = Limit(layer.GetType().Name),
+                Supported = layer.GetType() == typeof(GauntletLayer) && root != null,
+                RootCount = root?.ChildCount ?? 0,
+                RootVisible = root != null && root.IsVisible && !root.DisableRender,
+                RootEnabled = root != null && root.IsEnabled,
+            };
+            stack.Layers.Add(state);
+            if ((gauntlet?._movieIdentifiers?.Count ?? 0) > MaximumRoots)
+            { stack.Truncated = true; break; }
+            if (root != null)
+                for (int i = 0; i < root.ChildCount && i < MaximumRoots; i++)
+                {
+                    var child = root.GetChild(i);
+                    state.Roots.Add(child);
+                    state.RootStates.Add(child.IsVisible && !child.DisableRender);
+                    state.RootStates.Add(child.IsEnabled);
+                }
+            if (gauntlet?._movieIdentifiers != null)
+                foreach (var movie in gauntlet._movieIdentifiers)
+                {
+                    state.Movies.Add(movie);
+                    state.Movies.Add(movie.Movie?.RootWidget);
+                }
+        }
+        return stack;
+    }
+
+    public UiFrame Read(object selectedLayer = null)
+    {
+        var stack = Discover();
+        var result = new UiFrame { Screen = stack.Screen, ScreenName = stack.ScreenName, Stack = stack, Truncated = stack.Truncated };
+        if (result.Truncated || stack.Screen == null) return result;
+        int selected = selectedLayer == null ? -1 : stack.Layers.FindIndex(l => ReferenceEquals(l.Native, selectedLayer));
+        if (selectedLayer != null && selected < 0)
+            throw new UiAutomationException("stale_reference", "Selected layer is no longer on the screen.");
+        var domain = new UiFrame();
+        var contexts = new HashSet<object>();
+        for (int i = 0; i < stack.Layers.Count; i++)
+        {
+            var state = stack.Layers[i];
+            if (!state.Active || state.Finalized) continue;
+            bool inspected = selected < 0 || i == selected;
+            bool blocker = i > selected && BlocksMouse(state);
+            if (!inspected && !blocker) continue;
+            if (!state.Supported)
+            {
+                if (blocker) result.ScopeComplete = false;
+                continue;
+            }
+            var layer = (GauntletLayer)state.Native;
+            // Shared contexts make the layer boundary ambiguous, even when a second layer is below selection.
+            if (stack.Layers.Any(s => !ReferenceEquals(s.Native, layer) && ReferenceEquals(s.Context, state.Context)))
+                result.ScopeComplete = false;
+            if (!contexts.Add(state.Context)) { result.ScopeComplete = false; continue; }
+            var destination = inspected ? result : domain;
+            Visit(layer.UIContext.Root, layer, -1, 0, 0, true, true, false, destination,
+                MaximumWidgets - (inspected ? domain.Widgets.Count : result.Widgets.Count));
+            if (destination.Truncated) { result.Truncated = true; break; }
+            var natives = new HashSet<object>(destination.Widgets.Where(w => ReferenceEquals(w.Layer, layer)).Select(w => w.Native));
+            if (layer.UIContext.Root.ParentWidget != null ||
+                destination.Widgets.Any(w => ReferenceEquals(w.Layer, layer) &&
+                    (!ReferenceEquals(((Widget)w.Native).Context, layer.UIContext) ||
+                     !ReferenceEquals(((Widget)w.Native).EventManager, layer.UIContext.EventManager))) ||
+                state.Movies.Where((_, index) => index % 2 == 1).Any(root => root == null || !natives.Contains(root)))
+                result.ScopeComplete = false;
+        }
+        if (selected >= 0)
+            foreach (var item in result.Widgets)
+                item.Actions = item.Redacted ? Array.Empty<string>() : Actions((Widget)item.Native, scoped: true);
+        result.DomainWidgets = result.Widgets.Count + domain.Widgets.Count;
+        result.OcclusionWidgets = domain.Widgets;
+        // Only complete context roots and relevant upper layers may enter unbudgeted native hit testing.
+        if (!result.Truncated && result.ScopeComplete)
             foreach (var item in result.Widgets)
                 item.HitTestable = item.Visible && item.Enabled && item.Actions.Length > 0 &&
-                    CanHit((Widget)item.Native, (GauntletLayer)item.Layer, Center((Widget)item.Native));
-        }
+                    CanHit((Widget)item.Native, (GauntletLayer)item.Layer, Center((Widget)item.Native), stack);
         return result;
     }
 
+    private bool BlocksMouse(UiLayerState layer) =>
+        (layer.InputMask & (int)(InputUsageMask.MouseButtons | InputUsageMask.MouseWheels)) != 0;
+
     private void Visit(Widget widget, GauntletLayer layer, int parent, int childIndex, int depth,
-        bool visible, bool enabled, bool redacted, UiFrame frame)
+        bool visible, bool enabled, bool redacted, UiFrame frame, int budget)
     {
-        if (frame.Widgets.Count >= MaximumWidgets || depth > MaximumDepth)
+        if (frame.Widgets.Count >= budget || depth > MaximumDepth)
         {
             frame.Truncated = true;
             return;
@@ -85,16 +172,17 @@ public sealed class GauntletWidgetAdapter : IUiWidgetAdapter
         }
         for (int i = 0; i < widget.ChildCount; i++)
         {
-            if (frame.Widgets.Count >= MaximumWidgets) { frame.Truncated = true; break; }
-            Visit(widget.GetChild(i), layer, index, i, depth + 1, visible, enabled, redacted, frame);
+            if (frame.Widgets.Count >= budget) { frame.Truncated = true; break; }
+            Visit(widget.GetChild(i), layer, index, i, depth + 1, visible, enabled, redacted, frame, budget);
             if (frame.Truncated) break;
         }
     }
 
-    internal string[] Actions(Widget widget)
+    internal string[] Actions(Widget widget, bool scoped = false)
     {
-        if (widget is ButtonWidget button)
-            return button.IsToggle ? new[] { "click", "toggle" } : new[] { "click" };
+        if (widget.GetType() == typeof(ButtonWidget))
+            return ((ButtonWidget)widget).IsToggle ? new[] { "click", "toggle" } : new[] { "click" };
+        if (scoped) return Array.Empty<string>();
         if (widget.GetType() == typeof(EditableTextWidget)) return new[] { "text" };
         if (widget is SliderWidget slider && !slider.Locked) return new[] { "slider" };
         if (widget is ScrollablePanel panel)
@@ -107,12 +195,15 @@ public sealed class GauntletWidgetAdapter : IUiWidgetAdapter
         return Array.Empty<string>();
     }
 
-    public void Act(UiWidget target, string action, string text, double? value)
+    public void Act(UiWidget target, string action, string text, double? value, bool scoped = false)
     {
         var widget = (Widget)target.Native;
         var layer = (GauntletLayer)target.Layer;
-        var point = Center(widget);
-        if (!CanHit(widget, layer, point))
+        if (!Actions(widget, scoped).Contains(action))
+            throw new UiAutomationException("unsupported_action", "This concrete native control does not support that action in this scope.");
+        var current = Read(scoped ? layer : null);
+        if (current.Truncated || !current.ScopeComplete || !current.Widgets.Any(w =>
+            ReferenceEquals(w.Native, widget) && w.Visible && w.Enabled && w.HitTestable && !w.Redacted && !w.ContentTruncated))
             throw new UiAutomationException("not_interactable", "Native hit test no longer reaches this control.");
         if (action == "click" || action == "toggle")
         {
@@ -122,7 +213,7 @@ public sealed class GauntletWidgetAdapter : IUiWidgetAdapter
                 if (value != 0 && value != 1) throw new UiAutomationException("invalid_parameters", "Toggle value must be zero or one.");
                 if (button.IsSelected == (value == 1)) return;
             }
-            Click(widget, point);
+            ActivateButton((ButtonWidget)widget);
         }
         else if (action == "text")
         {
@@ -177,41 +268,37 @@ public sealed class GauntletWidgetAdapter : IUiWidgetAdapter
             throw new UiAutomationException("input_busy", "Release controller and on-screen keyboard input before automation.");
     }
 
-    internal void Click(Widget widget, Vector2 point)
+    // Semantic native activation, not a simulated pointer gesture or a VM/event-name dispatch.
+    internal void ActivateButton(ButtonWidget button)
     {
-        var context = widget.Context._uiInputContext;
-        bool previousOverride = context._isMousePositionOverridden;
-        var previousPosition = context._overrideMousePosition;
-        var events = widget.EventManager;
-        var previousHitTest = events.OnGetIsHitThisFrame;
-        if (events._mouseIsDown || events._mouseAlternateIsDown || events.IsDragging)
+        if (button.GetType() != typeof(ButtonWidget))
+            throw new UiAutomationException("unsupported_action", "Only the exact native ButtonWidget supports semantic activation.");
+        var events = button.EventManager;
+        if (events._mouseIsDown || events._mouseAlternateIsDown || events.IsDragging || button.IsPressed ||
+            button._clickState != ButtonWidget.ButtonClickState.None)
             throw new UiAutomationException("input_busy", "Release native input before UI automation.");
         try
         {
-            context.SetMousePositionOverride(point);
-            // Native frame hit state describes the physical cursor, not this validated target.
-            events.OnGetIsHitThisFrame = () => true;
-            events.MouseDown();
-            events.MouseUp();
+            button.HandleClick();
         }
-        finally
+        catch (Exception exception)
         {
-            try
-            {
-                if (events._mouseIsDown) events.MouseUp(false);
-            }
-            finally
-            {
-                events.OnGetIsHitThisFrame = previousHitTest;
-                if (previousOverride) context.SetMousePositionOverride(previousPosition);
-                else context.ResetMousePositionOverride();
-            }
+            // Even a bridge-shaped exception from a native callback follows possible mutation.
+            throw new InvalidOperationException("Native button activation failed; outcome is uncertain. Do not retry.", exception);
         }
     }
 
-    private bool CanHit(Widget widget, GauntletLayer layer, Vector2 point)
+    private bool CanHit(Widget widget, GauntletLayer layer, Vector2 point, UiLayerStack stack)
     {
-        if (!InsideClips(widget, point) || ScreenManager.IsLayerBlockedAtPosition(layer, point)) return false;
+        if (!InsideClips(widget, point)) return false;
+        for (int i = stack.Layers.Count - 1; i >= 0; i--)
+        {
+            var above = stack.Layers[i];
+            if (ReferenceEquals(above.Native, layer)) break;
+            // Maskless layers cannot block; native ScreenManager would still traverse their trees.
+            if (above.Active && !above.Finalized && BlocksMouse(above) &&
+                (!above.Supported || ((GauntletLayer)above.Native).HitTest(point))) return false;
+        }
         var kind = widget is ScrollablePanel ? GauntletEvent.MouseScroll : GauntletEvent.MousePressed;
         var hit = widget.EventManager.GetWidgetAtPositionForEvent(kind, point);
         if (widget is ScrollablePanel)
