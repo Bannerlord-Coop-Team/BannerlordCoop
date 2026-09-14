@@ -70,6 +70,10 @@ internal sealed class SiegeInteractionDebugBehavior : MissionBehavior, ISiegeInt
     private float capturedCameraElevation;
     private bool nativeCameraStaged;
     private object nativeAimTarget;
+    private Guid? watchedAgentId;
+    private object observerFrame;
+    private EquipmentIndex previousMainHand;
+    private ItemObject previousMainHandItem;
     private bool fixtureRestored;
     private string captureFailureReason;
     private Agent dismountAgent;
@@ -387,7 +391,7 @@ internal sealed class SiegeInteractionDebugBehavior : MissionBehavior, ISiegeInt
         }
         bool externalInput = request.Action == "arm-use" || request.Action == "arm-stop";
         string action = externalInput ? request.Action.Substring(4) : request.Action;
-        externalInput |= action == "fire";
+        externalInput |= action == "fire" || action == "attack";
         if (action != "use" && action != "stop" && action != "fire" && action != "attack")
         {
             status = "unexercised_unknown_action";
@@ -517,6 +521,9 @@ internal sealed class SiegeInteractionDebugBehavior : MissionBehavior, ISiegeInt
         nativeCameraStaged = false;
         nativeAimTarget = null;
         fixtureRestored = false;
+        previousMainHand = agent.GetPrimaryWieldedItemIndex();
+        previousMainHandItem = previousMainHand == EquipmentIndex.None ? null : agent.Equipment[previousMainHand].Item;
+        observerFrame = null;
         status = "fixture_captured";
     }
 
@@ -556,11 +563,12 @@ internal sealed class SiegeInteractionDebugBehavior : MissionBehavior, ISiegeInt
         var position = reaimOnly ? agent.Position : point.GetUserFrameForAgent(agent).Origin.GetGroundVec3();
         if (nativeCamera)
         {
-            if (capturedCamera != null || stagingCamera != null || agent.MountAgent != null)
+            if (capturedCamera != null || agent.MountAgent != null)
             {
                 status = "fixture_stage_rejected";
                 return;
             }
+            ReleaseCamera();
             var direction = point.GetUserFrameForAgent(agent).Rotation.f;
             if (machine is StonePile)
             {
@@ -585,6 +593,19 @@ internal sealed class SiegeInteractionDebugBehavior : MissionBehavior, ISiegeInt
                     return;
                 }
             }
+            if (machine is ArrowBarrel)
+            {
+                var bowSlot = Enumerable.Range(0, (int)EquipmentIndex.NumAllWeaponSlots)
+                    .Select(index => (EquipmentIndex)index)
+                    .Where(slot => agent.Equipment[slot].Item?.PrimaryWeapon?.WeaponClass == WeaponClass.Bow)
+                    .DefaultIfEmpty(EquipmentIndex.None).First();
+                if (bowSlot == EquipmentIndex.None || agent.GetOffhandWieldedItemIndex() != EquipmentIndex.None)
+                {
+                    status = "fixture_bow_unavailable";
+                    return;
+                }
+                agent.TryToWieldWeaponInSlot(bowSlot, Agent.WeaponWieldActionType.WithAnimationUninterruptible, false);
+            }
             if (!reaimOnly) agent.TeleportToPosition(position);
             agent.LookDirection = direction;
             screen.CameraBearing = direction.RotationZ;
@@ -601,9 +622,37 @@ internal sealed class SiegeInteractionDebugBehavior : MissionBehavior, ISiegeInt
         if (!watchOnly) agent.TeleportToPosition(position);
         var target = GetStagingTarget(machine, point.GameEntity.GlobalPosition, watchOnly);
         var eye = watchOnly ? target + new Vec3(3f, 3f, 2f) : position + (Vec3.Up * 1.6f);
+        observerFrame = null;
+        if (watchOnly && watchedAgentId.HasValue)
+        {
+            if (!ContainerProvider.TryResolve<INetworkAgentRegistry>(out var registry) ||
+                !registry.TryGetAgentInfo(watchedAgentId.Value, out var info) || info?.Agent == null ||
+                info.AgentId != watchedAgentId.Value || ReferenceEquals(info.Agent, agent) ||
+                !ReferenceEquals(info.Agent.Mission, Mission) || !info.Agent.IsActive() ||
+                info.Agent.AgentVisuals?.GetEntity() == null)
+            {
+                ReleaseCamera();
+                status = "fixture_observer_actor_unavailable";
+                return;
+            }
+            var actor = info.Agent;
+            target = actor.Position + (Vec3.Up * actor.AgentScale);
+            var behind = actor.LookDirection;
+            behind.z = 0f;
+            if (behind.LengthSquared < 0.5f)
+            {
+                ReleaseCamera();
+                status = "fixture_observer_actor_unavailable";
+                return;
+            }
+            eye = target - (behind.NormalizedCopy() * 3f) + (Vec3.Up * 0.8f);
+            observerFrame = new { agentId = info.AgentId.ToString("N"), info.OriginalOwner,
+                actorPosition = DescribePosition(actor.Position), target = DescribePosition(target), eye = DescribePosition(eye) };
+        }
         var up = Math.Abs(Vec3.DotProduct((target - eye).NormalizedCopy(), Vec3.Up)) > 0.99f
             ? new Vec3(0f, 1f, 0f) : Vec3.Up;
         stagingCamera.LookAt(eye, target, up);
+        stagingCamera.SetFovVertical(65f * MathF.PI / 180f, TaleWorlds.Engine.Screen.AspectRatio, 0.065f, 12500f);
         screen.CustomCamera = stagingCamera;
         status = watchOnly ? "fixture_observer_camera_staged" : "fixture_staged_native_focus_pending";
     }
@@ -662,6 +711,23 @@ internal sealed class SiegeInteractionDebugBehavior : MissionBehavior, ISiegeInt
             }
             externalInputArmed = false;
         }
+        if (previousMainHand != EquipmentIndex.None && !ReferenceEquals(agent.Equipment[previousMainHand].Item, previousMainHandItem))
+        {
+            status = "fixture_restore_rejected_equipment_changed";
+            return;
+        }
+        if (agent.GetPrimaryWieldedItemIndex() != previousMainHand)
+        {
+            if (previousMainHand == EquipmentIndex.None)
+                agent.TryToSheathWeaponInHand(Agent.HandIndex.MainHand, Agent.WeaponWieldActionType.InstantAfterPickUp);
+            else
+                agent.TryToWieldWeaponInSlot(previousMainHand, Agent.WeaponWieldActionType.InstantAfterPickUp, false);
+            if (agent.GetPrimaryWieldedItemIndex() != previousMainHand)
+            {
+                status = "fixture_restore_rejected_wield_state";
+                return;
+            }
+        }
         agent.TeleportToPosition(capturedPosition);
         agent.LookDirection = capturedLookDirection;
         ReleaseCamera();
@@ -672,7 +738,9 @@ internal sealed class SiegeInteractionDebugBehavior : MissionBehavior, ISiegeInt
             nativeCameraStaged = false;
         }
         fixtureRestored = (agent.Position - capturedPosition).LengthSquared < 0.01f &&
-            ReferenceEquals(screen.CustomCamera, capturedCamera);
+            ReferenceEquals(screen.CustomCamera, capturedCamera) &&
+            agent.GetPrimaryWieldedItemIndex() == previousMainHand &&
+            (previousMainHand == EquipmentIndex.None || ReferenceEquals(agent.Equipment[previousMainHand].Item, previousMainHandItem));
         status = fixtureRestored ? "fixture_restored" : "fixture_restore_mismatch";
         if (fixtureRestored) capturedAgent = null;
     }
@@ -695,6 +763,7 @@ internal sealed class SiegeInteractionDebugBehavior : MissionBehavior, ISiegeInt
         CoopAgentInfo mainInfo = null;
         if (agent != null) registry?.TryGetAgentInfo(agent, out mainInfo);
         var selectedAgentId = observedAgentId ?? mainInfo?.AgentId;
+        watchedAgentId = observedAgentId;
         return new
         {
             success = !removed && Mission == TaleWorlds.MountAndBlade.Mission.Current,
@@ -719,7 +788,7 @@ internal sealed class SiegeInteractionDebugBehavior : MissionBehavior, ISiegeInt
             requestId, status, pressInvoked, externalInputArmed, inputVirtualKey, edgeObserved, edgeCleared, inputGameKeyId, tick,
             fixtureActive = capturedAgent != null,
             fixtureRestored, captureFailureReason,
-            nativeCameraStaged, nativeAimTarget,
+            nativeCameraStaged, nativeAimTarget, observerFrame,
             stagingCameraActive = stagingCamera != null && ReferenceEquals(screen?.CustomCamera, stagingCamera),
             focusDiagnostic = ReadFocusDiagnostic(screen, agent),
             inputSamples = inputSamples.ToArray(),
