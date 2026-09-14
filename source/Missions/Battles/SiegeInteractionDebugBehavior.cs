@@ -387,6 +387,7 @@ internal sealed class SiegeInteractionDebugBehavior : MissionBehavior, ISiegeInt
         }
         bool externalInput = request.Action == "arm-use" || request.Action == "arm-stop";
         string action = externalInput ? request.Action.Substring(4) : request.Action;
+        externalInput |= action == "fire";
         if (action != "use" && action != "stop" && action != "fire" && action != "attack")
         {
             status = "unexercised_unknown_action";
@@ -433,7 +434,8 @@ internal sealed class SiegeInteractionDebugBehavior : MissionBehavior, ISiegeInt
             status = "unexercised_unbound_key";
             return;
         }
-        inputVirtualKey = Input.GetVirtualKeyCode(key.KeyboardKey.InputKey);
+        inputVirtualKey = key.KeyboardKey.InputKey == InputKey.LeftMouseButton
+            ? 1 : Input.GetVirtualKeyCode(key.KeyboardKey.InputKey);
         if (externalInput && (inputVirtualKey <= 0 || inputVirtualKey > 255))
         {
             status = "unexercised_unbound_key";
