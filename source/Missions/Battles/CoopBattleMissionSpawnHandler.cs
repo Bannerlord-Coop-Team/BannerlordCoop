@@ -6,7 +6,7 @@ using GameInterface.Services.MapEvents;
 using GameInterface.Services.MapEvents.TroopSupply;
 using SandBox.Missions.MissionLogics;
 using Serilog;
-using Missions.Data;
+using Missions.Messages;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.Core;
