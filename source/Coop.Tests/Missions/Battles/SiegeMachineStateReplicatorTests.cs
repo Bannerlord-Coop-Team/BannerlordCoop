@@ -16,7 +16,83 @@ namespace Coop.Tests.Missions.Battles;
 public class SiegeMachineStateReplicatorTests
 {
     [Fact]
-    public void NetworkSiegeMachineState_RoundTripsDiscreteLadderState()
+    public void NetworkGateHit_RoundTripsRamAuthorityAndDamage()
+    {
+        var original = new NetworkGateHit(12, 15, 350, "ram-owner", 8, 4);
+        var result = ProtoBuf.Serializer.DeepClone(original);
+        Assert.Equal(original.GateId, result.GateId);
+        Assert.Equal(original.RamId, result.RamId);
+        Assert.Equal(original.Damage, result.Damage);
+        Assert.Equal(original.SenderControllerId, result.SenderControllerId);
+        Assert.Equal(original.HostEpoch, result.HostEpoch);
+        Assert.Equal(original.AuthorityRevision, result.AuthorityRevision);
+    }
+
+    [Fact]
+    public void NetworkSiegeWeaponFired_RoundTripsMachineAuthorityAndProjectile()
+    {
+        _ = new SurrogateCollection();
+        var original = new NetworkSiegeWeaponFired(12, Guid.NewGuid(), new Vec3(1f, 2f, 3f),
+            new Vec3(0f, 1f, 0f), Mat3.Identity, 30f, 35f, "stone", "owner-b", 8, 4);
+        var result = ProtoBuf.Serializer.DeepClone(original);
+        Assert.Equal(original.MachineId, result.MachineId);
+        Assert.Equal(original.ShooterAgentId, result.ShooterAgentId);
+        Assert.Equal(original.Position, result.Position);
+        Assert.Equal(original.Direction, result.Direction);
+        Assert.Equal(original.BaseSpeed, result.BaseSpeed);
+        Assert.Equal(original.Speed, result.Speed);
+        Assert.Equal(original.MissileItemId, result.MissileItemId);
+        Assert.Equal(original.SenderControllerId, result.SenderControllerId);
+        Assert.Equal(original.HostEpoch, result.HostEpoch);
+        Assert.Equal(original.AuthorityRevision, result.AuthorityRevision);
+    }
+
+#if DEBUG
+    [Fact]
+    public void NativeInputRequest_RoundTripsTargetAndOneShotIdentity()
+    {
+        var original = new NetworkSiegeInteractionDebugRequest(
+            "map-event-1", "testclient2", "gate-use-1", 12, "use", 2);
+        var result = ProtoBuf.Serializer.DeepClone(original);
+        Assert.Equal(original.MapEventId, result.MapEventId);
+        Assert.Equal(original.ControllerId, result.ControllerId);
+        Assert.Equal(original.RequestId, result.RequestId);
+        Assert.Equal(original.MachineId, result.MachineId);
+        Assert.Equal(original.Action, result.Action);
+        Assert.Equal(original.StandingPointIndex, result.StandingPointIndex);
+    }
+#endif
+
+    [Fact]
+    public void NetworkSiegeMachineAuthority_RoundTripsOrderingIdentity()
+    {
+        var original = new NetworkSiegeMachineAuthority(
+            machineId: 12,
+            controllerId: "owner-a",
+            hostEpoch: 4,
+            authorityRevision: 3,
+            senderControllerId: "host-a");
+
+        NetworkSiegeMachineAuthority result;
+        using (var stream = new MemoryStream())
+        {
+            RuntimeTypeModel.Default.Serialize(stream, original);
+            stream.Position = 0;
+            result = (NetworkSiegeMachineAuthority)RuntimeTypeModel.Default.Deserialize(
+                stream,
+                null,
+                typeof(NetworkSiegeMachineAuthority));
+        }
+
+        Assert.Equal(original.MachineId, result.MachineId);
+        Assert.Equal(original.ControllerId, result.ControllerId);
+        Assert.Equal(original.HostEpoch, result.HostEpoch);
+        Assert.Equal(original.AuthorityRevision, result.AuthorityRevision);
+        Assert.Equal(original.SenderControllerId, result.SenderControllerId);
+    }
+
+    [Fact]
+    public void NetworkSiegeMachineState_RoundTripsSimulatorOwnedState()
     {
         var original = new NetworkSiegeMachineState(
             machineId: 12,
@@ -29,7 +105,10 @@ public class SiegeMachineStateReplicatorTests
             weaponState: -1,
             aimDirection: -1000f,
             aimReleaseAngle: -1000f,
-            hostEpoch: 4);
+            hostEpoch: 4,
+            stoneAmmo: 7,
+            senderControllerId: "peer-a",
+            authorityRevision: 3);
 
         NetworkSiegeMachineState result;
         using (var stream = new MemoryStream())
@@ -43,7 +122,11 @@ public class SiegeMachineStateReplicatorTests
         }
 
         Assert.Equal(original.LadderState, result.LadderState);
+        Assert.True(result.HasStoneAmmo);
+        Assert.Equal(original.StoneAmmo, result.StoneAmmo);
         Assert.Equal(original.HostEpoch, result.HostEpoch);
+        Assert.Equal(original.SenderControllerId, result.SenderControllerId);
+        Assert.Equal(original.AuthorityRevision, result.AuthorityRevision);
     }
 
     [Fact]
@@ -59,7 +142,9 @@ public class SiegeMachineStateReplicatorTests
             fallAngularSpeed: -0.5f,
             frame: ladderFrame,
             animationIndex: 17,
-            hostEpoch: 4);
+            hostEpoch: 4,
+            senderControllerId: "peer-a",
+            authorityRevision: 3);
 
         NetworkSiegeLadderAnimationState result;
         using (var stream = new MemoryStream())
@@ -80,6 +165,8 @@ public class SiegeMachineStateReplicatorTests
         Assert.Equal(original.Frame.origin, result.Frame.origin);
         Assert.Equal(original.AnimationIndex, result.AnimationIndex);
         Assert.Equal(original.HostEpoch, result.HostEpoch);
+        Assert.Equal(original.SenderControllerId, result.SenderControllerId);
+        Assert.Equal(original.AuthorityRevision, result.AuthorityRevision);
     }
 
     [Fact]

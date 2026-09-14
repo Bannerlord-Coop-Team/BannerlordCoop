@@ -38,6 +38,34 @@ public class SiegeLadderAuthorityPatchTests
         }
     }
 
+    [Fact]
+    public void SiegeMachineAuthorityPatches_HookRamAndStoneTicks_AndAllowRepeatedPatching()
+    {
+        var patchType = typeof(BattleSpawnGate).Assembly
+            .GetType("GameInterface.Services.MapEvents.Patches.SiegeMachineAuthorityPatches");
+        Assert.NotNull(patchType);
+        var harmony = new Harmony("e2e.siegemachine.authority");
+        var repeatedHarmony = new Harmony("e2e.siegemachine.authority.repeated");
+        try
+        {
+            harmony.CreateClassProcessor(patchType).Patch();
+            repeatedHarmony.CreateClassProcessor(patchType).Patch();
+            foreach (var machineType in new[] { typeof(BatteringRam), typeof(StonePile) })
+            {
+                var original = AccessTools.Method(machineType, "OnTick");
+                var patches = Harmony.GetPatchInfo(original);
+                Assert.NotNull(patches);
+                Assert.Contains(patches.Transpilers, patch => patch.owner == harmony.Id);
+                Assert.Contains(patches.Transpilers, patch => patch.owner == repeatedHarmony.Id);
+            }
+        }
+        finally
+        {
+            repeatedHarmony.UnpatchAll(repeatedHarmony.Id);
+            harmony.UnpatchAll(harmony.Id);
+        }
+    }
+
     [Theory]
     [InlineData(
         SiegeLadder.LadderState.OnLand,

@@ -117,6 +117,75 @@ internal class BattleHostHandler : IHandler
         public DateTime DeadlineUtc;
     }
 
+#if DEBUG
+    private readonly object fixtureReadyLock = new object();
+    private string fixtureReadyMapEventId;
+    private string fixtureExpectedHostId;
+    private bool fixtureMissionReady;
+
+    internal bool DeferFixtureMissionReady(string mapEventId, string expectedHostId)
+    {
+        if (ModInformation.IsServer || string.IsNullOrEmpty(mapEventId) ||
+            string.IsNullOrEmpty(expectedHostId) || expectedHostId == controllerIdProvider.ControllerId ||
+            hostRegistry.TryGet(mapEventId, out _)) return false;
+        lock (fixtureReadyLock)
+        {
+            if (fixtureReadyMapEventId != null) return false;
+            fixtureReadyMapEventId = mapEventId;
+            fixtureExpectedHostId = expectedHostId;
+            fixtureMissionReady = false;
+            return true;
+        }
+    }
+
+    internal bool CancelFixtureMissionReady(string mapEventId)
+    {
+        lock (fixtureReadyLock)
+        {
+            if (fixtureReadyMapEventId == null) return true;
+            if (fixtureReadyMapEventId != mapEventId) return false;
+            fixtureReadyMapEventId = null;
+            fixtureExpectedHostId = null;
+            fixtureMissionReady = false;
+            return true;
+        }
+    }
+
+    private bool ShouldDeferFixtureMissionReady(string mapEventId)
+    {
+        lock (fixtureReadyLock)
+        {
+            if (fixtureReadyMapEventId != mapEventId) return false;
+            // The desired peer may finish loading before this client does.
+            if (hostRegistry.TryGet(mapEventId, out var assignment) &&
+                assignment.HostControllerId == fixtureExpectedHostId && assignment.Epoch == 1)
+            {
+                fixtureReadyMapEventId = null;
+                fixtureExpectedHostId = null;
+                return false;
+            }
+            fixtureMissionReady = true;
+            return true;
+        }
+    }
+
+    private void ReleaseFixtureMissionReady(NetworkBattleHostAssigned assignment)
+    {
+        bool release;
+        lock (fixtureReadyLock)
+        {
+            release = fixtureMissionReady && fixtureReadyMapEventId == assignment.MapEventId &&
+                fixtureExpectedHostId == assignment.HostControllerId && assignment.Epoch == 1;
+            if (!release) return;
+            fixtureMissionReady = false;
+            fixtureReadyMapEventId = null;
+            fixtureExpectedHostId = null;
+        }
+        network.SendAll(new NetworkRequestBattleHost(assignment.MapEventId, controllerIdProvider.ControllerId));
+        Logger.Information("[BattleHost] Released fixture mission-ready request for {MapEventId}", assignment.MapEventId);
+    }
+#endif
+
     public BattleHostHandler(
         IMessageBroker messageBroker,
         INetwork network,
@@ -191,6 +260,9 @@ internal class BattleHostHandler : IHandler
         var mapEventId = payload.What.MapEventId;
         if (string.IsNullOrEmpty(mapEventId)) return;
 
+#if DEBUG
+        if (ShouldDeferFixtureMissionReady(mapEventId)) return;
+#endif
         network.SendAll(new NetworkRequestBattleHost(mapEventId, controllerIdProvider.ControllerId));
         Logger.Information("[BattleHost] Mission ready — requested host election for battle {MapEventId}", mapEventId);
     }
@@ -870,6 +942,9 @@ internal class BattleHostHandler : IHandler
             message.SuccessorControllerIds ?? Array.Empty<string>(),
             message.Epoch);
         hostRegistry.Set(message.MapEventId, assignment);
+#if DEBUG
+        ReleaseFixtureMissionReady(message);
+#endif
 
         bool isLocalHost = message.HostControllerId == controllerIdProvider.ControllerId;
         if (isLocalHost && (!wasLocalHost || previous?.Epoch != message.Epoch))

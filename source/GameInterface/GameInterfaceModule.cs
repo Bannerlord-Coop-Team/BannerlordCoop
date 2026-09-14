@@ -40,6 +40,7 @@ using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Party;
 using GameInterface.Services.Players;
 using GameInterface.Services.SiegeEvents;
+using GameInterface.Services.SiegeEvents.Commands;
 using GameInterface.Services.Stances;
 using GameInterface.Services.Time;
 using GameInterface.Services.TroopRosters;
@@ -141,6 +142,12 @@ public class GameInterfaceModule : Module
         builder.RegisterType<LocationConversationAgentGuard>().As<ILocationConversationAgentGuard>().InstancePerDependency();
         builder.RegisterType<BattleAgentBudget>().As<IBattleAgentBudget>().InstancePerDependency();
         builder.RegisterType<NearbyPartyReinforcer>().As<INearbyPartyReinforcer>().InstancePerDependency();
+#if DEBUG
+        // One capture spans the independently resolved DEBUG commands for this campaign session.
+        builder.RegisterType<DefenderFixtureBehaviorIdentity>().As<IDefenderFixtureBehaviorIdentity>().InstancePerDependency();
+        builder.RegisterType<DefenderSiegeContextFixture>().As<IDefenderSiegeContextFixture>().InstancePerLifetimeScope();
+        builder.RegisterType<DefenderFixtureCaptivityActions>().As<IDefenderFixtureCaptivityActions>().InstancePerDependency();
+#endif
         builder.RegisterType<SiegeMapEventLeaderReconciler>().As<ISiegeMapEventLeaderReconciler>().InstancePerDependency();
         builder.RegisterType<AiSiegeAssaultReadiness>().As<IAiSiegeAssaultReadiness>().InstancePerDependency();
         builder.RegisterType<AiSiegeTerminalPolicy>().As<IAiSiegeTerminalPolicy>().InstancePerLifetimeScope();
