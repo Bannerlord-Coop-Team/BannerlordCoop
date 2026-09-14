@@ -598,7 +598,7 @@ internal sealed class SiegeInteractionDebugBehavior : MissionBehavior, ISiegeInt
             }
             ReleaseCamera();
             var direction = point.GetUserFrameForAgent(agent).Rotation.f;
-            if (machine is StonePile || machine is Ballista)
+            if (machine is StonePile || machine is Ballista || machine is CastleGate)
             {
                 try
                 {
@@ -704,13 +704,13 @@ internal sealed class SiegeInteractionDebugBehavior : MissionBehavior, ISiegeInt
         if (nativeCamera && !watchOnly && machine is StonePile)
         {
             // Render bounds can change independently of the pile's focus collision.
-            var target = machine.GameEntity.ComputeGlobalPhysicsBoundingBoxCenter();
+            var physicsTarget = machine.GameEntity.ComputeGlobalPhysicsBoundingBoxCenter();
             nativeAimTarget = new
             {
                 requestId, tick, recordedUtc = DateTime.UtcNow, machineId = machine.Id.Id,
-                target = DescribePosition(target)
+                target = DescribePosition(physicsTarget)
             };
-            return target;
+            return physicsTarget;
         }
         if (nativeCamera && !watchOnly && machine is Ballista ballista)
         {
@@ -719,24 +719,33 @@ internal sealed class SiegeInteractionDebugBehavior : MissionBehavior, ISiegeInt
                 throw new InvalidOperationException("The current ballista has no resolved body.");
             var min = body.GameEntity.GlobalBoxMin;
             var max = body.GameEntity.GlobalBoxMax;
-            var target = body.GameEntity.ComputeGlobalPhysicsBoundingBoxCenter();
+            var bodyTarget = body.GameEntity.ComputeGlobalPhysicsBoundingBoxCenter();
             nativeAimTarget = new
             {
                 requestId, tick, recordedUtc = DateTime.UtcNow, machineId = machine.Id.Id, bodyId = body.Id.Id,
                 bodyName = body.GameEntity.Name, bodyTag = ballista.BodyTag,
-                min = DescribePosition(min), max = DescribePosition(max), target = DescribePosition(target),
+                min = DescribePosition(min), max = DescribePosition(max), target = DescribePosition(bodyTarget),
                 ancestors = DescribeAncestors(body.GameEntity)
             };
-            if (new[] { min.x, min.y, min.z, max.x, max.y, max.z, target.x, target.y, target.z }
+            if (new[] { min.x, min.y, min.z, max.x, max.y, max.z, bodyTarget.x, bodyTarget.y, bodyTarget.z }
                     .Any(value => float.IsNaN(value) || float.IsInfinity(value)) ||
                 min.x > max.x || min.y > max.y || min.z > max.z || (max - min).LengthSquared < 0.0001f)
                 throw new InvalidOperationException("The resolved ballista body has invalid world bounds.");
-            return target;
+            return bodyTarget;
         }
         if (watchOnly || !(machine is CastleGate gate)) return standingPointPosition;
         // Gate standing-point origins can lie directly beneath the player's feet.
         var bounds = gate.ComputeGlobalPhysicsBoundingBoxMinMax();
-        return (bounds.Item1 + bounds.Item2) * 0.5f;
+        var gateTarget = (bounds.Item1 + bounds.Item2) * 0.5f;
+        if (nativeCamera)
+        {
+            nativeAimTarget = new
+            {
+                requestId, tick, recordedUtc = DateTime.UtcNow, machineId = machine.Id.Id,
+                target = DescribePosition(gateTarget)
+            };
+        }
+        return gateTarget;
     }
 
     private void Restore(MissionScreen screen, Agent agent)

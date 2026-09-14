@@ -706,6 +706,22 @@ public class SiegeInteractionDebugBehaviorTests
             {
                 Assert.Equal(standingPosition, target);
             }
+
+            var nativeTarget = behavior.GetStagingTarget(machine, standingPosition, watchOnly, true);
+            if (gate && !watchOnly)
+            {
+                Assert.Equal(new Vec3(613f, 625f, 62f), nativeTarget);
+                var nativeAimTarget = JObject.FromObject(
+                    AccessTools.Field(typeof(SiegeInteractionDebugBehavior), "nativeAimTarget").GetValue(behavior));
+                Assert.Equal(613f, nativeAimTarget["target"]["x"].Value<float>());
+                Assert.Equal(625f, nativeAimTarget["target"]["y"].Value<float>());
+                Assert.Equal(62f, nativeAimTarget["target"]["z"].Value<float>());
+            }
+            else
+            {
+                Assert.Equal(standingPosition, nativeTarget);
+                Assert.Null(AccessTools.Field(typeof(SiegeInteractionDebugBehavior), "nativeAimTarget").GetValue(behavior));
+            }
         }
         finally
         {
