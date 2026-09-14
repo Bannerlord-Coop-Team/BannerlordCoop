@@ -45,19 +45,21 @@ public class StanceLinkSyncTests : SyncTestBase
             stance.SuccessfulTownSieges1 = 2;
             stance.SuccessfulTownSieges2 = 1;
         });
-        var firstClient = TestEnvironment.Clients.First();
-        firstClient.Call(() =>
+        foreach(var client in Clients)
         {
-            Assert.True(Server.ObjectManager.TryGetObject<StanceLink>(stanceLinkId, out var clientStance));
+            client.Call(() =>
+            {
+                Assert.True(client.ObjectManager.TryGetObject<StanceLink>(stanceLinkId, out var clientStance));
 
-            Assert.Equal(100, clientStance.TroopCasualties1);
-            Assert.Equal(200, clientStance.TroopCasualties2);
-            Assert.Equal(13, clientStance.SuccessfulSieges1);
-            Assert.Equal(11, clientStance.SuccessfulSieges2);
-            Assert.Equal(10, clientStance.SuccessfulRaids1);
-            Assert.Equal(4, clientStance.SuccessfulRaids2);
-            Assert.Equal(2, clientStance.SuccessfulTownSieges1);
-            Assert.Equal(1, clientStance.SuccessfulTownSieges2);
-        });
+                Assert.Equal(100, clientStance.TroopCasualties1);
+                Assert.Equal(200, clientStance.TroopCasualties2);
+                Assert.Equal(13, clientStance.SuccessfulSieges1);
+                Assert.Equal(11, clientStance.SuccessfulSieges2);
+                Assert.Equal(10, clientStance.SuccessfulRaids1);
+                Assert.Equal(4, clientStance.SuccessfulRaids2);
+                Assert.Equal(2, clientStance.SuccessfulTownSieges1);
+                Assert.Equal(1, clientStance.SuccessfulTownSieges2);
+            });
+        }
     }
 }
