@@ -618,7 +618,8 @@ namespace Missions.Agents.Packets
             if (actionIndex == ActionIndexCache.act_none.Index)
             {
                 action = ActionIndexCache.act_none;
-                return true;
+                // Retained guard cleanup releases its own action; other guard presentations decay locally.
+                return !IsGuardPresentationAction(agent.GetCurrentActionType(channel));
             }
 
             string actionName = GetActionNameWithCode(actionIndex);
