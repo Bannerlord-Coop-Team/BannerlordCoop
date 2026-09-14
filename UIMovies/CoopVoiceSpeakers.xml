@@ -1,0 +1,27 @@
+<Prefab>
+  <Window>
+    <Widget WidthSizePolicy="StretchToParent" HeightSizePolicy="StretchToParent"
+            DoNotAcceptEvents="true" DoNotPassEventsToChildren="true">
+      <Children>
+        <ListPanel Id="CoopVoiceSpeakers" WidthSizePolicy="Fixed" SuggestedWidth="260"
+                   HeightSizePolicy="CoverChildren" HorizontalAlignment="Left" VerticalAlignment="Top"
+                   MarginLeft="24" MarginTop="280" StackLayout.LayoutMethod="VerticalTopToBottom"
+                   IsVisible="@HasSpeakers" DoNotAcceptEvents="true" DoNotPassEventsToChildren="true">
+          <Children>
+            <TextWidget WidthSizePolicy="StretchToParent" HeightSizePolicy="Fixed" SuggestedHeight="26"
+                        Brush="Clan.TabControl.Text" Brush.FontSize="18" Brush.TextHorizontalAlignment="Left"
+                        Brush.FontColor="#B9AB9BFF" Text="@Title" DoNotAcceptEvents="true"/>
+            <ListPanel DataSource="{Speakers}" WidthSizePolicy="StretchToParent" HeightSizePolicy="CoverChildren"
+                       StackLayout.LayoutMethod="VerticalTopToBottom" DoNotAcceptEvents="true" DoNotPassEventsToChildren="true">
+              <ItemTemplate>
+                <TextWidget WidthSizePolicy="StretchToParent" HeightSizePolicy="Fixed" SuggestedHeight="24"
+                            Brush="Clan.TabControl.Text" Brush.FontSize="20" Brush.TextHorizontalAlignment="Left"
+                            Brush.FontColor="#FFFFFFFF" Text="@Name" ClipContents="true" DoNotAcceptEvents="true"/>
+              </ItemTemplate>
+            </ListPanel>
+          </Children>
+        </ListPanel>
+      </Children>
+    </Widget>
+  </Window>
+</Prefab>

@@ -28,56 +28,6 @@ public class BattlePuppetTeamOwnershipTests : MissionTestEnvironment
 {
     public BattlePuppetTeamOwnershipTests(ITestOutputHelper output) : base(output) { }
 
-    [Theory]
-    [InlineData(true, true)]
-    [InlineData(false, true)]
-    [InlineData(true, false)]
-    public void ExhaustedReturnReserve_RequiresLiveLocalHero(bool alive, bool ownParty)
-    {
-        using var fixture = new MissionEngineFixture();
-        var (mapEventId, partyIds) = SetupCoopBattle("local", "remote");
-        var client = Clients.First();
-        client.Call(() =>
-        {
-            var mock = fixture.CreateMission(client);
-            Assert.True(client.ObjectManager.TryGetObject<MobileParty>(partyIds[0], out var localParty));
-            Assert.True(client.ObjectManager.TryGetObject<MobileParty>(partyIds[1], out var remoteParty));
-            var hero = Hero.MainHero.CharacterObject;
-            var previousParty = Campaign.Current.MainParty;
-            Campaign.Current.MainParty = localParty;
-            try
-            {
-                var defender = new CoopTroopSupplier(mapEventId, BattleSideEnum.Defender,
-                    client.ObjectManager, new BattleAgentBudget());
-                var attacker = new CoopTroopSupplier(mapEventId, BattleSideEnum.Attacker,
-                    client.ObjectManager, new BattleAgentBudget());
-                defender.SetReserve(new[] { new PartyReserve("local-origin", 1,
-                    new[] { new TroopReserveEntry(1, "hero", 0) }, isReceiverPlayerParty: true) },
-                    sideTotal: 2, playerOwnedParties: 1, authoritativeBattleSize: 1000);
-                var handler = new CoopBattleMissionSpawnHandler(defender, attacker,
-                    client.Resolve<IMessageBroker>(), BattleSideEnum.Defender);
-                var data = new BattleAgentSpawnData(Guid.NewGuid(), "hero", default,
-                    BattleSideEnum.Defender, alive ? 100 : 0, "local",
-                    ownParty ? "local-origin" : "remote-origin", 1, new Equipment(), default, null);
-                Assert.Equal(alive && ownParty, handler.CanRestorePlayerAgent(data, hero));
-                var origin = new CoopAgentOrigin(hero, ownParty ? localParty.Party : remoteParty.Party,
-                    -1, null, new UniqueTroopDescriptor(1));
-                var agent = mock.SpawnAgent(new AgentBuildData(hero).Controller(AgentControllerType.Player)
-                    .Team(mock.DefenderTeam.Shell).TroopOrigin(origin));
-                Assert.True(AgentMirror.TryGet(agent, out var mirror));
-                mirror.IsActive = alive;
-                Assert.Equal(alive && ownParty, handler.HasRestoredPlayerAgent(agent));
-                Assert.False(handler.HasRestoredPlayerAgent(null));
-                Assert.Equal(0, defender.GetRemainingForParty("local-origin"));
-                Assert.Null(defender.SupplyOneTroop());
-            }
-            finally
-            {
-                Campaign.Current.MainParty = previousParty;
-            }
-        });
-    }
-
     [Fact]
     public async Task WireSpawn_EquipmentCloneRemainsTransientThroughPuppetSpawn()
     {

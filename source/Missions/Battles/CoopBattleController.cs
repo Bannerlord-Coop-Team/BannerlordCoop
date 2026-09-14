@@ -8,6 +8,7 @@ using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Players;
 using LiteNetLib;
 using Missions.Agents;
+using Missions.Agents.Handlers;
 using Missions.Data;
 using Missions.Messages;
 using Missions.Services.Network;
@@ -60,6 +61,8 @@ public class CoopBattleController : CoopMissionController
 
     /// <summary>Reports final siege engine state before the shared result is applied.</summary>
     public ISiegeEngineStateReporter SiegeEngineStateReporter { get; }
+
+
     private readonly IBattleInstanceLifecycle lifecycle;
     private readonly IOwnedAgentReplicator replicator;
     private readonly IAgentDeathReporter deathReporter;
@@ -189,7 +192,7 @@ public class CoopBattleController : CoopMissionController
         ResultCommitter = new BattleResultCommitter(network, relayNetwork, session);
         SiegeEngineStateReporter = new SiegeEngineStateReporter(objectManager, session, hostRegistry, relayNetwork);
         messageBroker.Subscribe<NetworkBattleResultSnapshot>(Handle_BattleResultSnapshot);
-        messageBroker.Subscribe<NetworkBattleHostAssigned>(Handle_BattleHostAssigned);
+        messageBroker.Subscribe<BattleHostAssignmentApplied>(Handle_BattleHostAssigned);
 
         heroAgentAuthorityProbe = ProbeHeroAgentAuthority;
         BattleSpawnGate.HeroAgentAuthorityProbe = heroAgentAuthorityProbe;
@@ -216,7 +219,7 @@ public class CoopBattleController : CoopMissionController
         siegeWeaponFire.Dispose();
         Deployment.Dispose();
         messageBroker.Unsubscribe<NetworkBattleResultSnapshot>(Handle_BattleResultSnapshot);
-        messageBroker.Unsubscribe<NetworkBattleHostAssigned>(Handle_BattleHostAssigned);
+        messageBroker.Unsubscribe<BattleHostAssignmentApplied>(Handle_BattleHostAssigned);
 
         if (BattleSpawnGate.HeroAgentAuthorityProbe == heroAgentAuthorityProbe)
             BattleSpawnGate.HeroAgentAuthorityProbe = null;
@@ -272,6 +275,8 @@ public class CoopBattleController : CoopMissionController
         // Register the buffered puppet batch before the one-shot end-condition gate so it can observe both
         // sides as fielded even when a queued terminal event removes every agent on one side this tick.
         puppetSpawner.DrainPendingPuppets();
+        replicator.RecoverRetainedPlayerHandoffs(dt);
+        authorityMigrator.TickPlayerHandoffs(dt);
         reinforcementFielder.Tick();
 
         // Vanilla's end checks unlock at the LOCAL deployment finish, but a side whose troops arrive as
@@ -428,6 +433,8 @@ public class CoopBattleController : CoopMissionController
             in collisionData);
     }
 
+    internal bool HasRetainedPlayerAgent(Agent agent) => puppetSpawner.HasRetainedPlayerAgent(agent);
+
     // The local player just finished their own deployment (Start Battle): the coordinator announces it to the
     // mesh (and marks the battle live if we are the host); on the FIRST commit we reveal the withheld own-party
     // troops at their deployed positions (requirement #4) — inline, on this same game-thread call, before the
@@ -487,8 +494,6 @@ public class CoopBattleController : CoopMissionController
 
         void ReplayJoinState()
         {
-            authorityMigrator.ReturnPartyTo(controllerId);
-            replicator.FlushPendingSpawns();
             replicator.ReplicateCurrentAgentsTo(controllerId);
             siegeEngineDeployment.CatchUpJoiner(controllerId);
             siegeMachineState.CatchUpJoiner(controllerId);
@@ -538,9 +543,9 @@ public class CoopBattleController : CoopMissionController
         GameThread.RunSafe(() => TryAcceptResultSnapshot(snapshot), context: nameof(Handle_BattleResultSnapshot));
     }
 
-    private void Handle_BattleHostAssigned(MessagePayload<NetworkBattleHostAssigned> payload)
+    private void Handle_BattleHostAssigned(MessagePayload<BattleHostAssignmentApplied> payload)
     {
-        if (payload.What.MapEventId != Session.InstanceId)
+        if (payload.What.Assignment.MapEventId != Session.InstanceId)
             return;
 
         GameThread.RunSafe(() =>

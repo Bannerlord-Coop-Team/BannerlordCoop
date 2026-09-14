@@ -93,6 +93,7 @@ public class DirectMigratedCommandTests
             new[]
             {
                 "battle_reward_fixture_start",
+                "kms",
                 "start_nearest_bandit_attack",
                 "upgrade_party_screen_troop",
             },

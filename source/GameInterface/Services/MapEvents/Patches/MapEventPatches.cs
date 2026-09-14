@@ -100,6 +100,28 @@ internal class MapEventPatches
         MessageBroker.Instance.Publish(__instance, new PartyRemovedFromMapEvent(removedParty));
     }
 
+    [HarmonyPatch(nameof(MapEvent.FinishBattle))]
+    [HarmonyPrefix]
+    private static bool Prefix_FinishBattle(MapEvent __instance)
+    {
+        if (CallOriginalPolicy.IsOriginalAllowed()) return true;
+
+        if (ModInformation.IsServer
+            && __instance.IsRaidHostileAction()
+            && __instance.BattleState == BattleState.AttackerVictory
+            && __instance.MapEventSettlement?.SettlementHitPoints <= 1E-05f
+            && __instance.ContainsPlayerParty())
+        {
+            // Keep vanilla's bookkeeping before finalization destroys the registry entry.
+            __instance._isFinishCalled = true;
+            // Natural raid completion needs the authoritative exit before vanilla clears the participants.
+            MessageBroker.Instance.Publish(__instance, new MapEventFinalizeAttempted(__instance));
+            return false;
+        }
+
+        return true;
+    }
+
     [HarmonyPatch(nameof(MapEvent.FinalizeEventAux))]
     [HarmonyPrefix]
     [HarmonyPriority(Priority.First)]

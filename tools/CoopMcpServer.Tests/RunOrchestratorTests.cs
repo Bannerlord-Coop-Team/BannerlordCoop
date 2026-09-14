@@ -1,4 +1,4 @@
-using Common.LiveTesting;
+﻿using Common.LiveTesting;
 using System.Collections.Concurrent;
 using System.Text.Json;
 
@@ -23,6 +23,102 @@ public sealed class RunOrchestratorTests : IDisposable
             Profiles = new() { ["test"] = new LaunchProfile { Executable = executable } },
         };
         runs = new RunOrchestrator(settings, launcher, pipe, new IncrementalLogReader(), preflight, new SaveCatalog(new FakeSaveDirectory(directory)));
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task LayerRequestsCheckLoadedCapabilityBeforeReadOnlyDispatch(bool inspect)
+    {
+        var run = await runs.StartAsync("test", 1, default);
+        pipe.Status = new { uiCapability = "bounded-ui-layers-v1" };
+        var tools = new DebugTools(runs, new ScreenshotCapture(runs, new ScreenshotImageEncoder()));
+        string layer = new string('a', 32);
+        var response = inspect
+            ? await tools.UiInspect(run.RunId, "client1", default, "snapshot", 128, layer)
+            : await tools.UiLayers(run.RunId, "client1", default);
+        Assert.True(response.Ok);
+        Assert.Equal(new[] { "status", inspect ? "ui-inspect" : "ui-layers" }, pipe.Methods);
+        Assert.False(pipe.LastMutation);
+        var payload = JsonSerializer.SerializeToElement(pipe.LastParameters);
+        if (inspect)
+        {
+            Assert.Equal(layer, payload.GetProperty("layer").GetString());
+            Assert.Equal("snapshot", payload.GetProperty("snapshot").GetString());
+            Assert.Equal(128, payload.GetProperty("offset").GetInt32());
+        }
+        else Assert.Empty(payload.EnumerateObject());
+    }
+
+    [Theory]
+    [InlineData("{}")]
+    [InlineData("null")]
+    [InlineData("[]")]
+    [InlineData("42")]
+    [InlineData("{\"uiCapability\":null}")]
+    [InlineData("{\"uiCapability\":42}")]
+    [InlineData("{\"uiCapability\":\"staged-ui-capture-v1\"}")]
+    [InlineData("{\"uiCapability\":\"bounded-ui-layers-v2\"}")]
+    [InlineData("{\"uiCapability\":\"BOUNDED-UI-LAYERS-V1\"}")]
+    public async Task MissingOrDifferentLayerCapabilityNeverFallsBack(string status)
+    {
+        var run = await runs.StartAsync("test", 1, default);
+        pipe.Status = JsonSerializer.Deserialize<JsonElement>(status);
+        var tools = new DebugTools(runs, new ScreenshotCapture(runs, new ScreenshotImageEncoder()));
+        var discovery = await tools.UiLayers(run.RunId, "client1", default);
+        var selected = await tools.UiInspect(run.RunId, "client1", default, layer: new string('a', 32));
+        Assert.Equal("ui_capability_unavailable", discovery.Error.Code);
+        Assert.Equal("ui_capability_unavailable", selected.Error.Code);
+        Assert.Equal(new[] { "status", "status" }, pipe.Methods);
+        Assert.False(discovery.Error.OutcomeUncertain);
+    }
+
+    [Fact]
+    public async Task CapabilityFailureAndExceptionPropagateWithoutUiDispatch()
+    {
+        var run = await runs.StartAsync("test", 1, default);
+        var tools = new DebugTools(runs, new ScreenshotCapture(runs, new ScreenshotImageEncoder()));
+        pipe.Uncertain = true;
+        var response = await tools.UiLayers(run.RunId, "client1", default);
+        Assert.Equal("game_thread_timeout", response.Error.Code);
+        Assert.True(response.Error.OutcomeUncertain);
+        pipe.Throw = true;
+        await Assert.ThrowsAsync<IOException>(() => tools.UiInspect(run.RunId, "client1", default, layer: new string('a', 32)));
+        Assert.Equal(new[] { "status", "status" }, pipe.Methods);
+    }
+
+    [Fact]
+    public async Task LayerRequestsRemainUnderOwnedInstanceGate()
+    {
+        var run = await runs.StartAsync("test", 1, default);
+        var tools = new DebugTools(runs, new ScreenshotCapture(runs, new ScreenshotImageEncoder()));
+        await Assert.ThrowsAsync<ArgumentException>(() => tools.UiLayers("foreign-run", "client1", default));
+        await Assert.ThrowsAsync<ArgumentException>(() => tools.UiLayers(run.RunId, "foreign-client", default));
+        pipe.Status = new { uiCapability = "bounded-ui-layers-v1" };
+        pipe.Delay = 20;
+        await Task.WhenAll(tools.UiLayers(run.RunId, "client1", default),
+            tools.UiInspect(run.RunId, "client1", default, layer: new string('a', 32)));
+        Assert.Equal(1, pipe.MaxConcurrent);
+        Assert.Equal("status", pipe.Methods.ToArray()[0]);
+        Assert.Equal("status", pipe.Methods.ToArray()[2]);
+        pipe.Methods.Clear();
+        using var cancelled = new CancellationTokenSource();
+        cancelled.Cancel();
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() => tools.UiLayers(run.RunId, "client1", cancelled.Token));
+        await launcher.Processes[1].StopAsync(TimeSpan.Zero);
+        await Assert.ThrowsAsync<InvalidOperationException>(() => tools.UiLayers(run.RunId, "client1", default));
+        Assert.Empty(pipe.Methods);
+    }
+
+    [Theory]
+    [InlineData(0)]
+    [InlineData(31)]
+    [InlineData(33)]
+    public async Task InvalidLayerHandlesNeverReachTheOwnedRequest(int length)
+    {
+        var tools = new DebugTools(runs, new ScreenshotCapture(runs, new ScreenshotImageEncoder()));
+        await Assert.ThrowsAsync<ArgumentException>(() => tools.UiInspect("missing", "client1", default, layer: new string('a', length)));
+        Assert.Empty(pipe.Methods);
     }
 
     [Theory]
@@ -55,6 +151,7 @@ public sealed class RunOrchestratorTests : IDisposable
         Assert.False(pipe.LastMutation);
         var args = JsonSerializer.SerializeToElement(pipe.LastParameters);
         Assert.Equal(128, args.GetProperty("offset").GetInt32());
+        Assert.False(args.TryGetProperty("layer", out _));
     }
 
     [Theory]
@@ -115,6 +212,29 @@ public sealed class RunOrchestratorTests : IDisposable
         Assert.Empty(pipe.Methods);
         Assert.True(File.Exists(Path.Combine(run.ArtifactDirectory, "run.json")));
         await Assert.ThrowsAsync<InvalidOperationException>(() => runs.StartAsync("test", 0, default));
+    }
+
+    [Fact]
+    public async Task DeploymentRequiresStoppedOwnedRunAndHoldsLaunchLifecycle()
+    {
+        var run = await runs.StartAsync("test", 0, default);
+        bool applied = false;
+        await Assert.ThrowsAsync<InvalidOperationException>(() => runs.DeployAsync(() =>
+        {
+            applied = true;
+            return Task.FromResult(new DeploymentReport());
+        }, default));
+        Assert.False(applied);
+        await runs.StopAsync(run.RunId);
+        var release = new TaskCompletionSource<DeploymentReport>(TaskCreationOptions.RunContinuationsAsynchronously);
+        Task<DeploymentReport> deploy = runs.DeployAsync(() => release.Task, default);
+        Task<RunView> start = runs.StartAsync("test", 0, default);
+        Assert.False(start.IsCompleted);
+        Assert.Single(launcher.Processes);
+        release.SetResult(new DeploymentReport { State = "deployed" });
+        await deploy;
+        Assert.Equal("started", (await start).State);
+        Assert.Equal(2, launcher.Processes.Count);
     }
 
     [Fact]
