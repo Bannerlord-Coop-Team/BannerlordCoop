@@ -395,9 +395,6 @@ public class RemoteAgentActionProcessor : IRemoteAgentActionProcessor
 
     public void ClearForLocalAgent(Guid agentId, Agent agent)
     {
-        if (!_agentStates.TryGetValue(agentId, out RemoteAgentActionState state))
-            return;
-
 #if DEBUG
         if (agentId == equipmentDelayAgent)
         {
@@ -406,6 +403,9 @@ public class RemoteAgentActionProcessor : IRemoteAgentActionProcessor
             delayedEquipment.Clear();
         }
 #endif
+        if (!_agentStates.TryGetValue(agentId, out RemoteAgentActionState state))
+            return;
+
         _agentStates.Remove(agentId);
         _pendingActionAgentIds.Remove(agentId);
         _retainedGuardAgentIds.Remove(agentId);

@@ -522,6 +522,35 @@ public class ActionEquipmentSyncTests : MissionTestEnvironment
     }
 
 #if DEBUG
+    [Fact]
+    public void EquipmentDelay_LocalPromotionCancelsHeldBaselineAfterPendingSweep()
+    {
+        RunScenario(context =>
+        {
+            var processor = context.Component.AgentActionHandler.EquipmentDelayProcessor;
+            Agent owner = context.Spawn("A", out var source, out _);
+            context.Spawn("A", out var puppet, out Guid id);
+            source.Equipment[EquipmentIndex.Weapon0] = Weapon("sword");
+            puppet.Equipment[EquipmentIndex.Weapon0] = source.Equipment[EquipmentIndex.Weapon0];
+            source.PrimaryWieldedItemIndex = EquipmentIndex.Weapon0;
+            source.Action0Index = 1001;
+            source.Action0CodeType = Agent.ActionCodeType.ReleaseMelee;
+            processor.EquipmentDelayObservation("arm", "A");
+            context.Receive(RevisionPacket(owner, id, 1, 1, true, "A", 0));
+            Assert.Equal(0, puppet.SetActionChannelCalls);
+            Assert.True(context.Registry.TryTransferAuthority("peer", id));
+            context.Component.AgentActionHandler.ApplyRemoteGuardStates();
+            Assert.True(context.Registry.TryGetAgentInfo(id, out var info));
+            processor.ClearForLocalAgent(id, info.Agent);
+            var result = Newtonsoft.Json.Linq.JObject.Parse(processor.EquipmentDelayObservation("snapshot", null));
+            Assert.Equal(0, (int)result["heldBaselines"]);
+            Assert.Contains(result["events"], e => (string)e["kind"] == "cancelled-local-authority");
+            processor.EquipmentDelayObservation("release", null);
+            context.Component.AgentActionHandler.ApplyRemoteGuardStates();
+            Assert.Equal(0, puppet.SetActionChannelCalls);
+        });
+    }
+
     [Theory]
     [InlineData(false)]
     [InlineData(true)]
