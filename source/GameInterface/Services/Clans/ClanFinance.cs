@@ -183,13 +183,8 @@ public class ClanFinance : IClanFinance
         // Don't add expenses if clan leader is occupied
         if (!CanChangeGold(clan.Leader)) return;
 
-        foreach (var member in GetNonLeaderMembers(clan))
+        foreach (var (member, amount) in GetPredictedPayments(clan))
         {
-            // Don't send gold if non-leader member is occupied
-            if (!CanChangeGold(member)) continue;
-
-            // Retrieve current settings and add expense to explained change
-            int amount = GetSettings(member)?.DailyPayment ?? 0;
             if (amount != 0)
             {
                 change.Add(-amount, GameTexts.FindText("str_coop_clan_payment_to").SetTextVariable("HERO", member.Name));
@@ -206,11 +201,9 @@ public class ClanFinance : IClanFinance
         // Only add payment from clan leader if clan leader's gold change is available
         if (CanChangeGold(member.Clan.Leader))
         {
-            int payment = GetSettings(member)?.DailyPayment ?? 0;
-            if (applyWithdrawals)
-            {
-                payment = Transfer(member.Clan.Leader, member, payment);
-            } 
+            int payment = applyWithdrawals
+                ? Transfer(member.Clan.Leader, member, GetSettings(member)?.DailyPayment ?? 0)
+                : GetPredictedPayments(member.Clan).FirstOrDefault(entry => entry.Member == member).Amount;
 
             change.Add(payment, GameTexts.FindText("str_coop_clan_payment_from_leader"));
         }
@@ -247,9 +240,26 @@ public class ClanFinance : IClanFinance
         return clan.Leader.Gold - originalGold;
     }
 
+    private IEnumerable<(Hero Member, int Amount)> GetPredictedPayments(Clan clan)
+    {
+        int availableGold = clan.Leader.Gold;
+        foreach (var member in GetNonLeaderMembers(clan))
+        {
+            if (!CanChangeGold(member)) continue;
+
+            // Reserve earlier payments in the same order used by ApplyDailyTransfers.
+            int amount = GetTransferAmount(availableGold, member, GetSettings(member)?.DailyPayment ?? 0);
+            availableGold -= amount;
+            yield return (member, amount);
+        }
+    }
+
+    private int GetTransferAmount(int availableGold, Hero recipient, int amount) =>
+        Math.Max(0, Math.Min(amount, Math.Min(availableGold, int.MaxValue - recipient.Gold)));
+
     private int Transfer(Hero payer, Hero recipient, int amount, bool disableNotification = true)
     {
-        amount = Math.Max(0, Math.Min(amount, Math.Min(payer.Gold, int.MaxValue - recipient.Gold)));
+        amount = GetTransferAmount(payer.Gold, recipient, amount);
         if (amount > 0)
         {
             GiveGoldAction.ApplyBetweenCharacters(payer, recipient, amount, disableNotification);
