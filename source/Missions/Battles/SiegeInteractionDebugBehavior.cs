@@ -629,19 +629,34 @@ internal sealed class SiegeInteractionDebugBehavior : MissionBehavior, ISiegeInt
             if (!ContainerProvider.TryResolve<INetworkAgentRegistry>(out var registry) ||
                 !registry.TryGetAgentInfo(watchedAgentId.Value, out var info) || info?.Agent == null ||
                 info.AgentId != watchedAgentId.Value || ReferenceEquals(info.Agent, agent) ||
-                !ReferenceEquals(info.Agent.Mission, Mission) || !info.Agent.IsActive() ||
-                info.Agent.AgentVisuals?.GetEntity() == null)
+                !ReferenceEquals(info.Agent.Mission, Mission) || !info.Agent.IsActive())
             {
+                observerFrame = new { agentId = watchedAgentId.Value.ToString("N"), tick,
+                    rejectionReason = "actor_identity_or_activity_unavailable", visualEntityAvailable = (bool?)null,
+                    lookDirection = DescribePosition(null), horizontalLookLengthSquared = (float?)null };
                 ReleaseCamera();
                 status = "fixture_observer_actor_unavailable";
                 return;
             }
             var actor = info.Agent;
+            if (actor.AgentVisuals?.GetEntity() == null)
+            {
+                observerFrame = new { agentId = info.AgentId.ToString("N"), tick,
+                    rejectionReason = "visual_entity_unavailable", visualEntityAvailable = false,
+                    lookDirection = DescribePosition(null), horizontalLookLengthSquared = (float?)null };
+                ReleaseCamera();
+                status = "fixture_observer_actor_unavailable";
+                return;
+            }
             target = actor.Position + (Vec3.Up * actor.AgentScale);
-            var behind = actor.LookDirection;
+            var lookDirection = actor.LookDirection;
+            var behind = lookDirection;
             behind.z = 0f;
             if (behind.LengthSquared < 0.5f)
             {
+                observerFrame = new { agentId = info.AgentId.ToString("N"), tick,
+                    rejectionReason = "horizontal_look_too_short", visualEntityAvailable = true,
+                    lookDirection = DescribePosition(lookDirection), horizontalLookLengthSquared = behind.LengthSquared };
                 ReleaseCamera();
                 status = "fixture_observer_actor_unavailable";
                 return;

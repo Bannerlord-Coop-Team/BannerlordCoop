@@ -368,6 +368,13 @@ public class SiegeInteractionDebugBehaviorTests
                 actions = new[] { new { channel = 0, index = 101, name = "act_use_ballista", type = "act_none" },
                     new { channel = 1, index = -1, name = "act_none", type = "act_none" } }
             },
+            observerFrame = new
+            {
+                agentId = Guid.NewGuid().ToString("N"), tick = 1642,
+                rejectionReason = "horizontal_look_too_short", visualEntityAvailable = true,
+                lookDirection = SiegeInteractionDebugBehavior.DescribePosition(new Vec3(0.3857944f, -0.255507f, -0.8864982f)),
+                horizontalLookLengthSquared = 0.2141193f
+            },
             nativeAimTarget = new
             {
                 requestId = "ballista-testclient2-stage", tick = 685, recordedUtc = DateTime.UtcNow,
