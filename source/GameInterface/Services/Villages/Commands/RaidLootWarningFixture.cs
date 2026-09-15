@@ -210,10 +210,11 @@ public sealed class RaidLootWarningFixture : IRaidLootWarningFixture
 
         // The same bounded server handler used by the simulation's skip action computes and replicates the result.
         fixture.RequestSimulationAdvance(messageBroker);
-        if (!mapEvent.HasWinner || mapEvent.BattleState != BattleState.AttackerVictory)
+        if (!fixture.SimulationAdvanceCompleted || !mapEvent.HasWinner || mapEvent.BattleState != BattleState.AttackerVictory)
         {
             fixture.Reject();
-            return Failed("The bounded production simulation advance did not yield attacker victory; reload the baseline.");
+            return Failed("The production simulation advance did not complete with attacker victory; reload the baseline. " +
+                JsonConvert.SerializeObject(fixture.SimulationAdvanceDetails));
         }
         return ReadState(player.ControllerId);
     }
@@ -473,6 +474,7 @@ public sealed class RaidLootWarningFixture : IRaidLootWarningFixture
             expectedSeed = new { item = "grain", count = 1 },
             seedApplied = session?.Seeded,
             simulationAdvanceRequested = session?.SimulationAdvanceRequested,
+            simulationAdvance = session?.SimulationAdvanceDetails,
             rawLootCount = session?.SeededLoot?.Sum(x => x.Amount),
             rawLootGrainCount = session?.SeededLoot == null ? (int?)null : GrainCount(session.SeededLoot),
             capturedMapEventId = session?.MapEventId,
@@ -610,6 +612,23 @@ public sealed class RaidLootWarningFixture : IRaidLootWarningFixture
         internal string MapEventId { get; private set; }
         internal bool Seeded { get; private set; }
         internal bool SimulationAdvanceRequested { get; private set; }
+        internal string SimulationAdvanceStage { get; set; } = "not-requested";
+        internal bool? SimulationSessionMatches { get; set; }
+        internal int SimulationRoundsEntered { get; set; }
+        internal int SimulationRoundsCompleted { get; set; }
+        internal string SimulationAdvanceException { get; set; }
+        internal bool SimulationAdvanceCompleted => SimulationAdvanceStage == "completed" &&
+            SimulationSessionMatches == true && SimulationAdvanceException == null;
+        internal object SimulationAdvanceDetails => new
+        {
+            sourceCommit = ModInformation.Commit,
+            mapEventId = MapEventId,
+            stage = SimulationAdvanceStage,
+            sessionMatches = SimulationSessionMatches,
+            roundsEntered = SimulationRoundsEntered,
+            roundsCompleted = SimulationRoundsCompleted,
+            exception = SimulationAdvanceException,
+        };
         internal ItemRoster SeededLoot { get; set; }
 
         internal FixtureSession(Campaign campaign, string controllerId, MobileParty party, Settlement settlement)
@@ -647,6 +666,7 @@ public sealed class RaidLootWarningFixture : IRaidLootWarningFixture
             if (Phase != "captured" || MapEvent == null || string.IsNullOrEmpty(MapEventId) || SimulationAdvanceRequested)
                 throw new InvalidOperationException("The captured simulation can only be advanced once.");
             SimulationAdvanceRequested = true;
+            SimulationAdvanceStage = "dispatching";
             broker.Publish(this, new NetworkAdvanceBattleSimulation(MapEventId, int.MaxValue));
         }
 

@@ -6,6 +6,12 @@ using Xunit;
 #if DEBUG
 using Common;
 using Common.Messaging;
+using Common.Network;
+using GameInterface.Services.MapEvents.Handlers;
+using GameInterface.Services.MapEvents.Logging;
+using System.Collections;
+using System.Reflection;
+using System.Runtime.CompilerServices;
 using GameInterface.Services.MapEvents.Messages.Start;
 using Common.Util;
 using GameInterface.Services.ObjectManager;
@@ -202,6 +208,69 @@ public class RaidLootWarningFixtureTests
         Assert.Throws<InvalidOperationException>(() => session.RequestSimulationAdvance(broker.Object));
         Assert.Throws<InvalidOperationException>(() => session.RequestSimulationAdvance(broker.Object));
         broker.Verify(x => x.Publish(session, It.IsAny<NetworkAdvanceBattleSimulation>()), Times.Once);
+    }
+
+    [Theory]
+    [InlineData(false, true, "dispatching")]
+    [InlineData(true, false, "server-role-check")]
+    [InlineData(true, true, "session-lookup")]
+    public void SimulationDiagnostics_DistinguishNoSubscriberWrongRoleAndMissingSession(bool subscribed, bool server, string stage)
+    {
+        bool previous = ModInformation.IsServer;
+        ModInformation.IsServer = server;
+        try
+        {
+            using var broker = new MessageBroker();
+            using var handler = subscribed ? new BattleSimulationRunHandler(broker, new Mock<INetwork>().Object,
+                new Mock<IObjectManager>().Object, new Mock<IMapEventLogger>().Object, new Mock<IPlayerManager>().Object) : null;
+            var session = CreateSession();
+            session.Prepare(() => { });
+            session.Capture(session.Campaign, session.Party, session.Settlement, ObjectHelper.SkipConstructor<MapEvent>(), "event-a");
+            session.RequestSimulationAdvance(broker);
+            Assert.Equal(stage, session.SimulationAdvanceStage);
+            Assert.Null(session.SimulationSessionMatches);
+            Assert.Null(session.SimulationAdvanceException);
+            Assert.Equal(0, session.SimulationRoundsEntered);
+            Assert.False(session.SimulationAdvanceCompleted);
+            Assert.Throws<InvalidOperationException>(() => session.RequestSimulationAdvance(broker));
+        }
+        finally
+        {
+            ModInformation.IsServer = previous;
+        }
+    }
+
+    [Fact]
+    public void SimulationDiagnostics_PreserveSessionMismatchAndCaughtGameThreadException()
+    {
+        RuntimeHelpers.RunModuleConstructor(typeof(Coop.Tests.Mocks.TestNetwork).Module.ModuleHandle);
+        bool previous = ModInformation.IsServer;
+        ModInformation.IsServer = true;
+        try
+        {
+            using var broker = new MessageBroker();
+            using var handler = new BattleSimulationRunHandler(broker, new Mock<INetwork>().Object,
+                new Mock<IObjectManager>().Object, new Mock<IMapEventLogger>().Object, new Mock<IPlayerManager>().Object);
+            var session = CreateSession();
+            session.Prepare(() => { });
+            session.Capture(session.Campaign, session.Party, session.Settlement, ObjectHelper.SkipConstructor<MapEvent>(), "event-a");
+            // A corrupt private handler session must report its identity mismatch and the swallowed exception.
+            var activeType = typeof(BattleSimulationRunHandler).GetNestedType("ActiveSimulation", BindingFlags.NonPublic);
+            var sessions = (IDictionary)typeof(BattleSimulationRunHandler).GetField("activeSimulations", BindingFlags.NonPublic | BindingFlags.Instance).GetValue(handler);
+            sessions.Add("event-a", Activator.CreateInstance(activeType, true));
+            GameThread.Run(() => session.RequestSimulationAdvance(broker), blocking: true);
+            Assert.False(session.SimulationSessionMatches);
+            Assert.Contains(nameof(NullReferenceException), session.SimulationAdvanceException);
+            Assert.Contains("Handle_NetworkAdvanceBattleSimulation", session.SimulationAdvanceException);
+            Assert.Equal(0, session.SimulationRoundsEntered);
+            Assert.Equal(0, session.SimulationRoundsCompleted);
+            Assert.False(session.SimulationAdvanceCompleted);
+            Assert.Throws<InvalidOperationException>(() => session.RequestSimulationAdvance(broker));
+        }
+        finally
+        {
+            ModInformation.IsServer = previous;
+        }
     }
 
     [Fact]

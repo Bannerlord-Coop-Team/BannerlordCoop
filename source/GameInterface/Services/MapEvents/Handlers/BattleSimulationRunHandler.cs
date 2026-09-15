@@ -393,11 +393,20 @@ internal class BattleSimulationRunHandler : IHandler
     /// <summary>[Server] Resolve the requested number of rounds, streaming each round back.</summary>
     private void Handle_NetworkAdvanceBattleSimulation(MessagePayload<NetworkAdvanceBattleSimulation> payload)
     {
+#if DEBUG
+        var observation = payload.Who as GameInterface.Services.Villages.Commands.RaidLootWarningFixture.FixtureSession;
+        if (observation != null) observation.SimulationAdvanceStage = "server-role-check";
+        try
+        {
+#endif
         if (ModInformation.IsClient)
             return;
 
         var mapEventId = payload.What.MapEventId;
 
+#if DEBUG
+        if (observation != null) observation.SimulationAdvanceStage = "session-lookup";
+#endif
         ActiveSimulation sim;
         lock (simLock)
         {
@@ -405,6 +414,13 @@ internal class BattleSimulationRunHandler : IHandler
                 return;
         }
 
+#if DEBUG
+        if (observation != null)
+        {
+            observation.SimulationSessionMatches = observation.MapEventId == mapEventId && observation.MapEvent == sim.MapEvent;
+            observation.SimulationAdvanceStage = "game-thread-dispatch";
+        }
+#endif
         var maxRounds = payload.What.MaxRounds;
         var finished = false;
         NetworkBattleSimulationLoot lootMessage = default;
@@ -412,8 +428,16 @@ internal class BattleSimulationRunHandler : IHandler
 
         GameThread.RunSafe(() =>
         {
+#if DEBUG
+            try
+            {
+                if (observation != null) observation.SimulationAdvanceStage = "hostile-action-check";
+#endif
             if (sim.MapEvent.IsUnsupportedMultiPlayerHostileAction())
             {
+#if DEBUG
+                if (observation != null) observation.SimulationAdvanceStage = "unsupported-hostile-action";
+#endif
                 EndSimulationSession(sim);
                 finished = true;
                 return;
@@ -429,13 +453,31 @@ internal class BattleSimulationRunHandler : IHandler
             while (rounds < maxRounds && rounds < MaxSimulationRounds && !sim.MapEvent.HasWinner)
             {
                 rounds++;
+#if DEBUG
+                if (observation != null)
+                {
+                    observation.SimulationAdvanceStage = "vanilla-round";
+                    observation.SimulationRoundsEntered = rounds;
+                }
+#endif
                 sim.MapEvent.SimulatePlayerEncounterBattle();
+#if DEBUG
+                if (observation != null)
+                {
+                    observation.SimulationRoundsCompleted = rounds;
+                    observation.SimulationAdvanceStage = "flush-round";
+                }
+#endif
 
                 var changes = sim.Observer.FlushRound();
                 if (changes.Length > 0)
                     batched.AddRange(changes);
             }
 
+#if DEBUG
+            if (observation != null) observation.SimulationAdvanceStage = sim.MapEvent.HasWinner
+                ? "winner-rounds-complete" : rounds == MaxSimulationRounds ? "round-limit" : "requested-rounds-complete";
+#endif
             // Broadcast to everyone: the pacer and the spectators (clients in this event) all replay these rounds.
             // Clients not in the event ignore rounds for a map event they have no active playback for.
             if (batched.Count > 0)
@@ -443,6 +485,9 @@ internal class BattleSimulationRunHandler : IHandler
 
             if (sim.MapEvent.HasWinner)
             {
+#if DEBUG
+                if (observation != null) observation.SimulationAdvanceStage = "capture-loot";
+#endif
                 // Capture the casualties and winner contributions before tearing the simulation down so the
                 // winning client can re-run the native loot flow locally and open its loot screen.
                 if (PlayerWonSimulation(sim.MapEvent))
@@ -455,13 +500,27 @@ internal class BattleSimulationRunHandler : IHandler
                     hasLoot = true;
                 }
 
+#if DEBUG
+                if (observation != null) observation.SimulationAdvanceStage = "end-session";
+#endif
                 EndSimulationSession(sim);
                 finished = true;
             }
+#if DEBUG
+            }
+            catch (Exception exception)
+            {
+                if (observation != null) observation.SimulationAdvanceException = exception.ToString();
+                throw;
+            }
+#endif
         }, blocking: true, context: nameof(Handle_NetworkAdvanceBattleSimulation));
 
         if (finished)
         {
+#if DEBUG
+            if (observation != null) observation.SimulationAdvanceStage = "publish-finished";
+#endif
             lock (simLock)
             {
                 activeSimulations.Remove(mapEventId);
@@ -476,7 +535,18 @@ internal class BattleSimulationRunHandler : IHandler
                 network.SendAll(lootMessage);
 
             network.SendAll(new NetworkBattleSimulationFinished(mapEventId));
+#if DEBUG
+            if (observation != null) observation.SimulationAdvanceStage = "completed";
+#endif
         }
+#if DEBUG
+        }
+        catch (Exception exception)
+        {
+            if (observation != null) observation.SimulationAdvanceException = exception.ToString();
+            throw;
+        }
+#endif
     }
 
     /// <summary>[Client] Resolve a streamed round and queue it for playback.</summary>
