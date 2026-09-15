@@ -56,7 +56,7 @@ public class GauntletWidgetAdapterTests
         int clicks = 0;
         button.boolPropertyChanged += (_, name, value) => { if (name == "IsSelected") backingOption = (bool)value; };
         button.ClickEventHandlers.Add(_ => clicks++);
-        adapter.Click(button, new Vector2(10, 10));
+        adapter.ActivateButton(button);
         Assert.True(button.IsSelected);
         Assert.True(backingOption);
         Assert.Equal(1, clicks);
@@ -65,7 +65,7 @@ public class GauntletWidgetAdapterTests
     }
 
     [Fact]
-    public void ThrowingNativeClickRestoresExistingMouseOverride()
+    public void ThrowingNativeActivationLeavesExistingMouseOverrideUntouched()
     {
         var context = Context();
         var button = new ButtonWidget(context);
@@ -74,7 +74,7 @@ public class GauntletWidgetAdapterTests
         context.Root.UpdatePosition();
         context._uiInputContext.SetMousePositionOverride(new Vector2(70, 80));
         button.ClickEventHandlers.Add(_ => throw new InvalidOperationException("native callback"));
-        Assert.Throws<InvalidOperationException>(() => adapter.Click(button, new Vector2(10, 10)));
+        Assert.Throws<InvalidOperationException>(() => adapter.ActivateButton(button));
         Assert.True(context._uiInputContext._isMousePositionOverridden);
         Assert.Equal(new Vector2(70, 80), context._uiInputContext.GetMousePosition());
         Assert.False(context.EventManager._mouseIsDown);
@@ -230,7 +230,9 @@ public class GauntletWidgetAdapterTests
     public void VisibleTreeRunsNativeHitTestingOnlyAfterPassingBounds(int children, bool truncated)
     {
         var context = Context();
-        var button = new HitCountingButton(context) { Size = new Vector2(40, 40) };
+        var button = new ButtonWidget(context) { Size = new Vector2(40, 40) };
+        var probe = new HitCountingWidget(context) { Size = new Vector2(40, 40) };
+        button.AddChild(probe);
         context.Root.AddChild(button);
         for (int i = 0; i < children; i++)
             context.Root.AddChild(new Widget(context) { Size = new Vector2(40, 40), DoNotAcceptEvents = true });
@@ -238,10 +240,10 @@ public class GauntletWidgetAdapterTests
         using var screen = new TestScreenScope(context);
         var frame = adapter.Read();
         Assert.Equal(truncated, frame.Truncated);
-        Assert.Equal(Math.Min(children + 2, LiveTestUi.MaximumWidgets), frame.Widgets.Count);
+        Assert.Equal(Math.Min(children + 3, LiveTestUi.MaximumWidgets), frame.Widgets.Count);
         Assert.True(frame.Widgets.Single(n => n.Native == button).Visible);
         Assert.Equal(!truncated, frame.Widgets.Single(n => n.Native == button).HitTestable);
-        Assert.Equal(truncated ? 0 : 1, button.HitTests);
+        Assert.Equal(truncated ? 0 : 1, probe.HitTests);
         if (truncated) Assert.All(frame.Widgets, n => Assert.False(n.HitTestable));
     }
 
@@ -354,14 +356,431 @@ public class GauntletWidgetAdapterTests
         Assert.Null(context.EventManager.FocusedWidget);
     }
 
-    private sealed class HitCountingButton : ButtonWidget
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void SelectedCompleteContextIgnoresHugeLowerOrMasklessUpperTree(bool upper)
+    {
+        var context = Context();
+        var button = new ButtonWidget(context) { Size = new Vector2(40, 40) };
+        var probe = new HitCountingWidget(context) { Size = new Vector2(40, 40) };
+        button.AddChild(probe);
+        context.Root.AddChild(button);
+        context.Root.UpdatePosition();
+        using var screen = new TestScreenScope(context);
+        var background = Context();
+        var container = new Widget(background);
+        background.Root.AddChild(container);
+        for (int i = 0; i < 20000; i++) container.AddChild(new Widget(background));
+        container.Children[0] = null; // Any descendant traversal would fail, not merely run slowly.
+        screen.AddLayer(background, upper, false);
+        var ui = new LiveTestUi(adapter);
+        var discovery = ui.Discover();
+        Assert.False(discovery.Truncated);
+        var handle = discovery.Layers[upper ? 0 : 1].Layer;
+        var snapshot = ui.Inspect(null, 0, handle);
+        Assert.True(snapshot.ScopeComplete);
+        Assert.False(snapshot.Truncated);
+        Assert.Equal(3, snapshot.Total);
+        Assert.Equal(3, snapshot.DomainWidgets);
+        var element = snapshot.Elements.Single(e => e.Widget.Native == button);
+        Assert.True(element.Widget.HitTestable);
+        int clicks = 0;
+        button.ClickEventHandlers.Add(_ => clicks++);
+        ui.Act(snapshot.Snapshot, element.Reference, "click", null, null);
+        Assert.Equal(1, clicks);
+    }
+
+    [Fact]
+    public void SharedContextWithUnselectedLayerDisablesNativeHitTesting()
+    {
+        var context = Context();
+        var button = new ButtonWidget(context) { Size = new Vector2(40, 40) };
+        var probe = new HitCountingWidget(context) { Size = new Vector2(40, 40) };
+        button.AddChild(probe);
+        context.Root.AddChild(button);
+        context.Root.UpdatePosition();
+        using var screen = new TestScreenScope(context);
+        screen.AddLayer(context, false, false);
+        var frame = adapter.Read(screen.Layer);
+        Assert.False(frame.ScopeComplete);
+        Assert.Equal(0, probe.HitTests);
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void UpperNativeLayerBlocksLowerButtonAndRevalidatesDynamicCoverage(bool dynamic)
+    {
+        var context = Context();
+        var button = new ButtonWidget(context) { Size = new Vector2(40, 40) };
+        context.Root.AddChild(button);
+        context.Root.UpdatePosition();
+        int clicks = 0;
+        button.ClickEventHandlers.Add(_ => clicks++);
+        using var screen = new TestScreenScope(context);
+        var upper = Context();
+        upper.Root.DoNotAcceptEvents = dynamic;
+        upper.Root.UpdatePosition();
+        screen.AddLayer(upper, true, true);
+        var ui = new LiveTestUi(adapter);
+        var handle = ui.Discover().Layers[0].Layer;
+        var snapshot = ui.Inspect(null, 0, handle);
+        var element = snapshot.Elements.Single(e => e.Widget.Native == button);
+        Assert.True(snapshot.ScopeComplete);
+        Assert.Equal(dynamic, element.Widget.HitTestable);
+        upper.Root.DoNotAcceptEvents = false;
+        Assert.Equal("not_interactable", Assert.Throws<UiAutomationException>(() =>
+            ui.Act(snapshot.Snapshot, element.Reference, "click", null, null)).Code);
+        Assert.Equal(0, clicks);
+    }
+
+    [Fact]
+    public void RelevantUpperTreeSharesWidgetBudgetAndNeverEntersNativeHitTestingWhenTruncated()
+    {
+        var context = Context();
+        var button = new ButtonWidget(context) { Size = new Vector2(40, 40) };
+        var probe = new HitCountingWidget(context) { Size = new Vector2(40, 40) };
+        button.AddChild(probe);
+        context.Root.AddChild(button);
+        context.Root.UpdatePosition();
+        using var screen = new TestScreenScope(context);
+        var upper = Context();
+        for (int i = 0; i < LiveTestUi.MaximumWidgets; i++) upper.Root.AddChild(new Widget(upper));
+        screen.AddLayer(upper, true, true);
+        var frame = adapter.Read(screen.Layer);
+        Assert.True(frame.Truncated);
+        Assert.Equal(LiveTestUi.MaximumWidgets, frame.DomainWidgets);
+        Assert.Equal(0, probe.HitTests);
+    }
+
+    [Theory]
+    [InlineData("root")]
+    [InlineData("stack")]
+    [InlineData("mask")]
+    [InlineData("modal")]
+    public void DiscoveryHandlesRejectChangedLayerStackOrModalRoots(string change)
+    {
+        var context = Context();
+        var modal = new Widget(context);
+        context.Root.AddChild(modal);
+        using var screen = new TestScreenScope(context);
+        var ui = new LiveTestUi(adapter);
+        string handle = ui.Discover().Layers[0].Layer;
+        if (change == "root") context.EventManager.Root = new Widget(context);
+        if (change == "stack") screen.AddLayer(Context(), true, false);
+        if (change == "mask") screen.Layer.InputRestrictions.SetInputRestrictions(true, TaleWorlds.Library.InputUsageMask.Mouse);
+        if (change == "modal") modal.IsVisible = false;
+        Assert.Equal("stale_reference", Assert.Throws<UiAutomationException>(() => ui.Inspect(null, 0, handle)).Code);
+    }
+
+    [Fact]
+    public void DiscoveryLayerLimitFailsBeforeSortedLayerOrWidgetTraversal()
+    {
+        using var screen = new TestScreenScope(Context());
+        for (int i = 0; i < 128; i++) ScreenManager.TopScreen._layers.Add(screen.Layer);
+        var ui = new LiveTestUi(adapter);
+        Assert.True(ui.Discover().Truncated);
+        Assert.Empty(ui.Discover().Layers);
+        Assert.True(adapter.Read().Truncated);
+    }
+
+    [Fact]
+    public void InvisibleSelectedRootCannotDispatchAndUnknownUpperLayerFailsClosed()
+    {
+        var context = Context();
+        context.Root.IsVisible = false;
+        context.Root.AddChild(new ButtonWidget(context) { Size = new Vector2(40, 40) });
+        using var screen = new TestScreenScope(context);
+        Assert.All(adapter.Read(screen.Layer).Widgets, w => Assert.False(w.HitTestable));
+        context.Root.IsVisible = true;
+        var unknown = new UnknownLayer();
+        unknown.IsActive = true;
+        unknown.InputRestrictions.SetInputRestrictions(true, TaleWorlds.Library.InputUsageMask.Mouse);
+        ScreenManager.TopScreen._layers.Add(unknown);
+        ScreenManager._isSortedActiveLayersDirty = true;
+        Assert.False(adapter.Read(screen.Layer).ScopeComplete);
+    }
+
+    [Fact]
+    public void SelectedSnapshotDispatchesOnceAndDiscoveryRefreshInvalidatesHandles()
+    {
+        var context = Context();
+        var button = new ButtonWidget(context) { Size = new Vector2(40, 40) };
+        context.Root.AddChild(button);
+        context.Root.UpdatePosition();
+        int clicks = 0;
+        button.ClickEventHandlers.Add(_ => clicks++);
+        using var screen = new TestScreenScope(context);
+        var ui = new LiveTestUi(adapter);
+        var oldHandle = ui.Discover().Layers[0].Layer;
+        var handle = ui.Discover().Layers[0].Layer;
+        Assert.Throws<UiAutomationException>(() => ui.Inspect(null, 0, oldHandle));
+        var snapshot = ui.Inspect(null, 0, handle);
+        var element = snapshot.Elements.Single(e => e.Widget.Native == button);
+        Assert.Throws<UiAutomationException>(() => ui.Inspect(snapshot.Snapshot, 0, oldHandle));
+        ui.Act(snapshot.Snapshot, element.Reference, "click", null, null);
+        Assert.Equal(1, clicks);
+        Assert.Throws<UiAutomationException>(() => ui.Act(snapshot.Snapshot, element.Reference, "click", null, null));
+        Assert.Throws<UiAutomationException>(() => ui.Inspect(null, 0, handle));
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void ForeignWidgetContextOrDetachedMovieRootDisablesHitTests(bool movieRoot)
+    {
+        var context = Context();
+        var button = new ButtonWidget(context) { Size = new Vector2(40, 40) };
+        var probe = new HitCountingWidget(context) { Size = new Vector2(40, 40) };
+        button.AddChild(probe);
+        context.Root.AddChild(button);
+        context.Root.UpdatePosition();
+        using var screen = new TestScreenScope(context);
+        if (movieRoot)
+        {
+            var upper = Context();
+            var layer = screen.AddLayer(upper, true, true);
+            Mock.Get(layer._movieIdentifiers[0].Movie).SetupGet(m => m.RootWidget).Returns(new Widget(upper));
+        }
+        else context.Root.AddChild(new Widget(Context()));
+        Assert.False(adapter.Read(screen.Layer).ScopeComplete);
+        Assert.Equal(0, probe.HitTests);
+    }
+
+    [Fact]
+    public void DynamicUpperModalDescendantsInvalidateSelectedSnapshotEvenAwayFromButton()
+    {
+        var context = Context();
+        var button = new ButtonWidget(context) { Size = new Vector2(40, 40) };
+        context.Root.AddChild(button);
+        context.Root.UpdatePosition();
+        using var screen = new TestScreenScope(context);
+        var upper = Context();
+        var parent = new Widget(upper) { DoNotAcceptEvents = true, Size = new Vector2(800, 800) };
+        var modal = new Widget(upper) { DoNotAcceptEvents = true, IsVisible = false, Size = new Vector2(40, 40), Left = 400 };
+        upper.Root.DoNotAcceptEvents = true;
+        parent.AddChild(modal);
+        upper.Root.AddChild(parent);
+        upper.Root.UpdatePosition();
+        screen.AddLayer(upper, true, true);
+        var ui = new LiveTestUi(adapter);
+        var snapshot = ui.Inspect(null, 0, ui.Discover().Layers[0].Layer);
+        var element = snapshot.Elements.Single(e => e.Widget.Native == button);
+        modal.IsVisible = true;
+        Assert.Equal("stale_reference", Assert.Throws<UiAutomationException>(() =>
+            ui.Act(snapshot.Snapshot, element.Reference, "click", null, null)).Code);
+    }
+
+    [Theory]
+    [InlineData(false, false)]
+    [InlineData(true, false)]
+    [InlineData(false, true)]
+    [InlineData(true, true)]
+    public void SemanticActivationAllowsRootOrModalReplacementWithoutLaterBridgeTraversal(bool scoped, bool modal)
+    {
+        var context = Context();
+        var button = new ButtonWidget(context) { Size = new Vector2(40, 40) };
+        context.Root.AddChild(button);
+        context.Root.UpdatePosition();
+        using var screen = new TestScreenScope(context);
+        var ui = new LiveTestUi(adapter);
+        string handle = scoped ? ui.Discover().Layers[0].Layer : null;
+        var snapshot = ui.Inspect(null, 0, handle);
+        var element = snapshot.Elements.Single(e => e.Widget.Native == button);
+        int clicks = 0;
+        var notifications = new List<string>();
+        button.EventFire += (_, name, _) => notifications.Add(name);
+        button.boolPropertyChanged += (_, name, _) =>
+        {
+            if (name == "IsPressed") throw new InvalidOperationException("Semantic activation must not synthesize press state.");
+        };
+        context.EventManager.Time = 2;
+        button.ClickEventHandlers.Add(_ =>
+        {
+            clicks++;
+            if (modal)
+            {
+                var layer = new UnknownLayer();
+                layer.IsActive = true;
+                layer.InputRestrictions.SetInputRestrictions(true, TaleWorlds.Library.InputUsageMask.Mouse);
+                ScreenManager.TopScreen._layers.Add(layer);
+                ScreenManager._isSortedActiveLayersDirty = true;
+            }
+            else
+            {
+                var root = new Widget(context);
+                root.AddChild(new Widget(context));
+                root.Children[0] = null; // Any later bridge read or mouse release collection fails.
+                context.EventManager.Root = root;
+            }
+        });
+        button.ClickEventHandlers.Add(_ => clicks++);
+        ui.Act(snapshot.Snapshot, element.Reference, "click", null, null);
+        Assert.Equal(2, clicks);
+        Assert.Equal(new[] { "Click" }, notifications);
+        Assert.Equal(2, button._lastClickTime);
+        Assert.False(button.IsPressed);
+        Assert.False(context.EventManager._mouseIsDown);
+        Assert.Null(context.EventManager.LatestMouseDownWidget);
+        Assert.False(context._uiInputContext._isMousePositionOverridden);
+        Assert.Equal("stale_reference", Assert.Throws<UiAutomationException>(() =>
+            ui.Act(snapshot.Snapshot, element.Reference, "click", null, null)).Code);
+        if (scoped) Assert.Throws<UiAutomationException>(() => ui.Inspect(null, 0, handle));
+    }
+
+    [Fact]
+    public void NativeClickEventCanFinalizeEventManagerBeforeNativeTimeContinuation()
+    {
+        var context = Context();
+        var button = new ButtonWidget(context);
+        context.EventManager.Time = 2;
+        button.EventFire += (_, name, _) => { if (name == "Click") context.EventManager.OnFinalize(); };
+        adapter.ActivateButton(button);
+        Assert.Equal(2, button._lastClickTime);
+        Assert.Null(context.EventManager._widgetContainers);
+        Assert.Same(context, button.Context);
+    }
+
+    [Fact]
+    public void SemanticActivationPreservesNativeClickToggleRadioAndDoubleClickOrdering()
+    {
+        var context = Context();
+        var button = new ButtonWidget(context) { ButtonType = ButtonType.Toggle };
+        var notifications = new List<string>();
+        button.ClickEventHandlers.Add(_ => notifications.Add("handler:" + button.IsSelected));
+        button.boolPropertyChanged += (_, name, _) => { if (name == "IsSelected") notifications.Add("selection"); };
+        button.EventFire += (_, name, _) => notifications.Add(name);
+        context.EventManager.Time = 2;
+        adapter.ActivateButton(button);
+        context.EventManager.Time = 2.1f;
+        adapter.ActivateButton(button);
+        Assert.Equal(new[] { "handler:False", "selection", "Click", "handler:True", "selection", "Click", "DoubleClick" }, notifications);
+        var parent = new ListPanel(context);
+        var radio = new ButtonWidget(context) { ButtonType = ButtonType.Radio };
+        parent.AddChild(new ButtonWidget(context));
+        parent.AddChild(radio);
+        adapter.ActivateButton(radio);
+        Assert.True(radio.IsSelected);
+        Assert.Equal(1, parent.IntValue);
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void UnknownButtonSubclassIsNotAdvertisedOrDispatched(bool scoped)
+    {
+        var context = Context();
+        var button = new UnknownButton(context) { Size = new Vector2(40, 40) };
+        context.Root.AddChild(button);
+        context.Root.UpdatePosition();
+        using var screen = new TestScreenScope(context);
+        Assert.Empty(adapter.Read(scoped ? screen.Layer : null).Widgets.Single(w => w.Native == button).Actions);
+        Assert.Equal("unsupported_action", Assert.Throws<UiAutomationException>(() =>
+            adapter.Act(new UiWidget { Native = button, Layer = screen.Layer }, "click", null, null, scoped)).Code);
+        Assert.Equal("unsupported_action", Assert.Throws<UiAutomationException>(() => adapter.ActivateButton(button)).Code);
+    }
+
+    [Theory]
+    [InlineData("mouse")]
+    [InlineData("alternate")]
+    [InlineData("drag")]
+    [InlineData("pressed")]
+    [InlineData("clickState")]
+    public void SemanticActivationRejectsBusyInputWithoutCancellation(string busy)
+    {
+        var context = Context();
+        var button = new ButtonWidget(context);
+        int clicks = 0;
+        button.ClickEventHandlers.Add(_ => clicks++);
+        if (busy == "mouse") context.EventManager._mouseIsDown = true;
+        if (busy == "alternate") context.EventManager._mouseAlternateIsDown = true;
+        if (busy == "drag") context.EventManager.DraggedWidget = button;
+        if (busy == "pressed") button.IsPressed = true;
+        if (busy == "clickState") button._clickState = ButtonWidget.ButtonClickState.HandlingClick;
+        Assert.Equal("input_busy", Assert.Throws<UiAutomationException>(() => adapter.ActivateButton(button)).Code);
+        Assert.Equal(0, clicks);
+        Assert.Equal(busy == "mouse", context.EventManager._mouseIsDown);
+        Assert.Equal(busy == "alternate", context.EventManager._mouseAlternateIsDown);
+        Assert.Equal(busy == "pressed", button.IsPressed);
+        Assert.Equal(busy == "drag", context.EventManager.IsDragging);
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void NativeFailureAfterMutationIsUncertainAndConsumesSelectedReferences(bool bridgeShapedException)
+    {
+        var context = Context();
+        var button = new ButtonWidget(context) { Size = new Vector2(40, 40) };
+        context.Root.AddChild(button);
+        context.Root.UpdatePosition();
+        using var screen = new TestScreenScope(context);
+        var ui = new LiveTestUi(adapter);
+        var handle = ui.Discover().Layers[0].Layer;
+        var snapshot = ui.Inspect(null, 0, handle);
+        var element = snapshot.Elements.Single(e => e.Widget.Native == button);
+        button.ClickEventHandlers.Add(_ =>
+        {
+            button.Id = "changed";
+            if (bridgeShapedException) throw new UiAutomationException("invalid_parameters", "native callback");
+            button.ClickEventHandlers.Clear(); // Native foreach continuation throws after mutation.
+        });
+        var error = Assert.Throws<InvalidOperationException>(() => ui.Act(snapshot.Snapshot, element.Reference, "click", null, null));
+        Assert.Contains("outcome is uncertain", error.Message);
+        Assert.NotNull(error.InnerException);
+        Assert.Equal("changed", button.Id);
+        Assert.False(button.IsPressed);
+        Assert.False(context.EventManager._mouseIsDown);
+        Assert.Equal("stale_reference", Assert.Throws<UiAutomationException>(() =>
+            ui.Act(snapshot.Snapshot, element.Reference, "click", null, null)).Code);
+        Assert.Throws<UiAutomationException>(() => ui.Inspect(null, 0, handle));
+    }
+
+    [Theory]
+    [InlineData("text")]
+    [InlineData("slider")]
+    [InlineData("scroll_vertical")]
+    [InlineData("scroll_horizontal")]
+    public void SelectedScopeDoesNotAdvertiseOrDispatchUnprovenNonButtonActions(string action)
+    {
+        var context = Context();
+        Widget widget = action == "text" ? (Widget)new EditableTextWidget(context) :
+            action == "slider" ? new SliderWidget(context) : new ScrollablePanel(context)
+            {
+                VerticalScrollbar = new ScrollbarWidget(context), HorizontalScrollbar = new ScrollbarWidget(context),
+            };
+        widget.Size = new Vector2(100, 100);
+        context.Root.AddChild(widget);
+        context.Root.UpdatePosition();
+        using var screen = new TestScreenScope(context);
+        Assert.Contains(action, adapter.Read().Widgets.Single(w => w.Native == widget).Actions);
+        Assert.Empty(adapter.Read(screen.Layer).Widgets.Single(w => w.Native == widget).Actions);
+        Assert.Equal("unsupported_action", Assert.Throws<UiAutomationException>(() =>
+            adapter.Act(new UiWidget { Native = widget, Layer = screen.Layer }, action, "new", 0.5, scoped: true)).Code);
+        Assert.Null(context.EventManager.FocusedWidget);
+    }
+
+    private sealed class UnknownButton : ButtonWidget
+    {
+        public UnknownButton(UIContext context) : base(context) { }
+        public override void HandleClick() => throw new InvalidOperationException("Unknown native override must not run.");
+    }
+
+    private sealed class UnknownLayer : ScreenLayer
+    {
+        public UnknownLayer() : base("unknown", 100) { }
+        public override bool HitTest(Vector2 point) => throw new InvalidOperationException("Must not call an unbounded unknown hit test.");
+    }
+
+    private sealed class HitCountingWidget : Widget
     {
         public int HitTests { get; private set; }
-        public HitCountingButton(UIContext context) : base(context) { }
+        public HitCountingWidget(UIContext context) : base(context) { }
         public override bool OnPreviewMousePressed()
         {
             HitTests++;
-            return base.OnPreviewMousePressed();
+            return false;
         }
     }
 
@@ -377,11 +796,30 @@ public class GauntletWidgetAdapterTests
             Layer = (GauntletLayer)FormatterServices.GetUninitializedObject(typeof(GauntletLayer));
             Layer.UIContext = context;
             Layer.IsActive = true;
+            Layer.InputRestrictions = new InputRestrictions(0);
+            System.Runtime.CompilerServices.Unsafe.AsRef(in Layer._movieIdentifiers) =
+                new TaleWorlds.Library.MBList<GauntletMovieIdentifier>();
             var screen = new TestScreen();
             screen._layers.Add(Layer);
             ScreenManager.TopScreen = screen;
             ScreenManager._sortedLayers = new List<ScreenLayer> { Layer };
             ScreenManager._globalLayers = new ObservableCollection<GlobalLayer>();
+        }
+        public GauntletLayer AddLayer(UIContext context, bool above, bool blocks)
+        {
+            var layer = (GauntletLayer)FormatterServices.GetUninitializedObject(typeof(GauntletLayer));
+            layer.UIContext = context;
+            layer.IsActive = true;
+            layer.InputRestrictions = new InputRestrictions(above ? 10 : -10);
+            layer.InputRestrictions.SetInputRestrictions(true, blocks ? TaleWorlds.Library.InputUsageMask.Mouse : (TaleWorlds.Library.InputUsageMask)0);
+            var movie = new Mock<TaleWorlds.GauntletUI.Data.IGauntletMovie>();
+            movie.SetupGet(m => m.RootWidget).Returns(context.Root);
+            var identifier = new GauntletMovieIdentifier("test", null) { Movie = movie.Object };
+            System.Runtime.CompilerServices.Unsafe.AsRef(in layer._movieIdentifiers) =
+                new TaleWorlds.Library.MBList<GauntletMovieIdentifier> { identifier };
+            ScreenManager.TopScreen._layers.Add(layer);
+            ScreenManager._isSortedActiveLayersDirty = true;
+            return layer;
         }
         public void Dispose()
         {
