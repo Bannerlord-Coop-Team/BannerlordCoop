@@ -286,8 +286,9 @@ public class ForceTransferTests
         var start = DateTime.UtcNow;
         subject.ParkForceTransferScreen(DeferredPool("req-1"), start);
 
-        Assert.False(subject.TryTakeParkedForceTransferScreen(start + TimeSpan.FromMinutes(6), out _, out _));
-        Assert.False(subject.TryTakeParkedForceTransferScreen(start + TimeSpan.FromMinutes(6), out _, out _));
+        // Parked lifetime matches the server pending window plus expiry grace.
+        Assert.False(subject.TryTakeParkedForceTransferScreen(start + TimeSpan.FromMinutes(11), out _, out _));
+        Assert.False(subject.TryTakeParkedForceTransferScreen(start + TimeSpan.FromMinutes(11), out _, out _));
     }
 
     [Fact]
@@ -325,14 +326,75 @@ public class ForceTransferTests
     }
 
     [Fact]
-    public void IsParkedPoolFresh_EnforcesDrainMargin()
+    public void DeferredForceScreen_TakeAt241Seconds_Succeeds()
+    {
+        // Park at t=0 while in a mission, first eligible tick at t=241s: the old
+        // 4-minute client budget dropped the earned reward before its screen
+        // opened. The parked entry must survive until the server lifetime ends.
+        var subject = new VillageHostileActionInterface(new MessageBroker(), new StubObjectManager());
+        var start = DateTime.UtcNow;
+        subject.ParkForceTransferScreen(DeferredPool("req-1"), start);
+
+        Assert.True(subject.TryTakeParkedForceTransferScreen(start + TimeSpan.FromSeconds(241), out var taken, out _));
+        Assert.Equal("req-1", taken.RequestId);
+    }
+
+    [Fact]
+    public void DeferredForceScreen_TakeAtSixMinutes_Succeeds()
+    {
+        // Past the old 5-minute client clear: the server still honors the pool
+        // through its expiry grace, so the screen must still open.
+        var subject = new VillageHostileActionInterface(new MessageBroker(), new StubObjectManager());
+        var start = DateTime.UtcNow;
+        subject.ParkForceTransferScreen(DeferredPool("req-1"), start);
+
+        Assert.True(subject.TryTakeParkedForceTransferScreen(start + TimeSpan.FromMinutes(6), out var taken, out _));
+        Assert.Equal("req-1", taken.RequestId);
+    }
+
+    [Theory]
+    [InlineData(0, true)]
+    [InlineData(241, true)]
+    [InlineData(360, true)]
+    [InlineData(569, true)]
+    [InlineData(570, true)]
+    [InlineData(571, false)]
+    [InlineData(600, false)]
+    public void IsParkedPoolOpenable_EnforcesReopenMargin(int seconds, bool expected)
     {
         var start = DateTime.UtcNow;
 
-        Assert.True(VillageHostileActionInterface.IsParkedPoolFresh(start, start + TimeSpan.FromMinutes(3)));
-        Assert.True(VillageHostileActionInterface.IsParkedPoolFresh(start, start + TimeSpan.FromMinutes(4)));
-        Assert.False(VillageHostileActionInterface.IsParkedPoolFresh(start, start + TimeSpan.FromMinutes(4).Add(TimeSpan.FromSeconds(1))));
-        Assert.False(VillageHostileActionInterface.IsParkedPoolFresh(start, start + TimeSpan.FromMinutes(6)));
+        Assert.Equal(expected, VillageHostileActionInterface.IsParkedPoolOpenable(start, start + TimeSpan.FromSeconds(seconds)));
+    }
+
+    [Fact]
+    public void DeferredForceScreen_TakeAtExactlyTenMinutes_Succeeds()
+    {
+        // The parked take uses a strict greater-than, so the 10-minute parked
+        // lifetime edge itself still opens; the reopen margin handles Done.
+        var subject = new VillageHostileActionInterface(new MessageBroker(), new StubObjectManager());
+        var start = DateTime.UtcNow;
+        subject.ParkForceTransferScreen(DeferredPool("req-1"), start);
+
+        Assert.True(subject.TryTakeParkedForceTransferScreen(start + TimeSpan.FromMinutes(10), out var taken, out _));
+        Assert.Equal("req-1", taken.RequestId);
+    }
+
+    [Fact]
+    public void ForceTransferPool_GraceWindowStillConsumable()
+    {
+        // Deferred open near the end of the parked lifetime: the server pending
+        // entry has retired into grace but still consumes one-shot. TryConsume
+        // takes no clock parameter, so pruning forward is how grace is reached.
+        var subject = new VillageHostileActionInterface(new MessageBroker(), new StubObjectManager());
+        var pool = subject.AuthorizeForceTransfer(
+            VillageHostileAction.ForceVolunteers, "party", "settlement", null, "imperial_recruit", 8);
+
+        subject.PruneExpiredForceTransfers(DateTime.UtcNow + TimeSpan.FromMinutes(9));
+
+        Assert.True(subject.TryPeekForceTransfer(pool.RequestId, "party", out _));
+        Assert.True(subject.TryConsumeForceTransfer(pool.RequestId, "party", out _));
+        Assert.False(subject.TryConsumeForceTransfer(pool.RequestId, "party", out _));
     }
 
     private static ForceTransferPoolData DeferredPool(string requestId)
@@ -519,6 +581,33 @@ public class ForceTransferTests
             0, 0, 0, 0, 0, false, null, null, out _));
     }
 
+    [Fact]
+    public void TryValidateVolunteersCommit_TakePlusOwnedPrisonerRelease_Rejects()
+    {
+        // Exact finding-1 repro: take the village recruits while releasing an
+        // already-owned ordinary prisoner. The screen must block this up front;
+        // the commit rejects it as backstop.
+        Assert.False(VillageHostileActionInterface.TryValidateVolunteersCommit(
+            "imperial_recruit", 8,
+            Delta(("imperial_recruit", 8)),
+            Delta(("imperial_recruit", -8)),
+            Delta(("vlandian_recruit", -1)),
+            EmptyDelta(),
+            1, 0, 0, 0, 0, true, null, null, out _));
+    }
+
+    [Fact]
+    public void TryValidateVolunteersCommit_TakePlusPrisonerRecruit_Rejects()
+    {
+        // Take the village recruits while recruiting an eligible existing
+        // prisoner: the recruited gain and history fail the commit backstop.
+        Assert.False(VillageHostileActionInterface.TryValidateVolunteersCommit(
+            "imperial_recruit", 8,
+            Delta(("imperial_recruit", 8), ("vlandian_recruit", 1)),
+            Delta(("imperial_recruit", -8)),
+            EmptyDelta(), EmptyDelta(),
+            0, 1, 0, 0, 0, false, null, null, out _));
+    }
     private static bool VolunteersCommit(
         string troopId, int count, TroopRosterData rightDelta, TroopRosterData leftDelta, out string error)
     {

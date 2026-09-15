@@ -38,15 +38,26 @@ internal class VillageHostileActionInterface : IVillageHostileActionInterface, I
     private const int ForceActionCooldownDays = 10;
     private static readonly TimeSpan MapEventStartApprovalTimeout = TimeSpan.FromSeconds(30);
     private static readonly TimeSpan ForceTransferPoolTimeout = TimeSpan.FromMinutes(5);
-    private static readonly TimeSpan DeferredDrainMargin = TimeSpan.FromSeconds(60);
-    // Commits attributed to a screen opened just inside the client freshness
-    // margin can land after the server authorization has expired (authorize at
-    // t=0, open at t=240s, Done at t=301s). Expired entries are kept this much
-    // longer and still honor one-shot commits, so an earned reward is never
-    // silently discarded. The client stops attributing 5 minutes after the
-    // screen opens, and screens open no later than 4 minutes after
-    // authorization, so 5 minutes of grace covers every attributed commit.
+    // Commits attributed to a screen opened just inside the parked lifetime can
+    // land after the server authorization has expired (authorize at t=0, open at
+    // t=540s, Done at t=601s). Expired entries are kept this much longer and
+    // still honor one-shot commits, so an earned reward is never silently
+    // discarded. The client stops attributing 5 minutes after the screen opens,
+    // and screens open no later than the parked lifetime below, so 5 minutes of
+    // grace covers every attributed commit.
     private static readonly TimeSpan ForceTransferExpiredRetention = TimeSpan.FromMinutes(5);
+    // A parked screen must stay openable as long as the server can still honor
+    // its commit: the pending window plus the expiry grace. ParkedAt is client
+    // clock against the server authorization clock, so roughly aligned clocks
+    // are assumed. Freshness is decided by the server consume, not by a
+    // shorter client budget, otherwise an earned reward is dropped before its
+    // screen ever opens.
+    private static readonly TimeSpan DeferredParkedLifetime =
+        ForceTransferPoolTimeout + ForceTransferExpiredRetention;
+    // A screen opened in the last seconds of the parked lifetime could not
+    // survive a pick-and-Done round trip, so the tick handler denies those
+    // instead of opening a doomed screen.
+    private static readonly TimeSpan DeferredReopenMargin = TimeSpan.FromSeconds(30);
 
     private readonly IMessageBroker messageBroker;
     private readonly IObjectManager objectManager;
@@ -827,15 +838,26 @@ internal class VillageHostileActionInterface : IVillageHostileActionInterface, I
         if (IsInMission()) return;
 
         var now = DateTime.UtcNow;
-        if (!TryTakeParkedForceTransferScreen(now, out var pool, out var parkedAt)) return;
+        var hadParked = HasParkedForceTransferScreen();
+        if (!TryTakeParkedForceTransferScreen(now, out var pool, out var parkedAt))
+        {
+            if (hadParked)
+            {
+                Logger.Information("ForceTransfer deferred screen expired before mission end");
+                messageBroker.Publish(this, new SendInformationMessage("The village has nothing left to give."));
+            }
+            return;
+        }
 
-        // The server pool expires on the server clock while parked here. Refuse to
-        // open a screen whose remaining budget cannot cover a pick-and-Done round
-        // trip; the player gets the deny message instead of a doomed screen.
-        if (!IsParkedPoolFresh(parkedAt, now))
+        // Always open the earned screen and let the server consume decide: it
+        // still holds the pool through the expiry grace, while a client-side
+        // freshness budget would drop the reward before it is ever shown. A
+        // gone pool is reported at Done time by the commit validation. Screens
+        // too close to the parked lifetime to survive Done are denied instead.
+        if (!IsParkedPoolOpenable(parkedAt, now))
         {
             Logger.Information(
-                "ForceTransfer deferred screen denied, pool budget exhausted (Request={RequestId}, Settlement={SettlementId})",
+                "ForceTransfer deferred screen denied, parked lifetime nearly exhausted (Request={RequestId}, Settlement={SettlementId})",
                 pool.RequestId,
                 pool.SettlementId);
             messageBroker.Publish(this, new SendInformationMessage("The village has nothing left to give."));
@@ -850,15 +872,14 @@ internal class VillageHostileActionInterface : IVillageHostileActionInterface, I
         OpenForceTransferLootScreenNow(pool);
     }
 
-    internal static bool IsParkedPoolFresh(DateTime parkedAtUtc, DateTime utcNow)
-    {
-        return utcNow - parkedAtUtc <= ForceTransferPoolTimeout - DeferredDrainMargin;
-    }
-
     internal void ParkForceTransferScreen(ForceTransferPoolData pool, DateTime? utcNow = null)
     {
         lock (deferredForceScreenGate)
         {
+            // Single slot: a second authorization while one is parked orphans
+            // the first client entry (its server pool expires unused). Kept
+            // because collisions need two authorizations with no eligible tick
+            // between, and the newest reward is the one the player just earned.
             if (deferredForceScreen != null)
             {
                 Logger.Warning(
@@ -871,6 +892,19 @@ internal class VillageHostileActionInterface : IVillageHostileActionInterface, I
         }
     }
 
+    internal bool HasParkedForceTransferScreen()
+    {
+        lock (deferredForceScreenGate)
+        {
+            return deferredForceScreen != null;
+        }
+    }
+
+    internal static bool IsParkedPoolOpenable(DateTime parkedAtUtc, DateTime utcNow)
+    {
+        return utcNow - parkedAtUtc <= DeferredParkedLifetime - DeferredReopenMargin;
+    }
+
     internal bool TryTakeParkedForceTransferScreen(DateTime? utcNow, out ForceTransferPoolData pool, out DateTime parkedAtUtc)
     {
         lock (deferredForceScreenGate)
@@ -880,7 +914,7 @@ internal class VillageHostileActionInterface : IVillageHostileActionInterface, I
             if (deferredForceScreen == null) return false;
 
             var now = utcNow ?? DateTime.UtcNow;
-            if (now - deferredForceScreen.ParkedAtUtc > ForceTransferPoolTimeout)
+            if (now - deferredForceScreen.ParkedAtUtc > DeferredParkedLifetime)
             {
                 Logger.Information(
                     "ForceTransfer deferred screen expired (Request={RequestId}, Settlement={SettlementId})",

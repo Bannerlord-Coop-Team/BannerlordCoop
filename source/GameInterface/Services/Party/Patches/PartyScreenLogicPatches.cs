@@ -34,19 +34,39 @@ internal class PartyScreenLogicPatches
     [HarmonyPrefix]
     public static bool ValidateCommandPrefix(PartyScreenLogic.PartyCommand command, ref bool __result)
     {
-        // Force-transfer loot screens cannot honor troop upgrades: the commit
-        // validation requires zero gold/influence/morale movement, and the
-        // upgrade gold cost would fail it after the screen already reset.
-        // Block the operation up front so the button simply stays disabled.
+        // Force-transfer loot screens only honor member takes and dismissals: the
+        // commit validation rejects any prisoner, upgrade, gold, influence, or
+        // morale movement, which would fail after the screen already reset.
+        // Block those operations up front so the buttons simply stay disabled.
         // ValidateCommand is also queried per-frame by the UI, so no message.
-        if (command.Code == PartyScreenLogic.PartyCommandCode.UpgradeTroop &&
-            ForceTransferScreenTracker.HasOpenForceTransferScreen())
+        // Member transfers stay allowed (takes and dismissals); shifts and sorts
+        // only reorder and never affect the commit deltas.
+        if (ForceTransferScreenTracker.HasOpenForceTransferScreen() &&
+            IsBlockedOnForceTransferScreen(command.Code, command.Type))
         {
             __result = false;
             return false;
         }
 
         return true;
+    }
+
+    internal static bool IsBlockedOnForceTransferScreen(PartyScreenLogic.PartyCommandCode code, PartyScreenLogic.TroopType type)
+    {
+        switch (code)
+        {
+            case PartyScreenLogic.PartyCommandCode.UpgradeTroop:
+            case PartyScreenLogic.PartyCommandCode.RecruitTroop:
+            case PartyScreenLogic.PartyCommandCode.ExecuteTroop:
+            case PartyScreenLogic.PartyCommandCode.TransferPartyLeaderTroop:
+                return true;
+            case PartyScreenLogic.PartyCommandCode.TransferTroop:
+            case PartyScreenLogic.PartyCommandCode.TransferTroopToLeaderSlot:
+            case PartyScreenLogic.PartyCommandCode.TransferAllTroops:
+                return (type & PartyScreenLogic.TroopType.Prisoner) != 0;
+            default:
+                return false;
+        }
     }
 
     [HarmonyPatch(nameof(PartyScreenLogic.DoneLogic))]
