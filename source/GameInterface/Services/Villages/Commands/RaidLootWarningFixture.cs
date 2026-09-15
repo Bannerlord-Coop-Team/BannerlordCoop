@@ -9,6 +9,8 @@ using GameInterface.Services.MobileParties.Messages.Behavior;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Players;
 using GameInterface.Services.Players.Data;
+using GameInterface.Services.Villages.Data;
+using GameInterface.Services.Villages.Interfaces;
 using HarmonyLib;
 using Helpers;
 using Newtonsoft.Json;
@@ -29,6 +31,7 @@ using TaleWorlds.CampaignSystem.Roster;
 using TaleWorlds.CampaignSystem.Settlements;
 using TaleWorlds.Core;
 using TaleWorlds.Library;
+using TaleWorlds.Localization;
 using TaleWorlds.ScreenSystem;
 
 namespace GameInterface.Services.Villages.Commands;
@@ -36,6 +39,12 @@ namespace GameInterface.Services.Villages.Commands;
 public interface IRaidLootWarningFixture : IGameAbstraction
 {
     CoopCommandResult Prepare(string controllerId, string baseline);
+    CoopCommandResult StartRaid(string controllerId);
+    CoopCommandResult RequestRaid(string controllerId);
+    CoopCommandResult CompleteSimulation(string controllerId);
+    CoopCommandResult CompleteLootParty(string controllerId);
+    CoopCommandResult ShowLootWarning(string controllerId);
+    CoopCommandResult AcceptLootWarning(string controllerId);
     CoopCommandResult ReadState(string controllerId);
     void CaptureMapEvent(MapEvent mapEvent);
     void SeedLoot(MapEvent mapEvent, Dictionary<MapEventParty, ItemRoster> playerLootRosters);
@@ -50,13 +59,20 @@ public sealed class RaidLootWarningFixture : IRaidLootWarningFixture
     private readonly IObjectManager objectManager;
     private readonly IPlayerManager playerManager;
     private readonly IMessageBroker messageBroker;
+    private readonly IVillageHostileActionInterface villageHostileActionInterface;
     private FixtureSession fixture;
+    private ClientActionSession clientAction;
 
-    public RaidLootWarningFixture(IObjectManager objectManager, IPlayerManager playerManager, IMessageBroker messageBroker)
+    public RaidLootWarningFixture(
+        IObjectManager objectManager,
+        IPlayerManager playerManager,
+        IMessageBroker messageBroker,
+        IVillageHostileActionInterface villageHostileActionInterface)
     {
         this.objectManager = objectManager;
         this.playerManager = playerManager;
         this.messageBroker = messageBroker;
+        this.villageHostileActionInterface = villageHostileActionInterface;
     }
 
     public CoopCommandResult Prepare(string controllerId, string baseline)
@@ -94,6 +110,153 @@ public sealed class RaidLootWarningFixture : IRaidLootWarningFixture
             LogManager.GetLogger<RaidLootWarningFixture>().Error(exception, "Issue 3262 fixture preparation failed; reload baseline");
             return Failed("Preparation partially failed: " + exception.Message + ". Reload the baseline; do not retry in this campaign.");
         }
+    }
+
+    public CoopCommandResult StartRaid(string controllerId)
+    {
+        if (ModInformation.IsServer) return Failed("Run the raid start on the client.");
+        if (Campaign.Current == null) return Failed("No campaign is loaded.");
+        if (!TryFindPlayer(controllerId, out var player, out var party, out var error)) return Failed(error);
+        if (party != MobileParty.MainParty)
+            return Failed("Run the raid start on the client that owns the fixture controller.");
+        if (!objectManager.TryGetObject<Settlement>(SettlementId, out var settlement))
+            return Failed("Registered Polisia (village_ES1_2) is missing.");
+        if (clientAction?.Campaign != Campaign.Current) clientAction = null;
+        if (clientAction != null)
+            return Failed("This client already started a raid-loot-warning fixture. Reload a fresh baseline before another start.");
+        if (party.MapEvent != null || PlayerEncounter.Current != null)
+            return Failed("The client party already has an encounter or map event. Reload the fresh baseline before starting the fixture.");
+        if (party.Position != settlement.GatePosition || party.CurrentSettlement != null)
+            return Failed("The client party is not at the prepared Polisia gate. Confirm server preparation before starting the fixture.");
+        if (settlement.Village?.VillageState != Village.VillageStates.Normal ||
+            !FactionManager.IsAtWarAgainstFaction(party.MapFaction, settlement.MapFaction))
+            return Failed("Polisia is not in the prepared raid state. Confirm the server fixture state before starting the fixture.");
+
+        clientAction = new ClientActionSession(Campaign.Current, player.ControllerId, party, settlement);
+        try
+        {
+            clientAction.RequestSettlementEntry();
+            EncounterManager.StartSettlementEncounter(party, settlement);
+            return ReadState(player.ControllerId);
+        }
+        catch (Exception exception)
+        {
+            clientAction.Fail();
+            LogManager.GetLogger<RaidLootWarningFixture>().Error(exception, "Issue 3262 fixture settlement entry request failed; reload baseline");
+            return Failed("Settlement entry request partially failed: " + exception.Message + ". Reload the baseline; do not retry in this campaign.");
+        }
+    }
+
+    public CoopCommandResult RequestRaid(string controllerId)
+    {
+        if (!TryGetClientAction(controllerId, out var party, out var action, out var error)) return Failed(error);
+        if (!action.IsAwaitingSettlementEntryApproval)
+            return Failed("The fixture raid request is not awaiting the approved settlement encounter.");
+        if (party.MapEvent != null || PlayerEncounter.Current == null ||
+            Settlement.CurrentSettlement != action.Settlement || PlayerEncounter.EncounterSettlement != action.Settlement)
+            return Failed("Wait for raid_loot_warning_state to show the approved Polisia settlement encounter before requesting the raid.");
+
+        try
+        {
+            action.ObserveSettlementEntryApproval();
+            action.RequestRaid();
+            villageHostileActionInterface.RequestHostileAction(VillageHostileAction.Raid);
+            return ReadState(action.ControllerId);
+        }
+        catch (Exception exception)
+        {
+            action.Fail();
+            LogManager.GetLogger<RaidLootWarningFixture>().Error(exception, "Issue 3262 fixture raid request failed; reload baseline");
+            return Failed("Raid request partially failed: " + exception.Message + ". Reload the baseline; do not retry in this campaign.");
+        }
+    }
+
+    public CoopCommandResult CompleteSimulation(string controllerId)
+    {
+        if (!TryGetClientAction(controllerId, out var party, out var action, out var error)) return Failed(error);
+        if (!action.CanCompleteSimulation()) return Failed("The fixture raid is not awaiting a simulation result.");
+        if (!IsExpectedRaidMapEvent(party, action.Settlement)) return Failed("The active map event is not the fixture raid.");
+
+        var battleSimulation = PlayerEncounter.Current?.BattleSimulation;
+        if (battleSimulation == null || !battleSimulation.IsSimulationFinished)
+            return Failed("The completed battle simulation is not ready.");
+
+        var mapScreen = ScreenManager.TopScreen as MapScreen;
+        var simulationVm = (mapScreen?._battleSimulationView as GauntletMapBattleSimulationView)?._dataSource;
+        if (simulationVm?.IsSimulation != true || !simulationVm.IsOver)
+            return Failed("The completed battle simulation result is not open.");
+
+        action.ObserveMapEvent(party.MapEvent);
+        simulationVm.ExecuteQuitAction();
+        action.CompleteSimulation();
+        return ReadState(action.ControllerId);
+    }
+
+    public CoopCommandResult CompleteLootParty(string controllerId)
+    {
+        if (!TryGetClientAction(controllerId, out var party, out var action, out var error)) return Failed(error);
+        if (!action.CanCompleteLootParty()) return Failed("The fixture raid is not awaiting the loot Party screen.");
+        if (!IsExpectedRaidMapEvent(party, action.Settlement)) return Failed("The active map event is not the fixture raid.");
+        if (!(Game.Current?.GameStateManager?.ActiveState is PartyState partyState) ||
+            partyState.PartyScreenMode != PartyScreenHelper.PartyScreenMode.Loot ||
+            !(ScreenManager.TopScreen is GauntletPartyScreen))
+            return Failed("The real raid loot Party screen is not active.");
+
+        action.ObserveMapEvent(party.MapEvent);
+        PartyScreenHelper.CloseScreen(isForced: false);
+        action.CompleteLootParty();
+        return ReadState(action.ControllerId);
+    }
+
+    public CoopCommandResult ShowLootWarning(string controllerId)
+    {
+        if (!TryGetClientAction(controllerId, out var party, out var action, out var error)) return Failed(error);
+        if (!action.CanShowLootWarning()) return Failed("The fixture raid is not awaiting the leaving-loot warning.");
+        if (!IsExpectedRaidMapEvent(party, action.Settlement)) return Failed("The active map event is not the fixture raid.");
+        if (!(Game.Current?.GameStateManager?.ActiveState is InventoryState) ||
+            !(ScreenManager.TopScreen is GauntletInventoryScreen inventoryScreen))
+            return Failed("The real raid loot inventory is not active.");
+        if (InformationManager.IsAnyInquiryActive()) return Failed("An inquiry is already active.");
+
+        var inventory = inventoryScreen._dataSource?._inventoryLogic;
+        if (inventory?.GetElementCountOnSide(InventoryLogic.InventorySide.OtherInventory) <= 0 ||
+            GrainCount(inventory.GetElementsInRoster(InventoryLogic.InventorySide.OtherInventory)) != 1)
+            return Failed("The fixture inventory does not contain its authoritative one-grain loot seed.");
+
+        InquiryData capturedInquiry = null;
+        Action<InquiryData, bool, bool> captureInquiry = (inquiry, _, _) => capturedInquiry = inquiry;
+        InformationManager.OnShowInquiry += captureInquiry;
+        try
+        {
+            inventoryScreen.ExecuteConfirm();
+        }
+        finally
+        {
+            InformationManager.OnShowInquiry -= captureInquiry;
+        }
+
+        var expectedText = GameTexts.FindText("str_leaving_loot_behind").ToString();
+        if (capturedInquiry?.AffirmativeAction == null ||
+            !InformationManager.IsAnyInquiryActive() ||
+            !string.Equals(capturedInquiry.Text, expectedText, StringComparison.Ordinal))
+            return Failed("The real leaving-loot-behind warning did not open.");
+
+        action.ObserveMapEvent(party.MapEvent);
+        action.ShowLootWarning(capturedInquiry);
+        return ReadState(action.ControllerId);
+    }
+
+    public CoopCommandResult AcceptLootWarning(string controllerId)
+    {
+        if (!TryGetClientAction(controllerId, out var party, out var action, out var error)) return Failed(error);
+        if (!action.TryGetPendingLootWarning(out var inquiry) || !InformationManager.IsAnyInquiryActive())
+            return Failed("The captured leaving-loot-behind warning is not active.");
+        if (!IsExpectedRaidMapEvent(party, action.Settlement)) return Failed("The active map event is not the fixture raid.");
+
+        InformationManager.HideInquiry();
+        inquiry.AffirmativeAction();
+        action.AcceptLootWarning();
+        return ReadState(action.ControllerId);
     }
 
     private string ValidatePreparation(MobileParty party, Settlement settlement)
@@ -250,6 +413,9 @@ public sealed class RaidLootWarningFixture : IRaidLootWarningFixture
 
         bool localClient = ModInformation.IsClient;
         var session = fixture?.Campaign == Campaign.Current && fixture.ControllerId == player.ControllerId ? fixture : null;
+        var action = localClient && clientAction?.Matches(Campaign.Current, player.ControllerId, party, settlement) == true
+            ? clientAction
+            : null;
         var activeState = localClient ? Game.Current?.GameStateManager?.ActiveState : null;
         var topScreen = localClient ? ScreenManager.TopScreen : null;
         var inventory = (topScreen as GauntletInventoryScreen)?._dataSource?._inventoryLogic;
@@ -265,7 +431,7 @@ public sealed class RaidLootWarningFixture : IRaidLootWarningFixture
 
         return Succeeded(new
         {
-            fixtureVersion = 2,
+            fixtureVersion = 3,
             buildVersion = ModInformation.BuildVersion,
             sourceCommit = ModInformation.Commit,
             assemblyMvid = typeof(RaidLootWarningFixture).Assembly.ManifestModule.ModuleVersionId,
@@ -275,6 +441,9 @@ public sealed class RaidLootWarningFixture : IRaidLootWarningFixture
             partyStringId = party.StringId,
             fixtureToken = session?.Token,
             fixturePhase = session?.Phase ?? "not-prepared-on-this-side",
+            clientActionPhase = action?.Phase ?? (localClient ? "not-started-on-this-client" : null),
+            clientActionMapEventObserved = action?.MapEvent != null,
+            clientPendingLootWarning = action?.HasPendingLootWarning,
             expectedSeed = new { item = "grain", count = 1 },
             seedApplied = session?.Seeded,
             rawLootCount = session?.SeededLoot?.Sum(x => x.Amount),
@@ -341,6 +510,46 @@ public sealed class RaidLootWarningFixture : IRaidLootWarningFixture
             objectManager.TryGetObject(player.MobilePartyId, out party);
     }
 
+    private bool TryGetClientAction(
+        string controllerId,
+        out MobileParty party,
+        out ClientActionSession action,
+        out string error)
+    {
+        party = null;
+        action = null;
+        error = "Run this command on the client that started the fixture raid.";
+        if (ModInformation.IsServer || Campaign.Current == null) return false;
+        if (!TryFindPlayer(controllerId, out var player, out party, out error)) return false;
+        if (party != MobileParty.MainParty)
+        {
+            error = "Run this command on the client that owns the fixture controller.";
+            return false;
+        }
+        if (!objectManager.TryGetObject<Settlement>(SettlementId, out var settlement))
+        {
+            error = "Registered Polisia (village_ES1_2) is missing.";
+            return false;
+        }
+        if (clientAction?.Matches(Campaign.Current, player.ControllerId, party, settlement) != true)
+        {
+            error = "No matching fixture raid is active on this client. Start from the prepared baseline first.";
+            return false;
+        }
+
+        action = clientAction;
+        return true;
+    }
+
+    private static bool IsExpectedRaidMapEvent(MobileParty party, Settlement settlement)
+    {
+        var mapEvent = party?.MapEvent;
+        return mapEvent != null && mapEvent.IsRaidHostileAction() &&
+            mapEvent.MapEventSettlement == settlement &&
+            mapEvent.AttackerSide?.LeaderParty == party.Party &&
+            mapEvent.DefenderSide?.LeaderParty == settlement.Party;
+    }
+
     private static object RosterState(TroopRoster roster) => roster.GetTroopRoster()
         .Where(x => x.Number > 0)
         .Select(x => new { id = x.Character.StringId, count = x.Number, wounded = x.WoundedNumber }).ToArray();
@@ -401,6 +610,105 @@ public sealed class RaidLootWarningFixture : IRaidLootWarningFixture
             seed();
             Seeded = true;
             Phase = "seeded";
+        }
+    }
+
+    internal sealed class ClientActionSession
+    {
+        internal Campaign Campaign { get; }
+        internal string ControllerId { get; }
+        internal MobileParty Party { get; }
+        internal Settlement Settlement { get; }
+        internal string Phase { get; private set; } = "starting";
+        internal MapEvent MapEvent { get; private set; }
+        internal bool HasPendingLootWarning => pendingLootWarning != null;
+        private InquiryData pendingLootWarning;
+
+        internal ClientActionSession(Campaign campaign, string controllerId, MobileParty party, Settlement settlement)
+        {
+            Campaign = campaign;
+            ControllerId = controllerId;
+            Party = party;
+            Settlement = settlement;
+        }
+
+        internal bool Matches(Campaign campaign, string controllerId, MobileParty party, Settlement settlement) =>
+            Campaign == campaign && ControllerId == controllerId && Party == party && Settlement == settlement;
+
+        internal void RequestSettlementEntry()
+        {
+            if (Phase != "starting") throw new InvalidOperationException("Settlement entry request has already run.");
+            Phase = "settlement-entry-requested";
+        }
+
+        internal bool IsAwaitingSettlementEntryApproval => Phase == "settlement-entry-requested";
+
+        internal void ObserveSettlementEntryApproval()
+        {
+            if (!IsAwaitingSettlementEntryApproval)
+                throw new InvalidOperationException("Settlement entry approval is out of order.");
+            Phase = "settlement-entry-approved";
+        }
+
+        internal bool CanRequestRaid() => Phase == "settlement-entry-approved";
+
+        internal void RequestRaid()
+        {
+            if (!CanRequestRaid()) throw new InvalidOperationException("Raid request is out of order.");
+            Phase = "raid-requested";
+        }
+
+        internal bool CanCompleteSimulation() => Phase == "raid-requested";
+
+        internal void CompleteSimulation()
+        {
+            if (!CanCompleteSimulation()) throw new InvalidOperationException("Simulation completion is out of order.");
+            Phase = "simulation-complete";
+        }
+
+        internal bool CanCompleteLootParty() => Phase == "simulation-complete";
+
+        internal void CompleteLootParty()
+        {
+            if (!CanCompleteLootParty()) throw new InvalidOperationException("Loot Party completion is out of order.");
+            Phase = "loot-party-complete";
+        }
+
+        internal bool CanShowLootWarning() => Phase == "loot-party-complete";
+
+        internal void ShowLootWarning(InquiryData inquiry)
+        {
+            if (!CanShowLootWarning() || inquiry?.AffirmativeAction == null)
+                throw new InvalidOperationException("Loot warning capture is out of order.");
+            pendingLootWarning = inquiry;
+            Phase = "loot-warning-shown";
+        }
+
+        internal bool TryGetPendingLootWarning(out InquiryData inquiry)
+        {
+            inquiry = pendingLootWarning;
+            return Phase == "loot-warning-shown" && inquiry?.AffirmativeAction != null;
+        }
+
+        internal void AcceptLootWarning()
+        {
+            if (Phase != "loot-warning-shown") throw new InvalidOperationException("Loot warning acceptance is out of order.");
+            pendingLootWarning = null;
+            Phase = "loot-warning-accepted";
+        }
+
+        internal void ObserveMapEvent(MapEvent mapEvent)
+        {
+            if (mapEvent == null) throw new InvalidOperationException("Fixture map event is unavailable.");
+            if (MapEvent != null && MapEvent != mapEvent)
+                throw new InvalidOperationException("Fixture map event changed during the scenario.");
+            MapEvent = mapEvent;
+        }
+
+        internal void Fail()
+        {
+            pendingLootWarning = null;
+            Phase = "failed-reload-baseline";
         }
     }
 }

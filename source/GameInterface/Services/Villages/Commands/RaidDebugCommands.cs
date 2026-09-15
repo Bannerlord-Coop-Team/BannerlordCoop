@@ -114,5 +114,131 @@ public class RaidDebugCommands
 
         public CoopCommandResult ProcessCommand(ICoopCommandArgs args) => fixture.ReadState(args[0]);
     }
+
+    public sealed class StartRaidLootWarningCoopCommand : ICoopCommand
+    {
+        private readonly IRaidLootWarningFixture fixture;
+
+        public StartRaidLootWarningCoopCommand(IRaidLootWarningFixture fixture)
+        {
+            this.fixture = fixture;
+        }
+
+        public string Prefix => "coop.debug.mapevent";
+        public string Name => "raid_loot_warning_start";
+        public string Description => "Requests the production settlement entry for issue 3262.";
+        public CoopCommandSide Side => CoopCommandSide.Client;
+        public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
+        {
+            new ExpectedArgs("controllerId", "Registered controller id, or only-connected for a one-client session."),
+        };
+
+        public CoopCommandResult ProcessCommand(ICoopCommandArgs args) => fixture.StartRaid(args[0]);
+    }
+
+    public sealed class RequestRaidLootWarningCoopCommand : ICoopCommand
+    {
+        private readonly IRaidLootWarningFixture fixture;
+
+        public RequestRaidLootWarningCoopCommand(IRaidLootWarningFixture fixture)
+        {
+            this.fixture = fixture;
+        }
+
+        public string Prefix => "coop.debug.mapevent";
+        public string Name => "raid_loot_warning_request_raid";
+        public string Description => "Requests the issue 3262 production village raid after settlement entry is approved.";
+        public CoopCommandSide Side => CoopCommandSide.Client;
+        public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
+        {
+            new ExpectedArgs("controllerId", "Registered controller id, or only-connected for a one-client session."),
+        };
+
+        public CoopCommandResult ProcessCommand(ICoopCommandArgs args) => fixture.RequestRaid(args[0]);
+    }
+
+    public sealed class CompleteRaidLootWarningSimulationCoopCommand : ICoopCommand
+    {
+        private readonly IRaidLootWarningFixture fixture;
+
+        public CompleteRaidLootWarningSimulationCoopCommand(IRaidLootWarningFixture fixture)
+        {
+            this.fixture = fixture;
+        }
+
+        public string Prefix => "coop.debug.mapevent";
+        public string Name => "raid_loot_warning_complete_simulation";
+        public string Description => "Completes the issue 3262 production battle simulation result action.";
+        public CoopCommandSide Side => CoopCommandSide.Client;
+        public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
+        {
+            new ExpectedArgs("controllerId", "Registered controller id, or only-connected for a one-client session."),
+        };
+
+        public CoopCommandResult ProcessCommand(ICoopCommandArgs args) => fixture.CompleteSimulation(args[0]);
+    }
+
+    public sealed class CompleteRaidLootWarningPartyCoopCommand : ICoopCommand
+    {
+        private readonly IRaidLootWarningFixture fixture;
+
+        public CompleteRaidLootWarningPartyCoopCommand(IRaidLootWarningFixture fixture)
+        {
+            this.fixture = fixture;
+        }
+
+        public string Prefix => "coop.debug.mapevent";
+        public string Name => "raid_loot_warning_complete_party";
+        public string Description => "Completes the issue 3262 production loot Party screen action.";
+        public CoopCommandSide Side => CoopCommandSide.Client;
+        public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
+        {
+            new ExpectedArgs("controllerId", "Registered controller id, or only-connected for a one-client session."),
+        };
+
+        public CoopCommandResult ProcessCommand(ICoopCommandArgs args) => fixture.CompleteLootParty(args[0]);
+    }
+
+    public sealed class ShowRaidLootWarningCoopCommand : ICoopCommand
+    {
+        private readonly IRaidLootWarningFixture fixture;
+
+        public ShowRaidLootWarningCoopCommand(IRaidLootWarningFixture fixture)
+        {
+            this.fixture = fixture;
+        }
+
+        public string Prefix => "coop.debug.mapevent";
+        public string Name => "raid_loot_warning_show";
+        public string Description => "Runs the issue 3262 production inventory completion action.";
+        public CoopCommandSide Side => CoopCommandSide.Client;
+        public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
+        {
+            new ExpectedArgs("controllerId", "Registered controller id, or only-connected for a one-client session."),
+        };
+
+        public CoopCommandResult ProcessCommand(ICoopCommandArgs args) => fixture.ShowLootWarning(args[0]);
+    }
+
+    public sealed class AcceptRaidLootWarningCoopCommand : ICoopCommand
+    {
+        private readonly IRaidLootWarningFixture fixture;
+
+        public AcceptRaidLootWarningCoopCommand(IRaidLootWarningFixture fixture)
+        {
+            this.fixture = fixture;
+        }
+
+        public string Prefix => "coop.debug.mapevent";
+        public string Name => "raid_loot_warning_accept";
+        public string Description => "Runs the captured issue 3262 warning affirmative action.";
+        public CoopCommandSide Side => CoopCommandSide.Client;
+        public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
+        {
+            new ExpectedArgs("controllerId", "Registered controller id, or only-connected for a one-client session."),
+        };
+
+        public CoopCommandResult ProcessCommand(ICoopCommandArgs args) => fixture.AcceptLootWarning(args[0]);
+    }
 #endif
 }

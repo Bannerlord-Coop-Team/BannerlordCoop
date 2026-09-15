@@ -1,69 +1,89 @@
 # Issue 3262: village raid loot warning
 
-This fixture is prepared for non-live review. Live testing has not started. Unit and compile checks cannot establish the UI result below.
+This is a source-bound Debug scenario. It proves the production hostile-action, battle-simulation, loot, and warning-dismissal paths without foregrounding a game window or injecting input. UI wiring is excluded and unverified; it is not a manual-testing gate.
 
-Use the existing issue 3262 PR branch, merged with the current `development`, and build Debug. The fixture commands and hook are excluded from Release. Before a later authorized runtime run, record `git rev-parse HEAD`, `git rev-parse HEAD^{tree}`, the baseline save SHA-256, build configuration, game version, and the deployed assembly hashes. Require both clients/server to report the same `buildVersion`, `sourceCommit` and `assemblyMvid` from the state command. An unknown source commit requires the external build manifest to bind those binaries to the recorded head/tree. Record the preparation output's fixture token alongside every case's evidence.
+Run only on the enrolled Local lane with one dedicated authoritative server and one connected client on a fresh copy of the disposable baseline. Before the run, record the source head/tree, baseline save SHA-256, Debug build identity, game version, and deployed assembly hashes. The state command reports `buildVersion`, `sourceCommit`, and `assemblyMvid` on both sides; they must match the recorded source receipt.
 
-## Disposable baseline and setup
+## Baseline
 
-Use one dedicated authoritative server and one connected client. The server has no player party. Save a baseline with the client on land, holding outside any settlement, army, siege or map event. The client must have a healthy living leader, exactly one copy of that leader in the party, and no companions or hero prisoners. Its faction must differ from Polisia's faction. Polisia must be normal, not under siege or involved in a map event; no visiting mobile parties may be inside it. Its native militia may be present but must be active and outside a battle. Its bound town must not be under siege.
+The client party starts on land, holding outside settlements, armies, sieges, and map events. It has one healthy leader and no companions or hero prisoners. Its faction differs from Polisia's. Polisia is normal, not under siege or in a map event, and has no visiting mobile parties. Its native militia may exist but must be active, inside the village, and outside a battle.
 
-The fixed location is **Polisia**, settlement `village_ES1_2`, village component `village_comp_ES1_2`, bound to **Danustica**, settlement `town_ES1`, town `town_comp_ES1`, in the Southern Empire at campaign start. Ownership can change in a save; preparation checks the actual factions.
+The fixed target is **Polisia**, settlement `village_ES1_2`, village component `village_comp_ES1_2`, bound to **Danustica**, settlement `town_ES1`, in the Southern Empire. The fixture validates the actual save state before changing it.
 
-For each case, load a **fresh copy of the baseline save**. Never save fixture changes over the baseline. The fixture permanently changes war state, troop rosters, position, village hit points, and subsequent battle outcomes. It has no restore command. Restore the prior raid-intervention setting after the campaign (it is session configuration, not part of the copied save). Reload the entire baseline after a failed preparation, defeat, completed case, disconnect, or unexpected event. A repeat prepare only succeeds before the raid starts while the same target still has the staged idle state; it does not add troops again. A different target or a partial mutation is rejected until reload.
+The fixture changes campaign state permanently and has no restore command. Reload the whole copied baseline after a failure or completed case. Do not save fixture state over the baseline.
+
+## Handler-driven scenario
 
 On the server, run:
 
 ```text
 coop.debug.players.list
 coop.debug.mapevent.allow_raid_ai_intervention on
-coop.debug.mapevent.allow_raid_ai_intervention status
 coop.debug.mapevent.raid_loot_warning_prepare only-connected disposable-baseline
 coop.debug.mapevent.raid_loot_warning_state only-connected
 ```
 
-`only-connected` is an actual supported selector and requires exactly one registered player; preparation also requires that player to be connected. For a session with more registrations, copy the exact `ControllerId` from `coop.debug.players.list` as the first argument to both commands. Do not invent controller or party ids. The server checks all prerequisites before staging. It declares war if necessary, preserves the player's leader, replaces other troops with exactly 60 of that leader's culture basic troop, replaces Polisia's settlement party troops with exactly eight of its culture basic troop, clears nonhero prisoners and village items, empties the native militia party rosters if present, sets village hit points to one, and places the player at Polisia's land gate in hold mode. It does not enter the settlement, start a raid, start a simulation, or manipulate a client screen.
+`only-connected` requires exactly one registered client. Otherwise, use the exact `ControllerId` returned by `coop.debug.players.list` for every command below.
 
-On the client, read:
+The preparation state must show 61 player members with zero wounded, eight village members, an empty native militia roster when present, `villageState=Normal`, `villageHitPoints=1`, `atWar=true`, and `allowRaidAiIntervention=true`. Preserve its `fixtureToken`, controller id, party id, troop ids, and source identity.
+
+On the client, read the replicated setup, then request the real settlement entry:
 
 ```text
 coop.debug.mapevent.raid_loot_warning_state only-connected
+coop.debug.mapevent.raid_loot_warning_start only-connected
 ```
 
-Within 30 seconds, both sides must report the same controller/party ids, Polisia ids, position, 61 player members with zero wounded (leader plus 60 basic troops), eight healthy village members, an empty native militia roster when `militiaId` is present, village state `Normal`, hit points `1`, and `atWar=true`, `allowRaidAiIntervention=true`. Disabled raid intervention would skip the intended village-resistance path; preparation rejects it. Preserve the actual troop ids returned by `playerMembers` and `villageMembers`. If they differ, stop and capture both state outputs and logs; do not compensate with client cheats. `fixtureToken` and `fixturePhase` are authoritative server fields; the client's `not-prepared-on-this-side` label is expected because observing never creates fixture state. Correlate client evidence through controller/party ids and `mapEventId` with the server's `capturedMapEventId`.
+`raid_loot_warning_start` calls only the normal settlement-encounter action. The client patch sends its normal entry request, and the normal server approval replies back onto the client game thread. It does not write a map event or client screen state directly.
 
-## Native UI actions and required observations
+Do not invoke `raid_loot_warning_start` again and do not request the raid yet. Poll the existing read-only state on the client no more than once per second for up to 30 seconds. Before advancing, require `clientActionPhase=settlement-entry-requested`, `mapEventId=null`, `partyCurrentSettlementId=village_ES1_2`, `encounterSettlementId=village_ES1_2`, and a non-null `encounterState`. A second entry command is rejected without sending another entry request. A premature raid command is rejected and leaves this pending state unchanged.
 
-1. On the client, click Polisia on the world map. Enter normally, select **Take a hostile action**, then **Raid the village**. Factions are already at war, so an additional declaration-of-war warning is not expected. No command may invoke the client action callbacks.
-2. Read state on both sides. The client `mapEventId` must equal the server `capturedMapEventId`. Server `fixturePhase` must become `captured`, event type must be `RaidEventComponent`, and event settlement must be `village_ES1_2`. Confirm the encounter shows eight defenders; militia regeneration or another party joining invalidates staging. If capture is absent or the wrong event/party appears, stop; that is an unexercised case.
-3. Choose **Send troops** on the native encounter menu. Let the simulation run, using its native fast-forward control if desired. Poll the read-only state after transitions, at most once per second. Allow 120 seconds for an attacker victory/result screen. Defeat, a mission opening in this case, no simulation, or timeout is a failed setup; reload the baseline instead of forging a result.
-4. Click native **Done** on the simulation result, then native **Done** on the troop/prisoner loot screen without transferring anything. Record `simulationResultVisible` and `partyLootActive` as those states occur. Allow 30 seconds for each UI transition.
-5. At the native inventory loot screen, record client `inventoryActive=true`, `topScreen=GauntletInventoryScreen`, `otherItemCount>0`, and `otherGrainCount=1`. On the server, require `fixturePhase=seeded`, `seedApplied=true`, `rawLootGrainCount=1`, and the matching captured event id. The hook normalizes the authoritative loot roster to one grain once, only for this raid's winning player party, before the ordinary results message is packed. It rejects unexpected participating parties or nonempty native militia at capture or seeding. It does not send a separate loot message or seed unrelated raids.
-6. Apply the case action below using native buttons. Record video or screenshots of the warning text and every response click. `inquiryActive` reports any native inquiry, so it must be paired with the visible leaving-loot warning, not treated as proof of a specific dialog by itself.
-7. Within 30 seconds after accepting or taking all loot, inventory and the leaving-loot warning must close. If the normal village result menu is shown, use its native **Leave**. Within a further 30 seconds, require client `topScreen=MapScreen`, `inventoryActive=false`, `partyLootActive=false`, `inquiryActive=false`, `encounterState=null` and `partyCurrentSettlementId=null`. Require server `capturedMapEventFinalized=true`, `capturedMapEventRegistered=false`, `capturedMapEventStillAttached=false`, and no current event id on both sides. Observe for another five seconds: no warning or loot screen may reappear. The fixture does not advance menus or release encounters for the test.
+After that approved state is observed, request the real hostile action:
 
-## Case matrix
+```text
+coop.debug.mapevent.raid_loot_warning_request_raid only-connected
+```
 
-Reload the original copied baseline before every row, repeat preparation, and record the new token.
+`raid_loot_warning_request_raid` only accepts the observed normal settlement encounter, then calls `IVillageHostileActionInterface.RequestHostileAction(Raid)`. That follows the normal client request, server validation/application/approval, network reply, and client presentation path without blocking the game thread or writing a map event directly.
 
-| Case | Battle path | Native loot action | Required result |
-| --- | --- | --- | --- |
-| A: original report | Send troops | Transfer nothing, click Done, then Yes on the leaving-loot warning | Exactly one warning presentation; Yes dismisses it and normal departure completes |
-| B: cancel then accept | Send troops | Transfer nothing, Done, No; verify inventory remains and grain is still one; Done, Yes | No returns to inventory; the second intentional Done shows one warning; Yes dismisses it without another unsolicited warning |
-| C: take all | Send troops | Use native Take all, verify other item count and grain count are zero, Done | No leaving-loot warning; normal departure completes |
-| D: fought battle regression | Native Attack / fight the village battle | Win by normal gameplay, then transfer nothing, Done, Yes | Same seeded loot and dismissal assertions after the native mission path; no command finishes or changes the battle |
+Poll the read-only state on both sides, no more than once per second. The client `mapEventId` must equal the server `capturedMapEventId`; the server `fixturePhase` must be `captured`; the event must be a `RaidEventComponent` for `village_ES1_2`; and the client must report `clientActionPhase=raid-requested`. Any other event, participant set, or missing capture ends the attempt.
 
-Case D requires a recorded actual mission and attacker victory, not a synthetic battle outcome. Deterministic staging fixes troop types/counts, location and loot; combat results and timing remain native. A defeat is a setup failure requiring reload and must not be reported as product success. An unrelated field battle or a second raid during a campaign with a used fixture must never receive another seed.
+Use the existing Debug command that invokes the production encounter-menu consequence for **Send troops**:
 
-## Failure diagnostics
+```text
+coop.debug.map_event.choose_battle_mode simulation
+```
 
-Preserve server and client command output immediately before and after the failed transition, fixture token, controller and party ids, captured/current map event ids, roster state, source identity, timestamps, and screenshots/video of the visible UI. Copy the client log before any relaunch because startup replaces it; save the dedicated server console output. Search those copies for `Issue 3262 fixture`, `Failed to get`, `NetworkCommitMapEventResults`, `MapEvent`, `PlayerEncounter`, and exceptions. Also record `allowRaidAiIntervention`: a changed setting or additional party intervention invalidates the bounded fixture and needs its own diagnosis.
+This calls `EncounterGameMenuBehavior.game_menu_encounter_order_attack_on_consequence`, including the normal client/server simulation gate. Wait for the read-only client state to report `simulationResultVisible=true`, then complete the real result action:
 
-Distinguish failures precisely:
+```text
+coop.debug.mapevent.raid_loot_warning_complete_simulation only-connected
+```
 
-- Missing capture, seed, grain, simulation or loot transition means the oracle was not exercised.
-- A leaving-loot warning that remains or reappears after Yes reproduces issue 3262.
-- Inventory closes but encounter/event cleanup does not converge is a separate lifecycle failure with the same captured event evidence.
-- Readiness state mismatch is a replication/setup failure; retain logs and reload the baseline after diagnosis.
+The command only runs `GauntletMapBattleSimulationView`'s real `ExecuteQuitAction` after the authoritative simulation is finished. Wait for `partyLootActive=true`, then run:
 
-Do not infer a pass from unit tests, command success, an empty inventory that never had the seed, a missing inquiry before any native Done, or an automatically closed screen without the native warning click. This document supplies future live-test steps only; it authorizes no launch, deployment, rotation or live lane.
+```text
+coop.debug.mapevent.raid_loot_warning_complete_party only-connected
+```
+
+That command only runs the real loot Party screen completion through `PartyScreenHelper.CloseScreen(isForced: false)`.
+
+Wait for the client to report `inventoryActive=true`, `topScreen=GauntletInventoryScreen`, `otherItemCount>0`, and `otherGrainCount=1`. On the server, require `fixturePhase=seeded`, `seedApplied=true`, `rawLootGrainCount=1`, and the same captured event id. The fixture's one-grain normalization is server-side setup for this exact winning raid only; the inventory result itself is replicated through the normal result path.
+
+Drive the normal inventory completion and the exact affirmative action captured from its normal inquiry:
+
+```text
+coop.debug.mapevent.raid_loot_warning_show only-connected
+coop.debug.mapevent.raid_loot_warning_state only-connected
+coop.debug.mapevent.raid_loot_warning_accept only-connected
+```
+
+`raid_loot_warning_show` calls the active `GauntletInventoryScreen.ExecuteConfirm`, captures only the resulting `str_leaving_loot_behind` inquiry, and requires its native affirmative callback. `raid_loot_warning_accept` hides that same inquiry and invokes its captured affirmative callback. It does not synthesize completion state or invoke a replacement handler.
+
+Within 30 seconds after acceptance, require on the client: `inventoryActive=false`, `partyLootActive=false`, `inquiryActive=false`, `clientPendingLootWarning=false`, and `clientActionPhase=loot-warning-accepted`. Within a further 30 seconds, require `topScreen=MapScreen`, `encounterState=null`, `partyCurrentSettlementId=null`, and no current `mapEventId` on both sides. On the server, require `capturedMapEventFinalized=true`, `capturedMapEventRegistered=false`, and `capturedMapEventStillAttached=false`. Observe the client state for five more seconds; the warning and loot screen must not reappear.
+
+## Evidence and failures
+
+Preserve every server/client command result, the fixture token, source receipt, timestamps, and copied logs before a relaunch. A failed capture, simulation, seed, client replication, warning callback, or cleanup is a failed attempt, not a pass. Preserve it, clean up the owned Local run once, and reload the copied baseline only after recording the result.
+
+Do not infer a pass from unit tests, an empty inventory, a warning that was not produced by `ExecuteConfirm`, or a synthetic map-event/screen write. This scenario never activates a window, sends native input, moves the cursor, or requires an operator to click a UI element.

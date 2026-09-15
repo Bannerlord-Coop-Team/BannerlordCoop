@@ -9,6 +9,7 @@ using Common.Messaging;
 using Common.Util;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Players;
+using GameInterface.Services.Villages.Interfaces;
 using Moq;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.MapEvents;
@@ -27,9 +28,21 @@ public class RaidLootWarningFixtureTests
 #if DEBUG
         Assert.Contains("PrepareRaidLootWarningCoopCommand", names);
         Assert.Contains("RaidLootWarningStateCoopCommand", names);
+        Assert.Contains("StartRaidLootWarningCoopCommand", names);
+        Assert.Contains("RequestRaidLootWarningCoopCommand", names);
+        Assert.Contains("CompleteRaidLootWarningSimulationCoopCommand", names);
+        Assert.Contains("CompleteRaidLootWarningPartyCoopCommand", names);
+        Assert.Contains("ShowRaidLootWarningCoopCommand", names);
+        Assert.Contains("AcceptRaidLootWarningCoopCommand", names);
 #else
         Assert.DoesNotContain("PrepareRaidLootWarningCoopCommand", names);
         Assert.DoesNotContain("RaidLootWarningStateCoopCommand", names);
+        Assert.DoesNotContain("StartRaidLootWarningCoopCommand", names);
+        Assert.DoesNotContain("RequestRaidLootWarningCoopCommand", names);
+        Assert.DoesNotContain("CompleteRaidLootWarningSimulationCoopCommand", names);
+        Assert.DoesNotContain("CompleteRaidLootWarningPartyCoopCommand", names);
+        Assert.DoesNotContain("ShowRaidLootWarningCoopCommand", names);
+        Assert.DoesNotContain("AcceptRaidLootWarningCoopCommand", names);
         Assert.Null(typeof(RaidDebugCommands).Assembly.GetType("GameInterface.Services.Villages.Commands.RaidLootWarningFixture"));
 #endif
         Assert.Contains("AllowRaidAiInterventionCoopCommand", names);
@@ -46,7 +59,8 @@ public class RaidLootWarningFixtureTests
             var fixture = new RaidLootWarningFixture(
                 new Mock<IObjectManager>(MockBehavior.Strict).Object,
                 new Mock<IPlayerManager>(MockBehavior.Strict).Object,
-                new Mock<IMessageBroker>(MockBehavior.Strict).Object);
+                new Mock<IMessageBroker>(MockBehavior.Strict).Object,
+                new Mock<IVillageHostileActionInterface>(MockBehavior.Strict).Object);
             var result = fixture.Prepare("only-connected", "reusable-save");
             Assert.False(result.Succeeded);
             Assert.Contains("disposable-baseline", result.Output);
@@ -67,7 +81,8 @@ public class RaidLootWarningFixtureTests
             var fixture = new RaidLootWarningFixture(
                 new Mock<IObjectManager>(MockBehavior.Strict).Object,
                 new Mock<IPlayerManager>(MockBehavior.Strict).Object,
-                new Mock<IMessageBroker>(MockBehavior.Strict).Object);
+                new Mock<IMessageBroker>(MockBehavior.Strict).Object,
+                new Mock<IVillageHostileActionInterface>(MockBehavior.Strict).Object);
             Assert.False(fixture.Prepare("only-connected", "disposable-baseline").Succeeded);
         }
         finally
@@ -77,11 +92,38 @@ public class RaidLootWarningFixtureTests
     }
 
     [Fact]
-    public void FixtureCommands_DeclareAuthorityAndReadOnlyObservationSides()
+    public void FixtureCommands_DeclareAuthorityAndClientActionSides()
     {
         var fixture = new Mock<IRaidLootWarningFixture>().Object;
         Assert.Equal(CoopCommandSide.Server, new RaidDebugCommands.PrepareRaidLootWarningCoopCommand(fixture).Side);
         Assert.Equal(CoopCommandSide.Both, new RaidDebugCommands.RaidLootWarningStateCoopCommand(fixture).Side);
+        Assert.Equal(CoopCommandSide.Client, new RaidDebugCommands.StartRaidLootWarningCoopCommand(fixture).Side);
+        Assert.Equal(CoopCommandSide.Client, new RaidDebugCommands.RequestRaidLootWarningCoopCommand(fixture).Side);
+        Assert.Equal(CoopCommandSide.Client, new RaidDebugCommands.CompleteRaidLootWarningSimulationCoopCommand(fixture).Side);
+        Assert.Equal(CoopCommandSide.Client, new RaidDebugCommands.CompleteRaidLootWarningPartyCoopCommand(fixture).Side);
+        Assert.Equal(CoopCommandSide.Client, new RaidDebugCommands.ShowRaidLootWarningCoopCommand(fixture).Side);
+        Assert.Equal(CoopCommandSide.Client, new RaidDebugCommands.AcceptRaidLootWarningCoopCommand(fixture).Side);
+    }
+
+    [Fact]
+    public void ClientActionSession_RequiresObservedSettlementEntryBeforeRequestingRaid()
+    {
+        var session = CreateClientActionSession();
+
+        Assert.Throws<InvalidOperationException>(() => session.RequestRaid());
+        session.RequestSettlementEntry();
+        Assert.Equal("settlement-entry-requested", session.Phase);
+        Assert.True(session.IsAwaitingSettlementEntryApproval);
+        Assert.False(session.CanRequestRaid());
+        Assert.Throws<InvalidOperationException>(() => session.RequestSettlementEntry());
+        Assert.Throws<InvalidOperationException>(() => session.RequestRaid());
+
+        session.ObserveSettlementEntryApproval();
+        Assert.Equal("settlement-entry-approved", session.Phase);
+        Assert.True(session.CanRequestRaid());
+        session.RequestRaid();
+        Assert.Equal("raid-requested", session.Phase);
+        Assert.Throws<InvalidOperationException>(() => session.RequestRaid());
     }
 
     [Fact]
@@ -200,6 +242,10 @@ public class RaidLootWarningFixtureTests
     }
 
     private static RaidLootWarningFixture.FixtureSession CreateSession() => new(
+        ObjectHelper.SkipConstructor<Campaign>(), "fixture-controller",
+        ObjectHelper.SkipConstructor<MobileParty>(), ObjectHelper.SkipConstructor<Settlement>());
+
+    private static RaidLootWarningFixture.ClientActionSession CreateClientActionSession() => new(
         ObjectHelper.SkipConstructor<Campaign>(), "fixture-controller",
         ObjectHelper.SkipConstructor<MobileParty>(), ObjectHelper.SkipConstructor<Settlement>());
 #endif
