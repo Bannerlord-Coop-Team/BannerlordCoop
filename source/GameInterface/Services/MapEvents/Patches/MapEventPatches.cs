@@ -42,6 +42,8 @@ internal class MapEventPatches
         party => party.CommitGoldChanges()
     };
 
+    private readonly record struct MapEventRewardState(List<RemovedMapEventParty> RemovedParties, float[] StrengthOfSide, float[] RenownValues, float[] InfluenceValues);
+
     private static void CommitRenownChanges(MapEventParty party)
     {
         Hero leaderHero = party.Party.LeaderHero;
@@ -297,20 +299,53 @@ internal class MapEventPatches
     // Exclude retreated parties from reward calculations
     [HarmonyPatch("CalculateMapEventResults")]
     [HarmonyPrefix]
-    private static void Prefix_CalculateMapEventResults(MapEvent __instance, out List<RemovedMapEventParty> __state)
+    private static void Prefix_CalculateMapEventResults(MapEvent __instance, out MapEventRewardState? __state)
     {
         __state = null;
         if (!ModInformation.IsServer || !ContainerProvider.TryResolve<IRetreatedMapEventPartyTracker>(out var tracker)) return;
 
-        __state = RemoveParties(__instance, party => tracker.IsRetreated(__instance, party.Party));
+        var removedParties = RemoveParties(__instance, party => tracker.IsRetreated(__instance, party.Party));
+
+        if (removedParties.Count == 0) return;
+        
+        __state = new MapEventRewardState(removedParties,
+            __instance.StrengthOfSide.ToArray(), 
+            __instance._sides.Select(side => side?.RenownValue ?? 0f).ToArray(), 
+            __instance._sides.Select(side => side?.InfluenceValue ?? 0f).ToArray());
+
+        foreach (RemovedMapEventParty removedParty in removedParties)
+        {
+            int side = (int)removedParty.Side.MissionSide;
+            __instance.StrengthOfSide[side] -= removedParty.Party.Party.GetCustomStrength(removedParty.Side.MissionSide, __instance.SimulationContext);
+        }
+
+        foreach (MapEventSide side in __instance._sides)
+        {
+            side?.CalculateRenownAndInfluenceValuesOnPartyInvolved(__instance.StrengthOfSide);
+        }
+
     }
 
-    // Restore the parties after calculating the results
+    // Restore the pre-calculation reward inputs and parties
     [HarmonyPatch("CalculateMapEventResults")]
     [HarmonyFinalizer]
-    private static void Finalizer_CalculateMapEventResults(List<RemovedMapEventParty> __state)
+    private static void Finalizer_CalculateMapEventResults(MapEvent __instance, MapEventRewardState? __state)
     {
-        RestoreParties(__state);
+        if (!__state.HasValue) return;
+
+        MapEventRewardState state = __state.Value;
+
+        for (int i = 0; i < __instance.StrengthOfSide.Length; i++)
+        {
+            __instance.StrengthOfSide[i] = state.StrengthOfSide[i];
+
+            if (__instance._sides[i] == null) continue;
+
+            __instance._sides[i].RenownValue = state.RenownValues[i];
+            __instance._sides[i].InfluenceValue = state.InfluenceValues[i];
+        }
+
+        RestoreParties(state.RemovedParties);
     }
 
     // Exclude retreated parties from defeat penalties
@@ -327,7 +362,7 @@ internal class MapEventPatches
         __state = RemoveParties(__instance, party => tracker.IsRetreated(__instance, party.Party));
     }
 
-    // Restore the parties after applying defeat penaltiees
+    // Restore the parties after applying defeat penalties
     [HarmonyPatch("ApplyMoraleAndBehaviorUpdatesOfDefeatedParties")]
     [HarmonyFinalizer]
     private static void Finalizer_ApplyMoraleAndBehaviorUpdatesOfDefeatedParties(
