@@ -18,6 +18,7 @@ public sealed class LaunchPreflightTests
     private sealed class Builds(string protocol = "1", string capability = "staged-ui-capture-v1") : IBridgeBuildInspector
     {
         public int Calls;
+        public BridgeBuild InspectPath(string path) => new(path, Guid.Empty, protocol, capability);
         public BridgeBuild Inspect(LaunchProfile profile) { Calls++; return new("fake", Guid.Empty, protocol, capability); }
     }
 

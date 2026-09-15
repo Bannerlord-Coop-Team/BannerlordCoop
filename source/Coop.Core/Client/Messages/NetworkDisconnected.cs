@@ -9,10 +9,12 @@ namespace Coop.Core.Client.Messages
     public record NetworkDisconnected : IEvent
     {
         public DisconnectInfo DisconnectInfo { get; }
+        public string ServerReason { get; }
 
-        public NetworkDisconnected(DisconnectInfo disconnectInfo)
+        public NetworkDisconnected(DisconnectInfo disconnectInfo, string serverReason = null)
         {
             DisconnectInfo = disconnectInfo;
+            ServerReason = serverReason;
         }
     }
 }

@@ -467,4 +467,33 @@
       <EquipmentSet id="npc_companion_equipment_template_vlandia" />
     </Equipments>
   </NPCCharacter>
+  <NPCCharacter
+    id="coop_wanderer_f992e349"
+    name="{=!}Charles"
+    voice="earnest"
+    age="27"
+    default_group="Infantry"
+    is_template="true"
+    is_hero="false"
+    is_female="false"
+    culture="Culture.battania"
+    occupation="Wanderer"
+    skill_template="SkillSet.spc_wanderer_battania_2_skills">
+    <face>
+      <face_key_template value="BodyProperty.fighter_battania" />
+    </face>
+    <Traits>
+      <Trait id="Calculating" value="1" />
+      <Trait id="Generosity" value="-1" />
+      <Trait id="Honor" value="1" />
+      <Trait id="Valor" value="1" />
+    </Traits>
+    <Equipments>
+      <EquipmentRoster civilian="true">
+        <equipment slot="Cape" id="Item.battania_cloak" />
+        <equipment slot="Body" id="Item.sackcloth_tunic" />
+      </EquipmentRoster>
+      <EquipmentSet id="npc_companion_equipment_template_battania" />
+    </Equipments>
+  </NPCCharacter>
 </NPCCharacters>

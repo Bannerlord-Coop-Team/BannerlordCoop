@@ -288,6 +288,30 @@ namespace Coop.Tests.Server.Connections.States
         }
 
         [Fact]
+        public void NetworkClientValidate_BannedSteamId_DisconnectsBeforePlayerResolution()
+        {
+            var currentState = connectionLogic.SetState<ResolveCharacterState>();
+            const string steamId = "76561198000000042";
+            var banList = serverComponent.Container.Resolve<Mock<ISteamBanList>>();
+            banList.Setup(list => list.IsBanned(steamId)).Returns(true);
+            var playerManager = serverComponent.Container.Resolve<Mock<IPlayerManager>>();
+
+            currentState.Handle_ClientValidate(new MessagePayload<NetworkClientValidate>(
+                playerPeer,
+                new NetworkClientValidate(steamId)));
+
+            banList.Verify(list => list.IsBanned(steamId), Times.Once);
+            playerManager.Verify(
+                manager => manager.TryGetPlayer(It.IsAny<string>(), out It.Ref<Player>.IsAny),
+                Times.Never);
+            var messages = serverComponent.TestNetwork.SentNetworkMessages
+                .GetValueOrDefault(playerPeer.Id) ?? Enumerable.Empty<IMessage>();
+            Assert.Empty(messages);
+            Assert.IsType<ResolveCharacterState>(connectionLogic.State);
+            Assert.Equal(ConnectionState.ShutdownRequested, playerPeer.ConnectionState);
+        }
+
+        [Fact]
         public void NetworkClientValidate_RegisteredHeroWithStaleParty_RepairsWithoutCreatingCharacter()
         {
             var currentState = connectionLogic.SetState<ResolveCharacterState>();

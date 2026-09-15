@@ -45,6 +45,8 @@ public sealed class LaunchSchemaFixture : IMemoryCommitProbe, IBridgeBuildInspec
         };
     }
 
+    public BridgeBuild InspectPath(string path) => Inspect(null);
+
     public BridgeBuild Inspect(LaunchProfile profile)
     {
         if (Failure == "bridge_build_unavailable") throw new FileNotFoundException("fixture bridge missing");
@@ -59,12 +61,32 @@ public sealed class LaunchSchemaFixture : IMemoryCommitProbe, IBridgeBuildInspec
         return new FixtureProcess(++launches, scenario == "ownership_probe_failed");
     }
 
-    public Task<LiveTestResponse> SendAsync(InstanceIdentity identity, string method, object parameters, bool mutation, CancellationToken cancellationToken) =>
-        Task.FromResult(LiveTestResponse.Success("fixture", new LiveTestProcessInfo
+    private readonly List<string> methods = new();
+    public Task<LiveTestResponse> SendAsync(InstanceIdentity identity, string method, object parameters, bool mutation, CancellationToken cancellationToken)
+    {
+        methods.Add(method);
+        var process = new LiveTestProcessInfo
         {
             Pid = identity.Pid, ProcessStartedUtc = identity.StartedUtc, Role = identity.Role,
             PlatformId = identity.PlatformId, RunToken = identity.RunToken,
-        }, JsonSerializer.SerializeToElement(new { readyForCampaignTests = true })));
+        };
+        object result = new { readyForCampaignTests = true };
+        if (scenario.StartsWith("ui-", StringComparison.Ordinal))
+        {
+            if (method == "status")
+            {
+                if (scenario == "ui-status-failure")
+                    return Task.FromResult(LiveTestResponse.Failure("exact-status-response", process,
+                        new LiveTestError("game_thread_timeout", "fixture status failure", true)));
+                result = scenario == "ui-missing" ? new { } : (object)new
+                {
+                    uiCapability = scenario == "ui-wrong" ? "bounded-ui-layers-v2" : "bounded-ui-layers-v1",
+                };
+            }
+            else result = new { method, parameters, mutation, methods = methods.ToArray() };
+        }
+        return Task.FromResult(LiveTestResponse.Success("fixture", process, JsonSerializer.SerializeToElement(result)));
+    }
 
     public string GetDirectory() => directory;
     public string GetSessionDirectory() => directory;

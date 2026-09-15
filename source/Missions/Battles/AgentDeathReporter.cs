@@ -112,14 +112,15 @@ public class AgentDeathReporter : IAgentDeathReporter
 
             var attribution = casualties.GetOrDefault(info.AgentId);
 
-            // Only wound player heros
             bool wounded = payload.What.Wounded;
+#if !TESTER
             if (attribution.TroopCharacterId != null
                 && objectManager.TryGetObject<CharacterObject>(attribution.TroopCharacterId, out var troop)
                 && troop.HeroObject?.IsPlayerHero() == true)
             {
                 wounded = true;
             }
+#endif
 
             Logger.Information("[DeathDiag] Broadcasting death of agent {AgentId} (wounded={Wounded}) to the battle mesh", info.AgentId, wounded);
             network.SendAll(new NetworkBattleAgentDied(

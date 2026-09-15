@@ -226,6 +226,7 @@ jobs:
             -p:SourceRevisionId="$GITHUB_SHA" \
             -p:IncludeSourceRevisionInInformationalVersion=true \
             -p:ModName= \
+            -p:DefineConstants=TRACE%3BTESTER \
             -p:NuGetAudit=false \
             --consoleLoggerParameters:ErrorsOnly
 
