@@ -394,7 +394,7 @@ internal class BattleSimulationRunHandler : IHandler
     private void Handle_NetworkAdvanceBattleSimulation(MessagePayload<NetworkAdvanceBattleSimulation> payload)
     {
 #if DEBUG
-        var observation = payload.Who as GameInterface.Services.Villages.Commands.RaidLootWarningFixture.FixtureSession;
+        var observation = payload.Who as global::GameInterface.Services.Villages.Commands.RaidLootWarningFixture.FixtureSession;
         if (observation != null) observation.SimulationAdvanceStage = "server-role-check";
         try
         {
