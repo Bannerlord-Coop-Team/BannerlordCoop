@@ -1,6 +1,10 @@
 ﻿using Autofac;
 using Common;
 using Common.Messaging;
+using Common.Network;
+using Coop.Core.Common;
+using System;
+using System.Threading;
 using Common.Tests.Utils;
 using Coop.Core.Client;
 using Coop.Core.Client.Messages;
@@ -18,8 +22,10 @@ using Xunit.Abstractions;
 
 namespace Coop.Tests.Client.States;
 
-public class CampaignStateTests
+public class CampaignStateTests : IDisposable
 {
+    public void Dispose() => clientLogic.State.Dispose();
+
     private readonly IClientLogic clientLogic;
     private readonly ClientTestComponent clientComponent;
 
@@ -42,6 +48,88 @@ public class CampaignStateTests
 
         // Assert
         //Assert.Single(TestMessageBroker.GetMessagesFromType<EnterMissionState>());
+    }
+
+    [Fact]
+    public void ReplayBatchAcknowledgement_WaitsForEarlierGameThreadApplicationAndEchoesId()
+    {
+        clientComponent.TestNetwork.CreatePeer();
+        _ = clientLogic.SetState<LoadingState>();
+        _ = clientLogic.SetState<CampaignState>();
+        using var earlierReplayStarted = new ManualResetEventSlim();
+        using var releaseEarlierReplay = new ManualResetEventSlim();
+        bool earlierReplayApplied = false;
+        GameThread.EnqueueSafe(
+            () =>
+            {
+                earlierReplayStarted.Set();
+                releaseEarlierReplay.Wait();
+                earlierReplayApplied = true;
+            },
+            context: nameof(ReplayBatchAcknowledgement_WaitsForEarlierGameThreadApplicationAndEchoesId));
+
+        try
+        {
+            Assert.True(earlierReplayStarted.Wait(TimeSpan.FromSeconds(5)));
+            TestMessageBroker.Publish(
+                this,
+                new NetworkJoinSync(JoinSyncSignal.ReplayBatchComplete, replayBatchId: 17));
+
+            Assert.False(earlierReplayApplied);
+            Assert.Equal(0, JoinSignalCount(JoinSyncSignal.ReplayBatchApplied));
+        }
+        finally
+        {
+            releaseEarlierReplay.Set();
+        }
+
+        DrainGameThread();
+
+        Assert.True(earlierReplayApplied);
+        NetworkJoinSync acknowledgement = Assert.Single(
+            clientComponent.TestNetwork
+                .GetPeerMessagesFromType<NetworkJoinSync>(clientComponent.TestNetwork.Peers[0]),
+            message => message.Signal == JoinSyncSignal.ReplayBatchApplied);
+        Assert.Equal(17, acknowledgement.ReplayBatchId);
+    }
+
+    [Fact]
+    public void FailedCampaignEntrySend_ReleasesTheFrameDrainLimit()
+    {
+        var container = clientComponent.Container;
+        _ = clientLogic.SetState<LoadingState>();
+        int previousLimitCount = GameThread.Instance.FrameDrainLimitCount;
+        var network = new Mock<INetwork>();
+        network
+            .Setup(value => value.SendAll(It.IsAny<IMessage>()))
+            .Throws<InvalidOperationException>();
+
+        Assert.Throws<InvalidOperationException>(() =>
+        {
+            _ = new CampaignState(
+                clientLogic,
+                container.Resolve<IMessageBroker>(),
+                network.Object,
+                container.Resolve<ILoadingInterface>(),
+                container.Resolve<IGameStateInterface>(),
+                container.Resolve<ICoopFinalizer>(),
+                container.Resolve<IMapTimeTrackerInterface>());
+        });
+
+        Assert.Equal(previousLimitCount, GameThread.Instance.FrameDrainLimitCount);
+    }
+
+    [Fact]
+    public void LeavingAJoiningCampaign_ReleasesTheFrameDrainLimit()
+    {
+        int previousLimitCount = GameThread.Instance.FrameDrainLimitCount;
+        _ = clientLogic.SetState<LoadingState>();
+        _ = clientLogic.SetState<CampaignState>();
+        Assert.Equal(previousLimitCount + 1, GameThread.Instance.FrameDrainLimitCount);
+
+        _ = clientLogic.SetState<MainMenuState>();
+
+        Assert.Equal(previousLimitCount, GameThread.Instance.FrameDrainLimitCount);
     }
 
     [Fact]

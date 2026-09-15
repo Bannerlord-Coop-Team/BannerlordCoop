@@ -31,6 +31,8 @@ For the best performance and stability, we strongly recommend hosting campaigns 
 
 Steam hosting does not require traditional port forwarding in most cases. Manual network hosting options are also available.
 
+Dedicated-server operators can block Steam64 identities with a [server-side ban list](doc/SteamBans.md).
+
 Server setup walkthrough: https://www.youtube.com/watch?v=laZM967Eals
 
 ## Current Features
