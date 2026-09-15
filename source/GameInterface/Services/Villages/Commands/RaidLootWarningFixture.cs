@@ -323,12 +323,13 @@ public sealed class RaidLootWarningFixture : IRaidLootWarningFixture
         return null;
     }
 
-    private bool CanStageMilitia(MobileParty militia, Settlement settlement) =>
-        militia == null || (militia.IsMilitia && militia.IsActive && militia.Party.IsActive &&
-            militia.CurrentSettlement == settlement && militia.MapEvent == null &&
-            objectManager.TryGetId(militia, out _) &&
-            !militia.MemberRoster.GetTroopRoster().Any(x => x.Character.IsHero) &&
-            !militia.PrisonRoster.GetTroopRoster().Any(x => x.Character.IsHero));
+    internal bool CanStageMilitia(MobileParty militia, Settlement settlement) =>
+        militia?.Party != null && militia.Party.MobileParty == militia &&
+        militia.IsMilitia && militia.IsActive && militia.Party.IsActive &&
+        militia.CurrentSettlement == settlement && militia.MapEvent == null &&
+        objectManager.TryGetId(militia, out _) && objectManager.TryGetId(militia.Party, out _) &&
+        !militia.MemberRoster.GetTroopRoster().Any(x => x.Character.IsHero) &&
+        !militia.PrisonRoster.GetTroopRoster().Any(x => x.Character.IsHero);
 
     internal static bool IsUnexpectedOccupant(MobileParty occupant, MobileParty player, MobileParty militia, Settlement settlement) =>
         occupant != player && occupant != militia && occupant.CurrentSettlement == settlement;
@@ -345,11 +346,13 @@ public sealed class RaidLootWarningFixture : IRaidLootWarningFixture
         settlement?.Party != null && settlement.Culture?.BasicTroop != null && settlement.Party.MapEvent == null &&
         party.Position == settlement.GatePosition && settlement.Village.VillageState == Village.VillageStates.Normal &&
         party.MemberRoster.TotalManCount == PlayerTroops + 1 &&
-        settlement.Party.MemberRoster.TotalManCount == VillageTroops &&
+        settlement.Party.MemberRoster.TotalManCount == 0 &&
         party.MemberRoster.TotalWounded == 0 && settlement.Party.MemberRoster.TotalWounded == 0 &&
-        (settlement.MilitiaPartyComponent?.MobileParty?.MemberRoster.TotalManCount ?? 0) == 0 &&
+        settlement.MilitiaPartyComponent?.MobileParty?.MemberRoster.TotalManCount == VillageTroops &&
+        settlement.MilitiaPartyComponent.MobileParty.MemberRoster.TotalWounded == 0 &&
+        settlement.MilitiaPartyComponent.MobileParty.Party.MobileParty == settlement.MilitiaPartyComponent.MobileParty &&
         party.MemberRoster.GetTroopCount(party.LeaderHero.Culture.BasicTroop) == PlayerTroops &&
-        settlement.Party.MemberRoster.GetTroopCount(settlement.Culture.BasicTroop) == VillageTroops &&
+        settlement.MilitiaPartyComponent.MobileParty.MemberRoster.GetTroopCount(settlement.Culture.BasicTroop) == VillageTroops &&
         FactionManager.IsAtWarAgainstFaction(party.MapFaction, settlement.MapFaction);
 
     private void Stage(MobileParty party, Settlement settlement)
@@ -366,15 +369,13 @@ public sealed class RaidLootWarningFixture : IRaidLootWarningFixture
         party.MemberRoster.AddToCounts(party.LeaderHero.Culture.BasicTroop, PlayerTroops);
         party.PrisonRoster.Clear();
         settlement.Party.MemberRoster.Clear();
-        settlement.Party.MemberRoster.AddToCounts(settlement.Culture.BasicTroop, VillageTroops);
         settlement.Party.PrisonRoster.Clear();
         settlement.Party.ItemRoster.Clear();
-        var militia = settlement.MilitiaPartyComponent?.MobileParty;
-        if (militia != null)
-        {
-            militia.MemberRoster.Clear();
-            militia.PrisonRoster.Clear();
-        }
+        var militia = settlement.MilitiaPartyComponent.MobileParty;
+        militia.MemberRoster.Clear();
+        // Vanilla casualty surgery XP requires the defender roster to belong to a mobile party.
+        militia.MemberRoster.AddToCounts(settlement.Culture.BasicTroop, VillageTroops);
+        militia.PrisonRoster.Clear();
         settlement.SettlementHitPoints = 1f;
         party.Position = settlement.GatePosition;
         party.SetMoveModeHold();
@@ -422,11 +423,12 @@ public sealed class RaidLootWarningFixture : IRaidLootWarningFixture
 
     private bool HasExpectedParticipants(MapEvent mapEvent)
     {
-        var militia = fixture.Settlement.MilitiaPartyComponent?.MobileParty;
-        return mapEvent.AttackerSide.Parties.Count == 1 &&
+        var militia = fixture.Militia;
+        return militia?.Party != null && militia.Party.MobileParty == militia &&
+            mapEvent.AttackerSide.Parties.Count == 1 &&
             mapEvent.AttackerSide.Parties[0].Party == fixture.Party.Party &&
             mapEvent.DefenderSide.Parties.All(x => x.Party == fixture.Settlement.Party || x.Party == militia?.Party) &&
-            (militia?.MemberRoster.TotalManCount ?? 0) == 0;
+            fixture.Settlement.Party.MemberRoster.TotalManCount == 0;
     }
 
     public CoopCommandResult ReadState(string controllerId)
@@ -449,7 +451,7 @@ public sealed class RaidLootWarningFixture : IRaidLootWarningFixture
         var simulation = ((topScreen as MapScreen)?._battleSimulationView as GauntletMapBattleSimulationView)?._dataSource;
         var currentEvent = party.MapEvent;
         var capturedEvent = session?.MapEvent;
-        var militia = settlement.MilitiaPartyComponent?.MobileParty;
+        var militia = session?.Militia ?? settlement.MilitiaPartyComponent?.MobileParty;
         string militiaId = null;
         if (militia != null) objectManager.TryGetId(militia, out militiaId);
         objectManager.TryGetId(party, out var partyId);
@@ -482,13 +484,13 @@ public sealed class RaidLootWarningFixture : IRaidLootWarningFixture
             capturedMapEventRegistered = capturedEvent == null ? (bool?)null :
                 objectManager.TryGetObject<MapEvent>(session.MapEventId, out var registeredEvent) && registeredEvent == capturedEvent,
             capturedMapEventStillAttached = capturedEvent == null ? (bool?)null :
-                party.MapEvent == capturedEvent || settlement.Party.MapEvent == capturedEvent,
+                party.MapEvent == capturedEvent || settlement.Party.MapEvent == capturedEvent || militia?.MapEvent == capturedEvent,
             mapEventId = eventId,
             mapEventState = currentEvent?.BattleState.ToString(),
             mapEventHasWinner = currentEvent?.HasWinner,
             mapEventType = currentEvent?.Component?.GetType().Name,
             attackerParties = currentEvent?.AttackerSide.Parties.Select(x => new { id = x.Party.Id, members = RosterState(x.Party.MemberRoster) }).ToArray(),
-            defenderParties = currentEvent?.DefenderSide.Parties.Select(x => new { id = x.Party.Id, members = RosterState(x.Party.MemberRoster) }).ToArray(),
+            defenderParties = currentEvent?.DefenderSide.Parties.Select(x => new { id = x.Party.Id, hasMobileParty = x.Party.MobileParty != null, members = RosterState(x.Party.MemberRoster) }).ToArray(),
             mapEventSettlementId = currentEvent?.MapEventSettlement?.StringId,
             settlementId = settlement.StringId,
             settlementName = settlement.Name.ToString(),
@@ -512,6 +514,8 @@ public sealed class RaidLootWarningFixture : IRaidLootWarningFixture
             playerMembers = RosterState(party.MemberRoster),
             villageMembers = RosterState(settlement.Party.MemberRoster),
             militiaId,
+            militiaPartyId = militia?.Party?.Id,
+            militiaOwnsParty = militia?.Party != null && militia.Party.MobileParty == militia,
             militiaCurrentSettlementId = militia?.CurrentSettlement?.StringId,
             militiaMembers = militia == null ? null : RosterState(militia.MemberRoster),
             leaderHitPoints = party.LeaderHero?.HitPoints,
@@ -606,6 +610,7 @@ public sealed class RaidLootWarningFixture : IRaidLootWarningFixture
         internal string ControllerId { get; }
         internal MobileParty Party { get; }
         internal Settlement Settlement { get; }
+        internal MobileParty Militia { get; }
         internal string Token { get; } = Guid.NewGuid().ToString("N");
         internal string Phase { get; private set; } = "preparing";
         internal MapEvent MapEvent { get; private set; }
@@ -637,10 +642,12 @@ public sealed class RaidLootWarningFixture : IRaidLootWarningFixture
             ControllerId = controllerId;
             Party = party;
             Settlement = settlement;
+            Militia = settlement.MilitiaPartyComponent?.MobileParty;
         }
 
         internal bool CanRepeat(Campaign campaign, string controllerId, MobileParty party, Settlement settlement) =>
-            Phase == "prepared" && Campaign == campaign && ControllerId == controllerId && Party == party && Settlement == settlement;
+            Phase == "prepared" && Campaign == campaign && ControllerId == controllerId && Party == party && Settlement == settlement &&
+            Militia == settlement.MilitiaPartyComponent?.MobileParty;
 
         internal void Reject() => Phase = "failed-reload-baseline";
 

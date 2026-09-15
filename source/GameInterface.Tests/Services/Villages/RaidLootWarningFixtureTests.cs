@@ -21,6 +21,8 @@ using Moq;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.MapEvents;
 using TaleWorlds.CampaignSystem.Party;
+using TaleWorlds.CampaignSystem.Party.PartyComponents;
+using TaleWorlds.CampaignSystem.Roster;
 using TaleWorlds.CampaignSystem.Settlements;
 #endif
 
@@ -310,6 +312,59 @@ public class RaidLootWarningFixtureTests
         Assert.Equal(1, seeds);
         Assert.False(session.Seeded);
         Assert.Equal("failed-reload-baseline", session.Phase);
+    }
+
+    [Fact]
+    public void MilitiaGuard_RequiresRegisteredMobileOwnerInsideTheVillage()
+    {
+        var objectManager = new Mock<IObjectManager>();
+        var fixture = new RaidLootWarningFixture(objectManager.Object,
+            new Mock<IPlayerManager>().Object, new Mock<IMessageBroker>().Object,
+            new Mock<IVillageHostileActionInterface>().Object);
+        var settlement = ObjectHelper.SkipConstructor<Settlement>();
+        var militia = ObjectHelper.SkipConstructor<MobileParty>();
+        var party = ObjectHelper.SkipConstructor<PartyBase>();
+        militia.Party = party;
+        militia._currentSettlement = settlement;
+        militia.IsActive = true;
+        militia._partyComponent = ObjectHelper.SkipConstructor<MilitiaPartyComponent>();
+        party.MemberRoster = new TroopRoster();
+        party.PrisonRoster = new TroopRoster();
+
+        Assert.False(fixture.CanStageMilitia(null, settlement));
+        Assert.False(fixture.CanStageMilitia(militia, settlement));
+        party.MobileParty = militia;
+        Assert.False(fixture.CanStageMilitia(militia, settlement));
+        string militiaId = "native-militia";
+        objectManager.Setup(x => x.TryGetId(militia, out militiaId)).Returns(true);
+        Assert.False(fixture.CanStageMilitia(militia, settlement));
+        string partyId = "native-militia-party";
+        objectManager.Setup(x => x.TryGetId(party, out partyId)).Returns(true);
+        Assert.True(fixture.CanStageMilitia(militia, settlement));
+        party.MobileParty = ObjectHelper.SkipConstructor<MobileParty>();
+        Assert.False(fixture.CanStageMilitia(militia, settlement));
+        party.MobileParty = militia;
+        militia._currentSettlement = ObjectHelper.SkipConstructor<Settlement>();
+        Assert.False(fixture.CanStageMilitia(militia, settlement));
+    }
+
+    [Fact]
+    public void PreparedSession_RetainsOriginalMilitiaForFinalDetachmentObservation()
+    {
+        var settlement = ObjectHelper.SkipConstructor<Settlement>();
+        var militia = ObjectHelper.SkipConstructor<MobileParty>();
+        var component = ObjectHelper.SkipConstructor<MilitiaPartyComponent>();
+        component.MobileParty = militia;
+        settlement.MilitiaPartyComponent = component;
+        var session = new RaidLootWarningFixture.FixtureSession(ObjectHelper.SkipConstructor<Campaign>(),
+            "fixture-controller", ObjectHelper.SkipConstructor<MobileParty>(), settlement);
+        session.Prepare(() => { });
+        Assert.True(session.CanRepeat(session.Campaign, session.ControllerId, session.Party, settlement));
+
+        settlement.MilitiaPartyComponent = null;
+        Assert.Same(militia, session.Militia);
+        Assert.False(session.CanRepeat(session.Campaign, session.ControllerId, session.Party, settlement));
+        Assert.Throws<InvalidOperationException>(() => session.Prepare(() => { }));
     }
 
     [Fact]

@@ -6,7 +6,7 @@ Run only on the enrolled Local lane with one dedicated authoritative server and 
 
 ## Baseline
 
-The client party starts on land, holding outside settlements, armies, sieges, and map events. It has one healthy leader and no companions or hero prisoners. Its faction differs from Polisia's. Polisia is normal, not under siege or in a map event, and has no visiting mobile parties. Its native militia may exist but must be active, inside the village, and outside a battle.
+The client party starts on land, holding outside settlements, armies, sieges, and map events. It has one healthy leader and no companions or hero prisoners. Its faction differs from Polisia's. Polisia is normal, not under siege or in a map event, and has no visiting mobile parties. Its existing native mobile militia must be registered, active, inside the village, and outside a battle.
 
 The fixed target is **Polisia**, settlement `village_ES1_2`, village component `village_comp_ES1_2`, bound to **Danustica**, settlement `town_ES1`, in the Southern Empire. The fixture validates the actual save state before changing it.
 
@@ -25,7 +25,7 @@ coop.debug.mapevent.raid_loot_warning_state only-connected
 
 `only-connected` requires exactly one registered client. Otherwise, use the exact `ControllerId` returned by `coop.debug.players.list` for every command below.
 
-The preparation state must show 61 player members with zero wounded, eight village members, an empty native militia roster when present, `villageState=Normal`, `villageHitPoints=1`, `atWar=true`, and `allowRaidAiIntervention=true`. Preserve its `fixtureToken`, controller id, party id, troop ids, and source identity.
+The preparation state must show 61 player members with zero wounded, an empty settlement roster, eight unwounded native mobile militia members, `militiaOwnsParty=true`, `villageState=Normal`, `villageHitPoints=1`, `atWar=true`, and `allowRaidAiIntervention=true`. Preserve its `fixtureToken`, controller id, party id, troop ids, and source identity.
 
 On the client, read the replicated setup, then request the real settlement entry:
 
