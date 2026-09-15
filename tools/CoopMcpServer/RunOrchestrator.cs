@@ -24,7 +24,8 @@ public interface IRunOrchestrator
 public sealed record InstanceView(string Name, InstanceIdentity Identity, bool ProcessAlive,
     [property: JsonIgnore(Condition = JsonIgnoreCondition.Never)] JsonElement? Status,
     [property: JsonIgnore(Condition = JsonIgnoreCondition.Never)] LiveTestError? Error,
-    [property: JsonIgnore(Condition = JsonIgnoreCondition.Never)] bool? ProcessTreeAlive, bool CleanupComplete);
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.Never)] bool? ProcessTreeAlive, bool CleanupComplete,
+    StartupPopupView StartupPopup = null);
 public sealed record RunView(string RunId, string Profile, string ArtifactDirectory, string State,
     [property: JsonIgnore(Condition = JsonIgnoreCondition.Never)] string? Error, InstanceView[] Instances,
     PreflightReport Preflight, IReadOnlyDictionary<int, string> ClientAttempts,
@@ -34,7 +35,7 @@ public sealed record ClientLaunchView(string Outcome, string Instance, RunView R
     [property: JsonIgnore(Condition = JsonIgnoreCondition.Never)] PreflightReport? Preflight);
 #nullable restore annotations
 
-public sealed class RunOrchestrator : IRunOrchestrator
+public sealed partial class RunOrchestrator : IRunOrchestrator, IDeploymentRunGuard
 {
     private readonly CoopMcpServerSettings settings;
     private readonly IGameProcessLauncher launcher;
@@ -42,6 +43,8 @@ public sealed class RunOrchestrator : IRunOrchestrator
     private readonly IIncrementalLogReader logs;
     private readonly ILaunchPreflight preflight;
     private readonly ISaveCatalog saves;
+    private readonly IDeploymentLease deploymentLease;
+    private readonly IBuildCleanupRecovery buildCleanup;
     private readonly SemaphoreSlim lifecycle = new(1, 1);
     private readonly ConcurrentDictionary<string, Run> runs = new();
     private static readonly JsonSerializerOptions JsonOptions = new() { PropertyNamingPolicy = JsonNamingPolicy.CamelCase, WriteIndented = true };
@@ -58,6 +61,8 @@ public sealed class RunOrchestrator : IRunOrchestrator
         public string ArchivedLogPath;
         public bool Stopped;
         public bool CleanupComplete;
+        public StartupPopupView StartupPopup;
+        public bool StartupPopupActionAttempted;
     }
 
     private sealed class Run
@@ -76,7 +81,7 @@ public sealed class RunOrchestrator : IRunOrchestrator
     }
 
     public RunOrchestrator(CoopMcpServerSettings settings, IGameProcessLauncher launcher,
-        ILiveTestPipeClient pipe, IIncrementalLogReader logs, ILaunchPreflight preflight, ISaveCatalog saves)
+        ILiveTestPipeClient pipe, IIncrementalLogReader logs, ILaunchPreflight preflight, ISaveCatalog saves, IDeploymentLease deploymentLease = null, IBuildCleanupRecovery buildCleanup = null)
     {
         this.settings = settings;
         this.launcher = launcher;
@@ -84,6 +89,21 @@ public sealed class RunOrchestrator : IRunOrchestrator
         this.logs = logs;
         this.preflight = preflight;
         this.saves = saves;
+        this.deploymentLease = deploymentLease;
+        this.buildCleanup = buildCleanup;
+    }
+
+    public async Task<DeploymentReport> DeployAsync(Func<Task<DeploymentReport>> action, CancellationToken cancellationToken)
+    {
+        if (!await lifecycle.WaitAsync(0, cancellationToken)) throw new InvalidOperationException("A launch, stop or deployment is already in progress.");
+        try
+        {
+            if (buildCleanup != null) await buildCleanup.RecoverAsync();
+            if (runs.Values.Any(r => r.State != "stopped" && r.State != "launch_failed" && r.State != "preflight_failed"))
+                throw new InvalidOperationException("Stop the owned run and confirm cleanup before deploying.");
+            return await action();
+        }
+        finally { lifecycle.Release(); }
     }
 
     public async Task<RunView> StartAsync(string profile, int clientCount, CancellationToken cancellationToken, string saveName = null)
@@ -91,11 +111,13 @@ public sealed class RunOrchestrator : IRunOrchestrator
         await lifecycle.WaitAsync(cancellationToken);
         try
         {
+            if (buildCleanup != null) await buildCleanup.RecoverAsync();
             if (runs.Values.Any(r => r.State != "stopped" && r.State != "launch_failed" && r.State != "preflight_failed"))
                 throw new InvalidOperationException("Stop the active run before starting another run.");
             if (!settings.Profiles.TryGetValue(profile, out var launchProfile))
                 throw new ArgumentException("Unknown configured profile.");
             launchProfile.Validate(clientCount);
+            using var deployment = deploymentLease?.Acquire(launchProfile);
             var selectedSave = saveName == null ? null : saves.ValidateSelection(saveName);
             var run = new Run { RequestedSave = selectedSave, Id = Guid.NewGuid().ToString("N"), Profile = profile, Preflight = preflight.Check(launchProfile, clientCount + 1) };
             run.Directory = Path.Combine(settings.ArtifactDirectory, run.Id);
@@ -153,9 +175,11 @@ public sealed class RunOrchestrator : IRunOrchestrator
         await lifecycle.WaitAsync(cancellationToken);
         try
         {
+            if (buildCleanup != null) await buildCleanup.RecoverAsync();
             var run = FindRun(runId);
             string name = "client" + clientIndex;
             var profile = settings.Profiles[run.Profile];
+            using var deployment = deploymentLease?.Acquire(profile);
             ArgumentOutOfRangeException.ThrowIfLessThan(clientIndex, 1);
             profile.Validate(clientIndex);
             if (run.ClientAttempts.TryGetValue(clientIndex, out string attempt))
@@ -231,11 +255,14 @@ public sealed class RunOrchestrator : IRunOrchestrator
             {
                 await RefreshAsync(run, target, timeout.Token);
                 reached = Matches(target, state);
+                if (reached && state == "readyForCampaignTests" && target.Identity.Role == "client")
+                    await TryDismissStartupPopupAsync(run, target, timeout.Token);
                 if (reached || !Alive(target)) break;
                 await Task.Delay(500, timeout.Token);
             } while (true);
         }
         catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested) { deadlineExpired = true; }
+        Save(run);
         return new { reached, state, outcome = reached ? "reached" : !Alive(target) ? "process_exited" : deadlineExpired ? "deadline_expired" : "not_ready",
             deadlineExpired, lastError = target.Error, instance = View(target) };
     }
@@ -268,23 +295,38 @@ public sealed class RunOrchestrator : IRunOrchestrator
                 }
                 finally { server.Gate.Release(); }
             }
+            if (method == "ui-layers" || (method == "ui-inspect" &&
+                JsonSerializer.SerializeToElement(parameters).TryGetProperty("layer", out var layer) && layer.ValueKind != JsonValueKind.Null))
+            {
+                var status = await pipe.SendAsync(target.Identity, "status", new { }, false, cancellationToken);
+                if (!status.Ok) return status;
+                if (status.Result is not JsonElement value || value.ValueKind != JsonValueKind.Object ||
+                    !value.TryGetProperty("uiCapability", out var capability) || capability.ValueKind != JsonValueKind.String ||
+                    capability.GetString() != "bounded-ui-layers-v1")
+                    return LocalFailure(target, "ui_capability_unavailable", "Loaded bridge lacks bounded-ui-layers-v1; no UI request was sent.");
+            }
             var response = await pipe.SendAsync(target.Identity, method, parameters, mutation, cancellationToken);
-            // Write each result before returning it so uncertain mutations remain inspectable after MCP disconnects.
-            try
-            {
-                File.WriteAllText(Path.Combine(run.Directory, instance + "-" + response.Id + ".json"),
-                    LiveTestProtocol.SerializeResponse(response));
-            }
-            catch (Exception exception) when (exception is IOException || exception is UnauthorizedAccessException)
-            {
-                var failure = LiveTestResponse.Failure(response.Id, response.Process,
-                    new LiveTestError("artifact_write_failed", exception.Message, mutation || (response.Error?.OutcomeUncertain ?? false)));
-                failure.Result = new { bridgeResponse = response };
-                return failure;
-            }
-            return response;
+            return RecordResponse(run, target, response, mutation);
         }
         finally { target.Gate.Release(); }
+    }
+
+    private LiveTestResponse RecordResponse(Run run, Instance target, LiveTestResponse response, bool mutation)
+    {
+        // Write each result before returning it so uncertain mutations remain inspectable after MCP disconnects.
+        try
+        {
+            File.WriteAllText(Path.Combine(run.Directory, target.Name + "-" + response.Id + ".json"),
+                LiveTestProtocol.SerializeResponse(response));
+        }
+        catch (Exception exception) when (exception is IOException || exception is UnauthorizedAccessException)
+        {
+            var failure = LiveTestResponse.Failure(response.Id, response.Process,
+                new LiveTestError("artifact_write_failed", exception.Message, mutation || (response.Error?.OutcomeUncertain ?? false)));
+            failure.Result = new { bridgeResponse = response };
+            return failure;
+        }
+        return response;
     }
 
     public async Task<LogChunk> ReadLogsAsync(string runId, string instance, string cursor, int maxBytes, CancellationToken cancellationToken)
@@ -459,7 +501,7 @@ public sealed class RunOrchestrator : IRunOrchestrator
     private InstanceView View(Instance i)
     {
         bool? treeAlive = TreeAlive(i);
-        return new(i.Name, i.Identity, Alive(i), i.Status, i.Error, treeAlive, i.CleanupComplete);
+        return new(i.Name, i.Identity, Alive(i), i.Status, i.Error, treeAlive, i.CleanupComplete, i.StartupPopup);
     }
     private RunView View(Run run) => new(run.Id, run.Profile, run.Directory, run.State, run.Error, Instances(run).Select(View).ToArray(), run.Preflight, new Dictionary<int, string>(run.ClientAttempts), run.RequestedSave, new Dictionary<int, LiveTestError>(run.ClientLaunchErrors));
     private void Save(Run run)

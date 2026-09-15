@@ -44,6 +44,8 @@ public interface INetworkAgentRegistry : IDisposable
     bool IsLocallyControlled(Agent agent);
     bool TryTransferAuthority(string controllerId, Guid agentId);
     bool TryTransferAuthority(string controllerId, Guid agentId, long authorityRevision);
+    bool TryReturnRetainedPlayer(string previousControllerId, string returningControllerId,
+        Guid agentId, long previousRevision, Guid mountAgentId, long previousMountRevision);
 
     IReadOnlyCollection<CoopAgentInfo> GetAgents(string controllerId);
 
@@ -270,6 +272,10 @@ public class NetworkAgentRegistry : INetworkAgentRegistry
         var succeeded = true;
 
         succeeded &= controlledAgents.Remove(agentInfo);
+        // Drop the controller key with its last agent, the same pruning TryTransferAuthority does, because
+        // GetControllerIds promises only controllers that still hold an agent.
+        if (controlledAgents.Count == 0)
+            ControllerAgentMap.Remove(agentInfo.CurrentAuthority);
         succeeded &= IdToInfo.Remove(agentInfo.AgentId);
         succeeded &= AgentToInfo.Remove(agentInfo.Agent);
         if (agentInfo.MovementId != 0)
@@ -422,6 +428,32 @@ public class NetworkAgentRegistry : INetworkAgentRegistry
     /// <inheritdoc/>
     public bool TryTransferAuthority(string controllerId, Guid agentId, long authorityRevision)
         => TryTransferAuthority(controllerId, agentId, (long?)authorityRevision);
+
+    // Validate rider and mount under the same lock before relinquishing either authority.
+    public bool TryReturnRetainedPlayer(string previousControllerId, string returningControllerId,
+        Guid agentId, long previousRevision, Guid mountAgentId, long previousMountRevision)
+    {
+        if (string.IsNullOrEmpty(previousControllerId) || string.IsNullOrEmpty(returningControllerId)
+            || previousControllerId == returningControllerId || agentId == Guid.Empty
+            || mountAgentId == agentId || previousRevision < 0 || previousRevision == long.MaxValue
+            || previousMountRevision < 0 || previousMountRevision == long.MaxValue) return false;
+
+        lock (gate)
+        {
+            if (!MatchesReturn(agentId, previousRevision)
+                || (mountAgentId != Guid.Empty && !MatchesReturn(mountAgentId, previousMountRevision))) return false;
+            if (!TryTransferAuthority(returningControllerId, agentId, previousRevision + 1)) return false;
+            return mountAgentId == Guid.Empty
+                || TryTransferAuthority(returningControllerId, mountAgentId, previousMountRevision + 1);
+        }
+
+        bool MatchesReturn(Guid id, long revision)
+        {
+            if (!IdToInfo.TryGetValue(id, out var info)) return false;
+            return (info.CurrentAuthority == previousControllerId && info.AuthorityRevision == revision)
+                || (info.CurrentAuthority == returningControllerId && info.AuthorityRevision == revision + 1);
+        }
+    }
 
     private bool TryTransferAuthority(string controllerId, Guid agentId, long? authorityRevision)
     {

@@ -46,7 +46,8 @@ namespace Coop.Tests.Server.Services.Save
                 new InteractionsPlayerData(new(), new(), new(), new(), new(), new(), new(), new(), new(), new(), new()),
                 new TradePlayerData(new(), new(), new(), new()),
                 new InventoryPlayerData(new(), new()),
-                new HeroMeetingData(new()));
+                new HeroMeetingData(new()),
+                new AgingPlayerData(new()));
 
             string saveFile = SAVE_PATH + sessionData.UniqueGameId + ".json";
 

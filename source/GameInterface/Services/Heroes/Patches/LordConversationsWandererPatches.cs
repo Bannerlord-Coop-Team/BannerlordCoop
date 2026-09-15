@@ -23,7 +23,7 @@ internal class LordConversationsWandererPatches
         if (targetSentence == null) return;
 
         // Vanilla incorrectly uses the NPC's gender to address the player
-        targetSentence.Text = new TextObject("{=coop_wanderer_alley_orders}Do you have any orders for your alley, {?PLAYER.GENDER}madam{?}sir{\\?}");
+        targetSentence.Text = new TextObject("{=str_coop_wanderer_alley_orders}Do you have any orders for your alley, {?PLAYER.GENDER}madam{?}sir{\\?}");
     }
 
     /// <summary>
