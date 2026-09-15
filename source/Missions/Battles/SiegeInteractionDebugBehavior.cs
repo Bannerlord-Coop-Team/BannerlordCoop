@@ -583,7 +583,8 @@ internal sealed class SiegeInteractionDebugBehavior : MissionBehavior, ISiegeInt
             return;
         }
         var point = machine.StandingPoints[pointIndex];
-        if (reaimOnly && (!(machine is Ballista ballista) || !ReferenceEquals(point, ballista.PilotStandingPoint)))
+        if (reaimOnly && !(machine is CastleGate ||
+            (machine is Ballista ballista && ReferenceEquals(point, ballista.PilotStandingPoint))))
         {
             status = "fixture_stage_rejected";
             return;
