@@ -168,8 +168,8 @@ public class RaidDebugCommands
 
         public string Prefix => "coop.debug.mapevent";
         public string Name => "raid_loot_warning_complete_simulation";
-        public string Description => "Completes the issue 3262 production battle simulation result action.";
-        public CoopCommandSide Side => CoopCommandSide.Client;
+        public string Description => "Resolves the captured simulation on the server or accepts its completed result on the client.";
+        public CoopCommandSide Side => CoopCommandSide.Both;
         public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
             new ExpectedArgs("controllerId", "Registered controller id, or only-connected for a one-client session."),

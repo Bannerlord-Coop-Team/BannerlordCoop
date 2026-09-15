@@ -4,6 +4,7 @@ using Common.Commands;
 using Common.Logging;
 using Common.Messaging;
 using GameInterface.Services.MapEvents;
+using GameInterface.Services.MapEvents.Messages.Start;
 using GameInterface.Services.MobileParties.Extensions;
 using GameInterface.Services.MobileParties.Messages.Behavior;
 using GameInterface.Services.ObjectManager;
@@ -173,6 +174,7 @@ public sealed class RaidLootWarningFixture : IRaidLootWarningFixture
 
     public CoopCommandResult CompleteSimulation(string controllerId)
     {
+        if (ModInformation.IsServer) return ResolveServerSimulation(controllerId);
         if (!TryGetClientAction(controllerId, out var party, out var action, out var error)) return Failed(error);
         if (!action.CanCompleteSimulation()) return Failed("The fixture raid is not awaiting a simulation result.");
         if (!IsExpectedRaidMapEvent(party, action.Settlement)) return Failed("The active map event is not the fixture raid.");
@@ -190,6 +192,30 @@ public sealed class RaidLootWarningFixture : IRaidLootWarningFixture
         simulationVm.ExecuteQuitAction();
         action.CompleteSimulation();
         return ReadState(action.ControllerId);
+    }
+
+    private CoopCommandResult ResolveServerSimulation(string controllerId)
+    {
+        if (Campaign.Current == null) return Failed("No campaign is loaded.");
+        if (!TryFindPlayer(controllerId, out var player, out var party, out var error)) return Failed(error);
+        if (!playerManager.IsConnected(player) || !playerManager.Contains(party) ||
+            fixture?.Campaign != Campaign.Current || fixture.ControllerId != player.ControllerId || fixture.Party != party)
+            return Failed("Require the connected party of the captured server fixture.");
+        var mapEvent = fixture.MapEvent;
+        if (fixture.Phase != "captured" || fixture.SimulationAdvanceRequested ||
+            mapEvent == null || mapEvent.IsFinalized || mapEvent.HasWinner || party.MapEvent != mapEvent ||
+            !objectManager.TryGetObject<MapEvent>(fixture.MapEventId, out var registered) || registered != mapEvent ||
+            !IsExpectedRaidMapEvent(party, fixture.Settlement) || !HasExpectedParticipants(mapEvent))
+            return Failed("Require the unresolved, registered captured raid before its one production advance.");
+
+        // The same bounded server handler used by the simulation's skip action computes and replicates the result.
+        fixture.RequestSimulationAdvance(messageBroker);
+        if (!mapEvent.HasWinner || mapEvent.BattleState != BattleState.AttackerVictory)
+        {
+            fixture.Reject();
+            return Failed("The bounded production simulation advance did not yield attacker victory; reload the baseline.");
+        }
+        return ReadState(player.ControllerId);
     }
 
     public CoopCommandResult CompleteLootParty(string controllerId)
@@ -446,6 +472,7 @@ public sealed class RaidLootWarningFixture : IRaidLootWarningFixture
             clientPendingLootWarning = action?.HasPendingLootWarning,
             expectedSeed = new { item = "grain", count = 1 },
             seedApplied = session?.Seeded,
+            simulationAdvanceRequested = session?.SimulationAdvanceRequested,
             rawLootCount = session?.SeededLoot?.Sum(x => x.Amount),
             rawLootGrainCount = session?.SeededLoot == null ? (int?)null : GrainCount(session.SeededLoot),
             capturedMapEventId = session?.MapEventId,
@@ -456,6 +483,7 @@ public sealed class RaidLootWarningFixture : IRaidLootWarningFixture
                 party.MapEvent == capturedEvent || settlement.Party.MapEvent == capturedEvent,
             mapEventId = eventId,
             mapEventState = currentEvent?.BattleState.ToString(),
+            mapEventHasWinner = currentEvent?.HasWinner,
             mapEventType = currentEvent?.Component?.GetType().Name,
             attackerParties = currentEvent?.AttackerSide.Parties.Select(x => new { id = x.Party.Id, members = RosterState(x.Party.MemberRoster) }).ToArray(),
             defenderParties = currentEvent?.DefenderSide.Parties.Select(x => new { id = x.Party.Id, members = RosterState(x.Party.MemberRoster) }).ToArray(),
@@ -581,6 +609,7 @@ public sealed class RaidLootWarningFixture : IRaidLootWarningFixture
         internal MapEvent MapEvent { get; private set; }
         internal string MapEventId { get; private set; }
         internal bool Seeded { get; private set; }
+        internal bool SimulationAdvanceRequested { get; private set; }
         internal ItemRoster SeededLoot { get; set; }
 
         internal FixtureSession(Campaign campaign, string controllerId, MobileParty party, Settlement settlement)
@@ -611,6 +640,14 @@ public sealed class RaidLootWarningFixture : IRaidLootWarningFixture
             MapEvent = mapEvent;
             MapEventId = mapEventId;
             Phase = "captured";
+        }
+
+        internal void RequestSimulationAdvance(IMessageBroker broker)
+        {
+            if (Phase != "captured" || MapEvent == null || string.IsNullOrEmpty(MapEventId) || SimulationAdvanceRequested)
+                throw new InvalidOperationException("The captured simulation can only be advanced once.");
+            SimulationAdvanceRequested = true;
+            broker.Publish(this, new NetworkAdvanceBattleSimulation(MapEventId, int.MaxValue));
         }
 
         internal void Seed(Campaign campaign, MapEvent mapEvent, MobileParty winner, Action seed)

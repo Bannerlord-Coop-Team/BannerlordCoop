@@ -6,6 +6,7 @@ using Xunit;
 #if DEBUG
 using Common;
 using Common.Messaging;
+using GameInterface.Services.MapEvents.Messages.Start;
 using Common.Util;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Players;
@@ -99,7 +100,7 @@ public class RaidLootWarningFixtureTests
         Assert.Equal(CoopCommandSide.Both, new RaidDebugCommands.RaidLootWarningStateCoopCommand(fixture).Side);
         Assert.Equal(CoopCommandSide.Client, new RaidDebugCommands.StartRaidLootWarningCoopCommand(fixture).Side);
         Assert.Equal(CoopCommandSide.Client, new RaidDebugCommands.RequestRaidLootWarningCoopCommand(fixture).Side);
-        Assert.Equal(CoopCommandSide.Client, new RaidDebugCommands.CompleteRaidLootWarningSimulationCoopCommand(fixture).Side);
+        Assert.Equal(CoopCommandSide.Both, new RaidDebugCommands.CompleteRaidLootWarningSimulationCoopCommand(fixture).Side);
         Assert.Equal(CoopCommandSide.Client, new RaidDebugCommands.CompleteRaidLootWarningPartyCoopCommand(fixture).Side);
         Assert.Equal(CoopCommandSide.Client, new RaidDebugCommands.ShowRaidLootWarningCoopCommand(fixture).Side);
         Assert.Equal(CoopCommandSide.Client, new RaidDebugCommands.AcceptRaidLootWarningCoopCommand(fixture).Side);
@@ -171,6 +172,36 @@ public class RaidLootWarningFixtureTests
         Assert.Same(first, session.MapEvent);
         Assert.Equal("event-a", session.MapEventId);
         Assert.False(session.CanRepeat(session.Campaign, session.ControllerId, session.Party, session.Settlement));
+    }
+
+    [Fact]
+    public void SimulationAdvance_RequiresCaptureAndPublishesTheBoundProductionRequestOnce()
+    {
+        var session = CreateSession();
+        var broker = new Mock<IMessageBroker>(MockBehavior.Strict);
+        Assert.Throws<InvalidOperationException>(() => session.RequestSimulationAdvance(broker.Object));
+        session.Prepare(() => { });
+        Assert.Throws<InvalidOperationException>(() => session.RequestSimulationAdvance(broker.Object));
+        session.Capture(session.Campaign, session.Party, session.Settlement, ObjectHelper.SkipConstructor<MapEvent>(), "event-a");
+        broker.Setup(x => x.Publish(session, It.Is<NetworkAdvanceBattleSimulation>(m => m.MapEventId == "event-a" && m.MaxRounds == int.MaxValue)));
+        session.RequestSimulationAdvance(broker.Object);
+        Assert.True(session.SimulationAdvanceRequested);
+        Assert.Equal("captured", session.Phase);
+        Assert.Throws<InvalidOperationException>(() => session.RequestSimulationAdvance(broker.Object));
+        broker.Verify(x => x.Publish(session, It.IsAny<NetworkAdvanceBattleSimulation>()), Times.Once);
+    }
+
+    [Fact]
+    public void SimulationAdvance_PartialDispatchFailureCannotBeRetried()
+    {
+        var session = CreateSession();
+        session.Prepare(() => { });
+        session.Capture(session.Campaign, session.Party, session.Settlement, ObjectHelper.SkipConstructor<MapEvent>(), "event-a");
+        var broker = new Mock<IMessageBroker>();
+        broker.Setup(x => x.Publish(session, It.IsAny<NetworkAdvanceBattleSimulation>())).Throws<InvalidOperationException>();
+        Assert.Throws<InvalidOperationException>(() => session.RequestSimulationAdvance(broker.Object));
+        Assert.Throws<InvalidOperationException>(() => session.RequestSimulationAdvance(broker.Object));
+        broker.Verify(x => x.Publish(session, It.IsAny<NetworkAdvanceBattleSimulation>()), Times.Once);
     }
 
     [Fact]
