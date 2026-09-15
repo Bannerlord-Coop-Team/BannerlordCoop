@@ -592,8 +592,6 @@ internal class BattleFinalizeHandler : IHandler
             return;
 
         settlement.Village.VillageState = Village.VillageStates.Normal;
-        if (settlement.SettlementHitPoints < 1f)
-            settlement.SettlementHitPoints = 1f;
     }
 
     private static bool IsAttackerVictory(MapEvent mapEvent)

@@ -90,7 +90,8 @@ internal sealed class CoopHideoutMissionLogic : MissionLogic
         if (!ReservesReady(IsAuthority, attackerSource, defenderSource)) return;
         if (!IsAuthority && ledger.Latest == null) return;
 
-        Attacker.Refresh(recoverStaged: false);
+        // A returning mission lost its pending escorts, but the accepted history still excludes prior spawns.
+        Attacker.Refresh(recoverStaged: !initialized && ledger.Latest != null);
         if (IsAuthority)
             Defender.Refresh(recoverStaged: false);
 

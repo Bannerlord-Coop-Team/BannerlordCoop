@@ -100,7 +100,10 @@ internal sealed class CoopHideoutMissionLauncher : ICoopHideoutMissionLauncher
                 behaviors.Add(new HideoutAmbushBossFightCinematicController());
                 behaviors.Add(new MissionAgentHandler());
                 behaviors.Add(new MissionLocationLogic(location));
-                behaviors.Add(new StealthFailCounterMissionLogic());
+                behaviors.Add(new StealthFailCounterMissionLogic
+                {
+                    FailCounterSeconds = CoopHideoutAmbushController.StealthFailCounterSeconds,
+                });
                 behaviors.Add(new MissionAIActivationDeactivationEventListenerLogic());
                 behaviors.Add(new CorpseDraggingMissionLogic());
                 behaviors.Add(new ShowQuickInformationEventListenerLogic());

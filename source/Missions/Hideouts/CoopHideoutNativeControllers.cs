@@ -145,6 +145,7 @@ internal sealed class CoopHideoutAssaultController : HideoutMissionController, I
 
 internal sealed class CoopHideoutAmbushController : HideoutAmbushMissionController, ICoopHideoutNativeController, IMissionAgentSpawnLogic
 {
+    internal const float StealthFailCounterSeconds = 15f;
     private readonly CoopHideoutMissionLogic coop;
     private bool locationListenerRegistered;
 
@@ -181,6 +182,10 @@ internal sealed class CoopHideoutAmbushController : HideoutAmbushMissionControll
 
     public void Initialize(bool authority, bool migration)
     {
+        var counter = Mission.GetMissionBehavior<StealthFailCounterMissionLogic>();
+        counter.FailCounterSeconds = StealthFailCounterSeconds;
+        if (counter._failCounter != null)
+            counter._failCounter.Duration = StealthFailCounterSeconds;
         if (!migration)
             InitializeMission();
         _isMissionInitialized = true;
@@ -200,7 +205,6 @@ internal sealed class CoopHideoutAmbushController : HideoutAmbushMissionControll
             Mission.GetMissionBehavior<MissionAgentHandler>().SpawnLocationCharacters();
             _remainingSentryCount = _stealthAreaData.Sum(area => area.StealthAreaMarkers.Values.Sum(agents => agents.Count));
             _sentryCount = _remainingSentryCount;
-            Mission.GetMissionBehavior<StealthFailCounterMissionLogic>().FailCounterSeconds = 15f;
             _locateTheMainCampObjective = new LocateTheMainCampObjective(Mission);
             _missionObjectiveLogic.StartObjective(_locateTheMainCampObjective);
         }
