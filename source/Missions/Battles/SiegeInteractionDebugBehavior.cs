@@ -602,7 +602,7 @@ internal sealed class SiegeInteractionDebugBehavior : MissionBehavior, ISiegeInt
             {
                 try
                 {
-                    var nativeTarget = GetStagingTarget(machine, position, false, true);
+                    var nativeTarget = GetStagingTarget(machine, position, false, true, point);
                     var eyeHeight = (agent.Monster.StandingEyeHeight + 0.2f) * agent.AgentScale;
                     direction = GetNativeStagingDirection(position, eyeHeight, nativeTarget);
                     if (!(direction.LengthSquared >= 0.5f))
@@ -699,7 +699,8 @@ internal sealed class SiegeInteractionDebugBehavior : MissionBehavior, ISiegeInt
         return (targetCenter - (userPosition + (Vec3.Up * eyeHeight))).NormalizedCopy();
     }
 
-    internal Vec3 GetStagingTarget(UsableMachine machine, Vec3 standingPointPosition, bool watchOnly, bool nativeCamera = false)
+    internal Vec3 GetStagingTarget(UsableMachine machine, Vec3 standingPointPosition, bool watchOnly, bool nativeCamera = false,
+        StandingPoint standingPoint = null)
     {
         if (nativeCamera && !watchOnly && machine is StonePile)
         {
@@ -737,6 +738,19 @@ internal sealed class SiegeInteractionDebugBehavior : MissionBehavior, ISiegeInt
         // Gate standing-point origins can lie directly beneath the player's feet.
         var bounds = gate.ComputeGlobalPhysicsBoundingBoxMinMax();
         var gateTarget = (bounds.Item1 + bounds.Item2) * 0.5f;
+        if (nativeCamera && gate.State == CastleGate.GateState.Open && standingPoint != null &&
+            machine.StandingPoints != null && machine.StandingPoints.Contains(standingPoint) &&
+            !standingPoint.IsDeactivated)
+        {
+            var standingPointEntity = standingPoint.GameEntity;
+            if (standingPointEntity.IsValid)
+            {
+                var standingPointTarget = standingPointEntity.ComputeGlobalPhysicsBoundingBoxCenter();
+                if (new[] { standingPointTarget.x, standingPointTarget.y, standingPointTarget.z }
+                        .All(value => !float.IsNaN(value) && !float.IsInfinity(value)))
+                    gateTarget = standingPointTarget;
+            }
+        }
         if (nativeCamera)
         {
             nativeAimTarget = new

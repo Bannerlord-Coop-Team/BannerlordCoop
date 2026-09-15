@@ -731,6 +731,59 @@ public class SiegeInteractionDebugBehaviorTests
 
     private static bool SkipScriptComponentCache() => false;
 
+    [Fact]
+    public void NativeOpenGateTarget_UsesTheRequestedActiveStandingPointPhysicsCenter()
+    {
+        using var mission = new MissionCurrentScope();
+        var harmony = new Harmony("coop.tests.open-gate-native-target");
+        try
+        {
+            harmony.Patch(AccessTools.Method(typeof(ScriptComponentBehavior), "CacheEditableFieldsForAllScriptComponents"),
+                prefix: new HarmonyMethod(AccessTools.Method(typeof(SiegeInteractionDebugBehaviorTests),
+                    nameof(SkipScriptComponentCache))));
+            harmony.Patch(AccessTools.Method(typeof(CastleGate), "ComputeGlobalPhysicsBoundingBoxMinMax"),
+                prefix: new HarmonyMethod(AccessTools.Method(typeof(SiegeInteractionDebugBehaviorTests),
+                    nameof(GatePhysicsBounds))));
+            harmony.Patch(AccessTools.Method(typeof(WeakGameEntity), nameof(WeakGameEntity.ComputeGlobalPhysicsBoundingBoxCenter)),
+                prefix: new HarmonyMethod(AccessTools.Method(typeof(SiegeInteractionDebugBehaviorTests),
+                    nameof(GateStandingPointPhysicsCenter))));
+#pragma warning disable SYSLIB0050
+            var gate = (CastleGate)FormatterServices.GetUninitializedObject(typeof(CastleGate));
+            var standingPoint = (StandingPoint)FormatterServices.GetUninitializedObject(typeof(StandingPoint));
+#pragma warning restore SYSLIB0050
+            AccessTools.Field(typeof(CastleGate), "<State>k__BackingField")
+                .SetValue(gate, CastleGate.GateState.Open);
+            AccessTools.Field(typeof(UsableMissionObject), "_isDeactivated").SetValue(standingPoint, false);
+            var entity = AccessTools.Constructor(typeof(WeakGameEntity), new[] { typeof(UIntPtr) })
+                .Invoke(new object[] { new UIntPtr(881u) });
+            AccessTools.Field(typeof(ScriptComponentBehavior), "_gameEntity").SetValue(standingPoint, entity);
+            AccessTools.Property(typeof(UsableMachine), nameof(UsableMachine.StandingPoints)).SetValue(gate,
+                new MBList<StandingPoint> { standingPoint });
+
+            var behavior = new SiegeInteractionDebugBehavior(Mock.Of<IMessageBroker>());
+            var standingPosition = new Vec3(610.707764f, 625.542664f, 60.684f);
+            var target = behavior.GetStagingTarget(gate, standingPosition, false, true, standingPoint);
+
+            Assert.Equal(new Vec3(614f, 626f, 63f), target);
+            var nativeAimTarget = JObject.FromObject(
+                AccessTools.Field(typeof(SiegeInteractionDebugBehavior), "nativeAimTarget").GetValue(behavior));
+            Assert.Equal(614f, nativeAimTarget["target"]["x"].Value<float>());
+            Assert.Equal(626f, nativeAimTarget["target"]["y"].Value<float>());
+            Assert.Equal(63f, nativeAimTarget["target"]["z"].Value<float>());
+        }
+        finally
+        {
+            harmony.UnpatchAll(harmony.Id);
+        }
+    }
+
+    private static bool GateStandingPointPhysicsCenter(WeakGameEntity __instance, ref Vec3 __result)
+    {
+        Assert.Equal(881UL, __instance.Pointer.ToUInt64());
+        __result = new Vec3(614f, 626f, 63f);
+        return false;
+    }
+
     private static bool GatePhysicsBounds(ref (Vec3, Vec3) __result)
     {
         __result = (new Vec3(612f, 623f, 60f), new Vec3(614f, 627f, 64f));
