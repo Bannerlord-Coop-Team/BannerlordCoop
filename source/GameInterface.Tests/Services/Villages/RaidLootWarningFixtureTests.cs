@@ -327,7 +327,7 @@ public class RaidLootWarningFixtureTests
         militia.Party = party;
         militia._currentSettlement = settlement;
         militia.IsActive = true;
-        militia._partyComponent = ObjectHelper.SkipConstructor<MilitiaPartyComponent>();
+        militia.IsMilitia = true;
         party.MemberRoster = new TroopRoster();
         party.PrisonRoster = new TroopRoster();
 
