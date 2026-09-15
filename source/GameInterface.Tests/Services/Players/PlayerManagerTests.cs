@@ -205,6 +205,62 @@ public class PlayerManagerTests
     }
 
     [Fact]
+    public void ClearPeer_StaleReplacedPeer_DoesNotRevokeTheCurrentPeersCampaignReadiness()
+    {
+        var playerManager = CreatePlayerManager(out _);
+        var player = new Player(ControllerId, string.Empty, string.Empty, string.Empty, string.Empty);
+        var network = new TestNetwork();
+        var firstPeer = network.CreatePeer();
+        var secondPeer = network.CreatePeer();
+
+        Assert.True(playerManager.AddPlayer(player));
+        playerManager.SetPeer(ControllerId, firstPeer);
+        playerManager.SetPeer(ControllerId, secondPeer);
+        playerManager.MarkCampaignReady(ControllerId);
+
+        playerManager.ClearPeer(firstPeer);
+
+        Assert.True(playerManager.TryGetPeer(ControllerId, out var resolvedPeer));
+        Assert.Same(secondPeer, resolvedPeer);
+        Assert.True(playerManager.IsCampaignReady(player));
+    }
+
+    [Fact]
+    public void ClearPeer_TheActualCurrentPeer_RevokesCampaignReadiness()
+    {
+        var playerManager = CreatePlayerManager(out _);
+        var player = new Player(ControllerId, string.Empty, string.Empty, string.Empty, string.Empty);
+        var network = new TestNetwork();
+        var peer = network.CreatePeer();
+
+        Assert.True(playerManager.AddPlayer(player));
+        playerManager.SetPeer(ControllerId, peer);
+        playerManager.MarkCampaignReady(ControllerId);
+
+        playerManager.ClearPeer(peer);
+
+        Assert.False(playerManager.IsCampaignReady(player));
+    }
+
+    [Fact]
+    public void SetPeer_ReplacingAnAlreadyReadyPeer_InvalidatesReadinessForTheReplacement()
+    {
+        var playerManager = CreatePlayerManager(out _);
+        var player = new Player(ControllerId, string.Empty, string.Empty, string.Empty, string.Empty);
+        var network = new TestNetwork();
+        var firstPeer = network.CreatePeer();
+        var secondPeer = network.CreatePeer();
+
+        Assert.True(playerManager.AddPlayer(player));
+        playerManager.SetPeer(ControllerId, firstPeer);
+        playerManager.MarkCampaignReady(ControllerId);
+
+        playerManager.SetPeer(ControllerId, secondPeer);
+
+        Assert.False(playerManager.IsCampaignReady(player));
+    }
+
+    [Fact]
     public void AddPlayer_SecondRegistrationForSameController_IsRefused()
     {
         var playerManager = CreatePlayerManager(out _);

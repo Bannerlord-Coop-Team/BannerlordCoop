@@ -41,6 +41,7 @@ public class IssueFinalizationSecurityTests : IDisposable
         var heroId = TestEnvironment.CreateRegisteredObject<Hero>();
         var villageId = TestEnvironment.CreateRegisteredObject<Village>();
         var settlementId = TestEnvironment.CreateRegisteredObject<Settlement>();
+        var boundSettlementId = TestEnvironment.CreateRegisteredObject<Settlement>();
         var itemId = TestEnvironment.CreateRegisteredObject<ItemObject>();
         var companionHeroId = TestEnvironment.CreateRegisteredObject<Hero>();
 
@@ -51,6 +52,7 @@ public class IssueFinalizationSecurityTests : IDisposable
                 Assert.True(instance.ObjectManager.TryGetObject<Hero>(heroId, out var hero));
                 Assert.True(instance.ObjectManager.TryGetObject<Village>(villageId, out var village));
                 Assert.True(instance.ObjectManager.TryGetObject<Settlement>(settlementId, out var settlement));
+                Assert.True(instance.ObjectManager.TryGetObject<Settlement>(boundSettlementId, out var boundSettlement));
                 Assert.True(instance.ObjectManager.TryGetObject<ItemObject>(itemId, out var item));
                 Assert.True(instance.ObjectManager.TryGetObject<Hero>(companionHeroId, out var companion));
 
@@ -60,7 +62,7 @@ public class IssueFinalizationSecurityTests : IDisposable
                     Campaign.Current.EncyclopediaManager.CreateEncyclopediaPages();
 
                     settlement.SetSettlementComponent(village);
-                    village.Bound = settlement;
+                    village.Bound = boundSettlement;
                     village.Hearth = 650f;
                     hero.StayingInSettlement = settlement;
                     hero.Occupation = Occupation.RuralNotable;
@@ -308,7 +310,7 @@ public class IssueFinalizationSecurityTests : IDisposable
     }
 
     [Fact]
-    public void RequestIssueRemoved_ClaimingQuestFailBeforeDueTimeHasPassed_Rejected()
+    public void RequestIssueRemoved_ClaimingQuestTimeoutBeforeDueTimeHasPassed_Rejected()
     {
         var fixture = SetupVillageOwner();
         var owned = SetupOwnedIssue(fixture);
@@ -331,7 +333,7 @@ public class IssueFinalizationSecurityTests : IDisposable
             Assert.True(Client.ObjectManager.TryGetId(owner, out var ownerId));
 
             var network = Client.Resolve<Common.Network.INetwork>();
-            network.SendAll(new RequestIssueRemoved(ownerId, IssueFinalizeReason.QuestFail, owned.Generation));
+            network.SendAll(new RequestIssueRemoved(ownerId, IssueFinalizeReason.QuestTimeout, owned.Generation));
         });
 
         Assert.Empty(Server.NetworkSentMessages.GetMessages<NetworkIssueRemoved>());

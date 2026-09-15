@@ -7,6 +7,7 @@ using Common.Network.Messages;
 using Coop.Core.Server.Connections.Messages;
 using Coop.Core.Server.Services.MobileParties;
 using Coop.Core.Server.Services.Kingdoms;
+using GameInterface.Services.Players;
 using LiteNetLib;
 using Serilog;
 using System.Collections.Generic;
@@ -52,6 +53,7 @@ public class LoadingState : ConnectionStateBase
     private readonly IJoinCampaignKingdomBaseLineSender campaignKingdomBaselineSender;
     private readonly IConnectionMessageQueue connectionMessageQueue;
     private readonly ISendCoalescer coalescer;
+    private readonly IPlayerManager playerManager;
     private readonly object joinGate = new object();
     private int phase = (int)JoinPhase.WaitingForCampaignEntry;
     private int initialBaselinesSent;
@@ -77,7 +79,8 @@ public class LoadingState : ConnectionStateBase
         IJoinCampaignBaselineSender campaignBaselineSender,
         IJoinCampaignKingdomBaseLineSender campaignKingdomBaselineSender,
         IConnectionMessageQueue connectionMessageQueue,
-        ISendCoalescer coalescer)
+        ISendCoalescer coalescer,
+        IPlayerManager playerManager)
         : base(connectionLogic)
     {
         this.messageBroker = messageBroker;
@@ -86,6 +89,7 @@ public class LoadingState : ConnectionStateBase
         this.campaignKingdomBaselineSender = campaignKingdomBaselineSender;
         this.connectionMessageQueue = connectionMessageQueue;
         this.coalescer = coalescer;
+        this.playerManager = playerManager;
 
         messageBroker.Subscribe<NetworkPlayerCampaignEntered>(PlayerCampaignEnteredHandler);
         messageBroker.Subscribe<NetworkJoinSync>(JoinSyncHandler);
@@ -311,6 +315,11 @@ public class LoadingState : ConnectionStateBase
                 if (!IsCurrent(JoinPhase.CatchUpAppliedQueued)) return;
 
                 connectionMessageQueue.CompleteCatchUp(peer);
+
+                if (playerManager.TryGetPlayer(peer, out var player))
+                {
+                    playerManager.MarkCampaignReady(player.ControllerId);
+                }
 
                 messageBroker.Publish(this, new PlayerCampaignSynchronized(peer));
 
