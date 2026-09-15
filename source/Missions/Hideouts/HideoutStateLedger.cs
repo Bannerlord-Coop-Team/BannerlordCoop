@@ -24,7 +24,7 @@ internal sealed class HideoutStateLedger
             state.HostEpoch != hostEpoch || hostEpoch <= 0 || state.Revision <= 0)
             return false;
         if (Latest != null && (state.HostEpoch < Latest.HostEpoch ||
-            state.HostEpoch == Latest.HostEpoch && state.Revision <= Latest.Revision))
+            (state.HostEpoch == Latest.HostEpoch && state.Revision <= Latest.Revision)))
             return false;
 
         Latest = state;

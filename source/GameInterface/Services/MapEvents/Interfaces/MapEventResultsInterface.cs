@@ -225,7 +225,7 @@ public class MapEventResultsInterface : IMapEventResultsInterface
         for (var index = 0; index < parties.Length; index++)
         {
             var party = parties[index];
-            party.PlunderedGold = gold / parties.Length + (index < gold % parties.Length ? 1 : 0);
+            party.PlunderedGold = (gold / parties.Length) + (index < (gold % parties.Length) ? 1 : 0);
             pooledItems.Add(loot.LootedItems[party]);
             loot.LootedItems[party].Clear();
         }
@@ -266,7 +266,7 @@ public class MapEventResultsInterface : IMapEventResultsInterface
             {
                 rosters[parties[receiver]].AddToCounts(troop.Character, 1, false,
                     count < troop.WoundedNumber ? 1 : 0,
-                    troop.Xp / troop.Number + (count < troop.Xp % troop.Number ? 1 : 0));
+                    (troop.Xp / troop.Number) + (count < (troop.Xp % troop.Number) ? 1 : 0));
                 receiver = (receiver + 1) % parties.Length;
             }
     }

@@ -233,7 +233,7 @@ internal sealed class CoopHideoutMissionLogic : MissionLogic
             (!authority || defender.TotalTroops == defender.SideTotalTroops);
 
     public bool PreserveStealthPosture => Native.Phase is HideoutPhase.Stealth ||
-        direct && Native.Phase == HideoutPhase.Camp;
+        (direct && Native.Phase == HideoutPhase.Camp);
 
     public bool RestoreAdoptedAgent(Agent agent)
     {
@@ -333,7 +333,7 @@ internal sealed class CoopHideoutMissionLogic : MissionLogic
             if (state.HostEpoch > battle.Session.HostEpoch)
             {
                 if (pendingState == null || state.HostEpoch > pendingState.HostEpoch ||
-                    state.HostEpoch == pendingState.HostEpoch && state.Revision > pendingState.Revision)
+                    (state.HostEpoch == pendingState.HostEpoch && state.Revision > pendingState.Revision))
                     pendingState = state;
                 return;
             }
