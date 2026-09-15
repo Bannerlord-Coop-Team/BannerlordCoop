@@ -100,10 +100,25 @@ public readonly struct NetworkApplyPendingQuestFailConsequence : IServerToClient
     public readonly string QuestTypeKey;
     [ProtoMember(2)]
     public readonly byte Proof;
+    [ProtoMember(3)]
+    public readonly long ObligationId;
 
-    public NetworkApplyPendingQuestFailConsequence(string questTypeKey, byte proof)
+    public NetworkApplyPendingQuestFailConsequence(long obligationId, string questTypeKey, byte proof)
     {
+        ObligationId = obligationId;
         QuestTypeKey = questTypeKey;
         Proof = proof;
+    }
+}
+
+[ProtoContract(SkipConstructor = true)]
+public readonly struct NetworkAcknowledgePendingQuestFailConsequence : ICommand
+{
+    [ProtoMember(1)]
+    public readonly long ObligationId;
+
+    public NetworkAcknowledgePendingQuestFailConsequence(long obligationId)
+    {
+        ObligationId = obligationId;
     }
 }

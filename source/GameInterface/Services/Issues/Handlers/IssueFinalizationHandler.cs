@@ -28,6 +28,7 @@ internal class IssueFinalizationHandler : IHandler
     private readonly IIssueOwnershipRegistry ownershipRegistry;
     private readonly IIssueGenerationRegistry generationRegistry;
     private readonly IPendingLocalOwnerConsequenceRegistry pendingConsequenceRegistry;
+    private readonly IAppliedPendingQuestFailConsequenceTracker appliedConsequenceTracker;
 
     public IssueFinalizationHandler(
         IMessageBroker messageBroker,
@@ -36,7 +37,8 @@ internal class IssueFinalizationHandler : IHandler
         IPlayerManager playerManager,
         IIssueOwnershipRegistry ownershipRegistry,
         IIssueGenerationRegistry generationRegistry,
-        IPendingLocalOwnerConsequenceRegistry pendingConsequenceRegistry)
+        IPendingLocalOwnerConsequenceRegistry pendingConsequenceRegistry,
+        IAppliedPendingQuestFailConsequenceTracker appliedConsequenceTracker)
     {
         this.messageBroker = messageBroker;
         this.objectManager = objectManager;
@@ -45,6 +47,7 @@ internal class IssueFinalizationHandler : IHandler
         this.ownershipRegistry = ownershipRegistry;
         this.generationRegistry = generationRegistry;
         this.pendingConsequenceRegistry = pendingConsequenceRegistry;
+        this.appliedConsequenceTracker = appliedConsequenceTracker;
 
         messageBroker.Subscribe<IssueFinalizedTriggered>(Handle_IssueFinalizedTriggered);
         messageBroker.Subscribe<QuestSuccessTriggered>(Handle_QuestSuccessTriggered);
@@ -52,6 +55,7 @@ internal class IssueFinalizationHandler : IHandler
         messageBroker.Subscribe<RequestIssueRemoved>(Handle_RequestIssueRemoved);
         messageBroker.Subscribe<NetworkIssueRemoved>(Handle_NetworkIssueRemoved);
         messageBroker.Subscribe<NetworkApplyPendingQuestFailConsequence>(Handle_NetworkApplyPendingQuestFailConsequence);
+        messageBroker.Subscribe<NetworkAcknowledgePendingQuestFailConsequence>(Handle_NetworkAcknowledgePendingQuestFailConsequence);
     }
 
     public void Dispose()
@@ -62,6 +66,7 @@ internal class IssueFinalizationHandler : IHandler
         messageBroker.Unsubscribe<RequestIssueRemoved>(Handle_RequestIssueRemoved);
         messageBroker.Unsubscribe<NetworkIssueRemoved>(Handle_NetworkIssueRemoved);
         messageBroker.Unsubscribe<NetworkApplyPendingQuestFailConsequence>(Handle_NetworkApplyPendingQuestFailConsequence);
+        messageBroker.Unsubscribe<NetworkAcknowledgePendingQuestFailConsequence>(Handle_NetworkAcknowledgePendingQuestFailConsequence);
     }
 
     private void Handle_NetworkApplyPendingQuestFailConsequence(MessagePayload<NetworkApplyPendingQuestFailConsequence> payload)
@@ -71,8 +76,23 @@ internal class IssueFinalizationHandler : IHandler
         var data = payload.What;
         GameThread.RunSafe(() =>
         {
-            QuestTypeRegistry.GetByDisplayName(data.QuestTypeKey)?.ApplyQuestFailLocalOwnerConsequence?.Invoke(null, data.Proof);
+            if (appliedConsequenceTracker.TryMarkApplied(data.ObligationId))
+            {
+                QuestTypeRegistry.GetByDisplayName(data.QuestTypeKey)?.ApplyQuestFailLocalOwnerConsequence?.Invoke(null, data.Proof);
+            }
+
+            network.SendAll(new NetworkAcknowledgePendingQuestFailConsequence(data.ObligationId));
         });
+    }
+
+    private void Handle_NetworkAcknowledgePendingQuestFailConsequence(MessagePayload<NetworkAcknowledgePendingQuestFailConsequence> payload)
+    {
+        if (ModInformation.IsClient) return;
+
+        var acker = payload.Who as NetPeer;
+        if (acker == null || !playerManager.TryGetPlayer(acker, out var player)) return;
+
+        pendingConsequenceRegistry.Ack(player.ControllerId, payload.What.ObligationId);
     }
 
     private static byte CaptureProof(IssueBase issue, IssueFinalizeReason reason)

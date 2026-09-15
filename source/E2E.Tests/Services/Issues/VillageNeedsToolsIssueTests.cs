@@ -13,6 +13,7 @@ using GameInterface.Services.ItemRosters.Messages;
 using GameInterface.Services.Players;
 using GameInterface.Services.Players.Data;
 using HarmonyLib;
+using System.Linq;
 using System.Reflection;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Actions;
@@ -1700,6 +1701,83 @@ public class VillageNeedsToolsIssueTests : IDisposable
 
         Server.Call(() =>
             Assert.Equal(hostHonorXpBefore, Campaign.Current.PlayerTraitDeveloper.GetPropertyValue(DefaultTraits.Honor)));
+    }
+
+    [Fact]
+    public void OnMapEventStarted_DeliveredObligationIsRedeliveredAfterALostAcknowledgement_AppliesThePenaltyOnlyOnce()
+    {
+        var fixture = SetupVillageOwner();
+        CreateIssueOnServer(fixture);
+        var ownerHeroId = CreateDistinctOwnerHero(fixture);
+        var partyId = AcceptQuestFromClient(fixture, "player-A", ownerHeroId);
+
+        foreach (var instance in AllInstances)
+        {
+            instance.Call(() =>
+            {
+                Assert.True(instance.ObjectManager.TryGetObject<Hero>(fixture.HeroId, out var giver));
+                Assert.True(instance.ObjectManager.TryGetObject<Settlement>(fixture.SettlementId, out var settlement));
+                using (new AllowedThread())
+                {
+                    settlement.Party ??= new PartyBase(settlement);
+                    giver.Occupation = Occupation.RuralNotable;
+                    settlement.CollectNotablesToCache();
+                }
+                Assert.Contains(giver, settlement.Notables);
+            });
+        }
+
+        Server.Resolve<IPlayerManager>().ClearPeer(Client.NetPeer);
+
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject<Hero>(fixture.HeroId, out var giver));
+            Assert.True(Server.ObjectManager.TryGetObject<MobileParty>(partyId, out var ownerParty));
+            Assert.True(Server.ObjectManager.TryGetObject<Settlement>(fixture.SettlementId, out var settlement));
+
+            var quest = Assert.IsType<VillageNeedsToolsIssueBehavior.VillageNeedsToolsIssueQuest>(giver.Issue.IssueQuest);
+            MapEvent mapEvent;
+            using (new AllowedThread())
+            {
+                mapEvent = new MapEvent();
+                mapEvent._mapEventType = MapEvent.BattleTypes.IsForcingSupplies;
+                mapEvent.MapEventSettlement = settlement;
+                mapEvent._sides[0] = new MapEventSide(mapEvent, BattleSideEnum.Defender, settlement.Party);
+                mapEvent._sides[1] = new MapEventSide(mapEvent, BattleSideEnum.Attacker, ownerParty.Party);
+                settlement.Party._mapEventSide = mapEvent.DefenderSide;
+            }
+
+            quest.OnMapEventStarted(mapEvent, ownerParty.Party, settlement.Party);
+        });
+
+        int ownerHonorXpBeforeRejoin = 0;
+        Client.Call(() => ownerHonorXpBeforeRejoin = Campaign.Current.PlayerTraitDeveloper.GetPropertyValue(DefaultTraits.Honor));
+
+        Server.Resolve<IPlayerManager>().SetPeer("player-A", Client.NetPeer);
+        Server.Resolve<IPlayerManager>().MarkCampaignReady("player-A");
+        Server.Call(() =>
+        {
+            new IssuesCampaignBehavior().RegisterEvents();
+            CampaignEvents.Instance.HourlyTick();
+        });
+
+        var firstDelivery = Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkApplyPendingQuestFailConsequence>());
+        Assert.Empty(Server.Resolve<IPendingLocalOwnerConsequenceRegistry>().Snapshot());
+
+        Client.Call(() =>
+            Assert.Equal(ownerHonorXpBeforeRejoin - 50, Campaign.Current.PlayerTraitDeveloper.GetPropertyValue(DefaultTraits.Honor)));
+
+        Server.Call(() => Server.Resolve<IPendingLocalOwnerConsequenceRegistry>()
+            .Restore("player-A", firstDelivery.ObligationId, firstDelivery.QuestTypeKey, firstDelivery.Proof));
+
+        Server.Call(() => CampaignEvents.Instance.HourlyTick());
+
+        var deliveries = Server.NetworkSentMessages.GetMessages<NetworkApplyPendingQuestFailConsequence>();
+        Assert.Equal(2, deliveries.Count());
+        Assert.Equal(firstDelivery.ObligationId, deliveries.Last().ObligationId);
+
+        Client.Call(() =>
+            Assert.Equal(ownerHonorXpBeforeRejoin - 50, Campaign.Current.PlayerTraitDeveloper.GetPropertyValue(DefaultTraits.Honor)));
     }
 
     [Fact]

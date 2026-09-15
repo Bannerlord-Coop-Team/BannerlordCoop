@@ -22,13 +22,17 @@ internal sealed class PendingLocalOwnerConsequenceSaveData
     [SaveableField(3)]
     internal byte Proof;
 
+    [SaveableField(4)]
+    internal long ObligationId;
+
     private PendingLocalOwnerConsequenceSaveData()
     {
     }
 
-    internal PendingLocalOwnerConsequenceSaveData(string controllerId, string questTypeKey, byte proof)
+    internal PendingLocalOwnerConsequenceSaveData(string controllerId, long obligationId, string questTypeKey, byte proof)
     {
         ControllerId = controllerId;
+        ObligationId = obligationId;
         QuestTypeKey = questTypeKey;
         Proof = proof;
     }
@@ -82,7 +86,7 @@ internal class PendingLocalOwnerConsequencePersistencePatches
         if (dataStore.IsSaving)
         {
             saveData = pendingConsequenceRegistry.Snapshot()
-                .Select(e => new PendingLocalOwnerConsequenceSaveData(e.ControllerId, e.QuestTypeKey, e.Proof))
+                .Select(e => new PendingLocalOwnerConsequenceSaveData(e.ControllerId, e.ObligationId, e.QuestTypeKey, e.Proof))
                 .ToList();
         }
 
@@ -92,10 +96,12 @@ internal class PendingLocalOwnerConsequencePersistencePatches
         pendingConsequenceRegistry.ClearAll();
         if (saveData == null) return;
 
+        var migratedObligationId = -1L;
         foreach (var entry in saveData)
         {
             if (entry?.ControllerId == null || entry.QuestTypeKey == null) continue;
-            pendingConsequenceRegistry.Restore(entry.ControllerId, entry.QuestTypeKey, entry.Proof);
+            var obligationId = entry.ObligationId != 0 ? entry.ObligationId : migratedObligationId--;
+            pendingConsequenceRegistry.Restore(entry.ControllerId, obligationId, entry.QuestTypeKey, entry.Proof);
         }
     }
 }

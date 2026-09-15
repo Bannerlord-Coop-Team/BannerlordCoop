@@ -7,15 +7,17 @@ namespace GameInterface.Services.Issues.Generic;
 public interface IPendingLocalOwnerConsequenceRegistry
 {
     void DeferQuestFail(string controllerId, string questTypeKey, byte proof);
-    void FlushReady(IPlayerManager playerManager, Action<string, string, byte> deliver);
+    void FlushReady(IPlayerManager playerManager, Action<string, long, string, byte> deliver);
+    void Ack(string controllerId, long obligationId);
     void ClearAll();
-    void Restore(string controllerId, string questTypeKey, byte proof);
-    IReadOnlyCollection<(string ControllerId, string QuestTypeKey, byte Proof)> Snapshot();
+    void Restore(string controllerId, long obligationId, string questTypeKey, byte proof);
+    IReadOnlyCollection<(string ControllerId, long ObligationId, string QuestTypeKey, byte Proof)> Snapshot();
 }
 
 internal sealed class PendingLocalOwnerConsequenceRegistry : IPendingLocalOwnerConsequenceRegistry
 {
-    private readonly Dictionary<string, List<(string QuestTypeKey, byte Proof)>> pendingQuestFailByController = new();
+    private readonly Dictionary<string, List<(long ObligationId, string QuestTypeKey, byte Proof)>> pendingQuestFailByController = new();
+    private long nextObligationId = 1;
 
     public void DeferQuestFail(string controllerId, string questTypeKey, byte proof)
     {
@@ -23,14 +25,14 @@ internal sealed class PendingLocalOwnerConsequenceRegistry : IPendingLocalOwnerC
 
         if (!pendingQuestFailByController.TryGetValue(controllerId, out var entries))
         {
-            entries = new List<(string, byte)>();
+            entries = new List<(long, string, byte)>();
             pendingQuestFailByController[controllerId] = entries;
         }
 
-        entries.Add((questTypeKey, proof));
+        entries.Add((nextObligationId++, questTypeKey, proof));
     }
 
-    public void FlushReady(IPlayerManager playerManager, Action<string, string, byte> deliver)
+    public void FlushReady(IPlayerManager playerManager, Action<string, long, string, byte> deliver)
     {
         if (pendingQuestFailByController.Count == 0) return;
 
@@ -45,28 +47,46 @@ internal sealed class PendingLocalOwnerConsequenceRegistry : IPendingLocalOwnerC
 
         foreach (var controllerId in readyControllerIds)
         {
-            var entries = pendingQuestFailByController[controllerId];
-            pendingQuestFailByController.Remove(controllerId);
-
-            foreach (var (questTypeKey, proof) in entries)
+            foreach (var (obligationId, questTypeKey, proof) in pendingQuestFailByController[controllerId])
             {
-                deliver(controllerId, questTypeKey, proof);
+                deliver(controllerId, obligationId, questTypeKey, proof);
             }
         }
     }
 
+    public void Ack(string controllerId, long obligationId)
+    {
+        if (string.IsNullOrEmpty(controllerId)) return;
+        if (!pendingQuestFailByController.TryGetValue(controllerId, out var entries)) return;
+
+        entries.RemoveAll(e => e.ObligationId == obligationId);
+        if (entries.Count == 0) pendingQuestFailByController.Remove(controllerId);
+    }
+
     public void ClearAll() => pendingQuestFailByController.Clear();
 
-    public void Restore(string controllerId, string questTypeKey, byte proof) => DeferQuestFail(controllerId, questTypeKey, proof);
-
-    public IReadOnlyCollection<(string ControllerId, string QuestTypeKey, byte Proof)> Snapshot()
+    public void Restore(string controllerId, long obligationId, string questTypeKey, byte proof)
     {
-        var snapshot = new List<(string, string, byte)>();
+        if (string.IsNullOrEmpty(controllerId) || string.IsNullOrEmpty(questTypeKey)) return;
+
+        if (!pendingQuestFailByController.TryGetValue(controllerId, out var entries))
+        {
+            entries = new List<(long, string, byte)>();
+            pendingQuestFailByController[controllerId] = entries;
+        }
+
+        entries.Add((obligationId, questTypeKey, proof));
+        if (obligationId >= nextObligationId) nextObligationId = obligationId + 1;
+    }
+
+    public IReadOnlyCollection<(string ControllerId, long ObligationId, string QuestTypeKey, byte Proof)> Snapshot()
+    {
+        var snapshot = new List<(string, long, string, byte)>();
         foreach (var kvp in pendingQuestFailByController)
         {
-            foreach (var (questTypeKey, proof) in kvp.Value)
+            foreach (var (obligationId, questTypeKey, proof) in kvp.Value)
             {
-                snapshot.Add((kvp.Key, questTypeKey, proof));
+                snapshot.Add((kvp.Key, obligationId, questTypeKey, proof));
             }
         }
         return snapshot;
