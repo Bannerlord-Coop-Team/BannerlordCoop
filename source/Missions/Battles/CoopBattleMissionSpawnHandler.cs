@@ -1,15 +1,19 @@
 ﻿using System;
 using Common.Logging;
 using Common.Messaging;
+using GameInterface;
 using GameInterface.Services.GameDebug.Messages;
 using GameInterface.Services.MapEvents;
 using GameInterface.Services.MapEvents.TroopSupply;
+using Missions.Messages;
 using SandBox.Missions.MissionLogics;
 using Serilog;
+using System.Collections.Generic;
 using TaleWorlds.Core;
 using TaleWorlds.MountAndBlade;
 
 namespace Missions.Battles;
+
 
 /// <summary>
 /// Coop replacement for <see cref="SandBoxBattleMissionSpawnHandler"/>: sizes each side to what THIS client's
@@ -76,8 +80,7 @@ public class CoopBattleMissionSpawnHandler : SandBoxMissionSpawnHandler
                 return;
             }
 
-            // Keep deployment held when the authoritative response cannot produce the local player agent.
-            // OnMissionTick ends the invalid mission without allowing native SetupTeams to run.
+            // Wait for the retained hero when its origin was already supplied, within the existing deadline.
             AddHeldPhases();
             Logger.Error("[BattleSync] Battle reserves cannot produce valid mission sizing and a local player origin; holding deployment before aborting the invalid mission");
             return;
@@ -103,7 +106,8 @@ public class CoopBattleMissionSpawnHandler : SandBoxMissionSpawnHandler
 
         _heldSeconds += dt;
         var sizing = ReadSizing();
-        if (ShouldContinueHolding(sizing)) return;
+        bool shouldContinueHolding = ShouldContinueHolding(sizing);
+        if (shouldContinueHolding) return;
 
         if (!HasValidMissionSizing(sizing) || !HasLocalPlayerOrigin())
         {
@@ -123,7 +127,7 @@ public class CoopBattleMissionSpawnHandler : SandBoxMissionSpawnHandler
     private bool ShouldContinueHolding(SideSizing sizing)
     {
         return _heldSeconds < ReserveHoldDeadlineSeconds
-            && (!sizing.Ready || !sizing.HasAnyOwnedTroops);
+            && (!sizing.Ready || !sizing.HasAnyOwnedTroops || !HasLocalPlayerOrigin());
     }
 
     private bool HasValidMissionSizing(SideSizing sizing)
@@ -148,9 +152,21 @@ public class CoopBattleMissionSpawnHandler : SandBoxMissionSpawnHandler
         base.Mission.EndMission();
     }
 
+
     private bool HasLocalPlayerOrigin()
     {
-        return HasLocalPlayerOrigin(_playerSide, GetLocalPlayerPartyId(), _defenderSupplier, _attackerSupplier);
+        var supplier = _playerSide == BattleSideEnum.Attacker ? _attackerSupplier : _defenderSupplier;
+        if (!supplier.WasPlayerHeroSupplied()
+            && HasLocalPlayerOrigin(_playerSide, GetLocalPlayerPartyId(), _defenderSupplier, _attackerSupplier)) return true;
+        var mission = base.Mission;
+        return mission?.GetMissionBehavior<CoopBattleController>()?.HasRetainedPlayerAgent(mission.InitialPlayerAgent) == true;
+    }
+
+    internal bool HasSuppliedPlayerOrigin(BattleAgentSpawnData data)
+    {
+        if (data == null || data.Side != _playerSide || data.MapEventPartyId != GetLocalPlayerPartyId()) return false;
+        var supplier = _playerSide == BattleSideEnum.Attacker ? _attackerSupplier : _defenderSupplier;
+        return supplier.IsTroopAlreadySupplied(data.MapEventPartyId, data.CharacterId, data.TroopSeed);
     }
 
     private string GetLocalPlayerPartyId()
@@ -469,17 +485,18 @@ public class CoopBattleMissionSpawnHandler : SandBoxMissionSpawnHandler
         adjustedDefenders -= transfer;
     }
 
-    // Init uses whole-side totals for vanilla sizing, but this client's deployment target must be its exact
-    // owner share. Derive remaining from total and initial so the native phase invariant stays intact.
+    // Retained agents already consumed supply; only the unspent owner share needs new native origins.
     private void ClampPhasesToOwnedShare(BattleSideEnum side, CoopTroopSupplier supplier)
     {
+        var allocation = supplier.CaptureAllocationSnapshot();
         foreach (var phase in _missionAgentSpawnLogic._phases[(int)side])
         {
             AdjustPhaseToOwnedShare(
                 phase.TotalSpawnNumber,
                 phase.InitialSpawnNumber,
-                supplier.OwnedShareOf(phase.TotalSpawnNumber),
-                supplier.OwnedShareOf(phase.InitialSpawnNumber),
+                allocation.OwnedShareOf(phase.TotalSpawnNumber),
+                allocation.OwnedShareOf(phase.InitialSpawnNumber),
+                allocation.SuppliedTroops,
                 out var total,
                 out var initial,
                 out var remaining);
@@ -494,12 +511,14 @@ public class CoopBattleMissionSpawnHandler : SandBoxMissionSpawnHandler
         int sideInitial,
         int ownedTotal,
         int ownedInitial,
+        int supplied,
         out int total,
         out int initial,
         out int remaining)
     {
-        total = ReachableSpawnNumber(sideTotal, ownedTotal);
-        initial = Math.Min(total, ReachableSpawnNumber(sideInitial, ownedInitial));
+        supplied = Math.Max(0, supplied);
+        total = Math.Max(0, ReachableSpawnNumber(sideTotal, ownedTotal) - supplied);
+        initial = Math.Min(total, Math.Max(0, ReachableSpawnNumber(sideInitial, ownedInitial) - supplied));
         remaining = total - initial;
     }
 
