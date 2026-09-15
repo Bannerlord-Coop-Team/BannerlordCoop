@@ -222,7 +222,7 @@ public class RaidLootWarningFixtureTests
         {
             using var broker = new MessageBroker();
             using var handler = subscribed ? new BattleSimulationRunHandler(broker, new Mock<INetwork>().Object,
-                new Mock<IObjectManager>().Object, new Mock<IMapEventLogger>().Object, new Mock<IPlayerManager>().Object) : null;
+                new Mock<IObjectManager>().Object, new MapEventLogger(new Mock<IObjectManager>().Object), new Mock<IPlayerManager>().Object) : null;
             var session = CreateSession();
             session.Prepare(() => { });
             session.Capture(session.Campaign, session.Party, session.Settlement, ObjectHelper.SkipConstructor<MapEvent>(), "event-a");
@@ -250,7 +250,7 @@ public class RaidLootWarningFixtureTests
         {
             using var broker = new MessageBroker();
             using var handler = new BattleSimulationRunHandler(broker, new Mock<INetwork>().Object,
-                new Mock<IObjectManager>().Object, new Mock<IMapEventLogger>().Object, new Mock<IPlayerManager>().Object);
+                new Mock<IObjectManager>().Object, new MapEventLogger(new Mock<IObjectManager>().Object), new Mock<IPlayerManager>().Object);
             var session = CreateSession();
             session.Prepare(() => { });
             session.Capture(session.Campaign, session.Party, session.Settlement, ObjectHelper.SkipConstructor<MapEvent>(), "event-a");
