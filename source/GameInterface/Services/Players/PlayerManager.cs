@@ -293,6 +293,8 @@ public class PlayerManager : IPlayerManager
         lock (registrySync)
         {
             peerToPlayer[peer] = player;
+            if (controllerToPeer.TryGetValue(controllerId, out var previousPeer) && !ReferenceEquals(previousPeer, peer))
+                campaignReadyControllerIds.Remove(controllerId);
             controllerToPeer[controllerId] = peer;
         }
     }
@@ -313,9 +315,10 @@ public class PlayerManager : IPlayerManager
 
             if (controllerToPeer.TryGetValue(player.ControllerId, out var currentPeer) &&
                 ReferenceEquals(currentPeer, peer))
+            {
                 controllerToPeer.Remove(player.ControllerId);
-
-            campaignReadyControllerIds.Remove(player.ControllerId);
+                campaignReadyControllerIds.Remove(player.ControllerId);
+            }
         }
     }
 
