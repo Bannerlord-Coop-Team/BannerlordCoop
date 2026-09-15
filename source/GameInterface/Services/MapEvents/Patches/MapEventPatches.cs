@@ -351,6 +351,13 @@ internal class MapEventPatches
         if (ModInformation.IsClient)
             return false;
 
+        bool hasPlayerParty = __instance.InvolvedParties.Any(
+            x => x != null && x.IsMobile && !x.MobileParty.IsControlledByThisInstance());
+
+        // Siege map events must not enter native campaign resolution, even on an allowed-thread setup path.
+        if (hasPlayerParty && !__instance.IsRaidHostileAction())
+            return false;
+
         // Receive path / setup: let the original run when patches are standing down.
         if (CallOriginalPolicy.IsOriginalAllowed())
             return true;
@@ -367,13 +374,11 @@ internal class MapEventPatches
                 return !HasOccupiedBattleMission(__instance);
         }
 
-        // A settlement PartyBase is a complete participant even though it has no MobileParty.
-        if (__instance.InvolvedParties.Any(x => x is null || (!x.IsMobile && !x.IsSettlement)))
+        if (hasPlayerParty)
             return false;
 
-        // Don't update if a player is involved
-        // Prevents server from instantly finishing the battle and waits for client finish request
-        if (__instance.InvolvedParties.Any(x => x.IsMobile && !x.MobileParty.IsControlledByThisInstance()))
+        // A settlement PartyBase is a complete participant even though it has no MobileParty.
+        if (__instance.InvolvedParties.Any(x => x is null || (!x.IsMobile && !x.IsSettlement)))
             return false;
 
         return true;

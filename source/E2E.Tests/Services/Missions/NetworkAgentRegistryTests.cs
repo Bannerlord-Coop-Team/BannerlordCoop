@@ -175,9 +175,12 @@ public class NetworkAgentRegistryTests
             EquipmentIndex.Weapon2,
             0));
 
+        info.UsesActionEquipment = true;
+
         Assert.True(registry.TryTransferAuthority("me", id));
 
         Assert.False(info.TryGetAuthoritativeEquipment(out _));
+        Assert.False(info.UsesActionEquipment);
     }
 
     [Fact]
