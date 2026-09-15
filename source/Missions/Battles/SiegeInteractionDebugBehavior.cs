@@ -204,6 +204,103 @@ internal sealed class SiegeInteractionDebugBehavior : MissionBehavior, ISiegeInt
                 if (pressed) useDispatchPressedCalls++;
                 if (useDispatchCalls != 1 && !pressed) return 0;
             }
+            object vanillaPredicate = null;
+            if (entry && method == nameof(MissionMainAgentInteractionComponent.FocusStateCheckTick))
+            {
+                IFocusable currentInteractable = null;
+                UsableMissionObject usable = null;
+                bool? mainIsUsingGameObject = null;
+                bool? mainIsAbleToUseMachine = null;
+                bool? hasUser = null;
+                bool? hasAIUser = null;
+                bool? objectHasVacantPosition = null;
+                string branch = "unclassified";
+                if (!pressed)
+                {
+                    branch = "input_not_pressed";
+                }
+                else if (!Mission.IsMainAgentItemInteractionEnabled)
+                {
+                    branch = "item_interaction_gate_requires_mountable_check";
+                }
+                else if (capturedScreen?.IsRadialMenuActive == true)
+                {
+                    branch = "radial_menu_active";
+                }
+                else if (Mission.IsOrderMenuOpen)
+                {
+                    branch = "order_menu_open";
+                }
+                else
+                {
+                    mainIsUsingGameObject = capturedAgent.IsUsingGameObject;
+                    bool continueToTarget = true;
+                    if (mainIsUsingGameObject == true &&
+                        !(capturedAgent.CurrentlyUsedGameObject is SpawnedItemEntity))
+                    {
+                        currentInteractable = interaction?._currentInteractableObject;
+                        var otherAgent = currentInteractable as Agent;
+                        var standingPoint = capturedAgent.CurrentlyUsedGameObject as StandingPoint;
+                        if (!(otherAgent != null && standingPoint != null &&
+                            !standingPoint.PlayerStopsUsingWhenInteractsWithOther))
+                        {
+                            branch = "main_already_using";
+                            continueToTarget = false;
+                        }
+                    }
+                    if (continueToTarget)
+                    {
+                        currentInteractable = interaction?._currentInteractableObject;
+                        usable = currentInteractable as UsableMissionObject;
+                        if (usable != null)
+                        {
+                            if (mainIsUsingGameObject == true)
+                            {
+                                branch = "usable_main_already_using";
+                            }
+                            else
+                            {
+                                mainIsAbleToUseMachine = capturedAgent.IsAbleToUseMachine();
+                                if (mainIsAbleToUseMachine != true)
+                                {
+                                    branch = "usable_unable_to_use";
+                                }
+                                else if (usable is SpawnedItemEntity)
+                                {
+                                    branch = "usable_spawned_item";
+                                }
+                                else
+                                {
+                                    objectHasVacantPosition = capturedAgent.ObjectHasVacantPosition(usable);
+                                    hasUser = usable.HasUser;
+                                    hasAIUser = hasUser == true ? usable.HasAIUser : null;
+                                    branch = objectHasVacantPosition == true ? "usable_dispatch" : "usable_not_vacant";
+                                }
+                            }
+                        }
+                        else
+                        {
+                            mainIsAbleToUseMachine = capturedAgent.IsAbleToUseMachine();
+                            branch = currentInteractable is Agent
+                                ? (mainIsAbleToUseMachine == true ? "agent_dispatch" : "agent_unable_to_use")
+                                : (mainIsAbleToUseMachine == true ? "return_without_dispatch" : "non_agent_unable_to_use");
+                        }
+                    }
+                }
+                vanillaPredicate = new
+                {
+                    target = Describe(currentInteractable),
+                    targetType = currentInteractable?.GetType().FullName,
+                    isUsableMissionObject = usable != null,
+                    isSpawnedItemEntity = usable is SpawnedItemEntity,
+                    mainIsUsingGameObject,
+                    mainIsAbleToUseMachine,
+                    hasUser,
+                    hasAIUser,
+                    objectHasVacantPosition,
+                    branch
+                };
+            }
             if (entry) call = System.Threading.Interlocked.Increment(ref useDispatchSequence);
             ContainerProvider.TryResolve<INetworkAgentRegistry>(out var registry);
             CoopAgentInfo info = null;
@@ -234,6 +331,7 @@ internal sealed class SiegeInteractionDebugBehavior : MissionBehavior, ISiegeInt
                 focusedObject = Describe(interaction?.CurrentFocusedObject),
                 interactableObject = Describe(interaction?._currentInteractableObject),
                 argumentObject = Describe(args?.OfType<UsableMissionObject>().FirstOrDefault()),
+                vanillaPredicate,
                 usingObject = capturedAgent.IsUsingGameObject, usedObject = Describe(capturedAgent.CurrentlyUsedGameObject),
                 stop, exception = failure?.GetType().FullName
             });
