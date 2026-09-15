@@ -120,6 +120,68 @@ public class RetreatedPartyOutcomeTests : MissionTestEnvironment
             Assert.Equal(retreaterInfluenceBefore, retreaterParty.LeaderHero.Clan.Influence);
         }, MapEventDisabledMethods);
     }
+    
+    [Fact]
+    public void AlliedPlayerRetreats_AllyLaterLoses_WinnerRewardsExcludeRetreaterStrength()
+    {
+        var setup = SetupBattle();
+        EnterBattle(Clients.ElementAt(1), setup.MapEventId);
+        EnterBattle(Clients.ElementAt(2), setup.MapEventId);
+        DepartBattle(RetreaterController, setup.MapEventId, wasRetreat: true);
+
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject<MapEvent>(setup.MapEventId, out var mapEvent));
+            Assert.True(Server.ObjectManager.TryGetObject<MobileParty>(setup.EnemyPartyId, out var enemyParty));
+            Assert.True(Server.ObjectManager.TryGetObject<MobileParty>(setup.RemainingPartyId, out var remainingParty));
+            Assert.True(Server.ObjectManager.TryGetObject<MobileParty>(setup.RetreaterPartyId, out var retreaterParty));
+
+            MapEventParty enemyMapEventParty = mapEvent.AttackerSide.Parties.Single(party => ReferenceEquals(party.Party, enemyParty.Party));
+
+            float remainingPreBattleStrength = remainingParty.Party.GetCustomStrength(mapEvent.DefenderSide.MissionSide, mapEvent.SimulationContext);
+
+            remainingParty.MemberRoster.Clear();
+
+            float remainingPostBattleStrength = remainingParty.Party.GetCustomStrength(mapEvent.DefenderSide.MissionSide, mapEvent.SimulationContext);
+
+            Assert.True(remainingPreBattleStrength > remainingPostBattleStrength);
+
+            float retreaterStrength = retreaterParty.Party.GetCustomStrength(mapEvent.DefenderSide.MissionSide, mapEvent.SimulationContext);
+
+            var eligibleStrengthOfSide = mapEvent.StrengthOfSide.ToArray();
+
+            eligibleStrengthOfSide[(int)mapEvent.DefenderSide.MissionSide] -= retreaterStrength;
+
+            float originalAttackerRenownValue = mapEvent.AttackerSide.RenownValue;
+            float originalAttackerInfluenceValue = mapEvent.AttackerSide.InfluenceValue;
+
+            mapEvent.AttackerSide.CalculateRenownAndInfluenceValuesOnPartyInvolved(eligibleStrengthOfSide);
+
+            float expectedRenownValue = mapEvent.AttackerSide.RenownValue;
+            float expectedInfluenceValue = mapEvent.AttackerSide.InfluenceValue;
+
+            mapEvent.AttackerSide.RenownValue = originalAttackerRenownValue;
+            mapEvent.AttackerSide.InfluenceValue = originalAttackerInfluenceValue;
+
+            float eligibleDefeatedStrength = eligibleStrengthOfSide[(int)mapEvent.DefenderSide.MissionSide];
+            float rewardMultiplier = eligibleDefeatedStrength == 0f ? 0f : (eligibleDefeatedStrength - remainingPostBattleStrength) / eligibleDefeatedStrength;
+
+            Assert.True(rewardMultiplier > 0f);
+
+            float contributionShare = (float)enemyMapEventParty.ContributionToBattle / mapEvent.AttackerSide.CalculateTotalContribution();
+
+            var rewardModel = Campaign.Current.Models.BattleRewardModel;
+
+            float expectedRenown = rewardModel.CalculateRenownGain(enemyParty.Party, expectedRenownValue, contributionShare, rewardMultiplier, includeDescriptions: false).ResultNumber;
+            float expectedInfluence = rewardModel.CalculateInfluenceGain(enemyParty.Party, expectedInfluenceValue, contributionShare, rewardMultiplier, includeDescriptions: false).ResultNumber;
+
+            mapEvent.BattleState = BattleState.AttackerVictory;
+            mapEvent.CalculateMapEventResults();
+
+            Assert.Equal(expectedRenown, enemyMapEventParty.GainedRenown, precision: 5);
+            Assert.Equal(expectedInfluence, enemyMapEventParty.GainedInfluence, precision: 5);
+        }, MapEventDisabledMethods);
+    }
 
     private OutcomeSetup SetupBattle()
     {
