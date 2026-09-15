@@ -252,6 +252,7 @@ internal class PartyCommands
         {
             new ExpectedArgs("party_id", "The party id.", true),
             new ExpectedArgs("settlement_id", "The settlement id.", true),
+            new ExpectedArgs("instant", "Set to true to teleport instantly instead of travelling.", isRequired: false),
         };
 
         public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
@@ -276,8 +277,18 @@ internal class PartyCommands
             if (!party.IsActive)
                 return Failed($"Party {party.StringId} is not active.");
 
-            if (party.CurrentSettlement != null)
+            bool instant = false;
+            if (args.Count >= 3)
+            {
+                if (!bool.TryParse(args[2], out instant))
+                    return Failed($"Invalid instant value '{args[2]}'. Expected true or false.");
+            }
+
+            if (party.CurrentSettlement != null && !instant)
                 return Failed($"Party {party.StringId} is already in {party.CurrentSettlement.StringId}.");
+
+            if (instant)
+                return TeleportToSettlement(party, settlement);
 
             var navigationType = party.IsCurrentlyAtSea
                 ? MobileParty.NavigationType.Naval
@@ -286,6 +297,41 @@ internal class PartyCommands
 
             return Succeeded($"Ordered {party.StringId} to {settlement.StringId}.");
         }
+    }
+
+    // Instant variant of the move-to-settlement order: drops the party at the
+    // settlement gate and re-issues the go-to order from there, so arrival fires
+    // on the next tick instead of after travelling. Runs with patches live so it replicates.
+    private static CoopCommandResult TeleportToSettlement(MobileParty party, Settlement settlement)
+    {
+        if (party.MapEvent != null)
+            return Failed($"Party {party.StringId} is in a map event.");
+
+        if (party.Army != null)
+            return Failed($"Party {party.StringId} is in an army; instant move does not carry attached parties.");
+
+        // Leaving runs with patches live so the exit replicates, then the
+        // teleport below moves the party from the old gate to the new one.
+        if (party.CurrentSettlement != null)
+            LeaveSettlementAction.ApplyForParty(party);
+
+        party.Position = settlement.GatePosition;
+        if (party.Position.IsOnLand == party.IsCurrentlyAtSea)
+            party.ChangeIsCurrentlyAtSeaCheat();
+
+        var navigationType = party.IsCurrentlyAtSea
+            ? MobileParty.NavigationType.Naval
+            : MobileParty.NavigationType.Default;
+        party.SetMoveGoToSettlement(settlement, navigationType, isTargetingThePort: false);
+        MessageBroker.Instance.Publish(
+            typeof(PartyCommands),
+            new PartyBehaviorChangeAttempted(
+                party,
+                forcePosition: true,
+                isCurrentlyAtSea: party.IsCurrentlyAtSea,
+                resetMovementToHold: false));
+
+        return Succeeded($"Teleported {party.StringId} to {settlement.StringId} gate at {party.Position.X:R},{party.Position.Y:R}.");
     }
 
     /// <summary>
