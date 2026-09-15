@@ -1,4 +1,4 @@
-#if DEBUG
+﻿#if DEBUG
 using Autofac;
 using Common;
 using Common.LiveTesting;
@@ -28,6 +28,7 @@ using TaleWorlds.ScreenSystem;
 
 [assembly: System.Reflection.AssemblyMetadata("CoopLiveTestProtocol", "1")]
 [assembly: System.Reflection.AssemblyMetadata("CoopLiveTestCapabilities", "staged-ui-capture-v1")]
+[assembly: System.Reflection.AssemblyMetadata("CoopLiveTestUiCapability", "bounded-ui-layers-v1")]
 
 namespace Coop.LiveTesting
 {
@@ -168,6 +169,7 @@ namespace Coop.LiveTesting
                     return HandleRenderStatus(request);
                 case "render-toggle":
                     return HandleRenderToggle(request);
+                case "ui-layers":
                 case "ui-inspect":
                 case "ui-action":
                     return HandleUi(request);
@@ -195,13 +197,23 @@ namespace Coop.LiveTesting
                     return Failure(request.Id, "client_only", "UI automation is client-only.", false);
                 try
                 {
+                    if (request.Method == "ui-layers")
+                    {
+                        if (request.Parameters.EnumerateObject().Any())
+                            return Failure(request.Id, "invalid_parameters", "ui-layers accepts no parameters.", false);
+                        return Success(request.Id, ui.Discover());
+                    }
+                    var allowed = mutation ? new[] { "snapshot", "element", "action", "text", "value" } : new[] { "snapshot", "offset", "layer" };
+                    if (request.Parameters.EnumerateObject().Any(p => !allowed.Contains(p.Name)))
+                        return Failure(request.Id, "invalid_parameters", "Unknown UI parameter.", false);
                     string snapshot = ReadUiString(request.Parameters, "snapshot");
                     if (!mutation)
                     {
                         int offset = 0;
-                        if (request.Parameters.TryGetProperty("offset", out var offsetValue) && !offsetValue.TryGetInt32(out offset))
+                        if (request.Parameters.TryGetProperty("offset", out var offsetValue) &&
+                            (offsetValue.ValueKind != JsonValueKind.Number || !offsetValue.TryGetInt32(out offset)))
                             return Failure(request.Id, "invalid_parameters", "offset must be an integer.", false);
-                        return Success(request.Id, ui.Inspect(snapshot, offset));
+                        return Success(request.Id, ui.Inspect(snapshot, offset, ReadUiString(request.Parameters, "layer")));
                     }
                     string element = ReadUiString(request.Parameters, "element");
                     string action = ReadUiString(request.Parameters, "action");
@@ -852,6 +864,7 @@ namespace Coop.LiveTesting
             return Success(requestId, new
             {
                 protocolVersion = LiveTestProtocol.Version,
+                uiCapability = "bounded-ui-layers-v1",
                 pid = processInfo.Pid,
                 role = processInfo.Role,
                 platformId = processInfo.PlatformId,
