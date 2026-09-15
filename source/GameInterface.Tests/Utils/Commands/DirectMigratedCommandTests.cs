@@ -94,6 +94,7 @@ public class DirectMigratedCommandTests
             {
                 "battle_reward_fixture_start",
                 "kms",
+                "move_to_settlement",
                 "start_nearest_bandit_attack",
                 "upgrade_party_screen_troop",
             },
@@ -121,6 +122,63 @@ public class DirectMigratedCommandTests
             Assert.False(result.Succeeded);
             Assert.Equal("invalid_arguments", result.ErrorCode);
             Assert.Contains("<party_id>", result.Output);
+        }
+        finally
+        {
+            ModInformation.IsServer = originalIsServer;
+        }
+    }
+
+    [Theory]
+    [InlineData("party")]
+    [InlineData("party", "settlement", "true", "extra")]
+    public void MoveToSettlement_RejectsInvalidArgumentCount(params string[] args)
+    {
+        bool originalIsServer = ModInformation.IsServer;
+        try
+        {
+            ModInformation.IsServer = true;
+            ICoopCommand command = Assert.Single(
+                CreateCommands(),
+                candidate => candidate.Name == "move_to_settlement");
+            var registry = new CoopCommandRegistry(
+                new[] { command },
+                new LoggerConfiguration().CreateLogger());
+
+            CoopCommandResult result = registry.ProcessCommand(
+                $"{command.Prefix}.{command.Name}",
+                new TestArgs(args));
+
+            Assert.False(result.Succeeded);
+            Assert.Equal("invalid_arguments", result.ErrorCode);
+        }
+        finally
+        {
+            ModInformation.IsServer = originalIsServer;
+        }
+    }
+
+    [Fact]
+    public void MoveToSettlement_UsageMarksInstantOptional()
+    {
+        bool originalIsServer = ModInformation.IsServer;
+        try
+        {
+            ModInformation.IsServer = true;
+            ICoopCommand command = Assert.Single(
+                CreateCommands(),
+                candidate => candidate.Name == "move_to_settlement");
+            var registry = new CoopCommandRegistry(
+                new[] { command },
+                new LoggerConfiguration().CreateLogger());
+
+            CoopCommandResult result = registry.ProcessCommand(
+                $"{command.Prefix}.{command.Name}",
+                new TestArgs(Array.Empty<string>()));
+
+            Assert.False(result.Succeeded);
+            Assert.Equal("invalid_arguments", result.ErrorCode);
+            Assert.Contains("[<instant>]", result.Output);
         }
         finally
         {
