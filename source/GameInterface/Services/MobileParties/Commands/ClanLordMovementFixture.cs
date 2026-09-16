@@ -41,7 +41,7 @@ internal sealed class ClanLordMovementFixture : IClanLordMovementFixture
     private readonly IClanLordMovementFixtureRules rules;
     private Campaign campaign;
     private Capture lordCapture;
-    private Capture caravanCapture;
+    private Capture interactionCapture;
     private FixtureLord fixtureLord;
     private Observation observation;
 
@@ -58,7 +58,7 @@ internal sealed class ClanLordMovementFixture : IClanLordMovementFixture
     {
         if (ModInformation.IsClient) return Result(false, "setup requires the server");
         if (!CheckCampaign()) return Result(false, "campaign is unavailable");
-        if (lordCapture != null || caravanCapture != null || fixtureLord != null)
+        if (lordCapture != null || interactionCapture != null || fixtureLord != null)
             return Result(false, "fixture already captured; run clan_lord_fixture_restore first");
         if (!objects.TryGetObject(playerId, out MobileParty player) || !player.IsPlayerParty())
             return Result(false, "playerPartyId must be the exact registered player MobileParty id");
@@ -75,41 +75,44 @@ internal sealed class ClanLordMovementFixture : IClanLordMovementFixture
             .ThenBy(p => p.StringId, StringComparer.Ordinal).ToArray();
         MobileParty lord = candidates.FirstOrDefault(p => EligibleAi(p) == null);
         var candidateEvidence = candidates.Select(p => new { party = Describe(p), rejected = EligibleAi(p) }).ToArray();
-        MobileParty caravan = MobileParty.All.Where(p => p.IsCaravan && EligibleAi(p) == null &&
-                !p.ShouldBeIgnored && p.MapFaction != null && player.MapFaction != null && !p.MapFaction.IsAtWarWith(player.MapFaction))
-            .OrderBy(p => p.Position.DistanceSquared(player.Position))
-            .ThenBy(p => p.StringId, StringComparer.Ordinal).FirstOrDefault();
-        if (caravan == null) return Result(false, "no eligible registered peaceful caravan", candidateEvidence);
         float interactionRange = campaign.Models.EncounterModel.NeededMaximumLandDistanceForEncounteringMobileParty;
         if (!rules.IsWithinInteractionRange(0f, interactionRange))
             return Result(false, "land interaction range is unavailable; nothing changed");
-        var caravanRadii = new[] { interactionRange * 0.6f, interactionRange * 0.4f, interactionRange * 0.2f };
-        if (!TryPoint(player.Position, caravanRadii, out CampaignVec2 caravanPoint))
-            return Result(false, "no deterministic navigable staging point or lord route; nothing changed", candidateEvidence);
         if (lord == null)
         {
             string preparationFailure = PrepareFixtureLord(player, clan, out lord);
             if (preparationFailure != null) return Result(false, preparationFailure, candidateEvidence);
         }
+        var interactionEvidence = MobileParty.All.Where(p => p != player && p != lord)
+            .Select(p => new { party = Describe(p), rejected = EligibleInteraction(p, player, lord) }).ToArray();
+        MobileParty interaction = MobileParty.All.Where(p => EligibleInteraction(p, player, lord) == null)
+            .OrderBy(p => rules.InteractionPriority(p.IsCaravan, p.IsLordParty))
+            .ThenBy(p => p.Position.DistanceSquared(player.Position))
+            .ThenBy(p => p.StringId, StringComparer.Ordinal).FirstOrDefault();
+        if (interaction == null)
+            return SetupFailure("no eligible registered peaceful interaction party", new { candidateEvidence, interactionEvidence });
+        var interactionRadii = new[] { interactionRange * 0.6f, interactionRange * 0.4f, interactionRange * 0.2f };
+        if (!TryPoint(player.Position, interactionRadii, out CampaignVec2 interactionPoint))
+            return SetupFailure("no deterministic navigable staging point", new { candidateEvidence, interactionEvidence });
         if (!TryPoint(lord.Position, new[] { 24f, 20f, 16f }, out CampaignVec2 target))
-            return SetupFailure("no deterministic navigable staging point or lord route", candidateEvidence);
+            return SetupFailure("no deterministic lord route", new { candidateEvidence, interactionEvidence });
         if (!snapshots.TryCreate(lord, out var lordState) || !snapshots.CanApply(lord, lordState) ||
-            !snapshots.TryCreate(caravan, out var caravanState) || !snapshots.CanApply(caravan, caravanState))
-            return SetupFailure("unable to capture restorable movement state", candidateEvidence);
+            !snapshots.TryCreate(interaction, out var interactionState) || !snapshots.CanApply(interaction, interactionState))
+            return SetupFailure("unable to capture restorable movement state", new { candidateEvidence, interactionEvidence });
 
         lordCapture = new Capture(lord, lordState);
-        caravanCapture = new Capture(caravan, caravanState);
-        observation = new Observation(Guid.NewGuid().ToString("N"), playerId, Id(lord), Id(caravan), target);
+        interactionCapture = new Capture(interaction, interactionState);
+        observation = new Observation(Guid.NewGuid().ToString("N"), playerId, Id(lord), Id(interaction), target);
         try
         {
-            caravanCapture.Modified = true;
-            caravan.Position = caravanPoint;
-            caravan.SetMoveModeHold();
-            caravan.SetNavigationModeHold();
-            caravan.Ai.SetDoNotMakeNewDecisions(true);
-            // CanPartyInteract reads the player's current target, which need not be this caravan.
-            if (!rules.IsWithinInteractionRange(player.Position.Distance(caravan.Position), interactionRange))
-                throw new InvalidOperationException("staged caravan is outside the real vanilla interaction range");
+            interactionCapture.Modified = true;
+            interaction.Position = interactionPoint;
+            interaction.SetMoveModeHold();
+            interaction.SetNavigationModeHold();
+            interaction.Ai.SetDoNotMakeNewDecisions(true);
+            // CanPartyInteract reads the player's current target, which need not be this interaction party.
+            if (!rules.IsWithinInteractionRange(player.Position.Distance(interaction.Position), interactionRange))
+                throw new InvalidOperationException("staged interaction party is outside the real vanilla interaction range");
             lordCapture.Modified = true;
             lord.Ai.SetDoNotMakeNewDecisions(true);
             lord.SetMoveGoToPoint(target, MobileParty.NavigationType.Default);
@@ -117,19 +120,19 @@ internal sealed class ClanLordMovementFixture : IClanLordMovementFixture
             lord.Ai.BehaviorTarget = target;
             lord.SetNavigationModePoint(target);
             Publish(lord);
-            Publish(caravan);
+            Publish(interaction);
         }
         catch (Exception error)
         {
-            return SetupFailure("staging failed: " + error.Message, candidateEvidence);
+            return SetupFailure("staging failed: " + error.Message, new { candidateEvidence, interactionEvidence });
         }
         return Result(true, "ready: run the printed source-bound start command on the participating client", new
         {
-            token = observation.Token, player = Describe(player), lord = Describe(lord), caravan = Describe(caravan),
+            token = observation.Token, player = Describe(player), lord = Describe(lord), interaction = Describe(interaction),
             preparedLord = fixtureLord != null,
             originalClan = fixtureLord == null ? null : new { id = Id(fixtureLord.OriginalClan), stringId = fixtureLord.OriginalClan.StringId },
             interactionRangeVerified = true, interactionRange,
-            distance = player.Position.Distance(caravan.Position), candidateEvidence,
+            distance = player.Position.Distance(interaction.Position), candidateEvidence, interactionEvidence,
             before = Command("before", lord.Position, CampaignTime.Now.NumTicks),
             start = Command("clan_lord_fixture_start", "before", lord.Position, CampaignTime.Now.NumTicks),
             during = Command("during", lord.Position, CampaignTime.Now.NumTicks),
@@ -148,10 +151,11 @@ internal sealed class ClanLordMovementFixture : IClanLordMovementFixture
             return Result(false, "use the exact numeric observation arguments printed by the fixture");
         if (!objects.TryGetObject(args[1], out MobileParty player) ||
             !objects.TryGetObject(args[2], out MobileParty lord) ||
-            !objects.TryGetObject(args[3], out MobileParty caravan))
+            !objects.TryGetObject(args[3], out MobileParty interaction))
             return Result(false, "a required exact registry id did not resolve");
-        if (!player.IsPlayerParty() || player.LeaderHero?.Clan == null || lord.LeaderHero?.Clan != player.LeaderHero?.Clan || !lord.IsLordParty || !caravan.IsCaravan)
-            return Result(false, "player/clan/lord/caravan identity changed");
+        if (!player.IsPlayerParty() || player.LeaderHero?.Clan == null || lord.LeaderHero?.Clan != player.LeaderHero?.Clan ||
+            !lord.IsLordParty || interaction == player || interaction == lord || interaction.IsPlayerParty())
+            return Result(false, "player/clan/lord/interaction identity changed");
         if (ModInformation.IsClient && (observation == null ||
             ((args[0] == "before" || args[0] == "state") && observation.Token != args[9])))
             observation = new Observation(args[9], args[1], args[2], args[3], new CampaignVec2(new Vec2(tx, ty), true));
@@ -159,15 +163,15 @@ internal sealed class ClanLordMovementFixture : IClanLordMovementFixture
             return Result(false, "observation does not match this session's fixture token, ids, or target");
         bool conversationActive = campaign.ConversationManager?.IsConversationInProgress == true;
         bool hasPlayerEncounter = PlayerEncounter.Current != null;
-        bool exactEncounter = PlayerEncounter.EncounteredParty == caravan.Party;
+        bool exactEncounter = PlayerEncounter.EncounteredParty == interaction.Party;
         var tracker = ConversationPartyTracker.Instance;
-        bool held = tracker?.TryGetEngagement(Id(caravan.Party), out _) == true;
-        bool exactHold = tracker != null && tracker.TryGetEngagement(Id(caravan.Party), out var engagement) &&
+        bool held = tracker?.TryGetEngagement(Id(interaction.Party), out _) == true;
+        bool exactHold = tracker != null && tracker.TryGetEngagement(Id(interaction.Party), out var engagement) &&
             engagement.EngagerPartyId == Id(player.Party);
         string phase = args[0];
         string failure = null;
-        if (phase != "state" && (Unavailable(player) != null || Unavailable(lord) != null || Unavailable(caravan) != null))
-            failure = "fixture party unavailable: player=" + Unavailable(player) + "; lord=" + Unavailable(lord) + "; caravan=" + Unavailable(caravan);
+        if (phase != "state" && (Unavailable(player) != null || Unavailable(lord) != null || Unavailable(interaction) != null))
+            failure = "fixture party unavailable: player=" + Unavailable(player) + "; lord=" + Unavailable(lord) + "; interaction=" + Unavailable(interaction);
         else if (phase != "state" && ModInformation.IsClient && MobileParty.MainParty != player)
             failure = "passive clients use the state phase; during/released/verify belong to the participating client";
         else if (phase == "during")
@@ -178,7 +182,7 @@ internal sealed class ClanLordMovementFixture : IClanLordMovementFixture
         else if (phase == "released" || phase == "verify")
         {
             if (!observation.During) failure = "the during checkpoint was never observed on this machine";
-            else if (ModInformation.IsServer ? held || caravan.Ai?.IsDisabled != false : conversationActive || hasPlayerEncounter)
+            else if (ModInformation.IsServer ? held || interaction.Ai?.IsDisabled != false : conversationActive || hasPlayerEncounter)
                 failure = "the selected conversation has not fully released";
             else if (phase == "released")
             {
@@ -194,7 +198,7 @@ internal sealed class ClanLordMovementFixture : IClanLordMovementFixture
         else if (phase != "before" && phase != "state") failure = "unknown observation phase";
         return Result(failure == null, failure ?? "observation passed", new
         {
-            phase, token = observation.Token, player = Describe(player), lord = Describe(lord), caravan = Describe(caravan),
+            phase, token = observation.Token, player = Describe(player), lord = Describe(lord), interaction = Describe(interaction),
             conversationActive, hasPlayerEncounter, exactEncounter, held, exactHold,
             duringObserved = observation.During, releaseObserved = observation.Released,
             baseline = new { x = observation.Baseline.X, y = observation.Baseline.Y, ticks = observation.Ticks },
@@ -209,18 +213,18 @@ internal sealed class ClanLordMovementFixture : IClanLordMovementFixture
         if (args[0] != "before") return Result(false, "use the exact start command printed by the fixture");
         CoopCommandResult before = Observe(args);
         if (!before.Succeeded) return before;
-        if (!objects.TryGetObject(args[1], out MobileParty player) || !objects.TryGetObject(args[3], out MobileParty caravan))
+        if (!objects.TryGetObject(args[1], out MobileParty player) || !objects.TryGetObject(args[3], out MobileParty interaction))
             return Result(false, "a required exact registry id did not resolve");
         if (MobileParty.MainParty != player) return Result(false, "start requires the participating player client");
         if (PlayerEncounter.Current != null) return Result(false, "finish the current player encounter before starting the fixture conversation");
         float interactionRange = campaign.Models.EncounterModel.NeededMaximumLandDistanceForEncounteringMobileParty;
-        if (!rules.IsWithinInteractionRange(player.Position.Distance(caravan.Position), interactionRange))
-            return Result(false, "the staged caravan is outside the real vanilla interaction range");
+        if (!rules.IsWithinInteractionRange(player.Position.Distance(interaction.Position), interactionRange))
+            return Result(false, "the staged interaction party is outside the real vanilla interaction range");
 
-        EncounterManager.StartPartyEncounter(player.Party, caravan.Party);
-        return Result(true, "requested the exact caravan through the production encounter action", new
+        EncounterManager.StartPartyEncounter(player.Party, interaction.Party);
+        return Result(true, "requested the exact interaction party through the production encounter action", new
         {
-            player = Describe(player), caravan = Describe(caravan), interactionRange
+            player = Describe(player), interaction = Describe(interaction), interactionRange
         });
     }
 
@@ -230,34 +234,34 @@ internal sealed class ClanLordMovementFixture : IClanLordMovementFixture
         if (args[0] != "during") return Result(false, "use the exact finish command printed by the fixture");
         CoopCommandResult during = Observe(args);
         if (!during.Succeeded) return during;
-        if (!objects.TryGetObject(args[3], out MobileParty caravan) || PlayerEncounter.EncounteredParty != caravan.Party)
-            return Result(false, "the exact staged caravan is no longer the active player encounter");
+        if (!objects.TryGetObject(args[3], out MobileParty interaction) || PlayerEncounter.EncounteredParty != interaction.Party)
+            return Result(false, "the exact staged interaction party is no longer the active player encounter");
 
         PlayerEncounter.Finish();
-        return Result(true, "finished the exact caravan through the production encounter action", new { caravan = Describe(caravan) });
+        return Result(true, "finished the exact interaction party through the production encounter action", new { interaction = Describe(interaction) });
     }
 
     public CoopCommandResult Restore()
     {
         if (ModInformation.IsClient) return Result(false, "restore requires the server");
         if (!CheckCampaign()) return Result(false, "campaign is unavailable");
-        if (lordCapture == null && caravanCapture == null && fixtureLord == null)
+        if (lordCapture == null && interactionCapture == null && fixtureLord == null)
             return Result(true, "already restored; no active capture");
-        if (IsHeld(lordCapture?.Party) || IsHeld(caravanCapture?.Party) || IsHeld(fixtureLord?.Party))
+        if (IsHeld(lordCapture?.Party) || IsHeld(interactionCapture?.Party) || IsHeld(fixtureLord?.Party))
             return Result(false, "exit the conversation normally before restoring");
         bool restoreFixtureLord = fixtureLord != null;
         var failures = new List<string>();
         RestoreCapture(lordCapture, failures);
-        RestoreCapture(caravanCapture, failures);
+        RestoreCapture(interactionCapture, failures);
         RestoreFixtureLord(failures);
         if (failures.Count > 0) return Result(false, "restore incomplete; capture retained, retry restore", failures);
         lordCapture = null;
-        caravanCapture = null;
+        interactionCapture = null;
         fixtureLord = null;
         observation = null;
         return Result(true, restoreFixtureLord
-            ? "lord, caravan, and prepared clan assignment restored"
-            : "lord and caravan restored and final behavior published");
+            ? "lord, interaction party, and prepared clan assignment restored"
+            : "lord and interaction party restored and final behavior published");
     }
 
     private string PrepareFixtureLord(MobileParty player, Clan clan, out MobileParty lord)
@@ -341,7 +345,7 @@ internal sealed class ClanLordMovementFixture : IClanLordMovementFixture
         {
             campaign = Campaign.Current;
             lordCapture = null;
-            caravanCapture = null;
+            interactionCapture = null;
             fixtureLord = null;
             observation = null;
         }
@@ -353,6 +357,12 @@ internal sealed class ClanLordMovementFixture : IClanLordMovementFixture
         Id(party) == null || Id(party.Party) == null || (party.IsLordParty && Id(party.LeaderHero) == null) ? "identity not registered" :
         party.MoveTargetParty != null && Id(party.MoveTargetParty) == null ? "movement target not registered" :
         IsHeld(party) ? "already in a conversation" : null);
+
+    private string EligibleInteraction(MobileParty party, MobileParty player, MobileParty lord) => EligibleAi(party) ??
+        (party == lord ? "selected lord" : party.ShouldBeIgnored ? "ignored" :
+        party.IsLordParty && party.LeaderHero?.Clan?.Leader == party.LeaderHero ? "clan leader" :
+        party.MapFaction == null ? "missing map faction" : player.MapFaction == null ? "player missing map faction" :
+        party.MapFaction.IsAtWarWith(player.MapFaction) ? "at war with player" : null);
 
     private string Unavailable(MobileParty party) => party == null ? "missing party" :
         !party.IsActive ? "inactive" : party.Ai == null ? "missing AI" :
@@ -423,7 +433,7 @@ internal sealed class ClanLordMovementFixture : IClanLordMovementFixture
 
     private string Command(string name, string phase, CampaignVec2 baseline, long ticks) =>
         string.Join(" ", "coop.debug.mobileparty." + name, phase, observation.PlayerId,
-            observation.LordId, observation.CaravanId, Number(observation.Target.X), Number(observation.Target.Y),
+            observation.LordId, observation.InteractionId, Number(observation.Target.X), Number(observation.Target.Y),
             Number(baseline.X), Number(baseline.Y), ticks.ToString(CultureInfo.InvariantCulture), observation.Token);
 
     private static string Number(float value) => value.ToString("R", CultureInfo.InvariantCulture);
@@ -489,24 +499,24 @@ internal sealed class ClanLordMovementFixture : IClanLordMovementFixture
         public string Token { get; }
         public string PlayerId { get; }
         public string LordId { get; }
-        public string CaravanId { get; }
+        public string InteractionId { get; }
         public CampaignVec2 Target { get; }
         public bool During { get; private set; }
         public bool Released { get; private set; }
         public CampaignVec2 Baseline { get; private set; }
         public long Ticks { get; private set; }
-        public Observation(string token, string playerId, string lordId, string caravanId, CampaignVec2 target)
+        public Observation(string token, string playerId, string lordId, string interactionId, CampaignVec2 target)
         {
             Token = token;
             PlayerId = playerId;
             LordId = lordId;
-            CaravanId = caravanId;
+            InteractionId = interactionId;
             Target = target;
         }
         public string ObserveDuring(bool actualConversation)
         {
             if (Released) return "conversation release already recorded; restore and stage a new fixture";
-            if (!actualConversation) return "the selected player's actual conversation with the exact caravan is not active";
+            if (!actualConversation) return "the selected player's actual conversation with the exact interaction party is not active";
             During = true;
             return null;
         }
@@ -522,7 +532,7 @@ internal sealed class ClanLordMovementFixture : IClanLordMovementFixture
             return null;
         }
         public bool Matches(IReadOnlyList<string> args, float tx, float ty) => args[1] == PlayerId && args[2] == LordId &&
-            args[3] == CaravanId && args[9] == Token && tx == Target.X && ty == Target.Y;
+            args[3] == InteractionId && args[9] == Token && tx == Target.X && ty == Target.Y;
     }
 }
 #endif

@@ -9,7 +9,7 @@ namespace GameInterface.Tests.Services.MobileParties;
 public class ClanLordMovementFixtureObservationTests
 {
     private static ClanLordMovementFixture.Observation Create() =>
-        new ClanLordMovementFixture.Observation("run-one", "player", "lord", "caravan", Point(24, 4));
+        new ClanLordMovementFixture.Observation("run-one", "player", "lord", "interaction", Point(24, 4));
 
     [Fact]
     public void ReleaseWithoutActualConversationCannotArmMovementVerification()
@@ -47,12 +47,12 @@ public class ClanLordMovementFixtureObservationTests
     [Theory]
     [InlineData(1, "other-player")]
     [InlineData(2, "other-lord")]
-    [InlineData(3, "other-caravan")]
+    [InlineData(3, "other-interaction")]
     [InlineData(9, "old-run")]
     public void ObservationsCannotBeReusedForAnotherIdentity(int index, string value)
     {
         var observation = Create();
-        string[] args = { "verify", "player", "lord", "caravan", "24", "4", "3", "4", "120", "run-one" };
+        string[] args = { "verify", "player", "lord", "interaction", "24", "4", "3", "4", "120", "run-one" };
         Assert.True(observation.Matches(args, 24, 4));
         args[index] = value;
         Assert.False(observation.Matches(args, 24, 4));
@@ -62,7 +62,7 @@ public class ClanLordMovementFixtureObservationTests
     public void ObservationsCannotChangeTheStagedDestination()
     {
         var observation = Create();
-        string[] args = { "verify", "player", "lord", "caravan", "24", "4", "3", "4", "120", "run-one" };
+        string[] args = { "verify", "player", "lord", "interaction", "24", "4", "3", "4", "120", "run-one" };
         Assert.False(observation.Matches(args, 25, 4));
         Assert.False(observation.Matches(args, 24, 5));
     }

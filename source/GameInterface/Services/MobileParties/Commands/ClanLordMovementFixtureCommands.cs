@@ -12,7 +12,7 @@ internal static class ClanLordMovementFixtureCommands
         new ExpectedArgs("phase", "before, during, released, verify, or state."),
         new ExpectedArgs("playerPartyId", "Exact player MobileParty registry id from setup."),
         new ExpectedArgs("lordPartyId", "Exact lord MobileParty registry id from setup."),
-        new ExpectedArgs("caravanPartyId", "Exact caravan MobileParty registry id from setup."),
+        new ExpectedArgs("interactionPartyId", "Exact interaction MobileParty registry id from setup."),
         new ExpectedArgs("targetX", "Target X returned by setup."),
         new ExpectedArgs("targetY", "Target Y returned by setup."),
         new ExpectedArgs("baselineX", "Baseline X returned by the released observation on this machine."),
@@ -21,14 +21,14 @@ internal static class ClanLordMovementFixtureCommands
         new ExpectedArgs("token", "Fixture token returned by setup."),
     };
 
-    /// <summary>Stages a registered clan lord and caravan through authoritative server mutations.</summary>
+    /// <summary>Stages a registered clan lord and interaction party through authoritative server mutations.</summary>
     public sealed class Setup : ICoopCommand
     {
         private readonly IClanLordMovementFixture fixture;
         public Setup(IClanLordMovementFixture fixture) => this.fixture = fixture;
         public string Prefix => "coop.debug.mobileparty";
         public string Name => "clan_lord_fixture_setup";
-        public string Description => "Stage a real clan lord and nearby caravan for issue 3264.";
+        public string Description => "Stage a real clan lord and nearby interaction party for issue 3264.";
         public CoopCommandSide Side => CoopCommandSide.Server;
         public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[] { new ExpectedArgs("playerPartyId", "Exact registered MobileParty id of the participating player.") };
         public CoopCommandResult ProcessCommand(ICoopCommandArgs args) => fixture.Setup(args[0]);
@@ -80,7 +80,7 @@ internal static class ClanLordMovementFixtureCommands
         public Restore(IClanLordMovementFixture fixture) => this.fixture = fixture;
         public string Prefix => "coop.debug.mobileparty";
         public string Name => "clan_lord_fixture_restore";
-        public string Description => "Restore the captured lord and caravan state, retrying partial restoration.";
+        public string Description => "Restore the captured lord and interaction party state, retrying partial restoration.";
         public CoopCommandSide Side => CoopCommandSide.Server;
         public IExpectedArgs[] ExpectedArgs { get; } = Array.Empty<IExpectedArgs>();
         public CoopCommandResult ProcessCommand(ICoopCommandArgs args) => fixture.Restore();

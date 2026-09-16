@@ -69,7 +69,7 @@ map outside an army, settlement, battle, captivity and navigation transition:
 coop.debug.mobileparty.clan_lord_fixture_setup MobileParty_Player_recovered_517c7a227d364777915062f6ab47967f
 ```
 
-Setup returns the selected or prepared lord, clan and caravan names and registry
+Setup returns the selected or prepared lord, clan and interaction-party names and registry
 IDs, a fixture token, the staged destination, and complete executable observation
 commands. Copy those commands verbatim to the indicated participant; the numeric
 coordinates, times and `Created_*` IDs depend on the loaded save. Do not substitute
@@ -89,7 +89,7 @@ claim to have opened a local conversation.
 
 Run the source-bound `clan_lord_fixture_start` command printed by setup on the
 participating client. It invokes the production encounter action for the exact
-staged caravan, so the existing approval and conversation handlers run without
+staged interaction party, so the existing approval and conversation handlers run without
 native input or UI wiring. After the `during` observations, run the printed
 `clan_lord_fixture_finish` command on that same client. It verifies the exact
 active encounter before invoking the production finish action. No conversation,
@@ -118,21 +118,23 @@ It records that hero's original clan and Restore returns it through the same cla
 membership path. No hero or party is created or deleted. This is setup only, not
 the behavior claim: the client still invokes the production encounter start and
 finish actions. The fixture prints the actual identities, stages movement and
-places a real caravan within normal interaction range. Staging checks the selected
-caravan distance against the current land encounter model and searches only inside
-that radius. It does not require the player to already target the caravan.
+places an eligible peaceful interaction party within normal interaction range. It
+prefers a caravan but accepts another non-player, non-leader AI party when a caravan
+is unavailable. Staging checks the selected interaction-party distance against the
+current land encounter model and searches only inside that radius. It does not
+require the player to already target the interaction party.
 Selection or setup failure is an unexercised test, never a pass. The server
 performs setup and restoration with synchronization patches active. Clients use
 the printed source-bound start and finish commands, then use observation commands.
 
 Capture all of these phases:
 
-1. **Ready:** server and both clients resolve the same lord and caravan. The lord
+1. **Ready:** server and both clients resolve the same lord and interaction party. The lord
    has coherent Point/GoToPoint navigation and a destination different from its
    current position.
 2. **During:** the selected client reports an active conversation and encounter
-   with the selected caravan. The server confirms the exact player owns the exact
-   caravan engagement.
+   with the selected interaction party. The server confirms the exact player owns
+   the exact interaction-party engagement.
 3. **Released:** finish through the generated source-bound command. The server
    engagement and the client's conversation/encounter have ended. Capture fresh
    position and campaign-time baselines on every participant now.

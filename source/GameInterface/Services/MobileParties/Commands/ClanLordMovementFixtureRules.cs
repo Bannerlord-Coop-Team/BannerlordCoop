@@ -8,6 +8,8 @@ public interface IClanLordMovementFixtureRules
 {
     int LordPriority(string heroId);
 
+    int InteractionPriority(bool isCaravan, bool isLordParty);
+
     bool IsWithinInteractionRange(float distance, float maximumDistance);
 
     string ValidateMovement(double baselineTicks, double nowTicks,
@@ -29,6 +31,9 @@ public sealed class ClanLordMovementFixtureRules : IClanLordMovementFixtureRules
             default: return 3;
         }
     }
+
+    public int InteractionPriority(bool isCaravan, bool isLordParty) =>
+        isCaravan ? 0 : isLordParty ? 2 : 1;
 
     public bool IsWithinInteractionRange(float distance, float maximumDistance) =>
         IsFinite(distance) && IsFinite(maximumDistance) && distance >= 0f && distance < maximumDistance;

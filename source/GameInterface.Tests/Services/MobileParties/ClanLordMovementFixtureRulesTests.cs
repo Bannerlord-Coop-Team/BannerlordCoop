@@ -23,6 +23,16 @@ public class ClanLordMovementFixtureRulesTests
     }
 
     [Theory]
+    [InlineData(true, false, 0)]
+    [InlineData(true, true, 0)]
+    [InlineData(false, false, 1)]
+    [InlineData(false, true, 2)]
+    public void InteractionPriority_PrefersCaravansAndThenNonLordParties(bool isCaravan, bool isLordParty, int expected)
+    {
+        Assert.Equal(expected, rules.InteractionPriority(isCaravan, isLordParty));
+    }
+
+    [Theory]
     [InlineData(0.3f, 0.5f, true)]
     [InlineData(0.499f, 0.5f, true)]
     [InlineData(0.5f, 0.5f, false)]
