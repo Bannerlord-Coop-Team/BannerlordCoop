@@ -57,6 +57,7 @@ public class SiegeDefenderCommandTests : IDisposable
         WireDefendersInside(siegeEventId, firstDefenderId, secondDefenderId);
         RegisterDefendersAsPlayers(firstDefenderId, secondDefenderId);
         AttachTown(siegeEventId);
+        DeclareWar(siegeEventId, firstDefenderId, secondDefenderId);
         EnsureEncounterModel();
 
         Server.Call(() =>
@@ -69,6 +70,33 @@ public class SiegeDefenderCommandTests : IDisposable
 
             Assert.False(runOriginal);
             Assert.Same(DefaultSiegeStrategies.Custom, siegeEvent.GetSiegeEventSide(BattleSideEnum.Defender).SiegeStrategy);
+        });
+    }
+
+    [Fact]
+    public void DefenderStrategy_WithNeutralVisitorInside_KeepsAiStrategy()
+    {
+        var siegeEventId = TestEnvironment.CreateRegisteredObject<SiegeEvent>(SiegeCreationDisabledMethods);
+        var visitorId = TestEnvironment.CreateRegisteredObject<MobileParty>();
+
+        WireDefendersInside(siegeEventId, visitorId);
+        RegisterDefendersAsPlayers(visitorId);
+        AttachTown(siegeEventId);
+        EnsureEncounterModel();
+
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject<SiegeEvent>(siegeEventId, out var siegeEvent));
+            Assert.True(Server.ObjectManager.TryGetObject<MobileParty>(visitorId, out var visitor));
+            Assert.False(visitor.MapFaction.IsAtWarWith(siegeEvent.BesiegerCamp.MapFaction));
+
+            var prefix = AccessTools.Method(typeof(SiegeEventCampaignBehaviorPatches), "SetDefaultTacticsPrefix");
+            Assert.NotNull(prefix);
+
+            bool runOriginal = (bool)prefix.Invoke(null, new object[] { siegeEvent, BattleSideEnum.Defender });
+
+            Assert.False(runOriginal);
+            Assert.NotSame(DefaultSiegeStrategies.Custom, siegeEvent.GetSiegeEventSide(BattleSideEnum.Defender).SiegeStrategy);
         });
     }
 
@@ -116,6 +144,27 @@ public class SiegeDefenderCommandTests : IDisposable
                         characterId)));
                 });
             }
+        }
+    }
+
+    private void DeclareWar(string siegeEventId, params string[] defenderPartyIds)
+    {
+        foreach (var instance in AllEnvironmentInstances)
+        {
+            instance.Call(() =>
+            {
+                Assert.True(instance.ObjectManager.TryGetObject<SiegeEvent>(siegeEventId, out var siegeEvent));
+                var besiegerFaction = siegeEvent.BesiegerCamp.MapFaction;
+                Assert.NotNull(besiegerFaction);
+                foreach (var partyId in defenderPartyIds)
+                {
+                    Assert.True(instance.ObjectManager.TryGetObject<MobileParty>(partyId, out var defender));
+                    var defenderFaction = defender.MapFaction;
+                    Assert.NotNull(defenderFaction);
+                    if (!defenderFaction.IsAtWarWith(besiegerFaction))
+                        FactionManager.DeclareWar(defenderFaction, besiegerFaction);
+                }
+            });
         }
     }
 

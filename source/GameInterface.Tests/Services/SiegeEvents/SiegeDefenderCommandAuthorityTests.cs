@@ -54,8 +54,10 @@ public class SiegeDefenderCommandAuthorityTests
         Assert.False(authority.HasPlayerDefender(siege, BattleSideEnum.Defender));
     }
 
+    // Without a Town there is no vanilla defender list, so presence alone never counts.
+    // At-war vs neutral filtering lives in Town.GetDefenderParties and is covered higher level.
     [Fact]
-    public void HasPlayerDefender_DefenderWithPlayerParty_ReturnsTrue()
+    public void HasPlayerDefender_PlayerPartyWithoutTown_ReturnsFalse()
     {
         var playerHero = ObjectHelper.SkipConstructor<Hero>();
         var settlement = CreateSettlement(CreateParty(playerHero));
@@ -64,30 +66,7 @@ public class SiegeDefenderCommandAuthorityTests
         playerManager.Setup(m => m.Contains(playerHero)).Returns(true);
         var authority = new SiegeDefenderCommandAuthority(playerManager.Object);
 
-        Assert.True(authority.HasPlayerDefender(siege, BattleSideEnum.Defender));
-    }
-
-    [Fact]
-    public void HasPlayerDefender_DefenderWithNonPlayerParties_ReturnsFalse()
-    {
-        var settlement = CreateSettlement(CreateParty(ObjectHelper.SkipConstructor<Hero>()));
-        var siege = CreateSiege(settlement);
-        var authority = new SiegeDefenderCommandAuthority(Mock.Of<IPlayerManager>());
-
         Assert.False(authority.HasPlayerDefender(siege, BattleSideEnum.Defender));
-    }
-
-    [Fact]
-    public void HasPlayerDefender_DefenderPlayerPartyWithoutHero_ReturnsTrue()
-    {
-        var party = ObjectHelper.SkipConstructor<MobileParty>();
-        var settlement = CreateSettlement(party);
-        var siege = CreateSiege(settlement);
-        var playerManager = new Mock<IPlayerManager>();
-        playerManager.Setup(m => m.Contains(party)).Returns(true);
-        var authority = new SiegeDefenderCommandAuthority(playerManager.Object);
-
-        Assert.True(authority.HasPlayerDefender(siege, BattleSideEnum.Defender));
     }
 
     [Fact]

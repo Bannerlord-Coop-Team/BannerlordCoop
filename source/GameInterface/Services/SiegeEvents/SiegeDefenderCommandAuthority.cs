@@ -1,6 +1,7 @@
 ﻿using GameInterface.Services.Players;
 using System;
 using System.Collections.Generic;
+using TaleWorlds.CampaignSystem.MapEvents;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Siege;
 using TaleWorlds.Core;
@@ -31,16 +32,23 @@ public class SiegeDefenderCommandAuthority : ISiegeDefenderCommandAuthority
         var settlement = siegeEvent.BesiegedSettlement;
         if (settlement == null) return false;
 
-        // Involved parties are the authoritative membership; the Parties fallback covers
-        // under-siege entries the server approved without recording (see ServerSettlementExitEnterHandler).
         if (HasPlayerInvolvedDefender(siegeEvent, side)) return true;
 
-        var parties = settlement.Parties;
-        if (parties == null) return false;
+        var town = settlement.Town;
+        if (town == null) return false;
 
-        foreach (var party in parties)
+        try
         {
-            if (IsPlayerLed(party)) return true;
+            foreach (var defender in town.GetDefenderParties(MapEvent.BattleTypes.Siege))
+            {
+                if (defender == null) continue;
+                if (defender.LeaderHero != null && playerManager.Contains(defender.LeaderHero)) return true;
+                if (defender.MobileParty != null && playerManager.Contains(defender.MobileParty)) return true;
+            }
+        }
+        catch (Exception)
+        {
+            return false;
         }
 
         return false;
@@ -87,12 +95,5 @@ public class SiegeDefenderCommandAuthority : ISiegeDefenderCommandAuthority
         }
 
         return false;
-    }
-
-    private bool IsPlayerLed(MobileParty party)
-    {
-        if (party == null) return false;
-        if (party.LeaderHero != null && playerManager.Contains(party.LeaderHero)) return true;
-        return playerManager.Contains(party);
     }
 }
