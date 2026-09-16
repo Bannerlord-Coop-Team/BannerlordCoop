@@ -190,6 +190,8 @@ public sealed class HideoutMissionRuntimeTests : MissionTestEnvironment
                 : new CoopHideoutAmbushController(logic, suppliers);
             AccessTools.Property(typeof(MissionBehavior), nameof(MissionBehavior.Mission)).SetValue(native, mock.Shell);
             logic.Native = (ICoopHideoutNativeController)native;
+            mock.Shell.MissionBehaviors.Add(logic);
+            mock.Shell.MissionBehaviors.Add(native);
             logic.Native.Apply(HideoutPhase.Camp, null, 25);
 
             var leader = mock.SpawnAgent(new AgentBuildData(Game.Current.PlayerTroop).Team(attackerTeam).Controller(AgentControllerType.Player));
@@ -213,6 +215,7 @@ public sealed class HideoutMissionRuntimeTests : MissionTestEnvironment
             Assert.False(logic.ShouldResumeBossBattle(HideoutPhase.Duel));
             if (!direct)
                 AssertNativeBattleEndUsesSpawnLogic(Assert.IsAssignableFrom<IMissionAgentSpawnLogic>(native), mock.Shell);
+            Assert.Same(logic, mock.Shell.GetMissionBehavior<CoopHideoutMissionLogic>());
             logic.Native.Apply(HideoutPhase.Camp, guard, 25);
             Assert.True(AgentMirror.TryGet(joiningHero, out var lastPlayer));
             lastPlayer.IsActive = false;
@@ -359,8 +362,6 @@ public sealed class HideoutMissionRuntimeTests : MissionTestEnvironment
     {
         using var fixture = new MissionEngineFixture();
         var harmony = new Harmony($"hideout-stealth-clock.{Guid.NewGuid()}");
-        harmony.Patch(AccessTools.Method(typeof(Mission), nameof(Mission.GetMissionBehavior)).MakeGenericMethod(typeof(StealthFailCounterMissionLogic)),
-            prefix: new HarmonyMethod(typeof(HideoutMissionRuntimeTests), nameof(GetStealthCounter)) { priority = Priority.First });
         harmony.Patch(AccessTools.PropertyGetter(typeof(Mission), nameof(Mission.CurrentTime)),
             prefix: new HarmonyMethod(typeof(HideoutMissionRuntimeTests), nameof(StealthMissionTime)) { priority = Priority.First });
         harmony.Patch(AccessTools.Method(typeof(Mission), nameof(Mission.SetMissionMode)),
@@ -380,7 +381,6 @@ public sealed class HideoutMissionRuntimeTests : MissionTestEnvironment
                 var logic = new CoopHideoutMissionLogic(Mock.Of<IBattleNetwork>(), Mock.Of<IMessageBroker>(),
                     Mock.Of<IMissionContext>(), defender, attacker, false);
                 var counter = new StealthFailCounterMissionLogic();
-                activeStealthCounter = counter;
                 var native = new CoopHideoutAmbushController(logic, new IMissionTroopSupplier[] { logic.Defender, logic.Attacker });
                 native._overriddenHideoutBossCharacterObject = (CharacterObject)Game.Current.PlayerTroop;
                 AccessTools.Field(typeof(Mission), "<MissionBehaviors>k__BackingField").SetValue(mission.Shell,
@@ -396,6 +396,7 @@ public sealed class HideoutMissionRuntimeTests : MissionTestEnvironment
                     mission.Shell._missionMode = MissionMode.Stealth;
                     native.Apply(HideoutPhase.Stealth, null, 0);
                     Assert.Same(counter, mission.Shell.GetMissionBehavior<StealthFailCounterMissionLogic>());
+                    Assert.Same(native, mission.Shell.GetMissionBehavior<CoopHideoutAmbushController>());
                     native.Initialize(authority: false, migration: false);
                     Assert.Equal(15f, counter.FailCounterSeconds);
                     Assert.Equal(HideoutPhase.Stealth, native.Phase);
@@ -420,11 +421,9 @@ public sealed class HideoutMissionRuntimeTests : MissionTestEnvironment
                 finally { native.OnEndMission(); logic.OnRemoveBehavior(); }
             }, new[] { AccessTools.Method(typeof(HideoutAmbushMissionController), "InitializeMission") }));
         }
-        finally { harmony.UnpatchAll(harmony.Id); activeStealthCounter = null; }
+        finally { harmony.UnpatchAll(harmony.Id); }
     }
 
-    private static StealthFailCounterMissionLogic activeStealthCounter;
-    private static bool GetStealthCounter(ref StealthFailCounterMissionLogic __result) { __result = activeStealthCounter; return false; }
     private static float stealthClock;
     private static int stealthFailureCount;
     private static bool StealthMissionTime(ref float __result) { __result = stealthClock; return false; }
@@ -573,15 +572,11 @@ public sealed class HideoutMissionRuntimeTests : MissionTestEnvironment
 
     private static bool SkipScriptCache() => false;
 
-    private static IMissionAgentSpawnLogic activeSpawnLogic;
     private static void AssertNativeBattleEndUsesSpawnLogic(IMissionAgentSpawnLogic spawnLogic, Mission mission)
     {
         var harmony = new Harmony($"hideout-end-check.{Guid.NewGuid()}");
         try
         {
-            activeSpawnLogic = spawnLogic;
-            harmony.Patch(AccessTools.Method(typeof(Mission), nameof(Mission.GetMissionBehavior)).MakeGenericMethod(typeof(IMissionAgentSpawnLogic)),
-                prefix: new HarmonyMethod(typeof(HideoutMissionRuntimeTests), nameof(FindSpawnLogic)) { priority = Priority.First });
             harmony.Patch(AccessTools.Method(typeof(MBCommon), nameof(MBCommon.GetTotalMissionTime)),
                 prefix: new HarmonyMethod(typeof(HideoutMissionRuntimeTests), nameof(FixedMissionTime)));
             var end = new BattleEndLogic();
@@ -594,17 +589,7 @@ public sealed class HideoutMissionRuntimeTests : MissionTestEnvironment
             Assert.True(end._isPlayerSideDepleted);
             Assert.False(end._isEnemySideDepleted);
         }
-        finally
-        {
-            harmony.UnpatchAll(harmony.Id);
-            activeSpawnLogic = null;
-        }
-    }
-
-    private static bool FindSpawnLogic(ref object __result)
-    {
-        __result = activeSpawnLogic;
-        return false;
+        finally { harmony.UnpatchAll(harmony.Id); }
     }
 
     private static bool FixedMissionTime(ref float __result)
