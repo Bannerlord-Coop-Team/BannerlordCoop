@@ -1143,8 +1143,8 @@ internal static class DefenderSiegeFixtureCommands
             expectedParties.All(party => party?.BesiegerCamp == null);
         bool insideSettlement = settlement != null && settlement.IsCastle &&
             expectedParties.All(party => party?.CurrentSettlement == settlement);
-        bool fixtureStaged = !isServer || activeFixture != null &&
-            activeFixture.HasExpectedControllers(expectedControllerIds) && IsStaged(activeFixture);
+        bool fixtureStaged = !isServer || (activeFixture != null &&
+            activeFixture.HasExpectedControllers(expectedControllerIds) && IsStaged(activeFixture));
         bool connectionReady = DefenderSiegeFixtureContract.IsConnectionReadinessSatisfied(
             isServer,
             connectedPlayerCount,
