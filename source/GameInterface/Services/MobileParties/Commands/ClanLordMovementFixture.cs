@@ -102,24 +102,28 @@ internal sealed class ClanLordMovementFixture : IClanLordMovementFixture
                 candidateEvidence, interactionCandidateCount = interactionCandidates.Length,
                 interactionEvidence, interactionEvidenceTruncated
             });
+        var selectedInteraction = Describe(interaction);
         var interactionRadii = new[] { interactionRange * 0.6f, interactionRange * 0.4f, interactionRange * 0.2f };
         if (!TryPoint(player.Position, interactionRadii, out CampaignVec2 interactionPoint))
             return SetupFailure("no deterministic navigable staging point", new
             {
-                candidateEvidence, interactionCandidateCount = interactionCandidates.Length,
+                candidateEvidence, interaction = selectedInteraction,
+                interactionCandidateCount = interactionCandidates.Length,
                 interactionEvidence, interactionEvidenceTruncated
             });
         if (!TryPoint(lord.Position, new[] { 24f, 20f, 16f }, out CampaignVec2 target))
             return SetupFailure("no deterministic lord route", new
             {
-                candidateEvidence, interactionCandidateCount = interactionCandidates.Length,
+                candidateEvidence, interaction = selectedInteraction,
+                interactionCandidateCount = interactionCandidates.Length,
                 interactionEvidence, interactionEvidenceTruncated
             });
         if (!snapshots.TryCreate(lord, out var lordState) || !snapshots.CanApply(lord, lordState) ||
             !snapshots.TryCreate(interaction, out var interactionState) || !snapshots.CanApply(interaction, interactionState))
             return SetupFailure("unable to capture restorable movement state", new
             {
-                candidateEvidence, interactionCandidateCount = interactionCandidates.Length,
+                candidateEvidence, interaction = selectedInteraction,
+                interactionCandidateCount = interactionCandidates.Length,
                 interactionEvidence, interactionEvidenceTruncated
             });
 
@@ -149,13 +153,14 @@ internal sealed class ClanLordMovementFixture : IClanLordMovementFixture
         {
             return SetupFailure("staging failed: " + error.Message, new
             {
-                candidateEvidence, interactionCandidateCount = interactionCandidates.Length,
+                candidateEvidence, interaction = selectedInteraction,
+                interactionCandidateCount = interactionCandidates.Length,
                 interactionEvidence, interactionEvidenceTruncated
             });
         }
         return Result(true, "ready: run the printed source-bound start command on the participating client", new
         {
-            token = observation.Token, player = Describe(player), lord = Describe(lord), interaction = Describe(interaction),
+            token = observation.Token, player = Describe(player), lord = Describe(lord), interaction = selectedInteraction,
             preparedLord = fixtureLord != null,
             originalClan = fixtureLord == null ? null : new { id = Id(fixtureLord.OriginalClan), stringId = fixtureLord.OriginalClan.StringId },
             interactionRangeVerified = true, interactionRange,
