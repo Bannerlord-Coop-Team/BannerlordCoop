@@ -50,6 +50,10 @@ The reporter's client log identifies **Valaria** (`lord_1_63_1`), **Zachanis**
 (`lord_1_74`) and **Zena** (`lord_1_74_1`). Resolve the party from its real hero and
 registry identity in the loaded campaign; do not invent a `Created_*` mapping.
 
+Those retained files are historical issue evidence, not a Stage 7 prerequisite. The
+source-bound fixture uses the connected authoritative player party in the enrolled
+Local runtime and does not wait for or revive a historical scenario.
+
 Use one standalone dedicated server and two clients. The server has no player
 party; the saved player joins as a client. Complete joining before fixture setup.
 Keep the original paired files unchanged. Restoring staged party state does not
@@ -65,8 +69,8 @@ map outside an army, settlement, battle, captivity and navigation transition:
 coop.debug.mobileparty.clan_lord_fixture_setup MobileParty_Player_recovered_517c7a227d364777915062f6ab47967f
 ```
 
-Setup returns the selected lord, clan and caravan names and registry IDs, a
-fixture token, the staged destination, and complete executable observation
+Setup returns the selected or temporary lord, clan and caravan names and registry
+IDs, a fixture token, the staged destination, and complete executable observation
 commands. Copy those commands verbatim to the indicated participant; the numeric
 coordinates, times and `Created_*` IDs depend on the loaded save. Do not substitute
 a different lord if one participant cannot resolve the selected one.
@@ -107,14 +111,19 @@ Retain the restore result and repeat the command to check its idempotent result.
 
 ## Required observations
 
-The fixture must select a registered, eligible lord in the selected player's
-clan, print the actual identities, stage movement and place a real caravan within
-normal interaction range. Staging checks the selected caravan distance against
-the current land encounter model and searches only inside that radius. It does
-not require the player to already target the caravan. Selection or setup failure
-is an unexercised test, never a pass. The server performs setup and restoration with synchronization
-patches active. Clients use the printed source-bound start and finish commands,
-then use observation commands.
+The fixture first selects a registered, eligible lord in the selected player's
+clan. If that save has none, setup creates a temporary non-player lord from the
+player culture's deterministic lord template, then creates its real clan party
+through the existing campaign actions. That actor is setup only, not the behavior
+claim: the client still invokes the production encounter start and finish actions.
+Restore destroys the temporary party and removes the temporary companion. The
+fixture prints the actual identities, stages movement and places a real caravan
+within normal interaction range. Staging checks the selected caravan distance
+against the current land encounter model and searches only inside that radius. It
+does not require the player to already target the caravan. Selection or setup
+failure is an unexercised test, never a pass. The server performs setup and
+restoration with synchronization patches active. Clients use the printed
+source-bound start and finish commands, then use observation commands.
 
 Capture all of these phases:
 
@@ -148,14 +157,16 @@ commands. Preserve the source/build manifest, server output, both client logs an
 screenshots of conversation and post-release map state. Copy logs before any
 restart because client log files are recreated at startup.
 
-Classify missing eligible actors, incomplete joins, stopped campaign time,
-unreachable staging positions and missing conversation evidence as unexercised.
+Classify missing eligible actors after temporary-lord preparation, incomplete
+joins, stopped campaign time, unreachable staging positions and missing
+conversation evidence as unexercised.
 A witnessed release followed by Hold, waiting, no displacement or inconsistent
 targets is a product failure requiring diagnosis. Inspect party registry IDs,
 hero/clan IDs, AI flags, army/settlement/map-event membership, time mode, target
 coordinates and the first relevant log error.
 
 Always attempt fixture restoration after a failed assertion. A failed restore
-must preserve its captured state for retry and report the unresolved party. Do
-not declare cleanup successful until restoration is verified. If world changes
-make restoration impossible, retain evidence and reload the disposable save pair.
+must preserve its captured state for retry and report the unresolved party or
+temporary fixture lord. Do not declare cleanup successful until restoration is
+verified. If world changes make restoration impossible, retain evidence and reload
+the disposable save pair.

@@ -15,6 +15,7 @@ using System.Globalization;
 using System.Linq;
 using System.Reflection;
 using TaleWorlds.CampaignSystem;
+using TaleWorlds.CampaignSystem.Actions;
 using TaleWorlds.CampaignSystem.Encounters;
 using TaleWorlds.CampaignSystem.Map;
 using TaleWorlds.CampaignSystem.Party;
@@ -42,6 +43,7 @@ internal sealed class ClanLordMovementFixture : IClanLordMovementFixture
     private Campaign campaign;
     private Capture lordCapture;
     private Capture caravanCapture;
+    private FixtureLord fixtureLord;
     private Observation observation;
 
     public ClanLordMovementFixture(IObjectManager objects, IMobilePartyBehaviorSnapshot snapshots,
@@ -57,7 +59,7 @@ internal sealed class ClanLordMovementFixture : IClanLordMovementFixture
     {
         if (ModInformation.IsClient) return Result(false, "setup requires the server");
         if (!CheckCampaign()) return Result(false, "campaign is unavailable");
-        if (lordCapture != null || caravanCapture != null)
+        if (lordCapture != null || caravanCapture != null || fixtureLord != null)
             return Result(false, "fixture already captured; run clan_lord_fixture_restore first");
         if (!objects.TryGetObject(playerId, out MobileParty player) || !player.IsPlayerParty())
             return Result(false, "playerPartyId must be the exact registered player MobileParty id");
@@ -74,7 +76,6 @@ internal sealed class ClanLordMovementFixture : IClanLordMovementFixture
             .ThenBy(p => p.StringId, StringComparer.Ordinal).ToArray();
         MobileParty lord = candidates.FirstOrDefault(p => EligibleAi(p) == null);
         var candidateEvidence = candidates.Select(p => new { party = Describe(p), rejected = EligibleAi(p) }).ToArray();
-        if (lord == null) return Result(false, "no eligible registered lord in this player's clan", candidateEvidence);
         MobileParty caravan = MobileParty.All.Where(p => p.IsCaravan && EligibleAi(p) == null &&
                 !p.ShouldBeIgnored && p.MapFaction != null && player.MapFaction != null && !p.MapFaction.IsAtWarWith(player.MapFaction))
             .OrderBy(p => p.Position.DistanceSquared(player.Position))
@@ -84,12 +85,18 @@ internal sealed class ClanLordMovementFixture : IClanLordMovementFixture
         if (!rules.IsWithinInteractionRange(0f, interactionRange))
             return Result(false, "land interaction range is unavailable; nothing changed");
         var caravanRadii = new[] { interactionRange * 0.6f, interactionRange * 0.4f, interactionRange * 0.2f };
-        if (!TryPoint(player.Position, caravanRadii, out CampaignVec2 caravanPoint) ||
-            !TryPoint(lord.Position, new[] { 24f, 20f, 16f }, out CampaignVec2 target))
+        if (!TryPoint(player.Position, caravanRadii, out CampaignVec2 caravanPoint))
             return Result(false, "no deterministic navigable staging point or lord route; nothing changed", candidateEvidence);
+        if (lord == null)
+        {
+            string creationFailure = CreateFixtureLord(player, clan, out lord);
+            if (creationFailure != null) return Result(false, creationFailure, candidateEvidence);
+        }
+        if (!TryPoint(lord.Position, new[] { 24f, 20f, 16f }, out CampaignVec2 target))
+            return SetupFailure("no deterministic navigable staging point or lord route", candidateEvidence);
         if (!snapshots.TryCreate(lord, out var lordState) || !snapshots.CanApply(lord, lordState) ||
             !snapshots.TryCreate(caravan, out var caravanState) || !snapshots.CanApply(caravan, caravanState))
-            return Result(false, "unable to capture restorable movement state; nothing changed", candidateEvidence);
+            return SetupFailure("unable to capture restorable movement state", candidateEvidence);
 
         lordCapture = new Capture(lord, lordState);
         caravanCapture = new Capture(caravan, caravanState);
@@ -115,13 +122,13 @@ internal sealed class ClanLordMovementFixture : IClanLordMovementFixture
         }
         catch (Exception error)
         {
-            CoopCommandResult restored = Restore();
-            return Result(false, "staging failed: " + error.Message, new { restore = restored.Output, candidateEvidence });
+            return SetupFailure("staging failed: " + error.Message, candidateEvidence);
         }
         return Result(true, "ready: run the printed source-bound start command on the participating client", new
         {
             token = observation.Token, player = Describe(player), lord = Describe(lord), caravan = Describe(caravan),
-            interactionRangeVerified = true, interactionRange, distance = player.Position.Distance(caravan.Position), candidateEvidence,
+            temporaryLord = fixtureLord != null, interactionRangeVerified = true, interactionRange,
+            distance = player.Position.Distance(caravan.Position), candidateEvidence,
             before = Command("before", lord.Position, CampaignTime.Now.NumTicks),
             start = Command("clan_lord_fixture_start", "before", lord.Position, CampaignTime.Now.NumTicks),
             during = Command("during", lord.Position, CampaignTime.Now.NumTicks),
@@ -233,17 +240,63 @@ internal sealed class ClanLordMovementFixture : IClanLordMovementFixture
     {
         if (ModInformation.IsClient) return Result(false, "restore requires the server");
         if (!CheckCampaign()) return Result(false, "campaign is unavailable");
-        if (lordCapture == null && caravanCapture == null) return Result(true, "already restored; no active capture");
-        if (IsHeld(lordCapture?.Party) || IsHeld(caravanCapture?.Party))
+        if (lordCapture == null && caravanCapture == null && fixtureLord == null)
+            return Result(true, "already restored; no active capture");
+        if (IsHeld(lordCapture?.Party) || IsHeld(caravanCapture?.Party) || IsHeld(fixtureLord?.Party))
             return Result(false, "exit the conversation normally before restoring");
+        bool removeFixtureLord = fixtureLord != null;
         var failures = new List<string>();
-        RestoreCapture(lordCapture, failures);
+        if (fixtureLord == null || lordCapture?.Party != fixtureLord.Party) RestoreCapture(lordCapture, failures);
         RestoreCapture(caravanCapture, failures);
+        RestoreFixtureLord(failures);
         if (failures.Count > 0) return Result(false, "restore incomplete; capture retained, retry restore", failures);
         lordCapture = null;
         caravanCapture = null;
+        fixtureLord = null;
         observation = null;
-        return Result(true, "lord and caravan restored and final behavior published");
+        return Result(true, removeFixtureLord
+            ? "lord, caravan, and temporary fixture lord restored"
+            : "lord and caravan restored and final behavior published");
+    }
+
+    private string CreateFixtureLord(MobileParty player, Clan clan, out MobileParty lord)
+    {
+        lord = null;
+        var template = player.LeaderHero.Culture?.LordTemplates?.Where(value => value != null)
+            .OrderBy(value => value.StringId, StringComparer.Ordinal).FirstOrDefault();
+        if (template == null)
+            return "no player-culture lord template is available for a temporary fixture lord";
+        try
+        {
+            Hero companion = HeroCreator.CreateSpecialHero(template,
+                player.LeaderHero.HomeSettlement ?? clan.HomeSettlement, age: 30);
+            fixtureLord = new FixtureLord(clan, companion);
+            companion.SetNewOccupation(Occupation.Wanderer);
+            AddCompanionAction.Apply(clan, companion);
+            AddHeroToPartyAction.Apply(companion, player, true);
+            MobileParty party = MobilePartyHelper.CreateNewClanMobileParty(companion, clan);
+            fixtureLord.Party = party;
+            if (!party.IsLordParty || party.IsPlayerParty() || party.LeaderHero != companion ||
+                party.ActualClan != clan || companion.Clan != clan)
+                throw new InvalidOperationException("temporary party was not created as a non-player lord in the player's clan");
+            string unavailable = EligibleAi(party);
+            if (unavailable != null) throw new InvalidOperationException("temporary lord is unavailable: " + unavailable);
+            if (Id(companion) == null || Id(party) == null || Id(party.Party) == null)
+                throw new InvalidOperationException("temporary lord identity was not registered");
+            lord = party;
+            return null;
+        }
+        catch (Exception error)
+        {
+            CoopCommandResult restored = Restore();
+            return "unable to create a temporary fixture lord: " + error.Message + "; " + restored.Output;
+        }
+    }
+
+    private CoopCommandResult SetupFailure(string message, object candidateEvidence)
+    {
+        CoopCommandResult restored = Restore();
+        return Result(false, message, new { restore = restored.Output, candidateEvidence });
     }
 
     private void RestoreCapture(Capture capture, List<string> failures)
@@ -275,6 +328,23 @@ internal sealed class ClanLordMovementFixture : IClanLordMovementFixture
         catch (Exception error) { failures.Add(capture.Party.StringId + ": " + error.Message); }
     }
 
+    private void RestoreFixtureLord(List<string> failures)
+    {
+        if (fixtureLord == null) return;
+        try
+        {
+            if (fixtureLord.Party?.IsActive == true) DestroyPartyAction.Apply(null, fixtureLord.Party);
+            if (fixtureLord.Hero?.CompanionOf != null) RemoveCompanionAction.ApplyByFire(fixtureLord.Clan, fixtureLord.Hero);
+            if (fixtureLord.Hero != null && fixtureLord.Hero.DeathMark == KillCharacterAction.KillCharacterActionDetail.None)
+                KillCharacterAction.ApplyByRemove(fixtureLord.Hero, false, true);
+            if (fixtureLord.Party?.IsActive == true)
+                throw new InvalidOperationException("temporary fixture party remains active");
+            if (fixtureLord.Hero?.DeathMark == KillCharacterAction.KillCharacterActionDetail.None)
+                throw new InvalidOperationException("temporary fixture hero remains active");
+        }
+        catch (Exception error) { failures.Add("temporary fixture lord: " + error.Message); }
+    }
+
     private bool CheckCampaign()
     {
         if (!ReferenceEquals(campaign, Campaign.Current))
@@ -282,6 +352,7 @@ internal sealed class ClanLordMovementFixture : IClanLordMovementFixture
             campaign = Campaign.Current;
             lordCapture = null;
             caravanCapture = null;
+            fixtureLord = null;
             observation = null;
         }
         return campaign?.CampaignObjectManager != null;
@@ -407,6 +478,18 @@ internal sealed class ClanLordMovementFixture : IClanLordMovementFixture
             NoDecisions = party.Ai.DoNotMakeNewDecisions;
             Rethink = party.Ai.RethinkAtNextHourlyTick;
             NeedsUpdate = party.Ai.DefaultBehaviorNeedsUpdate;
+        }
+    }
+
+    private sealed class FixtureLord
+    {
+        public Clan Clan { get; }
+        public Hero Hero { get; }
+        public MobileParty Party { get; set; }
+        public FixtureLord(Clan clan, Hero hero)
+        {
+            Clan = clan;
+            Hero = hero;
         }
     }
 
