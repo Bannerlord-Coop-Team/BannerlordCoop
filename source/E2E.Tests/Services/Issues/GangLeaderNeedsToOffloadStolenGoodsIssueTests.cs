@@ -1342,6 +1342,75 @@ public class GangLeaderNeedsToOffloadStolenGoodsIssueTests : IDisposable
     }
 
     [Fact]
+    public void OwnerTraitXpProgress_SurvivesASaveReloadRoundTrip_AndStillAccountsForPreReloadProgressOnTheNextReward()
+    {
+        var fixture = SetupIssueOwner();
+        CreateIssueOnServer(fixture);
+
+        var partyId = TestEnvironment.CreateRegisteredObject<MobileParty>();
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject<MobileParty>(partyId, out var party));
+            Assert.True(Server.ObjectManager.TryGetObject<Settlement>(fixture.OwnerSettlementId, out var settlement));
+            using (new AllowedThread())
+            {
+                party.CurrentSettlement = settlement;
+            }
+
+            var playerManager = Server.Resolve<IPlayerManager>();
+            Assert.True(playerManager.AddPlayer(new Player("owner-controller", fixture.HeroId, partyId, "", "")));
+        });
+        TestEnvironment.ConnectRegisteredPlayer(Client, "owner-controller");
+        Client.Resolve<IControllerIdProvider>().SetControllerId("owner-controller");
+        OpenConversation(Client, fixture.HeroId, "owner-controller");
+
+        Client.Call(() =>
+        {
+            Assert.True(Client.ObjectManager.TryGetObject<Hero>(fixture.HeroId, out var owner));
+            Assert.True(Campaign.Current.IssueManager.StartIssueQuest(owner));
+        });
+
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject<Hero>(fixture.HeroId, out var owner));
+            var quest = Assert.IsType<GangLeaderNeedsToOffloadStolenGoodsIssueBehavior.GangLeaderNeedsToOffloadStolenGoodsIssueQuest>(owner.Issue.IssueQuest);
+            owner.Gold = quest._stolenTradeGoodPrice + 1000;
+
+            var progress = new PropertyOwner<PropertyObject>();
+            progress.SetPropertyValue(DefaultTraits.Calculating, 950);
+            GangLeaderNeedsToOffloadStolenGoodsQuestType.OwnerTraitXpProgress.Set(owner, progress);
+
+            var behavior = new IssuesCampaignBehavior();
+            var records = new Dictionary<string, object>();
+            behavior.SyncData(new TestDataStore(isSaving: true, records));
+
+            GangLeaderNeedsToOffloadStolenGoodsQuestType.OwnerTraitXpProgress.ClearAll();
+            Assert.False(GangLeaderNeedsToOffloadStolenGoodsQuestType.OwnerTraitXpProgress.TryGet(owner, out _));
+
+            behavior.SyncData(new TestDataStore(isSaving: false, records));
+
+            Assert.True(GangLeaderNeedsToOffloadStolenGoodsQuestType.OwnerTraitXpProgress.TryGet(owner, out var restored));
+            Assert.Equal(950, restored.GetPropertyValue(DefaultTraits.Calculating));
+            Assert.Equal(0, owner.GetTraitLevel(DefaultTraits.Calculating));
+        });
+
+        Client.Call(() =>
+        {
+            Assert.True(Client.ObjectManager.TryGetObject<Hero>(fixture.HeroId, out var owner));
+            var quest = Assert.IsType<GangLeaderNeedsToOffloadStolenGoodsIssueBehavior.GangLeaderNeedsToOffloadStolenGoodsIssueQuest>(owner.Issue.IssueQuest);
+
+            SetResolvedMainHero(owner);
+            quest.SucceedQuestByPayingAndKeepingTheGoods();
+        });
+
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject<Hero>(fixture.HeroId, out var owner));
+            Assert.Equal(1, owner.GetTraitLevel(DefaultTraits.Calculating));
+        });
+    }
+
+    [Fact]
     public void RequestAlternativeSolutionCompletion_AppliesTheFrozenGoldAndItemPayout()
     {
         var fixture = SetupIssueOwner();

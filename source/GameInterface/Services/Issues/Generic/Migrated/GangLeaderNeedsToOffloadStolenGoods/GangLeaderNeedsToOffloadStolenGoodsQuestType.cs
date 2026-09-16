@@ -330,13 +330,16 @@ internal static class GangLeaderNeedsToOffloadStolenGoodsQuestType
         return CallOriginalPolicy.IsOriginalAllowedForOwnershipGate();
     }
 
-    private static readonly ConditionalWeakTable<Hero, PropertyOwner<PropertyObject>> OwnerTraitXpProgress = new();
+    public static readonly PendingRegistry<PropertyOwner<PropertyObject>> OwnerTraitXpProgress = new();
 
     private static void ApplyOwnerTraitXp(Hero owner, TraitObject trait, int xpValue)
     {
         if (owner == null) return;
 
-        var progress = OwnerTraitXpProgress.GetValue(owner, _ => new PropertyOwner<PropertyObject>());
+        if (!OwnerTraitXpProgress.TryGet(owner, out var progress))
+        {
+            progress = new PropertyOwner<PropertyObject>();
+        }
         var traitLevelBefore = owner.GetTraitLevel(trait);
         if (progress.GetPropertyValue(trait) == 0)
         {
@@ -345,6 +348,7 @@ internal static class GangLeaderNeedsToOffloadStolenGoodsQuestType
         Campaign.Current.Models.CharacterDevelopmentModel.GetTraitLevelForTraitXp(
             owner, trait, xpValue + progress.GetPropertyValue(trait), out var traitLevel, out var traitXp);
         progress.SetPropertyValue(trait, traitXp);
+        OwnerTraitXpProgress.Set(owner, progress);
         if (traitLevel != traitLevelBefore)
         {
             owner.SetTraitLevel(trait, traitLevel);
