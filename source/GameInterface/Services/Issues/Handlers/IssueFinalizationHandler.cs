@@ -92,7 +92,8 @@ internal class IssueFinalizationHandler : IHandler
         var acker = payload.Who as NetPeer;
         if (acker == null || !playerManager.TryGetPlayer(acker, out var player)) return;
 
-        pendingConsequenceRegistry.Ack(player.ControllerId, payload.What.ObligationId);
+        var obligationId = payload.What.ObligationId;
+        GameThread.RunSafe(() => pendingConsequenceRegistry.Ack(player.ControllerId, obligationId));
     }
 
     private static byte CaptureProof(IssueBase issue, IssueFinalizeReason reason)

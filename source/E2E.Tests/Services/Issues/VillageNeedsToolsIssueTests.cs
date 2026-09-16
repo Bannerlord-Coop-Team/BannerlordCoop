@@ -1781,6 +1781,77 @@ public class VillageNeedsToolsIssueTests : IDisposable
     }
 
     [Fact]
+    public void HandleAcknowledgePendingQuestFailConsequence_ArrivingOffTheGameThread_IsMarshaledBeforeMutatingTheRegistry()
+    {
+        var fixture = SetupVillageOwner();
+        CreateIssueOnServer(fixture);
+        var ownerHeroId = CreateDistinctOwnerHero(fixture);
+        var partyId = AcceptQuestFromClient(fixture, "player-A", ownerHeroId);
+
+        foreach (var instance in AllInstances)
+        {
+            instance.Call(() =>
+            {
+                Assert.True(instance.ObjectManager.TryGetObject<Hero>(fixture.HeroId, out var giver));
+                Assert.True(instance.ObjectManager.TryGetObject<Settlement>(fixture.SettlementId, out var settlement));
+                using (new AllowedThread())
+                {
+                    settlement.Party ??= new PartyBase(settlement);
+                    giver.Occupation = Occupation.RuralNotable;
+                    settlement.CollectNotablesToCache();
+                }
+                Assert.Contains(giver, settlement.Notables);
+            });
+        }
+
+        Server.Resolve<IPlayerManager>().ClearPeer(Client.NetPeer);
+
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject<Hero>(fixture.HeroId, out var giver));
+            Assert.True(Server.ObjectManager.TryGetObject<MobileParty>(partyId, out var ownerParty));
+            Assert.True(Server.ObjectManager.TryGetObject<Settlement>(fixture.SettlementId, out var settlement));
+
+            var quest = Assert.IsType<VillageNeedsToolsIssueBehavior.VillageNeedsToolsIssueQuest>(giver.Issue.IssueQuest);
+            MapEvent mapEvent;
+            using (new AllowedThread())
+            {
+                mapEvent = new MapEvent();
+                mapEvent._mapEventType = MapEvent.BattleTypes.IsForcingSupplies;
+                mapEvent.MapEventSettlement = settlement;
+                mapEvent._sides[0] = new MapEventSide(mapEvent, BattleSideEnum.Defender, settlement.Party);
+                mapEvent._sides[1] = new MapEventSide(mapEvent, BattleSideEnum.Attacker, ownerParty.Party);
+                settlement.Party._mapEventSide = mapEvent.DefenderSide;
+            }
+
+            quest.OnMapEventStarted(mapEvent, ownerParty.Party, settlement.Party);
+        });
+
+        Server.Resolve<IPlayerManager>().SetPeer("player-A", Client.NetPeer);
+        Server.Resolve<IPlayerManager>().MarkCampaignReady("player-A");
+        Server.Call(() =>
+        {
+            new IssuesCampaignBehavior().RegisterEvents();
+            CampaignEvents.Instance.HourlyTick();
+        });
+
+        var delivered = Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkApplyPendingQuestFailConsequence>());
+        Server.Call(() => Assert.Empty(Server.Resolve<IPendingLocalOwnerConsequenceRegistry>().Snapshot()));
+
+        Server.Call(() => Server.Resolve<IPendingLocalOwnerConsequenceRegistry>()
+            .Restore("player-A", delivered.ObligationId, delivered.QuestTypeKey, delivered.Proof));
+
+        Server.SimulateMessage(Client.NetPeer, new NetworkAcknowledgePendingQuestFailConsequence(delivered.ObligationId), markGameThread: false);
+
+        Assert.True(Server.PendingGameThreadActionCount > 0);
+        Server.Call(() => Assert.Single(Server.Resolve<IPendingLocalOwnerConsequenceRegistry>().Snapshot()));
+
+        Server.PumpGameThread();
+
+        Server.Call(() => Assert.Empty(Server.Resolve<IPendingLocalOwnerConsequenceRegistry>().Snapshot()));
+    }
+
+    [Fact]
     public void OnMapEventStarted_ListenHostOwnsTheIssueAndCoercesIt_AppliesTheLocalHonorPenaltyExactlyOnce_WithoutDeferringIt()
     {
         var fixture = SetupVillageOwner();
