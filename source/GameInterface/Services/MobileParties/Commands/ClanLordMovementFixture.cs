@@ -22,11 +22,13 @@ using TaleWorlds.Library;
 
 namespace GameInterface.Services.MobileParties.Commands;
 
-/// <summary>Stages and observes the clan-lord conversation regression without starting a live run.</summary>
+/// <summary>Stages and exercises the clan-lord conversation regression fixture.</summary>
 internal interface IClanLordMovementFixture
 {
     CoopCommandResult Setup(string playerId);
     CoopCommandResult Observe(IReadOnlyList<string> args);
+    CoopCommandResult Start(IReadOnlyList<string> args);
+    CoopCommandResult Finish(IReadOnlyList<string> args);
     CoopCommandResult Restore();
 }
 
@@ -116,12 +118,14 @@ internal sealed class ClanLordMovementFixture : IClanLordMovementFixture
             CoopCommandResult restored = Restore();
             return Result(false, "staging failed: " + error.Message, new { restore = restored.Output, candidateEvidence });
         }
-        return Result(true, "ready: speak to the named caravan through the normal client UI", new
+        return Result(true, "ready: run the printed source-bound start command on the participating client", new
         {
             token = observation.Token, player = Describe(player), lord = Describe(lord), caravan = Describe(caravan),
             interactionRangeVerified = true, interactionRange, distance = player.Position.Distance(caravan.Position), candidateEvidence,
             before = Command("before", lord.Position, CampaignTime.Now.NumTicks),
+            start = Command("clan_lord_fixture_start", "before", lord.Position, CampaignTime.Now.NumTicks),
             during = Command("during", lord.Position, CampaignTime.Now.NumTicks),
+            finish = Command("clan_lord_fixture_finish", "during", lord.Position, CampaignTime.Now.NumTicks),
             released = Command("released", lord.Position, CampaignTime.Now.NumTicks),
             restore = "coop.debug.mobileparty.clan_lord_fixture_restore"
         });
@@ -189,6 +193,40 @@ internal sealed class ClanLordMovementFixture : IClanLordMovementFixture
             verify = observation.Released ? Command("verify", observation.Baseline, observation.Ticks) : null,
             state = Command("state", lord.Position, CampaignTime.Now.NumTicks)
         });
+    }
+
+    public CoopCommandResult Start(IReadOnlyList<string> args)
+    {
+        if (ModInformation.IsServer) return Result(false, "start requires the participating client");
+        if (args[0] != "before") return Result(false, "use the exact start command printed by the fixture");
+        CoopCommandResult before = Observe(args);
+        if (!before.Succeeded) return before;
+        if (!objects.TryGetObject(args[1], out MobileParty player) || !objects.TryGetObject(args[3], out MobileParty caravan))
+            return Result(false, "a required exact registry id did not resolve");
+        if (MobileParty.MainParty != player) return Result(false, "start requires the participating player client");
+        if (PlayerEncounter.Current != null) return Result(false, "finish the current player encounter before starting the fixture conversation");
+        float interactionRange = campaign.Models.EncounterModel.NeededMaximumLandDistanceForEncounteringMobileParty;
+        if (!rules.IsWithinInteractionRange(player.Position.Distance(caravan.Position), interactionRange))
+            return Result(false, "the staged caravan is outside the real vanilla interaction range");
+
+        EncounterManager.StartPartyEncounter(player.Party, caravan.Party);
+        return Result(true, "requested the exact caravan through the production encounter action", new
+        {
+            player = Describe(player), caravan = Describe(caravan), interactionRange
+        });
+    }
+
+    public CoopCommandResult Finish(IReadOnlyList<string> args)
+    {
+        if (ModInformation.IsServer) return Result(false, "finish requires the participating client");
+        if (args[0] != "during") return Result(false, "use the exact finish command printed by the fixture");
+        CoopCommandResult during = Observe(args);
+        if (!during.Succeeded) return during;
+        if (!objects.TryGetObject(args[3], out MobileParty caravan) || PlayerEncounter.EncounteredParty != caravan.Party)
+            return Result(false, "the exact staged caravan is no longer the active player encounter");
+
+        PlayerEncounter.Finish();
+        return Result(true, "finished the exact caravan through the production encounter action", new { caravan = Describe(caravan) });
     }
 
     public CoopCommandResult Restore()
@@ -320,7 +358,10 @@ internal sealed class ClanLordMovementFixture : IClanLordMovementFixture
     }
 
     private string Command(string phase, CampaignVec2 baseline, long ticks) =>
-        string.Join(" ", "coop.debug.mobileparty.clan_lord_fixture_observe", phase, observation.PlayerId,
+        Command("clan_lord_fixture_observe", phase, baseline, ticks);
+
+    private string Command(string name, string phase, CampaignVec2 baseline, long ticks) =>
+        string.Join(" ", "coop.debug.mobileparty." + name, phase, observation.PlayerId,
             observation.LordId, observation.CaravanId, Number(observation.Target.X), Number(observation.Target.Y),
             Number(baseline.X), Number(baseline.Y), ticks.ToString(CultureInfo.InvariantCulture), observation.Token);
 

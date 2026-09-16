@@ -83,10 +83,13 @@ coordinates and campaign ticks, requiring at least 0.1 map units displacement,
 matching destination within 0.01 map units, and non-Hold behavior. It does not
 claim to have opened a local conversation.
 
-The selected player must use the normal map UI to interact with the named staged
-caravan, enter dialogue, and leave peacefully. Keep the dialogue open long enough
-to capture the `during` evidence on the server and that client. No conversation,
-movement or time cheat is part of this action.
+Run the source-bound `clan_lord_fixture_start` command printed by setup on the
+participating client. It invokes the production encounter action for the exact
+staged caravan, so the existing approval and conversation handlers run without
+native input or UI wiring. After the `during` observations, run the printed
+`clan_lord_fixture_finish` command on that same client. It verifies the exact
+active encounter before invoking the production finish action. No conversation,
+movement or time cheat is part of either action.
 
 Setup gives the lord a fixed GoToPoint order and temporarily prevents new AI
 decisions while leaving its AI enabled. This makes route displacement repeatable;
@@ -117,12 +120,12 @@ Capture all of these phases:
 1. **Ready:** server and both clients resolve the same lord and caravan. The lord
    has coherent Point/GoToPoint navigation and a destination different from its
    current position.
-2. **During:** the selected client is visibly talking to the selected caravan;
-   its observation reports an active conversation and encounter. The server
-   confirms the exact player owns the exact caravan engagement.
-3. **Released:** leave through the normal conversation UI. The server engagement
-   and the client's conversation/encounter have ended. Capture fresh position and
-   campaign-time baselines on every participant now.
+2. **During:** the selected client reports an active conversation and encounter
+   with the selected caravan. The server confirms the exact player owns the exact
+   caravan engagement.
+3. **Released:** finish through the generated source-bound command. The server
+   engagement and the client's conversation/encounter have ended. Capture fresh
+   position and campaign-time baselines on every participant now.
 4. **Moving:** advance ordinary campaign time, then verify at least 0.1 map units
    displacement from each participant's **released** baseline, increasing
    campaign ticks, non-Hold behavior and matching destination within 0.01 map
