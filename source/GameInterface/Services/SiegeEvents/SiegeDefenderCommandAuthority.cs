@@ -1,7 +1,6 @@
 ﻿using GameInterface.Services.Players;
 using System;
 using System.Collections.Generic;
-using TaleWorlds.CampaignSystem.MapEvents;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Siege;
 using TaleWorlds.Core;
@@ -29,29 +28,9 @@ public class SiegeDefenderCommandAuthority : ISiegeDefenderCommandAuthority
         if (siegeEvent == null) return false;
         if (side != BattleSideEnum.Defender) return false;
 
-        var settlement = siegeEvent.BesiegedSettlement;
-        if (settlement == null) return false;
+        if (siegeEvent.BesiegedSettlement == null) return false;
 
-        if (HasPlayerInvolvedDefender(siegeEvent, side)) return true;
-
-        var town = settlement.Town;
-        if (town == null) return false;
-
-        try
-        {
-            foreach (var defender in town.GetDefenderParties(MapEvent.BattleTypes.Siege))
-            {
-                if (defender == null) continue;
-                if (defender.LeaderHero != null && playerManager.Contains(defender.LeaderHero)) return true;
-                if (defender.MobileParty != null && playerManager.Contains(defender.MobileParty)) return true;
-            }
-        }
-        catch (Exception)
-        {
-            return false;
-        }
-
-        return false;
+        return HasPlayerInvolvedDefender(siegeEvent, side);
     }
 
     private bool HasPlayerInvolvedDefender(SiegeEvent siegeEvent, BattleSideEnum side)
