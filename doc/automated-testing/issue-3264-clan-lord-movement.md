@@ -113,7 +113,8 @@ normal interaction range. Staging checks the selected caravan distance against
 the current land encounter model and searches only inside that radius. It does
 not require the player to already target the caravan. Selection or setup failure
 is an unexercised test, never a pass. The server performs setup and restoration with synchronization
-patches active. Clients use observation commands and the normal conversation UI.
+patches active. Clients use the printed source-bound start and finish commands,
+then use observation commands.
 
 Capture all of these phases:
 
