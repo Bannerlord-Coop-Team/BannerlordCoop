@@ -264,7 +264,8 @@ internal sealed class ClanLordMovementFixture : IClanLordMovementFixture
     {
         lord = null;
         MobileParty party = MobileParty.All.Where(p => p.IsLordParty && p != player && !p.IsPlayerParty() &&
-                p.LeaderHero?.Clan != null && p.LeaderHero.Clan != clan && p.LeaderHero.CompanionOf == null && EligibleAi(p) == null)
+                p.LeaderHero?.Clan != null && p.LeaderHero.Clan.Leader != p.LeaderHero && p.LeaderHero.Clan != clan &&
+                p.LeaderHero.CompanionOf == null && EligibleAi(p) == null)
             .OrderBy(p => p.LeaderHero.StringId, StringComparer.Ordinal)
             .ThenBy(p => p.StringId, StringComparer.Ordinal).FirstOrDefault();
         if (party == null)
