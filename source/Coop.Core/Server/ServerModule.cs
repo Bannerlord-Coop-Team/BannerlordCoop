@@ -93,6 +93,7 @@ public class ServerModule : CommonModule
             .InstancePerDependency();
         // Pauses time while a peer's packet queue is overloaded (slow client catching up). Constructed
         // as a CoopServer dependency, so it registers its unpause policy when the server is built.
+        builder.RegisterType<JoinPeerTerminator>().As<IJoinPeerTerminator>().InstancePerDependency();
         builder.RegisterType<OverloadedPeerManager>().As<IOverloadedPeerManager>().InstancePerLifetimeScope().AutoActivate();
 
         builder.RegisterType<ServerTelemetryUploader>()

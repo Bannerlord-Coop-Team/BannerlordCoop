@@ -83,7 +83,6 @@ internal class ChangePlayerCharacterActionPatches
         CampaignEventDispatcher.Instance.OnPlayerCharacterChanged(mainHero, hero, MobileParty.MainParty, isMainPartyChanged);
         PartyBase.MainParty.SetVisualAsDirty();
         mainParty.Party.SetVisualAsDirty();
-        Campaign.Current.MainHeroIllDays = -1;
 
         // Nameplate relations were initialized against the save's previous main hero. The native VM
         // does not listen for player-character changes, so refresh its cached friendly/enemy state now.

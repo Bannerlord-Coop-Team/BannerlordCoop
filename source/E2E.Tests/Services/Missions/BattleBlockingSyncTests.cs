@@ -1455,8 +1455,10 @@ public class BattleBlockingSyncTests : MissionTestEnvironment
         });
     }
 
-    [Fact]
-    public void SuccessorAction_BeforeHostAssignment_WaitsForMigration()
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public void SuccessorAction_BeforeHostAssignment_WaitsForMigration(bool assignmentOnGameThread)
     {
         const string mapEventId = "mapEvent1";
         RunBattleScenario("observer", mapEventId, context =>
@@ -1483,7 +1485,16 @@ public class BattleBlockingSyncTests : MissionTestEnvironment
                 Assert.Equal(Agent.GuardMode.None, puppetMirror.GuardMode);
 
                 context.Broker.Publish(this, new MissionPeerDisconnected("A", mapEventId));
-                AssignBattleHost(context, mapEventId, "B", Array.Empty<string>(), epoch: 2);
+                context.Instance.SimulateMessage(this,
+                    new NetworkBattleHostAssigned(mapEventId, "B", Array.Empty<string>(), 2),
+                    markGameThread: assignmentOnGameThread);
+                if (!assignmentOnGameThread)
+                {
+                    Assert.True(context.Hosts.TryGet(mapEventId, out var beforePump));
+                    Assert.Equal("A", beforePump.HostControllerId);
+                    Assert.True(context.Instance.PendingGameThreadActionCount > 0);
+                }
+                context.Instance.PumpGameThread();
                 DrainGameThread();
                 context.Component.AgentActionHandler.ApplyRemoteGuardStates();
 

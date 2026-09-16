@@ -53,6 +53,14 @@ internal class PlayerPartyRestorer : IPlayerPartyRestorer
         restoredPlayer = player;
         if (player == null) return false;
         if (!objectManager.TryGetObjectWithLogging(player.HeroId, out Hero hero)) return false;
+
+        // A dead registered hero is waiting for heir selection. Keep its saved party association
+        // intact instead of restoring the dead hero into the roster as its leader.
+        if (hero.IsDead)
+        {
+            return objectManager.TryGetObjectWithLogging(player.MobilePartyId, out MobileParty _);
+        }
+
         if (hero.Clan == null || hero.CharacterObject == null)
         {
             Logger.Error(

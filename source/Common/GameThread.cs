@@ -23,6 +23,11 @@ public class GameThread : IUpdateable
     {
         internal readonly Queue<QueuedAction> queue = new Queue<QueuedAction>();
         internal readonly object gate = new object();
+        internal long removedTaskCount;
+        internal long nextDrainBudgetId;
+        internal long activeDrainTicks;
+        internal long activeBlockingTimeoutTicks;
+        internal readonly Dictionary<long, (long DrainTicks, long TimeoutTicks)> drainBudgets = new();
         internal bool isClosed;
         internal int rejectedAfterCloseCount;
         private Action waitPump;
@@ -228,6 +233,14 @@ public class GameThread : IUpdateable
             throw new ArgumentException("Wrong thread!");
         }
 
+        QueueContext current = CurrentQueue;
+        long budget = Interlocked.Read(ref current.activeDrainTicks);
+        if (budget > 0)
+        {
+            DrainLimitedFrame(current, budget);
+            return;
+        }
+
         List<QueuedAction> toBeRun = new List<QueuedAction>();
 
         int backlog;
@@ -238,6 +251,7 @@ public class GameThread : IUpdateable
             while (queueContext.queue.Count > 0)
             {
                 toBeRun.Add(queueContext.queue.Dequeue());
+                queueContext.removedTaskCount++;
             }
         }
 
@@ -307,6 +321,141 @@ public class GameThread : IUpdateable
         if (m_ReportTimer.Elapsed >= ReportInterval)
         {
             ReportAndReset();
+        }
+    }
+
+    /// <summary>Limits queued join work per frame while preserving the runtime's FIFO queue.</summary>
+    public IDisposable LimitFrameDrain(TimeSpan maximumDrainTime, TimeSpan? blockingTimeout = null)
+    {
+        if (maximumDrainTime <= TimeSpan.Zero) throw new ArgumentOutOfRangeException(nameof(maximumDrainTime));
+        TimeSpan timeout = blockingTimeout ?? BlockingTimeout;
+        if (timeout <= TimeSpan.Zero) throw new ArgumentOutOfRangeException(nameof(blockingTimeout));
+        QueueContext queue = CurrentQueue;
+        lock (queue.gate)
+        {
+            if (queue.isClosed) throw new OperationCanceledException("The game-thread queue is closed.");
+            long id = ++queue.nextDrainBudgetId;
+            queue.drainBudgets.Add(id, (Math.Max(1L,
+                (long)(maximumDrainTime.TotalSeconds * Stopwatch.Frequency)), timeout.Ticks));
+            RefreshDrainLimits(queue);
+            return new FrameDrainBudgetScope(queue, id);
+        }
+    }
+
+    /// <summary>Number of active drain limits in this runtime.</summary>
+    public int FrameDrainLimitCount
+    {
+        get
+        {
+            QueueContext queue = CurrentQueue;
+            lock (queue.gate) return queue.drainBudgets.Count;
+        }
+    }
+
+    /// <summary>Timeout applied to newly queued blocking work in this runtime.</summary>
+    public TimeSpan EffectiveBlockingTimeout
+    {
+        get
+        {
+            long ticks = Interlocked.Read(ref CurrentQueue.activeBlockingTimeoutTicks);
+            return ticks > 0 ? TimeSpan.FromTicks(ticks) : BlockingTimeout;
+        }
+    }
+
+    private void DrainLimitedFrame(QueueContext queue, long budgetTicks)
+    {
+        int backlog;
+        long frameEnd;
+        lock (queue.gate)
+        {
+            backlog = queue.queue.Count;
+            frameEnd = queue.removedTaskCount + backlog;
+        }
+
+        long started = Stopwatch.GetTimestamp();
+        int actionsRun = 0;
+        while (actionsRun < backlog)
+        {
+            QueuedAction task;
+            lock (queue.gate)
+            {
+                // Nested pumps and queue discards consume this frame's original work too.
+                if (queue.queue.Count == 0 || queue.removedTaskCount >= frameEnd) break;
+                task = queue.queue.Dequeue();
+                queue.removedTaskCount++;
+            }
+            long actionStart = Stopwatch.GetTimestamp();
+            try
+            {
+                RunQueuedTask(task);
+            }
+            catch
+            {
+                var abandoned = new List<QueuedAction>();
+                lock (queue.gate)
+                {
+                    while (queue.queue.Count > 0 && queue.removedTaskCount < frameEnd)
+                    {
+                        abandoned.Add(queue.queue.Dequeue());
+                        queue.removedTaskCount++;
+                    }
+                }
+                CancelUnrunBatch(abandoned, 0);
+                throw;
+            }
+            if (Instrument && !task.Cancellation.IsCancellationRequested)
+            {
+                string label = task.Label ?? "(unlabeled)";
+                m_PerLabel.TryGetValue(label, out var aggregate);
+                m_PerLabel[label] = (aggregate.Ticks + Stopwatch.GetTimestamp() - actionStart, aggregate.Count + 1);
+            }
+            actionsRun++;
+            if (Stopwatch.GetTimestamp() - started >= budgetTicks) break;
+        }
+
+        if (!Instrument) return;
+        long elapsed = Stopwatch.GetTimestamp() - started;
+        m_WindowFrames++;
+        m_WindowActions += actionsRun;
+        m_WindowTicks += elapsed;
+        if (elapsed > m_WorstFrameTicks)
+        {
+            m_WorstFrameTicks = elapsed;
+            m_WorstFrameActions = actionsRun;
+        }
+        m_WorstBacklog = Math.Max(m_WorstBacklog, backlog);
+        if (m_ReportTimer.Elapsed >= ReportInterval) ReportAndReset();
+    }
+
+    private static void RefreshDrainLimits(QueueContext queue)
+    {
+        Interlocked.Exchange(ref queue.activeDrainTicks,
+            queue.drainBudgets.Count == 0 ? 0 : queue.drainBudgets.Values.Min(value => value.DrainTicks));
+        Interlocked.Exchange(ref queue.activeBlockingTimeoutTicks,
+            queue.drainBudgets.Count == 0 ? 0 : queue.drainBudgets.Values.Max(value => value.TimeoutTicks));
+    }
+
+    /// <summary>Releases the limit on its owning queue even after the ambient runtime changes.</summary>
+    private sealed class FrameDrainBudgetScope : IDisposable
+    {
+        private QueueContext queue;
+        private readonly long id;
+
+        public FrameDrainBudgetScope(QueueContext queue, long id)
+        {
+            this.queue = queue;
+            this.id = id;
+        }
+
+        public void Dispose()
+        {
+            QueueContext owner = Interlocked.Exchange(ref queue, null);
+            if (owner == null) return;
+            lock (owner.gate)
+            {
+                owner.drainBudgets.Remove(id);
+                RefreshDrainLimits(owner);
+            }
         }
     }
 
@@ -433,16 +582,17 @@ public class GameThread : IUpdateable
 
             if (ewh == null) return;
 
+            TimeSpan waitTimeout = Instance.EffectiveBlockingTimeout;
             int waitResult = !cancellation.CanBeCanceled
-                ? (ewh.WaitOne(BlockingTimeout) ? 0 : WaitHandle.WaitTimeout)
+                ? (ewh.WaitOne(waitTimeout) ? 0 : WaitHandle.WaitTimeout)
                 : WaitHandle.WaitAny(
                     new[] { ewh, cancellation.WaitHandle },
-                    BlockingTimeout);
+                    waitTimeout);
             if (waitResult == WaitHandle.WaitTimeout)
             {
                 throw new TimeoutException(
                     $"A blocking {nameof(Run)} action was not processed by the game loop " +
-                    $"within {BlockingTimeout.TotalSeconds:0} seconds. The game loop thread is not pumping " +
+                    $"within {waitTimeout.TotalSeconds:0} seconds. The game loop thread is not pumping " +
                     $"{nameof(GameThread)}.{nameof(Update)} (initialized: {Instance.IsInitialized}).");
             }
             if (waitResult == 1)
@@ -653,6 +803,7 @@ public class GameThread : IUpdateable
                 queueContext.WaitPump = null;
             }
             discarded = new List<QueuedAction>(queueContext.queue);
+            queueContext.removedTaskCount += queueContext.queue.Count;
             queueContext.queue.Clear();
         }
 

@@ -3,6 +3,7 @@ using Coop.Core.Server.Services.Save;
 using GameInterface.CoopSessionData.Save.Data;
 using GameInterface.Services.Alleys;
 using GameInterface.Services.Caravans;
+using GameInterface.Services.Heroes;
 using GameInterface.Services.Inventory;
 using GameInterface.Services.Heroes;
 using System.Collections.Generic;
@@ -70,7 +71,8 @@ namespace Coop.Tests.Server.Services.Save
                 interactionsPlayerData,
                 tradePlayerData,
                 new InventoryPlayerData(new(), new()),
-                new HeroMeetingData(new()));
+                new HeroMeetingData(new()),
+                new AgingPlayerData(new()));
 
             string saveFile = sessionData.UniqueGameId;
 
@@ -135,7 +137,8 @@ namespace Coop.Tests.Server.Services.Save
                 interactionsPlayerData,
                 tradePlayerData,
                 new InventoryPlayerData(new(), new()),
-                new HeroMeetingData(meetingTimes));
+                new HeroMeetingData(meetingTimes),
+                new AgingPlayerData(new()));
 
             string saveFile = SAVE_PATH + sessionData.UniqueGameId;
 
