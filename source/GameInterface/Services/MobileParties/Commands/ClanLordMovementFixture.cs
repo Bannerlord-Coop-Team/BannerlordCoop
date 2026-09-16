@@ -160,7 +160,7 @@ internal sealed class ClanLordMovementFixture : IClanLordMovementFixture
         }
         return Result(true, "ready: run the printed source-bound start command on the participating client", new
         {
-            token = observation.Token, player = Describe(player), lord = Describe(lord), interaction = selectedInteraction,
+            token = observation.Token, player = Describe(player), lord = Describe(lord), interaction = Describe(interaction),
             preparedLord = fixtureLord != null,
             originalClan = fixtureLord == null ? null : new { id = Id(fixtureLord.OriginalClan), stringId = fixtureLord.OriginalClan.StringId },
             interactionRangeVerified = true, interactionRange,
