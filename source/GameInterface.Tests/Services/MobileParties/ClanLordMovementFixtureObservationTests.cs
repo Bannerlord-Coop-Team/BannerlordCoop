@@ -11,6 +11,14 @@ public class ClanLordMovementFixtureObservationTests
     private static ClanLordMovementFixture.Observation Create() =>
         new ClanLordMovementFixture.Observation("run-one", "player", "lord", "interaction", Point(24, 4));
 
+    [Theory]
+    [InlineData(false, true)]
+    [InlineData(true, false)]
+    public void ClientReleaseComplete_RequiresOnlyFinishedPlayerEncounter(bool hasPlayerEncounter, bool expected)
+    {
+        Assert.Equal(expected, ClanLordMovementFixture.ClientReleaseComplete(hasPlayerEncounter));
+    }
+
     [Fact]
     public void ReleaseWithoutActualConversationCannotArmMovementVerification()
     {

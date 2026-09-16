@@ -215,7 +215,8 @@ internal sealed class ClanLordMovementFixture : IClanLordMovementFixture
         else if (phase == "released" || phase == "verify")
         {
             if (!observation.During) failure = "the during checkpoint was never observed on this machine";
-            else if (ModInformation.IsServer ? held || interaction.Ai?.IsDisabled != false : conversationActive || hasPlayerEncounter)
+            // PlayerEncounter.Finish owns client release; conversationActive remains diagnostic evidence.
+            else if (ModInformation.IsServer ? held || interaction.Ai?.IsDisabled != false : !ClientReleaseComplete(hasPlayerEncounter))
                 failure = "the selected conversation has not fully released";
             else if (phase == "released")
             {
@@ -489,6 +490,8 @@ internal sealed class ClanLordMovementFixture : IClanLordMovementFixture
         a.MoveTargetPartyId == b.MoveTargetPartyId && a.InteractablePointId == b.InteractablePointId &&
         a.BestTargetPoint == b.BestTargetPoint && a.DesiredAiNavigationType == b.DesiredAiNavigationType &&
         a.IsTargetingPort == b.IsTargetingPort && a.IsInteractableAnchor == b.IsInteractableAnchor && a.IsCurrentlyAtSea == b.IsCurrentlyAtSea;
+
+    internal static bool ClientReleaseComplete(bool hasPlayerEncounter) => !hasPlayerEncounter;
 
     private sealed class Capture
     {
