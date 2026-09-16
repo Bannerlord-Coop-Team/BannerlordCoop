@@ -837,19 +837,6 @@ internal sealed class SiegeInteractionDebugBehavior : MissionBehavior, ISiegeInt
         // Gate standing-point origins can lie directly beneath the player's feet.
         var bounds = gate.ComputeGlobalPhysicsBoundingBoxMinMax();
         var gateTarget = (bounds.Item1 + bounds.Item2) * 0.5f;
-        if (nativeCamera && gate.State == CastleGate.GateState.Open && standingPoint != null &&
-            machine.StandingPoints != null && machine.StandingPoints.Contains(standingPoint) &&
-            !standingPoint.IsDeactivated)
-        {
-            var standingPointEntity = standingPoint.GameEntity;
-            if (standingPointEntity.IsValid)
-            {
-                var standingPointTarget = standingPointEntity.ComputeGlobalPhysicsBoundingBoxCenter();
-                if (new[] { standingPointTarget.x, standingPointTarget.y, standingPointTarget.z }
-                        .All(value => !float.IsNaN(value) && !float.IsInfinity(value)))
-                    gateTarget = standingPointTarget;
-            }
-        }
         if (nativeCamera)
         {
             nativeAimTarget = new

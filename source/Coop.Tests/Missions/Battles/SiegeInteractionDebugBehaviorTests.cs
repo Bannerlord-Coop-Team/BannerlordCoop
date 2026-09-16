@@ -732,7 +732,7 @@ public class SiegeInteractionDebugBehaviorTests
     private static bool SkipScriptComponentCache() => false;
 
     [Fact]
-    public void NativeOpenGateTarget_UsesTheRequestedActiveStandingPointPhysicsCenter()
+    public void NativeOpenGateTarget_UsesGatePhysicsCenterWhenOpen()
     {
         using var mission = new MissionCurrentScope();
         var harmony = new Harmony("coop.tests.open-gate-native-target");
@@ -764,12 +764,12 @@ public class SiegeInteractionDebugBehaviorTests
             var standingPosition = new Vec3(610.707764f, 625.542664f, 60.684f);
             var target = behavior.GetStagingTarget(gate, standingPosition, false, true, standingPoint);
 
-            Assert.Equal(new Vec3(614f, 626f, 63f), target);
+            Assert.Equal(new Vec3(613f, 625f, 62f), target);
             var nativeAimTarget = JObject.FromObject(
                 AccessTools.Field(typeof(SiegeInteractionDebugBehavior), "nativeAimTarget").GetValue(behavior));
-            Assert.Equal(614f, nativeAimTarget["target"]["x"].Value<float>());
-            Assert.Equal(626f, nativeAimTarget["target"]["y"].Value<float>());
-            Assert.Equal(63f, nativeAimTarget["target"]["z"].Value<float>());
+            Assert.Equal(613f, nativeAimTarget["target"]["x"].Value<float>());
+            Assert.Equal(625f, nativeAimTarget["target"]["y"].Value<float>());
+            Assert.Equal(62f, nativeAimTarget["target"]["z"].Value<float>());
         }
         finally
         {
