@@ -69,7 +69,7 @@ map outside an army, settlement, battle, captivity and navigation transition:
 coop.debug.mobileparty.clan_lord_fixture_setup MobileParty_Player_recovered_517c7a227d364777915062f6ab47967f
 ```
 
-Setup returns the selected or temporary lord, clan and caravan names and registry
+Setup returns the selected or prepared lord, clan and caravan names and registry
 IDs, a fixture token, the staged destination, and complete executable observation
 commands. Copy those commands verbatim to the indicated participant; the numeric
 coordinates, times and `Created_*` IDs depend on the loaded save. Do not substitute
@@ -112,18 +112,18 @@ Retain the restore result and repeat the command to check its idempotent result.
 ## Required observations
 
 The fixture first selects a registered, eligible lord in the selected player's
-clan. If that save has none, setup creates a temporary non-player lord from the
-player culture's deterministic lord template, then creates its real clan party
-through the existing campaign actions. That actor is setup only, not the behavior
-claim: the client still invokes the production encounter start and finish actions.
-Restore destroys the temporary party and removes the temporary companion. The
-fixture prints the actual identities, stages movement and places a real caravan
-within normal interaction range. Staging checks the selected caravan distance
-against the current land encounter model and searches only inside that radius. It
-does not require the player to already target the caravan. Selection or setup
-failure is an unexercised test, never a pass. The server performs setup and
-restoration with synchronization patches active. Clients use the printed
-source-bound start and finish commands, then use observation commands.
+clan. If that save has none, setup deterministically prepares an existing eligible
+non-player lord by temporarily assigning its hero to the selected player's clan.
+It records that hero's original clan and Restore returns it through the same clan
+membership path. No hero or party is created or deleted. This is setup only, not
+the behavior claim: the client still invokes the production encounter start and
+finish actions. The fixture prints the actual identities, stages movement and
+places a real caravan within normal interaction range. Staging checks the selected
+caravan distance against the current land encounter model and searches only inside
+that radius. It does not require the player to already target the caravan.
+Selection or setup failure is an unexercised test, never a pass. The server
+performs setup and restoration with synchronization patches active. Clients use
+the printed source-bound start and finish commands, then use observation commands.
 
 Capture all of these phases:
 
@@ -157,7 +157,7 @@ commands. Preserve the source/build manifest, server output, both client logs an
 screenshots of conversation and post-release map state. Copy logs before any
 restart because client log files are recreated at startup.
 
-Classify missing eligible actors after temporary-lord preparation, incomplete
+Classify missing eligible actors after existing-lord preparation, incomplete
 joins, stopped campaign time, unreachable staging positions and missing
 conversation evidence as unexercised.
 A witnessed release followed by Hold, waiting, no displacement or inconsistent
@@ -167,6 +167,6 @@ coordinates and the first relevant log error.
 
 Always attempt fixture restoration after a failed assertion. A failed restore
 must preserve its captured state for retry and report the unresolved party or
-temporary fixture lord. Do not declare cleanup successful until restoration is
+prepared fixture lord. Do not declare cleanup successful until restoration is
 verified. If world changes make restoration impossible, retain evidence and reload
 the disposable save pair.
