@@ -1,4 +1,6 @@
-﻿using GameInterface.Services.Villages;
+﻿using GameInterface.Services.Inventory.Patches;
+using GameInterface.Services.Party.Patches;
+using GameInterface.Services.Villages;
 using Xunit;
 
 namespace GameInterface.Tests.Services.Villages;
@@ -85,5 +87,60 @@ public class ForceTransferScreenTrackerTests
         ForceTransferScreenTracker.Clear();
 
         Assert.False(ForceTransferScreenTracker.HasOpenForceTransferScreen());
+    }
+
+    [Fact]
+    public void Cancel_PartyScreenClose_ClearsAttribution()
+    {
+        var roster = new object();
+        ForceTransferScreenTracker.NoteLootScreenOpened("req-1", roster);
+        try
+        {
+            PartyScreenLogicPatches.OnPartyScreenClosedPostfix();
+
+            Assert.False(ForceTransferScreenTracker.HasOpenForceTransferScreen());
+            Assert.False(ForceTransferScreenTracker.TryClaimForceTransferId(roster, out _));
+        }
+        finally
+        {
+            ForceTransferScreenTracker.Clear();
+        }
+    }
+
+    [Fact]
+    public void Cancel_InventoryClose_ClearsAttribution()
+    {
+        var roster = new object();
+        ForceTransferScreenTracker.NoteLootScreenOpened("req-1", roster);
+        try
+        {
+            InventoryForceTransferClosePatches.CloseScreenPrefix(fromCancel: true);
+
+            Assert.False(ForceTransferScreenTracker.HasOpenForceTransferScreen());
+            Assert.False(ForceTransferScreenTracker.TryClaimForceTransferId(roster, out _));
+        }
+        finally
+        {
+            ForceTransferScreenTracker.Clear();
+        }
+    }
+
+    [Fact]
+    public void Done_InventoryClose_PreservesAttributionForClaim()
+    {
+        var roster = new object();
+        ForceTransferScreenTracker.NoteLootScreenOpened("req-1", roster);
+        try
+        {
+            InventoryForceTransferClosePatches.CloseScreenPrefix(fromCancel: false);
+
+            Assert.True(ForceTransferScreenTracker.HasOpenForceTransferScreen());
+            Assert.True(ForceTransferScreenTracker.TryClaimForceTransferId(roster, out var claimed));
+            Assert.Equal("req-1", claimed);
+        }
+        finally
+        {
+            ForceTransferScreenTracker.Clear();
+        }
     }
 }

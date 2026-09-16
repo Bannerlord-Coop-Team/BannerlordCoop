@@ -195,6 +195,17 @@ internal class PartyScreenLogicPatches
         partyScreenLogic.PrisonerRosters[(int)PartyScreenLogic.PartyRosterSide.Left] = leftPrisonerRoster;
     }
 
+    [HarmonyPatch(nameof(PartyScreenLogic.OnPartyScreenClosed))]
+    [HarmonyPostfix]
+    public static void OnPartyScreenClosedPostfix()
+    {
+        // Cancel skips DoneLogic so the TryClaim there never runs. Drop the
+        // attribution here so a cancelled force screen stops gating unrelated
+        // party screens. The pool itself stays pending. Post-Done this is a
+        // no-op because the claim already cleared the single-shot slot.
+        ForceTransferScreenTracker.Clear();
+    }
+
     [HarmonyPatch(nameof(PartyScreenLogic.ExecuteTroop))]
     [HarmonyPostfix]
     public static void ExecuteTroopPostfix(PartyScreenLogic __instance, PartyScreenLogic.PartyCommand command)

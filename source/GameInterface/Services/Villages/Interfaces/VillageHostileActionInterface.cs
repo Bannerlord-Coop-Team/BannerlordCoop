@@ -16,6 +16,7 @@ using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Runtime.CompilerServices;
+using System.Threading;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Actions;
 using TaleWorlds.CampaignSystem.CharacterDevelopment;
@@ -37,27 +38,11 @@ internal class VillageHostileActionInterface : IVillageHostileActionInterface, I
 
     private const int ForceActionCooldownDays = 10;
     private static readonly TimeSpan MapEventStartApprovalTimeout = TimeSpan.FromSeconds(30);
-    private static readonly TimeSpan ForceTransferPoolTimeout = TimeSpan.FromMinutes(5);
-    // Commits attributed to a screen opened just inside the parked lifetime can
-    // land after the server authorization has expired (authorize at t=0, open at
-    // t=540s, Done at t=601s). Expired entries are kept this much longer and
-    // still honor one-shot commits, so an earned reward is never silently
-    // discarded. The client stops attributing 5 minutes after the screen opens,
-    // and screens open no later than the parked lifetime below, so 5 minutes of
-    // grace covers every attributed commit.
-    private static readonly TimeSpan ForceTransferExpiredRetention = TimeSpan.FromMinutes(5);
-    // A parked screen must stay openable as long as the server can still honor
-    // its commit: the pending window plus the expiry grace. ParkedAt is client
-    // clock against the server authorization clock, so roughly aligned clocks
-    // are assumed. Freshness is decided by the server consume, not by a
-    // shorter client budget, otherwise an earned reward is dropped before its
-    // screen ever opens.
-    private static readonly TimeSpan DeferredParkedLifetime =
-        ForceTransferPoolTimeout + ForceTransferExpiredRetention;
-    // A screen opened in the last seconds of the parked lifetime could not
-    // survive a pick-and-Done round trip, so the tick handler denies those
-    // instead of opening a doomed screen.
-    private static readonly TimeSpan DeferredReopenMargin = TimeSpan.FromSeconds(30);
+    // An earned pool stays valid until it is consumed one-shot, superseded by a
+    // newer authorization for the same party, or evicted by the cap below.
+    // Memory stays bounded because each party holds at most one live pool plus
+    // a small global cap.
+    private const int MaxPendingForceTransfers = 128;
 
     private readonly IMessageBroker messageBroker;
     private readonly IObjectManager objectManager;
@@ -65,7 +50,7 @@ internal class VillageHostileActionInterface : IVillageHostileActionInterface, I
     private readonly ConcurrentDictionary<string, bool> pendingHostileActionSettlements = new ConcurrentDictionary<string, bool>();
     private readonly ConcurrentDictionary<string, CampaignTime> forceActionCooldowns = new ConcurrentDictionary<string, CampaignTime>();
     private readonly ConcurrentDictionary<string, PendingForceTransfer> pendingForceTransfers = new ConcurrentDictionary<string, PendingForceTransfer>();
-    private readonly ConcurrentDictionary<string, ExpiredForceTransfer> expiredForceTransfers = new ConcurrentDictionary<string, ExpiredForceTransfer>();
+    private long nextForceTransferSeq;
     private readonly ConditionalWeakTable<MapEvent, AppliedForceActionOutcomeState> appliedForceActionOutcomes = new ConditionalWeakTable<MapEvent, AppliedForceActionOutcomeState>();
     private readonly object deferredForceScreenGate = new object();
     private DeferredForceScreen deferredForceScreen;
@@ -87,6 +72,7 @@ internal class VillageHostileActionInterface : IVillageHostileActionInterface, I
         {
             deferredForceScreen = null;
         }
+        pendingForceTransfers.Clear();
     }
 
     public void RequestHostileAction(VillageHostileAction action)
@@ -567,11 +553,51 @@ internal class VillageHostileActionInterface : IVillageHostileActionInterface, I
         string settlementId,
         ItemRosterElementData[] suppliesItems,
         string troopId,
-        int troopCount,
-        DateTime? utcNow = null)
+        int troopCount)
     {
-        var now = utcNow ?? DateTime.UtcNow;
-        PruneExpiredForceTransfers(now);
+        // A party earns one transfer at a time: a new authorization supersedes
+        // any older unconsumed pool for the same party.
+        foreach (var pair in pendingForceTransfers)
+        {
+            if (pair.Value.Pool.PartyId == partyId && pendingForceTransfers.TryRemove(pair.Key, out _))
+            {
+                Logger.Information(
+                    "ForceTransfer superseded pool dropped (Request={RequestId}, Party={PartyId})",
+                    pair.Key,
+                    partyId);
+            }
+        }
+
+        // Oldest-first eviction: each pool carries a monotonic sequence number
+        // because ConcurrentDictionary enumeration order is undefined.
+        while (pendingForceTransfers.Count >= MaxPendingForceTransfers)
+        {
+            string oldestKey = null;
+            long oldestSeq = long.MaxValue;
+            foreach (var pair in pendingForceTransfers)
+            {
+                if (pair.Value.Seq < oldestSeq)
+                {
+                    oldestSeq = pair.Value.Seq;
+                    oldestKey = pair.Key;
+                }
+            }
+
+            if (oldestKey == null)
+                break;
+
+            if (pendingForceTransfers.TryRemove(oldestKey, out var evicted))
+            {
+                Logger.Information(
+                    "ForceTransfer pool evicted by cap (Request={RequestId}, Party={PartyId})",
+                    oldestKey,
+                    evicted.Pool.PartyId);
+            }
+            else
+            {
+                break;
+            }
+        }
 
         var requestId = Guid.NewGuid().ToString("N");
         var pool = new ForceTransferPoolData(
@@ -582,7 +608,9 @@ internal class VillageHostileActionInterface : IVillageHostileActionInterface, I
             suppliesItems ?? Array.Empty<ItemRosterElementData>(),
             troopId,
             troopCount);
-        pendingForceTransfers[requestId] = new PendingForceTransfer(pool, now);
+        pendingForceTransfers[requestId] = new PendingForceTransfer(
+            pool,
+            Interlocked.Increment(ref nextForceTransferSeq));
         return pool;
     }
 
@@ -592,7 +620,6 @@ internal class VillageHostileActionInterface : IVillageHostileActionInterface, I
         if (string.IsNullOrEmpty(requestId))
             return false;
 
-        PruneExpiredForceTransfers(DateTime.UtcNow);
         if (pendingForceTransfers.TryRemove(requestId, out var entry))
         {
             if (entry.Pool.PartyId != partyId)
@@ -611,24 +638,6 @@ internal class VillageHostileActionInterface : IVillageHostileActionInterface, I
             return true;
         }
 
-        // A commit that lands inside the expiry grace window consumes the
-        // expired entry one-shot, exactly like a pending one.
-        if (expiredForceTransfers.TryRemove(requestId, out var expired))
-        {
-            if (expired.Pool.PartyId != partyId)
-            {
-                expiredForceTransfers[requestId] = expired;
-                return false;
-            }
-
-            pool = expired.Pool;
-            Logger.Information(
-                "ForceTransfer consumed from expiry grace (Request={RequestId}, Party={PartyId})",
-                requestId,
-                partyId);
-            return true;
-        }
-
         return false;
     }
 
@@ -638,22 +647,12 @@ internal class VillageHostileActionInterface : IVillageHostileActionInterface, I
         if (string.IsNullOrEmpty(requestId))
             return false;
 
-        PruneExpiredForceTransfers(DateTime.UtcNow);
         if (pendingForceTransfers.TryGetValue(requestId, out var entry))
         {
             if (entry.Pool.PartyId != partyId)
                 return false;
 
             pool = entry.Pool;
-            return true;
-        }
-
-        if (expiredForceTransfers.TryGetValue(requestId, out var expired))
-        {
-            if (expired.Pool.PartyId != partyId)
-                return false;
-
-            pool = expired.Pool;
             return true;
         }
 
@@ -665,14 +664,7 @@ internal class VillageHostileActionInterface : IVillageHostileActionInterface, I
         if (string.IsNullOrEmpty(partyId))
             return false;
 
-        PruneExpiredForceTransfers(DateTime.UtcNow);
         foreach (var pair in pendingForceTransfers)
-        {
-            if (pair.Value.Pool.PartyId == partyId)
-                return true;
-        }
-
-        foreach (var pair in expiredForceTransfers)
         {
             if (pair.Value.Pool.PartyId == partyId)
                 return true;
@@ -726,46 +718,6 @@ internal class VillageHostileActionInterface : IVillageHostileActionInterface, I
             pool.Action,
             pool.PartyId,
             pool.SettlementId);
-    }
-
-    internal void PruneExpiredForceTransfers(DateTime? utcNow = null)
-    {
-        var now = utcNow ?? DateTime.UtcNow;
-        foreach (var pair in pendingForceTransfers)
-        {
-            if (now - pair.Value.AuthorizedAtUtc <= ForceTransferPoolTimeout)
-                continue;
-
-            // Retire into the grace window instead of deleting: a deferred or
-            // still-open screen can still commit against it one-shot. Grace is
-            // measured from the actual expiry moment so a late prune cannot
-            // extend it.
-            if (pendingForceTransfers.TryRemove(pair.Key, out var entry))
-            {
-                expiredForceTransfers[pair.Key] = new ExpiredForceTransfer(
-                    entry.Pool,
-                    entry.AuthorizedAtUtc + ForceTransferPoolTimeout);
-                Logger.Information(
-                    "ForceTransfer pending entry expired into grace (Request={RequestId}, Party={PartyId}, Pending={PendingCount})",
-                    pair.Key,
-                    entry.Pool.PartyId,
-                    pendingForceTransfers.Count);
-            }
-        }
-
-        foreach (var pair in expiredForceTransfers)
-        {
-            if (now - pair.Value.ExpiredAtUtc <= ForceTransferExpiredRetention)
-                continue;
-
-            if (expiredForceTransfers.TryRemove(pair.Key, out _))
-            {
-                Logger.Information(
-                    "ForceTransfer expired entry dropped (Request={RequestId}, Party={PartyId})",
-                    pair.Key,
-                    pair.Value.Pool.PartyId);
-            }
-        }
     }
 
     internal static int ComputeSuppliesRewardUnits(float hearth)
@@ -834,35 +786,12 @@ internal class VillageHostileActionInterface : IVillageHostileActionInterface, I
     private void Handle_CampaignTick(MessagePayload<CampaignTick> payload)
     {
         if (ModInformation.IsServer) return;
-        // Keep the original parked time so a long mission cannot extend the entry past its expiry.
         if (IsInMission()) return;
 
-        var now = DateTime.UtcNow;
-        var hadParked = HasParkedForceTransferScreen();
-        if (!TryTakeParkedForceTransferScreen(now, out var pool, out var parkedAt))
-        {
-            if (hadParked)
-            {
-                Logger.Information("ForceTransfer deferred screen expired before mission end");
-                messageBroker.Publish(this, new SendInformationMessage("The village has nothing left to give."));
-            }
+        // Always open the earned screen and let the server consume decide. A
+        // gone pool is reported at Done time by the commit validation.
+        if (!TryTakeParkedForceTransferScreen(out var pool))
             return;
-        }
-
-        // Always open the earned screen and let the server consume decide: it
-        // still holds the pool through the expiry grace, while a client-side
-        // freshness budget would drop the reward before it is ever shown. A
-        // gone pool is reported at Done time by the commit validation. Screens
-        // too close to the parked lifetime to survive Done are denied instead.
-        if (!IsParkedPoolOpenable(parkedAt, now))
-        {
-            Logger.Information(
-                "ForceTransfer deferred screen denied, parked lifetime nearly exhausted (Request={RequestId}, Settlement={SettlementId})",
-                pool.RequestId,
-                pool.SettlementId);
-            messageBroker.Publish(this, new SendInformationMessage("The village has nothing left to give."));
-            return;
-        }
 
         Logger.Information(
             "ForceTransfer deferred loot screen opened after mission (Action={Action}, Settlement={SettlementId}, Request={RequestId})",
@@ -872,14 +801,14 @@ internal class VillageHostileActionInterface : IVillageHostileActionInterface, I
         OpenForceTransferLootScreenNow(pool);
     }
 
-    internal void ParkForceTransferScreen(ForceTransferPoolData pool, DateTime? utcNow = null)
+    internal void ParkForceTransferScreen(ForceTransferPoolData pool)
     {
         lock (deferredForceScreenGate)
         {
             // Single slot: a second authorization while one is parked orphans
-            // the first client entry (its server pool expires unused). Kept
-            // because collisions need two authorizations with no eligible tick
-            // between, and the newest reward is the one the player just earned.
+            // the first client entry. Kept because collisions need two
+            // authorizations with no eligible tick between, and the newest
+            // reward is the one the player just earned.
             if (deferredForceScreen != null)
             {
                 Logger.Warning(
@@ -888,7 +817,7 @@ internal class VillageHostileActionInterface : IVillageHostileActionInterface, I
                     pool.RequestId);
             }
 
-            deferredForceScreen = new DeferredForceScreen(pool, utcNow ?? DateTime.UtcNow);
+            deferredForceScreen = new DeferredForceScreen(pool);
         }
     }
 
@@ -900,32 +829,14 @@ internal class VillageHostileActionInterface : IVillageHostileActionInterface, I
         }
     }
 
-    internal static bool IsParkedPoolOpenable(DateTime parkedAtUtc, DateTime utcNow)
-    {
-        return utcNow - parkedAtUtc <= DeferredParkedLifetime - DeferredReopenMargin;
-    }
-
-    internal bool TryTakeParkedForceTransferScreen(DateTime? utcNow, out ForceTransferPoolData pool, out DateTime parkedAtUtc)
+    internal bool TryTakeParkedForceTransferScreen(out ForceTransferPoolData pool)
     {
         lock (deferredForceScreenGate)
         {
             pool = default;
-            parkedAtUtc = default;
             if (deferredForceScreen == null) return false;
 
-            var now = utcNow ?? DateTime.UtcNow;
-            if (now - deferredForceScreen.ParkedAtUtc > DeferredParkedLifetime)
-            {
-                Logger.Information(
-                    "ForceTransfer deferred screen expired (Request={RequestId}, Settlement={SettlementId})",
-                    deferredForceScreen.Pool.RequestId,
-                    deferredForceScreen.Pool.SettlementId);
-                deferredForceScreen = null;
-                return false;
-            }
-
             pool = deferredForceScreen.Pool;
-            parkedAtUtc = deferredForceScreen.ParkedAtUtc;
             deferredForceScreen = null;
             return true;
         }
@@ -938,14 +849,24 @@ internal class VillageHostileActionInterface : IVillageHostileActionInterface, I
 
     private sealed class DeferredForceScreen
     {
-        public DeferredForceScreen(ForceTransferPoolData pool, DateTime parkedAtUtc)
+        public DeferredForceScreen(ForceTransferPoolData pool)
         {
             Pool = pool;
-            ParkedAtUtc = parkedAtUtc;
         }
 
         public ForceTransferPoolData Pool { get; }
-        public DateTime ParkedAtUtc { get; }
+    }
+
+    private sealed class PendingForceTransfer
+    {
+        public PendingForceTransfer(ForceTransferPoolData pool, long seq)
+        {
+            Pool = pool;
+            Seq = seq;
+        }
+
+        public ForceTransferPoolData Pool { get; }
+        public long Seq { get; }
     }
 
     private void OpenForceTransferLootScreenNow(ForceTransferPoolData pool)
@@ -1278,32 +1199,50 @@ internal class VillageHostileActionInterface : IVillageHostileActionInterface, I
         if (!TryValidateVolunteersTake(troopId, troopCount, rightMemberDelta, out error, upgradedTroops))
             return false;
 
-        // Left final must stay within the pool: final = pool + delta per troop.
+        // Left final must stay within the pool: final = pool + net delta.
         // Non-pool troops moved onto the dummy left are player dismissals made
         // to free party room; the dummy is dropped on apply so they grant
-        // nothing, and the matching right-side loss is already applied. Only
-        // taking troops off the empty dummy (negative final) is rejected.
-        if (leftMemberDelta.Data != null)
+        // nothing, and the matching right-side loss is already applied. The
+        // same holds for pool-type troops the player already owned: dismissing
+        // one onto the dummy raises the left remainder above the pool size,
+        // with the matching right-side loss proving it was player-originated.
+        // Only taking troops off the empty dummy (negative final) or an
+        // unmatched left gain is rejected.
+        var rightNetByTroop = new Dictionary<string, int>(StringComparer.Ordinal);
+        foreach (var element in rightMemberDelta.Data ?? Array.Empty<TroopRosterElementData>())
         {
-            foreach (var element in leftMemberDelta.Data)
+            rightNetByTroop.TryGetValue(element.CharacterId, out var net);
+            rightNetByTroop[element.CharacterId] = net + element.Number;
+        }
+
+        var leftNetByTroop = new Dictionary<string, int>(StringComparer.Ordinal);
+        foreach (var element in leftMemberDelta.Data ?? Array.Empty<TroopRosterElementData>())
+        {
+            leftNetByTroop.TryGetValue(element.CharacterId, out var net);
+            leftNetByTroop[element.CharacterId] = net + element.Number;
+        }
+
+        foreach (var pair in leftNetByTroop)
+        {
+            if (pair.Key != troopId)
             {
-                if (element.CharacterId != troopId)
+                if (pair.Value < 0)
                 {
-                    if (element.Number < 0)
-                    {
-                        error = $"left remainder of {element.Number} x {element.CharacterId} takes troops outside the authorized pool";
-                        return false;
-                    }
-
-                    continue;
-                }
-
-                var final = troopCount + element.Number;
-                if (final < 0 || final > Math.Max(troopCount, 0))
-                {
-                    error = $"left remainder of {final} x {element.CharacterId} is outside the authorized pool of {troopCount}";
+                    error = $"left remainder of {pair.Value} x {pair.Key} takes troops outside the authorized pool";
                     return false;
                 }
+
+                continue;
+            }
+
+            rightNetByTroop.TryGetValue(troopId, out var rightNet);
+            var dismissedOwn = Math.Max(0, -rightNet);
+            var allowed = Math.Max(troopCount, 0) + dismissedOwn;
+            var final = troopCount + pair.Value;
+            if (final < 0 || final > allowed)
+            {
+                error = $"left remainder of {final} x {pair.Key} is outside the authorized pool of {troopCount}";
+                return false;
             }
         }
 
@@ -1380,30 +1319,6 @@ internal class VillageHostileActionInterface : IVillageHostileActionInterface, I
     private static string GetSuppliesPoolKey(string itemId, string modifierId)
     {
         return itemId + "|" + (modifierId ?? string.Empty);
-    }
-
-    private sealed class PendingForceTransfer
-    {
-        public PendingForceTransfer(ForceTransferPoolData pool, DateTime authorizedAtUtc)
-        {
-            Pool = pool;
-            AuthorizedAtUtc = authorizedAtUtc;
-        }
-
-        public ForceTransferPoolData Pool { get; }
-        public DateTime AuthorizedAtUtc { get; }
-    }
-
-    private sealed class ExpiredForceTransfer
-    {
-        public ExpiredForceTransfer(ForceTransferPoolData pool, DateTime expiredAtUtc)
-        {
-            Pool = pool;
-            ExpiredAtUtc = expiredAtUtc;
-        }
-
-        public ForceTransferPoolData Pool { get; }
-        public DateTime ExpiredAtUtc { get; }
     }
 
     private static Settlement GetHostileActionSettlement(MapEvent mapEvent)

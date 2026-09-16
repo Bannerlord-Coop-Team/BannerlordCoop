@@ -5,13 +5,13 @@ namespace GameInterface.Services.Villages;
 // Single-slot attribution from a force-transfer loot screen open to its Done commit.
 // A static is used because the Done prefixes are static Harmony patches; loot screens are
 // modal so at most one force screen is ever open, and the entry is single-shot.
+// The slot lives until claimed, overwritten, or cleared. Memory stays bounded
+// because it is a single slot holding a weak reference to the roster.
 internal static class ForceTransferScreenTracker
 {
     private static readonly object sync = new object();
-    private static readonly TimeSpan AttributionTimeout = TimeSpan.FromMinutes(5);
     private static WeakReference<object> leftRoster;
     private static string requestId;
-    private static DateTime notedAtUtc;
 
     public static void NoteLootScreenOpened(string forceTransferId, object leftLootRoster)
     {
@@ -21,7 +21,6 @@ internal static class ForceTransferScreenTracker
         {
             requestId = forceTransferId;
             leftRoster = new WeakReference<object>(leftLootRoster);
-            notedAtUtc = DateTime.UtcNow;
         }
     }
 
@@ -31,11 +30,6 @@ internal static class ForceTransferScreenTracker
         {
             forceTransferId = null;
             if (requestId == null || leftLootRoster == null) return false;
-            if (DateTime.UtcNow - notedAtUtc > AttributionTimeout)
-            {
-                ClearLocked();
-                return false;
-            }
             if (leftRoster == null || !leftRoster.TryGetTarget(out var target))
             {
                 // Screen was cancelled and the dummy roster collected: drop the stale slot.
@@ -57,11 +51,6 @@ internal static class ForceTransferScreenTracker
         lock (sync)
         {
             if (requestId == null) return false;
-            if (DateTime.UtcNow - notedAtUtc > AttributionTimeout)
-            {
-                ClearLocked();
-                return false;
-            }
             if (leftRoster == null || !leftRoster.TryGetTarget(out _))
             {
                 ClearLocked();
@@ -84,6 +73,5 @@ internal static class ForceTransferScreenTracker
     {
         requestId = null;
         leftRoster = null;
-        notedAtUtc = default;
     }
 }

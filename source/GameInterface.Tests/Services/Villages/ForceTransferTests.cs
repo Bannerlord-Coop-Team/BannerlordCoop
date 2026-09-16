@@ -171,16 +171,13 @@ public class ForceTransferTests
     }
 
     [Fact]
-    public void ForceTransferPool_Expired_MovedToGraceAndStillConsumable()
+    public void ForceTransferPool_StaysConsumableUntilConsumed()
     {
+        // An earned pool stays valid until consumed one-shot: peek and consume
+        // succeed, and a second consume fails.
         var subject = new VillageHostileActionInterface(new MessageBroker(), new StubObjectManager());
         var pool = subject.AuthorizeForceTransfer(
             VillageHostileAction.ForceVolunteers, "party", "settlement", null, "imperial_recruit", 8);
-
-        // A deferred screen opened at t=180s with Done at t=301s lands past the
-        // 5-minute authorization but inside the grace window: peek and consume
-        // must still succeed one-shot.
-        subject.PruneExpiredForceTransfers(DateTime.UtcNow + TimeSpan.FromMinutes(6));
 
         Assert.True(subject.TryPeekForceTransfer(pool.RequestId, "party", out _));
         Assert.True(subject.TryConsumeForceTransfer(pool.RequestId, "party", out _));
@@ -188,45 +185,69 @@ public class ForceTransferTests
     }
 
     [Fact]
-    public void ForceTransferPool_GraceElapsed_Dropped()
+    public void ForceTransferPool_SecondAuthorizeForSameParty_SupersedesFirst()
     {
+        // A party earns one transfer at a time: a newer authorization drops the
+        // older unconsumed pool instead of holding it forever.
         var subject = new VillageHostileActionInterface(new MessageBroker(), new StubObjectManager());
-        var pool = subject.AuthorizeForceTransfer(
+        var first = subject.AuthorizeForceTransfer(
             VillageHostileAction.ForceVolunteers, "party", "settlement", null, "imperial_recruit", 8);
+        var second = subject.AuthorizeForceTransfer(
+            VillageHostileAction.ForceSupplies, "party", "settlement", new[] { Item("grain", 5) }, null, 0);
 
-        subject.PruneExpiredForceTransfers(DateTime.UtcNow + TimeSpan.FromMinutes(12));
-
-        Assert.False(subject.TryPeekForceTransfer(pool.RequestId, "party", out _));
-        Assert.False(subject.TryConsumeForceTransfer(pool.RequestId, "party", out _));
+        Assert.False(subject.TryConsumeForceTransfer(first.RequestId, "party", out _));
+        Assert.True(subject.TryConsumeForceTransfer(second.RequestId, "party", out _));
+        Assert.False(subject.HasPendingForceTransferForParty("party"));
     }
 
     [Fact]
-    public void ForceTransferPool_WrongParty_ExpiredConsumeFailsAndPreservesEntry()
+    public void ForceTransferPool_DifferentParties_Coexist()
     {
         var subject = new VillageHostileActionInterface(new MessageBroker(), new StubObjectManager());
-        var pool = subject.AuthorizeForceTransfer(
-            VillageHostileAction.ForceVolunteers, "party", "settlement", null, "imperial_recruit", 8);
+        var first = subject.AuthorizeForceTransfer(
+            VillageHostileAction.ForceVolunteers, "party-a", "settlement", null, "imperial_recruit", 8);
+        var second = subject.AuthorizeForceTransfer(
+            VillageHostileAction.ForceVolunteers, "party-b", "settlement", null, "imperial_recruit", 8);
 
-        subject.PruneExpiredForceTransfers(DateTime.UtcNow + TimeSpan.FromMinutes(6));
-
-        Assert.False(subject.TryConsumeForceTransfer(pool.RequestId, "other-party", out _));
-        Assert.True(subject.TryConsumeForceTransfer(pool.RequestId, "party", out _));
+        Assert.True(subject.TryPeekForceTransfer(first.RequestId, "party-a", out _));
+        Assert.True(subject.TryPeekForceTransfer(second.RequestId, "party-b", out _));
+        Assert.True(subject.TryConsumeForceTransfer(first.RequestId, "party-a", out _));
+        Assert.True(subject.TryConsumeForceTransfer(second.RequestId, "party-b", out _));
     }
 
     [Fact]
-    public void ForceTransferPool_BeforeExpiry_PruneKeepsIt()
+    public void ForceTransferPool_CapEviction_EvictsOldestFirst()
     {
+        // 128 live pools max: authorizing beyond the cap evicts the oldest
+        // entries first via a monotonic sequence number, so the newest 128
+        // pools stay valid.
         var subject = new VillageHostileActionInterface(new MessageBroker(), new StubObjectManager());
-        var pool = subject.AuthorizeForceTransfer(
-            VillageHostileAction.ForceVolunteers, "party", "settlement", null, "imperial_recruit", 8);
+        var pools = new System.Collections.Generic.List<(string requestId, string partyId)>();
+        for (int i = 0; i < 133; i++)
+        {
+            var pool = subject.AuthorizeForceTransfer(
+                VillageHostileAction.ForceVolunteers, $"party-{i}", "settlement", null, "imperial_recruit", 8);
+            pools.Add((pool.RequestId, $"party-{i}"));
+        }
 
-        subject.PruneExpiredForceTransfers(DateTime.UtcNow + TimeSpan.FromMinutes(4));
+        for (int i = 0; i < 5; i++)
+        {
+            Assert.False(subject.TryPeekForceTransfer(pools[i].requestId, pools[i].partyId, out _));
+            Assert.False(subject.TryConsumeForceTransfer(pools[i].requestId, pools[i].partyId, out _));
+        }
 
-        Assert.True(subject.TryConsumeForceTransfer(pool.RequestId, "party", out _));
+        int live = 0;
+        for (int i = 5; i < pools.Count; i++)
+        {
+            if (subject.TryPeekForceTransfer(pools[i].requestId, pools[i].partyId, out _))
+                live++;
+        }
+
+        Assert.Equal(128, live);
     }
 
     [Fact]
-    public void HasPendingForceTransferForParty_TrueUntilConsumedOrExpired()
+    public void HasPendingForceTransferForParty_TrueUntilConsumedOrSuperseded()
     {
         var subject = new VillageHostileActionInterface(new MessageBroker(), new StubObjectManager());
         Assert.False(subject.HasPendingForceTransferForParty("party"));
@@ -236,7 +257,12 @@ public class ForceTransferTests
         Assert.True(subject.HasPendingForceTransferForParty("party"));
         Assert.False(subject.HasPendingForceTransferForParty("other-party"));
 
-        Assert.True(subject.TryConsumeForceTransfer(pool.RequestId, "party", out _));
+        var newer = subject.AuthorizeForceTransfer(
+            VillageHostileAction.ForceSupplies, "party", "settlement", new[] { Item("grain", 5) }, null, 0);
+        Assert.False(subject.TryConsumeForceTransfer(pool.RequestId, "party", out _));
+        Assert.True(subject.HasPendingForceTransferForParty("party"));
+
+        Assert.True(subject.TryConsumeForceTransfer(newer.RequestId, "party", out _));
         Assert.False(subject.HasPendingForceTransferForParty("party"));
     }
 
@@ -253,7 +279,7 @@ public class ForceTransferTests
     {
         var subject = new VillageHostileActionInterface(new MessageBroker(), new StubObjectManager());
 
-        Assert.False(subject.TryTakeParkedForceTransferScreen(DateTime.UtcNow, out _, out _));
+        Assert.False(subject.TryTakeParkedForceTransferScreen(out _));
     }
 
     [Fact]
@@ -263,9 +289,9 @@ public class ForceTransferTests
         var pool = DeferredPool("req-1");
         subject.ParkForceTransferScreen(pool);
 
-        Assert.True(subject.TryTakeParkedForceTransferScreen(DateTime.UtcNow, out var taken, out _));
+        Assert.True(subject.TryTakeParkedForceTransferScreen(out var taken));
         Assert.Equal("req-1", taken.RequestId);
-        Assert.False(subject.TryTakeParkedForceTransferScreen(DateTime.UtcNow, out _, out _));
+        Assert.False(subject.TryTakeParkedForceTransferScreen(out _));
     }
 
     [Fact]
@@ -275,30 +301,19 @@ public class ForceTransferTests
         subject.ParkForceTransferScreen(DeferredPool("req-1"));
         subject.ParkForceTransferScreen(DeferredPool("req-2"));
 
-        Assert.True(subject.TryTakeParkedForceTransferScreen(DateTime.UtcNow, out var taken, out _));
+        Assert.True(subject.TryTakeParkedForceTransferScreen(out var taken));
         Assert.Equal("req-2", taken.RequestId);
     }
 
     [Fact]
-    public void DeferredForceScreen_ExpiredTake_ReturnsFalseAndClears()
+    public void DeferredForceScreen_ParkedPoolStaysUntilTaken()
     {
+        // A pool parked while in a mission opens on the first eligible tick.
+        // The server consume decides validity at Done time.
         var subject = new VillageHostileActionInterface(new MessageBroker(), new StubObjectManager());
-        var start = DateTime.UtcNow;
-        subject.ParkForceTransferScreen(DeferredPool("req-1"), start);
+        subject.ParkForceTransferScreen(DeferredPool("req-1"));
 
-        // Parked lifetime matches the server pending window plus expiry grace.
-        Assert.False(subject.TryTakeParkedForceTransferScreen(start + TimeSpan.FromMinutes(11), out _, out _));
-        Assert.False(subject.TryTakeParkedForceTransferScreen(start + TimeSpan.FromMinutes(11), out _, out _));
-    }
-
-    [Fact]
-    public void DeferredForceScreen_BeforeExpiry_TakeSucceeds()
-    {
-        var subject = new VillageHostileActionInterface(new MessageBroker(), new StubObjectManager());
-        var start = DateTime.UtcNow;
-        subject.ParkForceTransferScreen(DeferredPool("req-1"), start);
-
-        Assert.True(subject.TryTakeParkedForceTransferScreen(start + TimeSpan.FromMinutes(4), out var taken, out _));
+        Assert.True(subject.TryTakeParkedForceTransferScreen(out var taken));
         Assert.Equal("req-1", taken.RequestId);
     }
 
@@ -323,78 +338,6 @@ public class ForceTransferTests
             Array.Empty<(string, string, int)>(),
             out _));
         Assert.True(subject.TryConsumeForceTransfer(pool.RequestId, "party", out _));
-    }
-
-    [Fact]
-    public void DeferredForceScreen_TakeAt241Seconds_Succeeds()
-    {
-        // Park at t=0 while in a mission, first eligible tick at t=241s: the old
-        // 4-minute client budget dropped the earned reward before its screen
-        // opened. The parked entry must survive until the server lifetime ends.
-        var subject = new VillageHostileActionInterface(new MessageBroker(), new StubObjectManager());
-        var start = DateTime.UtcNow;
-        subject.ParkForceTransferScreen(DeferredPool("req-1"), start);
-
-        Assert.True(subject.TryTakeParkedForceTransferScreen(start + TimeSpan.FromSeconds(241), out var taken, out _));
-        Assert.Equal("req-1", taken.RequestId);
-    }
-
-    [Fact]
-    public void DeferredForceScreen_TakeAtSixMinutes_Succeeds()
-    {
-        // Past the old 5-minute client clear: the server still honors the pool
-        // through its expiry grace, so the screen must still open.
-        var subject = new VillageHostileActionInterface(new MessageBroker(), new StubObjectManager());
-        var start = DateTime.UtcNow;
-        subject.ParkForceTransferScreen(DeferredPool("req-1"), start);
-
-        Assert.True(subject.TryTakeParkedForceTransferScreen(start + TimeSpan.FromMinutes(6), out var taken, out _));
-        Assert.Equal("req-1", taken.RequestId);
-    }
-
-    [Theory]
-    [InlineData(0, true)]
-    [InlineData(241, true)]
-    [InlineData(360, true)]
-    [InlineData(569, true)]
-    [InlineData(570, true)]
-    [InlineData(571, false)]
-    [InlineData(600, false)]
-    public void IsParkedPoolOpenable_EnforcesReopenMargin(int seconds, bool expected)
-    {
-        var start = DateTime.UtcNow;
-
-        Assert.Equal(expected, VillageHostileActionInterface.IsParkedPoolOpenable(start, start + TimeSpan.FromSeconds(seconds)));
-    }
-
-    [Fact]
-    public void DeferredForceScreen_TakeAtExactlyTenMinutes_Succeeds()
-    {
-        // The parked take uses a strict greater-than, so the 10-minute parked
-        // lifetime edge itself still opens; the reopen margin handles Done.
-        var subject = new VillageHostileActionInterface(new MessageBroker(), new StubObjectManager());
-        var start = DateTime.UtcNow;
-        subject.ParkForceTransferScreen(DeferredPool("req-1"), start);
-
-        Assert.True(subject.TryTakeParkedForceTransferScreen(start + TimeSpan.FromMinutes(10), out var taken, out _));
-        Assert.Equal("req-1", taken.RequestId);
-    }
-
-    [Fact]
-    public void ForceTransferPool_GraceWindowStillConsumable()
-    {
-        // Deferred open near the end of the parked lifetime: the server pending
-        // entry has retired into grace but still consumes one-shot. TryConsume
-        // takes no clock parameter, so pruning forward is how grace is reached.
-        var subject = new VillageHostileActionInterface(new MessageBroker(), new StubObjectManager());
-        var pool = subject.AuthorizeForceTransfer(
-            VillageHostileAction.ForceVolunteers, "party", "settlement", null, "imperial_recruit", 8);
-
-        subject.PruneExpiredForceTransfers(DateTime.UtcNow + TimeSpan.FromMinutes(9));
-
-        Assert.True(subject.TryPeekForceTransfer(pool.RequestId, "party", out _));
-        Assert.True(subject.TryConsumeForceTransfer(pool.RequestId, "party", out _));
-        Assert.False(subject.TryConsumeForceTransfer(pool.RequestId, "party", out _));
     }
 
     private static ForceTransferPoolData DeferredPool(string requestId)
@@ -498,6 +441,51 @@ public class ForceTransferTests
             Delta(("imperial_recruit", -8), ("vlandian_recruit", 1)),
             out var error));
         Assert.Null(error);
+    }
+
+    [Fact]
+    public void TryValidateVolunteersCommit_SameTypeDismissOnly_Accepts()
+    {
+        // Dismissing one already-owned recruit of the pool type: left final is
+        // pool + 1 with the matching right-side loss proving it was owned.
+        Assert.True(VolunteersCommit(
+            "imperial_recruit", 8,
+            Delta(("imperial_recruit", -1)),
+            Delta(("imperial_recruit", 1)),
+            out var error));
+        Assert.Null(error);
+    }
+
+    [Fact]
+    public void TryValidateVolunteersCommit_TakePlusSameTypeDismiss_Accepts()
+    {
+        // Take the 8 authorized recruits while dismissing one owned recruit of
+        // the same type to free party room.
+        Assert.True(VolunteersCommit(
+            "imperial_recruit", 8,
+            Delta(("imperial_recruit", 8), ("imperial_recruit", -1)),
+            Delta(("imperial_recruit", -8), ("imperial_recruit", 1)),
+            out var error));
+        Assert.Null(error);
+    }
+
+    [Fact]
+    public void TryValidateVolunteersCommit_SameTypeUnmatchedGain_Rejects()
+    {
+        // Left +1 of the pool type with no matching right-side loss is a
+        // fabricated pool remainder, not an owned dismissal.
+        Assert.False(VolunteersCommit(
+            "imperial_recruit", 8,
+            EmptyDelta(),
+            Delta(("imperial_recruit", 1)),
+            out _));
+        // Dismissing 1 owned but gaining 2 on the left still exceeds the
+        // owned-dismissal allowance.
+        Assert.False(VolunteersCommit(
+            "imperial_recruit", 8,
+            Delta(("imperial_recruit", -1)),
+            Delta(("imperial_recruit", 2)),
+            out _));
     }
 
     [Fact]

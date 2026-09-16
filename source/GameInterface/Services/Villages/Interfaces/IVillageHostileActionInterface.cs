@@ -1,4 +1,3 @@
-using System;
 using GameInterface.Services.Inventory.Data;
 using GameInterface.Services.MapEvents;
 using GameInterface.Services.Villages.Data;
@@ -28,8 +27,7 @@ public interface IVillageHostileActionInterface : IGameAbstraction
         string settlementId,
         ItemRosterElementData[] suppliesItems,
         string troopId,
-        int troopCount,
-        DateTime? utcNow = null);
+        int troopCount);
     bool TryConsumeForceTransfer(string requestId, string partyId, out ForceTransferPoolData pool);
     bool TryPeekForceTransfer(string requestId, string partyId, out ForceTransferPoolData pool);
     bool HasPendingForceTransferForParty(string partyId);
