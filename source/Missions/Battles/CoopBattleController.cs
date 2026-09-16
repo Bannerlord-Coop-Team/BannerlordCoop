@@ -11,6 +11,7 @@ using Missions.Agents;
 using Missions.Agents.Handlers;
 using Missions.Data;
 using Missions.Messages;
+using Missions.Hideouts;
 using Missions.Services.Network;
 using SandBox.Missions.MissionLogics.Hideout;
 using Serilog;
@@ -61,7 +62,6 @@ public class CoopBattleController : CoopMissionController
 
     /// <summary>Reports final siege engine state before the shared result is applied.</summary>
     public ISiegeEngineStateReporter SiegeEngineStateReporter { get; }
-
 
     private readonly IBattleInstanceLifecycle lifecycle;
     private readonly IOwnedAgentReplicator replicator;
@@ -498,6 +498,7 @@ public class CoopBattleController : CoopMissionController
             siegeEngineDeployment.CatchUpJoiner(controllerId);
             siegeMachineState.CatchUpJoiner(controllerId);
             Deployment.CatchUpJoiner(controllerId);
+            Mission?.GetMissionBehavior<CoopHideoutMissionLogic>()?.CatchUpJoiner(controllerId);
             if (Session.IsLocalHost)
                 coopMissionComponent.WeaponDropHandler.CatchUpJoiner(controllerId);
 

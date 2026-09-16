@@ -28,6 +28,8 @@ using GameInterface.Services.MobileParties.Extensions;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Players;
 using GameInterface.Services.Players.Data;
+using GameInterface.Services.UI.Notifications.Messages;
+using GameInterface.Services.UI.Notifications.Patches;
 using GameInterface.Services.Villages.Commands;
 using GameInterface.Services.Villages.Data;
 using GameInterface.Services.Villages.Interfaces;
@@ -35,6 +37,7 @@ using GameInterface.Services.Villages.Messages;
 using HarmonyLib;
 using Missions.Messages;
 using Moq;
+using SandBox.CampaignBehaviors;
 using System.Net;
 using System.Threading;
 using TaleWorlds.CampaignSystem;
@@ -823,6 +826,8 @@ public class VillageHostileActionTests : MapEventTestBase
             Assert.True(GetItemAmount(component._raidProductionRewards, item) > 0);
         }, MapEventDisabledMethods);
 
+        TestEnvironment.FlushCoalescer();
+
         Assert.NotNull(mapEventId);
         Assert.NotNull(componentId);
         Assert.NotNull(itemId);
@@ -831,6 +836,37 @@ public class VillageHostileActionTests : MapEventTestBase
         {
             AssertRaidProgressOutcome(client, mapEventId!, componentId!, mobilePartyId, target.SettlementId, target.VillageId, itemId);
         }
+    }
+
+    [Fact]
+    public void RaidLootedItems_DefaultNotificationSync_DoesNotDuplicateDedicatedRaidNotification()
+    {
+        var (_, mobilePartyId) = CreatePlayerHeroParty("PlayerOne");
+        var target = CreateVillageTarget();
+        var itemId = TestEnvironment.CreateRegisteredObject<ItemObject>();
+
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject<MobileParty>(mobilePartyId, out var mobileParty));
+            Assert.True(Server.ObjectManager.TryGetObject<Settlement>(target.SettlementId, out var settlement));
+            Assert.True(Server.ObjectManager.TryGetObject<ItemObject>(itemId, out var item));
+            Assert.NotNull(CreateHostileActionMapEvent(
+                mobileParty.Party,
+                settlement.Party,
+                VillageHostileAction.Raid));
+
+            var lootedItems = new ItemRoster();
+            lootedItems.AddToCounts(new EquipmentElement(item), 2);
+            DefaultNotificationsCampaignBehavior notificationsBehavior = null;
+
+            DefaultNotificationsCampaignBehaviorPatches.OnItemsLootedPostfix(
+                ref notificationsBehavior,
+                mobileParty,
+                lootedItems);
+        }, MapEventDisabledMethods);
+
+        Assert.Empty(Server.InternalMessages.GetMessages<NotifyItemsLooted>());
+        Assert.Empty(Server.NetworkSentMessages.GetMessages<NetworkNotifyItemsLooted>());
     }
 
     [Fact]
@@ -921,8 +957,9 @@ public class VillageHostileActionTests : MapEventTestBase
     }
 
     [Fact]
-    public void RaidDefenderVictoryFinalizeRequest_ResetsPlayersToVillage()
+    public void RaidAttackerVictoryFinalizeRequest_ResetsPlayersToVillageAndPreservesProgress()
     {
+        const float remainingRaidHitPoints = 0.5f;
         var client = Clients.First();
         var (heroId, mobilePartyId) = CreatePlayerHeroParty("PlayerOne");
         var attackerPartyId = GetPartyBaseId(mobilePartyId);
@@ -942,7 +979,7 @@ public class VillageHostileActionTests : MapEventTestBase
                 mobileParty.MemberRoster.AddToCounts(hero.CharacterObject, 1);
                 hero.PartyBelongedTo = mobileParty;
                 settlement.Party.MemberRoster.AddToCounts(defenderTroop, 1);
-                settlement.SettlementHitPoints = 0.5f;
+                settlement.SettlementHitPoints = remainingRaidHitPoints;
             }
 
             var mapEvent = CreateHostileActionMapEvent(mobileParty.Party, settlement.Party, VillageHostileAction.Raid);
@@ -974,7 +1011,15 @@ public class VillageHostileActionTests : MapEventTestBase
             Assert.Null(mobileParty.Party.MapEventSide);
             Assert.Same(settlement, mobileParty.CurrentSettlement);
             Assert.Equal(Village.VillageStates.Normal, village.VillageState);
-            Assert.Equal(1f, settlement.SettlementHitPoints, 3);
+            Assert.Equal(remainingRaidHitPoints, settlement.SettlementHitPoints, 3);
+
+            var restartedMapEvent = CreateHostileActionMapEvent(
+                mobileParty.Party,
+                settlement.Party,
+                VillageHostileAction.Raid);
+
+            Assert.IsType<RaidEventComponent>(restartedMapEvent.Component);
+            Assert.Equal(remainingRaidHitPoints, settlement.SettlementHitPoints, 3);
         }, MapEventDisabledMethods);
     }
 
@@ -2955,6 +3000,7 @@ public class VillageHostileActionTests : MapEventTestBase
             Assert.True(village.Hearth < 100f);
             Assert.NotNull(raidComponent._raidProductionRewards);
             Assert.True(GetItemAmount(raidComponent._raidProductionRewards, item) > 0);
+            Assert.True(GetItemAmount(mobileParty.Party, item) > 0);
         });
     }
 
