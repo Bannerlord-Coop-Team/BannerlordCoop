@@ -35,6 +35,8 @@ internal interface IClanLordMovementFixture
 /// <summary>Owns one session-scoped fixture and retains captured state until restoration succeeds.</summary>
 internal sealed class ClanLordMovementFixture : IClanLordMovementFixture
 {
+    private const int InteractionEvidenceLimit = 32;
+
     private readonly IObjectManager objects;
     private readonly IMobilePartyBehaviorSnapshot snapshots;
     private readonly IMessageBroker messages;
@@ -83,22 +85,43 @@ internal sealed class ClanLordMovementFixture : IClanLordMovementFixture
             string preparationFailure = PrepareFixtureLord(player, clan, out lord);
             if (preparationFailure != null) return Result(false, preparationFailure, candidateEvidence);
         }
-        var interactionEvidence = MobileParty.All.Where(p => p != player && p != lord)
-            .Select(p => new { party = Describe(p), rejected = EligibleInteraction(p, player, lord) }).ToArray();
-        MobileParty interaction = MobileParty.All.Where(p => EligibleInteraction(p, player, lord) == null)
+        var interactionCandidates = MobileParty.All.Where(p => p != player && p != lord)
+            .Select(p => new { Party = p, Rejected = EligibleInteraction(p, player, lord) }).ToArray();
+        var interactionEvidence = interactionCandidates.OrderBy(candidate => candidate.Party.StringId, StringComparer.Ordinal)
+            .Take(InteractionEvidenceLimit)
+            .Select(candidate => new { party = Describe(candidate.Party), rejected = candidate.Rejected }).ToArray();
+        bool interactionEvidenceTruncated = interactionCandidates.Length > interactionEvidence.Length;
+        MobileParty interaction = interactionCandidates.Where(candidate => candidate.Rejected == null)
+            .Select(candidate => candidate.Party)
             .OrderBy(p => rules.InteractionPriority(p.IsCaravan, p.IsLordParty))
             .ThenBy(p => p.Position.DistanceSquared(player.Position))
             .ThenBy(p => p.StringId, StringComparer.Ordinal).FirstOrDefault();
         if (interaction == null)
-            return SetupFailure("no eligible registered peaceful interaction party", new { candidateEvidence, interactionEvidence });
+            return SetupFailure("no eligible registered peaceful interaction party", new
+            {
+                candidateEvidence, interactionCandidateCount = interactionCandidates.Length,
+                interactionEvidence, interactionEvidenceTruncated
+            });
         var interactionRadii = new[] { interactionRange * 0.6f, interactionRange * 0.4f, interactionRange * 0.2f };
         if (!TryPoint(player.Position, interactionRadii, out CampaignVec2 interactionPoint))
-            return SetupFailure("no deterministic navigable staging point", new { candidateEvidence, interactionEvidence });
+            return SetupFailure("no deterministic navigable staging point", new
+            {
+                candidateEvidence, interactionCandidateCount = interactionCandidates.Length,
+                interactionEvidence, interactionEvidenceTruncated
+            });
         if (!TryPoint(lord.Position, new[] { 24f, 20f, 16f }, out CampaignVec2 target))
-            return SetupFailure("no deterministic lord route", new { candidateEvidence, interactionEvidence });
+            return SetupFailure("no deterministic lord route", new
+            {
+                candidateEvidence, interactionCandidateCount = interactionCandidates.Length,
+                interactionEvidence, interactionEvidenceTruncated
+            });
         if (!snapshots.TryCreate(lord, out var lordState) || !snapshots.CanApply(lord, lordState) ||
             !snapshots.TryCreate(interaction, out var interactionState) || !snapshots.CanApply(interaction, interactionState))
-            return SetupFailure("unable to capture restorable movement state", new { candidateEvidence, interactionEvidence });
+            return SetupFailure("unable to capture restorable movement state", new
+            {
+                candidateEvidence, interactionCandidateCount = interactionCandidates.Length,
+                interactionEvidence, interactionEvidenceTruncated
+            });
 
         lordCapture = new Capture(lord, lordState);
         interactionCapture = new Capture(interaction, interactionState);
@@ -124,7 +147,11 @@ internal sealed class ClanLordMovementFixture : IClanLordMovementFixture
         }
         catch (Exception error)
         {
-            return SetupFailure("staging failed: " + error.Message, new { candidateEvidence, interactionEvidence });
+            return SetupFailure("staging failed: " + error.Message, new
+            {
+                candidateEvidence, interactionCandidateCount = interactionCandidates.Length,
+                interactionEvidence, interactionEvidenceTruncated
+            });
         }
         return Result(true, "ready: run the printed source-bound start command on the participating client", new
         {
@@ -132,7 +159,8 @@ internal sealed class ClanLordMovementFixture : IClanLordMovementFixture
             preparedLord = fixtureLord != null,
             originalClan = fixtureLord == null ? null : new { id = Id(fixtureLord.OriginalClan), stringId = fixtureLord.OriginalClan.StringId },
             interactionRangeVerified = true, interactionRange,
-            distance = player.Position.Distance(interaction.Position), candidateEvidence, interactionEvidence,
+            distance = player.Position.Distance(interaction.Position), candidateEvidence,
+            interactionCandidateCount = interactionCandidates.Length, interactionEvidence, interactionEvidenceTruncated,
             before = Command("before", lord.Position, CampaignTime.Now.NumTicks),
             start = Command("clan_lord_fixture_start", "before", lord.Position, CampaignTime.Now.NumTicks),
             during = Command("during", lord.Position, CampaignTime.Now.NumTicks),
@@ -367,6 +395,7 @@ internal sealed class ClanLordMovementFixture : IClanLordMovementFixture
     private string Unavailable(MobileParty party) => party == null ? "missing party" :
         !party.IsActive ? "inactive" : party.Ai == null ? "missing AI" :
         party.CurrentSettlement != null ? "in settlement" : party.MapEvent != null ? "in map event" :
+        party.BesiegerCamp != null ? "in siege" :
         party.Army != null ? "in army" : party.LeaderHero?.IsPrisoner == true ? "leader captive" :
         party.IsLordParty && party.LeaderHero?.IsActive != true ? "lord inactive" :
         party.IsTransitionInProgress ? "navigation transition" :
