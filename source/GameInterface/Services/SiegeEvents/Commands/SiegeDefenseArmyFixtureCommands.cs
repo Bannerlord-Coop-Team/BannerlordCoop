@@ -529,7 +529,7 @@ internal static class SiegeDefenseArmyFixtureCommands
             && HasMatchingCompactPartyId(id, behavior.MobilePartyId) ? new PartySnapshot(party, id, behavior) : null;
 
     internal static bool HasMatchingCompactPartyId(string registeredId, string behaviorId) =>
-        ObjectManager.Compact(registeredId, typeof(MobileParty)) == behaviorId;
+        GameInterface.Services.ObjectManager.ObjectManager.Compact(registeredId, typeof(MobileParty)) == behaviorId;
 
     private static void StageAtHold(MobileParty party, CampaignVec2 position)
     {
