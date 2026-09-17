@@ -20,6 +20,15 @@ namespace GameInterface.Tests.Services.SiegeEvents;
 public class SiegeDefenseArmyFixtureCommandsTests
 {
     [Theory]
+    [InlineData("MobileParty_Player", "Player", true)]
+    [InlineData("MobileParty_Player438", "Player438", true)]
+    [InlineData("MobileParty_Player", "MobileParty_Player", false)]
+    public void CaptureParty_MatchesCompactBehaviorId(string registeredId, string behaviorId, bool expected)
+    {
+        Assert.Equal(expected, SiegeDefenseArmyFixtureCommands.HasMatchingCompactPartyId(registeredId, behaviorId));
+    }
+
+    [Theory]
     [InlineData("baseline")]
     [InlineData("joined")]
     [InlineData("unstuck")]

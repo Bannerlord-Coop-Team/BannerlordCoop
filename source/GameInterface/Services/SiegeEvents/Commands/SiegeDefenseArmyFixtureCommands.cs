@@ -526,7 +526,10 @@ internal static class SiegeDefenseArmyFixtureCommands
 
     private static PartySnapshot CaptureParty(MobileParty party, IObjectManager manager, IMobilePartyBehaviorSnapshot behaviors) =>
         TryGetId(manager, party, out var id) && behaviors.TryCreate(party, out var behavior)
-            && behavior.MobilePartyId == id ? new PartySnapshot(party, id, behavior) : null;
+            && HasMatchingCompactPartyId(id, behavior.MobilePartyId) ? new PartySnapshot(party, id, behavior) : null;
+
+    internal static bool HasMatchingCompactPartyId(string registeredId, string behaviorId) =>
+        ObjectManager.Compact(registeredId, typeof(MobileParty)) == behaviorId;
 
     private static void StageAtHold(MobileParty party, CampaignVec2 position)
     {
