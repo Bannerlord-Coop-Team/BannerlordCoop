@@ -345,7 +345,7 @@ public sealed class MissionEngineFixture : IDisposable
     private static bool Mission_get_InitialPlayerAgent(Mission __instance, ref Agent __result)
     {
         if (!MockMission.ForShell(__instance, out var mock) || !mock.TrackInitialPlayerAgent) return true;
-        __result = mock.InitialPlayerAgent;
+        __result = mock.InitialPlayerAgent ?? __instance._initialPlayerAgent;
         return false;
     }
 

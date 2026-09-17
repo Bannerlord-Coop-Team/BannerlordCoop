@@ -154,9 +154,10 @@ public class PuppetSpawner : IPuppetSpawner
             lock (pendingPuppetLock)
             {
                 pendingPuppets.RemoveAll(data => data.AgentId == pair.Key);
+                pendingAuthorities.Remove(returned.AgentId);
+                pendingAuthorities.Remove(returned.MountAgentId);
                 pendingPuppets.Insert(0, returned);
             }
-            appliedPlayerHandoffs.Add(pair.Key);
         }
     }
 
@@ -178,7 +179,6 @@ public class PuppetSpawner : IPuppetSpawner
     {
         if (!session.IsOwn(data.OwnerControllerId)
             || !playerHandoffs.TryGetValue(data.AgentId, out var handoff)
-            || !appliedPlayerHandoffs.Contains(data.AgentId)
             || handoff.ReturningControllerId != data.OwnerControllerId
             || data.AuthorityRevision != handoff.Previous.AuthorityRevision + 1
             || authorityMigrator?.IsPlayerHandoffIdentityValid(handoff) != true
@@ -271,9 +271,9 @@ public class PuppetSpawner : IPuppetSpawner
         if (Mission.Current == null) return true;                       // no mission — drop
         if (playerHandoffs.TryGetValue(data.AgentId, out var handoff))
         {
+            if (authorityMigrator?.IsPlayerHandoffIdentityValid(handoff) != true) return false;
             if (!appliedPlayerHandoffs.Contains(data.AgentId)
-                || authorityMigrator?.IsPlayerHandoffIdentityValid(handoff) != true) return false;
-            if (data.AuthorityRevision <= handoff.Previous.AuthorityRevision)
+                || data.AuthorityRevision <= handoff.Previous.AuthorityRevision)
                 data = handoff.CreateReturnedRecord();
         }
         if (!MergeSpawnAuthority(data)) return true;
@@ -419,6 +419,10 @@ public class PuppetSpawner : IPuppetSpawner
             data.MovementId,
             agent,
             pendingAuthority?.Revision ?? data.AuthorityRevision);
+        if (agentRegistered && handoff != null
+            && data.OwnerControllerId == handoff.ReturningControllerId
+            && data.AuthorityRevision == handoff.Previous.AuthorityRevision + 1)
+            appliedPlayerHandoffs.Add(data.AgentId);
         if (!agentRegistered)
         {
             Logger.Error(

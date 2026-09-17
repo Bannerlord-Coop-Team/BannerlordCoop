@@ -232,13 +232,41 @@ public class BattleAuthorityMigrator : IBattleAuthorityMigrator
         if (playerHandoffs.TryGetValue(handoff.ReturningControllerId, out var sent)
             && sent.Previous.AgentId == data.AgentId && sent.Previous.AuthorityRevision == data.AuthorityRevision)
             confirmedPlayerHandoffs.Add(data.AgentId);
-        if (wasLocal && !session.IsOwn(handoff.ReturningControllerId))
+        if (session.IsOwn(handoff.ReturningControllerId))
+        {
+            PromoteReturnedPlayer(info.Agent);
+            if (data.MountAgentId != Guid.Empty && registry.TryGetAgentInfo(data.MountAgentId, out var mount)
+                && mount.Agent != null && mount.Agent.IsActive())
+                coopMissionComponent.AgentMovementHandler.Interpolator.Forget(mount.Agent);
+        }
+        else if (wasLocal)
         {
             Demote(info.Agent);
             if (data.MountAgentId != Guid.Empty && registry.TryGetAgentInfo(data.MountAgentId, out var mount))
                 Demote(mount.Agent);
         }
         return true;
+
+        void PromoteReturnedPlayer(Agent agent)
+        {
+            var mission = Mission.Current;
+            if (agent == null || !agent.IsActive() || agent.Mission != mission
+                || agent.Character != Hero.MainHero?.CharacterObject) return;
+            coopMissionComponent.AgentMovementHandler.Interpolator.Forget(agent);
+            if (mission.InitialPlayerAgent == null)
+                mission._initialPlayerAgent = agent;
+            if (!deployment.IsCommitted && mission.GetMissionBehavior<DeploymentMissionController>() != null)
+            {
+                agent.Controller = AgentControllerType.None;
+                agent.SetIsAIPaused(true);
+            }
+            else
+            {
+                agent.Controller = AgentControllerType.Player;
+                agent.SetIsAIPaused(false);
+            }
+            mission.MainAgent = agent;
+        }
 
         void Demote(Agent agent)
         {
