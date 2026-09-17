@@ -28,6 +28,27 @@ public class SiegeDefenseArmyFixtureCommandsTests
         Assert.Equal(expected, SiegeDefenseArmyFixtureCommands.HasMatchingCompactPartyId(registeredId, behaviorId));
     }
 
+    [Fact]
+    public void ActiveCapture_AcceptsRoundTrippedFloatBehaviorProof()
+    {
+        var captured = Expected();
+        foreach (var party in captured["capturedParties"])
+        {
+            var behavior = (JObject)party["behavior"];
+            behavior["partyPosition"] = new JObject
+            {
+                ["X"] = 657.95f,
+                ["Y"] = 279.08f,
+                ["IsOnLand"] = true,
+            };
+        }
+        var json = new JObject { ["expectation"] = captured }.ToString(Formatting.None);
+
+        Assert.True(SiegeDefenseArmyFixtureCommands.TryReadExpectation(json, "controller", "town_ES1", true,
+            out var supplied, out var error), error);
+        Assert.True(SiegeDefenseArmyFixtureCommands.MatchesCapture(captured, supplied, out error), error);
+    }
+
     [Theory]
     [InlineData("baseline")]
     [InlineData("joined")]

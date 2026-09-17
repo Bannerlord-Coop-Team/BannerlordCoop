@@ -617,7 +617,10 @@ internal static class SiegeDefenseArmyFixtureCommands
         foreach (var name in new[] { "buildVersion", "commit", "fixtureToken", "controllerId", "settlementId", "settlementNetworkId", "playerPartyId",
             "besiegerPartyId", "followerPartyIds", "capturedParties" })
         {
-            if (!JToken.DeepEquals(expected[name], captured[name]))
+            var matches = name == "capturedParties"
+                ? MatchesRoundTrippedJson(expected[name], captured[name])
+                : JToken.DeepEquals(expected[name], captured[name]);
+            if (!matches)
             {
                 error = $"The captured fixture {name} does not match the active fixture";
                 return false;
@@ -625,6 +628,9 @@ internal static class SiegeDefenseArmyFixtureCommands
         }
         return true;
     }
+
+    private static bool MatchesRoundTrippedJson(JToken first, JToken second) =>
+        JToken.DeepEquals(JToken.Parse(first.ToString(Formatting.None)), JToken.Parse(second.ToString(Formatting.None)));
 
     private static string[] GetExpectedPartyIds(JObject expected) =>
         new[] { expected.Value<string>("playerPartyId"), expected.Value<string>("besiegerPartyId") }
