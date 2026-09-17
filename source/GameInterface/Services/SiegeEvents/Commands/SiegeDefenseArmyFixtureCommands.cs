@@ -630,7 +630,33 @@ internal static class SiegeDefenseArmyFixtureCommands
     }
 
     private static bool MatchesRoundTrippedJson(JToken first, JToken second) =>
-        JToken.DeepEquals(JToken.Parse(first.ToString(Formatting.None)), JToken.Parse(second.ToString(Formatting.None)));
+        MatchesJsonTokens(JToken.Parse(first.ToString(Formatting.None)), JToken.Parse(second.ToString(Formatting.None)));
+
+    private static bool MatchesJsonTokens(JToken first, JToken second)
+    {
+        if (first == null || second == null) return first == second;
+        if (first.Type == JTokenType.Float && second.Type == JTokenType.Float)
+            return Math.Abs(first.Value<double>() - second.Value<double>()) <= 0.00001d;
+
+        var firstObject = first as JObject;
+        var secondObject = second as JObject;
+        if (firstObject != null || secondObject != null)
+        {
+            return firstObject != null && secondObject != null && firstObject.Count == secondObject.Count
+                && firstObject.Properties().All(property => secondObject.TryGetValue(property.Name, out var value)
+                    && MatchesJsonTokens(property.Value, value));
+        }
+
+        var firstArray = first as JArray;
+        var secondArray = second as JArray;
+        if (firstArray != null || secondArray != null)
+        {
+            return firstArray != null && secondArray != null && firstArray.Count == secondArray.Count
+                && firstArray.Select((value, index) => MatchesJsonTokens(value, secondArray[index])).All(matches => matches);
+        }
+
+        return JToken.DeepEquals(first, second);
+    }
 
     private static string[] GetExpectedPartyIds(JObject expected) =>
         new[] { expected.Value<string>("playerPartyId"), expected.Value<string>("besiegerPartyId") }

@@ -50,29 +50,28 @@ public class SiegeDefenseArmyFixtureCommandsTests
     }
 
     [Fact]
-    public void RestoredState_AcceptsRoundTrippedFloatBehaviorProof()
+    public void RestoredState_AcceptsRetainedEightFieldFloatRoundTrip()
     {
         var captured = Expected();
-        var behavior = (JObject)captured["capturedParties"].Single(p => p.Value<string>("partyId") == "player")["behavior"];
-        behavior["partyPosition"] = new JObject
-        {
-            ["X"] = 657.95f,
-            ["Y"] = 279.08f,
-            ["IsOnLand"] = true,
-        };
         var observed = Observed("restored");
-        behavior = (JObject)Party(observed, "player")["behavior"];
-        behavior["partyPosition"] = new JObject
+        var capturedBesieger = (JObject)CapturedParty(captured, "besieger")["behavior"];
+        var observedBesieger = (JObject)Party(observed, "besieger")["behavior"];
+        foreach (var field in new[] { "partyPosition", "targetPosition", "moveTargetPoint" })
         {
-            ["X"] = 657.95f,
-            ["Y"] = 279.08f,
-            ["IsOnLand"] = true,
-        };
-        var json = new JObject { ["expectation"] = captured }.ToString(Formatting.None);
+            SetPoint(capturedBesieger, field, 618.78143d);
+            SetPoint(observedBesieger, field, 618.781433d);
+        }
+        var capturedFollower = (JObject)CapturedParty(captured, "follower-a")["behavior"];
+        var observedFollower = (JObject)Party(observed, "follower-a")["behavior"];
+        foreach (var field in new[] { "bestTargetPoint", "partyPosition", "targetPosition", "moveTargetPoint" })
+        {
+            SetPoint(capturedFollower, field, 618.78143d);
+            SetPoint(observedFollower, field, 618.781433d);
+        }
+        SetPoint((JObject)CapturedParty(captured, "follower-b")["behavior"], "bestTargetPoint", 554.02313d);
+        SetPoint((JObject)Party(observed, "follower-b")["behavior"], "bestTargetPoint", 554.023132d);
 
-        Assert.True(SiegeDefenseArmyFixtureCommands.TryReadExpectation(json, "controller", "town_ES1", false,
-            out var supplied, out var error), error);
-        Assert.True(SiegeDefenseArmyFixtureCommands.EvaluateState(supplied, observed, "restored", out error), error);
+        Assert.True(SiegeDefenseArmyFixtureCommands.EvaluateState(captured, observed, "restored", out var error), error);
     }
 
     [Theory]
@@ -223,6 +222,14 @@ public class SiegeDefenseArmyFixtureCommandsTests
     {
         var actual = Observed("restored");
         Party(actual, "besieger")["behavior"]["partyPosition"]["X"] = 7;
+        AssertFailure(Expected(), actual, "restored", "besieger");
+    }
+
+    [Fact]
+    public void Restored_BehaviorIdentityChanged_Fails()
+    {
+        var actual = Observed("restored");
+        Party(actual, "besieger")["behavior"]["MobilePartyId"] = "replacement";
         AssertFailure(Expected(), actual, "restored", "besieger");
     }
 
@@ -584,6 +591,19 @@ public class SiegeDefenseArmyFixtureCommandsTests
 
     private static JObject Party(JObject observed, string id) =>
         (JObject)observed["parties"].Single(p => p.Value<string>("partyId") == id);
+
+    private static JObject CapturedParty(JObject expected, string id) =>
+        (JObject)expected["capturedParties"].Single(p => p.Value<string>("partyId") == id);
+
+    private static void SetPoint(JObject behavior, string field, double x)
+    {
+        behavior[field] = new JObject
+        {
+            ["X"] = x,
+            ["Y"] = 2,
+            ["IsOnLand"] = true,
+        };
+    }
 
     private static JObject Behavior(string id) => JObject.FromObject(new
     {
