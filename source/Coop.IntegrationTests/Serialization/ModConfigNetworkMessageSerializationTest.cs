@@ -105,6 +105,26 @@ namespace Coop.IntegrationTests.Serialization
             Assert.True(copy.ShowPlayerNameplates);
         }
 
+        [Theory]
+        [InlineData(false, false)]
+        [InlineData(false, true)]
+        [InlineData(true, false)]
+        [InlineData(true, true)]
+        public void NetworkLoadModConfig_RoundTrips_VoiceAndWoundedEntryIndependently(
+            bool voiceEnabled, bool playerWoundedBattleEntry)
+        {
+            var options = new ModOptions(new ModOptionsData
+            {
+                VoiceEnabled = voiceEnabled,
+                PlayerWoundedBattleEntry = playerWoundedBattleEntry,
+            });
+
+            var copy = RoundTrip(new NetworkLoadModConfig(options)).ModOptions;
+
+            Assert.Equal(voiceEnabled, copy.VoiceEnabled);
+            Assert.Equal(playerWoundedBattleEntry, copy.PlayerWoundedBattleEntry);
+        }
+
         private static ModOptions AllOptionsOff() => new(new ModOptionsData
         {
             FastForwardEnabled = false,
@@ -127,6 +147,7 @@ namespace Coop.IntegrationTests.Serialization
             EnablePlayerExecutions = false,
             ShowPlayerNameplates = false,
             PlayerWoundedBattleEntry = false,
+            VoiceEnabled = false,
         });
 
         private static void AssertAllOptionsOff(ModOptions copy)
@@ -151,6 +172,7 @@ namespace Coop.IntegrationTests.Serialization
             Assert.False(copy.EnablePlayerExecutions);
             Assert.False(copy.ShowPlayerNameplates);
             Assert.False(copy.PlayerWoundedBattleEntry);
+            Assert.False(copy.VoiceEnabled);
         }
 
         private static T RoundTrip<T>(T original)

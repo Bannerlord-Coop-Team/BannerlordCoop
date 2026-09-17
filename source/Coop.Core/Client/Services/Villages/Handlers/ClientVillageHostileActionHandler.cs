@@ -35,6 +35,8 @@ internal class ClientVillageHostileActionHandler : IHandler
         messageBroker.Subscribe<NetworkVillageHostileActionStarted>(Handle_NetworkVillageHostileActionStarted);
         messageBroker.Subscribe<NetworkVillageHostileActionDenied>(Handle_NetworkVillageHostileActionDenied);
         messageBroker.Subscribe<NetworkVillageHostileActionCooldowns>(Handle_NetworkVillageHostileActionCooldowns);
+        messageBroker.Subscribe<NetworkAuthorizeForceTransfer>(Handle_NetworkAuthorizeForceTransfer);
+        messageBroker.Subscribe<NetworkDenyForceTransfer>(Handle_NetworkDenyForceTransfer);
     }
 
     public void Dispose()
@@ -43,6 +45,8 @@ internal class ClientVillageHostileActionHandler : IHandler
         messageBroker.Unsubscribe<NetworkVillageHostileActionStarted>(Handle_NetworkVillageHostileActionStarted);
         messageBroker.Unsubscribe<NetworkVillageHostileActionDenied>(Handle_NetworkVillageHostileActionDenied);
         messageBroker.Unsubscribe<NetworkVillageHostileActionCooldowns>(Handle_NetworkVillageHostileActionCooldowns);
+        messageBroker.Unsubscribe<NetworkAuthorizeForceTransfer>(Handle_NetworkAuthorizeForceTransfer);
+        messageBroker.Unsubscribe<NetworkDenyForceTransfer>(Handle_NetworkDenyForceTransfer);
     }
 
     private void Handle_VillageHostileActionAttempted(MessagePayload<VillageHostileActionAttempted> payload)
@@ -72,6 +76,19 @@ internal class ClientVillageHostileActionHandler : IHandler
         GameThread.RunSafe(
             () => villageHostileActionInterface.ApplyCooldowns(payload.What.Cooldowns),
             context: nameof(Handle_NetworkVillageHostileActionCooldowns));
+    }
+
+    private void Handle_NetworkAuthorizeForceTransfer(MessagePayload<NetworkAuthorizeForceTransfer> payload)
+    {
+        var pool = payload.What.Pool;
+        GameThread.RunSafe(
+            () => villageHostileActionInterface.OpenForceTransferLootScreen(pool),
+            context: nameof(Handle_NetworkAuthorizeForceTransfer));
+    }
+
+    private void Handle_NetworkDenyForceTransfer(MessagePayload<NetworkDenyForceTransfer> payload)
+    {
+        messageBroker.Publish(this, new SendInformationMessage("The village has nothing left to give."));
     }
 
     private static string GetDeniedMessage(VillageHostileActionDeniedReason reason)

@@ -820,7 +820,6 @@ public class KingdomDebugCommand
     }
 
     // coop.debug.kingdom.force_player_vassalage Player khuzait true
-
     public sealed class KingdomForcePlayerVassalageCoopCommand : ICoopCommand
     {
         public string Prefix => "coop.debug.kingdom";

@@ -84,4 +84,5 @@ public static class CoopTroopSupplierRegistry
                 if (key.StartsWith(prefix)) Pending.Remove(key);
         }
     }
+
 }
