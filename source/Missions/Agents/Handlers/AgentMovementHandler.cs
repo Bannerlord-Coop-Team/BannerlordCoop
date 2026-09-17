@@ -1,6 +1,7 @@
 ﻿using Common;
 using Common.Logging;
 using Common.Messaging;
+using Common.Network;
 using Common.PacketHandlers;
 using Common.Util;
 using GameInterface.Services.Entity;
@@ -101,6 +102,7 @@ public class AgentMovementHandler : IAgentMovementHandler
     private readonly IMovementRateController movementRateController;
     private readonly IMovementPriorityScheduler movementPriorityScheduler;
     private readonly IMissionContext missionContext;
+    private readonly IRelayNetwork relayNetwork;
     private readonly Dictionary<Guid, AgentEquipmentData> lastEquipment = new Dictionary<Guid, AgentEquipmentData>();
     // A puppet's horse, remembered when its owner dismounts, so a later re-mount can put it back on the
     // same one. Touched only on the game thread (inside HandlePacket's apply), so no lock; per-mission
@@ -336,6 +338,7 @@ public class AgentMovementHandler : IAgentMovementHandler
         public readonly ushort CompactId;
         public readonly Guid CanonicalId;
         public readonly bool UsesCompactId;
+        public readonly long AuthorityRevision;
         public readonly AgentData Data;
         public readonly AgentMountData MountData;
         public readonly bool IsMount;
@@ -345,12 +348,14 @@ public class AgentMovementHandler : IAgentMovementHandler
             ushort compactId,
             Guid canonicalId,
             bool usesCompactId,
-            AgentData data)
+            AgentData data,
+            long authorityRevision)
         {
             IdentityScopeId = identityScopeId;
             CompactId = compactId;
             CanonicalId = canonicalId;
             UsesCompactId = usesCompactId;
+            AuthorityRevision = authorityRevision;
             Data = data;
             MountData = null;
             IsMount = false;
@@ -361,12 +366,14 @@ public class AgentMovementHandler : IAgentMovementHandler
             ushort compactId,
             Guid canonicalId,
             bool usesCompactId,
-            AgentMountData mountData)
+            AgentMountData mountData,
+            long authorityRevision)
         {
             IdentityScopeId = identityScopeId;
             CompactId = compactId;
             CanonicalId = canonicalId;
             UsesCompactId = usesCompactId;
+            AuthorityRevision = authorityRevision;
             Data = default;
             MountData = mountData;
             IsMount = true;
@@ -424,7 +431,8 @@ public class AgentMovementHandler : IAgentMovementHandler
         IAgentVisualActionAccessor visualActionAccessor,
         IMovementRateController movementRateController,
         IMovementPriorityScheduler movementPriorityScheduler,
-        IMissionContext missionContext)
+        IMissionContext missionContext,
+        IRelayNetwork relayNetwork = null)
     {
         if (movementRateController == null) throw new ArgumentNullException(nameof(movementRateController));
         if (movementPriorityScheduler == null) throw new ArgumentNullException(nameof(movementPriorityScheduler));
@@ -444,6 +452,7 @@ public class AgentMovementHandler : IAgentMovementHandler
         this.movementRateController = movementRateController;
         this.movementPriorityScheduler = movementPriorityScheduler;
         this.missionContext = missionContext;
+        this.relayNetwork = relayNetwork;
         _interpolator = new AgentPositionInterpolator(agentRegistry);
         // Server-mediated membership. A peer entering is the cue to clear any STALE party it left behind
         // on a missed disconnect (so its rejoin re-spawns clean); a leave/disconnect releases its party.
@@ -1666,26 +1675,26 @@ public class AgentMovementHandler : IAgentMovementHandler
         }
     }
 
-    private static IPacket CreateMovementPacket(
+    private IPacket CreateMovementPacket(
         string identityScopeId,
         ushort[] compactIds,
         Guid[] canonicalIds,
         AgentData[] data)
     {
         return identityScopeId == null
-            ? new MovementPacket(canonicalIds, data)
-            : new MovementPacket(identityScopeId, compactIds, data);
+            ? new MovementPacket(canonicalIds, data, controllerIdProvider.ControllerId)
+            : new MovementPacket(identityScopeId, compactIds, data, controllerIdProvider.ControllerId);
     }
 
-    private static IPacket CreateMountMovementPacket(
+    private IPacket CreateMountMovementPacket(
         string identityScopeId,
         ushort[] compactIds,
         Guid[] canonicalIds,
         AgentMountData[] data)
     {
         return identityScopeId == null
-            ? new MountMovementPacket(canonicalIds, data)
-            : new MountMovementPacket(identityScopeId, compactIds, data);
+            ? new MountMovementPacket(canonicalIds, data, controllerIdProvider.ControllerId)
+            : new MountMovementPacket(identityScopeId, compactIds, data, controllerIdProvider.ControllerId);
     }
 
     public void HandlePacket(NetPeer peer, IPacket packet)
@@ -1693,7 +1702,8 @@ public class AgentMovementHandler : IAgentMovementHandler
         var movement = (MovementPacket)packet;
         int idCount = movement.AgentIds?.Length ?? movement.AgentGuids?.Length ?? 0;
         if (idCount == 0 || movement.Agents == null ||
-            movement.Agents.Length != idCount)
+            movement.Agents.Length != idCount ||
+            (movement.AuthorityRevisions != null && movement.AuthorityRevisions.Length != idCount))
         {
             return;
         }
@@ -1709,16 +1719,18 @@ public class AgentMovementHandler : IAgentMovementHandler
                 usesCompactIds ? movement.AgentIds[i] : (ushort)0,
                 usesCompactIds ? Guid.Empty : movement.AgentGuids[i],
                 usesCompactIds,
-                movement.Agents[i]);
+                movement.Agents[i],
+                movement.AuthorityRevisions?[i] ?? 0);
         }
 
-        QueueReceivedMovement(snapshots);
+        QueueReceivedMovement(peer, movement.SenderControllerId, snapshots);
     }
 
-    private void QueueMountMovement(MountMovementPacket movement)
+    private void QueueMountMovement(NetPeer peer, MountMovementPacket movement)
     {
         int idCount = movement.MountIds?.Length ?? movement.MountGuids?.Length ?? 0;
-        if (idCount == 0 || movement.Mounts == null || movement.Mounts.Length != idCount || _disposed)
+        if (idCount == 0 || movement.Mounts == null || movement.Mounts.Length != idCount || _disposed ||
+            (movement.AuthorityRevisions != null && movement.AuthorityRevisions.Length != idCount))
             return;
 
         bool usesCompactIds = movement.MountIds != null;
@@ -1730,14 +1742,19 @@ public class AgentMovementHandler : IAgentMovementHandler
                 usesCompactIds ? movement.MountIds[i] : (ushort)0,
                 usesCompactIds ? Guid.Empty : movement.MountGuids[i],
                 usesCompactIds,
-                movement.Mounts[i]);
+                movement.Mounts[i],
+                movement.AuthorityRevisions?[i] ?? 0);
         }
 
-        QueueReceivedMovement(snapshots);
+        QueueReceivedMovement(peer, movement.SenderControllerId, snapshots);
     }
 
-    private void QueueReceivedMovement(ReceivedMovement[] snapshots)
+    private void QueueReceivedMovement(
+        NetPeer peer, string packetSenderId, ReceivedMovement[] snapshots)
     {
+        if (!TryCaptureSender(peer, packetSenderId, out string senderId, out bool directPeer))
+            return;
+
         long queuedAt = Stopwatch.GetTimestamp();
         // Resolve and apply each received packet in one game-thread action so it remains FIFO-ordered
         // with spawn, deployment, and authority work queued by earlier messages.
@@ -1748,7 +1765,7 @@ public class AgentMovementHandler : IAgentMovementHandler
                 long applyStartedAt = Stopwatch.GetTimestamp();
                 try
                 {
-                    ApplyMovement(snapshots);
+                    ApplyMovement(peer, senderId, directPeer, snapshots);
                 }
                 finally
                 {
@@ -1761,14 +1778,76 @@ public class AgentMovementHandler : IAgentMovementHandler
             context: nameof(HandlePacket));
     }
 
-    private void ApplyMovement(IReadOnlyList<ReceivedMovement> snapshots)
+    private bool TryCaptureSender(
+        NetPeer peer, string packetSenderId, out string senderId, out bool directPeer)
     {
-        if (_disposed || Mission.Current == null) return;
+        senderId = null;
+        directPeer = false;
+        if (peer == null) return false;
+
+        foreach (string controllerId in missionContext.ControllersInMission)
+        {
+            if (!missionContext.TryGetPeer(controllerId, out NetPeer mappedPeer) ||
+                !ReferenceEquals(mappedPeer, peer))
+                continue;
+
+            if (!string.IsNullOrEmpty(packetSenderId) && packetSenderId != controllerId)
+                return false;
+
+            senderId = controllerId;
+            directPeer = true;
+            return true;
+        }
+
+        // The campaign relay forwards the inner packet, so its sender must travel in that packet.
+        if (string.IsNullOrEmpty(packetSenderId) || !IsRelayPeer(peer))
+            return false;
+
+        senderId = packetSenderId;
+        return IsMissionMember(senderId);
+    }
+
+    private bool IsRelayPeer(NetPeer peer)
+    {
+        var endpoint = relayNetwork?.ServerEndpoint;
+        return endpoint != null && endpoint.Port == peer.Port &&
+               endpoint.Address.Equals(peer.Address);
+    }
+
+    private bool IsMissionMember(string controllerId)
+    {
+        foreach (string member in missionContext.ControllersInMission)
+        {
+            if (member == controllerId)
+                return true;
+        }
+        return false;
+    }
+
+    private void ApplyMovement(
+        NetPeer peer, string senderId, bool directPeer,
+        IReadOnlyList<ReceivedMovement> snapshots)
+    {
+        if (_disposed || Mission.Current == null || !IsMissionMember(senderId)) return;
+
+        // A removed direct mapping must not become an anonymous relay while this apply is queued.
+        if (directPeer
+            ? !missionContext.TryGetPeer(senderId, out NetPeer mappedPeer) || !ReferenceEquals(mappedPeer, peer)
+            : !IsRelayPeer(peer))
+            return;
 
         using (new AllowedThread())
         {
             foreach (ReceivedMovement snapshot in snapshots)
             {
+                CoopAgentInfo agentInfo;
+                bool found = snapshot.UsesCompactId
+                    ? agentRegistry.TryGetAgentInfo(
+                        snapshot.IdentityScopeId, snapshot.CompactId, out agentInfo)
+                    : agentRegistry.TryGetAgentInfo(snapshot.CanonicalId, out agentInfo);
+                if (!found || agentInfo.CurrentAuthority != senderId ||
+                    agentInfo.AuthorityRevision != snapshot.AuthorityRevision) continue;
+
                 if (snapshot.IsMount)
                 {
                     _mountMovementApplier.ApplySnapshot(
@@ -1780,13 +1859,6 @@ public class AgentMovementHandler : IAgentMovementHandler
                     continue;
                 }
 
-                CoopAgentInfo agentInfo;
-                bool found = snapshot.UsesCompactId
-                    ? agentRegistry.TryGetAgentInfo(
-                        snapshot.IdentityScopeId, snapshot.CompactId, out agentInfo)
-                    : agentRegistry.TryGetAgentInfo(snapshot.CanonicalId, out agentInfo);
-                if (!found) continue;
-
                 Agent agent = agentInfo.Agent;
                 AgentData data = snapshot.Data;
 
@@ -1795,10 +1867,7 @@ public class AgentMovementHandler : IAgentMovementHandler
                 if (agent == null || agent.Mission != Mission.Current || agent.IsActive() == false)
                     continue;
 
-                // Re-check authority ON the game thread: a packet from the previous owner can be queued
-                // behind a host-migration adoption (both are game-thread actions queued from the network
-                // thread), and applying it after the transfer would re-pin the freshly adopted agent to a
-                // stale position/input snapshot the AI then fights.
+                // Locally adopted agents must not consume their former remote movement stream.
                 if (agentRegistry.IsLocallyControlled(agent))
                     continue;
 

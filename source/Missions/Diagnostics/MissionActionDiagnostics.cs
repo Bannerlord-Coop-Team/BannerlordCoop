@@ -46,8 +46,12 @@ internal static class MissionActionDiagnostics
     private const int TraceAgentsPerActionClass = 16;
     private const int MaximumTimelineEvents = 20000;
     private const int MaximumRewindSamples = 64;
+    private const int MaximumPacketAuthorities = 64;
     private const float ProgressTolerance = 0.02f;
 
+    private static readonly object ActionTrafficLock = new object();
+    private static readonly PacketAuthorityObservation[] PacketAuthorities =
+        new PacketAuthorityObservation[MaximumPacketAuthorities];
     private static readonly long[] PollTicks = new long[2];
     private static readonly long[] PollCalls = new long[2];
     private static readonly long[] PollVisits = new long[2];
@@ -80,6 +84,9 @@ internal static class MissionActionDiagnostics
     private static long receivedPackets;
     private static long receivedUpdates;
     private static long receivedBytes;
+    private static int packetAuthorityCount;
+    private static int nextPacketAuthority;
+    private static long evictedPacketAuthorities;
 
     private static bool animationTraceEnabled;
     private static bool traceAgentsSelected;
@@ -124,6 +131,18 @@ internal static class MissionActionDiagnostics
             AgentId = agentId;
             Sequence = sequence;
         }
+    }
+
+    private struct PacketAuthorityObservation
+    {
+        public string ControllerId;
+        public int BattleHostEpoch;
+        public long SentPackets;
+        public long SentUpdates;
+        public long SentBytes;
+        public long ReceivedPackets;
+        public long ReceivedUpdates;
+        public long ReceivedBytes;
     }
 
     private readonly struct TraceKey : IEquatable<TraceKey>
@@ -227,49 +246,112 @@ internal static class MissionActionDiagnostics
 
     public static void RecordActionPacketSent(
         AgentActionPacket packet,
-        int serializedBytes)
-    {
-        if (!performanceEnabled) return;
-        Interlocked.Increment(ref sentPackets);
-        Interlocked.Add(ref sentUpdates, packet.AgentIds?.Length ?? 0);
-        Interlocked.Add(ref sentBytes, serializedBytes);
-    }
+        int serializedBytes) =>
+        RecordActionPacket(packet, serializedBytes, sent: true);
 
     public static void RecordActionPacketReceived(
         AgentActionPacket packet,
-        int serializedBytes)
+        int serializedBytes) =>
+        RecordActionPacket(packet, serializedBytes, sent: false);
+
+    private static void RecordActionPacket(
+        AgentActionPacket packet,
+        int serializedBytes,
+        bool sent)
     {
         if (!performanceEnabled) return;
-        Interlocked.Increment(ref receivedPackets);
-        Interlocked.Add(ref receivedUpdates, packet.AgentIds?.Length ?? 0);
-        Interlocked.Add(ref receivedBytes, serializedBytes);
+        lock (ActionTrafficLock)
+        {
+            if (!performanceEnabled) return;
+            int updates = packet.AgentIds?.Length ?? 0;
+            ref PacketAuthorityObservation observation =
+                ref PacketAuthorities[GetPacketAuthorityIndex(packet)];
+            if (sent)
+            {
+                sentPackets++;
+                sentUpdates += updates;
+                sentBytes += serializedBytes;
+                observation.SentPackets++;
+                observation.SentUpdates += updates;
+                observation.SentBytes += serializedBytes;
+            }
+            else
+            {
+                receivedPackets++;
+                receivedUpdates += updates;
+                receivedBytes += serializedBytes;
+                observation.ReceivedPackets++;
+                observation.ReceivedUpdates += updates;
+                observation.ReceivedBytes += serializedBytes;
+            }
+        }
+    }
+
+    private static int GetPacketAuthorityIndex(AgentActionPacket packet)
+    {
+        for (int index = 0; index < packetAuthorityCount; index++)
+        {
+            if (PacketAuthorities[index].ControllerId == packet.ControllerId &&
+                PacketAuthorities[index].BattleHostEpoch == packet.BattleHostEpoch)
+                return index;
+        }
+
+        int addedIndex = nextPacketAuthority;
+        nextPacketAuthority = (nextPacketAuthority + 1) % MaximumPacketAuthorities;
+        if (packetAuthorityCount < MaximumPacketAuthorities)
+            packetAuthorityCount++;
+        else
+            evictedPacketAuthorities++;
+
+        PacketAuthorities[addedIndex] = new PacketAuthorityObservation
+        {
+            ControllerId = packet.ControllerId,
+            BattleHostEpoch = packet.BattleHostEpoch,
+        };
+        return addedIndex;
     }
 
     public static void StartPerformance()
     {
-        performanceEnabled = false;
-        for (int index = 0; index < 2; index++)
+        lock (ActionTrafficLock)
         {
-            Interlocked.Exchange(ref PollTicks[index], 0);
-            Interlocked.Exchange(ref PollCalls[index], 0);
-            Interlocked.Exchange(ref PollVisits[index], 0);
-            Interlocked.Exchange(ref PollActiveVisits[index], 0);
-            Interlocked.Exchange(ref PollPlayerVisits[index], 0);
-            Interlocked.Exchange(ref PollUpdates[index], 0);
+            performanceEnabled = false;
+            for (int index = 0; index < 2; index++)
+            {
+                Interlocked.Exchange(ref PollTicks[index], 0);
+                Interlocked.Exchange(ref PollCalls[index], 0);
+                Interlocked.Exchange(ref PollVisits[index], 0);
+                Interlocked.Exchange(ref PollActiveVisits[index], 0);
+                Interlocked.Exchange(ref PollPlayerVisits[index], 0);
+                Interlocked.Exchange(ref PollUpdates[index], 0);
+            }
+            sentPackets = 0;
+            sentUpdates = 0;
+            sentBytes = 0;
+            receivedPackets = 0;
+            receivedUpdates = 0;
+            receivedBytes = 0;
+            Array.Clear(PacketAuthorities, 0, PacketAuthorities.Length);
+            packetAuthorityCount = 0;
+            nextPacketAuthority = 0;
+            evictedPacketAuthorities = 0;
+            performanceStartedAt = Stopwatch.GetTimestamp();
+            performanceEnabled = true;
         }
-        Interlocked.Exchange(ref sentPackets, 0);
-        Interlocked.Exchange(ref sentUpdates, 0);
-        Interlocked.Exchange(ref sentBytes, 0);
-        Interlocked.Exchange(ref receivedPackets, 0);
-        Interlocked.Exchange(ref receivedUpdates, 0);
-        Interlocked.Exchange(ref receivedBytes, 0);
-        performanceStartedAt = Stopwatch.GetTimestamp();
-        performanceEnabled = true;
     }
 
     public static string SnapshotPerformance(bool stop)
     {
-        if (stop) performanceEnabled = false;
+        object actionTraffic;
+        bool enabled;
+        long startedAt;
+        lock (ActionTrafficLock)
+        {
+            if (stop) performanceEnabled = false;
+            enabled = performanceEnabled;
+            startedAt = performanceStartedAt;
+            actionTraffic = GetActionTrafficSnapshot();
+        }
 
         long preVisits = Interlocked.Read(ref PollVisits[PreNative]);
         long oldEquivalentVisits =
@@ -278,9 +360,8 @@ internal static class MissionActionDiagnostics
         long now = Stopwatch.GetTimestamp();
         return JsonConvert.SerializeObject(new
         {
-            enabled = performanceEnabled,
-            wallMilliseconds = ToMilliseconds(
-                now - performanceStartedAt),
+            enabled,
+            wallMilliseconds = ToMilliseconds(now - startedAt),
             preNative = GetPollSnapshot(PreNative),
             postNative = GetPollSnapshot(PostNative),
             scanComparison = new
@@ -292,16 +373,41 @@ internal static class MissionActionDiagnostics
                     ? 0d
                     : 100d * avoidedVisits / oldEquivalentVisits,
             },
-            actionTraffic = new
-            {
-                sentPackets = Interlocked.Read(ref sentPackets),
-                sentUpdates = Interlocked.Read(ref sentUpdates),
-                sentSerializedBytes = Interlocked.Read(ref sentBytes),
-                receivedPackets = Interlocked.Read(ref receivedPackets),
-                receivedUpdates = Interlocked.Read(ref receivedUpdates),
-                receivedSerializedBytes = Interlocked.Read(ref receivedBytes),
-            },
+            actionTraffic,
         });
+    }
+
+    private static object GetActionTrafficSnapshot()
+    {
+        int firstIndex = packetAuthorityCount == MaximumPacketAuthorities
+            ? nextPacketAuthority
+            : 0;
+        var observations = Enumerable.Range(0, packetAuthorityCount)
+            .Select(offset => PacketAuthorities[
+                (firstIndex + offset) % MaximumPacketAuthorities])
+            .Select(observation => new
+            {
+                controllerId = observation.ControllerId,
+                battleHostEpoch = observation.BattleHostEpoch,
+                sentPackets = observation.SentPackets,
+                sentUpdates = observation.SentUpdates,
+                sentSerializedBytes = observation.SentBytes,
+                receivedPackets = observation.ReceivedPackets,
+                receivedUpdates = observation.ReceivedUpdates,
+                receivedSerializedBytes = observation.ReceivedBytes,
+            }).ToArray();
+        return new
+        {
+            sentPackets,
+            sentUpdates,
+            sentSerializedBytes = sentBytes,
+            receivedPackets,
+            receivedUpdates,
+            receivedSerializedBytes = receivedBytes,
+            authorityObservationCapacity = MaximumPacketAuthorities,
+            evictedAuthorityObservations = evictedPacketAuthorities,
+            authorityObservations = observations,
+        };
     }
 
     private static object GetPollSnapshot(int index)
