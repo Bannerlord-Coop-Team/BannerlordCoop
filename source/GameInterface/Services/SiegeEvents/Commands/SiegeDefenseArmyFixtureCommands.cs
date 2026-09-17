@@ -682,7 +682,7 @@ internal static class SiegeDefenseArmyFixtureCommands
                 var original = expected["capturedParties"].Single(p => p.Value<string>("partyId") == record.Value<string>("partyId"));
                 if (!IsDetachedRecord(record) || record.Value<bool?>("armyActive") != false
                     || record.Value<bool?>("attachedToActive") != false || record["attachedPartyIds"]?.Count() != 0
-                    || !JToken.DeepEquals(record["behavior"], original["behavior"]))
+                    || !MatchesRoundTrippedJson(record["behavior"], original["behavior"]))
                 {
                     error = $"Party {record.Value<string>("partyId")} did not restore its captured movement or clean state";
                     return false;

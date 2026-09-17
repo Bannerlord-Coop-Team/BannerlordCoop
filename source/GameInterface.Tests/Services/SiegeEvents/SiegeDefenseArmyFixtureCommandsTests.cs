@@ -49,6 +49,32 @@ public class SiegeDefenseArmyFixtureCommandsTests
         Assert.True(SiegeDefenseArmyFixtureCommands.MatchesCapture(captured, supplied, out error), error);
     }
 
+    [Fact]
+    public void RestoredState_AcceptsRoundTrippedFloatBehaviorProof()
+    {
+        var captured = Expected();
+        var behavior = (JObject)captured["capturedParties"].Single(p => p.Value<string>("partyId") == "player")["behavior"];
+        behavior["partyPosition"] = new JObject
+        {
+            ["X"] = 657.95f,
+            ["Y"] = 279.08f,
+            ["IsOnLand"] = true,
+        };
+        var observed = Observed("restored");
+        behavior = (JObject)Party(observed, "player")["behavior"];
+        behavior["partyPosition"] = new JObject
+        {
+            ["X"] = 657.95f,
+            ["Y"] = 279.08f,
+            ["IsOnLand"] = true,
+        };
+        var json = new JObject { ["expectation"] = captured }.ToString(Formatting.None);
+
+        Assert.True(SiegeDefenseArmyFixtureCommands.TryReadExpectation(json, "controller", "town_ES1", false,
+            out var supplied, out var error), error);
+        Assert.True(SiegeDefenseArmyFixtureCommands.EvaluateState(supplied, observed, "restored", out error), error);
+    }
+
     [Theory]
     [InlineData("baseline")]
     [InlineData("joined")]
