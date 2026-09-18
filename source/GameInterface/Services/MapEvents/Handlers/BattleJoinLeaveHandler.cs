@@ -339,7 +339,7 @@ internal class BattleJoinLeaveHandler : IHandler
         if (!objectManager.TryGetIdWithLogging(payload.What.LeavingParty, out var partyId)) return;
 
         if (ModInformation.IsServer)
-            RemovePartyFromBattleAndBroadcast(partyId, payload.What.FinishLocalMenus);
+            RemovePartyFromBattleAndBroadcast(partyId, payload.What.FinishLocalMenus, payload.Who as NetPeer);
         else
             network.SendAll(new NetworkRequestLeaveBattle(partyId, payload.What.FinishLocalMenus));
     }

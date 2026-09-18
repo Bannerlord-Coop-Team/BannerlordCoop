@@ -36,6 +36,24 @@ public sealed class DebugToolsCompatibilityTests
                     Assert.False(string.IsNullOrWhiteSpace(actual["description"].GetValue<string>()));
                     actual["description"] = original["description"].DeepClone();
                 }
+                if (name == "wait_for_state")
+                {
+                    Assert.Contains("Client readyForCampaignTests waits also try closing", actual["description"].GetValue<string>());
+                    Assert.Contains("never replayed after uncertainty", actual["description"].GetValue<string>());
+                    Assert.NotEqual(true, tools.Single(t => t.Name == name).ProtocolTool.Annotations?.ReadOnlyHint);
+                    Assert.Null(actual["annotations"]);
+                    actual["description"] = original["description"].DeepClone();
+                    actual["annotations"] = original["annotations"].DeepClone();
+                }
+                if (name is "start_run" or "get_run" or "start_client" or "stop_run")
+                {
+                    var runSchema = name == "start_client" ? actual["outputSchema"]["properties"]["run"] : actual["outputSchema"];
+                    var instance = runSchema["properties"]["instances"]["items"];
+                    var response = baseline.Single(t => t["name"].GetValue<string>() == "ui_action")["outputSchema"];
+                    AssertStartupPopupSchema(instance["properties"]["startupPopup"], response);
+                    Assert.DoesNotContain(instance["required"].AsArray(), field => field.GetValue<string>() == "startupPopup");
+                    Assert.True(instance["properties"].AsObject().Remove("startupPopup"));
+                }
                 if (name == "ui_inspect")
                 {
                     var properties = actual["inputSchema"]["properties"].AsObject();
@@ -64,5 +82,27 @@ public sealed class DebugToolsCompatibilityTests
             Assert.Empty(Directory.GetDirectories(directory));
         }
         finally { Directory.Delete(directory, true); }
+    }
+
+    private static void AssertStartupPopupSchema(JsonNode actual, JsonNode response)
+    {
+        var action = response.DeepClone();
+        action["type"] = new JsonArray("object", "null");
+        action["default"] = null;
+        var error = response["properties"]["error"].DeepClone();
+        error["default"] = null;
+        var expected = new JsonObject
+        {
+            ["type"] = "object",
+            ["properties"] = new JsonObject
+            {
+                ["outcome"] = new JsonObject { ["type"] = new JsonArray("string", "null") },
+                ["action"] = action,
+                ["error"] = error,
+            },
+            ["required"] = new JsonArray("outcome"),
+            ["default"] = null,
+        };
+        Assert.True(JsonNode.DeepEquals(expected, actual), "Unexpected startupPopup schema.");
     }
 }

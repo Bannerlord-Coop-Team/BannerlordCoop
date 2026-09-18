@@ -133,17 +133,6 @@ public class ServerSettlementExitEnterHandler : IHandler
                 return;
             }
 
-            if (IsHideoutOccupiedByAnotherPlayer(mobileParty, settlement))
-            {
-                Logger.Warning(
-                    "Rejecting hideout entry for party {PartyId} because hideout {SettlementId} already contains another player party",
-                    payload.PartyId,
-                    payload.SettlementId);
-                network.Send(peer, new NetworkSettlementEncounterRejected(payload));
-
-                return;
-            }
-
             network.Send(peer, new NetworkStartSettlementEncounter(payload));
 
             // Vanilla starts under-siege and under-raid encounters outside the settlement.
@@ -155,20 +144,6 @@ public class ServerSettlementExitEnterHandler : IHandler
 
             settlementInterface.PartyEnterSettlement(mobileParty, settlement);
         }, context: nameof(NetworkRequestStartSettlementEncounter));
-    }
-
-    private bool IsHideoutOccupiedByAnotherPlayer(MobileParty enteringParty, Settlement settlement)
-    {
-        if (!settlement.IsHideout) return false;
-
-        foreach (var player in playerManager.Players)
-        {
-            if (!objectManager.TryGetObject<MobileParty>(player.MobilePartyId, out var playerParty)) continue;
-            if (ReferenceEquals(playerParty, enteringParty)) continue;
-            if (ReferenceEquals(playerParty.CurrentSettlement, settlement)) return true;
-        }
-        
-        return false;
     }
 
     private void RejectSettlementEncounter(
@@ -243,10 +218,18 @@ public class ServerSettlementExitEnterHandler : IHandler
         var mapEvent = party?.MapEvent;
         if (mapEvent?.EventType != MapEvent.BattleTypes.Hideout) return;
 
-        if (party.MapEventSide?.LeaderParty == party)
-            messageBroker.Publish(this, new MapEventFinalizeAttempted(mapEvent));
-        else
-            messageBroker.Publish(this, new PlayerLeaveBattleAttempted(party));
+        foreach (var player in playerManager.Players)
+        {
+            if (playerManager.IsConnected(player) &&
+                objectManager.TryGetObject<MobileParty>(player.MobilePartyId, out var participant) &&
+                participant != mobileParty && participant.Party.MapEventSide == party.MapEventSide)
+            {
+                messageBroker.Publish(this, new PlayerLeaveBattleAttempted(party));
+                return;
+            }
+        }
+
+        messageBroker.Publish(this, new MapEventFinalizeAttempted(mapEvent));
     }
 
     private bool DoesPeerControlParty(NetPeer peer, string partyId)
