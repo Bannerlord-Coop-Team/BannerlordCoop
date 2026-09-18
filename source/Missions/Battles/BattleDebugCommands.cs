@@ -142,13 +142,18 @@ internal static class BattleDebugCommands
                     candidate.GameEntity.IsVisibleIncludeParents() && candidate.StandingPoints.Count > 0)
                 .OrderBy(candidate => candidate.Id.Id).FirstOrDefault();
             if (machine == null) return Failed("The required machine type is absent from this siege scene.");
+            var agent = mission.MainAgent;
+            var point = machine.StandingPoints.FirstOrDefault(candidate =>
+                agent != null && !candidate.IsDeactivated && !candidate.IsDisabledForPlayers &&
+                !candidate.IsDisabledForAgent(agent) && (!candidate.HasUser || candidate.HasAIUser) &&
+                (machine is RangedSiegeWeapon ranged ? ReferenceEquals(candidate, ranged.PilotStandingPoint) :
+                    !(machine is StonePile stones) || stones.AmmoPickUpPoints.Contains(candidate)));
+            if (point == null) return Failed("The current machine has no active vacant player standing point.");
             return Succeeded("LIVE_TEST_JSON=" + JsonConvert.SerializeObject(new
             {
                 success = true, id = machine.Id.Id, type = machine.GetType().Name,
-                standingPointIndex = machine.StandingPoints.ToList().IndexOf(
-                    machine is RangedSiegeWeapon ranged ? ranged.PilotStandingPoint :
-                    machine is StonePile stones ? stones.AmmoPickUpPoints.FirstOrDefault() :
-                    machine.StandingPoints[0]),
+                standingPointIndex = machine.StandingPoints.ToList().IndexOf(point),
+                standingPointId = point.Id.Id,
                 standingPointCount = machine.StandingPoints.Count
             }));
         }
@@ -189,7 +194,8 @@ internal static class BattleDebugCommands
                 return Failed("Expected controller_id, unique request_id, machine_id, action and optional standing_point.");
             int standingPoint = 0;
             if ((args[3] != "capture" && args[3] != "dismount" && args[3] != "stage" && args[3] != "approach" && args[3] != "aim" && args[3] != "watch" && args[3] != "arm-use" && args[3] != "arm-stop" && args[3] != "use" &&
-                 args[3] != "fire" && args[3] != "attack" && args[3] != "stop" && args[3] != "restore") ||
+                 args[3] != "fire" && args[3] != "attack" && args[3] != "stop" && args[3] != "restore" &&
+                 args[3] != "handler-use" && args[3] != "handler-stop" && args[3] != "handler-fire" && args[3] != "handler-reload") ||
                 (args.Count == 5 && !int.TryParse(args[4], out standingPoint)))
                 return Failed("Invalid action or standing point.");
             if (!players.TryGetPlayer(args[0], out var player) ||

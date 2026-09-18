@@ -74,6 +74,7 @@ internal sealed class SiegeInteractionDebugBehavior : MissionBehavior, ISiegeInt
     private object nativeAimTarget;
     private Guid? watchedAgentId;
     private object observerFrame;
+    private object functionalAction;
     private EquipmentIndex previousMainHand;
     private ItemObject previousMainHandItem;
     private bool fixtureRestored;
@@ -515,6 +516,11 @@ internal sealed class SiegeInteractionDebugBehavior : MissionBehavior, ISiegeInt
             Restore(screen, agent);
             return;
         }
+        if (request.Action == "handler-use" || request.Action == "handler-stop" || request.Action == "handler-fire" || request.Action == "handler-reload")
+        {
+            ApplyFunctionalAction(request, screen, agent);
+            return;
+        }
         bool externalInput = request.Action == "arm-use" || request.Action == "arm-stop";
         string action = externalInput ? request.Action.Substring(4) : request.Action;
         externalInput |= action == "fire" || action == "attack";
@@ -586,6 +592,67 @@ internal sealed class SiegeInteractionDebugBehavior : MissionBehavior, ISiegeInt
         pressInvoked = !externalInput;
         status = externalInput ? "external_input_armed" : "press_invoked_outcome_pending";
         if (!externalInput) Input.PressKey(key.KeyboardKey.InputKey);
+    }
+
+    private void ApplyFunctionalAction(NetworkSiegeInteractionDebugRequest request, MissionScreen screen, Agent agent)
+    {
+        functionalAction = null;
+        status = "fixture_handler_rejected";
+        if (capturedAgent != agent || agent == null || !agent.IsActive() || capturedScreen != screen ||
+            agent.Mission != Mission || pressInvoked || externalInputArmed) return;
+        var machine = Mission.MissionObjects.OfType<UsableMachine>()
+            .FirstOrDefault(candidate => candidate.Id.Id == request.MachineId);
+        if (machine == null) return;
+        var usedPoint = agent.CurrentlyUsedGameObject as StandingPoint;
+        bool usingTarget = agent.IsUsingGameObject && usedPoint != null &&
+            machine.StandingPoints.Contains(usedPoint) && ReferenceEquals(usedPoint.UserAgent, agent);
+        StandingPoint point;
+        if (request.Action == "handler-use")
+        {
+            point = interaction?._currentInteractableObject as StandingPoint;
+            if (point == null || request.StandingPointIndex < 0 || request.StandingPointIndex >= machine.StandingPoints.Count ||
+                !ReferenceEquals(point, machine.StandingPoints[request.StandingPointIndex]) ||
+                !ReferenceEquals(interaction.CurrentFocusedMachine, machine) ||
+                !Mission.IsMainAgentItemInteractionEnabled || screen.IsRadialMenuActive || Mission.IsOrderMenuOpen ||
+                machine.IsDeactivated || machine.IsDisabled || point.IsDeactivated || point.IsDisabledForPlayers ||
+                point.IsDisabledForAgent(agent) || agent.IsUsingGameObject || !agent.IsAbleToUseMachine() ||
+                !agent.ObjectHasVacantPosition(point)) return;
+            float distance = point.GetUserFrameForAgent(agent).Origin.AsVec2.DistanceSquared(agent.Position.AsVec2);
+            if (!agent.CanReachAndUseObject(point, distance)) return;
+        }
+        else
+        {
+            if (!usingTarget) return;
+            point = usedPoint;
+            if ((request.Action == "handler-fire" || request.Action == "handler-reload") && (!(machine is RangedSiegeWeapon weapon) ||
+                !ReferenceEquals(weapon.PilotAgent, agent) || !ReferenceEquals(weapon.PilotStandingPoint, point) ||
+                (request.Action == "handler-fire" ? weapon.State != RangedSiegeWeapon.WeaponState.Idle :
+                    weapon.State != RangedSiegeWeapon.WeaponState.WaitingAfterShooting || !weapon.AttackClickWillReload) ||
+                GameNetwork.IsClientOrReplay || agent.IsInBeingStruckAction ||
+                machine.IsDeactivated || machine.IsDisabled || !machine.GameEntity.IsVisibleIncludeParents())) return;
+        }
+        observedMachineId = machine.Id.Id;
+        lock (useDispatchSamples)
+        {
+            useDispatchPoint = point;
+            useDispatchRequestId = requestId;
+            useDispatchThreadId = System.Threading.Thread.CurrentThread.ManagedThreadId;
+            useDispatchMachineId = machine.Id.Id;
+            useDispatchCalls = useDispatchPressedCalls = useDispatchDropped = 0;
+            useDispatchSamples.Clear();
+        }
+        bool usingBefore = agent.IsUsingGameObject;
+        // Call the installed vanilla action, without synthesizing its input or outcome.
+        if (request.Action == "handler-use") agent.HandleStartUsingAction(point, -1);
+        else if (request.Action == "handler-stop") agent.HandleStopUsingAction();
+        else if (request.Action == "handler-reload") ((RangedSiegeWeapon)machine).ManualReload();
+        else if (!((RangedSiegeWeapon)machine).Shoot()) return;
+        functionalAction = new
+        {
+            requestId, action = request.Action, machineId = machine.Id.Id, pointId = point.Id.Id,
+            tick, usingBefore, usingAfter = agent.IsUsingGameObject, usedObject = Describe(agent.CurrentlyUsedGameObject)
+        };
+        status = "fixture_handler_invoked";
     }
 
     private void Dismount(Agent agent)
@@ -944,7 +1011,7 @@ internal sealed class SiegeInteractionDebugBehavior : MissionBehavior, ISiegeInt
             requestId, status, pressInvoked, externalInputArmed, inputVirtualKey, edgeObserved, edgeCleared, inputGameKeyId, tick,
             fixtureActive = capturedAgent != null,
             fixtureRestored, captureFailureReason,
-            nativeCameraStaged, nativeAimTarget, observerFrame,
+            nativeCameraStaged, nativeAimTarget, observerFrame, functionalAction,
             stagingCameraActive = stagingCamera != null && ReferenceEquals(screen?.CustomCamera, stagingCamera),
             focusDiagnostic = ReadFocusDiagnostic(screen, agent),
             inputSamples = inputSamples.ToArray(),
@@ -968,6 +1035,7 @@ internal sealed class SiegeInteractionDebugBehavior : MissionBehavior, ISiegeInt
                 ladderState = machine is SiegeLadder ladder ? (int?)ladder.State : null,
                 rangedState = machine is RangedSiegeWeapon weapon ? (int?)weapon.State : null,
                 rangedStateName = (machine as RangedSiegeWeapon)?.State.ToString(),
+                manualReloadRequired = (machine as RangedSiegeWeapon)?.AttackClickWillReload,
                 standingPoints = machine.StandingPoints.Select((point, index) =>
                 {
                     try

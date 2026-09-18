@@ -8,6 +8,7 @@ using System.Collections.Generic;
 using System.Linq;
 using Missions.Battles;
 using Missions;
+using Missions.Messages;
 using Moq;
 using HarmonyLib;
 using Xunit;
@@ -21,6 +22,24 @@ namespace Coop.Tests.Missions.Battles;
 [Collection("Mission.Current")]
 public class SiegeInteractionDebugBehaviorTests
 {
+    [Theory]
+    [InlineData("handler-use")]
+    [InlineData("handler-stop")]
+    [InlineData("handler-fire")]
+    [InlineData("handler-reload")]
+    public void FunctionalAction_WithoutCapturedActorRejectsWithoutArmingInput(string action)
+    {
+        var behavior = new SiegeInteractionDebugBehavior(Mock.Of<IMessageBroker>());
+        var request = new NetworkSiegeInteractionDebugRequest("session", "testclient", "once", 337, action, 0);
+        AccessTools.Method(typeof(SiegeInteractionDebugBehavior), "ApplyFunctionalAction")
+            .Invoke(behavior, new object[] { request, null, null });
+        Assert.Equal("fixture_handler_rejected", AccessTools.Field(typeof(SiegeInteractionDebugBehavior), "status").GetValue(behavior));
+        Assert.Null(AccessTools.Field(typeof(SiegeInteractionDebugBehavior), "functionalAction").GetValue(behavior));
+        foreach (string flag in new[] { "pressInvoked", "externalInputArmed", "edgeObserved", "edgeCleared" })
+            Assert.False((bool)AccessTools.Field(typeof(SiegeInteractionDebugBehavior), flag).GetValue(behavior));
+        Assert.Empty(JObject.FromObject(behavior.ReadUseDispatch())["samples"]);
+    }
+
     [Fact]
     public void UseDispatchHooks_InstallOnImplementedTargetsAndPreserveResultsAndExceptions()
     {
@@ -121,7 +140,7 @@ public class SiegeInteractionDebugBehaviorTests
         Assert.InRange(callers.Length, 1, 8);
         Assert.All(callers, caller => Assert.InRange(caller.Length, 1, 256));
         Assert.Contains(callers, caller => caller.Contains(nameof(UseDispatchObservation_OffThreadStopRetainsArgumentsAndCallerWithoutNativeReads)));
-        Assert.InRange(samples[0]["recordedUtc"].Value<DateTime>(), before, DateTime.UtcNow);
+        Assert.InRange(samples[0]["recordedUtc"].Value<DateTime>().ToUniversalTime(), before, DateTime.UtcNow);
         Assert.Equal(typeof(InvalidOperationException).FullName, samples[1]["exception"].Value<string>());
         Assert.Equal(JTokenType.Null, samples[1]["stop"].Type);
         Assert.Null(samples[0]["usingObject"]);
@@ -210,7 +229,7 @@ public class SiegeInteractionDebugBehaviorTests
             Assert.Equal("testclient2", result["currentAuthority"].Value<string>());
             Assert.Equal(new[] { 0, 1 }, result["actions"].Select(action => action["channel"].Value<int>()));
             Assert.Equal(new[] { 101, 202 }, result["actions"].Select(action => action["index"].Value<int>()));
-            Assert.InRange(result["recordedUtc"].Value<DateTime>(), before, DateTime.UtcNow);
+            Assert.InRange(result["recordedUtc"].Value<DateTime>().ToUniversalTime(), before, DateTime.UtcNow);
             Assert.False(result["usingObject"].Value<bool>());
             Assert.Null(agent.CurrentlyUsedGameObject);
             Assert.Same(mission.Instance, agent.Mission);
@@ -442,7 +461,7 @@ public class SiegeInteractionDebugBehaviorTests
         Assert.True(samples[1]["nativeInput"]["rawReleased"].Value<bool>());
         Assert.False(samples[0]["nativeInput"]["isKeysAllowed"].Value<bool>());
         Assert.Equal(13, samples[0]["nativeInput"]["registeredGameKeyId"].Value<int>());
-        Assert.InRange(samples[0]["recordedUtc"].Value<DateTime>(), before, DateTime.UtcNow);
+        Assert.InRange(samples[0]["recordedUtc"].Value<DateTime>().ToUniversalTime(), before, DateTime.UtcNow);
         Assert.False((bool)AccessTools.Field(typeof(SiegeInteractionDebugBehavior), "edgeObserved").GetValue(behavior));
         Assert.False((bool)AccessTools.Field(typeof(SiegeInteractionDebugBehavior), "edgeCleared").GetValue(behavior));
     }
