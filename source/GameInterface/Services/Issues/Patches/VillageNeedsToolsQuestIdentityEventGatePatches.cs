@@ -30,7 +30,7 @@ internal class VillageNeedsToolsQuestWarDeclaredGatePatch
             }
             else
             {
-                DisconnectedOwnerEvaluationSupport.TryEvaluateOnBehalfOfDisconnectedOwner(
+                AbsentOwnerEvaluationSupport.TryEvaluateOnBehalfOfAbsentOwner(
                     __instance.QuestGiver, controllerId => Evaluate(__instance, faction1, faction2, detail, controllerId));
             }
 
@@ -70,7 +70,7 @@ internal class VillageNeedsToolsQuestClanChangedKingdomGatePatch
             }
             else
             {
-                DisconnectedOwnerEvaluationSupport.TryEvaluateOnBehalfOfDisconnectedOwner(
+                AbsentOwnerEvaluationSupport.TryEvaluateOnBehalfOfAbsentOwner(
                     __instance.QuestGiver, controllerId => Evaluate(__instance, controllerId));
             }
 
@@ -102,7 +102,7 @@ internal class VillageNeedsToolsQuestMapEventStartedGatePatch
             }
             else
             {
-                DisconnectedOwnerEvaluationSupport.TryEvaluateOnBehalfOfDisconnectedOwner(
+                AbsentOwnerEvaluationSupport.TryEvaluateOnBehalfOfAbsentOwner(
                     __instance.QuestGiver, controllerId => Evaluate(__instance, mapEvent, attackerParty, controllerId));
             }
 

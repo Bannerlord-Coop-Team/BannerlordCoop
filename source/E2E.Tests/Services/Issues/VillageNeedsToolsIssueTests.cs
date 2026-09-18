@@ -871,6 +871,7 @@ public class VillageNeedsToolsIssueTests : IDisposable
         CreateIssueOnServer(fixture);
         var ownerHeroId = CreateDistinctOwnerHero(fixture);
         AcceptQuestFromClient(fixture, "player-A", ownerHeroId);
+        Server.Resolve<IPlayerManager>().MarkCampaignReady("player-A");
 
         Client.Call(() =>
         {
@@ -1000,6 +1001,7 @@ public class VillageNeedsToolsIssueTests : IDisposable
         CreateIssueOnServer(fixture);
         var ownerHeroId = CreateDistinctOwnerHero(fixture);
         AcceptQuestFromClient(fixture, "player-A", ownerHeroId);
+        Server.Resolve<IPlayerManager>().MarkCampaignReady("player-A");
 
         Client.Call(() =>
         {
@@ -1570,6 +1572,44 @@ public class VillageNeedsToolsIssueTests : IDisposable
             Assert.True(Server.ObjectManager.TryGetObject<Hero>(ownerHeroId, out var ownerHero));
             Assert.True(Server.Resolve<IPlayerManager>().TryGetPlayer("player-A", out var player));
             Assert.False(Server.Resolve<IPlayerManager>().IsConnected(player));
+
+            CampaignEventDispatcher.Instance.OnWarDeclared(
+                giver.MapFaction, ownerHero.MapFaction, DeclareWarAction.DeclareWarDetail.CausedByPlayerHostility);
+        });
+
+        var removed = Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkIssueRemoved>());
+        Assert.Equal(fixture.HeroId, removed.OwnerId);
+        Assert.Equal(IssueFinalizeReason.QuestFail, removed.Reason);
+
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject<Hero>(fixture.HeroId, out var giver));
+            Assert.Null(giver.Issue);
+            Assert.False(Campaign.Current.IssueManager.Issues.ContainsKey(giver));
+        });
+    }
+
+    [Fact]
+    public void OnWarDeclared_PlayerCausedWar_WhileTheOwnerHasReconnectedButIsNotYetCampaignReady_TheServerStillFinalizesAgainstTheRecordedOwnersRealFaction()
+    {
+        var fixture = SetupVillageOwner();
+        CreateIssueOnServer(fixture);
+        var ownerHeroId = CreateDistinctOwnerHero(fixture);
+        AcceptQuestFromClient(fixture, "player-A", ownerHeroId);
+        Server.Resolve<IPlayerManager>().MarkCampaignReady("player-A");
+
+        DeclareWarBetweenGiverAndOwner(Server, fixture, ownerHeroId);
+
+        Server.Resolve<IPlayerManager>().ClearPeer(Client.NetPeer);
+        Server.Resolve<IPlayerManager>().SetPeer("player-A", Client.NetPeer);
+
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject<Hero>(fixture.HeroId, out var giver));
+            Assert.True(Server.ObjectManager.TryGetObject<Hero>(ownerHeroId, out var ownerHero));
+            Assert.True(Server.Resolve<IPlayerManager>().TryGetPlayer("player-A", out var player));
+            Assert.True(Server.Resolve<IPlayerManager>().IsConnected(player));
+            Assert.False(Server.Resolve<IPlayerManager>().IsCampaignReady(player));
 
             CampaignEventDispatcher.Instance.OnWarDeclared(
                 giver.MapFaction, ownerHero.MapFaction, DeclareWarAction.DeclareWarDetail.CausedByPlayerHostility);
