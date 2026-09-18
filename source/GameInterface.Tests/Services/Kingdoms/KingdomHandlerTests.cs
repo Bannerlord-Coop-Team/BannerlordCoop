@@ -116,7 +116,7 @@ public class KingdomHandlerTests
     }
 
     [Fact]
-    public void CanCahngeKingdomName_RulingClanWithName_ReturnsTrue()
+    public void CanChangeKingdomName_RulingClanWithName_ReturnsTrue()
     {
         var clan = ObjectHelper.SkipConstructor<Clan>();
         var kingdom = ObjectHelper.SkipConstructor<Kingdom>();

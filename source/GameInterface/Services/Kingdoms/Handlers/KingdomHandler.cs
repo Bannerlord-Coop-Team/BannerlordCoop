@@ -597,7 +597,6 @@ public class KingdomHandler : IHandler
 
     private void HandleNetworkGiftSettlementOwnership(MessagePayload<NetworkGiftSettlementOwnership> obj)
     {
-
         if (obj.Who is not NetPeer peer || !playerManager.TryGetPlayer(peer, out var player))
         {
             Logger.Warning("Ignoring GiftSettlementOwnership {Instance}: sender has no registered player",
