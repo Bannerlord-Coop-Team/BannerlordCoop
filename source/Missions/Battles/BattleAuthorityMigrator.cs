@@ -36,6 +36,7 @@ public interface IBattleAuthorityMigrator : IDisposable
     /// </summary>
     void ApplyLateSpawnedPuppet(Agent agent, Guid agentId, Agent mount, Guid mountAgentId);
     bool TrySurrenderPlayerHero(string controllerId, BattleAgentSpawnData data);
+    bool TrySurrenderPlayerHero(BattleAgentSpawnData data);
     void ReplayPlayerHandoff(string controllerId);
     void TickPlayerHandoffs(float dt);
     bool IsCurrentPlayerHandoff(NetworkRetainedPlayerHero handoff);
@@ -118,6 +119,15 @@ public class BattleAuthorityMigrator : IBattleAuthorityMigrator
         withdrawnHosts.Remove(payload.What.ControllerId);
     }
 
+    public bool TrySurrenderPlayerHero(BattleAgentSpawnData data)
+    {
+        if (data == null) return false;
+        foreach (var player in playerManager.Players)
+            if (player.CharacterObjectId == data.CharacterId)
+                return TrySurrenderPlayerHero(player.ControllerId, data);
+        return false;
+    }
+
     // Suspend the holder locally; only the server grant may advance the shared authority revision.
     public bool TrySurrenderPlayerHero(string controllerId, BattleAgentSpawnData data)
     {
@@ -195,7 +205,7 @@ public class BattleAuthorityMigrator : IBattleAuthorityMigrator
             || new HashSet<string>(missionContext.ControllersInMission).Contains(handoff.ReturningControllerId);
         if (!returningPlayerPresent || !playerManager.TryGetPlayer(handoff.ReturningControllerId, out var player)
             || player.CharacterObjectId != handoff.Previous.CharacterId
-            || handoff.Previous.OriginalOwnerControllerId != handoff.ReturningControllerId
+            || string.IsNullOrEmpty(handoff.Previous.OriginalOwnerControllerId)
             || !(handoff.Previous.Health > 0) || float.IsInfinity(handoff.Previous.Health)
             || handoff.Previous.IsRunningAway) return false;
         if (!TryGetPlayerParty(handoff.ReturningControllerId, out var party, out var hero)

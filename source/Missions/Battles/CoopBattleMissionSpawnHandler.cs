@@ -14,7 +14,6 @@ using TaleWorlds.MountAndBlade;
 
 namespace Missions.Battles;
 
-
 /// <summary>
 /// Coop replacement for <see cref="SandBoxBattleMissionSpawnHandler"/>: sizes each side to what THIS client's
 /// supplier owns (its party, plus the AI/enemy side for the host), not the full side the native handler waits on
@@ -151,7 +150,6 @@ public class CoopBattleMissionSpawnHandler : SandBoxMissionSpawnHandler
         _messageBroker.Publish(this, new SendInformationMessage(InvalidPlayerReserveMessage));
         base.Mission.EndMission();
     }
-
 
     private bool HasLocalPlayerOrigin()
     {

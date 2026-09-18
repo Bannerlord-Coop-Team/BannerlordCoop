@@ -21,6 +21,8 @@ namespace Missions.Agents.Packets
             MainHandIndex = (int)mainHandIndex;
             OffHandIndex = (int)offHandIndex;
             MainHandUsageIndex = mainHandUsageIndex;
+            MainHandItemId = GetItemId(agent?.Equipment, mainHandIndex);
+            OffHandItemId = GetItemId(agent?.Equipment, offHandIndex);
         }
 
         internal static bool TryCapture(Agent agent, out AgentEquipmentData data)
@@ -32,7 +34,10 @@ namespace Missions.Agents.Packets
                 return false;
             }
 
-            data = new AgentEquipmentData(mainHandIndex, offHandIndex, mainHandUsageIndex);
+            data = new AgentEquipmentData(
+                mainHandIndex, offHandIndex, mainHandUsageIndex,
+                GetItemId(agent.Equipment, mainHandIndex),
+                GetItemId(agent.Equipment, offHandIndex));
             return true;
         }
 
@@ -57,11 +62,57 @@ namespace Missions.Agents.Packets
         internal AgentEquipmentData(
             EquipmentIndex mainHandIndex,
             EquipmentIndex offHandIndex,
-            int mainHandUsageIndex)
+            int mainHandUsageIndex,
+            string mainHandItemId = null,
+            string offHandItemId = null)
         {
             MainHandIndex = (int)mainHandIndex;
             OffHandIndex = (int)offHandIndex;
             MainHandUsageIndex = mainHandUsageIndex;
+            MainHandItemId = mainHandItemId;
+            OffHandItemId = offHandItemId;
+        }
+
+        internal bool TryApplyForAction(Agent agent)
+        {
+            if (agent?.IsHuman != true || !HasSafeWeaponSlots(agent.Equipment)) return false;
+            var mainHand = (EquipmentIndex)MainHandIndex;
+            var offHand = (EquipmentIndex)OffHandIndex;
+            if (!CanWield(agent, mainHand) || !CanWield(agent, offHand)
+                || MainHandUsageIndex != GetSafeUsageIndex(agent.Equipment, mainHand, MainHandUsageIndex)
+                || !MatchesItem(agent.Equipment, mainHand, MainHandItemId)
+                || !MatchesItem(agent.Equipment, offHand, OffHandItemId))
+            {
+                return false;
+            }
+
+            Apply(agent);
+            return Matches(agent);
+        }
+
+        internal bool Matches(Agent agent)
+        {
+            return TryCapture(agent, out AgentEquipmentData current)
+                && MainHandIndex == current.MainHandIndex
+                && OffHandIndex == current.OffHandIndex
+                && MainHandUsageIndex == current.MainHandUsageIndex
+                && (MainHandItemId == null || MainHandItemId == current.MainHandItemId)
+                && (OffHandItemId == null || OffHandItemId == current.OffHandItemId);
+        }
+
+        private static bool MatchesItem(MissionEquipment equipment, EquipmentIndex index, string itemId)
+        {
+            return itemId == null || itemId == GetItemId(equipment, index);
+        }
+
+        private static string GetItemId(MissionEquipment equipment, EquipmentIndex index)
+        {
+            if (index < EquipmentIndex.WeaponItemBeginSlot || index >= EquipmentIndex.NumAllWeaponSlots
+                || equipment?._weaponSlots == null || equipment._weaponSlots.Length <= (int)index)
+            {
+                return string.Empty;
+            }
+            return equipment[index].Item?.StringId ?? string.Empty;
         }
 
         public void Apply(Agent agent)
@@ -169,7 +220,9 @@ namespace Missions.Agents.Packets
         {
             return MainHandIndex == other.MainHandIndex &&
                    OffHandIndex == other.OffHandIndex &&
-                   MainHandUsageIndex == other.MainHandUsageIndex;
+                   MainHandUsageIndex == other.MainHandUsageIndex
+                   && MainHandItemId == other.MainHandItemId
+                   && OffHandItemId == other.OffHandItemId;
         }
 
         public override bool Equals(object obj)
@@ -183,7 +236,9 @@ namespace Missions.Agents.Packets
             {
                 int hashCode = MainHandIndex;
                 hashCode = (hashCode * 397) ^ OffHandIndex;
-                return (hashCode * 397) ^ MainHandUsageIndex;
+                hashCode = (hashCode * 397) ^ MainHandUsageIndex;
+                hashCode = (hashCode * 397) ^ (MainHandItemId?.GetHashCode() ?? 0);
+                return (hashCode * 397) ^ (OffHandItemId?.GetHashCode() ?? 0);
             }
         }
 
@@ -193,6 +248,10 @@ namespace Missions.Agents.Packets
         public int OffHandIndex { get; }
         [ProtoMember(3)]
         public int MainHandUsageIndex { get; }
+        [ProtoMember(4)]
+        public string MainHandItemId { get; }
+        [ProtoMember(5)]
+        public string OffHandItemId { get; }
 
 
     }
