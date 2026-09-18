@@ -79,6 +79,7 @@ internal sealed class SiegeInteractionDebugBehavior : MissionBehavior, ISiegeInt
     private ItemObject previousMainHandItem;
     private bool capturedExtraSlotEmpty;
     private ItemObject ownedForkItem;
+    private ItemObject ownedAmmoItem;
     private bool fixtureRestored;
     private string captureFailureReason;
     private Agent dismountAgent;
@@ -720,6 +721,7 @@ internal sealed class SiegeInteractionDebugBehavior : MissionBehavior, ISiegeInt
         previousMainHandItem = previousMainHand == EquipmentIndex.None ? null : agent.Equipment[previousMainHand].Item;
         capturedExtraSlotEmpty = agent.Equipment[EquipmentIndex.ExtraWeaponSlot].IsEmpty;
         ownedForkItem = null;
+        ownedAmmoItem = null;
         observerFrame = null;
         status = "fixture_captured";
     }
@@ -752,6 +754,18 @@ internal sealed class SiegeInteractionDebugBehavior : MissionBehavior, ISiegeInt
             return;
         }
         var point = machine.StandingPoints[pointIndex];
+        if (!watchOnly && machine is SiegeMachineStonePile)
+        {
+            var suppliers = Mission.MissionObjects.OfType<Mangonel>()
+                .Where(weapon => weapon.AmmoPickUpPoints.Contains(point)).ToArray();
+            if (suppliers.Length != 1 || !capturedExtraSlotEmpty ||
+                !agent.Equipment[EquipmentIndex.ExtraWeaponSlot].IsEmpty || suppliers[0].OriginalMissileItem == null)
+            {
+                status = "fixture_ammo_baseline_rejected";
+                return;
+            }
+            ownedAmmoItem = suppliers[0].OriginalMissileItem;
+        }
         if (!watchOnly && machine is SiegeLadder ladder && ReferenceEquals(point, ladder._forkPickUpStandingPoint))
         {
             if (!capturedExtraSlotEmpty || !agent.Equipment[EquipmentIndex.ExtraWeaponSlot].IsEmpty || ladder._forkItem == null)
@@ -1035,7 +1049,7 @@ internal sealed class SiegeInteractionDebugBehavior : MissionBehavior, ISiegeInt
         }
         fixtureRestored = (agent.Position - capturedPosition).LengthSquared < 0.01f &&
             ReferenceEquals(screen.CustomCamera, capturedCamera) &&
-            (ownedForkItem == null || agent.Equipment[EquipmentIndex.ExtraWeaponSlot].IsEmpty) &&
+            ((ownedForkItem == null && ownedAmmoItem == null) || agent.Equipment[EquipmentIndex.ExtraWeaponSlot].IsEmpty) &&
             agent.GetPrimaryWieldedItemIndex() == previousMainHand &&
             (previousMainHand == EquipmentIndex.None || ReferenceEquals(agent.Equipment[previousMainHand].Item, previousMainHandItem));
         status = fixtureRestored ? "fixture_restored" : "fixture_restore_mismatch";
@@ -1044,11 +1058,11 @@ internal sealed class SiegeInteractionDebugBehavior : MissionBehavior, ISiegeInt
 
     internal bool RestoreFork(Agent agent)
     {
-        if (ownedForkItem == null) return true;
+        if (ownedForkItem == null && ownedAmmoItem == null) return true;
         if (!capturedExtraSlotEmpty) return false;
         var current = agent.Equipment[EquipmentIndex.ExtraWeaponSlot];
         if (current.IsEmpty) return true;
-        if (!ReferenceEquals(current.Item, ownedForkItem)) return false;
+        if (!ReferenceEquals(current.Item, ownedForkItem) && !ReferenceEquals(current.Item, ownedAmmoItem)) return false;
         agent.DropItem(EquipmentIndex.ExtraWeaponSlot);
         return agent.Equipment[EquipmentIndex.ExtraWeaponSlot].IsEmpty;
     }
@@ -1066,6 +1080,30 @@ internal sealed class SiegeInteractionDebugBehavior : MissionBehavior, ISiegeInt
     {
         int? selectedId = requestedMachineId ?? observedMachineId;
         return machines.Where(machine => !selectedId.HasValue || machine.Id.Id == selectedId.Value);
+    }
+
+    internal static object DescribeAmmoSupply(Mangonel weapon, IEnumerable<UsableMachine> machines)
+    {
+        var piles = machines.OfType<SiegeMachineStonePile>().ToArray();
+        return new
+        {
+            weaponId = weapon.Id.Id,
+            itemId = weapon.OriginalMissileItem?.StringId,
+            loadPointId = weapon.LoadAmmoStandingPoint?.Id.Id,
+            loadPointIndex = weapon.StandingPoints.IndexOf(weapon.LoadAmmoStandingPoint),
+            pickupPoints = weapon.AmmoPickUpPoints.Where(point => weapon.StandingPoints.Contains(point)).Select(point =>
+            {
+                var owners = piles.Where(pile => pile.StandingPoints.Contains(point)).ToArray();
+                return new
+                {
+                    pointId = point.Id.Id,
+                    machineId = owners.Length == 1 ? (int?)owners[0].Id.Id : null,
+                    pointIndex = owners.Length == 1 ? owners[0].StandingPoints.IndexOf(point) : -1,
+                    active = !point.IsDeactivated && !point.IsDisabledForPlayers,
+                    vacant = !point.HasUser
+                };
+            }).ToArray()
+        };
     }
 
     public object Observe(Guid? observedAgentId = null, int? requestedMachineId = null)
@@ -1103,6 +1141,7 @@ internal sealed class SiegeInteractionDebugBehavior : MissionBehavior, ISiegeInt
             fixtureActive = capturedAgent != null,
             fixtureRestored, captureFailureReason,
             ownedForkItemId = ownedForkItem?.StringId,
+            ownedAmmoItemId = ownedAmmoItem?.StringId,
             nativeCameraStaged, nativeAimTarget, observerFrame, functionalAction,
             stagingCameraActive = stagingCamera != null && ReferenceEquals(screen?.CustomCamera, stagingCamera),
             focusDiagnostic = ReadFocusDiagnostic(screen, agent),
@@ -1128,6 +1167,8 @@ internal sealed class SiegeInteractionDebugBehavior : MissionBehavior, ISiegeInt
                 rangedState = machine is RangedSiegeWeapon weapon ? (int?)weapon.State : null,
                 rangedStateName = (machine as RangedSiegeWeapon)?.State.ToString(),
                 manualReloadRequired = (machine as RangedSiegeWeapon)?.AttackClickWillReload,
+                ammoSupply = machine is Mangonel mangonel
+                    ? DescribeAmmoSupply(mangonel, Mission.MissionObjects.OfType<UsableMachine>()) : null,
                 standingPoints = machine.StandingPoints.Select((point, index) =>
                 {
                     try

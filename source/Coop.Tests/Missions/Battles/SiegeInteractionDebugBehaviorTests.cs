@@ -16,6 +16,7 @@ using System.Runtime.Serialization;
 using TaleWorlds.Library;
 using TaleWorlds.Engine;
 using TaleWorlds.MountAndBlade;
+using TaleWorlds.MountAndBlade.Objects.Usables;
 using TaleWorlds.Core;
 
 namespace Coop.Tests.Missions.Battles;
@@ -594,6 +595,14 @@ public class SiegeInteractionDebugBehaviorTests
                 id = 142, type = "StonePile", IsDeactivated = false, IsDisabled = false,
                 gateState = (int?)null, stoneAmmo = 12, stoneItemId = "boulder",
                 hitPoints = (float?)null, ladderState = (int?)null, rangedState = (int?)null,
+                ammoSupply = new
+                {
+                    weaponId = 1554, itemId = "mangonel_boulder", loadPointId = 1546, loadPointIndex = 2,
+                    pickupPoints = Enumerable.Range(0, 64).Select(index => new
+                    {
+                        pointId = 1556 + index, machineId = 1564, pointIndex = index, active = true, vacant = true
+                    }).ToArray()
+                },
                 standingPoints = Enumerable.Range(0, 64).Select(index => new
                 {
                     index, id = 141 + index, IsDeactivated = false, IsDisabledForPlayers = false,
@@ -912,15 +921,61 @@ public class SiegeInteractionDebugBehaviorTests
         return false;
     }
 
+    [Theory]
+    [InlineData(0)]
+    [InlineData(1)]
+    [InlineData(2)]
+    public void AmmoSupply_BindsSharedCurrentPointAndRejectsMissingOrAmbiguousPile(int ownerCount)
+    {
+        var harmony = new Harmony("coop.tests.ammo-supply");
+        try
+        {
+            harmony.Patch(AccessTools.Method(typeof(ScriptComponentBehavior), "CacheEditableFieldsForAllScriptComponents"),
+                prefix: new HarmonyMethod(AccessTools.Method(typeof(SiegeInteractionDebugBehaviorTests), nameof(SkipScriptComponentCache))));
+#pragma warning disable SYSLIB0050
+            var weapon = (Mangonel)FormatterServices.GetUninitializedObject(typeof(Mangonel));
+            var pickup = (StandingPoint)FormatterServices.GetUninitializedObject(typeof(StandingPoint));
+            var load = (StandingPointWithWeaponRequirement)FormatterServices.GetUninitializedObject(typeof(StandingPointWithWeaponRequirement));
+            var unrelated = (StandingPoint)FormatterServices.GetUninitializedObject(typeof(StandingPoint));
+            AccessTools.Property(typeof(MissionObject), "Id").SetValue(weapon, new MissionObjectId(1554, false));
+            AccessTools.Property(typeof(MissionObject), "Id").SetValue(pickup, new MissionObjectId(1556, false));
+            AccessTools.Property(typeof(MissionObject), "Id").SetValue(load, new MissionObjectId(1546, false));
+            AccessTools.Property(typeof(UsableMachine), "StandingPoints").SetValue(weapon, new MBList<StandingPoint> { load, pickup });
+            AccessTools.Property(typeof(UsableMachine), "AmmoPickUpPoints").SetValue(weapon, new List<StandingPoint> { pickup, unrelated });
+            AccessTools.Field(typeof(RangedSiegeWeapon), "LoadAmmoStandingPoint").SetValue(weapon, load);
+            var piles = Enumerable.Range(0, ownerCount).Select(index =>
+            {
+                var pile = (SiegeMachineStonePile)FormatterServices.GetUninitializedObject(typeof(SiegeMachineStonePile));
+                AccessTools.Property(typeof(MissionObject), "Id").SetValue(pile, new MissionObjectId(1564 + index, false));
+                AccessTools.Property(typeof(UsableMachine), "StandingPoints").SetValue(pile, new MBList<StandingPoint> { pickup });
+                return pile;
+            }).ToArray();
+#pragma warning restore SYSLIB0050
+            var supply = JObject.FromObject(SiegeInteractionDebugBehavior.DescribeAmmoSupply(weapon, piles));
+            Assert.Equal(1554, (int)supply["weaponId"]);
+            Assert.Equal(1546, (int)supply["loadPointId"]);
+            Assert.Equal(0, (int)supply["loadPointIndex"]);
+            var selected = Assert.Single(supply["pickupPoints"]);
+            Assert.Equal(1556, (int)selected["pointId"]);
+            Assert.Equal(ownerCount == 1 ? (int?)1564 : null, (int?)selected["machineId"]);
+            Assert.Equal(ownerCount == 1 ? 0 : -1, (int)selected["pointIndex"]);
+        }
+        finally { harmony.UnpatchAll(harmony.Id); }
+    }
+
     private static bool clearForkOnDrop;
     private static int forkDropCalls;
 
     [Theory]
-    [InlineData("clear")]
-    [InlineData("retained")]
-    [InlineData("foreign")]
-    [InlineData("occupied-baseline")]
-    public void RestoreFork_RequiresTheCapturedEmptySlotAndVerifiedOwnedDrop(string mode)
+    [InlineData("clear", false)]
+    [InlineData("retained", false)]
+    [InlineData("foreign", false)]
+    [InlineData("occupied-baseline", false)]
+    [InlineData("clear", true)]
+    [InlineData("retained", true)]
+    [InlineData("foreign", true)]
+    [InlineData("occupied-baseline", true)]
+    public void RestoreFork_RequiresTheCapturedEmptySlotAndVerifiedOwnedDrop(string mode, bool ammo)
     {
         var harmony = new Harmony("coop.tests.fork-restore");
         try
@@ -941,7 +996,7 @@ public class SiegeInteractionDebugBehaviorTests
             agent.Equipment[EquipmentIndex.ExtraWeaponSlot] = (MissionWeapon)weapon;
             Assert.False(agent.Equipment[EquipmentIndex.ExtraWeaponSlot].IsEmpty);
             var behavior = new SiegeInteractionDebugBehavior(Mock.Of<IMessageBroker>());
-            AccessTools.Field(typeof(SiegeInteractionDebugBehavior), "ownedForkItem").SetValue(behavior, fork);
+            AccessTools.Field(typeof(SiegeInteractionDebugBehavior), ammo ? "ownedAmmoItem" : "ownedForkItem").SetValue(behavior, fork);
             AccessTools.Field(typeof(SiegeInteractionDebugBehavior), "capturedExtraSlotEmpty").SetValue(behavior, mode != "occupied-baseline");
             clearForkOnDrop = mode == "clear";
             forkDropCalls = 0;
