@@ -156,10 +156,105 @@ public class LadderForkReplicationTests : IDisposable
         AccessTools.Field(typeof(SiegeLadder), "_forkItem").SetValue(ladder, item);
         AccessTools.Property(typeof(Agent), "CurrentlyUsedGameObject").SetValue(agent, point);
         ((ICollection<MissionObject>)mission.Instance.MissionObjects).Add(ladder);
-        Assert.True(LadderForkGrantPatch.IsLadderForkGrant(agent, new MissionWeapon(item, null, null, 0)));
-        Assert.False(LadderForkGrantPatch.IsLadderForkGrant(agent, default));
+        Assert.True(LadderForkGrantPatch.IsSiegeEquipmentGrant(agent, new MissionWeapon(item, null, null, 0)));
+        Assert.False(LadderForkGrantPatch.IsSiegeEquipmentGrant(agent, default));
         AccessTools.Property(typeof(Agent), "CurrentlyUsedGameObject").SetValue(agent, New<StandingPoint>());
-        Assert.False(LadderForkGrantPatch.IsLadderForkGrant(agent, new MissionWeapon(item, null, null, 0)));
+        Assert.False(LadderForkGrantPatch.IsSiegeEquipmentGrant(agent, new MissionWeapon(item, null, null, 0)));
+    }
+
+    [Theory]
+    [InlineData(false, false, false, false, true)]
+    [InlineData(true, false, false, false, false)]
+    [InlineData(false, true, false, false, false)]
+    [InlineData(false, false, true, false, false)]
+    [InlineData(false, false, false, true, false)]
+    public void Patch_BindsMangonelMissileToItsCurrentPickupPoint(
+        bool wrongItem, bool wrongPoint, bool oldMission, bool missingMachine, bool expected)
+    {
+        var ammo = RegisterAmmo();
+        var mangonel = New<Mangonel>();
+        var point = New<StandingPointWithWeaponRequirement>();
+        AccessTools.Field(typeof(RangedSiegeWeapon), "OriginalMissileItem").SetValue(mangonel, ammo);
+        AccessTools.Property(typeof(UsableMachine), "AmmoPickUpPoints").SetValue(mangonel,
+            new List<StandingPoint> { point });
+        AccessTools.Property(typeof(Agent), "CurrentlyUsedGameObject").SetValue(agent,
+            wrongPoint ? New<StandingPoint>() : point);
+        if (!missingMachine) ((ICollection<MissionObject>)mission.Instance.MissionObjects).Add(mangonel);
+        if (oldMission) AccessTools.Property(typeof(Agent), "Mission").SetValue(agent, New<Mission>());
+        Assert.Equal(expected, LadderForkGrantPatch.IsSiegeEquipmentGrant(agent,
+            new MissionWeapon(wrongItem ? item : ammo, null, null, 1)));
+        Assert.False(LadderForkGrantPatch.IsSiegeEquipmentGrant(agent, default));
+    }
+
+    [Theory]
+    [InlineData("actor", 7, false, false, true)]
+    [InlineData("actor", 6, false, false, false)]
+    [InlineData("actor", 8, false, false, false)]
+    [InlineData("other", 7, false, false, false)]
+    [InlineData("actor", 7, true, false, false)]
+    [InlineData("actor", 7, false, true, false)]
+    public void AmmoGrant_PreservesAmountAuthorityOrderingAndDuplicateProtection(
+        string authority, long revision, bool local, bool oldMission, bool expected)
+    {
+        var ammo = RegisterAmmo();
+        var weapon = new MissionWeapon(ammo, null, null, 1);
+        var message = Serializer.DeepClone(new NetworkLadderForkGranted(Guid.NewGuid(), info.AgentId,
+            authority, revision, "ammo-id", weapon.RawDataForNetwork,
+            new AgentEquipmentData(EquipmentIndex.ExtraWeaponSlot, EquipmentIndex.None, 0)));
+        Assert.Equal(1, new MissionWeapon(ammo, null, null, message.DataValue).Amount);
+        registry.Setup(r => r.IsLocallyControlled(agent)).Returns(local);
+        if (oldMission) AccessTools.Property(typeof(Agent), "Mission").SetValue(agent, New<Mission>());
+        Receive(message);
+        if (expected)
+        {
+            Assert.Same(ammo, agent.Equipment[EquipmentIndex.ExtraWeaponSlot].Item);
+            Assert.Equal(1, agent.Equipment[EquipmentIndex.ExtraWeaponSlot].Amount);
+            Assert.Equal(new[] { "equip", "wield" }, Calls);
+            SetExtra(agent, default); // Loading or dropping the missile has consumed the grant.
+            Receive(message);
+            Assert.Equal(2, Calls.Count);
+        }
+        else Assert.Empty(Calls);
+        Assert.True(agent.Equipment[EquipmentIndex.ExtraWeaponSlot].IsEmpty);
+    }
+
+    [Fact]
+    public void AmmoGrant_OnlyOwnerAnnouncesAndCatchUpPacksCurrentMissile()
+    {
+        var ammo = RegisterAmmo();
+        var weapon = new MissionWeapon(ammo, null, null, 1);
+        SetExtra(agent, weapon);
+        grant(new MessagePayload<LadderForkGranted>(this, new LadderForkGranted(agent)));
+        network.Verify(n => n.SendAll(It.IsAny<IMessage>()), Times.Never);
+        registry.Setup(r => r.IsLocallyControlled(agent)).Returns(true);
+        grant(new MessagePayload<LadderForkGranted>(this, new LadderForkGranted(agent)));
+        network.Verify(n => n.SendAll(It.Is<NetworkLadderForkGranted>(m =>
+            m.AgentId == info.AgentId && m.AuthorityRevision == 7 &&
+            m.ItemObjectId == "ammo-id" && m.DataValue == weapon.RawDataForNetwork)), Times.Once);
+        broker.Verify(b => b.Publish(It.IsAny<object>(), It.Is<WeaponPickupApplied>(p =>
+            p.AgentId == info.AgentId && p.SlotTransitionApplied)), Times.Once);
+
+        var replicator = New<OwnedAgentReplicator>();
+        AccessTools.Field(typeof(OwnedAgentReplicator), "missionWeaponDataMapper")
+            .SetValue(replicator, new MissionWeaponDataMapper(objects.Object));
+        var pack = AccessTools.Method(typeof(OwnedAgentReplicator), "PackMissionEquipmentData");
+        var held = (MissionEquipmentData)pack.Invoke(replicator, new object[] { agent.Equipment });
+        Assert.Equal("ammo-id", held.WeaponSlots[(int)EquipmentIndex.ExtraWeaponSlot].ItemObjectId);
+        SetExtra(agent, default);
+        var loaded = (MissionEquipmentData)pack.Invoke(replicator, new object[] { agent.Equipment });
+        Assert.Null(loaded.WeaponSlots[(int)EquipmentIndex.ExtraWeaponSlot].ItemObjectId);
+    }
+
+    private ItemObject RegisterAmmo()
+    {
+        var ammo = new ItemObject("grapeshot_stack");
+        ammo.AddWeapon(new WeaponComponentData(null, WeaponClass.Boulder, default), null);
+        var registered = ammo;
+        objects.Setup(o => o.TryGetObjectWithLogging("ammo-id", out registered)).Returns(true);
+        string id = "ammo-id";
+        objects.Setup(o => o.TryGetIdWithLogging(ammo, out id)).Returns(true);
+        objects.Setup(o => o.TryGetId(ammo, out id)).Returns(true);
+        return ammo;
     }
 
     private NetworkLadderForkGranted Message(string authority = "actor", long revision = 7) =>
