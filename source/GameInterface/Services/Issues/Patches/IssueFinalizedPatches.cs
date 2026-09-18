@@ -106,6 +106,22 @@ internal class QuestTimeoutFinalizeAuthorityPatch
     }
 }
 
+[HarmonyPatch(typeof(IssueBase), nameof(IssueBase.CompleteIssueWithAiLord))]
+internal class IssueAiLordCompletionFinalizeAuthorityPatch
+{
+    [HarmonyPrefix]
+    private static void Prefix(out IssueFinalizeAuthorityGuard __state)
+    {
+        __state = IssueExpiryFinalizeAuthorityPatch.OpenGuardIfAuthoritative();
+    }
+
+    [HarmonyFinalizer]
+    private static void Finalizer(IssueFinalizeAuthorityGuard __state)
+    {
+        __state?.Dispose();
+    }
+}
+
 [HarmonyPatch(typeof(QuestBase), nameof(QuestBase.CompleteQuestWithTimeOut))]
 internal class QuestTimeoutOwnerSubstitutionPatch
 {
@@ -163,6 +179,7 @@ internal class IssueFinalizedPatches
 
         if (CallOriginalPolicy.IsOriginalAllowed()) return;
         if (!DisableAllIssueBehaviorsExceptAllowlist.IsAllowlisted(__instance)) return;
+        if (ModInformation.IsServer && !wasGenuinelyFinalized) return;
 
         MessageBroker.Instance.Publish(__instance, new IssueFinalizedTriggered(owner, reason));
     }

@@ -883,6 +883,77 @@ public class VillageNeedsCraftingMaterialsIssueTests : IDisposable
     }
 
     [Fact]
+    public void CompleteIssueWithAiLordOnServer_GenuinelyRemovesTheIssue_AndBroadcastsTheRemovalToEveryPeer()
+    {
+        var fixture = SetupIssueOwner();
+        CreateIssueOnServer(fixture.HeroId);
+        var solverHeroId = TestEnvironment.CreateRegisteredObject<Hero>();
+
+        foreach (var instance in AllInstances)
+        {
+            instance.Call(() =>
+            {
+                Assert.True(instance.ObjectManager.TryGetObject<Hero>(fixture.HeroId, out var owner));
+                Assert.NotNull(owner.Issue);
+            });
+        }
+
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject<Hero>(fixture.HeroId, out var owner));
+            Assert.True(Server.ObjectManager.TryGetObject<Hero>(solverHeroId, out var solver));
+            Assert.True(owner.Issue.IsOngoingWithoutQuest);
+
+            owner.Issue.CompleteIssueWithAiLord(solver);
+
+            Assert.Null(owner.Issue);
+            Assert.False(Campaign.Current.IssueManager.Issues.ContainsKey(owner));
+        });
+
+        var removed = Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkIssueRemoved>());
+        Assert.Equal(fixture.HeroId, removed.OwnerId);
+        Assert.Equal(IssueFinalizeReason.IssueOnly, removed.Reason);
+
+        foreach (var instance in AllInstances)
+        {
+            instance.Call(() =>
+            {
+                Assert.True(instance.ObjectManager.TryGetObject<Hero>(fixture.HeroId, out var owner));
+                Assert.Null(owner.Issue);
+                Assert.False(Campaign.Current.IssueManager.Issues.ContainsKey(owner));
+            });
+        }
+    }
+
+    [Fact]
+    public void IssueFinalized_OrganicUnguardedCallOnServer_DoesNotBroadcastARemovalTheServerNeverPerformed()
+    {
+        var fixture = SetupIssueOwner();
+        CreateIssueOnServer(fixture.HeroId);
+
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject<Hero>(fixture.HeroId, out var owner));
+
+            owner.Issue.IssueFinalized();
+
+            Assert.NotNull(owner.Issue);
+            Assert.True(Campaign.Current.IssueManager.Issues.ContainsKey(owner));
+        });
+
+        Assert.Empty(Server.NetworkSentMessages.GetMessages<NetworkIssueRemoved>());
+
+        foreach (var instance in AllInstances)
+        {
+            instance.Call(() =>
+            {
+                Assert.True(instance.ObjectManager.TryGetObject<Hero>(fixture.HeroId, out var owner));
+                Assert.NotNull(owner.Issue);
+            });
+        }
+    }
+
+    [Fact]
     public void RequestQuestTypeAcceptAlternative_RejectedForTheGenuineClaimant_ClearsItsLocallyPopulatedRoster()
     {
         var fixture = SetupIssueOwner();
