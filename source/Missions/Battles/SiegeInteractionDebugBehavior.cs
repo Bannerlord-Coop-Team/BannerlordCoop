@@ -77,6 +77,8 @@ internal sealed class SiegeInteractionDebugBehavior : MissionBehavior, ISiegeInt
     private object functionalAction;
     private EquipmentIndex previousMainHand;
     private ItemObject previousMainHandItem;
+    private bool capturedExtraSlotEmpty;
+    private ItemObject ownedForkItem;
     private bool fixtureRestored;
     private string captureFailureReason;
     private Agent dismountAgent;
@@ -716,6 +718,8 @@ internal sealed class SiegeInteractionDebugBehavior : MissionBehavior, ISiegeInt
         fixtureRestored = false;
         previousMainHand = agent.GetPrimaryWieldedItemIndex();
         previousMainHandItem = previousMainHand == EquipmentIndex.None ? null : agent.Equipment[previousMainHand].Item;
+        capturedExtraSlotEmpty = agent.Equipment[EquipmentIndex.ExtraWeaponSlot].IsEmpty;
+        ownedForkItem = null;
         observerFrame = null;
         status = "fixture_captured";
     }
@@ -748,6 +752,15 @@ internal sealed class SiegeInteractionDebugBehavior : MissionBehavior, ISiegeInt
             return;
         }
         var point = machine.StandingPoints[pointIndex];
+        if (!watchOnly && machine is SiegeLadder ladder && ReferenceEquals(point, ladder._forkPickUpStandingPoint))
+        {
+            if (!capturedExtraSlotEmpty || !agent.Equipment[EquipmentIndex.ExtraWeaponSlot].IsEmpty || ladder._forkItem == null)
+            {
+                status = "fixture_fork_baseline_rejected";
+                return;
+            }
+            ownedForkItem = ladder._forkItem;
+        }
         if (reaimOnly && !(machine is CastleGate ||
             (machine is Ballista ballista && ReferenceEquals(point, ballista.PilotStandingPoint))))
         {
@@ -807,8 +820,18 @@ internal sealed class SiegeInteractionDebugBehavior : MissionBehavior, ISiegeInt
             stagingCamera = Camera.CreateCamera();
             stagingCamera.FillParametersFrom(screen.CombatCamera);
         }
+        Vec3 target;
+        try
+        {
+            target = GetStagingTarget(machine, point.GameEntity.GlobalPosition, watchOnly, standingPoint: point);
+        }
+        catch (InvalidOperationException exception)
+        {
+            nativeAimTarget = new { error = exception.Message };
+            status = "fixture_target_unavailable";
+            return;
+        }
         if (!watchOnly) agent.TeleportToPosition(position);
-        var target = GetStagingTarget(machine, point.GameEntity.GlobalPosition, watchOnly);
         var eye = watchOnly ? target + new Vec3(3f, 3f, 2f) : position + (Vec3.Up * 1.6f);
         observerFrame = null;
         if (watchOnly && watchedAgentId.HasValue)
@@ -868,6 +891,26 @@ internal sealed class SiegeInteractionDebugBehavior : MissionBehavior, ISiegeInt
     internal Vec3 GetStagingTarget(UsableMachine machine, Vec3 standingPointPosition, bool watchOnly, bool nativeCamera = false,
         StandingPoint standingPoint = null)
     {
+        if (!watchOnly && machine is SiegeLadder ladder)
+        {
+            if (standingPoint == null || !ladder.StandingPoints.Contains(standingPoint))
+                throw new InvalidOperationException("The ladder target requires its exact current standing point.");
+            var fork = ReferenceEquals(standingPoint, ladder._forkPickUpStandingPoint);
+            var body = fork ? ladder._forkEntity : ladder._ladderBodyObject;
+            if (body == null || !body.GameEntity.IsValid || (body.GameEntity.BodyFlag & BodyFlags.Disabled) != 0)
+                throw new InvalidOperationException("The selected ladder action has no enabled collision body.");
+            var target = body.GameEntity.ComputeGlobalPhysicsBoundingBoxCenter();
+            if (new[] { target.x, target.y, target.z }.Any(value => float.IsNaN(value) || float.IsInfinity(value)))
+                throw new InvalidOperationException("The selected ladder body has invalid world bounds.");
+            nativeAimTarget = new
+            {
+                requestId, tick, recordedUtc = DateTime.UtcNow, machineId = ladder.Id.Id,
+                standingPointId = standingPoint.Id.Id, bodyId = body.Id.Id,
+                bodyPointer = body.GameEntity.Pointer.ToUInt64().ToString("X16"),
+                ladderAction = fork ? "fork" : "movement", target = DescribePosition(target)
+            };
+            return target;
+        }
         if (nativeCamera && !watchOnly && machine is StonePile)
         {
             // Render bounds can change independently of the pile's focus collision.
@@ -959,6 +1002,11 @@ internal sealed class SiegeInteractionDebugBehavior : MissionBehavior, ISiegeInt
             }
             externalInputArmed = false;
         }
+        if (!RestoreFork(agent))
+        {
+            status = "fixture_restore_rejected_fork_equipment";
+            return;
+        }
         if (previousMainHand != EquipmentIndex.None && !ReferenceEquals(agent.Equipment[previousMainHand].Item, previousMainHandItem))
         {
             status = "fixture_restore_rejected_equipment_changed";
@@ -987,10 +1035,22 @@ internal sealed class SiegeInteractionDebugBehavior : MissionBehavior, ISiegeInt
         }
         fixtureRestored = (agent.Position - capturedPosition).LengthSquared < 0.01f &&
             ReferenceEquals(screen.CustomCamera, capturedCamera) &&
+            (ownedForkItem == null || agent.Equipment[EquipmentIndex.ExtraWeaponSlot].IsEmpty) &&
             agent.GetPrimaryWieldedItemIndex() == previousMainHand &&
             (previousMainHand == EquipmentIndex.None || ReferenceEquals(agent.Equipment[previousMainHand].Item, previousMainHandItem));
         status = fixtureRestored ? "fixture_restored" : "fixture_restore_mismatch";
         if (fixtureRestored) capturedAgent = null;
+    }
+
+    internal bool RestoreFork(Agent agent)
+    {
+        if (ownedForkItem == null) return true;
+        if (!capturedExtraSlotEmpty) return false;
+        var current = agent.Equipment[EquipmentIndex.ExtraWeaponSlot];
+        if (current.IsEmpty) return true;
+        if (!ReferenceEquals(current.Item, ownedForkItem)) return false;
+        agent.DropItem(EquipmentIndex.ExtraWeaponSlot);
+        return agent.Equipment[EquipmentIndex.ExtraWeaponSlot].IsEmpty;
     }
 
     private void ReleaseCamera()
@@ -1036,6 +1096,7 @@ internal sealed class SiegeInteractionDebugBehavior : MissionBehavior, ISiegeInt
             requestId, status, pressInvoked, externalInputArmed, inputVirtualKey, edgeObserved, edgeCleared, inputGameKeyId, tick,
             fixtureActive = capturedAgent != null,
             fixtureRestored, captureFailureReason,
+            ownedForkItemId = ownedForkItem?.StringId,
             nativeCameraStaged, nativeAimTarget, observerFrame, functionalAction,
             stagingCameraActive = stagingCamera != null && ReferenceEquals(screen?.CustomCamera, stagingCamera),
             focusDiagnostic = ReadFocusDiagnostic(screen, agent),
@@ -1058,6 +1119,7 @@ internal sealed class SiegeInteractionDebugBehavior : MissionBehavior, ISiegeInt
                 stoneItemId = machine is StonePile pile ? pile.GivenItemID : null,
                 hitPoints = machine.DestructionComponent?.HitPoint,
                 ladderState = machine is SiegeLadder ladder ? (int?)ladder.State : null,
+                ladderForkItemId = (machine as SiegeLadder)?._forkItem?.StringId,
                 rangedState = machine is RangedSiegeWeapon weapon ? (int?)weapon.State : null,
                 rangedStateName = (machine as RangedSiegeWeapon)?.State.ToString(),
                 manualReloadRequired = (machine as RangedSiegeWeapon)?.AttackClickWillReload,
@@ -1119,6 +1181,7 @@ internal sealed class SiegeInteractionDebugBehavior : MissionBehavior, ISiegeInt
             tick, recordedUtc = DateTime.UtcNow.ToString("O"),
             usingObject = observed.IsUsingGameObject,
             usedObject = Describe(observed.CurrentlyUsedGameObject),
+            equipment = ReadEquipment(observed),
             actions = Enumerable.Range(0, 2).Select(channel =>
             {
                 int index = observed.GetCurrentAction(channel).Index;

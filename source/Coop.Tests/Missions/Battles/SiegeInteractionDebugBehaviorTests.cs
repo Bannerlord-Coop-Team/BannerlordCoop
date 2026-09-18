@@ -16,6 +16,7 @@ using System.Runtime.Serialization;
 using TaleWorlds.Library;
 using TaleWorlds.Engine;
 using TaleWorlds.MountAndBlade;
+using TaleWorlds.Core;
 
 namespace Coop.Tests.Missions.Battles;
 
@@ -207,6 +208,7 @@ public class SiegeInteractionDebugBehaviorTests
         var registry = new Mock<INetworkAgentRegistry>(MockBehavior.Strict);
         registry.Setup(value => value.TryGetAgentInfo(id, out info)).Returns(true);
         var harmony = new Harmony("coop.tests.siege-observed-agent");
+        AccessTools.Property(typeof(Agent), nameof(Agent.Equipment)).SetValue(agent, new MissionEquipment());
         try
         {
             // ActionIndexCache initializes named actions before the observer reads its indices.
@@ -231,6 +233,7 @@ public class SiegeInteractionDebugBehaviorTests
             Assert.Equal(new[] { 101, 202 }, result["actions"].Select(action => action["index"].Value<int>()));
             Assert.InRange(result["recordedUtc"].Value<DateTime>().ToUniversalTime(), before, DateTime.UtcNow);
             Assert.False(result["usingObject"].Value<bool>());
+            Assert.All(result["equipment"], slot => Assert.Null(slot["itemId"].Value<string>()));
             Assert.Null(agent.CurrentlyUsedGameObject);
             Assert.Same(mission.Instance, agent.Mission);
             registry.Verify(value => value.TryGetAgentInfo(id, out info), Times.Once);
@@ -818,11 +821,127 @@ public class SiegeInteractionDebugBehaviorTests
         return false;
     }
 
+    [Theory]
+    [InlineData(true, 0)]
+    [InlineData(false, 0)]
+    [InlineData(true, 1)]
+    [InlineData(true, 2)]
+    [InlineData(true, 3)]
+    public void LadderTarget_BindsActionBodyAndRejectsUnavailableTarget(bool fork, int mode)
+    {
+        using var mission = new MissionCurrentScope();
+        var harmony = new Harmony("coop.tests.ladder-target");
+        try
+        {
+            harmony.Patch(AccessTools.Method(typeof(ScriptComponentBehavior), "CacheEditableFieldsForAllScriptComponents"),
+                prefix: new HarmonyMethod(AccessTools.Method(typeof(SiegeInteractionDebugBehaviorTests), nameof(SkipScriptComponentCache))));
+            harmony.Patch(AccessTools.Method(typeof(WeakGameEntity), nameof(WeakGameEntity.ComputeGlobalPhysicsBoundingBoxCenter)),
+                prefix: new HarmonyMethod(AccessTools.Method(typeof(SiegeInteractionDebugBehaviorTests), nameof(OpenGatePhysicsCenter))));
+            harmony.Patch(AccessTools.PropertyGetter(typeof(WeakGameEntity), nameof(WeakGameEntity.BodyFlag)),
+                prefix: new HarmonyMethod(AccessTools.Method(typeof(SiegeInteractionDebugBehaviorTests), nameof(OpenGateBodyFlags))));
+#pragma warning disable SYSLIB0050
+            var ladder = (SiegeLadder)FormatterServices.GetUninitializedObject(typeof(SiegeLadder));
+            var pickup = (StandingPointWithWeaponRequirement)FormatterServices.GetUninitializedObject(typeof(StandingPointWithWeaponRequirement));
+            var lift = (StandingPoint)FormatterServices.GetUninitializedObject(typeof(StandingPoint));
+            AccessTools.Property(typeof(UsableMachine), nameof(UsableMachine.StandingPoints))
+                .SetValue(ladder, new MBList<StandingPoint> { pickup, lift });
+            AccessTools.Field(typeof(SiegeLadder), "_forkPickUpStandingPoint").SetValue(ladder, pickup);
+            foreach (var entry in new[] { ("_forkEntity", 881u), ("_ladderBodyObject", 882u) })
+            {
+                var body = (SynchedMissionObject)FormatterServices.GetUninitializedObject(typeof(SynchedMissionObject));
+                var entity = AccessTools.Constructor(typeof(WeakGameEntity), new[] { typeof(UIntPtr) })
+                    .Invoke(new object[] { new UIntPtr(entry.Item2) });
+                AccessTools.Field(typeof(ScriptComponentBehavior), "_gameEntity").SetValue(body, entity);
+                AccessTools.Field(typeof(SiegeLadder), entry.Item1).SetValue(ladder, body);
+            }
+#pragma warning restore SYSLIB0050
+            openGateBodyMode = mode;
+            var behavior = new SiegeInteractionDebugBehavior(Mock.Of<IMessageBroker>());
+            var origin = new Vec3(424f, 684f, 14f);
+            StandingPoint point = fork ? pickup : lift;
+            Assert.Equal(origin, behavior.GetStagingTarget(ladder, origin, true));
+            if (mode == 3) point = null;
+            if (mode != 0)
+            {
+                Assert.Throws<InvalidOperationException>(() => behavior.GetStagingTarget(ladder, origin, false, standingPoint: point));
+                return;
+            }
+            Assert.Equal(new Vec3(fork ? 611f : 614f, 626f, 63f),
+                behavior.GetStagingTarget(ladder, origin, false, standingPoint: point));
+            var evidence = JObject.FromObject(AccessTools.Field(typeof(SiegeInteractionDebugBehavior), "nativeAimTarget").GetValue(behavior));
+            Assert.Equal(fork ? "fork" : "movement", evidence["ladderAction"].Value<string>());
+            Assert.Equal((fork ? 881UL : 882UL).ToString("X16"), evidence["bodyPointer"].Value<string>());
+            Assert.Null(AccessTools.Field(typeof(SiegeInteractionDebugBehavior), "capturedAgent").GetValue(behavior));
+        }
+        finally { harmony.UnpatchAll(harmony.Id); }
+    }
+
     private static bool OpenGatePhysicsCenter(WeakGameEntity __instance, ref Vec3 __result)
     {
         bool right = __instance.Pointer.ToUInt64() == 881UL;
         Assert.Contains(__instance.Pointer.ToUInt64(), new ulong[] { 881, 882 });
         __result = new Vec3(right ? (openGateBodyMode == 2 ? float.NaN : 611f) : 614f, 626f, 63f);
+        return false;
+    }
+
+    private static bool clearForkOnDrop;
+    private static int forkDropCalls;
+
+    [Theory]
+    [InlineData("clear")]
+    [InlineData("retained")]
+    [InlineData("foreign")]
+    [InlineData("occupied-baseline")]
+    public void RestoreFork_RequiresTheCapturedEmptySlotAndVerifiedOwnedDrop(string mode)
+    {
+        var harmony = new Harmony("coop.tests.fork-restore");
+        try
+        {
+            harmony.Patch(AccessTools.PropertyGetter(typeof(MissionWeapon), nameof(MissionWeapon.IsEmpty)),
+                prefix: new HarmonyMethod(AccessTools.Method(typeof(SiegeInteractionDebugBehaviorTests), nameof(ForkWeaponEmpty))));
+            harmony.Patch(AccessTools.Method(typeof(Agent), nameof(Agent.DropItem)),
+                prefix: new HarmonyMethod(AccessTools.Method(typeof(SiegeInteractionDebugBehaviorTests), nameof(DropOwnedFork))));
+#pragma warning disable SYSLIB0050
+            var agent = (Agent)FormatterServices.GetUninitializedObject(typeof(Agent));
+            var fork = (ItemObject)FormatterServices.GetUninitializedObject(typeof(ItemObject));
+            var other = (ItemObject)FormatterServices.GetUninitializedObject(typeof(ItemObject));
+#pragma warning restore SYSLIB0050
+            AccessTools.Property(typeof(Agent), nameof(Agent.Equipment)).SetValue(agent, new MissionEquipment());
+            object weapon = default(MissionWeapon);
+            typeof(MissionWeapon).GetFields(System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.NonPublic)
+                .Single(field => field.FieldType == typeof(ItemObject)).SetValue(weapon, mode == "foreign" ? other : fork);
+            agent.Equipment[EquipmentIndex.ExtraWeaponSlot] = (MissionWeapon)weapon;
+            Assert.False(agent.Equipment[EquipmentIndex.ExtraWeaponSlot].IsEmpty);
+            var behavior = new SiegeInteractionDebugBehavior(Mock.Of<IMessageBroker>());
+            AccessTools.Field(typeof(SiegeInteractionDebugBehavior), "ownedForkItem").SetValue(behavior, fork);
+            AccessTools.Field(typeof(SiegeInteractionDebugBehavior), "capturedExtraSlotEmpty").SetValue(behavior, mode != "occupied-baseline");
+            clearForkOnDrop = mode == "clear";
+            forkDropCalls = 0;
+
+            Assert.Equal(mode == "clear", behavior.RestoreFork(agent));
+            Assert.Equal(mode == "clear", agent.Equipment[EquipmentIndex.ExtraWeaponSlot].IsEmpty);
+            Assert.Equal(mode == "clear" || mode == "retained" ? 1 : 0, forkDropCalls);
+            if (mode == "clear")
+            {
+                Assert.True(behavior.RestoreFork(agent));
+                Assert.Equal(1, forkDropCalls);
+            }
+        }
+        finally { harmony.UnpatchAll(harmony.Id); }
+    }
+
+    private static bool DropOwnedFork(Agent __instance, EquipmentIndex itemIndex)
+    {
+        Assert.Equal(EquipmentIndex.ExtraWeaponSlot, itemIndex);
+        forkDropCalls++;
+        if (clearForkOnDrop) __instance.Equipment[itemIndex] = MissionWeapon.Invalid;
+        return false;
+    }
+
+    private static bool ForkWeaponEmpty(ref MissionWeapon __instance, ref bool __result)
+    {
+        // The inert weapon has no native subweapon data; only slot ownership is exercised.
+        __result = __instance.Item == null;
         return false;
     }
 

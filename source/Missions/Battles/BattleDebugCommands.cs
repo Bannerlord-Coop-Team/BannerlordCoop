@@ -129,32 +129,43 @@ internal static class BattleDebugCommands
         public CoopCommandSide Side => CoopCommandSide.Client;
         public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
-            new ExpectedArgs("type_name", "Exact concrete type from dump_machines all.")
+            new ExpectedArgs("type_name", "Exact concrete type from dump_machines all."),
+            new ExpectedArgs("ladder_action", "Optional exact ladder action: fork or lift.", false)
         };
 
         public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
         {
             var mission = Mission.Current;
-            if (ModInformation.IsServer || mission?.IsSiegeBattle != true || args.Count != 1)
+            if (ModInformation.IsServer || mission?.IsSiegeBattle != true || args.Count < 1 || args.Count > 2 ||
+                (args.Count == 2 && (args[0] != nameof(SiegeLadder) || (args[1] != "fork" && args[1] != "lift"))))
                 return Failed("A client siege mission and a concrete machine type are required.");
-            var machine = mission.MissionObjects.OfType<UsableMachine>()
+            var agent = mission.MainAgent;
+            var target = mission.MissionObjects.OfType<UsableMachine>()
                 .Where(candidate => candidate.GetType().Name == args[0] &&
                     candidate.GameEntity.IsVisibleIncludeParents() && candidate.StandingPoints.Count > 0)
-                .OrderBy(candidate => candidate.Id.Id).FirstOrDefault();
-            if (machine == null) return Failed("The required machine type is absent from this siege scene.");
-            var agent = mission.MainAgent;
-            var point = machine.StandingPoints.FirstOrDefault(candidate =>
-                agent != null && !candidate.IsDeactivated && !candidate.IsDisabledForPlayers &&
-                !candidate.IsDisabledForAgent(agent) && (!candidate.HasUser || candidate.HasAIUser) &&
-                (machine is RangedSiegeWeapon ranged ? ReferenceEquals(candidate, ranged.PilotStandingPoint) :
-                    !(machine is StonePile stones) || stones.AmmoPickUpPoints.Contains(candidate)));
-            if (point == null) return Failed("The current machine has no active vacant player standing point.");
+                .OrderBy(candidate => candidate.Id.Id)
+                .Take(args.Count == 2 ? int.MaxValue : 1)
+                .SelectMany(machine => machine.StandingPoints.Select(point => new { machine, point }))
+                .FirstOrDefault(pair =>
+                {
+                    var machine = pair.machine;
+                    var candidate = pair.point;
+                    if (args.Count == 2 && machine is SiegeLadder ladder &&
+                        !(args[1] == "fork" ? ReferenceEquals(candidate, ladder._forkPickUpStandingPoint) :
+                            ladder._attackerStandingPoints.Contains(candidate))) return false;
+                    return agent != null && !candidate.IsDeactivated && !candidate.IsDisabledForPlayers &&
+                        !candidate.IsDisabledForAgent(agent) && (!candidate.HasUser || candidate.HasAIUser) &&
+                        (machine is RangedSiegeWeapon ranged ? ReferenceEquals(candidate, ranged.PilotStandingPoint) :
+                            !(machine is StonePile stones) || stones.AmmoPickUpPoints.Contains(candidate));
+                });
+            if (target == null) return Failed("The current machine has no active vacant player standing point for the requested action.");
             return Succeeded("LIVE_TEST_JSON=" + JsonConvert.SerializeObject(new
             {
-                success = true, id = machine.Id.Id, type = machine.GetType().Name,
-                standingPointIndex = machine.StandingPoints.ToList().IndexOf(point),
-                standingPointId = point.Id.Id,
-                standingPointCount = machine.StandingPoints.Count
+                success = true, id = target.machine.Id.Id, type = target.machine.GetType().Name,
+                standingPointIndex = target.machine.StandingPoints.ToList().IndexOf(target.point),
+                standingPointId = target.point.Id.Id,
+                standingPointCount = target.machine.StandingPoints.Count,
+                ladderAction = args.Count == 2 ? args[1] : null
             }));
         }
     }
