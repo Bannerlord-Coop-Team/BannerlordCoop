@@ -1,4 +1,5 @@
 ﻿using Common.Messaging;
+using Common.Network;
 using Common.Util;
 using GameInterface.Services.Kingdoms;
 using GameInterface.Services.Kingdoms.Handlers;
@@ -257,6 +258,7 @@ public class KingdomHandlerTests
     {
         return new KingdomHandler(
             new Mock<IMessageBroker>().Object,
+            new Mock<INetwork>().Object,
             objectManager,
             new Mock<IPlayerManager>().Object,
             new Mock<IKingdomDecisionVoteManager>().Object,
@@ -277,6 +279,7 @@ public class KingdomHandlerTests
             .Callback<Action<MessagePayload<RemoveDecision>>>(handler => removeDecisionHandler = handler);
         _ = new KingdomHandler(
             messageBroker.Object,
+            new Mock<INetwork>().Object,
             objectManager,
             new Mock<IPlayerManager>().Object,
             voteManager,
