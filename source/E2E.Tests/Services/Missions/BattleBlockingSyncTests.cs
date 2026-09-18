@@ -33,19 +33,23 @@ public class BattleBlockingSyncTests : MissionTestEnvironment
     public BattleBlockingSyncTests(ITestOutputHelper output) : base(output) { }
 
     [Theory]
-    [InlineData(0, AgentControllerType.Player)]
-    [InlineData(1, AgentControllerType.Player)]
-    [InlineData(0, AgentControllerType.AI)]
-    [InlineData(1, AgentControllerType.AI)]
-    public void PollActions_BallistaOtherActions_SendEntryTransitionsAndClear(
-        int channel, AgentControllerType controllerType)
+    [InlineData(0, AgentControllerType.Player, false)]
+    [InlineData(1, AgentControllerType.Player, false)]
+    [InlineData(0, AgentControllerType.AI, false)]
+    [InlineData(1, AgentControllerType.AI, false)]
+    [InlineData(0, AgentControllerType.Player, true)]
+    [InlineData(1, AgentControllerType.Player, true)]
+    [InlineData(0, AgentControllerType.AI, true)]
+    [InlineData(1, AgentControllerType.AI, true)]
+    public void PollActions_RangedSiegeOtherActions_SendEntryTransitionsAndClear(
+        int channel, AgentControllerType controllerType, bool mangonel)
     {
         RunScenario("owner", context =>
         {
-            var harmony = new Harmony($"{nameof(PollActions_BallistaOtherActions_SendEntryTransitionsAndClear)}.{Guid.NewGuid()}");
+            var harmony = new Harmony($"{nameof(PollActions_RangedSiegeOtherActions_SendEntryTransitionsAndClear)}.{Guid.NewGuid()}");
             var target = AccessTools.Method(typeof(AgentActionData), "GetActionNameWithCode");
             harmony.Patch(target, postfix: new HarmonyMethod(
-                typeof(BattleBlockingSyncTests), nameof(ReadBallistaActionName)));
+                typeof(BattleBlockingSyncTests), nameof(ReadRangedSiegeActionName)));
             try
             {
                 var agentId = Guid.NewGuid();
@@ -55,7 +59,10 @@ public class BattleBlockingSyncTests : MissionTestEnvironment
                 Assert.Empty(context.Network.NetworkSentPackets.GetPackets<AgentActionPacket>());
 
                 long sequence = 0;
-                foreach (int action in new[] { 3715, 3716, 3717, 3718, 3713, -1 })
+                var useActions = mangonel
+                    ? new[] { 3730, 3731, 3732, 3733, 3730, -1 }
+                    : new[] { 3715, 3716, 3717, 3718, 3713, -1 };
+                foreach (int action in useActions)
                 {
                     if (channel == 0)
                     {
@@ -102,7 +109,7 @@ public class BattleBlockingSyncTests : MissionTestEnvironment
         });
     }
 
-    private static void ReadBallistaActionName(int actionCode, ref string __result)
+    private static void ReadRangedSiegeActionName(int actionCode, ref string __result)
     {
         __result = actionCode switch
         {
@@ -111,6 +118,10 @@ public class BattleBlockingSyncTests : MissionTestEnvironment
             3717 => "act_usage_ballista_ammo_place_start_defender",
             3718 => "act_usage_ballista_ammo_place_end_defender",
             3713 => "act_usage_ballista_idle_defender",
+            3730 => "act_usage_mangonel_big_idle",
+            3731 => "act_usage_mangonel_big_shoot",
+            3732 => "act_usage_mangonel_big_reload",
+            3733 => "act_usage_mangonel_reload_2_idle",
             1001 => "act_walk_forward",
             1002 => "act_idle",
             _ => __result,

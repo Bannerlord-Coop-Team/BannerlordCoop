@@ -787,13 +787,15 @@ public class AgentActionHandler : IAgentActionHandler
         hasPublishedSpeed = true;
     }
 
-    // Ballista use is also Other; recognize its actions without publishing ordinary locomotion.
+    // Ranged siege use is also Other; recognize its actions without publishing ordinary locomotion.
     private static bool IsDiscreteAction(Agent.ActionCodeType type, int actionIndex = -1)
     {
-        return (type != Agent.ActionCodeType.Other && type != Agent.ActionCodeType.Idle)
-            || (actionIndex >= 0
-                && AgentActionData.GetActionNameWithCode(actionIndex)
-                    ?.StartsWith("act_usage_ballista_", StringComparison.Ordinal) == true);
+        if (type != Agent.ActionCodeType.Other && type != Agent.ActionCodeType.Idle) return true;
+        if (actionIndex < 0) return false;
+
+        string actionName = AgentActionData.GetActionNameWithCode(actionIndex);
+        return actionName?.StartsWith("act_usage_ballista_", StringComparison.Ordinal) == true
+            || actionName?.StartsWith("act_usage_mangonel_", StringComparison.Ordinal) == true;
     }
 
     private static bool IsMountedGuardLocomotionChurn(
