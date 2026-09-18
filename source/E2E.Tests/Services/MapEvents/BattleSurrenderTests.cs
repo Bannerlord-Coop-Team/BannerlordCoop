@@ -42,6 +42,38 @@ public class BattleSurrenderTests : MapEventTestBase
 {
     public BattleSurrenderTests(ITestOutputHelper output) : base(output) { }
 
+    [Theory]
+    [InlineData(true, 2, true)]
+    [InlineData(true, 1, false)]
+    [InlineData(false, 2, false)]
+    public void HideoutDuelSurrender_WaitsForMissionCompletionAndRequiresCurrentHost(
+        bool fromHost, int epoch, bool accepted)
+    {
+        var setup = SetupTwoOpposingPlayersInBattle();
+        var clients = Clients.ToArray();
+        TestEnvironment.ConnectRegisteredPlayer(clients[0], "1");
+        TestEnvironment.ConnectRegisteredPlayer(clients[1], "2");
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject<MapEvent>(setup.ctx.MapEventId, out var battle));
+            battle._mapEventType = MapEvent.BattleTypes.Hideout;
+            Server.Resolve<IBattleHostRegistry>().Set(setup.ctx.MapEventId,
+                new BattleHostAssignment("1", new[] { "2" }, 2));
+            Assert.True(ServerBattleModeArbiter.TryClaimMission(setup.ctx.MapEventId));
+        });
+
+        Server.SimulateMessage(clients[fromHost ? 0 : 1].NetPeer,
+            new NetworkMapEventSurrender(setup.ctx.MapEventId, BattleSideEnum.Defender, epoch));
+
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject<MapEvent>(setup.ctx.MapEventId, out var battle));
+            Assert.Equal(accepted, battle.DefenderSide.IsSurrendered);
+            Assert.Equal(BattleState.None, battle.BattleState);
+            Assert.False(battle._mapEventResultsApplied);
+        });
+    }
+
     /// <summary>
     /// BR-060: a participating player is permitted to surrender. Driving the ACTUAL patched
     /// <c>PlayerEncounter.PlayerSurrenderInternal</c> (the menu action) on the participating player's client —

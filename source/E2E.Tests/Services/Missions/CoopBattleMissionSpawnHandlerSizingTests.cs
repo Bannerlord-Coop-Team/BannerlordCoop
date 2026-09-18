@@ -89,6 +89,8 @@ public class CoopBattleMissionSpawnHandlerSizingTests
 
     [Theory]
     [InlineData(1, 1, 1, 0, 0, 0)]
+    [InlineData(10, 4, 2, 8, 2, 6)]
+    [InlineData(1, 1, 2, 0, 0, 0)]
     [InlineData(5, 5, 1, 4, 4, 0)]
     [InlineData(10, 4, 1, 9, 3, 6)]
     [InlineData(10, 4, 6, 4, 0, 4)]

@@ -43,6 +43,77 @@ public class BattleAbandonmentTests : MissionTestEnvironment
     public BattleAbandonmentTests(ITestOutputHelper output) : base(output) { }
 
     [Fact]
+    public void HideoutSuccessor_WaitsForItsPhaseSnapshotAfterLoading()
+    {
+        var (mapEventId, _) = SetupCoopBattle("hideout-host", "hideout-joining");
+        var clients = Clients.ToArray();
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject<MapEvent>(mapEventId, out var battle));
+            battle._mapEventType = MapEvent.BattleTypes.Hideout;
+        });
+        EnterBattle(clients[0], mapEventId);
+        EnterBattle(clients[1], mapEventId);
+        Server.Call(() =>
+        {
+            Assert.True(Server.Resolve<IBattleHostRegistry>().TryGet(mapEventId, out var assignment));
+            Assert.Equal("hideout-host", assignment.HostControllerId);
+            Assert.Empty(assignment.SuccessorControllerIds);
+        });
+
+        Server.SimulateMessage(clients[1].NetPeer,
+            new NetworkRequestBattleHost(mapEventId, "hideout-joining", hideoutStateReady: true));
+
+        Server.Call(() =>
+        {
+            Assert.True(Server.Resolve<IBattleHostRegistry>().TryGet(mapEventId, out var assignment));
+            Assert.Equal(new[] { "hideout-joining" }, assignment.SuccessorControllerIds);
+        });
+    }
+
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public void HideoutWithoutSurvivingHost_FinalizesAndClosesRemainingParticipants(bool instanceEmpty)
+    {
+        var (mapEventId, partyIds) = SetupCoopBattle("hideout-host", "hideout-loader");
+        var clients = Clients.ToArray();
+        string[] partyBaseIds = null;
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject<MapEvent>(mapEventId, out var mapEvent));
+            mapEvent._mapEventType = MapEvent.BattleTypes.Hideout;
+            partyBaseIds = MapEventPlayerPartyCollector.CollectPartyIds(mapEvent, Server.ObjectManager);
+        });
+        EnterBattle(clients[0], mapEventId);
+        if (!instanceEmpty) EnterBattle(clients[1], mapEventId, missionReady: false);
+        AssertHost(Server, mapEventId, "hideout-host");
+        Server.Call(() =>
+        {
+            Assert.True(ServerBattleModeArbiter.TryClaimMission(mapEventId));
+            Server.Resolve<IBattleTroopLedger>().SetReserve(mapEventId, "hideout-spent-reserve",
+                new[] { new TroopReserveEntry(4250, "hideout-troop", 0) });
+        });
+        Server.NetworkSentMessages.Clear();
+
+        DepartBattle("hideout-host", mapEventId, wasRetreat: true, isInstanceEmpty: instanceEmpty);
+
+        AssertBattleInstanceDestroyed(mapEventId);
+        Server.Call(() =>
+        {
+            Assert.False(Server.ObjectManager.TryGetObject<MapEvent>(mapEventId, out _));
+            foreach (var partyId in partyIds)
+            {
+                Assert.True(Server.ObjectManager.TryGetObject<MobileParty>(partyId, out var party));
+                Assert.Null(party.MapEvent);
+            }
+        });
+        var close = Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkClosePvpEncounter>());
+        Assert.Equal(mapEventId, close.MapEventId);
+        Assert.Equal(partyBaseIds.OrderBy(id => id), close.PartyIds.OrderBy(id => id));
+    }
+
+    [Fact]
     public void DisconnectAndReconnectToAnUnresolvedMapEvent_RefreshesTheFastForwardLock()
     {
         var (mapEventId, _) = SetupCoopBattle("connected-ctrl", "offline-ctrl");

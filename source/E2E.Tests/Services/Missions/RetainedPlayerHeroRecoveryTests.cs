@@ -28,11 +28,12 @@ public class RetainedPlayerHeroRecoveryTests : MissionTestEnvironment
 {
     public RetainedPlayerHeroRecoveryTests(ITestOutputHelper output) : base(output) { }
 
-
     [Theory]
-    [InlineData(true)]
-    [InlineData(false)]
-    public void SuccessorReconstructsHandoffOnlyForStillPresentReturner(bool returnerPresent)
+    [InlineData(true, false)]
+    [InlineData(false, false)]
+    [InlineData(true, true)]
+    [InlineData(false, true)]
+    public void SuccessorReconstructsHandoffOnlyForStillPresentReturner(bool returnerPresent, bool spawnedByHost)
     {
         using var fixture = new MissionEngineFixture();
         var (battleId, partyIds) = SetupCoopBattle("successor", "returner");
@@ -73,13 +74,16 @@ public class RetainedPlayerHeroRecoveryTests : MissionTestEnvironment
             var agent = mission.SpawnAgent(new AgentBuildData(hero.CharacterObject)
                 .Controller(AgentControllerType.None).Team(mission.DefenderTeam.Shell).Equipment(new Equipment()));
             agent.Health = 22;
-            Assert.True(registry.TryRegisterAgent("former", "returner", "returner:first-mission", agentId, 7, agent, 1));
+            if (!spawnedByHost)
+                Assert.True(registry.TryRegisterAgent("former", "returner", "returner:first-mission", agentId, 7, agent, 1));
             casualties.Record(agentId, eventPartyId, 1141, characterId);
 
             replicator.RecoverRetainedPlayerHandoffs(0.5f);
             Assert.DoesNotContain(relay.Invocations, call => call.Arguments[0] is NetworkRequestRetainedPlayerHero);
             hosts.Set(battleId, new BattleHostAssignment("successor", new[] { "returner" }, 2));
             broker.Publish(this, new BattleHostMigrated(battleId, "former", "successor"));
+            if (spawnedByHost)
+                Assert.True(registry.TryRegisterAgent("successor", "successor", "successor:current", agentId, 7, agent, 0));
             replicator.RecoverRetainedPlayerHandoffs(0.5f);
             var requests = relay.Invocations.Select(call => call.Arguments[0]).OfType<NetworkRequestRetainedPlayerHero>().ToArray();
             Assert.Equal(returnerPresent ? 1 : 0, requests.Length);
@@ -87,18 +91,18 @@ public class RetainedPlayerHeroRecoveryTests : MissionTestEnvironment
             Assert.Same(agent, info.Agent);
             Assert.Single(mission.Agents);
             Assert.Equal(22, agent.Health);
-            Assert.Equal("returner", info.OriginalOwner);
-            Assert.Equal("returner:first-mission", info.MovementScopeId);
+            Assert.Equal(spawnedByHost ? "successor" : "returner", info.OriginalOwner);
+            Assert.Equal(spawnedByHost ? "successor:current" : "returner:first-mission", info.MovementScopeId);
             Assert.Equal(7, info.MovementId);
             Assert.Equal("successor", info.CurrentAuthority);
-            Assert.Equal(2, info.AuthorityRevision);
+            Assert.Equal(spawnedByHost ? 0 : 2, info.AuthorityRevision);
             if (!returnerPresent) return;
 
             var handoff = requests[0].Handoff;
             Assert.Equal(battleId, handoff.BattleInstanceId);
             Assert.Equal(2, handoff.HostEpoch);
             Assert.Equal("successor", handoff.Previous.OwnerControllerId);
-            Assert.Equal(2, handoff.Previous.AuthorityRevision);
+            Assert.Equal(spawnedByHost ? 0 : 2, handoff.Previous.AuthorityRevision);
             Assert.Equal(1141, handoff.Previous.TroopSeed);
             Assert.Equal(eventPartyId, handoff.Previous.MapEventPartyId);
             Assert.Equal(AgentControllerType.None, agent.Controller);
@@ -108,7 +112,7 @@ public class RetainedPlayerHeroRecoveryTests : MissionTestEnvironment
             Assert.True(migrator.ApplyPlayerHandoff(handoff));
             migrator.TickPlayerHandoffs(0.5f);
             Assert.Equal(2, relay.Invocations.Count(call => call.Arguments[0] is NetworkRequestRetainedPlayerHero));
-            Assert.Equal(3, info.AuthorityRevision);
+            Assert.Equal(spawnedByHost ? 1 : 3, info.AuthorityRevision);
         });
     }
     [Theory]
@@ -310,5 +314,4 @@ public class RetainedPlayerHeroRecoveryTests : MissionTestEnvironment
         }
         Server.PumpGameThread();
     }
-
 }

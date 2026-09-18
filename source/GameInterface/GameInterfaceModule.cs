@@ -20,6 +20,7 @@ using GameInterface.Services.GameDebug.Metrics;
 using GameInterface.Services.Heroes;
 using GameInterface.Services.Heroes.Commands;
 using GameInterface.Services.Heroes.Interfaces;
+using GameInterface.Services.Hideouts;
 using GameInterface.Services.Issues.Generic;
 using GameInterface.Services.Issues.Interfaces;
 using GameInterface.Services.Kingdoms;
@@ -32,6 +33,7 @@ using GameInterface.Services.MapEventParties;
 using GameInterface.Services.MapEvents;
 using GameInterface.Services.MapEvents.Initialization;
 using GameInterface.Services.MapEvents.Logging;
+using GameInterface.Services.MapEvents.Participation;
 using GameInterface.Services.MobileParties;
 using GameInterface.Services.MobileParties.Data;
 using GameInterface.Services.MobilePartyAIs;
@@ -106,6 +108,7 @@ public class GameInterfaceModule : Module
         builder.RegisterType<ControllerIdProvider>().As<IControllerIdProvider>().InstancePerLifetimeScope();
         builder.RegisterType<TimeControlModeConverter>().As<ITimeControlModeConverter>().InstancePerLifetimeScope();
         builder.RegisterType<PlayerManager>().As<IPlayerManager>().InstancePerLifetimeScope();
+        builder.RegisterType<HideoutPreparation>().As<IHideoutPreparation>().InstancePerDependency();
         builder.RegisterType<BugReportService>().As<IBugReportService>().InstancePerLifetimeScope().AutoActivate();
         builder.RegisterType<BugReportOverlay>().As<IBugReportOverlay>().InstancePerLifetimeScope();
         builder.RegisterType<CoopLogSnapshotProvider>().As<ICoopLogSnapshotProvider>().InstancePerDependency();
@@ -189,6 +192,7 @@ public class GameInterfaceModule : Module
         builder.RegisterType<MainPartyBattleRewardsCache>().As<IMainPartyBattleRewardsCache>().InstancePerLifetimeScope();
         builder.RegisterType<PacketManager>().As<IPacketManager>().InstancePerLifetimeScope();
         builder.RegisterType<MapEventInitializationBarrierBinding>().InstancePerLifetimeScope().AutoActivate();
+        builder.RegisterType<RetreatedMapEventPartyTracker>().As<IRetreatedMapEventPartyTracker>().InstancePerLifetimeScope();
         builder.RegisterType<MapTrackerProviderHolder>().As<IMapTrackerProviderHolder>().InstancePerLifetimeScope();
 
         builder.RegisterModule<ServiceModule>();
