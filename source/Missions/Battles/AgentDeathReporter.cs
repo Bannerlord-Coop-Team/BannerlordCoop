@@ -9,6 +9,7 @@ using GameInterface.Services.ObjectManager;
 using Missions.Messages;
 using Serilog;
 using System;
+using System.Collections.Concurrent;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.Core;
 using TaleWorlds.MountAndBlade;
@@ -23,6 +24,10 @@ namespace Missions.Battles;
 /// broadcast) is ignored — its authority is the owner, not us — so there is no echo. Registered MOUNTS flow
 /// through here too (the mission callback fires for any agent): they broadcast like troops so the horse dies
 /// on every client, but carry no casualty attribution, so no server roster report is sent for them.
+///
+/// Death broadcasts are retained for the lifetime of the mission. If a peer misses a death and later routes
+/// another hit for that now-unregistered agent back to its owner, the owner replays the original death event.
+/// This lets stale peers self-heal instead of keeping an unkillable "zombie" puppet alive indefinitely.
 /// </summary>
 public interface IAgentDeathReporter : IDisposable
 {
@@ -41,6 +46,7 @@ public class AgentDeathReporter : IAgentDeathReporter
     private readonly ICoopMissionComponent coopMissionComponent;
     private readonly IBattleSession session;
     private readonly ICasualtyAttributionMap casualties;
+    private readonly ConcurrentDictionary<Guid, NetworkBattleAgentDied> deathLedger = new();
 
     public AgentDeathReporter(
         IBattleNetwork network,
@@ -60,11 +66,14 @@ public class AgentDeathReporter : IAgentDeathReporter
         this.casualties = casualties;
 
         messageBroker.Subscribe<BattleAgentDied>(Handle_BattleAgentDied);
+        messageBroker.Subscribe<NetworkApplyBattleDamage>(Handle_NetworkApplyBattleDamage);
     }
 
     public void Dispose()
     {
         messageBroker.Unsubscribe<BattleAgentDied>(Handle_BattleAgentDied);
+        messageBroker.Unsubscribe<NetworkApplyBattleDamage>(Handle_NetworkApplyBattleDamage);
+        deathLedger.Clear();
     }
 
     public void OnAgentRemoved(Agent affectedAgent, Agent affectorAgent, AgentState agentState, KillingBlow killingBlow)
@@ -122,14 +131,25 @@ public class AgentDeathReporter : IAgentDeathReporter
             }
 #endif
 
-            Logger.Information("[DeathDiag] Broadcasting death of agent {AgentId} (wounded={Wounded}) to the battle mesh", info.AgentId, wounded);
-            network.SendAll(new NetworkBattleAgentDied(
+            var death = new NetworkBattleAgentDied(
                 info.AgentId,
                 wounded,
                 affectorAgentId,
                 payload.What.InflictedDamage,
                 payload.What.VictimBodyPart,
-                payload.What.DeathAction));
+                payload.What.DeathAction);
+
+            // Keep the immutable death message after the native agent leaves the registry. A stale peer can
+            // still route another hit for this id; that hit is our signal that the peer missed the terminal
+            // state and needs the death broadcast again.
+            deathLedger[info.AgentId] = death;
+
+            Logger.Information(
+                "[DeathDiag] Broadcasting death of agent {AgentId} (wounded={Wounded}) to the battle mesh; deathLedger={DeathLedgerCount}",
+                info.AgentId,
+                wounded,
+                deathLedger.Count);
+            network.SendAll(death);
 
             // Owner-authoritative casualty: tell the server to account this troop's death/wound against its
             // map-event party roster. The server-side mission accounting is suppressed during a coop battle
@@ -140,5 +160,23 @@ public class AgentDeathReporter : IAgentDeathReporter
             casualties.Forget(info.AgentId);
             registry.RemoveAgent(info.AgentId);
         });
+    }
+
+    private void Handle_NetworkApplyBattleDamage(MessagePayload<NetworkApplyBattleDamage> payload)
+    {
+        if (!BattleSpawnGate.IsCoopBattleActive) return;
+
+        NetworkApplyBattleDamage damage = payload.What;
+        if (!deathLedger.TryGetValue(damage.VictimAgentId, out NetworkBattleAgentDied death))
+            return;
+
+        Logger.Warning(
+            "[DeathDiag] Routed damage targeted already-dead authoritative agent {AgentId}; " +
+            "replaying death broadcast to repair a stale peer. attackerId={AttackerId} controller={ControllerId}",
+            damage.VictimAgentId,
+            damage.AttackerAgentId,
+            session.OwnControllerId);
+
+        network.SendAll(death);
     }
 }
