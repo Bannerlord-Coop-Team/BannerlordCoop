@@ -370,13 +370,14 @@ public class WeaponPickupSyncTests
             Assert.Contains(
                 patches.Postfixes,
                 patch => patch.owner == harmony.Id);
+            var grantTarget = AccessTools.Method(typeof(Agent), nameof(Agent.EquipWeaponToExtraSlotAndWield));
+            var grantPatches = Harmony.GetPatchInfo(grantTarget);
+            Assert.Contains(grantPatches.Postfixes, patch =>
+                patch.owner == harmony.Id && patch.PatchMethod.DeclaringType == typeof(LadderForkGrantPatch));
         }
         finally
         {
-            harmony.Unpatch(
-                target,
-                HarmonyPatchType.All,
-                harmony.Id);
+            harmony.UnpatchAll(harmony.Id);
         }
     }
 
