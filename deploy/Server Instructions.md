@@ -71,8 +71,6 @@ The exact router steps depend on your router model.
 
 ---
 
----
-
 ### 5. Connecting
 
 Players on the same LAN can connect using the host machine’s local IP address, for example:

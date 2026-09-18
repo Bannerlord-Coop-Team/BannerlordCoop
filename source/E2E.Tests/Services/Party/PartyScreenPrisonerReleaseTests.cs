@@ -2,20 +2,40 @@ using GameInterface.Services.Party.Handlers;
 using GameInterface.Services.Party.Patches;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Roster;
+using TaleWorlds.Core;
 
 namespace E2E.Tests.Services.Party;
 
 public class PartyScreenPrisonerReleaseTests
 {
     [Fact]
-    public void ReleaseActions_AreRequestedOnlyByVanillaDefaultDoneCallback()
+    public void ReleaseActions_AreNotRequestedForEmptyPrisonerRosters()
     {
+        // Vanilla DefaultDoneHandler calls HandleReleasedAndTakenPrisoners
+        // unconditionally, so empty rosters (e.g. a force volunteers loot
+        // screen with no prisoner moves) must not flag prisoner actions.
         PartyScreenHelperPatches.ResetReleasedAndTakenPrisonerActionsRequest();
 
         Assert.False(PartyScreenHelperPatches.ConsumeReleasedAndTakenPrisonerActionsRequest());
 
         PartyScreenHelperPatches.HandleReleasedAndTakenPrisonersPrefix(
             new FlattenedTroopRoster(4),
+            new FlattenedTroopRoster(4));
+
+        Assert.False(PartyScreenHelperPatches.ConsumeReleasedAndTakenPrisonerActionsRequest());
+    }
+
+    [Fact]
+    public void ReleaseActions_AreRequestedForNonEmptyPrisonerRosters()
+    {
+        PartyScreenHelperPatches.ResetReleasedAndTakenPrisonerActionsRequest();
+
+        var taken = new FlattenedTroopRoster(4);
+        var descriptor = new UniqueTroopDescriptor(123);
+        taken[descriptor] = new FlattenedTroopRosterElement(null, RosterTroopState.Active, 0, descriptor);
+
+        PartyScreenHelperPatches.HandleReleasedAndTakenPrisonersPrefix(
+            taken,
             new FlattenedTroopRoster(4));
 
         Assert.True(PartyScreenHelperPatches.ConsumeReleasedAndTakenPrisonerActionsRequest());
