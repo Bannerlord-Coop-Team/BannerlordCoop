@@ -24,7 +24,7 @@ namespace Missions.Battles;
 
 public interface ISiegeInteractionDebugBehavior
 {
-    object Observe(Guid? observedAgentId = null);
+    object Observe(Guid? observedAgentId = null, int? requestedMachineId = null);
 }
 
 internal sealed class SiegeInteractionDebugBehavior : MissionBehavior, ISiegeInteractionDebugBehavior
@@ -1062,7 +1062,13 @@ internal sealed class SiegeInteractionDebugBehavior : MissionBehavior, ISiegeInt
         stagingCamera = null;
     }
 
-    public object Observe(Guid? observedAgentId = null)
+    internal IEnumerable<UsableMachine> SelectObservedMachines(IEnumerable<UsableMachine> machines, int? requestedMachineId = null)
+    {
+        int? selectedId = requestedMachineId ?? observedMachineId;
+        return machines.Where(machine => !selectedId.HasValue || machine.Id.Id == selectedId.Value);
+    }
+
+    public object Observe(Guid? observedAgentId = null, int? requestedMachineId = null)
     {
         var screen = ScreenManager.TopScreen as MissionScreen;
         var agent = Mission?.MainAgent;
@@ -1104,10 +1110,9 @@ internal sealed class SiegeInteractionDebugBehavior : MissionBehavior, ISiegeInt
             useDispatch = ReadUseDispatch(),
             receivedStates, localShots, receivedShots,
             equipment = ReadEquipment(agent),
-            observedMachineId,
+            observedMachineId = requestedMachineId ?? observedMachineId,
             // Keep every input frame and the requested machine, even after focus is lost.
-            machines = Mission?.MissionObjects.OfType<UsableMachine>()
-                .Where(machine => !observedMachineId.HasValue || machine.Id.Id == observedMachineId.Value)
+            machines = SelectObservedMachines(Mission?.MissionObjects.OfType<UsableMachine>() ?? Enumerable.Empty<UsableMachine>(), requestedMachineId)
                 .Select(machine => new
             {
                 id = machine.Id.Id,

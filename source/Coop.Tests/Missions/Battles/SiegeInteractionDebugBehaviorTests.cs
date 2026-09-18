@@ -23,6 +23,34 @@ namespace Coop.Tests.Missions.Battles;
 [Collection("Mission.Current")]
 public class SiegeInteractionDebugBehaviorTests
 {
+    [Fact]
+    public void MachineObservation_ExplicitPeerTargetDoesNotChangeStagedTargetOrHideDuplicates()
+    {
+        var harmony = new Harmony("coop.tests.siege-observed-machine");
+        try
+        {
+            harmony.Patch(AccessTools.Method(typeof(ScriptComponentBehavior), "CacheEditableFieldsForAllScriptComponents"),
+                prefix: new HarmonyMethod(AccessTools.Method(typeof(SiegeInteractionDebugBehaviorTests), nameof(SkipScriptComponentCache))));
+#pragma warning disable SYSLIB0050
+            var ladder = (UsableMachine)FormatterServices.GetUninitializedObject(typeof(SiegeLadder));
+            var stone = (UsableMachine)FormatterServices.GetUninitializedObject(typeof(StonePile));
+#pragma warning restore SYSLIB0050
+            AccessTools.Property(typeof(MissionObject), "Id").SetValue(ladder, new MissionObjectId(915, false));
+            AccessTools.Property(typeof(MissionObject), "Id").SetValue(stone, new MissionObjectId(142, false));
+            var behavior = new SiegeInteractionDebugBehavior(Mock.Of<IMessageBroker>());
+            var machines = new[] { ladder, stone };
+            Assert.Equal(machines, behavior.SelectObservedMachines(machines));
+            AccessTools.Field(typeof(SiegeInteractionDebugBehavior), "observedMachineId").SetValue(behavior, 915);
+            Assert.Same(stone, Assert.Single(behavior.SelectObservedMachines(machines, 142)));
+            Assert.Same(ladder, Assert.Single(behavior.SelectObservedMachines(machines)));
+            Assert.Empty(behavior.SelectObservedMachines(machines, 999));
+            Assert.Equal(2, behavior.SelectObservedMachines(new[] { stone, stone }, 142).Count());
+            Assert.Null(AccessTools.Field(typeof(SiegeInteractionDebugBehavior), "requestId").GetValue(behavior));
+            Assert.False((bool)AccessTools.Field(typeof(SiegeInteractionDebugBehavior), "pressInvoked").GetValue(behavior));
+        }
+        finally { harmony.UnpatchAll(harmony.Id); }
+    }
+
     [Theory]
     [InlineData("handler-use")]
     [InlineData("handler-stop")]

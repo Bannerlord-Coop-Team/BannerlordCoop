@@ -101,23 +101,31 @@ internal static class BattleDebugCommands
         public CoopCommandSide Side => CoopCommandSide.Client;
         public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
-            new ExpectedArgs("agent_id", "Optional exact registered agent id to observe on this client.", false)
+            new ExpectedArgs("agent_id", "Optional exact registered agent id to observe on this client.", false),
+            new ExpectedArgs("machine_id", "Optional exact current mission machine id to read without staging it.", false)
         };
 
         public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
         {
             Guid? agentId = null;
-            if (args.Count > 1) return Failed("Expected at most one registered agent id.");
-            if (args.Count == 1)
+            int? machineId = null;
+            if (args.Count > 2) return Failed("Expected a registered agent id and optional machine id.");
+            if (args.Count >= 1)
             {
                 if (!Guid.TryParseExact(args[0], "N", out var parsedId) || parsedId == Guid.Empty)
                     return Failed("Expected a registered agent id in N format.");
                 agentId = parsedId;
             }
+            if (args.Count == 2)
+            {
+                if (!int.TryParse(args[1], out int parsedMachineId) || parsedMachineId <= 0)
+                    return Failed("Expected a positive current mission machine id.");
+                machineId = parsedMachineId;
+            }
             var observer = Mission.Current?.GetMissionBehavior<SiegeInteractionDebugBehavior>();
             if (ModInformation.IsServer || observer == null)
                 return Failed("A rendered client battle with its DEBUG observer is required.");
-            return Succeeded("LIVE_TEST_JSON=" + JsonConvert.SerializeObject(observer.Observe(agentId)));
+            return Succeeded("LIVE_TEST_JSON=" + JsonConvert.SerializeObject(observer.Observe(agentId, machineId)));
         }
     }
 
