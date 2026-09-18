@@ -901,6 +901,12 @@ internal sealed class SiegeInteractionDebugBehavior : MissionBehavior, ISiegeInt
             return bodyTarget;
         }
         if (watchOnly || !(machine is CastleGate gate)) return standingPointPosition;
+        if (gate.State == CastleGate.GateState.Open)
+        {
+            // The root bounds enclose empty space between the animated open leaves.
+            return GetOpenGateTarget(gate, new[] { gate._agentColliderRight, gate._agentColliderLeft }
+                .Where(body => body != null).Select(body => body.WeakEntity), standingPointPosition);
+        }
         // Gate standing-point origins can lie directly beneath the player's feet.
         var bounds = gate.ComputeGlobalPhysicsBoundingBoxMinMax();
         var gateTarget = (bounds.Item1 + bounds.Item2) * 0.5f;
@@ -913,6 +919,25 @@ internal sealed class SiegeInteractionDebugBehavior : MissionBehavior, ISiegeInt
             };
         }
         return gateTarget;
+    }
+
+    internal Vec3 GetOpenGateTarget(CastleGate gate, IEnumerable<WeakGameEntity> collisionBodies, Vec3 standingPointPosition)
+    {
+        var bodies = collisionBodies.Where(body => body.IsValid && (body.BodyFlag & BodyFlags.Disabled) == 0)
+            .Select(body => new { body, center = body.ComputeGlobalPhysicsBoundingBoxCenter() })
+            .Where(target => new[] { target.center.x, target.center.y, target.center.z }
+                .All(value => !float.IsNaN(value) && !float.IsInfinity(value)))
+            .OrderBy(target => (target.center - standingPointPosition).LengthSquared).ToArray();
+        if (bodies.Length == 0)
+            throw new InvalidOperationException("The open gate has no valid enabled collision body.");
+        var selected = bodies[0];
+        nativeAimTarget = new
+        {
+            requestId, tick, recordedUtc = DateTime.UtcNow, machineId = gate.Id.Id,
+            bodyPointer = selected.body.Pointer.ToUInt64().ToString("X16"),
+            target = DescribePosition(selected.center)
+        };
+        return selected.center;
     }
 
     private void Restore(MissionScreen screen, Agent agent)

@@ -712,6 +712,8 @@ public class SiegeInteractionDebugBehaviorTests
             var machine = (UsableMachine)FormatterServices.GetUninitializedObject(
                 gate ? typeof(CastleGate) : typeof(BatteringRam));
 #pragma warning restore SYSLIB0050
+            if (gate) AccessTools.Field(typeof(CastleGate), "<State>k__BackingField")
+                .SetValue(machine, CastleGate.GateState.Closed);
             var behavior = new SiegeInteractionDebugBehavior(Mock.Of<IMessageBroker>());
             var standingPosition = new Vec3(610.707764f, 625.542664f, 60.684f);
             var target = behavior.GetStagingTarget(machine, standingPosition, watchOnly);
@@ -750,8 +752,14 @@ public class SiegeInteractionDebugBehaviorTests
 
     private static bool SkipScriptComponentCache() => false;
 
-    [Fact]
-    public void NativeOpenGateTarget_UsesGatePhysicsCenterWhenOpen()
+    private static int openGateBodyMode;
+
+    [Theory]
+    [InlineData(0)]
+    [InlineData(1)]
+    [InlineData(2)]
+    [InlineData(3)]
+    public void OpenGateTarget_UsesCurrentEnabledLeafAndRejectsMissingBodies(int mode)
     {
         using var mission = new MissionCurrentScope();
         var harmony = new Harmony("coop.tests.open-gate-native-target");
@@ -765,30 +773,38 @@ public class SiegeInteractionDebugBehaviorTests
                     nameof(GatePhysicsBounds))));
             harmony.Patch(AccessTools.Method(typeof(WeakGameEntity), nameof(WeakGameEntity.ComputeGlobalPhysicsBoundingBoxCenter)),
                 prefix: new HarmonyMethod(AccessTools.Method(typeof(SiegeInteractionDebugBehaviorTests),
-                    nameof(GateStandingPointPhysicsCenter))));
+                    nameof(OpenGatePhysicsCenter))));
+            harmony.Patch(AccessTools.PropertyGetter(typeof(WeakGameEntity), nameof(WeakGameEntity.BodyFlag)),
+                prefix: new HarmonyMethod(AccessTools.Method(typeof(SiegeInteractionDebugBehaviorTests), nameof(OpenGateBodyFlags))));
 #pragma warning disable SYSLIB0050
             var gate = (CastleGate)FormatterServices.GetUninitializedObject(typeof(CastleGate));
-            var standingPoint = (StandingPoint)FormatterServices.GetUninitializedObject(typeof(StandingPoint));
 #pragma warning restore SYSLIB0050
+            openGateBodyMode = mode;
             AccessTools.Field(typeof(CastleGate), "<State>k__BackingField")
                 .SetValue(gate, CastleGate.GateState.Open);
-            AccessTools.Field(typeof(UsableMissionObject), "_isDeactivated").SetValue(standingPoint, false);
-            var entity = AccessTools.Constructor(typeof(WeakGameEntity), new[] { typeof(UIntPtr) })
-                .Invoke(new object[] { new UIntPtr(881u) });
-            AccessTools.Field(typeof(ScriptComponentBehavior), "_gameEntity").SetValue(standingPoint, entity);
-            AccessTools.Property(typeof(UsableMachine), nameof(UsableMachine.StandingPoints)).SetValue(gate,
-                new MBList<StandingPoint> { standingPoint });
+            var bodies = mode == 3 ? Array.Empty<WeakGameEntity>() : new[] { 881u, 882u }
+                .Select(pointer => (WeakGameEntity)AccessTools.Constructor(typeof(WeakGameEntity), new[] { typeof(UIntPtr) })
+                    .Invoke(new object[] { new UIntPtr(pointer) })).ToArray();
 
             var behavior = new SiegeInteractionDebugBehavior(Mock.Of<IMessageBroker>());
             var standingPosition = new Vec3(610.707764f, 625.542664f, 60.684f);
-            var target = behavior.GetStagingTarget(gate, standingPosition, false, true, standingPoint);
-
-            Assert.Equal(new Vec3(613f, 625f, 62f), target);
+            Assert.Equal(standingPosition, behavior.GetStagingTarget(gate, standingPosition, true));
+            if (mode == 3)
+            {
+                Assert.Throws<InvalidOperationException>(() => behavior.GetOpenGateTarget(gate, bodies, standingPosition));
+                return;
+            }
+            var target = behavior.GetOpenGateTarget(gate, bodies, standingPosition);
+            var expected = mode == 0 ? new Vec3(611f, 626f, 63f) : new Vec3(614f, 626f, 63f);
+            Assert.Equal(expected, target);
             var nativeAimTarget = JObject.FromObject(
                 AccessTools.Field(typeof(SiegeInteractionDebugBehavior), "nativeAimTarget").GetValue(behavior));
-            Assert.Equal(613f, nativeAimTarget["target"]["x"].Value<float>());
-            Assert.Equal(625f, nativeAimTarget["target"]["y"].Value<float>());
-            Assert.Equal(62f, nativeAimTarget["target"]["z"].Value<float>());
+            Assert.Equal(expected.x, nativeAimTarget["target"]["x"].Value<float>());
+            Assert.Equal(expected.y, nativeAimTarget["target"]["y"].Value<float>());
+            Assert.Equal(expected.z, nativeAimTarget["target"]["z"].Value<float>());
+            Assert.Equal((mode == 0 ? 881UL : 882UL).ToString("X16"), nativeAimTarget["bodyPointer"].Value<string>());
+            Assert.Null(AccessTools.Field(typeof(SiegeInteractionDebugBehavior), "capturedAgent").GetValue(behavior));
+            Assert.Null(AccessTools.Field(typeof(SiegeInteractionDebugBehavior), "stagingCamera").GetValue(behavior));
         }
         finally
         {
@@ -796,10 +812,17 @@ public class SiegeInteractionDebugBehaviorTests
         }
     }
 
-    private static bool GateStandingPointPhysicsCenter(WeakGameEntity __instance, ref Vec3 __result)
+    private static bool OpenGateBodyFlags(WeakGameEntity __instance, ref BodyFlags __result)
     {
-        Assert.Equal(881UL, __instance.Pointer.ToUInt64());
-        __result = new Vec3(614f, 626f, 63f);
+        __result = openGateBodyMode == 1 && __instance.Pointer.ToUInt64() == 881UL ? BodyFlags.Disabled : (BodyFlags)0;
+        return false;
+    }
+
+    private static bool OpenGatePhysicsCenter(WeakGameEntity __instance, ref Vec3 __result)
+    {
+        bool right = __instance.Pointer.ToUInt64() == 881UL;
+        Assert.Contains(__instance.Pointer.ToUInt64(), new ulong[] { 881, 882 });
+        __result = new Vec3(right ? (openGateBodyMode == 2 ? float.NaN : 611f) : 614f, 626f, 63f);
         return false;
     }
 
