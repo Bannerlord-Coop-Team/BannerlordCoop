@@ -210,6 +210,7 @@ internal class TroopRosterInterface : ITroopRosterInterface
 
                 if (finalNumber < 0 ||
                     finalNumber > int.MaxValue ||
+                    (elementData.Number > 0 && character.IsHero && finalNumber > 1) ||
                     finalWounded < 0 ||
                     finalWounded > finalNumber ||
                     finalXp < 0 ||

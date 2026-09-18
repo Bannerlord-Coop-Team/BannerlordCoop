@@ -61,19 +61,40 @@ public class PrisonerSaleValidatorTests
         AssertElement(result, character, 3, 1);
     }
 
+    [Theory]
+    [InlineData(5, 2, 5, 2, true)]
+    [InlineData(4, 1, 4, 1, true)]
+    [InlineData(2, 0, 3, 2, true)]
+    [InlineData(4, 1, 4, 1, false)]
+    public void Validate_DuplicateEntries_ShareAvailabilityAndPreserveXpOnce(
+        int firstNumber, int firstWounded, int secondNumber, int secondWounded, bool preserveTroopXp)
+    {
+        var character = ObjectHelper.SkipConstructor<CharacterObject>();
+        var requested = Roster(
+            Element(character, firstNumber, firstWounded),
+            Element(character, secondNumber, secondWounded));
+        var availableElement = Element(character, 5, 2);
+        availableElement.Xp = 60;
+        var available = Roster(availableElement);
+
+        var result = validator.Validate(requested, available, preserveTroopXp);
+
+        AssertElement(result, character, 5, 2);
+        Assert.Equal(preserveTroopXp ? 60 : 0, Assert.Single(result.GetTroopRoster()).Xp);
+        AssertElement(available, character, 5, 2);
+        Assert.Equal(60, Assert.Single(available.GetTroopRoster()).Xp);
+    }
+
     private static TroopRoster Roster(params TroopRosterElement[] elements)
     {
         var roster = new TroopRoster();
         foreach (var element in elements)
         {
-            roster.AddToCounts(
-                element.Character,
-                element.Number,
-                false,
-                element.WoundedNumber,
-                element.Xp,
-                true);
+            int index = roster.AddNewElement(element.Character, -1);
+            roster.data[index] = element;
         }
+        roster.UpdateVersion();
+        roster.InitializeCachedData();
         return roster;
     }
 
