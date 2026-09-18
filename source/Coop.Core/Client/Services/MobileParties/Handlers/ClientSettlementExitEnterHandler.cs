@@ -8,6 +8,7 @@ using GameInterface.Services.MapEvents;
 using GameInterface.Services.MobileParties.Messages.Behavior;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Settlements.Interfaces;
+using TaleWorlds.CampaignSystem.Encounters;
 using TaleWorlds.CampaignSystem.GameMenus;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Settlements;
@@ -250,7 +251,26 @@ public class ClientSettlementExitEnterHandler : IHandler
             {
                 settlementInterface.PartyLeaveSettlement(party);
             }
+
+            CloseStaleMainPartyEncounter(payload.PartyId);
         });
+    }
+
+    // A server-driven leave (unstuck, debug teleport) carries no leave reply, so the
+    // client-requested path that closes the menu never runs. Without this the town menu
+    // stays open on the old settlement and the next enter cannot open its own menu.
+    private void CloseStaleMainPartyEncounter(string partyId)
+    {
+        if (!IsMainParty(partyId))
+            return;
+
+        if (PlayerEncounter.Current == null || PlayerEncounter.EncounterSettlement == null)
+            return;
+
+        using (new AllowedThread())
+        {
+            settlementInterface.EndSettlementEncounter();
+        }
     }
 
     private enum PendingStartState

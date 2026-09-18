@@ -12,6 +12,7 @@ using GameInterface.Services.Players;
 using GameInterface.Services.Players.Data;
 using GameInterface.Services.TroopRosters.Data;
 using GameInterface.Services.TroopRosters.Interfaces;
+using GameInterface.Services.Villages.Interfaces;
 using GameInterface.Surrogates;
 using HarmonyLib;
 using Moq;
@@ -35,6 +36,7 @@ public class PlayerCaptivityReleasePositionTests
     private readonly Mock<IObjectManager> objectManager = new();
     private readonly Mock<INetwork> network = new();
     private readonly Mock<ITroopRosterInterface> troopRosterInterface = new();
+    private readonly Mock<IVillageHostileActionInterface> villageHostileActionInterface = new();
     private readonly PartyDoneLogicHandler handler;
 
     public PlayerCaptivityReleasePositionTests()
@@ -44,7 +46,8 @@ public class PlayerCaptivityReleasePositionTests
             messageBroker.Object,
             objectManager.Object,
             network.Object,
-            troopRosterInterface.Object);
+            troopRosterInterface.Object,
+            villageHostileActionInterface.Object);
     }
 
     [Fact]
