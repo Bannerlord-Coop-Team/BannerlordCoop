@@ -936,25 +936,28 @@ internal sealed class SiegeInteractionDebugBehavior : MissionBehavior, ISiegeInt
             };
             return physicsTarget;
         }
-        if (nativeCamera && !watchOnly && machine is Ballista ballista)
+        var mangonel = machine as Mangonel;
+        if (!watchOnly && ((nativeCamera && machine is Ballista) ||
+            (mangonel != null && standingPoint != null && ReferenceEquals(standingPoint, mangonel.PilotStandingPoint))))
         {
-            var body = ballista.ballistaBody;
+            var ballista = machine as Ballista;
+            var body = ballista != null ? ballista.ballistaBody : mangonel._body;
             if (body == null || !body.GameEntity.IsValid)
-                throw new InvalidOperationException("The current ballista has no resolved body.");
+                throw new InvalidOperationException("The current ranged siege weapon has no resolved body.");
             var min = body.GameEntity.GlobalBoxMin;
             var max = body.GameEntity.GlobalBoxMax;
             var bodyTarget = body.GameEntity.ComputeGlobalPhysicsBoundingBoxCenter();
             nativeAimTarget = new
             {
                 requestId, tick, recordedUtc = DateTime.UtcNow, machineId = machine.Id.Id, bodyId = body.Id.Id,
-                bodyName = body.GameEntity.Name, bodyTag = ballista.BodyTag,
+                bodyName = body.GameEntity.Name, bodyTag = ballista != null ? ballista.BodyTag : "body",
                 min = DescribePosition(min), max = DescribePosition(max), target = DescribePosition(bodyTarget),
                 ancestors = DescribeAncestors(body.GameEntity)
             };
             if (new[] { min.x, min.y, min.z, max.x, max.y, max.z, bodyTarget.x, bodyTarget.y, bodyTarget.z }
                     .Any(value => float.IsNaN(value) || float.IsInfinity(value)) ||
                 min.x > max.x || min.y > max.y || min.z > max.z || (max - min).LengthSquared < 0.0001f)
-                throw new InvalidOperationException("The resolved ballista body has invalid world bounds.");
+                throw new InvalidOperationException("The resolved ranged siege body has invalid world bounds.");
             return bodyTarget;
         }
         if (watchOnly || !(machine is CastleGate gate)) return standingPointPosition;

@@ -325,9 +325,10 @@ public class SiegeInteractionDebugBehaviorTests
     }
 
     [Theory]
-    [InlineData(false)]
-    [InlineData(true)]
-    public void NativeTarget_UsesCurrentPhysicsCenterWithoutChangingObserverTarget(bool ballistaTarget)
+    [InlineData(typeof(StonePile))]
+    [InlineData(typeof(Ballista))]
+    [InlineData(typeof(Mangonel))]
+    public void NativeTarget_UsesCurrentPhysicsCenterWithoutChangingObserverTarget(Type machineType)
     {
         using var mission = new MissionCurrentScope();
         var harmony = new Harmony("coop.tests.native-physics-target");
@@ -340,15 +341,22 @@ public class SiegeInteractionDebugBehaviorTests
                 prefix: new HarmonyMethod(AccessTools.Method(typeof(SiegeInteractionDebugBehaviorTests),
                     nameof(NativePhysicsCenter))));
 #pragma warning disable SYSLIB0050
-            var machine = (UsableMachine)FormatterServices.GetUninitializedObject(
-                ballistaTarget ? typeof(Ballista) : typeof(StonePile));
-            if (ballistaTarget)
+            var machine = (UsableMachine)FormatterServices.GetUninitializedObject(machineType);
+            StandingPoint pilot = null;
+            if (machine is RangedSiegeWeapon)
             {
                 var body = (SynchedMissionObject)FormatterServices.GetUninitializedObject(typeof(SynchedMissionObject));
                 var entity = AccessTools.Constructor(typeof(WeakGameEntity), new[] { typeof(UIntPtr) })
                     .Invoke(new object[] { new UIntPtr(880u) });
                 AccessTools.Field(typeof(ScriptComponentBehavior), "_gameEntity").SetValue(body, entity);
-                AccessTools.Property(typeof(Ballista), "ballistaBody").SetValue(machine, body);
+                if (machine is Ballista)
+                    AccessTools.Property(typeof(Ballista), "ballistaBody").SetValue(machine, body);
+                else
+                {
+                    AccessTools.Field(typeof(Mangonel), "_body").SetValue(machine, body);
+                    pilot = (StandingPoint)FormatterServices.GetUninitializedObject(typeof(StandingPoint));
+                    AccessTools.Property(typeof(UsableMachine), "PilotStandingPoint").SetValue(machine, pilot);
+                }
                 harmony.Patch(AccessTools.PropertyGetter(typeof(WeakGameEntity), nameof(WeakGameEntity.Name)),
                     prefix: new HarmonyMethod(AccessTools.Method(typeof(SiegeInteractionDebugBehaviorTests), nameof(BallistaBodyName))));
                 foreach (var name in new[] { nameof(WeakGameEntity.GlobalBoxMin), nameof(WeakGameEntity.GlobalBoxMax) })
@@ -361,11 +369,24 @@ public class SiegeInteractionDebugBehaviorTests
             var behavior = new SiegeInteractionDebugBehavior(Mock.Of<IMessageBroker>());
             var standingPosition = new Vec3(498.52f, 720.788f, 36.16533f);
 
-            Assert.Equal(standingPosition, behavior.GetStagingTarget(machine, standingPosition, true, true));
+            Assert.Equal(standingPosition, behavior.GetStagingTarget(machine, standingPosition, true, true, pilot));
             Assert.Equal(standingPosition, behavior.GetStagingTarget(machine, standingPosition, false));
-            var expectedX = ballistaTarget ? 500f : 499f;
+            var expectedX = machine is RangedSiegeWeapon ? 500f : 499f;
             Assert.Equal(new Vec3(expectedX, 721f, 36.5f),
-                behavior.GetStagingTarget(machine, standingPosition, false, true));
+                behavior.GetStagingTarget(machine, standingPosition, false, true, pilot));
+            if (machine is Mangonel)
+            {
+                Assert.Equal(new Vec3(expectedX, 721f, 36.5f),
+                    behavior.GetStagingTarget(machine, standingPosition, false, standingPoint: pilot));
+                Assert.Equal(standingPosition, behavior.GetStagingTarget(machine, standingPosition, true, standingPoint: pilot));
+#pragma warning disable SYSLIB0050
+                var otherPoint = (StandingPoint)FormatterServices.GetUninitializedObject(typeof(StandingPoint));
+#pragma warning restore SYSLIB0050
+                Assert.Equal(standingPosition, behavior.GetStagingTarget(machine, standingPosition, false, standingPoint: otherPoint));
+                AccessTools.Field(typeof(Mangonel), "_body").SetValue(machine, null);
+                Assert.Throws<InvalidOperationException>(() =>
+                    behavior.GetStagingTarget(machine, standingPosition, false, standingPoint: pilot));
+            }
             var target = JObject.FromObject(AccessTools.Field(typeof(SiegeInteractionDebugBehavior), "nativeAimTarget").GetValue(behavior));
             Assert.Equal(expectedX, target["target"]["x"].Value<float>());
             Assert.Null(AccessTools.Field(typeof(SiegeInteractionDebugBehavior), "capturedAgent").GetValue(behavior));
