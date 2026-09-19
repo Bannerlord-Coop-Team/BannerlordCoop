@@ -2,6 +2,7 @@
 using GameInterface.Services.Clans.Extensions;
 using GameInterface.Services.Heroes.Extensions;
 using TaleWorlds.CampaignSystem;
+using TaleWorlds.Localization;
 
 namespace GameInterface.Services.Heroes;
 
@@ -14,23 +15,26 @@ public static class HeroExecutionRules
     {
         if (!ModConfigProvider.ModOptions.EnableHeroExecutions)
         {
-            // TODO: Replace with localization "str_coop_cannot_execute_heroes"
-            reason = "Executing heroes has been disabled by the host.";
+            reason = new TextObject("{=str_coop_cannot_execute_heroes}Executing heroes has been disabled by the host.").ToString();
             return false;
         }
 
-        if (hero?.IsPlayerHero() == true) // TODO: Config for toggling player executions when player deaths supported
+#if TESTER
+        if (!ModConfigProvider.ModOptions.EnablePlayerExecutions
+            && hero?.IsPlayerHero() == true)
+#else
+        if (hero?.IsPlayerHero() == true)
+#endif
         {
-            // TODO: Replace with localization "str_coop_cannot_execute_players"
-            reason = "Executing players is disabled in Co-op for now.";
+            reason = new TextObject("{=str_coop_cannot_execute_players}Executing player heroes has been disabled by the host.").ToString();
             return false;
         }
 
-        if (!ModConfigProvider.ModOptions.EnablePlayerClanMemberExecutions
+        if (hero?.IsPlayerHero() != true
+            && !ModConfigProvider.ModOptions.EnablePlayerClanMemberExecutions
             && hero?.Clan?.IsPlayerClan() == true)
         {
-            // TODO: Replace with localization "str_coop_cannot_execute_player_clan_members"
-            reason = "Executing members of other players' clans has been disabled by the host.";
+            reason = new TextObject("{=str_coop_cannot_execute_player_clan_members}Executing members of other players' clans has been disabled by the host.").ToString();
             return false;
         }
 

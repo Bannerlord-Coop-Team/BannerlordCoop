@@ -1,5 +1,6 @@
 ﻿using Common.Logging;
 using Common.Messaging;
+using Common.Network;
 using GameInterface.Services.MapEvents;
 using GameInterface.Services.Time.UI;
 using GameInterface.Services.UI.PlayerNameplates;
@@ -13,7 +14,6 @@ namespace Missions.Battles;
 internal class CoopBattleBehaviorAttacher : ICoopBattleBehaviorAttacher
 {
     private static readonly ILogger Logger = LogManager.GetLogger<CoopBattleBehaviorAttacher>();
-
     // Autofac-provided factory: CoopBattleController is registered InstancePerDependency, so each call
     // builds a fresh controller that lives and is disposed with its mission.
     private readonly Func<CoopBattleController> controllerFactory;
@@ -21,6 +21,7 @@ internal class CoopBattleBehaviorAttacher : ICoopBattleBehaviorAttacher
     private readonly Func<SiegeInteractionDebugBehavior> siegeInteractionDebugFactory;
 #endif
     private readonly IMessageBroker messageBroker;
+    private readonly INetwork relayNetwork;
     private readonly Func<MissionMapTimeView> mapTimeViewFactory;
     private readonly Func<PlayerNameplateMissionView> playerNameplateViewFactory;
 
@@ -31,7 +32,8 @@ internal class CoopBattleBehaviorAttacher : ICoopBattleBehaviorAttacher
 #if DEBUG
         Func<SiegeInteractionDebugBehavior> siegeInteractionDebugFactory,
 #endif
-        IMessageBroker messageBroker)
+        IMessageBroker messageBroker,
+        INetwork relayNetwork)
     {
         this.controllerFactory = controllerFactory;
         this.mapTimeViewFactory = mapTimeViewFactory;
@@ -40,6 +42,7 @@ internal class CoopBattleBehaviorAttacher : ICoopBattleBehaviorAttacher
 #if DEBUG
         this.siegeInteractionDebugFactory = siegeInteractionDebugFactory;
 #endif
+        this.relayNetwork = relayNetwork;
     }
 
     public void Attach(Mission mission)
@@ -56,7 +59,8 @@ internal class CoopBattleBehaviorAttacher : ICoopBattleBehaviorAttacher
             controller.SiegeEngineStateReporter,
             messageBroker,
             controller.Session,
-            controller.Deployment));
+            controller.Deployment,
+            relayNetwork));
         Logger.Information("[BattleSync] Attached coop battle behaviors to mission '{Scene}'", mission.SceneName);
     }
 }

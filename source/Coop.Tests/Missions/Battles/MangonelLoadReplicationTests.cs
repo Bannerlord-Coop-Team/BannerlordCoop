@@ -90,6 +90,66 @@ public sealed class MangonelLoadReplicationTests : IDisposable
         return (sut, info, machine, network);
     }
 
+#if DEBUG
+    private static Agent diagnosticMover;
+    private static bool diagnosticContest;
+
+    private static bool DiagnosticMovingAgent(ref Agent __result) { __result = diagnosticMover; return false; }
+    private static bool DiagnosticContested(ref bool __result) { __result = diagnosticContest; return false; }
+
+    [Theory]
+    [InlineData(false, false, false)]
+    [InlineData(true, false, false)]
+    [InlineData(false, true, false)]
+    [InlineData(false, false, true)]
+    public void AuthorityObservation_RetainsBlockersAndTimersWithoutChangingAuthority(bool user, bool mover, bool contested)
+    {
+        var replica = Replica("loader");
+        AccessTools.Property(typeof(UsableMachine), nameof(UsableMachine.StandingPoints)).SetValue(replica.Machine,
+            new TaleWorlds.Library.MBList<StandingPoint> { Point(replica.Machine) });
+        AccessTools.Field(typeof(SiegeMachineStateReplicator), "trackedMission").SetValue(replica.Sut, mission.Instance);
+        var session = Mock.Get(Field<IBattleSession>(replica.Sut, "session"));
+        session.SetupGet(s => s.HostControllerId).Returns("host");
+        session.SetupGet(s => s.IsLocalHost).Returns(true);
+        // A stale stored epoch must remain untouched even on the host's read path.
+        Field<Dictionary<int, int>>(replica.Sut, "authorityEpochs")[1496] = 2;
+        Field<Dictionary<int, float>>(replica.Sut, "unusedOwnedSeconds")[1496] = 1.25f;
+        Field<Dictionary<int, float>>(replica.Sut, "grantGrace")[1496] = 4f;
+        Mock.Get(Field<INetworkAgentRegistry>(replica.Sut, "agentRegistry"))
+            .Setup(r => r.IsLocallyControlled(replica.Info.Agent)).Returns(true);
+        if (user) Use(replica.Info.Agent, Point(replica.Machine));
+        diagnosticMover = mover ? replica.Info.Agent : null;
+        diagnosticContest = contested;
+        harmony.Patch(AccessTools.PropertyGetter(typeof(UsableMissionObject), nameof(UsableMissionObject.MovingAgent)),
+            prefix: new HarmonyMethod(typeof(MangonelLoadReplicationTests), nameof(DiagnosticMovingAgent)));
+        Stub(typeof(UsableMachine), nameof(UsableMachine.IsDisabledForBattleSideAI), nameof(DiagnosticContested));
+
+        var value = Newtonsoft.Json.Linq.JObject.FromObject(replica.Sut.ObserveMachineAuthority(replica.Machine));
+        Assert.True((bool)value["available"]);
+        Assert.Equal("simulator", (string)value["simulator"]);
+        Assert.Equal(2, (int)value["authorityEpoch"]);
+        Assert.Equal(3, (int)value["hostEpoch"]);
+        Assert.Equal(user, (bool)value["localUser"]);
+        Assert.Equal(mover, (bool)value["localMover"]);
+        Assert.Equal(contested, (bool)value["contested"]);
+        Assert.Equal(1.25f, (float)value["unusedSeconds"]);
+        Assert.Equal(4f, (float)value["graceSeconds"]);
+        Assert.Equal(2, Field<Dictionary<int, int>>(replica.Sut, "authorityEpochs")[1496]);
+        Assert.Equal("simulator", Field<Dictionary<int, string>>(replica.Sut, "claimedMachines")[1496]);
+        replica.Network.Verify(n => n.SendAll(It.IsAny<IMessage>()), Times.Never);
+    }
+
+    [Fact]
+    public void AuthorityObservation_RejectsStaleMissionAndSameIdReplacement()
+    {
+        var replica = Replica("loader");
+        Assert.False((bool)Newtonsoft.Json.Linq.JObject.FromObject(replica.Sut.ObserveMachineAuthority(replica.Machine))["available"]);
+        AccessTools.Field(typeof(SiegeMachineStateReplicator), "trackedMission").SetValue(replica.Sut, mission.Instance);
+        Field<Dictionary<int, UsableMachine>>(replica.Sut, "machinesById")[1496] = New<Mangonel>();
+        Assert.False((bool)Newtonsoft.Json.Linq.JObject.FromObject(replica.Sut.ObserveMachineAuthority(replica.Machine))["available"]);
+    }
+#endif
+
     [Fact]
     public void CrossControllerLoad_UsesOwnerAnimationAndConsumesOnlyAfterNativeCompletion()
     {

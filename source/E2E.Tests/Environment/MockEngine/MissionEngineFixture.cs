@@ -39,6 +39,7 @@ public sealed class MissionEngineFixture : IDisposable
         // Mission statics / members
         Prefix(typeof(Mission), "get_Current", nameof(Mission_get_Current));
         Prefix(typeof(PartyBase), "get_MainParty", nameof(PartyBase_get_MainParty));
+        Prefix(typeof(Mission), nameof(Mission.GetShootDifficulty), nameof(Mission_GetShootDifficulty));
         Prefix(typeof(Mission), "get_CurrentTime", nameof(Mission_get_CurrentTime));
         Prefix(typeof(Mission), "get_DamageToPlayerMultiplier", nameof(Mission_get_DamageToPlayerMultiplier));
         Prefix(typeof(Mission), nameof(Mission.EndMission), nameof(Mission_EndMission));
@@ -48,6 +49,7 @@ public sealed class MissionEngineFixture : IDisposable
         Prefix(typeof(Mission), "get_Agents", nameof(Mission_get_Agents));
         Prefix(typeof(Mission), "get_AllAgents", nameof(Mission_get_AllAgents));
         Prefix(typeof(Mission), "get_MainAgent", nameof(Mission_get_MainAgent));
+        Prefix(typeof(Mission), "get_InitialPlayerAgent", nameof(Mission_get_InitialPlayerAgent));
         Prefix(typeof(Mission), "set_MainAgent", nameof(Mission_set_MainAgent));
         Prefix(typeof(Mission), nameof(Mission.FindAgentWithIndex), nameof(Mission_FindAgentWithIndex));
         Prefix(typeof(Mission), "get_Teams", nameof(Mission_get_Teams));
@@ -69,13 +71,6 @@ public sealed class MissionEngineFixture : IDisposable
                 typeof(BattleSideEnum), typeof(uint), typeof(uint), typeof(Banner), typeof(bool), typeof(bool), typeof(bool),
             }),
             prefix: new HarmonyMethod(AccessTools.Method(typeof(MissionEngineFixture), nameof(MissionTeamCollection_Add))));
-        // GetMissionBehavior<T> walks the mission's behavior list, which a skip-ctor shell doesn't have (NRE).
-        // Tests opt into a deployment-controller shell when they need to exercise pre-commit behavior.
-        // Reference-type instantiations share one method body, so patching this one covers them all.
-        harmony.Patch(
-            AccessTools.Method(typeof(Mission), nameof(Mission.GetMissionBehavior)).MakeGenericMethod(typeof(DeploymentMissionController)),
-            prefix: new HarmonyMethod(AccessTools.Method(typeof(MissionEngineFixture), nameof(Mission_GetMissionBehavior))));
-
         // Settlement population is a native presentation/AI boundary. The composed location fixture supplies
         // the roster-driven spawn callback, while these shims let the production director and suppression
         // patches decide whether the boundary runs.
@@ -129,6 +124,7 @@ public sealed class MissionEngineFixture : IDisposable
         Prefix(typeof(Agent), "get_RiderAgent", nameof(Agent_get_RiderAgent));
         Prefix(typeof(Agent), nameof(Agent.AddComponent), nameof(Agent_AddComponent));
         Prefix(typeof(Agent), nameof(Agent.RemoveComponent), nameof(Agent_RemoveComponent));
+        // Location puppets attach a dormant CampaignAgentComponent to the mirror after spawning.
         harmony.Patch(
             AccessTools.Method(typeof(Agent), nameof(Agent.GetComponent))
                 .MakeGenericMethod(typeof(CampaignAgentComponent)),
@@ -199,8 +195,12 @@ public sealed class MissionEngineFixture : IDisposable
         Prefix(typeof(Agent), nameof(Agent.GetMaximumForwardUnlimitedSpeed), nameof(Agent_GetMaximumForwardUnlimitedSpeed));
         Prefix(typeof(Agent), nameof(Agent.GetMaximumSpeedLimit), nameof(Agent_GetMaximumSpeedLimit));
         Prefix(typeof(Agent), nameof(Agent.SetMaximumSpeedLimit), nameof(Agent_SetMaximumSpeedLimit));
+        Prefix(typeof(Agent), nameof(Agent.SetWieldedItemIndexAsClient), nameof(Agent_SetWieldedItemIndexAsClient));
         Prefix(typeof(Agent), nameof(Agent.GetPrimaryWieldedItemIndex), nameof(Agent_GetPrimaryWieldedItemIndex));
         Prefix(typeof(Agent), nameof(Agent.GetOffhandWieldedItemIndex), nameof(Agent_GetOffhandWieldedItemIndex));
+        // Rebuild callers warmed by earlier tests after their native wield boundaries are patched.
+        harmony.Patch(AccessTools.Method(typeof(AgentEquipmentData), nameof(AgentEquipmentData.Apply)),
+            postfix: new HarmonyMethod(AccessTools.Method(typeof(MissionEngineFixture), nameof(EquipmentApplyPostfix))));
         Prefix(typeof(Agent), "get_MovementInputVector", nameof(Agent_get_MovementInputVector));
         Prefix(typeof(Agent), "set_MovementInputVector", nameof(Agent_set_MovementInputVector));
         // Action and mount snapshots use these shims so discrete animations can be captured and replayed headless.
@@ -260,6 +260,8 @@ public sealed class MissionEngineFixture : IDisposable
         harmony.Patch(target, prefix: new HarmonyMethod(AccessTools.Method(typeof(MissionEngineFixture), patch)));
     }
 
+    private static void EquipmentApplyPostfix() { }
+
     private static bool TryActiveMock(out MockMission mock)
     {
         mock = null;
@@ -278,6 +280,13 @@ public sealed class MissionEngineFixture : IDisposable
     {
         if (!TryActiveMock(out var mock)) return true;
         __result = mock.Shell;
+        return false;
+    }
+
+    private static bool Mission_GetShootDifficulty(Mission __instance, ref float __result)
+    {
+        if (!MockMission.ForShell(__instance, out var mock)) return true;
+        __result = mock.ShootDifficulty;
         return false;
     }
 
@@ -332,14 +341,10 @@ public sealed class MissionEngineFixture : IDisposable
     private static bool Mission_get_AllAgents(Mission __instance, ref TaleWorlds.MountAndBlade.Missions.AgentReadOnlyList __result)
         => Mission_get_Agents(__instance, ref __result);
 
-    private static bool Mission_GetMissionBehavior(Mission __instance, ref object __result)
+    private static bool Mission_get_InitialPlayerAgent(Mission __instance, ref Agent __result)
     {
-        if (!MockMission.ForShell(__instance, out var mock)) return true;
-
-        if (mock.LocationPopulationBoundaryEnabled)
-            __result = mock.LocationAgentHandler;
-        else
-            __result = mock.DeploymentInProgress ? mock.DeploymentController : null;
+        if (!MockMission.ForShell(__instance, out var mock) || !mock.TrackInitialPlayerAgent) return true;
+        __result = mock.InitialPlayerAgent;
         return false;
     }
 
@@ -554,8 +559,8 @@ public sealed class MissionEngineFixture : IDisposable
 
     private static bool Agent_get_Equipment(Agent __instance, ref MissionEquipment __result)
     {
-        if (!AgentMirror.TryGet(__instance, out _)) return true;
-        __result = null;
+        if (!AgentMirror.TryGet(__instance, out var mirror)) return true;
+        __result = mirror.Equipment;
         return false;
     }
 
@@ -692,6 +697,8 @@ public sealed class MissionEngineFixture : IDisposable
     private static bool Agent_RegisterBlow(Agent __instance, Blow blow)
     {
         if (!AgentMirror.TryGet(__instance, out var victim)) return true;
+        if (TryActiveMock(out var registrationMock))
+            registrationMock.LastRegisteredBlow = blow;
 
         // Model Mission.OnAgentHit's missile lookup: for a missile blow it indexes Mission._missilesDictionary
         // by blow.WeaponRecord.AffectorWeaponSlotOrMissileIndex and throws KeyNotFound when that projectile is
@@ -713,7 +720,19 @@ public sealed class MissionEngineFixture : IDisposable
                 "Mount has no equipment for Mission.OnAgentHit's affector weapon lookup");
         }
 
-        victim.Health -= blow.InflictedDamage;
+        registrationMock?.RegisteredBlow?.Invoke(__instance, blow);
+
+        // Agent.HandleBlow ignores non-damaging blows and clamps damage under local death guards.
+        if (blow.InflictedDamage <= 0) return false;
+        float damage = Math.Min(blow.InflictedDamage, victim.Health);
+        if (__instance.CurrentMortalityState == Agent.MortalityState.Immortal
+            || victim.Mission.DisableDying
+            || Mission.Current.Mode == MissionMode.Conversation
+            || Mission.Current.Mode == MissionMode.CutScene)
+        {
+            damage = 0f;
+        }
+        victim.Health = Math.Max(0f, victim.Health - damage);
         if (TryActiveMock(out var activeMock)
             && activeMock.DismountRiderOnNextBlow)
         {
@@ -1004,6 +1023,28 @@ public sealed class MissionEngineFixture : IDisposable
         m.MaximumSpeedLimit = __0;
         m.LastMaximumSpeedLimitIsMultiplier = __1;
         m.SetMaximumSpeedLimitCalls++;
+        return false;
+    }
+
+    private static bool Agent_SetWieldedItemIndexAsClient(
+        Agent __instance, Agent.HandIndex __0, EquipmentIndex __1, int __4)
+    {
+        if (!AgentMirror.TryGet(__instance, out var mirror)) return true;
+        if (__0 == Agent.HandIndex.MainHand)
+        {
+            mirror.PrimaryWieldedItemIndex = __1;
+            if (__1 >= EquipmentIndex.WeaponItemBeginSlot && __1 < EquipmentIndex.NumAllWeaponSlots)
+            {
+                MissionWeapon weapon = mirror.Equipment[__1];
+                weapon.CurrentUsageIndex = __4;
+                mirror.Equipment[__1] = weapon;
+            }
+        }
+        else
+        {
+            mirror.OffhandWieldedItemIndex = __1;
+        }
+        mirror.ActionAndGuardCallOrder.Add("wield");
         return false;
     }
 

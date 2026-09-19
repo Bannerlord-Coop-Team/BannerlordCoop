@@ -616,6 +616,15 @@ public class SiegeInteractionDebugBehaviorTests
                 id = 142, type = "StonePile", IsDeactivated = false, IsDisabled = false,
                 gateState = (int?)null, stoneAmmo = 12, stoneItemId = "boulder",
                 hitPoints = (float?)null, ladderState = (int?)null, rangedState = (int?)null,
+                authority = new
+                {
+                    available = true, machineId = 142, sessionId = "MapEvent_Created_1",
+                    observerControllerId = "testclient2", hostControllerId = "testclient", hostEpoch = 1,
+                    authorityEpoch = 1, authorityRevision = 2, authorityKnown = true,
+                    simulator = "testclient2", claimed = true, simulatedLocally = true,
+                    localUser = true, localMover = true, contested = true, unusedSeconds = 1.25f,
+                    releaseAfterSeconds = 2f, graceSeconds = 4f, claimRetrySeconds = 0.75f
+                },
                 ammoSupply = new
                 {
                     weaponId = 1554, itemId = "mangonel_boulder", loadPointId = 1546, loadPointIndex = 2,

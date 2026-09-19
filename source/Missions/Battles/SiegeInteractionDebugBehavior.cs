@@ -1113,7 +1113,8 @@ internal sealed class SiegeInteractionDebugBehavior : MissionBehavior, ISiegeInt
     {
         var screen = ScreenManager.TopScreen as MissionScreen;
         var agent = Mission?.MainAgent;
-        var session = Mission?.GetMissionBehavior<CoopBattleController>()?.Session;
+        var controller = Mission?.GetMissionBehavior<CoopBattleController>();
+        var session = controller?.Session;
         ContainerProvider.TryResolve<INetworkAgentRegistry>(out var registry);
         CoopAgentInfo mainInfo = null;
         if (agent != null) registry?.TryGetAgentInfo(agent, out mainInfo);
@@ -1169,6 +1170,7 @@ internal sealed class SiegeInteractionDebugBehavior : MissionBehavior, ISiegeInt
                 ladderForkItemId = (machine as SiegeLadder)?._forkItem?.StringId,
                 rangedState = machine is RangedSiegeWeapon weapon ? (int?)weapon.State : null,
                 rangedStateName = (machine as RangedSiegeWeapon)?.State.ToString(),
+                authority = controller?.DebugSiegeMachineState?.ObserveMachineAuthority(machine),
                 manualReloadRequired = (machine as RangedSiegeWeapon)?.AttackClickWillReload,
                 ammoSupply = machine is Mangonel mangonel
                     ? DescribeAmmoSupply(mangonel, Mission.MissionObjects.OfType<UsableMachine>()) : null,

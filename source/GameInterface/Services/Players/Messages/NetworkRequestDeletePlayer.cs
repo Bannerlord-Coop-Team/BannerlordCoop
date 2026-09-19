@@ -1,11 +1,11 @@
-using Common.Messaging;
+﻿using Common.Messaging;
 using ProtoBuf;
 
 namespace GameInterface.Services.Players.Messages;
 
 /// <summary>
 /// Client request to delete the requesting player: the server removes the player registration,
-/// kills the hero, destroys the party, and disconnects the requesting client.
+/// kills the hero, destroys the party, and optionally disconnects the requesting client.
 /// </summary>
 [ProtoContract(SkipConstructor = true)]
 internal readonly struct NetworkRequestDeletePlayer : ICommand
@@ -15,8 +15,12 @@ internal readonly struct NetworkRequestDeletePlayer : ICommand
     [ProtoMember(1)]
     public string HeroId { get; }
 
-    public NetworkRequestDeletePlayer(string heroId)
+    [ProtoMember(2)]
+    public bool KeepConnected { get; }
+
+    public NetworkRequestDeletePlayer(string heroId, bool keepConnected = false)
     {
         HeroId = heroId;
+        KeepConnected = keepConnected;
     }
 }

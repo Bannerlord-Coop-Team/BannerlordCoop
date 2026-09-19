@@ -1,5 +1,6 @@
 using Common;
 using Common.Messaging;
+using Common.Util;
 using GameInterface.Services.Heroes.Messages;
 using GameInterface.Services.ObjectManager;
 using System;
@@ -150,7 +151,14 @@ namespace GameInterface.Services.Heroes.Handlers
         {
             var data = payload.What;
 
-            MarshalApply(data.HeroId, nameof(ChangeHeroState), instance => instance._heroState = (Hero.CharacterStates)data.HeroState);
+            MarshalApply(data.HeroId, nameof(ChangeHeroState), instance =>
+            {
+                // Update caches
+                using (new AllowedThread())
+                {
+                    instance.ChangeState((Hero.CharacterStates)data.HeroState);
+                }
+            });
         }
 
         private void Handle(MessagePayload<ChangeName> payload)

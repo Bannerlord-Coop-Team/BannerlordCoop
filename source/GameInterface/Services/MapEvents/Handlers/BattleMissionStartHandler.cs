@@ -3,7 +3,10 @@ using Common.Logging;
 using Common.Messaging;
 using Common.Network;
 using Common.Util;
+using GameInterface.Services.Barters;
 using GameInterface.Services.MapEvents.Extensions;
+using GameInterface.Services.Hideouts;
+using GameInterface.Services.Hideouts.Handlers;
 using GameInterface.Services.MapEvents.Logging;
 using GameInterface.Services.MapEvents.Messages.Leave;
 using GameInterface.Services.MapEvents.Messages.Start;
@@ -55,6 +58,7 @@ internal class BattleMissionStartHandler : IHandler
     private readonly IMapEventLogger mapEventLogger;
     private readonly IBattleMissionInitializerResolver missionInitializerResolver;
     private readonly IBattleTroopReserveBuilder reserveBuilder;
+    private readonly HideoutRaidHandler hideoutRaids;
     private static long attackMissionStartSequence;
 
     // Server-side: the complete mission initializer chosen once per map event and reused for late entrants.
@@ -74,7 +78,8 @@ internal class BattleMissionStartHandler : IHandler
         INetwork network,
         IMapEventLogger mapEventLogger,
         IBattleMissionInitializerResolver missionInitializerResolver,
-        IBattleTroopReserveBuilder reserveBuilder)
+        IBattleTroopReserveBuilder reserveBuilder,
+        HideoutRaidHandler hideoutRaids = null)
     {
         this.messageBroker = messageBroker;
         this.objectManager = objectManager;
@@ -83,6 +88,7 @@ internal class BattleMissionStartHandler : IHandler
         this.mapEventLogger = mapEventLogger;
         this.missionInitializerResolver = missionInitializerResolver;
         this.reserveBuilder = reserveBuilder;
+        this.hideoutRaids = hideoutRaids;
 
         messageBroker.Subscribe<NetworkBattleStartRequest>(Handle_NetworkBattleStartRequest);
         messageBroker.Subscribe<NetworkStartAttackMission>(Handle_NetworkStartAttackMission);
@@ -149,6 +155,19 @@ internal class BattleMissionStartHandler : IHandler
                     return;
                 }
 
+                HideoutRaidState hideoutRaid = null;
+                Hero hideoutPlayerHero = null;
+                if (mapEvent.EventType == MapEvent.BattleTypes.Hideout &&
+                    (mapEvent.IsFinalized || mapEvent.BattleState != BattleState.None ||
+                     hideoutRaids == null || !hideoutRaids.TryGetRaid(mapEvent, out hideoutRaid) ||
+                     !hideoutRaids.IsAdmitted(mapEvent, attackerMobileParty) ||
+                     !playerManager.TryGetPlayer(requester, out var hideoutPlayer) ||
+                     !objectManager.TryGetObject(hideoutPlayer.HeroId, out hideoutPlayerHero)))
+                {
+                    network.Send(requester, new NetworkBattleStartReply(payload.What.RequestId, false));
+                    return;
+                }
+
                 operation = "validate hostile action mode";
                 if (mapEvent.IsUnsupportedMultiPlayerHostileAction())
                 {
@@ -210,10 +229,24 @@ internal class BattleMissionStartHandler : IHandler
                 }
 
                 operation = "make map event sides mission-ready";
-                reserveBuilder.PrepareMissionReserves(mapEvent, attackerMobileParty);
+                if (hideoutRaid == null)
+                    reserveBuilder.PrepareMissionReserves(mapEvent, attackerMobileParty);
+                else if (isNewMissionClaim)
+                {
+                    // Native hideout priorities read MainParty, which is absent on a dedicated server.
+                    using var context = new BarterPlayerContext(hideoutPlayerHero, attackerMobileParty);
+                    reserveBuilder.PrepareMissionReserves(mapEvent, attackerMobileParty);
+                }
 
                 IMessage missionStartMessage;
-                if (mapEvent.IsSiegeAssault || mapEvent.IsSiegeAmbush)
+                if (hideoutRaid != null)
+                {
+                    var initializer = GetOrCreateMissionInitializerSnapshot(payload.What.MapEventId,
+                        () => CreateHideoutMissionInitializer(mapEvent, attackerMobileParty, hideoutRaid));
+                    missionStartMessage = new NetworkStartAttackMission(payload.What.MapEventId, initializer,
+                        hideoutRaid.InitiatingPartyId, isHideout: true, hideoutRaid.IsDirectAssault);
+                }
+                else if (mapEvent.IsSiegeAssault || mapEvent.IsSiegeAmbush)
                 {
                     operation = "build siege mission snapshot";
                     var snapshot = siegeMissionSnapshots.GetOrAdd(payload.What.MapEventId, _ => BuildSiegeMissionSnapshot(payload.What.MapEventId, mapEvent));
@@ -310,6 +343,10 @@ internal class BattleMissionStartHandler : IHandler
             {
                 continue;
             }
+
+            if (mapEvent.EventType == MapEvent.BattleTypes.Hideout &&
+                hideoutRaids?.IsAdmitted(mapEvent, party) != true)
+                continue;
 
             participants.Add(new MissionParticipant(
                 player.ControllerId,
@@ -464,6 +501,24 @@ internal class BattleMissionStartHandler : IHandler
         }
     }
 
+    internal static MissionInitializerRecord CreateHideoutMissionInitializer(MapEvent mapEvent,
+        MobileParty initiatingParty, HideoutRaidState raid)
+    {
+        var location = mapEvent.MapEventSettlement.LocationComplex.GetLocationWithId("hideout_center");
+        return new MissionInitializerRecord(location.GetSceneName(0))
+        {
+            SceneLevels = raid.IsDirectAssault ? "level_2" : "level_1",
+            PlayingInCampaignMode = Campaign.Current.GameMode == CampaignGameMode.Campaign,
+            DamageToFriendsMultiplier = Campaign.Current.Models.DifficultyModel.GetPlayerTroopsReceivedDamageMultiplier(),
+            DamageFromPlayerToFriendsMultiplier = Campaign.Current.Models.DifficultyModel.GetPlayerTroopsReceivedDamageMultiplier(),
+            AtmosphereOnCampaign = GetAtmosphereOnCampaign(mapEvent),
+            TerrainType = Campaign.Current.MapSceneWrapper == null ? 0 :
+                (int)Campaign.Current.MapSceneWrapper.GetFaceTerrainType(initiatingParty.CurrentNavigationFace),
+            DecalAtlasGroup = 3,
+            DisableCorpseFadeOut = !raid.IsDirectAssault,
+        };
+    }
+
     private void Handle_NetworkStartAttackMission(MessagePayload<NetworkStartAttackMission> payload)
     {
         // Opening a mission pushes a screen, and ScreenManager only tolerates screen
@@ -498,7 +553,7 @@ internal class BattleMissionStartHandler : IHandler
         {
             LogAttackMissionLifecycle("executing queued open", sequence, message.MapEventId);
             OpenAttackMission(message.MapEventId, message.MissionInitializer,
-                message.InitiatingPartyId, sequence);
+                message.InitiatingPartyId, sequence, message.IsHideout, message.IsDirectAssault);
 
             if (MissionState.Current == null)
                 LoadingWindow.DisableGlobalLoadingWindow();
@@ -713,7 +768,7 @@ internal class BattleMissionStartHandler : IHandler
     }
 
     private void OpenAttackMission(string mapEventId, MissionInitializerRecord missionInitializer,
-        string initiatingPartyId, long sequence)
+        string initiatingPartyId, long sequence, bool isHideout = false, bool isDirectAssault = false)
     {
         bool spawnGateEngaged = false;
         try
@@ -756,7 +811,20 @@ internal class BattleMissionStartHandler : IHandler
             // launcher lives in Missions and is resolved from the container. There is deliberately no native
             // fallback: the same unavailable container would prevent BattleMissionEntryPatch from attaching the
             // lifecycle that owns EndBattle, while the already-engaged spawn patches could corrupt native setup.
-            if (ContainerProvider.TryResolve(out ICoopFieldBattleLauncher battleLauncher))
+            if (isHideout)
+            {
+                if (battle.EventType != MapEvent.BattleTypes.Hideout ||
+                    battle.IsFinalized || battle.BattleState != BattleState.None ||
+                    !ContainerProvider.TryResolve(out ICoopHideoutMissionLauncher hideoutLauncher))
+                    return;
+                var mission = hideoutLauncher.OpenCoopHideoutMission(missionInitializer, isDirectAssault);
+                if (mission != null)
+                {
+                    spawnGateEngaged = false;
+                    MissionStateFinalizeDiagnosticsPatch.RecordCorrelation(mission, sequence, mapEventId);
+                }
+            }
+            else if (ContainerProvider.TryResolve(out ICoopFieldBattleLauncher battleLauncher))
             {
                 var mission = battleLauncher.OpenCoopFieldBattle(missionInitializer);
                 if (mission != null)

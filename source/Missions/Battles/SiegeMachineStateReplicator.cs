@@ -35,6 +35,9 @@ public interface ISiegeMachineStateReplicator : IDisposable
         out int authorityRevision);
 
     event Action<int> AuthorityChanged;
+#if DEBUG
+    object ObserveMachineAuthority(UsableMachine machine);
+#endif
 }
 
 /// <inheritdoc cref="ISiegeMachineStateReplicator"/>
@@ -387,6 +390,40 @@ public partial class SiegeMachineStateReplicator : ISiegeMachineStateReplicator
 
     private int GetAuthorityRevision(int machineId)
         => authorityRevisions.TryGetValue(machineId, out var revision) ? revision : 0;
+
+#if DEBUG
+    public object ObserveMachineAuthority(UsableMachine machine)
+    {
+        if (machine == null || trackedMission == null || trackedMission != Mission.Current ||
+            !machinesById.TryGetValue(machine.Id.Id, out var current) || !ReferenceEquals(current, machine))
+            return new { available = false };
+        int machineId = machine.Id.Id;
+        bool claimed = claimedMachines.TryGetValue(machineId, out var claimant);
+        bool localUser = false;
+        bool localMover = false;
+        foreach (var point in machine.StandingPoints)
+        {
+            localUser |= point.UserAgent != null && agentRegistry.IsLocallyControlled(point.UserAgent);
+            localMover |= point.MovingAgent != null && agentRegistry.IsLocallyControlled(point.MovingAgent);
+        }
+        // Read the stored tuple without normalizing authority or advancing release clocks.
+        return new
+        {
+            available = true, machineId, sessionId = session.InstanceId,
+            observerControllerId = session.OwnControllerId, hostControllerId = session.HostControllerId,
+            hostEpoch = session.HostEpoch, authorityEpoch = GetSnapshotAuthorityEpoch(machineId),
+            authorityRevision = GetAuthorityRevision(machineId), authorityKnown = SiegeMissionAuthorityGate.IsAuthorityKnown,
+            simulator = claimed ? claimant : session.HostControllerId, claimed,
+            simulatedLocally = SiegeMissionAuthorityGate.IsMachineSimulatedLocally(machineId),
+            localUser, localMover,
+            contested = machine is SiegeWeapon weapon && weapon.IsDisabledForBattleSideAI(weapon.Side),
+            unusedSeconds = unusedOwnedSeconds.TryGetValue(machineId, out var unused) ? unused : 0f,
+            releaseAfterSeconds = ReleaseAfterUnusedSeconds,
+            graceSeconds = grantGrace.TryGetValue(machineId, out var grace) ? grace : 0f,
+            claimRetrySeconds = pendingClaimSeconds.TryGetValue(machineId, out var retry) ? retry : 0f
+        };
+    }
+#endif
 
     private int GetAuthorityEpoch(int machineId)
         => authorityEpochs.TryGetValue(machineId, out var epoch) ? epoch : 0;

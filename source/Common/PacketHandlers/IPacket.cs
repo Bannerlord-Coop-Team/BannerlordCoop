@@ -23,7 +23,8 @@ namespace Common.PacketHandlers
         AggregateMessage,
         CampaignTime,
         AgentEquipment,
-        CompressedMovement
+        CompressedMovement,
+        Voice
     }
 
     public interface IPacket

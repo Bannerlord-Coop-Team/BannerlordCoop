@@ -7,6 +7,7 @@ using GameInterface.Services.MapEvents;
 using GameInterface.Services.MapEvents.Extensions;
 using GameInterface.Services.MapEvents.Handlers;
 using GameInterface.Services.MapEvents.Messages;
+using GameInterface.Services.MapEvents.Messages.Leave;
 using GameInterface.Services.MapEvents.Messages.Start;
 using GameInterface.Services.MapEvents.TroopSupply;
 using GameInterface.Services.MapEvents.TroopSupply.Messages;
@@ -15,6 +16,7 @@ using GameInterface.Services.PlayerCaptivityService.Messages;
 using GameInterface.Services.Players;
 using LiteNetLib;
 using Missions.Messages;
+using Missions.Hideouts;
 using Serilog;
 using System;
 using System.Collections.Generic;
@@ -218,6 +220,7 @@ internal class BattleHostHandler : IHandler
         messageBroker.Subscribe<MapEventInvolvedPartiesAdded>(Handle_MapEventInvolvedPartiesAdded);
         messageBroker.Subscribe<BattleResolvedStateRecorded>(Handle_BattleResolvedStateRecorded);
         messageBroker.Subscribe<CampaignTick>(Handle_CampaignTick);
+        messageBroker.Subscribe<NetworkRequestRetainedPlayerHero>(Handle_RetainedPlayerHero);
     }
 
     public void Dispose()
@@ -233,6 +236,43 @@ internal class BattleHostHandler : IHandler
         messageBroker.Unsubscribe<MapEventInvolvedPartiesAdded>(Handle_MapEventInvolvedPartiesAdded);
         messageBroker.Unsubscribe<BattleResolvedStateRecorded>(Handle_BattleResolvedStateRecorded);
         messageBroker.Unsubscribe<CampaignTick>(Handle_CampaignTick);
+        messageBroker.Unsubscribe<NetworkRequestRetainedPlayerHero>(Handle_RetainedPlayerHero);
+    }
+
+    // Forward only the current holder's surrender for a present player and an already-supplied hero.
+    private void Handle_RetainedPlayerHero(MessagePayload<NetworkRequestRetainedPlayerHero> payload)
+    {
+        if (ModInformation.IsClient) return;
+        var handoff = payload.What.Handoff;
+        var sender = payload.Who as NetPeer;
+        GameThread.RunSafe(() =>
+        {
+            if (sender == null || handoff == null || !handoff.HasValidAuthorityTransition
+                || !playerManager.TryGetPlayer(sender, out var holder)
+                || holder.ControllerId != handoff.Previous.OwnerControllerId
+                || !hostRegistry.TryGet(handoff.BattleInstanceId, out var assignment)
+                || assignment.HostControllerId != holder.ControllerId || assignment.Epoch != handoff.HostEpoch
+                || !battleRuntimeStates.TryGetValue(handoff.BattleInstanceId, out var state)
+                || !state.PresentControllers.Contains(holder.ControllerId)
+                || !state.PresentControllers.Contains(handoff.ReturningControllerId)
+                || state.ResolvedState != BattleState.None
+                || !playerManager.TryGetPlayer(handoff.ReturningControllerId, out var player)
+                || player.CharacterObjectId != handoff.Previous.CharacterId
+                || !objectManager.TryGetObject<MobileParty>(player.MobilePartyId, out var party)
+                || !objectManager.TryGetObject<MapEventParty>(handoff.Previous.MapEventPartyId, out var eventParty)
+                || eventParty?.Party != party?.Party
+                || !ledger.TryGetReserve(handoff.BattleInstanceId, handoff.Previous.MapEventPartyId,
+                    out var entries, out int supplied)) return;
+            for (int i = 0; i < Math.Min(supplied, entries.Count); i++)
+            {
+                if (entries[i].CharacterId != handoff.Previous.CharacterId
+                    || entries[i].Seed != handoff.Previous.TroopSeed) continue;
+                // Entry can precede mission-ready, so the grant needs its host assignment first.
+                network.SendAll(ToMessage(handoff.BattleInstanceId, assignment));
+                network.SendAll(handoff);
+                return;
+            }
+        }, context: nameof(Handle_RetainedPlayerHero));
     }
 
     /// <summary>[Client] Entering a battle (still loading): request only the reserves we already OWN, so our
@@ -263,7 +303,9 @@ internal class BattleHostHandler : IHandler
 #if DEBUG
         if (ShouldDeferFixtureMissionReady(mapEventId)) return;
 #endif
-        network.SendAll(new NetworkRequestBattleHost(mapEventId, controllerIdProvider.ControllerId));
+        var hideout = TaleWorlds.MountAndBlade.Mission.Current?.GetMissionBehavior<CoopHideoutMissionLogic>();
+        network.SendAll(new NetworkRequestBattleHost(mapEventId, controllerIdProvider.ControllerId,
+            hideout?.HasPhaseSnapshot == true));
         Logger.Information("[BattleHost] Mission ready — requested host election for battle {MapEventId}", mapEventId);
     }
 
@@ -299,7 +341,8 @@ internal class BattleHostHandler : IHandler
             {
                 // Host already elected. Record this player in the successor line in join order (idempotent),
                 // so migration can promote the earliest joiner still present. A mid-battle joiner lands here too.
-                if (TryAppendSuccessor(existing, requesterId, out var updated))
+                if ((!mapEvent.IsHideoutBattle || payload.What.HideoutStateReady) &&
+                    TryAppendSuccessor(existing, requesterId, out var updated))
                 {
                     SetServerAssignment(mapEventId, updated);
                     Logger.Information("[BattleHost] {Requester} joined battle {MapEventId}; successor line: {Successors}",
@@ -787,7 +830,10 @@ internal class BattleHostHandler : IHandler
                 // included). Otherwise their supplied pointers stay at the end and only the re-flattened
                 // rejoiner's party re-spawns.
                 if (objectManager.TryGetObject<MapEvent>(mapEventId, out var abandonedEvent))
+                {
+                    if (TryFinalizeAbandonedHideout(mapEventId, abandonedEvent)) return;
                     reserveBuilder.ForgetMapEvent(abandonedEvent);
+                }
 
                 // Battle over as far as this instance is concerned — drop its scope bookkeeping with it.
                 ClearBattleRecords(mapEventId);
@@ -827,6 +873,8 @@ internal class BattleHostHandler : IHandler
             {
                 if (successors.Count == 0)
                 {
+                    if (TryFinalizeAbandonedHideout(mapEventId, mapEvent)) return;
+
                     // The recorded host left and no mission-ready successor exists — but the instance is NOT
                     // empty here (the empty branch above already returned), so a participant is still LOADING
                     // and will become the eventual host. Remove the now-hostless assignment and the departed
@@ -916,8 +964,11 @@ internal class BattleHostHandler : IHandler
     {
         if (ModInformation.IsServer) return;
 
-        var message = payload.What;
+        GameThread.RunSafe(() => ApplyHostAssignment(payload.What), context: nameof(Handle_NetworkBattleHostAssigned));
+    }
 
+    private void ApplyHostAssignment(NetworkBattleHostAssigned message)
+    {
         // Capture the host we knew before applying the update, so we can detect a migration TO us.
         string previousHost = null;
         bool wasLocalHost = false;
@@ -945,6 +996,7 @@ internal class BattleHostHandler : IHandler
 #if DEBUG
         ReleaseFixtureMissionReady(message);
 #endif
+        messageBroker.Publish(this, new BattleHostAssignmentApplied(message));
 
         bool isLocalHost = message.HostControllerId == controllerIdProvider.ControllerId;
         if (isLocalHost && (!wasLocalHost || previous?.Epoch != message.Epoch))
@@ -1078,6 +1130,20 @@ internal class BattleHostHandler : IHandler
     private void ClearBattleRecords(string mapEventId)
     {
         battleRuntimeStates.Remove(mapEventId);
+    }
+
+    private bool TryFinalizeAbandonedHideout(string mapEventId, MapEvent mapEvent)
+    {
+        if (mapEvent?.EventType != MapEvent.BattleTypes.Hideout || mapEvent.BattleState != BattleState.None)
+            return false;
+
+        // With no surviving mission host, the native hideout phase cannot be resumed.
+        hostRegistry.Remove(mapEventId);
+        if (ServerBattleModeArbiter.ReleaseMission(mapEventId))
+            network.SendAll(new NetworkBattleModeSet(mapEventId, (int)BattleStartMode.Unclaimed));
+        ClearBattleRecords(mapEventId);
+        messageBroker.Publish(this, new MapEventFinalizeAttempted(mapEvent));
+        return true;
     }
 
     // [Server] Issue the battle's next host epoch (BR-102): one past the highest ever issued for this map
