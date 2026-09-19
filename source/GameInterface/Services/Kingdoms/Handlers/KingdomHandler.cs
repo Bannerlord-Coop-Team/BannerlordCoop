@@ -609,12 +609,25 @@ public class KingdomHandler : IHandler
             if (!objectManager.TryGetObjectWithLogging<Settlement>(payload.SettlementId, out var settlement)) return;
             if (!objectManager.TryGetObjectWithLogging<Clan>(payload.ReceiverClanId, out var receiverClan)) return;
             if (!objectManager.TryGetObjectWithLogging<Clan>(player.ClanId, out var playerClan)) return;
-            if (playerClan != settlement.OwnerClan)
+            if (playerClan.Kingdom?.RulingClan != playerClan)
             {
-                Logger.Warning("Ignoring GiftSettlementOwnership {Instance}: sender's clan {SenderClan} does not own settlement {SettlementOwner}",
-                    obj.What.SettlementId, player.ClanId, settlement.OwnerClan?.StringId);
+                Logger.Warning("Ignoring GiftSettlementOwnership {Instance}: sender's clan {SenderClan} is not the ruling clan of their kingdom",
+                    obj.What.SettlementId, player.ClanId);
                 return;
             }
+            if(playerClan.Kingdom != receiverClan.Kingdom)
+            {
+                Logger.Warning("Ignoring GiftSettlementOwnership {Instance}: sender's clan {SenderClan} and receiver's clan {ReceiverClan} are not in the same kingdom",
+                    obj.What.SettlementId, player.ClanId, payload.ReceiverClanId);
+                return;
+            }
+            if (!settlement.IsFortification || settlement.OwnerClan != playerClan)
+            { 
+                Logger.Warning("Ignoring GiftSettlementOwnership {Instance}: settlement {Settlement} is not a fortification or is not owned by the sender's clan {SenderClan}",
+                       obj.What.SettlementId, settlement.Id, player.ClanId);
+                return;
+            }
+
             Campaign.Current.KingdomManager.GiftSettlementOwnership(settlement, receiverClan);
         });
     }
