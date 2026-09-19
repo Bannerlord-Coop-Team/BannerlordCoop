@@ -215,8 +215,7 @@ internal sealed class ClanLordMovementFixture : IClanLordMovementFixture
         else if (phase == "released" || phase == "verify")
         {
             if (!observation.During) failure = "the during checkpoint was never observed on this machine";
-            // PlayerEncounter.Finish owns client release; conversationActive remains diagnostic evidence.
-            else if (ModInformation.IsServer ? held || interaction.Ai?.IsDisabled != false : !ClientReleaseComplete(hasPlayerEncounter))
+            else if (ModInformation.IsServer ? held || interaction.Ai?.IsDisabled != false : !ClientReleaseComplete(conversationActive, hasPlayerEncounter))
                 failure = "the selected conversation has not fully released";
             else if (phase == "released")
             {
@@ -271,8 +270,19 @@ internal sealed class ClanLordMovementFixture : IClanLordMovementFixture
         if (!objects.TryGetObject(args[3], out MobileParty interaction) || PlayerEncounter.EncounteredParty != interaction.Party)
             return Result(false, "the exact staged interaction party is no longer the active player encounter");
 
-        PlayerEncounter.Finish();
-        return Result(true, "finished the exact interaction party through the production encounter action", new { interaction = Describe(interaction) });
+        var encounter = PlayerEncounter.Current;
+        campaign.ConversationManager.EndConversation();
+        if (campaign.ConversationManager.IsConversationInProgress)
+            return Result(false, "the selected conversation is still active");
+        if (PlayerEncounter.Current != null)
+        {
+            if (PlayerEncounter.Current != encounter || PlayerEncounter.EncounteredParty != interaction.Party)
+                return Result(false, "the player encounter changed during conversation teardown");
+            PlayerEncounter.Finish();
+        }
+        bool released = ClientReleaseComplete(campaign.ConversationManager.IsConversationInProgress, PlayerEncounter.Current != null);
+        return Result(released, released ? "finished the selected conversation and encounter" : "the selected conversation has not fully released",
+            new { interaction = Describe(interaction) });
     }
 
     public CoopCommandResult Restore()
@@ -491,7 +501,8 @@ internal sealed class ClanLordMovementFixture : IClanLordMovementFixture
         a.BestTargetPoint == b.BestTargetPoint && a.DesiredAiNavigationType == b.DesiredAiNavigationType &&
         a.IsTargetingPort == b.IsTargetingPort && a.IsInteractableAnchor == b.IsInteractableAnchor && a.IsCurrentlyAtSea == b.IsCurrentlyAtSea;
 
-    internal static bool ClientReleaseComplete(bool hasPlayerEncounter) => !hasPlayerEncounter;
+    internal static bool ClientReleaseComplete(bool conversationActive, bool hasPlayerEncounter) =>
+        !conversationActive && !hasPlayerEncounter;
 
     private sealed class Capture
     {

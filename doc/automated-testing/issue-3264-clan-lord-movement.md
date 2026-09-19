@@ -92,8 +92,11 @@ participating client. It invokes the production encounter action for the exact
 staged interaction party, so the existing approval and conversation handlers run without
 native input or UI wiring. After the `during` observations, run the printed
 `clan_lord_fixture_finish` command on that same client. It verifies the exact
-active encounter before invoking the production finish action. No conversation,
-movement or time cheat is part of either action.
+active encounter before calling `ConversationManager.EndConversation()`, then
+finishes that same encounter only if conversation teardown left it active. Both
+`IsConversationInProgress` and `PlayerEncounter.Current` must be clear before the
+client can capture a released baseline or verify movement. No movement or time
+cheat is part of either action.
 
 Setup gives the lord a fixed GoToPoint order and temporarily prevents new AI
 decisions while leaving its AI enabled. This makes route displacement repeatable;

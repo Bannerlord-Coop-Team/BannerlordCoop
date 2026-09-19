@@ -12,11 +12,14 @@ public class ClanLordMovementFixtureObservationTests
         new ClanLordMovementFixture.Observation("run-one", "player", "lord", "interaction", Point(24, 4));
 
     [Theory]
-    [InlineData(false, true)]
-    [InlineData(true, false)]
-    public void ClientReleaseComplete_RequiresOnlyFinishedPlayerEncounter(bool hasPlayerEncounter, bool expected)
+    [InlineData(false, false, true)]
+    [InlineData(false, true, false)]
+    [InlineData(true, false, false)]
+    [InlineData(true, true, false)]
+    public void ClientReleaseComplete_RequiresConversationAndEncounterToEnd(
+        bool conversationActive, bool hasPlayerEncounter, bool expected)
     {
-        Assert.Equal(expected, ClanLordMovementFixture.ClientReleaseComplete(hasPlayerEncounter));
+        Assert.Equal(expected, ClanLordMovementFixture.ClientReleaseComplete(conversationActive, hasPlayerEncounter));
     }
 
     [Fact]
