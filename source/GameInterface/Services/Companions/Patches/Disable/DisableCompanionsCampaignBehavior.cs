@@ -1,6 +1,7 @@
 ﻿using Common;
 using GameInterface.Configuration;
 using GameInterface.Extentions;
+using GameInterface.Services.Clans.Extensions;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Players;
 using HarmonyLib;
@@ -47,7 +48,13 @@ internal class CompanionsCampaignBehaviorPatches
         // Use fixed wanderer limit
         if (!ModConfigProvider.ModOptions.WandererLimitScalesWithPlayers)
         {
-            __result = ModConfigProvider.ModOptions.WandererLimit;
+            var ensuredUnaffiliatedWanderersBonusLimit = 0;
+            if (ModConfigProvider.ModOptions.EnsureUnaffiliatedWanderers)
+            {
+                ensuredUnaffiliatedWanderersBonusLimit = CalculateAffiliatedWanderers();
+            }
+
+            __result = ModConfigProvider.ModOptions.WandererLimit + ensuredUnaffiliatedWanderersBonusLimit;
             return false;
         }
 
@@ -228,5 +235,18 @@ internal class CompanionsCampaignBehaviorPatches
                 makeHeroFugitive(hero);
             }
         }
+    }
+
+    private static int CalculateAffiliatedWanderers()
+    {
+        var affiliatedWanderers = 0;
+        foreach (var hero in Hero.AllAliveHeroes)
+        {
+            if (hero.IsWanderer && hero.CompanionOf != null && hero.CompanionOf.IsPlayerClan())
+            {
+                affiliatedWanderers++;
+            }
+        }
+        return affiliatedWanderers;
     }
 }

@@ -68,13 +68,14 @@ namespace Coop.IntegrationTests.Serialization
                 GoldFoodInfluenceChangeInBattles = GoldFoodChangeMode.Enabled,
                 GoldFoodInfluenceChangeForDisconnectedPlayers = true,
                 PlayerBattleAiJoinWindowHours = 6,
+                EnsureUnaffiliatedWanderers = false,
                 WandererLimit = 64,
                 WandererLimitScalesWithPlayers = true,
                 PlayerKingdomClanTierRequired = 2,
                 SmithingStaminaRecoveryMultiplier = 2.5f,
                 MaximumLootersMultiplier = 0.25f,
                 LooterPartySizeMultiplier = 0.33f,
-                EnableHeroExecutions = false,
+                EnableHeroExecutions = true,
                 EnablePlayerClanMemberExecutions = true,
                 EnablePlayerExecutions = true,
                 ShowPlayerNameplates = true,
@@ -87,13 +88,14 @@ namespace Coop.IntegrationTests.Serialization
             Assert.Equal(GoldFoodChangeMode.Enabled, copy.GoldFoodInfluenceChangeInBattles);
             Assert.True(copy.GoldFoodInfluenceChangeForDisconnectedPlayers);
             Assert.Equal(6, copy.PlayerBattleAiJoinWindowHours);
+            Assert.False(copy.EnsureUnaffiliatedWanderers);
             Assert.Equal(64, copy.WandererLimit);
             Assert.True(copy.WandererLimitScalesWithPlayers);
             Assert.Equal(2, copy.PlayerKingdomClanTierRequired);
             Assert.Equal(2.5f, copy.SmithingStaminaRecoveryMultiplier);
             Assert.Equal(0.25f, copy.MaximumLootersMultiplier);
             Assert.Equal(0.33f, copy.LooterPartySizeMultiplier);
-            Assert.False(copy.EnableHeroExecutions);
+            Assert.True(copy.EnableHeroExecutions);
             Assert.True(copy.EnablePlayerClanMemberExecutions);
             Assert.True(copy.EnablePlayerExecutions);
             Assert.False(copy.PlayerWoundedBattleEntry);
@@ -135,6 +137,7 @@ namespace Coop.IntegrationTests.Serialization
             GoldFoodInfluenceChangeForDisconnectedPlayers = false,
             PlayerBattleAiJoinWindowHours = 0,
             SpeedLimitWhilePlayersInBattle = false,
+            EnsureUnaffiliatedWanderers = false,
             WandererLimit = 0,
             WandererLimitScalesWithPlayers = false,
             PlayerKingdomClanTierRequired = 0,
@@ -142,7 +145,7 @@ namespace Coop.IntegrationTests.Serialization
             SmithingStaminaRecoveryMultiplier = 0f,
             MaximumLootersMultiplier = 0f,
             LooterPartySizeMultiplier = 0f,
-            EnableHeroExecutions = false,
+            EnableHeroExecutions = true,
             EnablePlayerClanMemberExecutions = false,
             EnablePlayerExecutions = false,
             ShowPlayerNameplates = false,
@@ -160,6 +163,7 @@ namespace Coop.IntegrationTests.Serialization
             Assert.False(copy.GoldFoodInfluenceChangeForDisconnectedPlayers);
             Assert.Equal(0, copy.PlayerBattleAiJoinWindowHours);
             Assert.False(copy.SpeedLimitWhilePlayersInBattle);
+            Assert.False(copy.EnsureUnaffiliatedWanderers);
             Assert.Equal(0, copy.WandererLimit);
             Assert.False(copy.WandererLimitScalesWithPlayers);
             Assert.Equal(0, copy.PlayerKingdomClanTierRequired);
@@ -167,7 +171,7 @@ namespace Coop.IntegrationTests.Serialization
             Assert.Equal(0f, copy.SmithingStaminaRecoveryMultiplier);
             Assert.Equal(0f, copy.MaximumLootersMultiplier);
             Assert.Equal(0f, copy.LooterPartySizeMultiplier);
-            Assert.False(copy.EnableHeroExecutions);
+            Assert.True(copy.EnableHeroExecutions);
             Assert.False(copy.EnablePlayerClanMemberExecutions);
             Assert.False(copy.EnablePlayerExecutions);
             Assert.False(copy.ShowPlayerNameplates);
