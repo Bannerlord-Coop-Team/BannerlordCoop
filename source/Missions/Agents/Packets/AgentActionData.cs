@@ -566,7 +566,7 @@ namespace Missions.Agents.Packets
             agent.SetActionChannel(
                 channel,
                 action,
-                ignorePriority: forceGuardDirectionTransition,
+                ignorePriority: forceGuardDirectionTransition || action == ActionIndexCache.act_none,
                 additionalFlags: actionFlags,
                 actionSpeed: resolvedActionSpeed,
                 startProgress: actionProgress);
@@ -616,6 +616,14 @@ namespace Missions.Agents.Packets
             int actionIndex,
             out ActionIndexCache action)
         {
+            // A released action has no animation name, but must clear the replicated use pose.
+            if (actionIndex == ActionIndexCache.act_none.Index)
+            {
+                action = ActionIndexCache.act_none;
+                // Retained guard cleanup releases its own action; other guard presentations decay locally.
+                return !IsGuardPresentationAction(agent.GetCurrentActionType(channel));
+            }
+
             string actionName = GetActionNameWithCode(actionIndex);
             if (actionName != null)
             {

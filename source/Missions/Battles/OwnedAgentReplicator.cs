@@ -232,7 +232,9 @@ public class OwnedAgentReplicator : IOwnedAgentReplicator
                     mountInfo?.MovementScopeId ?? info.MovementScopeId,
                 isRunningAway: agent.IsRunningAway,
                 authorityRevision: info.AuthorityRevision,
-                mountAuthorityRevision: mountInfo?.AuthorityRevision ?? 0));
+                mountAuthorityRevision: mountInfo?.AuthorityRevision ?? 0,
+                siegeEquipmentGrant: agent.Equipment[EquipmentIndex.ExtraWeaponSlot].IsEmpty
+                    ? Guid.Empty : info.SiegeEquipmentGrant));
         }
         return records;
     }

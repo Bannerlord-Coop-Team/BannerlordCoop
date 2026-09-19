@@ -533,6 +533,24 @@ public class CoopAgentInfo
 {
     private AgentEquipmentData authoritativeEquipment;
     private bool hasAuthoritativeEquipment;
+    private readonly HashSet<Guid> consumedSiegeGrants = new();
+
+    internal Guid SiegeEquipmentGrant { get; private set; }
+
+    internal bool IsSiegeGrantConsumed(Guid grantId) => consumedSiegeGrants.Contains(grantId);
+
+    internal void RecordSiegeGrant(Guid grantId)
+    {
+        SiegeEquipmentGrant = grantId;
+    }
+
+    internal bool ConsumeSiegeGrant(Guid grantId)
+    {
+        if (grantId == Guid.Empty || !consumedSiegeGrants.Add(grantId)) return false;
+        if (SiegeEquipmentGrant != grantId) return false;
+        SiegeEquipmentGrant = Guid.Empty;
+        return true;
+    }
 
     internal bool UsesActionEquipment { get; set; }
 

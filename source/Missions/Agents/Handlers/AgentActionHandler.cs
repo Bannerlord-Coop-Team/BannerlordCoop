@@ -349,8 +349,8 @@ public class AgentActionHandler : IAgentActionHandler
             agent.GetCurrentActionType(0);
         Agent.ActionCodeType action1Type =
             agent.GetCurrentActionType(1);
-        bool action0Discrete = IsDiscreteAction(action0Type);
-        bool action1Discrete = IsDiscreteAction(action1Type);
+        bool action0Discrete = IsDiscreteAction(action0Type, action0);
+        bool action1Discrete = IsDiscreteAction(action1Type, action1);
 
         // Native command actions are untyped, so recognize the main agent's order gesture by action name.
         if (agent == Mission.Current.MainAgent)
@@ -837,11 +837,15 @@ public class AgentActionHandler : IAgentActionHandler
         hasPublishedSpeed = true;
     }
 
-    // Discrete actions worth replicating explicitly. Pure locomotion (Idle / the generic Other bucket that
-    // walk/run fall into) is reproduced on the puppet from the continuous movement packet, so it is NOT sent.
-    private static bool IsDiscreteAction(Agent.ActionCodeType type)
+    // Ranged siege use is also Other; recognize its actions without publishing ordinary locomotion.
+    private static bool IsDiscreteAction(Agent.ActionCodeType type, int actionIndex = -1)
     {
-        return type != Agent.ActionCodeType.Other && type != Agent.ActionCodeType.Idle;
+        if (type != Agent.ActionCodeType.Other && type != Agent.ActionCodeType.Idle) return true;
+        if (actionIndex < 0) return false;
+
+        string actionName = AgentActionData.GetActionNameWithCode(actionIndex);
+        return actionName?.StartsWith("act_usage_ballista_", StringComparison.Ordinal) == true
+            || actionName?.StartsWith("act_usage_mangonel_", StringComparison.Ordinal) == true;
     }
 
     private static bool IsMountedGuardLocomotionChurn(

@@ -45,7 +45,12 @@ public class MissionModule : Module
 
     protected override void Load(ContainerBuilder builder)
     {
+#if DEBUG
+        builder.RegisterType<SiegeInteractionDebugBehavior>().AsSelf()
+            .As<ISiegeInteractionDebugBehavior>().InstancePerDependency();
+#endif
         builder.RegisterType<ReceivePathDiagnostics>().As<IReceivePathDiagnostics>().InstancePerDependency();
+        builder.RegisterType<SiegeGateHitApplier>().As<ISiegeGateHitApplier>().InstancePerDependency();
         base.Load(builder);
 
         foreach (HarmonyPatchCategoryRegistration registration in CreatePatchCategoryRegistrations())
@@ -284,6 +289,10 @@ public class MissionModule : Module
 
     internal static IEnumerable<HarmonyPatchCategoryRegistration> CreatePatchCategoryRegistrations()
     {
+#if DEBUG
+        yield return new HarmonyPatchCategoryRegistration(
+            typeof(SiegeInteractionDebugBehavior).Assembly, "CoopSiegeInteractionDebug");
+#endif
         yield return new HarmonyPatchCategoryRegistration(typeof(HideoutDepletionPatch).Assembly, HideoutPatchCategory);
         yield return new HarmonyPatchCategoryRegistration(
             typeof(AddMissileAuxPatch).Assembly,

@@ -68,6 +68,19 @@ public sealed class BattleAgentSpawnBatchCodecTests
         Assert.Equal(encoded.RecordCount, decoded.Length);
     }
 
+    [Fact]
+    public void CatchUp_PreservesSiegeAmmoGrantIdentityWithItsEquipment()
+    {
+        var codec = new BattleAgentSpawnBatchCodec();
+        var grant = Guid.NewGuid();
+        var record = CreateWeaponRecord(null, grant);
+        var encoded = Assert.Single(codec.Encode(new[] { record }, SpawnBatchPurpose.CatchUp));
+        var decoded = Assert.Single(DecodeWireMessage(codec, encoded));
+        Assert.Equal(grant, decoded.SiegeEquipmentGrant);
+        Assert.Equal(record.AgentId, decoded.AgentId);
+        Assert.Equal(record.MissionEquipmentData.WeaponSlots.Count, decoded.MissionEquipmentData.WeaponSlots.Count);
+    }
+
     [Theory]
     [InlineData(SpawnBatchPurpose.Initial)]
     [InlineData(SpawnBatchPurpose.Deployment)]
@@ -184,7 +197,7 @@ public sealed class BattleAgentSpawnBatchCodecTests
         return records;
     }
 
-    private static BattleAgentSpawnData CreateWeaponRecord(string modifierId)
+    private static BattleAgentSpawnData CreateWeaponRecord(string modifierId, Guid siegeEquipmentGrant = default)
     {
         var weaponSlots = new List<MissionWeaponData>();
         for (int i = 0; i < (int)EquipmentIndex.NumAllWeaponSlots; i++)
@@ -209,6 +222,6 @@ public sealed class BattleAgentSpawnBatchCodecTests
             1,
             default,
             default,
-            new MissionEquipmentData(weaponSlots));
+            new MissionEquipmentData(weaponSlots), siegeEquipmentGrant: siegeEquipmentGrant);
     }
 }

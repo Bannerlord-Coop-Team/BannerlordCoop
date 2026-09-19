@@ -1,4 +1,5 @@
 ﻿using GameInterface.Services.ObjectManager;
+using GameInterface.Surrogates;
 using Missions.Data;
 using Moq;
 using ProtoBuf;
@@ -13,6 +14,11 @@ public class MissionWeaponDataMapperTests
 {
     private const string ItemId = "ItemObject_test_sword";
     private const string ModifierId = "ItemModifier_test_fine";
+
+    public MissionWeaponDataMapperTests()
+    {
+        _ = new SurrogateCollection();
+    }
 
     [Fact]
     public void ReceivedModifiedWeapon_ResolvesReceiverCanonicalModifier()
