@@ -381,11 +381,18 @@ public class SiegeInteractionDebugBehaviorTests
                 Assert.Equal(standingPosition, behavior.GetStagingTarget(machine, standingPosition, true, standingPoint: pilot));
 #pragma warning disable SYSLIB0050
                 var otherPoint = (StandingPoint)FormatterServices.GetUninitializedObject(typeof(StandingPoint));
+                var loadPoint = (StandingPointWithWeaponRequirement)FormatterServices.GetUninitializedObject(typeof(StandingPointWithWeaponRequirement));
 #pragma warning restore SYSLIB0050
+                AccessTools.Field(typeof(RangedSiegeWeapon), "LoadAmmoStandingPoint").SetValue(machine, loadPoint);
+                Assert.Equal(new Vec3(expectedX, 721f, 36.5f),
+                    behavior.GetStagingTarget(machine, standingPosition, false, standingPoint: loadPoint));
+                Assert.Equal(standingPosition, behavior.GetStagingTarget(machine, standingPosition, true, standingPoint: loadPoint));
                 Assert.Equal(standingPosition, behavior.GetStagingTarget(machine, standingPosition, false, standingPoint: otherPoint));
                 AccessTools.Field(typeof(Mangonel), "_body").SetValue(machine, null);
                 Assert.Throws<InvalidOperationException>(() =>
                     behavior.GetStagingTarget(machine, standingPosition, false, standingPoint: pilot));
+                Assert.Throws<InvalidOperationException>(() =>
+                    behavior.GetStagingTarget(machine, standingPosition, false, standingPoint: loadPoint));
             }
             var target = JObject.FromObject(AccessTools.Field(typeof(SiegeInteractionDebugBehavior), "nativeAimTarget").GetValue(behavior));
             Assert.Equal(expectedX, target["target"]["x"].Value<float>());

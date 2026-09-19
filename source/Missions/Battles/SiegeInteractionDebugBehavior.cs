@@ -970,7 +970,9 @@ internal sealed class SiegeInteractionDebugBehavior : MissionBehavior, ISiegeInt
         }
         var mangonel = machine as Mangonel;
         if (!watchOnly && ((nativeCamera && machine is Ballista) ||
-            (mangonel != null && standingPoint != null && ReferenceEquals(standingPoint, mangonel.PilotStandingPoint))))
+            (mangonel != null && standingPoint != null &&
+                (ReferenceEquals(standingPoint, mangonel.PilotStandingPoint) ||
+                    ReferenceEquals(standingPoint, mangonel.LoadAmmoStandingPoint)))))
         {
             var ballista = machine as Ballista;
             var body = ballista != null ? ballista.ballistaBody : mangonel._body;
