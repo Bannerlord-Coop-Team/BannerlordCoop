@@ -1,7 +1,8 @@
-using GameInterface.Services.Chat;
+﻿using GameInterface.Services.Chat;
 using GameInterface.Services.Chat.Messages;
 using System.Collections.Generic;
 using System.Linq;
+using TaleWorlds.Library;
 using Xunit;
 
 namespace GameInterface.Tests.Services.Chat;
@@ -18,6 +19,20 @@ public class ChatVMTests
         vm.ActionOpen();
 
         Assert.True(openRequested);
+        Assert.False(vm.IsOpen);
+    }
+
+    [Fact]
+    public void ActionOpen_WhenPlayerChatDisabled_DoesNothing()
+    {
+        var vm = new ChatVM(_ => { }, () => "local");
+        bool openRequested = false;
+        vm.OpenRequested += () => openRequested = true;
+        vm.SetPlayerChatEnabled(false);
+
+        vm.ActionOpen();
+
+        Assert.False(openRequested);
         Assert.False(vm.IsOpen);
     }
 
@@ -57,7 +72,7 @@ public class ChatVMTests
     }
 
     [Fact]
-    public void Receive_DirectMessage_AddsRibbonNotificationWithoutOpeningChat()
+    public void Receive_DirectMessage_AddsUnreadNotificationWithoutOpeningChat()
     {
         var vm = new ChatVM(_ => { }, () => "local");
 
@@ -74,25 +89,23 @@ public class ChatVMTests
         Assert.True(global.IsSelected);
         Assert.True(direct.HasUnreadMessages);
         Assert.False(vm.IsOpen);
-        Assert.True(vm.IsRibbonVisible);
         Assert.True(vm.HasUnreadNotification);
         Assert.Equal("1", vm.UnreadNotificationText);
-        Assert.Equal(string.Empty, vm.TranscriptText);
+        Assert.Empty(vm.VisibleLines);
 
         vm.SetOpen(true);
 
-        Assert.False(vm.IsRibbonVisible);
         Assert.False(vm.HasUnreadNotification);
-        Assert.Equal(string.Empty, vm.TranscriptText);
+        Assert.Empty(vm.VisibleLines);
 
         direct.ExecuteSelection();
 
         Assert.False(direct.HasUnreadMessages);
-        Assert.Contains("[From Other Hero] Other Hero: meet me in Pravend", vm.TranscriptText);
+        Assert.Contains(vm.VisibleLines, line => line.Text.Contains("[From Other Hero] Other Hero: meet me in Pravend"));
     }
 
     [Fact]
-    public void Receive_OwnGlobalEcho_DoesNotAddRibbonNotification()
+    public void Receive_OwnGlobalEcho_DoesNotAddUnreadNotification()
     {
         var vm = new ChatVM(_ => { }, () => "local");
 
@@ -106,6 +119,44 @@ public class ChatVMTests
 
         Assert.False(vm.HasUnreadNotification);
         Assert.Equal("0", vm.UnreadNotificationText);
+        Assert.Contains(vm.VisibleLines, line => line.Text.Contains("[Global] Local Hero: hello everyone"));
+    }
+
+    [Fact]
+    public void ReceiveEvent_AppendsToGlobalAndShowsWhileClosed()
+    {
+        var vm = new ChatVM(_ => { }, () => "local");
+        vm.AddParticipant("other-controller", "Other Hero");
+        vm.Channels.Single(channel => channel.ControllerId == "other-controller").ExecuteSelection();
+
+        vm.ReceiveEvent("You received 2000 denars.", Color.White, ChatEventLog.DefaultCategory);
+
+        Assert.False(vm.IsOpen);
+        Assert.Contains(vm.VisibleLines, line => line.Text == "You received 2000 denars." && !line.IsPlayerChat);
+
+        vm.SetOpen(true);
+        Assert.DoesNotContain(vm.VisibleLines, line => line.Text == "You received 2000 denars.");
+
+        vm.Channels.Single(channel => channel.IsGlobal).ExecuteSelection();
+        Assert.Contains(vm.VisibleLines, line => line.Text == "You received 2000 denars.");
+    }
+
+    [Fact]
+    public void ReceiveEvent_WhenPlayerChatDisabled_StillShowsEvents()
+    {
+        var vm = new ChatVM(_ => { }, () => "local");
+        vm.SetPlayerChatEnabled(false);
+        vm.Receive(new NetworkChatMessage(
+            ChatChannel.Global,
+            "other",
+            "Other Hero",
+            string.Empty,
+            string.Empty,
+            "hidden chat"));
+        vm.ReceiveEvent("Settlement captured.", Color.White, ChatEventLog.DefaultCategory);
+
+        Assert.DoesNotContain(vm.VisibleLines, line => line.IsPlayerChat);
+        Assert.Contains(vm.VisibleLines, line => line.Text == "Settlement captured.");
     }
 
     [Fact]
@@ -161,12 +212,12 @@ public class ChatVMTests
             "Local Hero",
             "direct noise"));
 
-        Assert.Equal(string.Empty, vm.TranscriptText);
+        Assert.Empty(vm.VisibleLines);
         Assert.False(vm.HasUnreadNotification);
         Assert.False(muted.HasUnreadMessages);
 
         muted.ExecuteSelection();
-        Assert.Equal(string.Empty, vm.TranscriptText);
+        Assert.Empty(vm.VisibleLines);
 
         vm.ActionToggleMute();
         global.ExecuteSelection();
@@ -178,7 +229,7 @@ public class ChatVMTests
             string.Empty,
             "audible again"));
 
-        Assert.Contains("[Global] Muted Hero: audible again", vm.TranscriptText);
+        Assert.Contains(vm.VisibleLines, line => line.Text.Contains("[Global] Muted Hero: audible again"));
     }
 
     [Fact]

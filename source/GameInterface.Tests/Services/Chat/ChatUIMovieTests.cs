@@ -1,5 +1,4 @@
-using System.IO;
-using System.Linq;
+﻿using System.IO;
 using System.Runtime.CompilerServices;
 using System.Xml.Linq;
 using Xunit;
@@ -9,7 +8,7 @@ namespace GameInterface.Tests.Services.Chat;
 public class ChatUIMovieTests
 {
     [Fact]
-    public void Movie_BindsInputAndChannelSelectionToChatViewModels()
+    public void Movie_BindsBottomLeftFeedAndChannelChrome()
     {
         var document = XDocument.Load(FindMoviePath());
 
@@ -28,30 +27,13 @@ public class ChatUIMovieTests
         Assert.Contains(document.Descendants(),
             element => element.Attribute("Command.Click")?.Value == "ActionSend");
         var closeButton = FindById(document, "CoopChatCloseButton");
-        Assert.Contains(closeButton.Ancestors(),
-            element => element.Attribute("Id")?.Value == "CoopChatHeader");
-        Assert.Equal("Right", closeButton.Attribute("HorizontalAlignment")?.Value);
-        Assert.Equal("Top", closeButton.Attribute("VerticalAlignment")?.Value);
-        Assert.Equal("CloseButton.Flat", closeButton.Attribute("Brush")?.Value);
         Assert.Equal("ActionClose", closeButton.Attribute("Command.Click")?.Value);
         Assert.Null(closeButton.Attribute("Parameter.Text"));
 
         var muteButton = FindById(document, "CoopChatMuteButton");
-        Assert.Contains(muteButton.Ancestors(),
-            element => element.Attribute("Id")?.Value == "CoopChatHeader");
         Assert.Equal("ActionToggleMute", muteButton.Attribute("Command.Click")?.Value);
         Assert.Equal("@MuteButtonText", muteButton.Attribute("Parameter.Text")?.Value);
         Assert.Equal("@IsMuteButtonVisible", muteButton.Attribute("IsVisible")?.Value);
-
-        var ribbon = FindById(document, "CoopChatRibbon");
-        Assert.Equal("Right", ribbon.Attribute("HorizontalAlignment")?.Value);
-        Assert.Equal("Bottom", ribbon.Attribute("VerticalAlignment")?.Value);
-        Assert.Equal("187", ribbon.Attribute("MarginBottom")?.Value);
-        Assert.Null(ribbon.Attribute("PositionYOffset"));
-        Assert.Equal("@IsRibbonVisible", ribbon.Attribute("IsVisible")?.Value);
-
-        var ribbonButton = FindById(document, "CoopChatRibbonButton");
-        Assert.Equal("ActionOpen", ribbonButton.Attribute("Command.Click")?.Value);
 
         var unreadBadge = FindById(document, "CoopChatUnreadBadge");
         Assert.Equal("@HasUnreadNotification", unreadBadge.Attribute("IsVisible")?.Value);
@@ -59,8 +41,20 @@ public class ChatUIMovieTests
             element => element.Attribute("Text")?.Value == "@UnreadNotificationText");
 
         var chatPanel = FindById(document, "CoopChatRoot");
-        Assert.Equal("Right", chatPanel.Attribute("HorizontalAlignment")?.Value);
-        Assert.Equal("@IsOpen", chatPanel.Attribute("IsVisible")?.Value);
+        Assert.Equal("Left", chatPanel.Attribute("HorizontalAlignment")?.Value);
+        Assert.Equal("Bottom", chatPanel.Attribute("VerticalAlignment")?.Value);
+        Assert.Equal("27", chatPanel.Attribute("MarginLeft")?.Value);
+        Assert.Equal("32", chatPanel.Attribute("MarginBottom")?.Value);
+
+        var feedList = FindById(document, "ChatFeedList");
+        Assert.Equal("{VisibleLines}", feedList.Attribute("DataSource")?.Value);
+        Assert.Contains(feedList.Descendants("RichTextWidget"),
+            element => element.Attribute("Text")?.Value == "@Text" &&
+                       element.Attribute("Brush.FontColor")?.Value == "@Color" &&
+                       element.Attribute("Brush.GlobalAlphaFactor")?.Value == "@Alpha");
+
+        Assert.DoesNotContain(document.Descendants(),
+            element => element.Attribute("Id")?.Value == "CoopChatRibbon");
     }
 
     private static XElement FindById(XDocument document, string id)

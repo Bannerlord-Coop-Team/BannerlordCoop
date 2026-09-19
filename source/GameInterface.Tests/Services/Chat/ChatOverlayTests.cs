@@ -1,4 +1,4 @@
-using GameInterface.Services.Chat;
+﻿using GameInterface.Services.Chat;
 using TaleWorlds.Library;
 using TaleWorlds.ScreenSystem;
 using Xunit;
@@ -87,15 +87,13 @@ public class ChatOverlayTests
     }
 
     [Theory]
-    [InlineData(true, true, false, true, false, true)]
-    [InlineData(true, true, false, false, true, true)]
-    [InlineData(false, true, false, true, false, false)]
-    [InlineData(true, false, false, true, false, false)]
-    [InlineData(true, true, true, true, false, false)]
-    [InlineData(true, true, true, false, true, false)]
-    [InlineData(true, true, false, false, false, false)]
-    public void Presentation_IsLimitedToUnobstructedGameplay(
-        bool isEnabled,
+    [InlineData(true, false, true, false, true)]
+    [InlineData(true, false, false, true, true)]
+    [InlineData(false, false, true, false, false)]
+    [InlineData(true, true, true, false, false)]
+    [InlineData(true, true, false, true, false)]
+    [InlineData(true, false, false, false, false)]
+    public void Presentation_ShowsEventLogOnUnobstructedGameplay(
         bool isGameplayScreen,
         bool isConversationActive,
         bool isGameplayLayerFocused,
@@ -103,7 +101,6 @@ public class ChatOverlayTests
         bool expected)
     {
         Assert.Equal(expected, ChatOverlay.ShouldShowPresentation(
-            isEnabled,
             isGameplayScreen,
             isConversationActive,
             isGameplayLayerFocused,
