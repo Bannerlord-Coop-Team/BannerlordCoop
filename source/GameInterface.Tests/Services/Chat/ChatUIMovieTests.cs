@@ -44,7 +44,7 @@ public class ChatUIMovieTests
         Assert.Equal("Left", chatPanel.Attribute("HorizontalAlignment")?.Value);
         Assert.Equal("Bottom", chatPanel.Attribute("VerticalAlignment")?.Value);
         Assert.Equal("27", chatPanel.Attribute("MarginLeft")?.Value);
-        Assert.Equal("32", chatPanel.Attribute("MarginBottom")?.Value);
+        Assert.Equal("100", chatPanel.Attribute("MarginBottom")?.Value);
 
         var feedList = FindById(document, "ChatFeedList");
         Assert.Equal("{VisibleLines}", feedList.Attribute("DataSource")?.Value);
@@ -52,6 +52,11 @@ public class ChatUIMovieTests
             element => element.Attribute("Text")?.Value == "@Text" &&
                        element.Attribute("Brush.FontColor")?.Value == "@Color" &&
                        element.Attribute("Brush.GlobalAlphaFactor")?.Value == "@Alpha");
+
+        var feedScroll = FindById(document, "ChatFeedScrollablePanel");
+        Assert.Equal(
+            @"..\ChatFeedScrollbarHolder\ChatFeedScrollbar",
+            feedScroll.Attribute("VerticalScrollbar")?.Value);
 
         Assert.DoesNotContain(document.Descendants(),
             element => element.Attribute("Id")?.Value == "CoopChatRibbon");

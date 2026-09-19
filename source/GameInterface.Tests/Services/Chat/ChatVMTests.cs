@@ -123,6 +123,22 @@ public class ChatVMTests
     }
 
     [Fact]
+    public void SetOpen_ShowsFullChannelHistoryForScrolling()
+    {
+        var vm = new ChatVM(_ => { }, () => "local");
+        for (int i = 0; i < 20; i++)
+            vm.ReceiveEvent($"event {i}", Color.White, ChatEventLog.DefaultCategory);
+
+        Assert.Equal(12, vm.VisibleLines.Count);
+
+        vm.SetOpen(true);
+
+        Assert.Equal(20, vm.VisibleLines.Count);
+        Assert.Equal("event 0", vm.VisibleLines[0].Text);
+        Assert.Equal("event 19", vm.VisibleLines[19].Text);
+    }
+
+    [Fact]
     public void ReceiveEvent_AppendsToGlobalAndShowsWhileClosed()
     {
         var vm = new ChatVM(_ => { }, () => "local");

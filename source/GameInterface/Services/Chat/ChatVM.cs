@@ -360,7 +360,8 @@ internal sealed class ChatVM : ViewModel
         if (!histories.TryGetValue(channelId, out var history))
             return;
 
-        int firstLine = Math.Max(0, history.Count - VisibleHistoryLines);
+        // Closed: recent fading lines only. Open: full channel history so the scrollbar can move.
+        int firstLine = IsOpen ? 0 : Math.Max(0, history.Count - VisibleHistoryLines);
         for (int i = firstLine; i < history.Count; i++)
         {
             var line = history[i];
