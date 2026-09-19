@@ -1,20 +1,86 @@
 ﻿using GameInterface.Surrogates;
 using Missions.Battles;
+using HarmonyLib;
 using Missions.Messages;
 using ProtoBuf.Meta;
 using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Reflection;
+using System.Runtime.Serialization;
 using TaleWorlds.Core;
+using TaleWorlds.Engine;
 using TaleWorlds.Library;
 using TaleWorlds.MountAndBlade;
 using Xunit;
 
 namespace Coop.Tests.Missions.Battles;
 
+[Collection("Mission.Current")]
 public class SiegeMachineStateReplicatorTests
 {
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void PeerMangonel_LoadingPointFollowsReceivedStateWithoutRunningWeaponState(bool catchUp)
+    {
+        var harmony = new Harmony("coop.tests.peer-mangonel." + Guid.NewGuid());
+        try
+        {
+            harmony.Patch(AccessTools.Method(typeof(ScriptComponentBehavior), "CacheEditableFieldsForAllScriptComponents"),
+                prefix: new HarmonyMethod(typeof(SiegeMachineStateReplicatorTests), nameof(SkipNativeCache)));
+            harmony.Patch(AccessTools.Method(typeof(UsableMissionObject), nameof(UsableMissionObject.SetIsDeactivatedSynched)),
+                prefix: new HarmonyMethod(typeof(SiegeMachineStateReplicatorTests), nameof(RecordPointActivation)));
+#pragma warning disable SYSLIB0050
+            var weapon = (Mangonel)FormatterServices.GetUninitializedObject(typeof(Mangonel));
+            var point = (StandingPointWithWeaponRequirement)FormatterServices.GetUninitializedObject(typeof(StandingPointWithWeaponRequirement));
+            var ballista = (Ballista)FormatterServices.GetUninitializedObject(typeof(Ballista));
+            var sut = (SiegeMachineStateReplicator)FormatterServices.GetUninitializedObject(typeof(SiegeMachineStateReplicator));
+#pragma warning restore SYSLIB0050
+            AccessTools.Property(typeof(MissionObject), "Id").SetValue(weapon, new MissionObjectId(1554, false));
+            AccessTools.Property(typeof(MissionObject), "Id").SetValue(ballista, new MissionObjectId(884, false));
+            AccessTools.Field(typeof(RangedSiegeWeapon), "LoadAmmoStandingPoint").SetValue(weapon, point);
+            AccessTools.Field(typeof(UsableMissionObject), "_isDeactivated").SetValue(point, true);
+            AccessTools.Field(typeof(SiegeMachineStateReplicator), "peerWeaponState").SetValue(sut, new Dictionary<int, int>());
+            pointActivationCalls = 0;
+            var apply = AccessTools.Method(typeof(SiegeMachineStateReplicator), "ApplyWeaponAnimation");
+            if (!catchUp) apply.Invoke(sut, new object[] { weapon, (int)RangedSiegeWeapon.WeaponState.Reloading });
+            int before = pointActivationCalls;
+            apply.Invoke(sut, new object[] { weapon, (int)RangedSiegeWeapon.WeaponState.LoadingAmmo });
+            Assert.False(point.IsDeactivated);
+            Assert.Equal(before + 1, pointActivationCalls);
+            Assert.Equal(RangedSiegeWeapon.WeaponState.Idle, weapon.State);
+            apply.Invoke(sut, new object[] { weapon, (int)RangedSiegeWeapon.WeaponState.LoadingAmmo });
+            Assert.Equal(before + 1, pointActivationCalls);
+            // Local simulation may change the point while the peer animation cache is retained.
+            AccessTools.Field(typeof(UsableMissionObject), "_isDeactivated").SetValue(point, true);
+            apply.Invoke(sut, new object[] { weapon, (int)RangedSiegeWeapon.WeaponState.LoadingAmmo });
+            Assert.False(point.IsDeactivated);
+            Assert.Equal(before + 2, pointActivationCalls);
+            apply.Invoke(sut, new object[] { weapon, -1 });
+            Assert.False(point.IsDeactivated);
+            Assert.Equal(before + 2, pointActivationCalls);
+            apply.Invoke(sut, new object[] { ballista, (int)RangedSiegeWeapon.WeaponState.LoadingAmmo });
+            Assert.Equal(before + 2, pointActivationCalls);
+            apply.Invoke(sut, new object[] { weapon, (int)RangedSiegeWeapon.WeaponState.WaitingBeforeIdle });
+            Assert.True(point.IsDeactivated);
+            Assert.Equal(before + 3, pointActivationCalls);
+            Assert.Equal(RangedSiegeWeapon.WeaponState.Idle, weapon.State);
+        }
+        finally { harmony.UnpatchAll(harmony.Id); }
+    }
+
+    private static int pointActivationCalls;
+
+    private static bool SkipNativeCache() => false;
+
+    private static bool RecordPointActivation(UsableMissionObject __instance, bool value)
+    {
+        pointActivationCalls++;
+        AccessTools.Field(typeof(UsableMissionObject), "_isDeactivated").SetValue(__instance, value);
+        return false;
+    }
+
     [Fact]
     public void NetworkGateHit_RoundTripsRamAuthorityAndDamage()
     {

@@ -1832,6 +1832,14 @@ public class SiegeMachineStateReplicator : ISiegeMachineStateReplicator
     {
         if (weaponState < 0 || !(machine is RangedSiegeWeapon rangedWeapon)) return;
 
+        // Peers need the loading point without running the simulator's weapon-state setter.
+        if (rangedWeapon is Mangonel mangonel && mangonel.LoadAmmoStandingPoint != null)
+        {
+            bool deactivated = weaponState != (int)RangedSiegeWeapon.WeaponState.LoadingAmmo;
+            if (mangonel.LoadAmmoStandingPoint.IsDeactivated != deactivated)
+                mangonel.LoadAmmoStandingPoint.SetIsDeactivatedSynched(deactivated);
+        }
+
         int id = machine.Id.Id;
         if (peerWeaponState.TryGetValue(id, out var previous) && previous == weaponState) return;
         peerWeaponState[id] = weaponState;
