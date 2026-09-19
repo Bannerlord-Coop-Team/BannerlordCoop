@@ -609,16 +609,16 @@ public class KingdomHandler : IHandler
             if (!objectManager.TryGetObjectWithLogging<Settlement>(payload.SettlementId, out var settlement)) return;
             if (!objectManager.TryGetObjectWithLogging<Clan>(payload.ReceiverClanId, out var receiverClan)) return;
             if (!objectManager.TryGetObjectWithLogging<Clan>(player.ClanId, out var playerClan)) return;
-            if (playerClan.Kingdom?.RulingClan != playerClan)
+            if (playerClan != playerClan.Kingdom?.RulingClan)
             {
                 Logger.Warning("Ignoring GiftSettlementOwnership {Instance}: sender's clan {SenderClan} is not the ruling clan of their kingdom",
                     obj.What.SettlementId, player.ClanId);
                 return;
             }
-            if(playerClan.Kingdom != receiverClan.Kingdom)
+            if(receiverClan.IsUnderMercenaryService || receiverClan.Kingdom != playerClan.Kingdom || receiverClan == playerClan)
             {
-                Logger.Warning("Ignoring GiftSettlementOwnership {Instance}: sender's clan {SenderClan} and receiver's clan {ReceiverClan} are not in the same kingdom",
-                    obj.What.SettlementId, player.ClanId, payload.ReceiverClanId);
+                Logger.Warning("Ignoring GiftSettlementOwnership {Instance}: receiver's clan {ReceiverClan} invalid (Mecenary: {Mecenary}, Kingdom: {Kingdom})",
+                    obj.What.SettlementId, payload.ReceiverClanId, receiverClan.IsUnderMercenaryService, receiverClan.Kingdom.StringId);
                 return;
             }
             if (!settlement.IsFortification || settlement.OwnerClan != playerClan)
