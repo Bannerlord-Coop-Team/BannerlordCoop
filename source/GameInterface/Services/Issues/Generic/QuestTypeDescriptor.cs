@@ -36,6 +36,16 @@ public static class QuestBetrayalProofContext
     public static void Set(byte value) => _current = value;
 }
 
+public static class DeferredLocalConsequenceContext
+{
+    [ThreadStatic]
+    private static bool _current;
+
+    public static bool Current => _current;
+
+    public static void Set(bool value) => _current = value;
+}
+
 public abstract class QuestTypeDescriptor
 {
     public Type IssueType { get; }

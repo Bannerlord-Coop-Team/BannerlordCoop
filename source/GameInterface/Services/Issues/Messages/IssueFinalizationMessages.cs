@@ -84,12 +84,15 @@ public readonly struct NetworkIssueRemoved : IServerToClientCommand
     public readonly IssueFinalizeReason Reason;
     [ProtoMember(3)]
     public readonly byte Proof;
+    [ProtoMember(4)]
+    public readonly bool LocalConsequenceDeferred;
 
-    public NetworkIssueRemoved(string ownerId, IssueFinalizeReason reason, byte proof = 0)
+    public NetworkIssueRemoved(string ownerId, IssueFinalizeReason reason, byte proof = 0, bool localConsequenceDeferred = false)
     {
         OwnerId = ownerId;
         Reason = reason;
         Proof = proof;
+        LocalConsequenceDeferred = localConsequenceDeferred;
     }
 }
 

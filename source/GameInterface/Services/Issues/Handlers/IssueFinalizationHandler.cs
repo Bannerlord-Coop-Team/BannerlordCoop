@@ -141,7 +141,7 @@ internal class IssueFinalizationHandler : IHandler
         if (ModInformation.IsServer)
         {
             var proof = IssueFinalizeAuthorityGuard.IsActive ? ReadProofContext(reason) : CaptureProof(owner.Issue, reason);
-            network.SendAll(new NetworkIssueRemoved(ownerId, reason, proof));
+            network.SendAll(new NetworkIssueRemoved(ownerId, reason, proof, DeferredLocalConsequenceContext.Current));
         }
         else
         {
@@ -281,19 +281,27 @@ internal class IssueFinalizationHandler : IHandler
         }
 
         var isLocalPeerOwner = ownershipRegistry.IsLocalPeerOwner(owner);
+        var defersLocalConsequence = !isLocalPeerOwner && reason == IssueFinalizeReason.QuestFail && descriptor?.ApplyQuestFailLocalOwnerConsequence != null;
 
-        if (!FinalizeAndBroadcast(owner, ownerId, player, reason, proof)) return;
-
-        if (reason == IssueFinalizeReason.QuestFail && descriptor?.ApplyQuestFailLocalOwnerConsequence != null)
+        DeferredLocalConsequenceContext.Set(defersLocalConsequence);
+        bool finalized;
+        try
         {
-            if (isLocalPeerOwner)
-            {
-                descriptor.ApplyQuestFailLocalOwnerConsequence(quest, proof);
-            }
-            else
-            {
-                pendingConsequenceRegistry.DeferQuestFail(player.ControllerId, descriptor.DisplayName, proof);
-            }
+            finalized = FinalizeAndBroadcast(owner, ownerId, player, reason, proof);
+        }
+        finally
+        {
+            DeferredLocalConsequenceContext.Set(false);
+        }
+        if (!finalized) return;
+
+        if (defersLocalConsequence)
+        {
+            pendingConsequenceRegistry.DeferQuestFail(player.ControllerId, descriptor.DisplayName, proof);
+        }
+        else if (reason == IssueFinalizeReason.QuestFail && descriptor?.ApplyQuestFailLocalOwnerConsequence != null)
+        {
+            descriptor.ApplyQuestFailLocalOwnerConsequence(quest, proof);
         }
     }
 
@@ -532,6 +540,7 @@ internal class IssueFinalizationHandler : IHandler
         var ownerId = payload.What.OwnerId;
         var reason = payload.What.Reason;
         var proof = payload.What.Proof;
+        var localConsequenceDeferred = payload.What.LocalConsequenceDeferred;
         GameThread.RunSafe(() =>
         {
             if (!objectManager.TryGetObjectWithLogging<Hero>(ownerId, out var owner)) return;
@@ -566,7 +575,7 @@ internal class IssueFinalizationHandler : IHandler
             {
                 descriptor?.ApplyQuestSuccessLocalOwnerConsequence?.Invoke(quest);
             }
-            else if (isLocalPeerOwner && reason == IssueFinalizeReason.QuestFail && quest != null)
+            else if (isLocalPeerOwner && reason == IssueFinalizeReason.QuestFail && quest != null && !localConsequenceDeferred)
             {
                 descriptor?.ApplyQuestFailLocalOwnerConsequence?.Invoke(quest, proof);
             }
