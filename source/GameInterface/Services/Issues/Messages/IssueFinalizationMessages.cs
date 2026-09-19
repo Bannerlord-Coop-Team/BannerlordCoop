@@ -40,6 +40,20 @@ public readonly struct QuestSuccessTriggered : IEvent
     }
 }
 
+public readonly struct QuestTerminalOutcomeTriggered : IEvent
+{
+    public readonly Hero Owner;
+    public readonly string ControllerId;
+    public readonly IssueFinalizeReason Reason;
+
+    public QuestTerminalOutcomeTriggered(Hero owner, string controllerId, IssueFinalizeReason reason)
+    {
+        Owner = owner;
+        ControllerId = controllerId;
+        Reason = reason;
+    }
+}
+
 [ProtoContract(SkipConstructor = true)]
 public readonly struct RequestIssueRemoved : ICommand
 {
@@ -70,11 +84,44 @@ public readonly struct NetworkIssueRemoved : IServerToClientCommand
     public readonly IssueFinalizeReason Reason;
     [ProtoMember(3)]
     public readonly byte Proof;
+    [ProtoMember(4)]
+    public readonly bool LocalConsequenceDeferred;
 
-    public NetworkIssueRemoved(string ownerId, IssueFinalizeReason reason, byte proof = 0)
+    public NetworkIssueRemoved(string ownerId, IssueFinalizeReason reason, byte proof = 0, bool localConsequenceDeferred = false)
     {
         OwnerId = ownerId;
         Reason = reason;
         Proof = proof;
+        LocalConsequenceDeferred = localConsequenceDeferred;
+    }
+}
+
+[ProtoContract(SkipConstructor = true)]
+public readonly struct NetworkApplyPendingQuestFailConsequence : IServerToClientCommand
+{
+    [ProtoMember(1)]
+    public readonly string QuestTypeKey;
+    [ProtoMember(2)]
+    public readonly byte Proof;
+    [ProtoMember(3)]
+    public readonly long ObligationId;
+
+    public NetworkApplyPendingQuestFailConsequence(long obligationId, string questTypeKey, byte proof)
+    {
+        ObligationId = obligationId;
+        QuestTypeKey = questTypeKey;
+        Proof = proof;
+    }
+}
+
+[ProtoContract(SkipConstructor = true)]
+public readonly struct NetworkAcknowledgePendingQuestFailConsequence : ICommand
+{
+    [ProtoMember(1)]
+    public readonly long ObligationId;
+
+    public NetworkAcknowledgePendingQuestFailConsequence(long obligationId)
+    {
+        ObligationId = obligationId;
     }
 }
