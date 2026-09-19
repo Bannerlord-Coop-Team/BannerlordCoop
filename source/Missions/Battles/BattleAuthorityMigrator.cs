@@ -6,6 +6,7 @@ using GameInterface.Services.MapEvents.TroopSupply;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Players;
 using Missions.Messages;
+using Missions.Hideouts;
 using Missions.Services.Network;
 using Serilog;
 using System;
@@ -35,6 +36,7 @@ public interface IBattleAuthorityMigrator : IDisposable
     /// </summary>
     void ApplyLateSpawnedPuppet(Agent agent, Guid agentId, Agent mount, Guid mountAgentId);
     bool TrySurrenderPlayerHero(string controllerId, BattleAgentSpawnData data);
+    bool TrySurrenderPlayerHero(BattleAgentSpawnData data);
     void ReplayPlayerHandoff(string controllerId);
     void TickPlayerHandoffs(float dt);
     bool IsCurrentPlayerHandoff(NetworkRetainedPlayerHero handoff);
@@ -117,6 +119,15 @@ public class BattleAuthorityMigrator : IBattleAuthorityMigrator
         withdrawnHosts.Remove(payload.What.ControllerId);
     }
 
+    public bool TrySurrenderPlayerHero(BattleAgentSpawnData data)
+    {
+        if (data == null) return false;
+        foreach (var player in playerManager.Players)
+            if (player.CharacterObjectId == data.CharacterId)
+                return TrySurrenderPlayerHero(player.ControllerId, data);
+        return false;
+    }
+
     // Suspend the holder locally; only the server grant may advance the shared authority revision.
     public bool TrySurrenderPlayerHero(string controllerId, BattleAgentSpawnData data)
     {
@@ -194,7 +205,7 @@ public class BattleAuthorityMigrator : IBattleAuthorityMigrator
             || new HashSet<string>(missionContext.ControllersInMission).Contains(handoff.ReturningControllerId);
         if (!returningPlayerPresent || !playerManager.TryGetPlayer(handoff.ReturningControllerId, out var player)
             || player.CharacterObjectId != handoff.Previous.CharacterId
-            || handoff.Previous.OriginalOwnerControllerId != handoff.ReturningControllerId
+            || string.IsNullOrEmpty(handoff.Previous.OriginalOwnerControllerId)
             || !(handoff.Previous.Health > 0) || float.IsInfinity(handoff.Previous.Health)
             || handoff.Previous.IsRunningAway) return false;
         if (!TryGetPlayerParty(handoff.ReturningControllerId, out var party, out var hero)
@@ -585,7 +596,8 @@ public class BattleAuthorityMigrator : IBattleAuthorityMigrator
         if (mount != null) interpolator.Forget(mount);
 
         ConvertPuppetToHostAi(agent, activateAi);
-        if (!agent.IsRunningAway && agent.Formation != null)
+        if (!agent.IsRunningAway && agent.Formation != null &&
+            Mission.Current.GetMissionBehavior<CoopHideoutMissionLogic>()?.PreserveStealthPosture != true)
             agent.Formation.SetMovementOrder(MovementOrder.MovementOrderCharge);
 
         Logger.Information(
@@ -678,8 +690,9 @@ public class BattleAuthorityMigrator : IBattleAuthorityMigrator
                 // has an active behavior (there is none here), so they'd stand idle. Give each adopted formation
                 // an explicit Charge so the NPCs actually engage. (Freshly spawned troops move because their
                 // OWNER's team AI drives them; these adopted puppets have no such driver and need the order.)
-                foreach (var formation in formations)
-                    formation.SetMovementOrder(MovementOrder.MovementOrderCharge);
+                if (Mission.Current.GetMissionBehavior<Missions.Hideouts.CoopHideoutMissionLogic>()?.PreserveStealthPosture != true)
+                    foreach (var formation in formations)
+                        formation.SetMovementOrder(MovementOrder.MovementOrderCharge);
 
                 // TEMP diagnostic: how many adopted agents actually became AI-controlled, across how many
                 // formations (each ordered to Charge above). The per-formation state is covered by the
@@ -761,6 +774,9 @@ public class BattleAuthorityMigrator : IBattleAuthorityMigrator
                 agent.Retreat(Mission.Current.GetClosestFleePositionForAgent(agent));
             return;
         }
+
+        if (Mission.Current.GetMissionBehavior<Missions.Hideouts.CoopHideoutMissionLogic>()?.RestoreAdoptedAgent(agent) == true)
+            return;
 
         // Fall back to the troop-class default only if the puppet has no formation yet.
         var formation = agent.Formation ?? formationAssigner.Assign(agent);

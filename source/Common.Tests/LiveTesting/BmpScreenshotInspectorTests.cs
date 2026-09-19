@@ -91,7 +91,7 @@ public class BmpScreenshotInspectorTests
     }
 
     [Fact]
-    public void ObserveFile_ReportsFreshnessAndFinalizesAnUnchangedFile()
+    public void ObserveFile_FinalizesAnUnchangedFile()
     {
         string path = NewTemporaryPath();
         try
@@ -107,8 +107,6 @@ public class BmpScreenshotInspectorTests
             BmpScreenshotObservation observation = inspector.ObserveFile(path);
 
             Assert.True(observation.HeaderValid);
-            Assert.False(observation.IsFreshFor(writtenUtc.AddMinutes(1)));
-            Assert.True(observation.IsFreshFor(writtenUtc.AddMinutes(-1)));
             Assert.True(inspector.TryInspectStableFile(path, observation, out var evidence));
             Assert.Equal(BmpScreenshotQualityVerdict.NonUniformPixelData, evidence.QualityVerdict);
         }

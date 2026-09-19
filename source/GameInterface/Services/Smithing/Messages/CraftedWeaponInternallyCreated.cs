@@ -19,6 +19,7 @@ public readonly struct CreatedCraftedWeaponInternal : IEvent
     public readonly Crafting CraftingLogic;
     public readonly CraftingOrder CraftingOrder;
     public readonly Settlement CurrentSettlement;
+    public readonly string ClientRequestId;
 
     public CreatedCraftedWeaponInternal(
         bool isFreeMode,
@@ -30,7 +31,8 @@ public readonly struct CreatedCraftedWeaponInternal : IEvent
         Hero playerHero,
         Crafting craftingLogic,
         CraftingOrder craftingOrder,
-        Settlement currentSettlement)
+        Settlement currentSettlement,
+        string clientRequestId)
     {
         IsFreeMode = isFreeMode;
         CraftingHero = craftingHero;
@@ -42,5 +44,6 @@ public readonly struct CreatedCraftedWeaponInternal : IEvent
         CraftingLogic = craftingLogic;
         CraftingOrder = craftingOrder;
         CurrentSettlement = currentSettlement;
+        ClientRequestId = clientRequestId;
     }
 }

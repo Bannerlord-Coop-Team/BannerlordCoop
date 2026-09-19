@@ -407,11 +407,6 @@ public sealed class BmpScreenshotObservation
         LastWriteUtc = lastWriteUtc;
     }
 
-    public bool IsFreshFor(DateTime captureRequestedUtc)
-    {
-        return LastWriteUtc.HasValue && LastWriteUtc.Value >= captureRequestedUtc;
-    }
-
     internal static BmpScreenshotObservation Unreadable(long length, DateTime? lastWriteUtc)
     {
         return new BmpScreenshotObservation(true, false, length, null, null, null, null, lastWriteUtc);

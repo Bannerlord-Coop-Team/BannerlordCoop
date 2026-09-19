@@ -26,8 +26,10 @@ public class RetainedPlayerHeroSurrenderTests : MissionTestEnvironment
 {
     public RetainedPlayerHeroSurrenderTests(ITestOutputHelper output) : base(output, numClients: 3) { }
 
-    [Fact]
-    public void RejectedSurrenderKeepsExistingObserverReadyForSecondRejoin()
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void RejectedSurrenderKeepsExistingObserverReadyForSecondRejoin(bool spawnedByHost)
     {
         using var fixture = new MissionEngineFixture();
         var (battleId, partyIds) = SetupCoopBattle("holder", "returner", "observer");
@@ -79,10 +81,12 @@ public class RetainedPlayerHeroSurrenderTests : MissionTestEnvironment
                     .Team(mission.DefenderTeam.Shell).Equipment(new Equipment()));
                 agents[i].Health = 22;
                 Assert.True(client.Resolve<INetworkAgentRegistry>().TryRegisterAgent(
-                    "holder", "returner", "returner:first-mission", agentId, 7, agents[i], 1));
+                    "holder", spawnedByHost ? "holder" : "returner", "original:first-mission",
+                    agentId, 7, agents[i], spawnedByHost ? 0 : 1));
                 previous = new BattleAgentSpawnData(agentId, characterId, default, BattleSideEnum.Defender,
                     22, "holder", eventPartyId, 1141, new Equipment(), default, null, movementId: 7,
-                    originalOwnerControllerId: "returner", movementScopeId: "returner:first-mission", authorityRevision: 1);
+                    originalOwnerControllerId: spawnedByHost ? "holder" : "returner",
+                    movementScopeId: "original:first-mission", authorityRevision: spawnedByHost ? 0 : 1);
             });
         }
         Server.Call(() =>
@@ -100,7 +104,7 @@ public class RetainedPlayerHeroSurrenderTests : MissionTestEnvironment
             Assert.Equal(AgentControllerType.None, agents[0].Controller);
             Assert.True(clients[0].Resolve<INetworkAgentRegistry>().TryGetAgentInfo(agentId, out var info));
             Assert.Equal("holder", info.CurrentAuthority);
-            Assert.Equal(1, info.AuthorityRevision);
+            Assert.Equal(spawnedByHost ? 0 : 1, info.AuthorityRevision);
         });
         // The server observes the departure before the queued holder request is accepted.
         DepartBattle("returner", battleId);
@@ -115,7 +119,7 @@ public class RetainedPlayerHeroSurrenderTests : MissionTestEnvironment
             {
                 Assert.True(clients[index].Resolve<INetworkAgentRegistry>().TryGetAgentInfo(agentId, out var info));
                 Assert.Equal("holder", info.CurrentAuthority);
-                Assert.Equal(1, info.AuthorityRevision);
+                Assert.Equal(spawnedByHost ? 0 : 1, info.AuthorityRevision);
                 Assert.Equal(index == 0 ? AgentControllerType.AI : AgentControllerType.None, info.Agent.Controller);
             });
         }
@@ -133,11 +137,11 @@ public class RetainedPlayerHeroSurrenderTests : MissionTestEnvironment
                 var registry = clients[index].Resolve<INetworkAgentRegistry>();
                 Assert.True(registry.TryGetAgentInfo(agentId, out var info));
                 Assert.Equal("returner", info.CurrentAuthority);
-                Assert.Equal(2, info.AuthorityRevision);
+                Assert.Equal(spawnedByHost ? 1 : 2, info.AuthorityRevision);
                 Assert.Same(agents[index], info.Agent);
                 Assert.Single(registry.GetAgents("returner"));
-                Assert.Equal("returner", info.OriginalOwner);
-                Assert.Equal("returner:first-mission", info.MovementScopeId);
+                Assert.Equal(spawnedByHost ? "holder" : "returner", info.OriginalOwner);
+                Assert.Equal("original:first-mission", info.MovementScopeId);
                 Assert.Equal(7, info.MovementId);
                 Assert.Equal(22, info.Agent.Health);
             });
