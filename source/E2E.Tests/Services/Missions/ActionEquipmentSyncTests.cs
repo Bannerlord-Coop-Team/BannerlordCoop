@@ -23,7 +23,7 @@ using Xunit.Abstractions;
 
 namespace E2E.Tests.Services.Missions;
 
-public class ActionEquipmentSyncTests : MissionTestEnvironment
+public partial class ActionEquipmentSyncTests : MissionTestEnvironment
 {
     public ActionEquipmentSyncTests(ITestOutputHelper output) : base(output, 3) { }
 

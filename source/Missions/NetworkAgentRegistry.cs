@@ -553,6 +553,7 @@ public class CoopAgentInfo
     }
 
     internal bool UsesActionEquipment { get; set; }
+    internal volatile StandingPoint ReplicatedPilotPoint;
 
     public Agent Agent { get; }
     public Guid AgentId { get; }

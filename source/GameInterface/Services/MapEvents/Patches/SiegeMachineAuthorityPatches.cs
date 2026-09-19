@@ -73,9 +73,34 @@ internal class SiegeMachineAuthorityPatches
         IEnumerable<CodeInstruction> instructions,
         MethodBase __originalMethod) => MachineOnTickTranspiler(instructions, __originalMethod);
 
+    [HarmonyPatch(typeof(RangedSiegeWeapon), "OnTick")]
+    [HarmonyTranspiler]
+    private static IEnumerable<CodeInstruction> RangedPilotTickTranspiler(
+        IEnumerable<CodeInstruction> instructions,
+        MethodBase __originalMethod) => MachineOnTickTranspiler(instructions, __originalMethod);
+
+    [HarmonyPatch(typeof(Ballista), "OnTickParallel")]
+    [HarmonyTranspiler]
+    private static IEnumerable<CodeInstruction> BallistaPilotTickTranspiler(
+        IEnumerable<CodeInstruction> instructions,
+        MethodBase __originalMethod) => MachineOnTickTranspiler(instructions, __originalMethod);
+
+    [HarmonyPatch(typeof(Mangonel), "OnTickParallel")]
+    [HarmonyTranspiler]
+    private static IEnumerable<CodeInstruction> MangonelPilotTickTranspiler(
+        IEnumerable<CodeInstruction> instructions,
+        MethodBase __originalMethod) => MachineOnTickTranspiler(instructions, __originalMethod, expectedChecks: 2);
+
+    [HarmonyPatch(typeof(Trebuchet), "OnTickParallel")]
+    [HarmonyTranspiler]
+    private static IEnumerable<CodeInstruction> TrebuchetPilotTickTranspiler(
+        IEnumerable<CodeInstruction> instructions,
+        MethodBase __originalMethod) => MachineOnTickTranspiler(instructions, __originalMethod, expectedChecks: 2);
+
     private static IEnumerable<CodeInstruction> MachineOnTickTranspiler(
         IEnumerable<CodeInstruction> instructions,
-        MethodBase __originalMethod)
+        MethodBase __originalMethod,
+        int expectedChecks = 1)
     {
         var nativeClientGetter = AccessTools.PropertyGetter(typeof(GameNetwork), nameof(GameNetwork.IsClientOrReplay));
         var coopClientGetter = AccessTools.Method(typeof(SiegeMachineAuthorityPatches), nameof(IsClientForMachine));
@@ -104,7 +129,7 @@ internal class SiegeMachineAuthorityPatches
             replacements++;
         }
 
-        if (replacements != 1 && !(replacements == 0 && existingReplacements == 1))
+        if (replacements != expectedChecks && !(replacements == 0 && existingReplacements == expectedChecks))
         {
             throw new InvalidOperationException(
                 $"Failed to patch siege machine authority check in {__originalMethod.Name}: " +

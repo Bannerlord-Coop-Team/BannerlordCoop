@@ -7,6 +7,7 @@ using GameInterface.Services.Locations;
 using LiteNetLib;
 using Missions.Agents.Messages;
 using Missions.Agents.Packets;
+using Missions.Battles;
 #if DEBUG
 using Missions.Diagnostics;
 #endif
@@ -20,6 +21,7 @@ namespace Missions.Agents.Handlers;
 
 public interface IAgentActionHandler : IPacketHandler, IDisposable
 {
+    void BindPilotSeats(string battleId, ISiegeMachineStateReplicator machineState);
     /// <summary>
     /// [Game thread] Detect discrete action and defend-input changes on the locally authoritative main player.
     /// </summary>
@@ -113,6 +115,7 @@ public class AgentActionHandler : IAgentActionHandler
         public Agent.MovementControlFlag InputBoundaryDefendFlags;
         public Agent.GuardMode InputBoundaryGuardMode;
         public long Sequence;
+        public AgentPilotSeatData? PilotSeat;
     }
 
     public AgentActionHandler(
@@ -137,6 +140,9 @@ public class AgentActionHandler : IAgentActionHandler
     }
 
     public PacketType PacketType => PacketType.AgentAction;
+
+    public void BindPilotSeats(string battleId, ISiegeMachineStateReplicator machineState) =>
+        remoteActionProcessor.BindPilotSeats(battleId, machineState);
 
     public void PollActions()
     {
@@ -239,6 +245,8 @@ public class AgentActionHandler : IAgentActionHandler
         int action1 = agent.GetCurrentAction(1).Index;
         _localAgentStates.TryGetValue(info.AgentId, out var state);
         bool hadState = state.HasObservation;
+        AgentPilotSeatData? pilotSeat = remoteActionProcessor.CapturePilotSeat(info, state.PilotSeat);
+        bool pilotSeatChanged = !Nullable.Equals(state.PilotSeat, pilotSeat);
         AgentEquipmentData? equipment = AgentEquipmentData.TryCapture(agent, out var capturedEquipment)
             ? capturedEquipment : (AgentEquipmentData?)null;
         bool equipmentChanged = hadState
@@ -403,7 +411,8 @@ public class AgentActionHandler : IAgentActionHandler
             && !defendChanged && !guardChanged
             && !guardedMountStateChanged
             && !guardedControllerRoleChanged
-            && !equipmentChanged)
+            && !equipmentChanged
+            && !pilotSeatChanged)
         {
             if (hadState)
             {
@@ -475,8 +484,10 @@ public class AgentActionHandler : IAgentActionHandler
             || guardedMountStateChanged
             || guardedControllerRoleChanged
             || discreteActionChanged
-            || equipmentChanged;
+            || equipmentChanged
+            || pilotSeatChanged;
         state.HasObservation = true;
+        state.PilotSeat = pilotSeat;
         state.Equipment = equipment;
         state.Action0 = action0;
         state.Action1 = action1;
@@ -532,7 +543,7 @@ public class AgentActionHandler : IAgentActionHandler
             guardReactionChannel,
             publishAction0Speed ? action0Speed : (float?)null,
             publishAction1Speed ? action1Speed : (float?)null);
-        actionData = PrepareEquipmentSnapshot(info, actionData, catchUp: false);
+        actionData = PrepareEquipmentSnapshot(info, actionData.WithPilotSeat(pilotSeat), catchUp: false);
 #if DEBUG
         MissionActionDiagnostics.RecordOutboundAction();
 #endif
@@ -560,6 +571,7 @@ public class AgentActionHandler : IAgentActionHandler
                 _localAgentStates.TryGetValue(
                     info.AgentId,
                     out LocalAgentActionState state);
+                AgentPilotSeatData? pilotSeat = remoteActionProcessor.CapturePilotSeat(info, state.PilotSeat);
                 bool useInputBoundary =
                     agent.Controller == AgentControllerType.Player
                     && state.HasInputBoundaryObservation;
@@ -595,13 +607,14 @@ public class AgentActionHandler : IAgentActionHandler
                 if (defendFlags == Agent.MovementControlFlag.None
                     && !AgentActionData.IsGuardMode(guardMode)
                     && !locationAmbient
+                    && !pilotSeat.HasValue
                     && !AgentEquipmentData.TryCapture(agent, out _))
                     continue;
 
                 (ids ??= new List<Guid>()).Add(info.AgentId);
                 (actions ??= new List<AgentActionData>()).Add(
                     PrepareEquipmentSnapshot(info,
-                        new AgentActionData(agent, defendFlags, guardMode), catchUp: true));
+                        new AgentActionData(agent, defendFlags, guardMode).WithPilotSeat(pilotSeat), catchUp: true));
                 (sequences ??= new List<long>()).Add(NextActionSequence(info.AgentId));
             }
 

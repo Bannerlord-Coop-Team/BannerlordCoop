@@ -10,6 +10,7 @@ using Missions.Battles;
 using Missions.Messages;
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Reflection;
 using System.Reflection.Emit;
 using System.Runtime.Serialization;
@@ -126,6 +127,36 @@ public class SiegeMachineSimulationTests : IDisposable
 
     private static T ReadField<T>(SiegeMachineStateReplicator replicator, string name) =>
         (T)typeof(SiegeMachineStateReplicator).GetField(name, BindingFlags.Instance | BindingFlags.NonPublic).GetValue(replicator);
+
+    [Theory]
+    [InlineData(typeof(RangedSiegeWeapon), "OnTick", "RangedPilotTickTranspiler", 1)]
+    [InlineData(typeof(Ballista), "OnTickParallel", "BallistaPilotTickTranspiler", 1)]
+    [InlineData(typeof(Mangonel), "OnTickParallel", "MangonelPilotTickTranspiler", 2)]
+    [InlineData(typeof(Trebuchet), "OnTickParallel", "TrebuchetPilotTickTranspiler", 2)]
+    public void RangedPilotTicks_ReplaceAllNativeSimulationChecksAndRetainVisualCode(
+        Type type, string methodName, string patchName, int expectedChecks)
+    {
+        var original = AccessTools.DeclaredMethod(type, methodName);
+        var patchType = typeof(BattleSpawnGate).Assembly
+            .GetType("GameInterface.Services.MapEvents.Patches.SiegeMachineAuthorityPatches");
+        var transpiler = AccessTools.Method(patchType, patchName);
+        var nativeCheck = AccessTools.PropertyGetter(typeof(GameNetwork), nameof(GameNetwork.IsClientOrReplay));
+        var authorityCheck = AccessTools.Method(patchType, "IsClientForMachine");
+        var instructions = PatchProcessor.GetOriginalInstructions(original);
+        Assert.Equal(expectedChecks, instructions.Count(x => x.Calls(nativeCheck)));
+        int originalCount = instructions.Count;
+
+        var patched = ((IEnumerable<CodeInstruction>)transpiler.Invoke(null,
+            new object[] { instructions, original })).ToArray();
+
+        Assert.DoesNotContain(patched, x => x.Calls(nativeCheck));
+        Assert.Equal(expectedChecks, patched.Count(x => x.Calls(authorityCheck)));
+        Assert.Equal(originalCount + expectedChecks, patched.Length);
+        var repeated = ((IEnumerable<CodeInstruction>)transpiler.Invoke(null,
+            new object[] { patched, original })).ToArray();
+        Assert.Equal(patched.Length, repeated.Length);
+        Assert.Equal(expectedChecks, repeated.Count(x => x.Calls(authorityCheck)));
+    }
 
     [Theory]
     [InlineData(true, true, 6)]
