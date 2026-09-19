@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using SandBox.View.Map;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.GameState;
@@ -14,7 +14,7 @@ using TaleWorlds.ScreenSystem;
 
 namespace GameInterface.Services.Chat;
 
-/// <summary>Chat UI shared by campaign-map and mission gameplay.</summary>
+/// <summary>Bottom-left event log and co-op chat UI shared by map and mission.</summary>
 internal sealed class ChatOverlay : GlobalLayer, IDisposable
 {
     private const string InputWidgetId = "CoopChatMessageInput";
@@ -28,16 +28,17 @@ internal sealed class ChatOverlay : GlobalLayer, IDisposable
     private bool initialized;
     private bool isInputFocused;
     private bool ignoreNextOutsideClick;
-    private bool isEnabled;
+    private bool playerChatEnabled;
 
-    public ChatOverlay(ChatVM dataSource, Action refreshParticipants, bool isEnabled)
+    public ChatOverlay(ChatVM dataSource, Action refreshParticipants, bool playerChatEnabled)
     {
         if (dataSource == null) throw new ArgumentNullException(nameof(dataSource));
         if (refreshParticipants == null) throw new ArgumentNullException(nameof(refreshParticipants));
 
         this.dataSource = dataSource;
         this.refreshParticipants = refreshParticipants;
-        this.isEnabled = isEnabled;
+        this.playerChatEnabled = playerChatEnabled;
+        dataSource.SetPlayerChatEnabled(playerChatEnabled);
         dataSource.OpenRequested += OpenInput;
         dataSource.CloseRequested += CloseInput;
     }
@@ -52,9 +53,6 @@ internal sealed class ChatOverlay : GlobalLayer, IDisposable
         Layer = gauntletLayer;
         ScreenManager.AddGlobalLayer(this, false);
         initialized = true;
-
-        if (!isEnabled)
-            ScreenManager.SetSuspendLayer(gauntletLayer, true);
     }
 
     protected override void OnTick(float dt)
@@ -62,9 +60,11 @@ internal sealed class ChatOverlay : GlobalLayer, IDisposable
         base.OnTick(dt);
         if (!UpdateVisibility()) return;
 
+        dataSource.Tick(dt);
+
         if (!dataSource.IsOpen)
         {
-            if (ShouldOpenInput(
+            if (playerChatEnabled && ShouldOpenInput(
                     Input.IsKeyPressed(InputKey.Enter),
                     Input.IsKeyPressed(InputKey.NumpadEnter),
                     Input.IsKeyPressed(InputKey.ControllerLOption)))
@@ -142,23 +142,21 @@ internal sealed class ChatOverlay : GlobalLayer, IDisposable
         initialized = false;
     }
 
-    internal bool IsEnabled => isEnabled;
+    internal bool IsPlayerChatEnabled => playerChatEnabled;
 
-    internal void SetEnabled(bool value)
+    internal void SetPlayerChatEnabled(bool value)
     {
-        if (isEnabled == value) return;
+        if (playerChatEnabled == value) return;
 
-        isEnabled = value;
-        if (!isEnabled && initialized)
-        {
+        playerChatEnabled = value;
+        dataSource.SetPlayerChatEnabled(value);
+        if (!value)
             CloseInput();
-            ScreenManager.SetSuspendLayer(gauntletLayer, true);
-        }
     }
 
     private bool CanOpenInput()
     {
-        if (!gauntletLayer.IsActive || Input.IsOnScreenKeyboardActive) return false;
+        if (!playerChatEnabled || !gauntletLayer.IsActive || Input.IsOnScreenKeyboardActive) return false;
 
         var focusedLayer = ScreenManager.FocusedLayer;
         if (focusedLayer == null || ReferenceEquals(focusedLayer, gauntletLayer)) return true;
@@ -194,7 +192,6 @@ internal sealed class ChatOverlay : GlobalLayer, IDisposable
 
         var focusedLayer = ScreenManager.FocusedLayer;
         bool shouldShow = ShouldShowPresentation(
-            isEnabled,
             isGameplayScreen && !LoadingWindow.IsLoadingWindowActive,
             isConversationActive,
             ReferenceEquals(focusedLayer, gameplayLayer),
@@ -299,14 +296,12 @@ internal sealed class ChatOverlay : GlobalLayer, IDisposable
     }
 
     internal static bool ShouldShowPresentation(
-        bool isEnabled,
         bool isGameplayScreen,
         bool isConversationActive,
         bool isGameplayLayerFocused,
         bool isChatLayerFocused)
     {
-        return isEnabled &&
-               isGameplayScreen &&
+        return isGameplayScreen &&
                !isConversationActive &&
                (isGameplayLayerFocused || isChatLayerFocused);
     }

@@ -1,4 +1,4 @@
-using GameInterface.Services.Chat.Messages;
+﻿using GameInterface.Services.Chat.Messages;
 using System;
 using System.Collections.Generic;
 using TaleWorlds.Library;
@@ -12,17 +12,19 @@ internal sealed class ChatVM : ViewModel
     private const int MaxHistoryPerChannel = 50;
     private const int VisibleHistoryLines = 12;
 
+    private static readonly Color PlayerChatColor = Color.White;
+
     private readonly Action<NetworkSendChatMessage> send;
     private readonly Func<string> getLocalControllerId;
     private readonly Dictionary<string, ChatChannelVM> channelsById =
         new Dictionary<string, ChatChannelVM>(StringComparer.Ordinal);
-    private readonly Dictionary<string, List<string>> histories =
-        new Dictionary<string, List<string>>(StringComparer.Ordinal);
+    private readonly Dictionary<string, List<ChatLineVM>> histories =
+        new Dictionary<string, List<ChatLineVM>>(StringComparer.Ordinal);
 
     private ChatChannelVM selectedChannel;
     private string writtenText = string.Empty;
-    private string transcriptText = string.Empty;
     private bool isOpen;
+    private bool playerChatEnabled = true;
     private int unreadMessageCount;
 
     public ChatVM(Action<NetworkSendChatMessage> send, Func<string> getLocalControllerId)
@@ -34,6 +36,7 @@ internal sealed class ChatVM : ViewModel
         this.getLocalControllerId = getLocalControllerId;
 
         Channels = new MBBindingList<ChatChannelVM>();
+        VisibleLines = new MBBindingList<ChatLineVM>();
         var global = EnsureChannel(GlobalChannelId, "Global");
         SelectChannel(global);
     }
@@ -43,6 +46,9 @@ internal sealed class ChatVM : ViewModel
 
     [DataSourceProperty]
     public MBBindingList<ChatChannelVM> Channels { get; }
+
+    [DataSourceProperty]
+    public MBBindingList<ChatLineVM> VisibleLines { get; }
 
     [DataSourceProperty]
     public int MaxMessageLength => ChatMessageLimits.MaxMessageLength;
@@ -65,18 +71,25 @@ internal sealed class ChatVM : ViewModel
     public string MuteButtonText => selectedChannel?.IsMuted == true ? "Unmute" : "Mute";
 
     [DataSourceProperty]
-    public string RibbonText => "Chat";
-
-    [DataSourceProperty]
-    public bool IsRibbonVisible => !IsOpen;
-
-    [DataSourceProperty]
     public bool HasUnreadNotification => unreadMessageCount > 0;
 
     [DataSourceProperty]
     public string UnreadNotificationText => unreadMessageCount > 99
         ? "99+"
         : unreadMessageCount.ToString();
+
+    [DataSourceProperty]
+    public bool IsPlayerChatEnabled
+    {
+        get => playerChatEnabled;
+        private set
+        {
+            if (playerChatEnabled == value) return;
+            playerChatEnabled = value;
+            OnPropertyChanged(nameof(IsPlayerChatEnabled));
+            UpdateVisibleLines();
+        }
+    }
 
     [DataSourceProperty]
     public string WrittenText
@@ -93,19 +106,6 @@ internal sealed class ChatVM : ViewModel
     }
 
     [DataSourceProperty]
-    public string TranscriptText
-    {
-        get => transcriptText;
-        private set
-        {
-            if (transcriptText == value) return;
-
-            transcriptText = value;
-            OnPropertyChanged(nameof(TranscriptText));
-        }
-    }
-
-    [DataSourceProperty]
     public bool IsOpen
     {
         get => isOpen;
@@ -115,17 +115,21 @@ internal sealed class ChatVM : ViewModel
 
             isOpen = value;
             OnPropertyChanged(nameof(IsOpen));
-            OnPropertyChanged(nameof(IsRibbonVisible));
+            RefreshForceVisible();
+            UpdateVisibleLines();
         }
     }
 
     public void ActionOpen()
     {
+        if (!IsPlayerChatEnabled) return;
         OpenRequested?.Invoke();
     }
 
     public void ActionSend()
     {
+        if (!IsPlayerChatEnabled) return;
+
         string text = WrittenText.Trim();
         if (text.Length == 0) return;
 
@@ -154,11 +158,30 @@ internal sealed class ChatVM : ViewModel
 
     public void SetOpen(bool open)
     {
+        if (open && !IsPlayerChatEnabled) return;
+
         IsOpen = open;
         if (!open) return;
 
         SetUnreadMessageCount(0);
-        UpdateTranscript();
+        UpdateVisibleLines();
+    }
+
+    public void SetPlayerChatEnabled(bool enabled)
+    {
+        if (!enabled && IsOpen)
+            SetOpen(false);
+
+        IsPlayerChatEnabled = enabled;
+    }
+
+    public void Tick(float dt)
+    {
+        foreach (var history in histories.Values)
+        {
+            for (int i = 0; i < history.Count; i++)
+                history[i].HandleFading(dt);
+        }
     }
 
     public void AddParticipant(string controllerId, string displayName)
@@ -204,6 +227,14 @@ internal sealed class ChatVM : ViewModel
 
         foreach (var participant in availableParticipants)
             EnsureChannel(participant.ControllerId, participant.DisplayName);
+    }
+
+    public void ReceiveEvent(string text, Color color, string category)
+    {
+        if (string.IsNullOrEmpty(text)) return;
+        _ = category;
+
+        AddLine(GlobalChannelId, new ChatLineVM(text, color, isPlayerChat: false), notify: false);
     }
 
     public void Receive(NetworkChatMessage message)
@@ -259,7 +290,7 @@ internal sealed class ChatVM : ViewModel
                 return;
         }
 
-        AddLine(channelId, line, notify);
+        AddLine(channelId, new ChatLineVM(line, PlayerChatColor, isPlayerChat: true), notify);
     }
 
     private ChatChannelVM EnsureChannel(string controllerId, string displayName)
@@ -274,7 +305,7 @@ internal sealed class ChatVM : ViewModel
 
         var channel = new ChatChannelVM(controllerId, displayName, SelectChannel);
         channelsById.Add(controllerId, channel);
-        histories.Add(controllerId, new List<string>());
+        histories.Add(controllerId, new List<ChatLineVM>());
         Channels.Add(channel);
         return channel;
     }
@@ -284,7 +315,7 @@ internal sealed class ChatVM : ViewModel
         if (channel == null || ReferenceEquals(selectedChannel, channel))
         {
             channel?.SetSelected(true);
-            UpdateTranscript();
+            UpdateVisibleLines();
             return;
         }
 
@@ -294,37 +325,57 @@ internal sealed class ChatVM : ViewModel
         OnPropertyChanged(nameof(ActiveChannelText));
         OnPropertyChanged(nameof(IsMuteButtonVisible));
         OnPropertyChanged(nameof(MuteButtonText));
-        UpdateTranscript();
+        UpdateVisibleLines();
     }
 
-    private void AddLine(string channelId, string line, bool notify)
+    private void AddLine(string channelId, ChatLineVM line, bool notify)
     {
         if (!histories.TryGetValue(channelId, out var history))
             history = histories[EnsureChannel(channelId, channelId).ControllerId];
 
-        history.Add(line ?? string.Empty);
+        line.ToggleForceVisible(IsOpen);
+        history.Add(line);
         if (history.Count > MaxHistoryPerChannel)
             history.RemoveAt(0);
 
-        if (string.Equals(selectedChannel?.ControllerId, channelId, StringComparison.Ordinal))
-            UpdateTranscript();
-        else if (channelsById.TryGetValue(channelId, out var channel))
+        bool viewingThisChannel = IsOpen &&
+            string.Equals(selectedChannel?.ControllerId, channelId, StringComparison.Ordinal);
+        bool passiveGlobal = !IsOpen && string.Equals(channelId, GlobalChannelId, StringComparison.Ordinal);
+        if (viewingThisChannel || passiveGlobal)
+            UpdateVisibleLines();
+        else if (channelsById.TryGetValue(channelId, out var channel) && line.IsPlayerChat)
             channel.MarkUnread();
 
-        if (notify && !IsOpen)
+        if (notify && !IsOpen && line.IsPlayerChat && IsPlayerChatEnabled)
             SetUnreadMessageCount(Math.Min(unreadMessageCount + 1, 999));
     }
 
-    private void UpdateTranscript()
+    private void UpdateVisibleLines()
     {
-        if (selectedChannel == null || !histories.TryGetValue(selectedChannel.ControllerId, out var history))
-        {
-            TranscriptText = string.Empty;
+        string channelId = IsOpen
+            ? selectedChannel?.ControllerId ?? GlobalChannelId
+            : GlobalChannelId;
+
+        VisibleLines.Clear();
+        if (!histories.TryGetValue(channelId, out var history))
             return;
-        }
 
         int firstLine = Math.Max(0, history.Count - VisibleHistoryLines);
-        TranscriptText = string.Join("\n", history.GetRange(firstLine, history.Count - firstLine));
+        for (int i = firstLine; i < history.Count; i++)
+        {
+            var line = history[i];
+            if (line.IsPlayerChat && !IsPlayerChatEnabled) continue;
+            VisibleLines.Add(line);
+        }
+    }
+
+    private void RefreshForceVisible()
+    {
+        foreach (var history in histories.Values)
+        {
+            for (int i = 0; i < history.Count; i++)
+                history[i].ToggleForceVisible(IsOpen);
+        }
     }
 
     private void SetUnreadMessageCount(int count)
