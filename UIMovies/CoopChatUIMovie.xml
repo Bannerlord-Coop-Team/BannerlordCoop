@@ -3,9 +3,9 @@
     <Widget WidthSizePolicy="StretchToParent" HeightSizePolicy="StretchToParent" DoNotAcceptEvents="true">
       <Children>
         <Widget Id="CoopChatRoot" WidthSizePolicy="Fixed" SuggestedWidth="520"
-                HeightSizePolicy="Fixed" SuggestedHeight="360"
+                HeightSizePolicy="Fixed" SuggestedHeight="350"
                 HorizontalAlignment="Left" VerticalAlignment="Bottom"
-                MarginLeft="27" MarginBottom="32">
+                MarginLeft="27" MarginBottom="100">
           <Children>
             <Widget WidthSizePolicy="StretchToParent" HeightSizePolicy="StretchToParent"
                     Sprite="BlankWhiteSquare_9" Color="#000000FF" AlphaFactor="0.5"
@@ -15,8 +15,9 @@
                        MarginLeft="8" MarginRight="8" MarginTop="8" MarginBottom="8"
                        StackLayout.LayoutMethod="VerticalTopToBottom">
               <Children>
-                <ListPanel WidthSizePolicy="StretchToParent" HeightSizePolicy="Fixed" SuggestedHeight="42"
-                           MarginBottom="4" StackLayout.LayoutMethod="HorizontalLeftToRight"
+                <ListPanel Id="CoopChatHeader" WidthSizePolicy="StretchToParent" HeightSizePolicy="Fixed"
+                           SuggestedHeight="42" MarginBottom="4"
+                           StackLayout.LayoutMethod="HorizontalLeftToRight"
                            IsVisible="@IsOpen">
                   <Children>
                     <ScrollablePanel Id="ChatChannelScrollablePanel" WidthSizePolicy="StretchToParent"
@@ -71,23 +72,25 @@
                   </Children>
                 </ListPanel>
 
-                <Widget WidthSizePolicy="StretchToParent" HeightSizePolicy="StretchToParent"
-                        ClipContents="true">
+                <Widget Id="CoopChatFeedArea" WidthSizePolicy="StretchToParent" HeightSizePolicy="StretchToParent"
+                        HorizontalAlignment="Left" VerticalAlignment="Bottom" ClipContents="true">
                   <Children>
                     <ScrollablePanel Id="ChatFeedScrollablePanel" WidthSizePolicy="StretchToParent"
                                      HeightSizePolicy="StretchToParent" AutoHideScrollBars="true"
+                                     VerticalAlignment="Bottom"
                                      ClipRect="ChatFeedClipRect"
                                      InnerPanel="ChatFeedClipRect\ChatFeedList"
-                                     VerticalScrollbar="..\ChatFeedScrollbar"
-                                     VerticalAlignment="Bottom">
+                                     VerticalScrollbar="..\ChatFeedScrollbarHolder\ChatFeedScrollbar">
                       <Children>
-                        <Widget Id="ChatFeedClipRect" WidthSizePolicy="StretchToParent"
-                                HeightSizePolicy="StretchToParent" ClipContents="true"
-                                MarginLeft="6" MarginRight="14">
+                        <Widget Id="ChatFeedClipRect" ClipContents="true"
+                                WidthSizePolicy="StretchToParent" HeightSizePolicy="StretchToParent"
+                                MarginLeft="6" MarginRight="21">
                           <Children>
                             <ListPanel Id="ChatFeedList" DataSource="{VisibleLines}"
+                                       DoNotAcceptEvents="true"
                                        WidthSizePolicy="StretchToParent" HeightSizePolicy="CoverChildren"
                                        HorizontalAlignment="Left" VerticalAlignment="Bottom"
+                                       ClipContents="true"
                                        StackLayout.LayoutMethod="VerticalTopToBottom">
                               <ItemTemplate>
                                 <RichTextWidget DoNotAcceptEvents="true" WidthSizePolicy="StretchToParent"
@@ -109,16 +112,16 @@
                       <Children>
                         <ScrollbarWidget Id="ChatFeedScrollbar" WidthSizePolicy="CoverChildren"
                                          HeightSizePolicy="StretchToParent" AlignmentAxis="Vertical"
-                                         Handle="ChatFeedScrollbarHandle" MarginTop="8" MarginBottom="4"
+                                         Handle="ChatFeedScrollbarHandle" MarginTop="12" MarginBottom="5"
                                          MaxValue="100" MinValue="0">
                           <Children>
                             <Widget WidthSizePolicy="Fixed" HeightSizePolicy="StretchToParent"
                                     SuggestedWidth="2" HorizontalAlignment="Center"
-                                    Sprite="BlankWhiteSquare_9" Color="#A37434FF" MarginTop="4"
-                                    MarginBottom="4" AlphaFactor="0.7"/>
+                                    Sprite="BlankWhiteSquare_9" Color="#A37434FF" MarginTop="5"
+                                    MarginBottom="5" AlphaFactor="0.7"/>
                             <ImageWidget Id="ChatFeedScrollbarHandle" WidthSizePolicy="Fixed"
                                          HeightSizePolicy="Fixed" MinHeight="15" SuggestedHeight="10"
-                                         SuggestedWidth="12" HorizontalAlignment="Center"
+                                         SuggestedWidth="14" HorizontalAlignment="Center"
                                          Brush="SPChatlog.Scrollbar.Handle"/>
                           </Children>
                         </ScrollbarWidget>
@@ -139,8 +142,9 @@
                   </Children>
                 </Widget>
 
-                <ListPanel WidthSizePolicy="StretchToParent" HeightSizePolicy="Fixed" SuggestedHeight="44"
-                           MarginTop="6" StackLayout.LayoutMethod="HorizontalLeftToRight"
+                <ListPanel Id="CoopChatInputRow" WidthSizePolicy="StretchToParent" HeightSizePolicy="Fixed"
+                           SuggestedHeight="44" MarginTop="6"
+                           StackLayout.LayoutMethod="HorizontalLeftToRight"
                            IsVisible="@IsOpen">
                   <Children>
                     <BrushWidget WidthSizePolicy="StretchToParent" HeightSizePolicy="StretchToParent"
