@@ -77,6 +77,7 @@ public class CoopBattleController : CoopMissionController
     private readonly ISiegeMachineStateReplicator siegeMachineState;
 #if DEBUG
     internal ISiegeMachineStateReplicator DebugSiegeMachineState => siegeMachineState;
+    internal bool DebugEndConditionHoldReleased => endConditionHoldReleased;
 #endif
     private readonly ISiegeWeaponFireReplicator siegeWeaponFire;
     private readonly IBattleHostRegistry hostRegistryRef;

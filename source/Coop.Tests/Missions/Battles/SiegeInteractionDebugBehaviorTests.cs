@@ -724,6 +724,7 @@ public class SiegeInteractionDebugBehaviorTests
     [InlineData("agent_inactive")]
     [InlineData("agent_using_object")]
     [InlineData("agent_mounted")]
+    [InlineData("battle_end_not_ready")]
     public void CaptureRejection_RecordsReasonWithoutChangingFixtureState(string reason)
     {
         var behavior = new SiegeInteractionDebugBehavior(Mock.Of<IMessageBroker>());
@@ -735,6 +736,86 @@ public class SiegeInteractionDebugBehaviorTests
             AccessTools.Field(typeof(SiegeInteractionDebugBehavior), "captureFailureReason").GetValue(behavior));
         Assert.Null(AccessTools.Field(typeof(SiegeInteractionDebugBehavior), "capturedAgent").GetValue(behavior));
         Assert.False((bool)AccessTools.Field(typeof(SiegeInteractionDebugBehavior), "fixtureRestored").GetValue(behavior));
+    }
+
+    [Theory]
+    [InlineData("_isEnemySideRetreating")]
+    [InlineData("_isEnemySideDepleted")]
+    [InlineData("_isPlayerSideRetreating")]
+    [InlineData("_isPlayerSideDepleted")]
+    [InlineData("_isEnemyDefenderPulledBack")]
+    public void BattleEndHold_RejectsLatchedOutcomeWithoutClearingIt(string flag)
+    {
+        using var mission = new MissionCurrentScope();
+        var behavior = new SiegeInteractionDebugBehavior(Mock.Of<IMessageBroker>());
+        var logic = new BattleEndLogic();
+        AccessTools.Property(typeof(MissionBehavior), "Mission").SetValue(behavior, mission.Instance);
+        AccessTools.Property(typeof(MissionBehavior), "Mission").SetValue(logic, mission.Instance);
+        AccessTools.Field(typeof(BattleEndLogic), flag).SetValue(logic, true);
+
+        Assert.False(behavior.HoldBattleEnd(logic, true));
+        Assert.True((bool)AccessTools.Field(typeof(BattleEndLogic), flag).GetValue(logic));
+        Assert.True((bool)AccessTools.Field(typeof(BattleEndLogic), "_canCheckForEndCondition").GetValue(logic));
+        Assert.Null(AccessTools.Field(typeof(SiegeInteractionDebugBehavior), "capturedBattleEndLogic").GetValue(behavior));
+    }
+
+    [Fact]
+    public void BattleEndHold_RejectsMissingForeignOrStillDeployingMission()
+    {
+        using var mission = new MissionCurrentScope();
+        var behavior = new SiegeInteractionDebugBehavior(Mock.Of<IMessageBroker>());
+        var logic = new BattleEndLogic();
+        AccessTools.Property(typeof(MissionBehavior), "Mission").SetValue(behavior, mission.Instance);
+        Assert.False(behavior.HoldBattleEnd(null, true));
+        Assert.False(behavior.HoldBattleEnd(logic, true));
+        AccessTools.Property(typeof(MissionBehavior), "Mission").SetValue(logic, mission.Instance);
+        Assert.False(behavior.HoldBattleEnd(logic, false));
+        logic.ChangeCanCheckForEndCondition(false);
+        Assert.False(behavior.HoldBattleEnd(logic, true));
+        logic.ChangeCanCheckForEndCondition(true);
+        using (var otherMission = new MissionCurrentScope())
+            Assert.False(behavior.HoldBattleEnd(logic, true));
+        Assert.True((bool)AccessTools.Field(typeof(BattleEndLogic), "_canCheckForEndCondition").GetValue(logic));
+    }
+
+    [Fact]
+    public void BattleEndHold_StopsNativeOutcomeChecksAcrossRecaptureAndRestoresOnlyItsSwitchOnce()
+    {
+        using var mission = new MissionCurrentScope();
+        var behavior = new SiegeInteractionDebugBehavior(Mock.Of<IMessageBroker>());
+        var logic = new BattleEndLogic();
+        AccessTools.Property(typeof(MissionBehavior), "Mission").SetValue(behavior, mission.Instance);
+        AccessTools.Property(typeof(MissionBehavior), "Mission").SetValue(logic, mission.Instance);
+        AccessTools.Field(typeof(BattleEndLogic), "_canCheckForEndConditionSiege").SetValue(logic, true);
+        Assert.True(behavior.CanHoldBattleEnd(logic, true));
+        Assert.True(behavior.HoldBattleEnd(logic, true));
+        Assert.False((bool)AccessTools.Field(typeof(BattleEndLogic), "_canCheckForEndCondition").GetValue(logic));
+        AccessTools.Method(typeof(BattleEndLogic), "CheckIsEnemySideRetreatingOrOneSideDepleted").Invoke(logic, null);
+        MissionResult result = null;
+        Assert.False(logic.MissionEnded(ref result));
+        Assert.Null(result);
+
+        // Pose restoration clears its actor; the battle hold must outlive both players' pose restores.
+        AccessTools.Field(typeof(SiegeInteractionDebugBehavior), "capturedAgent").SetValue(behavior, null);
+        Assert.True(behavior.HoldBattleEnd(logic, true));
+        var replacement = new BattleEndLogic();
+        AccessTools.Property(typeof(MissionBehavior), "Mission").SetValue(replacement, mission.Instance);
+        Assert.False(behavior.HoldBattleEnd(replacement, true));
+        replacement.ChangeCanCheckForEndCondition(false);
+        var harmony = new Harmony("coop.tests.battle-end-hold");
+        try
+        {
+            harmony.Patch(AccessTools.Method(typeof(SiegeInteractionDebugBehavior), "ReleaseCamera"),
+                prefix: new HarmonyMethod(AccessTools.Method(typeof(SiegeInteractionDebugBehaviorTests), nameof(SkipScriptComponentCache))));
+            behavior.OnRemoveBehavior();
+            Assert.True((bool)AccessTools.Field(typeof(BattleEndLogic), "_canCheckForEndCondition").GetValue(logic));
+            Assert.False((bool)AccessTools.Field(typeof(BattleEndLogic), "_canCheckForEndCondition").GetValue(replacement));
+            Assert.False(behavior.HoldBattleEnd(logic, true));
+            logic.ChangeCanCheckForEndCondition(false);
+            behavior.OnRemoveBehavior();
+            Assert.False((bool)AccessTools.Field(typeof(BattleEndLogic), "_canCheckForEndCondition").GetValue(logic));
+        }
+        finally { harmony.UnpatchAll(harmony.Id); }
     }
 
     [Fact]

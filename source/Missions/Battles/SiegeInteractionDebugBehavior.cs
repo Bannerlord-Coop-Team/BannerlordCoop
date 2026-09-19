@@ -63,6 +63,7 @@ internal sealed class SiegeInteractionDebugBehavior : MissionBehavior, ISiegeInt
     private int pressTick;
     private bool removed;
     private Agent capturedAgent;
+    private BattleEndLogic capturedBattleEndLogic;
     private Vec3 capturedPosition;
     private Vec3 capturedLookDirection;
     private MissionScreen capturedScreen;
@@ -390,6 +391,11 @@ internal sealed class SiegeInteractionDebugBehavior : MissionBehavior, ISiegeInt
     public override void OnRemoveBehavior()
     {
         removed = true;
+        if (capturedBattleEndLogic != null)
+        {
+            capturedBattleEndLogic.ChangeCanCheckForEndCondition(true);
+            capturedBattleEndLogic = null;
+        }
         messageBroker.Unsubscribe<NetworkSiegeInteractionDebugRequest>(Handle);
         messageBroker.Unsubscribe<NetworkSiegeMachineState>(ObserveReceivedState);
         messageBroker.Unsubscribe<SiegeWeaponFired>(ObserveLocalShot);
@@ -707,6 +713,9 @@ internal sealed class SiegeInteractionDebugBehavior : MissionBehavior, ISiegeInt
             RejectCapture(!agent.IsActive(), "agent_inactive") ||
             RejectCapture(agent.IsUsingGameObject, "agent_using_object") ||
             RejectCapture(agent.MountAgent != null, "agent_mounted")) return;
+        if (RejectCapture(!HoldBattleEnd(Mission?.GetMissionBehavior<BattleEndLogic>(),
+                Mission?.GetMissionBehavior<CoopBattleController>()?.DebugEndConditionHoldReleased == true),
+                "battle_end_not_ready")) return;
         capturedAgent = agent;
         capturedPosition = agent.Position;
         capturedLookDirection = agent.LookDirection;
@@ -731,6 +740,29 @@ internal sealed class SiegeInteractionDebugBehavior : MissionBehavior, ISiegeInt
         if (!rejected) return false;
         captureFailureReason = reason;
         status = "fixture_capture_rejected";
+        return true;
+    }
+
+    internal bool CanHoldBattleEnd(BattleEndLogic logic, bool deploymentHoldReleased)
+    {
+        return !removed && Mission != null && ReferenceEquals(Mission, TaleWorlds.MountAndBlade.Mission.Current) &&
+            logic != null && ReferenceEquals(logic.Mission, Mission) && deploymentHoldReleased &&
+            !Mission.IsMissionEnding && !Mission.MissionEnded &&
+            !logic._isEnemySideRetreating && !logic._isEnemySideDepleted &&
+            !logic._isPlayerSideRetreating && !logic._isPlayerSideDepleted && !logic._isEnemyDefenderPulledBack &&
+            (capturedBattleEndLogic == null ? logic._canCheckForEndCondition :
+                ReferenceEquals(capturedBattleEndLogic, logic) && !logic._canCheckForEndCondition);
+    }
+
+    internal bool HoldBattleEnd(BattleEndLogic logic, bool deploymentHoldReleased)
+    {
+        if (!CanHoldBattleEnd(logic, deploymentHoldReleased)) return false;
+        if (capturedBattleEndLogic == null)
+        {
+            // Preserve the enabled switch until mission removal, including pose restore and recapture.
+            capturedBattleEndLogic = logic;
+            logic.ChangeCanCheckForEndCondition(false);
+        }
         return true;
     }
 
@@ -1115,6 +1147,7 @@ internal sealed class SiegeInteractionDebugBehavior : MissionBehavior, ISiegeInt
         var agent = Mission?.MainAgent;
         var controller = Mission?.GetMissionBehavior<CoopBattleController>();
         var session = controller?.Session;
+        var battleEndLogic = Mission?.GetMissionBehavior<BattleEndLogic>();
         ContainerProvider.TryResolve<INetworkAgentRegistry>(out var registry);
         CoopAgentInfo mainInfo = null;
         if (agent != null) registry?.TryGetAgentInfo(agent, out mainInfo);
@@ -1144,6 +1177,9 @@ internal sealed class SiegeInteractionDebugBehavior : MissionBehavior, ISiegeInt
             requestId, status, pressInvoked, externalInputArmed, inputVirtualKey, edgeObserved, edgeCleared, inputGameKeyId, tick,
             fixtureActive = capturedAgent != null,
             fixtureRestored, captureFailureReason,
+            battleEndHoldReady = CanHoldBattleEnd(battleEndLogic, controller?.DebugEndConditionHoldReleased == true),
+            battleEndHeld = capturedBattleEndLogic != null && ReferenceEquals(capturedBattleEndLogic, battleEndLogic) &&
+                !capturedBattleEndLogic._canCheckForEndCondition,
             ownedForkItemId = ownedForkItem?.StringId,
             ownedAmmoItemId = ownedAmmoItem?.StringId,
             nativeCameraStaged, nativeAimTarget, observerFrame, functionalAction,
