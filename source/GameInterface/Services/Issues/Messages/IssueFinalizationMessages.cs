@@ -40,6 +40,20 @@ public readonly struct QuestSuccessTriggered : IEvent
     }
 }
 
+public readonly struct QuestTerminalOutcomeTriggered : IEvent
+{
+    public readonly Hero Owner;
+    public readonly string ControllerId;
+    public readonly IssueFinalizeReason Reason;
+
+    public QuestTerminalOutcomeTriggered(Hero owner, string controllerId, IssueFinalizeReason reason)
+    {
+        Owner = owner;
+        ControllerId = controllerId;
+        Reason = reason;
+    }
+}
+
 [ProtoContract(SkipConstructor = true)]
 public readonly struct RequestIssueRemoved : ICommand
 {
@@ -75,6 +89,21 @@ public readonly struct NetworkIssueRemoved : IServerToClientCommand
     {
         OwnerId = ownerId;
         Reason = reason;
+        Proof = proof;
+    }
+}
+
+[ProtoContract(SkipConstructor = true)]
+public readonly struct NetworkApplyPendingQuestFailConsequence : IServerToClientCommand
+{
+    [ProtoMember(1)]
+    public readonly string QuestTypeKey;
+    [ProtoMember(2)]
+    public readonly byte Proof;
+
+    public NetworkApplyPendingQuestFailConsequence(string questTypeKey, byte proof)
+    {
+        QuestTypeKey = questTypeKey;
         Proof = proof;
     }
 }
