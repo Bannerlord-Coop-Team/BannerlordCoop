@@ -216,13 +216,16 @@ public class GangLeaderNeedsToOffloadStolenGoodsIssueTests : IDisposable
                     counterOfferHero.StayingInSettlement = ownerSettlement;
                     counterOfferHero.ChangeState(Hero.CharacterStates.Active);
 
-                    var stolenGood = GameObjectCreator.CreateInitializedObject<ItemObject>();
-                    ItemValueProperty.SetValue(stolenGood, stolenGoodValue);
-                    stolenGood.ItemCategory = stolenGoodCategory;
-                    Assert.True(instance.ObjectManager.AddExisting(StolenGoodId, stolenGood));
+                    if (!instance.ObjectManager.TryGetObject<ItemObject>(StolenGoodId, out _))
+                    {
+                        var stolenGood = GameObjectCreator.CreateInitializedObject<ItemObject>();
+                        ItemValueProperty.SetValue(stolenGood, stolenGoodValue);
+                        stolenGood.ItemCategory = stolenGoodCategory;
+                        Assert.True(instance.ObjectManager.AddExisting(StolenGoodId, stolenGood));
 
-                    stolenGood.StringId = StolenGoodId;
-                    MBObjectManager.Instance.RegisterObject(stolenGood);
+                        stolenGood.StringId = StolenGoodId;
+                        MBObjectManager.Instance.RegisterObject(stolenGood);
+                    }
 
                     Campaign.Current.EncyclopediaManager ??= new EncyclopediaManager();
                     Campaign.Current.EncyclopediaManager.CreateEncyclopediaPages();
@@ -1498,6 +1501,103 @@ public class GangLeaderNeedsToOffloadStolenGoodsIssueTests : IDisposable
         });
 
         Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkIssueRemoved>());
+    }
+
+    private void AcceptAlternativeSolutionFromClient(EnvironmentInstance client, GangLeaderFixture fixture, string controllerId)
+    {
+        var partyId = TestEnvironment.CreateRegisteredObject<MobileParty>();
+        var escortTroopId = TestEnvironment.CreateRegisteredObject<CharacterObject>();
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject<MobileParty>(partyId, out var party));
+            Assert.True(Server.ObjectManager.TryGetObject<Settlement>(fixture.OwnerSettlementId, out var settlement));
+            Assert.True(Server.ObjectManager.TryGetObject<CharacterObject>(escortTroopId, out var escortTroop));
+            Assert.True(Server.ObjectManager.TryGetObject<Hero>(fixture.CounterOfferHeroId, out var companion));
+            using (new AllowedThread())
+            {
+                party.CurrentSettlement = settlement;
+                party.MemberRoster.AddToCounts(companion.CharacterObject, 1);
+                escortTroop.Level = 15;
+                party.MemberRoster.AddToCounts(escortTroop, 20);
+            }
+
+            Assert.True(Server.Resolve<IPlayerManager>().AddPlayer(new Player(controllerId, fixture.HeroId, partyId, "", "")));
+        });
+        TestEnvironment.ConnectRegisteredPlayer(client, controllerId);
+        client.Resolve<IControllerIdProvider>().SetControllerId(controllerId);
+        OpenConversation(client, fixture.HeroId, controllerId);
+        foreach (var instance in AllInstances)
+        {
+            instance.Call(() => Assert.True(instance.ObjectManager.TryGetObject<CharacterObject>(escortTroopId, out _)));
+        }
+
+        client.Call(() =>
+        {
+            Assert.True(client.ObjectManager.TryGetObject<Hero>(fixture.HeroId, out var owner));
+            Assert.True(client.ObjectManager.TryGetObject<Hero>(fixture.CounterOfferHeroId, out var companion));
+            Assert.True(client.ObjectManager.TryGetObject<CharacterObject>(escortTroopId, out var escortTroop));
+            using (new AllowedThread())
+            {
+                owner.Issue.AlternativeSolutionSentTroops.AddToCounts(companion.CharacterObject, 1);
+                owner.Issue.AlternativeSolutionSentTroops.AddToCounts(escortTroop, 20);
+            }
+            owner.Issue.StartIssueWithAlternativeSolution();
+        });
+
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject<Hero>(fixture.HeroId, out var owner));
+            Assert.True(owner.Issue.IsSolvingWithAlternative);
+            using (new AllowedThread())
+            {
+                owner.Issue.AlternativeSolutionReturnTimeForTroops = CampaignTime.Now - CampaignTime.Days(1f);
+            }
+        });
+    }
+
+    [Fact]
+    public void RequestAlternativeSolutionCompletion_RoutesTheCalculatingRewardThroughEachOwnersOwnProgress_ForTwoDistinctPlayers()
+    {
+        var fixtureA = SetupIssueOwner();
+        var fixtureB = SetupIssueOwner();
+        CreateIssueOnServer(fixtureA);
+        CreateIssueOnServer(fixtureB);
+
+        AcceptAlternativeSolutionFromClient(Client, fixtureA, "player-A");
+        AcceptAlternativeSolutionFromClient(OtherClient, fixtureB, "player-B");
+
+        int hostCalculatingXpBefore = 0;
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject<Hero>(fixtureA.HeroId, out var ownerA));
+            Assert.True(Server.ObjectManager.TryGetObject<Hero>(fixtureB.HeroId, out var ownerB));
+            ownerA.SetTraitLevel(DefaultTraits.Calculating, 1);
+            Assert.Equal(0, ownerB.GetTraitLevel(DefaultTraits.Calculating));
+            hostCalculatingXpBefore = Campaign.Current.PlayerTraitDeveloper.GetPropertyValue(DefaultTraits.Calculating);
+        });
+
+        Server.Call(() => Server.Resolve<IMessageBroker>().Publish(Client.NetPeer, new RequestAlternativeSolutionCompletion(fixtureA.HeroId)));
+        Server.Call(() => Server.Resolve<IMessageBroker>().Publish(OtherClient.NetPeer, new RequestAlternativeSolutionCompletion(fixtureB.HeroId)));
+
+        Assert.Equal(2, Server.NetworkSentMessages.GetMessages<NetworkIssueRemoved>().Count());
+
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject<Hero>(fixtureA.HeroId, out var ownerA));
+            Assert.True(Server.ObjectManager.TryGetObject<Hero>(fixtureB.HeroId, out var ownerB));
+            Assert.Null(ownerA.Issue);
+            Assert.Null(ownerB.Issue);
+
+            Assert.Equal(1, ownerA.GetTraitLevel(DefaultTraits.Calculating));
+            Assert.True(GangLeaderNeedsToOffloadStolenGoodsQuestType.OwnerTraitXpProgress.TryGet(ownerA, out var progressA));
+            Assert.Equal(1050, progressA.GetPropertyValue(DefaultTraits.Calculating));
+
+            Assert.Equal(0, ownerB.GetTraitLevel(DefaultTraits.Calculating));
+            Assert.True(GangLeaderNeedsToOffloadStolenGoodsQuestType.OwnerTraitXpProgress.TryGet(ownerB, out var progressB));
+            Assert.Equal(50, progressB.GetPropertyValue(DefaultTraits.Calculating));
+
+            Assert.Equal(hostCalculatingXpBefore, Campaign.Current.PlayerTraitDeveloper.GetPropertyValue(DefaultTraits.Calculating));
+        });
     }
 
     [Fact]

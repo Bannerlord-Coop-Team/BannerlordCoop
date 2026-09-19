@@ -355,6 +355,20 @@ internal static class GangLeaderNeedsToOffloadStolenGoodsQuestType
         }
     }
 
+    internal static void ApplyAlternativeSolutionSuccessConsequence(Issue issue)
+    {
+        GiveGoldAction.ApplyBetweenCharacters(null, Hero.MainHero, issue.RewardGold);
+        issue.RelationshipChangeWithIssueOwner = 10;
+        issue.IssueOwner.AddPower(5f);
+        issue.CounterOfferHero.AddPower(-5f);
+        foreach (var notable in issue.IssueOwner.CurrentSettlement.Notables.WhereQ(notable => notable.IsMerchant))
+        {
+            notable.AddPower(-3f);
+        }
+        MobileParty.MainParty.ItemRoster.AddToCounts(issue.StolenTradeGood, issue.StolenTradeGoodAmount);
+        ApplyOwnerTraitXp(Hero.MainHero, DefaultTraits.Calculating, 50);
+    }
+
     private static void ApplySucceedByPayingAndKeepingTheGoods(Quest quest)
     {
         GiveGoldAction.ApplyBetweenCharacters(Hero.MainHero, null, quest._stolenTradeGoodPrice);
@@ -474,6 +488,17 @@ internal static class GangLeaderNeedsToOffloadStolenGoodsQuestType
             .Build();
 
         QuestTypeRegistry.Register(descriptor);
+    }
+}
+
+[HarmonyPatch(typeof(GangLeaderNeedsToOffloadStolenGoodsIssueBehavior.GangLeaderNeedsToOffloadStolenGoodsIssue), "AlternativeSolutionEndWithSuccessConsequence")]
+internal class GangLeaderNeedsToOffloadStolenGoodsAlternativeSolutionConsequencePatch
+{
+    [HarmonyPrefix]
+    private static bool Prefix(Issue __instance)
+    {
+        GangLeaderNeedsToOffloadStolenGoodsQuestType.ApplyAlternativeSolutionSuccessConsequence(__instance);
+        return false;
     }
 }
 
