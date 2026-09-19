@@ -328,6 +328,8 @@ public class PuppetSpawner : IPuppetSpawner
             puppetRoutApplier?.ApplyFleeing(agent);
         if (data.HasCurrentEquipment)
             data.CurrentEquipment.Apply(agent);
+        if (agentRegistered && registry.TryGetAgentInfo(data.AgentId, out var spawnedInfo))
+            spawnedInfo.RecordSiegeGrant(data.SiegeEquipmentGrant);
 
         // The owner registered its cavalry's horse with its own network id; our engine spawned a matching
         // horse implicitly (same equipment) inside SpawnAgent. Register OUR copy under the same id, so mount

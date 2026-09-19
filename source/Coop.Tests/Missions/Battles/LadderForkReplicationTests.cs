@@ -245,6 +245,21 @@ public class LadderForkReplicationTests : IDisposable
         Assert.Null(loaded.WeaponSlots[(int)EquipmentIndex.ExtraWeaponSlot].ItemObjectId);
     }
 
+    [Fact]
+    public void ConsumedGrant_ArrivingLateCannotResurrectAmmo()
+    {
+        var message = Message();
+        Assert.False(info.ConsumeSiegeGrant(message.GrantId));
+        Receive(message);
+        Assert.True(agent.Equipment[EquipmentIndex.ExtraWeaponSlot].IsEmpty);
+        Assert.Empty(Calls);
+        var newer = Message();
+        Receive(newer);
+        Assert.Equal(newer.GrantId, info.SiegeEquipmentGrant);
+        Assert.False(info.ConsumeSiegeGrant(message.GrantId));
+        Assert.Same(item, agent.Equipment[EquipmentIndex.ExtraWeaponSlot].Item);
+    }
+
     private ItemObject RegisterAmmo()
     {
         var ammo = new ItemObject("grapeshot_stack");

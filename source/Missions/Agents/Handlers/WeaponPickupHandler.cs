@@ -423,6 +423,7 @@ namespace Missions.Agents.Handlers
             if (disposed || Mission.Current == null || message == null || message.GrantId == Guid.Empty ||
                 resolvedPickupIds.Contains(message.GrantId) ||
                 !TryGetActiveAgent(message.AgentId, out CoopAgentInfo info) ||
+                info.IsSiegeGrantConsumed(message.GrantId) ||
                 networkAgentRegistry.IsLocallyControlled(info.Agent) ||
                 string.IsNullOrEmpty(message.Authority) ||
                 message.Authority != info.CurrentAuthority ||
@@ -437,6 +438,8 @@ namespace Missions.Agents.Handlers
         private void RecordForkGrant(Guid agentId, Guid grantId)
         {
             TrackResolvedPickup(grantId);
+            if (networkAgentRegistry.TryGetAgentInfo(agentId, out var info))
+                info.RecordSiegeGrant(grantId);
             // A direct grant supersedes an older drop awaiting world-item identity, just like a pickup.
             messageBroker.Publish(this, new WeaponPickupApplied(agentId,
                 EquipmentIndex.ExtraWeaponSlot, Guid.Empty, 0, false, pickupId: grantId));
@@ -449,6 +452,9 @@ namespace Missions.Agents.Handlers
             bool isIdentityCorrection = false,
             bool recordLocalPickup = false)
         {
+            if (payload.EquipmentIndex == EquipmentIndex.ExtraWeaponSlot &&
+                networkAgentRegistry.TryGetAgentInfo(agentId, out var info))
+                info.RecordSiegeGrant(Guid.Empty);
             if (!objectManager.TryGetIdWithLogging(payload.WeaponObject, out string itemObjectId))
                 return;
             string worldItemModifierId = null;
@@ -1292,6 +1298,7 @@ namespace Missions.Agents.Handlers
             ref MissionWeapon resultingSlotWeapon)
         {
             Agent agent = agentInfo.Agent;
+            if (equipmentIndex == EquipmentIndex.ExtraWeaponSlot) agentInfo.RecordSiegeGrant(Guid.Empty);
             agentInfo.RecordAuthoritativeEquipment(currentEquipment);
             using (new AllowedThread())
             {
@@ -1331,6 +1338,7 @@ namespace Missions.Agents.Handlers
             ref MissionWeapon resultingSlotWeapon)
         {
             Agent agent = agentInfo.Agent;
+            if (equipmentIndex == EquipmentIndex.ExtraWeaponSlot) agentInfo.RecordSiegeGrant(Guid.Empty);
             agentInfo.RecordAuthoritativeEquipment(currentEquipment);
             using (new AllowedThread())
             {

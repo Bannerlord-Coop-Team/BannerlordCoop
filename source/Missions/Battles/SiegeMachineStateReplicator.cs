@@ -38,7 +38,7 @@ public interface ISiegeMachineStateReplicator : IDisposable
 }
 
 /// <inheritdoc cref="ISiegeMachineStateReplicator"/>
-public class SiegeMachineStateReplicator : ISiegeMachineStateReplicator
+public partial class SiegeMachineStateReplicator : ISiegeMachineStateReplicator
 {
     private const float PollInterval = 0.25f;
     // Below vanilla's slowest ram speed so a moving machine updates every poll and the peer's
@@ -132,6 +132,9 @@ public class SiegeMachineStateReplicator : ISiegeMachineStateReplicator
         messageBroker.Subscribe<NetworkSiegeMachineAuthority>(Handle_NetworkMachineAuthority);
         messageBroker.Subscribe<MissionPeerLeft>(Handle_MissionPeerLeft);
         messageBroker.Subscribe<MissionPeerDisconnected>(Handle_MissionPeerDisconnected);
+        messageBroker.Subscribe<NetworkMangonelLoad>(HandleMangonelLoad);
+        messageBroker.Subscribe<MangonelAmmoConsumed>(HandleMangonelAmmoConsumed);
+        messageBroker.Subscribe<MangonelLoadTick>(HandleMangonelLoadTick);
     }
 
     public void Dispose()
@@ -142,12 +145,18 @@ public class SiegeMachineStateReplicator : ISiegeMachineStateReplicator
         messageBroker.Unsubscribe<NetworkSiegeMachineAuthority>(Handle_NetworkMachineAuthority);
         messageBroker.Unsubscribe<MissionPeerLeft>(Handle_MissionPeerLeft);
         messageBroker.Unsubscribe<MissionPeerDisconnected>(Handle_MissionPeerDisconnected);
+        messageBroker.Unsubscribe<NetworkMangonelLoad>(HandleMangonelLoad);
+        messageBroker.Unsubscribe<MangonelAmmoConsumed>(HandleMangonelAmmoConsumed);
+        messageBroker.Unsubscribe<MangonelLoadTick>(HandleMangonelLoadTick);
+        mangonelLoadsDisposed = true;
+        ClearMangonelLoads();
     }
 
     public void Tick(float dt)
     {
         if (Mission.Current == null || !Mission.Current.IsSiegeBattle) return;
 
+        ObserveMangonelLoadActions();
         pollTimer += dt;
         if (pollTimer < PollInterval) return;
         float elapsed = pollTimer;
@@ -172,6 +181,7 @@ public class SiegeMachineStateReplicator : ISiegeMachineStateReplicator
         }
 
         RefreshMachineGates();
+        TickMangonelLoads();
         BroadcastChangedStates();
     }
 
@@ -182,6 +192,7 @@ public class SiegeMachineStateReplicator : ISiegeMachineStateReplicator
 
         if (trackedMission != mission)
         {
+            ClearMangonelLoads();
             lastSent.Clear();
             lastSentLadderAnimations.Clear();
             deactivated.Clear();
@@ -1900,6 +1911,7 @@ public class SiegeMachineStateReplicator : ISiegeMachineStateReplicator
             }
 
             int sent = 0;
+            ReplayMangonelLoads(controllerId);
             var machineIds = new List<int>(machines.Count);
             foreach (var machine in machines)
             {
