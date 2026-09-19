@@ -353,6 +353,32 @@ public class CoopTroopSupplier : IMissionTroopSupplier
         }
     }
 
+    /// <summary>Whether deployment must recover the local hero instead of obtaining a fresh origin.</summary>
+    public bool WasPlayerHeroSupplied()
+    {
+        var character = Hero.MainHero?.CharacterObject;
+        return character != null && objectManager != null
+            && objectManager.TryGetId(character, out var characterId)
+            && IsTroopAlreadySupplied(PlayerPartyId, characterId);
+    }
+
+    /// <summary>Whether this exact troop was already supplied, without advancing its reserve.</summary>
+    public bool IsTroopAlreadySupplied(string partyId, string characterId, int? seed = null)
+    {
+        if (string.IsNullOrEmpty(partyId) || string.IsNullOrEmpty(characterId)) return false;
+        lock (gate)
+        {
+            foreach (var party in parties)
+            {
+                if (party.PartyId != partyId) continue;
+                for (int i = 0; i < party.Supplied; i++)
+                    if (party.Entries[i].CharacterId == characterId && (!seed.HasValue || party.Entries[i].Seed == seed.Value))
+                        return true;
+            }
+            return false;
+        }
+    }
+
     /// <summary>Remaining troop count for one party, or zero when it is absent or exhausted.</summary>
     public int GetRemainingForParty(string partyId)
     {

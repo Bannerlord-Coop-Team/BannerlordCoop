@@ -4,7 +4,7 @@ using System.Text.Json;
 
 namespace CoopMcpServer.Tests;
 
-public sealed class RunOrchestratorTests : IDisposable
+public sealed partial class RunOrchestratorTests : IDisposable
 {
     private readonly string directory = Path.Combine(Path.GetTempPath(), "CoopMcpServerTests-" + Guid.NewGuid().ToString("N"));
     private readonly FakeLauncher launcher = new();
@@ -536,6 +536,7 @@ public sealed class RunOrchestratorTests : IDisposable
         public bool LastMutation;
         public object LastParameters;
         public object Status = new { readyForCampaignTests = false };
+        public Func<string, object, bool, CancellationToken, Task<LiveTestResponse>> Reply;
         public async Task<LiveTestResponse> SendAsync(InstanceIdentity identity, string method, object parameters, bool mutation, CancellationToken cancellationToken)
         {
             Methods.Enqueue(method);
@@ -547,6 +548,7 @@ public sealed class RunOrchestratorTests : IDisposable
             {
                 if (Throw) throw new IOException("fake pipe failure");
                 if (Delay > 0) await Task.Delay(Delay, cancellationToken);
+                if (Reply != null && method != "status") return await Reply(method, parameters, mutation, cancellationToken);
                 var process = new LiveTestProcessInfo { Pid = identity.Pid, RunToken = identity.RunToken, ProcessStartedUtc = identity.StartedUtc };
                 return Uncertain
                     ? LiveTestResponse.Failure(Guid.NewGuid().ToString("N"), process, new LiveTestError("game_thread_timeout", "fake timeout", true))

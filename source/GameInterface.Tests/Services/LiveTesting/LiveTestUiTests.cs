@@ -177,8 +177,9 @@ public class LiveTestUiTests
             Text = "Apply", Visible = true, Enabled = true, HitTestable = true, Width = 20, Height = 20,
             Actions = new[] { "click" },
         };
-        public UiFrame Read() => Frame;
-        public void Act(UiWidget target, string action, string text, double? value)
+        public UiLayerStack Discover() => Frame.Stack ?? new UiLayerStack { Screen = Frame.Screen };
+        public UiFrame Read(object selectedLayer = null) => Frame;
+        public void Act(UiWidget target, string action, string text, double? value, bool scoped = false)
         {
             Actions++; LastAction = action;
             if (Throw) throw new InvalidOperationException("after native side effect");

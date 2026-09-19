@@ -368,6 +368,11 @@ public class BattleDeploymentCoordinator : IBattleDeploymentCoordinator
         {
             var mission = Mission.Current;
             if (mission == null) return;
+            if (mission.GetMissionBehavior<Missions.Hideouts.CoopHideoutMissionLogic>()?.PreserveStealthPosture == true)
+            {
+                mission.AllowAiTicking = true;
+                return;
+            }
 
             var playerSide = mission.PlayerTeam?.Side ?? BattleSideEnum.None;
             if (playerSide != BattleSideEnum.Attacker && playerSide != BattleSideEnum.Defender)

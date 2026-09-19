@@ -14,6 +14,7 @@ using GameInterface.Services.TroopRosters.Data;
 using GameInterface.Services.TroopRosters.Interfaces;
 using GameInterface.Services.TroopRosters.Messages;
 using GameInterface.Services.UI.Notifications.Messages;
+using GameInterface.Services.Villages.Interfaces;
 using LiteNetLib;
 using Serilog;
 using System;
@@ -40,17 +41,20 @@ internal class PartyDoneLogicHandler : IHandler
     private readonly IObjectManager objectManager;
     private readonly INetwork network;
     private readonly ITroopRosterInterface troopRosterInterface;
+    private readonly IVillageHostileActionInterface villageHostileActionInterface;
 
     public PartyDoneLogicHandler(
         IMessageBroker messageBroker,
         IObjectManager objectManager,
         INetwork network,
-        ITroopRosterInterface troopRosterInterface)
+        ITroopRosterInterface troopRosterInterface,
+        IVillageHostileActionInterface villageHostileActionInterface)
     {
         this.messageBroker = messageBroker;
         this.objectManager = objectManager;
         this.network = network;
         this.troopRosterInterface = troopRosterInterface;
+        this.villageHostileActionInterface = villageHostileActionInterface;
 
         messageBroker.Subscribe<PartyDoneLogicAttempted>(Handle_PartyDoneLogicAttempted);
         messageBroker.Subscribe<NetworkCompleteDoneLogic>(Handle_CompletePartyDoneLogic);
@@ -128,7 +132,8 @@ internal class PartyDoneLogicHandler : IHandler
             rightMemberOrderData,
             obj.What.ApplyReleasedAndTakenPrisonerActions,
             donationSettlementId,
-            donatedPrisonersRoster
+            donatedPrisonersRoster,
+            obj.What.ForceTransferId
         );
 
         network.SendAll(message);
@@ -167,6 +172,27 @@ internal class PartyDoneLogicHandler : IHandler
             var takenPrisonersRoster = FlattenedTroopSerializer.Deserialize(message.TakenPrisonersRoster, objectManager);
             var recruitedPrisonersRoster = FlattenedTroopSerializer.Deserialize(message.RecruitedPrisonersRoster, objectManager);
             var donatedPrisonersRoster = FlattenedTroopSerializer.Deserialize(message.DonatedPrisonersRoster, objectManager);
+
+            if (ModInformation.IsServer && message.PartyScreenMode == Helpers.PartyScreenHelper.PartyScreenMode.Loot)
+            {
+                if (message.ForceTransferId != null)
+                {
+                    if (!TryValidateForceTransfer(message, mainHero, requester))
+                        return;
+                }
+                else if (mainHero.PartyBelongedTo != null &&
+                    objectManager.TryGetId(mainHero.PartyBelongedTo, out var committerPartyId) &&
+                    villageHostileActionInterface.HasPendingForceTransferForParty(committerPartyId))
+                {
+                    // Attribution missed (see ForceTransferScreenTracker): the cap cannot
+                    // be enforced on this commit. Logged so live runs prove attribution
+                    // works; still applied under the trusted-client model.
+                    logger.Warning(
+                        "ForceTransfer loot commit without attribution while a pool is pending (Hero={HeroId})",
+                        message.MainHeroId);
+                }
+            }
+
             var releasedPlayerCaptivityEvents = new List<PlayerCaptivityEndedByServer>();
             var leftPrisonerRosterData = message.LeftPrisonerRosterData;
             var rightPrisonerRosterData = message.RightPrisonerRosterData;
@@ -281,6 +307,72 @@ internal class PartyDoneLogicHandler : IHandler
 
             ApplyRosterOrder(mainHero.PartyBelongedTo.MemberRoster, message.RightMemberOrderData);
         });
+    }
+
+    private bool TryValidateForceTransfer(NetworkCompleteDoneLogic message, Hero mainHero, NetPeer requester)
+    {
+        if (mainHero.PartyBelongedTo == null ||
+            !objectManager.TryGetId(mainHero.PartyBelongedTo, out var partyId) ||
+            !villageHostileActionInterface.TryPeekForceTransfer(message.ForceTransferId, partyId, out var pool))
+        {
+            logger.Warning(
+                "Rejected force volunteers transfer with stale or consumed pool (Hero={HeroId}, Request={RequestId})",
+                message.MainHeroId,
+                message.ForceTransferId);
+        }
+        else if (!VillageHostileActionInterface.TryValidateVolunteersCommit(
+            pool.TroopId,
+            pool.TroopCount,
+            message.RightMemberRosterData,
+            message.LeftMemberRosterData,
+            message.LeftPrisonerRosterData,
+            message.RightPrisonerRosterData,
+            message.TakenPrisonersRoster?.Length ?? 0,
+            message.RecruitedPrisonersRoster?.Length ?? 0,
+            message.PartyGoldChangeAmount,
+            message.PartyInfluenceChangeAmount,
+            message.PartyMoraleChangeAmount,
+            message.ApplyReleasedAndTakenPrisonerActions,
+            message.DonationSettlementId,
+            ResolveUpgradedTroops(message.UpgradedTroopHistoryIds),
+            out var error))
+        {
+            // The pool is deliberately left intact: a rejection must not mutate
+            // pool state, so a false positive never destroys the reward.
+            logger.Warning(
+                "Rejected force volunteers transfer exceeding the authorized pool (Hero={HeroId}, Request={RequestId}, Reason={Reason})",
+                message.MainHeroId,
+                message.ForceTransferId,
+                error);
+        }
+        else if (!villageHostileActionInterface.TryConsumeForceTransfer(message.ForceTransferId, partyId, out _))
+        {
+            logger.Warning(
+                "Rejected force volunteers transfer with stale or consumed pool (Hero={HeroId}, Request={RequestId})",
+                message.MainHeroId,
+                message.ForceTransferId);
+        }
+        else
+        {
+            logger.Information(
+                "ForceTransfer volunteers commit accepted (Hero={HeroId}, Request={RequestId})",
+                message.MainHeroId,
+                message.ForceTransferId);
+            return true;
+        }
+
+        if (requester != null)
+            network.Send(requester, new SendInformationMessage("The village has no recruits left to give."));
+        return false;
+    }
+
+    private static IEnumerable<(string fromId, string toId, int number)> ResolveUpgradedTroops(UpgradedTroopHistoryData history)
+    {
+        if (history.Data == null)
+            return Enumerable.Empty<(string fromId, string toId, int number)>();
+        return history.Data
+            .Where(e => !string.IsNullOrEmpty(e.Character2Id) && e.Number > 0)
+            .Select(e => (fromId: e.Character1Id, toId: e.Character2Id, number: e.Number));
     }
 
     private bool TryResolveCompleteDoneLogic(

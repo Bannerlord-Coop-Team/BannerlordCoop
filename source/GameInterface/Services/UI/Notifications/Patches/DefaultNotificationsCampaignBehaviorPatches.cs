@@ -10,6 +10,7 @@ using System;
 using System.Collections.Generic;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Actions;
+using TaleWorlds.CampaignSystem.MapEvents;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Roster;
 using TaleWorlds.CampaignSystem.Settlements;
@@ -194,6 +195,11 @@ internal class DefaultNotificationsCampaignBehaviorPatches
     public static void OnItemsLootedPostfix(ref DefaultNotificationsCampaignBehavior __instance, MobileParty mobileParty, ItemRoster items)
     {
         if (ModInformation.IsClient || !IsValidPlayerParty(mobileParty)) return;
+
+        // RaidEventComponentPatches already replicates the leader party's exact inventory delta.
+        // Relaying this native aggregate too makes clients display the same raid loot twice.
+        if (mobileParty.MapEvent?.Component is RaidEventComponent raidComponent &&
+            raidComponent.AttackerSide?.LeaderParty?.MobileParty == mobileParty) return;
 
         var message = new NotifyItemsLooted(mobileParty, items._data);
         MessageBroker.Instance.Publish(__instance, message);

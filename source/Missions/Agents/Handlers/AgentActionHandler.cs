@@ -84,6 +84,12 @@ public class AgentActionHandler : IAgentActionHandler
     private struct LocalAgentActionState
     {
         public bool HasObservation;
+        public AgentEquipmentData? Equipment;
+        public AgentEquipmentData? RevisionEquipment;
+        public long EquipmentRevision;
+        public long BroadcastEquipmentRevision;
+        public int EquipmentHostEpoch;
+        public long EquipmentAuthorityRevision;
         public int Action0;
         public int Action1;
         public float Action0Speed;
@@ -127,7 +133,7 @@ public class AgentActionHandler : IAgentActionHandler
         this.guardReactionHandler = guardReactionHandler;
 
         this.packetManager.RegisterPacketHandler(this);
-        this.messageBroker.Subscribe<NetworkBattleHostAssigned>(Handle_BattleHostAssigned);
+        this.messageBroker.Subscribe<BattleHostAssignmentApplied>(Handle_BattleHostAssigned);
     }
 
     public PacketType PacketType => PacketType.AgentAction;
@@ -233,6 +239,17 @@ public class AgentActionHandler : IAgentActionHandler
         int action1 = agent.GetCurrentAction(1).Index;
         _localAgentStates.TryGetValue(info.AgentId, out var state);
         bool hadState = state.HasObservation;
+        AgentEquipmentData? equipment = AgentEquipmentData.TryCapture(agent, out var capturedEquipment)
+            ? capturedEquipment : (AgentEquipmentData?)null;
+        bool equipmentChanged = hadState
+            ? !Nullable.Equals(state.Equipment, equipment)
+            : equipment.HasValue
+                && (equipment.Value.MainHandIndex != (int)EquipmentIndex.None
+                    || equipment.Value.OffHandIndex != (int)EquipmentIndex.None);
+        equipmentChanged |= equipment.HasValue && state.EquipmentRevision > 0
+            && (state.EquipmentHostEpoch != remoteActionProcessor.GetOutgoingBattleHostEpoch()
+                || state.EquipmentAuthorityRevision != info.AuthorityRevision
+                || state.BroadcastEquipmentRevision != state.EquipmentRevision);
         bool isPlayerControlled =
             agent.Controller == AgentControllerType.Player;
         bool retainInputBoundary =
@@ -385,7 +402,8 @@ public class AgentActionHandler : IAgentActionHandler
             && !action0SpeedChanged && !action1SpeedChanged
             && !defendChanged && !guardChanged
             && !guardedMountStateChanged
-            && !guardedControllerRoleChanged)
+            && !guardedControllerRoleChanged
+            && !equipmentChanged)
         {
             if (hadState)
             {
@@ -456,8 +474,10 @@ public class AgentActionHandler : IAgentActionHandler
             || guardChanged
             || guardedMountStateChanged
             || guardedControllerRoleChanged
-            || discreteActionChanged;
+            || discreteActionChanged
+            || equipmentChanged;
         state.HasObservation = true;
+        state.Equipment = equipment;
         state.Action0 = action0;
         state.Action1 = action1;
         UpdateActionSpeedObservation(
@@ -512,6 +532,7 @@ public class AgentActionHandler : IAgentActionHandler
             guardReactionChannel,
             publishAction0Speed ? action0Speed : (float?)null,
             publishAction1Speed ? action1Speed : (float?)null);
+        actionData = PrepareEquipmentSnapshot(info, actionData, catchUp: false);
 #if DEBUG
         MissionActionDiagnostics.RecordOutboundAction();
 #endif
@@ -573,12 +594,14 @@ public class AgentActionHandler : IAgentActionHandler
                         || agent.GetCurrentAction(1) != ActionIndexCache.act_none);
                 if (defendFlags == Agent.MovementControlFlag.None
                     && !AgentActionData.IsGuardMode(guardMode)
-                    && !locationAmbient)
+                    && !locationAmbient
+                    && !AgentEquipmentData.TryCapture(agent, out _))
                     continue;
 
                 (ids ??= new List<Guid>()).Add(info.AgentId);
                 (actions ??= new List<AgentActionData>()).Add(
-                    new AgentActionData(agent, defendFlags, guardMode));
+                    PrepareEquipmentSnapshot(info,
+                        new AgentActionData(agent, defendFlags, guardMode), catchUp: true));
                 (sequences ??= new List<long>()).Add(NextActionSequence(info.AgentId));
             }
 
@@ -590,6 +613,33 @@ public class AgentActionHandler : IAgentActionHandler
                 sequences,
                 packet => client.Send(controllerId, packet));
         });
+    }
+
+    private AgentActionData PrepareEquipmentSnapshot(
+        CoopAgentInfo info, AgentActionData action, bool catchUp)
+    {
+        // Host epochs scope host actions; ordinary senders use the retained agent authority revision.
+        long authorityRevision = remoteActionProcessor.GetOutgoingBattleHostEpoch() == 0
+            ? info.AuthorityRevision : 0;
+        if (!action.Equipment.HasValue) return action.WithEquipment(0, null, authorityRevision);
+        _localAgentStates.TryGetValue(info.AgentId, out LocalAgentActionState state);
+        int epoch = remoteActionProcessor.GetOutgoingBattleHostEpoch();
+        if (state.EquipmentRevision == 0
+            || !Nullable.Equals(state.RevisionEquipment, action.Equipment)
+            || state.EquipmentHostEpoch != epoch
+            || state.EquipmentAuthorityRevision != info.AuthorityRevision)
+        {
+            state.EquipmentRevision++;
+            state.RevisionEquipment = action.Equipment;
+            state.EquipmentHostEpoch = epoch;
+            state.EquipmentAuthorityRevision = info.AuthorityRevision;
+        }
+        bool includeEquipment = catchUp || state.BroadcastEquipmentRevision != state.EquipmentRevision;
+        // A baseline sent to one joiner has not been published to the existing peers.
+        if (!catchUp) state.BroadcastEquipmentRevision = state.EquipmentRevision;
+        _localAgentStates[info.AgentId] = state;
+        return action.WithEquipment(state.EquipmentRevision, includeEquipment ? action.Equipment : null,
+            authorityRevision);
     }
 
     private void SendActionPackets(
@@ -673,11 +723,11 @@ public class AgentActionHandler : IAgentActionHandler
     }
 
     private void Handle_BattleHostAssigned(
-        MessagePayload<NetworkBattleHostAssigned> payload)
+        MessagePayload<BattleHostAssignmentApplied> payload)
     {
         if (_disposed) return;
 
-        remoteActionProcessor.HandleBattleHostAssigned(payload.What);
+        remoteActionProcessor.HandleBattleHostAssigned(payload.What.Assignment);
     }
 
     public void HandlePacket(NetPeer peer, IPacket packet)
@@ -1004,7 +1054,7 @@ public class AgentActionHandler : IAgentActionHandler
         if (_disposed) return;
         _disposed = true;
 
-        messageBroker.Unsubscribe<NetworkBattleHostAssigned>(Handle_BattleHostAssigned);
+        messageBroker.Unsubscribe<BattleHostAssignmentApplied>(Handle_BattleHostAssigned);
         packetManager.RemovePacketHandler(this);
         remoteActionProcessor.Dispose();
         guardReactionHandler.Dispose();

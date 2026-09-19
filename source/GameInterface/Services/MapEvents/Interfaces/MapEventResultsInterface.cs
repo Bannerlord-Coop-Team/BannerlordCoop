@@ -3,6 +3,8 @@ using Common.Logging;
 using Common.Util;
 using GameInterface.Services.Heroes.Extensions;
 using GameInterface.Services.MapEvents.Data;
+using GameInterface.Services.MapEvents.Participation;
+using GameInterface.Services.MapEvents.Patches;
 using GameInterface.Services.MobileParties.Extensions;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.PlayerCaptivityService.Patches;
@@ -43,12 +45,14 @@ public class MapEventResultsInterface : IMapEventResultsInterface
     private static readonly ILogger Logger = LogManager.GetLogger<MapEventResultsInterface>();
     private readonly IObjectManager objectManager;
     private readonly ITroopRosterInterface troopRosterInterface;
+    private readonly IRetreatedMapEventPartyTracker retreatedPartyTracker;
 
 #if DEBUG
     private readonly IRaidLootWarningFixture raidLootWarningFixture;
 #endif
 
-    public MapEventResultsInterface(IObjectManager objectManager, ITroopRosterInterface troopRosterInterface
+    public MapEventResultsInterface(IObjectManager objectManager, ITroopRosterInterface troopRosterInterface,
+        IRetreatedMapEventPartyTracker retreatedPartyTracker
 #if DEBUG
         , IRaidLootWarningFixture raidLootWarningFixture = null
 #endif
@@ -56,6 +60,7 @@ public class MapEventResultsInterface : IMapEventResultsInterface
     {
         this.objectManager = objectManager;
         this.troopRosterInterface = troopRosterInterface;
+        this.retreatedPartyTracker = retreatedPartyTracker;
 #if DEBUG
         this.raidLootWarningFixture = raidLootWarningFixture;
 #endif
@@ -189,8 +194,10 @@ public class MapEventResultsInterface : IMapEventResultsInterface
         {
             if (mapEvent.BattleState == BattleState.AttackerVictory || mapEvent.BattleState == BattleState.DefenderVictory)
             {
-                MBList<MapEventParty> defeatedParties = mapEvent.GetMapEventSide(mapEvent.DefeatedSide).Parties.ToMBList<MapEventParty>();
-                MBList<MapEventParty> winnerParties = mapEvent.GetMapEventSide(mapEvent.WinningSide).Parties.ToMBList<MapEventParty>();
+                MBList<MapEventParty> defeatedParties = mapEvent.GetMapEventSide(mapEvent.DefeatedSide).Parties
+                    .Where(party => !retreatedPartyTracker.IsRetreated(mapEvent, party.Party)).ToMBList<MapEventParty>();
+                MBList<MapEventParty> winnerParties = mapEvent.GetMapEventSide(mapEvent.WinningSide).Parties
+                    .Where(party => !retreatedPartyTracker.IsRetreated(mapEvent, party.Party)).ToMBList<MapEventParty>();
 
                 List<MapEventParty> winnerPlayerParties = winnerParties.FindAll(x => x.Party.MobileParty.IsPlayerParty());
                 bool winningSideIncludesPlayers = winnerPlayerParties.Count > 0;
@@ -220,13 +227,74 @@ public class MapEventResultsInterface : IMapEventResultsInterface
 #endif
                 }
 
+                SplitHideoutLoot(mapEvent, playerLootData);
+
                 // Need to patch the gold change to display plunder message
                 mapEvent.CommitCalculatedMapEventResults();
+                // Commit XP, renown, influence, morale, and gold only for parties that remained in the battle.
+                MapEventPatches.CommitCalculatedMapEventResults(mapEvent, party => !retreatedPartyTracker.IsRetreated(mapEvent, party.Party));
             }
             mapEvent._mapEventResultsApplied = true;
         });
 
         networkPlayerLootData = PackPlayerLootData(playerLootData);
+    }
+
+    internal void SplitHideoutLoot(MapEvent mapEvent, PlayerLootData loot)
+    {
+        if (!mapEvent.IsHideoutBattle || mapEvent.WinningSide != BattleSideEnum.Attacker) return;
+        var parties = mapEvent.AttackerSide.Parties.Where(loot.LootedItems.ContainsKey).ToArray();
+        if (parties.Length < 2) return;
+
+        var gold = parties.Sum(party => party.PlunderedGold);
+        var pooledItems = new ItemRoster();
+        for (var index = 0; index < parties.Length; index++)
+        {
+            var party = parties[index];
+            party.PlunderedGold = (gold / parties.Length) + (index < (gold % parties.Length) ? 1 : 0);
+            pooledItems.Add(loot.LootedItems[party]);
+            loot.LootedItems[party].Clear();
+        }
+
+        var values = new long[parties.Length];
+        var counts = new int[parties.Length];
+        foreach (var item in pooledItems.OrderByDescending(item => item.EquipmentElement.ItemValue))
+        {
+            for (var count = 0; count < item.Amount; count++)
+            {
+                var receiver = 0;
+                for (var index = 1; index < parties.Length; index++)
+                    if (values[index] < values[receiver] ||
+                        (values[index] == values[receiver] && counts[index] < counts[receiver]))
+                        receiver = index;
+                loot.LootedItems[parties[receiver]].AddToCounts(item.EquipmentElement, 1);
+                values[receiver] += item.EquipmentElement.ItemValue;
+                counts[receiver]++;
+            }
+        }
+
+        SplitHideoutTroops(parties, loot.LootedMembers);
+        SplitHideoutTroops(parties, loot.LootedPrisoners);
+    }
+
+    private void SplitHideoutTroops(MapEventParty[] parties, Dictionary<MapEventParty, TroopRoster> rosters)
+    {
+        var pooled = TroopRoster.CreateDummyTroopRoster();
+        foreach (var party in parties)
+        {
+            pooled.Add(rosters[party]);
+            rosters[party].Clear();
+        }
+
+        var receiver = 0;
+        foreach (var troop in pooled.GetTroopRoster().OrderByDescending(troop => troop.Character.Tier))
+            for (var count = 0; count < troop.Number; count++)
+            {
+                rosters[parties[receiver]].AddToCounts(troop.Character, 1, false,
+                    count < troop.WoundedNumber ? 1 : 0,
+                    (troop.Xp / troop.Number) + (count < (troop.Xp % troop.Number) ? 1 : 0));
+                receiver = (receiver + 1) % parties.Length;
+            }
     }
 
     // Needs extra arguments because vanilla seems to only allow the player to loot items from enemy casualties

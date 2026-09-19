@@ -11,6 +11,10 @@ public sealed class UiFrame
     public string ScreenName { get; set; }
     public List<UiWidget> Widgets { get; } = new List<UiWidget>();
     public bool Truncated { get; set; }
+    public bool ScopeComplete { get; set; } = true;
+    public int DomainWidgets { get; set; }
+    internal UiLayerStack Stack;
+    internal List<UiWidget> OcclusionWidgets = new List<UiWidget>();
 }
 
 /// <summary>Serializable widget description with a separate in-process native identity.</summary>

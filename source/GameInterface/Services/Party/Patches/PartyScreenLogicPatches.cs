@@ -3,6 +3,7 @@ using Common.Messaging;
 using Common.Util;
 using GameInterface.Services.Heroes;
 using GameInterface.Services.Party.Messages;
+using GameInterface.Services.Villages;
 using HarmonyLib;
 using Serilog;
 using System;
@@ -28,6 +29,46 @@ internal class PartyScreenLogicPatches
         get => _inCommit;
         private set => _inCommit = value;
     }
+
+    [HarmonyPatch(nameof(PartyScreenLogic.ValidateCommand))]
+    [HarmonyPrefix]
+    public static bool ValidateCommandPrefix(PartyScreenLogic.PartyCommand command, ref bool __result)
+    {
+        // Force-transfer loot screens only honor member takes and dismissals: the
+        // commit validation rejects any prisoner, upgrade, gold, influence, or
+        // morale movement, which would fail after the screen already reset.
+        // Block those operations up front so the buttons simply stay disabled.
+        // ValidateCommand is also queried per-frame by the UI, so no message.
+        // Member transfers stay allowed (takes and dismissals); shifts and sorts
+        // only reorder and never affect the commit deltas.
+        if (ForceTransferScreenTracker.HasOpenForceTransferScreen() &&
+            IsBlockedOnForceTransferScreen(command.Code, command.Type))
+        {
+            __result = false;
+            return false;
+        }
+
+        return true;
+    }
+
+    internal static bool IsBlockedOnForceTransferScreen(PartyScreenLogic.PartyCommandCode code, PartyScreenLogic.TroopType type)
+    {
+        switch (code)
+        {
+            case PartyScreenLogic.PartyCommandCode.UpgradeTroop:
+            case PartyScreenLogic.PartyCommandCode.RecruitTroop:
+            case PartyScreenLogic.PartyCommandCode.ExecuteTroop:
+            case PartyScreenLogic.PartyCommandCode.TransferPartyLeaderTroop:
+                return true;
+            case PartyScreenLogic.PartyCommandCode.TransferTroop:
+            case PartyScreenLogic.PartyCommandCode.TransferTroopToLeaderSlot:
+            case PartyScreenLogic.PartyCommandCode.TransferAllTroops:
+                return (type & PartyScreenLogic.TroopType.Prisoner) != 0;
+            default:
+                return false;
+        }
+    }
+
     [HarmonyPatch(nameof(PartyScreenLogic.DoneLogic))]
     [HarmonyPrefix]
     public static bool DoneLogicPrefix(PartyScreenLogic __instance, ref bool __result, bool isForced)
@@ -76,6 +117,7 @@ internal class PartyScreenLogicPatches
                 partyScreenMode = partyState.PartyScreenMode;
             }
 
+            ForceTransferScreenTracker.TryClaimForceTransferId(__instance.MemberRosters[0], out var forceTransferId);
             var message = new PartyDoneLogicAttempted(
                 Hero.MainHero,
                 releasedPrisonersRoster,
@@ -99,7 +141,8 @@ internal class PartyScreenLogicPatches
                 partyScreenMode,
                 applyReleasedAndTakenPrisonerActions,
                 donationSettlement,
-                donatedPrisonersRoster
+                donatedPrisonersRoster,
+                forceTransferId
             );
 
             MessageBroker.Instance.Publish(__instance, message);
@@ -150,6 +193,17 @@ internal class PartyScreenLogicPatches
     {
         partyScreenLogic.MemberRosters[(int)PartyScreenLogic.PartyRosterSide.Left] = leftMemberRoster;
         partyScreenLogic.PrisonerRosters[(int)PartyScreenLogic.PartyRosterSide.Left] = leftPrisonerRoster;
+    }
+
+    [HarmonyPatch(nameof(PartyScreenLogic.OnPartyScreenClosed))]
+    [HarmonyPostfix]
+    public static void OnPartyScreenClosedPostfix()
+    {
+        // Cancel skips DoneLogic so the TryClaim there never runs. Drop the
+        // attribution here so a cancelled force screen stops gating unrelated
+        // party screens. The pool itself stays pending. Post-Done this is a
+        // no-op because the claim already cleared the single-shot slot.
+        ForceTransferScreenTracker.Clear();
     }
 
     [HarmonyPatch(nameof(PartyScreenLogic.ExecuteTroop))]

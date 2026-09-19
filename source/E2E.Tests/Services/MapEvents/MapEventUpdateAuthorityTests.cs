@@ -1,5 +1,6 @@
 ﻿using Common.Util;
 using E2E.Tests.Util;
+using GameInterface.Services.MapEvents;
 using HarmonyLib;
 using TaleWorlds.CampaignSystem.MapEvents;
 using TaleWorlds.CampaignSystem.Party;
@@ -48,6 +49,32 @@ public class MapEventUpdateAuthorityTests : MapEventTestBase
 
             Assert.False(InvokeMapEventUpdatePrefix(mapEvent));
         }, MapEventDisabledMethods);
+    }
+
+    [Fact]
+    public void MissionAcceptedPlayerMapEvent_WithAllowedThread_ServerUpdateRemainsBlocked()
+    {
+        var context = CreateServerMapEvent();
+        var (_, playerPartyId) = CreatePlayerHeroParty("player");
+
+        try
+        {
+            Server.Call(() =>
+            {
+                Assert.True(Server.ObjectManager.TryGetObject<MapEvent>(context.MapEventId, out var mapEvent));
+                Assert.True(Server.ObjectManager.TryGetObject<MobileParty>(playerPartyId, out var playerParty));
+
+                AddSyntheticMapEventParty(mapEvent.AttackerSide, playerParty.Party);
+                Assert.True(ServerBattleModeArbiter.TryClaimMission(context.MapEventId));
+
+                using (new AllowedThread())
+                    Assert.False(InvokeMapEventUpdatePrefix(mapEvent));
+            }, MapEventDisabledMethods);
+        }
+        finally
+        {
+            Server.Call(() => ServerBattleModeArbiter.Release(context.MapEventId));
+        }
     }
 
     [Fact]
