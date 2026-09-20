@@ -38,6 +38,20 @@ public class WeaponPickupSyncTests
     private static bool wieldRanInsideAllowedThread;
 
     [Fact]
+    public void ReplicatedDrop_RoundTripsExactSiegeGrantIdentity()
+    {
+        new SurrogateCollection();
+        var message = new NetworkWeaponDropped(Guid.NewGuid(), Guid.NewGuid(), EquipmentIndex.ExtraWeaponSlot,
+            Guid.NewGuid(), "owner", "fork", null, null, 0, default, default, 0, false, 0,
+            new AgentEquipmentData(EquipmentIndex.None, EquipmentIndex.None, 0), false, Guid.NewGuid());
+        var copy = Serializer.DeepClone(message);
+        Assert.Equal(message.SiegeEquipmentGrant, copy.SiegeEquipmentGrant);
+        Assert.Equal(message.AgentId, copy.AgentId);
+        Assert.Equal(message.OriginControllerId, copy.OriginControllerId);
+        Assert.True(copy.HasCurrentEquipment);
+    }
+
+    [Fact]
     public void ReplicatedPickup_RoundTripsCompleteMessage()
     {
         new SurrogateCollection();

@@ -144,6 +144,8 @@ public class BattleAgentSpawnData
     public readonly long MountAuthorityRevision;
     [ProtoMember(26)]
     public readonly Guid SiegeEquipmentGrant;
+    [ProtoMember(27)]
+    public readonly long SiegeEquipmentGrantRevision;
 
     public BattleAgentSpawnData(
         Guid agentId,
@@ -169,7 +171,8 @@ public class BattleAgentSpawnData
         bool isRunningAway = false,
         long authorityRevision = 0,
         long mountAuthorityRevision = 0,
-        Guid siegeEquipmentGrant = default)
+        Guid siegeEquipmentGrant = default,
+        long siegeEquipmentGrantRevision = 0)
     {
         AgentId = agentId;
         CharacterId = characterId;
@@ -197,5 +200,6 @@ public class BattleAgentSpawnData
         AuthorityRevision = authorityRevision;
         MountAuthorityRevision = mountAuthorityRevision;
         SiegeEquipmentGrant = siegeEquipmentGrant;
+        SiegeEquipmentGrantRevision = siegeEquipmentGrantRevision;
     }
 }

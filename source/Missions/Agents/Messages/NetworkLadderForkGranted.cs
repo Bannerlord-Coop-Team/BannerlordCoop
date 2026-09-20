@@ -26,9 +26,11 @@ public sealed class NetworkLadderForkGranted : IEvent
     [ProtoMember(5)] public string ItemObjectId { get; }
     [ProtoMember(6)] public short DataValue { get; }
     [ProtoMember(7)] public AgentEquipmentData Equipment { get; }
+    [ProtoMember(8)] public long GrantRevision { get; }
 
     public NetworkLadderForkGranted(Guid grantId, Guid agentId, string authority,
-        long authorityRevision, string itemObjectId, short dataValue, AgentEquipmentData equipment)
+        long authorityRevision, string itemObjectId, short dataValue, AgentEquipmentData equipment,
+        long grantRevision = 1)
     {
         GrantId = grantId;
         AgentId = agentId;
@@ -37,5 +39,6 @@ public sealed class NetworkLadderForkGranted : IEvent
         ItemObjectId = itemObjectId;
         DataValue = dataValue;
         Equipment = equipment;
+        GrantRevision = grantRevision;
     }
 }

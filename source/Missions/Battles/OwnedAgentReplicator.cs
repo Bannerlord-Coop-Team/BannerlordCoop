@@ -234,7 +234,8 @@ public class OwnedAgentReplicator : IOwnedAgentReplicator
                 authorityRevision: info.AuthorityRevision,
                 mountAuthorityRevision: mountInfo?.AuthorityRevision ?? 0,
                 siegeEquipmentGrant: agent.Equipment[EquipmentIndex.ExtraWeaponSlot].IsEmpty
-                    ? Guid.Empty : info.SiegeEquipmentGrant));
+                    ? Guid.Empty : info.SiegeEquipmentGrant,
+                siegeEquipmentGrantRevision: info.SiegeEquipmentGrantRevision));
         }
         return records;
     }

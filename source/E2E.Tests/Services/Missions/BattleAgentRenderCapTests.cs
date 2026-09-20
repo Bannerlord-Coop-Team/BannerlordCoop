@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.Linq;
 using Common.Messaging;
+using Common.Util;
 using E2E.Tests.Environment.MockEngine;
 using GameInterface.Services.MapEvents;
 using GameInterface.Services.MapEvents.Patches;
@@ -10,6 +11,8 @@ using GameInterface.Services.ObjectManager;
 using GameInterface.Surrogates;
 using HarmonyLib;
 using Missions;
+using Missions.Agents.Messages;
+using Missions.Agents.Packets;
 using Missions.Battles;
 using Missions.Data;
 using Missions.Messages;
@@ -215,15 +218,22 @@ public class BattleAgentRenderCapTests : MissionTestEnvironment
     /// and not dropped; the drain fields it once removals free capacity. RED today: TrySpawnPuppetNow spawns
     /// unconditionally.
     /// </summary>
-    [Fact]
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
     [Trait("Requirement", "BR-110")]
-    public void PuppetSpawn_AtEngineAgentLimit_IsDeferredUntilCapacityFrees()
+    public void PuppetSpawn_AtEngineAgentLimit_IsDeferredUntilCapacityFrees(bool grantWhileDeferred)
     {
         using var fixture = new MissionEngineFixture();
         var (mapEventId, partyIds) = SetupCoopBattle("host", "peer");
         var host = Clients.First();
         var characterId = CreateRegisteredObject<CharacterObject>();
+        var itemId = CreateRegisteredObject<ItemObject>();
         var agentId = Guid.NewGuid();
+        var grantId = Guid.NewGuid();
+        var harmony = new Harmony("coop.tests.deferred-siege-grant." + Guid.NewGuid());
+        harmony.Patch(AccessTools.Method(typeof(Agent), nameof(Agent.EquipWeaponToExtraSlotAndWield)),
+            prefix: new HarmonyMethod(AccessTools.Method(typeof(BattleAgentRenderCapTests), nameof(EquipExtraSlot))));
 
         try
         {
@@ -249,20 +259,56 @@ public class BattleAgentRenderCapTests : MissionTestEnvironment
 
                 Assert.False(registry.TryGetAgentInfo(agentId, out _)); // deferred: not spawned at the limit
                 Assert.Equal(EngineAgentLimit, CountLiveAgents(mock));
+                Assert.True(host.ObjectManager.TryGetObject<ItemObject>(itemId, out var item));
+                item.AddWeapon(new WeaponComponentData(null, WeaponClass.OneHandedPolearm, default), null);
+                var grant = new NetworkLadderForkGranted(grantId, agentId, "peer", 0, itemId, 0,
+                    new AgentEquipmentData(EquipmentIndex.ExtraWeaponSlot, EquipmentIndex.None, 0));
+                var pickupHandler = host.Resolve<ICoopMissionComponent>().WeaponPickupHandler;
+                if (grantWhileDeferred)
+                {
+                    host.Resolve<IMessageBroker>().Publish(this, grant);
+                    pickupHandler.Tick(0.1f);
+                }
 
                 DeleteAgents(mock, 1);                                  // deletion frees one slot
                 GetPuppetSpawner(controller).DrainPendingPuppets();
 
-                Assert.True(registry.TryGetAgentInfo(agentId, out _));  // the buffered puppet fielded
+                Assert.True(registry.TryGetAgentInfo(agentId, out var spawned));  // the buffered puppet fielded
                 Assert.Equal(EngineAgentLimit, CountLiveAgents(mock));
+                Assert.True(spawned.Agent.Equipment[EquipmentIndex.ExtraWeaponSlot].IsEmpty);
+                pickupHandler.Tick(0.1f);
+                if (grantWhileDeferred)
+                {
+                    Assert.Same(item, spawned.Agent.Equipment[EquipmentIndex.ExtraWeaponSlot].Item);
+                    Assert.Equal(grantId, spawned.SiegeEquipmentGrant);
+                    Assert.Equal(1, spawned.SiegeEquipmentGrantRevision);
+                    SetExtraSlot(spawned.Agent, default);
+                    host.Resolve<IMessageBroker>().Publish(this, grant);
+                    pickupHandler.Tick(0.1f);
+                    Assert.True(spawned.Agent.Equipment[EquipmentIndex.ExtraWeaponSlot].IsEmpty);
+                }
 
                 GC.KeepAlive(controller);
             });
         }
         finally
         {
+            harmony.UnpatchAll(harmony.Id);
             BattleSpawnGate.EndBattle();
         }
+    }
+
+    private static bool EquipExtraSlot(Agent __instance, ref MissionWeapon weapon)
+    {
+        Assert.True(AllowedThread.IsThisThreadAllowed());
+        SetExtraSlot(__instance, weapon);
+        return false;
+    }
+
+    private static void SetExtraSlot(Agent agent, MissionWeapon weapon)
+    {
+        var slots = (MissionWeapon[])AccessTools.Field(typeof(MissionEquipment), "_weaponSlots").GetValue(agent.Equipment);
+        slots[(int)EquipmentIndex.ExtraWeaponSlot] = weapon;
     }
 
     [Fact]

@@ -77,6 +77,7 @@ public sealed class BattleAgentSpawnBatchCodecTests
         var encoded = Assert.Single(codec.Encode(new[] { record }, SpawnBatchPurpose.CatchUp));
         var decoded = Assert.Single(DecodeWireMessage(codec, encoded));
         Assert.Equal(grant, decoded.SiegeEquipmentGrant);
+        Assert.Equal(23, decoded.SiegeEquipmentGrantRevision);
         Assert.Equal(record.AgentId, decoded.AgentId);
         Assert.Equal(record.MissionEquipmentData.WeaponSlots.Count, decoded.MissionEquipmentData.WeaponSlots.Count);
     }
@@ -222,6 +223,7 @@ public sealed class BattleAgentSpawnBatchCodecTests
             1,
             default,
             default,
-            new MissionEquipmentData(weaponSlots), siegeEquipmentGrant: siegeEquipmentGrant);
+            new MissionEquipmentData(weaponSlots), siegeEquipmentGrant: siegeEquipmentGrant,
+            siegeEquipmentGrantRevision: 23);
     }
 }
