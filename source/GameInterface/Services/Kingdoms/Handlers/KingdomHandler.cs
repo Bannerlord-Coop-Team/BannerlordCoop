@@ -609,7 +609,8 @@ public class KingdomHandler : IHandler
             if (!objectManager.TryGetObjectWithLogging<Settlement>(payload.SettlementId, out var settlement)) return;
             if (!objectManager.TryGetObjectWithLogging<Clan>(payload.ReceiverClanId, out var receiverClan)) return;
             if (!objectManager.TryGetObjectWithLogging<Clan>(player.ClanId, out var playerClan)) return;
-            if (playerClan != playerClan.Kingdom?.RulingClan)
+            if (!objectManager.TryGetObjectWithLogging<Hero>(player.HeroId, out var playerHero)) return;
+            if (playerClan != playerClan.Kingdom?.RulingClan || playerHero != playerClan.Leader)
             {
                 Logger.Warning("Ignoring GiftSettlementOwnership {Instance}: sender's clan {SenderClan} is not the ruling clan of their kingdom",
                     obj.What.SettlementId, player.ClanId);
