@@ -342,8 +342,18 @@ public class SiegeInteractionDebugBehaviorTests
         Assert.True((oldHit - target).Length > 1f);
     }
 
-    [Fact]
-    public void ArrowReaim_UsesOwnedCameraBelowTorchWithoutMovingActorAndRestoresCamera()
+    [Theory]
+    [InlineData(0.966359735f, 17, true, true)]
+    [InlineData(0.1f, 17, true, true)]
+    [InlineData(0.8f, 791, true, false)]
+    [InlineData(0.8f, 0, true, false)]
+    [InlineData(0.8f, 17, false, false)]
+    [InlineData(float.NaN, 17, true, false)]
+    [InlineData(float.PositiveInfinity, 17, true, false)]
+    [InlineData(-0.1f, 17, true, false)]
+    [InlineData(2f, 17, true, false)]
+    public void ArrowReaim_BindsCloseCameraToCurrentSurfaceWithoutMovingActorAndRestoresCamera(
+        float collisionDistance, int entityId, bool rayHit, bool accepted)
     {
         using var mission = new MissionCurrentScope();
         var harmony = new Harmony("coop.tests.arrow-eye-camera");
@@ -371,6 +381,8 @@ public class SiegeInteractionDebugBehaviorTests
             Patch(AccessTools.Method(typeof(WorldPosition), nameof(WorldPosition.GetGroundVec3)), nameof(ArrowActorPosition));
             Patch(AccessTools.Method(typeof(WeakGameEntity), nameof(WeakGameEntity.ComputeGlobalPhysicsBoundingBoxCenter)), nameof(ArrowPhysicsTarget));
             Patch(AccessTools.PropertyGetter(typeof(WeakGameEntity), nameof(WeakGameEntity.GlobalPosition)), nameof(ArrowPhysicsTarget));
+            Patch(AccessTools.PropertyGetter(typeof(Mission), nameof(Mission.Scene)), nameof(ArrowMissionScene));
+            Patch(AccessTools.Method(typeof(Scene), nameof(Scene.FocusRayCastForFixedPhysics)), nameof(ArrowSurfaceRay));
             Patch(AccessTools.Method(typeof(Camera), nameof(Camera.CreateCamera)), nameof(ArrowCreateCamera));
             Patch(AccessTools.Method(typeof(Camera), nameof(Camera.FillParametersFrom)), nameof(SkipScriptComponentCache));
             Patch(AccessTools.Method(typeof(Camera), nameof(Camera.LookAt)), nameof(ArrowCameraLookAt));
@@ -384,7 +396,15 @@ public class SiegeInteractionDebugBehaviorTests
             arrowMonster = (Monster)FormatterServices.GetUninitializedObject(typeof(Monster));
             var barrel = (ArrowBarrel)FormatterServices.GetUninitializedObject(typeof(ArrowBarrel));
             var point = (StandingPoint)FormatterServices.GetUninitializedObject(typeof(StandingPoint));
+            arrowScene = (Scene)FormatterServices.GetUninitializedObject(typeof(Scene));
 #pragma warning restore SYSLIB0050
+            GC.SuppressFinalize(arrowScene);
+            var entityConstructor = AccessTools.Constructor(typeof(WeakGameEntity), new[] { typeof(UIntPtr) });
+            AccessTools.Field(typeof(ScriptComponentBehavior), "_gameEntity").SetValue(barrel,
+                entityConstructor.Invoke(new object[] { new UIntPtr(17u) }));
+            arrowSurfaceEntity = (WeakGameEntity)entityConstructor.Invoke(new object[] { new UIntPtr((uint)entityId) });
+            arrowSurfaceDistance = collisionDistance;
+            arrowSurfaceHit = rayHit;
             AccessTools.Property(typeof(Monster), nameof(Monster.StandingEyeHeight)).SetValue(arrowMonster, 1.4f);
             AccessTools.Property(typeof(Agent), nameof(Agent.Equipment)).SetValue(agent, new MissionEquipment());
             var bow = new ItemObject("test_bow");
@@ -413,15 +433,29 @@ public class SiegeInteractionDebugBehaviorTests
             Assert.True((bool)Get("nativeCameraStaged"));
             Assert.Equal(1, arrowTeleports);
             stage.Invoke(behavior, new object[] { screen, agent, 17, 0, false, true, true });
-            Assert.Same(Get("stagingCamera"), GetCamera());
-            Assert.NotNull(GetCamera());
             Assert.Equal(1, arrowTeleports);
-            Assert.Equal(arrowPosition + (Vec3.Up * 1.6f), arrowCameraEye);
-            Assert.Equal(new Vec3(498.269f, 721.444f, 22.0302753f), arrowCameraTarget);
-            var direction = (arrowCameraTarget - arrowCameraEye).NormalizedCopy();
-            var atTorchFront = arrowCameraEye + (direction * ((721.545654f - arrowCameraEye.y) / direction.y));
-            Assert.True(atTorchFront.z + 0.2f < 22.77746f);
-            Assert.Equal("fixture_staged_native_focus_pending", Get("status"));
+            if (accepted)
+            {
+                Assert.Same(Get("stagingCamera"), GetCamera());
+                Assert.NotNull(GetCamera());
+                Assert.Equal(new Vec3(498.269f, 721.444f, 22.0302753f), arrowCameraTarget);
+                var direction = (arrowCameraTarget - arrowCameraEye).NormalizedCopy();
+                var origin = arrowCameraEye + (direction * arrowCameraEye.AsVec2.Distance(arrowPosition.AsVec2));
+                var surface = arrowPosition + (Vec3.Up * 1.6f) + (direction * collisionDistance);
+                Assert.True(Math.Abs((surface - origin).Length - Math.Min(collisionDistance, 0.3f)) < 0.0002f);
+                if (collisionDistance > 0.3f) Assert.True((surface - origin).Length > 0.2f);
+                Assert.True((surface - origin).Length < 0.4f);
+                Assert.True((arrowCameraEye - (arrowPosition + (Vec3.Up * 1.6f))).Length < collisionDistance);
+                var atTorchFront = arrowCameraEye + (direction * ((721.545654f - arrowCameraEye.y) / direction.y));
+                Assert.True(atTorchFront.z + 0.2f < 22.77746f);
+                Assert.Equal("fixture_staged_native_focus_pending", Get("status"));
+            }
+            else
+            {
+                Assert.Null(GetCamera());
+                Assert.Null(Get("stagingCamera"));
+                Assert.Equal("fixture_target_unavailable", Get("status"));
+            }
             Assert.False((bool)Get("pressInvoked"));
             Assert.False((bool)Get("externalInputArmed"));
             Assert.Null(Get("functionalAction"));
@@ -445,7 +479,25 @@ public class SiegeInteractionDebugBehaviorTests
 
     private static Vec3 arrowPosition, arrowCameraEye, arrowCameraTarget;
     private static Monster arrowMonster;
+    private static Scene arrowScene;
+    private static WeakGameEntity arrowSurfaceEntity;
+    private static float arrowSurfaceDistance;
+    private static bool arrowSurfaceHit;
     private static int arrowTeleports, arrowCameraReleases;
+    private static bool ArrowMissionScene(ref Scene __result) { __result = arrowScene; return false; }
+    private static bool ArrowSurfaceRay(Vec3 __0, Vec3 __1, ref float __2, ref Vec3 __3,
+        ref WeakGameEntity __4, float __5, BodyFlags __6, ref bool __result)
+    {
+        Assert.Equal(arrowPosition + (Vec3.Up * 1.6f), __0);
+        Assert.Equal(new Vec3(498.269f, 721.444f, 22.0302753f), __1);
+        Assert.Equal(0.01f, __5);
+        Assert.Equal(unchecked((BodyFlags)(-251707585)), __6);
+        __2 = arrowSurfaceDistance;
+        __3 = __0 + ((__1 - __0).NormalizedCopy() * arrowSurfaceDistance);
+        __4 = arrowSurfaceEntity;
+        __result = arrowSurfaceHit;
+        return false;
+    }
     private static bool ArrowActorMonster(ref Monster __result) { __result = arrowMonster; return false; }
     private static bool ArrowActorPosition(ref Vec3 __result) { __result = arrowPosition; return false; }
     private static bool ArrowActorScale(ref float __result) { __result = 1f; return false; }

@@ -932,6 +932,20 @@ internal sealed class SiegeInteractionDebugBehavior : MissionBehavior, ISiegeInt
         }
         if (!watchOnly && !reaimOnly) agent.TeleportToPosition(position);
         var eye = watchOnly ? target + new Vec3(3f, 3f, 2f) : position + (Vec3.Up * 1.6f);
+        if (reaimOnly && machine is ArrowBarrel barrel)
+        {
+            try
+            {
+                eye = GetArrowCameraEye(barrel, eye, target);
+            }
+            catch (InvalidOperationException exception)
+            {
+                nativeAimTarget = new { target = nativeAimTarget, error = exception.Message };
+                ReleaseCamera();
+                status = "fixture_target_unavailable";
+                return;
+            }
+        }
         observerFrame = null;
         if (watchOnly && watchedAgentId.HasValue)
         {
@@ -985,6 +999,28 @@ internal sealed class SiegeInteractionDebugBehavior : MissionBehavior, ISiegeInt
     internal static Vec3 GetNativeStagingDirection(Vec3 userPosition, float eyeHeight, Vec3 targetCenter)
     {
         return (targetCenter - (userPosition + (Vec3.Up * eyeHeight))).NormalizedCopy();
+    }
+
+    private Vec3 GetArrowCameraEye(ArrowBarrel barrel, Vec3 eye, Vec3 target)
+    {
+        var direction = (target - eye).NormalizedCopy();
+        if (!(direction.LengthSquared >= 0.5f) || Mission.Scene == null || !barrel.GameEntity.IsValid ||
+            !Mission.Scene.FocusRayCastForFixedPhysics(eye, target, out float distance, out Vec3 hitPoint,
+                out WeakGameEntity hit, 0.01f, unchecked((BodyFlags)(-251707585))) ||
+            !hit.IsValid || hit.Pointer != barrel.GameEntity.Pointer ||
+            float.IsNaN(distance) || float.IsInfinity(distance) || distance <= 0f || distance > (target - eye).Length)
+            throw new InvalidOperationException("The current barrel surface is not on the clear camera ray.");
+
+        // Keep the ray origin between vanilla's 0.2m focus radius and 0.4m wide-ray offset.
+        var advance = Math.Max(0f, distance - 0.3f) / (1f + direction.AsVec2.Length);
+        var cameraEye = eye + (direction * advance);
+        nativeAimTarget = new
+        {
+            requestId, tick, recordedUtc = DateTime.UtcNow, machineId = barrel.Id.Id,
+            target = DescribePosition(target), surface = DescribePosition(hitPoint), surfaceDistance = distance,
+            cameraEye = DescribePosition(cameraEye), cameraAdvance = advance
+        };
+        return cameraEye;
     }
 
     internal Vec3 GetStagingTarget(UsableMachine machine, Vec3 standingPointPosition, bool watchOnly, bool nativeCamera = false,
