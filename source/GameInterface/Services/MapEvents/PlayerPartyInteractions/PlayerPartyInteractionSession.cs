@@ -2,6 +2,7 @@ using GameInterface.Services.Inventory.Data;
 using GameInterface.Services.TroopRosters.Data;
 using LiteNetLib;
 using System.Collections.Generic;
+using TaleWorlds.CampaignSystem;
 
 namespace GameInterface.Services.MapEvents.PlayerPartyInteractions;
 
@@ -16,8 +17,11 @@ internal sealed class PlayerPartyInteractionSession
     public NetPeer ResponderPeer { get; set; }
     public bool IsHostile { get; }
     public PlayerPartyInteractionVassalUnavailableReason VassalUnavailableReason { get; set; }
+    public PlayerPartyInteractionMercenaryUnavailableReason MercenaryUnavailableReason { get; set; }
+    public int MercenaryAwardMultiplier { get; set; }
     public PlayerPartyInteractionProposal Proposal { get; set; }
     public bool HostileDemandConfirmed { get; set; }
+    public bool MercenaryConfirmed { get; set; }
     public bool InitiatorAcceptedTrade { get; set; }
     public bool ResponderAcceptedTrade { get; set; }
     public ItemRosterElementData[] InitiatorOfferedItems { get; set; } = new ItemRosterElementData[0];
@@ -32,6 +36,7 @@ internal sealed class PlayerPartyInteractionSession
     public TroopRosterElementData[] ResponderOfferedTroops { get; set; } = new TroopRosterElementData[0];
     public bool InitiatorOfferedPeace { get; set; }
     public bool ResponderOfferedPeace { get; set; }
+    public Kingdom TargetKingdom { get; set; }
 
     public HashSet<PlayerPartyInteractionOption> InitiatorOptions { get; } = new HashSet<PlayerPartyInteractionOption>();
     public HashSet<PlayerPartyInteractionOption> InitiatorEnabledOptions { get; } = new HashSet<PlayerPartyInteractionOption>();
