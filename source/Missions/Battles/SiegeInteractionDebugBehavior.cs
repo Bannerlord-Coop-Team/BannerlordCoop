@@ -859,7 +859,7 @@ internal sealed class SiegeInteractionDebugBehavior : MissionBehavior, ISiegeInt
             }
             ownedForkItem = ladder._forkItem;
         }
-        if (reaimOnly && !(machine is CastleGate ||
+        if (reaimOnly && !(machine is CastleGate || machine is ArrowBarrel ||
             (machine is Ballista ballista && ReferenceEquals(point, ballista.PilotStandingPoint))))
         {
             status = "fixture_stage_rejected";

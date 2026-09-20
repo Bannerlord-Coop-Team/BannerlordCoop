@@ -325,6 +325,24 @@ public class SiegeInteractionDebugBehaviorTests
     }
 
     [Theory]
+    [InlineData(1.6f)]
+    [InlineData(2.2f)]
+    public void NativeArrowReaim_UsesSettledEyeToReachTheRecordedBarrel(float eyeHeight)
+    {
+        var position = new Vec3(498.091949f, 721.966248f, 21.6503487f);
+        var target = new Vec3(498.269f, 721.444f, 22.0302753f);
+        var eye = position + (Vec3.Up * eyeHeight);
+        var direction = SiegeInteractionDebugBehavior.GetNativeStagingDirection(position, eyeHeight, target);
+
+        Assert.True(direction.y < 0f);
+        Assert.True((eye + (direction * (target - eye).Length) - target).Length < 0.0001f);
+        var oldCamera = new Vec3(498.1203f, 722.0794f, 25.4501629f);
+        var oldRay = new Vec3(0.0298132747f, 0.119006753f, -0.9924458f);
+        var oldHit = oldCamera + (oldRay * ((target.z - oldCamera.z) / oldRay.z));
+        Assert.True((oldHit - target).Length > 1f);
+    }
+
+    [Theory]
     [InlineData(typeof(StonePile))]
     [InlineData(typeof(ArrowBarrel))]
     [InlineData(typeof(Ballista))]
