@@ -26,12 +26,6 @@ internal class DoSmeltingPatch
         var message = new DoSmelting(currentCraftingHero, equipmentElement);
         MessageBroker.Instance.Publish(__instance, message);
 
-        // Need to check to prevent spam clicking giving more xp and research points
-        if (currentCraftingHero.PartyBelongedTo.ItemRoster.FindIndexOfElement(equipmentElement) < 0) return false;
-
-        // Patched separately for sending to server
-        __instance.AddResearchPoints(equipmentElement.Item.WeaponDesign.Template, Campaign.Current.Models.SmithingModel.GetPartResearchGainForSmeltingItem(equipmentElement.Item, currentCraftingHero));
-
         // Skip original to override original client saving
         return false;
     }

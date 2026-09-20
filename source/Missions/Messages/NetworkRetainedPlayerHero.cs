@@ -41,7 +41,7 @@ public sealed class NetworkRetainedPlayerHero : IEvent
         && !string.IsNullOrEmpty(ReturningControllerId)
         && !string.IsNullOrEmpty(Previous.OwnerControllerId)
         && ReturningControllerId != Previous.OwnerControllerId
-        && Previous.AuthorityRevision > 0 && Previous.AuthorityRevision < long.MaxValue
+        && Previous.AuthorityRevision >= 0 && Previous.AuthorityRevision < long.MaxValue
         && (Previous.MountAgentId == Guid.Empty
             || (Previous.MountAgentId != Previous.AgentId
                 && Previous.MountAuthorityRevision >= 0 && Previous.MountAuthorityRevision < long.MaxValue));

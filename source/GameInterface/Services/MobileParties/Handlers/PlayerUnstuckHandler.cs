@@ -29,9 +29,9 @@ using TaleWorlds.Library;
 namespace GameInterface.Services.MobileParties.Handlers;
 
 /// <summary>
-/// Dedicated recovery flow behind coop.debug.mobileparty.unstuck. The client forwards
+/// Dedicated recovery flow behind coop.unstuck. The client forwards
 /// <see cref="PlayerUnstuckRequested"/> to the server as <see cref="NetworkRequestPlayerUnstuck"/>;
-/// the server force-applies every applicable exit (captivity, map event, army, siege camp,
+/// the server force-applies every applicable exit (captivity, map event, follower army, siege camp,
 /// settlement) with each step guarded independently, so one broken exit flow cannot block the
 /// others; the
 /// <see cref="NetworkPlayerUnstuckResult"/> reply then lets the requesting client clear the
@@ -164,7 +164,11 @@ internal class PlayerUnstuckHandler : IHandler
         }
 
         var army = party.Army;
-        if (army != null)
+        if (army?.LeaderParty == party)
+        {
+            actions.Add("Preserved the player-led army and its attached parties.");
+        }
+        else if (army != null)
         {
             TryStep(actions, "army removal", () =>
             {
@@ -202,7 +206,7 @@ internal class PlayerUnstuckHandler : IHandler
         {
             TryStep(actions, "map event removal", () =>
             {
-                // Reuse the normal authoritative leave flow so the removal and client cleanup are broadcast.
+                // The party-side setter also releases attached members on the server and clients.
                 messageBroker.Publish(party, new PlayerLeaveBattleAttempted(party.Party));
                 if (party.Party.MapEvent != null)
                     throw new InvalidOperationException("The battle leave flow did not remove the party from its map event.");

@@ -142,7 +142,7 @@ public class OwnedAgentReplicator : IOwnedAgentReplicator
         if (retainedHeroRecoverySeconds < 0.5f) return;
         retainedHeroRecoverySeconds = 0;
         foreach (var data in BuildOwnedAgentRecords(ownPartyOnly: false, retainedPlayerHeroesOnly: true))
-            authorityMigrator.TrySurrenderPlayerHero(data.OriginalOwnerControllerId, data);
+            authorityMigrator.TrySurrenderPlayerHero(data);
     }
 
     public void FlushPendingSpawns()
@@ -192,7 +192,7 @@ public class OwnedAgentReplicator : IOwnedAgentReplicator
             var agent = info.Agent;
             if (agent == null || !agent.IsActive() || agent.IsMount || !(agent.Character is CharacterObject character)) continue;
 
-            if (retainedPlayerHeroesOnly && (!character.IsHero || session.IsOwn(info.OriginalOwner))) continue;
+            if (retainedPlayerHeroesOnly && !character.IsHero) continue;
 
             bool isOwnParty = IsOwnPartyAgent(agent, character);
             if (ownPartyOnly && !isOwnParty) continue;

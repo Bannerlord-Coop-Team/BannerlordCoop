@@ -11,6 +11,7 @@ using Missions.Agents;
 using Missions.Agents.Handlers;
 using Missions.Data;
 using Missions.Messages;
+using Missions.Hideouts;
 using Missions.Services.Network;
 using SandBox.Missions.MissionLogics.Hideout;
 using Serilog;
@@ -61,7 +62,6 @@ public class CoopBattleController : CoopMissionController
 
     /// <summary>Reports final siege engine state before the shared result is applied.</summary>
     public ISiegeEngineStateReporter SiegeEngineStateReporter { get; }
-
 
     private readonly IBattleInstanceLifecycle lifecycle;
     private readonly IOwnedAgentReplicator replicator;
@@ -374,7 +374,7 @@ public class CoopBattleController : CoopMissionController
         bool hasHideoutMissionController,
         bool hasHideoutAmbushMissionController)
         => !hasHideoutMissionController && !hasHideoutAmbushMissionController;
-        
+
     // Compare current authority with controller id
     private bool? ProbeHeroAgentAuthority(Hero hero)
     {
@@ -498,6 +498,7 @@ public class CoopBattleController : CoopMissionController
             siegeEngineDeployment.CatchUpJoiner(controllerId);
             siegeMachineState.CatchUpJoiner(controllerId);
             Deployment.CatchUpJoiner(controllerId);
+            Mission?.GetMissionBehavior<CoopHideoutMissionLogic>()?.CatchUpJoiner(controllerId);
             if (Session.IsLocalHost)
                 coopMissionComponent.WeaponDropHandler.CatchUpJoiner(controllerId);
 
@@ -609,6 +610,7 @@ public class CoopBattleController : CoopMissionController
         // Retry the result-ready report before tearing the instance down. Duplicate reports are idempotent.
         ResultCommitter.ReportResolvedResult(missionResult);
 
-        lifecycle.Leave();
+        // Retreats are reported separately by OnRetreatMission
+        lifecycle.Leave(wasRetreat: false);
     }
 }
