@@ -187,6 +187,31 @@ public class LadderForkReplicationTests : IDisposable
     }
 
     [Theory]
+    [InlineData(false, false, false, false, true)]
+    [InlineData(true, false, false, false, false)]
+    [InlineData(false, true, false, false, false)]
+    [InlineData(false, false, true, false, false)]
+    [InlineData(false, false, false, true, false)]
+    public void Patch_BindsStonePileRockToExactCurrentPickupPoint(
+        bool wrongItem, bool wrongPoint, bool oldMission, bool foreignPile, bool expected)
+    {
+        var ammo = RegisterAmmo();
+        var pile = New<StonePile>();
+        var point = New<StandingPoint>();
+        AccessTools.Field(typeof(StonePile), "_givenItem").SetValue(pile, ammo);
+        AccessTools.Property(typeof(UsableMachine), "AmmoPickUpPoints").SetValue(pile,
+            new List<StandingPoint> { point });
+        AccessTools.Property(typeof(Agent), "CurrentlyUsedGameObject").SetValue(agent,
+            wrongPoint ? New<StandingPoint>() : point);
+        if (!foreignPile) ((ICollection<MissionObject>)mission.Instance.MissionObjects).Add(pile);
+        if (oldMission) AccessTools.Property(typeof(Agent), "Mission").SetValue(agent, New<Mission>());
+        Assert.Equal(expected, LadderForkGrantPatch.IsSiegeEquipmentGrant(agent,
+            new MissionWeapon(wrongItem ? item : ammo, null, null, 1)));
+        Assert.False(LadderForkGrantPatch.IsSiegeEquipmentGrant(null, new MissionWeapon(ammo, null, null, 1)));
+        Assert.False(LadderForkGrantPatch.IsSiegeEquipmentGrant(agent, default));
+    }
+
+    [Theory]
     [InlineData("actor", 7, false, false, true)]
     [InlineData("actor", 6, false, false, false)]
     [InlineData("actor", 8, false, false, false)]

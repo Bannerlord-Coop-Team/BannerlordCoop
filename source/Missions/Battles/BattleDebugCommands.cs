@@ -215,7 +215,7 @@ internal static class BattleDebugCommands
             if ((args[3] != "capture" && args[3] != "dismount" && args[3] != "stage" && args[3] != "approach" && args[3] != "aim" && args[3] != "watch" && args[3] != "arm-use" && args[3] != "arm-stop" && args[3] != "use" &&
                  args[3] != "fire" && args[3] != "attack" && args[3] != "stop" && args[3] != "restore" &&
                  args[3] != "handler-use" && args[3] != "handler-stop" && args[3] != "handler-fire" && args[3] != "handler-reload" &&
-                 args[3] != "prepare-arrows") ||
+                 args[3] != "prepare-arrows" && args[3] != "handler-throw") ||
                 (args.Count == 5 && !int.TryParse(args[4], out standingPoint)))
                 return Failed("Invalid action or standing point.");
             if (!players.TryGetPlayer(args[0], out var player) ||

@@ -25,6 +25,174 @@ namespace Coop.Tests.Missions.Battles;
 public class SiegeInteractionDebugBehaviorTests
 {
     [Fact]
+    public void RockThrow_HoldsThenReleasesOnceAndRequiresNativeShotAndConsumption()
+    {
+        var behavior = new SiegeInteractionDebugBehavior(Mock.Of<IMessageBroker>());
+        AccessTools.Field(typeof(SiegeInteractionDebugBehavior), "rockPhase").SetValue(behavior, "holding");
+        var none = Agent.ActionStage.None;
+        var attack = Agent.MovementControlFlag.AttackDown;
+        Assert.Equal(attack, behavior.AdvanceRockThrow(none, none, Agent.MovementControlFlag.Forward, attack, 0));
+        Assert.Equal(attack, behavior.AdvanceRockThrow(none, none, 0, attack, 10));
+        Assert.Equal((Agent.MovementControlFlag)0,
+            behavior.AdvanceRockThrow(none, Agent.ActionStage.AttackReady, 0, attack, 20));
+        Assert.Equal((Agent.MovementControlFlag)0,
+            behavior.AdvanceRockThrow(none, Agent.ActionStage.AttackReady, 0, attack, 30));
+        Assert.Equal((Agent.MovementControlFlag)0,
+            behavior.AdvanceRockThrow(none, Agent.ActionStage.AttackRelease, 0, attack, 40));
+        var state = JObject.FromObject(behavior.ReadRockThrow());
+        Assert.Equal("released", state["phase"]);
+        Assert.Equal(2, state["heldFrames"]);
+        Assert.Equal(1, state["releaseEdges"]);
+        Assert.True((bool)state["attackRelease"]);
+        AccessTools.Field(typeof(SiegeInteractionDebugBehavior), "rockAmmoConsumed").SetValue(behavior, true);
+        behavior.AdvanceRockThrow(none, none, 0, attack, 50);
+        Assert.Equal("released", JObject.FromObject(behavior.ReadRockThrow())["phase"]);
+        AccessTools.Field(typeof(SiegeInteractionDebugBehavior), "rockShotObserved").SetValue(behavior, true);
+        behavior.AdvanceRockThrow(none, none, 0, attack, 60);
+        Assert.Equal("completed", JObject.FromObject(behavior.ReadRockThrow())["phase"]);
+        Assert.Equal((Agent.MovementControlFlag)0, behavior.AdvanceRockThrow(none, none, 0, attack, 70));
+        Assert.False((bool)AccessTools.Field(typeof(SiegeInteractionDebugBehavior), "pressInvoked").GetValue(behavior));
+        Assert.False((bool)AccessTools.Field(typeof(SiegeInteractionDebugBehavior), "externalInputArmed").GetValue(behavior));
+    }
+
+    [Theory]
+    [InlineData(Agent.ActionStage.AttackReady, (Agent.MovementControlFlag)0, 0)]
+    [InlineData(Agent.ActionStage.AttackRelease, (Agent.MovementControlFlag)0, 0)]
+    [InlineData(Agent.ActionStage.ReloadMidPhase, (Agent.MovementControlFlag)0, 0)]
+    [InlineData(Agent.ActionStage.None, Agent.MovementControlFlag.AttackLeft, 0)]
+    [InlineData(Agent.ActionStage.None, (Agent.MovementControlFlag)0, 10000)]
+    public void RockThrow_RejectsPreexistingAttackForeignControlsAndElapsedDeadline(
+        Agent.ActionStage stage, Agent.MovementControlFlag flags, long elapsed)
+    {
+        var behavior = new SiegeInteractionDebugBehavior(Mock.Of<IMessageBroker>());
+        AccessTools.Field(typeof(SiegeInteractionDebugBehavior), "rockPhase").SetValue(behavior, "holding");
+        Assert.Equal((Agent.MovementControlFlag)0,
+            behavior.AdvanceRockThrow(Agent.ActionStage.None, stage, flags, Agent.MovementControlFlag.AttackDown, elapsed));
+        Assert.Equal("failed", JObject.FromObject(behavior.ReadRockThrow())["phase"]);
+        Assert.Equal((Agent.MovementControlFlag)0,
+            behavior.AdvanceRockThrow(Agent.ActionStage.None, Agent.ActionStage.None, 0, Agent.MovementControlFlag.AttackDown, 0));
+    }
+
+    [Fact]
+    public void RockThrow_FrameBudgetAndLostIdentityCannotKeepAttacking()
+    {
+        var behavior = new SiegeInteractionDebugBehavior(Mock.Of<IMessageBroker>());
+        AccessTools.Field(typeof(SiegeInteractionDebugBehavior), "rockPhase").SetValue(behavior, "holding");
+        for (int frame = 0; frame < 600; frame++)
+            Assert.Equal(Agent.MovementControlFlag.AttackDown, behavior.AdvanceRockThrow(
+                Agent.ActionStage.None, Agent.ActionStage.None, 0, Agent.MovementControlFlag.AttackDown, 0));
+        Assert.Equal((Agent.MovementControlFlag)0, behavior.AdvanceRockThrow(
+            Agent.ActionStage.None, Agent.ActionStage.None, 0, Agent.MovementControlFlag.AttackDown, 0));
+        Assert.Equal("failed", JObject.FromObject(behavior.ReadRockThrow())["phase"]);
+        Assert.Equal(2, JObject.FromObject(behavior.ReadRockThrow())["transitions"].Count());
+        Assert.False((bool)AccessTools.Method(typeof(SiegeInteractionDebugBehavior), "CanDriveRockThrow")
+            .Invoke(behavior, new object[] { null, null }));
+        AccessTools.Field(typeof(SiegeInteractionDebugBehavior), "rockPhase").SetValue(behavior, "holding");
+        AccessTools.Method(typeof(SiegeInteractionDebugBehavior), "TickRockThrow").Invoke(behavior, new object[] { null, null });
+        Assert.Equal("failed", JObject.FromObject(behavior.ReadRockThrow())["phase"]);
+    }
+
+    [Fact]
+    public void RockHooks_AreInstalledByExistingDebugCategoryAndObserveBothNativeConsumptionCallbacks()
+    {
+        using var mission = new MissionCurrentScope();
+        var harmony = new Harmony("coop.tests.rock-native-observation");
+        try
+        {
+            foreach (var patch in new[] { typeof(SiegeInteractionDebugBehavior.RockThrowControllerPatch),
+                typeof(SiegeInteractionDebugBehavior.RockConsumptionObservationPatch) })
+            {
+                Assert.Contains(MissionModule.CreatePatchCategoryRegistrations(), registration =>
+                    registration.Assembly == patch.Assembly && registration.Category == "CoopSiegeInteractionDebug");
+                harmony.CreateClassProcessor(patch).Patch();
+            }
+            var targets = SiegeInteractionDebugBehavior.RockConsumptionObservationPatch.TargetMethods().ToList();
+            Assert.Equal(2, targets.Count);
+            targets.Add(AccessTools.Method(AccessTools.TypeByName("TaleWorlds.MountAndBlade.View.MissionViews.MissionMainAgentController"), "OnPreMissionTick"));
+            Assert.All(targets, target => Assert.Contains(Harmony.GetPatchInfo(target).Postfixes,
+                installed => installed.owner == harmony.Id));
+            SiegeInteractionDebugBehavior.RockConsumptionObservationPatch.Prefix(null, EquipmentIndex.ExtraWeaponSlot, out var state);
+            Assert.Null(state.Observer);
+            SiegeInteractionDebugBehavior.RockConsumptionObservationPatch.Postfix(null, EquipmentIndex.ExtraWeaponSlot, targets[0], state);
+        }
+        finally { harmony.UnpatchAll(harmony.Id); }
+    }
+
+    [Fact]
+    public void RockThrow_FailedStageCannotBeOverwrittenByEarlierSuccessfulObservations()
+    {
+        var behavior = new SiegeInteractionDebugBehavior(Mock.Of<IMessageBroker>());
+        AccessTools.Field(typeof(SiegeInteractionDebugBehavior), "rockPhase").SetValue(behavior, "released");
+        foreach (var field in new[] { "rockAttackRelease", "rockAmmoConsumed", "rockShotObserved" })
+            AccessTools.Field(typeof(SiegeInteractionDebugBehavior), field).SetValue(behavior, true);
+        behavior.AdvanceRockThrow(Agent.ActionStage.None, Agent.ActionStage.ReloadMidPhase, 0,
+            Agent.MovementControlFlag.AttackDown, 100);
+        Assert.Equal("failed", JObject.FromObject(behavior.ReadRockThrow())["phase"]);
+    }
+
+    private static Agent.MovementControlFlag rockTestFlags;
+    private static bool ReadRockFlags(ref Agent.MovementControlFlag __result) { __result = rockTestFlags; return false; }
+    private static bool WriteRockFlags(Agent.MovementControlFlag value) { rockTestFlags = value; return false; }
+
+    [Fact]
+    public void RockThrow_CancellationReleasesOnlyItsFlagAndCannotRecreateConsumedRock()
+    {
+        using var mission = new MissionCurrentScope();
+        var harmony = new Harmony("coop.tests.rock-cancel");
+        try
+        {
+            harmony.Patch(AccessTools.PropertyGetter(typeof(Agent), nameof(Agent.MovementFlags)),
+                prefix: new HarmonyMethod(AccessTools.Method(typeof(SiegeInteractionDebugBehaviorTests), nameof(ReadRockFlags))));
+            harmony.Patch(AccessTools.PropertySetter(typeof(Agent), nameof(Agent.MovementFlags)),
+                prefix: new HarmonyMethod(AccessTools.Method(typeof(SiegeInteractionDebugBehaviorTests), nameof(WriteRockFlags))));
+            harmony.Patch(AccessTools.Method(typeof(Agent), nameof(Agent.IsActive)),
+                prefix: new HarmonyMethod(AccessTools.Method(typeof(SiegeInteractionDebugBehaviorTests), nameof(ObservedAgentActive))));
+#pragma warning disable SYSLIB0050
+            var agent = (Agent)FormatterServices.GetUninitializedObject(typeof(Agent));
+#pragma warning restore SYSLIB0050
+            AccessTools.Property(typeof(Agent), "Mission").SetValue(agent, mission.Instance);
+            AccessTools.Property(typeof(Agent), "Equipment").SetValue(agent, new MissionEquipment());
+            var behavior = new SiegeInteractionDebugBehavior(Mock.Of<IMessageBroker>());
+            AccessTools.Property(typeof(MissionBehavior), "Mission").SetValue(behavior, mission.Instance);
+            AccessTools.Field(typeof(SiegeInteractionDebugBehavior), "capturedAgent").SetValue(behavior, agent);
+            AccessTools.Field(typeof(SiegeInteractionDebugBehavior), "ownedAmmoItem").SetValue(behavior, new ItemObject("rock"));
+            AccessTools.Field(typeof(SiegeInteractionDebugBehavior), "capturedExtraSlotEmpty").SetValue(behavior, true);
+            AccessTools.Field(typeof(SiegeInteractionDebugBehavior), "rockAppliedAttack").SetValue(behavior, Agent.MovementControlFlag.AttackDown);
+            rockTestFlags = Agent.MovementControlFlag.Forward | Agent.MovementControlFlag.AttackDown;
+            behavior.ReleaseRockFlag();
+            Assert.Equal(Agent.MovementControlFlag.Forward, rockTestFlags);
+            rockTestFlags |= Agent.MovementControlFlag.AttackDown;
+            behavior.ReleaseRockFlag();
+            Assert.True(rockTestFlags.HasFlag(Agent.MovementControlFlag.AttackDown));
+            Assert.True(behavior.RestoreFork(agent));
+            Assert.True(agent.Equipment[EquipmentIndex.ExtraWeaponSlot].IsEmpty);
+        }
+        finally { harmony.UnpatchAll(harmony.Id); }
+    }
+
+    [Theory]
+    [InlineData(false, false, true)]
+    [InlineData(true, false, false)]
+    [InlineData(false, true, false)]
+    public void RockConsumption_RequiresSameRequestAndTheObservedNativeDecrease(bool staleRequest, bool unchanged, bool expected)
+    {
+#pragma warning disable SYSLIB0050
+        var agent = (Agent)FormatterServices.GetUninitializedObject(typeof(Agent));
+#pragma warning restore SYSLIB0050
+        var rock = new ItemObject("rock");
+        rock.AddWeapon(new WeaponComponentData(null, WeaponClass.Stone, default), null);
+        AccessTools.Property(typeof(Agent), "Equipment").SetValue(agent, new MissionEquipment());
+        if (unchanged) agent.Equipment[EquipmentIndex.ExtraWeaponSlot] = new MissionWeapon(rock, null, null, 1);
+        var behavior = new SiegeInteractionDebugBehavior(Mock.Of<IMessageBroker>());
+        AccessTools.Field(typeof(SiegeInteractionDebugBehavior), "rockPhase").SetValue(behavior, "released");
+        AccessTools.Field(typeof(SiegeInteractionDebugBehavior), "rockRequestId").SetValue(behavior, "one");
+        AccessTools.Field(typeof(SiegeInteractionDebugBehavior), "ownedAmmoItem").SetValue(behavior, rock);
+        SiegeInteractionDebugBehavior.RockConsumptionObservationPatch.Postfix(agent, EquipmentIndex.ExtraWeaponSlot,
+            AccessTools.Method(typeof(Agent), "OnWeaponAmountChange"), (behavior, staleRequest ? "old" : "one", 1));
+        Assert.Equal(expected, (bool)JObject.FromObject(behavior.ReadRockThrow())["ammoConsumed"]);
+    }
+
+    [Fact]
     public void MachineObservation_ExplicitPeerTargetDoesNotChangeStagedTargetOrHideDuplicates()
     {
         var harmony = new Harmony("coop.tests.siege-observed-machine");

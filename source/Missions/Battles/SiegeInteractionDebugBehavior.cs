@@ -8,6 +8,7 @@ using Missions.Agents.Packets;
 using GameInterface.Services.MapEvents.Messages;
 using TaleWorlds.Core;
 using Missions.Messages;
+using Missions.Missiles.Message;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -88,6 +89,28 @@ internal sealed class SiegeInteractionDebugBehavior : MissionBehavior, ISiegeInt
     private bool fixtureRestored;
     private string captureFailureReason;
     private Agent dismountAgent;
+    private StonePile ownedRockPile;
+    private bool rockPickupInvoked;
+    private string rockRequestId;
+    private string rockSessionId;
+    private string rockControllerId;
+    private Guid rockAgentId;
+    private long rockAuthorityRevision;
+    private MissionMainAgentController rockController;
+    private Agent.MovementControlFlag rockAppliedAttack;
+    private readonly System.Diagnostics.Stopwatch rockClock = new System.Diagnostics.Stopwatch();
+    private string rockPhase = "unarmed";
+    private int rockFrames;
+    private int rockHeldFrames;
+    private int rockReleaseEdges;
+    private int rockReleaseFrame;
+    private bool rockAttackRelease;
+    private bool rockAmmoConsumed;
+    private bool rockShotObserved;
+    private bool rockEvidenceOverflow;
+    private readonly List<object> rockTransitions = new List<object>();
+    private readonly List<object> rockConsumption = new List<object>();
+    private readonly List<object> rockProjectiles = new List<object>();
 
     public override MissionBehaviorType BehaviorType => MissionBehaviorType.Other;
 
@@ -98,11 +121,15 @@ internal sealed class SiegeInteractionDebugBehavior : MissionBehavior, ISiegeInt
         messageBroker.Subscribe<NetworkSiegeMachineState>(ObserveReceivedState);
         messageBroker.Subscribe<SiegeWeaponFired>(ObserveLocalShot);
         messageBroker.Subscribe<NetworkSiegeWeaponFired>(ObserveReceivedShot);
+        messageBroker.Subscribe<AgentShoot>(ObserveRockShot);
+        messageBroker.Subscribe<NetworkAgentShoot>(ObserveRockPacket);
+        messageBroker.Subscribe<MissileReconstructed>(ObserveRockReconstruction);
     }
 
     public override void OnPreDisplayMissionTick(float dt)
     {
         tick++;
+        if (RockThrowActive && rockClock.ElapsedMilliseconds >= 10000) CancelRockThrow("deadline_rejected");
         UpdateDismount();
         BindObserver();
         if ((!pressInvoked && !externalInputArmed) || edgeCleared || inputSamples.Count >= 300) return;
@@ -394,6 +421,7 @@ internal sealed class SiegeInteractionDebugBehavior : MissionBehavior, ISiegeInt
 
     public override void OnRemoveBehavior()
     {
+        CancelRockThrow("mission_removed");
         removed = true;
         if (capturedBattleEndLogic != null)
         {
@@ -404,6 +432,9 @@ internal sealed class SiegeInteractionDebugBehavior : MissionBehavior, ISiegeInt
         messageBroker.Unsubscribe<NetworkSiegeMachineState>(ObserveReceivedState);
         messageBroker.Unsubscribe<SiegeWeaponFired>(ObserveLocalShot);
         messageBroker.Unsubscribe<NetworkSiegeWeaponFired>(ObserveReceivedShot);
+        messageBroker.Unsubscribe<AgentShoot>(ObserveRockShot);
+        messageBroker.Unsubscribe<NetworkAgentShoot>(ObserveRockPacket);
+        messageBroker.Unsubscribe<MissileReconstructed>(ObserveRockReconstruction);
         UnbindObserver();
         ReleaseCamera();
     }
@@ -504,6 +535,7 @@ internal sealed class SiegeInteractionDebugBehavior : MissionBehavior, ISiegeInt
                 input == null || input.IsGameKeyDown(inputGameKeyId))) return;
         if (requests.Count >= 256) return;
         requests.Add(request.RequestId);
+        if (RockThrowActive) CancelRockThrow("request_superseded");
         requestId = request.RequestId;
         if (status == "fixture_dismount_pending") status = "unexercised";
         BindObserver();
@@ -521,6 +553,12 @@ internal sealed class SiegeInteractionDebugBehavior : MissionBehavior, ISiegeInt
         if (request.Action == "prepare-arrows")
         {
             PrepareArrowAmmo(screen, agent);
+            return;
+        }
+        if (request.Action == "handler-throw")
+        {
+            ContainerProvider.TryResolve<INetworkAgentRegistry>(out var registry);
+            BeginRockThrow(request, screen, agent, registry);
             return;
         }
         if (request.Action == "stage" || request.Action == "watch" || request.Action == "approach" || request.Action == "aim")
@@ -665,12 +703,306 @@ internal sealed class SiegeInteractionDebugBehavior : MissionBehavior, ISiegeInt
         else if (request.Action == "handler-stop") agent.HandleStopUsingAction();
         else if (request.Action == "handler-reload") ((RangedSiegeWeapon)machine).ManualReload();
         else if (!((RangedSiegeWeapon)machine).Shoot()) return;
+        if (request.Action == "handler-use" && ReferenceEquals(machine, ownedRockPile) &&
+            ownedRockPile.AmmoPickUpPoints.Contains(point)) rockPickupInvoked = true;
         functionalAction = new
         {
             requestId, action = request.Action, machineId = machine.Id.Id, pointId = point.Id.Id,
             tick, usingBefore, usingAfter = agent.IsUsingGameObject, usedObject = Describe(agent.CurrentlyUsedGameObject)
         };
         status = "fixture_handler_invoked";
+    }
+
+    private bool RockThrowActive => rockPhase == "holding" || rockPhase == "released";
+
+    internal object ReadRockThrow() => new
+    {
+        requestId = rockRequestId, phase = rockPhase, agentId = rockAgentId.ToString("N"),
+        sessionId = rockSessionId, controllerId = rockControllerId, itemId = ownedRockPile?._givenItem?.StringId,
+        frames = rockFrames, heldFrames = rockHeldFrames, releaseEdges = rockReleaseEdges,
+        attackRelease = rockAttackRelease, ammoConsumed = rockAmmoConsumed, shotObserved = rockShotObserved,
+        evidenceOverflow = rockEvidenceOverflow, transitions = rockTransitions.ToArray(),
+        consumption = rockConsumption.ToArray(), projectiles = rockProjectiles.ToArray()
+    };
+
+    internal void BeginRockThrow(NetworkSiegeInteractionDebugRequest request, MissionScreen screen,
+        Agent agent, INetworkAgentRegistry registry)
+    {
+        status = "fixture_rock_rejected";
+        var controller = Mission?.GetMissionBehavior<MissionMainAgentController>();
+        if (rockRequestId != null || !rockPickupInvoked || ownedRockPile == null ||
+            request.MachineId != ownedRockPile.Id.Id || request.StandingPointIndex < 0 ||
+            request.StandingPointIndex >= ownedRockPile.StandingPoints.Count ||
+            !ReferenceEquals(useDispatchPoint, ownedRockPile.StandingPoints[request.StandingPointIndex]) ||
+            !ownedRockPile.AmmoPickUpPoints.Contains(useDispatchPoint) ||
+            !Mission.MissionObjects.Contains(ownedRockPile) || !capturedExtraSlotEmpty ||
+            !ReferenceEquals(ownedRockPile._givenItem, ownedAmmoItem) || capturedAgent != agent ||
+            agent == null || screen != capturedScreen || registry == null ||
+            !registry.TryGetAgentInfo(agent, out var info) || info == null || info.AgentId == Guid.Empty ||
+            !ReferenceEquals(info.Agent, agent) || !registry.IsLocallyControlled(agent)) return;
+        rockRequestId = request.RequestId;
+        rockSessionId = request.MapEventId;
+        rockControllerId = request.ControllerId;
+        rockAgentId = info.AgentId;
+        rockAuthorityRevision = info.AuthorityRevision;
+        rockController = controller;
+        rockPhase = "holding";
+        rockClock.Restart();
+        if (!CanDriveRockThrow(controller, registry) || !HasOwnedRock(agent) ||
+            agent.GetCurrentActionStage(0) != Agent.ActionStage.None ||
+            agent.GetCurrentActionStage(1) != Agent.ActionStage.None ||
+            (agent.MovementFlags & Agent.MovementControlFlag.AttackMask) != 0)
+        {
+            CancelRockThrow("baseline_rejected");
+            return;
+        }
+        status = "fixture_rock_armed";
+    }
+
+    private bool HasOwnedRock(Agent agent)
+    {
+        var extra = agent.Equipment[EquipmentIndex.ExtraWeaponSlot];
+        return !extra.IsEmpty && ReferenceEquals(extra.Item, ownedAmmoItem) && extra.Amount == 1 &&
+            extra.CurrentUsageItem?.IsConsumable == true && extra.CurrentUsageItem.IsRangedWeapon &&
+            agent.GetPrimaryWieldedItemIndex() == EquipmentIndex.ExtraWeaponSlot;
+    }
+
+    internal bool CanDriveRockThrow(MissionMainAgentController controller, INetworkAgentRegistry registry)
+    {
+        var session = Mission?.GetMissionBehavior<CoopBattleController>()?.Session;
+        var agent = capturedAgent;
+        return !removed && RockThrowActive && requestId == rockRequestId &&
+            Mission != null && ReferenceEquals(Mission, TaleWorlds.MountAndBlade.Mission.Current) &&
+            !Mission.IsMissionEnding && !Mission.MissionEnded && session?.InstanceId == rockSessionId &&
+            session.OwnControllerId == rockControllerId && agent != null && ReferenceEquals(agent, Mission.MainAgent) &&
+            ReferenceEquals(agent.Mission, Mission) && agent.IsActive() && !agent.IsAIControlled &&
+            agent.MountAgent == null && !agent.IsUsingGameObject && agent.CombatActionsEnabled &&
+            (agent.GetAgentFlags() & AgentFlag.CanAttack) != 0 && !pressInvoked && !externalInputArmed &&
+            controller != null && ReferenceEquals(controller, rockController) && ReferenceEquals(controller.Mission, Mission) &&
+            ReferenceEquals(controller, Mission.GetMissionBehavior<MissionMainAgentController>()) &&
+            !controller.IsDisabled && controller._activated && capturedScreen != null &&
+            ReferenceEquals(capturedScreen, ScreenManager.TopScreen) && ReferenceEquals(capturedScreen, controller.MissionScreen) &&
+            !capturedScreen.IsCheatGhostMode && !capturedScreen.IsPhotoModeEnabled && !capturedScreen.MouseVisible &&
+            !capturedScreen.IsRadialMenuActive && !Mission.IsOrderMenuOpen &&
+            registry != null && registry.IsLocallyControlled(agent) && registry.TryGetAgentInfo(agent, out var info) &&
+            info != null && ReferenceEquals(info.Agent, agent) && info.AgentId == rockAgentId && info.CurrentAuthority == rockControllerId &&
+            info.AuthorityRevision == rockAuthorityRevision;
+    }
+
+    internal void TickRockThrow(MissionMainAgentController controller, INetworkAgentRegistry registry)
+    {
+        if (!RockThrowActive) return;
+        if (!CanDriveRockThrow(controller, registry) || ownedRockPile == null ||
+            !Mission.MissionObjects.Contains(ownedRockPile) || !ReferenceEquals(ownedRockPile._givenItem, ownedAmmoItem) ||
+            (!HasOwnedRock(capturedAgent) && !(rockReleaseEdges == 1 && rockAmmoConsumed &&
+                (capturedAgent.Equipment[EquipmentIndex.ExtraWeaponSlot].IsEmpty ||
+                 (ReferenceEquals(capturedAgent.Equipment[EquipmentIndex.ExtraWeaponSlot].Item, ownedAmmoItem) &&
+                  capturedAgent.Equipment[EquipmentIndex.ExtraWeaponSlot].Amount == 0)))))
+        {
+            CancelRockThrow("identity_or_equipment_rejected");
+            return;
+        }
+        var agent = capturedAgent;
+        var flags = agent.MovementFlags;
+        var attack = AdvanceRockThrow(agent.GetCurrentActionStage(0), agent.GetCurrentActionStage(1),
+            flags, agent.AttackDirectionToMovementFlag(agent.GetAttackDirection()), rockClock.ElapsedMilliseconds);
+        if (attack != 0)
+        {
+            agent.MovementFlags = flags | attack;
+            rockAppliedAttack = attack;
+        }
+    }
+
+    internal Agent.MovementControlFlag AdvanceRockThrow(Agent.ActionStage first, Agent.ActionStage second,
+        Agent.MovementControlFlag flags, Agent.MovementControlFlag attack, long elapsedMilliseconds)
+    {
+        if (!RockThrowActive) return 0;
+        if (++rockFrames > 600 || elapsedMilliseconds >= 10000 || elapsedMilliseconds < 0 ||
+            (flags & Agent.MovementControlFlag.AttackMask) != 0)
+        {
+            CancelRockThrow("budget_or_control_rejected");
+            return 0;
+        }
+        bool ready = first == Agent.ActionStage.AttackReady || first == Agent.ActionStage.AttackQuickReady ||
+            second == Agent.ActionStage.AttackReady || second == Agent.ActionStage.AttackQuickReady;
+        bool release = first == Agent.ActionStage.AttackRelease || second == Agent.ActionStage.AttackRelease;
+        if (rockPhase == "holding")
+        {
+            if (ready && rockHeldFrames > 0)
+            {
+                rockPhase = "released";
+                rockReleaseEdges++;
+                rockReleaseFrame = rockFrames;
+                rockTransitions.Add(new { frame = rockFrames, stage = "ready_release_edge", first, second, flags });
+            }
+            else if (first == Agent.ActionStage.None && second == Agent.ActionStage.None && attack != 0 &&
+                (attack & ~Agent.MovementControlFlag.AttackMask) == 0)
+            {
+                if (rockHeldFrames++ == 0)
+                    rockTransitions.Add(new { frame = rockFrames, stage = "post_controller_hold", flags = flags | attack });
+                return attack;
+            }
+            else CancelRockThrow("unexpected_stage_rejected");
+        }
+        else if (release && rockFrames > rockReleaseFrame && !rockAttackRelease)
+        {
+            rockAttackRelease = true;
+            rockTransitions.Add(new { frame = rockFrames, stage = "native_attack_release", first, second, flags });
+        }
+        else if (!ready && !release && (first != Agent.ActionStage.None || second != Agent.ActionStage.None))
+            CancelRockThrow("unexpected_stage_rejected");
+        if (rockPhase == "released" && rockAttackRelease && rockAmmoConsumed && rockShotObserved)
+        {
+            rockPhase = "completed";
+            status = "fixture_rock_completed";
+        }
+        return 0;
+    }
+
+    private void CancelRockThrow(string reason)
+    {
+        if (!RockThrowActive) return;
+        rockPhase = "failed";
+        status = "fixture_rock_" + reason;
+        rockTransitions.Add(new { frame = rockFrames, stage = reason });
+        ReleaseRockFlag();
+    }
+
+    internal void ReleaseRockFlag()
+    {
+        var applied = rockAppliedAttack;
+        rockAppliedAttack = 0;
+        if (applied == 0 || capturedAgent == null || capturedAgent.Mission != Mission || !capturedAgent.IsActive()) return;
+        capturedAgent.MovementFlags &= ~applied;
+    }
+
+    [HarmonyPatch(typeof(MissionMainAgentController), nameof(MissionMainAgentController.OnPreMissionTick))]
+    [HarmonyPatchCategory("CoopSiegeInteractionDebug")]
+    internal static class RockThrowControllerPatch
+    {
+        [HarmonyPrefix]
+        internal static void Prefix(MissionMainAgentController __instance)
+        {
+            try
+            {
+                var observer = TaleWorlds.MountAndBlade.Mission.Current?.GetMissionBehavior<SiegeInteractionDebugBehavior>();
+                // Release our previous flag before vanilla rebuilds this frame's controls.
+                if (observer != null && ReferenceEquals(observer.rockController, __instance)) observer.ReleaseRockFlag();
+            }
+            catch { } // Never prevent vanilla controller execution.
+        }
+
+        [HarmonyPostfix]
+        internal static void Postfix(MissionMainAgentController __instance)
+        {
+            var observer = TaleWorlds.MountAndBlade.Mission.Current?.GetMissionBehavior<SiegeInteractionDebugBehavior>();
+            try
+            {
+                if (observer?.RockThrowActive != true) return;
+                ContainerProvider.TryResolve<INetworkAgentRegistry>(out var registry);
+                observer.TickRockThrow(__instance, registry);
+            }
+            catch { observer?.CancelRockThrow("controller_rejected"); }
+        }
+    }
+
+    [HarmonyPatch]
+    [HarmonyPatchCategory("CoopSiegeInteractionDebug")]
+    internal static class RockConsumptionObservationPatch
+    {
+        internal static IEnumerable<MethodBase> TargetMethods() => new[]
+        {
+            AccessTools.Method(typeof(Agent), nameof(Agent.OnWeaponAmmoConsume)),
+            AccessTools.Method(typeof(Agent), nameof(Agent.OnWeaponAmountChange))
+        };
+
+        [HarmonyPrefix]
+        internal static void Prefix(Agent __instance, EquipmentIndex slotIndex,
+            out (SiegeInteractionDebugBehavior Observer, string Request, short Amount) __state)
+        {
+            __state = default;
+            try
+            {
+                var observer = TaleWorlds.MountAndBlade.Mission.Current?.GetMissionBehavior<SiegeInteractionDebugBehavior>();
+                if (observer?.RockThrowActive != true || observer.capturedAgent != __instance ||
+                    slotIndex != EquipmentIndex.ExtraWeaponSlot || observer.rockReleaseEdges != 1) return;
+                var weapon = __instance.Equipment[slotIndex];
+                if (!weapon.IsEmpty && ReferenceEquals(weapon.Item, observer.ownedAmmoItem))
+                    __state = (observer, observer.rockRequestId, weapon.Amount);
+            }
+            catch { } // Observe the native callback without changing it.
+        }
+
+        [HarmonyPostfix]
+        internal static void Postfix(Agent __instance, EquipmentIndex slotIndex, MethodBase __originalMethod,
+            (SiegeInteractionDebugBehavior Observer, string Request, short Amount) __state)
+        {
+            try
+            {
+                var observer = __state.Observer;
+                if (observer == null || observer.rockRequestId != __state.Request || !observer.RockThrowActive) return;
+                var weapon = __instance.Equipment[slotIndex];
+                if (!weapon.IsEmpty && !ReferenceEquals(weapon.Item, observer.ownedAmmoItem)) return;
+                int after = weapon.IsEmpty ? 0 : weapon.Amount;
+                observer.rockAmmoConsumed |= __state.Amount == 1 && after == 0;
+                observer.AppendRockEvidence(observer.rockConsumption, new
+                {
+                    requestId = __state.Request, method = __originalMethod.Name, before = __state.Amount, after,
+                    frame = observer.rockFrames, utc = DateTime.UtcNow.ToString("O")
+                });
+            }
+            catch { } // Preserve the original callback result.
+        }
+    }
+
+    private void AppendRockEvidence(List<object> observations, object observation)
+    {
+        if (observations.Count < 32) observations.Add(observation);
+        else rockEvidenceOverflow = true;
+    }
+
+    private bool CanObserveRockAgent(Guid agentId)
+    {
+        return !removed && Mission != null && ReferenceEquals(Mission, TaleWorlds.MountAndBlade.Mission.Current) &&
+            (watchedAgentId == agentId || rockAgentId == agentId);
+    }
+
+    private void ObserveRockShot(MessagePayload<AgentShoot> payload)
+    {
+        var shot = payload.What;
+        GameThread.RunSafe(() =>
+        {
+            if (!CanObserveRockAgent(rockAgentId) || !RockThrowActive || shot.Agent != capturedAgent ||
+                rockReleaseEdges != 1 || !ReferenceEquals(shot.MissionWeapon.Item, ownedAmmoItem)) return;
+            rockShotObserved = true;
+            AppendRockEvidence(rockProjectiles, new { kind = "owner_shot", agentId = rockAgentId.ToString("N"),
+                requestId = rockRequestId, itemId = shot.MissionWeapon.Item.StringId,
+                missileIndex = shot.MissileIndex, frame = rockFrames, utc = DateTime.UtcNow.ToString("O") });
+        });
+    }
+
+    private void ObserveRockPacket(MessagePayload<NetworkAgentShoot> payload)
+    {
+        var shot = payload.What;
+        GameThread.RunSafe(() =>
+        {
+            if (!CanObserveRockAgent(shot.AgentId)) return;
+            AppendRockEvidence(rockProjectiles, new { kind = "peer_packet", agentId = shot.AgentId.ToString("N"),
+                itemId = shot.MissileItemId, missileIndex = shot.MissileIndex, shotSequence = shot.ShotSequence,
+                frame = tick, utc = DateTime.UtcNow.ToString("O") });
+        });
+    }
+
+    private void ObserveRockReconstruction(MessagePayload<MissileReconstructed> payload)
+    {
+        var shot = payload.What;
+        GameThread.RunSafe(() =>
+        {
+            if (!CanObserveRockAgent(shot.AgentId)) return;
+            AppendRockEvidence(rockProjectiles, new { kind = "peer_reconstruction", agentId = shot.AgentId.ToString("N"),
+                itemId = shot.MissileItemId, shotSequence = shot.ShotSequence,
+                frame = tick, utc = DateTime.UtcNow.ToString("O") });
+        });
     }
 
     private void Dismount(Agent agent)
@@ -740,6 +1072,14 @@ internal sealed class SiegeInteractionDebugBehavior : MissionBehavior, ISiegeInt
         capturedExtraSlotEmpty = agent.Equipment[EquipmentIndex.ExtraWeaponSlot].IsEmpty;
         ownedForkItem = null;
         ownedAmmoItem = null;
+        ownedRockPile = null;
+        rockPickupInvoked = false;
+        rockRequestId = null;
+        rockPhase = "unarmed";
+        rockFrames = rockHeldFrames = rockReleaseEdges = rockReleaseFrame = 0;
+        rockAttackRelease = rockAmmoConsumed = rockShotObserved = false;
+        rockTransitions.Clear();
+        rockConsumption.Clear();
         preparedArrowSlot = EquipmentIndex.None;
         preparedArrowItem = null;
         preparedArrowModifier = null;
@@ -838,6 +1178,17 @@ internal sealed class SiegeInteractionDebugBehavior : MissionBehavior, ISiegeInt
             return;
         }
         var point = machine.StandingPoints[pointIndex];
+        if (!watchOnly && machine is StonePile rockPile && !(machine is SiegeMachineStonePile))
+        {
+            if (!capturedExtraSlotEmpty || !agent.Equipment[EquipmentIndex.ExtraWeaponSlot].IsEmpty ||
+                rockPile._givenItem == null || !rockPile.AmmoPickUpPoints.Contains(point))
+            {
+                status = "fixture_rock_baseline_rejected";
+                return;
+            }
+            ownedRockPile = rockPile;
+            ownedAmmoItem = rockPile._givenItem;
+        }
         if (!watchOnly && machine is SiegeMachineStonePile)
         {
             var suppliers = Mission.MissionObjects.OfType<Mangonel>()
@@ -1125,6 +1476,7 @@ internal sealed class SiegeInteractionDebugBehavior : MissionBehavior, ISiegeInt
 
     private void Restore(MissionScreen screen, Agent agent)
     {
+        CancelRockThrow("restoration");
         if (capturedAgent == null || capturedAgent != agent || screen != capturedScreen ||
             !agent.IsActive() || agent.IsUsingGameObject ||
             !ReferenceEquals(screen.CustomCamera, stagingCamera ?? capturedCamera))
@@ -1285,6 +1637,7 @@ internal sealed class SiegeInteractionDebugBehavior : MissionBehavior, ISiegeInt
                 originalAmount = preparedArrowAmount, preparedAmount = preparedArrowAmount - 1
             },
             nativeCameraStaged, nativeAimTarget, observerFrame, functionalAction,
+            rockThrow = ReadRockThrow(),
             stagingCameraActive = stagingCamera != null && ReferenceEquals(screen?.CustomCamera, stagingCamera),
             focusDiagnostic = ReadFocusDiagnostic(screen, agent),
             inputSamples = inputSamples.ToArray(),

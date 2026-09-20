@@ -28,7 +28,10 @@ public class LadderForkGrantPatch
             ReferenceEquals(ladder._forkItem, weapon.Item)) ||
             agent.Mission.MissionObjects.OfType<Mangonel>().Any(mangonel =>
                 ReferenceEquals(mangonel.OriginalMissileItem, weapon.Item) &&
-                mangonel.AmmoPickUpPoints.Any(pickup => ReferenceEquals(pickup, point)));
+                mangonel.AmmoPickUpPoints.Any(pickup => ReferenceEquals(pickup, point))) ||
+            agent.Mission.MissionObjects.OfType<StonePile>().Any(pile =>
+                ReferenceEquals(pile._givenItem, weapon.Item) &&
+                pile.AmmoPickUpPoints.Any(pickup => ReferenceEquals(pickup, point)));
     }
 
     private static void Postfix(Agent __instance, bool __state)
