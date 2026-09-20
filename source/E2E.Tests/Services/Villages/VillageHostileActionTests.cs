@@ -1001,6 +1001,10 @@ public class VillageHostileActionTests : MapEventTestBase
                 Campaign.Current.MainParty = mobileParty;
             }
 
+            // The server fixture writes the backing field, so seed the completed result on this replica too.
+            mapEvent._battleState = BattleState.AttackerVictory;
+            Assert.True(mapEvent.HasWinner);
+
             encounter.ForceRaid = true;
             encounter.EncounterState = PlayerEncounterState.Wait;
 
