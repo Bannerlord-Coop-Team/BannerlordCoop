@@ -3,6 +3,7 @@ using Common.Util;
 using E2E.Tests.Environment;
 using E2E.Tests.Environment.Instance;
 using E2E.Tests.Util;
+using GameInterface.Policies;
 using GameInterface.Services.Entity;
 using GameInterface.Services.Heroes.Patches;
 using GameInterface.Services.Issues.Generic;
@@ -1598,6 +1599,75 @@ public class GangLeaderNeedsToOffloadStolenGoodsIssueTests : IDisposable
 
             Assert.Equal(hostCalculatingXpBefore, Campaign.Current.PlayerTraitDeveloper.GetPropertyValue(DefaultTraits.Calculating));
         });
+    }
+
+    [Fact]
+    public void DailyTickOnServer_DueAlternativeOutsideSynchronizationWithNoRecordedOwner_AccumulatesTheCalculatingRewardInTheVanillaTraitStore()
+    {
+        var fixture = SetupIssueOwner();
+        CreateIssueOnServer(fixture);
+
+        var escortTroopId = TestEnvironment.CreateRegisteredObject<CharacterObject>();
+        var syncPolicy = Assert.IsType<TestPolicy>(Server.Resolve<ISyncPolicy>());
+        syncPolicy.AllowOriginals = true;
+        try
+        {
+            Server.Call(() =>
+            {
+                Assert.True(Server.ObjectManager.TryGetObject<Hero>(fixture.HeroId, out var owner));
+                Assert.True(Server.ObjectManager.TryGetObject<Hero>(fixture.CounterOfferHeroId, out var companion));
+                Assert.True(Server.ObjectManager.TryGetObject<CharacterObject>(escortTroopId, out var escortTroop));
+                Assert.True(CallOriginalPolicy.IsOriginalAllowedForOwnershipGate());
+                Assert.False(Server.Resolve<IIssueOwnershipRegistry>().TryGetOwnerControllerId(owner, out _));
+
+                var issue = Assert.IsType<GangLeaderNeedsToOffloadStolenGoodsIssueBehavior.GangLeaderNeedsToOffloadStolenGoodsIssue>(owner.Issue);
+                escortTroop.Level = 15;
+                issue.AlternativeSolutionSentTroops.AddToCounts(companion.CharacterObject, 1);
+                issue.AlternativeSolutionSentTroops.AddToCounts(escortTroop, 20);
+                issue.StartIssueWithAlternativeSolution();
+                Assert.True(issue.IsSolvingWithAlternative);
+                Assert.False(Server.Resolve<IIssueOwnershipRegistry>().TryGetOwnerControllerId(owner, out _));
+                issue.AlternativeSolutionReturnTimeForTroops = CampaignTime.Now - CampaignTime.Days(1f);
+
+                var mainHero = Hero.MainHero;
+                Assert.NotSame(owner, mainHero);
+                Assert.Equal(0, mainHero.GetTraitLevel(DefaultTraits.Calculating));
+                Assert.Equal(0, Campaign.Current.PlayerTraitDeveloper.GetPropertyValue(DefaultTraits.Calculating));
+                TraitLevelingHelper.OnIssueSolvedThroughQuest(mainHero, new[] { new Tuple<TraitObject, int>(DefaultTraits.Calculating, 950) });
+                Assert.Equal(950, Campaign.Current.PlayerTraitDeveloper.GetPropertyValue(DefaultTraits.Calculating));
+                Assert.Equal(0, mainHero.GetTraitLevel(DefaultTraits.Calculating));
+
+                var rewardGold = issue.RewardGold;
+                var stolenGood = issue.StolenTradeGood;
+                var stolenTradeGoodAmount = issue.StolenTradeGoodAmount;
+                Assert.True(rewardGold > 0);
+                Assert.True(stolenTradeGoodAmount > 0);
+                var goldBefore = mainHero.Gold;
+                var rosterBefore = MobileParty.MainParty.ItemRoster.GetItemNumber(stolenGood);
+
+                Campaign.Current.IssueManager.DailyTick();
+
+                Assert.Null(owner.Issue);
+                Assert.False(Campaign.Current.IssueManager.Issues.ContainsKey(owner));
+                Assert.Equal(goldBefore + (2 * rewardGold), mainHero.Gold);
+                Assert.Equal(rosterBefore + stolenTradeGoodAmount, MobileParty.MainParty.ItemRoster.GetItemNumber(stolenGood));
+                Assert.Equal(1000, Campaign.Current.PlayerTraitDeveloper.GetPropertyValue(DefaultTraits.Calculating));
+                Assert.Equal(1, mainHero.GetTraitLevel(DefaultTraits.Calculating));
+                Assert.False(GangLeaderNeedsToOffloadStolenGoodsQuestType.OwnerTraitXpProgress.TryGet(mainHero, out _));
+                Assert.False(GangLeaderNeedsToOffloadStolenGoodsQuestType.OwnerTraitXpProgress.TryGet(owner, out _));
+
+                TraitLevelingHelper.OnIssueSolvedThroughQuest(mainHero, new[] { new Tuple<TraitObject, int>(DefaultTraits.Calculating, 30) });
+                Assert.Equal(1030, Campaign.Current.PlayerTraitDeveloper.GetPropertyValue(DefaultTraits.Calculating));
+                Assert.Equal(1, mainHero.GetTraitLevel(DefaultTraits.Calculating));
+                Assert.False(GangLeaderNeedsToOffloadStolenGoodsQuestType.OwnerTraitXpProgress.TryGet(mainHero, out _));
+            });
+        }
+        finally
+        {
+            syncPolicy.AllowOriginals = false;
+        }
+
+        Assert.Empty(Server.NetworkSentMessages.GetMessages<NetworkIssueRemoved>());
     }
 
     [Fact]

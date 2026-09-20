@@ -68,6 +68,21 @@ public class GangLeaderNeedsToOffloadStolenGoodsGateBypassTests : IDisposable
         ContainerProvider.SetContainer(builder.Build());
     }
 
+    private static void SetUpPeerWithoutRecordedOwner(bool allowOriginal)
+    {
+        var controllerIdProvider = new Mock<IControllerIdProvider>();
+        controllerIdProvider.SetupGet(p => p.ControllerId).Returns("player-B");
+
+        var syncPolicy = new Mock<ISyncPolicy>();
+        syncPolicy.Setup(p => p.AllowOriginal()).Returns(allowOriginal);
+
+        var builder = new ContainerBuilder();
+        builder.RegisterInstance(controllerIdProvider.Object).As<IControllerIdProvider>();
+        builder.RegisterInstance((IIssueOwnershipRegistry)new IssueOwnershipRegistry()).As<IIssueOwnershipRegistry>();
+        builder.RegisterInstance(syncPolicy.Object).As<ISyncPolicy>();
+        ContainerProvider.SetContainer(builder.Build());
+    }
+
     [Fact]
     public void BlockAndReportTerminalOutcome_AnOpenAllowedThreadNeverOverridesAResolvedNonOwner()
     {
@@ -107,5 +122,41 @@ public class GangLeaderNeedsToOffloadStolenGoodsGateBypassTests : IDisposable
         {
             if (previousDescriptor != null) QuestTypeRegistry.Register(previousDescriptor);
         }
+    }
+
+    [Fact]
+    public void AlternativeSolutionConsequence_OutsideAuthoritativeCompletion_DefersToVanillaWhenOriginalsAreAllowed()
+    {
+        SetUpPeerWithoutRecordedOwner(allowOriginal: true);
+
+        Assert.True(GangLeaderNeedsToOffloadStolenGoodsQuestType.DefersAlternativeSolutionConsequenceToVanilla());
+    }
+
+    [Fact]
+    public void AlternativeSolutionConsequence_UnderAuthoritativeCompletion_KeepsThePerOwnerPathEvenWhenOriginalsAreAllowed()
+    {
+        SetUpPeerWithoutRecordedOwner(allowOriginal: true);
+
+        bool defers;
+        using (new AlternativeSolutionCompletionAuthorityGuard())
+        {
+            defers = GangLeaderNeedsToOffloadStolenGoodsQuestType.DefersAlternativeSolutionConsequenceToVanilla();
+        }
+
+        Assert.False(defers);
+    }
+
+    [Fact]
+    public void AlternativeSolutionConsequence_AnOpenAllowedThreadNeverMakesItDeferToVanilla()
+    {
+        SetUpPeerWithoutRecordedOwner(allowOriginal: false);
+
+        bool defers;
+        using (new AllowedThread())
+        {
+            defers = GangLeaderNeedsToOffloadStolenGoodsQuestType.DefersAlternativeSolutionConsequenceToVanilla();
+        }
+
+        Assert.False(defers);
     }
 }

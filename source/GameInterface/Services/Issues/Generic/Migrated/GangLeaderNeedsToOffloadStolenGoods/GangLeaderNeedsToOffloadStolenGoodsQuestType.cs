@@ -369,6 +369,9 @@ internal static class GangLeaderNeedsToOffloadStolenGoodsQuestType
         ApplyOwnerTraitXp(Hero.MainHero, DefaultTraits.Calculating, 50);
     }
 
+    internal static bool DefersAlternativeSolutionConsequenceToVanilla() =>
+        !AlternativeSolutionCompletionAuthorityGuard.IsActive && CallOriginalPolicy.IsOriginalAllowedForOwnershipGate();
+
     private static void ApplySucceedByPayingAndKeepingTheGoods(Quest quest)
     {
         GiveGoldAction.ApplyBetweenCharacters(Hero.MainHero, null, quest._stolenTradeGoodPrice);
@@ -497,6 +500,8 @@ internal class GangLeaderNeedsToOffloadStolenGoodsAlternativeSolutionConsequence
     [HarmonyPrefix]
     private static bool Prefix(Issue __instance)
     {
+        if (GangLeaderNeedsToOffloadStolenGoodsQuestType.DefersAlternativeSolutionConsequenceToVanilla()) return true;
+
         GangLeaderNeedsToOffloadStolenGoodsQuestType.ApplyAlternativeSolutionSuccessConsequence(__instance);
         return false;
     }
