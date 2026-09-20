@@ -1,12 +1,8 @@
 ﻿using Common;
-using Common.Extensions;
 using Common.Logging;
 using Common.Messaging;
 using Common.Network;
 using Common.Util;
-using GameInterface.Registry.Auto;
-using GameInterface.Services.Clans.Messages;
-using GameInterface.Services.Kingdoms;
 using GameInterface.Services.Kingdoms.Messages;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Players;
@@ -15,7 +11,6 @@ using LiteNetLib;
 using Serilog;
 using System;
 using System.Linq;
-using System.Reflection;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Actions;
 using TaleWorlds.CampaignSystem.Election;
@@ -622,13 +617,12 @@ public class KingdomHandler : IHandler
                     obj.What.SettlementId, payload.ReceiverClanId, receiverClan.IsUnderMercenaryService, receiverClan.Kingdom.StringId);
                 return;
             }
-            if (!settlement.IsFortification || settlement.OwnerClan != playerClan)
+            if (!settlement.IsFortification || settlement.Town.IsOwnerUnassigned || settlement.OwnerClan != playerClan)
             { 
-                Logger.Warning("Ignoring GiftSettlementOwnership {Instance}: settlement {Settlement} is not a fortification or is not owned by the sender's clan {SenderClan}",
+                Logger.Warning("Ignoring GiftSettlementOwnership {Instance}: settlement {Settlement} is not a fortification, currently unassigned, or is not owned by the sender's clan {SenderClan}",
                        obj.What.SettlementId, settlement.Id, player.ClanId);
                 return;
             }
-
             Campaign.Current.KingdomManager.GiftSettlementOwnership(settlement, receiverClan);
         });
     }

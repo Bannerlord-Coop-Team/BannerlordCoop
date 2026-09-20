@@ -749,6 +749,62 @@ public class KingdomHandlerTests
     }
 
     [Fact]
+    public void NetworkGiftSettlementOwnership_SettlementIsNotGiftable_IsIgnored()
+    {
+        var peer = ObjectHelper.SkipConstructor<NetPeer>();
+        var player = ObjectHelper.SkipConstructor<Player>();
+        SetField(player, "ClanId", "sender-clan-id");
+        SetField(player, "HeroId", "sender-hero-id");
+        var settlement = ObjectHelper.SkipConstructor<Settlement>();
+        settlement.Town = ObjectHelper.SkipConstructor<Town>();
+        settlement.Town.IsOwnerUnassigned = true;
+        var senderClan = ObjectHelper.SkipConstructor<Clan>();
+        var senderHero = ObjectHelper.SkipConstructor<Hero>();
+        var receiverClan = ObjectHelper.SkipConstructor<Clan>();
+        var kingdom = ObjectHelper.SkipConstructor<Kingdom>();
+
+        senderClan._kingdom = kingdom;
+        senderClan._leader = senderHero;
+        receiverClan._kingdom = kingdom;
+        kingdom._rulingClan = senderClan;
+
+        var objectManager = new Mock<IObjectManager>();
+        var playerManager = new Mock<IPlayerManager>();
+        playerManager
+            .Setup(manager => manager.TryGetPlayer(peer, out player))
+            .Returns(true);
+        SetupGiftObjects(objectManager, settlement, receiverClan, senderClan, senderHero);
+
+        var handler = CreateNetworkGiftSettlementOwnershipHandler(objectManager.Object, playerManager.Object);
+
+        RunWithBoundGameThread(() =>
+        {
+            handler(new MessagePayload<NetworkGiftSettlementOwnership>(
+            peer,
+            new NetworkGiftSettlementOwnership("settlement-id", "receiver-clan-id")));
+            DrainGameThread();
+
+            Clan retrievedReceiverClan = null!;
+            Clan retrievedSenderClan = null!;
+            Settlement retrievedSettlement = null!;
+            Hero retrievedSenderHero = null!;
+            objectManager.Verify(
+                manager => manager.TryGetObjectWithLogging("settlement-id", out retrievedSettlement),
+                Times.Once);
+            objectManager.Verify(
+                manager => manager.TryGetObjectWithLogging("receiver-clan-id", out retrievedReceiverClan),
+                Times.Once);
+            objectManager.Verify(
+                manager => manager.TryGetObjectWithLogging("sender-clan-id", out retrievedSenderClan),
+                Times.Once);
+            objectManager.Verify(
+                manager => manager.TryGetObjectWithLogging("sender-hero-id", out retrievedSenderHero),
+                Times.Once);
+            objectManager.VerifyNoOtherCalls();
+        });
+    }
+
+    [Fact]
     public void NetworkGiftSettlementOwnership_SettlementIsNotOwnedBySender_IsIgnored()
     {
         var peer = ObjectHelper.SkipConstructor<NetPeer>();
