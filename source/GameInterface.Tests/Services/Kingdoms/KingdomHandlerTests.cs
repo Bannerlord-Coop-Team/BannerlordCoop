@@ -1,4 +1,5 @@
-﻿using Common.Messaging;
+﻿using Common;
+using Common.Messaging;
 using Common.Network;
 using Common.Util;
 using GameInterface.Services.Kingdoms;
@@ -6,12 +7,15 @@ using GameInterface.Services.Kingdoms.Handlers;
 using GameInterface.Services.Kingdoms.Messages;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Players;
+using GameInterface.Services.Players.Data;
+using LiteNetLib;
 using Moq;
 using System;
 using System.Collections.Generic;
 using System.Reflection;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Election;
+using TaleWorlds.CampaignSystem.Settlements;
 using TaleWorlds.Library;
 using Xunit;
 using CampaignKingdomDecision = TaleWorlds.CampaignSystem.Election.KingdomDecision;
@@ -156,13 +160,15 @@ public class KingdomHandlerTests
             objectManager.Object,
             voteManager.Object,
             kingdomInterface.Object);
+        RunWithBoundGameThread(() =>
+        {
+            handler(new MessagePayload<RemoveDecision>(this, new RemoveDecision("kingdom-id", 0)));
 
-        handler(new MessagePayload<RemoveDecision>(this, new RemoveDecision("kingdom-id", 0)));
-
-        Assert.Equal(new[] { "clear", "close", "remove" }, calls);
-        voteManager.Verify(manager => manager.ClearDecisionState("kingdom-id", 0), Times.Once);
-        voteManager.Verify(manager => manager.CloseDecision("kingdom-id", 0), Times.Once);
-        kingdomInterface.Verify(manager => manager.RemoveDecision(kingdom, decision), Times.Once);
+            Assert.Equal(new[] { "clear", "close", "remove" }, calls);
+            voteManager.Verify(manager => manager.ClearDecisionState("kingdom-id", 0), Times.Once);
+            voteManager.Verify(manager => manager.CloseDecision("kingdom-id", 0), Times.Once);
+            kingdomInterface.Verify(manager => manager.RemoveDecision(kingdom, decision), Times.Once);
+        });
     }
 
     [Fact]
@@ -253,7 +259,428 @@ public class KingdomHandlerTests
         Assert.False(result);
         Assert.Equal("kingdom name was empty", reason);
     }
-    
+
+    [Fact]
+    public void NetworkGiftSettlementOwnership_UnregisteredSender_IsIgnored()
+    {
+        var objectManager = new Mock<IObjectManager>();
+        var playerManager = new Mock<IPlayerManager>();
+        var handler = CreateNetworkGiftSettlementOwnershipHandler(objectManager.Object, playerManager.Object);
+
+        handler(new MessagePayload<NetworkGiftSettlementOwnership>(
+            null!,
+            new NetworkGiftSettlementOwnership("settlement-id", "receiver-clan-id")));
+
+        Player ignoredPlayer = null!;
+        playerManager.Verify(
+            manager => manager.TryGetPlayer(It.IsAny<NetPeer>(), out ignoredPlayer),
+            Times.Never);
+        objectManager.VerifyNoOtherCalls();
+    }
+
+    [Fact]
+    public void NetworkGiftSettlementOwnership_MissingSettlement_IsIgnored()
+    {
+        var peer = ObjectHelper.SkipConstructor<NetPeer>();
+        var player = ObjectHelper.SkipConstructor<Player>();
+
+        var objectManager = new Mock<IObjectManager>();
+        var playerManager = new Mock<IPlayerManager>();
+        playerManager
+            .Setup(manager => manager.TryGetPlayer(peer, out player))
+            .Returns(true);
+        SetupGiftObjects(objectManager, null!, null!, null!);
+
+        var handler = CreateNetworkGiftSettlementOwnershipHandler(objectManager.Object, playerManager.Object);
+        RunWithBoundGameThread(() =>
+        {
+            handler(new MessagePayload<NetworkGiftSettlementOwnership>(
+                peer,
+                new NetworkGiftSettlementOwnership("settlement-id", "receiver-clan-id")));
+            DrainGameThread();
+
+            Settlement missingSettlement = null!;
+            objectManager.Verify(
+                manager => manager.TryGetObjectWithLogging("settlement-id", out missingSettlement),
+                Times.Once);
+            objectManager.VerifyNoOtherCalls();
+        });
+    }
+    [Fact]
+    public void NetworkGiftSettlementOwnership_MissingReceiverClan_IsIgnored()
+    {
+        var peer = ObjectHelper.SkipConstructor<NetPeer>();
+        var player = ObjectHelper.SkipConstructor<Player>();
+        var settlement = ObjectHelper.SkipConstructor<Settlement>();
+        var objectManager = new Mock<IObjectManager>();
+        var playerManager = new Mock<IPlayerManager>();        
+        playerManager
+            .Setup(manager => manager.TryGetPlayer(peer, out player))
+            .Returns(true);
+        SetupGiftObjects(objectManager, settlement, null!, null!);
+
+        var handler = CreateNetworkGiftSettlementOwnershipHandler(objectManager.Object, playerManager.Object);
+        RunWithBoundGameThread(() =>
+        {
+            handler(new MessagePayload<NetworkGiftSettlementOwnership>(
+                peer,
+                new NetworkGiftSettlementOwnership("settlement-id", "receiver-clan-id")));
+            DrainGameThread();
+
+            Settlement retrievedSettlement = null!;
+            Clan missingReceiverClan = null!;
+            objectManager.Verify(
+                manager => manager.TryGetObjectWithLogging("settlement-id", out retrievedSettlement),
+                Times.Once);
+            objectManager.Verify(
+                manager => manager.TryGetObjectWithLogging("receiver-clan-id", out missingReceiverClan),
+                Times.Once);
+            objectManager.VerifyNoOtherCalls();
+        });
+    }
+
+    [Fact]
+    public void NetworkGiftSettlementOwnership_MissingSenderClan_IsIgnored()
+    {
+        var peer = ObjectHelper.SkipConstructor<NetPeer>();
+        var player = ObjectHelper.SkipConstructor<Player>();
+        SetField(player, "ClanId", "sender-clan-id");
+        var settlement = ObjectHelper.SkipConstructor<Settlement>();
+        var receiverClan = ObjectHelper.SkipConstructor<Clan>();
+
+        var objectManager = new Mock<IObjectManager>();
+        var playerManager = new Mock<IPlayerManager>();
+        playerManager
+            .Setup(manager => manager.TryGetPlayer(peer, out player))
+            .Returns(true);
+        SetupGiftObjects(objectManager, settlement, receiverClan, null!);
+
+        var handler = CreateNetworkGiftSettlementOwnershipHandler(objectManager.Object, playerManager.Object);
+        RunWithBoundGameThread(() =>
+        {
+            handler(new MessagePayload<NetworkGiftSettlementOwnership>(
+            peer,
+            new NetworkGiftSettlementOwnership("settlement-id", "receiver-clan-id")));
+            DrainGameThread();
+
+            Clan retrievedReceiverClan = null!;
+            Settlement retrievedSettlement = null!;
+            Clan missingSenderClan = null!;
+            objectManager.Verify(
+                manager => manager.TryGetObjectWithLogging("settlement-id", out retrievedSettlement),
+                Times.Once);
+            objectManager.Verify(
+                manager => manager.TryGetObjectWithLogging("receiver-clan-id", out retrievedReceiverClan),
+                Times.Once);
+            objectManager.Verify(
+                manager => manager.TryGetObjectWithLogging("sender-clan-id", out missingSenderClan),
+                Times.Once);
+            objectManager.VerifyNoOtherCalls();
+        });
+
+        
+    }
+
+    [Fact]
+    public void NetworkGiftSettlementOwnership_SenderIsNotRulingClan_IsIgnored()
+    {
+        var peer = ObjectHelper.SkipConstructor<NetPeer>();
+        var player = ObjectHelper.SkipConstructor<Player>();
+        SetField(player, "ClanId", "sender-clan-id");
+        var settlement = ObjectHelper.SkipConstructor<Settlement>();
+        var senderClan = ObjectHelper.SkipConstructor<Clan>();
+        var receiverClan = ObjectHelper.SkipConstructor<Clan>();
+        var kingdom = ObjectHelper.SkipConstructor<Kingdom>();
+        kingdom._rulingClan = receiverClan;
+        senderClan._kingdom = kingdom;
+        receiverClan._kingdom = kingdom;
+
+        var objectManager = new Mock<IObjectManager>();
+        var playerManager = new Mock<IPlayerManager>();
+        playerManager
+            .Setup(manager => manager.TryGetPlayer(peer, out player))
+            .Returns(true);
+        SetupGiftObjects(objectManager, settlement, receiverClan, senderClan);
+
+        var handler = CreateNetworkGiftSettlementOwnershipHandler(objectManager.Object, playerManager.Object);
+        RunWithBoundGameThread(() =>
+        {
+            handler(new MessagePayload<NetworkGiftSettlementOwnership>(
+            peer,
+            new NetworkGiftSettlementOwnership("settlement-id", "receiver-clan-id")));
+            DrainGameThread();
+
+            Clan retrievedReceiverClan = null!;
+            Clan retrievedSenderClan = null!;
+            Settlement retrievedSettlement = null!;
+            objectManager.Verify(
+                manager => manager.TryGetObjectWithLogging("settlement-id", out retrievedSettlement),
+                Times.Once);
+            objectManager.Verify(
+                manager => manager.TryGetObjectWithLogging("receiver-clan-id", out retrievedReceiverClan),
+                Times.Once);
+            objectManager.Verify(
+                manager => manager.TryGetObjectWithLogging("sender-clan-id", out retrievedSenderClan),
+                Times.Once);
+            objectManager.VerifyNoOtherCalls();
+        });
+    }
+
+    [Fact]
+    public void NetworkGiftSettlementOwnership_ReceiverIsUnderMercenaryService_IsIgnored()
+    {
+        var peer = ObjectHelper.SkipConstructor<NetPeer>();
+        var player = ObjectHelper.SkipConstructor<Player>();
+        SetField(player, "ClanId", "sender-clan-id");
+        var settlement = ObjectHelper.SkipConstructor<Settlement>();
+        var senderClan = ObjectHelper.SkipConstructor<Clan>();
+        var receiverClan = ObjectHelper.SkipConstructor<Clan>();
+        var kingdom = ObjectHelper.SkipConstructor<Kingdom>();
+
+        senderClan._kingdom = kingdom;
+        receiverClan._kingdom = kingdom;
+        kingdom._rulingClan = senderClan;
+        receiverClan.IsUnderMercenaryService = true;
+
+        var objectManager = new Mock<IObjectManager>();
+        var playerManager = new Mock<IPlayerManager>();
+        playerManager
+            .Setup(manager => manager.TryGetPlayer(peer, out player))
+            .Returns(true);
+        SetupGiftObjects(objectManager, settlement, receiverClan, senderClan);
+
+        var handler = CreateNetworkGiftSettlementOwnershipHandler(objectManager.Object, playerManager.Object);
+        RunWithBoundGameThread(() =>
+        {
+            handler(new MessagePayload<NetworkGiftSettlementOwnership>(
+            peer,
+            new NetworkGiftSettlementOwnership("settlement-id", "receiver-clan-id")));
+            DrainGameThread();
+
+            Clan retrievedReceiverClan = null!;
+            Clan retrievedSenderClan = null!;
+            Settlement retrievedSettlement = null!;
+            objectManager.Verify(
+                manager => manager.TryGetObjectWithLogging("settlement-id", out retrievedSettlement),
+                Times.Once);
+            objectManager.Verify(
+                manager => manager.TryGetObjectWithLogging("receiver-clan-id", out retrievedReceiverClan),
+                Times.Once);
+            objectManager.Verify(
+                manager => manager.TryGetObjectWithLogging("sender-clan-id", out retrievedSenderClan),
+                Times.Once);
+            objectManager.VerifyNoOtherCalls();
+        });
+    }
+
+    [Fact]
+    public void NetworkGiftSettlementOwnership_ReceiverIsInDifferentKingdom_IsIgnored()
+    {
+        var peer = ObjectHelper.SkipConstructor<NetPeer>();
+        var player = ObjectHelper.SkipConstructor<Player>();
+        SetField(player, "ClanId", "sender-clan-id");
+        var settlement = ObjectHelper.SkipConstructor<Settlement>();
+        var senderClan = ObjectHelper.SkipConstructor<Clan>();
+        var receiverClan = ObjectHelper.SkipConstructor<Clan>();
+        var senderKingdom = ObjectHelper.SkipConstructor<Kingdom>();
+        var receiverKingdom = ObjectHelper.SkipConstructor<Kingdom>();
+
+        senderClan._kingdom = senderKingdom;
+        receiverClan._kingdom = receiverKingdom;
+        senderKingdom._rulingClan = senderClan;
+
+        var objectManager = new Mock<IObjectManager>();
+        var playerManager = new Mock<IPlayerManager>();
+
+        playerManager
+            .Setup(manager => manager.TryGetPlayer(peer, out player))
+            .Returns(true);
+        SetupGiftObjects(objectManager, settlement, receiverClan, senderClan);
+
+        var handler = CreateNetworkGiftSettlementOwnershipHandler(objectManager.Object, playerManager.Object);
+        RunWithBoundGameThread(() =>
+        {
+            handler(new MessagePayload<NetworkGiftSettlementOwnership>(
+            peer,
+            new NetworkGiftSettlementOwnership("settlement-id", "receiver-clan-id")));
+            DrainGameThread();
+
+            Clan retrievedReceiverClan = null!;
+            Clan retrievedSenderClan = null!;
+            Settlement retrievedSettlement = null!;
+            objectManager.Verify(
+                manager => manager.TryGetObjectWithLogging("settlement-id", out retrievedSettlement),
+                Times.Once);
+            objectManager.Verify(
+                manager => manager.TryGetObjectWithLogging("receiver-clan-id", out retrievedReceiverClan),
+                Times.Once);
+            objectManager.Verify(
+                manager => manager.TryGetObjectWithLogging("sender-clan-id", out retrievedSenderClan),
+                Times.Once);
+            objectManager.VerifyNoOtherCalls();
+        });
+    }
+
+    [Fact]
+    public void NetworkGiftSettlementOwnership_ReceiverIsSenderClan_IsIgnored()
+    {
+        var peer = ObjectHelper.SkipConstructor<NetPeer>();
+        var player = ObjectHelper.SkipConstructor<Player>();
+        SetField(player, "ClanId", "sender-clan-id");
+        var settlement = ObjectHelper.SkipConstructor<Settlement>();
+        var senderClan = ObjectHelper.SkipConstructor<Clan>();
+        var kingdom = ObjectHelper.SkipConstructor<Kingdom>();
+
+        senderClan._kingdom = kingdom;
+        kingdom._rulingClan = senderClan;
+
+        var objectManager = new Mock<IObjectManager>();
+        var playerManager = new Mock<IPlayerManager>();
+
+        playerManager
+            .Setup(manager => manager.TryGetPlayer(peer, out player))
+            .Returns(true);
+        SetupGiftObjects(objectManager, settlement, senderClan, senderClan);
+
+        var handler = CreateNetworkGiftSettlementOwnershipHandler(objectManager.Object, playerManager.Object);
+
+        RunWithBoundGameThread(() =>
+        {
+            handler(new MessagePayload<NetworkGiftSettlementOwnership>(
+            peer,
+            new NetworkGiftSettlementOwnership("settlement-id", "sender-clan-id")));
+            DrainGameThread();
+
+            Clan retrievedSenderClan = null!;
+            Settlement retrievedSettlement = null!;
+            objectManager.Verify(
+                manager => manager.TryGetObjectWithLogging("settlement-id", out retrievedSettlement),
+                Times.Once);
+            objectManager.Verify(
+                manager => manager.TryGetObjectWithLogging("sender-clan-id", out retrievedSenderClan),
+                Times.Exactly(2));
+            objectManager.VerifyNoOtherCalls();
+        });
+    }
+
+    [Fact]
+    public void NetworkGiftSettlementOwnership_SettlementIsNotFortification_IsIgnored()
+    {
+        var peer = ObjectHelper.SkipConstructor<NetPeer>();
+        var player = ObjectHelper.SkipConstructor<Player>();
+        SetField(player, "ClanId", "sender-clan-id");
+        var settlement = ObjectHelper.SkipConstructor<Settlement>();
+        settlement.Village = ObjectHelper.SkipConstructor<Village>();
+        var senderClan = ObjectHelper.SkipConstructor<Clan>();
+        var receiverClan = ObjectHelper.SkipConstructor<Clan>();
+        var kingdom = ObjectHelper.SkipConstructor<Kingdom>();
+
+        senderClan._kingdom = kingdom;
+        receiverClan._kingdom = kingdom;
+        kingdom._rulingClan = senderClan;
+
+        var objectManager = new Mock<IObjectManager>();
+        var playerManager = new Mock<IPlayerManager>();
+        playerManager
+            .Setup(manager => manager.TryGetPlayer(peer, out player))
+            .Returns(true);
+        SetupGiftObjects(objectManager, settlement, receiverClan, senderClan);
+
+        var handler = CreateNetworkGiftSettlementOwnershipHandler(objectManager.Object, playerManager.Object);
+
+        RunWithBoundGameThread(() =>
+        {
+            handler(new MessagePayload<NetworkGiftSettlementOwnership>(
+            peer,
+            new NetworkGiftSettlementOwnership("settlement-id", "receiver-clan-id")));
+            DrainGameThread();
+
+            Clan retrievedReceiverClan = null!;
+            Clan retrievedSenderClan = null!;
+            Settlement retrievedSettlement = null!;
+            objectManager.Verify(
+                manager => manager.TryGetObjectWithLogging("settlement-id", out retrievedSettlement),
+                Times.Once);
+            objectManager.Verify(
+                manager => manager.TryGetObjectWithLogging("receiver-clan-id", out retrievedReceiverClan),
+                Times.Once);
+            objectManager.Verify(
+                manager => manager.TryGetObjectWithLogging("sender-clan-id", out retrievedSenderClan),
+                Times.Once);
+            objectManager.VerifyNoOtherCalls();
+        });
+    }
+
+    [Fact]
+    public void NetworkGiftSettlementOwnership_SettlementIsNotOwnedBySender_IsIgnored()
+    {
+        var peer = ObjectHelper.SkipConstructor<NetPeer>();
+        var player = ObjectHelper.SkipConstructor<Player>();
+        SetField(player, "ClanId", "sender-clan-id");
+        var settlement = ObjectHelper.SkipConstructor<Settlement>();
+        var town = ObjectHelper.SkipConstructor<Town>();
+        settlement.Town = town;
+
+        var senderClan = ObjectHelper.SkipConstructor<Clan>();
+        var actualOwnerClan = ObjectHelper.SkipConstructor<Clan>();
+        var receiverClan = ObjectHelper.SkipConstructor<Clan>();
+        var kingdom = ObjectHelper.SkipConstructor<Kingdom>();
+
+        senderClan._kingdom = kingdom;
+        receiverClan._kingdom = kingdom;
+        kingdom._rulingClan = senderClan;
+        SetField(town, "_ownerClan", actualOwnerClan);
+
+        var objectManager = new Mock<IObjectManager>();
+        var playerManager = new Mock<IPlayerManager>();
+        playerManager
+            .Setup(manager => manager.TryGetPlayer(peer, out player))
+            .Returns(true);
+
+        SetupGiftObjects(objectManager, settlement, receiverClan, senderClan);
+
+        var handler = CreateNetworkGiftSettlementOwnershipHandler(objectManager.Object, playerManager.Object);
+
+        RunWithBoundGameThread(() =>
+        {
+            handler(new MessagePayload<NetworkGiftSettlementOwnership>(
+            peer,
+            new NetworkGiftSettlementOwnership("settlement-id", "receiver-clan-id")));
+            DrainGameThread();
+
+            Clan retrievedReceiverClan = null!;
+            Clan retrievedSenderClan = null!;
+            Settlement retrievedSettlement = null!;
+            objectManager.Verify(
+                manager => manager.TryGetObjectWithLogging("settlement-id", out retrievedSettlement),
+                Times.Once);
+            objectManager.Verify(
+                manager => manager.TryGetObjectWithLogging("receiver-clan-id", out retrievedReceiverClan),
+                Times.Once);
+            objectManager.Verify(
+                manager => manager.TryGetObjectWithLogging("sender-clan-id", out retrievedSenderClan),
+                Times.Once);
+            objectManager.VerifyNoOtherCalls();
+        });
+    }
+
+    private static void RunWithBoundGameThread(Action action)
+    {
+        bool ownsGameThreadMark = GameThread.Instance.GameThreadId == 0;
+        if (ownsGameThreadMark)
+            GameThread.Instance.MarkGameThread();
+        try
+        {
+            action();
+        }
+        finally
+        {
+            if (ownsGameThreadMark)
+                GameThread.Instance.RestoreGameThread(0);
+        }
+    }
+
+
     private static KingdomHandler CreateHandler(IObjectManager objectManager)
     {
         return new KingdomHandler(
@@ -297,5 +724,59 @@ public class KingdomHandlerTests
         bool result = (bool)(methodInfo.Invoke(handler, args) ?? false);
         culture = (CultureObject)args[1];
         return result;
+    }
+    private static void DrainGameThread()
+    {
+        GameThread.Run(() => { }, blocking: true);
+    }
+
+    private static void SetField(object target, string fieldName, object value)
+    {
+        var field = target.GetType().GetField(
+            fieldName,
+            BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic)
+            ?? throw new MissingFieldException(target.GetType().FullName, fieldName);
+
+        field.SetValue(target, value);
+    }
+
+    private static Action<MessagePayload<NetworkGiftSettlementOwnership>> CreateNetworkGiftSettlementOwnershipHandler(
+        IObjectManager objectManager,
+        IPlayerManager playerManager)
+    {
+        Action<MessagePayload<NetworkGiftSettlementOwnership>> handler = null!;
+        var messageBroker = new Mock<IMessageBroker>();
+        messageBroker
+            .Setup(broker => broker.Subscribe(It.IsAny<Action<MessagePayload<NetworkGiftSettlementOwnership>>>()!))
+            .Callback<Action<MessagePayload<NetworkGiftSettlementOwnership>>>(callback => handler = callback);
+
+        _ = new KingdomHandler(
+            messageBroker.Object,
+            new Mock<INetwork>().Object,
+            objectManager,
+            playerManager,
+            new Mock<IKingdomDecisionVoteManager>().Object,
+            new Mock<IKingdomMembershipState>().Object,
+            new Mock<IKingdomInterface>().Object,
+            new Mock<IKingdomCreator>().Object);
+
+        return handler;
+    }
+
+    private static void SetupGiftObjects(
+        Mock<IObjectManager> objectManager,
+        Settlement settlement,
+        Clan receiverClan,
+        Clan senderClan)
+    {
+        objectManager
+            .Setup(manager => manager.TryGetObjectWithLogging("settlement-id", out settlement))
+            .Returns(settlement != null);
+        objectManager
+            .Setup(manager => manager.TryGetObjectWithLogging("receiver-clan-id", out receiverClan))
+            .Returns(receiverClan != null);
+        objectManager
+            .Setup(manager => manager.TryGetObjectWithLogging("sender-clan-id", out senderClan))
+            .Returns(senderClan != null);
     }
 }
