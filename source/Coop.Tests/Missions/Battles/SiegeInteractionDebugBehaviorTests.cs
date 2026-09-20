@@ -342,6 +342,142 @@ public class SiegeInteractionDebugBehaviorTests
         Assert.True((oldHit - target).Length > 1f);
     }
 
+    [Fact]
+    public void ArrowReaim_UsesOwnedCameraBelowTorchWithoutMovingActorAndRestoresCamera()
+    {
+        using var mission = new MissionCurrentScope();
+        var harmony = new Harmony("coop.tests.arrow-eye-camera");
+        var managedInterface = AccessTools.Field(AccessTools.TypeByName("TaleWorlds.DotNet.LibraryApplicationInterface"), "IManaged");
+        var originalManagedInterface = managedInterface.GetValue(null);
+        try
+        {
+            managedInterface.SetValue(null, typeof(System.Reflection.DispatchProxy).GetMethod("Create", Type.EmptyTypes)
+                .MakeGenericMethod(managedInterface.FieldType, typeof(ArrowManagedBridge)).Invoke(null, null));
+            void Patch(System.Reflection.MethodBase method, string prefix) => harmony.Patch(method,
+                prefix: new HarmonyMethod(AccessTools.Method(typeof(SiegeInteractionDebugBehaviorTests), prefix)));
+            Patch(AccessTools.Method(typeof(ScriptComponentBehavior), "CacheEditableFieldsForAllScriptComponents"), nameof(SkipScriptComponentCache));
+            Patch(AccessTools.Method(typeof(Agent), nameof(Agent.IsActive)), nameof(ObservedAgentActive));
+            Patch(AccessTools.PropertyGetter(typeof(Agent), nameof(Agent.IsUsingGameObject)), nameof(ObservedAgentUnused));
+            Patch(AccessTools.PropertyGetter(typeof(Agent), nameof(Agent.MountAgent)), nameof(SkipScriptComponentCache));
+            Patch(AccessTools.PropertyGetter(typeof(Agent), nameof(Agent.Position)), nameof(ArrowActorPosition));
+            Patch(AccessTools.PropertyGetter(typeof(Agent), nameof(Agent.AgentScale)), nameof(ArrowActorScale));
+            Patch(AccessTools.PropertyGetter(typeof(Agent), nameof(Agent.Monster)), nameof(ArrowActorMonster));
+            Patch(AccessTools.PropertySetter(typeof(Agent), nameof(Agent.LookDirection)), nameof(SkipScriptComponentCache));
+            Patch(AccessTools.Method(typeof(Agent), nameof(Agent.TeleportToPosition)), nameof(ArrowTeleport));
+            Patch(AccessTools.Method(typeof(Agent), nameof(Agent.GetOffhandWieldedItemIndex)), nameof(ArrowEmptyHand));
+            Patch(AccessTools.Method(typeof(Agent), nameof(Agent.GetPrimaryWieldedItemIndex)), nameof(ArrowEmptyHand));
+            Patch(AccessTools.Method(typeof(Agent), nameof(Agent.TryToWieldWeaponInSlot)), nameof(SkipScriptComponentCache));
+            Patch(AccessTools.Method(typeof(StandingPoint), nameof(StandingPoint.GetUserFrameForAgent)), nameof(ArrowUserFrame));
+            Patch(AccessTools.Method(typeof(WorldPosition), nameof(WorldPosition.GetGroundVec3)), nameof(ArrowActorPosition));
+            Patch(AccessTools.Method(typeof(WeakGameEntity), nameof(WeakGameEntity.ComputeGlobalPhysicsBoundingBoxCenter)), nameof(ArrowPhysicsTarget));
+            Patch(AccessTools.PropertyGetter(typeof(WeakGameEntity), nameof(WeakGameEntity.GlobalPosition)), nameof(ArrowPhysicsTarget));
+            Patch(AccessTools.Method(typeof(Camera), nameof(Camera.CreateCamera)), nameof(ArrowCreateCamera));
+            Patch(AccessTools.Method(typeof(Camera), nameof(Camera.FillParametersFrom)), nameof(SkipScriptComponentCache));
+            Patch(AccessTools.Method(typeof(Camera), nameof(Camera.LookAt)), nameof(ArrowCameraLookAt));
+            Patch(AccessTools.Method(typeof(Camera), nameof(Camera.SetFovVertical)), nameof(SkipScriptComponentCache));
+            Patch(AccessTools.Method(typeof(Camera), nameof(Camera.ReleaseCamera)), nameof(ArrowReleaseCamera));
+            Patch(AccessTools.PropertyGetter(typeof(TaleWorlds.Engine.Screen), nameof(TaleWorlds.Engine.Screen.AspectRatio)), nameof(ArrowActorScale));
+#pragma warning disable SYSLIB0050
+            var screenType = AccessTools.TypeByName("TaleWorlds.MountAndBlade.View.Screens.MissionScreen");
+            var screen = FormatterServices.GetUninitializedObject(screenType);
+            var agent = (Agent)FormatterServices.GetUninitializedObject(typeof(Agent));
+            arrowMonster = (Monster)FormatterServices.GetUninitializedObject(typeof(Monster));
+            var barrel = (ArrowBarrel)FormatterServices.GetUninitializedObject(typeof(ArrowBarrel));
+            var point = (StandingPoint)FormatterServices.GetUninitializedObject(typeof(StandingPoint));
+#pragma warning restore SYSLIB0050
+            AccessTools.Property(typeof(Monster), nameof(Monster.StandingEyeHeight)).SetValue(arrowMonster, 1.4f);
+            AccessTools.Property(typeof(Agent), nameof(Agent.Equipment)).SetValue(agent, new MissionEquipment());
+            var bow = new ItemObject("test_bow");
+            bow.AddWeapon(new WeaponComponentData(null, WeaponClass.Bow, default), null);
+            agent.Equipment[EquipmentIndex.Weapon0] = new MissionWeapon(bow, null, null, 1);
+            AccessTools.Property(typeof(MissionObject), nameof(MissionObject.Id)).SetValue(barrel, new MissionObjectId(17, false));
+            AccessTools.Property(typeof(UsableMachine), nameof(UsableMachine.StandingPoints)).SetValue(barrel, new MBList<StandingPoint> { point });
+            ((MBList<MissionObject>)AccessTools.Field(typeof(Mission), "_missionObjects").GetValue(mission.Instance)).Add(barrel);
+            var behavior = new SiegeInteractionDebugBehavior(Mock.Of<IMessageBroker>());
+            AccessTools.Property(typeof(MissionBehavior), "Mission").SetValue(behavior, mission.Instance);
+            void Set(string field, object value) => AccessTools.Field(typeof(SiegeInteractionDebugBehavior), field).SetValue(behavior, value);
+            object Get(string field) => AccessTools.Field(typeof(SiegeInteractionDebugBehavior), field).GetValue(behavior);
+            object GetCamera() => AccessTools.Property(screenType, "CustomCamera").GetValue(screen);
+            Set("capturedAgent", agent);
+            Set("capturedScreen", screen);
+            Set("previousMainHand", EquipmentIndex.None);
+            Set("capturedPosition", new Vec3(434f, 690f, 11f));
+            Set("capturedCameraBearing", 0.25f);
+            Set("capturedCameraElevation", -0.1f);
+            arrowPosition = new Vec3(498.091949f, 721.966248f, 21.6503487f);
+            arrowTeleports = arrowCameraReleases = 0;
+
+            var stage = AccessTools.Method(typeof(SiegeInteractionDebugBehavior), "Stage");
+            stage.Invoke(behavior, new object[] { screen, agent, 17, 0, false, true, false });
+            Assert.Null(GetCamera());
+            Assert.True((bool)Get("nativeCameraStaged"));
+            Assert.Equal(1, arrowTeleports);
+            stage.Invoke(behavior, new object[] { screen, agent, 17, 0, false, true, true });
+            Assert.Same(Get("stagingCamera"), GetCamera());
+            Assert.NotNull(GetCamera());
+            Assert.Equal(1, arrowTeleports);
+            Assert.Equal(arrowPosition + (Vec3.Up * 1.6f), arrowCameraEye);
+            Assert.Equal(new Vec3(498.269f, 721.444f, 22.0302753f), arrowCameraTarget);
+            var direction = (arrowCameraTarget - arrowCameraEye).NormalizedCopy();
+            var atTorchFront = arrowCameraEye + (direction * ((721.545654f - arrowCameraEye.y) / direction.y));
+            Assert.True(atTorchFront.z + 0.2f < 22.77746f);
+            Assert.Equal("fixture_staged_native_focus_pending", Get("status"));
+            Assert.False((bool)Get("pressInvoked"));
+            Assert.False((bool)Get("externalInputArmed"));
+            Assert.Null(Get("functionalAction"));
+
+            AccessTools.Method(typeof(SiegeInteractionDebugBehavior), "Restore").Invoke(behavior, new object[] { screen, agent });
+            Assert.Equal("fixture_restored", Get("status"));
+            Assert.Null(GetCamera());
+            Assert.Null(Get("stagingCamera"));
+            Assert.False((bool)Get("nativeCameraStaged"));
+            Assert.Equal(0.25f, AccessTools.Property(screenType, "CameraBearing").GetValue(screen));
+            Assert.Equal(-0.1f, AccessTools.Property(screenType, "CameraElevation").GetValue(screen));
+            Assert.Equal(1, arrowCameraReleases);
+            Assert.Equal(2, arrowTeleports);
+        }
+        finally
+        {
+            harmony.UnpatchAll(harmony.Id);
+            managedInterface.SetValue(null, originalManagedInterface);
+        }
+    }
+
+    private static Vec3 arrowPosition, arrowCameraEye, arrowCameraTarget;
+    private static Monster arrowMonster;
+    private static int arrowTeleports, arrowCameraReleases;
+    private static bool ArrowActorMonster(ref Monster __result) { __result = arrowMonster; return false; }
+    private static bool ArrowActorPosition(ref Vec3 __result) { __result = arrowPosition; return false; }
+    private static bool ArrowActorScale(ref float __result) { __result = 1f; return false; }
+    private static bool ArrowTeleport(Vec3 __0) { arrowPosition = __0; arrowTeleports++; return false; }
+    private static bool ArrowEmptyHand(ref EquipmentIndex __result) { __result = EquipmentIndex.None; return false; }
+    private static bool ArrowUserFrame(ref WorldFrame __result)
+    {
+        __result = new WorldFrame(Mat3.Identity, default);
+        return false;
+    }
+    private static bool ArrowPhysicsTarget(ref Vec3 __result) { __result = new Vec3(498.269f, 721.444f, 22.0302753f); return false; }
+    private static bool ArrowCreateCamera(ref Camera __result)
+    {
+#pragma warning disable SYSLIB0050
+        __result = (Camera)FormatterServices.GetUninitializedObject(typeof(Camera));
+#pragma warning restore SYSLIB0050
+        GC.SuppressFinalize(__result);
+        AccessTools.Property(typeof(TaleWorlds.DotNet.NativeObject), "Pointer").SetValue(__result, new UIntPtr(91u));
+        return false;
+    }
+    private static bool ArrowCameraLookAt(Vec3 __0, Vec3 __1) { arrowCameraEye = __0; arrowCameraTarget = __1; return false; }
+    private static bool ArrowReleaseCamera() { arrowCameraReleases++; return false; }
+
+    public class ArrowManagedBridge : System.Reflection.DispatchProxy
+    {
+        protected override object Invoke(System.Reflection.MethodInfo method, object[] args)
+        {
+            if (method.Name == "GetClassTypeDefinitionCount") return 0;
+            throw new InvalidOperationException("Unexpected native call: " + method.Name);
+        }
+    }
+
     [Theory]
     [InlineData(typeof(StonePile))]
     [InlineData(typeof(ArrowBarrel))]

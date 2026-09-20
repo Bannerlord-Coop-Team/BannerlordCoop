@@ -911,7 +911,8 @@ internal sealed class SiegeInteractionDebugBehavior : MissionBehavior, ISiegeInt
             screen.CameraElevation = direction.RotationX;
             nativeCameraStaged = true;
             status = "fixture_staged_native_focus_pending";
-            return;
+            // The settled barrel reaim uses the owned eye-height camera below wall fixtures.
+            if (!reaimOnly || !(machine is ArrowBarrel)) return;
         }
         if (stagingCamera == null)
         {
@@ -921,7 +922,7 @@ internal sealed class SiegeInteractionDebugBehavior : MissionBehavior, ISiegeInt
         Vec3 target;
         try
         {
-            target = GetStagingTarget(machine, point.GameEntity.GlobalPosition, watchOnly, standingPoint: point);
+            target = GetStagingTarget(machine, point.GameEntity.GlobalPosition, watchOnly, nativeCamera, point);
         }
         catch (InvalidOperationException exception)
         {
@@ -929,7 +930,7 @@ internal sealed class SiegeInteractionDebugBehavior : MissionBehavior, ISiegeInt
             status = "fixture_target_unavailable";
             return;
         }
-        if (!watchOnly) agent.TeleportToPosition(position);
+        if (!watchOnly && !reaimOnly) agent.TeleportToPosition(position);
         var eye = watchOnly ? target + new Vec3(3f, 3f, 2f) : position + (Vec3.Up * 1.6f);
         observerFrame = null;
         if (watchOnly && watchedAgentId.HasValue)
