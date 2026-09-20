@@ -149,7 +149,12 @@ internal class CompanionsCampaignBehaviorPatches
     [HarmonyPrefix]
     public static bool TrySpawnNewCompanionPrefix(CompanionsCampaignBehavior __instance)
     {
-        if ((float)__instance._aliveCompanionTemplates.Count < __instance._desiredTotalCompanionCount)
+        var shouldSpawn = ModConfigProvider.ModOptions.EnsureUnaffiliatedWanderers &&
+            !ModConfigProvider.ModOptions.WandererLimitScalesWithPlayers
+            ? ShouldSpawnUnaffiliatedWanderer(Hero.AllAliveHeroes, ModConfigProvider.ModOptions.WandererLimit)
+            : (float)__instance._aliveCompanionTemplates.Count < __instance._desiredTotalCompanionCount;
+
+        if (shouldSpawn)
         {
             Town targetTown = Town.AllTowns.GetRandomElementWithPredicate(delegate (Town x)
             {
@@ -248,5 +253,19 @@ internal class CompanionsCampaignBehaviorPatches
             }
         }
         return affiliatedWanderers;
+    }
+
+    private static bool ShouldSpawnUnaffiliatedWanderer(IEnumerable<Hero> aliveHeroes, int targetPopulation)
+    {
+        var unaffiliatedWanderers = 0;
+        foreach (var hero in aliveHeroes)
+        {
+            if (hero.IsWanderer && hero.CompanionOf == null)
+            {
+                unaffiliatedWanderers++;
+            }
+        }
+
+        return unaffiliatedWanderers < targetPopulation;
     }
 }
