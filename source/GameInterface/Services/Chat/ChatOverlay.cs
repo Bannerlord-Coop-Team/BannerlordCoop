@@ -18,6 +18,7 @@ namespace GameInterface.Services.Chat;
 internal sealed class ChatOverlay : GlobalLayer, IDisposable
 {
     private const string InputWidgetId = "CoopChatMessageInput";
+    private const string FeedScrollablePanelId = "ChatFeedScrollablePanel";
     private const int LayerOrder = 110;
 
     private readonly ChatVM dataSource;
@@ -25,10 +26,13 @@ internal sealed class ChatOverlay : GlobalLayer, IDisposable
     private GauntletLayer gauntletLayer;
     private GauntletMovieIdentifier movie;
     private EditableTextWidget inputWidget;
+    private ScrollablePanel feedScrollablePanel;
     private bool initialized;
     private bool isInputFocused;
     private bool ignoreNextOutsideClick;
     private bool playerChatEnabled;
+    private bool pinFeedToBottom;
+    private float pinFeedLastMaxValue = -1f;
 
     public ChatOverlay(ChatVM dataSource, Action refreshParticipants, bool playerChatEnabled)
     {
@@ -41,6 +45,7 @@ internal sealed class ChatOverlay : GlobalLayer, IDisposable
         dataSource.SetPlayerChatEnabled(playerChatEnabled);
         dataSource.OpenRequested += OpenInput;
         dataSource.CloseRequested += CloseInput;
+        dataSource.FeedScrolledToBottomRequested += OnFeedScrolledToBottomRequested;
     }
 
     public void Initialize()
@@ -64,6 +69,8 @@ internal sealed class ChatOverlay : GlobalLayer, IDisposable
 
         if (!dataSource.IsOpen)
         {
+            pinFeedToBottom = false;
+            pinFeedLastMaxValue = -1f;
             if (playerChatEnabled && ShouldOpenInput(
                     Input.IsKeyPressed(InputKey.Enter),
                     Input.IsKeyPressed(InputKey.NumpadEnter),
@@ -73,6 +80,9 @@ internal sealed class ChatOverlay : GlobalLayer, IDisposable
             }
             return;
         }
+
+        if (pinFeedToBottom)
+            ContinuePinFeedToBottom();
 
         if (ShouldCaptureCloseInput(
                 isInputFocused,
@@ -128,6 +138,7 @@ internal sealed class ChatOverlay : GlobalLayer, IDisposable
     {
         dataSource.OpenRequested -= OpenInput;
         dataSource.CloseRequested -= CloseInput;
+        dataSource.FeedScrolledToBottomRequested -= OnFeedScrolledToBottomRequested;
         if (!initialized) return;
 
         CloseInput();
@@ -136,6 +147,7 @@ internal sealed class ChatOverlay : GlobalLayer, IDisposable
         dataSource.OnFinalize();
 
         inputWidget = null;
+        feedScrollablePanel = null;
         movie = null;
         gauntletLayer = null;
         Layer = null;
@@ -211,10 +223,47 @@ internal sealed class ChatOverlay : GlobalLayer, IDisposable
         refreshParticipants();
         dataSource.SetOpen(true);
 
-        inputWidget ??= movie?.Movie?.RootWidget?
-            .FindChild(InputWidgetId, includeAllChildren: true) as EditableTextWidget;
+        ResolveFeedWidgets();
         ignoreNextOutsideClick = true;
         FocusInput();
+    }
+
+    private void OnFeedScrolledToBottomRequested()
+    {
+        // ScrollablePanel updates MaxValue in OnLateUpdate after the new line is measured
+        // One pin lands on the previous MaxValue (second-most-recent line) 
+        // keep pinning until MaxValue stops growing
+        pinFeedToBottom = true;
+        pinFeedLastMaxValue = -1f;
+    }
+
+    private void ContinuePinFeedToBottom()
+    {
+        ResolveFeedWidgets();
+        var bar = feedScrollablePanel?.VerticalScrollbar;
+        if (bar == null) return;
+
+        feedScrollablePanel.ResetTweenSpeed();
+        float maxValue = bar.MaxValue;
+        bar.ValueFloat = maxValue;
+
+        if (pinFeedLastMaxValue >= 0f && maxValue <= pinFeedLastMaxValue + 0.01f)
+        {
+            pinFeedToBottom = false;
+            pinFeedLastMaxValue = -1f;
+            return;
+        }
+
+        pinFeedLastMaxValue = maxValue;
+    }
+
+    private void ResolveFeedWidgets()
+    {
+        var root = movie?.Movie?.RootWidget;
+        if (root == null) return;
+
+        inputWidget ??= root.FindChild(InputWidgetId, includeAllChildren: true) as EditableTextWidget;
+        feedScrollablePanel ??= root.FindChild(FeedScrollablePanelId, includeAllChildren: true) as ScrollablePanel;
     }
 
     private void CloseInput()

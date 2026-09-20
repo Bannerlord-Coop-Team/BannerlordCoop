@@ -123,6 +123,28 @@ public class ChatVMTests
     }
 
     [Fact]
+    public void SetOpen_AndReceive_RequestFeedScrollToBottom()
+    {
+        var vm = new ChatVM(_ => { }, () => "local");
+        int pinRequests = 0;
+        vm.FeedScrolledToBottomRequested += () => pinRequests++;
+
+        vm.SetOpen(true);
+        Assert.True(pinRequests > 0);
+
+        int afterOpen = pinRequests;
+        vm.Receive(new NetworkChatMessage(
+            ChatChannel.Global,
+            "local",
+            "Local Hero",
+            string.Empty,
+            string.Empty,
+            "hello"));
+
+        Assert.True(pinRequests > afterOpen);
+    }
+
+    [Fact]
     public void SetOpen_ShowsFullChannelHistoryForScrolling()
     {
         var vm = new ChatVM(_ => { }, () => "local");
