@@ -43,6 +43,7 @@ internal sealed class ChatVM : ViewModel
 
     public event Action CloseRequested;
     public event Action OpenRequested;
+    public event Action FeedScrolledToBottomRequested;
 
     [DataSourceProperty]
     public MBBindingList<ChatChannelVM> Channels { get; }
@@ -164,7 +165,6 @@ internal sealed class ChatVM : ViewModel
         if (!open) return;
 
         SetUnreadMessageCount(0);
-        UpdateVisibleLines();
     }
 
     public void SetPlayerChatEnabled(bool enabled)
@@ -335,19 +335,37 @@ internal sealed class ChatVM : ViewModel
 
         line.ToggleForceVisible(IsOpen);
         history.Add(line);
+        ChatLineVM trimmed = null;
         if (history.Count > MaxHistoryPerChannel)
+        {
+            trimmed = history[0];
             history.RemoveAt(0);
+        }
 
         bool viewingThisChannel = IsOpen &&
             string.Equals(selectedChannel?.ControllerId, channelId, StringComparison.Ordinal);
         bool passiveGlobal = !IsOpen && string.Equals(channelId, GlobalChannelId, StringComparison.Ordinal);
         if (viewingThisChannel || passiveGlobal)
-            UpdateVisibleLines();
+            AppendVisibleLine(line, trimmed);
         else if (channelsById.TryGetValue(channelId, out var channel) && line.IsPlayerChat)
             channel.MarkUnread();
 
         if (notify && !IsOpen && line.IsPlayerChat && IsPlayerChatEnabled)
             SetUnreadMessageCount(Math.Min(unreadMessageCount + 1, 999));
+    }
+
+    private void AppendVisibleLine(ChatLineVM line, ChatLineVM trimmed)
+    {
+        if (line.IsPlayerChat && !IsPlayerChatEnabled) return;
+
+        if (trimmed != null)
+            VisibleLines.Remove(trimmed);
+        if (!IsOpen && VisibleLines.Count >= VisibleHistoryLines)
+            VisibleLines.RemoveAt(0);
+
+        VisibleLines.Add(line);
+        if (IsOpen)
+            FeedScrolledToBottomRequested?.Invoke();
     }
 
     private void UpdateVisibleLines()
@@ -364,10 +382,13 @@ internal sealed class ChatVM : ViewModel
         int firstLine = IsOpen ? 0 : Math.Max(0, history.Count - VisibleHistoryLines);
         for (int i = firstLine; i < history.Count; i++)
         {
-            var line = history[i];
-            if (line.IsPlayerChat && !IsPlayerChatEnabled) continue;
-            VisibleLines.Add(line);
+            var historyLine = history[i];
+            if (historyLine.IsPlayerChat && !IsPlayerChatEnabled) continue;
+            VisibleLines.Add(historyLine);
         }
+
+        if (IsOpen)
+            FeedScrolledToBottomRequested?.Invoke();
     }
 
     private void RefreshForceVisible()

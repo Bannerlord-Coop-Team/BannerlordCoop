@@ -18,11 +18,18 @@ public class ChatUIMovieTests
 
         var channelList = FindById(document, "ChatChannelList");
         Assert.Equal("{Channels}", channelList.Attribute("DataSource")?.Value);
+        Assert.Equal("CoverChildren", channelList.Attribute("WidthSizePolicy")?.Value);
         var channelButton = Assert.Single(channelList.Descendants("ButtonWidget"));
         Assert.Equal("ExecuteSelection", channelButton.Attribute("Command.Click")?.Value);
         Assert.Equal("@IsSelected", channelButton.Attribute("IsSelected")?.Value);
         Assert.Contains(channelButton.Descendants("TextWidget"),
             element => element.Attribute("Text")?.Value == "@Name");
+
+        var channelScroll = FindById(document, "ChatChannelScrollablePanel");
+        Assert.Equal(@"..\ChatChannelScrollbar", channelScroll.Attribute("HorizontalScrollbar")?.Value);
+        Assert.Equal("Horizontal", channelScroll.Attribute("MouseScrollAxis")?.Value);
+        Assert.Null(channelScroll.Attribute("VerticalScrollbar"));
+        Assert.Equal("true", channelScroll.Attribute("AutoHideScrollBars")?.Value);
 
         Assert.Contains(document.Descendants(),
             element => element.Attribute("Command.Click")?.Value == "ActionSend");
@@ -57,6 +64,7 @@ public class ChatUIMovieTests
         Assert.Equal(
             @"..\ChatFeedScrollbarHolder\ChatFeedScrollbar",
             feedScroll.Attribute("VerticalScrollbar")?.Value);
+        Assert.Equal("true", feedScroll.Attribute("ReverseInitialScrollBarAlignment")?.Value);
 
         Assert.DoesNotContain(document.Descendants(),
             element => element.Attribute("Id")?.Value == "CoopChatRibbon");

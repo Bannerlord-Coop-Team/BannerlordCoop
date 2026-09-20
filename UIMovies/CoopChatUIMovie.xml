@@ -20,47 +20,52 @@
                            StackLayout.LayoutMethod="HorizontalLeftToRight"
                            IsVisible="@IsOpen">
                   <Children>
-                    <ScrollablePanel Id="ChatChannelScrollablePanel" WidthSizePolicy="StretchToParent"
-                                     HeightSizePolicy="StretchToParent" AutoHideScrollBars="true"
-                                     ClipRect="ChatChannelClipRect"
-                                     InnerPanel="ChatChannelClipRect\ChatChannelList"
-                                     VerticalScrollbar="..\ChatChannelScrollbar">
+                    <Widget Id="ChatChannelTabArea" WidthSizePolicy="StretchToParent" HeightSizePolicy="StretchToParent">
                       <Children>
-                        <Widget Id="ChatChannelClipRect" WidthSizePolicy="StretchToParent"
-                                HeightSizePolicy="StretchToParent" ClipContents="true">
+                        <ScrollablePanel Id="ChatChannelScrollablePanel" WidthSizePolicy="StretchToParent"
+                                         HeightSizePolicy="StretchToParent" AutoHideScrollBars="true"
+                                         ClipRect="ChatChannelClipRect"
+                                         InnerPanel="ChatChannelClipRect\ChatChannelList"
+                                         HorizontalScrollbar="..\ChatChannelScrollbar"
+                                         MouseScrollAxis="Horizontal">
                           <Children>
-                            <ListPanel Id="ChatChannelList" DataSource="{Channels}"
-                                       WidthSizePolicy="StretchToParent" HeightSizePolicy="CoverChildren"
-                                       StackLayout.LayoutMethod="HorizontalLeftToRight">
-                              <ItemTemplate>
-                                <ButtonWidget DoNotPassEventsToChildren="true" UpdateChildrenStates="true"
-                                              WidthSizePolicy="CoverChildren" HeightSizePolicy="Fixed"
-                                              SuggestedHeight="36" MarginRight="6" Brush="Header.Tab.Center"
-                                              Command.Click="ExecuteSelection" IsSelected="@IsSelected">
-                                  <Children>
-                                    <TextWidget WidthSizePolicy="CoverChildren" HeightSizePolicy="StretchToParent"
-                                                MarginLeft="10" MarginRight="10" Brush="Clan.TabControl.Text"
-                                                Brush.FontSize="18" Brush.TextHorizontalAlignment="Center"
-                                                Brush.TextVerticalAlignment="Center" ClipContents="true"
-                                                Text="@Name"/>
-                                  </Children>
-                                </ButtonWidget>
-                              </ItemTemplate>
-                            </ListPanel>
+                            <Widget Id="ChatChannelClipRect" WidthSizePolicy="StretchToParent"
+                                    HeightSizePolicy="StretchToParent" ClipContents="true">
+                              <Children>
+                                <ListPanel Id="ChatChannelList" DataSource="{Channels}"
+                                           WidthSizePolicy="CoverChildren" HeightSizePolicy="CoverChildren"
+                                           StackLayout.LayoutMethod="HorizontalLeftToRight">
+                                  <ItemTemplate>
+                                    <ButtonWidget DoNotPassEventsToChildren="true" UpdateChildrenStates="true"
+                                                  WidthSizePolicy="CoverChildren" HeightSizePolicy="Fixed"
+                                                  SuggestedHeight="36" MarginRight="6" Brush="Header.Tab.Center"
+                                                  Command.Click="ExecuteSelection" IsSelected="@IsSelected">
+                                      <Children>
+                                        <TextWidget WidthSizePolicy="CoverChildren" HeightSizePolicy="StretchToParent"
+                                                    MarginLeft="10" MarginRight="10" Brush="Clan.TabControl.Text"
+                                                    Brush.FontSize="18" Brush.TextHorizontalAlignment="Center"
+                                                    Brush.TextVerticalAlignment="Center" ClipContents="true"
+                                                    Text="@Name"/>
+                                      </Children>
+                                    </ButtonWidget>
+                                  </ItemTemplate>
+                                </ListPanel>
+                              </Children>
+                            </Widget>
                           </Children>
-                        </Widget>
+                        </ScrollablePanel>
+                        <ScrollbarWidget Id="ChatChannelScrollbar" WidthSizePolicy="StretchToParent"
+                                         HeightSizePolicy="Fixed" SuggestedHeight="3" VerticalAlignment="Bottom"
+                                         AlignmentAxis="Horizontal" Handle="ChatChannelScrollbarHandle"
+                                         MaxValue="100" MinValue="0" IsVisible="false">
+                          <Children>
+                            <ImageWidget Id="ChatChannelScrollbarHandle" WidthSizePolicy="Fixed" SuggestedWidth="10"
+                                         HeightSizePolicy="Fixed" SuggestedHeight="3" VerticalAlignment="Center"
+                                         Brush="FaceGen.Scrollbar.Handle" Brush.AlphaFactor="0.7"/>
+                          </Children>
+                        </ScrollbarWidget>
                       </Children>
-                    </ScrollablePanel>
-                    <ScrollbarWidget Id="ChatChannelScrollbar" WidthSizePolicy="Fixed" SuggestedWidth="4"
-                                     HeightSizePolicy="StretchToParent" HorizontalAlignment="Right"
-                                     AlignmentAxis="Vertical" Handle="ChatChannelScrollbarHandle"
-                                     MaxValue="100" MinValue="0" IsVisible="false">
-                      <Children>
-                        <ImageWidget Id="ChatChannelScrollbarHandle" WidthSizePolicy="Fixed" SuggestedWidth="3"
-                                     HeightSizePolicy="Fixed" SuggestedHeight="8" HorizontalAlignment="Center"
-                                     Brush="FaceGen.Scrollbar.Handle" Brush.AlphaFactor="0.7"/>
-                      </Children>
-                    </ScrollbarWidget>
+                    </Widget>
                     <Standard.Button Id="CoopChatMuteButton" WidthSizePolicy="Fixed" SuggestedWidth="90"
                                      HeightSizePolicy="Fixed" SuggestedHeight="36" MarginLeft="4"
                                      Command.Click="ActionToggleMute"
@@ -78,6 +83,7 @@
                     <ScrollablePanel Id="ChatFeedScrollablePanel" WidthSizePolicy="StretchToParent"
                                      HeightSizePolicy="StretchToParent" AutoHideScrollBars="true"
                                      VerticalAlignment="Bottom"
+                                     ReverseInitialScrollBarAlignment="true"
                                      ClipRect="ChatFeedClipRect"
                                      InnerPanel="ChatFeedClipRect\ChatFeedList"
                                      VerticalScrollbar="..\ChatFeedScrollbarHolder\ChatFeedScrollbar">
