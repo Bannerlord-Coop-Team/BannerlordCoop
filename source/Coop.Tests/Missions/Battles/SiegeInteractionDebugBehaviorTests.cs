@@ -326,6 +326,7 @@ public class SiegeInteractionDebugBehaviorTests
 
     [Theory]
     [InlineData(typeof(StonePile))]
+    [InlineData(typeof(ArrowBarrel))]
     [InlineData(typeof(Ballista))]
     [InlineData(typeof(Mangonel))]
     public void NativeTarget_UsesCurrentPhysicsCenterWithoutChangingObserverTarget(Type machineType)

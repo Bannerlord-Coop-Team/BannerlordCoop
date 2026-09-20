@@ -875,7 +875,7 @@ internal sealed class SiegeInteractionDebugBehavior : MissionBehavior, ISiegeInt
             }
             ReleaseCamera();
             var direction = point.GetUserFrameForAgent(agent).Rotation.f;
-            if (machine is StonePile || machine is Ballista || machine is CastleGate)
+            if (machine is StonePile || machine is ArrowBarrel || machine is Ballista || machine is CastleGate)
             {
                 try
                 {
@@ -1009,9 +1009,9 @@ internal sealed class SiegeInteractionDebugBehavior : MissionBehavior, ISiegeInt
             };
             return target;
         }
-        if (nativeCamera && !watchOnly && machine is StonePile)
+        if (nativeCamera && !watchOnly && (machine is StonePile || machine is ArrowBarrel))
         {
-            // Render bounds can change independently of the pile's focus collision.
+            // Render bounds can change independently of the pickup's focus collision.
             var physicsTarget = machine.GameEntity.ComputeGlobalPhysicsBoundingBoxCenter();
             nativeAimTarget = new
             {
