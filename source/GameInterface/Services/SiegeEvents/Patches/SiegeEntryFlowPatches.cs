@@ -71,6 +71,37 @@ internal class SiegeEntryFlowPatches
         }
     }
 
+    // Breaking through to a besieged settlement is a join act, but vanilla never issues the
+    // DefendSettlement order the "Join the defense" button does, so break-in parties fail the
+    // defender command gate. Mirror the join here. Only the server-approved continuation counts:
+    // the prefix suppresses the initial attempt (postfixes still fire on a skipped original),
+    // so an unguarded postfix would plant the joined flag before approval. Requires the party
+    // to actually be inside, and forwards through the gated AI-behavior channel so the server
+    // picks up the order instead of wiping it on the next authoritative sync.
+    [HarmonyPatch(typeof(EncounterGameMenuBehavior), "break_in_debrief_continue_on_consequence")]
+    [HarmonyPostfix]
+    internal static void BreakInContinuationPostfix()
+    {
+        if (ModInformation.IsServer) return;
+        if (approvedBreakInContinuationDepth <= 0) return;
+
+        try
+        {
+            var mainParty = MobileParty.MainParty;
+            var settlement = Settlement.CurrentSettlement;
+            if (mainParty == null || settlement == null) return;
+            if (mainParty.CurrentSettlement != settlement) return;
+            if (settlement.SiegeEvent == null) return;
+
+            mainParty.SetMoveDefendSettlement(settlement, isTargetingPort: false, MobileParty.NavigationType.Default);
+            MessageBroker.Instance.Publish(mainParty.Ai, new PartyBehaviorChangeAttempted(mainParty));
+        }
+        catch (Exception ex)
+        {
+            Logger.Error(ex, "Failed to issue the break-in defend order");
+        }
+    }
+
     [HarmonyPatch(typeof(EncounterGameMenuBehavior), nameof(EncounterGameMenuBehavior.game_menu_town_town_besiege_on_consequence))]
     [HarmonyPrefix]
     private static bool BesiegeConsequencePrefix()
