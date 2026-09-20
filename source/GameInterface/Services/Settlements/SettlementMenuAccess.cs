@@ -1,5 +1,7 @@
 ﻿using Common.Network;
 using GameInterface.Services.ObjectManager;
+using SandBox.GauntletUI.Menu;
+using SandBox.View.Map;
 using GameInterface.Services.Settlements.Messages;
 using System;
 using System.Collections.Generic;
@@ -46,6 +48,10 @@ internal class SettlementMenuAccess : ISettlementMenuAccess
         => menuId == "manage_garrison" || menuId == "town_prison_manage_prisoners" ||
             menuId == "open_stash" || menuId == "manage_production";
 
+    public static bool CanUseSettlement(Hero hero, Settlement settlement)
+        => hero != null && settlement != null && hero.IsAlive && !hero.IsPrisoner &&
+            hero.CurrentSettlement == settlement && hero.Clan == settlement.OwnerClan;
+
     public SettlementMenuUse[] GetOpenMenus() => openMenus.Values.ToArray();
 
     public bool TryAcquire(string settlementId, string menuId, string heroId)
@@ -69,8 +75,7 @@ internal class SettlementMenuAccess : ISettlementMenuAccess
         openMenus.Clear();
         foreach (var menu in menus ?? Array.Empty<SettlementMenuUse>()) openMenus[menu.HeroId] = menu;
 
-        var context = Campaign.Current?.CurrentMenuContext;
-        if (context != null) Campaign.Current.GameMenuManager.RefreshMenuOptionConditions(context);
+        RefreshMenu();
     }
 
     public bool TryOpen(GameMenuOption option, MenuContext context)
@@ -134,5 +139,15 @@ internal class SettlementMenuAccess : ISettlementMenuAccess
 
         network.SendAll(new RequestSettlementMenuAccess(activeMenu.Value.SettlementId, activeMenu.Value.MenuId, false));
         activeMenu = null;
+        RefreshMenu();
+    }
+
+    private static void RefreshMenu()
+    {
+        var context = Campaign.Current?.CurrentMenuContext;
+        if (context?.GameMenu == null) return;
+
+        Campaign.Current.GameMenuManager.RefreshMenuOptionConditions(context);
+        MapScreen.Instance?._menuViewContext?.GetMenuView<GauntletMenuBaseView>()?.GameMenuDataSource.Refresh(true);
     }
 }

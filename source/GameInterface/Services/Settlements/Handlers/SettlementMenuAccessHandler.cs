@@ -2,6 +2,8 @@
 using Common.Messaging;
 using Common.Network;
 using Common.Network.Messages;
+using GameInterface.Services.Clans.Messages;
+using GameInterface.Services.Heroes.Messages;
 using GameInterface.Services.MobileParties.Messages.Behavior;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Players;
@@ -39,7 +41,10 @@ internal class SettlementMenuAccessHandler : IHandler
         messageBroker.Subscribe<NetworkSettlementMenusChanged>(Handle_NetworkSettlementMenusChanged);
 
         messageBroker.Subscribe<PlayerConnectionStateChanged>(Handle_PlayerConnectionStateChanged);
-        messageBroker.Subscribe<PartyOccupancyChanged>(Handle_OccupancyChanged);
+        messageBroker.Subscribe<PartyOccupancyChanged>(Handle_AccessChanged);
+        messageBroker.Subscribe<ClanManagementChanged>(Handle_AccessChanged);
+        messageBroker.Subscribe<HeroStateChanged>(Handle_AccessChanged);
+        messageBroker.Subscribe<SettlementOwnershipChanged>(Handle_AccessChanged);
     }
 
     public void Dispose()
@@ -49,7 +54,10 @@ internal class SettlementMenuAccessHandler : IHandler
         messageBroker.Unsubscribe<NetworkSettlementMenusChanged>(Handle_NetworkSettlementMenusChanged);
 
         messageBroker.Unsubscribe<PlayerConnectionStateChanged>(Handle_PlayerConnectionStateChanged);
-        messageBroker.Unsubscribe<PartyOccupancyChanged>(Handle_OccupancyChanged);
+        messageBroker.Unsubscribe<PartyOccupancyChanged>(Handle_AccessChanged);
+        messageBroker.Unsubscribe<ClanManagementChanged>(Handle_AccessChanged);
+        messageBroker.Unsubscribe<HeroStateChanged>(Handle_AccessChanged);
+        messageBroker.Unsubscribe<SettlementOwnershipChanged>(Handle_AccessChanged);
     }
 
     private void Handle_RequestSettlementMenuAccess(MessagePayload<RequestSettlementMenuAccess> obj)
@@ -105,11 +113,12 @@ internal class SettlementMenuAccessHandler : IHandler
         });
     }
 
-    private void Handle_OccupancyChanged(MessagePayload<PartyOccupancyChanged> obj)
+    private void Handle_AccessChanged<T>(MessagePayload<T> obj) where T : IMessage
     {
-        if (ModInformation.IsClient) return;
+        if (ModInformation.IsClient || settlementMenuAccess.GetOpenMenus().Length == 0) return;
 
-        GameThread.RunSafe(() =>
+        // Ownership notifications can arrive before the action changes the settlement.
+        GameThread.EnqueueSafe(() =>
         {
             if (RemoveUnavailablePlayers()) Broadcast();
         });
@@ -135,9 +144,7 @@ internal class SettlementMenuAccessHandler : IHandler
         if (!objectManager.TryGetObjectWithLogging<Hero>(heroId, out var hero)) return false;
         if (!objectManager.TryGetObjectWithLogging<Settlement>(settlementId, out var settlement)) return false;
 
-        if (hero.CurrentSettlement != settlement) return false;
-
-        return !hero.IsPrisoner && hero.Clan == settlement.OwnerClan;
+        return SettlementMenuAccess.CanUseSettlement(hero, settlement);
     }
 
     private void Broadcast()
