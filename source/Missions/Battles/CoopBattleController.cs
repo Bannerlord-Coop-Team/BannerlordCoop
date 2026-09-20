@@ -188,7 +188,6 @@ public class CoopBattleController : CoopMissionController
         // per-battle transient (see MissionModule), so this controller's per-battle lifetime resets it.
         siegeEngineDeployment = new SiegeEngineDeploymentReplicator(network, messageBroker, session, hostEpochPolicy);
         siegeMachineState = new SiegeMachineStateReplicator(network, messageBroker, session, coopMissionComponent.AgentRegistry, hostEpochPolicy);
-        coopMissionComponent.AgentActionHandler.BindPilotSeats(session.InstanceId, siegeMachineState);
         siegeWeaponFire = new SiegeWeaponFireReplicator(network, messageBroker, coopMissionComponent.AgentRegistry, session, siegeMachineState, siegeGateHitApplier, hostEpochPolicy);
         supplyReporter = new SupplyProgressReporter(relayNetwork, session);
 
@@ -256,7 +255,11 @@ public class CoopBattleController : CoopMissionController
         Deployment.OnMissionReady();
 
         if (Session.HasInstance)
+        {
+            // Battle entry and native mission initialization follow controller construction.
+            coopMissionComponent.AgentActionHandler.BindPilotSeats(Session.InstanceId, siegeMachineState);
             messageBroker.Publish(this, new BattleMissionReady(Session.InstanceId));
+        }
         else
             Logger.Warning("[BattleHost] Battle mission finished loading with no instance session — cannot announce mission-ready");
     }

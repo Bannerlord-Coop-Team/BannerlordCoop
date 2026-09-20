@@ -24,6 +24,44 @@ namespace E2E.Tests.Services.Missions;
 
 public partial class ActionEquipmentSyncTests
 {
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void PilotSeat_MissionReadyBindsAfterControllerConstructionAndBattleEntry(bool previousMission)
+    {
+        using var fixture = new MissionEngineFixture();
+        var client = Clients.First();
+        SetControllerId(client, "peer");
+        client.Call(() =>
+        {
+            if (previousMission) fixture.CreateMission(client);
+            using var controller = client.Resolve<CoopBattleController>();
+            Assert.False(controller.Session.HasInstance);
+            var component = (ICoopMissionComponent)AccessTools.Field(
+                typeof(CoopMissionController), "coopMissionComponent").GetValue(controller);
+            var context = new Context(fixture, client, component);
+            using var seats = new PilotSeatFixture(context, "peer", bind: false);
+            Assert.True(controller.Session.TryBegin("pilot-battle"));
+            client.Resolve<IBattleHostRegistry>().Set("pilot-battle",
+                new BattleHostAssignment("peer", Array.Empty<string>(), epoch: 1));
+            controller.AfterStart();
+
+            var agent = seats.Spawn("peer", out _);
+            context.Component.AgentActionHandler.PollActionsAfterNativeTick();
+            context.Network.NetworkSentPackets.Packets.Clear();
+            agent.UseGameObject(seats.Point);
+            context.Component.AgentActionHandler.PollActionsAfterNativeTick();
+
+            var action = Assert.Single(Assert.Single(
+                context.Network.NetworkSentPackets.GetPackets<AgentActionPacket>()).Actions);
+            Assert.True(action.PilotSeat.HasValue);
+            Assert.Equal("pilot-battle", action.PilotSeat.Value.BattleId);
+            Assert.True(action.PilotSeat.Value.Using);
+            Assert.Equal(884, action.PilotSeat.Value.MachineId);
+            Assert.Equal(882, action.PilotSeat.Value.PointId);
+        });
+    }
+
     [Fact]
     public void PilotSeat_UseAndStopPublishWithoutAnimationChangeAndCatchUpIncludesSeat()
     {
@@ -629,7 +667,7 @@ public partial class ActionEquipmentSyncTests
         public readonly StandingPoint Point;
         public MBList<MissionObject> Objects => (MBList<MissionObject>)AccessTools.Field(typeof(Mission), "_missionObjects").GetValue(Mission.Current);
 
-        public PilotSeatFixture(Context context, string owner = "owner")
+        public PilotSeatFixture(Context context, string owner = "owner", bool bind = true)
         {
             this.context = context;
             harmony.Patch(AccessTools.Method(typeof(ScriptComponentBehavior), "CacheEditableFieldsForAllScriptComponents"),
@@ -647,7 +685,7 @@ public partial class ActionEquipmentSyncTests
                 postfix: new HarmonyMethod(typeof(PilotSeatFixture), nameof(Used)));
             harmony.Patch(AccessTools.Method(typeof(Agent), nameof(Agent.StopUsingGameObject)),
                 prefix: new HarmonyMethod(typeof(PilotSeatFixture), nameof(Stopping)) { priority = Priority.First });
-            context.Component.AgentActionHandler.BindPilotSeats("pilot-battle", Authority);
+            if (bind) context.Component.AgentActionHandler.BindPilotSeats("pilot-battle", Authority);
         }
 
         public Agent Spawn(string owner, out Guid id)
