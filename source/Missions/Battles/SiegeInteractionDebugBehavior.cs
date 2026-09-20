@@ -81,6 +81,10 @@ internal sealed class SiegeInteractionDebugBehavior : MissionBehavior, ISiegeInt
     private bool capturedExtraSlotEmpty;
     private ItemObject ownedForkItem;
     private ItemObject ownedAmmoItem;
+    private EquipmentIndex preparedArrowSlot = EquipmentIndex.None;
+    private ItemObject preparedArrowItem;
+    private ItemModifier preparedArrowModifier;
+    private short preparedArrowAmount;
     private bool fixtureRestored;
     private string captureFailureReason;
     private Agent dismountAgent;
@@ -514,6 +518,11 @@ internal sealed class SiegeInteractionDebugBehavior : MissionBehavior, ISiegeInt
             Capture(screen, agent);
             return;
         }
+        if (request.Action == "prepare-arrows")
+        {
+            PrepareArrowAmmo(screen, agent);
+            return;
+        }
         if (request.Action == "stage" || request.Action == "watch" || request.Action == "approach" || request.Action == "aim")
         {
             Stage(screen, agent, request.MachineId, request.StandingPointIndex, request.Action == "watch",
@@ -731,8 +740,51 @@ internal sealed class SiegeInteractionDebugBehavior : MissionBehavior, ISiegeInt
         capturedExtraSlotEmpty = agent.Equipment[EquipmentIndex.ExtraWeaponSlot].IsEmpty;
         ownedForkItem = null;
         ownedAmmoItem = null;
+        preparedArrowSlot = EquipmentIndex.None;
+        preparedArrowItem = null;
+        preparedArrowModifier = null;
+        preparedArrowAmount = 0;
         observerFrame = null;
         status = "fixture_captured";
+    }
+
+    internal void PrepareArrowAmmo(MissionScreen screen, Agent agent)
+    {
+        status = "fixture_arrow_prepare_rejected";
+        if (capturedAgent == null || capturedAgent != agent || screen == null || screen != capturedScreen ||
+            Mission != TaleWorlds.MountAndBlade.Mission.Current || agent.Mission != Mission ||
+            !agent.IsActive() || agent.IsUsingGameObject || agent.MountAgent != null ||
+            pressInvoked || externalInputArmed || preparedArrowSlot != EquipmentIndex.None ||
+            !AgentEquipmentData.HasSafeWeaponSlots(agent.Equipment)) return;
+        var slots = Enumerable.Range((int)EquipmentIndex.WeaponItemBeginSlot, (int)EquipmentIndex.ExtraWeaponSlot)
+            .Select(index => (EquipmentIndex)index)
+            .Where(slot => agent.Equipment[slot].CurrentUsageItem?.WeaponClass == WeaponClass.Arrow ||
+                agent.Equipment[slot].CurrentUsageItem?.WeaponClass == WeaponClass.Bolt).ToArray();
+        if (slots.Length != 1) return;
+        var weapon = agent.Equipment[slots[0]];
+        if (weapon.Item == null || weapon.CurrentUsageItem.WeaponClass != WeaponClass.Arrow ||
+            weapon.ModifiedMaxAmount <= 1 || weapon.Amount != weapon.ModifiedMaxAmount) return;
+        preparedArrowSlot = slots[0];
+        preparedArrowItem = weapon.Item;
+        preparedArrowModifier = weapon.ItemModifier;
+        preparedArrowAmount = weapon.Amount;
+        // This reversible deficit is setup; only the barrel's native tick counts as restocking.
+        agent.SetWeaponAmountInSlot(preparedArrowSlot, (short)(preparedArrowAmount - 1), enforcePrimaryItem: true);
+        status = agent.Equipment[preparedArrowSlot].Amount == preparedArrowAmount - 1
+            ? "fixture_arrow_deficit_prepared" : "fixture_arrow_prepare_mismatch";
+    }
+
+    internal bool RestoreArrowAmmo(Agent agent)
+    {
+        if (preparedArrowSlot == EquipmentIndex.None) return true;
+        if (agent == null || agent != capturedAgent || !AgentEquipmentData.HasSafeWeaponSlots(agent.Equipment)) return false;
+        var weapon = agent.Equipment[preparedArrowSlot];
+        if (!ReferenceEquals(weapon.Item, preparedArrowItem) || !ReferenceEquals(weapon.ItemModifier, preparedArrowModifier) ||
+            weapon.CurrentUsageItem?.WeaponClass != WeaponClass.Arrow || weapon.ModifiedMaxAmount != preparedArrowAmount ||
+            (weapon.Amount != preparedArrowAmount && weapon.Amount != preparedArrowAmount - 1)) return false;
+        if (weapon.Amount != preparedArrowAmount)
+            agent.SetWeaponAmountInSlot(preparedArrowSlot, preparedArrowAmount, enforcePrimaryItem: true);
+        return agent.Equipment[preparedArrowSlot].Amount == preparedArrowAmount;
     }
 
     internal bool RejectCapture(bool rejected, string reason)
@@ -1053,6 +1105,11 @@ internal sealed class SiegeInteractionDebugBehavior : MissionBehavior, ISiegeInt
             }
             externalInputArmed = false;
         }
+        if (!RestoreArrowAmmo(agent))
+        {
+            status = "fixture_restore_rejected_arrow_equipment";
+            return;
+        }
         if (!RestoreFork(agent))
         {
             status = "fixture_restore_rejected_fork_equipment";
@@ -1184,6 +1241,12 @@ internal sealed class SiegeInteractionDebugBehavior : MissionBehavior, ISiegeInt
                 !capturedBattleEndLogic._canCheckForEndCondition,
             ownedForkItemId = ownedForkItem?.StringId,
             ownedAmmoItemId = ownedAmmoItem?.StringId,
+            arrowPreparation = preparedArrowSlot == EquipmentIndex.None ? null : new
+            {
+                slot = (int)preparedArrowSlot, itemId = preparedArrowItem?.StringId,
+                itemModifierId = preparedArrowModifier?.StringId,
+                originalAmount = preparedArrowAmount, preparedAmount = preparedArrowAmount - 1
+            },
             nativeCameraStaged, nativeAimTarget, observerFrame, functionalAction,
             stagingCameraActive = stagingCamera != null && ReferenceEquals(screen?.CustomCamera, stagingCamera),
             focusDiagnostic = ReadFocusDiagnostic(screen, agent),
@@ -1421,6 +1484,8 @@ internal sealed class SiegeInteractionDebugBehavior : MissionBehavior, ISiegeInt
             slots.Add(new
             {
                 slot = (int)index, itemId = weapon.Item?.StringId, amount = weapon.Amount,
+                itemModifierId = weapon.ItemModifier?.StringId,
+                modifiedMaxAmount = weapon.ModifiedMaxAmount,
                 weaponClass = weapon.Item?.PrimaryWeapon?.WeaponClass.ToString()
             });
         }

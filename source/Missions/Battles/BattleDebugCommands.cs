@@ -193,7 +193,7 @@ internal static class BattleDebugCommands
             new ExpectedArgs("controller_id", "Connected defender controller."),
             new ExpectedArgs("request_id", "Unique native input request."),
             new ExpectedArgs("machine_id", "Native mission object id from dump_machines."),
-            new ExpectedArgs("action", "capture, dismount, stage, approach, aim, watch, use, fire, attack, stop or restore."),
+            new ExpectedArgs("action", "capture, prepare-arrows, dismount, stage, approach, aim, watch, use, fire, attack, stop or restore."),
             new ExpectedArgs("standing_point", "Existing standing point index.", isRequired: false)
         };
 
@@ -214,7 +214,8 @@ internal static class BattleDebugCommands
             int standingPoint = 0;
             if ((args[3] != "capture" && args[3] != "dismount" && args[3] != "stage" && args[3] != "approach" && args[3] != "aim" && args[3] != "watch" && args[3] != "arm-use" && args[3] != "arm-stop" && args[3] != "use" &&
                  args[3] != "fire" && args[3] != "attack" && args[3] != "stop" && args[3] != "restore" &&
-                 args[3] != "handler-use" && args[3] != "handler-stop" && args[3] != "handler-fire" && args[3] != "handler-reload") ||
+                 args[3] != "handler-use" && args[3] != "handler-stop" && args[3] != "handler-fire" && args[3] != "handler-reload" &&
+                 args[3] != "prepare-arrows") ||
                 (args.Count == 5 && !int.TryParse(args[4], out standingPoint)))
                 return Failed("Invalid action or standing point.");
             if (!players.TryGetPlayer(args[0], out var player) ||
