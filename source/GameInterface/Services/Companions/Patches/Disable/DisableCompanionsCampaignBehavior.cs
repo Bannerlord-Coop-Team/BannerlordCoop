@@ -255,7 +255,7 @@ internal class CompanionsCampaignBehaviorPatches
         return affiliatedWanderers;
     }
 
-    private static bool ShouldSpawnUnaffiliatedWanderer(IEnumerable<Hero> aliveHeroes, int targetPopulation)
+    internal static bool ShouldSpawnUnaffiliatedWanderer(IEnumerable<Hero> aliveHeroes, int targetPopulation)
     {
         var unaffiliatedWanderers = 0;
         foreach (var hero in aliveHeroes)
