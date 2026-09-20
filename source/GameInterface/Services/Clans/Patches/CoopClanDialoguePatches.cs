@@ -1,5 +1,7 @@
 ﻿using HarmonyLib;
 using TaleWorlds.CampaignSystem;
+using GameInterface.Services.Heroes.Extensions;
+using System.Collections.Generic;
 using TaleWorlds.CampaignSystem.CampaignBehaviors;
 
 namespace GameInterface.Services.Clans.Patches;
@@ -81,6 +83,25 @@ internal class CoopClanDialoguePatches
     [HarmonyPostfix]
     public static void CreateKingdomConditionPostfix(ref bool __result)
         => CheckCanManageClan(ref __result);
+
+    [HarmonyPatch(typeof(RomanceCampaignBehavior), nameof(RomanceCampaignBehavior.FindPlayerRelativesEligibleForMarriage))]
+    [HarmonyPostfix]
+    public static void FindPlayerRelativesEligibleForMarriagePostfix(List<CharacterObject> __result)
+    {
+        if (!CoopClanPermissions.CanManageClan(Hero.MainHero.Clan))
+            __result.Clear();
+        else
+            __result.RemoveAll(character => character.HeroObject.IsPlayerHero());
+    }
+
+    [HarmonyPatch(typeof(RomanceCampaignBehavior), nameof(RomanceCampaignBehavior.MarriageCourtshipPossibility))]
+    [HarmonyPostfix]
+    public static void MarriageCourtshipPossibilityPostfix(Hero person1, Hero person2, ref bool __result)
+    {
+        __result = __result && !person2.IsPlayerHero() &&
+            (person1 == Hero.MainHero ||
+                (!person1.IsPlayerHero() && CoopClanPermissions.CanManageClan(person1.Clan)));
+    }
 
     private static void CheckCanManageClan(ref bool __result)
     {
