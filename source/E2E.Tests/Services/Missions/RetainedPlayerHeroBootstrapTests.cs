@@ -26,13 +26,16 @@ public class RetainedPlayerHeroBootstrapTests : MissionTestEnvironment
     public RetainedPlayerHeroBootstrapTests(ITestOutputHelper output) : base(output) { }
 
     [Theory]
-    [InlineData(true, false, false, false)]
-    [InlineData(false, false, false, false)]
-    [InlineData(false, true, false, false)]
-    [InlineData(false, false, true, false)]
-    [InlineData(false, false, false, true)]
+    [InlineData(true, false, false, false, false)]
+    [InlineData(false, false, false, false, false)]
+    [InlineData(false, false, true, false, false)]
+    [InlineData(false, false, false, true, false)]
+    [InlineData(false, false, false, false, true)]
+    [InlineData(true, true, false, false, false)]
+    [InlineData(false, true, false, false, false)]
     public void AcceptedGrantAttachesInitialPlayerBeforeSetupEvenWhenSpawnOrderingChanges(
-        bool catchUpFirst, bool puppetSpawnedFirst, bool conflictingRefresh, bool conflictingRefreshFirst)
+        bool catchUpFirst, bool spawnedByHost, bool puppetSpawnedFirst,
+        bool conflictingRefresh, bool conflictingRefreshFirst)
     {
         using var fixture = new MissionEngineFixture();
         var (battleId, partyIds) = SetupCoopBattle("holder", "returner");
@@ -71,7 +74,8 @@ public class RetainedPlayerHeroBootstrapTests : MissionTestEnvironment
                 .GetField("puppetSpawner", BindingFlags.Instance | BindingFlags.NonPublic).GetValue(controller);
             var previous = new BattleAgentSpawnData(Guid.NewGuid(), characterId, default, BattleSideEnum.Defender,
                 22, "holder", eventPartyId, 1141, new Equipment(), default, null, movementId: 7,
-                originalOwnerControllerId: "returner", movementScopeId: "returner:old", authorityRevision: 1);
+                originalOwnerControllerId: spawnedByHost ? "holder" : "returner",
+                movementScopeId: spawnedByHost ? "holder:current" : "returner:old", authorityRevision: spawnedByHost ? 0 : 1);
             var grant = new NetworkRetainedPlayerHero(battleId, 1, "returner", previous);
             Assert.Same(controller, Mission.Current.GetMissionBehavior<CoopBattleController>());
             Assert.Same(spawnHandler, Mission.Current.GetMissionBehavior<CoopBattleMissionSpawnHandler>());
@@ -120,7 +124,9 @@ public class RetainedPlayerHeroBootstrapTests : MissionTestEnvironment
             Assert.Equal(AgentControllerType.None, Mission.Current.InitialPlayerAgent.Controller);
             Assert.True(returner.Resolve<INetworkAgentRegistry>().TryGetAgentInfo(previous.AgentId, out var info));
             Assert.Equal("returner", info.CurrentAuthority);
-            Assert.Equal(2, info.AuthorityRevision);
+            Assert.Equal(spawnedByHost ? 1 : 2, info.AuthorityRevision);
+            Assert.Equal(previous.OriginalOwnerControllerId, info.OriginalOwner);
+            Assert.Equal(previous.MovementScopeId, info.MovementScopeId);
             Assert.Equal(22, info.Agent.Health);
             Assert.Equal(0, supplier.GetRemainingForParty(eventPartyId));
             Assert.Equal(1, supplier.CaptureAllocationSnapshot().SuppliedTroops);
@@ -140,7 +146,9 @@ public class RetainedPlayerHeroBootstrapTests : MissionTestEnvironment
             Assert.Equal(conflictingRefresh, mission.DeploymentController.TeamSetupOver);
             Assert.False(controller.Deployment.IsCommitted);
             Assert.Equal("returner", info.CurrentAuthority);
-            Assert.Equal(2, info.AuthorityRevision);
+            Assert.Equal(spawnedByHost ? 1 : 2, info.AuthorityRevision);
+            Assert.Equal(previous.OriginalOwnerControllerId, info.OriginalOwner);
+            Assert.Equal(previous.MovementScopeId, info.MovementScopeId);
             Assert.Equal(1, supplier.CaptureAllocationSnapshot().SuppliedTroops);
 
             broker.Publish(this, grant);

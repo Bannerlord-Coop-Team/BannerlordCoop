@@ -20,7 +20,6 @@ using TaleWorlds.MountAndBlade;
 
 namespace Missions.Battles;
 
-
 /// <summary>
 /// Peer-side spawn application for a coop battle: spawns the agents other owners replicate over the mesh
 /// (<see cref="NetworkSpawnBattleAgents"/>) as local puppets driven by their owner's movement. Spawns that
@@ -35,7 +34,6 @@ public interface IPuppetSpawner : IDisposable
     /// </summary>
     void DrainPendingPuppets();
     bool HasRetainedPlayerAgent(Agent agent);
-
 }
 
 /// <inheritdoc cref="IPuppetSpawner"/>
@@ -809,7 +807,6 @@ public class PuppetSpawner : IPuppetSpawner
         var controller = Mission.Current?.GetMissionBehavior<DeploymentMissionController>();
         return controller != null && (isOwnAgent || !controller.TeamSetupOver);
     }
-
 
     public void DrainPendingPuppets()
     {

@@ -45,6 +45,7 @@ internal static class MissionActionDiagnostics
     private const int TraceAgentsPerMovementClass = 32;
     private const int TraceAgentsPerActionClass = 16;
     private const int MaximumTimelineEvents = 20000;
+    internal const int MaximumSnapshotTimelineEvents = 256;
     private const int MaximumRewindSamples = 64;
     private const int MaximumPacketAuthorities = 64;
     private const float ProgressTolerance = 0.02f;
@@ -843,6 +844,9 @@ internal static class MissionActionDiagnostics
                 FinishTrack(key, now);
         }
 
+        int timelineEventCount = Timeline.Count;
+        TraceEvent[] timeline = TakeSnapshotTail(Timeline);
+
         return JsonConvert.SerializeObject(new
         {
             enabled = animationTraceEnabled,
@@ -867,9 +871,17 @@ internal static class MissionActionDiagnostics
                 mountActionCommands,
                 sampledProgressDrops,
             },
-            timelineTruncated = Timeline.Count >= MaximumTimelineEvents,
-            timeline = Timeline,
+            timelineTruncated = timelineEventCount >= MaximumTimelineEvents,
+            timelineEventCount,
+            timelineOutputTruncated = timeline.Length < timelineEventCount,
+            timeline,
         });
+    }
+
+    internal static T[] TakeSnapshotTail<T>(IReadOnlyList<T> values)
+    {
+        return values.Skip(Math.Max(0, values.Count - MaximumSnapshotTimelineEvents))
+            .ToArray();
     }
 
     private static string GetActionCategory(

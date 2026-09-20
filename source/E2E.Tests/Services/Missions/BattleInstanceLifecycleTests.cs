@@ -10,6 +10,7 @@ using Missions.Agents;
 using Missions.Battles;
 using Missions.Messages;
 using Missions.Services.Network;
+using Moq;
 using TaleWorlds.MountAndBlade;
 using Xunit;
 using Xunit.Abstractions;
@@ -39,13 +40,16 @@ public class BattleInstanceLifecycleTests : MissionTestEnvironment
                 client.Resolve<IBattleHostRegistry>());
             session.TryBegin(mapEventId);
             var worldItemRegistry = new RecordingWorldItemRegistry();
+            var agentRegistry = new Mock<INetworkAgentRegistry>();
+            var missionComponent = new Mock<ICoopMissionComponent>();
+            missionComponent.SetupGet(component => component.AgentRegistry).Returns(agentRegistry.Object);
 
             using var lifecycle = new BattleInstanceLifecycle(
                 client.Resolve<IBattleNetwork>(),
                 client.Resolve<INetwork>(),
                 broker,
                 objectManager: null,
-                coopMissionComponent: null,
+                coopMissionComponent: missionComponent.Object,
                 worldItemRegistry: worldItemRegistry,
                 session: session,
                 missionContext: context);
@@ -53,6 +57,7 @@ public class BattleInstanceLifecycleTests : MissionTestEnvironment
             lifecycle.Leave(wasRetreat: false);
 
             Assert.Empty(context.ControllersInMission);
+            agentRegistry.Verify(registry => registry.Clear(), Times.Once);
             Assert.Equal(1, worldItemRegistry.ClearCalls);
         });
     }
@@ -71,13 +76,16 @@ public class BattleInstanceLifecycleTests : MissionTestEnvironment
                 client.Resolve<IControllerIdProvider>(),
                 client.Resolve<IBattleHostRegistry>());
             Assert.True(session.TryBegin(mapEventId));
+            var agentRegistry = new Mock<INetworkAgentRegistry>();
+            var missionComponent = new Mock<ICoopMissionComponent>();
+            missionComponent.SetupGet(component => component.AgentRegistry).Returns(agentRegistry.Object);
 
             using var lifecycle = new BattleInstanceLifecycle(
                 client.Resolve<IBattleNetwork>(),
                 client.Resolve<INetwork>(),
                 client.Resolve<IMessageBroker>(),
                 objectManager: null,
-                coopMissionComponent: null,
+                coopMissionComponent: missionComponent.Object,
                 worldItemRegistry: new RecordingWorldItemRegistry(),
                 session: session,
                 missionContext: client.Resolve<IMissionContext>());
@@ -87,6 +95,7 @@ public class BattleInstanceLifecycleTests : MissionTestEnvironment
             Assert.Equal(expectedRetreatMessages,
                 client.NetworkSentMessages.GetMessageCount<NetworkBattleRetreated>());
             Assert.Equal(1, client.NetworkSentMessages.GetMessageCount<NetworkMissionLeft>());
+            agentRegistry.Verify(registry => registry.Clear(), Times.Once);
         });
     }
 
