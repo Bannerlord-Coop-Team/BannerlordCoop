@@ -78,7 +78,7 @@ public class KingdomHandlerTests
             null!,
             "New Kingdom",
             out string reason);
-        
+
         Assert.False(result);
         Assert.Equal("kingdom was null", reason);
     }
@@ -88,13 +88,13 @@ public class KingdomHandlerTests
     {
         var clan = ObjectHelper.SkipConstructor<Clan>();
         var kingdom = ObjectHelper.SkipConstructor<Kingdom>();
-        
+
         bool result = KingdomHandler.CanChangeKingdomName(
             clan,
             kingdom,
             "New Kingdom",
             out string reason);
-        
+
         Assert.False(result);
         Assert.Equal("clan is not a member of the kingdom", reason);
     }
@@ -108,13 +108,13 @@ public class KingdomHandlerTests
 
         clan._kingdom = kingdom;
         kingdom._rulingClan = otherClan;
-        
+
         bool result = KingdomHandler.CanChangeKingdomName(
             clan,
             kingdom,
             "New Kingdom",
             out string reason);
-        
+
         Assert.False(result);
         Assert.Equal("clan is not the ruling clan of the kingdom", reason);
     }
@@ -124,16 +124,16 @@ public class KingdomHandlerTests
     {
         var clan = ObjectHelper.SkipConstructor<Clan>();
         var kingdom = ObjectHelper.SkipConstructor<Kingdom>();
-        
+
         clan._kingdom = kingdom;
         kingdom._rulingClan = clan;
-        
+
         bool result = KingdomHandler.CanChangeKingdomName(
             clan,
             kingdom,
             "New Kingdom",
             out string reason);
-        
+
         Assert.True(result);
         Assert.Null(reason);
     }
@@ -244,18 +244,18 @@ public class KingdomHandlerTests
     [InlineData(" ")]
     public void CanChangeKingdomName_EmptyName_ReturnsFalse(string? requestedName)
     {
-        var clan  = ObjectHelper.SkipConstructor<Clan>();
+        var clan = ObjectHelper.SkipConstructor<Clan>();
         var kingdom = ObjectHelper.SkipConstructor<Kingdom>();
 
         clan._kingdom = kingdom;
         kingdom._rulingClan = clan;
-        
+
         bool result = KingdomHandler.CanChangeKingdomName(
             clan,
             kingdom,
             requestedName!,
             out string reason);
-        
+
         Assert.False(result);
         Assert.Equal("kingdom name was empty", reason);
     }
@@ -313,7 +313,7 @@ public class KingdomHandlerTests
         var player = ObjectHelper.SkipConstructor<Player>();
         var settlement = ObjectHelper.SkipConstructor<Settlement>();
         var objectManager = new Mock<IObjectManager>();
-        var playerManager = new Mock<IPlayerManager>();        
+        var playerManager = new Mock<IPlayerManager>();
         playerManager
             .Setup(manager => manager.TryGetPlayer(peer, out player))
             .Returns(true);
@@ -377,8 +377,6 @@ public class KingdomHandlerTests
                 Times.Once);
             objectManager.VerifyNoOtherCalls();
         });
-
-        
     }
 
     [Fact]
@@ -679,7 +677,6 @@ public class KingdomHandlerTests
                 GameThread.Instance.RestoreGameThread(0);
         }
     }
-
 
     private static KingdomHandler CreateHandler(IObjectManager objectManager)
     {
