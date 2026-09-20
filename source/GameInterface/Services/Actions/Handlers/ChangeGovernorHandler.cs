@@ -3,8 +3,11 @@ using Common.Logging;
 using Common.Messaging;
 using Common.Network;
 using GameInterface.Services.Actions.Messages;
+using GameInterface.Services.Clans;
 using GameInterface.Services.Clans.Messages;
 using GameInterface.Services.ObjectManager;
+using GameInterface.Services.Players;
+using LiteNetLib;
 using Serilog;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Actions;
@@ -19,15 +22,21 @@ internal class ChangeGovernorHandler : IHandler
     private readonly IMessageBroker messageBroker;
     private readonly IObjectManager objectManager;
     private readonly INetwork network;
+    private readonly IPlayerManager playerManager;
+    private readonly ICoopClanPermissions permissions;
 
     public ChangeGovernorHandler(
         IMessageBroker messageBroker,
         IObjectManager objectManager,
-        INetwork network)
+        INetwork network,
+        IPlayerManager playerManager,
+        ICoopClanPermissions permissions)
     {
         this.messageBroker = messageBroker;
         this.objectManager = objectManager;
         this.network = network;
+        this.playerManager = playerManager;
+        this.permissions = permissions;
 
         messageBroker.Subscribe<GovernorChanged>(Handle_GovernorChanged);
         messageBroker.Subscribe<ChangeGovernor>(Handle_ChangeGovernor);
@@ -60,6 +69,7 @@ internal class ChangeGovernorHandler : IHandler
         {
             if (!objectManager.TryGetObjectWithLogging<Town>(data.FortificationId, out var fortification)) return;
             if (!objectManager.TryGetObjectWithLogging<Hero>(data.GovernorId, out var governor)) return;
+            if (ModInformation.IsServer && !CanManageClan(obj.Who, fortification.OwnerClan)) return;
 
             ChangeGovernorAction.ApplyInternal(fortification, governor);
 
@@ -83,11 +93,20 @@ internal class ChangeGovernorHandler : IHandler
         GameThread.RunSafe(() =>
         {
             if (!objectManager.TryGetObjectWithLogging<Hero>(data.GovernorId, out var governor)) return;
+            if (ModInformation.IsServer &&
+                (governor.GovernorOf == null || !CanManageClan(obj.Who, governor.GovernorOf.OwnerClan))) return;
 
             ChangeGovernorAction.ApplyGiveUpInternal(governor);
 
             if (!objectManager.TryGetIdWithLogging(governor.Clan, out var clanId)) return;
             network.SendAll(new NetworkRefreshClanMembersList(clanId));
         });
+    }
+
+    private bool CanManageClan(object sender, Clan clan)
+    {
+        return sender is NetPeer peer && playerManager.TryGetPlayer(peer, out var player) &&
+            objectManager.TryGetObjectWithLogging<Hero>(player.HeroId, out var actor) &&
+            permissions.CanManageClan(actor, clan);
     }
 }

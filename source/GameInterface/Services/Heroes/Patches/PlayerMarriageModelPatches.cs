@@ -6,7 +6,7 @@ using TaleWorlds.CampaignSystem.GameComponents;
 namespace GameInterface.Services.Heroes.Patches;
 
 [HarmonyPatch(typeof(DefaultMarriageModel))]
-public class PlayerMarriageModelPatches
+internal class PlayerMarriageModelPatches
 {
     [HarmonyPrefix]
     [HarmonyPatch(nameof(DefaultMarriageModel.IsCoupleSuitableForMarriage))]

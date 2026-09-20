@@ -154,7 +154,7 @@ internal class BuildingHelperHandler : IHandler
             ApplyBoostBuildingProcessWithGold(obj.What);
         });
     }
-    
+
     internal void ApplyBoostBuildingProcessWithGold(BoostBuildingProcessWithGold data)
     {
         if (!objectManager.TryGetObjectWithLogging<Town>(data.TownId, out var town)) return;

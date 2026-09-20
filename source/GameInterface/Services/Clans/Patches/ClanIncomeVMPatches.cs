@@ -10,7 +10,7 @@ using TaleWorlds.CampaignSystem.ViewModelCollection.ClanManagement.ClanFinance;
 namespace GameInterface.Services.Clans.Patches;
 
 [HarmonyPatch]
-public static class ClanIncomeVMPatches
+internal static class ClanIncomeVMPatches
 {
     public static IEnumerable<MethodBase> TargetMethods()
     {

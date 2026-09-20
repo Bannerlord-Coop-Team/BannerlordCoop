@@ -216,7 +216,7 @@ public class ClanFinance : IClanFinance
             if (applyWithdrawals)
             {
                 GiveGoldAction.ApplyBetweenCharacters(null, member, -wage, true);
-            } 
+            }
 
             change.Add(-wage, DefaultClanFinanceModel._mainPartywageText);
         }

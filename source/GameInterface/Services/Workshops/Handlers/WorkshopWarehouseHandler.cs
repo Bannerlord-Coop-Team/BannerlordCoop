@@ -92,7 +92,7 @@ internal class WorkshopWarehouseHandler : IHandler
                 if (workshopsBehavior.GetDataOfWorkshop(workshop) == null)
                 {
                     workshopsBehavior.AddNewWorkshopData(workshop);
-                }  
+                }
             }
             else if (oldOwner.IsPlayerHero())
             {

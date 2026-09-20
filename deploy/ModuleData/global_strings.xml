@@ -5,7 +5,7 @@
     <string id="str_coop_cannot_execute_heroes" text="Executing heroes has been disabled by the host."/>
     <string id="str_coop_cannot_execute_players" text="Executing player heroes has been disabled by the host."/>
     <string id="str_coop_cannot_execute_player_clan_members" text="Executing members of other players' clans has been disabled by the host."/>
-	
+
     <string id="str_coop_clan_players" text="{=str_coop_clan_players}Players" />
     <string id="str_coop_clan_other_families" text="{=str_coop_clan_other_families}Other Families" />
     <string id="str_coop_clan_player" text="{=str_coop_clan_player}Player" />

@@ -91,7 +91,6 @@ internal class SettlementMenuAccessHandler : IHandler
             settlementMenuAccess.OnAccessReceived(obj.What);
         });
     }
-        
 
     private void Handle_NetworkSettlementMenusChanged(MessagePayload<NetworkSettlementMenusChanged> obj)
     {

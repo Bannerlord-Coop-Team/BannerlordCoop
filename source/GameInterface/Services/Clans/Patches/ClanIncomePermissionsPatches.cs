@@ -7,7 +7,7 @@ using TaleWorlds.CampaignSystem.ViewModelCollection.ClanManagement.ClanFinance;
 namespace GameInterface.Services.Clans.Patches;
 
 [HarmonyPatch]
-public static class ClanIncomePermissionsPatches
+internal static class ClanIncomePermissionsPatches
 {
     public static IEnumerable<MethodBase> TargetMethods()
     {

@@ -69,7 +69,7 @@ internal class MapTrackerProviderRefreshHandler : IHandler
             if (!objectManager.TryGetObjectWithLogging<Clan>(obj.What.ClanId, out var clan)) return;
 
             if (clan != Clan.PlayerClan) return;
-                
+
             holder.Current.ResetTrackers();
         });
     }
