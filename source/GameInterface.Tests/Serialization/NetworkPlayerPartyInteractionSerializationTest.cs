@@ -59,12 +59,14 @@ public class NetworkPlayerPartyInteractionSerializationTest
             PlayerPartyInteractionProposal.Trade,
             new[] { PlayerPartyInteractionOption.AcceptProposal, PlayerPartyInteractionOption.DeclineProposal },
             isInitiator: false,
+            mercenaryAwardMultiplier: 12,
             initiatorAcceptedTrade: true,
             responderAcceptedTrade: false,
             partyItems: new[] { new ItemRosterElementData(new ItemObjectData("party-item", null, itemModifierNull: true), 3) },
             otherPartyItems: new[] { new ItemRosterElementData(new ItemObjectData("other-item", null, itemModifierNull: true), 4) },
             enabledOptions: new[] { PlayerPartyInteractionOption.AcceptProposal },
             isHostile: true,
+            mercenaryUnavailableReason: PlayerPartyInteractionMercenaryUnavailableReason.InitiatorClanTierTooLow,
             clanJoinUnavailableReason: ClanJoinUnavailableReason.IncompatibleWars);
 
         var result = RoundTrip(original);
@@ -81,6 +83,8 @@ public class NetworkPlayerPartyInteractionSerializationTest
         Assert.Equal(original.InitiatorAcceptedTrade, result.InitiatorAcceptedTrade);
         Assert.Equal(original.ResponderAcceptedTrade, result.ResponderAcceptedTrade);
         Assert.Equal(original.IsHostile, result.IsHostile);
+        Assert.Equal(original.MercenaryAwardMultiplier, result.MercenaryAwardMultiplier);
+        Assert.Equal(original.MercenaryUnavailableReason, result.MercenaryUnavailableReason);
         Assert.Equal(original.ClanJoinUnavailableReason, result.ClanJoinUnavailableReason);
         Assert.Single(result.PartyItems);
         Assert.Equal("party-item", result.PartyItems[0].ItemObjectData.ItemObjectId);
@@ -92,6 +96,9 @@ public class NetworkPlayerPartyInteractionSerializationTest
 
     [Theory]
     [InlineData(PlayerPartyInteractionOption.TradeProposal)]
+    [InlineData(PlayerPartyInteractionOption.Mercenary)]
+    [InlineData(PlayerPartyInteractionOption.ConfirmMercenary)]
+    [InlineData(PlayerPartyInteractionOption.CancelMercenary)]
     [InlineData(PlayerPartyInteractionOption.LeaveClan)]
     [InlineData(PlayerPartyInteractionOption.RemoveFromClan)]
     [InlineData(PlayerPartyInteractionOption.ProposeMarriage)]
@@ -114,6 +121,8 @@ public class NetworkPlayerPartyInteractionSerializationTest
 
     [Theory]
     [InlineData(PlayerPartyInteractionOutcomeType.TradeAccepted)]
+    [InlineData(PlayerPartyInteractionOutcomeType.MercenaryAccepted)]
+    [InlineData(PlayerPartyInteractionOutcomeType.MercenaryDeclined)]
     [InlineData(PlayerPartyInteractionOutcomeType.ClanLeft)]
     [InlineData(PlayerPartyInteractionOutcomeType.ClanMemberRemoved)]
     [InlineData(PlayerPartyInteractionOutcomeType.MarriageAccepted)]

@@ -34,6 +34,7 @@ public class WorldSettlementDirectCommandTests
         "SettlementAuditorCommand",
         "SettlementCommands",
         "SiegeDebugCommand",
+        "SiegeDefenseArmyFixtureCommands",
         "TournamentDebugCommand",
         "TownAuditorDebugCommand",
         "TownDebugCommand",
@@ -49,7 +50,7 @@ public class WorldSettlementDirectCommandTests
         Type[] commandTypes = GetCommandTypes();
 
 #if DEBUG
-        Assert.Equal(134, commandTypes.Length);
+        Assert.Equal(140, commandTypes.Length);
 #else
         Assert.Equal(123, commandTypes.Length);
 #endif

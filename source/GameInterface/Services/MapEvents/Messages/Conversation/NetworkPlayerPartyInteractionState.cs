@@ -40,6 +40,10 @@ internal readonly struct NetworkPlayerPartyInteractionState : ICommand
     [ProtoMember(15)]
     public readonly PlayerPartyInteractionVassalUnavailableReason VassalUnavailableReason;
     [ProtoMember(16)]
+    public readonly PlayerPartyInteractionMercenaryUnavailableReason MercenaryUnavailableReason;
+    [ProtoMember(17)]
+    public readonly int MercenaryAwardMultiplier;
+    [ProtoMember(18)]
     public readonly ClanJoinUnavailableReason ClanJoinUnavailableReason;
 
     public NetworkPlayerPartyInteractionState(
@@ -51,6 +55,7 @@ internal readonly struct NetworkPlayerPartyInteractionState : ICommand
         PlayerPartyInteractionProposal proposal,
         PlayerPartyInteractionOption[] options,
         bool isInitiator,
+        int mercenaryAwardMultiplier = 0,
         bool initiatorAcceptedTrade = false,
         bool responderAcceptedTrade = false,
         ItemRosterElementData[] partyItems = null,
@@ -58,6 +63,7 @@ internal readonly struct NetworkPlayerPartyInteractionState : ICommand
         PlayerPartyInteractionOption[] enabledOptions = null,
         bool isHostile = false,
         PlayerPartyInteractionVassalUnavailableReason vassalUnavailableReason = PlayerPartyInteractionVassalUnavailableReason.None,
+        PlayerPartyInteractionMercenaryUnavailableReason mercenaryUnavailableReason = PlayerPartyInteractionMercenaryUnavailableReason.None,
         ClanJoinUnavailableReason clanJoinUnavailableReason = ClanJoinUnavailableReason.None)
     {
         SessionId = sessionId;
@@ -75,6 +81,8 @@ internal readonly struct NetworkPlayerPartyInteractionState : ICommand
         EnabledOptions = enabledOptions ?? Options;
         IsHostile = isHostile;
         VassalUnavailableReason = vassalUnavailableReason;
+        MercenaryUnavailableReason = mercenaryUnavailableReason;
+        MercenaryAwardMultiplier = mercenaryAwardMultiplier;
         ClanJoinUnavailableReason = clanJoinUnavailableReason;
     }
 }
