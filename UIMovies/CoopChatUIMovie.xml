@@ -2,10 +2,11 @@
   <Window>
     <Widget WidthSizePolicy="StretchToParent" HeightSizePolicy="StretchToParent" DoNotAcceptEvents="true">
       <Children>
-        <Widget Id="CoopChatRoot" WidthSizePolicy="Fixed" SuggestedWidth="520"
-                HeightSizePolicy="Fixed" SuggestedHeight="350"
+        <Widget Id="CoopChatRoot" WidthSizePolicy="Fixed" HeightSizePolicy="Fixed"
+                SuggestedWidth="@ChatBoxSizeX" SuggestedHeight="@ChatBoxSizeY"
+                MinWidth="425" MaxWidth="650" MinHeight="170" MaxHeight="470"
                 HorizontalAlignment="Left" VerticalAlignment="Bottom"
-                MarginLeft="27" MarginBottom="100">
+                MarginLeft="27" MarginBottom="75">
           <Children>
             <Widget WidthSizePolicy="StretchToParent" HeightSizePolicy="StretchToParent"
                     Sprite="BlankWhiteSquare_9" Color="#000000FF" AlphaFactor="0.5"
@@ -70,10 +71,6 @@
                                      HeightSizePolicy="Fixed" SuggestedHeight="36" MarginLeft="4"
                                      Command.Click="ActionToggleMute"
                                      Parameter.Text="@MuteButtonText" IsVisible="@IsMuteButtonVisible"/>
-                    <ButtonWidget Id="CoopChatCloseButton" DoNotPassEventsToChildren="true"
-                                  UpdateChildrenStates="true" WidthSizePolicy="Fixed" SuggestedWidth="36"
-                                  HeightSizePolicy="Fixed" SuggestedHeight="36" MarginLeft="4"
-                                  Brush="CloseButton.Flat" Command.Click="ActionClose"/>
                   </Children>
                 </ListPanel>
 
@@ -164,18 +161,17 @@
                                             KeyboardInfoText="@ActiveChannelText"/>
                       </Children>
                     </BrushWidget>
-                    <Standard.Button WidthSizePolicy="Fixed" SuggestedWidth="90"
-                                     HeightSizePolicy="StretchToParent" MarginLeft="6"
-                                     Command.Click="ActionSend" Parameter.Text="@SendButtonText"/>
                   </Children>
                 </ListPanel>
-
-                <TextWidget WidthSizePolicy="StretchToParent" HeightSizePolicy="Fixed" SuggestedHeight="24"
-                            MarginTop="2" Brush="ChatLog.HideShowText"
-                            Brush.TextHorizontalAlignment="Right" Brush.TextVerticalAlignment="Center"
-                            Text="@InputHintText" IsVisible="@IsOpen"/>
               </Children>
             </ListPanel>
+
+            <Widget Id="CoopChatResizeFrame" WidthSizePolicy="StretchToParent" HeightSizePolicy="StretchToParent"
+                    Sprite="WhiteFrame_9" VerticalAlignment="Bottom" IsVisible="false"/>
+            <ImageWidget Id="CoopChatResizer" WidthSizePolicy="Fixed" HeightSizePolicy="Fixed"
+                         SuggestedWidth="21" SuggestedHeight="22" HorizontalAlignment="Right"
+                         MarginRight="1" MarginTop="1" Brush="SPChatlog.Resizer"
+                         IsVisible="@IsOpen" HoveredCursorState="DiagonalRightResize"/>
           </Children>
         </Widget>
       </Children>

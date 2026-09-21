@@ -122,6 +122,27 @@ public class ChatVMTests
         Assert.Contains(vm.VisibleLines, line => line.Text.Contains("[Global] Local Hero: hello everyone"));
     }
 
+    [Theory]
+    [InlineData(0f, ChatVM.DefaultChatBoxSizeX)]
+    [InlineData(-10f, ChatVM.DefaultChatBoxSizeX)]
+    [InlineData(200f, ChatVM.MinChatBoxSizeX)]
+    [InlineData(900f, ChatVM.MaxChatBoxSizeX)]
+    [InlineData(500f, 500f)]
+    public void ClampSizeX_UsesVanillaBounds(float value, float expected)
+    {
+        Assert.Equal(expected, ChatVM.ClampSizeX(value));
+    }
+
+    [Theory]
+    [InlineData(0f, ChatVM.DefaultChatBoxSizeY)]
+    [InlineData(100f, ChatVM.MinChatBoxSizeY)]
+    [InlineData(900f, ChatVM.MaxChatBoxSizeY)]
+    [InlineData(300f, 300f)]
+    public void ClampSizeY_UsesVanillaBounds(float value, float expected)
+    {
+        Assert.Equal(expected, ChatVM.ClampSizeY(value));
+    }
+
     [Fact]
     public void SetOpen_AndReceive_RequestFeedScrollToBottom()
     {
@@ -289,5 +310,58 @@ public class ChatVMTests
         Assert.DoesNotContain(vm.Channels, channel => channel.ControllerId == "offline");
         Assert.Contains(vm.Channels, channel => channel.ControllerId == "online");
         Assert.True(vm.Channels.Single(channel => channel.IsGlobal).IsSelected);
+    }
+
+    [Fact]
+    public void Constructor_UsesDefaultChatBoxSizesWhenConfigUnavailable()
+    {
+        var vm = new ChatVM(_ => { }, () => "local");
+
+        Assert.Equal(ChatVM.DefaultChatBoxSizeX, vm.ChatBoxSizeX);
+        Assert.Equal(ChatVM.DefaultChatBoxSizeY, vm.ChatBoxSizeY);
+    }
+
+    [Theory]
+    [InlineData(0f, ChatVM.DefaultChatBoxSizeX)]
+    [InlineData(-10f, ChatVM.DefaultChatBoxSizeX)]
+    [InlineData(400f, ChatVM.MinChatBoxSizeX)]
+    [InlineData(700f, ChatVM.MaxChatBoxSizeX)]
+    [InlineData(500f, 500f)]
+    public void ClampSizeX_ClampsToConfiguredBounds(float input, float expected)
+    {
+        Assert.Equal(expected, ChatVM.ClampSizeX(input));
+    }
+
+    [Theory]
+    [InlineData(0f, ChatVM.DefaultChatBoxSizeY)]
+    [InlineData(-10f, ChatVM.DefaultChatBoxSizeY)]
+    [InlineData(100f, ChatVM.MinChatBoxSizeY)]
+    [InlineData(500f, ChatVM.MaxChatBoxSizeY)]
+    [InlineData(300f, 300f)]
+    public void ClampSizeY_ClampsToConfiguredBounds(float input, float expected)
+    {
+        Assert.Equal(expected, ChatVM.ClampSizeY(input));
+    }
+
+    [Fact]
+    public void ChatBoxSizeSetters_ClampAndNotify()
+    {
+        var vm = new ChatVM(_ => { }, () => "local");
+
+        vm.ChatBoxSizeX = 900f;
+        vm.ChatBoxSizeY = 50f;
+
+        Assert.Equal(ChatVM.MaxChatBoxSizeX, vm.ChatBoxSizeX);
+        Assert.Equal(ChatVM.MinChatBoxSizeY, vm.ChatBoxSizeY);
+    }
+
+    [Fact]
+    public void ExecuteSaveSizes_DoesNotThrowWithoutEngineConfig()
+    {
+        var vm = new ChatVM(_ => { }, () => "local");
+        vm.ChatBoxSizeX = 500f;
+        vm.ChatBoxSizeY = 300f;
+
+        vm.ExecuteSaveSizes();
     }
 }

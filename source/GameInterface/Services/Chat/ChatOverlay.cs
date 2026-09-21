@@ -5,6 +5,7 @@ using TaleWorlds.CampaignSystem.GameState;
 using TaleWorlds.Core;
 using TaleWorlds.Engine;
 using TaleWorlds.Engine.GauntletUI;
+using TaleWorlds.GauntletUI;
 using TaleWorlds.GauntletUI.BaseTypes;
 using TaleWorlds.GauntletUI.Data;
 using TaleWorlds.InputSystem;
@@ -19,7 +20,10 @@ internal sealed class ChatOverlay : GlobalLayer, IDisposable
 {
     private const string InputWidgetId = "CoopChatMessageInput";
     private const string FeedScrollablePanelId = "ChatFeedScrollablePanel";
+    private const string ResizerWidgetId = "CoopChatResizer";
+    private const string ResizeFrameWidgetId = "CoopChatResizeFrame";
     private const int LayerOrder = 110;
+    private const float ResizeTransitionSeconds = 0.14f;
 
     private readonly ChatVM dataSource;
     private readonly Action refreshParticipants;
@@ -27,12 +31,21 @@ internal sealed class ChatOverlay : GlobalLayer, IDisposable
     private GauntletMovieIdentifier movie;
     private EditableTextWidget inputWidget;
     private ScrollablePanel feedScrollablePanel;
+    private Widget resizerWidget;
+    private Widget resizeFrameWidget;
     private bool initialized;
     private bool isInputFocused;
     private bool ignoreNextOutsideClick;
     private bool playerChatEnabled;
     private bool pinFeedToBottom;
     private float pinFeedLastMaxValue = -1f;
+    private bool isResizing;
+    private bool applyResizeToPanel;
+    private float resizeLerpRatio;
+    private Vec2 resizeStartMousePosition;
+    private Vec2 resizeOriginalSize;
+    private SizePolicy feedInnerWidthPolicy;
+    private SizePolicy feedInnerHeightPolicy;
 
     public ChatOverlay(ChatVM dataSource, Action refreshParticipants, bool playerChatEnabled)
     {
@@ -44,7 +57,6 @@ internal sealed class ChatOverlay : GlobalLayer, IDisposable
         this.playerChatEnabled = playerChatEnabled;
         dataSource.SetPlayerChatEnabled(playerChatEnabled);
         dataSource.OpenRequested += OpenInput;
-        dataSource.CloseRequested += CloseInput;
         dataSource.FeedScrolledToBottomRequested += OnFeedScrolledToBottomRequested;
     }
 
@@ -71,6 +83,8 @@ internal sealed class ChatOverlay : GlobalLayer, IDisposable
         {
             pinFeedToBottom = false;
             pinFeedLastMaxValue = -1f;
+            isResizing = false;
+            applyResizeToPanel = false;
             if (playerChatEnabled && ShouldOpenInput(
                     Input.IsKeyPressed(InputKey.Enter),
                     Input.IsKeyPressed(InputKey.NumpadEnter),
@@ -81,8 +95,12 @@ internal sealed class ChatOverlay : GlobalLayer, IDisposable
             return;
         }
 
+        UpdateResize(dt);
+
         if (pinFeedToBottom)
             ContinuePinFeedToBottom();
+
+        if (isResizing || applyResizeToPanel) return;
 
         if (ShouldCaptureCloseInput(
                 isInputFocused,
@@ -137,7 +155,6 @@ internal sealed class ChatOverlay : GlobalLayer, IDisposable
     public void Dispose()
     {
         dataSource.OpenRequested -= OpenInput;
-        dataSource.CloseRequested -= CloseInput;
         dataSource.FeedScrolledToBottomRequested -= OnFeedScrolledToBottomRequested;
         if (!initialized) return;
 
@@ -148,6 +165,8 @@ internal sealed class ChatOverlay : GlobalLayer, IDisposable
 
         inputWidget = null;
         feedScrollablePanel = null;
+        resizerWidget = null;
+        resizeFrameWidget = null;
         movie = null;
         gauntletLayer = null;
         Layer = null;
@@ -230,9 +249,8 @@ internal sealed class ChatOverlay : GlobalLayer, IDisposable
 
     private void OnFeedScrolledToBottomRequested()
     {
-        // ScrollablePanel updates MaxValue in OnLateUpdate after the new line is measured
-        // One pin lands on the previous MaxValue (second-most-recent line) 
-        // keep pinning until MaxValue stops growing
+        // ScrollablePanel updates MaxValue in OnLateUpdate after the new line is measured.
+        // Keep pinning until MaxValue stops growing.
         pinFeedToBottom = true;
         pinFeedLastMaxValue = -1f;
     }
@@ -257,6 +275,80 @@ internal sealed class ChatOverlay : GlobalLayer, IDisposable
         pinFeedLastMaxValue = maxValue;
     }
 
+    private void UpdateResize(float dt)
+    {
+        ResolveFeedWidgets();
+        if (resizerWidget == null || resizeFrameWidget == null) return;
+
+        if (Input.IsKeyPressed(InputKey.LeftMouseButton) &&
+            ReferenceEquals(gauntletLayer.UIContext.EventManager.HoveredWidget, resizerWidget))
+        {
+            ReleaseInputFocus();
+            isResizing = true;
+            resizeStartMousePosition = Input.MousePositionPixel;
+            resizeOriginalSize = new Vec2(dataSource.ChatBoxSizeX, dataSource.ChatBoxSizeY);
+            resizeFrameWidget.IsVisible = true;
+            resizeFrameWidget.WidthSizePolicy = SizePolicy.Fixed;
+            resizeFrameWidget.HeightSizePolicy = SizePolicy.Fixed;
+            resizeFrameWidget.SuggestedWidth = dataSource.ChatBoxSizeX;
+            resizeFrameWidget.SuggestedHeight = dataSource.ChatBoxSizeY;
+
+            if (feedScrollablePanel?.InnerPanel != null)
+            {
+                feedInnerWidthPolicy = feedScrollablePanel.InnerPanel.WidthSizePolicy;
+                feedInnerHeightPolicy = feedScrollablePanel.InnerPanel.HeightSizePolicy;
+                feedScrollablePanel.InnerPanel.WidthSizePolicy = SizePolicy.Fixed;
+                feedScrollablePanel.InnerPanel.HeightSizePolicy = SizePolicy.Fixed;
+                feedScrollablePanel.InnerPanel.SuggestedWidth = feedScrollablePanel.InnerPanel.Size.X;
+                feedScrollablePanel.InnerPanel.SuggestedHeight = feedScrollablePanel.InnerPanel.Size.Y;
+            }
+        }
+        else if (Input.IsKeyReleased(InputKey.LeftMouseButton))
+        {
+            if (isResizing)
+            {
+                resizeFrameWidget.IsVisible = false;
+                applyResizeToPanel = true;
+                resizeLerpRatio = 0f;
+            }
+
+            isResizing = false;
+        }
+
+        if (isResizing)
+        {
+            Vec2 mouseDelta = Input.MousePositionPixel - resizeStartMousePosition;
+            Vec2 proposed = resizeOriginalSize + new Vec2(mouseDelta.X, -mouseDelta.Y);
+            resizeFrameWidget.SuggestedWidth = ChatVM.ClampSizeX(proposed.X);
+            resizeFrameWidget.SuggestedHeight = ChatVM.ClampSizeY(proposed.Y);
+        }
+        else if (applyResizeToPanel)
+        {
+            resizeLerpRatio = MBMath.ClampFloat(resizeLerpRatio + dt / ResizeTransitionSeconds, 0f, 1f);
+            float targetWidth = resizeFrameWidget.SuggestedWidth;
+            float targetHeight = resizeFrameWidget.SuggestedHeight;
+            dataSource.ChatBoxSizeX = MBMath.Lerp(resizeOriginalSize.X, targetWidth, resizeLerpRatio);
+            dataSource.ChatBoxSizeY = MBMath.Lerp(resizeOriginalSize.Y, targetHeight, resizeLerpRatio);
+
+            if (Math.Abs(dataSource.ChatBoxSizeX - targetWidth) < 0.01f &&
+                Math.Abs(dataSource.ChatBoxSizeY - targetHeight) < 0.01f)
+            {
+                dataSource.ChatBoxSizeX = targetWidth;
+                dataSource.ChatBoxSizeY = targetHeight;
+                resizeFrameWidget.WidthSizePolicy = SizePolicy.StretchToParent;
+                resizeFrameWidget.HeightSizePolicy = SizePolicy.StretchToParent;
+                if (feedScrollablePanel?.InnerPanel != null)
+                {
+                    feedScrollablePanel.InnerPanel.WidthSizePolicy = feedInnerWidthPolicy;
+                    feedScrollablePanel.InnerPanel.HeightSizePolicy = feedInnerHeightPolicy;
+                }
+
+                applyResizeToPanel = false;
+                dataSource.ExecuteSaveSizes();
+            }
+        }
+    }
+
     private void ResolveFeedWidgets()
     {
         var root = movie?.Movie?.RootWidget;
@@ -264,6 +356,8 @@ internal sealed class ChatOverlay : GlobalLayer, IDisposable
 
         inputWidget ??= root.FindChild(InputWidgetId, includeAllChildren: true) as EditableTextWidget;
         feedScrollablePanel ??= root.FindChild(FeedScrollablePanelId, includeAllChildren: true) as ScrollablePanel;
+        resizerWidget ??= root.FindChild(ResizerWidgetId, includeAllChildren: true);
+        resizeFrameWidget ??= root.FindChild(ResizeFrameWidgetId, includeAllChildren: true);
     }
 
     private void CloseInput()
@@ -272,6 +366,10 @@ internal sealed class ChatOverlay : GlobalLayer, IDisposable
 
         dataSource.SetOpen(false);
         ignoreNextOutsideClick = false;
+        isResizing = false;
+        applyResizeToPanel = false;
+        if (resizeFrameWidget != null)
+            resizeFrameWidget.IsVisible = false;
         ReleaseInputFocus();
     }
 
@@ -300,7 +398,17 @@ internal sealed class ChatOverlay : GlobalLayer, IDisposable
         isInputFocused = false;
         gauntletLayer.IsFocusLayer = false;
         ScreenManager.TryLoseFocus(gauntletLayer);
-        SetPassiveInputRestrictions(gauntletLayer.InputRestrictions);
+        // Keep the cursor while the panel is open so channel tabs / resizer stay usable.
+        if (dataSource.IsOpen)
+        {
+            gauntletLayer.InputRestrictions.SetInputRestrictions(
+                isMouseVisible: true,
+                mask: InputUsageMask.Mouse);
+        }
+        else
+        {
+            SetPassiveInputRestrictions(gauntletLayer.InputRestrictions);
+        }
     }
 
     internal static bool ShouldReleaseInputFocus(
