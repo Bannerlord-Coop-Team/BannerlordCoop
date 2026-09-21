@@ -208,31 +208,32 @@ public class BattleFormationSyncTests : MissionTestEnvironment
             if (disconnected) broker.Publish(this, new MissionPeerDisconnected("A", mapEventId));
             else broker.Publish(this, new MissionPeerLeft("A", mapEventId));
 
-            Assert.False(pending.Contains(withdrawn.AgentId));
-            Assert.DoesNotContain(spawns, record => record.AgentId == withdrawn.AgentId);
+            Assert.Equal(disconnected, pending.Contains(withdrawn.AgentId));
+            Assert.Equal(disconnected, spawns.Any(record => record.AgentId == withdrawn.AgentId));
             Assert.True(pending.Contains(delayed.AgentId));
-            Assert.Equal(wasHost, pending.Contains(npc.AgentId));
+            Assert.Equal(wasHost || disconnected, pending.Contains(npc.AgentId));
             Update(withdrawn);
-            Assert.False(pending.Contains(withdrawn.AgentId));
+            Assert.Equal(disconnected, pending.Contains(withdrawn.AgentId));
 
-            // A stale spawn arriving after withdrawal must retire its update too.
+            // Late spawns remain valid after disconnect, but are discarded after withdrawal.
             var late = Record(0, "A");
             Update(late);
             broker.Publish(this, new NetworkSpawnBattleAgents(new[] { late }));
             Update(late);
-            Assert.False(pending.Contains(late.AgentId));
+            Assert.Equal(disconnected, pending.Contains(late.AgentId));
             spawner.DrainPendingPuppets();
-            Assert.Equal(wasHost ? 2 : 1, pending.Count);
+            Assert.Equal(disconnected ? 4 : wasHost ? 2 : 1, pending.Count);
 
             budget.Setup(value => value.RemainingCapacity(It.IsAny<int>())).Returns(10);
             spawner.DrainPendingPuppets();
             Assert.Empty(pending);
             Assert.Empty(spawns);
-            Assert.False(registry.TryGetAgentInfo(withdrawn.AgentId, out _));
+            Assert.Equal(disconnected, registry.TryGetAgentInfo(withdrawn.AgentId, out _));
+            Assert.Equal(disconnected, registry.TryGetAgentInfo(late.AgentId, out _));
             Assert.True(registry.TryGetAgentInfo(delayed.AgentId, out var delayedInfo));
             Assert.Same(mission.DefenderTeam.GetFormation(FormationClass.Ranged).Shell, delayedInfo.Agent.Formation);
-            Assert.Equal(wasHost, registry.TryGetAgentInfo(npc.AgentId, out var npcInfo));
-            if (wasHost)
+            Assert.Equal(wasHost || disconnected, registry.TryGetAgentInfo(npc.AgentId, out var npcInfo));
+            if (wasHost || disconnected)
                 Assert.Same(mission.AttackerTeam.GetFormation(FormationClass.Ranged).Shell, npcInfo.Agent.Formation);
         });
     }
