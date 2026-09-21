@@ -100,12 +100,19 @@ jobs:
             -e "s/\${game_version}/$game_version/g" \
             deploy/SubModule.xml > "$module/SubModule.xml"
 
-      - name: Build and test
+      - name: Build and run unit tests
         working-directory: source
         run: |
           dotnet build CoopTests.slnf -c Release -p:NuGetAudit=false -p:ModName= -p:CoopVersion="${GITHUB_REF_NAME#v}"
           dotnet test CoopUnitTests.slnf -c Release --no-build --no-restore --consoleLoggerParameters:ErrorsOnly
-          sh ../.github/scripts/run-e2e-shard.sh 0 1
+
+      - name: Upload test build output
+        uses: actions/upload-artifact@v7
+        with:
+          name: release-test-build-output
+          path: source/*/bin/**
+          if-no-files-found: error
+          retention-days: 1
 
       - name: Upload unsigned module
         uses: actions/upload-artifact@v7
@@ -115,8 +122,44 @@ jobs:
           if-no-files-found: error
           retention-days: 1
 
-  draft:
+  e2e:
+    name: E2E Tests (${{ matrix.shard }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
     needs: build
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [0, 1, 2, 3, 4, 5, 6, 7]
+
+    container:
+      image: garrettluskey/bannerlordcoop:latest
+
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+
+      - name: Link Bannerlord assemblies
+        run: ln -s /home/mb2 mb2
+
+      - name: Download test build output
+        uses: actions/download-artifact@v8
+        with:
+          name: release-test-build-output
+          path: source
+
+      - name: Restore test assets
+        working-directory: source
+        run: dotnet restore CoopTests.slnf -p:NuGetAudit=false -p:ModName= -p:CoopVersion="${GITHUB_REF_NAME#v}"
+
+      - name: Run E2E test shard
+        working-directory: source
+        run: sh ../.github/scripts/run-e2e-shard.sh "${{ matrix.shard }}" 8
+
+  draft:
+    needs: [build, e2e]
     runs-on: windows-latest
     timeout-minutes: 20
     permissions:
