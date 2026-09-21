@@ -16,6 +16,7 @@ function fixture(t) {
   const bytes = Buffer.from('packaged binaries');
   const checksum = crypto.createHash('sha256').update(bytes).digest('hex');
   const result = { ...payload, client_asset_sha256: checksum, manifest_sha256: checksum, windows: { name: "BannerlordCoop-DedicatedServer-Win64-v0.2.0.7z", bytes: 123, sha256: checksum, url: `https://pub-c80efa34191141fd803f8508e025f726.r2.dev/release/v0.2.0/${checksum}/BannerlordCoop-DedicatedServer-Win64-v0.2.0.7z` } };
+  result.client = { name: 'BannerlordCoop-v0.2.0.zip', bytes: 123, sha256: checksum, url: `https://pub-c80efa34191141fd803f8508e025f726.r2.dev/release/v0.2.0/${checksum}/BannerlordCoop-v0.2.0.zip` };
   fs.mkdirSync('release-result');
   fs.writeFileSync('release-result/release-result.json', JSON.stringify(result));
   const release = { id: 10, tag_name: 'v0.2.0', draft: true, prerelease: false, body: `notes\n<!-- release-coordination ${JSON.stringify(identity)} -->` };
@@ -23,6 +24,7 @@ function fixture(t) {
   const calls = [];
   const serverRun = { path: '.github/workflows/release.yml', event: 'repository_dispatch', status: 'completed', conclusion: 'success', run_attempt: 1 };
   const clientRun = { ...serverRun, event: 'push', head_sha: identity.client_sha };
+  const jobs = ['Windows package and R2 upload', 'Linux image and boot test'].map((name, id) => ({ id, name, status: 'completed', conclusion: 'success' }));
   const github = {
     paginate: async (method) => method(),
     rest: {
@@ -37,11 +39,11 @@ function fixture(t) {
         },
         createDispatchEvent: async args => { calls.push(['dispatch', args]); },
       },
-      actions: { getWorkflowRun: async args => ({ data: args.run_id === 30 ? serverRun : clientRun }) },
+      actions: { listJobsForWorkflowRun: async () => jobs, getWorkflowRun: async args => ({ data: args.run_id === 30 ? serverRun : clientRun }) },
     },
   };
   const context = { repo: { owner: 'Bannerlord-Coop-Team', repo: 'BannerlordCoop' }, payload: { client_payload: payload } };
-  return { github, context, calls, assets, release, serverRun, clientRun, result };
+  return { github, context, calls, assets, release, serverRun, clientRun, result, jobs };
 }
 
 test('publishes only after verification, then requests a digest-bound promotion command', async t => {
@@ -50,6 +52,7 @@ test('publishes only after verification, then requests a digest-bound promotion 
   assert.deepEqual(f.calls.map(call => call[0]), ['update', 'dispatch']);
   assert.equal(f.calls[0][1].draft, false);
   assert.ok(f.calls[0][1].body.includes(f.result.windows.url));
+  assert.ok(f.calls[0][1].body.includes(f.result.client.url));
   assert.equal(f.release.tag_name, f.result.tag);
   assert.equal(f.release.target_commitish, f.result.client_sha);
   assert.equal(f.calls[1][1].event_type, 'promote_stable');
@@ -110,5 +113,22 @@ test('draft identity mismatch stops uploads and dispatch', async t => {
   f.github.rest.repos.updateRelease = async () => ({ data: { ...f.release, tag_name: 'untagged-placeholder' } });
   Object.assign(f.context, { ref: 'refs/tags/v0.2.0', sha: f.result.client_sha, runId: 20 });
   await assert.rejects(createDraft(f), /Draft release identity changed during update/);
+  assert.deepEqual(f.calls, []);
+});
+
+test('publishes while notification runs only after both platform jobs succeed', async t => {
+  const f = fixture(t);
+  f.serverRun.status = 'in_progress';
+  f.serverRun.conclusion = null;
+  await publish(f);
+  assert.equal(f.calls[0][0], 'update');
+});
+
+test('rejects a newer failed platform job while notification runs', async t => {
+  const f = fixture(t);
+  f.serverRun.status = 'in_progress';
+  f.serverRun.conclusion = null;
+  f.jobs.push({ ...f.jobs[0], id: 100, conclusion: 'failure' });
+  await assert.rejects(publish(f), /job has not succeeded/);
   assert.deepEqual(f.calls, []);
 });

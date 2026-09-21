@@ -63,9 +63,22 @@ async function verifyServerRun({ github, context }) {
   }
   const { data: run } = await github.rest.actions.getWorkflowRun({ ...serverRepo, run_id: payload.server_run_id });
   if (run.path !== '.github/workflows/release.yml' || run.event !== 'repository_dispatch'
-      || run.status !== 'completed' || run.conclusion !== 'success'
+      || !((run.status === 'completed' && run.conclusion === 'success')
+        || (run.status === 'in_progress' && run.conclusion === null))
       || run.run_attempt !== payload.server_run_attempt) {
     throw new Error('Server release run has not completed successfully at the requested attempt');
+  }
+  if (run.status === 'in_progress') {
+    const jobs = await github.paginate(github.rest.actions.listJobsForWorkflowRun, {
+      ...serverRepo, run_id: payload.server_run_id, filter: 'all', per_page: 100,
+    });
+    jobs.sort((a, b) => b.id - a.id);
+    for (const name of ['Windows package and R2 upload', 'Linux image and boot test']) {
+      const job = jobs.find(item => item.name === name);
+      if (!job || job.status !== 'completed' || job.conclusion !== 'success') {
+        throw new Error(`Server release job has not succeeded: ${name}`);
+      }
+    }
   }
 }
 
@@ -103,17 +116,26 @@ async function publish({ github, context }) {
     if (asset.digest !== `sha256:${checksum}`) throw new Error(`Release asset checksum mismatch: ${name}`);
   }
   const windows = result.windows;
+  const client = result.client;
   const name = `BannerlordCoop-DedicatedServer-Win64-${payload.tag}.7z`;
-  if (!windows || windows.name !== name || !/^[a-f0-9]{64}$/.test(windows.sha256)
-      || !Number.isSafeInteger(windows.bytes) || windows.bytes <= 0
-      || windows.url !== `https://pub-c80efa34191141fd803f8508e025f726.r2.dev/release/${payload.tag}/${windows.sha256}/${name}`) {
-    throw new Error('Invalid Windows release download');
+  for (const [download, expectedName] of [[windows, name], [client, `BannerlordCoop-${payload.tag}.zip`]]) {
+    if (!download || download.name !== expectedName || !/^[a-f0-9]{64}$/.test(download.sha256)
+        || !Number.isSafeInteger(download.bytes) || download.bytes <= 0
+        || download.url !== `https://pub-c80efa34191141fd803f8508e025f726.r2.dev/release/${payload.tag}/${download.sha256}/${expectedName}`) {
+      throw new Error('Invalid R2 release download');
+    }
   }
+  if (client.sha256 !== result.client_asset_sha256) throw new Error('R2 client checksum mismatch');
   if (release.draft) {
     await github.rest.repos.updateRelease({
       ...context.repo, release_id: release.id, tag_name: payload.tag, target_commitish: payload.client_sha,
       draft: false, make_latest: 'legacy',
       body: `${release.body}
+
+## Client
+[Download ${client.name}](${client.url})
+
+Size: ${client.bytes} bytes. SHA-256: \`${client.sha256}\`.
 
 ## Windows dedicated server
 [Download ${name}](${windows.url})
