@@ -412,6 +412,36 @@ public class CoopLogBugReportTests : IDisposable
     }
 
     [Fact]
+    public async Task Uploader_OmitsEmptyOptionalServerLog()
+    {
+        var handler = new RecordingHttpHandler();
+        using var httpClient = new HttpClient(handler);
+        using var uploader = new BugReportUploader(
+            httpClient,
+            "https://bug-reports.example.test/api/v1/reports");
+        var report = new BugReportArchiveContents(
+            Guid.NewGuid().ToString("N"),
+            "network-client-1",
+            new[] { "player-submitted" },
+            Array.Empty<BugReportSubmission>(),
+            new CollectedBugReportServerLog(Array.Empty<byte>(), 0),
+            null,
+            DateTimeOffset.UtcNow,
+            Array.Empty<CollectedBugReportLog>(),
+            expectedClients: 0,
+            declinedClients: 0,
+            failedClients: 0,
+            timedOutClients: 0);
+
+        var result = await uploader.UploadAsync(report, CancellationToken.None);
+
+        Assert.True(result.Uploaded);
+        Assert.Null(handler.ServerLogBody);
+        using var json = JsonDocument.Parse(handler.Body);
+        Assert.Equal(JsonValueKind.Null, json.RootElement.GetProperty("serverLog").ValueKind);
+    }
+
+    [Fact]
     public async Task Uploader_ReturnsFailureWhenMultipartPutFails()
     {
         var handler = new RecordingHttpHandler { FailUpload = true };

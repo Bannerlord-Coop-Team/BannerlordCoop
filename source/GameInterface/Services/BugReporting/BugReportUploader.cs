@@ -179,7 +179,7 @@ public class BugReportUploader : IBugReportUploader, IDisposable
         var content = new MultipartFormDataContent();
         content.Add(new StringContent(json, Encoding.UTF8, "application/json"), "report");
 
-        if (report.ServerLog != null)
+        if (HasUploadableServerLog(report.ServerLog))
         {
             content.Add(
                 CreateBinaryContent(report.ServerLog.CompressedData, "application/gzip"),
@@ -239,12 +239,17 @@ public class BugReportUploader : IBugReportUploader, IDisposable
             (total, log) => total + (log?.CompressedData?.LongLength ?? 0));
     }
 
+    private static bool HasUploadableServerLog(CollectedBugReportServerLog serverLog)
+    {
+        return serverLog?.CompressedData != null && serverLog.CompressedData.Length > 0;
+    }
+
     private static BugReportJsonRequest CreateRequest(BugReportArchiveContents report)
     {
         var primarySubmission = report.Submissions.FirstOrDefault(submission =>
                                     submission.ReportingClientNetworkId == report.ReportingClientNetworkId) ??
                                 report.Submissions.FirstOrDefault();
-        var serverLog = report.ServerLog == null
+        var serverLog = !HasUploadableServerLog(report.ServerLog)
             ? null
             : new BugReportJsonLog(
                 "Coop_server.log",
