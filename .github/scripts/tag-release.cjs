@@ -38,7 +38,12 @@ async function createDraft({ github, context }) {
   const body = identityPattern.test(release.body || '')
     ? release.body.replace(identityPattern, marker)
     : `${release.body || ''}\n\n${marker}`;
-  await github.rest.repos.updateRelease({ ...context.repo, release_id: release.id, body });
+  const { data: updated } = await github.rest.repos.updateRelease({
+    ...context.repo, release_id: release.id, body, tag_name: tag, target_commitish: context.sha,
+  });
+  if (updated.tag_name !== tag || updated.target_commitish !== context.sha || !updated.draft) {
+    throw new Error('Draft release identity changed during update');
+  }
   const name = `BannerlordCoop-${tag}.zip`;
   const assets = await github.paginate(github.rest.repos.listReleaseAssets, { ...context.repo, release_id: release.id });
   const existing = assets.find(asset => asset.name === name);
@@ -98,7 +103,10 @@ async function publish({ github, context }) {
     if (asset.digest !== `sha256:${checksum}`) throw new Error(`Release asset checksum mismatch: ${name}`);
   }
   if (release.draft) {
-    await github.rest.repos.updateRelease({ ...context.repo, release_id: release.id, draft: false, make_latest: 'legacy' });
+    await github.rest.repos.updateRelease({
+      ...context.repo, release_id: release.id, tag_name: payload.tag, target_commitish: payload.client_sha,
+      draft: false, make_latest: 'legacy',
+    });
   }
   await github.rest.repos.createDispatchEvent({ ...serverRepo, event_type: 'promote_stable', client_payload: payload });
 }
