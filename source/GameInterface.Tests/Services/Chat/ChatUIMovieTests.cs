@@ -68,6 +68,12 @@ public class ChatUIMovieTests
         Assert.Equal("DiagonalRightResize", resizer.Attribute("HoveredCursorState")?.Value);
         Assert.NotNull(FindById(document, "CoopChatResizeFrame"));
 
+        var resizeCapture = FindById(document, "CoopChatResizeCapture");
+        Assert.Equal("StretchToParent", resizeCapture.Attribute("WidthSizePolicy")?.Value);
+        Assert.Equal("StretchToParent", resizeCapture.Attribute("HeightSizePolicy")?.Value);
+        Assert.Equal("false", resizeCapture.Attribute("IsVisible")?.Value);
+        Assert.Null(resizeCapture.Attribute("DoNotAcceptEvents"));
+
         var feedList = FindById(document, "ChatFeedList");
         Assert.Equal("{VisibleLines}", feedList.Attribute("DataSource")?.Value);
         Assert.Contains(feedList.Descendants("RichTextWidget"),

@@ -2,6 +2,9 @@
   <Window>
     <Widget WidthSizePolicy="StretchToParent" HeightSizePolicy="StretchToParent" DoNotAcceptEvents="true">
       <Children>
+        <!-- Full-screen hit sink while resizing so map SceneLayer does not see the drag. -->
+        <Widget Id="CoopChatResizeCapture" WidthSizePolicy="StretchToParent" HeightSizePolicy="StretchToParent"
+                Sprite="BlankWhiteSquare_9" Color="#000000FF" AlphaFactor="0.01" IsVisible="false"/>
         <Widget Id="CoopChatRoot" WidthSizePolicy="Fixed" HeightSizePolicy="Fixed"
                 SuggestedWidth="@ChatBoxSizeX" SuggestedHeight="@ChatBoxSizeY"
                 MinWidth="425" MaxWidth="650" MinHeight="170" MaxHeight="470"
