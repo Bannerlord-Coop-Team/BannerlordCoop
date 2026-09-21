@@ -31,11 +31,14 @@ public class ChatUIMovieTests
         Assert.Null(channelScroll.Attribute("VerticalScrollbar"));
         Assert.Equal("true", channelScroll.Attribute("AutoHideScrollBars")?.Value);
 
-        Assert.Contains(document.Descendants(),
+        Assert.DoesNotContain(document.Descendants(),
             element => element.Attribute("Command.Click")?.Value == "ActionSend");
-        var closeButton = FindById(document, "CoopChatCloseButton");
-        Assert.Equal("ActionClose", closeButton.Attribute("Command.Click")?.Value);
-        Assert.Null(closeButton.Attribute("Parameter.Text"));
+        Assert.DoesNotContain(document.Descendants(),
+            element => element.Attribute("Command.Click")?.Value == "ActionClose");
+        Assert.DoesNotContain(document.Descendants(),
+            element => element.Attribute("Id")?.Value == "CoopChatCloseButton");
+        Assert.DoesNotContain(document.Descendants("TextWidget"),
+            element => element.Attribute("Text")?.Value == "@InputHintText");
 
         var muteButton = FindById(document, "CoopChatMuteButton");
         Assert.Equal("ActionToggleMute", muteButton.Attribute("Command.Click")?.Value);
@@ -51,7 +54,19 @@ public class ChatUIMovieTests
         Assert.Equal("Left", chatPanel.Attribute("HorizontalAlignment")?.Value);
         Assert.Equal("Bottom", chatPanel.Attribute("VerticalAlignment")?.Value);
         Assert.Equal("27", chatPanel.Attribute("MarginLeft")?.Value);
-        Assert.Equal("100", chatPanel.Attribute("MarginBottom")?.Value);
+        Assert.Equal("75", chatPanel.Attribute("MarginBottom")?.Value);
+        Assert.Equal("@ChatBoxSizeX", chatPanel.Attribute("SuggestedWidth")?.Value);
+        Assert.Equal("@ChatBoxSizeY", chatPanel.Attribute("SuggestedHeight")?.Value);
+        Assert.Equal("425", chatPanel.Attribute("MinWidth")?.Value);
+        Assert.Equal("650", chatPanel.Attribute("MaxWidth")?.Value);
+        Assert.Equal("170", chatPanel.Attribute("MinHeight")?.Value);
+        Assert.Equal("470", chatPanel.Attribute("MaxHeight")?.Value);
+
+        var resizer = FindById(document, "CoopChatResizer");
+        Assert.Equal("SPChatlog.Resizer", resizer.Attribute("Brush")?.Value);
+        Assert.Equal("@IsOpen", resizer.Attribute("IsVisible")?.Value);
+        Assert.Equal("DiagonalRightResize", resizer.Attribute("HoveredCursorState")?.Value);
+        Assert.NotNull(FindById(document, "CoopChatResizeFrame"));
 
         var feedList = FindById(document, "ChatFeedList");
         Assert.Equal("{VisibleLines}", feedList.Attribute("DataSource")?.Value);

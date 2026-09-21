@@ -2,6 +2,7 @@
 using System;
 using System.Collections.Generic;
 using TaleWorlds.Library;
+using TaleWorlds.MountAndBlade;
 
 namespace GameInterface.Services.Chat;
 
@@ -11,6 +12,12 @@ internal sealed class ChatVM : ViewModel
     private const string GlobalChannelId = "";
     private const int MaxHistoryPerChannel = 50;
     private const int VisibleHistoryLines = 12;
+    internal const float DefaultChatBoxSizeX = 520f;
+    internal const float DefaultChatBoxSizeY = 350f;
+    internal const float MinChatBoxSizeX = 425f;
+    internal const float MaxChatBoxSizeX = 650f;
+    internal const float MinChatBoxSizeY = 170f;
+    internal const float MaxChatBoxSizeY = 470f;
 
     private static readonly Color PlayerChatColor = Color.White;
 
@@ -26,6 +33,8 @@ internal sealed class ChatVM : ViewModel
     private bool isOpen;
     private bool playerChatEnabled = true;
     private int unreadMessageCount;
+    private float chatBoxSizeX;
+    private float chatBoxSizeY;
 
     public ChatVM(Action<NetworkSendChatMessage> send, Func<string> getLocalControllerId)
     {
@@ -37,11 +46,14 @@ internal sealed class ChatVM : ViewModel
 
         Channels = new MBBindingList<ChatChannelVM>();
         VisibleLines = new MBBindingList<ChatLineVM>();
+        // Original fixed panel size. Don't seed from BannerlordConfig — that value is shared
+        // with vanilla MP chat and is often much larger than this overlay's prior 520x350.
+        chatBoxSizeX = DefaultChatBoxSizeX;
+        chatBoxSizeY = DefaultChatBoxSizeY;
         var global = EnsureChannel(GlobalChannelId, "Global");
         SelectChannel(global);
     }
 
-    public event Action CloseRequested;
     public event Action OpenRequested;
     public event Action FeedScrolledToBottomRequested;
 
@@ -58,12 +70,6 @@ internal sealed class ChatVM : ViewModel
     public string ActiveChannelText => selectedChannel?.IsGlobal == false
         ? $"Direct message: {selectedChannel.Name.TrimEnd(' ', '*')}"
         : "Global chat";
-
-    [DataSourceProperty]
-    public string InputHintText => "Enter or click Send to send    Esc: close";
-
-    [DataSourceProperty]
-    public string SendButtonText => "Send";
 
     [DataSourceProperty]
     public bool IsMuteButtonVisible => selectedChannel?.IsGlobal == false;
@@ -121,6 +127,34 @@ internal sealed class ChatVM : ViewModel
         }
     }
 
+    [DataSourceProperty]
+    public float ChatBoxSizeX
+    {
+        get => chatBoxSizeX;
+        set
+        {
+            float clamped = ClampSizeX(value);
+            if (chatBoxSizeX == clamped) return;
+
+            chatBoxSizeX = clamped;
+            OnPropertyChanged(nameof(ChatBoxSizeX));
+        }
+    }
+
+    [DataSourceProperty]
+    public float ChatBoxSizeY
+    {
+        get => chatBoxSizeY;
+        set
+        {
+            float clamped = ClampSizeY(value);
+            if (chatBoxSizeY == clamped) return;
+
+            chatBoxSizeY = clamped;
+            OnPropertyChanged(nameof(ChatBoxSizeY));
+        }
+    }
+
     public void ActionOpen()
     {
         if (!IsPlayerChatEnabled) return;
@@ -143,11 +177,6 @@ internal sealed class ChatVM : ViewModel
         WrittenText = string.Empty;
     }
 
-    public void ActionClose()
-    {
-        CloseRequested?.Invoke();
-    }
-
     public void ActionToggleMute()
     {
         if (selectedChannel == null || selectedChannel.IsGlobal) return;
@@ -155,6 +184,32 @@ internal sealed class ChatVM : ViewModel
         selectedChannel.SetMuted(!selectedChannel.IsMuted);
         OnPropertyChanged(nameof(MuteButtonText));
         OnPropertyChanged(nameof(ActiveChannelText));
+    }
+
+    public void ExecuteSaveSizes()
+    {
+        try
+        {
+            BannerlordConfig.ChatBoxSizeX = ChatBoxSizeX;
+            BannerlordConfig.ChatBoxSizeY = ChatBoxSizeY;
+            BannerlordConfig.Save();
+        }
+        catch (TypeInitializationException)
+        {
+            // Unit tests construct ChatVM without the engine; skip persist.
+        }
+    }
+
+    internal static float ClampSizeX(float value)
+    {
+        if (value <= 0f) return DefaultChatBoxSizeX;
+        return MBMath.ClampFloat(value, MinChatBoxSizeX, MaxChatBoxSizeX);
+    }
+
+    internal static float ClampSizeY(float value)
+    {
+        if (value <= 0f) return DefaultChatBoxSizeY;
+        return MBMath.ClampFloat(value, MinChatBoxSizeY, MaxChatBoxSizeY);
     }
 
     public void SetOpen(bool open)
