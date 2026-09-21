@@ -160,6 +160,7 @@ jobs:
 
   draft:
     needs: [build, e2e]
+    environment: release
     runs-on: windows-latest
     timeout-minutes: 20
     permissions:
