@@ -258,6 +258,7 @@ public class CoopBattleController : CoopMissionController
     {
         // Reliable spawn work is queued before this frame's unreliable movement traffic.
         replicator.FlushPendingSpawns();
+        replicator.FlushPendingFormations();
         base.OnMissionTick(dt);
 
         // The mission host is the single siege authority (engine deployment and machine simulation);

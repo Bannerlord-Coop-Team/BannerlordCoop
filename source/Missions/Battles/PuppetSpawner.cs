@@ -66,6 +66,8 @@ public class PuppetSpawner : IPuppetSpawner
     private readonly HashSet<string> withdrawnControllers = new HashSet<string>();
     private readonly HashSet<string> withdrawnHostControllers = new HashSet<string>();
     private readonly HashSet<Guid> retainedFormerHostAgentIds = new HashSet<Guid>();
+    private readonly Dictionary<Guid, (string Controller, BattleAgentFormationData Data)> pendingFormations = new();
+    private bool disposed;
 
     public PuppetSpawner(
         IMessageBroker messageBroker,
@@ -97,6 +99,7 @@ public class PuppetSpawner : IPuppetSpawner
         this.authorityMigrator = authorityMigrator;
 
         messageBroker.Subscribe<NetworkSpawnBattleAgents>(Handle_NetworkSpawnBattleAgents);
+        messageBroker.Subscribe<NetworkBattleAgentFormations>(Handle_Formations);
         messageBroker.Subscribe<NetworkRetainedPlayerHero>(Handle_RetainedPlayerHero);
         messageBroker.Subscribe<NetworkMissionPeerEntered>(Handle_PeerEntered);
         messageBroker.Subscribe<MissionPeerLeft>(Handle_PeerLeft);
@@ -105,6 +108,9 @@ public class PuppetSpawner : IPuppetSpawner
 
     public void Dispose()
     {
+        disposed = true;
+        messageBroker.Unsubscribe<NetworkBattleAgentFormations>(Handle_Formations);
+        pendingFormations.Clear();
         messageBroker.Unsubscribe<NetworkSpawnBattleAgents>(Handle_NetworkSpawnBattleAgents);
         messageBroker.Unsubscribe<NetworkRetainedPlayerHero>(Handle_RetainedPlayerHero);
         playerHandoffs.Clear();
@@ -112,6 +118,47 @@ public class PuppetSpawner : IPuppetSpawner
         messageBroker.Unsubscribe<NetworkMissionPeerEntered>(Handle_PeerEntered);
         messageBroker.Unsubscribe<MissionPeerLeft>(Handle_PeerLeft);
         messageBroker.Unsubscribe<MissionPeerDisconnected>(Handle_PeerDisconnected);
+    }
+
+    private void Handle_Formations(MessagePayload<NetworkBattleAgentFormations> payload)
+    {
+        GameThread.RunSafe(() =>
+        {
+            var message = payload.What;
+            if (disposed || message.BattleInstanceId != session.InstanceId
+                || string.IsNullOrEmpty(message.ControllerId) || session.IsOwn(message.ControllerId)
+                || message.Agents == null || message.Agents.Length > NetworkBattleAgentFormations.MaxUpdates) return;
+
+            foreach (var data in message.Agents)
+            {
+                if (data == null || data.AgentId == Guid.Empty || data.AuthorityRevision < 0
+                    || data.FormationIndex < -1 || data.FormationIndex >= (int)FormationClass.NumberOfAllFormations) continue;
+                if (pendingFormations.TryGetValue(data.AgentId, out var pending)
+                    && pending.Data.AuthorityRevision > data.AuthorityRevision) continue;
+                pendingFormations[data.AgentId] = (message.ControllerId, data);
+            }
+            ApplyPendingFormations();
+        }, context: nameof(Handle_Formations));
+    }
+
+    private void ApplyPendingFormations()
+    {
+        if (disposed || Mission.Current == null || pendingFormations.Count == 0) return;
+        foreach (var id in new List<Guid>(pendingFormations.Keys))
+        {
+            if (!coopMissionComponent.AgentRegistry.TryGetAgentInfo(id, out var info)) continue;
+            var pending = pendingFormations[id];
+            // A new owner's update can arrive before the authority handoff on the other connection.
+            if (info.AuthorityRevision < pending.Data.AuthorityRevision) continue;
+            pendingFormations.Remove(id);
+            if (info.CurrentAuthority != pending.Controller || info.AuthorityRevision != pending.Data.AuthorityRevision
+                || session.IsOwn(info.CurrentAuthority) || info.Agent == null || !info.Agent.IsActive()) continue;
+
+            if (pending.Data.FormationIndex == -1)
+                info.Agent.Formation = null;
+            else
+                formationAssigner.Assign(info.Agent, pending.Data.FormationIndex);
+        }
     }
 
     private void Handle_RetainedPlayerHero(MessagePayload<NetworkRetainedPlayerHero> payload)
@@ -611,6 +658,8 @@ public class PuppetSpawner : IPuppetSpawner
         if (Mission.Current == null || Mission.Current.DefenderTeam == null) return;
         ApplyPendingPlayerHandoffs();
 
+        ApplyPendingFormations();
+
         BattleAgentSpawnData[] pending;
         lock (pendingPuppetLock)
         {
@@ -645,6 +694,7 @@ public class PuppetSpawner : IPuppetSpawner
                 Logger.Error(e, "[BattleSync] Failed to spawn buffered puppet {AgentId}; dropping it", data.AgentId);
             }
         }
+        ApplyPendingFormations();
     }
 
     private IEnumerable<BattleAgentSpawnData> PlayerHeroesFirst(IEnumerable<BattleAgentSpawnData> agents)
