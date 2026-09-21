@@ -4,6 +4,7 @@ using LiteNetLib;
 using Moq;
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Net;
 using System.Reflection;
 using System.Threading;
@@ -30,10 +31,13 @@ public class MissionManagerTests
         Assert.True(manager.TryEnterMission(first, "first", "battle", out var firstEntry));
         Assert.True(firstEntry.IsFirstMember);
         Assert.Empty(firstEntry.ExistingMembers);
+        Assert.NotEqual(Guid.Empty, firstEntry.PeerCredential);
 
         Assert.True(manager.TryEnterMission(second, "second", "battle", out var secondEntry));
         Assert.False(secondEntry.IsFirstMember);
-        Assert.Single(secondEntry.ExistingMembers);
+        var existing = Assert.Single(secondEntry.ExistingMembers);
+        Assert.Equal(firstEntry.PeerCredential, existing.peerCredential);
+        Assert.NotEqual(firstEntry.PeerCredential, secondEntry.PeerCredential);
     }
 
     [Fact]
@@ -423,15 +427,21 @@ public class MissionManagerTests
     {
         var manager = CreateManager();
         var peer = CreatePeer(1);
+        var observerPeer = CreatePeer(2);
 
-        Assert.True(manager.TryEnterMission(peer, "host", "battle", out _));
+        Assert.True(manager.TryEnterMission(peer, "host", "battle", out var first));
+        Assert.True(manager.TryEnterMission(observerPeer, "observer", "battle", out var observer));
         Assert.True(manager.TryEnterMission(peer, "host", "battle", out var duplicate));
 
         Assert.Equal(MissionEntryStatus.Unchanged, duplicate.Status);
-        Assert.Empty(duplicate.ExistingMembers);
+        var existing = Assert.Single(duplicate.ExistingMembers);
+        Assert.Equal("observer", existing.controllerId);
+        Assert.Same(observerPeer, existing.peer);
+        Assert.Equal(observer.PeerCredential, existing.peerCredential);
         Assert.Empty(duplicate.PreviousDepartures);
+        Assert.Equal(first.PeerCredential, duplicate.PeerCredential);
         Assert.True(manager.TryGetControllers("battle", out var controllers));
-        Assert.Equal(new[] { "host" }, controllers);
+        Assert.Equal(new[] { "host", "observer" }, controllers.OrderBy(value => value));
     }
 
     [Fact]
@@ -465,12 +475,13 @@ public class MissionManagerTests
         var replacementPeer = CreatePeer(2);
         var observerPeer = CreatePeer(3);
 
-        Assert.True(manager.TryEnterMission(oldPeer, "host", "battle", out _));
+        Assert.True(manager.TryEnterMission(oldPeer, "host", "battle", out var original));
         Assert.True(manager.TryEnterMission(observerPeer, "observer", "battle", out _));
 
         Assert.True(manager.TryEnterMission(replacementPeer, "host", "battle", out var replacement));
 
         Assert.Equal(MissionEntryStatus.Reconnected, replacement.Status);
+        Assert.NotEqual(original.PeerCredential, replacement.PeerCredential);
         Assert.Empty(replacement.PreviousDepartures);
         Assert.Equal("observer", Assert.Single(replacement.ExistingMembers).controllerId);
         Assert.False(manager.TryGetRelayTarget(oldPeer, "battle", "observer", out _));
@@ -491,7 +502,11 @@ public class MissionManagerTests
             BindingFlags.NonPublic | BindingFlags.Instance)!;
         var instances = (Dictionary<string, MissionInstance>)byInstanceIdField.GetValue(manager)!;
         var staleInstance = new MissionInstance("stale-instance");
-        staleInstance.Memberships.Add(new MissionMembership("stale", peer, staleInstance));
+        staleInstance.Memberships.Add(new MissionMembership(
+            "stale",
+            peer,
+            staleInstance,
+            Guid.NewGuid()));
         instances[staleInstance.Id] = staleInstance;
 
         var departures = manager.HandleDisconnect(peer);
@@ -702,11 +717,14 @@ public class MissionManagerTests
         Assert.False(manager.TryAuthorizeIntroduction(oldPeer, "moving", "battle", Guid.NewGuid(), out _));
     }
 
-    [Fact]
-    public void DuplicateRequestAndPunchRetainTheFirstAcceptedEndpoint()
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void DuplicateRequestAndPunchRetainTheFirstAcceptedEndpoint(bool member)
     {
         var peer = CreatePeer(1);
         var manager = CreateManager(("moving", peer));
+        if (member) Assert.True(manager.TryEnterMission(peer, "moving", "battle", out _));
         var requestId = Guid.NewGuid();
         Assert.True(manager.TryAuthorizeIntroduction(peer, "moving", "battle", requestId, out var token));
         var nat = new NetManager(null).NatPunchModule;
@@ -767,6 +785,80 @@ public class MissionManagerTests
         manager.HandleIntroductionRequest(new NetManager(null).NatPunchModule, endpoint, endpoint, token);
 
         Assert.False(HasInstance(manager, "battle"));
+    }
+
+    [Fact]
+    public void MembershipEntryRotatesAnEarlierAuthorizationEvenForTheSameRequest()
+    {
+        var peer = CreatePeer(1);
+        var manager = CreateManager(("moving", peer));
+        var requestId = Guid.NewGuid();
+        Assert.True(manager.TryAuthorizeIntroduction(peer, "moving", "battle", requestId, out var oldToken));
+        Assert.True(manager.TryEnterMission(peer, "moving", "battle", out _));
+
+        Assert.True(manager.TryAuthorizeIntroduction(peer, "moving", "battle", requestId, out var currentToken));
+        Assert.NotEqual(oldToken, currentToken);
+        var nat = new NetManager(null).NatPunchModule;
+        var endpoint = new IPEndPoint(IPAddress.Loopback, 53001);
+        manager.HandleIntroductionRequest(nat, endpoint, endpoint, oldToken);
+        Assert.Empty(GetInstance(manager, "battle").PunchEndpoints);
+
+        manager.HandleIntroductionRequest(nat, endpoint, endpoint, currentToken);
+        Assert.Single(GetInstance(manager, "battle").PunchEndpoints);
+    }
+
+    [Fact]
+    public void ReplacementMembershipRejectsOldAuthorizationBeforePlayerRegistryChanges()
+    {
+        var peer = CreatePeer(1);
+        var manager = CreateManager(("moving", peer));
+        Assert.True(manager.TryEnterMission(peer, "moving", "battle", out var original));
+        var token = Authorize(manager, peer, "moving", "battle");
+        Assert.True(manager.TryEnterMission(CreatePeer(2), "moving", "battle", out var replacement));
+        Assert.NotEqual(original.PeerCredential, replacement.PeerCredential);
+        var endpoint = new IPEndPoint(IPAddress.Loopback, 53001);
+
+        manager.HandleIntroductionRequest(new NetManager(null).NatPunchModule, endpoint, endpoint, token);
+
+        Assert.Empty(GetInstance(manager, "battle").PunchEndpoints);
+    }
+
+    [Fact]
+    public void SameInstanceReentryRejectsThePreviousCredentialAuthorization()
+    {
+        var peer = CreatePeer(1);
+        var manager = CreateManager(("moving", peer));
+        Assert.True(manager.TryEnterMission(peer, "moving", "battle", out var original));
+        var requestId = Guid.NewGuid();
+        Assert.True(manager.TryAuthorizeIntroduction(peer, "moving", "battle", requestId, out var oldToken));
+        Assert.True(manager.TryLeaveMission(peer, "moving", "battle", out _));
+        Assert.True(manager.TryEnterMission(peer, "moving", "battle", out var current));
+        Assert.NotEqual(original.PeerCredential, current.PeerCredential);
+        Assert.True(manager.TryAuthorizeIntroduction(peer, "moving", "battle", requestId, out var currentToken));
+        Assert.NotEqual(oldToken, currentToken);
+        var nat = new NetManager(null).NatPunchModule;
+        var currentEndpoint = new IPEndPoint(IPAddress.Loopback, 53001);
+        var staleEndpoint = new IPEndPoint(IPAddress.Loopback, 53002);
+
+        manager.HandleIntroductionRequest(nat, currentEndpoint, currentEndpoint, currentToken);
+        manager.HandleIntroductionRequest(nat, staleEndpoint, staleEndpoint, oldToken);
+
+        Assert.Equal(currentEndpoint, Assert.Single(GetInstance(manager, "battle").PunchEndpoints).External);
+    }
+
+    [Fact]
+    public void MemberAuthorizationReservesTheCredentialInTheDiscoveryTokenLengthLimit()
+    {
+        var peer = CreatePeer(1);
+        var manager = CreateManager(("moving", peer));
+        string longestInstance = new string('x', NatPunchModule.MaxTokenLength - "moving%".Length - 33);
+        Assert.True(manager.TryEnterMission(peer, "moving", longestInstance, out _));
+
+        Assert.True(manager.TryAuthorizeIntroduction(peer, "moving", longestInstance, Guid.NewGuid(), out var token));
+        Assert.True(Guid.TryParseExact(token, "N", out _));
+
+        Assert.True(manager.TryEnterMission(peer, "moving", longestInstance + "x", out _));
+        Assert.False(manager.TryAuthorizeIntroduction(peer, "moving", longestInstance + "x", Guid.NewGuid(), out _));
     }
 
     [Fact]

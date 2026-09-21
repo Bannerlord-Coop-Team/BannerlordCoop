@@ -6,6 +6,7 @@ using Coop.Core.Common.Network;
 using E2E.Tests.Environment.Instance;
 using E2E.Tests.Environment.Mock;
 using LiteNetLib;
+using System.Net;
 
 namespace E2E.Tests.Environment;
 
@@ -51,6 +52,8 @@ public class TestNetworkRouter
     /// synchronous harness behavior; turn it off when a test needs to control delivery explicitly.
     /// </summary>
     public bool AutoDrainReady { get; set; } = true;
+
+    public IPEndPoint ServerEndpoint => new(Server.NetPeer.Address, Server.NetPeer.Port);
 
     public TimeSpan CurrentTime => scheduler.CurrentTime;
 
