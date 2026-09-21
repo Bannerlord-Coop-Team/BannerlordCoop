@@ -122,6 +122,16 @@ internal static class BattleDebugCommands
     private static readonly HashSet<string> replicationFixtureCatchUpTargets =
         new HashSet<string>();
     private static int replicationFixtureInitialAgentIndex = -1;
+    private static FormationSyncFixture formationSyncFixture;
+
+    private sealed class FormationSyncFixture
+    {
+        public Mission Mission;
+        public Agent Agent;
+        public Guid AgentId;
+        public int OriginalFormationIndex;
+        public int TargetFormationIndex;
+    }
 
     private sealed class ColumnReinforcementCandidate
     {
@@ -690,6 +700,137 @@ internal static class BattleDebugCommands
         wieldTestOriginalMainHand = EquipmentIndex.None;
         wieldTestActive = false;
         return Succeeded($"WIELD_TEST_RESTORED agent={restoredAgentId:D}");
+    }
+
+    public sealed class FormationSyncFixtureCoopCommand : ICoopCommand
+    {
+        public string Prefix => "coop.debug.battle";
+
+        public string Name => "formation_sync_fixture";
+
+        public string Description => "Moves one local troop between formations and reports its replicated state.";
+
+        public CoopCommandSide Side => CoopCommandSide.Client;
+
+        public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
+        {
+            new ExpectedArgs("action", "The action.", true),
+            new ExpectedArgs("agent_id", "The agent id for state.", false),
+        };
+
+        public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
+        {
+            switch (args[0].ToLowerInvariant())
+            {
+                case "start":
+                    return args.Count == 1 ? StartFormationSyncFixture() : Failed("Invalid command argument value.");
+                case "state":
+                    return args.Count == 2 ? GetFormationSyncFixtureState(args[1]) : Failed("Invalid command argument value.");
+                case "restore":
+                    return args.Count == 1 ? RestoreFormationSyncFixture() : Failed("Invalid command argument value.");
+                default:
+                    return Failed("Invalid command argument value.");
+            }
+        }
+    }
+
+    private static CoopCommandResult StartFormationSyncFixture()
+    {
+        if (formationSyncFixture != null)
+            return Failed("FORMATION_SYNC_FIXTURE is already active");
+
+        Mission mission = Mission.Current;
+        CoopBattleController controller = mission?.GetMissionBehavior<CoopBattleController>();
+        if (mission == null || controller == null || !controller.Deployment.IsCommitted)
+            return Failed("FORMATION_SYNC_FIXTURE requires an active committed co-op battle");
+        if (!ContainerProvider.TryResolve<INetworkAgentRegistry>(out var registry)
+            || !ContainerProvider.TryResolve<IAgentFormationAssigner>(out var formationAssigner))
+        {
+            return Failed("FORMATION_SYNC_FIXTURE required battle services are unavailable");
+        }
+
+        CoopAgentInfo info = registry.GetAgents(controller.Session.OwnControllerId)
+            .Where(candidate => candidate.OriginalOwner == controller.Session.OwnControllerId)
+            .Where(candidate => candidate.Agent != null && candidate.Agent.IsActive()
+                && candidate.Agent.IsHuman && !candidate.Agent.IsMount
+                && candidate.Agent.Team == mission.PlayerTeam && candidate.Agent.Formation != null)
+            .OrderBy(candidate => candidate.AgentId)
+            .FirstOrDefault();
+        if (info == null)
+            return Failed("FORMATION_SYNC_FIXTURE has no locally owned troop");
+
+        int originalFormationIndex = (int)info.Agent.Formation.FormationIndex;
+        int targetFormationIndex = (originalFormationIndex + 1) % (int)FormationClass.NumberOfAllFormations;
+        Formation targetFormation = formationAssigner.Assign(info.Agent, targetFormationIndex);
+        if (targetFormation == null || !ReferenceEquals(targetFormation, info.Agent.Formation))
+            return Failed("FORMATION_SYNC_FIXTURE could not assign the target formation");
+
+        formationSyncFixture = new FormationSyncFixture
+        {
+            Mission = mission,
+            Agent = info.Agent,
+            AgentId = info.AgentId,
+            OriginalFormationIndex = originalFormationIndex,
+            TargetFormationIndex = targetFormationIndex,
+        };
+        return Succeeded(FormatFormationSyncFixtureState("started", info));
+    }
+
+    private static CoopCommandResult GetFormationSyncFixtureState(string value)
+    {
+        if (!Guid.TryParseExact(value, "N", out Guid agentId))
+            return Failed("Invalid command argument value.");
+        if (!ContainerProvider.TryResolve<INetworkAgentRegistry>(out var registry)
+            || !registry.TryGetAgentInfo(agentId, out CoopAgentInfo info)
+            || info.Agent == null || !info.Agent.IsActive())
+        {
+            return Failed($"FORMATION_SYNC_FIXTURE missing agent={agentId:N}");
+        }
+
+        return Succeeded(FormatFormationSyncFixtureState("observed", info));
+    }
+
+    private static CoopCommandResult RestoreFormationSyncFixture()
+    {
+        FormationSyncFixture fixture = formationSyncFixture;
+        if (fixture == null)
+            return Failed("FORMATION_SYNC_FIXTURE is inactive");
+        if (fixture.Mission != Mission.Current || fixture.Agent == null || !fixture.Agent.IsActive()
+            || !ContainerProvider.TryResolve<INetworkAgentRegistry>(out var registry)
+            || !registry.TryGetAgentInfo(fixture.AgentId, out CoopAgentInfo info)
+            || info.Agent != fixture.Agent
+            || !ContainerProvider.TryResolve<IAgentFormationAssigner>(out var formationAssigner))
+        {
+            return Failed("FORMATION_SYNC_FIXTURE cannot restore the selected troop");
+        }
+
+        Formation originalFormation = formationAssigner.Assign(fixture.Agent, fixture.OriginalFormationIndex);
+        if (originalFormation == null || (int)originalFormation.FormationIndex != fixture.OriginalFormationIndex)
+            return Failed("FORMATION_SYNC_FIXTURE could not restore the original formation");
+
+        string restoredState = FormatFormationSyncFixtureState("restored", info);
+        formationSyncFixture = null;
+        return Succeeded(restoredState);
+    }
+
+    private static string FormatFormationSyncFixtureState(string action, CoopAgentInfo info)
+    {
+        int formationIndex = info.Agent.Formation == null ? -1 : (int)info.Agent.Formation.FormationIndex;
+        FormationSyncFixture fixture = formationSyncFixture?.AgentId == info.AgentId
+            ? formationSyncFixture
+            : null;
+        string structuredState = JsonConvert.SerializeObject(new
+        {
+            action,
+            agentId = info.AgentId.ToString("N"),
+            authority = info.CurrentAuthority,
+            authorityRevision = info.AuthorityRevision,
+            formationIndex,
+            originalFormationIndex = fixture?.OriginalFormationIndex,
+            targetFormationIndex = fixture?.TargetFormationIndex,
+        });
+        return $"FORMATION_SYNC_FIXTURE {action} agent={info.AgentId:N} formation={formationIndex} " +
+               $"authority={info.CurrentAuthority} revision={info.AuthorityRevision}\nLIVE_TEST_JSON={structuredState}";
     }
 
 #endif
