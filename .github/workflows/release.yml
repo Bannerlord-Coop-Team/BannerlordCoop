@@ -100,11 +100,9 @@ jobs:
             -e "s/\${game_version}/$game_version/g" \
             deploy/SubModule.xml > "$module/SubModule.xml"
 
-      - name: Build and run unit tests
+      - name: Build test projects
         working-directory: source
-        run: |
-          dotnet build CoopTests.slnf -c Release -p:NuGetAudit=false -p:ModName= -p:CoopVersion="${GITHUB_REF_NAME#v}"
-          dotnet test CoopUnitTests.slnf -c Release --no-build --no-restore --consoleLoggerParameters:ErrorsOnly
+        run: dotnet build CoopTests.slnf -c Release -p:NuGetAudit=false -p:ModName= -p:CoopVersion="${GITHUB_REF_NAME#v}"
 
       - name: Upload test build output
         uses: actions/upload-artifact@v7
@@ -121,6 +119,38 @@ jobs:
           path: release-stage/
           if-no-files-found: error
           retention-days: 1
+
+  test:
+    name: Unit and integration tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    needs: build
+
+    container:
+      image: garrettluskey/bannerlordcoop:latest
+
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+
+      - name: Link Bannerlord assemblies
+        run: ln -s /home/mb2 mb2
+
+      - name: Download test build output
+        uses: actions/download-artifact@v8
+        with:
+          name: release-test-build-output
+          path: source
+
+      - name: Restore test assets
+        working-directory: source
+        run: dotnet restore CoopTests.slnf -p:NuGetAudit=false -p:ModName= -p:CoopVersion="${GITHUB_REF_NAME#v}"
+
+      - name: Run unit and integration tests
+        working-directory: source
+        run: dotnet test CoopUnitTests.slnf -c Release --no-build --no-restore --consoleLoggerParameters:ErrorsOnly
 
   e2e:
     name: E2E Tests (${{ matrix.shard }})
@@ -159,7 +189,7 @@ jobs:
         run: sh ../.github/scripts/run-e2e-shard.sh "${{ matrix.shard }}" 8
 
   draft:
-    needs: [build, e2e]
+    needs: [build, test, e2e]
     environment: release
     runs-on: windows-latest
     timeout-minutes: 20
