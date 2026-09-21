@@ -1,5 +1,6 @@
 ﻿using Common.Messaging;
 using E2E.Tests.Environment.MockEngine;
+using GameInterface.Services.MapEvents;
 using GameInterface.Services.MapEvents.Messages;
 using GameInterface.Services.Players;
 using HarmonyLib;
