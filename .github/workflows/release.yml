@@ -1,0 +1,219 @@
+name: Release
+
+on:
+  push:
+    tags: ['v*']
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-${{ github.ref_name }}
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    container:
+      image: garrettluskey/bannerlordcoop:latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+
+      - name: Validate release tag
+        run: |
+          printf '%s' "$GITHUB_REF_NAME" | grep -Eq '^v(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$'
+
+      - name: Link Bannerlord assemblies
+        run: ln -s /home/mb2 mb2
+
+      - name: Restore .NET Framework build inputs
+        run: |
+          set -eu
+          reference_package="$RUNNER_TEMP/net472.nupkg"
+          reference_root="$RUNNER_TEMP/net472"
+          mkdir -p "$reference_root" source/packages
+          wget -q \
+            https://api.nuget.org/v3-flatcontainer/microsoft.netframework.referenceassemblies.net472/1.0.3/microsoft.netframework.referenceassemblies.net472.1.0.3.nupkg \
+            -O "$reference_package"
+          echo "ffa0a5570a39f911399164d0581ffddef99b5e3dfbaa5f220e5ce22969bcf57c  $reference_package" | sha256sum -c -
+          unzip -q "$reference_package" -d "$reference_root"
+
+          sed -n 's/.*id="\([^"]*\)" version="\([^"]*\)".*/\1 \2/p' source/Coop/packages.config |
+            while read -r package_id package_version; do
+              lower_id=$(printf '%s' "$package_id" | tr '[:upper:]' '[:lower:]')
+              destination="source/packages/$package_id.$package_version"
+              package_file="$RUNNER_TEMP/$lower_id.$package_version.nupkg"
+              mkdir -p "$destination"
+              wget -q \
+                "https://api.nuget.org/v3-flatcontainer/$lower_id/$package_version/$lower_id.$package_version.nupkg" \
+                -O "$package_file"
+              unzip -q "$package_file" -d "$destination"
+            done
+
+      - name: Build release module
+        working-directory: source
+        run: |
+          dotnet build Coop/Coop.csproj \
+            -c Release \
+            -p:CustomAfterMicrosoftCommonTargets="$RUNNER_TEMP/net472/build/Microsoft.NETFramework.ReferenceAssemblies.net472.targets" \
+            -p:SourceRevisionId="$GITHUB_SHA" \
+            -p:IncludeSourceRevisionInInformationalVersion=true \
+            -p:CoopVersion="${GITHUB_REF_NAME#v}" -p:ModName= \
+            -p:NuGetAudit=false \
+            --consoleLoggerParameters:ErrorsOnly
+
+      - name: Stage module
+        run: |
+          set -eu
+          rm -rf -- release-stage
+          module=release-stage/Coop
+          binary="$module/bin/Win64_Shipping_Client"
+          mkdir -p "$binary" "$module/GUI/Prefabs"
+
+          for file in source/Coop/bin/Release/*.dll; do
+            name=${file##*/}
+            case "$name" in
+              TaleWorlds.*|SandBox.*|StoryMode.*) continue ;;
+            esac
+            cp "$file" "$binary/"
+          done
+          cp source/Coop/bin/Release/Coop.CrashReporter.exe "$binary/"
+          for required in Coop.dll Common.dll Coop.Core.dll Coop.Steam.dll GameInterface.dll Missions.dll Coop.CrashReporter.exe; do
+            test -s "$binary/$required"
+          done
+          cp 'deploy/Server Instructions.md' deploy/mod-config.default.json "$module/"
+          cp -R deploy/ModuleData deploy/ThirdPartyNotices "$module/"
+          cp -R UIMovies/. "$module/GUI/Prefabs/"
+
+          coop_version=${GITHUB_REF_NAME#v}
+          game_version=$(sed -n 's/.*<GameVersion>\([^<]*\)<\/GameVersion>.*/\1/p' source/Coop/Coop.csproj)
+          test -n "$coop_version"
+          test -n "$game_version"
+          # shellcheck disable=SC2016
+          sed \
+            -e 's/${name}/Coop/g' \
+            -e 's/${main_class}/CoopMod/g' \
+            -e "s/\${version}/v$coop_version/g" \
+            -e "s/\${game_version}/$game_version/g" \
+            deploy/SubModule.xml > "$module/SubModule.xml"
+
+      - name: Build and run unit tests
+        working-directory: source
+        run: |
+          dotnet build CoopTests.slnf -c Release -p:NuGetAudit=false -p:ModName= -p:CoopVersion="${GITHUB_REF_NAME#v}"
+          dotnet test CoopUnitTests.slnf -c Release --no-build --no-restore --consoleLoggerParameters:ErrorsOnly
+
+      - name: Upload test build output
+        uses: actions/upload-artifact@v7
+        with:
+          name: release-test-build-output
+          path: source/*/bin/**
+          if-no-files-found: error
+          retention-days: 1
+
+      - name: Upload unsigned module
+        uses: actions/upload-artifact@v7
+        with:
+          name: unsigned-release-module
+          path: release-stage/
+          if-no-files-found: error
+          retention-days: 1
+
+  e2e:
+    name: E2E Tests (${{ matrix.shard }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    needs: build
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [0, 1, 2, 3, 4, 5, 6, 7]
+
+    container:
+      image: garrettluskey/bannerlordcoop:latest
+
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+
+      - name: Link Bannerlord assemblies
+        run: ln -s /home/mb2 mb2
+
+      - name: Download test build output
+        uses: actions/download-artifact@v8
+        with:
+          name: release-test-build-output
+          path: source
+
+      - name: Restore test assets
+        working-directory: source
+        run: dotnet restore CoopTests.slnf -p:NuGetAudit=false -p:ModName= -p:CoopVersion="${GITHUB_REF_NAME#v}"
+
+      - name: Run E2E test shard
+        working-directory: source
+        run: sh ../.github/scripts/run-e2e-shard.sh "${{ matrix.shard }}" 8
+
+  draft:
+    needs: [build, e2e]
+    environment: release
+    runs-on: windows-latest
+    timeout-minutes: 20
+    permissions:
+      contents: write
+      id-token: write
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: actions/download-artifact@v8
+        with:
+          name: unsigned-release-module
+          path: release-stage
+
+      - name: Azure login
+        uses: azure/login@532459ea530d8321f2fb9bb10d1e0bcf23869a43 # v3
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Sign module binaries
+        uses: azure/artifact-signing-action@c7ab2a863ab5f9a846ddb8265964877ef296ee82 # v2
+        with:
+          endpoint: ${{ vars.SIGNING_ENDPOINT }}
+          signing-account-name: ${{ vars.SIGNING_ACCOUNT_NAME }}
+          certificate-profile-name: ${{ vars.SIGNING_PROFILE_NAME }}
+          files-folder: ${{ github.workspace }}\release-stage\Coop\bin\Win64_Shipping_Client
+          files-folder-filter: exe,dll
+          file-digest: SHA256
+          timestamp-rfc3161: http://timestamp.acs.microsoft.com
+          timestamp-digest: SHA256
+
+      - name: Verify signatures
+        shell: pwsh
+        run: |
+          $binaries = @(Get-ChildItem 'release-stage\Coop\bin\Win64_Shipping_Client\*' -Include '*.dll', '*.exe')
+          if ($binaries.Count -eq 0) { throw 'No module binaries found to verify' }
+          $invalid = @($binaries | Where-Object { (Get-AuthenticodeSignature $_.FullName).Status -ne 'Valid' })
+          foreach ($file in $invalid) {
+            Write-Host "Not validly signed: $($file.Name) ($((Get-AuthenticodeSignature $file.FullName).Status))"
+          }
+          if ($invalid.Count -gt 0) { throw "$($invalid.Count) of $($binaries.Count) binaries are not validly signed" }
+          Write-Host "Verified Authenticode signatures on $($binaries.Count) binaries"
+
+      - name: Package signed module
+        shell: pwsh
+        run: Compress-Archive -Path release-stage/Coop -DestinationPath "BannerlordCoop-$env:GITHUB_REF_NAME.zip"
+
+      - name: Create draft and dispatch dedicated server
+        uses: actions/github-script@v8
+        with:
+          github-token: ${{ secrets.RELEASE_DISPATCH_TOKEN }}
+          script: |
+            const release = require('./.github/scripts/tag-release.cjs');
+            await release.createDraft({ github, context });
