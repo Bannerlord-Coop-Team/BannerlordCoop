@@ -22,6 +22,7 @@ internal sealed class ChatOverlay : GlobalLayer, IDisposable
     private const string FeedScrollablePanelId = "ChatFeedScrollablePanel";
     private const string ResizerWidgetId = "CoopChatResizer";
     private const string ResizeFrameWidgetId = "CoopChatResizeFrame";
+    private const string ResizeCaptureWidgetId = "CoopChatResizeCapture";
     private const int LayerOrder = 110;
     private const float ResizeTransitionSeconds = 0.14f;
 
@@ -33,6 +34,7 @@ internal sealed class ChatOverlay : GlobalLayer, IDisposable
     private ScrollablePanel feedScrollablePanel;
     private Widget resizerWidget;
     private Widget resizeFrameWidget;
+    private Widget resizeCaptureWidget;
     private bool initialized;
     private bool isInputFocused;
     private bool ignoreNextOutsideClick;
@@ -83,6 +85,7 @@ internal sealed class ChatOverlay : GlobalLayer, IDisposable
         {
             pinFeedToBottom = false;
             pinFeedLastMaxValue = -1f;
+            SetResizeCaptureVisible(false);
             isResizing = false;
             applyResizeToPanel = false;
             if (playerChatEnabled && ShouldOpenInput(
@@ -167,6 +170,7 @@ internal sealed class ChatOverlay : GlobalLayer, IDisposable
         feedScrollablePanel = null;
         resizerWidget = null;
         resizeFrameWidget = null;
+        resizeCaptureWidget = null;
         movie = null;
         gauntletLayer = null;
         Layer = null;
@@ -283,8 +287,10 @@ internal sealed class ChatOverlay : GlobalLayer, IDisposable
         if (Input.IsKeyPressed(InputKey.LeftMouseButton) &&
             ReferenceEquals(gauntletLayer.UIContext.EventManager.HoveredWidget, resizerWidget))
         {
-            ReleaseInputFocus();
+            gauntletLayer.UIContext.EventManager.FocusedWidget = null;
+            isInputFocused = false;
             isResizing = true;
+            SetResizeCaptureVisible(true);
             resizeStartMousePosition = Input.MousePositionPixel;
             resizeOriginalSize = new Vec2(dataSource.ChatBoxSizeX, dataSource.ChatBoxSizeY);
             resizeFrameWidget.IsVisible = true;
@@ -310,6 +316,7 @@ internal sealed class ChatOverlay : GlobalLayer, IDisposable
                 resizeFrameWidget.IsVisible = false;
                 applyResizeToPanel = true;
                 resizeLerpRatio = 0f;
+                SetResizeCaptureVisible(false);
             }
 
             isResizing = false;
@@ -358,6 +365,14 @@ internal sealed class ChatOverlay : GlobalLayer, IDisposable
         feedScrollablePanel ??= root.FindChild(FeedScrollablePanelId, includeAllChildren: true) as ScrollablePanel;
         resizerWidget ??= root.FindChild(ResizerWidgetId, includeAllChildren: true);
         resizeFrameWidget ??= root.FindChild(ResizeFrameWidgetId, includeAllChildren: true);
+        resizeCaptureWidget ??= root.FindChild(ResizeCaptureWidgetId, includeAllChildren: true);
+    }
+
+    private void SetResizeCaptureVisible(bool visible)
+    {
+        ResolveFeedWidgets();
+        if (resizeCaptureWidget != null)
+            resizeCaptureWidget.IsVisible = visible;
     }
 
     private void CloseInput()
@@ -366,6 +381,7 @@ internal sealed class ChatOverlay : GlobalLayer, IDisposable
 
         dataSource.SetOpen(false);
         ignoreNextOutsideClick = false;
+        SetResizeCaptureVisible(false);
         isResizing = false;
         applyResizeToPanel = false;
         if (resizeFrameWidget != null)
@@ -400,15 +416,9 @@ internal sealed class ChatOverlay : GlobalLayer, IDisposable
         ScreenManager.TryLoseFocus(gauntletLayer);
         // Keep the cursor while the panel is open so channel tabs / resizer stay usable.
         if (dataSource.IsOpen)
-        {
-            gauntletLayer.InputRestrictions.SetInputRestrictions(
-                isMouseVisible: true,
-                mask: InputUsageMask.Mouse);
-        }
+            SetOpenPanelInputRestrictions(gauntletLayer.InputRestrictions);
         else
-        {
             SetPassiveInputRestrictions(gauntletLayer.InputRestrictions);
-        }
     }
 
     internal static bool ShouldReleaseInputFocus(
@@ -467,6 +477,13 @@ internal sealed class ChatOverlay : GlobalLayer, IDisposable
     {
         inputRestrictions.SetInputRestrictions(
             isMouseVisible: false,
+            mask: InputUsageMask.Mouse);
+    }
+
+    internal static void SetOpenPanelInputRestrictions(InputRestrictions inputRestrictions)
+    {
+        inputRestrictions.SetInputRestrictions(
+            isMouseVisible: true,
             mask: InputUsageMask.Mouse);
     }
 }

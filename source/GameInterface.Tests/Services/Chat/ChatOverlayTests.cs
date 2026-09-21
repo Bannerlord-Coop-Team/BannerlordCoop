@@ -19,6 +19,17 @@ public class ChatOverlayTests
     }
 
     [Fact]
+    public void OpenPanelInputRestrictions_ShowCursorWithoutClaimingKeyboard()
+    {
+        var inputRestrictions = new InputRestrictions(900);
+
+        ChatOverlay.SetOpenPanelInputRestrictions(inputRestrictions);
+
+        Assert.Equal(InputUsageMask.Mouse, inputRestrictions.InputUsageMask);
+        Assert.True(inputRestrictions.MouseVisibility);
+    }
+
+    [Fact]
     public void OutsideMouseClick_ReleasesOnlyFocusedTextInput()
     {
         Assert.True(ChatOverlay.ShouldReleaseInputFocus(
