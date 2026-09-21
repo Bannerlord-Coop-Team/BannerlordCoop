@@ -95,17 +95,30 @@ async function publish({ github, context }) {
   const assets = await github.paginate(github.rest.repos.listReleaseAssets, { ...context.repo, release_id: release.id });
   for (const [name, checksum] of [
     [`BannerlordCoop-${payload.tag}.zip`, result.client_asset_sha256],
-    [`BannerlordCoop-DedicatedServer-Linux64-${payload.tag}.tar.zst`, result.server_asset_sha256],
+    ['manifest.json', result.manifest_sha256],
   ]) {
     const asset = assets.find(item => item.name === name);
     if (!asset || asset.state !== 'uploaded' || asset.size <= 0) throw new Error(`Missing release asset: ${name}`);
     if (!/^[a-f0-9]{64}$/.test(checksum)) throw new Error(`Missing checksum: ${name}`);
     if (asset.digest !== `sha256:${checksum}`) throw new Error(`Release asset checksum mismatch: ${name}`);
   }
+  const windows = result.windows;
+  const name = `BannerlordCoop-DedicatedServer-Win64-${payload.tag}.7z`;
+  if (!windows || windows.name !== name || !/^[a-f0-9]{64}$/.test(windows.sha256)
+      || !Number.isSafeInteger(windows.bytes) || windows.bytes <= 0
+      || windows.url !== `https://pub-c80efa34191141fd803f8508e025f726.r2.dev/release/${payload.tag}/${windows.sha256}/${name}`) {
+    throw new Error('Invalid Windows release download');
+  }
   if (release.draft) {
     await github.rest.repos.updateRelease({
       ...context.repo, release_id: release.id, tag_name: payload.tag, target_commitish: payload.client_sha,
       draft: false, make_latest: 'legacy',
+      body: `${release.body}
+
+## Windows dedicated server
+[Download ${name}](${windows.url})
+
+Size: ${windows.bytes} bytes. SHA-256: \`${windows.sha256}\`.`,
     });
   }
   await github.rest.repos.createDispatchEvent({ ...serverRepo, event_type: 'promote_stable', client_payload: payload });
