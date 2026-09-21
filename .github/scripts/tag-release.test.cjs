@@ -15,11 +15,11 @@ function fixture(t) {
   const payload = { ...identity, server_run_id: 30, server_run_attempt: 1, image_digest: `sha256:${'b'.repeat(64)}` };
   const bytes = Buffer.from('packaged binaries');
   const checksum = crypto.createHash('sha256').update(bytes).digest('hex');
-  const result = { ...payload, client_asset_sha256: checksum, server_asset_sha256: checksum };
+  const result = { ...payload, client_asset_sha256: checksum, manifest_sha256: checksum, windows: { name: "BannerlordCoop-DedicatedServer-Win64-v0.2.0.7z", bytes: 123, sha256: checksum, url: `https://pub-c80efa34191141fd803f8508e025f726.r2.dev/release/v0.2.0/${checksum}/BannerlordCoop-DedicatedServer-Win64-v0.2.0.7z` } };
   fs.mkdirSync('release-result');
   fs.writeFileSync('release-result/release-result.json', JSON.stringify(result));
   const release = { id: 10, tag_name: 'v0.2.0', draft: true, prerelease: false, body: `notes\n<!-- release-coordination ${JSON.stringify(identity)} -->` };
-  const assets = ['BannerlordCoop-v0.2.0.zip', 'BannerlordCoop-DedicatedServer-Linux64-v0.2.0.tar.zst'].map((name, id) => ({ id, name, size: bytes.length, state: 'uploaded', digest: `sha256:${checksum}` }));
+  const assets = ['BannerlordCoop-v0.2.0.zip', 'manifest.json'].map((name, id) => ({ id, name, size: bytes.length, state: 'uploaded', digest: `sha256:${checksum}` }));
   const calls = [];
   const serverRun = { path: '.github/workflows/release.yml', event: 'repository_dispatch', status: 'completed', conclusion: 'success', run_attempt: 1 };
   const clientRun = { ...serverRun, event: 'push', head_sha: identity.client_sha };
@@ -49,6 +49,7 @@ test('publishes only after verification, then requests a digest-bound promotion 
   await publish(f);
   assert.deepEqual(f.calls.map(call => call[0]), ['update', 'dispatch']);
   assert.equal(f.calls[0][1].draft, false);
+  assert.ok(f.calls[0][1].body.includes(f.result.windows.url));
   assert.equal(f.release.tag_name, f.result.tag);
   assert.equal(f.release.target_commitish, f.result.client_sha);
   assert.equal(f.calls[1][1].event_type, 'promote_stable');
@@ -61,6 +62,7 @@ test('rejects failed runs, stale attempts, missing assets and changed bytes befo
     f => { f.serverRun.run_attempt = 2; },
     f => { f.clientRun.run_attempt = 2; },
     f => { f.assets.pop(); },
+    f => { f.result.windows.url = 'https://wrong.example/server.7z'; fs.writeFileSync('release-result/release-result.json', JSON.stringify(f.result)); },
     f => { f.context.payload.client_payload.client_sha = 'c'.repeat(40); },
     f => { f.release.body = f.release.body.replace('"client_run_attempt":1', '"client_run_attempt":2'); },
     f => { f.assets[1].digest = `sha256:${'d'.repeat(64)}`; },
