@@ -72,6 +72,7 @@ internal class ClanFinanceHandler : IHandler
 
         GameThread.RunSafe(() =>
         {
+            if (!playerManager.ValidateHeroSender(obj.Who, data.ActorId)) return;
             if (!objectManager.TryGetObjectWithLogging<Hero>(data.ActorId, out var actor)) return;
             if (!objectManager.TryGetObjectWithLogging<Hero>(data.MemberId, out var member)) return;
             if (!objectManager.TryGetObjectWithLogging<Clan>(data.ClanId, out var clan)) return;

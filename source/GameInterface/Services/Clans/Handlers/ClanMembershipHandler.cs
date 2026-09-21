@@ -3,6 +3,7 @@ using Common.Messaging;
 using Common.Network;
 using GameInterface.Services.Clans.Messages;
 using GameInterface.Services.ObjectManager;
+using GameInterface.Services.Players;
 using TaleWorlds.CampaignSystem;
 
 namespace GameInterface.Services.Clans.Handlers;
@@ -13,14 +14,17 @@ internal class ClanMembershipHandler : IHandler
     private readonly IObjectManager objectManager;
     private readonly INetwork network;
     private readonly IClanLeaveRules leaveRules;
+    private readonly IPlayerManager playerManager;
 
     public ClanMembershipHandler(IMessageBroker messageBroker, IObjectManager objectManager,
-        INetwork network, IClanLeaveRules leaveRules)
+        INetwork network, IClanLeaveRules leaveRules, IPlayerManager playerManager)
     {
         this.messageBroker = messageBroker;
         this.objectManager = objectManager;
         this.network = network;
         this.leaveRules = leaveRules;
+        this.playerManager = playerManager;
+
         messageBroker.Subscribe<ClanMemberLeaveRequested>(Handle);
         messageBroker.Subscribe<RequestClanMemberLeave>(Handle);
     }
@@ -45,6 +49,7 @@ internal class ClanMembershipHandler : IHandler
         if (ModInformation.IsClient) return;
         GameThread.RunSafe(() =>
         {
+            if (!playerManager.ValidateHeroSender(payload.Who, payload.What.ActorId)) return;
             if (!objectManager.TryGetObjectWithLogging<Hero>(payload.What.ActorId, out var actor) ||
                 !objectManager.TryGetObjectWithLogging<Hero>(payload.What.MemberId, out var member)) return;
             if (actor == member ? leaveRules.CanLeave(member) : leaveRules.CanRemove(actor, member))
