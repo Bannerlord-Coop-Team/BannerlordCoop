@@ -188,13 +188,14 @@ jobs:
         working-directory: source
         run: sh ../.github/scripts/run-e2e-shard.sh "${{ matrix.shard }}" 8
 
-  draft:
+  sign:
+    name: Sign release module
     needs: [build, test, e2e]
     environment: release
     runs-on: windows-latest
     timeout-minutes: 20
     permissions:
-      contents: write
+      contents: read
       id-token: write
     steps:
       - uses: actions/checkout@v7
@@ -239,6 +240,31 @@ jobs:
       - name: Package signed module
         shell: pwsh
         run: Compress-Archive -Path release-stage/Coop -DestinationPath "BannerlordCoop-$env:GITHUB_REF_NAME.zip"
+
+      - name: Upload signed package
+        uses: actions/upload-artifact@v7
+        with:
+          name: signed-release-package
+          path: BannerlordCoop-${{ github.ref_name }}.zip
+          if-no-files-found: error
+          retention-days: 1
+
+  draft:
+    name: Create draft and dispatch dedicated server
+    needs: sign
+    environment: release
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+
+      - name: Download signed package
+        uses: actions/download-artifact@v8
+        with:
+          name: signed-release-package
+          path: .
 
       - name: Create draft and dispatch dedicated server
         uses: actions/github-script@v8
