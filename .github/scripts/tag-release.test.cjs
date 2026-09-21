@@ -30,7 +30,11 @@ function fixture(t) {
         getRelease: async () => ({ data: release }),
         getCommit: async () => ({ data: { sha: identity.client_sha } }),
         listReleaseAssets: async () => assets,
-        updateRelease: async args => { calls.push(['update', args]); },
+        updateRelease: async args => {
+          calls.push(['update', args]);
+          Object.assign(release, args, { tag_name: args.tag_name || 'untagged-placeholder' });
+          return { data: release };
+        },
         createDispatchEvent: async args => { calls.push(['dispatch', args]); },
       },
       actions: { getWorkflowRun: async args => ({ data: args.run_id === 30 ? serverRun : clientRun }) },
@@ -45,6 +49,8 @@ test('publishes only after verification, then requests a digest-bound promotion 
   await publish(f);
   assert.deepEqual(f.calls.map(call => call[0]), ['update', 'dispatch']);
   assert.equal(f.calls[0][1].draft, false);
+  assert.equal(f.release.tag_name, f.result.tag);
+  assert.equal(f.release.target_commitish, f.result.client_sha);
   assert.equal(f.calls[1][1].event_type, 'promote_stable');
   assert.equal(f.calls[1][1].client_payload.image_digest, f.result.image_digest);
 });
@@ -90,6 +96,17 @@ test('draft creation uploads the client package before dispatch and never publis
   await createDraft(f);
   assert.deepEqual(f.calls.map(call => call[0]), ['create', 'update', 'upload', 'dispatch']);
   assert.equal(f.calls[0][1].draft, true);
+  assert.equal(f.release.tag_name, f.result.tag);
+  assert.equal(f.release.target_commitish, f.result.client_sha);
   assert.equal(f.calls[3][1].event_type, 'build_release');
   assert.equal(f.calls[3][1].client_payload.release_id, 10);
+});
+
+test('draft identity mismatch stops uploads and dispatch', async t => {
+  const f = fixture(t);
+  f.github.rest.repos.listReleases = async () => [f.release];
+  f.github.rest.repos.updateRelease = async () => ({ data: { ...f.release, tag_name: 'untagged-placeholder' } });
+  Object.assign(f.context, { ref: 'refs/tags/v0.2.0', sha: f.result.client_sha, runId: 20 });
+  await assert.rejects(createDraft(f), /Draft release identity changed during update/);
+  assert.deepEqual(f.calls, []);
 });
