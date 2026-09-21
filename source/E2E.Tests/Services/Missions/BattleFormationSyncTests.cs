@@ -10,7 +10,11 @@ using Missions.Data;
 using Missions.Messages;
 using Moq;
 using System;
+using System.Collections;
+using System.Collections.Generic;
 using System.Linq;
+using TaleWorlds.CampaignSystem;
+using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.Core;
 using TaleWorlds.MountAndBlade;
 using Xunit;
@@ -148,6 +152,88 @@ public class BattleFormationSyncTests : MissionTestEnvironment
             broker.Publish(this, new NetworkBattleAgentFormations("battle", "former",
                 new[] { new BattleAgentFormationData(id, -1, 0) }));
             Assert.NotNull(agent.Formation);
+        });
+    }
+
+    [Theory]
+    [InlineData(false, false)]
+    [InlineData(false, true)]
+    [InlineData(true, false)]
+    [InlineData(true, true)]
+    public void Withdrawal_DiscardsFormationUpdatesButKeepsDeferredSpawns(bool wasHost, bool disconnected)
+    {
+        using var fixture = new MissionEngineFixture();
+        var (mapEventId, partyIds) = SetupCoopBattle("A", "B", "C");
+        var peer = Clients.First();
+        var characterId = CreateRegisteredObject<CharacterObject>();
+        peer.Call(() =>
+        {
+            var mission = fixture.CreateMission(peer);
+            var broker = peer.Resolve<IMessageBroker>();
+            var registry = peer.Resolve<INetworkAgentRegistry>();
+            var session = Mock.Of<IBattleSession>(value => value.InstanceId == mapEventId);
+            Mock.Get(session).Setup(value => value.IsHostController("A")).Returns(wasHost);
+            var budget = new Mock<IBattleAgentBudget>();
+            budget.Setup(value => value.SlotsForEquipment(It.IsAny<Equipment>())).Returns(1);
+            using var spawner = new PuppetSpawner(broker, peer.ObjectManager, peer.Resolve<IPlayerManager>(),
+                peer.Resolve<ICoopMissionComponent>(), session, new CasualtyAttributionMap(),
+                Mock.Of<IBattleDeploymentCoordinator>(), new AgentFormationAssigner(), budget.Object,
+                peer.Resolve<IMissionWeaponDataMapper>());
+            var pending = (IDictionary)AccessTools.Field(typeof(PuppetSpawner), "pendingFormations").GetValue(spawner);
+            var spawns = (List<BattleAgentSpawnData>)AccessTools.Field(typeof(PuppetSpawner), "pendingPuppets").GetValue(spawner);
+
+            BattleAgentSpawnData Record(int partyIndex, string owner)
+            {
+                Assert.True(peer.ObjectManager.TryGetObject<MobileParty>(partyIds[partyIndex], out var party));
+                var side = party.Party.Side;
+                var mapEventParty = party.MapEvent.GetMapEventSide(side).Parties.Single(value => value.Party == party.Party);
+                Assert.True(peer.ObjectManager.TryGetId(mapEventParty, out var partyId));
+                return new BattleAgentSpawnData(Guid.NewGuid(), characterId, default, side,
+                    100f, owner, partyId, partyIndex + 1, new Equipment(), new BodyProperties(), new(new()));
+            }
+            void Update(BattleAgentSpawnData record)
+                => broker.Publish(this, new NetworkBattleAgentFormations(mapEventId, record.OwnerControllerId,
+                    new[] { new BattleAgentFormationData(record.AgentId, (int)FormationClass.Ranged, 0) }));
+
+            var withdrawn = Record(0, "A");
+            var delayed = Record(1, "B");
+            var npc = Record(2, "A");
+            broker.Publish(this, new NetworkSpawnBattleAgents(new[] { withdrawn, delayed, npc }));
+            Update(withdrawn);
+            Update(delayed);
+            Update(npc);
+            Assert.Equal(3, pending.Count);
+            Assert.Equal(3, spawns.Count);
+
+            if (disconnected) broker.Publish(this, new MissionPeerDisconnected("A", mapEventId));
+            else broker.Publish(this, new MissionPeerLeft("A", mapEventId));
+
+            Assert.False(pending.Contains(withdrawn.AgentId));
+            Assert.DoesNotContain(spawns, record => record.AgentId == withdrawn.AgentId);
+            Assert.True(pending.Contains(delayed.AgentId));
+            Assert.Equal(wasHost, pending.Contains(npc.AgentId));
+            Update(withdrawn);
+            Assert.False(pending.Contains(withdrawn.AgentId));
+
+            // A stale spawn arriving after withdrawal must retire its update too.
+            var late = Record(0, "A");
+            Update(late);
+            broker.Publish(this, new NetworkSpawnBattleAgents(new[] { late }));
+            Update(late);
+            Assert.False(pending.Contains(late.AgentId));
+            spawner.DrainPendingPuppets();
+            Assert.Equal(wasHost ? 2 : 1, pending.Count);
+
+            budget.Setup(value => value.RemainingCapacity(It.IsAny<int>())).Returns(10);
+            spawner.DrainPendingPuppets();
+            Assert.Empty(pending);
+            Assert.Empty(spawns);
+            Assert.False(registry.TryGetAgentInfo(withdrawn.AgentId, out _));
+            Assert.True(registry.TryGetAgentInfo(delayed.AgentId, out var delayedInfo));
+            Assert.Same(mission.DefenderTeam.GetFormation(FormationClass.Ranged).Shell, delayedInfo.Agent.Formation);
+            Assert.Equal(wasHost, registry.TryGetAgentInfo(npc.AgentId, out var npcInfo));
+            if (wasHost)
+                Assert.Same(mission.AttackerTeam.GetFormation(FormationClass.Ranged).Shell, npcInfo.Agent.Formation);
         });
     }
 }

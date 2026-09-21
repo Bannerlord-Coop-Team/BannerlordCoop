@@ -67,6 +67,7 @@ public class PuppetSpawner : IPuppetSpawner
     private readonly HashSet<string> withdrawnHostControllers = new HashSet<string>();
     private readonly HashSet<Guid> retainedFormerHostAgentIds = new HashSet<Guid>();
     private readonly Dictionary<Guid, (string Controller, BattleAgentFormationData Data)> pendingFormations = new();
+    private readonly HashSet<Guid> discardedFormationAgentIds = new();
     private bool disposed;
 
     public PuppetSpawner(
@@ -111,6 +112,7 @@ public class PuppetSpawner : IPuppetSpawner
         disposed = true;
         messageBroker.Unsubscribe<NetworkBattleAgentFormations>(Handle_Formations);
         pendingFormations.Clear();
+        discardedFormationAgentIds.Clear();
         messageBroker.Unsubscribe<NetworkSpawnBattleAgents>(Handle_NetworkSpawnBattleAgents);
         messageBroker.Unsubscribe<NetworkRetainedPlayerHero>(Handle_RetainedPlayerHero);
         playerHandoffs.Clear();
@@ -131,7 +133,8 @@ public class PuppetSpawner : IPuppetSpawner
 
             foreach (var data in message.Agents)
             {
-                if (data == null || data.AgentId == Guid.Empty || data.AuthorityRevision < 0
+                if (data == null || data.AgentId == Guid.Empty || discardedFormationAgentIds.Contains(data.AgentId)
+                    || data.AuthorityRevision < 0
                     || data.FormationIndex < -1 || data.FormationIndex >= (int)FormationClass.NumberOfAllFormations) continue;
                 if (pendingFormations.TryGetValue(data.AgentId, out var pending)
                     && pending.Data.AuthorityRevision > data.AuthorityRevision) continue;
@@ -159,6 +162,14 @@ public class PuppetSpawner : IPuppetSpawner
             else
                 formationAssigner.Assign(info.Agent, pending.Data.FormationIndex);
         }
+    }
+
+    private void DiscardPendingFormations(Guid agentId)
+    {
+        if (coopMissionComponent.AgentRegistry.TryGetAgentInfo(agentId, out _)) return;
+        pendingFormations.Remove(agentId);
+        // Keep the identity so late updates cannot recreate work for a discarded spawn.
+        discardedFormationAgentIds.Add(agentId);
     }
 
     private void Handle_RetainedPlayerHero(MessagePayload<NetworkRetainedPlayerHero> payload)
@@ -266,6 +277,8 @@ public class PuppetSpawner : IPuppetSpawner
     {
         if (Mission.Current == null)
         {
+            foreach (var data in agents)
+                if (data != null && data.AgentId != Guid.Empty) DiscardPendingFormations(data.AgentId);
             Logger.Warning(
                 "[BattleTraffic] Dropping spawn transfer {TransferId} batch {BatchIndex}/{BatchCount}: mission ended",
                 message.TransferId,
@@ -291,6 +304,7 @@ public class PuppetSpawner : IPuppetSpawner
             }
             catch (Exception e)
             {
+                DiscardPendingFormations(data.AgentId);
                 Logger.Error(e, "[BattleSync] Failed to spawn puppet {AgentId}; dropping it", data.AgentId);
             }
         }
@@ -308,8 +322,11 @@ public class PuppetSpawner : IPuppetSpawner
     {
         var registry = coopMissionComponent.AgentRegistry;
 
-        if (Mission.Current == null) return true;                       // no mission — drop
-        if (IsWithdrawnPlayerParty(data)) return true;                  // stale replay after leave/drop — drop
+        if (Mission.Current == null || IsWithdrawnPlayerParty(data))
+        {
+            DiscardPendingFormations(data.AgentId);
+            return true;
+        }
         if (registry.TryGetAgentInfo(data.AgentId, out _)) return true; // already spawned — dedupe
         bool isRetainedFormerHostRecord = IsRetainedFormerHostRecord(data);
 
@@ -338,6 +355,7 @@ public class PuppetSpawner : IPuppetSpawner
 
         if (!objectManager.TryGetObjectWithLogging(data.CharacterId, out CharacterObject character))
         {
+            DiscardPendingFormations(data.AgentId);
             Logger.Warning("[BattleSync] Puppet skipped: unresolved character {Char} for agent {AgentId}", data.CharacterId, data.AgentId);
             return true;
         }
@@ -448,8 +466,10 @@ public class PuppetSpawner : IPuppetSpawner
             data.MovementId,
             agent,
             data.AuthorityRevision);
+        if (agentRegistered) discardedFormationAgentIds.Remove(data.AgentId);
         if (!agentRegistered)
         {
+            DiscardPendingFormations(data.AgentId);
             Logger.Error(
                 "[BattleDesync] Spawned puppet remained unregistered: kind=rider agentId={AgentId} " +
                 "owner={Owner} originalOwner={OriginalOwner} movementIdentity={Scope}/{MovementId} " +
@@ -580,7 +600,8 @@ public class PuppetSpawner : IPuppetSpawner
                 {
                     if (data.OwnerControllerId != controllerId) return false;
                     bool remove = !wasHost || IsPlayerPartyRecord(data, controllerId);
-                    if (!remove) retainedAgentIds.Add(data.AgentId);
+                    if (remove) DiscardPendingFormations(data.AgentId);
+                    else retainedAgentIds.Add(data.AgentId);
                     return remove;
                 });
             }
@@ -691,6 +712,7 @@ public class PuppetSpawner : IPuppetSpawner
             }
             catch (Exception e)
             {
+                DiscardPendingFormations(data.AgentId);
                 Logger.Error(e, "[BattleSync] Failed to spawn buffered puppet {AgentId}; dropping it", data.AgentId);
             }
         }

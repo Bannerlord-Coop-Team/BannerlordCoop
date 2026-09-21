@@ -135,6 +135,10 @@ public class BattleAgentRenderCapTests : MissionTestEnvironment
                 receiver.Resolve<IMessageBroker>().Publish(this, new NetworkSpawnBattleAgents(new[] { record }));
                 Assert.False(registry.TryGetAgentInfo(agentId, out _));
 
+                if (!promotedHost)
+                    receiver.Resolve<IMessageBroker>().Publish(this, new NetworkBattleAgentFormations(mapEventId, "B",
+                        new[] { new BattleAgentFormationData(agentId, (int)FormationClass.Ranged, 1) }));
+
                 receiver.Resolve<IMessageBroker>().Publish(this, new MissionPeerDisconnected("A", mapEventId));
                 receiver.Resolve<IMessageBroker>().Publish(
                     this,
@@ -152,6 +156,9 @@ public class BattleAgentRenderCapTests : MissionTestEnvironment
                 Assert.Equal(
                     promotedHost ? AgentControllerType.AI : AgentControllerType.None,
                     info.Agent.Controller);
+
+                if (!promotedHost)
+                    Assert.Same(mock.AttackerTeam.GetFormation(FormationClass.Ranged).Shell, info.Agent.Formation);
 
                 // Re-entry clears the departure state, but the buffered old-host NPC record above stays retained.
                 // A fresh record for the returning player's own party stays under that player at revision 0.
