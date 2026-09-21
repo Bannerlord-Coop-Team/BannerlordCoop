@@ -357,6 +357,7 @@ public class MapEventCollectionTests : MapEventTestBase
         });
 
         Server.SimulateMessage(this, new PlayerDisconnected(client.NetPeer, default));
+        Server.PumpGameThread();
 
         Server.Call(() =>
         {

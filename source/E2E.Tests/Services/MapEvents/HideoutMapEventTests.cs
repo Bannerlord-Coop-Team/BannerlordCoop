@@ -765,6 +765,7 @@ public class HideoutMapEventTests : MapEventTestBase
     {
         var raid = CreateSharedHideout();
         Server.SimulateMessage(this, new PlayerDisconnected(Clients.First().NetPeer, default));
+        Server.PumpGameThread();
 
         Server.Call(() =>
         {

@@ -272,6 +272,8 @@ public class SettlementTestEnvironment : LocationHostTestEnvironment, IDisposabl
                 new PlayerDisconnected(client.NetPeer, default));
             Server.Resolve<MockServer>().RemovePeer(client.NetPeer);
         });
+
+        Server.PumpGameThread();
     }
 
     public TimeSpan MeshLatency
