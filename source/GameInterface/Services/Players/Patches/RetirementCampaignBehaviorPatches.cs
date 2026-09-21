@@ -1,6 +1,12 @@
 ﻿using Common;
+using Common.Messaging;
+using GameInterface.Services.Heroes.HeirSelection.Messages;
+using GameInterface.Services.Players.Messages;
 using HarmonyLib;
 using SandBox.CampaignBehaviors;
+using TaleWorlds.CampaignSystem;
+using TaleWorlds.CampaignSystem.Encounters;
+using TaleWorlds.CampaignSystem.GameMenus;
 
 namespace GameInterface.Services.Players.Patches;
 
@@ -17,5 +23,28 @@ internal class RetirementCampaignBehaviorPatches
 
     [HarmonyPatch(nameof(RetirementCampaignBehavior.GameMenuOpened))]
     [HarmonyPrefix]
-    public static bool GameMenuOpenedPrefix() => ModInformation.IsClient;
+    public static bool GameMenuOpenedPrefix(RetirementCampaignBehavior __instance, MenuCallbackArgs args)
+    {
+        if (ModInformation.IsServer) return false;
+        if (args.MenuContext.GameMenu.StringId != "retirement_place") return false;
+
+        if (__instance._selectedHeir != null)
+        {
+            PlayerEncounter.Finish(true);
+
+            MessageBroker.Instance.Publish(__instance, new HeirSelectedForRetirement(Hero.MainHero, __instance._selectedHeir));
+
+            __instance._selectedHeir = null;
+            return false;
+        }
+        if (__instance._playerEndedGame)
+        {
+            MessageBroker.Instance.Publish(__instance, new PlayerDeleteRequested(true));
+
+            GameMenu.ExitToLast();
+            __instance.ShowGameStatistics();
+        }
+
+        return false;
+    }
 }
