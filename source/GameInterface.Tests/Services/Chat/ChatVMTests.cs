@@ -84,9 +84,9 @@ public class ChatVMTests
             "Local Hero",
             "meet me in Pravend"));
 
-        var global = vm.Channels.Single(channel => channel.IsGlobal);
+        var all = vm.Channels.Single(channel => channel.IsAll);
         var direct = vm.Channels.Single(channel => channel.ControllerId == "other-controller");
-        Assert.True(global.IsSelected);
+        Assert.True(all.IsSelected);
         Assert.True(direct.HasUnreadMessages);
         Assert.False(vm.IsOpen);
         Assert.True(vm.HasUnreadNotification);
@@ -182,7 +182,22 @@ public class ChatVMTests
     }
 
     [Fact]
-    public void ReceiveEvent_AppendsToGlobalAndShowsWhileClosed()
+    public void Constructor_CreatesAllEventsGlobalThenDirectTabs()
+    {
+        var vm = new ChatVM(_ => { }, () => "local");
+        vm.AddParticipant("other-controller", "Other Hero");
+
+        Assert.Equal(4, vm.Channels.Count);
+        Assert.True(vm.Channels[0].IsAll);
+        Assert.True(vm.Channels[1].IsEvents);
+        Assert.True(vm.Channels[2].IsGlobal);
+        Assert.True(vm.Channels[3].IsDirect);
+        Assert.True(vm.Channels[0].IsSelected);
+        Assert.Equal("All", vm.ActiveChannelText);
+    }
+
+    [Fact]
+    public void ReceiveEvent_AppendsToEventsAndAll_NotGlobal()
     {
         var vm = new ChatVM(_ => { }, () => "local");
         vm.AddParticipant("other-controller", "Other Hero");
@@ -197,7 +212,51 @@ public class ChatVMTests
         Assert.DoesNotContain(vm.VisibleLines, line => line.Text == "You received 2000 denars.");
 
         vm.Channels.Single(channel => channel.IsGlobal).ExecuteSelection();
+        Assert.DoesNotContain(vm.VisibleLines, line => line.Text == "You received 2000 denars.");
+
+        vm.Channels.Single(channel => channel.IsEvents).ExecuteSelection();
         Assert.Contains(vm.VisibleLines, line => line.Text == "You received 2000 denars.");
+
+        vm.Channels.Single(channel => channel.IsAll).ExecuteSelection();
+        Assert.Contains(vm.VisibleLines, line => line.Text == "You received 2000 denars.");
+    }
+
+    [Fact]
+    public void Receive_GlobalChat_AppearsOnGlobalAndAll_NotEvents()
+    {
+        var vm = new ChatVM(_ => { }, () => "local");
+        vm.SetOpen(true);
+
+        vm.Receive(new NetworkChatMessage(
+            ChatChannel.Global,
+            "local",
+            "Local Hero",
+            string.Empty,
+            string.Empty,
+            "hello everyone"));
+
+        Assert.Contains(vm.VisibleLines, line => line.Text.Contains("[Global] Local Hero: hello everyone"));
+
+        vm.Channels.Single(channel => channel.IsEvents).ExecuteSelection();
+        Assert.DoesNotContain(vm.VisibleLines, line => line.IsPlayerChat);
+
+        vm.Channels.Single(channel => channel.IsGlobal).ExecuteSelection();
+        Assert.Contains(vm.VisibleLines, line => line.Text.Contains("[Global] Local Hero: hello everyone"));
+    }
+
+    [Fact]
+    public void ActionSend_EventsChannel_DoesNotSend()
+    {
+        var sent = new List<NetworkSendChatMessage>();
+        var vm = new ChatVM(sent.Add, () => "local");
+        vm.SetOpen(true);
+        vm.Channels.Single(channel => channel.IsEvents).ExecuteSelection();
+        vm.WrittenText = "should not send";
+
+        vm.ActionSend();
+
+        Assert.Empty(sent);
+        Assert.Equal("should not send", vm.WrittenText);
     }
 
     [Fact]
@@ -309,7 +368,7 @@ public class ChatVMTests
 
         Assert.DoesNotContain(vm.Channels, channel => channel.ControllerId == "offline");
         Assert.Contains(vm.Channels, channel => channel.ControllerId == "online");
-        Assert.True(vm.Channels.Single(channel => channel.IsGlobal).IsSelected);
+        Assert.True(vm.Channels.Single(channel => channel.IsAll).IsSelected);
     }
 
     [Fact]
