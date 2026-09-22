@@ -3458,6 +3458,7 @@ public class VillageHostileActionTests : MapEventTestBase
         var boundOwnerKingdomId = TestEnvironment.CreateRegisteredObject<Kingdom>();
         var boundOwnerHeroId = TestEnvironment.CreateRegisteredObject<Hero>();
         string? settlementPartyId = null;
+        uint settlementPartyHandle = 0;
         string? ownerFactionId = null;
 
         Server.Call(() =>
@@ -3488,6 +3489,7 @@ public class VillageHostileActionTests : MapEventTestBase
             }
 
             Assert.True(Server.ObjectManager.AddNewObject(settlement.Party, out settlementPartyId));
+            Assert.True(Server.ObjectManager.TryGetHandle(settlement.Party, out settlementPartyHandle));
             var ownerFaction = settlement.MapFaction?.MapFaction;
             Assert.NotNull(ownerFaction);
             Assert.True(Server.ObjectManager.TryGetId(ownerFaction, out ownerFactionId));
@@ -3516,7 +3518,8 @@ public class VillageHostileActionTests : MapEventTestBase
                         settlement.Party = settlementParty;
                     }
 
-                    Assert.True(client.ObjectManager.AddExisting(settlementPartyId!, settlementParty));
+                    Assert.True(client.ObjectManager.AddExisting(
+                        settlementPartyId!, settlementParty, settlementPartyHandle));
                     return;
                 }
 

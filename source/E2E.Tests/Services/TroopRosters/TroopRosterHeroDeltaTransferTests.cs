@@ -8,7 +8,6 @@ using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Roster;
 using Xunit.Abstractions;
-using static GameInterface.Services.ObjectManager.ObjectManager;
 
 namespace E2E.Tests.Services.TroopRosters;
 
@@ -277,8 +276,7 @@ public class TroopRosterHeroDeltaTransferTests : IDisposable
             fillerRoster.AddToCounts(firstFiller, 1);
             fillerRoster.AddToCounts(secondFiller, 1);
 
-            Assert.True(Server.ObjectManager.TryGetId(fillerRoster, out var fillerRosterId));
-            fillerRosterId = Compact(fillerRosterId, typeof(TroopRoster));
+            Assert.True(Server.ObjectManager.TryGetHandle(fillerRoster, out var fillerRosterId));
 
             var coalescer = Server.Resolve<ISendCoalescer>();
             Assert.True(coalescer.HasPending);
