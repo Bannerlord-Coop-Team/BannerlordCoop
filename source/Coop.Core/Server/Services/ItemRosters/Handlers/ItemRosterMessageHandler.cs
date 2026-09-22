@@ -67,13 +67,20 @@ public class ItemRosterMessageHandler : IHandler
         if (objectManager.TryGetHandle(item, out itemHandle))
             return true;
 
-        if (!itemObjectRegistry.TryRegisterExistingItem(item, out _))
+        if (!itemObjectRegistry.TryRegisterExistingItem(
+                item,
+                out _,
+                out itemHandle,
+                out var announceHandle))
         {
             itemHandle = 0;
             return false;
         }
 
-        return objectManager.TryGetHandleWithLogging(item, out itemHandle);
+        if (announceHandle)
+            network.SendAll(new NetworkRegisterItemHandle(item.StringId, itemHandle));
+
+        return true;
     }
 
     public void Handle(MessagePayload<ItemRosterCleared> payload)

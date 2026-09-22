@@ -33,15 +33,21 @@ public class ItemObjectRegistry : AutoRegistryBase<ItemObject>
         }
     }
 
-    public bool TryRegisterExistingItem(ItemObject item, out string itemId)
+    public bool TryRegisterExistingItem(
+        ItemObject item,
+        out string itemId,
+        out uint itemHandle,
+        out bool announceHandle)
     {
         itemId = null;
+        itemHandle = 0;
+        announceHandle = false;
 
         if (item == null)
             return false;
 
         if (objectManager.TryGetId(item, out itemId))
-            return true;
+            return objectManager.TryGetHandle(item, out itemHandle);
 
         if (string.IsNullOrEmpty(item.StringId))
             return false;
@@ -53,18 +59,53 @@ public class ItemObjectRegistry : AutoRegistryBase<ItemObject>
                 registeredItem != item &&
                 registeredItem.StringId == item.StringId)
             {
-                objectManager.Remove(registeredItem);
-                if (objectManager.AddExisting(itemId, item))
-                    return objectManager.TryGetId(item, out itemId);
+                if (!objectManager.TryGetHandle(registeredItem, out itemHandle))
+                    return false;
+
+                if (!objectManager.Remove(registeredItem))
+                    return false;
+
+                if (objectManager.AddExisting(itemId, item, itemHandle))
+                    return true;
             }
 
-            return objectManager.TryGetId(item, out itemId);
+            return objectManager.TryGetId(item, out itemId) &&
+                   objectManager.TryGetHandle(item, out itemHandle);
         }
 
         if (!objectManager.AddExisting(itemId, item))
             return false;
 
-        return objectManager.TryGetId(item, out itemId);
+        announceHandle = true;
+        return objectManager.TryGetHandle(item, out itemHandle);
+    }
+
+    public bool TryRegisterExistingItem(string stringId, uint itemHandle)
+    {
+        if (string.IsNullOrEmpty(stringId) || itemHandle == 0)
+            return false;
+
+        var mbObjectManager = MBObjectManager.Instance;
+        var item = mbObjectManager?.GetObject<ItemObject>(stringId) ??
+                   mbObjectManager?.GetObjectTypeList<ItemObject>().FirstOrDefault(value => value.StringId == stringId);
+        if (item == null)
+        {
+            Logger.Error("Failed to register item handle {Handle}, item {StringId} was not found", itemHandle, stringId);
+            return false;
+        }
+
+        var itemId = IdPrefix + stringId;
+        if (objectManager.TryGetId(item, out _) &&
+            objectManager.TryGetHandle(item, out var existingHandle) &&
+            existingHandle == itemHandle)
+        {
+            return true;
+        }
+
+        if (objectManager.TryGetObject<ItemObject>(itemId, out var registeredItem))
+            objectManager.Remove(registeredItem);
+
+        return objectManager.AddExisting(itemId, item, itemHandle);
     }
 
     public override void OnClientCreated(ItemObject obj, string id)
