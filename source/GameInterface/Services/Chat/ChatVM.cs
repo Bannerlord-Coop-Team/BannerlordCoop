@@ -1,4 +1,5 @@
 ﻿using GameInterface.Services.Chat.Messages;
+using GameInterface.Services.UI;
 using System;
 using System.Collections.Generic;
 using TaleWorlds.Library;
@@ -21,10 +22,9 @@ internal sealed class ChatVM : ViewModel
     internal const float MinChatBoxSizeY = 170f;
     internal const float MaxChatBoxSizeY = 470f;
 
-    private static readonly Color PlayerChatColor = Color.White;
-
     private readonly Action<NetworkSendChatMessage> send;
     private readonly Func<string> getLocalControllerId;
+    private readonly Func<string, Color> getPlayerColor;
     private readonly Dictionary<string, ChatChannelVM> channelsById =
         new Dictionary<string, ChatChannelVM>(StringComparer.Ordinal);
     private readonly Dictionary<string, List<ChatLineVM>> histories =
@@ -38,13 +38,18 @@ internal sealed class ChatVM : ViewModel
     private float chatBoxSizeX;
     private float chatBoxSizeY;
 
-    public ChatVM(Action<NetworkSendChatMessage> send, Func<string> getLocalControllerId)
+    public ChatVM(
+        Action<NetworkSendChatMessage> send,
+        Func<string> getLocalControllerId,
+        Func<string, Color> getPlayerColor = null)
     {
         if (send == null) throw new ArgumentNullException(nameof(send));
         if (getLocalControllerId == null) throw new ArgumentNullException(nameof(getLocalControllerId));
 
         this.send = send;
         this.getLocalControllerId = getLocalControllerId;
+        // Same mapping as nameplates: kill-feed color, else PlayerColorAssigner.
+        this.getPlayerColor = getPlayerColor ?? PlayerColorAssigner.GetColor;
 
         Channels = new MBBindingList<ChatChannelVM>();
         VisibleLines = new MBBindingList<ChatLineVM>();
@@ -370,7 +375,10 @@ internal sealed class ChatVM : ViewModel
                 return;
         }
 
-        AddLine(channelId, new ChatLineVM(line, PlayerChatColor, isPlayerChat: true), notify);
+        AddLine(
+            channelId,
+            new ChatLineVM(line, getPlayerColor(message.SenderControllerId), isPlayerChat: true),
+            notify);
     }
 
     private void EnsureFixedChannel(string channelId, string displayName, ChatChannelKind kind)

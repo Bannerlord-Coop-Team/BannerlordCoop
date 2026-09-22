@@ -1,5 +1,7 @@
 ﻿using GameInterface.Services.Chat;
 using GameInterface.Services.Chat.Messages;
+using GameInterface.Services.UI;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using TaleWorlds.Library;
@@ -120,6 +122,47 @@ public class ChatVMTests
         Assert.False(vm.HasUnreadNotification);
         Assert.Equal("0", vm.UnreadNotificationText);
         Assert.Contains(vm.VisibleLines, line => line.Text.Contains("[Global] Local Hero: hello everyone"));
+    }
+
+    [Fact]
+    public void Receive_PlayerMessage_UsesResolvedNameplateColorForWholeLine()
+    {
+        var expected = new Color(0.1f, 0.2f, 0.3f, 1f);
+        var vm = new ChatVM(
+            _ => { },
+            () => "local",
+            controllerId => string.Equals(controllerId, "other", StringComparison.Ordinal)
+                ? expected
+                : Color.White);
+
+        vm.Receive(new NetworkChatMessage(
+            ChatChannel.Global,
+            "other",
+            "Other Hero",
+            string.Empty,
+            string.Empty,
+            "colored line"));
+
+        var line = Assert.Single(vm.VisibleLines);
+        Assert.Equal(expected, line.Color);
+        Assert.Contains("[Global] Other Hero: colored line", line.Text);
+    }
+
+    [Fact]
+    public void Receive_PlayerMessage_DefaultsToPlayerColorAssigner()
+    {
+        var vm = new ChatVM(_ => { }, () => "local");
+
+        vm.Receive(new NetworkChatMessage(
+            ChatChannel.Global,
+            "other-controller",
+            "Other Hero",
+            string.Empty,
+            string.Empty,
+            "hello"));
+
+        var line = Assert.Single(vm.VisibleLines);
+        Assert.Equal(PlayerColorAssigner.GetColor("other-controller"), line.Color);
     }
 
     [Theory]
