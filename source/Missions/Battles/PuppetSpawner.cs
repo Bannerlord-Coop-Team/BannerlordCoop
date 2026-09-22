@@ -143,6 +143,8 @@ public class PuppetSpawner : IPuppetSpawner
                 if (pendingFormations.TryGetValue(data.AgentId, out var pending)
                     && pending.Data.AuthorityRevision > data.AuthorityRevision) continue;
                 pendingFormations[data.AgentId] = (message.ControllerId, data);
+                if (pendingAuthorities.TryGetValue(data.AgentId, out var authority))
+                    RetainPendingFormation(data.AgentId, authority);
             }
             ApplyPendingFormations();
         }, context: nameof(Handle_Formations));
@@ -166,6 +168,13 @@ public class PuppetSpawner : IPuppetSpawner
             else
                 formationAssigner.Assign(info.Agent, pending.Data.FormationIndex);
         }
+    }
+
+    private void RetainPendingFormation(Guid agentId, PendingAuthority authority)
+    {
+        if (pendingFormations.TryGetValue(agentId, out var pending)
+            && pending.Controller == authority.ControllerId && pending.Data.AuthorityRevision == authority.Revision)
+            authority.FormationIndex = pending.Data.FormationIndex;
     }
 
     private void DiscardPendingFormations(Guid agentId)
@@ -446,7 +455,11 @@ public class PuppetSpawner : IPuppetSpawner
         agent.FadeIn();
         if (data.Health > 0) agent.Health = data.Health;
 
-        formationAssigner.Assign(agent, data.FormationIndex);
+        // Retained spawns carry the last accepted formation even after their authority migrates.
+        if (pendingAuthority?.FormationIndex == -1)
+            agent.Formation = null;
+        else
+            formationAssigner.Assign(agent, pendingAuthority?.FormationIndex ?? data.FormationIndex);
         if (retainedPlayerBootstrap)
         {
             // BuildAgent has established InitialPlayerAgent; native deployment still owns its activation.
@@ -646,6 +659,7 @@ public class PuppetSpawner : IPuppetSpawner
                 if (revision == authority.Revision && controllerId != authority.ControllerId) return false;
                 if (revision > authority.Revision)
                 {
+                    authority.FormationIndex = null;
                     authority.ControllerId = controllerId;
                     authority.Revision = revision;
                 }
@@ -655,6 +669,7 @@ public class PuppetSpawner : IPuppetSpawner
                 pendingAuthorities.Add(agentId,
                     new PendingAuthority(controllerId, revision, originalOwner, movementScopeId, movementId));
             }
+            RetainPendingFormation(agentId, pendingAuthorities[agentId]);
         }
         return true;
     }
@@ -861,6 +876,7 @@ public class PuppetSpawner : IPuppetSpawner
     {
         public string ControllerId;
         public long Revision;
+        public int? FormationIndex;
         public readonly string OriginalOwner;
         public readonly string MovementScopeId;
         public readonly ushort MovementId;
