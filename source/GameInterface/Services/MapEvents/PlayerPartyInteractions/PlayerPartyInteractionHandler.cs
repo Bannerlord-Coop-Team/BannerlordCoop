@@ -89,7 +89,12 @@ internal class PlayerPartyInteractionHandler : IHandler
         this.clanJoinRules = clanJoinRules;
         this.clanLeaveRules = clanLeaveRules;
         this.playerMarriageRules = playerMarriageRules;
-        outcomeHandler = new PlayerPartyInteractionOutcomeHandler(objectManager, messageBroker, kingdomMembershipState, clanJoinRules);
+        outcomeHandler = new PlayerPartyInteractionOutcomeHandler(
+            objectManager,
+            kingdomMembershipState,
+            clanJoinRules,
+            clanLeaveRules,
+            playerMarriageRules);
 
         messageBroker.Subscribe<NetworkPlayerPartyInteractionStarted>(Handle_NetworkPlayerPartyInteractionStarted);
         messageBroker.Subscribe<NetworkPlayerPartyInteractionState>(Handle_NetworkPlayerPartyInteractionState);
@@ -503,23 +508,11 @@ internal class PlayerPartyInteractionHandler : IHandler
     {
         if (option != PlayerPartyInteractionOption.LeaveClan && option != PlayerPartyInteractionOption.RemoveFromClan)
             return false;
-        if (!objectManager.TryGetObjectWithLogging(partyId, out PartyBase actorParty) ||
-            !objectManager.TryGetObjectWithLogging(session.GetOtherPartyId(partyId), out PartyBase otherParty)) return true;
-
-        var actor = actorParty.LeaderHero;
-        var other = otherParty.LeaderHero;
-        var allowed = actor?.Clan != null && actor.Clan == other?.Clan &&
-            (option == PlayerPartyInteractionOption.LeaveClan ? clanLeaveRules.CanLeave(actor) : clanLeaveRules.CanRemove(actor, other));
-        var memberParty = option == PlayerPartyInteractionOption.LeaveClan ? actorParty : otherParty;
-        if (!allowed || !clanLeaveRules.TryApply(memberParty.LeaderHero, isRemoval: option == PlayerPartyInteractionOption.RemoveFromClan))
-        {
-            EndSession(session, PlayerPartyInteractionOutcomeType.Rejected);
-            return true;
-        }
 
         EndSession(session, option == PlayerPartyInteractionOption.LeaveClan
             ? PlayerPartyInteractionOutcomeType.ClanLeft
-            : PlayerPartyInteractionOutcomeType.ClanMemberRemoved);
+            : PlayerPartyInteractionOutcomeType.ClanMemberRemoved,
+            partyId);
         return true;
     }
 
@@ -740,11 +733,7 @@ internal class PlayerPartyInteractionHandler : IHandler
 
         if (IsMarriageProposal(session.Proposal))
         {
-            var married = objectManager.TryGetObjectWithLogging(session.InitiatorPartyId, out PartyBase initiatorParty) &&
-                objectManager.TryGetObjectWithLogging(session.ResponderPartyId, out PartyBase responderParty) &&
-                !session.IsHostile && playerMarriageRules.TryApply(initiatorParty.LeaderHero, responderParty.LeaderHero,
-                    session.Proposal == PlayerPartyInteractionProposal.MatrilinealMarriage);
-            EndSession(session, married ? PlayerPartyInteractionOutcomeType.MarriageAccepted : PlayerPartyInteractionOutcomeType.Rejected);
+            EndSession(session, PlayerPartyInteractionOutcomeType.MarriageAccepted);
             return;
         }
 
@@ -907,7 +896,10 @@ internal class PlayerPartyInteractionHandler : IHandler
             session.ClanJoinUnavailableReason));
     }
 
-    private void EndSession(PlayerPartyInteractionSession session, PlayerPartyInteractionOutcomeType outcomeType)
+    private void EndSession(
+        PlayerPartyInteractionSession session,
+        PlayerPartyInteractionOutcomeType outcomeType,
+        string actorPartyId = null)
     {
         lock (sessionGate)
         {
@@ -918,9 +910,9 @@ internal class PlayerPartyInteractionHandler : IHandler
             conversationPartyTracker.EndPvpConversation(session.InitiatorPartyId);
         }
 
-        var outcome = new PlayerPartyInteractionOutcome(session, outcomeType);
+        var outcome = new PlayerPartyInteractionOutcome(session, outcomeType, actorPartyId);
         var applied = outcomeHandler.Handle(outcome);
-        var finalOutcomeType = applied ? outcomeType : GetDeclinedOutcome(session.Proposal);
+        var finalOutcomeType = applied ? outcomeType : GetFailedOutcome(outcomeType, session.Proposal);
 
         network.SendAll(new NetworkPlayerPartyInteractionEnded(
             session.SessionId,
@@ -1190,6 +1182,17 @@ internal class PlayerPartyInteractionHandler : IHandler
             default:
                 return PlayerPartyInteractionOutcomeType.None;
         }
+    }
+
+    private static PlayerPartyInteractionOutcomeType GetFailedOutcome(
+        PlayerPartyInteractionOutcomeType outcomeType,
+        PlayerPartyInteractionProposal proposal)
+    {
+        if (outcomeType == PlayerPartyInteractionOutcomeType.ClanLeft ||
+            outcomeType == PlayerPartyInteractionOutcomeType.ClanMemberRemoved)
+            return PlayerPartyInteractionOutcomeType.Rejected;
+
+        return GetDeclinedOutcome(proposal);
     }
 
     private static PlayerPartyInteractionOutcomeType GetLeaveOutcome(PlayerPartyInteractionSession session)

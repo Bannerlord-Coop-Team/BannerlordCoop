@@ -1,6 +1,5 @@
 ﻿using Common;
 using Common.Logging;
-using Common.Messaging;
 using GameInterface.Services.Clans;
 using GameInterface.Services.Inventory.Data;
 using GameInterface.Services.Kingdoms;
@@ -37,27 +36,36 @@ internal readonly struct PlayerPartyInteractionOutcome
     public readonly TroopRosterElementData[] ResponderOfferedTroops;
     public readonly bool InitiatorOfferedPeace;
     public readonly bool ResponderOfferedPeace;
+    public readonly PlayerPartyInteractionProposal Proposal;
+    public readonly bool IsHostile;
+    public readonly string ActorPartyId;
     public readonly Kingdom TargetKingdom;
     public readonly int MercenaryAwardMultiplier;
 
-    public PlayerPartyInteractionOutcome(PlayerPartyInteractionSession session, PlayerPartyInteractionOutcomeType outcomeType)
+    public PlayerPartyInteractionOutcome(
+        PlayerPartyInteractionSession session,
+        PlayerPartyInteractionOutcomeType outcomeType,
+        string actorPartyId)
     {
         SessionId = session.SessionId;
         InitiatorPartyId = session.InitiatorPartyId;
         ResponderPartyId = session.ResponderPartyId;
         OutcomeType = outcomeType;
-        InitiatorOfferedItems = session.InitiatorOfferedItems ?? new ItemRosterElementData[0];
-        ResponderOfferedItems = session.ResponderOfferedItems ?? new ItemRosterElementData[0];
+        InitiatorOfferedItems = session.InitiatorOfferedItems ?? Array.Empty<ItemRosterElementData>();
+        ResponderOfferedItems = session.ResponderOfferedItems ?? Array.Empty<ItemRosterElementData>();
         InitiatorOfferedGold = session.InitiatorOfferedGold;
         ResponderOfferedGold = session.ResponderOfferedGold;
-        InitiatorOfferedFiefs = session.InitiatorOfferedFiefs ?? new string[0];
-        ResponderOfferedFiefs = session.ResponderOfferedFiefs ?? new string[0];
-        InitiatorOfferedPrisoners = session.InitiatorOfferedPrisoners ?? new TroopRosterElementData[0];
-        ResponderOfferedPrisoners = session.ResponderOfferedPrisoners ?? new TroopRosterElementData[0];
-        InitiatorOfferedTroops = session.InitiatorOfferedTroops ?? new TroopRosterElementData[0];
-        ResponderOfferedTroops = session.ResponderOfferedTroops ?? new TroopRosterElementData[0];
+        InitiatorOfferedFiefs = session.InitiatorOfferedFiefs ?? Array.Empty<string>();
+        ResponderOfferedFiefs = session.ResponderOfferedFiefs ?? Array.Empty<string>();
+        InitiatorOfferedPrisoners = session.InitiatorOfferedPrisoners ?? Array.Empty<TroopRosterElementData>();
+        ResponderOfferedPrisoners = session.ResponderOfferedPrisoners ?? Array.Empty<TroopRosterElementData>();
+        InitiatorOfferedTroops = session.InitiatorOfferedTroops ?? Array.Empty<TroopRosterElementData>();
+        ResponderOfferedTroops = session.ResponderOfferedTroops ?? Array.Empty<TroopRosterElementData>();
         InitiatorOfferedPeace = session.InitiatorOfferedPeace;
         ResponderOfferedPeace = session.ResponderOfferedPeace;
+        Proposal = session.Proposal;
+        IsHostile = session.IsHostile;
+        ActorPartyId = actorPartyId;
         TargetKingdom = session.TargetKingdom;
         MercenaryAwardMultiplier = session.MercenaryAwardMultiplier;
     }
@@ -68,20 +76,23 @@ internal class PlayerPartyInteractionOutcomeHandler
     private static readonly ILogger Logger = LogManager.GetLogger<PlayerPartyInteractionOutcomeHandler>();
 
     private readonly IObjectManager objectManager;
-    private readonly IMessageBroker messageBroker;
     private readonly IKingdomMembershipState kingdomMembershipState;
     private readonly IClanJoinRules clanJoinRules;
+    private readonly IClanLeaveRules clanLeaveRules;
+    private readonly IPlayerMarriageRules playerMarriageRules;
 
     public PlayerPartyInteractionOutcomeHandler(
         IObjectManager objectManager,
-        IMessageBroker messageBroker,
         IKingdomMembershipState kingdomMembershipState,
-        IClanJoinRules clanJoinRules)
+        IClanJoinRules clanJoinRules,
+        IClanLeaveRules clanLeaveRules,
+        IPlayerMarriageRules playerMarriageRules)
     {
         this.objectManager = objectManager;
-        this.messageBroker = messageBroker;
         this.kingdomMembershipState = kingdomMembershipState;
         this.clanJoinRules = clanJoinRules;
+        this.clanLeaveRules = clanLeaveRules;
+        this.playerMarriageRules = playerMarriageRules;
     }
 
     public bool Handle(PlayerPartyInteractionOutcome outcome)
@@ -96,9 +107,102 @@ internal class PlayerPartyInteractionOutcomeHandler
                 return HandleVassalAccepted(outcome);
             case PlayerPartyInteractionOutcomeType.MercenaryAccepted:
                 return HandleMercenaryAccepted(outcome);
+            case PlayerPartyInteractionOutcomeType.ClanLeft:
+            case PlayerPartyInteractionOutcomeType.ClanMemberRemoved:
+                return HandleClanDeparture(outcome);
+            case PlayerPartyInteractionOutcomeType.MarriageAccepted:
+                return HandleMarriageAccepted(outcome);
             default:
                 return true;
         }
+    }
+
+    private bool HandleClanDeparture(PlayerPartyInteractionOutcome outcome)
+    {
+        try
+        {
+            bool result = false;
+            RunOnGameThread(() => result = ApplyClanDeparture(outcome), "Apply player-party clan departure");
+            return result;
+        }
+        catch (Exception e)
+        {
+            Logger.Error(e,
+                "Failed to apply player-party clan departure. SessionId={SessionId}, InitiatorPartyId={InitiatorPartyId}, ResponderPartyId={ResponderPartyId}",
+                outcome.SessionId,
+                outcome.InitiatorPartyId,
+                outcome.ResponderPartyId);
+            return false;
+        }
+    }
+
+    private bool ApplyClanDeparture(PlayerPartyInteractionOutcome outcome)
+    {
+        if (!TryGetSessionParties(outcome, outcome.ActorPartyId, out var actorParty, out var otherParty)) return false;
+
+        var actor = actorParty.LeaderHero;
+        var other = otherParty.LeaderHero;
+        bool isRemoval = outcome.OutcomeType == PlayerPartyInteractionOutcomeType.ClanMemberRemoved;
+        var member = isRemoval ? other : actor;
+        var allowed = actor?.Clan != null && actor.Clan == other?.Clan &&
+            (isRemoval ? clanLeaveRules.CanRemove(actor, member) : clanLeaveRules.CanLeave(member));
+
+        return allowed && clanLeaveRules.TryApply(member, isRemoval);
+    }
+
+    private bool HandleMarriageAccepted(PlayerPartyInteractionOutcome outcome)
+    {
+        try
+        {
+            bool result = false;
+            RunOnGameThread(() => result = ApplyMarriage(outcome), "Apply player-party marriage");
+            return result;
+        }
+        catch (Exception e)
+        {
+            Logger.Error(e,
+                "Failed to apply player-party marriage. SessionId={SessionId}, InitiatorPartyId={InitiatorPartyId}, ResponderPartyId={ResponderPartyId}",
+                outcome.SessionId,
+                outcome.InitiatorPartyId,
+                outcome.ResponderPartyId);
+            return false;
+        }
+    }
+
+    private bool ApplyMarriage(PlayerPartyInteractionOutcome outcome)
+    {
+        if (outcome.IsHostile ||
+            !objectManager.TryGetObjectWithLogging(outcome.InitiatorPartyId, out PartyBase initiatorParty) ||
+            !objectManager.TryGetObjectWithLogging(outcome.ResponderPartyId, out PartyBase responderParty)) return false;
+
+        if (outcome.Proposal != PlayerPartyInteractionProposal.PatrilinealMarriage &&
+            outcome.Proposal != PlayerPartyInteractionProposal.MatrilinealMarriage) return false;
+
+        return playerMarriageRules.TryApply(
+            initiatorParty.LeaderHero,
+            responderParty.LeaderHero,
+            outcome.Proposal == PlayerPartyInteractionProposal.MatrilinealMarriage);
+    }
+
+    private bool TryGetSessionParties(
+        PlayerPartyInteractionOutcome outcome,
+        string actorPartyId,
+        out PartyBase actorParty,
+        out PartyBase otherParty)
+    {
+        actorParty = null;
+        otherParty = null;
+
+        string otherPartyId;
+        if (actorPartyId == outcome.InitiatorPartyId)
+            otherPartyId = outcome.ResponderPartyId;
+        else if (actorPartyId == outcome.ResponderPartyId)
+            otherPartyId = outcome.InitiatorPartyId;
+        else
+            return false;
+
+        return objectManager.TryGetObjectWithLogging(actorPartyId, out actorParty) &&
+            objectManager.TryGetObjectWithLogging(otherPartyId, out otherParty);
     }
 
     private bool HandleVassalAccepted(PlayerPartyInteractionOutcome outcome)

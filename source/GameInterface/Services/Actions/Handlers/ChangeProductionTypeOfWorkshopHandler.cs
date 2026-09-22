@@ -54,7 +54,6 @@ internal class ChangeProductionTypeOfWorkshopHandler : IHandler
 
         ChangeProductionTypeOfWorkshopAction.Apply(workshop, workshopType, obj.What.IgnoreCost);
 
-        if (!objectManager.TryGetIdWithLogging(workshop.Owner?.Clan, out var clanId)) return;
-        network.SendAll(new NetworkRefreshWorkshopsList(clanId));
+        messageBroker.Publish(this, new ClanManagementChanged(workshop.Owner?.Clan, ClanManagementRefresh.Income));
     }
 }

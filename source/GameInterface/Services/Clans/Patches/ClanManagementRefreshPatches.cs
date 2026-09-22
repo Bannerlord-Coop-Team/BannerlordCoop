@@ -19,11 +19,6 @@ internal static class ClanManagementRefreshPatches
     [HarmonyPostfix]
     public static void HeroChangedClanPostfix(Hero hero, Clan oldClan)
     {
-        // Clear existing finance rules for this player potentially in a coop clan
-        if (ModInformation.IsServer && hero.Clan != oldClan &&
-            ContainerProvider.TryResolve<IClanFinance>(out var finance))
-            finance.Clear(hero);
-
         Refresh(oldClan, ClanManagementRefresh.All);
         Refresh(hero.Clan, ClanManagementRefresh.All);
     }
@@ -75,10 +70,6 @@ internal static class ClanManagementRefreshPatches
     [HarmonyPostfix]
     public static void ClanLeaderChangedPostfix(Hero oldLeader, Hero newLeader)
     {
-        // Clear existing finance rules for all players potentially in a coop clan
-        if (ModInformation.IsServer && ContainerProvider.TryResolve<IClanFinance>(out var finance))
-            foreach (var hero in newLeader.Clan.Heroes) finance.Clear(hero);
-
         Refresh(oldLeader?.Clan, ClanManagementRefresh.All);
         Refresh(newLeader.Clan, ClanManagementRefresh.All);
     }

@@ -73,8 +73,7 @@ internal class ChangeGovernorHandler : IHandler
 
             ChangeGovernorAction.ApplyInternal(fortification, governor);
 
-            if (!objectManager.TryGetIdWithLogging(governor.Clan, out var clanId)) return;
-            network.SendAll(new NetworkRefreshClanMembersList(clanId));
+            messageBroker.Publish(this, new ClanManagementChanged(governor.Clan, ClanManagementRefresh.Members));
         });
     }
 
@@ -98,8 +97,7 @@ internal class ChangeGovernorHandler : IHandler
 
             ChangeGovernorAction.ApplyGiveUpInternal(governor);
 
-            if (!objectManager.TryGetIdWithLogging(governor.Clan, out var clanId)) return;
-            network.SendAll(new NetworkRefreshClanMembersList(clanId));
+            messageBroker.Publish(this, new ClanManagementChanged(governor.Clan, ClanManagementRefresh.Members));
         });
     }
 

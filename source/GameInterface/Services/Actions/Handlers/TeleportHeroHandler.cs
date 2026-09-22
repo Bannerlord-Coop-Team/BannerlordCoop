@@ -72,8 +72,7 @@ internal class TeleportHeroHandler : IHandler
 
             TeleportHeroAction.ApplyInternal(hero, targetSettlement, targetParty, data.Detail);
 
-            if (!objectManager.TryGetIdWithLogging(hero.Clan, out var clanId)) return;
-            network.SendAll(new NetworkRefreshClanMembersList(clanId));
+            messageBroker.Publish(this, new ClanManagementChanged(hero.Clan, ClanManagementRefresh.Members));
         });
     }
 }

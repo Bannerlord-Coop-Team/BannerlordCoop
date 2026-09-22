@@ -442,7 +442,6 @@ public class WorkshopPurchaseConversationTests : IDisposable
                 .Select(message => message.ClanId).OrderBy(id => id).ToArray();
 
             Assert.Equal(expectedClanIds, actualClanIds);
-            Assert.Empty(Server.NetworkSentMessages.GetMessages<NetworkRefreshWorkshopsList>());
         });
     }
 

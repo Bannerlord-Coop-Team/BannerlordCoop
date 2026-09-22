@@ -96,7 +96,7 @@ internal class ClanPartiesVMHandler : IHandler
                 sendCoalescer?.FlushInstance(Compact(rosterId, typeof(TroopRoster)), network);
             }
 
-            network.SendAll(new NetworkRefreshPartiesList(data.TargetClanId));
+            messageBroker.Publish(this, new ClanManagementChanged(targetClan, ClanManagementRefresh.Parties | ClanManagementRefresh.Members));
         });
     }
 
@@ -191,8 +191,7 @@ internal class ClanPartiesVMHandler : IHandler
                 GiveGoldAction.ApplyBetweenCharacters(mainHero, newLeader, partyGoldLowerThreshold - newLeader.Gold, false);
             }
 
-            if (!objectManager.TryGetIdWithLogging(mainHero.Clan, out var clanId)) return;
-            network.SendAll(new NetworkRefreshPartiesList(clanId));
+            messageBroker.Publish(this, new ClanManagementChanged(mainHero.Clan, ClanManagementRefresh.Parties | ClanManagementRefresh.Members));
         });
     }
 }

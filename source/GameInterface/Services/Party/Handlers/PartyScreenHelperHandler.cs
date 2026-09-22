@@ -124,8 +124,7 @@ internal class PartyScreenHelperHandler : IHandler
                 sendCoalescer?.FlushInstance(Compact(rosterId, typeof(TroopRoster)), network);
             }
 
-            if (!objectManager.TryGetIdWithLogging(mobileParty.ActualClan, out var clanId)) return;
-            network.SendAll(new NetworkRefreshPartiesList(clanId));
+            messageBroker.Publish(this, new ClanManagementChanged(mobileParty.ActualClan, ClanManagementRefresh.Parties | ClanManagementRefresh.Members));
         });
     }
 

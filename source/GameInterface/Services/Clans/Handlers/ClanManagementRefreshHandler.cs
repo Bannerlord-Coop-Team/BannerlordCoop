@@ -37,9 +37,6 @@ internal class ClanManagementRefreshHandler : IHandler
         messageBroker.Subscribe<ClanManagementChanged>(Handle_ClanManagementChanged);
 
         messageBroker.Subscribe<NetworkRefreshClanManagement>(Handle_NetworkRefreshClanManagement);
-        messageBroker.Subscribe<NetworkRefreshPartiesList>(Handle_NetworkRefreshPartiesList);
-        messageBroker.Subscribe<NetworkRefreshWorkshopsList>(Handle_NetworkRefreshWorkshopsList);
-        messageBroker.Subscribe<NetworkRefreshClanMembersList>(Handle_NetworkRefreshClanMembersList);
         messageBroker.Subscribe<NetworkRefreshAfterRoleAssignment>(Handle_NetworkRefreshAfterRoleAssignment);
     }
 
@@ -49,9 +46,6 @@ internal class ClanManagementRefreshHandler : IHandler
         messageBroker.Unsubscribe<ClanManagementChanged>(Handle_ClanManagementChanged);
 
         messageBroker.Unsubscribe<NetworkRefreshClanManagement>(Handle_NetworkRefreshClanManagement);
-        messageBroker.Unsubscribe<NetworkRefreshPartiesList>(Handle_NetworkRefreshPartiesList);
-        messageBroker.Unsubscribe<NetworkRefreshWorkshopsList>(Handle_NetworkRefreshWorkshopsList);
-        messageBroker.Unsubscribe<NetworkRefreshClanMembersList>(Handle_NetworkRefreshClanMembersList);
         messageBroker.Unsubscribe<NetworkRefreshAfterRoleAssignment>(Handle_NetworkRefreshAfterRoleAssignment);
     }
 
@@ -96,21 +90,6 @@ internal class ClanManagementRefreshHandler : IHandler
     private void Handle_NetworkRefreshClanManagement(MessagePayload<NetworkRefreshClanManagement> obj)
     {
         Refresh(obj.What.ClanId, obj.What.Sections);
-    }
-
-    private void Handle_NetworkRefreshPartiesList(MessagePayload<NetworkRefreshPartiesList> obj)
-    {
-        Refresh(obj.What.ClanId, ClanManagementRefresh.Parties | ClanManagementRefresh.Members);
-    }
-
-    private void Handle_NetworkRefreshWorkshopsList(MessagePayload<NetworkRefreshWorkshopsList> obj)
-    {
-        Refresh(obj.What.ClanId, ClanManagementRefresh.Income);
-    }
-
-    private void Handle_NetworkRefreshClanMembersList(MessagePayload<NetworkRefreshClanMembersList> obj)
-    {
-        Refresh(obj.What.ClanId, ClanManagementRefresh.Members);
     }
 
     private void Refresh(string clanId, ClanManagementRefresh sections)
