@@ -58,7 +58,6 @@ internal sealed class ChatOverlay : GlobalLayer, IDisposable
         this.refreshParticipants = refreshParticipants;
         this.playerChatEnabled = playerChatEnabled;
         dataSource.SetPlayerChatEnabled(playerChatEnabled);
-        dataSource.OpenRequested += OpenInput;
         dataSource.FeedScrolledToBottomRequested += OnFeedScrolledToBottomRequested;
     }
 
@@ -157,7 +156,6 @@ internal sealed class ChatOverlay : GlobalLayer, IDisposable
 
     public void Dispose()
     {
-        dataSource.OpenRequested -= OpenInput;
         dataSource.FeedScrolledToBottomRequested -= OnFeedScrolledToBottomRequested;
         if (!initialized) return;
 
@@ -253,8 +251,7 @@ internal sealed class ChatOverlay : GlobalLayer, IDisposable
 
     private void OnFeedScrolledToBottomRequested()
     {
-        // ScrollablePanel updates MaxValue in OnLateUpdate after the new line is measured.
-        // Keep pinning until MaxValue stops growing.
+        // MaxValue updates in OnLateUpdate after the line is measured so pin until it settles
         pinFeedToBottom = true;
         pinFeedLastMaxValue = -1f;
     }
@@ -414,7 +411,7 @@ internal sealed class ChatOverlay : GlobalLayer, IDisposable
         isInputFocused = false;
         gauntletLayer.IsFocusLayer = false;
         ScreenManager.TryLoseFocus(gauntletLayer);
-        // Keep the cursor while the panel is open so channel tabs / resizer stay usable.
+        // Cursor stays while open so tabs and the resizer stay usable
         if (dataSource.IsOpen)
             SetOpenPanelInputRestrictions(gauntletLayer.InputRestrictions);
         else

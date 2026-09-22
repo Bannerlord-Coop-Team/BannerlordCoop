@@ -13,7 +13,7 @@ public class ChatEventLogTests
     [InlineData(ChatEventLog.CombatCategory, false, true, false)]
     [InlineData(ChatEventLog.BarkCategory, false, true, true)]
     [InlineData(ChatEventLog.BarkCategory, true, false, false)]
-    public void ShouldInclude_MatchesVanillaCombatAndBarkFilters(
+    public void ShouldInclude_RespectsCombatAndBarkFilters(
         string category,
         bool reportDamage,
         bool reportBark,

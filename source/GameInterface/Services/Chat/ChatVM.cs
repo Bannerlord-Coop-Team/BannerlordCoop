@@ -48,13 +48,13 @@ internal sealed class ChatVM : ViewModel
 
         this.send = send;
         this.getLocalControllerId = getLocalControllerId;
-        // Same mapping as nameplates: kill-feed color, else PlayerColorAssigner.
+        // Same colors as nameplates
         this.getPlayerColor = getPlayerColor ?? PlayerColorAssigner.GetColor;
 
         Channels = new MBBindingList<ChatChannelVM>();
         VisibleLines = new MBBindingList<ChatLineVM>();
-        // Original fixed panel size. Don't seed from BannerlordConfig — that value is shared
-        // with vanilla MP chat and is often much larger than this overlay's prior 520x350.
+        // Don't seed from BannerlordConfig
+        //  it is shared with vanilla MP chat and is larger.
         chatBoxSizeX = DefaultChatBoxSizeX;
         chatBoxSizeY = DefaultChatBoxSizeY;
 
@@ -64,7 +64,6 @@ internal sealed class ChatVM : ViewModel
         SelectChannel(channelsById[AllChannelId]);
     }
 
-    public event Action OpenRequested;
     public event Action FeedScrolledToBottomRequested;
 
     [DataSourceProperty]
@@ -104,7 +103,6 @@ internal sealed class ChatVM : ViewModel
         ? "99+"
         : unreadMessageCount.ToString();
 
-    [DataSourceProperty]
     public bool IsPlayerChatEnabled
     {
         get => playerChatEnabled;
@@ -174,12 +172,6 @@ internal sealed class ChatVM : ViewModel
         }
     }
 
-    public void ActionOpen()
-    {
-        if (!IsPlayerChatEnabled) return;
-        OpenRequested?.Invoke();
-    }
-
     public void ActionSend()
     {
         if (!IsPlayerChatEnabled) return;
@@ -216,7 +208,7 @@ internal sealed class ChatVM : ViewModel
         }
         catch (TypeInitializationException)
         {
-            // Unit tests construct ChatVM without the engine; skip persist.
+            // No BannerlordConfig under unit tests.
         }
     }
 
@@ -252,7 +244,8 @@ internal sealed class ChatVM : ViewModel
 
     public void Tick(float dt)
     {
-        // All shares line instances with Events/Global; tick source histories only.
+        // All reuses Events/Global line instances
+        // Only tick the source lists
         TickHistory(EventsChannelId, dt);
         TickHistory(GlobalChannelId, dt);
         foreach (var pair in histories)
@@ -310,10 +303,9 @@ internal sealed class ChatVM : ViewModel
             EnsureDirectChannel(participant.ControllerId, participant.DisplayName);
     }
 
-    public void ReceiveEvent(string text, Color color, string category)
+    public void ReceiveEvent(string text, Color color)
     {
         if (string.IsNullOrEmpty(text)) return;
-        _ = category;
 
         AddLine(EventsChannelId, new ChatLineVM(text, color, isPlayerChat: false), notify: false);
     }
@@ -434,7 +426,7 @@ internal sealed class ChatVM : ViewModel
         history.Add(line);
         ChatLineVM trimmed = TrimHistory(history);
 
-        // Events + Global also feed the merged All history (same line instance).
+        // Also append to All
         ChatLineVM allTrimmed = null;
         bool feedsAll = channelId == EventsChannelId || channelId == GlobalChannelId;
         if (feedsAll)
@@ -493,7 +485,8 @@ internal sealed class ChatVM : ViewModel
         if (!histories.TryGetValue(channelId, out var history))
             return;
 
-        // Closed: recent fading lines only. Open: full channel history so the scrollbar can move.
+        // Closed shows recent fading lines
+        // Open shows the full channel for scrolling
         int firstLine = IsOpen ? 0 : Math.Max(0, history.Count - VisibleHistoryLines);
         for (int i = firstLine; i < history.Count; i++)
         {

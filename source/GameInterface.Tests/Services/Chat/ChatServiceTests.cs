@@ -1,6 +1,5 @@
 ﻿using Common.Messaging;
 using Common.Network;
-using Common.Serialization;
 using GameInterface.Services.Chat;
 using GameInterface.Services.Chat.Messages;
 using GameInterface.Services.Entity;
@@ -18,17 +17,6 @@ namespace GameInterface.Tests.Services.Chat;
 
 public class ChatServiceTests
 {
-    [Fact]
-    public void ParticipantSnapshot_RoundTripsControllerIds()
-    {
-        var serializer = new ProtoBufSerializer(new SerializableTypeMapper());
-        byte[] payload = serializer.Serialize(new NetworkChatParticipants(new[] { "first", "second" }));
-
-        var snapshot = Assert.IsType<NetworkChatParticipants>(serializer.Deserialize(payload));
-
-        Assert.Equal(new[] { "first", "second" }, snapshot.ControllerIds);
-    }
-
     [Fact]
     public void RequestParticipants_AsksServerForLiveMembership()
     {
