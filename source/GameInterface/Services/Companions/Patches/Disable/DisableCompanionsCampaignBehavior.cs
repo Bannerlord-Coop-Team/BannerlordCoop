@@ -1,6 +1,7 @@
 ﻿using Common;
 using GameInterface.Configuration;
 using GameInterface.Extentions;
+using GameInterface.Services.Clans.Extensions;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Players;
 using HarmonyLib;
@@ -47,7 +48,13 @@ internal class CompanionsCampaignBehaviorPatches
         // Use fixed wanderer limit
         if (!ModConfigProvider.ModOptions.WandererLimitScalesWithPlayers)
         {
-            __result = ModConfigProvider.ModOptions.WandererLimit;
+            var ensuredUnaffiliatedWanderersBonusLimit = 0;
+            if (ModConfigProvider.ModOptions.EnsureUnaffiliatedWanderers)
+            {
+                ensuredUnaffiliatedWanderersBonusLimit = CalculateAffiliatedWanderers();
+            }
+
+            __result = ModConfigProvider.ModOptions.WandererLimit + ensuredUnaffiliatedWanderersBonusLimit;
             return false;
         }
 
@@ -142,7 +149,12 @@ internal class CompanionsCampaignBehaviorPatches
     [HarmonyPrefix]
     public static bool TrySpawnNewCompanionPrefix(CompanionsCampaignBehavior __instance)
     {
-        if ((float)__instance._aliveCompanionTemplates.Count < __instance._desiredTotalCompanionCount)
+        var shouldSpawn = ModConfigProvider.ModOptions.EnsureUnaffiliatedWanderers &&
+            !ModConfigProvider.ModOptions.WandererLimitScalesWithPlayers
+            ? ShouldSpawnUnaffiliatedWanderer(Hero.AllAliveHeroes, ModConfigProvider.ModOptions.WandererLimit)
+            : (float)__instance._aliveCompanionTemplates.Count < __instance._desiredTotalCompanionCount;
+
+        if (shouldSpawn)
         {
             Town targetTown = Town.AllTowns.GetRandomElementWithPredicate(delegate (Town x)
             {
@@ -228,5 +240,32 @@ internal class CompanionsCampaignBehaviorPatches
                 makeHeroFugitive(hero);
             }
         }
+    }
+
+    private static int CalculateAffiliatedWanderers()
+    {
+        var affiliatedWanderers = 0;
+        foreach (var hero in Hero.AllAliveHeroes)
+        {
+            if (hero.IsWanderer && hero.CompanionOf != null && hero.CompanionOf.IsPlayerClan())
+            {
+                affiliatedWanderers++;
+            }
+        }
+        return affiliatedWanderers;
+    }
+
+    internal static bool ShouldSpawnUnaffiliatedWanderer(IEnumerable<Hero> aliveHeroes, int targetPopulation)
+    {
+        var unaffiliatedWanderers = 0;
+        foreach (var hero in aliveHeroes)
+        {
+            if (hero.IsWanderer && hero.CompanionOf == null)
+            {
+                unaffiliatedWanderers++;
+            }
+        }
+
+        return unaffiliatedWanderers < targetPopulation;
     }
 }

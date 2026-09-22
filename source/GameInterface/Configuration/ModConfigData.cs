@@ -88,6 +88,8 @@ public sealed class ModOptionsData
 
     public bool? SpeedLimitWhilePlayersInBattle { get; set; }
 
+    public bool? EnsureUnaffiliatedWanderers { get; set; }
+
     public int? WandererLimit { get; set; }
 
     public bool? WandererLimitScalesWithPlayers { get; set; }
