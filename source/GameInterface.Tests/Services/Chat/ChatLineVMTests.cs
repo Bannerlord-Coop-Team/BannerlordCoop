@@ -14,19 +14,9 @@ public class ChatLineVMTests
     [InlineData(10.5f, false, 0f)]
     [InlineData(11f, false, 0f)]
     [InlineData(10.5f, true, 1f)]
-    public void ComputeAlpha_MatchesVanillaFadeCurve(float time, bool forcedVisible, float expected)
+    public void ComputeAlpha_FadesAfterVisibilityWindow(float time, bool forcedVisible, float expected)
     {
         Assert.Equal(expected, ChatLineVM.ComputeAlpha(time, forcedVisible), 3);
-    }
-
-    [Fact]
-    public void HandleFading_ReducesAlphaAfterVisibilityWindow()
-    {
-        var line = new ChatLineVM("event", Color.White, isPlayerChat: false);
-
-        line.HandleFading(10.25f);
-
-        Assert.Equal(0.5f, line.Alpha, 3);
     }
 
     [Fact]

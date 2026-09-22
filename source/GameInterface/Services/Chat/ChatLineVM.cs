@@ -74,12 +74,6 @@ internal sealed class ChatLineVM : ViewModel
         RefreshAlpha();
     }
 
-    public void ForceInvisible()
-    {
-        timeSinceCreation = VisibilityDuration + FadeOutDuration;
-        Alpha = 0f;
-    }
-
     internal static float ComputeAlpha(float timeSinceCreation, bool forcedVisible)
     {
         if (forcedVisible) return 1f;

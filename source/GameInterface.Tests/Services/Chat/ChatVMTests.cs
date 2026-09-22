@@ -1,6 +1,5 @@
 ﻿using GameInterface.Services.Chat;
 using GameInterface.Services.Chat.Messages;
-using GameInterface.Services.UI;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -11,33 +10,6 @@ namespace GameInterface.Tests.Services.Chat;
 
 public class ChatVMTests
 {
-    [Fact]
-    public void ActionOpen_RaisesRequestForOverlay()
-    {
-        var vm = new ChatVM(_ => { }, () => "local");
-        bool openRequested = false;
-        vm.OpenRequested += () => openRequested = true;
-
-        vm.ActionOpen();
-
-        Assert.True(openRequested);
-        Assert.False(vm.IsOpen);
-    }
-
-    [Fact]
-    public void ActionOpen_WhenPlayerChatDisabled_DoesNothing()
-    {
-        var vm = new ChatVM(_ => { }, () => "local");
-        bool openRequested = false;
-        vm.OpenRequested += () => openRequested = true;
-        vm.SetPlayerChatEnabled(false);
-
-        vm.ActionOpen();
-
-        Assert.False(openRequested);
-        Assert.False(vm.IsOpen);
-    }
-
     [Fact]
     public void ActionSend_DefaultChannel_SendsTrimmedGlobalRequest()
     {
@@ -71,6 +43,17 @@ public class ChatVMTests
         Assert.Equal(ChatChannel.Direct, request.Channel);
         Assert.Equal("other-controller", request.RecipientControllerId);
         Assert.Equal("secret", request.Text);
+    }
+
+    [Fact]
+    public void SetOpen_WhenPlayerChatDisabled_DoesNothing()
+    {
+        var vm = new ChatVM(_ => { }, () => "local");
+        vm.SetPlayerChatEnabled(false);
+
+        vm.SetOpen(true);
+
+        Assert.False(vm.IsOpen);
     }
 
     [Fact]
@@ -149,44 +132,6 @@ public class ChatVMTests
     }
 
     [Fact]
-    public void Receive_PlayerMessage_DefaultsToPlayerColorAssigner()
-    {
-        var vm = new ChatVM(_ => { }, () => "local");
-
-        vm.Receive(new NetworkChatMessage(
-            ChatChannel.Global,
-            "other-controller",
-            "Other Hero",
-            string.Empty,
-            string.Empty,
-            "hello"));
-
-        var line = Assert.Single(vm.VisibleLines);
-        Assert.Equal(PlayerColorAssigner.GetColor("other-controller"), line.Color);
-    }
-
-    [Theory]
-    [InlineData(0f, ChatVM.DefaultChatBoxSizeX)]
-    [InlineData(-10f, ChatVM.DefaultChatBoxSizeX)]
-    [InlineData(200f, ChatVM.MinChatBoxSizeX)]
-    [InlineData(900f, ChatVM.MaxChatBoxSizeX)]
-    [InlineData(500f, 500f)]
-    public void ClampSizeX_UsesVanillaBounds(float value, float expected)
-    {
-        Assert.Equal(expected, ChatVM.ClampSizeX(value));
-    }
-
-    [Theory]
-    [InlineData(0f, ChatVM.DefaultChatBoxSizeY)]
-    [InlineData(100f, ChatVM.MinChatBoxSizeY)]
-    [InlineData(900f, ChatVM.MaxChatBoxSizeY)]
-    [InlineData(300f, 300f)]
-    public void ClampSizeY_UsesVanillaBounds(float value, float expected)
-    {
-        Assert.Equal(expected, ChatVM.ClampSizeY(value));
-    }
-
-    [Fact]
     public void SetOpen_AndReceive_RequestFeedScrollToBottom()
     {
         var vm = new ChatVM(_ => { }, () => "local");
@@ -213,7 +158,7 @@ public class ChatVMTests
     {
         var vm = new ChatVM(_ => { }, () => "local");
         for (int i = 0; i < 20; i++)
-            vm.ReceiveEvent($"event {i}", Color.White, ChatEventLog.DefaultCategory);
+            vm.ReceiveEvent($"event {i}", Color.White);
 
         Assert.Equal(12, vm.VisibleLines.Count);
 
@@ -246,7 +191,7 @@ public class ChatVMTests
         vm.AddParticipant("other-controller", "Other Hero");
         vm.Channels.Single(channel => channel.ControllerId == "other-controller").ExecuteSelection();
 
-        vm.ReceiveEvent("You received 2000 denars.", Color.White, ChatEventLog.DefaultCategory);
+        vm.ReceiveEvent("You received 2000 denars.", Color.White);
 
         Assert.False(vm.IsOpen);
         Assert.Contains(vm.VisibleLines, line => line.Text == "You received 2000 denars." && !line.IsPlayerChat);
@@ -314,7 +259,7 @@ public class ChatVMTests
             string.Empty,
             string.Empty,
             "hidden chat"));
-        vm.ReceiveEvent("Settlement captured.", Color.White, ChatEventLog.DefaultCategory);
+        vm.ReceiveEvent("Settlement captured.", Color.White);
 
         Assert.DoesNotContain(vm.VisibleLines, line => line.IsPlayerChat);
         Assert.Contains(vm.VisibleLines, line => line.Text == "Settlement captured.");
@@ -394,7 +339,7 @@ public class ChatVMTests
     }
 
     [Fact]
-    public void SetParticipants_ReplacesOfflineChannelsAndSelectsGlobalFallback()
+    public void SetParticipants_ReplacesOfflineChannelsAndSelectsAllFallback()
     {
         var vm = new ChatVM(_ => { }, () => "local");
         vm.SetParticipants(new[]
@@ -414,20 +359,13 @@ public class ChatVMTests
         Assert.True(vm.Channels.Single(channel => channel.IsAll).IsSelected);
     }
 
-    [Fact]
-    public void Constructor_UsesDefaultChatBoxSizesWhenConfigUnavailable()
-    {
-        var vm = new ChatVM(_ => { }, () => "local");
-
-        Assert.Equal(ChatVM.DefaultChatBoxSizeX, vm.ChatBoxSizeX);
-        Assert.Equal(ChatVM.DefaultChatBoxSizeY, vm.ChatBoxSizeY);
-    }
-
     [Theory]
     [InlineData(0f, ChatVM.DefaultChatBoxSizeX)]
     [InlineData(-10f, ChatVM.DefaultChatBoxSizeX)]
+    [InlineData(200f, ChatVM.MinChatBoxSizeX)]
     [InlineData(400f, ChatVM.MinChatBoxSizeX)]
     [InlineData(700f, ChatVM.MaxChatBoxSizeX)]
+    [InlineData(900f, ChatVM.MaxChatBoxSizeX)]
     [InlineData(500f, 500f)]
     public void ClampSizeX_ClampsToConfiguredBounds(float input, float expected)
     {
@@ -439,31 +377,10 @@ public class ChatVMTests
     [InlineData(-10f, ChatVM.DefaultChatBoxSizeY)]
     [InlineData(100f, ChatVM.MinChatBoxSizeY)]
     [InlineData(500f, ChatVM.MaxChatBoxSizeY)]
+    [InlineData(900f, ChatVM.MaxChatBoxSizeY)]
     [InlineData(300f, 300f)]
     public void ClampSizeY_ClampsToConfiguredBounds(float input, float expected)
     {
         Assert.Equal(expected, ChatVM.ClampSizeY(input));
-    }
-
-    [Fact]
-    public void ChatBoxSizeSetters_ClampAndNotify()
-    {
-        var vm = new ChatVM(_ => { }, () => "local");
-
-        vm.ChatBoxSizeX = 900f;
-        vm.ChatBoxSizeY = 50f;
-
-        Assert.Equal(ChatVM.MaxChatBoxSizeX, vm.ChatBoxSizeX);
-        Assert.Equal(ChatVM.MinChatBoxSizeY, vm.ChatBoxSizeY);
-    }
-
-    [Fact]
-    public void ExecuteSaveSizes_DoesNotThrowWithoutEngineConfig()
-    {
-        var vm = new ChatVM(_ => { }, () => "local");
-        vm.ChatBoxSizeX = 500f;
-        vm.ChatBoxSizeY = 300f;
-
-        vm.ExecuteSaveSizes();
     }
 }

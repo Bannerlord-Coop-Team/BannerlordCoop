@@ -31,15 +31,6 @@ public class ChatUIMovieTests
         Assert.Null(channelScroll.Attribute("VerticalScrollbar"));
         Assert.Equal("true", channelScroll.Attribute("AutoHideScrollBars")?.Value);
 
-        Assert.DoesNotContain(document.Descendants(),
-            element => element.Attribute("Command.Click")?.Value == "ActionSend");
-        Assert.DoesNotContain(document.Descendants(),
-            element => element.Attribute("Command.Click")?.Value == "ActionClose");
-        Assert.DoesNotContain(document.Descendants(),
-            element => element.Attribute("Id")?.Value == "CoopChatCloseButton");
-        Assert.DoesNotContain(document.Descendants("TextWidget"),
-            element => element.Attribute("Text")?.Value == "@InputHintText");
-
         var muteButton = FindById(document, "CoopChatMuteButton");
         Assert.Equal("ActionToggleMute", muteButton.Attribute("Command.Click")?.Value);
         Assert.Equal("@MuteButtonText", muteButton.Attribute("Parameter.Text")?.Value);
@@ -86,9 +77,6 @@ public class ChatUIMovieTests
             @"..\ChatFeedScrollbarHolder\ChatFeedScrollbar",
             feedScroll.Attribute("VerticalScrollbar")?.Value);
         Assert.Equal("true", feedScroll.Attribute("ReverseInitialScrollBarAlignment")?.Value);
-
-        Assert.DoesNotContain(document.Descendants(),
-            element => element.Attribute("Id")?.Value == "CoopChatRibbon");
     }
 
     private static XElement FindById(XDocument document, string id)

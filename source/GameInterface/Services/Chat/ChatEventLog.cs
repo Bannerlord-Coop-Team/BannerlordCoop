@@ -8,7 +8,7 @@ namespace GameInterface.Services.Chat;
 /// <summary>Forwards vanilla InformationManager lines into the co-op chat feed.</summary>
 public interface IChatEventLog : IDisposable
 {
-    void Start(Action<string, Color, string> receiveEvent);
+    void Start(Action<string, Color> receiveEvent);
     void Stop();
 }
 
@@ -19,10 +19,10 @@ public sealed class ChatEventLog : IChatEventLog
     public const string CombatCategory = "Combat";
     public const string BarkCategory = "Bark";
 
-    private Action<string, Color, string> receiveEvent;
+    private Action<string, Color> receiveEvent;
     private bool started;
 
-    public void Start(Action<string, Color, string> receiveEvent)
+    public void Start(Action<string, Color> receiveEvent)
     {
         if (receiveEvent == null) throw new ArgumentNullException(nameof(receiveEvent));
         if (started) return;
@@ -67,7 +67,7 @@ public sealed class ChatEventLog : IChatEventLog
         Color color = message.Color;
         var sink = receiveEvent;
         GameThread.RunSafe(
-            () => sink?.Invoke(text, color, category),
+            () => sink?.Invoke(text, color),
             context: nameof(ChatEventLog));
     }
 }
