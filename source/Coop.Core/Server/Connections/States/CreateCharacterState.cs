@@ -78,6 +78,11 @@ public class CreateCharacterState : ConnectionStateBase
         if (!heroInterface.TryGetRegistrationHandles(hero, out var registrationHandles))
         {
             Logger.Error("Failed to capture player graph handles; disconnecting the joining peer");
+            GameThread.RunSafe(() =>
+            {
+                var registrationIds = playerCreationRollback.CaptureRegistrationIds(player);
+                playerCreationRollback.Rollback(player, registrationIds);
+            }, blocking: true, context: "CreateCharacterState.PlayerCreationRollback");
             ConnectionLogic.Peer.Disconnect();
             return;
         }

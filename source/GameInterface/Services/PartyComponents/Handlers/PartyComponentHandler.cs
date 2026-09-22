@@ -76,21 +76,20 @@ internal class PartyComponentHandler : IHandler
 
     private void Handle(MessagePayload<PartyComponentCreated> payload)
     {
+        uint settlementHandle = 0;
+        if (payload.What.SettlementId != null &&
+            (!objectManager.TryGetObjectWithLogging<Settlement>(payload.What.SettlementId, out var settlement) ||
+             !objectManager.TryGetHandleWithLogging(settlement, out settlementHandle))) return;
+
         if (!objectManager.AddNewObject(payload.What.Instance, out var id)) return;
         if (!objectManager.TryGetHandleWithLogging(payload.What.Instance, out var handle)) return;
 
         var typeIndex = partyTypes.IndexOf(payload.What.Instance.GetType());
         var data = new PartyComponentData(typeIndex, id, handle)
         {
+            HomeSettlementId = settlementHandle,
             IsNaval = payload.What.IsNaval,
         };
-        if (payload.What.SettlementId != null)
-        {
-            if (!objectManager.TryGetObjectWithLogging<Settlement>(payload.What.SettlementId, out var settlement) ||
-                !objectManager.TryGetHandleWithLogging(settlement, out var settlementHandle)) return;
-
-            data.HomeSettlementId = settlementHandle;
-        }
 
         network.SendAll(new NetworkCreatePartyComponent(data));
     }

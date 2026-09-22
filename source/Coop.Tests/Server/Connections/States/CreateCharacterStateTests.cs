@@ -254,6 +254,33 @@ namespace Coop.Tests.Server.Connections.States
         }
 
         [Fact]
+        public void NetworkTransferNewHero_HandleCaptureFailureRollsBackPlayerGraph()
+        {
+            var hero = SetupUnpackedHero();
+            var heroInterfaceMock = serverComponent.Container.Resolve<Mock<IHeroInterface>>();
+            var rollbackMock = serverComponent.Container.Resolve<Mock<IPlayerCreationRollback>>();
+            var registrationIds = new[] { "Hero_test", "MobileParty_test" };
+            var missingHandles = default(PlayerRegistrationHandles);
+            heroInterfaceMock
+                .Setup(h => h.TryGetRegistrationHandles(hero, out missingHandles))
+                .Returns(false);
+            rollbackMock
+                .Setup(rollback => rollback.CaptureRegistrationIds(It.IsAny<Player>()))
+                .Returns(registrationIds);
+            var currentState = connectionLogic.SetState<CreateCharacterState>();
+
+            currentState.Handle_NetworkTransferNewHero(new MessagePayload<NetworkTransferNewHero>(
+                playerPeer, new NetworkTransferNewHero("MyId", Array.Empty<byte>())));
+
+            Assert.Equal(ConnectionState.ShutdownRequested, playerPeer.ConnectionState);
+            rollbackMock.Verify(rollback => rollback.CaptureRegistrationIds(It.IsAny<Player>()), Times.Once);
+            rollbackMock.Verify(
+                rollback => rollback.Rollback(It.IsAny<Player>(), registrationIds),
+                Times.Once);
+            Assert.Empty(serverComponent.TestNetwork.SentNetworkMessages);
+        }
+
+        [Fact]
         public void NetworkTransferNewHero_ControllerAlreadyRegistered_DisconnectsWithoutAnnouncing()
         {
             // Arrange — two joins for one controller reached character creation before either

@@ -241,7 +241,7 @@ internal class CaravansCampaignBehaviorHandler : IHandler
         GameThread.RunSafe(() =>
         {
             if (!TryGetCaravansBehavior(out var caravansBehavior)) return;
-            if (!objectManager.TryGetObjectWithLogging<MobileParty>(obj.What.MobilePartyId, out var mobileParty)) return;
+            if (!TryGetMobileParty(obj.What, out var mobileParty)) return;
 
             var tradeActionLogs = new List<CaravansCampaignBehavior.TradeActionLog>();
             foreach (var tradeActionLogData in obj.What.TradeActionLogsData)
@@ -306,11 +306,15 @@ internal class CaravansCampaignBehaviorHandler : IHandler
             return false;
         }
 
-        Settlement boughtSettlement = null;
-        if (tradeActionLogData.BoughtSettlementId != 0 && !objectManager.TryGetObjectWithLogging(tradeActionLogData.BoughtSettlementId, out boughtSettlement)) return false;
+        if (!TryGetSettlement(
+                tradeActionLogData.BoughtSettlementId,
+                tradeActionLogData.LegacyBoughtSettlementId,
+                out var boughtSettlement)) return false;
 
-        Settlement soldSettlement = null;
-        if (tradeActionLogData.SoldSettlementId != 0 && !objectManager.TryGetObjectWithLogging(tradeActionLogData.SoldSettlementId, out soldSettlement)) return false;
+        if (!TryGetSettlement(
+                tradeActionLogData.SoldSettlementId,
+                tradeActionLogData.LegacySoldSettlementId,
+                out var soldSettlement)) return false;
 
         tradeActionLog = new CaravansCampaignBehavior.TradeActionLog()
         {
@@ -322,6 +326,32 @@ internal class CaravansCampaignBehaviorHandler : IHandler
             BoughtTime = tradeActionLogData.BoughtTime
         };
 
+        return true;
+    }
+
+    private bool TryGetMobileParty(
+        NetworkUpdateTradeActionLogsForParty message,
+        out MobileParty mobileParty)
+    {
+        if (message.MobilePartyId != 0)
+            return objectManager.TryGetObjectWithLogging(message.MobilePartyId, out mobileParty);
+
+        if (!string.IsNullOrEmpty(message.LegacyMobilePartyId))
+            return objectManager.TryGetObjectWithLogging(message.LegacyMobilePartyId, out mobileParty);
+
+        mobileParty = null;
+        return false;
+    }
+
+    private bool TryGetSettlement(uint handle, string legacyId, out Settlement settlement)
+    {
+        if (handle != 0)
+            return objectManager.TryGetObjectWithLogging(handle, out settlement);
+
+        if (!string.IsNullOrEmpty(legacyId))
+            return objectManager.TryGetObjectWithLogging(legacyId, out settlement);
+
+        settlement = null;
         return true;
     }
 
