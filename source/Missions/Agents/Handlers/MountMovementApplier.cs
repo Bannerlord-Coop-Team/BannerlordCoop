@@ -22,14 +22,14 @@ public class MountMovementApplier : IPacketHandler
     private readonly IAgentPositionInterpolator interpolator;
     private readonly IPuppetMountStateRepairer puppetMountStateRepairer;
     private readonly Action<Agent, AgentMountData> updateSyntheticTurn;
-    private readonly Action<MountMovementPacket> queueMovement;
+    private readonly Action<NetPeer, MountMovementPacket> queueMovement;
 
     public MountMovementApplier(
         INetworkAgentRegistry agentRegistry,
         IAgentPositionInterpolator interpolator,
         IPuppetMountStateRepairer puppetMountStateRepairer,
         Action<Agent, AgentMountData> updateSyntheticTurn,
-        Action<MountMovementPacket> queueMovement)
+        Action<NetPeer, MountMovementPacket> queueMovement)
     {
         this.agentRegistry = agentRegistry;
         this.interpolator = interpolator;
@@ -46,7 +46,7 @@ public class MountMovementApplier : IPacketHandler
 
     public void HandlePacket(NetPeer peer, IPacket packet)
     {
-        queueMovement((MountMovementPacket)packet);
+        queueMovement(peer, (MountMovementPacket)packet);
     }
 
     internal void ApplySnapshot(
