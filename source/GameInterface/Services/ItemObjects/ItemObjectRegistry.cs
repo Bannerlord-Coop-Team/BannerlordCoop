@@ -14,6 +14,7 @@ namespace GameInterface.Services.ItemObjects;
 public class ItemObjectRegistry : AutoRegistryBase<ItemObject>
 {
     private const string IdPrefix = nameof(ItemObject) + "_";
+    private readonly HashSet<uint> handlesKnownToClients = new();
 
     public ItemObjectRegistry(ILogger logger, IAutoRegistryFactory autoRegistryFactory, IObjectManager objectManager)
         : base(logger, autoRegistryFactory, objectManager)
@@ -30,6 +31,8 @@ public class ItemObjectRegistry : AutoRegistryBase<ItemObject>
         foreach (var item in MBObjectManager.Instance.GetObjectTypeList<ItemObject>().OrderBy(i => i.StringId))
         {
             RegisterExistingObject(item.StringId, item);
+            if (objectManager.TryGetHandle(item, out var handle))
+                handlesKnownToClients.Add(handle);
         }
     }
 
@@ -47,7 +50,13 @@ public class ItemObjectRegistry : AutoRegistryBase<ItemObject>
             return false;
 
         if (objectManager.TryGetId(item, out itemId))
-            return objectManager.TryGetHandle(item, out itemHandle);
+        {
+            if (!objectManager.TryGetHandle(item, out itemHandle))
+                return false;
+
+            announceHandle = !handlesKnownToClients.Contains(itemHandle);
+            return true;
+        }
 
         if (string.IsNullOrEmpty(item.StringId))
             return false;
@@ -66,18 +75,36 @@ public class ItemObjectRegistry : AutoRegistryBase<ItemObject>
                     return false;
 
                 if (objectManager.AddExisting(itemId, item, itemHandle))
+                {
+                    announceHandle = !handlesKnownToClients.Contains(itemHandle);
                     return true;
+                }
             }
 
-            return objectManager.TryGetId(item, out itemId) &&
-                   objectManager.TryGetHandle(item, out itemHandle);
+            if (!objectManager.TryGetId(item, out itemId) ||
+                !objectManager.TryGetHandle(item, out itemHandle))
+            {
+                return false;
+            }
+
+            announceHandle = !handlesKnownToClients.Contains(itemHandle);
+            return true;
         }
 
         if (!objectManager.AddExisting(itemId, item))
             return false;
 
-        announceHandle = true;
-        return objectManager.TryGetHandle(item, out itemHandle);
+        if (!objectManager.TryGetHandle(item, out itemHandle))
+            return false;
+
+        announceHandle = !handlesKnownToClients.Contains(itemHandle);
+        return true;
+    }
+
+    public void MarkHandleKnownToClients(uint itemHandle)
+    {
+        if (itemHandle != 0)
+            handlesKnownToClients.Add(itemHandle);
     }
 
     public bool TryRegisterExistingItem(string stringId, uint itemHandle)
@@ -99,13 +126,18 @@ public class ItemObjectRegistry : AutoRegistryBase<ItemObject>
             objectManager.TryGetHandle(item, out var existingHandle) &&
             existingHandle == itemHandle)
         {
+            handlesKnownToClients.Add(itemHandle);
             return true;
         }
 
         if (objectManager.TryGetObject<ItemObject>(itemId, out var registeredItem))
             objectManager.Remove(registeredItem);
 
-        return objectManager.AddExisting(itemId, item, itemHandle);
+        if (!objectManager.AddExisting(itemId, item, itemHandle))
+            return false;
+
+        handlesKnownToClients.Add(itemHandle);
+        return true;
     }
 
     public override void OnClientCreated(ItemObject obj, string id)

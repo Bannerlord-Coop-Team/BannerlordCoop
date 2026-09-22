@@ -64,9 +64,6 @@ public class ItemRosterMessageHandler : IHandler
 
     private bool TryGetItemHandle(ItemObject item, out uint itemHandle)
     {
-        if (objectManager.TryGetHandle(item, out itemHandle))
-            return true;
-
         if (!itemObjectRegistry.TryRegisterExistingItem(
                 item,
                 out _,
@@ -78,7 +75,10 @@ public class ItemRosterMessageHandler : IHandler
         }
 
         if (announceHandle)
+        {
             network.SendAll(new NetworkRegisterItemHandle(item.StringId, itemHandle));
+            itemObjectRegistry.MarkHandleKnownToClients(itemHandle);
+        }
 
         return true;
     }

@@ -29,6 +29,7 @@ public class ItemObjectRegistryHandleTests
 
             Assert.True(manager.AddExisting("ItemObject_test_item", original));
             Assert.True(manager.TryGetHandle(original, out var originalHandle));
+            registry.MarkHandleKnownToClients(originalHandle);
 
             Assert.True(registry.TryRegisterExistingItem(
                 replacement,
@@ -68,6 +69,47 @@ public class ItemObjectRegistryHandleTests
                 out var announceHandle));
 
             Assert.NotEqual(0u, itemHandle);
+            Assert.True(announceHandle);
+
+            registry.MarkHandleKnownToClients(itemHandle);
+            Assert.True(registry.TryRegisterExistingItem(
+                item,
+                out _,
+                out var repeatedHandle,
+                out var repeatAnnouncement));
+            Assert.Equal(itemHandle, repeatedHandle);
+            Assert.False(repeatAnnouncement);
+        }
+        finally
+        {
+            ModInformation.IsServer = wasServer;
+        }
+    }
+
+    [Fact]
+    public void ItemRegisteredOutsideRegistry_ReturnsHandleThatMustBeAnnounced()
+    {
+        bool wasServer = ModInformation.IsServer;
+        ModInformation.IsServer = true;
+        try
+        {
+            var manager = new ObjectManagerService(Mock.Of<ILogger>());
+            var registry = new ItemObjectRegistry(
+                Mock.Of<ILogger>(),
+                Mock.Of<IAutoRegistryFactory>(),
+                manager);
+            var item = new ItemObject("test_item");
+
+            Assert.True(manager.AddExisting("ItemObject_test_item", item));
+            Assert.True(manager.TryGetHandle(item, out var originalHandle));
+
+            Assert.True(registry.TryRegisterExistingItem(
+                item,
+                out _,
+                out var itemHandle,
+                out var announceHandle));
+
+            Assert.Equal(originalHandle, itemHandle);
             Assert.True(announceHandle);
         }
         finally
