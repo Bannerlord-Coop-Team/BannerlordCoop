@@ -873,6 +873,352 @@ public class MissionManagerTests
         Assert.False(manager.TryAuthorizeIntroduction(peer, "moving", longestInstance + "x", Guid.NewGuid(), out _));
     }
 
+    [Fact]
+    public void DisconnectedNatOnlyInstanceIsRemovedByTheMaintenancePass()
+    {
+        var peer = CreatePeer(1);
+        var manager = CreateManager(("late", peer));
+
+        Punch(manager, peer, "late", "battle", 53101);
+        Assert.True(HasInstance(manager, "battle"));
+
+        // A disconnect drops the endpoints but leaves the instance behind, and without endpoints its
+        // lease can no longer remove it.
+        Assert.Empty(manager.HandleDisconnect(peer));
+        manager.PruneExpired(DateTime.UtcNow);
+
+        Assert.False(HasInstance(manager, "battle"));
+        Assert.Equal(0, manager.GetDiagnostics().ActiveInstances);
+    }
+
+    [Fact]
+    public void FirstNatPunchCreatesTheInstance()
+    {
+        var peer = CreatePeer(1);
+        var manager = CreateManager(("late", peer));
+
+        Punch(manager, peer, "late", "battle", 53201);
+
+        Assert.True(HasInstance(manager, "battle"));
+        var counts = manager.GetDiagnostics();
+        Assert.Equal(1, counts.ActiveInstances);
+        Assert.Equal(1, counts.NatOnlyInstances);
+        Assert.Equal(0, counts.MembershipBackedInstances);
+        Assert.Equal(1, counts.PunchEndpoints);
+    }
+
+    [Fact]
+    public void NatOnlyInstanceSurvivesUntilItsLeaseExpires()
+    {
+        var peer = CreatePeer(1);
+        var manager = CreateManager(("late", peer));
+        var punchedUtc = DateTime.UtcNow;
+
+        Punch(manager, peer, "late", "battle", 53203);
+        manager.PruneExpired(punchedUtc + TimeSpan.FromMinutes(4));
+
+        Assert.True(HasInstance(manager, "battle"));
+        Assert.Equal(1, manager.GetDiagnostics().PunchEndpoints);
+    }
+
+    [Fact]
+    public void NatOnlyInstanceAndItsEndpointsExpireAfterTheLease()
+    {
+        var peer = CreatePeer(1);
+        var manager = CreateManager(("late", peer));
+        var punchedUtc = DateTime.UtcNow;
+
+        Punch(manager, peer, "late", "battle", 53205);
+        manager.PruneExpired(punchedUtc + TimeSpan.FromMinutes(6));
+
+        Assert.False(HasInstance(manager, "battle"));
+        var counts = manager.GetDiagnostics();
+        Assert.Equal(0, counts.ActiveInstances);
+        Assert.Equal(0, counts.PunchEndpoints);
+        Assert.True(counts.ExpiredEntries > 0);
+    }
+
+    [Fact]
+    public void MembershipKeepsItsInstanceAndEndpointThroughExpiry()
+    {
+        var peer = CreatePeer(1);
+        var manager = CreateManager(("moving", peer));
+        var punchedUtc = DateTime.UtcNow;
+
+        Assert.True(manager.TryEnterMission(peer, "moving", "battle", out _));
+        Punch(manager, peer, "moving", "battle", 53207);
+        manager.PruneExpired(punchedUtc + TimeSpan.FromHours(1));
+
+        Assert.True(HasInstance(manager, "battle"));
+        var counts = manager.GetDiagnostics();
+        Assert.Equal(1, counts.MembershipBackedInstances);
+        Assert.Equal(1, counts.PunchEndpoints);
+    }
+
+    [Fact]
+    public void LastMembershipLeavingStillPrunesImmediately()
+    {
+        var peer = CreatePeer(1);
+        var manager = CreateManager(("moving", peer));
+
+        Assert.True(manager.TryEnterMission(peer, "moving", "battle", out _));
+        Assert.True(manager.TryLeaveMission(peer, "moving", "battle", out _));
+
+        Assert.False(HasInstance(manager, "battle"));
+        Assert.Equal(0, manager.GetDiagnostics().ActiveInstances);
+    }
+
+    [Fact]
+    public void SuccessfulConclusionRejectsADelayedDuplicate()
+    {
+        var peer = CreatePeer(1);
+        var manager = CreateManager(("late", peer));
+        var concludedUtc = DateTime.UtcNow;
+
+        Assert.True(manager.TryBeginEmptyInstanceConclusion("battle"));
+        Assert.True(manager.CompleteInstanceConclusion("battle", succeeded: true));
+        Assert.Equal(1, manager.GetDiagnostics().ConclusionTombstones);
+
+        manager.PruneExpired(concludedUtc + TimeSpan.FromMinutes(14));
+
+        Assert.False(manager.TryEnterMission(peer, "late", "battle", out _));
+        Assert.False(manager.TryAuthorizeIntroduction(peer, "late", "battle", Guid.NewGuid(), out _));
+    }
+
+    [Fact]
+    public void ConclusionProtectionIsReleasedAfterItsRetention()
+    {
+        var peer = CreatePeer(1);
+        var manager = CreateManager(("late", peer));
+        var concludedUtc = DateTime.UtcNow;
+
+        Assert.True(manager.TryBeginEmptyInstanceConclusion("battle"));
+        Assert.True(manager.CompleteInstanceConclusion("battle", succeeded: true));
+
+        manager.PruneExpired(concludedUtc + TimeSpan.FromMinutes(16));
+
+        Assert.Equal(0, manager.GetDiagnostics().ConclusionTombstones);
+        Assert.True(manager.TryEnterMission(peer, "late", "battle", out _));
+    }
+
+    [Fact]
+    public void ConclusionProtectionStaysWithinItsBound()
+    {
+        var manager = CreateManager();
+
+        for (int index = 0; index < 5000; index++)
+        {
+            string instanceId = "battle-" + index;
+            Assert.True(manager.TryBeginEmptyInstanceConclusion(instanceId));
+            Assert.True(manager.CompleteInstanceConclusion(instanceId, succeeded: true));
+        }
+
+        var counts = manager.GetDiagnostics();
+        Assert.True(counts.ConclusionTombstones <= 4096);
+        Assert.True(counts.ExpiredEntries >= 5000 - 4096);
+    }
+
+    [Fact]
+    public void StalledEmptyConclusionRollsBackAfterItsDeadline()
+    {
+        var peer = CreatePeer(1);
+        var manager = CreateManager(("late", peer));
+        var startedUtc = DateTime.UtcNow;
+
+        Assert.True(manager.TryBeginEmptyInstanceConclusion("battle"));
+        manager.PruneExpired(startedUtc + TimeSpan.FromMinutes(6));
+
+        Assert.Equal(0, manager.GetDiagnostics().ConcludingInstances);
+        Assert.Equal(0, manager.GetDiagnostics().ConclusionTombstones);
+        Assert.True(manager.TryEnterMission(peer, "late", "battle", out _));
+    }
+
+    [Fact]
+    public void StalledActiveConclusionRollsBackAndKeepsItsMembers()
+    {
+        var peer = CreatePeer(1);
+        var manager = CreateManager(("moving", peer));
+        var startedUtc = DateTime.UtcNow;
+
+        Assert.True(manager.TryEnterMission(peer, "moving", "battle", out _));
+        Assert.True(manager.TryBeginActiveInstanceConclusion("battle", new[] { "moving" }));
+
+        manager.PruneExpired(startedUtc + TimeSpan.FromMinutes(6));
+
+        Assert.True(HasInstance(manager, "battle"));
+        Assert.True(manager.TryGetControllers("battle", out var controllers));
+        Assert.Equal(new[] { "moving" }, controllers);
+    }
+
+    [Fact]
+    public void AbandonedPunchesAndConclusionsStayBoundedOverALongRun()
+    {
+        var peer = CreatePeer(1);
+        var playerManager = new Mock<IPlayerManager>();
+        playerManager.Setup(registry => registry.TryGetPeer(It.IsAny<string>(), out peer)).Returns(true);
+        var manager = new MissionManager(playerManager.Object);
+        var netManager = new NetManager(null);
+        var startedUtc = DateTime.UtcNow;
+
+        for (int index = 0; index < 2000; index++)
+        {
+            manager.HandleIntroductionRequest(
+                netManager.NatPunchModule,
+                new IPEndPoint(IPAddress.Loopback, 20000 + index),
+                new IPEndPoint(IPAddress.Loopback, 40000 + index),
+                Authorize(manager, peer, "controller-" + index, "instance-" + index));
+
+            string concluded = "concluded-" + index;
+            Assert.True(manager.TryBeginEmptyInstanceConclusion(concluded));
+            Assert.True(manager.CompleteInstanceConclusion(concluded, succeeded: true));
+        }
+
+        Assert.True(manager.GetDiagnostics().ConclusionTombstones <= 4096);
+
+        manager.PruneExpired(startedUtc + TimeSpan.FromHours(1));
+
+        var counts = manager.GetDiagnostics();
+        Assert.Equal(0, counts.ActiveInstances);
+        Assert.Equal(0, counts.PunchEndpoints);
+        Assert.Equal(0, counts.ConcludingInstances);
+        Assert.Equal(0, counts.ConclusionTombstones);
+    }
+
+    [Fact]
+    public void MaintenanceRunningAgainstLiveTrafficKeepsTheIndexesConsistent()
+    {
+        var manager = CreateManagerForRandomTraffic(out var peers);
+        var random = new Random(20260922);
+        var netManager = new NetManager(null);
+        var stop = new CancellationTokenSource(TimeSpan.FromSeconds(2));
+
+        var maintenance = Task.Run(() =>
+        {
+            var utcNow = DateTime.UtcNow;
+            while (!stop.IsCancellationRequested)
+            {
+                manager.PruneExpired(utcNow);
+                utcNow += TimeSpan.FromSeconds(30);
+            }
+        });
+
+        var traffic = Task.Run(() =>
+        {
+            while (!stop.IsCancellationRequested)
+            {
+                int index = random.Next(peers.Length);
+                var peer = peers[index];
+                string controllerId = "controller-" + index;
+                string instanceId = "instance-" + random.Next(4);
+
+                switch (random.Next(6))
+                {
+                    case 0:
+                        manager.TryEnterMission(peer, controllerId, instanceId, out _);
+                        break;
+                    case 1:
+                        manager.TryLeaveMission(peer, controllerId, instanceId, out _);
+                        break;
+                    case 2:
+                        manager.HandleDisconnect(peer);
+                        break;
+                    case 3:
+                        manager.TryGetRelayTarget(peer, instanceId, controllerId, out _);
+                        break;
+                    case 4:
+                        if (manager.TryAuthorizeIntroduction(peer, controllerId, instanceId, Guid.NewGuid(), out var token))
+                        {
+                            manager.HandleIntroductionRequest(
+                                netManager.NatPunchModule,
+                                new IPEndPoint(IPAddress.Loopback, 56000 + index),
+                                new IPEndPoint(IPAddress.Loopback, 57000 + index),
+                                token);
+                        }
+                        break;
+                    default:
+                        if (manager.TryBeginEmptyInstanceConclusion(instanceId))
+                            manager.CompleteInstanceConclusion(instanceId, succeeded: random.Next(2) == 0);
+                        break;
+                }
+            }
+        });
+
+        Task.WaitAll(new[] { maintenance, traffic }, TimeSpan.FromSeconds(30));
+        manager.PruneExpired(DateTime.UtcNow + TimeSpan.FromHours(1));
+
+        AssertIndexesAreConsistent(manager);
+    }
+
+    // Every membership must be reachable from all three indexes, and no index may point at an
+    // instance the manager has already dropped.
+    private static void AssertIndexesAreConsistent(MissionManager manager)
+    {
+        var instances = GetInstances(manager);
+        var byPeer = GetMembershipsByPeer(manager);
+        var byController = GetMembershipsByController(manager);
+
+        foreach (var membership in byPeer.Values)
+        {
+            Assert.True(instances.ContainsKey(membership.Instance.Id));
+            Assert.Contains(membership, instances[membership.Instance.Id].Memberships);
+            Assert.Same(membership, byController[membership.ControllerId]);
+        }
+
+        foreach (var membership in byController.Values)
+        {
+            Assert.True(instances.ContainsKey(membership.Instance.Id));
+            Assert.Same(membership, byPeer[membership.Peer]);
+        }
+
+        foreach (var instance in instances.Values)
+        {
+            Assert.True(instance.Memberships.Count > 0 || instance.PunchEndpoints.Count > 0);
+            foreach (var membership in instance.Memberships)
+            {
+                Assert.Same(membership, byPeer[membership.Peer]);
+                Assert.Same(membership, byController[membership.ControllerId]);
+            }
+        }
+    }
+
+    private static MissionManager CreateManagerForRandomTraffic(out NetPeer[] peers)
+    {
+        var created = new NetPeer[8];
+        var playerManager = new Mock<IPlayerManager>();
+        for (int index = 0; index < created.Length; index++)
+        {
+            created[index] = CreatePeer(100 + index);
+            var peer = created[index];
+            playerManager
+                .Setup(manager => manager.TryGetPeer("controller-" + index, out peer))
+                .Returns(true);
+        }
+
+        peers = created;
+        return new MissionManager(playerManager.Object);
+    }
+
+    private static void Punch(
+        MissionManager manager, NetPeer peer, string controllerId, string instanceId, int port)
+    {
+        var netManager = new NetManager(null);
+        manager.HandleIntroductionRequest(
+            netManager.NatPunchModule,
+            new IPEndPoint(IPAddress.Loopback, port),
+            new IPEndPoint(IPAddress.Loopback, port + 1),
+            Authorize(manager, peer, controllerId, instanceId));
+    }
+
+    private static Dictionary<NetPeer, MissionMembership> GetMembershipsByPeer(MissionManager manager)
+        => (Dictionary<NetPeer, MissionMembership>)typeof(MissionManager)
+            .GetField("byPeer", BindingFlags.NonPublic | BindingFlags.Instance)!
+            .GetValue(manager)!;
+
+    private static Dictionary<string, MissionMembership> GetMembershipsByController(MissionManager manager)
+        => (Dictionary<string, MissionMembership>)typeof(MissionManager)
+            .GetField("byController", BindingFlags.NonPublic | BindingFlags.Instance)!
+            .GetValue(manager)!;
+
     private static string Authorize(MissionManager manager, NetPeer peer, string controllerId, string instanceId)
     {
         Assert.True(manager.TryAuthorizeIntroduction(peer, controllerId, instanceId, Guid.NewGuid(), out var token));
