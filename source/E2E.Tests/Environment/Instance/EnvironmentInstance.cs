@@ -202,9 +202,10 @@ public abstract class EnvironmentInstance : IDisposable
     public T CreateRegisteredObject<T>(string stringId) where T : class
     {
         var obj = ObjectHelper.SkipConstructor<T>();
+        var handle = Resolve<TestNetworkRouter>().GetOrCreateFixtureHandle(stringId);
 
         var objectManager = Resolve<IObjectManager>();
-        if (!objectManager.AddExisting(stringId, obj))
+        if (!objectManager.AddExisting(stringId, obj, handle))
             throw new Exception($"Unable to register {stringId} for type {typeof(T)}");
 
         return obj;
