@@ -84,10 +84,11 @@ internal class PartyComponentHandler : IHandler
         {
             IsNaval = payload.What.IsNaval,
         };
-        if (payload.What.SettlementId != null &&
-            objectManager.TryGetObject<Settlement>(payload.What.SettlementId, out var settlement) &&
-            objectManager.TryGetHandleWithLogging(settlement, out var settlementHandle))
+        if (payload.What.SettlementId != null)
         {
+            if (!objectManager.TryGetObjectWithLogging<Settlement>(payload.What.SettlementId, out var settlement) ||
+                !objectManager.TryGetHandleWithLogging(settlement, out var settlementHandle)) return;
+
             data.HomeSettlementId = settlementHandle;
         }
 

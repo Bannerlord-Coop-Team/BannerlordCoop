@@ -153,7 +153,7 @@ internal class AlleyHandler : IHandler
         }
     }
 
-    private void RunDailyAlleyTick(Alley alley, string alleyId, AlleyManagementData data)
+    private void RunDailyAlleyTick(Alley alley, string alleyId, AlleyManagementState data)
     {
         ConvertTroopsToBandits(alleyId, data);
 
@@ -188,7 +188,7 @@ internal class AlleyHandler : IHandler
     /// roster on the host): each non-hero, non-gangster troop has a 1% daily chance to turn into a thug of
     /// at least its own tier. Only broadcasts when something actually changed.
     /// </summary>
-    private void ConvertTroopsToBandits(string alleyId, AlleyManagementData data)
+    private void ConvertTroopsToBandits(string alleyId, AlleyManagementState data)
     {
         var garrison = data.Garrison;
         if (garrison == null || garrison.Length == 0) return;
@@ -257,7 +257,7 @@ internal class AlleyHandler : IHandler
     /// Vanilla SkillLevelingManager.OnDailyAlleyTick, minus the Hero.MainHero deref that NREs on the host:
     /// the owner and the overseer both gain daily Roguery XP, captured and replicated by the XP sync.
     /// </summary>
-    private void GrantDailyXp(Alley alley, AlleyManagementData data)
+    private void GrantDailyXp(Alley alley, AlleyManagementState data)
     {
         var model = Model;
         if (model == null) return;
@@ -274,7 +274,7 @@ internal class AlleyHandler : IHandler
         }
     }
 
-    private void CheckSpawnAttack(Alley alley, string alleyId, AlleyManagementData data)
+    private void CheckSpawnAttack(Alley alley, string alleyId, AlleyManagementState data)
     {
         if (MBRandom.RandomFloat >= 0.015f) return;
         StartAttack(alley, alleyId, data);
@@ -285,7 +285,7 @@ internal class AlleyHandler : IHandler
     /// gang-occupied alley in the same settlement (RNG rolled once here), set the response deadline, and
     /// tell the owning client so its confront-alley menu/conversation/fight light up.
     /// </summary>
-    private void StartAttack(Alley alley, string alleyId, AlleyManagementData data)
+    private void StartAttack(Alley alley, string alleyId, AlleyManagementState data)
     {
         var settlement = alley.Settlement;
         if (settlement?.Alleys == null) return;
@@ -586,7 +586,7 @@ internal class AlleyHandler : IHandler
         }
     }
 
-    private Hero ResolveOverseer(AlleyManagementData data)
+    private Hero ResolveOverseer(AlleyManagementState data)
     {
         if (data?.OverseerId == null) return null;
         objectManager.TryGetObject<Hero>(data.OverseerId, out var overseer);

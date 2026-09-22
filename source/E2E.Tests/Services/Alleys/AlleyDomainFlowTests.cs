@@ -40,7 +40,9 @@ public class AlleyDomainFlowTests : AlleyTestEnvironment
             Assert.Equal(scenario.OwnerHeroId, seeded.OverseerId);
             Assert.Empty(seeded.Garrison);
 
-            seeded.LastRecruitTimeTicks = CampaignTime.Now.NumTicks - CampaignTime.Days(9f).NumTicks;
+            session.SetLastRecruitTimeTicks(
+                scenario.PlayerAlleyId,
+                CampaignTime.Now.NumTicks - CampaignTime.Days(9f).NumTicks);
             session.SetUnderAttackByAi(
                 scenario.PlayerAlleyId,
                 scenario.AttackerAlleyId,
@@ -98,7 +100,7 @@ public class AlleyDomainFlowTests : AlleyTestEnvironment
                 new SetAlleyGarrisonRequested(alley, roster));
         });
 
-        AlleyManagementData managed = GetManagementData(scenario.PlayerAlleyId);
+        AlleyManagementState managed = GetManagementData(scenario.PlayerAlleyId);
         Assert.Equal(scenario.OverseerHeroId, managed.OverseerId);
         Assert.Contains(managed.Garrison,
             element => element.CharacterId == CharacterHandle(overseerCharacterId) && element.Number == 1);
@@ -146,10 +148,11 @@ public class AlleyDomainFlowTests : AlleyTestEnvironment
         {
             var session = Server.Resolve<ISessionAlleyPlayerDataInterface>();
             Assert.True(session.TryGetManagementData(scenario.PlayerAlleyId, out var data));
-            data.LastRecruitTimeTicks = CampaignTime.Now.NumTicks;
+            var lastRecruitTimeTicks = CampaignTime.Now.NumTicks;
+            session.SetLastRecruitTimeTicks(scenario.PlayerAlleyId, lastRecruitTimeTicks);
             Campaign.Current.MapTimeTracker._deltaTimeInTicks += CampaignTime.Days(8f).NumTicks;
             expectedRecruitTime = CampaignTime.Now.NumTicks;
-            Assert.True(new CampaignTime(data.LastRecruitTimeTicks).ElapsedDaysUntilNow >
+            Assert.True(new CampaignTime(lastRecruitTimeTicks).ElapsedDaysUntilNow >
                 CampaignTime.DaysInWeek);
         });
 
@@ -256,7 +259,7 @@ public class AlleyDomainFlowTests : AlleyTestEnvironment
 
         ForceAttack(scenario);
 
-        AlleyManagementData attacked = GetManagementData(scenario.PlayerAlleyId);
+        AlleyManagementState attacked = GetManagementData(scenario.PlayerAlleyId);
         Assert.Equal(scenario.AttackerAlleyId, attacked.UnderAttackByAlleyId);
         Assert.Same(
             ownerClient.GetRegisteredObject<Alley>(scenario.AttackerAlleyId),
@@ -269,7 +272,7 @@ public class AlleyDomainFlowTests : AlleyTestEnvironment
             new TroopRosterElementData(CharacterHandle(ownerCharacterId), 1, 0, 0),
             new TroopRosterElementData(CharacterHandle(troopId), 2, 0, 10));
 
-        AlleyManagementData resolved = GetManagementData(scenario.PlayerAlleyId);
+        AlleyManagementState resolved = GetManagementData(scenario.PlayerAlleyId);
         Assert.Null(resolved.UnderAttackByAlleyId);
         Assert.Contains(resolved.Garrison,
             element => element.CharacterId == CharacterHandle(troopId) && element.Number == 2 && element.Xp == 10);

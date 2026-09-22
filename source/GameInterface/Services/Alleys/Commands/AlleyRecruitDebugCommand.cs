@@ -671,15 +671,15 @@ public class AlleyRecruitDebugCommand
             element => $"{element.Character.StringId}:{element.Number}"));
     }
 
-    private static AlleyManagementData CloneManagementData(AlleyManagementData data)
+    private static AlleyManagementState CloneManagementData(AlleyManagementState data)
     {
         if (data == null) return null;
-        return new AlleyManagementData(data.OverseerId, data.Garrison?.ToArray() ?? Array.Empty<TroopRosterElementData>())
-        {
-            UnderAttackByAlleyId = data.UnderAttackByAlleyId,
-            AttackResponseDueDate = data.AttackResponseDueDate,
-            LastRecruitTimeTicks = data.LastRecruitTimeTicks,
-        };
+        return new AlleyManagementState(
+            data.OverseerId,
+            data.Garrison?.ToArray() ?? Array.Empty<TroopRosterElementData>(),
+            data.UnderAttackByAlleyId,
+            data.AttackResponseDueDate,
+            data.LastRecruitTimeTicks);
     }
 
     internal static bool IsFixtureAlley(string alleyId)
@@ -713,7 +713,7 @@ public class AlleyRecruitDebugCommand
         public Alley Alley { get; }
         public string AlleyId { get; }
         public Hero OriginalOwner { get; }
-        public AlleyManagementData OriginalManagementData { get; }
+        public AlleyManagementState OriginalManagementData { get; }
         public MobileParty PlayerParty { get; }
         public TroopRosterElement[] MemberRoster { get; }
 
@@ -721,7 +721,7 @@ public class AlleyRecruitDebugCommand
             Alley alley,
             string alleyId,
             Hero originalOwner,
-            AlleyManagementData originalManagementData,
+            AlleyManagementState originalManagementData,
             MobileParty playerParty,
             TroopRosterElement[] memberRoster)
         {

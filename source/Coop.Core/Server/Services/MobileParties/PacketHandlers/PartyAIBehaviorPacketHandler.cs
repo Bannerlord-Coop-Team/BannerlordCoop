@@ -1,4 +1,5 @@
-﻿using Common.Messaging;
+﻿using Common;
+using Common.Messaging;
 using Common.Network;
 using Common.Network.Coalescing;
 using Common.PacketHandlers;
@@ -54,9 +55,12 @@ internal class RequestMobilePartyBehaviorPacketHandler : IPacketHandler
     {
         RequestMobilePartyBehaviorPacket convertedPacket = (RequestMobilePartyBehaviorPacket)packet;
 
-        if (!wireMapper.TryFromNetwork(convertedPacket.BehaviorUpdateData, out var data)) return;
+        GameThread.RunSafe(() =>
+        {
+            if (!wireMapper.TryFromNetwork(convertedPacket.BehaviorUpdateData, out var data)) return;
 
-        messageBroker.Publish(this, new UpdatePartyBehavior(ref data));
+            messageBroker.Publish(this, new UpdatePartyBehavior(ref data, alreadyOnGameThread: true));
+        }, context: nameof(RequestMobilePartyBehaviorPacketHandler));
     }
 
     private void Handle_PartyBehaviorUpdated(MessagePayload<PartyBehaviorUpdated> payload)

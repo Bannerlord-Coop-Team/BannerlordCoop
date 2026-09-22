@@ -8,6 +8,7 @@ using Coop.Core.Server.Connections.Messages;
 using Coop.Core.Server.Connections.States;
 using Coop.Tests.Mocks;
 using GameInterface.Services.GameState.Interfaces;
+using GameInterface.Services.Heroes.Data;
 using GameInterface.Services.Heroes.Interfaces;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Players;
@@ -111,6 +112,8 @@ namespace Coop.Tests.Server.Connections.States
             var created = Assert.IsType<NetworkNewPlayerHeroCreated>(message);
             Assert.Equal(TestCharacterObjectId, created.Player.CharacterObjectId);
             Assert.Equal(heroData, created.HeroData);
+            Assert.Equal((uint)1, created.RegistrationHandles.Hero);
+            Assert.Equal((uint)9, created.RegistrationHandles.PrisonRoster);
             serverComponent.Container.Resolve<Mock<IHeroInterface>>()
                 .Verify(x => x.ServerUnpackHero(heroData), Times.Once);
             Assert.IsType<LoadingState>(connectionLogic.State);
@@ -312,6 +315,10 @@ namespace Coop.Tests.Server.Connections.States
             heroInterfaceMock
                 .Setup(h => h.ServerUnpackHero(It.IsAny<byte[]>()))
                 .Returns(hero);
+            var handles = new PlayerRegistrationHandles(1, 2, 3, 4, 5, 6, 7, 8, 9);
+            heroInterfaceMock
+                .Setup(h => h.TryGetRegistrationHandles(hero, out handles))
+                .Returns(true);
             playerRegistryMock
                 .Setup(p => p.AddPlayer(It.IsAny<Player>()))
                 .Returns(true);

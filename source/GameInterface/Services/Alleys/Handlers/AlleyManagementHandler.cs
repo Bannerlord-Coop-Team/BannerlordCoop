@@ -332,7 +332,7 @@ internal class AlleyManagementHandler : IHandler
         });
     }
 
-    private void BroadcastManagementUpdate(string alleyId, AlleyManagementData data)
+    private void BroadcastManagementUpdate(string alleyId, AlleyManagementState data)
     {
         network.SendAll(new NetworkAlleyManagementUpdated(
             alleyId,

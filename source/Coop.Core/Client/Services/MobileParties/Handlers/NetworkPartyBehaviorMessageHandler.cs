@@ -1,4 +1,5 @@
-﻿using Common.Messaging;
+﻿using Common;
+using Common.Messaging;
 using Coop.Core.Server.Services.MobileParties.Messages;
 using GameInterface.Services.MobileParties.Messages.Behavior;
 using GameInterface.Services.MobileParties.Data;
@@ -23,9 +24,12 @@ namespace Coop.Core.Client.Services.MobileParties.Handlers
 
         public void Handle(MessagePayload<NetworkUpdatePartyBehavior> payload)
         {
-            if (!wireMapper.TryFromNetwork(payload.What.BehaviorUpdateData, out var data)) return;
+            GameThread.RunSafe(() =>
+            {
+                if (!wireMapper.TryFromNetwork(payload.What.BehaviorUpdateData, out var data)) return;
 
-            messageBroker.Publish(this, new UpdatePartyBehavior(ref data));
+                messageBroker.Publish(this, new UpdatePartyBehavior(ref data, alreadyOnGameThread: true));
+            }, context: nameof(NetworkPartyBehaviorMessageHandler));
         }
 
         public void Dispose()

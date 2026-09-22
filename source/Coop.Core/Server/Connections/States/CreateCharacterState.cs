@@ -75,6 +75,13 @@ public class CreateCharacterState : ConnectionStateBase
             return;
         }
 
+        if (!heroInterface.TryGetRegistrationHandles(hero, out var registrationHandles))
+        {
+            Logger.Error("Failed to capture player graph handles; disconnecting the joining peer");
+            ConnectionLogic.Peer.Disconnect();
+            return;
+        }
+
         if (!playerManager.AddPlayer(player))
         {
             // The controller already holds a registration — two joins for it raced into character
@@ -92,7 +99,7 @@ public class CreateCharacterState : ConnectionStateBase
         // First join: associate this peer with the player it just created.
         playerManager.SetPeer(controllerId, netPeer);
         // Send created to all other clients
-        var message = new NetworkNewPlayerHeroCreated(controllerId, player, data);
+        var message = new NetworkNewPlayerHeroCreated(controllerId, player, data, registrationHandles);
         network.SendAllBut(netPeer, message);
 
         // Run authoritative setup only after existing clients can create the referenced hero graph. Follow-up

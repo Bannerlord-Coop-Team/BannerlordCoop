@@ -131,7 +131,7 @@ public class AlleyTestEnvironment : SettlementTestEnvironment
             {
                 clone[pair.Key] = new AlleyManagementData(
                     pair.Value.OverseerId,
-                    pair.Value.Garrison?.ToArray() ?? Array.Empty<TroopRosterElementData>())
+                    pair.Value.Garrison?.ToArray() ?? Array.Empty<AlleyRosterElementData>())
                 {
                     UnderAttackByAlleyId = pair.Value.UnderAttackByAlleyId,
                     AttackResponseDueDate = pair.Value.AttackResponseDueDate,
@@ -149,9 +149,9 @@ public class AlleyTestEnvironment : SettlementTestEnvironment
         }, GetNonAlleyPlayerHeroChangedHandlers());
     }
 
-    public AlleyManagementData GetManagementData(string alleyId)
+    public AlleyManagementState GetManagementData(string alleyId)
     {
-        AlleyManagementData result = null;
+        AlleyManagementState result = null;
         Server.Call(() =>
         {
             Assert.True(Server.Resolve<ISessionAlleyPlayerDataInterface>()
