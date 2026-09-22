@@ -6,6 +6,7 @@ using GameInterface.Services.Chat.Messages;
 using GameInterface.Services.Entity;
 using GameInterface.Services.Players;
 using GameInterface.Services.Players.Data;
+using GameInterface.Services.UI;
 using GameInterface.Services.UI.CoopOptions;
 using GameInterface.Services.UI.CoopOptions.Providers.ChatTab;
 using GameInterface.Services.UI.CoopOptions.Providers.ChatTab.Sections;
@@ -124,7 +125,8 @@ public class ChatServiceTests
             optionsStore.Object,
             messageBroker,
             vanillaLogGate.Object,
-            eventLog.Object);
+            eventLog.Object,
+            new PlayerKillFeedColorService());
     }
 
     private static Player Player(string controllerId)

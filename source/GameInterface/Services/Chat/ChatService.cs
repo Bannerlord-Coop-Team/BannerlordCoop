@@ -3,6 +3,7 @@ using Common.Network;
 using GameInterface.Services.Chat.Messages;
 using GameInterface.Services.Entity;
 using GameInterface.Services.Players;
+using GameInterface.Services.UI;
 using GameInterface.Services.UI.CoopOptions;
 using GameInterface.Services.UI.CoopOptions.Providers.ChatTab;
 using GameInterface.Services.UI.Messages;
@@ -41,7 +42,8 @@ public sealed class ChatService : IChatService, IDisposable
         ICoopOptionsStore optionsStore,
         IMessageBroker messageBroker,
         IChatVanillaLogGate vanillaLogGate,
-        IChatEventLog eventLog)
+        IChatEventLog eventLog,
+        IPlayerKillFeedColorService killFeedColorService)
     {
         if (network == null) throw new ArgumentNullException(nameof(network));
         if (playerManager == null) throw new ArgumentNullException(nameof(playerManager));
@@ -51,6 +53,7 @@ public sealed class ChatService : IChatService, IDisposable
         if (messageBroker == null) throw new ArgumentNullException(nameof(messageBroker));
         if (vanillaLogGate == null) throw new ArgumentNullException(nameof(vanillaLogGate));
         if (eventLog == null) throw new ArgumentNullException(nameof(eventLog));
+        if (killFeedColorService == null) throw new ArgumentNullException(nameof(killFeedColorService));
 
         this.network = network;
         this.playerManager = playerManager;
@@ -60,7 +63,10 @@ public sealed class ChatService : IChatService, IDisposable
         this.vanillaLogGate = vanillaLogGate;
         this.eventLog = eventLog;
 
-        viewModel = new ChatVM(message => network.SendAll(message), () => controllerIdProvider.ControllerId);
+        viewModel = new ChatVM(
+            message => network.SendAll(message),
+            () => controllerIdProvider.ControllerId,
+            killFeedColorService.GetColor);
         var showChat = ChatOptionsTabProvider.GetShowChatOrDefault(optionsStore.LoadOrDefault());
         overlay = new ChatOverlay(viewModel, RequestParticipants, showChat);
         messageBroker.Subscribe<ChatVisibilitySelected>(HandleChatVisibilitySelected);
