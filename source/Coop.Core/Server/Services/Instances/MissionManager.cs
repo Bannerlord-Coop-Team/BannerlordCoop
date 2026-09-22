@@ -705,10 +705,25 @@ public class MissionManager : IMissionManager, IMissionMembershipRegistry
     {
         lock (gate)
         {
+            long removedBefore = expiredEntryCount;
             ExpirePunchEndpoints(utcNow);
             RollBackStalledConclusions(utcNow);
             PruneEmptyInstances();
             ExpireConclusions(utcNow);
+
+            if (expiredEntryCount == removedBefore)
+                return;
+
+            Logger.Information(
+                "Mission maintenance dropped {Removed} expired entries; instances {Instances} " +
+                "({NatOnly} NAT-only), punch endpoints {Endpoints}, concluding {Concluding}, " +
+                "finished {Finished}",
+                expiredEntryCount - removedBefore,
+                byInstanceId.Count,
+                byInstanceId.Values.Count(instance => instance.Memberships.Count == 0),
+                byInstanceId.Values.Sum(instance => instance.PunchEndpoints.Count),
+                concludingInstances.Count,
+                concludedInstances.Count);
         }
     }
 

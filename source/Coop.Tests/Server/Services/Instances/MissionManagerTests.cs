@@ -1051,6 +1051,41 @@ public class MissionManagerTests
     }
 
     [Fact]
+    public void ExpiryDoesNotReopenRelayForARevokedPeerOrAConcludedInstance()
+    {
+        var first = CreatePeer(1);
+        var second = CreatePeer(2);
+        var manager = CreateManager(("first", first), ("second", second));
+        var startedUtc = DateTime.UtcNow;
+
+        Assert.True(manager.TryEnterMission(first, "first", "battle", out _));
+        Assert.True(manager.TryEnterMission(second, "second", "battle", out _));
+        Assert.True(manager.TryGetRelayTarget(first, "battle", "second", out _));
+
+        manager.RevokeRelay(second);
+        manager.PruneExpired(startedUtc + TimeSpan.FromHours(1));
+
+        Assert.False(manager.TryGetRelayTarget(first, "battle", "second", out _));
+    }
+
+    [Fact]
+    public void ConclusionReportingAfterItsRollbackIsRefusedAndLeavesNoProtection()
+    {
+        var peer = CreatePeer(1);
+        var manager = CreateManager(("late", peer));
+        var startedUtc = DateTime.UtcNow;
+
+        Assert.True(manager.TryBeginEmptyInstanceConclusion("battle"));
+        manager.PruneExpired(startedUtc + TimeSpan.FromMinutes(6));
+
+        // The rolled-back instance is free again, so the late report is refused and writes no
+        // replay protection: a conclusion that misses its deadline has to be claimed again.
+        Assert.False(manager.CompleteInstanceConclusion("battle", succeeded: true));
+        Assert.Equal(0, manager.GetDiagnostics().ConclusionTombstones);
+        Assert.True(manager.TryEnterMission(peer, "late", "battle", out _));
+    }
+
+    [Fact]
     public void AbandonedPunchesAndConclusionsStayBoundedOverALongRun()
     {
         var peer = CreatePeer(1);
@@ -1120,7 +1155,8 @@ public class MissionManagerTests
                         manager.TryLeaveMission(peer, controllerId, instanceId, out _);
                         break;
                     case 2:
-                        manager.HandleDisconnect(peer);
+                        if (index >= RetiringPeerIndex)
+                            manager.HandleDisconnect(peer);
                         break;
                     case 3:
                         manager.TryGetRelayTarget(peer, instanceId, controllerId, out _);
@@ -1181,9 +1217,13 @@ public class MissionManagerTests
         }
     }
 
+    // Peers at or above this index are the only ones the random traffic disconnects, because a
+    // disconnected peer is retired for good and could no longer punch.
+    private const int RetiringPeerIndex = 12;
+
     private static MissionManager CreateManagerForRandomTraffic(out NetPeer[] peers)
     {
-        var created = new NetPeer[8];
+        var created = new NetPeer[16];
         var playerManager = new Mock<IPlayerManager>();
         for (int index = 0; index < created.Length; index++)
         {
