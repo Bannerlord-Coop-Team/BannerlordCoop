@@ -1185,13 +1185,27 @@ public class MissionManagerTests
         AssertIndexesAreConsistent(manager);
     }
 
-    // Every membership must be reachable from all three indexes, and no index may point at an
-    // instance the manager has already dropped.
+    // Every membership must be reachable from all three indexes, no index may point at an instance
+    // the manager has already dropped, and the conclusion collections must agree with them.
     private static void AssertIndexesAreConsistent(MissionManager manager)
     {
         var instances = GetInstances(manager);
         var byPeer = GetMembershipsByPeer(manager);
         var byController = GetMembershipsByController(manager);
+        var concluding = GetConclusions(manager, "concludingInstances");
+        var concluded = GetConclusions(manager, "concludedInstances");
+        var pendingEmpty = GetInstances(manager, "pendingEmptyInstances");
+
+        foreach (var instanceId in pendingEmpty.Keys)
+        {
+            Assert.Contains(instanceId, concluding.Keys);
+            Assert.DoesNotContain(instanceId, instances.Keys);
+        }
+
+        foreach (var instanceId in concluding.Keys)
+        {
+            Assert.DoesNotContain(instanceId, concluded.Keys);
+        }
 
         foreach (var membership in byPeer.Values)
         {
@@ -1285,13 +1299,19 @@ public class MissionManagerTests
     private static MissionInstance GetInstance(MissionManager manager, string instanceId) =>
         GetInstances(manager)[instanceId];
 
-    private static Dictionary<string, MissionInstance> GetInstances(MissionManager manager)
+    private static Dictionary<string, MissionInstance> GetInstances(
+        MissionManager manager, string fieldName = "byInstanceId")
     {
-        var byInstanceIdField = typeof(MissionManager).GetField(
-            "byInstanceId",
+        var instanceField = typeof(MissionManager).GetField(
+            fieldName,
             BindingFlags.NonPublic | BindingFlags.Instance)!;
-        return (Dictionary<string, MissionInstance>)byInstanceIdField.GetValue(manager)!;
+        return (Dictionary<string, MissionInstance>)instanceField.GetValue(manager)!;
     }
+
+    private static Dictionary<string, DateTime> GetConclusions(MissionManager manager, string fieldName)
+        => (Dictionary<string, DateTime>)typeof(MissionManager)
+            .GetField(fieldName, BindingFlags.NonPublic | BindingFlags.Instance)!
+            .GetValue(manager)!;
 
     private static NetPeer CreatePeer(int id)
         => (NetPeer)PeerConstructor.Invoke(new object[]

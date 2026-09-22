@@ -82,19 +82,9 @@ public interface IMissionManager
 
     /// <summary>Commits a successful conclusion or rolls its entry fence back after a failed apply.</summary>
     bool CompleteInstanceConclusion(string instanceId, bool succeeded);
-
-    /// <summary>
-    /// Server maintenance pass: drops punch endpoints that never joined their mission, the instance
-    /// records they leave behind, conclusions that never finished, and replay protection that is no
-    /// longer needed.
-    /// </summary>
-    void PruneExpired();
 }
 
-/// <summary>
-/// Counts of the mission-manager state that can grow while a server runs, so an operator can see at a
-/// glance whether anything is accumulating.
-/// </summary>
+/// <summary>Counts of the mission-manager state that can grow while a server runs.</summary>
 internal readonly struct MissionManagerDiagnostics
 {
     public int ActiveInstances { get; }
@@ -190,33 +180,32 @@ public class MissionManager : IMissionManager, IMissionMembershipRegistry
     private readonly Dictionary<string, MissionMembership> byController = new Dictionary<string, MissionMembership>();
     private readonly Dictionary<NetPeer, long> relayRevocationCounts = new Dictionary<NetPeer, long>();
     private readonly Dictionary<string, MissionInstance> pendingEmptyInstances = new Dictionary<string, MissionInstance>();
-    // Both conclusion sets carry the time they were recorded: a conclusion that never reports back is
-    // rolled back after its deadline, and replay protection is released once it is no longer needed.
+    // Both conclusion sets carry the time they were recorded, so each one can expire.
     private readonly Dictionary<string, DateTime> concludingInstances = new Dictionary<string, DateTime>();
     private readonly Dictionary<string, DateTime> concludedInstances = new Dictionary<string, DateTime>();
     private readonly Dictionary<string, IntroductionAuthorization> introductionAuthorizations = new();
     // Retired peers cannot authorize again, without retaining every disconnected socket for the session.
     private readonly ConditionalWeakTable<NetPeer, object> disconnectedPeers = new();
     private long expiredEntryCount;
+    private DateTime lastDiagnosticsUtc;
 
     /// <summary>How long a punch endpoint may wait for its mission entry before it expires.</summary>
     private static readonly TimeSpan PunchEndpointLease = TimeSpan.FromMinutes(5);
 
     /// <summary>
-    /// How long a finished instance keeps rejecting delayed duplicates. It matches
-    /// <see cref="NetworkJoinLimits.CampaignEntryTimeout"/>, the longest a late message can still be
-    /// on its way while a peer is joining.
+    /// How long a finished instance keeps rejecting delayed duplicates, matching the longest a late
+    /// message can still be on its way (<see cref="NetworkJoinLimits.CampaignEntryTimeout"/>).
     /// </summary>
     private static readonly TimeSpan ConclusionRetention = NetworkJoinLimits.CampaignEntryTimeout;
 
     /// <summary>How long a conclusion may stay in flight before it is rolled back.</summary>
     private static readonly TimeSpan ConclusionDeadline = TimeSpan.FromMinutes(5);
 
-    /// <summary>
-    /// Upper bound on retained conclusions, so a session that finishes missions faster than the
-    /// retention window cannot grow the set without limit.
-    /// </summary>
+    /// <summary>Upper bound on retained conclusions, whatever the rate missions finish at.</summary>
     private const int MaxConcludedInstances = 4096;
+
+    /// <summary>How often the counts above are written out while nothing is expiring.</summary>
+    private static readonly TimeSpan DiagnosticsInterval = TimeSpan.FromMinutes(5);
 
     /// <summary>Latest mission punch authorization for one controller's campaign session.</summary>
     private sealed class IntroductionAuthorization
@@ -259,6 +248,7 @@ public class MissionManager : IMissionManager, IMissionMembershipRegistry
 
         lock (gate)
         {
+            PruneExpired(DateTime.UtcNow);
             if (disconnectedPeers.TryGetValue(peer, out _) || IsConclusionFenced(instanceId) ||
                 !playerManager.TryGetPeer(controllerId, out var currentPeer) ||
                 !ReferenceEquals(currentPeer, peer))
@@ -298,6 +288,7 @@ public class MissionManager : IMissionManager, IMissionMembershipRegistry
 
         lock (gate)
         {
+            PruneExpired(DateTime.UtcNow);
             // Validation and insertion share the disconnect gate; a retired session cannot repunch.
             var authorization = introductionAuthorizations.Values.FirstOrDefault(candidate => candidate.Token == token);
             if (authorization == null || authorization.Punched ||
@@ -414,6 +405,7 @@ public class MissionManager : IMissionManager, IMissionMembershipRegistry
 
         lock (gate)
         {
+            PruneExpired(DateTime.UtcNow);
             if (IsConclusionFenced(instanceId))
             {
                 Logger.Information("Ignoring mission entry by {Controller} for concluded instance {Instance}",
@@ -675,32 +667,36 @@ public class MissionManager : IMissionManager, IMissionMembershipRegistry
 
         lock (gate)
         {
-            if (!concludingInstances.Remove(instanceId))
-                return false;
-
-            if (succeeded)
-            {
-                RecordConclusion(instanceId, DateTime.UtcNow);
-                pendingEmptyInstances.Remove(instanceId);
-                return true;
-            }
-
-            if (pendingEmptyInstances.TryGetValue(instanceId, out var emptyInstance))
-            {
-                byInstanceId[instanceId] = emptyInstance;
-                pendingEmptyInstances.Remove(instanceId);
-            }
-
-            return true;
+            PruneExpired(DateTime.UtcNow);
+            return CompleteConclusion(instanceId, succeeded);
         }
     }
 
-    /// <inheritdoc/>
-    public void PruneExpired() => PruneExpired(DateTime.UtcNow);
+    // The rollback path uses this directly: going through the public method would restart the
+    // maintenance pass it is already running inside. Caller holds the lock.
+    private bool CompleteConclusion(string instanceId, bool succeeded)
+    {
+        if (!concludingInstances.Remove(instanceId))
+            return false;
 
-    // One maintenance pass over everything that has a lease. Called from CoopServer.Update on the poll
-    // thread and holds the same gate as every other mutation, so it cannot interleave with entry,
-    // leave, disconnect, relay lookup or conclusion.
+        if (succeeded)
+        {
+            RecordConclusion(instanceId, DateTime.UtcNow);
+            pendingEmptyInstances.Remove(instanceId);
+            return true;
+        }
+
+        if (pendingEmptyInstances.TryGetValue(instanceId, out var emptyInstance))
+        {
+            byInstanceId[instanceId] = emptyInstance;
+            pendingEmptyInstances.Remove(instanceId);
+        }
+
+        return true;
+    }
+
+    // Every entry point below runs this before it reads an index, because rolling back a stalled
+    // conclusion puts its instance back into byInstanceId.
     internal void PruneExpired(DateTime utcNow)
     {
         lock (gate)
@@ -711,19 +707,24 @@ public class MissionManager : IMissionManager, IMissionMembershipRegistry
             PruneEmptyInstances();
             ExpireConclusions(utcNow);
 
-            if (expiredEntryCount == removedBefore)
+            long removed = expiredEntryCount - removedBefore;
+            if (removed == 0 && utcNow - lastDiagnosticsUtc < DiagnosticsInterval)
                 return;
 
+            lastDiagnosticsUtc = utcNow;
+            var counts = GetDiagnostics();
             Logger.Information(
-                "Mission maintenance dropped {Removed} expired entries; instances {Instances} " +
-                "({NatOnly} NAT-only), punch endpoints {Endpoints}, concluding {Concluding}, " +
-                "finished {Finished}",
-                expiredEntryCount - removedBefore,
-                byInstanceId.Count,
-                byInstanceId.Values.Count(instance => instance.Memberships.Count == 0),
-                byInstanceId.Values.Sum(instance => instance.PunchEndpoints.Count),
-                concludingInstances.Count,
-                concludedInstances.Count);
+                "Mission state: dropped {Removed} ({Expired} in total), instances {Instances} " +
+                "({WithMembers} with members, {NatOnly} NAT-only), punch endpoints {Endpoints}, " +
+                "concluding {Concluding}, finished {Finished}",
+                removed,
+                counts.ExpiredEntries,
+                counts.ActiveInstances,
+                counts.MembershipBackedInstances,
+                counts.NatOnlyInstances,
+                counts.PunchEndpoints,
+                counts.ConcludingInstances,
+                counts.ConclusionTombstones);
         }
     }
 
@@ -740,8 +741,7 @@ public class MissionManager : IMissionManager, IMissionMembershipRegistry
         }
     }
 
-    // A conclusion whose result never arrived releases its fence the same way a failed one does, so the
-    // instance becomes usable again instead of staying blocked for the session. Caller holds the lock.
+    // A conclusion whose result never arrived releases its fence like a failed one. Caller holds the lock.
     private void RollBackStalledConclusions(DateTime utcNow)
     {
         foreach (var instanceId in concludingInstances
@@ -751,7 +751,7 @@ public class MissionManager : IMissionManager, IMissionMembershipRegistry
         {
             Logger.Warning("Rolling back instance {Instance}: its conclusion did not report back in time",
                 instanceId);
-            CompleteInstanceConclusion(instanceId, succeeded: false);
+            CompleteConclusion(instanceId, succeeded: false);
             expiredEntryCount++;
         }
     }
@@ -769,9 +769,8 @@ public class MissionManager : IMissionManager, IMissionMembershipRegistry
         }
     }
 
-    // An instance without members and without punch endpoints has nothing left to route. PruneIfEmpty
-    // itself only runs on the membership path, so a peer that only ever punched needs this sweep.
-    // Caller holds the lock.
+    // PruneIfEmpty itself only runs on the membership path, so a peer that only ever punched needs
+    // this sweep. Caller holds the lock.
     private void PruneEmptyInstances()
     {
         foreach (var instance in byInstanceId.Values.ToArray())
@@ -780,9 +779,8 @@ public class MissionManager : IMissionManager, IMissionMembershipRegistry
         }
     }
 
-    // Remember a finished instance so a delayed duplicate is still rejected, and keep that memory
-    // bounded: past the cap the oldest entry goes. The scan only runs at the cap, and a conclusion is
-    // a rare event. Caller holds the lock.
+    // Remember a finished instance so a delayed duplicate is still rejected, bounded by dropping the
+    // oldest past the cap. Caller holds the lock.
     private void RecordConclusion(string instanceId, DateTime utcNow)
     {
         concludedInstances[instanceId] = utcNow;
@@ -795,7 +793,7 @@ public class MissionManager : IMissionManager, IMissionMembershipRegistry
         }
     }
 
-    // Read-only snapshot of everything that can grow, for the server log and for tests.
+    // Read-only snapshot of everything that can grow. Caller may hold the lock.
     internal MissionManagerDiagnostics GetDiagnostics()
     {
         lock (gate)

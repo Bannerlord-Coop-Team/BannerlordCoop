@@ -174,7 +174,6 @@ public class CoopServer : CoopNetworkBase, ICoopServer
     public override void Update(TimeSpan frameTime)
     {
         overloadedPeerManager.Value.CheckForOverloadedPeers();
-        missionManager.PruneExpired();
 
         netManager.PollEvents();
         netManager.NatPunchModule.PollEvents();
