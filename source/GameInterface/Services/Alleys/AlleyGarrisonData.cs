@@ -9,9 +9,25 @@ namespace GameInterface.Services.Alleys;
 /// <summary>
 /// Converts an alley garrison between live, network, and persistent representations.
 /// </summary>
-internal static class AlleyGarrisonData
+public interface IAlleyGarrisonData
 {
-    public static TroopRosterElementData[] ToData(TroopRoster roster, IObjectManager objectManager)
+    TroopRosterElementData[] ToData(TroopRoster roster);
+    TroopRoster FromData(TroopRosterElementData[] data);
+    TroopRoster FromData(AlleyRosterElementData[] data);
+    AlleyRosterElementData[] ToStorageData(TroopRosterElementData[] data);
+    TroopRosterElementData[] ToNetworkData(AlleyRosterElementData[] data);
+}
+
+internal sealed class AlleyGarrisonData : IAlleyGarrisonData
+{
+    private readonly IObjectManager objectManager;
+
+    public AlleyGarrisonData(IObjectManager objectManager)
+    {
+        this.objectManager = objectManager;
+    }
+
+    public TroopRosterElementData[] ToData(TroopRoster roster)
     {
         var list = new List<TroopRosterElementData>();
         if (roster == null) return list.ToArray();
@@ -24,7 +40,7 @@ internal static class AlleyGarrisonData
         return list.ToArray();
     }
 
-    public static TroopRoster FromData(TroopRosterElementData[] data, IObjectManager objectManager)
+    public TroopRoster FromData(TroopRosterElementData[] data)
     {
         var roster = TroopRoster.CreateDummyTroopRoster();
         if (data == null) return roster;
@@ -37,7 +53,7 @@ internal static class AlleyGarrisonData
         return roster;
     }
 
-    public static TroopRoster FromData(AlleyRosterElementData[] data, IObjectManager objectManager)
+    public TroopRoster FromData(AlleyRosterElementData[] data)
     {
         var roster = TroopRoster.CreateDummyTroopRoster();
         if (data == null) return roster;
@@ -57,9 +73,7 @@ internal static class AlleyGarrisonData
         return roster;
     }
 
-    public static AlleyRosterElementData[] ToStorageData(
-        TroopRosterElementData[] data,
-        IObjectManager objectManager)
+    public AlleyRosterElementData[] ToStorageData(TroopRosterElementData[] data)
     {
         var result = new List<AlleyRosterElementData>();
         if (data == null) return result.ToArray();
@@ -81,9 +95,7 @@ internal static class AlleyGarrisonData
         return result.ToArray();
     }
 
-    public static TroopRosterElementData[] ToNetworkData(
-        AlleyRosterElementData[] data,
-        IObjectManager objectManager)
+    public TroopRosterElementData[] ToNetworkData(AlleyRosterElementData[] data)
     {
         var result = new List<TroopRosterElementData>();
         if (data == null) return result.ToArray();

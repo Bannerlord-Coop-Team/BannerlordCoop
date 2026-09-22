@@ -112,6 +112,7 @@ public class ObjectManager : IObjectManager
     protected ConditionalWeakTable<object, string> objsIds = new ConditionalWeakTable<object, string>();
     protected readonly ConcurrentDictionary<uint, object> handleObjs = new ConcurrentDictionary<uint, object>();
     protected ConditionalWeakTable<object, HandleBox> objsHandles = new ConditionalWeakTable<object, HandleBox>();
+    private ConditionalWeakTable<object, HandleBox> retiredHandles = new ConditionalWeakTable<object, HandleBox>();
 
     private readonly ConcurrentDictionary<Type, int> objectCounters = new ConcurrentDictionary<Type, int>();
     private IReadOnlyDictionary<string, uint> joinHandles;
@@ -155,7 +156,7 @@ public class ObjectManager : IObjectManager
 
         lock (_gate)
         {
-            return AddExistingCore(id, obj, ResolveRegistrationHandle(id), allowMissingHandle: true);
+            return AddExistingCore(id, obj, ResolveRegistrationHandle(id, obj), allowMissingHandle: true);
         }
     }
 
@@ -240,7 +241,7 @@ public class ObjectManager : IObjectManager
 
             objsIds.Add(obj, newId);
 
-            var handle = ResolveRegistrationHandle(newId);
+            var handle = ResolveRegistrationHandle(newId, obj);
             if (handle != 0 && !AddHandle(obj, handle))
             {
                 idObjs.TryRemove(newId, out _);
@@ -396,6 +397,8 @@ public class ObjectManager : IObjectManager
             {
                 handleObjs.TryRemove(box.Value, out _);
                 objsHandles.Remove(obj);
+                retiredHandles.Remove(obj);
+                retiredHandles.Add(obj, box);
             }
             return removed;
         }
@@ -450,13 +453,19 @@ public class ObjectManager : IObjectManager
         }
     }
 
-    private uint ResolveRegistrationHandle(string id)
+    private uint ResolveRegistrationHandle(string id, object obj)
     {
         if (joinHandles != null && joinHandles.TryGetValue(id, out var mappedHandle))
         {
             if (mappedHandle == 0)
                 throw new InvalidOperationException($"Join handle for {id} cannot be zero.");
             return mappedHandle;
+        }
+
+        if (retiredHandles.TryGetValue(obj, out var retiredHandle) &&
+            !handleObjs.ContainsKey(retiredHandle.Value))
+        {
+            return retiredHandle.Value;
         }
 
         if (!ModInformation.IsServer) return 0;
@@ -485,6 +494,7 @@ public class ObjectManager : IObjectManager
         }
 
         objsHandles.Add(obj, new HandleBox(handle));
+        retiredHandles.Remove(obj);
         if (handle >= nextHandle)
             nextHandle = handle == uint.MaxValue ? 0 : handle + 1;
         return true;
@@ -587,6 +597,7 @@ public class ObjectManager : IObjectManager
         {
             objsIds = new ConditionalWeakTable<object, string>();
             objsHandles = new ConditionalWeakTable<object, HandleBox>();
+            retiredHandles = new ConditionalWeakTable<object, HandleBox>();
             idObjs.Clear();
             handleObjs.Clear();
             joinHandles = null;

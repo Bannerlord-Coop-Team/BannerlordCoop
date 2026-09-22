@@ -2,7 +2,6 @@
 using GameInterface.CoopSessionData.Save.Data;
 using GameInterface.Services.Alleys;
 using GameInterface.Services.Alleys.Interfaces;
-using GameInterface.Services.ObjectManager;
 using GameInterface.Services.TroopRosters.Data;
 using Moq;
 using System;
@@ -76,6 +75,6 @@ public class SessionAlleyPlayerDataInterfaceTests
 
         var provider = new Mock<ICoopSessionProvider>();
         provider.SetupGet(session => session.CoopSession).Returns(coopSession.Object);
-        return new SessionAlleyPlayerDataInterface(provider.Object, Mock.Of<IObjectManager>());
+        return new SessionAlleyPlayerDataInterface(provider.Object, Mock.Of<IAlleyGarrisonData>());
     }
 }

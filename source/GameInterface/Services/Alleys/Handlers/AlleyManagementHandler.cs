@@ -33,19 +33,22 @@ internal class AlleyManagementHandler : IHandler
     private readonly INetwork network;
     private readonly ISessionAlleyPlayerDataInterface sessionInterface;
     private readonly IAlleyCampaignBehaviorInterface behaviorInterface;
+    private readonly IAlleyGarrisonData garrisonData;
 
     public AlleyManagementHandler(
         IMessageBroker messageBroker,
         IObjectManager objectManager,
         INetwork network,
         ISessionAlleyPlayerDataInterface sessionInterface,
-        IAlleyCampaignBehaviorInterface behaviorInterface)
+        IAlleyCampaignBehaviorInterface behaviorInterface,
+        IAlleyGarrisonData garrisonData)
     {
         this.messageBroker = messageBroker;
         this.objectManager = objectManager;
         this.network = network;
         this.sessionInterface = sessionInterface;
         this.behaviorInterface = behaviorInterface;
+        this.garrisonData = garrisonData;
 
         messageBroker.Subscribe<AlleyAcquiredRequested>(Handle_AlleyAcquiredRequested);
         messageBroker.Subscribe<AbandonAlleyRequested>(Handle_AbandonAlleyRequested);
@@ -90,7 +93,7 @@ internal class AlleyManagementHandler : IHandler
         if (!objectManager.TryGetIdWithLogging(payload.What.Owner, out var ownerId)) return;
         if (!objectManager.TryGetIdWithLogging(payload.What.Overseer, out var overseerId)) return;
 
-        network.SendAll(new RequestAcquireAlley(alleyId, ownerId, overseerId, AlleyGarrisonData.ToData(payload.What.Garrison, objectManager)));
+        network.SendAll(new RequestAcquireAlley(alleyId, ownerId, overseerId, garrisonData.ToData(payload.What.Garrison)));
     }
 
     private void Handle_AbandonAlleyRequested(MessagePayload<AbandonAlleyRequested> payload)
@@ -115,7 +118,7 @@ internal class AlleyManagementHandler : IHandler
         if (ModInformation.IsServer) return;
         if (!objectManager.TryGetIdWithLogging(payload.What.Alley, out var alleyId)) return;
 
-        network.SendAll(new RequestSetAlleyGarrison(alleyId, AlleyGarrisonData.ToData(payload.What.NewGarrison, objectManager)));
+        network.SendAll(new RequestSetAlleyGarrison(alleyId, garrisonData.ToData(payload.What.NewGarrison)));
     }
 
     private void Handle_RecruitAlleyTroopsRequested(MessagePayload<RecruitAlleyTroopsRequested> payload)
@@ -125,7 +128,7 @@ internal class AlleyManagementHandler : IHandler
 
         network.SendAll(new RequestRecruitAlleyTroops(
             alleyId,
-            AlleyGarrisonData.ToData(payload.What.Troops, objectManager)));
+            garrisonData.ToData(payload.What.Troops)));
     }
 
     // --- Network requests (server, authoritative) ---
@@ -327,7 +330,7 @@ internal class AlleyManagementHandler : IHandler
             behaviorInterface.AddOrUpdatePlayerAlleyData(
                 alley,
                 overseer,
-                AlleyGarrisonData.FromData(data.Garrison, objectManager),
+                garrisonData.FromData(data.Garrison),
                 new CampaignTime(data.LastRecruitTimeTicks));
         });
     }

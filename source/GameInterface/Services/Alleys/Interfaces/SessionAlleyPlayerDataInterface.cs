@@ -1,6 +1,5 @@
 ﻿using Common.Logging;
 using GameInterface.CoopSessionData;
-using GameInterface.Services.ObjectManager;
 using GameInterface.Services.TroopRosters.Data;
 using Serilog;
 using System;
@@ -35,17 +34,17 @@ public class SessionAlleyPlayerDataInterface : ISessionAlleyPlayerDataInterface
     private static readonly ILogger Logger = LogManager.GetLogger<SessionAlleyPlayerDataInterface>();
 
     private readonly ICoopSessionProvider coopSessionProvider;
-    private readonly IObjectManager objectManager;
+    private readonly IAlleyGarrisonData garrisonData;
 
     private Dictionary<string, AlleyManagementData> ManagementData
         => coopSessionProvider.CoopSession?.AlleyPlayerData?.ManagementDataPerAlley;
 
     public SessionAlleyPlayerDataInterface(
         ICoopSessionProvider coopSessionProvider,
-        IObjectManager objectManager)
+        IAlleyGarrisonData garrisonData)
     {
         this.coopSessionProvider = coopSessionProvider;
-        this.objectManager = objectManager;
+        this.garrisonData = garrisonData;
     }
 
     public bool TryGetManagementData(string alleyId, out AlleyManagementState data)
@@ -56,7 +55,7 @@ public class SessionAlleyPlayerDataInterface : ISessionAlleyPlayerDataInterface
 
         data = new AlleyManagementState(
             stored.OverseerId,
-            AlleyGarrisonData.ToNetworkData(stored.Garrison, objectManager),
+            garrisonData.ToNetworkData(stored.Garrison),
             stored.UnderAttackByAlleyId,
             stored.AttackResponseDueDate,
             stored.LastRecruitTimeTicks);
@@ -75,7 +74,7 @@ public class SessionAlleyPlayerDataInterface : ISessionAlleyPlayerDataInterface
 
         var entry = new AlleyManagementData(
             overseerId,
-            AlleyGarrisonData.ToStorageData(garrison, objectManager));
+            garrisonData.ToStorageData(garrison));
 
         // A garrison/overseer change must not drop an in-progress attack, so carry the under-attack
         // fields forward from the existing entry.

@@ -41,6 +41,32 @@ public class ObjectManagerHandleTests
     }
 
     [Fact]
+    public void SameObjectReregistration_PreservesHandle()
+    {
+        bool wasServer = ModInformation.IsServer;
+        ModInformation.IsServer = true;
+        try
+        {
+            var manager = CreateManager();
+            var value = new object();
+
+            Assert.True(manager.AddExisting("first", value));
+            Assert.True(manager.TryGetHandle(value, out var originalHandle));
+            Assert.True(manager.Remove(value));
+            Assert.True(manager.AddExisting("first", value));
+            Assert.True(manager.TryGetHandle(value, out var restoredHandle));
+
+            Assert.Equal(originalHandle, restoredHandle);
+            Assert.True(manager.TryGetObject(restoredHandle, out object resolved));
+            Assert.Same(value, resolved);
+        }
+        finally
+        {
+            ModInformation.IsServer = wasServer;
+        }
+    }
+
+    [Fact]
     public void ClientJoinMap_AdoptsServerHandles()
     {
         bool wasServer = ModInformation.IsServer;

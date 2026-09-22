@@ -44,19 +44,22 @@ internal class AlleyHandler : IHandler
     private readonly INetwork network;
     private readonly ISessionAlleyPlayerDataInterface sessionInterface;
     private readonly IAlleyCampaignBehaviorInterface behaviorInterface;
+    private readonly IAlleyGarrisonData garrisonData;
 
     public AlleyHandler(
         IMessageBroker messageBroker,
         IObjectManager objectManager,
         INetwork network,
         ISessionAlleyPlayerDataInterface sessionInterface,
-        IAlleyCampaignBehaviorInterface behaviorInterface)
+        IAlleyCampaignBehaviorInterface behaviorInterface,
+        IAlleyGarrisonData garrisonData)
     {
         this.messageBroker = messageBroker;
         this.objectManager = objectManager;
         this.network = network;
         this.sessionInterface = sessionInterface;
         this.behaviorInterface = behaviorInterface;
+        this.garrisonData = garrisonData;
 
         messageBroker.Subscribe<AlleyOwnerChanged>(Handle_AlleyOwnerChanged);
         messageBroker.Subscribe<ChangeAlleyOwner>(Handle_ChangeAlleyOwner);
@@ -299,7 +302,7 @@ internal class AlleyHandler : IHandler
         var attacker = rivals[MBRandom.RandomInt(0, rivals.Count)];
         if (attacker == null || !objectManager.TryGetId(attacker, out var attackerId)) return;
 
-        var responseRoster = AlleyGarrisonData.FromData(data.Garrison, objectManager);
+        var responseRoster = garrisonData.FromData(data.Garrison);
         var dueDate = CampaignTime.DaysFromNow(Model.GetAlleyAttackResponseTimeInDays(responseRoster));
 
         sessionInterface.SetUnderAttackByAi(alleyId, attackerId, dueDate);
@@ -505,7 +508,7 @@ internal class AlleyHandler : IHandler
 
         // On a win, forward the post-fight garrison so the server records the defenders lost in the fight.
         var garrison = payload.What.Garrison != null
-            ? AlleyGarrisonData.ToData(payload.What.Garrison, objectManager)
+            ? garrisonData.ToData(payload.What.Garrison)
             : Array.Empty<TroopRosterElementData>();
         network.SendAll(new RequestAlleyDefenseResolved(alleyId, won, garrison));
     }
