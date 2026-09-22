@@ -5,5 +5,8 @@
     <string id="str_coop_cannot_execute_heroes" text="Executing heroes has been disabled by the host."/>
     <string id="str_coop_cannot_execute_players" text="Executing player heroes has been disabled by the host."/>
     <string id="str_coop_cannot_execute_player_clan_members" text="Executing members of other players' clans has been disabled by the host."/>
+    <string id="str_coop_clanless" text="{=str_coop_clanless}Clanless" />
+    <string id="str_coop_in_clan" text="{=str_coop_in_clan}In Clan" />
+    <string id="str_coop_clan_status" text="{=str_coop_clan_status}Clan Status" />
     <!-- Add other custom text here in the future-->
 </strings>
