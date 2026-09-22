@@ -8,9 +8,12 @@ internal class NetworkCreateBuilding : ICommand
 {
     [ProtoMember(1)]
     public string BuildingId { get; }
+    [ProtoMember(2)]
+    public uint Handle { get; }
 
-    public NetworkCreateBuilding(string buildingId)
+    public NetworkCreateBuilding(string buildingId, uint handle)
     {
         BuildingId = buildingId;
+        Handle = handle;
     }
 }

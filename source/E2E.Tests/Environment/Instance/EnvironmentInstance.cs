@@ -204,9 +204,42 @@ public abstract class EnvironmentInstance : IDisposable
         var obj = ObjectHelper.SkipConstructor<T>();
 
         var objectManager = Resolve<IObjectManager>();
-        objectManager.AddExisting(stringId, obj);
+        if (!objectManager.AddExisting(stringId, obj))
+            throw new Exception($"Unable to register {stringId} for type {typeof(T)}");
 
         return obj;
+    }
+
+    public T CreateRegisteredObject<T>(string stringId, uint handle) where T : class
+    {
+        var obj = ObjectHelper.SkipConstructor<T>();
+
+        var objectManager = Resolve<IObjectManager>();
+        if (!objectManager.AddExisting(stringId, obj, handle))
+            throw new Exception($"Unable to register {stringId} for type {typeof(T)}");
+
+        return obj;
+    }
+
+    public uint GetHandle<T>(string stringId) where T : class
+    {
+        var objectManager = Resolve<IObjectManager>();
+        if (!objectManager.TryGetObject<T>(stringId, out var obj) ||
+            !objectManager.TryGetHandle(obj, out var handle))
+        {
+            throw new Exception($"Unable to resolve handle for {stringId} and type {typeof(T)}");
+        }
+
+        return handle;
+    }
+
+    public uint GetHandle(object obj)
+    {
+        var objectManager = Resolve<IObjectManager>();
+        if (!objectManager.TryGetHandle(obj, out var handle))
+            throw new Exception($"Unable to resolve handle for type {obj?.GetType()}");
+
+        return handle;
     }
 
     public T GetRegisteredObject<T>(string stringId) where T : class

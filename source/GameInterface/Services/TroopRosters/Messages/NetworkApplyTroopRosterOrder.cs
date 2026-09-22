@@ -1,6 +1,6 @@
 ﻿using Common.Messaging;
-using GameInterface.Services.TroopRosters.Data;
 using ProtoBuf;
+using System.Collections.Generic;
 
 namespace GameInterface.Services.TroopRosters.Messages;
 
@@ -8,14 +8,14 @@ namespace GameInterface.Services.TroopRosters.Messages;
 internal readonly struct NetworkApplyTroopRosterOrder : ICommand
 {
     [ProtoMember(1)]
-    public readonly string TroopRosterId;
+    public readonly uint TroopRosterId;
 
     [ProtoMember(2)]
-    public readonly TroopRosterOrderData OrderData;
+    public readonly Dictionary<int, uint> IndexCharacterIds;
 
-    public NetworkApplyTroopRosterOrder(string troopRosterId, TroopRosterOrderData orderData)
+    public NetworkApplyTroopRosterOrder(uint troopRosterId, Dictionary<int, uint> indexCharacterIds)
     {
         TroopRosterId = troopRosterId;
-        OrderData = orderData;
+        IndexCharacterIds = indexCharacterIds;
     }
 }

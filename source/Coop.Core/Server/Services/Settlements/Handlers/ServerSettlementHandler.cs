@@ -3,7 +3,6 @@ using Common.Network;
 using Coop.Core.Client.Services.Settlements.Messages;
 using Coop.Core.Server.Services.Settlements.Messages;
 using GameInterface.Services.ObjectManager;
-using static GameInterface.Services.ObjectManager.ObjectManager;
 using GameInterface.Services.Settlements.Audit;
 using GameInterface.Services.Settlements.Messages;
 using LiteNetLib;
@@ -117,11 +116,8 @@ internal class ServerSettlementHandler : IHandler
     {
         var obj = payload.What;
 
-        if (!objectManager.TryGetIdWithLogging(obj.Settlement, out var settlementId)) return;
-        if (!objectManager.TryGetIdWithLogging(obj.MobileParty, out var mobilePartyId)) return;
-
-        settlementId = Compact(settlementId, typeof(Settlement));
-        mobilePartyId = Compact(mobilePartyId, typeof(MobileParty));
+        if (!objectManager.TryGetHandleWithLogging(obj.Settlement, out var settlementId)) return;
+        if (!objectManager.TryGetHandleWithLogging(obj.MobileParty, out var mobilePartyId)) return;
 
         var message = new NetworkChangeSettlementMobileParty(settlementId, mobilePartyId, obj.AddMobileParty);
         network.SendAll(message);
@@ -142,8 +138,7 @@ internal class ServerSettlementHandler : IHandler
     {
         var obj = payload.What;
 
-        if (!objectManager.TryGetIdWithLogging(obj.Settlement, out var settlementId)) return;
-        settlementId = Compact(settlementId, typeof(Settlement));
+        if (!objectManager.TryGetHandleWithLogging(obj.Settlement, out var settlementId)) return;
 
         var message = new NetworkChangeSettlementMilitia(settlementId, obj.Militia);
         network.SendAll(message);

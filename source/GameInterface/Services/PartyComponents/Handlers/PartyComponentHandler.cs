@@ -76,14 +76,20 @@ internal class PartyComponentHandler : IHandler
 
     private void Handle(MessagePayload<PartyComponentCreated> payload)
     {
-        objectManager.AddNewObject(payload.What.Instance, out var id);
+        if (!objectManager.AddNewObject(payload.What.Instance, out var id)) return;
+        if (!objectManager.TryGetHandleWithLogging(payload.What.Instance, out var handle)) return;
 
         var typeIndex = partyTypes.IndexOf(payload.What.Instance.GetType());
-        var data = new PartyComponentData(typeIndex, id)
+        var data = new PartyComponentData(typeIndex, id, handle)
         {
-            HomeSettlementId = payload.What.SettlementId,
             IsNaval = payload.What.IsNaval,
         };
+        if (payload.What.SettlementId != null &&
+            objectManager.TryGetObject<Settlement>(payload.What.SettlementId, out var settlement) &&
+            objectManager.TryGetHandleWithLogging(settlement, out var settlementHandle))
+        {
+            data.HomeSettlementId = settlementHandle;
+        }
 
         network.SendAll(new NetworkCreatePartyComponent(data));
     }
@@ -101,20 +107,20 @@ internal class PartyComponentHandler : IHandler
                 switch (data.TypeIndex)
                 {
                     case 0:
-                        objectManager.AddExisting(data.Id, obj);
+                        objectManager.AddExisting(data.Id, obj, data.Handle);
                         break;
                     case 1:
-                        objectManager.AddExisting(data.Id, obj);
+                        objectManager.AddExisting(data.Id, obj, data.Handle);
                         break;
                     case 2:
-                        objectManager.AddExisting(data.Id, obj);
+                        objectManager.AddExisting(data.Id, obj, data.Handle);
                         break;
                     case 3:
-                        objectManager.AddExisting(data.Id, obj);
+                        objectManager.AddExisting(data.Id, obj, data.Handle);
 
                         var garrisonComponent = (GarrisonPartyComponent)obj;
 
-                        if (data.HomeSettlementId is null) break;
+                        if (data.HomeSettlementId == 0) break;
 
                         // Reconstitute the Settlement link that is normally set in the constructor.
                         // It is bundled in the creation message to avoid any dependency on AutoSync
@@ -142,14 +148,14 @@ internal class PartyComponentHandler : IHandler
 
                         break;
                     case 4:
-                        objectManager.AddExisting(data.Id, obj);
+                        objectManager.AddExisting(data.Id, obj, data.Handle);
                         break;
                     case 5:
-                        objectManager.AddExisting(data.Id, obj);
+                        objectManager.AddExisting(data.Id, obj, data.Handle);
 
                         var militiaComponent = (MilitiaPartyComponent)obj;
 
-                        if (data.HomeSettlementId is null) break;
+                        if (data.HomeSettlementId == 0) break;
 
                         // Reconstitute the Settlement link that is normally set in the constructor,
                         // bundled in the creation message like the garrison's. Without it the militia's
@@ -175,11 +181,11 @@ internal class PartyComponentHandler : IHandler
 
                         break;
                     case 6:
-                        objectManager.AddExisting(data.Id, obj);
+                        objectManager.AddExisting(data.Id, obj, data.Handle);
 
                         var patrolComponent = (PatrolPartyComponent)obj;
 
-                        if (data.HomeSettlementId is null) break;
+                        if (data.HomeSettlementId == 0) break;
 
                         // Reconstitute fields that are normally set in the constructor and
                         // InitializePartyComponentProperties. These are bundled in the creation
@@ -205,7 +211,7 @@ internal class PartyComponentHandler : IHandler
 
                         break;
                     case 7:
-                        objectManager.AddExisting(data.Id, obj);
+                        objectManager.AddExisting(data.Id, obj, data.Handle);
                         break;
                     default:
                         Logger.Error(
@@ -225,7 +231,7 @@ internal class PartyComponentHandler : IHandler
 
     private PartyComponent CreatePartyComponent(PartyComponentData data)
     {
-        if (data.TypeIndex != 0 || data.HomeSettlementId is null)
+        if (data.TypeIndex != 0 || data.HomeSettlementId == 0)
         {
             return (PartyComponent)ObjectHelper.SkipConstructor(partyTypes[data.TypeIndex]);
         }

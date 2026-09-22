@@ -39,7 +39,7 @@ public sealed class MobilePartyRegistryCoalescingTests
         var party = CreateParty();
 
         var objectManager = new ObjectManagerService(Mock.Of<ILogger>());
-        Assert.True(objectManager.AddExisting(fullPartyId, party));
+        Assert.True(objectManager.AddExisting(fullPartyId, party, 1));
 
         var coalescer = new SendCoalescer();
         coalescer.Enqueue(
@@ -76,7 +76,7 @@ public sealed class MobilePartyRegistryCoalescingTests
         Assert.True(mobilePartyDestroyedPublished);
         Assert.False(coalescer.HasPending);
         var destroy = Assert.IsType<NetworkDestroyInstance<MobileParty>>(Assert.Single(sent));
-        Assert.Equal(fullPartyId, destroy.InstanceId);
+        Assert.Equal(1u, destroy.InstanceHandle);
 
         coalescer.Flush(network.Object);
         Assert.Single(sent);
@@ -89,7 +89,7 @@ public sealed class MobilePartyRegistryCoalescingTests
         var clientParty = CreateParty();
         var serverObjectManager = new ObjectManagerService(Mock.Of<ILogger>());
         var clientObjectManager = new ObjectManagerService(Mock.Of<ILogger>());
-        Assert.True(serverObjectManager.AddExisting("MobileParty_destroy-me", serverParty));
+        Assert.True(serverObjectManager.AddExisting("MobileParty_destroy-me", serverParty, 1));
         RegisterRosters(serverObjectManager, serverParty);
         RegisterRosters(clientObjectManager, clientParty);
 
@@ -150,9 +150,9 @@ public sealed class MobilePartyRegistryCoalescingTests
 
     private static void RegisterRosters(ObjectManagerService objectManager, MobileParty party)
     {
-        Assert.True(objectManager.AddExisting(ItemRosterId, party.ItemRoster));
-        Assert.True(objectManager.AddExisting(MemberRosterId, party.MemberRoster));
-        Assert.True(objectManager.AddExisting(PrisonRosterId, party.PrisonRoster));
+        Assert.True(objectManager.AddExisting(ItemRosterId, party.ItemRoster, 2));
+        Assert.True(objectManager.AddExisting(MemberRosterId, party.MemberRoster, 3));
+        Assert.True(objectManager.AddExisting(PrisonRosterId, party.PrisonRoster, 4));
     }
 
     private static void AssertRostersRemoved(ObjectManagerService objectManager)

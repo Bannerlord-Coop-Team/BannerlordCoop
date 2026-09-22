@@ -130,6 +130,7 @@ public class GameInterfaceModule : Module
         builder.RegisterType<PlayerPartyRestorer>().As<IPlayerPartyRestorer>().InstancePerDependency();
         builder.RegisterType<PlayerCreationRollback>().As<IPlayerCreationRollback>().InstancePerDependency();
         builder.RegisterType<MobilePartyBehaviorSnapshot>().As<IMobilePartyBehaviorSnapshot>().InstancePerDependency();
+        builder.RegisterType<PartyBehaviorWireMapper>().As<IPartyBehaviorWireMapper>().InstancePerDependency();
 #if DEBUG
         builder.RegisterType<ClanLordMovementFixture>().As<IClanLordMovementFixture>().InstancePerLifetimeScope();
         builder.RegisterType<ClanLordMovementFixtureRules>().As<IClanLordMovementFixtureRules>().InstancePerDependency();

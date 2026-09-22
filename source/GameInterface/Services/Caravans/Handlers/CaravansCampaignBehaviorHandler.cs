@@ -8,7 +8,6 @@ using GameInterface.Services.Caravans.Messages;
 using GameInterface.Services.MobileParties.Interfaces;
 using GameInterface.Services.MobileParties.Messages;
 using GameInterface.Services.ObjectManager;
-using static GameInterface.Services.ObjectManager.ObjectManager;
 using Serilog;
 using System.Collections.Generic;
 using TaleWorlds.CampaignSystem;
@@ -222,8 +221,7 @@ internal class CaravansCampaignBehaviorHandler : IHandler
 
     private void Handle_UpdateTradeActionLogsForParty(MessagePayload<UpdateTradeActionLogsForParty> obj)
     {
-        if (!objectManager.TryGetIdWithLogging(obj.What.MobileParty, out var mobilePartyId)) return;
-        mobilePartyId = Compact(mobilePartyId, typeof(MobileParty));
+        if (!objectManager.TryGetHandleWithLogging(obj.What.MobileParty, out var mobilePartyId)) return;
 
         var tradeActionLogsData = new List<TradeActionLogData>();
         foreach (var tradeActionLog in obj.What.TradeActionLogs)
@@ -272,14 +270,11 @@ internal class CaravansCampaignBehaviorHandler : IHandler
     {
         tradeActionLogData = new();
 
-        string boughtSettlementId = null;
-        if (tradeActionLog.BoughtSettlement != null && !objectManager.TryGetIdWithLogging(tradeActionLog.BoughtSettlement, out boughtSettlementId)) return false;
+        uint boughtSettlementId = 0;
+        if (tradeActionLog.BoughtSettlement != null && !objectManager.TryGetHandleWithLogging(tradeActionLog.BoughtSettlement, out boughtSettlementId)) return false;
 
-        string soldSettlementId = null;
-        if (tradeActionLog.SoldSettlement != null && !objectManager.TryGetIdWithLogging(tradeActionLog.SoldSettlement, out soldSettlementId)) return false;
-
-        boughtSettlementId = Compact(boughtSettlementId, typeof(Settlement));
-        soldSettlementId = Compact(soldSettlementId, typeof(Settlement));
+        uint soldSettlementId = 0;
+        if (tradeActionLog.SoldSettlement != null && !objectManager.TryGetHandleWithLogging(tradeActionLog.SoldSettlement, out soldSettlementId)) return false;
 
         tradeActionLogData = new TradeActionLogData(
             boughtSettlementId,
@@ -312,10 +307,10 @@ internal class CaravansCampaignBehaviorHandler : IHandler
         }
 
         Settlement boughtSettlement = null;
-        if (tradeActionLogData.BoughtSettlementId != null && !objectManager.TryGetObjectWithLogging(tradeActionLogData.BoughtSettlementId, out boughtSettlement)) return false;
+        if (tradeActionLogData.BoughtSettlementId != 0 && !objectManager.TryGetObjectWithLogging(tradeActionLogData.BoughtSettlementId, out boughtSettlement)) return false;
 
         Settlement soldSettlement = null;
-        if (tradeActionLogData.SoldSettlementId != null && !objectManager.TryGetObjectWithLogging(tradeActionLogData.SoldSettlementId, out soldSettlement)) return false;
+        if (tradeActionLogData.SoldSettlementId != 0 && !objectManager.TryGetObjectWithLogging(tradeActionLogData.SoldSettlementId, out soldSettlement)) return false;
 
         tradeActionLog = new CaravansCampaignBehavior.TradeActionLog()
         {

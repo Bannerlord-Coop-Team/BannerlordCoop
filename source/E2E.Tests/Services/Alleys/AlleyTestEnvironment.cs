@@ -320,7 +320,7 @@ public class AlleyTestEnvironment : SettlementTestEnvironment
         var roster = TroopRoster.CreateDummyTroopRoster();
         foreach (var element in elements)
         {
-            CharacterObject character = instance.GetRegisteredObject<CharacterObject>(element.CharacterId);
+            Assert.True(instance.ObjectManager.TryGetObject<CharacterObject>(element.CharacterId, out var character));
             roster.AddToCounts(
                 character,
                 element.Number,

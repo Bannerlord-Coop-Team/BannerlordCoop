@@ -7,15 +7,11 @@ namespace GameInterface.Services.PartyVisuals.Messages
     public record NetworkDestroyPartyVisual : ICommand
     {
         [ProtoMember(1)]
-        public string PartyVisualId { get; }
+        public uint MobilePartyHandle { get; }
 
-        [ProtoMember(2)]
-        public string MobilePartyId { get; }
-
-        public NetworkDestroyPartyVisual(string partyVisualId, string mobilePartyId)
+        public NetworkDestroyPartyVisual(uint mobilePartyHandle)
         {
-            PartyVisualId = partyVisualId;
-            MobilePartyId = mobilePartyId;
+            MobilePartyHandle = mobilePartyHandle;
         }
     }
 }

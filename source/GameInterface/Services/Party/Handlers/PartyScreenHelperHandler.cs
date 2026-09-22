@@ -119,9 +119,9 @@ internal class PartyScreenHelperHandler : IHandler
             }
 
             // Flush troop roster to show actual member count on clients after refresh
-            if (objectManager.TryGetId(mobileParty.MemberRoster, out var rosterId))
+            if (objectManager.TryGetHandle(mobileParty.MemberRoster, out var rosterId))
             {
-                sendCoalescer?.FlushInstance(Compact(rosterId, typeof(TroopRoster)), network);
+                sendCoalescer?.FlushInstance(rosterId, network);
             }
 
             network.Send(obj.Who as NetPeer, new RefreshPartiesList());

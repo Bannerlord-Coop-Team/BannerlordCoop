@@ -75,29 +75,29 @@ public class IdCompactionTests
     }
 
     [Fact]
-    public void ValueEventCtor_CompactsInstanceId()
+    public void ValueEventCtor_UsesNumericHandle()
     {
-        Assert.Equal("looters1_1", new TestValueEvent("MobileParty_looters1_1").InstanceId);
+        Assert.Equal(41u, new TestValueEvent(41).InstanceId);
     }
 
     [Fact]
-    public void ReferenceEventCtor_CompactsInstanceIdAndValueId()
+    public void ReferenceEventCtor_UsesNumericHandles()
     {
-        var message = new TestReferenceEvent("MobileParty_looters1_1", "Settlement_town_ES1");
-        Assert.Equal("looters1_1", message.InstanceId);
-        Assert.Equal("town_ES1", message.ValueId);
+        var message = new TestReferenceEvent(41, 73);
+        Assert.Equal(41u, message.InstanceId);
+        Assert.Equal(73u, message.ValueId);
     }
 
     private record TestValueEvent : GenericNetworkEvent<MobileParty, byte[]>
     {
-        public override string InstanceId { get; set; } = null!; // set by the base ctor
-        public TestValueEvent(string instanceId) : base(instanceId) { }
+        public override uint InstanceId { get; set; }
+        public TestValueEvent(uint instanceId) : base(instanceId) { }
     }
 
     private record TestReferenceEvent : GenericNetworkReferenceEvent<MobileParty, Settlement>
     {
-        public override string InstanceId { get; set; } = null!; // set by the base ctor
-        public override string ValueId { get; set; } = null!; // set by the base ctor
-        public TestReferenceEvent(string instanceId, string valueId) : base(instanceId, valueId) { }
+        public override uint InstanceId { get; set; }
+        public override uint ValueId { get; set; }
+        public TestReferenceEvent(uint instanceId, uint valueId) : base(instanceId, valueId) { }
     }
 }

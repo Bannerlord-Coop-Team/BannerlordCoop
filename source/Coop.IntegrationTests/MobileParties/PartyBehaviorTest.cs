@@ -105,7 +105,7 @@ public class PartyBehaviorTest
 
         // Assert
         var sent = Assert.Single(server.NetworkSentMessages.GetMessages<NetworkUpdatePartyBehavior>());
-        Assert.Null(sent.BehaviorUpdateData.InteractablePointId);
+        Assert.Equal(0u, sent.BehaviorUpdateData.InteractablePointId);
         Assert.True(sent.BehaviorUpdateData.ForcePosition);
         Assert.True(sent.BehaviorUpdateData.IsCurrentlyAtSea);
         Assert.True(sent.BehaviorUpdateData.ResetMovementToHold);

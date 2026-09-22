@@ -288,7 +288,14 @@ internal class CraftingCampaignBehaviorCraftingHandler : IHandler
         network.SendAll(new NetworkSetHeroCraftingStamina(data.CraftingHeroId, newHeroCraftingStamina));
 
         // Create weapon on all clients
-        NetworkCreateCraftedWeaponInternalClients message = new(data, nextCraftedItemId, true);
+        if (!objectManager.TryGetObjectWithLogging<ItemObject>(nextCraftedItemId, out var craftedItem) ||
+            !objectManager.TryGetHandleWithLogging(craftedItem, out var craftedItemHandle)) return false;
+
+        NetworkCreateCraftedWeaponInternalClients message = new(
+            data,
+            nextCraftedItemId,
+            true,
+            craftedItemHandle);
         network.SendAll(message);
 
         ApplyCraftingRewards(data, craftingHero, weaponModifier, craftingOrder, nextCraftedItemId);
@@ -379,7 +386,13 @@ internal class CraftingCampaignBehaviorCraftingHandler : IHandler
                 weaponDesign = new WeaponDesign(weaponDesign.Template, weaponDesign.WeaponName, weaponDesign.UsedPieces, nextCraftedItemId);
             }
 
-            craftedItemObject = craftingCampaignBehaviorInterface.CreateAndRegisterCraftedItem(weaponDesign, data.Name, culture, itemModifierGroup, nextCraftedItemId);
+            craftedItemObject = craftingCampaignBehaviorInterface.CreateAndRegisterCraftedItem(
+                weaponDesign,
+                data.Name,
+                culture,
+                itemModifierGroup,
+                nextCraftedItemId,
+                data.CraftedItemHandle);
             CampaignEventDispatcher.Instance.OnNewItemCrafted(craftedItemObject, weaponModifier, !data.IsFreeMode);
 
             // Only run on crafting client
@@ -460,9 +473,7 @@ internal class CraftingCampaignBehaviorCraftingHandler : IHandler
 
     private void FlushCoalescer(ItemRoster itemRoster)
     {
-        objectManager.TryGetId(itemRoster, out var rosterId);
-        var compactId = Compact(rosterId, typeof(ItemRoster));
-
-        sendCoalescer?.FlushInstance(compactId, network);
+        if (objectManager.TryGetHandle(itemRoster, out var rosterId))
+            sendCoalescer?.FlushInstance(rosterId, network);
     }
 }

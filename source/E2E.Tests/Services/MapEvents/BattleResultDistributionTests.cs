@@ -208,8 +208,8 @@ public class BattleResultDistributionTests : MapEventTestBase
 
             var lootedPrisoners = new Dictionary<string, TroopRosterData>
             {
-                { mep1Id, new TroopRosterData(new[] { new TroopRosterElementData(troopForP1, 1, 0, 0) }) },
-                { mep2Id, new TroopRosterData(new[] { new TroopRosterElementData(troopForP2, 1, 0, 0) }) },
+                { mep1Id, new TroopRosterData(new[] { new TroopRosterElementData(Server.GetHandle<CharacterObject>(troopForP1), 1, 0, 0) }) },
+                { mep2Id, new TroopRosterData(new[] { new TroopRosterElementData(Server.GetHandle<CharacterObject>(troopForP2), 1, 0, 0) }) },
             };
             if (emptyLoot) lootedPrisoners.Clear();
 
@@ -404,8 +404,8 @@ public class BattleResultDistributionTests : MapEventTestBase
                 new Dictionary<string, TroopRosterData>(),
                 new Dictionary<string, TroopRosterData>
                 {
-                    { mep1Id, new TroopRosterData(new[] { new TroopRosterElementData(troopForP1, 1, 0, 0) }) },
-                    { mep2Id, new TroopRosterData(new[] { new TroopRosterElementData(troopForP2, 1, 0, 0) }) },
+                    { mep1Id, new TroopRosterData(new[] { new TroopRosterElementData(Server.GetHandle<CharacterObject>(troopForP1), 1, 0, 0) }) },
+                    { mep2Id, new TroopRosterData(new[] { new TroopRosterElementData(Server.GetHandle<CharacterObject>(troopForP2), 1, 0, 0) }) },
                 });
 
             var network = Server.Resolve<INetwork>();
@@ -456,7 +456,7 @@ public class BattleResultDistributionTests : MapEventTestBase
                 {
                     {
                         playerMapEventPartyId,
-                        new TroopRosterData(new[] { new TroopRosterElementData(troop, 1, 0, 0) })
+                        new TroopRosterData(new[] { new TroopRosterElementData(Server.GetHandle<CharacterObject>(troop), 1, 0, 0) })
                     },
                 });
 

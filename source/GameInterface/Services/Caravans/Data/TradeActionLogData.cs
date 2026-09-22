@@ -8,7 +8,7 @@ namespace GameInterface.Services.Caravans.Data;
 public struct TradeActionLogData
 {
     [ProtoMember(1)]
-    public string BoughtSettlementId { get; set; }
+    public uint BoughtSettlementId { get; set; }
 
     [ProtoMember(2)]
     public int BuyPrice { get; set; }
@@ -20,17 +20,17 @@ public struct TradeActionLogData
     public CaravanTradeItemData ItemRosterElement { get; set; }
 
     [ProtoMember(5)]
-    public string SoldSettlementId { get; set; }
+    public uint SoldSettlementId { get; set; }
 
     [ProtoMember(6)]
     public CampaignTime BoughtTime { get; set; }
 
     public TradeActionLogData(
-        string boughtSettlementId,
+        uint boughtSettlementId,
         int buyPrice,
         int sellPrice,
         ItemRosterElement itemRosterElement,
-        string soldSettlementId,
+        uint soldSettlementId,
         CampaignTime boughtTime)
     {
         BoughtSettlementId = boughtSettlementId;

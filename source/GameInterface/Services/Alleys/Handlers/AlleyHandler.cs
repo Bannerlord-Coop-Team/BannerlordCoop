@@ -593,17 +593,17 @@ internal class AlleyHandler : IHandler
         return overseer;
     }
 
-    private bool TryGetThug(string stringId, out CharacterObject character, out string id)
+    private bool TryGetThug(string stringId, out CharacterObject character, out uint id)
     {
-        id = null;
+        id = 0;
         character = MBObjectManager.Instance?.GetObject<CharacterObject>(stringId);
         if (character == null) return false;
-        return objectManager.TryGetId(character, out id);
+        return objectManager.TryGetHandle(character, out id);
     }
 
-    private static void AddTroopCount(List<TroopRosterElementData> roster, string characterId, int count)
+    private static void AddTroopCount(List<TroopRosterElementData> roster, uint characterId, int count)
     {
-        if (count <= 0 || characterId == null) return;
+        if (count <= 0 || characterId == 0) return;
 
         for (int i = 0; i < roster.Count; i++)
         {

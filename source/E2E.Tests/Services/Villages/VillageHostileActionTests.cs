@@ -216,14 +216,14 @@ public class VillageHostileActionTests : MapEventTestBase
             requester.InternalMessages.GetMessages<NetworkSettlementEncounterLeaveResult>(),
             message =>
             {
-                Assert.Equal(otherMobilePartyId, message.PartyId);
+                Assert.Equal(Server.GetHandle<MobileParty>(otherMobilePartyId), message.PartyId);
                 Assert.Equal(SettlementEncounterLeaveOutcome.Applied, message.Outcome);
             });
         var leaveResult = Assert.Single(
             otherClient.InternalMessages.GetMessages<NetworkSettlementEncounterLeaveResult>());
-        Assert.Equal(otherMobilePartyId, leaveResult.PartyId);
+        Assert.Equal(Server.GetHandle<MobileParty>(otherMobilePartyId), leaveResult.PartyId);
         Assert.Equal(SettlementEncounterLeaveOutcome.Applied, leaveResult.Outcome);
-        var compactOtherMobilePartyId = ObjectManager.Compact(otherMobilePartyId, typeof(MobileParty));
+        var compactOtherMobilePartyId = Server.GetHandle<MobileParty>(otherMobilePartyId);
         Assert.All(
             Server.NetworkSentMessages.GetMessages<NetworkPartyLeaveSettlement>(),
             message => Assert.Equal(compactOtherMobilePartyId, message.PartyId));

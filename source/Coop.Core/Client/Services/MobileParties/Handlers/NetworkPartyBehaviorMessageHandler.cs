@@ -1,6 +1,7 @@
 ﻿using Common.Messaging;
 using Coop.Core.Server.Services.MobileParties.Messages;
 using GameInterface.Services.MobileParties.Messages.Behavior;
+using GameInterface.Services.MobileParties.Data;
 
 namespace Coop.Core.Client.Services.MobileParties.Handlers
 {
@@ -10,17 +11,19 @@ namespace Coop.Core.Client.Services.MobileParties.Handlers
     public class NetworkPartyBehaviorMessageHandler : IHandler
     {
         private readonly IMessageBroker messageBroker;
+        private readonly IPartyBehaviorWireMapper wireMapper;
 
-        public NetworkPartyBehaviorMessageHandler(IMessageBroker broker)
+        public NetworkPartyBehaviorMessageHandler(IMessageBroker broker, IPartyBehaviorWireMapper wireMapper)
         {
             messageBroker = broker;
+            this.wireMapper = wireMapper;
 
             messageBroker.Subscribe<NetworkUpdatePartyBehavior>(Handle);
         }
 
         public void Handle(MessagePayload<NetworkUpdatePartyBehavior> payload)
         {
-            var data = payload.What.BehaviorUpdateData;
+            if (!wireMapper.TryFromNetwork(payload.What.BehaviorUpdateData, out var data)) return;
 
             messageBroker.Publish(this, new UpdatePartyBehavior(ref data));
         }

@@ -32,8 +32,11 @@ public class TroopRosterHeroDeltaTransferTests : IDisposable
         TestEnvironment = new E2ETestEnvironment(output);
     }
 
-    private static TroopRosterData Delta(string characterId, int number, int xp = 0)
-        => new TroopRosterData(new[] { new TroopRosterElementData(characterId, number, 0, xp) });
+    private TroopRosterData Delta(string characterId, int number, int xp = 0) =>
+        new(new[]
+        {
+            new TroopRosterElementData(Server.GetHandle<CharacterObject>(characterId), number, 0, xp),
+        });
 
     [Fact]
     public void CompanionTransfer_MainToOtherParty_ViaDelta_SyncsRostersAndPartyBelongedTo()

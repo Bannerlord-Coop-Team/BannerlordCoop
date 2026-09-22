@@ -19,7 +19,7 @@ internal static class AlleyGarrisonData
 
         foreach (var element in roster.GetTroopRoster())
         {
-            if (!objectManager.TryGetIdWithLogging(element.Character, out var characterId)) continue;
+            if (!objectManager.TryGetHandleWithLogging(element.Character, out var characterId)) continue;
             list.Add(new TroopRosterElementData(characterId, element.Number, element.WoundedNumber, element.Xp));
         }
         return list.ToArray();

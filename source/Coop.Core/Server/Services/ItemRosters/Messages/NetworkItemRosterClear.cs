@@ -10,9 +10,9 @@ namespace Coop.Core.Server.Services.ItemRosters.Messages
     public class NetworkItemRosterClear : IMessage
     {
         [ProtoMember(1)]
-        public string ItemRosterId { get; }
+        public uint ItemRosterId { get; }
 
-        public NetworkItemRosterClear(string itemRosterId)
+        public NetworkItemRosterClear(uint itemRosterId)
         {
             ItemRosterId = itemRosterId;
         }

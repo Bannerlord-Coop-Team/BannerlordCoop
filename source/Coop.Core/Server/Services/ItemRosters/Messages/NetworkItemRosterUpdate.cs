@@ -10,13 +10,13 @@ namespace Coop.Core.Server.Services.ItemRosters.Messages;
 public readonly struct NetworkItemRosterUpdate : IMessage, IJoinCatchUpMergeMessage
 {
     [ProtoMember(1)]
-    public readonly string ItemRosterId;
+    public readonly uint ItemRosterId;
 
     [ProtoMember(2)]
-    public readonly string ItemID;
+    public readonly uint ItemID;
 
     [ProtoMember(3)]
-    public readonly string ItemModifierID;
+    public readonly uint ItemModifierID;
 
     [ProtoMember(4)]
     public readonly int Amount;
@@ -41,7 +41,7 @@ public readonly struct NetworkItemRosterUpdate : IMessage, IJoinCatchUpMergeMess
         return true;
     }
 
-    public NetworkItemRosterUpdate(string itemRosterId, string itemID, string itemModifierID, int amount)
+    public NetworkItemRosterUpdate(uint itemRosterId, uint itemID, uint itemModifierID, int amount)
     {
         ItemRosterId = itemRosterId;
         ItemID = itemID;

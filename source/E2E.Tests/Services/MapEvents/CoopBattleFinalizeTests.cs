@@ -180,7 +180,8 @@ public class CoopBattleFinalizeTests : MapEventTestBase
 
             SetMockPlayerEncounter(successor, mapEventId: ctx.MapEventId);
 
-            successor.SimulateMessage(Server, new NetworkDestroyInstance<MapEvent>(ctx.MapEventId));
+            successor.SimulateMessage(Server, new NetworkDestroyInstance<MapEvent>(
+                successor.GetHandle<MapEvent>(ctx.MapEventId)));
             successor.SimulateMessage(Server, new NetworkClosePvpEncounter(
                 new[] { successorPartyBaseId }, mapEventId: ctx.MapEventId));
 
@@ -391,7 +392,10 @@ public class CoopBattleFinalizeTests : MapEventTestBase
             {
                 {
                     setup.MapEventPartyId,
-                    new TroopRosterData(new[] { new TroopRosterElementData(lootTroopId, 1, 0, 0) })
+                    new TroopRosterData(new[]
+                    {
+                        new TroopRosterElementData(client.GetHandle<CharacterObject>(lootTroopId), 1, 0, 0),
+                    })
                 },
             });
         var result = new NetworkCommitMapEventResults(
@@ -402,7 +406,8 @@ public class CoopBattleFinalizeTests : MapEventTestBase
             payload);
 
         client.SimulateMessage(Server.NetPeer, result);
-        client.SimulateMessage(Server.NetPeer, new NetworkDestroyInstance<MapEvent>(setup.MapEventId));
+        client.SimulateMessage(Server.NetPeer, new NetworkDestroyInstance<MapEvent>(
+            client.GetHandle<MapEvent>(setup.MapEventId)));
 
         client.Call(() =>
         {
@@ -457,7 +462,8 @@ public class CoopBattleFinalizeTests : MapEventTestBase
             Assert.Null(encounter.BattleSimulation.MapEvent);
         }, MapEventDisabledMethods);
 
-        client.SimulateMessage(Server.NetPeer, new NetworkDestroyInstance<MapEvent>(setup.MapEventId));
+        client.SimulateMessage(Server.NetPeer, new NetworkDestroyInstance<MapEvent>(
+            client.GetHandle<MapEvent>(setup.MapEventId)));
 
         client.Call(() =>
         {
@@ -544,7 +550,8 @@ public class CoopBattleFinalizeTests : MapEventTestBase
             Assert.Same(destroyedMapEvent, simulation.MapEvent);
         }, MapEventDisabledMethods);
 
-        client.SimulateMessage(Server.NetPeer, new NetworkDestroyInstance<MapEvent>(setup.MapEventId));
+        client.SimulateMessage(Server.NetPeer, new NetworkDestroyInstance<MapEvent>(
+            client.GetHandle<MapEvent>(setup.MapEventId)));
 
         client.Call(() =>
         {
@@ -622,7 +629,8 @@ public class CoopBattleFinalizeTests : MapEventTestBase
             Assert.DoesNotContain(mapEventParty, side.Parties);
         }, MapEventDisabledMethods);
 
-        client.SimulateMessage(Server.NetPeer, new NetworkDestroyInstance<MapEvent>(setup.MapEventId));
+        client.SimulateMessage(Server.NetPeer, new NetworkDestroyInstance<MapEvent>(
+            client.GetHandle<MapEvent>(setup.MapEventId)));
 
         client.Call(() =>
         {

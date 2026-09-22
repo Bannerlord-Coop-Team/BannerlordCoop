@@ -411,11 +411,11 @@ internal class AlleyManagementHandler : IHandler
         return list.ToArray();
     }
 
-    private bool TryGetHeroCharacterId(string heroId, out string characterId)
+    private bool TryGetHeroCharacterId(string heroId, out uint characterId)
     {
-        characterId = null;
+        characterId = 0;
         if (heroId == null) return false;
         if (!objectManager.TryGetObject<Hero>(heroId, out var hero) || hero.CharacterObject == null) return false;
-        return objectManager.TryGetId(hero.CharacterObject, out characterId);
+        return objectManager.TryGetHandle(hero.CharacterObject, out characterId);
     }
 }

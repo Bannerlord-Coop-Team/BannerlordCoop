@@ -28,7 +28,7 @@ public class SessionAlleyPlayerDataInterfaceTests
         sessionInterface.SetManagementData(
             "alley",
             "new-overseer",
-            new[] { new TroopRosterElementData("troop", 3, 0, 0) });
+            new[] { new TroopRosterElementData(1, 3, 0, 0) });
 
         Assert.True(sessionInterface.TryGetManagementData("alley", out var updated));
         Assert.Equal("new-overseer", updated.OverseerId);

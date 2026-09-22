@@ -78,13 +78,13 @@ internal readonly struct NetworkAddToLootedCaravans : ICommand
 internal readonly struct NetworkUpdateTradeActionLogsForParty : ICommand
 {
     [ProtoMember(1)]
-    public readonly string MobilePartyId;
+    public readonly uint MobilePartyId;
 
     [ProtoMember(2)]
     public readonly List<TradeActionLogData> TradeActionLogsData;
 
     public NetworkUpdateTradeActionLogsForParty(
-        string mobilePartyId,
+        uint mobilePartyId,
         List<TradeActionLogData> tradeActionLogsData)
     {
         MobilePartyId = mobilePartyId;

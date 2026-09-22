@@ -47,7 +47,7 @@ namespace GameInterface.Services.Workshops.Handlers
         {
             var payload = obj.What.Data;
 
-            if (objectManager.TryGetObject(payload.SettlementId, out Settlement settlement) == false) {
+            if (objectManager.TryGetObject(payload.SettlementHandle, out Settlement settlement) == false) {
                 return;
             }
             
@@ -56,7 +56,7 @@ namespace GameInterface.Services.Workshops.Handlers
                 using (new AllowedThread())
                 {
                     var Workshop = new Workshop(settlement, payload.Tag);
-                    objectManager.AddExisting(payload.WorkshopId, Workshop);
+                    objectManager.AddExisting(payload.WorkshopId, Workshop, payload.WorkshopHandle);
                 }
             });
         }
