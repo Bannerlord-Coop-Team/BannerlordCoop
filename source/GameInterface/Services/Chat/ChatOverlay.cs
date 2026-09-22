@@ -328,7 +328,7 @@ internal sealed class ChatOverlay : GlobalLayer, IDisposable
         }
         else if (applyResizeToPanel)
         {
-            resizeLerpRatio = MBMath.ClampFloat(resizeLerpRatio + dt / ResizeTransitionSeconds, 0f, 1f);
+            resizeLerpRatio = MBMath.ClampFloat(resizeLerpRatio + (dt / ResizeTransitionSeconds), 0f, 1f);
             float targetWidth = resizeFrameWidget.SuggestedWidth;
             float targetHeight = resizeFrameWidget.SuggestedHeight;
             dataSource.ChatBoxSizeX = MBMath.Lerp(resizeOriginalSize.X, targetWidth, resizeLerpRatio);

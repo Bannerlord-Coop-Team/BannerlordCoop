@@ -78,7 +78,7 @@ internal sealed class ChatLineVM : ViewModel
     {
         if (forcedVisible) return 1f;
         if (timeSinceCreation >= VisibilityDuration)
-            return MBMath.ClampFloat(1f - (timeSinceCreation - VisibilityDuration) / FadeOutDuration, 0f, 1f);
+            return MBMath.ClampFloat(1f - ((timeSinceCreation - VisibilityDuration) / FadeOutDuration), 0f, 1f);
         return 1f;
     }
 
