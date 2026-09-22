@@ -154,4 +154,42 @@ public class ItemObjectRegistryHandleTests
             ModInformation.IsServer = wasServer;
         }
     }
+
+    [Fact]
+    public void MidSessionRescan_DoesNotMarkExternallyRegisteredHandleKnownToClients()
+    {
+        bool wasServer = ModInformation.IsServer;
+        ModInformation.IsServer = true;
+        GameBootStrap.Initialize();
+        var initialItem = new ItemObject("handle-seed-test-" + Guid.NewGuid().ToString("N"));
+        var externalItem = new ItemObject("handle-rescan-test-" + Guid.NewGuid().ToString("N"));
+        MBObjectManager.Instance.RegisterObject(initialItem);
+        try
+        {
+            var manager = new ObjectManagerService(Mock.Of<ILogger>());
+            var registry = new ItemObjectRegistry(
+                Mock.Of<ILogger>(),
+                Mock.Of<IAutoRegistryFactory>(),
+                manager);
+
+            registry.RegisterAllObjects();
+
+            MBObjectManager.Instance.RegisterObject(externalItem);
+            Assert.True(manager.AddExisting("ItemObject_" + externalItem.StringId, externalItem));
+            registry.RegisterAllObjects();
+
+            Assert.True(registry.TryRegisterExistingItem(
+                externalItem,
+                out _,
+                out _,
+                out var announceHandle));
+            Assert.True(announceHandle);
+        }
+        finally
+        {
+            MBObjectManager.Instance.UnregisterObject(externalItem);
+            MBObjectManager.Instance.UnregisterObject(initialItem);
+            ModInformation.IsServer = wasServer;
+        }
+    }
 }

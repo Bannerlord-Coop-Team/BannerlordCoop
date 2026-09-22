@@ -15,6 +15,7 @@ public class ItemObjectRegistry : AutoRegistryBase<ItemObject>
 {
     private const string IdPrefix = nameof(ItemObject) + "_";
     private readonly HashSet<uint> handlesKnownToClients = new();
+    private bool seededKnownHandles;
 
     public ItemObjectRegistry(ILogger logger, IAutoRegistryFactory autoRegistryFactory, IObjectManager objectManager)
         : base(logger, autoRegistryFactory, objectManager)
@@ -27,16 +28,20 @@ public class ItemObjectRegistry : AutoRegistryBase<ItemObject>
 
     public override void RegisterAllObjects()
     {
-        if (!IsCollectingIdRemap)
+        bool seedKnownHandles = !IsCollectingIdRemap && !seededKnownHandles;
+        if (seedKnownHandles)
             handlesKnownToClients.Clear();
 
         // Must order by string id as this is not deterministic on load
         foreach (var item in MBObjectManager.Instance.GetObjectTypeList<ItemObject>().OrderBy(i => i.StringId))
         {
             RegisterExistingObject(item.StringId, item);
-            if (!IsCollectingIdRemap && objectManager.TryGetHandle(item, out var handle))
+            if (seedKnownHandles && objectManager.TryGetHandle(item, out var handle))
                 handlesKnownToClients.Add(handle);
         }
+
+        if (seedKnownHandles)
+            seededKnownHandles = true;
     }
 
     public bool TryRegisterExistingItem(
