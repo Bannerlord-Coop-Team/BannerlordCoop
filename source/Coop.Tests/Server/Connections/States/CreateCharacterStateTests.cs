@@ -134,7 +134,7 @@ namespace Coop.Tests.Server.Connections.States
                     creationWasSentBeforeSetup = serverComponent.TestNetwork.SentNetworkMessages
                         .TryGetValue(differentPeer.Id, out var messages) &&
                         messages.OfType<NetworkNewPlayerHeroCreated>().Any();
-                    joiningPeerWasAnsweredBeforeSetup = serverComponent.TestNetwork.ImmediateSends.Any();
+                    joiningPeerWasAnsweredBeforeSetup = serverComponent.TestNetwork.ImmediateSends.Count != 0;
                 });
             var currentState = connectionLogic.SetState<CreateCharacterState>();
 
