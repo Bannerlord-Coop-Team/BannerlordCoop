@@ -34,8 +34,12 @@ public class JoinRosterReplayTests : SyncTestBase
     public JoinRosterReplayTests(ITestOutputHelper output) : base(output)
     {
         items = "join-replay-items";
-        Server.CreateRegisteredObject<ItemRoster>(items);
-        uint itemsHandle = Server.GetHandle<ItemRoster>(items);
+        uint itemsHandle = 0;
+        Server.Call(() =>
+        {
+            Server.CreateRegisteredObject<ItemRoster>(items);
+            itemsHandle = Server.GetHandle<ItemRoster>(items);
+        });
         foreach (var client in Clients)
             client.CreateRegisteredObject<ItemRoster>(items, itemsHandle);
         item = TestEnvironment.CreateRegisteredObject<ItemObject>();
