@@ -10,6 +10,7 @@ using TaleWorlds.Localization;
 using TaleWorlds.MountAndBlade.View;
 using TaleWorlds.MountAndBlade.ViewModelCollection.EscapeMenu;
 using TaleWorlds.ScreenSystem;
+using TaleWorlds.CampaignSystem;
 
 namespace GameInterface.Services.UI.Patches;
 
@@ -20,6 +21,9 @@ namespace GameInterface.Services.UI.Patches;
 internal class EscapeMenuCoopOptionsPatch
 {
     private static readonly TextObject CampaignOptionsText = new TextObject("{=PXT6aA4J}Campaign Options");
+
+    private static readonly TextObject BugReportUnavailableDuringConversation =
+        new TextObject("Bug reporting is unavailable during conversations.");
 
     [HarmonyPostfix]
     static void AddCoopOptionsItem(MapScreen __instance, List<EscapeMenuItemVM> __result)
@@ -43,7 +47,7 @@ internal class EscapeMenuCoopOptionsPatch
                 new TextObject("Report Coop Bug"),
                 _ => OpenBugReport(__instance, overlay),
                 identifier: null,
-                getIsDisabledAndReason: () => new Tuple<bool, TextObject>(false, new TextObject("")),
+                getIsDisabledAndReason: GetBugReportDisabledState,
                 isPositiveBehaviored: false));
         }
 
@@ -55,8 +59,29 @@ internal class EscapeMenuCoopOptionsPatch
         return ContainerProvider.TryResolve(out overlay) && overlay.IsAvailable;
     }
 
+    private static Tuple<bool, TextObject> GetBugReportDisabledState()
+    {
+        if (IsConversationInProgress())
+        {
+            return new Tuple<bool, TextObject>(true, BugReportUnavailableDuringConversation);
+        }
+        
+        return new Tuple<bool, TextObject>(false, new TextObject(""));
+    }
+
+    internal static bool CanOpenBugReport(bool isAvailable, bool isConversationInProgress)
+    {
+        return isAvailable && !isConversationInProgress;
+    }
+
+    private static bool IsConversationInProgress()
+    {
+        return Campaign.Current?.ConversationManager?.IsConversationInProgress == true;
+    }
+
     private static void OpenBugReport(MapScreen mapScreen, IBugReportOverlay overlay)
     {
+        if (!CanOpenBugReport(overlay.IsAvailable, IsConversationInProgress())) return;
         mapScreen.OnEscapeMenuToggled(false);
         overlay.Open();
     }
