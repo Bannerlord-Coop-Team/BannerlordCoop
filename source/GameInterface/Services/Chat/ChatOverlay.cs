@@ -348,7 +348,6 @@ internal sealed class ChatOverlay : GlobalLayer, IDisposable
                 }
 
                 applyResizeToPanel = false;
-                dataSource.ExecuteSaveSizes();
             }
         }
     }

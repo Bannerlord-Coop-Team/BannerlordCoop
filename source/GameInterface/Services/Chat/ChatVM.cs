@@ -3,7 +3,6 @@ using GameInterface.Services.UI;
 using System;
 using System.Collections.Generic;
 using TaleWorlds.Library;
-using TaleWorlds.MountAndBlade;
 
 namespace GameInterface.Services.Chat;
 
@@ -53,8 +52,7 @@ internal sealed class ChatVM : ViewModel
 
         Channels = new MBBindingList<ChatChannelVM>();
         VisibleLines = new MBBindingList<ChatLineVM>();
-        // Don't seed from BannerlordConfig
-        //  it is shared with vanilla MP chat and is larger.
+        // Session only, no BannerlordConfig save
         chatBoxSizeX = DefaultChatBoxSizeX;
         chatBoxSizeY = DefaultChatBoxSizeY;
 
@@ -196,20 +194,6 @@ internal sealed class ChatVM : ViewModel
         selectedChannel.SetMuted(!selectedChannel.IsMuted);
         OnPropertyChanged(nameof(MuteButtonText));
         OnPropertyChanged(nameof(ActiveChannelText));
-    }
-
-    public void ExecuteSaveSizes()
-    {
-        try
-        {
-            BannerlordConfig.ChatBoxSizeX = ChatBoxSizeX;
-            BannerlordConfig.ChatBoxSizeY = ChatBoxSizeY;
-            BannerlordConfig.Save();
-        }
-        catch (TypeInitializationException)
-        {
-            // No BannerlordConfig under unit tests.
-        }
     }
 
     internal static float ClampSizeX(float value)
