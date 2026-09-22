@@ -27,11 +27,14 @@ public class ItemObjectRegistry : AutoRegistryBase<ItemObject>
 
     public override void RegisterAllObjects()
     {
+        if (!IsCollectingIdRemap)
+            handlesKnownToClients.Clear();
+
         // Must order by string id as this is not deterministic on load
         foreach (var item in MBObjectManager.Instance.GetObjectTypeList<ItemObject>().OrderBy(i => i.StringId))
         {
             RegisterExistingObject(item.StringId, item);
-            if (objectManager.TryGetHandle(item, out var handle))
+            if (!IsCollectingIdRemap && objectManager.TryGetHandle(item, out var handle))
                 handlesKnownToClients.Add(handle);
         }
     }

@@ -1,9 +1,13 @@
 ﻿using Common;
 using GameInterface.Registry.Auto;
 using GameInterface.Services.ItemObjects;
+using GameInterface.Tests.Bootstrap;
 using Moq;
 using Serilog;
+using System;
+using System.Collections.Generic;
 using TaleWorlds.Core;
+using TaleWorlds.ObjectSystem;
 using Xunit;
 using ObjectManagerService = GameInterface.Services.ObjectManager.ObjectManager;
 
@@ -114,6 +118,39 @@ public class ItemObjectRegistryHandleTests
         }
         finally
         {
+            ModInformation.IsServer = wasServer;
+        }
+    }
+
+    [Fact]
+    public void CollectIdRemap_DoesNotMarkExternallyRegisteredHandleKnownToClients()
+    {
+        bool wasServer = ModInformation.IsServer;
+        ModInformation.IsServer = true;
+        GameBootStrap.Initialize();
+        var item = new ItemObject("handle-remap-test-" + Guid.NewGuid().ToString("N"));
+        MBObjectManager.Instance.RegisterObject(item);
+        try
+        {
+            var manager = new ObjectManagerService(Mock.Of<ILogger>());
+            var registry = new ItemObjectRegistry(
+                Mock.Of<ILogger>(),
+                Mock.Of<IAutoRegistryFactory>(),
+                manager);
+
+            Assert.True(manager.AddExisting("ItemObject_" + item.StringId, item));
+            registry.CollectIdRemap(new Dictionary<string, string>());
+
+            Assert.True(registry.TryRegisterExistingItem(
+                item,
+                out _,
+                out _,
+                out var announceHandle));
+            Assert.True(announceHandle);
+        }
+        finally
+        {
+            MBObjectManager.Instance.UnregisterObject(item);
             ModInformation.IsServer = wasServer;
         }
     }
