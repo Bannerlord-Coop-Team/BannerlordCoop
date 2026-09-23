@@ -65,6 +65,12 @@ internal static class IssueFinalizationSupport
                 RunConsequenceOrFallback(QuestTypeRegistry.Get(owner.Issue)?.ApplyQuestFailConsequence, quest, () => quest.CompleteQuestWithFail());
                 return;
             case IssueFinalizeReason.QuestTimeout:
+                if (skipConsequenceReapplication)
+                {
+                    QuestTypeRegistry.Get(owner.Issue)?.ApplyQuestTimeoutMirrorPresentation?.Invoke(quest);
+                    CompleteQuestWithoutVanillaConsequence(quest, QuestBase.QuestCompleteDetails.Timeout);
+                    return;
+                }
                 quest.CompleteQuestWithTimeOut();
                 return;
             case IssueFinalizeReason.QuestBetrayal:

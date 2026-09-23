@@ -334,6 +334,11 @@ internal static class VillageNeedsToolsQuestType
         });
     }
 
+    private static void ApplyQuestTimeoutMirrorPresentation(Quest quest)
+    {
+        quest.AddLog(quest.QuestTimeOutFailLog);
+    }
+
     private static void ApplyQuestSuccessLocalOwnerConsequence(Quest quest)
     {
         TraitLevelingHelper.OnIssueSolvedThroughQuest(Hero.MainHero, new Tuple<TraitObject, int>[1]
@@ -382,6 +387,7 @@ internal static class VillageNeedsToolsQuestType
             .WithQuestFailProofCapture(CaptureQuestFailProof)
             .WithQuestFailConsequence(ApplyQuestFailConsequence)
             .WithQuestFailLocalOwnerConsequence(ApplyQuestFailLocalOwnerConsequence)
+            .WithQuestTimeoutMirrorPresentation(ApplyQuestTimeoutMirrorPresentation)
             .Build();
 
         QuestTypeRegistry.Register(descriptor);

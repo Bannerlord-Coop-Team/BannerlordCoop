@@ -88,6 +88,8 @@ public abstract class QuestTypeDescriptor
 
     public Action<QuestBase, byte> ApplyQuestFailLocalOwnerConsequence { get; }
 
+    public Action<QuestBase> ApplyQuestTimeoutMirrorPresentation { get; }
+
     public Func<Hero, Func<Hero, bool>, (bool Accepted, byte[] FieldsBytes)> TryArbitrateQuestSolutionAcceptBytes { get; }
 
     public Action<Hero, byte[]> MirrorQuestSolutionAcceptBytes { get; }
@@ -122,6 +124,7 @@ public abstract class QuestTypeDescriptor
         Action<QuestBase> applyQuestCancelConsequence,
         Action<QuestBase> applyQuestSuccessLocalOwnerConsequence,
         Action<QuestBase, byte> applyQuestFailLocalOwnerConsequence,
+        Action<QuestBase> applyQuestTimeoutMirrorPresentation,
         Func<Hero, Func<Hero, bool>, (bool, byte[])> tryArbitrateQuestSolutionAcceptBytes,
         Action<Hero, byte[]> mirrorQuestSolutionAcceptBytes,
         Action<Hero> rejectQuestSolutionAccept,
@@ -150,6 +153,7 @@ public abstract class QuestTypeDescriptor
         ApplyQuestCancelConsequence = applyQuestCancelConsequence;
         ApplyQuestSuccessLocalOwnerConsequence = applyQuestSuccessLocalOwnerConsequence;
         ApplyQuestFailLocalOwnerConsequence = applyQuestFailLocalOwnerConsequence;
+        ApplyQuestTimeoutMirrorPresentation = applyQuestTimeoutMirrorPresentation;
         TryArbitrateQuestSolutionAcceptBytes = tryArbitrateQuestSolutionAcceptBytes;
         MirrorQuestSolutionAcceptBytes = mirrorQuestSolutionAcceptBytes;
         RejectQuestSolutionAccept = rejectQuestSolutionAccept;
@@ -188,6 +192,7 @@ public sealed class QuestTypeDescriptor<TIssue, TQuest> : QuestTypeDescriptor
         Action<TQuest> applyQuestCancelConsequence,
         Action<TQuest> applyQuestSuccessLocalOwnerConsequence,
         Action<TQuest, byte> applyQuestFailLocalOwnerConsequence,
+        Action<TQuest> applyQuestTimeoutMirrorPresentation,
         Func<Hero, Func<Hero, bool>, (bool, byte[])> tryArbitrateQuestSolutionAcceptBytes,
         Action<Hero, byte[]> mirrorQuestSolutionAcceptBytes,
         Action<Hero> rejectQuestSolutionAccept,
@@ -216,6 +221,7 @@ public sealed class QuestTypeDescriptor<TIssue, TQuest> : QuestTypeDescriptor
             NarrowQuestAction(applyQuestCancelConsequence),
             NarrowQuestAction(applyQuestSuccessLocalOwnerConsequence),
             NarrowQuestByteAction(applyQuestFailLocalOwnerConsequence),
+            NarrowQuestAction(applyQuestTimeoutMirrorPresentation),
             tryArbitrateQuestSolutionAcceptBytes,
             mirrorQuestSolutionAcceptBytes,
             rejectQuestSolutionAccept,
@@ -288,6 +294,7 @@ public static class QuestDescriptorBuilder
         private Action<TQuest> _applyQuestCancelConsequence;
         private Action<TQuest> _applyQuestSuccessLocalOwnerConsequence;
         private Action<TQuest, byte> _applyQuestFailLocalOwnerConsequence;
+        private Action<TQuest> _applyQuestTimeoutMirrorPresentation;
         private Func<Hero, Func<Hero, bool>, (bool, byte[])> _tryArbitrateQuestSolutionAcceptBytes;
         private Action<Hero, byte[]> _mirrorQuestSolutionAcceptBytes;
         private Action<Hero> _rejectQuestSolutionAccept;
@@ -444,6 +451,12 @@ public static class QuestDescriptorBuilder
             return this;
         }
 
+        public Builder<TIssue, TQuest> WithQuestTimeoutMirrorPresentation(Action<TQuest> applyQuestTimeoutMirrorPresentation)
+        {
+            _applyQuestTimeoutMirrorPresentation = applyQuestTimeoutMirrorPresentation;
+            return this;
+        }
+
         public QuestTypeDescriptor<TIssue, TQuest> Build()
             => new(_displayName, _questSolutionAccept, _alternativeAccept,
                 _supportsQuestSolutionAccept, _supportsAlternativeAccept,
@@ -452,7 +465,7 @@ public static class QuestDescriptorBuilder
                 _validateQuestCancel, _validateQuestBetrayal, _validateQuestFail,
                 _captureQuestFailProof, _captureQuestBetrayalProof,
                 _applyQuestSuccessConsequence, _applyQuestFailConsequence, _applyQuestBetrayalConsequence, _applyQuestCancelConsequence,
-                _applyQuestSuccessLocalOwnerConsequence, _applyQuestFailLocalOwnerConsequence,
+                _applyQuestSuccessLocalOwnerConsequence, _applyQuestFailLocalOwnerConsequence, _applyQuestTimeoutMirrorPresentation,
                 _tryArbitrateQuestSolutionAcceptBytes, _mirrorQuestSolutionAcceptBytes, _rejectQuestSolutionAccept,
                 _tryArbitrateAlternativeAcceptBytes, _mirrorAlternativeAcceptBytes, _rejectAlternativeAccept);
     }

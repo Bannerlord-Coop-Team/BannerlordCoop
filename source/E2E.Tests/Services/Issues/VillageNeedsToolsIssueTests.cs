@@ -866,6 +866,99 @@ public class VillageNeedsToolsIssueTests : IDisposable
     }
 
     [Fact]
+    public void HourlyTickOnServer_AcceptedQuestTimedOut_AppliesThePowerAndHearthPenaltiesExactlyOnceOnEveryPeer_AndTheOwnerRelationPenaltyOnlyOnTheServer()
+    {
+        var fixture = SetupVillageOwner();
+        CreateIssueOnServer(fixture);
+        var ownerHeroId = CreateDistinctOwnerHero(fixture);
+        AcceptQuestFromClient(fixture, "player-A", ownerHeroId);
+        Server.Resolve<IPlayerManager>().MarkCampaignReady("player-A");
+
+        Client.Call(() =>
+        {
+            Assert.True(Client.ObjectManager.TryGetObject<Hero>(ownerHeroId, out var ownerHero));
+            Game.Current.PlayerTroop = ownerHero.CharacterObject;
+        });
+
+        var giverPowerBefore = new Dictionary<EnvironmentInstance, float>();
+        var villageHearthBefore = new Dictionary<EnvironmentInstance, float>();
+        var journalCountBefore = new Dictionary<EnvironmentInstance, int>();
+        var ongoingQuests = new Dictionary<EnvironmentInstance, QuestBase>();
+        int ownerRelationBefore = 0;
+        int hostRelationBefore = 0;
+        foreach (var instance in AllInstances)
+        {
+            instance.Call(() =>
+            {
+                Assert.True(instance.ObjectManager.TryGetObject<Hero>(fixture.HeroId, out var giver));
+                Assert.True(instance.ObjectManager.TryGetObject<Hero>(ownerHeroId, out var ownerHero));
+                Assert.True(instance.ObjectManager.TryGetObject<Village>(fixture.VillageId, out var village));
+                using (new AllowedThread())
+                {
+                    giver._power = 200f;
+                }
+                Assert.True(village.Hearth >= 100f);
+                giverPowerBefore[instance] = giver.Power;
+                villageHearthBefore[instance] = village.Hearth;
+
+                var quest = giver.Issue.IssueQuest;
+                if (instance == Server || instance == Client)
+                {
+                    Assert.True(quest.IsOngoing);
+                    Assert.Contains(quest, Campaign.Current.QuestManager.Quests);
+                    ongoingQuests[instance] = quest;
+                    journalCountBefore[instance] = quest.JournalEntries.Count;
+                }
+                if (instance == Server)
+                {
+                    ownerRelationBefore = giver.GetRelation(ownerHero);
+                    hostRelationBefore = giver.GetRelation(Hero.MainHero);
+                }
+            });
+        }
+
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject<Hero>(fixture.HeroId, out var giver));
+            var quest = giver.Issue.IssueQuest;
+            quest.ChangeQuestDueTime(CampaignTime.Now - CampaignTime.Days(1f));
+            Assert.True(quest.QuestDueTime.IsPast);
+
+            Campaign.Current.QuestManager.HourlyTick();
+        });
+
+        var removed = Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkIssueRemoved>());
+        Assert.Equal(fixture.HeroId, removed.OwnerId);
+        Assert.Equal(IssueFinalizeReason.QuestTimeout, removed.Reason);
+
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject<Hero>(fixture.HeroId, out var giver));
+            Assert.True(Server.ObjectManager.TryGetObject<Hero>(ownerHeroId, out var ownerHero));
+            Assert.Equal(ownerRelationBefore - 5, giver.GetRelation(ownerHero));
+            Assert.Equal(hostRelationBefore, giver.GetRelation(Hero.MainHero));
+        });
+
+        foreach (var instance in AllInstances)
+        {
+            instance.Call(() =>
+            {
+                Assert.True(instance.ObjectManager.TryGetObject<Hero>(fixture.HeroId, out var giver));
+                Assert.True(instance.ObjectManager.TryGetObject<Village>(fixture.VillageId, out var village));
+                Assert.Null(giver.Issue);
+                Assert.False(Campaign.Current.IssueManager.Issues.ContainsKey(giver));
+                Assert.Equal(giverPowerBefore[instance] - 10f, giver.Power);
+                Assert.Equal(villageHearthBefore[instance] - 30f, village.Hearth);
+                if (ongoingQuests.TryGetValue(instance, out var quest))
+                {
+                    Assert.False(quest.IsOngoing);
+                    Assert.Equal(journalCountBefore[instance] + 1, quest.JournalEntries.Count);
+                }
+            });
+        }
+    }
+
+    [Fact]
     public void OnWarDeclared_PlayerCausedWar_FailsOnlyViaTheOwningClient_ServerAndNonOwnerNeverActLocally_AndTheGiverLosesPowerExactlyOnceOnEveryPeer()
     {
         var fixture = SetupVillageOwner();
