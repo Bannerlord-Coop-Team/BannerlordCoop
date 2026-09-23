@@ -105,6 +105,7 @@ internal readonly struct MissionManagerDiagnostics
     public int PunchEndpoints { get; }
     public int ConcludingInstances { get; }
     public int ConclusionTombstones { get; }
+    public int RolledBackConclusions { get; }
     public long ExpiredEntries { get; }
 
     public MissionManagerDiagnostics(
@@ -114,6 +115,7 @@ internal readonly struct MissionManagerDiagnostics
         int punchEndpoints,
         int concludingInstances,
         int conclusionTombstones,
+        int rolledBackConclusions,
         long expiredEntries)
     {
         ActiveInstances = activeInstances;
@@ -122,6 +124,7 @@ internal readonly struct MissionManagerDiagnostics
         PunchEndpoints = punchEndpoints;
         ConcludingInstances = concludingInstances;
         ConclusionTombstones = conclusionTombstones;
+        RolledBackConclusions = rolledBackConclusions;
         ExpiredEntries = expiredEntries;
     }
 }
@@ -758,7 +761,7 @@ public class MissionManager : IMissionManager, IMissionMembershipRegistry
             Logger.Information(
                 "Mission state: dropped {Removed} ({Expired} in total), instances {Instances} " +
                 "({WithMembers} with members, {NatOnly} NAT-only), punch endpoints {Endpoints}, " +
-                "concluding {Concluding}, finished {Finished}",
+                "concluding {Concluding}, finished {Finished}, rolled back {RolledBack}",
                 removed,
                 counts.ExpiredEntries,
                 counts.ActiveInstances,
@@ -766,7 +769,8 @@ public class MissionManager : IMissionManager, IMissionMembershipRegistry
                 counts.NatOnlyInstances,
                 counts.PunchEndpoints,
                 counts.ConcludingInstances,
-                counts.ConclusionTombstones);
+                counts.ConclusionTombstones,
+                counts.RolledBackConclusions);
         }
     }
 
@@ -856,6 +860,7 @@ public class MissionManager : IMissionManager, IMissionMembershipRegistry
                 byInstanceId.Values.Sum(instance => instance.PunchEndpoints.Count),
                 concludingInstances.Count,
                 concludedInstances.Count,
+                expiredConclusions.Count,
                 expiredEntryCount);
         }
     }

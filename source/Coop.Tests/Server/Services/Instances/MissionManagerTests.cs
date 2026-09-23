@@ -1308,8 +1308,11 @@ public class MissionManagerTests
         manager.ConclusionDeadline = TimeSpan.Zero;
 
         Assert.True(manager.TryBeginEmptyInstanceConclusion("battle"));
+        manager.PruneExpired(DateTime.UtcNow);
+        Assert.Equal(1, manager.GetDiagnostics().RolledBackConclusions);
 
         Assert.Equal(new[] { "battle" }, manager.TakeExpiredConclusions());
+        Assert.Equal(0, manager.GetDiagnostics().RolledBackConclusions);
         Assert.Empty(manager.TakeExpiredConclusions());
     }
 
