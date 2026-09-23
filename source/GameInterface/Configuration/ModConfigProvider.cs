@@ -33,7 +33,7 @@ public readonly struct ModOptions
     [ProtoMember(6)]
     public readonly bool GoldFoodInfluenceChangeForDisconnectedPlayers { get; } = false;
     [ProtoMember(7)]
-    public readonly int PlayerBattleAiJoinWindowHours { get; } = 24;
+    public readonly int PlayerBattleAiJoinWindowHours { get; } = 6;
     [ProtoMember(8)]
     public readonly bool SpeedLimitWhilePlayersInBattle { get; } = true;
     [ProtoMember(9)]
@@ -53,7 +53,7 @@ public readonly struct ModOptions
     [ProtoMember(16)]
     public readonly LordDefectionRetryMode LordDefectionRetries { get; } = LordDefectionRetryMode.Vanilla;
     [ProtoMember(17)]  
-    public readonly bool EnableHeroExecutions { get; } = true;
+    public readonly bool EnableHeroExecutions { get; } = false;
     [ProtoMember(18)]
     public readonly bool EnablePlayerClanMemberExecutions { get; } = false;
     [ProtoMember(19)]
@@ -62,9 +62,10 @@ public readonly struct ModOptions
     public readonly bool ShowPlayerNameplates { get; } = true;
     [ProtoMember(21)]
     public readonly bool PlayerWoundedBattleEntry { get; } = true;
-
     [ProtoMember(22)]
     public bool VoiceEnabled { get; } = true;
+    [ProtoMember(23)]
+    public bool EnsureUnaffiliatedWanderers { get; } = true;
 
     public ModOptions(ModOptions previous, bool voiceEnabled)
     {
@@ -83,6 +84,7 @@ public readonly struct ModOptions
         GoldFoodInfluenceChangeForDisconnectedPlayers = modOptionsData.GoldFoodInfluenceChangeForDisconnectedPlayers ?? GoldFoodInfluenceChangeForDisconnectedPlayers;
         PlayerBattleAiJoinWindowHours = modOptionsData.PlayerBattleAiJoinWindowHours ?? PlayerBattleAiJoinWindowHours;
         SpeedLimitWhilePlayersInBattle = modOptionsData.SpeedLimitWhilePlayersInBattle ?? SpeedLimitWhilePlayersInBattle;
+        EnsureUnaffiliatedWanderers = modOptionsData.EnsureUnaffiliatedWanderers ?? EnsureUnaffiliatedWanderers;
         WandererLimit = modOptionsData.WandererLimit ?? WandererLimit;
         WandererLimitScalesWithPlayers = modOptionsData.WandererLimitScalesWithPlayers ?? WandererLimitScalesWithPlayers;
         PlayerKingdomClanTierRequired = modOptionsData.PlayerKingdomClanTierRequired ?? PlayerKingdomClanTierRequired;

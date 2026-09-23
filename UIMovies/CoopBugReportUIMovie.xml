@@ -3,12 +3,6 @@
     <Widget WidthSizePolicy="StretchToParent" HeightSizePolicy="StretchToParent"
             IsVisible="@IsPresentationVisible" DoNotAcceptEvents="true">
       <Children>
-        <Standard.Button Id="CoopBugReportButton" WidthSizePolicy="Fixed" SuggestedWidth="280"
-                         HeightSizePolicy="Fixed" SuggestedHeight="54" HorizontalAlignment="Right"
-                         VerticalAlignment="Top" MarginRight="24" MarginTop="82"
-                         IsVisible="@IsButtonVisible" Command.Click="ActionOpen"
-                         Parameter.Text="@ButtonText"/>
-
         <Widget WidthSizePolicy="StretchToParent" HeightSizePolicy="StretchToParent"
                 IsVisible="@IsFormVisible">
           <Children>

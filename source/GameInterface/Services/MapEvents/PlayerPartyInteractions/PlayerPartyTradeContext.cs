@@ -584,6 +584,10 @@ internal static class PlayerPartyTradeContext
                 return "Vassalage offer accepted.";
             case PlayerPartyInteractionOutcomeType.VassalDeclined:
                 return "Vassalage offer declined.";
+            case PlayerPartyInteractionOutcomeType.MercenaryAccepted:
+                return "Mercenary offer accepted.";
+            case PlayerPartyInteractionOutcomeType.MercenaryDeclined:
+                return "Mercenary offer declined.";
             default:
                 return null;
         }

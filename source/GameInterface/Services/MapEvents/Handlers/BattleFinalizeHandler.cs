@@ -171,7 +171,8 @@ internal class BattleFinalizeHandler : IHandler
             return;
         }
 
-        network.Send(requester, new NetworkMapEventFinalized());
+        if (requester != null)
+            network.Send(requester, new NetworkMapEventFinalized());
     }
 
     private bool TryLeaveSharedHideout(NetPeer requester, string mapEventId)

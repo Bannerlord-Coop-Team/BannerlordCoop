@@ -101,6 +101,7 @@ public class CoopCommandSideRegressionTests
         yield return new object[] { "MapEventDebugCommands", "LateJoinModeExitMissionsCoopCommand", CoopCommandSide.Server };
         yield return new object[] { "MapEventDebugCommands", "LateJoinModeCleanupCoopCommand", CoopCommandSide.Server };
 #endif
+        yield return new object[] { "MapEventDebugCommands", "LateJoinModeFixtureStateCoopCommand", CoopCommandSide.Server };
         yield return new object[] { "MapEventDebugCommands", "StartAttackMissionCoopCommand", CoopCommandSide.Client };
         yield return new object[] { "CampaignOptionsCommands", "CampaignOptionsIsIronmanModeCoopCommand", CoopCommandSide.Both };
     }

@@ -18,7 +18,7 @@ public class UnstuckCommand
     private static CoopCommandResult Failed(string output) =>
         new CoopCommandResult(false, output, "command_failed");
 
-    // coop.debug.mobileparty.unstuck
+    // coop.unstuck
     /// <summary>
     /// Requests a server-authoritative unstuck of the local player party. Client only.
     /// </summary>
@@ -44,8 +44,9 @@ public class UnstuckCommand
 
             MessageBroker.Instance.Publish(mainParty, new PlayerUnstuckRequested(mainParty));
 
-            return Succeeded("Unstuck request sent to the server. Captivity, map event, army, siege camp, and " +
-                   "settlement exits apply on the server; the local encounter and menu state clear when its reply arrives. " +
+            return Succeeded("Unstuck request sent to the server. Captivity, map event, siege camp, and " +
+                   "settlement exits apply on the server. Player-led armies are preserved; followers leave their army. " +
+                   "The local encounter and menu state clear when its reply arrives. " +
                    "Consenting clients may also send their current co-op log for a diagnostic report.");
         }
     }
