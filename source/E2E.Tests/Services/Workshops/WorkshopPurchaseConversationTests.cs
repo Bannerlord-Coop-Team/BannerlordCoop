@@ -427,7 +427,7 @@ public class WorkshopPurchaseConversationTests : IDisposable
 
     private void AssertWorkshopRefreshesFor(params string[] heroIds)
     {
-        Server.PumpGameThread();
+        TestEnvironment.FlushCoalescer();
         foreach (var client in Clients) client.PumpGameThread();
         Server.Call(() =>
         {

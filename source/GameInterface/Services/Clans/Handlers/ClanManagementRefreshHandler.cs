@@ -58,17 +58,34 @@ internal class ClanManagementRefreshHandler : IHandler
             var clan = obj.What.Clan;
             if (!clan.IsPlayerClan()) return;
 
-            bool scheduleRefresh = pendingRefreshes.Count == 0;
-            pendingRefreshes.TryGetValue(clan, out var sections);
+            bool scheduleRefresh = !pendingRefreshes.TryGetValue(clan, out var sections);
 
             // Optimisation: Combines refresh categories for each clan to avoid duplicate messages
             pendingRefreshes[clan] = sections | obj.What.Sections;
 
-            // Enqueuing means the refresh messages are sent after the current queue is complete
-            // This allows pending actions to be completed before clients get updated VMs
-            if (scheduleRefresh)
-                GameThread.EnqueueSafe(SendPendingRefreshes);
+            if (!scheduleRefresh) return;
+            if (sendCoalescer == null)
+            {
+                SendPendingRefreshes();
+                return;
+            }
+            if (!objectManager.TryGetIdWithLogging(clan, out var clanId))
+            {
+                pendingRefreshes.Remove(clan);
+                return;
+            }
+
+            sendCoalescer.Enqueue(
+                new CoalesceKey(nameof(NetworkRefreshClanManagement), clanId),
+                new SnapshotPayload(() => CreatePendingRefreshMessage(clan, clanId)));
         });
+    }
+
+    private IMessage CreatePendingRefreshMessage(Clan clan, string clanId)
+    {
+        pendingRefreshes.TryGetValue(clan, out var sections);
+        pendingRefreshes.Remove(clan);
+        return new NetworkRefreshClanManagement(clanId, sections);
     }
 
     private void SendPendingRefreshes()
@@ -76,9 +93,6 @@ internal class ClanManagementRefreshHandler : IHandler
         if (pendingRefreshes.Count == 0) return;
         var refreshes = pendingRefreshes.ToArray();
         pendingRefreshes.Clear();
-
-        // Send buffered changes before the UI reads the resulting state
-        sendCoalescer?.Flush(network);
 
         foreach (var refresh in refreshes)
         {
