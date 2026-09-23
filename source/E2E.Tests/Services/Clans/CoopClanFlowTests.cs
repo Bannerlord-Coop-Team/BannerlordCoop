@@ -1,6 +1,7 @@
 ﻿using Common.Messaging;
 using Common.Network;
 using Common.Util;
+using Coop.Core.Server.Services.Kingdoms.Messages;
 using E2E.Tests.Environment.Instance;
 using E2E.Tests.Services.MapEvents;
 using GameInterface.Services.Buildings.Messages;
@@ -11,6 +12,8 @@ using GameInterface.Services.CampaignService.Messages;
 using GameInterface.Services.Entity;
 using GameInterface.Services.Heroes.HeirSelection.Interfaces;
 using GameInterface.Services.Heroes.HeirSelection.Messages;
+using GameInterface.Services.Kingdoms.Data;
+using GameInterface.Services.Kingdoms.Messages;
 using GameInterface.Services.Players;
 using GameInterface.Services.Players.Data;
 using GameInterface.Services.Settlements;
@@ -23,6 +26,7 @@ using TaleWorlds.CampaignSystem.Actions;
 using TaleWorlds.CampaignSystem.CampaignBehaviors;
 using TaleWorlds.CampaignSystem.Roster;
 using TaleWorlds.CampaignSystem;
+using TaleWorlds.CampaignSystem.Election;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Settlements;
 using TaleWorlds.CampaignSystem.Settlements.Buildings;
@@ -163,6 +167,59 @@ public class CoopClanFlowTests : MapEventTestBase, IDisposable
         Flush();
         Server.Call(() => Assert.Equal(leader.HeroId,
             Assert.Single(Server.Resolve<ISettlementMenuAccess>().GetOpenMenus()).HeroId));
+    }
+
+    [Fact]
+    public void JoinedMemberAppointedLeader_ReceivesKingdomDecisionsWithoutReconnect()
+    {
+        Join();
+        var kingdomId = TestEnvironment.CreateRegisteredObject<Kingdom>();
+        var targetKingdomId = TestEnvironment.CreateRegisteredObject<Kingdom>();
+
+        foreach (var instance in Clients.Prepend(Server))
+        {
+            instance.Call(() =>
+            {
+                using var scope = new AllowedThread();
+                var joinedClan = Get<Clan>(instance, leader.ClanId);
+                var appointedLeader = Get<Hero>(instance, member.HeroId);
+                var kingdom = Get<Kingdom>(instance, kingdomId);
+
+                joinedClan.SetLeader(appointedLeader);
+                joinedClan._kingdom = kingdom;
+                kingdom._rulingClan = joinedClan;
+                kingdom._clans ??= new();
+                if (!kingdom._clans.Contains(joinedClan)) kingdom._clans.Add(joinedClan);
+
+                Assert.True(instance.Resolve<IPlayerManager>().TryGetPlayer(member.ControllerId, out var registeredPlayer));
+                Assert.Equal(member.ClanId, registeredPlayer.ClanId);
+                Assert.NotSame(Get<Clan>(instance, registeredPlayer.ClanId), appointedLeader.Clan);
+                Assert.Same(appointedLeader, joinedClan.Leader);
+            });
+        }
+
+        var decisionData = new DeclareWarDecisionData(
+            leader.ClanId,
+            kingdomId,
+            CampaignTime.Now._numTicks,
+            false,
+            false,
+            false,
+            targetKingdomId);
+
+        memberClient.SimulateMessage(
+            Server.NetPeer,
+            new NetworkAddDecision(kingdomId, decisionData, false, 0.5f));
+
+        Assert.Contains(
+            memberClient.InternalMessages.GetMessages<AddDecision>(),
+            message => message.KingdomId == kingdomId);
+        memberClient.Call(() =>
+        {
+            var kingdom = Get<Kingdom>(memberClient, kingdomId);
+            Assert.Single(kingdom.UnresolvedDecisions);
+            Assert.IsType<DeclareWarDecision>(kingdom.UnresolvedDecisions[0]);
+        });
     }
 
     // A01, A07, A08, L05, L07, P02: transfer, assign roles as a member, then leave with eligible family.
