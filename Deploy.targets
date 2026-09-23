@@ -35,18 +35,19 @@
     <ModPrefabDir>$(ModDir)\GUI\Prefabs</ModPrefabDir>
   </PropertyGroup>
 
-  <ItemGroup>
-    <!-- Static module files (start-*.bat, instructions); SubModule.xml is templated separately. -->
-    <DeployStaticFiles Include="$(DeploySourceDir)\**\*"
-                       Exclude="$(SubModuleTemplate)" />
-
-    <!-- UI movie prefabs (copied into GUI\Prefabs). -->
-    <UIMovieFiles Include="$(UIMoviesDir)\**\*" Condition="Exists('$(UIMoviesDir)')" />
-  </ItemGroup>
-
   <Target Name="DeployToGame"
           AfterTargets="Build"
           Condition="'$(ModName)' != '' and Exists('$(ModsRoot)')">
+
+    <!-- Discover these at execution time so files added after Visual Studio evaluated the project are deployed. -->
+    <ItemGroup>
+      <!-- Static module files (start-*.bat, instructions); SubModule.xml is templated separately. -->
+      <DeployStaticFiles Include="$(DeploySourceDir)\**\*"
+                         Exclude="$(SubModuleTemplate)" />
+
+      <!-- UI movie prefabs (copied into GUI\Prefabs). -->
+      <UIMovieFiles Include="$(UIMoviesDir)\**\*" Condition="Exists('$(UIMoviesDir)')" />
+    </ItemGroup>
 
     <Message Importance="high" Text="Deploying $(ModName) -> $(ModDir)" />
 

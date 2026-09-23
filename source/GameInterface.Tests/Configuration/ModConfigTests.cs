@@ -293,8 +293,9 @@ public class ModConfigTests : IDisposable
         Assert.True(options.GoldFoodInfluenceChangeInSettlements);
         Assert.Equal(GoldFoodChangeMode.OneDayMax, options.GoldFoodInfluenceChangeInBattles);
         Assert.False(options.GoldFoodInfluenceChangeForDisconnectedPlayers);
-        Assert.Equal(24, options.PlayerBattleAiJoinWindowHours);
+        Assert.Equal(6, options.PlayerBattleAiJoinWindowHours);
         Assert.True(options.SpeedLimitWhilePlayersInBattle);
+        Assert.True(options.EnsureUnaffiliatedWanderers);
         Assert.Equal(32, options.WandererLimit);
         Assert.False(options.WandererLimitScalesWithPlayers);
         Assert.Equal(4, options.PlayerKingdomClanTierRequired);
@@ -304,6 +305,7 @@ public class ModConfigTests : IDisposable
         Assert.Equal(LordDefectionRetryMode.Vanilla, options.LordDefectionRetries);
         Assert.True(options.ShowPlayerNameplates);
         Assert.True(options.CoopClansEnabled);
+        Assert.False(options.EnableHeroExecutions);
     }
 
     /// <summary>

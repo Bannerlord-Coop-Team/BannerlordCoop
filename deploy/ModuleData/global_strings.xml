@@ -5,7 +5,6 @@
     <string id="str_coop_cannot_execute_heroes" text="Executing heroes has been disabled by the host."/>
     <string id="str_coop_cannot_execute_players" text="Executing player heroes has been disabled by the host."/>
     <string id="str_coop_cannot_execute_player_clan_members" text="Executing members of other players' clans has been disabled by the host."/>
-
     <string id="str_coop_clan_players" text="{=str_coop_clan_players}Players" />
     <string id="str_coop_clan_other_families" text="{=str_coop_clan_other_families}Other Families" />
     <string id="str_coop_clan_player" text="{=str_coop_clan_player}Player" />
@@ -98,5 +97,8 @@
     <string id="str_coop_succession_game_over_title" text="{=str_coop_succession_game_over_title}Your Lineage Has Ended" />
     <string id="str_coop_succession_member_game_over" text="{=str_coop_succession_member_game_over}You have no eligible heirs. Your journey has ended, but the clan will continue under its remaining members. You will create a new character when you rejoin." />
     <string id="str_coop_succession_leader_game_over" text="{=str_coop_succession_leader_game_over}Your lineage has come to an end. {HERO} has taken leadership of {CLAN}. You will create a new character when you rejoin." />
+    <string id="str_coop_clanless" text="{=str_coop_clanless}Clanless" />
+    <string id="str_coop_in_clan" text="{=str_coop_in_clan}In Clan" />
+    <string id="str_coop_clan_status" text="{=str_coop_clan_status}Clan Status" />
     <!-- Add other custom text here in the future-->
 </strings>

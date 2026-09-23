@@ -4,17 +4,13 @@ using GameInterface.Services.BugReporting;
 using GameInterface.Services.UI.CoopOptions;
 using GameInterface.Services.UI.CoopOptions.Providers.BugReportTab;
 using GameInterface.Services.UI.Messages;
-using SandBox.View.Map;
 using System;
-using TaleWorlds.CampaignSystem;
 using TaleWorlds.Core;
-using TaleWorlds.Engine;
 using TaleWorlds.Engine.GauntletUI;
 using TaleWorlds.GauntletUI.BaseTypes;
 using TaleWorlds.GauntletUI.Data;
 using TaleWorlds.InputSystem;
 using TaleWorlds.Library;
-using TaleWorlds.MountAndBlade.View.Screens;
 using TaleWorlds.ScreenSystem;
 
 namespace GameInterface.Services.UI.BugReporting;
@@ -22,7 +18,9 @@ namespace GameInterface.Services.UI.BugReporting;
 /// <summary>Displays the in-game bug-report button and form.</summary>
 public interface IBugReportOverlay : IDisposable
 {
+    bool IsAvailable { get; }
     void Initialize();
+    void Open();
 }
 
 /// <inheritdoc />
@@ -42,6 +40,8 @@ internal sealed class BugReportOverlay : GlobalLayer, IBugReportOverlay
     private EditableTextWidget summaryInput;
     private bool initialized;
     private bool showBugReportButton;
+
+    public bool IsAvailable => initialized && showBugReportButton;
 
     public BugReportOverlay(
         IBugReportService bugReportService,
@@ -79,12 +79,19 @@ internal sealed class BugReportOverlay : GlobalLayer, IBugReportOverlay
         initialized = true;
     }
 
+    public void Open()
+    {
+        if (!IsAvailable) return;
+
+        dataSource.SetPresentationVisible(true);
+        dataSource.ActionOpen();
+    }
+
     protected override void OnTick(float dt)
     {
         base.OnTick(dt);
         if (!initialized) return;
 
-        UpdateVisibility();
         if (dataSource.IsFormVisible && Input.IsKeyReleased(InputKey.Escape))
             dataSource.ActionClose();
     }
@@ -187,34 +194,9 @@ internal sealed class BugReportOverlay : GlobalLayer, IBugReportOverlay
             mask: InputUsageMask.Mouse);
     }
 
-    private void UpdateVisibility()
-    {
-        var topScreen = ScreenManager.TopScreen;
-        var isGameplayScreen = topScreen is MapScreen || topScreen is MissionScreen;
-        var isConversationActive = Campaign.Current?.ConversationManager?.IsConversationInProgress == true;
-        if (topScreen is MissionScreen missionScreen)
-            isConversationActive |= missionScreen.IsConversationActive;
-
-        var shouldShow = ShouldShowPresentation(
-            showBugReportButton,
-            isGameplayScreen,
-            LoadingWindow.IsLoadingWindowActive,
-            isConversationActive);
-        dataSource.SetPresentationVisible(shouldShow);
-    }
-
     private void HandleVisibilitySelected(MessagePayload<BugReportVisibilitySelected> payload)
     {
         showBugReportButton = payload.What.ShowBugReportButton;
         if (!showBugReportButton) dataSource.SetPresentationVisible(false);
-    }
-
-    internal static bool ShouldShowPresentation(
-        bool showBugReportButton,
-        bool isGameplayScreen,
-        bool isLoading,
-        bool isConversationActive)
-    {
-        return showBugReportButton && isGameplayScreen && !isLoading && !isConversationActive;
     }
 }
