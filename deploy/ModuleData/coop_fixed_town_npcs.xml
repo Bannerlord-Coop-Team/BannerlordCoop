@@ -477,7 +477,7 @@
     coop_location="tavern"
     coop_spawn_tag="npc_common"
     coop_dialogue="What’s up my homie"
-    coop_enabled="true">
+    coop_enabled="false">
     <face>
       <face_key_template value="BodyProperty.townsman_battania" />
     </face>
@@ -519,6 +519,36 @@
         <equipment slot="Body" id="Item.battania_noble_armor" />
         <equipment slot="Gloves" id="Item.battania_noble_bracers" />
         <equipment slot="Leg" id="Item.battania_fur_boots" />
+      </EquipmentRoster>
+    </Equipments>
+  </NPCCharacter>
+  <NPCCharacter
+    id="coop_fixed_npc_1aed6ac7"
+    name="{=!}Legate Aueralius aux Wilson"
+    default_group="Infantry"
+    level="1"
+    is_female="false"
+    is_hero="false"
+    is_template="false"
+    occupation="Townsfolk"
+    culture="Culture.empire"
+    is_hidden_encyclopedia="true"
+    coop_settlement="town_A1"
+    coop_location="prison"
+    coop_spawn_tag="npc_common"
+    coop_dialogue="Deus Vult Friend"
+    coop_enabled="true">
+    <face>
+      <face_key_template value="BodyProperty.townsman_empire" />
+    </face>
+    <skills />
+    <Equipments>
+      <EquipmentRoster civilian="true">
+        <equipment slot="Head" id="Item.visored_helmet_over_mail_coif" />
+        <equipment slot="Cape" id="Item.imperial_studded_strip_shoulders" />
+        <equipment slot="Body" id="Item.hauberk" />
+        <equipment slot="Gloves" id="Item.lamellar_plate_gauntlets" />
+        <equipment slot="Leg" id="Item.lamellar_plate_boots" />
       </EquipmentRoster>
     </Equipments>
   </NPCCharacter>

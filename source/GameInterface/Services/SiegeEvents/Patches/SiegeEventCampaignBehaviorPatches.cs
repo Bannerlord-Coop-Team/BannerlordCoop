@@ -70,6 +70,7 @@ internal class SiegeEventCampaignBehaviorPatches
     // Vanilla compares the side leader to Hero.MainHero, which is null on the dedicated host: a
     // leaderless garrison side would match null == null and get the Custom (player decides, AI idles)
     // strategy, and a player-led side would get an AI strategy. Same logic with the player check fixed.
+    // Defenders stay Custom while any involved defender is player-led, so AI never plans over co-op builds.
     [HarmonyPatch(nameof(SiegeEventCampaignBehavior.SetDefaultTactics))]
     [HarmonyPrefix]
     private static bool SetDefaultTacticsPrefix(SiegeEvent siegeEvent, BattleSideEnum side)
@@ -81,6 +82,10 @@ internal class SiegeEventCampaignBehaviorPatches
         var leader = Campaign.Current.Models.EncounterModel.GetLeaderOfSiegeEvent(siegeEvent, side);
         SiegeStrategy strategy = null;
         if (leader != null && leader.IsPlayerHero())
+        {
+            strategy = DefaultSiegeStrategies.Custom;
+        }
+        else if (side == BattleSideEnum.Defender && HasPlayerDefender(siegeEvent))
         {
             strategy = DefaultSiegeStrategies.Custom;
         }
@@ -102,6 +107,13 @@ internal class SiegeEventCampaignBehaviorPatches
         }
 
         siegeEvent.GetSiegeEventSide(side).SetSiegeStrategy(strategy);
+        return false;
+    }
+
+    private static bool HasPlayerDefender(SiegeEvent siegeEvent)
+    {
+        if (ContainerProvider.TryResolve<ISiegeDefenderCommandAuthority>(out var authority))
+            return authority.HasPlayerDefender(siegeEvent, BattleSideEnum.Defender);
         return false;
     }
 }

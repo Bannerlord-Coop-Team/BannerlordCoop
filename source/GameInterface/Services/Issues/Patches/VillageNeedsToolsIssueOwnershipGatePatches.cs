@@ -29,7 +29,7 @@ internal class VillageNeedsToolsQuestSuccessTriggerPatch
         if (owner == null) return;
 
         ContainerProvider.TryResolve<IControllerIdProvider>(out var controllerIdProvider);
-        MessageBroker.Instance.Publish(owner, new QuestSuccessTriggered(owner, controllerIdProvider?.ControllerId));
+        MessageBroker.Instance.Publish(owner, new QuestTerminalOutcomeTriggered(owner, controllerIdProvider?.ControllerId, IssueFinalizeReason.QuestSuccess));
     }
 }
 
