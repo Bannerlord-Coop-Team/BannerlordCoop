@@ -198,12 +198,12 @@ internal static class VillageNeedsCraftingMaterialsQuestType
     private static byte CaptureQuestFailProof(Issue issue)
         => issue.IssueQuest is Quest quest && ObservedFailProof.TryGetValue(quest, out var proof) ? (byte)proof : (byte)0;
 
-    private static bool TryResolveRecordedOwner(Issue issue, out Hero ownerHero, out MobileParty ownerParty)
+    internal static bool TryResolveRecordedOwner(Hero issueOwner, out Hero ownerHero, out MobileParty ownerParty)
     {
         ownerHero = null;
         ownerParty = null;
         if (!ContainerProvider.TryResolve<IIssueOwnershipRegistry>(out var ownershipRegistry) ||
-            !ownershipRegistry.TryGetOwnerControllerId(issue.IssueOwner, out var controllerId)) return false;
+            !ownershipRegistry.TryGetOwnerControllerId(issueOwner, out var controllerId)) return false;
         if (!ContainerProvider.TryResolve<IPlayerManager>(out var playerManager) ||
             !playerManager.TryGetPlayer(controllerId, out var player)) return false;
         if (!ContainerProvider.TryResolve<IObjectManager>(out var objectManager)) return false;
@@ -214,14 +214,14 @@ internal static class VillageNeedsCraftingMaterialsQuestType
     }
 
     private static bool IsAtWarWithRecordedOwner(Issue issue)
-        => TryResolveRecordedOwner(issue, out var ownerHero, out _) &&
+        => TryResolveRecordedOwner(issue.IssueOwner, out var ownerHero, out _) &&
            issue.IssueOwner.MapFaction is { } giverFaction &&
            ownerHero.MapFaction is { } ownerFaction &&
            giverFaction.IsAtWarWith(ownerFaction);
 
     private static bool IsBeingCoercedByRecordedOwner(Issue issue)
     {
-        if (!TryResolveRecordedOwner(issue, out _, out var ownerParty) || ownerParty == null) return false;
+        if (!TryResolveRecordedOwner(issue.IssueOwner, out _, out var ownerParty) || ownerParty == null) return false;
 
         var mapEvent = issue.IssueOwner.CurrentSettlement?.Party?.MapEvent;
         return mapEvent != null &&

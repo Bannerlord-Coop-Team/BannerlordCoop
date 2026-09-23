@@ -10,6 +10,7 @@ using GameInterface.Services.Issues.Interfaces;
 using GameInterface.Services.Issues.Messages;
 using GameInterface.Services.Players;
 using GameInterface.Services.Players.Data;
+using GameInterface.Services.Smithing.Messages;
 using HarmonyLib;
 using System.Reflection;
 using TaleWorlds.CampaignSystem;
@@ -68,6 +69,58 @@ public class VillageNeedsCraftingMaterialsIssueTests : IDisposable
         }
 
         DiplomacyModelProperty.SetValue(models, new DefaultDiplomacyModel());
+    }
+
+    private static readonly PropertyInfo SmithingModelProperty =
+        AccessTools.Property(typeof(GameModels), nameof(GameModels.SmithingModel));
+    private static readonly PropertyInfo GenericXpModelProperty =
+        AccessTools.Property(typeof(GameModels), nameof(GameModels.GenericXpModel));
+
+    private static void InstallSmithingModels()
+    {
+        var models = (GameModels)GameModelsField.GetValue(Campaign.Current);
+        if (models == null)
+        {
+            models = ObjectHelper.SkipConstructor<GameModels>();
+            GameModelsField.SetValue(Campaign.Current, models);
+        }
+
+        SmithingModelProperty.SetValue(models, new DefaultSmithingModel());
+        if (models.GenericXpModel == null)
+        {
+            GenericXpModelProperty.SetValue(models, new DefaultGenericXpModel());
+        }
+    }
+
+    private static void EnsureCraftingBehavior()
+    {
+        if (Campaign.Current.CampaignBehaviorManager == null)
+        {
+            Campaign.Current.AddCampaignBehaviorManager(new CampaignBehaviorManager(new CampaignBehaviorBase[] { new CraftingCampaignBehavior() }));
+            return;
+        }
+
+        if (Campaign.Current.GetCampaignBehavior<CraftingCampaignBehavior>() == null)
+        {
+            Campaign.Current.CampaignBehaviorManager.AddBehavior(new CraftingCampaignBehavior());
+        }
+    }
+
+    private void RegisterRefiningMaterialsEverywhere()
+    {
+        foreach (var instance in AllInstances)
+        {
+            instance.Call(() =>
+            {
+                foreach (var item in new[] { DefaultItems.IronOre, DefaultItems.IronIngot1, DefaultItems.IronIngot2, DefaultItems.Charcoal })
+                {
+                    if (!instance.ObjectManager.Contains(item))
+                    {
+                        Assert.True(instance.ObjectManager.AddExisting(item.StringId, item));
+                    }
+                }
+            });
+        }
     }
 
     private E2ETestEnvironment TestEnvironment { get; }
@@ -2160,6 +2213,79 @@ public class VillageNeedsCraftingMaterialsIssueTests : IDisposable
 
         var requests = Client.NetworkSentMessages.GetMessages<RequestAlternativeSolutionCompletion>();
         Assert.Single(requests);
+    }
+
+    [Fact]
+    public void NetworkDoRefinement_WithAnAcceptedQuestAndNoServerMainParty_CompletesTheRefinementAndTracksProgressFromTheRecordedOwnersParty()
+    {
+        var fixture = SetupIssueOwner();
+        var ownerHeroId = CreateDistinctOwnerHero(fixture);
+        CreateIssueOnServer(fixture.HeroId);
+        ForcePromisedPaymentEverywhere(fixture.HeroId);
+        RegisterRefiningMaterialsEverywhere();
+        var partyId = AcceptQuestFromClient(fixture, "player-A", ownerHeroId);
+
+        var producesWroughtIron = false;
+        var requestedAmount = 0;
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject<Hero>(fixture.HeroId, out var giver));
+            var quest = Assert.IsType<VillageNeedsCraftingMaterialsIssueBehavior.VillageNeedsCraftingMaterialsIssueQuest>(giver.Issue.IssueQuest);
+            producesWroughtIron = quest._requestedItem.StringId == DefaultItems.IronIngot2.StringId;
+            requestedAmount = quest._requestedItemAmount;
+            Assert.True(requestedAmount > 0);
+            Assert.Equal(0, quest._playerAcceptedQuestLog.CurrentProgress);
+        });
+
+        var input1 = producesWroughtIron ? CraftingMaterials.Iron1 : CraftingMaterials.IronOre;
+        var output = producesWroughtIron ? CraftingMaterials.Iron2 : CraftingMaterials.Iron1;
+        var outputCount = producesWroughtIron ? 1 : 2;
+
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject<Hero>(fixture.HeroId, out var giver));
+            Assert.True(Server.ObjectManager.TryGetObject<Hero>(ownerHeroId, out var ownerHero));
+            Assert.True(Server.ObjectManager.TryGetObject<MobileParty>(partyId, out var party));
+            var quest = Assert.IsType<VillageNeedsCraftingMaterialsIssueBehavior.VillageNeedsCraftingMaterialsIssueQuest>(giver.Issue.IssueQuest);
+            InstallSmithingModels();
+            EnsureCraftingBehavior();
+            using (new AllowedThread())
+            {
+                ownerHero.PartyBelongedTo = party;
+                party.ItemRoster.AddToCounts(Campaign.Current.Models.SmithingModel.GetCraftingMaterialItem(input1), 1);
+                party.ItemRoster.AddToCounts(DefaultItems.Charcoal, 1);
+                if (requestedAmount > 1)
+                {
+                    party.ItemRoster.AddToCounts(quest._requestedItem, requestedAmount - 1);
+                }
+                Campaign.Current.MainParty = null;
+            }
+            Assert.Null(MobileParty.MainParty);
+            Assert.Equal(0, quest._playerAcceptedQuestLog.CurrentProgress);
+        });
+
+        Server.Call(() =>
+        {
+            Server.Resolve<IMessageBroker>().Publish(Client.NetPeer, new NetworkDoRefinement(
+                ownerHeroId, input1, 1, CraftingMaterials.Charcoal, 1, output, outputCount, CraftingMaterials.Iron1, 0));
+        });
+
+        Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkSetHeroCraftingStamina>());
+        Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkRefreshRefinement>());
+
+        Server.Call(() =>
+        {
+            Assert.Null(MobileParty.MainParty);
+            Assert.True(Server.ObjectManager.TryGetObject<Hero>(fixture.HeroId, out var giver));
+            Assert.True(Server.ObjectManager.TryGetObject<MobileParty>(partyId, out var party));
+            var quest = Assert.IsType<VillageNeedsCraftingMaterialsIssueBehavior.VillageNeedsCraftingMaterialsIssueQuest>(giver.Issue.IssueQuest);
+            Assert.True(quest.IsOngoing);
+            Assert.Equal(0, party.ItemRoster.GetItemNumber(Campaign.Current.Models.SmithingModel.GetCraftingMaterialItem(input1)));
+            Assert.Equal(0, party.ItemRoster.GetItemNumber(DefaultItems.Charcoal));
+            Assert.Equal(requestedAmount - 1 + outputCount, party.ItemRoster.GetItemNumber(quest._requestedItem));
+            Assert.Equal(requestedAmount, quest._playerAcceptedQuestLog.CurrentProgress);
+            Assert.NotNull(quest._playerHasNeededItemsLog);
+        });
     }
 
     private string CreateDistinctOwnerHero(CraftingFixture fixture)

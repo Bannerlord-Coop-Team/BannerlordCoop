@@ -7,7 +7,10 @@ using GameInterface.Services.Issues.Generic.Migrated.VillageNeedsCraftingMateria
 using GameInterface.Services.Issues.Interfaces;
 using GameInterface.Services.Issues.Messages;
 using HarmonyLib;
+using System;
 using TaleWorlds.CampaignSystem.Issues;
+using TaleWorlds.CampaignSystem.Party;
+using TaleWorlds.Core;
 using TaleWorlds.Localization;
 
 namespace GameInterface.Services.Issues.Patches;
@@ -47,6 +50,41 @@ internal class VillageNeedsCraftingMaterialsQuestAcceptedConsequencesOncePatch
     [HarmonyPrefix]
     private static bool Prefix(VillageNeedsCraftingMaterialsIssueBehavior.VillageNeedsCraftingMaterialsIssueQuest __instance) =>
         __instance._playerAcceptedQuestLog == null;
+}
+
+[HarmonyPatch(typeof(VillageNeedsCraftingMaterialsIssueBehavior.VillageNeedsCraftingMaterialsIssueQuest), "UpdateQuestLog")]
+internal class VillageNeedsCraftingMaterialsQuestProgressCallbackPatch
+{
+    [HarmonyPrefix]
+    private static bool Prefix(VillageNeedsCraftingMaterialsIssueBehavior.VillageNeedsCraftingMaterialsIssueQuest __instance)
+    {
+        if (!ContainerProvider.TryResolve<IIssueOwnershipRegistry>(out var ownershipRegistry))
+        {
+            return CallOriginalPolicy.IsOriginalAllowedForOwnershipGate();
+        }
+
+        var isLocalPeerOwner = ownershipRegistry.IsLocalPeerOwner(__instance.QuestGiver);
+        var ownerParty = isLocalPeerOwner ? MobileParty.MainParty : null;
+        if (ownerParty == null && !VillageNeedsCraftingMaterialsQuestType.TryResolveRecordedOwner(__instance.QuestGiver, out _, out ownerParty))
+        {
+            return CallOriginalPolicy.IsOriginalAllowedForOwnershipGate();
+        }
+
+        if (ownerParty == null || __instance._playerAcceptedQuestLog == null) return false;
+
+        var itemNumber = ownerParty.ItemRoster.GetItemNumber(__instance._requestedItem);
+        if (isLocalPeerOwner && itemNumber >= __instance._requestedItemAmount)
+        {
+            var textObject = new TextObject("{=MTCrXEvj}You have enough {ITEM} to complete the quest. Return to {QUEST_SETTLEMENT} to hand it over.");
+            textObject.SetTextVariable("QUEST_SETTLEMENT", __instance.QuestGiver.CurrentSettlement.Name);
+            textObject.SetTextVariable("ITEM", __instance._requestedItem.Name);
+            MBInformationManager.AddQuickInformation(textObject);
+        }
+
+        __instance._playerAcceptedQuestLog.UpdateCurrentProgress(Math.Min(itemNumber, __instance._requestedItemAmount));
+        __instance.CheckIfPlayerReadyToReturnItems();
+        return false;
+    }
 }
 
 [HarmonyPatch(typeof(VillageNeedsCraftingMaterialsIssueBehavior.VillageNeedsCraftingMaterialsIssueQuest), "Success")]
