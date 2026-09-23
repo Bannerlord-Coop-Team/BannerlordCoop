@@ -2,6 +2,7 @@ using Common.Messaging;
 using Common.Util;
 using E2E.Tests.Environment;
 using E2E.Tests.Environment.Instance;
+using System.Collections.Generic;
 using E2E.Tests.Util;
 using GameInterface.Services.Entity;
 using GameInterface.Services.Issues.Generic;
@@ -865,7 +866,7 @@ public class VillageNeedsToolsIssueTests : IDisposable
     }
 
     [Fact]
-    public void OnWarDeclared_PlayerCausedWar_FailsOnlyViaTheOwningClient_ServerAndNonOwnerNeverActLocally()
+    public void OnWarDeclared_PlayerCausedWar_FailsOnlyViaTheOwningClient_ServerAndNonOwnerNeverActLocally_AndTheGiverLosesPowerExactlyOnceOnEveryPeer()
     {
         var fixture = SetupVillageOwner();
         CreateIssueOnServer(fixture);
@@ -901,6 +902,19 @@ public class VillageNeedsToolsIssueTests : IDisposable
         });
         Assert.Empty(OtherClient.NetworkSentMessages.GetMessages<RequestIssueRemoved>());
 
+        var giverPowerBefore = new Dictionary<EnvironmentInstance, float>();
+        int relationBefore = 0;
+        foreach (var instance in AllInstances)
+        {
+            instance.Call(() =>
+            {
+                Assert.True(instance.ObjectManager.TryGetObject<Hero>(fixture.HeroId, out var giver));
+                Assert.True(instance.ObjectManager.TryGetObject<Hero>(ownerHeroId, out var ownerHero));
+                giverPowerBefore[instance] = giver.Power;
+                if (instance == Server) relationBefore = giver.GetRelation(ownerHero);
+            });
+        }
+
         Client.Call(() =>
         {
             Assert.True(Client.ObjectManager.TryGetObject<Hero>(fixture.HeroId, out var giver));
@@ -912,6 +926,13 @@ public class VillageNeedsToolsIssueTests : IDisposable
         Assert.Equal(fixture.HeroId, removed.OwnerId);
         Assert.Equal(IssueFinalizeReason.QuestFail, removed.Reason);
 
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject<Hero>(fixture.HeroId, out var giver));
+            Assert.True(Server.ObjectManager.TryGetObject<Hero>(ownerHeroId, out var ownerHero));
+            Assert.Equal(relationBefore - 5, giver.GetRelation(ownerHero));
+        });
+
         foreach (var instance in AllInstances)
         {
             instance.Call(() =>
@@ -919,6 +940,7 @@ public class VillageNeedsToolsIssueTests : IDisposable
                 Assert.True(instance.ObjectManager.TryGetObject<Hero>(fixture.HeroId, out var giver));
                 Assert.Null(giver.Issue);
                 Assert.False(Campaign.Current.IssueManager.Issues.ContainsKey(giver));
+                Assert.Equal(giverPowerBefore[instance] - 10f, giver.Power);
             });
         }
     }

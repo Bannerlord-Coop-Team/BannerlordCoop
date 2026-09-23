@@ -57,8 +57,12 @@ internal static class IssueFinalizationSupport
                 RunConsequenceOrFallback(applyCancelConsequence, quest, () => quest.CompleteQuestWithCancel());
                 return;
             case IssueFinalizeReason.QuestFail:
-                var applyFailConsequence = skipConsequenceReapplication ? null : QuestTypeRegistry.Get(owner.Issue)?.ApplyQuestFailConsequence;
-                RunConsequenceOrFallback(applyFailConsequence, quest, () => quest.CompleteQuestWithFail());
+                if (skipConsequenceReapplication)
+                {
+                    CompleteQuestWithoutVanillaConsequence(quest, QuestBase.QuestCompleteDetails.Fail);
+                    return;
+                }
+                RunConsequenceOrFallback(QuestTypeRegistry.Get(owner.Issue)?.ApplyQuestFailConsequence, quest, () => quest.CompleteQuestWithFail());
                 return;
             case IssueFinalizeReason.QuestTimeout:
                 quest.CompleteQuestWithTimeOut();
@@ -83,5 +87,12 @@ internal static class IssueFinalizationSupport
         {
             fallback();
         }
+    }
+
+    private static void CompleteQuestWithoutVanillaConsequence(QuestBase quest, QuestBase.QuestCompleteDetails detail)
+    {
+        quest.FinalizeQuest();
+        CampaignEventDispatcher.Instance.OnQuestCompleted(quest, detail);
+        quest.AfterFinalize();
     }
 }
