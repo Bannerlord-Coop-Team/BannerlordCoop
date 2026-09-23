@@ -1273,6 +1273,60 @@ public class MissionManagerTests
             .GetField("byController", BindingFlags.NonPublic | BindingFlags.Instance)!
             .GetValue(manager)!;
 
+    [Fact]
+    public void StalledEmptyClaimIsReacquirableThroughTheConclusionApiAlone()
+    {
+        var manager = CreateManager();
+        manager.ConclusionDeadline = TimeSpan.Zero;
+
+        Assert.True(manager.TryBeginEmptyInstanceConclusion("battle"));
+
+        // No punch, no entry, no direct maintenance call in between: the retry has to release the
+        // claim it finds itself.
+        Assert.True(manager.TryBeginEmptyInstanceConclusion("battle"));
+    }
+
+    [Fact]
+    public void StalledActiveClaimIsReacquirableThroughTheConclusionApiAlone()
+    {
+        var peer = CreatePeer(1);
+        var manager = CreateManager(("moving", peer));
+        manager.ConclusionDeadline = TimeSpan.Zero;
+        Assert.True(manager.TryEnterMission(peer, "moving", "battle", out _));
+
+        Assert.True(manager.TryBeginActiveInstanceConclusion("battle", new[] { "moving" }));
+
+        Assert.True(manager.TryBeginActiveInstanceConclusion("battle", new[] { "moving" }));
+        Assert.True(manager.TryGetControllers("battle", out var controllers));
+        Assert.Equal(new[] { "moving" }, controllers);
+    }
+
+    [Fact]
+    public void ClaimThatTimedOutIsHandedToTheCoordinatorExactlyOnce()
+    {
+        var manager = CreateManager();
+        manager.ConclusionDeadline = TimeSpan.Zero;
+
+        Assert.True(manager.TryBeginEmptyInstanceConclusion("battle"));
+
+        Assert.Equal(new[] { "battle" }, manager.TakeExpiredConclusions());
+        Assert.Empty(manager.TakeExpiredConclusions());
+    }
+
+    [Fact]
+    public void ResultForATimedOutClaimIsTakenAsExpiredWhileAStrangeOneStaysUnknown()
+    {
+        var manager = CreateManager();
+        manager.ConclusionDeadline = TimeSpan.Zero;
+
+        Assert.True(manager.TryBeginEmptyInstanceConclusion("battle"));
+
+        Assert.False(manager.CompleteInstanceConclusion("battle", succeeded: true));
+        Assert.True(manager.TryTakeExpiredConclusion("battle"));
+        Assert.False(manager.TryTakeExpiredConclusion("battle"));
+        Assert.False(manager.TryTakeExpiredConclusion("never-claimed"));
+    }
+
     private static string Authorize(MissionManager manager, NetPeer peer, string controllerId, string instanceId)
     {
         Assert.True(manager.TryAuthorizeIntroduction(peer, controllerId, instanceId, Guid.NewGuid(), out var token));

@@ -82,6 +82,18 @@ public interface IMissionManager
 
     /// <summary>Commits a successful conclusion or rolls its entry fence back after a failed apply.</summary>
     bool CompleteInstanceConclusion(string instanceId, bool succeeded);
+
+    /// <summary>
+    /// Hands over every instance whose conclusion was rolled back after its deadline, so the coordinator
+    /// can recover it. Each instance is handed over once.
+    /// </summary>
+    IReadOnlyList<string> TakeExpiredConclusions();
+
+    /// <summary>
+    /// Hands over one rolled-back instance, so a result that arrives after its own claim timed out is
+    /// recovered instead of being dropped as stale.
+    /// </summary>
+    bool TryTakeExpiredConclusion(string instanceId);
 }
 
 /// <summary>Counts of the mission-manager state that can grow while a server runs.</summary>
@@ -186,20 +198,21 @@ public class MissionManager : IMissionManager, IMissionMembershipRegistry
     private readonly Dictionary<string, IntroductionAuthorization> introductionAuthorizations = new();
     // Retired peers cannot authorize again, without retaining every disconnected socket for the session.
     private readonly ConditionalWeakTable<NetPeer, object> disconnectedPeers = new();
+    private readonly Dictionary<string, DateTime> expiredConclusions = new Dictionary<string, DateTime>();
     private long expiredEntryCount;
     private DateTime lastDiagnosticsUtc;
 
     /// <summary>How long a punch endpoint may wait for its mission entry before it expires.</summary>
-    private static readonly TimeSpan PunchEndpointLease = TimeSpan.FromMinutes(5);
+    internal TimeSpan PunchEndpointLease { get; set; } = TimeSpan.FromMinutes(5);
 
     /// <summary>
     /// How long a finished instance keeps rejecting delayed duplicates, matching the longest a late
     /// message can still be on its way (<see cref="NetworkJoinLimits.CampaignEntryTimeout"/>).
     /// </summary>
-    private static readonly TimeSpan ConclusionRetention = NetworkJoinLimits.CampaignEntryTimeout;
+    internal TimeSpan ConclusionRetention { get; set; } = NetworkJoinLimits.CampaignEntryTimeout;
 
     /// <summary>How long a conclusion may stay in flight before it is rolled back.</summary>
-    private static readonly TimeSpan ConclusionDeadline = TimeSpan.FromMinutes(5);
+    internal TimeSpan ConclusionDeadline { get; set; } = TimeSpan.FromMinutes(5);
 
     /// <summary>Upper bound on retained conclusions, whatever the rate missions finish at.</summary>
     private const int MaxConcludedInstances = 4096;
@@ -619,6 +632,7 @@ public class MissionManager : IMissionManager, IMissionMembershipRegistry
 
         lock (gate)
         {
+            PruneExpired(DateTime.UtcNow);
             if ((byInstanceId.TryGetValue(instanceId, out var instance) && instance.Controllers.Count > 0) ||
                 IsConclusionFenced(instanceId))
             {
@@ -642,6 +656,7 @@ public class MissionManager : IMissionManager, IMissionMembershipRegistry
 
         lock (gate)
         {
+            PruneExpired(DateTime.UtcNow);
             if (!byInstanceId.TryGetValue(instanceId, out var instance) ||
                 IsConclusionFenced(instanceId))
             {
@@ -669,6 +684,33 @@ public class MissionManager : IMissionManager, IMissionMembershipRegistry
         {
             PruneExpired(DateTime.UtcNow);
             return CompleteConclusion(instanceId, succeeded);
+        }
+    }
+
+    /// <inheritdoc/>
+    public IReadOnlyList<string> TakeExpiredConclusions()
+    {
+        lock (gate)
+        {
+            PruneExpired(DateTime.UtcNow);
+            if (expiredConclusions.Count == 0)
+                return Array.Empty<string>();
+
+            var expired = expiredConclusions.Keys.ToArray();
+            expiredConclusions.Clear();
+            return expired;
+        }
+    }
+
+    /// <inheritdoc/>
+    public bool TryTakeExpiredConclusion(string instanceId)
+    {
+        if (string.IsNullOrEmpty(instanceId))
+            return false;
+
+        lock (gate)
+        {
+            return expiredConclusions.Remove(instanceId);
         }
     }
 
@@ -752,6 +794,7 @@ public class MissionManager : IMissionManager, IMissionMembershipRegistry
             Logger.Warning("Rolling back instance {Instance}: its conclusion did not report back in time",
                 instanceId);
             CompleteConclusion(instanceId, succeeded: false);
+            expiredConclusions[instanceId] = utcNow;
             expiredEntryCount++;
         }
     }
@@ -766,6 +809,14 @@ public class MissionManager : IMissionManager, IMissionMembershipRegistry
         {
             concludedInstances.Remove(instanceId);
             expiredEntryCount++;
+        }
+
+        foreach (var instanceId in expiredConclusions
+            .Where(entry => utcNow - entry.Value >= ConclusionRetention)
+            .Select(entry => entry.Key)
+            .ToArray())
+        {
+            expiredConclusions.Remove(instanceId);
         }
     }
 
