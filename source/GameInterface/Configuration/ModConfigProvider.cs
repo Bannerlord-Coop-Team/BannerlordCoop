@@ -67,7 +67,7 @@ public readonly struct ModOptions
     [ProtoMember(23)]
     public bool EnsureUnaffiliatedWanderers { get; } = true;
 
-    [ProtoMember(23)]
+    [ProtoMember(24)]
     public readonly bool CoopClansEnabled { get; } = true;
 
     public ModOptions(ModOptions previous, bool voiceEnabled)
