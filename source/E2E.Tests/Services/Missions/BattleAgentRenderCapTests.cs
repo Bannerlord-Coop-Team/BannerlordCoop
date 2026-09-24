@@ -94,14 +94,21 @@ public class BattleAgentRenderCapTests : MissionTestEnvironment
         => (IPuppetSpawner)AccessTools.Field(typeof(CoopBattleController), "puppetSpawner").GetValue(controller);
 
     [Theory]
-    [InlineData(true, 1, false)]
-    [InlineData(false, 1, false)]
-    [InlineData(true, 2, false)]
-    [InlineData(false, 2, false)]
-    [InlineData(true, 2, true)]
-    [InlineData(false, 2, true)]
+    [InlineData(true, 1, false, false, 1)]
+    [InlineData(false, 1, false, false, 1)]
+    [InlineData(true, 2, false, false, 1)]
+    [InlineData(false, 2, false, false, 1)]
+    [InlineData(true, 2, true, false, 1)]
+    [InlineData(false, 2, true, false, 1)]
+    [InlineData(true, 1, false, true, 1)]
+    [InlineData(false, 1, false, true, 1)]
+    [InlineData(true, 2, false, true, 1)]
+    [InlineData(false, 2, false, true, 1)]
+    [InlineData(true, 2, true, true, 1)]
+    [InlineData(false, 2, true, true, 1)]
+    [InlineData(false, 2, false, true, -1)]
     public void FormerHostRecord_BufferedBeforeMigration_DrainsUnderCurrentAuthority(
-        bool promotedHost, int transfers, bool startsAsNonHost)
+        bool promotedHost, int transfers, bool startsAsNonHost, bool formerOwnerUpdate, int formationIndex)
     {
         using var fixture = new MissionEngineFixture();
         var (mapEventId, partyIds) = SetupCoopBattle("A", "B", "C");
@@ -150,6 +157,13 @@ public class BattleAgentRenderCapTests : MissionTestEnvironment
                 receiver.Resolve<IMessageBroker>().Publish(this, new NetworkSpawnBattleAgents(new[] { record, record }));
                 Assert.False(registry.TryGetAgentInfo(agentId, out _));
 
+                if (formerOwnerUpdate)
+                    receiver.Resolve<IMessageBroker>().Publish(this, new NetworkBattleAgentFormations(mapEventId, "A",
+                        new[] { new BattleAgentFormationData(agentId, formationIndex, 4) }));
+                else if (!promotedHost)
+                    receiver.Resolve<IMessageBroker>().Publish(this, new NetworkBattleAgentFormations(mapEventId, finalHost,
+                        new[] { new BattleAgentFormationData(agentId, formationIndex, 4 + transfers) }));
+
                 receiver.Resolve<IMessageBroker>().Publish(this, new MissionPeerDisconnected("A", mapEventId));
                 if (!startsAsNonHost)
                     receiver.Resolve<IMessageBroker>().Publish(
@@ -163,6 +177,9 @@ public class BattleAgentRenderCapTests : MissionTestEnvironment
                 }
                 receiver.Resolve<IMessageBroker>().Publish(
                     this, new BattleHostMigrated(mapEventId, transfers == 1 ? "A" : "B", finalHost));
+                if (formerOwnerUpdate)
+                    receiver.Resolve<IMessageBroker>().Publish(this, new NetworkBattleAgentFormations(mapEventId, "A",
+                        new[] { new BattleAgentFormationData(agentId, (int)FormationClass.Infantry, 4) }));
                 receiver.Resolve<IMessageBroker>().Publish(
                     this,
                     new NetworkMissionPeerEntered("A", mapEventId));
@@ -203,6 +220,12 @@ public class BattleAgentRenderCapTests : MissionTestEnvironment
                     interpolator.Tick(1f / 60f);
                     Assert.Equal(new Vec2(1f, 0f), riderMirror.MovementDirection);
                     Assert.Equal(new Vec2(1f, 0f), mountMirror.MovementDirection);
+                }
+
+                if (formerOwnerUpdate || !promotedHost)
+                {
+                    if (formationIndex == -1) Assert.Null(info.Agent.Formation);
+                    else Assert.Same(mock.AttackerTeam.GetFormation((FormationClass)formationIndex).Shell, info.Agent.Formation);
                 }
 
                 // Re-entry clears the departure state, but the buffered old-host NPC record above stays retained.

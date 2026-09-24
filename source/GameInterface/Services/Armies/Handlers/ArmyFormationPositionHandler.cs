@@ -80,8 +80,9 @@ internal sealed class ArmyFormationPositionHandler : IHandler
             return;
 
         lastReportedPositions[state.LeaderPartyId] = state.Position;
+        if (!objectManager.TryGetHandleWithLogging(leaderParty, out var leaderPartyHandle)) return;
         network.SendAll(new NetworkRequestArmyLeaderPositionConvergence(
-            state.LeaderPartyId,
+            leaderPartyHandle,
             state.Position));
     }
 
@@ -114,13 +115,12 @@ internal sealed class ArmyFormationPositionHandler : IHandler
         }, context: nameof(NetworkRequestArmyLeaderPositionConvergence));
     }
 
-    private bool PeerControlsParty(NetPeer peer, string partyId)
+    private bool PeerControlsParty(NetPeer peer, uint partyId)
     {
         if (playerManager.TryGetPlayer(peer, out var player) &&
-            string.Equals(
-                Compact(player.MobilePartyId, typeof(MobileParty)),
-                Compact(partyId, typeof(MobileParty)),
-                StringComparison.Ordinal))
+            objectManager.TryGetObject<MobileParty>(player.MobilePartyId, out var playerParty) &&
+            objectManager.TryGetHandle(playerParty, out var playerPartyHandle) &&
+            playerPartyHandle == partyId)
             return true;
 
         Logger.Warning(

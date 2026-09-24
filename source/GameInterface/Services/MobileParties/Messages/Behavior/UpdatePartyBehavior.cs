@@ -12,10 +12,12 @@ namespace GameInterface.Services.MobileParties.Messages.Behavior;
 public struct UpdatePartyBehavior : ICommand
 {
     public PartyBehaviorUpdateData BehaviorUpdateData;
+    public bool AlreadyOnGameThread;
 
-    public UpdatePartyBehavior(ref PartyBehaviorUpdateData behaviorUpdateData)
+    public UpdatePartyBehavior(ref PartyBehaviorUpdateData behaviorUpdateData, bool alreadyOnGameThread = false)
     {
         BehaviorUpdateData = behaviorUpdateData;
+        AlreadyOnGameThread = alreadyOnGameThread;
     }
 }
 

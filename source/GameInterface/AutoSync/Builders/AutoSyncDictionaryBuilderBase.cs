@@ -1,4 +1,4 @@
-using GameInterface.AutoSync.Templates;
+﻿using GameInterface.AutoSync.Templates;
 using GameInterface.Registry.Auto;
 using System;
 using System.Collections.Generic;
@@ -80,8 +80,8 @@ public class AutoSyncDictionaryBuilderBase : AutoSyncBuilderBase
             ValueType = AutoSyncUtils.GetSimpleTypeName(valueType),
             KeyByValue = keyByValue,
             ValueByValue = valueByValue,
-            KeyWireType = keyByValue ? "byte[]" : "string",
-            ValueWireType = valueByValue ? "byte[]" : "string",
+            KeyWireType = keyByValue ? "byte[]" : "uint",
+            ValueWireType = valueByValue ? "byte[]" : "uint",
             KeySerializeMethod = keySerializers.serialize,
             KeyDeserializeMethod = keySerializers.deserialize,
             ValueSerializeMethod = valueSerializers.serialize,

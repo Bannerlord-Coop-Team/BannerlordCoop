@@ -102,15 +102,15 @@
     "clientsCanUseCheats": false,
 
     // Toggle Gold & food change while in settlements. THIS INCLUDES INCOME
-    // false: Gold & food will remain the same while being in a settlement, including walking around the settlement, participating in tournaments etc.
-    // (Default) true: Gold & food will change the same in settlements as on the campaign map.
-    "goldFoodInfluenceChangeInSettlements": true,
+    // (Default) false: Gold & food will remain the same while being in a settlement, including walking around the settlement, participating in tournaments etc.
+    // true: Gold & food will change the same in settlements as on the campaign map.
+    "goldFoodInfluenceChangeInSettlements": false,
 
     // Set gold & food change mode for battles. THIS INCLUDES INCOME
-    // Disabled: No gold or food will change while in battles.
-    // (Default) OneDayMax: Gold and food change can happen at most once during a battle. e.g. Only paying for troops once during a 15 day siege.
+    // (Default) Disabled: No gold or food will change while in battles.
+    // OneDayMax: Gold and food change can happen at most once during a battle. e.g. Only paying for troops once during a 15 day siege.
     // Enabled: Gold and food change happen regardless of whether a player is in a battle or not.
-    "goldFoodInfluenceChangeInBattles": "OneDayMax",
+    "goldFoodInfluenceChangeInBattles": "Disabled",
 
     // Set gold, food & influence change for disconnected players. THIS INCLUDES INCOME
     // (Default) false: Disconnected players won't have any gold or food change.
@@ -206,6 +206,6 @@
 
     // Toggle players being allowed to join battles when wounded
     // Default is true
-    "playerWoundedBattleEntry": true,
+    "playerWoundedBattleEntry": true
   }
 }

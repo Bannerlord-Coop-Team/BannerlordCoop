@@ -29,7 +29,7 @@ namespace Coop.IntegrationTests.Serialization
     {
         /// <summary>Every option set to the value protobuf treats as absent — the direction that only
         /// survives because the receiver starts zeroed. <c>GoldFoodChangeMode.Disabled</c> is enum 0,
-        /// so it is omitted too and must not arrive as the <c>OneDayMax</c> default.</summary>
+        /// so it is omitted too.</summary>
         [Fact]
         public void NetworkLoadModConfig_RoundTrips_OptionsTurnedOff()
         {
@@ -65,6 +65,7 @@ namespace Coop.IntegrationTests.Serialization
             var options = new ModOptions(new ModOptionsData
             {
                 ClientsCanUseCheats = true,
+                GoldFoodInfluenceChangeInSettlements = true,
                 GoldFoodInfluenceChangeInBattles = GoldFoodChangeMode.Enabled,
                 GoldFoodInfluenceChangeForDisconnectedPlayers = true,
                 PlayerBattleAiJoinWindowHours = 6,
@@ -85,6 +86,7 @@ namespace Coop.IntegrationTests.Serialization
             var copy = RoundTrip(new NetworkLoadModConfig(options)).ModOptions;
 
             Assert.True(copy.ClientsCanUseCheats);
+            Assert.True(copy.GoldFoodInfluenceChangeInSettlements);
             Assert.Equal(GoldFoodChangeMode.Enabled, copy.GoldFoodInfluenceChangeInBattles);
             Assert.True(copy.GoldFoodInfluenceChangeForDisconnectedPlayers);
             Assert.Equal(6, copy.PlayerBattleAiJoinWindowHours);

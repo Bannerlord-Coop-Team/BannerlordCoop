@@ -3348,7 +3348,8 @@ public class PlayerKingdomCreationFlowTests : IDisposable
 
         Assert.Contains(
             client.NetworkSentMessages.GetMessages<NetworkRequestStartSettlementEncounter>(),
-            message => message.PartyId == player.PartyId && message.SettlementId == settlementId);
+            message => message.PartyId == client.GetHandle<MobileParty>(player.PartyId) &&
+                       message.SettlementId == client.GetHandle<Settlement>(settlementId));
 
         client.Call(() =>
         {
@@ -3408,10 +3409,10 @@ public class PlayerKingdomCreationFlowTests : IDisposable
 
         Assert.DoesNotContain(
             client.NetworkSentMessages.GetMessages<NetworkRequestEndSettlementEncounter>(),
-            message => message.PartyId == player.PartyId);
+            message => message.PartyId == client.GetHandle<MobileParty>(player.PartyId));
         Assert.DoesNotContain(
             Server.NetworkSentMessages.GetMessages<NetworkPartyLeaveSettlement>(),
-            message => message.PartyId == player.PartyId);
+            message => message.PartyId == Server.GetHandle<MobileParty>(player.PartyId));
 
         client.Call(() =>
         {
@@ -3461,7 +3462,9 @@ public class PlayerKingdomCreationFlowTests : IDisposable
             Assert.Same(settlement, party.CurrentSettlement);
         });
 
-        client.SimulateMessage(this, new NetworkPartyEnterSettlement(settlementId, player.PartyId));
+        client.SimulateMessage(this, new NetworkPartyEnterSettlement(
+            client.GetHandle<Settlement>(settlementId),
+            client.GetHandle<MobileParty>(player.PartyId)));
 
         client.Call(() =>
         {
@@ -3500,15 +3503,15 @@ public class PlayerKingdomCreationFlowTests : IDisposable
 
         var leaveRequest = Assert.Single(
             client.NetworkSentMessages.GetMessages<NetworkRequestEndSettlementEncounter>(),
-            message => message.PartyId == player.PartyId);
-        Assert.Equal(player.PartyId, leaveRequest.PartyId);
+            message => message.PartyId == client.GetHandle<MobileParty>(player.PartyId));
+        Assert.Equal(client.GetHandle<MobileParty>(player.PartyId), leaveRequest.PartyId);
         var leaveResult = Assert.Single(
             client.InternalMessages.GetMessages<NetworkSettlementEncounterLeaveResult>(),
-            message => message.PartyId == player.PartyId);
+            message => message.PartyId == client.GetHandle<MobileParty>(player.PartyId));
         Assert.Equal(SettlementEncounterLeaveOutcome.Suppressed, leaveResult.Outcome);
         Assert.DoesNotContain(
             Server.NetworkSentMessages.GetMessages<NetworkPartyLeaveSettlement>(),
-            message => message.PartyId == player.PartyId);
+            message => message.PartyId == Server.GetHandle<MobileParty>(player.PartyId));
 
         client.Call(() =>
         {
@@ -3530,16 +3533,17 @@ public class PlayerKingdomCreationFlowTests : IDisposable
         Server.SimulateMessage(
             client.NetPeer,
             new NetworkRequestCreateKingdom(ControllerId, KingdomName, player.CultureId, player.PartyId, settlementId));
-        Server.SimulateMessage(client.NetPeer, new NetworkRequestEndSettlementEncounter(player.PartyId));
+        Server.SimulateMessage(client.NetPeer, new NetworkRequestEndSettlementEncounter(
+            Server.GetHandle<MobileParty>(player.PartyId)));
         Server.SimulateMessage(this, new PartyLeaveSettlementAttempted(GetObject<MobileParty>(Server, player.PartyId)));
 
         var leaveResult = Assert.Single(
             Server.NetworkSentMessages.GetMessages<NetworkSettlementEncounterLeaveResult>(),
-            message => message.PartyId == player.PartyId);
+            message => message.PartyId == Server.GetHandle<MobileParty>(player.PartyId));
         Assert.Equal(SettlementEncounterLeaveOutcome.Suppressed, leaveResult.Outcome);
         Assert.DoesNotContain(
             Server.NetworkSentMessages.GetMessages<NetworkPartyLeaveSettlement>(),
-            message => message.PartyId == player.PartyId);
+            message => message.PartyId == Server.GetHandle<MobileParty>(player.PartyId));
 
         Server.Call(() =>
         {
@@ -3586,7 +3590,7 @@ public class PlayerKingdomCreationFlowTests : IDisposable
         client.SimulateMessage(
             this,
             new NetworkSettlementEncounterLeaveResult(
-                player.PartyId,
+                client.GetHandle<MobileParty>(player.PartyId),
                 SettlementEncounterLeaveOutcome.Suppressed));
 
         client.Call(() =>

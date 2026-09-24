@@ -11,12 +11,12 @@ namespace Coop.Core.Server.Services.MobileParties.Messages;
 public readonly struct TroopXpBaselineEntry
 {
     [ProtoMember(1)]
-    public readonly string CharacterId;
+    public readonly uint CharacterId;
 
     [ProtoMember(2)]
     public readonly int Xp;
 
-    public TroopXpBaselineEntry(string characterId, int xp)
+    public TroopXpBaselineEntry(uint characterId, int xp)
     {
         CharacterId = characterId;
         Xp = xp;
@@ -28,12 +28,12 @@ public readonly struct TroopXpBaselineEntry
 public readonly struct TroopRosterXpBaseline
 {
     [ProtoMember(1)]
-    public readonly string RosterId;
+    public readonly uint RosterId;
 
     [ProtoMember(2)]
     public readonly TroopXpBaselineEntry[] Entries;
 
-    public TroopRosterXpBaseline(string rosterId, TroopXpBaselineEntry[] entries)
+    public TroopRosterXpBaseline(uint rosterId, TroopXpBaselineEntry[] entries)
     {
         RosterId = rosterId;
         Entries = entries;
@@ -50,7 +50,7 @@ public readonly struct NetworkJoinCampaignBaseline : IMessage
     public readonly long ServerTicks;
 
     [ProtoMember(2)]
-    public readonly MobilePartyJoinState[] PartyStates;
+    public readonly NetworkMobilePartyJoinState[] PartyStates;
 
     [ProtoMember(3)]
     public readonly bool IsComplete;
@@ -64,7 +64,7 @@ public readonly struct NetworkJoinCampaignBaseline : IMessage
     public NetworkJoinCampaignBaseline(
         long serverTicks,
         TimeControlEnum timeControlMode,
-        MobilePartyJoinState[] partyStates,
+        NetworkMobilePartyJoinState[] partyStates,
         bool isComplete = true,
         TroopRosterXpBaseline[] troopXpBaselines = null)
     {

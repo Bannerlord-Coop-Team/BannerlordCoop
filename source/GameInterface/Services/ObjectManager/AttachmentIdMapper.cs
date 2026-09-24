@@ -1,5 +1,6 @@
 ﻿using GameInterface.Registry.Auto;
 using System.Collections.Generic;
+using System.Linq;
 using TaleWorlds.CampaignSystem;
 
 namespace GameInterface.Services.ObjectManager;
@@ -20,21 +21,25 @@ public interface IAttachmentIdMapper : IGameAbstraction
 internal class AttachmentIdMapper : IAttachmentIdMapper
 {
     private readonly IAutoRegistryFactory autoRegistryFactory;
+    private readonly IObjectManager objectManager;
 
-    public AttachmentIdMapper(IAutoRegistryFactory autoRegistryFactory)
+    public AttachmentIdMapper(IAutoRegistryFactory autoRegistryFactory, IObjectManager objectManager)
     {
         this.autoRegistryFactory = autoRegistryFactory;
+        this.objectManager = objectManager;
     }
 
     public AttachmentIdMap BuildServerMap()
     {
         var map = new Dictionary<string, string>();
-        if (Campaign.Current == null) return new AttachmentIdMap(map);
+        if (Campaign.Current != null)
+        {
+            // Reuse every registry's RegisterAllObjects (the single source of the owner-derived id formula) to collect
+            // the live-created attachments whose server id diverges from what a joining client re-derives.
+            autoRegistryFactory.BuildIdRemap(map);
+        }
 
-        // Reuse every registry's RegisterAllObjects (the single source of the owner-derived id formula) to collect
-        // the live-created attachments whose server id diverges from what a joining client re-derives.
-        autoRegistryFactory.BuildIdRemap(map);
-
-        return new AttachmentIdMap(map);
+        var handles = objectManager.GetHandleMap().ToDictionary(entry => entry.Key, entry => entry.Value);
+        return new AttachmentIdMap(map, handles);
     }
 }

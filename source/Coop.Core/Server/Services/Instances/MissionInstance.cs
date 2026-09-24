@@ -39,16 +39,21 @@ internal class MissionInstance
         public readonly IPEndPoint Internal;
         public readonly IPEndPoint External;
 
+        /// <summary>When the punch arrived, so an endpoint that never joins the mission can expire.</summary>
+        public readonly DateTime PunchedUtc;
+
         public Endpoints(
             string controllerId,
             NetPeer campaignPeer,
             IPEndPoint @internal,
-            IPEndPoint external)
+            IPEndPoint external,
+            DateTime punchedUtc)
         {
             ControllerId = controllerId;
             CampaignPeer = campaignPeer;
             Internal = @internal;
             External = external;
+            PunchedUtc = punchedUtc;
         }
     }
 }

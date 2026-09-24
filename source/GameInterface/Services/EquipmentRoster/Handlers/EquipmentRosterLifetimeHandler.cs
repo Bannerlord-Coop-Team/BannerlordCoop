@@ -36,8 +36,9 @@ namespace GameInterface.Services.EquipmentRoster.Handlers
             var payload = obj.What;
 
             if (objectManager.AddNewObject(payload.EquipmentRoster, out string EquipmentRosterId) == false) return;
+            if (!objectManager.TryGetHandleWithLogging(payload.EquipmentRoster, out var handle)) return;
 
-            var message = new NetworkCreateEquipmentRoster(EquipmentRosterId);
+            var message = new NetworkCreateEquipmentRoster(EquipmentRosterId, handle);
             network.SendAll(message);
         }
 
@@ -46,7 +47,7 @@ namespace GameInterface.Services.EquipmentRoster.Handlers
             var payload = obj.What;
 
             var EquipmentRoster = ObjectHelper.SkipConstructor<MBEquipmentRoster>();
-            if (objectManager.AddExisting(payload.EquipmentRosterId, EquipmentRoster) == false)
+            if (objectManager.AddExisting(payload.EquipmentRosterId, EquipmentRoster, payload.Handle) == false)
             {
                 Logger.Error("Failed to add existing EquipmentRoster, {id}", payload.EquipmentRosterId);
                 return;

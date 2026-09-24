@@ -11,9 +11,9 @@ namespace Coop.Core.Server.Services.MobileParties.Messages;
 public readonly struct NetworkUpdatePartyBehavior : IMessage
 {
     [ProtoMember(1)]
-    public readonly PartyBehaviorUpdateData BehaviorUpdateData;
+    public readonly NetworkPartyBehaviorUpdateData BehaviorUpdateData;
 
-    public NetworkUpdatePartyBehavior(PartyBehaviorUpdateData behaviorUpdateData)
+    public NetworkUpdatePartyBehavior(NetworkPartyBehaviorUpdateData behaviorUpdateData)
     {
         BehaviorUpdateData = behaviorUpdateData;
     }

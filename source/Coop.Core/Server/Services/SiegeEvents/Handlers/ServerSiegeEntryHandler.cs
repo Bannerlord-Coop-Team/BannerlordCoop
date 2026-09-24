@@ -23,7 +23,6 @@ using TaleWorlds.CampaignSystem.Actions;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Settlements;
 using TaleWorlds.Core;
-using static GameInterface.Services.ObjectManager.ObjectManager;
 
 namespace Coop.Core.Server.Services.SiegeEvents.Handlers;
 
@@ -117,9 +116,10 @@ internal class ServerSiegeEntryHandler : IHandler
 
         if (alreadyEntered)
         {
-            network.Send(peer, new NetworkPartyEnterSettlement(
-                Compact(request.SettlementId, typeof(Settlement)),
-                Compact(request.PartyId, typeof(MobileParty))));
+            if (!objectManager.TryGetHandleWithLogging(settlement, out var settlementHandle) ||
+                !objectManager.TryGetHandleWithLogging(party, out var partyHandle))
+                return false;
+            network.Send(peer, new NetworkPartyEnterSettlement(settlementHandle, partyHandle));
         }
         else
         {

@@ -12,9 +12,9 @@ namespace Coop.Core.Client.Services.MobileParties.Messages;
 internal class NetworkStartSettlementEncounter : ICommand
 {
     [ProtoMember(1)]
-    public string SettlementId;
+    public uint SettlementId;
     [ProtoMember(2)]
-    public string PartyId;
+    public uint PartyId;
 
     public NetworkStartSettlementEncounter(NetworkRequestStartSettlementEncounter payload)
     {

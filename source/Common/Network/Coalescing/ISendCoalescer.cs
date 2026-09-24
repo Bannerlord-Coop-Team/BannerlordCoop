@@ -49,7 +49,9 @@ public interface ISendCoalescer
     /// before sending that instance's destroy so its final state reaches clients ahead of the destroy.
     /// </summary>
     void FlushInstance(string instanceId, INetwork network);
+    void FlushInstance(uint instanceHandle, INetwork network);
 
     /// <summary>Discards the pending updates for one instance without sending them.</summary>
     void DropInstance(string instanceId);
+    void DropInstance(uint instanceHandle);
 }
