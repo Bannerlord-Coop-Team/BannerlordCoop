@@ -12,14 +12,24 @@ using Xunit;
 
 namespace GameInterface.Tests
 {
+    [Collection(nameof(PatchTestCollection))]
     public class PatchTest
     {
+        // Validate discovery without leaving production patches active in other tests.
         [Fact]
         public void HarmonyPatchesAll()
         {
-            var harmony = new Harmony("Test");
-
-            harmony.PatchAll(typeof(GameInterface).Assembly);
+            var harmony = new Harmony($"{typeof(PatchTest).FullName}.{nameof(HarmonyPatchesAll)}");
+            try
+            {
+                harmony.PatchAll(typeof(GameInterface).Assembly);
+                Assert.True(Harmony.HasAnyPatches(harmony.Id));
+            }
+            finally
+            {
+                harmony.UnpatchAll(harmony.Id);
+            }
+            Assert.False(Harmony.HasAnyPatches(harmony.Id));
         }
 
         [Fact]
