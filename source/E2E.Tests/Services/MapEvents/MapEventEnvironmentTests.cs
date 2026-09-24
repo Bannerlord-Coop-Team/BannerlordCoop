@@ -6,6 +6,7 @@ using GameInterface.Services.MapEvents.TroopSupply;
 using Common.Util;
 using GameInterface.Services.Entity;
 using GameInterface.Services.MapEventParties.Messages;
+using GameInterface.Services.MapEvents.Messages;
 using GameInterface.Services.MobileParties.Extensions;
 using GameInterface.Services.MobilePartyAIs.Patches;
 using TaleWorlds.CampaignSystem;
@@ -25,6 +26,73 @@ namespace E2E.Tests.Services.MapEvents;
 public class MapEventEnvironmentTests : MapEventTestBase
 {
     public MapEventEnvironmentTests(ITestOutputHelper output) : base(output) { }
+
+    [Theory]
+    [InlineData(BattleState.None, BattleSideEnum.None)]
+    [InlineData(BattleState.AttackerVictory, BattleSideEnum.Attacker)]
+    [InlineData(BattleState.DefenderVictory, BattleSideEnum.Defender)]
+    public void RepeatedOverrideWinner_DoesNotWriteManagedStateOrSendRequest(BattleState state, BattleSideEnum winner)
+    {
+        var battle = CreateServerMapEvent();
+        var client = Clients.First();
+        var diagnostics = new List<string>();
+        Action<string> capture = message =>
+        {
+            if (message.Contains("Client updated managed") && message.Contains("BattleState"))
+                diagnostics.Add(message);
+        };
+        client.NetworkSentMessages.Clear();
+        OutputSinkManager.AddLogCallback(capture);
+        try
+        {
+            client.Call(() =>
+            {
+                Assert.True(client.ObjectManager.TryGetObject<MapEvent>(battle.MapEventId, out var mapEvent));
+                mapEvent._battleState = state;
+                mapEvent.SetOverrideWinner(winner);
+                Assert.Equal(state, mapEvent.BattleState);
+            });
+            Assert.Empty(client.NetworkSentMessages.GetMessages<NetworkChangeBattleState>());
+            Assert.Empty(diagnostics);
+        }
+        finally
+        {
+            OutputSinkManager.RemoveLogCallback(capture);
+        }
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void ChangedOverrideWinner_PreservesRequestAndServerValidation(bool runOnServer)
+    {
+        var battle = CreateServerMapEvent();
+        var client = Clients.First();
+        foreach (var instance in Clients.Append(Server))
+            instance.Call(() =>
+            {
+                Assert.True(instance.ObjectManager.TryGetObject<MapEvent>(battle.MapEventId, out var mapEvent));
+                mapEvent._battleState = BattleState.DefenderVictory;
+            });
+        client.NetworkSentMessages.Clear();
+        (runOnServer ? Server : client).Call(() =>
+        {
+            Assert.True((runOnServer ? Server : client).ObjectManager.TryGetObject<MapEvent>(battle.MapEventId, out var mapEvent));
+            mapEvent.SetOverrideWinner(BattleSideEnum.None);
+        });
+        var requests = client.NetworkSentMessages.GetMessages<NetworkChangeBattleState>();
+        if (runOnServer)
+            Assert.Empty(requests);
+        else
+            Assert.Equal(BattleState.None, Assert.Single(requests).BattleState);
+        foreach (var instance in Clients.Append(Server))
+            instance.Call(() =>
+            {
+                Assert.True(instance.ObjectManager.TryGetObject<MapEvent>(battle.MapEventId, out var mapEvent));
+                var expected = runOnServer || instance == client ? BattleState.None : BattleState.DefenderVictory;
+                Assert.Equal(expected, mapEvent.BattleState);
+            });
+    }
 
     [Fact]
     public void NewMapEvent_ClientReplicaStartsWithNoRetreatState()
