@@ -8,11 +8,6 @@ using Xunit;
 
 namespace GameInterface.Tests.Services.MapEvents;
 
-/// <summary>
-/// An attached army member is permanently at the army_wait menu, so the player-party interaction dialog (and
-/// therefore the barter screen) must still be allowed to open there rather than being deferred like a
-/// transient menu.
-/// </summary>
 [Collection(nameof(CampaignCurrentCollection))]
 public class PlayerPartyMapConversationGateTests
 {
@@ -50,7 +45,6 @@ public class PlayerPartyMapConversationGateTests
     [Fact]
     public void CanOpenMapConversation_AtArmyWaitMenu_IsAllowed()
     {
-        // Army members sit at army_wait; a blanket AtMenu bail would soft-lock their interaction dialog.
         Assert.True(PlayerPartyInteractionHandler.CanOpenMapConversation(
             atMenu: true, currentMenuId: "army_wait", topScreenIsMapScreen: true));
     }
@@ -86,8 +80,6 @@ public class PlayerPartyMapConversationGateTests
     [Fact]
     public void CanOpenMapConversation_LiveEncounterWithSomeoneElse_IsDeferred()
     {
-        // Player is parked at army_encounter for an unrelated army when another player initiates an interaction.
-        // Opening the dialog here would let session teardown tear that encounter down.
         Assert.False(PlayerPartyInteractionHandler.CanOpenMapConversation(
             atMenu: true,
             currentMenuId: "army_encounter",
@@ -98,8 +90,6 @@ public class PlayerPartyMapConversationGateTests
     [Fact]
     public void CanOpenMapConversation_LiveEncounterWithSessionPartner_IsAllowed()
     {
-        // The in-army/outsider initiator legitimately reaches this point still in an army_encounter with the
-        // session's other party - that is not "unrelated" and must still open.
         Assert.True(PlayerPartyInteractionHandler.CanOpenMapConversation(
             atMenu: true,
             currentMenuId: "army_encounter",
@@ -143,7 +133,7 @@ public class PlayerPartyMapConversationGateTests
     }
 
     [Fact]
-    public void HasUnrelatedLiveEncounter_InitiatorWithEncounterAgainstAThirdParty_IsFalse()
+    public void HasUnrelatedLiveEncounter_InitiatorWithUnchangedEncounterAgainstAThirdParty_IsFalse()
     {
         var chosenMember = ObjectHelper.SkipConstructor<PartyBase>();
         var originallyEncounteredArmy = ObjectHelper.SkipConstructor<PartyBase>();
@@ -151,7 +141,75 @@ public class PlayerPartyMapConversationGateTests
 
         WithCampaign(encounter, originallyEncounteredArmy, () =>
         {
-            Assert.False(PlayerPartyInteractionHandler.HasUnrelatedLiveEncounter(
+            PlayerPartyInteractionDialogState.RecordInitiatingEncounter(encounter);
+            try
+            {
+                Assert.False(PlayerPartyInteractionHandler.HasUnrelatedLiveEncounter(
+                    chosenMember, localPlayerInitiated: true));
+            }
+            finally
+            {
+                PlayerPartyInteractionDialogState.Clear();
+            }
+        });
+    }
+
+    [Fact]
+    public void HasUnrelatedLiveEncounter_InitiatorWithReplacedEncounterAgainstAThirdParty_IsTrue()
+    {
+        var chosenMember = ObjectHelper.SkipConstructor<PartyBase>();
+        var newEncounterParty = ObjectHelper.SkipConstructor<PartyBase>();
+        var originalEncounter = ObjectHelper.SkipConstructor<PlayerEncounter>();
+        var replacementEncounter = ObjectHelper.SkipConstructor<PlayerEncounter>();
+
+        WithCampaign(replacementEncounter, newEncounterParty, () =>
+        {
+            PlayerPartyInteractionDialogState.RecordInitiatingEncounter(originalEncounter);
+            try
+            {
+                Assert.True(PlayerPartyInteractionHandler.HasUnrelatedLiveEncounter(
+                    chosenMember, localPlayerInitiated: true));
+            }
+            finally
+            {
+                PlayerPartyInteractionDialogState.Clear();
+            }
+        });
+    }
+
+    [Fact]
+    public void HasUnrelatedLiveEncounter_InitiatorWithReplacedEncounterThatNowMatchesSessionParty_IsFalse()
+    {
+        var sessionOtherParty = ObjectHelper.SkipConstructor<PartyBase>();
+        var originalEncounter = ObjectHelper.SkipConstructor<PlayerEncounter>();
+        var replacementEncounter = ObjectHelper.SkipConstructor<PlayerEncounter>();
+
+        WithCampaign(replacementEncounter, sessionOtherParty, () =>
+        {
+            PlayerPartyInteractionDialogState.RecordInitiatingEncounter(originalEncounter);
+            try
+            {
+                Assert.False(PlayerPartyInteractionHandler.HasUnrelatedLiveEncounter(
+                    sessionOtherParty, localPlayerInitiated: true));
+            }
+            finally
+            {
+                PlayerPartyInteractionDialogState.Clear();
+            }
+        });
+    }
+
+    [Fact]
+    public void HasUnrelatedLiveEncounter_InitiatorWithNoRecordedSnapshot_FallsThroughToNormalCheck()
+    {
+        var chosenMember = ObjectHelper.SkipConstructor<PartyBase>();
+        var currentEncounterParty = ObjectHelper.SkipConstructor<PartyBase>();
+        var encounter = ObjectHelper.SkipConstructor<PlayerEncounter>();
+
+        WithCampaign(encounter, currentEncounterParty, () =>
+        {
+            PlayerPartyInteractionDialogState.Clear();
+            Assert.True(PlayerPartyInteractionHandler.HasUnrelatedLiveEncounter(
                 chosenMember, localPlayerInitiated: true));
         });
     }
@@ -159,7 +217,6 @@ public class PlayerPartyMapConversationGateTests
     [Fact]
     public void HasUnrelatedLiveEncounter_ResponderWithEncounterAgainstTheSessionParty_IsFalse()
     {
-        // Responder side, but the encounter it is already in IS with the session counterpart - not unrelated.
         var sessionOtherParty = ObjectHelper.SkipConstructor<PartyBase>();
         var encounter = ObjectHelper.SkipConstructor<PlayerEncounter>();
 

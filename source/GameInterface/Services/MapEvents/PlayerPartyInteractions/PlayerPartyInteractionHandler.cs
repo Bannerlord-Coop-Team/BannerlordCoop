@@ -1530,12 +1530,12 @@ internal class PlayerPartyInteractionHandler : IHandler
     // interaction session is against.
     internal static bool HasUnrelatedLiveEncounter(PartyBase sessionOtherParty, bool localPlayerInitiated)
     {
-        if (localPlayerInitiated)
+        if (PlayerEncounter.Current == null)
         {
             return false;
         }
-
-        if (PlayerEncounter.Current == null)
+        
+        if (localPlayerInitiated && PlayerPartyInteractionDialogState.InitiatingEncounterStillCurrent())
         {
             return false;
         }

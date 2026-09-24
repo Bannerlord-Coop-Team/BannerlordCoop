@@ -6,6 +6,7 @@ using GameInterface.Services.MapEvents.Messages.Conversation;
 using GameInterface.Services.MapEvents.Patches;
 using GameInterface.Services.MapEvents.PlayerPartyInteractions;
 using GameInterface.Services.Players;
+using GameInterface.Tests.Services.SiegeEvents;
 using HarmonyLib;
 using System;
 using System.Collections.Generic;
@@ -17,12 +18,7 @@ using Xunit;
 
 namespace GameInterface.Tests.Services.MapEvents;
 
-/// <summary>
-/// Covers the prefix on ConversationManager.OpenMapConversation that reroutes a local player's map conversation
-/// with another player's party into the synced player-party interaction pipeline instead of letting vanilla
-/// open a local, unsynced one.
-/// </summary>
-[Collection(PlayerPartyInteractionStaticsCollection.Name)]
+[Collection(nameof(CampaignCurrentCollection))]
 public class PlayerToPlayerMapConversationRedirectPatchTests : IDisposable
 {
     private const string LocalControllerId = "PlayerOne";
@@ -99,7 +95,6 @@ public class PlayerToPlayerMapConversationRedirectPatchTests : IDisposable
     [Fact]
     public void ShouldRedirect_SelfIsAnotherPlayersParty_IsFalse()
     {
-        // Both sides are player parties but the local instance does not control the "self" side.
         var self = OtherPlayerParty();
         var other = OtherPlayerParty();
 
