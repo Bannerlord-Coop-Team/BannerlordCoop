@@ -26,6 +26,85 @@ public class BattleFormationSyncTests : MissionTestEnvironment
 {
     public BattleFormationSyncTests(ITestOutputHelper output) : base(output) { }
 
+    // Catch-up snapshots refresh existing remote agents but cannot overwrite local or newer-authority state.
+    [Theory]
+    [InlineData("owner", 0, "owner", 0, 7, 7)]
+    [InlineData("owner", 0, "owner", 0, -1, -1)]
+    [InlineData("peer", 0, "peer", 0, 7, 0)]
+    [InlineData("owner", 1, "owner", 0, 7, 0)]
+    [InlineData("owner", 0, "former", 0, 7, 0)]
+    public void CatchUp_RefreshesOnlyCurrentRemoteMembership(
+        string owner, long revision, string sender, long snapshotRevision, int slot, int expectedSlot)
+    {
+        using var fixture = new MissionEngineFixture();
+        var peer = Clients.First();
+        peer.Call(() =>
+        {
+            var mission = fixture.CreateMission(peer);
+            var broker = peer.Resolve<IMessageBroker>();
+            var registry = peer.Resolve<INetworkAgentRegistry>();
+            var session = Mock.Of<IBattleSession>(value => value.InstanceId == "battle" && value.OwnControllerId == "peer");
+            Mock.Get(session).Setup(value => value.IsOwn(It.IsAny<string>())).Returns((string id) => id == "peer");
+            using var spawner = new PuppetSpawner(broker, peer.ObjectManager, peer.Resolve<IPlayerManager>(),
+                peer.Resolve<ICoopMissionComponent>(), session, new CasualtyAttributionMap(),
+                Mock.Of<IBattleDeploymentCoordinator>(), new AgentFormationAssigner(), new BattleAgentBudget(),
+                peer.Resolve<IMissionWeaponDataMapper>());
+            var id = Guid.NewGuid();
+            var agent = mission.SpawnAgent(new AgentBuildData(Game.Current.PlayerTroop)
+                .Controller(AgentControllerType.None).Team(mission.DefenderTeam.Shell));
+            agent.Formation = mission.DefenderTeam.GetFormation(FormationClass.Infantry).Shell;
+            Assert.True(registry.TryRegisterAgent(owner, "original", "original", id, 0, agent, revision));
+            var record = new BattleAgentSpawnData(id, "troop", default, BattleSideEnum.Defender,
+                100f, sender, null, 0, new Equipment(), default, null, formationIndex: slot,
+                originalOwnerControllerId: "original", authorityRevision: snapshotRevision);
+
+            broker.Publish(this, new NetworkSpawnBattleAgents(new[] { record }));
+
+            if (expectedSlot == -1) Assert.Null(agent.Formation);
+            else Assert.Same(mission.DefenderTeam.GetFormation((FormationClass)expectedSlot).Shell, agent.Formation);
+            Assert.True(registry.TryGetAgentInfo(id, out var info));
+            Assert.Same(agent, info.Agent);
+            Assert.Equal(owner, info.CurrentAuthority);
+            Assert.Equal(revision, info.AuthorityRevision);
+        });
+    }
+
+    // Retrying an old buffered spawn must not undo a newer live formation update.
+    [Fact]
+    public void BufferedSpawn_DoesNotRefreshExistingMembership()
+    {
+        using var fixture = new MissionEngineFixture();
+        var peer = Clients.First();
+        peer.Call(() =>
+        {
+            var mission = fixture.CreateMission(peer);
+            var broker = peer.Resolve<IMessageBroker>();
+            var registry = peer.Resolve<INetworkAgentRegistry>();
+            var session = Mock.Of<IBattleSession>(value => value.InstanceId == "battle" && value.OwnControllerId == "peer");
+            using var spawner = new PuppetSpawner(broker, peer.ObjectManager, peer.Resolve<IPlayerManager>(),
+                peer.Resolve<ICoopMissionComponent>(), session, new CasualtyAttributionMap(),
+                Mock.Of<IBattleDeploymentCoordinator>(), new AgentFormationAssigner(),
+                Mock.Of<IBattleAgentBudget>(value => value.SlotsForEquipment(It.IsAny<Equipment>()) == 1),
+                peer.Resolve<IMissionWeaponDataMapper>());
+            var id = Guid.NewGuid();
+            var record = new BattleAgentSpawnData(id, "troop", default, BattleSideEnum.Defender,
+                100f, "owner", null, 0, new Equipment(), default, null, formationIndex: 0);
+            broker.Publish(this, new NetworkSpawnBattleAgents(new[] { record }));
+            var pending = (List<BattleAgentSpawnData>)AccessTools.Field(typeof(PuppetSpawner), "pendingPuppets").GetValue(spawner);
+            Assert.Single(pending);
+            var agent = mission.SpawnAgent(new AgentBuildData(Game.Current.PlayerTroop)
+                .Controller(AgentControllerType.None).Team(mission.DefenderTeam.Shell));
+            Assert.True(registry.TryRegisterAgent("owner", id, agent));
+            broker.Publish(this, new NetworkBattleAgentFormations("battle", "owner",
+                new[] { new BattleAgentFormationData(id, 7, 0) }));
+
+            spawner.DrainPendingPuppets();
+
+            Assert.Empty(pending);
+            Assert.Same(mission.DefenderTeam.GetFormation((FormationClass)7).Shell, agent.Formation);
+        });
+    }
+
     [Fact]
     public void BulkRegroup_CoalescesLatestSlotAndBoundsBatches()
     {

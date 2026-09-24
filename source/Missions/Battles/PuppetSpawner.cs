@@ -170,6 +170,19 @@ public class PuppetSpawner : IPuppetSpawner
         }
     }
 
+    // Refresh an existing remote puppet from a snapshot without changing local or newer-authority membership.
+    private void RefreshExistingFormation(BattleAgentSpawnData data, CoopAgentInfo info)
+    {
+        if (session.IsOwn(info.CurrentAuthority) || info.CurrentAuthority != data.OwnerControllerId
+            || info.AuthorityRevision != data.AuthorityRevision || info.Agent == null || !info.Agent.IsActive()) return;
+        if (data.FormationIndex < -1 || data.FormationIndex >= (int)FormationClass.NumberOfAllFormations) return;
+
+        if (data.FormationIndex == -1)
+            info.Agent.Formation = null;
+        else
+            formationAssigner.Assign(info.Agent, data.FormationIndex);
+    }
+
     private void RetainPendingFormation(Guid agentId, PendingAuthority authority)
     {
         if (pendingFormations.TryGetValue(agentId, out var pending)
@@ -307,7 +320,7 @@ public class PuppetSpawner : IPuppetSpawner
 
             try
             {
-                if (!TrySpawnPuppetNow(data, ref slotsAvailable))
+                if (!TrySpawnPuppetNow(data, ref slotsAvailable, refreshFormation: true))
                 {
                     lock (pendingPuppetLock)
                     {
@@ -332,7 +345,7 @@ public class PuppetSpawner : IPuppetSpawner
 
     // [Game thread] Spawn one puppet, consuming <paramref name="slotsAvailable"/> render slots on success.
     // Returns false when a required team, explicit party identity, deployment state, or render slot is pending.
-    private bool TrySpawnPuppetNow(BattleAgentSpawnData data, ref int slotsAvailable)
+    private bool TrySpawnPuppetNow(BattleAgentSpawnData data, ref int slotsAvailable, bool refreshFormation = false)
     {
         var registry = coopMissionComponent.AgentRegistry;
 
@@ -354,7 +367,12 @@ public class PuppetSpawner : IPuppetSpawner
             DiscardPendingFormations(data.AgentId);
             return true;
         }
-        if (registry.TryGetAgentInfo(data.AgentId, out _)) return true; // already spawned — dedupe
+        if (registry.TryGetAgentInfo(data.AgentId, out var existing))
+        {
+            // Only newly received snapshots refresh membership; buffered records may predate live transfers.
+            if (refreshFormation) RefreshExistingFormation(data, existing);
+            return true;
+        }
         PendingAuthority pendingAuthority;
         PendingAuthority pendingMountAuthority;
         lock (pendingPuppetLock)
