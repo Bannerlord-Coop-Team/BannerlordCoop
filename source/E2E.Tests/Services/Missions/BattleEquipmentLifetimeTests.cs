@@ -1,6 +1,11 @@
 ﻿using Common.Logging;
 using E2E.Tests.Environment;
 using GameInterface.Registry.Auto;
+using GameInterface.Services.Heroes.Messages;
+using GameInterface.Surrogates;
+using ProtoBuf;
+using System.IO;
+using TaleWorlds.Localization;
 using Missions.Battles;
 using Missions.Messages;
 using System;
@@ -102,6 +107,50 @@ public sealed class BattleEquipmentLifetimeTests : IDisposable
         });
 
         Assert.Contains(GetCapturedLogs(), ContainsClientEquipmentLifetimeError);
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void HeroEquipmentWireCopies_RemainTransientAndPreserveRegisteredEquipment(bool decodeOnServer)
+    {
+        _ = new SurrogateCollection();
+        var server = testEnvironment.Server;
+        var receiver = decodeOnServer ? server : testEnvironment.Clients.First();
+        string battleId = null!;
+        string civilianId = null!;
+        byte[] wire = null!;
+        server.Call(() =>
+        {
+            var battle = new Equipment(Equipment.EquipmentType.Battle);
+            var civilian = new Equipment(Equipment.EquipmentType.Civilian);
+            Assert.True(server.ObjectManager.TryGetId(battle, out battleId));
+            Assert.True(server.ObjectManager.TryGetId(civilian, out civilianId));
+            using var stream = new MemoryStream();
+            Serializer.Serialize(stream, new NetworkInitializeNewHero(
+                "Hero_wire_test", new TextObject("first"), new TextObject("name"),
+                civilianId, battleId, civilian, battle));
+            wire = stream.ToArray();
+        });
+
+        ClearCapturedLogs();
+        receiver.Call(() =>
+        {
+            using var stream = new MemoryStream(wire);
+            var received = Serializer.Deserialize<NetworkInitializeNewHero>(stream);
+            Assert.Equal(Equipment.EquipmentType.Civilian, received.CivilianEquipment._equipmentType);
+            Assert.Equal(Equipment.EquipmentType.Battle, received.BattleEquipment._equipmentType);
+            Assert.Equal(Equipment.EquipmentSlotLength, received.CivilianEquipment._itemSlots.Length);
+            Assert.Equal(Equipment.EquipmentSlotLength, received.BattleEquipment._itemSlots.Length);
+            Assert.False(receiver.ObjectManager.Contains(received.CivilianEquipment));
+            Assert.False(receiver.ObjectManager.Contains(received.BattleEquipment));
+            Assert.True(receiver.ObjectManager.TryGetObject<Equipment>(battleId, out var registeredBattle));
+            Assert.True(receiver.ObjectManager.TryGetObject<Equipment>(civilianId, out var registeredCivilian));
+            Assert.NotSame(registeredBattle, received.BattleEquipment);
+            Assert.NotSame(registeredCivilian, received.CivilianEquipment);
+            Assert.False(TransientEquipmentSyncScope.IsActive);
+        });
+        Assert.DoesNotContain(GetCapturedLogs(), ContainsClientEquipmentDiagnostic);
     }
 
     [Fact]

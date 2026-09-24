@@ -237,6 +237,108 @@ namespace E2E.Tests.Services.Heroes
             }
         }
 
+        [Theory]
+        [InlineData(-1f)]
+        [InlineData(0.75f)]
+        public void Client_PowerModifierGetter_PreservesLazyCacheWithoutMutationDiagnostic(float cached)
+        {
+            int diagnosticCount = 0;
+            Action<string> capture = message =>
+            {
+                if (message.Contains("Client updated managed") && message.Contains("_powerModifier"))
+                    Interlocked.Increment(ref diagnosticCount);
+            };
+            OutputSinkManager.AddLogCallback(capture);
+            try
+            {
+                foreach (var client in Clients)
+                {
+                    client.Call(() =>
+                    {
+                        Assert.True(client.ObjectManager.TryGetObject(HeroId, out Hero hero));
+                        hero._powerModifier = cached;
+                        float expected = cached == -1f
+                            ? Campaign.Current.Models.MilitaryPowerModel.GetPowerModifierOfHero(hero)
+                            : cached;
+                        var builder = new ContainerBuilder();
+                        builder.RegisterInstance(new DenyOriginalSyncPolicy()).As<ISyncPolicy>();
+                        using var container = builder.Build();
+                        using (ContainerProvider.UseContainerThreadSafe(container))
+                        {
+                            Assert.False(CallOriginalPolicy.IsOriginalAllowed());
+                            Assert.Equal(expected, hero.PowerModifier);
+                            Assert.Equal(expected, hero._powerModifier);
+                            Assert.Equal(expected, hero.PowerModifier);
+                            Assert.False(CallOriginalPolicy.IsOriginalAllowed());
+                        }
+                    });
+                }
+                Assert.Equal(0, Volatile.Read(ref diagnosticCount));
+            }
+            finally
+            {
+                OutputSinkManager.RemoveLogCallback(capture);
+            }
+        }
+
+        [Fact]
+        public void Client_UpdatePowerModifierOutsideGetter_RetainsMutationDiagnostic()
+        {
+            int diagnosticCount = 0;
+            Action<string> capture = message =>
+            {
+                if (message.Contains("Client updated managed") && message.Contains("_powerModifier"))
+                    Interlocked.Increment(ref diagnosticCount);
+            };
+            OutputSinkManager.AddLogCallback(capture);
+            try
+            {
+                foreach (var client in Clients)
+                {
+                    client.Call(() =>
+                    {
+                        Assert.True(client.ObjectManager.TryGetObject(HeroId, out Hero hero));
+                        hero._powerModifier = -1f;
+                        var builder = new ContainerBuilder();
+                        builder.RegisterInstance(new DenyOriginalSyncPolicy()).As<ISyncPolicy>();
+                        using var container = builder.Build();
+                        using (ContainerProvider.UseContainerThreadSafe(container))
+                        {
+                            hero.UpdatePowerModifier();
+                            Assert.False(CallOriginalPolicy.IsOriginalAllowed());
+                        }
+                    });
+                }
+                Assert.Equal(Clients.Count(), Volatile.Read(ref diagnosticCount));
+            }
+            finally
+            {
+                OutputSinkManager.RemoveLogCallback(capture);
+            }
+        }
+
+        [Fact]
+        public void Server_UpdatePowerModifier_ReplicatesCachedValue()
+        {
+            float expected = 0f;
+            Server.Call(() =>
+            {
+                Assert.True(Server.ObjectManager.TryGetObject(HeroId, out Hero hero));
+                hero._powerModifier = -1f;
+                expected = Campaign.Current.Models.MilitaryPowerModel.GetPowerModifierOfHero(hero);
+                hero.UpdatePowerModifier();
+                Assert.Equal(expected, hero._powerModifier);
+            });
+            foreach (var client in Clients)
+            {
+                client.Call(() =>
+                {
+                    Assert.True(client.ObjectManager.TryGetObject(HeroId, out Hero hero));
+                    Assert.Equal(expected, hero._powerModifier);
+                });
+            }
+        }
+
         private sealed class DenyOriginalSyncPolicy : ISyncPolicy
         {
             public bool AllowOriginal() => false;
