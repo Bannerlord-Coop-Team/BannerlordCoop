@@ -106,7 +106,8 @@ public sealed class BattleEquipmentLifetimeTests : IDisposable
             Assert.False(client.ObjectManager.TryGetId(unsupportedEquipment, out _));
         });
 
-        Assert.Contains(GetCapturedLogs(), ContainsClientEquipmentLifetimeError);
+        Assert.Contains(GetCapturedLogs(), log => ContainsClientEquipmentLifetimeError(log) &&
+            log.Contains("caller=") && log.Contains(nameof(BattleEquipmentLifetimeTests)));
     }
 
     [Theory]
@@ -175,7 +176,8 @@ public sealed class BattleEquipmentLifetimeTests : IDisposable
             var ordinaryEquipment = new Equipment(Equipment.EquipmentType.Battle);
             Assert.False(client.ObjectManager.TryGetId(ordinaryEquipment, out _));
         });
-        Assert.Contains(GetCapturedLogs(), ContainsClientEquipmentLifetimeError);
+        Assert.Contains(GetCapturedLogs(), log => ContainsClientEquipmentLifetimeError(log) &&
+            log.Contains("caller=") && log.Contains(nameof(BattleEquipmentLifetimeTests)));
     }
 
     private void CaptureLog(string message)

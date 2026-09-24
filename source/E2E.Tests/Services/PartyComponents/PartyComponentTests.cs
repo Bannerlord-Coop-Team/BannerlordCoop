@@ -1,4 +1,9 @@
 ﻿using E2E.Tests.Util;
+using Common.Logging;
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Runtime.Serialization;
 using HarmonyLib;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Party.PartyComponents;
@@ -9,6 +14,33 @@ public class PartyComponentTests : SyncTestBase
 {
     public PartyComponentTests(ITestOutputHelper output) : base(output)
     {
+    }
+
+    [Fact]
+    public void UnboundWarPartyBanner_ReportsCallerAndPreservesNullFallback()
+    {
+        var logs = new List<string>();
+        Action<string> capture = message => { lock (logs) logs.Add(message); };
+        OutputSinkManager.AddLogCallback(capture);
+        try
+        {
+            TestEnvironment.Clients.First().Call(() =>
+            {
+                var component = (LordPartyComponent)FormatterServices.GetUninitializedObject(typeof(LordPartyComponent));
+                Assert.Null(component.GetDefaultComponentBanner());
+                Assert.Null(component.MobileParty);
+            });
+            lock (logs)
+            {
+                Assert.Contains(logs, log => log.Contains("MobileParty is null") &&
+                    log.Contains(nameof(LordPartyComponent)) && log.Contains("caller=") &&
+                    log.Contains(nameof(UnboundWarPartyBanner_ReportsCallerAndPreservesNullFallback)));
+            }
+        }
+        finally
+        {
+            OutputSinkManager.RemoveLogCallback(capture);
+        }
     }
 
     [Fact]
