@@ -68,6 +68,9 @@ public class PuppetSpawner : IPuppetSpawner
     private readonly HashSet<string> disconnectedControllers = new HashSet<string>();
     private readonly HashSet<string> withdrawnHostControllers = new HashSet<string>();
     private readonly HashSet<Guid> retainedFormerHostAgentIds = new HashSet<Guid>();
+    private readonly Dictionary<Guid, (string Controller, BattleAgentFormationData Data)> pendingFormations = new();
+    private readonly HashSet<Guid> discardedFormationAgentIds = new();
+    private bool disposed;
 
     public PuppetSpawner(
         IMessageBroker messageBroker,
@@ -99,6 +102,7 @@ public class PuppetSpawner : IPuppetSpawner
         this.authorityMigrator = authorityMigrator;
 
         messageBroker.Subscribe<NetworkSpawnBattleAgents>(Handle_NetworkSpawnBattleAgents);
+        messageBroker.Subscribe<NetworkBattleAgentFormations>(Handle_Formations);
         messageBroker.Subscribe<NetworkRetainedPlayerHero>(Handle_RetainedPlayerHero);
         messageBroker.Subscribe<NetworkMissionPeerEntered>(Handle_PeerEntered);
         messageBroker.Subscribe<MissionPeerLeft>(Handle_PeerLeft);
@@ -108,6 +112,10 @@ public class PuppetSpawner : IPuppetSpawner
 
     public void Dispose()
     {
+        disposed = true;
+        messageBroker.Unsubscribe<NetworkBattleAgentFormations>(Handle_Formations);
+        pendingFormations.Clear();
+        discardedFormationAgentIds.Clear();
         messageBroker.Unsubscribe<NetworkSpawnBattleAgents>(Handle_NetworkSpawnBattleAgents);
         messageBroker.Unsubscribe<NetworkRetainedPlayerHero>(Handle_RetainedPlayerHero);
         playerHandoffs.Clear();
@@ -116,6 +124,65 @@ public class PuppetSpawner : IPuppetSpawner
         messageBroker.Unsubscribe<MissionPeerLeft>(Handle_PeerLeft);
         messageBroker.Unsubscribe<MissionPeerDisconnected>(Handle_PeerDisconnected);
         messageBroker.Unsubscribe<BattleHostMigrated>(Handle_BattleHostMigrated);
+    }
+
+    private void Handle_Formations(MessagePayload<NetworkBattleAgentFormations> payload)
+    {
+        GameThread.RunSafe(() =>
+        {
+            var message = payload.What;
+            if (disposed || message.BattleInstanceId != session.InstanceId
+                || string.IsNullOrEmpty(message.ControllerId) || session.IsOwn(message.ControllerId)
+                || message.Agents == null || message.Agents.Length > NetworkBattleAgentFormations.MaxUpdates) return;
+
+            foreach (var data in message.Agents)
+            {
+                if (data == null || data.AgentId == Guid.Empty || discardedFormationAgentIds.Contains(data.AgentId)
+                    || data.AuthorityRevision < 0
+                    || data.FormationIndex < -1 || data.FormationIndex >= (int)FormationClass.NumberOfAllFormations) continue;
+                if (pendingFormations.TryGetValue(data.AgentId, out var pending)
+                    && pending.Data.AuthorityRevision > data.AuthorityRevision) continue;
+                pendingFormations[data.AgentId] = (message.ControllerId, data);
+                if (pendingAuthorities.TryGetValue(data.AgentId, out var authority))
+                    RetainPendingFormation(data.AgentId, authority);
+            }
+            ApplyPendingFormations();
+        }, context: nameof(Handle_Formations));
+    }
+
+    private void ApplyPendingFormations()
+    {
+        if (disposed || Mission.Current == null || pendingFormations.Count == 0) return;
+        foreach (var id in new List<Guid>(pendingFormations.Keys))
+        {
+            if (!coopMissionComponent.AgentRegistry.TryGetAgentInfo(id, out var info)) continue;
+            var pending = pendingFormations[id];
+            // A new owner's update can arrive before the authority handoff on the other connection.
+            if (info.AuthorityRevision < pending.Data.AuthorityRevision) continue;
+            pendingFormations.Remove(id);
+            if (info.CurrentAuthority != pending.Controller || info.AuthorityRevision != pending.Data.AuthorityRevision
+                || session.IsOwn(info.CurrentAuthority) || info.Agent == null || !info.Agent.IsActive()) continue;
+
+            if (pending.Data.FormationIndex == -1)
+                info.Agent.Formation = null;
+            else
+                formationAssigner.Assign(info.Agent, pending.Data.FormationIndex);
+        }
+    }
+
+    private void RetainPendingFormation(Guid agentId, PendingAuthority authority)
+    {
+        if (pendingFormations.TryGetValue(agentId, out var pending)
+            && pending.Controller == authority.ControllerId && pending.Data.AuthorityRevision == authority.Revision)
+            authority.FormationIndex = pending.Data.FormationIndex;
+    }
+
+    private void DiscardPendingFormations(Guid agentId)
+    {
+        if (coopMissionComponent.AgentRegistry.TryGetAgentInfo(agentId, out _)) return;
+        pendingFormations.Remove(agentId);
+        // Keep the identity so late updates cannot recreate work for a discarded spawn.
+        discardedFormationAgentIds.Add(agentId);
     }
 
     private void Handle_RetainedPlayerHero(MessagePayload<NetworkRetainedPlayerHero> payload)
@@ -223,6 +290,8 @@ public class PuppetSpawner : IPuppetSpawner
     {
         if (Mission.Current == null)
         {
+            foreach (var data in agents)
+                if (data != null && data.AgentId != Guid.Empty) DiscardPendingFormations(data.AgentId);
             Logger.Warning(
                 "[BattleTraffic] Dropping spawn transfer {TransferId} batch {BatchIndex}/{BatchCount}: mission ended",
                 message.TransferId,
@@ -248,6 +317,7 @@ public class PuppetSpawner : IPuppetSpawner
             }
             catch (Exception e)
             {
+                DiscardPendingFormations(data.AgentId);
                 Logger.Error(e, "[BattleSync] Failed to spawn puppet {AgentId}; dropping it", data.AgentId);
             }
         }
@@ -266,7 +336,11 @@ public class PuppetSpawner : IPuppetSpawner
     {
         var registry = coopMissionComponent.AgentRegistry;
 
-        if (Mission.Current == null) return true;                       // no mission — drop
+        if (Mission.Current == null)
+        {
+            DiscardPendingFormations(data.AgentId);
+            return true;
+        }
         if (playerHandoffs.TryGetValue(data.AgentId, out var handoff))
         {
             if (authorityMigrator?.IsPlayerHandoffIdentityValid(handoff) != true) return false;
@@ -275,7 +349,11 @@ public class PuppetSpawner : IPuppetSpawner
                 data = handoff.CreateReturnedRecord();
         }
         if (!MergeSpawnAuthority(data)) return true;
-        if (IsWithdrawnPlayerParty(data)) return true;                  // stale replay after leave/drop — drop
+        if (IsWithdrawnPlayerParty(data))
+        {
+            DiscardPendingFormations(data.AgentId);
+            return true;
+        }
         if (registry.TryGetAgentInfo(data.AgentId, out _)) return true; // already spawned — dedupe
         PendingAuthority pendingAuthority;
         PendingAuthority pendingMountAuthority;
@@ -307,6 +385,7 @@ public class PuppetSpawner : IPuppetSpawner
 
         if (!objectManager.TryGetObjectWithLogging(data.CharacterId, out CharacterObject character))
         {
+            DiscardPendingFormations(data.AgentId);
             Logger.Warning("[BattleSync] Puppet skipped: unresolved character {Char} for agent {AgentId}", data.CharacterId, data.AgentId);
             return true;
         }
@@ -376,7 +455,11 @@ public class PuppetSpawner : IPuppetSpawner
         agent.FadeIn();
         if (data.Health > 0) agent.Health = data.Health;
 
-        formationAssigner.Assign(agent, data.FormationIndex);
+        // Retained spawns carry the last accepted formation even after their authority migrates.
+        if (pendingAuthority?.FormationIndex == -1)
+            agent.Formation = null;
+        else
+            formationAssigner.Assign(agent, pendingAuthority?.FormationIndex ?? data.FormationIndex);
         if (retainedPlayerBootstrap)
         {
             // BuildAgent has established InitialPlayerAgent; native deployment still owns its activation.
@@ -417,12 +500,14 @@ public class PuppetSpawner : IPuppetSpawner
             data.MovementId,
             agent,
             pendingAuthority?.Revision ?? data.AuthorityRevision);
+        if (agentRegistered) discardedFormationAgentIds.Remove(data.AgentId);
         if (agentRegistered && handoff != null
             && data.OwnerControllerId == handoff.ReturningControllerId
             && data.AuthorityRevision == handoff.Previous.AuthorityRevision + 1)
             appliedPlayerHandoffs.Add(data.AgentId);
         if (!agentRegistered)
         {
+            DiscardPendingFormations(data.AgentId);
             Logger.Error(
                 "[BattleDesync] Spawned puppet remained unregistered: kind=rider agentId={AgentId} " +
                 "owner={Owner} originalOwner={OriginalOwner} movementIdentity={Scope}/{MovementId} " +
@@ -574,6 +659,7 @@ public class PuppetSpawner : IPuppetSpawner
                 if (revision == authority.Revision && controllerId != authority.ControllerId) return false;
                 if (revision > authority.Revision)
                 {
+                    authority.FormationIndex = null;
                     authority.ControllerId = controllerId;
                     authority.Revision = revision;
                 }
@@ -583,6 +669,7 @@ public class PuppetSpawner : IPuppetSpawner
                 pendingAuthorities.Add(agentId,
                     new PendingAuthority(controllerId, revision, originalOwner, movementScopeId, movementId));
             }
+            RetainPendingFormation(agentId, pendingAuthorities[agentId]);
         }
         return true;
     }
@@ -696,7 +783,11 @@ public class PuppetSpawner : IPuppetSpawner
             {
                 pendingPuppets.RemoveAll(data =>
                 {
-                    if (withdrawnHandoffs.Contains(data.AgentId)) return true;
+                    if (withdrawnHandoffs.Contains(data.AgentId))
+                    {
+                        DiscardPendingFormations(data.AgentId);
+                        return true;
+                    }
                     var authority = GetPendingAuthority(data.AgentId, data.AuthorityRevision);
                     string riderController = authority?.ControllerId ?? data.OwnerControllerId;
                     if (riderController != controllerId)
@@ -709,7 +800,8 @@ public class PuppetSpawner : IPuppetSpawner
                         return false;
                     }
                     bool remove = !disconnected && (!wasHost || IsPlayerPartyRecord(data, controllerId));
-                    if (!remove) retainedAgentIds.Add(data.AgentId);
+                    if (remove) DiscardPendingFormations(data.AgentId);
+                    else retainedAgentIds.Add(data.AgentId);
                     return remove;
                 });
             }
@@ -784,6 +876,7 @@ public class PuppetSpawner : IPuppetSpawner
     {
         public string ControllerId;
         public long Revision;
+        public int? FormationIndex;
         public readonly string OriginalOwner;
         public readonly string MovementScopeId;
         public readonly ushort MovementId;
@@ -812,6 +905,8 @@ public class PuppetSpawner : IPuppetSpawner
     {
         if (Mission.Current == null || Mission.Current.DefenderTeam == null) return;
         ApplyPendingPlayerHandoffs();
+
+        ApplyPendingFormations();
 
         BattleAgentSpawnData[] pending;
         lock (pendingPuppetLock)
@@ -844,9 +939,11 @@ public class PuppetSpawner : IPuppetSpawner
             }
             catch (Exception e)
             {
+                DiscardPendingFormations(data.AgentId);
                 Logger.Error(e, "[BattleSync] Failed to spawn buffered puppet {AgentId}; dropping it", data.AgentId);
             }
         }
+        ApplyPendingFormations();
         PrunePendingAuthorities();
     }
 
