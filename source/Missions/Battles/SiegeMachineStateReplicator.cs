@@ -1464,7 +1464,6 @@ public partial class SiegeMachineStateReplicator : ISiegeMachineStateReplicator
             // BR-102: a deposed host's snapshot (its host-owned fields carry damage and removal-relevant
             // state) must not fight the promoted host's simulation — nor even be buffered for re-apply.
             if (DropStaleHostEpoch(obj.HostEpoch, nameof(NetworkSiegeMachineState))) return;
-            if (obj.HasMangonelAmmo && !session.IsHostController(obj.SenderControllerId)) return;
 
             RefreshMachineCache();
             var authority = ClassifySnapshotAuthority(

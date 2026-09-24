@@ -24,6 +24,8 @@ public class MangonelAmmoPickupPatch
     {
         var equip = AccessTools.Method(typeof(Agent), nameof(Agent.EquipWeaponToExtraSlotAndWield));
         var consume = AccessTools.Method(typeof(RangedSiegeWeapon), "ConsumeAmmo");
+        var pickupReplacement = AccessTools.Method(typeof(MangonelAmmoPickupPatch), nameof(PickUp));
+        var consumeReplacement = AccessTools.Method(typeof(MangonelAmmoPickupPatch), nameof(Consume));
         int pickups = 0;
         int consumes = 0;
         foreach (var instruction in instructions)
@@ -34,15 +36,17 @@ public class MangonelAmmoPickupPatch
                 machine.MoveLabelsFrom(instruction);
                 yield return machine;
                 instruction.opcode = OpCodes.Call;
-                instruction.operand = AccessTools.Method(typeof(MangonelAmmoPickupPatch), nameof(PickUp));
+                instruction.operand = pickupReplacement;
                 pickups++;
             }
             else if (instruction.Calls(consume))
             {
                 instruction.opcode = OpCodes.Call;
-                instruction.operand = AccessTools.Method(typeof(MangonelAmmoPickupPatch), nameof(Consume));
+                instruction.operand = consumeReplacement;
                 consumes++;
             }
+            else if (instruction.Calls(pickupReplacement)) pickups++;
+            else if (instruction.Calls(consumeReplacement)) consumes++;
             yield return instruction;
         }
         if (pickups != 1 || consumes != 1)

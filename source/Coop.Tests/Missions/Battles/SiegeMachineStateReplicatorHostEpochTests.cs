@@ -684,6 +684,29 @@ public class SiegeMachineStateReplicatorHostEpochTests : IDisposable
     }
 
     [Fact]
+    public void MangonelSupplyBeforeHostAssignment_IsRetainedUntilItsAuthorityArrives()
+    {
+        var supply = new NetworkSiegeMachineState(23, -1f, -1, -1, -1, -1f, false, -1,
+            -1000f, -1000f, hostEpoch: LocalEpoch + 1, senderControllerId: "promoted-host",
+            authorityRevision: 1, mangonelAmmo: 0);
+        broker.Publish(this, supply);
+        DrainGameThread();
+        Assert.Same(supply, Assert.Single(PendingStates()).Value);
+
+        session.SetupGet(s => s.HostEpoch).Returns(LocalEpoch + 1);
+        session.Setup(s => s.IsHostController(It.IsAny<string>()))
+            .Returns((string controllerId) => controllerId == "promoted-host");
+        broker.Publish(this, new NetworkSiegeMachineAuthority(23, "pilot", hostEpoch: LocalEpoch + 1,
+            authorityRevision: 1, senderControllerId: "promoted-host"));
+        DrainGameThread();
+        InvokePrivate("DrainPendingMachineStates");
+        var pending = Assert.Single(PendingStates()).Value;
+        Assert.True(pending.HasMangonelAmmo);
+        Assert.Equal(0, pending.MangonelAmmo);
+        Assert.Equal("promoted-host", pending.SenderControllerId);
+    }
+
+    [Fact]
     [Trait("Requirement", "BR-102")]
     public void AfterAcceptingAHigherEpoch_ADelayedLowerButStillAheadMachineState_IsDropped()
     {

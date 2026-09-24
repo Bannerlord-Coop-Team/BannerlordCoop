@@ -11,6 +11,7 @@ using Missions.Agents.Handlers;
 using Missions.Agents.Messages;
 using Missions.Agents.Packets;
 using Missions.Agents.Patches;
+using Missions.Battles;
 using Missions.Tournaments;
 using Missions.Tournaments.Messages;
 using ProtoBuf;
@@ -374,11 +375,13 @@ public class WeaponPickupSyncTests
             candidate => candidate.Category == MissionModule.WeaponPickupPatchCategory);
         var harmony = new Harmony(
             $"{nameof(MissionModule_RegistersWeaponPickupPatchCategory)}.{System.Guid.NewGuid()}");
+        var repeatedHarmony = new Harmony(harmony.Id + ".repeated");
         MethodInfo target = AccessTools.Method(typeof(Agent), "OnItemPickup");
 
         try
         {
             registration.Apply(harmony);
+            registration.Apply(repeatedHarmony);
 
             Patches patches = Harmony.GetPatchInfo(target);
             Assert.Contains(
@@ -388,9 +391,15 @@ public class WeaponPickupSyncTests
             var grantPatches = Harmony.GetPatchInfo(grantTarget);
             Assert.Contains(grantPatches.Postfixes, patch =>
                 patch.owner == harmony.Id && patch.PatchMethod.DeclaringType == typeof(LadderForkGrantPatch));
+            var pickupPatches = Harmony.GetPatchInfo(AccessTools.DeclaredMethod(typeof(Mangonel), "OnTick"));
+            Assert.Contains(pickupPatches.Transpilers, patch =>
+                patch.owner == harmony.Id && patch.PatchMethod.DeclaringType == typeof(MangonelAmmoPickupPatch));
+            Assert.Contains(pickupPatches.Transpilers, patch =>
+                patch.owner == repeatedHarmony.Id && patch.PatchMethod.DeclaringType == typeof(MangonelAmmoPickupPatch));
         }
         finally
         {
+            repeatedHarmony.UnpatchAll(repeatedHarmony.Id);
             harmony.UnpatchAll(harmony.Id);
         }
     }

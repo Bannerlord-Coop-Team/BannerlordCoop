@@ -189,6 +189,8 @@ public sealed partial class MangonelLoadReplicationTests
             .Cast<HarmonyPatchCategory>().Single();
         Assert.Equal(MissionModule.WeaponPickupPatchCategory, category.info.category);
         harmony.CreateClassProcessor(typeof(MangonelAmmoPickupPatch)).Patch();
+        var repeatedHarmony = new Harmony(harmony.Id + ".repeated");
+        repeatedHarmony.CreateClassProcessor(typeof(MangonelAmmoPickupPatch)).Patch();
         Assert.Contains(Harmony.GetPatchInfo(AccessTools.DeclaredMethod(typeof(Mangonel), "OnTick")).Transpilers,
             p => p.PatchMethod.DeclaringType == typeof(MangonelAmmoPickupPatch));
         bool oldEnabled = BattleSpawnConfig.Enabled;
@@ -208,6 +210,7 @@ public sealed partial class MangonelLoadReplicationTests
         }
         finally
         {
+            repeatedHarmony.UnpatchAll(repeatedHarmony.Id);
             MessageBroker.Instance.Unsubscribe(receive);
             BattleSpawnGate.EndBattle();
             BattleSpawnConfig.Enabled = oldEnabled;
