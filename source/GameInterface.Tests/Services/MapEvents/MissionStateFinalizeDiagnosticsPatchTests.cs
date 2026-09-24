@@ -2,7 +2,7 @@
 using GameInterface.Services.MapEvents;
 using Common.Logging;
 using System;
-using System.Collections.Generic;
+using System.Collections.Concurrent;
 using System.Linq;
 using TaleWorlds.Core;
 using System.Runtime.Serialization;
@@ -35,8 +35,8 @@ public class MissionStateFinalizeDiagnosticsPatchTests
     public void ExitDiagnostics_RecordRequestAndResultWithoutChangingMission()
     {
         var mission = (Mission)FormatterServices.GetUninitializedObject(typeof(Mission));
-        var logs = new List<string>();
-        Action<string> capture = logs.Add;
+        var logs = new ConcurrentQueue<string>();
+        Action<string> capture = logs.Enqueue;
         OutputSinkManager.AddLogCallback(capture);
         BattleSpawnGate.BeginBattle("diagnostic-battle");
         try
