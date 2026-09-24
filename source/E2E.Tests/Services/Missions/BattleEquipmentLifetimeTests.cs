@@ -6,6 +6,8 @@ using TaleWorlds.MountAndBlade;
 using TaleWorlds.MountAndBlade.ComponentInterfaces;
 using E2E.Tests.Environment;
 using GameInterface.Registry.Auto;
+using GameInterface.Services.Equipments.Patches;
+using SandBox.View.Map;
 using GameInterface.Services.Heroes.Messages;
 using GameInterface.Surrogates;
 using ProtoBuf;
@@ -259,6 +261,71 @@ public sealed class BattleEquipmentLifetimeTests : IDisposable
                 MissionGameModels.Current = previousModels;
             }
         }, new[] { AccessTools.Method(typeof(MBCommon), nameof(MBCommon.GetTotalMissionTime)) });
+    }
+
+    [Theory]
+    [InlineData(false, false)]
+    [InlineData(false, true)]
+    [InlineData(true, false)]
+    public void ConversationCopy_PreservesRegisteredEquipmentAndCloneOptions(bool onServer, bool stripWeapons)
+    {
+        string equipmentId = null!;
+        testEnvironment.Server.Call(() =>
+        {
+            var equipment = new Equipment(Equipment.EquipmentType.Battle);
+            Assert.True(testEnvironment.Server.ObjectManager.TryGetId(equipment, out equipmentId));
+        });
+        var instance = onServer ? testEnvironment.Server : testEnvironment.Clients.First();
+        instance.Call(() =>
+        {
+            Assert.True(instance.ObjectManager.TryGetObject<Equipment>(equipmentId, out var original));
+            var weapon = ObjectHelper.SkipConstructor<ItemObject>();
+            var armor = ObjectHelper.SkipConstructor<ItemObject>();
+            using (new AllowedThread())
+            {
+                original[EquipmentIndex.Weapon0] = new EquipmentElement(weapon);
+                original[EquipmentIndex.Head] = new EquipmentElement(armor);
+            }
+            ClearCapturedLogs();
+            var copy = ConversationEquipmentPatch.CloneForDisplay(original, stripWeapons);
+            Assert.NotSame(original, copy);
+            Assert.Same(weapon, original[EquipmentIndex.Weapon0].Item);
+            Assert.Same(armor, original[EquipmentIndex.Head].Item);
+            Assert.Same(armor, copy[EquipmentIndex.Head].Item);
+            Assert.Same(stripWeapons ? null : weapon, copy[EquipmentIndex.Weapon0].Item);
+            Assert.True(instance.ObjectManager.TryGetId(original, out var retainedId));
+            Assert.Equal(equipmentId, retainedId);
+            Assert.Equal(onServer, instance.ObjectManager.Contains(copy));
+            Assert.False(TransientEquipmentSyncScope.IsActive);
+            Assert.DoesNotContain(GetCapturedLogs(), ContainsClientEquipmentDiagnostic);
+        });
+    }
+
+    [Fact]
+    public void ConversationCopy_FailureRestoresClientEquipmentDiagnostics()
+    {
+        testEnvironment.Clients.First().Call(() =>
+        {
+            ClearCapturedLogs();
+            Assert.Throws<NullReferenceException>(() => ConversationEquipmentPatch.CloneForDisplay(null!, false));
+            Assert.False(TransientEquipmentSyncScope.IsActive);
+            _ = new Equipment(Equipment.EquipmentType.Battle);
+            Assert.Contains(GetCapturedLogs(), ContainsClientEquipmentLifetimeError);
+        });
+    }
+
+    [Fact]
+    public void ConversationCopy_ReplacesTheInstalledDisplayClone()
+    {
+        testEnvironment.Clients.First().Call(() =>
+        {
+            var target = AccessTools.Method(typeof(MapConversationTableau), "SpawnOpponentLeader");
+            var clone = AccessTools.Method(typeof(Equipment), nameof(Equipment.Clone));
+            var displayClone = AccessTools.Method(typeof(ConversationEquipmentPatch), nameof(ConversationEquipmentPatch.CloneForDisplay));
+            var instructions = PatchProcessor.GetCurrentInstructions(target);
+            Assert.Single(instructions.Where(instruction => instruction.Calls(displayClone)));
+            Assert.DoesNotContain(instructions, instruction => instruction.Calls(clone));
+        });
     }
 
     private static Equipment CreateBannerFixtureEquipment()

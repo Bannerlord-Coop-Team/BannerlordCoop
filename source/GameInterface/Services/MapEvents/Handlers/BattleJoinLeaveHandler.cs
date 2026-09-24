@@ -384,7 +384,7 @@ internal class BattleJoinLeaveHandler : IHandler
                 if (!objectManager.TryGetObjectWithLogging<PartyBase>(partyId, out var party)) return;
 
                 var mapEvent = party.MapEvent;
-                bool leaveSiege = IsAttackingSiegeAssault(party);
+                bool leaveSiege = IsBesiegerInSiegeBattle(party);
                 ApplyAuthoritativeLeave(party);
                 // Preserve the client's PlayerSiege reference until its explicit cleanup runs.
                 network.SendAll(new NetworkPartyLeftBattle(
@@ -487,9 +487,10 @@ internal class BattleJoinLeaveHandler : IHandler
         return true;
     }
 
-    private static bool IsAttackingSiegeAssault(PartyBase party)
+    private static bool IsBesiegerInSiegeBattle(PartyBase party)
     {
-        return party.MapEvent?.IsSiegeAssault == true && party.Side == BattleSideEnum.Attacker;
+        return (party.MapEvent?.IsSiegeAssault == true && party.Side == BattleSideEnum.Attacker) ||
+            (party.MapEvent?.IsSallyOut == true && party.Side == BattleSideEnum.Defender);
     }
 
     // Apply the received removal under AllowedThread and close this client's encounter UI when appropriate.

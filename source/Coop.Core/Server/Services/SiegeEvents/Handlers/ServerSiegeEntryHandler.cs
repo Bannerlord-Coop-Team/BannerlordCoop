@@ -497,8 +497,8 @@ internal class ServerSiegeEntryHandler : IHandler
         {
             if (!objectManager.TryGetObjectWithLogging<MobileParty>(obj.PartyId, out var party)) return;
 
-            if (party.MapEvent?.IsSiegeAssault == true &&
-                party.Party.Side == BattleSideEnum.Attacker)
+            if ((party.MapEvent?.IsSiegeAssault == true && party.Party.Side == BattleSideEnum.Attacker) ||
+                (party.MapEvent?.IsSallyOut == true && party.Party.Side == BattleSideEnum.Defender))
             {
                 messageBroker.Publish(
                     party,

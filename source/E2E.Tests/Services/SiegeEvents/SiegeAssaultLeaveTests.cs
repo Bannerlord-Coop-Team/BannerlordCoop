@@ -137,13 +137,20 @@ public class SiegeAssaultLeaveTests : MapEventTestBase
     }
 
     [Theory]
-    [InlineData(false)]
-    [InlineData(true)]
-    public void ActiveSiegeAttacker_WithOrWithoutServerCamp_CanLeave(bool serverHasCamp)
+    [InlineData(false, false, false)]
+    [InlineData(true, false, false)]
+    [InlineData(false, true, false)]
+    [InlineData(true, true, false)]
+    [InlineData(false, true, true)]
+    [InlineData(true, true, true)]
+    public void ActiveBesieger_WithOrWithoutServerCamp_CanLeave(bool serverHasCamp, bool sallyOut, bool lastBesieger)
     {
         var mapEvent = CreateServerMapEvent();
-        var partyId = JoinNewServerPartyToSide(mapEvent.MapEventId, BattleSideEnum.Attacker);
-        SetMapEventType(mapEvent.MapEventId, MapEvent.BattleTypes.Siege);
+        var partyId = lastBesieger ? mapEvent.DefenderPartyId :
+            JoinNewServerPartyToSide(mapEvent.MapEventId,
+                sallyOut ? BattleSideEnum.Defender : BattleSideEnum.Attacker);
+        SetMapEventType(mapEvent.MapEventId,
+            sallyOut ? MapEvent.BattleTypes.SallyOut : MapEvent.BattleTypes.Siege);
         var leavingClient = Clients.First();
         SetMainParty(leavingClient, partyId);
         var siegeEventId = SetClientOnlyCamp(leavingClient, partyId);
@@ -159,6 +166,13 @@ public class SiegeAssaultLeaveTests : MapEventTestBase
         Assert.NotNull(partyBaseId);
         AssertPartyState(Server, partyId, expectMapEvent: true, expectCamp: serverHasCamp);
         AssertPartyState(leavingClient, partyId, expectMapEvent: true, expectCamp: true);
+        EnableHeadlessEncounterFinish(leavingClient);
+        leavingClient.Call(() =>
+        {
+            Assert.True(leavingClient.ObjectManager.TryGetObject<MapEvent>(mapEvent.MapEventId, out var battle));
+            PlayerEncounter.Start();
+            PlayerEncounter.Current._mapEvent = battle;
+        }, MapEventDisabledMethods);
         Server.NetworkSentMessages.Clear();
 
         leavingClient.Call(() =>
@@ -176,12 +190,15 @@ public class SiegeAssaultLeaveTests : MapEventTestBase
         var approval = Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkBreakSiegeApproved>());
         Assert.Equal(SiegeBreakOutcome.Applied, approval.Outcome);
         Assert.True(approval.BattleLeaveApplied);
+        leavingClient.Call(() => Assert.Null(PlayerEncounter.Current));
 
         AssertPartyState(Server, partyId, expectMapEvent: false, expectCamp: false);
         foreach (var client in Clients)
         {
             AssertPartyState(client, partyId, expectMapEvent: false, expectCamp: false);
         }
+        foreach (var instance in Clients.Append(Server))
+            AssertPartyState(instance, mapEvent.AttackerPartyId, expectMapEvent: !lastBesieger, expectCamp: false);
     }
 
     [Fact]
