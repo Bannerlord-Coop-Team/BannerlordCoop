@@ -3,6 +3,7 @@ using LiteNetLib;
 using System;
 using System.Net;
 using System.Reflection;
+using System.Threading;
 
 namespace E2E.Tests.Environment.Extensions;
 
@@ -11,6 +12,8 @@ namespace E2E.Tests.Environment.Extensions;
 /// </summary>
 internal static class NetPeerExtensions
 {
+    private static int endpointSequence;
+    private static readonly IPAddress MockAddress = IPAddress.Parse("127.0.0.2");
     private static readonly FieldInfo Id = typeof(NetPeer).GetField(nameof(NetPeer.Id))!;
     private static readonly ConstructorInfo Ctor = typeof(NetPeer).GetConstructor(BindingFlags.NonPublic | BindingFlags.Instance, new Type[]
     {
@@ -25,7 +28,11 @@ internal static class NetPeerExtensions
 
     public static NetPeer CreatePeer()
     {
-        return ObjectHelper.SkipConstructor<NetPeer>();
+        var peer = ObjectHelper.SkipConstructor<NetPeer>();
+        // NetPeer inherits endpoint equality, so dictionary keys need distinct initialized endpoints.
+        peer.Address = MockAddress;
+        peer.Port = 1 + (int)(unchecked((uint)Interlocked.Increment(ref endpointSequence)) % 60000);
+        return peer;
     }
 
     public static NetPeer CreatePeer(int id)

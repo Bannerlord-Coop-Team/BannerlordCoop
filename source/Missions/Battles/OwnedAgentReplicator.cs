@@ -48,6 +48,9 @@ public interface IOwnedAgentReplicator : IDisposable
     /// call, before the native un-pause moves the troops, so the captured positions are the deployed ones.
     /// </summary>
     void BroadcastOwnDeployedTroops();
+
+    /// <summary>[Game thread] Refresh owned riders affected by an authority change, including their horses.</summary>
+    void BroadcastAuthorityRefresh(IReadOnlyCollection<Guid> changedAgentIds);
 }
 
 /// <inheritdoc cref="IOwnedAgentReplicator"/>
@@ -179,6 +182,20 @@ public class OwnedAgentReplicator : IOwnedAgentReplicator
         LogBatchSend("Committed deployment", records.Count, batches, null);
     }
 
+    public void BroadcastAuthorityRefresh(IReadOnlyCollection<Guid> changedAgentIds)
+    {
+        if (Mission.Current == null || changedAgentIds.Count == 0) return;
+        var changedIds = new HashSet<Guid>(changedAgentIds);
+        var records = BuildOwnedAgentRecords(ownPartyOnly: false);
+        records.RemoveAll(record => !changedIds.Contains(record.AgentId) && !changedIds.Contains(record.MountAgentId));
+        if (records.Count == 0) return;
+
+        var batches = spawnBatchCodec.Encode(records, SpawnBatchPurpose.CatchUp);
+        foreach (var batch in batches)
+            network.SendAll(batch);
+        LogBatchSend("Refreshed authority for", records.Count, batches, null);
+    }
+
     // [Game thread] Build spawn records for the battle agents WE currently own, at their CURRENT positions.
     // <paramref name="ownPartyOnly"/> limits it to the local player's own-party troops — used by the deployment
     // commit, which withholds those until they are placed; the joiner catch-up passes false to replay all we own.
@@ -233,6 +250,7 @@ public class OwnedAgentReplicator : IOwnedAgentReplicator
                 isRunningAway: agent.IsRunningAway,
                 authorityRevision: info.AuthorityRevision,
                 mountAuthorityRevision: mountInfo?.AuthorityRevision ?? 0,
+                mountOwnerControllerId: mountInfo?.CurrentAuthority ?? info.CurrentAuthority,
                 siegeEquipmentGrant: agent.Equipment[EquipmentIndex.ExtraWeaponSlot].IsEmpty
                     ? Guid.Empty : info.SiegeEquipmentGrant,
                 siegeEquipmentGrantRevision: info.SiegeEquipmentGrantRevision));

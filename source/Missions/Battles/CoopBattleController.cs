@@ -156,8 +156,10 @@ public class CoopBattleController : CoopMissionController
             puppetMountStateRepairer,
             battleDamageDataMapper);
         reinforcementFielder = new ReinforcementFielder(messageBroker, objectManager, coopMissionComponent, session, deployment, formationAssigner, casualties, agentBudget);
-        authorityMigrator = new BattleAuthorityMigrator(relayNetwork, messageBroker, objectManager, playerManager, coopMissionComponent, session, casualties, deployment, formationAssigner, missionContext, reinforcementFielder);
-        replicator = new OwnedAgentReplicator(
+        OwnedAgentReplicator ownedAgentReplicator = null;
+        authorityMigrator = new BattleAuthorityMigrator(relayNetwork, messageBroker, objectManager, playerManager, coopMissionComponent, session, casualties, deployment, formationAssigner, missionContext, reinforcementFielder,
+            changedAgentIds => ownedAgentReplicator.BroadcastAuthorityRefresh(changedAgentIds));
+        ownedAgentReplicator = new OwnedAgentReplicator(
             network,
             messageBroker,
             objectManager,
@@ -168,6 +170,7 @@ public class CoopBattleController : CoopMissionController
             spawnBatchCodec,
             missionWeaponDataMapper,
             authorityMigrator);
+        replicator = ownedAgentReplicator;
         puppetSpawner = new PuppetSpawner(
             messageBroker,
             objectManager,

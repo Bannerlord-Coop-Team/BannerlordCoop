@@ -31,6 +31,8 @@ public sealed class MangonelLoadReplicationTests : IDisposable
     private static readonly Dictionary<UsableMissionObject, Agent> Users = new();
     private static readonly Dictionary<Agent, ActionIndexCache> CurrentActions = new();
     private static bool changeActionOnUse;
+    private static int nativeBaseTicks;
+    private static int nativePickupConsumes;
 
     public MangonelLoadReplicationTests()
     {
@@ -88,6 +90,77 @@ public sealed class MangonelLoadReplicationTests : IDisposable
         Field<Dictionary<int, int>>(sut, "authorityRevisions")[1496] = 2;
         replicas.Add(sut);
         return (sut, info, machine, network);
+    }
+
+    [Theory]
+    [InlineData(true, false)]
+    [InlineData(true, true)]
+    [InlineData(false, false)]
+    public void NativeLoadingTick_OnlySimulatorConsumesWhileLocalPickupsRemainAvailable(
+        bool authorityKnown, bool localSimulator)
+    {
+        var replica = Replica("loader");
+        SetState(replica.Machine, RangedSiegeWeapon.WeaponState.LoadingAmmo);
+        Use(replica.Info.Agent, Point(replica.Machine));
+        CurrentActions[replica.Info.Agent] = ActionIndex(12);
+        var picker = New<Agent>();
+        AccessTools.Property(typeof(Agent), "Equipment").SetValue(picker, new MissionEquipment());
+        var pickup = New<StandingPoint>();
+        Use(picker, pickup);
+        CurrentActions[picker] = ActionIndexCache.act_pickup_boulder_end;
+        AccessTools.Property(typeof(UsableMachine), "AmmoPickUpPoints").SetValue(replica.Machine,
+            new List<StandingPoint> { pickup });
+        AccessTools.Property(typeof(RangedSiegeWeapon), "Projectile").SetValue(replica.Machine,
+            New<SynchedMissionObject>());
+        Stub(typeof(RangedSiegeWeapon), "OnTick", nameof(BaseTick));
+        Stub(typeof(WeakGameEntity), "IsVisibleIncludeParents", nameof(Active));
+        Stub(typeof(RangedSiegeWeapon), "ChangeProjectileEntityServer", nameof(Skip));
+        Stub(typeof(SynchedMissionObject), "SetVisibleSynched", nameof(Skip));
+        Stub(typeof(RangedSiegeWeapon), "ConsumeAmmo", nameof(PickupConsume));
+        Stub(typeof(Agent), nameof(Agent.EquipWeaponToExtraSlotAndWield), nameof(PickupEquip));
+        harmony.Patch(AccessTools.PropertyGetter(typeof(ScriptComponentBehavior), "GameEntity"),
+            prefix: new HarmonyMethod(typeof(MangonelLoadReplicationTests), nameof(Entity)));
+        harmony.Patch(AccessTools.PropertyGetter(typeof(Agent), nameof(Agent.IsAIControlled)),
+            prefix: new HarmonyMethod(typeof(MangonelLoadReplicationTests), nameof(NotAi)));
+        harmony.Patch(AccessTools.PropertySetter(typeof(RangedSiegeWeapon), nameof(RangedSiegeWeapon.State)),
+            prefix: new HarmonyMethod(typeof(MangonelLoadReplicationTests), nameof(NativeState)));
+        var patchType = typeof(BattleSpawnGate).Assembly
+            .GetType("GameInterface.Services.MapEvents.Patches.SiegeMachineAuthorityPatches");
+        harmony.CreateClassProcessor(patchType).Patch();
+        harmony.CreateClassProcessor(typeof(MangonelAmmoConsumedPatch)).Patch();
+
+        bool oldHost = SiegeMissionAuthorityGate.IsLocalAuthority;
+        bool oldKnown = SiegeMissionAuthorityGate.IsAuthorityKnown;
+        bool oldEnabled = BattleSpawnConfig.Enabled;
+        BattleSpawnConfig.Enabled = true;
+        BattleSpawnGate.BeginBattle("mangonel-former-simulator");
+        SiegeMissionAuthorityGate.IsLocalAuthority = false;
+        SiegeMissionAuthorityGate.IsAuthorityKnown = authorityKnown;
+        SiegeMissionAuthorityGate.SetClaimedMachines(localSimulator
+            ? new HashSet<int> { replica.Machine.Id.Id } : new HashSet<int>(), new HashSet<int>());
+        nativeBaseTicks = 0;
+        nativePickupConsumes = 0;
+        try
+        {
+            AccessTools.DeclaredMethod(typeof(Mangonel), "OnTick").Invoke(replica.Machine, new object[] { 0.1f });
+
+            Assert.Equal(1, nativeBaseTicks);
+            Assert.Equal(1, nativePickupConsumes);
+            Assert.Same(missile, picker.Equipment[EquipmentIndex.ExtraWeaponSlot].Item);
+            Assert.Null(picker.CurrentlyUsedGameObject);
+            Assert.Equal(localSimulator, replica.Info.Agent.Equipment[EquipmentIndex.ExtraWeaponSlot].IsEmpty);
+            Assert.Equal(localSimulator ? 1 : 0, Removals.TryGetValue(replica.Info.Agent, out int count) ? count : 0);
+            Assert.Equal(localSimulator ? RangedSiegeWeapon.WeaponState.WaitingBeforeIdle
+                : RangedSiegeWeapon.WeaponState.LoadingAmmo, replica.Machine.State);
+        }
+        finally
+        {
+            BattleSpawnGate.EndBattle();
+            BattleSpawnConfig.Enabled = oldEnabled;
+            SiegeMissionAuthorityGate.IsLocalAuthority = oldHost;
+            SiegeMissionAuthorityGate.IsAuthorityKnown = oldKnown;
+            SiegeMissionAuthorityGate.ResetClaimedMachines();
+        }
     }
 
 #if DEBUG
@@ -626,10 +699,28 @@ public sealed class MangonelLoadReplicationTests : IDisposable
     private void Stub(Type type, string name, string prefix) => harmony.Patch(AccessTools.Method(type, name),
         prefix: new HarmonyMethod(typeof(MangonelLoadReplicationTests), prefix));
     private static bool Skip() => false;
+    private static bool BaseTick() { nativeBaseTicks++; return false; }
+    private static bool PickupConsume() { nativePickupConsumes++; return false; }
+    private static bool Entity(ref WeakGameEntity __result) { __result = default; return false; }
+    private static bool NotAi(ref bool __result) { __result = false; return false; }
+    private static bool PickupEquip(Agent __instance, ref MissionWeapon __0)
+    {
+        __instance.Equipment[EquipmentIndex.ExtraWeaponSlot] = __0;
+        return false;
+    }
+    private static bool NativeState(RangedSiegeWeapon __instance, RangedSiegeWeapon.WeaponState __0)
+    {
+        AccessTools.Field(typeof(RangedSiegeWeapon), "_state").SetValue(__instance, __0);
+        return false;
+    }
     private static bool Active(ref bool __result) { __result = true; return false; }
     private static bool MainHand(ref EquipmentIndex __result) { __result = EquipmentIndex.ExtraWeaponSlot; return false; }
     private static bool OffHand(ref EquipmentIndex __result) { __result = EquipmentIndex.None; return false; }
-    private static bool ActionCode(ref int __result) { __result = 0; return false; }
+    private static bool ActionCode(string __0, ref int __result)
+    {
+        __result = __0 == "act_pickup_boulder_begin" ? 21 : __0 == "act_pickup_boulder_end" ? 22 : 0;
+        return false;
+    }
     private static ActionIndexCache ActionIndex(int index)
     {
         object action = default(ActionIndexCache);

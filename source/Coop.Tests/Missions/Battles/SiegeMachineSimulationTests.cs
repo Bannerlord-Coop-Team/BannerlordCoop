@@ -129,12 +129,13 @@ public class SiegeMachineSimulationTests : IDisposable
         (T)typeof(SiegeMachineStateReplicator).GetField(name, BindingFlags.Instance | BindingFlags.NonPublic).GetValue(replicator);
 
     [Theory]
-    [InlineData(typeof(RangedSiegeWeapon), "OnTick", "RangedPilotTickTranspiler", 1)]
-    [InlineData(typeof(Ballista), "OnTickParallel", "BallistaPilotTickTranspiler", 1)]
-    [InlineData(typeof(Mangonel), "OnTickParallel", "MangonelPilotTickTranspiler", 2)]
-    [InlineData(typeof(Trebuchet), "OnTickParallel", "TrebuchetPilotTickTranspiler", 2)]
-    public void RangedPilotTicks_ReplaceAllNativeSimulationChecksAndRetainVisualCode(
-        Type type, string methodName, string patchName, int expectedChecks)
+    [InlineData(typeof(RangedSiegeWeapon), "OnTick", "RangedPilotTickTranspiler", 1, 0)]
+    [InlineData(typeof(Ballista), "OnTickParallel", "BallistaPilotTickTranspiler", 1, 0)]
+    [InlineData(typeof(Mangonel), "OnTickParallel", "MangonelPilotTickTranspiler", 2, 0)]
+    [InlineData(typeof(Trebuchet), "OnTickParallel", "TrebuchetPilotTickTranspiler", 2, 0)]
+    [InlineData(typeof(Mangonel), "OnTick", "MangonelLoadTickTranspiler", 1, 1)]
+    public void RangedTicks_ReplaceOnlyMachineSimulationChecks(
+        Type type, string methodName, string patchName, int expectedChecks, int keptChecks)
     {
         var original = AccessTools.DeclaredMethod(type, methodName);
         var patchType = typeof(BattleSpawnGate).Assembly
@@ -143,19 +144,23 @@ public class SiegeMachineSimulationTests : IDisposable
         var nativeCheck = AccessTools.PropertyGetter(typeof(GameNetwork), nameof(GameNetwork.IsClientOrReplay));
         var authorityCheck = AccessTools.Method(patchType, "IsClientForMachine");
         var instructions = PatchProcessor.GetOriginalInstructions(original);
-        Assert.Equal(expectedChecks, instructions.Count(x => x.Calls(nativeCheck)));
+        Assert.Equal(expectedChecks + keptChecks, instructions.Count(x => x.Calls(nativeCheck)));
         int originalCount = instructions.Count;
 
         var patched = ((IEnumerable<CodeInstruction>)transpiler.Invoke(null,
             new object[] { instructions, original })).ToArray();
 
-        Assert.DoesNotContain(patched, x => x.Calls(nativeCheck));
+        Assert.Equal(keptChecks, patched.Count(x => x.Calls(nativeCheck)));
         Assert.Equal(expectedChecks, patched.Count(x => x.Calls(authorityCheck)));
         Assert.Equal(originalCount + expectedChecks, patched.Length);
         var repeated = ((IEnumerable<CodeInstruction>)transpiler.Invoke(null,
             new object[] { patched, original })).ToArray();
         Assert.Equal(patched.Length, repeated.Length);
         Assert.Equal(expectedChecks, repeated.Count(x => x.Calls(authorityCheck)));
+        Assert.Equal(keptChecks, repeated.Count(x => x.Calls(nativeCheck)));
+        if (keptChecks > 0)
+            Assert.True(Array.FindIndex(patched, x => x.Calls(nativeCheck))
+                < Array.FindIndex(patched, x => x.Calls(authorityCheck)));
     }
 
     [Theory]

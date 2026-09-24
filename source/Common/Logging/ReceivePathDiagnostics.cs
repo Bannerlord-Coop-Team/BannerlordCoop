@@ -100,6 +100,7 @@ public enum ReceivePathEvent
 {
     MappedReceive,
     UnmappedDrop,
+    PendingReliableBuffered,
     MissionPeerSend,
     CampaignRelaySend,
     SteamReceive,

@@ -91,6 +91,12 @@ internal class SiegeMachineAuthorityPatches
         IEnumerable<CodeInstruction> instructions,
         MethodBase __originalMethod) => MachineOnTickTranspiler(instructions, __originalMethod, expectedChecks: 2);
 
+    [HarmonyPatch(typeof(Mangonel), "OnTick")]
+    [HarmonyTranspiler]
+    private static IEnumerable<CodeInstruction> MangonelLoadTickTranspiler(
+        IEnumerable<CodeInstruction> instructions,
+        MethodBase __originalMethod) => MachineOnTickTranspiler(instructions, __originalMethod, nativeChecksToKeep: 1);
+
     [HarmonyPatch(typeof(Trebuchet), "OnTickParallel")]
     [HarmonyTranspiler]
     private static IEnumerable<CodeInstruction> TrebuchetPilotTickTranspiler(
@@ -100,12 +106,14 @@ internal class SiegeMachineAuthorityPatches
     private static IEnumerable<CodeInstruction> MachineOnTickTranspiler(
         IEnumerable<CodeInstruction> instructions,
         MethodBase __originalMethod,
-        int expectedChecks = 1)
+        int expectedChecks = 1,
+        int nativeChecksToKeep = 0)
     {
         var nativeClientGetter = AccessTools.PropertyGetter(typeof(GameNetwork), nameof(GameNetwork.IsClientOrReplay));
         var coopClientGetter = AccessTools.Method(typeof(SiegeMachineAuthorityPatches), nameof(IsClientForMachine));
         int replacements = 0;
         int existingReplacements = 0;
+        int keptChecks = 0;
 
         foreach (var instruction in instructions)
         {
@@ -122,6 +130,14 @@ internal class SiegeMachineAuthorityPatches
                 continue;
             }
 
+            // Mangonel's first check handles local pickups; only the loader branch belongs to its simulator.
+            if (keptChecks < nativeChecksToKeep)
+            {
+                keptChecks++;
+                yield return instruction;
+                continue;
+            }
+
             instruction.opcode = OpCodes.Ldarg_0;
             instruction.operand = null;
             yield return instruction;
@@ -129,11 +145,12 @@ internal class SiegeMachineAuthorityPatches
             replacements++;
         }
 
-        if (replacements != expectedChecks && !(replacements == 0 && existingReplacements == expectedChecks))
+        if (keptChecks != nativeChecksToKeep
+            || (replacements != expectedChecks && !(replacements == 0 && existingReplacements == expectedChecks)))
         {
             throw new InvalidOperationException(
                 $"Failed to patch siege machine authority check in {__originalMethod.Name}: " +
-                $"found {replacements} native and {existingReplacements} co-op checks.");
+                $"found {replacements} native, {existingReplacements} co-op and {keptChecks} retained checks.");
         }
     }
 
