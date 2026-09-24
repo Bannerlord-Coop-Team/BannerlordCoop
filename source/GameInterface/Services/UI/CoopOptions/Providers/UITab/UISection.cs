@@ -1,4 +1,6 @@
 ﻿using Common.Messaging;
+using System;
+using TaleWorlds.MountAndBlade.ViewModelCollection.GameOptions;
 using GameInterface.Services.UI.CoopOptions.Providers.BugReportTab;
 using GameInterface.Services.UI.CoopOptions.Providers.BugReportTab.Sections;
 using GameInterface.Services.UI.CoopOptions.Providers.ChatTab;
@@ -14,8 +16,11 @@ using TaleWorlds.Library;
 namespace GameInterface.Services.UI.CoopOptions.Providers.UITab;
 
 /// <summary>Edits grouped display settings while retaining their saved keys and notifications.</summary>
-public sealed class UISection : CoopOptionsSectionVM
+public sealed class UISection : CoopOptionsSectionVM, ICoopKeybindingSection
 {
+    private readonly IMessageBroker messageBroker;
+    public event Action<KeyOptionVM> KeybindRequested;
+    [DataSourceProperty] public PlayerListKeyVM PlayerListKey { get; }
     private bool nameplatesAvailable;
     public override string Id => "UISection";
     public string TitleText => "Interface";
@@ -45,6 +50,8 @@ public sealed class UISection : CoopOptionsSectionVM
     // Loads the existing display editors so saved preferences remain compatible.
     public UISection(CoopOptionsData options, IMessageBroker messageBroker)
     {
+        this.messageBroker = messageBroker;
+        PlayerListKey = new PlayerListKeyVM(UIOptionsTabProvider.GetPlayerListKey(options), key => KeybindRequested?.Invoke(key));
         BugReport = new BugReportSection(BugReportOptionsTabProvider.GetShowBugReportButtonOrDefault(options), messageBroker);
         Chat = new ChatSection(ChatOptionsTabProvider.GetShowChatOrDefault(options), messageBroker);
         MapTime = new MapTimeSection(MapTimeOptionsTabProvider.GetShowMapTimeInMissionsOrDefault(options));
@@ -55,6 +62,7 @@ public sealed class UISection : CoopOptionsSectionVM
     // Saves to the original keys used by overlay services, excluding server-disabled nameplates.
     public override void Apply(string tabId, CoopOptionsData options)
     {
+        options.SetSection(tabId, "PlayerList", new PlayerListSectionOptions { ToggleKey = PlayerListKey.CurrentKey.InputKey });
         BugReport.Apply(BugReportOptionsTabProvider.TabId, options);
         Chat.Apply(ChatOptionsTabProvider.TabId, options);
         MapTime.Apply(MapTimeOptionsTabProvider.TabId, options);
@@ -66,6 +74,8 @@ public sealed class UISection : CoopOptionsSectionVM
     // Notifies active overlays after the combined settings have been saved.
     public override void AfterApply()
     {
+        PlayerListKey.Apply();
+        messageBroker.Publish(this, new PlayerListKeySelected(PlayerListKey.CurrentKey.InputKey));
         BugReport.AfterApply();
         Chat.AfterApply();
         MapTime.AfterApply();
@@ -77,6 +87,8 @@ public sealed class UISection : CoopOptionsSectionVM
     // Releases each nested editor when the options screen closes.
     public override void OnFinalize()
     {
+        KeybindRequested = null;
+        PlayerListKey.OnFinalize();
         BugReport.OnFinalize();
         Chat.OnFinalize();
         MapTime.OnFinalize();

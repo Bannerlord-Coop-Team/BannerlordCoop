@@ -1,4 +1,5 @@
-﻿using Autofac;
+﻿using GameInterface.Services.UI.PlayerList;
+using Autofac;
 using Common.Messaging;
 using Common.Network;
 using Common.Serialization;
@@ -132,6 +133,9 @@ internal abstract class TestComponentBase
         RegisterMock<IMapEventInitializationBarrier>(builder);
         RegisterMock<IConnectedPlayerCountService>(builder);
         RegisterMock<IChatService>(builder);
+        RegisterMock<IPlayerListService>(builder);
+        RegisterMock<IPlayerActivityReader>(builder);
+        RegisterMock<IPlatformDisplayNameProvider>(builder);
         RegisterMock<IVoiceClient>(builder);
         RegisterMock<IChatPlayerNameResolver>(builder);
         // BattleHostHandler (MissionModule, auto-activated) needs the registry and the troop ledger,
