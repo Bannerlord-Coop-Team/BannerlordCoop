@@ -35,7 +35,8 @@ namespace Missions.Agents.Packets
             int? mountAction0TurnDirection = null,
             int? mountAction0TurnActionIndex = null,
             float? mountAction0TurnProgress = null,
-            bool? mountAction0IsSyntheticTurn = null)
+            bool? mountAction0IsSyntheticTurn = null,
+            long? mountAuthorityRevision = null)
         {
             MountInputVector = mountAgent.MovementInputVector;
             MountAction0Index = mountAgent.GetCurrentAction(0).Index;
@@ -73,6 +74,7 @@ namespace Missions.Agents.Packets
             MountMovementId = mountMovementId;
             MountIdentityScopeId = mountIdentityScopeId;
             MountAgentId = mountAgentId;
+            MountAuthorityRevision = mountAuthorityRevision;
             MountAction0Speed = syntheticStationaryTurn
                 ? 1f
                 : mountAction0Speed ?? renderedAction0Speed;
@@ -545,5 +547,9 @@ namespace Missions.Agents.Packets
         /// <summary>Whether channel zero is being driven through the bounded synthetic turn timeline.</summary>
         [ProtoMember(20)]
         public bool MountAction0IsSyntheticTurn { get; }
+
+        // Embedded poses may share ordering with the horse stream only in this authority generation.
+        [ProtoMember(21)]
+        public long? MountAuthorityRevision { get; }
     }
 }

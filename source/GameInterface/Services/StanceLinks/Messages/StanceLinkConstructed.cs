@@ -13,11 +13,14 @@ public readonly struct StanceLinkConstructed : ICommand
     public readonly string Faction2Id;
     [ProtoMember(3)]
     public readonly StanceType StanceType;
+    [ProtoMember(4)]
+    public readonly uint StanceLinkHandle;
 
-    public StanceLinkConstructed(string faction1Id, string faction2Id, StanceType stanceType)
+    public StanceLinkConstructed(string faction1Id, string faction2Id, StanceType stanceType, uint stanceLinkHandle = 0)
     {
         Faction1Id = faction1Id;
         Faction2Id = faction2Id;
         StanceType = stanceType;
+        StanceLinkHandle = stanceLinkHandle;
     }
 }

@@ -141,8 +141,8 @@ internal sealed class MapEventInitializationBarrier : IMapEventInitializationBar
                     tracker.AddParty(party);
         }
         Capture(state, mapEvent);
-        if (!TryResolveCommitIds(mapEvent, tracker,
-                out var mapEventId, out var trackerId, out var componentId, out var visualId))
+        if (!TryResolveCommitHandles(mapEvent, tracker,
+                out var mapEventHandle, out var trackerHandle, out var componentHandle, out var visualHandle))
         {
             AbortServer(mapEvent);
             return;
@@ -157,40 +157,40 @@ internal sealed class MapEventInitializationBarrier : IMapEventInitializationBar
         }
 
         network.SendAll(new NetworkMapEventInitialized(
-            mapEventId, false, trackerId, componentId, visualId, siegeGraph));
+            mapEventHandle, false, trackerHandle, componentHandle, visualHandle, siegeGraph));
         state.Committed = true;
         state.Announced.Clear();
         PublishPendingParties();
     }
 
-    private bool TryResolveCommitIds(MapEvent mapEvent, TroopUpgradeTracker tracker,
-        out string mapEventId, out string trackerId, out string componentId, out string visualId)
+    private bool TryResolveCommitHandles(MapEvent mapEvent, TroopUpgradeTracker tracker,
+        out uint mapEventHandle, out uint trackerHandle, out uint componentHandle, out uint visualHandle)
     {
-        bool hasEventId = TryGetId(mapEvent, out mapEventId);
-        bool hasTrackerId = TryGetId(tracker, out trackerId);
-        bool hasComponentId = TryGetId(mapEvent.Component, out componentId);
-        bool hasVisualId = TryGetId(mapEvent.MapEventVisual as GauntletMapEventVisual, out visualId);
-        if (hasEventId && hasTrackerId && hasComponentId && hasVisualId) return true;
+        bool hasEventHandle = TryGetHandle(mapEvent, out mapEventHandle);
+        bool hasTrackerHandle = TryGetHandle(tracker, out trackerHandle);
+        bool hasComponentHandle = TryGetHandle(mapEvent.Component, out componentHandle);
+        bool hasVisualHandle = TryGetHandle(mapEvent.MapEventVisual as GauntletMapEventVisual, out visualHandle);
+        if (hasEventHandle && hasTrackerHandle && hasComponentHandle && hasVisualHandle) return true;
 
         // The resulting abort destroys the whole battle graph on the server AND every client;
         // without a named reason its only trace is a generic ObjectManager id-miss line, which has
         // made this exit the least diagnosable step of battle replication.
         Logger.Error(
-            "Aborting MapEvent commit: unresolvable id (event={HasEventId}, tracker={HasTrackerId}, " +
-            "component={HasComponentId} [{ComponentType}], visual={HasVisualId} [{VisualType}])",
-            hasEventId, hasTrackerId,
-            hasComponentId, mapEvent.Component?.GetType().Name ?? "null",
-            hasVisualId, mapEvent.MapEventVisual?.GetType().Name ?? "null");
+            "Aborting MapEvent commit: unresolvable handle (event={HasEventHandle}, tracker={HasTrackerHandle}, " +
+            "component={HasComponentHandle} [{ComponentType}], visual={HasVisualHandle} [{VisualType}])",
+            hasEventHandle, hasTrackerHandle,
+            hasComponentHandle, mapEvent.Component?.GetType().Name ?? "null",
+            hasVisualHandle, mapEvent.MapEventVisual?.GetType().Name ?? "null");
         return false;
     }
 
     public void AbortServer(MapEvent mapEvent)
     {
         if (mapEvent == null || !states.TryGetValue(mapEvent, out var state) || state.Committed) return;
-        bool notified = TryGetId(mapEvent, out var id);
+        bool notified = TryGetHandle(mapEvent, out var handle);
         Logger.Error("Aborting MapEvent {MapEventId}: destroying its graph on the server and every notified client",
-            notified ? id : "<unregistered>");
-        if (notified) network.SendAll(new NetworkMapEventInitialized(id, true));
+            objectManager.TryGetId(mapEvent, out var id) ? id : "<unregistered>");
+        if (notified) network.SendAll(new NetworkMapEventInitialized(handle, true));
         DestroyGraph(mapEvent);
     }
 
@@ -198,6 +198,12 @@ internal sealed class MapEventInitializationBarrier : IMapEventInitializationBar
     {
         id = null;
         return instance == null || objectManager.TryGetIdWithLogging(instance, out id);
+    }
+
+    private bool TryGetHandle(object instance, out uint handle)
+    {
+        handle = 0;
+        return instance == null || objectManager.TryGetHandleWithLogging(instance, out handle);
     }
 
     private void HandlePendingParty(MessagePayload<NetworkMapEventPartyPending> payload)
@@ -219,7 +225,7 @@ internal sealed class MapEventInitializationBarrier : IMapEventInitializationBar
         var message = payload.What;
         GameThread.RunSafe(() =>
         {
-            if (!objectManager.TryGetObjectWithLogging<MapEvent>(message.MapEventId, out var mapEvent)) return;
+            if (!objectManager.TryGetObjectWithLogging<MapEvent>(message.MapEventHandle, out var mapEvent)) return;
             if (message.IsTerminal)
             {
                 FinishClient(mapEvent, abort: true);
@@ -229,16 +235,16 @@ internal sealed class MapEventInitializationBarrier : IMapEventInitializationBar
             if (message.SiegeGraph.IsComplete && !siegeEventGraphSynchronizer.TryApply(message.SiegeGraph))
             {
                 Logger.Error("Client could not apply the siege graph carried by MapEvent {MapEventId}",
-                    message.MapEventId);
+                    message.MapEventHandle);
                 FinishClient(mapEvent, abort: true);
                 return;
             }
 
             TroopUpgradeTracker tracker = null;
-            bool hasTracker = !string.IsNullOrEmpty(message.TroopUpgradeTrackerId) &&
-                objectManager.TryGetObjectWithLogging<TroopUpgradeTracker>(message.TroopUpgradeTrackerId, out tracker);
-            bool componentMatches = TryBindComponent(message.ComponentId, mapEvent);
-            bool visualMatches = Matches(message.VisualId, mapEvent.MapEventVisual as GauntletMapEventVisual);
+            bool hasTracker = message.TroopUpgradeTrackerHandle != 0 &&
+                objectManager.TryGetObjectWithLogging<TroopUpgradeTracker>(message.TroopUpgradeTrackerHandle, out tracker);
+            bool componentMatches = TryBindComponent(message.ComponentHandle, mapEvent);
+            bool visualMatches = Matches(message.VisualHandle, mapEvent.MapEventVisual as GauntletMapEventVisual);
             if (!hasTracker || !componentMatches || !visualMatches)
             {
                 // Destroying the replica graph over a mismatch must say WHICH member mismatched —
@@ -247,9 +253,9 @@ internal sealed class MapEventInitializationBarrier : IMapEventInitializationBar
                 Logger.Error(
                     "Client destroying MapEvent {MapEventId} graph at commit: tracker={HasTracker}, " +
                     "componentMatch={ComponentMatches}, visualMatch={VisualMatches} " +
-                    "(message visual id {VisualId}, local visual {LocalVisualType})",
-                    message.MapEventId, hasTracker, componentMatches, visualMatches,
-                    message.VisualId ?? "null", mapEvent.MapEventVisual?.GetType().Name ?? "null");
+                    "(message visual handle {VisualHandle}, local visual {LocalVisualType})",
+                    message.MapEventHandle, hasTracker, componentMatches, visualMatches,
+                    message.VisualHandle, mapEvent.MapEventVisual?.GetType().Name ?? "null");
                 FinishClient(mapEvent, abort: true);
                 return;
             }
@@ -259,14 +265,14 @@ internal sealed class MapEventInitializationBarrier : IMapEventInitializationBar
         }, context: nameof(NetworkMapEventInitialized));
     }
 
-    private bool Matches<T>(string id, T actual) where T : class =>
-        id == null ? actual == null :
-        objectManager.TryGetObjectWithLogging<T>(id, out var expected) && ReferenceEquals(expected, actual);
+    private bool Matches<T>(uint handle, T actual) where T : class =>
+        handle == 0 ? actual == null :
+        objectManager.TryGetObjectWithLogging<T>(handle, out var expected) && ReferenceEquals(expected, actual);
 
-    private bool TryBindComponent(string id, MapEvent mapEvent)
+    private bool TryBindComponent(uint handle, MapEvent mapEvent)
     {
         MapEventComponent component = null;
-        if (id != null && !objectManager.TryGetObjectWithLogging(id, out component))
+        if (handle != 0 && !objectManager.TryGetObjectWithLogging(handle, out component))
             return false;
 
         if (component?.MapEvent != null && !ReferenceEquals(component.MapEvent, mapEvent))

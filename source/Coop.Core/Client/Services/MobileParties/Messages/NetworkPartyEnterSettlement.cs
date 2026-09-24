@@ -11,11 +11,11 @@ namespace Coop.Core.Client.Services.MobileParties.Messages;
 public record NetworkPartyEnterSettlement : ICommand
 {
     [ProtoMember(1)]
-    public string SettlementId;
+    public uint SettlementId;
     [ProtoMember(2)]
-    public string PartyId;
+    public uint PartyId;
 
-    public NetworkPartyEnterSettlement(string settlementId, string partyId)
+    public NetworkPartyEnterSettlement(uint settlementId, uint partyId)
     {
         SettlementId = settlementId;
         PartyId = partyId;

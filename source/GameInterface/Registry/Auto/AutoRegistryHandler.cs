@@ -60,6 +60,7 @@ class AutoRegistryHandler<T> : IHandler where T : class
             Logger.Error("Unable to create new id for {type}", typeof(T).Name);
             return;
         }
+        if (!ObjectManager.TryGetHandleWithLogging(payload.What.Instance, out var handle)) return;
 
 
         if (Registry.Debug)
@@ -71,16 +72,15 @@ class AutoRegistryHandler<T> : IHandler where T : class
                 Environment.StackTrace);
         }
 
+        Network.SendAll(new NetworkCreateInstance<T>(id, handle));
+
         try { 
-            // Callback before sent on network
             Registry.OnServerCreated(payload.What.Instance, $"{typeof(T).Name}_{id}");
         }
         catch (Exception ex)
         {
             Logger.Error(ex, "Failed to run OnClientCreated for {MessageType}", payload.What.GetType());
         }
-
-        Network.SendAll(new NetworkCreateInstance<T>(id));
     }
 
     private void Handle_NetworkCreateInstance(MessagePayload<NetworkCreateInstance<T>> payload)
@@ -104,7 +104,7 @@ class AutoRegistryHandler<T> : IHandler where T : class
             }
         }
 
-        if (!ObjectManager.AddExisting($"{typeof(T).Name}_{id}", newInstance))
+        if (!ObjectManager.AddExisting($"{typeof(T).Name}_{id}", newInstance, payload.What.InstanceHandle))
         {
             Logger.Error("Failed to create new id for {type} with id {id}", typeof(T).Name, payload.What.InstanceId);
             return;
@@ -132,6 +132,7 @@ class AutoRegistryHandler<T> : IHandler where T : class
     private void Handle_InstanceDestroyed(MessagePayload<InstanceDestroyed<T>> payload)
     {
         if (!ObjectManager.TryGetIdWithLogging(payload.What.Instance, out string id)) return;
+        if (!ObjectManager.TryGetHandleWithLogging(payload.What.Instance, out var handle)) return;
 
         try
         {
@@ -154,7 +155,7 @@ class AutoRegistryHandler<T> : IHandler where T : class
 
         ObjectManager.Remove(payload.What.Instance);
 
-        Network.SendAll(new NetworkDestroyInstance<T>(id));
+        Network.SendAll(new NetworkDestroyInstance<T>(handle));
     }
 
     private void Handle_NetworkDestroyInstance(MessagePayload<NetworkDestroyInstance<T>> payload)
@@ -166,20 +167,21 @@ class AutoRegistryHandler<T> : IHandler where T : class
         // tearing down twice.
         GameThread.RunSafe(() =>
         {
-            if (!ObjectManager.TryGetObjectWithLogging(payload.What.InstanceId, out T obj)) return;
+            if (!ObjectManager.TryGetObjectWithLogging(payload.What.InstanceHandle, out T obj)) return;
+            if (!ObjectManager.TryGetIdWithLogging(obj, out var id)) return;
 
             if (Registry.Debug)
             {
                 Logger.Debug("[Client][{CallingMethod}] Destroyed instance of {type} with id {id}",
                     $"{nameof(AutoRegistryHandler<T>)}.{nameof(Handle_NetworkDestroyInstance)}",
                     typeof(T).Name,
-                    payload.What.InstanceId);
+                    id);
             }
 
             try
             {
                 // Callback before object is removed from registry
-                Registry.OnClientDestroyed(obj, payload.What.InstanceId);
+                Registry.OnClientDestroyed(obj, id);
             }
             catch (Exception ex)
             {

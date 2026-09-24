@@ -23,28 +23,28 @@ public class PlayerPartyTroopXpBaselineApplierTests
 
         var objectManager = new Mock<IObjectManager>();
         objectManager
-            .Setup(manager => manager.TryGetObjectWithLogging("members", out memberRoster))
+            .Setup(manager => manager.TryGetObjectWithLogging(1u, out memberRoster))
             .Returns(true);
         objectManager
-            .Setup(manager => manager.TryGetObjectWithLogging("prisoners", out prisonerRoster))
+            .Setup(manager => manager.TryGetObjectWithLogging(2u, out prisonerRoster))
             .Returns(true);
         objectManager
-            .Setup(manager => manager.TryGetObjectWithLogging("member", out member))
+            .Setup(manager => manager.TryGetObjectWithLogging(3u, out member))
             .Returns(true);
         objectManager
-            .Setup(manager => manager.TryGetObjectWithLogging("prisoner", out prisoner))
+            .Setup(manager => manager.TryGetObjectWithLogging(4u, out prisoner))
             .Returns(true);
         var applier = new PlayerPartyTroopXpBaselineApplier(objectManager.Object);
 
         bool applied = applier.TryApply(new[]
         {
-            new TroopRosterXpBaseline("members", new[]
+            new TroopRosterXpBaseline(1, new[]
             {
-                new TroopXpBaselineEntry("member", 123),
+                new TroopXpBaselineEntry(3, 123),
             }),
-            new TroopRosterXpBaseline("prisoners", new[]
+            new TroopRosterXpBaseline(2, new[]
             {
-                new TroopXpBaselineEntry("prisoner", 456),
+                new TroopXpBaselineEntry(4, 456),
             }),
         });
 
@@ -64,22 +64,22 @@ public class PlayerPartyTroopXpBaselineApplierTests
         CharacterObject missing = null;
         var objectManager = new Mock<IObjectManager>();
         objectManager
-            .Setup(manager => manager.TryGetObjectWithLogging("roster", out roster))
+            .Setup(manager => manager.TryGetObjectWithLogging(1u, out roster))
             .Returns(true);
         objectManager
-            .Setup(manager => manager.TryGetObjectWithLogging("character", out character))
+            .Setup(manager => manager.TryGetObjectWithLogging(2u, out character))
             .Returns(true);
         objectManager
-            .Setup(manager => manager.TryGetObjectWithLogging("missing", out missing))
+            .Setup(manager => manager.TryGetObjectWithLogging(3u, out missing))
             .Returns(false);
         var applier = new PlayerPartyTroopXpBaselineApplier(objectManager.Object);
 
         bool applied = applier.TryApply(new[]
         {
-            new TroopRosterXpBaseline("roster", new[]
+            new TroopRosterXpBaseline(1, new[]
             {
-                new TroopXpBaselineEntry("character", 100),
-                new TroopXpBaselineEntry("missing", 200),
+                new TroopXpBaselineEntry(2, 100),
+                new TroopXpBaselineEntry(3, 200),
             }),
         });
 

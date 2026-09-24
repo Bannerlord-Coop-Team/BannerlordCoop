@@ -24,52 +24,68 @@ namespace GameInterface.Services.SiegeEvents;
 internal readonly struct SiegeEventGraphSnapshot
 {
     public string SiegeEventId { get; }
-    public string SettlementId { get; }
+    public uint SiegeEventHandle { get; }
+    public uint SettlementHandle { get; }
     public string BesiegerCampId { get; }
-    public string LeaderPartyId { get; }
+    public uint BesiegerCampHandle { get; }
+    public uint LeaderPartyHandle { get; }
     public string AttackerSiegeEnginesId { get; }
+    public uint AttackerSiegeEnginesHandle { get; }
     public string DefenderSiegeEnginesId { get; }
+    public uint DefenderSiegeEnginesHandle { get; }
     public long SiegeStartTimeTicks { get; }
     public string BesiegerStrategyId { get; }
     public int BesiegerTroopsKilled { get; }
-    public string[] BesiegerPartyIds { get; }
+    public uint[] BesiegerPartyHandles { get; }
     public SiegeEngineGraphSnapshot[] AttackerEngines { get; }
     public SiegeEngineGraphSnapshot[] DefenderEngines { get; }
 
     public bool IsComplete =>
         !string.IsNullOrEmpty(SiegeEventId) &&
-        !string.IsNullOrEmpty(SettlementId) &&
+        SiegeEventHandle != 0 &&
+        SettlementHandle != 0 &&
         !string.IsNullOrEmpty(BesiegerCampId) &&
-        !string.IsNullOrEmpty(LeaderPartyId) &&
+        BesiegerCampHandle != 0 &&
+        LeaderPartyHandle != 0 &&
         !string.IsNullOrEmpty(AttackerSiegeEnginesId) &&
-        !string.IsNullOrEmpty(DefenderSiegeEnginesId);
+        AttackerSiegeEnginesHandle != 0 &&
+        !string.IsNullOrEmpty(DefenderSiegeEnginesId) &&
+        DefenderSiegeEnginesHandle != 0;
 
-    public bool HasState => BesiegerPartyIds != null;
+    public bool HasState => BesiegerPartyHandles != null;
 
     public SiegeEventGraphSnapshot(
         string siegeEventId,
-        string settlementId,
+        uint siegeEventHandle,
+        uint settlementHandle,
         string besiegerCampId,
-        string leaderPartyId,
+        uint besiegerCampHandle,
+        uint leaderPartyHandle,
         string attackerSiegeEnginesId,
+        uint attackerSiegeEnginesHandle,
         string defenderSiegeEnginesId,
+        uint defenderSiegeEnginesHandle,
         long siegeStartTimeTicks = 0,
         string besiegerStrategyId = null,
         int besiegerTroopsKilled = 0,
-        string[] besiegerPartyIds = null,
+        uint[] besiegerPartyHandles = null,
         SiegeEngineGraphSnapshot[] attackerEngines = null,
         SiegeEngineGraphSnapshot[] defenderEngines = null)
     {
         SiegeEventId = siegeEventId;
-        SettlementId = settlementId;
+        SiegeEventHandle = siegeEventHandle;
+        SettlementHandle = settlementHandle;
         BesiegerCampId = besiegerCampId;
-        LeaderPartyId = leaderPartyId;
+        BesiegerCampHandle = besiegerCampHandle;
+        LeaderPartyHandle = leaderPartyHandle;
         AttackerSiegeEnginesId = attackerSiegeEnginesId;
+        AttackerSiegeEnginesHandle = attackerSiegeEnginesHandle;
         DefenderSiegeEnginesId = defenderSiegeEnginesId;
+        DefenderSiegeEnginesHandle = defenderSiegeEnginesHandle;
         SiegeStartTimeTicks = siegeStartTimeTicks;
         BesiegerStrategyId = besiegerStrategyId;
         BesiegerTroopsKilled = besiegerTroopsKilled;
-        BesiegerPartyIds = besiegerPartyIds;
+        BesiegerPartyHandles = besiegerPartyHandles;
         AttackerEngines = attackerEngines;
         DefenderEngines = defenderEngines;
     }
@@ -89,22 +105,25 @@ public readonly struct SiegeEngineGraphSnapshot
     [ProtoMember(1)]
     public string Id { get; }
     [ProtoMember(2)]
-    public string EngineTypeId { get; }
+    public uint Handle { get; }
     [ProtoMember(3)]
-    public float Progress { get; }
+    public string EngineTypeId { get; }
     [ProtoMember(4)]
-    public float RedeploymentProgress { get; }
+    public float Progress { get; }
     [ProtoMember(5)]
-    public float Hitpoints { get; }
+    public float RedeploymentProgress { get; }
     [ProtoMember(6)]
-    public float MaxHitpoints { get; }
+    public float Hitpoints { get; }
     [ProtoMember(7)]
-    public SiegeEngineGraphLocation Location { get; }
+    public float MaxHitpoints { get; }
     [ProtoMember(8)]
+    public SiegeEngineGraphLocation Location { get; }
+    [ProtoMember(9)]
     public int Index { get; }
 
     public SiegeEngineGraphSnapshot(
         string id,
+        uint handle,
         string engineTypeId,
         float progress,
         float redeploymentProgress,
@@ -114,6 +133,7 @@ public readonly struct SiegeEngineGraphSnapshot
         int index = -1)
     {
         Id = id;
+        Handle = handle;
         EngineTypeId = engineTypeId;
         Progress = progress;
         RedeploymentProgress = redeploymentProgress;
@@ -169,26 +189,34 @@ internal sealed class SiegeEventGraphSynchronizer : ISiegeEventGraphSynchronizer
         var defenderEngines = settlement?.SiegeEngines;
 
         if (!objectManager.TryGetIdWithLogging(siegeEvent, out var siegeEventId)
-            || !objectManager.TryGetIdWithLogging(settlement, out var settlementId)
+            || !objectManager.TryGetHandleWithLogging(siegeEvent, out var siegeEventHandle)
+            || !objectManager.TryGetHandleWithLogging(settlement, out var settlementHandle)
             || !objectManager.TryGetIdWithLogging(camp, out var campId)
-            || !objectManager.TryGetIdWithLogging(leaderParty, out var leaderPartyId)
+            || !objectManager.TryGetHandleWithLogging(camp, out var campHandle)
+            || !objectManager.TryGetHandleWithLogging(leaderParty, out var leaderPartyHandle)
             || !objectManager.TryGetIdWithLogging(attackerEngines, out var attackerEnginesId)
+            || !objectManager.TryGetHandleWithLogging(attackerEngines, out var attackerEnginesHandle)
             || !objectManager.TryGetIdWithLogging(defenderEngines, out var defenderEnginesId)
-            || !TryCaptureParties(camp, leaderParty, out var besiegerPartyIds)
+            || !objectManager.TryGetHandleWithLogging(defenderEngines, out var defenderEnginesHandle)
+            || !TryCaptureParties(camp, leaderParty, out var besiegerPartyHandles)
             || !TryCaptureEngines(attackerEngines, out var attackerEngineStates)
             || !TryCaptureEngines(defenderEngines, out var defenderEngineStates)) return false;
 
         snapshot = new SiegeEventGraphSnapshot(
             siegeEventId,
-            settlementId,
+            siegeEventHandle,
+            settlementHandle,
             campId,
-            leaderPartyId,
+            campHandle,
+            leaderPartyHandle,
             attackerEnginesId,
+            attackerEnginesHandle,
             defenderEnginesId,
+            defenderEnginesHandle,
             siegeEvent.SiegeStartTime.NumTicks,
             camp.SiegeStrategy?.StringId,
             camp.NumberOfTroopsKilledOnSide,
-            besiegerPartyIds,
+            besiegerPartyHandles,
             attackerEngineStates,
             defenderEngineStates);
         return true;
@@ -197,15 +225,15 @@ internal sealed class SiegeEventGraphSynchronizer : ISiegeEventGraphSynchronizer
     public bool TryApply(SiegeEventGraphSnapshot snapshot)
     {
         if (!snapshot.IsComplete
-            || !objectManager.TryGetObjectWithLogging<Settlement>(snapshot.SettlementId, out var settlement)
-            || !objectManager.TryGetObjectWithLogging<MobileParty>(snapshot.LeaderPartyId, out var leaderParty)) return false;
+            || !objectManager.TryGetObjectWithLogging<Settlement>(snapshot.SettlementHandle, out var settlement)
+            || !objectManager.TryGetObjectWithLogging<MobileParty>(snapshot.LeaderPartyHandle, out var leaderParty)) return false;
 
-        bool hasSiegeEvent = objectManager.TryGetObject<SiegeEvent>(snapshot.SiegeEventId, out var siegeEvent);
-        bool hasCamp = objectManager.TryGetObject<BesiegerCamp>(snapshot.BesiegerCampId, out var camp);
+        bool hasSiegeEvent = objectManager.TryGetObject<SiegeEvent>(snapshot.SiegeEventHandle, out var siegeEvent);
+        bool hasCamp = objectManager.TryGetObject<BesiegerCamp>(snapshot.BesiegerCampHandle, out var camp);
         bool hasAttackerEngines = objectManager.TryGetObject<SiegeEnginesContainer>(
-            snapshot.AttackerSiegeEnginesId, out var attackerEngines);
+            snapshot.AttackerSiegeEnginesHandle, out var attackerEngines);
         bool hasDefenderEngines = objectManager.TryGetObject<SiegeEnginesContainer>(
-            snapshot.DefenderSiegeEnginesId, out var defenderEngines);
+            snapshot.DefenderSiegeEnginesHandle, out var defenderEngines);
         bool needsRecovery = !hasSiegeEvent || !hasCamp || !hasAttackerEngines || !hasDefenderEngines;
         if (needsRecovery && !snapshot.HasState) return false;
 
@@ -218,7 +246,7 @@ internal sealed class SiegeEventGraphSynchronizer : ISiegeEventGraphSynchronizer
         var attackerEngineTypes = new Dictionary<string, SiegeEngineType>();
         var defenderEngineTypes = new Dictionary<string, SiegeEngineType>();
         if (snapshot.HasState
-            && (!TryResolveParties(snapshot.BesiegerPartyIds, leaderParty, out besiegerParties)
+            && (!TryResolveParties(snapshot.BesiegerPartyHandles, leaderParty, out besiegerParties)
                 || !TryResolveEngineTypes(attackerSnapshots, out attackerEngineTypes)
                 || !TryResolveEngineTypes(defenderSnapshots, out defenderEngineTypes))) return false;
 
@@ -229,10 +257,12 @@ internal sealed class SiegeEventGraphSynchronizer : ISiegeEventGraphSynchronizer
         var createdProgresses = new List<(SiegeEngineConstructionProgress Instance, string Id)>();
 
         bool registered = objectManager.RunRegistrationTransaction(() =>
-            TryGetOrCreate(snapshot.SiegeEventId, out siegeEvent, out createdSiegeEvent)
-            && TryGetOrCreate(snapshot.BesiegerCampId, out camp, out createdCamp)
-            && TryGetOrCreate(snapshot.AttackerSiegeEnginesId, out attackerEngines, out createdAttackerEngines)
-            && TryGetOrCreate(snapshot.DefenderSiegeEnginesId, out defenderEngines, out createdDefenderEngines)
+            TryGetOrCreate(snapshot.SiegeEventId, snapshot.SiegeEventHandle, out siegeEvent, out createdSiegeEvent)
+            && TryGetOrCreate(snapshot.BesiegerCampId, snapshot.BesiegerCampHandle, out camp, out createdCamp)
+            && TryGetOrCreate(snapshot.AttackerSiegeEnginesId, snapshot.AttackerSiegeEnginesHandle,
+                out attackerEngines, out createdAttackerEngines)
+            && TryGetOrCreate(snapshot.DefenderSiegeEnginesId, snapshot.DefenderSiegeEnginesHandle,
+                out defenderEngines, out createdDefenderEngines)
             && TryRegisterProgresses(attackerSnapshots, createdProgresses)
             && TryRegisterProgresses(defenderSnapshots, createdProgresses));
         if (!registered) return false;
@@ -318,16 +348,16 @@ internal sealed class SiegeEventGraphSynchronizer : ISiegeEventGraphSynchronizer
         return true;
     }
 
-    private bool TryCaptureParties(BesiegerCamp camp, MobileParty leaderParty, out string[] ids)
+    private bool TryCaptureParties(BesiegerCamp camp, MobileParty leaderParty, out uint[] handles)
     {
         var parties = new List<MobileParty>();
         if (camp?._besiegerParties != null) parties.AddRange(camp._besiegerParties);
         if (leaderParty != null && !parties.Contains(leaderParty)) parties.Add(leaderParty);
 
-        ids = new string[parties.Count];
+        handles = new uint[parties.Count];
         for (int i = 0; i < parties.Count; i++)
         {
-            if (!objectManager.TryGetIdWithLogging(parties[i], out ids[i])) return false;
+            if (!objectManager.TryGetHandleWithLogging(parties[i], out handles[i])) return false;
         }
 
         return true;
@@ -383,10 +413,12 @@ internal sealed class SiegeEventGraphSynchronizer : ISiegeEventGraphSynchronizer
         ICollection<SiegeEngineGraphSnapshot> snapshots)
     {
         if (!objectManager.TryGetIdWithLogging(engine, out var id)
+            || !objectManager.TryGetHandleWithLogging(engine, out var handle)
             || string.IsNullOrEmpty(engine.SiegeEngine?.StringId)) return false;
 
         snapshots.Add(new SiegeEngineGraphSnapshot(
             id,
+            handle,
             engine.SiegeEngine.StringId,
             engine.Progress,
             engine.RedeploymentProgress,
@@ -397,18 +429,18 @@ internal sealed class SiegeEventGraphSynchronizer : ISiegeEventGraphSynchronizer
         return true;
     }
 
-    private bool TryResolveParties(string[] ids, MobileParty leaderParty, out MobileParty[] parties)
+    private bool TryResolveParties(uint[] handles, MobileParty leaderParty, out MobileParty[] parties)
     {
-        if (ids == null)
+        if (handles == null)
         {
             parties = new[] { leaderParty };
             return true;
         }
 
-        parties = new MobileParty[ids.Length];
-        for (int i = 0; i < ids.Length; i++)
+        parties = new MobileParty[handles.Length];
+        for (int i = 0; i < handles.Length; i++)
         {
-            if (!objectManager.TryGetObjectWithLogging(ids[i], out parties[i])) return false;
+            if (!objectManager.TryGetObjectWithLogging(handles[i], out parties[i])) return false;
         }
 
         if (!parties.Contains(leaderParty)) parties = parties.Append(leaderParty).ToArray();
@@ -425,6 +457,7 @@ internal sealed class SiegeEventGraphSynchronizer : ISiegeEventGraphSynchronizer
         foreach (var snapshot in snapshots)
         {
             if (string.IsNullOrEmpty(snapshot.Id)
+                || snapshot.Handle == 0
                 || string.IsNullOrEmpty(snapshot.EngineTypeId)
                 || engineTypes.ContainsKey(snapshot.Id)) return false;
 
@@ -443,10 +476,10 @@ internal sealed class SiegeEventGraphSynchronizer : ISiegeEventGraphSynchronizer
         if (snapshots == null) return true;
         foreach (var snapshot in snapshots)
         {
-            if (objectManager.TryGetObject<SiegeEngineConstructionProgress>(snapshot.Id, out _)) continue;
+            if (objectManager.TryGetObject<SiegeEngineConstructionProgress>(snapshot.Handle, out _)) continue;
 
             var progress = ObjectHelper.SkipConstructor<SiegeEngineConstructionProgress>();
-            if (!objectManager.AddExisting(snapshot.Id, progress)) return false;
+            if (!objectManager.AddExisting(snapshot.Id, progress, snapshot.Handle)) return false;
             created.Add((progress, snapshot.Id));
         }
 
@@ -482,7 +515,7 @@ internal sealed class SiegeEventGraphSynchronizer : ISiegeEventGraphSynchronizer
 
         foreach (var snapshot in snapshots)
         {
-            objectManager.TryGetObject<SiegeEngineConstructionProgress>(snapshot.Id, out var progress);
+            objectManager.TryGetObject<SiegeEngineConstructionProgress>(snapshot.Handle, out var progress);
             if (progress.SiegeEngine != engineTypes[snapshot.Id])
             {
                 ReflectionUtils.SetPrivateField(
@@ -517,13 +550,13 @@ internal sealed class SiegeEventGraphSynchronizer : ISiegeEventGraphSynchronizer
         }
     }
 
-    private bool TryGetOrCreate<T>(string id, out T instance, out bool created) where T : class
+    private bool TryGetOrCreate<T>(string id, uint handle, out T instance, out bool created) where T : class
     {
         created = false;
-        if (objectManager.TryGetObject<T>(id, out instance)) return true;
+        if (objectManager.TryGetObject<T>(handle, out instance)) return true;
 
         instance = ObjectHelper.SkipConstructor<T>();
-        if (!objectManager.AddExisting(id, instance))
+        if (!objectManager.AddExisting(id, instance, handle))
         {
             instance = null;
             return false;

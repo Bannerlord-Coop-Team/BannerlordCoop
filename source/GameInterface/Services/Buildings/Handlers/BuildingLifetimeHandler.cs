@@ -36,8 +36,9 @@ namespace GameInterface.Services.Buildings.Handlers
             var payload = obj.What;
 
             if (objectManager.AddNewObject(payload.Building, out string buildingId) == false) return;
+            if (!objectManager.TryGetHandleWithLogging(payload.Building, out var handle)) return;
 
-            var message = new NetworkCreateBuilding(buildingId);
+            var message = new NetworkCreateBuilding(buildingId, handle);
             network.SendAll(message);
         }
 
@@ -46,7 +47,7 @@ namespace GameInterface.Services.Buildings.Handlers
             var payload = obj.What;
 
             var building = ObjectHelper.SkipConstructor<Building>();
-            if (objectManager.AddExisting(payload.BuildingId, building) == false)
+            if (objectManager.AddExisting(payload.BuildingId, building, payload.Handle) == false)
             {
                 Logger.Error("Failed to add existing Building, {id}", payload.BuildingId);
                 return;

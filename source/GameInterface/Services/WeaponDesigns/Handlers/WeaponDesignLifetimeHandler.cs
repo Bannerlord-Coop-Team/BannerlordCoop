@@ -36,8 +36,9 @@ namespace GameInterface.Services.WeaponDesigns.Handlers
             var data = payload.What;
 
             if (objectManager.AddNewObject(data.WeaponDesign, out string weaponDesignId) == false) return;
+            if (!objectManager.TryGetHandleWithLogging(data.WeaponDesign, out var handle)) return;
 
-            var message = new NetworkCreateWeaponDesign(weaponDesignId);
+            var message = new NetworkCreateWeaponDesign(weaponDesignId, handle);
             network.SendAll(message);
         }
 
@@ -46,7 +47,7 @@ namespace GameInterface.Services.WeaponDesigns.Handlers
             var data = payload.What;
 
             var weaponDesign = ObjectHelper.SkipConstructor<WeaponDesign>();
-            if (objectManager.AddExisting(data.WeaponDesignId, weaponDesign) == false)
+            if (objectManager.AddExisting(data.WeaponDesignId, weaponDesign, data.Handle) == false)
             {
                 Logger.Error("Failed to add existing Building, {id}", data.WeaponDesignId);
                 return;

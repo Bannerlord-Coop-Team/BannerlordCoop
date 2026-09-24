@@ -8,11 +8,11 @@ namespace GameInterface.Services.Settlements.Messages;
 /// </summary>
 public record ChangeMobileParty : ICommand
 {
-    public string SettlementId { get; }
-    public string MobilePartyId { get; }
+    public uint SettlementId { get; }
+    public uint MobilePartyId { get; }
     public bool AddMobileParty { get; }
 
-    public ChangeMobileParty(string settlementId, string mobilePartyId, bool addMobileParty)
+    public ChangeMobileParty(uint settlementId, uint mobilePartyId, bool addMobileParty)
     {
         SettlementId = settlementId;
         MobilePartyId = mobilePartyId;

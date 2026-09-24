@@ -8,13 +8,13 @@ namespace GameInterface.Services.Party.Messages;
 internal readonly struct SellPrisoners : ICommand
 {
     [ProtoMember(1)]
-    public readonly string SellingPartyId;
+    public readonly uint SellingPartyId;
 
     [ProtoMember(2)]
     public readonly TroopRosterData LeftPrisonerRosterData;
 
     public SellPrisoners(
-        string sellingPartyId,
+        uint sellingPartyId,
         TroopRosterData leftPrisonerRosterData)
     {
         SellingPartyId = sellingPartyId;

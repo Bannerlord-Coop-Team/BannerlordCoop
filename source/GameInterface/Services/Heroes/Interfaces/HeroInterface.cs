@@ -5,6 +5,7 @@ using Common.Serialization;
 using Common.Util;
 using GameInterface.Serialization;
 using GameInterface.Serialization.External;
+using GameInterface.Services.Heroes.Data;
 using GameInterface.Services.MobileParties;
 using GameInterface.Services.MobileParties.Patches;
 using GameInterface.Services.ObjectManager;
@@ -34,7 +35,8 @@ public interface IHeroInterface : IGameAbstraction
     void SwitchToPlayer(Player player);
     Hero ServerUnpackHero(byte[] bytes);
     void SetupServerHero(Hero hero);
-    Hero ClientUnpackHero(byte[] bytes, Player player);
+    bool TryGetRegistrationHandles(Hero hero, out PlayerRegistrationHandles handles);
+    Hero ClientUnpackHero(byte[] bytes, Player player, PlayerRegistrationHandles handles);
 }
 
 internal class HeroInterface : IHeroInterface
@@ -97,10 +99,41 @@ internal class HeroInterface : IHeroInterface
         exception?.Throw();
     }
 
-    public Hero ClientUnpackHero(byte[] bytes, Player player)
+    public bool TryGetRegistrationHandles(Hero hero, out PlayerRegistrationHandles handles)
+    {
+        handles = default;
+        var party = hero?.PartyBelongedTo;
+        if (party == null ||
+            !objectManager.TryGetHandleWithLogging(hero, out var heroHandle) ||
+            !objectManager.TryGetHandleWithLogging(party, out var partyHandle) ||
+            !objectManager.TryGetHandleWithLogging(hero.Clan, out var clanHandle) ||
+            !objectManager.TryGetHandleWithLogging(hero.CharacterObject, out var characterHandle) ||
+            !objectManager.TryGetHandleWithLogging(hero.HeroDeveloper, out var developerHandle) ||
+            !objectManager.TryGetHandleWithLogging(party.ItemRoster, out var itemRosterHandle) ||
+            !objectManager.TryGetHandleWithLogging(party.Party, out var partyBaseHandle) ||
+            !objectManager.TryGetHandleWithLogging(party.MemberRoster, out var memberRosterHandle) ||
+            !objectManager.TryGetHandleWithLogging(party.PrisonRoster, out var prisonRosterHandle))
+        {
+            return false;
+        }
+
+        handles = new PlayerRegistrationHandles(
+            heroHandle,
+            partyHandle,
+            clanHandle,
+            characterHandle,
+            developerHandle,
+            itemRosterHandle,
+            partyBaseHandle,
+            memberRosterHandle,
+            prisonRosterHandle);
+        return true;
+    }
+
+    public Hero ClientUnpackHero(byte[] bytes, Player player, PlayerRegistrationHandles handles)
     {
         // The client applies the received creation as one suppressed main-thread operation.
-        return UnpackHero(bytes, hero => AssignClientHeroNetworkIds(hero, player), setupHero: true);
+        return UnpackHero(bytes, hero => AssignClientHeroNetworkIds(hero, player, handles), setupHero: true);
     }
 
     private Hero UnpackHero(byte[] bytes, Action<Hero> assignNetworkIds, bool setupHero)
@@ -318,22 +351,28 @@ internal class HeroInterface : IHeroInterface
     }
 
     /// <summary>
-    /// Client: reuse the ids the host already chose (carried by <paramref name="player"/>). The same StringIds
-    /// are stamped onto the received objects so every derived id and the campaign bookkeeping match the host.
+    /// Client: reuse the ids and handles the host already chose. The same StringIds are stamped onto the
+    /// received objects so every derived id and the campaign bookkeeping match the host.
     /// </summary>
-    private void AssignClientHeroNetworkIds(Hero hero, Player player)
+    private void AssignClientHeroNetworkIds(Hero hero, Player player, PlayerRegistrationHandles handles)
     {
         var party = hero.PartyBelongedTo;
 
-        RegisterPrimary(hero, StripTypePrefix(player.HeroId, hero));
-        RegisterPrimary(party, StripTypePrefix(player.MobilePartyId, party));
-        RegisterPrimary(hero.Clan, StripTypePrefix(player.ClanId, hero.Clan));
-        RegisterPrimary(hero.CharacterObject, StripTypePrefix(player.CharacterObjectId, hero.CharacterObject));
+        RegisterPrimary(hero, StripTypePrefix(player.HeroId, hero), handles.Hero);
+        RegisterPrimary(party, StripTypePrefix(player.MobilePartyId, party), handles.MobileParty);
+        RegisterPrimary(hero.Clan, StripTypePrefix(player.ClanId, hero.Clan), handles.Clan);
+        RegisterPrimary(
+            hero.CharacterObject,
+            StripTypePrefix(player.CharacterObjectId, hero.CharacterObject),
+            handles.CharacterObject);
 
         // HeroDeveloper is not a child of MBObjectBase, can't use RegisterPrimary
-        objectManager.AddExisting($"{nameof(HeroDeveloper)}_{StripTypePrefix(player.HeroId, hero)}", hero.HeroDeveloper);
+        objectManager.AddExisting(
+            $"{nameof(HeroDeveloper)}_{StripTypePrefix(player.HeroId, hero)}",
+            hero.HeroDeveloper,
+            handles.HeroDeveloper);
 
-        RegisterPartyChildren(party);
+        RegisterPartyChildren(party, handles);
     }
 
     private string NewServerStringId<T>(T obj) where T : MBObjectBase
@@ -346,6 +385,12 @@ internal class HeroInterface : IHeroInterface
         objectManager.AddExisting($"{typeof(T).Name}_{obj.StringId}", obj);
     }
 
+    private void RegisterPrimary<T>(T obj, string stringId, uint handle) where T : MBObjectBase
+    {
+        obj.StringId = stringId;
+        objectManager.AddExisting($"{typeof(T).Name}_{obj.StringId}", obj, handle);
+    }
+
     private void RegisterPartyChildren(MobileParty party)
     {
         // PartyBase + rosters have no StringId of their own; key them off the party's so host and client match.
@@ -355,9 +400,28 @@ internal class HeroInterface : IHeroInterface
         RegisterChild(party.PrisonRoster, $"{nameof(MobileParty.PrisonRoster)}_{party.StringId}");
     }
 
+    private void RegisterPartyChildren(MobileParty party, PlayerRegistrationHandles handles)
+    {
+        RegisterChild(party.ItemRoster, party.StringId, handles.ItemRoster);
+        RegisterChild(party.Party, party.StringId, handles.PartyBase);
+        RegisterChild(
+            party.MemberRoster,
+            $"{nameof(MobileParty.MemberRoster)}_{party.StringId}",
+            handles.MemberRoster);
+        RegisterChild(
+            party.PrisonRoster,
+            $"{nameof(MobileParty.PrisonRoster)}_{party.StringId}",
+            handles.PrisonRoster);
+    }
+
     private void RegisterChild(object obj, string suffix)
     {
         objectManager.AddExisting($"{obj.GetType().Name}_{suffix}", obj);
+    }
+
+    private void RegisterChild(object obj, string suffix, uint handle)
+    {
+        objectManager.AddExisting($"{obj.GetType().Name}_{suffix}", obj, handle);
     }
 
     /// <summary>

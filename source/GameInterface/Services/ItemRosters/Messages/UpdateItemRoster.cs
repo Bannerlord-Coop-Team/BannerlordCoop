@@ -7,12 +7,12 @@ namespace GameInterface.Services.ItemRosters.Messages;
 /// </summary>
 public readonly struct UpdateItemRoster : ICommand
 {
-    public readonly string ItemRosterId;
-    public readonly string ItemId;
-    public readonly string ItemModifierId;
+    public readonly uint ItemRosterId;
+    public readonly uint ItemId;
+    public readonly uint ItemModifierId;
     public readonly int Amount;
 
-    public UpdateItemRoster(string itemRosterId, string itemId, string itemModifierId, int amount)
+    public UpdateItemRoster(uint itemRosterId, uint itemId, uint itemModifierId, int amount)
     {
         ItemRosterId = itemRosterId;
         ItemId = itemId;

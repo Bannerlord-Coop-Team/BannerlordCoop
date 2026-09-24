@@ -5,6 +5,7 @@ using Common.Util;
 using Coop.Core.Common.Network;
 using E2E.Tests.Environment.Instance;
 using E2E.Tests.Environment.Mock;
+using GameInterface.Services.ObjectManager;
 using LiteNetLib;
 using System.Net;
 
@@ -27,6 +28,8 @@ public class TestNetworkRouter
     private ServerInstance Server;
     private readonly List<ClientInstance> Clients = new List<ClientInstance>();
     private readonly List<MockNetworkBase> networks = new List<MockNetworkBase>();
+    private readonly object handleGate = new object();
+    private readonly Dictionary<string, uint> fixtureHandles = new Dictionary<string, uint>();
     private int networkTickActive;
 
     internal event Action<NetPeer>? PeerConnectionGenerationChanged;
@@ -74,6 +77,31 @@ public class TestNetworkRouter
     public void AddClient(ClientInstance instance)
     {
         Clients.Add(instance);
+    }
+
+    public uint GetOrCreateFixtureHandle(string stringId)
+    {
+        lock (handleGate)
+        {
+            if (fixtureHandles.TryGetValue(stringId, out var existingHandle))
+                return existingHandle;
+
+            uint handle = 0;
+            Server.Call(() =>
+            {
+                var reservation = new object();
+                IObjectManager objectManager = Server.ObjectManager;
+                if (!objectManager.AddNewObject(reservation, out _) ||
+                    !objectManager.TryGetHandle(reservation, out handle) ||
+                    !objectManager.Remove(reservation))
+                {
+                    throw new InvalidOperationException($"Unable to reserve a network handle for {stringId}");
+                }
+            });
+
+            fixtureHandles.Add(stringId, handle);
+            return handle;
+        }
     }
 
     internal void AddNetwork(MockNetworkBase network)
