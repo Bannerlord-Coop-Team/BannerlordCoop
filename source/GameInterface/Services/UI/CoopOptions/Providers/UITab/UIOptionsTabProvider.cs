@@ -1,6 +1,7 @@
 ﻿using Common.Messaging;
 using GameInterface.Configuration;
 using System;
+using TaleWorlds.InputSystem;
 
 namespace GameInterface.Services.UI.CoopOptions.Providers.UITab;
 
@@ -9,6 +10,13 @@ public sealed class UIOptionsTabProvider : ICoopOptionsTabProvider
 {
     public const string TabId = "UITab";
     public string Id => TabId;
+
+    // Reads the persisted shortcut, retaining O for missing or unsupported values.
+    public static InputKey GetPlayerListKey(CoopOptionsData options)
+    {
+        var key = options.GetSectionOrDefault(TabId, "PlayerList", new PlayerListSectionOptions()).ToggleKey;
+        return PlayerListSectionOptions.IsSupported(key) ? key : InputKey.O;
+    }
 
     // Display preferences are available on every server.
     public bool IsAvailable(ModOptions modOptions) => true;

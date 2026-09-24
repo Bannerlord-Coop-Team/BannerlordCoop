@@ -12,7 +12,7 @@ public sealed class TogglePlayerListCommand : ICoopCommand
     public CoopCommandSide Side => CoopCommandSide.Client;
     public IExpectedArgs[] ExpectedArgs { get; } = System.Array.Empty<IExpectedArgs>();
 
-    // Exercises the same action as F8 and reports whether the current screen permits it.
+    // Exercises the same action as the configured shortcut and reports whether the current screen permits it.
     public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
     {
         if (!ContainerProvider.TryResolve<IPlayerListService>(out var service))

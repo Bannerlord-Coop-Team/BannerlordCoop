@@ -1,4 +1,8 @@
 ﻿using GameInterface.Services.Chat;
+using Common.Messaging;
+using GameInterface.Services.UI.CoopOptions;
+using GameInterface.Services.UI.CoopOptions.Providers.UITab;
+using TaleWorlds.InputSystem;
 using System;
 using System.Linq;
 
@@ -20,6 +24,8 @@ public interface IPlayerListService : IGameAbstraction
 public sealed class PlayerListService : IPlayerListService, IDisposable
 {
     private readonly IChatService chat;
+    private readonly IMessageBroker messageBroker;
+    private InputKey toggleKey;
     private PlayerListOverlay overlay;
     private readonly PlayerListVM viewModel;
 #if DEBUG
@@ -28,9 +34,12 @@ public sealed class PlayerListService : IPlayerListService, IDisposable
 #endif
 
     // Keeps chat focus separate from the player-list toggle.
-    public PlayerListService(IChatService chat)
+    public PlayerListService(IChatService chat, ICoopOptionsStore optionsStore, IMessageBroker messageBroker)
     {
         this.chat = chat;
+        this.messageBroker = messageBroker;
+        toggleKey = UIOptionsTabProvider.GetPlayerListKey(optionsStore.LoadOrDefault());
+        messageBroker.Subscribe<PlayerListKeySelected>(HandleKeySelected);
         viewModel = new PlayerListVM(() => overlay?.Close());
     }
 
@@ -38,7 +47,7 @@ public sealed class PlayerListService : IPlayerListService, IDisposable
     public void Initialize()
     {
         if (overlay != null) return;
-        overlay = new PlayerListOverlay(viewModel, chat);
+        overlay = new PlayerListOverlay(viewModel, chat, () => toggleKey);
         overlay.Initialize();
     }
 
@@ -80,9 +89,13 @@ public sealed class PlayerListService : IPlayerListService, IDisposable
     public string Describe() => $"Open: {viewModel.IsOpen}\n" + string.Join("\n",
         viewModel.Rows.Select(row => $"{row.ControllerId}: {row.PlatformName} | {row.HeroName} | {row.Status}"));
 
+    // Applies saved key changes without recreating the map overlay.
+    private void HandleKeySelected(MessagePayload<PlayerListKeySelected> payload) => toggleKey = payload.What.Key;
+
     // Removes the global layer and its bindings when the co-op session ends.
     public void Dispose()
     {
+        messageBroker.Unsubscribe<PlayerListKeySelected>(HandleKeySelected);
         overlay?.Dispose();
         overlay = null;
         viewModel.OnFinalize();

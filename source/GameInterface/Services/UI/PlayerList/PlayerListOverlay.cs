@@ -19,14 +19,16 @@ internal sealed class PlayerListOverlay : GlobalLayer, IDisposable
 {
     private readonly PlayerListVM viewModel;
     private readonly IChatService chat;
+    private readonly Func<InputKey> toggleKey;
     private GauntletLayer layer;
     private GauntletMovieIdentifier movie;
 
     // Receives presentation state and the chat focus guard.
-    public PlayerListOverlay(PlayerListVM viewModel, IChatService chat)
+    public PlayerListOverlay(PlayerListVM viewModel, IChatService chat, Func<InputKey> toggleKey)
     {
         this.viewModel = viewModel;
         this.chat = chat;
+        this.toggleKey = toggleKey;
     }
 
     // Keeps an unfocused layer available to receive the map toggle while closed.
@@ -53,7 +55,7 @@ internal sealed class PlayerListOverlay : GlobalLayer, IDisposable
             Close();
             return;
         }
-        if (Input.IsKeyPressed(InputKey.F8)) Toggle();
+        if (Input.IsKeyPressed(toggleKey())) Toggle();
         else if (viewModel.IsOpen && Input.IsKeyReleased(InputKey.Escape)) Close();
     }
 

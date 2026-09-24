@@ -1,5 +1,9 @@
 ﻿using GameInterface.Services.Players.Data;
 using GameInterface.Services.Chat;
+using Common.Messaging;
+using GameInterface.Services.UI.CoopOptions;
+using GameInterface.Services.UI.CoopOptions.Providers.UITab;
+using TaleWorlds.InputSystem;
 using Moq;
 using GameInterface.Services.UI.PlayerList;
 using ProtoBuf;
@@ -84,7 +88,9 @@ public class PlayerListTests
     [Fact]
     public void PreviewRestoresLatestReceivedRoster()
     {
-        using var service = new PlayerListService(Mock.Of<IChatService>());
+        var store = new Mock<ICoopOptionsStore>();
+        store.Setup(x => x.LoadOrDefault()).Returns(new CoopOptionsData());
+        using var service = new PlayerListService(Mock.Of<IChatService>(), store.Object, Mock.Of<IMessageBroker>());
         service.PreviewLayout(true);
         service.Update(new[] { new PlayerListEntry { ControllerId = "real", PlatformName = "Actual player" } });
         Assert.Contains("Preview Player 18", service.Describe());
@@ -93,6 +99,23 @@ public class PlayerListTests
         Assert.DoesNotContain("Preview", service.Describe());
     }
 #endif
+
+    // A changed binding stays local until Apply and is persisted with the UI settings.
+    [Fact]
+    public void PlayerListBindingIsSavedOnlyOnApply()
+    {
+        var options = new CoopOptionsData();
+        var broker = new Mock<IMessageBroker>();
+        var section = new UISection(options, broker.Object);
+        Assert.Equal(InputKey.O, section.PlayerListKey.CurrentKey.InputKey);
+        section.PlayerListKey.Set(InputKey.F8);
+        Assert.Equal(InputKey.O, UIOptionsTabProvider.GetPlayerListKey(options));
+        section.Apply(UIOptionsTabProvider.TabId, options);
+        Assert.Equal(InputKey.F8, UIOptionsTabProvider.GetPlayerListKey(options));
+        section.PlayerListKey.Set(InputKey.Escape);
+        Assert.Equal(InputKey.F8, section.PlayerListKey.CurrentKey.InputKey);
+        section.OnFinalize();
+    }
 
     // Missing assignment is explicit and never masquerades as an idle campaign hero.
     [Fact]
