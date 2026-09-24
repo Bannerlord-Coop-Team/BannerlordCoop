@@ -2,6 +2,7 @@
 
 namespace GameInterface.Services.Players.Data;
 
+/// <summary>Stores a player's controller identity, campaign objects and last known platform name.</summary>
 [ProtoContract(SkipConstructor = true)]
 public class Player
 {
@@ -15,7 +16,10 @@ public class Player
     public readonly string ClanId;
     [ProtoMember(5)]
     public readonly string CharacterObjectId;
+    [ProtoMember(6)]
+    public string PlatformName { get; set; }
 
+    // Associates one controller with its registered campaign objects.
     public Player(string controllerId, string heroId, string mobilePartyId, string clanId, string characterObjectId)
     {
         ControllerId = controllerId;
