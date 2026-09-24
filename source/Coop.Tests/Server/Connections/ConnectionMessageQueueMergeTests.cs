@@ -1,4 +1,4 @@
-using Common.Messaging;
+﻿using Common.Messaging;
 using Common.Network;
 using Common.Network.Messages;
 using Common.PacketHandlers;
@@ -35,8 +35,8 @@ public class ConnectionMessageQueueMergeTests
         return peer;
     }
 
-    private MessagePacket Item(int amount, string roster = "roster", string item = "item", string? modifier = null) =>
-        MessagePacket.Create(new NetworkItemRosterUpdate(roster, item, modifier!, amount), serializer);
+    private MessagePacket Item(int amount, uint roster = 1, uint item = 2, uint modifier = 0) =>
+        MessagePacket.Create(new NetworkItemRosterUpdate(roster, item, modifier, amount), serializer);
 
     private void Drain(ConnectionMessageQueue queue, NetPeer peer)
     {
@@ -96,10 +96,10 @@ public class ConnectionMessageQueueMergeTests
         var peer = Join(queue);
         var packets = new[]
         {
-            Item(1), Item(2, modifier: "fine"), Item(3, item: "food"), Item(4, roster: "other"),
-            Item(5), MessagePacket.Create(new NetworkItemRosterClear("roster"), serializer), Item(6),
-            MessagePacket.Create(new NetworkDestroyInstance<ItemRoster>("roster"), serializer),
-            MessagePacket.Create(new NetworkCreateInstance<ItemRoster>("roster"), serializer), Item(7),
+            Item(1), Item(2, modifier: 3), Item(3, item: 4), Item(4, roster: 5),
+            Item(5), MessagePacket.Create(new NetworkItemRosterClear(1), serializer), Item(6),
+            MessagePacket.Create(new NetworkDestroyInstance<ItemRoster>(1), serializer),
+            MessagePacket.Create(new NetworkCreateInstance<ItemRoster>("roster", 1), serializer), Item(7),
             MessagePacket.Create(new AddOutputProgressForTown("workshop", 0.1f), serializer), Item(8)
         };
         foreach (var packet in packets) queue.TryHandleBroadcast(peer, packet);
@@ -119,7 +119,7 @@ public class ConnectionMessageQueueMergeTests
         queue.EndFinalBaselineCoverage(peer);
         queue.TryHandleBroadcast(peer, Item(3));
         queue.TryHandleBroadcast(peer, Item(4));
-        var tail = new NetworkItemRosterClear("tail");
+        var tail = new NetworkItemRosterClear(9);
         while (queue.OpenWithTailBatch(peer, tail, () => true).HasMore) { }
 
         Assert.Equal(new[] { 1, 2, 3, 4 }, ReadItems(peer).Select(item => item.Amount));
@@ -165,7 +165,7 @@ public class ConnectionMessageQueueMergeTests
         queue.TryHandleBroadcast(peer, Item(int.MaxValue - 2));
         Assert.True(queue.HasCatchUpOverflowed(peer));
         queue.TryHandleBroadcast(peer, Item(1));
-        var result = queue.OpenWithTailBatch(peer, new NetworkItemRosterClear("tail"), () => true);
+        var result = queue.OpenWithTailBatch(peer, new NetworkItemRosterClear(9), () => true);
         Assert.True(result.Overflowed);
         Assert.Equal(2, ReadItems(peer).Single().Amount);
         Assert.DoesNotContain(network.ImmediateSends, send => send.Payload is IMessage);

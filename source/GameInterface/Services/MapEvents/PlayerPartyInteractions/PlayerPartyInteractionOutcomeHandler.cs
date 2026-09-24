@@ -1,4 +1,4 @@
-using Common;
+﻿using Common;
 using Common.Logging;
 using GameInterface.Services.Inventory.Data;
 using GameInterface.Services.Kingdoms;
@@ -581,9 +581,9 @@ internal class PlayerPartyInteractionOutcomeHandler
         return result;
     }
 
-    private Dictionary<string, TroopRequest> BuildTroopRequests(TroopRosterElementData[] offeredTroops)
+    private Dictionary<uint, TroopRequest> BuildTroopRequests(TroopRosterElementData[] offeredTroops)
     {
-        var result = new Dictionary<string, TroopRequest>();
+        var result = new Dictionary<uint, TroopRequest>();
         if (offeredTroops == null) return result;
 
         foreach (var offeredTroop in offeredTroops)

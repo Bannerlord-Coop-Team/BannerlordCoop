@@ -24,6 +24,8 @@ public class JoinCampaignBaselineHandlerTests
     private readonly Mock<ITimeControlInterface> timeControl = new Mock<ITimeControlInterface>();
     private readonly Mock<IPlayerPartyTroopXpBaselineApplier> troopXpBaselineApplier =
         new Mock<IPlayerPartyTroopXpBaselineApplier>();
+    private readonly Mock<IPartyBehaviorWireMapper> partyBehaviorWireMapper =
+        new Mock<IPartyBehaviorWireMapper>();
     private readonly JoinCampaignBaselineHandler handler;
 
     public JoinCampaignBaselineHandlerTests(ITestOutputHelper output)
@@ -32,27 +34,34 @@ public class JoinCampaignBaselineHandlerTests
         troopXpBaselineApplier
             .Setup(applier => applier.TryApply(It.IsAny<TroopRosterXpBaseline[]>()))
             .Returns(true);
+        PartyBehaviorUpdateData mappedBehavior = default;
+        partyBehaviorWireMapper
+            .Setup(mapper => mapper.TryFromNetwork(
+                It.IsAny<NetworkPartyBehaviorUpdateData>(), out mappedBehavior))
+            .Returns(true);
         handler = new JoinCampaignBaselineHandler(
             messageBroker,
             mapTimeTracker.Object,
             mobilePartyBehaviorSnapshot.Object,
             timeControl.Object,
-            troopXpBaselineApplier.Object);
+            troopXpBaselineApplier.Object,
+            partyBehaviorWireMapper.Object);
     }
 
     [Fact]
     public void CompleteBaseline_AppliesAllPartyStateBeforePublishingSuccess()
     {
         var partyStates = new[] { new MobilePartyJoinState() };
+        var networkPartyStates = new[] { new NetworkMobilePartyJoinState(partyStates[0], default) };
         bool timeControlApplied = false;
         bool timeApplied = false;
         bool partyStateApplied = false;
         bool troopXpApplied = false;
         var troopXpBaselines = new[]
         {
-            new TroopRosterXpBaseline("member_roster", new[]
+            new TroopRosterXpBaseline(1, new[]
             {
-                new TroopXpBaselineEntry("troop", 42),
+                new TroopXpBaselineEntry(2, 42),
             }),
         };
         timeControl
@@ -66,7 +75,7 @@ public class JoinCampaignBaselineHandlerTests
                 timeApplied = true;
             });
         mobilePartyBehaviorSnapshot
-            .Setup(snapshot => snapshot.TryApplyJoinBaseline(partyStates, It.IsAny<Action>()))
+            .Setup(snapshot => snapshot.TryApplyJoinBaseline(It.IsAny<MobilePartyJoinState[]>(), It.IsAny<Action>()))
             .Callback<MobilePartyJoinState[], Action>((_, beforeApply) =>
             {
                 beforeApply();
@@ -92,13 +101,13 @@ public class JoinCampaignBaselineHandlerTests
         var applied = Apply(new NetworkJoinCampaignBaseline(
             123456L,
             TimeControlEnum.Play_2x,
-            partyStates,
+            networkPartyStates,
             troopXpBaselines: troopXpBaselines));
 
         timeControl.Verify(time => time.ClientSetTimeControl(TimeControlEnum.Play_2x), Times.Once);
         mapTimeTracker.Verify(tracker => tracker.ApplyCampaignJoinBaseline(123456L), Times.Once);
         mobilePartyBehaviorSnapshot.Verify(
-            snapshot => snapshot.TryApplyJoinBaseline(partyStates, It.IsAny<Action>()),
+            snapshot => snapshot.TryApplyJoinBaseline(It.IsAny<MobilePartyJoinState[]>(), It.IsAny<Action>()),
             Times.Once);
         troopXpBaselineApplier.Verify(applier => applier.TryApply(troopXpBaselines), Times.Once);
         Assert.True(applied.Success);
@@ -112,6 +121,7 @@ public class JoinCampaignBaselineHandlerTests
         int expectedApplyAttempts)
     {
         var partyStates = Array.Empty<MobilePartyJoinState>();
+        var networkPartyStates = Array.Empty<NetworkMobilePartyJoinState>();
         mobilePartyBehaviorSnapshot
             .Setup(snapshot => snapshot.TryApplyJoinBaseline(partyStates, It.IsAny<Action>()))
             .Returns(false);
@@ -119,7 +129,7 @@ public class JoinCampaignBaselineHandlerTests
         var applied = Apply(new NetworkJoinCampaignBaseline(
             123456L,
             TimeControlEnum.Play_1x,
-            partyStates,
+            networkPartyStates,
             isComplete));
 
         mobilePartyBehaviorSnapshot.Verify(
@@ -138,9 +148,10 @@ public class JoinCampaignBaselineHandlerTests
     public void RejectedTroopXpBaseline_PublishesFailureAfterPartyStateApplies()
     {
         var partyStates = new[] { new MobilePartyJoinState() };
+        var networkPartyStates = new[] { new NetworkMobilePartyJoinState(partyStates[0], default) };
         var troopXpBaselines = Array.Empty<TroopRosterXpBaseline>();
         mobilePartyBehaviorSnapshot
-            .Setup(snapshot => snapshot.TryApplyJoinBaseline(partyStates, It.IsAny<Action>()))
+            .Setup(snapshot => snapshot.TryApplyJoinBaseline(It.IsAny<MobilePartyJoinState[]>(), It.IsAny<Action>()))
             .Callback<MobilePartyJoinState[], Action>((_, beforeApply) => beforeApply())
             .Returns(true);
         troopXpBaselineApplier
@@ -150,7 +161,7 @@ public class JoinCampaignBaselineHandlerTests
         var applied = Apply(new NetworkJoinCampaignBaseline(
             123456L,
             TimeControlEnum.Play_1x,
-            partyStates,
+            networkPartyStates,
             troopXpBaselines: troopXpBaselines));
 
         Assert.False(applied.Success);

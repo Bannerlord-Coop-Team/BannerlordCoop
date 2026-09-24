@@ -40,6 +40,7 @@ public interface IOwnedAgentReplicator : IDisposable
 
     /// <summary>[Owner, game thread] Send newly captured agents as bounded batches once per mission tick.</summary>
     void FlushPendingSpawns();
+    void FlushPendingFormations();
 
     /// <summary>
     /// [Owner, game thread] Replicate our own-party troops at their DEPLOYED positions so peers spawn matching
@@ -70,6 +71,7 @@ public class OwnedAgentReplicator : IOwnedAgentReplicator
     private readonly IBattleAuthorityMigrator authorityMigrator;
     private float retainedHeroRecoverySeconds;
     private readonly List<BattleAgentSpawnData> pendingSpawns = new List<BattleAgentSpawnData>();
+    private readonly HashSet<Agent> pendingFormations = new HashSet<Agent>();
 
     // The horse each of our riders SPAWNED with (rider id → mount id), so a record built while the rider is
     // momentarily dismounted still carries the horse's identity — a joiner's puppet spawns a horse from the
@@ -106,14 +108,48 @@ public class OwnedAgentReplicator : IOwnedAgentReplicator
             session.OwnControllerId + ":" + Guid.NewGuid().ToString("N");
 
         messageBroker.Subscribe<AgentSpawnedInBattle>(Handle_AgentSpawnedInBattle);
-        messageBroker.Subscribe<BattleAgentFormationChanged>(Handle_BattleAgentFormationChanged);
+        messageBroker.Subscribe<BattleAgentFormationChanged>(Handle_FormationChanged);
     }
 
     public void Dispose()
     {
         messageBroker.Unsubscribe<AgentSpawnedInBattle>(Handle_AgentSpawnedInBattle);
-        messageBroker.Unsubscribe<BattleAgentFormationChanged>(Handle_BattleAgentFormationChanged);
+        messageBroker.Unsubscribe<BattleAgentFormationChanged>(Handle_FormationChanged);
         pendingSpawns.Clear();
+        pendingFormations.Clear();
+    }
+
+    private void Handle_FormationChanged(MessagePayload<BattleAgentFormationChanged> payload)
+    {
+        var agent = payload.What.Agent;
+        if (coopMissionComponent.AgentRegistry.TryGetAgentInfo(agent, out var info)
+            && info.CurrentAuthority == session.OwnControllerId)
+            pendingFormations.Add(agent);
+    }
+
+    public void FlushPendingFormations()
+    {
+        if (pendingFormations.Count == 0) return;
+
+        var updates = new List<BattleAgentFormationData>();
+        foreach (var agent in pendingFormations)
+        {
+            if (!coopMissionComponent.AgentRegistry.TryGetAgentInfo(agent, out var info)
+                || info.CurrentAuthority != session.OwnControllerId || !agent.IsActive()
+                || agent.IsMount || !(agent.Character is CharacterObject character)
+                || deployment.ShouldWithhold(IsOwnPartyAgent(agent, character))) continue;
+
+            updates.Add(new BattleAgentFormationData(info.AgentId,
+                agent.Formation == null ? -1 : (int)agent.Formation.FormationIndex, info.AuthorityRevision));
+            if (updates.Count == NetworkBattleAgentFormations.MaxUpdates)
+            {
+                network.SendAll(new NetworkBattleAgentFormations(session.InstanceId, session.OwnControllerId, updates.ToArray()));
+                updates.Clear();
+            }
+        }
+        pendingFormations.Clear();
+        if (updates.Count > 0)
+            network.SendAll(new NetworkBattleAgentFormations(session.InstanceId, session.OwnControllerId, updates.ToArray()));
     }
 
     // Reading agent transforms must run on the game thread. SendJoinInfo supplies the blocking barrier when an
@@ -299,20 +335,6 @@ public class OwnedAgentReplicator : IOwnedAgentReplicator
     {
         if (character.IsHero && character.HeroObject == Hero.MainHero) return true;
         return agent.Origin is CoopAgentOrigin origin && origin.Party == PartyBase.MainParty;
-    }
-
-    // Send actual membership only for revealed, locally authoritative agents, after their queued spawn.
-    private void Handle_BattleAgentFormationChanged(MessagePayload<BattleAgentFormationChanged> payload)
-    {
-        var agent = payload.What.Agent;
-        if (agent == null || !(agent.Character is CharacterObject character)) return;
-        if (!coopMissionComponent.AgentRegistry.TryGetAgentInfo(agent, out var info)) return;
-        if (info.CurrentAuthority != session.OwnControllerId) return;
-        if (deployment.ShouldWithhold(IsOwnPartyAgent(agent, character))) return;
-
-        FlushPendingSpawns();
-        network.SendAll(new NetworkBattleAgentFormationChanged(
-            session.InstanceId, info.AgentId, info.CurrentAuthority, info.AuthorityRevision, payload.What.FormationIndex));
     }
 
     // [Owner] An agent WE spawned into the battle was captured (BattleAgentSpawnedPatch). Each client spawns

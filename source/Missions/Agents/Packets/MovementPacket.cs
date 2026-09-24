@@ -32,8 +32,13 @@ namespace Missions.Agents.Packets
         [ProtoMember(6, IsPacked = true)]
         public long[] AuthorityRevisions { get; }
 
-        public MovementPacket(string identityScopeId, ushort[] agentIds, AgentData[] agents, string senderControllerId = null, long[] authorityRevisions = null)
+        // All snapshots in a packet come from the same sender capture, including split batches.
+        [ProtoMember(7)]
+        public long SampleSequence { get; }
+
+        public MovementPacket(string identityScopeId, ushort[] agentIds, AgentData[] agents, string senderControllerId = null, long[] authorityRevisions = null, long sampleSequence = 0)
         {
+            SampleSequence = sampleSequence;
             SenderControllerId = senderControllerId;
             AuthorityRevisions = authorityRevisions;
             IdentityScopeId = identityScopeId;
@@ -42,8 +47,9 @@ namespace Missions.Agents.Packets
             AgentGuids = null;
         }
 
-        public MovementPacket(Guid[] agentGuids, AgentData[] agents, string senderControllerId = null, long[] authorityRevisions = null)
+        public MovementPacket(Guid[] agentGuids, AgentData[] agents, string senderControllerId = null, long[] authorityRevisions = null, long sampleSequence = 0)
         {
+            SampleSequence = sampleSequence;
             SenderControllerId = senderControllerId;
             AuthorityRevisions = authorityRevisions;
             IdentityScopeId = null;
@@ -52,7 +58,7 @@ namespace Missions.Agents.Packets
             Agents = agents;
         }
         internal MovementPacket WithAuthorityRevisions(long[] revisions) => AgentIds == null
-            ? new MovementPacket(AgentGuids, Agents, SenderControllerId, revisions)
-            : new MovementPacket(IdentityScopeId, AgentIds, Agents, SenderControllerId, revisions);
+            ? new MovementPacket(AgentGuids, Agents, SenderControllerId, revisions, SampleSequence)
+            : new MovementPacket(IdentityScopeId, AgentIds, Agents, SenderControllerId, revisions, SampleSequence);
     }
 }

@@ -74,6 +74,11 @@ public class JoinCampaignBaselineSenderTests
             var timeControl = new Mock<ITimeControlInterface>();
             timeControl.Setup(service => service.GetTimeControl()).Returns(TimeControlEnum.Pause);
             var troopXpBaselineProvider = new Mock<IPlayerPartyTroopXpBaselineProvider>();
+            var partyBehaviorWireMapper = new Mock<IPartyBehaviorWireMapper>();
+            NetworkPartyBehaviorUpdateData networkBehavior = default;
+            partyBehaviorWireMapper
+                .Setup(service => service.TryToNetwork(It.IsAny<PartyBehaviorUpdateData>(), out networkBehavior))
+                .Returns(true);
             TroopRosterXpBaseline[] troopXpBaselines = Array.Empty<TroopRosterXpBaseline>();
             troopXpBaselineProvider
                 .Setup(service => service.TryCapture(
@@ -92,7 +97,8 @@ public class JoinCampaignBaselineSenderTests
                 mapTimeTracker.Object,
                 snapshot.Object,
                 timeControl.Object,
-                troopXpBaselineProvider.Object);
+                troopXpBaselineProvider.Object,
+                partyBehaviorWireMapper.Object);
 
             sender.Send(null!);
 

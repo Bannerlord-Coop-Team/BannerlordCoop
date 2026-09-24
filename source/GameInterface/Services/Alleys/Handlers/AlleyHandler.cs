@@ -44,19 +44,22 @@ internal class AlleyHandler : IHandler
     private readonly INetwork network;
     private readonly ISessionAlleyPlayerDataInterface sessionInterface;
     private readonly IAlleyCampaignBehaviorInterface behaviorInterface;
+    private readonly IAlleyGarrisonData garrisonData;
 
     public AlleyHandler(
         IMessageBroker messageBroker,
         IObjectManager objectManager,
         INetwork network,
         ISessionAlleyPlayerDataInterface sessionInterface,
-        IAlleyCampaignBehaviorInterface behaviorInterface)
+        IAlleyCampaignBehaviorInterface behaviorInterface,
+        IAlleyGarrisonData garrisonData)
     {
         this.messageBroker = messageBroker;
         this.objectManager = objectManager;
         this.network = network;
         this.sessionInterface = sessionInterface;
         this.behaviorInterface = behaviorInterface;
+        this.garrisonData = garrisonData;
 
         messageBroker.Subscribe<AlleyOwnerChanged>(Handle_AlleyOwnerChanged);
         messageBroker.Subscribe<ChangeAlleyOwner>(Handle_ChangeAlleyOwner);
@@ -153,7 +156,7 @@ internal class AlleyHandler : IHandler
         }
     }
 
-    private void RunDailyAlleyTick(Alley alley, string alleyId, AlleyManagementData data)
+    private void RunDailyAlleyTick(Alley alley, string alleyId, AlleyManagementState data)
     {
         ConvertTroopsToBandits(alleyId, data);
 
@@ -188,7 +191,7 @@ internal class AlleyHandler : IHandler
     /// roster on the host): each non-hero, non-gangster troop has a 1% daily chance to turn into a thug of
     /// at least its own tier. Only broadcasts when something actually changed.
     /// </summary>
-    private void ConvertTroopsToBandits(string alleyId, AlleyManagementData data)
+    private void ConvertTroopsToBandits(string alleyId, AlleyManagementState data)
     {
         var garrison = data.Garrison;
         if (garrison == null || garrison.Length == 0) return;
@@ -257,7 +260,7 @@ internal class AlleyHandler : IHandler
     /// Vanilla SkillLevelingManager.OnDailyAlleyTick, minus the Hero.MainHero deref that NREs on the host:
     /// the owner and the overseer both gain daily Roguery XP, captured and replicated by the XP sync.
     /// </summary>
-    private void GrantDailyXp(Alley alley, AlleyManagementData data)
+    private void GrantDailyXp(Alley alley, AlleyManagementState data)
     {
         var model = Model;
         if (model == null) return;
@@ -274,7 +277,7 @@ internal class AlleyHandler : IHandler
         }
     }
 
-    private void CheckSpawnAttack(Alley alley, string alleyId, AlleyManagementData data)
+    private void CheckSpawnAttack(Alley alley, string alleyId, AlleyManagementState data)
     {
         if (MBRandom.RandomFloat >= 0.015f) return;
         StartAttack(alley, alleyId, data);
@@ -285,7 +288,7 @@ internal class AlleyHandler : IHandler
     /// gang-occupied alley in the same settlement (RNG rolled once here), set the response deadline, and
     /// tell the owning client so its confront-alley menu/conversation/fight light up.
     /// </summary>
-    private void StartAttack(Alley alley, string alleyId, AlleyManagementData data)
+    private void StartAttack(Alley alley, string alleyId, AlleyManagementState data)
     {
         var settlement = alley.Settlement;
         if (settlement?.Alleys == null) return;
@@ -299,7 +302,7 @@ internal class AlleyHandler : IHandler
         var attacker = rivals[MBRandom.RandomInt(0, rivals.Count)];
         if (attacker == null || !objectManager.TryGetId(attacker, out var attackerId)) return;
 
-        var responseRoster = AlleyGarrisonData.FromData(data.Garrison, objectManager);
+        var responseRoster = garrisonData.FromData(data.Garrison);
         var dueDate = CampaignTime.DaysFromNow(Model.GetAlleyAttackResponseTimeInDays(responseRoster));
 
         sessionInterface.SetUnderAttackByAi(alleyId, attackerId, dueDate);
@@ -505,7 +508,7 @@ internal class AlleyHandler : IHandler
 
         // On a win, forward the post-fight garrison so the server records the defenders lost in the fight.
         var garrison = payload.What.Garrison != null
-            ? AlleyGarrisonData.ToData(payload.What.Garrison, objectManager)
+            ? garrisonData.ToData(payload.What.Garrison)
             : Array.Empty<TroopRosterElementData>();
         network.SendAll(new RequestAlleyDefenseResolved(alleyId, won, garrison));
     }
@@ -586,24 +589,24 @@ internal class AlleyHandler : IHandler
         }
     }
 
-    private Hero ResolveOverseer(AlleyManagementData data)
+    private Hero ResolveOverseer(AlleyManagementState data)
     {
         if (data?.OverseerId == null) return null;
         objectManager.TryGetObject<Hero>(data.OverseerId, out var overseer);
         return overseer;
     }
 
-    private bool TryGetThug(string stringId, out CharacterObject character, out string id)
+    private bool TryGetThug(string stringId, out CharacterObject character, out uint id)
     {
-        id = null;
+        id = 0;
         character = MBObjectManager.Instance?.GetObject<CharacterObject>(stringId);
         if (character == null) return false;
-        return objectManager.TryGetId(character, out id);
+        return objectManager.TryGetHandle(character, out id);
     }
 
-    private static void AddTroopCount(List<TroopRosterElementData> roster, string characterId, int count)
+    private static void AddTroopCount(List<TroopRosterElementData> roster, uint characterId, int count)
     {
-        if (count <= 0 || characterId == null) return;
+        if (count <= 0 || characterId == 0) return;
 
         for (int i = 0; i < roster.Count; i++)
         {

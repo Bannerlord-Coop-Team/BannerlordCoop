@@ -36,8 +36,9 @@ namespace GameInterface.Services.Monsters.Handlers
             var payload = obj.What;
 
             if (objectManager.AddNewObject(payload.Monster, out string monsterId) == false) return;
+            if (!objectManager.TryGetHandleWithLogging(payload.Monster, out var handle)) return;
 
-            var message = new NetworkCreateMonster(monsterId);
+            var message = new NetworkCreateMonster(monsterId, handle);
             network.SendAll(message);
         }
 
@@ -46,7 +47,7 @@ namespace GameInterface.Services.Monsters.Handlers
             var payload = obj.What;
 
             var monster = ObjectHelper.SkipConstructor<Monster>();
-            if (objectManager.AddExisting(payload.MonsterId, monster) == false)
+            if (objectManager.AddExisting(payload.MonsterId, monster, payload.Handle) == false)
             {
                 Logger.Error("Failed to add existing Building, {id}", payload.MonsterId);
                 return;

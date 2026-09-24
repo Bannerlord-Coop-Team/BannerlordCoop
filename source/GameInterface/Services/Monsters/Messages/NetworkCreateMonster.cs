@@ -8,10 +8,13 @@ namespace GameInterface.Services.Monsters.Messages
     {
         [ProtoMember(1)]
         public string MonsterId { get; set; }
+        [ProtoMember(2)]
+        public uint Handle { get; set; }
 
-        public NetworkCreateMonster(string monsterId)
+        public NetworkCreateMonster(string monsterId, uint handle)
         {
             MonsterId = monsterId;
+            Handle = handle;
         }
     }
 }

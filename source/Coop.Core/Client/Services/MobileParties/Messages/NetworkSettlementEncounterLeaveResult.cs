@@ -16,13 +16,13 @@ internal enum SettlementEncounterLeaveOutcome
 internal class NetworkSettlementEncounterLeaveResult : ICommand
 {
     [ProtoMember(1)]
-    public readonly string PartyId;
+    public readonly uint PartyId;
 
     [ProtoMember(2)]
     public readonly SettlementEncounterLeaveOutcome Outcome;
 
     public NetworkSettlementEncounterLeaveResult(
-        string partyId,
+        uint partyId,
         SettlementEncounterLeaveOutcome outcome)
     {
         PartyId = partyId;

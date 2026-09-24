@@ -24,6 +24,7 @@ using AgentData = Missions.Agents.Packets.AgentData;
 
 namespace E2E.Tests.Services.Missions;
 
+/// <summary>Checks movement authority generations and sender sample ordering through the receive path.</summary>
 public class MovementAuthorityTransitionTests : MissionTestEnvironment
 {
     private const string HostA = "host-a";
@@ -32,6 +33,106 @@ public class MovementAuthorityTransitionTests : MissionTestEnvironment
     private const string BattleId = "movement-authority-battle";
 
     public MovementAuthorityTransitionTests(ITestOutputHelper output) : base(output) { }
+
+    [Theory]
+    [InlineData(false, false, false)]
+    [InlineData(false, true, false)]
+    [InlineData(true, false, false)]
+    [InlineData(true, true, false)]
+    [InlineData(false, false, true)]
+    [InlineData(false, true, true)]
+    [InlineData(true, false, true)]
+    [InlineData(true, true, true)]
+    public void NewerSample_RejectsOlderAndDuplicateBeforeContinuousStateOrTargetApply(
+        bool mount, bool compact, bool compressedRelay)
+    {
+        using var engine = new MissionEngineFixture();
+        var observer = Clients.First();
+        SetControllerId(observer, Observer);
+        observer.Call(() =>
+        {
+            var state = CreateFixture(engine, observer, mount, compact);
+            var oldPacket = WithAuthority(state.Packet, HostA, 1, 10);
+            Assert.True(AgentMirror.TryGet(state.Source, out var source));
+            source.MovementDirection = new Vec2(0f, 1f);
+            source.Position = new Vec3(2f, 3f, 0f);
+            var newPacket = WithAuthority(
+                CreatePacket(state.Source, state.AgentId, 1, mount, compact), HostA, 1, 20);
+            state.Handler.Dispose();
+            NetPeer relayPeer = NetPeerExtensions.CreatePeer(4);
+            var relay = new Mock<IRelayNetwork>();
+            relay.SetupGet(value => value.ServerEndpoint).Returns(relayPeer);
+            using var handler = CreateHandler(observer, relay.Object);
+            var serializer = new ProtoBufSerializer(new SerializableTypeMapper());
+            var compressor = new MovementPacketCompressor(serializer);
+            void Deliver(IPacket packet)
+            {
+                if (compressedRelay)
+                    observer.SimulatePacket(relayPeer, RelayPayload(packet, serializer, compressor));
+                else
+                    observer.SimulatePacket(state.PeerA, packet);
+            }
+
+            Deliver(newPacket);
+            handler.Interpolator.Tick(1f / 60f);
+            Assert.True(handler.Interpolator.TryGetTargetFrame(
+                state.Puppet, out var position, out _, out long sequence));
+            Assert.Equal(source.Position, position);
+            Assert.Equal(source.MovementDirection, state.Mirror.MovementDirection);
+
+            Deliver(oldPacket);
+            Assert.Equal(source.MovementDirection, state.Mirror.MovementDirection);
+            Assert.True(handler.Interpolator.TryGetTargetFrame(
+                state.Puppet, out var afterOldPosition, out _, out long afterOldSequence));
+            Assert.Equal(position, afterOldPosition);
+            Assert.Equal(sequence, afterOldSequence);
+            Deliver(newPacket);
+            handler.Interpolator.Tick(1f / 60f);
+            Assert.Equal(source.MovementDirection, state.Mirror.MovementDirection);
+            Assert.True(handler.Interpolator.TryGetTargetFrame(
+                state.Puppet, out var retainedPosition, out _, out long retainedSequence));
+            Assert.Equal(position, retainedPosition);
+            Assert.Equal(sequence, retainedSequence);
+
+            // A later-arriving batch for another agent must not inherit this agent's watermark.
+            Assert.True(observer.Resolve<INetworkAgentRegistry>()
+                .TryTransferAuthority(HostA, state.OwnPartyId, 1));
+            Deliver(WithAuthority(state.OwnPartyPacket, HostA, 1, 1));
+            Assert.Equal(state.Direction, state.OwnPartyMirror.MovementDirection);
+        });
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void TransportRemap_PreservesOrderingButNewRegistrationStartsFresh(bool mount)
+    {
+        using var engine = new MissionEngineFixture();
+        var observer = Clients.First();
+        SetControllerId(observer, Observer);
+        observer.Call(() =>
+        {
+            var state = CreateFixture(engine, observer, mount, compact: true);
+            observer.SimulatePacket(state.PeerA, WithAuthority(state.Packet, HostA, 1, 20));
+            state.Mirror.MovementDirection = Vec2.Zero;
+            NetPeer replacement = NetPeerExtensions.CreatePeer(3);
+            observer.Resolve<IMissionContext>().MapPeer(HostA, replacement);
+            observer.SimulatePacket(state.PeerA, WithAuthority(state.Packet, HostA, 1, 30));
+            observer.SimulatePacket(replacement, WithAuthority(state.Packet, HostA, 1, 10));
+            Assert.Equal(Vec2.Zero, state.Mirror.MovementDirection);
+            observer.SimulatePacket(replacement, WithAuthority(state.Packet, HostA, 1, 21));
+            Assert.Equal(state.Direction, state.Mirror.MovementDirection);
+
+            var registry = observer.Resolve<INetworkAgentRegistry>();
+            registry.RemoveAgent(state.Puppet);
+            Assert.True(registry.TryRegisterAgent(HostA, state.AgentId, 1, state.Puppet, 1));
+            state.Mirror.MovementDirection = Vec2.Zero;
+            observer.SimulatePacket(state.PeerA, WithAuthority(state.Packet, HostA, 1, 100));
+            Assert.Equal(Vec2.Zero, state.Mirror.MovementDirection);
+            observer.SimulatePacket(replacement, WithAuthority(state.Packet, HostA, 1, 1));
+            Assert.Equal(state.Direction, state.Mirror.MovementDirection);
+        });
+    }
 
     [Theory]
     [InlineData(false, false)]
@@ -58,7 +159,7 @@ public class MovementAuthorityTransitionTests : MissionTestEnvironment
         // Unreliable movement can arrive after the reliable host assignment and transfer.
         observer.SimulatePacket(state.PeerA, state.Packet);
         observer.Call(() => Assert.Equal(Vec2.Zero, state.Mirror.MovementDirection));
-        observer.SimulatePacket(state.PeerB, WithAuthority(state.Packet, HostB, 2));
+        observer.SimulatePacket(state.PeerB, WithAuthority(state.Packet, HostB, 2, 1));
         observer.Call(() => Assert.Equal(state.Direction, state.Mirror.MovementDirection));
         observer.SimulatePacket(state.PeerA, state.OwnPartyPacket);
         observer.Call(() =>
@@ -89,7 +190,7 @@ public class MovementAuthorityTransitionTests : MissionTestEnvironment
         observer.PumpGameThread();
         observer.Call(() => Assert.Equal(Vec2.Zero, state.Mirror.MovementDirection));
 
-        observer.SimulatePacket(state.PeerB, WithAuthority(state.Packet, HostB, 2));
+        observer.SimulatePacket(state.PeerB, WithAuthority(state.Packet, HostB, 2, 1));
         observer.Call(() => Assert.Equal(state.Direction, state.Mirror.MovementDirection));
     }
 
@@ -155,7 +256,7 @@ public class MovementAuthorityTransitionTests : MissionTestEnvironment
             observer.SimulatePacket(relayPeer, oldPayload);
             Assert.Equal(Vec2.Zero, state.Mirror.MovementDirection);
             observer.SimulatePacket(relayPeer,
-                RelayPayload(WithAuthority(state.Packet, HostB, 2), serializer, compressor));
+                RelayPayload(WithAuthority(state.Packet, HostB, 2, 1), serializer, compressor));
             Assert.Equal(state.Direction, state.Mirror.MovementDirection);
 
             state.Mirror.MovementDirection = Vec2.Zero;
@@ -166,7 +267,7 @@ public class MovementAuthorityTransitionTests : MissionTestEnvironment
             observer.SimulatePacket(relayPeer, oldPayload);
             Assert.Equal(Vec2.Zero, state.Mirror.MovementDirection);
             byte[] currentPayload = RelayPayload(
-                WithAuthority(state.Packet, HostA, 3), serializer, compressor);
+                WithAuthority(state.Packet, HostA, 3, 1), serializer, compressor);
             observer.SimulatePacket(NetPeerExtensions.CreatePeer(5), currentPayload);
             Assert.Equal(Vec2.Zero, state.Mirror.MovementDirection);
             observer.SimulatePacket(relayPeer, currentPayload);
@@ -204,7 +305,7 @@ public class MovementAuthorityTransitionTests : MissionTestEnvironment
     [InlineData(false, true)]
     [InlineData(true, false)]
     [InlineData(true, true)]
-    public void FragmentedPriorityBatches_PreserveCapturedRevisionsAcrossSerialization(bool mount, bool compact)
+    public void FragmentedPriorityBatches_PreserveCaptureSequenceAndRevisionsAcrossSerialization(bool mount, bool compact)
     {
         using var engine = new MissionEngineFixture();
         var observer = Clients.First();
@@ -232,16 +333,16 @@ public class MovementAuthorityTransitionTests : MissionTestEnvironment
                 var batch = CreateBatch(((MountMovementPacket)state.Packet).Mounts[0], compact, expected, compactIds);
                 sender.Send(Observer, new[] { batch }, null, 128,
                     (scope, ids, guids, data) => scope == null
-                        ? new MountMovementPacket(guids, data, HostB)
-                        : new MountMovementPacket(scope, ids, data, HostB), (_, _) => { });
+                        ? new MountMovementPacket(guids, data, HostB, sampleSequence: 123456789)
+                        : new MountMovementPacket(scope, ids, data, HostB, sampleSequence: 123456789), (_, _) => { });
             }
             else
             {
                 var batch = CreateBatch(((MovementPacket)state.Packet).Agents[0], compact, expected, compactIds);
                 sender.Send(Observer, new[] { batch }, null, 128,
                     (scope, ids, guids, data) => scope == null
-                        ? new MovementPacket(guids, data, HostB)
-                        : new MovementPacket(scope, ids, data, HostB), (_, _) => { });
+                        ? new MovementPacket(guids, data, HostB, sampleSequence: 123456789)
+                        : new MovementPacket(scope, ids, data, HostB, sampleSequence: 123456789), (_, _) => { });
             }
 
             Assert.True(sent.Count > 1);
@@ -254,6 +355,7 @@ public class MovementAuthorityTransitionTests : MissionTestEnvironment
                 if (packet is MovementPacket movement)
                 {
                     Assert.Equal(HostB, movement.SenderControllerId);
+                    Assert.Equal(123456789, movement.SampleSequence);
                     ids = movement.AgentIds;
                     guids = movement.AgentGuids;
                     revisions = movement.AuthorityRevisions;
@@ -262,6 +364,7 @@ public class MovementAuthorityTransitionTests : MissionTestEnvironment
                 {
                     var mounts = (MountMovementPacket)packet;
                     Assert.Equal(HostB, mounts.SenderControllerId);
+                    Assert.Equal(123456789, mounts.SampleSequence);
                     ids = mounts.MountIds;
                     guids = mounts.MountGuids;
                     revisions = mounts.AuthorityRevisions;
@@ -310,10 +413,10 @@ public class MovementAuthorityTransitionTests : MissionTestEnvironment
             packet = movement.AgentIds == null
                 ? new MovementPacket(Enumerable.Repeat(movement.AgentGuids[0], 8).ToArray(),
                     Enumerable.Repeat(movement.Agents[0], 8).ToArray(), movement.SenderControllerId,
-                    Enumerable.Repeat(movement.AuthorityRevisions[0], 8).ToArray())
+                    Enumerable.Repeat(movement.AuthorityRevisions[0], 8).ToArray(), movement.SampleSequence)
                 : new MovementPacket(movement.IdentityScopeId, Enumerable.Repeat(movement.AgentIds[0], 8).ToArray(),
                     Enumerable.Repeat(movement.Agents[0], 8).ToArray(), movement.SenderControllerId,
-                    Enumerable.Repeat(movement.AuthorityRevisions[0], 8).ToArray());
+                    Enumerable.Repeat(movement.AuthorityRevisions[0], 8).ToArray(), movement.SampleSequence);
         }
         else
         {
@@ -321,10 +424,10 @@ public class MovementAuthorityTransitionTests : MissionTestEnvironment
             packet = mounts.MountIds == null
                 ? new MountMovementPacket(Enumerable.Repeat(mounts.MountGuids[0], 8).ToArray(),
                     Enumerable.Repeat(mounts.Mounts[0], 8).ToArray(), mounts.SenderControllerId,
-                    Enumerable.Repeat(mounts.AuthorityRevisions[0], 8).ToArray())
+                    Enumerable.Repeat(mounts.AuthorityRevisions[0], 8).ToArray(), mounts.SampleSequence)
                 : new MountMovementPacket(mounts.IdentityScopeId, Enumerable.Repeat(mounts.MountIds[0], 8).ToArray(),
                     Enumerable.Repeat(mounts.Mounts[0], 8).ToArray(), mounts.SenderControllerId,
-                    Enumerable.Repeat(mounts.AuthorityRevisions[0], 8).ToArray());
+                    Enumerable.Repeat(mounts.AuthorityRevisions[0], 8).ToArray(), mounts.SampleSequence);
         }
         byte[] bytes = compressor.Serialize(packet);
         Assert.IsType<CompressedMovementPacket>(serializer.Deserialize<IPacket>(bytes));
@@ -356,6 +459,8 @@ public class MovementAuthorityTransitionTests : MissionTestEnvironment
         Assert.True(AgentMirror.TryGet(puppet, out var puppetMirror));
         Assert.True(AgentMirror.TryGet(ownPartyPuppet, out var ownPartyMirror));
         Assert.True(AgentMirror.TryGet(source, out var sourceMirror));
+        state.Source = source;
+        state.Puppet = puppet;
         state.Mirror = puppetMirror;
         state.OwnPartyMirror = ownPartyMirror;
         state.Mirror.MovementDirection = Vec2.Zero;
@@ -364,7 +469,7 @@ public class MovementAuthorityTransitionTests : MissionTestEnvironment
         var registry = observer.Resolve<INetworkAgentRegistry>();
         Assert.True(registry.TryRegisterAgent(HostA, state.AgentId, 1, puppet, 1));
         Assert.True(registry.TryRegisterAgent(HostA, state.OwnPartyId, 2, ownPartyPuppet, 0));
-        state.Packet = WithAuthority(CreatePacket(source, state.AgentId, 1, mount, compact), HostA, 1);
+        state.Packet = WithAuthority(CreatePacket(source, state.AgentId, 1, mount, compact), HostA, 1, 20);
         state.OwnPartyPacket = WithAuthority(CreatePacket(source, state.OwnPartyId, 2, mount, compact), HostA, 0);
         return state;
     }
@@ -403,21 +508,21 @@ public class MovementAuthorityTransitionTests : MissionTestEnvironment
             : new MovementPacket(new[] { id }, riders);
     }
 
-    private static IPacket WithAuthority(IPacket packet, string sender, long revision)
+    private static IPacket WithAuthority(IPacket packet, string sender, long revision, long? sampleSequence = null)
     {
         if (packet is MovementPacket movement)
         {
             var revisions = Enumerable.Repeat(revision, movement.Agents.Length).ToArray();
             return movement.AgentIds == null
-                ? new MovementPacket(movement.AgentGuids, movement.Agents, sender, revisions)
-                : new MovementPacket(movement.IdentityScopeId, movement.AgentIds, movement.Agents, sender, revisions);
+                ? new MovementPacket(movement.AgentGuids, movement.Agents, sender, revisions, sampleSequence ?? movement.SampleSequence)
+                : new MovementPacket(movement.IdentityScopeId, movement.AgentIds, movement.Agents, sender, revisions, sampleSequence ?? movement.SampleSequence);
         }
 
         var mounts = (MountMovementPacket)packet;
         var mountRevisions = Enumerable.Repeat(revision, mounts.Mounts.Length).ToArray();
         return mounts.MountIds == null
-            ? new MountMovementPacket(mounts.MountGuids, mounts.Mounts, sender, mountRevisions)
-            : new MountMovementPacket(mounts.IdentityScopeId, mounts.MountIds, mounts.Mounts, sender, mountRevisions);
+            ? new MountMovementPacket(mounts.MountGuids, mounts.Mounts, sender, mountRevisions, sampleSequence ?? mounts.SampleSequence)
+            : new MountMovementPacket(mounts.IdentityScopeId, mounts.MountIds, mounts.Mounts, sender, mountRevisions, sampleSequence ?? mounts.SampleSequence);
     }
 
     private sealed class MovementFixture
@@ -427,6 +532,8 @@ public class MovementAuthorityTransitionTests : MissionTestEnvironment
         public readonly Guid AgentId = Guid.NewGuid();
         public readonly Guid OwnPartyId = Guid.NewGuid();
         public readonly Vec2 Direction = new Vec2(1f, 0f);
+        public Agent Source;
+        public Agent Puppet;
         public MirrorAgent Mirror;
         public MirrorAgent OwnPartyMirror;
         public IAgentMovementHandler Handler;

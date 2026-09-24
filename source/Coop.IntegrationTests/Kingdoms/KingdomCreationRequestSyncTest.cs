@@ -65,9 +65,11 @@ public class KingdomCreationRequestSyncTest
                 new NetworkRequestCreateKingdom("player1", "Real Kingdom", "empire", "party1", "settlement1")));
 
         Assert.Same(settlement, party.CurrentSettlement);
+        Assert.True(server.ObjectManager.TryGetHandle(party, out var partyHandle));
+        Assert.True(server.ObjectManager.TryGetHandle(settlement, out var settlementHandle));
         Assert.Single(
             server.NetworkSentMessages.GetMessages<NetworkPartyEnterSettlement>(),
-            message => message.PartyId == "party1" && message.SettlementId == "settlement1");
+            message => message.PartyId == partyHandle && message.SettlementId == settlementHandle);
     }
 
     [Fact]

@@ -474,7 +474,7 @@ internal sealed class PeaceBarterHandler : IHandler
 
     private void FlushHeroGold(Hero hero)
     {
-        if (sendCoalescer == null || hero == null || !objectManager.TryGetId(hero, out var heroId)) return;
+        if (sendCoalescer == null || hero == null || !objectManager.TryGetHandle(hero, out var heroId)) return;
         sendCoalescer.FlushInstance(heroId, network);
     }
 

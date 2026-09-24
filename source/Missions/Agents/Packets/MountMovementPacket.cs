@@ -34,8 +34,13 @@ namespace Missions.Agents.Packets
         [ProtoMember(6, IsPacked = true)]
         public long[] AuthorityRevisions { get; }
 
-        public MountMovementPacket(string identityScopeId, ushort[] mountIds, AgentMountData[] mounts, string senderControllerId = null, long[] authorityRevisions = null)
+        // All snapshots in a packet come from the same sender capture, including split batches.
+        [ProtoMember(7)]
+        public long SampleSequence { get; }
+
+        public MountMovementPacket(string identityScopeId, ushort[] mountIds, AgentMountData[] mounts, string senderControllerId = null, long[] authorityRevisions = null, long sampleSequence = 0)
         {
+            SampleSequence = sampleSequence;
             SenderControllerId = senderControllerId;
             AuthorityRevisions = authorityRevisions;
             IdentityScopeId = identityScopeId;
@@ -44,8 +49,9 @@ namespace Missions.Agents.Packets
             MountGuids = null;
         }
 
-        public MountMovementPacket(Guid[] mountGuids, AgentMountData[] mounts, string senderControllerId = null, long[] authorityRevisions = null)
+        public MountMovementPacket(Guid[] mountGuids, AgentMountData[] mounts, string senderControllerId = null, long[] authorityRevisions = null, long sampleSequence = 0)
         {
+            SampleSequence = sampleSequence;
             SenderControllerId = senderControllerId;
             AuthorityRevisions = authorityRevisions;
             IdentityScopeId = null;
@@ -54,7 +60,7 @@ namespace Missions.Agents.Packets
             Mounts = mounts;
         }
         internal MountMovementPacket WithAuthorityRevisions(long[] revisions) => MountIds == null
-            ? new MountMovementPacket(MountGuids, Mounts, SenderControllerId, revisions)
-            : new MountMovementPacket(IdentityScopeId, MountIds, Mounts, SenderControllerId, revisions);
+            ? new MountMovementPacket(MountGuids, Mounts, SenderControllerId, revisions, SampleSequence)
+            : new MountMovementPacket(IdentityScopeId, MountIds, Mounts, SenderControllerId, revisions, SampleSequence);
     }
 }

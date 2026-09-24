@@ -151,12 +151,14 @@ public class TestEnvironment
 
     public void RegisterObjectInNetwork<T>(T obj, string? stringId = null)
     {
+        uint handle = 0;
         if (stringId == null)
         {
             Server.Call(() =>
             {
                 var objectManager = Server.Resolve<IObjectManager>();
                 objectManager.AddNewObject(obj, out stringId);
+                objectManager.TryGetHandle(obj, out handle);
             });
         }
         else
@@ -165,6 +167,7 @@ public class TestEnvironment
             {
                 var objectManager = Server.Resolve<IObjectManager>();
                 objectManager.AddExisting(stringId, obj);
+                objectManager.TryGetHandle(obj, out handle);
             });
         }
 
@@ -173,7 +176,7 @@ public class TestEnvironment
             client.Call(() =>
             {
                 var objectManager = client.Resolve<IObjectManager>();
-                objectManager.AddExisting(stringId, obj);
+                objectManager.AddExisting(stringId, obj, handle);
             });
         }
     }

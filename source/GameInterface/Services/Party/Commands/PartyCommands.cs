@@ -177,6 +177,7 @@ internal class PartyCommands
                 new TaleWorlds.Library.Vec2(current.X + offsetX, current.Y + offsetY),
                 current.IsOnLand);
             party.SetNavigationModePoint(target);
+            party.SetMoveGoToPoint(target, MobileParty.NavigationType.Default);
             MessageBroker.Instance.Publish(typeof(PartyCommands), new PartyBehaviorChangeAttempted(party));
 
             return Succeeded($"Movement order submitted for {party.StringId}.\n" +

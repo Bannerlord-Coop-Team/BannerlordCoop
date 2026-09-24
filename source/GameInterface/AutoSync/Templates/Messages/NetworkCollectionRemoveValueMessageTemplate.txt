@@ -13,12 +13,12 @@ namespace AutoSync
     public record {{ MemberDeclaringTypeName}}_{{ MemberName }}_RemoveNetworkMessage : GenericNetworkEvent<{{ MemberDeclaringType}}, {{ ElementType }}>
     {
         [ProtoMember(1)]
-        public override string InstanceId { get; set; }
+        public override uint InstanceId { get; set; }
 
         [ProtoMember(2)]
         public byte[] Value { get; set; }
 
-        public {{ MemberDeclaringTypeName}}_{{ MemberName }}_RemoveNetworkMessage(string instanceId, byte[] value) : base(instanceId)
+        public {{ MemberDeclaringTypeName}}_{{ MemberName }}_RemoveNetworkMessage(uint instanceId, byte[] value) : base(instanceId)
         {
             Value = value;
         }

@@ -5,6 +5,7 @@ using Common.PacketHandlers;
 using Common.Serialization;
 using Common.Tests.Utils;
 using Common.Util;
+using Coop.IntegrationTests.Environment;
 using Coop.IntegrationTests.Environment.Mock;
 using GameInterface.Services.ObjectManager;
 using HarmonyLib;
@@ -127,9 +128,14 @@ public abstract class EnvironmentInstance
     public T CreateRegisteredObject<T>(string stringId) where T : class
     {
         var obj = ObjectHelper.SkipConstructor<T>();
+        var handle = Resolve<TestNetworkRouter>().GetOrCreateFixtureHandle(stringId);
 
-        var objectManager = Resolve<IObjectManager>();
-        objectManager.AddExisting(stringId, obj);
+        Call(() =>
+        {
+            var objectManager = Resolve<IObjectManager>();
+            if (!objectManager.AddExisting(stringId, obj, handle))
+                throw new InvalidOperationException($"Unable to register {stringId} for {typeof(T)}");
+        });
 
         return obj;
     }

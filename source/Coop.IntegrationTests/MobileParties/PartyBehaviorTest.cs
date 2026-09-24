@@ -1,5 +1,6 @@
 ﻿using Common.Network;
 using Common.Network.Coalescing;
+using Common.Util;
 using Coop.Core.Server.Services.MobileParties.Messages;
 using Coop.Core.Server.Services.MobileParties.Packets;
 using Coop.IntegrationTests.Environment;
@@ -31,16 +32,20 @@ public class PartyBehaviorTest
     public void ControlledPartyBehaviorUpdated_Publishes_AllClients()
     {
         // Arrange
+        RegisterTestParty();
         var data = new PartyBehaviorUpdateData("Test_Party", default, default, default, default, default, default, default);
 
         var message = new PartyBehaviorUpdated(ref data);
 
         var server = TestEnvironment.Server;
         // Act
-        server.SimulateMessage(this, message);
+        GameThreadTestRunner.Run(() =>
+        {
+            server.SimulateMessage(this, message);
 
-        // The update is coalesced, so it only reaches clients once the server flushes for the tick.
-        FlushCoalescer(server);
+            // The update is coalesced, so it only reaches clients once the server flushes for the tick.
+            FlushCoalescer(server);
+        });
 
         // Assert
         foreach (var client in TestEnvironment.Clients)
@@ -55,19 +60,23 @@ public class PartyBehaviorTest
     [Fact]
     public void ServerCoalescesPartyBehaviorUpdates_SendsLatestOnly()
     {
+        RegisterTestParty();
         var first = new PartyBehaviorUpdateData("Test_Party", default, default, default, default, default, default, default);
         var expected = new CampaignVec2(new Vec2(42f, 24f), true);
         var latest = first;
         latest.MoveTargetPoint = expected;
         var server = TestEnvironment.Server;
 
-        server.SimulateMessage(this, new PartyBehaviorUpdated(ref first));
-        server.SimulateMessage(this, new PartyBehaviorUpdated(ref latest));
+        GameThreadTestRunner.Run(() =>
+        {
+            server.SimulateMessage(this, new PartyBehaviorUpdated(ref first));
+            server.SimulateMessage(this, new PartyBehaviorUpdated(ref latest));
 
-        // Nothing goes out until the tick flush.
-        Assert.Equal(0, server.NetworkSentMessages.GetMessageCount<NetworkUpdatePartyBehavior>());
+            // Nothing goes out until the tick flush.
+            Assert.Equal(0, server.NetworkSentMessages.GetMessageCount<NetworkUpdatePartyBehavior>());
 
-        FlushCoalescer(server);
+            FlushCoalescer(server);
+        });
 
         var sent = Assert.Single(server.NetworkSentMessages.GetMessages<NetworkUpdatePartyBehavior>());
         AssertCampaignVec2Equal(expected, sent.BehaviorUpdateData.MoveTargetPoint);
@@ -86,6 +95,7 @@ public class PartyBehaviorTest
     public void ServerFlushesImmediateMixedPartyUpdate()
     {
         // Arrange
+        RegisterTestParty();
         const string compactPartyId = "Test_Party";
         const string fullPartyId = "MobileParty_Test_Party";
         var pending = new PartyBehaviorUpdateData(compactPartyId, default, default, default, default, default, default, default);
@@ -98,14 +108,17 @@ public class PartyBehaviorTest
 
         var server = TestEnvironment.Server;
         // Act
-        server.SimulateMessage(this, new PartyBehaviorUpdated(ref pending));
-        Assert.Equal(0, server.NetworkSentMessages.GetMessageCount<NetworkUpdatePartyBehavior>());
+        GameThreadTestRunner.Run(() =>
+        {
+            server.SimulateMessage(this, new PartyBehaviorUpdated(ref pending));
+            Assert.Equal(0, server.NetworkSentMessages.GetMessageCount<NetworkUpdatePartyBehavior>());
 
-        server.SimulateMessage(this, new PartyBehaviorUpdated(ref immediate));
+            server.SimulateMessage(this, new PartyBehaviorUpdated(ref immediate));
+        });
 
         // Assert
         var sent = Assert.Single(server.NetworkSentMessages.GetMessages<NetworkUpdatePartyBehavior>());
-        Assert.Null(sent.BehaviorUpdateData.InteractablePointId);
+        Assert.Equal(0u, sent.BehaviorUpdateData.InteractablePointId);
         Assert.True(sent.BehaviorUpdateData.ForcePosition);
         Assert.True(sent.BehaviorUpdateData.IsCurrentlyAtSea);
         Assert.True(sent.BehaviorUpdateData.ResetMovementToHold);
@@ -196,6 +209,13 @@ public class PartyBehaviorTest
     private static void FlushCoalescer(EnvironmentInstance server)
     {
         server.Call(() => server.Resolve<ISendCoalescer>().Flush(server.Resolve<INetwork>()));
+    }
+
+    private void RegisterTestParty()
+    {
+        TestEnvironment.RegisterObjectInNetwork(
+            ObjectHelper.SkipConstructor<MobileParty>(),
+            "MobileParty_Test_Party");
     }
 
     private static void AssertCampaignVec2Equal(CampaignVec2 expected, CampaignVec2 actual)

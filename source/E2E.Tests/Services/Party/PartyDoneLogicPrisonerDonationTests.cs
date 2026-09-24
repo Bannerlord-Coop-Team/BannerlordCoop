@@ -161,15 +161,16 @@ public class PartyDoneLogicPrisonerDonationTests : IDisposable
         return fixture;
     }
 
-    private static NetworkCompleteDoneLogic CreateDonationMessage(DonationFixture fixture)
+    private NetworkCompleteDoneLogic CreateDonationMessage(DonationFixture fixture)
     {
+        uint prisonerHandle = Server.GetHandle<CharacterObject>(fixture.PrisonerId);
         var settlementDelta = new TroopRosterData(new[]
         {
-            new TroopRosterElementData(fixture.PrisonerId, 1, 0, 0),
+            new TroopRosterElementData(prisonerHandle, 1, 0, 0),
         });
         var playerDelta = new TroopRosterData(new[]
         {
-            new TroopRosterElementData(fixture.PrisonerId, -1, 0, 0),
+            new TroopRosterElementData(prisonerHandle, -1, 0, 0),
         });
         var donatedPrisoners = new[]
         {

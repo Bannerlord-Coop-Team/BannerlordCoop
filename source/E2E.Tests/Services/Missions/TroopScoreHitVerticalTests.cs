@@ -195,6 +195,7 @@ public class TroopScoreHitVerticalTests : MissionTestEnvironment
     public void RepeatedScoreHitsInOneTick_SendLatestContributionOnce()
     {
         var (partyId, troopSeed, _) = SetupScoredBattleOnServer();
+        uint partyHandle = Server.GetHandle<MapEventParty>(partyId);
 
         Server.NetworkSentMessages.Clear();
 
@@ -211,11 +212,11 @@ public class TroopScoreHitVerticalTests : MissionTestEnvironment
             serverContribution = party.ContributionToBattle;
         });
 
-        Assert.DoesNotContain(Server.NetworkSentMessages, message => IsContributionMessageFor(message, partyId));
+        Assert.DoesNotContain(Server.NetworkSentMessages, message => IsContributionMessageFor(message, partyHandle));
 
         FlushCoalescer();
 
-        Assert.Single(Server.NetworkSentMessages, message => IsContributionMessageFor(message, partyId));
+        Assert.Single(Server.NetworkSentMessages, message => IsContributionMessageFor(message, partyHandle));
         AssertClientsConvergedOn(partyId, serverContribution);
     }
 
@@ -223,6 +224,7 @@ public class TroopScoreHitVerticalTests : MissionTestEnvironment
     public void LastPartyLeave_FlushesPendingContributionBeforeMapEventDestroy()
     {
         var (partyId, troopSeed, _) = SetupScoredBattleOnServer();
+        uint partyHandle = Server.GetHandle<MapEventParty>(partyId);
 
         string? partyBaseId = null;
         Server.NetworkSentMessages.Clear();
@@ -238,7 +240,7 @@ public class TroopScoreHitVerticalTests : MissionTestEnvironment
         });
 
         Assert.NotNull(partyBaseId);
-        Assert.DoesNotContain(Server.NetworkSentMessages, message => IsContributionMessageFor(message, partyId));
+        Assert.DoesNotContain(Server.NetworkSentMessages, message => IsContributionMessageFor(message, partyHandle));
 
         // The leave and finalization paths run normally; only the campaign-map locatable scan is unavailable headlessly.
         Server.Call(
@@ -246,11 +248,11 @@ public class TroopScoreHitVerticalTests : MissionTestEnvironment
             new[] { AccessTools.Method(typeof(MapEvent), "ResetUnsuitablePartiesThatWereTargetingThisMapEvent") });
 
         var messages = Server.NetworkSentMessages.Messages;
-        int contributionIndex = messages.FindIndex(message => IsContributionMessageFor(message, partyId));
+        int contributionIndex = messages.FindIndex(message => IsContributionMessageFor(message, partyHandle));
         int destroyIndex = messages.FindIndex(message => message is NetworkDestroyInstance<MapEvent>);
         int leaveIndex = messages.FindIndex(message => message is NetworkPartyLeftBattle);
 
-        Assert.Single(messages, message => IsContributionMessageFor(message, partyId));
+        Assert.Single(messages, message => IsContributionMessageFor(message, partyHandle));
         Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkDestroyInstance<MapEvent>>());
         Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkPartyLeftBattle>());
         Assert.True(contributionIndex < destroyIndex,
@@ -259,12 +261,12 @@ public class TroopScoreHitVerticalTests : MissionTestEnvironment
             $"Contribution packet index {contributionIndex} was not before leave index {leaveIndex}");
     }
 
-    private static bool IsContributionMessageFor(IMessage message, string partyId)
+    private static bool IsContributionMessageFor(IMessage message, uint partyHandle)
     {
         if (message.GetType().Name != "MapEventParty__contributionToBattle_SetNetworkMessage") return false;
 
-        var instanceId = AccessTools.Property(message.GetType(), "InstanceId").GetValue(message) as string;
-        return instanceId == ObjectManager.Compact(partyId, typeof(MapEventParty));
+        var instanceId = (uint)AccessTools.Property(message.GetType(), "InstanceId").GetValue(message)!;
+        return instanceId == partyHandle;
     }
 
     /// <summary>
