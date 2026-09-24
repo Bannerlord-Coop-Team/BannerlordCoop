@@ -23,16 +23,17 @@ public class FactionInterface : IFactionInterface
 
     public bool TryGetFaction(string id, out IFaction faction)
     {
-        if (objectManager.TryGetObject(id, out Kingdom kingdom))
+        // Preserve concrete-type lookup precedence for compact IDs without trying a Clan as a Kingdom.
+        var lookupId = id;
+        if (!string.IsNullOrEmpty(id))
         {
-            faction = kingdom;
-            return true;
+            if (objectManager.Contains($"Kingdom_{id}"))
+                lookupId = $"Kingdom_{id}";
+            else if (objectManager.Contains($"Clan_{id}") &&
+                !(objectManager.TryGetObject(id, out object direct) && direct is Kingdom))
+                lookupId = $"Clan_{id}";
         }
-        if (objectManager.TryGetObject(id, out Clan clan))
-        {
-            faction = clan;
-            return true;
-        }
+        if (objectManager.TryGetObject(lookupId, out faction)) return true;
         Logger.Debug("Faction not found in IFactionInterface with id: {id}", id);
         faction = null;
         return false;

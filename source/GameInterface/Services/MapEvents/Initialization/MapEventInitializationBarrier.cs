@@ -428,7 +428,12 @@ internal sealed class MapEventInitializationBarrier : IMapEventInitializationBar
             var party = mapEventParty.Party;
             if (party == null || (party._mapEventSide != null && party._mapEventSide.MapEvent != mapEvent)) continue;
             if (party != preservedParty && party._mapEventSide?.MapEvent == mapEvent) party._mapEventSide = null;
-            if (party.MobileParty != null) party.MobileParty.EventPositionAdder = Vec2.Zero;
+            if (party.MobileParty != null)
+            {
+                // Client graph removal applies the received teardown; server aborts still replicate their writes.
+                using (ModInformation.IsClient ? new AllowedThread() : null)
+                    party.MobileParty.EventPositionAdder = Vec2.Zero;
+            }
             party.SetVisualAsDirty();
         }
 

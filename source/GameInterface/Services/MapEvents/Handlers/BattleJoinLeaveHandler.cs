@@ -308,6 +308,10 @@ internal class BattleJoinLeaveHandler : IHandler
                         return;
                     }
 
+                    // Vanilla JoinBattleInternal assigns this locally; accepted joins must replicate it instead.
+                    if (mapEvent.IsSiegeAssault && data.Side == BattleSideEnum.Attacker && party.MobileParty != null)
+                        party.MobileParty.BesiegerCamp = mapEvent.MapEventSettlement?.SiegeEvent?.BesiegerCamp;
+
                     // Removal temporarily promotes a remaining party; put the persistent besieger back when it rejoins.
                     siegeMapEventLeaderReconciler.RestoreAfterJoin(mapEvent, party);
 

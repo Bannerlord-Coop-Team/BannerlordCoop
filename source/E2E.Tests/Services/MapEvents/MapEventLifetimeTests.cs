@@ -6,6 +6,7 @@ using GameInterface.Registry.Auto;
 using GameInterface.Services.MapEventSides.Messages;
 using GameInterface.Services.MapEvents;
 using GameInterface.Services.MapEvents.Handlers;
+using GameInterface.Services.MapEvents.Initialization;
 using GameInterface.Services.MapEvents.Messages;
 using GameInterface.Services.MapEvents.Messages.Leave;
 using GameInterface.Services.MapEvents.Messages.Start;
@@ -27,6 +28,56 @@ public class MapEventLifetimeTests : MapEventTestBase
     private static MobileParty? dispatchedSiegeLeader;
 
     public MapEventLifetimeTests(ITestOutputHelper output) : base(output) { }
+
+    [Fact]
+    public void DestroyGraph_ResetsClientOffsetsUnderReceivePolicy_WithoutSuppressingServer()
+    {
+        var battle = CreateServerMapEvent();
+        foreach (var instance in Clients.Append(Server))
+        {
+            instance.Call(() =>
+            {
+                Assert.True(instance.ObjectManager.TryGetObject<MobileParty>(battle.AttackerPartyId, out var party));
+                using (new AllowedThread())
+                    party.EventPositionAdder = new TaleWorlds.Library.Vec2(1, 2);
+            });
+        }
+        var writes = new List<(bool Server, bool Allowed)>();
+        var setter = AccessTools.PropertySetter(typeof(MobileParty), nameof(MobileParty.EventPositionAdder));
+        var harmony = new Harmony($"map-event-destroy-offset-{Guid.NewGuid()}");
+        offsetWrites = writes;
+        harmony.Patch(setter, prefix: new HarmonyMethod(typeof(MapEventLifetimeTests), nameof(RecordOffsetWrite)));
+        try
+        {
+            foreach (var instance in Clients.Append(Server))
+            {
+                instance.Call(() =>
+                {
+                    Assert.True(instance.ObjectManager.TryGetObject<MapEvent>(battle.MapEventId, out var mapEvent));
+                    instance.Resolve<IMapEventInitializationBarrier>().DestroyGraph(mapEvent);
+                    Assert.True(instance.ObjectManager.TryGetObject<MobileParty>(battle.AttackerPartyId, out var party));
+                    Assert.Null(party.MapEvent);
+                    Assert.Equal(TaleWorlds.Library.Vec2.Zero, party.EventPositionAdder);
+                });
+            }
+
+            Assert.Contains(writes, write => write.Server && !write.Allowed);
+            Assert.Contains(writes, write => !write.Server && write.Allowed);
+            Assert.All(writes, write => Assert.Equal(!write.Server, write.Allowed));
+        }
+        finally
+        {
+            harmony.Unpatch(setter, HarmonyPatchType.Prefix, harmony.Id);
+            offsetWrites = null;
+        }
+    }
+
+    private static List<(bool Server, bool Allowed)>? offsetWrites;
+
+    private static void RecordOffsetWrite()
+    {
+        offsetWrites?.Add((Common.ModInformation.IsServer, AllowedThread.IsThisThreadAllowed()));
+    }
 
     [Fact]
     public void ServerCreate_MapEvent_SyncAllClients()
