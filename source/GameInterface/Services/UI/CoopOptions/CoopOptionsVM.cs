@@ -3,7 +3,6 @@ using GameInterface.Services.UI.CoopOptions.Providers.UITab;
 using GameInterface.Configuration;
 using GameInterface.Services.CampaignService.Messages;
 using GameInterface.Services.UI.CoopOptions.Providers;
-using GameInterface.Services.UI.CoopOptions.Providers.BugReportTab;
 using GameInterface.Services.UI.CoopOptions.Providers.NetworkTab;
 using GameInterface.Services.UI.CoopOptions.Providers.VoiceTab;
 using GameInterface.Services.UI.Donate;
@@ -75,9 +74,6 @@ public class CoopOptionsVM : ViewModel
 
     [DataSourceProperty]
     public bool IsApplyButtonVisible => SelectedTab?.CanApply == true;
-
-    [DataSourceProperty]
-    public CoopOptionsTabVM BugReportTab { get; set; }
 
     [DataSourceProperty]
     public CoopOptionsTabVM NetworkTab { get; set; }
@@ -191,11 +187,6 @@ public class CoopOptionsVM : ViewModel
         {
             UITab = tab;
             OnPropertyChanged(nameof(UITab));
-        }
-        else if (tabId == BugReportOptionsTabProvider.TabId)
-        {
-            BugReportTab = tab;
-            OnPropertyChanged(nameof(BugReportTab));
         }
         else if (tabId == VoiceOptionsTabProvider.TabId)
         {

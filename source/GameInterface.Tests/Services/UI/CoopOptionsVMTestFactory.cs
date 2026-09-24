@@ -27,7 +27,6 @@ internal static class CoopOptionsVMTestFactory
         ICoopOptionsTabProvider[] providers =
         {
             new UIOptionsTabProvider(),
-            new BugReportOptionsTabProvider(),
             new NetworkOptionsTabProvider(),
         };
         return new CoopOptionsVM(

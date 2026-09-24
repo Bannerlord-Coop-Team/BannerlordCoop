@@ -25,7 +25,6 @@
               </ItemTemplate>
             </ListPanel>
 
-			<!-- COOP_OPTIONS_PROVIDER:Providers/BugReportTab/BugReportTab.xml -->
             <!-- COOP_OPTIONS_PROVIDER:Providers/VoiceTab/VoiceTab.xml -->
             <!-- COOP_OPTIONS_PROVIDER:Providers/UITab/UITab.xml -->
 			<!-- COOP_OPTIONS_PROVIDER:Providers/NetworkTab/NetworkTab.xml -->

@@ -31,6 +31,16 @@
                                                 </ButtonWidget>
                                             </Children>
                                         </ListPanel>
+                                    <ListPanel DataSource="{BugReport}" WidthSizePolicy="StretchToParent" HeightSizePolicy="Fixed" SuggestedHeight="64" LayoutImp.LayoutMethod="HorizontalLeftToRight">
+                                            <Children>
+                                                <TextWidget WidthSizePolicy="Fixed" SuggestedWidth="440" HeightSizePolicy="StretchToParent" Brush="SPOptions.OptionName.Text" Brush.FontSize="24" Brush.TextHorizontalAlignment="Left" Brush.TextVerticalAlignment="Center" Text="@ShowBugReportButtonText" />
+                                                <ButtonWidget WidthSizePolicy="Fixed" HeightSizePolicy="Fixed" SuggestedWidth="40" SuggestedHeight="40" VerticalAlignment="Center" Brush="SPOptions.Checkbox.Empty.Button" ButtonType="Toggle" IsSelected="@ShowBugReportButton" ToggleIndicator="ToggleIndicator" UpdateChildrenStates="true">
+                                                    <Children>
+                                                        <BrushWidget Id="ToggleIndicator" WidthSizePolicy="StretchToParent" HeightSizePolicy="StretchToParent" Brush="SPOptions.Checkbox.Full.Button" />
+                                                    </Children>
+                                                </ButtonWidget>
+                                            </Children>
+                                        </ListPanel>
                                         <ListPanel IsVisible="@NameplatesAvailable" WidthSizePolicy="StretchToParent" HeightSizePolicy="CoverChildren" MarginTop="24" LayoutImp.LayoutMethod="VerticalTopToBottom">
                                             <Children>
                                                 <TextWidget WidthSizePolicy="StretchToParent" HeightSizePolicy="Fixed" SuggestedHeight="40" Brush="Clan.TabControl.Text" Brush.FontSize="26" Brush.TextHorizontalAlignment="Left" Brush.TextVerticalAlignment="Center" Text="@NameplatesText" />
