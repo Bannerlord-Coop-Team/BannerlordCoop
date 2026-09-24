@@ -167,11 +167,23 @@ internal class BattleJoinLeaveHandler : IHandler
         if (MobileParty.MainParty?.MapEvent != mapEvent)
             return;
 
-        var encounterMapEvent = PlayerEncounter.Battle ?? PlayerEncounter.EncounteredBattle ?? MapEvent.PlayerMapEvent;
-        if (encounterMapEvent != mapEvent)
+        if (Campaign.Current?.CurrentMenuContext?.GameMenu?.StringId != "join_siege_event")
             return;
 
-        if (Campaign.Current?.CurrentMenuContext?.GameMenu?.StringId != "join_siege_event")
+        var encounter = PlayerEncounter.Current;
+        if (encounter == null)
+            return;
+
+        // Involved-party snapshots can arrive before the encountered party is ready.
+        var encounteredParty = encounter._encounteredParty;
+        if (encounter._mapEvent == null && encounteredParty == null)
+            return;
+
+        var encounterMapEvent = encounter._mapEvent ?? encounteredParty?.MapEvent ??
+            (encounteredParty?.IsSettlement == true
+                ? encounteredParty.SiegeEvent?.BesiegerCamp?.LeaderParty?.MapEvent
+                : null) ?? MapEvent.PlayerMapEvent;
+        if (encounterMapEvent != mapEvent)
             return;
 
         GameMenu.SwitchToMenu("encounter");

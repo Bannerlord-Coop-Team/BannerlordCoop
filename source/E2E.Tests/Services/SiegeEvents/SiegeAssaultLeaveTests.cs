@@ -1,5 +1,6 @@
 ﻿using Common.Messaging;
 using Autofac;
+using Common.Logging;
 using Common.Network;
 using Common.PacketHandlers;
 using Common.Serialization;
@@ -193,6 +194,78 @@ public class SiegeAssaultLeaveTests : MapEventTestBase
             AssertTrackerMatchesSides(mapEvent);
             Assert.Contains(tracker._mapEventParties, involvedParty => involvedParty.Party == party.Party);
         });
+    }
+
+    [Theory]
+    [InlineData("encounter", "absent", false)]
+    [InlineData("join_siege_event", "absent", false)]
+    [InlineData("join_siege_event", "empty", false)]
+    [InlineData("join_siege_event", "settlement", true)]
+    [InlineData("join_siege_event", "matching", true)]
+    [InlineData("join_siege_event", "other-battle", false)]
+    public void InvolvedParties_PreservesSnapshotAndOnlyResumesMatchingJoinMenu(
+        string menuId, string encounterState, bool expectMenuSwitch)
+    {
+        var context = CreateServerMapEvent();
+        var partyId = JoinNewServerPartyToSide(context.MapEventId, BattleSideEnum.Attacker);
+        var client = Clients.First();
+        SetMapEventType(context.MapEventId, MapEvent.BattleTypes.Siege);
+        SetMainParty(client, partyId);
+        var settlementId = TestEnvironment.CreateRegisteredObject<Settlement>();
+        string[] involvedPartyIds = Array.Empty<string>();
+        client.Call(() =>
+        {
+            Assert.True(client.ObjectManager.TryGetObject<MapEvent>(context.MapEventId, out var mapEvent));
+            var encounter = encounterState == "absent" ? null : ObjectHelper.SkipConstructor<PlayerEncounter>();
+            Campaign.Current.PlayerEncounter = encounter;
+            if (encounterState == "matching")
+                encounter!._mapEvent = mapEvent;
+            if (encounterState == "other-battle")
+                encounter!._mapEvent = ObjectHelper.SkipConstructor<MapEvent>();
+            if (encounterState == "settlement")
+            {
+                Assert.True(client.ObjectManager.TryGetObject<Settlement>(settlementId, out var settlement));
+                settlement.SiegeEvent = null;
+                settlement.Party._mapEventSide = null;
+                encounter!._encounteredParty = settlement.Party;
+            }
+
+            var mapState = Game.Current.GameStateManager.CreateState<MapState>();
+            mapState._menuContext = ObjectHelper.SkipConstructor<MenuContext>();
+            mapState._menuContext.GameMenu = new GameMenu(menuId);
+            Game.Current.GameStateManager._gameStates.Add(mapState);
+            involvedPartyIds = mapEvent._sides.SelectMany(side => side.Parties).Select(party =>
+            {
+                Assert.True(client.ObjectManager.TryGetId(party, out var id));
+                return id;
+            }).ToArray();
+        });
+
+        int applyFailures = 0;
+        Action<string> captureFailure = message =>
+        {
+            if (message.Contains("Failed to apply") && message.Contains("NetworkAddInvolvedParties"))
+                Interlocked.Increment(ref applyFailures);
+        };
+        using var menuSwitchRecorder = new GameMenuSwitchRecorder();
+        OutputSinkManager.AddLogCallback(captureFailure);
+        try
+        {
+            client.SimulateMessage(Server.NetPeer, new NetworkAddInvolvedParties(
+                context.MapEventId, involvedPartyIds, new CampaignVec2[involvedPartyIds.Length]));
+            client.Call(() =>
+            {
+                Assert.True(client.ObjectManager.TryGetObject<MapEvent>(context.MapEventId, out var mapEvent));
+                AssertTrackerMatchesSides(mapEvent);
+            });
+            Assert.Equal(0, Volatile.Read(ref applyFailures));
+            Assert.Equal(expectMenuSwitch ? new[] { "encounter" } : Array.Empty<string>(),
+                menuSwitchRecorder.SwitchesFor(client));
+        }
+        finally
+        {
+            OutputSinkManager.RemoveLogCallback(captureFailure);
+        }
     }
 
     [Fact]
