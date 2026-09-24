@@ -8,9 +8,12 @@ namespace GameInterface.Services.EquipmentRoster.Messages
     {
         [ProtoMember(1)]
         public string EquipmentRosterId;
-        public NetworkCreateEquipmentRoster(string equipmentRosterId)
+        [ProtoMember(2)]
+        public uint Handle;
+        public NetworkCreateEquipmentRoster(string equipmentRosterId, uint handle)
         {
             EquipmentRosterId = equipmentRosterId;
+            Handle = handle;
         }
     }
 }

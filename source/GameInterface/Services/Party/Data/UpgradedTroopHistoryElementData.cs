@@ -6,15 +6,15 @@ namespace GameInterface.Services.Party.Data;
 public readonly struct UpgradedTroopHistoryElementData
 {
     [ProtoMember(1)]
-    public readonly string Character1Id;
+    public readonly uint Character1Id;
 
     [ProtoMember(2)]
-    public readonly string Character2Id;
+    public readonly uint Character2Id;
 
     [ProtoMember(3)]
     public readonly int Number;
 
-    public UpgradedTroopHistoryElementData(string character1Id, string character2Id, int number)
+    public UpgradedTroopHistoryElementData(uint character1Id, uint character2Id, int number)
     {
         Character1Id = character1Id;
         Character2Id = character2Id;

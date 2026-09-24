@@ -673,8 +673,7 @@ internal class PlayerCaptivityServerHandler : IHandler
     {
         var partyVisual = party.Party.GetPartyVisual();
         if (partyVisual == null) return;
-        if (!objectManager.TryGetIdWithLogging(partyVisual, out string partyVisualId)) return;
-        if (!objectManager.TryGetIdWithLogging(party, out string mobilePartyId)) return;
+        if (!objectManager.TryGetHandleWithLogging(party, out var mobilePartyHandle)) return;
 
         objectManager.Remove(partyVisual);
 
@@ -683,7 +682,7 @@ internal class PlayerCaptivityServerHandler : IHandler
             MobilePartyVisualManager.Current?.RemovePartyVisualForParty(party);
         }
 
-        network.SendAll(new NetworkDestroyPartyVisual(partyVisualId, mobilePartyId));
+        network.SendAll(new NetworkDestroyPartyVisual(mobilePartyHandle));
     }
 
     /// <summary>

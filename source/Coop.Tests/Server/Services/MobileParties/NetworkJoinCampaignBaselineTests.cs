@@ -64,16 +64,35 @@ public class NetworkJoinCampaignBaselineTests
         var expected = new NetworkJoinCampaignBaseline(
             987654321L,
             TimeControlEnum.Play_2x,
-            new[] { state },
+            new[] { new NetworkMobilePartyJoinState(state, new NetworkPartyBehaviorUpdateData
+            {
+                MobilePartyId = 1,
+                NewAiBehavior = behavior.NewAiBehavior,
+                InteractablePointId = 2,
+                BestTargetPoint = behavior.BestTargetPoint,
+                PartyPosition = behavior.PartyPosition,
+                DefaultBehavior = behavior.DefaultBehavior,
+                TargetPosition = behavior.TargetPosition,
+                DesiredAiNavigationType = behavior.DesiredAiNavigationType,
+                OriginControllerId = behavior.OriginControllerId,
+                ForcePosition = behavior.ForcePosition,
+                TargetPartyId = 3,
+                TargetSettlementId = 4,
+                MoveTargetPoint = behavior.MoveTargetPoint,
+                IsTargetingPort = behavior.IsTargetingPort,
+                PartyMoveMode = behavior.PartyMoveMode,
+                MoveTargetPartyId = 5,
+                IsInteractableAnchor = behavior.IsInteractableAnchor,
+            }) },
             troopXpBaselines: new[]
             {
-                new TroopRosterXpBaseline("member_roster", new[]
+                new TroopRosterXpBaseline(6, new[]
                 {
-                    new TroopXpBaselineEntry("member_troop", 123),
+                    new TroopXpBaselineEntry(7, 123),
                 }),
-                new TroopRosterXpBaseline("prison_roster", new[]
+                new TroopRosterXpBaseline(8, new[]
                 {
-                    new TroopXpBaselineEntry("prisoner_troop", 456),
+                    new TroopXpBaselineEntry(9, 456),
                 }),
             });
 
@@ -86,16 +105,16 @@ public class NetworkJoinCampaignBaselineTests
         Assert.Collection(received.TroopXpBaselines,
             members =>
             {
-                Assert.Equal("member_roster", members.RosterId);
+                Assert.Equal(6u, members.RosterId);
                 var entry = Assert.Single(members.Entries);
-                Assert.Equal("member_troop", entry.CharacterId);
+                Assert.Equal(7u, entry.CharacterId);
                 Assert.Equal(123, entry.Xp);
             },
             prisoners =>
             {
-                Assert.Equal("prison_roster", prisoners.RosterId);
+                Assert.Equal(8u, prisoners.RosterId);
                 var entry = Assert.Single(prisoners.Entries);
-                Assert.Equal("prisoner_troop", entry.CharacterId);
+                Assert.Equal(9u, entry.CharacterId);
                 Assert.Equal(456, entry.Xp);
             });
     }
@@ -106,7 +125,7 @@ public class NetworkJoinCampaignBaselineTests
         var message = new NetworkJoinCampaignBaseline(
             123L,
             TimeControlEnum.Play_1x,
-            Array.Empty<MobilePartyJoinState>(),
+            Array.Empty<NetworkMobilePartyJoinState>(),
             isComplete: false);
 
         var received = RoundTrip(message);

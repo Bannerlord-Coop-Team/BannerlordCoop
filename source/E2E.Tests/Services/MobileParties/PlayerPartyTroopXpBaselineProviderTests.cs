@@ -10,7 +10,6 @@ using TaleWorlds.CampaignSystem.Party.PartyComponents;
 using TaleWorlds.CampaignSystem.Roster;
 using TaleWorlds.CampaignSystem.Settlements;
 using Xunit.Abstractions;
-using static GameInterface.Services.ObjectManager.ObjectManager;
 
 namespace E2E.Tests.Services.MobileParties;
 
@@ -54,16 +53,16 @@ public class PlayerPartyTroopXpBaselineProviderTests : SyncTestBase
             Assert.Collection(baselines,
                 members =>
                 {
-                    Assert.Equal(Compact(memberRosterId, typeof(TroopRoster)), members.RosterId);
+                    Assert.Equal(Server.GetHandle<TroopRoster>(memberRosterId), members.RosterId);
                     var entry = Assert.Single(members.Entries,
-                        candidate => candidate.CharacterId == Compact(memberId, typeof(CharacterObject)));
+                        candidate => candidate.CharacterId == Server.GetHandle<CharacterObject>(memberId));
                     Assert.Equal(123, entry.Xp);
                 },
                 prisoners =>
                 {
-                    Assert.Equal(Compact(prisonRosterId, typeof(TroopRoster)), prisoners.RosterId);
+                    Assert.Equal(Server.GetHandle<TroopRoster>(prisonRosterId), prisoners.RosterId);
                     var entry = Assert.Single(prisoners.Entries,
-                        candidate => candidate.CharacterId == Compact(prisonerId, typeof(CharacterObject)));
+                        candidate => candidate.CharacterId == Server.GetHandle<CharacterObject>(prisonerId));
                     Assert.Equal(456, entry.Xp);
                 });
         });
@@ -141,21 +140,21 @@ public class PlayerPartyTroopXpBaselineProviderTests : SyncTestBase
             var provider = Server.Resolve<IPlayerPartyTroopXpBaselineProvider>();
             Assert.True(provider.TryCapture(joiningClient.NetPeer, out var baselines));
             Assert.Equal(4, baselines.Length);
-            Assert.Equal(Compact(playerMemberRosterId, typeof(TroopRoster)), baselines[0].RosterId);
-            Assert.Equal(Compact(playerPrisonRosterId, typeof(TroopRoster)), baselines[1].RosterId);
+            Assert.Equal(Server.GetHandle<TroopRoster>(playerMemberRosterId), baselines[0].RosterId);
+            Assert.Equal(Server.GetHandle<TroopRoster>(playerPrisonRosterId), baselines[1].RosterId);
 
             var companionMembers = Assert.Single(baselines,
-                baseline => baseline.RosterId == Compact(companionMemberRosterId, typeof(TroopRoster)));
+                baseline => baseline.RosterId == Server.GetHandle<TroopRoster>(companionMemberRosterId));
             Assert.Equal(789, Assert.Single(companionMembers.Entries,
-                entry => entry.CharacterId == Compact(companionMemberId, typeof(CharacterObject))).Xp);
+                entry => entry.CharacterId == Server.GetHandle<CharacterObject>(companionMemberId)).Xp);
             var companionPrisoners = Assert.Single(baselines,
-                baseline => baseline.RosterId == Compact(companionPrisonRosterId, typeof(TroopRoster)));
+                baseline => baseline.RosterId == Server.GetHandle<TroopRoster>(companionPrisonRosterId));
             Assert.Equal(987, Assert.Single(companionPrisoners.Entries,
-                entry => entry.CharacterId == Compact(companionPrisonerId, typeof(CharacterObject))).Xp);
+                entry => entry.CharacterId == Server.GetHandle<CharacterObject>(companionPrisonerId)).Xp);
             Assert.DoesNotContain(baselines,
-                baseline => baseline.RosterId == Compact(worldAiMemberRosterId, typeof(TroopRoster)));
+                baseline => baseline.RosterId == Server.GetHandle<TroopRoster>(worldAiMemberRosterId));
             Assert.DoesNotContain(baselines,
-                baseline => baseline.RosterId == Compact(otherPlayerMemberRosterId, typeof(TroopRoster)));
+                baseline => baseline.RosterId == Server.GetHandle<TroopRoster>(otherPlayerMemberRosterId));
         });
     }
 
@@ -205,13 +204,13 @@ public class PlayerPartyTroopXpBaselineProviderTests : SyncTestBase
             Assert.True(provider.TryCapture(joiningClient.NetPeer, out var baselines));
 
             var members = Assert.Single(baselines,
-                baseline => baseline.RosterId == Compact(memberRosterId, typeof(TroopRoster)));
+                baseline => baseline.RosterId == Server.GetHandle<TroopRoster>(memberRosterId));
             Assert.Equal(654, Assert.Single(members.Entries,
-                entry => entry.CharacterId == Compact(memberId, typeof(CharacterObject))).Xp);
+                entry => entry.CharacterId == Server.GetHandle<CharacterObject>(memberId)).Xp);
             var prisoners = Assert.Single(baselines,
-                baseline => baseline.RosterId == Compact(prisonRosterId, typeof(TroopRoster)));
+                baseline => baseline.RosterId == Server.GetHandle<TroopRoster>(prisonRosterId));
             Assert.Equal(321, Assert.Single(prisoners.Entries,
-                entry => entry.CharacterId == Compact(prisonerId, typeof(CharacterObject))).Xp);
+                entry => entry.CharacterId == Server.GetHandle<CharacterObject>(prisonerId)).Xp);
         });
     }
 

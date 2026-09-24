@@ -304,8 +304,9 @@ internal class ServerVillageHostileActionHandler : IHandler
             if (playerParty == raidingParty || playerParty.CurrentSettlement != settlement)
                 continue;
 
+            if (!objectManager.TryGetHandleWithLogging(playerParty, out var partyHandle)) continue;
             network.SendAll(new NetworkSettlementEncounterLeaveResult(
-                player.MobilePartyId,
+                partyHandle,
                 SettlementEncounterLeaveOutcome.Applied));
             settlementInterface.PartyLeaveSettlement(playerParty);
         }

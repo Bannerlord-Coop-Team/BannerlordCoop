@@ -42,8 +42,15 @@ internal class WorkshopLifetimePatches
             objectManager.AddNewObject(__instance, out var newWorkshopId);
 
             objectManager.TryGetId(settlement, out string settlementId);
+            if (!objectManager.TryGetHandleWithLogging(__instance, out var workshopHandle) ||
+                !objectManager.TryGetHandleWithLogging(settlement, out var settlementHandle)) return true;
 
-            var data = new WorkshopCreatedData(newWorkshopId, settlementId, tag);
+            var data = new WorkshopCreatedData(
+                newWorkshopId,
+                settlementId,
+                tag,
+                workshopHandle,
+                settlementHandle);
             var message = new WorkshopCreated(data);
 
             MessageBroker.Instance.Publish(null, message);

@@ -19,10 +19,10 @@ public class TroopRosterElementBatchPayloadTests
     [Fact]
     public void Merge_AdjacentXpSets_KeepsLatestOnly()
     {
-        var payload = new TroopRosterElementBatchPayload("roster", "character",
+        var payload = new TroopRosterElementBatchPayload(1, 2,
             TroopRosterElementOperation.SetXp(10));
 
-        payload.Merge(new TroopRosterElementBatchPayload("roster", "character",
+        payload.Merge(new TroopRosterElementBatchPayload(1, 2,
             TroopRosterElementOperation.SetXp(20)));
 
         var batch = Assert.IsType<NetworkTroopRosterElementBatch>(payload.ToMessage());
@@ -34,12 +34,12 @@ public class TroopRosterElementBatchPayloadTests
     [Fact]
     public void Merge_AdjacentAddCounts_PreservesEveryNonCommutativeOperation()
     {
-        var payload = new TroopRosterElementBatchPayload("roster", "character",
+        var payload = new TroopRosterElementBatchPayload(1, 2,
             TroopRosterElementOperation.AddCounts(5, 5, 100, true));
 
-        payload.Merge(new TroopRosterElementBatchPayload("roster", "character",
+        payload.Merge(new TroopRosterElementBatchPayload(1, 2,
             TroopRosterElementOperation.AddCounts(-4, 0, 50, true)));
-        payload.Merge(new TroopRosterElementBatchPayload("roster", "character",
+        payload.Merge(new TroopRosterElementBatchPayload(1, 2,
             TroopRosterElementOperation.AddCounts(4, 0, 7, false)));
 
         var batch = Assert.IsType<NetworkTroopRosterElementBatch>(payload.ToMessage());
@@ -52,12 +52,12 @@ public class TroopRosterElementBatchPayloadTests
     [Fact]
     public void Merge_AddCountsBetweenXpSets_PreservesOperationOrderAndArguments()
     {
-        var payload = new TroopRosterElementBatchPayload("roster", "character",
+        var payload = new TroopRosterElementBatchPayload(1, 2,
             TroopRosterElementOperation.SetXp(10));
 
-        payload.Merge(new TroopRosterElementBatchPayload("roster", "character",
+        payload.Merge(new TroopRosterElementBatchPayload(1, 2,
             TroopRosterElementOperation.AddCounts(-3, -1, 7, true)));
-        payload.Merge(new TroopRosterElementBatchPayload("roster", "character",
+        payload.Merge(new TroopRosterElementBatchPayload(1, 2,
             TroopRosterElementOperation.SetXp(20)));
 
         var batch = Assert.IsType<NetworkTroopRosterElementBatch>(payload.ToMessage());

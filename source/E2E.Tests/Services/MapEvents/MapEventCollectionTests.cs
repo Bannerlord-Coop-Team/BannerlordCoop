@@ -47,8 +47,8 @@ public class MapEventCollectionTests : MapEventTestBase
 
         var marker = Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkMapEventInitialized>());
         Assert.False(marker.IsTerminal);
-        Assert.NotNull(marker.TroopUpgradeTrackerId);
-        Assert.NotNull(marker.ComponentId);
+        Assert.NotEqual(0u, marker.TroopUpgradeTrackerHandle);
+        Assert.NotEqual(0u, marker.ComponentHandle);
         foreach (var instance in AllInstances) AssertCommitted(instance, staged);
         foreach (var client in Clients) AssertPending(client, staged, false);
     }

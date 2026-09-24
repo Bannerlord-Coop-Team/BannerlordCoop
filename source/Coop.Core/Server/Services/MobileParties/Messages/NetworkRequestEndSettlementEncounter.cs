@@ -10,9 +10,9 @@ namespace Coop.Core.Server.Services.MobileParties.Messages;
 internal readonly struct NetworkRequestEndSettlementEncounter : ICommand
 {
     [ProtoMember(1)]
-    public string PartyId { get; }
+    public uint PartyId { get; }
 
-    public NetworkRequestEndSettlementEncounter(string partyId)
+    public NetworkRequestEndSettlementEncounter(uint partyId)
     {
         PartyId = partyId;
     }

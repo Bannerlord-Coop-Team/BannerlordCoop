@@ -85,7 +85,7 @@ internal class TroopRosterInterface : ITroopRosterInterface
             if (troopRosterElement.Character == null)
                 continue;
 
-            if (!objectManager.TryGetIdWithLogging(troopRosterElement.Character, out var characterId))
+            if (!objectManager.TryGetHandleWithLogging(troopRosterElement.Character, out var characterId))
                 continue;
 
             elements.Add(new TroopRosterElementData(characterId, troopRosterElement.Number, troopRosterElement.WoundedNumber, troopRosterElement.Xp));
@@ -171,7 +171,7 @@ internal class TroopRosterInterface : ITroopRosterInterface
             if (numberDelta == 0 && woundedDelta == 0 && xpDelta == 0)
                 continue;
 
-            if (!objectManager.TryGetIdWithLogging(character, out var characterId))
+            if (!objectManager.TryGetHandleWithLogging(character, out var characterId))
                 continue;
 
             elements.Add(new TroopRosterElementData(characterId, numberDelta, woundedDelta, xpDelta));

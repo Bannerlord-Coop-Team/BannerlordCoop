@@ -1,4 +1,4 @@
-// Whole-dictionary replacement (member reassignment)
+﻿// Whole-dictionary replacement (member reassignment)
 Subscribe<{{MemberType}}, {{ MemberDeclaringTypeName}}_{{ MemberName }}_SetLocalMessage>((instanceId, data) =>
 {
     // A whole-dictionary replacement must follow any earlier buffered element updates.
@@ -12,14 +12,13 @@ Subscribe<{{MemberType}}, {{ MemberDeclaringTypeName}}_{{ MemberName }}_SetLocal
         var keyData = {{KeySerializeMethod}}(pair.Key);
         {{~ else ~}}
         if (pair.Key == null) continue;
-        if (!objectManager.TryGetId(pair.Key, out string keyData)) continue;
-        keyData = ObjectManager.Compact(keyData, typeof({{KeyType}}));
+        if (!objectManager.TryGetHandle(pair.Key, out uint keyData)) continue;
         {{~ end ~}}
         {{~ if ValueByValue ~}}
         var valueData = {{ValueSerializeMethod}}(pair.Value);
         {{~ else ~}}
         if (pair.Value == null) continue;
-        if (!objectManager.TryGetId(pair.Value, out string valueData)) continue;
+        if (!objectManager.TryGetHandle(pair.Value, out uint valueData)) continue;
         {{~ end ~}}
         keys.Add(keyData);
         values.Add(valueData);
@@ -63,16 +62,15 @@ SubscribeTracked((MessagePayload<{{ MemberDeclaringTypeName}}_{{ MemberName }}_U
 {
     var data = payload.What;
 
-    if (!objectManager.TryGetIdWithLogging(data.Instance, out var instanceId)) return;
+    if (!objectManager.TryGetHandleWithLogging(data.Instance, out var instanceId)) return;
 
     {{~ if KeyByValue ~}}
     var keyData = {{KeySerializeMethod}}(data.Key);
     {{~ else ~}}
-    if (!objectManager.TryGetIdWithLogging(data.Key, out string keyData)) return;
-    keyData = ObjectManager.Compact(keyData, typeof({{KeyType}}));
+    if (!objectManager.TryGetHandleWithLogging(data.Key, out uint keyData)) return;
     {{~ end ~}}
     {{~ if !ValueByValue ~}}
-    if (!objectManager.TryGetIdWithLogging(data.Value, out string valueData)) return;
+    if (!objectManager.TryGetHandleWithLogging(data.Value, out uint valueData)) return;
     {{~ end ~}}
     {{~ if Debug ~}}
     Logger.Debug("[Server] Broadcasting dictionary upsert {MemberName}", "{{MemberDeclaringType}}.{{MemberName}}");
@@ -126,8 +124,7 @@ Subscribe<{{KeyType}}, {{ MemberDeclaringTypeName}}_{{ MemberName }}_RemoveLocal
     {{~ if KeyByValue ~}}
     var keyData = {{KeySerializeMethod}}(data.Value);
     {{~ else ~}}
-    if (!objectManager.TryGetIdWithLogging(data.Value, out string keyData)) return;
-    keyData = ObjectManager.Compact(keyData, typeof({{KeyType}}));
+    if (!objectManager.TryGetHandleWithLogging(data.Value, out uint keyData)) return;
     {{~ end ~}}
     {{~ if Debug ~}}
     Logger.Debug("[Server] Broadcasting dictionary remove {MemberName}", "{{MemberDeclaringType}}.{{MemberName}}");

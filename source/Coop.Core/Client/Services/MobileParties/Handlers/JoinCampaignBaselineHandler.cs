@@ -21,19 +21,22 @@ public sealed class JoinCampaignBaselineHandler : IHandler
     private readonly IMobilePartyBehaviorSnapshot mobilePartyBehaviorSnapshot;
     private readonly ITimeControlInterface timeControlInterface;
     private readonly IPlayerPartyTroopXpBaselineApplier troopXpBaselineApplier;
+    private readonly IPartyBehaviorWireMapper partyBehaviorWireMapper;
 
     public JoinCampaignBaselineHandler(
         IMessageBroker messageBroker,
         IMapTimeTrackerInterface mapTimeTrackerInterface,
         IMobilePartyBehaviorSnapshot mobilePartyBehaviorSnapshot,
         ITimeControlInterface timeControlInterface,
-        IPlayerPartyTroopXpBaselineApplier troopXpBaselineApplier)
+        IPlayerPartyTroopXpBaselineApplier troopXpBaselineApplier,
+        IPartyBehaviorWireMapper partyBehaviorWireMapper)
     {
         this.messageBroker = messageBroker;
         this.mapTimeTrackerInterface = mapTimeTrackerInterface;
         this.mobilePartyBehaviorSnapshot = mobilePartyBehaviorSnapshot;
         this.timeControlInterface = timeControlInterface;
         this.troopXpBaselineApplier = troopXpBaselineApplier;
+        this.partyBehaviorWireMapper = partyBehaviorWireMapper;
 
         messageBroker.Subscribe<NetworkJoinCampaignBaseline>(Handle);
     }
@@ -55,8 +58,9 @@ public sealed class JoinCampaignBaselineHandler : IHandler
             }
 #endif
             bool success = baseline.IsComplete &&
+                TryMapPartyStates(baseline.PartyStates, out var partyStates) &&
                 mobilePartyBehaviorSnapshot.TryApplyJoinBaseline(
-                    baseline.PartyStates,
+                    partyStates,
                     () =>
                     {
                         timeControlInterface.ClientSetTimeControl(baseline.TimeControlMode);
@@ -66,5 +70,18 @@ public sealed class JoinCampaignBaselineHandler : IHandler
 
             messageBroker.Publish(this, new JoinCampaignBaselineApplied(success));
         }, context: nameof(JoinCampaignBaselineHandler));
+    }
+
+    private bool TryMapPartyStates(NetworkMobilePartyJoinState[] source, out MobilePartyJoinState[] destination)
+    {
+        destination = new MobilePartyJoinState[source?.Length ?? 0];
+        if (source == null) return false;
+
+        for (int i = 0; i < source.Length; i++)
+        {
+            if (!partyBehaviorWireMapper.TryFromNetwork(source[i].Behavior, out var behavior)) return false;
+            destination[i] = source[i].ToLocal(behavior);
+        }
+        return true;
     }
 }

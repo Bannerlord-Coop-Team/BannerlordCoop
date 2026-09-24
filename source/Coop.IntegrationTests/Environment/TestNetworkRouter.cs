@@ -2,6 +2,7 @@
 using Common.Messaging;
 using Common.PacketHandlers;
 using Coop.IntegrationTests.Environment.Instance;
+using GameInterface.Services.ObjectManager;
 using LiteNetLib;
 
 namespace Coop.IntegrationTests.Environment;
@@ -15,6 +16,8 @@ public class TestNetworkRouter
 
     private ServerInstance Server;
     private List<ClientInstance> Clients = new List<ClientInstance>();
+    private readonly object handleGate = new object();
+    private readonly Dictionary<string, uint> fixtureHandles = new Dictionary<string, uint>();
 
     public void AddServer(ServerInstance instance)
     {
@@ -24,6 +27,31 @@ public class TestNetworkRouter
     public void AddClient(ClientInstance instance)
     {
         Clients.Add(instance);
+    }
+
+    public uint GetOrCreateFixtureHandle(string stringId)
+    {
+        lock (handleGate)
+        {
+            if (fixtureHandles.TryGetValue(stringId, out var existingHandle))
+                return existingHandle;
+
+            uint handle = 0;
+            Server.Call(() =>
+            {
+                var reservation = new object();
+                IObjectManager objectManager = Server.ObjectManager;
+                if (!objectManager.AddNewObject(reservation, out _) ||
+                    !objectManager.TryGetHandle(reservation, out handle) ||
+                    !objectManager.Remove(reservation))
+                {
+                    throw new InvalidOperationException($"Unable to reserve a network handle for {stringId}");
+                }
+            });
+
+            fixtureHandles.Add(stringId, handle);
+            return handle;
+        }
     }
 
     public void Send(NetPeer sender, NetPeer receiver, IMessage message)

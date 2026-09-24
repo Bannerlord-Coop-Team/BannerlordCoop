@@ -9,7 +9,6 @@ using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Party;
 using GameInterface.Services.Players;
 using GameInterface.Services.TroopRosters;
-using static GameInterface.Services.ObjectManager.ObjectManager;
 using GameInterface.Services.TroopRosters.Coalescing;
 using GameInterface.Services.TroopRosters.Messages;
 using Serilog;
@@ -150,13 +149,12 @@ internal class TroopRosterDeltaHandler : IHandler
     {
         // Resolve silently: an unregistered roster is a scratch/dummy roster (see TryResolve) with nothing
         // to replicate, not an error.
-        if (!objectManager.TryGetId(payload.What.TroopRoster, out var rosterId)) return;
-        rosterId = Compact(rosterId, typeof(TroopRoster));
+        if (!objectManager.TryGetHandle(payload.What.TroopRoster, out var rosterId)) return;
         coalescer?.FlushInstance(rosterId, network);
         network.SendAll(new NetworkTroopRosterRemoveZeroCounts(rosterId));
     }
 
-    private void Enqueue(string rosterId, string characterId, TroopRosterElementOperation operation)
+    private void Enqueue(uint rosterId, uint characterId, TroopRosterElementOperation operation)
     {
         if (coalescer == null)
         {
@@ -169,7 +167,7 @@ internal class TroopRosterDeltaHandler : IHandler
         coalescer.Enqueue(key, new TroopRosterElementBatchPayload(rosterId, characterId, operation));
     }
 
-    private void EnqueueRegular(TroopRoster roster, string rosterId, string characterId,
+    private void EnqueueRegular(TroopRoster roster, uint rosterId, uint characterId,
         TroopRosterElementOperation operation)
     {
         var mobileParty = roster.OwnerParty?.MobileParty;
@@ -208,8 +206,8 @@ internal class TroopRosterDeltaHandler : IHandler
         }
     }
 
-    private void EnqueueForClanRelevantPlayers(MobileParty mobileParty, string rosterId,
-        string characterId, TroopRosterElementOperation operation, bool isAddCounts)
+    private void EnqueueForClanRelevantPlayers(MobileParty mobileParty, uint rosterId,
+        uint characterId, TroopRosterElementOperation operation, bool isAddCounts)
     {
         var relevantPeers = playerTroopXpRelevance.GetConnectedPeers(mobileParty);
         if (relevantPeers.Count == 0)
@@ -258,7 +256,7 @@ internal class TroopRosterDeltaHandler : IHandler
         }
     }
 
-    private void EnqueueRoute(string rosterId, string characterId,
+    private void EnqueueRoute(uint rosterId, uint characterId,
         TroopRosterElementOperation operation, string channel)
     {
         if (coalescer == null)
@@ -271,7 +269,7 @@ internal class TroopRosterDeltaHandler : IHandler
             new TroopRosterElementBatchPayload(rosterId, characterId, operation));
     }
 
-    private void EnqueueToPeer(string rosterId, string characterId,
+    private void EnqueueToPeer(uint rosterId, uint characterId,
         TroopRosterElementOperation operation, string channel, LiteNetLib.NetPeer peer)
     {
         if (coalescer == null)
@@ -284,7 +282,7 @@ internal class TroopRosterDeltaHandler : IHandler
             new TroopRosterElementBatchPayload(rosterId, characterId, operation), peer);
     }
 
-    private void EnqueueToAllBut(string rosterId, string characterId,
+    private void EnqueueToAllBut(uint rosterId, uint characterId,
         TroopRosterElementOperation operation, string channel, LiteNetLib.NetPeer excludedPeer)
     {
         if (coalescer == null)
@@ -297,7 +295,7 @@ internal class TroopRosterDeltaHandler : IHandler
             new TroopRosterElementBatchPayload(rosterId, characterId, operation), excludedPeer);
     }
 
-    private static NetworkTroopRosterElementBatch CreateBatch(string rosterId, string characterId,
+    private static NetworkTroopRosterElementBatch CreateBatch(uint rosterId, uint characterId,
         TroopRosterElementOperation operation) =>
         new NetworkTroopRosterElementBatch(rosterId, characterId, new[] { operation });
 
@@ -317,20 +315,18 @@ internal class TroopRosterDeltaHandler : IHandler
     /// nothing to replicate, so it is skipped rather than logged as an error - a battle mutates thousands of
     /// such scratch rosters and the per-miss error log floods the game thread.
     /// </summary>
-    private bool TryResolve(TroopRoster roster, CharacterObject character, out string rosterId, out string characterId)
+    private bool TryResolve(TroopRoster roster, CharacterObject character, out uint rosterId, out uint characterId)
     {
-        rosterId = null;
-        characterId = null;
+        rosterId = 0;
+        characterId = 0;
         if (roster == null || character == null) return false;
-        if (!objectManager.TryGetId(roster, out rosterId)) return false;
-        if (!objectManager.TryGetIdWithLogging(character, out characterId)) return false;
-        rosterId = Compact(rosterId, typeof(TroopRoster));
-        characterId = Compact(characterId, typeof(CharacterObject));
+        if (!objectManager.TryGetHandle(roster, out rosterId)) return false;
+        if (!objectManager.TryGetHandleWithLogging(character, out characterId)) return false;
         return true;
     }
 
-    private void ApplyAddCounts(TroopRoster roster, CharacterObject character, string rosterId,
-        string characterId, int count, int woundedCount, int xpChange, bool removeDepleted)
+    private void ApplyAddCounts(TroopRoster roster, CharacterObject character, uint rosterId,
+        uint characterId, int count, int woundedCount, int xpChange, bool removeDepleted)
     {
         int index = roster.FindIndexOfTroop(character);
 
@@ -440,7 +436,7 @@ internal class TroopRosterDeltaHandler : IHandler
     /// re-trigger the authority patches. Resolution runs inside the game loop too, so it stays ordered
     /// behind any deferred create of the roster or character.
     /// </summary>
-    private void Apply(string rosterId, string characterId, string messageName, Action<TroopRoster, CharacterObject> apply)
+    private void Apply(uint rosterId, uint characterId, string messageName, Action<TroopRoster, CharacterObject> apply)
     {
         GameThread.RunSafe(() =>
         {
@@ -468,15 +464,15 @@ internal class TroopRosterDeltaHandler : IHandler
     /// create a placeholder for an absolute Set: element creation is carried by an earlier AddToCounts delta.
     /// Skipping keeps the client consistent until the create arrives.
     /// </summary>
-    private void ApplyToExisting(string rosterId, string characterId, string messageName, Action<TroopRoster, int> apply)
+    private void ApplyToExisting(uint rosterId, uint characterId, string messageName, Action<TroopRoster, int> apply)
     {
         Apply(rosterId, characterId, messageName,
             (roster, character) => ApplyToExisting(roster, character, rosterId, characterId,
                 messageName, apply));
     }
 
-    private void ApplyToExisting(TroopRoster roster, CharacterObject character, string rosterId,
-        string characterId, string messageName, Action<TroopRoster, int> apply)
+    private void ApplyToExisting(TroopRoster roster, CharacterObject character, uint rosterId,
+        uint characterId, string messageName, Action<TroopRoster, int> apply)
     {
         int index = roster.FindIndexOfTroop(character);
         if (index < 0)
