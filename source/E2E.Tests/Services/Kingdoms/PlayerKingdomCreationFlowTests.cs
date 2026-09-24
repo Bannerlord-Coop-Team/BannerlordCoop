@@ -3901,7 +3901,10 @@ public class PlayerKingdomCreationFlowTests : IDisposable
         var client = Clients.First();
         var player = CreateSyncedPlayerContext(ControllerId, client);
         var otherKingdomId = TestEnvironment.CreateRegisteredObject<Kingdom>();
-        var proposerClanId = TestEnvironment.CreateRegisteredObject<Clan>();
+
+        // Setting up the election asks every clan of the deciding kingdom whether its leader is the
+        // local player, so the proposing clan needs a leader hero.
+        var proposerClanId = CreateSyncedNpcClan();
 
         ConfigureClanInKingdom(client, proposerClanId, otherKingdomId);
 
