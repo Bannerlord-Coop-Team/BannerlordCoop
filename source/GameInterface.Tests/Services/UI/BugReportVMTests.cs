@@ -1,4 +1,7 @@
 ﻿using GameInterface.Services.UI.BugReporting;
+using System.IO;
+using System.Runtime.CompilerServices;
+using System.Xml.Linq;
 using Xunit;
 
 namespace GameInterface.Tests.Services.UI;
@@ -6,26 +9,17 @@ namespace GameInterface.Tests.Services.UI;
 /// <summary>Tests the in-game bug-report form.</summary>
 public class BugReportVMTests
 {
-    [Theory]
-    [InlineData(true, true, false, false, true)]
-    [InlineData(false, true, false, false, false)]
-    [InlineData(true, true, true, false, false)]
-    [InlineData(true, true, false, true, false)]
-    [InlineData(true, false, false, false, false)]
-    public void OverlayVisibility_RequiresEnabledUnblockedGameplay(
-        bool showBugReportButton,
-        bool isGameplayScreen,
-        bool isLoading,
-        bool isConversationActive,
-        bool expected)
+    [Fact]
+    public void Movie_ContainsFormWithoutGameplayLauncherButton()
     {
-        Assert.Equal(
-            expected,
-            BugReportOverlay.ShouldShowPresentation(
-                showBugReportButton,
-                isGameplayScreen,
-                isLoading,
-                isConversationActive));
+        var document = XDocument.Load(FindMoviePath());
+
+        Assert.DoesNotContain(document.Descendants(),
+            element => element.Attribute("Id")?.Value == "CoopBugReportButton");
+        Assert.Contains(document.Descendants(),
+            element => element.Attribute("Id")?.Value == "CoopBugReportSummaryInput");
+        Assert.Contains(document.Descendants(),
+            element => element.Attribute("IsVisible")?.Value == "@IsFormVisible");
     }
 
     [Fact]
@@ -104,5 +98,12 @@ public class BugReportVMTests
         Assert.False(submitted);
         Assert.Equal(string.Empty, viewModel.Summary);
         Assert.Equal(string.Empty, viewModel.Description);
+    }
+
+    private static string FindMoviePath([CallerFilePath] string sourceFile = "")
+    {
+        var sourceDirectory = Path.GetDirectoryName(sourceFile);
+        return Path.GetFullPath(Path.Combine(sourceDirectory!,
+            "..", "..", "..", "..", "UIMovies", "CoopBugReportUIMovie.xml"));
     }
 }

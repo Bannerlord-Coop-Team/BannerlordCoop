@@ -13,7 +13,6 @@ using Serilog;
 using System.Collections.Generic;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.CraftingSystem;
-using TaleWorlds.CampaignSystem.GameState;
 using TaleWorlds.CampaignSystem.Roster;
 using TaleWorlds.CampaignSystem.Settlements;
 using TaleWorlds.Core;
@@ -351,6 +350,7 @@ internal class CraftingCampaignBehaviorCraftingHandler : IHandler
         });
     }
 
+    // Applies authoritative crafting results independently of the currently open crafting window.
     private bool TryApplyCraftingResult(NetworkCreateCraftedWeaponInternalClients data)
     {
         if (!data.Success) return false;
@@ -398,11 +398,6 @@ internal class CraftingCampaignBehaviorCraftingHandler : IHandler
             // Only run on crafting client
             if (playerHero == Hero.MainHero)
             {
-                if (GameStateManager.Current.ActiveState is CraftingState currentState)
-                {
-                    currentState.CraftingLogic._craftedItemObject = craftedItemObject;
-                }
-
                 AddItemToHistoryPatch.OverrideAddItemToHistory(ref craftingBehavior, craftedItemObject);
             }
         }

@@ -4,7 +4,7 @@ using TaleWorlds.Library;
 
 namespace GameInterface.Services.UI.CoopOptions.Providers.BugReportTab.Sections;
 
-/// <summary>Configures visibility of the in-game bug-report button.</summary>
+/// <summary>Configures availability of the in-game bug-report menu option.</summary>
 public class BugReportSection : CoopOptionsSectionVM
 {
     public const string SectionId = "BugReportButton";
@@ -20,8 +20,8 @@ public class BugReportSection : CoopOptionsSectionVM
 
     public override string Id => SectionId;
     public string TitleText => "Bug Report";
-    public string DescriptionText => "Configure the in-game co-op bug-report button.";
-    public string ShowBugReportButtonText => "Show Coop Bug Report Button";
+    public string DescriptionText => "Configure the co-op bug-report escape-menu option.";
+    public string ShowBugReportButtonText => "Show Coop Bug Report Menu Option";
 
     [DataSourceProperty]
     public bool ShowBugReportButton
