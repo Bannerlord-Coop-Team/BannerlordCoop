@@ -1,4 +1,5 @@
 ﻿using Common;
+using Common.Logging;
 using Common.Messaging;
 using Common.Network;
 using Common.Util;
@@ -11,6 +12,7 @@ using GameInterface.Services.MobileParties.Extensions;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Players;
 using LiteNetLib;
+using Serilog;
 using System;
 using System.Collections.Generic;
 using TaleWorlds.CampaignSystem;
@@ -25,6 +27,8 @@ namespace Coop.Core.Server.Services.Kingdoms.Handlers;
 /// </summary>
 public class ServerKingdomHandler : IHandler
 {
+    private static readonly ILogger Logger = LogManager.GetLogger<ServerKingdomHandler>();
+
     private readonly IMessageBroker messageBroker;
     private readonly INetwork network;
     private readonly IObjectManager objectManager;
@@ -246,6 +250,19 @@ public class ServerKingdomHandler : IHandler
     private void HandleNetworkRequestKingdomDecisionVote(MessagePayload<NetworkRequestKingdomDecisionVote> obj)
     {
         var payload = obj.What;
+
+        // Interim support changes arrive while a player is still choosing, so only a confirmed vote is
+        // reported here.
+        if (payload.VoteData != null && payload.VoteData.IsFinal)
+        {
+            Logger.Information(
+                "Received kingdom decision vote from controller {ControllerId} for {KingdomId} " +
+                "decision {DecisionIndex}; final {IsFinal}",
+                payload.ControllerId,
+                payload.VoteData.KingdomId,
+                payload.VoteData.DecisionIndex,
+                payload.VoteData.IsFinal);
+        }
 
         messageBroker.Publish(this, new ChangeKingdomDecisionVote(payload.ControllerId, payload.VoteData));
     }
