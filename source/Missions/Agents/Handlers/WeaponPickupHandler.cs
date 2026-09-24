@@ -20,6 +20,7 @@ namespace Missions.Agents.Handlers
     public interface IWeaponPickupHandler : IHandler
     {
         void Tick(float dt);
+        void RetryPendingSiegeGrants();
     }
     /// <inheritdoc/>
     public class WeaponPickupHandler : IWeaponPickupHandler
@@ -494,8 +495,9 @@ namespace Missions.Agents.Handlers
             siegeGrantMission = Mission.Current;
         }
 
-        private void RetryPendingSiegeGrants()
+        public void RetryPendingSiegeGrants()
         {
+            if (disposed) return;
             ResetPendingSiegeGrantMission();
             foreach (Guid agentId in new List<Guid>(pendingSiegeGrants.Keys))
                 RetryPendingSiegeGrant(agentId);

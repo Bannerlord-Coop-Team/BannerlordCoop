@@ -1,8 +1,13 @@
 ﻿using Common.Messaging;
 using Common;
+using GameInterface.Services.ObjectManager;
 using GameInterface.Services.MapEvents;
 using HarmonyLib;
 using Missions;
+using Missions.Agents;
+using Missions.Agents.Handlers;
+using Missions.Agents.Messages;
+using Missions.Agents.Packets;
 using Missions.Battles;
 using Missions.Messages;
 using Moq;
@@ -516,6 +521,86 @@ public sealed class MangonelLoadReplicationTests : IDisposable
         peer.Sut.ApplyMangonelLoad(complete.WithPhase(MangonelLoadPhase.Request, "loader"));
         Assert.Null(peer.Info.Agent.CurrentlyUsedGameObject);
         Assert.Equal(1, Removals[peer.Info.Agent]);
+    }
+
+    [Theory]
+    [InlineData(false, false)]
+    [InlineData(true, false)]
+    [InlineData(false, true)]
+    public void BufferedGrantAndLoad_AfterRegistrationReplayEquipmentBeforeTheSiegePoll(
+        bool consumed, bool authorityChanged)
+    {
+        var simulator = Replica("simulator");
+        var info = simulator.Info;
+        info.Agent.Equipment[EquipmentIndex.ExtraWeaponSlot] = default;
+        info.RecordSiegeGrant(Guid.Empty, 0);
+        bool registered = false;
+        var registry = Mock.Get(Field<INetworkAgentRegistry>(simulator.Sut, "agentRegistry"));
+        registry.Setup(r => r.TryGetAgentInfo(agentId, out info)).Returns(() => registered);
+        var objects = new Mock<IObjectManager>();
+        var item = missile;
+        objects.Setup(o => o.TryGetObjectWithLogging("boulder-id", out item)).Returns(true);
+        using var pickups = new WeaponPickupHandler(registry.Object, Mock.Of<INetworkWorldItemRegistry>(),
+            simulator.Network.Object, Mock.Of<IMessageBroker>(), objects.Object);
+        Stub(typeof(Agent), nameof(Agent.EquipWeaponToExtraSlotAndWield), nameof(PickupEquip));
+        Stub(typeof(AgentEquipmentData), nameof(AgentEquipmentData.Apply), nameof(Skip));
+        var grant = new NetworkLadderForkGranted(grantId, agentId, "loader", 7, "boulder-id", 1,
+            new AgentEquipmentData(info.Agent));
+        var request = new NetworkMangonelLoad("battle", Guid.NewGuid(), grantId, agentId,
+            "loader", 7, 1496, 1487, "simulator", 3, 2, MangonelLoadPhase.Request, "loader");
+        pickups.ApplyLadderForkGrant(grant);
+        simulator.Sut.ApplyMangonelLoad(request);
+
+        // Base mission tick runs before DrainPendingPuppets installs the empty spawn baseline.
+        pickups.Tick(0.1f);
+        Tick(simulator.Sut);
+        Assert.Single(Field<Dictionary<Guid, NetworkMangonelLoad>>(simulator.Sut, "pendingMangonelLoads"));
+        Assert.True(info.Agent.Equipment[EquipmentIndex.ExtraWeaponSlot].IsEmpty);
+        registered = true;
+        if (consumed) info.ConsumeSiegeGrant(grantId);
+        if (authorityChanged)
+        {
+            info.CurrentAuthority = "new-owner";
+            info.AuthorityRevision = 8;
+        }
+
+        // The battle tick replays only the buffered grants before its dependent siege poll.
+        pickups.RetryPendingSiegeGrants();
+        Tick(simulator.Sut);
+        pickups.Tick(0.1f);
+        pickups.ApplyLadderForkGrant(grant);
+        Tick(simulator.Sut);
+        Assert.Empty(Field<Dictionary<Guid, NetworkMangonelLoad>>(simulator.Sut, "pendingMangonelLoads"));
+        Assert.Null(info.Agent.CurrentlyUsedGameObject);
+        Assert.False(Actions.ContainsKey(info.Agent));
+        if (consumed || authorityChanged)
+        {
+            Assert.True(info.Agent.Equipment[EquipmentIndex.ExtraWeaponSlot].IsEmpty);
+            simulator.Network.Verify(n => n.Send(It.IsAny<string>(), It.IsAny<NetworkMangonelLoad>()), Times.Never);
+        }
+        else
+        {
+            Assert.Same(item, info.Agent.Equipment[EquipmentIndex.ExtraWeaponSlot].Item);
+            Assert.Equal(1, info.Agent.Equipment[EquipmentIndex.ExtraWeaponSlot].Amount);
+            Assert.Equal(grantId, info.SiegeEquipmentGrant);
+            Assert.Equal(request.RequestId, Sent(simulator.Network, MangonelLoadPhase.Animate).RequestId);
+        }
+    }
+
+    [Fact]
+    public void BattleTick_ReplaysBufferedGrantsAfterPuppetRegistrationBeforeSiegeLoads()
+    {
+        var instructions = PatchProcessor.GetOriginalInstructions(
+            AccessTools.Method(typeof(CoopBattleController), nameof(CoopBattleController.OnMissionTick)));
+        int baseTick = instructions.FindIndex(i => i.Calls(
+            AccessTools.Method(typeof(CoopMissionController), nameof(CoopMissionController.OnMissionTick))));
+        int spawns = instructions.FindIndex(i => i.Calls(
+            AccessTools.Method(typeof(IPuppetSpawner), nameof(IPuppetSpawner.DrainPendingPuppets))));
+        int grants = instructions.FindIndex(i => i.Calls(
+            AccessTools.Method(typeof(IWeaponPickupHandler), nameof(IWeaponPickupHandler.RetryPendingSiegeGrants))));
+        int loads = instructions.FindIndex(i => i.Calls(
+            AccessTools.Method(typeof(ISiegeMachineStateReplicator), nameof(ISiegeMachineStateReplicator.Tick))));
+        Assert.True(baseTick >= 0 && spawns > baseTick && grants > spawns && loads > grants);
     }
 
     [Theory]

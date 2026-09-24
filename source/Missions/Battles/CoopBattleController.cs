@@ -320,6 +320,8 @@ public class CoopBattleController : CoopMissionController
         puppetRoutApplier.DrainPendingRouts();
 
         siegeEngineDeployment.DrainPending(dt);
+        // Puppets registered this frame need their buffered equipment before pending load requests drain.
+        coopMissionComponent.WeaponPickupHandler.RetryPendingSiegeGrants();
         siegeMachineState.Tick(dt);
         siegeWeaponFire.Tick(dt);
         diagnostics.Tick(dt);
