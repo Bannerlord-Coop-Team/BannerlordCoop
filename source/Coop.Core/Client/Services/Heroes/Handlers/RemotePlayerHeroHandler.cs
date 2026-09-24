@@ -87,7 +87,7 @@ internal class RemotePlayerHeroHandler : IHandler
         GameThread.Run(() =>
         {
             if (message.HeroData != null && message.HeroData.Length > 0)
-                heroInterface.ClientUnpackHero(message.HeroData, player);
+                heroInterface.ClientUnpackHero(message.HeroData, player, message.RegistrationHandles);
 
             if (!playerRegistry.AddPlayer(player))
                 Logger.Error("Player {HeroId} has already been added.", player.HeroId);

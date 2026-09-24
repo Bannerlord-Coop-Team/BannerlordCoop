@@ -831,7 +831,9 @@ namespace E2E.Tests.Services.TroopRosters
             client.Call(() =>
             {
                 var broker = client.Resolve<IMessageBroker>();
-                broker.Publish(this, new NetworkTroopRosterElementBatch(TroopRosterId, CharacterId1,
+                broker.Publish(this, new NetworkTroopRosterElementBatch(
+                    client.GetHandle<TroopRoster>(TroopRosterId),
+                    client.GetHandle<CharacterObject>(CharacterId1),
                     new[] { TroopRosterElementOperation.AddCounts(-5, 0, 0, false) }));
             });
 

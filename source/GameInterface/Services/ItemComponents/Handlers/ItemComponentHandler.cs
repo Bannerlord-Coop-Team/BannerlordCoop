@@ -46,10 +46,11 @@ internal class ItemComponentHandler : IHandler
 
     private void Handle(MessagePayload<ItemComponentCreated> payload)
     {
-        objectManager.AddNewObject(payload.What.Instance, out var id);
+        if (!objectManager.AddNewObject(payload.What.Instance, out var id)) return;
+        if (!objectManager.TryGetHandleWithLogging(payload.What.Instance, out var handle)) return;
 
         var typeIndex = itemTypes.IndexOf(payload.What.Instance.GetType());
-        var data = new ItemComponentData(typeIndex, id);
+        var data = new ItemComponentData(typeIndex, id, handle);
         network.SendAll(new NetworkCreateItemComponent(data));
     }
 
@@ -60,6 +61,6 @@ internal class ItemComponentHandler : IHandler
 
         var obj = ObjectHelper.SkipConstructor(itemTypes[typeIdx]);
 
-        objectManager.AddExisting(data.Id, obj);
+        objectManager.AddExisting(data.Id, obj, data.Handle);
     }
 }

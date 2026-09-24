@@ -882,7 +882,7 @@ internal sealed partial class LordBarterHandler : IHandler
 
     private void FlushGold(Hero hero)
     {
-        if (sendCoalescer != null && hero != null && objectManager.TryGetId(hero, out var id)) sendCoalescer.FlushInstance(id, network);
+        if (sendCoalescer != null && hero != null && objectManager.TryGetHandle(hero, out var id)) sendCoalescer.FlushInstance(id, network);
     }
 
     // Both the Charm XP and the total XP are coalesced dictionary upserts on HeroDeveloper, so
@@ -891,7 +891,7 @@ internal sealed partial class LordBarterHandler : IHandler
     private void FlushHeroDeveloper(Hero hero)
     {
         if (sendCoalescer != null && hero?.HeroDeveloper != null &&
-            objectManager.TryGetId(hero.HeroDeveloper, out var id))
+            objectManager.TryGetHandle(hero.HeroDeveloper, out var id))
             sendCoalescer.FlushInstance(id, network);
     }
 

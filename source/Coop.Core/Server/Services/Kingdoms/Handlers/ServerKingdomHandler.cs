@@ -16,7 +16,6 @@ using System.Collections.Generic;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Settlements;
-using static GameInterface.Services.ObjectManager.ObjectManager;
 
 namespace Coop.Core.Server.Services.Kingdoms.Handlers;
 
@@ -173,9 +172,9 @@ public class ServerKingdomHandler : IHandler
             }
         });
 
-        network.SendAll(new NetworkPartyEnterSettlement(
-            Compact(settlementId, typeof(Settlement)),
-            Compact(partyId, typeof(MobileParty))));
+        if (!objectManager.TryGetHandleWithLogging(settlement, out var settlementHandle)) return;
+        if (!objectManager.TryGetHandleWithLogging(party, out var partyHandle)) return;
+        network.SendAll(new NetworkPartyEnterSettlement(settlementHandle, partyHandle));
     }
 
     private static void RunSettlementMutation(Action action)

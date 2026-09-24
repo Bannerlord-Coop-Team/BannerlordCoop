@@ -13,7 +13,7 @@ public interface ILocalMovementBandwidth
 /// <summary>Reads this client's saved movement bandwidth overrides.</summary>
 public class LocalMovementBandwidth : ILocalMovementBandwidth
 {
-    public const double DefaultMiBPerSecond = 5d;
+    public const double DefaultMiBPerSecond = 10d;
     public const double MaximumMiBPerSecond = 1024d;
 
     public double? UploadMiBPerSecond { get; }

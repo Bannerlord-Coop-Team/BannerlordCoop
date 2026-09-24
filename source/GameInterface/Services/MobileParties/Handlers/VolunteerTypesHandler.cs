@@ -6,7 +6,6 @@ using Common.Util;
 using GameInterface.Services.Heroes.Messages.Collections;
 using GameInterface.Services.MobileParties.Messages;
 using GameInterface.Services.ObjectManager;
-using static GameInterface.Services.ObjectManager.ObjectManager;
 using System.Collections.Generic;
 using TaleWorlds.CampaignSystem;
 
@@ -61,7 +60,7 @@ internal class VolunteerTypesHandler : IHandler
 
     private void Handle_VolunteersUpdated(MessagePayload<VolunteersUpdated> obj)
     {
-        Dictionary<string, string[]> updatedVolunteerTypeIds = new();
+        Dictionary<uint, uint[]> updatedVolunteerTypeIds = new();
         foreach (KeyValuePair<Hero, CharacterObject[]> keyValuePair in obj.What.UpdatedVolunteerTypes)
         {
             if (!TrySerializeSnapshot(keyValuePair.Key, keyValuePair.Value, -1, null, out var heroId, out var volunteerTypeIds)) continue;
@@ -77,13 +76,13 @@ internal class VolunteerTypesHandler : IHandler
         if (hero?.VolunteerTypes == null) return;
         if (!TrySerializeSnapshot(hero, hero.VolunteerTypes, changedIndex, changedValue, out var heroId, out var volunteerTypeIds)) return;
 
-        EnqueueSnapshot(new Dictionary<string, string[]>
+        EnqueueSnapshot(new Dictionary<uint, uint[]>
         {
             [heroId] = volunteerTypeIds,
         });
     }
 
-    private void EnqueueSnapshot(Dictionary<string, string[]> snapshots)
+    private void EnqueueSnapshot(Dictionary<uint, uint[]> snapshots)
     {
         if (snapshots.Count == 0) return;
 
@@ -103,27 +102,26 @@ internal class VolunteerTypesHandler : IHandler
         CharacterObject[] volunteerTypes,
         int changedIndex,
         CharacterObject changedValue,
-        out string heroId,
-        out string[] volunteerTypeIds)
+        out uint heroId,
+        out uint[] volunteerTypeIds)
     {
-        heroId = null;
+        heroId = 0;
         volunteerTypeIds = null;
-        if (!objectManager.TryGetIdWithLogging(hero, out heroId)) return false;
+        if (!objectManager.TryGetHandleWithLogging(hero, out heroId)) return false;
 
-        heroId = Compact(heroId, typeof(Hero));
-        volunteerTypeIds = new string[volunteerTypes.Length];
+        volunteerTypeIds = new uint[volunteerTypes.Length];
         for (int i = 0; i < volunteerTypes.Length; i++)
         {
             CharacterObject character = i == changedIndex ? changedValue : volunteerTypes[i];
             if (character == null)
             {
-                volunteerTypeIds[i] = string.Empty;
+                volunteerTypeIds[i] = 0;
                 continue;
             }
 
-            if (!objectManager.TryGetIdWithLogging(character, out var characterId)) return false;
+            if (!objectManager.TryGetHandleWithLogging(character, out var characterId)) return false;
 
-            volunteerTypeIds[i] = Compact(characterId, typeof(CharacterObject));
+            volunteerTypeIds[i] = characterId;
         }
 
         return true;
@@ -135,16 +133,16 @@ internal class VolunteerTypesHandler : IHandler
 
         GameThread.RunSafe(() =>
         {
-            foreach (KeyValuePair<string, string[]> keyValuePair in updatedVolunteerTypeIds)
+            foreach (KeyValuePair<uint, uint[]> keyValuePair in updatedVolunteerTypeIds)
             {
                 if (!objectManager.TryGetObjectWithLogging<Hero>(keyValuePair.Key, out var currentHero)) continue;
 
-                string[] volunteerTypeIds = keyValuePair.Value;
+                uint[] volunteerTypeIds = keyValuePair.Value;
                 using (new AllowedThread())
                 {
                     for (int i = 0; i < volunteerTypeIds.Length && i < currentHero.VolunteerTypes.Length; i++)
                     {
-                        if (string.IsNullOrEmpty(volunteerTypeIds[i]))
+                        if (volunteerTypeIds[i] == 0)
                         {
                             currentHero.VolunteerTypes[i] = null;
                         }

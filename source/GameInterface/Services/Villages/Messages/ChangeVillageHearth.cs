@@ -7,10 +7,10 @@ namespace GameInterface.Services.Villages.Messages;
 /// </summary>
 public record ChangeVillageHearth : ICommand
 {
-    public string VillageId { get; }
+    public uint VillageId { get; }
     public float Hearth { get; }
 
-    public ChangeVillageHearth(string villageId, float hearth)
+    public ChangeVillageHearth(uint villageId, float hearth)
     {
         VillageId = villageId;
         Hearth = hearth;
