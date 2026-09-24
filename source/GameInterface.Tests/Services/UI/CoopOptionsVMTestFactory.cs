@@ -1,4 +1,5 @@
-﻿using Common.Messaging;
+﻿using GameInterface.Services.UI.CoopOptions.Providers.UITab;
+using Common.Messaging;
 using GameInterface.Configuration;
 using GameInterface.Services.UI.CoopOptions;
 using GameInterface.Services.UI.CoopOptions.Providers;
@@ -25,11 +26,8 @@ internal static class CoopOptionsVMTestFactory
     {
         ICoopOptionsTabProvider[] providers =
         {
-            new KillFeedOptionsTabProvider(),
-            new MapTimeOptionsTabProvider(),
+            new UIOptionsTabProvider(),
             new BugReportOptionsTabProvider(),
-            new ChatOptionsTabProvider(),
-            new PlayerNameplatesOptionsTabProvider(),
             new NetworkOptionsTabProvider(),
         };
         return new CoopOptionsVM(
