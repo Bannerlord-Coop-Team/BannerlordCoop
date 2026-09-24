@@ -38,6 +38,44 @@ public class MovementTrafficTests : MissionTestEnvironment
     }
 
     [Fact]
+    public void PollMovement_StampsRidersAndStandaloneMountsWithIncreasingCaptureSequence()
+    {
+        using var fixture = new MissionEngineFixture();
+        var peer = Clients.First();
+        SetControllerId(peer, "peer");
+        peer.Call(() =>
+        {
+            var mock = CreateMovementMission(fixture, peer);
+            var registry = peer.Resolve<INetworkAgentRegistry>();
+            var handler = peer.Resolve<ICoopMissionComponent>().AgentMovementHandler;
+            var network = Assert.IsType<MockBattleNetwork>(peer.Resolve<IBattleNetwork>());
+            Agent rider = SpawnRider(mock);
+            Agent horse = mock.SpawnMount();
+            Agent riddenHorse = mock.SpawnMount(rider);
+            Assert.True(registry.TryRegisterAgent("peer", Guid.NewGuid(), 1, rider, 3));
+            Assert.True(registry.TryRegisterAgent("peer", Guid.NewGuid(), 3, riddenHorse, 7));
+            Assert.True(registry.TryRegisterAgent("peer", Guid.NewGuid(), 2, horse));
+            Assert.True(AgentMirror.TryGet(rider, out var riderMirror));
+            Assert.True(AgentMirror.TryGet(horse, out var horseMirror));
+
+            handler.PollMovement(0f);
+            var firstPacket = Assert.Single(network.NetworkSentPackets.GetPackets<MovementPacket>());
+            long first = firstPacket.SampleSequence;
+            Assert.Equal(7, Assert.Single(firstPacket.Agents).MountData.MountAuthorityRevision);
+            Assert.Equal(3, Assert.Single(firstPacket.AuthorityRevisions));
+            Assert.True(first > 0);
+            Assert.Equal(first, Assert.Single(network.NetworkSentPackets.GetPackets<MountMovementPacket>()).SampleSequence);
+            network.NetworkSentPackets.Packets.Clear();
+            riderMirror.Position = new Vec3(1f, 0f, 0f);
+            horseMirror.Position = new Vec3(1f, 0f, 0f);
+            handler.PollMovement(0.026f);
+            long second = Assert.Single(network.NetworkSentPackets.GetPackets<MovementPacket>()).SampleSequence;
+            Assert.True(second > first);
+            Assert.Equal(second, Assert.Single(network.NetworkSentPackets.GetPackets<MountMovementPacket>()).SampleSequence);
+        });
+    }
+
+    [Fact]
     public void PollMovement_UsesFortyHertzCadenceAndSkipsUnchangedAgents()
     {
         using var fixture = new MissionEngineFixture();
