@@ -1,5 +1,6 @@
 ﻿using GameInterface.Services.Players.Data;
 using GameInterface.Services.Chat;
+using GameInterface.Services.Entity;
 using Common.Messaging;
 using GameInterface.Services.UI.CoopOptions;
 using GameInterface.Services.UI.CoopOptions.Providers.UITab;
@@ -23,20 +24,20 @@ public class PlayerListTests
         var vm = new PlayerListVM(() => { });
         var first = new PlayerListEntry { ControllerId = "one", PlatformName = "Same name", HeroName = "Hero", Online = true, Activity = PlayerActivity.Siege };
         var second = first with { ControllerId = "two" };
-        vm.Update(new[] { first, second });
+        vm.Update(new[] { first, second }, null);
         Assert.Equal("Players Online: 2", vm.OnlineSummary);
         Assert.Equal(348f, vm.PanelHeight);
         Assert.False(vm.Rows[0].IsAlternate);
         Assert.True(vm.Rows[1].IsAlternate);
         var row = vm.Rows[0];
-        vm.Update(new[] { first with { Online = false }, second });
+        vm.Update(new[] { first with { Online = false }, second }, null);
         Assert.Equal("Offline", row.Status);
         Assert.True(row.IsOffline);
         Assert.Equal("Offline", row.PresenceText);
         Assert.Equal("Players Online: 1", vm.OnlineSummary);
         Assert.Equal(0.55f, row.RowOpacity);
         Assert.Equal(@"SPGeneral\GameMenu\leave_icon", row.ActivityIcon);
-        vm.Update(new[] { first with { Activity = PlayerActivity.Town }, second });
+        vm.Update(new[] { first with { Activity = PlayerActivity.Town }, second }, null);
         Assert.Equal(2, vm.Rows.Count);
         Assert.Same(row, vm.Rows[0]);
         Assert.Equal("In Town", row.Status);
@@ -46,6 +47,37 @@ public class PlayerListTests
         Assert.Equal("Players Online: 2", vm.OnlineSummary);
         Assert.Equal(1f, row.RowOpacity);
         Assert.Equal(@"SPGeneral\GameMenu\visit_town_icon", row.ActivityIcon);
+    }
+
+    // Pins the local player and reorders presence groups by name while retaining row identities.
+    [Fact]
+    public void SortsLocalPlayerThenOnlineAndOfflineAlphabetically()
+    {
+        var vm = new PlayerListVM(() => { });
+        var entries = new[]
+        {
+            new PlayerListEntry { ControllerId = "offline-z", PlatformName = "Zulu" },
+            new PlayerListEntry { ControllerId = "online-z", PlatformName = "Zulu", Online = true },
+            new PlayerListEntry { ControllerId = "offline-a", PlatformName = "alpha" },
+            new PlayerListEntry { ControllerId = "local", PlatformName = "Zzz", Online = true },
+            new PlayerListEntry { ControllerId = "online-a", PlatformName = "alpha", Online = true }
+        };
+        vm.Update(entries, "local");
+        Assert.Equal(new[] { "local", "online-a", "online-z", "offline-a", "offline-z" },
+            vm.Rows.Select(row => row.ControllerId));
+        var row = vm.Rows[2];
+        entries[1] = entries[1] with { Online = false, PlatformName = "Aaron" };
+        vm.Update(entries.Reverse().ToArray(), "local");
+        Assert.Equal(new[] { "local", "online-a", "online-z", "offline-a", "offline-z" },
+            vm.Rows.Select(item => item.ControllerId));
+        Assert.Same(row, vm.Rows[2]);
+        entries[1] = entries[1] with { Online = true };
+        vm.Update(entries, "local");
+        Assert.Same(row, vm.Rows[1]);
+        Assert.Equal(new[] { "local", "online-z", "online-a", "offline-a", "offline-z" },
+            vm.Rows.Select(item => item.ControllerId));
+        for (var index = 0; index < vm.Rows.Count; index++)
+            Assert.Equal(index % 2 != 0, vm.Rows[index].IsAlternate);
     }
 
     // Preserves all display fields across the network and platform names in existing player saves.
@@ -72,11 +104,11 @@ public class PlayerListTests
         {
             ControllerId = index.ToString(), PlatformName = name, HeroName = name
         }).ToArray();
-        vm.Update(entries);
+        vm.Update(entries, null);
         Assert.Equal(32, vm.Rows.Count);
         Assert.Equal(684f, vm.PanelHeight);
         Assert.All(vm.Rows, row => Assert.Equal(name, row.PlatformName));
-        vm.Update(entries.Skip(1).ToArray());
+        vm.Update(entries.Skip(1).ToArray(), null);
         Assert.Equal(31, vm.Rows.Count);
         Assert.False(vm.Rows[0].IsAlternate);
         Assert.True(vm.Rows[1].IsAlternate);
@@ -90,7 +122,7 @@ public class PlayerListTests
     {
         var store = new Mock<ICoopOptionsStore>();
         store.Setup(x => x.LoadOrDefault()).Returns(new CoopOptionsData());
-        using var service = new PlayerListService(Mock.Of<IChatService>(), store.Object, Mock.Of<IMessageBroker>());
+        using var service = new PlayerListService(Mock.Of<IChatService>(), store.Object, Mock.Of<IMessageBroker>(), Mock.Of<IControllerIdProvider>());
         service.PreviewLayout(true);
         service.Update(new[] { new PlayerListEntry { ControllerId = "real", PlatformName = "Actual player" } });
         Assert.Contains("Preview Player 18", service.Describe());

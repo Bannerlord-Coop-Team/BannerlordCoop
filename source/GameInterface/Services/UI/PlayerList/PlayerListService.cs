@@ -1,5 +1,6 @@
 ﻿using GameInterface.Services.Chat;
 using Common.Messaging;
+using GameInterface.Services.Entity;
 using GameInterface.Services.UI.CoopOptions;
 using GameInterface.Services.UI.CoopOptions.Providers.UITab;
 using TaleWorlds.InputSystem;
@@ -16,7 +17,7 @@ public interface IPlayerListService : IGameAbstraction
     bool Toggle();
     string Describe();
 #if DEBUG
-    void PreviewLayout(bool enabled);
+    void PreviewLayout(bool enabled, bool sorting = false);
 #endif
 }
 
@@ -24,6 +25,7 @@ public interface IPlayerListService : IGameAbstraction
 public sealed class PlayerListService : IPlayerListService, IDisposable
 {
     private readonly IChatService chat;
+    private readonly IControllerIdProvider controllerIdProvider;
     private readonly IMessageBroker messageBroker;
     private InputKey toggleKey;
     private PlayerListOverlay overlay;
@@ -34,9 +36,10 @@ public sealed class PlayerListService : IPlayerListService, IDisposable
 #endif
 
     // Keeps chat focus separate from the player-list toggle.
-    public PlayerListService(IChatService chat, ICoopOptionsStore optionsStore, IMessageBroker messageBroker)
+    public PlayerListService(IChatService chat, ICoopOptionsStore optionsStore, IMessageBroker messageBroker, IControllerIdProvider controllerIdProvider)
     {
         this.chat = chat;
+        this.controllerIdProvider = controllerIdProvider;
         this.messageBroker = messageBroker;
         toggleKey = UIOptionsTabProvider.GetPlayerListKey(optionsStore.LoadOrDefault());
         messageBroker.Subscribe<PlayerListKeySelected>(HandleKeySelected);
@@ -58,17 +61,29 @@ public sealed class PlayerListService : IPlayerListService, IDisposable
         receivedEntries = entries;
         if (previewLayout) return;
 #endif
-        viewModel.Update(entries);
+        viewModel.Update(entries, controllerIdProvider.ControllerId);
     }
 
 #if DEBUG
     // Previews overflowing names and all activity icons without changing players or saved game data.
-    public void PreviewLayout(bool enabled)
+    public void PreviewLayout(bool enabled, bool sorting = false)
     {
         previewLayout = enabled;
         if (!enabled)
         {
-            viewModel.Update(receivedEntries);
+            viewModel.Update(receivedEntries, controllerIdProvider.ControllerId);
+            return;
+        }
+        if (sorting)
+        {
+            viewModel.Update(new[]
+            {
+                new PlayerListEntry { ControllerId = "preview-offline-z", PlatformName = "Zulu", HeroName = "Offline Zulu" },
+                new PlayerListEntry { ControllerId = "preview-online-z", PlatformName = "Zulu", HeroName = "Online Zulu", Online = true },
+                new PlayerListEntry { ControllerId = "preview-offline-a", PlatformName = "alpha", HeroName = "Offline Alpha" },
+                new PlayerListEntry { ControllerId = controllerIdProvider.ControllerId, PlatformName = "Your player (Zulu)", HeroName = "Local player", Online = true },
+                new PlayerListEntry { ControllerId = "preview-online-a", PlatformName = "alpha", HeroName = "Online Alpha", Online = true }
+            }, controllerIdProvider.ControllerId);
             return;
         }
         viewModel.Update(Enumerable.Range(0, 20).Select(index => new PlayerListEntry
@@ -78,7 +93,7 @@ public sealed class PlayerListService : IPlayerListService, IDisposable
             HeroName = index == 0 ? "Preview: A very long hero name that exceeds this column" : $"Preview Hero {index + 1:00}",
             Online = index % 10 != 9,
             Activity = (PlayerActivity)(index % 10 == 9 ? 0 : index % 10)
-        }).ToArray());
+        }).ToArray(), controllerIdProvider.ControllerId);
     }
 #endif
 

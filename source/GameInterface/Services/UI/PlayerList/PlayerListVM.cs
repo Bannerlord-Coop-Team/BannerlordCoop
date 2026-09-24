@@ -37,7 +37,7 @@ internal sealed class PlayerListVM : ViewModel
     public PlayerListVM(Action close) => this.close = close;
 
     // Updates existing rows in place to preserve scrolling and hover targets.
-    public void Update(PlayerListEntry[] entries)
+    public void Update(PlayerListEntry[] entries, string localControllerId)
     {
         foreach (var row in Rows.ToArray())
         {
@@ -51,7 +51,21 @@ internal sealed class PlayerListVM : ViewModel
             if (row == null) Rows.Add(new PlayerListRowVM(entry));
             else row.Update(entry);
         }
-        for (var index = 0; index < Rows.Count; index++) Rows[index].IsAlternate = index % 2 != 0;
+        var sortedRows = Rows.OrderByDescending(row => row.ControllerId == localControllerId)
+            .ThenByDescending(row => row.IsOnline)
+            .ThenBy(row => row.PlatformName, StringComparer.CurrentCultureIgnoreCase)
+            .ThenBy(row => row.ControllerId, StringComparer.Ordinal)
+            .ToArray();
+        for (var index = 0; index < sortedRows.Length; index++)
+        {
+            var row = sortedRows[index];
+            if (Rows[index] != row)
+            {
+                Rows.Remove(row);
+                Rows.Insert(index, row);
+            }
+            row.IsAlternate = index % 2 != 0;
+        }
         OnPropertyChanged(nameof(OnlineSummary));
         OnPropertyChanged(nameof(PanelHeight));
     }

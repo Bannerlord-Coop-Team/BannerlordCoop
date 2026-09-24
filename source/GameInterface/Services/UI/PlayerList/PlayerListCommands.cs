@@ -44,18 +44,18 @@ public sealed class PreviewPlayerListCommand : ICoopCommand
 {
     public string Prefix => "coop.debug.player_list";
     public string Name => "preview";
-    public string Description => "Use on for synthetic layout rows, off to restore the latest server snapshot.";
+    public string Description => "Use on for layout rows, sorting for a compact sorting preview, off to restore the server snapshot.";
     public CoopCommandSide Side => CoopCommandSide.Client;
-    public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[] { new ExpectedArgs("mode", "on or off") };
+    public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[] { new ExpectedArgs("mode", "on, sorting or off") };
 
     // Switches only the presentation fixture; normal focus guards still control opening the list.
     public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
     {
-        if (args[0] != "on" && args[0] != "off")
-            return new CoopCommandResult(false, "Use on or off.", "invalid_mode");
+        if (args[0] != "on" && args[0] != "sorting" && args[0] != "off")
+            return new CoopCommandResult(false, "Use on, sorting or off.", "invalid_mode");
         if (!ContainerProvider.TryResolve<IPlayerListService>(out var service))
             return new CoopCommandResult(false, "Player list unavailable.", "unavailable");
-        service.PreviewLayout(args[0] == "on");
+        service.PreviewLayout(args[0] != "off", args[0] == "sorting");
         return new CoopCommandResult(true, service.Describe());
     }
 }
