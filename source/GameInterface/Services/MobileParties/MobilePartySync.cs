@@ -20,7 +20,7 @@ internal class MobilePartySync : IAutoSync
         autoSyncBuilder.AddField(AccessTools.Field(typeof(MobileParty), nameof(MobileParty._isCurrentlyUsedByAQuest)));
         autoSyncBuilder.AddField(AccessTools.Field(typeof(MobileParty), nameof(MobileParty._ignoredUntilTime)));
         // _besiegerCampResetStarted guards this process's call stack, not replicated campaign state.
-        autoSyncBuilder.AddField(AccessTools.Field(typeof(MobileParty), nameof(MobileParty._partyComponent)));
+        // PartyComponentHandler applies the component and its party backlink together.
 
         // Movement is replicated atomically by NetworkUpdatePartyBehavior. These members are
         // interdependent, so independent AutoSync messages can apply a behavior before its target.
