@@ -202,10 +202,13 @@ public sealed class MissionEngineFixture : IDisposable
         Prefix(typeof(Agent), nameof(Agent.GetMaximumSpeedLimit), nameof(Agent_GetMaximumSpeedLimit));
         Prefix(typeof(Agent), nameof(Agent.SetMaximumSpeedLimit), nameof(Agent_SetMaximumSpeedLimit));
         Prefix(typeof(Agent), nameof(Agent.SetWieldedItemIndexAsClient), nameof(Agent_SetWieldedItemIndexAsClient));
+        Prefix(typeof(Agent), nameof(Agent.SetWeaponAmountInSlot), nameof(Agent_SetWeaponAmountInSlot));
         Prefix(typeof(Agent), nameof(Agent.GetPrimaryWieldedItemIndex), nameof(Agent_GetPrimaryWieldedItemIndex));
         Prefix(typeof(Agent), nameof(Agent.GetOffhandWieldedItemIndex), nameof(Agent_GetOffhandWieldedItemIndex));
         // Rebuild callers warmed by earlier tests after their native wield boundaries are patched.
         harmony.Patch(AccessTools.Method(typeof(AgentEquipmentData), nameof(AgentEquipmentData.Apply)),
+            postfix: new HarmonyMethod(AccessTools.Method(typeof(MissionEngineFixture), nameof(EquipmentApplyPostfix))));
+        harmony.Patch(AccessTools.Method(typeof(AgentEquipmentData), "TryApplyForAction"),
             postfix: new HarmonyMethod(AccessTools.Method(typeof(MissionEngineFixture), nameof(EquipmentApplyPostfix))));
         Prefix(typeof(Agent), "get_MovementInputVector", nameof(Agent_get_MovementInputVector));
         Prefix(typeof(Agent), "set_MovementInputVector", nameof(Agent_set_MovementInputVector));
@@ -1100,6 +1103,16 @@ public sealed class MissionEngineFixture : IDisposable
             mirror.OffhandWieldedItemIndex = __1;
         }
         mirror.ActionAndGuardCallOrder.Add("wield");
+        return false;
+    }
+
+    private static bool Agent_SetWeaponAmountInSlot(Agent __instance, EquipmentIndex __0, short __1, bool __2)
+    {
+        if (!__2 || !AgentMirror.TryGet(__instance, out var mirror)) return true;
+        var weapon = mirror.Equipment[__0];
+        weapon.Amount = __1;
+        mirror.Equipment[__0] = weapon;
+        mirror.ActionAndGuardCallOrder.Add("ammo");
         return false;
     }
 

@@ -31,6 +31,47 @@ public class RapidGuardTransitionSyncTests : MissionTestEnvironment
 {
     public RapidGuardTransitionSyncTests(ITestOutputHelper output) : base(output) { }
 
+    [Theory]
+    [InlineData(0)]
+    [InlineData(1)]
+    public void RemoteUseActionRelease_ClearsHighPriorityPoseWithoutAnimationName(int channel)
+    {
+        RunScenario("peer", context =>
+        {
+            var agentId = Guid.NewGuid();
+            Agent puppet = SpawnRegisteredAgent(
+                context, "owner", agentId, AgentControllerType.None,
+                out MirrorAgent puppetMirror);
+            Agent owner = SpawnAgent(
+                context, AgentControllerType.Player,
+                out MirrorAgent ownerMirror);
+
+            if (channel == 0) ownerMirror.Action0Index = 202;
+            else ownerMirror.Action1Index = 202;
+            ApplyOwnerAction(context.Component, 1L, agentId, owner);
+            context.Component.AgentActionHandler.ApplyRemoteGuardStates();
+            Assert.Equal(202, puppet.GetCurrentAction(channel).Index);
+
+            puppetMirror.RejectSetActionChannelWithoutIgnorePriority = true;
+            puppetMirror.SetActionChannelCalls = 0;
+            if (channel == 0) ownerMirror.Action0Index = ActionIndexCache.act_none.Index;
+            else ownerMirror.Action1Index = ActionIndexCache.act_none.Index;
+            ApplyOwnerAction(context.Component, 2L, agentId, owner);
+            context.Component.AgentActionHandler.ApplyRemoteGuardStates();
+
+            Assert.Equal(ActionIndexCache.act_none, puppet.GetCurrentAction(channel));
+            Assert.True(puppetMirror.LastSetActionIgnorePriority);
+            Assert.Equal(1, puppetMirror.SetActionChannelCalls);
+
+            if (channel == 0) ownerMirror.Action0Index = 202;
+            else ownerMirror.Action1Index = 202;
+            ApplyOwnerAction(context.Component, 1L, agentId, owner);
+            context.Component.AgentActionHandler.ApplyRemoteGuardStates();
+            Assert.Equal(ActionIndexCache.act_none, puppet.GetCurrentAction(channel));
+            Assert.Equal(1, puppetMirror.SetActionChannelCalls);
+        });
+    }
+
     [Fact]
     public void RemotePlayerRelease_DoesNotReplayLingeringGuardAction()
     {

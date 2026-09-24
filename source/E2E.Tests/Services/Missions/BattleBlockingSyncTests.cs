@@ -9,6 +9,7 @@ using E2E.Tests.Environment.Instance;
 using E2E.Tests.Environment.Mock;
 using E2E.Tests.Environment.MockEngine;
 using GameInterface.Services.MapEvents;
+using HarmonyLib;
 using Missions;
 using Missions.Agents.Handlers;
 using Missions.Agents.Messages;
@@ -30,6 +31,102 @@ namespace E2E.Tests.Services.Missions;
 public class BattleBlockingSyncTests : MissionTestEnvironment
 {
     public BattleBlockingSyncTests(ITestOutputHelper output) : base(output) { }
+
+    [Theory]
+    [InlineData(0, AgentControllerType.Player, false)]
+    [InlineData(1, AgentControllerType.Player, false)]
+    [InlineData(0, AgentControllerType.AI, false)]
+    [InlineData(1, AgentControllerType.AI, false)]
+    [InlineData(0, AgentControllerType.Player, true)]
+    [InlineData(1, AgentControllerType.Player, true)]
+    [InlineData(0, AgentControllerType.AI, true)]
+    [InlineData(1, AgentControllerType.AI, true)]
+    public void PollActions_RangedSiegeOtherActions_SendEntryTransitionsAndClear(
+        int channel, AgentControllerType controllerType, bool mangonel)
+    {
+        RunScenario("owner", context =>
+        {
+            var harmony = new Harmony($"{nameof(PollActions_RangedSiegeOtherActions_SendEntryTransitionsAndClear)}.{Guid.NewGuid()}");
+            var target = AccessTools.Method(typeof(AgentActionData), "GetActionNameWithCode");
+            harmony.Patch(target, postfix: new HarmonyMethod(
+                typeof(BattleBlockingSyncTests), nameof(ReadRangedSiegeActionName)));
+            try
+            {
+                var agentId = Guid.NewGuid();
+                Agent agent = SpawnRegisteredAgent(
+                    context, "owner", agentId, controllerType, out MirrorAgent mirror);
+                context.Component.AgentActionHandler.PollActionsAfterNativeTick();
+                Assert.Empty(context.Network.NetworkSentPackets.GetPackets<AgentActionPacket>());
+
+                long sequence = 0;
+                var useActions = mangonel
+                    ? new[] { 3730, 3731, 3732, 3733, 3730, -1 }
+                    : new[] { 3715, 3716, 3717, 3718, 3713, -1 };
+                foreach (int action in useActions)
+                {
+                    if (channel == 0)
+                    {
+                        mirror.Action0Index = action;
+                        mirror.Action0CodeType = Agent.ActionCodeType.Other;
+                    }
+                    else
+                    {
+                        mirror.Action1Index = action;
+                        mirror.Action1CodeType = Agent.ActionCodeType.Other;
+                    }
+                    // The use object can already be detached when the animation clears.
+                    Assert.Null(agent.CurrentlyUsedGameObject);
+                    Assert.Equal(Agent.ActionCodeType.Other, agent.GetCurrentActionType(channel));
+                    context.Component.AgentActionHandler.PollActionsAfterNativeTick();
+
+                    AgentActionPacket packet = Assert.Single(
+                        context.Network.NetworkSentPackets.GetPackets<AgentActionPacket>());
+                    Assert.Equal(agentId, Assert.Single(packet.AgentIds));
+                    Assert.Equal(++sequence, Assert.Single(packet.Sequences));
+                    AgentActionData data = Assert.Single(packet.Actions);
+                    Assert.Equal(action, channel == 0 ? data.Action0Index : data.Action1Index);
+                    Assert.Equal(-1, channel == 0 ? data.Action1Index : data.Action0Index);
+
+                    context.Network.NetworkSentPackets.Packets.Clear();
+                    context.Component.AgentActionHandler.PollActionsAfterNativeTick();
+                    Assert.Empty(context.Network.NetworkSentPackets.GetPackets<AgentActionPacket>());
+                }
+
+                foreach (var type in new[] { Agent.ActionCodeType.Other, Agent.ActionCodeType.Idle })
+                {
+                    mirror.Action0Index = type == Agent.ActionCodeType.Other ? 1001 : 1002;
+                    mirror.Action1Index = type == Agent.ActionCodeType.Other ? 1002 : 1001;
+                    mirror.Action0CodeType = type;
+                    mirror.Action1CodeType = type;
+                    context.Component.AgentActionHandler.PollActionsAfterNativeTick();
+                    Assert.Empty(context.Network.NetworkSentPackets.GetPackets<AgentActionPacket>());
+                }
+            }
+            finally
+            {
+                harmony.Unpatch(target, HarmonyPatchType.All, harmony.Id);
+            }
+        });
+    }
+
+    private static void ReadRangedSiegeActionName(int actionCode, ref string __result)
+    {
+        __result = actionCode switch
+        {
+            3715 => "act_usage_ballista_ammo_pick_up_start_defender",
+            3716 => "act_usage_ballista_ammo_pick_up_end_defender",
+            3717 => "act_usage_ballista_ammo_place_start_defender",
+            3718 => "act_usage_ballista_ammo_place_end_defender",
+            3713 => "act_usage_ballista_idle_defender",
+            3730 => "act_usage_mangonel_big_idle",
+            3731 => "act_usage_mangonel_big_shoot",
+            3732 => "act_usage_mangonel_big_reload",
+            3733 => "act_usage_mangonel_reload_2_idle",
+            1001 => "act_walk_forward",
+            1002 => "act_idle",
+            _ => __result,
+        };
+    }
 
     [Fact]
     public void PollActions_PlayerGuardInput_SendsActionPacket()

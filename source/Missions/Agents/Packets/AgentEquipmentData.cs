@@ -1,5 +1,7 @@
 ﻿using ProtoBuf;
 using System;
+using System.Collections.Generic;
+using System.Linq;
 using TaleWorlds.Core;
 using TaleWorlds.MountAndBlade;
 
@@ -23,6 +25,7 @@ namespace Missions.Agents.Packets
             MainHandUsageIndex = mainHandUsageIndex;
             MainHandItemId = GetItemId(agent?.Equipment, mainHandIndex);
             OffHandItemId = GetItemId(agent?.Equipment, offHandIndex);
+            ArrowAmmo = agent?.IsHuman == true ? CaptureArrowAmmo(agent.Equipment) : null;
         }
 
         internal static bool TryCapture(Agent agent, out AgentEquipmentData data)
@@ -37,7 +40,7 @@ namespace Missions.Agents.Packets
             data = new AgentEquipmentData(
                 mainHandIndex, offHandIndex, mainHandUsageIndex,
                 GetItemId(agent.Equipment, mainHandIndex),
-                GetItemId(agent.Equipment, offHandIndex));
+                GetItemId(agent.Equipment, offHandIndex), CaptureArrowAmmo(agent.Equipment));
             return true;
         }
 
@@ -64,13 +67,15 @@ namespace Missions.Agents.Packets
             EquipmentIndex offHandIndex,
             int mainHandUsageIndex,
             string mainHandItemId = null,
-            string offHandItemId = null)
+            string offHandItemId = null,
+            AgentArrowAmmoData[] arrowAmmo = null)
         {
             MainHandIndex = (int)mainHandIndex;
             OffHandIndex = (int)offHandIndex;
             MainHandUsageIndex = mainHandUsageIndex;
             MainHandItemId = mainHandItemId;
             OffHandItemId = offHandItemId;
+            ArrowAmmo = arrowAmmo;
         }
 
         internal bool TryApplyForAction(Agent agent)
@@ -81,12 +86,21 @@ namespace Missions.Agents.Packets
             if (!CanWield(agent, mainHand) || !CanWield(agent, offHand)
                 || MainHandUsageIndex != GetSafeUsageIndex(agent.Equipment, mainHand, MainHandUsageIndex)
                 || !MatchesItem(agent.Equipment, mainHand, MainHandItemId)
-                || !MatchesItem(agent.Equipment, offHand, OffHandItemId))
+                || !MatchesItem(agent.Equipment, offHand, OffHandItemId)
+                || !CanApplyArrowAmmo(agent.Equipment))
             {
                 return false;
             }
 
             Apply(agent);
+            if (ArrowAmmo != null)
+            {
+                foreach (var ammo in ArrowAmmo)
+                {
+                    if (agent.Equipment[(EquipmentIndex)ammo.Slot].Amount != ammo.Amount)
+                        agent.SetWeaponAmountInSlot((EquipmentIndex)ammo.Slot, ammo.Amount, enforcePrimaryItem: true);
+                }
+            }
             return Matches(agent);
         }
 
@@ -97,7 +111,50 @@ namespace Missions.Agents.Packets
                 && OffHandIndex == current.OffHandIndex
                 && MainHandUsageIndex == current.MainHandUsageIndex
                 && (MainHandItemId == null || MainHandItemId == current.MainHandItemId)
-                && (OffHandItemId == null || OffHandItemId == current.OffHandItemId);
+                && (OffHandItemId == null || OffHandItemId == current.OffHandItemId)
+                && (ArrowAmmo == null || ArrowAmmo.SequenceEqual(current.ArrowAmmo ?? Array.Empty<AgentArrowAmmoData>()));
+        }
+
+        private static AgentArrowAmmoData[] CaptureArrowAmmo(MissionEquipment equipment)
+        {
+            if (!HasSafeWeaponSlots(equipment)) return null;
+            List<AgentArrowAmmoData> amounts = null;
+            for (var slot = EquipmentIndex.WeaponItemBeginSlot; slot < EquipmentIndex.ExtraWeaponSlot; slot++)
+            {
+                var weapon = equipment[slot];
+                if (!IsArrowAmmo(weapon)) continue;
+                (amounts ??= new List<AgentArrowAmmoData>()).Add(new AgentArrowAmmoData(
+                    (int)slot, weapon.Item.StringId, weapon.ItemModifier?.StringId, weapon.Amount));
+            }
+            return amounts?.ToArray();
+        }
+
+        private static bool IsArrowAmmo(MissionWeapon weapon)
+        {
+            var weaponClass = weapon.CurrentUsageItem?.WeaponClass;
+            return weapon.Item != null && (weaponClass == WeaponClass.Arrow || weaponClass == WeaponClass.Bolt);
+        }
+
+        private bool CanApplyArrowAmmo(MissionEquipment equipment)
+        {
+            if (ArrowAmmo == null) return true;
+            if (ArrowAmmo.Length > (int)EquipmentIndex.ExtraWeaponSlot) return false;
+            int expectedCount = 0;
+            for (var slot = EquipmentIndex.WeaponItemBeginSlot; slot < EquipmentIndex.ExtraWeaponSlot; slot++)
+                if (IsArrowAmmo(equipment[slot])) expectedCount++;
+            if (ArrowAmmo.Length != expectedCount) return false;
+            int previousSlot = -1;
+            foreach (var ammo in ArrowAmmo)
+            {
+                if (ammo.Slot <= previousSlot || ammo.Slot < (int)EquipmentIndex.WeaponItemBeginSlot ||
+                    ammo.Slot >= (int)EquipmentIndex.ExtraWeaponSlot || string.IsNullOrEmpty(ammo.ItemId)) return false;
+                previousSlot = ammo.Slot;
+                var weapon = equipment[(EquipmentIndex)ammo.Slot];
+                if (!IsArrowAmmo(weapon) || weapon.Item.StringId != ammo.ItemId ||
+                    weapon.ItemModifier?.StringId != ammo.ItemModifierId ||
+                    ammo.Amount < 0 || ammo.Amount > weapon.ModifiedMaxAmount) return false;
+            }
+            return true;
         }
 
         private static bool MatchesItem(MissionEquipment equipment, EquipmentIndex index, string itemId)
@@ -222,7 +279,9 @@ namespace Missions.Agents.Packets
                    OffHandIndex == other.OffHandIndex &&
                    MainHandUsageIndex == other.MainHandUsageIndex
                    && MainHandItemId == other.MainHandItemId
-                   && OffHandItemId == other.OffHandItemId;
+                   && OffHandItemId == other.OffHandItemId
+                   && (ArrowAmmo ?? Array.Empty<AgentArrowAmmoData>()).SequenceEqual(
+                       other.ArrowAmmo ?? Array.Empty<AgentArrowAmmoData>());
         }
 
         public override bool Equals(object obj)
@@ -238,7 +297,10 @@ namespace Missions.Agents.Packets
                 hashCode = (hashCode * 397) ^ OffHandIndex;
                 hashCode = (hashCode * 397) ^ MainHandUsageIndex;
                 hashCode = (hashCode * 397) ^ (MainHandItemId?.GetHashCode() ?? 0);
-                return (hashCode * 397) ^ (OffHandItemId?.GetHashCode() ?? 0);
+                hashCode = (hashCode * 397) ^ (OffHandItemId?.GetHashCode() ?? 0);
+                if (ArrowAmmo != null)
+                    foreach (var ammo in ArrowAmmo) hashCode = (hashCode * 397) ^ ammo.GetHashCode();
+                return hashCode;
             }
         }
 
@@ -252,7 +314,28 @@ namespace Missions.Agents.Packets
         public string MainHandItemId { get; }
         [ProtoMember(5)]
         public string OffHandItemId { get; }
+        [ProtoMember(6)]
+        public AgentArrowAmmoData[] ArrowAmmo { get; }
+    }
 
+    [ProtoContract(SkipConstructor = true)]
+    public readonly struct AgentArrowAmmoData
+    {
+        public AgentArrowAmmoData(int slot, string itemId, string itemModifierId, short amount)
+        {
+            Slot = slot;
+            ItemId = itemId;
+            ItemModifierId = itemModifierId;
+            Amount = amount;
+        }
 
+        [ProtoMember(1)]
+        public int Slot { get; }
+        [ProtoMember(2)]
+        public string ItemId { get; }
+        [ProtoMember(3)]
+        public string ItemModifierId { get; }
+        [ProtoMember(4)]
+        public short Amount { get; }
     }
 }
