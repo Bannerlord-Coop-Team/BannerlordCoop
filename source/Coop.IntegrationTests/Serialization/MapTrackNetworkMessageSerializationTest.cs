@@ -1,4 +1,5 @@
-using GameInterface.Services.MapTracks.Data;
+﻿using GameInterface.Services.MapTracks.Data;
+using GameInterface.Services.MapTracks.Interfaces;
 using GameInterface.Services.MapTracks.Messages;
 using GameInterface.Surrogates;
 using ProtoBuf;
@@ -134,6 +135,16 @@ namespace Coop.IntegrationTests.Serialization
                 isRemovingTracks: true));
 
             Assert.True(copy.IsRemovingTracks);
+        }
+
+        [Fact]
+        public void InitialVisibleTracks_EmptyRoundTrip_AppliesWithoutDereferencingTrackState()
+        {
+            var copy = RoundTrip(new NetworkUpdateClientInitialVisibleTracks(new List<MapTrackData>()));
+            Assert.Null(copy.VisibleTrackChanges);
+
+            var tracks = new MapTracksCampaignBehaviorInterface(null, null, null);
+            tracks.ApplyVisibleTrackChanges(null, copy.VisibleTrackChanges, false);
         }
 
         private static Track CreateTrack() => new()

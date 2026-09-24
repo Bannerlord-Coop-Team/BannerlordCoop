@@ -1,4 +1,4 @@
-using Common;
+﻿using Common;
 using Common.Messaging;
 using GameInterface.Services.MapTracks.Data;
 using GameInterface.Services.MapTracks.Messages;
@@ -427,6 +427,9 @@ public class MapTracksCampaignBehaviorInterface : IMapTracksCampaignBehaviorInte
 
     public void ApplyVisibleTrackChanges(MapTracksCampaignBehavior behavior, List<MapTrackData> visibleTrackChanges, bool isRemovingTracks)
     {
+        // Protobuf can omit an empty track list from the initial snapshot.
+        if (visibleTrackChanges == null) return;
+
         foreach (var changedTrackData in visibleTrackChanges)
         {
             var changedTrack = changedTrackData.Track;
