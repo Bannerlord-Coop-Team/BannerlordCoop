@@ -23,7 +23,7 @@ using Xunit;
 namespace Coop.Tests.Missions.Battles;
 
 [Collection("Mission.Current")]
-public sealed class MangonelLoadReplicationTests : IDisposable
+public sealed partial class MangonelLoadReplicationTests : IDisposable
 {
     private readonly MissionCurrentScope mission = new();
     private readonly Harmony harmony = new("coop.tests.mangonel-load." + Guid.NewGuid());
@@ -60,13 +60,14 @@ public sealed class MangonelLoadReplicationTests : IDisposable
             prefix: new HarmonyMethod(typeof(MangonelLoadReplicationTests), nameof(HasUser)));
     }
 
-    private (SiegeMachineStateReplicator Sut, CoopAgentInfo Info, Mangonel Machine, Mock<IBattleNetwork> Network) Replica(string own)
+    private (SiegeMachineStateReplicator Sut, CoopAgentInfo Info, Mangonel Machine, Mock<IBattleNetwork> Network) Replica(
+        string own, Guid? pickerId = null, string agentOwner = "loader")
     {
         var agent = New<Agent>();
         AccessTools.Property(typeof(Agent), "Mission").SetValue(agent, mission.Instance);
         AccessTools.Property(typeof(Agent), "Equipment").SetValue(agent, new MissionEquipment());
         agent.Equipment[EquipmentIndex.ExtraWeaponSlot] = new MissionWeapon(missile, null, null, 1);
-        var info = new CoopAgentInfo("loader", "loader", "battle", agent, agentId, 1, 7);
+        var info = new CoopAgentInfo(agentOwner, agentOwner, "battle", agent, pickerId ?? agentId, 1, 7);
         info.RecordSiegeGrant(grantId);
         var point = New<StandingPointWithWeaponRequirement>();
         var machine = New<Mangonel>();
@@ -78,7 +79,7 @@ public sealed class MangonelLoadReplicationTests : IDisposable
         AccessTools.Field(typeof(Mangonel), "_loadAmmoBeginAnimationActionIndex").SetValue(machine, ActionIndex(11));
         SetState(machine, own == "simulator" ? RangedSiegeWeapon.WeaponState.LoadingAmmo : RangedSiegeWeapon.WeaponState.Idle);
         var registry = new Mock<INetworkAgentRegistry>();
-        registry.Setup(r => r.TryGetAgentInfo(agentId, out info)).Returns(true);
+        registry.Setup(r => r.TryGetAgentInfo(info.AgentId, out info)).Returns(true);
         registry.Setup(r => r.TryGetAgentInfo(agent, out info)).Returns(true);
         registry.Setup(r => r.GetAgents(own)).Returns(own == "loader" ? new[] { info } : Array.Empty<CoopAgentInfo>());
         var session = new Mock<IBattleSession>();
@@ -133,6 +134,7 @@ public sealed class MangonelLoadReplicationTests : IDisposable
             .GetType("GameInterface.Services.MapEvents.Patches.SiegeMachineAuthorityPatches");
         harmony.CreateClassProcessor(patchType).Patch();
         harmony.CreateClassProcessor(typeof(MangonelAmmoConsumedPatch)).Patch();
+        harmony.CreateClassProcessor(typeof(MangonelAmmoPickupPatch)).Patch();
 
         bool oldHost = SiegeMissionAuthorityGate.IsLocalAuthority;
         bool oldKnown = SiegeMissionAuthorityGate.IsAuthorityKnown;

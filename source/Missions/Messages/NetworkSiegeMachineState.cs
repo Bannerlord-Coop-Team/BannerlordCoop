@@ -59,6 +59,10 @@ public class NetworkSiegeMachineState : IEvent
     /// <summary>Per-machine claim generation known by the sender.</summary>
     [ProtoMember(15)]
     public readonly int AuthorityRevision;
+    [ProtoMember(16)]
+    public readonly int MangonelAmmo;
+    [ProtoMember(17)]
+    public readonly bool HasMangonelAmmo;
     public NetworkSiegeMachineState(
         int machineId,
         float hitPoints,
@@ -73,7 +77,8 @@ public class NetworkSiegeMachineState : IEvent
         int hostEpoch = 0,
         int stoneAmmo = -1,
         string senderControllerId = null,
-        int authorityRevision = 0)
+        int authorityRevision = 0,
+        int mangonelAmmo = -1)
     {
         MachineId = machineId;
         HitPoints = hitPoints;
@@ -90,5 +95,7 @@ public class NetworkSiegeMachineState : IEvent
         HasStoneAmmo = stoneAmmo >= 0;
         SenderControllerId = senderControllerId;
         AuthorityRevision = authorityRevision;
+        MangonelAmmo = mangonelAmmo;
+        HasMangonelAmmo = mangonelAmmo >= 0;
     }
 }

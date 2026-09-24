@@ -138,6 +138,8 @@ public partial class SiegeMachineStateReplicator : ISiegeMachineStateReplicator
         messageBroker.Subscribe<NetworkMangonelLoad>(HandleMangonelLoad);
         messageBroker.Subscribe<MangonelAmmoConsumed>(HandleMangonelAmmoConsumed);
         messageBroker.Subscribe<MangonelLoadTick>(HandleMangonelLoadTick);
+        messageBroker.Subscribe<MangonelAmmoPickup>(HandleMangonelAmmoPickup);
+        messageBroker.Subscribe<NetworkMangonelAmmoPickup>(HandleNetworkMangonelAmmoPickup);
     }
 
     public void Dispose()
@@ -151,8 +153,11 @@ public partial class SiegeMachineStateReplicator : ISiegeMachineStateReplicator
         messageBroker.Unsubscribe<NetworkMangonelLoad>(HandleMangonelLoad);
         messageBroker.Unsubscribe<MangonelAmmoConsumed>(HandleMangonelAmmoConsumed);
         messageBroker.Unsubscribe<MangonelLoadTick>(HandleMangonelLoadTick);
+        messageBroker.Unsubscribe<MangonelAmmoPickup>(HandleMangonelAmmoPickup);
+        messageBroker.Unsubscribe<NetworkMangonelAmmoPickup>(HandleNetworkMangonelAmmoPickup);
         mangonelLoadsDisposed = true;
         ClearMangonelLoads();
+        ClearMangonelPickups();
     }
 
     public void Tick(float dt)
@@ -184,6 +189,7 @@ public partial class SiegeMachineStateReplicator : ISiegeMachineStateReplicator
         }
 
         RefreshMachineGates();
+        TickMangonelPickups();
         TickMangonelLoads();
         BroadcastChangedStates();
     }
@@ -196,6 +202,7 @@ public partial class SiegeMachineStateReplicator : ISiegeMachineStateReplicator
         if (trackedMission != mission)
         {
             ClearMangonelLoads();
+            ClearMangonelPickups();
             lastSent.Clear();
             lastSentLadderAnimations.Clear();
             deactivated.Clear();
@@ -336,6 +343,8 @@ public partial class SiegeMachineStateReplicator : ISiegeMachineStateReplicator
             && previous.WeaponState == state.WeaponState
             && previous.HasStoneAmmo == state.HasStoneAmmo
             && (!state.HasStoneAmmo || previous.StoneAmmo == state.StoneAmmo)
+            && previous.HasMangonelAmmo == state.HasMangonelAmmo
+            && (!state.HasMangonelAmmo || previous.MangonelAmmo == state.MangonelAmmo)
             && Math.Abs(previous.MoveDistance - state.MoveDistance) < MoveDistanceThreshold
             && Math.Abs(previous.AimDirection - state.AimDirection) < AimEpsilon
             && Math.Abs(previous.AimReleaseAngle - state.AimReleaseAngle) < AimEpsilon;
@@ -370,7 +379,8 @@ public partial class SiegeMachineStateReplicator : ISiegeMachineStateReplicator
             state.AimDirection, state.AimReleaseAngle, GetSnapshotAuthorityEpoch(state.MachineId),
             state.HasStoneAmmo ? state.StoneAmmo : -1,
             session.OwnControllerId,
-            GetAuthorityRevision(state.MachineId));
+            GetAuthorityRevision(state.MachineId),
+            state.HasMangonelAmmo ? state.MangonelAmmo : -1);
     }
 
     private NetworkSiegeLadderAnimationState Stamp(NetworkSiegeLadderAnimationState state)
@@ -525,7 +535,8 @@ public partial class SiegeMachineStateReplicator : ISiegeMachineStateReplicator
         }
 
         return new NetworkSiegeMachineState(machine.Id.Id, hitPoints, destructionState, gateState, ladderState,
-            moveDistance, hasArrived, weaponState, aimDirection, aimReleaseAngle, stoneAmmo: stoneAmmo);
+            moveDistance, hasArrived, weaponState, aimDirection, aimReleaseAngle, stoneAmmo: stoneAmmo,
+            mangonelAmmo: isHost && machine is Mangonel mangonel && mangonel.StartingAmmoCount > 0 ? mangonel.AmmoCount : -1);
     }
 
     private static NetworkSiegeLadderAnimationState CaptureLadderAnimationState(SiegeLadder ladder)
@@ -1453,6 +1464,7 @@ public partial class SiegeMachineStateReplicator : ISiegeMachineStateReplicator
             // BR-102: a deposed host's snapshot (its host-owned fields carry damage and removal-relevant
             // state) must not fight the promoted host's simulation — nor even be buffered for re-apply.
             if (DropStaleHostEpoch(obj.HostEpoch, nameof(NetworkSiegeMachineState))) return;
+            if (obj.HasMangonelAmmo && !session.IsHostController(obj.SenderControllerId)) return;
 
             RefreshMachineCache();
             var authority = ClassifySnapshotAuthority(
@@ -1619,7 +1631,8 @@ public partial class SiegeMachineStateReplicator : ISiegeMachineStateReplicator
                 ? incoming.StoneAmmo
                 : (existing.HasStoneAmmo ? existing.StoneAmmo : -1),
             incoming.SenderControllerId,
-            incoming.AuthorityRevision);
+            incoming.AuthorityRevision,
+            incoming.HasMangonelAmmo ? incoming.MangonelAmmo : (existing.HasMangonelAmmo ? existing.MangonelAmmo : -1));
     }
 
     private void BufferLadderAnimationState(NetworkSiegeLadderAnimationState state)
@@ -1746,6 +1759,8 @@ public partial class SiegeMachineStateReplicator : ISiegeMachineStateReplicator
         {
             stonePile.SetAmmo(state.StoneAmmo);
         }
+        if (state.HasMangonelAmmo && machine is Mangonel mangonel)
+            ApplyMangonelSupply(mangonel, state.MangonelAmmo);
 
         if (state.HitPoints >= 0f && machine.DestructionComponent != null)
         {
