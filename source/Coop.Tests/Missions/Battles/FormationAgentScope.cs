@@ -10,6 +10,7 @@ using TaleWorlds.MountAndBlade;
 namespace Coop.Tests.Missions.Battles;
 
 /// <summary>Provides an identity-only active agent; only static animation lookup is stubbed during initialization.</summary>
+[HarmonyPatch(typeof(MBAnimation), nameof(MBAnimation.GetActionCodeWithName))]
 internal sealed class FormationAgentScope : IDisposable
 {
     private readonly IntPtr state = Marshal.AllocHGlobal(sizeof(int));
@@ -18,15 +19,14 @@ internal sealed class FormationAgentScope : IDisposable
     public FormationAgentScope()
     {
         var harmony = new Harmony("coop.tests.formation-agent");
-        var lookup = AccessTools.Method(typeof(MBAnimation), nameof(MBAnimation.GetActionCodeWithName));
         try
         {
-            harmony.Patch(lookup, prefix: new HarmonyMethod(typeof(FormationAgentScope), nameof(AnimationLookup)));
+            harmony.CreateClassProcessor(typeof(FormationAgentScope)).Patch();
             RuntimeHelpers.RunClassConstructor(typeof(Agent).TypeHandle);
         }
         finally
         {
-            harmony.Unpatch(lookup, HarmonyPatchType.Prefix, harmony.Id);
+            harmony.UnpatchAll(harmony.Id);
         }
 
         Agent = (Agent)FormatterServices.GetUninitializedObject(typeof(Agent));
@@ -36,6 +36,7 @@ internal sealed class FormationAgentScope : IDisposable
     }
 
     // Static action caches need an index, but these tests never play an animation.
+    [HarmonyPrefix]
     private static bool AnimationLookup(ref int __result)
     {
         __result = 0;
