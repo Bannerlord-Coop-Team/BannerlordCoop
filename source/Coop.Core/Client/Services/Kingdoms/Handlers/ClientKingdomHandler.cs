@@ -388,10 +388,13 @@ public class ClientKingdomHandler : IHandler
     private void HandleNetworkAddDecision(MessagePayload<NetworkAddDecision> obj)
     {
         var payload = obj.What;
-        if (!ShouldApplyNetworkDecision(payload.KingdomId)) return;
+        GameThread.RunSafe(() =>
+        {
+            if (!ShouldApplyNetworkDecision(payload.KingdomId)) return;
 
-        var message = new AddDecision(payload.KingdomId, payload.Data, payload.IgnoreInfluenceCost, payload.RandomNumber);
-        messageBroker.Publish(this, message);
+            var message = new AddDecision(payload.KingdomId, payload.Data, payload.IgnoreInfluenceCost, payload.RandomNumber);
+            messageBroker.Publish(this, message);
+        }, context: nameof(HandleNetworkAddDecision));
     }
 
     private bool ShouldApplyNetworkDecision(string kingdomId)
