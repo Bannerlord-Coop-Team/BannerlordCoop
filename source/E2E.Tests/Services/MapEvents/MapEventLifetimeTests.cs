@@ -1,5 +1,8 @@
 ﻿using Common.Messaging;
 using Common.Network;
+using Common.Network.Coalescing;
+using GameInterface.Services.TroopRosters.Messages;
+using TaleWorlds.CampaignSystem.Roster;
 using Common.Util;
 using E2E.Tests.Util;
 using GameInterface.Registry.Auto;
@@ -28,6 +31,64 @@ public class MapEventLifetimeTests : MapEventTestBase
     private static MobileParty? dispatchedSiegeLeader;
 
     public MapEventLifetimeTests(ITestOutputHelper output) : base(output) { }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void DestroyGraph_FlushesFinalCasualtiesBeforeRemovingRosterIds(bool abort)
+    {
+        var battle = CreateServerMapEvent(commit: !abort);
+        var troopId = TestEnvironment.CreateRegisteredObject<CharacterObject>();
+        var rosterIds = new List<string>();
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject<MapEvent>(battle.MapEventId, out var mapEvent));
+            var party = mapEvent.AttackerSide.Parties.First();
+            foreach (var roster in new[] { party._woundedInBattle, party._diedInBattle, party._routedInBattle })
+            {
+                Assert.True(Server.ObjectManager.TryGetId(roster, out var id));
+                rosterIds.Add(id);
+            }
+        });
+        var receivedRosters = Clients.SelectMany(client => rosterIds.Select(id =>
+        {
+            Assert.True(client.ObjectManager.TryGetObject<TroopRoster>(id, out var roster));
+            return roster;
+        })).ToArray();
+        TestEnvironment.FlushCoalescer();
+        Server.NetworkSentMessages.Clear();
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject<CharacterObject>(troopId, out var troop));
+            Assert.False(troop.IsHero);
+            foreach (var id in rosterIds)
+            {
+                Assert.True(Server.ObjectManager.TryGetObject<TroopRoster>(id, out var roster));
+                roster.AddToCounts(troop, 3);
+            }
+            Assert.True(Server.Resolve<ISendCoalescer>().HasPending);
+            Assert.True(Server.ObjectManager.TryGetObject<MapEvent>(battle.MapEventId, out var mapEvent));
+            if (abort)
+                Server.Resolve<IMapEventInitializationBarrier>().AbortServer(mapEvent);
+            else
+                Server.Resolve<IMessageBroker>().Publish(this, new InstanceDestroyed<MapEvent>(mapEvent));
+        });
+        TestEnvironment.FlushCoalescer();
+
+        var messages = Server.NetworkSentMessages.ToList();
+        int destruction = messages.FindIndex(message => abort
+            ? message is NetworkMapEventInitialized initialized && initialized.IsTerminal
+            : message is NetworkDestroyInstance<MapEvent>);
+        Assert.True(destruction >= 0);
+        var updates = messages.Select((message, index) => (message, index))
+            .Where(entry => entry.message is NetworkTroopRosterElementBatch).ToArray();
+        Assert.Equal(3, updates.Length);
+        Assert.All(updates, entry => Assert.True(entry.index < destruction));
+        Assert.All(receivedRosters, roster => Assert.Equal(3, roster.TotalManCount));
+        foreach (var instance in Clients.Append(Server))
+            foreach (var id in rosterIds)
+                Assert.False(instance.ObjectManager.TryGetObject<TroopRoster>(id, out _));
+    }
 
     [Fact]
     public void DestroyGraph_ResetsClientOffsetsUnderReceivePolicy_WithoutSuppressingServer()

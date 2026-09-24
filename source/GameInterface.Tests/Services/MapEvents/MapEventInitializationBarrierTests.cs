@@ -1,6 +1,7 @@
 ﻿using Autofac;
 using Common.Messaging;
 using Common.Network;
+using Common.Network.Coalescing;
 using Common.Util;
 using GameInterface.Services.MapEvents.Initialization;
 using GameInterface.Services.ObjectManager;
@@ -141,7 +142,8 @@ public class MapEventInitializationBarrierTests
             new Mock<IMessageBroker>().Object,
             new Mock<INetwork>().Object,
             objectManager.Object,
-            new StubSiegeEventGraphSynchronizer());
+            new StubSiegeEventGraphSynchronizer(),
+            new SendCoalescer());
     }
 
     private sealed class StubSiegeEventGraphSynchronizer : ISiegeEventGraphSynchronizer
