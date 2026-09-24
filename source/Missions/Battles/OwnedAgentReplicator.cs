@@ -106,11 +106,13 @@ public class OwnedAgentReplicator : IOwnedAgentReplicator
             session.OwnControllerId + ":" + Guid.NewGuid().ToString("N");
 
         messageBroker.Subscribe<AgentSpawnedInBattle>(Handle_AgentSpawnedInBattle);
+        messageBroker.Subscribe<BattleAgentFormationChanged>(Handle_BattleAgentFormationChanged);
     }
 
     public void Dispose()
     {
         messageBroker.Unsubscribe<AgentSpawnedInBattle>(Handle_AgentSpawnedInBattle);
+        messageBroker.Unsubscribe<BattleAgentFormationChanged>(Handle_BattleAgentFormationChanged);
         pendingSpawns.Clear();
     }
 
@@ -297,6 +299,20 @@ public class OwnedAgentReplicator : IOwnedAgentReplicator
     {
         if (character.IsHero && character.HeroObject == Hero.MainHero) return true;
         return agent.Origin is CoopAgentOrigin origin && origin.Party == PartyBase.MainParty;
+    }
+
+    // Send actual membership only for revealed, locally authoritative agents, after their queued spawn.
+    private void Handle_BattleAgentFormationChanged(MessagePayload<BattleAgentFormationChanged> payload)
+    {
+        var agent = payload.What.Agent;
+        if (agent == null || !(agent.Character is CharacterObject character)) return;
+        if (!coopMissionComponent.AgentRegistry.TryGetAgentInfo(agent, out var info)) return;
+        if (info.CurrentAuthority != session.OwnControllerId) return;
+        if (deployment.ShouldWithhold(IsOwnPartyAgent(agent, character))) return;
+
+        FlushPendingSpawns();
+        network.SendAll(new NetworkBattleAgentFormationChanged(
+            session.InstanceId, info.AgentId, info.CurrentAuthority, info.AuthorityRevision, payload.What.FormationIndex));
     }
 
     // [Owner] An agent WE spawned into the battle was captured (BattleAgentSpawnedPatch). Each client spawns

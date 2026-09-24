@@ -61,6 +61,9 @@ public class PuppetSpawner : IPuppetSpawner
     private readonly object pendingPuppetLock = new object();
     private readonly List<BattleAgentSpawnData> pendingPuppets = new List<BattleAgentSpawnData>();
     private readonly Dictionary<Guid, PendingAuthority> pendingAuthorities = new Dictionary<Guid, PendingAuthority>();
+    // Keep the latest reliable slot while older spawn records wait for teams, deployment or capacity.
+    private readonly Dictionary<Guid, (NetworkBattleAgentFormationChanged State, bool IsTransfer)> formations = new();
+    private bool disposed;
     private readonly Dictionary<Guid, NetworkRetainedPlayerHero> playerHandoffs = new();
     private readonly HashSet<Guid> appliedPlayerHandoffs = new();
     private readonly object withdrawnControllerLock = new object();
@@ -99,6 +102,7 @@ public class PuppetSpawner : IPuppetSpawner
         this.authorityMigrator = authorityMigrator;
 
         messageBroker.Subscribe<NetworkSpawnBattleAgents>(Handle_NetworkSpawnBattleAgents);
+        messageBroker.Subscribe<NetworkBattleAgentFormationChanged>(Handle_NetworkBattleAgentFormationChanged);
         messageBroker.Subscribe<NetworkRetainedPlayerHero>(Handle_RetainedPlayerHero);
         messageBroker.Subscribe<NetworkMissionPeerEntered>(Handle_PeerEntered);
         messageBroker.Subscribe<MissionPeerLeft>(Handle_PeerLeft);
@@ -108,6 +112,9 @@ public class PuppetSpawner : IPuppetSpawner
 
     public void Dispose()
     {
+        disposed = true;
+        formations.Clear();
+        messageBroker.Unsubscribe<NetworkBattleAgentFormationChanged>(Handle_NetworkBattleAgentFormationChanged);
         messageBroker.Unsubscribe<NetworkSpawnBattleAgents>(Handle_NetworkSpawnBattleAgents);
         messageBroker.Unsubscribe<NetworkRetainedPlayerHero>(Handle_RetainedPlayerHero);
         playerHandoffs.Clear();
@@ -185,6 +192,45 @@ public class PuppetSpawner : IPuppetSpawner
         return spawnHandler?.HasSuppliedPlayerOrigin(data) == true;
     }
 
+    // Resolve identity and apply on the same game-thread queue as reliable spawn batches.
+    private void Handle_NetworkBattleAgentFormationChanged(MessagePayload<NetworkBattleAgentFormationChanged> payload)
+    {
+        GameThread.RunSafe(() =>
+        {
+            if (disposed || Mission.Current == null || payload.What.BattleInstanceId != session.InstanceId) return;
+            RememberFormation(payload.What);
+            ApplyFormation(payload.What.AgentId);
+        }, context: nameof(Handle_NetworkBattleAgentFormationChanged));
+    }
+
+    // Reliable arrival order decides the latest slot within one authority revision, including catch-up records.
+    private void RememberFormation(NetworkBattleAgentFormationChanged state, bool isTransfer = true)
+    {
+        if (coopMissionComponent.AgentRegistry.TryGetAgentInfo(state.AgentId, out var info)
+            && (info.AuthorityRevision > state.AuthorityRevision
+                || (info.AuthorityRevision == state.AuthorityRevision && info.CurrentAuthority != state.ControllerId))) return;
+        if (formations.TryGetValue(state.AgentId, out var previous)
+            && (previous.State.AuthorityRevision > state.AuthorityRevision
+                || (previous.State.AuthorityRevision == state.AuthorityRevision && previous.State.ControllerId != state.ControllerId))) return;
+        formations[state.AgentId] = (state, isTransfer);
+    }
+
+    // Membership changes never transfer authority or move a puppet onto a locally commandable team.
+    private void ApplyFormation(Guid agentId)
+    {
+        if (!formations.TryGetValue(agentId, out var latest)) return;
+        var state = latest.State;
+        if (!coopMissionComponent.AgentRegistry.TryGetAgentInfo(agentId, out var info)) return;
+        if (session.IsOwn(info.CurrentAuthority) || info.CurrentAuthority != state.ControllerId
+            || info.AuthorityRevision != state.AuthorityRevision) return;
+        if (info.Agent == null || !info.Agent.IsActive()) return;
+
+        if (state.FormationIndex < 0)
+            info.Agent.Formation = null;
+        else
+            formationAssigner.Assign(info.Agent, state.FormationIndex);
+    }
+
     private void Handle_NetworkSpawnBattleAgents(MessagePayload<NetworkSpawnBattleAgents> payload)
     {
         NetworkSpawnBattleAgents message = payload.What;
@@ -221,7 +267,7 @@ public class PuppetSpawner : IPuppetSpawner
         NetworkSpawnBattleAgents message,
         BattleAgentSpawnData[] agents)
     {
-        if (Mission.Current == null)
+        if (disposed || Mission.Current == null)
         {
             Logger.Warning(
                 "[BattleTraffic] Dropping spawn transfer {TransferId} batch {BatchIndex}/{BatchCount}: mission ended",
@@ -238,7 +284,7 @@ public class PuppetSpawner : IPuppetSpawner
 
             try
             {
-                if (!TrySpawnPuppetNow(data, ref slotsAvailable))
+                if (!TrySpawnPuppetNow(data, ref slotsAvailable, rememberFormation: true))
                 {
                     lock (pendingPuppetLock)
                     {
@@ -260,9 +306,9 @@ public class PuppetSpawner : IPuppetSpawner
             Math.Max(1, message.BatchCount));
     }
 
-    // [Game thread] Spawn one puppet, consuming <paramref name="slotsAvailable"/> render slots on success.
+    // Spawn or refresh membership; deferred records use the latest reliable slot rather than their old snapshot.
     // Returns false when a required team, explicit party identity, deployment state, or render slot is pending.
-    private bool TrySpawnPuppetNow(BattleAgentSpawnData data, ref int slotsAvailable)
+    private bool TrySpawnPuppetNow(BattleAgentSpawnData data, ref int slotsAvailable, bool rememberFormation = false)
     {
         var registry = coopMissionComponent.AgentRegistry;
 
@@ -276,7 +322,14 @@ public class PuppetSpawner : IPuppetSpawner
         }
         if (!MergeSpawnAuthority(data)) return true;
         if (IsWithdrawnPlayerParty(data)) return true;                  // stale replay after leave/drop — drop
-        if (registry.TryGetAgentInfo(data.AgentId, out _)) return true; // already spawned — dedupe
+        if (rememberFormation)
+            RememberFormation(new NetworkBattleAgentFormationChanged(
+                session.InstanceId, data.AgentId, data.OwnerControllerId, data.AuthorityRevision, data.FormationIndex), isTransfer: false);
+        if (registry.TryGetAgentInfo(data.AgentId, out _))
+        {
+            ApplyFormation(data.AgentId);
+            return true;
+        }
         PendingAuthority pendingAuthority;
         PendingAuthority pendingMountAuthority;
         lock (pendingPuppetLock)
@@ -417,6 +470,10 @@ public class PuppetSpawner : IPuppetSpawner
             data.MovementId,
             agent,
             pendingAuthority?.Revision ?? data.AuthorityRevision);
+        // Initial assignment keeps its existing fallback; a later update received while buffered replaces it.
+        if (agentRegistered && formations.TryGetValue(data.AgentId, out var latestFormation)
+            && (latestFormation.IsTransfer || latestFormation.State.FormationIndex != data.FormationIndex))
+            ApplyFormation(data.AgentId);
         if (agentRegistered && handoff != null
             && data.OwnerControllerId == handoff.ReturningControllerId
             && data.AuthorityRevision == handoff.Previous.AuthorityRevision + 1)
