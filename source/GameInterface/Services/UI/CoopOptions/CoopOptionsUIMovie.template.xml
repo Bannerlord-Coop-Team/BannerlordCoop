@@ -7,18 +7,18 @@
         <Standard.TopPanel Parameter.Title="@MovieTextHeader"/>
 
         <ListPanel WidthSizePolicy="Fixed" SuggestedWidth="1050" HeightSizePolicy="CoverChildren"
-                   HorizontalAlignment="Center" VerticalAlignment="Center" MarginTop="-80"
+                   HorizontalAlignment="Center" VerticalAlignment="Top" MarginTop="180"
                    LayoutImp.LayoutMethod="VerticalTopToBottom">
           <Children>
             <ListPanel DataSource="{Tabs}" WidthSizePolicy="CoverChildren" HeightSizePolicy="Fixed" SuggestedHeight="66"
                        HorizontalAlignment="Center" MarginBottom="24" StackLayout.LayoutMethod="HorizontalLeftToRight">
               <ItemTemplate>
                 <ButtonWidget DoNotPassEventsToChildren="true" WidthSizePolicy="Fixed" HeightSizePolicy="Fixed"
-                              SuggestedWidth="168" SuggestedHeight="58" Brush="Header.Tab.Center"
+                              SuggestedWidth="150" SuggestedHeight="58" Brush="Header.Tab.Center"
                               Command.Click="ExecuteSelection" IsSelected="@IsSelected" UpdateChildrenStates="true">
                   <Children>
                     <TextWidget WidthSizePolicy="StretchToParent" HeightSizePolicy="StretchToParent"
-                                Brush="Clan.TabControl.Text" Brush.TextHorizontalAlignment="Center"
+                                Brush="Clan.TabControl.Text" Brush.FontSize="22" Brush.TextHorizontalAlignment="Center"
                                 Brush.TextVerticalAlignment="Center" Text="@Name"/>
                   </Children>
                 </ButtonWidget>
