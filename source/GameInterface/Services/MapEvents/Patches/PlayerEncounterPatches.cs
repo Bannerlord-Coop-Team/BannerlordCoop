@@ -49,7 +49,7 @@ internal class PlayerEncounterPatches
         bool replaced = false;
         foreach (var instruction in instructions)
         {
-            if (instruction.Calls(setter))
+            if (instruction.Calls(setter) || instruction.Calls(apply))
             {
                 instruction.opcode = OpCodes.Call;
                 instruction.operand = apply;
