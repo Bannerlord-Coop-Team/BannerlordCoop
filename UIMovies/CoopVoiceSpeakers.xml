@@ -3,6 +3,14 @@
     <Widget WidthSizePolicy="StretchToParent" HeightSizePolicy="StretchToParent"
             DoNotAcceptEvents="true" DoNotPassEventsToChildren="true">
       <Children>
+        <Widget DataSource="{PartyMarkers}" WidthSizePolicy="StretchToParent" HeightSizePolicy="StretchToParent"
+                DoNotAcceptEvents="true" DoNotPassEventsToChildren="true">
+          <ItemTemplate>
+            <Widget WidthSizePolicy="Fixed" HeightSizePolicy="Fixed" SuggestedWidth="32" SuggestedHeight="26"
+                    PositionXOffset="@X" PositionYOffset="@Y" IsVisible="@IsVisible"
+                    Sprite="MPGeneral\MPScoreboard\unmute_icon" Color="#7FC875FF" DoNotAcceptEvents="true"/>
+          </ItemTemplate>
+        </Widget>
         <ListPanel Id="CoopVoiceSpeakers" WidthSizePolicy="Fixed" SuggestedWidth="260"
                    HeightSizePolicy="CoverChildren" HorizontalAlignment="Left" VerticalAlignment="Top"
                    MarginLeft="24" MarginTop="280" StackLayout.LayoutMethod="VerticalTopToBottom"
