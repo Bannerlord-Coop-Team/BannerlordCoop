@@ -1,4 +1,4 @@
-using Autofac;
+﻿using Autofac;
 using Common.Util;
 using GameInterface.Policies;
 using GameInterface.Services.Entity;
@@ -19,6 +19,7 @@ namespace GameInterface.Tests.Services.Issues;
 using Issue = GangLeaderNeedsToOffloadStolenGoodsIssueBehavior.GangLeaderNeedsToOffloadStolenGoodsIssue;
 using Quest = GangLeaderNeedsToOffloadStolenGoodsIssueBehavior.GangLeaderNeedsToOffloadStolenGoodsIssueQuest;
 
+[Collection(ModInformationRoleCollection.Name)]
 public class GangLeaderNeedsToOffloadStolenGoodsGateBypassTests : IDisposable
 {
     private static readonly FieldInfo QuestGiverField = AccessTools.Field(typeof(QuestBase), "_questGiver");

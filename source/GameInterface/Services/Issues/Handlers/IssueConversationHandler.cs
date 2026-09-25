@@ -1,4 +1,4 @@
-using Common;
+﻿using Common;
 using Common.Logging;
 using Common.Messaging;
 using Common.Network;
@@ -107,7 +107,9 @@ internal class IssueConversationHandler : IHandler
         GameThread.RunSafe(() =>
         {
             if (!ContainerProvider.TryResolve<IControllerIdProvider>(out var controllerIdProvider)) return;
+            if (!objectManager.TryGetObjectWithLogging<Hero>(data.IssueGiverId, out var issueGiver)) return;
 
+            generationRegistry.SetGeneration(issueGiver, data.Generation);
             conversationTracker.Register(data.IssueGiverId, controllerIdProvider.ControllerId, data.Generation);
         });
     }

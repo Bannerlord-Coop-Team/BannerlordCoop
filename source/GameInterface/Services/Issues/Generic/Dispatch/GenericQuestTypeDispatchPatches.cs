@@ -1,12 +1,14 @@
-using Common;
+﻿using Common;
 using Common.Messaging;
 using GameInterface.Policies;
 using GameInterface.Services.Entity;
 using GameInterface.Services.Issues.Interfaces;
 using GameInterface.Services.Issues.Messages;
+using GameInterface.Services.Party.Patches;
 using HarmonyLib;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Issues;
+using TaleWorlds.CampaignSystem.Roster;
 
 namespace GameInterface.Services.Issues.Generic.Dispatch;
 
@@ -67,8 +69,26 @@ internal class GenericQuestTypeAlternativeAcceptTriggerPatch
 {
     [HarmonyPriority(Priority.First)]
     [HarmonyPatch(nameof(IssueBase.StartIssueWithAlternativeSolution))]
+    [HarmonyPrefix]
+    private static bool Prefix(IssueBase __instance, out TroopRoster __state)
+    {
+        if (!ModInformation.IsClient || QuestTypeRegistry.Get(__instance)?.SupportsAlternativeAccept != true ||
+            AlternativeSolutionStartAuthorityGuard.IsActive ||
+            CallOriginalPolicy.IsOriginalAllowed() || IssueDispatchReplayGuard.IsActive)
+        {
+            __state = null;
+            return true;
+        }
+
+        __state = TroopRoster.CreateDummyTroopRoster();
+        __state.Add(__instance.AlternativeSolutionSentTroops);
+        return __instance.IsOngoingWithoutQuest;
+    }
+
+    [HarmonyPriority(Priority.First)]
+    [HarmonyPatch(nameof(IssueBase.StartIssueWithAlternativeSolution))]
     [HarmonyPostfix]
-    private static void Postfix(IssueBase __instance)
+    private static void Postfix(IssueBase __instance, TroopRoster __state)
     {
         if (CallOriginalPolicy.IsOriginalAllowed() || IssueDispatchReplayGuard.IsActive) return;
         if (AlternativeSolutionStartAuthorityGuard.IsActive) return;
@@ -77,8 +97,12 @@ internal class GenericQuestTypeAlternativeAcceptTriggerPatch
         if (descriptor?.SupportsAlternativeAccept != true) return;
 
         ContainerProvider.TryResolve<IControllerIdProvider>(out var controllerIdProvider);
-        descriptor.OnGenuineAlternativeAccept?.Invoke(__instance.IssueOwner, controllerIdProvider?.ControllerId);
-        MessageBroker.Instance.Publish(__instance, new QuestTypeAlternativeAcceptTriggered(__instance.IssueOwner, controllerIdProvider?.ControllerId));
+        if (!ContainerProvider.TryResolve<IIssueOwnershipRegistry>(out var ownershipRegistry) ||
+            !ownershipRegistry.TryGetOwnerControllerId(__instance.IssueOwner, out _))
+            descriptor.OnGenuineAlternativeAccept?.Invoke(__instance.IssueOwner, controllerIdProvider?.ControllerId);
+        MessageBroker.Instance.Publish(__instance, new QuestTypeAlternativeAcceptTriggered(
+            __instance.IssueOwner, controllerIdProvider?.ControllerId, __state,
+            PartyScreenLogicPatches.CurrentQuestScreen));
     }
 }
 
