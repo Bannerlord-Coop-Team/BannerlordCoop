@@ -21,7 +21,13 @@ def record(event):
         output.write(json.dumps([event, args]) + '\\n')
 record('start')
 if args[0] == 'run':
-    time.sleep(.05)
+    deadline = time.monotonic() + 3
+    while time.monotonic() < deadline:
+        with open(os.environ['DOCKER_EVENTS']) as events:
+            starts = sum(json.loads(line)[0] == 'start' and json.loads(line)[1][0] == 'run' for line in events)
+        if starts == int(os.environ.get('E2E_SHARDS', '4')):
+            break
+        time.sleep(.01)
 record('end')
 sys.exit(1 if args[0] == 'run' and args[args.index('--name') + 1].endswith('-' + os.environ.get('FAILED_SHARD', 'none')) else 0)
 """)
@@ -40,23 +46,20 @@ sys.exit(1 if args[0] == 'run' and args[args.index('--name') + 1].endswith('-' +
             events = root / "events"
             return result, [json.loads(line) for line in events.read_text().splitlines()] if events.exists() else []
 
-    def test_default_shards_run_sequentially(self):
+    def test_default_four_shards_start_before_any_finishes(self):
         result, events = self.run_launcher()
         self.assertEqual(0, result.returncode, result.stderr)
         runs = [(event, args) for event, args in events if args[0] == "run"]
-        self.assertEqual(["start", "end"] * 4, [event for event, _ in runs])
-        for index, (_, args) in enumerate(runs[::2]):
-            self.assertIn(f"run-e2e-shard.sh {index} 4", args[-1])
-        build = next(args[-1] for event, args in events
-                     if event == "start" and args[0] == "exec" and "dotnet build" in args[-1])
-        self.assertIn("-m:1 -nodeReuse:false -p:UseSharedCompilation=false", build)
+        self.assertEqual(["start"] * 4 + ["end"] * 4, [event for event, _ in runs])
+        for index in range(4):
+            self.assertTrue(any(f"run-e2e-shard.sh {index} 4" in args[-1] for _, args in runs))
 
     def test_override_and_failure_still_run_remaining_shards_and_cleanup(self):
         result, events = self.run_launcher("2", "0")
         self.assertEqual(1, result.returncode)
         runs = [args for event, args in events if event == "start" and args[0] == "run"]
         self.assertEqual(2, len(runs))
-        self.assertIn("run-e2e-shard.sh 1 2", runs[-1][-1])
+        self.assertTrue(any("run-e2e-shard.sh 1 2" in args[-1] for args in runs))
         self.assertTrue(any(args[:2] == ["image", "rm"] for _, args in events))
 
     def test_invalid_shard_count_starts_no_containers(self):
