@@ -68,7 +68,7 @@ public sealed class ChatService : IChatService, IDisposable
             () => controllerIdProvider.ControllerId,
             killFeedColorService.GetColor);
         var showChat = ChatOptionsTabProvider.GetShowChatOrDefault(optionsStore.LoadOrDefault());
-        overlay = new ChatOverlay(viewModel, RequestParticipants, showChat);
+        overlay = new ChatOverlay(viewModel, RequestParticipants, showChat, vanillaLogGate);
         messageBroker.Subscribe<ChatVisibilitySelected>(HandleChatVisibilitySelected);
     }
 

@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using SandBox.View.Map;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.GameState;
@@ -28,6 +28,7 @@ internal sealed class ChatOverlay : GlobalLayer, IDisposable
 
     private readonly ChatVM dataSource;
     private readonly Action refreshParticipants;
+    private readonly IChatVanillaLogGate vanillaLogGate;
     private GauntletLayer gauntletLayer;
     private GauntletMovieIdentifier movie;
     private EditableTextWidget inputWidget;
@@ -49,13 +50,19 @@ internal sealed class ChatOverlay : GlobalLayer, IDisposable
     private SizePolicy feedInnerWidthPolicy;
     private SizePolicy feedInnerHeightPolicy;
 
-    public ChatOverlay(ChatVM dataSource, Action refreshParticipants, bool playerChatEnabled)
+    public ChatOverlay(
+        ChatVM dataSource,
+        Action refreshParticipants,
+        bool playerChatEnabled,
+        IChatVanillaLogGate vanillaLogGate)
     {
         if (dataSource == null) throw new ArgumentNullException(nameof(dataSource));
         if (refreshParticipants == null) throw new ArgumentNullException(nameof(refreshParticipants));
+        if (vanillaLogGate == null) throw new ArgumentNullException(nameof(vanillaLogGate));
 
         this.dataSource = dataSource;
         this.refreshParticipants = refreshParticipants;
+        this.vanillaLogGate = vanillaLogGate;
         this.playerChatEnabled = playerChatEnabled;
         dataSource.SetPlayerChatEnabled(playerChatEnabled);
         dataSource.FeedScrolledToBottomRequested += OnFeedScrolledToBottomRequested;
@@ -82,11 +89,12 @@ internal sealed class ChatOverlay : GlobalLayer, IDisposable
 
         if (!dataSource.IsOpen)
         {
-            pinFeedToBottom = false;
-            pinFeedLastMaxValue = -1f;
             SetResizeCaptureVisible(false);
             isResizing = false;
             applyResizeToPanel = false;
+            // Keep pinning while closed so new lines stay in view
+            if (pinFeedToBottom)
+                ContinuePinFeedToBottom();
             if (playerChatEnabled && ShouldOpenInput(
                     Input.IsKeyPressed(InputKey.Enter),
                     Input.IsKeyPressed(InputKey.NumpadEnter),
@@ -103,6 +111,9 @@ internal sealed class ChatOverlay : GlobalLayer, IDisposable
             ContinuePinFeedToBottom();
 
         if (isResizing || applyResizeToPanel) return;
+
+        if (isInputFocused && !dataSource.IsChatInputEnabled)
+            ReleaseInputFocus();
 
         if (ShouldCaptureCloseInput(
                 isInputFocused,
@@ -230,10 +241,15 @@ internal sealed class ChatOverlay : GlobalLayer, IDisposable
             ReferenceEquals(focusedLayer, gameplayLayer),
             ReferenceEquals(focusedLayer, gauntletLayer));
 
-        if (gauntletLayer.IsActive == shouldShow) return shouldShow;
+        if (gauntletLayer.IsActive == shouldShow)
+        {
+            vanillaLogGate.SetReplacementVisible(shouldShow);
+            return shouldShow;
+        }
 
         if (!shouldShow) CloseInput();
         ScreenManager.SetSuspendLayer(gauntletLayer, !shouldShow);
+        vanillaLogGate.SetReplacementVisible(shouldShow);
         return shouldShow;
     }
 
@@ -387,7 +403,7 @@ internal sealed class ChatOverlay : GlobalLayer, IDisposable
 
     private void FocusInput()
     {
-        if (inputWidget == null) return;
+        if (inputWidget == null || !dataSource.IsChatInputEnabled) return;
 
         gauntletLayer.InputRestrictions.SetInputRestrictions();
         gauntletLayer.IsFocusLayer = true;
@@ -395,7 +411,7 @@ internal sealed class ChatOverlay : GlobalLayer, IDisposable
         if (!ReferenceEquals(ScreenManager.FocusedLayer, gauntletLayer))
         {
             gauntletLayer.IsFocusLayer = false;
-            SetPassiveInputRestrictions(gauntletLayer.InputRestrictions);
+            SetOpenPanelInputRestrictions(gauntletLayer.InputRestrictions);
             return;
         }
 
