@@ -46,7 +46,7 @@ jobs:
       # Missions-dependent MissionTests) that require Windows.
       - name: Build Solution
         working-directory: source
-        run: dotnet build CoopTests.slnf -c Release
+        run: dotnet build CoopTests.slnf -c Release -m:1 -nodeReuse:false -p:UseSharedCompilation=false
 
       - name: Upload Build Output
         uses: actions/upload-artifact@v7
@@ -91,11 +91,11 @@ jobs:
       # the binaries under bin/ come from the build job's artifact, so nothing is recompiled.
       - name: Restore Test Assets
         working-directory: source
-        run: dotnet restore CoopTests.slnf
+        run: dotnet restore CoopTests.slnf -m:1 -nodeReuse:false
 
       - name: Run Unit Tests
         working-directory: source
-        run: dotnet test CoopUnitTests.slnf -c Release --no-build --no-restore --consoleLoggerParameters:ErrorsOnly
+        run: dotnet test CoopUnitTests.slnf -c Release --no-build --no-restore --consoleLoggerParameters:ErrorsOnly -m:1 -nodeReuse:false
 
   verification-harness:
     name: Verification plan and local harness profiles
@@ -166,7 +166,7 @@ jobs:
 
       - name: Restore Test Assets
         working-directory: source
-        run: dotnet restore CoopTests.slnf
+        run: dotnet restore CoopTests.slnf -m:1 -nodeReuse:false
 
       - name: Run E2E Test Shard
         working-directory: source

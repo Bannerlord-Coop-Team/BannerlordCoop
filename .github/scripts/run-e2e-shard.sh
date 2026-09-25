@@ -6,6 +6,9 @@ shard_index=${1:?missing shard index}
 shard_count=${2:?missing shard count}
 dotnet_cmd=${DOTNET:-dotnet}
 
+# Collect more aggressively without capping the live heap required by the fixtures.
+export DOTNET_GCConserveMemory=${DOTNET_GCConserveMemory:-7}
+
 case "$shard_index" in
     ''|*[!0-9]*)
         echo "shard index must be a non-negative integer: $shard_index" >&2

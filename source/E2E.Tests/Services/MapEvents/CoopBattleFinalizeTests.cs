@@ -1013,6 +1013,7 @@ public class CoopBattleFinalizeTests : MapEventTestBase
         public void Dispose()
         {
             harmony.Unpatch(ExitToLastMethod, HarmonyPatchType.Prefix, harmony.Id);
+            exitToLastContainers.Clear();
         }
     }
 
@@ -1047,6 +1048,7 @@ public class CoopBattleFinalizeTests : MapEventTestBase
         {
             harmony.Unpatch(ActivateGameMenuMethod, HarmonyPatchType.Prefix, harmony.Id);
             harmony.Unpatch(SwitchToMenuMethod, HarmonyPatchType.Prefix, harmony.Id);
+            MenuCalls.Clear();
         }
 
         private static bool RecordMenu(string menuId)

@@ -4,7 +4,7 @@ set -euo pipefail
 
 repo_root=$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)
 docker_image=${E2E_IMAGE:-garrettluskey/bannerlordcoop:latest}
-shard_count=${E2E_SHARDS:-8}
+shard_count=${E2E_SHARDS:-4}
 run_id="bannerlordcoop-e2e-$(date +%s)-$$"
 seed_container="${run_id}-seed"
 local_image="${run_id}:workspace"
@@ -48,24 +48,20 @@ docker cp "$repo_root/.github/scripts/run-e2e-shard.sh" "$seed_container:/worksp
 docker exec "$seed_container" /bin/sh -eu -c '
     find /workspace/source -type d \( -name bin -o -name obj \) -prune -exec rm -rf {} +
     ln -s /home/mb2 /workspace/mb2
-    dotnet build /workspace/source/CoopTests.slnf -c Release
+    dotnet build /workspace/source/CoopTests.slnf -c Release -m:1 -nodeReuse:false -p:UseSharedCompilation=false
 '
 docker commit "$seed_container" "$local_image" >/dev/null
 docker rm --force "$seed_container" >/dev/null
 
 echo "running $shard_count Docker E2E shards"
+failed=0
+# Each shard keeps its own workspace, but only one testhost runs at a time.
 for ((shard_index = 0; shard_index < shard_count; shard_index++)); do
     container_name="${run_id}-${shard_index}"
     container_names+=("$container_name")
-    docker run --rm --name "$container_name" "$local_image" /bin/sh -eu -c \
+    if ! docker run --rm --name "$container_name" "$local_image" /bin/sh -eu -c \
         "cd /workspace/source && sh /workspace/run-e2e-shard.sh $shard_index $shard_count" \
-        >"$status_dir/$shard_index.log" 2>&1 &
-    echo "$!" > "$status_dir/$shard_index.pid"
-done
-
-failed=0
-for ((shard_index = 0; shard_index < shard_count; shard_index++)); do
-    if ! wait "$(<"$status_dir/$shard_index.pid")"; then
+        >"$status_dir/$shard_index.log" 2>&1; then
         failed=1
     fi
     sed "s/^/[e2e $shard_index] /" "$status_dir/$shard_index.log"

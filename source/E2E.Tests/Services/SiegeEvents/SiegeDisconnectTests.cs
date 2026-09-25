@@ -819,6 +819,9 @@ public class SiegeDisconnectTests : MapEventTestBase
             harmony.Unpatch(ExitToLastMethod, HarmonyPatchType.Prefix, harmony.Id);
             harmony.Unpatch(SwitchToMenuMethod, HarmonyPatchType.Prefix, harmony.Id);
             harmony.Unpatch(PlayerSiegeDeactivatedMethod, HarmonyPatchType.Prefix, harmony.Id);
+            ExitContainers.Clear();
+            SwitchCalls.Clear();
+            DeactivationContainers.Clear();
         }
 
         private static bool CountExitToLast()

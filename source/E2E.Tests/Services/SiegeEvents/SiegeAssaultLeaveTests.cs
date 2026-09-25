@@ -708,8 +708,11 @@ public class SiegeAssaultLeaveTests : MapEventTestBase
                 .Select(call => call.MenuId)
                 .ToArray();
 
-        public void Dispose() =>
+        public void Dispose()
+        {
             harmony.Unpatch(ActivateGameMenuMethod, HarmonyPatchType.Prefix, harmony.Id);
+            ActivationCalls.Clear();
+        }
 
         private static bool RecordActivation(string menuId)
         {
@@ -744,8 +747,11 @@ public class SiegeAssaultLeaveTests : MapEventTestBase
                 .Select(call => call.MenuId)
                 .ToArray();
 
-        public void Dispose() =>
+        public void Dispose()
+        {
             harmony.Unpatch(SwitchToMenuMethod, HarmonyPatchType.Prefix, harmony.Id);
+            SwitchCalls.Clear();
+        }
 
         private static bool RecordSwitchToMenu(string menuId)
         {

@@ -3882,8 +3882,11 @@ public class VillageHostileActionTests : MapEventTestBase
 
         public void Clear() => SwitchCalls.Clear();
 
-        public void Dispose() =>
+        public void Dispose()
+        {
             harmony.Unpatch(SwitchToMenuMethod, HarmonyPatchType.Prefix, harmony.Id);
+            SwitchCalls.Clear();
+        }
 
         private static bool RecordSwitchToMenu(string menuId)
         {

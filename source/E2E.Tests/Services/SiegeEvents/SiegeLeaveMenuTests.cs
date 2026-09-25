@@ -901,6 +901,7 @@ public class SiegeLeaveMenuTests : IDisposable
         public void Dispose()
         {
             harmony.Unpatch(ExitToLastMethod, HarmonyPatchType.Prefix, harmony.Id);
+            ExitContainers.Clear();
         }
 
         private static bool CountExitToLast()
@@ -933,6 +934,7 @@ public class SiegeLeaveMenuTests : IDisposable
         public void Dispose()
         {
             harmony.Unpatch(FinishMethod, HarmonyPatchType.Prefix, harmony.Id);
+            FinishContainers.Clear();
         }
 
         private static bool CountFinish()
