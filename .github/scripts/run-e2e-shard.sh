@@ -8,6 +8,7 @@ dotnet_cmd=${DOTNET:-dotnet}
 
 # Collect more aggressively without capping the live heap required by the fixtures.
 export DOTNET_GCConserveMemory=${DOTNET_GCConserveMemory:-7}
+export COOP_DISABLE_SEQ=${COOP_DISABLE_SEQ:-1}
 
 case "$shard_index" in
     ''|*[!0-9]*)
