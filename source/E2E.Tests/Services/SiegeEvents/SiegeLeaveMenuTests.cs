@@ -4,6 +4,7 @@ using Coop.Core.Client.Services.SiegeEvents.Messages;
 using Coop.Core.Server.Services.SiegeEvents.Messages;
 using E2E.Tests.Environment;
 using E2E.Tests.Environment.Instance;
+using E2E.Tests.Util;
 using GameInterface.Services.Armies.Patches;
 using GameInterface.Services.MapEvents.Messages.Leave;
 using GameInterface.Services.SiegeEvents.Patches;
@@ -267,7 +268,7 @@ public class SiegeLeaveMenuTests : IDisposable
             .Where(method => method.DeclaringType != typeof(GameMenu) ||
                 method.Name != nameof(GameMenu.ExitToLast))
             .ToList();
-        using var menuExit = new GameMenuExitToLastCounter();
+        using var menuExit = new MethodCallRecorder(AccessTools.Method(typeof(GameMenu), nameof(GameMenu.ExitToLast)));
         leavingClient.Call(InvokePatchedEncounterLeave, disabledMethods);
 
         var approval = Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkBreakSiegeApproved>());
@@ -289,7 +290,7 @@ public class SiegeLeaveMenuTests : IDisposable
             .Where(method => method.DeclaringType != typeof(GameMenu) ||
                 method.Name != nameof(GameMenu.ExitToLast))
             .ToList();
-        using var menuExit = new GameMenuExitToLastCounter();
+        using var menuExit = new MethodCallRecorder(AccessTools.Method(typeof(GameMenu), nameof(GameMenu.ExitToLast)));
         leavingClient.Call(InvokePatchedPassiveArmySiegeLeave, disabledMethods);
 
         var request = Assert.Single(leavingClient.NetworkSentMessages.GetMessages<NetworkRequestBreakSiege>());
@@ -317,7 +318,8 @@ public class SiegeLeaveMenuTests : IDisposable
                 nameof(ArmyPatches.RemoveMobilePartyInArmy)))
             .ToList();
 
-        using var encounterFinish = new PlayerEncounterFinishCounter();
+        using var encounterFinish = new MethodCallRecorder(
+            AccessTools.Method(typeof(PlayerEncounter), nameof(PlayerEncounter.Finish)));
         leavingClient.Call(() =>
         {
             Assert.True(leavingClient.ObjectManager.TryGetObject<MobileParty>(partyId, out var party));
@@ -879,69 +881,4 @@ public class SiegeLeaveMenuTests : IDisposable
         });
     }
 
-    private sealed class GameMenuExitToLastCounter : IDisposable
-    {
-        private static readonly MethodInfo ExitToLastMethod =
-            AccessTools.Method(typeof(GameMenu), nameof(GameMenu.ExitToLast));
-        private static readonly List<object> ExitContainers = new();
-
-        private readonly Harmony harmony = new($"siege-leave-menu-counter-{Guid.NewGuid()}");
-
-        public GameMenuExitToLastCounter()
-        {
-            ExitContainers.Clear();
-            harmony.Patch(
-                ExitToLastMethod,
-                prefix: new HarmonyMethod(typeof(GameMenuExitToLastCounter), nameof(CountExitToLast)));
-        }
-
-        public int CountFor(EnvironmentInstance instance) =>
-            ExitContainers.Count(container => ReferenceEquals(container, instance.Container));
-
-        public void Dispose()
-        {
-            harmony.Unpatch(ExitToLastMethod, HarmonyPatchType.Prefix, harmony.Id);
-            ExitContainers.Clear();
-        }
-
-        private static bool CountExitToLast()
-        {
-            if (GameInterface.ContainerProvider.TryGetContainer(out var container))
-                ExitContainers.Add(container);
-            return false;
-        }
-    }
-
-    private sealed class PlayerEncounterFinishCounter : IDisposable
-    {
-        private static readonly MethodInfo FinishMethod =
-            AccessTools.Method(typeof(PlayerEncounter), nameof(PlayerEncounter.Finish));
-        private static readonly List<object> FinishContainers = new();
-
-        private readonly Harmony harmony = new($"siege-leave-encounter-counter-{Guid.NewGuid()}");
-
-        public PlayerEncounterFinishCounter()
-        {
-            FinishContainers.Clear();
-            harmony.Patch(
-                FinishMethod,
-                prefix: new HarmonyMethod(typeof(PlayerEncounterFinishCounter), nameof(CountFinish)));
-        }
-
-        public int CountFor(EnvironmentInstance instance) =>
-            FinishContainers.Count(container => ReferenceEquals(container, instance.Container));
-
-        public void Dispose()
-        {
-            harmony.Unpatch(FinishMethod, HarmonyPatchType.Prefix, harmony.Id);
-            FinishContainers.Clear();
-        }
-
-        private static bool CountFinish()
-        {
-            if (GameInterface.ContainerProvider.TryGetContainer(out var container))
-                FinishContainers.Add(container);
-            return false;
-        }
-    }
 }
