@@ -9,9 +9,12 @@ public readonly struct PlayerLeaveBattleAttempted : IEvent
     public readonly PartyBase LeavingParty;
     public readonly bool FinishLocalMenus;
 
-    public PlayerLeaveBattleAttempted(PartyBase leavingParty, bool finishLocalMenus = true)
+    public readonly bool BreakSiege;
+
+    public PlayerLeaveBattleAttempted(PartyBase leavingParty, bool finishLocalMenus = true, bool breakSiege = false)
     {
         LeavingParty = leavingParty;
         FinishLocalMenus = finishLocalMenus;
+        BreakSiege = breakSiege;
     }
 }

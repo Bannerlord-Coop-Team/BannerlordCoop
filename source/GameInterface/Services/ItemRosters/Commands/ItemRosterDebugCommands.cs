@@ -137,8 +137,9 @@ namespace GameInterface.Services.ItemRosters.Commands
                     return Failed(string.Format("ID: '{0}' not found", args[0]));
                 }
 
-                return Succeeded(string.Format("ItemRoster info for '{0}':\n  Items: {1}\n  Count: {2}\n  SHA1: {3:X}\n",
-                    owner, roster.Count, roster.Sum((i) => { return i.Amount; }), ItemRosterHash(roster)));
+                return Succeeded(string.Format("ItemRoster info for '{0}':\n  Items: {1}\n  Count: {2}\n  SHA1: {3:X}\n  Food: {4}\n",
+                    owner, roster.Count, roster.Sum((i) => { return i.Amount; }), ItemRosterHash(roster),
+                    roster.TotalFood));
             }
         }
 

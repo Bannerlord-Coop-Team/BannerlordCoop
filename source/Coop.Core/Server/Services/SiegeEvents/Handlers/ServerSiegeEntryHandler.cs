@@ -502,7 +502,7 @@ internal class ServerSiegeEntryHandler : IHandler
             {
                 messageBroker.Publish(
                     party,
-                    new PlayerLeaveBattleAttempted(party.Party, obj.FinishLocalMenus));
+                    new PlayerLeaveBattleAttempted(party.Party, obj.FinishLocalMenus, breakSiege: true));
                 network.Send(peer, new NetworkBreakSiegeApproved(
                     SiegeBreakOutcome.Applied,
                     obj.FinishLocalMenus,

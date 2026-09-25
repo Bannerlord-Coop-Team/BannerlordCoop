@@ -367,6 +367,20 @@ public class MapEventLifetimeTests : MapEventTestBase
             Assert.Same(replacement.Party, mapEvent.DefenderSide.LeaderParty);
         }, disabledMethods);
 
+        foreach (var instance in Clients.Prepend(Server))
+        {
+            instance.Call(() =>
+            {
+                Assert.True(instance.ObjectManager.TryGetObject<MapEvent>(mapEventId!, out var mapEvent));
+                Assert.True(instance.ObjectManager.TryGetObject<MobileParty>(besiegerMobilePartyId, out var besieger));
+                Assert.Null(besieger.Party.MapEventSide);
+                Assert.NotNull(besieger.BesiegerCamp);
+                Assert.Same(besieger.BesiegerCamp, mapEvent.MapEventSettlement.SiegeEvent.BesiegerCamp);
+                // This fixture seeds the camp leader directly on the server.
+                if (instance == Server) Assert.Same(besieger, besieger.BesiegerCamp.LeaderParty);
+            }, disabledMethods);
+        }
+
         client.Call(() => client.Resolve<INetwork>().SendAll(
             new NetworkRequestJoinBattle(
                 Guid.NewGuid().ToString(),

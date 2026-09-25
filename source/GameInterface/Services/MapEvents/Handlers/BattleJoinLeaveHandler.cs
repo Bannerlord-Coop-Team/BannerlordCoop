@@ -355,9 +355,9 @@ internal class BattleJoinLeaveHandler : IHandler
         if (!objectManager.TryGetIdWithLogging(payload.What.LeavingParty, out var partyId)) return;
 
         if (ModInformation.IsServer)
-            RemovePartyFromBattleAndBroadcast(partyId, payload.What.FinishLocalMenus, payload.Who as NetPeer);
+            RemovePartyFromBattleAndBroadcast(partyId, payload.What.FinishLocalMenus, payload.Who as NetPeer, payload.What.BreakSiege);
         else
-            network.SendAll(new NetworkRequestLeaveBattle(partyId, payload.What.FinishLocalMenus));
+            network.SendAll(new NetworkRequestLeaveBattle(partyId, payload.What.FinishLocalMenus, payload.What.BreakSiege));
     }
 
     /// <summary>[Server] A client asked to leave a battle without ending it.</summary>
@@ -368,7 +368,8 @@ internal class BattleJoinLeaveHandler : IHandler
         RemovePartyFromBattleAndBroadcast(
             payload.What.PartyId,
             payload.What.FinishLocalMenus,
-            payload.Who as NetPeer);
+            payload.Who as NetPeer,
+            payload.What.BreakSiege);
     }
 
     // Single-party removal does not auto-replicate (RemovePartyInternal uses RemoveAt, bypassing the
@@ -376,7 +377,8 @@ internal class BattleJoinLeaveHandler : IHandler
     private void RemovePartyFromBattleAndBroadcast(
         string partyId,
         bool finishLocalMenus = true,
-        NetPeer requestingPeer = null)
+        NetPeer requestingPeer = null,
+        bool breakSiege = false)
     {
         GameThread.RunSafe(
             () =>
@@ -384,7 +386,7 @@ internal class BattleJoinLeaveHandler : IHandler
                 if (!objectManager.TryGetObjectWithLogging<PartyBase>(partyId, out var party)) return;
 
                 var mapEvent = party.MapEvent;
-                bool leaveSiege = IsBesiegerInSiegeBattle(party);
+                bool leaveSiege = IsBesiegerInSiegeBattle(party, breakSiege);
                 ApplyAuthoritativeLeave(party);
                 // Preserve the client's PlayerSiege reference until its explicit cleanup runs.
                 network.SendAll(new NetworkPartyLeftBattle(
@@ -487,10 +489,10 @@ internal class BattleJoinLeaveHandler : IHandler
         return true;
     }
 
-    private static bool IsBesiegerInSiegeBattle(PartyBase party)
+    private static bool IsBesiegerInSiegeBattle(PartyBase party, bool breakSiege)
     {
         return (party.MapEvent?.IsSiegeAssault == true && party.Side == BattleSideEnum.Attacker) ||
-            (party.MapEvent?.IsSallyOut == true && party.Side == BattleSideEnum.Defender);
+            (breakSiege && party.MapEvent?.IsSallyOut == true && party.Side == BattleSideEnum.Defender);
     }
 
     // Apply the received removal under AllowedThread and close this client's encounter UI when appropriate.
