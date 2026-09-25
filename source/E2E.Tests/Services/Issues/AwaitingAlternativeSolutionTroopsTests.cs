@@ -698,7 +698,7 @@ public class AwaitingAlternativeSolutionTroopsTests : IDisposable
             Assert.True(Client.ObjectManager.TryGetObject<Hero>(fixture.HeroId, out var owner));
             Assert.True(Client.ObjectManager.TryGetId(owner, out var ownerId));
             Assert.True(Client.ObjectManager.TryGetObject<Hero>(fixture.CompanionHeroId, out var companion));
-            Assert.True(Client.ObjectManager.TryGetId(companion.CharacterObject, out var companionCharacterId));
+            Assert.True(Client.ObjectManager.TryGetHandle(companion.CharacterObject, out var companionCharacterId));
 
             var fabricatedPacked = new TroopRosterData(new[]
             {
