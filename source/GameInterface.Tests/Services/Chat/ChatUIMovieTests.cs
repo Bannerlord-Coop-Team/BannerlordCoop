@@ -1,4 +1,4 @@
-﻿using System.IO;
+using System.IO;
 using System.Runtime.CompilerServices;
 using System.Xml.Linq;
 using Xunit;
@@ -15,6 +15,7 @@ public class ChatUIMovieTests
         var input = FindById(document, "CoopChatMessageInput");
         Assert.Equal("@WrittenText", input.Attribute("Text")?.Value);
         Assert.Equal("@MaxMessageLength", input.Attribute("MaxLength")?.Value);
+        Assert.Equal("@IsChatInputEnabled", input.Attribute("IsEnabled")?.Value);
 
         var channelList = FindById(document, "ChatChannelList");
         Assert.Equal("{Channels}", channelList.Attribute("DataSource")?.Value);
@@ -38,10 +39,13 @@ public class ChatUIMovieTests
 
         var unreadBadge = FindById(document, "CoopChatUnreadBadge");
         Assert.Equal("@HasUnreadNotification", unreadBadge.Attribute("IsVisible")?.Value);
+        Assert.Equal("Bottom", unreadBadge.Attribute("VerticalAlignment")?.Value);
+        Assert.Equal("Right", unreadBadge.Attribute("HorizontalAlignment")?.Value);
         Assert.Contains(unreadBadge.Descendants("TextWidget"),
             element => element.Attribute("Text")?.Value == "@UnreadNotificationText");
 
         var chatPanel = FindById(document, "CoopChatRoot");
+        Assert.Equal("true", chatPanel.Attribute("DoNotAcceptEvents")?.Value);
         Assert.Equal("Left", chatPanel.Attribute("HorizontalAlignment")?.Value);
         Assert.Equal("Bottom", chatPanel.Attribute("VerticalAlignment")?.Value);
         Assert.Equal("27", chatPanel.Attribute("MarginLeft")?.Value);
@@ -77,6 +81,7 @@ public class ChatUIMovieTests
             @"..\ChatFeedScrollbarHolder\ChatFeedScrollbar",
             feedScroll.Attribute("VerticalScrollbar")?.Value);
         Assert.Equal("true", feedScroll.Attribute("ReverseInitialScrollBarAlignment")?.Value);
+        Assert.Equal("true", feedScroll.Attribute("DoNotAcceptEvents")?.Value);
     }
 
     private static XElement FindById(XDocument document, string id)

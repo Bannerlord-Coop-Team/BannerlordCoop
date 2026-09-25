@@ -137,10 +137,15 @@ internal sealed class ChatVM : ViewModel
 
             isOpen = value;
             OnPropertyChanged(nameof(IsOpen));
+            OnPropertyChanged(nameof(IsChatInputEnabled));
             RefreshForceVisible();
             UpdateVisibleLines();
         }
     }
+
+    /// <summary>False on Events (read-only) or when the panel is closed.</summary>
+    [DataSourceProperty]
+    public bool IsChatInputEnabled => isOpen && selectedChannel?.IsEvents != true;
 
     [DataSourceProperty]
     public float ChatBoxSizeX
@@ -398,6 +403,7 @@ internal sealed class ChatVM : ViewModel
         OnPropertyChanged(nameof(ActiveChannelText));
         OnPropertyChanged(nameof(IsMuteButtonVisible));
         OnPropertyChanged(nameof(MuteButtonText));
+        OnPropertyChanged(nameof(IsChatInputEnabled));
         UpdateVisibleLines();
     }
 

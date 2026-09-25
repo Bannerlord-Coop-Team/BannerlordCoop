@@ -10,8 +10,6 @@ internal static class GauntletChatLogViewCoopPatches
     [HarmonyPostfix]
     private static void InitializePostfix()
     {
-        if (!ChatVanillaLogGate.IsActive) return;
-
         ChatVanillaLogGate.SuspendIfPresent();
     }
 }

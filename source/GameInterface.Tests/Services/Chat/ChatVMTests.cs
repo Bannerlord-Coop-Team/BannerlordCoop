@@ -245,6 +245,23 @@ public class ChatVMTests
 
         Assert.Empty(sent);
         Assert.Equal("should not send", vm.WrittenText);
+        Assert.False(vm.IsChatInputEnabled);
+    }
+
+    [Fact]
+    public void IsChatInputEnabled_FalseOnEvents_TrueOnGlobalWhenOpen()
+    {
+        var vm = new ChatVM(_ => { }, () => "local");
+        Assert.False(vm.IsChatInputEnabled);
+
+        vm.SetOpen(true);
+        Assert.True(vm.IsChatInputEnabled);
+
+        vm.Channels.Single(channel => channel.IsEvents).ExecuteSelection();
+        Assert.False(vm.IsChatInputEnabled);
+
+        vm.Channels.Single(channel => channel.IsGlobal).ExecuteSelection();
+        Assert.True(vm.IsChatInputEnabled);
     }
 
     [Fact]
