@@ -68,5 +68,4 @@ public class BattleHeroDamageSyncTests : MissionTestEnvironment
             GC.KeepAlive(controller);
         });
     }
-
 }

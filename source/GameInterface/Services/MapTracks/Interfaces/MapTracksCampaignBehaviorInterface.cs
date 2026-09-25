@@ -651,5 +651,4 @@ public class MapTracksCampaignBehaviorInterface : IMapTracksCampaignBehaviorInte
 
         return MathF.Round(Campaign.Current.Models.MapTrackModel.MaxTrackLife * lifeRatio);
     }
-
 }
