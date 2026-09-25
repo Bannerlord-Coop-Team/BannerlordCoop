@@ -1,4 +1,4 @@
-using Common.Messaging;
+﻿using Common.Messaging;
 using Common.Network;
 using Common.Util;
 using E2E.Tests.Environment;
@@ -10,6 +10,7 @@ using GameInterface.Services.Issues.Messages;
 using GameInterface.Services.Issues.Patches;
 using GameInterface.Services.Players;
 using GameInterface.Services.Players.Data;
+using GameInterface.Services.TroopRosters.Data;
 using HarmonyLib;
 using System;
 using System.Collections.Generic;
@@ -697,15 +698,19 @@ public class AwaitingAlternativeSolutionTroopsTests : IDisposable
             Assert.True(Client.ObjectManager.TryGetObject<Hero>(fixture.HeroId, out var owner));
             Assert.True(Client.ObjectManager.TryGetId(owner, out var ownerId));
             Assert.True(Client.ObjectManager.TryGetObject<Hero>(fixture.CompanionHeroId, out var companion));
+            Assert.True(Client.ObjectManager.TryGetId(companion.CharacterObject, out var companionCharacterId));
 
-            var troopRosterInterface = Client.Resolve<GameInterface.Services.TroopRosters.Interfaces.ITroopRosterInterface>();
-            var fabricatedRoster = TroopRoster.CreateDummyTroopRoster();
-            fabricatedRoster.AddToCounts(companion.CharacterObject, 999999);
-            var fabricatedPacked = troopRosterInterface.PackTroopRosterData(fabricatedRoster);
+            var fabricatedPacked = new TroopRosterData(new[]
+            {
+                new TroopRosterElementData(companionCharacterId, 999999, 0, 0),
+            });
 
             var network = Client.Resolve<Common.Network.INetwork>();
             network.SendAll(new RequestAwaitingAlternativeSolutionTroopsDeposit(ownerId, fabricatedPacked));
         });
+
+        Assert.Empty(Server.NetworkSentMessages.OfType<NetworkAwaitingAlternativeSolutionTroopsDepositRejected>());
+        Assert.Single(Server.NetworkSentMessages.OfType<NetworkAwaitingAlternativeSolutionTroopsDepositConfirmed>());
 
         Server.Call(() =>
         {
