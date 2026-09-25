@@ -1,5 +1,6 @@
 ﻿using Common;
 using Common.Messaging;
+using GameInterface.Services.Kingdoms.Interfaces;
 using GameInterface.Services.MapTracks.Data;
 using GameInterface.Services.MapTracks.Messages;
 using GameInterface.Services.MobileParties.Extensions;
@@ -118,15 +119,18 @@ public class MapTracksCampaignBehaviorInterface : IMapTracksCampaignBehaviorInte
     private readonly IObjectManager objectManager;
     private readonly IMessageBroker messageBroker;
     private readonly IPlayerManager playerManager;
+    private readonly IFactionInterface factionInterface;
 
     public MapTracksCampaignBehaviorInterface(
         IObjectManager objectManager,
         IMessageBroker messageBroker,
-        IPlayerManager playerManager)
+        IPlayerManager playerManager,
+        IFactionInterface factionInterface)
     {
         this.objectManager = objectManager;
         this.messageBroker = messageBroker;
         this.playerManager = playerManager;
+        this.factionInterface = factionInterface;
     }
 
     public void PublishUpdateClientsMapTrackData(Dictionary<string, List<MapTrackData>> visibleTrackChanges, bool isRemovingTracks)
@@ -519,7 +523,7 @@ public class MapTracksCampaignBehaviorInterface : IMapTracksCampaignBehaviorInte
     private bool IsTrackHostileToMainParty(string mapFactionId)
     {
         if (Hero.MainHero?.MapFaction == null) return false;
-        if (!TryResolveFaction(mapFactionId, out var trackMapFaction)) return false;
+        if (!factionInterface.TryGetFaction(mapFactionId, out var trackMapFaction)) return false;
 
         return FactionManager.IsAtWarAgainstFaction(Hero.MainHero.MapFaction, trackMapFaction);
     }
@@ -648,24 +652,4 @@ public class MapTracksCampaignBehaviorInterface : IMapTracksCampaignBehaviorInte
         return MathF.Round(Campaign.Current.Models.MapTrackModel.MaxTrackLife * lifeRatio);
     }
 
-    private bool TryResolveFaction(string mapFactionId, out IFaction faction)
-    {
-        faction = null;
-
-        if (string.IsNullOrEmpty(mapFactionId)) return false;
-
-        if (objectManager.TryGetObject<Kingdom>(mapFactionId, out var kingdom))
-        {
-            faction = kingdom;
-            return true;
-        }
-
-        if (objectManager.TryGetObject<Clan>(mapFactionId, out var clan))
-        {
-            faction = clan;
-            return true;
-        }
-
-        return false;
-    }
 }

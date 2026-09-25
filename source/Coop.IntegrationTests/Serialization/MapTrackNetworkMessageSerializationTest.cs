@@ -143,7 +143,7 @@ namespace Coop.IntegrationTests.Serialization
             var copy = RoundTrip(new NetworkUpdateClientInitialVisibleTracks(new List<MapTrackData>()));
             Assert.Null(copy.VisibleTrackChanges);
 
-            var tracks = new MapTracksCampaignBehaviorInterface(null, null, null);
+            var tracks = new MapTracksCampaignBehaviorInterface(null, null, null, null);
             tracks.ApplyVisibleTrackChanges(null, copy.VisibleTrackChanges, false);
         }
 
