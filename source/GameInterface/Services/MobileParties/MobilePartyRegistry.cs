@@ -139,13 +139,13 @@ internal class MobilePartyRegistry : AutoRegistryBase<MobileParty>
 
             messageBroker.Publish(this, new MobilePartyDestroyed(obj));
 
-            objectManager.TryGetIdWithLogging(obj.ItemRoster, out var itemRosterId);
-            objectManager.TryGetIdWithLogging(obj.MemberRoster, out var memberRosterId);
-            objectManager.TryGetIdWithLogging(obj.PrisonRoster, out var prisonerRosterId);
+            objectManager.TryGetHandleWithLogging(obj.ItemRoster, out var itemRosterId);
+            objectManager.TryGetHandleWithLogging(obj.MemberRoster, out var memberRosterId);
+            objectManager.TryGetHandleWithLogging(obj.PrisonRoster, out var prisonerRosterId);
 
-            coalescer?.DropInstance(Compact(itemRosterId, typeof(ItemRoster)));
-            coalescer?.DropInstance(Compact(memberRosterId, typeof(TroopRoster)));
-            coalescer?.DropInstance(Compact(prisonerRosterId, typeof(TroopRoster)));
+            coalescer?.DropInstance(itemRosterId);
+            coalescer?.DropInstance(memberRosterId);
+            coalescer?.DropInstance(prisonerRosterId);
 
             // These attachments have no destroy hooks, so their lifetime ends with their party.
             messageBroker.Publish(this, new InstanceDestroyed<ItemRoster>(obj.ItemRoster));
@@ -159,8 +159,8 @@ internal class MobilePartyRegistry : AutoRegistryBase<MobileParty>
             // queued before or during teardown so no behavior update can follow that destroy.
             // AutoSync keys use full registry ids; behavior packets use compact wire ids.
             coalescer?.DropInstance(id);
-            coalescer?.DropInstance(
-                Compact(id, typeof(MobileParty)));
+            if (objectManager.TryGetHandle(obj, out var handle))
+                coalescer?.DropInstance(handle);
         }
     }
 }

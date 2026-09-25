@@ -1644,10 +1644,10 @@ public class PlayerPartyInteractionFlowTests : MapEventTestBase
             {
                 new ItemRosterElementData(new ItemObjectData(initiatorItemId, null, itemModifierNull: true), 2)
             },
-            new[] { new TroopRosterElementData(initiatorTroopId, 4, 0, 0) },
+            new[] { new TroopRosterElementData(client1.GetHandle<CharacterObject>(initiatorTroopId), 4, 0, 0) },
             offeredGold: 25,
             offeredFiefs: new[] { initiatorSettlementId },
-            offeredPrisoners: new[] { new TroopRosterElementData(initiatorPrisonerCharacterId, 1, 0, 0) })));
+            offeredPrisoners: new[] { new TroopRosterElementData(client1.GetHandle<CharacterObject>(initiatorPrisonerCharacterId), 1, 0, 0) })));
         client2.Call(() => client2.Resolve<INetwork>().SendAll(new NetworkPlayerPartyTradeOfferUpdated(
             sessionId,
             responderPartyId,
@@ -1655,10 +1655,10 @@ public class PlayerPartyInteractionFlowTests : MapEventTestBase
             {
                 new ItemRosterElementData(new ItemObjectData(responderItemId, null, itemModifierNull: true), 3)
             },
-            new[] { new TroopRosterElementData(responderTroopId, 5, 0, 0) },
+            new[] { new TroopRosterElementData(client2.GetHandle<CharacterObject>(responderTroopId), 5, 0, 0) },
             offeredGold: 10,
             offeredFiefs: new[] { responderSettlementId },
-            offeredPrisoners: new[] { new TroopRosterElementData(responderPrisonerCharacterId, 1, 0, 0) })));
+            offeredPrisoners: new[] { new TroopRosterElementData(client2.GetHandle<CharacterObject>(responderPrisonerCharacterId), 1, 0, 0) })));
 
         Server.NetworkSentMessages.Clear();
         client1.Call(() => client1.Resolve<INetwork>().SendAll(new NetworkPlayerPartyTradeAcceptChanged(sessionId, accepted: true)));
@@ -1879,10 +1879,10 @@ public class PlayerPartyInteractionFlowTests : MapEventTestBase
             {
                 new ItemRosterElementData(new ItemObjectData("item-1", null, itemModifierNull: true), 2)
             },
-            new[] { new TroopRosterElementData("troop-1", 3, 0, 7) },
+            new[] { new TroopRosterElementData(1, 3, 0, 7) },
             offeredGold: 25,
             offeredFiefs: new[] { "fief-1" },
-            offeredPrisoners: new[] { new TroopRosterElementData("prisoner-1", 1, 0, 0) })));
+            offeredPrisoners: new[] { new TroopRosterElementData(2, 1, 0, 0) })));
 
         var relayedOffer = Server.NetworkSentMessages.GetMessages<NetworkPlayerPartyTradeOfferUpdated>().Single();
         Assert.Equal(sessionId, relayedOffer.SessionId);
@@ -1890,13 +1890,13 @@ public class PlayerPartyInteractionFlowTests : MapEventTestBase
         Assert.Single(relayedOffer.OfferedItems);
         Assert.Equal(2, relayedOffer.OfferedItems[0].Amount);
         Assert.Single(relayedOffer.OfferedTroops);
-        Assert.Equal("troop-1", relayedOffer.OfferedTroops[0].CharacterId);
+        Assert.Equal(1u, relayedOffer.OfferedTroops[0].CharacterId);
         Assert.Equal(3, relayedOffer.OfferedTroops[0].Number);
         Assert.Equal(25, relayedOffer.OfferedGold);
         Assert.Single(relayedOffer.OfferedFiefs);
         Assert.Equal("fief-1", relayedOffer.OfferedFiefs[0]);
         Assert.Single(relayedOffer.OfferedPrisoners);
-        Assert.Equal("prisoner-1", relayedOffer.OfferedPrisoners[0].CharacterId);
+        Assert.Equal(2u, relayedOffer.OfferedPrisoners[0].CharacterId);
 
         var states = Server.NetworkSentMessages.GetMessages<NetworkPlayerPartyInteractionState>().ToArray();
         Assert.Contains(states, s =>
@@ -1959,7 +1959,7 @@ public class PlayerPartyInteractionFlowTests : MapEventTestBase
             sessionId,
             initiatorPartyId,
             Array.Empty<ItemRosterElementData>(),
-            new[] { new TroopRosterElementData(initiatorTroopId, 4, 0, 0) })));
+            new[] { new TroopRosterElementData(client1.GetHandle<CharacterObject>(initiatorTroopId), 4, 0, 0) })));
 
         client2.Call(() =>
         {
@@ -2998,10 +2998,10 @@ public class PlayerPartyInteractionFlowTests : MapEventTestBase
         var settlementEntry = Assert.Single(
             Server.NetworkSentMessages.GetMessages<NetworkPartyEnterSettlement>());
         Assert.Equal(
-            ObjectManager.Compact(playerMobilePartyId, typeof(MobileParty)),
+            Server.GetHandle<MobileParty>(playerMobilePartyId),
             settlementEntry.PartyId);
         Assert.Equal(
-            ObjectManager.Compact(siege.SettlementId, typeof(Settlement)),
+            Server.GetHandle<Settlement>(siege.SettlementId),
             settlementEntry.SettlementId);
         var breakInApproval = Assert.Single(
             Server.NetworkSentMessages.GetMessages<NetworkBreakInContinuationApproved>());
@@ -3254,8 +3254,8 @@ public class PlayerPartyInteractionFlowTests : MapEventTestBase
         client.SimulateMessage(
             Server.NetPeer,
             new NetworkPartyEnterSettlement(
-                ObjectManager.Compact(siege.SettlementId, typeof(Settlement)),
-                ObjectManager.Compact(playerMobilePartyId, typeof(MobileParty))));
+                client.GetHandle<Settlement>(siege.SettlementId),
+                client.GetHandle<MobileParty>(playerMobilePartyId)));
         AssertPartyEnteredSettlement(client, playerMobilePartyId, siege.SettlementId);
 
         PlayerEncounter? changedEncounter = null;

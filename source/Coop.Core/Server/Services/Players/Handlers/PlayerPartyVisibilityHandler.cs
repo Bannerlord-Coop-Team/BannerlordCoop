@@ -334,9 +334,7 @@ internal class PlayerPartyVisibilityHandler : IHandler
     {
         var partyVisual = party.Party.GetPartyVisual();
         if (partyVisual == null) return;
-        if (!objectManager.TryGetIdWithLogging(partyVisual, out string partyVisualId))
-            return;
-        if (!objectManager.TryGetIdWithLogging(party, out string mobilePartyId))
+        if (!objectManager.TryGetHandleWithLogging(party, out var mobilePartyHandle))
             return;
         objectManager.Remove(partyVisual);
 
@@ -345,7 +343,7 @@ internal class PlayerPartyVisibilityHandler : IHandler
             AccessTools.Method(typeof(MobilePartyVisualManager), "RemovePartyVisualForParty").Invoke(MobilePartyVisualManager.Current, new object[] { party });
         }
 
-        network.SendAll(new NetworkDestroyPartyVisual(partyVisualId, mobilePartyId));
+        network.SendAll(new NetworkDestroyPartyVisual(mobilePartyHandle));
     }
 
     /// <summary>
@@ -373,7 +371,10 @@ internal class PlayerPartyVisibilityHandler : IHandler
             return;
         }
 
-        network.SendAll(new NetworkCreatePartyVisual(visualId, mobilePartyId));
+        if (!objectManager.TryGetHandleWithLogging(partyVisual, out var visualHandle) ||
+            !objectManager.TryGetHandleWithLogging(party, out var mobilePartyHandle)) return;
+
+        network.SendAll(new NetworkCreatePartyVisual(visualId, visualHandle, mobilePartyHandle));
     }
 
     private bool TryResolveParty(NetPeer peer, out Player player, out MobileParty party)

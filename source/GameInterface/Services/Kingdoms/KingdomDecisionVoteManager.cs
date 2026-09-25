@@ -399,12 +399,38 @@ namespace GameInterface.Services.Kingdoms
             KingdomDecision decision = decisionItem.KingdomDecisionMaker._decision;
             if (decision == null || Clan.PlayerClan == null) return false;
 
+            bool routed;
+            string reason;
             if (DecisionStates.TryGetValue(decision, out KingdomDecisionVoteState state) && state.HasRoundSnapshot)
             {
-                return Clan.PlayerClan.Kingdom == decision.Kingdom;
+                routed = Clan.PlayerClan.Kingdom == decision.Kingdom;
+                reason = routed
+                    ? "the player clan votes in this round"
+                    : "the player clan is not in the deciding kingdom";
+            }
+            else
+            {
+                routed = IsLocalPlayerEligible(decision);
+                reason = routed
+                    ? "the player clan is eligible to vote"
+                    : "the player clan is not eligible to vote";
             }
 
-            return IsLocalPlayerEligible(decision);
+            LogFinalSelection(decision, routed, reason);
+            return routed;
+        }
+
+        // ExecuteFinalSelection is the only caller, so this fires once per confirmed selection.
+        private void LogFinalSelection(KingdomDecision decision, bool routed, string reason)
+        {
+            TryGetKingdomId(decision.Kingdom, out string kingdomId);
+            TryGetDecisionIndex(decision, out int decisionIndex);
+            Logger.Information(
+                "Kingdom decision final selection for {KingdomId} decision {DecisionIndex}: {Routing}; {Reason}",
+                kingdomId,
+                decisionIndex,
+                routed ? "sent to the server" : "resolved locally",
+                reason);
         }
 
         public void RegisterDecisionItem(DecisionItemBaseVM decisionItem)
@@ -710,11 +736,20 @@ namespace GameInterface.Services.Kingdoms
         {
             if (string.IsNullOrWhiteSpace(clanId)) return false;
             voteData = NormalizeVoteData(voteData);
-            if (!TryGetSupportWeight(voteData.SupportWeight, out _)) return false;
-            if (state.FinalVotes.ContainsKey(clanId)) return false;
+            if (!TryGetSupportWeight(voteData.SupportWeight, out _))
+            {
+                LogFinalVote(state, clanId, voteData, "refused: the support weight is not supported");
+                return false;
+            }
+            if (state.FinalVotes.ContainsKey(clanId))
+            {
+                LogFinalVote(state, clanId, voteData, "refused: this clan already voted");
+                return false;
+            }
 
             if (!ApplyVoteToElection(state.Election, clan, voteData))
             {
+                LogFinalVote(state, clanId, voteData, "refused: the election did not accept it");
                 return false;
             }
 
@@ -722,6 +757,7 @@ namespace GameInterface.Services.Kingdoms
             if (voteData.IsFinal)
             {
                 state.FinalVotes[clanId] = new AppliedKingdomDecisionVote(clanId, voteData);
+                LogFinalVote(state, clanId, voteData, "counted");
                 if (state.RoundClans.TryGetValue(clanId, out KingdomDecisionRoundClanStatusData roundClan))
                 {
                     state.RoundClans[clanId] = new KingdomDecisionRoundClanStatusData(
@@ -1395,13 +1431,56 @@ namespace GameInterface.Services.Kingdoms
             Dictionary<string, KingdomDecisionRoundClanStatusData> roundClans = ModInformation.IsServer
                 ? CreateRoundClanStatuses(decision, eligibleClanIds)
                 : new Dictionary<string, KingdomDecisionRoundClanStatusData>();
-            return new KingdomDecisionVoteState(
+            var state = new KingdomDecisionVoteState(
                 kingdomId,
                 decisionIndex,
                 decision,
                 eligibleClanIds,
                 deadlineUtc,
                 roundClans);
+
+            DescribeDecision(decision, out string decisionType, out string proposerClanId);
+            Logger.Information(
+                "Kingdom decision voting round opened for {KingdomId} decision {DecisionIndex} " +
+                "({DecisionType} proposed by {ProposerClanId}); {EligibleClans} eligible clans, " +
+                "deadline {DeadlineUtc}",
+                kingdomId,
+                decisionIndex,
+                decisionType,
+                proposerClanId,
+                eligibleClanIds.Count,
+                deadlineUtc);
+            return state;
+        }
+
+        // Interim support changes arrive while a player is still choosing, so only a confirmed vote is
+        // reported. Caller has already applied it, so the count includes this vote.
+        private void LogFinalVote(
+            KingdomDecisionVoteState state, string clanId, KingdomDecisionVoteData voteData, string outcome)
+        {
+            if (voteData == null || !voteData.IsFinal) return;
+
+            Logger.Information(
+                "Kingdom decision vote for {KingdomId} decision {DecisionIndex} by clan {ClanId} {Outcome}; " +
+                "{FinalVotes}/{EligibleClans} final clan votes",
+                state.KingdomId,
+                state.DecisionIndex,
+                clanId,
+                outcome,
+                state.FinalVotes.Count,
+                state.EligibleClanIds.Count);
+        }
+
+        // The decision index is only a position in the kingdom's unresolved list, so type and proposer are
+        // what tell two rounds of one kingdom apart.
+        private void DescribeDecision(KingdomDecision decision, out string decisionType, out string proposerClanId)
+        {
+            decisionType = decision?.GetType().Name;
+            proposerClanId = null;
+            if (decision?.ProposerClan != null)
+            {
+                TryGetClanId(decision.ProposerClan, out proposerClanId);
+            }
         }
 
         private HashSet<string> GetEligibleClanIds(KingdomDecision decision)
@@ -1675,10 +1754,15 @@ namespace GameInterface.Services.Kingdoms
         {
             if (!state.RoundDeadlineUtc.HasValue || utcNow < state.RoundDeadlineUtc.Value) return false;
 
+            DescribeDecision(state.Decision, out string decisionType, out string proposerClanId);
             Logger.Information(
-                "Kingdom decision voting deadline reached for {KingdomId} decision {DecisionIndex}; resolving with {FinalVotes}/{EligibleClans} final clan votes",
+                "Kingdom decision voting deadline reached for {KingdomId} decision {DecisionIndex} " +
+                "({DecisionType} proposed by {ProposerClanId}); resolving with {FinalVotes}/{EligibleClans} " +
+                "final clan votes",
                 state.KingdomId,
                 state.DecisionIndex,
+                decisionType,
+                proposerClanId,
                 state.FinalVotes.Count,
                 state.EligibleClanIds.Count);
             ApplyMissingAbstentions(state);

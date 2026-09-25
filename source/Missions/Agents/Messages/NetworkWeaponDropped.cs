@@ -63,6 +63,8 @@ namespace Missions.Agents.Messages
 
         [ProtoMember(17)]
         public float RemainingLifeTime { get; }
+        [ProtoMember(18)]
+        public Guid SiegeEquipmentGrant { get; }
 
         public NetworkWeaponDropped(
             Guid dropId,
@@ -80,7 +82,8 @@ namespace Missions.Agents.Messages
             bool hasLifeTime,
             float remainingLifeTime,
             AgentEquipmentData? currentEquipment,
-            bool isCatchUp)
+            bool isCatchUp,
+            Guid siegeEquipmentGrant = default)
         {
             DropId = dropId;
             AgentId = agentId;
@@ -99,6 +102,7 @@ namespace Missions.Agents.Messages
             CurrentEquipment = currentEquipment.GetValueOrDefault();
             HasCurrentEquipment = currentEquipment.HasValue;
             IsCatchUp = isCatchUp;
+            SiegeEquipmentGrant = siegeEquipmentGrant;
         }
     }
 

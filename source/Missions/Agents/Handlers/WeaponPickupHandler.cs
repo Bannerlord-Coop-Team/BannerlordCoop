@@ -20,6 +20,7 @@ namespace Missions.Agents.Handlers
     public interface IWeaponPickupHandler : IHandler
     {
         void Tick(float dt);
+        void RetryPendingSiegeGrants();
     }
     /// <inheritdoc/>
     public class WeaponPickupHandler : IWeaponPickupHandler
@@ -28,6 +29,7 @@ namespace Missions.Agents.Handlers
         private const int MaxPendingNetworkWorldItems = 64;
         private const int MaxPendingIdentityPickupsPerWorldItem = 8;
         private const int MaxResolvedPickupIds = 512;
+        private const int MaxPendingSiegeGrants = 64;
         private const int MaxResyncTargetsPerMessage = 64;
         private const int MaxResyncPickupIdsPerMessage = 512;
         private const float ResyncRetrySeconds = 5f;
@@ -219,6 +221,8 @@ namespace Missions.Agents.Handlers
             new Dictionary<(Guid AgentId, EquipmentIndex Slot), long>();
         readonly HashSet<Guid> resolvedPickupIds = new HashSet<Guid>();
         readonly Queue<Guid> resolvedPickupIdOrder = new Queue<Guid>();
+        readonly Dictionary<Guid, (NetworkLadderForkGranted Grant, NetworkWeaponDropped Drop)> pendingSiegeGrants = new();
+        Mission siegeGrantMission;
         readonly static ILogger Logger = LogManager.GetLogger<WeaponPickupHandler>();
         bool disposed;
         public WeaponPickupHandler(
@@ -253,6 +257,9 @@ namespace Missions.Agents.Handlers
             this.controllerIdProvider = controllerIdProvider;
 
             messageBroker.Subscribe<WeaponPickedup>(WeaponPickupSend);
+            messageBroker.Subscribe<LadderForkGranted>(HandleLadderForkGranted);
+            messageBroker.Subscribe<NetworkLadderForkGranted>(HandleNetworkLadderForkGranted);
+            messageBroker.Subscribe<NetworkWeaponDropped>(HandlePendingSiegeGrantDrop);
             messageBroker.Subscribe<NetworkWeaponPickedup>(WeaponPickupReceive);
             messageBroker.Subscribe<NetworkWeaponPickupSlotState>(HandleNetworkWeaponPickupSlotState);
             messageBroker.Subscribe<NetworkWeaponDropStateResponse>(HandleNetworkWeaponDropStateResponse);
@@ -270,6 +277,9 @@ namespace Missions.Agents.Handlers
             if (disposed) return;
             disposed = true;
             messageBroker.Unsubscribe<WeaponPickedup>(WeaponPickupSend);
+            messageBroker.Unsubscribe<LadderForkGranted>(HandleLadderForkGranted);
+            messageBroker.Unsubscribe<NetworkLadderForkGranted>(HandleNetworkLadderForkGranted);
+            messageBroker.Unsubscribe<NetworkWeaponDropped>(HandlePendingSiegeGrantDrop);
             messageBroker.Unsubscribe<NetworkWeaponPickedup>(WeaponPickupReceive);
             messageBroker.Unsubscribe<NetworkWeaponPickupSlotState>(HandleNetworkWeaponPickupSlotState);
             messageBroker.Unsubscribe<NetworkWeaponDropStateResponse>(HandleNetworkWeaponDropStateResponse);
@@ -285,13 +295,16 @@ namespace Missions.Agents.Handlers
             appliedSlotStateRevisions.Clear();
             resolvedPickupIds.Clear();
             resolvedPickupIdOrder.Clear();
+            pendingSiegeGrants.Clear();
+            siegeGrantMission = null;
             GC.SuppressFinalize(this);
         }
 
         public void Tick(float dt)
         {
-            if (dt <= 0f) return;
+            if (disposed || dt <= 0f) return;
 
+            RetryPendingSiegeGrants();
             RetryPendingNetworkPickupsWithActiveAgents();
             if (latestResyncRequests.Count == 0) return;
 
@@ -390,6 +403,140 @@ namespace Missions.Agents.Handlers
             SendWeaponPickup(payload, agentInfo.AgentId, worldItemId);
         }
 
+        private void HandleLadderForkGranted(MessagePayload<LadderForkGranted> payload)
+        {
+            Agent agent = payload.What.Agent;
+            if (disposed || Mission.Current == null || agent == null || agent.Mission != Mission.Current ||
+                !agent.IsActive() || !networkAgentRegistry.IsLocallyControlled(agent) ||
+                !networkAgentRegistry.TryGetAgentInfo(agent, out CoopAgentInfo info)) return;
+
+            MissionWeapon weapon = agent.Equipment[EquipmentIndex.ExtraWeaponSlot];
+            if (weapon.IsEmpty ||
+                !objectManager.TryGetIdWithLogging(weapon.Item, out string itemId)) return;
+
+            Guid grantId = Guid.NewGuid();
+            long revision = checked(info.SiegeEquipmentGrantRevision + 1);
+            var message = new NetworkLadderForkGranted(grantId, info.AgentId,
+                info.CurrentAuthority, info.AuthorityRevision, itemId,
+                weapon.RawDataForNetwork, new AgentEquipmentData(agent), revision);
+            RecordForkGrant(info.AgentId, grantId, revision);
+            network.SendAll(message);
+        }
+
+        private void HandleNetworkLadderForkGranted(MessagePayload<NetworkLadderForkGranted> payload)
+        {
+            GameThread.RunSafe(() => ApplyLadderForkGrant(payload.What));
+        }
+
+        internal void ApplyLadderForkGrant(NetworkLadderForkGranted message, NetworkWeaponDropped drop = null)
+        {
+            if (disposed || Mission.Current == null || message == null || message.GrantId == Guid.Empty ||
+                message.AgentId == Guid.Empty || message.GrantRevision <= 0 ||
+                string.IsNullOrEmpty(message.Authority) || resolvedPickupIds.Contains(message.GrantId)) return;
+
+            ResetPendingSiegeGrantMission();
+            if (!networkAgentRegistry.TryGetAgentInfo(message.AgentId, out CoopAgentInfo info))
+            {
+                if (pendingSiegeGrants.TryGetValue(message.AgentId, out var pending))
+                {
+                    if (message.AuthorityRevision < pending.Grant.AuthorityRevision ||
+                        (message.AuthorityRevision == pending.Grant.AuthorityRevision &&
+                         message.GrantRevision <= pending.Grant.GrantRevision)) return;
+                }
+                else if (pendingSiegeGrants.Count >= MaxPendingSiegeGrants)
+                {
+                    Logger.Warning("[WeaponPickup] Pending siege grant capacity reached agent={AgentId}", message.AgentId);
+                    return;
+                }
+                pendingSiegeGrants[message.AgentId] = (message, drop);
+                return;
+            }
+
+            RetryPendingSiegeGrant(message.AgentId);
+            if (resolvedPickupIds.Contains(message.GrantId)) return;
+            if (!TryGetActiveAgent(message.AgentId, out info) || networkAgentRegistry.IsLocallyControlled(info.Agent) ||
+                message.Authority != info.CurrentAuthority ||
+                message.AuthorityRevision != info.AuthorityRevision ||
+                message.GrantRevision < info.SiegeEquipmentGrantRevision) return;
+
+            if (drop != null)
+            {
+                if (message.GrantRevision == info.SiegeEquipmentGrantRevision &&
+                    info.SiegeEquipmentGrant != message.GrantId) return;
+                // A drop can follow the grant while the older spawn snapshot still awaits capacity.
+                using (new AllowedThread())
+                {
+                    if (!info.Agent.Equipment[EquipmentIndex.ExtraWeaponSlot].IsEmpty)
+                        info.Agent.RemoveEquippedWeapon(EquipmentIndex.ExtraWeaponSlot);
+                    if (drop.HasCurrentEquipment)
+                    {
+                        info.RecordAuthoritativeEquipment(drop.CurrentEquipment);
+                        drop.CurrentEquipment.Apply(info.Agent);
+                    }
+                }
+                info.RecordSiegeGrant(Guid.Empty, message.GrantRevision);
+                info.ConsumeSiegeGrant(message.GrantId);
+                TrackResolvedPickup(message.GrantId);
+                return;
+            }
+            if (message.GrantRevision == info.SiegeEquipmentGrantRevision ||
+                info.IsSiegeGrantConsumed(message.GrantId)) return;
+            if (!objectManager.TryGetObjectWithLogging<ItemObject>(message.ItemObjectId, out var item)) return;
+
+            var weapon = new MissionWeapon(item, null, null, message.DataValue);
+            ApplyResultingPickupState(info, EquipmentIndex.ExtraWeaponSlot, message.Equipment, ref weapon);
+            RecordForkGrant(info.AgentId, message.GrantId, message.GrantRevision);
+        }
+
+        private void ResetPendingSiegeGrantMission()
+        {
+            if (ReferenceEquals(siegeGrantMission, Mission.Current)) return;
+            pendingSiegeGrants.Clear();
+            siegeGrantMission = Mission.Current;
+        }
+
+        public void RetryPendingSiegeGrants()
+        {
+            if (disposed) return;
+            ResetPendingSiegeGrantMission();
+            foreach (Guid agentId in new List<Guid>(pendingSiegeGrants.Keys))
+                RetryPendingSiegeGrant(agentId);
+        }
+
+        private void RetryPendingSiegeGrant(Guid agentId)
+        {
+            ResetPendingSiegeGrantMission();
+            if (!networkAgentRegistry.TryGetAgentInfo(agentId, out _) ||
+                !pendingSiegeGrants.TryGetValue(agentId, out var pending)) return;
+            pendingSiegeGrants.Remove(agentId);
+            ApplyLadderForkGrant(pending.Grant, pending.Drop);
+        }
+
+        private void HandlePendingSiegeGrantDrop(MessagePayload<NetworkWeaponDropped> payload)
+        {
+            GameThread.RunSafe(() =>
+            {
+                if (disposed) return;
+                ResetPendingSiegeGrantMission();
+                var drop = payload.What;
+                if (drop == null || drop.IsCatchUp || drop.EquipmentIndex != EquipmentIndex.ExtraWeaponSlot ||
+                    !pendingSiegeGrants.TryGetValue(drop.AgentId, out var pending) ||
+                    drop.SiegeEquipmentGrant != pending.Grant.GrantId ||
+                    drop.OriginControllerId != pending.Grant.Authority) return;
+                pendingSiegeGrants[drop.AgentId] = (pending.Grant, drop);
+            });
+        }
+
+        private void RecordForkGrant(Guid agentId, Guid grantId, long revision)
+        {
+            TrackResolvedPickup(grantId);
+            if (networkAgentRegistry.TryGetAgentInfo(agentId, out var info))
+                info.RecordSiegeGrant(grantId, revision);
+            // A direct grant supersedes an older drop awaiting world-item identity, just like a pickup.
+            messageBroker.Publish(this, new WeaponPickupApplied(agentId,
+                EquipmentIndex.ExtraWeaponSlot, Guid.Empty, 0, false, pickupId: grantId));
+        }
+
         private void SendWeaponPickup(
             WeaponPickedup payload,
             Guid agentId,
@@ -397,6 +544,9 @@ namespace Missions.Agents.Handlers
             bool isIdentityCorrection = false,
             bool recordLocalPickup = false)
         {
+            if (payload.EquipmentIndex == EquipmentIndex.ExtraWeaponSlot &&
+                networkAgentRegistry.TryGetAgentInfo(agentId, out var info))
+                info.RecordSiegeGrant(Guid.Empty);
             if (!objectManager.TryGetIdWithLogging(payload.WeaponObject, out string itemObjectId))
                 return;
             string worldItemModifierId = null;
@@ -645,6 +795,8 @@ namespace Missions.Agents.Handlers
                 return;
             }
 
+            // Preserve reliable-order equipment transitions across deferred agent registration.
+            RetryPendingSiegeGrant(message.AgentId);
             if (canApplyResultingState)
             {
                 ApplyResultingPickupState(
@@ -1240,6 +1392,7 @@ namespace Missions.Agents.Handlers
             ref MissionWeapon resultingSlotWeapon)
         {
             Agent agent = agentInfo.Agent;
+            if (equipmentIndex == EquipmentIndex.ExtraWeaponSlot) agentInfo.RecordSiegeGrant(Guid.Empty);
             agentInfo.RecordAuthoritativeEquipment(currentEquipment);
             using (new AllowedThread())
             {
@@ -1279,6 +1432,7 @@ namespace Missions.Agents.Handlers
             ref MissionWeapon resultingSlotWeapon)
         {
             Agent agent = agentInfo.Agent;
+            if (equipmentIndex == EquipmentIndex.ExtraWeaponSlot) agentInfo.RecordSiegeGrant(Guid.Empty);
             agentInfo.RecordAuthoritativeEquipment(currentEquipment);
             using (new AllowedThread())
             {

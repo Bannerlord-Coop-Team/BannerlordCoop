@@ -46,6 +46,7 @@ public class ServerModule : CommonModule
         builder.RegisterModule<ConnectionModule>();
 
 #if DEBUG
+        builder.RegisterType<JoinDebugCommands.PlayerPartyReadinessCoopCommand>().As<ICoopCommand>().InstancePerDependency();
         builder.RegisterType<JoinDebugCommands.JoinStateCoopCommand>().As<ICoopCommand>().InstancePerDependency();
         builder.RegisterType<JoinDebugCommands.StageInactivePartyCoopCommand>().As<ICoopCommand>().InstancePerDependency();
         builder.RegisterType<JoinDebugCommands.RestoreInactivePartyCoopCommand>().As<ICoopCommand>().InstancePerDependency();

@@ -27,9 +27,9 @@ public readonly struct ModOptions
     [ProtoMember(3)]
     public readonly bool ClientsCanUseCheats { get; } = false;
     [ProtoMember(4)]
-    public readonly bool GoldFoodInfluenceChangeInSettlements { get; } = true;
+    public readonly bool GoldFoodInfluenceChangeInSettlements { get; } = false;
     [ProtoMember(5)]
-    public readonly GoldFoodChangeMode GoldFoodInfluenceChangeInBattles { get; } = GoldFoodChangeMode.OneDayMax;
+    public readonly GoldFoodChangeMode GoldFoodInfluenceChangeInBattles { get; } = GoldFoodChangeMode.Disabled;
     [ProtoMember(6)]
     public readonly bool GoldFoodInfluenceChangeForDisconnectedPlayers { get; } = false;
     [ProtoMember(7)]

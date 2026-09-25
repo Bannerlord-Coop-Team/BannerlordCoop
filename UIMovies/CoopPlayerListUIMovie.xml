@@ -1,0 +1,95 @@
+<Prefab>
+  <Window>
+    <Widget WidthSizePolicy="StretchToParent" HeightSizePolicy="StretchToParent" DoNotAcceptEvents="true" IsVisible="@IsOpen">
+      <Children>
+        <BrushWidget Id="CoopPlayerListRoot" WidthSizePolicy="Fixed" SuggestedWidth="1240" HeightSizePolicy="Fixed" SuggestedHeight="@PanelHeight"
+                     HorizontalAlignment="Center" VerticalAlignment="Center" Brush="Frame1Brush">
+          <Children>
+            <Widget WidthSizePolicy="StretchToParent" HeightSizePolicy="StretchToParent" Sprite="BlankWhiteSquare_9" Color="#17161380" DoNotAcceptEvents="true"/>
+            <BrushWidget WidthSizePolicy="Fixed" SuggestedWidth="580" HeightSizePolicy="Fixed" SuggestedHeight="116" MarginLeft="12" MarginTop="-24" Brush="Coop.PlayerList.Title.Background" DoNotAcceptEvents="true">
+              <Children>
+                <TextWidget WidthSizePolicy="StretchToParent" HeightSizePolicy="StretchToParent" MarginLeft="74" MarginRight="40" Brush="Coop.PlayerList.Title.Text" Text="@Title" DoNotAcceptEvents="true"/>
+              </Children>
+            </BrushWidget>
+            <BrushWidget WidthSizePolicy="Fixed" SuggestedWidth="290" HeightSizePolicy="Fixed" SuggestedHeight="64" HorizontalAlignment="Right" MarginRight="32" MarginTop="30" Brush="Panel.Dent" DoNotAcceptEvents="true">
+              <Children>
+                <Widget WidthSizePolicy="Fixed" SuggestedWidth="28" HeightSizePolicy="Fixed" SuggestedHeight="28" MarginLeft="20" VerticalAlignment="Center" Sprite="SPGeneral\GameMenu\manage_troops_icon" DoNotAcceptEvents="true"/>
+                <TextWidget WidthSizePolicy="StretchToParent" HeightSizePolicy="StretchToParent" MarginLeft="62" MarginRight="12" Brush="Coop.PlayerList.Text" Text="@OnlineSummary" DoNotAcceptEvents="true"/>
+              </Children>
+            </BrushWidget>
+            <Widget WidthSizePolicy="StretchToParent" HeightSizePolicy="Fixed" SuggestedHeight="52" MarginLeft="24" MarginRight="24" MarginTop="112" Sprite="BlankWhiteSquare_9" Color="#08090866" DoNotAcceptEvents="true">
+              <Children>
+                <ListPanel WidthSizePolicy="StretchToParent" HeightSizePolicy="StretchToParent" MarginLeft="20" StackLayout.LayoutMethod="HorizontalLeftToRight" DoNotAcceptEvents="true">
+                  <Children>
+                    <TextWidget WidthSizePolicy="Fixed" SuggestedWidth="376" MarginLeft="34" HeightSizePolicy="StretchToParent" Brush="Coop.PlayerList.Text" Brush.FontSize="24" Brush.FontColor="#C6B58DFF" Text="@PlatformHeading" DoNotAcceptEvents="true"/>
+                    <TextWidget WidthSizePolicy="Fixed" SuggestedWidth="380" HeightSizePolicy="StretchToParent" Brush="Coop.PlayerList.Text" Brush.FontSize="24" Brush.FontColor="#C6B58DFF" Text="@HeroHeading" DoNotAcceptEvents="true"/>
+                    <TextWidget WidthSizePolicy="StretchToParent" HeightSizePolicy="StretchToParent" Brush="Coop.PlayerList.Text" Brush.FontSize="24" Brush.FontColor="#C6B58DFF" Text="@StatusHeading" DoNotAcceptEvents="true"/>
+                  </Children>
+                </ListPanel>
+                <Widget WidthSizePolicy="StretchToParent" HeightSizePolicy="Fixed" SuggestedHeight="1" VerticalAlignment="Bottom" Sprite="BlankWhiteSquare_9" Color="#AA976038" DoNotAcceptEvents="true"/>
+              </Children>
+            </Widget>
+            <ScrollablePanel Id="PlayerListScroll" WidthSizePolicy="StretchToParent" HeightSizePolicy="StretchToParent" MarginLeft="24" MarginRight="40" MarginTop="164" MarginBottom="72"
+                             AutoHideScrollBars="true" ClipRect="Clip" InnerPanel="Clip\Rows" VerticalScrollbar="..\PlayerListScrollbar">
+              <Children>
+                <Widget Id="Clip" WidthSizePolicy="StretchToParent" HeightSizePolicy="StretchToParent" ClipContents="true">
+                  <Children>
+                    <ListPanel Id="Rows" DataSource="{Rows}" WidthSizePolicy="StretchToParent" HeightSizePolicy="CoverChildren" StackLayout.LayoutMethod="VerticalTopToBottom">
+                      <ItemTemplate>
+                        <ButtonWidget WidthSizePolicy="StretchToParent" HeightSizePolicy="Fixed" SuggestedHeight="56" Brush="ScoreboardUnitRowBrush" DoNotPassEventsToChildren="true" Command.HoverBegin="ExecuteBeginHint" Command.HoverEnd="ExecuteEndHint">
+                          <Children>
+                            <Widget WidthSizePolicy="StretchToParent" HeightSizePolicy="StretchToParent" Sprite="BlankWhiteSquare_9" Color="#E8E4DA06" IsVisible="@IsAlternate" DoNotAcceptEvents="true"/>
+                            <ListPanel WidthSizePolicy="StretchToParent" HeightSizePolicy="StretchToParent" MarginLeft="20" StackLayout.LayoutMethod="HorizontalLeftToRight" DoNotAcceptEvents="true">
+                              <Children>
+                                <Widget WidthSizePolicy="Fixed" SuggestedWidth="410" HeightSizePolicy="StretchToParent" DoNotAcceptEvents="true">
+                                  <Children>
+                                    <Widget WidthSizePolicy="Fixed" SuggestedWidth="16" HeightSizePolicy="Fixed" SuggestedHeight="16" VerticalAlignment="Center" Sprite="BlankWhiteCircle" Color="#7FC875FF" IsVisible="@IsOnline" DoNotAcceptEvents="true"/>
+                                    <Widget WidthSizePolicy="Fixed" SuggestedWidth="16" HeightSizePolicy="Fixed" SuggestedHeight="16" VerticalAlignment="Center" Sprite="BlankWhiteCircle" Color="#B0AEA6FF" IsVisible="@IsOffline" DoNotAcceptEvents="true">
+                                      <Children>
+                                        <Widget WidthSizePolicy="Fixed" SuggestedWidth="10" HeightSizePolicy="Fixed" SuggestedHeight="10" HorizontalAlignment="Center" VerticalAlignment="Center" Sprite="BlankWhiteCircle" Color="#201C17FF" DoNotAcceptEvents="true"/>
+                                      </Children>
+                                    </Widget>
+                                    <ScrollingTextWidget WidthSizePolicy="StretchToParent" HeightSizePolicy="StretchToParent" MarginLeft="34" MarginRight="26" Brush="Coop.PlayerList.Text" Brush.FontSize="23" Brush.GlobalAlphaFactor="@RowOpacity" Text="@PlatformName" IsAutoScrolling="false" ScrollOnHoverWidget="..\..\.." DoNotAcceptEvents="true"/>
+                                  </Children>
+                                </Widget>
+                                <Widget WidthSizePolicy="Fixed" SuggestedWidth="380" HeightSizePolicy="StretchToParent" DoNotAcceptEvents="true">
+                                  <Children>
+                                    <ScrollingTextWidget WidthSizePolicy="StretchToParent" HeightSizePolicy="StretchToParent" MarginRight="26" Brush="Coop.PlayerList.Text" Brush.FontSize="23" Brush.GlobalAlphaFactor="@RowOpacity" Text="@HeroName" IsAutoScrolling="false" ScrollOnHoverWidget="..\..\.." DoNotAcceptEvents="true"/>
+                                  </Children>
+                                </Widget>
+                                <Widget WidthSizePolicy="StretchToParent" HeightSizePolicy="StretchToParent" DoNotAcceptEvents="true">
+                                  <Children>
+                                    <Widget WidthSizePolicy="Fixed" SuggestedWidth="34" HeightSizePolicy="Fixed" SuggestedHeight="30" VerticalAlignment="Center" Sprite="@ActivityIcon" Color="#C6B58DFF" AlphaFactor="@RowOpacity" DoNotAcceptEvents="true"/>
+                                    <TextWidget WidthSizePolicy="StretchToParent" HeightSizePolicy="StretchToParent" MarginLeft="46" MarginRight="8" Brush="Coop.PlayerList.Text" Brush.FontSize="22" Brush.GlobalAlphaFactor="@RowOpacity" Text="@Status" DoNotAcceptEvents="true"/>
+                                  </Children>
+                                </Widget>
+                              </Children>
+                            </ListPanel>
+                            <Widget WidthSizePolicy="StretchToParent" HeightSizePolicy="Fixed" SuggestedHeight="1" VerticalAlignment="Bottom" Sprite="BlankWhiteSquare_9" Color="#E8E4DA1A" DoNotAcceptEvents="true"/>
+                          </Children>
+                        </ButtonWidget>
+                      </ItemTemplate>
+                    </ListPanel>
+                  </Children>
+                </Widget>
+              </Children>
+            </ScrollablePanel>
+            <ScrollbarWidget Id="PlayerListScrollbar" WidthSizePolicy="Fixed" SuggestedWidth="16" HeightSizePolicy="StretchToParent" HorizontalAlignment="Right" MarginRight="18" MarginTop="166" MarginBottom="74"
+                             AlignmentAxis="Vertical" Handle="Handle" MaxValue="100" MinValue="0" Sprite="scrollbar_9">
+              <Children>
+                <Widget Id="Handle" WidthSizePolicy="Fixed" SuggestedWidth="16" HeightSizePolicy="Fixed" SuggestedHeight="36" MinHeight="20" HorizontalAlignment="Center" Sprite="scroll_button_9"/>
+              </Children>
+            </ScrollbarWidget>
+            <Widget WidthSizePolicy="StretchToParent" HeightSizePolicy="Fixed" SuggestedHeight="1" VerticalAlignment="Bottom" MarginBottom="66" MarginLeft="24" MarginRight="24" Sprite="BlankWhiteSquare_9" Color="#AA976038" DoNotAcceptEvents="true"/>
+            <ButtonWidget Id="PlayerListClose" WidthSizePolicy="Fixed" SuggestedWidth="160" HeightSizePolicy="Fixed" SuggestedHeight="48" HorizontalAlignment="Right" VerticalAlignment="Bottom" MarginRight="26" MarginBottom="8" Brush="ScoreboardUnitRowBrush" Command.Click="ExecuteClose" DoNotPassEventsToChildren="true">
+              <Children>
+                <InputKeyVisualWidget WidthSizePolicy="Fixed" SuggestedWidth="48" HeightSizePolicy="Fixed" SuggestedHeight="48" KeyID="Escape" DoNotAcceptEvents="true"/>
+                <TextWidget WidthSizePolicy="StretchToParent" HeightSizePolicy="StretchToParent" MarginLeft="58" MarginRight="12" Brush="Coop.PlayerList.Text" Brush.FontSize="23" Text="@CloseText" DoNotAcceptEvents="true"/>
+              </Children>
+            </ButtonWidget>
+          </Children>
+        </BrushWidget>
+      </Children>
+    </Widget>
+  </Window>
+</Prefab>

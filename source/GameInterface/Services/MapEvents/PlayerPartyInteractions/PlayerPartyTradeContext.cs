@@ -385,9 +385,9 @@ internal static class PlayerPartyTradeContext
         return result;
     }
 
-    private static Dictionary<string, int> BuildOfferedTroops(TroopRosterElementData[] offeredTroops)
+    private static Dictionary<uint, int> BuildOfferedTroops(TroopRosterElementData[] offeredTroops)
     {
-        var result = new Dictionary<string, int>();
+        var result = new Dictionary<uint, int>();
         if (offeredTroops == null) return result;
 
         foreach (var offeredTroop in offeredTroops)
@@ -529,13 +529,13 @@ internal static class PlayerPartyTradeContext
         return !string.IsNullOrEmpty(key);
     }
 
-    private static bool TryGetCharacterKey(CharacterObject character, IObjectManager objectManager, out string key)
+    private static bool TryGetCharacterKey(CharacterObject character, IObjectManager objectManager, out uint key)
     {
-        key = null;
+        key = 0;
 
         if (character == null) return false;
 
-        return objectManager.TryGetId(character, out key);
+        return objectManager.TryGetHandle(character, out key);
     }
 
     private static string GetItemKey(ItemObjectData itemObjectData)

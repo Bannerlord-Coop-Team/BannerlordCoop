@@ -1824,7 +1824,7 @@ internal class PlayerPartyInteractionHandler : IHandler
         {
             if (character == null || count <= 0) continue;
 
-            if (!objectManager.TryGetIdWithLogging(character, out var characterId)) continue;
+            if (!objectManager.TryGetHandleWithLogging(character, out var characterId)) continue;
 
             result.Add(new TroopRosterElementData(characterId, count, 0, 0));
         }
@@ -1841,7 +1841,7 @@ internal class PlayerPartyInteractionHandler : IHandler
             var character = troop.Character;
             if (character == null || count <= 0) continue;
 
-            if (!objectManager.TryGetIdWithLogging(character, out var characterId))
+            if (!objectManager.TryGetHandleWithLogging(character, out var characterId))
                 continue;
 
             result.Add(new TroopRosterElementData(characterId, count, troop.WoundedNumber, troop.Xp));

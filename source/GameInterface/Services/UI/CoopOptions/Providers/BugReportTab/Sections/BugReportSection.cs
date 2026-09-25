@@ -21,7 +21,7 @@ public class BugReportSection : CoopOptionsSectionVM
     public override string Id => SectionId;
     public string TitleText => "Bug Report";
     public string DescriptionText => "Configure the co-op bug-report escape-menu option.";
-    public string ShowBugReportButtonText => "Show Coop Bug Report Menu Option";
+    public string ShowBugReportButtonText => "Show bug report menu option";
 
     [DataSourceProperty]
     public bool ShowBugReportButton

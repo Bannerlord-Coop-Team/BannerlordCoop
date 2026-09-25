@@ -115,13 +115,21 @@ internal class StanceLinkHandler : IHandler
 
             var id = GetStanceLinkKey(faction1, faction2);
 
-            if (!objectManager.AddExisting($"{typeof(StanceLink).Name}_{id}", stanceLink))
+            bool registered = ModInformation.IsServer
+                ? objectManager.AddExisting($"{typeof(StanceLink).Name}_{id}", stanceLink)
+                : objectManager.AddExisting($"{typeof(StanceLink).Name}_{id}", stanceLink, obj.StanceLinkHandle);
+            if (!registered)
             {
                 return;
             }
             if (ModInformation.IsServer)
             {
-                network.SendAll(new StanceLinkConstructed(obj.Faction1Id, obj.Faction2Id, obj.StanceType));
+                if (!objectManager.TryGetHandleWithLogging(stanceLink, out var stanceLinkHandle)) return;
+                network.SendAll(new StanceLinkConstructed(
+                    obj.Faction1Id,
+                    obj.Faction2Id,
+                    obj.StanceType,
+                    stanceLinkHandle));
             }
         });
     }

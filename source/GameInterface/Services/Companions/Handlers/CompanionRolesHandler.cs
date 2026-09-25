@@ -25,7 +25,6 @@ using TaleWorlds.CampaignSystem.Roster;
 using TaleWorlds.CampaignSystem.Settlements;
 using TaleWorlds.Core;
 using TaleWorlds.Localization;
-using static GameInterface.Services.ObjectManager.ObjectManager;
 
 namespace GameInterface.Services.Companions.Handlers;
 
@@ -245,15 +244,13 @@ internal class CompanionRolesHandler : IHandler
                     throw new InvalidOperationException("The companion's party changed before dismissal.");
 
                 TroopRoster memberRoster = oneToOneConversationHero.PartyBelongedTo?.MemberRoster;
-                string memberRosterId = null;
-                string characterId = null;
+                uint memberRosterId = 0;
+                uint characterId = 0;
                 if (memberRoster != null)
                 {
-                    if (!objectManager.TryGetIdWithLogging(memberRoster, out memberRosterId) ||
-                        !objectManager.TryGetIdWithLogging(oneToOneConversationHero.CharacterObject, out characterId))
+                    if (!objectManager.TryGetHandleWithLogging(memberRoster, out memberRosterId) ||
+                        !objectManager.TryGetHandleWithLogging(oneToOneConversationHero.CharacterObject, out characterId))
                         throw new InvalidOperationException("The companion's party roster could not be resolved.");
-                    memberRosterId = Compact(memberRosterId, typeof(TroopRoster));
-                    characterId = Compact(characterId, typeof(CharacterObject));
                 }
 
                 RemoveCompanionAction.ApplyByFire(oneToOneConversationHero.CompanionOf, oneToOneConversationHero);
@@ -344,7 +341,7 @@ internal class CompanionRolesHandler : IHandler
     }
 
     internal static void ReconcileDismissedCompanionRoster(TroopRoster memberRoster, CharacterObject character,
-        string memberRosterId, string characterId, INetwork network, ISendCoalescer sendCoalescer = null)
+        uint memberRosterId, uint characterId, INetwork network, ISendCoalescer sendCoalescer = null)
     {
         int index = memberRoster.FindIndexOfTroop(character);
         if (index >= 0)

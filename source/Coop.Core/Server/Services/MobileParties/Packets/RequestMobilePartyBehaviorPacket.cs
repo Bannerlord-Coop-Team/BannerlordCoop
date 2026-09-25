@@ -14,9 +14,9 @@ public struct RequestMobilePartyBehaviorPacket : IPacket
     public PacketType PacketType => PacketType.RequestUpdatePartyBehavior;
     public DeliveryMethod DeliveryMethod => DeliveryMethod.ReliableOrdered;
     [ProtoMember(1)]
-    public PartyBehaviorUpdateData BehaviorUpdateData { get; }
+    public NetworkPartyBehaviorUpdateData BehaviorUpdateData { get; }
 
-    public RequestMobilePartyBehaviorPacket(PartyBehaviorUpdateData behaviorUpdateData)
+    public RequestMobilePartyBehaviorPacket(NetworkPartyBehaviorUpdateData behaviorUpdateData)
     {
         BehaviorUpdateData = behaviorUpdateData;
     }

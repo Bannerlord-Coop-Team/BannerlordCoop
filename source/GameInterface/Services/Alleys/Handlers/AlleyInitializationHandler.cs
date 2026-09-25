@@ -20,17 +20,20 @@ internal class AlleyInitializationHandler : IHandler
     private readonly IMessageBroker messageBroker;
     private readonly IObjectManager objectManager;
     private readonly IAlleyCampaignBehaviorInterface behaviorInterface;
+    private readonly IAlleyGarrisonData garrisonData;
 
     private AlleyPlayerData alleyPlayerData;
 
     public AlleyInitializationHandler(
         IMessageBroker messageBroker,
         IObjectManager objectManager,
-        IAlleyCampaignBehaviorInterface behaviorInterface)
+        IAlleyCampaignBehaviorInterface behaviorInterface,
+        IAlleyGarrisonData garrisonData)
     {
         this.messageBroker = messageBroker;
         this.objectManager = objectManager;
         this.behaviorInterface = behaviorInterface;
+        this.garrisonData = garrisonData;
 
         messageBroker.Subscribe<InitializeClientAlleyData>(Handle);
         messageBroker.Subscribe<PlayerHeroChanged>(Handle);
@@ -72,7 +75,7 @@ internal class AlleyInitializationHandler : IHandler
                 behaviorInterface.AddOrUpdatePlayerAlleyData(
                     alley,
                     overseer,
-                    AlleyGarrisonData.FromData(pair.Value.Garrison, objectManager),
+                    garrisonData.FromData(pair.Value.Garrison),
                     new CampaignTime(pair.Value.LastRecruitTimeTicks));
 
                 // Restore an in-progress attack so the confront-alley menu works after joining mid-attack;

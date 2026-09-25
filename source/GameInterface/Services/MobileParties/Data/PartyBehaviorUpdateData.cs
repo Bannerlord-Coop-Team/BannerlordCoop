@@ -101,3 +101,27 @@ public struct PartyBehaviorUpdateData
         ResetMovementToHold = false;
     }
 }
+
+[ProtoContract(SkipConstructor = true)]
+public struct NetworkPartyBehaviorUpdateData
+{
+    [ProtoMember(1)] public uint MobilePartyId { get; set; }
+    [ProtoMember(2)] public AiBehavior NewAiBehavior { get; set; }
+    [ProtoMember(3)] public uint InteractablePointId { get; set; }
+    [ProtoMember(4)] public CampaignVec2 BestTargetPoint { get; set; }
+    [ProtoMember(5)] public CampaignVec2 PartyPosition { get; set; }
+    [ProtoMember(6)] public AiBehavior DefaultBehavior { get; set; }
+    [ProtoMember(7)] public CampaignVec2 TargetPosition { get; set; }
+    [ProtoMember(8)] public MobileParty.NavigationType DesiredAiNavigationType { get; set; }
+    [ProtoMember(9)] public string OriginControllerId { get; set; }
+    [ProtoMember(10)] public bool ForcePosition { get; set; }
+    [ProtoMember(11)] public uint TargetPartyId { get; set; }
+    [ProtoMember(12)] public uint TargetSettlementId { get; set; }
+    [ProtoMember(13)] public CampaignVec2 MoveTargetPoint { get; set; }
+    [ProtoMember(14)] public bool IsTargetingPort { get; set; }
+    [ProtoMember(15)] public MoveModeType PartyMoveMode { get; set; }
+    [ProtoMember(16)] public uint MoveTargetPartyId { get; set; }
+    [ProtoMember(17)] public bool IsInteractableAnchor { get; set; }
+    [ProtoMember(18)] public bool IsCurrentlyAtSea { get; set; }
+    [ProtoMember(19)] public bool ResetMovementToHold { get; set; }
+}

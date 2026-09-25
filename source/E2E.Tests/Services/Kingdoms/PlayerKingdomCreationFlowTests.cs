@@ -2,6 +2,7 @@
 using Common.Commands;
 using Common.Network;
 using Common.Messaging;
+using Common.Logging;
 using Common.Util;
 using Coop.Core.Client.Services.Kingdoms.Handlers;
 using Coop.Core.Client.Services.MobileParties.Messages;
@@ -3436,7 +3437,8 @@ public class PlayerKingdomCreationFlowTests : IDisposable
 
         Assert.Contains(
             client.NetworkSentMessages.GetMessages<NetworkRequestStartSettlementEncounter>(),
-            message => message.PartyId == player.PartyId && message.SettlementId == settlementId);
+            message => message.PartyId == client.GetHandle<MobileParty>(player.PartyId) &&
+                       message.SettlementId == client.GetHandle<Settlement>(settlementId));
 
         client.Call(() =>
         {
@@ -3496,10 +3498,10 @@ public class PlayerKingdomCreationFlowTests : IDisposable
 
         Assert.DoesNotContain(
             client.NetworkSentMessages.GetMessages<NetworkRequestEndSettlementEncounter>(),
-            message => message.PartyId == player.PartyId);
+            message => message.PartyId == client.GetHandle<MobileParty>(player.PartyId));
         Assert.DoesNotContain(
             Server.NetworkSentMessages.GetMessages<NetworkPartyLeaveSettlement>(),
-            message => message.PartyId == player.PartyId);
+            message => message.PartyId == Server.GetHandle<MobileParty>(player.PartyId));
 
         client.Call(() =>
         {
@@ -3549,7 +3551,9 @@ public class PlayerKingdomCreationFlowTests : IDisposable
             Assert.Same(settlement, party.CurrentSettlement);
         });
 
-        client.SimulateMessage(this, new NetworkPartyEnterSettlement(settlementId, player.PartyId));
+        client.SimulateMessage(this, new NetworkPartyEnterSettlement(
+            client.GetHandle<Settlement>(settlementId),
+            client.GetHandle<MobileParty>(player.PartyId)));
 
         client.Call(() =>
         {
@@ -3588,15 +3592,15 @@ public class PlayerKingdomCreationFlowTests : IDisposable
 
         var leaveRequest = Assert.Single(
             client.NetworkSentMessages.GetMessages<NetworkRequestEndSettlementEncounter>(),
-            message => message.PartyId == player.PartyId);
-        Assert.Equal(player.PartyId, leaveRequest.PartyId);
+            message => message.PartyId == client.GetHandle<MobileParty>(player.PartyId));
+        Assert.Equal(client.GetHandle<MobileParty>(player.PartyId), leaveRequest.PartyId);
         var leaveResult = Assert.Single(
             client.InternalMessages.GetMessages<NetworkSettlementEncounterLeaveResult>(),
-            message => message.PartyId == player.PartyId);
+            message => message.PartyId == client.GetHandle<MobileParty>(player.PartyId));
         Assert.Equal(SettlementEncounterLeaveOutcome.Suppressed, leaveResult.Outcome);
         Assert.DoesNotContain(
             Server.NetworkSentMessages.GetMessages<NetworkPartyLeaveSettlement>(),
-            message => message.PartyId == player.PartyId);
+            message => message.PartyId == Server.GetHandle<MobileParty>(player.PartyId));
 
         client.Call(() =>
         {
@@ -3620,16 +3624,17 @@ public class PlayerKingdomCreationFlowTests : IDisposable
         Server.SimulateMessage(
             client.NetPeer,
             new NetworkRequestCreateKingdom(ControllerId, KingdomName, player.CultureId, player.PartyId, settlementId));
-        Server.SimulateMessage(client.NetPeer, new NetworkRequestEndSettlementEncounter(player.PartyId));
+        Server.SimulateMessage(client.NetPeer, new NetworkRequestEndSettlementEncounter(
+            Server.GetHandle<MobileParty>(player.PartyId)));
         Server.SimulateMessage(this, new PartyLeaveSettlementAttempted(GetObject<MobileParty>(Server, player.PartyId)));
 
         var leaveResult = Assert.Single(
             Server.NetworkSentMessages.GetMessages<NetworkSettlementEncounterLeaveResult>(),
-            message => message.PartyId == player.PartyId);
+            message => message.PartyId == Server.GetHandle<MobileParty>(player.PartyId));
         Assert.Equal(SettlementEncounterLeaveOutcome.Suppressed, leaveResult.Outcome);
         Assert.DoesNotContain(
             Server.NetworkSentMessages.GetMessages<NetworkPartyLeaveSettlement>(),
-            message => message.PartyId == player.PartyId);
+            message => message.PartyId == Server.GetHandle<MobileParty>(player.PartyId));
 
         Server.Call(() =>
         {
@@ -3678,7 +3683,7 @@ public class PlayerKingdomCreationFlowTests : IDisposable
         client.SimulateMessage(
             this,
             new NetworkSettlementEncounterLeaveResult(
-                player.PartyId,
+                client.GetHandle<MobileParty>(player.PartyId),
                 SettlementEncounterLeaveOutcome.Suppressed));
 
         client.Call(() =>
@@ -3934,6 +3939,126 @@ public class PlayerKingdomCreationFlowTests : IDisposable
             .GetValue(instance.ObjectManager);
 
         table.Add(obj, id);
+    }
+
+    [Fact]
+    public void KingdomDecisionVoting_LogsRoundOpeningVoteReceiptAndCounting()
+    {
+        var client1 = Clients.First();
+        var client2 = Clients.Skip(1).First();
+        var player1 = CreateSyncedPlayerContext(ControllerId, client1);
+        var player2 = CreateSyncedPlayerContext(SecondControllerId, client2);
+        var kingdomId = TestEnvironment.CreateRegisteredObject<Kingdom>();
+
+        ConfigureClanInKingdom(Server, player1.ClanId, kingdomId);
+        ConfigureClanInKingdom(Server, player2.ClanId, kingdomId);
+
+        var lines = CaptureKingdomVoteLog(() =>
+        {
+            Server.Call(() =>
+            {
+                Assert.True(Server.ObjectManager.TryGetObject<Kingdom>(kingdomId, out var kingdom));
+                Assert.True(Server.ObjectManager.TryGetObject<Clan>(player1.ClanId, out var proposerClan));
+
+                using (new AllowedThread())
+                {
+                    kingdom._unresolvedDecisions ??= new MBList<KingdomDecision>();
+                    kingdom._unresolvedDecisions.Add(
+                        new KingdomPolicyDecision(proposerClan, PolicyObject.All.First(), false));
+                }
+
+                KingdomDecision decision = Assert.Single(kingdom.UnresolvedDecisions);
+                GetVoteManager(Server).RegisterDecision(decision);
+
+                var vote = new KingdomDecisionVoteData(
+                    kingdomId,
+                    decisionIndex: 0,
+                    outcomeIndex: 0,
+                    supportWeight: (int)Supporter.SupportWeights.FullyPush,
+                    isAbstain: false,
+                    isFinal: true);
+                Server.Resolve<IMessageBroker>().Publish(
+                    this, new NetworkRequestKingdomDecisionVote(ControllerId, vote));
+            });
+        });
+
+        Assert.Contains(lines, line =>
+            line.Contains("Kingdom decision voting round opened") &&
+            line.Contains(nameof(KingdomPolicyDecision)) &&
+            line.Contains("2 eligible clans"));
+        Assert.Contains(lines, line => line.Contains("Received kingdom decision vote from controller"));
+        Assert.Contains(lines, line =>
+            line.Contains("Kingdom decision vote for") && line.Contains("counted"));
+    }
+
+    [Fact]
+    public void KingdomDecisionFinalSelection_LogsWhyItStaysLocalForAClanOutsideTheDecidingKingdom()
+    {
+        var client = Clients.First();
+        var player = CreateSyncedPlayerContext(ControllerId, client);
+        var otherKingdomId = TestEnvironment.CreateRegisteredObject<Kingdom>();
+
+        // Setting up the election asks every clan of the deciding kingdom whether its leader is the
+        // local player, so the proposing clan needs a leader hero.
+        var proposerClanId = CreateSyncedNpcClan();
+
+        ConfigureClanInKingdom(client, proposerClanId, otherKingdomId);
+
+        var lines = CaptureKingdomVoteLog(() =>
+        {
+            client.Call(() =>
+            {
+                Assert.True(client.ObjectManager.TryGetObject<Kingdom>(otherKingdomId, out var kingdom));
+                Assert.True(client.ObjectManager.TryGetObject<Clan>(proposerClanId, out var proposerClan));
+
+                using (new AllowedThread())
+                {
+                    kingdom._unresolvedDecisions ??= new MBList<KingdomDecision>();
+                    kingdom._unresolvedDecisions.Add(
+                        new KingdomPolicyDecision(proposerClan, PolicyObject.All.First(), false));
+                }
+
+                KingdomDecision decision = Assert.Single(kingdom.UnresolvedDecisions);
+                var election = new KingdomElection(decision);
+                var decisionItem = ObjectHelper.SkipConstructor<DecisionItemBaseVM>();
+                decisionItem.DecisionOptionsList = new MBBindingList<DecisionOptionVM>();
+                decisionItem.KingdomDecisionMaker = election;
+
+                Assert.False(GetVoteManager(client).ShouldBlockLocalResolution(decisionItem));
+            });
+        });
+
+        Assert.Contains(lines, line =>
+            line.Contains("Kingdom decision final selection") && line.Contains("resolved locally"));
+    }
+
+    // Collects what the mod writes while the action runs. The voting path reports through the shared
+    // logger, so the callback of the output sink is the seam that sees it.
+    private static IReadOnlyList<string> CaptureKingdomVoteLog(Action action)
+    {
+        var lines = new List<string>();
+        void Collect(string line)
+        {
+            lock (lines)
+            {
+                lines.Add(line);
+            }
+        }
+
+        OutputSinkManager.AddLogCallback(Collect);
+        try
+        {
+            action();
+        }
+        finally
+        {
+            OutputSinkManager.RemoveLogCallback(Collect);
+        }
+
+        lock (lines)
+        {
+            return lines.ToList();
+        }
     }
 
     private PlayerContext CreateSyncedPlayerContext()

@@ -180,6 +180,7 @@ public class PlayerManager : IPlayerManager
                 !ReferenceEquals(current, registeredPlayer))
                 return false;
 
+            replacementPlayer.PlatformName = registeredPlayer.PlatformName;
             _players[registeredPlayer.ControllerId] = replacementPlayer;
 
             foreach (var peer in peerToPlayer

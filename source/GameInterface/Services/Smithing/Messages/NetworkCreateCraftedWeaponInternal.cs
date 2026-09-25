@@ -134,10 +134,14 @@ public readonly struct NetworkCreateCraftedWeaponInternalClients : ICommand
     [ProtoMember(16)]
     public readonly string ClientRequestId;
 
+    [ProtoMember(17)]
+    public readonly uint CraftedItemHandle;
+
     public NetworkCreateCraftedWeaponInternalClients(
         NetworkCreateCraftedWeaponInternalServer cloneObject,
         string nextCraftedItemId,
-        bool success)
+        bool success,
+        uint craftedItemHandle = 0)
     {
         Name = cloneObject.Name;
         CultureId = cloneObject.CultureId;
@@ -155,5 +159,6 @@ public readonly struct NetworkCreateCraftedWeaponInternalClients : ICommand
         CurrentSettlementId = cloneObject.CurrentSettlementId;
         Success = success;
         ClientRequestId = cloneObject.ClientRequestId;
+        CraftedItemHandle = craftedItemHandle;
     }
 }

@@ -1,4 +1,5 @@
-﻿using Common.Messaging;
+﻿using GameInterface.Services.UI.CoopOptions.Providers.UITab;
+using Common.Messaging;
 using GameInterface.Configuration;
 using GameInterface.Services.CampaignService.Messages;
 using GameInterface.Services.UI.CoopOptions;
@@ -158,7 +159,7 @@ public class PlayerNameplatesOptionsTests
     }
 
     [Fact]
-    public void ServerDisabled_HidesPlayerNameplatesTab()
+    public void ServerDisabled_HidesPlayerNameplatesSettings()
     {
         string filePath = CreateTempFilePath();
 
@@ -167,7 +168,7 @@ public class PlayerNameplatesOptionsTests
             using var messageBroker = new MessageBroker();
             var viewModel = CreateViewModel(filePath, messageBroker, false);
 
-            Assert.Null(viewModel.PlayerNameplatesTab);
+            Assert.False(Assert.IsType<UISection>(Assert.Single(viewModel.UITab.Sections)).NameplatesAvailable);
             Assert.DoesNotContain(viewModel.Tabs, tab => tab.Id == PlayerNameplatesOptionsTabProvider.TabId);
             viewModel.OnFinalize();
         }
@@ -178,7 +179,7 @@ public class PlayerNameplatesOptionsTests
     }
 
     [Fact]
-    public void ServerDisabledAfterMenuOpened_RemovesPlayerNameplatesTab()
+    public void ServerDisabledAfterMenuOpened_HidesPlayerNameplatesSettings()
     {
         string filePath = CreateTempFilePath();
 
@@ -186,15 +187,15 @@ public class PlayerNameplatesOptionsTests
         {
             using var messageBroker = new MessageBroker();
             var viewModel = CreateViewModel(filePath, messageBroker, true);
-            Assert.NotNull(viewModel.PlayerNameplatesTab);
+            Assert.True(Assert.IsType<UISection>(Assert.Single(viewModel.UITab.Sections)).NameplatesAvailable);
 
             messageBroker.Publish(
                 this,
                 new ModConfigApplied(new ModOptions(new ModOptionsData { ShowPlayerNameplates = false })));
 
-            Assert.Null(viewModel.PlayerNameplatesTab);
+            Assert.False(Assert.IsType<UISection>(Assert.Single(viewModel.UITab.Sections)).NameplatesAvailable);
             Assert.DoesNotContain(viewModel.Tabs, tab => tab.Id == PlayerNameplatesOptionsTabProvider.TabId);
-            Assert.Equal(KillFeedOptionsTabProvider.TabId, viewModel.SelectedTab.Id);
+            Assert.Equal(UIOptionsTabProvider.TabId, viewModel.SelectedTab.Id);
             viewModel.OnFinalize();
         }
         finally
@@ -265,8 +266,7 @@ public class PlayerNameplatesOptionsTests
     {
         ICoopOptionsTabProvider[] providers =
         {
-            new KillFeedOptionsTabProvider(),
-            new PlayerNameplatesOptionsTabProvider()
+            new UIOptionsTabProvider()
         };
         var modOptions = new ModOptions(new ModOptionsData
         {

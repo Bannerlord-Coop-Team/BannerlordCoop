@@ -64,15 +64,14 @@ public class PartyVisualLifetimeHandler : IHandler
 
         if (!objectManager.AddNewObject(payload.What.MobilePartyVisual, out var visualId))
             return;
+        if (!objectManager.TryGetHandleWithLogging(payload.What.MobilePartyVisual, out var visualHandle) ||
+            !objectManager.TryGetHandleWithLogging(mobileParty, out var mobilePartyHandle)) return;
 
-        network.SendAll(new NetworkCreatePartyVisual(visualId, mobilePartyId));
+        network.SendAll(new NetworkCreatePartyVisual(visualId, visualHandle, mobilePartyHandle));
     }
 
     private void Handle(MessagePayload<NetworkCreatePartyVisual> payload)
     {
-        var mobilePartyId = payload.What.MobilePartyId;
-        if (mobilePartyId == null) return;
-
         var partyVisualId = payload.What.PartyVisualId;
 
         // Resolve the party and build its visual on the main thread, in network order behind the
@@ -83,7 +82,7 @@ public class PartyVisualLifetimeHandler : IHandler
         // mutates its party list here while OnTick walks it on the main thread, so this must not race.
         GameThread.RunSafe(() =>
         {
-            if (!objectManager.TryGetObjectWithLogging<MobileParty>(mobilePartyId, out var mobileParty))
+            if (!objectManager.TryGetObjectWithLogging<MobileParty>(payload.What.MobilePartyHandle, out var mobileParty))
                 return;
 
             using (new AllowedThread())
@@ -92,7 +91,7 @@ public class PartyVisualLifetimeHandler : IHandler
 
                 var partyVisual = mobileParty.Party.GetPartyVisual();
                 if (partyVisual != null)
-                    objectManager.AddExisting(partyVisualId, partyVisual);
+                    objectManager.AddExisting(partyVisualId, partyVisual, payload.What.PartyVisualHandle);
             }
         }, context: $"create party visual {partyVisualId}");
     }
@@ -107,27 +106,21 @@ public class PartyVisualLifetimeHandler : IHandler
             return;
         }
 
-        if (!objectManager.TryGetIdWithLogging(payload.What.MobileParty, out string mobilePartyId))
+        if (!objectManager.TryGetHandleWithLogging(payload.What.MobileParty, out var mobilePartyHandle))
             return;
 
         skippedVisualIds.Remove(partyVisual);
         if (isRegistered)
             objectManager.Remove(partyVisual);
 
-        network.SendAll(new NetworkDestroyPartyVisual(partyVisualId, mobilePartyId));
+        network.SendAll(new NetworkDestroyPartyVisual(mobilePartyHandle));
     }
 
     private void Handle(MessagePayload<NetworkDestroyPartyVisual> payload)
     {
-        var partyVisualId = payload.What.PartyVisualId;
-        var mobilePartyId = payload.What.MobilePartyId;
-
         GameThread.RunSafe(() =>
         {
-            if (objectManager.TryGetObject<MobilePartyVisual>(partyVisualId, out var registeredPartyVisual))
-                objectManager.Remove(registeredPartyVisual);
-
-            if (!objectManager.TryGetObjectWithLogging<MobileParty>(mobilePartyId, out var mobileParty))
+            if (!objectManager.TryGetObjectWithLogging<MobileParty>(payload.What.MobilePartyHandle, out var mobileParty))
                 return;
 
             using (new AllowedThread())
@@ -138,6 +131,6 @@ public class PartyVisualLifetimeHandler : IHandler
 
                 MobilePartyVisualManager.Current?.RemovePartyVisualForParty(mobileParty);
             }
-        }, context: $"destroy party visual {mobilePartyId}");
+        }, context: $"destroy party visual {payload.What.MobilePartyHandle}");
     }
 }

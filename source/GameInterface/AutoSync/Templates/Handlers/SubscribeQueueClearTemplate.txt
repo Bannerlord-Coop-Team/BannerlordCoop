@@ -2,7 +2,7 @@
 {
     var data = payload.What;
 
-    if (!objectManager.TryGetIdWithLogging(data.Instance, out var instanceId))
+    if (!objectManager.TryGetHandleWithLogging(data.Instance, out var instanceId))
         return;
 
     {{~ if Debug ~}}

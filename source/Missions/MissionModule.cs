@@ -41,11 +41,17 @@ public class MissionModule : Module
     internal const string AgentVoicePatchCategory = "CoopAgentVoicePatches";
     internal const string WeaponDropPatchCategory = "CoopWeaponDropPatches";
     internal const string WeaponPickupPatchCategory = "CoopWeaponPickupPatches";
+    internal const string PilotSeatPatchCategory = "CoopPilotSeatPatches";
     internal const string HideoutPatchCategory = "CoopHideoutPatches";
 
     protected override void Load(ContainerBuilder builder)
     {
+#if DEBUG
+        builder.RegisterType<SiegeInteractionDebugBehavior>().AsSelf()
+            .As<ISiegeInteractionDebugBehavior>().InstancePerDependency();
+#endif
         builder.RegisterType<ReceivePathDiagnostics>().As<IReceivePathDiagnostics>().InstancePerDependency();
+        builder.RegisterType<SiegeGateHitApplier>().As<ISiegeGateHitApplier>().InstancePerDependency();
         base.Load(builder);
 
         foreach (HarmonyPatchCategoryRegistration registration in CreatePatchCategoryRegistrations())
@@ -284,6 +290,10 @@ public class MissionModule : Module
 
     internal static IEnumerable<HarmonyPatchCategoryRegistration> CreatePatchCategoryRegistrations()
     {
+#if DEBUG
+        yield return new HarmonyPatchCategoryRegistration(
+            typeof(SiegeInteractionDebugBehavior).Assembly, "CoopSiegeInteractionDebug");
+#endif
         yield return new HarmonyPatchCategoryRegistration(typeof(HideoutDepletionPatch).Assembly, HideoutPatchCategory);
         yield return new HarmonyPatchCategoryRegistration(
             typeof(AddMissileAuxPatch).Assembly,
@@ -303,5 +313,8 @@ public class MissionModule : Module
         yield return new HarmonyPatchCategoryRegistration(
             typeof(AgentPickupPatch).Assembly,
             WeaponPickupPatchCategory);
+        yield return new HarmonyPatchCategoryRegistration(
+            typeof(ReplicatedPilotPointPatch).Assembly,
+            PilotSeatPatchCategory);
     }
 }

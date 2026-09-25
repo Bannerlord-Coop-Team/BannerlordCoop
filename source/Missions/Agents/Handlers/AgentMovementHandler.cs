@@ -338,6 +338,7 @@ public class AgentMovementHandler : IAgentMovementHandler
         public readonly Guid CanonicalId;
         public readonly bool UsesCompactId;
         public readonly long AuthorityRevision;
+        public readonly long SampleSequence;
         public readonly AgentData Data;
         public readonly AgentMountData MountData;
         public readonly bool IsMount;
@@ -348,13 +349,15 @@ public class AgentMovementHandler : IAgentMovementHandler
             Guid canonicalId,
             bool usesCompactId,
             AgentData data,
-            long authorityRevision)
+            long authorityRevision,
+            long sampleSequence)
         {
             IdentityScopeId = identityScopeId;
             CompactId = compactId;
             CanonicalId = canonicalId;
             UsesCompactId = usesCompactId;
             AuthorityRevision = authorityRevision;
+            SampleSequence = sampleSequence;
             Data = data;
             MountData = null;
             IsMount = false;
@@ -366,13 +369,15 @@ public class AgentMovementHandler : IAgentMovementHandler
             Guid canonicalId,
             bool usesCompactId,
             AgentMountData mountData,
-            long authorityRevision)
+            long authorityRevision,
+            long sampleSequence)
         {
             IdentityScopeId = identityScopeId;
             CompactId = compactId;
             CanonicalId = canonicalId;
             UsesCompactId = usesCompactId;
             AuthorityRevision = authorityRevision;
+            SampleSequence = sampleSequence;
             Data = default;
             MountData = mountData;
             IsMount = true;
@@ -383,6 +388,9 @@ public class AgentMovementHandler : IAgentMovementHandler
         new Dictionary<string, RecipientMovementState>(StringComparer.Ordinal);
     private readonly Dictionary<Agent, ResolvedMountIdentity> resolvedMountIdentities =
         new Dictionary<Agent, ResolvedMountIdentity>();
+    private readonly Dictionary<Guid, (CoopAgentInfo Registration, string Authority, long Revision, long Sequence)>
+        receivedMovementSequences = new Dictionary<Guid, (CoopAgentInfo, string, long, long)>();
+    private long sampleSequence;
     private float totalSimulationTime = 0f;
 
     // Per-frame position smoothing for received puppets. Fed the latest target on each packet apply (below) and
@@ -497,6 +505,7 @@ public class AgentMovementHandler : IAgentMovementHandler
 
         _dismountedHorses.Clear();
         resolvedMountIdentities.Clear();
+        receivedMovementSequences.Clear();
         recipientMovementStates.Clear();
 
         movementBatchSender.Clear();
@@ -706,6 +715,8 @@ public class AgentMovementHandler : IAgentMovementHandler
         float bulkSampleElapsed,
         float prioritySampleElapsed)
     {
+        // One sequence identifies this capture across recipients, priorities, and packet fragments.
+        sampleSequence++;
         var capturedMovements = new List<CapturedMovement>();
         var broadcastAgentIds = new HashSet<Guid>();
         int activeLocallyControlledAgents = 0;
@@ -762,7 +773,8 @@ public class AgentMovementHandler : IAgentMovementHandler
                     agentInfo.MovementScopeId,
                     out ushort mountMovementId,
                     out string mountIdentityScopeId,
-                    out Guid mountAgentId);
+                    out Guid mountAgentId,
+                    out long? mountAuthorityRevision);
                 Agent mount = agent.MountAgent;
                 int turnDirection = EnsureStationaryMountTurnAnimation(
                     mount,
@@ -778,7 +790,8 @@ public class AgentMovementHandler : IAgentMovementHandler
                     turnDirection == AgentMountData.NoTurn ? (int?)null : turnDirection,
                     turnDirection == AgentMountData.NoTurn ? (int?)null : turnActionIndex,
                     turnDirection == AgentMountData.NoTurn ? (float?)null : turnProgress,
-                    mountAction0IsSyntheticTurn: syntheticTurn);
+                    mountAction0IsSyntheticTurn: syntheticTurn,
+                    mountAuthorityRevision: mountAuthorityRevision);
 
                 capturedMovements.Add(
                     new CapturedMovement(agentInfo, agentData, isPriority));
@@ -1601,6 +1614,7 @@ public class AgentMovementHandler : IAgentMovementHandler
         batch.Add(agentInfo, data, priority);
     }
 
+    // Stamp every candidate fragment with the current capture sequence.
     private IPacket CreateMovementPacket(
         string identityScopeId,
         ushort[] compactIds,
@@ -1608,10 +1622,11 @@ public class AgentMovementHandler : IAgentMovementHandler
         AgentData[] data)
     {
         return identityScopeId == null
-            ? new MovementPacket(canonicalIds, data, controllerIdProvider.ControllerId)
-            : new MovementPacket(identityScopeId, compactIds, data, controllerIdProvider.ControllerId);
+            ? new MovementPacket(canonicalIds, data, controllerIdProvider.ControllerId, sampleSequence: sampleSequence)
+            : new MovementPacket(identityScopeId, compactIds, data, controllerIdProvider.ControllerId, sampleSequence: sampleSequence);
     }
 
+    // Standalone mounts share the rider capture clock but retain per-agent receive ordering.
     private IPacket CreateMountMovementPacket(
         string identityScopeId,
         ushort[] compactIds,
@@ -1619,8 +1634,8 @@ public class AgentMovementHandler : IAgentMovementHandler
         AgentMountData[] data)
     {
         return identityScopeId == null
-            ? new MountMovementPacket(canonicalIds, data, controllerIdProvider.ControllerId)
-            : new MountMovementPacket(identityScopeId, compactIds, data, controllerIdProvider.ControllerId);
+            ? new MountMovementPacket(canonicalIds, data, controllerIdProvider.ControllerId, sampleSequence: sampleSequence)
+            : new MountMovementPacket(identityScopeId, compactIds, data, controllerIdProvider.ControllerId, sampleSequence: sampleSequence);
     }
 
     public void HandlePacket(NetPeer peer, IPacket packet)
@@ -1646,7 +1661,8 @@ public class AgentMovementHandler : IAgentMovementHandler
                 usesCompactIds ? Guid.Empty : movement.AgentGuids[i],
                 usesCompactIds,
                 movement.Agents[i],
-                movement.AuthorityRevisions?[i] ?? 0);
+                movement.AuthorityRevisions?[i] ?? 0,
+                movement.SampleSequence);
         }
 
         QueueReceivedMovement(peer, movement.SenderControllerId, snapshots);
@@ -1669,7 +1685,8 @@ public class AgentMovementHandler : IAgentMovementHandler
                 usesCompactIds ? Guid.Empty : movement.MountGuids[i],
                 usesCompactIds,
                 movement.Mounts[i],
-                movement.AuthorityRevisions?[i] ?? 0);
+                movement.AuthorityRevisions?[i] ?? 0,
+                movement.SampleSequence);
         }
 
         QueueReceivedMovement(peer, movement.SenderControllerId, snapshots);
@@ -1750,6 +1767,7 @@ public class AgentMovementHandler : IAgentMovementHandler
         return false;
     }
 
+    // Validate authority and sample order on the game thread before changing any puppet state.
     private void ApplyMovement(
         NetPeer peer, string senderId, bool directPeer,
         IReadOnlyList<ReceivedMovement> snapshots)
@@ -1774,17 +1792,6 @@ public class AgentMovementHandler : IAgentMovementHandler
                 if (!found || agentInfo.CurrentAuthority != senderId ||
                     agentInfo.AuthorityRevision != snapshot.AuthorityRevision) continue;
 
-                if (snapshot.IsMount)
-                {
-                    _mountMovementApplier.ApplySnapshot(
-                        snapshot.IdentityScopeId,
-                        snapshot.CompactId,
-                        snapshot.CanonicalId,
-                        snapshot.UsesCompactId,
-                        snapshot.MountData);
-                    continue;
-                }
-
                 Agent agent = agentInfo.Agent;
                 AgentData data = snapshot.Data;
 
@@ -1797,11 +1804,31 @@ public class AgentMovementHandler : IAgentMovementHandler
                 if (agentRegistry.IsLocallyControlled(agent))
                     continue;
 
+                if (!IsNewMovementSequence(agentInfo, snapshot.SampleSequence))
+                    continue;
+
+                if (snapshot.IsMount)
+                {
+                    RecordMovementSequence(agentInfo, snapshot.SampleSequence);
+                    _mountMovementApplier.ApplySnapshot(
+                        snapshot.IdentityScopeId,
+                        snapshot.CompactId,
+                        snapshot.CanonicalId,
+                        snapshot.UsesCompactId,
+                        snapshot.MountData);
+                    continue;
+                }
+
+                string riderScope = snapshot.IdentityScopeId ?? agentInfo.MovementScopeId;
+                bool applyMount = TryAcceptEmbeddedMountSequence(
+                    agent, riderScope, data.MountData, senderId, snapshot.SampleSequence);
+                // A mounted target couples both poses; do not replace or refresh it with an older horse pose.
+                if (!applyMount && agent.HasMount) continue;
+                RecordMovementSequence(agentInfo, snapshot.SampleSequence);
+
                 Agent previousMount = agent.MountAgent;
-                SyncMountState(
-                    agent,
-                    snapshot.IdentityScopeId ?? agentInfo.MovementScopeId,
-                    data);
+                if (applyMount)
+                    SyncMountState(agent, riderScope, data);
                 if (!ReferenceEquals(previousMount, agent.MountAgent))
                 {
                     if (previousMount != null)
@@ -1844,6 +1871,40 @@ public class AgentMovementHandler : IAgentMovementHandler
                 }
             }
         }
+    }
+
+    // Keep ordering per registration and authority generation, not per packet batch or transport connection.
+    private bool IsNewMovementSequence(CoopAgentInfo agentInfo, long sequence)
+    {
+        return !receivedMovementSequences.TryGetValue(agentInfo.AgentId, out var previous) ||
+            !ReferenceEquals(previous.Registration, agentInfo) ||
+            previous.Authority != agentInfo.CurrentAuthority ||
+            previous.Revision != agentInfo.AuthorityRevision ||
+            sequence > previous.Sequence;
+    }
+
+    // Record only after deciding which snapshot state can be applied.
+    private void RecordMovementSequence(CoopAgentInfo agentInfo, long sequence)
+    {
+        receivedMovementSequences[agentInfo.AgentId] =
+            (agentInfo, agentInfo.CurrentAuthority, agentInfo.AuthorityRevision, sequence);
+    }
+
+    // Rider and loose-horse streams share a clock only when the embedded horse generation also matches.
+    private bool TryAcceptEmbeddedMountSequence(
+        Agent rider, string riderScope, AgentMountData data, string senderId, long sequence)
+    {
+        if (data?.MountAuthorityRevision == null) return true;
+        Agent horse = ResolveRegisteredHorse(rider, riderScope, data);
+        if (horse == null || horse.Mission != Mission.Current || !horse.IsActive() ||
+            (horse.RiderAgent != null && horse.RiderAgent != rider) ||
+            !agentRegistry.TryGetAgentInfo(horse, out var info) ||
+            info.CurrentAuthority != senderId || info.AuthorityRevision != data.MountAuthorityRevision)
+            return true;
+
+        if (!IsNewMovementSequence(info, sequence)) return false;
+        RecordMovementSequence(info, sequence);
+        return true;
     }
 
     // [Game thread] Replicate the owner's mount/dismount onto its puppet. The per-tick AgentData reports
@@ -2011,20 +2072,24 @@ public class AgentMovementHandler : IAgentMovementHandler
         return mount;
     }
 
+    // Capture the horse identity and its own revision together, independently of the rider revision.
     private void GetRegisteredMountIdentity(
         Agent agent,
         string riderIdentityScopeId,
         out ushort movementId,
         out string identityScopeId,
-        out Guid agentId)
+        out Guid agentId,
+        out long? authorityRevision)
     {
         movementId = 0;
         identityScopeId = null;
         agentId = Guid.Empty;
+        authorityRevision = null;
 
         var mount = agent.MountAgent;
         if (mount != null && agentRegistry.TryGetAgentInfo(mount, out var mountInfo))
         {
+            authorityRevision = mountInfo.AuthorityRevision;
             if (mountInfo.MovementId == 0)
             {
                 agentId = mountInfo.AgentId;

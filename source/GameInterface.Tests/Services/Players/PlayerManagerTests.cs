@@ -285,11 +285,15 @@ public class PlayerManagerTests
         Assert.Same(current, resolved);
     }
 
+    // Replacing campaign objects preserves the same controller's peer and saved platform name.
     [Fact]
     public void ReplacePlayer_CurrentRegistration_UpdatesControllerAndPeerAtomically()
     {
         var playerManager = CreatePlayerManager(out _);
-        var registered = new Player(ControllerId, "Hero", "StaleParty", "Clan", "Character");
+        var registered = new Player(ControllerId, "Hero", "StaleParty", "Clan", "Character")
+        {
+            PlatformName = "Platform player"
+        };
         var replacement = new Player(ControllerId, "Hero", "RecoveredParty", "Clan", "Character");
         var peer = new TestNetwork().CreatePeer();
 
@@ -303,6 +307,7 @@ public class PlayerManagerTests
         Assert.True(playerManager.TryGetPlayer(peer, out var byPeer));
         Assert.Same(replacement, byPeer);
         Assert.Same(replacement, Assert.Single(playerManager.Players));
+        Assert.Equal("Platform player", replacement.PlatformName);
     }
 
     [Fact]

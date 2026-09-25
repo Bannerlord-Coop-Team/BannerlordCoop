@@ -1,5 +1,7 @@
-﻿using Common.Messaging;
+﻿using Common;
+using Common.Messaging;
 using Coop.Core.Server.Services.ItemRosters.Messages;
+using GameInterface.Services.ItemObjects;
 using GameInterface.Services.ItemRosters.Messages;
 
 namespace Coop.Core.Client.Services.ItemRosters.Handlers
@@ -10,14 +12,25 @@ namespace Coop.Core.Client.Services.ItemRosters.Handlers
     public class NetworkItemRosterMessageHandler : IHandler
     {
         private readonly IMessageBroker messageBroker;
+        private readonly ItemObjectRegistry itemObjectRegistry;
 
 
-        public NetworkItemRosterMessageHandler(IMessageBroker broker)
+        public NetworkItemRosterMessageHandler(
+            IMessageBroker broker,
+            ItemObjectRegistry itemObjectRegistry)
         {
             messageBroker = broker;
+            this.itemObjectRegistry = itemObjectRegistry;
 
+            messageBroker.Subscribe<NetworkRegisterItemHandle>(Handle);
             messageBroker.Subscribe<NetworkItemRosterUpdate>(Handle);
             messageBroker.Subscribe<NetworkItemRosterClear>(Handle);
+        }
+
+        public void Handle(MessagePayload<NetworkRegisterItemHandle> payload)
+        {
+            GameThread.RunSafe(() =>
+                itemObjectRegistry.TryRegisterExistingItem(payload.What.StringId, payload.What.Handle));
         }
 
         public void Handle(MessagePayload<NetworkItemRosterUpdate> payload)
@@ -37,6 +50,7 @@ namespace Coop.Core.Client.Services.ItemRosters.Handlers
 
         public void Dispose()
         {
+            messageBroker.Unsubscribe<NetworkRegisterItemHandle>(Handle);
             messageBroker.Unsubscribe<NetworkItemRosterUpdate>(Handle);
             messageBroker.Unsubscribe<NetworkItemRosterClear>(Handle);
         }

@@ -82,8 +82,8 @@ internal class PartyDoneLogicHandler : IHandler
         var upgradedTroopHistory = new UpgradedTroopHistoryData(new());
         foreach (Tuple<CharacterObject, CharacterObject, int> tuple in obj.What.UpgradedTroopHistory)
         {
-            if (!objectManager.TryGetIdWithLogging(tuple.Item1, out var character1Id)) continue;
-            if (!objectManager.TryGetIdWithLogging(tuple.Item2, out var character2Id)) continue;
+            if (!objectManager.TryGetHandleWithLogging(tuple.Item1, out var character1Id)) continue;
+            if (!objectManager.TryGetHandleWithLogging(tuple.Item2, out var character2Id)) continue;
 
             upgradedTroopHistory.Data.Add(new(character1Id, character2Id, tuple.Item3));
         }
@@ -216,7 +216,7 @@ internal class PartyDoneLogicHandler : IHandler
                     out leftPrisonerRosterData,
                     out rightPrisonerRosterData);
             }
-            var takenHeroCharacterIds = new HashSet<string>();
+            var takenHeroCharacterIds = new HashSet<uint>();
             var actionRostersAreValid =
                 !message.ApplyReleasedAndTakenPrisonerActions ||
                 TryValidatePrisonerActionRosters(
@@ -311,6 +311,7 @@ internal class PartyDoneLogicHandler : IHandler
 
     private bool TryValidateForceTransfer(NetworkCompleteDoneLogic message, Hero mainHero, NetPeer requester)
     {
+        string error = null;
         if (mainHero.PartyBelongedTo == null ||
             !objectManager.TryGetId(mainHero.PartyBelongedTo, out var partyId) ||
             !villageHostileActionInterface.TryPeekForceTransfer(message.ForceTransferId, partyId, out var pool))
@@ -320,8 +321,10 @@ internal class PartyDoneLogicHandler : IHandler
                 message.MainHeroId,
                 message.ForceTransferId);
         }
-        else if (!VillageHostileActionInterface.TryValidateVolunteersCommit(
-            pool.TroopId,
+        else if (!objectManager.TryGetObjectWithLogging<CharacterObject>(pool.TroopId, out var poolTroop) ||
+            !objectManager.TryGetHandleWithLogging(poolTroop, out var poolTroopHandle) ||
+            !VillageHostileActionInterface.TryValidateVolunteersCommit(
+            poolTroopHandle,
             pool.TroopCount,
             message.RightMemberRosterData,
             message.LeftMemberRosterData,
@@ -335,7 +338,7 @@ internal class PartyDoneLogicHandler : IHandler
             message.ApplyReleasedAndTakenPrisonerActions,
             message.DonationSettlementId,
             ResolveUpgradedTroops(message.UpgradedTroopHistoryIds),
-            out var error))
+            out error))
         {
             // The pool is deliberately left intact: a rejection must not mutate
             // pool state, so a false positive never destroys the reward.
@@ -366,12 +369,12 @@ internal class PartyDoneLogicHandler : IHandler
         return false;
     }
 
-    private static IEnumerable<(string fromId, string toId, int number)> ResolveUpgradedTroops(UpgradedTroopHistoryData history)
+    private static IEnumerable<(uint fromId, uint toId, int number)> ResolveUpgradedTroops(UpgradedTroopHistoryData history)
     {
         if (history.Data == null)
-            return Enumerable.Empty<(string fromId, string toId, int number)>();
+            return Enumerable.Empty<(uint fromId, uint toId, int number)>();
         return history.Data
-            .Where(e => !string.IsNullOrEmpty(e.Character2Id) && e.Number > 0)
+            .Where(e => e.Character2Id != 0 && e.Number > 0)
             .Select(e => (fromId: e.Character1Id, toId: e.Character2Id, number: e.Number));
     }
 
@@ -460,13 +463,13 @@ internal class PartyDoneLogicHandler : IHandler
         }
     }
 
-    private HashSet<string> GetTakenHeroCharacterIds(FlattenedTroopRoster takenPrisonersRoster)
+    private HashSet<uint> GetTakenHeroCharacterIds(FlattenedTroopRoster takenPrisonersRoster)
     {
-        var characterIds = new HashSet<string>();
+        var characterIds = new HashSet<uint>();
         foreach (var element in takenPrisonersRoster)
         {
             if (element.Troop?.IsHero == true &&
-                objectManager.TryGetIdWithLogging(element.Troop, out var characterId))
+                objectManager.TryGetHandleWithLogging(element.Troop, out var characterId))
                 characterIds.Add(characterId);
         }
 
@@ -477,7 +480,7 @@ internal class PartyDoneLogicHandler : IHandler
         FlattenedTroopRoster releasedPrisonersRoster,
         FlattenedTroopRoster takenPrisonersRoster,
         TroopRosterData rightPrisonerRosterData,
-        out HashSet<string> takenHeroCharacterIds)
+        out HashSet<uint> takenHeroCharacterIds)
     {
         takenHeroCharacterIds = GetTakenHeroCharacterIds(takenPrisonersRoster);
         var signedDeltas = (rightPrisonerRosterData.Data ?? Array.Empty<TroopRosterElementData>())
@@ -490,14 +493,14 @@ internal class PartyDoneLogicHandler : IHandler
 
     private bool ActionsMatchDelta(
         FlattenedTroopRoster actionRoster,
-        IReadOnlyDictionary<string, int> signedDeltas,
+        IReadOnlyDictionary<uint, int> signedDeltas,
         int expectedSign)
     {
-        var actionCounts = new Dictionary<string, int>();
+        var actionCounts = new Dictionary<uint, int>();
         foreach (var element in actionRoster)
         {
             if (element.Troop == null ||
-                !objectManager.TryGetIdWithLogging(element.Troop, out var characterId))
+                !objectManager.TryGetHandleWithLogging(element.Troop, out var characterId))
                 return false;
 
             actionCounts.TryGetValue(characterId, out var count);
@@ -511,7 +514,7 @@ internal class PartyDoneLogicHandler : IHandler
 
     internal static TroopRosterData FilterTakenHeroAdditions(
         TroopRosterData delta,
-        HashSet<string> takenHeroCharacterIds)
+        HashSet<uint> takenHeroCharacterIds)
     {
         if (delta.Data == null || takenHeroCharacterIds.Count == 0)
             return delta;
@@ -579,11 +582,11 @@ internal class PartyDoneLogicHandler : IHandler
         TroopRosterData delta,
         int expectedSign)
     {
-        var actionCounts = new Dictionary<string, int>();
+        var actionCounts = new Dictionary<uint, int>();
         foreach (var element in actionRoster)
         {
             if (element.Troop == null ||
-                !objectManager.TryGetIdWithLogging(element.Troop, out var characterId))
+                !objectManager.TryGetHandleWithLogging(element.Troop, out var characterId))
                 return false;
 
             actionCounts.TryGetValue(characterId, out var count);
@@ -749,9 +752,9 @@ internal class PartyDoneLogicHandler : IHandler
             .ToList();
     }
 
-    private HashSet<string> GetTransferredPlayerPrisoners(params TroopRosterData[] prisonerRosterDeltas)
+    private HashSet<uint> GetTransferredPlayerPrisoners(params TroopRosterData[] prisonerRosterDeltas)
     {
-        var transferredPlayerPrisoners = new HashSet<string>();
+        var transferredPlayerPrisoners = new HashSet<uint>();
         foreach (var delta in prisonerRosterDeltas)
         {
             foreach (var elementData in delta.Data ?? Array.Empty<TroopRosterElementData>())
@@ -766,7 +769,7 @@ internal class PartyDoneLogicHandler : IHandler
 
     private TroopRosterData FilterPlayerPrisonerReleaseDelta(
         TroopRosterData delta,
-        HashSet<string> transferredPlayerPrisoners,
+        HashSet<uint> transferredPlayerPrisoners,
         List<Hero> releasedPlayerPrisoners)
     {
         if (delta.Data == null) return delta;

@@ -160,10 +160,10 @@ public class NetworkPlayerPartyInteractionSerializationTest
             "session-1",
             "party-1",
             new[] { new ItemRosterElementData(new ItemObjectData("item-1", null, itemModifierNull: true), 2) },
-            new[] { new TroopRosterElementData("troop-1", 3, 1, 4) },
+            new[] { new TroopRosterElementData(1, 3, 1, 4) },
             offeredGold: 25,
             offeredFiefs: new[] { "fief-1" },
-            offeredPrisoners: new[] { new TroopRosterElementData("prisoner-1", 1, 0, 0) },
+            offeredPrisoners: new[] { new TroopRosterElementData(2, 1, 0, 0) },
             offeredPeace: true);
 
         var result = RoundTrip(original);
@@ -173,12 +173,12 @@ public class NetworkPlayerPartyInteractionSerializationTest
         Assert.Single(result.OfferedItems);
         Assert.Equal("item-1", result.OfferedItems[0].ItemObjectData.ItemObjectId);
         Assert.Single(result.OfferedTroops);
-        Assert.Equal("troop-1", result.OfferedTroops[0].CharacterId);
+        Assert.Equal(1u, result.OfferedTroops[0].CharacterId);
         Assert.Equal(25, result.OfferedGold);
         Assert.Single(result.OfferedFiefs);
         Assert.Equal("fief-1", result.OfferedFiefs[0]);
         Assert.Single(result.OfferedPrisoners);
-        Assert.Equal("prisoner-1", result.OfferedPrisoners[0].CharacterId);
+        Assert.Equal(2u, result.OfferedPrisoners[0].CharacterId);
         Assert.True(result.OfferedPeace);
     }
 

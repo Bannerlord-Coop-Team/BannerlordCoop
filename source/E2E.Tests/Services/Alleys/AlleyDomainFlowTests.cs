@@ -40,7 +40,9 @@ public class AlleyDomainFlowTests : AlleyTestEnvironment
             Assert.Equal(scenario.OwnerHeroId, seeded.OverseerId);
             Assert.Empty(seeded.Garrison);
 
-            seeded.LastRecruitTimeTicks = CampaignTime.Now.NumTicks - CampaignTime.Days(9f).NumTicks;
+            session.SetLastRecruitTimeTicks(
+                scenario.PlayerAlleyId,
+                CampaignTime.Now.NumTicks - CampaignTime.Days(9f).NumTicks);
             session.SetUnderAttackByAi(
                 scenario.PlayerAlleyId,
                 scenario.AttackerAlleyId,
@@ -81,8 +83,8 @@ public class AlleyDomainFlowTests : AlleyTestEnvironment
             ownerClient,
             scenario,
             scenario.OwnerHeroId,
-            new TroopRosterElementData(ownerCharacterId, 1, 0, 0),
-            new TroopRosterElementData(troopId, 3, 0, 20));
+            new TroopRosterElementData(CharacterHandle(ownerCharacterId), 1, 0, 0),
+            new TroopRosterElementData(CharacterHandle(troopId), 3, 0, 20));
 
         ownerClient.Call(() =>
         {
@@ -100,12 +102,12 @@ public class AlleyDomainFlowTests : AlleyTestEnvironment
                 new SetAlleyGarrisonRequested(alley, roster));
         });
 
-        AlleyManagementData managed = GetManagementData(scenario.PlayerAlleyId);
+        AlleyManagementState managed = GetManagementData(scenario.PlayerAlleyId);
         Assert.Equal(scenario.OverseerHeroId, managed.OverseerId);
         Assert.Contains(managed.Garrison,
-            element => element.CharacterId == overseerCharacterId && element.Number == 1);
+            element => element.CharacterId == CharacterHandle(overseerCharacterId) && element.Number == 1);
         Assert.Contains(managed.Garrison,
-            element => element.CharacterId == troopId && element.Number == 5 && element.Xp == 35);
+            element => element.CharacterId == CharacterHandle(troopId) && element.Number == 5 && element.Xp == 35);
 
         var clientData = GetClientAlleyData(ownerClient, scenario.PlayerAlleyId);
         Assert.Equal(scenario.OverseerHeroId, GetId(ownerClient, clientData.AssignedClanMember));
@@ -143,17 +145,18 @@ public class AlleyDomainFlowTests : AlleyTestEnvironment
             ownerClient,
             scenario,
             scenario.OwnerHeroId,
-            new TroopRosterElementData(ownerCharacterId, 1, 0, 0));
+            new TroopRosterElementData(CharacterHandle(ownerCharacterId), 1, 0, 0));
 
         long expectedRecruitTime = 0;
         Server.Call(() =>
         {
             var session = Server.Resolve<ISessionAlleyPlayerDataInterface>();
             Assert.True(session.TryGetManagementData(scenario.PlayerAlleyId, out var data));
-            data.LastRecruitTimeTicks = CampaignTime.Now.NumTicks;
+            var lastRecruitTimeTicks = CampaignTime.Now.NumTicks;
+            session.SetLastRecruitTimeTicks(scenario.PlayerAlleyId, lastRecruitTimeTicks);
             Campaign.Current.MapTimeTracker._deltaTimeInTicks += CampaignTime.Days(8f).NumTicks;
             expectedRecruitTime = CampaignTime.Now.NumTicks;
-            Assert.True(new CampaignTime(data.LastRecruitTimeTicks).ElapsedDaysUntilNow >
+            Assert.True(new CampaignTime(lastRecruitTimeTicks).ElapsedDaysUntilNow >
                 CampaignTime.DaysInWeek);
         });
 
@@ -190,7 +193,7 @@ public class AlleyDomainFlowTests : AlleyTestEnvironment
             ownerClient,
             scenario,
             scenario.OverseerHeroId,
-            new TroopRosterElementData(overseerCharacterId, 1, 0, 0));
+            new TroopRosterElementData(CharacterHandle(overseerCharacterId), 1, 0, 0));
 
         Server.Call(() =>
         {
@@ -222,7 +225,7 @@ public class AlleyDomainFlowTests : AlleyTestEnvironment
             ownerClient,
             scenario,
             scenario.OwnerHeroId,
-            new TroopRosterElementData(ownerCharacterId, 1, 0, 0));
+            new TroopRosterElementData(CharacterHandle(ownerCharacterId), 1, 0, 0));
 
         Server.Call(() =>
         {
@@ -261,12 +264,12 @@ public class AlleyDomainFlowTests : AlleyTestEnvironment
             ownerClient,
             scenario,
             scenario.OwnerHeroId,
-            new TroopRosterElementData(ownerCharacterId, 1, 0, 0),
-            new TroopRosterElementData(troopId, 5, 0, 0));
+            new TroopRosterElementData(CharacterHandle(ownerCharacterId), 1, 0, 0),
+            new TroopRosterElementData(CharacterHandle(troopId), 5, 0, 0));
 
         ForceAttack(scenario);
 
-        AlleyManagementData attacked = GetManagementData(scenario.PlayerAlleyId);
+        AlleyManagementState attacked = GetManagementData(scenario.PlayerAlleyId);
         Assert.Equal(scenario.AttackerAlleyId, attacked.UnderAttackByAlleyId);
         Assert.Same(
             ownerClient.GetRegisteredObject<Alley>(scenario.AttackerAlleyId),
@@ -276,13 +279,13 @@ public class AlleyDomainFlowTests : AlleyTestEnvironment
             ownerClient,
             scenario,
             won: true,
-            new TroopRosterElementData(ownerCharacterId, 1, 0, 0),
-            new TroopRosterElementData(troopId, 2, 0, 10));
+            new TroopRosterElementData(CharacterHandle(ownerCharacterId), 1, 0, 0),
+            new TroopRosterElementData(CharacterHandle(troopId), 2, 0, 10));
 
-        AlleyManagementData resolved = GetManagementData(scenario.PlayerAlleyId);
+        AlleyManagementState resolved = GetManagementData(scenario.PlayerAlleyId);
         Assert.Null(resolved.UnderAttackByAlleyId);
         Assert.Contains(resolved.Garrison,
-            element => element.CharacterId == troopId && element.Number == 2 && element.Xp == 10);
+            element => element.CharacterId == CharacterHandle(troopId) && element.Number == 2 && element.Xp == 10);
         ownerClient.Call(() => Assert.Null(
             GetClientAlleyData(ownerClient, scenario.PlayerAlleyId).UnderAttackBy));
 
@@ -306,7 +309,7 @@ public class AlleyDomainFlowTests : AlleyTestEnvironment
             ownerClient,
             scenario,
             scenario.OwnerHeroId,
-            new TroopRosterElementData(ownerCharacterId, 1, 0, 0));
+            new TroopRosterElementData(CharacterHandle(ownerCharacterId), 1, 0, 0));
         ForceAttack(scenario);
 
         ResolveDefense(ownerClient, scenario, won: false);
@@ -337,7 +340,7 @@ public class AlleyDomainFlowTests : AlleyTestEnvironment
             ownerClient,
             scenario,
             scenario.OwnerHeroId,
-            new TroopRosterElementData(ownerCharacterId, 1, 0, 0));
+            new TroopRosterElementData(CharacterHandle(ownerCharacterId), 1, 0, 0));
         ForceAttack(scenario);
 
         KillHero(scenario.GangLeaderId);
@@ -365,7 +368,7 @@ public class AlleyDomainFlowTests : AlleyTestEnvironment
             ownerClient,
             scenario,
             scenario.OverseerHeroId,
-            new TroopRosterElementData(overseerCharacterId, 1, 0, 0));
+            new TroopRosterElementData(CharacterHandle(overseerCharacterId), 1, 0, 0));
 
         KillHero(scenario.OverseerHeroId);
 
@@ -396,7 +399,7 @@ public class AlleyDomainFlowTests : AlleyTestEnvironment
             clients[0],
             scenario,
             scenario.OwnerHeroId,
-            new TroopRosterElementData(ownerCharacterId, 1, 0, 0));
+            new TroopRosterElementData(CharacterHandle(ownerCharacterId), 1, 0, 0));
         ForceAttack(scenario);
 
         MakeLocationReady(clients[0], scenario.InstanceId);
@@ -436,6 +439,9 @@ public class AlleyDomainFlowTests : AlleyTestEnvironment
         });
         return characterId;
     }
+
+    private uint CharacterHandle(string characterId) =>
+        Server.GetHandle<CharacterObject>(characterId);
 
     private static string GetId<T>(
         E2E.Tests.Environment.Instance.EnvironmentInstance instance,

@@ -12,11 +12,11 @@ namespace GameInterface.Services.TroopRosters.Coalescing;
 /// </summary>
 internal sealed class TroopRosterElementBatchPayload : ICoalescedPayload
 {
-    private readonly string rosterId;
-    private readonly string characterId;
+    private readonly uint rosterId;
+    private readonly uint characterId;
     private readonly List<TroopRosterElementOperation> operations = new();
 
-    public TroopRosterElementBatchPayload(string rosterId, string characterId,
+    public TroopRosterElementBatchPayload(uint rosterId, uint characterId,
         TroopRosterElementOperation operation)
     {
         this.rosterId = rosterId;
@@ -34,8 +34,7 @@ internal sealed class TroopRosterElementBatchPayload : ICoalescedPayload
                 nameof(incoming));
         }
 
-        if (!string.Equals(rosterId, other.rosterId, StringComparison.Ordinal) ||
-            !string.Equals(characterId, other.characterId, StringComparison.Ordinal))
+        if (rosterId != other.rosterId || characterId != other.characterId)
         {
             throw new ArgumentException("Cannot merge troop-roster batches for different elements.",
                 nameof(incoming));

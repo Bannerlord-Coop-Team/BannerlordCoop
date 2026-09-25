@@ -5,7 +5,6 @@ using Coop.Core.Server.Services.ItemRosters.Messages;
 using GameInterface.Services.ItemObjects;
 using GameInterface.Services.ItemRosters.Messages;
 using GameInterface.Services.ObjectManager;
-using static GameInterface.Services.ObjectManager.ObjectManager;
 using TaleWorlds.CampaignSystem.Roster;
 using TaleWorlds.Core;
 
@@ -45,19 +44,15 @@ public class ItemRosterMessageHandler : IHandler
     {
         var message = payload.What;
 
-        if (!objectManager.TryGetId(message.Instance, out var itemRosterId)) return;
-        if (!TryGetItemId(message.Item, out var itemId)) return;
+        if (!objectManager.TryGetHandle(message.Instance, out var itemRosterId)) return;
+        if (!TryGetItemHandle(message.Item, out var itemId)) return;
 
-        string itemModifierId = null;
+        uint itemModifierId = 0;
         if (message.ItemModifier != null &&
-            !objectManager.TryGetIdWithLogging(message.ItemModifier, out itemModifierId))
+            !objectManager.TryGetHandleWithLogging(message.ItemModifier, out itemModifierId))
         {
             return;
         }
-
-        itemRosterId = Compact(itemRosterId, typeof(ItemRoster));
-        itemId = Compact(itemId, typeof(ItemObject));
-        itemModifierId = Compact(itemModifierId, typeof(ItemModifier));
 
         // Sum this tick's deltas for the element and send one update at flush instead of one per AddToCounts.
         var key = new CoalesceKey(ItemRosterUpdateChannel, itemRosterId, $"{itemId}:{itemModifierId}");
@@ -67,23 +62,32 @@ public class ItemRosterMessageHandler : IHandler
             total => new NetworkItemRosterUpdate(itemRosterId, itemId, itemModifierId, total)));
     }
 
-    private bool TryGetItemId(ItemObject item, out string itemId)
+    private bool TryGetItemHandle(ItemObject item, out uint itemHandle)
     {
-        if (objectManager.TryGetId(item, out itemId))
-            return true;
+        if (!itemObjectRegistry.TryRegisterExistingItem(
+                item,
+                out _,
+                out itemHandle,
+                out var announceHandle))
+        {
+            itemHandle = 0;
+            return false;
+        }
 
-        if (itemObjectRegistry.TryRegisterExistingItem(item, out itemId))
-            return true;
+        if (announceHandle)
+        {
+            network.SendAll(new NetworkRegisterItemHandle(item.StringId, itemHandle));
+            itemObjectRegistry.MarkHandleKnownToClients(itemHandle);
+        }
 
-        return objectManager.TryGetIdWithLogging(item, out itemId);
+        return true;
     }
 
     public void Handle(MessagePayload<ItemRosterCleared> payload)
     {
         var message = payload.What;
 
-        if (!objectManager.TryGetId(message.ItemRoster, out var itemRosterId)) return;
-        itemRosterId = Compact(itemRosterId, typeof(ItemRoster));
+        if (!objectManager.TryGetHandle(message.ItemRoster, out var itemRosterId)) return;
 
         // A clear supersedes this roster's pending updates; drop them so the clear isn't trailed by a stale update.
         coalescer.DropInstance(itemRosterId);
