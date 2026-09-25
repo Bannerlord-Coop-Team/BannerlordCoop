@@ -68,7 +68,7 @@ public class VoiceSectionTests
         {
             Assert.Equal("Disconnected microphone", section.MicrophoneSelector.ItemList[1].StringItem);
             h.Callbacks.Single().error(new InvalidOperationException("microphone unplugged"));
-            Wait(() => Volatile.Read(ref h.InputDisposals) == 1);
+            Wait(() => Volatile.Read(ref h.InputStopRequests) == 1);
             Assert.Contains("Select Retry", client.Status);
             if (latchClientError)
             {

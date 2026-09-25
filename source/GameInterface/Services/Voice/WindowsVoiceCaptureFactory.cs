@@ -1,13 +1,24 @@
-﻿using NAudio.Wave;
+﻿using Common.Logging;
+using NAudio.Wave;
+using Serilog;
 using System;
 using System.Collections.Generic;
+using System.Threading.Tasks;
 
 namespace GameInterface.Services.Voice;
+
+/// <summary>Owns one microphone until its asynchronous native release completes.</summary>
+public interface IVoiceCapture
+{
+    /// <summary>Suppresses capture immediately; succeeds only after native release, faults if release fails.</summary>
+    /// <remarks>Repeated calls return the same task; no data or completion can leave it pending indefinitely.</remarks>
+    Task StopAsync();
+}
 
 public interface IVoiceCaptureFactory
 {
     IReadOnlyList<string> Microphones();
-    IDisposable Open(VoiceSettings settings, Action<byte[], int> captured, Action<Exception> failed);
+    IVoiceCapture Open(VoiceSettings settings, Action<byte[], int> captured, Action<Exception> failed);
 }
 
 public sealed class WindowsVoiceCaptureFactory : IVoiceCaptureFactory
@@ -20,7 +31,7 @@ public sealed class WindowsVoiceCaptureFactory : IVoiceCaptureFactory
     }
 
     /// <summary>Defers microphone resource release until recording has stopped.</summary>
-    public IDisposable Open(VoiceSettings settings, Action<byte[], int> captured, Action<Exception> failed)
+    public IVoiceCapture Open(VoiceSettings settings, Action<byte[], int> captured, Action<Exception> failed)
     {
         int device = settings.Microphone;
         if (device >= WaveInEvent.DeviceCount || (device >= 0 && !string.IsNullOrEmpty(settings.MicrophoneName) &&
@@ -35,19 +46,20 @@ public sealed class WindowsVoiceCaptureFactory : IVoiceCaptureFactory
         }, captured, failed);
     }
 
-    /// <summary>Defers native release until recording and any in-flight control call have finished.</summary>
-    internal sealed class Capture : IDisposable
+    /// <summary>Serializes stop and release without waiting for the recording worker.</summary>
+    internal sealed class Capture : IVoiceCapture
     {
+        private enum CaptureState { AwaitingData, Recording, Stopping, Stopped, Releasing, ReleaseFinished }
+
+        private static readonly ILogger Logger = LogManager.GetLogger<Capture>();
         private readonly IWaveIn input;
         private readonly Action<byte[], int> captured;
         private readonly Action<Exception> failed;
         private readonly object gate = new();
-        private volatile bool disposed;
-        private bool captureStarted;
+        private readonly TaskCompletionSource<object> completion = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        private CaptureState state;
         private bool stopRequested;
-        private bool recordingStopped;
-        private bool controlCall = true;
-        private bool released;
+        private bool nativeCallActive = true;
 
         /// <summary>Subscribes before starting so even immediate completion is observed.</summary>
         internal Capture(IWaveIn input, Action<byte[], int> captured, Action<Exception> failed)
@@ -61,71 +73,92 @@ public sealed class WindowsVoiceCaptureFactory : IVoiceCaptureFactory
             catch
             {
                 // WaveInEvent queues its recording worker only after all fallible startup calls.
-                lock (gate) { disposed = recordingStopped = true; }
+                lock (gate) { stopRequested = true; state = CaptureState.Stopped; }
                 throw;
             }
-            finally { CompleteControlCall(); }
+            finally
+            {
+                lock (gate) nativeCallActive = false;
+                AdvanceShutdown();
+            }
         }
 
-        /// <summary>Suppresses old capture callbacks without waiting on the recording thread.</summary>
-        public void Dispose()
+        /// <summary>Returns the same release task on every request, without waiting on callbacks.</summary>
+        public Task StopAsync()
         {
-            lock (gate)
-            {
-                if (disposed) return;
-                disposed = true;
-            }
-            RequestStop();
+            lock (gate) stopRequested = true;
+            AdvanceShutdown();
+            return completion.Task;
         }
 
         // Data proves NAudio's worker has passed its unconditional initial Capturing assignment.
         private void OnDataAvailable(object sender, WaveInEventArgs args)
         {
-            lock (gate) captureStarted = true;
-            if (disposed) { RequestStop(); return; }
-            captured(args.Buffer, args.BytesRecorded);
+            bool publish;
+            lock (gate)
+            {
+                if (state == CaptureState.AwaitingData) state = CaptureState.Recording;
+                publish = !stopRequested && state == CaptureState.Recording;
+            }
+            if (publish) captured(args.Buffer, args.BytesRecorded);
+            else AdvanceShutdown();
         }
 
-        // RecordingStopped is raised after DoRecording's final buffer use, possibly on a captured context.
+        // RecordingStopped follows DoRecording's final buffer use, possibly on a captured context.
         private void OnRecordingStopped(object sender, StoppedEventArgs args)
         {
-            lock (gate) recordingStopped = true;
-            ReleaseIfStopped();
-            if (!disposed && args.Exception != null) failed(args.Exception);
-        }
-
-        // Do not hold gate across NAudio calls or close a handle while StopRecording still uses it.
-        private void RequestStop()
-        {
+            bool report;
             lock (gate)
             {
-                if (!captureStarted || stopRequested || recordingStopped || controlCall || released) return;
-                stopRequested = true;
-                controlCall = true;
+                if (state == CaptureState.Releasing || state == CaptureState.ReleaseFinished) return;
+                state = CaptureState.Stopped;
+                report = !stopRequested && args.Exception != null;
             }
-            try { input.StopRecording(); }
-            finally { CompleteControlCall(); }
+            try { if (report) failed(args.Exception); }
+            finally { AdvanceShutdown(); }
         }
 
-        // An inline or concurrent RecordingStopped callback must wait for the control call to return.
-        private void CompleteControlCall()
+        // One driver claims native work under gate and executes it outside gate; callbacks only advance state.
+        private void AdvanceShutdown()
         {
-            lock (gate) controlCall = false;
-            ReleaseIfStopped();
-            if (disposed) RequestStop();
-        }
-
-        // Claim release once under gate, but unsubscribe and dispose outside it.
-        private void ReleaseIfStopped()
-        {
-            lock (gate)
+            while (true)
             {
-                if (!recordingStopped || controlCall || released) return;
-                released = true;
+                bool release;
+                lock (gate)
+                {
+                    if (nativeCallActive) return;
+                    release = state == CaptureState.Stopped;
+                    if (release) state = CaptureState.Releasing;
+                    else if (stopRequested && state == CaptureState.Recording) state = CaptureState.Stopping;
+                    else return;
+                    nativeCallActive = true;
+                }
+
+                try
+                {
+                    if (release)
+                    {
+                        input.DataAvailable -= OnDataAvailable;
+                        input.RecordingStopped -= OnRecordingStopped;
+                        input.Dispose();
+                        completion.TrySetResult(null);
+                    }
+                    else input.StopRecording();
+                }
+                catch (Exception ex)
+                {
+                    if (release) completion.TrySetException(ex);
+                    else Logger.Warning(ex, "Voice microphone stop failed; waiting for recording completion");
+                }
+                finally
+                {
+                    lock (gate)
+                    {
+                        nativeCallActive = false;
+                        if (release) state = CaptureState.ReleaseFinished;
+                    }
+                }
             }
-            input.DataAvailable -= OnDataAvailable;
-            input.RecordingStopped -= OnRecordingStopped;
-            input.Dispose();
         }
     }
 }

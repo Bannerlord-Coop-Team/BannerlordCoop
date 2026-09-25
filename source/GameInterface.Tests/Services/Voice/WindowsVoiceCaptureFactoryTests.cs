@@ -12,25 +12,27 @@ public class WindowsVoiceCaptureFactoryTests
 {
     [Fact]
     // Native buffers remain owned until completion, even when disposal is repeated.
-    public void Dispose_DefersReleaseUntilRecordingStopped_AndReleasesOnce()
+    public void StopAsync_DefersReleaseUntilRecordingStopped_AndReleasesOnce()
     {
         var input = NewRecordingInput();
-        using var capture = new WindowsVoiceCaptureFactory.Capture(input.Object, (_, _) => { }, _ => { });
+        var capture = new WindowsVoiceCaptureFactory.Capture(input.Object, (_, _) => { }, _ => { });
 
-        capture.Dispose();
-        capture.Dispose();
+        var completion = capture.StopAsync();
+        Assert.Same(completion, capture.StopAsync());
+        Assert.False(completion.IsCompleted);
 
         input.Verify(x => x.StopRecording(), Times.Once);
         input.Verify(x => x.Dispose(), Times.Never);
         input.Raise(x => x.RecordingStopped += null, new StoppedEventArgs());
         input.Raise(x => x.RecordingStopped += null, new StoppedEventArgs());
-        capture.Dispose();
+        Assert.Same(completion, capture.StopAsync());
+        Assert.True(completion.IsCompletedSuccessfully);
         input.Verify(x => x.Dispose(), Times.Once);
     }
 
     [Fact]
     // An inline completion must not close the handle while StopRecording still uses it.
-    public void Dispose_InlineStoppedEvent_DoesNotReleaseUntilStopReturns()
+    public void StopAsync_InlineStoppedEvent_DoesNotReleaseUntilStopReturns()
     {
         var input = NewRecordingInput();
         input.Setup(x => x.StopRecording()).Callback(() =>
@@ -38,16 +40,16 @@ public class WindowsVoiceCaptureFactoryTests
             input.Raise(x => x.RecordingStopped += null, new StoppedEventArgs());
             input.Verify(x => x.Dispose(), Times.Never);
         });
-        using var capture = new WindowsVoiceCaptureFactory.Capture(input.Object, (_, _) => { }, _ => { });
+        var capture = new WindowsVoiceCaptureFactory.Capture(input.Object, (_, _) => { }, _ => { });
 
-        capture.Dispose();
+        capture.StopAsync();
 
         input.Verify(x => x.Dispose(), Times.Once);
     }
 
     [Fact]
     // A completion on another thread must be able to return before StopRecording returns.
-    public void Dispose_ConcurrentStoppedEvent_DoesNotHoldLockAcrossStop()
+    public void StopAsync_ConcurrentStoppedEvent_DoesNotHoldLockAcrossStop()
     {
         var input = NewRecordingInput();
         bool eventReturned = false;
@@ -57,9 +59,9 @@ public class WindowsVoiceCaptureFactoryTests
             eventReturned = callback.Wait(TimeSpan.FromSeconds(5));
             input.Verify(x => x.Dispose(), Times.Never);
         });
-        using var capture = new WindowsVoiceCaptureFactory.Capture(input.Object, (_, _) => { }, _ => { });
+        var capture = new WindowsVoiceCaptureFactory.Capture(input.Object, (_, _) => { }, _ => { });
 
-        capture.Dispose();
+        capture.StopAsync();
 
         Assert.True(eventReturned, "RecordingStopped was blocked by StopRecording's lock");
         input.Verify(x => x.Dispose(), Times.Once);
@@ -67,14 +69,14 @@ public class WindowsVoiceCaptureFactoryTests
 
     [Fact]
     // An early logical dispose must not let NAudio overwrite the native stop request during startup.
-    public void Dispose_BeforeFirstData_StopsOnlyAfterWorkerHasStartedWithoutPublishingAudio()
+    public void StopAsync_BeforeFirstData_StopsOnlyAfterWorkerHasStartedWithoutPublishingAudio()
     {
         var input = new Mock<IWaveIn>();
         int frames = 0;
         int failures = 0;
-        using var capture = new WindowsVoiceCaptureFactory.Capture(input.Object, (_, _) => frames++, _ => failures++);
+        var capture = new WindowsVoiceCaptureFactory.Capture(input.Object, (_, _) => frames++, _ => failures++);
 
-        capture.Dispose();
+        capture.StopAsync();
         input.Verify(x => x.StopRecording(), Times.Never);
         input.Verify(x => x.Dispose(), Times.Never);
         input.Raise(x => x.DataAvailable += null, new WaveInEventArgs(new byte[1920], 1920));
@@ -95,10 +97,10 @@ public class WindowsVoiceCaptureFactoryTests
         var input = NewRecordingInput();
         var failure = new InvalidOperationException("recording failed");
         Exception? reported = null;
-        using var capture = new WindowsVoiceCaptureFactory.Capture(input.Object, (_, _) => { }, error => reported = error);
+        var capture = new WindowsVoiceCaptureFactory.Capture(input.Object, (_, _) => { }, error => reported = error);
 
         input.Raise(x => x.RecordingStopped += null, new StoppedEventArgs(failure));
-        capture.Dispose();
+        capture.StopAsync();
 
         Assert.Same(failure, reported);
         input.Verify(x => x.StopRecording(), Times.Never);
@@ -130,7 +132,7 @@ public class WindowsVoiceCaptureFactoryTests
             input.Verify(x => x.Dispose(), Times.Never);
         });
 
-        using var capture = new WindowsVoiceCaptureFactory.Capture(input.Object, (_, _) => { }, _ => { });
+        var capture = new WindowsVoiceCaptureFactory.Capture(input.Object, (_, _) => { }, _ => { });
 
         input.Verify(x => x.Dispose(), Times.Once);
     }
@@ -144,9 +146,9 @@ public class WindowsVoiceCaptureFactoryTests
         int oldFrames = 0;
         int newFrames = 0;
         int failures = 0;
-        using var oldCapture = new WindowsVoiceCaptureFactory.Capture(oldInput.Object, (_, _) => oldFrames++, _ => failures++);
-        oldCapture.Dispose();
-        using var newCapture = new WindowsVoiceCaptureFactory.Capture(newInput.Object, (_, _) => newFrames++, _ => failures++);
+        var oldCapture = new WindowsVoiceCaptureFactory.Capture(oldInput.Object, (_, _) => oldFrames++, _ => failures++);
+        oldCapture.StopAsync();
+        var newCapture = new WindowsVoiceCaptureFactory.Capture(newInput.Object, (_, _) => newFrames++, _ => failures++);
 
         oldInput.Raise(x => x.DataAvailable += null, new WaveInEventArgs(new byte[1920], 1920));
         oldInput.Raise(x => x.RecordingStopped += null, new StoppedEventArgs(new InvalidOperationException()));
@@ -158,7 +160,7 @@ public class WindowsVoiceCaptureFactoryTests
         oldInput.Verify(x => x.Dispose(), Times.Once);
         newInput.Verify(x => x.Dispose(), Times.Never);
         newInput.Verify(x => x.StopRecording(), Times.Never);
-        newCapture.Dispose();
+        newCapture.StopAsync();
         newInput.Raise(x => x.RecordingStopped += null, new StoppedEventArgs());
         newInput.Verify(x => x.Dispose(), Times.Once);
     }
@@ -169,12 +171,45 @@ public class WindowsVoiceCaptureFactoryTests
     {
         var input = NewRecordingInput();
         input.Setup(x => x.StopRecording()).Throws(new InvalidOperationException("stop failed"));
-        using var capture = new WindowsVoiceCaptureFactory.Capture(input.Object, (_, _) => { }, _ => { });
+        var capture = new WindowsVoiceCaptureFactory.Capture(input.Object, (_, _) => { }, _ => { });
 
-        Assert.Throws<InvalidOperationException>(() => capture.Dispose());
+        var completion = capture.StopAsync();
 
+        Assert.False(completion.IsCompleted);
         input.Verify(x => x.Dispose(), Times.Never);
         input.Raise(x => x.RecordingStopped += null, new StoppedEventArgs());
+        Assert.True(completion.IsCompletedSuccessfully);
+        input.Verify(x => x.Dispose(), Times.Once);
+    }
+
+    [Fact]
+    // Completion is a release guarantee, not merely the RecordingStopped notification.
+    public void StopAsync_CompletesOnlyAfterNativeDisposeReturns()
+    {
+        var input = NewRecordingInput();
+        var capture = new WindowsVoiceCaptureFactory.Capture(input.Object, (_, _) => { }, _ => { });
+        var completion = capture.StopAsync();
+        input.Setup(x => x.Dispose()).Callback(() => Assert.False(completion.IsCompleted));
+
+        input.Raise(x => x.RecordingStopped += null, new StoppedEventArgs());
+
+        Assert.True(completion.IsCompletedSuccessfully);
+    }
+
+    [Fact]
+    // A release failure must never be mistaken for permission to open a replacement.
+    public async Task StopAsync_NativeReleaseFailureFaultsStableCompletion()
+    {
+        var input = NewRecordingInput();
+        var failure = new InvalidOperationException("release failed");
+        input.Setup(x => x.Dispose()).Throws(failure);
+        var capture = new WindowsVoiceCaptureFactory.Capture(input.Object, (_, _) => { }, _ => { });
+        var completion = capture.StopAsync();
+
+        input.Raise(x => x.RecordingStopped += null, new StoppedEventArgs());
+
+        Assert.Same(failure, await Assert.ThrowsAsync<InvalidOperationException>(() => completion));
+        Assert.Same(completion, capture.StopAsync());
         input.Verify(x => x.Dispose(), Times.Once);
     }
 
