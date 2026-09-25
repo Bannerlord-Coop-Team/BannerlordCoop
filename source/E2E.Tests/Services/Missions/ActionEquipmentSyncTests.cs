@@ -23,7 +23,7 @@ using Xunit.Abstractions;
 
 namespace E2E.Tests.Services.Missions;
 
-public class ActionEquipmentSyncTests : MissionTestEnvironment
+public partial class ActionEquipmentSyncTests : MissionTestEnvironment
 {
     public ActionEquipmentSyncTests(ITestOutputHelper output) : base(output, 3) { }
 
@@ -713,12 +713,12 @@ public class ActionEquipmentSyncTests : MissionTestEnvironment
         public INetworkAgentRegistry Registry { get; }
         public MockBattleNetwork Network { get; }
 
-        public Context(MissionEngineFixture fixture, EnvironmentInstance instance)
+        public Context(MissionEngineFixture fixture, EnvironmentInstance instance, ICoopMissionComponent component = null)
         {
             Instance = instance;
             Mission = fixture.CreateMission(instance);
-            Component = instance.Resolve<ICoopMissionComponent>();
-            Registry = instance.Resolve<INetworkAgentRegistry>();
+            Component = component ?? instance.Resolve<ICoopMissionComponent>();
+            Registry = Component.AgentRegistry;
             Network = instance.Resolve<MockBattleNetwork>();
         }
 

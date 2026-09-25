@@ -16,7 +16,7 @@ namespace GameInterface.Services.Alleys.Interfaces;
 /// </summary>
 public interface ISessionAlleyPlayerDataInterface : IGameAbstraction
 {
-    bool TryGetManagementData(string alleyId, out AlleyManagementData data);
+    bool TryGetManagementData(string alleyId, out AlleyManagementState data);
     void SetManagementData(string alleyId, string overseerId, TroopRosterElementData[] garrison);
     void SetLastRecruitTimeTicks(string alleyId, long lastRecruitTimeTicks);
     void RemoveManagementData(string alleyId);
@@ -34,21 +34,32 @@ public class SessionAlleyPlayerDataInterface : ISessionAlleyPlayerDataInterface
     private static readonly ILogger Logger = LogManager.GetLogger<SessionAlleyPlayerDataInterface>();
 
     private readonly ICoopSessionProvider coopSessionProvider;
+    private readonly IAlleyGarrisonData garrisonData;
 
     private Dictionary<string, AlleyManagementData> ManagementData
         => coopSessionProvider.CoopSession?.AlleyPlayerData?.ManagementDataPerAlley;
 
-    public SessionAlleyPlayerDataInterface(ICoopSessionProvider coopSessionProvider)
+    public SessionAlleyPlayerDataInterface(
+        ICoopSessionProvider coopSessionProvider,
+        IAlleyGarrisonData garrisonData)
     {
         this.coopSessionProvider = coopSessionProvider;
+        this.garrisonData = garrisonData;
     }
 
-    public bool TryGetManagementData(string alleyId, out AlleyManagementData data)
+    public bool TryGetManagementData(string alleyId, out AlleyManagementState data)
     {
         data = null;
         var map = ManagementData;
-        if (map == null) return false;
-        return map.TryGetValue(alleyId, out data);
+        if (map == null || !map.TryGetValue(alleyId, out var stored)) return false;
+
+        data = new AlleyManagementState(
+            stored.OverseerId,
+            garrisonData.ToNetworkData(stored.Garrison),
+            stored.UnderAttackByAlleyId,
+            stored.AttackResponseDueDate,
+            stored.LastRecruitTimeTicks);
+        return true;
     }
 
     public void SetManagementData(string alleyId, string overseerId, TroopRosterElementData[] garrison)
@@ -61,7 +72,9 @@ public class SessionAlleyPlayerDataInterface : ISessionAlleyPlayerDataInterface
             return;
         }
 
-        var entry = new AlleyManagementData(overseerId, garrison ?? Array.Empty<TroopRosterElementData>());
+        var entry = new AlleyManagementData(
+            overseerId,
+            garrisonData.ToStorageData(garrison));
 
         // A garrison/overseer change must not drop an in-progress attack, so carry the under-attack
         // fields forward from the existing entry.
@@ -77,7 +90,7 @@ public class SessionAlleyPlayerDataInterface : ISessionAlleyPlayerDataInterface
 
     public void SetLastRecruitTimeTicks(string alleyId, long lastRecruitTimeTicks)
     {
-        if (!TryGetManagementData(alleyId, out var data)) return;
+        if (!TryGetStoredManagementData(alleyId, out var data)) return;
         data.LastRecruitTimeTicks = lastRecruitTimeTicks;
     }
 
@@ -89,14 +102,21 @@ public class SessionAlleyPlayerDataInterface : ISessionAlleyPlayerDataInterface
     public void SetUnderAttackByAi(string alleyId, string attackerAlleyId, CampaignTime dueDate)
     {
         // Only a managed (player-owned) alley can be under attack; if there's no entry there's nothing to mark.
-        if (!TryGetManagementData(alleyId, out var data)) return;
+        if (!TryGetStoredManagementData(alleyId, out var data)) return;
         data.UnderAttackByAlleyId = attackerAlleyId;
         data.AttackResponseDueDate = dueDate;
     }
 
     public void ClearUnderAttackByAi(string alleyId)
     {
-        if (!TryGetManagementData(alleyId, out var data)) return;
+        if (!TryGetStoredManagementData(alleyId, out var data)) return;
         data.UnderAttackByAlleyId = null;
+    }
+
+    private bool TryGetStoredManagementData(string alleyId, out AlleyManagementData data)
+    {
+        data = null;
+        var map = ManagementData;
+        return map != null && map.TryGetValue(alleyId, out data);
     }
 }

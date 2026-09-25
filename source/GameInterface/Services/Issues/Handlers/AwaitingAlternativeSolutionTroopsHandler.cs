@@ -1,4 +1,4 @@
-using Common;
+﻿using Common;
 using Common.Logging;
 using Common.Messaging;
 using Common.Network;
@@ -193,8 +193,11 @@ internal class AwaitingAlternativeSolutionTroopsHandler : IHandler
         var roster = TroopRoster.CreateDummyTroopRoster();
         foreach (var element in troopRosterInterface.UnpackTroopRosterData(troops))
         {
-            roster.AddToCounts(element.Character, element.Number, false, element.WoundedNumber, element.Xp, false);
+            int index = roster.AddNewElement(element.Character, -1);
+            roster.data[index] = element;
         }
+        roster.UpdateVersion();
+        roster.InitializeCachedData();
 
         return roster;
     }

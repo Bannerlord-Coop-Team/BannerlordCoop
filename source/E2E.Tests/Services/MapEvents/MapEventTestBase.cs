@@ -666,7 +666,7 @@ public abstract class MapEventTestBase : IDisposable
             Assert.True(Server.ObjectManager.TryGetObject<Hero>(captorHeroId, out var captorHero));
             Assert.True(Server.ObjectManager.TryGetObject<MobileParty>(captorPartyId, out var captorParty));
             Assert.True(Server.ObjectManager.TryGetObject<Hero>(prisonerHeroId, out var prisonerHero));
-            Assert.True(Server.ObjectManager.TryGetId(prisonerHero.CharacterObject, out var prisonerCharacterId));
+            Assert.True(Server.ObjectManager.TryGetHandle(prisonerHero.CharacterObject, out var prisonerCharacterId));
 
             var emptyRosterDelta = new TroopRosterData(Array.Empty<TroopRosterElementData>());
             var message = new NetworkCompleteDoneLogic(
@@ -715,7 +715,8 @@ public abstract class MapEventTestBase : IDisposable
             {
                 int index = party.PrisonRoster.FindIndexOfTroop(hero.CharacterObject);
                 Assert.True(index >= 0);
-                party.PrisonRoster.AddToCountsAtIndex(index, count);
+                party.PrisonRoster.data[index]._number += count;
+                party.PrisonRoster._totalHeroes += count;
             }
         });
     }

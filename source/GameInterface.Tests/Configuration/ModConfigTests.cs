@@ -290,8 +290,8 @@ public class ModConfigTests : IDisposable
         Assert.True(options.FastForwardEnabled);
         Assert.True(options.AutoPauseEnabled);
         Assert.False(options.ClientsCanUseCheats);
-        Assert.True(options.GoldFoodInfluenceChangeInSettlements);
-        Assert.Equal(GoldFoodChangeMode.OneDayMax, options.GoldFoodInfluenceChangeInBattles);
+        Assert.False(options.GoldFoodInfluenceChangeInSettlements);
+        Assert.Equal(GoldFoodChangeMode.Disabled, options.GoldFoodInfluenceChangeInBattles);
         Assert.False(options.GoldFoodInfluenceChangeForDisconnectedPlayers);
         Assert.Equal(6, options.PlayerBattleAiJoinWindowHours);
         Assert.True(options.SpeedLimitWhilePlayersInBattle);
@@ -304,6 +304,7 @@ public class ModConfigTests : IDisposable
         Assert.Equal(1f, options.MaximumLootersMultiplier);
         Assert.Equal(LordDefectionRetryMode.Vanilla, options.LordDefectionRetries);
         Assert.True(options.ShowPlayerNameplates);
+        Assert.True(options.CoopClansEnabled);
         Assert.False(options.EnableHeroExecutions);
     }
 
@@ -327,6 +328,7 @@ public class ModConfigTests : IDisposable
         // Read back a value rather than only the overflow: an unparsed block would leave every
         // property null, which the defaults comparison below would accept as a vacuous pass.
         Assert.Equal(1f, config.ModOptions.MaximumLootersMultiplier);
+        Assert.True(config.ModOptions.CoopClansEnabled);
         Assert.Equal(ModConfigProvider.ModOptions, new ModOptions(config.ModOptions));
     }
 

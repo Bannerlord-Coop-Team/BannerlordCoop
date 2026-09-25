@@ -77,8 +77,10 @@ namespace GameInterface.Services.Kingdoms.Patches
         // Bypass vanilla's single-clan shortcut so the receiving player gets the normal peace decision UI and vote.
         [HarmonyPatch(typeof(KingdomDecisionsVM), nameof(KingdomDecisionsVM.RefreshWith))]
         [HarmonyPrefix]
-        private static bool RefreshWithPrefix(KingdomDecisionsVM __instance, KingdomDecision decision)
+        public static bool RefreshWithPrefix(KingdomDecisionsVM __instance, KingdomDecision decision)
         {
+            if (TryGetVoteManager(out var voteManager) && voteManager.ShouldSuppressLocalDecision(decision)) return false;
+
             if ((CoopKingdomElection.IsPendingPlayerPeaceOffer(decision) || CoopKingdomElection.IsPendingPlayerAllianceOffer(decision)) && decision.IsSingleClanDecision())
             {
                 __instance._shouldCheckForDecision = false;

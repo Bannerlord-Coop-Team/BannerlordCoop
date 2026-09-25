@@ -27,9 +27,9 @@ public readonly struct ModOptions
     [ProtoMember(3)]
     public readonly bool ClientsCanUseCheats { get; } = false;
     [ProtoMember(4)]
-    public readonly bool GoldFoodInfluenceChangeInSettlements { get; } = true;
+    public readonly bool GoldFoodInfluenceChangeInSettlements { get; } = false;
     [ProtoMember(5)]
-    public readonly GoldFoodChangeMode GoldFoodInfluenceChangeInBattles { get; } = GoldFoodChangeMode.OneDayMax;
+    public readonly GoldFoodChangeMode GoldFoodInfluenceChangeInBattles { get; } = GoldFoodChangeMode.Disabled;
     [ProtoMember(6)]
     public readonly bool GoldFoodInfluenceChangeForDisconnectedPlayers { get; } = false;
     [ProtoMember(7)]
@@ -67,6 +67,9 @@ public readonly struct ModOptions
     [ProtoMember(23)]
     public bool EnsureUnaffiliatedWanderers { get; } = true;
 
+    [ProtoMember(24)]
+    public readonly bool CoopClansEnabled { get; } = true;
+
     public ModOptions(ModOptions previous, bool voiceEnabled)
     {
         this = previous;
@@ -88,6 +91,7 @@ public readonly struct ModOptions
         WandererLimit = modOptionsData.WandererLimit ?? WandererLimit;
         WandererLimitScalesWithPlayers = modOptionsData.WandererLimitScalesWithPlayers ?? WandererLimitScalesWithPlayers;
         PlayerKingdomClanTierRequired = modOptionsData.PlayerKingdomClanTierRequired ?? PlayerKingdomClanTierRequired;
+        CoopClansEnabled = modOptionsData.CoopClansEnabled ?? CoopClansEnabled;
         SmithingStaminaRecoveryOutsideSettlements = modOptionsData.SmithingStaminaRecoveryOutsideSettlements ?? SmithingStaminaRecoveryOutsideSettlements;
         SmithingStaminaRecoveryMultiplier = modOptionsData.SmithingStaminaRecoveryMultiplier ?? SmithingStaminaRecoveryMultiplier;
         MaximumLootersMultiplier = modOptionsData.MaximumLootersMultiplier ?? MaximumLootersMultiplier;

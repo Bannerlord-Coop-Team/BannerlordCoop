@@ -96,6 +96,8 @@ public sealed class ModOptionsData
 
     public int? PlayerKingdomClanTierRequired { get; set; }
 
+    public bool? CoopClansEnabled { get; set; }
+
     public bool? SmithingStaminaRecoveryOutsideSettlements { get; set; }
 
     public float? SmithingStaminaRecoveryMultiplier { get; set; }

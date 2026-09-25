@@ -117,9 +117,9 @@ internal class GoldNotificationHandler : IHandler
 
         GameThread.RunSafe(() =>
         {
-            if (!objectManager.TryGetIdWithLogging(data.Clan, out var clanId)) return;
+            if (!objectManager.TryGetIdWithLogging(data.Hero, out var heroId)) return;
 
-            network.SendAll(new NetworkNotifyDailyGoldChange(clanId, data.GoldChange));
+            network.SendAll(new NetworkNotifyDailyGoldChange(heroId, data.GoldChange));
         });
     }
 
@@ -129,10 +129,10 @@ internal class GoldNotificationHandler : IHandler
 
         GameThread.RunSafe(() =>
         {
-            if (!objectManager.TryGetObjectWithLogging<Clan>(data.ClanId, out var clan)) return;
+            if (!objectManager.TryGetObjectWithLogging<Hero>(data.HeroId, out var hero)) return;
 
-            // Only notify client of gold change for their clan
-            if (clan != Clan.PlayerClan) return;
+            // Each member has their own daily budget.
+            if (hero != Hero.MainHero) return;
 
             var goldChange = data.GoldChange;
 

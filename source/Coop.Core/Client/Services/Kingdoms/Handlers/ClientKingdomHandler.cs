@@ -388,10 +388,13 @@ public class ClientKingdomHandler : IHandler
     private void HandleNetworkAddDecision(MessagePayload<NetworkAddDecision> obj)
     {
         var payload = obj.What;
-        if (!ShouldApplyNetworkDecision(payload.KingdomId)) return;
+        GameThread.RunSafe(() =>
+        {
+            if (!ShouldApplyNetworkDecision(payload.KingdomId)) return;
 
-        var message = new AddDecision(payload.KingdomId, payload.Data, payload.IgnoreInfluenceCost, payload.RandomNumber);
-        messageBroker.Publish(this, message);
+            var message = new AddDecision(payload.KingdomId, payload.Data, payload.IgnoreInfluenceCost, payload.RandomNumber);
+            messageBroker.Publish(this, message);
+        }, context: nameof(HandleNetworkAddDecision));
     }
 
     private bool ShouldApplyNetworkDecision(string kingdomId)
@@ -399,10 +402,10 @@ public class ClientKingdomHandler : IHandler
         if (string.IsNullOrWhiteSpace(kingdomId)) return false;
         if (!objectManager.TryGetObject(kingdomId, out Kingdom kingdom)) return true;
         if (!playerManager.TryGetPlayer(controllerIdProvider.ControllerId, out var player)) return true;
-        if (string.IsNullOrWhiteSpace(player.ClanId)) return false;
-        if (!objectManager.TryGetObject(player.ClanId, out Clan clan)) return false;
+        if (string.IsNullOrWhiteSpace(player.HeroId)) return false;
+        if (!objectManager.TryGetObject(player.HeroId, out Hero hero)) return false;
 
-        return clan.Kingdom == kingdom;
+        return hero.Clan?.Kingdom == kingdom;
     }
 
     private void HandleDestroyKingdom(MessagePayload<DestroyKingdom> obj)

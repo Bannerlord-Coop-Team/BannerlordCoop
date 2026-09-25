@@ -49,7 +49,7 @@ internal class SellPrisonersHandler : IHandler
 
     private void Handle_PrisonersSold(MessagePayload<PrisonersSold> obj)
     {
-        if (!objectManager.TryGetIdWithLogging(obj.What.SellingParty, out var sellingPartyId)) return;
+        if (!objectManager.TryGetHandleWithLogging(obj.What.SellingParty, out var sellingPartyId)) return;
 
         var packedData = troopRosterInterface.PackTroopRosterData(obj.What.LeftPrisonerRoster);
 
@@ -67,10 +67,8 @@ internal class SellPrisonersHandler : IHandler
             troopRosterInterface.UpdateWithData(leftPrisonerRoster, obj.What.LeftPrisonerRosterData, sellingParty.LeaderHero);
             prisonerSaleProcessor.Sell(sellingParty, leftPrisonerRoster);
 
-            objectManager.TryGetId(sellingParty.PrisonRoster, out var rosterId);
-            var compactId = Compact(rosterId, typeof(TroopRoster));
-
-            sendCoalescer?.FlushInstance(compactId, network);
+            if (objectManager.TryGetHandle(sellingParty.PrisonRoster, out var rosterId))
+                sendCoalescer?.FlushInstance(rosterId, network);
 
             // Refresh the menu to show updated menu items
             if (!objectManager.TryGetIdWithLogging(sellingParty.LeaderHero, out var heroId)) return;

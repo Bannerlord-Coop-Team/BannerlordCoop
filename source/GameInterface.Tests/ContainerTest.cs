@@ -5,6 +5,7 @@ using Common.Network;
 using Common.Serialization;
 using GameInterface.AutoSync;
 using GameInterface.Services.Players;
+using GameInterface.Tests.Services.SiegeEvents;
 using HarmonyLib;
 using Moq;
 using System;
@@ -15,6 +16,7 @@ using Xunit;
 
 namespace GameInterface.Tests;
 
+[Collection(nameof(CampaignCurrentCollection))]
 public class ContainerTest
 {
     private const string ContributedPatchCategory = "GameInterface.Tests.ContributedPatches";
@@ -28,27 +30,34 @@ public class ContainerTest
             var containerBuilder = new ContainerBuilder();
 
             containerBuilder.RegisterInstance(MessageBroker.Instance).As<IMessageBroker>().SingleInstance();
-            containerBuilder.RegisterInstance(harmony).As<Harmony>().SingleInstance();
 
             RegisterMock<INetwork>(containerBuilder);
             RegisterMock<INetworkConfig>(containerBuilder);
             RegisterMock<ISerializableTypeMapper>(containerBuilder);
 
             containerBuilder.RegisterModule<GameInterfaceModule>();
+            containerBuilder.RegisterInstance(harmony).As<Harmony>().SingleInstance();
 
-            using var module = containerBuilder.Build();
+            try
+            {
+                using var module = containerBuilder.Build();
 
-            var gameInterface = module.Resolve<IGameInterface>();
-            var AutoSyncPatcher = module.Resolve<AutoSyncPatcher>();
-            module.Resolve<IPlayerPartyRestorer>();
-            ICoopCommand[] commands = module.Resolve<IEnumerable<ICoopCommand>>().ToArray();
-            Assert.Contains(commands, command =>
-                $"{command.Prefix}.{command.Name}" == "coop.debug.hero.set_gold");
-            Assert.Contains(commands, command =>
-                $"{command.Prefix}.{command.Name}" == "coop.debug.kingdom.add_decision");
+                var gameInterface = module.Resolve<IGameInterface>();
+                var AutoSyncPatcher = module.Resolve<AutoSyncPatcher>();
+                module.Resolve<IPlayerPartyRestorer>();
+                ICoopCommand[] commands = module.Resolve<IEnumerable<ICoopCommand>>().ToArray();
+                Assert.Contains(commands, command =>
+                    $"{command.Prefix}.{command.Name}" == "coop.debug.hero.set_gold");
+                Assert.Contains(commands, command =>
+                    $"{command.Prefix}.{command.Name}" == "coop.debug.kingdom.add_decision");
 
-            gameInterface.PatchAll();
-            gameInterface.UnpatchAll();
+                gameInterface.PatchAll();
+            }
+            finally
+            {
+                // Production keeps patches through disconnects; tests must release their own patches.
+                harmony.UnpatchAll(harmony.Id);
+            }
         }
     }
 

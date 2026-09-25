@@ -633,7 +633,8 @@ public class HideoutMapEventTests : MapEventTestBase
         {
             Server.Resolve<IMessageBroker>().Publish(
                 requester.NetPeer,
-                new NetworkRequestEndSettlementEncounter(playerPartyId));
+                new NetworkRequestEndSettlementEncounter(
+                    Server.GetHandle<MobileParty>(playerPartyId)));
         }, MapEventDisabledMethods);
 
         Server.Call(() =>
@@ -686,7 +687,8 @@ public class HideoutMapEventTests : MapEventTestBase
         {
             Server.Resolve<IMessageBroker>().Publish(
                 requester.NetPeer,
-                new NetworkRequestEndSettlementEncounter(joinedPartyId));
+                new NetworkRequestEndSettlementEncounter(
+                    Server.GetHandle<MobileParty>(joinedPartyId)));
         }, MapEventDisabledMethods);
 
         Server.Call(() =>
@@ -706,7 +708,8 @@ public class HideoutMapEventTests : MapEventTestBase
         var raid = CreateSharedHideout();
         var clients = Clients.ToArray();
 
-        Server.SimulateMessage(clients[0].NetPeer, new NetworkRequestEndSettlementEncounter(raid.LeaderPartyId));
+        Server.SimulateMessage(clients[0].NetPeer, new NetworkRequestEndSettlementEncounter(
+            Server.GetHandle<MobileParty>(raid.LeaderPartyId)));
 
         Server.Call(() =>
         {
@@ -719,7 +722,8 @@ public class HideoutMapEventTests : MapEventTestBase
             Assert.Same(joiner.Party, mapEvent.AttackerSide.LeaderParty);
         });
 
-        Server.SimulateMessage(clients[1].NetPeer, new NetworkRequestEndSettlementEncounter(raid.JoinerPartyId));
+        Server.SimulateMessage(clients[1].NetPeer, new NetworkRequestEndSettlementEncounter(
+            Server.GetHandle<MobileParty>(raid.JoinerPartyId)));
 
         Server.Call(() =>
         {
@@ -765,6 +769,7 @@ public class HideoutMapEventTests : MapEventTestBase
     {
         var raid = CreateSharedHideout();
         Server.SimulateMessage(this, new PlayerDisconnected(Clients.First().NetPeer, default));
+        Server.PumpGameThread();
 
         Server.Call(() =>
         {
@@ -781,7 +786,8 @@ public class HideoutMapEventTests : MapEventTestBase
         if (missionExit)
             Server.SimulateMessage(Clients.Last().NetPeer, new NetworkMapEventFinalizeAttempted(raid.MapEventId));
         else
-            Server.SimulateMessage(Clients.Last().NetPeer, new NetworkRequestEndSettlementEncounter(raid.JoinerPartyId));
+            Server.SimulateMessage(Clients.Last().NetPeer, new NetworkRequestEndSettlementEncounter(
+                Server.GetHandle<MobileParty>(raid.JoinerPartyId)));
 
         Server.Call(() =>
         {

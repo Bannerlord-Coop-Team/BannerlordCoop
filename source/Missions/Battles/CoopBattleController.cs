@@ -75,6 +75,10 @@ public class CoopBattleController : CoopMissionController
     private readonly IReinforcementFielder reinforcementFielder;
     private readonly ISiegeEngineDeploymentReplicator siegeEngineDeployment;
     private readonly ISiegeMachineStateReplicator siegeMachineState;
+#if DEBUG
+    internal ISiegeMachineStateReplicator DebugSiegeMachineState => siegeMachineState;
+    internal bool DebugEndConditionHoldReleased => endConditionHoldReleased;
+#endif
     private readonly ISiegeWeaponFireReplicator siegeWeaponFire;
     private readonly IBattleHostRegistry hostRegistryRef;
     private readonly IMissionContext debugMissionContext;
@@ -108,7 +112,8 @@ public class CoopBattleController : CoopMissionController
         IPuppetMountStateRepairer puppetMountStateRepairer,
         IBattleAgentSpawnBatchCodec spawnBatchCodec,
         IBattleDamageDataMapper battleDamageDataMapper,
-        IMissionWeaponDataMapper missionWeaponDataMapper)
+        IMissionWeaponDataMapper missionWeaponDataMapper,
+        ISiegeGateHitApplier siegeGateHitApplier)
         : base(
             network,
             messageBroker,
@@ -186,7 +191,7 @@ public class CoopBattleController : CoopMissionController
         // per-battle transient (see MissionModule), so this controller's per-battle lifetime resets it.
         siegeEngineDeployment = new SiegeEngineDeploymentReplicator(network, messageBroker, session, hostEpochPolicy);
         siegeMachineState = new SiegeMachineStateReplicator(network, messageBroker, session, coopMissionComponent.AgentRegistry, hostEpochPolicy);
-        siegeWeaponFire = new SiegeWeaponFireReplicator(network, messageBroker, coopMissionComponent.AgentRegistry);
+        siegeWeaponFire = new SiegeWeaponFireReplicator(network, messageBroker, coopMissionComponent.AgentRegistry, session, siegeMachineState, siegeGateHitApplier, hostEpochPolicy);
         supplyReporter = new SupplyProgressReporter(relayNetwork, session);
 
         hostRegistryRef = hostRegistry;
@@ -218,6 +223,7 @@ public class CoopBattleController : CoopMissionController
         authorityMigrator.Dispose();
         reinforcementFielder.Dispose();
         siegeEngineDeployment.Dispose();
+        coopMissionComponent.AgentActionHandler.BindPilotSeats(null, null);
         siegeMachineState.Dispose();
         siegeWeaponFire.Dispose();
         Deployment.Dispose();
@@ -252,7 +258,11 @@ public class CoopBattleController : CoopMissionController
         Deployment.OnMissionReady();
 
         if (Session.HasInstance)
+        {
+            // Battle entry and native mission initialization follow controller construction.
+            coopMissionComponent.AgentActionHandler.BindPilotSeats(Session.InstanceId, siegeMachineState);
             messageBroker.Publish(this, new BattleMissionReady(Session.InstanceId));
+        }
         else
             Logger.Warning("[BattleHost] Battle mission finished loading with no instance session — cannot announce mission-ready");
     }
@@ -261,6 +271,7 @@ public class CoopBattleController : CoopMissionController
     {
         // Reliable spawn work is queued before this frame's unreliable movement traffic.
         replicator.FlushPendingSpawns();
+        replicator.FlushPendingFormations();
         base.OnMissionTick(dt);
 
         // The mission host is the single siege authority (engine deployment and machine simulation);
@@ -310,7 +321,10 @@ public class CoopBattleController : CoopMissionController
         puppetRoutApplier.DrainPendingRouts();
 
         siegeEngineDeployment.DrainPending(dt);
+        // Puppets registered this frame need their buffered equipment before pending load requests drain.
+        coopMissionComponent.WeaponPickupHandler.RetryPendingSiegeGrants();
         siegeMachineState.Tick(dt);
+        siegeWeaponFire.Tick(dt);
         diagnostics.Tick(dt);
         supplyReporter.Tick(dt);
 

@@ -1,4 +1,5 @@
-﻿using Autofac;
+﻿using GameInterface.Services.UI.PlayerList;
+using Autofac;
 using Common.Messaging;
 using Common.Network;
 using Common.Serialization;
@@ -94,6 +95,7 @@ internal abstract class TestComponentBase
 
         builder.RegisterType<ObjectManager>().As<IObjectManager>().InstancePerLifetimeScope();
         builder.RegisterType<MobilePartyBehaviorSnapshot>().As<IMobilePartyBehaviorSnapshot>().InstancePerDependency();
+        RegisterMock<IPartyBehaviorWireMapper>(builder);
         builder.RegisterType<RegistryCollection>().As<IRegistryCollection>().InstancePerLifetimeScope();
         builder.RegisterType<KingdomCreationSettlementTracker>().As<IKingdomCreationSettlementTracker>().InstancePerLifetimeScope();
         builder.RegisterType<KingdomDecisionDataConverter>().As<IKingdomDecisionDataConverter>().InstancePerLifetimeScope();
@@ -131,6 +133,9 @@ internal abstract class TestComponentBase
         RegisterMock<IMapEventInitializationBarrier>(builder);
         RegisterMock<IConnectedPlayerCountService>(builder);
         RegisterMock<IChatService>(builder);
+        RegisterMock<IPlayerListService>(builder);
+        RegisterMock<IPlayerActivityReader>(builder);
+        RegisterMock<IPlatformDisplayNameProvider>(builder);
         RegisterMock<IVoiceClient>(builder);
         RegisterMock<IChatPlayerNameResolver>(builder);
         // BattleHostHandler (MissionModule, auto-activated) needs the registry and the troop ledger,

@@ -4,11 +4,11 @@ using E2E.Tests.Environment.Instance;
 using E2E.Tests.Util;
 using GameInterface.Services.TroopRosters.Data;
 using GameInterface.Services.TroopRosters.Interfaces;
+using GameInterface.Services.TroopRosters.Messages;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Roster;
 using Xunit.Abstractions;
-using static GameInterface.Services.ObjectManager.ObjectManager;
 
 namespace E2E.Tests.Services.TroopRosters;
 
@@ -32,8 +32,11 @@ public class TroopRosterHeroDeltaTransferTests : IDisposable
         TestEnvironment = new E2ETestEnvironment(output);
     }
 
-    private static TroopRosterData Delta(string characterId, int number, int xp = 0)
-        => new TroopRosterData(new[] { new TroopRosterElementData(characterId, number, 0, xp) });
+    private TroopRosterData Delta(string characterId, int number, int xp = 0) =>
+        new(new[]
+        {
+            new TroopRosterElementData(Server.GetHandle<CharacterObject>(characterId), number, 0, xp),
+        });
 
     [Fact]
     public void CompanionTransfer_MainToOtherParty_ViaDelta_SyncsRostersAndPartyBelongedTo()
@@ -139,6 +142,72 @@ public class TroopRosterHeroDeltaTransferTests : IDisposable
             Assert.Equal(0, rightParty.Party.PrisonRoster.GetTroopCount(prisoner.CharacterObject));
             Assert.Equal(1, leftParty.Party.PrisonRoster.GetTroopCount(prisoner.CharacterObject));
             Assert.Same(leftParty.Party, prisoner.PartyBelongedToAsPrisoner);
+        }
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void HeroTransferWithDuplicateDestinationCount_IsRejectedAtomically(bool isPrisoner)
+    {
+        string sourcePartyId = null;
+        string destinationPartyId = null;
+        string characterId = null;
+
+        Server.Call(() =>
+        {
+            var sourceParty = GameObjectCreator.CreateInitializedObject<MobileParty>();
+            var destinationParty = GameObjectCreator.CreateInitializedObject<MobileParty>();
+            var hero = GameObjectCreator.CreateInitializedObject<Hero>();
+            var sourceRoster = isPrisoner ? sourceParty.PrisonRoster : sourceParty.MemberRoster;
+            sourceRoster.AddToCounts(hero.CharacterObject, 1);
+
+            Assert.True(Server.ObjectManager.TryGetId(sourceParty, out sourcePartyId));
+            Assert.True(Server.ObjectManager.TryGetId(destinationParty, out destinationPartyId));
+            Assert.True(Server.ObjectManager.TryGetId(hero.CharacterObject, out characterId));
+        });
+        TestEnvironment.FlushCoalescer();
+        Server.InternalMessages.Clear();
+        Server.NetworkSentMessages.Clear();
+
+        Server.Call(() =>
+        {
+            var troopRosterInterface = Server.Resolve<ITroopRosterInterface>();
+            Assert.True(Server.ObjectManager.TryGetObject<MobileParty>(sourcePartyId, out var sourceParty));
+            Assert.True(Server.ObjectManager.TryGetObject<MobileParty>(destinationPartyId, out var destinationParty));
+            var sourceRoster = isPrisoner ? sourceParty.PrisonRoster : sourceParty.MemberRoster;
+            var destinationRoster = isPrisoner ? destinationParty.PrisonRoster : destinationParty.MemberRoster;
+            int sourceVersion = sourceRoster.VersionNo;
+            int destinationVersion = destinationRoster.VersionNo;
+
+            var applied = troopRosterInterface.TryApplyTroopRosterDeltas(new[]
+            {
+                (sourceRoster, Delta(characterId, -1)),
+                (destinationRoster, Delta(characterId, 2)),
+            });
+
+            Assert.False(applied);
+            Assert.Equal(sourceVersion, sourceRoster.VersionNo);
+            Assert.Equal(destinationVersion, destinationRoster.VersionNo);
+        });
+        TestEnvironment.FlushCoalescer();
+
+        Assert.Empty(Server.InternalMessages.OfType<CountsAtIndexAdded>());
+        Assert.Empty(Server.NetworkSentMessages.GetMessages<NetworkTroopRosterElementBatch>());
+        foreach (var instance in Clients.Prepend(Server))
+        {
+            Assert.True(instance.ObjectManager.TryGetObject<MobileParty>(sourcePartyId, out var sourceParty));
+            Assert.True(instance.ObjectManager.TryGetObject<MobileParty>(destinationPartyId, out var destinationParty));
+            Assert.True(instance.ObjectManager.TryGetObject<CharacterObject>(characterId, out var character));
+            var sourceRoster = isPrisoner ? sourceParty.PrisonRoster : sourceParty.MemberRoster;
+            var destinationRoster = isPrisoner ? destinationParty.PrisonRoster : destinationParty.MemberRoster;
+
+            Assert.Equal(1, sourceRoster.GetTroopCount(character));
+            Assert.Equal(0, destinationRoster.GetTroopCount(character));
+            if (isPrisoner)
+                Assert.Same(sourceParty.Party, character.HeroObject.PartyBelongedToAsPrisoner);
+            else
+                Assert.Same(sourceParty, character.HeroObject.PartyBelongedTo);
         }
     }
 
@@ -274,8 +343,7 @@ public class TroopRosterHeroDeltaTransferTests : IDisposable
             fillerRoster.AddToCounts(firstFiller, 1);
             fillerRoster.AddToCounts(secondFiller, 1);
 
-            Assert.True(Server.ObjectManager.TryGetId(fillerRoster, out var fillerRosterId));
-            fillerRosterId = Compact(fillerRosterId, typeof(TroopRoster));
+            Assert.True(Server.ObjectManager.TryGetHandle(fillerRoster, out var fillerRosterId));
 
             var coalescer = Server.Resolve<ISendCoalescer>();
             Assert.True(coalescer.HasPending);

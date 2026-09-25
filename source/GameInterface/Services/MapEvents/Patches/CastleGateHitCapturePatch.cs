@@ -8,8 +8,8 @@ namespace GameInterface.Services.MapEvents.Patches;
 
 /// <summary>
 /// [Ram simulator] Reports each battering ram hit on a gate, with its damage. A granted ram strikes only on
-/// its simulator, so the host applies the carried damage to the authoritative gate and everyone else replays
-/// the hit reaction (their gate's OnHit never runs). See SiegeWeaponFireReplicator's gate-hit handler.
+/// its simulator, so the host applies the carried damage even if a peer simulates the gate and everyone else
+/// replays the hit reaction. See SiegeWeaponFireReplicator's gate-hit handler.
 /// </summary>
 [HarmonyPatch(typeof(CastleGate), "OnHitTaken")]
 internal static class CastleGateHitCapturePatch

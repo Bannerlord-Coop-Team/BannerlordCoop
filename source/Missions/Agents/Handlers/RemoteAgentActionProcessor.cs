@@ -3,6 +3,7 @@ using Common.Util;
 using GameInterface.Services.Entity;
 using GameInterface.Services.MapEvents;
 using Missions.Agents.Packets;
+using Missions.Battles;
 #if DEBUG
 using Missions.Diagnostics;
 #endif
@@ -18,6 +19,8 @@ namespace Missions.Agents.Handlers;
 
 public interface IRemoteAgentActionProcessor : IDisposable
 {
+    void BindPilotSeats(string battleId, ISiegeMachineStateReplicator machineState);
+    AgentPilotSeatData? CapturePilotSeat(CoopAgentInfo info, AgentPilotSeatData? previous);
     int GetOutgoingBattleHostEpoch();
     void ClearLocalAgentStates();
     void ClearForLocalAgent(Guid agentId, Agent agent);
@@ -28,7 +31,7 @@ public interface IRemoteAgentActionProcessor : IDisposable
     void HandleBattleHostAssigned(NetworkBattleHostAssigned message);
 }
 
-public class RemoteAgentActionProcessor : IRemoteAgentActionProcessor
+public partial class RemoteAgentActionProcessor : IRemoteAgentActionProcessor
 {
     private const float RetainedGuardReleaseBlendPeriod = 0.4f;
 
@@ -61,9 +64,13 @@ public class RemoteAgentActionProcessor : IRemoteAgentActionProcessor
         public Dictionary<string, RemoteAction> PendingByController;
         public MigratedActionAuthority? MigratedAuthority;
         public Dictionary<(string ControllerId, bool IsBattleHost), EquipmentBaseline> EquipmentByAuthority;
+        public PilotSeatAttachment PilotSeat;
+        public RemoteAction? PendingPilotSeat;
 
         public bool IsEmpty =>
             RetainedGuard == null
+            && PilotSeat == null
+            && !PendingPilotSeat.HasValue
             && !LastSequence.HasValue
             && (PendingByController == null || PendingByController.Count == 0)
             && !MigratedAuthority.HasValue
@@ -285,6 +292,7 @@ public class RemoteAgentActionProcessor : IRemoteAgentActionProcessor
         if (!_agentStates.TryGetValue(agentId, out RemoteAgentActionState state))
             return;
 
+        ReleasePilotSeat(state, preserveLocalUser: true);
         _agentStates.Remove(agentId);
         _pendingActionAgentIds.Remove(agentId);
         _retainedGuardAgentIds.Remove(agentId);
@@ -301,6 +309,7 @@ public class RemoteAgentActionProcessor : IRemoteAgentActionProcessor
     {
         if (_disposed || Mission.Current == null) return;
 
+        RefreshPilotSeats();
         ApplyPendingRemoteActions();
         ApplyRetainedRemoteGuardStates(
             RemoteGuardTickPhase.BeforeNativeTick);
@@ -760,6 +769,7 @@ public class RemoteAgentActionProcessor : IRemoteAgentActionProcessor
         if (agent == null || agent.Mission != Mission.Current || !agent.IsActive())
             return RemoteActionApplyResult.AgentNotReady;
 
+        GetOrCreateAgentState(agentId).PendingPilotSeat = null;
         if (action.Data.EquipmentRevision > 0)
         {
             RemoteAgentActionState state = GetOrCreateAgentState(agentId);
@@ -778,6 +788,10 @@ public class RemoteAgentActionProcessor : IRemoteAgentActionProcessor
                 action.Data.WithEquipment(baseline.Revision, baseline.Equipment),
                 action.Sequence, action.BattleHostEpoch);
         }
+
+        bool pilotSeatReady = TryApplyPilotSeat(info, action, out bool useConflict);
+        if (!pilotSeatReady && !useConflict)
+            return RemoteActionApplyResult.AgentNotReady;
 
         // Equipment and its dependent action must become visible in the same game-thread apply.
         if (action.Data.Equipment.HasValue)
@@ -863,6 +877,8 @@ public class RemoteAgentActionProcessor : IRemoteAgentActionProcessor
             appliedGuardState.HasGuardCommand = false;
         }
         RecordRemoteActionSequence(agentId, action);
+        // A busy seat must not block unrelated equipment or action presentation.
+        GetOrCreateAgentState(agentId).PendingPilotSeat = pilotSeatReady ? null : action;
         UpdateRemoteGuardState(
             agentId,
             appliedGuardState,
@@ -1314,6 +1330,14 @@ public class RemoteAgentActionProcessor : IRemoteAgentActionProcessor
         }
 
         actionsByController[action.ControllerId] = action;
+        if (state.PendingPilotSeat.HasValue)
+        {
+            RemoteAction deferred = state.PendingPilotSeat.Value;
+            if (deferred.ControllerId == action.ControllerId &&
+                (action.BattleHostEpoch > deferred.BattleHostEpoch ||
+                    HasPendingRemoteActionAtOrAfter(agentId, deferred)))
+                state.PendingPilotSeat = null;
+        }
     }
 
     private bool IsStaleRemoteAction(Guid agentId, RemoteAction action)
@@ -1540,6 +1564,7 @@ public class RemoteAgentActionProcessor : IRemoteAgentActionProcessor
         if (_disposed) return;
         _disposed = true;
 
+        BindPilotSeats(null, null);
         _agentStates.Clear();
         _pendingActionAgentIds.Clear();
         _retainedGuardAgentIds.Clear();

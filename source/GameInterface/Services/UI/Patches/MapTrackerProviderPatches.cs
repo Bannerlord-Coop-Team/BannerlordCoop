@@ -1,17 +1,35 @@
 ﻿using Common;
 using Common.Messaging;
+using GameInterface.Services.MobileParties.Extensions;
 using GameInterface.Services.UI.Messages;
 using HarmonyLib;
+using SandBox.ViewModelCollection.Map.Tracker;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Settlements;
 
 namespace GameInterface.Services.UI.Patches;
 
-[HarmonyPatch(typeof(CampaignEventDispatcher))]
+[HarmonyPatch]
 internal class MapTrackerProviderUpdatePatches
 {
-    [HarmonyPatch(nameof(CampaignEventDispatcher.OnMobilePartyCreated))]
+    [HarmonyPatch(typeof(MapMobilePartyTrackItemVM), nameof(MapMobilePartyTrackItemVM.IsVisibleOnMap))]
+    [HarmonyPostfix]
+    public static void IsVisibleOnMapPostfix(MapMobilePartyTrackItemVM __instance, ref bool __result)
+    {
+        __result &= __instance.TrackedObject.IsActive;
+    }
+
+    [HarmonyPatch(typeof(MapTrackerProvider), nameof(MapTrackerProvider.CanAddMobileParty))]
+    [HarmonyPostfix]
+    public static void CanAddMobilePartyPostfix(MobileParty party, ref bool __result)
+    {
+        // Defeated player parties are retained for release, even after their leader is removed.
+        if (__result && party.IsPlayerParty() && (party.LeaderHero == null || party.LeaderHero.IsPrisoner))
+            __result = false;
+    }
+
+    [HarmonyPatch(typeof(CampaignEventDispatcher), nameof(CampaignEventDispatcher.OnMobilePartyCreated))]
     [HarmonyPostfix]
     public static void OnMobilePartyCreatedPostfix(MobileParty party)
     {
@@ -20,7 +38,7 @@ internal class MapTrackerProviderUpdatePatches
         MessageBroker.Instance.Publish(null, new MapTrackerPartyCreated(party));
     }
 
-    [HarmonyPatch(nameof(CampaignEventDispatcher.OnPartyDisbanded))]
+    [HarmonyPatch(typeof(CampaignEventDispatcher), nameof(CampaignEventDispatcher.OnPartyDisbanded))]
     [HarmonyPostfix]
     public static void OnPartyDisbandedPostfix(MobileParty disbandParty, Settlement relatedSettlement)
     {
@@ -29,7 +47,7 @@ internal class MapTrackerProviderUpdatePatches
         MessageBroker.Instance.Publish(null, new MapTrackerPartyRemoved(disbandParty));
     }
 
-    [HarmonyPatch(nameof(CampaignEventDispatcher.OnMobilePartyDestroyed))]
+    [HarmonyPatch(typeof(CampaignEventDispatcher), nameof(CampaignEventDispatcher.OnMobilePartyDestroyed))]
     [HarmonyPostfix]
     public static void OnMobilePartyDestroyedPostfix(MobileParty mobileParty, PartyBase destroyerParty)
     {
@@ -38,7 +56,7 @@ internal class MapTrackerProviderUpdatePatches
         MessageBroker.Instance.Publish(null, new MapTrackerPartyRemoved(mobileParty));
     }
 
-    [HarmonyPatch(nameof(CampaignEventDispatcher.OnClanCreated))]
+    [HarmonyPatch(typeof(CampaignEventDispatcher), nameof(CampaignEventDispatcher.OnClanCreated))]
     [HarmonyPostfix]
     public static void OnCompanionClanCreatedPostfix(Clan clan, bool isCompanion)
     {

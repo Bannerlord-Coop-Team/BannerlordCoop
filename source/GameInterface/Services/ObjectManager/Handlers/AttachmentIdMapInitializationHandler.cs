@@ -15,11 +15,16 @@ internal class AttachmentIdMapInitializationHandler : IHandler
 {
     private readonly IMessageBroker messageBroker;
     private readonly IAutoRegistryFactory autoRegistryFactory;
+    private readonly IObjectManager objectManager;
 
-    public AttachmentIdMapInitializationHandler(IMessageBroker messageBroker, IAutoRegistryFactory autoRegistryFactory)
+    public AttachmentIdMapInitializationHandler(
+        IMessageBroker messageBroker,
+        IAutoRegistryFactory autoRegistryFactory,
+        IObjectManager objectManager)
     {
         this.messageBroker = messageBroker;
         this.autoRegistryFactory = autoRegistryFactory;
+        this.objectManager = objectManager;
 
         messageBroker.Subscribe<InitializeClientAttachmentIdMap>(Handle);
     }
@@ -33,6 +38,8 @@ internal class AttachmentIdMapInitializationHandler : IHandler
     {
         if (ModInformation.IsServer) return;
 
-        autoRegistryFactory.SetJoinIdRemap(payload.What.AttachmentIdMap?.DerivedToServerId);
+        var map = payload.What.AttachmentIdMap;
+        autoRegistryFactory.SetJoinIdRemap(map?.DerivedToServerId);
+        objectManager.SetJoinHandleMap(map?.ServerIdToHandle);
     }
 }

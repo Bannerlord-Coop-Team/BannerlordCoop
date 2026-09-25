@@ -1,10 +1,11 @@
-using GameInterface.Services.Inventory.Data;
+﻿using GameInterface.Services.Inventory.Data;
 using GameInterface.Services.MapEvents.Messages.Conversation;
 using GameInterface.Services.MapEvents.PlayerPartyInteractions;
 using GameInterface.Services.TroopRosters.Data;
 using ProtoBuf.Meta;
 using System.IO;
 using Xunit;
+using GameInterface.Services.Clans.Data;
 
 namespace GameInterface.Tests.Serialization;
 
@@ -58,12 +59,15 @@ public class NetworkPlayerPartyInteractionSerializationTest
             PlayerPartyInteractionProposal.Trade,
             new[] { PlayerPartyInteractionOption.AcceptProposal, PlayerPartyInteractionOption.DeclineProposal },
             isInitiator: false,
+            mercenaryAwardMultiplier: 12,
             initiatorAcceptedTrade: true,
             responderAcceptedTrade: false,
             partyItems: new[] { new ItemRosterElementData(new ItemObjectData("party-item", null, itemModifierNull: true), 3) },
             otherPartyItems: new[] { new ItemRosterElementData(new ItemObjectData("other-item", null, itemModifierNull: true), 4) },
             enabledOptions: new[] { PlayerPartyInteractionOption.AcceptProposal },
-            isHostile: true);
+            isHostile: true,
+            mercenaryUnavailableReason: PlayerPartyInteractionMercenaryUnavailableReason.InitiatorClanTierTooLow,
+            clanJoinUnavailableReason: ClanJoinUnavailableReason.IncompatibleWars);
 
         var result = RoundTrip(original);
 
@@ -79,6 +83,9 @@ public class NetworkPlayerPartyInteractionSerializationTest
         Assert.Equal(original.InitiatorAcceptedTrade, result.InitiatorAcceptedTrade);
         Assert.Equal(original.ResponderAcceptedTrade, result.ResponderAcceptedTrade);
         Assert.Equal(original.IsHostile, result.IsHostile);
+        Assert.Equal(original.MercenaryAwardMultiplier, result.MercenaryAwardMultiplier);
+        Assert.Equal(original.MercenaryUnavailableReason, result.MercenaryUnavailableReason);
+        Assert.Equal(original.ClanJoinUnavailableReason, result.ClanJoinUnavailableReason);
         Assert.Single(result.PartyItems);
         Assert.Equal("party-item", result.PartyItems[0].ItemObjectData.ItemObjectId);
         Assert.Equal(3, result.PartyItems[0].Amount);
@@ -87,12 +94,22 @@ public class NetworkPlayerPartyInteractionSerializationTest
         Assert.Equal(4, result.OtherPartyItems[0].Amount);
     }
 
-    [Fact]
-    public void SubmitOption_RoundTrip_PreservesFields()
+    [Theory]
+    [InlineData(PlayerPartyInteractionOption.TradeProposal)]
+    [InlineData(PlayerPartyInteractionOption.Mercenary)]
+    [InlineData(PlayerPartyInteractionOption.ConfirmMercenary)]
+    [InlineData(PlayerPartyInteractionOption.CancelMercenary)]
+    [InlineData(PlayerPartyInteractionOption.LeaveClan)]
+    [InlineData(PlayerPartyInteractionOption.RemoveFromClan)]
+    [InlineData(PlayerPartyInteractionOption.ProposeMarriage)]
+    [InlineData(PlayerPartyInteractionOption.PatrilinealMarriage)]
+    [InlineData(PlayerPartyInteractionOption.MatrilinealMarriage)]
+    [InlineData(PlayerPartyInteractionOption.CancelMarriage)]
+    public void SubmitOption_RoundTrip_PreservesFields(PlayerPartyInteractionOption option)
     {
         var original = new NetworkSubmitPlayerPartyInteractionOption(
             "session-1",
-            PlayerPartyInteractionOption.TradeProposal,
+            option,
             "party-1");
 
         var result = RoundTrip(original);
@@ -102,14 +119,21 @@ public class NetworkPlayerPartyInteractionSerializationTest
         Assert.Equal(original.PartyId, result.PartyId);
     }
 
-    [Fact]
-    public void Ended_RoundTrip_PreservesFields()
+    [Theory]
+    [InlineData(PlayerPartyInteractionOutcomeType.TradeAccepted)]
+    [InlineData(PlayerPartyInteractionOutcomeType.MercenaryAccepted)]
+    [InlineData(PlayerPartyInteractionOutcomeType.MercenaryDeclined)]
+    [InlineData(PlayerPartyInteractionOutcomeType.ClanLeft)]
+    [InlineData(PlayerPartyInteractionOutcomeType.ClanMemberRemoved)]
+    [InlineData(PlayerPartyInteractionOutcomeType.MarriageAccepted)]
+    [InlineData(PlayerPartyInteractionOutcomeType.MarriageDeclined)]
+    public void Ended_RoundTrip_PreservesFields(PlayerPartyInteractionOutcomeType outcome)
     {
         var original = new NetworkPlayerPartyInteractionEnded(
             "session-1",
             "initiator-party",
             "responder-party",
-            PlayerPartyInteractionOutcomeType.TradeAccepted);
+            outcome);
 
         var result = RoundTrip(original);
 
@@ -136,10 +160,10 @@ public class NetworkPlayerPartyInteractionSerializationTest
             "session-1",
             "party-1",
             new[] { new ItemRosterElementData(new ItemObjectData("item-1", null, itemModifierNull: true), 2) },
-            new[] { new TroopRosterElementData("troop-1", 3, 1, 4) },
+            new[] { new TroopRosterElementData(1, 3, 1, 4) },
             offeredGold: 25,
             offeredFiefs: new[] { "fief-1" },
-            offeredPrisoners: new[] { new TroopRosterElementData("prisoner-1", 1, 0, 0) },
+            offeredPrisoners: new[] { new TroopRosterElementData(2, 1, 0, 0) },
             offeredPeace: true);
 
         var result = RoundTrip(original);
@@ -149,12 +173,12 @@ public class NetworkPlayerPartyInteractionSerializationTest
         Assert.Single(result.OfferedItems);
         Assert.Equal("item-1", result.OfferedItems[0].ItemObjectData.ItemObjectId);
         Assert.Single(result.OfferedTroops);
-        Assert.Equal("troop-1", result.OfferedTroops[0].CharacterId);
+        Assert.Equal(1u, result.OfferedTroops[0].CharacterId);
         Assert.Equal(25, result.OfferedGold);
         Assert.Single(result.OfferedFiefs);
         Assert.Equal("fief-1", result.OfferedFiefs[0]);
         Assert.Single(result.OfferedPrisoners);
-        Assert.Equal("prisoner-1", result.OfferedPrisoners[0].CharacterId);
+        Assert.Equal(2u, result.OfferedPrisoners[0].CharacterId);
         Assert.True(result.OfferedPeace);
     }
 

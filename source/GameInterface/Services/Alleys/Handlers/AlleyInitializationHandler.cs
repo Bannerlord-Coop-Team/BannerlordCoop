@@ -4,6 +4,7 @@ using GameInterface.Services.Alleys.Interfaces;
 using GameInterface.Services.Alleys.Messages;
 using GameInterface.Services.Heroes.Messages;
 using GameInterface.Services.ObjectManager;
+using System.Collections.Generic;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Settlements;
 
@@ -19,17 +20,20 @@ internal class AlleyInitializationHandler : IHandler
     private readonly IMessageBroker messageBroker;
     private readonly IObjectManager objectManager;
     private readonly IAlleyCampaignBehaviorInterface behaviorInterface;
+    private readonly IAlleyGarrisonData garrisonData;
 
     private AlleyPlayerData alleyPlayerData;
 
     public AlleyInitializationHandler(
         IMessageBroker messageBroker,
         IObjectManager objectManager,
-        IAlleyCampaignBehaviorInterface behaviorInterface)
+        IAlleyCampaignBehaviorInterface behaviorInterface,
+        IAlleyGarrisonData garrisonData)
     {
         this.messageBroker = messageBroker;
         this.objectManager = objectManager;
         this.behaviorInterface = behaviorInterface;
+        this.garrisonData = garrisonData;
 
         messageBroker.Subscribe<InitializeClientAlleyData>(Handle);
         messageBroker.Subscribe<PlayerHeroChanged>(Handle);
@@ -44,6 +48,8 @@ internal class AlleyInitializationHandler : IHandler
     private void Handle(MessagePayload<InitializeClientAlleyData> payload)
     {
         alleyPlayerData = payload.What.AlleyPlayerData;
+        GameThread.RunSafe(() => behaviorInterface.ClientAlleyData = payload.What.AlleyPlayerData?.ManagementDataPerAlley
+            ?? new Dictionary<string, AlleyManagementData>());
     }
 
     private void Handle(MessagePayload<PlayerHeroChanged> payload)
@@ -69,7 +75,7 @@ internal class AlleyInitializationHandler : IHandler
                 behaviorInterface.AddOrUpdatePlayerAlleyData(
                     alley,
                     overseer,
-                    AlleyGarrisonData.FromData(pair.Value.Garrison, objectManager),
+                    garrisonData.FromData(pair.Value.Garrison),
                     new CampaignTime(pair.Value.LastRecruitTimeTicks));
 
                 // Restore an in-progress attack so the confront-alley menu works after joining mid-attack;

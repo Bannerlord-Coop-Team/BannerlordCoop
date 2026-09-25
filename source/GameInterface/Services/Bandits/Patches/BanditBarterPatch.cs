@@ -1,4 +1,4 @@
-using Common;
+﻿using Common;
 using Common.Network;
 using GameInterface.Policies;
 using GameInterface.Services.Barters;
@@ -269,7 +269,7 @@ internal static class BanditBarterPatch
         IObjectManager objectManager)
     {
         var prisoner = barterable._prisonerCharacter?.CharacterObject;
-        if (prisoner == null || !objectManager.TryGetId(prisoner, out var prisonerId))
+        if (prisoner == null || !objectManager.TryGetHandle(prisoner, out var prisonerId))
             return false;
 
         prisoners.Add(new TroopRosterElementData(prisonerId, barterable.CurrentAmount, 0, 0));

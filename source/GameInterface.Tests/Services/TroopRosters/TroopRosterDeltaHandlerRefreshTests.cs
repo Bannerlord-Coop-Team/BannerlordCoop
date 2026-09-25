@@ -31,8 +31,8 @@ public class TroopRosterDeltaHandlerRefreshTests
         var roster = new TroopRoster();
         var character = new CharacterObject();
         var objectManager = new Mock<IObjectManager>();
-        objectManager.Setup(o => o.TryGetObjectWithLogging("roster", out roster)).Returns(true);
-        objectManager.Setup(o => o.TryGetObjectWithLogging("character", out character)).Returns(true);
+        objectManager.Setup(o => o.TryGetObjectWithLogging(1, out roster)).Returns(true);
+        objectManager.Setup(o => o.TryGetObjectWithLogging(2, out character)).Returns(true);
 
         Action<MessagePayload<NetworkTroopRosterElementBatch>>? subscriber = null;
         var messageBroker = new Mock<IMessageBroker>();
@@ -57,8 +57,8 @@ public class TroopRosterDeltaHandlerRefreshTests
         subscriber!(new MessagePayload<NetworkTroopRosterElementBatch>(
             this,
             new NetworkTroopRosterElementBatch(
-                "roster",
-                "character",
+                1,
+                2,
                 new[]
                 {
                     TroopRosterElementOperation.AddCounts(3, 0, 0, false),

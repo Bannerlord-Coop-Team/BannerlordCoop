@@ -1,4 +1,5 @@
-﻿using Autofac;
+﻿using GameInterface.Services.UI.CoopOptions.Providers.UITab;
+using Autofac;
 using Autofac.Core;
 using Autofac.Core.Registration;
 using Autofac.Core.Resolving.Pipeline;
@@ -11,6 +12,7 @@ using GameInterface.Registry;
 using GameInterface.Serialization;
 using GameInterface.Services;
 using GameInterface.Services.Armies;
+using GameInterface.Services.Alleys;
 using GameInterface.Services.Bandits;
 using GameInterface.Services.Barters;
 using GameInterface.Services.BugReporting;
@@ -43,6 +45,7 @@ using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Party;
 using GameInterface.Services.Players;
 using GameInterface.Services.SiegeEvents;
+using GameInterface.Services.SiegeEvents.Commands;
 using GameInterface.Services.Stances;
 using GameInterface.Services.Time;
 using GameInterface.Services.TroopRosters;
@@ -119,17 +122,15 @@ public class GameInterfaceModule : Module
         builder.RegisterType<BugReportUploader>().As<IBugReportUploader>().InstancePerDependency();
         builder.RegisterType<BugReportLogSharingPreference>().As<IBugReportLogSharingPreference>().InstancePerDependency();
         builder.RegisterType<BugReportSubmissionConsent>().As<IBugReportSubmissionConsent>().InstancePerDependency();
-        builder.RegisterType<KillFeedOptionsTabProvider>().As<ICoopOptionsTabProvider>().InstancePerDependency();
-        builder.RegisterType<MapTimeOptionsTabProvider>().As<ICoopOptionsTabProvider>().InstancePerDependency();
-        builder.RegisterType<BugReportOptionsTabProvider>().As<ICoopOptionsTabProvider>().InstancePerDependency();
-        builder.RegisterType<ChatOptionsTabProvider>().As<ICoopOptionsTabProvider>().InstancePerDependency();
-        builder.RegisterType<PlayerNameplatesOptionsTabProvider>().As<ICoopOptionsTabProvider>().InstancePerDependency();
+        builder.RegisterType<UIOptionsTabProvider>().As<ICoopOptionsTabProvider>().InstancePerDependency();
         builder.RegisterType<NetworkOptionsTabProvider>().As<ICoopOptionsTabProvider>().InstancePerDependency();
         builder.RegisterType<LocalMovementBandwidth>().As<ILocalMovementBandwidth>().InstancePerDependency();
         builder.RegisterType<ChatPlayerName>().As<IChatPlayerNameResolver>().InstancePerDependency();
         builder.RegisterType<PlayerPartyRestorer>().As<IPlayerPartyRestorer>().InstancePerDependency();
         builder.RegisterType<PlayerCreationRollback>().As<IPlayerCreationRollback>().InstancePerDependency();
         builder.RegisterType<MobilePartyBehaviorSnapshot>().As<IMobilePartyBehaviorSnapshot>().InstancePerDependency();
+        builder.RegisterType<PartyBehaviorWireMapper>().As<IPartyBehaviorWireMapper>().InstancePerDependency();
+        builder.RegisterType<AlleyGarrisonData>().As<IAlleyGarrisonData>().InstancePerDependency();
 #if DEBUG
         builder.RegisterType<ClanLordMovementFixture>().As<IClanLordMovementFixture>().InstancePerLifetimeScope();
         builder.RegisterType<ClanLordMovementFixtureRules>().As<IClanLordMovementFixtureRules>().InstancePerDependency();
@@ -149,6 +150,12 @@ public class GameInterfaceModule : Module
         builder.RegisterType<LocationConversationAgentGuard>().As<ILocationConversationAgentGuard>().InstancePerDependency();
         builder.RegisterType<BattleAgentBudget>().As<IBattleAgentBudget>().InstancePerDependency();
         builder.RegisterType<NearbyPartyReinforcer>().As<INearbyPartyReinforcer>().InstancePerDependency();
+#if DEBUG
+        // One capture spans the independently resolved DEBUG commands for this campaign session.
+        builder.RegisterType<DefenderFixtureBehaviorIdentity>().As<IDefenderFixtureBehaviorIdentity>().InstancePerDependency();
+        builder.RegisterType<DefenderSiegeContextFixture>().As<IDefenderSiegeContextFixture>().InstancePerLifetimeScope();
+        builder.RegisterType<DefenderFixtureCaptivityActions>().As<IDefenderFixtureCaptivityActions>().InstancePerDependency();
+#endif
         builder.RegisterType<SiegeMapEventLeaderReconciler>().As<ISiegeMapEventLeaderReconciler>().InstancePerDependency();
         builder.RegisterType<AiSiegeAssaultReadiness>().As<IAiSiegeAssaultReadiness>().InstancePerDependency();
         builder.RegisterType<SiegeDefenderCommandAuthority>().As<ISiegeDefenderCommandAuthority>().InstancePerDependency();
