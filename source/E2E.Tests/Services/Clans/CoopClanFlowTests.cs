@@ -170,7 +170,7 @@ public class CoopClanFlowTests : MapEventTestBase, IDisposable
     }
 
     [Fact]
-    public void JoinedMemberAppointedLeader_ReceivesKingdomDecisionsWithoutReconnect()
+    public void JoinedMemberAppointedLeader_CanUseKingdomActionsWithoutReconnect()
     {
         Join();
         var kingdomId = TestEnvironment.CreateRegisteredObject<Kingdom>();
@@ -220,6 +220,14 @@ public class CoopClanFlowTests : MapEventTestBase, IDisposable
             Assert.Single(kingdom.UnresolvedDecisions);
             Assert.IsType<DeclareWarDecision>(kingdom.UnresolvedDecisions[0]);
         });
+
+        const string renamedKingdom = "Joined Kingdom";
+        Send(memberClient, new NetworkRequestChangeKingdomName(kingdomId, renamedKingdom));
+        Flush();
+
+        Assert.Contains(
+            Server.InternalMessages.GetMessages<KingdomNameChanged>(),
+            message => message.ControllerId == member.ControllerId && message.KingdomId == kingdomId);
     }
 
     // A01, A07, A08, L05, L07, P02: transfer, assign roles as a member, then leave with eligible family.
