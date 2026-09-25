@@ -136,20 +136,43 @@ public static class IssuesDebugCommand
     {
         public string Prefix => "coop.debug.issues";
         public string Name => "stage_accept";
-        public string Description => "Stages an unaccepted gang leader stolen-goods issue at Danustica.";
+        public string Description => "Stages an unaccepted gang leader stolen-goods issue for an eligible registered owner.";
         public CoopCommandSide Side => CoopCommandSide.Server;
         public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
-            new ExpectedArgs("hero_id", "The registered Danustica gang leader id.", isRequired: true),
+            new ExpectedArgs("hero_id", "An optional registered gang leader id; omit to select an eligible owner.", isRequired: false),
         };
+
+        private static bool IsEligibleOwner(Hero hero)
+        {
+            var settlement = hero?.CurrentSettlement;
+            return hero?.IsActive == true && hero.IsGangLeader && hero.Issue == null &&
+                settlement?.IsTown == true && settlement.Town.Security < 70f &&
+                settlement.Notables.Any(other => other != hero && other.IsActive && other.IsMerchant &&
+                    other.CurrentSettlement == settlement);
+        }
 
         public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
         {
             if (!CommandHelpers.IsServerOnlyCommand(out var error, "coop.debug.issues.stage_accept")) return Failed(error);
             if (!CommandHelpers.TryGetObjectManager(out var objectManager, out error)) return Failed(error);
-            if (!CommandHelpers.TryGetManagedObject<Hero>(objectManager, args[0], out var hero, out error)) return Failed(error);
-            if (hero.CurrentSettlement?.StringId != "town_ES1") return Failed("Issue owner must be at Danustica (town_ES1).");
-            if (hero.Issue != null) return Failed($"Hero '{hero.Name}' already has an issue.");
+            Hero hero;
+            string ownerId;
+            if (args.Count > 0)
+            {
+                ownerId = args[0];
+                if (!CommandHelpers.TryGetManagedObject<Hero>(objectManager, ownerId, out hero, out error)) return Failed(error);
+            }
+            else
+            {
+                hero = Hero.AllAliveHeroes
+                    .Where(candidate => IsEligibleOwner(candidate) && objectManager.TryGetId(candidate, out _))
+                    .OrderBy(candidate => candidate.StringId, StringComparer.Ordinal)
+                    .FirstOrDefault();
+                if (hero == null) return Failed("No registered eligible gang leader with an active merchant was found in a town.");
+                objectManager.TryGetId(hero, out ownerId);
+            }
+            if (!IsEligibleOwner(hero)) return Failed($"Hero '{hero.Name}' is not an eligible town gang leader without an issue.");
             if (!IssueGiveCatalog.TryGet(StolenGoodsKey, out var entry)) return Failed("Stolen-goods issue is unavailable.");
             var (factory, resolveError) = entry.Resolve(hero);
             if (factory == null) return Failed(resolveError);
@@ -164,7 +187,7 @@ public static class IssuesDebugCommand
                     return Failed("Issue did not remain available for acceptance.");
                 }
                 StagedAcceptOwners.Add(hero);
-                return Succeeded($"Staged unaccepted {StolenGoodsKey} for '{hero.Name}' ({args[0]}), issue '{hero.Issue.StringId}'.");
+                return Succeeded($"Staged unaccepted {StolenGoodsKey} for '{hero.Name}' ({ownerId}), issue '{hero.Issue.StringId}'.");
             }
             catch (Exception ex)
             {
