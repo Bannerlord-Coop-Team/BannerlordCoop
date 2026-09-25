@@ -2,6 +2,7 @@
 using Common.Messaging;
 using GameInterface.Services.Clans.Messages;
 using GameInterface.Services.Heroes.Extensions;
+using GameInterface.Services.MobileParties.Extensions;
 using HarmonyLib;
 using Serilog;
 using System.Collections.Generic;
@@ -10,7 +11,9 @@ using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.ViewModelCollection.ClanManagement;
 using TaleWorlds.CampaignSystem.ViewModelCollection.ClanManagement.Categories;
+using TaleWorlds.Core;
 using TaleWorlds.Library;
+using TaleWorlds.Localization;
 
 namespace GameInterface.Services.Clans.Patches;
 
@@ -21,12 +24,44 @@ internal class ClanPartiesVMPatches
 
     private const string PlayerHeroRejectedMessage = "Failed to change clan party leader because hero is a player.";
 
+    [HarmonyPatch(nameof(ClanPartiesVM.GetCanCreateNewParty))]
+    [HarmonyPrefix]
+    public static bool GetCanCreateNewPartyPrefix(ClanPartiesVM __instance, ref bool __result, ref TextObject disabledReason)
+    {
+        if (CoopClanPermissions.CanManageClan(__instance._faction)) return true;
+        __result = false;
+        disabledReason = GameTexts.FindText("str_coop_clan_party_leader_only");
+        return false;
+    }
+
+    [HarmonyPatch(nameof(ClanPartiesVM.OnShowNewPartyPopup))]
+    [HarmonyPrefix]
+    public static bool NewPartyPopupPrefix(ClanPartiesVM __instance) => CoopClanPermissions.CanManageClan(__instance._faction);
+
+    [HarmonyPatch(nameof(ClanPartiesVM.OnNewPartyCreationOver))]
+    [HarmonyPrefix]
+    public static bool NewPartyCreationOverPrefix(ClanPartiesVM __instance) => CoopClanPermissions.CanManageClan(__instance._faction);
+
+    [HarmonyPatch(nameof(ClanPartiesVM.GetCanDisbandParty))]
+    [HarmonyPrefix]
+    public static bool GetCanDisbandPartyPrefix(ClanPartiesVM __instance, ref bool __result, ref TextObject cannotDisbandReason)
+    {
+        var party = __instance.CurrentSelectedParty?.Party?.MobileParty;
+        if (CoopClanPermissions.CanManageParty(party)) return true;
+        cannotDisbandReason = GameTexts.FindText(party?.IsPlayerParty() == true
+            ? "str_coop_clan_player_party_protected" : "str_coop_clan_party_leader_only");
+        __result = false;
+        return false;
+    }
+
     [HarmonyPatch(nameof(ClanPartiesVM.CreateNewClanParty))]
     [HarmonyPrefix]
     public static bool CreateNewClanPartyPrefix(ClanPartiesVM __instance, Hero newLeader, int partyGoldLowerThreshold)
     {
+        if (!CoopClanPermissions.CanManageClan(__instance._faction) || newLeader == null) return false;
+
         // Reject forming a new party with a player hero
-        if (newLeader != null && newLeader.IsPlayerHero())
+        if (newLeader.IsPlayerHero())
         {
             Logger.Error($"Rejecting new clan mobile party because newLeader is a player hero ({newLeader.StringId}).");
 
@@ -34,6 +69,8 @@ internal class ClanPartiesVMPatches
             InformationManager.DisplayMessage(new InformationMessage(PlayerHeroRejectedMessage));
             return false;
         }
+
+        if (!CoopClanPermissions.CanManageHero(newLeader)) return false;
 
         if (newLeader.PartyBelongedTo == MobileParty.MainParty)
         {
@@ -59,9 +96,14 @@ internal class ClanPartiesVMPatches
 
     [HarmonyPatch(nameof(ClanPartiesVM.OnShowChangeLeaderPopup))]
     [HarmonyPrefix]
-    public static void OnShowChangeLeaderPopupPrefix(ClanPartiesVM __instance)
+    public static bool OnShowChangeLeaderPopupPrefix(ClanPartiesVM __instance)
     {
-        popupParty = __instance.CurrentSelectedParty?.Party?.MobileParty;
+        popupParty = null;
+        var party = __instance.CurrentSelectedParty?.Party?.MobileParty;
+        if (!CoopClanPermissions.CanManageParty(party)) return false;
+
+        popupParty = party;
+        return true;
     }
 
     [HarmonyPatch(nameof(ClanPartiesVM.OnPartyLeaderChanged))]
@@ -73,6 +115,7 @@ internal class ClanPartiesVMPatches
         popupParty = null;
 
         if (selectedParty == null) return false;
+        if (!CoopClanPermissions.CanManageParty(selectedParty)) return false;
 
         var oldLeader = selectedParty.Party?.LeaderHero;
         if (oldLeader != null && oldLeader.IsPlayerHero())
@@ -94,6 +137,8 @@ internal class ClanPartiesVMPatches
         }
 
         // Change clan party leader on the server
+        if (newLeader != null && !CoopClanPermissions.CanManageHero(newLeader)) return false;
+
         var message = new ClanPartyLeaderChanged(Hero.MainHero, newLeader, selectedParty, MobileParty.MainParty);
         MessageBroker.Instance.Publish(__instance, message);
 
@@ -120,24 +165,23 @@ internal class ClanPartiesVMPatches
     [HarmonyPostfix]
     public static void GetNewPartyLeaderCandidatesPostfix(ref IEnumerable<ClanCardSelectionItemInfo> __result)
     {
-        // Remove player heroes from card selection
-        __result = WithoutPlayerHeroes(__result);
+        __result = WithManageableHeroes(__result);
     }
 
     [HarmonyPatch(nameof(ClanPartiesVM.GetChangeLeaderCandidates))]
     [HarmonyPostfix]
     public static void GetChangeLeaderCandidatesPostfix(ref IEnumerable<ClanCardSelectionItemInfo> __result)
     {
-        // Remove player heroes from card selection
-        __result = WithoutPlayerHeroes(__result);
+        __result = WithManageableHeroes(__result);
     }
 
-    private static IEnumerable<ClanCardSelectionItemInfo> WithoutPlayerHeroes(IEnumerable<ClanCardSelectionItemInfo> candidates)
+    private static IEnumerable<ClanCardSelectionItemInfo> WithManageableHeroes(IEnumerable<ClanCardSelectionItemInfo> candidates)
     {
         if (candidates == null) return candidates;
 
         return candidates
-            .Where(candidate => !(candidate.Identifier is Hero hero && hero.IsPlayerHero()))
+            .Where(candidate => !(candidate.Identifier is Hero hero) ||
+                (!hero.IsPlayerHero() && CoopClanPermissions.CanManageHero(hero)))
             .ToList();
     }
 }

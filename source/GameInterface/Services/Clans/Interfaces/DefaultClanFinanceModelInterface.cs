@@ -22,6 +22,12 @@ public interface IDefaultClanFinanceModelInterface : IGameAbstraction
 public class DefaultClanFinanceModelInterface : IDefaultClanFinanceModelInterface
 {
     private static readonly TextObject AlleyIncomeText = new TextObject("{=coop_alley_income}Alleys");
+    private readonly IClanFinance clanFinance;
+
+    public DefaultClanFinanceModelInterface(IClanFinance clanFinance)
+    {
+        this.clanFinance = clanFinance;
+    }
 
     public int AddExpenseFromLeaderParty(DefaultClanFinanceModel model, Clan clan, ExplainedNumber goldChange, bool applyWithdrawals)
     {
@@ -104,6 +110,8 @@ public class DefaultClanFinanceModelInterface : IDefaultClanFinanceModelInterfac
         {
             __instance.AddExpensesForCallToWarAgreements(clan, ref goldChange, applyWithdrawals);
         }
+        // Add coop clan payments to non-leader members to explanation
+        if (!applyWithdrawals) clanFinance.AddPaymentExpenses(clan, ref goldChange);
     }
 
     public int AddPartyExpense(DefaultClanFinanceModel __instance, MobileParty party, Clan clan, ExplainedNumber goldChange, bool applyWithdrawals)

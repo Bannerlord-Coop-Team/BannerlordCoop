@@ -6,6 +6,7 @@ using GameInterface.Services.Alleys.Interfaces;
 using GameInterface.Services.Alleys.Messages;
 using GameInterface.Services.Heroes.Extensions;
 using GameInterface.Services.ObjectManager;
+using GameInterface.Services.Clans.Messages;
 using GameInterface.Services.TroopRosters.Data;
 using Serilog;
 using System;
@@ -313,6 +314,15 @@ internal class AlleyManagementHandler : IHandler
         var data = payload.What;
         GameThread.RunSafe(() =>
         {
+            var storedGarrison = garrisonData.ToStorageData(data.Garrison);
+            if (!behaviorInterface.ClientAlleyData.TryGetValue(data.AlleyId, out var stored))
+            {
+                stored = new AlleyManagementData(data.OverseerId, storedGarrison);
+                behaviorInterface.ClientAlleyData[data.AlleyId] = stored;
+            }
+            stored.OverseerId = data.OverseerId;
+            stored.Garrison = storedGarrison;
+            stored.LastRecruitTimeTicks = data.LastRecruitTimeTicks;
             if (!objectManager.TryGetObjectWithLogging<Alley>(data.AlleyId, out var alley)) return;
 
             // Only the owning client keeps the behavior-side management data. A client that no longer
@@ -342,6 +352,9 @@ internal class AlleyManagementHandler : IHandler
             data.OverseerId,
             data.Garrison,
             data.LastRecruitTimeTicks));
+        if (objectManager.TryGetObjectWithLogging<Alley>(alleyId, out var alley))
+            messageBroker.Publish(this, new ClanManagementChanged(alley.Owner?.Clan,
+                ClanManagementRefresh.Income | ClanManagementRefresh.Members));
     }
 
     private void Handle_NetworkAlleyManagementRemoved(MessagePayload<NetworkAlleyManagementRemoved> payload)
@@ -351,6 +364,7 @@ internal class AlleyManagementHandler : IHandler
         var data = payload.What;
         GameThread.RunSafe(() =>
         {
+            behaviorInterface.ClientAlleyData.Remove(data.AlleyId);
             if (!objectManager.TryGetObjectWithLogging<Alley>(data.AlleyId, out var alley)) return;
             behaviorInterface.RemovePlayerAlleyData(alley);
         });

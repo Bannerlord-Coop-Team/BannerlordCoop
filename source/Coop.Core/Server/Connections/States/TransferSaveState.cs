@@ -92,7 +92,8 @@ public class TransferSaveState : ConnectionStateBase
                     Clone(coopSessionProvider.CoopSession?.HeroMeetingData),
                     Clone(coopSessionProvider.CoopSession?.AgingPlayerData),
                     attachmentIdMapper.BuildServerMap(),
-                    serverOptionsProvider.GetServerOptions());
+                    serverOptionsProvider.GetServerOptions(),
+                    Clone(coopSessionProvider.CoopSession?.ClanFinance));
 
                 // Start holding this peer's broadcasts now that the snapshot has been taken. The whole save
                 // runs in a blocking GameThread.Run call issued from the network thread, so the poller is
@@ -162,7 +163,8 @@ public class TransferSaveState : ConnectionStateBase
                 chunkIndex == 0 ? snapshot.HeroMeetingData : null,
                 chunkIndex == 0 ? snapshot.AgingPlayerData : null,
                 chunkIndex == 0 ? snapshot.AttachmentIdMap : null,
-                chunkIndex == 0 ? snapshot.ServerOptions : null);
+                chunkIndex == 0 ? snapshot.ServerOptions : null,
+                chunkIndex == 0 ? snapshot.ClanFinance : null);
 
             network.SendImmediate(ConnectionLogic.Peer, chunkPacket);
         }

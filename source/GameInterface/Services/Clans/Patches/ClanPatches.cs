@@ -28,16 +28,6 @@ internal class ClanPatches
         }
     }
 
-    [HarmonyPatch(nameof(Clan.PlayerClan))]
-    [HarmonyPatch(MethodType.Getter)]
-    [HarmonyPrefix]
-    static bool PlayerClanGetter()
-    {
-        if (Campaign.Current == null) return false;
-        
-        return true;
-    }
-
     // Patch for server to use passed down ClientHero instead of server's MainHero
     // which leads to a different hero
     [HarmonyPatch(nameof(Clan.CreateCompanionToLordClan))]

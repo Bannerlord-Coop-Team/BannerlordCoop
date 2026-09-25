@@ -18,14 +18,17 @@ public class Player
     public readonly string CharacterObjectId;
     [ProtoMember(6)]
     public string PlatformName { get; set; }
+    [ProtoMember(7)]
+    public readonly string OriginalClanId;
 
     // Associates one controller with its registered campaign objects.
-    public Player(string controllerId, string heroId, string mobilePartyId, string clanId, string characterObjectId)
+    public Player(string controllerId, string heroId, string mobilePartyId, string clanId, string characterObjectId, string originalClanId = null)
     {
         ControllerId = controllerId;
         HeroId = heroId;
         MobilePartyId = mobilePartyId;
         ClanId = clanId;
         CharacterObjectId = characterObjectId;
+        OriginalClanId = originalClanId ?? clanId;
     }
 }

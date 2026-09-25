@@ -42,6 +42,7 @@ using Helpers;
 using LiteNetLib;
 using Missions.Messages;
 using System.Reflection;
+using System.Xml;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Actions;
 using TaleWorlds.CampaignSystem.BarterSystem;
@@ -62,6 +63,7 @@ using TaleWorlds.Core;
 using TaleWorlds.Core.ImageIdentifiers;
 using TaleWorlds.Library;
 using Xunit.Abstractions;
+using GameInterface.Services.Clans.Data;
 using TaleWorlds.ObjectSystem;
 
 namespace E2E.Tests.Services.MapEvents;
@@ -363,6 +365,7 @@ public class PlayerPartyInteractionFlowTests : MapEventTestBase
         Assert.DoesNotContain(PlayerPartyInteractionOption.Vassal, initialState.EnabledOptions);
         Assert.DoesNotContain(PlayerPartyInteractionOption.Mercenary, initialState.EnabledOptions);
         Assert.Equal(PlayerPartyInteractionVassalUnavailableReason.TargetIsNotKingdomLeader, initialState.VassalUnavailableReason);
+        Assert.Equal(ClanJoinUnavailableReason.TargetIsNotClanLeader, initialState.ClanJoinUnavailableReason);
         Assert.Equal(PlayerPartyInteractionMercenaryUnavailableReason.InitiatorClanTierTooLow, initialState.MercenaryUnavailableReason);
 
         Server.NetworkSentMessages.Clear();
@@ -392,7 +395,7 @@ public class PlayerPartyInteractionFlowTests : MapEventTestBase
     }
 
     [Fact]
-    public void OfferServices_WithClanLeader_ShowsJoinClanDisabledAndNevermind()
+    public void OfferServices_WithClanLeader_ShowsJoinClanEnabledAndNevermind()
     {
         var (client1, _, initiatorPartyId, responderPartyId) = CreateTwoPlayerParties();
 
@@ -413,7 +416,7 @@ public class PlayerPartyInteractionFlowTests : MapEventTestBase
         {
             Assert.Equal(PlayerPartyInteractionPhase.OfferServices, PlayerPartyInteractionDialogState.Phase);
             Assert.True(PlayerPartyInteractionDialogState.HasOption(PlayerPartyInteractionOption.JoinClan));
-            Assert.False(PlayerPartyInteractionDialogState.IsOptionEnabled(PlayerPartyInteractionOption.JoinClan));
+            Assert.True(PlayerPartyInteractionDialogState.IsOptionEnabled(PlayerPartyInteractionOption.JoinClan));
             Assert.True(PlayerPartyInteractionDialogState.HasOption(PlayerPartyInteractionOption.Vassal));
             Assert.False(PlayerPartyInteractionDialogState.IsOptionEnabled(PlayerPartyInteractionOption.Vassal));
             Assert.True(PlayerPartyInteractionDialogState.HasOption(PlayerPartyInteractionOption.Mercenary));
@@ -442,7 +445,7 @@ public class PlayerPartyInteractionFlowTests : MapEventTestBase
         client1.Call(() =>
         {
             Assert.True(PlayerPartyInteractionDialogState.HasOption(PlayerPartyInteractionOption.JoinClan));
-            Assert.False(PlayerPartyInteractionDialogState.IsOptionEnabled(PlayerPartyInteractionOption.JoinClan));
+            Assert.True(PlayerPartyInteractionDialogState.IsOptionEnabled(PlayerPartyInteractionOption.JoinClan));
             Assert.True(PlayerPartyInteractionDialogState.HasOption(PlayerPartyInteractionOption.Leave));
             Assert.True(PlayerPartyInteractionDialogState.IsOptionEnabled(PlayerPartyInteractionOption.Leave));
             Assert.True(PlayerPartyInteractionDialogState.HasOption(PlayerPartyInteractionOption.Vassal));
@@ -472,7 +475,7 @@ public class PlayerPartyInteractionFlowTests : MapEventTestBase
         client1.Call(() =>
         {
             Assert.True(PlayerPartyInteractionDialogState.HasOption(PlayerPartyInteractionOption.JoinClan));
-            Assert.False(PlayerPartyInteractionDialogState.IsOptionEnabled(PlayerPartyInteractionOption.JoinClan));
+            Assert.True(PlayerPartyInteractionDialogState.IsOptionEnabled(PlayerPartyInteractionOption.JoinClan));
             Assert.True(PlayerPartyInteractionDialogState.HasOption(PlayerPartyInteractionOption.Leave));
             Assert.True(PlayerPartyInteractionDialogState.IsOptionEnabled(PlayerPartyInteractionOption.Leave));
             Assert.True(PlayerPartyInteractionDialogState.HasOption(PlayerPartyInteractionOption.Vassal));
@@ -513,6 +516,7 @@ public class PlayerPartyInteractionFlowTests : MapEventTestBase
             Assert.True(initiatorParty.LeaderHero.Clan.MapFaction.IsAtWarWith(enemyKingdom));
 
             Campaign.Current.Kingdoms.Add(enemyKingdom);
+            VillageHostileFactionStanceHelper.ApplyWarStance(enemyKingdom, initiatorParty.LeaderHero.Clan);
             Assert.Contains(enemyKingdom, Kingdom.All);
         });
 
@@ -571,6 +575,7 @@ public class PlayerPartyInteractionFlowTests : MapEventTestBase
             Assert.True(initiatorParty.LeaderHero.Clan.MapFaction.IsAtWarWith(enemyKingdom));
 
             Campaign.Current.Kingdoms.Add(enemyKingdom);
+            VillageHostileFactionStanceHelper.ApplyWarStance(enemyKingdom, initiatorParty.LeaderHero.Clan);
             Assert.Contains(enemyKingdom, Kingdom.All);
         });
 
@@ -1007,7 +1012,7 @@ public class PlayerPartyInteractionFlowTests : MapEventTestBase
         });
         Server.NetworkSentMessages.Clear();
         SubmitOption(client2, sessionId, responderPartyId, PlayerPartyInteractionOption.AcceptProposal);
-        
+
         var ended = Server.NetworkSentMessages.GetMessages<NetworkPlayerPartyInteractionEnded>().Single();
         Assert.Equal(PlayerPartyInteractionOutcomeType.MercenaryDeclined, ended.OutcomeType);
 
@@ -1129,7 +1134,7 @@ public class PlayerPartyInteractionFlowTests : MapEventTestBase
         client1.Call(() =>
         {
             Assert.True(PlayerPartyInteractionDialogState.HasOption(PlayerPartyInteractionOption.JoinClan));
-            Assert.False(PlayerPartyInteractionDialogState.IsOptionEnabled(PlayerPartyInteractionOption.JoinClan));
+            Assert.True(PlayerPartyInteractionDialogState.IsOptionEnabled(PlayerPartyInteractionOption.JoinClan));
             Assert.True(PlayerPartyInteractionDialogState.HasOption(PlayerPartyInteractionOption.Leave));
             Assert.True(PlayerPartyInteractionDialogState.IsOptionEnabled(PlayerPartyInteractionOption.Leave));
             Assert.True(PlayerPartyInteractionDialogState.HasOption(PlayerPartyInteractionOption.Vassal));
@@ -1143,6 +1148,11 @@ public class PlayerPartyInteractionFlowTests : MapEventTestBase
     public void ClanServiceProposal_Disabled_DoesNotSubmitOrJoinResponderClan()
     {
         var (client1, _, initiatorPartyId, responderPartyId) = CreateTwoPlayerParties();
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject<PartyBase>(initiatorPartyId, out var initiatorParty));
+            initiatorParty.LeaderHero.Clan._fiefsCache.Add(ObjectHelper.SkipConstructor<Town>());
+        });
 
         RequestInteraction(client1, initiatorPartyId, responderPartyId);
         var sessionId = Server.NetworkSentMessages.GetMessages<NetworkPlayerPartyInteractionStarted>().Single().SessionId;
@@ -1176,10 +1186,151 @@ public class PlayerPartyInteractionFlowTests : MapEventTestBase
     }
 
     [Fact]
-    public void VassalServiceProposal_AcceptedByKingdomLeader_JoinsKingdomOnAllInstances()
+    public void OfferServices_SameClan_IsHidden()
+    {
+        var (client1, _, initiatorPartyId, responderPartyId) = CreateTwoPlayerParties();
+        AssignSameClan(initiatorPartyId, responderPartyId);
+
+        RequestInteraction(client1, initiatorPartyId, responderPartyId);
+
+        var initialState = Server.NetworkSentMessages.GetMessages<NetworkPlayerPartyInteractionState>()
+            .Single(state => state.Phase == PlayerPartyInteractionPhase.InitialOptions);
+        Assert.DoesNotContain(PlayerPartyInteractionOption.OfferServices, initialState.Options);
+        Assert.DoesNotContain(PlayerPartyInteractionOption.JoinClan, initialState.EnabledOptions);
+        Assert.Contains(PlayerPartyInteractionOption.TradeProposal, initialState.EnabledOptions);
+    }
+
+    [Fact]
+    public void OfferServices_CoopClanLeader_AllowsVassalServiceButDisablesJoiningClan()
+    {
+        var (client1, _, initiatorPartyId, responderPartyId) = CreateTwoPlayerParties();
+        SetupResponderKingdomLeader(initiatorPartyId, responderPartyId, initiatorClanTier: 2);
+        var (memberId, _) = CreatePlayerHeroParty("PlayerThree");
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject<PartyBase>(initiatorPartyId, out var initiatorParty));
+            Assert.True(Server.ObjectManager.TryGetObject<Hero>(memberId, out var member));
+            member.Clan = initiatorParty.LeaderHero.Clan;
+        });
+
+        RequestInteraction(client1, initiatorPartyId, responderPartyId);
+
+        var initialState = Server.NetworkSentMessages.GetMessages<NetworkPlayerPartyInteractionState>()
+            .Single(state => state.Phase == PlayerPartyInteractionPhase.InitialOptions);
+        Assert.Contains(PlayerPartyInteractionOption.OfferServices, initialState.Options);
+        Assert.Contains(PlayerPartyInteractionOption.OfferServices, initialState.EnabledOptions);
+        Assert.DoesNotContain(PlayerPartyInteractionOption.JoinClan, initialState.EnabledOptions);
+        Assert.Contains(PlayerPartyInteractionOption.Vassal, initialState.EnabledOptions);
+        Assert.Equal(ClanJoinUnavailableReason.OtherPlayersInClan, initialState.ClanJoinUnavailableReason);
+
+        client1.Call(() =>
+        {
+            var previousTexts = GameTexts._gameTextManager;
+            try
+            {
+                GameTexts._gameTextManager = new GameTextManager();
+                var strings = new XmlDocument();
+                strings.Load(Path.Combine(AppContext.BaseDirectory, "global_strings.xml"));
+                GameTexts._gameTextManager.LoadFromXML(strings);
+                PlayerPartyInteractionDialogState.Apply(initialState);
+
+                Assert.True(PlayerPartyInteractionDialogState.IsOptionEnabled(PlayerPartyInteractionOption.OfferServices));
+                PlayerPartyInteractionDialogState.ShowServiceOptions();
+                Assert.Equal(PlayerPartyInteractionPhase.OfferServices, PlayerPartyInteractionDialogState.Phase);
+                Assert.True(PlayerPartyInteractionDialogState.IsOptionEnabled(PlayerPartyInteractionOption.Vassal));
+                Assert.False(PlayerPartyInteractionDialogState.IsOptionEnabled(PlayerPartyInteractionOption.JoinClan, out var explanation));
+                Assert.Equal("You cannot join another clan while other players belong to your clan.", explanation.ToString());
+            }
+            finally
+            {
+                GameTexts._gameTextManager = previousTexts;
+            }
+        });
+    }
+
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public void ClanServiceProposal_BecomesIneligible_IsRejected(bool beforeProposal)
+    {
+        var (client1, client2, initiatorPartyId, responderPartyId) = CreateTwoPlayerParties();
+        RequestInteraction(client1, initiatorPartyId, responderPartyId);
+        var initialState = Server.NetworkSentMessages.GetMessages<NetworkPlayerPartyInteractionState>()
+            .Single(state => state.Phase == PlayerPartyInteractionPhase.InitialOptions);
+        Assert.Contains(PlayerPartyInteractionOption.JoinClan, initialState.EnabledOptions);
+
+        if (!beforeProposal)
+            SubmitOption(client1, initialState.SessionId, initiatorPartyId, PlayerPartyInteractionOption.JoinClan);
+
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject<PartyBase>(initiatorPartyId, out var initiatorParty));
+            initiatorParty.LeaderHero.Clan._fiefsCache.Add(ObjectHelper.SkipConstructor<Town>());
+        });
+        Server.NetworkSentMessages.Clear();
+
+        if (beforeProposal)
+            SubmitOption(client1, initialState.SessionId, initiatorPartyId, PlayerPartyInteractionOption.JoinClan);
+        else
+            SubmitOption(client2, initialState.SessionId, responderPartyId, PlayerPartyInteractionOption.AcceptProposal);
+
+        var ended = Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkPlayerPartyInteractionEnded>());
+        Assert.Equal(PlayerPartyInteractionOutcomeType.Rejected, ended.OutcomeType);
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject<PartyBase>(initiatorPartyId, out var initiatorParty));
+            Assert.True(Server.ObjectManager.TryGetObject<PartyBase>(responderPartyId, out var responderParty));
+            Assert.NotEqual(responderParty.LeaderHero.Clan, initiatorParty.LeaderHero.Clan);
+        });
+    }
+
+    [Fact]
+    public void ClanServiceProposal_Eligible_IsAccepted()
+    {
+        var (client1, client2, initiatorPartyId, responderPartyId) = CreateTwoPlayerParties();
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject<PartyBase>(responderPartyId, out var responderParty));
+            responderParty.LeaderHero.Clan._banner = new Banner();
+        });
+        RequestInteraction(client1, initiatorPartyId, responderPartyId);
+        var sessionId = Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkPlayerPartyInteractionStarted>()).SessionId;
+        SubmitOption(client1, sessionId, initiatorPartyId, PlayerPartyInteractionOption.JoinClan);
+        SubmitOption(client2, sessionId, responderPartyId, PlayerPartyInteractionOption.AcceptProposal);
+
+        var ended = Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkPlayerPartyInteractionEnded>());
+        Assert.Equal(PlayerPartyInteractionOutcomeType.ClanJoinAccepted, ended.OutcomeType);
+        foreach (var instance in Clients.Prepend(Server))
+        {
+            instance.Call(() =>
+            {
+                Assert.True(instance.ObjectManager.TryGetObject<PartyBase>(initiatorPartyId, out var initiatorParty));
+                Assert.True(instance.ObjectManager.TryGetObject<PartyBase>(responderPartyId, out var responderParty));
+                Assert.Same(responderParty.LeaderHero.Clan, initiatorParty.LeaderHero.Clan);
+                Assert.Same(responderParty.LeaderHero.Clan, initiatorParty.MobileParty.ActualClan);
+            });
+        }
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void VassalServiceProposal_AcceptedByKingdomLeader_JoinsKingdomOnAllInstances(bool coopClan)
     {
         var (client1, client2, initiatorPartyId, responderPartyId) = CreateTwoPlayerParties();
         SetupResponderKingdomLeader(initiatorPartyId, responderPartyId, initiatorClanTier: 2);
+
+        string? coopMemberId = null;
+        if (coopClan)
+        {
+            (coopMemberId, _) = CreatePlayerHeroParty("PlayerThree");
+            Server.Call(() =>
+            {
+                Assert.True(Server.ObjectManager.TryGetObject<PartyBase>(initiatorPartyId, out var initiatorParty));
+                Assert.True(Server.ObjectManager.TryGetObject<Hero>(coopMemberId, out var member));
+                member.Clan = initiatorParty.LeaderHero.Clan;
+            });
+        }
 
         RequestInteraction(client1, initiatorPartyId, responderPartyId);
         var sessionId = Server.NetworkSentMessages.GetMessages<NetworkPlayerPartyInteractionStarted>().Single().SessionId;
@@ -1214,13 +1365,19 @@ public class PlayerPartyInteractionFlowTests : MapEventTestBase
                 Assert.Same(responderKingdom, initiatorClan.Kingdom);
                 Assert.Contains(initiatorClan, responderKingdom.Clans);
                 Assert.False(initiatorClan.IsUnderMercenaryService);
+                Assert.Same(initiatorParty.LeaderHero, initiatorClan.Leader);
+                if (coopMemberId != null)
+                {
+                    Assert.True(instance.ObjectManager.TryGetObject<Hero>(coopMemberId, out var member));
+                    Assert.Same(initiatorClan, member.Clan);
+                }
             });
         }
     }
 
     [Theory]
     [InlineData(PlayerPartyInteractionProposal.Trade, 0, "I have a proposal that may benefit us both.")]
-    [InlineData(PlayerPartyInteractionProposal.JoinClan, 0, "(COMING SOON) I wish to offer my services in your clan.")]
+    [InlineData(PlayerPartyInteractionProposal.JoinClan, 0, "I wish to offer my services in your clan.")]
     [InlineData(PlayerPartyInteractionProposal.Vassal, 0, "I wish to swear my allegiance to your majesty.")]
     [InlineData(PlayerPartyInteractionProposal.Mercenary, 12, null)]
     public void ProposalPending_DialogText_ShowsInitiatorSelectedLine(
@@ -3255,6 +3412,8 @@ public class PlayerPartyInteractionFlowTests : MapEventTestBase
         AssertPeaceMade(Server, playerClanId, targetClanId);
         foreach (var environmentClient in Clients)
             AssertPeaceMade(environmentClient, playerClanId, targetClanId);
+
+        Server.PumpGameThread();
     }
 
     [Fact]
@@ -3318,6 +3477,8 @@ public class PlayerPartyInteractionFlowTests : MapEventTestBase
         var result = Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkPeaceBarterResult>());
         Assert.True(result.Accepted, result.Reason);
         Assert.Equal("besieger-peace-success", result.RequestId);
+
+        Server.PumpGameThread();
     }
 
     [Theory]
@@ -3436,6 +3597,8 @@ public class PlayerPartyInteractionFlowTests : MapEventTestBase
         {
             harmony.UnpatchAll(harmony.Id);
         }
+
+        Server.PumpGameThread();
     }
 
     [Fact]
@@ -3524,6 +3687,8 @@ public class PlayerPartyInteractionFlowTests : MapEventTestBase
         AssertWarDeclared(Server, playerClanId, requestedTargetClanId);
 
         client.Call(() => client.Resolve<INetwork>().SendAll(new NetworkConversationEnded()));
+
+        Server.PumpGameThread();
     }
 
     [Fact]
@@ -3611,6 +3776,8 @@ public class PlayerPartyInteractionFlowTests : MapEventTestBase
         }
 
         client.Call(() => client.Resolve<INetwork>().SendAll(new NetworkLocationConversationEnded()));
+
+        Server.PumpGameThread();
     }
 
     [Fact]
@@ -3686,6 +3853,8 @@ public class PlayerPartyInteractionFlowTests : MapEventTestBase
         AssertWarListsContainEachOther(Server, playerClanId, targetClanId);
 
         client.Call(() => client.Resolve<INetwork>().SendAll(new NetworkLocationConversationEnded()));
+
+        Server.PumpGameThread();
     }
 
     [Fact]
@@ -3829,6 +3998,8 @@ public class PlayerPartyInteractionFlowTests : MapEventTestBase
                     DefaultMobilePartyAIModelPatches.RemoveAttackProtectionsForParty(joiningBanditParty);
             });
         }
+
+        Server.PumpGameThread();
     }
 
     [Theory]
@@ -3963,6 +4134,8 @@ public class PlayerPartyInteractionFlowTests : MapEventTestBase
                     DefaultMobilePartyAIModelPatches.RemoveAttackProtectionsForParty(banditParty);
             });
         }
+
+        Server.PumpGameThread();
     }
 
     [Fact]

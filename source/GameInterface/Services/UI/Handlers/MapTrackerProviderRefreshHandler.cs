@@ -1,15 +1,17 @@
 ﻿using Common;
 using Common.Messaging;
 using Common.Network;
+using GameInterface.Services.Clans.Messages;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.UI.Messages;
 using GameInterface.Services.UI.Patches;
+using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Party;
 
 namespace GameInterface.Services.UI.Handlers;
 
 /// <summary>
-/// Handler for resetting the trackers after the mainhero has been properly set up
+/// Refreshes map trackers when changes to local player or their clan occur
 /// </summary>
 internal class MapTrackerProviderRefreshHandler : IHandler
 {
@@ -30,6 +32,7 @@ internal class MapTrackerProviderRefreshHandler : IHandler
         this.holder = holder;
 
         messageBroker.Subscribe<SwitchedPlayer>(Handle_SwitchedPlayer);
+        messageBroker.Subscribe<NetworkRefreshClanManagement>(Handle_NetworkRefreshClanManagement);
 
         messageBroker.Subscribe<MapTrackerPartyCreated>(Handle_MapTrackerPartyCreated);
         messageBroker.Subscribe<NetworkMapTrackerPartyCreated>(Handle_NetworkMapTrackerPartyCreated);
@@ -41,6 +44,7 @@ internal class MapTrackerProviderRefreshHandler : IHandler
     public void Dispose()
     {
         messageBroker.Unsubscribe<SwitchedPlayer>(Handle_SwitchedPlayer);
+        messageBroker.Unsubscribe<NetworkRefreshClanManagement>(Handle_NetworkRefreshClanManagement);
 
         messageBroker.Unsubscribe<MapTrackerPartyCreated>(Handle_MapTrackerPartyCreated);
         messageBroker.Unsubscribe<NetworkMapTrackerPartyCreated>(Handle_NetworkMapTrackerPartyCreated);
@@ -53,6 +57,21 @@ internal class MapTrackerProviderRefreshHandler : IHandler
     {
         if (holder.Current == null) return;
         holder.Current.ResetTrackers();
+    }
+
+    private void Handle_NetworkRefreshClanManagement(MessagePayload<NetworkRefreshClanManagement> obj)
+    {
+        if ((obj.What.Sections & ClanManagementRefresh.Parties) == 0) return;
+
+        GameThread.RunSafe(() =>
+        {
+            if (holder.Current == null) return;
+            if (!objectManager.TryGetObjectWithLogging<Clan>(obj.What.ClanId, out var clan)) return;
+
+            if (clan != Clan.PlayerClan) return;
+
+            holder.Current.ResetTrackers();
+        });
     }
 
     private void Handle_MapTrackerPartyCreated(MessagePayload<MapTrackerPartyCreated> obj)
