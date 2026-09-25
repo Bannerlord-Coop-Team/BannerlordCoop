@@ -988,5 +988,4 @@ public class CoopBattleFinalizeTests : MapEventTestBase
             Assert.False(instance.ObjectManager.TryGetObject<MapEvent>(mapEventId, out _),
                 $"MapEvent {mapEventId} should be finalized/removed on {instance.GetType().Name}"));
     }
-
 }

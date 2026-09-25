@@ -880,5 +880,4 @@ public class SiegeLeaveMenuTests : IDisposable
             }
         });
     }
-
 }
