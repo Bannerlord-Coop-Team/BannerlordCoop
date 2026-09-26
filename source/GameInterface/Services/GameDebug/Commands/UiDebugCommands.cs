@@ -247,6 +247,31 @@ internal class UiDebugCommands
         }
     }
 
+    public sealed class UiCompleteInventoryCoopCommand : ICoopCommand
+    {
+        public string Prefix => "coop.debug.ui";
+
+        public string Name => "complete_inventory";
+
+        public string Description => "Completes and closes the active inventory through its normal handler.";
+
+        public CoopCommandSide Side => CoopCommandSide.Client;
+
+        public IExpectedArgs[] ExpectedArgs { get; } = Array.Empty<IExpectedArgs>();
+
+        public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
+        {
+            if (ModInformation.IsServer)
+                return Failed("Run this command on a client.");
+
+            if (Campaign.Current == null || !(Game.Current?.GameStateManager?.ActiveState is InventoryState))
+                return Failed("Open the inventory before completing it.");
+
+            Helpers.InventoryScreenHelper.CloseScreen(false);
+            return Succeeded("Requested inventory completion.");
+        }
+    }
+
     public sealed class UiMapClickOffsetCoopCommand : ICoopCommand
     {
         public string Prefix => "coop.debug.ui";

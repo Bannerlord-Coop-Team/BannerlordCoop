@@ -54,7 +54,7 @@ public class SystemDeveloperDirectCommandTests
         Type[] commandTypes = GetCommandTypes();
 
 #if DEBUG
-        Assert.Equal(105, commandTypes.Length);
+        Assert.Equal(106, commandTypes.Length);
 #else
         Assert.Equal(93, commandTypes.Length);
 #endif
