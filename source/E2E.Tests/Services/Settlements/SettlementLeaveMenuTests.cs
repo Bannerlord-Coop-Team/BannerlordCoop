@@ -59,10 +59,10 @@ public class SettlementLeaveMenuTests : IDisposable
             if (state != "no-menu")
             {
                 string menuId = state == "other-menu" ? "encounter" : "town_outside";
-                var starter = new CampaignGameStarter(Campaign.Current.GameMenuManager, Campaign.Current.ConversationManager);
-                starter.AddGameMenu(menuId, "Test menu", _ => { });
+                // Seed the orphaned menu without running settlement-dependent vanilla initialization.
                 map._menuContext = Game.Current.ObjectManager.CreateObject<MenuContext>();
-                map._menuContext.SwitchToMenu(menuId);
+                map._menuContext.GameMenu = ObjectHelper.SkipConstructor<GameMenu>();
+                map._menuContext.GameMenu.StringId = menuId;
                 Assert.Equal(menuId, Campaign.Current.CurrentMenuContext.GameMenu.StringId);
             }
 
@@ -76,7 +76,14 @@ public class SettlementLeaveMenuTests : IDisposable
             if (state == "siege-camp")
                 leaving._besiegerCamp = ObjectHelper.SkipConstructor<BesiegerCamp>();
             if (state == "mission-state")
+            {
                 states._gameStates.Add(ObjectHelper.SkipConstructor<MissionState>());
+                Assert.IsType<MissionState>(states.ActiveState);
+            }
+            else
+            {
+                Assert.Same(map, states.ActiveState);
+            }
         });
 
         using var menuExit = new MethodCallRecorder(AccessTools.Method(typeof(GameMenu), nameof(GameMenu.ExitToLast)));
