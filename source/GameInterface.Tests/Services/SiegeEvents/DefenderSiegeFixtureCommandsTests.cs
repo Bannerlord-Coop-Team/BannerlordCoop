@@ -1352,6 +1352,25 @@ public sealed class DefenderSiegeFixtureCommandsTests : IDisposable
             objects, new[] { secondFallback, firstFallback, preferred }, parties));
     }
 
+    [Fact]
+    public void SelectStagingSettlement_UsesDanusticaOnlyWhenExplicitlyAllowed()
+    {
+        Settlement castle = CreateStagingCastle("castle_ES1");
+        Settlement danustica = CreateStagingCastle("town_ES1");
+        danustica.Town._isCastle = false;
+        Assert.True(danustica.IsTown);
+        MobileParty[] parties = captives.Select(captive => captive.Party).ToArray();
+        Assert.True(objects.AddExisting(castle.StringId, castle));
+        Assert.True(objects.AddExisting(danustica.StringId, danustica));
+
+        Assert.Null(DefenderSiegeFixtureCommands.SelectStagingSettlement(
+            objects, new[] { danustica }, parties));
+        Assert.Same(danustica, DefenderSiegeFixtureCommands.SelectStagingSettlement(
+            objects, new[] { danustica }, parties, allowDanustica: true));
+        Assert.Same(castle, DefenderSiegeFixtureCommands.SelectStagingSettlement(
+            objects, new[] { danustica, castle }, parties));
+    }
+
     private Settlement PrepareStagingParties()
     {
         Settlement settlement = CreateStagingCastle("castle_ES1");

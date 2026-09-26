@@ -112,7 +112,8 @@ internal sealed class DefenderSiegeContextFixture : IDefenderSiegeContextFixture
         Settlement target = defenderParties[0].CurrentSettlement;
         if (target == null || defenderParties.Any(party => party.CurrentSettlement != target))
             return Result(false, "inside_defenders_required");
-        if (!target.IsCastle || target.Party == null || target.SiegeEvent != null || target.Party.MapEvent != null)
+        if (!(target.IsCastle || (target.StringId == "town_ES1" && target.IsTown)) ||
+            target.Party == null || target.SiegeEvent != null || target.Party.MapEvent != null)
             return Result(false, "castle_not_clean");
         if (!objects.TryGetObject<Settlement>(target.StringId, out var registeredTarget) ||
             !ReferenceEquals(registeredTarget, target))

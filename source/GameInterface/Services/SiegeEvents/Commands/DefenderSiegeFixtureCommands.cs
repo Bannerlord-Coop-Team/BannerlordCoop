@@ -27,7 +27,7 @@ using TaleWorlds.Library;
 
 namespace GameInterface.Services.SiegeEvents.Commands;
 
-/// <summary>Stages two connected defender parties inside an available castle for a restorable siege fixture.</summary>
+/// <summary>Stages two connected defender parties inside a castle or exact Danustica town fixture.</summary>
 internal static class DefenderSiegeFixtureCommands
 {
 #if DEBUG
@@ -187,7 +187,7 @@ internal static class DefenderSiegeFixtureCommands
     {
         public string Prefix => "coop.debug.siege";
         public string Name => "defender_fixture_stage";
-        public string Description => "Stages both defenders inside the castle.";
+        public string Description => "Stages both defenders inside the selected fortification.";
         public CoopCommandSide Side => CoopCommandSide.Server;
         public IExpectedArgs[] ExpectedArgs { get; } = Array.Empty<IExpectedArgs>();
         public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
@@ -232,7 +232,7 @@ internal static class DefenderSiegeFixtureCommands
     {
         public string Prefix => "coop.debug.siege";
         public string Name => "defender_preassault_ack";
-        public string Description => "Reports replicated inside-castle defender readiness.";
+        public string Description => "Reports replicated inside-settlement defender readiness.";
         public CoopCommandSide Side => CoopCommandSide.Both;
         public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
@@ -249,6 +249,7 @@ internal static class DefenderSiegeFixtureCommands
 #endif
 
     private const string PreferredSettlementId = "castle_ES1";
+    private const string DanusticaSettlementId = "town_ES1";
     private const int ExpectedPlayerCount = 2;
 
     private static DefenderSiegeFixture pendingCapture;
@@ -277,7 +278,7 @@ internal static class DefenderSiegeFixtureCommands
         string requestedSettlementId = args?.Count == 3 ? args[2] : null;
         var controllerArgs = args?.Count == 3 ? args.Take(2).ToList() : args;
         if (args?.Count == 3 && string.IsNullOrWhiteSpace(requestedSettlementId))
-            return Failure("capture", "An explicit castle id must not be empty.");
+            return Failure("capture", "An explicit settlement id must not be empty.");
         if (!TryGetExpectedControllerIds(controllerArgs, out string[] expectedControllerIds, out string error))
             return Failure("capture", error);
         if (activeFixture != null || restoredFixture != null)
@@ -1141,7 +1142,8 @@ internal static class DefenderSiegeFixtureCommands
             expectedParties.All(party => party?.MapEvent == null);
         bool noBesiegerCamp = settlement?.SiegeEvent?.BesiegerCamp == null &&
             expectedParties.All(party => party?.BesiegerCamp == null);
-        bool insideSettlement = settlement != null && settlement.IsCastle &&
+        bool insideSettlement = settlement != null &&
+            (settlement.IsCastle || (settlement.StringId == DanusticaSettlementId && settlement.IsTown)) &&
             expectedParties.All(party => party?.CurrentSettlement == settlement);
         bool fixtureStaged = !isServer || (activeFixture != null &&
             activeFixture.HasExpectedControllers(expectedControllerIds) && IsStaged(activeFixture));
@@ -1309,14 +1311,15 @@ internal static class DefenderSiegeFixtureCommands
 
         MobileParty[] playerParties = parties.Select(party => party.Party).ToArray();
         Settlement settlement = objectManager.TryGetObject<Settlement>(requestedSettlementId ?? PreferredSettlementId, out var preferredSettlement)
-            ? SelectStagingSettlement(objectManager, new[] { preferredSettlement }, playerParties)
+            ? SelectStagingSettlement(objectManager, new[] { preferredSettlement }, playerParties,
+                requestedSettlementId == DanusticaSettlementId)
             : null;
         if (requestedSettlementId == null)
             settlement ??= SelectStagingSettlement(objectManager, Settlement.All, playerParties);
         else if (settlement == null)
         {
-            error = $"Requested castle {requestedSettlementId} is unavailable: registered={preferredSettlement != null}, " +
-                $"castle={preferredSettlement?.IsCastle}, mapEvent={preferredSettlement?.Party?.MapEvent != null}, " +
+            error = $"Requested {(requestedSettlementId == DanusticaSettlementId ? "town" : "castle")} {requestedSettlementId} is unavailable: registered={preferredSettlement != null}, " +
+                $"castle={preferredSettlement?.IsCastle}, town={preferredSettlement?.IsTown}, mapEvent={preferredSettlement?.Party?.MapEvent != null}, " +
                 $"siege={preferredSettlement?.SiegeEvent != null}, " +
                 $"ownerVisit={playerParties.Any(party => WouldUpdateOwnerVisit(party, preferredSettlement))}.";
             return false;
@@ -2526,7 +2529,7 @@ internal static class DefenderSiegeFixtureCommands
         }
         if (fixture.Parties.Any(party => WouldUpdateOwnerVisit(party.Party, fixture.Settlement)))
         {
-            error = "A defender party would mutate the selected castle's owner visit timestamp.";
+            error = "A defender party would mutate the selected settlement's owner visit timestamp.";
             return false;
         }
         if (fixture.Parties.Any(party => party.OriginalSettlement != null &&
@@ -2549,7 +2552,7 @@ internal static class DefenderSiegeFixtureCommands
         }
         if (fixture.Settlement.Party.MapEvent != null || fixture.Settlement.SiegeEvent != null)
         {
-            error = "The selected castle has a map event or besieger camp; fixture restore is unsafe.";
+            error = "The selected settlement has a map event or besieger camp; fixture restore is unsafe.";
             return false;
         }
         if (fixture.Parties.Any(party => !HasRestorableConnectionState(party) ||
@@ -2624,12 +2627,16 @@ internal static class DefenderSiegeFixtureCommands
     internal static Settlement SelectStagingSettlement(
         IObjectManager objects,
         IEnumerable<Settlement> settlements,
-        IEnumerable<MobileParty> parties)
+        IEnumerable<MobileParty> parties,
+        bool allowDanustica = false)
     {
         if (objects == null || settlements == null || parties == null) return null;
         MobileParty[] partyArray = parties.ToArray();
         return settlements
-            .Where(settlement => settlement != null && settlement.IsCastle && settlement.Party != null &&
+            .Where(settlement => settlement != null &&
+                (settlement.IsCastle || (allowDanustica &&
+                    settlement.StringId == DanusticaSettlementId && settlement.IsTown)) &&
+                settlement.Party != null &&
                 objects.TryGetObject<Settlement>(settlement.StringId, out var registeredSettlement) &&
                 ReferenceEquals(registeredSettlement, settlement) &&
                 settlement.Party.MapEvent == null && settlement.SiegeEvent == null &&
