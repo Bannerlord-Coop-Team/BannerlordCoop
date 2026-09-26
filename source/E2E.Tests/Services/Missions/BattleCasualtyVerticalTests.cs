@@ -43,6 +43,8 @@ public class BattleCasualtyVerticalTests : MissionTestEnvironment
             party.Update();
             Assert.Equal(2, CountLive(party.Troops, troop));
 
+            int casualtiesBefore = mapEvent.DefenderSide.TroopCasualties;
+
             int applied = 0;
             var broker = Server.Resolve<IMessageBroker>();
             broker.Subscribe<OnTroopKilledAttempted>(_ => applied++);
@@ -52,6 +54,7 @@ public class BattleCasualtyVerticalTests : MissionTestEnvironment
 
             Assert.True(applied > 0, "BattleCasualtyHandler did not apply the casualty on the server");
             Assert.Equal(1, CountLive(party.Troops, troop)); // one killed in the authoritative roster
+            Assert.Equal(casualtiesBefore + 1, mapEvent.DefenderSide.TroopCasualties);
         });
     }
 
