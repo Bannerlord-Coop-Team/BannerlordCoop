@@ -1,4 +1,4 @@
-using Autofac;
+﻿using Autofac;
 using Common.Util;
 using GameInterface.Services.Entity;
 using GameInterface.Services.Issues.Generic;
@@ -17,6 +17,7 @@ namespace GameInterface.Tests.Services.Issues;
 using Issue = GangLeaderNeedsToOffloadStolenGoodsIssueBehavior.GangLeaderNeedsToOffloadStolenGoodsIssue;
 using Quest = GangLeaderNeedsToOffloadStolenGoodsIssueBehavior.GangLeaderNeedsToOffloadStolenGoodsIssueQuest;
 
+[Collection(ModInformationRoleCollection.Name)]
 public class GangLeaderNeedsToOffloadStolenGoodsNoActiveSessionTests : IDisposable
 {
     public GangLeaderNeedsToOffloadStolenGoodsNoActiveSessionTests()

@@ -1,10 +1,13 @@
-﻿using Common.Logging;
+﻿using Common;
+using Common.Logging;
 using Common.Messaging;
 using Common.Util;
 using GameInterface.Services.Heroes;
+using GameInterface.Services.Issues.Messages;
 using GameInterface.Services.Party.Messages;
 using GameInterface.Services.Villages;
 using HarmonyLib;
+using Helpers;
 using Serilog;
 using System;
 using System.Collections.Generic;
@@ -24,6 +27,9 @@ internal class PartyScreenLogicPatches
     private static readonly ILogger Logger = LogManager.GetLogger<PartyScreenLogic>();
     [ThreadStatic]
     private static bool _inCommit;
+    [ThreadStatic]
+    private static PartyScreenLogic _currentQuestScreen;
+    internal static PartyScreenLogic CurrentQuestScreen => _currentQuestScreen;
     internal static bool InCommit
     {
         get => _inCommit;
@@ -69,6 +75,79 @@ internal class PartyScreenLogicPatches
         }
     }
 
+    [HarmonyPatch("TransferTroop")]
+    [HarmonyPrefix]
+    private static void TransferTroopPrefix(PartyScreenLogic __instance, PartyScreenLogic.PartyCommand command,
+        out (TroopRoster Roster, TroopRoster Before, CharacterObject Character, int Count, int Wounded, int Xp) __state)
+    {
+        __state = default;
+        if (!ModInformation.IsClient || __instance._partyScreenMode != PartyScreenHelper.PartyScreenMode.QuestTroopManage ||
+            command.Character == null || MobileParty.MainParty == null ||
+            command.Type != PartyScreenLogic.TroopType.Member ||
+            __instance.MemberRosters[(int)PartyScreenLogic.PartyRosterSide.Right] != MobileParty.MainParty.MemberRoster)
+            return;
+
+        var roster = __instance.MemberRosters[(int)PartyScreenLogic.PartyRosterSide.Left];
+        if (roster == null) return;
+        var element = ReadTroopElement(roster, command.Character);
+        __state = (roster, CopyRoster(roster), command.Character, element.Count, element.Wounded, element.Xp);
+    }
+
+    [HarmonyPatch("TransferTroop")]
+    [HarmonyPostfix]
+    private static void TransferTroopPostfix(
+        (TroopRoster Roster, TroopRoster Before, CharacterObject Character, int Count, int Wounded, int Xp) __state)
+    {
+        if (__state.Roster == null) return;
+        var element = ReadTroopElement(__state.Roster, __state.Character);
+        if (element.Count == __state.Count && element.Wounded == __state.Wounded && element.Xp == __state.Xp) return;
+
+        MessageBroker.Instance.Publish(__state.Roster, new QuestAlternativeTroopsTransferredLocally(
+            __state.Roster, __state.Before, CopyRoster(__state.Roster)));
+    }
+
+    [HarmonyPatch("TransferTroopToLeaderSlot")]
+    [HarmonyPrefix]
+    private static void TransferTroopToLeaderSlotPrefix(PartyScreenLogic __instance, PartyScreenLogic.PartyCommand command,
+        out (TroopRoster Roster, TroopRoster Before, CharacterObject Character, int Count, int Wounded, int Xp) __state)
+        => TransferTroopPrefix(__instance, command, out __state);
+
+    [HarmonyPatch("TransferTroopToLeaderSlot")]
+    [HarmonyPostfix]
+    private static void TransferTroopToLeaderSlotPostfix(
+        (TroopRoster Roster, TroopRoster Before, CharacterObject Character, int Count, int Wounded, int Xp) __state)
+        => TransferTroopPostfix(__state);
+
+    private static TroopRoster CopyRoster(TroopRoster roster)
+    {
+        var copy = TroopRoster.CreateDummyTroopRoster();
+        copy.Add(roster);
+        return copy;
+    }
+
+    private static (int Count, int Wounded, int Xp) ReadTroopElement(TroopRoster roster, CharacterObject character)
+    {
+        var index = roster.FindIndexOfTroop(character);
+        if (index < 0) return default;
+        var element = roster.GetElementCopyAtIndex(index);
+        return (element.Number, element.WoundedNumber, element.Xp);
+    }
+
+    [HarmonyPatch(nameof(PartyScreenLogic.Reset))]
+    [HarmonyPostfix]
+    public static void ResetPostfix(PartyScreenLogic __instance, bool fromCancel)
+    {
+        if (!ModInformation.IsClient || fromCancel || InCommit ||
+            __instance._partyScreenMode != PartyScreenHelper.PartyScreenMode.QuestTroopManage ||
+            __instance.CurrentData == __instance._initialData ||
+            __instance.MemberRosters[(int)PartyScreenLogic.PartyRosterSide.Right] != MobileParty.MainParty?.MemberRoster)
+            return;
+
+        var roster = __instance.MemberRosters[(int)PartyScreenLogic.PartyRosterSide.Left];
+        if (roster != null)
+            MessageBroker.Instance.Publish(__instance, new QuestAlternativeTroopSelectionReset(roster, __instance));
+    }
+
     [HarmonyPatch(nameof(PartyScreenLogic.DoneLogic))]
     [HarmonyPrefix]
     public static bool DoneLogicPrefix(PartyScreenLogic __instance, ref bool __result, bool isForced)
@@ -97,7 +176,18 @@ internal class PartyScreenLogicPatches
 
         PartyScreenHelperPatches.ResetReleasedAndTakenPrisonerActionsRequest();
         PartyScreenHelperPatches.ResetPrisonerDonationRequest();
-        bool flag = __instance.PartyPresentationDoneButtonDelegate(__instance.MemberRosters[0], __instance.PrisonerRosters[0], __instance.MemberRosters[1], __instance.PrisonerRosters[1], takenPrisonersRoster, releasedPrisonersRoster, isForced, __instance.LeftOwnerParty, __instance.RightOwnerParty);
+        var previousQuestScreen = _currentQuestScreen;
+        if (ModInformation.IsClient && __instance._partyScreenMode == PartyScreenHelper.PartyScreenMode.QuestTroopManage)
+            _currentQuestScreen = __instance;
+        bool flag;
+        try
+        {
+            flag = __instance.PartyPresentationDoneButtonDelegate(__instance.MemberRosters[0], __instance.PrisonerRosters[0], __instance.MemberRosters[1], __instance.PrisonerRosters[1], takenPrisonersRoster, releasedPrisonersRoster, isForced, __instance.LeftOwnerParty, __instance.RightOwnerParty);
+        }
+        finally
+        {
+            _currentQuestScreen = previousQuestScreen;
+        }
         bool applyReleasedAndTakenPrisonerActions =
             PartyScreenHelperPatches.ConsumeReleasedAndTakenPrisonerActionsRequest();
         PartyScreenHelperPatches.ConsumePrisonerDonationRequest(
@@ -105,6 +195,12 @@ internal class PartyScreenLogicPatches
             out var donatedPrisonersRoster);
         if (flag)
         {
+            var questSelectionRoster = ModInformation.IsClient &&
+                __instance._partyScreenMode == PartyScreenHelper.PartyScreenMode.QuestTroopManage &&
+                __instance.CurrentData != __instance._initialData &&
+                __instance.MemberRosters[(int)PartyScreenLogic.PartyRosterSide.Right] == MobileParty.MainParty?.MemberRoster
+                ? __instance.MemberRosters[(int)PartyScreenLogic.PartyRosterSide.Left] : null;
+            var questSelectionSnapshot = questSelectionRoster == null ? null : CopyRoster(questSelectionRoster);
             FlattenedTroopRoster recruitedPrisonersRoster = new FlattenedTroopRoster(4);
             foreach (Tuple<CharacterObject, int> tuple in __instance.CurrentData.RecruitedPrisonersHistory)
             {
@@ -181,6 +277,8 @@ internal class PartyScreenLogicPatches
                     InCommit = false;
                 }
             }
+            if (questSelectionRoster != null)
+                MessageBroker.Instance.Publish(__instance, new QuestAlternativeTroopSelectionReset(questSelectionRoster, __instance, questSelectionSnapshot));
         }
         __result = flag;
         return false;
@@ -197,7 +295,7 @@ internal class PartyScreenLogicPatches
 
     [HarmonyPatch(nameof(PartyScreenLogic.OnPartyScreenClosed))]
     [HarmonyPostfix]
-    public static void OnPartyScreenClosedPostfix()
+    public static void OnPartyScreenClosedPostfix(PartyScreenLogic __instance = null)
     {
         // Cancel skips DoneLogic so the TryClaim there never runs. Drop the
         // attribution here so a cancelled force screen stops gating unrelated

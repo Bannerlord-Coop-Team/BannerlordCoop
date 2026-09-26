@@ -59,6 +59,7 @@ public class BattleTroopAssignmentTests : MissionTestEnvironment
 
         // Stand in for the mission's real (injection-patched) supplier for the entrant's own side, so the
         // reserve the server delivers over the network lands somewhere observable in this headless harness.
+        CoopTroopSupplierRegistry.ClearBattle(mapEventId);
         var ownSupplier = new CoopTroopSupplier(mapEventId, BattleSideEnum.Defender, null, new BattleAgentBudget());
         CoopTroopSupplierRegistry.Register(ownSupplier);
         try

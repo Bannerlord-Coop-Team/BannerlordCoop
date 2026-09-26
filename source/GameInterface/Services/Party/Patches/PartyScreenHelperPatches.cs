@@ -1,11 +1,14 @@
-﻿using Common.Logging;
+﻿using Common;
+using Common.Logging;
 using Common.Messaging;
+using GameInterface.Services.Issues.Messages;
 using GameInterface.Services.Party.Messages;
 using HarmonyLib;
 using Helpers;
 using Serilog;
 using System;
 using TaleWorlds.CampaignSystem;
+using TaleWorlds.CampaignSystem.GameState;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Roster;
 using TaleWorlds.CampaignSystem.Settlements;
@@ -48,6 +51,27 @@ internal class PartyScreenHelperPatches
         donatedPrisonersRoster = _donatedPrisonersRoster;
         ResetPrisonerDonationRequest();
         return settlement != null && donatedPrisonersRoster != null;
+    }
+
+    [HarmonyPatch("ClosePartyPresentation")]
+    [HarmonyPrefix]
+    private static void ClosePartyPresentationPrefix(
+        out (PartyState State, PartyScreenLogic Screen, TroopRoster Roster) __state)
+    {
+        __state = default;
+        if (!ModInformation.IsClient || Game.Current?.GameStateManager?.ActiveState is not PartyState state) return;
+        var screen = state.PartyScreenLogic;
+        if (screen == null || screen._partyScreenMode != PartyScreenHelper.PartyScreenMode.QuestTroopManage) return;
+        __state = (state, screen, screen.CurrentData.LeftMemberRoster);
+    }
+
+    [HarmonyPatch("ClosePartyPresentation")]
+    [HarmonyPostfix]
+    private static void ClosePartyPresentationPostfix(
+        (PartyState State, PartyScreenLogic Screen, TroopRoster Roster) __state)
+    {
+        if (__state.State?.PartyScreenLogic != null || __state.Roster == null) return;
+        MessageBroker.Instance.Publish(__state.Screen, new QuestAlternativeTroopSelectionClosed(__state.Roster));
     }
 
     [HarmonyPatch(nameof(PartyScreenHelper.OpenScreenAsCreateClanPartyForHeroPartyScreenClosed))]
