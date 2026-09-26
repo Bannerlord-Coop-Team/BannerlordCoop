@@ -14,6 +14,7 @@ using TaleWorlds.CampaignSystem.Conversation;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.Core;
 using TaleWorlds.Library;
+using TaleWorlds.CampaignSystem.Encounters;
 using TaleWorlds.Localization;
 
 namespace GameInterface.Services.MapEvents.PlayerPartyInteractions;
@@ -27,6 +28,8 @@ public static class PlayerPartyInteractionDialogState
 
     private static NetworkPlayerPartyInteractionState currentState;
     private static bool hasState;
+    private static PlayerEncounter initiatingEncounter;
+    private static bool hasInitiatingEncounterSnapshot;
     private static string clanJoinConfirmationSessionId;
     private static NetworkPlayerPartyInteractionState? marriageInitialState;
 
@@ -41,6 +44,7 @@ public static class PlayerPartyInteractionDialogState
     public static bool IsHostile => hasState && currentState.IsHostile;
     public static int MercenaryAwardMultiplier => hasState ? currentState.MercenaryAwardMultiplier : 0;
     public static bool HasActiveState => hasState;
+    internal static bool IsInitiator => hasState && currentState.IsInitiator;
     public static bool IsMarriageProposal => Proposal == PlayerPartyInteractionProposal.PatrilinealMarriage ||
         Proposal == PlayerPartyInteractionProposal.MatrilinealMarriage;
 
@@ -56,6 +60,21 @@ public static class PlayerPartyInteractionDialogState
         RefreshConversation();
     }
 
+    internal static void RecordInitiatingEncounter(PlayerEncounter encounter)
+    {
+        initiatingEncounter = encounter;
+        hasInitiatingEncounterSnapshot = true;
+    }
+
+    internal static bool InitiatingEncounterStillCurrent()
+        => hasInitiatingEncounterSnapshot && ReferenceEquals(initiatingEncounter, PlayerEncounter.Current);
+
+    internal static void ClearInitiatingEncounter()
+    {
+        initiatingEncounter = null;
+        hasInitiatingEncounterSnapshot = false;
+    }
+
     public static void Clear(string sessionId = null)
     {
         if (sessionId != null && hasState && currentState.SessionId != sessionId) return;
@@ -64,6 +83,7 @@ public static class PlayerPartyInteractionDialogState
         hasState = false;
         currentState = default;
         marriageInitialState = null;
+        ClearInitiatingEncounter();
     }
 
     public static bool HasOption(PlayerPartyInteractionOption option)

@@ -143,6 +143,11 @@ internal class ConversationRequestHandler : IHandler
         lastRequestSentUtc = now;
         var requestId = restartContextTracker.Capture(PlayerEncounter.Current);
         pendingConversationRequestId = requestId;
+        
+        if (request.ArmyTalkEncounter)
+        {
+            PlayerPartyInteractionDialogState.RecordInitiatingEncounter(PlayerEncounter.Current);
+        }
 
         Logger.Debug("Requesting conversation from server. AttackerId={AttackerId}, DefenderId={DefenderId}", attackerId, defenderId);
 
@@ -743,6 +748,7 @@ internal class ConversationRequestHandler : IHandler
         {
             restartContextTracker.Remove(message.RequestId);
             ClearPendingConversationRequest(message.RequestId);
+            PlayerPartyInteractionDialogState.ClearInitiatingEncounter();
 
             if (message.Reason == ConversationDeniedReason.PlayerUnavailable)
                 ConversationPartyHold.ShowPlayerUnavailableMessage();
