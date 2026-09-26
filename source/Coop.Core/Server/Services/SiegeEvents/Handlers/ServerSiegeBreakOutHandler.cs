@@ -77,9 +77,6 @@ internal class ServerSiegeBreakOutHandler : IHandler
                 }
                 else
                 {
-                    // Retain failure as well: a partially applied sacrifice must never be repeated.
-                    receipt = new Receipt { Siege = siege, Result = result };
-                    receipts[party] = receipt;
                     try
                     {
                         var parties = party.Army?.LeaderParty == party ? party.Army.Parties.ToArray() : new[] { party };
@@ -91,6 +88,9 @@ internal class ServerSiegeBreakOutHandler : IHandler
                                 if (element.Character.IsRegular && !objectManager.TryGetHandleWithLogging(element.Character, out _))
                                     throw new InvalidOperationException("Breakout troop is not registered");
                         }
+                        // Cache only once mutation can begin; missing registrations may recover on retry.
+                        receipt = new Receipt { Siege = siege, Result = result };
+                        receipts[party] = receipt;
                         var casualties = breakOut.ApplySacrifice(party, out var armyCasualties);
                         var elements = casualties.GetTroopRoster();
                         var ids = new uint[elements.Count];

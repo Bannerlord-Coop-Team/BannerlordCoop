@@ -131,6 +131,22 @@ public class ServerSiegeBreakOutHandlerTests : IDisposable
     }
 
     [Fact]
+    public void MissingRosterRegistration_CanRetryAfterRegistrationRecovers()
+    {
+        uint rosterId = 4;
+        objects.Setup(manager => manager.TryGetHandleWithLogging(party.MemberRoster, out rosterId)).Returns(false);
+        Send("missing-roster");
+        Assert.False(Assert.Single(Results()).Approved);
+        action.Verify(service => service.ApplySacrifice(party, out It.Ref<int>.IsAny), Times.Never);
+
+        objects.Setup(manager => manager.TryGetHandleWithLogging(party.MemberRoster, out rosterId)).Returns(true);
+        Send("registered-roster");
+        Send("duplicate");
+        Assert.Equal(new[] { false, true, true }, Results().Select(result => result.Approved));
+        action.Verify(service => service.ApplySacrifice(party, out It.Ref<int>.IsAny), Times.Once);
+    }
+
+    [Fact]
     public void SacrificeFailure_IsRetainedAndNotRepeated()
     {
         action.Setup(service => service.ApplySacrifice(party, out It.Ref<int>.IsAny))
