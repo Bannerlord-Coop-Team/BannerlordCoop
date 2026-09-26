@@ -5,12 +5,12 @@ namespace GameInterface.Services.UI.Notifications.Messages;
 
 public readonly struct NotifyDailyGoldChange : IEvent
 {
-    public readonly Clan Clan;
+    public readonly Hero Hero;
     public readonly int GoldChange;
 
-    public NotifyDailyGoldChange(Clan clan, int goldChange)
+    public NotifyDailyGoldChange(Hero hero, int goldChange)
     {
-        Clan = clan;
+        Hero = hero;
         GoldChange = goldChange;
     }
 }

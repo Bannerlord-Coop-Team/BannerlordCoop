@@ -124,7 +124,7 @@ internal class PartyScreenHelperHandler : IHandler
                 sendCoalescer?.FlushInstance(rosterId, network);
             }
 
-            network.Send(obj.Who as NetPeer, new RefreshPartiesList());
+            messageBroker.Publish(this, new ClanManagementChanged(mobileParty.ActualClan, ClanManagementRefresh.Parties | ClanManagementRefresh.Members));
         });
     }
 

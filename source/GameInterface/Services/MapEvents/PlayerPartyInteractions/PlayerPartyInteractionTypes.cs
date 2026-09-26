@@ -1,4 +1,4 @@
-namespace GameInterface.Services.MapEvents.PlayerPartyInteractions;
+﻿namespace GameInterface.Services.MapEvents.PlayerPartyInteractions;
 
 public enum PlayerPartyInteractionPhase
 {
@@ -11,7 +11,8 @@ public enum PlayerPartyInteractionPhase
     TradeActive,
     HostileDemandConfirm,
     HostileDemandPending,
-    MercenaryConfirm
+    MercenaryConfirm,
+    MarriageOptions
 }
 
 public enum PlayerPartyInteractionOption
@@ -31,7 +32,13 @@ public enum PlayerPartyInteractionOption
     ConfirmHostileDemand,
     CancelHostileDemand,
     RefuseHostileDemand,
-    YieldHostileDemand
+    YieldHostileDemand,
+    LeaveClan,
+    RemoveFromClan,
+    ProposeMarriage,
+    PatrilinealMarriage,
+    MatrilinealMarriage,
+    CancelMarriage
 }
 
 public enum PlayerPartyInteractionVassalUnavailableReason
@@ -64,7 +71,9 @@ public enum PlayerPartyInteractionProposal
     JoinClan,
     Vassal,
     Mercenary,
-    HostileDemand
+    HostileDemand,
+    PatrilinealMarriage,
+    MatrilinealMarriage
 }
 
 public enum PlayerPartyInteractionOutcomeType
@@ -82,7 +91,11 @@ public enum PlayerPartyInteractionOutcomeType
     Rejected,
     Disconnected,
     HostileDemandAccepted,
-    HostileDemandYielded
+    HostileDemandYielded,
+    ClanLeft,
+    ClanMemberRemoved,
+    MarriageAccepted,
+    MarriageDeclined
 }
 
 public enum PlayerPartyInteractionDeniedReason

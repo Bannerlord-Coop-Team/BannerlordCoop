@@ -2,6 +2,7 @@
 using Common.Messaging;
 using GameInterface.Policies;
 using GameInterface.Services.Buildings.Messages;
+using GameInterface.Services.Settlements;
 using HarmonyLib;
 using Helpers;
 using System.Collections.Generic;
@@ -19,6 +20,7 @@ internal class BuildingHelperPatches
     public static bool ChangeDefaultBuildingPrefix(Building newDefault, Town town)
     {
         if (CallOriginalPolicy.IsOriginalAllowed() || ModInformation.IsServer) return true;
+        if (!SettlementMenuAccess.CanUseSettlement(Hero.MainHero, town.Settlement)) return false;
 
         var message = new DefaultBuildingChanged(newDefault, town);
         MessageBroker.Instance.Publish(null, message);
@@ -31,6 +33,7 @@ internal class BuildingHelperPatches
     public static bool ChangeCurrentBuildingQueuePrefix(List<Building> buildings, Town town)
     {
         if (CallOriginalPolicy.IsOriginalAllowed() || ModInformation.IsServer) return true;
+        if (!SettlementMenuAccess.CanUseSettlement(Hero.MainHero, town.Settlement)) return false;
 
         var message = new CurrentBuildingQueueChanged(buildings, town);
         MessageBroker.Instance.Publish(null, message);
@@ -43,6 +46,7 @@ internal class BuildingHelperPatches
     public static bool BoostBuildingProcessWithGoldPrefix(int gold, Town town)
     {
         if (CallOriginalPolicy.IsOriginalAllowed() || ModInformation.IsServer) return true;
+        if (!SettlementMenuAccess.CanUseSettlement(Hero.MainHero, town.Settlement)) return false;
 
         var message = new BuildingProcessBoostedWithGold(gold, town, Hero.MainHero);
         MessageBroker.Instance.Publish(null, message);

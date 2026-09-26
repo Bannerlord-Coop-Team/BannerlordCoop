@@ -5,6 +5,98 @@
     <string id="str_coop_cannot_execute_heroes" text="Executing heroes has been disabled by the host."/>
     <string id="str_coop_cannot_execute_players" text="Executing player heroes has been disabled by the host."/>
     <string id="str_coop_cannot_execute_player_clan_members" text="Executing members of other players' clans has been disabled by the host."/>
+    <string id="str_coop_clan_players" text="{=str_coop_clan_players}Players" />
+    <string id="str_coop_clan_other_families" text="{=str_coop_clan_other_families}Other Families" />
+    <string id="str_coop_clan_player" text="{=str_coop_clan_player}Player" />
+    <string id="str_coop_clan_player_leader" text="{=str_coop_clan_player_leader}Player · Clan leader" />
+    <string id="str_coop_clan_player_self" text="{=str_coop_clan_player_self}{ROLE} (You)" />
+    <string id="str_coop_clan_party_leader_only" text="{=str_coop_clan_party_leader_only}Only the clan leader can manage clan parties." />
+    <string id="str_coop_clan_party_roles_owner_only" text="{=str_coop_clan_party_roles_owner_only}Only this party's leader can assign its roles." />
+    <string id="str_coop_clan_player_party_protected" text="{=str_coop_clan_player_party_protected}Player parties cannot be disbanded or have their leaders replaced." />
+    <string id="str_coop_clan_player_party_wages_disabled" text="{=str_coop_clan_player_party_wages_disabled}Wage limits cannot be set for player parties." />
+    <string id="str_coop_clan_identity_leader_only" text="{=str_coop_clan_identity_leader_only}Only the clan leader can change the clan's name or banner." />
+    <string id="str_coop_clan_assets_leader_only" text="{=str_coop_clan_assets_leader_only}Only the clan leader can manage clan assets." />
+    <string id="str_coop_clan_hero_recall_restricted" text="{=str_coop_clan_hero_recall_restricted}Only the clan leader can recall heroes assigned to a party or governorship." />
+    <string id="str_coop_clan_join_title" text="{=str_coop_clan_join_title}Join {CLAN_NAME}?" />
+    <string id="str_coop_clan_experimental_warning" text="{=str_coop_clan_experimental_warning}EXPERIMENTAL: Use of coop clan features may cause unexpected issues." />
+    <string id="str_coop_clan_join_description" text="{=str_coop_clan_join_description}You are asking to join {CLAN_NAME}, led by {LEADER_NAME}. The clan leader will manage the Coop clan and its assets." />
+	<string id="str_coop_clan_join_companions" text="{=str_coop_clan_join_companions}Companions: {COUNT}" />
+    <string id="str_coop_clan_join_workshops" text="{=str_coop_clan_join_workshops}Workshops: {COUNT}" />
+    <string id="str_coop_clan_join_caravans" text="{=str_coop_clan_join_caravans}Caravans: {COUNT}" />
+    <string id="str_coop_clan_join_parties" text="{=str_coop_clan_join_parties}NPC clan parties: {COUNT}" />
+    <string id="str_coop_clan_join_alleys" text="{=str_coop_clan_join_alleys}Alleys: {COUNT}" />
+    <string id="str_coop_clan_join_supporters" text="{=str_coop_clan_join_supporters}Supporters: {COUNT}" />
+    <string id="str_coop_clan_join_forfeit_warning" text="{=str_coop_clan_join_forfeit_warning}On joining the clan, you give up ownership and control of the companions, assets and supporters listed above to the new clan leader. They will not be returned to you if you leave the clan later." />
+    <string id="str_coop_clan_join_confirm" text="{=str_coop_clan_join_confirm}Send join request" />
+    <string id="str_coop_clan_join_other_players" text="{=str_coop_clan_join_other_players}You cannot join another clan while other players belong to your clan." />
+    <string id="str_coop_clan_join_target_not_leader" text="{=str_coop_clan_join_target_not_leader}You must speak to the clan leader to request membership." />
+    <string id="str_coop_clan_join_rules_kingdom" text="{=str_coop_clan_join_rules_kingdom}You cannot join another clan while ruling a kingdom." />
+    <string id="str_coop_clan_join_mercenary" text="{=str_coop_clan_join_mercenary}You must end your mercenary contract before joining another clan." />
+    <string id="str_coop_clan_join_vassal" text="{=str_coop_clan_join_vassal}You must leave your current kingdom before joining another clan." />
+    <string id="str_coop_clan_join_owns_fiefs" text="{=str_coop_clan_join_owns_fiefs}You cannot join another clan while your clan owns any fiefs." />
+    <string id="str_coop_clan_join_incompatible_wars" text="{=str_coop_clan_join_incompatible_wars}Your clan is at war with a faction that the other clan is not at war with. Make peace first." />
+    <string id="str_coop_clan_join_too_many_companions" text="{=str_coop_clan_join_too_many_companions}Joining would exceed this clan's companion limit. Dismiss companions before joining." />
+    <string id="str_coop_clan_join_too_many_workshops" text="{=str_coop_clan_join_too_many_workshops}Joining would exceed this clan's workshop limit. Sell workshops before joining." />
+    <string id="str_coop_clan_join_too_many_parties" text="{=str_coop_clan_join_too_many_parties}Joining would exceed this clan's party limit. Disband clan parties and wait for disbanding to finish before joining." />
+    <string id="str_coop_clan_leave" text="{=str_coop_clan_leave}Leave Clan" />
+    <string id="str_coop_clan_manage_player" text="{=str_coop_clan_manage_player}Manage Player" />
+    <string id="str_coop_clan_manage_player_title" text="{=str_coop_clan_manage_player_title}Manage {HERO}" />
+    <string id="str_coop_clan_manage_player_description" text="{=str_coop_clan_manage_player_description}Choose an action for this player. Hover over an option for details." />
+    <string id="str_coop_clan_manage_player_confirm" text="{=str_coop_clan_manage_player_confirm}Confirm" />
+    <string id="str_coop_clan_remove_player" text="{=str_coop_clan_remove_player}Remove from Clan" />
+    <string id="str_coop_clan_remove_player_description" text="{=str_coop_clan_remove_player_description}Removing this player returns them to their own clan with their eligible family. Companions and shared assets stay with this clan. The player's approval is not required." />
+    <string id="str_coop_clan_leave_dialogue" text="{=str_coop_clan_leave_dialogue}I am leaving the clan." />
+    <string id="str_coop_clan_remove_player_dialogue" text="{=str_coop_clan_remove_player_dialogue}You are no longer a member of this clan." />
+    <string id="str_coop_clan_player_left" text="{=str_coop_clan_player_left}{HERO} has left the clan." />
+    <string id="str_coop_clan_player_removed" text="{=str_coop_clan_player_removed}{HERO} has been removed from the clan." />
+    <string id="str_coop_marriage_propose" text="{=str_coop_marriage_propose}I would like to propose marriage." />
+    <string id="str_coop_marriage_choose" text="{=str_coop_marriage_choose}What kind of marriage do you propose?" />
+    <string id="str_coop_marriage_patrilineal" text="{=str_coop_marriage_patrilineal}Patrilineal: the husband leads and the wife joins his clan." />
+    <string id="str_coop_marriage_matrilineal" text="{=str_coop_marriage_matrilineal}Matrilineal: the wife leads and the husband joins her clan." />
+    <string id="str_coop_marriage_patrilineal_request" text="{=str_coop_marriage_patrilineal_request}I propose a patrilineal marriage. (The wife joins the husband's clan, and he remains its leader)" />
+    <string id="str_coop_marriage_matrilineal_request" text="{=str_coop_marriage_matrilineal_request}I propose a matrilineal marriage. (The husband joins the wife's clan, and she remains its leader)" />
+    <string id="str_coop_marriage_ineligible" text="{=str_coop_marriage_ineligible}These heroes are not currently eligible for marriage. Both must be unmarried, of marriageable age, of opposite sexes and not close relatives." />
+    <string id="str_coop_marriage_hostile" text="{=str_coop_marriage_hostile}You cannot propose marriage while hostile." />
+    <string id="str_coop_marriage_clan_unavailable" text="{=str_coop_marriage_clan_unavailable}The designated leader must already lead their clan, and the joining spouse must meet the clan-joining requirements. Both heroes must remain eligible for marriage." />
+    <string id="str_coop_marriage_send" text="{=str_coop_marriage_send}Propose" />
+    <string id="str_coop_marriage_accept" text="{=str_coop_marriage_accept}Accept proposal" />
+    <string id="str_coop_marriage_accepted" text="{=str_coop_marriage_accepted}Marriage proposal accepted." />
+    <string id="str_coop_marriage_declined" text="{=str_coop_marriage_declined}Marriage proposal declined." />
+    <string id="str_coop_marriage_proposal_title" text="{=str_coop_marriage_proposal_title}Propose marriage to {LEADER_NAME}?" />
+    <string id="str_coop_marriage_proposal_description" text="{=str_coop_marriage_proposal_description}You are proposing marriage to {LEADER_NAME}. If they accept, you will join {CLAN_NAME}. They will remain clan leader and manage its shared assets." />
+    <string id="str_coop_marriage_acceptance_title" text="{=str_coop_marriage_acceptance_title}Accept marriage proposal?" />
+    <string id="str_coop_marriage_acceptance_description" text="{=str_coop_marriage_acceptance_description}If you accept {LEADER_NAME}'s marriage proposal, you will marry them and join {CLAN_NAME}. They will remain clan leader and manage its shared assets." />
+    <string id="str_coop_marriage_clan_commitment" text="{=str_coop_marriage_clan_commitment}While married to another player, you cannot leave the clan or be removed from it." />
+    <string id="str_coop_marriage_forfeit_warning" text="{=str_coop_marriage_forfeit_warning}On joining the clan through marriage, you permanently give up ownership and control of the companions, assets and supporters listed above to the clan leader. You cannot leave the clan or be removed while married to another player." />
+    <string id="str_coop_clan_daily_payment" text="{=str_coop_clan_daily_payment}Daily Payment" />
+    <string id="str_coop_clan_set_daily_payment" text="{=str_coop_clan_set_daily_payment}Set Daily Payment" />
+    <string id="str_coop_clan_send_tribute" text="{=str_coop_clan_send_tribute}Send Tribute" />
+    <string id="str_coop_clan_daily_payment_amount" text="{=str_coop_clan_daily_payment_amount}Daily Payment: {AMOUNT}" />
+    <string id="str_coop_clan_payment_description" text="{=str_coop_clan_payment_description}Gold to send to {HERO} each day, after clan expenses. They pay their own party wages. Enter 0 to stop payments. If funds are insufficient, only the available gold is sent." />
+    <string id="str_coop_clan_tribute_description" text="{=str_coop_clan_tribute_description}Send a one-time payment to clan leader {HERO}. Available gold: {GOLD}. This payment does not repeat. If your gold changes before the transfer, only the available amount is sent." />
+    <string id="str_coop_clan_invalid_payment" text="{=str_coop_clan_invalid_payment}Enter a whole number from {MIN} to {MAX}." />
+    <string id="str_coop_clan_no_tribute_gold" text="{=str_coop_clan_no_tribute_gold}You have no gold available to send." />
+    <string id="str_coop_clan_tribute_received" text="{=str_coop_clan_tribute_received}You received {AMOUNT} gold in tribute from clan member {HERO}." />
+    <string id="str_coop_clan_payment_to" text="{=str_coop_clan_payment_to}Daily Payment To {HERO}" />
+    <string id="str_coop_clan_payment_from_leader" text="{=str_coop_clan_payment_from_leader}Daily Payment From Clan Leader" />
+    <string id="str_coop_clan_governor_leader_only" text="{=str_coop_clan_governor_leader_only}Only the clan leader can assign or remove governors." />
+    <string id="str_coop_clan_player_governor_unavailable" text="{=str_coop_clan_player_governor_unavailable}Only the clan leader can appoint an available adult player member who is not already a governor." />
+    <string id="str_coop_clan_player_governor_effects" text="{=str_coop_clan_player_governor_effects}Player governor" />
+    <string id="str_coop_clan_assign_player_governor" text="{=str_coop_clan_assign_player_governor}Assign {HERO} as governor of {SETTLEMENT}? They will keep their party, and their governor bonuses will remain active while travelling." />
+    <string id="str_coop_clan_kingdom_leader_only" text="{=str_coop_clan_kingdom_leader_only}Only the clan leader can manage kingdom affairs." />
+    <string id="str_coop_clan_settlement_menu_in_use" text="{=str_coop_clan_settlement_menu_in_use}Another player is using this menu at this settlement." />
+    <string id="str_coop_clan_member_cannot_leave" text="{=str_coop_clan_member_cannot_leave}The clan leader's family and players married to another player cannot leave or be removed from the clan." />
+    <string id="str_coop_succession_heir_title" text="{=str_coop_succession_heir_title}Select Your Heir" />
+    <string id="str_coop_succession_appoint_title" text="{=str_coop_succession_appoint_title}Appoint a New Clan Leader" />
+    <string id="str_coop_succession_appoint_button" text="{=str_coop_succession_appoint_button}Appoint Clan Leader" />
+    <string id="str_coop_succession_appoint_description" text="{=str_coop_succession_appoint_description}Your lineage has no eligible heir. {HERO} will keep their character and take leadership of your clan. Your journey will end, and you will create a new character when you rejoin." />
+    <string id="str_coop_succession_wait_title" text="{=str_coop_succession_wait_title}Inheritance Pending" />
+    <string id="str_coop_succession_wait_description" text="{=str_coop_succession_wait_description}Another player's heir selection must finish before you can continue. This screen will update automatically. You may disconnect and return later." />
+    <string id="str_coop_succession_disconnect" text="{=str_coop_succession_disconnect}Disconnect" />
+    <string id="str_coop_succession_choice_unavailable" text="{=str_coop_succession_choice_unavailable}That choice is no longer available. The available successors have been updated." />
+    <string id="str_coop_succession_game_over_title" text="{=str_coop_succession_game_over_title}Your Lineage Has Ended" />
+    <string id="str_coop_succession_member_game_over" text="{=str_coop_succession_member_game_over}You have no eligible heirs. Your journey has ended, but the clan will continue under its remaining members. You will create a new character when you rejoin." />
+    <string id="str_coop_succession_leader_game_over" text="{=str_coop_succession_leader_game_over}Your lineage has come to an end. {HERO} has taken leadership of {CLAN}. You will create a new character when you rejoin." />
     <string id="str_coop_clanless" text="{=str_coop_clanless}Clanless" />
     <string id="str_coop_in_clan" text="{=str_coop_in_clan}In Clan" />
     <string id="str_coop_clan_status" text="{=str_coop_clan_status}Clan Status" />

@@ -4,6 +4,7 @@ using GameInterface.Services.Alleys.Interfaces;
 using GameInterface.Services.Alleys.Messages;
 using GameInterface.Services.Heroes.Messages;
 using GameInterface.Services.ObjectManager;
+using System.Collections.Generic;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Settlements;
 
@@ -47,6 +48,8 @@ internal class AlleyInitializationHandler : IHandler
     private void Handle(MessagePayload<InitializeClientAlleyData> payload)
     {
         alleyPlayerData = payload.What.AlleyPlayerData;
+        GameThread.RunSafe(() => behaviorInterface.ClientAlleyData = payload.What.AlleyPlayerData?.ManagementDataPerAlley
+            ?? new Dictionary<string, AlleyManagementData>());
     }
 
     private void Handle(MessagePayload<PlayerHeroChanged> payload)

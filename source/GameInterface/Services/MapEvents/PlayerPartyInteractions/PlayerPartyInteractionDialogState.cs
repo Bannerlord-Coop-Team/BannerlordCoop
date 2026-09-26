@@ -1,6 +1,9 @@
-using Common.Logging;
+﻿using Common.Logging;
 using Common.Messaging;
+using GameInterface.Services.Clans;
+using GameInterface.Services.Clans.Data;
 using GameInterface.Services.MapEvents.Messages.Conversation;
+using GameInterface.Services.ObjectManager;
 using Serilog;
 using System;
 using System.Collections.Generic;
@@ -8,6 +11,9 @@ using System.Linq;
 using System.Reflection;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Conversation;
+using TaleWorlds.CampaignSystem.Party;
+using TaleWorlds.Core;
+using TaleWorlds.Library;
 using TaleWorlds.Localization;
 
 namespace GameInterface.Services.MapEvents.PlayerPartyInteractions;
@@ -21,6 +27,8 @@ public static class PlayerPartyInteractionDialogState
 
     private static NetworkPlayerPartyInteractionState currentState;
     private static bool hasState;
+    private static string clanJoinConfirmationSessionId;
+    private static NetworkPlayerPartyInteractionState? marriageInitialState;
 
     public static string SessionId => hasState ? currentState.SessionId : null;
     public static string PartyId => hasState ? currentState.PartyId : null;
@@ -33,10 +41,17 @@ public static class PlayerPartyInteractionDialogState
     public static bool IsHostile => hasState && currentState.IsHostile;
     public static int MercenaryAwardMultiplier => hasState ? currentState.MercenaryAwardMultiplier : 0;
     public static bool HasActiveState => hasState;
+    public static bool IsMarriageProposal => Proposal == PlayerPartyInteractionProposal.PatrilinealMarriage ||
+        Proposal == PlayerPartyInteractionProposal.MatrilinealMarriage;
 
     internal static void Apply(NetworkPlayerPartyInteractionState state)
     {
+        if (clanJoinConfirmationSessionId != null &&
+            (state.SessionId != SessionId || state.Phase != Phase || state.OtherPartyId != OtherPartyId))
+            ClearClanJoinConfirmation();
+
         currentState = state;
+        marriageInitialState = null;
         hasState = true;
         RefreshConversation();
     }
@@ -45,8 +60,10 @@ public static class PlayerPartyInteractionDialogState
     {
         if (sessionId != null && hasState && currentState.SessionId != sessionId) return;
 
+        ClearClanJoinConfirmation();
         hasState = false;
         currentState = default;
+        marriageInitialState = null;
     }
 
     public static bool HasOption(PlayerPartyInteractionOption option)
@@ -68,6 +85,17 @@ public static class PlayerPartyInteractionDialogState
             return true;
         }
 
+        if (option == PlayerPartyInteractionOption.ProposeMarriage)
+        {
+            explanation = GameTexts.FindText(IsHostile ? "str_coop_marriage_hostile" : "str_coop_marriage_ineligible");
+            return false;
+        }
+        if (option == PlayerPartyInteractionOption.PatrilinealMarriage || option == PlayerPartyInteractionOption.MatrilinealMarriage)
+        {
+            explanation = GameTexts.FindText("str_coop_marriage_clan_unavailable");
+            return false;
+        }
+
         if (option == PlayerPartyInteractionOption.OfferServices && IsHostile)
         {
             explanation = new TextObject("{=coop_player_party_interaction_hostile_disabled}Not available while hostile");
@@ -75,6 +103,9 @@ public static class PlayerPartyInteractionDialogState
         }
 
         if (option == PlayerPartyInteractionOption.Vassal && TryGetVassalUnavailableExplanation(out explanation))
+            return false;
+
+        if (option == PlayerPartyInteractionOption.JoinClan && TryGetClanJoinUnavailableExplanation(out explanation))
             return false;
 
         if (option == PlayerPartyInteractionOption.Mercenary && TryGetMercenaryUnavailableExplanation(out explanation))
@@ -104,6 +135,26 @@ public static class PlayerPartyInteractionDialogState
                 explanation = null;
                 return false;
         }
+    }
+
+    private static bool TryGetClanJoinUnavailableExplanation(out TextObject explanation)
+    {
+        var textId = currentState.ClanJoinUnavailableReason switch
+        {
+            ClanJoinUnavailableReason.OtherPlayersInClan => "str_coop_clan_join_other_players",
+            ClanJoinUnavailableReason.TargetIsNotClanLeader => "str_coop_clan_join_target_not_leader",
+            ClanJoinUnavailableReason.RulesKingdom => "str_coop_clan_join_rules_kingdom",
+            ClanJoinUnavailableReason.Mercenary => "str_coop_clan_join_mercenary",
+            ClanJoinUnavailableReason.Vassal => "str_coop_clan_join_vassal",
+            ClanJoinUnavailableReason.OwnsFiefs => "str_coop_clan_join_owns_fiefs",
+            ClanJoinUnavailableReason.IncompatibleWars => "str_coop_clan_join_incompatible_wars",
+            ClanJoinUnavailableReason.TooManyCompanions => "str_coop_clan_join_too_many_companions",
+            ClanJoinUnavailableReason.TooManyWorkshops => "str_coop_clan_join_too_many_workshops",
+            ClanJoinUnavailableReason.TooManyParties => "str_coop_clan_join_too_many_parties",
+            _ => null
+        };
+        explanation = textId == null ? null : GameTexts.FindText(textId);
+        return explanation != null;
     }
 
     private static bool TryGetMercenaryUnavailableExplanation(out TextObject explanation)
@@ -165,6 +216,8 @@ public static class PlayerPartyInteractionDialogState
                 return "Let us review the trade.";
             case PlayerPartyInteractionPhase.OfferServices:
                 return "What service do you wish to offer?";
+            case PlayerPartyInteractionPhase.MarriageOptions:
+                return GameTexts.FindText("str_coop_marriage_choose").ToString();
             case PlayerPartyInteractionPhase.MercenaryConfirm:
                 var mercenaryConfirmText = new TextObject("{=coop_player_party_mercenary_confirm}Mercenaries receive influence like vassals for fighting, but it is exchanged at the end of each day for denars at the rate of {MERCENARY_AWARD}{GOLD_ICON} per influence point. Do you accept these terms?");
                 mercenaryConfirmText.SetTextVariable("MERCENARY_AWARD", MercenaryAwardMultiplier);
@@ -172,6 +225,77 @@ public static class PlayerPartyInteractionDialogState
             default:
                 return "What would you like to discuss?";
         }
+    }
+
+    public static void ConfirmClanJoin()
+    {
+        if (!IsOptionEnabled(PlayerPartyInteractionOption.JoinClan) || clanJoinConfirmationSessionId != null) return;
+        if (!ContainerProvider.TryResolve<IObjectManager>(out var objectManager)) return;
+        if (!objectManager.TryGetObjectWithLogging(OtherPartyId, out PartyBase otherParty)) return;
+
+        var hero = Hero.MainHero;
+        var targetClan = otherParty.LeaderHero?.Clan;
+        if (hero.Clan == null || targetClan?.Leader == null) return;
+
+        ShowClanJoinConfirmation(hero, targetClan, PlayerPartyInteractionOption.JoinClan);
+    }
+
+    public static void ProposeMarriage(bool matrilineal)
+        => ConfirmMarriageClanJoin(matrilineal ? PlayerPartyInteractionOption.MatrilinealMarriage :
+            PlayerPartyInteractionOption.PatrilinealMarriage, matrilineal);
+
+    public static void AcceptProposal()
+    {
+        if (IsMarriageProposal)
+            ConfirmMarriageClanJoin(PlayerPartyInteractionOption.AcceptProposal, Proposal == PlayerPartyInteractionProposal.MatrilinealMarriage);
+        else
+            Submit(PlayerPartyInteractionOption.AcceptProposal);
+    }
+
+    private static void ConfirmMarriageClanJoin(PlayerPartyInteractionOption option, bool matrilineal)
+    {
+        if (!IsOptionEnabled(option) || clanJoinConfirmationSessionId != null) return;
+        if (!ContainerProvider.TryResolve<IObjectManager>(out var objectManager)) return;
+        if (!objectManager.TryGetObjectWithLogging(OtherPartyId, out PartyBase otherParty)) return;
+
+        var hero = Hero.MainHero;
+        var targetClan = otherParty.LeaderHero?.Clan;
+        if (hero.IsFemale == matrilineal || hero.Clan == targetClan)
+        {
+            Submit(option);
+            return;
+        }
+        if (hero.Clan == null || targetClan?.Leader == null) return;
+
+        ShowClanJoinConfirmation(hero, targetClan, option, option == PlayerPartyInteractionOption.AcceptProposal
+            ? ClanJoinConfirmationContext.MarriageAcceptance : ClanJoinConfirmationContext.MarriageProposal);
+    }
+
+    private static void ShowClanJoinConfirmation(Hero hero, Clan targetClan, PlayerPartyInteractionOption option,
+        ClanJoinConfirmationContext context = ClanJoinConfirmationContext.JoinRequest)
+    {
+        if (!ContainerProvider.TryResolve<IClanJoinConfirmation>(out var confirmation)) return;
+        var sessionId = SessionId;
+        clanJoinConfirmationSessionId = sessionId;
+        InformationManager.ShowInquiry(confirmation.CreateInquiry(hero, targetClan,
+            () =>
+            {
+                if (clanJoinConfirmationSessionId != sessionId || SessionId != sessionId) return;
+                clanJoinConfirmationSessionId = null;
+                Submit(option);
+            },
+            () =>
+            {
+                if (clanJoinConfirmationSessionId == sessionId)
+                    clanJoinConfirmationSessionId = null;
+            }, context), false);
+    }
+
+    private static void ClearClanJoinConfirmation()
+    {
+        if (clanJoinConfirmationSessionId == null) return;
+        clanJoinConfirmationSessionId = null;
+        InformationManager.HideInquiry();
     }
 
     public static void Submit(PlayerPartyInteractionOption option)
@@ -213,24 +337,52 @@ public static class PlayerPartyInteractionDialogState
         if (Phase != PlayerPartyInteractionPhase.InitialOptions) return;
         if (!IsOptionEnabled(PlayerPartyInteractionOption.OfferServices)) return;
 
+        ShowLocalOptions(PlayerPartyInteractionPhase.OfferServices, GetLocalServiceOptions(), GetLocalServiceEnabledOptions());
+    }
+
+    public static void ShowMarriageOptions()
+    {
+        if (Phase != PlayerPartyInteractionPhase.InitialOptions || !IsOptionEnabled(PlayerPartyInteractionOption.ProposeMarriage)) return;
+
+        marriageInitialState = currentState;
+        var options = new[] { PlayerPartyInteractionOption.PatrilinealMarriage,
+            PlayerPartyInteractionOption.MatrilinealMarriage, PlayerPartyInteractionOption.CancelMarriage };
+        var enabledOptions = options.Where(option => option == PlayerPartyInteractionOption.CancelMarriage || IsOptionEnabled(option)).ToArray();
+        ShowLocalOptions(PlayerPartyInteractionPhase.MarriageOptions, options, enabledOptions);
+    }
+
+    public static void CancelMarriageOptions()
+    {
+        if (Phase != PlayerPartyInteractionPhase.MarriageOptions || !marriageInitialState.HasValue) return;
+
+        ClearClanJoinConfirmation();
+        currentState = marriageInitialState.Value;
+        marriageInitialState = null;
+        RefreshConversation();
+    }
+
+    private static void ShowLocalOptions(PlayerPartyInteractionPhase phase,
+        PlayerPartyInteractionOption[] options, PlayerPartyInteractionOption[] enabledOptions)
+    {
         currentState = new NetworkPlayerPartyInteractionState(
             currentState.SessionId,
             currentState.PartyId,
             currentState.OtherPartyId,
             currentState.OtherPlayerName,
-            PlayerPartyInteractionPhase.OfferServices,
+            phase,
             PlayerPartyInteractionProposal.None,
-            GetLocalServiceOptions(),
+            options,
             currentState.IsInitiator,
             currentState.MercenaryAwardMultiplier,
             currentState.InitiatorAcceptedTrade,
             currentState.ResponderAcceptedTrade,
             currentState.PartyItems,
             currentState.OtherPartyItems,
-            GetLocalServiceEnabledOptions(),
+            enabledOptions,
             currentState.IsHostile,
             currentState.VassalUnavailableReason,
-            currentState.MercenaryUnavailableReason);
+            currentState.MercenaryUnavailableReason,
+            currentState.ClanJoinUnavailableReason);
 
         RefreshConversation();
     }
@@ -261,7 +413,8 @@ public static class PlayerPartyInteractionDialogState
             new[] { PlayerPartyInteractionOption.ConfirmMercenary, PlayerPartyInteractionOption.CancelMercenary },
             currentState.IsHostile,
             currentState.VassalUnavailableReason,
-            currentState.MercenaryUnavailableReason);
+            currentState.MercenaryUnavailableReason,
+            currentState.ClanJoinUnavailableReason);
 
         RefreshConversation();
     }
@@ -293,7 +446,8 @@ public static class PlayerPartyInteractionDialogState
             Array.Empty<PlayerPartyInteractionOption>(),
             currentState.IsHostile,
             currentState.VassalUnavailableReason,
-            currentState.MercenaryUnavailableReason);
+            currentState.MercenaryUnavailableReason,
+            currentState.ClanJoinUnavailableReason);
 
         RefreshConversation();
     }
@@ -305,7 +459,7 @@ public static class PlayerPartyInteractionDialogState
             case PlayerPartyInteractionProposal.Trade:
                 return "I have a proposal that may benefit us both.";
             case PlayerPartyInteractionProposal.JoinClan:
-                return "(COMING SOON) I wish to offer my services in your clan.";
+                return "I wish to offer my services in your clan.";
             case PlayerPartyInteractionProposal.Vassal:
                 return "I wish to swear my allegiance to your majesty.";
             case PlayerPartyInteractionProposal.Mercenary:
@@ -315,6 +469,10 @@ public static class PlayerPartyInteractionDialogState
                 return mercenaryProposalText.ToString();
             case PlayerPartyInteractionProposal.HostileDemand:
                 return "I offer you one chance to surrender or die";
+            case PlayerPartyInteractionProposal.PatrilinealMarriage:
+                return GameTexts.FindText("str_coop_marriage_patrilineal_request").ToString();
+            case PlayerPartyInteractionProposal.MatrilinealMarriage:
+                return GameTexts.FindText("str_coop_marriage_matrilineal_request").ToString();
             default:
                 return $"{OtherPlayerName} has made a proposal.";
         }

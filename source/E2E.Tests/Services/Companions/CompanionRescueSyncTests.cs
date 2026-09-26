@@ -72,6 +72,8 @@ public class CompanionRescueSyncTests : IDisposable
             Assert.DoesNotContain(otherClient.InternalMessages.OfType<CompanionRescueCompleted>(),
                 message => message.CompanionHeroId == context.HeroId);
         }
+
+        Server.PumpGameThread();
     }
 
     [Fact]
@@ -94,6 +96,8 @@ public class CompanionRescueSyncTests : IDisposable
         AssertJoinPartyState(Server, context, assertHeroState: true);
         foreach (var client in Clients)
             AssertJoinPartyState(client, context, assertHeroState: false);
+
+        Server.PumpGameThread();
     }
 
     [Fact]
@@ -128,6 +132,8 @@ public class CompanionRescueSyncTests : IDisposable
             Assert.DoesNotContain(otherClient.InternalMessages.OfType<CompanionRescueCompleted>(),
                 message => message.CompanionHeroId == context.HeroId);
         }
+
+        Server.PumpGameThread();
     }
 
     [Fact]
@@ -161,6 +167,8 @@ public class CompanionRescueSyncTests : IDisposable
         AssertLeadPartyState(Server, context, assertHeroState: true);
         foreach (var client in Clients)
             AssertLeadPartyState(client, context, assertHeroState: false);
+
+        Server.PumpGameThread();
     }
 
     [Fact]
@@ -216,6 +224,8 @@ public class CompanionRescueSyncTests : IDisposable
         AssertRejected(requester, context.HeroId, CompanionRescueRequestKind.JoinParty,
             "does not own the target party");
         AssertRescueNotApplied(context);
+
+        Server.PumpGameThread();
     }
 
     [Fact]

@@ -1,4 +1,4 @@
-using Common.Network;
+﻿using Common.Network;
 using Common.Util;
 using E2E.Tests.Environment.Instance;
 using E2E.Tests.Services.MapEvents;
@@ -150,6 +150,8 @@ public class LordBarterSyncTests : MapEventTestBase
             harmony.UnpatchAll(harmony.Id);
             observedBarterAcceptedDispatches = 0;
         }
+
+        Server.PumpGameThread();
     }
 
     [Fact]
@@ -371,6 +373,8 @@ public class LordBarterSyncTests : MapEventTestBase
             Assert.Equal(initialPlayerGold - offeredGold, heroOne.Gold);
             Assert.Equal(initialPlayerGold, heroTwo.Gold);
         });
+
+        Server.PumpGameThread();
     }
 
     /// <summary>
@@ -500,6 +504,8 @@ public class LordBarterSyncTests : MapEventTestBase
             Assert.Equal(targetLeaves ? initialPlayerGold : initialPlayerGold - offeredGold, playerHero.Gold);
             Assert.Equal(targetLeaves ? initialTargetGold : initialTargetGold + offeredGold, targetHero.Gold);
         });
+
+        Server.PumpGameThread();
     }
 
     [Fact]
@@ -621,6 +627,8 @@ public class LordBarterSyncTests : MapEventTestBase
         {
             Server.Call(DefaultMobilePartyAIModelPatches.ResetPersistedAttackProtections);
         }
+
+        Server.PumpGameThread();
     }
 
     [Fact]

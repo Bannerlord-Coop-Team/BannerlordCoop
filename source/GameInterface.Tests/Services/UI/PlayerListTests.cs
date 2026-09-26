@@ -80,17 +80,20 @@ public class PlayerListTests
             Assert.Equal(index % 2 != 0, vm.Rows[index].IsAlternate);
     }
 
-    // Preserves all display fields across the network and platform names in existing player saves.
+    // Preserves all display fields across the network and player metadata in existing saves.
     [Fact]
     public void SnapshotAndPlayerMetadataRoundTrip()
     {
         var entry = new PlayerListEntry { ControllerId = "one", PlatformName = "玩家", HeroName = "Hero", Online = true, Activity = PlayerActivity.Hideout };
         var message = Serializer.DeepClone(new NetworkPlayerList(new[] { entry }));
         Assert.Equal(entry, Assert.Single(message.Entries));
-        var player = new Player("one", "hero", "party", "clan", "character") { PlatformName = "玩家" };
-        Assert.Equal(player.PlatformName, Serializer.DeepClone(player).PlatformName);
-        Assert.Equal(player.PlatformName,
-            JsonConvert.DeserializeObject<Player>(JsonConvert.SerializeObject(player))!.PlatformName);
+        var player = new Player("one", "hero", "party", "clan", "character", "original-clan") { PlatformName = "玩家" };
+        var protobufCopy = Serializer.DeepClone(player);
+        Assert.Equal(player.PlatformName, protobufCopy.PlatformName);
+        Assert.Equal(player.OriginalClanId, protobufCopy.OriginalClanId);
+        var jsonCopy = JsonConvert.DeserializeObject<Player>(JsonConvert.SerializeObject(player))!;
+        Assert.Equal(player.PlatformName, jsonCopy.PlatformName);
+        Assert.Equal(player.OriginalClanId, jsonCopy.OriginalClanId);
         Assert.Null(Serializer.DeepClone(new Player("old", "hero", "party", "clan", "character")).PlatformName);
     }
 

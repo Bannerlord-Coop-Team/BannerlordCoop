@@ -4,6 +4,8 @@ using Common.Messaging;
 using GameInterface.Services.Alleys;
 using GameInterface.Services.CampaignService.Data;
 using GameInterface.Services.Caravans;
+using GameInterface.Services.Clans;
+using System.Collections.Generic;
 using GameInterface.Services.Heroes;
 using GameInterface.Services.Inventory;
 using GameInterface.Services.Inventory.TradeSkills;
@@ -47,6 +49,8 @@ public record NetworkGameSaveDataReceived : IEvent
     public AttachmentIdMap AttachmentIdMap { get; }
     [ProtoMember(13)]
     public ServerOptions ServerOptions { get; }
+    [ProtoMember(14)]
+    public Dictionary<string, ClanFinanceSettings> ClanFinance { get; }
 
     public NetworkGameSaveDataReceived(
         byte[] gameSaveData,
@@ -61,7 +65,8 @@ public record NetworkGameSaveDataReceived : IEvent
         HeroMeetingData heroMeetingData,
         AgingPlayerData agingPlayerData,
         AttachmentIdMap attachmentIdMap,
-        ServerOptions serverOptions)
+        ServerOptions serverOptions,
+        Dictionary<string, ClanFinanceSettings> clanFinance = null)
     {
         GameSaveData = gameSaveData;
         CampaignID = campaignID;
@@ -76,5 +81,6 @@ public record NetworkGameSaveDataReceived : IEvent
         AgingPlayerData = agingPlayerData;
         AttachmentIdMap = attachmentIdMap;
         ServerOptions = serverOptions;
+        ClanFinance = clanFinance;
     }
 }

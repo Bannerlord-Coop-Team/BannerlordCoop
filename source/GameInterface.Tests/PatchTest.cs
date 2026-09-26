@@ -1,6 +1,7 @@
 ﻿using Common.Util;
 using HarmonyLib;
 using GameInterface.Services.MobileParties.Patches;
+using GameInterface.Tests.Services.SiegeEvents;
 using System;
 using System.Collections.Generic;
 using TaleWorlds.CampaignSystem;
@@ -12,6 +13,7 @@ using Xunit;
 
 namespace GameInterface.Tests
 {
+    [Collection(nameof(CampaignCurrentCollection))]
     public class PatchTest
     {
         [Fact]
@@ -19,7 +21,14 @@ namespace GameInterface.Tests
         {
             var harmony = new Harmony("Test");
 
-            harmony.PatchAll(typeof(GameInterface).Assembly);
+            try
+            {
+                harmony.PatchAll(typeof(GameInterface).Assembly);
+            }
+            finally
+            {
+                harmony.UnpatchAll(harmony.Id);
+            }
         }
 
         [Fact]

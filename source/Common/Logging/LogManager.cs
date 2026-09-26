@@ -9,12 +9,19 @@ public static class LogManager
 	public static LoggerConfiguration Configuration { get; set; } = new LoggerConfiguration();
 	
 	// If this is called before the Configuration is setup, logging does not work
-	private static Lazy<ILogger> _logger = new Lazy<ILogger>(() => Configuration
-		.Enrich.With(new NetworkEnricher())
-		.Enrich.With(new StackTraceEnricher())
-        .WriteTo.Sink(new OutputSinkManager())
-		.WriteTo.Seq("http://localhost:5341")
-		.CreateLogger());
+	private static Lazy<ILogger> _logger = new Lazy<ILogger>(() =>
+    {
+        var configuration = Configuration
+            .Enrich.With(new NetworkEnricher())
+            .Enrich.With(new StackTraceEnricher())
+            .WriteTo.Sink(new OutputSinkManager());
+
+        // CI keeps its test output without buffering events for an absent Seq server.
+        if (Environment.GetEnvironmentVariable("COOP_DISABLE_SEQ") != "1")
+            configuration.WriteTo.Seq("http://localhost:5341");
+
+        return configuration.CreateLogger();
+    });
 
 	public static ILogger GetLogger<T>() => _logger.Value
 		.ForContext<T>();

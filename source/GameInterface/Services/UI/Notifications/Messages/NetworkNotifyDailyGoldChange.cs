@@ -7,14 +7,14 @@ namespace GameInterface.Services.UI.Notifications.Messages;
 internal readonly struct NetworkNotifyDailyGoldChange : ICommand
 {
     [ProtoMember(1)]
-    public readonly string ClanId;
+    public readonly string HeroId;
 
     [ProtoMember(2)]
     public readonly int GoldChange;
 
-    public NetworkNotifyDailyGoldChange(string clanId, int goldChange)
+    public NetworkNotifyDailyGoldChange(string heroId, int goldChange)
     {
-        ClanId = clanId;
+        HeroId = heroId;
         GoldChange = goldChange;
     }
 }

@@ -26,16 +26,19 @@ internal class ClanPartiesVMHandler : IHandler
     private readonly IObjectManager objectManager;
     private readonly INetwork network;
     private readonly ISendCoalescer sendCoalescer;
+    private readonly ICoopClanPermissions permissions;
 
     public ClanPartiesVMHandler(
         IMessageBroker messageBroker,
         IObjectManager objectManager,
         INetwork network,
+        ICoopClanPermissions permissions,
         ISendCoalescer sendCoalescer = null)
     {
         this.messageBroker = messageBroker;
         this.objectManager = objectManager;
         this.network = network;
+        this.permissions = permissions;
         this.sendCoalescer = sendCoalescer;
         messageBroker.Subscribe<NewClanPartyCreated>(Handle_NewClanPartyCreated);
         messageBroker.Subscribe<CreateNewClanParty>(Handle_CreateNewClanParty);
@@ -71,6 +74,7 @@ internal class ClanPartiesVMHandler : IHandler
             if (!objectManager.TryGetObjectWithLogging<Hero>(data.MainHeroId, out var mainHero)) return;
             if (!objectManager.TryGetObjectWithLogging<Hero>(data.NewLeaderId, out var newLeader)) return;
             if (!objectManager.TryGetObjectWithLogging<Clan>(data.TargetClanId, out var targetClan)) return;
+            if (!permissions.CanManageClan(mainHero, targetClan) || !permissions.CanManageHero(mainHero, newLeader)) return;
 
             // Don't create a party for a hero a player controls.
             if (newLeader.IsPlayerHero())
@@ -92,7 +96,7 @@ internal class ClanPartiesVMHandler : IHandler
                 sendCoalescer?.FlushInstance(rosterId, network);
             }
 
-            network.Send(obj.Who as NetPeer, new RefreshPartiesList());
+            messageBroker.Publish(this, new ClanManagementChanged(targetClan, ClanManagementRefresh.Parties | ClanManagementRefresh.Members));
         });
     }
 
@@ -126,6 +130,8 @@ internal class ClanPartiesVMHandler : IHandler
             if (data.NewLeaderId != null && !objectManager.TryGetObjectWithLogging<Hero>(data.NewLeaderId, out newLeader)) return;
 
             if (!objectManager.TryGetObjectWithLogging<MobileParty>(data.SelectedPartyId, out var selectedParty)) return;
+            if (!permissions.CanManageParty(mainHero, selectedParty)) return;
+            if (newLeader != null && !permissions.CanManageHero(mainHero, newLeader)) return;
 
             // Block changing leader if party is a player party
             if (selectedParty.IsPlayerParty())
@@ -185,7 +191,7 @@ internal class ClanPartiesVMHandler : IHandler
                 GiveGoldAction.ApplyBetweenCharacters(mainHero, newLeader, partyGoldLowerThreshold - newLeader.Gold, false);
             }
 
-            network.Send(obj.Who as NetPeer, new RefreshPartiesList());
+            messageBroker.Publish(this, new ClanManagementChanged(mainHero.Clan, ClanManagementRefresh.Parties | ClanManagementRefresh.Members));
         });
     }
 }

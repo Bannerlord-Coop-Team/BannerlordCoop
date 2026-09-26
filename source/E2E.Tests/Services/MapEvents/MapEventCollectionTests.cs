@@ -357,6 +357,7 @@ public class MapEventCollectionTests : MapEventTestBase
         });
 
         Server.SimulateMessage(this, new PlayerDisconnected(client.NetPeer, default));
+        Server.PumpGameThread();
 
         Server.Call(() =>
         {
@@ -379,6 +380,8 @@ public class MapEventCollectionTests : MapEventTestBase
             Assert.Equal(reconnectBeforeMapEventEnds, party.IsActive);
             Assert.Null(party.MapEvent);
         });
+
+        Server.PumpGameThread();
     }
 
     private static void AssertCommitted(EnvironmentInstance instance, MapEventContext staged) => instance.Call(() =>
