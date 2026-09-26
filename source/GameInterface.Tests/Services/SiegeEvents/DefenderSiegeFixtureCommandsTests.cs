@@ -110,7 +110,13 @@ public sealed class DefenderSiegeFixtureCommandsTests : IDisposable
             snapshots.Setup(service => service.TryCreate(It.IsAny<MobileParty>(), out It.Ref<PartyBehaviorUpdateData>.IsAny))
                 .Returns((MobileParty party, out PartyBehaviorUpdateData data) =>
                 {
-                    data = new PartyBehaviorUpdateData { PartyPosition = party.Position };
+                    data = new PartyBehaviorUpdateData(
+                        null, default, null, default, party.Position, party.DefaultBehavior,
+                        party.TargetPosition, default)
+                    {
+                        PartyMoveMode = party.PartyMoveMode,
+                        MoveTargetPoint = party.MoveTargetPoint,
+                    };
                     return true;
                 });
             snapshots.Setup(service => service.CanApply(It.IsAny<MobileParty>(), It.IsAny<PartyBehaviorUpdateData>())).Returns(true);
@@ -125,6 +131,10 @@ public sealed class DefenderSiegeFixtureCommandsTests : IDisposable
                     }
 
                     party._position = data.PartyPosition;
+                    party.PartyMoveMode = data.PartyMoveMode;
+                    party.MoveTargetPoint = data.MoveTargetPoint;
+                    party.TargetPosition = data.TargetPosition;
+                    party.DefaultBehavior = data.DefaultBehavior;
                     return true;
                 });
             actions.Setup(service => service.Release(It.IsAny<Hero>())).Callback<Hero>(hero =>
@@ -758,6 +768,40 @@ public sealed class DefenderSiegeFixtureCommandsTests : IDisposable
         Assert.Equal(originalStates, captives.Select(ReadState).ToArray());
         Assert.Empty(actionCalls);
         AssertNoSnapshotReplay();
+    }
+
+    [Fact]
+    public void Stage_StopsExistingMovementAndRestoreReplaysCapturedOrders()
+    {
+        PrepareStagingParties();
+        var target = new CampaignVec2(new Vec2(45f, 67f), isOnLand: true);
+        foreach (var captive in captives)
+        {
+            captive.Party.PartyMoveMode = MoveModeType.Point;
+            captive.Party.DefaultBehavior = AiBehavior.GoToPoint;
+            captive.Party.TargetPosition = target;
+            captive.Party.MoveTargetPoint = target;
+        }
+        AssertSuccess(Parse(DefenderSiegeFixtureCommands.Capture(new() { "testclient", "testclient2" })));
+
+        AssertSuccess(Parse(DefenderSiegeFixtureCommands.Stage(new())));
+
+        Assert.All(captives, captive =>
+        {
+            Assert.Equal(MoveModeType.Hold, captive.Party.PartyMoveMode);
+            Assert.Equal(AiBehavior.Hold, captive.Party.DefaultBehavior);
+            Assert.Equal(captive.Party.Position, captive.Party.MoveTargetPoint);
+            Assert.Equal(captive.Party.Position, captive.Party.NextTargetPosition);
+        });
+        AssertSuccess(Parse(DefenderSiegeFixtureCommands.Restore(new())));
+        Assert.All(captives, captive =>
+        {
+            Assert.Equal(MoveModeType.Point, captive.Party.PartyMoveMode);
+            Assert.Equal(AiBehavior.GoToPoint, captive.Party.DefaultBehavior);
+            Assert.Equal(target, captive.Party.MoveTargetPoint);
+            Assert.Equal(target, captive.Party.TargetPosition);
+        });
+        AssertSuccess(Parse(DefenderSiegeFixtureCommands.VerifyRestore(new())));
     }
 
     [Fact]

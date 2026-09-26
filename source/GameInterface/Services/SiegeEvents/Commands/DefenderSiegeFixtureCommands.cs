@@ -5,6 +5,7 @@ using Common.Messaging;
 using GameInterface.Services.Entity;
 using GameInterface.Services.MobilePartyAIs.Patches;
 using GameInterface.Services.MobileParties.Data;
+using GameInterface.Services.MobileParties.Extensions;
 using GameInterface.Services.MobileParties.Messages.Behavior;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.PartyBases.Extensions;
@@ -1190,6 +1191,11 @@ internal static class DefenderSiegeFixtureCommands
                 partyId = expectedPlayers[index]?.MobilePartyId,
                 partyStringId = expectedParties[index]?.StringId,
                 currentSettlementId = expectedParties[index]?.CurrentSettlement?.StringId,
+                moveMode = expectedParties[index]?.PartyMoveMode.ToString(),
+                positionX = expectedParties[index]?.Position.X,
+                positionY = expectedParties[index]?.Position.Y,
+                moveTargetX = expectedParties[index]?.MoveTargetPoint.X,
+                moveTargetY = expectedParties[index]?.MoveTargetPoint.Y,
                 hasMapEvent = expectedParties[index]?.MapEvent != null,
                 hasBesiegerCamp = expectedParties[index]?.BesiegerCamp != null
             }).ToArray()
@@ -2607,11 +2613,25 @@ internal static class DefenderSiegeFixtureCommands
     private static bool StagePartyInsideSettlement(DefenderSiegeFixture fixture, MobileParty party)
     {
         if (!HasCurrentFixtureIdentities(fixture)) return false;
-        if (party.CurrentSettlement == fixture.Settlement) return true;
-        if (party.CurrentSettlement != null)
-            LeaveSettlementAction.ApplyForParty(party);
+        if (party.CurrentSettlement != fixture.Settlement)
+        {
+            if (party.CurrentSettlement != null)
+                LeaveSettlementAction.ApplyForParty(party);
+            if (!HasCurrentFixtureIdentities(fixture)) return false;
+            EnterSettlementAction.ApplyForParty(party, fixture.Settlement);
+        }
         if (!HasCurrentFixtureIdentities(fixture)) return false;
-        EnterSettlementAction.ApplyForParty(party, fixture.Settlement);
+
+        // Entry moves the party but leaves its previous movement order active.
+        party.SetMoveModeHold();
+        party.ResetNavigationToHold();
+        MessageBroker.Instance.Publish(
+            typeof(DefenderSiegeFixtureCommands),
+            new PartyBehaviorChangeAttempted(
+                party,
+                forcePosition: true,
+                isCurrentlyAtSea: party.IsCurrentlyAtSea,
+                resetMovementToHold: true));
         return HasCurrentFixtureIdentities(fixture);
     }
 
@@ -2737,6 +2757,11 @@ internal static class DefenderSiegeFixtureCommands
                 partyStringId = party.Party.StringId,
                 originalSettlementId = party.OriginalSettlement?.StringId,
                 currentSettlementId = party.Party.CurrentSettlement?.StringId,
+                moveMode = party.Party.PartyMoveMode.ToString(),
+                positionX = party.Party.Position.X,
+                positionY = party.Party.Position.Y,
+                moveTargetX = party.Party.MoveTargetPoint.X,
+                moveTargetY = party.Party.MoveTargetPoint.Y,
                 hasMapEvent = party.Party.MapEvent != null,
                 hasBesiegerCamp = party.Party.BesiegerCamp != null
             }).ToArray()
