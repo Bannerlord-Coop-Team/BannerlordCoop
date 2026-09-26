@@ -344,11 +344,34 @@ public class DefenderSiegeContextFixtureTests
     public void Start_UncapturedEligibleDefender_RefusesBeforeStartingSiege()
     {
         using var test = new AssaultFixture();
-        test.PrepareStartWithVisitor("hostile-lord");
-        Assert.False(test.Fixture.Start().Succeeded);
+        var visitor = test.PrepareCleanStart();
+        visitor.IsActive = true;
+        var result = test.Fixture.Start();
+        var evidence = JObject.Parse(result.Output.Substring("LIVE_TEST_JSON=".Length));
+        Assert.False(result.Succeeded);
+        Assert.Equal("uncaptured_assault_defender", (string)evidence["startFailureDetail"]);
+        Assert.Equal(new[] { visitor.StringId }, evidence["uncapturedAssaultDefenderIds"].ToObject<string[]>());
         Assert.False(test.StartAttempted);
         test.Siege.Verify(value => value.StartSiegeEvent(It.IsAny<MobileParty>(), It.IsAny<Settlement>()), Times.Never);
         Assert.Null(test.Settlement.SiegeEvent);
+    }
+
+    [Fact]
+    public void Start_LaterRefusal_DoesNotReportPreviousUncapturedDefender()
+    {
+        using var test = new AssaultFixture();
+        var visitor = test.PrepareCleanStart();
+        visitor.IsActive = true;
+        Assert.False(test.Fixture.Start().Succeeded);
+        visitor.IsActive = false;
+        test.Defenders[0]._currentSettlement = null;
+
+        var result = test.Fixture.Start();
+        var evidence = JObject.Parse(result.Output.Substring("LIVE_TEST_JSON=".Length));
+        Assert.Equal("defenders_changed", (string)evidence["startFailureDetail"]);
+        Assert.Empty(evidence["uncapturedAssaultDefenderIds"]);
+        Assert.False(test.StartAttempted);
+        test.Siege.Verify(value => value.StartSiegeEvent(It.IsAny<MobileParty>(), It.IsAny<Settlement>()), Times.Never);
     }
 
     [Theory]

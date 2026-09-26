@@ -76,6 +76,7 @@ internal sealed class DefenderSiegeContextFixture : IDefenderSiegeContextFixture
     private bool restored;
     private string captureFailureDetail;
     private string startFailureDetail;
+    private string[] uncapturedAssaultDefenderIds = Array.Empty<string>();
 
     public DefenderSiegeContextFixture(IObjectManager objects, IPlayerManager players,
         IMobilePartyBehaviorSnapshot behavior, ISiegeEventInterface siege, IMessageBroker broker, INetwork network,
@@ -101,6 +102,7 @@ internal sealed class DefenderSiegeContextFixture : IDefenderSiegeContextFixture
         if (campaign != null) return Result(false, "fixture_already_captured");
         captureFailureDetail = null;
         startFailureDetail = null;
+        uncapturedAssaultDefenderIds = Array.Empty<string>();
         if (Campaign.Current == null) return Result(false, "campaign_required");
         var defenders = players.Players.Where(players.IsConnected).ToArray();
         if (defenders.Length != 2 ||
@@ -228,6 +230,7 @@ internal sealed class DefenderSiegeContextFixture : IDefenderSiegeContextFixture
 
     public CoopCommandResult Start()
     {
+        uncapturedAssaultDefenderIds = Array.Empty<string>();
         startFailureDetail = GetStartFailure();
         if (startFailureDetail != null)
             return Result(false, "start_precondition_changed");
@@ -255,7 +258,9 @@ internal sealed class DefenderSiegeContextFixture : IDefenderSiegeContextFixture
         if (!IdentityCurrent()) return "captured_identity_changed";
         if (!behaviorIdentity.IsCurrent(originalBehaviorReferences)) return "behavior_identity_changed";
         if (!DefendersCurrent(requireInside: true)) return "defenders_changed";
-        if (!HasOnlyCapturedAssaultDefenders(settlement.Parties)) return "uncaptured_assault_defender";
+        uncapturedAssaultDefenderIds = settlement.Parties.Where(IsUncapturedAssaultDefender)
+            .Select(party => party.StringId).ToArray();
+        if (uncapturedAssaultDefenderIds.Length != 0) return "uncaptured_assault_defender";
         if (startAttempted) return "start_already_attempted";
         if (restored) return "already_restored";
         if (settlement.SiegeEvent != null) return "settlement_has_siege";
@@ -449,9 +454,12 @@ internal sealed class DefenderSiegeContextFixture : IDefenderSiegeContextFixture
 
     // Match vanilla siege defenders before the siege needed by Town.GetDefenderParties exists.
     internal bool HasOnlyCapturedAssaultDefenders(IEnumerable<MobileParty> parties) =>
-        parties.All(party => expectedBattleParties.Contains(party.Party) || !party.IsActive ||
-            party.IsVillager || party.IsCaravan || (party.IsMilitia && settlement.Town.InRebelliousState) ||
-            party.MapFaction?.IsAtWarWith(besieger.MapFaction) != true);
+        !parties.Any(IsUncapturedAssaultDefender);
+
+    private bool IsUncapturedAssaultDefender(MobileParty party) =>
+        !expectedBattleParties.Contains(party.Party) && party.IsActive &&
+        !party.IsVillager && !party.IsCaravan && (!party.IsMilitia || !settlement.Town.InRebelliousState) &&
+        party.MapFaction?.IsAtWarWith(besieger.MapFaction) == true;
 
     private bool TryGetOwnedAssault(out MapEvent assault)
     {
@@ -676,7 +684,7 @@ internal sealed class DefenderSiegeContextFixture : IDefenderSiegeContextFixture
         {
             success, status, settlementId = settlement?.StringId, besiegerPartyId = partyId,
             startAttempted, missionExitRequested, restored, captured = campaign != null,
-            originalRelation, stagedRelation, captureFailureDetail, startFailureDetail
+            originalRelation, stagedRelation, captureFailureDetail, startFailureDetail, uncapturedAssaultDefenderIds
         }), success ? null : "defender_context_failed");
 
     public sealed class CaptureCoopCommand : ICoopCommand
