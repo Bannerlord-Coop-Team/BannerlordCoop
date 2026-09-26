@@ -1,5 +1,7 @@
 ﻿using Common;
 using Common.Messaging;
+using GameInterface.Services.MapEvents;
+using GameInterface.Services.MapEvents.Messages;
 using Missions.Agents.Extensions;
 using Missions.Agents.Messages;
 using System;
@@ -26,7 +28,7 @@ public interface ICombatHitPresentationHandler : IHandler
         string attackerControllerId);
 }
 
-/// <summary>Replicates blood and shield-impact presentation without changing authoritative combat state.</summary>
+/// <summary>Replicates blood and impact sounds without changing authoritative combat state.</summary>
 public class CombatHitPresentationHandler : ICombatHitPresentationHandler
 {
     private readonly INetworkAgentRegistry agentRegistry;
@@ -44,12 +46,60 @@ public class CombatHitPresentationHandler : ICombatHitPresentationHandler
 
         messageBroker.Subscribe<MeleeHitPresentation>(Handle_LocalPresentation);
         messageBroker.Subscribe<NetworkMeleeHitPresentation>(Handle_NetworkPresentation);
+        messageBroker.Subscribe<AgentHitSound>(Handle_LocalHitSound);
+        messageBroker.Subscribe<NetworkAgentHitSound>(Handle_NetworkHitSound);
     }
 
     public void Dispose()
     {
         messageBroker.Unsubscribe<MeleeHitPresentation>(Handle_LocalPresentation);
         messageBroker.Unsubscribe<NetworkMeleeHitPresentation>(Handle_NetworkPresentation);
+        messageBroker.Unsubscribe<AgentHitSound>(Handle_LocalHitSound);
+        messageBroker.Unsubscribe<NetworkAgentHitSound>(Handle_NetworkHitSound);
+    }
+
+    private void Handle_LocalHitSound(MessagePayload<AgentHitSound> payload)
+    {
+        AgentHitSound sound = payload.What;
+        if (!TryResolveIdentity(sound.SoundOwner, out Guid ownerId, out _) ||
+            !agentRegistry.IsLocallyControlled(ownerId) ||
+            !TryResolveIdentity(sound.Victim, out Guid victimId, out bool isMount))
+        {
+            return;
+        }
+
+        string excludedController = null;
+        if (TryResolveIdentity(sound.AlreadyPlayedBy, out Guid attackerId, out _) &&
+            agentRegistry.TryGetAgentInfo(attackerId, out CoopAgentInfo attackerInfo))
+        {
+            excludedController = attackerInfo.CurrentAuthority;
+        }
+
+        // The attacking peer already played a suppressed puppet hit locally.
+        network.SendAllBut(excludedController, new NetworkAgentHitSound(
+            victimId, isMount, sound.SoundIndex, sound.Position, sound.ArmorType));
+    }
+
+    private void Handle_NetworkHitSound(MessagePayload<NetworkAgentHitSound> payload)
+    {
+        NetworkAgentHitSound sound = payload.What;
+        GameThread.RunSafe(() =>
+        {
+            if (!BattleSpawnGate.IsCoopBattleActive || sound.SoundIndex < 0 ||
+                !IsFinite(sound.Position) || !IsFinite(sound.ArmorType) ||
+                !agentRegistry.TryGetAgentInfo(sound.VictimAgentId, out CoopAgentInfo info))
+            {
+                return;
+            }
+
+            Mission mission = Mission.Current;
+            Agent victim = sound.IsMount ? info.Agent?.MountAgent : info.Agent;
+            if (mission == null || victim == null || victim.Mission != mission) return;
+
+            var parameter = new SoundEventParameter("Armor Type", sound.ArmorType);
+            mission.MakeSound(sound.SoundIndex, sound.Position, soundCanBePredicted: false,
+                isReliable: true, -1, -1, ref parameter);
+        }, context: nameof(Handle_NetworkHitSound));
     }
 
     public void BroadcastAcceptedMeleeBlood(
@@ -163,6 +213,7 @@ public class CombatHitPresentationHandler : ICombatHitPresentationHandler
     {
         victimId = Guid.Empty;
         isMount = false;
+        if (victim == null) return false;
         if (agentRegistry.TryGetAgentInfo(victim, out CoopAgentInfo info))
         {
             victimId = info.AgentId;
