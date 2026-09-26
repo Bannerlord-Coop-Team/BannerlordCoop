@@ -1,4 +1,7 @@
-using Common.Logging;
+﻿using Common.Logging;
+#if DEBUG
+using GameInterface.Services.GameMenus.Patches;
+#endif
 using GameInterface.Services.Locations;
 using Serilog;
 using TaleWorlds.CampaignSystem;
@@ -72,9 +75,17 @@ internal class SettlementInterface : ISettlementInterface
 
     public void PartyLeaveSettlement(MobileParty party)
     {
+#if DEBUG
+        if (party == MobileParty.MainParty && SiegeEncounterMenuTrace.IsCurrentMenu)
+            SiegeEncounterMenuTrace.Log("Replicated party leave before apply");
+#endif
         if (party.CurrentSettlement == null) return;
 
         LeaveSettlementAction.ApplyForParty(party);
+#if DEBUG
+        if (party == MobileParty.MainParty && SiegeEncounterMenuTrace.IsCurrentMenu)
+            SiegeEncounterMenuTrace.Log("Replicated party leave after apply");
+#endif
     }
 
     public void StartSettlementEncounter(MobileParty party, Settlement settlement)
