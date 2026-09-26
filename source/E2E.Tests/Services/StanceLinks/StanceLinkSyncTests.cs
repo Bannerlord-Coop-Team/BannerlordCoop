@@ -1,5 +1,6 @@
 ﻿using E2E.Tests.Util;
 using TaleWorlds.CampaignSystem;
+using TaleWorlds.CampaignSystem.Actions;
 using Xunit.Abstractions;
 
 namespace E2E.Tests.Services.StanceLinks;
@@ -10,6 +11,46 @@ public class StanceLinkSyncTests : SyncTestBase
     public StanceLinkSyncTests(ITestOutputHelper output) : base(output)
     {
         StanceLinkId = TestEnvironment.CreateRegisteredObject<StanceLink>();
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void ClanWarAndPeace_ReplicateAgainstClanOrKingdom(bool againstKingdom)
+    {
+        var firstId = TestEnvironment.CreateRegisteredObject<Clan>();
+        var secondId = againstKingdom
+            ? TestEnvironment.CreateRegisteredObject<Kingdom>()
+            : TestEnvironment.CreateRegisteredObject<Clan>();
+
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject<IFaction>(firstId, out var first));
+            Assert.True(Server.ObjectManager.TryGetObject<IFaction>(secondId, out var second));
+            DeclareWarAction.ApplyInternal(first, second, DeclareWarAction.DeclareWarDetail.CausedByKingdomDecision);
+        });
+        AssertStance(true);
+
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject<IFaction>(firstId, out var first));
+            Assert.True(Server.ObjectManager.TryGetObject<IFaction>(secondId, out var second));
+            MakePeaceAction.ApplyInternal(first, second, 0, 0, MakePeaceAction.MakePeaceDetail.ByKingdomDecision);
+        });
+        AssertStance(false);
+
+        void AssertStance(bool atWar)
+        {
+            foreach (var instance in Clients.Append(Server))
+            {
+                instance.Call(() =>
+                {
+                    Assert.True(instance.ObjectManager.TryGetObject<IFaction>(firstId, out var first));
+                    Assert.True(instance.ObjectManager.TryGetObject<IFaction>(secondId, out var second));
+                    Assert.Equal(atWar, FactionManager.IsAtWarAgainstFaction(first, second));
+                });
+            }
+        }
     }
 
     [Fact]

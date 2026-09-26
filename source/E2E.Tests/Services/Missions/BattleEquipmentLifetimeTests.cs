@@ -1,6 +1,18 @@
 ﻿using Common.Logging;
+using Common.Util;
+using Moq;
+using HarmonyLib;
+using TaleWorlds.MountAndBlade;
+using TaleWorlds.MountAndBlade.ComponentInterfaces;
 using E2E.Tests.Environment;
 using GameInterface.Registry.Auto;
+using GameInterface.Services.Equipments.Patches;
+using SandBox.View.Map;
+using GameInterface.Services.Heroes.Messages;
+using GameInterface.Surrogates;
+using ProtoBuf;
+using System.IO;
+using TaleWorlds.Localization;
 using Missions.Battles;
 using Missions.Messages;
 using System;
@@ -101,7 +113,52 @@ public sealed class BattleEquipmentLifetimeTests : IDisposable
             Assert.False(client.ObjectManager.TryGetId(unsupportedEquipment, out _));
         });
 
-        Assert.Contains(GetCapturedLogs(), ContainsClientEquipmentLifetimeError);
+        Assert.Contains(GetCapturedLogs(), log => ContainsClientEquipmentLifetimeError(log) &&
+            log.Contains("caller=") && log.Contains(nameof(BattleEquipmentLifetimeTests)));
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void HeroEquipmentWireCopies_RemainTransientAndPreserveRegisteredEquipment(bool decodeOnServer)
+    {
+        _ = new SurrogateCollection();
+        var server = testEnvironment.Server;
+        var receiver = decodeOnServer ? server : testEnvironment.Clients.First();
+        string battleId = null!;
+        string civilianId = null!;
+        byte[] wire = null!;
+        server.Call(() =>
+        {
+            var battle = new Equipment(Equipment.EquipmentType.Battle);
+            var civilian = new Equipment(Equipment.EquipmentType.Civilian);
+            Assert.True(server.ObjectManager.TryGetId(battle, out battleId));
+            Assert.True(server.ObjectManager.TryGetId(civilian, out civilianId));
+            using var stream = new MemoryStream();
+            Serializer.Serialize(stream, new NetworkInitializeNewHero(
+                "Hero_wire_test", new TextObject("first"), new TextObject("name"),
+                civilianId, battleId, civilian, battle));
+            wire = stream.ToArray();
+        });
+
+        ClearCapturedLogs();
+        receiver.Call(() =>
+        {
+            using var stream = new MemoryStream(wire);
+            var received = Serializer.Deserialize<NetworkInitializeNewHero>(stream);
+            Assert.Equal(Equipment.EquipmentType.Civilian, received.CivilianEquipment._equipmentType);
+            Assert.Equal(Equipment.EquipmentType.Battle, received.BattleEquipment._equipmentType);
+            Assert.Equal(Equipment.EquipmentSlotLength, received.CivilianEquipment._itemSlots.Length);
+            Assert.Equal(Equipment.EquipmentSlotLength, received.BattleEquipment._itemSlots.Length);
+            Assert.False(receiver.ObjectManager.Contains(received.CivilianEquipment));
+            Assert.False(receiver.ObjectManager.Contains(received.BattleEquipment));
+            Assert.True(receiver.ObjectManager.TryGetObject<Equipment>(battleId, out var registeredBattle));
+            Assert.True(receiver.ObjectManager.TryGetObject<Equipment>(civilianId, out var registeredCivilian));
+            Assert.NotSame(registeredBattle, received.BattleEquipment);
+            Assert.NotSame(registeredCivilian, received.CivilianEquipment);
+            Assert.False(TransientEquipmentSyncScope.IsActive);
+        });
+        Assert.DoesNotContain(GetCapturedLogs(), ContainsClientEquipmentDiagnostic);
     }
 
     [Fact]
@@ -126,7 +183,160 @@ public sealed class BattleEquipmentLifetimeTests : IDisposable
             var ordinaryEquipment = new Equipment(Equipment.EquipmentType.Battle);
             Assert.False(client.ObjectManager.TryGetId(ordinaryEquipment, out _));
         });
-        Assert.Contains(GetCapturedLogs(), ContainsClientEquipmentLifetimeError);
+        Assert.Contains(GetCapturedLogs(), log => ContainsClientEquipmentLifetimeError(log) &&
+            log.Contains("caller=") && log.Contains(nameof(BattleEquipmentLifetimeTests)));
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void BannerFactory_PreservesOriginalAndScopesOnlyClientCopy(bool onServer)
+    {
+        var instance = onServer ? testEnvironment.Server : testEnvironment.Clients.First();
+        instance.Call(() =>
+        {
+            var original = CreateBannerFixtureEquipment();
+            var originalWeapon = original[EquipmentIndex.WeaponItemBeginSlot].Item;
+            var banner = ObjectHelper.SkipConstructor<ItemObject>();
+            var replacement = ObjectHelper.SkipConstructor<ItemObject>();
+            var agent = ObjectHelper.SkipConstructor<Agent>();
+            agent.SpawnEquipment = original;
+            var logic = new BannerBearerLogic();
+            var previousModels = MissionGameModels.Current;
+            var model = new Mock<BattleBannerBearersModel>();
+            model.Setup(x => x.GetBannerBearerReplacementWeapon(It.IsAny<BasicCharacterObject>()))
+                .Returns(replacement);
+            try
+            {
+                MissionGameModels.Current = ObjectHelper.SkipConstructor<MissionGameModels>();
+                MissionGameModels.Current.BattleBannerBearersModel = model.Object;
+                ClearCapturedLogs();
+                var copy = logic.CreateBannerEquipmentForAgent(agent, banner);
+                Assert.NotSame(original, copy);
+                Assert.Same(original, agent.SpawnEquipment);
+                Assert.Same(original, logic._initialSpawnEquipments[agent]);
+                Assert.Same(originalWeapon, original[EquipmentIndex.WeaponItemBeginSlot].Item);
+                Assert.Same(originalWeapon, original[EquipmentIndex.Weapon1].Item);
+                Assert.Same(replacement, copy[EquipmentIndex.WeaponItemBeginSlot].Item);
+                Assert.Same(banner, copy[EquipmentIndex.ExtraWeaponSlot].Item);
+                for (int index = 1; index < 4; index++) Assert.True(copy[index].IsEmpty);
+                Assert.Same(original[EquipmentIndex.Head].Item, copy[EquipmentIndex.Head].Item);
+                Assert.Equal(onServer, instance.ObjectManager.Contains(copy));
+                Assert.False(TransientEquipmentSyncScope.IsActive);
+                Assert.DoesNotContain(GetCapturedLogs(), ContainsClientEquipmentDiagnostic);
+            }
+            finally
+            {
+                MissionGameModels.Current = previousModels;
+            }
+        }, new[] { AccessTools.Method(typeof(MBCommon), nameof(MBCommon.GetTotalMissionTime)) });
+    }
+
+    [Fact]
+    public void BannerFactory_ModelFailureRestoresClientEquipmentDiagnostics()
+    {
+        testEnvironment.Clients.First().Call(() =>
+        {
+            var agent = ObjectHelper.SkipConstructor<Agent>();
+            agent.SpawnEquipment = CreateBannerFixtureEquipment();
+            var previousModels = MissionGameModels.Current;
+            var model = new Mock<BattleBannerBearersModel>();
+            var failure = new InvalidOperationException("banner model failure");
+            model.Setup(x => x.GetBannerBearerReplacementWeapon(It.IsAny<BasicCharacterObject>()))
+                .Throws(failure);
+            try
+            {
+                MissionGameModels.Current = ObjectHelper.SkipConstructor<MissionGameModels>();
+                MissionGameModels.Current.BattleBannerBearersModel = model.Object;
+                ClearCapturedLogs();
+                Assert.Same(failure, Assert.Throws<InvalidOperationException>(() =>
+                    new BannerBearerLogic().CreateBannerEquipmentForAgent(agent, null)));
+                Assert.False(TransientEquipmentSyncScope.IsActive);
+                Assert.DoesNotContain(GetCapturedLogs(), ContainsClientEquipmentDiagnostic);
+                _ = new Equipment(Equipment.EquipmentType.Battle);
+                Assert.Contains(GetCapturedLogs(), ContainsClientEquipmentLifetimeError);
+            }
+            finally
+            {
+                MissionGameModels.Current = previousModels;
+            }
+        }, new[] { AccessTools.Method(typeof(MBCommon), nameof(MBCommon.GetTotalMissionTime)) });
+    }
+
+    [Theory]
+    [InlineData(false, false)]
+    [InlineData(false, true)]
+    [InlineData(true, false)]
+    public void ConversationCopy_PreservesRegisteredEquipmentAndCloneOptions(bool onServer, bool stripWeapons)
+    {
+        string equipmentId = null!;
+        testEnvironment.Server.Call(() =>
+        {
+            var equipment = new Equipment(Equipment.EquipmentType.Battle);
+            Assert.True(testEnvironment.Server.ObjectManager.TryGetId(equipment, out equipmentId));
+        });
+        var instance = onServer ? testEnvironment.Server : testEnvironment.Clients.First();
+        instance.Call(() =>
+        {
+            Assert.True(instance.ObjectManager.TryGetObject<Equipment>(equipmentId, out var original));
+            var weapon = ObjectHelper.SkipConstructor<ItemObject>();
+            var armor = ObjectHelper.SkipConstructor<ItemObject>();
+            using (new AllowedThread())
+            {
+                original[EquipmentIndex.Weapon0] = new EquipmentElement(weapon);
+                original[EquipmentIndex.Head] = new EquipmentElement(armor);
+            }
+            ClearCapturedLogs();
+            var copy = ConversationEquipmentPatch.CloneForDisplay(original, stripWeapons);
+            Assert.NotSame(original, copy);
+            Assert.Same(weapon, original[EquipmentIndex.Weapon0].Item);
+            Assert.Same(armor, original[EquipmentIndex.Head].Item);
+            Assert.Same(armor, copy[EquipmentIndex.Head].Item);
+            Assert.Same(stripWeapons ? null : weapon, copy[EquipmentIndex.Weapon0].Item);
+            Assert.True(instance.ObjectManager.TryGetId(original, out var retainedId));
+            Assert.Equal(equipmentId, retainedId);
+            Assert.Equal(onServer, instance.ObjectManager.Contains(copy));
+            Assert.False(TransientEquipmentSyncScope.IsActive);
+            Assert.DoesNotContain(GetCapturedLogs(), ContainsClientEquipmentDiagnostic);
+        });
+    }
+
+    [Fact]
+    public void ConversationCopy_FailureRestoresClientEquipmentDiagnostics()
+    {
+        testEnvironment.Clients.First().Call(() =>
+        {
+            ClearCapturedLogs();
+            Assert.Throws<NullReferenceException>(() => ConversationEquipmentPatch.CloneForDisplay(null!, false));
+            Assert.False(TransientEquipmentSyncScope.IsActive);
+            _ = new Equipment(Equipment.EquipmentType.Battle);
+            Assert.Contains(GetCapturedLogs(), ContainsClientEquipmentLifetimeError);
+        });
+    }
+
+    [Fact]
+    public void ConversationCopy_ReplacesTheInstalledDisplayClone()
+    {
+        testEnvironment.Clients.First().Call(() =>
+        {
+            var target = AccessTools.Method(typeof(MapConversationTableau), "SpawnOpponentLeader");
+            var clone = AccessTools.Method(typeof(Equipment), nameof(Equipment.Clone));
+            var displayClone = AccessTools.Method(typeof(ConversationEquipmentPatch), nameof(ConversationEquipmentPatch.CloneForDisplay));
+            var instructions = PatchProcessor.GetCurrentInstructions(target);
+            Assert.Single(instructions.Where(instruction => instruction.Calls(displayClone)));
+            Assert.DoesNotContain(instructions, instruction => instruction.Calls(clone));
+        });
+    }
+
+    private static Equipment CreateBannerFixtureEquipment()
+    {
+        using var scope = new TransientEquipmentSyncScope();
+        var equipment = new Equipment(Equipment.EquipmentType.Battle);
+        var weapon = ObjectHelper.SkipConstructor<ItemObject>();
+        equipment[EquipmentIndex.WeaponItemBeginSlot] = new EquipmentElement(weapon);
+        equipment[EquipmentIndex.Weapon1] = new EquipmentElement(weapon);
+        equipment[EquipmentIndex.Head] = new EquipmentElement(ObjectHelper.SkipConstructor<ItemObject>());
+        return equipment;
     }
 
     private void CaptureLog(string message)

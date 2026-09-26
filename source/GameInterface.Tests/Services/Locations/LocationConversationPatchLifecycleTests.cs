@@ -13,6 +13,7 @@ using Xunit;
 
 namespace GameInterface.Tests.Services.Locations;
 
+[Collection(ModInformationRoleCollection.Name)]
 public sealed class LocationConversationPatchLifecycleTests
 {
     private static readonly MethodInfo OnBehaviorInitializePostfix =

@@ -1,5 +1,6 @@
 ﻿using Common.Messaging;
 using Autofac;
+using Common.Logging;
 using Common.Network;
 using Common.PacketHandlers;
 using Common.Serialization;
@@ -57,11 +58,99 @@ public class SiegeAssaultLeaveTests : MapEventTestBase
     [Theory]
     [InlineData(false)]
     [InlineData(true)]
-    public void ActiveSiegeAttacker_WithOrWithoutServerCamp_CanLeave(bool serverHasCamp)
+    public void JoinActiveSiege_AssignsCampOnlyAfterServerAccepts(bool rejectJoin)
+    {
+        var battle = CreateServerMapEvent();
+        var (heroId, partyId) = CreatePlayerHeroParty("PlayerOne");
+        var client = Clients.First();
+        RegisterAsPlayerParty("PlayerOne", heroId, partyId);
+        TestEnvironment.ConnectRegisteredPlayer(client, "PlayerOne");
+        SetMainParty(client, partyId);
+        var disabledMethods = MapEventDisabledMethods.Concat(SiegeCreationDisabledMethods)
+            .Append(AccessTools.Method(typeof(PartyBaseHelper), nameof(PartyBaseHelper.HasFeat)))
+            .ToList();
+        var siegeId = TestEnvironment.CreateRegisteredObject<SiegeEvent>(disabledMethods);
+        foreach (var instance in Clients.Append(Server))
+        {
+            instance.Call(() =>
+            {
+                Assert.True(instance.ObjectManager.TryGetObject<MapEvent>(battle.MapEventId, out var mapEvent));
+                Assert.True(instance.ObjectManager.TryGetObject<SiegeEvent>(siegeId, out var siege));
+                mapEvent._mapEventType = MapEvent.BattleTypes.Siege;
+                mapEvent.MapEventSettlement = siege.BesiegedSettlement;
+                siege.BesiegedSettlement.SiegeEvent = siege;
+                siege.BesiegedSettlement.Party._mapEventSide = mapEvent.DefenderSide;
+                mapEvent.DefenderSide.LeaderParty = siege.BesiegedSettlement.Party;
+            }, disabledMethods);
+        }
+
+        var blockedDelivery = AccessTools.Method(
+            typeof(E2E.Tests.Environment.TestNetworkRouter),
+            nameof(E2E.Tests.Environment.TestNetworkRouter.SendReliablePayload),
+            new[] { typeof(LiteNetLib.NetPeer), typeof(LiteNetLib.NetPeer), typeof(byte[]) });
+        client.NetworkSentMessages.Clear();
+        client.Call(() =>
+        {
+            Assert.True(client.ObjectManager.TryGetObject<MapEvent>(battle.MapEventId, out var mapEvent));
+            var encounter = ObjectHelper.SkipConstructor<PlayerEncounter>();
+            encounter._encounteredParty = mapEvent.DefenderSide.LeaderParty;
+            encounter._mapEvent = mapEvent;
+            Campaign.Current.PlayerEncounter = encounter;
+            PlayerEncounter.JoinBattle(BattleSideEnum.Attacker);
+            Assert.True(encounter.IsJoinedBattle);
+            Assert.Null(MobileParty.MainParty.MapEvent);
+            Assert.Null(MobileParty.MainParty.BesiegerCamp);
+        }, disabledMethods.Append(blockedDelivery).ToList());
+
+        var request = Assert.Single(client.NetworkSentMessages.GetMessages<NetworkRequestJoinBattle>());
+        Server.NetworkSentMessages.Clear();
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject<MapEvent>(battle.MapEventId, out var mapEvent));
+            if (rejectJoin) mapEvent._state = MapEventState.WaitingRemoval;
+            Server.Resolve<IMessageBroker>().Publish(client.NetPeer, request);
+        }, disabledMethods);
+
+        Assert.Equal(!rejectJoin, Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkJoinBattleReply>()).Accepted);
+        foreach (var instance in Clients.Append(Server))
+        {
+            instance.Call(() =>
+            {
+                Assert.True(instance.ObjectManager.TryGetObject<MobileParty>(partyId, out var party));
+                Assert.True(instance.ObjectManager.TryGetObject<SiegeEvent>(siegeId, out var siege));
+                Assert.Equal(!rejectJoin, party.MapEvent != null);
+                Assert.Same(rejectJoin ? null : siege.BesiegerCamp, party.BesiegerCamp);
+            });
+        }
+
+        if (rejectJoin)
+        {
+            client.Call(() => Assert.False(PlayerEncounter.Current.IsJoinedBattle));
+            return;
+        }
+
+        client.Call(() => client.Resolve<INetwork>().SendAll(
+            new NetworkRequestBreakSiege(partyId, finishLocalMenus: true)),
+            disabledMethods.Append(AccessTools.Method(typeof(GameMenu), nameof(GameMenu.ExitToLast))).ToList());
+        foreach (var instance in Clients.Append(Server))
+            AssertPartyState(instance, partyId, expectMapEvent: false, expectCamp: false);
+    }
+
+    [Theory]
+    [InlineData(false, false, false)]
+    [InlineData(true, false, false)]
+    [InlineData(false, true, false)]
+    [InlineData(true, true, false)]
+    [InlineData(false, true, true)]
+    [InlineData(true, true, true)]
+    public void ActiveBesieger_WithOrWithoutServerCamp_CanLeave(bool serverHasCamp, bool sallyOut, bool lastBesieger)
     {
         var mapEvent = CreateServerMapEvent();
-        var partyId = JoinNewServerPartyToSide(mapEvent.MapEventId, BattleSideEnum.Attacker);
-        SetMapEventType(mapEvent.MapEventId, MapEvent.BattleTypes.Siege);
+        var partyId = lastBesieger ? mapEvent.DefenderPartyId :
+            JoinNewServerPartyToSide(mapEvent.MapEventId,
+                sallyOut ? BattleSideEnum.Defender : BattleSideEnum.Attacker);
+        SetMapEventType(mapEvent.MapEventId,
+            sallyOut ? MapEvent.BattleTypes.SallyOut : MapEvent.BattleTypes.Siege);
         var leavingClient = Clients.First();
         SetMainParty(leavingClient, partyId);
         var siegeEventId = SetClientOnlyCamp(leavingClient, partyId);
@@ -77,6 +166,13 @@ public class SiegeAssaultLeaveTests : MapEventTestBase
         Assert.NotNull(partyBaseId);
         AssertPartyState(Server, partyId, expectMapEvent: true, expectCamp: serverHasCamp);
         AssertPartyState(leavingClient, partyId, expectMapEvent: true, expectCamp: true);
+        EnableHeadlessEncounterFinish(leavingClient);
+        leavingClient.Call(() =>
+        {
+            Assert.True(leavingClient.ObjectManager.TryGetObject<MapEvent>(mapEvent.MapEventId, out var battle));
+            PlayerEncounter.Start();
+            PlayerEncounter.Current._mapEvent = battle;
+        }, MapEventDisabledMethods);
         Server.NetworkSentMessages.Clear();
 
         leavingClient.Call(() =>
@@ -94,12 +190,15 @@ public class SiegeAssaultLeaveTests : MapEventTestBase
         var approval = Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkBreakSiegeApproved>());
         Assert.Equal(SiegeBreakOutcome.Applied, approval.Outcome);
         Assert.True(approval.BattleLeaveApplied);
+        leavingClient.Call(() => Assert.Null(PlayerEncounter.Current));
 
         AssertPartyState(Server, partyId, expectMapEvent: false, expectCamp: false);
         foreach (var client in Clients)
         {
             AssertPartyState(client, partyId, expectMapEvent: false, expectCamp: false);
         }
+        foreach (var instance in Clients.Append(Server))
+            AssertPartyState(instance, mapEvent.AttackerPartyId, expectMapEvent: !lastBesieger, expectCamp: false);
     }
 
     [Fact]
@@ -193,6 +292,79 @@ public class SiegeAssaultLeaveTests : MapEventTestBase
             AssertTrackerMatchesSides(mapEvent);
             Assert.Contains(tracker._mapEventParties, involvedParty => involvedParty.Party == party.Party);
         });
+    }
+
+    [Theory]
+    [InlineData("encounter", "absent", false)]
+    [InlineData("join_siege_event", "absent", false)]
+    [InlineData("join_siege_event", "empty", false)]
+    [InlineData("join_siege_event", "settlement", true)]
+    [InlineData("join_siege_event", "matching", true)]
+    [InlineData("join_siege_event", "other-battle", false)]
+    public void InvolvedParties_PreservesSnapshotAndOnlyResumesMatchingJoinMenu(
+        string menuId, string encounterState, bool expectMenuSwitch)
+    {
+        var context = CreateServerMapEvent();
+        var partyId = JoinNewServerPartyToSide(context.MapEventId, BattleSideEnum.Attacker);
+        var client = Clients.First();
+        SetMapEventType(context.MapEventId, MapEvent.BattleTypes.Siege);
+        SetMainParty(client, partyId);
+        var settlementId = TestEnvironment.CreateRegisteredObject<Settlement>();
+        string[] involvedPartyIds = Array.Empty<string>();
+        client.Call(() =>
+        {
+            Assert.True(client.ObjectManager.TryGetObject<MapEvent>(context.MapEventId, out var mapEvent));
+            var encounter = encounterState == "absent" ? null : ObjectHelper.SkipConstructor<PlayerEncounter>();
+            Campaign.Current.PlayerEncounter = encounter;
+            if (encounterState == "matching")
+                encounter!._mapEvent = mapEvent;
+            if (encounterState == "other-battle")
+                encounter!._mapEvent = ObjectHelper.SkipConstructor<MapEvent>();
+            if (encounterState == "settlement")
+            {
+                Assert.True(client.ObjectManager.TryGetObject<Settlement>(settlementId, out var settlement));
+                settlement.SiegeEvent = null;
+                settlement.Party._mapEventSide = null;
+                encounter!._encounteredParty = settlement.Party;
+            }
+
+            var mapState = Game.Current.GameStateManager.CreateState<MapState>();
+            mapState._menuContext = ObjectHelper.SkipConstructor<MenuContext>();
+            mapState._menuContext.GameMenu = new GameMenu(menuId);
+            Game.Current.GameStateManager._gameStates.Add(mapState);
+            involvedPartyIds = mapEvent._sides.SelectMany(side => side.Parties).Select(party =>
+            {
+                Assert.True(client.ObjectManager.TryGetId(party, out var id));
+                return id;
+            }).ToArray();
+        });
+
+        int applyFailures = 0;
+        Action<string> captureFailure = message =>
+        {
+            if (message.Contains("Failed to apply") && message.Contains("NetworkAddInvolvedParties"))
+                Interlocked.Increment(ref applyFailures);
+        };
+        using var menuSwitchRecorder = new MethodCallRecorder(Priority.First,
+            AccessTools.Method(typeof(GameMenu), nameof(GameMenu.SwitchToMenu), new[] { typeof(string) }));
+        OutputSinkManager.AddLogCallback(captureFailure);
+        try
+        {
+            client.SimulateMessage(Server.NetPeer, new NetworkAddInvolvedParties(
+                context.MapEventId, involvedPartyIds, new CampaignVec2[involvedPartyIds.Length]));
+            client.Call(() =>
+            {
+                Assert.True(client.ObjectManager.TryGetObject<MapEvent>(context.MapEventId, out var mapEvent));
+                AssertTrackerMatchesSides(mapEvent);
+            });
+            Assert.Equal(0, Volatile.Read(ref applyFailures));
+            Assert.Equal(expectMenuSwitch ? new[] { "encounter" } : Array.Empty<string>(),
+                menuSwitchRecorder.MenusFor(client));
+        }
+        finally
+        {
+            OutputSinkManager.RemoveLogCallback(captureFailure);
+        }
     }
 
     [Fact]

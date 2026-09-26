@@ -153,6 +153,8 @@ internal class MapTracksHandler : IHandler
 
             mapTracksCampaignBehaviorInterface.ClearVisibleTracks(mapTracksBehavior);
             mapTracksCampaignBehaviorInterface.ApplyVisibleTrackChanges(mapTracksBehavior, obj.What.VisibleTrackChanges, false);
+            Logger.Debug("Applied initial visible tracks: count={TrackCount}, nullPayload={NullPayload}",
+                obj.What.VisibleTrackChanges?.Count ?? 0, obj.What.VisibleTrackChanges == null);
         });
     }
 

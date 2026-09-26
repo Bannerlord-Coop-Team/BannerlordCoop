@@ -1,3 +1,4 @@
+﻿using GameInterface.Registry.Auto;
 using ProtoBuf;
 using System;
 using TaleWorlds.Core;
@@ -33,6 +34,8 @@ internal class EquipmentSurrogate
         if (surrogate is null)
             return null!;
 
+        // Wire copies are temporary values, not authoritative registered equipment.
+        using var scope = new TransientEquipmentSyncScope();
         var equipment = new Equipment(surrogate.EquipmentType);
         if (surrogate.ItemSlots is not null)
         {

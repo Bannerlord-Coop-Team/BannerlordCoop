@@ -1,5 +1,6 @@
 ﻿using Common.Messaging;
 using GameInterface.Services.Heroes.Extensions;
+using GameInterface.Services.Heroes.Messages;
 using GameInterface.Services.MapEventParties.Messages;
 using Helpers;
 using System.Threading;
@@ -152,7 +153,10 @@ public class CoopAgentOrigin : IAgentOriginBase
 
         if (!hero.IsHealthControlledByThisInstance()) return;
 
-        hero.HitPoints = MathF.Max(1, MathF.Round(agentHealth));
+        var hitPoints = MathF.Max(1, MathF.Round(agentHealth));
+        if (hero.HitPoints == hitPoints) return;
+
+        MessageBroker.Instance.Publish(this, new HeroHitPointsChangeRequested(hero, hitPoints));
     }
 
     // Unlike the casualty hooks above, score hits have NO other path to the map event party in a coop battle

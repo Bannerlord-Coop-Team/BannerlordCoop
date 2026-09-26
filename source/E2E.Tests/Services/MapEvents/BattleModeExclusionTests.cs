@@ -1,4 +1,10 @@
 ﻿using Common.Network;
+using Common.Util;
+using TaleWorlds.CampaignSystem.GameState;
+using TaleWorlds.CampaignSystem.GameMenus;
+using TaleWorlds.CampaignSystem.Encounters;
+using TaleWorlds.CampaignSystem.MapEvents;
+using TaleWorlds.Core;
 using GameInterface.Services.MapEvents;
 using GameInterface.Services.MapEvents.Handlers;
 using GameInterface.Services.MapEvents.Messages.Start;
@@ -21,6 +27,54 @@ namespace E2E.Tests.Services.MapEvents;
 public class BattleModeExclusionTests : MapEventTestBase
 {
     public BattleModeExclusionTests(ITestOutputHelper output) : base(output) { }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void ReceivedBattleMode_RefreshesConditionsWithoutReinitializingEncounter(bool clearMode)
+    {
+        var battle = CreateServerMapEvent();
+        var client = Clients.First();
+        int initializations = 0;
+        int conditions = 0;
+        bool? optionEnabled = null;
+        client.Call(() =>
+        {
+            Assert.True(client.ObjectManager.TryGetObject<MapEvent>(battle.MapEventId, out var mapEvent));
+            var encounter = ObjectHelper.SkipConstructor<PlayerEncounter>();
+            encounter._mapEvent = mapEvent;
+            Campaign.Current.PlayerEncounter = encounter;
+            var starter = new CampaignGameStarter(Campaign.Current.GameMenuManager, Campaign.Current.ConversationManager);
+            starter.AddGameMenu("encounter", "Encounter", _ => initializations++);
+            starter.AddGameMenuOption("encounter", "test_mode", "Attack", args =>
+            {
+                conditions++;
+                optionEnabled = !BattleModeRegistry.IsMission(battle.MapEventId);
+                args.IsEnabled = optionEnabled.Value;
+                return true;
+            }, _ => { });
+            var state = Game.Current.GameStateManager.CreateState<MapState>();
+            state._menuContext = ObjectHelper.SkipConstructor<MenuContext>();
+            state._menuContext.GameMenu = Campaign.Current.GameMenuManager.GetGameMenu("encounter");
+            Game.Current.GameStateManager._gameStates.Add(state);
+            if (clearMode) BattleModeRegistry.Begin(battle.MapEventId, BattleStartMode.Mission);
+        });
+        try
+        {
+            client.SimulateMessage(Server.NetPeer, new NetworkBattleModeSet(battle.MapEventId,
+                (int)(clearMode ? BattleStartMode.Unclaimed : BattleStartMode.Mission)));
+            client.Call(() =>
+            {
+                Assert.Equal(0, initializations);
+                Assert.True(conditions > 0);
+                Assert.Equal(clearMode, optionEnabled);
+            });
+        }
+        finally
+        {
+            client.Call(() => BattleModeRegistry.End());
+        }
+    }
 
     /// <summary>
     /// BR-003 para 1 / BR-001: player simulation ("Send Troops") must not be available for a map event after a

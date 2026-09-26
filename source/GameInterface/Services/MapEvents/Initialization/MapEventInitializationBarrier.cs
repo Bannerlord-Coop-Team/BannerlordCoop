@@ -2,6 +2,7 @@
 using Common.Logging;
 using Common.Messaging;
 using Common.Network;
+using Common.Network.Coalescing;
 using Common.Util;
 using GameInterface.Services.GuantletMapEventVisuals;
 using GameInterface.Services.MapEvents.Messages.Start;
@@ -22,6 +23,7 @@ using TaleWorlds.CampaignSystem.GameMenus;
 using TaleWorlds.CampaignSystem.GameState;
 using TaleWorlds.CampaignSystem.MapEvents;
 using TaleWorlds.CampaignSystem.Party;
+using TaleWorlds.CampaignSystem.Roster;
 using TaleWorlds.Core;
 using TaleWorlds.Library;
 using TaleWorlds.MountAndBlade;
@@ -53,6 +55,7 @@ internal sealed class MapEventInitializationBarrier : IMapEventInitializationBar
 
     private readonly IMessageBroker messageBroker;
     private readonly INetwork network;
+    private readonly ISendCoalescer coalescer;
     private readonly IObjectManager objectManager;
     private readonly ISiegeEventGraphSynchronizer siegeEventGraphSynchronizer;
     private readonly Dictionary<MapEvent, State> states = new Dictionary<MapEvent, State>();
@@ -64,10 +67,12 @@ internal sealed class MapEventInitializationBarrier : IMapEventInitializationBar
         IMessageBroker messageBroker,
         INetwork network,
         IObjectManager objectManager,
-        ISiegeEventGraphSynchronizer siegeEventGraphSynchronizer)
+        ISiegeEventGraphSynchronizer siegeEventGraphSynchronizer,
+        ISendCoalescer coalescer = null)
     {
         this.messageBroker = messageBroker;
         this.network = network;
+        this.coalescer = coalescer;
         this.objectManager = objectManager;
         this.siegeEventGraphSynchronizer = siegeEventGraphSynchronizer;
         messageBroker.Subscribe<NetworkMapEventPartyPending>(HandlePendingParty);
@@ -190,8 +195,8 @@ internal sealed class MapEventInitializationBarrier : IMapEventInitializationBar
         bool notified = TryGetHandle(mapEvent, out var handle);
         Logger.Error("Aborting MapEvent {MapEventId}: destroying its graph on the server and every notified client",
             objectManager.TryGetId(mapEvent, out var id) ? id : "<unregistered>");
-        if (notified) network.SendAll(new NetworkMapEventInitialized(handle, true));
         DestroyGraph(mapEvent);
+        if (notified) network.SendAll(new NetworkMapEventInitialized(handle, true));
     }
 
     private bool TryGetId(object instance, out string id)
@@ -424,6 +429,11 @@ internal sealed class MapEventInitializationBarrier : IMapEventInitializationBar
         if (mapEvent == null) return;
         if (!states.TryGetValue(mapEvent, out var state)) state = new State(mapEvent);
         Capture(state, mapEvent);
+        // Final casualty updates must precede the message that removes their client roster IDs.
+        if (ModInformation.IsServer)
+            foreach (var roster in state.Owned.OfType<TroopRoster>())
+                if (objectManager.TryGetHandle(roster, out var rosterHandle))
+                    coalescer?.FlushInstance(rosterHandle, network);
         if (preservedParty != null)
             deferredEncounterCleanup = new DeferredEncounterCleanup(mapEvent, preservedParty);
         else if (ReferenceEquals(deferredEncounterCleanup?.MapEvent, mapEvent))
@@ -434,7 +444,12 @@ internal sealed class MapEventInitializationBarrier : IMapEventInitializationBar
             var party = mapEventParty.Party;
             if (party == null || (party._mapEventSide != null && party._mapEventSide.MapEvent != mapEvent)) continue;
             if (party != preservedParty && party._mapEventSide?.MapEvent == mapEvent) party._mapEventSide = null;
-            if (party.MobileParty != null) party.MobileParty.EventPositionAdder = Vec2.Zero;
+            if (party.MobileParty != null)
+            {
+                // Client graph removal applies the received teardown; server aborts still replicate their writes.
+                using (ModInformation.IsClient ? new AllowedThread() : null)
+                    party.MobileParty.EventPositionAdder = Vec2.Zero;
+            }
             party.SetVisualAsDirty();
         }
 

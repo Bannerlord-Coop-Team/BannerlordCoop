@@ -1,4 +1,10 @@
 ﻿using GameInterface.Services.MapEvents.Patches;
+using GameInterface.Services.MapEvents;
+using Common.Logging;
+using System;
+using System.Collections.Concurrent;
+using System.Linq;
+using TaleWorlds.Core;
 using System.Runtime.Serialization;
 using TaleWorlds.MountAndBlade;
 using Xunit;
@@ -23,6 +29,40 @@ public class MissionStateFinalizeDiagnosticsPatchTests
         Assert.True(found);
         Assert.Equal(42, sequence);
         Assert.Equal("map-event-7", mapEventId);
+    }
+
+    [Fact]
+    public void ExitDiagnostics_RecordRequestAndResultWithoutChangingMission()
+    {
+        var mission = (Mission)FormatterServices.GetUninitializedObject(typeof(Mission));
+        var logs = new ConcurrentQueue<string>();
+        Action<string> capture = logs.Enqueue;
+        OutputSinkManager.AddLogCallback(capture);
+        BattleSpawnGate.BeginBattle("diagnostic-battle");
+        try
+        {
+            var state = mission.CurrentState;
+            MissionStateFinalizeDiagnosticsPatch.EndMissionPrefix(mission);
+            MissionStateFinalizeDiagnosticsPatch.MissionResultReadyPrefix(mission, null);
+            Assert.False(mission.MissionEnded);
+            Assert.Equal(state, mission.CurrentState);
+            Assert.Null(mission.MissionResult);
+            Assert.Single(logs.Where(log => log.Contains("Mission end requested:") &&
+                log.Contains("diagnostic-battle") && log.Contains(nameof(ExitDiagnostics_RecordRequestAndResultWithoutChangingMission))));
+            Assert.Single(logs.Where(log => log.Contains("Mission result ready:") &&
+                log.Contains("diagnostic-battle")));
+
+            logs.Clear();
+            BattleSpawnGate.EndBattle();
+            MissionStateFinalizeDiagnosticsPatch.EndMissionPrefix(mission);
+            MissionStateFinalizeDiagnosticsPatch.MissionResultReadyPrefix(mission, new MissionResult());
+            Assert.Empty(logs.Where(log => log.Contains("[BattleMissionLifecycle]")));
+        }
+        finally
+        {
+            BattleSpawnGate.EndBattle();
+            OutputSinkManager.RemoveLogCallback(capture);
+        }
     }
 
     [Fact]
