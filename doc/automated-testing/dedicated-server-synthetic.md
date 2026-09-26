@@ -103,11 +103,18 @@ Windows or Linux shim, and the platform's TaleWorlds starter assembly. Windows u
 `staged-executable` process host. Linux explicitly uses the image's `system-dotnet` host while the
 staged `TaleWorlds.Starter.DotNetCore.Linux` assembly remains path, hash, MVID, and version checked.
 
+The manifest's `loadedAssemblies` map describes all six staged co-op artifacts. Runtime status
+must report `Common`, `Coop.Core`, `GameInterface`, and `Missions`. `Coop` and `Coop.Steam` are
+optional loaded assemblies on a headless direct-connect server; their staged files are still
+checked for version, MVID, and hash. If either is loaded, its reported location and metadata
+must also match. Unknown or missing required loaded assemblies fail verification. The status
+`assemblyMvid` must match loaded `Coop`, or be null when `Coop` is absent.
+
 Before UDP work and again after the lifecycle, the controller verifies:
 
 - the raw and canonical manifest digests plus both requested source identities;
 - status PID, role, run token, and process start time against the OS process;
-- every loaded assembly's allowlisted path, SHA-256, MVID, and version;
+- every staged assembly's SHA-256, MVID, and version, plus every loaded assembly's allowlisted path and metadata;
 - unchanged manifest and process identities at postflight.
 
 The server's opt-in `status` result must supply:

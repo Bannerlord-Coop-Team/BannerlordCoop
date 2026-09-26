@@ -1,5 +1,6 @@
 ﻿using Common.LiveTesting;
 using System.Text.Json;
+using System.Text.Json.Nodes;
 using VerificationHarness.DedicatedServerSynthetic;
 using VerificationHarness.Serialization;
 
@@ -195,6 +196,132 @@ public sealed class DedicatedServerSyntheticArtifactManifestTests
         {
             File.Delete(path);
         }
+    }
+
+    [Theory]
+    [InlineData(false, false)]
+    [InlineData(false, true)]
+    [InlineData(true, false)]
+    public async Task VerifyAsync_AcceptsOptionalUnloadedAssembliesAndChecksEveryStagedFile(
+        bool loadCoop, bool loadSteam)
+    {
+        DedicatedServerSyntheticArtifactManifest manifest = CreateManifest();
+        string path = WriteManifest(manifest);
+        try
+        {
+            var reader = new StubHostArtifactReader(manifest);
+            var verifier = new DedicatedServerSyntheticArtifactVerifier(
+                new StatusControlClient(manifest, mutateResult: result =>
+                {
+                    if (!loadCoop) RemoveLoadedAssembly(result, "Coop");
+                    if (!loadSteam) RemoveLoadedAssembly(result, "Coop.Steam");
+                }), reader, new CanonicalJsonHasher());
+
+            DedicatedServerSyntheticArtifactVerification verification = await verifier.VerifyAsync(
+                CreateOptions(path), CancellationToken.None);
+
+            Assert.True(verification.IsValid);
+            Assert.Equal(manifest.LoadedAssemblies.Count + manifest.DedicatedServerAssemblies.Count + 1,
+                reader.HashedPaths.Count);
+        }
+        finally
+        {
+            File.Delete(path);
+        }
+    }
+
+    [Theory]
+    [InlineData("Common", "artifact-loaded-assembly-set-mismatch")]
+    [InlineData("Coop.Core", "artifact-loaded-assembly-set-mismatch")]
+    [InlineData("GameInterface", "artifact-loaded-assembly-set-mismatch")]
+    [InlineData("Missions", "artifact-loaded-assembly-set-mismatch")]
+    [InlineData("unknown", "artifact-loaded-assembly-set-mismatch")]
+    [InlineData("absent-coop-mvid", "artifact-coop-mvid-mismatch")]
+    [InlineData("loaded-coop-null-mvid", "artifact-coop-mvid-mismatch")]
+    [InlineData("loaded-coop-wrong-mvid", "artifact-coop-mvid-mismatch")]
+    public async Task VerifyAsync_RejectsContradictoryOrIncompleteLoadedStatus(string defect, string failureCode)
+    {
+        DedicatedServerSyntheticArtifactManifest manifest = CreateManifest();
+        string path = WriteManifest(manifest);
+        try
+        {
+            var verifier = new DedicatedServerSyntheticArtifactVerifier(
+                new StatusControlClient(manifest, mutateResult: result =>
+                {
+                    if (defect == "unknown")
+                    {
+                        JsonArray assemblies = result["loadedAssemblies"]!.AsArray();
+                        JsonNode unexpected = assemblies[0]!.DeepClone();
+                        unexpected["name"] = "unexpected";
+                        assemblies.Add(unexpected);
+                    }
+                    else if (defect == "absent-coop-mvid")
+                    {
+                        RemoveLoadedAssembly(result, "Coop");
+                        result["assemblyMvid"] = manifest.LoadedAssemblies["Coop"].Mvid;
+                    }
+                    else if (defect == "loaded-coop-null-mvid")
+                        result["assemblyMvid"] = null;
+                    else if (defect == "loaded-coop-wrong-mvid")
+                        result["assemblyMvid"] = Guid.NewGuid().ToString("D");
+                    else
+                        RemoveLoadedAssembly(result, defect);
+                }), new StubHostArtifactReader(manifest), new CanonicalJsonHasher());
+
+            DedicatedServerSyntheticArtifactVerification verification = await verifier.VerifyAsync(
+                CreateOptions(path), CancellationToken.None);
+
+            Assert.False(verification.IsValid);
+            Assert.Contains(failureCode, verification.FailureCodes);
+        }
+        finally
+        {
+            File.Delete(path);
+        }
+    }
+
+    [Theory]
+    [InlineData("Coop", "hash", "artifact-loaded-assembly-hash-mismatch")]
+    [InlineData("Coop.Steam", "hash", "artifact-loaded-assembly-hash-mismatch")]
+    [InlineData("Coop", "mvid", "artifact-loaded-assembly-disk-mvid-mismatch")]
+    [InlineData("Coop.Steam", "version", "artifact-loaded-assembly-metadata-mismatch")]
+    public async Task VerifyAsync_RejectsChangedStagedFilesEvenWhenUnloaded(
+        string name, string defect, string failureCode)
+    {
+        DedicatedServerSyntheticArtifactManifest manifest = CreateManifest();
+        string path = WriteManifest(manifest);
+        try
+        {
+            var reader = new StubHostArtifactReader(manifest);
+            DedicatedServerSyntheticAssemblyArtifact artifact = manifest.LoadedAssemblies[name];
+            string artifactPath = StagedPath(artifact.RelativePath);
+            if (defect == "hash")
+                reader.HashOverrides[artifactPath] = new string('0', 64);
+            else
+                reader.IdentityOverrides[artifactPath] = new DedicatedServerHostAssemblyIdentity(
+                    defect == "version" ? "9.0.0.0" : artifact.Version,
+                    defect == "mvid" ? Guid.NewGuid().ToString("D") : artifact.Mvid);
+            var verifier = new DedicatedServerSyntheticArtifactVerifier(
+                new StatusControlClient(manifest, mutateResult: result => RemoveLoadedAssembly(result, name)),
+                reader, new CanonicalJsonHasher());
+
+            DedicatedServerSyntheticArtifactVerification verification = await verifier.VerifyAsync(
+                CreateOptions(path), CancellationToken.None);
+
+            Assert.False(verification.IsValid);
+            Assert.Contains(failureCode, verification.FailureCodes);
+        }
+        finally
+        {
+            File.Delete(path);
+        }
+    }
+
+    private static void RemoveLoadedAssembly(JsonObject result, string name)
+    {
+        JsonArray assemblies = result["loadedAssemblies"]!.AsArray();
+        assemblies.Remove(assemblies.Single(item => item!["name"]!.GetValue<string>() == name));
+        if (name == "Coop") result["assemblyMvid"] = null;
     }
 
     [Fact]
@@ -581,13 +708,16 @@ public sealed class DedicatedServerSyntheticArtifactManifestTests
         private readonly DedicatedServerSyntheticArtifactManifest manifest;
         private readonly Func<string, string, string, (string Version, string Mvid)> mutate;
         private readonly Func<string, string, string> mutateLocation;
+        private readonly Action<JsonObject>? mutateResult;
 
         public StatusControlClient(
             DedicatedServerSyntheticArtifactManifest manifest,
             Func<string, string, string, (string Version, string Mvid)>? mutate = null,
-            Func<string, string, string>? mutateLocation = null)
+            Func<string, string, string>? mutateLocation = null,
+            Action<JsonObject>? mutateResult = null)
         {
             this.manifest = manifest;
+            this.mutateResult = mutateResult;
             this.mutate = mutate ?? ((_, version, mvid) => (version, mvid));
             this.mutateLocation = mutateLocation ?? ((_, location) => location);
         }
@@ -634,6 +764,12 @@ public sealed class DedicatedServerSyntheticArtifactManifestTests
                     dedicatedServerAssemblies = Assemblies(manifest.DedicatedServerAssemblies)
                 }
             });
+            if (mutateResult != null)
+            {
+                JsonObject response = JsonNode.Parse(json)!.AsObject();
+                mutateResult(response["result"]!.AsObject());
+                json = response.ToJsonString();
+            }
             return Task.FromResult(json);
         }
     }

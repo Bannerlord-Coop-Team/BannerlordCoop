@@ -453,6 +453,8 @@ public sealed class DedicatedServerHostArtifactReader : IDedicatedServerHostArti
 
 public sealed class DedicatedServerSyntheticArtifactVerifier : IDedicatedServerSyntheticArtifactVerifier
 {
+    private static readonly string[] RequiredLoadedAssemblyNames =
+        { "Common", "Coop.Core", "GameInterface", "Missions" };
     private readonly IDedicatedServerControlClient controlClient;
     private readonly IDedicatedServerHostArtifactReader hostArtifactReader;
     private readonly ICanonicalJsonHasher hasher;
@@ -558,9 +560,8 @@ public sealed class DedicatedServerSyntheticArtifactVerifier : IDedicatedServerS
             return Failed("artifact-loaded-assembly-set-mismatch", manifest);
         }
 
-        if (!observed.Keys.OrderBy(name => name, StringComparer.Ordinal).SequenceEqual(
-                DedicatedServerSyntheticArtifactManifestFile.RequiredAssemblyNames,
-                StringComparer.Ordinal))
+        if (RequiredLoadedAssemblyNames.Any(name => !observed.ContainsKey(name)) ||
+            observed.Keys.Any(name => !manifest.LoadedAssemblies.ContainsKey(name)))
         {
             return Failed("artifact-loaded-assembly-set-mismatch", manifest);
         }
@@ -580,12 +581,17 @@ public sealed class DedicatedServerSyntheticArtifactVerifier : IDedicatedServerS
             return Failed("artifact-build-version-mismatch", manifest);
         }
 
-        if (!TryReadBoundedString(result, "assemblyMvid", 128, out string coopMvid) ||
-            !DedicatedServerSyntheticArtifactManifestFile.TryNormalizeGuid(coopMvid, out string normalizedCoopMvid) ||
-            !string.Equals(
-                normalizedCoopMvid,
-                manifest.LoadedAssemblies["Coop"].Mvid,
-                StringComparison.Ordinal))
+        if (observed.ContainsKey("Coop"))
+        {
+            if (!TryReadBoundedString(result, "assemblyMvid", 128, out string coopMvid) ||
+                !DedicatedServerSyntheticArtifactManifestFile.TryNormalizeGuid(coopMvid, out string normalizedCoopMvid) ||
+                !string.Equals(normalizedCoopMvid, manifest.LoadedAssemblies["Coop"].Mvid, StringComparison.Ordinal))
+            {
+                return Failed("artifact-coop-mvid-mismatch", manifest);
+            }
+        }
+        else if (!result.TryGetProperty("assemblyMvid", out JsonElement coopMvidElement) ||
+                 coopMvidElement.ValueKind != JsonValueKind.Null)
         {
             return Failed("artifact-coop-mvid-mismatch", manifest);
         }
@@ -657,19 +663,22 @@ public sealed class DedicatedServerSyntheticArtifactVerifier : IDedicatedServerS
     {
         foreach ((string name, DedicatedServerSyntheticAssemblyArtifact expected) in expectedAssemblies)
         {
-            ObservedAssembly actual = observedAssemblies[name];
+            observedAssemblies.TryGetValue(name, out ObservedAssembly? actual);
             string expectedPath = ResolveStagedPath(artifactRootPath, expected.RelativePath);
-            if (!PathsEqual(actual.Location, expectedPath))
+            if (actual != null && !PathsEqual(actual.Location, expectedPath))
             {
                 failureCode = "artifact-loaded-assembly-path-mismatch";
                 return false;
             }
 
+            // Headless and direct-connect servers may leave Coop and Coop.Steam unloaded.
+            string artifactPath = actual?.Location ?? expectedPath;
             DedicatedServerHostAssemblyIdentity diskIdentity =
-                hostArtifactReader.ReadAssemblyIdentity(actual.Location);
-            if (!string.Equals(actual.Version, expected.Version, StringComparison.Ordinal) ||
-                !string.Equals(diskIdentity.Version, expected.Version, StringComparison.Ordinal) ||
-                !string.Equals(actual.Mvid, expected.Mvid, StringComparison.Ordinal))
+                hostArtifactReader.ReadAssemblyIdentity(artifactPath);
+            if (!string.Equals(diskIdentity.Version, expected.Version, StringComparison.Ordinal) ||
+                (actual != null &&
+                 (!string.Equals(actual.Version, expected.Version, StringComparison.Ordinal) ||
+                  !string.Equals(actual.Mvid, expected.Mvid, StringComparison.Ordinal))))
             {
                 failureCode = "artifact-loaded-assembly-metadata-mismatch";
                 return false;
@@ -680,7 +689,7 @@ public sealed class DedicatedServerSyntheticArtifactVerifier : IDedicatedServerS
                 return false;
             }
 
-            string actualHash = hostArtifactReader.ComputeSha256(actual.Location);
+            string actualHash = hostArtifactReader.ComputeSha256(artifactPath);
             if (!string.Equals(actualHash, expected.Sha256, StringComparison.Ordinal))
             {
                 failureCode = "artifact-loaded-assembly-hash-mismatch";
