@@ -581,9 +581,11 @@ internal static class LargeBattleRosterFixtureCommands
     {
         int healthyHeroes = 0;
         bool hasHealthyLeader = false;
+        bool hasHero = false;
         foreach (TroopRosterElement element in snapshot.MemberRoster)
         {
             if (!element.Character.IsHero) continue;
+            hasHero = true;
 
             int healthy = Math.Max(0, element.Number - element.WoundedNumber);
             healthyHeroes += healthy;
@@ -591,16 +593,39 @@ internal static class LargeBattleRosterFixtureCommands
                 hasHealthyLeader = true;
         }
 
-        if (!hasHealthyLeader)
+        return TryGetFixtureTroopCount(
+            snapshot.PartyId,
+            healthyTarget,
+            healthyHeroes,
+            hasHealthyLeader,
+            snapshot.Party.IsBandit,
+            snapshot.Party.LeaderHero != null,
+            hasHero,
+            out fixtureTroops,
+            out error);
+    }
+
+    internal static bool TryGetFixtureTroopCount(
+        string partyId,
+        int healthyTarget,
+        int healthyHeroes,
+        bool hasHealthyLeader,
+        bool isBandit,
+        bool hasLeader,
+        bool hasHero,
+        out int fixtureTroops,
+        out string error)
+    {
+        if (!hasHealthyLeader && !(isBandit && !hasLeader && !hasHero))
         {
             fixtureTroops = 0;
-            error = $"Party {snapshot.PartyId} must have a healthy leader before staging the battle.";
+            error = $"Party {partyId} must have a healthy leader before staging the battle.";
             return false;
         }
         if (healthyHeroes > healthyTarget)
         {
             fixtureTroops = 0;
-            error = $"Party {snapshot.PartyId} has {healthyHeroes} healthy heroes, more than target {healthyTarget}.";
+            error = $"Party {partyId} has {healthyHeroes} healthy heroes, more than target {healthyTarget}.";
             return false;
         }
 
