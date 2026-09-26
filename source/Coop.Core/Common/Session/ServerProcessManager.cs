@@ -54,12 +54,25 @@ public class ServerProcessManager : IDisposable
             CleanupLocked();
 
             var currentProcess = Process.GetCurrentProcess();
-            var exePath = ManagedServerLauncher.GetEngineExecutablePath();
-            var arguments = ServerLaunchArguments.BuildManagedServerArguments(
-                ManagedServerLauncher.GetActiveModuleIds(), saveName, currentProcess.Id, password, visibility);
 
             // The arguments may contain the hosted-server password, so never write them to a log.
-            Logger.Information("Spawning co-op server for save '{SaveName}': {Exe}", saveName, exePath);
+            string arguments;
+            var exePath = ResolveDedicatedServerExecutable();
+            if (exePath != null)
+            {
+                arguments = ServerLaunchArguments.BuildDedicatedServerArguments(
+                    saveName, currentProcess.Id, password, visibility);
+                Logger.Information("Spawning bundled dedicated co-op server for save '{SaveName}': {Exe}",
+                    saveName, exePath);
+            }
+            else
+            {
+                exePath = ManagedServerLauncher.GetEngineExecutablePath();
+                arguments = ServerLaunchArguments.BuildManagedServerArguments(
+                    ManagedServerLauncher.GetActiveModuleIds(), saveName, currentProcess.Id, password, visibility);
+                Logger.Information("Spawning co-op game-instance server for save '{SaveName}': {Exe}",
+                    saveName, exePath);
+            }
 
             var process = new Process
             {
@@ -97,6 +110,25 @@ public class ServerProcessManager : IDisposable
         {
             CleanupLocked();
         }
+    }
+
+    /// <summary>
+    /// The dedicated server bundled with the Coop module, when it is installed and can host
+    /// the active module set; null falls the spawn back to a game-instance server.
+    /// </summary>
+    private static string ResolveDedicatedServerExecutable()
+    {
+        var exePath = ManagedServerLauncher.GetDedicatedServerExecutablePath();
+        if (exePath == null) return null;
+
+        if (!ManagedServerLauncher.CanDedicatedServerHostActiveModules())
+        {
+            Logger.Information(
+                "Dedicated server skipped: the active community modules need a game-instance server");
+            return null;
+        }
+
+        return exePath;
     }
 
     private void OnServerExited(object sender, EventArgs e)
