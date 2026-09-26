@@ -207,6 +207,46 @@ internal class UiDebugCommands
     }
 
 #if DEBUG
+    public sealed class UiOpenScreenCoopCommand : ICoopCommand
+    {
+        public string Prefix => "coop.debug.ui";
+
+        public string Name => "open_screen";
+
+        public string Description => "Opens the character or inventory screen through campaign navigation.";
+
+        public CoopCommandSide Side => CoopCommandSide.Client;
+
+        public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
+        {
+            new ExpectedArgs("screen", "character or inventory", isRequired: true),
+        };
+
+        public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
+        {
+            if (ModInformation.IsServer)
+                return Failed("Run this command on a client.");
+
+            string screen = args[0];
+            if (screen != "character" && screen != "inventory")
+                return Failed("Screen must be character or inventory.");
+
+            if (Campaign.Current == null || !(Game.Current?.GameStateManager?.ActiveState is MapState))
+                return Failed("Return to the campaign map before opening a screen.");
+
+            var navigation = MapScreen.Instance?.NavigationHandler;
+            if (navigation == null)
+                return Failed("Campaign navigation is unavailable.");
+
+            if (screen == "character")
+                navigation.OpenCharacterDeveloper();
+            else
+                navigation.OpenInventory();
+
+            return Succeeded($"Requested {screen} screen.");
+        }
+    }
+
     public sealed class UiMapClickOffsetCoopCommand : ICoopCommand
     {
         public string Prefix => "coop.debug.ui";
