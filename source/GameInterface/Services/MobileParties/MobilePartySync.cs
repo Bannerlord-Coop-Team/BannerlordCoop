@@ -16,7 +16,6 @@ internal class MobilePartySync : IAutoSync
         autoSyncBuilder.AddField(AccessTools.Field(typeof(MobileParty), nameof(MobileParty._disorganizedUntilTime)));
         autoSyncBuilder.AddField(AccessTools.Field(typeof(MobileParty), nameof(MobileParty._doNotAttackMainParty)));
         autoSyncBuilder.AddField(AccessTools.Field(typeof(MobileParty), nameof(MobileParty._customHomeSettlement)));
-        autoSyncBuilder.AddField(AccessTools.Field(typeof(MobileParty), nameof(MobileParty._isDisorganized)));
         autoSyncBuilder.AddField(AccessTools.Field(typeof(MobileParty), nameof(MobileParty._isCurrentlyUsedByAQuest)));
         autoSyncBuilder.AddField(AccessTools.Field(typeof(MobileParty), nameof(MobileParty._ignoredUntilTime)));
         // _besiegerCampResetStarted guards this process's call stack, not replicated campaign state.
