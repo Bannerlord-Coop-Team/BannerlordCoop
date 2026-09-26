@@ -269,8 +269,8 @@ internal static class LargeBattleRosterFixtureCommands
         fixture = activeFixture;
         try
         {
-            SetExactRoster(firstSnapshot, fixtureTroop, firstTroops);
-            SetExactRoster(secondSnapshot, fixtureTroop, secondTroops);
+            SetExactRoster(firstSnapshot.Party.MemberRoster, fixtureTroop, firstTroops);
+            SetExactRoster(secondSnapshot.Party.MemberRoster, fixtureTroop, secondTroops);
         }
         catch (Exception ex)
         {
@@ -638,25 +638,12 @@ internal static class LargeBattleRosterFixtureCommands
         return true;
     }
 
-    private static void SetExactRoster(
-        PartySnapshot snapshot,
+    internal static void SetExactRoster(
+        TroopRoster roster,
         CharacterObject fixtureTroop,
         int fixtureTroops)
     {
-        TroopRoster roster = snapshot.Party.MemberRoster;
-        ClearRoster(roster);
-        foreach (TroopRosterElement element in snapshot.MemberRoster)
-        {
-            if (!element.Character.IsHero) continue;
-
-            roster.AddToCounts(
-                element.Character,
-                element.Number,
-                false,
-                element.WoundedNumber,
-                element.Xp,
-                true);
-        }
+        ClearRoster(roster, preserveHeroes: true);
         if (fixtureTroops > 0)
             roster.AddToCounts(fixtureTroop, fixtureTroops);
     }
@@ -719,11 +706,14 @@ internal static class LargeBattleRosterFixtureCommands
          snapshot.Party.MoveTargetPoint.IsOnLand == snapshot.Behavior.MoveTargetPoint.IsOnLand &&
          snapshot.Party.IsCurrentlyAtSea == snapshot.Behavior.IsCurrentlyAtSea);
 
-    private static void ClearRoster(TroopRoster roster)
+    private static void ClearRoster(TroopRoster roster, bool preserveHeroes = false)
     {
         for (int index = roster.Count - 1; index >= 0; index--)
         {
             TroopRosterElement element = roster.GetElementCopyAtIndex(index);
+            // Removing a hero clears its party leader and role assignments.
+            if (preserveHeroes && element.Character.IsHero) continue;
+
             roster.AddToCountsAtIndex(
                 index,
                 -element.Number,
