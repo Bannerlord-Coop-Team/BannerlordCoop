@@ -80,6 +80,21 @@ evidence, errors, hashes, or replay identity.
 
 ## Artifact and status contract
 
+After canonical preparation verifies both source identities and the deployed files, run
+`VerificationHarness dedicated-server-synthetic-manifest` on the Windows game host before
+starting synthetic clients. Supply `--head`, `--tree`, `--server-head`, `--server-tree`,
+`--build-version`, `--artifact-root`, and a fresh `--output` path. The writer prints the raw file
+SHA-256 to pass to the controller. It reads the actual staged PE versions, MVIDs, and file hashes;
+it does not attest build provenance or running processes on its own.
+
+The `--core-assembly`, `--shim-assembly`, `--starter-assembly`, `--coop-directory`, and
+`--server-executable` arguments are forward-slash paths relative to the artifact root. Dedicated
+assemblies need not share a directory. Pin the Core location from the prepared loader contract
+when duplicate copies exist; the runtime verifier checks the actual loaded location. Attest the
+pipe server process's executable, which may be `engine/dotnet/dotnet.exe`, not the outer launcher.
+The writer refuses existing output, missing files, and paths outside the stage. Linux manifest
+production is not implemented by this Windows writer.
+
 The source-bound build creates `dedicated-server-synthetic-artifacts.v1`; the runtime controller
 only verifies it. The caller supplies the frozen raw manifest hash separately. The manifest binds
 both repositories' head/tree pairs, the co-op build version, stage-relative paths, hashes, assembly

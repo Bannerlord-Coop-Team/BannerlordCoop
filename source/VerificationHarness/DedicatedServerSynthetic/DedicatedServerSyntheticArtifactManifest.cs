@@ -64,6 +64,61 @@ public static class DedicatedServerSyntheticArtifactManifestFile
         "Missions"
     };
 
+    /// <summary>Freezes prepared Windows artifacts before the independent runtime checks.</summary>
+    public static DedicatedServerSyntheticArtifactManifest CreateWindows(
+        string outputPath, string coopHead, string coopTree, string serverHead, string serverTree,
+        string buildVersion, string artifactRoot, string coreAssembly, string shimAssembly,
+        string starterAssembly, string coopDirectory, string serverExecutable)
+    {
+        var manifest = new DedicatedServerSyntheticArtifactManifest
+        {
+            CoopSource = new() { Head = coopHead, Tree = coopTree },
+            DedicatedServerSource = new() { Head = serverHead, Tree = serverTree },
+            BuildVersion = buildVersion,
+            ServerExecutable = new()
+            {
+                RelativePath = serverExecutable,
+                FileName = Path.GetFileName(serverExecutable)
+            }
+        };
+        ValidateSource(manifest.CoopSource);
+        ValidateSource(manifest.DedicatedServerSource);
+        var reader = new DedicatedServerHostArtifactReader();
+        string Resolve(string relativePath)
+        {
+            if (!IsSafeRelativePath(relativePath))
+                throw new InvalidDataException("Artifact paths must be relative to the prepared stage.");
+            return Path.Combine(Path.GetFullPath(artifactRoot), relativePath.Replace('/', Path.DirectorySeparatorChar));
+        }
+        DedicatedServerSyntheticAssemblyArtifact ReadAssembly(string relativePath)
+        {
+            string path = Resolve(relativePath);
+            DedicatedServerHostAssemblyIdentity identity = reader.ReadAssemblyIdentity(path);
+            return new()
+            {
+                RelativePath = relativePath,
+                Version = identity.Version,
+                Mvid = identity.Mvid,
+                Sha256 = reader.ComputeSha256(path)
+            };
+        }
+        manifest.ServerExecutable.Sha256 = reader.ComputeSha256(Resolve(serverExecutable));
+        manifest.DedicatedServerAssemblies.Add("DedicatedServer.Core", ReadAssembly(coreAssembly));
+        manifest.DedicatedServerAssemblies.Add("DedicatedServer.Windows", ReadAssembly(shimAssembly));
+        manifest.DedicatedServerAssemblies.Add("TaleWorlds.Starter.DotNetCore", ReadAssembly(starterAssembly));
+        foreach (string name in RequiredAssemblyNames)
+            manifest.LoadedAssemblies.Add(name, ReadAssembly(coopDirectory + "/" + name + ".dll"));
+        RefreshDigests(manifest);
+        ValidateShape(manifest);
+
+        // Never overwrite the manifest frozen for an earlier run.
+        byte[] bytes = JsonSerializer.SerializeToUtf8Bytes(manifest, DedicatedServerSyntheticJson.Options);
+        using var output = new FileStream(outputPath, FileMode.CreateNew, FileAccess.Write, FileShare.None);
+        output.Write(bytes);
+        output.Flush(flushToDisk: true);
+        return manifest;
+    }
+
     public static DedicatedServerSyntheticArtifactManifest LoadAndVerify(
         string path,
         string expectedCoopHead,

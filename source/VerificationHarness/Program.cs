@@ -55,6 +55,11 @@ public static class Program
                     CancellationToken.None);
             }
 
+            if (string.Equals(args[0], "dedicated-server-synthetic-manifest", StringComparison.Ordinal))
+            {
+                return RunDedicatedServerSyntheticManifest(args.Skip(1).ToArray());
+            }
+
             if (string.Equals(args[0], "dedicated-server-synthetic", StringComparison.Ordinal))
             {
                 return await new DedicatedServerSyntheticController().RunAsync(
@@ -217,12 +222,33 @@ public static class Program
         return 0;
     }
 
+    private static int RunDedicatedServerSyntheticManifest(string[] args)
+    {
+        string[] expected = { "--artifact-root", "--build-version", "--coop-directory", "--core-assembly", "--head", "--output",
+            "--server-executable", "--server-head", "--server-tree", "--shim-assembly", "--starter-assembly", "--tree" };
+        if (args.Length != expected.Length * 2)
+            throw new ArgumentException("The dedicated-server-synthetic-manifest command requires twelve option/value pairs.");
+        var values = new Dictionary<string, string>(StringComparer.Ordinal);
+        for (int index = 0; index < args.Length; index += 2)
+            if (!values.TryAdd(args[index], args[index + 1]))
+                throw new ArgumentException($"Duplicate manifest option: {args[index]}.");
+        if (!values.Keys.OrderBy(value => value, StringComparer.Ordinal).SequenceEqual(expected, StringComparer.Ordinal))
+            throw new ArgumentException("Unknown dedicated-server-synthetic-manifest option.");
+        DedicatedServerSyntheticArtifactManifestFile.CreateWindows(
+            values["--output"], values["--head"], values["--tree"], values["--server-head"], values["--server-tree"],
+            values["--build-version"], values["--artifact-root"], values["--core-assembly"], values["--shim-assembly"],
+            values["--starter-assembly"], values["--coop-directory"], values["--server-executable"]);
+        Console.WriteLine(DedicatedServerSyntheticArtifactManifestFile.Sha256File(values["--output"]));
+        return 0;
+    }
+
     private static void WriteUsage()
     {
         Console.Error.WriteLine("Usage:");
         Console.Error.WriteLine("  VerificationHarness plan --head <40-hex> --tree <40-hex> <repository-path> [repository-path ...]");
         Console.Error.WriteLine("  VerificationHarness plan --head <40-hex> --tree <40-hex> --stdin");
         Console.Error.WriteLine("  VerificationHarness validate-plan --plan <json-path> --head <40-hex> --tree <40-hex> --base <40-hex> --changed-paths <newline-list-path> --output <json-path>");
+        Console.Error.WriteLine("  VerificationHarness dedicated-server-synthetic-manifest --head <40-hex> --tree <40-hex> --server-head <40-hex> --server-tree <40-hex> --build-version <version> --artifact-root <stage> --core-assembly <relative-file> --shim-assembly <relative-file> --starter-assembly <relative-file> --coop-directory <relative-dir> --server-executable <relative-file> --output <new-json-path>");
         Console.Error.WriteLine("  VerificationHarness process-peer-manifest --head <40-hex> --tree <40-hex> --output <json-path>");
         Console.Error.WriteLine("  VerificationHarness process-peer --head <40-hex> --tree <40-hex> --artifact-manifest <json-path> [--scenario converge|diverge|reconnect|malformed|out-of-sequence|corrupt-acknowledgement|timeout] [--timeout-ms <milliseconds>] [--seed <non-negative-decimal|0x16-hex>] [--output <json-path>]");
         Console.Error.WriteLine("  VerificationHarness process-peer-suite --head <40-hex> --tree <40-hex> --artifact-manifest <json-path> [--timeout-ms <milliseconds>] [--seed <non-negative-decimal|0x16-hex>] [--output <json-path>]");

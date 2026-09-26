@@ -12,6 +12,80 @@ public sealed class DedicatedServerSyntheticArtifactManifestTests
         "dedicated-server-synthetic-test-stage");
 
     [Fact]
+    public void CreateWindows_FreezesFilesAtTheirActualStagePaths()
+    {
+        using var stage = new PreparedManifestStage();
+        DedicatedServerSyntheticArtifactManifest manifest = stage.Create();
+        DedicatedServerSyntheticArtifactManifest verified = DedicatedServerSyntheticArtifactManifestFile.LoadAndVerify(
+            stage.Output, new string('a', 40), new string('b', 40), new string('c', 40), new string('d', 40),
+            DedicatedServerSyntheticArtifactManifestFile.Sha256File(stage.Output));
+
+        Assert.Equal(manifest.ManifestDigest, verified.ManifestDigest);
+        Assert.Equal("engine/bin/DedicatedServer.Core.dll", verified.DedicatedServerAssemblies["DedicatedServer.Core"].RelativePath);
+        Assert.Equal("engine/module/DedicatedServer.Windows.dll", verified.DedicatedServerAssemblies["DedicatedServer.Windows"].RelativePath);
+        Assert.Equal("engine/dotnet/dotnet.exe", verified.ServerExecutable.RelativePath);
+        var reader = new DedicatedServerHostArtifactReader();
+        string assemblyPath = Path.Combine(stage.Root, "coop/Common.dll");
+        Assert.Equal(reader.ReadAssemblyIdentity(assemblyPath).Mvid, verified.LoadedAssemblies["Common"].Mvid);
+        Assert.Equal(reader.ComputeSha256(assemblyPath), verified.LoadedAssemblies["Common"].Sha256);
+    }
+
+    [Fact]
+    public void CreateWindows_DoesNotReplaceAFrozenManifest()
+    {
+        using var stage = new PreparedManifestStage();
+        stage.Create();
+        byte[] original = File.ReadAllBytes(stage.Output);
+        Assert.Throws<IOException>(() => stage.Create());
+        Assert.Equal(original, File.ReadAllBytes(stage.Output));
+    }
+
+    [Fact]
+    public void CreateWindows_RejectsMissingArtifactsBeforePublication()
+    {
+        using var stage = new PreparedManifestStage();
+        File.Delete(Path.Combine(stage.Root, "coop/Common.dll"));
+        Assert.Throws<InvalidDataException>(() => stage.Create());
+        Assert.False(File.Exists(stage.Output));
+    }
+
+    [Fact]
+    public void CreateWindows_RejectsPathsOutsideTheStage()
+    {
+        using var stage = new PreparedManifestStage();
+        Assert.Throws<InvalidDataException>(() => stage.Create("../core.dll"));
+        Assert.False(File.Exists(stage.Output));
+    }
+
+    private sealed class PreparedManifestStage : IDisposable
+    {
+        public string Root { get; } = Path.Combine(Path.GetTempPath(), "synthetic-manifest-" + Guid.NewGuid().ToString("N"));
+        public string Output => Path.Combine(Root, "manifest.json");
+
+        public PreparedManifestStage()
+        {
+            // Real PE metadata exercises file freezing; this fixture does not simulate a running server.
+            foreach (string relative in DedicatedServerSyntheticArtifactManifestFile.RequiredAssemblyNames
+                .Select(name => "coop/" + name + ".dll")
+                .Concat(new[] { "engine/bin/DedicatedServer.Core.dll", "engine/module/DedicatedServer.Windows.dll",
+                    "engine/bin/TaleWorlds.Starter.DotNetCore.dll", "engine/dotnet/dotnet.exe" }))
+            {
+                string path = Path.Combine(Root, relative);
+                Directory.CreateDirectory(Path.GetDirectoryName(path)!);
+                File.Copy(typeof(DedicatedServerSyntheticArtifactManifest).Assembly.Location, path);
+            }
+        }
+
+        public DedicatedServerSyntheticArtifactManifest Create(string core = "engine/bin/DedicatedServer.Core.dll") =>
+            DedicatedServerSyntheticArtifactManifestFile.CreateWindows(Output,
+                new string('a', 40), new string('b', 40), new string('c', 40), new string('d', 40),
+                "0.1.3+" + new string('a', 40), Root, core, "engine/module/DedicatedServer.Windows.dll",
+                "engine/bin/TaleWorlds.Starter.DotNetCore.dll", "coop", "engine/dotnet/dotnet.exe");
+
+        public void Dispose() => Directory.Delete(Root, recursive: true);
+    }
+
+    [Fact]
     public void LoadAndVerify_RejectsSourceRelabeling()
     {
         string path = WriteManifest(CreateManifest());
