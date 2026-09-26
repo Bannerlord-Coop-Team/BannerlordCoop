@@ -104,7 +104,7 @@ public class LargeBattleRosterFixtureCommandsTests
 
         LargeBattleRosterFixtureCommands.SetExactRoster(roster, fixtureTroop, 7);
 
-        Assert.Single(roster);
+        Assert.Equal(1, roster.Count);
         Assert.False(roster.Contains(oldTroop));
         Assert.Equal(7, roster.GetElementNumber(fixtureTroop));
         Assert.Equal(7, roster.TotalHealthyCount);
