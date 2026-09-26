@@ -80,6 +80,12 @@ internal class ServerSiegeBreakOutHandler : IHandler
                     try
                     {
                         var parties = party.Army?.LeaderParty == party ? party.Army.Parties.ToArray() : new[] { party };
+                        int losses = breakOut.GetRequiredCasualties(party);
+                        if (losses > parties.Sum(member => member.MemberRoster.TotalRegulars))
+                        {
+                            network.Send(peer, result);
+                            return;
+                        }
                         foreach (var member in parties)
                         {
                             if (!objectManager.TryGetHandleWithLogging(member.MemberRoster, out _))
@@ -88,10 +94,10 @@ internal class ServerSiegeBreakOutHandler : IHandler
                                 if (element.Character.IsRegular && !objectManager.TryGetHandleWithLogging(element.Character, out _))
                                     throw new InvalidOperationException("Breakout troop is not registered");
                         }
-                        // Cache only once mutation can begin; missing registrations may recover on retry.
+                        // Cache only once mutation can begin; affordability and registrations may recover on retry.
                         receipt = new Receipt { Siege = siege, Result = result };
                         receipts[party] = receipt;
-                        var casualties = breakOut.ApplySacrifice(party, out var armyCasualties);
+                        var casualties = breakOut.ApplySacrifice(party, losses, out var armyCasualties);
                         var elements = casualties.GetTroopRoster();
                         var ids = new uint[elements.Count];
                         var counts = new int[elements.Count];

@@ -15,6 +15,7 @@ using LiteNetLib;
 using Moq;
 using System;
 using System.Linq;
+using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Roster;
 using TaleWorlds.CampaignSystem.Settlements;
@@ -58,7 +59,7 @@ public class ServerSiegeBreakOutHandlerTests : IDisposable
         uint rosterId = 4;
         objects.Setup(manager => manager.TryGetHandleWithLogging(roster, out rosterId)).Returns(true);
         int armyLosses = -1;
-        action.Setup(service => service.ApplySacrifice(party, out armyLosses)).Returns(TroopRoster.CreateDummyTroopRoster());
+        action.Setup(service => service.ApplySacrifice(party, It.IsAny<int>(), out armyLosses)).Returns(TroopRoster.CreateDummyTroopRoster());
         handler = new ServerSiegeBreakOutHandler(broker, network, objects.Object, players.Object, action.Object);
     }
 
@@ -70,7 +71,81 @@ public class ServerSiegeBreakOutHandlerTests : IDisposable
         Send("retry");
         Assert.Equal(new[] { "first", "first", "retry" }, Results().Select(result => result.RequestId));
         Assert.All(Results(), result => Assert.True(result.Approved));
-        action.Verify(service => service.ApplySacrifice(party, out It.Ref<int>.IsAny), Times.Once);
+        action.Verify(service => service.ApplySacrifice(party, It.IsAny<int>(), out It.Ref<int>.IsAny), Times.Once);
+    }
+
+    [Theory]
+    [InlineData(0)]
+    [InlineData(4)]
+    public void InsufficientTroops_RejectsWithoutSacrifice(int available)
+    {
+        var troop = AddRegularTroops(available);
+        action.Setup(service => service.GetRequiredCasualties(party)).Returns(5);
+
+        Send("insufficient");
+
+        Assert.False(Assert.Single(Results()).Approved);
+        Assert.Equal(available, party.MemberRoster.GetTroopCount(troop));
+        action.Verify(service => service.ApplySacrifice(party, It.IsAny<int>(), out It.Ref<int>.IsAny), Times.Never);
+    }
+
+    [Fact]
+    public void ExactlySufficientTroops_ChargesRequiredCountOnceForDuplicateRequests()
+    {
+        var troop = AddRegularTroops(5);
+        SetRequiredSacrifice(troop, 5);
+
+        Send("first");
+        Send("first");
+        Send("duplicate");
+
+        Assert.Equal(3, Results().Length);
+        Assert.All(Results(), result => Assert.True(result.Approved));
+        Assert.Equal(0, party.MemberRoster.TotalRegulars);
+        action.Verify(service => service.GetRequiredCasualties(party), Times.Once);
+        action.Verify(service => service.ApplySacrifice(party, 5, out It.Ref<int>.IsAny), Times.Once);
+    }
+
+    [Fact]
+    public void InsufficientTroops_CanRetrySameRequestAfterReplenishment()
+    {
+        var troop = AddRegularTroops(4);
+        SetRequiredSacrifice(troop, 5);
+        Send("retry");
+        Assert.False(Assert.Single(Results()).Approved);
+        Assert.Equal(4, party.MemberRoster.TotalRegulars);
+
+        party.MemberRoster.AddToCounts(troop, 1);
+        Send("retry");
+        Send("duplicate");
+
+        Assert.Equal(new[] { false, true, true }, Results().Select(result => result.Approved));
+        Assert.Equal(0, party.MemberRoster.TotalRegulars);
+        action.Verify(service => service.GetRequiredCasualties(party), Times.Exactly(2));
+        action.Verify(service => service.ApplySacrifice(party, 5, out It.Ref<int>.IsAny), Times.Once);
+    }
+
+    private CharacterObject AddRegularTroops(int count)
+    {
+        var troop = ObjectHelper.SkipConstructor<CharacterObject>();
+        party.MemberRoster.AddToCounts(troop, count);
+        uint id = 5;
+        objects.Setup(manager => manager.TryGetHandleWithLogging(troop, out id)).Returns(true);
+        return troop;
+    }
+
+    private void SetRequiredSacrifice(CharacterObject troop, int losses)
+    {
+        action.Setup(service => service.GetRequiredCasualties(party)).Returns(losses);
+        action.Setup(service => service.ApplySacrifice(party, losses, out It.Ref<int>.IsAny))
+            .Returns((MobileParty current, int required, out int armyLosses) =>
+            {
+                armyLosses = -1;
+                current.MemberRoster.AddToCounts(troop, -required);
+                var casualties = TroopRoster.CreateDummyTroopRoster();
+                casualties.AddToCounts(troop, required);
+                return casualties;
+            });
     }
 
     [Fact]
@@ -80,7 +155,7 @@ public class ServerSiegeBreakOutHandlerTests : IDisposable
         GameThread.Run(() => broker.Publish(this, new PartyEnterSettlementAttempted(settlement, party)), blocking: true);
         Send("second-stay");
         Assert.All(Results(), result => Assert.True(result.Approved));
-        action.Verify(service => service.ApplySacrifice(party, out It.Ref<int>.IsAny), Times.Exactly(2));
+        action.Verify(service => service.ApplySacrifice(party, It.IsAny<int>(), out It.Ref<int>.IsAny), Times.Exactly(2));
     }
 
     [Fact]
@@ -107,7 +182,7 @@ public class ServerSiegeBreakOutHandlerTests : IDisposable
         AccessTools.Field(typeof(MobileParty), "_currentSettlement").SetValue(party, null);
         Send("stale");
         Assert.False(Assert.Single(Results()).Approved);
-        action.Verify(service => service.ApplySacrifice(It.IsAny<MobileParty>(), out It.Ref<int>.IsAny), Times.Never);
+        action.Verify(service => service.ApplySacrifice(It.IsAny<MobileParty>(), It.IsAny<int>(), out It.Ref<int>.IsAny), Times.Never);
     }
 
     [Fact]
@@ -117,7 +192,7 @@ public class ServerSiegeBreakOutHandlerTests : IDisposable
         objects.Setup(manager => manager.TryGetObject("party", out other)).Returns(true);
         Send("other-owner");
         Assert.False(Assert.Single(Results()).Approved);
-        action.Verify(service => service.ApplySacrifice(It.IsAny<MobileParty>(), out It.Ref<int>.IsAny), Times.Never);
+        action.Verify(service => service.ApplySacrifice(It.IsAny<MobileParty>(), It.IsAny<int>(), out It.Ref<int>.IsAny), Times.Never);
     }
 
     [Fact]
@@ -127,7 +202,7 @@ public class ServerSiegeBreakOutHandlerTests : IDisposable
             settlement, ObjectHelper.SkipConstructor<SiegeEvent>());
         Send("old-siege");
         Assert.False(Assert.Single(Results()).Approved);
-        action.Verify(service => service.ApplySacrifice(It.IsAny<MobileParty>(), out It.Ref<int>.IsAny), Times.Never);
+        action.Verify(service => service.ApplySacrifice(It.IsAny<MobileParty>(), It.IsAny<int>(), out It.Ref<int>.IsAny), Times.Never);
     }
 
     [Fact]
@@ -137,24 +212,24 @@ public class ServerSiegeBreakOutHandlerTests : IDisposable
         objects.Setup(manager => manager.TryGetHandleWithLogging(party.MemberRoster, out rosterId)).Returns(false);
         Send("missing-roster");
         Assert.False(Assert.Single(Results()).Approved);
-        action.Verify(service => service.ApplySacrifice(party, out It.Ref<int>.IsAny), Times.Never);
+        action.Verify(service => service.ApplySacrifice(party, It.IsAny<int>(), out It.Ref<int>.IsAny), Times.Never);
 
         objects.Setup(manager => manager.TryGetHandleWithLogging(party.MemberRoster, out rosterId)).Returns(true);
         Send("registered-roster");
         Send("duplicate");
         Assert.Equal(new[] { false, true, true }, Results().Select(result => result.Approved));
-        action.Verify(service => service.ApplySacrifice(party, out It.Ref<int>.IsAny), Times.Once);
+        action.Verify(service => service.ApplySacrifice(party, It.IsAny<int>(), out It.Ref<int>.IsAny), Times.Once);
     }
 
     [Fact]
     public void SacrificeFailure_IsRetainedAndNotRepeated()
     {
-        action.Setup(service => service.ApplySacrifice(party, out It.Ref<int>.IsAny))
+        action.Setup(service => service.ApplySacrifice(party, It.IsAny<int>(), out It.Ref<int>.IsAny))
             .Throws(new InvalidOperationException("partial sacrifice"));
         Send("first");
         Send("retry");
         Assert.All(Results(), result => Assert.False(result.Approved));
-        action.Verify(service => service.ApplySacrifice(party, out It.Ref<int>.IsAny), Times.Once);
+        action.Verify(service => service.ApplySacrifice(party, It.IsAny<int>(), out It.Ref<int>.IsAny), Times.Once);
     }
 
     private void Send(string requestId)

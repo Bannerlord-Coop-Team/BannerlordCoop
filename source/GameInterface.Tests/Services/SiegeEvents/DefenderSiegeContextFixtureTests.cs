@@ -665,6 +665,7 @@ public class DefenderSiegeContextFixtureTests
             if (Campaign.Current == null) Campaign.Current = ObjectHelper.SkipConstructor<Campaign>();
             Write("campaign", Campaign.Current);
             Settlement.Town._ownerClan = visitor.ActualClan;
+            Settlement.SettlementComponent = Settlement.Town;
             CapturedBesieger.NavigationTransitionStartTime = CampaignTime.Zero;
             CapturedBesieger._attachedParties = new MBList<MobileParty>();
             return visitor;

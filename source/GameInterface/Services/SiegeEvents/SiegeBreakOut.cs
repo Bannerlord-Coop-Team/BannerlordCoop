@@ -17,7 +17,8 @@ namespace GameInterface.Services.SiegeEvents;
 
 public interface ISiegeBreakOut
 {
-    TroopRoster ApplySacrifice(MobileParty party, out int armyCasualties);
+    int GetRequiredCasualties(MobileParty party);
+    TroopRoster ApplySacrifice(MobileParty party, int losses, out int armyCasualties);
     void ShowDebrief(TroopRoster casualties, int armyCasualties);
     void Continue();
     void ProtectAfterLeave(MobileParty party, Settlement settlement);
@@ -25,7 +26,11 @@ public interface ISiegeBreakOut
 
 public class SiegeBreakOut : ISiegeBreakOut
 {
-    public TroopRoster ApplySacrifice(MobileParty party, out int armyCasualties)
+    public int GetRequiredCasualties(MobileParty party) => Math.Max(0,
+        Campaign.Current.Models.TroopSacrificeModel.GetLostTroopCountForBreakingOutOfBesiegedSettlement(
+            party, party.CurrentSettlement.SiegeEvent, false).RoundedResultNumber);
+
+    public TroopRoster ApplySacrifice(MobileParty party, int losses, out int armyCasualties)
     {
         var casualties = TroopRoster.CreateDummyTroopRoster();
         var army = party.Army;
@@ -33,10 +38,7 @@ public class SiegeBreakOut : ISiegeBreakOut
         armyCasualties = leadsArmy ? 0 : -1;
         var parties = leadsArmy ? army.Parties.ToArray() : new[] { party };
         var model = Campaign.Current.Models.TroopSacrificeModel;
-        int losses = model.GetLostTroopCountForBreakingOutOfBesiegedSettlement(
-            party, party.CurrentSettlement.SiegeEvent, false).RoundedResultNumber;
         int available = parties.Sum(member => member.MemberRoster.TotalRegulars);
-        losses = Math.Min(Math.Max(0, losses), available);
 
         // The server selects the sacrificed troops once; normal roster patches replicate the losses.
         for (int loss = 0; loss < losses; loss++)
