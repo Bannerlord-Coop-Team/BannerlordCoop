@@ -55,6 +55,11 @@ public static class Program
                     CancellationToken.None);
             }
 
+            if (string.Equals(args[0], "dedicated-server-synthetic-manifest", StringComparison.Ordinal))
+            {
+                return await RunDedicatedServerManifest(args.Skip(1).ToArray());
+            }
+
             if (string.Equals(args[0], "dedicated-server-synthetic", StringComparison.Ordinal))
             {
                 return await new DedicatedServerSyntheticController().RunAsync(
@@ -217,9 +222,29 @@ public static class Program
         return 0;
     }
 
+    private static async Task<int> RunDedicatedServerManifest(string[] args)
+    {
+        string[] expected = { "--artifact-root", "--build-stamp", "--build-stamp-sha256", "--head", "--output", "--server-head", "--server-tree", "--tree" };
+        if (args.Length != expected.Length * 2)
+            throw new ArgumentException("The dedicated-server manifest command requires the prepared build stamp, frozen stamp hash, staged root, both source identities, and output.");
+        var values = new Dictionary<string, string>(StringComparer.Ordinal);
+        for (int index = 0; index < args.Length; index += 2)
+        {
+            if (!values.TryAdd(args[index], args[index + 1]))
+                throw new ArgumentException("Duplicate dedicated-server manifest option.");
+        }
+        if (!values.Keys.OrderBy(item => item, StringComparer.Ordinal).SequenceEqual(expected, StringComparer.Ordinal))
+            throw new ArgumentException("Unknown dedicated-server manifest option.");
+        await DedicatedServerSyntheticArtifactManifestFile.CreatePreparedWindowsAsync(
+            values["--build-stamp"], values["--build-stamp-sha256"], values["--artifact-root"],
+            values["--head"], values["--tree"], values["--server-head"], values["--server-tree"], values["--output"]);
+        return 0;
+    }
+
     private static void WriteUsage()
     {
         Console.Error.WriteLine("Usage:");
+        Console.Error.WriteLine("  VerificationHarness dedicated-server-synthetic-manifest --build-stamp <path> --build-stamp-sha256 <sha256> --artifact-root <stage> --head <40-hex> --tree <40-hex> --server-head <40-hex> --server-tree <40-hex> --output <path>");
         Console.Error.WriteLine("  VerificationHarness plan --head <40-hex> --tree <40-hex> <repository-path> [repository-path ...]");
         Console.Error.WriteLine("  VerificationHarness plan --head <40-hex> --tree <40-hex> --stdin");
         Console.Error.WriteLine("  VerificationHarness validate-plan --plan <json-path> --head <40-hex> --tree <40-hex> --base <40-hex> --changed-paths <newline-list-path> --output <json-path>");
