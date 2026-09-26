@@ -316,6 +316,8 @@ public class GangLeaderNeedsToOffloadStolenGoodsIssueTests : IDisposable
                 settlement.Town.Security = 50f;
                 settlement.CollectNotablesToCache();
                 RegisterHideoutWithCampaign(hideout.Hideout);
+                Campaign.Current.CampaignObjectManager.Settlements =
+                    new MBList<Settlement>(Campaign.Current.CampaignObjectManager.Settlements) { hideout };
             }
 
             var args = new CoopCommandArgsFactory().FromValues(new[] { fixture.HeroId });
