@@ -68,14 +68,15 @@ public class CombatHitPresentationHandler : ICombatHitPresentationHandler
             return;
         }
 
-        string excludedController = null;
-        if (TryResolveIdentity(sound.AlreadyPlayedBy, out Guid attackerId, out _) &&
+        string excludedController = BattleSpawnGate.RoutedBlowSourceControllerId;
+        if (excludedController == null &&
+            TryResolveIdentity(sound.AlreadyPlayedBy, out Guid attackerId, out _) &&
             agentRegistry.TryGetAgentInfo(attackerId, out CoopAgentInfo attackerInfo))
         {
             excludedController = attackerInfo.CurrentAuthority;
         }
 
-        // The attacking peer already played a suppressed puppet hit locally.
+        // A routed horse collision can originate on a peer that does not own the horse.
         network.SendAllBut(excludedController, new NetworkAgentHitSound(
             victimId, isMount, sound.SoundIndex, sound.Position, sound.ArmorType));
     }

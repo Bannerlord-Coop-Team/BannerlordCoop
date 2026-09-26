@@ -10,6 +10,9 @@ using Missions;
 using Missions.Agents.Handlers;
 using Missions.Agents.Messages;
 using Missions.Agents.Patches;
+using Missions.Battles;
+using Missions.Messages;
+using System.Reflection;
 using TaleWorlds.Core;
 using TaleWorlds.Engine;
 using TaleWorlds.Library;
@@ -87,6 +90,89 @@ public class AgentHitSoundTests : MissionTestEnvironment
         finally
         {
             foreach (var handler in handlers) handler.Dispose();
+            BattleSpawnGate.EndBattle();
+        }
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void RoutedHorseCollision_ExcludesTheSourcePeerRegardlessOfHorseAuthority(bool sourceOwnsHorse)
+    {
+        using var fixture = new MissionEngineFixture();
+        using var sounds = new SoundRecorder();
+        var clients = Clients.ToArray();
+        var missions = new MockMission[3];
+        var attackers = new Agent[3];
+        var victims = new Agent[3];
+        var controllers = new CoopBattleController[3];
+        Guid victimId = Guid.NewGuid();
+        Guid horseId = Guid.NewGuid();
+        var position = new Vec3(4f, 5f, 6f);
+        BattleSpawnGate.BeginBattle("routed-hit-sound-test");
+        try
+        {
+            for (int i = 0; i < clients.Length; i++)
+            {
+                int index = i;
+                SetControllerId(clients[i], "peer-" + i);
+                clients[i].Call(() =>
+                {
+                    var mission = CreateConnectedMission(fixture, clients[index], "routed-hit-sound-test");
+                    missions[index] = mission;
+                    controllers[index] = clients[index].Resolve<CoopBattleController>();
+                    var registry = clients[index].Resolve<INetworkAgentRegistry>();
+                    Agent rider = mission.SpawnAgent(new AgentBuildData(Game.Current.PlayerTroop));
+                    attackers[index] = mission.SpawnMount(rider);
+                    victims[index] = mission.SpawnAgent(new AgentBuildData(Game.Current.PlayerTroop)
+                        .Controller(index == 0 ? AgentControllerType.AI : AgentControllerType.None));
+                    Assert.True(registry.TryRegisterAgent(sourceOwnsHorse ? "peer-1" : "peer-0", horseId, attackers[index]));
+                    Assert.True(registry.TryRegisterAgent("peer-0", victimId, victims[index]));
+                    // The native-blow seam models HandleBlow's sound before damage is applied.
+                    mission.RegisteredBlow = (victim, blow) =>
+                    {
+                        var parameter = new SoundEventParameter("Armor Type", 0.1f);
+                        mission.Shell.MakeSound(258, blow.GlobalPosition, false, true,
+                            blow.OwnerId, victim.Index, ref parameter);
+                    };
+                });
+            }
+
+            clients[1].Call(() =>
+            {
+                var parameter = new SoundEventParameter("Armor Type", 0.1f);
+                missions[1].Shell.MakeSound(258, position, false, true,
+                    attackers[1].Index, victims[1].Index, ref parameter);
+                var blow = new Blow(attackers[1].Index)
+                {
+                    InflictedDamage = 1,
+                    GlobalPosition = position,
+                    DamageType = DamageTypes.Blunt,
+                };
+                blow.WeaponRecord.AffectorWeaponSlotOrMissileIndex = -1;
+                clients[1].Resolve<IMessageBroker>().Publish(this,
+                    new BattlePuppetHit(victims[1], attackers[1], blow, default));
+                var field = typeof(CoopBattleController).GetField("damageRouter", BindingFlags.Instance | BindingFlags.NonPublic);
+                Assert.IsAssignableFrom<IBattleDamageRouter>(field.GetValue(controllers[1])).Tick(0.016f);
+            });
+
+            var routed = Assert.Single(clients[1].Resolve<MockBattleNetwork>().NetworkSentMessages
+                .OfType<NetworkApplyBattleDamage>());
+            Assert.Equal("peer-1", routed.SourceControllerId);
+            Assert.Equal(3, sounds.Calls.Count);
+            foreach (var mission in missions)
+                Assert.Single(sounds.Calls, call => call.Mission == mission.Shell);
+            Assert.DoesNotContain(sounds.Calls,
+                call => call.Mission == missions[1].Shell && call.AttackerIndex == -1);
+            Assert.Contains(sounds.Calls,
+                call => call.Mission == missions[2].Shell && call.AttackerIndex == -1 && call.VictimIndex == -1);
+            Assert.True(AgentMirror.TryGet(victims[0], out var victimMirror));
+            Assert.Equal(99f, victimMirror.Health);
+            Assert.Null(BattleSpawnGate.RoutedBlowSourceControllerId);
+        }
+        finally
+        {
+            foreach (var controller in controllers) controller?.Dispose();
             BattleSpawnGate.EndBattle();
         }
     }

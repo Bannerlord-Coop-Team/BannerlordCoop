@@ -16,7 +16,7 @@ namespace Missions.Diagnostics;
 
 internal static class AgentHitSoundDiagnostics
 {
-    private const int MaximumEvents = 128;
+    private const int MaximumEvents = 512;
     private static readonly object Gate = new object();
     private static readonly List<object> Events = new List<object>();
     private static Mission observedMission;
@@ -80,6 +80,7 @@ internal static class AgentHitSoundDiagnostics
             attackerId = AgentId(registry, attacker),
             victimIndex = victim.Index,
             attackerIndex = blow.OwnerId,
+            sourceControllerId = BattleSpawnGate.RoutedBlowSourceControllerId,
             damage = blow.InflictedDamage,
             blockedWithShield = collisionData.AttackBlockedWithShield,
             missile = blow.IsMissile,
