@@ -153,5 +153,4 @@ public class MobilePartyDisorganizationTests : SyncTestBase
                 Assert.Equal(party.GetVersionNoForBaseSpeedCalculation(), party._partyPureSpeedLastCheckVersion);
             });
     }
-
 }
