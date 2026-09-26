@@ -35,6 +35,7 @@ using GameInterface.Services.Players;
 using GameInterface.Services.Players.Data;
 using GameInterface.Services.Save.Interfaces;
 using GameInterface.Services.Settlements.Interfaces;
+using GameInterface.Services.SiegeEvents;
 using GameInterface.Services.SiegeEvents.Interfaces;
 using GameInterface.Services.Time.Interfaces;
 using GameInterface.Services.TroopRosters.Interfaces;
@@ -127,7 +128,7 @@ internal abstract class TestComponentBase
         RegisterMock<IGameStateInterface>(builder);
         RegisterMock<ISettlementInterface>(builder);
         RegisterMock<ISiegeEventInterface>(builder);
-        RegisterMock<GameInterface.Services.SiegeEvents.ISiegeBreakOut>(builder);
+        RegisterMock<ISiegeBreakOut>(builder);
         RegisterMock<IAttachmentIdMapper>(builder);
         RegisterMock<IAutoRegistryFactory>(builder);
         RegisterMock<IBattleTroopReserveBuilder>(builder);
