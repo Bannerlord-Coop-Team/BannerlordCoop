@@ -1,4 +1,6 @@
-﻿using E2E.Tests.Util;
+﻿using Common.Commands;
+using E2E.Tests.Util;
+using GameInterface.Services.MobileParties.Commands;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Party;
 using Xunit.Abstractions;
@@ -109,4 +111,47 @@ public class MobilePartyDisorganizationTests : SyncTestBase
                 Assert.Equal(expectedExpiry, party._disorganizedUntilTime);
             });
     }
+
+    [Fact]
+    public void DebugCommands_UseAuthoritativeActionAndObserveWithoutChangingCache()
+    {
+        var partyId = TestEnvironment.CreateRegisteredObject<MobileParty>();
+        TestEnvironment.FlushCoalescer();
+        var args = new CoopCommandArgsFactory();
+        Server.Call(() =>
+        {
+            var set = new MobilePartyDebugCommand.SetDisorganizedCoopCommand(Server.ObjectManager);
+            Assert.False(set.ProcessCommand(args.FromValues(new[] { partyId, "invalid" })).Succeeded);
+            Assert.False(set.ProcessCommand(args.FromValues(new[] { "missing-party", "true" })).Succeeded);
+            Assert.True(set.ProcessCommand(args.FromValues(new[] { partyId, "true" })).Succeeded);
+        });
+        TestEnvironment.FlushCoalescer();
+        foreach (var client in Clients)
+            client.Call(() =>
+            {
+                Assert.True(client.ObjectManager.TryGetObject<MobileParty>(partyId, out var party));
+                Assert.True(party.IsDisorganized);
+                var version = party.VersionNo;
+                var cachedVersion = party._partyPureSpeedLastCheckVersion;
+                var inspect = new MobilePartyDebugCommand.DisorganizationCacheCoopCommand(client.ObjectManager);
+                var result = inspect.ProcessCommand(args.FromValues(new[] { partyId, "false" }));
+                Assert.True(result.Succeeded);
+                Assert.Contains("IsDisorganized=True", result.Output);
+                Assert.Contains($"DerivedVersion={party.GetVersionNoForBaseSpeedCalculation()} ", result.Output);
+                Assert.Contains($"CacheVersion={cachedVersion} ", result.Output);
+                Assert.Equal(version, party.VersionNo);
+                Assert.Equal(cachedVersion, party._partyPureSpeedLastCheckVersion);
+                Assert.False(inspect.ProcessCommand(args.FromValues(new[] { "missing-party", "false" })).Succeeded);
+                Assert.False(inspect.ProcessCommand(args.FromValues(new[] { partyId, "invalid" })).Succeeded);
+                var set = new MobilePartyDebugCommand.SetDisorganizedCoopCommand(client.ObjectManager);
+                Assert.False(set.ProcessCommand(args.FromValues(new[] { partyId, "false" })).Succeeded);
+                Assert.True(party.IsDisorganized);
+                Assert.Equal(version, party.VersionNo);
+                var evaluated = inspect.ProcessCommand(args.FromValues(new[] { partyId, "true" }));
+                Assert.True(evaluated.Succeeded);
+                Assert.Contains("Evaluate=True", evaluated.Output);
+                Assert.Equal(party.GetVersionNoForBaseSpeedCalculation(), party._partyPureSpeedLastCheckVersion);
+            });
+    }
+
 }
