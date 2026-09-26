@@ -83,7 +83,7 @@ evidence, errors, hashes, or replay identity.
 The source-bound build creates `dedicated-server-synthetic-artifacts.v1`; the runtime controller
 only verifies it. The caller supplies the frozen raw manifest hash separately. The manifest binds
 both repositories' head/tree pairs, the co-op build version, stage-relative paths, hashes, assembly
-versions, and MVIDs. It contains the five managed co-op assemblies loaded by the standalone server, `DedicatedServer.Core`, the active
+versions, and MVIDs. It contains the five managed co-op assemblies staged for the standalone server, `DedicatedServer.Core`, the active
 Windows or Linux shim, and the platform's TaleWorlds starter assembly. Windows uses a hashed
 `staged-executable` process host. Linux explicitly uses the image's `system-dotnet` host while the
 staged `TaleWorlds.Starter.DotNetCore.Linux` assembly remains path, hash, MVID, and version checked.
@@ -92,7 +92,7 @@ Before UDP work and again after the lifecycle, the controller verifies:
 
 - the raw and canonical manifest digests plus both requested source identities;
 - status PID, role, run token, and process start time against the OS process;
-- every loaded assembly's allowlisted path, SHA-256, MVID, and version;
+- every staged assembly's SHA-256, MVID, and version, plus each loaded assembly's allowlisted path and runtime identity;
 - unchanged manifest and process identities at postflight.
 
 The server's opt-in `status` result must supply:
@@ -140,8 +140,10 @@ into the controller's named password environment variable; never print or retain
 After stopping owned processes, the carrier restores that config through the same script's
 `Restore` action. Owner mismatch or outside config changes preserve the backup and fail closed.
 
-The five required loaded mod assemblies are Common, Coop.Core, Coop.Steam, GameInterface,
-and Missions. Each still requires path, hash, version, and MVID agreement with both disk and
-runtime status. Missing or additional assemblies are rejected; no client entry assembly is
-loaded merely to satisfy attestation. Existing Linux manifest consumption remains supported;
-this producer targets the existing Windows stage layout.
+The five required staged mod assemblies are Common, Coop.Core, Coop.Steam, GameInterface,
+and Missions. Direct-connect servers may leave Coop.Steam unloaded; its staged file still
+requires hash, version, and MVID agreement. The other four must appear in runtime status,
+and every loaded assembly must also match its expected path, version, and MVID. Missing
+required, additional, or duplicate runtime assemblies are rejected. No client entry assembly
+is loaded merely to satisfy attestation. Existing Linux manifest consumption remains
+supported; this producer targets the existing Windows stage layout.

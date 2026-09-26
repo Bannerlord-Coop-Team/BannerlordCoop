@@ -569,7 +569,7 @@ public sealed class DedicatedServerSyntheticArtifactVerifier : IDedicatedServerS
                 cancellationToken);
             return VerifyStatusAndHostArtifacts(responseJson, requestId, options, manifest);
         }
-        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or InvalidOperationException or ArgumentException)
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or InvalidOperationException or ArgumentException or InvalidDataException)
         {
             return Failed("runtime-artifact-verification-failed", manifest);
         }
@@ -615,8 +615,10 @@ public sealed class DedicatedServerSyntheticArtifactVerifier : IDedicatedServerS
             return Failed("artifact-loaded-assembly-set-mismatch", manifest);
         }
 
+        // Direct-connect servers can leave Coop.Steam unloaded; its staged bytes are still checked.
         if (!observed.Keys.OrderBy(name => name, StringComparer.Ordinal).SequenceEqual(
-                DedicatedServerSyntheticArtifactManifestFile.RequiredAssemblyNames,
+                DedicatedServerSyntheticArtifactManifestFile.RequiredAssemblyNames
+                    .Where(name => name != "Coop.Steam" || observed.ContainsKey(name)),
                 StringComparer.Ordinal))
         {
             return Failed("artifact-loaded-assembly-set-mismatch", manifest);
@@ -711,19 +713,21 @@ public sealed class DedicatedServerSyntheticArtifactVerifier : IDedicatedServerS
     {
         foreach ((string name, DedicatedServerSyntheticAssemblyArtifact expected) in expectedAssemblies)
         {
-            ObservedAssembly actual = observedAssemblies[name];
+            observedAssemblies.TryGetValue(name, out ObservedAssembly? actual);
             string expectedPath = ResolveStagedPath(artifactRootPath, expected.RelativePath);
-            if (!PathsEqual(actual.Location, expectedPath))
+            string artifactPath = actual?.Location ?? expectedPath;
+            if (!PathsEqual(artifactPath, expectedPath))
             {
                 failureCode = "artifact-loaded-assembly-path-mismatch";
                 return false;
             }
 
             DedicatedServerHostAssemblyIdentity diskIdentity =
-                hostArtifactReader.ReadAssemblyIdentity(actual.Location);
-            if (!string.Equals(actual.Version, expected.Version, StringComparison.Ordinal) ||
-                !string.Equals(diskIdentity.Version, expected.Version, StringComparison.Ordinal) ||
-                !string.Equals(actual.Mvid, expected.Mvid, StringComparison.Ordinal))
+                hostArtifactReader.ReadAssemblyIdentity(artifactPath);
+            if (!string.Equals(diskIdentity.Version, expected.Version, StringComparison.Ordinal) ||
+                (actual != null &&
+                 (!string.Equals(actual.Version, expected.Version, StringComparison.Ordinal) ||
+                  !string.Equals(actual.Mvid, expected.Mvid, StringComparison.Ordinal))))
             {
                 failureCode = "artifact-loaded-assembly-metadata-mismatch";
                 return false;
@@ -734,7 +738,7 @@ public sealed class DedicatedServerSyntheticArtifactVerifier : IDedicatedServerS
                 return false;
             }
 
-            string actualHash = hostArtifactReader.ComputeSha256(actual.Location);
+            string actualHash = hostArtifactReader.ComputeSha256(artifactPath);
             if (!string.Equals(actualHash, expected.Sha256, StringComparison.Ordinal))
             {
                 failureCode = "artifact-loaded-assembly-hash-mismatch";
