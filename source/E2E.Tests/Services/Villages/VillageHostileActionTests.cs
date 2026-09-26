@@ -2089,7 +2089,8 @@ public class VillageHostileActionTests : MapEventTestBase
             gameStateManager._gameStates.Add(mapState);
         });
 
-        using var menuSwitchRecorder = new GameMenuSwitchRecorder();
+        using var menuSwitchRecorder = new MethodCallRecorder(Priority.First,
+            AccessTools.Method(typeof(GameMenu), nameof(GameMenu.SwitchToMenu), new[] { typeof(string) }));
 
         client.SimulateMessage(Server.NetPeer, new NetworkJoinBattleReply(
             request.RequestId,
@@ -2097,7 +2098,7 @@ public class VillageHostileActionTests : MapEventTestBase
             request.PartyId,
             accepted: false));
 
-        Assert.Equal(new[] { "join_encounter" }, menuSwitchRecorder.SwitchesFor(client));
+        Assert.Equal(new[] { "join_encounter" }, menuSwitchRecorder.MenusFor(client));
         menuSwitchRecorder.Clear();
 
         client.Call(() =>
@@ -2120,7 +2121,7 @@ public class VillageHostileActionTests : MapEventTestBase
             Assert.Null(joinerParty.Party.MapEventSide);
         }, disabledMethods);
 
-        Assert.Equal(new[] { "encounter" }, menuSwitchRecorder.SwitchesFor(client));
+        Assert.Equal(new[] { "encounter" }, menuSwitchRecorder.MenusFor(client));
         menuSwitchRecorder.Clear();
 
         var requests = client.NetworkSentMessages.GetMessages<NetworkRequestJoinBattle>().ToArray();
@@ -2159,7 +2160,7 @@ public class VillageHostileActionTests : MapEventTestBase
             Assert.Contains(mapEvent.AttackerSide.Parties, party => party.Party == joinerParty.Party);
         }, MapEventDisabledMethods);
 
-        Assert.Empty(menuSwitchRecorder.SwitchesFor(client));
+        Assert.Empty(menuSwitchRecorder.MenusFor(client));
     }
 
     [Fact]
@@ -3854,44 +3855,6 @@ public class VillageHostileActionTests : MapEventTestBase
         forceBlockadeAttack: false,
         forceBlockadeSallyOutAttack: false,
         forceHideoutSendTroops: false);
-
-    private sealed class GameMenuSwitchRecorder : IDisposable
-    {
-        private static readonly System.Reflection.MethodInfo SwitchToMenuMethod =
-            AccessTools.Method(typeof(GameMenu), nameof(GameMenu.SwitchToMenu), new[] { typeof(string) });
-        private static readonly List<(object Container, string MenuId)> SwitchCalls = new();
-
-        private readonly Harmony harmony = new($"village-join-menu-recorder-{Guid.NewGuid()}");
-
-        public GameMenuSwitchRecorder()
-        {
-            SwitchCalls.Clear();
-            harmony.Patch(
-                SwitchToMenuMethod,
-                prefix: new HarmonyMethod(typeof(GameMenuSwitchRecorder), nameof(RecordSwitchToMenu))
-                {
-                    priority = Priority.First,
-                });
-        }
-
-        public string[] SwitchesFor(EnvironmentInstance instance) =>
-            SwitchCalls
-                .Where(call => ReferenceEquals(call.Container, instance.Container))
-                .Select(call => call.MenuId)
-                .ToArray();
-
-        public void Clear() => SwitchCalls.Clear();
-
-        public void Dispose() =>
-            harmony.Unpatch(SwitchToMenuMethod, HarmonyPatchType.Prefix, harmony.Id);
-
-        private static bool RecordSwitchToMenu(string menuId)
-        {
-            if (GameInterface.ContainerProvider.TryGetContainer(out var container))
-                SwitchCalls.Add((container, menuId));
-            return false;
-        }
-    }
 
     private readonly record struct VillageTarget(string SettlementId, string VillageId, string SettlementPartyId, string OwnerFactionId);
     private readonly record struct RaidMapEventContext(

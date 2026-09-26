@@ -210,7 +210,11 @@ public class SiegeDisconnectTests : MapEventTestBase
             mapEvent.MapEventId,
             hasPlayerEncounter);
 
-        using var menuCalls = new GameMenuCallCounter();
+        using var menuExit = new MethodCallRecorder(AccessTools.Method(typeof(GameMenu), nameof(GameMenu.ExitToLast)));
+        using var menuSwitch = new MethodCallRecorder(
+            AccessTools.Method(typeof(MenuContext), nameof(MenuContext.SwitchToMenu), new[] { typeof(string) }));
+        using var siegeDeactivation = new MethodCallRecorder(
+            AccessTools.Method(typeof(MapState), nameof(MapState.OnPlayerSiegeDeactivated)));
         Server.SimulateMessage(
             requestingClient.NetPeer,
             new NetworkRequestBreakSiege(partyId, finishLocalMenus));
@@ -219,10 +223,10 @@ public class SiegeDisconnectTests : MapEventTestBase
         Assert.Equal(SiegeBreakOutcome.Applied, approval.Outcome);
         Assert.Equal(finishLocalMenus, approval.FinishLocalMenus);
         Assert.True(approval.BattleLeaveApplied);
-        Assert.Equal(expectedCleanupCalls, menuCalls.ExitCountFor(requestingClient));
-        Assert.Equal(expectedCleanupCalls, menuCalls.DeactivationCountFor(requestingClient));
-        Assert.Equal(0, menuCalls.ExitCountFor(Clients.Last()));
-        Assert.Equal(0, menuCalls.DeactivationCountFor(Clients.Last()));
+        Assert.Equal(expectedCleanupCalls, menuExit.CountFor(requestingClient));
+        Assert.Equal(expectedCleanupCalls, siegeDeactivation.CountFor(requestingClient));
+        Assert.Equal(0, menuExit.CountFor(Clients.Last()));
+        Assert.Equal(0, siegeDeactivation.CountFor(Clients.Last()));
 
         foreach (var instance in Clients.Append(Server))
         {
@@ -270,13 +274,17 @@ public class SiegeDisconnectTests : MapEventTestBase
         });
         Assert.NotNull(partyBaseId);
 
-        using var menuCalls = new GameMenuCallCounter();
+        using var menuExit = new MethodCallRecorder(AccessTools.Method(typeof(GameMenu), nameof(GameMenu.ExitToLast)));
+        using var menuSwitch = new MethodCallRecorder(
+            AccessTools.Method(typeof(MenuContext), nameof(MenuContext.SwitchToMenu), new[] { typeof(string) }));
+        using var siegeDeactivation = new MethodCallRecorder(
+            AccessTools.Method(typeof(MapState), nameof(MapState.OnPlayerSiegeDeactivated)));
         var leave = new NetworkPartyLeftBattle(partyBaseId!);
         Assert.True(leave.FinishLocalMenus);
         client.SimulateMessage(this, leave);
 
-        Assert.Equal(0, menuCalls.ExitCountFor(client));
-        Assert.Equal(0, menuCalls.DeactivationCountFor(client));
+        Assert.Equal(0, menuExit.CountFor(client));
+        Assert.Equal(0, siegeDeactivation.CountFor(client));
         client.Call(() =>
         {
             Assert.True(client.ObjectManager.TryGetObject<MobileParty>(partyId, out var party));
@@ -484,7 +492,11 @@ public class SiegeDisconnectTests : MapEventTestBase
 
         ConfigureTerminationClient(client, mainPartyId, leaderPartyId, settlementId, role);
 
-        using var menuCalls = new GameMenuCallCounter();
+        using var menuExit = new MethodCallRecorder(AccessTools.Method(typeof(GameMenu), nameof(GameMenu.ExitToLast)));
+        using var menuSwitch = new MethodCallRecorder(
+            AccessTools.Method(typeof(MenuContext), nameof(MenuContext.SwitchToMenu), new[] { typeof(string) }));
+        using var siegeDeactivation = new MethodCallRecorder(
+            AccessTools.Method(typeof(MapState), nameof(MapState.OnPlayerSiegeDeactivated)));
         client.SimulateMessage(
             this,
             new NetworkPromptSiegeEnded(
@@ -498,11 +510,11 @@ public class SiegeDisconnectTests : MapEventTestBase
                     ? new[] { mainPartyId }
                     : Array.Empty<string>()));
 
-        Assert.Equal(expectExit ? 1 : 0, menuCalls.ExitCountFor(client));
+        Assert.Equal(expectExit ? 1 : 0, menuExit.CountFor(client));
         if (expectedMenu == null)
-            Assert.Empty(menuCalls.SwitchesFor(client));
+            Assert.Empty(menuSwitch.MenusFor(client));
         else
-            Assert.Equal(new[] { expectedMenu }, menuCalls.SwitchesFor(client));
+            Assert.Equal(new[] { expectedMenu }, menuSwitch.MenusFor(client));
     }
 
     [Fact]
@@ -521,7 +533,11 @@ public class SiegeDisconnectTests : MapEventTestBase
         SetMockPlayerEncounter(client);
 
         MockMission mission = null;
-        using var menuCalls = new GameMenuCallCounter();
+        using var menuExit = new MethodCallRecorder(AccessTools.Method(typeof(GameMenu), nameof(GameMenu.ExitToLast)));
+        using var menuSwitch = new MethodCallRecorder(
+            AccessTools.Method(typeof(MenuContext), nameof(MenuContext.SwitchToMenu), new[] { typeof(string) }));
+        using var siegeDeactivation = new MethodCallRecorder(
+            AccessTools.Method(typeof(MapState), nameof(MapState.OnPlayerSiegeDeactivated)));
         using (var fixture = new MissionEngineFixture())
         {
             client.Call(() =>
@@ -557,12 +573,12 @@ public class SiegeDisconnectTests : MapEventTestBase
             Assert.Null(MobileParty.MainParty.Party.MapEventSide);
         });
 
-        Assert.Equal(1, menuCalls.ExitCountFor(client));
-        Assert.Equal(1, menuCalls.DeactivationCountFor(client));
+        Assert.Equal(1, menuExit.CountFor(client));
+        Assert.Equal(1, siegeDeactivation.CountFor(client));
 
         client.Call(() => client.Resolve<IMessageBroker>().Publish(this, new CampaignTick()));
-        Assert.Equal(1, menuCalls.ExitCountFor(client));
-        Assert.Equal(1, menuCalls.DeactivationCountFor(client));
+        Assert.Equal(1, menuExit.CountFor(client));
+        Assert.Equal(1, siegeDeactivation.CountFor(client));
     }
 
     [Fact]
@@ -770,77 +786,6 @@ public class SiegeDisconnectTests : MapEventTestBase
             Assert.True(instance.ObjectManager.TryGetObject<MobileParty>(partyId, out var party));
             Assert.Equal(expectCamp, party.BesiegerCamp != null);
         });
-    }
-
-    private sealed class GameMenuCallCounter : IDisposable
-    {
-        private static readonly MethodInfo ExitToLastMethod =
-            AccessTools.Method(typeof(GameMenu), nameof(GameMenu.ExitToLast));
-        private static readonly MethodInfo SwitchToMenuMethod =
-            AccessTools.Method(typeof(MenuContext), nameof(MenuContext.SwitchToMenu), new[] { typeof(string) });
-        private static readonly MethodInfo PlayerSiegeDeactivatedMethod =
-            AccessTools.Method(typeof(MapState), nameof(MapState.OnPlayerSiegeDeactivated));
-        private static readonly List<object> ExitContainers = new();
-        private static readonly List<(object Container, string MenuId)> SwitchCalls = new();
-        private static readonly List<object> DeactivationContainers = new();
-
-        private readonly Harmony harmony = new($"siege-termination-menu-counter-{Guid.NewGuid()}");
-
-        public GameMenuCallCounter()
-        {
-            ExitContainers.Clear();
-            SwitchCalls.Clear();
-            DeactivationContainers.Clear();
-            harmony.Patch(
-                ExitToLastMethod,
-                prefix: new HarmonyMethod(typeof(GameMenuCallCounter), nameof(CountExitToLast)));
-            harmony.Patch(
-                SwitchToMenuMethod,
-                prefix: new HarmonyMethod(typeof(GameMenuCallCounter), nameof(CountSwitchToMenu)));
-            harmony.Patch(
-                PlayerSiegeDeactivatedMethod,
-                prefix: new HarmonyMethod(typeof(GameMenuCallCounter), nameof(CountPlayerSiegeDeactivated)));
-        }
-
-        public int ExitCountFor(EnvironmentInstance instance) =>
-            ExitContainers.Count(container => ReferenceEquals(container, instance.Container));
-
-        public string[] SwitchesFor(EnvironmentInstance instance) =>
-            SwitchCalls
-                .Where(call => ReferenceEquals(call.Container, instance.Container))
-                .Select(call => call.MenuId)
-                .ToArray();
-
-        public int DeactivationCountFor(EnvironmentInstance instance) =>
-            DeactivationContainers.Count(container => ReferenceEquals(container, instance.Container));
-
-        public void Dispose()
-        {
-            harmony.Unpatch(ExitToLastMethod, HarmonyPatchType.Prefix, harmony.Id);
-            harmony.Unpatch(SwitchToMenuMethod, HarmonyPatchType.Prefix, harmony.Id);
-            harmony.Unpatch(PlayerSiegeDeactivatedMethod, HarmonyPatchType.Prefix, harmony.Id);
-        }
-
-        private static bool CountExitToLast()
-        {
-            if (GameInterface.ContainerProvider.TryGetContainer(out var container))
-                ExitContainers.Add(container);
-            return false;
-        }
-
-        private static bool CountSwitchToMenu(string menuId)
-        {
-            if (GameInterface.ContainerProvider.TryGetContainer(out var container))
-                SwitchCalls.Add((container, menuId));
-            return false;
-        }
-
-        private static bool CountPlayerSiegeDeactivated()
-        {
-            if (GameInterface.ContainerProvider.TryGetContainer(out var container))
-                DeactivationContainers.Add(container);
-            return false;
-        }
     }
 
     private readonly record struct SiegeContext(string SiegeEventId, string CampId);

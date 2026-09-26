@@ -214,7 +214,8 @@ public class SiegeAssaultLeaveTests : MapEventTestBase
                 new[] { typeof(LiteNetLib.NetPeer), typeof(LiteNetLib.NetPeer), typeof(byte[]) }))
             .ToList();
 
-        using var menuSwitchRecorder = new GameMenuSwitchRecorder();
+        using var menuSwitchRecorder = new MethodCallRecorder(Priority.First,
+            AccessTools.Method(typeof(GameMenu), nameof(GameMenu.SwitchToMenu), new[] { typeof(string) }));
         client.Call(() =>
         {
             Assert.True(client.ObjectManager.TryGetObject<MapEvent>(mapEventContext.MapEventId, out var mapEvent));
@@ -244,7 +245,7 @@ public class SiegeAssaultLeaveTests : MapEventTestBase
             Assert.Null(party.MapEvent);
         }, disabledMethods);
 
-        Assert.Empty(menuSwitchRecorder.SwitchesFor(client));
+        Assert.Empty(menuSwitchRecorder.MenusFor(client));
         var request = Assert.Single(client.NetworkSentMessages.GetMessages<NetworkRequestJoinBattle>());
         Assert.Equal(mapEventContext.MapEventId, request.MapEventId);
         Assert.Equal(BattleSideEnum.Attacker, request.Side);
@@ -259,10 +260,10 @@ public class SiegeAssaultLeaveTests : MapEventTestBase
         Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkAddBattleParty>());
         var involvedParties = Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkAddInvolvedParties>());
 
-        Assert.Empty(menuSwitchRecorder.SwitchesFor(client));
+        Assert.Empty(menuSwitchRecorder.MenusFor(client));
 
         client.SimulateMessage(Server.NetPeer, involvedParties);
-        Assert.Equal(new[] { "encounter" }, menuSwitchRecorder.SwitchesFor(client));
+        Assert.Equal(new[] { "encounter" }, menuSwitchRecorder.MenusFor(client));
         client.SimulateMessage(Server.NetPeer, Server.NetworkSentMessages.GetMessages<NetworkJoinBattleReply>().Single());
         client.Call(() =>
         {
@@ -366,8 +367,10 @@ public class SiegeAssaultLeaveTests : MapEventTestBase
                 new[] { typeof(LiteNetLib.NetPeer), typeof(LiteNetLib.NetPeer), typeof(byte[]) }))
             .ToList();
 
-        using var menuActivationRecorder = new GameMenuActivationRecorder();
-        using var menuSwitchRecorder = new GameMenuSwitchRecorder();
+        using var menuActivationRecorder = new MethodCallRecorder(Priority.Last,
+            AccessTools.Method(typeof(GameMenu), nameof(GameMenu.ActivateGameMenu), new[] { typeof(string) }));
+        using var menuSwitchRecorder = new MethodCallRecorder(Priority.First,
+            AccessTools.Method(typeof(GameMenu), nameof(GameMenu.SwitchToMenu), new[] { typeof(string) }));
         client.Call(() =>
         {
             Assert.True(client.ObjectManager.TryGetObject<MapEvent>(mapEventContext.MapEventId, out var mapEvent));
@@ -393,7 +396,7 @@ public class SiegeAssaultLeaveTests : MapEventTestBase
             Assert.Null(party.MapEvent);
         }, disabledMethods);
 
-        Assert.Empty(menuActivationRecorder.ActivationsFor(client));
+        Assert.Empty(menuActivationRecorder.MenusFor(client));
         var request = Assert.Single(client.NetworkSentMessages.GetMessages<NetworkRequestJoinBattle>());
 
         Server.NetworkSentMessages.Clear();
@@ -404,11 +407,11 @@ public class SiegeAssaultLeaveTests : MapEventTestBase
 
         Assert.True(Server.NetworkSentMessages.GetMessages<NetworkJoinBattleReply>().Single().Accepted);
         var involvedParties = Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkAddInvolvedParties>());
-        Assert.Empty(menuActivationRecorder.ActivationsFor(client));
+        Assert.Empty(menuActivationRecorder.MenusFor(client));
 
         client.SimulateMessage(Server.NetPeer, involvedParties);
-        Assert.Equal(new[] { "join_siege_event" }, menuActivationRecorder.ActivationsFor(client));
-        Assert.Equal(new[] { "encounter" }, menuSwitchRecorder.SwitchesFor(client));
+        Assert.Equal(new[] { "join_siege_event" }, menuActivationRecorder.MenusFor(client));
+        Assert.Equal(new[] { "encounter" }, menuSwitchRecorder.MenusFor(client));
         client.SimulateMessage(Server.NetPeer, Server.NetworkSentMessages.GetMessages<NetworkJoinBattleReply>().Single());
     }
 
@@ -681,78 +684,6 @@ public class SiegeAssaultLeaveTests : MapEventTestBase
         Assert.NotNull(prefix);
 
         return (bool)prefix.Invoke(null, new object[] { "join_siege_event" })!;
-    }
-
-    private sealed class GameMenuActivationRecorder : IDisposable
-    {
-        private static readonly MethodInfo ActivateGameMenuMethod =
-            AccessTools.Method(typeof(GameMenu), nameof(GameMenu.ActivateGameMenu), new[] { typeof(string) });
-        private static readonly List<(object Container, string MenuId)> ActivationCalls = new();
-
-        private readonly Harmony harmony = new($"siege-join-menu-activation-recorder-{Guid.NewGuid()}");
-
-        public GameMenuActivationRecorder()
-        {
-            ActivationCalls.Clear();
-            harmony.Patch(
-                ActivateGameMenuMethod,
-                prefix: new HarmonyMethod(typeof(GameMenuActivationRecorder), nameof(RecordActivation))
-                {
-                    priority = Priority.Last,
-                });
-        }
-
-        public string[] ActivationsFor(EnvironmentInstance instance) =>
-            ActivationCalls
-                .Where(call => ReferenceEquals(call.Container, instance.Container))
-                .Select(call => call.MenuId)
-                .ToArray();
-
-        public void Dispose() =>
-            harmony.Unpatch(ActivateGameMenuMethod, HarmonyPatchType.Prefix, harmony.Id);
-
-        private static bool RecordActivation(string menuId)
-        {
-            if (GameInterface.ContainerProvider.TryGetContainer(out var container))
-                ActivationCalls.Add((container, menuId));
-            return false;
-        }
-    }
-
-    private sealed class GameMenuSwitchRecorder : IDisposable
-    {
-        private static readonly MethodInfo SwitchToMenuMethod =
-            AccessTools.Method(typeof(GameMenu), nameof(GameMenu.SwitchToMenu), new[] { typeof(string) });
-        private static readonly List<(object Container, string MenuId)> SwitchCalls = new();
-
-        private readonly Harmony harmony = new($"siege-join-menu-recorder-{Guid.NewGuid()}");
-
-        public GameMenuSwitchRecorder()
-        {
-            SwitchCalls.Clear();
-            harmony.Patch(
-                SwitchToMenuMethod,
-                prefix: new HarmonyMethod(typeof(GameMenuSwitchRecorder), nameof(RecordSwitchToMenu))
-                {
-                    priority = Priority.First,
-                });
-        }
-
-        public string[] SwitchesFor(EnvironmentInstance instance) =>
-            SwitchCalls
-                .Where(call => ReferenceEquals(call.Container, instance.Container))
-                .Select(call => call.MenuId)
-                .ToArray();
-
-        public void Dispose() =>
-            harmony.Unpatch(SwitchToMenuMethod, HarmonyPatchType.Prefix, harmony.Id);
-
-        private static bool RecordSwitchToMenu(string menuId)
-        {
-            if (GameInterface.ContainerProvider.TryGetContainer(out var container))
-                SwitchCalls.Add((container, menuId));
-            return false;
-        }
     }
 
     private sealed class NetworkDeliveryBlocker : IDisposable
