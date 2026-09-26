@@ -216,7 +216,8 @@ public class CoopBattleFinalizeTests : MapEventTestBase
         SetMockPlayerEncounter(Clients.First());
         SetMockPlayerEncounter(Clients.Last());
 
-        using var exitToLast = new GameMenuExitToLastCounter();
+        using var exitToLast = new MethodCallRecorder(
+            AccessTools.Method(typeof(GameMenu), nameof(GameMenu.ExitToLast)));
 
         var client1 = Clients.First();
         client1.Call(() =>
@@ -243,7 +244,8 @@ public class CoopBattleFinalizeTests : MapEventTestBase
         Clients.First().Resolve<IMessageBroker>().Subscribe<NetworkClosePvpEncounter>(p => closeOnClient1 = p.What.PartyIds);
         Clients.Last().Resolve<IMessageBroker>().Subscribe<NetworkClosePvpEncounter>(p => closeOnClient2 = p.What.PartyIds);
 
-        using var exitToLast = new GameMenuExitToLastCounter();
+        using var exitToLast = new MethodCallRecorder(
+            AccessTools.Method(typeof(GameMenu), nameof(GameMenu.ExitToLast)));
 
         var recipientClient = Clients.Last();
         recipientClient.Call(() =>
@@ -285,7 +287,8 @@ public class CoopBattleFinalizeTests : MapEventTestBase
         var spectatorClient = Clients.Last();
         SetMockPlayerEncounter(spectatorClient, mapEventId: setup.ctx.MapEventId);
 
-        using var exitToLast = new GameMenuExitToLastCounter();
+        using var exitToLast = new MethodCallRecorder(
+            AccessTools.Method(typeof(GameMenu), nameof(GameMenu.ExitToLast)));
 
         spectatorClient.Call(() =>
         {
@@ -574,7 +577,9 @@ public class CoopBattleFinalizeTests : MapEventTestBase
         var client = Clients.First();
         MapEvent destroyedMapEvent = null;
         BattleSimulation simulation = null;
-        using var menuRecorder = new GameMenuActivationRecorder();
+        using var menuRecorder = new MethodCallRecorder(Priority.First,
+            AccessTools.Method(typeof(GameMenu), nameof(GameMenu.ActivateGameMenu), new[] { typeof(string) }),
+            AccessTools.Method(typeof(GameMenu), nameof(GameMenu.SwitchToMenu), new[] { typeof(string) }));
 
         client.Call(() =>
         {
@@ -982,93 +987,5 @@ public class CoopBattleFinalizeTests : MapEventTestBase
         instance.Call(() =>
             Assert.False(instance.ObjectManager.TryGetObject<MapEvent>(mapEventId, out _),
                 $"MapEvent {mapEventId} should be finalized/removed on {instance.GetType().Name}"));
-    }
-
-    /// <summary>
-    /// Counts <see cref="GameMenu.ExitToLast"/> calls and attributes each to the instance whose container was
-    /// active at call time. Attribution is deliberately container-based, not party-based: a handler that sends
-    /// a message to another instance mid-flight leaves that instance's game statics behind
-    /// (EnvironmentInstance.StaticScope restores the container but not the game statics), so ambient state
-    /// like <see cref="MobileParty.MainParty"/> is unreliable inside the prefix while the container is not.
-    /// </summary>
-    private sealed class GameMenuExitToLastCounter : IDisposable
-    {
-        private readonly Harmony harmony = new("coop-battle-finalize-exit-to-last-counter");
-
-        public GameMenuExitToLastCounter()
-        {
-            exitToLastCount = 0;
-            exitToLastContainers.Clear();
-            harmony.Patch(
-                ExitToLastMethod,
-                prefix: new HarmonyMethod(typeof(CoopBattleFinalizeTests), nameof(CountGameMenuExitToLast)));
-        }
-
-        public int Count => exitToLastCount;
-
-        /// <summary>How many exits ran in the scope of <paramref name="instance"/>.</summary>
-        public int CountFor(EnvironmentInstance instance) =>
-            exitToLastContainers.Count(container => ReferenceEquals(container, instance.Container));
-
-        public void Dispose()
-        {
-            harmony.Unpatch(ExitToLastMethod, HarmonyPatchType.Prefix, harmony.Id);
-        }
-    }
-
-    private sealed class GameMenuActivationRecorder : IDisposable
-    {
-        private static readonly MethodInfo ActivateGameMenuMethod =
-            AccessTools.Method(typeof(GameMenu), nameof(GameMenu.ActivateGameMenu), new[] { typeof(string) });
-        private static readonly MethodInfo SwitchToMenuMethod =
-            AccessTools.Method(typeof(GameMenu), nameof(GameMenu.SwitchToMenu), new[] { typeof(string) });
-        private static readonly List<(object Container, string MenuId)> MenuCalls = new();
-
-        private readonly Harmony harmony = new($"coop-battle-finalize-menu-recorder-{Guid.NewGuid()}");
-
-        public GameMenuActivationRecorder()
-        {
-            MenuCalls.Clear();
-            var prefix = new HarmonyMethod(typeof(GameMenuActivationRecorder), nameof(RecordMenu))
-            {
-                priority = Priority.First,
-            };
-            harmony.Patch(ActivateGameMenuMethod, prefix: prefix);
-            harmony.Patch(SwitchToMenuMethod, prefix: prefix);
-        }
-
-        public string[] MenusFor(EnvironmentInstance instance) =>
-            MenuCalls
-                .Where(call => ReferenceEquals(call.Container, instance.Container))
-                .Select(call => call.MenuId)
-                .ToArray();
-
-        public void Dispose()
-        {
-            harmony.Unpatch(ActivateGameMenuMethod, HarmonyPatchType.Prefix, harmony.Id);
-            harmony.Unpatch(SwitchToMenuMethod, HarmonyPatchType.Prefix, harmony.Id);
-        }
-
-        private static bool RecordMenu(string menuId)
-        {
-            if (GameInterface.ContainerProvider.TryGetContainer(out var container))
-                MenuCalls.Add((container, menuId));
-            return false;
-        }
-    }
-
-    private static readonly MethodInfo ExitToLastMethod = AccessTools.Method(typeof(GameMenu), nameof(GameMenu.ExitToLast));
-    private static int exitToLastCount;
-    private static readonly List<object> exitToLastContainers = new();
-
-    private static bool CountGameMenuExitToLast()
-    {
-        exitToLastCount++;
-        if (GameInterface.ContainerProvider.TryGetContainer(out var container))
-        {
-            exitToLastContainers.Add(container);
-        }
-
-        return false;
     }
 }

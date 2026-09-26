@@ -21,6 +21,10 @@
                                  WidthSizePolicy="Fixed" HeightSizePolicy="Fixed"
                                  SuggestedWidth="1" SuggestedHeight="1" Brush="NameMarker.VisualBrush"
                                  Brush.AlphaFactor="0"/>
+                    <Widget WidthSizePolicy="Fixed" HeightSizePolicy="Fixed"
+                            SuggestedWidth="@SpeakingIconWidth" SuggestedHeight="26" VerticalAlignment="Center"
+                            Sprite="MPGeneral\MPScoreboard\unmute_icon" Color="@SpeakingIconColor"
+                            DoNotAcceptEvents="true"/>
                     <TextWidget Id="NameText" WidthSizePolicy="CoverChildren" HeightSizePolicy="StretchToParent"
                                 Brush="NameMarker.TextBrush" Brush.FontColor="@NameColor"
                                 Brush.TextVerticalAlignment="Center" OverrideDefaultStateSwitchingEnabled="true"
