@@ -187,7 +187,8 @@ public static class IssuesDebugCommand
                     return Failed("Issue did not remain available for acceptance.");
                 }
                 StagedAcceptOwners.Add(hero);
-                return Succeeded($"Staged unaccepted {StolenGoodsKey} for '{hero.Name}' ({ownerId}), issue '{hero.Issue.StringId}'.");
+                return Succeeded($"Staged unaccepted {StolenGoodsKey} for '{hero.Name}' ({ownerId}), issue '{hero.Issue.StringId}', " +
+                    $"settlement '{hero.CurrentSettlement.StringId}'.");
             }
             catch (Exception ex)
             {
@@ -345,11 +346,10 @@ public static class IssuesDebugCommand
             if (!StagedAcceptOwners.Contains(hero)) return Failed("This owner was not staged by the acceptance fixture.");
             try
             {
-                if (hero.Issue?.IssueQuest?.IsOngoing == true)
+                if (hero.Issue != null)
                 {
-                    using (new IssueFinalizeAuthorityGuard()) hero.Issue.IssueQuest.CompleteQuestWithCancel();
+                    using (new IssueFinalizeAuthorityGuard()) hero.Issue.CompleteIssueWithCancel();
                 }
-                if (hero.Issue != null) Campaign.Current.IssueManager.DeactivateIssue(hero.Issue);
                 StagedAcceptOwners.Remove(hero);
                 return Succeeded($"Reset staged issue for '{hero.Name}' ({args[0]}).");
             }
