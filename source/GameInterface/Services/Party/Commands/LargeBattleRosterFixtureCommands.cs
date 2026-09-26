@@ -294,6 +294,8 @@ internal static class LargeBattleRosterFixtureCommands
             : $"EXACT_BATTLE_ROSTER_FIXTURE_STARTED troop={FixtureTroopId} " +
               $"firstHealthy={firstHealthyCount} secondHealthy={secondHealthyCount}";
         return Succeeded(started + "\n" +
+               $"ORIGINAL_SYNC_ROSTER party={firstSnapshot.PartyId}|members={SyncedRoster(firstSnapshot.MemberRoster)}\n" +
+               $"ORIGINAL_SYNC_ROSTER party={secondSnapshot.PartyId}|members={SyncedRoster(secondSnapshot.MemberRoster)}\n" +
                FormatState("active", firstParty, secondParty, firstHealthyCount, secondHealthyCount));
     }
 
@@ -315,13 +317,13 @@ internal static class LargeBattleRosterFixtureCommands
 
         public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
         {
-            return Status(args);
+            return Status(args, serverOnly: true);
         }
     }
 
-    private static CoopCommandResult Status(IReadOnlyList<string> args)
+    private static CoopCommandResult Status(IReadOnlyList<string> args, bool serverOnly)
     {
-        if (!ModInformation.IsServer)
+        if (serverOnly && !ModInformation.IsServer)
             return Failed("Run this command on the server.");
         if (!TryGetObjectManager(out IObjectManager objectManager))
             return Failed("Unable to resolve ObjectManager.");
@@ -358,7 +360,7 @@ internal static class LargeBattleRosterFixtureCommands
 
         public string Description => "Reports exact battle roster status.";
 
-        public CoopCommandSide Side => CoopCommandSide.Server;
+        public CoopCommandSide Side => CoopCommandSide.Both;
 
         public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
@@ -368,7 +370,7 @@ internal static class LargeBattleRosterFixtureCommands
 
         public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
         {
-            return Status(args);
+            return Status(args, serverOnly: false);
         }
     }
 
@@ -435,7 +437,9 @@ internal static class LargeBattleRosterFixtureCommands
 
         if (!IsPartyStateRestored(activeFixture.FirstParty)
             || !IsPartyStateRestored(activeFixture.SecondParty)
-            || !behaviorRestored)
+            || !behaviorRestored
+            || !IsPartyMovementRestored(activeFixture.FirstParty)
+            || !IsPartyMovementRestored(activeFixture.SecondParty))
         {
             return Failed("Large-battle fixture restoration did not restore the original rosters, heroes, leaders, and movement behavior.\n" +
                    warning +
@@ -448,7 +452,7 @@ internal static class LargeBattleRosterFixtureCommands
         }
 
         fixture = null;
-        return Succeeded("LARGE_BATTLE_ROSTER_FIXTURE_RESTORED\n" +
+        return Succeeded("LARGE_BATTLE_ROSTER_FIXTURE_RESTORED snapshotVerified=True\n" +
             warning +
             FormatState(
                 "none",
@@ -704,6 +708,17 @@ internal static class LargeBattleRosterFixtureCommands
         snapshot.Party.LeaderHero == snapshot.LeaderHero &&
         snapshot.HeroHitPoints.All(hero => hero.Key.HitPoints == hero.Value);
 
+    private static bool IsPartyMovementRestored(PartySnapshot snapshot) =>
+        !snapshot.HasBehavior ||
+        (snapshot.Party.Position.X == snapshot.Behavior.PartyPosition.X &&
+         snapshot.Party.Position.Y == snapshot.Behavior.PartyPosition.Y &&
+         snapshot.Party.Position.IsOnLand == snapshot.Behavior.PartyPosition.IsOnLand &&
+         snapshot.Party.PartyMoveMode == snapshot.Behavior.PartyMoveMode &&
+         snapshot.Party.MoveTargetPoint.X == snapshot.Behavior.MoveTargetPoint.X &&
+         snapshot.Party.MoveTargetPoint.Y == snapshot.Behavior.MoveTargetPoint.Y &&
+         snapshot.Party.MoveTargetPoint.IsOnLand == snapshot.Behavior.MoveTargetPoint.IsOnLand &&
+         snapshot.Party.IsCurrentlyAtSea == snapshot.Behavior.IsCurrentlyAtSea);
+
     private static void ClearRoster(TroopRoster roster)
     {
         for (int index = roster.Count - 1; index >= 0; index--)
@@ -726,6 +741,7 @@ internal static class LargeBattleRosterFixtureCommands
             return false;
 
         snapshot.Party.Position = snapshot.Behavior.PartyPosition;
+        snapshot.Party.IsCurrentlyAtSea = snapshot.Behavior.IsCurrentlyAtSea;
         if (!behaviorSnapshot.TryApply(snapshot.Party, snapshot.Behavior, out _))
             return false;
 
@@ -781,8 +797,13 @@ internal static class LargeBattleRosterFixtureCommands
             $"leader={leader?.StringId ?? "none"}|leaderHitPoints={leader?.HitPoints.ToString() ?? "none"}|" +
             $"position={party.Position.X:R},{party.Position.Y:R},{party.Position.IsOnLand}|" +
             $"moveMode={party.PartyMoveMode}|" +
-            $"fingerprint={Fingerprint(roster)}");
+            $"fingerprint={Fingerprint(roster)}|syncedRoster={SyncedRoster(CopyRoster(roster))}");
     }
+
+    private static string SyncedRoster(TroopRosterElement[] elements) =>
+        string.Join(";", elements
+            .OrderBy(element => element.Character.StringId, StringComparer.Ordinal)
+            .Select(element => $"{element.Character.StringId}:{element.Number}:{element.WoundedNumber}"));
 
     private static string Fingerprint(TroopRoster roster)
     {

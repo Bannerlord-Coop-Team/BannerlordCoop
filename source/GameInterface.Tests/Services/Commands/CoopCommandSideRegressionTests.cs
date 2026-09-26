@@ -92,7 +92,8 @@ public class CoopCommandSideRegressionTests
 #if DEBUG
         yield return new object[] { "AiLordPeaceReleaseFixtureCommands", "PlayerCaptivityCaptureAiLordFixtureCoopCommand", CoopCommandSide.Server };
         yield return new object[] { "LargeBattleRosterFixtureCommands", "LargeBattleRosterStatusCoopCommand", CoopCommandSide.Server };
-        yield return new object[] { "LargeBattleRosterFixtureCommands", "ExactBattleRosterStatusCoopCommand", CoopCommandSide.Server };
+        yield return new object[] { "LargeBattleRosterFixtureCommands", "BattleSizeRosterBeginCoopCommand", CoopCommandSide.Server };
+        yield return new object[] { "LargeBattleRosterFixtureCommands", "ExactBattleRosterStatusCoopCommand", CoopCommandSide.Both };
         yield return new object[] { "LargeBattleRosterFixtureCommands", "LargeBattleRosterRestoreCoopCommand", CoopCommandSide.Server };
         yield return new object[] { "LargeBattleRosterFixtureCommands", "ExactBattleRosterRestoreCoopCommand", CoopCommandSide.Server };
 #endif
