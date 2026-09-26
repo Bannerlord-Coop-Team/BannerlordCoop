@@ -80,6 +80,21 @@ evidence, errors, hashes, or replay identity.
 
 ## Artifact and status contract
 
+After canonical preparation verifies both source identities and the deployed files, run
+`VerificationHarness dedicated-server-synthetic-manifest` on the Windows game host before
+starting synthetic clients. Supply `--head`, `--tree`, `--server-head`, `--server-tree`,
+`--build-version`, `--artifact-root`, and a fresh `--output` path. The writer prints the raw file
+SHA-256 to pass to the controller. It reads the actual staged PE versions, MVIDs, and file hashes;
+it does not attest build provenance or running processes on its own.
+
+The `--core-assembly`, `--shim-assembly`, `--starter-assembly`, `--coop-directory`, and
+`--server-executable` arguments are forward-slash paths relative to the artifact root. Dedicated
+assemblies need not share a directory. Pin the Core location from the prepared loader contract
+when duplicate copies exist; the runtime verifier checks the actual loaded location. Attest the
+pipe server process's executable, which may be `engine/dotnet/dotnet.exe`, not the outer launcher.
+The writer refuses existing output, missing files, and paths outside the stage. Linux manifest
+production is not implemented by this Windows writer.
+
 The source-bound build creates `dedicated-server-synthetic-artifacts.v1`; the runtime controller
 only verifies it. The caller supplies the frozen raw manifest hash separately. The manifest binds
 both repositories' head/tree pairs, the co-op build version, stage-relative paths, hashes, assembly
@@ -88,11 +103,18 @@ Windows or Linux shim, and the platform's TaleWorlds starter assembly. Windows u
 `staged-executable` process host. Linux explicitly uses the image's `system-dotnet` host while the
 staged `TaleWorlds.Starter.DotNetCore.Linux` assembly remains path, hash, MVID, and version checked.
 
+The manifest's `loadedAssemblies` map describes all six staged co-op artifacts. Runtime status
+must report `Common`, `Coop.Core`, `GameInterface`, and `Missions`. `Coop` and `Coop.Steam` are
+optional loaded assemblies on a headless direct-connect server; their staged files are still
+checked for version, MVID, and hash. If either is loaded, its reported location and metadata
+must also match. Unknown or missing required loaded assemblies fail verification. The status
+`assemblyMvid` must match loaded `Coop`, or be null when `Coop` is absent.
+
 Before UDP work and again after the lifecycle, the controller verifies:
 
 - the raw and canonical manifest digests plus both requested source identities;
 - status PID, role, run token, and process start time against the OS process;
-- every loaded assembly's allowlisted path, SHA-256, MVID, and version;
+- every staged assembly's SHA-256, MVID, and version, plus every loaded assembly's allowlisted path and metadata;
 - unchanged manifest and process identities at postflight.
 
 The server's opt-in `status` result must supply:

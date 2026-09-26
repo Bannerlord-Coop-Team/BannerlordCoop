@@ -75,6 +75,7 @@ internal sealed class DefenderSiegeContextFixture : IDefenderSiegeContextFixture
     private bool startAttempted;
     private bool restored;
     private string captureFailureDetail;
+    private string startFailureDetail;
 
     public DefenderSiegeContextFixture(IObjectManager objects, IPlayerManager players,
         IMobilePartyBehaviorSnapshot behavior, ISiegeEventInterface siege, IMessageBroker broker, INetwork network,
@@ -99,6 +100,7 @@ internal sealed class DefenderSiegeContextFixture : IDefenderSiegeContextFixture
         }
         if (campaign != null) return Result(false, "fixture_already_captured");
         captureFailureDetail = null;
+        startFailureDetail = null;
         if (Campaign.Current == null) return Result(false, "campaign_required");
         var defenders = players.Players.Where(players.IsConnected).ToArray();
         if (defenders.Length != 2 ||
@@ -112,7 +114,8 @@ internal sealed class DefenderSiegeContextFixture : IDefenderSiegeContextFixture
         Settlement target = defenderParties[0].CurrentSettlement;
         if (target == null || defenderParties.Any(party => party.CurrentSettlement != target))
             return Result(false, "inside_defenders_required");
-        if (!target.IsCastle || target.Party == null || target.SiegeEvent != null || target.Party.MapEvent != null)
+        if (!(target.IsCastle || (target.StringId == "town_ES1" && target.IsTown)) ||
+            target.Party == null || target.SiegeEvent != null || target.Party.MapEvent != null)
             return Result(false, "castle_not_clean");
         if (!objects.TryGetObject<Settlement>(target.StringId, out var registeredTarget) ||
             !ReferenceEquals(registeredTarget, target))
@@ -225,15 +228,8 @@ internal sealed class DefenderSiegeContextFixture : IDefenderSiegeContextFixture
 
     public CoopCommandResult Start()
     {
-        if (ModInformation.IsClient || !IdentityCurrent() || !behaviorIdentity.IsCurrent(originalBehaviorReferences) ||
-            !DefendersCurrent(requireInside: true) || !HasOnlyCapturedAssaultDefenders(settlement.Parties) ||
-            startAttempted || restored ||
-            settlement.SiegeEvent != null || settlement.Party.MapEvent != null ||
-            besieger.MapEvent != null || besieger.BesiegerCamp != null || !besieger.IsActive ||
-            besieger.CurrentSettlement != null || besieger.IsCurrentlyAtSea || !besieger.Position.IsOnLand ||
-            besieger.IsTransitionInProgress || besieger.Army != null || besieger.AttachedTo != null ||
-            besieger.AttachedParties.Count != 0 ||
-            besieger.MapFaction?.IsAtWarWith(settlement.MapFaction) != true)
+        startFailureDetail = GetStartFailure();
+        if (startFailureDetail != null)
             return Result(false, "start_precondition_changed");
         startAttempted = true;
         // Keep the capture even if native start throws after moving or creating the camp.
@@ -251,6 +247,31 @@ internal sealed class DefenderSiegeContextFixture : IDefenderSiegeContextFixture
             if (candidate?.BesiegerCamp?.LeaderParty == besieger) createdSiege = candidate;
         }
         return Result(createdSiege != null, createdSiege != null ? "started" : "start_incomplete");
+    }
+
+    private string GetStartFailure()
+    {
+        if (ModInformation.IsClient) return "server_required";
+        if (!IdentityCurrent()) return "captured_identity_changed";
+        if (!behaviorIdentity.IsCurrent(originalBehaviorReferences)) return "behavior_identity_changed";
+        if (!DefendersCurrent(requireInside: true)) return "defenders_changed";
+        if (!HasOnlyCapturedAssaultDefenders(settlement.Parties)) return "uncaptured_assault_defender";
+        if (startAttempted) return "start_already_attempted";
+        if (restored) return "already_restored";
+        if (settlement.SiegeEvent != null) return "settlement_has_siege";
+        if (settlement.Party.MapEvent != null) return "settlement_has_map_event";
+        if (besieger.MapEvent != null) return "besieger_has_map_event";
+        if (besieger.BesiegerCamp != null) return "besieger_has_camp";
+        if (!besieger.IsActive) return "besieger_inactive";
+        if (besieger.CurrentSettlement != null) return "besieger_inside_settlement";
+        if (besieger.IsCurrentlyAtSea) return "besieger_at_sea";
+        if (!besieger.Position.IsOnLand) return "besieger_position_not_on_land";
+        if (besieger.IsTransitionInProgress) return "besieger_in_transition";
+        if (besieger.Army != null) return "besieger_in_army";
+        if (besieger.AttachedTo != null) return "besieger_attached";
+        if (besieger.AttachedParties.Count != 0) return "besieger_has_attached_parties";
+        if (besieger.MapFaction?.IsAtWarWith(settlement.MapFaction) != true) return "besieger_not_hostile";
+        return null;
     }
 
     public CoopCommandResult EndMissions()
@@ -655,7 +676,7 @@ internal sealed class DefenderSiegeContextFixture : IDefenderSiegeContextFixture
         {
             success, status, settlementId = settlement?.StringId, besiegerPartyId = partyId,
             startAttempted, missionExitRequested, restored, captured = campaign != null,
-            originalRelation, stagedRelation, captureFailureDetail
+            originalRelation, stagedRelation, captureFailureDetail, startFailureDetail
         }), success ? null : "defender_context_failed");
 
     public sealed class CaptureCoopCommand : ICoopCommand

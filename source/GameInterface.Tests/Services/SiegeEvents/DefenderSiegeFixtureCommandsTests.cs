@@ -110,7 +110,13 @@ public sealed class DefenderSiegeFixtureCommandsTests : IDisposable
             snapshots.Setup(service => service.TryCreate(It.IsAny<MobileParty>(), out It.Ref<PartyBehaviorUpdateData>.IsAny))
                 .Returns((MobileParty party, out PartyBehaviorUpdateData data) =>
                 {
-                    data = new PartyBehaviorUpdateData { PartyPosition = party.Position };
+                    data = new PartyBehaviorUpdateData(
+                        null, default, null, default, party.Position, party.DefaultBehavior,
+                        party.TargetPosition, default)
+                    {
+                        PartyMoveMode = party.PartyMoveMode,
+                        MoveTargetPoint = party.MoveTargetPoint,
+                    };
                     return true;
                 });
             snapshots.Setup(service => service.CanApply(It.IsAny<MobileParty>(), It.IsAny<PartyBehaviorUpdateData>())).Returns(true);
@@ -125,6 +131,10 @@ public sealed class DefenderSiegeFixtureCommandsTests : IDisposable
                     }
 
                     party._position = data.PartyPosition;
+                    party.PartyMoveMode = data.PartyMoveMode;
+                    party.MoveTargetPoint = data.MoveTargetPoint;
+                    party.TargetPosition = data.TargetPosition;
+                    party.DefaultBehavior = data.DefaultBehavior;
                     return true;
                 });
             actions.Setup(service => service.Release(It.IsAny<Hero>())).Callback<Hero>(hero =>
@@ -761,6 +771,40 @@ public sealed class DefenderSiegeFixtureCommandsTests : IDisposable
     }
 
     [Fact]
+    public void Stage_StopsExistingMovementAndRestoreReplaysCapturedOrders()
+    {
+        PrepareStagingParties();
+        var target = new CampaignVec2(new Vec2(45f, 67f), isOnLand: true);
+        foreach (var captive in captives)
+        {
+            captive.Party.PartyMoveMode = MoveModeType.Point;
+            captive.Party.DefaultBehavior = AiBehavior.GoToPoint;
+            captive.Party.TargetPosition = target;
+            captive.Party.MoveTargetPoint = target;
+        }
+        AssertSuccess(Parse(DefenderSiegeFixtureCommands.Capture(new() { "testclient", "testclient2" })));
+
+        AssertSuccess(Parse(DefenderSiegeFixtureCommands.Stage(new())));
+
+        Assert.All(captives, captive =>
+        {
+            Assert.Equal(MoveModeType.Hold, captive.Party.PartyMoveMode);
+            Assert.Equal(AiBehavior.Hold, captive.Party.DefaultBehavior);
+            Assert.Equal(captive.Party.Position, captive.Party.MoveTargetPoint);
+            Assert.Equal(captive.Party.Position, captive.Party.NextTargetPosition);
+        });
+        AssertSuccess(Parse(DefenderSiegeFixtureCommands.Restore(new())));
+        Assert.All(captives, captive =>
+        {
+            Assert.Equal(MoveModeType.Point, captive.Party.PartyMoveMode);
+            Assert.Equal(AiBehavior.GoToPoint, captive.Party.DefaultBehavior);
+            Assert.Equal(target, captive.Party.MoveTargetPoint);
+            Assert.Equal(target, captive.Party.TargetPosition);
+        });
+        AssertSuccess(Parse(DefenderSiegeFixtureCommands.VerifyRestore(new())));
+    }
+
+    [Fact]
     public void StagingFixture_UnchangedIdentities_ClearsOnlyAfterRestoreVerification()
     {
         CaptureStagingFixture();
@@ -1350,6 +1394,25 @@ public sealed class DefenderSiegeFixtureCommandsTests : IDisposable
         preferred.SiegeEvent = null;
         Assert.Same(preferred, DefenderSiegeFixtureCommands.SelectStagingSettlement(
             objects, new[] { secondFallback, firstFallback, preferred }, parties));
+    }
+
+    [Fact]
+    public void SelectStagingSettlement_UsesDanusticaOnlyWhenExplicitlyAllowed()
+    {
+        Settlement castle = CreateStagingCastle("castle_ES1");
+        Settlement danustica = CreateStagingCastle("town_ES1");
+        danustica.Town._isCastle = false;
+        Assert.True(danustica.IsTown);
+        MobileParty[] parties = captives.Select(captive => captive.Party).ToArray();
+        Assert.True(objects.AddExisting(castle.StringId, castle));
+        Assert.True(objects.AddExisting(danustica.StringId, danustica));
+
+        Assert.Null(DefenderSiegeFixtureCommands.SelectStagingSettlement(
+            objects, new[] { danustica }, parties));
+        Assert.Same(danustica, DefenderSiegeFixtureCommands.SelectStagingSettlement(
+            objects, new[] { danustica }, parties, allowDanustica: true));
+        Assert.Same(castle, DefenderSiegeFixtureCommands.SelectStagingSettlement(
+            objects, new[] { danustica, castle }, parties));
     }
 
     private Settlement PrepareStagingParties()
