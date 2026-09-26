@@ -655,6 +655,7 @@ public class GangLeaderNeedsToOffloadStolenGoodsIssueTests : IDisposable
         Server.Call(() =>
         {
             Assert.True(Server.ObjectManager.TryGetObject<Hero>(fixture.HeroId, out var owner));
+            Assert.False(QuestSolutionStartRunner.HasRegisteredQuest(owner));
             Assert.True(Server.Resolve<IIssueGenerationRegistry>().TryGetGeneration(owner, out generation));
             Server.Resolve<IMessageBroker>().Publish(Client.NetPeer, new RequestQuestTypeAcceptQuest(fixture.HeroId, generation));
         });
@@ -664,6 +665,7 @@ public class GangLeaderNeedsToOffloadStolenGoodsIssueTests : IDisposable
         Server.Call(() =>
         {
             Assert.True(Server.ObjectManager.TryGetObject<Hero>(fixture.HeroId, out var owner));
+            Assert.True(QuestSolutionStartRunner.HasRegisteredQuest(owner));
             var quest = Assert.IsType<GangLeaderNeedsToOffloadStolenGoodsIssueBehavior.GangLeaderNeedsToOffloadStolenGoodsIssueQuest>(owner.Issue.IssueQuest);
             Assert.Contains(quest, Campaign.Current.QuestManager.Quests);
             Assert.NotNull(quest._playerStartsQuestLog);

@@ -122,6 +122,12 @@ internal class GenericQuestTypeAcceptHandler : IHandler
                     return owner.Issue.StartIssueWithQuest();
                 });
                 if (!started) return;
+                if (descriptor.TryArbitrateQuestSolutionAcceptBytes != null &&
+                    !QuestSolutionStartRunner.HasRegisteredQuest(owner))
+                {
+                    Logger.Error("Quest-solution accept for owner {Owner} did not leave a registered ongoing quest - not broadcasting", ownerId);
+                    return;
+                }
 
                 ownershipRegistry.SetOwner(owner, hostControllerId);
                 network.SendAll(new NetworkQuestTypeQuestAccepted(ownerId, hostControllerId, fieldsBytes));
@@ -216,6 +222,13 @@ internal class GenericQuestTypeAcceptHandler : IHandler
                 if (!started)
                 {
                     Logger.Error("Replayed accept for owner {Owner} but could not read back its quest fields - rolled back and rejecting", ownerId);
+                    network.Send(requester, new NetworkQuestTypeAcceptRejected(ownerId, isAlternative: false));
+                    return;
+                }
+                if (descriptor.TryArbitrateQuestSolutionAcceptBytes != null &&
+                    !QuestSolutionStartRunner.HasRegisteredQuest(owner))
+                {
+                    Logger.Error("Quest-solution accept for owner {Owner} did not leave a registered ongoing quest - rejecting", ownerId);
                     network.Send(requester, new NetworkQuestTypeAcceptRejected(ownerId, isAlternative: false));
                     return;
                 }

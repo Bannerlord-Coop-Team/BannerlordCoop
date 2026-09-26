@@ -1,4 +1,5 @@
 using System;
+using System.Linq;
 using GameInterface.Services.Heroes.Patches;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Players.Data;
@@ -21,6 +22,10 @@ public sealed class QuestSolutionStartAuthorityGuard : IDisposable
 
 public static class QuestSolutionStartRunner
 {
+    public static bool HasRegisteredQuest(Hero owner) =>
+        owner?.Issue?.IssueQuest is { IsOngoing: true } quest &&
+        Campaign.Current.QuestManager.Quests.Contains(quest);
+
     public static T RunGuarded<T>(Player truePlayer, Func<T> action)
     {
         using (new QuestSolutionStartAuthorityGuard())
