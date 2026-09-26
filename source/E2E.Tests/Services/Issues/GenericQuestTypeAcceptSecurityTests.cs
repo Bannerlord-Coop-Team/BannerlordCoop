@@ -9,6 +9,7 @@ using GameInterface.Services.Issues.Messages;
 using GameInterface.Services.Players;
 using GameInterface.Services.Players.Data;
 using HarmonyLib;
+using Helpers;
 using Moq;
 using System;
 using System.Linq;
@@ -749,6 +750,77 @@ public class GenericQuestTypeAcceptSecurityTests : IDisposable
         });
 
         Assert.Empty(Client.NetworkSentMessages.GetMessages<RequestQuestTypeAcceptAlternative>());
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void ManualQuestScreenReset_BeforeCompetingAcceptance_DoesNotReturnTroopsTwice(bool alternativeWinner)
+    {
+        var fixture = SetupVillageOwner();
+        CreateIssueOnBothPeers(fixture);
+        var partyId = TestEnvironment.CreateRegisteredObject<MobileParty>();
+        var troopId = TestEnvironment.CreateRegisteredObject<CharacterObject>();
+        Client.Resolve<IControllerIdProvider>().SetControllerId("player-A");
+
+        Client.Call(() =>
+        {
+            Assert.True(Client.ObjectManager.TryGetObject<Hero>(fixture.HeroId, out var owner));
+            Assert.True(Client.ObjectManager.TryGetObject<Hero>(fixture.CompanionHeroId, out var companion));
+            Assert.True(Client.ObjectManager.TryGetObject<MobileParty>(partyId, out var party));
+            Assert.True(Client.ObjectManager.TryGetObject<CharacterObject>(troopId, out var troop));
+            var roster = owner.Issue.AlternativeSolutionSentTroops;
+            using (new AllowedThread())
+            {
+                Campaign.Current.MainParty = party;
+                party.MemberRoster.AddToCounts(troop, 6);
+            }
+
+            var screen = new PartyScreenLogic();
+            screen._partyScreenMode = PartyScreenHelper.PartyScreenMode.QuestTroopManage;
+            screen.MemberRosters[(int)PartyScreenLogic.PartyRosterSide.Left] = roster;
+            screen.MemberRosters[(int)PartyScreenLogic.PartyRosterSide.Right] = party.MemberRoster;
+            screen.CurrentData.LeftMemberRoster = roster;
+            screen.CurrentData.RightMemberRoster = party.MemberRoster;
+            screen.CurrentData.LeftPrisonerRoster = TroopRoster.CreateDummyTroopRoster();
+            screen.CurrentData.RightPrisonerRoster = TroopRoster.CreateDummyTroopRoster();
+            screen._initialData.LeftMemberRoster = TroopRoster.CreateDummyTroopRoster();
+            screen._initialData.RightMemberRoster = party.MemberRoster.CloneRosterData();
+            screen._initialData.LeftPrisonerRoster = TroopRoster.CreateDummyTroopRoster();
+            screen._initialData.RightPrisonerRoster = TroopRoster.CreateDummyTroopRoster();
+
+            var before = TroopRoster.CreateDummyTroopRoster();
+            using (new AllowedThread())
+            {
+                party.MemberRoster.AddToCounts(troop, -6);
+                roster.AddToCounts(troop, 6);
+            }
+            var after = roster.CloneRosterData();
+            Common.Messaging.MessageBroker.Instance.Publish(owner,
+                new QuestAlternativeTroopsTransferredLocally(roster, before, after));
+            Assert.Equal(0, party.MemberRoster.GetTroopCount(troop));
+
+            screen.Reset(false);
+            Assert.Equal(6, party.MemberRoster.GetTroopCount(troop));
+            Assert.Equal(0, roster.GetTroopCount(troop));
+
+            if (alternativeWinner)
+            {
+                var winner = TroopRoster.CreateDummyTroopRoster();
+                winner.AddToCounts(companion.CharacterObject, 1);
+                var packed = Client.Resolve<GameInterface.Services.TroopRosters.Interfaces.ITroopRosterInterface>()
+                    .PackTroopRosterData(winner);
+                Common.Messaging.MessageBroker.Instance.Publish(owner,
+                    new NetworkQuestTypeAlternativeAccepted(fixture.HeroId, "player-B", default, null, packed));
+            }
+            else
+            {
+                Common.Messaging.MessageBroker.Instance.Publish(owner,
+                    new NetworkQuestTypeQuestAccepted(fixture.HeroId, "player-B", null));
+            }
+
+            Assert.Equal(6, party.MemberRoster.GetTroopCount(troop));
+        });
     }
 
     [Theory]

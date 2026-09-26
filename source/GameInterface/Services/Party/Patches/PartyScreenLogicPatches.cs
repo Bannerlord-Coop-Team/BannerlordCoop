@@ -133,6 +133,21 @@ internal class PartyScreenLogicPatches
         return (element.Number, element.WoundedNumber, element.Xp);
     }
 
+    [HarmonyPatch(nameof(PartyScreenLogic.Reset))]
+    [HarmonyPostfix]
+    public static void ResetPostfix(PartyScreenLogic __instance, bool fromCancel)
+    {
+        if (!ModInformation.IsClient || fromCancel || InCommit ||
+            __instance._partyScreenMode != PartyScreenHelper.PartyScreenMode.QuestTroopManage ||
+            __instance.CurrentData == __instance._initialData ||
+            __instance.MemberRosters[(int)PartyScreenLogic.PartyRosterSide.Right] != MobileParty.MainParty?.MemberRoster)
+            return;
+
+        var roster = __instance.MemberRosters[(int)PartyScreenLogic.PartyRosterSide.Left];
+        if (roster != null)
+            MessageBroker.Instance.Publish(__instance, new QuestAlternativeTroopSelectionReset(roster, __instance));
+    }
+
     [HarmonyPatch(nameof(PartyScreenLogic.DoneLogic))]
     [HarmonyPrefix]
     public static bool DoneLogicPrefix(PartyScreenLogic __instance, ref bool __result, bool isForced)
