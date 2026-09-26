@@ -118,6 +118,7 @@ public class SystemDeveloperDirectCommandTests
                 "instrument",
                 "is_ironman_mode",
                 "set_time_mode",
+                "stage_accept",
             },
             countReaders);
 #else
@@ -129,6 +130,7 @@ public class SystemDeveloperDirectCommandTests
                 "force_autosave",
                 "instrument",
                 "is_ironman_mode",
+                "stage_accept",
             },
             countReaders);
 #endif
