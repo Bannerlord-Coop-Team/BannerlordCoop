@@ -4,6 +4,7 @@ param(
     [Parameter(Mandatory=$true)][string]$InputsRoot,
     [Parameter(Mandatory=$true)][ValidatePattern('^[A-Za-z0-9_-]{1,64}$')][string]$RunToken,
     [string]$StageRoot,
+    [string]$SeedConfigPath,
     [string]$DotNetRoot,
     [string]$ExpectedCoopHead,
     [string]$ExpectedCoopTree,
@@ -16,9 +17,12 @@ $statePath = Join-Path $stateDirectory 'owner.json'
 $originalPath = Join-Path $stateDirectory 'original-config'
 $installedPath = Join-Path $stateDirectory 'installed-config'
 function Initialize-SyntheticPassword {
-    param([Parameter(Mandatory=$true)][string]$ConfigPath)
-    $original = [IO.File]::ReadAllBytes($configPath)
-    $configText = [IO.File]::ReadAllText($configPath)
+    param([Parameter(Mandatory=$true)][string]$ConfigPath, [string]$SeedConfigPath)
+    $originalExists = Test-Path -LiteralPath $ConfigPath -PathType Leaf
+    # The launcher seeds this template only at first start; prepare its password before then.
+    $inputPath = if ($originalExists) { $ConfigPath } else { $SeedConfigPath }
+    $original = [IO.File]::ReadAllBytes($inputPath)
+    $configText = [IO.File]::ReadAllText($inputPath)
     $passwordPattern = '"password"\s*:\s*"(?:[^"\\]|\\.)*"'
     $passwordMatches = [regex]::Matches($configText, $passwordPattern)
     if ($passwordMatches.Count -ne 1) { throw 'Expected exactly one password field in the prepared server config.' }
@@ -35,7 +39,7 @@ function Initialize-SyntheticPassword {
     Set-Acl -LiteralPath $stateDirectory -AclObject $acl
     [IO.File]::WriteAllBytes($originalPath, $original)
     [IO.File]::WriteAllText($installedPath, $updated, [Text.UTF8Encoding]::new($false))
-    [IO.File]::WriteAllText($statePath, ([ordered]@{runToken=$RunToken;configPath=$configPath} | ConvertTo-Json), [Text.UTF8Encoding]::new($false))
+    [IO.File]::WriteAllText($statePath, ([ordered]@{runToken=$RunToken;configPath=$configPath;originalExists=$originalExists} | ConvertTo-Json), [Text.UTF8Encoding]::new($false))
     [IO.File]::WriteAllBytes($configPath, [IO.File]::ReadAllBytes($installedPath))
     $password = $null
     $updated = $null
@@ -48,10 +52,11 @@ if ($Action -ceq 'Restore') {
     $currentHash = (Get-FileHash -LiteralPath $configPath -Algorithm SHA256).Hash
     $originalHash = (Get-FileHash -LiteralPath $originalPath -Algorithm SHA256).Hash
     $installedHash = (Get-FileHash -LiteralPath $installedPath -Algorithm SHA256).Hash
-    if ($currentHash -cne $originalHash -and $currentHash -cne $installedHash) {
+    if ($currentHash -cne $installedHash -and (-not $state.originalExists -or $currentHash -cne $originalHash)) {
         throw 'Synthetic server config changed outside the owned setup; backup retained.'
     }
-    [IO.File]::WriteAllBytes($configPath, [IO.File]::ReadAllBytes($originalPath))
+    if ($state.originalExists) { [IO.File]::WriteAllBytes($configPath, [IO.File]::ReadAllBytes($originalPath)) }
+    else { Remove-Item -LiteralPath $configPath -Force }
     Remove-Item -LiteralPath $stateDirectory -Recurse -Force
     return
 }
@@ -70,4 +75,4 @@ $harness = Join-Path $sourceRoot 'source\VerificationHarness\bin\Release\net10.0
     --server-head $ExpectedServerHead --server-tree $ExpectedServerTree `
     --output (Join-Path $StageRoot 'dedicated-server-synthetic-artifacts.json')
 if ($LASTEXITCODE -ne 0) { throw 'Synthetic build manifest creation failed.' }
-Initialize-SyntheticPassword -ConfigPath (Join-Path $StageRoot 'server-data\server-config.json')
+Initialize-SyntheticPassword -ConfigPath (Join-Path $StageRoot 'server-data\server-config.json') -SeedConfigPath $SeedConfigPath

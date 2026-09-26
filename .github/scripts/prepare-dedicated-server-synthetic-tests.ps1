@@ -28,6 +28,26 @@ try {
     & $scriptPath -Action Restore -InputsRoot $InputsRoot -RunToken $RunToken
     if ([Convert]::ToBase64String([IO.File]::ReadAllBytes($configPath)) -cne [Convert]::ToBase64String($original)) { throw 'Original config bytes were not restored.' }
     if (Test-Path -LiteralPath $stateDirectory) { throw 'Password backup remains after restoration.' }
+    # A fresh pinned stage has no config; use its shipped template, not the repository dev config.
+    $stageRoot=Join-Path $testRoot '.stage-win'
+    $stageData=Join-Path $stageRoot 'server-data'
+    New-Item -Path $stageData -ItemType Directory | Out-Null
+    $freshConfig=Join-Path $stageData 'server-config.json'
+    $seedConfig=Join-Path $testRoot 'server-config.default.json'
+    [IO.File]::WriteAllBytes($seedConfig,$original)
+    Initialize-SyntheticPassword -ConfigPath $freshConfig -SeedConfigPath $seedConfig
+    $configured=Get-Content -LiteralPath $freshConfig -Raw | ConvertFrom-Json
+    if ($configured.password -notmatch '^[a-f0-9]{32}$' -or $configured.port -ne 4200) { throw 'Fresh stage config was not seeded.' }
+    & $scriptPath -Action Restore -InputsRoot $InputsRoot -RunToken $RunToken
+    if (Test-Path -LiteralPath $freshConfig) { throw 'Fresh stage cleanup did not restore config absence.' }
+    if ([Convert]::ToBase64String([IO.File]::ReadAllBytes($seedConfig)) -cne [Convert]::ToBase64String($original)) { throw 'Config seed was changed.' }
+    Initialize-SyntheticPassword -ConfigPath $freshConfig -SeedConfigPath $seedConfig
+    [IO.File]::AppendAllText($freshConfig,' ')
+    $rejected=$false
+    try { & $scriptPath -Action Restore -InputsRoot $InputsRoot -RunToken $RunToken } catch { $rejected=$true }
+    if (-not $rejected -or -not (Test-Path -LiteralPath $stateDirectory)) { throw 'Changed fresh config lost its recovery state.' }
+    [IO.File]::WriteAllBytes($freshConfig,[IO.File]::ReadAllBytes($installedPath))
+    & $scriptPath -Action Restore -InputsRoot $InputsRoot -RunToken $RunToken
     Initialize-SyntheticPassword -ConfigPath $configPath
     [IO.File]::AppendAllText($configPath,' ')
     $rejected=$false
