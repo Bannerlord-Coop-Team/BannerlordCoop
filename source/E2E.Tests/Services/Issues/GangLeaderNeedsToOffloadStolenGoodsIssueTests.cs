@@ -422,6 +422,51 @@ public class GangLeaderNeedsToOffloadStolenGoodsIssueTests : IDisposable
     }
 
     [Fact]
+    public void OpenAccept_ReportsTrackedConversationBeforeQuestHasAnOwner()
+    {
+        var fixture = SetupIssueOwner();
+        CreateIssueOnServer(fixture);
+        var partyId = TestEnvironment.CreateRegisteredObject<MobileParty>();
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject<MobileParty>(partyId, out var party));
+            Assert.True(Server.ObjectManager.TryGetObject<Settlement>(fixture.OwnerSettlementId, out var settlement));
+            using (new AllowedThread()) { party.CurrentSettlement = settlement; }
+            Assert.True(Server.Resolve<IPlayerManager>().AddPlayer(
+                new Player("player-A", fixture.HeroId, partyId, "", "")));
+        });
+        TestEnvironment.ConnectRegisteredPlayer(Client, "player-A");
+        Client.Resolve<IControllerIdProvider>().SetControllerId("player-A");
+
+        var args = new CoopCommandArgsFactory().FromValues(new[] { fixture.HeroId, "player-A" });
+        Client.Call(() =>
+        {
+            var before = new IssuesDebugCommand.IssuesObserveAcceptCoopCommand().ProcessCommand(args);
+            Assert.Contains("trackedConversationGeneration=none", before.Output);
+            var opened = new IssuesDebugCommand.IssuesOpenAcceptCoopCommand().ProcessCommand(
+                new CoopCommandArgsFactory().FromValues(new[] { fixture.HeroId }));
+            Assert.True(opened.Succeeded, opened.Output);
+        });
+
+        Server.Call(() =>
+        {
+            Assert.True(Server.Resolve<IIssueConversationTracker>().TryGetTrackedRequester(
+                fixture.HeroId, "player-A", out var generation));
+            var observed = new IssuesDebugCommand.IssuesObserveAcceptCoopCommand().ProcessCommand(args);
+            Assert.Contains($"trackedConversationGeneration={generation}", observed.Output);
+            Assert.Contains("controller=none", observed.Output);
+        });
+        Client.Call(() =>
+        {
+            Assert.True(Client.Resolve<IIssueConversationTracker>().TryGetTrackedRequester(
+                fixture.HeroId, "player-A", out var generation));
+            var observed = new IssuesDebugCommand.IssuesObserveAcceptCoopCommand().ProcessCommand(args);
+            Assert.Contains($"trackedConversationGeneration={generation}", observed.Output);
+            Assert.Contains("controller=none", observed.Output);
+        });
+    }
+
+    [Fact]
     public void RemoteClientAccept_ForceCorrectsPriceAmountRewardAndCounterOfferGold_OnEveryPeer_IncludingTheAccepterItself_WhenPriceAndDifficultyDiverge()
     {
         var fixture = SetupIssueOwner();

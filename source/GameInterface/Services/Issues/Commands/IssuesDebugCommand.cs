@@ -307,6 +307,7 @@ public static class IssuesDebugCommand
         public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
             new ExpectedArgs("hero_id", "The registered issue owner id.", isRequired: true),
+            new ExpectedArgs("controller_id", "An optional requester controller id for conversation tracking.", isRequired: false),
         };
 
         public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
@@ -319,11 +320,20 @@ public static class IssuesDebugCommand
             ContainerProvider.TryResolve<IIssueOwnershipRegistry>(out var owners);
             var generation = generations != null && generations.TryGetGeneration(hero, out var value) ? value.ToString() : "none";
             var controller = owners != null && owners.TryGetOwnerControllerId(hero, out var id) ? id : "none";
+            var trackedConversation = "";
+            if (args.Count > 1)
+            {
+                ContainerProvider.TryResolve<IIssueConversationTracker>(out var conversations);
+                var trackedGeneration = conversations != null &&
+                    conversations.TryGetTrackedRequester(args[0], args[1], out var currentGeneration)
+                    ? currentGeneration.ToString() : "none";
+                trackedConversation = $" trackedConversationGeneration={trackedGeneration}";
+            }
             var troops = string.Join(",", issue.AlternativeSolutionSentTroops.GetTroopRoster()
                 .Select(element => $"{element.Character.StringId}:{element.Number}:{element.WoundedNumber}:{element.Xp}"));
             return Succeeded($"owner={args[0]} issue={issue.StringId} ongoingWithoutQuest={issue.IsOngoingWithoutQuest} " +
                 $"quest={issue.IssueQuest?.StringId ?? "none"} alternative={issue.IsSolvingWithAlternative} " +
-                $"generation={generation} controller={controller} sentTroops=[{troops}]");
+                $"generation={generation} controller={controller}{trackedConversation} sentTroops=[{troops}]");
         }
     }
 
