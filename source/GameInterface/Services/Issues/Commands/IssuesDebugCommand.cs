@@ -331,9 +331,14 @@ public static class IssuesDebugCommand
             }
             var troops = string.Join(",", issue.AlternativeSolutionSentTroops.GetTroopRoster()
                 .Select(element => $"{element.Character.StringId}:{element.Number}:{element.WoundedNumber}:{element.Xp}"));
+            var issueManagerSame = Campaign.Current.IssueManager.Issues.TryGetValue(hero, out var registeredIssue) &&
+                ReferenceEquals(registeredIssue, issue);
+            var trackedQuestCount = Campaign.Current.QuestManager.Quests.Count(quest =>
+                quest.StringId == issue.StringId + "_quest");
             return Succeeded($"owner={args[0]} issue={issue.StringId} ongoingWithoutQuest={issue.IsOngoingWithoutQuest} " +
                 $"quest={issue.IssueQuest?.StringId ?? "none"} alternative={issue.IsSolvingWithAlternative} " +
-                $"generation={generation} controller={controller}{trackedConversation} sentTroops=[{troops}]");
+                $"generation={generation} controller={controller}{trackedConversation} sentTroops=[{troops}] " +
+                $"issueManagerSame={issueManagerSame} trackedQuestCount={trackedQuestCount}");
         }
     }
 
