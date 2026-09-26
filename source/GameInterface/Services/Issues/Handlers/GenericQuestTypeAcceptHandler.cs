@@ -380,7 +380,10 @@ internal class GenericQuestTypeAcceptHandler : IHandler
     {
         if (payload.What.Roster == null) return;
         localSelectionTransfers.Remove(payload.What.Roster);
-        resetQuestScreens[payload.What.Roster] = (payload.What.Screen, payload.What.SelectedTroops);
+        if (payload.What.SelectedTroops != null ||
+            !resetQuestScreens.TryGetValue(payload.What.Roster, out var previous) ||
+            !ReferenceEquals(previous.Screen, payload.What.Screen) || previous.SelectedTroops == null)
+            resetQuestScreens[payload.What.Roster] = (payload.What.Screen, payload.What.SelectedTroops);
         Hero pendingOwner = null;
         foreach (var pair in pendingAlternativeAccepts)
         {

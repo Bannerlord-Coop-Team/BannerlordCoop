@@ -50,6 +50,23 @@ public class GenericQuestTypeAcceptSecurityTests : IDisposable
 
     private record VillageFixture(string HeroId, string VillageId, string SettlementId, string ItemId, string CompanionHeroId);
 
+    private static PartyScreenLogic CreateQuestSelectionScreen(TroopRoster roster, MobileParty party)
+    {
+        var screen = new PartyScreenLogic();
+        screen._partyScreenMode = PartyScreenHelper.PartyScreenMode.QuestTroopManage;
+        screen.MemberRosters[(int)PartyScreenLogic.PartyRosterSide.Left] = roster;
+        screen.MemberRosters[(int)PartyScreenLogic.PartyRosterSide.Right] = party.MemberRoster;
+        screen.CurrentData.LeftMemberRoster = roster;
+        screen.CurrentData.RightMemberRoster = party.MemberRoster;
+        screen.CurrentData.LeftPrisonerRoster = TroopRoster.CreateDummyTroopRoster();
+        screen.CurrentData.RightPrisonerRoster = TroopRoster.CreateDummyTroopRoster();
+        screen._initialData.LeftMemberRoster = TroopRoster.CreateDummyTroopRoster();
+        screen._initialData.RightMemberRoster = party.MemberRoster.CloneRosterData();
+        screen._initialData.LeftPrisonerRoster = TroopRoster.CreateDummyTroopRoster();
+        screen._initialData.RightPrisonerRoster = TroopRoster.CreateDummyTroopRoster();
+        return screen;
+    }
+
     private VillageFixture SetupVillageOwner()
     {
         var heroId = TestEnvironment.CreateRegisteredObject<Hero>();
@@ -776,18 +793,7 @@ public class GenericQuestTypeAcceptSecurityTests : IDisposable
                 party.MemberRoster.AddToCounts(troop, 6);
             }
 
-            var screen = new PartyScreenLogic();
-            screen._partyScreenMode = PartyScreenHelper.PartyScreenMode.QuestTroopManage;
-            screen.MemberRosters[(int)PartyScreenLogic.PartyRosterSide.Left] = roster;
-            screen.MemberRosters[(int)PartyScreenLogic.PartyRosterSide.Right] = party.MemberRoster;
-            screen.CurrentData.LeftMemberRoster = roster;
-            screen.CurrentData.RightMemberRoster = party.MemberRoster;
-            screen.CurrentData.LeftPrisonerRoster = TroopRoster.CreateDummyTroopRoster();
-            screen.CurrentData.RightPrisonerRoster = TroopRoster.CreateDummyTroopRoster();
-            screen._initialData.LeftMemberRoster = TroopRoster.CreateDummyTroopRoster();
-            screen._initialData.RightMemberRoster = party.MemberRoster.CloneRosterData();
-            screen._initialData.LeftPrisonerRoster = TroopRoster.CreateDummyTroopRoster();
-            screen._initialData.RightPrisonerRoster = TroopRoster.CreateDummyTroopRoster();
+            var screen = CreateQuestSelectionScreen(roster, party);
 
             var before = TroopRoster.CreateDummyTroopRoster();
             using (new AllowedThread())
@@ -820,6 +826,44 @@ public class GenericQuestTypeAcceptSecurityTests : IDisposable
             }
 
             Assert.Equal(6, party.MemberRoster.GetTroopCount(troop));
+        });
+    }
+
+    [Fact]
+    public void ManualQuestScreenReset_AfterDone_KeepsSelectedTroopsForAcceptTrigger()
+    {
+        var fixture = SetupVillageOwner();
+        CreateIssueOnBothPeers(fixture);
+        var partyId = TestEnvironment.CreateRegisteredObject<MobileParty>();
+        var troopId = TestEnvironment.CreateRegisteredObject<CharacterObject>();
+        Client.Resolve<IControllerIdProvider>().SetControllerId("player-A");
+
+        Client.Call(() =>
+        {
+            Assert.True(Client.ObjectManager.TryGetObject<Hero>(fixture.HeroId, out var owner));
+            Assert.True(Client.ObjectManager.TryGetObject<MobileParty>(partyId, out var party));
+            Assert.True(Client.ObjectManager.TryGetObject<CharacterObject>(troopId, out var troop));
+            using (new AllowedThread())
+            {
+                Campaign.Current.MainParty = party;
+                party.MemberRoster.AddToCounts(troop, 6);
+            }
+
+            var roster = owner.Issue.AlternativeSolutionSentTroops;
+            var screen = CreateQuestSelectionScreen(roster, party);
+            var selected = TroopRoster.CreateDummyTroopRoster();
+            selected.AddToCounts(troop, 6);
+            Common.Messaging.MessageBroker.Instance.Publish(owner,
+                new QuestAlternativeTroopSelectionReset(roster, screen, selected));
+
+            screen.Reset(false);
+            Common.Messaging.MessageBroker.Instance.Publish(owner,
+                new QuestTypeAlternativeAcceptTriggered(owner, "player-A", null, screen));
+
+            var request = Assert.Single(Client.NetworkSentMessages.GetMessages<RequestQuestTypeAcceptAlternative>());
+            var requested = Client.Resolve<GameInterface.Services.TroopRosters.Interfaces.ITroopRosterInterface>()
+                .UnpackTroopRosterData(request.SentTroops).ToArray();
+            Assert.Equal(6, requested.Sum(element => element.Number));
         });
     }
 
