@@ -3,6 +3,7 @@ using Common.Network;
 using GameInterface.Services.Chat.Messages;
 using GameInterface.Services.Entity;
 using GameInterface.Services.Players;
+using GameInterface.Services.UI;
 using GameInterface.Services.UI.CoopOptions;
 using GameInterface.Services.UI.CoopOptions.Providers.ChatTab;
 using GameInterface.Services.UI.Messages;
@@ -28,6 +29,8 @@ public sealed class ChatService : IChatService, IDisposable
     private readonly IChatPlayerNameResolver playerNameResolver;
     private readonly IControllerIdProvider controllerIdProvider;
     private readonly IMessageBroker messageBroker;
+    private readonly IChatVanillaLogGate vanillaLogGate;
+    private readonly IChatEventLog eventLog;
     private readonly ChatVM viewModel;
     private readonly ChatOverlay overlay;
 
@@ -37,17 +40,35 @@ public sealed class ChatService : IChatService, IDisposable
         IChatPlayerNameResolver playerNameResolver,
         IControllerIdProvider controllerIdProvider,
         ICoopOptionsStore optionsStore,
-        IMessageBroker messageBroker)
+        IMessageBroker messageBroker,
+        IChatVanillaLogGate vanillaLogGate,
+        IChatEventLog eventLog,
+        IPlayerKillFeedColorService killFeedColorService)
     {
+        if (network == null) throw new ArgumentNullException(nameof(network));
+        if (playerManager == null) throw new ArgumentNullException(nameof(playerManager));
+        if (playerNameResolver == null) throw new ArgumentNullException(nameof(playerNameResolver));
+        if (controllerIdProvider == null) throw new ArgumentNullException(nameof(controllerIdProvider));
+        if (optionsStore == null) throw new ArgumentNullException(nameof(optionsStore));
+        if (messageBroker == null) throw new ArgumentNullException(nameof(messageBroker));
+        if (vanillaLogGate == null) throw new ArgumentNullException(nameof(vanillaLogGate));
+        if (eventLog == null) throw new ArgumentNullException(nameof(eventLog));
+        if (killFeedColorService == null) throw new ArgumentNullException(nameof(killFeedColorService));
+
         this.network = network;
         this.playerManager = playerManager;
         this.playerNameResolver = playerNameResolver;
         this.controllerIdProvider = controllerIdProvider;
         this.messageBroker = messageBroker;
+        this.vanillaLogGate = vanillaLogGate;
+        this.eventLog = eventLog;
 
-        viewModel = new ChatVM(message => network.SendAll(message), () => controllerIdProvider.ControllerId);
+        viewModel = new ChatVM(
+            message => network.SendAll(message),
+            () => controllerIdProvider.ControllerId,
+            killFeedColorService.GetColor);
         var showChat = ChatOptionsTabProvider.GetShowChatOrDefault(optionsStore.LoadOrDefault());
-        overlay = new ChatOverlay(viewModel, RequestParticipants, showChat);
+        overlay = new ChatOverlay(viewModel, RequestParticipants, showChat, vanillaLogGate);
         messageBroker.Subscribe<ChatVisibilitySelected>(HandleChatVisibilitySelected);
     }
 
@@ -55,6 +76,8 @@ public sealed class ChatService : IChatService, IDisposable
 
     public void Initialize()
     {
+        vanillaLogGate.Activate();
+        eventLog.Start(viewModel.ReceiveEvent);
         overlay.Initialize();
     }
 
@@ -86,10 +109,12 @@ public sealed class ChatService : IChatService, IDisposable
     public void Dispose()
     {
         messageBroker.Unsubscribe<ChatVisibilitySelected>(HandleChatVisibilitySelected);
+        eventLog.Dispose();
+        vanillaLogGate.Deactivate();
         overlay.Dispose();
     }
 
-    internal bool IsChatEnabled => overlay.IsEnabled;
+    internal bool IsPlayerChatEnabled => overlay.IsPlayerChatEnabled;
 
     internal void RequestParticipants()
     {
@@ -98,6 +123,6 @@ public sealed class ChatService : IChatService, IDisposable
 
     private void HandleChatVisibilitySelected(MessagePayload<ChatVisibilitySelected> payload)
     {
-        overlay.SetEnabled(payload.What.ShowChat);
+        overlay.SetPlayerChatEnabled(payload.What.ShowChat);
     }
 }

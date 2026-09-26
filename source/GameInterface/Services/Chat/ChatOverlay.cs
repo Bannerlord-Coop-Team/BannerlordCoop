@@ -5,6 +5,7 @@ using TaleWorlds.CampaignSystem.GameState;
 using TaleWorlds.Core;
 using TaleWorlds.Engine;
 using TaleWorlds.Engine.GauntletUI;
+using TaleWorlds.GauntletUI;
 using TaleWorlds.GauntletUI.BaseTypes;
 using TaleWorlds.GauntletUI.Data;
 using TaleWorlds.InputSystem;
@@ -14,32 +15,57 @@ using TaleWorlds.ScreenSystem;
 
 namespace GameInterface.Services.Chat;
 
-/// <summary>Chat UI shared by campaign-map and mission gameplay.</summary>
+/// <summary>Bottom-left event log and co-op chat UI shared by map and mission.</summary>
 internal sealed class ChatOverlay : GlobalLayer, IDisposable
 {
     private const string InputWidgetId = "CoopChatMessageInput";
+    private const string FeedScrollablePanelId = "ChatFeedScrollablePanel";
+    private const string ResizerWidgetId = "CoopChatResizer";
+    private const string ResizeFrameWidgetId = "CoopChatResizeFrame";
+    private const string ResizeCaptureWidgetId = "CoopChatResizeCapture";
     private const int LayerOrder = 110;
+    private const float ResizeTransitionSeconds = 0.14f;
 
     private readonly ChatVM dataSource;
     private readonly Action refreshParticipants;
+    private readonly IChatVanillaLogGate vanillaLogGate;
     private GauntletLayer gauntletLayer;
     private GauntletMovieIdentifier movie;
     private EditableTextWidget inputWidget;
+    private ScrollablePanel feedScrollablePanel;
+    private Widget resizerWidget;
+    private Widget resizeFrameWidget;
+    private Widget resizeCaptureWidget;
     private bool initialized;
     private bool isInputFocused;
     private bool ignoreNextOutsideClick;
-    private bool isEnabled;
+    private bool playerChatEnabled;
+    private bool pinFeedToBottom;
+    private float pinFeedLastMaxValue = -1f;
+    private bool isResizing;
+    private bool applyResizeToPanel;
+    private float resizeLerpRatio;
+    private Vec2 resizeStartMousePosition;
+    private Vec2 resizeOriginalSize;
+    private SizePolicy feedInnerWidthPolicy;
+    private SizePolicy feedInnerHeightPolicy;
 
-    public ChatOverlay(ChatVM dataSource, Action refreshParticipants, bool isEnabled)
+    public ChatOverlay(
+        ChatVM dataSource,
+        Action refreshParticipants,
+        bool playerChatEnabled,
+        IChatVanillaLogGate vanillaLogGate)
     {
         if (dataSource == null) throw new ArgumentNullException(nameof(dataSource));
         if (refreshParticipants == null) throw new ArgumentNullException(nameof(refreshParticipants));
+        if (vanillaLogGate == null) throw new ArgumentNullException(nameof(vanillaLogGate));
 
         this.dataSource = dataSource;
         this.refreshParticipants = refreshParticipants;
-        this.isEnabled = isEnabled;
-        dataSource.OpenRequested += OpenInput;
-        dataSource.CloseRequested += CloseInput;
+        this.vanillaLogGate = vanillaLogGate;
+        this.playerChatEnabled = playerChatEnabled;
+        dataSource.SetPlayerChatEnabled(playerChatEnabled);
+        dataSource.FeedScrolledToBottomRequested += OnFeedScrolledToBottomRequested;
     }
 
     public void Initialize()
@@ -52,9 +78,6 @@ internal sealed class ChatOverlay : GlobalLayer, IDisposable
         Layer = gauntletLayer;
         ScreenManager.AddGlobalLayer(this, false);
         initialized = true;
-
-        if (!isEnabled)
-            ScreenManager.SetSuspendLayer(gauntletLayer, true);
     }
 
     protected override void OnTick(float dt)
@@ -62,9 +85,17 @@ internal sealed class ChatOverlay : GlobalLayer, IDisposable
         base.OnTick(dt);
         if (!UpdateVisibility()) return;
 
+        dataSource.Tick(dt);
+
         if (!dataSource.IsOpen)
         {
-            if (ShouldOpenInput(
+            SetResizeCaptureVisible(false);
+            isResizing = false;
+            applyResizeToPanel = false;
+            // Keep pinning while closed so new lines stay in view
+            if (pinFeedToBottom)
+                ContinuePinFeedToBottom();
+            if (playerChatEnabled && ShouldOpenInput(
                     Input.IsKeyPressed(InputKey.Enter),
                     Input.IsKeyPressed(InputKey.NumpadEnter),
                     Input.IsKeyPressed(InputKey.ControllerLOption)))
@@ -73,6 +104,16 @@ internal sealed class ChatOverlay : GlobalLayer, IDisposable
             }
             return;
         }
+
+        UpdateResize(dt);
+
+        if (pinFeedToBottom)
+            ContinuePinFeedToBottom();
+
+        if (isResizing || applyResizeToPanel) return;
+
+        if (isInputFocused && !dataSource.IsChatInputEnabled)
+            ReleaseInputFocus();
 
         if (ShouldCaptureCloseInput(
                 isInputFocused,
@@ -126,8 +167,7 @@ internal sealed class ChatOverlay : GlobalLayer, IDisposable
 
     public void Dispose()
     {
-        dataSource.OpenRequested -= OpenInput;
-        dataSource.CloseRequested -= CloseInput;
+        dataSource.FeedScrolledToBottomRequested -= OnFeedScrolledToBottomRequested;
         if (!initialized) return;
 
         CloseInput();
@@ -136,29 +176,31 @@ internal sealed class ChatOverlay : GlobalLayer, IDisposable
         dataSource.OnFinalize();
 
         inputWidget = null;
+        feedScrollablePanel = null;
+        resizerWidget = null;
+        resizeFrameWidget = null;
+        resizeCaptureWidget = null;
         movie = null;
         gauntletLayer = null;
         Layer = null;
         initialized = false;
     }
 
-    internal bool IsEnabled => isEnabled;
+    internal bool IsPlayerChatEnabled => playerChatEnabled;
 
-    internal void SetEnabled(bool value)
+    internal void SetPlayerChatEnabled(bool value)
     {
-        if (isEnabled == value) return;
+        if (playerChatEnabled == value) return;
 
-        isEnabled = value;
-        if (!isEnabled && initialized)
-        {
+        playerChatEnabled = value;
+        dataSource.SetPlayerChatEnabled(value);
+        if (!value)
             CloseInput();
-            ScreenManager.SetSuspendLayer(gauntletLayer, true);
-        }
     }
 
     private bool CanOpenInput()
     {
-        if (!gauntletLayer.IsActive || Input.IsOnScreenKeyboardActive) return false;
+        if (!playerChatEnabled || !gauntletLayer.IsActive || Input.IsOnScreenKeyboardActive) return false;
 
         var focusedLayer = ScreenManager.FocusedLayer;
         if (focusedLayer == null || ReferenceEquals(focusedLayer, gauntletLayer)) return true;
@@ -194,16 +236,20 @@ internal sealed class ChatOverlay : GlobalLayer, IDisposable
 
         var focusedLayer = ScreenManager.FocusedLayer;
         bool shouldShow = ShouldShowPresentation(
-            isEnabled,
             isGameplayScreen && !LoadingWindow.IsLoadingWindowActive,
             isConversationActive,
             ReferenceEquals(focusedLayer, gameplayLayer),
             ReferenceEquals(focusedLayer, gauntletLayer));
 
-        if (gauntletLayer.IsActive == shouldShow) return shouldShow;
+        if (gauntletLayer.IsActive == shouldShow)
+        {
+            vanillaLogGate.SetReplacementVisible(shouldShow);
+            return shouldShow;
+        }
 
         if (!shouldShow) CloseInput();
         ScreenManager.SetSuspendLayer(gauntletLayer, !shouldShow);
+        vanillaLogGate.SetReplacementVisible(shouldShow);
         return shouldShow;
     }
 
@@ -214,10 +260,131 @@ internal sealed class ChatOverlay : GlobalLayer, IDisposable
         refreshParticipants();
         dataSource.SetOpen(true);
 
-        inputWidget ??= movie?.Movie?.RootWidget?
-            .FindChild(InputWidgetId, includeAllChildren: true) as EditableTextWidget;
+        ResolveFeedWidgets();
         ignoreNextOutsideClick = true;
         FocusInput();
+    }
+
+    private void OnFeedScrolledToBottomRequested()
+    {
+        // MaxValue updates in OnLateUpdate after the line is measured so pin until it settles
+        pinFeedToBottom = true;
+        pinFeedLastMaxValue = -1f;
+    }
+
+    private void ContinuePinFeedToBottom()
+    {
+        ResolveFeedWidgets();
+        var bar = feedScrollablePanel?.VerticalScrollbar;
+        if (bar == null) return;
+
+        feedScrollablePanel.ResetTweenSpeed();
+        float maxValue = bar.MaxValue;
+        bar.ValueFloat = maxValue;
+
+        if (pinFeedLastMaxValue >= 0f && maxValue <= pinFeedLastMaxValue + 0.01f)
+        {
+            pinFeedToBottom = false;
+            pinFeedLastMaxValue = -1f;
+            return;
+        }
+
+        pinFeedLastMaxValue = maxValue;
+    }
+
+    private void UpdateResize(float dt)
+    {
+        ResolveFeedWidgets();
+        if (resizerWidget == null || resizeFrameWidget == null) return;
+
+        if (Input.IsKeyPressed(InputKey.LeftMouseButton) &&
+            ReferenceEquals(gauntletLayer.UIContext.EventManager.HoveredWidget, resizerWidget))
+        {
+            gauntletLayer.UIContext.EventManager.FocusedWidget = null;
+            isInputFocused = false;
+            isResizing = true;
+            SetResizeCaptureVisible(true);
+            resizeStartMousePosition = Input.MousePositionPixel;
+            resizeOriginalSize = new Vec2(dataSource.ChatBoxSizeX, dataSource.ChatBoxSizeY);
+            resizeFrameWidget.IsVisible = true;
+            resizeFrameWidget.WidthSizePolicy = SizePolicy.Fixed;
+            resizeFrameWidget.HeightSizePolicy = SizePolicy.Fixed;
+            resizeFrameWidget.SuggestedWidth = dataSource.ChatBoxSizeX;
+            resizeFrameWidget.SuggestedHeight = dataSource.ChatBoxSizeY;
+
+            if (feedScrollablePanel?.InnerPanel != null)
+            {
+                feedInnerWidthPolicy = feedScrollablePanel.InnerPanel.WidthSizePolicy;
+                feedInnerHeightPolicy = feedScrollablePanel.InnerPanel.HeightSizePolicy;
+                feedScrollablePanel.InnerPanel.WidthSizePolicy = SizePolicy.Fixed;
+                feedScrollablePanel.InnerPanel.HeightSizePolicy = SizePolicy.Fixed;
+                feedScrollablePanel.InnerPanel.SuggestedWidth = feedScrollablePanel.InnerPanel.Size.X;
+                feedScrollablePanel.InnerPanel.SuggestedHeight = feedScrollablePanel.InnerPanel.Size.Y;
+            }
+        }
+        else if (Input.IsKeyReleased(InputKey.LeftMouseButton))
+        {
+            if (isResizing)
+            {
+                resizeFrameWidget.IsVisible = false;
+                applyResizeToPanel = true;
+                resizeLerpRatio = 0f;
+                SetResizeCaptureVisible(false);
+            }
+
+            isResizing = false;
+        }
+
+        if (isResizing)
+        {
+            Vec2 mouseDelta = Input.MousePositionPixel - resizeStartMousePosition;
+            Vec2 proposed = resizeOriginalSize + new Vec2(mouseDelta.X, -mouseDelta.Y);
+            resizeFrameWidget.SuggestedWidth = ChatVM.ClampSizeX(proposed.X);
+            resizeFrameWidget.SuggestedHeight = ChatVM.ClampSizeY(proposed.Y);
+        }
+        else if (applyResizeToPanel)
+        {
+            resizeLerpRatio = MBMath.ClampFloat(resizeLerpRatio + (dt / ResizeTransitionSeconds), 0f, 1f);
+            float targetWidth = resizeFrameWidget.SuggestedWidth;
+            float targetHeight = resizeFrameWidget.SuggestedHeight;
+            dataSource.ChatBoxSizeX = MBMath.Lerp(resizeOriginalSize.X, targetWidth, resizeLerpRatio);
+            dataSource.ChatBoxSizeY = MBMath.Lerp(resizeOriginalSize.Y, targetHeight, resizeLerpRatio);
+
+            if (Math.Abs(dataSource.ChatBoxSizeX - targetWidth) < 0.01f &&
+                Math.Abs(dataSource.ChatBoxSizeY - targetHeight) < 0.01f)
+            {
+                dataSource.ChatBoxSizeX = targetWidth;
+                dataSource.ChatBoxSizeY = targetHeight;
+                resizeFrameWidget.WidthSizePolicy = SizePolicy.StretchToParent;
+                resizeFrameWidget.HeightSizePolicy = SizePolicy.StretchToParent;
+                if (feedScrollablePanel?.InnerPanel != null)
+                {
+                    feedScrollablePanel.InnerPanel.WidthSizePolicy = feedInnerWidthPolicy;
+                    feedScrollablePanel.InnerPanel.HeightSizePolicy = feedInnerHeightPolicy;
+                }
+
+                applyResizeToPanel = false;
+            }
+        }
+    }
+
+    private void ResolveFeedWidgets()
+    {
+        var root = movie?.Movie?.RootWidget;
+        if (root == null) return;
+
+        inputWidget ??= root.FindChild(InputWidgetId, includeAllChildren: true) as EditableTextWidget;
+        feedScrollablePanel ??= root.FindChild(FeedScrollablePanelId, includeAllChildren: true) as ScrollablePanel;
+        resizerWidget ??= root.FindChild(ResizerWidgetId, includeAllChildren: true);
+        resizeFrameWidget ??= root.FindChild(ResizeFrameWidgetId, includeAllChildren: true);
+        resizeCaptureWidget ??= root.FindChild(ResizeCaptureWidgetId, includeAllChildren: true);
+    }
+
+    private void SetResizeCaptureVisible(bool visible)
+    {
+        ResolveFeedWidgets();
+        if (resizeCaptureWidget != null)
+            resizeCaptureWidget.IsVisible = visible;
     }
 
     private void CloseInput()
@@ -226,12 +393,17 @@ internal sealed class ChatOverlay : GlobalLayer, IDisposable
 
         dataSource.SetOpen(false);
         ignoreNextOutsideClick = false;
+        SetResizeCaptureVisible(false);
+        isResizing = false;
+        applyResizeToPanel = false;
+        if (resizeFrameWidget != null)
+            resizeFrameWidget.IsVisible = false;
         ReleaseInputFocus();
     }
 
     private void FocusInput()
     {
-        if (inputWidget == null) return;
+        if (inputWidget == null || !dataSource.IsChatInputEnabled) return;
 
         gauntletLayer.InputRestrictions.SetInputRestrictions();
         gauntletLayer.IsFocusLayer = true;
@@ -239,7 +411,7 @@ internal sealed class ChatOverlay : GlobalLayer, IDisposable
         if (!ReferenceEquals(ScreenManager.FocusedLayer, gauntletLayer))
         {
             gauntletLayer.IsFocusLayer = false;
-            SetPassiveInputRestrictions(gauntletLayer.InputRestrictions);
+            SetOpenPanelInputRestrictions(gauntletLayer.InputRestrictions);
             return;
         }
 
@@ -254,7 +426,11 @@ internal sealed class ChatOverlay : GlobalLayer, IDisposable
         isInputFocused = false;
         gauntletLayer.IsFocusLayer = false;
         ScreenManager.TryLoseFocus(gauntletLayer);
-        SetPassiveInputRestrictions(gauntletLayer.InputRestrictions);
+        // Cursor stays while open so tabs and the resizer stay usable
+        if (dataSource.IsOpen)
+            SetOpenPanelInputRestrictions(gauntletLayer.InputRestrictions);
+        else
+            SetPassiveInputRestrictions(gauntletLayer.InputRestrictions);
     }
 
     internal static bool ShouldReleaseInputFocus(
@@ -299,14 +475,12 @@ internal sealed class ChatOverlay : GlobalLayer, IDisposable
     }
 
     internal static bool ShouldShowPresentation(
-        bool isEnabled,
         bool isGameplayScreen,
         bool isConversationActive,
         bool isGameplayLayerFocused,
         bool isChatLayerFocused)
     {
-        return isEnabled &&
-               isGameplayScreen &&
+        return isGameplayScreen &&
                !isConversationActive &&
                (isGameplayLayerFocused || isChatLayerFocused);
     }
@@ -315,6 +489,13 @@ internal sealed class ChatOverlay : GlobalLayer, IDisposable
     {
         inputRestrictions.SetInputRestrictions(
             isMouseVisible: false,
+            mask: InputUsageMask.Mouse);
+    }
+
+    internal static void SetOpenPanelInputRestrictions(InputRestrictions inputRestrictions)
+    {
+        inputRestrictions.SetInputRestrictions(
+            isMouseVisible: true,
             mask: InputUsageMask.Mouse);
     }
 }
