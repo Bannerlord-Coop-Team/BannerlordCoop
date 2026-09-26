@@ -484,7 +484,7 @@ public sealed class DedicatedServerSyntheticArtifactManifestTests
             string common = typeof(Common.ModInformation).Assembly.Location;
             var paths = DedicatedServerSyntheticArtifactManifestFile.RequiredAssemblyNames.Select(name => modBin + name + ".dll")
                 .Concat(new[] { engineBin + "DedicatedServer.Core.dll", engineBin + "TaleWorlds.Starter.DotNetCore.dll",
-                    engineBin + "TaleWorlds.Starter.DotNetCore.exe",
+                    "engine/dotnet/dotnet.exe",
                     "engine/Modules/DedicatedServer.Windows/bin/Win64_Shipping_Server/DedicatedServer.Windows.dll" });
             foreach (string relative in paths)
             {
@@ -511,7 +511,8 @@ public sealed class DedicatedServerSyntheticArtifactManifestTests
                 new string('b', 40), new string('c', 40), new string('d', 40), output);
             if (mutation != "valid")
             {
-                await Assert.ThrowsAnyAsync<IOException>(Create);
+                Exception? failure = await Record.ExceptionAsync(Create);
+                Assert.True(failure is IOException or InvalidDataException);
                 Assert.False(File.Exists(output));
                 return;
             }

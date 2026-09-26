@@ -199,10 +199,10 @@ public static class DedicatedServerSyntheticArtifactManifestFile
         manifest.DedicatedServerAssemblies.Add("DedicatedServer.Windows", ReadAssembly(
             "engine/Modules/DedicatedServer.Windows/bin/Win64_Shipping_Server/DedicatedServer.Windows.dll"));
         manifest.DedicatedServerAssemblies.Add("TaleWorlds.Starter.DotNetCore", ReadAssembly(engineBin + "TaleWorlds.Starter.DotNetCore.dll"));
-        string executable = engineBin + "TaleWorlds.Starter.DotNetCore.exe";
+        string executable = "engine/dotnet/dotnet.exe";
         manifest.ServerExecutable = new DedicatedServerSyntheticExecutableArtifact
         {
-            FileName = "TaleWorlds.Starter.DotNetCore.exe",
+            FileName = "dotnet.exe",
             RelativePath = executable,
             Sha256 = reader.ComputeSha256(Resolve(executable))
         };

@@ -20,8 +20,8 @@ function Initialize-SyntheticPassword {
     $original = [IO.File]::ReadAllBytes($configPath)
     $configText = [IO.File]::ReadAllText($configPath)
     $passwordPattern = '"password"\s*:\s*"(?:[^"\\]|\\.)*"'
-    $matches = [regex]::Matches($configText, $passwordPattern)
-    if ($matches.Count -ne 1) { throw 'Expected exactly one password field in the prepared server config.' }
+    $passwordMatches = [regex]::Matches($configText, $passwordPattern)
+    if ($passwordMatches.Count -ne 1) { throw 'Expected exactly one password field in the prepared server config.' }
     $password = [Guid]::NewGuid().ToString('N')
     $updated = [regex]::Replace($configText, $passwordPattern, ('"password": "' + $password + '"'))
     New-Item -Path $stateDirectory -ItemType Directory | Out-Null
