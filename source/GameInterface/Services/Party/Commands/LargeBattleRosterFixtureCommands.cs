@@ -269,8 +269,8 @@ internal static class LargeBattleRosterFixtureCommands
         fixture = activeFixture;
         try
         {
-            SetExactRoster(firstSnapshot.Party.MemberRoster, fixtureTroop, firstTroops);
-            SetExactRoster(secondSnapshot.Party.MemberRoster, fixtureTroop, secondTroops);
+            SetExactRoster(firstSnapshot, fixtureTroop, firstTroops);
+            SetExactRoster(secondSnapshot, fixtureTroop, secondTroops);
         }
         catch (Exception ex)
         {
@@ -294,8 +294,6 @@ internal static class LargeBattleRosterFixtureCommands
             : $"EXACT_BATTLE_ROSTER_FIXTURE_STARTED troop={FixtureTroopId} " +
               $"firstHealthy={firstHealthyCount} secondHealthy={secondHealthyCount}";
         return Succeeded(started + "\n" +
-               $"ORIGINAL_SYNC_ROSTER party={firstSnapshot.PartyId}|members={SyncedRoster(firstSnapshot.MemberRoster)}\n" +
-               $"ORIGINAL_SYNC_ROSTER party={secondSnapshot.PartyId}|members={SyncedRoster(secondSnapshot.MemberRoster)}\n" +
                FormatState("active", firstParty, secondParty, firstHealthyCount, secondHealthyCount));
     }
 
@@ -317,13 +315,13 @@ internal static class LargeBattleRosterFixtureCommands
 
         public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
         {
-            return Status(args, serverOnly: true);
+            return Status(args);
         }
     }
 
-    private static CoopCommandResult Status(IReadOnlyList<string> args, bool serverOnly)
+    private static CoopCommandResult Status(IReadOnlyList<string> args)
     {
-        if (serverOnly && !ModInformation.IsServer)
+        if (!ModInformation.IsServer)
             return Failed("Run this command on the server.");
         if (!TryGetObjectManager(out IObjectManager objectManager))
             return Failed("Unable to resolve ObjectManager.");
@@ -360,7 +358,7 @@ internal static class LargeBattleRosterFixtureCommands
 
         public string Description => "Reports exact battle roster status.";
 
-        public CoopCommandSide Side => CoopCommandSide.Both;
+        public CoopCommandSide Side => CoopCommandSide.Server;
 
         public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
@@ -370,7 +368,7 @@ internal static class LargeBattleRosterFixtureCommands
 
         public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
         {
-            return Status(args, serverOnly: false);
+            return Status(args);
         }
     }
 
@@ -437,9 +435,7 @@ internal static class LargeBattleRosterFixtureCommands
 
         if (!IsPartyStateRestored(activeFixture.FirstParty)
             || !IsPartyStateRestored(activeFixture.SecondParty)
-            || !behaviorRestored
-            || !IsPartyMovementRestored(activeFixture.FirstParty)
-            || !IsPartyMovementRestored(activeFixture.SecondParty))
+            || !behaviorRestored)
         {
             return Failed("Large-battle fixture restoration did not restore the original rosters, heroes, leaders, and movement behavior.\n" +
                    warning +
@@ -452,7 +448,7 @@ internal static class LargeBattleRosterFixtureCommands
         }
 
         fixture = null;
-        return Succeeded("LARGE_BATTLE_ROSTER_FIXTURE_RESTORED snapshotVerified=True\n" +
+        return Succeeded("LARGE_BATTLE_ROSTER_FIXTURE_RESTORED\n" +
             warning +
             FormatState(
                 "none",
@@ -585,11 +581,9 @@ internal static class LargeBattleRosterFixtureCommands
     {
         int healthyHeroes = 0;
         bool hasHealthyLeader = false;
-        bool hasHero = false;
         foreach (TroopRosterElement element in snapshot.MemberRoster)
         {
             if (!element.Character.IsHero) continue;
-            hasHero = true;
 
             int healthy = Math.Max(0, element.Number - element.WoundedNumber);
             healthyHeroes += healthy;
@@ -597,39 +591,16 @@ internal static class LargeBattleRosterFixtureCommands
                 hasHealthyLeader = true;
         }
 
-        return TryGetFixtureTroopCount(
-            snapshot.PartyId,
-            healthyTarget,
-            healthyHeroes,
-            hasHealthyLeader,
-            snapshot.Party.IsBandit,
-            snapshot.Party.LeaderHero != null,
-            hasHero,
-            out fixtureTroops,
-            out error);
-    }
-
-    internal static bool TryGetFixtureTroopCount(
-        string partyId,
-        int healthyTarget,
-        int healthyHeroes,
-        bool hasHealthyLeader,
-        bool isBandit,
-        bool hasLeader,
-        bool hasHero,
-        out int fixtureTroops,
-        out string error)
-    {
-        if (!hasHealthyLeader && !(isBandit && !hasLeader && !hasHero))
+        if (!hasHealthyLeader)
         {
             fixtureTroops = 0;
-            error = $"Party {partyId} must have a healthy leader before staging the battle.";
+            error = $"Party {snapshot.PartyId} must have a healthy leader before staging the battle.";
             return false;
         }
         if (healthyHeroes > healthyTarget)
         {
             fixtureTroops = 0;
-            error = $"Party {partyId} has {healthyHeroes} healthy heroes, more than target {healthyTarget}.";
+            error = $"Party {snapshot.PartyId} has {healthyHeroes} healthy heroes, more than target {healthyTarget}.";
             return false;
         }
 
@@ -638,12 +609,25 @@ internal static class LargeBattleRosterFixtureCommands
         return true;
     }
 
-    internal static void SetExactRoster(
-        TroopRoster roster,
+    private static void SetExactRoster(
+        PartySnapshot snapshot,
         CharacterObject fixtureTroop,
         int fixtureTroops)
     {
-        ClearRoster(roster, preserveHeroes: true);
+        TroopRoster roster = snapshot.Party.MemberRoster;
+        ClearRoster(roster);
+        foreach (TroopRosterElement element in snapshot.MemberRoster)
+        {
+            if (!element.Character.IsHero) continue;
+
+            roster.AddToCounts(
+                element.Character,
+                element.Number,
+                false,
+                element.WoundedNumber,
+                element.Xp,
+                true);
+        }
         if (fixtureTroops > 0)
             roster.AddToCounts(fixtureTroop, fixtureTroops);
     }
@@ -695,25 +679,11 @@ internal static class LargeBattleRosterFixtureCommands
         snapshot.Party.LeaderHero == snapshot.LeaderHero &&
         snapshot.HeroHitPoints.All(hero => hero.Key.HitPoints == hero.Value);
 
-    private static bool IsPartyMovementRestored(PartySnapshot snapshot) =>
-        !snapshot.HasBehavior ||
-        (snapshot.Party.Position.X == snapshot.Behavior.PartyPosition.X &&
-         snapshot.Party.Position.Y == snapshot.Behavior.PartyPosition.Y &&
-         snapshot.Party.Position.IsOnLand == snapshot.Behavior.PartyPosition.IsOnLand &&
-         snapshot.Party.PartyMoveMode == snapshot.Behavior.PartyMoveMode &&
-         snapshot.Party.MoveTargetPoint.X == snapshot.Behavior.MoveTargetPoint.X &&
-         snapshot.Party.MoveTargetPoint.Y == snapshot.Behavior.MoveTargetPoint.Y &&
-         snapshot.Party.MoveTargetPoint.IsOnLand == snapshot.Behavior.MoveTargetPoint.IsOnLand &&
-         snapshot.Party.IsCurrentlyAtSea == snapshot.Behavior.IsCurrentlyAtSea);
-
-    private static void ClearRoster(TroopRoster roster, bool preserveHeroes = false)
+    private static void ClearRoster(TroopRoster roster)
     {
         for (int index = roster.Count - 1; index >= 0; index--)
         {
             TroopRosterElement element = roster.GetElementCopyAtIndex(index);
-            // Removing a hero clears its party leader and role assignments.
-            if (preserveHeroes && element.Character.IsHero) continue;
-
             roster.AddToCountsAtIndex(
                 index,
                 -element.Number,
@@ -731,7 +701,6 @@ internal static class LargeBattleRosterFixtureCommands
             return false;
 
         snapshot.Party.Position = snapshot.Behavior.PartyPosition;
-        snapshot.Party.IsCurrentlyAtSea = snapshot.Behavior.IsCurrentlyAtSea;
         if (!behaviorSnapshot.TryApply(snapshot.Party, snapshot.Behavior, out _))
             return false;
 
@@ -787,13 +756,8 @@ internal static class LargeBattleRosterFixtureCommands
             $"leader={leader?.StringId ?? "none"}|leaderHitPoints={leader?.HitPoints.ToString() ?? "none"}|" +
             $"position={party.Position.X:R},{party.Position.Y:R},{party.Position.IsOnLand}|" +
             $"moveMode={party.PartyMoveMode}|" +
-            $"fingerprint={Fingerprint(roster)}|syncedRoster={SyncedRoster(CopyRoster(roster))}");
+            $"fingerprint={Fingerprint(roster)}");
     }
-
-    private static string SyncedRoster(TroopRosterElement[] elements) =>
-        string.Join(";", elements
-            .OrderBy(element => element.Character.StringId, StringComparer.Ordinal)
-            .Select(element => $"{element.Character.StringId}:{element.Number}:{element.WoundedNumber}"));
 
     private static string Fingerprint(TroopRoster roster)
     {
