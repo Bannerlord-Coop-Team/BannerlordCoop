@@ -1,4 +1,5 @@
 ﻿using Common.Logging;
+using Coop.Core.Common.Configuration;
 using Serilog;
 using System;
 using System.Collections.Generic;
@@ -169,9 +170,7 @@ internal sealed class SteamBanList : ISteamBanList
 
     private static string ResolvePath()
     {
-        string? configuredPath = Environment.GetEnvironmentVariable(BanFileEnvironmentVariable);
-        string? coopDataDirectory = Environment.GetEnvironmentVariable("COOP_DATA_DIR");
-        return ResolvePath(configuredPath, coopDataDirectory, AppContext.BaseDirectory);
+        return ServerDataPath.Resolve(BanFileEnvironmentVariable, FileName);
     }
 
     internal static string ResolvePath(
@@ -179,20 +178,6 @@ internal sealed class SteamBanList : ISteamBanList
         string? coopDataDirectory,
         string applicationBaseDirectory)
     {
-        if (!string.IsNullOrWhiteSpace(configuredPath)) return Path.GetFullPath(configuredPath);
-
-        if (!string.IsNullOrWhiteSpace(coopDataDirectory))
-        {
-            return Path.Combine(coopDataDirectory, FileName);
-        }
-
-        string deploymentPath = Path.GetFullPath(Path.Combine(
-            applicationBaseDirectory,
-            "..",
-            "..",
-            "..",
-            "server-data",
-            FileName));
-        return deploymentPath;
+        return ServerDataPath.Resolve(configuredPath, coopDataDirectory, applicationBaseDirectory, FileName);
     }
 }
