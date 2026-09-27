@@ -11,6 +11,7 @@ using Coop.Core.Server.Connections;
 using Coop.Core.Server.Connections.Messages;
 using Coop.Core.Server.Services.Instances;
 using Coop.Core.Server.Services.Session.Messages;
+using Coop.Core.Server.Services.Shutdown;
 using Coop.Core.Server.Services.Time;
 using GameInterface.Services.Entity;
 using LiteNetLib;
@@ -43,6 +44,7 @@ public class CoopServer : CoopNetworkBase, ICoopServer
     private readonly IPacketManager packetManager;
     private readonly IMessagePacketHandler messagePacketHandler;
     private readonly IConnectionMessageQueue connectionMessageQueue;
+    private readonly IServerAdmissionGate admissionGate;
     // Buffers per-change sends and merges them into one send per key. Drained each tick in Update.
     private readonly ISendCoalescer coalescer;
     // Lazy breaks the construction cycle: the manager depends on ITimeControlInterface, which depends
@@ -59,6 +61,7 @@ public class CoopServer : CoopNetworkBase, ICoopServer
         IPacketManager packetManager,
         IMessagePacketHandler messagePacketHandler,
         IConnectionMessageQueue connectionMessageQueue,
+        IServerAdmissionGate admissionGate,
         IControllerIdProvider controllerIdProvider,
         IMissionManager missionManager,
         Lazy<IOverloadedPeerManager> overloadedPeerManager,
@@ -73,6 +76,7 @@ public class CoopServer : CoopNetworkBase, ICoopServer
         this.packetManager = packetManager;
         this.messagePacketHandler = messagePacketHandler;
         this.connectionMessageQueue = connectionMessageQueue;
+        this.admissionGate = admissionGate;
         this.missionManager = missionManager;
         this.overloadedPeerManager = overloadedPeerManager;
         this.coalescer = coalescer;
@@ -94,14 +98,22 @@ public class CoopServer : CoopNetworkBase, ICoopServer
         catch (Exception)
         {
             Logger.Warning("Client connection rejected for {Endpoint}: malformed password data", request.RemoteEndPoint);
-            RejectIncorrectPassword(request);
+            Reject(request, ConnectionRejectCode.IncorrectPassword);
             return;
         }
 
         if (!ConnectionPassword.IsAccepted(Config.Token, suppliedPassword))
         {
             Logger.Warning("Client connection rejected for {Endpoint}: incorrect password", request.RemoteEndPoint);
-            RejectIncorrectPassword(request);
+            Reject(request, ConnectionRejectCode.IncorrectPassword);
+            return;
+        }
+
+        // Checked after the password, so a wrong password learns nothing about a pending restart.
+        if (!admissionGate.IsOpen)
+        {
+            Logger.Information("Client connection rejected for {Endpoint}: the server is restarting", request.RemoteEndPoint);
+            Reject(request, ConnectionRejectCode.ServerRestarting);
             return;
         }
 
@@ -109,10 +121,10 @@ public class CoopServer : CoopNetworkBase, ICoopServer
         request.Accept();
     }
 
-    private static void RejectIncorrectPassword(ConnectionRequest request)
+    private static void Reject(ConnectionRequest request, ConnectionRejectCode code)
     {
         var reason = new NetDataWriter();
-        reason.Put((byte)ConnectionRejectCode.IncorrectPassword);
+        reason.Put((byte)code);
         request.Reject(reason);
     }
 

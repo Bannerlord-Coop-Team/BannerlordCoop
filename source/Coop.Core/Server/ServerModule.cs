@@ -22,6 +22,7 @@ using Coop.Core.Server.Services.MobileParties;
 using Coop.Core.Server.Services.Save;
 using Coop.Core.Server.Services.Session;
 using Coop.Core.Server.Services.Settlements;
+using Coop.Core.Server.Services.Shutdown;
 using Coop.Core.Server.Services.Telemetry;
 using Coop.Core.Server.Services.Time;
 using Coop.Core.Server.States;
@@ -92,6 +93,10 @@ public class ServerModule : CommonModule
         builder.RegisterType<SettlementEncounterDistanceValidator>()
             .As<ISettlementEncounterDistanceValidator>()
             .InstancePerDependency();
+
+        // Graceful restart, in Release too.
+        builder.RegisterType<ServerAdmissionGate>().As<IServerAdmissionGate>().InstancePerLifetimeScope();
+
         // Pauses time while a peer's packet queue is overloaded (slow client catching up). Constructed
         // as a CoopServer dependency, so it registers its unpause policy when the server is built.
         builder.RegisterType<JoinPeerTerminator>().As<IJoinPeerTerminator>().InstancePerDependency();
