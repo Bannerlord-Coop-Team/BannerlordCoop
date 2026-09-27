@@ -135,8 +135,9 @@ engine process executable, not its launcher. Runtime status cannot manufacture t
 The Remote carrier enables this preparation only when its sole external profile is
 `dedicated-server-synthetic` and rendered clients defer connecting. Preparation generates an
 ephemeral test password in the normal server configuration, preserving the exact original
-bytes in an account-restricted owned backup. If the staged data directory has no config yet,
-preparation seeds the pinned server's Windows default template and cleanup restores its absence.
+bytes in an account-restricted owned backup. Synthetic setup uses the pinned server's
+Windows default template so launcher migration does not change the owned config. Cleanup
+restores the old file exactly, or restores its absence when the staged data had no config.
 The repository dev config is not used by the staged `--data-dir` launch. The scenario resolves
 the prepared config through the run-bound PID receipt and reads it privately
 into the controller's named password environment variable; never print or retain its value.
