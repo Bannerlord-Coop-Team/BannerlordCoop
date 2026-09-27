@@ -47,6 +47,8 @@ using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Actions;
 using TaleWorlds.CampaignSystem.CampaignBehaviors;
 using TaleWorlds.CampaignSystem.Election;
+using TaleWorlds.CampaignSystem.GameMenus;
+using TaleWorlds.CampaignSystem.GameState;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Party.PartyComponents;
 using TaleWorlds.CampaignSystem.Settlements;
@@ -3754,6 +3756,11 @@ public class PlayerKingdomCreationFlowTests : IDisposable
                     Assert.True(client.ObjectManager.TryGetObject<MobileParty>(captor.PartyId, out var captorParty));
                     assignedHero._heroState = Hero.CharacterStates.Prisoner;
                     assignedHero.PartyBelongedToAsPrisoner = captorParty.Party;
+                    // Native character switching removes and re-adds this existing prisoner.
+                    captorParty.PrisonRoster.AddToCounts(assignedHero.CharacterObject, 1);
+                    Assert.Equal(1, captorParty.PrisonRoster.GetTroopCount(assignedHero.CharacterObject));
+                    var states = Game.Current.GameStateManager;
+                    states._gameStates.Add(states.CreateState<MapState>());
                     expectedFollow = captorParty.Party;
                 }
             }
@@ -3769,12 +3776,17 @@ public class PlayerKingdomCreationFlowTests : IDisposable
                 player.CharacterId));
             Assert.Same(expectedFollow, Campaign.Current.CameraFollowParty);
             Assert.Equal(active, assignedParty.IsActive);
+            if (captive)
+                Assert.Equal(1, expectedFollow.PrisonRoster.GetTroopCount(Hero.MainHero.CharacterObject));
         }, new[]
         {
             AccessTools.Method(typeof(InteractionsInitializationHandler), "Handle", new[] { typeof(MessagePayload<PlayerHeroChanged>) }),
             // Native captivity still selects its captor; exclude the separate menu presentation handler.
             AccessTools.Method(typeof(GameInterface.Services.PlayerCaptivityService.Handlers.PlayerCaptivityClientHandler),
                 "Handle_PlayerCaptivityChanged"),
+            // The camera and prisoner roster are exercised without opening the captivity UI.
+            AccessTools.Method(typeof(GameMenu), nameof(GameMenu.ActivateGameMenu), new[] { typeof(string) }),
+            AccessTools.Method(typeof(GameMenu), nameof(GameMenu.SwitchToMenu), new[] { typeof(string) }),
         });
         GameThread.Run(() => { }, blocking: true);
 
