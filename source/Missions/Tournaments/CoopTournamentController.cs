@@ -473,6 +473,7 @@ public class CoopTournamentController : CoopMissionController
 
         if (blow.InflictedDamage > 0)
         {
+            ApplyRemotePlayerReceivedDamage(victim, ref blow, ref collisionData);
             CaptureMissileProgressionData(
                 victim,
                 attacker,
@@ -501,6 +502,40 @@ public class CoopTournamentController : CoopMissionController
                 guardCandidateId));
         }
         return false;
+    }
+
+    // A remote human is a puppet here, so vanilla skipped its main-agent multiplier.
+    // Only the source scales because every peer applies the broadcast blow.
+    private void ApplyRemotePlayerReceivedDamage(
+        Agent victim,
+        ref Blow blow,
+        ref AttackCollisionData collisionData)
+    {
+        Agent player = victim.IsMount ? victim.RiderAgent : victim;
+        if (player == null) return;
+        if (!coopMissionComponent.AgentRegistry.TryGetAgentInfo(player, out var playerInfo)) return;
+
+        TournamentAgentSpawnData spawn = FindManifestAgent(playerInfo.AgentId);
+        TournamentContestantData contestant = spawn == null
+            ? null
+            : snapshot.Contestants.FirstOrDefault(data => data.SlotId == spawn.SlotId);
+        if (!TournamentDamageAuthority.ShouldApplyPlayerReceivedDamage(
+                contestant,
+                session.OwnControllerId,
+                collisionData.AttackBlockedWithShield,
+                collisionData.IsFallDamage)) return;
+
+        int rawDamage = blow.InflictedDamage;
+        float multiplier = Mission.Current.DamageToPlayerMultiplier;
+        int scaledDamage = TournamentDamageAuthority.ScalePlayerReceivedDamage(rawDamage, multiplier);
+        blow.InflictedDamage = scaledDamage;
+        collisionData.InflictedDamage = scaledDamage;
+        Logger.Debug(
+            "[Tournament] Applied player received damage at source for {AgentId}: raw={RawDamage}, multiplier={Multiplier}, scaled={ScaledDamage}",
+            playerInfo.AgentId,
+            rawDamage,
+            multiplier,
+            scaledDamage);
     }
 
     private void CaptureMissileProgressionData(
