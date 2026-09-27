@@ -83,7 +83,7 @@ evidence, errors, hashes, or replay identity.
 The source-bound build creates `dedicated-server-synthetic-artifacts.v1`; the runtime controller
 only verifies it. The caller supplies the frozen raw manifest hash separately. The manifest binds
 both repositories' head/tree pairs, the co-op build version, stage-relative paths, hashes, assembly
-versions, and MVIDs. It contains the five managed co-op assemblies staged for the standalone server, `DedicatedServer.Core`, the active
+versions, and MVIDs. It contains the six managed co-op assemblies, `DedicatedServer.Core`, the active
 Windows or Linux shim, and the platform's TaleWorlds starter assembly. Windows uses a hashed
 `staged-executable` process host. Linux explicitly uses the image's `system-dotnet` host while the
 staged `TaleWorlds.Starter.DotNetCore.Linux` assembly remains path, hash, MVID, and version checked.
@@ -92,13 +92,12 @@ Before UDP work and again after the lifecycle, the controller verifies:
 
 - the raw and canonical manifest digests plus both requested source identities;
 - status PID, role, run token, and process start time against the OS process;
-- every staged assembly's SHA-256, MVID, and version, plus each loaded assembly's allowlisted path and runtime identity;
+- every loaded assembly's allowlisted path, SHA-256, MVID, and version;
 - unchanged manifest and process identities at postflight.
 
 The server's opt-in `status` result must supply:
 
 - `buildVersion`, `processStartedUtc`, and `serving`;
-- `assemblyMvid: null`, because the standalone server does not load the client entry assembly `Coop.dll`;
 - the resolved `joinPort`;
 - the complete provider-order `moduleValidation` contract;
 - `loadedAssemblies` and `dedicatedServerAssemblies` with name, version, MVID, and location;
@@ -121,29 +120,3 @@ Replay identity covers source, profile, seed, options, controller IDs, manifest 
 contract. The logical state digest excludes timestamps, PIDs, paths, ports, tokens, passwords,
 campaign ticks, and recyclable connection IDs. A passing controller result is one input to the
 source-bound orchestration receipt; it cannot authorize caller-supplied source labels by itself.
-
-## Producing the Windows build manifest
-
-The owned build preparation invokes `.github/scripts/prepare-dedicated-server-synthetic.ps1`
-after the exact-source standalone build, before starting the server. Its
-`dedicated-server-synthetic-manifest` command requires the frozen build-stamp hash, both
-head/tree pairs, and the staged root. It checks the stamp identities and deployed mod
-fingerprint, then reads each staged assembly's hash, version, and MVID without loading it.
-The build version comes from staged Common metadata. The resulting manifest pins the real
-engine process executable, not its launcher. Runtime status cannot manufacture this receipt.
-
-The Remote carrier enables this preparation only when its sole external profile is
-`dedicated-server-synthetic` and rendered clients defer connecting. Preparation generates an
-ephemeral test password in the normal server configuration, preserving the exact original
-bytes in an account-restricted owned backup. The scenario reads the prepared config privately
-into the controller's named password environment variable; never print or retain its value.
-After stopping owned processes, the carrier restores that config through the same script's
-`Restore` action. Owner mismatch or outside config changes preserve the backup and fail closed.
-
-The five required staged mod assemblies are Common, Coop.Core, Coop.Steam, GameInterface,
-and Missions. Direct-connect servers may leave Coop.Steam unloaded; its staged file still
-requires hash, version, and MVID agreement. The other four must appear in runtime status,
-and every loaded assembly must also match its expected path, version, and MVID. Missing
-required, additional, or duplicate runtime assemblies are rejected. No client entry assembly
-is loaded merely to satisfy attestation. Existing Linux manifest consumption remains
-supported; this producer targets the existing Windows stage layout.

@@ -44,7 +44,7 @@ public sealed class DedicatedServerSyntheticArtifactManifestTests
             string frozenManifestSha256 =
                 DedicatedServerSyntheticArtifactManifestFile.Sha256File(path);
             string json = File.ReadAllText(path).Replace(
-                manifest.LoadedAssemblies["Coop.Core"].Sha256,
+                manifest.LoadedAssemblies["Coop"].Sha256,
                 new string('f', 64),
                 StringComparison.Ordinal);
             File.WriteAllText(path, json);
@@ -124,112 +124,6 @@ public sealed class DedicatedServerSyntheticArtifactManifestTests
     }
 
     [Fact]
-    public async Task VerifyAsync_AcceptsUnloadedSteamAndVerifiesItsStagedArtifact()
-    {
-        DedicatedServerSyntheticArtifactManifest manifest = CreateManifest();
-        string path = WriteManifest(manifest);
-        try
-        {
-            var reader = new StubHostArtifactReader(manifest);
-            var verifier = new DedicatedServerSyntheticArtifactVerifier(
-                new StatusControlClient(manifest, omittedAssembly: "Coop.Steam"),
-                reader,
-                new CanonicalJsonHasher());
-
-            DedicatedServerSyntheticArtifactVerification result = await verifier.VerifyAsync(
-                CreateOptions(path),
-                CancellationToken.None);
-
-            Assert.True(result.IsValid);
-            Assert.Contains(StagedPath(manifest.LoadedAssemblies["Coop.Steam"].RelativePath), reader.HashedPaths);
-            Assert.Equal(
-                manifest.LoadedAssemblies.Count + manifest.DedicatedServerAssemblies.Count + 1,
-                reader.HashedPaths.Count);
-        }
-        finally
-        {
-            File.Delete(path);
-        }
-    }
-
-    [Theory]
-    [InlineData("hash", "artifact-loaded-assembly-hash-mismatch")]
-    [InlineData("version", "artifact-loaded-assembly-metadata-mismatch")]
-    [InlineData("mvid", "artifact-loaded-assembly-disk-mvid-mismatch")]
-    [InlineData("missing", "runtime-artifact-verification-failed")]
-    public async Task VerifyAsync_RejectsInvalidUnloadedSteamArtifact(string defect, string failureCode)
-    {
-        DedicatedServerSyntheticArtifactManifest manifest = CreateManifest();
-        string path = WriteManifest(manifest);
-        try
-        {
-            var reader = new StubHostArtifactReader(manifest);
-            DedicatedServerSyntheticAssemblyArtifact steam = manifest.LoadedAssemblies["Coop.Steam"];
-            string steamPath = StagedPath(steam.RelativePath);
-            if (defect == "hash") reader.HashOverrides[steamPath] = new string('0', 64);
-            if (defect == "missing") reader.MissingPaths.Add(steamPath);
-            if (defect is "version" or "mvid")
-            {
-                reader.IdentityOverrides[steamPath] = new DedicatedServerHostAssemblyIdentity(
-                    defect == "version" ? "0.0.0.0" : steam.Version,
-                    defect == "mvid" ? "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee" : steam.Mvid);
-            }
-            var verifier = new DedicatedServerSyntheticArtifactVerifier(
-                new StatusControlClient(manifest, omittedAssembly: "Coop.Steam"),
-                reader,
-                new CanonicalJsonHasher());
-
-            DedicatedServerSyntheticArtifactVerification result = await verifier.VerifyAsync(
-                CreateOptions(path),
-                CancellationToken.None);
-
-            Assert.False(result.IsValid);
-            Assert.Equal(new[] { failureCode }, result.FailureCodes);
-            Assert.Equal(manifest.ManifestDigest, result.Manifest?.ManifestDigest);
-        }
-        finally
-        {
-            File.Delete(path);
-        }
-    }
-
-    [Theory]
-    [InlineData("Common", null)]
-    [InlineData("Coop.Core", null)]
-    [InlineData("GameInterface", null)]
-    [InlineData("Missions", null)]
-    [InlineData("Coop.Steam", "Coop")]
-    [InlineData("Coop.Steam", "Common")]
-    public async Task VerifyAsync_RejectsMissingRequiredOrAdditionalRuntimeAssemblies(
-        string omittedAssembly,
-        string? additionalAssembly)
-    {
-        DedicatedServerSyntheticArtifactManifest manifest = CreateManifest();
-        string path = WriteManifest(manifest);
-        try
-        {
-            var verifier = new DedicatedServerSyntheticArtifactVerifier(
-                new StatusControlClient(
-                    manifest,
-                    omittedAssembly: omittedAssembly,
-                    additionalAssembly: additionalAssembly),
-                new StubHostArtifactReader(manifest),
-                new CanonicalJsonHasher());
-
-            DedicatedServerSyntheticArtifactVerification result = await verifier.VerifyAsync(
-                CreateOptions(path),
-                CancellationToken.None);
-
-            Assert.False(result.IsValid);
-            Assert.Equal(new[] { "artifact-loaded-assembly-set-mismatch" }, result.FailureCodes);
-        }
-        finally
-        {
-            File.Delete(path);
-        }
-    }
-
-    [Fact]
     public void LoadAndVerify_AcceptsTheLinuxStarterIdentity()
     {
         DedicatedServerSyntheticArtifactManifest manifest = CreateManifest(
@@ -300,7 +194,7 @@ public sealed class DedicatedServerSyntheticArtifactManifestTests
         {
             DedicatedServerSyntheticOptions options = CreateOptions(path);
             var reader = new StubHostArtifactReader(manifest);
-            reader.HashOverrides[StagedPath("runtime/Coop.Core.dll")] = new string('0', 64);
+            reader.HashOverrides[StagedPath("runtime/Coop.dll")] = new string('0', 64);
             var verifier = new DedicatedServerSyntheticArtifactVerifier(
                 new StatusControlClient(manifest),
                 reader,
@@ -327,7 +221,7 @@ public sealed class DedicatedServerSyntheticArtifactManifestTests
         try
         {
             DedicatedServerSyntheticOptions options = CreateOptions(path);
-            DedicatedServerSyntheticAssemblyArtifact coop = manifest.LoadedAssemblies["Coop.Core"];
+            DedicatedServerSyntheticAssemblyArtifact coop = manifest.LoadedAssemblies["Coop"];
             string expectedPath = StagedPath(coop.RelativePath);
             string observedPath = Path.Combine(
                 Path.GetDirectoryName(expectedPath)!,
@@ -338,7 +232,7 @@ public sealed class DedicatedServerSyntheticArtifactManifestTests
             var verifier = new DedicatedServerSyntheticArtifactVerifier(
                 new StatusControlClient(
                     manifest,
-                    mutateLocation: (name, location) => name == "Coop.Core" ? observedPath : location),
+                    mutateLocation: (name, location) => name == "Coop" ? observedPath : location),
                 reader,
                 new CanonicalJsonHasher());
 
@@ -367,11 +261,11 @@ public sealed class DedicatedServerSyntheticArtifactManifestTests
         {
             DedicatedServerSyntheticOptions options = CreateOptions(path);
             string mismatchedPath = StagedPath(
-                manifest.LoadedAssemblies["Coop.Core"].RelativePath.Replace("Coop.Core.dll", "coop.core.dll"));
+                manifest.LoadedAssemblies["Coop"].RelativePath.Replace("Coop.dll", "coop.dll"));
             var verifier = new DedicatedServerSyntheticArtifactVerifier(
                 new StatusControlClient(
                     manifest,
-                    mutateLocation: (name, location) => name == "Coop.Core" ? mismatchedPath : location),
+                    mutateLocation: (name, location) => name == "Coop" ? mismatchedPath : location),
                 new StubHostArtifactReader(manifest),
                 new CanonicalJsonHasher());
 
@@ -492,9 +386,9 @@ public sealed class DedicatedServerSyntheticArtifactManifestTests
         {
             DedicatedServerSyntheticOptions options = CreateOptions(path);
             var reader = new StubHostArtifactReader(manifest);
-            string coopPath = StagedPath(manifest.LoadedAssemblies["Coop.Core"].RelativePath);
+            string coopPath = StagedPath(manifest.LoadedAssemblies["Coop"].RelativePath);
             reader.IdentityOverrides[coopPath] = new DedicatedServerHostAssemblyIdentity(
-                manifest.LoadedAssemblies["Coop.Core"].Version,
+                manifest.LoadedAssemblies["Coop"].Version,
                 "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee");
             var verifier = new DedicatedServerSyntheticArtifactVerifier(
                 new StatusControlClient(manifest),
@@ -512,130 +406,6 @@ public sealed class DedicatedServerSyntheticArtifactManifestTests
         {
             File.Delete(path);
         }
-    }
-
-    [Theory]
-    [InlineData("Common")]
-    [InlineData("Coop.Core")]
-    [InlineData("Coop.Steam")]
-    [InlineData("GameInterface")]
-    [InlineData("Missions")]
-    public async Task VerifyAsync_RejectsCorruptionOfEachStandaloneAssembly(string name)
-    {
-        DedicatedServerSyntheticArtifactManifest manifest = CreateManifest();
-        string path = WriteManifest(manifest);
-        try
-        {
-            var verifier = new DedicatedServerSyntheticArtifactVerifier(
-                new StatusControlClient(manifest, (assembly, version, mvid) =>
-                    assembly == name ? (version, Guid.NewGuid().ToString("D")) : (version, mvid)),
-                new StubHostArtifactReader(manifest), new CanonicalJsonHasher());
-            var result = await verifier.VerifyAsync(CreateOptions(path), CancellationToken.None);
-            Assert.False(result.IsValid);
-            Assert.Contains("artifact-loaded-assembly-metadata-mismatch", result.FailureCodes);
-        }
-        finally { File.Delete(path); }
-    }
-
-    [Theory]
-    [InlineData(true)]
-    [InlineData(false)]
-    public void LoadAndVerify_RejectsMissingOrAdditionalLoadedAssemblies(bool missing)
-    {
-        var manifest = CreateManifest();
-        if (missing) manifest.LoadedAssemblies.Remove("Missions");
-        else manifest.LoadedAssemblies.Add("Coop", manifest.LoadedAssemblies["Coop.Core"]);
-        DedicatedServerSyntheticArtifactManifestFile.RefreshDigests(manifest);
-        string path = WriteManifest(manifest);
-        try
-        {
-            Assert.Throws<InvalidDataException>(() => DedicatedServerSyntheticArtifactManifestFile.LoadAndVerify(
-                path, new string('a', 40), new string('b', 40), new string('c', 40), new string('d', 40),
-                DedicatedServerSyntheticArtifactManifestFile.Sha256File(path)));
-        }
-        finally { File.Delete(path); }
-    }
-
-    [Fact]
-    public async Task VerifyAsync_RejectsUnexpectedClientAssemblyMvid()
-    {
-        DedicatedServerSyntheticArtifactManifest manifest = CreateManifest();
-        string path = WriteManifest(manifest);
-        try
-        {
-            var verifier = new DedicatedServerSyntheticArtifactVerifier(
-                new StatusControlClient(manifest, clientMvid: Guid.NewGuid().ToString("D")),
-                new StubHostArtifactReader(manifest), new CanonicalJsonHasher());
-            var result = await verifier.VerifyAsync(CreateOptions(path), CancellationToken.None);
-            Assert.False(result.IsValid);
-            Assert.Contains("artifact-coop-mvid-mismatch", result.FailureCodes);
-        }
-        finally { File.Delete(path); }
-    }
-
-    [Theory]
-    [InlineData("valid")]
-    [InlineData("source")]
-    [InlineData("stamp-hash")]
-    [InlineData("staged-hash")]
-    [InlineData("missing-assembly")]
-    public async Task PreparedManifestBindsSourceAndStagedBytes(string mutation)
-    {
-        string root = Path.Combine(Path.GetTempPath(), "synthetic-build-" + Guid.NewGuid().ToString("N"));
-        Directory.CreateDirectory(root);
-        try
-        {
-            const string modBin = "engine/Modules/Coop/bin/Win64_Shipping_Server/";
-            const string engineBin = "engine/bin/Win64_Shipping_Server/";
-            string common = typeof(Common.ModInformation).Assembly.Location;
-            var paths = DedicatedServerSyntheticArtifactManifestFile.RequiredAssemblyNames.Select(name => modBin + name + ".dll")
-                .Concat(new[] { engineBin + "DedicatedServer.Core.dll", engineBin + "TaleWorlds.Starter.DotNetCore.dll",
-                    "engine/dotnet/dotnet.exe",
-                    "engine/Modules/DedicatedServer.Windows/bin/Win64_Shipping_Server/DedicatedServer.Windows.dll" });
-            foreach (string relative in paths)
-            {
-                string destination = Path.Combine(root, relative);
-                Directory.CreateDirectory(Path.GetDirectoryName(destination)!);
-                File.Copy(common, destination);
-            }
-            string stampPath = Path.Combine(root, "stamp.json");
-            string sourceHash = DedicatedServerSyntheticArtifactManifestFile.Sha256File(common);
-            File.WriteAllText(stampPath, JsonSerializer.Serialize(new
-            {
-                coopHead = new string('a', 40), coopTree = new string('b', 40),
-                serverHead = new string('c', 40), serverTree = new string('d', 40),
-                coopFingerprint = string.Join("|", DedicatedServerSyntheticArtifactManifestFile.RequiredAssemblyNames
-                    .Select(name => name + ".dll:" + sourceHash))
-            }));
-            string stampHash = DedicatedServerSyntheticArtifactManifestFile.Sha256File(stampPath);
-            if (mutation == "stamp-hash") File.AppendAllText(stampPath, " ");
-            if (mutation == "staged-hash") File.AppendAllText(Path.Combine(root, modBin + "Missions.dll"), "changed");
-            if (mutation == "missing-assembly") File.Delete(Path.Combine(root, modBin + "Missions.dll"));
-            string output = Path.Combine(root, "manifest.json");
-            Task Create() => DedicatedServerSyntheticArtifactManifestFile.CreatePreparedWindowsAsync(
-                stampPath, stampHash, root, new string(mutation == "source" ? 'f' : 'a', 40),
-                new string('b', 40), new string('c', 40), new string('d', 40), output);
-            if (mutation != "valid")
-            {
-                Exception? failure = await Record.ExceptionAsync(Create);
-                Assert.True(failure is IOException or InvalidDataException);
-                Assert.False(File.Exists(output));
-                return;
-            }
-            await Create();
-            var manifest = DedicatedServerSyntheticArtifactManifestFile.LoadAndVerify(output,
-                new string('a', 40), new string('b', 40), new string('c', 40), new string('d', 40),
-                DedicatedServerSyntheticArtifactManifestFile.Sha256File(output));
-            Assert.Equal(Common.ModInformation.BuildVersion, manifest.BuildVersion);
-            Assert.Equal(5, manifest.LoadedAssemblies.Count);
-            Assert.DoesNotContain("Coop", manifest.LoadedAssemblies.Keys);
-            Assert.All(manifest.LoadedAssemblies.Values, artifact =>
-            {
-                Assert.Equal(sourceHash, artifact.Sha256);
-                Assert.Equal(typeof(Common.ModInformation).Assembly.ManifestModule.ModuleVersionId.ToString("D"), artifact.Mvid);
-            });
-        }
-        finally { Directory.Delete(root, true); }
     }
 
     private static DedicatedServerSyntheticArtifactManifest CreateManifest(
@@ -737,22 +507,13 @@ public sealed class DedicatedServerSyntheticArtifactManifestTests
         private readonly DedicatedServerSyntheticArtifactManifest manifest;
         private readonly Func<string, string, string, (string Version, string Mvid)> mutate;
         private readonly Func<string, string, string> mutateLocation;
-        private readonly string? clientMvid;
-        private readonly string? omittedAssembly;
-        private readonly string? additionalAssembly;
 
         public StatusControlClient(
             DedicatedServerSyntheticArtifactManifest manifest,
             Func<string, string, string, (string Version, string Mvid)>? mutate = null,
-            Func<string, string, string>? mutateLocation = null,
-            string? clientMvid = null,
-            string? omittedAssembly = null,
-            string? additionalAssembly = null)
+            Func<string, string, string>? mutateLocation = null)
         {
             this.manifest = manifest;
-            this.clientMvid = clientMvid;
-            this.omittedAssembly = omittedAssembly;
-            this.additionalAssembly = additionalAssembly;
             this.mutate = mutate ?? ((_, version, mvid) => (version, mvid));
             this.mutateLocation = mutateLocation ?? ((_, location) => location);
         }
@@ -764,7 +525,7 @@ public sealed class DedicatedServerSyntheticArtifactManifestTests
             CancellationToken cancellationToken)
         {
             object[] Assemblies(
-                IEnumerable<KeyValuePair<string, DedicatedServerSyntheticAssemblyArtifact>> artifacts) =>
+                SortedDictionary<string, DedicatedServerSyntheticAssemblyArtifact> artifacts) =>
                 artifacts.Select(pair =>
                 {
                     (string version, string mvid) = mutate(
@@ -780,16 +541,6 @@ public sealed class DedicatedServerSyntheticArtifactManifestTests
                     };
                 }).Cast<object>().ToArray();
 
-            IEnumerable<KeyValuePair<string, DedicatedServerSyntheticAssemblyArtifact>> loadedAssemblies =
-                manifest.LoadedAssemblies.Where(pair => pair.Key != omittedAssembly);
-            if (additionalAssembly != null)
-            {
-                loadedAssemblies = loadedAssemblies.Append(
-                    new KeyValuePair<string, DedicatedServerSyntheticAssemblyArtifact>(
-                        additionalAssembly,
-                        manifest.LoadedAssemblies["Common"]));
-            }
-
             string json = LiveTestProtocol.SerializeResponse(new LiveTestResponse
             {
                 Id = requestId,
@@ -804,8 +555,8 @@ public sealed class DedicatedServerSyntheticArtifactManifestTests
                 {
                     processStartedUtc = StubHostArtifactReader.ExpectedProcessStartedUtc,
                     buildVersion = manifest.BuildVersion,
-                    assemblyMvid = clientMvid,
-                    loadedAssemblies = Assemblies(loadedAssemblies),
+                    assemblyMvid = manifest.LoadedAssemblies["Coop"].Mvid,
+                    loadedAssemblies = Assemblies(manifest.LoadedAssemblies),
                     dedicatedServerAssemblies = Assemblies(manifest.DedicatedServerAssemblies)
                 }
             });
@@ -849,7 +600,6 @@ public sealed class DedicatedServerSyntheticArtifactManifestTests
         public Dictionary<string, DedicatedServerHostAssemblyIdentity> IdentityOverrides { get; } =
             new(StringComparer.Ordinal);
         public HashSet<string> HashedPaths { get; } = new(StringComparer.Ordinal);
-        public HashSet<string> MissingPaths { get; } = new(StringComparer.Ordinal);
 
         public string GetProcessExecutablePath(int processId) => ProcessExecutablePath;
 
@@ -872,11 +622,8 @@ public sealed class DedicatedServerSyntheticArtifactManifestTests
             return HashOverrides.GetValueOrDefault(path, hashes[path]);
         }
 
-        public DedicatedServerHostAssemblyIdentity ReadAssemblyIdentity(string path)
-        {
-            if (MissingPaths.Contains(path)) throw new InvalidDataException("Staged assembly is missing.");
-            return IdentityOverrides.GetValueOrDefault(path, identities[path]);
-        }
+        public DedicatedServerHostAssemblyIdentity ReadAssemblyIdentity(string path) =>
+            IdentityOverrides.GetValueOrDefault(path, identities[path]);
     }
 
     private static string StagedPath(string relativePath) => Path.GetFullPath(Path.Combine(
