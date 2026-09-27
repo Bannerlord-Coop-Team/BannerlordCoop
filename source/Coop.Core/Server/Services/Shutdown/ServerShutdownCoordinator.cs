@@ -190,6 +190,9 @@ public class ServerShutdownCoordinator : IServerShutdownCoordinator
         nextNotice = 0;
         while (nextNotice < NoticeSeconds.Length && NoticeSeconds[nextNotice] >= seconds) nextNotice++;
 
+        // A new countdown after Completed or Failed takes joins again until its own 120 s mark.
+        if (requestedDeadline - now > JoinGateLead) admissionGate.Open();
+
         Logger.Information("Server shutdown scheduled in {Seconds}s, saving {SaveName}", seconds, name);
         if (seconds > 0) Broadcast($"The server will restart in {FormatDelay(seconds)}.");
 

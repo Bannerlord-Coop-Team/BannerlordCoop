@@ -391,6 +391,24 @@ public class ServerShutdownCoordinatorTests : IDisposable
         Assert.False(gate.IsOpen);
     }
 
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public void Schedule_AfterAFinishedShutdown_TakesJoinsUntilTheNew120SecondMark(bool saved)
+    {
+        Schedule(0);
+        broker.Publish(new object(), new CoopSessionWritten(LoadedSave, true));
+        broker.Publish(new object(), new GameSaveCompleted(LoadedSave, saved));
+        Assert.False(gate.IsOpen);
+        AddPlayer();
+
+        Schedule(600);
+
+        Assert.True(gate.IsOpen);
+        TickFor(480);
+        Assert.False(gate.IsOpen);
+    }
+
     [Fact]
     public void Reschedule_EarlierDeadlineReplacesAndLaterIsRefused()
     {
