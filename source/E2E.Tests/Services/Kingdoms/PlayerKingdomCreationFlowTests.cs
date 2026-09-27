@@ -3695,13 +3695,17 @@ public class PlayerKingdomCreationFlowTests : IDisposable
         });
     }
 
-    [Fact]
-    public void SwitchedPlayer_RefreshesPreExistingArmyTracker_AfterMainHeroWasStillWrongAtConstruction()
+    [Theory]
+    [InlineData(false, false)]
+    [InlineData(true, false)]
+    [InlineData(false, true)]
+    public void SwitchedPlayer_RefreshesArmyTrackerAndCamera_WithAssignedPartyOrCaptor(bool active, bool captive)
     {
         var client = TestEnvironment.Clients.First();
         client.Resolve<IControllerIdProvider>().SetControllerId(ControllerId);
 
         var player = CreateSyncedPlayerContext(ControllerId, _ => false);
+        var captor = captive ? CreateSyncedPlayerContext(SecondControllerId, _ => false) : null;
         var kingdomId = TestEnvironment.CreateRegisteredObject<Kingdom>();
         var armyId = TestEnvironment.CreateRegisteredObject<Army>();
         ConfigureClanInKingdom(client, player.ClanId, kingdomId);
@@ -3739,6 +3743,23 @@ public class PlayerKingdomCreationFlowTests : IDisposable
         // Act: real switch, publishes SwitchedPlayer at the end.
         client.Call(() =>
         {
+            Assert.True(client.ObjectManager.TryGetObject<MobileParty>(player.PartyId, out var assignedParty));
+            PartyBase expectedFollow = assignedParty.Party;
+            using (new AllowedThread())
+            {
+                assignedParty.IsActive = active;
+                if (captive)
+                {
+                    Assert.True(client.ObjectManager.TryGetObject<Hero>(player.HeroId, out var assignedHero));
+                    Assert.True(client.ObjectManager.TryGetObject<MobileParty>(captor.PartyId, out var captorParty));
+                    assignedHero._heroState = Hero.CharacterStates.Prisoner;
+                    assignedHero.PartyBelongedToAsPrisoner = captorParty.Party;
+                    expectedFollow = captorParty.Party;
+                }
+            }
+            var oldParty = Campaign.Current.MainParty.Party;
+            Campaign.Current.CameraFollowParty = oldParty;
+            Assert.NotSame(assignedParty.Party, oldParty);
             var heroInterface = client.Resolve<IHeroInterface>();
             heroInterface.SwitchToPlayer(new Player(
                 ControllerId,
@@ -3746,7 +3767,15 @@ public class PlayerKingdomCreationFlowTests : IDisposable
                 player.PartyId,
                 player.ClanId,
                 player.CharacterId));
-        }, new[] { AccessTools.Method(typeof(InteractionsInitializationHandler), "Handle", new[] { typeof(MessagePayload<PlayerHeroChanged>) }) });
+            Assert.Same(expectedFollow, Campaign.Current.CameraFollowParty);
+            Assert.Equal(active, assignedParty.IsActive);
+        }, new[]
+        {
+            AccessTools.Method(typeof(InteractionsInitializationHandler), "Handle", new[] { typeof(MessagePayload<PlayerHeroChanged>) }),
+            // Native captivity still selects its captor; exclude the separate menu presentation handler.
+            AccessTools.Method(typeof(GameInterface.Services.PlayerCaptivityService.Handlers.PlayerCaptivityClientHandler),
+                "Handle_PlayerCaptivityChanged"),
+        });
         GameThread.Run(() => { }, blocking: true);
 
         client.Call(() =>
@@ -3755,6 +3784,25 @@ public class PlayerKingdomCreationFlowTests : IDisposable
             Assert.Contains(
                 provider.GetTrackers(),
                 tracker => ReferenceEquals(tracker.TrackedObject, army));
+        });
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void SwitchToPlayer_UnresolvedRegistrationPreservesCamera(bool resolveHero)
+    {
+        var client = TestEnvironment.Clients.First();
+        var player = CreateSyncedPlayerContext(ControllerId, _ => false);
+        client.Call(() =>
+        {
+            var previousTarget = Campaign.Current.MainParty.Party;
+            Campaign.Current.CameraFollowParty = previousTarget;
+            client.Resolve<IHeroInterface>().SwitchToPlayer(new Player(
+                ControllerId, resolveHero ? player.HeroId : "missing-hero",
+                "missing-party", player.ClanId, player.CharacterId));
+            Assert.Same(previousTarget, Campaign.Current.CameraFollowParty);
+            Assert.Same(previousTarget, Campaign.Current.MainParty.Party);
         });
     }
 
