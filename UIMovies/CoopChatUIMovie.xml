@@ -1,4 +1,4 @@
-<Prefab>
+﻿<Prefab>
   <Window>
     <Widget WidthSizePolicy="StretchToParent" HeightSizePolicy="StretchToParent" DoNotAcceptEvents="true">
       <Children>
@@ -109,7 +109,7 @@
                                                 Brush.FontColor="@Color" Brush.GlobalAlphaFactor="@Alpha"
                                                 Brush.TextHorizontalAlignment="Left"
                                                 Brush.TextVerticalAlignment="Center"
-                                                Text="@Text" ClipContents="false"/>
+                                                Text="@Text" ClipContents="true"/>
                               </ItemTemplate>
                             </ListPanel>
                           </Children>

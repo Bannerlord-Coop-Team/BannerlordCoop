@@ -1,4 +1,4 @@
-using System.IO;
+﻿using System.IO;
 using System.Runtime.CompilerServices;
 using System.Xml.Linq;
 using Xunit;
@@ -74,7 +74,8 @@ public class ChatUIMovieTests
         Assert.Contains(feedList.Descendants("RichTextWidget"),
             element => element.Attribute("Text")?.Value == "@Text" &&
                        element.Attribute("Brush.FontColor")?.Value == "@Color" &&
-                       element.Attribute("Brush.GlobalAlphaFactor")?.Value == "@Alpha");
+                       element.Attribute("Brush.GlobalAlphaFactor")?.Value == "@Alpha" &&
+                       element.Attribute("ClipContents")?.Value == "true");
 
         var feedScroll = FindById(document, "ChatFeedScrollablePanel");
         Assert.Equal(

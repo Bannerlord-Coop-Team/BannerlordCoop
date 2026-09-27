@@ -12,4 +12,12 @@ internal static class GauntletChatLogViewCoopPatches
     {
         ChatVanillaLogGate.SuspendIfPresent();
     }
+
+    // Keep vanilla recording while suspended; only steal input when co-op owns the feed.
+    [HarmonyPatch("HandleInput")]
+    [HarmonyPrefix]
+    private static bool HandleInputPrefix()
+    {
+        return !ChatVanillaLogGate.IsReplacementVisible;
+    }
 }

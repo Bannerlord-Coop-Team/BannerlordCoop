@@ -1,4 +1,4 @@
-using GameInterface.Services.Chat;
+﻿using GameInterface.Services.Chat;
 using Xunit;
 
 namespace GameInterface.Tests.Services.Chat;
@@ -35,6 +35,20 @@ public class ChatVanillaLogGateTests
         Assert.False(ChatVanillaLogGate.IsReplacementVisible);
 
         gate.Deactivate();
+        Assert.False(ChatVanillaLogGate.IsReplacementVisible);
+    }
+
+    [Fact]
+    public void SetReplacementVisible_ClearsReplacementWhenInactive()
+    {
+        var gate = new ChatVanillaLogGate();
+        gate.Activate();
+        gate.SetReplacementVisible(true);
+
+        gate.Deactivate();
+        gate.SetReplacementVisible(true);
+
+        Assert.False(ChatVanillaLogGate.IsActive);
         Assert.False(ChatVanillaLogGate.IsReplacementVisible);
     }
 }

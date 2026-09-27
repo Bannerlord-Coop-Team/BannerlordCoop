@@ -461,8 +461,7 @@ internal sealed class ChatVM : ViewModel
             VisibleLines.RemoveAt(0);
 
         VisibleLines.Add(line);
-        if (IsOpen)
-            FeedScrolledToBottomRequested?.Invoke();
+        FeedScrolledToBottomRequested?.Invoke();
     }
 
     private void UpdateVisibleLines()
@@ -475,8 +474,7 @@ internal sealed class ChatVM : ViewModel
         if (!histories.TryGetValue(channelId, out var history))
             return;
 
-        // Closed shows recent fading lines
-        // Open shows the full channel for scrolling
+        // Closed always shows recent All lines (channel tab only applies while open)
         int firstLine = IsOpen ? 0 : Math.Max(0, history.Count - VisibleHistoryLines);
         for (int i = firstLine; i < history.Count; i++)
         {
@@ -485,8 +483,7 @@ internal sealed class ChatVM : ViewModel
             VisibleLines.Add(historyLine);
         }
 
-        if (IsOpen)
-            FeedScrolledToBottomRequested?.Invoke();
+        FeedScrolledToBottomRequested?.Invoke();
     }
 
     private void TickHistory(string channelId, float dt)

@@ -1,5 +1,4 @@
-﻿using System;
-using TaleWorlds.MountAndBlade.GauntletUI;
+﻿using TaleWorlds.MountAndBlade.GauntletUI;
 using TaleWorlds.ScreenSystem;
 
 namespace GameInterface.Services.Chat;
@@ -37,12 +36,12 @@ public sealed class ChatVanillaLogGate : IChatVanillaLogGate
         if (!IsActive)
         {
             IsReplacementVisible = false;
+            ResumeIfPresent();
             return;
         }
 
-        if (IsReplacementVisible == visible) return;
-
         IsReplacementVisible = visible;
+        // Re-assert every tick: another system can flip the layer after our last toggle.
         if (visible)
             SuspendIfPresent();
         else

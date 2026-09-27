@@ -283,6 +283,49 @@ public class ChatVMTests
     }
 
     [Fact]
+    public void Receive_GlobalWhileClosedOnGlobalTab_StillShowsInPassiveFeed()
+    {
+        var vm = new ChatVM(_ => { }, () => "local");
+        int pinRequests = 0;
+        vm.FeedScrolledToBottomRequested += () => pinRequests++;
+
+        vm.SetOpen(true);
+        vm.Channels.Single(channel => channel.IsGlobal).ExecuteSelection();
+        vm.SetOpen(false);
+        int pinsAfterClose = pinRequests;
+
+        vm.Receive(new NetworkChatMessage(
+            ChatChannel.Global,
+            "local",
+            "Local Hero",
+            string.Empty,
+            string.Empty,
+            "still visible closed"));
+
+        Assert.Contains(vm.VisibleLines, line => line.Text.Contains("[Global] Local Hero: still visible closed"));
+        Assert.True(pinRequests > pinsAfterClose);
+    }
+
+    [Fact]
+    public void SetOpen_False_RebuildsPassiveAllFeedAndRequestsPin()
+    {
+        var vm = new ChatVM(_ => { }, () => "local");
+        int pinRequests = 0;
+        vm.FeedScrolledToBottomRequested += () => pinRequests++;
+
+        vm.ReceiveEvent("map event", Color.White);
+        vm.SetOpen(true);
+        vm.Channels.Single(channel => channel.IsGlobal).ExecuteSelection();
+        Assert.DoesNotContain(vm.VisibleLines, line => line.Text == "map event");
+
+        int pinsBeforeClose = pinRequests;
+        vm.SetOpen(false);
+
+        Assert.Contains(vm.VisibleLines, line => line.Text == "map event");
+        Assert.True(pinRequests > pinsBeforeClose);
+    }
+
+    [Fact]
     public void ActionToggleMute_SelectedPlayer_UpdatesChannelAndButtonState()
     {
         var vm = new ChatVM(_ => { }, () => "local");

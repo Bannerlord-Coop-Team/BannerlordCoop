@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using SandBox.View.Map;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.GameState;
@@ -23,7 +23,7 @@ internal sealed class ChatOverlay : GlobalLayer, IDisposable
     private const string ResizerWidgetId = "CoopChatResizer";
     private const string ResizeFrameWidgetId = "CoopChatResizeFrame";
     private const string ResizeCaptureWidgetId = "CoopChatResizeCapture";
-    private const int LayerOrder = 110;
+    private const int LayerOrder = 200;
     private const float ResizeTransitionSeconds = 0.14f;
 
     private readonly ChatVM dataSource;
@@ -40,6 +40,7 @@ internal sealed class ChatOverlay : GlobalLayer, IDisposable
     private bool isInputFocused;
     private bool ignoreNextOutsideClick;
     private bool playerChatEnabled;
+    private bool allowChatOpen;
     private bool pinFeedToBottom;
     private float pinFeedLastMaxValue = -1f;
     private bool isResizing;
@@ -95,7 +96,7 @@ internal sealed class ChatOverlay : GlobalLayer, IDisposable
             // Keep pinning while closed so new lines stay in view
             if (pinFeedToBottom)
                 ContinuePinFeedToBottom();
-            if (playerChatEnabled && ShouldOpenInput(
+            if (allowChatOpen && playerChatEnabled && ShouldOpenInput(
                     Input.IsKeyPressed(InputKey.Enter),
                     Input.IsKeyPressed(InputKey.NumpadEnter),
                     Input.IsKeyPressed(InputKey.ControllerLOption)))
@@ -200,7 +201,8 @@ internal sealed class ChatOverlay : GlobalLayer, IDisposable
 
     private bool CanOpenInput()
     {
-        if (!playerChatEnabled || !gauntletLayer.IsActive || Input.IsOnScreenKeyboardActive) return false;
+        if (!allowChatOpen || !playerChatEnabled || !gauntletLayer.IsActive || Input.IsOnScreenKeyboardActive)
+            return false;
 
         var focusedLayer = ScreenManager.FocusedLayer;
         if (focusedLayer == null || ReferenceEquals(focusedLayer, gauntletLayer)) return true;
@@ -216,6 +218,8 @@ internal sealed class ChatOverlay : GlobalLayer, IDisposable
         ScreenLayer gameplayLayer;
         bool isGameplayScreen;
         bool isConversationActive = Campaign.Current?.ConversationManager?.IsConversationInProgress == true;
+        bool isCampaignContext = Campaign.Current != null;
+        bool isLoading = LoadingWindow.IsLoadingWindowActive;
 
         if (topScreen is MapScreen mapScreen)
         {
@@ -231,15 +235,25 @@ internal sealed class ChatOverlay : GlobalLayer, IDisposable
         else
         {
             gameplayLayer = null;
+            // Character, clan, party, inventory, settlement menus, Coop Options, etc.
             isGameplayScreen = false;
         }
 
         var focusedLayer = ScreenManager.FocusedLayer;
-        bool shouldShow = ShouldShowPresentation(
-            isGameplayScreen && !LoadingWindow.IsLoadingWindowActive,
+        bool isGameplayLayerFocused = ReferenceEquals(focusedLayer, gameplayLayer);
+        bool isChatLayerFocused = ReferenceEquals(focusedLayer, gauntletLayer);
+
+        // Own the bottom-left event feed for the whole campaign; do not fall back to vanilla
+        // panels that clear the frame (character / clan / party).
+        bool shouldShow = ShouldShowPresentation(isCampaignContext, isConversationActive, isLoading);
+        allowChatOpen = ShouldAllowChatOpen(
+            isGameplayScreen && !isLoading,
             isConversationActive,
-            ReferenceEquals(focusedLayer, gameplayLayer),
-            ReferenceEquals(focusedLayer, gauntletLayer));
+            isGameplayLayerFocused,
+            isChatLayerFocused);
+
+        if (!allowChatOpen && dataSource.IsOpen)
+            CloseInput();
 
         if (gauntletLayer.IsActive == shouldShow)
         {
@@ -474,7 +488,17 @@ internal sealed class ChatOverlay : GlobalLayer, IDisposable
         return enterPressed || numpadEnterPressed || controllerSendPressed;
     }
 
+    /// <summary>Passive event feed for any campaign screen (map, party, character, settlement, …).</summary>
     internal static bool ShouldShowPresentation(
+        bool isCampaignContext,
+        bool isConversationActive,
+        bool isLoading)
+    {
+        return isCampaignContext && !isConversationActive && !isLoading;
+    }
+
+    /// <summary>Enter/typing only on unobstructed map or mission gameplay.</summary>
+    internal static bool ShouldAllowChatOpen(
         bool isGameplayScreen,
         bool isConversationActive,
         bool isGameplayLayerFocused,
