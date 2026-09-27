@@ -37,7 +37,7 @@ Network-receive handlers run on the single `Poller` thread, but the object an id
 
 ### Project Structure
 
-The main solution is `source/Coop.sln`. Game-facing code lives in `source/Coop`, shared networking/serialization in `source/Common`, sync/domain logic in `source/Coop.Core`, and Bannerlord API adapters in `source/GameInterface`. Tests sit beside the code in `source/*.Tests`, `source/Coop.IntegrationTests`, `source/E2E.Tests`, and `source/MissionTests`. Deploy templates and launch scripts are in `deploy`, UI prefabs in `UIMovies`, docs in `doc`, and workshop/media assets in `Workshop` and `Images`.
+The main solution is `source/Coop.sln`. Game-facing code lives in `source/Coop`, shared networking/serialization in `source/Common`, sync/domain logic in `source/Coop.Core`, and Bannerlord API adapters in `source/GameInterface`. Tests sit beside the code in `source/*.Tests`, `source/Coop.IntegrationTests`, and `source/E2E.Tests`. Deploy templates are in `deploy`, UI prefabs in `UIMovies`, docs in `doc`, and workshop/media assets in `Workshop` and `Images`.
 
 ### Build & Test Commands
 
@@ -45,11 +45,11 @@ Run from the repo root on Windows; the repo expects `mb2` to be a junction to th
 
 - `nuget restore source\Coop.sln` — restores legacy `packages.config` dependencies.
 - `dotnet build source\Coop.Core\Coop.Core.csproj -c Release` — the SDK-style core projects.
-- `dotnet build source\ServerConsole\ServerConsole.csproj -c Debug` — the .NET 10 server console.
+- `dotnet build source\ServerConsole\ServerConsole.csproj -c Debug` — the old IntroServer test launcher, not the co-op server.
 - `dotnet test source\Coop.sln -c Release` — xUnit tests where game runtime deps permit.
-- `MSBuild.exe source\Coop\Coop.csproj /p:Configuration=Debug /p:Platform=AnyCPU` — builds and deploys the mod via `deploy.ps1`.
+- `MSBuild.exe source\Coop\Coop.csproj /p:Configuration=Debug /p:Platform=AnyCPU` — builds the mod and deploys it into `mb2\Modules\Coop` through `Deploy.targets`.
 
-For compile-only checks, clear the post-build event: `/p:PostBuildEvent=`.
+`DeployToGame` in `Deploy.targets` runs after every successful build of a project that imports it (`Coop.csproj`, `MissionTestMod.csproj`), including a full `Coop.sln` build, whenever `mb2\Modules` exists. Clearing `PostBuildEvent` doesn't stop it. For compile-only checks, pass an empty global `-p:ModName=`, which turns off `DeployToGame`.
 
 ### Licensing & Authorized Agent Use
 
@@ -190,7 +190,7 @@ Keep a drafted comment to its one load-bearing point. Don't fold in secondary me
 
 ## Worktree & Working-Directory Workflow
 
-Running the server + client end-to-end needs the changes in the main working directory — the checkout wired to the `mb2` junction and `deploy.ps1`. A linked git worktree can't drive a live run, so changes made in a separate worktree usually have to be moved into the main checkout before they can be tested.
+Running the server + client end-to-end needs the changes in the main working directory — the checkout wired to the `mb2` junction and `Deploy.targets`. A linked git worktree can't drive a live run, so changes made in a separate worktree usually have to be moved into the main checkout before they can be tested.
 
 When asked to move worktree changes into the working directory, **don't blindly layer them on top of what's already there.** Check the working directory first, and **stop and ask for direction before moving if either is true** so the next step can be chosen (stash, commit, discard, switch branch, merge, …):
 
