@@ -20,6 +20,7 @@ namespace GameInterface.Tests;
 public class ContainerTest
 {
     private const string ContributedPatchCategory = "GameInterface.Tests.ContributedPatches";
+    private const string RollbackPatchCategory = "GameInterface.Tests.RollbackPatches";
 
     [Fact]
     public void Test()
@@ -149,6 +150,35 @@ public class ContainerTest
         }
     }
 
+    [Fact]
+    public void PatchAll_AfterAFailureThatLeftNoPatches_RunsTheFullInstallAgain()
+    {
+        Harmony harmony = new($"{nameof(PatchAll_AfterAFailureThatLeftNoPatches_RunsTheFullInstallAgain)}.{Guid.NewGuid()}");
+        var rollbackCategory = new HarmonyPatchCategoryRegistration(typeof(ContainerTest).Assembly, RollbackPatchCategory);
+
+        try
+        {
+            Exception? firstFailure;
+            using (IContainer failedStart = BuildContainer(harmony, rollbackCategory))
+            {
+                firstFailure = Record.Exception(failedStart.Resolve<IGameInterface>().PatchAll);
+            }
+
+            // Same state as a failure before the first patch.
+            Assert.Equal("Failed with nothing applied", firstFailure?.GetBaseException().Message);
+            Assert.False(Harmony.HasAnyPatches(harmony.Id));
+
+            using IContainer retry = BuildContainer(harmony);
+            retry.Resolve<IGameInterface>().PatchAll();
+
+            Assert.True(Harmony.HasAnyPatches(harmony.Id));
+        }
+        finally
+        {
+            harmony.UnpatchAll(harmony.Id);
+        }
+    }
+
     private static IContainer BuildContainer(
         Harmony harmony,
         HarmonyPatchCategoryRegistration? patchCategory = null,
@@ -191,6 +221,27 @@ public class ContainerTest
     [HarmonyPatchCategory(ContributedPatchCategory)]
     private static class ContributedPatch
     {
+        [HarmonyPrefix]
+        private static void Prefix()
+        {
+        }
+    }
+
+    // Removes every patch of the harmony applying it, then fails, so nothing of that attempt stays applied.
+    [HarmonyPatch(typeof(ContainerTest), nameof(ContributedPatchTarget))]
+    [HarmonyPatchCategory(RollbackPatchCategory)]
+    private static class RollbackPatch
+    {
+        [HarmonyPrepare]
+        private static bool Prepare(Harmony instance)
+        {
+            // The test bootstrap patches every class in this assembly.
+            if (!instance.Id.StartsWith(nameof(PatchAll_AfterAFailureThatLeftNoPatches_RunsTheFullInstallAgain), StringComparison.Ordinal)) return false;
+
+            instance.UnpatchAll(instance.Id);
+            throw new InvalidOperationException("Failed with nothing applied");
+        }
+
         [HarmonyPrefix]
         private static void Prefix()
         {
