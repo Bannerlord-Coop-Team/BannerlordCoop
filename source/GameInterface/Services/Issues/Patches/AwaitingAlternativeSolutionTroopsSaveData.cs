@@ -22,14 +22,18 @@ internal sealed class AwaitingAlternativeSolutionTroopsSaveData
     [SaveableField(2)]
     internal TroopRoster Troops;
 
+    [SaveableField(3)]
+    internal string Revision;
+
     private AwaitingAlternativeSolutionTroopsSaveData()
     {
     }
 
-    internal AwaitingAlternativeSolutionTroopsSaveData(string ownerControllerId, TroopRoster troops)
+    internal AwaitingAlternativeSolutionTroopsSaveData(string ownerControllerId, TroopRoster troops, string revision)
     {
         OwnerControllerId = ownerControllerId;
         Troops = troops;
+        Revision = revision;
     }
 }
 
@@ -84,7 +88,7 @@ internal class AwaitingAlternativeSolutionTroopsPersistencePatches
         if (dataStore.IsSaving)
         {
             saveData = troopsRegistry.Snapshot()
-                .Select(e => new AwaitingAlternativeSolutionTroopsSaveData(e.OwnerControllerId, e.Troops))
+                .Select(e => new AwaitingAlternativeSolutionTroopsSaveData(e.OwnerControllerId, e.Troops, e.Revision))
                 .ToList();
         }
 
@@ -97,7 +101,7 @@ internal class AwaitingAlternativeSolutionTroopsPersistencePatches
             foreach (var entry in saveData)
             {
                 if (entry?.OwnerControllerId == null || entry.Troops == null) continue;
-                troopsRegistry.Restore(entry.OwnerControllerId, entry.Troops);
+                troopsRegistry.Restore(entry.OwnerControllerId, entry.Troops, entry.Revision);
             }
         }
 
