@@ -2660,6 +2660,10 @@ internal static class DefenderSiegeFixtureCommands
                 objects.TryGetObject<Settlement>(settlement.StringId, out var registeredSettlement) &&
                 ReferenceEquals(registeredSettlement, settlement) &&
                 settlement.Party.MapEvent == null && settlement.SiegeEvent == null &&
+                settlement.Parties.All(party => !party.IsActive || partyArray.Contains(party) ||
+                    ReferenceEquals(party, settlement.Town.GarrisonParty) ||
+                    ReferenceEquals(party, settlement.MilitiaPartyComponent?.MobileParty) ||
+                    party.IsVillager || party.IsCaravan) &&
                 partyArray.All(party => !WouldUpdateOwnerVisit(party, settlement)))
             .OrderBy(settlement => settlement.StringId == PreferredSettlementId ? 0 : 1)
             .ThenBy(settlement => settlement.StringId, StringComparer.Ordinal)
