@@ -1,4 +1,5 @@
 using Common;
+using Common.Logging;
 using Common.Network;
 using Common.Util;
 using GameInterface.Policies;
@@ -6,6 +7,7 @@ using GameInterface.Services.Barters.Messages;
 using GameInterface.Services.Heroes.Extensions;
 using GameInterface.Services.ObjectManager;
 using HarmonyLib;
+using Serilog;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -26,7 +28,10 @@ namespace GameInterface.Services.Barters.Patches;
 [HarmonyPatch(typeof(BarterManager))]
 internal static class LordBarterPatch
 {
+    private const string UnsendableMessage = "Unable to send the lord barter to the server.";
+    private static readonly ILogger Logger = LogManager.GetLogger(typeof(LordBarterPatch));
     private static BarterData authorizedBarter;
+    private static string authorizationFailure;
     private static bool requestPending;
     private static bool pendingUiActive;
     private static string pendingRequestId;
@@ -49,6 +54,7 @@ internal static class LordBarterPatch
 
         if (authorizedBarter != null)
             CancelAuthorization();
+        authorizationFailure = null;
 
         if (args.OffererHero == null ||
             !args.OffererHero.IsControlledByThisInstance() ||
@@ -57,7 +63,11 @@ internal static class LordBarterPatch
             return;
         }
 
-        TryAuthorize(args, kind);
+        if (!TryAuthorize(args, kind, out var failure))
+        {
+            authorizationFailure = failure;
+            Logger.Warning("Lord barter with {TargetHero} was not authorized: {Reason}", args.OtherHero?.StringId, failure);
+        }
     }
 
     [HarmonyPatch(nameof(BarterManager.ApplyAndFinalizePlayerBarter))]
@@ -73,10 +83,16 @@ internal static class LordBarterPatch
         if (authorizedBarter != barterData ||
             string.IsNullOrEmpty(pendingRequestId) ||
             !ContainerProvider.TryResolve<IObjectManager>(out var objectManager) ||
-            !ContainerProvider.TryResolve<INetwork>(out var network) ||
-            !TryCreateTerms(barterData.GetOfferedBarterables(), objectManager, out var terms))
+            !ContainerProvider.TryResolve<INetwork>(out var network))
         {
-            ShowMessage("Unable to send the lord barter to the server.");
+            ShowMessage(authorizationFailure == null ? UnsendableMessage : $"{UnsendableMessage} {authorizationFailure}");
+            return false;
+        }
+
+        if (!TryCreateTerms(barterData.GetOfferedBarterables(), objectManager, out var terms, out var termFailure))
+        {
+            Logger.Warning("Lord barter with {TargetHero} has a term that cannot be sent: {Reason}", barterData.OtherHero?.StringId, termFailure);
+            ShowMessage($"{UnsendableMessage} {termFailure}");
             return false;
         }
 
@@ -256,6 +272,7 @@ internal static class LordBarterPatch
     internal static void ClearPendingRequest()
     {
         authorizedBarter = null;
+        authorizationFailure = null;
         requestPending = false;
         pendingUiActive = false;
         pendingRequestId = null;
@@ -286,13 +303,35 @@ internal static class LordBarterPatch
         return true;
     }
 
-    private static bool TryAuthorize(BarterData barterData, LordBarterKind kind)
+    private static bool TryAuthorize(BarterData barterData, LordBarterKind kind, out string failure)
     {
+        failure = null;
         if (!ContainerProvider.TryResolve<IObjectManager>(out var objectManager) ||
-            !ContainerProvider.TryResolve<INetwork>(out var network) ||
-            !objectManager.TryGetId(barterData.OtherHero, out var targetHeroId) ||
-            !TryGetConversationContext(barterData, objectManager, out var context, out var contextId))
+            !ContainerProvider.TryResolve<INetwork>(out var network))
         {
+            return false;
+        }
+
+        if (!objectManager.TryGetId(barterData.OtherHero, out var targetHeroId))
+        {
+            failure = "The lord is not registered with the server.";
+            return false;
+        }
+
+        if (!TryGetConversationContext(barterData, objectManager, out var context, out var contextId))
+        {
+            var otherHero = barterData.OtherHero;
+            failure = "The conversation with this lord could not be identified.";
+            Logger.Warning(
+                "Lord barter context unresolved: prisoner={IsPrisoner} captor={Captor} offererParty={OffererParty} " +
+                "otherParty={OtherParty} settlement={Settlement} lordSettlement={LordSettlement} location={Location}",
+                otherHero.IsPrisoner,
+                otherHero.PartyBelongedToAsPrisoner?.Id,
+                barterData.OffererParty?.Id,
+                barterData.OtherParty?.Id,
+                barterData.OffererParty?.MobileParty?.CurrentSettlement?.StringId,
+                otherHero.CurrentSettlement?.StringId,
+                CampaignMission.Current?.Location?.StringId);
             return false;
         }
 
@@ -312,6 +351,7 @@ internal static class LordBarterPatch
                 !objectManager.TryGetId(joinKingdom.TargetKingdom, out targetKingdomId))
             {
                 ClearPendingRequest();
+                failure = $"The kingdom {joinKingdom?.TargetKingdom?.StringId} is not registered with the server.";
                 return false;
             }
         }
@@ -353,6 +393,18 @@ internal static class LordBarterPatch
 
     internal static bool TryGetConversationContext(BarterData barterData, IObjectManager manager, out PeaceConversationContext context, out string contextId)
     {
+        // First, because vanilla opens the prisoner barter with no OtherParty, and a party screen talk
+        // sets no location, so no branch below would match it.
+        var captor = barterData.OtherHero?.PartyBelongedToAsPrisoner;
+        if (barterData.OtherHero?.IsPrisoner == true &&
+            captor != null &&
+            captor == barterData.OffererParty &&
+            manager.TryGetId(captor, out contextId))
+        {
+            context = PeaceConversationContext.PlayerPartyPrisoner;
+            return true;
+        }
+
         var location = CampaignMission.Current?.Location;
         if (location != null && manager.TryGetId(location, out contextId))
         {
@@ -386,18 +438,20 @@ internal static class LordBarterPatch
         return false;
     }
 
-    private static bool TryCreateTerms(IEnumerable<Barterable> barterables, IObjectManager manager, out List<PeaceBarterTerm> terms)
+    private static bool TryCreateTerms(IEnumerable<Barterable> barterables, IObjectManager manager, out List<PeaceBarterTerm> terms, out string failure)
     {
         terms = new List<PeaceBarterTerm>();
+        failure = null;
         foreach (var barterable in barterables)
         {
             if (barterable is SafePassageBarterable || barterable is NoAttackBarterable || barterable is JoinKingdomAsClanBarterable)
                 continue;
-            if (barterable == null || barterable.CurrentAmount <= 0 || !manager.TryGetId(barterable.OriginalOwner, out var ownerId))
+            if (barterable == null || barterable.CurrentAmount <= 0 || !manager.TryGetId(barterable.OriginalOwner, out var ownerId) ||
+                !TryCreateTerm(barterable, ownerId, manager, out var term))
+            {
+                failure = $"The offered {barterable?.GetType().Name} (amount {barterable?.CurrentAmount}) cannot be sent.";
                 return false;
-
-            if (!TryCreateTerm(barterable, ownerId, manager, out var term))
-                return false;
+            }
 
             terms.Add(term);
         }
