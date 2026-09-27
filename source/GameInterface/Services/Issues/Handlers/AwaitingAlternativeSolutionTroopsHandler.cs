@@ -243,8 +243,6 @@ internal class AwaitingAlternativeSolutionTroopsHandler : IHandler
                     if (element.Character.IsHero && element.Character.HeroObject.HeroState != Hero.CharacterStates.Active)
                     {
                         var beforeActivation = party.MemberRoster.GetTroopCount(element.Character);
-                        Logger.Warning("Issue3649ReturnActivation Hero={HeroId} AllowedThread={AllowedThread}",
-                            element.Character.HeroObject.StringId, AllowedThread.IsThisThreadAllowed());
                         element.Character.HeroObject.ChangeState(Hero.CharacterStates.Active);
                         restoredByActivation = party.MemberRoster.GetTroopCount(element.Character) - beforeActivation;
                     }

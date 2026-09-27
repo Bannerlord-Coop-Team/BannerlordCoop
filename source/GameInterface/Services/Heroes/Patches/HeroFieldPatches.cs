@@ -205,48 +205,6 @@ namespace GameInterface.Services.Heroes.Patches
             instance._name = newName;
         }
 
-        [HarmonyTranspiler]
-        private static IEnumerable<CodeInstruction> HeroStateTranspiler(IEnumerable<CodeInstruction> instructions)
-        {
-            var heroStateField = AccessTools.Field(typeof(Hero), nameof(Hero._heroState));
-            var fieldIntercept = AccessTools.Method(typeof(HeroFieldPatches), nameof(HeroStateIntercept));
-
-            foreach (var instruction in instructions)
-            {
-                if (instruction.StoresField(heroStateField))
-                {
-                    CodeInstruction codeInst = new CodeInstruction(OpCodes.Call, fieldIntercept);
-                    codeInst.labels = instruction.labels;
-                    yield return codeInst;
-                }
-                else
-                {
-                    yield return instruction;
-                }
-            }
-        }
-        public static void HeroStateIntercept(Hero instance, Hero.CharacterStates newState)
-        {
-            var originalAllowed = CallOriginalPolicy.IsOriginalAllowed();
-            if (ModInformation.IsServer && newState == Hero.CharacterStates.Active)
-                Logger.Warning("Issue3649HeroStateIntercept Hero={HeroId} OriginalAllowed={OriginalAllowed}",
-                    instance.StringId, originalAllowed);
-            if (originalAllowed)
-            {
-                instance._heroState = newState;
-                return;
-            }
-            if (ModInformation.IsClient)
-            {
-                Logger.Error("Client updated managed {var}", nameof(Hero._heroState));
-                instance._heroState = newState;
-                return;
-            }
-
-            MessageBroker.Instance.Publish(instance, new HeroStateChanged((int)newState, instance));
-
-            instance._heroState = newState;
-        }
 
         [HarmonyTranspiler]
         private static IEnumerable<CodeInstruction> DefaultAgeTranspiler(IEnumerable<CodeInstruction> instructions)
