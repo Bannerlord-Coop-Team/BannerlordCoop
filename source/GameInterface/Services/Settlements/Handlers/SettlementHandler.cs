@@ -305,6 +305,7 @@ public class SettlementHandler : IHandler
         messageBroker.Unsubscribe<ChangeSettlementCurrentSiegeState>(HandleCurrentSiegeState);
         messageBroker.Unsubscribe<ChangeSettlementMilitia>(HandleMilitia);
         messageBroker.Unsubscribe<ChangeSettlementGarrisonWagePaymentLimit>(HandleGarrisonWageLimit);
+        messageBroker.Unsubscribe<ChangeMobileParty>(HandleMobileParty);
         messageBroker.Unsubscribe<ChangeSettlementWallHitPointsRatio>(HandleHitPointsRatio);
         messageBroker.Unsubscribe<ChangeSettlementLastVisitTimeOfOwner>(HandleLastVisitTimeOfOwner);
 
@@ -315,6 +316,8 @@ public class SettlementHandler : IHandler
 
         messageBroker.Unsubscribe<ChangeLordConversationCampaignBehaviourPlayerClaimValue>(HandleLordConversationCampaignBehaviorPlayerClaimValue);
         messageBroker.Unsubscribe<ChangeLordConversationCampaignBehaviorPlayerClaimValueOthers>(HandleLordConversationCampaignBehaviorPlayerClaimValueOthers);
+
+        messageBroker.Unsubscribe<ChangeSettlementClaimantCanBeClaimed>(HandleSettlementClaimaintCanBeClaimed);
 
         messageBroker.Unsubscribe<NewGarrisonParty>(HandleNewGarrisonParty);
         messageBroker.Unsubscribe<NetworkNewGarrisonParty>(HandleNetworkNewGarrisonParty);
