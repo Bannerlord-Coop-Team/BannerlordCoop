@@ -753,6 +753,11 @@ internal class ConversationRequestHandler : IHandler
         if (ModInformation.IsServer) return;
 
         var message = payload.What;
+
+        // Handle_ConversationRequested always sends an id, so a null id comes from a server-detected encounter
+        // or the request_player_field_battle debug command.
+        if (message.RequestId == null) return;
+
         GameThread.RunSafe(() =>
         {
             restartContextTracker.Remove(message.RequestId);

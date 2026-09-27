@@ -2564,6 +2564,37 @@ public class PlayerPartyInteractionFlowTests : MapEventTestBase
     }
 
     [Fact]
+    public void ConversationDenial_WithoutRequestId_ShowsNoMessage()
+    {
+        var (client, _, playerPartyId, _) = CreateTwoPlayerParties();
+        var aiPartyId = CreateMobilePartyBase();
+        var lastMessageField = AccessTools.Field(typeof(ConversationPartyHold), "lastInteractionBlockedMessageUtc");
+        Assert.NotNull(lastMessageField);
+
+        SetMockPlayerEncounter(client);
+        PublishConversationRequest(client, playerPartyId, aiPartyId, new[] { GetNetworkRoutingMethod() });
+        var request = Assert.Single(client.NetworkSentMessages.GetMessages<NetworkRequestConversation>());
+        lastMessageField.SetValue(null, DateTime.MinValue);
+
+        try
+        {
+            client.SimulateMessage(Server.NetPeer, new NetworkConversationDenied(ConversationDeniedReason.PartyEngaged, null));
+
+            Assert.Equal(DateTime.MinValue, (DateTime)lastMessageField.GetValue(null)!);
+            Assert.Equal(request.RequestId, GetPendingConversationRequestId(client));
+
+            client.SimulateMessage(Server.NetPeer, new NetworkConversationDenied(ConversationDeniedReason.PartyEngaged, request.RequestId));
+
+            Assert.NotEqual(DateTime.MinValue, (DateTime)lastMessageField.GetValue(null)!);
+            Assert.Null(GetPendingConversationRequestId(client));
+        }
+        finally
+        {
+            lastMessageField.SetValue(null, DateTime.MinValue);
+        }
+    }
+
+    [Fact]
     public void ConversationApproval_ReplacesCapturedEncounter()
     {
         var (client, _, playerPartyId, _) = CreateTwoPlayerParties();
