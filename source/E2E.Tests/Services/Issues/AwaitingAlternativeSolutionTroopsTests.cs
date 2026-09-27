@@ -331,6 +331,8 @@ public class AwaitingAlternativeSolutionTroopsTests : IDisposable
             Server.Resolve<TestNetworkRouter>().ReceiveContext = TestNetworkReceiveContext.PollerThread;
             Client.Call(() => InquiryCaptureHandler.InvokeAffirmativeAction(capturedInquiry));
             Server.PumpGameThread();
+            TestEnvironment.FlushCoalescer();
+            Client.PumpGameThread();
         }
         finally
         {
@@ -359,14 +361,11 @@ public class AwaitingAlternativeSolutionTroopsTests : IDisposable
         Assert.True(Client.InternalMessages.GetMessages<ChangeHeroState>()
             .Count(message => message.HeroId == fixture.CompanionHeroId && message.HeroState == (int)Hero.CharacterStates.Active)
             > clientActivationMessagesBeforeDrain, "Client did not receive companion activation");
-        Client.PumpGameThread();
         Client.Call(() =>
         {
             Assert.True(Client.ObjectManager.TryGetObject<Hero>(fixture.CompanionHeroId, out var companion));
             Assert.Equal(Hero.CharacterStates.Active, companion.HeroState);
         });
-        TestEnvironment.FlushCoalescer();
-        Client.PumpGameThread();
         Client.Call(() =>
         {
             Assert.True(Client.ObjectManager.TryGetObject<Hero>(fixture.CompanionHeroId, out var companion));
