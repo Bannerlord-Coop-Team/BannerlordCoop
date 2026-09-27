@@ -79,6 +79,7 @@ public class AwaitingAlternativeSolutionTroopsTests : IDisposable
                     hero.StayingInSettlement = settlement;
                     hero.Occupation = Occupation.RuralNotable;
                     AccessTools.Property(typeof(ItemObject), nameof(ItemObject.Value)).SetValue(item, 40);
+                    companion.CharacterObject.HeroObject = companion;
                     companion.ChangeState(Hero.CharacterStates.Disabled);
                 }
             });
@@ -319,9 +320,11 @@ public class AwaitingAlternativeSolutionTroopsTests : IDisposable
             Assert.True(Server.ObjectManager.TryGetObject<CharacterObject>(eligibleTroopId, out var eligibleTroop));
             Assert.Equal(1, party.MemberRoster.GetTroopCount(companion.CharacterObject));
             Assert.Equal(6, party.MemberRoster.GetTroopCount(eligibleTroop));
+            Assert.Equal(Hero.CharacterStates.Active, companion.HeroState);
             Assert.False(Server.Resolve<IAwaitingAlternativeSolutionTroopsRegistry>().TryGet(controllerId, out _));
         });
         Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkAwaitingAlternativeSolutionTroopsDrainConfirmed>());
+        TestEnvironment.FlushCoalescer();
         Client.Call(() =>
         {
             Assert.True(Client.ObjectManager.TryGetObject<Hero>(fixture.CompanionHeroId, out var companion));
@@ -501,9 +504,11 @@ public class AwaitingAlternativeSolutionTroopsTests : IDisposable
             Assert.True(Server.ObjectManager.TryGetObject<CharacterObject>(eligibleTroopId, out var eligibleTroop));
             Assert.Equal(1, party.MemberRoster.GetTroopCount(companion.CharacterObject));
             Assert.Equal(6, party.MemberRoster.GetTroopCount(eligibleTroop));
+            Assert.Equal(Hero.CharacterStates.Active, companion.HeroState);
             Assert.False(Server.Resolve<IAwaitingAlternativeSolutionTroopsRegistry>().TryGet(controllerId, out _));
         });
         Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkAwaitingAlternativeSolutionTroopsDrainConfirmed>());
+        TestEnvironment.FlushCoalescer();
         Client.Call(() =>
         {
             Assert.True(Client.ObjectManager.TryGetObject<Hero>(fixture.CompanionHeroId, out var companion));
