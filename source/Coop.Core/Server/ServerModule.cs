@@ -83,6 +83,7 @@ public class ServerModule : CommonModule
         // campaign. AutoActivate so it subscribes to connection lifecycle events before any peer joins.
         builder.RegisterType<ConnectionMessageQueue>().As<IConnectionMessageQueue>().InstancePerLifetimeScope().AutoActivate();
         builder.RegisterType<SteamBanList>().As<ISteamBanList>().InstancePerDependency();
+        builder.RegisterType<ServerInfoConfig>().As<IServerInfoConfig>().InstancePerLifetimeScope();
 
         builder.RegisterType<MissionManager>()
             .As<IMissionManager>()
