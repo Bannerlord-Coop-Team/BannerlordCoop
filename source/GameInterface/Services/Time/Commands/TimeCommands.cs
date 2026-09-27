@@ -97,6 +97,29 @@ internal class TimeCommands
     }
 
 #if DEBUG
+    public sealed class GetCampaignTimeCoopCommand : ICoopCommand
+    {
+        public string Prefix => "coop.debug";
+
+        public string Name => "get_campaign_time";
+
+        public string Description => "Reports campaign hour and the game night predicate.";
+
+        public CoopCommandSide Side => CoopCommandSide.Both;
+
+        public IExpectedArgs[] ExpectedArgs { get; } = Array.Empty<IExpectedArgs>();
+
+        public CoopCommandResult ProcessCommand(ICoopCommandArgs strings)
+        {
+            if (Campaign.Current == null)
+                return Failed("No campaign is currently loaded.");
+
+            var now = CampaignTime.Now;
+            return Succeeded($"hour={now.CurrentHourInDay.ToString("0.000", System.Globalization.CultureInfo.InvariantCulture)} " +
+                $"isNightTime={now.IsNightTime} ticks={now.NumTicks}");
+        }
+    }
+
     public sealed class RequestTimeModeCoopCommand : ICoopCommand
     {
         public string Prefix => "coop.debug";
