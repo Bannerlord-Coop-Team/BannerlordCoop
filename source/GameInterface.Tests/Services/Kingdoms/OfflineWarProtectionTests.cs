@@ -217,14 +217,15 @@ public class OfflineWarProtectionTests : IDisposable
     }
 
     [Theory]
-    [InlineData(typeof(MakePeaceKingdomDecision))]
-    [InlineData(typeof(KingdomPolicyDecision))]
-    [InlineData(typeof(TradeAgreementDecision))]
-    [InlineData(typeof(StartAllianceDecision))]
-    public void NonWarDecisions_AreAllowed(Type decisionType)
+    [InlineData(typeof(MakePeaceKingdomDecision), nameof(MakePeaceKingdomDecision.FactionToMakePeaceWith))]
+    [InlineData(typeof(StartAllianceDecision), nameof(StartAllianceDecision.KingdomToStartAllianceWith))]
+    [InlineData(typeof(TradeAgreementDecision), nameof(TradeAgreementDecision.TargetKingdom))]
+    [InlineData(typeof(KingdomPolicyDecision), null)]
+    public void NonWarDecisions_AgainstOfflinePlayerKingdom_AreAllowed(Type decisionType, string? targetField)
     {
         var decision = (CampaignKingdomDecision)ObjectHelper.SkipConstructor(decisionType);
         decision.ProposerClan = aiClan;
+        if (targetField != null) AccessTools.Field(decisionType, targetField).SetValue(decision, playerKingdom);
 
         Assert.False(protection.ShouldRefuse(decision, out _));
     }

@@ -5,8 +5,11 @@ using E2E.Tests.Environment.Instance;
 using GameInterface.Configuration;
 using GameInterface.Services.Players;
 using GameInterface.Services.Players.Data;
+using HarmonyLib;
 using TaleWorlds.CampaignSystem;
+using TaleWorlds.CampaignSystem.CampaignBehaviors;
 using TaleWorlds.CampaignSystem.Election;
+using TaleWorlds.CampaignSystem.GameComponents;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.Core;
 using TaleWorlds.Library;
@@ -98,6 +101,42 @@ public class OfflineWarProtectionFlowTests : IDisposable
         AssertWarProposalQueued();
     }
 
+    [Fact]
+    public void AllianceCallToWar_AgainstOfflinePlayerKingdom_IsDroppedOnTheServer()
+    {
+        SetOption(true);
+
+        StartAllianceWhileAtWarWithPlayerKingdom();
+
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject(aiKingdomId, out Kingdom aiKingdom));
+
+            Assert.Empty(aiKingdom.UnresolvedDecisions);
+        });
+        Assert.Empty(Server.NetworkSentMessages.GetMessages<NetworkAddDecision>());
+    }
+
+    [Fact]
+    public void AllianceCallToWar_WithOptionOff_IsQueuedWhileRulerIsOffline()
+    {
+        SetOption(false);
+
+        StartAllianceWhileAtWarWithPlayerKingdom();
+
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject(aiKingdomId, out Kingdom aiKingdom));
+            Assert.True(Server.ObjectManager.TryGetObject(playerKingdomId, out Kingdom playerKingdom));
+
+            var decision = Assert.IsType<ProposeCallToWarAgreementDecision>(Assert.Single(aiKingdom.UnresolvedDecisions));
+            Assert.Same(playerKingdom, decision.KingdomToCallToWarAgainst);
+        });
+        Assert.Single(
+            Server.NetworkSentMessages.GetMessages<NetworkAddDecision>(),
+            message => message.KingdomId == aiKingdomId);
+    }
+
     private static void SetOption(bool enabled)
     {
         ModConfigProvider.ModOptions = new ModOptions(new ModOptionsData { BlockAiWarDeclarationsOnOfflinePlayers = enabled });
@@ -118,6 +157,35 @@ public class OfflineWarProtectionFlowTests : IDisposable
 
             aiKingdom.AddDecision(new DeclareWarDecision(aiClan, playerKingdom));
         });
+    }
+
+    // A resolved StartAllianceDecision calls StartAlliance with no allowed-call scope, and an alliance
+    // started while at war asks the ally to join through Kingdom.AddDecision.
+    private void StartAllianceWhileAtWarWithPlayerKingdom()
+    {
+        string allyKingdomId = TestEnvironment.CreateRegisteredObject<Kingdom>();
+        string allyClanId = CreateLedClan("OfflineWarAllyClan", controllerId: null);
+        ConfigureClanInKingdom(allyClanId, allyKingdomId);
+
+        // The call-to-war cost reads Clan.PlayerClan, which this harness leaves unset. The gate never reads the cost.
+        var disabledMethods = new[] { AccessTools.Method(typeof(DefaultAllianceModel), nameof(DefaultAllianceModel.GetCallToWarCost)) };
+
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject(aiKingdomId, out Kingdom aiKingdom));
+            Assert.True(Server.ObjectManager.TryGetObject(allyKingdomId, out Kingdom allyKingdom));
+            Assert.True(Server.ObjectManager.TryGetObject(playerKingdomId, out Kingdom playerKingdom));
+
+            FactionManager.DeclareWar(aiKingdom, playerKingdom);
+            using (new AllowedThread())
+            {
+                // Kingdoms made here are not in Kingdom.All, so the war declaration cannot refresh this cache.
+                aiKingdom._factionsAtWarWith.Add(playerKingdom);
+            }
+            Assert.True(aiKingdom.IsAtWarWith(playerKingdom));
+
+            new AllianceCampaignBehavior().StartAlliance(aiKingdom, allyKingdom);
+        }, disabledMethods);
     }
 
     private void AssertWarProposalQueued()
