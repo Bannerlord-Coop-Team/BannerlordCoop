@@ -17,13 +17,11 @@ namespace GameInterface.Services.SiegeEvents.Commands;
 
 internal static class SiegeBreakOutDebugCommands
 {
-    private const string SettlementId = "town_ES1";
-
     public sealed class JoinDefenseCoopCommand : ICoopCommand
     {
         public string Prefix => "coop.debug.siege";
         public string Name => "break_out_join_defense";
-        public string Description => "Joins Danustica's defense through the siege preparation menu consequence.";
+        public string Description => "Joins the current settlement's defense through the siege preparation menu consequence.";
         public CoopCommandSide Side => CoopCommandSide.Client;
         public IExpectedArgs[] ExpectedArgs { get; } = Array.Empty<IExpectedArgs>();
 
@@ -33,12 +31,12 @@ internal static class SiegeBreakOutDebugCommands
                 return Failed("client_campaign_required");
             var settlement = Settlement.CurrentSettlement;
             if (MobileParty.MainParty?.CurrentSettlement != settlement ||
-                settlement?.StringId != SettlementId || settlement.SiegeEvent == null ||
-                PlayerEncounter.Current == null ||
+                settlement == null || !settlement.IsFortification || settlement.SiegeEvent == null ||
+                PlayerEncounter.EncounterSettlement != settlement ||
                 Campaign.Current.CurrentMenuContext?.GameMenu?.StringId !=
                     "encounter_interrupted_siege_preparations" ||
                 !settlement.SiegeEvent.CanPartyJoinSide(PartyBase.MainParty, BattleSideEnum.Defender))
-                return Failed("danustica_defense_option_required");
+                return Failed("settlement_defense_option_required");
             var behavior = Campaign.Current.GetCampaignBehavior<EncounterGameMenuBehavior>();
             if (behavior == null) return Failed("encounter_behavior_unavailable");
             behavior.game_menu_encounter_interrupted_siege_preparations_join_defend_on_consequence(null);
@@ -91,7 +89,7 @@ internal static class SiegeBreakOutDebugCommands
 
         public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
         {
-            if (!TryGetBehavior("break_out_debrief_menu", out var behavior, out var reason))
+            if (!TryGetBehavior("break_out_debrief_menu", out var behavior, out var reason, requireDefender: false))
                 return Failed(reason);
             if (behavior._isBreakingOutFromPort) return Failed("port_breakout_not_supported");
             behavior.break_out_debrief_continue_on_consequence(null);
@@ -156,17 +154,18 @@ internal static class SiegeBreakOutDebugCommands
         }
     }
 
-    private static bool TryGetBehavior(string expectedMenu, out EncounterGameMenuBehavior behavior, out string reason)
+    private static bool TryGetBehavior(string expectedMenu, out EncounterGameMenuBehavior behavior, out string reason, bool requireDefender = true)
     {
         behavior = null;
         reason = null;
         if (ModInformation.IsServer || Campaign.Current == null)
             reason = "client_campaign_required";
-        else if (MobileParty.MainParty?.CurrentSettlement?.StringId != SettlementId ||
-                 PlayerSiege.PlayerSiegeEvent?.BesiegedSettlement?.StringId != SettlementId ||
-                 PlayerSiege.PlayerSide != BattleSideEnum.Defender ||
-                 PlayerEncounter.Current == null)
-            reason = "danustica_defender_encounter_required";
+        else if (requireDefender &&
+                 (MobileParty.MainParty?.CurrentSettlement == null ||
+                  PlayerSiege.PlayerSiegeEvent?.BesiegedSettlement != MobileParty.MainParty.CurrentSettlement ||
+                  PlayerSiege.PlayerSide != BattleSideEnum.Defender ||
+                  PlayerEncounter.EncounterSettlement != MobileParty.MainParty.CurrentSettlement))
+            reason = "settlement_defender_encounter_required";
         else if (Campaign.Current.CurrentMenuContext?.GameMenu?.StringId != expectedMenu)
             reason = "expected_menu_" + expectedMenu;
         else

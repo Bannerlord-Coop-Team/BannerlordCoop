@@ -270,12 +270,14 @@ public class ClientSettlementExitEnterHandler : IHandler
         if (PlayerEncounter.Current == null)
         {
             var party = MobileParty.MainParty;
+            var menu = Campaign.Current.CurrentMenuContext?.GameMenu?.StringId;
             if (party != null && party.CurrentSettlement == null && party.Party.MapEventSide == null &&
                 party.BesiegerCamp == null && party.SiegeEvent == null &&
                 Game.Current.GameStateManager.ActiveState is MapState &&
-                Campaign.Current.CurrentMenuContext?.GameMenu?.StringId == "town_outside")
+                (menu == "town_outside" || menu == "castle_outside" ||
+                 menu == "siege_attacker_left" || menu == "siege_attacker_defeated"))
             {
-                // Close an orphaned gates menu after the replicated leave.
+                // Close settlement-only menus after the replicated leave.
                 using (new AllowedThread()) GameMenu.ExitToLast();
             }
             return;

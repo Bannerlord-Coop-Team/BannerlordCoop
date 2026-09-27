@@ -3,6 +3,9 @@ using Coop.Core.Client.Services.MobileParties.Messages;
 using E2E.Tests.Environment;
 using E2E.Tests.Util;
 using HarmonyLib;
+using GameInterface.Services.Settlements.Patches;
+using TaleWorlds.CampaignSystem.CampaignBehaviors;
+using TaleWorlds.CampaignSystem.Settlements;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Encounters;
 using TaleWorlds.CampaignSystem.GameMenus;
@@ -26,16 +29,16 @@ public class SettlementLeaveMenuTests : IDisposable
         environment = new E2ETestEnvironment(output);
     }
 
+    public static IEnumerable<object[]> MenuStates()
+    {
+        foreach (string menu in new[] { "town_outside", "castle_outside", "siege_attacker_left", "siege_attacker_defeated" })
+        foreach (string state in new[] { "orphaned", "other-party", "other-menu", "no-menu", "active-encounter", "battle-side", "siege-camp", "mission-state" })
+            yield return new object[] { menu, state, state == "orphaned" };
+    }
+
     [Theory]
-    [InlineData("orphaned-town", true)]
-    [InlineData("other-party", false)]
-    [InlineData("other-menu", false)]
-    [InlineData("no-menu", false)]
-    [InlineData("active-encounter", false)]
-    [InlineData("battle-side", false)]
-    [InlineData("siege-camp", false)]
-    [InlineData("mission-state", false)]
-    public void ServerDrivenLeave_ClosesOnlyOrphanedTownMenu(string state, bool closesMenu)
+    [MemberData(nameof(MenuStates))]
+    public void ServerDrivenLeave_ClosesOnlyOrphanedSettlementMenu(string settlementMenu, string state, bool closesMenu)
     {
         var client = environment.Clients.First();
         var leavingId = environment.CreateRegisteredObject<MobileParty>();
@@ -58,7 +61,7 @@ public class SettlementLeaveMenuTests : IDisposable
             states._gameStates.Add(map);
             if (state != "no-menu")
             {
-                string menuId = state == "other-menu" ? "encounter" : "town_outside";
+                string menuId = state == "other-menu" ? "encounter" : settlementMenu;
                 // Seed the orphaned menu without running settlement-dependent vanilla initialization.
                 map._menuContext = Game.Current.ObjectManager.CreateObject<MenuContext>();
                 map._menuContext.GameMenu = ObjectHelper.SkipConstructor<GameMenu>();
@@ -94,6 +97,25 @@ public class SettlementLeaveMenuTests : IDisposable
         Assert.Equal(0, menuExit.CountFor(environment.Clients.Last()));
         Assert.Equal(0, encounterFinish.Count);
         client.Call(() => Assert.Same(originalEncounter, PlayerEncounter.Current));
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void CastleInitialization_RequiresEncounterSettlement(bool hasSettlement)
+    {
+        environment.Clients.First().Call(() =>
+        {
+            var encounter = ObjectHelper.SkipConstructor<PlayerEncounter>();
+            encounter.EncounterSettlementAux = hasSettlement ? ObjectHelper.SkipConstructor<Settlement>() : null;
+            Campaign.Current.PlayerEncounter = encounter;
+            var method = AccessTools.Method(typeof(EncounterGameMenuBehavior), "game_menu_castle_outside_on_init");
+            Assert.Contains(Harmony.GetPatchInfo(method).Prefixes,
+                patch => patch.PatchMethod == AccessTools.Method(typeof(EncounterGameMenuBehaviorPatch), nameof(EncounterGameMenuBehaviorPatch.CastleOutsidePrefix)));
+            Assert.Equal(hasSettlement, EncounterGameMenuBehaviorPatch.CastleOutsidePrefix(null));
+            if (!hasSettlement)
+                ObjectHelper.SkipConstructor<EncounterGameMenuBehavior>().game_menu_castle_outside_on_init(null);
+        });
     }
 
     public void Dispose() => environment.Dispose();
