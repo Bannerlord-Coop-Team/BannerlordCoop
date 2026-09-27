@@ -84,6 +84,39 @@ public class FreeOrCapturePrisonerHeroesTests : IDisposable
     }
 
     [Fact]
+    public void UpdateInternalAfterBattle_CompanionOfUnregisteredClan_IsReleased()
+    {
+        var fixture = CreateFixture();
+        // A deleted player's clan keeps its companions after the registration is gone.
+        foreach (var instance in Clients.Prepend(Server))
+        {
+            instance.Call(() =>
+            {
+                var playerManager = instance.Resolve<IPlayerManager>();
+                Assert.True(playerManager.TryGetPlayer("CompanionOwner", out var owner));
+                Assert.True(playerManager.RemovePlayer(owner));
+            });
+        }
+        var companionId = CreateCaptiveHero(fixture.OwnerPartyId, fixture.CaptorPartyId, Occupation.Wanderer);
+        var rescuer = Clients[0];
+        rescuer.NetworkSentMessages.Clear();
+        Server.InternalMessages.Clear();
+
+        RunFreeHeroes(rescuer, fixture, new[] { companionId }, encounter =>
+        {
+            new PlayerEncounterInterface().UpdateInternalAfterBattle(encounter);
+
+            Assert.Empty(openedConversations);
+            Assert.Equal(PlayerEncounterState.LootParty, encounter.EncounterState);
+        });
+
+        var release = Assert.Single(rescuer.NetworkSentMessages.OfType<NetworkEndCaptivityAttempted>());
+        Assert.Equal(companionId, release.PrisonerId);
+        testEnvironment.FlushCoalescer();
+        AssertReleasedOnceEverywhere(companionId, fixture.CaptorPartyId);
+    }
+
+    [Fact]
     public void DoFreeOrCapturePrisonerHeroes_UnregisteredForeignCompanion_IsDequeuedWithoutConversation()
     {
         var fixture = CreateFixture();

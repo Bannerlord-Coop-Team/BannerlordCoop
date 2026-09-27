@@ -1,6 +1,5 @@
 ﻿using Common;
 using Common.Logging;
-using GameInterface.Services.Clans.Extensions;
 using GameInterface.Services.Heroes.Extensions;
 using Serilog;
 using System.Linq;
@@ -107,9 +106,8 @@ public class PlayerEncounterInterface : IPlayerEncounterInterface
         if (hero.Clan != null && hero.Clan != localPlayerClan && hero.IsPlayerHero())
             return true;
 
-        return hero.CompanionOf != null &&
-               hero.CompanionOf != localPlayerClan &&
-               hero.CompanionOf.IsPlayerClan();
+        // Native only has a free prisoner line for the local clan's companions.
+        return hero.CompanionOf != null && hero.CompanionOf != localPlayerClan;
     }
 
     private void EndPlayerEncounter(PlayerEncounter playerEncounter)
