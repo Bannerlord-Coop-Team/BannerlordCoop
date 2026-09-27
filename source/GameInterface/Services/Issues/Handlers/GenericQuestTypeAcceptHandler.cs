@@ -125,7 +125,8 @@ internal class GenericQuestTypeAcceptHandler : IHandler
                 if (descriptor.TryArbitrateQuestSolutionAcceptBytes != null &&
                     !QuestSolutionStartRunner.HasRegisteredQuest(owner))
                 {
-                    Logger.Error("Quest-solution accept for owner {Owner} did not leave a registered ongoing quest - not broadcasting", ownerId);
+                    Logger.Error("Quest-solution accept for owner {Owner} did not leave a registered ongoing quest - finalizing rejected accept", ownerId);
+                    IssueFinalizationSupport.FinalizeMirror(owner, IssueFinalizeReason.RejectedAccept, suppressReplicationPatches: false);
                     return;
                 }
 
@@ -228,7 +229,8 @@ internal class GenericQuestTypeAcceptHandler : IHandler
                 if (descriptor.TryArbitrateQuestSolutionAcceptBytes != null &&
                     !QuestSolutionStartRunner.HasRegisteredQuest(owner))
                 {
-                    Logger.Error("Quest-solution accept for owner {Owner} did not leave a registered ongoing quest - rejecting", ownerId);
+                    Logger.Error("Quest-solution accept for owner {Owner} did not leave a registered ongoing quest - finalizing rejected accept", ownerId);
+                    IssueFinalizationSupport.FinalizeMirror(owner, IssueFinalizeReason.RejectedAccept, suppressReplicationPatches: false);
                     network.Send(requester, new NetworkQuestTypeAcceptRejected(ownerId, isAlternative: false));
                     return;
                 }

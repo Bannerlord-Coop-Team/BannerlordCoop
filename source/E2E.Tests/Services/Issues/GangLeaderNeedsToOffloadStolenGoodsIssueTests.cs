@@ -695,6 +695,63 @@ public class GangLeaderNeedsToOffloadStolenGoodsIssueTests : IDisposable
         }
     }
 
+    private static bool SkipServerGangLeaderQuestStart(QuestBase __instance) =>
+        Common.ModInformation.IsClient ||
+        __instance is not GangLeaderNeedsToOffloadStolenGoodsIssueBehavior.GangLeaderNeedsToOffloadStolenGoodsIssueQuest;
+
+    [Fact]
+    public void RequestQuestTypeAcceptQuest_QuestNotRegistered_RemovesIssueOnEveryPeer()
+    {
+        var fixture = SetupIssueOwner();
+        CreateIssueOnServer(fixture);
+
+        var partyId = TestEnvironment.CreateRegisteredObject<MobileParty>();
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject<MobileParty>(partyId, out var party));
+            Assert.True(Server.ObjectManager.TryGetObject<Settlement>(fixture.OwnerSettlementId, out var settlement));
+            using (new AllowedThread()) party.CurrentSettlement = settlement;
+            Assert.True(Server.Resolve<IPlayerManager>().AddPlayer(new Player("player-A", fixture.HeroId, partyId, "", "")));
+        });
+        TestEnvironment.ConnectRegisteredPlayer(Client, "player-A");
+        OpenConversation(Client, fixture.HeroId, "player-A");
+
+        var harmony = new Harmony($"e2e.gang-leader-quest-start.{Guid.NewGuid():N}");
+        try
+        {
+            harmony.Patch(
+                AccessTools.Method(typeof(QuestBase), nameof(QuestBase.StartQuest)),
+                prefix: new HarmonyMethod(typeof(GangLeaderNeedsToOffloadStolenGoodsIssueTests), nameof(SkipServerGangLeaderQuestStart)));
+
+            Server.Call(() =>
+            {
+                Assert.True(Server.ObjectManager.TryGetObject<Hero>(fixture.HeroId, out var owner));
+                Assert.True(Server.Resolve<IIssueGenerationRegistry>().TryGetGeneration(owner, out var generation));
+                Server.Resolve<IMessageBroker>().Publish(Client.NetPeer, new RequestQuestTypeAcceptQuest(fixture.HeroId, generation));
+            });
+        }
+        finally
+        {
+            harmony.UnpatchSelf();
+        }
+
+        Assert.Empty(Server.NetworkSentMessages.GetMessages<NetworkQuestTypeQuestAccepted>());
+        Assert.Equal(IssueFinalizeReason.RejectedAccept,
+            Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkIssueRemoved>()).Reason);
+        Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkQuestTypeAcceptRejected>());
+        Server.Call(() => Assert.DoesNotContain(
+            Campaign.Current.QuestManager.TrackedObjects.Values.SelectMany(quests => quests),
+            quest => quest.StringId.EndsWith("_quest") && quest.QuestGiver.StringId == fixture.HeroId));
+        foreach (var instance in AllInstances)
+        {
+            instance.Call(() =>
+            {
+                Assert.True(instance.ObjectManager.TryGetObject<Hero>(fixture.HeroId, out var owner));
+                Assert.Null(owner.Issue);
+            });
+        }
+    }
+
     [Fact]
     public void RequestQuestTypeAcceptQuest_FromUnregisteredRequester_IsRejectedWithoutMutatingTheIssue()
     {

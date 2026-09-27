@@ -1,5 +1,6 @@
-using Common.Util;
+﻿using Common.Util;
 using GameInterface.Services.Issues.Messages;
+using GameInterface.Services.Issues.Patches;
 using System;
 using TaleWorlds.CampaignSystem;
 
@@ -23,24 +24,37 @@ internal static class IssueFinalizationSupport
     {
         if (owner?.Issue == null) return;
 
+        if (reason == IssueFinalizeReason.RejectedAccept)
+            IssueManagerQuestCompletedReasonCapture.PendingReasons[owner] = reason;
         IDisposable replicationScope = suppressReplicationPatches ? new AllowedThread() : null;
-        using (new IssueFinalizeAuthorityGuard())
-        using (replicationScope)
+        try
         {
-            var quest = owner.Issue.IssueQuest;
-            if (quest != null && quest.IsOngoing)
+            using (new IssueFinalizeAuthorityGuard())
+            using (replicationScope)
             {
-                ApplyOngoingQuestFinalize(owner, quest, reason, skipConsequenceReapplication);
-                return;
-            }
+                var quest = owner.Issue.IssueQuest;
+                if (quest != null && quest.IsOngoing)
+                {
+                    ApplyOngoingQuestFinalize(owner, quest, reason, skipConsequenceReapplication);
+                    return;
+                }
 
+                if (reason == IssueFinalizeReason.RejectedAccept)
+                {
+                    if (quest != null)
+                        quest.CompleteQuestWithCancel();
+                    else
+                        owner.Issue.CompleteIssueWithCancel();
+                    return;
+                }
+
+                owner.Issue.IssueFinalized();
+            }
+        }
+        finally
+        {
             if (reason == IssueFinalizeReason.RejectedAccept)
-            {
-                owner.Issue.CompleteIssueWithCancel();
-                return;
-            }
-
-            owner.Issue.IssueFinalized();
+                IssueManagerQuestCompletedReasonCapture.PendingReasons.Remove(owner);
         }
     }
 
