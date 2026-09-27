@@ -84,6 +84,38 @@ public class FreeOrCapturePrisonerHeroesTests : IDisposable
     }
 
     [Fact]
+    public void DoFreeOrCapturePrisonerHeroes_UnregisteredForeignCompanion_IsDequeuedWithoutConversation()
+    {
+        var fixture = CreateFixture();
+        var rescuer = Clients[0];
+        rescuer.NetworkSentMessages.Clear();
+
+        RunFreeHeroes(rescuer, fixture, Array.Empty<string>(), encounter =>
+        {
+            Assert.True(rescuer.ObjectManager.TryGetObject<MobileParty>(fixture.OwnerPartyId, out var ownerParty));
+            Assert.True(rescuer.ObjectManager.TryGetObject<MobileParty>(fixture.CaptorPartyId, out var captorParty));
+            Hero companion;
+            // Created with patches off, so the release cannot be forwarded.
+            using (new AllowedThread())
+            {
+                companion = GameObjectCreator.CreateInitializedObject<Hero>();
+                companion._companionOf = ownerParty.ActualClan;
+                companion._heroState = Hero.CharacterStates.Prisoner;
+                companion.PartyBelongedToAsPrisoner = captorParty.Party;
+            }
+            Assert.False(rescuer.ObjectManager.TryGetId(companion, out _));
+            encounter.RosterToReceiveLootMembers.AddToCounts(companion.CharacterObject, 1);
+
+            encounter.DoFreeOrCapturePrisonerHeroes();
+
+            Assert.Empty(openedConversations);
+            Assert.Equal(PlayerEncounterState.LootParty, encounter.EncounterState);
+        });
+
+        Assert.Empty(rescuer.NetworkSentMessages.OfType<NetworkEndCaptivityAttempted>());
+    }
+
+    [Fact]
     public void DoFreeOrCapturePrisonerHeroes_OwnCompanion_StillOpensRescueConversation()
     {
         var fixture = CreateFixture();
