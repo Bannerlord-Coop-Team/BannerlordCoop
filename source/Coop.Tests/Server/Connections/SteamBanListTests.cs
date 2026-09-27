@@ -93,6 +93,56 @@ public sealed class SteamBanListTests : IDisposable
         Assert.Equal(Path.Combine(configuredDataDirectory, "steam-bans.json"), path);
     }
 
+    [Fact]
+    public void ResolvePath_BanFileVariableWinsOverDataDirectory()
+    {
+        string banFile = Path.Combine(directory, "bans", "list.json");
+
+        string path = SteamBanList.ResolvePath(
+            banFile,
+            Path.Combine(directory, "configured-data"),
+            Path.Combine(directory, "engine", "bin", "server"));
+
+        Assert.Equal(banFile, path);
+    }
+
+    [Theory]
+    [InlineData(null)]
+    [InlineData("")]
+    [InlineData("  ")]
+    public void ResolvePath_BlankValuesFallThrough(string? blank)
+    {
+        string applicationDirectory = Path.Combine(directory, "engine", "bin", "server");
+        string dataDirectory = Path.Combine(directory, "configured-data");
+
+        Assert.Equal(
+            Path.Combine(dataDirectory, "steam-bans.json"),
+            SteamBanList.ResolvePath(blank, dataDirectory, applicationDirectory));
+        Assert.Equal(
+            Path.GetFullPath(Path.Combine(directory, "server-data", "steam-bans.json")),
+            SteamBanList.ResolvePath(blank, blank, applicationDirectory));
+    }
+
+    [Fact]
+    public void ResolvePath_RelativeBanFileUsesCurrentDirectory()
+    {
+        string relative = Path.Combine("bans", "list.json");
+
+        string path = SteamBanList.ResolvePath(relative, null, directory);
+
+        Assert.True(Path.IsPathRooted(path));
+        Assert.Equal(Path.GetFullPath(Path.Combine(Environment.CurrentDirectory, relative)), path);
+    }
+
+    [Fact]
+    public void IsBanned_FolderAtBanFilePathBansNobody()
+    {
+        Directory.CreateDirectory(BanFilePath);
+        var banList = new SteamBanList(BanFilePath);
+
+        Assert.False(banList.IsBanned("76561198000000042"));
+    }
+
     [Theory]
     [InlineData(null)]
     [InlineData("")]
