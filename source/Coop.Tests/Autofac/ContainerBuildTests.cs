@@ -7,6 +7,7 @@ using Coop.Core.Common.Configuration;
 using Coop.Core.Client;
 using Coop.Core.Client.Services.Discord;
 using Coop.Core.Server;
+using Coop.Core.Server.Services.Shutdown;
 using Coop.Core.Server.Services.Telemetry;
 using Coop.Tests.Mocks;
 using GameInterface;
@@ -96,6 +97,11 @@ namespace Coop.Tests.Autofac
 
             var logic = container.Resolve<ILogic>();
             Assert.NotNull(logic);
+
+            // The restart command is an operator command, so Release servers have it too.
+            Assert.True(container.Resolve<ICoopCommandRegistry>().Contains("coop.server.shutdown"));
+            Assert.Same(container.Resolve<IServerAdmissionGate>(), container.Resolve<IServerAdmissionGate>());
+            Assert.Equal(ServerShutdownPhase.Idle, container.Resolve<IServerShutdownCoordinator>().Phase);
 
 #if DEBUG
             Assert.False(container.IsRegistered<IVoiceSyntheticTest>());
