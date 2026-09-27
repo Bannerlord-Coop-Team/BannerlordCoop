@@ -1,9 +1,11 @@
 ﻿using Common.Messaging;
 using Common.Network;
 using Common.Util;
+using Coop.Core.Client.Services.Heroes.Messages;
 using E2E.Tests.Environment;
 using E2E.Tests.Environment.Instance;
 using GameInterface.Services.Entity;
+using GameInterface.Services.Heroes.Messages;
 using GameInterface.Services.Issues.Generic;
 using GameInterface.Services.Issues.Interfaces;
 using GameInterface.Services.Issues.Messages;
@@ -293,6 +295,10 @@ public class AwaitingAlternativeSolutionTroopsTests : IDisposable
         object capturedInquiry = null;
         var onShowInquiry = InquiryCaptureHandler.MakeDelegate(data => capturedInquiry = data);
         InquiryCaptureHandler.OnShowInquiryEvent.AddEventHandler(null, onShowInquiry);
+        var serverActivationMessagesBeforeDrain = Server.NetworkSentMessages.GetMessages<NetworkHeroStateChanged>()
+            .Count(message => message.HeroId == fixture.CompanionHeroId && message.HeroState == (int)Hero.CharacterStates.Active);
+        var clientActivationMessagesBeforeDrain = Client.InternalMessages.GetMessages<ChangeHeroState>()
+            .Count(message => message.HeroId == fixture.CompanionHeroId && message.HeroState == (int)Hero.CharacterStates.Active);
         try
         {
             Client.Call(() =>
@@ -305,7 +311,9 @@ public class AwaitingAlternativeSolutionTroopsTests : IDisposable
 
             Assert.NotNull(capturedInquiry);
 
+            Server.Resolve<TestNetworkRouter>().ReceiveContext = TestNetworkReceiveContext.PollerThread;
             Client.Call(() => InquiryCaptureHandler.InvokeAffirmativeAction(capturedInquiry));
+            Server.PumpGameThread();
         }
         finally
         {
@@ -324,7 +332,20 @@ public class AwaitingAlternativeSolutionTroopsTests : IDisposable
             Assert.False(Server.Resolve<IAwaitingAlternativeSolutionTroopsRegistry>().TryGet(controllerId, out _));
         });
         Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkAwaitingAlternativeSolutionTroopsDrainConfirmed>());
+        Assert.True(Server.NetworkSentMessages.GetMessages<NetworkHeroStateChanged>()
+            .Count(message => message.HeroId == fixture.CompanionHeroId && message.HeroState == (int)Hero.CharacterStates.Active)
+            > serverActivationMessagesBeforeDrain, "Server did not broadcast companion activation");
+        Assert.True(Client.InternalMessages.GetMessages<ChangeHeroState>()
+            .Count(message => message.HeroId == fixture.CompanionHeroId && message.HeroState == (int)Hero.CharacterStates.Active)
+            > clientActivationMessagesBeforeDrain, "Client did not receive companion activation");
+        Client.PumpGameThread();
+        Client.Call(() =>
+        {
+            Assert.True(Client.ObjectManager.TryGetObject<Hero>(fixture.CompanionHeroId, out var companion));
+            Assert.Equal(Hero.CharacterStates.Active, companion.HeroState);
+        });
         TestEnvironment.FlushCoalescer();
+        Client.PumpGameThread();
         Client.Call(() =>
         {
             Assert.True(Client.ObjectManager.TryGetObject<Hero>(fixture.CompanionHeroId, out var companion));
@@ -337,6 +358,7 @@ public class AwaitingAlternativeSolutionTroopsTests : IDisposable
 
             Assert.False(Client.Resolve<IAwaitingAlternativeSolutionTroopsRegistry>().TryGet(controllerId, out _));
         });
+        Server.Resolve<TestNetworkRouter>().ReceiveContext = TestNetworkReceiveContext.GameThread;
 
         Client.Call(() =>
         {
