@@ -3,6 +3,7 @@ using GameInterface.Policies;
 using HarmonyLib;
 using System;
 using System.Collections.Generic;
+using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.GameState;
 using TaleWorlds.CampaignSystem.Issues;
 using TaleWorlds.ObjectSystem;
@@ -19,8 +20,8 @@ internal class MBObjectBasePatches
         // Call original if we allow this function
         if (CallOriginalPolicy.IsOriginalAllowed()) return true;
 
-        // Vanilla assigns issue ids during authoritative creation.
-        if (ModInformation.IsServer && __instance is IssueBase) return true;
+        // Vanilla assigns issue and quest ids during authoritative creation.
+        if (ModInformation.IsServer && (__instance is IssueBase || __instance is QuestBase)) return true;
 
         if (allowedTypes.Contains(__instance.GetType())) return true;
 

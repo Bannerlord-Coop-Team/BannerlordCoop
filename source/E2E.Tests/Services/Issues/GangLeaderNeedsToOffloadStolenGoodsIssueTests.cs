@@ -667,6 +667,7 @@ public class GangLeaderNeedsToOffloadStolenGoodsIssueTests : IDisposable
             Assert.True(Server.ObjectManager.TryGetObject<Hero>(fixture.HeroId, out var owner));
             Assert.True(QuestSolutionStartRunner.HasRegisteredQuest(owner));
             var quest = Assert.IsType<GangLeaderNeedsToOffloadStolenGoodsIssueBehavior.GangLeaderNeedsToOffloadStolenGoodsIssueQuest>(owner.Issue.IssueQuest);
+            Assert.Equal(owner.Issue.StringId + "_quest", quest.StringId);
             Assert.Contains(quest, Campaign.Current.QuestManager.Quests);
             Assert.NotNull(quest._playerStartsQuestLog);
 
