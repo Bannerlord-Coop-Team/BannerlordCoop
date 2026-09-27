@@ -207,7 +207,7 @@ namespace Coop.Tests.Client.States
         }
 
         [Fact]
-        public void NetworkConnected_WhenPatchingFails_OnASteamJoin_AbandonsTheLobby()
+        public void NetworkConnected_WhenPatchingFails_OnASteamJoin_AbandonsTheLobbyOnTheGameThread()
         {
             var steamComponent = new ClientTestComponent(output, JoinIntent.PlayerSteam);
             var steamLogic = steamComponent.Container.Resolve<IClientLogic>()!;
@@ -217,10 +217,17 @@ namespace Coop.Tests.Client.States
             FailPatching(steamComponent);
             steamComponent.TestMessageBroker.Messages.Clear();
 
+            // The lobby listener is game-thread only.
+            bool? abandonedOnGameThread = null;
+            steamComponent.TestMessageBroker.Subscribe<SessionJoinAbandoned>(
+                _ => abandonedOnGameThread = GameThread.Instance.IsGameThread);
+            Assert.False(GameThread.Instance.IsGameThread, "the caller must model the network thread");
+
             state.Handle_NetworkConnected(Payload(new NetworkConnected()));
             DrainGameThread();
 
             Assert.Single(steamComponent.TestMessageBroker.GetMessagesFromType<SessionJoinAbandoned>());
+            Assert.True(abandonedOnGameThread);
         }
 
         [Fact]
