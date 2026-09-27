@@ -44,6 +44,8 @@ internal class DisconnectHandler : IHandler
             case "JoinCampaignEntryTimeout":
                 return "Joining the campaign timed out while loading the transferred save.\n" +
                        "The server stopped this join to keep the campaign responsive. Please try again.";
+            case "ServerRestarting":
+                return "The server is restarting. Try again in a few minutes.";
         }
 
         return reason == DisconnectReason.Timeout

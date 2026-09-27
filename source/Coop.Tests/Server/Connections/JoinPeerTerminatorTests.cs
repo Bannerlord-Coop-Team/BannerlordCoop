@@ -35,6 +35,9 @@ public class JoinPeerTerminatorTests
         "JoinCampaignEntryTimeout",
         "Joining the campaign timed out while loading the transferred save.\n" +
         "The server stopped this join to keep the campaign responsive. Please try again.")]
+    [InlineData(
+        "ServerRestarting",
+        "The server is restarting. Try again in a few minutes.")]
     public void Disconnect_DeliversReasonThroughClientBeforeFinalizing(
         string code,
         string expectedMessage)
