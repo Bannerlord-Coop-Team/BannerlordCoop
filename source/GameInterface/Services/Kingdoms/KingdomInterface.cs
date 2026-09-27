@@ -1,9 +1,11 @@
 ﻿using Common;
+using Common.Logging;
 using Common.Messaging;
 using Common.Util;
 using GameInterface.Policies;
 using GameInterface.Services.Kingdoms.Extentions;
 using GameInterface.Services.Kingdoms.Messages;
+using Serilog;
 using System;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Actions;
@@ -22,10 +24,13 @@ public interface IKingdomInterface : IGameAbstraction
 }
 internal class KingdomInterface : IKingdomInterface
 {
+    private static readonly ILogger Logger = LogManager.GetLogger<KingdomInterface>();
     private readonly IKingdomDecisionVoteManager decisionVoteManager;
-    public KingdomInterface(IKingdomDecisionVoteManager decisionVoteManager)
+    private readonly IOfflineWarProtection offlineWarProtection;
+    public KingdomInterface(IKingdomDecisionVoteManager decisionVoteManager, IOfflineWarProtection offlineWarProtection)
     {
         this.decisionVoteManager = decisionVoteManager;
+        this.offlineWarProtection = offlineWarProtection;
     }
     public bool AddDecisionPrefix(Kingdom kingdom, KingdomDecision kingdomDecision, bool ignoreInfluenceCost)
     {
@@ -35,6 +40,13 @@ internal class KingdomInterface : IKingdomInterface
             float clientRandomNumber = AddDecision(kingdom, kingdomDecision, ignoreInfluenceCost, applyInfluenceCost: false);
             MessageBroker.Instance.Publish(kingdom,
                 new DecisionAdded(kingdom, kingdomDecision, ignoreInfluenceCost, clientRandomNumber));
+            return false;
+        }
+        if (offlineWarProtection.ShouldRefuse(kingdomDecision, out IFaction target))
+        {
+            Logger.Information(
+                "Refused {DecisionType} from AI clan {ProposerClanId} against {TargetId}: no player of the target is online",
+                kingdomDecision.GetType().Name, kingdomDecision.ProposerClan.StringId, target.StringId);
             return false;
         }
         float randomNumber = AddDecision(kingdom, kingdomDecision, ignoreInfluenceCost, applyInfluenceCost: true);

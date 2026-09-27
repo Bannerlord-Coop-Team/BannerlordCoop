@@ -306,6 +306,7 @@ public class ModConfigTests : IDisposable
         Assert.True(options.ShowPlayerNameplates);
         Assert.True(options.CoopClansEnabled);
         Assert.False(options.EnableHeroExecutions);
+        Assert.False(options.BlockAiWarDeclarationsOnOfflinePlayers);
     }
 
     /// <summary>
@@ -366,6 +367,26 @@ public class ModConfigTests : IDisposable
 
         Assert.Null(config.Difficulty.PlayerReceivedDamage);
         Assert.Equal(DifficultyLevel.Easy, config.Difficulty.BattleDeath);
+    }
+
+    [Theory]
+    [InlineData("true", true)]
+    [InlineData("false", false)]
+    [InlineData("\"yes\"", false)]
+    [InlineData("1", true)]
+    public void BlockAiWarDeclarationsOnOfflinePlayers_ReadsTheKey_AndSkipsOnlyABadValue(string value, bool expected)
+    {
+        File.WriteAllText(ConfigPath, @"{
+  ""modOptions"": {
+    ""blockAiWarDeclarationsOnOfflinePlayers"": " + value + @",
+    ""wandererLimit"": 40
+  }
+}");
+
+        var options = new ModOptions(NewModConfig().Data.ModOptions);
+
+        Assert.Equal(expected, options.BlockAiWarDeclarationsOnOfflinePlayers);
+        Assert.Equal(40, options.WandererLimit);
     }
 
     [Fact]
