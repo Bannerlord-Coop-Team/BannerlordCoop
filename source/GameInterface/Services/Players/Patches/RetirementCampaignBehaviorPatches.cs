@@ -1,5 +1,6 @@
 ﻿using Common;
 using Common.Messaging;
+using GameInterface.Services.CampaignService.Handlers;
 using GameInterface.Services.Heroes.HeirSelection.Messages;
 using GameInterface.Services.Players.Messages;
 using HarmonyLib;
@@ -39,6 +40,7 @@ internal class RetirementCampaignBehaviorPatches
         }
         if (__instance._playerEndedGame)
         {
+            GameOverState.IsGameOver = true;
             MessageBroker.Instance.Publish(__instance, new PlayerDeleteRequested(true));
 
             GameMenu.ExitToLast();
