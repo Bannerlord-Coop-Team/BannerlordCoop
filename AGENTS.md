@@ -96,6 +96,8 @@ A freshly-created worktree has **no `mb2` junction** (only the main checkout doe
 
 If a local Release restore fails with Scriban's `NU1902` advisory promoted to an error, build-time flags can't undo it — it is baked into `obj/project.assets.json`. Delete the SDK projects' `obj/` and re-restore with `-p:NuGetAudit=false`. CI doesn't hit this.
 
+If `dotnet test` fails with `An Application Control policy has blocked this file. (0x800711C7)` (Win32 error 4551), an App Control policy such as Windows 11 Smart App Control is refusing the freshly built, unsigned test assemblies. `Unblock-File` doesn't help, because locally built files carry no download mark. Changing Smart App Control is the machine owner's call: turning it off lowers protection, and on some Windows builds it can only be turned back on by resetting Windows ([Microsoft's FAQ](https://support.microsoft.com/windows/security/threat-malware-protection/smart-app-control-frequently-asked-questions)). An agent should report the error, not change security settings. CI doesn't hit this.
+
 ### Local MCP Tools (Pi and Codex)
 
 `runmefirst.cmd` includes the standalone MCP setup after game-path setup succeeds. See [repo-local MCP setup](doc/automated-testing/mcp-setup.md) for existing-developer refresh, local profiles and client prerequisites. Start Pi/Codex at the repo root, or use `tools/mcp/start-pi.cmd` / `start-codex.cmd` from a subdirectory; these wrappers select their own checkout, not an ancestor.
