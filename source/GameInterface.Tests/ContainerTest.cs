@@ -88,9 +88,71 @@ public class ContainerTest
         }
     }
 
+    [Fact]
+    public void PatchAll_AfterAFailedAttempt_RefusesToReportSuccess()
+    {
+        Harmony harmony = new($"{nameof(PatchAll_AfterAFailedAttempt_RefusesToReportSuccess)}.{Guid.NewGuid()}");
+        // Throws in the category loop, after the uncategorized patches and before AutoSync's static assembly.
+        var failingCategory = new HarmonyPatchCategoryRegistration(assembly: null, "GameInterface.Tests.FailingCategory");
+
+        try
+        {
+            Exception? firstFailure;
+            using (IContainer failedStart = BuildContainer(harmony, failingCategory))
+            {
+                firstFailure = Record.Exception(failedStart.Resolve<IGameInterface>().PatchAll);
+            }
+
+            Assert.NotNull(firstFailure);
+            Assert.True(Harmony.HasAnyPatches(harmony.Id));
+
+            using IContainer retry = BuildContainer(harmony);
+            var refused = Assert.Throws<InvalidOperationException>(retry.Resolve<IGameInterface>().PatchAll);
+            Assert.Contains("Restart Bannerlord", refused.Message);
+            Assert.Same(firstFailure, refused.InnerException);
+        }
+        finally
+        {
+            harmony.UnpatchAll(harmony.Id);
+        }
+    }
+
+    [Fact]
+    public void PatchAll_AfterAFailedAutoSyncBind_RefusesToReportSuccess()
+    {
+        Harmony harmony = new($"{nameof(PatchAll_AfterAFailedAutoSyncBind_RefusesToReportSuccess)}.{Guid.NewGuid()}");
+        var typeMapper = new Mock<ISerializableTypeMapper>();
+
+        try
+        {
+            Exception? firstFailure;
+            using (IContainer failedStart = BuildContainer(harmony, typeMapper: typeMapper.Object))
+            {
+                // Registries add their types while the container builds, so only the AutoSync bind after it throws.
+                typeMapper.Setup(mapper => mapper.AddTypes(It.IsAny<IEnumerable<Type>>()))
+                    .Throws(new InvalidOperationException("AutoSync bind failed"));
+
+                firstFailure = Record.Exception(failedStart.Resolve<IGameInterface>().PatchAll);
+            }
+
+            // Build and the AutoSync patches went in; only the handler bind failed.
+            Assert.Equal("AutoSync bind failed", firstFailure?.Message);
+
+            using IContainer retry = BuildContainer(harmony);
+            var refused = Assert.Throws<InvalidOperationException>(retry.Resolve<IGameInterface>().PatchAll);
+            Assert.Contains("Restart Bannerlord", refused.Message);
+            Assert.Same(firstFailure, refused.InnerException);
+        }
+        finally
+        {
+            harmony.UnpatchAll(harmony.Id);
+        }
+    }
+
     private static IContainer BuildContainer(
         Harmony harmony,
-        HarmonyPatchCategoryRegistration patchCategory)
+        HarmonyPatchCategoryRegistration? patchCategory = null,
+        ISerializableTypeMapper? typeMapper = null)
     {
         var containerBuilder = new ContainerBuilder();
 
@@ -98,11 +160,16 @@ public class ContainerTest
 
         RegisterMock<INetwork>(containerBuilder);
         RegisterMock<INetworkConfig>(containerBuilder);
-        RegisterMock<ISerializableTypeMapper>(containerBuilder);
+        containerBuilder.RegisterInstance(typeMapper ?? new Mock<ISerializableTypeMapper>().Object)
+            .As<ISerializableTypeMapper>()
+            .SingleInstance();
 
         containerBuilder.RegisterModule<GameInterfaceModule>();
         containerBuilder.RegisterInstance(harmony).As<Harmony>().SingleInstance();
-        containerBuilder.RegisterInstance(patchCategory);
+        if (patchCategory != null)
+        {
+            containerBuilder.RegisterInstance(patchCategory);
+        }
 
         return containerBuilder.Build();
     }
