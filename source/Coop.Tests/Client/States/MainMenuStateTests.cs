@@ -7,13 +7,16 @@ using Coop.Core.Client.Messages;
 using Coop.Core.Client.States;
 using Coop.Core.Common.Services.Connection.Messages;
 using Coop.Core.Common.Session;
+using GameInterface.Services.GameDebug.Messages;
 using GameInterface.Services.GameState.Interfaces;
 using GameInterface.Services.UI.Interfaces;
 using GameInterface.Services.UI.JoinCancel;
 using GameInterface.Services.UI.Messages;
 using Moq;
+using System;
 using Xunit;
 using Xunit.Abstractions;
+using IGameInterface = GameInterface.IGameInterface;
 
 namespace Coop.Tests.Client.States
 {
@@ -187,6 +190,60 @@ namespace Coop.Tests.Client.States
             loadingInterfaceMock.Verify(x => x.HideLoadingScreen(), Times.Never);
             overlayMock.Verify(x => x.Hide(), Times.Never);
         }
+
+        [Fact]
+        public void NetworkConnected_WhenPatchingFails_EndsTheJoinWithTheReason()
+        {
+            var state = StartDialing();
+            FailPatching(clientComponent);
+
+            state.Handle_NetworkConnected(Payload(new NetworkConnected()));
+            DrainGameThread();
+
+            loadingInterfaceMock.Verify(x => x.HideLoadingScreen(), Times.Once);
+            Assert.Single(clientComponent.TestMessageBroker.GetMessagesFromType<EndCoopMode>());
+            var popup = Assert.Single(clientComponent.TestMessageBroker.GetMessagesFromType<SendPopupMessage>());
+            Assert.Contains("System.Collections.Immutable 1.2.5.0", popup.Text);
+        }
+
+        [Fact]
+        public void NetworkConnected_WhenPatchingFails_OnASteamJoin_AbandonsTheLobby()
+        {
+            var steamComponent = new ClientTestComponent(output, JoinIntent.PlayerSteam);
+            var steamLogic = steamComponent.Container.Resolve<IClientLogic>()!;
+            var state = steamLogic.SetState<MainMenuState>();
+            steamLogic.Connect();
+            DrainGameThread();
+            FailPatching(steamComponent);
+            steamComponent.TestMessageBroker.Messages.Clear();
+
+            state.Handle_NetworkConnected(Payload(new NetworkConnected()));
+            DrainGameThread();
+
+            Assert.Single(steamComponent.TestMessageBroker.GetMessagesFromType<SessionJoinAbandoned>());
+        }
+
+        [Fact]
+        public void NetworkConnected_WhenPatchingFails_DoesNotStartModuleValidation()
+        {
+            var state = StartDialing();
+            FailPatching(clientComponent);
+
+            state.Handle_NetworkConnected(Payload(new NetworkConnected()));
+            DrainGameThread();
+
+            Assert.IsType<MainMenuState>(clientLogic.State);
+            loadingInterfaceMock.Verify(x => x.SetLoadingMessage(
+                It.IsAny<string>(), "Validating modules..."), Times.Never);
+        }
+
+        // The load failure from the #3196 logs, thrown by AutoSyncBuilder.Build.
+        private static void FailPatching(ClientTestComponent component) =>
+            component.Container.Resolve<Mock<IGameInterface>>()
+                .Setup(x => x.PatchAll())
+                .Throws(new TypeLoadException(
+                    "Could not load type 'System.Runtime.InteropServices.ImmutableCollectionsMarshal' from assembly " +
+                    "'System.Collections.Immutable, Version=1.2.5.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a'."));
 
         [Fact]
         public void ValidateModulesMethod_Transitions_ValidateModuleState()
