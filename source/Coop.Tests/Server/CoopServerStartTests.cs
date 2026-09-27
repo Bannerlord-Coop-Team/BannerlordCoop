@@ -14,6 +14,7 @@ using LiteNetLib;
 using Moq;
 using System;
 using System.Collections.Concurrent;
+using System.Runtime.InteropServices;
 using System.Threading;
 using Xunit;
 
@@ -40,6 +41,14 @@ public class CoopServerStartTests
             string failure = Assert.Single(logs, line => line.StartsWith($"Server failed to bind UDP port {port} "));
             Assert.StartsWith($"Server failed to bind UDP port {port} (AddressAlreadyInUse, 10048): ", failure);
             Assert.EndsWith(Closing, failure);
+            if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
+            {
+                Assert.Contains($"): opened by this process (Windows pid {Environment.ProcessId}). ", failure);
+            }
+            else
+            {
+                Assert.Contains($"ss -ulpn 'sport = :{port}'", failure);
+            }
             Assert.DoesNotContain(logs, line => line.StartsWith(ListeningPrefix));
             Assert.Empty(broker.GetMessagesFromType<ServerListening>());
         }

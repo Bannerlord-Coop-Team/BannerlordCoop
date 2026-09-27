@@ -1,11 +1,16 @@
 ﻿using System;
+using System.Collections.Generic;
+using System.Diagnostics;
+using System.Linq;
 using System.Net;
 using System.Net.Sockets;
+using System.Runtime.InteropServices;
 
 namespace Coop.Core.Server;
 
 /// <summary>
-/// Explains why the server could not bind its UDP port, for the bind failure log line.
+/// Explains why the server could not bind its UDP port and, on Windows, which processes opened it,
+/// for the bind failure log line.
 /// </summary>
 public interface IUdpBindDiagnostics
 {
@@ -37,6 +42,12 @@ public class UdpBindDiagnostics : IUdpBindDiagnostics
 {
     internal const string ReasonUnavailable = "reason unavailable";
     internal const string Closing = "Players cannot join this server. Close it, free the port and start it again.";
+    private const string NameUnavailable = "a process with no readable name";
+    private const int MaxOwners = 5;
+
+    private static readonly string[] CoopServerNames = { "Bannerlord", "BannerlordCoopServer" };
+    // Generic hosts that also run tests and tools, so a name match says nothing about a co-op server.
+    private static readonly string[] GenericHostNames = { "dotnet", "testhost" };
 
     public UdpBindFailure Describe(int port)
     {
@@ -45,7 +56,10 @@ public class UdpBindDiagnostics : IUdpBindDiagnostics
             if (port <= 0) return new UdpBindFailure(ReasonUnavailable, Closing);
 
             SocketError? error = Probe(port);
-            return new UdpBindFailure(FormatError(error), Format(port, error));
+            // Only AddressAlreadyInUse can mean a holder; AccessDenied never does for an exclusive wildcard bind.
+            string? owners = error == SocketError.AddressAlreadyInUse ? DescribeOwners(port) : null;
+            string detail = owners == null ? Format(port, error) : owners + " " + Closing;
+            return new UdpBindFailure(FormatError(error), detail);
         }
         catch (Exception ex)
         {
@@ -97,4 +111,147 @@ public class UdpBindDiagnostics : IUdpBindDiagnostics
                 return Closing;
         }
     }
+
+    // The table keeps the pid that bound the socket. A child can inherit the socket after that process exits,
+    // and the pid can be reused, hence "opened by".
+    private static string? DescribeOwners(int port)
+    {
+        try
+        {
+            IReadOnlyList<int> pids = FindOwnerPids(port);
+            if (pids.Count == 0) return null;
+
+            using var current = Process.GetCurrentProcess();
+            return FormatOwners(pids.Select(NameOwner).ToArray(), current.Id, current.ProcessName);
+        }
+        catch (Exception)
+        {
+            return null;
+        }
+    }
+
+    internal static IReadOnlyList<int> FindOwnerPids(int port)
+    {
+        if (!RuntimeInformation.IsOSPlatform(OSPlatform.Windows)) return Array.Empty<int>();
+
+        // MIB_UDPROW_OWNER_PID is 12 bytes (port at 4, pid at 8), MIB_UDP6ROW_OWNER_PID is 28 (port at 20, pid at 24).
+        return ParseOwnerPids(ReadUdpTable(AfInet), 12, 4, 8, port)
+            .Concat(ParseOwnerPids(ReadUdpTable(AfInet6), 28, 20, 24, port))
+            .Distinct()
+            .ToArray();
+    }
+
+    // Copied into managed memory, so a bad row count cannot read past the native buffer.
+    private static byte[]? ReadUdpTable(int addressFamily)
+    {
+        try
+        {
+            int size = 0;
+            uint result = GetExtendedUdpTable(IntPtr.Zero, ref size, false, addressFamily, UdpTableOwnerPid, 0);
+            // The table can grow between the size query and the copy.
+            for (int attempt = 0; attempt < 3 && result == ErrorInsufficientBuffer && size > 0; attempt++)
+            {
+                int allocated = size;
+                IntPtr buffer = Marshal.AllocHGlobal(allocated);
+                try
+                {
+                    result = GetExtendedUdpTable(buffer, ref size, false, addressFamily, UdpTableOwnerPid, 0);
+                    if (result == 0)
+                    {
+                        var table = new byte[allocated];
+                        Marshal.Copy(buffer, table, 0, allocated);
+                        return table;
+                    }
+                }
+                finally
+                {
+                    Marshal.FreeHGlobal(buffer);
+                }
+            }
+        }
+        catch (Exception)
+        {
+            // DllNotFound or EntryPointNotFound on a runtime without iphlpapi; the command hint covers it.
+        }
+
+        return null;
+    }
+
+    // Each row holds the port in network order in the low two bytes of a DWORD whose upper bytes are undefined.
+    internal static IReadOnlyList<int> ParseOwnerPids(byte[]? table, int rowSize, int portOffset, int pidOffset, int port)
+    {
+        var pids = new List<int>();
+        if (table == null || table.Length < 4) return pids;
+
+        long rows = Math.Min(BitConverter.ToUInt32(table, 0), (table.Length - 4) / rowSize);
+        for (int row = 0; row < rows; row++)
+        {
+            int start = 4 + (row * rowSize);
+            int rowPort = (table[start + portOffset] << 8) | table[start + portOffset + 1];
+            int pid = BitConverter.ToInt32(table, start + pidOffset);
+            if (rowPort == port && pid != 0) pids.Add(pid);
+        }
+
+        return pids;
+    }
+
+    private static (int Pid, string? Name) NameOwner(int pid)
+    {
+        try
+        {
+            // ProcessName only; MainModule holds a path with the user name.
+            using var process = Process.GetProcessById(pid);
+            return (pid, process.ProcessName);
+        }
+        catch (Exception ex) when (ex is ArgumentException || ex is InvalidOperationException)
+        {
+            return (pid, null);
+        }
+        catch (Exception)
+        {
+            return (pid, NameUnavailable);
+        }
+    }
+
+    // Owners are distinct pids, each with its process name, or null when the process has exited.
+    internal static string FormatOwners(IReadOnlyList<(int Pid, string? Name)> owners, int currentPid, string currentName)
+    {
+        IEnumerable<string> shown = owners
+            .Take(MaxOwners)
+            .Select(owner => DescribeOwner(owner.Pid, owner.Name, currentPid, currentName));
+        string more = owners.Count > MaxOwners ? $" (and {owners.Count - MaxOwners} more)" : "";
+        return "opened by " + string.Join("; ", shown) + more + ".";
+    }
+
+    // "Windows pid" because Wine reports its own process ids, not Unix ones.
+    private static string DescribeOwner(int pid, string? name, int currentPid, string currentName)
+    {
+        if (pid == currentPid) return $"this process (Windows pid {pid})";
+        if (name == null)
+        {
+            return $"Windows pid {pid}, which has exited; a program it started may still hold the port (close it, or restart the PC)";
+        }
+
+        string owner = $"{name} (Windows pid {pid})";
+        return IsCoopServer(name, currentName)
+            ? owner + ", a co-op server, probably one still running from an earlier session (its window may be hidden)"
+            : owner;
+    }
+
+    private static bool IsCoopServer(string name, string currentName)
+    {
+        if (GenericHostNames.Contains(name, StringComparer.OrdinalIgnoreCase)) return false;
+
+        return CoopServerNames.Contains(name, StringComparer.OrdinalIgnoreCase) ||
+            string.Equals(name, currentName, StringComparison.OrdinalIgnoreCase);
+    }
+
+    private const int AfInet = 2;
+    private const int AfInet6 = 23;
+    private const int UdpTableOwnerPid = 1;
+    private const uint ErrorInsufficientBuffer = 122;
+
+    [DllImport("iphlpapi.dll")]
+    private static extern uint GetExtendedUdpTable(
+        IntPtr table, ref int size, bool order, int addressFamily, int tableClass, int reserved);
 }
