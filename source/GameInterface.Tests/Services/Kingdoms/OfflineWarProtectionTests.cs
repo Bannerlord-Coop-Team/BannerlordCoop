@@ -135,6 +135,17 @@ public class OfflineWarProtectionTests : IDisposable
     }
 
     [Fact]
+    public void RulerOffline_PlayerMercenaryOnline_KeepsProtection()
+    {
+        // A mercenary has no vote on the kingdom's war or peace.
+        Clan mercenaryClan = CreateClan(playerKingdom);
+        mercenaryClan.IsUnderMercenaryService = true;
+        AddPlayer("mercenary", mercenaryClan, isConnected: true);
+
+        Assert.True(protection.ShouldRefuse(DeclareWar(aiClan, playerKingdom), out _));
+    }
+
+    [Fact]
     public void OnlinePlayerOfAnotherFaction_DoesNotProtectTarget()
     {
         AddPlayer("elsewhere", CreateClan(aiKingdom), isConnected: true);

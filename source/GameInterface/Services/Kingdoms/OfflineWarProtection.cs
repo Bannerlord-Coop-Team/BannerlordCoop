@@ -44,7 +44,7 @@ public class OfflineWarProtection : IOfflineWarProtection
     {
         target = null;
 
-        if (!ModInformation.IsServer || !ModConfigProvider.ModOptions.BlockAiWarDeclarationsOnOfflinePlayers) return false;
+        if (ModInformation.IsClient || !ModConfigProvider.ModOptions.BlockAiWarDeclarationsOnOfflinePlayers) return false;
 
         Clan proposerClan = decision?.ProposerClan;
         if (proposerClan == null || playerManager.Contains(proposerClan)) return false;
@@ -80,6 +80,7 @@ public class OfflineWarProtection : IOfflineWarProtection
     }
 
     // Any connected player of the faction can respond, including a vassal or a coop clan member.
+    // A mercenary does not count, it has no vote on the kingdom's war or peace.
     private bool HasConnectedPlayer(IFaction faction)
     {
         foreach (Player player in playerManager.Players)
@@ -87,7 +88,8 @@ public class OfflineWarProtection : IOfflineWarProtection
             if (!playerManager.IsConnected(player)) continue;
 
             Clan clan = GetCurrentClan(player);
-            if (clan != null && (clan == faction || clan.Kingdom == faction)) return true;
+            if (clan == null) continue;
+            if (clan == faction || (clan.Kingdom == faction && !clan.IsUnderMercenaryService)) return true;
         }
 
         return false;
