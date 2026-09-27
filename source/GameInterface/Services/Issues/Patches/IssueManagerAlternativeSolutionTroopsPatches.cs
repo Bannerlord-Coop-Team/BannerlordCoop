@@ -108,14 +108,25 @@ internal class IssueManagerAlternativeSolutionTroopsPatches
         InformationManager.ShowInquiry(new InquiryData(string.Empty, textObject.ToString(), isAffirmativeOptionShown: true,
             isNegativeOptionShown: false, GameTexts.FindText("str_ok").ToString(), null, delegate
             {
-                MakeAlternativeTroopsReturn(troops);
-                MessageBroker.Instance.Publish(null, new AwaitingAlternativeSolutionTroopsDrainedLocally(localControllerId, troops));
-                if (ContainerProvider.TryResolve<IAwaitingAlternativeSolutionTroopsRegistry>(out var registryAtDrainTime))
-                {
-                    registryAtDrainTime.Withdraw(localControllerId, troops);
-                }
+                ReturnAwaitingTroops();
                 _inquiryInFlight = false;
             }, null), pauseGameActiveState: true);
+    }
+
+    internal static bool ReturnAwaitingTroops()
+    {
+        if (ModInformation.IsServer || MobileParty.MainParty == null) return false;
+        if (!ContainerProvider.TryResolve<IControllerIdProvider>(out var controllerIdProvider) ||
+            string.IsNullOrEmpty(controllerIdProvider.ControllerId)) return false;
+        if (!ContainerProvider.TryResolve<IAwaitingAlternativeSolutionTroopsRegistry>(out var troopsRegistry) ||
+            !troopsRegistry.TryGet(controllerIdProvider.ControllerId, out var troops)) return false;
+
+        MakeAlternativeTroopsReturn(troops);
+        MessageBroker.Instance.Publish(null,
+            new AwaitingAlternativeSolutionTroopsDrainedLocally(controllerIdProvider.ControllerId, troops));
+        troopsRegistry.Withdraw(controllerIdProvider.ControllerId, troops);
+        _inquiryInFlight = false;
+        return true;
     }
 
     private static bool IsLocalMainHeroSafelyAvailable() => Game.Current?.PlayerTroop != null;

@@ -4,6 +4,7 @@ using Common.Messaging;
 using GameInterface.Services.Entity;
 using GameInterface.Services.Issues.Generic;
 using GameInterface.Services.Issues.Handlers;
+using GameInterface.Services.Issues.Interfaces;
 using GameInterface.Services.Issues.Messages;
 using GameInterface.Services.Issues.Patches;
 using GameInterface.Utils.Commands;
@@ -258,7 +259,7 @@ public static class IssuesDebugCommand
     {
         public string Prefix => "coop.debug.issues";
         public string Name => "accept_alternative";
-        public string Description => "Selects a companion and six troops, then uses the normal client alternative-acceptance method.";
+        public string Description => "Selects a companion and the required troops, then uses the normal client alternative-acceptance method.";
         public CoopCommandSide Side => CoopCommandSide.Client;
         public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
@@ -281,27 +282,33 @@ public static class IssuesDebugCommand
                 return Failed("The companion must be present in this client's party.");
             var troop = party.MemberRoster.GetTroopRoster().FirstOrDefault(element =>
                 element.Character?.StringId == args[2] && !element.Character.IsHero);
-            if (troop.Character == null || troop.Number - troop.WoundedNumber < 6)
-                return Failed("The client party needs six healthy troops of that StringId.");
+            var troopCount = hero.Issue.GetTotalAlternativeSolutionNeededMenCount();
+            if (troop.Character == null || troop.Number - troop.WoundedNumber < troopCount)
+                return Failed($"The client party needs {troopCount} healthy troops of that StringId.");
             var roster = hero.Issue.AlternativeSolutionSentTroops;
             if (roster.TotalManCount != 0) return Failed("The issue already has a troop selection.");
+            var selected = TroopRoster.CreateDummyTroopRoster();
+            selected.AddToCounts(companion.CharacterObject, 1);
+            selected.AddToCounts(troop.Character, troopCount);
+            if (!hero.Issue.DoTroopsSatisfyAlternativeSolution(selected, out _))
+                return Failed("The selected troops do not satisfy this issue's alternative solution.");
             var before = TroopRoster.CreateDummyTroopRoster();
             before.Add(roster);
             var companionElement = party.MemberRoster.GetElementCopyAtIndex(
                 party.MemberRoster.FindIndexOfTroop(companion.CharacterObject));
-            var troopXp = troop.Xp * 6 / troop.Number;
+            var troopXp = troop.Xp * troopCount / troop.Number;
             using (new Common.Util.AllowedThread())
             {
                 party.MemberRoster.AddToCounts(companion.CharacterObject, -1, false, 0, -companionElement.Xp, true);
                 roster.AddToCounts(companion.CharacterObject, 1, false, 0, companionElement.Xp, true);
-                party.MemberRoster.AddToCounts(troop.Character, -6, false, 0, -troopXp, true);
-                roster.AddToCounts(troop.Character, 6, false, 0, troopXp, true);
+                party.MemberRoster.AddToCounts(troop.Character, -troopCount, false, 0, -troopXp, true);
+                roster.AddToCounts(troop.Character, troopCount, false, 0, troopXp, true);
             }
             var after = TroopRoster.CreateDummyTroopRoster();
             after.Add(roster);
             MessageBroker.Instance.Publish(roster, new QuestAlternativeTroopsTransferredLocally(roster, before, after));
             hero.Issue.StartIssueWithAlternativeSolution();
-            return Succeeded($"Requested alternative acceptance for '{hero.Name}' ({args[0]}) with companion '{companion.Name}' and six {troop.Character.Name}.");
+            return Succeeded($"Requested alternative acceptance for '{hero.Name}' ({args[0]}) with companion '{companion.Name}' and {troopCount} {troop.Character.Name}.");
         }
     }
 
@@ -347,6 +354,43 @@ public static class IssuesDebugCommand
                 $"generation={generation} controller={controller}{trackedConversation} sentTroops=[{troops}] " +
                 $"issueManagerSame={issueManagerSame} trackedQuestCount={trackedQuestCount}" +
                 ServerFinalizationTrace(issue));
+        }
+    }
+
+    public sealed class IssuesObserveAwaitingTroopsCoopCommand : ICoopCommand
+    {
+        public string Prefix => "coop.debug.issues";
+        public string Name => "observe_awaiting_troops";
+        public string Description => "Reports awaiting alternative-solution troops for a controller.";
+        public CoopCommandSide Side => CoopCommandSide.Both;
+        public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
+        {
+            new ExpectedArgs("controller_id", "The player controller id.", isRequired: true),
+        };
+
+        public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
+        {
+            if (!ContainerProvider.TryResolve<IAwaitingAlternativeSolutionTroopsRegistry>(out var registry))
+                return Failed("Awaiting alternative troops registry is unavailable.");
+            var count = registry.TryGet(args[0], out var troops) ? troops.TotalManCount : 0;
+            return Succeeded($"controller={args[0]} awaitingTroops={count}");
+        }
+    }
+
+    public sealed class IssuesReturnAwaitingTroopsCoopCommand : ICoopCommand
+    {
+        public string Prefix => "coop.debug.issues";
+        public string Name => "return_awaiting_troops";
+        public string Description => "Returns this client's awaiting alternative-solution troops through the normal return path.";
+        public CoopCommandSide Side => CoopCommandSide.Client;
+        public IExpectedArgs[] ExpectedArgs { get; } = Array.Empty<IExpectedArgs>();
+
+        public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
+        {
+            if (ModInformation.IsServer) return Failed("Run this command on a client.");
+            return IssueManagerAlternativeSolutionTroopsPatches.ReturnAwaitingTroops()
+                ? Succeeded("Returned awaiting alternative troops to this client's party.")
+                : Failed("No awaiting alternative troops for this client.");
         }
     }
 
