@@ -4,6 +4,7 @@ using Common.Messaging;
 using GameInterface.Services.Entity;
 using GameInterface.Services.Issues.Generic;
 using GameInterface.Services.Issues.Messages;
+using GameInterface.Services.Issues.Patches;
 using GameInterface.Utils.Commands;
 using System;
 using System.Collections.Generic;
@@ -27,6 +28,10 @@ public static class IssuesDebugCommand
 
     private static CoopCommandResult Failed(string output) =>
         new CoopCommandResult(false, output, "command_failed");
+
+    private static string ServerFinalizationTrace() => ModInformation.IsServer
+        ? $" lastIssueFinalization=[{IssueFinalizedOwnershipGatePatch.LastServerTrace}] lastQuestFinalization=[{IssueQuestFinalizedTracePatch.LastServerTrace}]"
+        : "";
 
     public sealed class IssuesGiveCoopCommand : ICoopCommand
     {
@@ -315,7 +320,7 @@ public static class IssuesDebugCommand
             if (!CommandHelpers.TryGetObjectManager(out var objectManager, out var error)) return Failed(error);
             if (!CommandHelpers.TryGetManagedObject<Hero>(objectManager, args[0], out var hero, out error)) return Failed(error);
             var issue = hero.Issue;
-            if (issue == null) return Succeeded($"owner={args[0]} issue=none");
+            if (issue == null) return Succeeded($"owner={args[0]} issue=none{ServerFinalizationTrace()}");
             ContainerProvider.TryResolve<IIssueGenerationRegistry>(out var generations);
             ContainerProvider.TryResolve<IIssueOwnershipRegistry>(out var owners);
             var generation = generations != null && generations.TryGetGeneration(hero, out var value) ? value.ToString() : "none";
@@ -338,7 +343,8 @@ public static class IssuesDebugCommand
             return Succeeded($"owner={args[0]} issue={issue.StringId} ongoingWithoutQuest={issue.IsOngoingWithoutQuest} " +
                 $"quest={issue.IssueQuest?.StringId ?? "none"} alternative={issue.IsSolvingWithAlternative} " +
                 $"generation={generation} controller={controller}{trackedConversation} sentTroops=[{troops}] " +
-                $"issueManagerSame={issueManagerSame} trackedQuestCount={trackedQuestCount}");
+                $"issueManagerSame={issueManagerSame} trackedQuestCount={trackedQuestCount}" +
+                ServerFinalizationTrace());
         }
     }
 

@@ -44,6 +44,7 @@ internal class IssueManagerQuestCompletedReasonCapture
 internal class IssueFinalizedOwnershipGatePatch
 {
     private static readonly ILogger Logger = LogManager.GetLogger<IssueFinalizedOwnershipGatePatch>();
+    internal static string LastServerTrace { get; private set; }
 
     [HarmonyPrefix]
     internal static bool Prefix(IssueBase __instance)
@@ -52,8 +53,12 @@ internal class IssueFinalizedOwnershipGatePatch
 
         var allowed = IssueFinalizeAuthorityGuard.IsActive || CallOriginalPolicy.IsOriginalAllowedForOwnershipGate();
         if (ModInformation.IsServer)
+        {
+            var stack = Environment.StackTrace;
+            LastServerTrace = $"issue={__instance.StringId} allowed={allowed} quest={__instance.IssueQuest?.StringId} stack={stack.Replace(Environment.NewLine, " | ")}";
             Logger.Information("Issue finalization for {Issue} allowed={Allowed} quest={Quest} stack={Stack}",
-                __instance.StringId, allowed, __instance.IssueQuest?.StringId, Environment.StackTrace);
+                __instance.StringId, allowed, __instance.IssueQuest?.StringId, stack);
+        }
         return allowed;
     }
 }
@@ -62,14 +67,17 @@ internal class IssueFinalizedOwnershipGatePatch
 internal class IssueQuestFinalizedTracePatch
 {
     private static readonly ILogger Logger = LogManager.GetLogger<IssueQuestFinalizedTracePatch>();
+    internal static string LastServerTrace { get; private set; }
 
     [HarmonyPrefix]
     private static void Prefix(QuestBase quest)
     {
         if (ModInformation.IsClient ||
             quest is not GangLeaderNeedsToOffloadStolenGoodsIssueBehavior.GangLeaderNeedsToOffloadStolenGoodsIssueQuest) return;
+        var stack = Environment.StackTrace;
+        LastServerTrace = $"quest={quest.StringId} ongoing={quest.IsOngoing} issue={quest.QuestGiver?.Issue?.StringId} stack={stack.Replace(Environment.NewLine, " | ")}";
         Logger.Information("Quest manager finalizing {Quest} ongoing={Ongoing} issue={Issue} stack={Stack}",
-            quest.StringId, quest.IsOngoing, quest.QuestGiver?.Issue?.StringId, Environment.StackTrace);
+            quest.StringId, quest.IsOngoing, quest.QuestGiver?.Issue?.StringId, stack);
     }
 }
 
