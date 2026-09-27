@@ -140,10 +140,10 @@ internal class UiDebugCommands
         string cameraFollowPartyId = cameraFollowParty?.MobileParty?.StringId ?? "null";
         string cameraMode = cameraView?.CurrentCameraFollowMode.ToString() ?? "null";
         bool followTargetReached = false;
-        if (cameraView != null && cameraFollowParty != null)
+        if (cameraView != null && cameraFollowParty != null &&
+            cameraFollowParty == MobileParty.MainParty?.Party && cameraMode == "FollowParty")
         {
-            var followPosition = cameraFollowParty.MapEvent?.Position ?? cameraFollowParty.Position;
-            var targetDelta = followPosition.ToVec2() - cameraView._cameraTarget.AsVec2;
+            var targetDelta = cameraView.IdealCameraTarget.AsVec2 - cameraView._cameraTarget.AsVec2;
             followTargetReached = targetDelta.LengthSquared < 0.0001f;
         }
 
