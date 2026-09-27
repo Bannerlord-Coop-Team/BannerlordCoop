@@ -124,8 +124,8 @@ source-bound orchestration receipt; it cannot authorize caller-supplied source l
 
 ## Producing the Windows build manifest
 
-The owned build preparation invokes `.github/scripts/prepare-dedicated-server-synthetic.ps1`
-after the exact-source standalone build, before starting the server. Its
+The existing runner preparation invokes the harness directly after the exact-source
+standalone build, before starting the server. The
 `dedicated-server-synthetic-manifest` command requires the frozen build-stamp hash, both
 head/tree pairs, and the staged root. It checks the stamp identities and deployed mod
 fingerprint, then reads each staged assembly's hash, version, and MVID without loading it.
@@ -140,7 +140,8 @@ preparation seeds the pinned server's Windows default template and cleanup resto
 The repository dev config is not used by the staged `--data-dir` launch. The scenario resolves
 the prepared config through the run-bound PID receipt and reads it privately
 into the controller's named password environment variable; never print or retain its value.
-After stopping owned processes, the carrier restores that config through the same script's
+The runner uses its existing standalone config/save transaction in config-only mode.
+After stopping owned processes, it restores the config through that transaction's
 `Restore` action. Owner mismatch or outside config changes preserve the backup and fail closed.
 
 The five required staged mod assemblies are Common, Coop.Core, Coop.Steam, GameInterface,
