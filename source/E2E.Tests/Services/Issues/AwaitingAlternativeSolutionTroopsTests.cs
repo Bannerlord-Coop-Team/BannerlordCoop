@@ -152,6 +152,19 @@ public class AwaitingAlternativeSolutionTroopsTests : IDisposable
     [Fact]
     public void ClientOwnedAlternativeSolutionCompletion_WhileOwnerUnreachable_TroopsSurviveASaveReloadAndReturnOnReconnect()
     {
+        try
+        {
+            RunClientOwnedAlternativeSolutionCompletion_WhileOwnerUnreachable_TroopsSurviveASaveReloadAndReturnOnReconnect();
+        }
+        catch (Exception exception)
+        {
+            Console.WriteLine($"Original return regression failure: {exception}");
+            throw;
+        }
+    }
+
+    private void RunClientOwnedAlternativeSolutionCompletion_WhileOwnerUnreachable_TroopsSurviveASaveReloadAndReturnOnReconnect()
+    {
         var controllerId = "player-A-" + Guid.NewGuid();
         int depositedManCount = 0;
         string completedRevision = null;
