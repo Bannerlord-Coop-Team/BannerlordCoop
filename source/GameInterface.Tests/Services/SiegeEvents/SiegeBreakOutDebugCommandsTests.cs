@@ -12,6 +12,7 @@ using TaleWorlds.CampaignSystem.Encounters;
 using TaleWorlds.CampaignSystem.GameMenus;
 using TaleWorlds.CampaignSystem.GameState;
 using TaleWorlds.CampaignSystem.Party;
+using TaleWorlds.CampaignSystem.Roster;
 using TaleWorlds.CampaignSystem.Settlements;
 using TaleWorlds.CampaignSystem.Siege;
 using TaleWorlds.Core;
@@ -116,6 +117,7 @@ public sealed class SiegeBreakOutDebugCommandsTests : IDisposable
         settlement.StringId = id;
         settlement.Party = ObjectHelper.SkipConstructor<PartyBase>();
         settlement.Party.Settlement = settlement;
+        settlement.Party.ItemRoster = new ItemRoster();
         settlement.Town = ObjectHelper.SkipConstructor<Town>();
         settlement.Town._isCastle = id.StartsWith("castle_");
         settlement.Town.Owner = settlement.Party;
