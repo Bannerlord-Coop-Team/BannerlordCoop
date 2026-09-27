@@ -732,7 +732,7 @@ public class GangLeaderNeedsToOffloadStolenGoodsIssueTests : IDisposable
         }
         finally
         {
-            harmony.UnpatchSelf();
+            harmony.UnpatchAll(harmony.Id);
         }
 
         Assert.Empty(Server.NetworkSentMessages.GetMessages<NetworkQuestTypeQuestAccepted>());
