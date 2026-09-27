@@ -83,18 +83,10 @@ evidence, errors, hashes, or replay identity.
 The source-bound build creates `dedicated-server-synthetic-artifacts.v1`; the runtime controller
 only verifies it. The caller supplies the frozen raw manifest hash separately. The manifest binds
 both repositories' head/tree pairs, the co-op build version, stage-relative paths, hashes, assembly
-versions, and MVIDs. It contains the five loaded server assemblies (`Common`, `Coop.Core`, `Coop.Steam`,
-`GameInterface`, and `Missions`), `DedicatedServer.Core`, the active
-Windows or Linux shim, and the platform's TaleWorlds starter assembly. The standalone status reports a null
-`assemblyMvid` because `Coop.dll` is the client entry assembly. Windows uses a hashed
+versions, and MVIDs. It contains the six managed co-op assemblies, `DedicatedServer.Core`, the active
+Windows or Linux shim, and the platform's TaleWorlds starter assembly. Windows uses a hashed
 `staged-executable` process host. Linux explicitly uses the image's `system-dotnet` host while the
 staged `TaleWorlds.Starter.DotNetCore.Linux` assembly remains path, hash, MVID, and version checked.
-
-The Windows preparation command creates this manifest from the frozen build stamp and staged
-files before launch. Its temporary password is installed into the pinned server's shipped config
-template, which already contains the launcher's migration fields. Cleanup restores the original
-config bytes, or removes the config when it did not previously exist; unexpected edits retain
-the backup and fail restoration.
 
 Before UDP work and again after the lifecycle, the controller verifies:
 
