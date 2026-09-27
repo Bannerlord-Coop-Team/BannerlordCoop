@@ -8,7 +8,6 @@ using GameInterface.Services.Issues.Messages;
 using GameInterface.Services.ObjectManager;
 using HarmonyLib;
 using Serilog;
-using Serilog.Events;
 using System;
 using System.Collections.Generic;
 using TaleWorlds.CampaignSystem;
@@ -52,8 +51,8 @@ internal class IssueFinalizedOwnershipGatePatch
         if (!DisableAllIssueBehaviorsExceptAllowlist.IsAllowlisted(__instance)) return true;
 
         var allowed = IssueFinalizeAuthorityGuard.IsActive || CallOriginalPolicy.IsOriginalAllowedForOwnershipGate();
-        if (ModInformation.IsServer && Logger.IsEnabled(LogEventLevel.Debug))
-            Logger.Debug("Issue finalization for {Issue} allowed={Allowed} quest={Quest} stack={Stack}",
+        if (ModInformation.IsServer)
+            Logger.Information("Issue finalization for {Issue} allowed={Allowed} quest={Quest} stack={Stack}",
                 __instance.StringId, allowed, __instance.IssueQuest?.StringId, Environment.StackTrace);
         return allowed;
     }
@@ -67,9 +66,9 @@ internal class IssueQuestFinalizedTracePatch
     [HarmonyPrefix]
     private static void Prefix(QuestBase quest)
     {
-        if (ModInformation.IsClient || !Logger.IsEnabled(LogEventLevel.Debug) ||
+        if (ModInformation.IsClient ||
             quest is not GangLeaderNeedsToOffloadStolenGoodsIssueBehavior.GangLeaderNeedsToOffloadStolenGoodsIssueQuest) return;
-        Logger.Debug("Quest manager finalizing {Quest} ongoing={Ongoing} issue={Issue} stack={Stack}",
+        Logger.Information("Quest manager finalizing {Quest} ongoing={Ongoing} issue={Issue} stack={Stack}",
             quest.StringId, quest.IsOngoing, quest.QuestGiver?.Issue?.StringId, Environment.StackTrace);
     }
 }
