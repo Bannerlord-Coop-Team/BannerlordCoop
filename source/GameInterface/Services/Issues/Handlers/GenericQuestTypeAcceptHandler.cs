@@ -5,6 +5,8 @@ using Common.Network;
 using Common.Util;
 using System;
 using System.Collections.Generic;
+using System.Linq;
+using System.Runtime.CompilerServices;
 using GameInterface.Services.Entity;
 using GameInterface.Services.Heroes.Patches;
 using GameInterface.Services.Issues.Generic;
@@ -29,6 +31,26 @@ namespace GameInterface.Services.Issues.Handlers;
 internal class GenericQuestTypeAcceptHandler : IHandler
 {
     private static readonly ILogger Logger = LogManager.GetLogger<GenericQuestTypeAcceptHandler>();
+    internal static string LastServerQuestAcceptTrace { get; private set; }
+
+    private static void TraceServerQuestAccept(string phase, Hero owner, IssueBase initialIssue, QuestTypeDescriptor descriptor)
+    {
+        var issue = owner.Issue;
+        var quest = issue?.IssueQuest;
+        var manager = Campaign.Current.QuestManager;
+        var managerIssueSame = Campaign.Current.IssueManager.Issues.TryGetValue(owner, out var managerIssue) &&
+            ReferenceEquals(managerIssue, issue);
+        var trace = $"phase={phase} descriptor={descriptor?.DisplayName ?? "none"} " +
+            $"arbitrated={descriptor?.TryArbitrateQuestSolutionAcceptBytes != null} " +
+            $"initialIssueRef={RuntimeHelpers.GetHashCode(initialIssue)} issueRef={(issue == null ? 0 : RuntimeHelpers.GetHashCode(issue))} " +
+            $"managerIssueSame={managerIssueSame} managerRef={RuntimeHelpers.GetHashCode(manager)} " +
+            $"quest={quest?.StringId ?? "none"} registered={QuestSolutionStartRunner.HasRegisteredQuest(owner)} " +
+            $"trackedQuestCount={manager.Quests.Count(candidate => candidate.StringId == initialIssue.StringId + "_quest")}";
+        LastServerQuestAcceptTrace = string.IsNullOrEmpty(LastServerQuestAcceptTrace)
+            ? trace
+            : LastServerQuestAcceptTrace + " / " + trace;
+        Logger.Information("Quest accept state: {Trace}", trace);
+    }
 
     private readonly IMessageBroker messageBroker;
     private readonly IObjectManager objectManager;
@@ -207,6 +229,9 @@ internal class GenericQuestTypeAcceptHandler : IHandler
                 return;
             }
 
+            var initialIssue = owner.Issue;
+            LastServerQuestAcceptTrace = null;
+            TraceServerQuestAccept("validated", owner, initialIssue, descriptor);
             byte[] fieldsBytes = null;
             try
             {
@@ -220,6 +245,7 @@ internal class GenericQuestTypeAcceptHandler : IHandler
                     }
                     return owner.Issue.StartIssueWithQuest();
                 });
+                TraceServerQuestAccept("after-start", owner, initialIssue, descriptor);
                 if (!started)
                 {
                     Logger.Error("Replayed accept for owner {Owner} but could not read back its quest fields - rolled back and rejecting", ownerId);
@@ -244,7 +270,9 @@ internal class GenericQuestTypeAcceptHandler : IHandler
             }
 
             ownershipRegistry.SetOwner(owner, player.ControllerId);
+            TraceServerQuestAccept("before-broadcast", owner, initialIssue, descriptor);
             network.SendAll(new NetworkQuestTypeQuestAccepted(ownerId, player.ControllerId, fieldsBytes));
+            TraceServerQuestAccept("broadcasted", owner, initialIssue, descriptor);
         });
     }
 

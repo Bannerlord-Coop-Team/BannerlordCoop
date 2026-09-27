@@ -3,12 +3,14 @@ using Common;
 using Common.Messaging;
 using GameInterface.Services.Entity;
 using GameInterface.Services.Issues.Generic;
+using GameInterface.Services.Issues.Handlers;
 using GameInterface.Services.Issues.Messages;
 using GameInterface.Services.Issues.Patches;
 using GameInterface.Utils.Commands;
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Runtime.CompilerServices;
 using System.Text;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Issues;
@@ -29,8 +31,8 @@ public static class IssuesDebugCommand
     private static CoopCommandResult Failed(string output) =>
         new CoopCommandResult(false, output, "command_failed");
 
-    private static string ServerFinalizationTrace() => ModInformation.IsServer
-        ? $" lastIssueFinalization=[{IssueFinalizedOwnershipGatePatch.LastServerTrace}] lastQuestFinalization=[{IssueQuestFinalizedTracePatch.LastServerTrace}]"
+    private static string ServerFinalizationTrace(IssueBase issue = null) => ModInformation.IsServer
+        ? $" lastIssueFinalization=[{IssueFinalizedOwnershipGatePatch.LastServerTrace}] lastQuestFinalization=[{IssueQuestFinalizedTracePatch.LastServerTrace}] lastServerQuestAccept=[{GenericQuestTypeAcceptHandler.LastServerQuestAcceptTrace}] observedIssueRef={(issue == null ? 0 : RuntimeHelpers.GetHashCode(issue))} observedQuestManagerRef={RuntimeHelpers.GetHashCode(Campaign.Current.QuestManager)}"
         : "";
 
     public sealed class IssuesGiveCoopCommand : ICoopCommand
@@ -344,7 +346,7 @@ public static class IssuesDebugCommand
                 $"quest={issue.IssueQuest?.StringId ?? "none"} alternative={issue.IsSolvingWithAlternative} " +
                 $"generation={generation} controller={controller}{trackedConversation} sentTroops=[{troops}] " +
                 $"issueManagerSame={issueManagerSame} trackedQuestCount={trackedQuestCount}" +
-                ServerFinalizationTrace());
+                ServerFinalizationTrace(issue));
         }
     }
 
