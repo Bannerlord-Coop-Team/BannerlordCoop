@@ -10,6 +10,11 @@ namespace Coop.Core.Server.Connections.Messages;
 [ProtoContract(SkipConstructor = true)]
 public record NetworkModuleVersionsValidated : IEvent
 {
+    /// <summary>
+    /// Reason a server without the Coop module gives; the client joins anyway, so it is not a refusal.
+    /// </summary>
+    public const string UnsupportedCoopModuleReason = "Server does not support module 'Coop'.";
+
     [ProtoMember(1)]
     public bool Matches { get; }
     [ProtoMember(2)]
