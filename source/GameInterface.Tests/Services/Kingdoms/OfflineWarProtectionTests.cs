@@ -187,6 +187,24 @@ public class OfflineWarProtectionTests : IDisposable
         Assert.False(protection.ShouldRefuse(DeclareWar(aiClan, playerKingdom), out _));
     }
 
+    [Fact]
+    public void ConnectedPlayer_WithHeroOutsideAnyClan_CountsFromRegisteredClan()
+    {
+        AddPlayer("clanless", heroClan: null, isConnected: true, registeredClan: CreateClan(playerKingdom));
+
+        Assert.False(protection.ShouldRefuse(DeclareWar(aiClan, playerKingdom), out _));
+    }
+
+    [Fact]
+    public void PlayerClanInsideAKingdom_AsTarget_IsNotProtectedOnItsOwn()
+    {
+        // Only a kingdom or an independent clan is a war target the rule protects.
+        Clan vassalClan = CreateClan(aiKingdom);
+        AddPlayer("vassal", vassalClan, isConnected: false);
+
+        Assert.False(protection.ShouldRefuse(DeclareWar(aiClan, vassalClan), out _));
+    }
+
     [Theory]
     [InlineData(typeof(MakePeaceKingdomDecision))]
     [InlineData(typeof(KingdomPolicyDecision))]
@@ -245,17 +263,17 @@ public class OfflineWarProtectionTests : IDisposable
         return clan;
     }
 
-    private Player AddPlayer(string controllerId, Clan heroClan, bool isConnected, Clan? registeredClan = null)
+    private Player AddPlayer(string controllerId, Clan? heroClan, bool isConnected, Clan? registeredClan = null)
     {
         var hero = ObjectHelper.SkipConstructor<Hero>();
         hero._clan = heroClan;
-        Clan storedClan = registeredClan ?? heroClan;
+        Clan storedClan = (registeredClan ?? heroClan)!;
         var player = new Player(controllerId, controllerId + "_hero", controllerId + "_party", controllerId + "_clan", controllerId + "_character");
 
         objectManager.Setup(manager => manager.TryGetObject(player.HeroId, out hero)).Returns(true);
         objectManager.Setup(manager => manager.TryGetObject(player.ClanId, out storedClan)).Returns(true);
         players.Add(player);
-        playerClans.Add(heroClan);
+        playerClans.Add(heroClan ?? storedClan);
         if (isConnected) connectedPlayers.Add(player);
         return player;
     }
