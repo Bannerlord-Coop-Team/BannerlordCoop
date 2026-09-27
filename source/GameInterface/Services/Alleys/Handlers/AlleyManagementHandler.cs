@@ -14,6 +14,7 @@ using System.Collections.Generic;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Actions;
 using TaleWorlds.CampaignSystem.Settlements;
+using TaleWorlds.Core;
 
 namespace GameInterface.Services.Alleys.Handlers;
 
@@ -155,6 +156,7 @@ internal class AlleyManagementHandler : IHandler
             alley.SetOwner(owner);
             ApplyAcquisitionRelationPenalties(owner, displacedOwner, alley.Settlement);
             sessionInterface.SetManagementData(data.AlleyId, data.OverseerId, garrison);
+            AddXpFromClearingAlley(owner);
             TeleportOverseerToAlley(overseer, alley);
 
             if (sessionInterface.TryGetManagementData(data.AlleyId, out var stored))
@@ -192,6 +194,15 @@ internal class AlleyManagementHandler : IHandler
                 ChangeRelationAction.ApplyRelationChangeBetweenHeroes(owner, notable, -1, showQuickNotification: false);
             }
         }
+    }
+
+    /// <summary>
+    /// Applies the xp gain added by OnAlleyOccupiedByPlayer in vanilla using the server authoritative path instead.
+    /// GetInitialXpGainForMainHero() returns a hardcoded value and doesn't use Hero.MainHero so is safe to run on the server.
+    /// </summary>
+    private static void AddXpFromClearingAlley(Hero newOwner)
+    {
+        newOwner.AddSkillXp(DefaultSkills.Roguery, Campaign.Current.Models.AlleyModel.GetInitialXpGainForMainHero());
     }
 
     /// <summary>
