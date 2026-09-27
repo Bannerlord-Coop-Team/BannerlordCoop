@@ -83,9 +83,9 @@ public class AgentHitSoundTests : MissionTestEnvironment
             if (crossOwnerHit)
                 Assert.DoesNotContain(sounds.Calls, call => call.Mission == missions[0].Shell);
             Assert.Single(clients[owner].Resolve<MockBattleNetwork>().NetworkSentMessages
-                .OfType<NetworkAgentHitSound>());
+                .OfType<NetworkMeleeHitPresentation>(), message => message.Kind == MeleeHitPresentationKind.BodyImpact);
             foreach (var peer in clients.Where((_, i) => i != owner))
-                Assert.Empty(peer.Resolve<MockBattleNetwork>().NetworkSentMessages.OfType<NetworkAgentHitSound>());
+                Assert.Empty(peer.Resolve<MockBattleNetwork>().NetworkSentMessages.OfType<NetworkMeleeHitPresentation>());
         }
         finally
         {
@@ -200,7 +200,7 @@ public class AgentHitSoundTests : MissionTestEnvironment
                 var parameter = new SoundEventParameter(parameterName, 0.5f);
                 mission.Shell.MakeSound(123, new Vec3(1f, 2f, 3f), false, true, -1, victim.Index, ref parameter);
                 Assert.Equal(expected, client.Resolve<MockBattleNetwork>().NetworkSentMessages
-                    .OfType<NetworkAgentHitSound>().Count());
+                    .OfType<NetworkMeleeHitPresentation>().Count(message => message.Kind == MeleeHitPresentationKind.BodyImpact));
             });
         }
         finally
@@ -229,24 +229,81 @@ public class AgentHitSoundTests : MissionTestEnvironment
             client.Resolve<IMessageBroker>().Publish(this,
                 new AgentHitSound(victim, attacker, null, 123, new Vec3(1f, 2f, 3f), 0.5f));
 
-            network.Verify(value => value.SendAllBut(null, Moq.It.IsAny<NetworkAgentHitSound>()), Moq.Times.Once);
+            network.Verify(value => value.SendAllBut(null, Moq.It.Is<NetworkMeleeHitPresentation>(
+                message => message.Kind == MeleeHitPresentationKind.BodyImpact)), Moq.Times.Once);
         });
     }
 
-    [Fact]
-    public void NetworkSound_RoundTripsTheSelectedSoundPositionAndArmor()
+    [Theory]
+    [InlineData(MeleeHitPresentationKind.Blood)]
+    [InlineData(MeleeHitPresentationKind.ShieldImpact)]
+    [InlineData(MeleeHitPresentationKind.BodyImpact)]
+    public void NetworkPresentation_RoundTripsExistingFieldsAndSelectedSound(MeleeHitPresentationKind kind)
     {
-        var original = new NetworkAgentHitSound(Guid.NewGuid(), true, 123, new Vec3(1f, 2f, 3f), 0.75f);
+        var original = new NetworkMeleeHitPresentation(Guid.NewGuid(), true, kind, 4,
+            new Vec3(1f, 2f, 3f), WeaponClass.OneHandedSword, 5, 0.5f, 123, 0.75f);
         var serializer = new ProtoBufSerializer(new SerializableTypeMapper());
         var packet = MessagePacket.Create(original, serializer);
 
-        var result = Assert.IsType<NetworkAgentHitSound>(serializer.Deserialize<IMessage>(packet.Data));
+        var result = Assert.IsType<NetworkMeleeHitPresentation>(serializer.Deserialize<IMessage>(packet.Data));
 
         Assert.Equal(original.VictimAgentId, result.VictimAgentId);
         Assert.True(result.IsMount);
+        Assert.Equal(kind, result.Kind);
+        Assert.Equal(original.CollisionBoneIndex, result.CollisionBoneIndex);
+        Assert.Equal(original.CollisionPosition, result.CollisionPosition);
+        Assert.Equal(original.AttackerWeaponClass, result.AttackerWeaponClass);
+        Assert.Equal(original.PhysicsMaterialIndex, result.PhysicsMaterialIndex);
+        Assert.Equal(original.Strength, result.Strength);
         Assert.Equal(original.SoundIndex, result.SoundIndex);
-        Assert.Equal(original.Position, result.Position);
         Assert.Equal(original.ArmorType, result.ArmorType);
+    }
+
+    [Theory]
+    [InlineData(MeleeHitPresentationKind.BodyImpact, true, 1)]
+    [InlineData(MeleeHitPresentationKind.BodyImpact, false, 1)]
+    [InlineData(MeleeHitPresentationKind.ShieldImpact, true, 1)]
+    [InlineData(MeleeHitPresentationKind.ShieldImpact, false, 0)]
+    public void NetworkPresentation_InactiveVictimStillPlaysBodyImpactOnly(
+        MeleeHitPresentationKind kind, bool active, int expectedSounds)
+    {
+        using var fixture = new MissionEngineFixture();
+        using var sounds = new SoundRecorder();
+        var client = Clients.First();
+        SetControllerId(client, "observer");
+        BattleSpawnGate.BeginBattle("presentation-receive-test");
+        try
+        {
+            client.Call(() =>
+            {
+                var mission = fixture.CreateMission(client);
+                Agent victim = mission.SpawnAgent(new AgentBuildData(Game.Current.PlayerTroop));
+                Guid victimId = Guid.NewGuid();
+                Assert.True(client.Resolve<INetworkAgentRegistry>().TryRegisterAgent("owner", victimId, victim));
+                Assert.True(AgentMirror.TryGet(victim, out var mirror));
+                mirror.IsActive = active;
+                float healthBefore = mirror.Health;
+                using var handler = client.Resolve<ICombatHitPresentationHandler>();
+                client.Resolve<IMessageBroker>().Publish(this, new NetworkMeleeHitPresentation(
+                    victimId, false, kind, -1, new Vec3(1f, 2f, 3f),
+                    WeaponClass.OneHandedSword, -1, 0.5f, 123, 0.75f));
+
+                Assert.Equal(expectedSounds, sounds.Calls.Count);
+                Assert.Equal(healthBefore, mirror.Health);
+                Assert.Equal(active, mirror.IsActive);
+                Assert.All(sounds.Calls, call =>
+                {
+                    Assert.Equal(kind == MeleeHitPresentationKind.BodyImpact ? "Armor Type" : "Force", call.ParameterName);
+                    Assert.Equal(-1, call.AttackerIndex);
+                    Assert.Equal(-1, call.VictimIndex);
+                });
+                Assert.Empty(client.Resolve<MockBattleNetwork>().NetworkSentMessages);
+            });
+        }
+        finally
+        {
+            BattleSpawnGate.EndBattle();
+        }
     }
 
     private sealed class SoundRecorder : IDisposable
