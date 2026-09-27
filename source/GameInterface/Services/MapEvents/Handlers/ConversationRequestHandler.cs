@@ -171,6 +171,20 @@ internal class ConversationRequestHandler : IHandler
         if (!objectManager.TryGetIdWithLogging(request.DefenderParty, out var defenderId)) return;
         if (!objectManager.TryGetIdWithLogging(request.AttackerParty, out var attackerId)) return;
 
+        var playerPartyId = attackerIsPlayer ? attackerId : defenderId;
+        var aiPartyId = attackerIsPlayer ? defenderId : attackerId;
+
+        // The player did not ask for this encounter. Wait while either side is in another conversation,
+        // otherwise the attacker retries every tick and each retry denies a request nobody made.
+        if (conversationPartyTracker.IsInOtherConversation(playerPeer, playerPartyId, aiPartyId))
+        {
+            Logger.Verbose(
+                "Deferring server-detected conversation. AttackerId={AttackerId}, DefenderId={DefenderId}",
+                attackerId,
+                defenderId);
+            return;
+        }
+
         Logger.Debug(
             "Starting server-detected conversation. AttackerId={AttackerId}, DefenderId={DefenderId}",
             attackerId,
