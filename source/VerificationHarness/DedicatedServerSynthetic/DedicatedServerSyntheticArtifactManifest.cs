@@ -57,7 +57,6 @@ public static class DedicatedServerSyntheticArtifactManifestFile
     internal static readonly string[] RequiredAssemblyNames =
     {
         "Common",
-        "Coop",
         "Coop.Core",
         "Coop.Steam",
         "GameInterface",
@@ -122,6 +121,119 @@ public static class DedicatedServerSyntheticArtifactManifestFile
             throw new InvalidDataException("The dedicated-server synthetic artifact manifest digest is invalid.");
 
         return manifest;
+    }
+
+    public static async Task CreatePreparedWindowsAsync(
+        string buildStampPath,
+        string buildStampSha256,
+        string artifactRoot,
+        string head,
+        string tree,
+        string serverHead,
+        string serverTree,
+        string outputPath)
+    {
+        if (!IsSha256(buildStampSha256) || Sha256File(buildStampPath) != buildStampSha256)
+            throw new InvalidDataException("The prepared build stamp hash does not match.");
+        using JsonDocument stampDocument = JsonDocument.Parse(File.ReadAllText(buildStampPath));
+        JsonElement stamp = stampDocument.RootElement;
+        var manifest = new DedicatedServerSyntheticArtifactManifest
+        {
+            CoopSource = new DedicatedServerSyntheticSourceIdentity { Head = head, Tree = tree },
+            DedicatedServerSource = new DedicatedServerSyntheticSourceIdentity { Head = serverHead, Tree = serverTree }
+        };
+        ValidateSource(manifest.CoopSource);
+        ValidateSource(manifest.DedicatedServerSource);
+        foreach ((string field, string expected) in new[]
+        {
+            ("coopHead", head), ("coopTree", tree), ("serverHead", serverHead), ("serverTree", serverTree)
+        })
+        {
+            if (stamp.GetProperty(field).GetString() != expected)
+                throw new InvalidDataException("The prepared build stamp source identity does not match.");
+        }
+
+        string root = Path.GetFullPath(artifactRoot);
+        string Resolve(string relativePath)
+        {
+            if (!IsSafeRelativePath(relativePath))
+                throw new InvalidDataException("Invalid staged artifact path.");
+            string path = Path.Combine(root, relativePath.Replace('/', Path.DirectorySeparatorChar));
+            for (FileSystemInfo? entry = new FileInfo(path); entry != null; entry = entry is FileInfo file
+                     ? file.Directory : ((DirectoryInfo)entry).Parent)
+            {
+                if ((entry.Attributes & FileAttributes.ReparsePoint) != 0)
+                    throw new InvalidDataException("Staged artifacts cannot use reparse points.");
+            }
+            return path;
+        }
+        var reader = new DedicatedServerHostArtifactReader();
+        DedicatedServerSyntheticAssemblyArtifact ReadAssembly(string relativePath)
+        {
+            string path = Resolve(relativePath);
+            DedicatedServerHostAssemblyIdentity identity = reader.ReadAssemblyIdentity(path);
+            return new DedicatedServerSyntheticAssemblyArtifact
+            {
+                RelativePath = relativePath,
+                Version = identity.Version,
+                Mvid = identity.Mvid,
+                Sha256 = reader.ComputeSha256(path)
+            };
+        }
+
+        const string engineBin = "engine/bin/Win64_Shipping_Server/";
+        const string modBin = "engine/Modules/Coop/bin/Win64_Shipping_Server/";
+        string fingerprint = stamp.GetProperty("coopFingerprint").GetString() ?? string.Empty;
+        Dictionary<string, string> deployedHashes = fingerprint.Split('|')
+            .Select(item => item.Split(':', 2))
+            .ToDictionary(pair => pair[0], pair => pair[1].ToLowerInvariant(), StringComparer.Ordinal);
+        foreach (string name in RequiredAssemblyNames)
+        {
+            DedicatedServerSyntheticAssemblyArtifact artifact = ReadAssembly(modBin + name + ".dll");
+            if (!deployedHashes.TryGetValue(name + ".dll", out string? expectedHash) ||
+                artifact.Sha256 != expectedHash)
+                throw new InvalidDataException("A staged mod assembly differs from the prepared build fingerprint.");
+            manifest.LoadedAssemblies.Add(name, artifact);
+        }
+        manifest.DedicatedServerAssemblies.Add("DedicatedServer.Core", ReadAssembly(engineBin + "DedicatedServer.Core.dll"));
+        manifest.DedicatedServerAssemblies.Add("DedicatedServer.Windows", ReadAssembly(
+            "engine/Modules/DedicatedServer.Windows/bin/Win64_Shipping_Server/DedicatedServer.Windows.dll"));
+        manifest.DedicatedServerAssemblies.Add("TaleWorlds.Starter.DotNetCore", ReadAssembly(engineBin + "TaleWorlds.Starter.DotNetCore.dll"));
+        string executable = "engine/dotnet/dotnet.exe";
+        manifest.ServerExecutable = new DedicatedServerSyntheticExecutableArtifact
+        {
+            FileName = "dotnet.exe",
+            RelativePath = executable,
+            Sha256 = reader.ComputeSha256(Resolve(executable))
+        };
+        manifest.BuildVersion = ReadInformationalVersion(Resolve(modBin + "Common.dll"));
+        RefreshDigests(manifest);
+        ValidateShape(manifest);
+        if (Sha256File(buildStampPath) != buildStampSha256)
+            throw new InvalidDataException("The prepared build stamp changed during manifest creation.");
+        await VerificationHarness.Transport.TransportEvidenceFileWriter.WriteAtomicallyAsync(
+            outputPath, JsonSerializer.Serialize(manifest, DedicatedServerSyntheticJson.Options));
+    }
+
+    private static string ReadInformationalVersion(string path)
+    {
+        using FileStream stream = File.OpenRead(path);
+        using var pe = new PEReader(stream);
+        MetadataReader metadata = pe.GetMetadataReader();
+        foreach (CustomAttributeHandle handle in metadata.GetAssemblyDefinition().GetCustomAttributes())
+        {
+            CustomAttribute attribute = metadata.GetCustomAttribute(handle);
+            if (attribute.Constructor.Kind != HandleKind.MemberReference) continue;
+            MemberReference constructor = metadata.GetMemberReference((MemberReferenceHandle)attribute.Constructor);
+            if (constructor.Parent.Kind != HandleKind.TypeReference) continue;
+            TypeReference type = metadata.GetTypeReference((TypeReferenceHandle)constructor.Parent);
+            if (metadata.GetString(type.Namespace) != "System.Reflection" ||
+                metadata.GetString(type.Name) != "AssemblyInformationalVersionAttribute") continue;
+            BlobReader blob = metadata.GetBlobReader(attribute.Value);
+            if (blob.ReadUInt16() != 1) break;
+            return blob.ReadSerializedString() ?? throw new InvalidDataException("Missing build version.");
+        }
+        throw new InvalidDataException("The staged Common assembly has no informational version.");
     }
 
     internal static void RefreshDigests(DedicatedServerSyntheticArtifactManifest manifest)
@@ -457,7 +569,7 @@ public sealed class DedicatedServerSyntheticArtifactVerifier : IDedicatedServerS
                 cancellationToken);
             return VerifyStatusAndHostArtifacts(responseJson, requestId, options, manifest);
         }
-        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or InvalidOperationException or ArgumentException)
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or InvalidOperationException or ArgumentException or InvalidDataException)
         {
             return Failed("runtime-artifact-verification-failed", manifest);
         }
@@ -503,8 +615,10 @@ public sealed class DedicatedServerSyntheticArtifactVerifier : IDedicatedServerS
             return Failed("artifact-loaded-assembly-set-mismatch", manifest);
         }
 
+        // Direct-connect servers can leave Coop.Steam unloaded; its staged bytes are still checked.
         if (!observed.Keys.OrderBy(name => name, StringComparer.Ordinal).SequenceEqual(
-                DedicatedServerSyntheticArtifactManifestFile.RequiredAssemblyNames,
+                DedicatedServerSyntheticArtifactManifestFile.RequiredAssemblyNames
+                    .Where(name => name != "Coop.Steam" || observed.ContainsKey(name)),
                 StringComparer.Ordinal))
         {
             return Failed("artifact-loaded-assembly-set-mismatch", manifest);
@@ -525,12 +639,9 @@ public sealed class DedicatedServerSyntheticArtifactVerifier : IDedicatedServerS
             return Failed("artifact-build-version-mismatch", manifest);
         }
 
-        if (!TryReadBoundedString(result, "assemblyMvid", 128, out string coopMvid) ||
-            !DedicatedServerSyntheticArtifactManifestFile.TryNormalizeGuid(coopMvid, out string normalizedCoopMvid) ||
-            !string.Equals(
-                normalizedCoopMvid,
-                manifest.LoadedAssemblies["Coop"].Mvid,
-                StringComparison.Ordinal))
+        // The standalone server never loads the client entry assembly Coop.dll.
+        if (!result.TryGetProperty("assemblyMvid", out JsonElement clientMvid) ||
+            clientMvid.ValueKind != JsonValueKind.Null)
         {
             return Failed("artifact-coop-mvid-mismatch", manifest);
         }
@@ -602,19 +713,21 @@ public sealed class DedicatedServerSyntheticArtifactVerifier : IDedicatedServerS
     {
         foreach ((string name, DedicatedServerSyntheticAssemblyArtifact expected) in expectedAssemblies)
         {
-            ObservedAssembly actual = observedAssemblies[name];
+            observedAssemblies.TryGetValue(name, out ObservedAssembly? actual);
             string expectedPath = ResolveStagedPath(artifactRootPath, expected.RelativePath);
-            if (!PathsEqual(actual.Location, expectedPath))
+            string artifactPath = actual?.Location ?? expectedPath;
+            if (!PathsEqual(artifactPath, expectedPath))
             {
                 failureCode = "artifact-loaded-assembly-path-mismatch";
                 return false;
             }
 
             DedicatedServerHostAssemblyIdentity diskIdentity =
-                hostArtifactReader.ReadAssemblyIdentity(actual.Location);
-            if (!string.Equals(actual.Version, expected.Version, StringComparison.Ordinal) ||
-                !string.Equals(diskIdentity.Version, expected.Version, StringComparison.Ordinal) ||
-                !string.Equals(actual.Mvid, expected.Mvid, StringComparison.Ordinal))
+                hostArtifactReader.ReadAssemblyIdentity(artifactPath);
+            if (!string.Equals(diskIdentity.Version, expected.Version, StringComparison.Ordinal) ||
+                (actual != null &&
+                 (!string.Equals(actual.Version, expected.Version, StringComparison.Ordinal) ||
+                  !string.Equals(actual.Mvid, expected.Mvid, StringComparison.Ordinal))))
             {
                 failureCode = "artifact-loaded-assembly-metadata-mismatch";
                 return false;
@@ -625,7 +738,7 @@ public sealed class DedicatedServerSyntheticArtifactVerifier : IDedicatedServerS
                 return false;
             }
 
-            string actualHash = hostArtifactReader.ComputeSha256(actual.Location);
+            string actualHash = hostArtifactReader.ComputeSha256(artifactPath);
             if (!string.Equals(actualHash, expected.Sha256, StringComparison.Ordinal))
             {
                 failureCode = "artifact-loaded-assembly-hash-mismatch";
