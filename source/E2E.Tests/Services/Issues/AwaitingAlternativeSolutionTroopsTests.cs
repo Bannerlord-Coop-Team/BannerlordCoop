@@ -292,6 +292,15 @@ public class AwaitingAlternativeSolutionTroopsTests : IDisposable
             Campaign.Current.MainParty = clientParty;
         });
 
+        Hero serverCompanion = null;
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject<Hero>(fixture.CompanionHeroId, out var companion));
+            Assert.Same(companion, companion.CharacterObject.HeroObject);
+            Assert.Equal(Hero.CharacterStates.Disabled, companion.HeroState);
+            serverCompanion = companion;
+        });
+
         object capturedInquiry = null;
         var onShowInquiry = InquiryCaptureHandler.MakeDelegate(data => capturedInquiry = data);
         InquiryCaptureHandler.OnShowInquiryEvent.AddEventHandler(null, onShowInquiry);
@@ -299,6 +308,9 @@ public class AwaitingAlternativeSolutionTroopsTests : IDisposable
             .Count(message => message.HeroId == fixture.CompanionHeroId && message.HeroState == (int)Hero.CharacterStates.Active);
         var clientActivationMessagesBeforeDrain = Client.InternalMessages.GetMessages<ChangeHeroState>()
             .Count(message => message.HeroId == fixture.CompanionHeroId && message.HeroState == (int)Hero.CharacterStates.Active);
+        var serverActivationEventsBeforeDrain = Server.InternalMessages.GetMessages<HeroStateChanged>()
+            .Count(message => ReferenceEquals(message.Hero, serverCompanion)
+                && message.HeroState == (int)Hero.CharacterStates.Active);
         try
         {
             Client.Call(() =>
@@ -332,6 +344,10 @@ public class AwaitingAlternativeSolutionTroopsTests : IDisposable
             Assert.False(Server.Resolve<IAwaitingAlternativeSolutionTroopsRegistry>().TryGet(controllerId, out _));
         });
         Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkAwaitingAlternativeSolutionTroopsDrainConfirmed>());
+        Assert.True(Server.InternalMessages.GetMessages<HeroStateChanged>()
+            .Count(message => ReferenceEquals(message.Hero, serverCompanion)
+                && message.HeroState == (int)Hero.CharacterStates.Active)
+            > serverActivationEventsBeforeDrain, "Server did not publish companion activation");
         Assert.True(Server.NetworkSentMessages.GetMessages<NetworkHeroStateChanged>()
             .Count(message => message.HeroId == fixture.CompanionHeroId && message.HeroState == (int)Hero.CharacterStates.Active)
             > serverActivationMessagesBeforeDrain, "Server did not broadcast companion activation");
