@@ -17,7 +17,6 @@ public sealed class VerificationReportSchemaTests
         "unit",
         "deterministic-peer",
         "process-peer",
-        "dedicated-server-synthetic",
         "rendered-smoke",
         "full-live"
     };
@@ -29,7 +28,6 @@ public sealed class VerificationReportSchemaTests
         "poller-game-thread",
         "deterministic-peer",
         "process-peer",
-        "dedicated-server-synthetic",
         "rendered-smoke",
         "full-live"
     };

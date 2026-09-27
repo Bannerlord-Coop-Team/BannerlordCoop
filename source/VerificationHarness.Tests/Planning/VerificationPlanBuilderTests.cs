@@ -9,7 +9,6 @@ public sealed class VerificationPlanBuilderTests
         "unit",
         "deterministic-peer",
         "process-peer",
-        "dedicated-server-synthetic",
         "rendered-smoke",
         "full-live"
     };
@@ -39,15 +38,16 @@ public sealed class VerificationPlanBuilderTests
     }
 
     [Fact]
-    public void ProductionNetworkPathRequiresDedicatedServerSyntheticProfile()
+    public void ProductionNetworkPathRequiresExistingLiveProfile()
     {
         VerificationPlan plan = Build("source/Common/Network/MessagePacket.cs");
 
-        Assert.Equal("dedicated-server-synthetic", plan.HighestRequiredTier);
-        Assert.Equal(AllTiers.Take(4), plan.RequiredTiers);
+        Assert.Equal("full-live", plan.HighestRequiredTier);
+        Assert.Equal(AllTiers, plan.RequiredTiers);
     }
 
     [Theory]
+    [InlineData("source/VerificationHarness/Program.cs")]
     [InlineData("source/VerificationHarness/Transport/ProcessPeerController.cs")]
     [InlineData("source/VerificationHarness.Tests/Transport/ProcessPeerLabTests.cs")]
     public void ProcessHarnessChangesRequireTheirOwnProcessProfile(string path)
@@ -58,16 +58,6 @@ public sealed class VerificationPlanBuilderTests
         Assert.Equal(new[] { "unit", "deterministic-peer", "process-peer" }, plan.RequiredTiers);
     }
 
-    [Fact]
-    public void DedicatedSyntheticHarnessChangesRequireDedicatedServerProfile()
-    {
-        VerificationPlan plan = Build(
-            "source/VerificationHarness/DedicatedServerSynthetic/DedicatedServerSyntheticController.cs");
-
-        Assert.Equal("dedicated-server-synthetic", plan.HighestRequiredTier);
-        Assert.Equal(AllTiers.Take(4), plan.RequiredTiers);
-    }
-
     [Theory]
     [InlineData("source/ServerConsole/Program.cs")]
     [InlineData("source/Coop.Core/Client/States/ValidateModuleState.cs")]
@@ -76,13 +66,12 @@ public sealed class VerificationPlanBuilderTests
     [InlineData("source/Common/Network/ConnectionPassword.cs")]
     [InlineData("source/Common/Network/ReliableMessageBatcher.cs")]
     [InlineData("source/Common/PacketHandlers/AggregateMessagePacketHandler.cs")]
-    [InlineData("source/VerificationHarness/Program.cs")]
-    public void DedicatedServerContractPathRequiresDedicatedServerSyntheticProfile(string path)
+    public void DedicatedServerContractPathRequiresExistingLiveProfile(string path)
     {
         VerificationPlan plan = Build(path);
 
-        Assert.Equal("dedicated-server-synthetic", plan.HighestRequiredTier);
-        Assert.Equal(AllTiers.Take(4), plan.RequiredTiers);
+        Assert.Equal("full-live", plan.HighestRequiredTier);
+        Assert.Equal(AllTiers, plan.RequiredTiers);
     }
 
     [Theory]
@@ -273,7 +262,7 @@ public sealed class VerificationPlanBuilderTests
         Assert.Contains("Synthetic transport lab", processPeer.Scope);
         Assert.Contains("does not claim Bannerlord handlers", processPeer.Scope);
 
-        foreach (string profileId in new[] { "dedicated-server-synthetic", "rendered-smoke", "full-live" })
+        foreach (string profileId in new[] { "rendered-smoke", "full-live" })
         {
             VerificationProfile profile = plan.Profiles.Single(item => item.Id == profileId);
             Assert.NotEmpty(profile.Arguments);
@@ -281,25 +270,6 @@ public sealed class VerificationPlanBuilderTests
             Assert.Contains("{source.syntheticTree}", profile.Arguments);
             Assert.Contains("{evidence.output}", profile.Arguments);
         }
-
-        VerificationProfile dedicatedServerSynthetic = plan.Profiles.Single(
-            profile => profile.Id == "dedicated-server-synthetic");
-        Assert.Contains("--password-env", dedicatedServerSynthetic.Arguments);
-        Assert.Contains(
-            "{dedicatedServer.passwordEnvironmentVariable}",
-            dedicatedServerSynthetic.Arguments);
-        Assert.Contains("{dedicatedServer.artifactManifest}", dedicatedServerSynthetic.Arguments);
-        Assert.Contains(
-            "{dedicatedServer.artifactManifestSha256}",
-            dedicatedServerSynthetic.Arguments);
-        Assert.Contains("{dedicatedServer.artifactRoot}", dedicatedServerSynthetic.Arguments);
-
-        VerificationCheck dedicatedServerSyntheticCheck = plan.Checks.Single(
-            check => check.Id == "dedicated-server-synthetic");
-        Assert.Equal(1, dedicatedServerSyntheticCheck.Topology.ServerCount);
-        Assert.Equal(2, dedicatedServerSyntheticCheck.Topology.ClientCount);
-        Assert.Equal(2, dedicatedServerSyntheticCheck.Topology.ProcessCount);
-        Assert.False(dedicatedServerSyntheticCheck.Topology.ProcessIsolated);
     }
 
     [Fact]
@@ -318,7 +288,6 @@ public sealed class VerificationPlanBuilderTests
             "poller-game-thread",
             "deterministic-peer",
             "process-peer",
-            "dedicated-server-synthetic",
             "rendered-smoke",
             "full-live"
         }, plan.RequiredChecks);

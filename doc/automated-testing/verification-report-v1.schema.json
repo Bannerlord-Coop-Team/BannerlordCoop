@@ -98,7 +98,6 @@
         "unit",
         "deterministic-peer",
         "process-peer",
-        "dedicated-server-synthetic",
         "rendered-smoke",
         "full-live"
       ]
@@ -110,7 +109,6 @@
         "poller-game-thread",
         "deterministic-peer",
         "process-peer",
-        "dedicated-server-synthetic",
         "rendered-smoke",
         "full-live"
       ]
