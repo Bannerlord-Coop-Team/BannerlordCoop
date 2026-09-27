@@ -21,7 +21,7 @@ public class ConnectionDirectCommandTests
             .Where(type => typeof(ICoopCommand).IsAssignableFrom(type))
             .ToArray();
 
-        Assert.Equal(5, commandTypes.Length);
+        Assert.Equal(6, commandTypes.Length);
         Assert.All(commandTypes, type =>
         {
             Assert.Equal(typeof(object), type.BaseType);
