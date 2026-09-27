@@ -1,11 +1,15 @@
 ﻿using Common;
 using Common.Messaging;
+using Common.Logging;
 using GameInterface.Policies;
 using GameInterface.Services.Issues.Generic;
 using GameInterface.Services.Issues.Interfaces;
 using GameInterface.Services.Issues.Messages;
 using GameInterface.Services.ObjectManager;
 using HarmonyLib;
+using Serilog;
+using Serilog.Events;
+using System;
 using System.Collections.Generic;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Issues;
@@ -40,12 +44,33 @@ internal class IssueManagerQuestCompletedReasonCapture
 [HarmonyPatch(typeof(IssueBase), nameof(IssueBase.IssueFinalized))]
 internal class IssueFinalizedOwnershipGatePatch
 {
+    private static readonly ILogger Logger = LogManager.GetLogger<IssueFinalizedOwnershipGatePatch>();
+
     [HarmonyPrefix]
     internal static bool Prefix(IssueBase __instance)
     {
         if (!DisableAllIssueBehaviorsExceptAllowlist.IsAllowlisted(__instance)) return true;
 
-        return IssueFinalizeAuthorityGuard.IsActive || CallOriginalPolicy.IsOriginalAllowedForOwnershipGate();
+        var allowed = IssueFinalizeAuthorityGuard.IsActive || CallOriginalPolicy.IsOriginalAllowedForOwnershipGate();
+        if (ModInformation.IsServer && Logger.IsEnabled(LogEventLevel.Debug))
+            Logger.Debug("Issue finalization for {Issue} allowed={Allowed} quest={Quest} stack={Stack}",
+                __instance.StringId, allowed, __instance.IssueQuest?.StringId, Environment.StackTrace);
+        return allowed;
+    }
+}
+
+[HarmonyPatch(typeof(QuestManager), nameof(QuestManager.OnQuestFinalized))]
+internal class IssueQuestFinalizedTracePatch
+{
+    private static readonly ILogger Logger = LogManager.GetLogger<IssueQuestFinalizedTracePatch>();
+
+    [HarmonyPrefix]
+    private static void Prefix(QuestBase quest)
+    {
+        if (ModInformation.IsClient || !Logger.IsEnabled(LogEventLevel.Debug) ||
+            quest is not GangLeaderNeedsToOffloadStolenGoodsIssueBehavior.GangLeaderNeedsToOffloadStolenGoodsIssueQuest) return;
+        Logger.Debug("Quest manager finalizing {Quest} ongoing={Ongoing} issue={Issue} stack={Stack}",
+            quest.StringId, quest.IsOngoing, quest.QuestGiver?.Issue?.StringId, Environment.StackTrace);
     }
 }
 
