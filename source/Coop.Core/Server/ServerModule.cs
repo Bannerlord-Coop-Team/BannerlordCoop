@@ -97,7 +97,12 @@ public class ServerModule : CommonModule
         builder.RegisterType<JoinPeerTerminator>().As<IJoinPeerTerminator>().InstancePerDependency();
         builder.RegisterType<OverloadedPeerManager>().As<IOverloadedPeerManager>().InstancePerLifetimeScope().AutoActivate();
 
+        // DEBUG builds, including MCP live-test runs, keep their heartbeats and battle counts off the production statistics.
+#if DEBUG
+        builder.RegisterType<DisabledServerTelemetryUploader>()
+#else
         builder.RegisterType<ServerTelemetryUploader>()
+#endif
             .As<IServerTelemetryUploader>()
             .As<IBattlesFoughtUploader>()
             .InstancePerLifetimeScope();
