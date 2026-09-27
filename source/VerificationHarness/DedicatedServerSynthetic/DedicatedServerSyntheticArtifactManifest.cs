@@ -69,7 +69,8 @@ public static class DedicatedServerSyntheticArtifactManifestFile
         string expectedCoopTree,
         string expectedDedicatedServerHead,
         string expectedDedicatedServerTree,
-        string expectedManifestFileSha256)
+        string expectedManifestFileSha256,
+        string artifactRoot = "")
     {
         if (string.IsNullOrWhiteSpace(path) || !File.Exists(path))
             throw new InvalidDataException("The dedicated-server synthetic artifact manifest does not exist.");
@@ -86,11 +87,15 @@ public static class DedicatedServerSyntheticArtifactManifestFile
         DedicatedServerSyntheticArtifactManifest? manifest;
         try
         {
-            manifest = JsonSerializer.Deserialize<DedicatedServerSyntheticArtifactManifest>(
-                manifestBytes,
-                DedicatedServerSyntheticJson.Options);
+            // Windows preparation already records source identities and staged binary hashes.
+            using JsonDocument document = JsonDocument.Parse(Encoding.UTF8.GetString(manifestBytes).TrimStart('\uFEFF'));
+            manifest = !document.RootElement.TryGetProperty("schemaVersion", out _) &&
+                document.RootElement.TryGetProperty("stagedRuntimeFingerprint", out _)
+                ? ReadPreparedWindows(document.RootElement, artifactRoot)
+                : document.RootElement.Deserialize<DedicatedServerSyntheticArtifactManifest>(
+                    DedicatedServerSyntheticJson.Options);
         }
-        catch (JsonException ex)
+        catch (Exception ex) when (ex is JsonException or KeyNotFoundException or InvalidOperationException)
         {
             throw new InvalidDataException(
                 "The dedicated-server synthetic artifact manifest is malformed.",
@@ -123,96 +128,60 @@ public static class DedicatedServerSyntheticArtifactManifestFile
         return manifest;
     }
 
-    public static async Task CreatePreparedWindowsAsync(
-        string buildStampPath,
-        string buildStampSha256,
-        string artifactRoot,
-        string head,
-        string tree,
-        string serverHead,
-        string serverTree,
-        string outputPath)
+    private static DedicatedServerSyntheticArtifactManifest ReadPreparedWindows(JsonElement stamp, string artifactRoot)
     {
-        if (!IsSha256(buildStampSha256) || Sha256File(buildStampPath) != buildStampSha256)
-            throw new InvalidDataException("The prepared build stamp hash does not match.");
-        using JsonDocument stampDocument = JsonDocument.Parse(File.ReadAllText(buildStampPath));
-        JsonElement stamp = stampDocument.RootElement;
-        var manifest = new DedicatedServerSyntheticArtifactManifest
+        if (string.IsNullOrWhiteSpace(artifactRoot))
+            throw new InvalidDataException("The prepared build receipt requires its staged root.");
+        var hashes = new Dictionary<string, string>(StringComparer.Ordinal);
+        foreach (string item in (stamp.GetProperty("stagedRuntimeFingerprint").GetString() ?? "").Split('|'))
         {
-            CoopSource = new DedicatedServerSyntheticSourceIdentity { Head = head, Tree = tree },
-            DedicatedServerSource = new DedicatedServerSyntheticSourceIdentity { Head = serverHead, Tree = serverTree }
-        };
-        ValidateSource(manifest.CoopSource);
-        ValidateSource(manifest.DedicatedServerSource);
-        foreach ((string field, string expected) in new[]
-        {
-            ("coopHead", head), ("coopTree", tree), ("serverHead", serverHead), ("serverTree", serverTree)
-        })
-        {
-            if (stamp.GetProperty(field).GetString() != expected)
-                throw new InvalidDataException("The prepared build stamp source identity does not match.");
+            string[] pair = item.Split(':', 2);
+            string relative = pair[0].Replace('\\', '/');
+            if (pair.Length != 2 || !IsSafeRelativePath(relative) || !IsSha256(pair[1].ToLowerInvariant()) ||
+                !hashes.TryAdd(relative, pair[1].ToLowerInvariant()))
+                throw new InvalidDataException("The prepared runtime fingerprint is invalid.");
         }
-
-        string root = Path.GetFullPath(artifactRoot);
-        string Resolve(string relativePath)
+        string Resolve(string relative)
         {
-            if (!IsSafeRelativePath(relativePath))
-                throw new InvalidDataException("Invalid staged artifact path.");
-            string path = Path.Combine(root, relativePath.Replace('/', Path.DirectorySeparatorChar));
+            if (!hashes.ContainsKey(relative))
+                throw new InvalidDataException("The prepared receipt is missing a required runtime artifact.");
+            string path = Path.Combine(Path.GetFullPath(artifactRoot), relative.Replace('/', Path.DirectorySeparatorChar));
             for (FileSystemInfo? entry = new FileInfo(path); entry != null; entry = entry is FileInfo file
                      ? file.Directory : ((DirectoryInfo)entry).Parent)
-            {
                 if ((entry.Attributes & FileAttributes.ReparsePoint) != 0)
                     throw new InvalidDataException("Staged artifacts cannot use reparse points.");
-            }
             return path;
         }
         var reader = new DedicatedServerHostArtifactReader();
-        DedicatedServerSyntheticAssemblyArtifact ReadAssembly(string relativePath)
+        foreach ((string relative, string hash) in hashes)
+            if (reader.ComputeSha256(Resolve(relative)) != hash)
+                throw new InvalidDataException("A staged runtime artifact differs from the prepared build receipt.");
+        DedicatedServerSyntheticAssemblyArtifact ReadAssembly(string relative)
         {
-            string path = Resolve(relativePath);
-            DedicatedServerHostAssemblyIdentity identity = reader.ReadAssemblyIdentity(path);
+            DedicatedServerHostAssemblyIdentity identity = reader.ReadAssemblyIdentity(Resolve(relative));
             return new DedicatedServerSyntheticAssemblyArtifact
             {
-                RelativePath = relativePath,
-                Version = identity.Version,
-                Mvid = identity.Mvid,
-                Sha256 = reader.ComputeSha256(path)
+                RelativePath = relative, Sha256 = hashes[relative], Version = identity.Version, Mvid = identity.Mvid
             };
         }
-
         const string engineBin = "engine/bin/Win64_Shipping_Server/";
         const string modBin = "engine/Modules/Coop/bin/Win64_Shipping_Server/";
-        string fingerprint = stamp.GetProperty("coopFingerprint").GetString() ?? string.Empty;
-        Dictionary<string, string> deployedHashes = fingerprint.Split('|')
-            .Select(item => item.Split(':', 2))
-            .ToDictionary(pair => pair[0], pair => pair[1].ToLowerInvariant(), StringComparer.Ordinal);
-        foreach (string name in RequiredAssemblyNames)
+        const string executable = "engine/dotnet/dotnet.exe";
+        var manifest = new DedicatedServerSyntheticArtifactManifest
         {
-            DedicatedServerSyntheticAssemblyArtifact artifact = ReadAssembly(modBin + name + ".dll");
-            if (!deployedHashes.TryGetValue(name + ".dll", out string? expectedHash) ||
-                artifact.Sha256 != expectedHash)
-                throw new InvalidDataException("A staged mod assembly differs from the prepared build fingerprint.");
-            manifest.LoadedAssemblies.Add(name, artifact);
-        }
+            CoopSource = new() { Head = stamp.GetProperty("coopHead").GetString() ?? "", Tree = stamp.GetProperty("coopTree").GetString() ?? "" },
+            DedicatedServerSource = new() { Head = stamp.GetProperty("serverHead").GetString() ?? "", Tree = stamp.GetProperty("serverTree").GetString() ?? "" },
+            BuildVersion = ReadInformationalVersion(Resolve(modBin + "Common.dll")),
+            ServerExecutable = new() { FileName = "dotnet.exe", RelativePath = executable, Sha256 = hashes.GetValueOrDefault(executable, "") }
+        };
+        foreach (string name in RequiredAssemblyNames)
+            manifest.LoadedAssemblies.Add(name, ReadAssembly(modBin + name + ".dll"));
         manifest.DedicatedServerAssemblies.Add("DedicatedServer.Core", ReadAssembly(engineBin + "DedicatedServer.Core.dll"));
         manifest.DedicatedServerAssemblies.Add("DedicatedServer.Windows", ReadAssembly(
             "engine/Modules/DedicatedServer.Windows/bin/Win64_Shipping_Server/DedicatedServer.Windows.dll"));
         manifest.DedicatedServerAssemblies.Add("TaleWorlds.Starter.DotNetCore", ReadAssembly(engineBin + "TaleWorlds.Starter.DotNetCore.dll"));
-        string executable = "engine/dotnet/dotnet.exe";
-        manifest.ServerExecutable = new DedicatedServerSyntheticExecutableArtifact
-        {
-            FileName = "dotnet.exe",
-            RelativePath = executable,
-            Sha256 = reader.ComputeSha256(Resolve(executable))
-        };
-        manifest.BuildVersion = ReadInformationalVersion(Resolve(modBin + "Common.dll"));
         RefreshDigests(manifest);
-        ValidateShape(manifest);
-        if (Sha256File(buildStampPath) != buildStampSha256)
-            throw new InvalidDataException("The prepared build stamp changed during manifest creation.");
-        await VerificationHarness.Transport.TransportEvidenceFileWriter.WriteAtomicallyAsync(
-            outputPath, JsonSerializer.Serialize(manifest, DedicatedServerSyntheticJson.Options));
+        return manifest;
     }
 
     private static string ReadInformationalVersion(string path)
@@ -547,7 +516,8 @@ public sealed class DedicatedServerSyntheticArtifactVerifier : IDedicatedServerS
                 options.Tree,
                 options.ServerHead,
                 options.ServerTree,
-                options.ArtifactManifestSha256);
+                options.ArtifactManifestSha256,
+                options.ArtifactRootPath);
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or JsonException or InvalidDataException)
         {

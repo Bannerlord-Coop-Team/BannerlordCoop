@@ -579,7 +579,12 @@ public sealed class DedicatedServerSyntheticArtifactManifestTests
     [InlineData("stamp-hash")]
     [InlineData("staged-hash")]
     [InlineData("missing-assembly")]
-    public async Task PreparedManifestBindsSourceAndStagedBytes(string mutation)
+    [InlineData("missing-runtime-host")]
+    [InlineData("duplicate-path")]
+    [InlineData("escaping-path")]
+    [InlineData("engine-hash")]
+    [InlineData("starter-hash")]
+    public void RunnerReceiptBindsSourceAndStagedBytes(string mutation)
     {
         string root = Path.Combine(Path.GetTempPath(), "synthetic-build-" + Guid.NewGuid().ToString("N"));
         Directory.CreateDirectory(root);
@@ -604,28 +609,31 @@ public sealed class DedicatedServerSyntheticArtifactManifestTests
             {
                 coopHead = new string('a', 40), coopTree = new string('b', 40),
                 serverHead = new string('c', 40), serverTree = new string('d', 40),
-                coopFingerprint = string.Join("|", DedicatedServerSyntheticArtifactManifestFile.RequiredAssemblyNames
-                    .Select(name => name + ".dll:" + sourceHash))
+                stagedRuntimeFingerprint = string.Join("|", paths
+                    .Where(path => mutation != "missing-runtime-host" || path != "engine/dotnet/dotnet.exe")
+                    .Concat(mutation == "duplicate-path" ? new[] { paths.First() } : Array.Empty<string>())
+                    .Concat(mutation == "escaping-path" ? new[] { "../outside.dll" } : Array.Empty<string>())
+                    .Select(path => path.Replace('/', '\\') + ":" + sourceHash.ToUpperInvariant()))
             }));
             string stampHash = DedicatedServerSyntheticArtifactManifestFile.Sha256File(stampPath);
+            // Windows PowerShell writes its existing receipt with a UTF-8 BOM.
+            File.WriteAllText(stampPath, File.ReadAllText(stampPath), new System.Text.UTF8Encoding(true));
+            stampHash = DedicatedServerSyntheticArtifactManifestFile.Sha256File(stampPath);
+            if (mutation == "engine-hash") File.AppendAllText(Path.Combine(root, "engine/dotnet/dotnet.exe"), "changed");
+            if (mutation == "starter-hash") File.AppendAllText(Path.Combine(root, engineBin + "TaleWorlds.Starter.DotNetCore.dll"), "changed");
             if (mutation == "stamp-hash") File.AppendAllText(stampPath, " ");
             if (mutation == "staged-hash") File.AppendAllText(Path.Combine(root, modBin + "Missions.dll"), "changed");
             if (mutation == "missing-assembly") File.Delete(Path.Combine(root, modBin + "Missions.dll"));
-            string output = Path.Combine(root, "manifest.json");
-            Task Create() => DedicatedServerSyntheticArtifactManifestFile.CreatePreparedWindowsAsync(
-                stampPath, stampHash, root, new string(mutation == "source" ? 'f' : 'a', 40),
-                new string('b', 40), new string('c', 40), new string('d', 40), output);
+            DedicatedServerSyntheticArtifactManifest Read() => DedicatedServerSyntheticArtifactManifestFile.LoadAndVerify(
+                stampPath, new string(mutation == "source" ? 'f' : 'a', 40),
+                new string('b', 40), new string('c', 40), new string('d', 40), stampHash, root);
             if (mutation != "valid")
             {
-                Exception? failure = await Record.ExceptionAsync(Create);
+                Exception? failure = Record.Exception(() => Read());
                 Assert.True(failure is IOException or InvalidDataException);
-                Assert.False(File.Exists(output));
                 return;
             }
-            await Create();
-            var manifest = DedicatedServerSyntheticArtifactManifestFile.LoadAndVerify(output,
-                new string('a', 40), new string('b', 40), new string('c', 40), new string('d', 40),
-                DedicatedServerSyntheticArtifactManifestFile.Sha256File(output));
+            var manifest = Read();
             Assert.Equal(Common.ModInformation.BuildVersion, manifest.BuildVersion);
             Assert.Equal(5, manifest.LoadedAssemblies.Count);
             Assert.DoesNotContain("Coop", manifest.LoadedAssemblies.Keys);

@@ -80,13 +80,14 @@ evidence, errors, hashes, or replay identity.
 
 ## Artifact and status contract
 
-The source-bound build creates `dedicated-server-synthetic-artifacts.v1`; the runtime controller
-only verifies it. The caller supplies the frozen raw manifest hash separately. The manifest binds
-both repositories' head/tree pairs, the co-op build version, stage-relative paths, hashes, assembly
-versions, and MVIDs. It contains the five managed co-op assemblies staged for the standalone server, `DedicatedServer.Core`, the active
-Windows or Linux shim, and the platform's TaleWorlds starter assembly. Windows uses a hashed
-`staged-executable` process host. Linux explicitly uses the image's `system-dotnet` host while the
-staged `TaleWorlds.Starter.DotNetCore.Linux` assembly remains path, hash, MVID, and version checked.
+On Windows, pass the existing runner `live-server-stamp.json` as `--artifact-manifest`,
+with its frozen raw SHA-256 and staged root. The verifier checks both source identities and
+`stagedRuntimeFingerprint` directly, then compares loaded assemblies with those checked files.
+No separate synthetic manifest or generator command is needed. The runner's existing
+config transaction owns the temporary password and restoration.
+
+The existing `dedicated-server-synthetic-artifacts.v1` input remains supported for Linux.
+It binds the staged assemblies and the image's `system-dotnet` host.
 
 Before UDP work and again after the lifecycle, the controller verifies:
 
@@ -122,33 +123,6 @@ contract. The logical state digest excludes timestamps, PIDs, paths, ports, toke
 campaign ticks, and recyclable connection IDs. A passing controller result is one input to the
 source-bound orchestration receipt; it cannot authorize caller-supplied source labels by itself.
 
-## Producing the Windows build manifest
-
-The existing runner preparation invokes the harness directly after the exact-source
-standalone build, before starting the server. The
-`dedicated-server-synthetic-manifest` command requires the frozen build-stamp hash, both
-head/tree pairs, and the staged root. It checks the stamp identities and deployed mod
-fingerprint, then reads each staged assembly's hash, version, and MVID without loading it.
-The build version comes from staged Common metadata. The resulting manifest pins the real
-engine process executable, not its launcher. Runtime status cannot manufacture this receipt.
-
-The Remote carrier enables this preparation only when its sole external profile is
-`dedicated-server-synthetic` and rendered clients defer connecting. Preparation generates an
-ephemeral test password in the normal server configuration, preserving the exact original
-bytes in an account-restricted owned backup. Synthetic setup uses the pinned server's
-Windows default template so launcher migration does not change the owned config. Cleanup
-restores the old file exactly, or restores its absence when the staged data had no config.
-The repository dev config is not used by the staged `--data-dir` launch. The scenario resolves
-the prepared config through the run-bound PID receipt and reads it privately
-into the controller's named password environment variable; never print or retain its value.
-The runner uses its existing standalone config/save transaction in config-only mode.
-After stopping owned processes, it restores the config through that transaction's
-`Restore` action. Owner mismatch or outside config changes preserve the backup and fail closed.
-
-The five required staged mod assemblies are Common, Coop.Core, Coop.Steam, GameInterface,
-and Missions. Direct-connect servers may leave Coop.Steam unloaded; its staged file still
-requires hash, version, and MVID agreement. The other four must appear in runtime status,
-and every loaded assembly must also match its expected path, version, and MVID. Missing
-required, additional, or duplicate runtime assemblies are rejected. No client entry assembly
-is loaded merely to satisfy attestation. Existing Linux manifest consumption remains
-supported; this producer targets the existing Windows stage layout.
+Direct-connect servers may leave Coop.Steam unloaded; its staged file is still checked.
+The other four mod assemblies must be loaded. Missing, extra, or duplicate runtime assemblies
+are rejected. The standalone server never loads the client entry assembly Coop.dll.
