@@ -269,6 +269,7 @@ public class AgentHitSoundTests : MissionTestEnvironment
     {
         using var fixture = new MissionEngineFixture();
         using var sounds = new SoundRecorder();
+        sounds.StubShieldSound();
         var client = Clients.First();
         SetControllerId(client, "observer");
         BattleSpawnGate.BeginBattle("presentation-receive-test");
@@ -293,6 +294,7 @@ public class AgentHitSoundTests : MissionTestEnvironment
                 Assert.Equal(active, mirror.IsActive);
                 Assert.All(sounds.Calls, call =>
                 {
+                    Assert.Equal(123, call.SoundIndex);
                     Assert.Equal(kind == MeleeHitPresentationKind.BodyImpact ? "Armor Type" : "Force", call.ParameterName);
                     Assert.Equal(-1, call.AttackerIndex);
                     Assert.Equal(-1, call.VictimIndex);
@@ -321,6 +323,20 @@ public class AgentHitSoundTests : MissionTestEnvironment
             harmony.Patch(method, prefix: new HarmonyMethod(typeof(SoundRecorder), nameof(Capture)));
             Assert.Single(Harmony.GetPatchInfo(method).Postfixes,
                 patch => patch.PatchMethod.DeclaringType == typeof(AgentHitSoundPatch));
+        }
+
+        public void StubShieldSound()
+        {
+            // This lifecycle test does not initialize the game's native sound table.
+            harmony.Patch(AccessTools.Method(typeof(CombatHitPresentationHandler),
+                nameof(CombatHitPresentationHandler.SelectShieldImpactSound)),
+                prefix: new HarmonyMethod(typeof(SoundRecorder), nameof(SelectShieldSound)));
+        }
+
+        private static bool SelectShieldSound(ref int __result)
+        {
+            __result = 123;
+            return false;
         }
 
         private static bool Capture(Mission __instance, int soundIndex, Vec3 position,
