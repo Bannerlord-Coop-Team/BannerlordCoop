@@ -89,6 +89,7 @@ public class ProtoBufSerializer : ICommonSerializer
         
         using (var payload = new PooledWriteStream(InitialPayloadBytes, bufferPool))
         {
+            // Serializer.Serialize binds to Serialize<object> here: same bytes, but about 2 KB and several microseconds more per call.
             RuntimeTypeModel.Default.Serialize(payload, obj);
             return WrapPayload(typeId, payload);
         }
