@@ -227,7 +227,11 @@ namespace GameInterface.Services.Heroes.Patches
         }
         public static void HeroStateIntercept(Hero instance, Hero.CharacterStates newState)
         {
-            if (CallOriginalPolicy.IsOriginalAllowed())
+            var originalAllowed = CallOriginalPolicy.IsOriginalAllowed();
+            if (ModInformation.IsServer && newState == Hero.CharacterStates.Active)
+                Logger.Warning("Issue3649HeroStateIntercept Hero={HeroId} OriginalAllowed={OriginalAllowed}",
+                    instance.StringId, originalAllowed);
+            if (originalAllowed)
             {
                 instance._heroState = newState;
                 return;
