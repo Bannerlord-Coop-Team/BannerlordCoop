@@ -4,6 +4,7 @@ using Common.Util;
 using Coop.Core.Client.Services.Heroes.Messages;
 using E2E.Tests.Environment;
 using E2E.Tests.Environment.Instance;
+using GameInterface.Policies;
 using GameInterface.Services.Entity;
 using GameInterface.Services.Heroes.Messages;
 using GameInterface.Services.Issues.Generic;
@@ -298,6 +299,10 @@ public class AwaitingAlternativeSolutionTroopsTests : IDisposable
             Assert.True(Server.ObjectManager.TryGetObject<Hero>(fixture.CompanionHeroId, out var companion));
             Assert.Same(companion, companion.CharacterObject.HeroObject);
             Assert.Equal(Hero.CharacterStates.Disabled, companion.HeroState);
+            Assert.False(CallOriginalPolicy.IsOriginalAllowed());
+            Assert.True(Server.Resolve<IAwaitingAlternativeSolutionTroopsRegistry>().TryGet(controllerId, out var pending));
+            var pendingCompanion = Assert.Single(pending.GetTroopRoster().Where(element => element.Character.IsHero));
+            Assert.Same(companion, pendingCompanion.Character.HeroObject);
             serverCompanion = companion;
         });
 
