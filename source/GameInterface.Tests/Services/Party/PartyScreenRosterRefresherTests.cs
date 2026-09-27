@@ -130,6 +130,132 @@ public class PartyScreenRosterRefresherTests
     }
 
     [Fact]
+    public void ServerXpGain_KeepsFullyRemovedStackRemoved()
+    {
+        var character = new CharacterObject();
+        var logic = CreateLogic(character, 1, 0, out var visible, xp: 100);
+        visible.AddToCounts(character, -1);
+        logic.CurrentData.LeftMemberRoster.AddToCounts(character, 1, false, 0, 100);
+        int notificationCount = 0;
+
+        var applied = CreateRefresher().TryApply(logic, visible, character, AddXp(50), () => notificationCount++);
+
+        Assert.True(applied);
+        Assert.Equal(0, notificationCount);
+        Assert.True(logic.IsThereAnyChanges());
+        Assert.Equal(-1, visible.FindIndexOfTroop(character));
+        AssertRoster(logic._initialData.RightMemberRoster, character, 1, 0, 150);
+    }
+
+    [Fact]
+    public void ServerUpdate_KeepsZeroCountTransferredStack()
+    {
+        var character = new CharacterObject();
+        var logic = CreateLogic(character, 1, 0, out var visible, xp: 100);
+        // Vanilla right-side transfers keep the emptied row and its xp until Done.
+        visible.AddToCounts(character, -1, false, 0, 0, removeDepleted: false);
+        logic.CurrentData.LeftMemberRoster.AddToCounts(character, 1, false, 0, 100);
+        int notificationCount = 0;
+
+        var applied = CreateRefresher().TryApply(logic, visible, character, AddXp(50), () => notificationCount++);
+
+        Assert.True(applied);
+        Assert.Equal(0, notificationCount);
+        Assert.True(logic.IsThereAnyChanges());
+        AssertRoster(visible, character, 0, 0, 0);
+        AssertRoster(logic._initialData.RightMemberRoster, character, 1, 0, 150);
+    }
+
+    [Fact]
+    public void ServerXpLoss_StillResetsZeroCountTransferredStack()
+    {
+        var character = new CharacterObject();
+        var logic = CreateLogic(character, 1, 0, out var visible, xp: 100);
+        visible.AddToCounts(character, -1, false, 0, 0, removeDepleted: false);
+        logic.CurrentData.LeftMemberRoster.AddToCounts(character, 1, false, 0, 100);
+        int notificationCount = 0;
+
+        var applied = CreateRefresher().TryApply(logic, visible, character, AddXp(-50), () => notificationCount++);
+
+        Assert.True(applied);
+        Assert.Equal(1, notificationCount);
+        Assert.False(logic.IsThereAnyChanges());
+        AssertRoster(visible, character, 1, 0, 50);
+        Assert.Equal(-1, logic.CurrentData.LeftMemberRoster.FindIndexOfTroop(character));
+    }
+
+    [Fact]
+    public void ServerXpLoss_StillResetsFullyRemovedStack()
+    {
+        var character = new CharacterObject();
+        var logic = CreateLogic(character, 1, 0, out var visible, xp: 100);
+        visible.AddToCounts(character, -1);
+        int notificationCount = 0;
+
+        var applied = CreateRefresher().TryApply(logic, visible, character, AddXp(-50), () => notificationCount++);
+
+        Assert.True(applied);
+        Assert.Equal(1, notificationCount);
+        Assert.False(logic.IsThereAnyChanges());
+        AssertRoster(visible, character, 1, 0, 50);
+    }
+
+    [Fact]
+    public void ServerXpGain_RebasesPartialRemoval()
+    {
+        var character = new CharacterObject();
+        var logic = CreateLogic(character, 2, 0, out var visible, xp: 200);
+        visible.AddToCounts(character, -1, false, 0, -100);
+        int notificationCount = 0;
+
+        var applied = CreateRefresher().TryApply(logic, visible, character, AddXp(50), () => notificationCount++);
+
+        Assert.True(applied);
+        Assert.Equal(0, notificationCount);
+        AssertRoster(visible, character, 1, 0, 150);
+        AssertRoster(logic._initialData.RightMemberRoster, character, 2, 0, 250);
+    }
+
+    [Fact]
+    public void ServerRemoval_StillResetsFullyRemovedStack()
+    {
+        var character = new CharacterObject();
+        var logic = CreateLogic(character, 1, 0, out var visible, xp: 100);
+        visible.AddToCounts(character, -1);
+        logic.CurrentData.LeftMemberRoster.AddToCounts(character, 1, false, 0, 100);
+        int notificationCount = 0;
+
+        var applied = CreateRefresher().TryApply(
+            logic,
+            visible,
+            character,
+            (roster, troop) => roster.AddToCounts(troop, -1),
+            () => notificationCount++);
+
+        Assert.True(applied);
+        Assert.Equal(1, notificationCount);
+        Assert.Equal(-1, logic.CurrentData.LeftMemberRoster.FindIndexOfTroop(character));
+    }
+
+    [Fact]
+    public void ServerXpGain_KeepsFullyRemovedStackInSavedPopupState()
+    {
+        var character = new CharacterObject();
+        var logic = CreateLogic(character, 1, 0, out var visible, xp: 100);
+        visible.AddToCounts(character, -1);
+        logic.SavePartyScreenData();
+        visible.AddToCounts(character, 1, false, 0, 100);
+        int notificationCount = 0;
+
+        var applied = CreateRefresher().TryApply(logic, visible, character, AddXp(50), () => notificationCount++);
+
+        Assert.True(applied);
+        Assert.Equal(0, notificationCount);
+        AssertRoster(visible, character, 1, 0, 150);
+        Assert.Equal(-1, logic._savedData.RightMemberRoster.FindIndexOfTroop(character));
+    }
+
+    [Fact]
     public void FindSelectionReplacement_MatchesCharacterSideAndType()
     {
         var character = new CharacterObject();
@@ -246,7 +372,8 @@ public class PartyScreenRosterRefresherTests
         CharacterObject character,
         int number,
         int wounded,
-        out TroopRoster visible)
+        out TroopRoster visible,
+        int xp = 0)
     {
         var logic = new PartyScreenLogic();
         visible = TroopRoster.CreateDummyTroopRoster();
@@ -254,7 +381,7 @@ public class PartyScreenRosterRefresherTests
         var rightPrisoners = TroopRoster.CreateDummyTroopRoster();
         var leftPrisoners = TroopRoster.CreateDummyTroopRoster();
 
-        visible.AddToCounts(character, number, false, wounded);
+        visible.AddToCounts(character, number, false, wounded, xp);
         logic.MemberRosters[(int)PartyScreenLogic.PartyRosterSide.Right] = visible;
         logic.MemberRosters[(int)PartyScreenLogic.PartyRosterSide.Left] = leftMembers;
         logic.PrisonerRosters[(int)PartyScreenLogic.PartyRosterSide.Right] = rightPrisoners;
@@ -267,9 +394,16 @@ public class PartyScreenRosterRefresherTests
             null,
             null);
         logic._initialData.InitializeCopyFrom(null, null);
-        logic._initialData.RightMemberRoster.AddToCounts(character, number, false, wounded);
+        logic._initialData.RightMemberRoster.AddToCounts(character, number, false, wounded, xp);
         return logic;
     }
+
+    private static Action<TroopRoster, CharacterObject> AddXp(int xp) => (roster, troop) =>
+    {
+        int index = roster.FindIndexOfTroop(troop);
+        roster.SetElementXp(index, roster.GetElementXp(index) + xp);
+        roster.InitializeCachedData();
+    };
 
     private static PartyScreenRosterRefresher CreateRefresher()
         => new PartyScreenRosterRefresher(new PartyScreenRosterBaselineProvider());
@@ -285,12 +419,14 @@ public class PartyScreenRosterRefresherTests
         TroopRoster roster,
         CharacterObject character,
         int number,
-        int wounded)
+        int wounded,
+        int? xp = null)
     {
         int index = roster.FindIndexOfTroop(character);
         Assert.True(index >= 0);
         Assert.Equal(number, roster.GetElementNumber(index));
         Assert.Equal(wounded, roster.GetElementWoundedNumber(index));
+        if (xp.HasValue) Assert.Equal(xp.Value, roster.GetElementXp(index));
     }
 
     private sealed class FixedBaselineProvider : IPartyScreenRosterBaselineProvider
