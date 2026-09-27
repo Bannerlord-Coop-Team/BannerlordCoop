@@ -76,14 +76,14 @@
     "profiles": {
       "type": "array",
       "items": { "$ref": "#/$defs/profile" },
-      "minItems": 6,
-      "maxItems": 6
+      "minItems": 5,
+      "maxItems": 5
     },
     "checks": {
       "type": "array",
       "items": { "$ref": "#/$defs/check" },
-      "minItems": 8,
-      "maxItems": 8
+      "minItems": 7,
+      "maxItems": 7
     },
     "reasons": {
       "type": "array",
