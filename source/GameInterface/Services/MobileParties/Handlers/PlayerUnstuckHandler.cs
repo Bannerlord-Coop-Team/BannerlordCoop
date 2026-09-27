@@ -10,13 +10,13 @@ using GameInterface.Services.MapEvents.Messages.Leave;
 using GameInterface.Services.MobileParties.Messages.Unstuck;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Players;
+using GameInterface.Services.Players.Data;
 using GameInterface.Services.Settlements.Interfaces;
 using GameInterface.Services.SiegeEvents.Interfaces;
 using LiteNetLib;
 using Serilog;
 using System;
 using System.Collections.Generic;
-using System.Linq;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Actions;
 using TaleWorlds.CampaignSystem.Encounters;
@@ -32,8 +32,8 @@ namespace GameInterface.Services.MobileParties.Handlers;
 /// Dedicated recovery flow behind coop.unstuck. The client forwards
 /// <see cref="PlayerUnstuckRequested"/> to the server as <see cref="NetworkRequestPlayerUnstuck"/>;
 /// the server force-applies every applicable exit (captivity, map event, follower army, siege camp,
-/// settlement) with each step guarded independently, so one broken exit flow cannot block the
-/// others; the
+/// settlement) for the requesting connection's registered player, with each step guarded
+/// independently, so one broken exit flow cannot block the others; the
 /// <see cref="NetworkPlayerUnstuckResult"/> reply then lets the requesting client clear the
 /// local-only encounter and menu state the server cannot see. Intentionally separate from the
 /// normal exit request flows — those carry gating state that may be exactly what is stuck.
@@ -95,37 +95,55 @@ internal class PlayerUnstuckHandler : IHandler
     }
 
     /// <summary>
-    /// Server: force-apply every applicable exit for the requesting party and report back.
+    /// Server: force-apply every applicable exit for the requesting connection's registered party
+    /// and report back to that connection.
     /// </summary>
     private void Handle_NetworkRequestPlayerUnstuck(MessagePayload<NetworkRequestPlayerUnstuck> payload)
     {
         if (!ModInformation.IsServer) return;
 
-        var data = payload.What;
-        var requester = payload.Who as NetPeer;
-        GameThread.RunSafe(() =>
+        if (!(payload.Who is NetPeer requester))
         {
-            try
-            {
-                ApplyServerUnstuck(data.PartyId, data.HeroId);
-            }
-            finally
-            {
-                TryRequestBugReport(data.PartyId, requester);
-            }
-        }, context: nameof(PlayerUnstuckHandler));
-    }
-
-    private void TryRequestBugReport(string partyId, NetPeer requester)
-    {
-        if (!BugReportConfig.UnstuckCommandReportsEnabled) return;
-
-        if (requester == null ||
-            !playerManager.TryGetPlayer(requester, out var player) ||
-            player.MobilePartyId != partyId)
-        {
+            Logger.Warning("{Message} arrived without a source peer; cannot resolve the requesting player",
+                nameof(NetworkRequestPlayerUnstuck));
             return;
         }
+
+        var data = payload.What;
+        GameThread.RunSafe(() => UnstuckRequester(requester, data), context: nameof(PlayerUnstuckHandler));
+    }
+
+    private void UnstuckRequester(NetPeer requester, NetworkRequestPlayerUnstuck request)
+    {
+        if (!playerManager.TryGetPlayer(requester, out var player))
+        {
+            // No kick: a peer without a player may still be joining.
+            Logger.Warning("Unstuck request from peer {PeerId} with no registered player", requester.Id);
+            return;
+        }
+
+        // The request ids can be stale local state; only the registration decides what is changed.
+        if (request.PartyId != player.MobilePartyId ||
+            (!string.IsNullOrEmpty(request.HeroId) && request.HeroId != player.HeroId))
+        {
+            Logger.Warning(
+                "Unstuck request names party {RequestedPartyId} and hero {RequestedHeroId} but controller {ControllerId} is registered with party {PartyId} and hero {HeroId}; unsticking the registered player",
+                request.PartyId, request.HeroId, player.ControllerId, player.MobilePartyId, player.HeroId);
+        }
+
+        try
+        {
+            ApplyServerUnstuck(player, requester);
+        }
+        finally
+        {
+            TryRequestBugReport(requester);
+        }
+    }
+
+    private void TryRequestBugReport(NetPeer requester)
+    {
+        if (!BugReportConfig.UnstuckCommandReportsEnabled) return;
 
         try
         {
@@ -137,18 +155,20 @@ internal class PlayerUnstuckHandler : IHandler
         }
     }
 
-    private void ApplyServerUnstuck(string partyId, string heroId)
+    // The DEBUG siege defense fixture patches this method by name and binds its player parameter.
+    private void ApplyServerUnstuck(Player player, NetPeer requester)
     {
+        var partyId = player.MobilePartyId;
         var actions = new List<string>();
 
         if (!objectManager.TryGetObjectWithLogging(partyId, out MobileParty party))
         {
             actions.Add($"Party '{partyId}' was not found on the server; nothing was applied.");
-            network.SendAll(new NetworkPlayerUnstuckResult(partyId, actions.ToArray()));
+            network.Send(requester, new NetworkPlayerUnstuckResult(partyId, actions.ToArray()));
             return;
         }
 
-        var hero = ResolvePlayerHero(partyId, heroId, party);
+        var hero = ResolvePlayerHero(player, party);
 
         // Every step runs with patches live (no AllowedThread) so the applied changes replicate to
         // clients through their normal sync flows, and each step is guarded independently.
@@ -220,23 +240,18 @@ internal class PlayerUnstuckHandler : IHandler
             actions.Add("No server-side stuck state found (captivity, map event, army, siege camp, settlement).");
         }
 
-        network.SendAll(new NetworkPlayerUnstuckResult(partyId, actions.ToArray()));
+        network.Send(requester, new NetworkPlayerUnstuckResult(partyId, actions.ToArray()));
     }
 
     /// <summary>
-    /// The client's hero when it sent one, else the party leader, else the registered player owning
-    /// the party. A captured player's party can have no leader, so the fallbacks matter.
+    /// The registered player's hero, else the party leader. A captured player's party can have no
+    /// leader, so the registration comes first.
     /// </summary>
-    private Hero ResolvePlayerHero(string partyId, string heroId, MobileParty party)
+    private Hero ResolvePlayerHero(Player player, MobileParty party)
     {
-        if (!string.IsNullOrEmpty(heroId) && objectManager.TryGetObject(heroId, out Hero requestedHero)) return requestedHero;
+        if (!string.IsNullOrEmpty(player.HeroId) && objectManager.TryGetObject(player.HeroId, out Hero playerHero)) return playerHero;
 
-        if (party.LeaderHero != null) return party.LeaderHero;
-
-        var player = playerManager.Players.FirstOrDefault(candidate => candidate.MobilePartyId == partyId);
-        if (player != null && objectManager.TryGetObject(player.HeroId, out Hero playerHero)) return playerHero;
-
-        return null;
+        return party.LeaderHero;
     }
 
     /// <summary>
@@ -258,7 +273,7 @@ internal class PlayerUnstuckHandler : IHandler
         var mainParty = MobileParty.MainParty;
         if (mainParty == null) return;
 
-        // The result is broadcast; only the stuck player's client applies local cleanup.
+        // Only the stuck player's client applies local cleanup.
         if (!objectManager.TryGetId(mainParty, out var mainPartyId) || mainPartyId != partyId) return;
 
         var actions = new List<string>(serverActions);
