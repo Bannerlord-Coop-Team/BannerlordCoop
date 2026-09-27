@@ -328,6 +328,10 @@ namespace Coop.LiveTesting
                     {
                         output = JoinDebugCommands.Reconnect(arguments);
                     }
+                    else if (string.Equals(command, "coop.debug.connection.report_build", StringComparison.Ordinal))
+                    {
+                        output = JoinBuildDebugCommands.ReportBuild(arguments);
+                    }
 
                     if (output != null)
                     {

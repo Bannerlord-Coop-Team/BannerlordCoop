@@ -3,6 +3,9 @@ using Common.Logging;
 using Common.Messaging;
 using Common.Network;
 using Coop.Core.Common;
+#if DEBUG
+using Coop.Core.Common.Commands;
+#endif
 using Coop.Core.Server.Connections.Messages;
 using GameInterface.Services.CharacterCreation.Messages;
 using GameInterface.Services.Entity;
@@ -79,7 +82,12 @@ public class ValidateModuleState : ClientStateBase
         controllerIdProvider.SetControllerAsPlatformId();
 #endif
 
+#if DEBUG
+        network.SendAll(new NetworkModuleVersionsValidate(
+            moduleInfoProvider.GetModuleInfos(), JoinBuildDebugCommands.ReportedBuildVersion));
+#else
         network.SendAll(new NetworkModuleVersionsValidate(moduleInfoProvider.GetModuleInfos()));
+#endif
 
         // One-shot deadline covering this state's whole exchange; leaving the state disposes it.
         // The timer thread only marshals — the decision runs on the game thread like every other
