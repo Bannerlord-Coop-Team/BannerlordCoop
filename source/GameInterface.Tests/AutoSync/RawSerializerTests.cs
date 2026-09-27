@@ -79,6 +79,27 @@ public class RawSerializerTests
         Assert.Empty(RawSerializer.Serialize(null));
     }
 
+    [Fact]
+    public void Serialize_AllocatesLessThanGenericObjectCall()
+    {
+        object value = 1234567;
+        LegacySerialize(value);
+        RawSerializer.Serialize(value);
+
+        long legacy = AllocatedBytes(() => LegacySerialize(value));
+        long current = AllocatedBytes(() => RawSerializer.Serialize(value));
+
+        // The generic object call allocates about 2 KB more per call.
+        Assert.True(current * 2 < legacy, $"current {current} B, legacy {legacy} B");
+    }
+
+    private static long AllocatedBytes(Func<byte[]> serialize)
+    {
+        long before = GC.GetAllocatedBytesForCurrentThread();
+        for (int i = 0; i < 100; i++) serialize();
+        return GC.GetAllocatedBytesForCurrentThread() - before;
+    }
+
     // Frozen copy of RawSerializer.Serialize before the non-generic call, kept as the wire reference.
     private static byte[] LegacySerialize(object? obj)
     {
