@@ -38,7 +38,7 @@ public class BattleTroopAssignmentTests : MissionTestEnvironment
     {
         // client0 = "enemy" (attacker side), client1 = "solo" (defender side).
         var (mapEventId, _) = SetupCoopBattle("enemy", "solo");
-        // Map-event ids repeat across tests; discard any reserve buffered by an earlier battle.
+        // Fresh test environments reuse map-event ids held by the static registry.
         CoopTroopSupplierRegistry.ClearBattle(mapEventId);
         var solo = Clients.Last();
         const int assignedTroops = 3;
