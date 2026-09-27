@@ -11,6 +11,7 @@ using GameInterface.Services.Players;
 using GameInterface.Services.Players.Data;
 using GameInterface.Services.Save.Messages;
 using Serilog;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using TaleWorlds.CampaignSystem;
@@ -107,7 +108,18 @@ internal class SaveGameHandler : IHandler
 
         coopSessionProvider.CoopSession = session;
 
-        saveManager.SaveCoopSession(saveName, session);
+        try
+        {
+            saveManager.SaveCoopSession(saveName, session);
+        }
+        catch (Exception ex)
+        {
+            Logger.Error(ex, "Failed to write the co-op session for save {SaveName}", saveName);
+            messageBroker.Publish(this, new CoopSessionWritten(saveName, false));
+            return;
+        }
+
+        messageBroker.Publish(this, new CoopSessionWritten(saveName, true));
     }
 
     private ICoopSession savedSession;

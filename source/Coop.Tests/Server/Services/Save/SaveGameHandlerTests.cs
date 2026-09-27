@@ -14,6 +14,7 @@ using GameInterface.Services.Save.Messages;
 using Moq;
 using System;
 using System.Collections.Generic;
+using System.IO;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Party;
 using Xunit;
@@ -60,6 +61,36 @@ public class SaveGameHandlerTests
                 message => !message.IsSaving)),
             Times.Once);
         network.VerifyNoOtherCalls();
+    }
+
+    [Fact]
+    public void GameSaved_WritesSessionAndReportsWritten()
+    {
+        var messageBroker = new TestMessageBroker();
+        var saveManager = new StubSaveManager(null!);
+        using var handler = CreateSavingHandler(messageBroker, saveManager);
+
+        messageBroker.Publish(new object(), new GameSaved(SaveName));
+
+        Assert.Equal(new[] { SaveName }, saveManager.WrittenSaveNames);
+        var written = Assert.Single(messageBroker.Messages.GetMessages<CoopSessionWritten>());
+        Assert.Equal(SaveName, written.SaveName);
+        Assert.True(written.Success);
+    }
+
+    [Fact]
+    public void GameSaved_SessionWriteThrows_ReportsNotWritten()
+    {
+        var messageBroker = new TestMessageBroker();
+        var saveManager = new StubSaveManager(null!, new IOException("disk full"));
+        using var handler = CreateSavingHandler(messageBroker, saveManager);
+
+        // TestMessageBroker does not catch subscriber exceptions, so a leaked throw fails here.
+        messageBroker.Publish(new object(), new GameSaved(SaveName));
+
+        var written = Assert.Single(messageBroker.Messages.GetMessages<CoopSessionWritten>());
+        Assert.Equal(SaveName, written.SaveName);
+        Assert.False(written.Success);
     }
 
     [Theory]
@@ -246,6 +277,21 @@ public class SaveGameHandlerTests
         return handler;
     }
 
+    private static SaveGameHandler CreateSavingHandler(TestMessageBroker messageBroker, StubSaveManager saveManager)
+    {
+        var playerRegistry = new Mock<IPlayerManager>();
+        playerRegistry.SetupGet(registry => registry.Players).Returns(Array.Empty<Player>());
+
+        return new SaveGameHandler(
+            messageBroker,
+            saveManager,
+            new Mock<ICoopSessionProvider>().Object,
+            playerRegistry.Object,
+            new Mock<IPlayerPartyRestorer>().Object,
+            new Mock<INetwork>().Object,
+            new Mock<IObjectManager>().Object);
+    }
+
     /// <summary>
     /// Serves one loaded session. A hand-written stub rather than a mock because ICoopSaveManager
     /// is internal to Coop.Core, which is not marked visible to Moq's proxy generator.
@@ -253,15 +299,26 @@ public class SaveGameHandlerTests
     private sealed class StubSaveManager : ICoopSaveManager
     {
         private readonly ICoopSession session;
+        private readonly Exception? writeFailure;
 
-        public StubSaveManager(ICoopSession session) => this.session = session;
+        public StubSaveManager(ICoopSession session, Exception? writeFailure = null)
+        {
+            this.session = session;
+            this.writeFailure = writeFailure;
+        }
 
         public string DefaultPath => string.Empty;
         public string FileType => ".json";
+        public List<string> WrittenSaveNames { get; } = new List<string>();
 
         public ICoopSession LoadCoopSession(string saveName) => session;
 
-        public void SaveCoopSession(string saveName, ICoopSession session) { }
+        public void SaveCoopSession(string saveName, ICoopSession session)
+        {
+            if (writeFailure != null) throw writeFailure;
+
+            WrittenSaveNames.Add(saveName);
+        }
     }
 
     private static CoopSession SessionWith(Player[] players)
