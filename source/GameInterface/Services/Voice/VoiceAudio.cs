@@ -4,6 +4,7 @@ using Serilog;
 using System;
 using System.Collections.Generic;
 using System.Threading;
+using System.Threading.Tasks;
 
 namespace GameInterface.Services.Voice;
 
@@ -237,10 +238,14 @@ public sealed class VoiceAudio : IVoiceAudio
         Logger.Warning(ex, "Voice capture failed; playback continues");
     }
 
+    // Retain the retiring capture until native release completes; playback continues while it stops.
     private void Run()
     {
         IVoiceDevice device = null;
-        IDisposable microphone = null;
+        IVoiceCapture microphone = null;
+        Task microphoneStop = null;
+        bool reopenMicrophone = false;
+        bool stopFailureReported = false;
         IVoiceEncoder encoder = null;
         long nextMix = clock.Milliseconds;
         try
@@ -280,16 +285,22 @@ public sealed class VoiceAudio : IVoiceAudio
                 }
                 try
                 {
-                    bool restartCapture = reopen;
                     if (reopen || failed || microphoneFailed)
                     {
-                        try { microphone?.Dispose(); }
-                        catch (Exception ex)
-                        {
-                            restartCapture = false;
-                            CaptureFailed(generation, ex);
-                        }
-                        finally { microphone = null; }
+                        reopenMicrophone = reopen && options.GetActivation() != VoiceActivation.Disabled;
+                        if (microphone != null && microphoneStop == null)
+                            microphoneStop = microphone.StopAsync();
+                    }
+                    if (microphoneStop?.Status == TaskStatus.RanToCompletion)
+                    {
+                        microphone = null;
+                        microphoneStop = null;
+                    }
+                    else if (microphoneStop?.IsFaulted == true && !stopFailureReported)
+                    {
+                        stopFailureReported = true;
+                        reopenMicrophone = false;
+                        CaptureFailed(generation, microphoneStop.Exception.GetBaseException());
                     }
                     if (reset || failed || (reopen && options.GetActivation() == VoiceActivation.Disabled))
                     {
@@ -308,17 +319,25 @@ public sealed class VoiceAudio : IVoiceAudio
                             nextMix = clock.Milliseconds;
                         }
                         encoder = codecs.CreateEncoder();
-                        if (restartCapture)
+                    }
+                    bool openMicrophone;
+                    lock (gate)
+                    {
+                        // Consume newer context/settings requests before opening the replacement.
+                        openMicrophone = reopenMicrophone && microphone == null && !disposed &&
+                            !retry && failure == null && captureFailure == null;
+                        if (openMicrophone) status = "Ready";
+                    }
+                    if (openMicrophone)
+                    {
+                        reopenMicrophone = false;
+                        try
                         {
-                            lock (gate) { if (failure == null && captureFailure == null) status = "Ready"; }
-                            try
-                            {
-                                microphone = microphones.Open(options,
-                                    (data, count) => Captured(generation, data, count),
-                                    ex => CaptureFailed(generation, ex));
-                            }
-                            catch (Exception ex) { CaptureFailed(generation, ex); }
+                            microphone = microphones.Open(options,
+                                (data, count) => Captured(generation, data, count),
+                                ex => CaptureFailed(generation, ex));
                         }
+                        catch (Exception ex) { CaptureFailed(generation, ex); }
                     }
                     if (reset)
                     {
@@ -362,7 +381,13 @@ public sealed class VoiceAudio : IVoiceAudio
         catch (Exception ex) { SetFailure(ex); }
         finally
         {
-            try { microphone?.Dispose(); }
+            // Final shutdown does not wait for a device that may never report recording completion.
+            try
+            {
+                var shutdown = microphoneStop ?? microphone?.StopAsync();
+                shutdown?.ContinueWith(task => Logger.Warning(task.Exception, "Voice microphone shutdown failed"),
+                    CancellationToken.None, TaskContinuationOptions.OnlyOnFaulted, TaskScheduler.Default);
+            }
             catch (Exception ex) { Logger.Warning(ex, "Voice microphone shutdown failed"); }
             try { device?.Dispose(); }
             catch (Exception ex) { Logger.Warning(ex, "Voice device shutdown failed"); }
