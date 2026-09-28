@@ -1,6 +1,7 @@
 ﻿using Common.Logging;
 using Serilog;
 using System;
+using System.ComponentModel;
 using System.Diagnostics;
 
 namespace GameInterface.Services.UI.ServerInfo;
@@ -52,8 +53,10 @@ public sealed class BrowserLinkOpener : IBrowserLinkOpener
         }
         catch (Exception exception)
         {
-            // A missing browser association or a blocked start must not reach the UI click handler.
-            Logger.Error(exception, "Could not open a server info link in the browser");
+            // A missing browser association or a blocked start must not reach the UI click handler. Only the type and
+            // code are logged, because newer runtimes put the file name, here the address, in the message.
+            int code = exception is Win32Exception win32 ? win32.NativeErrorCode : exception.HResult;
+            Logger.Error("Could not open a server info link in the browser ({Error}, code {Code})", exception.GetType().Name, code);
         }
     }
 }

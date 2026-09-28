@@ -72,29 +72,39 @@ public sealed class BrowserLinkOpenerTests : IDisposable
         Assert.Contains(logs, log => log.Contains("Refused to open a server info link"));
     }
 
+    // 1155 is ERROR_NO_ASSOCIATION, what Windows reports when no browser is set up for http.
     [Fact]
-    public void FailedStart_IsLoggedAndNotThrown()
+    public void FailedStart_IsLoggedWithItsTypeAndCodeAndNotThrown()
     {
         string marker = "no browser " + Guid.NewGuid().ToString("N");
-        var opener = new BrowserLinkOpener(new ServerInfoLinkRules(), _ => throw new Win32Exception(marker));
+        var opener = new BrowserLinkOpener(new ServerInfoLinkRules(), _ => throw new Win32Exception(1155, marker));
 
         var thrown = Record.Exception(() => opener.Open("https://example.com/"));
 
         Assert.Null(thrown);
-        Assert.Contains(logs, log => log.Contains("Could not open a server info link") && log.Contains(marker));
+        Assert.Contains(logs, log => log.Contains("Could not open a server info link in the browser") && log.Contains("Win32Exception") && log.Contains("code 1155"));
+        Assert.DoesNotContain(logs, log => log.Contains(marker));
     }
 
+    // On .NET Core and newer the start error names the file, here the address, so the message is never logged.
     [Fact]
     public void LogsNeverCarryTheAddress()
     {
         string marker = Guid.NewGuid().ToString("N");
-        var opener = new BrowserLinkOpener(new ServerInfoLinkRules(), _ => throw new InvalidOperationException("start failed"));
+        var errors = new Queue<Exception>(new Exception[]
+        {
+            new Win32Exception(2, "An error occurred trying to start process 'https://example.com/" + marker + "' with working directory 'C:\\'."),
+            new InvalidOperationException("start failed for https://example.com/" + marker),
+        });
+        var opener = new BrowserLinkOpener(new ServerInfoLinkRules(), _ => throw errors.Dequeue());
 
         opener.Open("javascript:" + marker);
         opener.Open("https://example.com/" + marker);
+        opener.Open("https://example.com/" + marker);
 
         Assert.DoesNotContain(logs, log => log.Contains(marker));
-        Assert.Equal(2, logs.Count(log => log.Contains("server info link")));
+        Assert.Equal(3, logs.Count(log => log.Contains("server info link")));
+        Assert.Contains(logs, log => log.Contains("InvalidOperationException") && log.Contains("code " + new InvalidOperationException().HResult));
     }
 
     public void Dispose()
