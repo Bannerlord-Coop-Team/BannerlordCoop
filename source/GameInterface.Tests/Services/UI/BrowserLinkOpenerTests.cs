@@ -24,16 +24,33 @@ public sealed class BrowserLinkOpenerTests : IDisposable
     }
 
     [Fact]
-    public void ValidAddress_StartsTheShellWithTheNormalizedAddressOnly()
+    public void CheckedAddress_StartsTheShellWithThatAddressOnly()
     {
         var opener = new BrowserLinkOpener(new ServerInfoLinkRules(), started.Add);
 
-        opener.Open("HTTPS://Bücher.Example/Pfad?q=\"x\"");
+        opener.Open("https://xn--bcher-kva.example/Pfad?q=%22x%22");
 
         var info = Assert.Single(started);
         Assert.Equal("https://xn--bcher-kva.example/Pfad?q=%22x%22", info.FileName);
         Assert.Equal(string.Empty, info.Arguments);
         Assert.True(info.UseShellExecute);
+    }
+
+    // The dialog shows the checked form, so text that checks to anything else was never shown and never opens.
+    [Theory]
+    [InlineData("HTTPS://Example.COM/")]
+    [InlineData("https://Bücher.example/pfad")]
+    [InlineData("http://example.com")]
+    [InlineData("https://example.com:443/")]
+    [InlineData("https://example.com/a\"b")]
+    public void AddressThatIsNotInItsCheckedForm_NeverStartsAnything(string address)
+    {
+        var opener = new BrowserLinkOpener(new ServerInfoLinkRules(), started.Add);
+
+        opener.Open(address);
+
+        Assert.Empty(started);
+        Assert.Contains(logs, log => log.Contains("Refused to open a server info link"));
     }
 
     // The client never opens what it would not show, even if a caller passes the raw server text.

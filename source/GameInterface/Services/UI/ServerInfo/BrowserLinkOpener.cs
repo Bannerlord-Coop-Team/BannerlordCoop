@@ -8,7 +8,10 @@ namespace GameInterface.Services.UI.ServerInfo;
 /// <summary>Opens a server info link in the player's browser.</summary>
 public interface IBrowserLinkOpener
 {
-    /// <summary>Checks the address again and opens it; a refused address or a failed start is logged, never thrown.</summary>
+    /// <summary>
+    /// Opens the address only if checking it again gives exactly the same text, so the browser gets what the dialog
+    /// showed; a refused address or a failed start is logged, never thrown.
+    /// </summary>
     void Open(string address);
 }
 
@@ -33,12 +36,13 @@ public sealed class BrowserLinkOpener : IBrowserLinkOpener
         this.start = start;
     }
 
-    // The shell gets only the re-checked http or https address, never the text the server sent.
+    // The shell gets only the re-checked http or https address, never the text the server sent. The dialog shows the
+    // normalized form, so anything that normalizes to other text was never shown and is refused.
     public void Open(string address)
     {
-        if (!linkRules.TryNormalize(address, out string link))
+        if (!linkRules.TryNormalize(address, out string link) || !string.Equals(link, address, StringComparison.Ordinal))
         {
-            Logger.Warning("Refused to open a server info link that is not an absolute http or https address");
+            Logger.Warning("Refused to open a server info link that is not a checked http or https address");
             return;
         }
 

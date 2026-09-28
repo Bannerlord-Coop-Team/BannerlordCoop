@@ -52,7 +52,7 @@ A link is kept only if its address is an absolute `http://` or `https://` addres
 
 The address a player sees is normalized: the scheme and host are lower case, a default port is dropped, the path is escaped, and a host with non-English letters is shown in its `xn--` form, so a name that only looks like another cannot pass for it. Each player's game checks every link again before showing it, and its log names the index of any link it drops, again without the address.
 
-Clicking a link opens a small dialog in the panel that shows the full address. The browser opens only after the player clicks Open; Cancel or Escape closes the dialog and leaves the panel open. Open is dimmed and takes no click for half a second after the dialog appears, so a double click on a link cannot open it.
+Clicking a link opens a small dialog in the panel that shows the full address. The browser opens only after the player clicks Open; Cancel or Escape closes the dialog and leaves the panel open. Open is dimmed and takes no click for half a second after the dialog appears, so a double click on a link cannot open it. Right before the browser starts, the game checks the address once more and opens it only if that gives exactly the address the dialog showed.
 
 ## Showing it again
 
