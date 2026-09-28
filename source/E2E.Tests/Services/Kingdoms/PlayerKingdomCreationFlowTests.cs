@@ -47,9 +47,11 @@ using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Actions;
 using TaleWorlds.CampaignSystem.CampaignBehaviors;
 using TaleWorlds.CampaignSystem.Election;
+using TaleWorlds.CampaignSystem.Encyclopedia;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Party.PartyComponents;
 using TaleWorlds.CampaignSystem.Settlements;
+using TaleWorlds.CampaignSystem.Settlements.Buildings;
 using TaleWorlds.CampaignSystem.Settlements.Locations;
 using TaleWorlds.CampaignSystem.ViewModelCollection.KingdomManagement.Diplomacy;
 using TaleWorlds.CampaignSystem.ViewModelCollection.KingdomManagement.Decisions;
@@ -1849,6 +1851,83 @@ public class PlayerKingdomCreationFlowTests : IDisposable
             Assert.Same(secondDecisionItem, decisionsVm.CurrentDecision);
             Assert.True(secondDecisionItem.IsActive);
         });
+    }
+
+    [Fact]
+    public void KingdomDecisionFinalVote_VotedClaimantFollowUpGivesWayToNextBallot()
+    {
+        var (client1, client2, player1, player2, kingdomId) = SetUpPlayerDeclareWarVotes("TargetKingdomClaimantFollowUp");
+        LeadPlayerPartiesEverywhere(player1, player2);
+        string settlementId = CreateSyncedKingdomTown(player2.ClanId, player2.CultureId);
+        // The claimant merit reads map distances, which the test campaign has no map for.
+        var harmony = new Harmony($"e2e.claimant-follow-up.{Guid.NewGuid():N}");
+        harmony.Patch(
+            AccessTools.Method(typeof(SettlementClaimantDecision), nameof(SettlementClaimantDecision.CalculateMeritOfOutcome)),
+            prefix: new HarmonyMethod(AccessTools.Method(typeof(PlayerKingdomCreationFlowTests), nameof(FixedClaimantMeritPrefix))));
+
+        try
+        {
+            Server.Call(() =>
+            {
+                Assert.True(Server.ObjectManager.TryGetObject<Kingdom>(kingdomId, out var kingdom));
+                Assert.True(Server.ObjectManager.TryGetObject<Clan>(player1.ClanId, out var proposerClan));
+                Assert.True(Server.ObjectManager.TryGetObject<Settlement>(settlementId, out var settlement));
+                kingdom.AddDecision(new SettlementClaimantPreliminaryDecision(proposerClan, settlement));
+            });
+            KingdomDecisionsVM decisionsVm = null;
+
+            // Both clans vote to give the fief to a new clan, so the server adds the claimant decision.
+            client1.Call(() =>
+            {
+                decisionsVm = new KingdomDecisionsVM(() => { });
+                decisionsVm.RefreshWith(Clan.PlayerClan.Kingdom.UnresolvedDecisions.OfType<SettlementClaimantPreliminaryDecision>().Single());
+                SubmitCurrentDecisionVote(decisionsVm, IsFiefOwnerChangeOutcome);
+            });
+            client2.Call(() =>
+            {
+                var client2DecisionsVm = new KingdomDecisionsVM(() => { });
+                client2DecisionsVm.RefreshWith(Clan.PlayerClan.Kingdom.UnresolvedDecisions.OfType<SettlementClaimantPreliminaryDecision>().Single());
+                SubmitCurrentDecisionVote(client2DecisionsVm, IsFiefOwnerChangeOutcome);
+            });
+
+            client1.Call(() =>
+            {
+                MBReadOnlyList<KingdomDecision> decisions = Clan.PlayerClan.Kingdom.UnresolvedDecisions;
+                Assert.Equal(2, decisions.Count);
+                var warDecision = Assert.IsType<DeclareWarDecision>(decisions[0]);
+                var claimantDecision = Assert.IsType<SettlementClaimantDecision>(decisions[1]);
+                var preliminaryDecision = Assert.IsType<SettlementClaimantPreliminaryDecision>(
+                    Assert.Single(decisionsVm._solvedDecisionsSinceInit));
+                Assert.Same(claimantDecision, preliminaryDecision.GetFollowUpDecision());
+
+                // Not voted yet, the follow-up comes before the older ballot like in vanilla.
+                Assert.Single(CaptureInquiries(decisionsVm.OnFrameTick)).AffirmativeAction();
+                AssertOpenBallot(decisionsVm, claimantDecision);
+                SubmitCurrentDecisionVote(decisionsVm, outcome =>
+                    outcome is SettlementClaimantDecision.ClanAsDecisionOutcome clanOutcome && clanOutcome.Clan == Clan.PlayerClan);
+                Assert.Null(decisionsVm.CurrentDecision);
+                Assert.Contains(claimantDecision, Clan.PlayerClan.Kingdom.UnresolvedDecisions);
+
+                // The fiefs tab Resolve still reopens it, and closing that view does not bring it back.
+                decisionsVm.RefreshWith(claimantDecision);
+                AssertClosableWaitingViewCloses(decisionsVm, claimantDecision);
+
+                Assert.Single(CaptureInquiries(decisionsVm.OnFrameTick)).AffirmativeAction();
+                AssertOpenBallot(decisionsVm, warDecision);
+            });
+        }
+        finally
+        {
+            harmony.UnpatchAll(harmony.Id);
+        }
+
+        Assert.Equal(2, client1.NetworkSentMessages.GetMessages<NetworkRequestKingdomDecisionVote>().Count());
+    }
+
+    private static bool FixedClaimantMeritPrefix(ref float __result)
+    {
+        __result = 1f;
+        return false;
     }
 
     [Fact]
@@ -4356,13 +4435,81 @@ public class PlayerKingdomCreationFlowTests : IDisposable
     private static DecisionItemBaseVM SubmitDeclareWarVoteFromPanel(KingdomDecisionsVM decisionsVm, KingdomDecision decision)
     {
         decisionsVm.RefreshWith(decision);
+        return SubmitCurrentDecisionVote(decisionsVm, outcome => IsDeclareWarOutcome(outcome, true));
+    }
+
+    private static DecisionItemBaseVM SubmitCurrentDecisionVote(KingdomDecisionsVM decisionsVm, Func<DecisionOutcome, bool> isChosenOutcome)
+    {
         DecisionItemBaseVM decisionItem = decisionsVm.CurrentDecision;
-        DecisionOptionVM option = decisionItem.DecisionOptionsList.Single(candidate =>
-            IsDeclareWarOutcome(candidate.Option, true));
+        DecisionOptionVM option = decisionItem.DecisionOptionsList.Single(candidate => isChosenOutcome(candidate.Option));
         option.CurrentSupportWeight = Supporter.SupportWeights.FullyPush;
         decisionItem._currentSelectedOption = option;
         decisionItem.ExecuteFinalSelection();
         return decisionItem;
+    }
+
+    private static bool IsFiefOwnerChangeOutcome(DecisionOutcome outcome)
+    {
+        return outcome is SettlementClaimantPreliminaryDecision.SettlementClaimantPreliminaryOutcome preliminaryOutcome &&
+               preliminaryOutcome.ShouldSettlementOwnerChange;
+    }
+
+    // Player heroes count as human players only when they lead their party, which the shared context leaves unset.
+    private void LeadPlayerPartiesEverywhere(params PlayerContext[] players)
+    {
+        foreach (var instance in Clients.Prepend(Server))
+        {
+            instance.Call(() =>
+            {
+                foreach (PlayerContext player in players)
+                {
+                    Assert.True(instance.ObjectManager.TryGetObject<Hero>(player.HeroId, out var hero));
+                    Assert.True(instance.ObjectManager.TryGetObject<MobileParty>(player.PartyId, out var party));
+                    using (new AllowedThread())
+                    {
+                        party._partyComponent = new LordPartyComponent(hero, hero, null);
+                    }
+
+                    Assert.True(hero.IsHumanPlayerCharacter);
+                }
+            });
+        }
+    }
+
+    // A town owned by the clan with what the fief decisions and their panel read.
+    private string CreateSyncedKingdomTown(string ownerClanId, string cultureId)
+    {
+        var townId = TestEnvironment.CreateRegisteredObject<Town>();
+        var settlementId = TestEnvironment.CreateRegisteredObject<Settlement>();
+        foreach (var instance in Clients.Prepend(Server))
+        {
+            instance.Call(() =>
+            {
+                Assert.True(instance.ObjectManager.TryGetObject<Clan>(ownerClanId, out var ownerClan));
+                Assert.True(instance.ObjectManager.TryGetObject<CultureObject>(cultureId, out var culture));
+                Assert.True(instance.ObjectManager.TryGetObject<Town>(townId, out var town));
+                Assert.True(instance.ObjectManager.TryGetObject<Settlement>(settlementId, out var settlement));
+
+                using (new AllowedThread())
+                {
+                    culture.Name ??= new TextObject("Empire");
+                    settlement._name = new TextObject("Danustica");
+                    settlement.Culture = culture;
+                    settlement._boundVillages ??= new MBList<Village>();
+                    settlement._notablesCache ??= new MBList<Hero>();
+                    settlement.SetSettlementComponent(town);
+                    town.Buildings ??= new MBList<Building>();
+                    town._ownerClan = ownerClan;
+                    Campaign.Current.EncyclopediaManager ??= new EncyclopediaManager();
+                    Campaign.Current.EncyclopediaManager.CreateEncyclopediaPages();
+                }
+
+                Assert.Same(ownerClan, settlement.OwnerClan);
+                Assert.Same(ownerClan.Kingdom, settlement.MapFaction);
+            });
+        }
+
+        return settlementId;
     }
 
     private static IReadOnlyList<InquiryData> CaptureInquiries(Action action)

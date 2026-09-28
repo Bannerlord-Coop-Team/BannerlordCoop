@@ -6,6 +6,8 @@ using Serilog;
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Reflection;
+using System.Reflection.Emit;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Election;
 using TaleWorlds.CampaignSystem.GameComponents;
@@ -59,6 +61,33 @@ namespace GameInterface.Services.Kingdoms.Patches
         private static void OnFrameTickPrefix(KingdomDecisionsVM __instance)
         {
             MarkSubmittedDecisionsExamined(__instance);
+        }
+
+        // Vanilla prefers the last solved decision's follow-up without checking the examined list.
+        [HarmonyPatch(nameof(KingdomDecisionsVM.OnFrameTick))]
+        [HarmonyTranspiler]
+        private static IEnumerable<CodeInstruction> OnFrameTickTranspiler(IEnumerable<CodeInstruction> instructions)
+        {
+            MethodInfo getFollowUpDecision = AccessTools.Method(typeof(KingdomDecision), nameof(KingdomDecision.GetFollowUpDecision));
+            foreach (CodeInstruction instruction in instructions)
+            {
+                if (instruction.Calls(getFollowUpDecision))
+                {
+                    instruction.opcode = OpCodes.Call;
+                    instruction.operand = AccessTools.Method(typeof(KingdomDecisionsVMPatches), nameof(GetUnsubmittedFollowUpDecision));
+                }
+
+                yield return instruction;
+            }
+        }
+
+        // A submitted follow-up gives way to the next unvoted decision.
+        private static KingdomDecision GetUnsubmittedFollowUpDecision(KingdomDecision solvedDecision)
+        {
+            KingdomDecision followUpDecision = solvedDecision.GetFollowUpDecision();
+            if (!TryGetVoteManager(out var voteManager)) return followUpDecision;
+
+            return voteManager.IsSubmittedDecision(followUpDecision) ? null : followUpDecision;
         }
 
         [HarmonyPatch(nameof(KingdomDecisionsVM.HandleNextDecision))]
