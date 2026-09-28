@@ -22,6 +22,9 @@ namespace Coop.Core.Client.Services.MobileParties.Handlers;
 /// </summary>
 public class ClientSettlementExitEnterHandler : IHandler
 {
+#if DEBUG
+    private readonly Serilog.ILogger Logger = Common.Logging.LogManager.GetLogger<ClientSettlementExitEnterHandler>();
+#endif
     private readonly IMessageBroker messageBroker;
     private readonly INetwork network;
     private readonly IObjectManager objectManager;
@@ -89,6 +92,13 @@ public class ClientSettlementExitEnterHandler : IHandler
             request,
             pendingLeavePartyId == 0 ? PendingStartState.Sent : PendingStartState.Queued);
 
+#if DEBUG
+        objectManager.TryGetHandle(payload.Settlement.Party?.MapEvent, out var battleHandle);
+        Logger.Debug(
+            "SettlementEncounterRecovery phase={Phase} automatic={Automatic} partyHandle={PartyHandle} settlementHandle={SettlementHandle} party={PartyStringId} settlement={SettlementStringId} battleHandle={BattleHandle}",
+            pendingStart.State == PendingStartState.Sent ? "send" : "queued", payload.IsAutomaticRecovery,
+            partyId, settlementId, payload.Party.StringId, payload.Settlement.StringId, battleHandle);
+#endif
         if (pendingStart.State == PendingStartState.Sent)
             network.SendAll(request);
     }
@@ -120,6 +130,10 @@ public class ClientSettlementExitEnterHandler : IHandler
         if (!IsPendingStart(partyId, settlementId, PendingStartState.Sent))
             return;
 
+#if DEBUG
+        Logger.Debug("SettlementEncounterRecovery phase=approval-received partyHandle={PartyHandle} settlementHandle={SettlementHandle}",
+            partyId, settlementId);
+#endif
         pendingStart.State = PendingStartState.Approved;
         if (pendingLeavePartyId != 0)
             return;
@@ -141,6 +155,12 @@ public class ClientSettlementExitEnterHandler : IHandler
             if (ShouldShowRaidOccupiedMenu(party, settlement))
                 GameMenu.SwitchToMenu("raid_occupied");
         }
+#if DEBUG
+        Logger.Debug(
+            "SettlementEncounterRecovery phase=applied partyHandle={PartyHandle} settlementHandle={SettlementHandle} encounter={HasEncounter} currentSettlement={CurrentSettlement} partyBattle={HasPartyBattle}",
+            partyId, settlementId, TaleWorlds.CampaignSystem.Campaign.Current?.PlayerEncounter != null,
+            party.CurrentSettlement?.StringId, party.Party?.MapEvent != null);
+#endif
     }
 
     private void Handle(MessagePayload<NetworkSettlementEncounterRejected> obj)
@@ -209,6 +229,10 @@ public class ClientSettlementExitEnterHandler : IHandler
         if (start.State == PendingStartState.Queued)
         {
             start.State = PendingStartState.Sent;
+#if DEBUG
+            Logger.Debug("SettlementEncounterRecovery phase=send-deferred partyHandle={PartyHandle} settlementHandle={SettlementHandle}",
+                start.Request.PartyId, start.Request.SettlementId);
+#endif
             network.SendAll(start.Request);
             return;
         }
