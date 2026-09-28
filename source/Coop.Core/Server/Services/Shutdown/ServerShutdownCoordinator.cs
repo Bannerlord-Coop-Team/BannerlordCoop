@@ -197,7 +197,7 @@ public class ServerShutdownCoordinator : IServerShutdownCoordinator
         if (seconds > 0) Broadcast($"The server will restart in {FormatDelay(seconds)}.");
 
         if (ticker == null) ticker = startTicker(Tick);
-        Tick();
+        TickCountdown(now, scheduling: true);
 
         result = $"Server shutdown scheduled in {seconds}s, saving {name}. {DescribeStatus()}";
         return true;
@@ -271,7 +271,7 @@ public class ServerShutdownCoordinator : IServerShutdownCoordinator
         }
     }
 
-    private void TickCountdown(DateTime now)
+    private void TickCountdown(DateTime now, bool scheduling = false)
     {
         TimeSpan remaining = deadline - now;
         if (remaining <= JoinGateLead && admissionGate.IsOpen)
@@ -287,8 +287,9 @@ public class ServerShutdownCoordinator : IServerShutdownCoordinator
             nextNotice++;
         }
 
-        // Nobody to warn, so skip the rest of the countdown.
-        if (remaining <= TimeSpan.Zero || !connections.Any())
+        // Nobody to warn. While joins are open a player who dropped can still come back.
+        bool nobodyToWaitFor = !connections.Any() && (scheduling || remaining <= JoinGateLead);
+        if (remaining <= TimeSpan.Zero || nobodyToWaitFor)
         {
             BeginDrain(now);
             return;

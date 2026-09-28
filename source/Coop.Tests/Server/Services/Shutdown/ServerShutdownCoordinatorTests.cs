@@ -147,16 +147,49 @@ public class ServerShutdownCoordinatorTests : IDisposable
     }
 
     [Fact]
-    public void LastPlayerLeaving_SkipsTheRestOfTheCountdown()
+    public void LastPlayerLeavingWhileJoinsAreOpen_KeepsCountingUntilJoinsClose()
     {
         var connection = AddPlayer();
         Schedule(600);
+
+        connectionList.Remove(connection);
+        TickFor(479);
+        Assert.Equal(ServerShutdownPhase.Countdown, coordinator.Phase);
+        Assert.True(gate.IsOpen);
+
+        // 120 s left: joins close, and with nobody connected nobody can arrive.
+        Advance(1);
+        Assert.Equal(ServerShutdownPhase.Saving, coordinator.Phase);
+        Assert.Equal(new[] { LoadedSave }, queuedSaves);
+    }
+
+    [Fact]
+    public void LastPlayerLeavingAfterJoinsClosed_SkipsTheRestOfTheCountdown()
+    {
+        var connection = AddPlayer();
+        Schedule(100);
+        Assert.False(gate.IsOpen);
 
         connectionList.Remove(connection);
         Advance(1);
 
         Assert.Equal(ServerShutdownPhase.Saving, coordinator.Phase);
         Assert.Equal(new[] { LoadedSave }, queuedSaves);
+    }
+
+    [Fact]
+    public void PlayerReturningBeforeJoinsClose_IsWarnedAndDisconnectedAtTimeUp()
+    {
+        var connection = AddPlayer();
+        Schedule(600);
+        connectionList.Remove(connection);
+        TickFor(30);
+
+        NetPeer returning = AddPlayer().Peer;
+        TickFor(570);
+
+        Assert.Equal(new[] { (returning, Restarting) }, disconnects);
+        Assert.Equal("The server will restart in 10 seconds.", Notices().Last());
     }
 
     [Fact]
