@@ -516,6 +516,15 @@ internal class MapEventPatches
             if (side._battleParties == null)
                 return false;
 
+            // Loaded events can retain a removed leader after their last party has gone.
+            if (side._battleParties.Count == 0)
+            {
+                Logger.Warning("Finalizing map event {MapEventId} because {Side} side has no parties",
+                    mapEvent.StringId, side.MissionSide);
+                mapEvent.FinalizeEvent();
+                return false;
+            }
+
             var leaderParty = side.LeaderParty;
             if (leaderParty != null &&
                 side._battleParties.Any(entry => ReferenceEquals(entry?.Party, leaderParty)))
