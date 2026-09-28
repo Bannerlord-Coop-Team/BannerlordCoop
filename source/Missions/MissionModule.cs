@@ -15,6 +15,9 @@ using Missions.Agents.Patches;
 using Missions.Agents.Voice;
 using Missions.Battles;
 using Missions.Data;
+#if DEBUG
+using Missions.Diagnostics;
+#endif
 using Missions.Locations;
 using Missions.Hideouts;
 using Missions.Missiles.Handlers;
@@ -49,6 +52,8 @@ public class MissionModule : Module
 #if DEBUG
         builder.RegisterType<SiegeInteractionDebugBehavior>().AsSelf()
             .As<ISiegeInteractionDebugBehavior>().InstancePerDependency();
+        builder.RegisterType<AgentHitSoundFixtureHandler>().As<IAgentHitSoundFixtureHandler>()
+            .InstancePerLifetimeScope().AutoActivate();
 #endif
         builder.RegisterType<ReceivePathDiagnostics>().As<IReceivePathDiagnostics>().InstancePerDependency();
         builder.RegisterType<SiegeGateHitApplier>().As<ISiegeGateHitApplier>().InstancePerDependency();
