@@ -454,7 +454,8 @@ public sealed class ServerInfoConfigTests : IDisposable
         Assert.Contains(LogsForThisTest(), log => log.Contains("\"rules\" in") && log.Contains("was cut to"));
     }
 
-    // Every link rule the client applies is applied when the file is loaded, so a bad link never goes out.
+    // Every link rule the client applies is applied when the file is loaded, so a bad link never goes out. The first
+    // eight bad links are named by index and the rest counted in one line.
     [Fact]
     public void BadLinks_AreDroppedWithAWarningNamingTheirIndex()
     {
@@ -471,6 +472,7 @@ public sealed class ServerInfoConfigTests : IDisposable
             "https://exa mple.com/",
             "https://example.com/\u0007",
             "https://example.com/" + new string('a', ServerInfoLimits.MaxLinkUrlLength),
+            "http://localhost:8080/",
             "https://example.com/rules",
         };
         WriteInfoFile(Json(new { links = urls.Select(url => new { label = "Link", url }).ToArray() }));
@@ -478,10 +480,54 @@ public sealed class ServerInfoConfigTests : IDisposable
         var config = Create();
 
         Assert.Equal(new[] { "https://discord.gg/example", "https://example.com/rules" }, config.Links.Select(link => link.Url));
-        for (int index = 1; index <= 10; index++)
+        Assert.Equal(8, ServerInfoConfig.MaxLoggedBadLinks);
+        for (int index = 1; index <= 8; index++)
             Assert.Contains(LogsForThisTest(), log => log.Contains("link at index " + index + " in"));
-        Assert.DoesNotContain(LogsForThisTest(), log => log.Contains("link at index 0 ") || log.Contains("link at index 11 "));
-        Assert.DoesNotContain(LogsForThisTest(), log => log.Contains("javascript") || log.Contains("win.ini"));
+        Assert.DoesNotContain(LogsForThisTest(), log => new[] { 0, 9, 10, 11, 12 }.Any(index => log.Contains("link at index " + index + " ")));
+        Assert.Single(LogsForThisTest(), log => log.Contains("have 3 more link(s) with no usable http or https url"));
+        Assert.DoesNotContain(LogsForThisTest(), log => log.Contains("javascript") || log.Contains("win.ini") || log.Contains("localhost"));
+    }
+
+    // Thousands of broken links still log only the first eight and one count, and a good link after them is kept.
+    [Fact]
+    public void ManyBadLinks_LogAFewLines()
+    {
+        WriteInfoFile("{\"links\":[" + string.Concat(Enumerable.Repeat("{},", 5000)) + "{\"url\":\"https://example.com/\"}]}");
+
+        var config = Create();
+
+        Assert.Equal("https://example.com/", Assert.Single(config.Links).Url);
+        var linkLogs = LogsForThisTest().Where(log => log.Contains("no usable http or https url")).ToArray();
+        Assert.Equal(ServerInfoConfig.MaxLoggedBadLinks + 1, linkLogs.Length);
+        Assert.Contains(linkLogs, log => log.Contains("have 4992 more link(s)"));
+    }
+
+    // A file far larger than any server info is not read at all; one at the cap still is.
+    [Fact]
+    public void FileOverTheSizeCap_IsNotReadAndLogsOneWarning()
+    {
+        WriteInfoFile(PaddedJson(ServerInfoConfig.MaxFileBytes + 1));
+
+        var config = Create();
+
+        AssertEmpty(config);
+        Assert.Contains("is larger than 262144 bytes; running without server info", Assert.Single(LogsForThisTest()));
+
+        lock (logs) logs.Clear();
+        WriteInfoFile(PaddedJson(ServerInfoConfig.MaxFileBytes));
+
+        config = Create();
+
+        Assert.Equal(new[] { "Welcome to EU-1" }, config.Motd);
+        Assert.Contains("motd 1 paragraph(s)", Assert.Single(LogsForThisTest()));
+    }
+
+    // Valid JSON of exactly the given size in bytes, padded by a key the reader ignores.
+    private static string PaddedJson(long bytes)
+    {
+        const string prefix = "{\"motd\":[\"Welcome to EU-1\"],\"pad\":\"";
+        const string suffix = "\"}";
+        return prefix + new string('x', (int)bytes - prefix.Length - suffix.Length) + suffix;
     }
 
     [Theory]

@@ -48,7 +48,7 @@ Text is cut at the limit without splitting a character, and nothing after a cut 
 
 ## Links
 
-A link is kept only if its address is an absolute `http://` or `https://` address whose host is a domain name like `discord.gg`, has no user name or password (`user@host`), no spaces, backslashes, control or invisible characters, and is at most 512 characters long. Anything else, such as `javascript:`, `file:`, `ftp:`, a relative address like `/rules`, an IP address like `http://192.168.1.1/`, a single name like `http://localhost/` or `http://router/`, a name under `.localhost`, a host ending in a dot or port 0, is dropped with a warning naming its index in the `links` array (the first entry is index 0) and never reaches a player. The server log does not show the address.
+A link is kept only if its address is an absolute `http://` or `https://` address whose host is a domain name like `discord.gg`, has no user name or password (`user@host`), no spaces, backslashes, control or invisible characters, and is at most 512 characters long. Anything else, such as `javascript:`, `file:`, `ftp:`, a relative address like `/rules`, an IP address like `http://192.168.1.1/`, a single name like `http://localhost/` or `http://router/`, a name under `.localhost`, a host ending in a dot or port 0, is dropped with a warning naming its index in the `links` array (the first entry is index 0) and never reaches a player. After eight such warnings, one more line gives how many other links were dropped. The server log does not show the address.
 
 The address a player sees is normalized: the scheme and host are lower case, a default port is dropped, the path is escaped, and a host with non-English letters is shown in its `xn--` form, so a name that only looks like another cannot pass for it. Each player's game checks every link again before showing it, and its log names the index of any link it drops, again without the address.
 
@@ -70,4 +70,4 @@ The server reads one file, the first that applies:
 
 To move only this file, set `COOP_SERVER_INFO_FILE`, because `COOP_DATA_DIR` also moves `mod-config.json`.
 
-The file is read once when the server starts, so restart the server after editing it. Without the file nothing is shown and nothing is logged. If the file holds malformed JSON, the server logs an error and runs without server info. The server log shows how many paragraphs, rules, links and news entries it loaded, not their text.
+The file is read once when the server starts, so restart the server after editing it. Without the file nothing is shown and nothing is logged. If the file holds malformed JSON, the server logs an error and runs without server info. A file larger than 256 KB is not read: the server logs a warning and runs without server info. Everything the limits keep fits in a small part of that. The server log shows how many paragraphs, rules, links and news entries it loaded, not their text.

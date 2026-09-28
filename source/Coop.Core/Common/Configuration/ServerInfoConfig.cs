@@ -34,6 +34,11 @@ internal sealed class ServerInfoConfig : IServerInfoConfig
     private const string FileName = "server-info.json";
     private const string FileEnvironmentVariable = "COOP_SERVER_INFO_FILE";
 
+    // Far more than the 12000 characters the caps keep, even with every character escaped, so only a wrong file is refused.
+    internal const long MaxFileBytes = 256 * 1024;
+    // Later bad links are only counted, so a file full of broken links logs a few lines.
+    internal const int MaxLoggedBadLinks = ServerInfoLimits.MaxLinks;
+
     private static readonly ILogger Logger = LogManager.GetLogger<ServerInfoConfig>();
 
     private readonly IServerInfoLinkRules linkRules;
@@ -72,7 +77,7 @@ internal sealed class ServerInfoConfig : IServerInfoConfig
             string json;
             try
             {
-                json = File.ReadAllText(path);
+                json = ReadFile(path);
             }
             catch (FileNotFoundException)
             {
@@ -80,6 +85,12 @@ internal sealed class ServerInfoConfig : IServerInfoConfig
             }
             catch (DirectoryNotFoundException)
             {
+                return;
+            }
+
+            if (json == null)
+            {
+                Logger.Warning("Server info in {Path} is larger than {MaxBytes} bytes; running without server info", path, MaxFileBytes);
                 return;
             }
 
@@ -109,6 +120,16 @@ internal sealed class ServerInfoConfig : IServerInfoConfig
             Links = Array.Empty<ServerInfoLink>();
             News = Array.Empty<ServerInfoNews>();
         }
+    }
+
+    // Gives null for a file over MaxFileBytes without reading it, so a huge file cannot fill the server's memory.
+    private static string ReadFile(string path)
+    {
+        using var stream = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.Read);
+        if (stream.Length > MaxFileBytes) return null;
+
+        using var reader = new StreamReader(stream);
+        return reader.ReadToEnd();
     }
 
     private void Read(JsonElement root, string path)
@@ -193,15 +214,21 @@ internal sealed class ServerInfoConfig : IServerInfoConfig
         var links = new List<ServerInfoLink>();
         bool trimmed = false;
         int index = -1;
+        int dropped = 0;
         foreach (JsonElement entry in array.EnumerateArray())
         {
             index++;
             if (!TryReadLink(entry, ref trimmed, out ServerInfoLink link))
             {
-                Logger.Warning(
-                    "Server info link at index {Index} in {Path} has no usable http or https url; skipping it",
-                    index,
-                    path);
+                dropped++;
+                if (dropped <= MaxLoggedBadLinks)
+                {
+                    Logger.Warning(
+                        "Server info link at index {Index} in {Path} has no usable http or https url; skipping it",
+                        index,
+                        path);
+                }
+
                 continue;
             }
 
@@ -212,6 +239,14 @@ internal sealed class ServerInfoConfig : IServerInfoConfig
             }
 
             links.Add(link);
+        }
+
+        if (dropped > MaxLoggedBadLinks)
+        {
+            Logger.Warning(
+                "Server info links in {Path} have {Count} more link(s) with no usable http or https url; skipping them",
+                path,
+                dropped - MaxLoggedBadLinks);
         }
 
         if (trimmed)
