@@ -1,5 +1,4 @@
-﻿using VerificationHarness.DedicatedServerSynthetic;
-using VerificationHarness.Planning;
+﻿using VerificationHarness.Planning;
 using VerificationHarness.Transport;
 
 namespace VerificationHarness;
@@ -50,22 +49,6 @@ public static class Program
             if (string.Equals(args[0], "transport-node", StringComparison.Ordinal))
             {
                 return await TransportNodeCommand.RunAsync(
-                    args.Skip(1).ToArray(),
-                    Console.Out,
-                    CancellationToken.None);
-            }
-
-            if (string.Equals(args[0], "dedicated-server-synthetic", StringComparison.Ordinal))
-            {
-                return await new DedicatedServerSyntheticController().RunAsync(
-                    args.Skip(1).ToArray(),
-                    Console.Out,
-                    CancellationToken.None);
-            }
-
-            if (string.Equals(args[0], "dedicated-server-synthetic-node", StringComparison.Ordinal))
-            {
-                return await DedicatedServerSyntheticNodeCommand.RunAsync(
                     args.Skip(1).ToArray(),
                     Console.Out,
                     CancellationToken.None);
@@ -226,12 +209,5 @@ public static class Program
         Console.Error.WriteLine("  VerificationHarness process-peer-manifest --head <40-hex> --tree <40-hex> --output <json-path>");
         Console.Error.WriteLine("  VerificationHarness process-peer --head <40-hex> --tree <40-hex> --artifact-manifest <json-path> [--scenario converge|diverge|reconnect|malformed|out-of-sequence|corrupt-acknowledgement|timeout] [--timeout-ms <milliseconds>] [--seed <non-negative-decimal|0x16-hex>] [--output <json-path>]");
         Console.Error.WriteLine("  VerificationHarness process-peer-suite --head <40-hex> --tree <40-hex> --artifact-manifest <json-path> [--timeout-ms <milliseconds>] [--seed <non-negative-decimal|0x16-hex>] [--output <json-path>]");
-        Console.Error.WriteLine("  VerificationHarness dedicated-server-synthetic --head <40-hex> --tree <40-hex> --server-head <40-hex> --server-tree <40-hex> --server-pid <pid> --run-token <token> --request-id <id> --join-port <port> --password-env <name> --artifact-manifest <json-path> --artifact-manifest-sha256 <sha256> --artifact-root <staged-runtime-path> [--timeout-ms <milliseconds>] [--seed <non-negative-decimal|0x16-hex>] [--output <json-path>]");
-        Console.Error.WriteLine("  VerificationHarness dedicated-server-synthetic-node --role server --scenario baseline --port <port> --timeout-ms <milliseconds> --run-token <token> --request-id <id> --password-env <name> --module-contract <base64-json-contract> --expected-clients 2");
-        Console.Error.WriteLine("  VerificationHarness dedicated-server-synthetic-node --role server --scenario module-mismatch --port <port> --timeout-ms <milliseconds> --run-token <token> --request-id <id> --password-env <name> --module-contract <base64-json-contract> --expected-clients 1");
-        Console.Error.WriteLine("  VerificationHarness dedicated-server-synthetic-node --role server --scenario wrong-password --port <port> --timeout-ms <milliseconds> --run-token <token> --request-id <id> --password-env <name> --expected-clients 1");
-        Console.Error.WriteLine("  VerificationHarness dedicated-server-synthetic-node --role client --scenario baseline --port <port> --timeout-ms <milliseconds> --run-token <token> --request-id <id> --password-env <name> --controller-id <ds-synthetic-client-a|ds-synthetic-client-b> --module-contract <base64-json-contract>");
-        Console.Error.WriteLine("  VerificationHarness dedicated-server-synthetic-node --role client --scenario module-mismatch --port <port> --timeout-ms <milliseconds> --run-token <token> --request-id <id> --password-env <name> --controller-id <ds-synthetic-client-a|ds-synthetic-client-b> --module-contract <base64-json-contract>");
-        Console.Error.WriteLine("  VerificationHarness dedicated-server-synthetic-node --role client --scenario wrong-password --port <port> --timeout-ms <milliseconds> --run-token <token> --request-id <id> --password-env <name> --controller-id <ds-synthetic-client-a|ds-synthetic-client-b>");
     }
 }

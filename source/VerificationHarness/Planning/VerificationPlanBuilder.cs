@@ -55,28 +55,6 @@ public sealed class VerificationPlanBuilder : IVerificationPlanBuilder
             },
             "Synthetic transport lab over real loopback UDP with one LiteNetLib server process, two isolated client processes, and Common serialization; this does not claim Bannerlord handlers, campaign state, native code, rendering, or save loading."),
         new(
-            VerificationTier.DedicatedServerSynthetic,
-            "issue-to-pr-orchestrator",
-            "dedicated-server-synthetic",
-            new[]
-            {
-                "--head", "{source.head}",
-                "--tree", "{source.syntheticTree}",
-                "--seed", "{seed}",
-                "--server-head", "{dedicatedServer.head}",
-                "--server-tree", "{dedicatedServer.tree}",
-                "--server-pid", "{dedicatedServer.pid}",
-                "--run-token", "{run.token}",
-                "--request-id", "{request.id}",
-                "--join-port", "{dedicatedServer.joinPort}",
-                "--password-env", "{dedicatedServer.passwordEnvironmentVariable}",
-                "--artifact-manifest", "{dedicatedServer.artifactManifest}",
-                "--artifact-manifest-sha256", "{dedicatedServer.artifactManifestSha256}",
-                "--artifact-root", "{dedicatedServer.artifactRoot}",
-                "--output", "{evidence.output}"
-            },
-            "Standalone dedicated server with synthetic clients."),
-        new(
             VerificationTier.RenderedSmoke,
             "issue-to-pr-orchestrator",
             "rendered-smoke",
@@ -113,7 +91,6 @@ public sealed class VerificationPlanBuilder : IVerificationPlanBuilder
         new("poller-game-thread", VerificationTier.DeterministicPeer, new VerificationTopology(1, 2, 1, false)),
         new("deterministic-peer", VerificationTier.DeterministicPeer, new VerificationTopology(1, 2, 1, false)),
         new("process-peer", VerificationTier.ProcessPeer, new VerificationTopology(1, 2, 3, true)),
-        new("dedicated-server-synthetic", VerificationTier.DedicatedServerSynthetic, new VerificationTopology(1, 2, 2, false)),
         new("rendered-smoke", VerificationTier.RenderedSmoke, new VerificationTopology(1, 2, 3, true)),
         new("full-live", VerificationTier.FullLive, new VerificationTopology(1, 2, 3, true))
     };
@@ -172,8 +149,8 @@ public sealed class VerificationPlanBuilder : IVerificationPlanBuilder
             IsProductionBuildContractPath),
         new(
             "dedicated-server",
-            VerificationTier.DedicatedServerSynthetic,
-            "Dedicated-server, join, and session changes require synthetic clients.",
+            VerificationTier.FullLive,
+            "Dedicated-server, join, and session changes require the existing live runner to exercise the affected behavior.",
             IsDedicatedServerPath),
         new(
             "network-process-boundary",
@@ -545,9 +522,6 @@ public sealed class VerificationPlanBuilder : IVerificationPlanBuilder
     private static bool IsDedicatedServerPath(string path) =>
         StartsWith(path, "source/ServerConsole/") ||
         StartsWith(path, "source/IntroServer/") ||
-        StartsWith(path, "source/VerificationHarness/DedicatedServerSynthetic/") ||
-        StartsWith(path, "source/VerificationHarness.Tests/DedicatedServerSynthetic/") ||
-        path.Equals("source/VerificationHarness/Program.cs", StringComparison.OrdinalIgnoreCase) ||
         path.Equals(
             "source/Coop.Core/Client/States/ValidateModuleState.cs",
             StringComparison.OrdinalIgnoreCase) ||
@@ -573,6 +547,7 @@ public sealed class VerificationPlanBuilder : IVerificationPlanBuilder
          Path.GetFileNameWithoutExtension(path).Contains("Save", StringComparison.OrdinalIgnoreCase));
 
     private static bool IsProcessBoundaryPath(string path) =>
+        path.Equals("source/VerificationHarness/Program.cs", StringComparison.OrdinalIgnoreCase) ||
         StartsWith(path, "source/VerificationHarness/Transport/") ||
         StartsWith(path, "source/VerificationHarness.Tests/Transport/");
 
@@ -610,7 +585,6 @@ public sealed class VerificationPlanBuilder : IVerificationPlanBuilder
         VerificationTier.Unit => "unit",
         VerificationTier.DeterministicPeer => "deterministic-peer",
         VerificationTier.ProcessPeer => "process-peer",
-        VerificationTier.DedicatedServerSynthetic => "dedicated-server-synthetic",
         VerificationTier.RenderedSmoke => "rendered-smoke",
         VerificationTier.FullLive => "full-live",
         _ => throw new ArgumentOutOfRangeException(nameof(tier), tier, null)
@@ -621,9 +595,8 @@ public sealed class VerificationPlanBuilder : IVerificationPlanBuilder
         Unit = 0,
         DeterministicPeer = 1,
         ProcessPeer = 2,
-        DedicatedServerSynthetic = 3,
-        RenderedSmoke = 4,
-        FullLive = 5
+        RenderedSmoke = 3,
+        FullLive = 4
     }
 
     private sealed class ProfileDefinition
