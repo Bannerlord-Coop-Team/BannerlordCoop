@@ -1,10 +1,16 @@
-﻿using Common.Tests.Utils;
+﻿using Common;
+using Common.Tests.Utils;
 using Coop.Core.Client.Messages;
 using Coop.Core.Client.Services.Connection.Handlers;
 using Coop.Core.Common;
+using Coop.Core.Common.Services.Connection.Messages;
+using GameInterface.Services.GameDebug.Messages;
 using GameInterface.Services.GameState.Interfaces;
+using GameInterface.Services.UI.Interfaces;
 using LiteNetLib;
 using Moq;
+using System;
+using System.Threading;
 using Xunit;
 
 namespace Coop.Tests.Client.Services.Connection.Handlers;
@@ -38,6 +44,55 @@ public class DisconnectHandlerTests
         RunDisconnect(DisconnectReason.RemoteConnectionClose, expected, serverReason);
     }
 
+    [Fact]
+    public void LeavingTheCampaignEndsTheSession_ShowsTheServerReasonInstead()
+    {
+        using var messageBroker = new TestMessageBroker();
+        var finalizer = new CoopFinalizer(messageBroker, Mock.Of<ILoadingInterface>());
+        var gameState = new Mock<IGameStateInterface>();
+        // On the map EndGame enters the main menu before it returns, so the state's MainMenuEntered
+        // handler finalizes coop and that teardown wakes the blocking EndGame marshal.
+        gameState.Setup(value => value.GoToMainMenu())
+            .Callback(() => finalizer.Finalize("Client has been stopped"))
+            .Throws(new OperationCanceledException("The game-thread session ended before the blocking Run action completed."));
+        using var handler = new DisconnectHandler(messageBroker, finalizer, gameState.Object);
+
+        messageBroker.Publish(handler, ServerDisconnect("ServerRestarting"));
+
+        Assert.Equal(RestartingMessage, Assert.Single(messageBroker.GetMessagesFromType<SendPopupMessage>()).Text);
+        Assert.Single(messageBroker.GetMessagesFromType<EndCoopMode>());
+    }
+
+    [Fact]
+    public void SessionEndsAsTheMainMenuIsReached_ShowsTheServerReasonOnce()
+    {
+        using var messageBroker = new TestMessageBroker();
+        var finalizer = new CoopFinalizer(messageBroker, Mock.Of<ILoadingInterface>());
+        using var session = new CancellationTokenSource();
+        var gameState = new Mock<IGameStateInterface>();
+        // The EndGame marshal can still report completion after the teardown cancelled the session.
+        gameState.Setup(value => value.GoToMainMenu()).Callback(() =>
+        {
+            finalizer.Finalize("Client has been stopped");
+            session.Cancel();
+        });
+        using var handler = new DisconnectHandler(messageBroker, finalizer, gameState.Object);
+
+        // The network poller publishes the disconnect inside its session.
+        using (GameThread.ActivateCancellation(session.Token))
+        {
+            messageBroker.Publish(handler, ServerDisconnect("ServerRestarting"));
+        }
+
+        Assert.Equal(RestartingMessage, Assert.Single(messageBroker.GetMessagesFromType<SendPopupMessage>()).Text);
+        Assert.Single(messageBroker.GetMessagesFromType<EndCoopMode>());
+    }
+
+    private const string RestartingMessage = "The server is restarting. Try again in a few minutes.";
+
+    private static NetworkDisconnected ServerDisconnect(string serverReason) =>
+        new NetworkDisconnected(new DisconnectInfo { Reason = DisconnectReason.RemoteConnectionClose }, serverReason);
+
     private static void RunDisconnect(DisconnectReason reason, string expectedMessage, string? serverReason = null)
     {
         var messageBroker = new TestMessageBroker();
@@ -48,6 +103,7 @@ public class DisconnectHandlerTests
         // cancels the network session, which would drop GoToMainMenu's still-queued blocking
         // EndGame marshal and strand the player in a campaign with no coop container.
         var sequence = new MockSequence();
+        finalizer.InSequence(sequence).Setup(value => value.SetCloseText(expectedMessage));
         gameState.InSequence(sequence).Setup(value => value.GoToMainMenu());
         finalizer.InSequence(sequence).Setup(value => value.Finalize(expectedMessage));
         using var handler = new DisconnectHandler(
@@ -59,6 +115,7 @@ public class DisconnectHandlerTests
             handler,
             new NetworkDisconnected(new DisconnectInfo { Reason = reason }, serverReason));
 
+        finalizer.Verify(value => value.SetCloseText(expectedMessage), Times.Once);
         gameState.Verify(value => value.GoToMainMenu(), Times.Once);
         finalizer.Verify(value => value.Finalize(expectedMessage), Times.Once);
     }

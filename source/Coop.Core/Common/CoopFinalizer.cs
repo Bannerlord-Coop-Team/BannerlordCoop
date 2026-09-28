@@ -12,6 +12,11 @@ namespace Coop.Core.Common;
 public interface ICoopFinalizer
 {
     void Finalize(string closeText);
+
+    /// <summary>
+    /// Makes every later <see cref="Finalize"/> in this session show <paramref name="closeText"/> instead of its own text.
+    /// </summary>
+    void SetCloseText(string closeText);
 }
 
 /// <inheritdoc cref="ICoopFinalizer"/>
@@ -19,11 +24,18 @@ public class CoopFinalizer : ICoopFinalizer
 {
     private readonly IMessageBroker messageBroker;
     private readonly ILoadingInterface loadingInterface;
+    // Set on the network thread and read by a finalize on the game thread.
+    private volatile string closeTextOverride;
 
     public CoopFinalizer(IMessageBroker messageBroker, ILoadingInterface loadingInterface)
     {
         this.messageBroker = messageBroker;
         this.loadingInterface = loadingInterface;
+    }
+
+    public void SetCloseText(string closeText)
+    {
+        closeTextOverride = closeText;
     }
 
     /// <summary>
@@ -32,6 +44,8 @@ public class CoopFinalizer : ICoopFinalizer
     /// <param name="closeText">Text for ending notification pop-up message</param>
     public void Finalize(string closeText = null)
     {
+        closeText = closeTextOverride ?? closeText;
+
         // A join/load flow may have force-shown the global loading window (ILoadingInterface keeps
         // it up across state transitions via the static LoadingWindowPatches.ForceLoadingWindow
         // flag, which even blocks native disables and survives the container teardown below).

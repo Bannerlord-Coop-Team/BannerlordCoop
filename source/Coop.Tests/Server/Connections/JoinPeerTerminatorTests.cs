@@ -67,6 +67,7 @@ public class JoinPeerTerminatorTests
         var gameState = new Mock<IGameStateInterface>(MockBehavior.Strict);
         var finalizer = new Mock<ICoopFinalizer>(MockBehavior.Strict);
         var sequence = new MockSequence();
+        finalizer.InSequence(sequence).Setup(value => value.SetCloseText(expectedMessage));
         gameState.InSequence(sequence).Setup(value => value.GoToMainMenu());
         finalizer.InSequence(sequence).Setup(value => value.Finalize(expectedMessage));
         using var handler = new DisconnectHandler(broker, finalizer.Object, gameState.Object);
