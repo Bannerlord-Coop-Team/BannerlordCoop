@@ -5,6 +5,7 @@ using Common.Util;
 using Coop.Core.Client.Services.MobileParties.Messages;
 using Coop.Core.Server.Services.MobileParties.Messages;
 using GameInterface.Services.MapEvents;
+using GameInterface.Services.MapEvents.Messages.Leave;
 using GameInterface.Services.MobileParties.Messages.Behavior;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Settlements.Interfaces;
@@ -48,6 +49,7 @@ public class ClientSettlementExitEnterHandler : IHandler
 
         messageBroker.Subscribe<NetworkPartyEnterSettlement>(Handle);
         messageBroker.Subscribe<NetworkPartyLeaveSettlement>(Handle);
+        messageBroker.Subscribe<NetworkPartyLeftBattle>(Handle);
     }
 
     public void Dispose()
@@ -60,6 +62,7 @@ public class ClientSettlementExitEnterHandler : IHandler
 
         messageBroker.Unsubscribe<NetworkPartyEnterSettlement>(Handle);
         messageBroker.Unsubscribe<NetworkPartyLeaveSettlement>(Handle);
+        messageBroker.Unsubscribe<NetworkPartyLeftBattle>(Handle);
     }
 
     private void Handle(MessagePayload<StartSettlementEncounterAttempted> obj)
@@ -157,6 +160,16 @@ public class ClientSettlementExitEnterHandler : IHandler
         pendingStart.State == state &&
         pendingStart.Request.PartyId == partyId &&
         pendingStart.Request.SettlementId == settlementId;
+
+    private void Handle(MessagePayload<NetworkPartyLeftBattle> obj)
+    {
+        var partyId = obj.What.PartyId;
+        GameThread.RunSafe(() =>
+        {
+            if (objectManager.TryGetObjectWithLogging<PartyBase>(partyId, out var party) && party == PartyBase.MainParty)
+                lastAutomaticRecovery = default;
+        });
+    }
 
     private static bool ShouldShowRaidOccupiedMenu(MobileParty party, Settlement settlement)
     {

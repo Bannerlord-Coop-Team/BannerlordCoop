@@ -10,6 +10,7 @@ using E2E.Tests.Environment.Instance;
 using E2E.Tests.Services.MapEvents;
 using E2E.Tests.Util;
 using GameInterface.Services.GameDebug.Messages;
+using GameInterface.Services.MapEvents.Messages.Leave;
 using GameInterface.Services.MobileParties.Messages.Behavior;
 using GameInterface.Services.SiegeEvents.Interfaces;
 using GameInterface.Services.Villages.Interfaces;
@@ -440,10 +441,11 @@ public class SiegeEntryValidationFlowTests : MapEventTestBase
     }
 
     [Theory]
-    [InlineData(false, false)]
-    [InlineData(true, false)]
-    [InlineData(false, true)]
-    public void RejectedGenericBattleRecovery_RetriesOnlyForExplicitEntryOrDifferentBattle(bool explicitEntry, bool differentBattle)
+    [InlineData(false, false, false)]
+    [InlineData(true, false, false)]
+    [InlineData(false, true, false)]
+    [InlineData(false, false, true)]
+    public void RejectedGenericBattleRecovery_RetriesAfterExplicitEntryOrBattleChange(bool explicitEntry, bool differentBattle, bool leaveBattle)
     {
         var client = Clients.First();
         var context = CreateEntryContext(client);
@@ -473,13 +475,20 @@ public class SiegeEntryValidationFlowTests : MapEventTestBase
             Assert.True(client.ObjectManager.TryGetObject<MapEvent>(nextBattle.MapEventId, out var mapEvent));
             using (new AllowedThread()) settlement.Party._mapEventSide = mapEvent.DefenderSide;
 
+            if (leaveBattle)
+            {
+                using (new AllowedThread()) MobileParty.MainParty.Party.MapEventSide = mapEvent.DefenderSide;
+                Assert.True(client.ObjectManager.TryGetId(MobileParty.MainParty.Party, out var partyBaseId));
+                client.SimulateMessage(Server.NetPeer, new NetworkPartyLeftBattle(partyBaseId, finishLocalMenus: false));
+                Assert.Null(MobileParty.MainParty.MapEvent);
+            }
             if (explicitEntry)
                 client.SimulateMessage(this, new StartSettlementEncounterAttempted(MobileParty.MainParty, settlement));
             Assert.Null(new DefaultEncounterGameMenuModel().GetGenericStateMenu());
             Assert.Null(PlayerEncounter.Current);
         }, WithoutNetworkDelivery());
 
-        Assert.Equal(explicitEntry || differentBattle ? 2 : 1,
+        Assert.Equal(explicitEntry || differentBattle || leaveBattle ? 2 : 1,
             client.NetworkSentMessages.GetMessages<NetworkRequestStartSettlementEncounter>().Count());
     }
 
