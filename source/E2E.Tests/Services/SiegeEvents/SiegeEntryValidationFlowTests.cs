@@ -16,6 +16,9 @@ using HarmonyLib;
 using System.Reflection;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Actions;
+using TaleWorlds.CampaignSystem.Encounters;
+using TaleWorlds.CampaignSystem.GameComponents;
+using TaleWorlds.CampaignSystem.MapEvents;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Settlements;
 using TaleWorlds.CampaignSystem.Siege;
@@ -373,6 +376,66 @@ public class SiegeEntryValidationFlowTests : MapEventTestBase
             client,
             "Unable to join the siege: your party belongs to the defending faction.");
         AssertNotJoined(context);
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void GenericBattleJoinMenu_RequestsMissingEncounterOnceAndPreservesExistingEncounter(bool hasEncounter)
+    {
+        var client = Clients.First();
+        var context = CreateEntryContext(client);
+        var battle = CreateServerMapEvent();
+        client.NetworkSentMessages.Clear();
+
+        client.Call(() =>
+        {
+            Assert.True(client.ObjectManager.TryGetObject<Settlement>(context.SettlementId, out var settlement));
+            Assert.True(client.ObjectManager.TryGetObject<MapEvent>(battle.MapEventId, out var mapEvent));
+            using (new AllowedThread())
+            {
+                MobileParty.MainParty.CurrentSettlement = settlement;
+                settlement.Party._mapEventSide = mapEvent.DefenderSide;
+            }
+            var encounter = hasEncounter ? ObjectHelper.SkipConstructor<PlayerEncounter>() : null;
+            Campaign.Current.PlayerEncounter = encounter;
+            var model = new DefaultEncounterGameMenuModel();
+
+            Assert.Equal(hasEncounter ? "join_encounter" : null, model.GetGenericStateMenu());
+            Assert.Equal(hasEncounter ? "join_encounter" : null, model.GetGenericStateMenu());
+            Assert.Same(encounter, PlayerEncounter.Current);
+            Assert.Same(settlement, MobileParty.MainParty.CurrentSettlement);
+            Assert.Null(MobileParty.MainParty.MapEvent);
+        }, WithoutNetworkDelivery());
+
+        var requests = client.NetworkSentMessages.GetMessages<NetworkRequestStartSettlementEncounter>();
+        if (hasEncounter)
+        {
+            Assert.Empty(requests);
+        }
+        else
+        {
+            var request = Assert.Single(requests);
+            Assert.Equal(client.GetHandle<MobileParty>(context.PartyId), request.PartyId);
+            Assert.Equal(client.GetHandle<Settlement>(context.SettlementId), request.SettlementId);
+        }
+    }
+
+    [Fact]
+    public void GenericTownMenu_WithoutBattle_DoesNotRequestEncounterRecovery()
+    {
+        var client = Clients.First();
+        var context = CreateEntryContext(client);
+        client.Call(() =>
+        {
+            Assert.True(client.ObjectManager.TryGetObject<Settlement>(context.SettlementId, out var settlement));
+            using (new AllowedThread()) MobileParty.MainParty.CurrentSettlement = settlement;
+            Campaign.Current.PlayerEncounter = null;
+
+            Assert.Equal("town_outside", new DefaultEncounterGameMenuModel().GetGenericStateMenu());
+        }, WithoutNetworkDelivery());
+
+        Assert.Empty(client.NetworkSentMessages.GetMessages<NetworkRequestStartSettlementEncounter>());
     }
 
     private EntryContext CreateEntryContext(EnvironmentInstance client)
