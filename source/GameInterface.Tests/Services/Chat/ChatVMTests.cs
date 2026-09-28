@@ -6,6 +6,7 @@ using Xunit;
 
 namespace GameInterface.Tests.Services.Chat;
 
+[Collection(ViewModelCollection.Name)]
 public class ChatVMTests
 {
     [Fact]

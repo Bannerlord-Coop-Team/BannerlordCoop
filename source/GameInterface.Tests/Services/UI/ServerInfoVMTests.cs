@@ -7,6 +7,7 @@ using Xunit;
 namespace GameInterface.Tests.Services.UI;
 
 /// <summary>Protects the panel's tabs, their content and the confirmation before a link opens.</summary>
+[Collection(ViewModelCollection.Name)]
 public class ServerInfoVMTests
 {
     private readonly FakeOpener opener = new();

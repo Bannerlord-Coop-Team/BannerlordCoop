@@ -7,6 +7,7 @@ using static GameInterface.Tests.Services.UI.ServerInfoVMTests;
 namespace GameInterface.Tests.Services.UI;
 
 /// <summary>Protects when the server info panel opens: once per join, after the map is free, and never empty.</summary>
+[Collection(ViewModelCollection.Name)]
 public class ServerInfoServiceTests
 {
     private static readonly NetworkServerInfo Welcome = new(new[] { "Welcome to EU-1", "Restart 06:00 UTC" }, null, null, null);
