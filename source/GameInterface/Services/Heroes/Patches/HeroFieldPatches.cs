@@ -205,7 +205,6 @@ namespace GameInterface.Services.Heroes.Patches
             instance._name = newName;
         }
 
-
         [HarmonyTranspiler]
         private static IEnumerable<CodeInstruction> DefaultAgeTranspiler(IEnumerable<CodeInstruction> instructions)
         {

@@ -829,7 +829,6 @@ public class AwaitingAlternativeSolutionTroopsTests : IDisposable
         {
             InquiryCaptureHandler.OnShowInquiryEvent.RemoveEventHandler(null, onShowInquiry);
         }
-
     }
 
     [Fact]

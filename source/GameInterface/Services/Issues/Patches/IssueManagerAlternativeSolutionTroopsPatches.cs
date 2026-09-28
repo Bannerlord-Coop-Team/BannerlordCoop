@@ -1,4 +1,4 @@
-using Common;
+﻿using Common;
 using Common.Logging;
 using Common.Messaging;
 using Common.Network;
@@ -158,5 +158,4 @@ internal class IssueManagerAlternativeSolutionTroopsPatches
         textObject.SetTextVariable("NUMBER", troops.TotalManCount);
         return textObject;
     }
-
 }
