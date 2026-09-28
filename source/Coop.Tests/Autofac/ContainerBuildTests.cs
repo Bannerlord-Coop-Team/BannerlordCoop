@@ -37,6 +37,9 @@ namespace Coop.Tests.Autofac
             Assert.NotNull(container.Resolve<global::GameInterface.Services.UI.CoopOptions.ICoopOptionsKeybinding>());
             Assert.NotNull(container.Resolve<global::GameInterface.Services.UI.CoopOptions.ICoopKeybindingPopupFactory>());
             Assert.NotNull(container.Resolve<IVoiceWindowFocus>());
+            // Chat and the server info panel need each other; Lazy keeps that from being a cycle.
+            Assert.NotNull(container.Resolve<global::GameInterface.Services.Chat.IChatService>());
+            Assert.NotNull(container.Resolve<global::GameInterface.Services.UI.ServerInfo.IServerInfoService>());
             Assert.Equal("Not started", container.Resolve<IVoiceAudio>().Status);
 
             var logic = container.Resolve<ILogic>();

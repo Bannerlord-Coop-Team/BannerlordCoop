@@ -187,6 +187,125 @@ public class ServerInfoServiceTests
             service.Describe());
     }
 
+    // !motd reopens the last info on its first tab, after the map is free, and only once.
+    [Fact]
+    public void ReopenShowsTheLastInfoAgainOnItsFirstTab()
+    {
+        var popup = new FakePopup();
+        using var service = popup.CreateService();
+        service.Initialize();
+        service.Show(Info(true, true, true, true));
+        service.Update();
+        popup.ViewModel!.ExecuteSelectTab((int)ServerInfoTab.Rules);
+        popup.ViewModel.ExecuteClose();
+        popup.CanOpenResult = false;
+
+        Assert.True(service.Reopen());
+        Assert.True(service.Reopen());
+        service.Update();
+        Assert.False(popup.ViewModel.IsOpen);
+        Assert.Contains("Pending: True", service.Describe());
+
+        popup.CanOpenResult = true;
+        service.Update();
+        service.Update();
+
+        Assert.True(popup.ViewModel.IsOpen);
+        Assert.Equal(2, popup.Opened);
+        Assert.Equal(ServerInfoTab.Motd, popup.ViewModel.SelectedTab);
+        Assert.Equal(1, popup.ViewModel.Rules.Count);
+    }
+
+    [Fact]
+    public void ReopenWhileOpen_KeepsThePanelAsItIs()
+    {
+        var popup = new FakePopup();
+        using var service = popup.CreateService();
+        service.Initialize();
+        service.Show(Info(true, true, false, false));
+        service.Update();
+        popup.ViewModel!.ExecuteSelectTab((int)ServerInfoTab.Rules);
+
+        Assert.True(service.Reopen());
+        service.Update();
+
+        Assert.Equal(1, popup.Opened);
+        Assert.Equal(ServerInfoTab.Rules, popup.ViewModel.SelectedTab);
+        Assert.Contains("Pending: False", service.Describe());
+    }
+
+    // The join's own pending open and a !motd before the map is free open the panel once.
+    [Fact]
+    public void ReopenBeforeTheFirstOpen_OpensOnce()
+    {
+        var popup = new FakePopup { CanOpenResult = false };
+        using var service = popup.CreateService();
+        service.Initialize();
+        service.Show(Welcome);
+
+        Assert.True(service.Reopen());
+        popup.CanOpenResult = true;
+        service.Update();
+        service.Update();
+
+        Assert.Equal(1, popup.Opened);
+    }
+
+    [Theory]
+    [MemberData(nameof(EmptyInfos))]
+    public void ReopenWithoutUsableInfo_ReportsIt(NetworkServerInfo info)
+    {
+        var popup = new FakePopup();
+        using var service = popup.CreateService();
+        service.Initialize();
+        if (info != null) service.Show(info);
+
+        Assert.False(service.Reopen());
+        service.Update();
+
+        Assert.Equal(0, popup.Opened);
+    }
+
+    // After a disconnect the old server's info is gone: nothing pending, nothing to reopen, the panel closed.
+    [Fact]
+    public void ClearForgetsTheInfoAndClosesThePanel()
+    {
+        var popup = new FakePopup();
+        using var service = popup.CreateService();
+        service.Initialize();
+        service.Show(Info(true, true, true, true));
+        service.Update();
+        popup.ViewModel!.Links[0].ExecuteOpen();
+
+        service.Clear();
+
+        Assert.False(popup.ViewModel.IsOpen);
+        Assert.False(popup.ViewModel.IsLinkDialogOpen);
+        Assert.False(service.Reopen());
+        Assert.StartsWith("Open: False\nPending: False\nTab: none\nTabs: none\nCounts: motd 0, rules 0, links 0, news 0", service.Describe());
+
+        service.Show(new NetworkServerInfo(new[] { "Other server" }, null, null, null));
+        service.Update();
+
+        Assert.Equal("Other server", Assert.Single(popup.ViewModel.Paragraphs).Text);
+        Assert.Empty(popup.Opener.Opened);
+    }
+
+    [Fact]
+    public void ClearWhilePending_OpensNothing()
+    {
+        var popup = new FakePopup { CanOpenResult = false };
+        using var service = popup.CreateService();
+        service.Initialize();
+        service.Show(Welcome);
+
+        service.Clear();
+        popup.CanOpenResult = true;
+        service.Update();
+
+        Assert.Equal(0, popup.Opened);
+    }
+
     // The overlay is created once and removed with the session.
     [Fact]
     public void InitializeCreatesOneOverlayAndDisposeRemovesIt()

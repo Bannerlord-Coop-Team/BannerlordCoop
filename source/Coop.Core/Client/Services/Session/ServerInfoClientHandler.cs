@@ -18,6 +18,7 @@ internal sealed class ServerInfoClientHandler : IHandler
         this.service = service;
         broker.Subscribe<ClientCampaignReady>(Ready);
         broker.Subscribe<NetworkServerInfo>(Receive);
+        broker.Subscribe<NetworkDisconnected>(Disconnected);
     }
 
     // The overlay needs the campaign map, so it is created only once the campaign is ready.
@@ -34,11 +35,19 @@ internal sealed class ServerInfoClientHandler : IHandler
         service.Show(payload.What);
     }, context: nameof(ServerInfoClientHandler));
 
+    // !motd must not show one server's info after the client leaves it, so a disconnect forgets it.
+    private void Disconnected(MessagePayload<NetworkDisconnected> payload) => GameThread.RunSafe(() =>
+    {
+        if (disposed) return;
+        service.Clear();
+    }, context: nameof(ServerInfoClientHandler));
+
     // Prevents queued messages from reopening a disposed session's UI.
     public void Dispose()
     {
         disposed = true;
         broker.Unsubscribe<ClientCampaignReady>(Ready);
         broker.Unsubscribe<NetworkServerInfo>(Receive);
+        broker.Unsubscribe<NetworkDisconnected>(Disconnected);
     }
 }

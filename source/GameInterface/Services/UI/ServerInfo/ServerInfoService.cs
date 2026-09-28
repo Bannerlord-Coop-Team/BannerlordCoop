@@ -10,6 +10,13 @@ public interface IServerInfoService : IGameAbstraction
 {
     void Initialize();
     void Show(NetworkServerInfo info);
+
+    /// <summary>Opens the last info this session received again, once the map is free; false when there is none.</summary>
+    bool Reopen();
+
+    /// <summary>Forgets this session's info and closes the panel, as when the client disconnects.</summary>
+    void Clear();
+
     string Describe();
 }
 
@@ -56,6 +63,21 @@ public sealed class ServerInfoService : IServerInfoService, IDisposable
 
         // Info that arrives while the panel is open replaces it in place instead of opening it twice.
         pending = !viewModel.IsOpen;
+    }
+
+    // Behind !motd: an open panel stays as it is, a closed one waits for the map like a join.
+    public bool Reopen()
+    {
+        if (!viewModel.HasContent) return false;
+        if (!viewModel.IsOpen) pending = true;
+        return true;
+    }
+
+    public void Clear()
+    {
+        pending = false;
+        popup?.Close();
+        viewModel.SetContent(null);
     }
 
     // Runs each frame while closed: opens pending info once, on its first tab, when the map is free.
