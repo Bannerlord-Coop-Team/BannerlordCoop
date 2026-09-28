@@ -4583,8 +4583,7 @@ public class PlayerKingdomCreationFlowTests : IDisposable
         KingdomDecisionsVM decisionsVm)
     {
         var diplomacyVm = ObjectHelper.SkipConstructor<KingdomDiplomacyVM>();
-        AccessTools.Field(typeof(KingdomDiplomacyVM), "_actions")
-            .SetValue(diplomacyVm, new MBBindingList<KingdomDiplomacyProposalActionItemVM>());
+        diplomacyVm._actions = new MBBindingList<KingdomDiplomacyProposalActionItemVM>();
         AccessTools.Field(typeof(KingdomDiplomacyVM), "_playerKingdom").SetValue(diplomacyVm, kingdom);
         AccessTools.Field(typeof(KingdomDiplomacyVM), "_forceDecision")
             .SetValue(diplomacyVm, new Action<KingdomDecision>(decisionsVm.RefreshWith));
@@ -4602,12 +4601,12 @@ public class PlayerKingdomCreationFlowTests : IDisposable
     private static KingdomPoliciesVM SelectPolicyWithResolve(KingdomPolicyDecision decision, KingdomDecisionsVM decisionsVm)
     {
         var policiesVm = ObjectHelper.SkipConstructor<KingdomPoliciesVM>();
-        AccessTools.Field(typeof(KingdomPoliciesVM), "_doneHint").SetValue(policiesVm, new HintViewModel());
+        policiesVm._doneHint = new HintViewModel();
         AccessTools.Field(typeof(KingdomPoliciesVM), "_forceDecide")
             .SetValue(policiesVm, new Action<KingdomDecision>(decisionsVm.RefreshWith));
 
         var policyItem = ObjectHelper.SkipConstructor<KingdomPolicyItemVM>();
-        AccessTools.Field(typeof(KingdomPolicyItemVM), "_policy").SetValue(policyItem, decision.Policy);
+        policyItem._policy = decision.Policy;
         policiesVm.OnPolicySelect(policyItem);
 
         Assert.Same(decision, policiesVm._currentItemsUnresolvedDecision);
