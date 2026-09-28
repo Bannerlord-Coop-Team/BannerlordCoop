@@ -64,6 +64,7 @@ namespace Coop.Tests.Autofac
             Assert.True(catalog.Contains("coop.debug.battle.hit_sound_trace"));
             Assert.True(catalog.Contains("coop.debug.ui.server_info_preview"));
             Assert.True(catalog.Contains("coop.debug.ui.server_info_state"));
+            Assert.True(catalog.Contains("coop.debug.ui.chat_submit"));
             Assert.Same(container.Resolve<IVoiceClient>(), container.Resolve<IVoiceSyntheticTest>());
             Assert.Equal(CoopCommandSide.Client, Assert.Single(registeredCommands,
                 command => $"{command.Prefix}.{command.Name}" == "coop.debug.voice.synthetic").Side);

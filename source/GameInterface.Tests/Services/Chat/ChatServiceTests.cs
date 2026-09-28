@@ -94,7 +94,7 @@ public class ChatServiceTests
         Assert.True(service.IsChatEnabled);
     }
 
-    private static ChatService CreateService(
+    internal static ChatService CreateService(
         Mock<INetwork>? network = null,
         Mock<IPlayerManager>? playerManager = null,
         Mock<IChatPlayerNameResolver>? playerNameResolver = null,
