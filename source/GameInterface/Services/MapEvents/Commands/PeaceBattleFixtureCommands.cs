@@ -34,15 +34,21 @@ internal static class PeaceBattleFixtureCommands
     {
         public string Prefix => "coop.debug.map_event";
         public string Name => "peace_battle_fixture_start";
-        public string Description => "Stages Battanian and Vlandian AI armies against a Wolfskins party.";
+        public string Description => "Stages a defender-reinforcement or partial-peace army battle.";
         public CoopCommandSide Side => CoopCommandSide.Server;
-        public IExpectedArgs[] ExpectedArgs { get; } = Array.Empty<IExpectedArgs>();
+        public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
+        {
+            new ExpectedArgs("mode", "Use partial for allied attackers; omit for defender reinforcement.", false),
+        };
 
         public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
         {
             if (!ModInformation.IsServer) return Failed("Run this command on the server.");
             if (fixture != null) return Failed("Restore the existing peace-battle fixture first.");
             if (Campaign.Current == null) return Failed("No campaign is loaded.");
+            if (args.Count > 1 || (args.Count == 1 && args[0] != "partial"))
+                return Failed("Mode must be partial, or omit it for defender reinforcement.");
+            var partialMode = args.Count == 1;
             if (!TryServices(out var objects, out var behavior, out var time, out _, out var error))
                 return Failed(error);
             if (time.GetTimeControl() != TimeControlEnum.Pause)
@@ -56,7 +62,9 @@ internal static class PeaceBattleFixtureCommands
             if (battania == null || vlandia == null || wolfskins == null ||
                 battanianTarget == null || vlandianTarget == null)
                 return Failed("The required Battania, Vlandia, Wolfskins, or army target was not found.");
-            if (FactionManager.IsAtWarAgainstFaction(vlandia, wolfskins))
+            if (wolfskins.Kingdom != null)
+                return Failed("Wolfskins must be an independent faction for this three-faction fixture.");
+            if (!partialMode && FactionManager.IsAtWarAgainstFaction(vlandia, wolfskins))
                 return Failed("Vlandia and Wolfskins must be at peace so the reinforcement can join the defender.");
 
             var battanians = SelectParties(battania, 2);
@@ -79,18 +87,27 @@ internal static class PeaceBattleFixtureCommands
                 Battania = battania,
                 Vlandia = vlandia,
                 Wolfskins = wolfskins,
+                PartialMode = partialMode,
                 Parties = snapshots.ToArray(),
                 BattaniaWolfskinsAtWar = FactionManager.IsAtWarAgainstFaction(battania, wolfskins),
                 BattaniaVlandiaAtWar = FactionManager.IsAtWarAgainstFaction(battania, vlandia),
+                VlandiaWolfskinsAtWar = FactionManager.IsAtWarAgainstFaction(vlandia, wolfskins),
             };
             fixture = pending;
             try
             {
                 if (!pending.BattaniaWolfskinsAtWar) DeclareWarAction.ApplyByDefault(battania, wolfskins);
-                if (!pending.BattaniaVlandiaAtWar) DeclareWarAction.ApplyByDefault(battania, vlandia);
+                if (partialMode)
+                {
+                    if (pending.BattaniaVlandiaAtWar) MakePeaceAction.Apply(battania, vlandia);
+                    if (!pending.VlandiaWolfskinsAtWar) DeclareWarAction.ApplyByDefault(vlandia, wolfskins);
+                }
+                else if (!pending.BattaniaVlandiaAtWar)
+                    DeclareWarAction.ApplyByDefault(battania, vlandia);
                 if (!FactionManager.IsAtWarAgainstFaction(battania, wolfskins) ||
-                    !FactionManager.IsAtWarAgainstFaction(battania, vlandia))
-                    throw new InvalidOperationException("The required wars could not be established.");
+                    FactionManager.IsAtWarAgainstFaction(battania, vlandia) != !partialMode ||
+                    FactionManager.IsAtWarAgainstFaction(vlandia, wolfskins) != partialMode)
+                    throw new InvalidOperationException("The required faction relationships could not be established.");
 
                 var position = wolves[0].Position;
                 foreach (var party in parties)
@@ -117,18 +134,15 @@ internal static class PeaceBattleFixtureCommands
                 if (pending.MapEvent?.IsFieldBattle != true || wolves[0].MapEvent != pending.MapEvent)
                     throw new InvalidOperationException("The Battanian attack did not create a field battle with Wolfskins.");
 
-                StartBattleAction.Apply(vlandians[0].Party, battanians[0].Party);
-                if (!HasExactBattleParties(pending.MapEvent, parties) ||
-                    battanians.Any(party => party.Party.MapEventSide != pending.MapEvent.AttackerSide) ||
-                    wolves[0].Party.MapEventSide != pending.MapEvent.DefenderSide ||
-                    vlandians.Any(party => party.Party.MapEventSide != pending.MapEvent.DefenderSide) ||
+                StartBattleAction.Apply(vlandians[0].Party, partialMode ? wolves[0].Party : battanians[0].Party);
+                if (!HasExactBattleParties(pending.MapEvent, parties) || !HasFixtureSides(pending, parties) ||
                     !objects.TryGetId(pending.MapEvent, out pending.MapEventId) ||
                     !objects.TryGetId(pending.BattanianArmy, out _) ||
                     !objects.TryGetId(pending.VlandianArmy, out _))
                     throw new InvalidOperationException("All five registered parties must join the expected sides of one field battle.");
 
                 return Succeeded("Peace-battle fixture staged. Call peace_battle_fixture_state on server and client, then peace_battle_fixture_peace on server.\n" +
-                    StateJson(objects, pending.MapEventId, parties));
+                    StateJson(objects, pending.MapEventId, parties, partialMode: partialMode));
             }
             catch (Exception setupError)
             {
@@ -160,17 +174,20 @@ internal static class PeaceBattleFixtureCommands
             new ExpectedArgs("wolfskins_party_id", "The Wolfskins party StringId.", true),
             new ExpectedArgs("vlandia_leader_id", "The Vlandian leader party StringId.", true),
             new ExpectedArgs("vlandia_member_id", "The Vlandian member party StringId.", true),
+            new ExpectedArgs("mode", "Use partial for the allied-attacker fixture; omit for defender reinforcement.", false),
         };
 
         public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
         {
             if (Campaign.Current == null) return Failed("No campaign is loaded.");
+            if (args.Count > 7 || (args.Count == 7 && args[6] != "partial"))
+                return Failed("Mode must be partial, or omit it for defender reinforcement.");
             if (!ContainerProvider.TryResolve<IObjectManager>(out var objects))
                 return Failed("Unable to resolve ObjectManager.");
             var parties = Enumerable.Range(1, 5)
                 .Select(index => Campaign.Current.CampaignObjectManager.Find<MobileParty>(args[index]))
                 .ToArray();
-            return Succeeded(StateJson(objects, args[0], parties));
+            return Succeeded(StateJson(objects, args[0], parties, partialMode: args.Count == 7));
         }
     }
 
@@ -178,7 +195,7 @@ internal static class PeaceBattleFixtureCommands
     {
         public string Prefix => "coop.debug.map_event";
         public string Name => "peace_battle_fixture_peace";
-        public string Description => "Makes peace between Battania and Vlandia during the fixture battle.";
+        public string Description => "Makes peace between the selected fixture factions during battle.";
         public CoopCommandSide Side => CoopCommandSide.Server;
         public IExpectedArgs[] ExpectedArgs { get; } = Array.Empty<IExpectedArgs>();
 
@@ -189,36 +206,42 @@ internal static class PeaceBattleFixtureCommands
             if (current?.MapEvent == null || current.MapEvent.IsFinalized)
                 return Failed("No active peace-battle fixture is available.");
             if (current.PeaceApplied) return Failed("Peace was already applied to this fixture.");
-            if (!FactionManager.IsAtWarAgainstFaction(current.Battania, current.Vlandia))
-                return Failed("Battania and Vlandia are no longer at war.");
+            IFaction peaceFirst = current.PartialMode ? (IFaction)current.Vlandia : current.Battania;
+            IFaction peaceSecond = current.PartialMode ? (IFaction)current.Wolfskins : current.Vlandia;
+            if (!FactionManager.IsAtWarAgainstFaction(peaceFirst, peaceSecond))
+                return Failed("The selected fixture factions are no longer at war.");
             var parties = current.Parties.Select(snapshot => snapshot.Party).ToArray();
-            if (!HasExactBattleParties(current.MapEvent, parties) ||
+            if (!HasExactBattleParties(current.MapEvent, parties) || !HasFixtureSides(current, parties) ||
                 current.Parties[0].Party.Army != current.BattanianArmy ||
                 current.Parties[1].Party.Army != current.BattanianArmy ||
                 current.Parties[3].Party.Army != current.VlandianArmy ||
-                current.Parties[4].Party.Army != current.VlandianArmy ||
-                parties.Take(2).Any(party => party.Party.MapEventSide != current.MapEvent.AttackerSide) ||
-                parties.Skip(2).Any(party => party.Party.MapEventSide != current.MapEvent.DefenderSide))
+                current.Parties[4].Party.Army != current.VlandianArmy)
                 return Failed("The fixture parties are no longer all in the same battle.");
 
             if (!ContainerProvider.TryResolve<IObjectManager>(out var objects))
                 return Failed("ObjectManager was unavailable for the peace state report.");
-            var before = StateJson(objects, current.MapEventId, parties, current.MapEvent, "before_peace");
+            var before = StateJson(objects, current.MapEventId, parties, current.MapEvent, "before_peace", current.PartialMode);
             try
             {
-                MakePeaceAction.Apply(current.Battania, current.Vlandia);
+                MakePeaceAction.Apply(peaceFirst, peaceSecond);
             }
             catch (Exception ex)
             {
                 return Failed($"MakePeaceAction failed: {ex.Message}.\n{before}\n" +
-                    StateJson(objects, current.MapEventId, parties, current.MapEvent, "after_failed_peace"));
+                    StateJson(objects, current.MapEventId, parties, current.MapEvent, "after_failed_peace", current.PartialMode));
             }
             current.PeaceApplied = true;
-            if (FactionManager.IsAtWarAgainstFaction(current.Battania, current.Vlandia))
-                return Failed("MakePeaceAction did not end the Battania-Vlandia war.\n" + before + "\n" +
-                    StateJson(objects, current.MapEventId, parties, current.MapEvent, "after_peace"));
+            var after = StateJson(objects, current.MapEventId, parties, current.MapEvent, "after_peace", current.PartialMode);
+            if (FactionManager.IsAtWarAgainstFaction(peaceFirst, peaceSecond))
+                return Failed("MakePeaceAction did not end the selected war.\n" + before + "\n" + after);
+            if (current.PartialMode &&
+                (!FactionManager.IsAtWarAgainstFaction(current.Battania, current.Wolfskins) ||
+                 parties.Skip(3).Any(party => party.MapEvent != null || party.Party.MapEventSide != null) ||
+                 !HasExactBattleParties(current.MapEvent, parties.Take(3).ToArray()) ||
+                 !HasExactSides(current.MapEvent, parties.Take(2).ToArray(), new[] { parties[2] })))
+                return Failed("The partial-peace battle did not retain only Wolfskins and the Battanian army.\n" + before + "\n" + after);
             return Succeeded("Production peace applied with patches live.\n" + before + "\n" +
-                StateJson(objects, current.MapEventId, parties, current.MapEvent, "after_peace"));
+                after);
         }
     }
 
@@ -291,8 +314,22 @@ internal static class PeaceBattleFixtureCommands
         new HashSet<PartyBase>(mapEvent.InvolvedParties).SetEquals(parties.Select(party => party.Party)) &&
         parties.All(party => party.MapEvent == mapEvent);
 
+    private static bool HasFixtureSides(Fixture current, MobileParty[] parties) =>
+        HasExactSides(current.MapEvent,
+            current.PartialMode ? new[] { parties[0], parties[1], parties[3], parties[4] } : parties.Take(2).ToArray(),
+            current.PartialMode ? new[] { parties[2] } : parties.Skip(2).ToArray());
+
+    private static bool HasExactSides(MapEvent mapEvent, MobileParty[] attackers, MobileParty[] defenders) =>
+        mapEvent != null &&
+        new HashSet<PartyBase>(mapEvent.AttackerSide.Parties.Select(entry => entry.Party))
+            .SetEquals(attackers.Select(party => party.Party)) &&
+        new HashSet<PartyBase>(mapEvent.DefenderSide.Parties.Select(entry => entry.Party))
+            .SetEquals(defenders.Select(party => party.Party)) &&
+        attackers.All(party => party.Party.MapEventSide == mapEvent.AttackerSide) &&
+        defenders.All(party => party.Party.MapEventSide == mapEvent.DefenderSide);
+
     private static string StateJson(IObjectManager objects, string expectedMapEventId, MobileParty[] parties,
-        MapEvent knownEvent = null, string phase = "observation")
+        MapEvent knownEvent = null, string phase = "observation", bool partialMode = false)
     {
         var battania = Kingdom.All.FirstOrDefault(kingdom => kingdom.StringId == "battania");
         var vlandia = Kingdom.All.FirstOrDefault(kingdom => kingdom.StringId == "vlandia");
@@ -327,6 +364,8 @@ internal static class PeaceBattleFixtureCommands
         {
             machine = ModInformation.IsServer ? "server" : "client",
             phase,
+            mode = partialMode ? "partial" : "defender_reinforcement",
+            peaceFactionIds = partialMode ? new[] { "vlandia", "wolfskins" } : new[] { "battania", "vlandia" },
             expectedMapEventId,
             mapEventId = Id(objects, mapEvent),
             mapEventExists = mapEvent != null,
@@ -361,6 +400,7 @@ internal static class PeaceBattleFixtureCommands
 
         RestoreWar(current.Battania, current.Vlandia, current.BattaniaVlandiaAtWar);
         RestoreWar(current.Battania, current.Wolfskins, current.BattaniaWolfskinsAtWar);
+        RestoreWar(current.Vlandia, current.Wolfskins, current.VlandiaWolfskinsAtWar);
         foreach (var snapshot in current.Parties)
         {
             snapshot.RestoreRosters();
@@ -378,6 +418,8 @@ internal static class PeaceBattleFixtureCommands
         var atWar = FactionManager.IsAtWarAgainstFaction(first, second);
         if (wasAtWar && !atWar) DeclareWarAction.ApplyByDefault(first, second);
         if (!wasAtWar && atWar) MakePeaceAction.Apply(first, second);
+        if (FactionManager.IsAtWarAgainstFaction(first, second) != wasAtWar)
+            throw new InvalidOperationException($"Unable to restore the {first.StringId}-{second.StringId} war state.");
     }
 
     private sealed class PartySnapshot
@@ -419,6 +461,7 @@ internal static class PeaceBattleFixtureCommands
         public Kingdom Battania;
         public Kingdom Vlandia;
         public Clan Wolfskins;
+        public bool PartialMode;
         public PartySnapshot[] Parties;
         public Army BattanianArmy;
         public Army VlandianArmy;
@@ -426,6 +469,7 @@ internal static class PeaceBattleFixtureCommands
         public string MapEventId;
         public bool BattaniaWolfskinsAtWar;
         public bool BattaniaVlandiaAtWar;
+        public bool VlandiaWolfskinsAtWar;
         public bool PeaceApplied;
     }
 }
