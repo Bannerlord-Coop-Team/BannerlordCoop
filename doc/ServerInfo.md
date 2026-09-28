@@ -56,7 +56,7 @@ Clicking a link opens a small dialog in the panel that shows the full address. T
 
 ## Showing it again
 
-The panel opens once per join, when the player first reaches the campaign map with nothing else open, and does not pause the game. A player who rejoins sees it again.
+The panel opens by itself once per join, when the player first reaches the campaign map with nothing else open, and does not pause the game. If the server sends its info again during the same session, the panel shows the new text but does not open by itself. A player who rejoins sees it again.
 
 A player who types `!motd` in chat, alone and in any case, opens the panel again on its first tab. `!motd` is not sent to the server or other players. If this server sent nothing to show, a line in the player's own chat says so. Anything else, like `!motd please`, is sent as a normal chat message.
 

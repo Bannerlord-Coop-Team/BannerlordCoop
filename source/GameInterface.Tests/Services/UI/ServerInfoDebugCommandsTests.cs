@@ -8,9 +8,30 @@ using Xunit;
 namespace GameInterface.Tests.Services.UI;
 
 /// <summary>Protects the DEBUG samples a live run uses to show every tab and the link dialog.</summary>
+[Collection(ViewModelCollection.Name)]
 public class ServerInfoDebugCommandsTests
 {
     private readonly ServerInfoLinkRules rules = new();
+
+    // A live run previews after the join's own open, when new info no longer opens the panel by itself.
+    [Fact]
+    public void Preview_OpensTheSampleAfterTheJoinsOwnOpen()
+    {
+        var popup = new ServerInfoServiceTests.FakePopup();
+        using var service = popup.CreateService();
+        service.Initialize();
+        service.Show(ServerInfoDebugCommands.Samples["motd-only"]);
+        service.Update();
+        popup.ViewModel!.ExecuteClose();
+
+        var result = ServerInfoDebugCommands.ServerInfoPreviewCoopCommand.Preview(service, ServerInfoDebugCommands.Samples["full"]);
+        service.Update();
+
+        Assert.True(result.Succeeded);
+        Assert.StartsWith("Open: False\nPending: True\nTab: Motd\nTabs: Motd, Rules, Links, News", result.Output);
+        Assert.True(popup.ViewModel.IsOpen);
+        Assert.Equal(2, popup.Opened);
+    }
 
     [Fact]
     public void CommandsAreClientSideUnderTheUiPrefix()

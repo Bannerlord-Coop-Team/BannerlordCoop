@@ -9,6 +9,8 @@ namespace GameInterface.Services.UI.ServerInfo;
 public interface IServerInfoService : IGameAbstraction
 {
     void Initialize();
+
+    /// <summary>Replaces what the panel shows; only the session's first info opens it by itself, once the map is free.</summary>
     void Show(NetworkServerInfo info);
 
     /// <summary>Opens the last info this session received again, once the map is free; false when there is none.</summary>
@@ -27,6 +29,7 @@ public sealed class ServerInfoService : IServerInfoService, IDisposable
     private readonly ServerInfoVM viewModel;
     private IServerInfoPopup popup;
     private bool pending;
+    private bool openedThisSession;
 
     // Builds the Gauntlet overlay only when Initialize runs on a client with a campaign.
     public ServerInfoService(IChatService chat, IMapAvailability mapAvailability, IServerInfoLinkRules linkRules, IBrowserLinkOpener opener) : this((viewModel, update) =>
@@ -61,8 +64,9 @@ public sealed class ServerInfoService : IServerInfoService, IDisposable
             return;
         }
 
-        // Info that arrives while the panel is open replaces it in place instead of opening it twice.
-        pending = !viewModel.IsOpen;
+        // Only the session's first info opens the panel by itself. Later info replaces what it shows, open or closed,
+        // so a server that sends it again cannot take the map away each time the player closes the panel.
+        if (!openedThisSession && !viewModel.IsOpen) pending = true;
     }
 
     // Behind !motd: an open panel stays as it is, a closed one waits for the map like a join.
@@ -73,9 +77,11 @@ public sealed class ServerInfoService : IServerInfoService, IDisposable
         return true;
     }
 
+    // A disconnect ends the session, so the next join's info opens the panel again.
     public void Clear()
     {
         pending = false;
+        openedThisSession = false;
         popup?.Close();
         viewModel.SetContent(null);
     }
@@ -85,6 +91,7 @@ public sealed class ServerInfoService : IServerInfoService, IDisposable
     {
         if (!pending || popup == null || viewModel.IsOpen || !popup.CanOpen()) return;
         pending = false;
+        openedThisSession = true;
         viewModel.SelectFirstTab();
         popup.Open();
     }

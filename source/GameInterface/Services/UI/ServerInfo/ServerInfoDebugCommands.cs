@@ -105,7 +105,14 @@ internal class ServerInfoDebugCommands
                 return new CoopCommandResult(false, "Unknown sample. Use " + string.Join(", ", Samples.Keys) + ".", "invalid_sample");
             if (!ContainerProvider.TryResolve<IServerInfoService>(out var service))
                 return new CoopCommandResult(false, "Server info unavailable.", "unavailable");
+            return Preview(service, info);
+        }
+
+        // After the join's own open, new info no longer opens the panel by itself, so the preview opens it like !motd.
+        internal static CoopCommandResult Preview(IServerInfoService service, NetworkServerInfo info)
+        {
             service.Show(info);
+            service.Reopen();
             return new CoopCommandResult(true, service.Describe());
         }
     }
