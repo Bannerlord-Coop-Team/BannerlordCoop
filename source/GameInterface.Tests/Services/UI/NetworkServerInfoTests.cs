@@ -1,4 +1,5 @@
-﻿using Common.Serialization;
+﻿using Common.Messaging;
+using Common.Serialization;
 using GameInterface.Services.UI.ServerInfo;
 using ProtoBuf;
 using System;
@@ -9,6 +10,13 @@ namespace GameInterface.Tests.Services.UI;
 /// <summary>Protects the one message that carries the whole server info to a joining player.</summary>
 public class NetworkServerInfoTests
 {
+    // MessagePacketHandler drops a server to client message that reaches the server, so a client cannot send one.
+    [Fact]
+    public void Message_IsServerToClientOnly()
+    {
+        Assert.IsAssignableFrom<IServerToClientCommand>(new NetworkServerInfo(null, null, null, null));
+    }
+
     // Every section travels in one message and keeps every character.
     [Fact]
     public void AllSectionsRoundTripInOneMessage()

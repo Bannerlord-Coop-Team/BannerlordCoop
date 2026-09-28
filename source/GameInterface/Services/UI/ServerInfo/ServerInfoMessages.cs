@@ -38,9 +38,9 @@ public sealed record ServerInfoNews
     [ProtoMember(3)] public string Text { get; set; }
 }
 
-/// <summary>Carries the whole server info to one joining player.</summary>
+/// <summary>Carries the whole server info to one joining player; the server drops a copy a client sends.</summary>
 [ProtoContract(SkipConstructor = true)]
-public sealed record NetworkServerInfo : IMessage
+public sealed record NetworkServerInfo : IServerToClientCommand
 {
     [ProtoMember(1)] public string[] Motd { get; }
     [ProtoMember(2)] public string[] Rules { get; }
