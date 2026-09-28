@@ -1,12 +1,8 @@
 using Common;
-using Common.Logging;
 using Common.Messaging;
 using Coop.Core.Common.Services.Connection.Messages;
 using GameInterface.Services.GameDebug.Messages;
 using GameInterface.Services.UI.Interfaces;
-using Serilog;
-using System;
-using System.Threading;
 
 namespace Coop.Core.Common;
 
@@ -21,8 +17,6 @@ public interface ICoopFinalizer
 /// <inheritdoc cref="ICoopFinalizer"/>
 public class CoopFinalizer : ICoopFinalizer
 {
-    private static readonly ILogger Logger = LogManager.GetLogger<CoopFinalizer>();
-
     private readonly IMessageBroker messageBroker;
     private readonly ILoadingInterface loadingInterface;
 
@@ -51,29 +45,7 @@ public class CoopFinalizer : ICoopFinalizer
         // message handler denying validation runs there), so marshal it. Blocking so the screen is
         // down before the teardown messages below, and inline (no marshal) when already on the game
         // thread — e.g. the validation-timeout path.
-        int hideClaimed = 0;
-        void HideLoadingScreenOnce()
-        {
-            if (Interlocked.Exchange(ref hideClaimed, 1) == 0)
-                loadingInterface.HideLoadingScreen();
-        }
-
-        try
-        {
-            GameThread.RunSafe(HideLoadingScreenOnce, blocking: true);
-        }
-        catch (TimeoutException e)
-        {
-            // An expired hide never runs, so the hide and the teardown move to the game thread in the same
-            // session. The claim skips the hide there when the first copy had already started, and separate
-            // items keep a failing hide from skipping the teardown, as on the blocking path.
-            GameThread.RunSafe(HideLoadingScreenOnce);
-            GameThread.RunSafe(() => EndCoop(closeText));
-            Logger.Warning(e, "Hiding the loading screen timed out; coop ends on the game thread instead");
-            return;
-        }
-
-        EndCoop(closeText);
+        GameThread.RunCleanupSafe(loadingInterface.HideLoadingScreen, then: () => EndCoop(closeText));
     }
 
     private void EndCoop(string closeText)

@@ -720,6 +720,41 @@ public class GameThread : IUpdateable
     }
 
     /// <summary>
+    /// Runs mandatory cleanup like a blocking <see cref="RunSafe"/>, then <paramref name="then"/> on the calling
+    /// thread. An expired call never runs, so after a timeout both are queued as separate items in the caller's
+    /// session instead and the timeout is logged, not thrown. A claim runs the cleanup once when the first copy
+    /// already started. Session cancellation still throws at once and queues nothing.
+    /// </summary>
+    public static void RunCleanupSafe(Action cleanup, Action then = null, string context = null,
+        [CallerFilePath] string callerFile = null,
+        [CallerMemberName] string callerMember = null)
+    {
+        string label = context ?? BuildLabel(callerFile, callerMember);
+        int claimed = 0;
+        Action cleanupOnce = WrapSafe(() =>
+        {
+            if (Interlocked.Exchange(ref claimed, 1) == 0)
+                cleanup();
+        }, context);
+
+        try
+        {
+            Run(cleanupOnce, blocking: true, label: label);
+        }
+        catch (TimeoutException e)
+        {
+            // Separate items keep a failing cleanup from skipping the continuation, as on the blocking path.
+            Run(cleanupOnce, label: label);
+            if (then != null)
+                Run(WrapSafe(then, context), label: label);
+            Logger.Warning(e, "Blocking game-thread cleanup {Label} timed out; it runs once on the game thread with its continuation instead", label);
+            return;
+        }
+
+        then?.Invoke();
+    }
+
+    /// <summary>
     /// Queues an action for a later <see cref="Update"/> even when called from the game-loop thread.
     /// Use this when running inline would mutate state currently being iterated by the engine.
     /// </summary>
