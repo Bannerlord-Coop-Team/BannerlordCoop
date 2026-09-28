@@ -1582,17 +1582,35 @@ public class LordBarterSyncTests : MapEventTestBase
         Server.PumpGameThread();
     }
 
+    public enum MapPartyRefusal
+    {
+        PlayerPartyInBattle,
+        LordPartyInBattle,
+        HoldEnded,
+        HoldOnAnotherLordParty,
+        HoldFromAnotherParty,
+    }
+
     /// <summary>
-    /// A map-party barter refused because the player's party joined a battle names the battle, instead
-    /// of the "no longer active" text it shared with the Location context.
+    /// A refused map-party barter names the check that failed, instead of the "no longer active" text
+    /// every map-party refusal shared.
     /// </summary>
-    [Fact]
-    public void MapPartyBarter_PlayerPartyInMapEvent_ReportsBattleReason()
+    [Theory]
+    [InlineData(MapPartyRefusal.PlayerPartyInBattle, "Your party is in a battle.")]
+    [InlineData(MapPartyRefusal.LordPartyInBattle, "The lord's party is in a battle.")]
+    [InlineData(MapPartyRefusal.HoldEnded, "The conversation hold on the lord's party ended or belongs to another party.")]
+    [InlineData(MapPartyRefusal.HoldOnAnotherLordParty, "The conversation hold on the lord's party ended or belongs to another party.")]
+    [InlineData(MapPartyRefusal.HoldFromAnotherParty, "The conversation hold on the lord's party ended or belongs to another party.")]
+    public void MapPartyBarter_Refused_ReportsWhichCheckFailed(MapPartyRefusal refusal, string expectedReason)
     {
         var client = Clients.First();
         var player = CreatePartyWithRegisteredLeader();
         var target = CreatePartyWithRegisteredLeader();
-        var mapEvent = CreateServerMapEvent();
+        var other = CreatePartyWithRegisteredLeader();
+        var mapEvent = refusal is MapPartyRefusal.PlayerPartyInBattle or MapPartyRefusal.LordPartyInBattle
+            ? CreateServerMapEvent()
+            : null;
+        var tracker = Server.Resolve<ConversationPartyTracker>();
         var requestId = Guid.NewGuid().ToString("N");
 
         RegisterPlayer(client, player.HeroId, player.MobilePartyId);
@@ -1601,7 +1619,7 @@ public class LordBarterSyncTests : MapEventTestBase
         {
             Assert.True(Server.ObjectManager.TryGetObject<MobileParty>(target.MobilePartyId, out var targetParty));
             Assert.True(ConversationPartyHold.TryEngage(
-                Server.Resolve<ConversationPartyTracker>(),
+                tracker,
                 client.NetPeer,
                 player.PartyId,
                 targetParty,
@@ -1614,8 +1632,33 @@ public class LordBarterSyncTests : MapEventTestBase
         Server.Call(() =>
         {
             Assert.True(Server.ObjectManager.TryGetObject<MobileParty>(player.MobilePartyId, out var playerParty));
-            Assert.True(Server.ObjectManager.TryGetObject<MapEvent>(mapEvent.MapEventId, out var battle));
-            playerParty.Party._mapEventSide = battle.AttackerSide;
+            Assert.True(Server.ObjectManager.TryGetObject<MobileParty>(target.MobilePartyId, out var targetParty));
+            Assert.True(Server.ObjectManager.TryGetObject<MobileParty>(other.MobilePartyId, out var otherParty));
+            MapEvent? battle = null;
+            if (mapEvent != null)
+                Assert.True(Server.ObjectManager.TryGetObject<MapEvent>(mapEvent.MapEventId, out battle));
+
+            switch (refusal)
+            {
+                case MapPartyRefusal.PlayerPartyInBattle:
+                    playerParty.Party._mapEventSide = battle!.AttackerSide;
+                    break;
+                case MapPartyRefusal.LordPartyInBattle:
+                    targetParty.Party._mapEventSide = battle!.DefenderSide;
+                    break;
+                case MapPartyRefusal.HoldEnded:
+                    ConversationPartyHold.EndEngagement(tracker, client.NetPeer);
+                    break;
+                case MapPartyRefusal.HoldOnAnotherLordParty:
+                    ConversationPartyHold.EndEngagement(tracker, client.NetPeer);
+                    Assert.True(ConversationPartyHold.TryEngage(
+                        tracker, client.NetPeer, player.PartyId, otherParty, other.PartyId, engagerIsDefender: true));
+                    break;
+                case MapPartyRefusal.HoldFromAnotherParty:
+                    Assert.True(ConversationPartyHold.TryEngage(
+                        tracker, client.NetPeer, other.PartyId, targetParty, target.PartyId, engagerIsDefender: true));
+                    break;
+            }
         });
         Server.NetworkSentMessages.Clear();
 
@@ -1632,14 +1675,17 @@ public class LordBarterSyncTests : MapEventTestBase
 
             var result = Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkLordBarterResult>());
             Assert.False(result.Accepted);
-            Assert.Equal("Your party is in a battle.", result.Reason);
+            Assert.Equal(expectedReason, result.Reason);
         }
         finally
         {
             Server.Call(() =>
             {
                 Assert.True(Server.ObjectManager.TryGetObject<MobileParty>(player.MobilePartyId, out var playerParty));
+                Assert.True(Server.ObjectManager.TryGetObject<MobileParty>(target.MobilePartyId, out var targetParty));
                 playerParty.Party._mapEventSide = null;
+                targetParty.Party._mapEventSide = null;
+                ConversationPartyHold.EndEngagement(tracker, client.NetPeer);
             });
         }
 
@@ -1661,7 +1707,7 @@ public class LordBarterSyncTests : MapEventTestBase
 
     /// <summary>
     /// A lord barter the client can't send says why on Offer in plain words, never a type name, and
-    /// no request reaches the server.
+    /// no barter request is sent.
     /// </summary>
     [Theory]
     [InlineData(UnsendableLordBarter.UnresolvedContext, "The conversation with this lord could not be identified.")]
