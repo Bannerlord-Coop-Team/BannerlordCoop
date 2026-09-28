@@ -24,6 +24,6 @@ internal class EncounterGameMenuModelPatches
 
         // Settlement state can arrive before the encounter that the join menu dereferences.
         __result = null;
-        MessageBroker.Instance.Publish(null, new StartSettlementEncounterAttempted(mainParty, settlement));
+        MessageBroker.Instance.Publish(null, new StartSettlementEncounterAttempted(mainParty, settlement, isAutomaticRecovery: true));
     }
 }

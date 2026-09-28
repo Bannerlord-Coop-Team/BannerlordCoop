@@ -10,6 +10,7 @@ using E2E.Tests.Environment.Instance;
 using E2E.Tests.Services.MapEvents;
 using E2E.Tests.Util;
 using GameInterface.Services.GameDebug.Messages;
+using GameInterface.Services.MobileParties.Messages.Behavior;
 using GameInterface.Services.SiegeEvents.Interfaces;
 using GameInterface.Services.Villages.Interfaces;
 using HarmonyLib;
@@ -436,6 +437,50 @@ public class SiegeEntryValidationFlowTests : MapEventTestBase
         }, WithoutNetworkDelivery());
 
         Assert.Empty(client.NetworkSentMessages.GetMessages<NetworkRequestStartSettlementEncounter>());
+    }
+
+    [Theory]
+    [InlineData(false, false)]
+    [InlineData(true, false)]
+    [InlineData(false, true)]
+    public void RejectedGenericBattleRecovery_RetriesOnlyForExplicitEntryOrDifferentBattle(bool explicitEntry, bool differentBattle)
+    {
+        var client = Clients.First();
+        var context = CreateEntryContext(client);
+        var battle = CreateServerMapEvent();
+        var nextBattle = differentBattle ? CreateServerMapEvent() : battle;
+        client.NetworkSentMessages.Clear();
+
+        client.Call(() =>
+        {
+            Assert.True(client.ObjectManager.TryGetObject<Settlement>(context.SettlementId, out var settlement));
+            Assert.True(client.ObjectManager.TryGetObject<MapEvent>(battle.MapEventId, out var mapEvent));
+            using (new AllowedThread())
+            {
+                MobileParty.MainParty.CurrentSettlement = settlement;
+                settlement.Party._mapEventSide = mapEvent.DefenderSide;
+            }
+            Campaign.Current.PlayerEncounter = null;
+            Assert.Null(new DefaultEncounterGameMenuModel().GetGenericStateMenu());
+        }, WithoutNetworkDelivery());
+
+        var request = Assert.Single(client.NetworkSentMessages.GetMessages<NetworkRequestStartSettlementEncounter>());
+        client.SimulateMessage(Server.NetPeer, new NetworkSettlementEncounterRejected(request));
+
+        client.Call(() =>
+        {
+            Assert.True(client.ObjectManager.TryGetObject<Settlement>(context.SettlementId, out var settlement));
+            Assert.True(client.ObjectManager.TryGetObject<MapEvent>(nextBattle.MapEventId, out var mapEvent));
+            using (new AllowedThread()) settlement.Party._mapEventSide = mapEvent.DefenderSide;
+
+            if (explicitEntry)
+                client.SimulateMessage(this, new StartSettlementEncounterAttempted(MobileParty.MainParty, settlement));
+            Assert.Null(new DefaultEncounterGameMenuModel().GetGenericStateMenu());
+            Assert.Null(PlayerEncounter.Current);
+        }, WithoutNetworkDelivery());
+
+        Assert.Equal(explicitEntry || differentBattle ? 2 : 1,
+            client.NetworkSentMessages.GetMessages<NetworkRequestStartSettlementEncounter>().Count());
     }
 
     private EntryContext CreateEntryContext(EnvironmentInstance client)

@@ -10,6 +10,7 @@ using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Settlements.Interfaces;
 using TaleWorlds.CampaignSystem.Encounters;
 using TaleWorlds.CampaignSystem.GameMenus;
+using TaleWorlds.CampaignSystem.MapEvents;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Settlements;
 
@@ -27,6 +28,7 @@ public class ClientSettlementExitEnterHandler : IHandler
     // Local attempts and all response transitions run on the game thread.
     private PendingStart pendingStart;
     private uint pendingLeavePartyId;
+    private (MobileParty Party, Settlement Settlement, MapEvent Battle) lastAutomaticRecovery;
 
     public ClientSettlementExitEnterHandler(
         IMessageBroker messageBroker,
@@ -69,6 +71,15 @@ public class ClientSettlementExitEnterHandler : IHandler
 
         if (pendingStart != null)
             return;
+
+        if (payload.IsAutomaticRecovery)
+        {
+            var recovery = (payload.Party, payload.Settlement, payload.Settlement.Party.MapEvent);
+            // A rejected automatic request must not repeat on every map tick.
+            if (lastAutomaticRecovery == recovery)
+                return;
+            lastAutomaticRecovery = recovery;
+        }
 
         var request = new NetworkRequestStartSettlementEncounter(partyId, settlementId);
         pendingStart = new PendingStart(
@@ -116,6 +127,7 @@ public class ClientSettlementExitEnterHandler : IHandler
 
     private void ApplySettlementEncounter(uint partyId, uint settlementId)
     {
+        lastAutomaticRecovery = default;
         if (!objectManager.TryGetObjectWithLogging(partyId, out MobileParty party)) return;
         if (!objectManager.TryGetObjectWithLogging(settlementId, out Settlement settlement)) return;
 
@@ -207,6 +219,7 @@ public class ClientSettlementExitEnterHandler : IHandler
         if (!IsMainParty(partyId))
             return;
 
+        lastAutomaticRecovery = default;
         if (!resolvesPendingLeave)
             pendingStart = null;
 
@@ -264,6 +277,7 @@ public class ClientSettlementExitEnterHandler : IHandler
         if (!IsMainParty(partyId))
             return;
 
+        lastAutomaticRecovery = default;
         if (PlayerEncounter.Current == null || PlayerEncounter.EncounterSettlement == null)
             return;
 
