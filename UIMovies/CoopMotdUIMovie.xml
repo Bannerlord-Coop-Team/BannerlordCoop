@@ -22,7 +22,7 @@
                 <ScrollablePanel Id="MotdScroll" WidthSizePolicy="StretchToParent" HeightSizePolicy="CoverChildren" MarginLeft="40" MarginRight="48"
                                  AutoHideScrollBars="true" ClipRect="Clip" InnerPanel="Clip\Paragraphs" VerticalScrollbar="..\..\MotdScrollbar">
                   <Children>
-                    <Widget Id="Clip" WidthSizePolicy="StretchToParent" HeightSizePolicy="CoverChildren" MaxHeight="426" ClipContents="true">
+                    <Widget Id="Clip" WidthSizePolicy="StretchToParent" HeightSizePolicy="CoverChildren" MaxHeight="420" ClipContents="true">
                       <Children>
                         <ListPanel Id="Paragraphs" DataSource="{Paragraphs}" WidthSizePolicy="StretchToParent" HeightSizePolicy="CoverChildren" StackLayout.LayoutMethod="VerticalTopToBottom">
                           <ItemTemplate>
@@ -33,7 +33,7 @@
                     </Widget>
                   </Children>
                 </ScrollablePanel>
-                <Widget WidthSizePolicy="StretchToParent" HeightSizePolicy="Fixed" SuggestedHeight="66" DoNotAcceptEvents="true"/>
+                <Widget WidthSizePolicy="StretchToParent" HeightSizePolicy="Fixed" SuggestedHeight="72" DoNotAcceptEvents="true"/>
               </Children>
             </ListPanel>
             <ScrollbarWidget Id="MotdScrollbar" WidthSizePolicy="Fixed" SuggestedWidth="16" HeightSizePolicy="StretchToParent" HorizontalAlignment="Right" MarginRight="18" MarginTop="130" MarginBottom="74"
