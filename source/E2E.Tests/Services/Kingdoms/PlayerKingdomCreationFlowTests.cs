@@ -1856,7 +1856,7 @@ public class PlayerKingdomCreationFlowTests : IDisposable
     [Fact]
     public void KingdomDecisionFinalVote_VotedClaimantFollowUpGivesWayToNextBallot()
     {
-        var (client1, client2, player1, player2, kingdomId) = SetUpPlayerDeclareWarVotes("TargetKingdomClaimantFollowUp");
+        var (client1, client2, player1, player2, kingdomId) = SetUpPlayerDeclareWarVotes("TargetKingdomClaimantFollowUp", decisionCount: 2);
         LeadPlayerPartiesEverywhere(player1, player2);
         string settlementId = CreateSyncedKingdomTown(player2.ClanId, player2.CultureId);
         // The claimant merit reads map distances, which the test campaign has no map for.
@@ -1893,14 +1893,15 @@ public class PlayerKingdomCreationFlowTests : IDisposable
             client1.Call(() =>
             {
                 MBReadOnlyList<KingdomDecision> decisions = Clan.PlayerClan.Kingdom.UnresolvedDecisions;
-                Assert.Equal(2, decisions.Count);
+                Assert.Equal(3, decisions.Count);
                 var warDecision = Assert.IsType<DeclareWarDecision>(decisions[0]);
-                var claimantDecision = Assert.IsType<SettlementClaimantDecision>(decisions[1]);
+                var laterWarDecision = Assert.IsType<DeclareWarDecision>(decisions[1]);
+                var claimantDecision = Assert.IsType<SettlementClaimantDecision>(decisions[2]);
                 var preliminaryDecision = Assert.IsType<SettlementClaimantPreliminaryDecision>(
                     Assert.Single(decisionsVm._solvedDecisionsSinceInit));
                 Assert.Same(claimantDecision, preliminaryDecision.GetFollowUpDecision());
 
-                // Not voted yet, the follow-up comes before the older ballot like in vanilla.
+                // Not voted yet, the follow-up comes before the older ballots like in vanilla.
                 Assert.Single(CaptureInquiries(decisionsVm.OnFrameTick)).AffirmativeAction();
                 AssertOpenBallot(decisionsVm, claimantDecision);
                 SubmitCurrentDecisionVote(decisionsVm, outcome =>
@@ -1908,12 +1909,17 @@ public class PlayerKingdomCreationFlowTests : IDisposable
                 Assert.Null(decisionsVm.CurrentDecision);
                 Assert.Contains(claimantDecision, Clan.PlayerClan.Kingdom.UnresolvedDecisions);
 
+                // Once voted, the very next tick prompts the next ballot.
+                Assert.Single(CaptureInquiries(decisionsVm.OnFrameTick)).AffirmativeAction();
+                AssertOpenBallot(decisionsVm, warDecision);
+                SubmitCurrentDecisionVote(decisionsVm, outcome => IsDeclareWarOutcome(outcome, true));
+
                 // The fiefs tab Resolve still reopens it, and closing that view does not bring it back.
                 decisionsVm.RefreshWith(claimantDecision);
                 AssertClosableWaitingViewCloses(decisionsVm, claimantDecision);
 
                 Assert.Single(CaptureInquiries(decisionsVm.OnFrameTick)).AffirmativeAction();
-                AssertOpenBallot(decisionsVm, warDecision);
+                AssertOpenBallot(decisionsVm, laterWarDecision);
             });
         }
         finally
@@ -1921,7 +1927,7 @@ public class PlayerKingdomCreationFlowTests : IDisposable
             harmony.UnpatchAll(harmony.Id);
         }
 
-        Assert.Equal(2, client1.NetworkSentMessages.GetMessages<NetworkRequestKingdomDecisionVote>().Count());
+        Assert.Equal(3, client1.NetworkSentMessages.GetMessages<NetworkRequestKingdomDecisionVote>().Count());
     }
 
     private static bool FixedClaimantMeritPrefix(ref float __result)
