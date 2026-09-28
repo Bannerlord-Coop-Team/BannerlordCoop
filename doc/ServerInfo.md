@@ -68,6 +68,6 @@ The server reads one file, the first that applies:
 2. `server-info.json` in the folder named by `COOP_DATA_DIR`.
 3. `..\..\..\server-data\server-info.json`, relative to the folder that holds the server program. This is used only when neither variable is set.
 
-To move only this file, set `COOP_SERVER_INFO_FILE`, because `COOP_DATA_DIR` also moves `mod-config.json`.
+To move only this file, set `COOP_SERVER_INFO_FILE`, because `COOP_DATA_DIR` also moves `mod-config.json` and `steam-bans.json`. [Server data locations](ServerDataLocations.md) lists the other server files and the variables that move them.
 
 The file is read once when the server starts, so restart the server after editing it. Without the file nothing is shown and nothing is logged. If the file holds malformed JSON, the server logs an error and runs without server info. A file larger than 256 KB is not read: the server logs a warning and runs without server info. Everything the limits keep fits in a small part of that. The server log shows how many paragraphs, rules, links and news entries it loaded, not their text.
