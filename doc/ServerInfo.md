@@ -48,7 +48,7 @@ Text is cut at the limit without splitting a character, and nothing after a cut 
 
 ## Links
 
-A link is kept only if its address is an absolute `http://` or `https://` address with a host, has no user name or password (`user@host`), no spaces, backslashes, control or invisible characters, and is at most 512 characters long. Anything else, such as `javascript:`, `file:`, `ftp:` or a relative address like `/rules`, is dropped with a warning naming its index in the `links` array (the first entry is index 0) and never reaches a player. The server log does not show the address.
+A link is kept only if its address is an absolute `http://` or `https://` address whose host is a domain name like `discord.gg`, has no user name or password (`user@host`), no spaces, backslashes, control or invisible characters, and is at most 512 characters long. Anything else, such as `javascript:`, `file:`, `ftp:`, a relative address like `/rules`, an IP address like `http://192.168.1.1/`, a single name like `http://localhost/` or `http://router/`, a name under `.localhost`, a host ending in a dot or port 0, is dropped with a warning naming its index in the `links` array (the first entry is index 0) and never reaches a player. The server log does not show the address.
 
 The address a player sees is normalized: the scheme and host are lower case, a default port is dropped, the path is escaped, and a host with non-English letters is shown in its `xn--` form, so a name that only looks like another cannot pass for it. Each player's game checks every link again before showing it, and its log names the index of any link it drops, again without the address.
 

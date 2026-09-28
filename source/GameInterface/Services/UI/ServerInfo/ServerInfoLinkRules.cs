@@ -7,9 +7,10 @@ namespace GameInterface.Services.UI.ServerInfo;
 public interface IServerInfoLinkRules
 {
     /// <summary>
-    /// Accepts an absolute http or https address with a host, no user info, no whitespace or control
-    /// characters, within <see cref="ServerInfoLimits.MaxLinkUrlLength"/>, and returns it in a plain
-    /// ASCII form with the host in punycode. Anything else is rejected.
+    /// Accepts an absolute http or https address whose host is a domain name, with no user info, no whitespace or
+    /// control characters and no port 0, within <see cref="ServerInfoLimits.MaxLinkUrlLength"/>, and returns it in a
+    /// plain ASCII form with the host in punycode. Anything else, IP addresses and names like localhost included, is
+    /// rejected.
     /// </summary>
     bool TryNormalize(string address, out string normalized);
 }
@@ -57,23 +58,28 @@ public sealed class ServerInfoLinkRules : IServerInfoLinkRules
     // Punycode shows a look-alike host for what it is, and the escaped path keeps the whole address ASCII.
     private static string Normalize(Uri uri)
     {
-        string host;
-        switch (uri.HostNameType)
-        {
-            case UriHostNameType.Dns:
-                host = uri.IdnHost;
-                break;
-            case UriHostNameType.IPv4:
-            case UriHostNameType.IPv6:
-                host = uri.Host;
-                break;
-            default:
-                return null;
-        }
+        // Community links use domain names, and an IP address can point the browser at the player's own machine or network.
+        if (uri.HostNameType != UriHostNameType.Dns) return null;
 
-        if (string.IsNullOrEmpty(host)) return null;
+        string host = uri.IdnHost;
+        // No browser opens port 0, so it would only make a confusing address.
+        if (!IsDomainName(host) || uri.Port == 0) return null;
+
         string port = uri.IsDefaultPort ? string.Empty : ":" + uri.Port.ToString(CultureInfo.InvariantCulture);
         return uri.Scheme + "://" + host + port + uri.PathAndQuery + uri.Fragment;
+    }
+
+    // A name that ends in a number is an IP address to a browser, a single name like localhost or one under .localhost
+    // reaches the player's own machine or network, and a trailing dot makes one site look like two.
+    private static bool IsDomainName(string host)
+    {
+        if (string.IsNullOrEmpty(host) || host.EndsWith(".localhost", StringComparison.OrdinalIgnoreCase)) return false;
+
+        int lastDot = host.LastIndexOf('.');
+        if (lastDot <= 0 || lastDot == host.Length - 1) return false;
+
+        char first = char.ToLowerInvariant(host[lastDot + 1]);
+        return first >= 'a' && first <= 'z';
     }
 
     private static bool HasOnlyAddressCharacters(string address)
