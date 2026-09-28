@@ -13,7 +13,6 @@ using TaleWorlds.CampaignSystem.ViewModelCollection;
 using TaleWorlds.CampaignSystem.ViewModelCollection.KingdomManagement.Decisions;
 using TaleWorlds.CampaignSystem.ViewModelCollection.KingdomManagement.Decisions.ItemTypes;
 using TaleWorlds.CampaignSystem.ViewModelCollection.KingdomManagement.Diplomacy;
-using TaleWorlds.CampaignSystem.ViewModelCollection.KingdomManagement.Policies;
 using TaleWorlds.Core;
 using TaleWorlds.Localization;
 
@@ -290,146 +289,9 @@ namespace GameInterface.Services.Kingdoms.Patches
         }
     }
 
-    [HarmonyPatch(typeof(KingdomPoliciesVM))]
-    internal class KingdomPoliciesVMPatches
-    {
-        [HarmonyPatch(nameof(KingdomPoliciesVM.RefreshValues))]
-        [HarmonyPostfix]
-        internal static void RefreshValuesPostfix(KingdomPoliciesVM __instance)
-        {
-            DisablePolicyResolveIfAlreadyVoted(__instance);
-        }
-
-        [HarmonyPatch("OnPolicySelect")]
-        [HarmonyPostfix]
-        internal static void OnPolicySelectPostfix(KingdomPoliciesVM __instance)
-        {
-            DisablePolicyResolveIfAlreadyVoted(__instance);
-        }
-
-        [HarmonyPatch("ExecuteProposeOrDisavow")]
-        [HarmonyPrefix]
-        internal static bool ExecuteProposeOrDisavowPrefix(KingdomPoliciesVM __instance)
-        {
-            return !KingdomDecisionsVMPatches.TryGetVoteManager(out var voteManager) ||
-                   !voteManager.ShouldDisableResolveDecision(__instance?._currentItemsUnresolvedDecision);
-        }
-
-        internal static void DisablePolicyResolveIfAlreadyVoted(KingdomPoliciesVM policiesVm)
-        {
-            if (policiesVm == null) return;
-            if (!KingdomDecisionsVMPatches.TryGetVoteManager(out var voteManager)) return;
-            if (!voteManager.ShouldDisableResolveDecision(policiesVm._currentItemsUnresolvedDecision)) return;
-
-            policiesVm.CanProposeOrDisavowPolicy = false;
-            if (policiesVm.DoneHint != null)
-            {
-                policiesVm.DoneHint.HintText = KingdomTabResolveDecisionPatches.AlreadyVotedHint;
-            }
-        }
-    }
-
     [HarmonyPatch(typeof(KingdomDiplomacyVM))]
     public class KingdomDiplomacyVMPatches
     {
-        [HarmonyPatch(nameof(KingdomDiplomacyVM.RefreshValues))]
-        [HarmonyPostfix]
-        internal static void RefreshValuesPostfix(KingdomDiplomacyVM __instance)
-        {
-            DisableDiplomacyResolveActionsIfAlreadyVoted(__instance, __instance.CurrentSelectedDiplomacyItem);
-        }
-
-        [HarmonyPatch("OnSetWarItem")]
-        [HarmonyPostfix]
-        internal static void OnSetWarItemPostfix(KingdomDiplomacyVM __instance, KingdomWarItemVM item)
-        {
-            if (PeaceOfferIsPending(__instance, item)) return;
-            DisableDiplomacyResolveActionsIfAlreadyVoted(__instance, item);
-        }
-
-        [HarmonyPatch("OnSetPeaceItem")]
-        [HarmonyPostfix]
-        internal static void OnSetPeaceItemPostfix(KingdomDiplomacyVM __instance, KingdomTruceItemVM item)
-        {
-            if (AllianceOfferPending(__instance, item)) return;
-            DisableDiplomacyResolveActionsIfAlreadyVoted(__instance, item);
-        }
-
-        internal static void DisableDiplomacyResolveActionsIfAlreadyVoted(
-            KingdomDiplomacyVM diplomacyVm,
-            KingdomDiplomacyItemVM diplomacyItem)
-        {
-            if (diplomacyVm?.Actions == null || diplomacyItem == null) return;
-
-            List<KingdomDecision> resolveDecisions = GetResolveDecisions(diplomacyItem)
-                .Where(decision => decision != null)
-                .ToList();
-            if (resolveDecisions.Count == 0) return;
-
-            int resolveDecisionIndex = 0;
-            foreach (KingdomDiplomacyProposalActionItemVM action in diplomacyVm.Actions)
-            {
-                if (!KingdomTabResolveDecisionPatches.IsResolveAction(action)) continue;
-                if (resolveDecisionIndex >= resolveDecisions.Count) return;
-
-                KingdomDecision resolveDecision = resolveDecisions[resolveDecisionIndex++];
-                if (!KingdomDecisionsVMPatches.TryGetVoteManager(out var voteManager)) return;
-                if (!voteManager.ShouldDisableResolveDecision(resolveDecision)) continue;
-
-                KingdomTabResolveDecisionPatches.DisableAction(action);
-            }
-        }
-
-        internal static bool PeaceOfferIsPending(KingdomDiplomacyVM diplomacyVm, KingdomWarItemVM diplomacyItem)
-        {
-            if (diplomacyVm?.Actions == null || diplomacyItem == null) return false;
-            if (Clan.PlayerClan?.Kingdom == null) return false;
-
-            Kingdom playerKingdom = Clan.PlayerClan.Kingdom;
-            Kingdom targetKingdom = diplomacyItem.Faction2 as Kingdom;
-            if (targetKingdom == null) return false;
-
-            return PeaceOfferPendingRegistry.IsPending(playerKingdom.StringId, targetKingdom.StringId);
-        }
-
-        internal static bool AllianceOfferPending(KingdomDiplomacyVM diplomacyVm, KingdomTruceItemVM diplomacyItem)
-        {
-            if (diplomacyVm?.Actions == null || diplomacyItem == null) return false;
-            if (Clan.PlayerClan?.Kingdom == null) return false;
-
-            Kingdom playerKingdom = Clan.PlayerClan.Kingdom;
-            Kingdom targetKingdom = diplomacyItem.Faction2 as Kingdom;
-            if (targetKingdom == null) return false;
-
-            return AllianceOfferPendingRegistry.IsPending(playerKingdom.StringId, targetKingdom.StringId);
-        }
-
-        private static IEnumerable<KingdomDecision> GetResolveDecisions(KingdomDiplomacyItemVM diplomacyItem)
-        {
-            if (Clan.PlayerClan?.Kingdom?.UnresolvedDecisions == null) yield break;
-
-            IFaction faction = diplomacyItem.Faction2;
-            if (diplomacyItem is KingdomWarItemVM)
-            {
-                yield return Clan.PlayerClan.Kingdom.UnresolvedDecisions
-                    .OfType<MakePeaceKingdomDecision>()
-                    .FirstOrDefault(decision => decision.FactionToMakePeaceWith == faction);
-                yield break;
-            }
-
-            if (diplomacyItem is not KingdomTruceItemVM) yield break;
-
-            yield return Clan.PlayerClan.Kingdom.UnresolvedDecisions
-                .OfType<StartAllianceDecision>()
-                .FirstOrDefault(decision => decision.KingdomToStartAllianceWith == faction);
-            yield return Clan.PlayerClan.Kingdom.UnresolvedDecisions
-                .OfType<DeclareWarDecision>()
-                .FirstOrDefault(decision => decision.FactionToDeclareWarOn == faction);
-            yield return Clan.PlayerClan.Kingdom.UnresolvedDecisions
-                .OfType<TradeAgreementDecision>()
-                .FirstOrDefault(decision => decision.TargetKingdom == faction);
-        }
-
         /// <summary>
         /// Kingdom.UnresolveDecisions is not uniformly synchronized,
         /// so we have to send a request to the server,
@@ -499,32 +361,6 @@ namespace GameInterface.Services.Kingdoms.Patches
         internal static bool ExecuteActionPrefix(KingdomDiplomacyProposalActionItemVM __instance)
         {
             return __instance?.IsEnabled ?? false;
-        }
-    }
-
-    internal static class KingdomTabResolveDecisionPatches
-    {
-        private static readonly TextObject AlreadyVotedHintText = new TextObject("You have already voted on this decision.");
-
-        internal static TextObject AlreadyVotedHint => AlreadyVotedHintText;
-
-        internal static bool IsResolveAction(KingdomDiplomacyProposalActionItemVM action)
-        {
-            if (action == null) return false;
-
-            string resolveText = GameTexts.FindText("str_resolve")?.ToString();
-            return !string.IsNullOrWhiteSpace(resolveText) && string.Equals(action.Name, resolveText, StringComparison.Ordinal);
-        }
-
-        internal static void DisableAction(KingdomDiplomacyProposalActionItemVM action)
-        {
-            if (action == null) return;
-
-            action.IsEnabled = false;
-            if (action.Hint != null)
-            {
-                action.Hint.HintText = AlreadyVotedHint;
-            }
         }
     }
 

@@ -2758,7 +2758,7 @@ public class PlayerKingdomCreationFlowTests : IDisposable
     }
 
     [Fact]
-    public void KingdomDecisionResolveTabs_DisableDiplomacyResolveOnlyForClientsThatAlreadyVoted()
+    public void KingdomDecisionResolveTabs_DiplomacyResolveReopensClosableWaitingViewAfterVote()
     {
         var client1 = Clients.First();
         var client2 = Clients.Skip(1).First();
@@ -2794,20 +2794,17 @@ public class PlayerKingdomCreationFlowTests : IDisposable
             var decision = Assert.IsType<DeclareWarDecision>(Assert.Single(kingdom.UnresolvedDecisions));
             var voteManager = GetVoteManager(client1);
             voteManager.RegisterDecision(decision);
-
-            var diplomacyVm = CreateDiplomacyResolveVm(out var resolveAction);
-            var truceItem = CreateTruceItem(decision.FactionToDeclareWarOn);
-
-            KingdomDiplomacyVMPatches.DisableDiplomacyResolveActionsIfAlreadyVoted(diplomacyVm, truceItem);
-            Assert.True(resolveAction.IsEnabled);
-            Assert.True(KingdomDiplomacyProposalActionItemVMPatches.ExecuteActionPrefix(resolveAction));
-
             voteManager.ApplyRemoteVote(player1.ClanId, player1FinalVote);
             Assert.True(voteManager.HasLocalPlayerSubmittedVote(decision));
 
-            KingdomDiplomacyVMPatches.DisableDiplomacyResolveActionsIfAlreadyVoted(diplomacyVm, truceItem);
-            Assert.False(resolveAction.IsEnabled);
-            Assert.False(KingdomDiplomacyProposalActionItemVMPatches.ExecuteActionPrefix(resolveAction));
+            var decisionsVm = new KingdomDecisionsVM(() => { });
+            KingdomDiplomacyProposalActionItemVM resolveAction =
+                SelectDiplomacyResolveAction(kingdom, decision.FactionToDeclareWarOn, decisionsVm);
+            Assert.True(resolveAction.IsEnabled);
+
+            resolveAction.ExecuteAction();
+
+            AssertClosableWaitingViewCloses(decisionsVm, decision);
         });
 
         client2.Call(() =>
@@ -2819,17 +2816,19 @@ public class PlayerKingdomCreationFlowTests : IDisposable
             voteManager.ApplyRemoteVote(player1.ClanId, player1FinalVote);
             Assert.False(voteManager.HasLocalPlayerSubmittedVote(decision));
 
-            var diplomacyVm = CreateDiplomacyResolveVm(out var resolveAction);
-            var truceItem = CreateTruceItem(decision.FactionToDeclareWarOn);
+            var decisionsVm = new KingdomDecisionsVM(() => { });
+            KingdomDiplomacyProposalActionItemVM resolveAction =
+                SelectDiplomacyResolveAction(kingdom, decision.FactionToDeclareWarOn, decisionsVm);
+            resolveAction.ExecuteAction();
 
-            KingdomDiplomacyVMPatches.DisableDiplomacyResolveActionsIfAlreadyVoted(diplomacyVm, truceItem);
-            Assert.True(resolveAction.IsEnabled);
-            Assert.True(KingdomDiplomacyProposalActionItemVMPatches.ExecuteActionPrefix(resolveAction));
+            AssertOpenBallot(decisionsVm, decision);
         });
+
+        Assert.Empty(client1.NetworkSentMessages.GetMessages<NetworkRequestKingdomDecisionVote>());
     }
 
     [Fact]
-    public void KingdomDecisionResolveTabs_DisablePolicyResolveOnlyForClientsThatAlreadyVoted()
+    public void KingdomDecisionResolveTabs_PolicyResolveReopensClosableWaitingViewAfterVote()
     {
         var client1 = Clients.First();
         var client2 = Clients.Skip(1).First();
@@ -2875,19 +2874,16 @@ public class PlayerKingdomCreationFlowTests : IDisposable
             var decision = Assert.IsType<KingdomPolicyDecision>(Assert.Single(kingdom.UnresolvedDecisions));
             var voteManager = GetVoteManager(client1);
             voteManager.RegisterDecision(decision);
-
-            KingdomPoliciesVM policiesVm = CreatePolicyResolveVm(decision);
-            KingdomPoliciesVMPatches.DisablePolicyResolveIfAlreadyVoted(policiesVm);
-            Assert.True(policiesVm.CanProposeOrDisavowPolicy);
-            Assert.True(KingdomPoliciesVMPatches.ExecuteProposeOrDisavowPrefix(policiesVm));
-
             voteManager.ApplyRemoteVote(player1.ClanId, player1FinalVote);
             Assert.True(voteManager.HasLocalPlayerSubmittedVote(decision));
 
-            policiesVm = CreatePolicyResolveVm(decision);
-            KingdomPoliciesVMPatches.DisablePolicyResolveIfAlreadyVoted(policiesVm);
-            Assert.False(policiesVm.CanProposeOrDisavowPolicy);
-            Assert.False(KingdomPoliciesVMPatches.ExecuteProposeOrDisavowPrefix(policiesVm));
+            var decisionsVm = new KingdomDecisionsVM(() => { });
+            KingdomPoliciesVM policiesVm = SelectPolicyWithResolve(decision, decisionsVm);
+            Assert.True(policiesVm.CanProposeOrDisavowPolicy);
+
+            policiesVm.ExecuteProposeOrDisavow();
+
+            AssertClosableWaitingViewCloses(decisionsVm, decision);
         });
 
         client2.Call(() =>
@@ -2899,11 +2895,16 @@ public class PlayerKingdomCreationFlowTests : IDisposable
             voteManager.ApplyRemoteVote(player1.ClanId, player1FinalVote);
             Assert.False(voteManager.HasLocalPlayerSubmittedVote(decision));
 
-            KingdomPoliciesVM policiesVm = CreatePolicyResolveVm(decision);
-            KingdomPoliciesVMPatches.DisablePolicyResolveIfAlreadyVoted(policiesVm);
+            var decisionsVm = new KingdomDecisionsVM(() => { });
+            KingdomPoliciesVM policiesVm = SelectPolicyWithResolve(decision, decisionsVm);
             Assert.True(policiesVm.CanProposeOrDisavowPolicy);
-            Assert.True(KingdomPoliciesVMPatches.ExecuteProposeOrDisavowPrefix(policiesVm));
+
+            policiesVm.ExecuteProposeOrDisavow();
+
+            AssertOpenBallot(decisionsVm, decision);
         });
+
+        Assert.Empty(client1.NetworkSentMessages.GetMessages<NetworkRequestKingdomDecisionVote>());
     }
 
     [Fact]
@@ -4575,36 +4576,68 @@ public class PlayerKingdomCreationFlowTests : IDisposable
                (bool)fieldInfo.GetValue(outcome) == shouldWarBeDeclared;
     }
 
-    private static KingdomDiplomacyVM CreateDiplomacyResolveVm(out KingdomDiplomacyProposalActionItemVM resolveAction)
+    // Builds the Resolve action through vanilla OnSetPeaceItem, wired to the decision panel like the kingdom screen.
+    private static KingdomDiplomacyProposalActionItemVM SelectDiplomacyResolveAction(
+        Kingdom kingdom,
+        IFaction faction,
+        KingdomDecisionsVM decisionsVm)
     {
         var diplomacyVm = ObjectHelper.SkipConstructor<KingdomDiplomacyVM>();
-        var actions = new MBBindingList<KingdomDiplomacyProposalActionItemVM>();
-        resolveAction = new KingdomDiplomacyProposalActionItemVM(
-            GameTexts.FindText("str_resolve"),
-            GameTexts.FindText("str_resolve_explanation"),
-            0,
-            true,
-            TextObject.GetEmpty(),
-            () => { });
-        actions.Add(resolveAction);
-        AccessTools.Field(typeof(KingdomDiplomacyVM), "_actions").SetValue(diplomacyVm, actions);
-        return diplomacyVm;
-    }
+        AccessTools.Field(typeof(KingdomDiplomacyVM), "_actions")
+            .SetValue(diplomacyVm, new MBBindingList<KingdomDiplomacyProposalActionItemVM>());
+        AccessTools.Field(typeof(KingdomDiplomacyVM), "_playerKingdom").SetValue(diplomacyVm, kingdom);
+        AccessTools.Field(typeof(KingdomDiplomacyVM), "_forceDecision")
+            .SetValue(diplomacyVm, new Action<KingdomDecision>(decisionsVm.RefreshWith));
 
-    private static KingdomTruceItemVM CreateTruceItem(IFaction faction)
-    {
         var truceItem = ObjectHelper.SkipConstructor<KingdomTruceItemVM>();
+        AccessTools.Field(typeof(KingdomDiplomacyItemVM), "Faction1").SetValue(truceItem, kingdom);
         AccessTools.Field(typeof(KingdomDiplomacyItemVM), "Faction2").SetValue(truceItem, faction);
-        return truceItem;
+        diplomacyVm.OnSetPeaceItem(truceItem);
+
+        string resolveText = GameTexts.FindText("str_resolve").ToString();
+        return Assert.Single(diplomacyVm.Actions, action => action.Name == resolveText);
     }
 
-    private static KingdomPoliciesVM CreatePolicyResolveVm(KingdomDecision decision)
+    // Selects the policy through vanilla OnPolicySelect, wired to the decision panel like the kingdom screen.
+    private static KingdomPoliciesVM SelectPolicyWithResolve(KingdomPolicyDecision decision, KingdomDecisionsVM decisionsVm)
     {
         var policiesVm = ObjectHelper.SkipConstructor<KingdomPoliciesVM>();
-        AccessTools.Field(typeof(KingdomPoliciesVM), "_currentItemsUnresolvedDecision").SetValue(policiesVm, decision);
-        AccessTools.Field(typeof(KingdomPoliciesVM), "_canProposeOrDisavowPolicy").SetValue(policiesVm, true);
         AccessTools.Field(typeof(KingdomPoliciesVM), "_doneHint").SetValue(policiesVm, new HintViewModel());
+        AccessTools.Field(typeof(KingdomPoliciesVM), "_forceDecide")
+            .SetValue(policiesVm, new Action<KingdomDecision>(decisionsVm.RefreshWith));
+
+        var policyItem = ObjectHelper.SkipConstructor<KingdomPolicyItemVM>();
+        AccessTools.Field(typeof(KingdomPolicyItemVM), "_policy").SetValue(policyItem, decision.Policy);
+        policiesVm.OnPolicySelect(policyItem);
+
+        Assert.Same(decision, policiesVm._currentItemsUnresolvedDecision);
         return policiesVm;
+    }
+
+    private static void AssertClosableWaitingViewCloses(KingdomDecisionsVM decisionsVm, KingdomDecision decision)
+    {
+        DecisionItemBaseVM decisionItem = decisionsVm.CurrentDecision;
+        Assert.NotNull(decisionItem);
+        Assert.Same(decision, decisionItem.KingdomDecisionMaker._decision);
+        Assert.True(decisionItem.IsActive);
+        Assert.True(decisionItem._finalSelectionDone);
+        Assert.True(decisionItem.CanEndDecision);
+        Assert.All(decisionItem.DecisionOptionsList, candidate => Assert.False(candidate.CanBeChosen));
+
+        decisionItem.ExecuteFinalSelection();
+
+        Assert.Null(decisionsVm.CurrentDecision);
+        Assert.False(decisionItem.IsActive);
+    }
+
+    private static void AssertOpenBallot(KingdomDecisionsVM decisionsVm, KingdomDecision decision)
+    {
+        DecisionItemBaseVM decisionItem = decisionsVm.CurrentDecision;
+        Assert.NotNull(decisionItem);
+        Assert.Same(decision, decisionItem.KingdomDecisionMaker._decision);
+        Assert.True(decisionItem.IsActive);
+        Assert.False(decisionItem._finalSelectionDone);
+        Assert.Contains(decisionItem.DecisionOptionsList, candidate => candidate.CanBeChosen);
     }
 
     private static void ConfigureClanFief(EnvironmentInstance instance, string clanId, string fiefId, string settlementId)

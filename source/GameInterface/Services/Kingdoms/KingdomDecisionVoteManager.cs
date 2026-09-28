@@ -42,7 +42,6 @@ namespace GameInterface.Services.Kingdoms
         IReadOnlyList<string> GetDecisionWaitingColumns(DecisionItemBaseVM decisionItem);
         string RefreshDecisionTitle(DecisionItemBaseVM decisionItem);
         bool ShouldSuppressLocalDecision(KingdomDecision decision);
-        bool ShouldDisableResolveDecision(KingdomDecision decision);
         bool HasLocalPlayerSubmittedVote(KingdomDecision decision);
         bool IsSubmittedDecision(KingdomDecision decision);
         void DismissSubmittedDecisionItem(DecisionItemBaseVM decisionItem);
@@ -371,11 +370,6 @@ namespace GameInterface.Services.Kingdoms
             if (Clan.PlayerClan.Kingdom != decision.Kingdom) return false;
             if (DecisionStates.TryGetValue(decision, out KingdomDecisionVoteState state) && state.IsResolved) return true;
             return !IsLocalPlayerEligible(decision);
-        }
-
-        public bool ShouldDisableResolveDecision(KingdomDecision decision)
-        {
-            return HasLocalPlayerSubmittedVote(decision);
         }
 
         public bool HasLocalPlayerSubmittedVote(KingdomDecision decision)
