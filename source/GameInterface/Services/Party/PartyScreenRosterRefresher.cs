@@ -488,9 +488,6 @@ internal class PartyScreenRosterRefresher : IPartyScreenRosterRefresher
                 ((long)previousVisible.Wounded - previousBaseline.Wounded);
             long xp = authoritative.Xp +
                 ((long)previousVisible.Xp - previousBaseline.Xp);
-            // An emptied stack keeps no xp, so a server xp gain on it leaves the pending removal valid.
-            // A loss still resets, because the troops moved out already carry the old xp.
-            if (number == 0 && xp > 0 && authoritative.Xp >= previousBaseline.Xp) xp = 0;
             if (number < 0 ||
                 number > int.MaxValue ||
                 wounded < 0 ||
