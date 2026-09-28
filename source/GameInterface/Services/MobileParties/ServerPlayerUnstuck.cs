@@ -20,8 +20,8 @@ using TaleWorlds.CampaignSystem.Party;
 namespace GameInterface.Services.MobileParties;
 
 /// <summary>
-/// Server steps of the unstuck flow, shared by a player's own coop.unstuck request and the
-/// operator's coop.unstuck_player command.
+/// Server steps of the unstuck flow, shared by a player's own coop.unstuck request and an
+/// operator's coop.unstuck on the server.
 /// </summary>
 internal interface IServerPlayerUnstuck
 {

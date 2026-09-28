@@ -1,11 +1,11 @@
-﻿using GameInterface.Services.MobileParties.Commands;
+﻿using GameInterface.Services.GameDebug.Commands;
 using GameInterface.Services.Players.Data;
 using System.Collections.Generic;
 using Xunit;
 
 namespace GameInterface.Tests.Services.MobileParties;
 
-/// <summary>Verifies how coop.unstuck_player picks its target from a controller id or hero name.</summary>
+/// <summary>Verifies how coop.unstuck on the server picks its target from a controller id or hero name.</summary>
 public class UnstuckPlayerTargetResolutionTests
 {
     private static readonly Player Mira = new Player("76561198000000001", "hero_mira", "party_mira", null, null);
@@ -22,7 +22,7 @@ public class UnstuckPlayerTargetResolutionTests
     };
 
     private static bool Resolve(string query, out Player target, out string error, params Player[] players) =>
-        UnstuckPlayerCommand.TryResolveTarget(query, players, player => Names[player], out target, out error);
+        UnstuckCommand.TryResolveTarget(query, players, player => Names[player], out target, out error);
 
     [Fact]
     public void ControllerId_ResolvesThatPlayer()
@@ -38,7 +38,7 @@ public class UnstuckPlayerTargetResolutionTests
         var namedLikeAnId = new Player("76561198000000005", "hero_id_name", "party_id_name", null, null);
         var players = new[] { namedLikeAnId, Mira };
 
-        Assert.True(UnstuckPlayerCommand.TryResolveTarget(
+        Assert.True(UnstuckCommand.TryResolveTarget(
             "76561198000000001",
             players,
             player => player == namedLikeAnId ? "76561198000000001" : "Lady Mira",

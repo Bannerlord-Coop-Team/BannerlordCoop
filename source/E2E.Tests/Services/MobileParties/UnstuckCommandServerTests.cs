@@ -22,37 +22,33 @@ using Xunit.Abstractions;
 namespace E2E.Tests.Services.MobileParties;
 
 /// <summary>
-/// Verifies coop.unstuck_player: the server console resolves a connected player by controller id
-/// or hero name and runs the same server unstuck steps as the player's own coop.unstuck.
+/// Verifies the server branch of coop.unstuck: the server console resolves a connected player by
+/// controller id or hero name and runs the same server unstuck steps as the player's own coop.unstuck.
 /// </summary>
-public class UnstuckPlayerCommandTests : MapEventTestBase
+public class UnstuckCommandServerTests : MapEventTestBase
 {
-    private const string CommandName = "coop.unstuck_player";
+    private const string CommandName = "coop.unstuck";
 
     private EnvironmentInstance Client => TestEnvironment.Clients.First();
     private EnvironmentInstance SecondClient => TestEnvironment.Clients.Skip(1).First();
 
-    public UnstuckPlayerCommandTests(ITestOutputHelper output) : base(output) { }
+    public UnstuckCommandServerTests(ITestOutputHelper output) : base(output) { }
 
     [Fact]
-    public void OnClient_IsRefused()
+    public void OnClient_WithAPlayer_IsRefusedAndSendsNothing()
     {
         var target = CreateConnectedPlayer("unstuck-target", Client, "Lady Mira");
         StageArmyAndSettlement(target.PartyId);
 
-        Client.Call(() =>
-        {
-            var registryResult = Client.Resolve<ICoopCommandRegistry>()
-                .ProcessCommand(CommandName, new CoopCommandArgsFactory().FromValues(new[] { "unstuck-target" }));
-            Assert.False(registryResult.Succeeded);
-            Assert.Equal("command_wrong_side", registryResult.ErrorCode);
+        CoopCommandResult result = null;
+        Client.Call(() => result = Client.Resolve<ICoopCommandRegistry>()
+            .ProcessCommand(CommandName, new CoopCommandArgsFactory().FromValues(new[] { "unstuck-target" })));
 
-            var command = Client.Resolve<IEnumerable<ICoopCommand>>().Single(candidate => candidate.Prefix == "coop" && candidate.Name == "unstuck_player");
-            var directResult = command.ProcessCommand(new CoopCommandArgsFactory().FromValues(new[] { "unstuck-target" }));
-            Assert.False(directResult.Succeeded);
-            Assert.Equal("Command can only be run on the server.", directResult.Output);
-        });
-
+        Assert.False(result.Succeeded);
+        Assert.Equal("invalid_arguments", result.ErrorCode);
+        Assert.Equal("On a client coop.unstuck takes no player, it always unsticks your own party. Usage: coop.unstuck", result.Output);
+        Assert.Empty(Client.InternalMessages.GetMessages<PlayerUnstuckRequested>());
+        Assert.Empty(Client.NetworkSentMessages.GetMessages<NetworkRequestPlayerUnstuck>());
         AssertInArmyAndSettlement(target.PartyId);
         Assert.Empty(Server.NetworkSentMessages.GetMessages<NetworkPlayerUnstuckResult>());
     }
