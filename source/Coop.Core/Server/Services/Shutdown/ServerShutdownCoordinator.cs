@@ -316,8 +316,7 @@ public class ServerShutdownCoordinator : IServerShutdownCoordinator
 
     private void TickDraining(DateTime now)
     {
-        // A request accepted just before the gate closed can still show up here.
-        DisconnectRemainingPeers();
+        DisconnectLateConnections();
 
         bool saving = saveInterface.IsSaving;
         if (!saving && !connections.Any())
@@ -337,6 +336,14 @@ public class ServerShutdownCoordinator : IServerShutdownCoordinator
         Logger.Warning("Server shutdown: {Connections} connection(s) still listed after 15 seconds; saving anyway",
             connections.Count());
         BeginSave(now);
+    }
+
+    // A join accepted just before the gate closed only shows up as a connection a poll later.
+    private void DisconnectLateConnections()
+    {
+        int disconnected = DisconnectRemainingPeers();
+        if (disconnected > 0)
+            Logger.Information("Server shutdown: disconnected {Connections} connection(s) that arrived after joins closed", disconnected);
     }
 
     private int DisconnectRemainingPeers()
@@ -373,6 +380,8 @@ public class ServerShutdownCoordinator : IServerShutdownCoordinator
 
     private void TickSaving(DateTime now)
     {
+        DisconnectLateConnections();
+
         TimeSpan elapsed = now - saveQueuedAt;
         if (!saveStarted && elapsed >= SaveStartTimeout)
         {
@@ -449,6 +458,7 @@ public class ServerShutdownCoordinator : IServerShutdownCoordinator
     {
         if (!gameSaveWritten || !sessionWritten) return;
 
+        DisconnectLateConnections();
         Phase = ServerShutdownPhase.Completed;
         StopTicker();
         loadedSaveName = saveName;

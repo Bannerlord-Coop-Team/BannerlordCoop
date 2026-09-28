@@ -236,6 +236,33 @@ public class ServerShutdownCoordinatorTests : IDisposable
         Assert.Equal(new[] { first.Peer, racer.Peer }, disconnects.Select(entry => entry.Peer));
     }
 
+    [Fact]
+    public void Saving_ConnectionAcceptedJustBeforeTheGateClosed_IsDisconnectedToo()
+    {
+        // Nobody connected, so the drain ends at once and the racer only shows up while saving.
+        Schedule(0);
+        Assert.Equal(ServerShutdownPhase.Saving, coordinator.Phase);
+
+        var racer = AddPlayer();
+        Advance(1);
+
+        Assert.Equal(new[] { (racer.Peer, Restarting) }, disconnects);
+        Assert.Equal(ServerShutdownPhase.Saving, coordinator.Phase);
+    }
+
+    [Fact]
+    public void Saving_ConnectionArrivingBeforeTheResults_IsDisconnectedOnCompletion()
+    {
+        Schedule(0);
+        var racer = AddPlayer();
+
+        broker.Publish(new object(), new CoopSessionWritten(LoadedSave, true));
+        broker.Publish(new object(), new GameSaveCompleted(LoadedSave, true));
+
+        Assert.Equal(ServerShutdownPhase.Completed, coordinator.Phase);
+        Assert.Equal(new[] { (racer.Peer, Restarting) }, disconnects);
+    }
+
     [Theory]
     [InlineData(true)]
     [InlineData(false)]
