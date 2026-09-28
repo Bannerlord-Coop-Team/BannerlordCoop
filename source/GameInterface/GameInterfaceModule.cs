@@ -59,6 +59,7 @@ using GameInterface.Services.UI.CoopOptions.Providers.NetworkTab;
 using GameInterface.Services.UI.CoopOptions.Providers.PlayerNameplatesTab;
 using GameInterface.Services.UI.BugReporting;
 using GameInterface.Services.UI.Patches;
+using GameInterface.Services.UI.ServerInfo;
 using GameInterface.Services.Workshops;
 using GameInterface.Surrogates;
 using GameInterface.Utils.Commands;
@@ -126,6 +127,7 @@ public class GameInterfaceModule : Module
         builder.RegisterType<NetworkOptionsTabProvider>().As<ICoopOptionsTabProvider>().InstancePerDependency();
         builder.RegisterType<LocalMovementBandwidth>().As<ILocalMovementBandwidth>().InstancePerDependency();
         builder.RegisterType<ChatPlayerName>().As<IChatPlayerNameResolver>().InstancePerDependency();
+        builder.RegisterType<ServerInfoLinkRules>().As<IServerInfoLinkRules>().InstancePerDependency();
         builder.RegisterType<PlayerPartyRestorer>().As<IPlayerPartyRestorer>().InstancePerDependency();
         builder.RegisterType<PlayerCreationRollback>().As<IPlayerCreationRollback>().InstancePerDependency();
         builder.RegisterType<MobilePartyBehaviorSnapshot>().As<IMobilePartyBehaviorSnapshot>().InstancePerDependency();

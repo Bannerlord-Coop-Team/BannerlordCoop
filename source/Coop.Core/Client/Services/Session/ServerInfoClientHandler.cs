@@ -31,7 +31,7 @@ internal sealed class ServerInfoClientHandler : IHandler
     private void Receive(MessagePayload<NetworkServerInfo> payload) => GameThread.RunSafe(() =>
     {
         if (disposed) return;
-        service.Show(payload.What.Paragraphs);
+        service.Show(payload.What.Motd);
     }, context: nameof(ServerInfoClientHandler));
 
     // Prevents queued messages from reopening a disposed session's UI.

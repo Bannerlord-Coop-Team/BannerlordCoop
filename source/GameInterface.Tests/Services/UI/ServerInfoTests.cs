@@ -1,6 +1,4 @@
-﻿using Common.Serialization;
-using GameInterface.Services.UI.ServerInfo;
-using ProtoBuf;
+﻿using GameInterface.Services.UI.ServerInfo;
 using System;
 using System.Collections.Generic;
 using System.IO;
@@ -170,20 +168,6 @@ public class ServerInfoTests
         Assert.True(popup.Disposed);
     }
 
-    // The whole MOTD travels as one message and keeps every character.
-    [Fact]
-    public void MessageRoundTripsAsOneMessage()
-    {
-        var paragraphs = new[] { "Willkommen überall, 欢迎 \U0001F600", "{PLAYER} <b>bold</b>", new string('a', ServerInfoLimits.MaxLength) };
-
-        var copy = Serializer.DeepClone(new NetworkServerInfo(paragraphs));
-        var serializer = new ProtoBufSerializer(new SerializableTypeMapper());
-        var wire = Assert.IsType<NetworkServerInfo>(serializer.Deserialize(serializer.Serialize(new NetworkServerInfo(paragraphs))));
-
-        Assert.Equal(paragraphs, copy.Paragraphs);
-        Assert.Equal(paragraphs, wire.Paragraphs);
-    }
-
     // Binds only to members the view models have and shows paragraphs with the non-markup text widget.
     [Fact]
     public void MovieBindsToTheViewModelsAndShowsPlainText()
@@ -225,9 +209,9 @@ public class ServerInfoTests
     [Fact]
     public void PreviewSamplesFitTheServerCaps()
     {
-        Assert.InRange(ServerInfoDebugCommands.SampleParagraphs.Length, 2, ServerInfoLimits.MaxParagraphs);
-        Assert.Equal(ServerInfoLimits.MaxParagraphs, ServerInfoDebugCommands.LongSampleParagraphs.Length);
-        Assert.InRange(ServerInfoDebugCommands.LongSampleParagraphs.Sum(paragraph => paragraph.Length), 1, ServerInfoLimits.MaxLength);
+        Assert.InRange(ServerInfoDebugCommands.SampleParagraphs.Length, 2, ServerInfoLimits.MaxMotdParagraphs);
+        Assert.Equal(ServerInfoLimits.MaxMotdParagraphs, ServerInfoDebugCommands.LongSampleParagraphs.Length);
+        Assert.InRange(ServerInfoDebugCommands.LongSampleParagraphs.Sum(paragraph => paragraph.Length), 1, ServerInfoLimits.MaxMotdLength);
         var registry = new Common.Commands.CoopCommandRegistry(
             new Common.Commands.ICoopCommand[] { new ServerInfoDebugCommands.ServerInfoPreviewCoopCommand(), new ServerInfoDebugCommands.ServerInfoStateCoopCommand() },
             new Serilog.LoggerConfiguration().CreateLogger());

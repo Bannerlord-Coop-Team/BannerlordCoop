@@ -32,7 +32,7 @@ public sealed class ServerInfoClientHandlerTests : IDisposable
         var paragraphs = new[] { "Welcome to EU-1", "{PLAYER} <b>Restart 06:00 UTC</b>" };
         using var handler = new ServerInfoClientHandler(broker, service.Object);
 
-        broker.Publish(this, new NetworkServerInfo(paragraphs));
+        broker.Publish(this, new NetworkServerInfo(paragraphs, null, null, null));
         DrainGameThread();
 
         service.Verify(motd => motd.Show(paragraphs), Times.Once);
@@ -47,7 +47,7 @@ public sealed class ServerInfoClientHandlerTests : IDisposable
 
         handler.Dispose();
         broker.Publish(this, new ClientCampaignReady());
-        broker.Publish(this, new NetworkServerInfo(new[] { "Welcome to EU-1" }));
+        broker.Publish(this, new NetworkServerInfo(new[] { "Welcome to EU-1" }, null, null, null));
         DrainGameThread();
 
         Assert.Equal(0, broker.GetTotalSubscribers());

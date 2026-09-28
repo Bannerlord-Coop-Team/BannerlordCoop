@@ -4,6 +4,7 @@ using Serilog;
 using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Linq;
 using System.Text.Json;
 
 namespace Coop.Core.Common.Configuration;
@@ -11,12 +12,21 @@ namespace Coop.Core.Common.Configuration;
 /// <summary>Operator-written details the server shares with joining players.</summary>
 public interface IServerInfoConfig
 {
-    /// <summary>Paragraphs of the message of the day popup each player sees after their campaign sync.</summary>
+    /// <summary>Paragraphs of the message of the day.</summary>
     IReadOnlyList<string> Motd { get; }
+
+    /// <summary>Server rules in the operator's order.</summary>
+    IReadOnlyList<string> Rules { get; }
+
+    /// <summary>Links whose address passed <see cref="IServerInfoLinkRules"/>, in its normalized form.</summary>
+    IReadOnlyList<ServerInfoLink> Links { get; }
+
+    /// <summary>News entries in the operator's order.</summary>
+    IReadOnlyList<ServerInfoNews> News { get; }
 }
 
 /// <summary>
-/// Reads the optional server-info.json once per server container. A missing file gives no MOTD,
+/// Reads the optional server-info.json once per server container. A missing file gives no server info,
 /// and an unreadable one is logged and ignored.
 /// </summary>
 internal sealed class ServerInfoConfig : IServerInfoConfig
@@ -26,23 +36,32 @@ internal sealed class ServerInfoConfig : IServerInfoConfig
 
     private static readonly ILogger Logger = LogManager.GetLogger<ServerInfoConfig>();
 
-    public ServerInfoConfig(IServerDataPath dataPath) : this(() => dataPath.Resolve(FileEnvironmentVariable, FileName))
+    private readonly IServerInfoLinkRules linkRules;
+
+    public ServerInfoConfig(IServerDataPath dataPath, IServerInfoLinkRules linkRules)
+        : this(() => dataPath.Resolve(FileEnvironmentVariable, FileName), linkRules)
     {
     }
 
-    internal ServerInfoConfig(string path) : this(() => path)
+    internal ServerInfoConfig(string path, IServerInfoLinkRules linkRules) : this(() => path, linkRules)
     {
     }
 
-    private ServerInfoConfig(Func<string> resolvePath)
+    private ServerInfoConfig(Func<string> resolvePath, IServerInfoLinkRules linkRules)
     {
         if (resolvePath == null) throw new ArgumentNullException(nameof(resolvePath));
-        Motd = Load(resolvePath);
+        if (linkRules == null) throw new ArgumentNullException(nameof(linkRules));
+
+        this.linkRules = linkRules;
+        Load(resolvePath);
     }
 
-    public IReadOnlyList<string> Motd { get; }
+    public IReadOnlyList<string> Motd { get; private set; } = Array.Empty<string>();
+    public IReadOnlyList<string> Rules { get; private set; } = Array.Empty<string>();
+    public IReadOnlyList<ServerInfoLink> Links { get; private set; } = Array.Empty<ServerInfoLink>();
+    public IReadOnlyList<ServerInfoNews> News { get; private set; } = Array.Empty<ServerInfoNews>();
 
-    private static IReadOnlyList<string> Load(Func<string> resolvePath)
+    private void Load(Func<string> resolvePath)
     {
         string path = string.Empty;
 
@@ -57,97 +76,280 @@ internal sealed class ServerInfoConfig : IServerInfoConfig
             }
             catch (FileNotFoundException)
             {
-                return Array.Empty<string>();
+                return;
             }
             catch (DirectoryNotFoundException)
             {
-                return Array.Empty<string>();
+                return;
             }
 
             using JsonDocument document = JsonDocument.Parse(json);
-            IReadOnlyList<string> motd = ReadMotd(document.RootElement, path);
-            Logger.Information("Server info loaded from {Path} (motd {Count} paragraph(s))", path, motd.Count);
-            return motd;
+            Read(document.RootElement, path);
+            Logger.Information(
+                "Server info loaded from {Path} (motd {Motd} paragraph(s), rules {Rules}, links {Links}, news {News})",
+                path,
+                Motd.Count,
+                Rules.Count,
+                Links.Count,
+                News.Count);
         }
         catch (Exception exception) when (
             exception is IOException ||
             exception is UnauthorizedAccessException ||
             exception is JsonException ||
-            // A lone surrogate escape in a key the motd lookup has to unescape.
+            // A lone surrogate escape in a key that a lookup has to unescape.
             exception is InvalidOperationException ||
             exception is ArgumentException ||
             exception is NotSupportedException)
         {
-            Logger.Error(exception, "Server info could not be read from {Path}; running without a MOTD", path);
-            return Array.Empty<string>();
+            Logger.Error(exception, "Server info could not be read from {Path}; running without server info", path);
+            // A key lookup can throw after earlier keys were read, and a broken file shows nothing.
+            Motd = Array.Empty<string>();
+            Rules = Array.Empty<string>();
+            Links = Array.Empty<ServerInfoLink>();
+            News = Array.Empty<ServerInfoNews>();
         }
     }
 
-    private static IReadOnlyList<string> ReadMotd(JsonElement root, string path)
+    private void Read(JsonElement root, string path)
     {
-        // A root that is not an object leaves motd undefined, so it gets the warning below.
-        JsonElement motd = default;
-        if (root.ValueKind == JsonValueKind.Object && !root.TryGetProperty("motd", out motd))
+        if (root.ValueKind != JsonValueKind.Object)
         {
-            return Array.Empty<string>();
+            Logger.Warning("Server info in {Path} is not a JSON object; running without server info", path);
+            return;
         }
 
-        if (motd.ValueKind != JsonValueKind.Array)
-        {
-            Logger.Warning("Server info in {Path} has no motd array of strings; running without a MOTD", path);
-            return Array.Empty<string>();
-        }
+        Motd = ReadTexts(root, "motd", ServerInfoLimits.MaxMotdParagraphs, ServerInfoLimits.MaxMotdLength, path);
+        Rules = ReadTexts(root, "rules", ServerInfoLimits.MaxRules, ServerInfoLimits.MaxRulesLength, path);
+        Links = ReadLinks(root, path);
 
-        var paragraphs = new List<string>();
+        int used = Motd.Sum(paragraph => paragraph.Length) +
+            Rules.Sum(rule => rule.Length) +
+            Links.Sum(link => link.Label.Length + link.Url.Length);
+        News = ReadNews(root, ServerInfoLimits.MaxTotalLength - used, path);
+    }
+
+    private static string[] ReadTexts(JsonElement root, string key, int maxCount, int maxLength, string path)
+    {
+        if (!TryGetArray(root, key, path, out JsonElement array)) return Array.Empty<string>();
+
+        var texts = new List<string>();
         int length = 0;
         int skipped = 0;
         bool trimmed = false;
-        foreach (JsonElement entry in motd.EnumerateArray())
+        foreach (JsonElement entry in array.EnumerateArray())
         {
-            if (!TryReadText(entry, out string text))
+            if (!TryReadText(entry, out string raw))
             {
                 skipped++;
                 continue;
             }
 
-            string paragraph = RemoveControlCharacters(text);
-            if (paragraph.Length == 0) continue;
+            string text = RemoveControlCharacters(raw);
+            if (text.Length == 0) continue;
 
-            int room = ServerInfoLimits.MaxLength - length;
-            if (paragraphs.Count == ServerInfoLimits.MaxParagraphs || room == 0)
+            int room = maxLength - length;
+            if (texts.Count == maxCount || room == 0)
             {
                 trimmed = true;
                 break;
             }
 
-            if (paragraph.Length > room)
+            if (text.Length > room)
             {
-                // The rest of the file is dropped too, so no later paragraph gets a fragment.
-                paragraph = Truncate(paragraph, room);
-                if (paragraph.Length > 0) paragraphs.Add(paragraph);
+                // The rest of the key is dropped too, so no later entry gets a fragment.
+                text = Truncate(text, room);
+                if (text.Length > 0) texts.Add(text);
                 trimmed = true;
                 break;
             }
 
-            paragraphs.Add(paragraph);
-            length += paragraph.Length;
+            texts.Add(text);
+            length += text.Length;
         }
 
         if (skipped > 0)
         {
-            Logger.Warning("Server info motd in {Path} has {Count} entry(s) that are not valid strings; skipping them", path, skipped);
+            Logger.Warning("Server info {Key} in {Path} has {Count} entry(s) that are not valid strings; skipping them", key, path, skipped);
         }
 
         if (trimmed)
         {
             Logger.Warning(
-                "Server info motd in {Path} was cut to {MaxParagraphs} paragraph(s) and {MaxLength} characters",
+                "Server info {Key} in {Path} was cut to {MaxCount} entry(s) and {MaxLength} characters",
+                key,
                 path,
-                ServerInfoLimits.MaxParagraphs,
-                ServerInfoLimits.MaxLength);
+                maxCount,
+                maxLength);
         }
 
-        return paragraphs.ToArray();
+        return texts.ToArray();
+    }
+
+    private ServerInfoLink[] ReadLinks(JsonElement root, string path)
+    {
+        if (!TryGetArray(root, "links", path, out JsonElement array)) return Array.Empty<ServerInfoLink>();
+
+        var links = new List<ServerInfoLink>();
+        bool trimmed = false;
+        int index = -1;
+        foreach (JsonElement entry in array.EnumerateArray())
+        {
+            index++;
+            if (!TryReadLink(entry, ref trimmed, out ServerInfoLink link))
+            {
+                Logger.Warning(
+                    "Server info link at index {Index} in {Path} has no usable http or https url; skipping it",
+                    index,
+                    path);
+                continue;
+            }
+
+            if (links.Count == ServerInfoLimits.MaxLinks)
+            {
+                trimmed = true;
+                break;
+            }
+
+            links.Add(link);
+        }
+
+        if (trimmed)
+        {
+            Logger.Warning(
+                "Server info links in {Path} were cut to {MaxLinks} link(s) and {MaxLabelLength} label characters",
+                path,
+                ServerInfoLimits.MaxLinks,
+                ServerInfoLimits.MaxLinkLabelLength);
+        }
+
+        return links.ToArray();
+    }
+
+    // A missing, empty or non-text label is kept empty; the client then shows the address.
+    private bool TryReadLink(JsonElement entry, ref bool trimmed, out ServerInfoLink link)
+    {
+        link = null;
+        if (entry.ValueKind != JsonValueKind.Object) return false;
+
+        try
+        {
+            if (!entry.TryGetProperty("url", out JsonElement url) ||
+                !TryReadText(url, out string address) ||
+                !linkRules.TryNormalize(address, out string normalized)) return false;
+
+            string label = ReadField(entry, "label", ServerInfoLimits.MaxLinkLabelLength, ref trimmed);
+            link = new ServerInfoLink { Label = label, Url = normalized };
+            return true;
+        }
+        catch (InvalidOperationException)
+        {
+            // A lone surrogate escape in one of this entry's keys.
+            return false;
+        }
+    }
+
+    private static ServerInfoNews[] ReadNews(JsonElement root, int room, string path)
+    {
+        if (!TryGetArray(root, "news", path, out JsonElement array)) return Array.Empty<ServerInfoNews>();
+
+        var news = new List<ServerInfoNews>();
+        int skipped = 0;
+        bool trimmed = false;
+        bool overTotal = false;
+        foreach (JsonElement entry in array.EnumerateArray())
+        {
+            if (!TryReadNews(entry, ref trimmed, out ServerInfoNews item))
+            {
+                skipped++;
+                continue;
+            }
+
+            if (news.Count == ServerInfoLimits.MaxNews)
+            {
+                trimmed = true;
+                break;
+            }
+
+            int length = item.Date.Length + item.Title.Length + item.Text.Length;
+            if (length > room)
+            {
+                overTotal = true;
+                break;
+            }
+
+            room -= length;
+            news.Add(item);
+        }
+
+        if (skipped > 0)
+        {
+            Logger.Warning("Server info news in {Path} has {Count} entry(s) that are not objects with a title or text; skipping them", path, skipped);
+        }
+
+        if (trimmed)
+        {
+            Logger.Warning(
+                "Server info news in {Path} was cut to {MaxNews} entry(s) with {MaxDate} date, {MaxTitle} title and {MaxText} text characters",
+                path,
+                ServerInfoLimits.MaxNews,
+                ServerInfoLimits.MaxNewsDateLength,
+                ServerInfoLimits.MaxNewsTitleLength,
+                ServerInfoLimits.MaxNewsTextLength);
+        }
+
+        if (overTotal)
+        {
+            Logger.Warning(
+                "Server info news in {Path} was cut to keep the server info under {MaxTotalLength} characters",
+                path,
+                ServerInfoLimits.MaxTotalLength);
+        }
+
+        return news.ToArray();
+    }
+
+    // An entry needs a title or text; a missing or non-text field reads as empty.
+    private static bool TryReadNews(JsonElement entry, ref bool trimmed, out ServerInfoNews item)
+    {
+        item = null;
+        if (entry.ValueKind != JsonValueKind.Object) return false;
+
+        try
+        {
+            string date = ReadField(entry, "date", ServerInfoLimits.MaxNewsDateLength, ref trimmed);
+            string title = ReadField(entry, "title", ServerInfoLimits.MaxNewsTitleLength, ref trimmed);
+            string text = ReadField(entry, "text", ServerInfoLimits.MaxNewsTextLength, ref trimmed);
+            if (title.Length == 0 && text.Length == 0) return false;
+
+            item = new ServerInfoNews { Date = date, Title = title, Text = text };
+            return true;
+        }
+        catch (InvalidOperationException)
+        {
+            // A lone surrogate escape in one of this entry's keys.
+            return false;
+        }
+    }
+
+    private static bool TryGetArray(JsonElement root, string key, string path, out JsonElement array)
+    {
+        if (!root.TryGetProperty(key, out array)) return false;
+        if (array.ValueKind == JsonValueKind.Array) return true;
+
+        Logger.Warning("Server info {Key} in {Path} is not an array; skipping it", key, path);
+        return false;
+    }
+
+    private static string ReadField(JsonElement entry, string name, int maxLength, ref bool trimmed)
+    {
+        if (!entry.TryGetProperty(name, out JsonElement value) || !TryReadText(value, out string raw)) return string.Empty;
+
+        string text = RemoveControlCharacters(raw);
+        if (text.Length <= maxLength) return text;
+
+        trimmed = true;
+        return Truncate(text, maxLength);
     }
 
     // A lone surrogate escape such as \ud83d cannot become a string, so that entry is skipped, not fatal.
@@ -178,12 +380,12 @@ internal sealed class ServerInfoConfig : IServerInfoConfig
         return new string(characters).Trim();
     }
 
-    private static string Truncate(string paragraph, int maxLength)
+    private static string Truncate(string text, int maxLength)
     {
         int length = maxLength;
         // Cut before a surrogate pair instead of keeping half of it.
-        if (char.IsHighSurrogate(paragraph[length - 1])) length--;
+        if (char.IsHighSurrogate(text[length - 1])) length--;
 
-        return paragraph.Substring(0, length).TrimEnd();
+        return text.Substring(0, length).TrimEnd();
     }
 }
