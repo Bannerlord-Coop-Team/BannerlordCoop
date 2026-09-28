@@ -4,12 +4,9 @@ using E2E.Tests.Util;
 using GameInterface.Services.TroopRosters.Data;
 using GameInterface.Services.TroopRosters.Interfaces;
 using GameInterface.Services.TroopRosters.Messages;
-using HarmonyLib;
 using TaleWorlds.CampaignSystem;
-using TaleWorlds.CampaignSystem.GameComponents;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Roster;
-using TaleWorlds.Core;
 using Xunit.Abstractions;
 
 namespace E2E.Tests.Services.TroopRosters;
@@ -33,7 +30,7 @@ public class TroopRosterZeroCountXpDeltaTests : IDisposable
     public TroopRosterZeroCountXpDeltaTests(ITestOutputHelper output)
     {
         TestEnvironment = new E2ETestEnvironment(output);
-        InstallXpCapModels();
+        XpCapModels.Install(Server);
     }
 
     [Theory]
@@ -346,24 +343,6 @@ public class TroopRosterZeroCountXpDeltaTests : IDisposable
         Assert.True(index >= 0);
         var element = roster.GetElementCopyAtIndex(index);
         Assert.Equal((number, wounded, xp), (element.Number, element.WoundedNumber, element.Xp));
-    }
-
-    // The harness Campaign boots without models; the vanilla xp cap reads these three.
-    private void InstallXpCapModels()
-    {
-        Server.Call(() =>
-        {
-            if (Campaign.Current.Models != null) return;
-
-            var models = new List<GameModel>
-            {
-                new DefaultCharacterStatsModel(),
-                new DefaultPartyTroopUpgradeModel(),
-                new DefaultPrisonerRecruitmentCalculationModel(),
-            };
-            var gameModels = Server.GameInstance.Game.AddGameModelsManager<GameModels>(models);
-            AccessTools.Field(typeof(Campaign), "_gameModels").SetValue(Campaign.Current, gameModels);
-        });
     }
 
     public void Dispose() => TestEnvironment.Dispose();
