@@ -73,6 +73,8 @@ internal sealed class ServerInfoConfig : IServerInfoConfig
             exception is IOException ||
             exception is UnauthorizedAccessException ||
             exception is JsonException ||
+            // A lone surrogate escape in a key the motd lookup has to unescape.
+            exception is InvalidOperationException ||
             exception is ArgumentException ||
             exception is NotSupportedException)
         {

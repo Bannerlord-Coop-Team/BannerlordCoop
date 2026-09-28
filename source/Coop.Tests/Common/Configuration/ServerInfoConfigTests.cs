@@ -240,6 +240,31 @@ public sealed class ServerInfoConfigTests : IDisposable
         Assert.Contains("could not be read", Assert.Single(LogsForThisTest()));
     }
 
+    // Looking up motd unescapes top-level keys that could match it, and a lone surrogate there throws.
+    [Theory]
+    [InlineData("{\"motd\":[\"Welcome to EU-1\"],\"\\ud800\":0}")]
+    [InlineData("{\"\\udc00note\":1}")]
+    public void LoneSurrogateEscapeInAKey_LogsAnErrorAndIsNotFatal(string json)
+    {
+        WriteInfoFile(json);
+
+        var config = new ServerInfoConfig(InfoFilePath);
+
+        Assert.Empty(config.Motd);
+        Assert.Contains("could not be read", Assert.Single(LogsForThisTest()));
+    }
+
+    [Fact]
+    public void LoneSurrogateEscapeOutsideTheMotd_IsIgnored()
+    {
+        WriteInfoFile("{\"motd\":[\"Welcome to EU-1\"],\"note\":\"\\ud800\",\"meta\":{\"\\ud800\":1}}");
+
+        var config = new ServerInfoConfig(InfoFilePath);
+
+        Assert.Equal(new[] { "Welcome to EU-1" }, config.Motd);
+        Assert.Contains("motd 1 paragraph(s)", Assert.Single(LogsForThisTest()));
+    }
+
     [Theory]
     [InlineData("{\"motd\":\"Welcome to EU-1\"}")]
     [InlineData("{\"motd\":42}")]
