@@ -43,6 +43,9 @@ namespace Coop.Tests.Autofac
             var logic = container.Resolve<ILogic>();
             Assert.NotNull(logic);
 
+            // Only ServerModule registers the restart command, so a client console doesn't know it.
+            Assert.False(container.Resolve<ICoopCommandRegistry>().Contains("coop.server.shutdown"));
+
             ICoopCommand[] registeredCommands = container.Resolve<IEnumerable<ICoopCommand>>().ToArray();
             Assert.Contains(registeredCommands, command =>
                 $"{command.Prefix}.{command.Name}" == "coop.debug.workshop.set_workshop_custom_name");
