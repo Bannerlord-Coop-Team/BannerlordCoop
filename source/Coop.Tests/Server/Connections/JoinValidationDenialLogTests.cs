@@ -1,59 +1,56 @@
 ﻿using Common;
+using Common.Logging;
 using Coop.Core.Server.Connections;
 using Coop.Tests.Mocks;
 using LiteNetLib;
-using Serilog;
-using Serilog.Core;
-using Serilog.Events;
 using System;
 using System.Collections.Concurrent;
-using System.Collections.Generic;
 using System.Linq;
 using Xunit;
 
 namespace Coop.Tests.Server.Connections;
 
-public class JoinValidationDenialLogTests
+public class JoinValidationDenialLogTests : IDisposable
 {
-    private readonly CaptureSink sink = new CaptureSink();
-    private readonly JoinValidationDenialLog denialLog;
+    private const int NullPeerCount = 7331;
+
+    private readonly ConcurrentQueue<string> logs = new ConcurrentQueue<string>();
+    private readonly Action<string> captureLog;
+    private readonly JoinValidationDenialLog denialLog = new JoinValidationDenialLog();
     private readonly TestNetwork network = new TestNetwork();
 
     public JoinValidationDenialLogTests()
     {
-        ILogger logger = new LoggerConfiguration().MinimumLevel.Verbose().WriteTo.Sink(sink).CreateLogger();
-        denialLog = new JoinValidationDenialLog(logger);
+        captureLog = logs.Enqueue;
+        OutputSinkManager.AddLogCallback(captureLog);
     }
 
+    public void Dispose() => OutputSinkManager.RemoveLogCallback(captureLog);
+
+    private static string ServerBuild => JoinValidationDenialLog.SanitizeBuild(ModInformation.BuildVersion);
+
     [Fact]
-    public void Report_LogsOneWarningWithEveryField()
+    public void Report_LogsOneLineWithEveryField()
     {
         NetPeer peer = network.CreatePeer("10.0.0.7");
 
         denialLog.Report(peer, JoinDenialKind.BuildMismatch, "9.9.9+deadbeef", "Incompatible co-op mod build.");
 
-        LogEvent line = Assert.Single(sink.Events);
-        Assert.Equal(LogEventLevel.Warning, line.Level);
-        Assert.Equal(peer.Id, Scalar(line, "PeerId"));
-        Assert.Equal("10.0.0.7:5555", Scalar(line, "Endpoint"));
-        Assert.Equal(JoinDenialKind.BuildMismatch, Scalar(line, "Kind"));
-        Assert.Equal("9.9.9+deadbeef", Scalar(line, "ClientBuild"));
-        Assert.Equal(JoinValidationDenialLog.SanitizeBuild(ModInformation.BuildVersion), Scalar(line, "ServerBuild"));
-        Assert.Equal("Incompatible co-op mod build.", Scalar(line, "Reason"));
+        Assert.Equal(
+            $"Join validation denied for peer {peer.Id} (\"10.0.0.7:5555\"): BuildMismatch; client build \"9.9.9+deadbeef\", server build \"{ServerBuild}\"; \"Incompatible co-op mod build.\"",
+            Assert.Single(Denials(peer)));
     }
 
     [Fact]
-    public void ReportRepeats_LogsOneWarningWithTheCount()
+    public void ReportRepeats_LogsOneLineWithTheCount()
     {
         NetPeer peer = network.CreatePeer("10.0.0.7");
 
         denialLog.ReportRepeats(peer, 3);
 
-        LogEvent line = Assert.Single(sink.Events);
-        Assert.Equal(LogEventLevel.Warning, line.Level);
-        Assert.Equal(3, Scalar(line, "Count"));
-        Assert.Equal(peer.Id, Scalar(line, "PeerId"));
-        Assert.Equal("10.0.0.7:5555", Scalar(line, "Endpoint"));
+        Assert.Equal(
+            $"Join validation denied 3 times for peer {peer.Id} (\"10.0.0.7:5555\") on one connection",
+            Assert.Single(Denials(peer)));
     }
 
     [Fact]
@@ -65,9 +62,10 @@ public class JoinValidationDenialLogTests
         denialLog.Report(first, JoinDenialKind.BuildMismatch, "1.0.0+aaaa", "reason");
         denialLog.Report(second, JoinDenialKind.BuildMismatch, "2.0.0+bbbb", "reason");
 
-        Assert.Equal(
-            new object[] { "1.0.0+aaaa", "2.0.0+bbbb" },
-            sink.Events.Select(line => Scalar(line, "ClientBuild")).ToArray());
+        Assert.Collection(
+            Denials(first, second),
+            line => Assert.StartsWith($"Join validation denied for peer {first.Id} (\"127.0.0.1:5555\"): BuildMismatch; client build \"1.0.0+aaaa\",", line),
+            line => Assert.StartsWith($"Join validation denied for peer {second.Id} (\"127.0.0.1:5555\"): BuildMismatch; client build \"2.0.0+bbbb\",", line));
     }
 
     [Theory]
@@ -101,25 +99,27 @@ public class JoinValidationDenialLogTests
     [Fact]
     public void Report_CoopPlusAnotherModule_KeepsTheRealModuleVisible()
     {
+        NetPeer peer = network.CreatePeer();
         string reason = string.Join(Environment.NewLine,
             "Server does not support module 'Coop'.",
             "Server does not support module 'WarSails'.");
 
-        denialLog.Report(network.CreatePeer(), JoinDenialKind.ModuleValidation, "build", reason);
+        denialLog.Report(peer, JoinDenialKind.ModuleValidation, "build", reason);
 
-        Assert.Equal(
-            "Server does not support module 'Coop'. | Server does not support module 'WarSails'.",
-            Scalar(Assert.Single(sink.Events), "Reason"));
+        Assert.EndsWith(
+            "): ModuleValidation; client build \"build\", server build \"" + ServerBuild + "\"; \"Server does not support module 'Coop'. | Server does not support module 'WarSails'.\"",
+            Assert.Single(Denials(peer)));
     }
 
     [Fact]
     public void Report_ForgedLogLine_StaysOnOneRenderedLine()
     {
         const string forged = "\r\n[(4242) 12:00:00 INF Coop.Core.Server.CoopServer] SERVING";
+        NetPeer peer = network.CreatePeer();
 
-        denialLog.Report(network.CreatePeer(), JoinDenialKind.BuildMismatch, "1.0" + forged, "reason" + forged);
+        denialLog.Report(peer, JoinDenialKind.BuildMismatch, "1.0" + forged, "reason" + forged);
 
-        string rendered = Assert.Single(sink.Events).RenderMessage();
+        string rendered = Assert.Single(Denials(peer));
         Assert.DoesNotContain("\r", rendered);
         Assert.DoesNotContain("\n", rendered);
         Assert.Contains("reason | [(4242) 12:00:00 INF Coop.Core.Server.CoopServer] SERVING", rendered);
@@ -129,12 +129,13 @@ public class JoinValidationDenialLogTests
     public void Report_HugeStrings_AreCapped()
     {
         string huge = new string('a', 10 * 1024);
+        NetPeer peer = network.CreatePeer();
 
-        denialLog.Report(network.CreatePeer(), JoinDenialKind.BuildMismatch, huge, huge);
+        denialLog.Report(peer, JoinDenialKind.BuildMismatch, huge, huge);
 
-        LogEvent line = Assert.Single(sink.Events);
-        Assert.Equal(new string('a', 96) + "...(+10144)", Scalar(line, "ClientBuild"));
-        Assert.Equal(new string('a', 400) + "...(+9840)", Scalar(line, "Reason"));
+        string line = Assert.Single(Denials(peer));
+        Assert.Contains($"; client build \"{new string('a', 96)}...(+10144)\", server build ", line);
+        Assert.EndsWith($"; \"{new string('a', 400)}...(+9840)\"", line);
     }
 
     [Fact]
@@ -150,23 +151,22 @@ public class JoinValidationDenialLogTests
     [Fact]
     public void NullPeer_Throws()
     {
+        string marker = Guid.NewGuid().ToString("N");
+
         Assert.Throws<ArgumentNullException>(() =>
-            denialLog.Report(null!, JoinDenialKind.BuildMismatch, "build", "reason"));
-        Assert.Throws<ArgumentNullException>(() => denialLog.ReportRepeats(null!, 2));
-        Assert.Empty(sink.Events);
+            denialLog.Report(null!, JoinDenialKind.BuildMismatch, marker, marker));
+        Assert.Throws<ArgumentNullException>(() => denialLog.ReportRepeats(null!, NullPeerCount));
+        Assert.DoesNotContain(logs, line =>
+            line.Contains(marker) || line.StartsWith($"Join validation denied {NullPeerCount} times", StringComparison.Ordinal));
     }
 
-    private static object Scalar(LogEvent logEvent, string property)
+    // Log callbacks are shared with tests running in parallel, so lines are matched by peer id
+    private string[] Denials(params NetPeer[] peers)
     {
-        return Assert.IsType<ScalarValue>(logEvent.Properties[property]).Value;
-    }
-
-    private sealed class CaptureSink : ILogEventSink
-    {
-        private readonly ConcurrentQueue<LogEvent> events = new ConcurrentQueue<LogEvent>();
-
-        public List<LogEvent> Events => events.ToList();
-
-        public void Emit(LogEvent logEvent) => events.Enqueue(logEvent);
+        string[] markers = peers.Select(peer => $" for peer {peer.Id} (").ToArray();
+        return logs
+            .Where(line => line.StartsWith("Join validation denied ", StringComparison.Ordinal) &&
+                           markers.Any(marker => line.Contains(marker)))
+            .ToArray();
     }
 }

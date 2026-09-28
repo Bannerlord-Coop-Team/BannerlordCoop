@@ -35,25 +35,14 @@ public class JoinValidationDenialLog : IJoinValidationDenialLog
 
     private const string LineSeparator = " | ";
 
-    private static readonly ILogger DefaultLogger = LogManager.GetLogger<JoinValidationDenialLog>();
-
-    private readonly ILogger logger;
-
-    public JoinValidationDenialLog() : this(DefaultLogger)
-    {
-    }
-
-    internal JoinValidationDenialLog(ILogger logger)
-    {
-        this.logger = logger;
-    }
+    private static readonly ILogger Logger = LogManager.GetLogger<JoinValidationDenialLog>();
 
     public void Report(NetPeer peer, JoinDenialKind kind, string? clientBuild, string? reason)
     {
         if (peer == null) throw new ArgumentNullException(nameof(peer));
 
         // The build and reason come from the client, and the file template writes strings as they are.
-        logger.Warning(
+        Logger.Warning(
             "Join validation denied for peer {PeerId} ({Endpoint}): {Kind}; client build {ClientBuild}, server build {ServerBuild}; {Reason}",
             peer.Id,
             EndpointOf(peer),
@@ -67,7 +56,7 @@ public class JoinValidationDenialLog : IJoinValidationDenialLog
     {
         if (peer == null) throw new ArgumentNullException(nameof(peer));
 
-        logger.Warning(
+        Logger.Warning(
             "Join validation denied {Count} times for peer {PeerId} ({Endpoint}) on one connection",
             count,
             peer.Id,
