@@ -16,9 +16,9 @@
               </Children>
             </BrushWidget>
             <Widget WidthSizePolicy="StretchToParent" HeightSizePolicy="Fixed" SuggestedHeight="1" MarginLeft="24" MarginRight="24" MarginTop="104" Sprite="BlankWhiteSquare_9" Color="#AA976038" DoNotAcceptEvents="true"/>
-            <ListPanel Id="Content" WidthSizePolicy="StretchToParent" HeightSizePolicy="CoverChildren" MinHeight="320" StackLayout.LayoutMethod="VerticalTopToBottom">
+            <ListPanel Id="Content" WidthSizePolicy="StretchToParent" HeightSizePolicy="CoverChildren" MinHeight="250" StackLayout.LayoutMethod="VerticalTopToBottom">
               <Children>
-                <Widget WidthSizePolicy="StretchToParent" HeightSizePolicy="Fixed" SuggestedHeight="128" DoNotAcceptEvents="true"/>
+                <Widget WidthSizePolicy="StretchToParent" HeightSizePolicy="Fixed" SuggestedHeight="116" DoNotAcceptEvents="true"/>
                 <ScrollablePanel Id="MotdScroll" WidthSizePolicy="StretchToParent" HeightSizePolicy="CoverChildren" MarginLeft="40" MarginRight="48"
                                  AutoHideScrollBars="true" ClipRect="Clip" InnerPanel="Clip\Paragraphs" VerticalScrollbar="..\..\MotdScrollbar">
                   <Children>
@@ -26,20 +26,20 @@
                       <Children>
                         <ListPanel Id="Paragraphs" DataSource="{Paragraphs}" WidthSizePolicy="StretchToParent" HeightSizePolicy="CoverChildren" StackLayout.LayoutMethod="VerticalTopToBottom">
                           <ItemTemplate>
-                            <TextWidget WidthSizePolicy="StretchToParent" HeightSizePolicy="CoverChildren" MarginBottom="24" Brush="Coop.PlayerList.Text" Brush.FontSize="24" Brush.TextVerticalAlignment="Top" Text="@Text" DoNotAcceptEvents="true"/>
+                            <TextWidget WidthSizePolicy="StretchToParent" HeightSizePolicy="CoverChildren" MarginTop="12" MarginBottom="12" Brush="Coop.PlayerList.Text" Brush.FontSize="24" Brush.TextVerticalAlignment="Top" Text="@Text" DoNotAcceptEvents="true"/>
                           </ItemTemplate>
                         </ListPanel>
                       </Children>
                     </Widget>
                   </Children>
                 </ScrollablePanel>
-                <Widget WidthSizePolicy="StretchToParent" HeightSizePolicy="Fixed" SuggestedHeight="72" DoNotAcceptEvents="true"/>
+                <Widget WidthSizePolicy="StretchToParent" HeightSizePolicy="Fixed" SuggestedHeight="84" DoNotAcceptEvents="true"/>
               </Children>
             </ListPanel>
-            <ScrollbarWidget Id="MotdScrollbar" WidthSizePolicy="Fixed" SuggestedWidth="16" HeightSizePolicy="StretchToParent" HorizontalAlignment="Right" MarginRight="18" MarginTop="130" MarginBottom="74"
+            <ScrollbarWidget Id="MotdScrollbar" WidthSizePolicy="Fixed" SuggestedWidth="16" HeightSizePolicy="StretchToParent" HorizontalAlignment="Right" MarginRight="18" MarginTop="118" MarginBottom="86"
                              AlignmentAxis="Vertical" Handle="Handle" MaxValue="100" MinValue="0" Sprite="scrollbar_9">
               <Children>
-                <Widget Id="Handle" WidthSizePolicy="Fixed" SuggestedWidth="16" HeightSizePolicy="Fixed" SuggestedHeight="36" MinHeight="20" HorizontalAlignment="Center" Sprite="scroll_button_9"/>
+                <Widget Id="Handle" WidthSizePolicy="Fixed" SuggestedWidth="6" HeightSizePolicy="Fixed" SuggestedHeight="36" MinHeight="20" HorizontalAlignment="Center" Sprite="BlankWhiteSquare_9" Color="#AA9760FF"/>
               </Children>
             </ScrollbarWidget>
             <Widget WidthSizePolicy="StretchToParent" HeightSizePolicy="Fixed" SuggestedHeight="1" VerticalAlignment="Bottom" MarginBottom="66" MarginLeft="24" MarginRight="24" Sprite="BlankWhiteSquare_9" Color="#AA976038" DoNotAcceptEvents="true"/>
