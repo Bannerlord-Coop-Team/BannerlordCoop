@@ -1,5 +1,7 @@
-﻿using GameInterface.Services.UI.ServerInfo;
+﻿using Common.Logging;
+using GameInterface.Services.UI.ServerInfo;
 using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
 using Xunit;
@@ -8,10 +10,18 @@ namespace GameInterface.Tests.Services.UI;
 
 /// <summary>Protects the panel's tabs, their content and the confirmation before a link opens.</summary>
 [Collection(ViewModelCollection.Name)]
-public class ServerInfoVMTests
+public sealed class ServerInfoVMTests : IDisposable
 {
     private readonly FakeOpener opener = new();
+    private readonly ConcurrentQueue<string> logs = new();
+    private readonly Action<string> capture;
     private int closed;
+
+    public ServerInfoVMTests()
+    {
+        capture = logs.Enqueue;
+        OutputSinkManager.AddLogCallback(capture);
+    }
 
     [Fact]
     public void TextsAreTheEnglishDefaults()
@@ -160,25 +170,43 @@ public class ServerInfoVMTests
     }
 
     // A client must not trust a server: anything the link rules refuse is never shown, and what is shown is normalized.
+    // Each refused link is logged by its index, never by its address.
     [Fact]
     public void BadLinksThatSlippedPastTheServer_AreNotShown()
     {
+        string marker = Guid.NewGuid().ToString("N");
         var vm = Create();
 
         vm.SetContent(new NetworkServerInfo(null, null, new[]
         {
-            new ServerInfoLink { Label = "Script", Url = "javascript:void(0)" },
-            new ServerInfoLink { Label = "File", Url = "file:///C:/Windows/win.ini" },
-            new ServerInfoLink { Label = "Login", Url = "https://user@example.com/" },
-            new ServerInfoLink { Label = "Relative", Url = "/relative/path" },
-            new ServerInfoLink { Label = "Spaces", Url = "https://example.com/ \"--flag" },
+            new ServerInfoLink { Label = "Script", Url = "javascript:void('" + marker + "')" },
+            new ServerInfoLink { Label = "File", Url = "file:///C:/" + marker + "/win.ini" },
+            new ServerInfoLink { Label = "Login", Url = "https://user@example.com/" + marker },
+            new ServerInfoLink { Label = "Relative", Url = "/relative/" + marker },
+            new ServerInfoLink { Label = "Spaces", Url = "https://example.com/ \"--flag " + marker },
             new ServerInfoLink { Label = "Empty", Url = null },
-            new ServerInfoLink { Label = "Shop", Url = "https://bücher.example/" },
+            new ServerInfoLink { Label = "Shop", Url = "https://bücher.example/" + marker },
             null,
         }, null));
 
         var link = Assert.Single(vm.Links);
-        Assert.Equal(("Shop", "https://xn--bcher-kva.example/"), (link.Label, link.Address));
+        Assert.Equal(("Shop", "https://xn--bcher-kva.example/" + marker), (link.Label, link.Address));
+        Assert.Equal(new[] { 0, 1, 2, 3, 4, 5, 7 }, LoggedLinkIndexes());
+        Assert.DoesNotContain(logs, log => log.Contains(marker));
+    }
+
+    // Only the first MaxLinks entries are checked, so a server sending many bad links adds at most MaxLinks log lines.
+    [Fact]
+    public void ManyBadLinks_AreCheckedOnlyUpToTheLinkCap()
+    {
+        var vm = Create();
+        var links = Enumerable.Range(0, 30).Select(index => new ServerInfoLink { Label = "Script", Url = "javascript:void(" + index + ")" }).ToList();
+        links.Add(new ServerInfoLink { Label = "Website", Url = "https://example.com/" });
+
+        Assert.True(vm.SetContent(new NetworkServerInfo(new[] { "Welcome" }, null, links.ToArray(), null)));
+
+        Assert.Empty(vm.Links);
+        Assert.Equal(Enumerable.Range(0, ServerInfoLimits.MaxLinks), LoggedLinkIndexes());
     }
 
     [Fact]
@@ -320,7 +348,22 @@ public class ServerInfoVMTests
         Assert.Equal(1, closed);
     }
 
+    public void Dispose()
+    {
+        OutputSinkManager.RemoveLogCallback(capture);
+    }
+
     private ServerInfoVM Create() => new(() => closed++, new ServerInfoLinkRules(), opener);
+
+    // The indexes this test's view model logged as refused, in order.
+    private IEnumerable<int> LoggedLinkIndexes()
+    {
+        const string prefix = "Server info link at index ";
+        const string suffix = " from the server has no usable http or https url; skipping it";
+        return logs.Where(log => log.StartsWith(prefix, StringComparison.Ordinal) && log.EndsWith(suffix, StringComparison.Ordinal))
+            .Select(log => int.Parse(log.Substring(prefix.Length, log.Length - prefix.Length - suffix.Length)))
+            .ToArray();
+    }
 
     private ServerInfoVM CreateWithLinks()
     {

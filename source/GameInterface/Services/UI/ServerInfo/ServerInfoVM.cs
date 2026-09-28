@@ -1,4 +1,6 @@
-﻿using System;
+﻿using Common.Logging;
+using Serilog;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using TaleWorlds.Library;
@@ -18,6 +20,7 @@ internal enum ServerInfoTab
 /// <summary>Presents the server info as tabs, with a confirmation inside the panel before a link opens.</summary>
 internal sealed class ServerInfoVM : ViewModel
 {
+    private static readonly ILogger Logger = LogManager.GetLogger<ServerInfoVM>();
     private static readonly ServerInfoTab[] TabOrder = { ServerInfoTab.Motd, ServerInfoTab.Rules, ServerInfoTab.Links, ServerInfoTab.News };
 
     private readonly Action close;
@@ -94,10 +97,11 @@ internal sealed class ServerInfoVM : ViewModel
             .Select(text => new ServerInfoParagraphVM(text)));
         Replace(Rules, Texts(info?.Rules, ServerInfoLimits.MaxRules)
             .Select((text, index) => new ServerInfoRuleVM(index + 1, text)));
+        // A server sends at most MaxLinks links, so checking only those keeps a bad server from flooding the log.
         Replace(Links, (info?.Links ?? Array.Empty<ServerInfoLink>())
-            .Select(CreateLink)
-            .Where(link => link != null)
-            .Take(ServerInfoLimits.MaxLinks));
+            .Take(ServerInfoLimits.MaxLinks)
+            .Select((link, index) => CreateLink(link, index))
+            .Where(link => link != null));
         Replace(News, (info?.News ?? Array.Empty<ServerInfoNews>())
             .Where(item => item != null && (!string.IsNullOrWhiteSpace(item.Title) || !string.IsNullOrWhiteSpace(item.Text)))
             .Take(ServerInfoLimits.MaxNews)
@@ -157,9 +161,14 @@ internal sealed class ServerInfoVM : ViewModel
         Replace(News, Enumerable.Empty<ServerInfoNewsVM>());
     }
 
-    private ServerInfoLinkVM CreateLink(ServerInfoLink link)
+    // The log names only the index: the address came from the server and is not trusted.
+    private ServerInfoLinkVM CreateLink(ServerInfoLink link, int index)
     {
-        if (link == null || !linkRules.TryNormalize(link.Url, out string address)) return null;
+        if (link == null || !linkRules.TryNormalize(link.Url, out string address))
+        {
+            Logger.Warning("Server info link at index {Index} from the server has no usable http or https url; skipping it", index);
+            return null;
+        }
 
         // An empty label shows the address, so every row still says where it goes.
         string label = string.IsNullOrWhiteSpace(link.Label) ? address : link.Label;
