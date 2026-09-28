@@ -94,6 +94,20 @@ public class DisconnectHandlerTests
     }
 
     [Fact]
+    public void CharacterCreation_HandlerFinalizesFirst_ShowsTheServerReasonOnce()
+    {
+        using var messageBroker = new TestMessageBroker();
+        var finalizer = new CoopFinalizer(messageBroker, Mock.Of<ILoadingInterface>());
+        using var session = new CancellationTokenSource();
+        RunServerDisconnect(messageBroker, finalizer, session, () => { });
+
+        // The state's MainMenuEntered handler on a later tick, before the queued teardown runs.
+        finalizer.Finalize("Client has been stopped");
+
+        Assert.Equal(RestartingMessage, Assert.Single(messageBroker.GetMessagesFromType<SendPopupMessage>()).Text);
+    }
+
+    [Fact]
     public void FinalizeEndsTheSessionDuringTheReturn_ShowsTheServerReasonOnce()
     {
         using var messageBroker = new TestMessageBroker();

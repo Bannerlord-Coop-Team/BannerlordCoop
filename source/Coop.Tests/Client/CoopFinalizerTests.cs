@@ -7,6 +7,7 @@ using GameInterface.Services.GameDebug.Messages;
 using GameInterface.Services.UI.Interfaces;
 using Moq;
 using System;
+using System.Linq;
 using System.Threading;
 using Xunit;
 
@@ -41,6 +42,34 @@ public class CoopFinalizerTests
 
         Assert.Equal(RestartingMessage, Assert.Single(messageBroker.GetMessagesFromType<SendPopupMessage>()).Text);
         Assert.Single(messageBroker.GetMessagesFromType<EndCoopMode>());
+    }
+
+    [Fact]
+    public void Finalize_TwiceAfterSetCloseText_ShowsTheCloseTextOnce()
+    {
+        using var messageBroker = new TestMessageBroker();
+        var finalizer = new CoopFinalizer(messageBroker, Mock.Of<ILoadingInterface>());
+
+        finalizer.SetCloseText(RestartingMessage);
+        finalizer.Finalize("Client has been stopped");
+        finalizer.Finalize("Client has been stopped");
+
+        Assert.Equal(RestartingMessage, Assert.Single(messageBroker.GetMessagesFromType<SendPopupMessage>()).Text);
+        Assert.Equal(2, messageBroker.GetMessagesFromType<EndCoopMode>().Count());
+    }
+
+    [Fact]
+    public void Finalize_TwiceWithoutSetCloseText_ShowsEachText()
+    {
+        using var messageBroker = new TestMessageBroker();
+        var finalizer = new CoopFinalizer(messageBroker, Mock.Of<ILoadingInterface>());
+
+        finalizer.Finalize("You have been Disconnected");
+        finalizer.Finalize("Client has been stopped");
+
+        Assert.Equal(
+            new[] { "You have been Disconnected", "Client has been stopped" },
+            messageBroker.GetMessagesFromType<SendPopupMessage>().Select(popup => popup.Text));
     }
 
     [Fact]

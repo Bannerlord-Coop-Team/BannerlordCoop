@@ -15,7 +15,7 @@ public interface ICoopFinalizer
     void Finalize(string closeText);
 
     /// <summary>
-    /// Makes every later <see cref="Finalize"/> in this session show <paramref name="closeText"/> instead of its own text.
+    /// Makes the later finalizes in this session show <paramref name="closeText"/> once instead of their own text.
     /// </summary>
     void SetCloseText(string closeText);
 
@@ -32,7 +32,7 @@ public class CoopFinalizer : ICoopFinalizer
     private readonly ILoadingInterface loadingInterface;
     // Set on the network thread and read by a finalize on the game thread.
     private volatile string closeTextOverride;
-    // Set when a finalize or ShowCloseText reaches its popup, so ShowCloseText never shows a second one.
+    // Set when a finalize or ShowCloseText reaches its popup, so the SetCloseText text shows only once.
     private int closeTextShown;
 
     public CoopFinalizer(IMessageBroker messageBroker, ILoadingInterface loadingInterface)
@@ -63,7 +63,8 @@ public class CoopFinalizer : ICoopFinalizer
     /// <param name="closeText">Text for ending notification pop-up message</param>
     public void Finalize(string closeText = null)
     {
-        closeText = closeTextOverride ?? closeText;
+        string overrideText = closeTextOverride;
+        closeText = overrideText ?? closeText;
 
         // A join/load flow may have force-shown the global loading window (ILoadingInterface keeps
         // it up across state transitions via the static LoadingWindowPatches.ForceLoadingWindow
@@ -82,10 +83,10 @@ public class CoopFinalizer : ICoopFinalizer
 
         // After the marshal above, which throws once the session is cancelled, and before EndCoopMode,
         // whose teardown can wake a caller that shows the close text itself.
-        Interlocked.Exchange(ref closeTextShown, 1);
+        bool firstToShow = Interlocked.Exchange(ref closeTextShown, 1) == 0;
 
-        // Only show pop-up with valid message
-        if (string.IsNullOrEmpty(closeText) == false)
+        // Only show pop-up with valid message, and the SetCloseText text only once
+        if (string.IsNullOrEmpty(closeText) == false && (overrideText == null || firstToShow))
         {
             messageBroker.Publish(this, new SendPopupMessage(closeText));
         }
