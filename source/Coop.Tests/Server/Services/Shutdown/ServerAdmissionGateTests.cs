@@ -1,21 +1,26 @@
-﻿using Common.Network;
+﻿using Common;
+using Common.Messaging;
+using Common.Network;
 using Common.Network.Coalescing;
 using Common.PacketHandlers;
 using Common.Serialization;
 using Common.Tests.Utils;
 using Coop.Core.Client;
 using Coop.Core.Client.Messages;
+using Coop.Core.Common.Services.Connection.Messages;
 using Coop.Core.Server;
 using Coop.Core.Server.Connections;
 using Coop.Core.Server.Services.Instances;
 using Coop.Core.Server.Services.Shutdown;
 using Coop.Core.Server.Services.Time;
 using GameInterface.Services.Entity;
+using GameInterface.Services.GameDebug.Handlers;
 using GameInterface.Services.GameDebug.Messages;
 using LiteNetLib;
 using LiteNetLib.Utils;
 using Moq;
 using System;
+using System.Collections.Concurrent;
 using System.Diagnostics;
 using System.Linq;
 using System.Net;
@@ -68,6 +73,25 @@ public class ServerAdmissionGateTests
         Assert.Empty(broker.GetMessagesFromType<SendPopupMessage>());
     }
 
+    [Theory]
+    [InlineData(false, Password, RestartingPopup)]
+    [InlineData(true, "wrong", PasswordPopup)]
+    public void RejectPopup_OutlivesTheTeardownThatEndsTheSession(bool gateOpen, string suppliedPassword, string expected)
+    {
+        using var broker = new TestMessageBroker();
+        var shown = new ConcurrentQueue<string>();
+        using var popups = new DebugMessageHandler(broker, shown.Enqueue);
+        using var session = new CancellationTokenSource();
+        // The EndCoopMode teardown runs inline on the game thread and cancels the session.
+        Action<MessagePayload<EndCoopMode>> tearDown = _ => session.Cancel();
+        broker.Subscribe(tearDown);
+
+        RunLoopback(broker, gateOpen, suppliedPassword, () => !shown.IsEmpty, session);
+
+        Assert.Equal(expected, Assert.Single(shown));
+        GC.KeepAlive(tearDown);
+    }
+
     [Fact]
     public void UnknownRejectCode_ShowsTheGenericPopup()
     {
@@ -91,7 +115,12 @@ public class ServerAdmissionGateTests
         return Assert.Single(broker.GetMessagesFromType<SendPopupMessage>()).Text;
     }
 
-    private static void RunLoopback(TestMessageBroker broker, bool gateOpen, string suppliedPassword, Func<bool> complete)
+    private static void RunLoopback(
+        TestMessageBroker broker,
+        bool gateOpen,
+        string suppliedPassword,
+        Func<bool> complete,
+        CancellationTokenSource? session = null)
     {
         var gate = new ServerAdmissionGate();
         if (!gateOpen) gate.Close();
@@ -112,16 +141,18 @@ public class ServerAdmissionGateTests
             Mock.Of<IReliableMessageBatcher<NetPeer>>(),
             cancellation);
 
-        RunLoopback(broker, server.OnConnectionRequest, suppliedPassword, complete);
+        RunLoopback(broker, server.OnConnectionRequest, suppliedPassword, complete, session);
     }
 
     private static void RunLoopback(
         TestMessageBroker broker,
         Action<ConnectionRequest> onConnectionRequest,
         string suppliedPassword,
-        Func<bool> complete)
+        Func<bool> complete,
+        CancellationTokenSource? session = null)
     {
-        using var cancellation = new CancellationTokenSource();
+        using var ownSession = new CancellationTokenSource();
+        var cancellation = session ?? ownSession;
         using var client = new CoopClient(CreateConfig(null).Object, broker, Mock.Of<IPacketManager>(),
             Mock.Of<IMessagePacketHandler>(), Mock.Of<ICommonSerializer>(),
             Mock.Of<IReliableMessageBatcher<NetPeer>>(), cancellation);
@@ -136,7 +167,7 @@ public class ServerAdmissionGateTests
             Assert.True(clientTransport.StartInManualMode(0));
             clientTransport.Connect(IPAddress.Loopback.ToString(), serverTransport.LocalPort, suppliedPassword);
 
-            PumpUntil(serverTransport, clientTransport, complete);
+            PumpUntil(serverTransport, clientTransport, cancellation.Token, complete);
         }
         finally
         {
@@ -155,7 +186,7 @@ public class ServerAdmissionGateTests
         return config;
     }
 
-    private static void PumpUntil(NetManager server, NetManager client, Func<bool> complete)
+    private static void PumpUntil(NetManager server, NetManager client, CancellationToken session, Func<bool> complete)
     {
         // The client publishes the reject popup through the test game-loop pump.
         var timer = Stopwatch.StartNew();
@@ -164,7 +195,11 @@ public class ServerAdmissionGateTests
             server.ManualUpdate(15);
             client.ManualUpdate(15);
             server.PollEvents();
-            client.PollEvents();
+            // Polled inside the session like CoopNetworkBase's poller.
+            using (GameThread.ActivateCancellation(session))
+            {
+                client.PollEvents();
+            }
             Thread.Sleep(1);
         }
 
