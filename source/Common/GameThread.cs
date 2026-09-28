@@ -747,7 +747,7 @@ public class GameThread : IUpdateable
             Run(cleanupOnce, label: label);
             if (then != null)
                 Run(WrapSafe(then, context), label: label);
-            Logger.Warning(e, "Blocking game-thread cleanup {Label} timed out; it runs once on the game thread with its continuation instead", label);
+            Logger.Warning(e, "Blocking game-thread cleanup {Label} timed out; it is queued on the game thread with its continuation instead", label);
             return;
         }
 
