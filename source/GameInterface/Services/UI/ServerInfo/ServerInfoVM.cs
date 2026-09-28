@@ -23,12 +23,18 @@ internal sealed class ServerInfoVM : ViewModel
     private static readonly ILogger Logger = LogManager.GetLogger<ServerInfoVM>();
     private static readonly ServerInfoTab[] TabOrder = { ServerInfoTab.Motd, ServerInfoTab.Rules, ServerInfoTab.Links, ServerInfoTab.News };
 
+    // Gauntlet's double-click window. The dialog opens under the pointer, so a quick second click on a row would land on Open.
+    internal const float OpenLinkDelaySeconds = 0.5f;
+    // A long frame counts as at most this much, so a hitch during a double-click does not end the wait early.
+    internal const float MaxOpenLinkTickSeconds = 0.125f;
+
     private readonly Action close;
     private readonly IServerInfoLinkRules linkRules;
     private readonly IBrowserLinkOpener opener;
     private bool isOpen;
     private ServerInfoTab selectedTab;
     private ServerInfoLinkVM pendingLink;
+    private float openLinkWait;
 
     [DataSourceProperty] public MBBindingList<ServerInfoParagraphVM> Paragraphs { get; } = new MBBindingList<ServerInfoParagraphVM>();
     [DataSourceProperty] public MBBindingList<ServerInfoRuleVM> Rules { get; } = new MBBindingList<ServerInfoRuleVM>();
@@ -49,6 +55,7 @@ internal sealed class ServerInfoVM : ViewModel
 
     [DataSourceProperty] public string LinkDialogAddress => pendingLink?.Address ?? string.Empty;
     [DataSourceProperty] public bool IsLinkDialogOpen => pendingLink != null;
+    [DataSourceProperty] public bool IsOpenLinkEnabled => pendingLink != null && openLinkWait <= 0f;
 
     [DataSourceProperty] public bool HasMotd => Paragraphs.Count > 0;
     [DataSourceProperty] public bool HasRules => Rules.Count > 0;
@@ -133,17 +140,26 @@ internal sealed class ServerInfoVM : ViewModel
     // Allows the native close button to release overlay input focus.
     public void ExecuteClose() => close();
 
-    // Opens the confirmed link; nothing opens without this click.
+    // Opens the confirmed link; nothing opens without this click, and not before the wait after the dialog appeared.
     public void ExecuteOpenLink()
     {
         var link = pendingLink;
-        if (link == null) return;
+        if (link == null || !IsOpenLinkEnabled) return;
 
         SetPendingLink(null);
         opener.Open(link.Address);
     }
 
     public void ExecuteCancelLink() => SetPendingLink(null);
+
+    // Runs each frame while the panel is open and counts down the wait before Open takes a click.
+    public void Tick(float dt)
+    {
+        if (pendingLink == null || IsOpenLinkEnabled || !(dt > 0f)) return;
+
+        openLinkWait -= Math.Min(dt, MaxOpenLinkTickSeconds);
+        if (openLinkWait <= 0f) OnPropertyChanged(nameof(IsOpenLinkEnabled));
+    }
 
     // Escape closes the link dialog first and the panel only when no dialog is open.
     public void HandleEscape()
@@ -180,8 +196,10 @@ internal sealed class ServerInfoVM : ViewModel
         if (ReferenceEquals(pendingLink, link)) return;
 
         pendingLink = link;
+        openLinkWait = link == null ? 0f : OpenLinkDelaySeconds;
         OnPropertyChanged(nameof(IsLinkDialogOpen));
         OnPropertyChanged(nameof(LinkDialogAddress));
+        OnPropertyChanged(nameof(IsOpenLinkEnabled));
     }
 
     private bool HasTab(ServerInfoTab tab)

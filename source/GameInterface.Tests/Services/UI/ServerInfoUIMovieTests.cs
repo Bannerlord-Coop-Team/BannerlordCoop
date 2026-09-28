@@ -162,6 +162,10 @@ public class ServerInfoUIMovieTests
         Assert.Contains(Widget("ServerInfoLinkCancel"), Widget("ServerInfoLinkDialogBox").Descendants());
         Assert.Equal(nameof(ServerInfoVM.ExecuteOpenLink), Widget("ServerInfoLinkOpen").Attribute("Command.Click")?.Value);
         Assert.Equal(nameof(ServerInfoVM.ExecuteCancelLink), Widget("ServerInfoLinkCancel").Attribute("Command.Click")?.Value);
+        // The game skips a disabled button when it hands out a press, so Open takes none until the view model's
+        // wait is over. Cancel never waits.
+        Assert.Equal("@" + nameof(ServerInfoVM.IsOpenLinkEnabled), Widget("ServerInfoLinkOpen").Attribute("IsEnabled")?.Value);
+        Assert.Null(Widget("ServerInfoLinkCancel").Attribute("IsEnabled"));
         Assert.Equal("@LinkDialogAddress", Widget("ServerInfoLinkDialogAddress").Attribute("Text")?.Value);
         Assert.Equal(nameof(ServerInfoLinkVM.ExecuteOpen), Widget("ServerInfoLinkRow").Attribute("Command.Click")?.Value);
     }

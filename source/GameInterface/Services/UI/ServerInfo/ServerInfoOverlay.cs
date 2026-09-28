@@ -57,6 +57,7 @@ internal sealed class ServerInfoOverlay : GlobalLayer, IServerInfoPopup
         }
         if (!mapAvailability.IsMapAvailable() || !ReferenceEquals(ScreenManager.FocusedLayer, layer)) Close();
         else if (Input.IsKeyReleased(InputKey.Escape)) viewModel.HandleEscape();
+        else viewModel.Tick(dt);
     }
 
     // Uses the player list's toggle rules, so it waits while the list, chat typing or another modal has focus.

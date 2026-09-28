@@ -236,7 +236,8 @@
                         <TextWidget Id="ServerInfoLinkDialogAddress" WidthSizePolicy="StretchToParent" HeightSizePolicy="CoverChildren" MarginTop="10" MarginLeft="40" MarginRight="40" Brush="Coop.PlayerList.Text" Brush.FontSize="21" Brush.FontColor="#C6B58DFF" Brush.TextHorizontalAlignment="Center" Brush.TextVerticalAlignment="Top" Text="@LinkDialogAddress" DoNotAcceptEvents="true"/>
                         <ListPanel WidthSizePolicy="CoverChildren" HeightSizePolicy="Fixed" SuggestedHeight="52" HorizontalAlignment="Center" MarginTop="26" MarginBottom="32" StackLayout.LayoutMethod="HorizontalLeftToRight">
                           <Children>
-                            <ButtonWidget Id="ServerInfoLinkOpen" WidthSizePolicy="Fixed" SuggestedWidth="200" HeightSizePolicy="Fixed" SuggestedHeight="52" Brush="Popup.Done.Button" Command.Click="ExecuteOpenLink" DoNotPassEventsToChildren="true" UpdateChildrenStates="true">
+                            <!-- Open is disabled for a moment after the dialog appears, so the second click of a double-click on a row cannot land on it. -->
+                            <ButtonWidget Id="ServerInfoLinkOpen" WidthSizePolicy="Fixed" SuggestedWidth="200" HeightSizePolicy="Fixed" SuggestedHeight="52" Brush="Popup.Done.Button" Command.Click="ExecuteOpenLink" IsEnabled="@IsOpenLinkEnabled" DoNotPassEventsToChildren="true" UpdateChildrenStates="true">
                               <Children>
                                 <TextWidget WidthSizePolicy="StretchToParent" HeightSizePolicy="StretchToParent" Brush="Popup.Button.Text" Text="@OpenLinkText"/>
                               </Children>

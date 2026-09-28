@@ -291,9 +291,11 @@ public sealed class ServerInfoVMTests : IDisposable
         vm.Links[1].ExecuteOpen();
 
         Assert.True(vm.IsLinkDialogOpen);
+        Assert.False(vm.IsOpenLinkEnabled);
         Assert.Equal("https://example.com/", vm.LinkDialogAddress);
         Assert.Contains(nameof(ServerInfoVM.IsLinkDialogOpen), changed);
         Assert.Contains(nameof(ServerInfoVM.LinkDialogAddress), changed);
+        Assert.Contains(nameof(ServerInfoVM.IsOpenLinkEnabled), changed);
         Assert.Empty(opener.Opened);
     }
 
@@ -302,13 +304,121 @@ public sealed class ServerInfoVMTests : IDisposable
     {
         var vm = CreateWithLinks();
         vm.Links[0].ExecuteOpen();
+        WaitOutTheOpenDelay(vm);
 
         vm.ExecuteOpenLink();
         vm.ExecuteOpenLink();
 
         Assert.Equal(new[] { "https://xn--bcher-kva.example/pfad" }, opener.Opened);
         Assert.False(vm.IsLinkDialogOpen);
+        Assert.False(vm.IsOpenLinkEnabled);
         Assert.Equal(string.Empty, vm.LinkDialogAddress);
+        Assert.Equal(0, closed);
+    }
+
+    // The dialog opens under the pointer, so the second click of a double-click on a row, or a quick run of clicks,
+    // reaches Open before the player has read the address. Open takes no click until the wait is over.
+    [Fact]
+    public void OpenRightAfterTheDialogAppears_OpensNothing()
+    {
+        var vm = CreateWithLinks();
+        vm.Links[0].ExecuteOpen();
+
+        vm.ExecuteOpenLink();
+        vm.Tick(ServerInfoVM.MaxOpenLinkTickSeconds);
+        vm.ExecuteOpenLink();
+
+        Assert.Empty(opener.Opened);
+        Assert.True(vm.IsLinkDialogOpen);
+        Assert.False(vm.IsOpenLinkEnabled);
+    }
+
+    // Four frames of an eighth of a second make the half second, and the button is told once when it turns on.
+    [Fact]
+    public void OpenTurnsOnAfterTheDelayAndOpensOnce()
+    {
+        var vm = CreateWithLinks();
+        vm.Links[0].ExecuteOpen();
+        var changed = new List<string>();
+        vm.PropertyChanged += (_, args) => changed.Add(args.PropertyName);
+        int frames = (int)(ServerInfoVM.OpenLinkDelaySeconds / ServerInfoVM.MaxOpenLinkTickSeconds);
+
+        for (int frame = 1; frame < frames; frame++) vm.Tick(ServerInfoVM.MaxOpenLinkTickSeconds);
+        Assert.False(vm.IsOpenLinkEnabled);
+        Assert.Empty(changed);
+
+        vm.Tick(ServerInfoVM.MaxOpenLinkTickSeconds);
+        vm.Tick(ServerInfoVM.MaxOpenLinkTickSeconds);
+
+        Assert.True(vm.IsOpenLinkEnabled);
+        Assert.Equal(new[] { nameof(ServerInfoVM.IsOpenLinkEnabled) }, changed);
+        vm.ExecuteOpenLink();
+        vm.ExecuteOpenLink();
+        Assert.Equal(new[] { "https://xn--bcher-kva.example/pfad" }, opener.Opened);
+    }
+
+    // A hitch while the player double-clicks must not end the wait in one frame, and a frame of zero, below zero or
+    // NaN does not count at all.
+    [Fact]
+    public void LongOrBrokenFrames_DoNotEndTheWaitEarly()
+    {
+        var vm = CreateWithLinks();
+        vm.Links[0].ExecuteOpen();
+
+        vm.Tick(10f);
+        vm.Tick(0f);
+        vm.Tick(-1f);
+        vm.Tick(float.NaN);
+        vm.ExecuteOpenLink();
+
+        Assert.False(vm.IsOpenLinkEnabled);
+        Assert.Empty(opener.Opened);
+
+        vm.Tick(float.PositiveInfinity);
+        vm.Tick(ServerInfoVM.MaxOpenLinkTickSeconds);
+        vm.Tick(ServerInfoVM.MaxOpenLinkTickSeconds);
+
+        Assert.True(vm.IsOpenLinkEnabled);
+    }
+
+    // Every time the dialog appears, for the same link or another, Open waits again.
+    [Fact]
+    public void ReopeningTheDialog_WaitsAgain()
+    {
+        var vm = CreateWithLinks();
+        vm.Links[0].ExecuteOpen();
+        WaitOutTheOpenDelay(vm);
+        vm.ExecuteCancelLink();
+
+        vm.Links[0].ExecuteOpen();
+        vm.ExecuteOpenLink();
+        Assert.False(vm.IsOpenLinkEnabled);
+
+        WaitOutTheOpenDelay(vm);
+        vm.HandleEscape();
+        vm.Links[1].ExecuteOpen();
+        vm.ExecuteOpenLink();
+        Assert.False(vm.IsOpenLinkEnabled);
+        Assert.Empty(opener.Opened);
+
+        WaitOutTheOpenDelay(vm);
+        vm.ExecuteOpenLink();
+        Assert.Equal(new[] { "https://example.com/" }, opener.Opened);
+    }
+
+    // Cancel and Escape never wait.
+    [Fact]
+    public void CancelAndEscapeWorkDuringTheWait()
+    {
+        var vm = CreateWithLinks();
+
+        vm.Links[0].ExecuteOpen();
+        vm.ExecuteCancelLink();
+        Assert.False(vm.IsLinkDialogOpen);
+
+        vm.Links[0].ExecuteOpen();
+        vm.HandleEscape();
+        Assert.False(vm.IsLinkDialogOpen);
         Assert.Equal(0, closed);
     }
 
@@ -399,6 +509,13 @@ public sealed class ServerInfoVMTests : IDisposable
     }
 
     private ServerInfoVM Create() => new(() => closed++, new ServerInfoLinkRules(), opener);
+
+    // The overlay's frames while the player reads the dialog.
+    internal static void WaitOutTheOpenDelay(ServerInfoVM vm)
+    {
+        for (float waited = 0f; waited < ServerInfoVM.OpenLinkDelaySeconds; waited += ServerInfoVM.MaxOpenLinkTickSeconds)
+            vm.Tick(ServerInfoVM.MaxOpenLinkTickSeconds);
+    }
 
     // The indexes this test's view model logged as refused, in order.
     private IEnumerable<int> LoggedLinkIndexes()
