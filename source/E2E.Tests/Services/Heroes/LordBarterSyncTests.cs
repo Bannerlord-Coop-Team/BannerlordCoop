@@ -1720,8 +1720,8 @@ public class LordBarterSyncTests : MapEventTestBase
     }
 
     /// <summary>
-    /// Every case but the first two resolves the map party context, so the client authorizes it and
-    /// the failure comes from the offered term.
+    /// Every case but the first two resolves the map party context, so the failure comes from the
+    /// offered term.
     /// </summary>
     private static BarterData CreateUnsendableBarter(
         UnsendableLordBarter failure, Hero playerHero, PartyBase playerParty, Hero targetHero, PartyBase targetParty)
