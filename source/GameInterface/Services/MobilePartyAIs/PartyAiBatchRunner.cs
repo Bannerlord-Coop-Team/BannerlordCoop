@@ -26,34 +26,25 @@ internal sealed class PartyAiBatchRunner : IPartyAiBatchRunner, IDisposable
     private const int FailuresBeforeQuarantine = 3;
     private const int QuarantineVisits = 10;
 
-    private static readonly ILogger DefaultLogger = LogManager.GetLogger<PartyAiBatchRunner>();
+    private static readonly ILogger Logger = LogManager.GetLogger<PartyAiBatchRunner>();
 
     private readonly MobileParty[] batch = new MobileParty[UpdatesPerTick];
     private readonly ConditionalWeakTable<MobileParty, FailureState> failures =
         new ConditionalWeakTable<MobileParty, FailureState>();
     private readonly Action<MobilePartyAi, float> tickOverride;
-    private readonly ILogger logger;
     private Task delay = Task.CompletedTask;
     private int currentStartIndex;
     private bool loggedNullParty;
 
     public PartyAiBatchRunner()
     {
-        logger = DefaultLogger;
         PartiesThinkPatch.Bind(this);
     }
 
     internal PartyAiBatchRunner(Action<MobilePartyAi, float> tickOverride)
-        : this(tickOverride, DefaultLogger)
-    {
-    }
-
-    internal PartyAiBatchRunner(Action<MobilePartyAi, float> tickOverride, ILogger logger)
     {
         if (tickOverride == null) throw new ArgumentNullException(nameof(tickOverride));
-        if (logger == null) throw new ArgumentNullException(nameof(logger));
         this.tickOverride = tickOverride;
-        this.logger = logger;
     }
 
     public void TickBatch(Campaign campaign, float dt)
@@ -96,7 +87,7 @@ internal sealed class PartyAiBatchRunner : IPartyAiBatchRunner, IDisposable
                 if (!loggedNullParty)
                 {
                     loggedNullParty = true;
-                    logger.Error("Skipping null party in mobile-party AI batch");
+                    Logger.Error("Skipping null party in mobile-party AI batch");
                 }
                 continue;
             }
@@ -142,7 +133,7 @@ internal sealed class PartyAiBatchRunner : IPartyAiBatchRunner, IDisposable
         if (state.UnavailableLogged) return;
         state.UnavailableLogged = true;
 
-        logger.Error(
+        Logger.Error(
             "Skipping mobile-party AI tick for {PartyId}: {Reason}",
             party.StringId,
             "Party AI is unavailable");
@@ -153,7 +144,7 @@ internal sealed class PartyAiBatchRunner : IPartyAiBatchRunner, IDisposable
         // A new exception type gets its own Error so its stack is not hidden behind the first one
         if (state.LoggedExceptionTypes.Add(exception.GetType()))
         {
-            logger.Error(
+            Logger.Error(
                 exception,
                 "Skipping mobile-party AI tick for {PartyId}: {Reason}",
                 party.StringId,
@@ -175,7 +166,7 @@ internal sealed class PartyAiBatchRunner : IPartyAiBatchRunner, IDisposable
         if (!warn) return;
 
         state.EpisodeWarned = true;
-        logger.Warning(
+        Logger.Warning(
             "Skipping mobile-party AI for {PartyId} for its next {Visits} visits after {Failures} failures, last error {Error}",
             party.StringId,
             QuarantineVisits,
@@ -187,7 +178,7 @@ internal sealed class PartyAiBatchRunner : IPartyAiBatchRunner, IDisposable
     {
         if (state.EpisodeWarned)
         {
-            logger.Information(
+            Logger.Information(
                 "Mobile-party AI for {PartyId} recovered after {Failures} failures",
                 party.StringId,
                 state.EpisodeFailures);

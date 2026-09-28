@@ -1,10 +1,9 @@
-﻿using Common.Util;
+﻿using Common.Logging;
+using Common.Util;
 using GameInterface.Services.MobilePartyAIs;
 using GameInterface.Services.MobilePartyAIs.Patches;
-using Serilog;
-using Serilog.Core;
-using Serilog.Events;
 using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
@@ -14,15 +13,18 @@ using Xunit;
 
 namespace GameInterface.Tests.Services.MobilePartyAIs;
 
-public sealed class PartyAiBatchRunnerTests
+public sealed class PartyAiBatchRunnerTests : IDisposable
 {
-    private readonly CaptureSink sink = new CaptureSink();
-    private readonly ILogger logger;
+    private readonly ConcurrentQueue<string> logs = new ConcurrentQueue<string>();
+    private readonly Action<string> captureLog;
 
     public PartyAiBatchRunnerTests()
     {
-        logger = new LoggerConfiguration().MinimumLevel.Verbose().WriteTo.Sink(sink).CreateLogger();
+        captureLog = logs.Enqueue;
+        OutputSinkManager.AddLogCallback(captureLog);
     }
+
+    public void Dispose() => OutputSinkManager.RemoveLogCallback(captureLog);
 
     [Fact]
     public void TickParties_ThrowingParty_ContinuesWithRemainingParties()
@@ -59,7 +61,7 @@ public sealed class PartyAiBatchRunnerTests
     [Fact]
     public void TickParties_TransientFailure_RetriesOnNextVisit()
     {
-        MobileParty party = CreateParty();
+        MobileParty party = CreateParty("transient_party");
         int visit = 0;
         var attempts = new List<int>();
         using var runner = new PartyAiBatchRunner((_, _) =>
@@ -67,39 +69,39 @@ public sealed class PartyAiBatchRunnerTests
             attempts.Add(visit);
             if (visit == 1 || visit >= 3)
                 throw new InvalidOperationException("transient");
-        }, logger);
+        });
 
         for (visit = 1; visit <= 4; visit++)
             Visit(runner, party);
 
         Assert.Equal(new[] { 1, 2, 3, 4 }, attempts);
-        Assert.Equal(0, sink.Count(LogEventLevel.Warning));
+        Assert.Empty(Warnings("transient_party"));
 
         // The success on visit 2 reset the count, so visit 5 is the third consecutive failure
         for (; visit <= 6; visit++)
             Visit(runner, party);
 
         Assert.Equal(new[] { 1, 2, 3, 4, 5 }, attempts);
-        Assert.Equal(1, sink.Count(LogEventLevel.Error));
+        Assert.Single(Errors("transient_party"));
     }
 
     [Fact]
     public void TickParties_PersistentFailure_RetriesAfterTenSkippedVisits()
     {
-        MobileParty party = CreateParty();
+        MobileParty party = CreateParty("persistent_party");
         int visit = 0;
         var attempts = new List<int>();
         using var runner = new PartyAiBatchRunner((_, _) =>
         {
             attempts.Add(visit);
             throw new InvalidOperationException("persistent");
-        }, logger);
+        });
 
         for (visit = 1; visit <= 36; visit++)
             Visit(runner, party);
 
         Assert.Equal(new[] { 1, 2, 3, 14, 25, 36 }, attempts);
-        Assert.Equal(1, sink.Count(LogEventLevel.Error));
+        Assert.Single(Errors("persistent_party"));
     }
 
     [Fact]
@@ -114,7 +116,7 @@ public sealed class PartyAiBatchRunnerTests
             attempts.Add(ai);
             if (ai == poisoned.Ai)
                 throw new InvalidOperationException("poisoned party");
-        }, logger);
+        });
 
         for (int visit = 1; visit <= 25; visit++)
             runner.TickParties(new[] { first, poisoned, last }, 3, 0f);
@@ -135,27 +137,27 @@ public sealed class PartyAiBatchRunnerTests
             attempts.Add(visit);
             if (visit <= 14)
                 throw new InvalidOperationException("broken");
-        }, logger);
+        });
 
         for (visit = 1; visit <= 26; visit++)
             Visit(runner, party);
 
         Assert.Equal(new[] { 1, 2, 3, 14, 25, 26 }, attempts);
-        LogEvent recovery = Assert.Single(sink.Events, e => e.Level == LogEventLevel.Information);
-        Assert.Equal("Mobile-party AI for \"villager_ES1_1\" recovered after 4 failures", recovery.RenderMessage());
-        Assert.Equal(2, sink.Count(LogEventLevel.Warning));
+        string recovery = Assert.Single(Recoveries("villager_ES1_1"));
+        Assert.Equal("Mobile-party AI for \"villager_ES1_1\" recovered after 4 failures", recovery);
+        Assert.Equal(2, Warnings("villager_ES1_1").Length);
     }
 
     [Fact]
     public void TickParties_FlappingParty_WarnsOnPowerOfTwoEpisodesAndSecondQuarantine()
     {
-        MobileParty party = CreateParty();
+        MobileParty party = CreateParty("flapping_party");
         bool broken = false;
         using var runner = new PartyAiBatchRunner((_, _) =>
         {
             if (broken)
                 throw new InvalidOperationException("flapping");
-        }, logger);
+        });
 
         for (int cycle = 0; cycle < 64; cycle++)
         {
@@ -167,25 +169,25 @@ public sealed class PartyAiBatchRunnerTests
             Visit(runner, party);
         }
 
-        Assert.Equal(1, sink.Count(LogEventLevel.Error));
-        Assert.Equal(7, sink.Count(LogEventLevel.Warning));
-        Assert.Equal(7, sink.Count(LogEventLevel.Information));
-        Assert.DoesNotContain(sink.Events, e => e.Level < LogEventLevel.Information);
+        Assert.Single(Errors("flapping_party"));
+        Assert.Equal(7, Warnings("flapping_party").Length);
+        Assert.Equal(7, Recoveries("flapping_party").Length);
+        Assert.Equal(15, logs.Count(l => l.Contains("\"flapping_party\"")));
 
         // Episode 65 is not a power of two, so its first quarantine is quiet but its second is not
         broken = true;
         for (int visit = 0; visit < 13; visit++)
             Visit(runner, party);
-        Assert.Equal(7, sink.Count(LogEventLevel.Warning));
+        Assert.Equal(7, Warnings("flapping_party").Length);
 
         Visit(runner, party);
-        Assert.Equal(8, sink.Count(LogEventLevel.Warning));
+        Assert.Equal(8, Warnings("flapping_party").Length);
     }
 
     [Fact]
     public void TickParties_ExceptionTypeChanges_LogsAnotherErrorAndKeepsCounting()
     {
-        MobileParty party = CreateParty();
+        MobileParty party = CreateParty("type_change_party");
         var failures = new Exception[]
         {
             new InvalidOperationException("first"),
@@ -198,21 +200,22 @@ public sealed class PartyAiBatchRunnerTests
             Exception failure = failures[Math.Min(attempts, failures.Length - 1)];
             attempts++;
             throw failure;
-        }, logger);
+        });
 
         for (int visit = 0; visit < 4; visit++)
             Visit(runner, party);
 
         Assert.Equal(3, attempts);
-        Assert.Equal(
-            new[] { typeof(InvalidOperationException), typeof(TargetInvocationException) },
-            sink.Events.Where(e => e.Level == LogEventLevel.Error).Select(e => e.Exception?.GetType()));
+        Assert.Collection(
+            Errors("type_change_party"),
+            e => Assert.Contains(Environment.NewLine + typeof(InvalidOperationException).FullName + ": first", e),
+            e => Assert.Contains(Environment.NewLine + typeof(TargetInvocationException).FullName + ":", e));
     }
 
     [Fact]
     public void TickParties_ExceptionMessageThrows_LaterPartiesStillTick()
     {
-        MobileParty broken = CreateParty();
+        MobileParty broken = CreateParty("unreadable_message_party");
         MobileParty healthy = CreateParty();
         int healthyAttempts = 0;
         using var runner = new PartyAiBatchRunner((ai, _) =>
@@ -220,29 +223,31 @@ public sealed class PartyAiBatchRunnerTests
             if (ai == broken.Ai)
                 throw new UnreadableMessageException();
             healthyAttempts++;
-        }, logger);
+        });
 
         for (int visit = 0; visit < 3; visit++)
             runner.TickParties(new[] { broken, healthy }, 2, 0f);
 
         Assert.Equal(3, healthyAttempts);
-        LogEvent warning = Assert.Single(sink.Events, e => e.Level == LogEventLevel.Warning);
-        Assert.Contains(typeof(UnreadableMessageException).FullName!, warning.RenderMessage());
+        string warning = Assert.Single(Warnings("unreadable_message_party"));
+        Assert.Contains(typeof(UnreadableMessageException).FullName!, warning);
     }
 
     [Fact]
     public void TickParties_MissingAiThenThrowing_LogsBothErrors()
     {
         MobileParty party = ObjectHelper.SkipConstructor<MobileParty>();
-        using var runner = new PartyAiBatchRunner((_, _) => throw new InvalidOperationException("broken"), logger);
+        party.StringId = "missing_ai_party";
+        using var runner = new PartyAiBatchRunner((_, _) => throw new InvalidOperationException("broken"));
 
         Visit(runner, party);
         party.Ai = new MobilePartyAi(party);
         Visit(runner, party);
 
-        Assert.Equal(
-            new object[] { "Party AI is unavailable", "Party AI tick threw" },
-            sink.Events.Where(e => e.Level == LogEventLevel.Error).Select(e => ((ScalarValue)e.Properties["Reason"]).Value));
+        Assert.Collection(
+            Errors("missing_ai_party"),
+            e => Assert.Contains("\"Party AI is unavailable\"", e),
+            e => Assert.Contains("\"Party AI tick threw\"", e));
     }
 
     [Fact]
@@ -256,7 +261,7 @@ public sealed class PartyAiBatchRunnerTests
             if (ai != broken.Ai) return;
             brokenAttempts++;
             throw new InvalidOperationException("broken");
-        }, logger);
+        });
 
         for (int visit = 0; visit < 3; visit++)
             Visit(runner, broken);
@@ -283,7 +288,7 @@ public sealed class PartyAiBatchRunnerTests
             attempts.Add(ai == removed.Ai ? "removed" : "recreated");
             if (ai == removed.Ai)
                 throw new InvalidOperationException("broken");
-        }, logger);
+        });
 
         for (int visit = 0; visit < 3; visit++)
             Visit(runner, removed);
@@ -301,7 +306,7 @@ public sealed class PartyAiBatchRunnerTests
         {
             attempts++;
             throw new InvalidOperationException("broken");
-        }, logger);
+        });
 
         WeakReference party = QuarantineNewParty(runner);
         GC.Collect();
@@ -351,21 +356,22 @@ public sealed class PartyAiBatchRunnerTests
     private static void Visit(PartyAiBatchRunner runner, MobileParty party) =>
         runner.TickParties(new[] { party }, 1, 0f);
 
+    // The sink is shared with tests running in parallel, so lines are matched by party id
+    private string[] Errors(string partyId) => Logs($"Skipping mobile-party AI tick for \"{partyId}\":");
+
+    private string[] Warnings(string partyId) => Logs($"Skipping mobile-party AI for \"{partyId}\" for its next");
+
+    private string[] Recoveries(string partyId) => Logs($"Mobile-party AI for \"{partyId}\" recovered");
+
+    private string[] Logs(string prefix) =>
+        logs.Where(l => l.StartsWith(prefix, StringComparison.Ordinal)).ToArray();
+
     private static MobileParty CreateParty(string? stringId = null)
     {
         var party = ObjectHelper.SkipConstructor<MobileParty>();
         party.StringId = stringId;
         party.Ai = new MobilePartyAi(party);
         return party;
-    }
-
-    private sealed class CaptureSink : ILogEventSink
-    {
-        public List<LogEvent> Events { get; } = new List<LogEvent>();
-
-        public void Emit(LogEvent logEvent) => Events.Add(logEvent);
-
-        public int Count(LogEventLevel level) => Events.Count(e => e.Level == level);
     }
 
     private sealed class UnreadableMessageException : Exception
