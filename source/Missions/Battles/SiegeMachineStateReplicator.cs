@@ -1769,7 +1769,7 @@ public partial class SiegeMachineStateReplicator : ISiegeMachineStateReplicator
             SyncMissionSiegeWeaponHealth(destruction, state.HitPoints);
             // Assigning HitPoint raises no destroyed event, so run the gate's own handler before the mesh swap like
             // vanilla OnHit: it hides the plank, turns off the standing points and opens the gate navmesh. The
-            // component event stays on the host.
+            // component's OnDestroyed event isn't raised here, so its other listeners only run where the hit happened.
             if (!wasDestroyed && destruction.IsDestroyed && machine is CastleGate destroyedGate)
             {
                 destroyedGate.OnDestroyed(destruction, null, in MissionWeapon.Invalid, null, 0);
