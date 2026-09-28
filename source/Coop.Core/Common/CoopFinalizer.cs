@@ -3,6 +3,7 @@ using Common.Messaging;
 using Coop.Core.Common.Services.Connection.Messages;
 using GameInterface.Services.GameDebug.Messages;
 using GameInterface.Services.UI.Interfaces;
+using System.Threading;
 
 namespace Coop.Core.Common;
 
@@ -17,6 +18,11 @@ public interface ICoopFinalizer
     /// Makes every later <see cref="Finalize"/> in this session show <paramref name="closeText"/> instead of its own text.
     /// </summary>
     void SetCloseText(string closeText);
+
+    /// <summary>
+    /// Shows the <see cref="SetCloseText"/> text once for a session that ended without a <see cref="Finalize"/> showing it.
+    /// </summary>
+    void ShowCloseText();
 }
 
 /// <inheritdoc cref="ICoopFinalizer"/>
@@ -26,6 +32,8 @@ public class CoopFinalizer : ICoopFinalizer
     private readonly ILoadingInterface loadingInterface;
     // Set on the network thread and read by a finalize on the game thread.
     private volatile string closeTextOverride;
+    // Set when a finalize or ShowCloseText reaches its popup, so ShowCloseText never shows a second one.
+    private int closeTextShown;
 
     public CoopFinalizer(IMessageBroker messageBroker, ILoadingInterface loadingInterface)
     {
@@ -36,6 +44,17 @@ public class CoopFinalizer : ICoopFinalizer
     public void SetCloseText(string closeText)
     {
         closeTextOverride = closeText;
+    }
+
+    public void ShowCloseText()
+    {
+        if (Interlocked.Exchange(ref closeTextShown, 1) != 0) return;
+
+        string closeText = closeTextOverride;
+        if (string.IsNullOrEmpty(closeText) == false)
+        {
+            messageBroker.Publish(this, new SendPopupMessage(closeText));
+        }
     }
 
     /// <summary>
@@ -60,6 +79,10 @@ public class CoopFinalizer : ICoopFinalizer
         // down before the teardown messages below, and inline (no marshal) when already on the game
         // thread — e.g. the validation-timeout path.
         GameThread.RunSafe(loadingInterface.HideLoadingScreen, blocking: true);
+
+        // After the marshal above, which throws once the session is cancelled, and before EndCoopMode,
+        // whose teardown can wake a caller that shows the close text itself.
+        Interlocked.Exchange(ref closeTextShown, 1);
 
         // Only show pop-up with valid message
         if (string.IsNullOrEmpty(closeText) == false)

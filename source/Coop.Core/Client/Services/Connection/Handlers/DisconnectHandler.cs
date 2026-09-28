@@ -34,8 +34,8 @@ internal class DisconnectHandler : IHandler
     {
         string message = GetDisconnectMessage(obj.What.DisconnectInfo.Reason, obj.What.ServerReason);
 
-        // Leaving a campaign finalizes coop from the state's MainMenuEntered handler before GoToMainMenu
-        // returns, so that finalize has to show this message too.
+        // The state's MainMenuEntered handler can finalize first (in character creation, on the next tick),
+        // so every finalize in this session shows this message.
         coopFinalizer.SetCloseText(message);
 
         try
@@ -45,7 +45,8 @@ internal class DisconnectHandler : IHandler
         }
         catch (OperationCanceledException)
         {
-            // The session ended on the way to the main menu, so its teardown already ended coop.
+            // A teardown ended the session first. On the map that is CoopMod.OnGameEnd, which shows no popup.
+            coopFinalizer.ShowCloseText();
             Logger.Information("The co-op session ended while returning to the main menu after a disconnect ({Reason})",
                 obj.What.ServerReason ?? obj.What.DisconnectInfo.Reason.ToString());
         }

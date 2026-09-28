@@ -45,44 +45,66 @@ public class DisconnectHandlerTests
     }
 
     [Fact]
-    public void LeavingTheCampaignEndsTheSession_ShowsTheServerReasonInstead()
+    public void LeavingTheMap_SessionEndsWithoutAFinalize_ShowsTheServerReason()
     {
         using var messageBroker = new TestMessageBroker();
         var finalizer = new CoopFinalizer(messageBroker, Mock.Of<ILoadingInterface>());
-        var gameState = new Mock<IGameStateInterface>();
-        // On the map EndGame enters the main menu before it returns, so the state's MainMenuEntered
-        // handler finalizes coop and that teardown wakes the blocking EndGame marshal.
-        gameState.Setup(value => value.GoToMainMenu())
-            .Callback(() => finalizer.Finalize("Client has been stopped"))
-            .Throws(new OperationCanceledException("The game-thread session ended before the blocking Run action completed."));
-        using var handler = new DisconnectHandler(messageBroker, finalizer, gameState.Object);
+        using var session = new CancellationTokenSource();
+        // On the map EndGame destroys the game, and CoopMod.OnGameEnd ends the session with no finalize,
+        // which wakes the blocking EndGame marshal.
+        RunServerDisconnect(messageBroker, finalizer, session, () =>
+        {
+            session.Cancel();
+            throw new OperationCanceledException("The game-thread session ended before the blocking Run action completed.");
+        });
 
-        messageBroker.Publish(handler, ServerDisconnect("ServerRestarting"));
+        Assert.Equal(RestartingMessage, Assert.Single(messageBroker.GetMessagesFromType<SendPopupMessage>()).Text);
+        // That teardown already ended coop.
+        Assert.Empty(messageBroker.GetMessagesFromType<EndCoopMode>());
+    }
+
+    [Fact]
+    public void SessionEndsWithoutAFinalizeBeforeTheHandlerFinalizes_ShowsTheServerReason()
+    {
+        using var messageBroker = new TestMessageBroker();
+        var finalizer = new CoopFinalizer(messageBroker, Mock.Of<ILoadingInterface>());
+        using var session = new CancellationTokenSource();
+        RunServerDisconnect(messageBroker, finalizer, session, () => session.Cancel());
+
+        Assert.Equal(RestartingMessage, Assert.Single(messageBroker.GetMessagesFromType<SendPopupMessage>()).Text);
+        Assert.Empty(messageBroker.GetMessagesFromType<EndCoopMode>());
+    }
+
+    [Fact]
+    public void CharacterCreation_StateFinalizesFirst_ShowsTheServerReasonOnce()
+    {
+        using var messageBroker = new TestMessageBroker();
+        var finalizer = new CoopFinalizer(messageBroker, Mock.Of<ILoadingInterface>());
+        using var session = new CancellationTokenSource();
+        // In character creation EndGame returns, then the state's MainMenuEntered handler finalizes on the
+        // next tick and its teardown ends the session before this handler's finalize reaches the game thread.
+        RunServerDisconnect(messageBroker, finalizer, session, () =>
+        {
+            finalizer.Finalize("Client has been stopped");
+            session.Cancel();
+        });
 
         Assert.Equal(RestartingMessage, Assert.Single(messageBroker.GetMessagesFromType<SendPopupMessage>()).Text);
         Assert.Single(messageBroker.GetMessagesFromType<EndCoopMode>());
     }
 
     [Fact]
-    public void SessionEndsAsTheMainMenuIsReached_ShowsTheServerReasonOnce()
+    public void FinalizeEndsTheSessionDuringTheReturn_ShowsTheServerReasonOnce()
     {
         using var messageBroker = new TestMessageBroker();
         var finalizer = new CoopFinalizer(messageBroker, Mock.Of<ILoadingInterface>());
         using var session = new CancellationTokenSource();
-        var gameState = new Mock<IGameStateInterface>();
-        // The EndGame marshal can still report completion after the teardown cancelled the session.
-        gameState.Setup(value => value.GoToMainMenu()).Callback(() =>
+        RunServerDisconnect(messageBroker, finalizer, session, () =>
         {
             finalizer.Finalize("Client has been stopped");
             session.Cancel();
+            throw new OperationCanceledException("The game-thread session ended before the blocking Run action completed.");
         });
-        using var handler = new DisconnectHandler(messageBroker, finalizer, gameState.Object);
-
-        // The network poller publishes the disconnect inside its session.
-        using (GameThread.ActivateCancellation(session.Token))
-        {
-            messageBroker.Publish(handler, ServerDisconnect("ServerRestarting"));
-        }
 
         Assert.Equal(RestartingMessage, Assert.Single(messageBroker.GetMessagesFromType<SendPopupMessage>()).Text);
         Assert.Single(messageBroker.GetMessagesFromType<EndCoopMode>());
@@ -92,6 +114,20 @@ public class DisconnectHandlerTests
 
     private static NetworkDisconnected ServerDisconnect(string serverReason) =>
         new NetworkDisconnected(new DisconnectInfo { Reason = DisconnectReason.RemoteConnectionClose }, serverReason);
+
+    private static void RunServerDisconnect(
+        TestMessageBroker messageBroker, ICoopFinalizer finalizer, CancellationTokenSource session, Action goToMainMenu)
+    {
+        var gameState = new Mock<IGameStateInterface>();
+        gameState.Setup(value => value.GoToMainMenu()).Callback(goToMainMenu);
+        using var handler = new DisconnectHandler(messageBroker, finalizer, gameState.Object);
+
+        // The network poller publishes the disconnect inside its session.
+        using (GameThread.ActivateCancellation(session.Token))
+        {
+            messageBroker.Publish(handler, ServerDisconnect("ServerRestarting"));
+        }
+    }
 
     private static void RunDisconnect(DisconnectReason reason, string expectedMessage, string? serverReason = null)
     {
