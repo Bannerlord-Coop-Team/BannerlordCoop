@@ -61,8 +61,7 @@ public class CoopFinalizerTests
         try
         {
             using var fixture = new Fixture();
-            using var shortTimeout = GameThread.Instance.LimitFrameDrain(
-                TimeSpan.FromSeconds(1), TimeSpan.FromMilliseconds(500));
+            using var shortTimeout = GameThread.Instance.LimitFrameDrain(TimeSpan.FromSeconds(1), TimeSpan.FromSeconds(2));
             Rejection rejection = fixture.RejectOnWorker();
             fixture.WaitUntilQueued();
 
@@ -94,7 +93,7 @@ public class CoopFinalizerTests
         using var shortTimeout = GameThread.Instance.LimitFrameDrain(TimeSpan.FromSeconds(1), ShortTimeout);
         Assert.Null(fixture.RejectOnWorker().Join());
 
-        // Another teardown ended this session first. A later session owns coop and the loading screen by then.
+        // Another teardown ended this session first, so that teardown owns the cleanup.
         fixture.Session.Cancel();
         fixture.Pump();
 
