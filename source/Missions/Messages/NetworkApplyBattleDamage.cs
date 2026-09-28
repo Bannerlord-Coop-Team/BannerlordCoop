@@ -31,6 +31,8 @@ public class NetworkApplyBattleDamage : IEvent
     /// <summary>The original missile weapon used by vanilla to select the combat skill reward.</summary>
     [ProtoMember(8)]
     public WeaponComponentData AttackerWeapon { get; }
+    [ProtoMember(9)]
+    public string SourceControllerId { get; }
 
     [ProtoIgnore]
     public Blow Blow { get; private set; }
@@ -44,7 +46,8 @@ public class NetworkApplyBattleDamage : IEvent
         bool isMissile,
         bool isMount = false,
         long missileShotSequence = 0,
-        WeaponComponentData attackerWeapon = null)
+        WeaponComponentData attackerWeapon = null,
+        string sourceControllerId = null)
     {
         VictimAgentId = victimAgentId;
         AttackerAgentId = attackerAgentId;
@@ -53,6 +56,7 @@ public class NetworkApplyBattleDamage : IEvent
         MissileShotSequence = missileShotSequence;
         IsMissile = isMissile;
         AttackerWeapon = attackerWeapon;
+        SourceControllerId = sourceControllerId;
     }
 
     internal void AttachDecodedData(Blow blow, AttackCollisionData collisionData)
