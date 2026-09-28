@@ -5,6 +5,7 @@ using Common.Network;
 using Common.Serialization;
 using Common.Tests.Utils;
 using Coop.Core.Client;
+using Coop.Core.Common.Configuration;
 using Coop.Core.Server;
 using Coop.Core.Server.Services.Settlements;
 using Coop.Core.Server.Services.Telemetry;
@@ -14,6 +15,7 @@ using GameInterface;
 using GameInterface.Policies;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Settlements.Interfaces;
+using GameInterface.Services.UI.ServerInfo;
 using Moq;
 using Serilog;
 using TaleWorlds.CampaignSystem.Party;
@@ -91,6 +93,7 @@ public class TestEnvironment
             .As<IServerTelemetryUploader>()
             .As<IBattlesFoughtUploader>()
             .SingleInstance();
+        builder.RegisterType<NoServerInfoConfig>().As<IServerInfoConfig>().SingleInstance();
 
         var container = BuildContainer(builder);
 
@@ -147,6 +150,17 @@ public class TestEnvironment
             rejectionReason = string.Empty;
             return true;
         }
+    }
+
+    /// <summary>
+    /// Replaces the server-info.json reader, so the tests never depend on that file on this machine.
+    /// </summary>
+    private sealed class NoServerInfoConfig : IServerInfoConfig
+    {
+        public IReadOnlyList<string> Motd => Array.Empty<string>();
+        public IReadOnlyList<string> Rules => Array.Empty<string>();
+        public IReadOnlyList<ServerInfoLink> Links => Array.Empty<ServerInfoLink>();
+        public IReadOnlyList<ServerInfoNews> News => Array.Empty<ServerInfoNews>();
     }
 
     public void RegisterObjectInNetwork<T>(T obj, string? stringId = null)
