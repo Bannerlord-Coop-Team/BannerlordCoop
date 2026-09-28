@@ -6,6 +6,7 @@ using System.Collections.Concurrent;
 using System.Linq;
 using System.Reflection;
 using System.Threading;
+using System.Threading.Tasks;
 using Xunit;
 
 namespace GameInterface.Tests.Services.Voice;
@@ -27,10 +28,12 @@ public partial class VoiceAudioTests
         public long Now = 1000;
         public int DecoderCount;
         public int ReceivedCount;
-        public int InputDisposals;
+        public int InputStopRequests;
         public int Clears;
         public Exception? OpenError;
+        public Task CaptureRelease = Task.CompletedTask;
 
+        // Each fake capture owns a stable release task so tests can hold native shutdown pending.
         public WorkerHarness(bool realCodec = false, IVoicePolicy? policy = null)
         {
             Device.Setup(x => x.Play(It.IsAny<byte[]>())).Callback<byte[]>(Played.Enqueue);
@@ -41,8 +44,13 @@ public partial class VoiceAudioTests
                 {
                     Callbacks.Enqueue((data, error));
                     if (OpenError != null) throw OpenError;
-                    var capture = new Mock<IDisposable>();
-                    capture.Setup(x => x.Dispose()).Callback(() => Interlocked.Increment(ref InputDisposals));
+                    var release = CaptureRelease;
+                    var capture = new Mock<IVoiceCapture>();
+                    capture.Setup(x => x.StopAsync()).Returns(() =>
+                    {
+                        Interlocked.Increment(ref InputStopRequests);
+                        return release;
+                    });
                     return capture.Object;
                 });
             var opus = new OpusVoiceCodecFactory();
