@@ -136,6 +136,7 @@ internal abstract class TestComponentBase
         RegisterMock<IChatService>(builder);
         RegisterMock<IPlayerListService>(builder);
         RegisterMock<IServerInfoService>(builder);
+        RegisterMock<IServerInfoLinkRules>(builder);
         RegisterMock<IPlayerActivityReader>(builder);
         RegisterMock<IPlatformDisplayNameProvider>(builder);
         RegisterMock<IVoiceClient>(builder);
