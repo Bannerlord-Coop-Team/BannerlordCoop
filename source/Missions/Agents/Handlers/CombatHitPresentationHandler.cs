@@ -1,5 +1,7 @@
 ﻿using Common;
 using Common.Messaging;
+using GameInterface.Services.MapEvents;
+using GameInterface.Services.MapEvents.Messages;
 using Missions.Agents.Extensions;
 using Missions.Agents.Messages;
 using System;
@@ -26,7 +28,7 @@ public interface ICombatHitPresentationHandler : IHandler
         string attackerControllerId);
 }
 
-/// <summary>Replicates blood and shield-impact presentation without changing authoritative combat state.</summary>
+/// <summary>Replicates blood and impact sounds without changing authoritative combat state.</summary>
 public class CombatHitPresentationHandler : ICombatHitPresentationHandler
 {
     private readonly INetworkAgentRegistry agentRegistry;
@@ -44,12 +46,38 @@ public class CombatHitPresentationHandler : ICombatHitPresentationHandler
 
         messageBroker.Subscribe<MeleeHitPresentation>(Handle_LocalPresentation);
         messageBroker.Subscribe<NetworkMeleeHitPresentation>(Handle_NetworkPresentation);
+        messageBroker.Subscribe<AgentHitSound>(Handle_LocalHitSound);
     }
 
     public void Dispose()
     {
         messageBroker.Unsubscribe<MeleeHitPresentation>(Handle_LocalPresentation);
         messageBroker.Unsubscribe<NetworkMeleeHitPresentation>(Handle_NetworkPresentation);
+        messageBroker.Unsubscribe<AgentHitSound>(Handle_LocalHitSound);
+    }
+
+    private void Handle_LocalHitSound(MessagePayload<AgentHitSound> payload)
+    {
+        AgentHitSound sound = payload.What;
+        if (!TryResolveIdentity(sound.SoundOwner, out Guid ownerId, out _) ||
+            !agentRegistry.IsLocallyControlled(ownerId) ||
+            !TryResolveIdentity(sound.Victim, out Guid victimId, out bool isMount))
+        {
+            return;
+        }
+
+        string excludedController = BattleSpawnGate.RoutedBlowSourceControllerId;
+        if (excludedController == null &&
+            TryResolveIdentity(sound.AlreadyPlayedBy, out Guid attackerId, out _) &&
+            agentRegistry.TryGetAgentInfo(attackerId, out CoopAgentInfo attackerInfo))
+        {
+            excludedController = attackerInfo.CurrentAuthority;
+        }
+
+        // A routed horse collision can originate on a peer that does not own the horse.
+        network.SendAllBut(excludedController, new NetworkMeleeHitPresentation(
+            victimId, isMount, MeleeHitPresentationKind.BodyImpact, -1, sound.Position,
+            WeaponClass.Undefined, -1, 0f, sound.SoundIndex, sound.ArmorType));
     }
 
     public void BroadcastAcceptedMeleeBlood(
@@ -163,6 +191,7 @@ public class CombatHitPresentationHandler : ICombatHitPresentationHandler
     {
         victimId = Guid.Empty;
         isMount = false;
+        if (victim == null) return false;
         if (agentRegistry.TryGetAgentInfo(victim, out CoopAgentInfo info))
         {
             victimId = info.AgentId;
@@ -197,7 +226,11 @@ public class CombatHitPresentationHandler : ICombatHitPresentationHandler
 
         Agent victim = presentation.IsMount ? info.Agent?.MountAgent : info.Agent;
         Mission mission = Mission.Current;
-        if (mission == null || victim == null || victim.Mission != mission || !victim.IsActive())
+        if (mission == null || victim == null || victim.Mission != mission)
+            return;
+
+        // A fatal hit can reach the observer after its victim has become inactive.
+        if (presentation.Kind != MeleeHitPresentationKind.BodyImpact && !victim.IsActive())
             return;
 
         switch (presentation.Kind)
@@ -208,7 +241,23 @@ public class CombatHitPresentationHandler : ICombatHitPresentationHandler
             case MeleeHitPresentationKind.ShieldImpact:
                 PlayShieldImpact(mission, victim, presentation);
                 break;
+            case MeleeHitPresentationKind.BodyImpact:
+                PlayBodyImpact(mission, presentation);
+                break;
         }
+    }
+
+    private static void PlayBodyImpact(Mission mission, NetworkMeleeHitPresentation presentation)
+    {
+        if (!BattleSpawnGate.IsCoopBattleActive || presentation.SoundIndex < 0 ||
+            !IsFinite(presentation.CollisionPosition) || !IsFinite(presentation.ArmorType))
+        {
+            return;
+        }
+
+        var parameter = new SoundEventParameter("Armor Type", presentation.ArmorType);
+        mission.MakeSound(presentation.SoundIndex, presentation.CollisionPosition,
+            soundCanBePredicted: false, isReliable: true, -1, -1, ref parameter);
     }
 
     internal static void PlayBlood(Agent victim, int collisionBoneIndex, float strength)
