@@ -1651,7 +1651,7 @@ public class PlayerKingdomCreationFlowTests : IDisposable
     }
 
     [Fact]
-    public void KingdomDecisionRoundStatus_DisablesPanelWhenLocalClanAlreadySubmitted()
+    public void KingdomDecisionRoundStatus_ShowsClosableWaitingViewWhenLocalClanAlreadySubmitted()
     {
         var client1 = Clients.First();
         var client2 = Clients.Skip(1).First();
