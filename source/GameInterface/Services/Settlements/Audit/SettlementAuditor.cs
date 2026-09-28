@@ -49,6 +49,10 @@ internal class SettlementAuditor : IAuditor
 
     private void Handle_Response(MessagePayload<SettlementAuditResponse> payload)
     {
+        // The server and clients that did not request this audit also receive the response
+        var pending = tcs;
+        if (pending == null || pending.Task.IsCompleted) return;
+
         var stringBuilder = new StringBuilder();
         var auditDatas = payload.What.Data;
 
@@ -56,9 +60,18 @@ internal class SettlementAuditor : IAuditor
         stringBuilder.AppendLine(payload.What.ServerAuditResults);
 
         stringBuilder.AppendLine("CLient Audit Results:");
-        stringBuilder.AppendLine(AuditData(auditDatas));
+        try
+        {
+            stringBuilder.AppendLine(AuditData(auditDatas));
+        }
+        catch (Exception ex)
+        {
+            // Audit() blocks the game thread on this task, so fail it now instead of at the timeout
+            pending.TrySetException(ex);
+            throw;
+        }
 
-        tcs.SetResult(stringBuilder.ToString());
+        pending.TrySetResult(stringBuilder.ToString());
     }
 
     private void Handle_Request(MessagePayload<ProcessSettlementAudit> payload)
@@ -78,12 +91,13 @@ internal class SettlementAuditor : IAuditor
             return errorMsg;
         }
 
-        var cts = new CancellationTokenSource(TimeSpan.FromSeconds(15));
-        tcs = new TaskCompletionSource<string>();
+        using var cts = new CancellationTokenSource(configuration.AuditTimeout);
+        var pending = new TaskCompletionSource<string>();
+        tcs = pending;
 
         cts.Token.Register(() =>
         {
-            tcs.TrySetCanceled();
+            pending.TrySetCanceled();
         });
 
         var request = new RequestSettlementAudit(GetAuditData());
@@ -92,8 +106,8 @@ internal class SettlementAuditor : IAuditor
 
         try
         {
-            tcs.Task.Wait();
-            return tcs.Task.Result;
+            pending.Task.Wait();
+            return pending.Task.Result;
 
         }catch (AggregateException ex)
         {
