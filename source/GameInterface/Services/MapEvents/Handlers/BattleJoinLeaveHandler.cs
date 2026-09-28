@@ -19,6 +19,7 @@ using LiteNetLib;
 using Serilog;
 using System;
 using System.Collections.Concurrent;
+using System.Threading;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Encounters;
 using TaleWorlds.CampaignSystem.GameMenus;
@@ -255,85 +256,99 @@ internal class BattleJoinLeaveHandler : IHandler
         var data = payload.What;
         var requestingPeer = payload.Who as NetPeer;
 
-        GameThread.RunSafe(
-            () =>
-            {
-                bool joined = false;
-                var reservationId = Guid.NewGuid();
-                var reservedControllerId = ReserveJoin(requestingPeer, data.MapEventId, reservationId);
-                try
+        // The join and the timeout rejection below claim the one reply the client waits for.
+        int replyClaim = 0;
+        try
+        {
+            GameThread.RunSafe(
+                () =>
                 {
-                    if (!objectManager.TryGetObjectWithLogging<MapEvent>(data.MapEventId, out var mapEvent)) return;
-                    if (!objectManager.TryGetObjectWithLogging<PartyBase>(data.PartyId, out var party)) return;
-                    if (!TryGetRequestingPlayer(requestingPeer, party, out _))
+                    if (Interlocked.Exchange(ref replyClaim, 1) != 0) return;
+
+                    bool joined = false;
+                    var reservationId = Guid.NewGuid();
+                    var reservedControllerId = ReserveJoin(requestingPeer, data.MapEventId, reservationId);
+                    try
                     {
-                        Logger.Warning("Ignoring join request: peer does not control party {PartyId}", data.PartyId);
-                        return;
-                    }
+                        if (!objectManager.TryGetObjectWithLogging<MapEvent>(data.MapEventId, out var mapEvent)) return;
+                        if (!objectManager.TryGetObjectWithLogging<PartyBase>(data.PartyId, out var party)) return;
+                        if (!TryGetRequestingPlayer(requestingPeer, party, out _))
+                        {
+                            Logger.Warning("Ignoring join request: peer does not control party {PartyId}", data.PartyId);
+                            return;
+                        }
 
-                    if (mapEvent.BattleState != BattleState.None || mapEvent.IsFinalized)
+                        if (mapEvent.BattleState != BattleState.None || mapEvent.IsFinalized)
+                        {
+                            Logger.Warning("Ignoring join request: map event {MapEventId} is already concluded", data.MapEventId);
+                            return;
+                        }
+                        if (party.MapEventSide != null)
+                        {
+                            Logger.Warning("Ignoring join request: party {PartyId} is already in a map event", data.PartyId);
+                            return;
+                        }
+                        var side = mapEvent.GetMapEventSide(data.Side);
+                        if (side == null)
+                        {
+                            Logger.Warning("Ignoring join request: map event {MapEventId} has no side {Side}", data.MapEventId, data.Side);
+                            return;
+                        }
+
+                        // The setter runs the native MapEventSide.AddPartyInternal on the server (NOT under AllowedThread), so the
+                        // AddIntercept publishes the battle-party add and it replicates to every client through the map-event sync.
+                        party.MapEventSide = side;
+                        joined = mapEvent.FindMapEventParty(party) != null;
+                        if (!joined)
+                        {
+                            Logger.Error("Battle join did not create a MapEventParty for party {PartyId} in map event {MapEventId}",
+                                data.PartyId, data.MapEventId);
+                            return;
+                        }
+
+                        // Removal temporarily promotes a remaining party; put the persistent besieger back when it rejoins.
+                        siegeMapEventLeaderReconciler.RestoreAfterJoin(mapEvent, party);
+
+                        if (mapEvent.IsVillageHostileAction() && data.Side == BattleSideEnum.Attacker)
+                            MapEventHostileActionConsequences.Apply(mapEvent, party, "village hostile action attacker join");
+
+                        // The original mode broadcast predates this join. Replay it after the party add so the joining
+                        // client applies membership first and rebuilds its encounter menu with the authoritative mode.
+                        if (requestingPeer != null && ServerBattleModeArbiter.TryGetMode(data.MapEventId, out var mode))
+                            network.Send(requestingPeer, new NetworkBattleModeSet(data.MapEventId, (int)mode));
+
+                        // If this battle is being auto-resolved, pull the joiner into the simulation instead of leaving it stuck in
+                        // the encounter menu. A ForwardingBattleObserver on the event means a server-driven simulation is running.
+                        // Sent after the add above so the joiner applies the replicated battle-party add (and so builds its own
+                        // party into its scoreboard) before this open arrives; the simulation handler then opens it as a spectator.
+                        if (mapEvent.BattleObserver is ForwardingBattleObserver && !mapEvent.IsUnsupportedMultiPlayerHostileAction())
+                            network.SendAll(new NetworkOpenBattleSimulation(data.MapEventId));
+                    }
+                    finally
                     {
-                        Logger.Warning("Ignoring join request: map event {MapEventId} is already concluded", data.MapEventId);
-                        return;
+                        if (!joined && reservedControllerId != null)
+                            PublishJoinCancelled(requestingPeer, data.MapEventId, reservedControllerId, reservationId);
+
+                        if (requestingPeer != null)
+                        {
+                            network.Send(requestingPeer, new NetworkJoinBattleReply(
+                                data.RequestId,
+                                data.MapEventId,
+                                data.PartyId,
+                                joined));
+                        }
                     }
-                    if (party.MapEventSide != null)
-                    {
-                        Logger.Warning("Ignoring join request: party {PartyId} is already in a map event", data.PartyId);
-                        return;
-                    }
-                    var side = mapEvent.GetMapEventSide(data.Side);
-                    if (side == null)
-                    {
-                        Logger.Warning("Ignoring join request: map event {MapEventId} has no side {Side}", data.MapEventId, data.Side);
-                        return;
-                    }
-
-                    // The setter runs the native MapEventSide.AddPartyInternal on the server (NOT under AllowedThread), so the
-                    // AddIntercept publishes the battle-party add and it replicates to every client through the map-event sync.
-                    party.MapEventSide = side;
-                    joined = mapEvent.FindMapEventParty(party) != null;
-                    if (!joined)
-                    {
-                        Logger.Error("Battle join did not create a MapEventParty for party {PartyId} in map event {MapEventId}",
-                            data.PartyId, data.MapEventId);
-                        return;
-                    }
-
-                    // Removal temporarily promotes a remaining party; put the persistent besieger back when it rejoins.
-                    siegeMapEventLeaderReconciler.RestoreAfterJoin(mapEvent, party);
-
-                    if (mapEvent.IsVillageHostileAction() && data.Side == BattleSideEnum.Attacker)
-                        MapEventHostileActionConsequences.Apply(mapEvent, party, "village hostile action attacker join");
-
-                    // The original mode broadcast predates this join. Replay it after the party add so the joining
-                    // client applies membership first and rebuilds its encounter menu with the authoritative mode.
-                    if (requestingPeer != null && ServerBattleModeArbiter.TryGetMode(data.MapEventId, out var mode))
-                        network.Send(requestingPeer, new NetworkBattleModeSet(data.MapEventId, (int)mode));
-
-                    // If this battle is being auto-resolved, pull the joiner into the simulation instead of leaving it stuck in
-                    // the encounter menu. A ForwardingBattleObserver on the event means a server-driven simulation is running.
-                    // Sent after the add above so the joiner applies the replicated battle-party add (and so builds its own
-                    // party into its scoreboard) before this open arrives; the simulation handler then opens it as a spectator.
-                    if (mapEvent.BattleObserver is ForwardingBattleObserver && !mapEvent.IsUnsupportedMultiPlayerHostileAction())
-                        network.SendAll(new NetworkOpenBattleSimulation(data.MapEventId));
-                }
-                finally
-                {
-                    if (!joined && reservedControllerId != null)
-                        PublishJoinCancelled(requestingPeer, data.MapEventId, reservedControllerId, reservationId);
-
-                    if (requestingPeer != null)
-                    {
-                        network.Send(requestingPeer, new NetworkJoinBattleReply(
-                            data.RequestId,
-                            data.MapEventId,
-                            data.PartyId,
-                            joined));
-                    }
-                }
-            },
-            blocking: true,
-            context: nameof(Handle_NetworkRequestJoinBattle));
+                },
+                blocking: true,
+                context: nameof(Handle_NetworkRequestJoinBattle));
+        }
+        catch (TimeoutException)
+        {
+            // Reject a join that never ran, otherwise the client keeps the request pending and refuses every later join.
+            if (Interlocked.Exchange(ref replyClaim, 1) == 0 && requestingPeer != null)
+                network.Send(requestingPeer, new NetworkJoinBattleReply(data.RequestId, data.MapEventId, data.PartyId, false));
+            throw;
+        }
     }
 
     /// <summary>[Client] Bridge a joiner's leave to a server request; [Server] perform it directly.</summary>
