@@ -2564,6 +2564,37 @@ public class PlayerPartyInteractionFlowTests : MapEventTestBase
     }
 
     [Fact]
+    public void ConversationDenial_WithoutRequestId_ShowsNoMessage()
+    {
+        var (client, _, playerPartyId, _) = CreateTwoPlayerParties();
+        var aiPartyId = CreateMobilePartyBase();
+        var lastMessageField = AccessTools.Field(typeof(ConversationPartyHold), "lastInteractionBlockedMessageUtc");
+        Assert.NotNull(lastMessageField);
+
+        SetMockPlayerEncounter(client);
+        PublishConversationRequest(client, playerPartyId, aiPartyId, new[] { GetNetworkRoutingMethod() });
+        var request = Assert.Single(client.NetworkSentMessages.GetMessages<NetworkRequestConversation>());
+        lastMessageField.SetValue(null, DateTime.MinValue);
+
+        try
+        {
+            client.SimulateMessage(Server.NetPeer, new NetworkConversationDenied(ConversationDeniedReason.PartyEngaged, null));
+
+            Assert.Equal(DateTime.MinValue, (DateTime)lastMessageField.GetValue(null)!);
+            Assert.Equal(request.RequestId, GetPendingConversationRequestId(client));
+
+            client.SimulateMessage(Server.NetPeer, new NetworkConversationDenied(ConversationDeniedReason.PartyEngaged, request.RequestId));
+
+            Assert.NotEqual(DateTime.MinValue, (DateTime)lastMessageField.GetValue(null)!);
+            Assert.Null(GetPendingConversationRequestId(client));
+        }
+        finally
+        {
+            lastMessageField.SetValue(null, DateTime.MinValue);
+        }
+    }
+
+    [Fact]
     public void ConversationApproval_ReplacesCapturedEncounter()
     {
         var (client, _, playerPartyId, _) = CreateTwoPlayerParties();
@@ -3313,6 +3344,149 @@ public class PlayerPartyInteractionFlowTests : MapEventTestBase
         Assert.Equal(playerPartyId, allowed.DefenderId);
         Assert.Null(allowed.RequestId);
         Assert.Empty(Server.NetworkSentMessages.GetMessages<NetworkConversationDenied>());
+    }
+
+    [Fact]
+    public void ServerAiPartyEncounter_WhilePlayerTalksToAnotherParty_WaitsWithoutDenial()
+    {
+        var client = Clients.First();
+        client.Resolve<IControllerIdProvider>().SetControllerId("PlayerOne");
+        var (_, playerMobilePartyId) = CreatePlayerHeroParty("PlayerOne");
+        var playerPartyId = GetPartyBaseId(Server, playerMobilePartyId);
+        var firstAiPartyId = CreateMobilePartyBase();
+        var secondAiPartyId = CreateMobilePartyBase();
+
+        Server.Resolve<IPlayerManager>().SetPeer("PlayerOne", client.NetPeer);
+        StartServerAiPartyEncounter(firstAiPartyId, playerPartyId);
+        Assert.Equal(firstAiPartyId, Server.NetworkSentMessages.GetMessages<NetworkAllowConversation>().Single().AttackerId);
+        Server.NetworkSentMessages.Clear();
+
+        // The second attacker retries on every tick while the first conversation is open.
+        StartServerAiPartyEncounter(secondAiPartyId, playerPartyId);
+        StartServerAiPartyEncounter(secondAiPartyId, playerPartyId);
+
+        Assert.Empty(Server.NetworkSentMessages.GetMessages<NetworkAllowConversation>());
+        Assert.Empty(Server.NetworkSentMessages.GetMessages<NetworkConversationDenied>());
+        Server.Call(() =>
+        {
+            var tracker = Server.Resolve<ConversationPartyTracker>();
+            Assert.True(tracker.TryGetEngagement(client.NetPeer, out var engagement));
+            Assert.Equal(firstAiPartyId, engagement.PartyId);
+            Assert.False(tracker.TryGetEngagement(secondAiPartyId, out _));
+        });
+
+        client.Call(() => client.Resolve<INetwork>().SendAll(new NetworkConversationEnded()));
+        Server.PumpGameThread();
+        StartServerAiPartyEncounter(secondAiPartyId, playerPartyId);
+
+        var allowed = Server.NetworkSentMessages.GetMessages<NetworkAllowConversation>().Single();
+        Assert.Equal(secondAiPartyId, allowed.AttackerId);
+        Assert.Equal(playerPartyId, allowed.DefenderId);
+        Assert.Empty(Server.NetworkSentMessages.GetMessages<NetworkConversationDenied>());
+
+        client.Call(() => client.Resolve<INetwork>().SendAll(new NetworkConversationEnded()));
+        Server.PumpGameThread();
+    }
+
+    [Fact]
+    public void ServerAiPartyEncounter_WhilePlayerRequestedConversationIsOpen_Waits()
+    {
+        var (client, _, playerPartyId, _) = CreateTwoPlayerParties();
+        var requestedAiPartyId = CreateMobilePartyBase();
+        var attackerAiPartyId = CreateMobilePartyBase();
+
+        // The first conversation comes from the player's own request, which carries an id.
+        SetMockPlayerEncounter(client);
+        PublishConversationRequest(client, playerPartyId, requestedAiPartyId, new[] { GetDirectNetworkRoutingMethod() });
+        var request = Assert.Single(client.NetworkSentMessages.GetMessages<NetworkRequestConversation>());
+        Assert.NotNull(request.RequestId);
+        using (new ReliableMessageDeliveryBlocker<NetworkAllowConversation>())
+            Server.SimulateMessage(client.NetPeer, request);
+        Assert.Equal(request.RequestId, Server.NetworkSentMessages.GetMessages<NetworkAllowConversation>().Single().RequestId);
+        Server.NetworkSentMessages.Clear();
+
+        StartServerAiPartyEncounter(attackerAiPartyId, playerPartyId);
+        StartServerAiPartyEncounter(attackerAiPartyId, playerPartyId);
+
+        Assert.Empty(Server.NetworkSentMessages.GetMessages<NetworkAllowConversation>());
+        Assert.Empty(Server.NetworkSentMessages.GetMessages<NetworkConversationDenied>());
+        Server.Call(() =>
+        {
+            var tracker = Server.Resolve<ConversationPartyTracker>();
+            Assert.True(tracker.TryGetEngagement(client.NetPeer, out var engagement));
+            Assert.Equal(requestedAiPartyId, engagement.PartyId);
+            Assert.Equal(request.RequestId, engagement.RequestId);
+            Assert.False(tracker.TryGetEngagement(attackerAiPartyId, out _));
+        });
+
+        client.Call(() => client.Resolve<INetwork>().SendAll(new NetworkConversationEnded(request.RequestId)));
+        Server.PumpGameThread();
+        StartServerAiPartyEncounter(attackerAiPartyId, playerPartyId);
+
+        var allowed = Server.NetworkSentMessages.GetMessages<NetworkAllowConversation>().Single();
+        Assert.Equal(attackerAiPartyId, allowed.AttackerId);
+        Assert.Equal(playerPartyId, allowed.DefenderId);
+
+        client.Call(() => client.Resolve<INetwork>().SendAll(new NetworkConversationEnded()));
+        Server.PumpGameThread();
+    }
+
+    [Fact]
+    public void ServerAiPartyEncounter_WithAttackerHeldByAnotherPlayer_DoesNotDeny()
+    {
+        var (client1, client2, firstPlayerPartyId, secondPlayerPartyId) = CreateTwoPlayerParties();
+        var aiPartyId = CreateMobilePartyBase();
+
+        StartServerAiPartyEncounter(aiPartyId, secondPlayerPartyId);
+        Assert.Equal(secondPlayerPartyId, Server.NetworkSentMessages.GetMessages<NetworkAllowConversation>().Single().DefenderId);
+        Server.NetworkSentMessages.Clear();
+
+        StartServerAiPartyEncounter(aiPartyId, firstPlayerPartyId);
+
+        Assert.Empty(Server.NetworkSentMessages.GetMessages<NetworkAllowConversation>());
+        Assert.Empty(Server.NetworkSentMessages.GetMessages<NetworkConversationDenied>());
+        Server.Call(() =>
+        {
+            var tracker = Server.Resolve<ConversationPartyTracker>();
+            Assert.True(tracker.TryGetEngagement(aiPartyId, out var engagement));
+            Assert.Same(client2.NetPeer, engagement.EngagerKey);
+            Assert.False(tracker.TryGetEngagement(client1.NetPeer, out _));
+        });
+
+        client2.Call(() => client2.Resolve<INetwork>().SendAll(new NetworkConversationEnded()));
+        Server.PumpGameThread();
+        StartServerAiPartyEncounter(aiPartyId, firstPlayerPartyId);
+
+        Assert.Equal(firstPlayerPartyId, Server.NetworkSentMessages.GetMessages<NetworkAllowConversation>().Single().DefenderId);
+
+        client1.Call(() => client1.Resolve<INetwork>().SendAll(new NetworkConversationEnded()));
+        Server.PumpGameThread();
+    }
+
+    [Fact]
+    public void ServerAiPartyEncounter_WhilePlayerInPlayerInteraction_Waits()
+    {
+        var (client1, _, initiatorPartyId, responderPartyId) = CreateTwoPlayerParties();
+        var aiPartyId = CreateMobilePartyBase();
+        RequestInteraction(client1, initiatorPartyId, responderPartyId);
+        var sessionId = Server.NetworkSentMessages.GetMessages<NetworkPlayerPartyInteractionStarted>().Single().SessionId;
+        Server.NetworkSentMessages.Clear();
+
+        StartServerAiPartyEncounter(aiPartyId, initiatorPartyId);
+        StartServerAiPartyEncounter(aiPartyId, responderPartyId);
+
+        Assert.Empty(Server.NetworkSentMessages.GetMessages<NetworkAllowConversation>());
+        Assert.Empty(Server.NetworkSentMessages.GetMessages<NetworkConversationDenied>());
+        Server.Call(() => Assert.False(Server.Resolve<ConversationPartyTracker>().TryGetEngagement(aiPartyId, out _)));
+
+        SubmitOption(client1, sessionId, initiatorPartyId, PlayerPartyInteractionOption.Leave);
+        Server.NetworkSentMessages.Clear();
+        StartServerAiPartyEncounter(aiPartyId, initiatorPartyId);
+
+        Assert.Equal(initiatorPartyId, Server.NetworkSentMessages.GetMessages<NetworkAllowConversation>().Single().DefenderId);
+
+        client1.Call(() => client1.Resolve<INetwork>().SendAll(new NetworkConversationEnded()));
+        Server.PumpGameThread();
     }
 
     [Fact]
@@ -5020,6 +5194,17 @@ public class PlayerPartyInteractionFlowTests : MapEventTestBase
                 ConversationRestartSource.PlayerEncounter, 
                 armyTalkEncounter: true));
         }, disabledMethods);
+    }
+
+    private void StartServerAiPartyEncounter(string aiPartyId, string playerPartyId)
+    {
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject<PartyBase>(aiPartyId, out var aiParty));
+            Assert.True(Server.ObjectManager.TryGetObject<PartyBase>(playerPartyId, out var playerParty));
+
+            EncounterManager.StartPartyEncounter(aiParty, playerParty);
+        });
     }
 
     private void SubmitOption(
