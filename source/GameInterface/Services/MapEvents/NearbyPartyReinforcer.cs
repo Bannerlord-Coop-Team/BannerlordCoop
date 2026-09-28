@@ -1,6 +1,4 @@
-﻿using Common.Messaging;
-using GameInterface.Services.MapEvents.Patches;
-using GameInterface.Services.MapEventSides.Messages;
+﻿using GameInterface.Services.MapEvents.Patches;
 using GameInterface.Services.MobileParties.Extensions;
 using System;
 using System.Collections.Generic;
@@ -31,15 +29,9 @@ internal sealed class NearbyPartyReinforcer : INearbyPartyReinforcer
         public long NextScanAtTicks { get; set; }
     }
 
-    private readonly IMessageBroker messageBroker;
     private readonly Dictionary<MapEvent, FollowUpScanState> followUpScans = new();
     private readonly List<MapEvent> completedFollowUpScans = new();
     private long nextFollowUpScanAtTicks = long.MaxValue;
-
-    public NearbyPartyReinforcer(IMessageBroker messageBroker)
-    {
-        this.messageBroker = messageBroker;
-    }
 
     public void Reinforce(MapEvent mapEvent)
     {
@@ -152,15 +144,7 @@ internal sealed class NearbyPartyReinforcer : INearbyPartyReinforcer
             if (nearbyParty?.MapEventSide != side)
                 continue;
 
-            // The setter recursively removes attached army parties, so snapshot the whole side.
-            var partiesBeforeRemoval = new List<MapEventParty>(side.Parties);
-
             nearbyParty.MapEventSide = null;
-            foreach (var removedParty in partiesBeforeRemoval)
-            {
-                if (!side.Parties.Contains(removedParty))
-                    messageBroker.Publish(side, new MapEventPartyRemoved(side, removedParty));
-            }
         }
     }
 
