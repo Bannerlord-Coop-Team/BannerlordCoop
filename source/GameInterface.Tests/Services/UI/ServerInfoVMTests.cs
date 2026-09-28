@@ -84,6 +84,51 @@ public sealed class ServerInfoVMTests : IDisposable
         Assert.Contains(nameof(ServerInfoVM.IsNewsSelected), changed);
     }
 
+    // Tabs switch in any order and as often as the player clicks. After every click exactly that tab is selected,
+    // a second click keeps it, and the buttons are told so they follow.
+    [Theory]
+    [InlineData("Rules,Links,News,Links,Rules,Motd")]
+    [InlineData("News,Motd,News,Motd,News")]
+    [InlineData("Rules,Rules,Rules,Motd,Motd")]
+    [InlineData("Links,Motd,Links,Links,News,Rules,Motd,News,News,Links")]
+    public void TabsSwitchBackAndForthInAnyOrder(string clicks)
+    {
+        var vm = Create();
+        vm.SetContent(Info(true, true, true, true));
+        vm.SelectFirstTab();
+        var changed = new List<string>();
+        vm.PropertyChanged += (_, args) => changed.Add(args.PropertyName);
+
+        foreach (var tab in clicks.Split(',').Select(name => Enum.Parse<ServerInfoTab>(name)))
+        {
+            changed.Clear();
+
+            vm.ExecuteSelectTab((int)tab);
+
+            Assert.Equal(tab, vm.SelectedTab);
+            Assert.Equal(new[] { tab }, SelectedTabs(vm));
+            Assert.Equal(new[] { "IsMotdSelected", "IsRulesSelected", "IsLinksSelected", "IsNewsSelected" }, changed.Where(name => name.EndsWith("Selected", StringComparison.Ordinal)));
+        }
+    }
+
+    // A tab without content has no button, so clicks between the shown tabs keep working around it.
+    [Fact]
+    public void SwitchingSkipsTabsWithoutContent()
+    {
+        var vm = Create();
+        vm.SetContent(Info(motd: true, rules: false, links: false, news: true));
+        vm.SelectFirstTab();
+
+        var seen = new List<ServerInfoTab>();
+        foreach (var tab in new[] { ServerInfoTab.News, ServerInfoTab.Rules, ServerInfoTab.Motd, ServerInfoTab.Links, ServerInfoTab.News, ServerInfoTab.Motd })
+        {
+            vm.ExecuteSelectTab((int)tab);
+            seen.Add(Assert.Single(SelectedTabs(vm)));
+        }
+
+        Assert.Equal(new[] { ServerInfoTab.News, ServerInfoTab.News, ServerInfoTab.Motd, ServerInfoTab.Motd, ServerInfoTab.News, ServerInfoTab.Motd }, seen);
+    }
+
     [Theory]
     [InlineData(-1)]
     [InlineData(4)]
@@ -377,6 +422,11 @@ public sealed class ServerInfoVMTests : IDisposable
         vm.IsOpen = true;
         return vm;
     }
+
+    // The tabs whose selected flag the buttons read, in the order they are shown.
+    private static IEnumerable<ServerInfoTab> SelectedTabs(ServerInfoVM vm) =>
+        new[] { (ServerInfoTab.Motd, vm.IsMotdSelected), (ServerInfoTab.Rules, vm.IsRulesSelected), (ServerInfoTab.Links, vm.IsLinksSelected), (ServerInfoTab.News, vm.IsNewsSelected) }
+            .Where(entry => entry.Item2).Select(entry => entry.Item1).ToArray();
 
     internal static NetworkServerInfo Info(bool motd, bool rules, bool links, bool news) => new(
         motd ? new[] { "Welcome to EU-1" } : null,

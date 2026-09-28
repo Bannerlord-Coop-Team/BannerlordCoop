@@ -52,8 +52,9 @@
             </ListPanel>
             <Widget WidthSizePolicy="StretchToParent" HeightSizePolicy="Fixed" SuggestedHeight="1" MarginLeft="24" MarginRight="24" MarginTop="160" Sprite="BlankWhiteSquare_9" Color="#AA976038" DoNotAcceptEvents="true"/>
 
-            <!-- The height is the two fixed spacers (256) plus the shown tab, so 620 at most with the 364 high clip. -->
-            <ListPanel Id="Content" WidthSizePolicy="StretchToParent" HeightSizePolicy="CoverChildren" StackLayout.LayoutMethod="VerticalTopToBottom">
+            <!-- The height is the two fixed spacers (256) plus the shown tab, so 620 at most with the 364 high clip.
+                 It covers the whole panel and draws after the tabs, so it passes presses on to them. -->
+            <ListPanel Id="Content" WidthSizePolicy="StretchToParent" HeightSizePolicy="CoverChildren" StackLayout.LayoutMethod="VerticalTopToBottom" DoNotAcceptEvents="true">
               <Children>
                 <Widget WidthSizePolicy="StretchToParent" HeightSizePolicy="Fixed" SuggestedHeight="172" DoNotAcceptEvents="true"/>
 

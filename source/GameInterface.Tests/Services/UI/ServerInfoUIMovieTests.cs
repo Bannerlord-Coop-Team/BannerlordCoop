@@ -1,6 +1,7 @@
 ﻿using GameInterface.Services.UI.ServerInfo;
 using System;
 using System.Collections.Generic;
+using System.Globalization;
 using System.IO;
 using System.Linq;
 using System.Xml.Linq;
@@ -68,7 +69,49 @@ public class ServerInfoUIMovieTests
             Assert.Equal(i.ToString(), tabs[i].Attribute("CommandParameter.Click")?.Value);
             Assert.Equal("@Is" + tab + "Selected", tabs[i].Attribute("IsSelected")?.Value);
             Assert.Equal("@Has" + tab, tabs[i].Attribute("IsVisible")?.Value);
+            // The game's tab brush has its own hover, press and selected looks, and the text follows the button's state.
+            Assert.Equal("Header.Tab.Center", tabs[i].Attribute("Brush")?.Value);
+            Assert.Equal("true", tabs[i].Attribute("UpdateChildrenStates")?.Value);
+            // A toggle or radio button would change its own selection; a plain one leaves it to the view model,
+            // so a second click keeps the tab selected.
+            Assert.Null(tabs[i].Attribute("ButtonType"));
         }
+    }
+
+    // The game hands a press to the last drawn widget under the pointer that accepts events, even one with no
+    // command (EventManager.CollectEnableWidgetsAt). So whatever the panel draws after the tabs passes presses
+    // on or sits below the tab row, and only the open link dialog covers them.
+    [Fact]
+    public void NothingDrawnAfterTheTabsTakesTheirPresses()
+    {
+        var tabs = Widget("ServerInfoTabs");
+        int tabRowBottom = Number(tabs, "MarginTop") + Number(tabs, "SuggestedHeight");
+        var drawnAfter = Widget("CoopServerInfoRoot").Element("Children")!.Elements().SkipWhile(element => element != tabs).Skip(1).ToArray();
+
+        Assert.Contains(Widget("Content"), drawnAfter);
+        foreach (var element in drawnAfter)
+        {
+            string id = element.Attribute("Id")?.Value ?? element.Name.LocalName;
+            if (id == "ServerInfoLinkDialog") Assert.Equal("@IsLinkDialogOpen", element.Attribute("IsVisible")?.Value);
+            else if (id == "ServerInfoClose") Assert.Equal("Bottom", element.Attribute("VerticalAlignment")?.Value);
+            else Assert.True(element.Attribute("DoNotAcceptEvents")?.Value == "true", id + " takes the presses meant for the tabs");
+        }
+
+        // Inside those, the tab bodies and the scrollbars start below the tab row.
+        Assert.True(Number(Widget("Content").Element("Children")!.Elements().First(), "SuggestedHeight") >= tabRowBottom);
+        Assert.All(document.Descendants("ScrollbarWidget"), scrollbar => Assert.True(Number(scrollbar, "MarginTop") >= tabRowBottom));
+    }
+
+    // A button's own text or icons would take its presses before it, so every button keeps them.
+    [Fact]
+    public void EveryButtonTakesItsOwnPresses()
+    {
+        var buttons = document.Descendants("ButtonWidget").ToArray();
+
+        Assert.Equal(
+            new[] { "ServerInfoTabMotd", "ServerInfoTabRules", "ServerInfoTabLinks", "ServerInfoTabNews", "ServerInfoLinkRow", "ServerInfoClose", "ServerInfoLinkOpen", "ServerInfoLinkCancel" },
+            buttons.Select(button => button.Attribute("Id")?.Value));
+        Assert.All(buttons, button => Assert.Equal("true", button.Attribute("DoNotPassEventsToChildren")?.Value));
     }
 
     // Each tab body and its scrollbar show only with their tab, so a hidden tab never leaves a scrollbar behind.
@@ -89,6 +132,17 @@ public class ServerInfoUIMovieTests
         Assert.Equal(@"..\..\..\ServerInfo" + tab + @"ScrollbarArea\ServerInfo" + tab + "Scrollbar", scroll.Attribute("VerticalScrollbar")?.Value);
         Assert.Contains(Widget("ServerInfo" + tab + "Scrollbar"), scrollbarArea.Elements("Children").Elements());
         Assert.Equal("364", Widget("ServerInfo" + tab + "Clip").Attribute("MaxHeight")?.Value);
+        // The area only places the scrollbar, and the game drags the bar when it or its handle is pressed.
+        Assert.Equal("true", scrollbarArea.Attribute("DoNotAcceptEvents")?.Value);
+        var scrollbar = Widget("ServerInfo" + tab + "Scrollbar");
+        var handle = Assert.Single(scrollbar.Element("Children")!.Elements());
+        Assert.Equal(scrollbar.Attribute("Handle")?.Value, handle.Attribute("Id")?.Value);
+        Assert.Null(scrollbar.Attribute("DoNotAcceptEvents"));
+        Assert.Null(handle.Attribute("DoNotAcceptEvents"));
+        // The scrollbar draws after the rows and Close after the scrollbar, so none of them overlap.
+        Assert.True(Number(scroll, "MarginRight") >= Number(scrollbar, "MarginRight") + Number(scrollbar, "SuggestedWidth"));
+        var close = Widget("ServerInfoClose");
+        Assert.True(Number(scrollbar, "MarginBottom") >= Number(close, "MarginBottom") + Number(close, "SuggestedHeight"));
     }
 
     // The dialog sits last so it draws above the rows, and its backdrop takes the clicks meant for them.
@@ -101,6 +155,11 @@ public class ServerInfoUIMovieTests
         Assert.Same(dialog, root.Element("Children")!.Elements().Last());
         Assert.Equal("@IsLinkDialogOpen", dialog.Attribute("IsVisible")?.Value);
         Assert.Null(Widget("ServerInfoLinkDialogBackdrop").Attribute("DoNotAcceptEvents"));
+        // The box draws after the backdrop, so its Open and Cancel buttons get their own presses.
+        Assert.Equal(new[] { "ServerInfoLinkDialogBackdrop", "ServerInfoLinkDialogBox" },
+            dialog.Element("Children")!.Elements().Select(element => element.Attribute("Id")?.Value));
+        Assert.Contains(Widget("ServerInfoLinkOpen"), Widget("ServerInfoLinkDialogBox").Descendants());
+        Assert.Contains(Widget("ServerInfoLinkCancel"), Widget("ServerInfoLinkDialogBox").Descendants());
         Assert.Equal(nameof(ServerInfoVM.ExecuteOpenLink), Widget("ServerInfoLinkOpen").Attribute("Command.Click")?.Value);
         Assert.Equal(nameof(ServerInfoVM.ExecuteCancelLink), Widget("ServerInfoLinkCancel").Attribute("Command.Click")?.Value);
         Assert.Equal("@LinkDialogAddress", Widget("ServerInfoLinkDialogAddress").Attribute("Text")?.Value);
@@ -128,6 +187,9 @@ public class ServerInfoUIMovieTests
     }
 
     private XElement Widget(string id) => Assert.Single(document.Descendants(), element => element.Attribute("Id")?.Value == id);
+
+    private static int Number(XElement element, string attribute) =>
+        int.Parse(element.Attribute(attribute)?.Value ?? throw new InvalidOperationException(attribute + " is missing"), CultureInfo.InvariantCulture);
 
     private IEnumerable<(XElement Element, string Property)> Bindings() =>
         document.Descendants().SelectMany(element => element.Attributes()
