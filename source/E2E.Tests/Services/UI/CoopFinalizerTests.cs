@@ -105,6 +105,24 @@ public class CoopFinalizerTests
     }
 
     [Fact]
+    public void RejectionWhoseQueuedHideThrows_StillEndsCoopOnce()
+    {
+        using var fixture = new Fixture();
+        using var shortTimeout = GameThread.Instance.LimitFrameDrain(TimeSpan.FromSeconds(1), ShortTimeout);
+
+        // The native disable throws after the forced flag was cleared, as LoadingInterface.HideLoadingScreen can.
+        fixture.LoadingScreen.HideFailure = new InvalidOperationException("the native loading window failed to close");
+        Assert.Null(fixture.RejectOnWorker().Join());
+        fixture.Pump();
+        fixture.Pump();
+
+        Assert.Equal(1, fixture.LoadingScreen.HideCount);
+        Assert.Single(fixture.Broker.GetMessagesFromType<EndCoopMode>());
+        Assert.Single(fixture.Broker.GetMessagesFromType<SendPopupMessage>());
+        Assert.Equal(0, fixture.Queue.Count);
+    }
+
+    [Fact]
     public void RejectionWhoseSessionEndsDuringTheHideWait_ThrowsAtOnceAndQueuesNoTeardown()
     {
         using var fixture = new Fixture();
@@ -227,6 +245,7 @@ public class CoopFinalizerTests
         public bool Forced { get; private set; }
         public int HideCount => Volatile.Read(ref hideCount);
         public Action? DuringHide { get; set; }
+        public Exception? HideFailure { get; set; }
         public bool IsLoadingScreenAvailable => true;
 
         public void ShowLoadingScreen() => Forced = true;
@@ -242,6 +261,7 @@ public class CoopFinalizerTests
             Interlocked.Increment(ref hideCount);
             DuringHide?.Invoke();
             Forced = false;
+            if (HideFailure != null) throw HideFailure;
         }
     }
 }

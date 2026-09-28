@@ -65,12 +65,10 @@ public class CoopFinalizer : ICoopFinalizer
         catch (TimeoutException e)
         {
             // An expired hide never runs, so the hide and the teardown move to the game thread in the same
-            // session. The claim skips the hide there when the first copy had already started.
-            GameThread.RunSafe(() =>
-            {
-                HideLoadingScreenOnce();
-                EndCoop(closeText);
-            });
+            // session. The claim skips the hide there when the first copy had already started, and separate
+            // items keep a failing hide from skipping the teardown, as on the blocking path.
+            GameThread.RunSafe(HideLoadingScreenOnce);
+            GameThread.RunSafe(() => EndCoop(closeText));
             Logger.Warning(e, "Hiding the loading screen timed out; coop ends on the game thread instead");
             return;
         }
