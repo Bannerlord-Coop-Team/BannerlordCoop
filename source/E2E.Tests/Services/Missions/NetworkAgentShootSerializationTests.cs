@@ -83,7 +83,8 @@ public class NetworkAgentShootSerializationTests
             damageData,
             blow.IsMissile,
             missileShotSequence: 4_500_000_123L,
-            attackerWeapon: attackerWeapon);
+            attackerWeapon: attackerWeapon,
+            sourceControllerId: "collision-peer");
 
         var serializer = new ProtoBufSerializer(new SerializableTypeMapper());
         MessagePacket packet = MessagePacket.Create(original, serializer);
@@ -99,6 +100,7 @@ public class NetworkAgentShootSerializationTests
         Assert.Equal(original.AttackerAgentId, result.AttackerAgentId);
         Assert.True(result.IsMissile);
         Assert.Equal(4_500_000_123L, result.MissileShotSequence);
+        Assert.Equal("collision-peer", result.SourceControllerId);
         Assert.NotNull(result.AttackerWeapon);
         Assert.Equal(WeaponClass.Arrow, result.AttackerWeapon.WeaponClass);
     }
