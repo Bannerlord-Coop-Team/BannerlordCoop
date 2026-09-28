@@ -40,6 +40,7 @@ public class ServerShutdownCoordinatorTests : IDisposable
 
     private DateTime now = new DateTime(2026, 9, 27, 12, 0, 0, DateTimeKind.Utc);
     private bool isSaving;
+    private string? ironmanSaveName;
     private bool peersLeaveOnDisconnect = true;
     private int tickersStarted;
     private int tickersStopped;
@@ -56,6 +57,7 @@ public class ServerShutdownCoordinatorTests : IDisposable
             });
         saves.SetupGet(value => value.CanQueueSave).Returns(true);
         saves.SetupGet(value => value.IsSaving).Returns(() => isSaving);
+        saves.SetupGet(value => value.IronmanSaveName).Returns(() => ironmanSaveName!);
         saves.Setup(value => value.TryQueueSave(It.IsAny<string>()))
             .Callback<string>(queuedSaves.Add)
             .Returns(true);
@@ -541,6 +543,36 @@ public class ServerShutdownCoordinatorTests : IDisposable
         Schedule(0, "Maintenance_1");
 
         Assert.Equal(new[] { "Maintenance_1" }, queuedSaves);
+    }
+
+    [Fact]
+    public void Ironman_SavesToTheIronmanSlotAndCompletes()
+    {
+        ironmanSaveName = "Ironman7f3c";
+
+        Schedule(0);
+        broker.Publish(new object(), new GameSaved("Ironman7f3c"));
+        broker.Publish(new object(), new CoopSessionWritten("Ironman7f3c", true));
+        broker.Publish(new object(), new GameSaveCompleted("Ironman7f3c", true));
+
+        Assert.Equal(new[] { "Ironman7f3c" }, queuedSaves);
+        Assert.Equal(ServerShutdownPhase.Completed, coordinator.Phase);
+        Assert.Equal("Ironman7f3c", Assert.Single(broker.Messages.GetMessages<ServerShutdownCompleted>()).SaveName);
+    }
+
+    [Fact]
+    public void Ironman_AnotherSaveName_IsRefused()
+    {
+        ironmanSaveName = "Ironman7f3c";
+
+        Assert.False(coordinator.TrySchedule(0, "MP_other", out string result));
+
+        Assert.Equal("Ironman campaigns always save to Ironman7f3c, so leave save_name out.", result);
+        Assert.Equal(ServerShutdownPhase.Idle, coordinator.Phase);
+        Assert.Empty(queuedSaves);
+
+        Schedule(0, "ironman7F3C");
+        Assert.Equal(new[] { "Ironman7f3c" }, queuedSaves);
     }
 
     [Fact]

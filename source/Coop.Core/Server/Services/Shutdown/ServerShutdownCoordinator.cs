@@ -167,7 +167,16 @@ public class ServerShutdownCoordinator : IServerShutdownCoordinator
             return false;
         }
 
-        string name = saveName ?? (Phase == ServerShutdownPhase.Countdown ? this.saveName : loadedSaveName);
+        // Vanilla writes every save of an ironman campaign to its own slot, whatever name is queued.
+        string ironmanSaveName = saveInterface.IronmanSaveName;
+        if (ironmanSaveName != null && saveName != null &&
+            !string.Equals(saveName, ironmanSaveName, StringComparison.OrdinalIgnoreCase))
+        {
+            result = $"Ironman campaigns always save to {ironmanSaveName}, so leave save_name out.";
+            return false;
+        }
+
+        string name = ironmanSaveName ?? saveName ?? (Phase == ServerShutdownPhase.Countdown ? this.saveName : loadedSaveName);
         if (name == null)
         {
             result = "No save has been loaded, so give a save_name.";
@@ -248,7 +257,7 @@ public class ServerShutdownCoordinator : IServerShutdownCoordinator
             case ServerShutdownPhase.Failed:
                 return $"phase=Failed reason={failureReason} joins={joins}";
             default:
-                return $"phase=Idle joins={joins} defaultSave={loadedSaveName ?? "none"}";
+                return $"phase=Idle joins={joins} defaultSave={saveInterface.IronmanSaveName ?? loadedSaveName ?? "none"}";
         }
     }
 

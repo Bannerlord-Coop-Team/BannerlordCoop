@@ -25,6 +25,9 @@ public interface ISaveInterface : IGameAbstraction
 
     /// <summary>Queues a named save on the campaign's SaveHandler. False when no campaign is loaded.</summary>
     bool TryQueueSave(string saveName);
+
+    /// <summary>The slot every save of an ironman campaign goes to, or null when the campaign is not ironman.</summary>
+    string IronmanSaveName { get; }
 }
 
 internal class SaveInterface : ISaveInterface
@@ -34,6 +37,9 @@ internal class SaveInterface : ISaveInterface
     public bool CanQueueSave => Campaign.Current?.SaveHandler != null;
 
     public bool IsSaving => Campaign.Current?.SaveHandler?.IsSaving == true;
+
+    public string IronmanSaveName =>
+        CampaignOptions.IsIronmanMode ? Campaign.Current?.SaveHandler?.IronmanModSaveName : null;
 
     public bool TryQueueSave(string saveName)
     {
