@@ -151,6 +151,9 @@ public class ServerAdmissionGateTests
         Assert.Equal(ended, race.Coordinator.Phase);
 
         race.Register();
+        // Refused inside the registration call, before any pump.
+        Assert.DoesNotContain("registered", race.ServerEvents);
+        Assert.Empty(race.Connections);
         race.PumpUntil(() => race.ClientDisconnectReason != null);
 
         Assert.Equal(ServerShutdownCoordinator.DisconnectReason, race.ClientDisconnectReason);
@@ -174,14 +177,23 @@ public class ServerAdmissionGateTests
         };
         race.ServerBroker.Subscribe(pause);
 
-        // The connection logic enters its first state before it is added to the collection.
-        var registration = Task.Run(race.Register);
-        Assert.True(registering.Wait(TimeSpan.FromSeconds(5)));
-        var shutdown = Task.Run(race.ScheduleShutdownNow);
+        Task registration;
+        Task shutdown;
+        try
+        {
+            // The connection logic enters its first state before it is added to the collection.
+            registration = RunOnOwnThread(race.Register);
+            Assert.True(registering.Wait(TimeSpan.FromSeconds(5)), "The registration never started.");
+            shutdown = RunOnOwnThread(race.ScheduleShutdownNow);
+            Assert.True(race.Gate.Closing.Wait(TimeSpan.FromSeconds(5)), "The shutdown never started closing the gate.");
 
-        await Task.WhenAny(shutdown, Task.Delay(300));
-        Assert.False(shutdown.IsCompleted, "The shutdown got past the gate while a registration was still running.");
-        release.Set();
+            await Task.WhenAny(shutdown, Task.Delay(300));
+            Assert.False(shutdown.IsCompleted, "The shutdown got past the gate while a registration was still running.");
+        }
+        finally
+        {
+            release.Set();
+        }
         await Task.WhenAll(registration, shutdown).WaitAsync(TimeSpan.FromSeconds(5));
 
         race.PumpUntil(() => race.ClientDisconnectReason != null && !race.Connections.Any());
@@ -194,6 +206,10 @@ public class ServerAdmissionGateTests
         Assert.Equal(new[] { "registered", "disconnected", "save queued" }, race.ServerEvents);
         GC.KeepAlive(pause);
     }
+
+    // A dedicated thread, so neither side of the race waits for a pool thread to start.
+    private static Task RunOnOwnThread(Action action) =>
+        Task.Factory.StartNew(action, CancellationToken.None, TaskCreationOptions.LongRunning, TaskScheduler.Default);
 
     private static string ConnectAndReadPopup(bool gateOpen, string suppliedPassword)
     {
@@ -305,6 +321,7 @@ public class ServerAdmissionGateTests
     private sealed class RegistrationRace : IDisposable
     {
         public readonly TestMessageBroker ServerBroker = new TestMessageBroker();
+        public readonly SignallingAdmissionGate Gate = new SignallingAdmissionGate();
         public readonly ConnectionCollection Connections;
         public readonly ServerShutdownCoordinator Coordinator;
         public readonly ConcurrentQueue<string> ServerEvents = new ConcurrentQueue<string>();
@@ -321,8 +338,7 @@ public class ServerAdmissionGateTests
 
         public RegistrationRace()
         {
-            var gate = new ServerAdmissionGate();
-            server = CreateServer(ServerBroker, gate, serverSession);
+            server = CreateServer(ServerBroker, Gate, serverSession);
             Connections = new ConnectionCollection(ServerBroker, CreateConnectionContext(ServerBroker));
             // Subscribed after the collection, so it runs once the peer is in it.
             recordRegistration = _ => ServerEvents.Enqueue("registered");
@@ -338,7 +354,7 @@ public class ServerAdmissionGateTests
                 Mock.Of<INetwork>(),
                 Connections,
                 new JoinPeerTerminator(),
-                gate,
+                Gate,
                 saves.Object,
                 Mock.Of<IMissionManager>(),
                 () => DateTime.UtcNow,
@@ -402,6 +418,7 @@ public class ServerAdmissionGateTests
             server.Dispose();
             clientSession.Dispose();
             serverSession.Dispose();
+            Gate.Dispose();
         }
 
         private static ConnectionContext CreateConnectionContext(TestMessageBroker broker) => new ConnectionContext(
@@ -424,5 +441,27 @@ public class ServerAdmissionGateTests
             Mock.Of<IServerOptionsProvider>(),
             Mock.Of<IJoinCampaignBaselineSender>(),
             Mock.Of<IJoinCampaignKingdomBaseLineSender>());
+    }
+
+    /// <summary>The real gate, which also signals once a shutdown has started closing it.</summary>
+    private sealed class SignallingAdmissionGate : IServerAdmissionGate, IDisposable
+    {
+        public readonly ManualResetEventSlim Closing = new ManualResetEventSlim();
+
+        private readonly ServerAdmissionGate gate = new ServerAdmissionGate();
+
+        public bool IsOpen => gate.IsOpen;
+
+        public void Open() => gate.Open();
+
+        public void Close()
+        {
+            Closing.Set();
+            gate.Close();
+        }
+
+        public bool TryAdmit(Action register) => gate.TryAdmit(register);
+
+        public void Dispose() => Closing.Dispose();
     }
 }
