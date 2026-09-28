@@ -22,6 +22,12 @@ using Xunit.Abstractions;
 
 namespace Coop.Tests.Client.States;
 
+[CollectionDefinition("Campaign state frame drain", DisableParallelization = true)]
+public sealed class CampaignStateFrameDrainCollection
+{
+}
+
+[Collection("Campaign state frame drain")]
 public class CampaignStateTests : IDisposable
 {
     public void Dispose() => clientLogic.State.Dispose();
