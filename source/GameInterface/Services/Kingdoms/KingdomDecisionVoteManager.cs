@@ -44,6 +44,8 @@ namespace GameInterface.Services.Kingdoms
         bool ShouldSuppressLocalDecision(KingdomDecision decision);
         bool ShouldDisableResolveDecision(KingdomDecision decision);
         bool HasLocalPlayerSubmittedVote(KingdomDecision decision);
+        bool IsSubmittedDecision(KingdomDecision decision);
+        void DismissSubmittedDecisionItem(DecisionItemBaseVM decisionItem);
         bool ShouldBlockLocalResolution(DecisionItemBaseVM decisionItem);
         void RegisterDecisionItem(DecisionItemBaseVM decisionItem);
         void UnregisterDecisionItem(DecisionItemBaseVM decisionItem);
@@ -223,7 +225,7 @@ namespace GameInterface.Services.Kingdoms
             {
                 LocalSubmittedDecisions.Add(decisionItem.KingdomDecisionMaker._decision);
             }
-            ShowSubmittedState(decisionItem);
+            DismissSubmittedDecisionItem(decisionItem);
             return true;
         }
 
@@ -381,16 +383,42 @@ namespace GameInterface.Services.Kingdoms
             if (decision == null || Clan.PlayerClan == null) return false;
             if (Clan.PlayerClan.Kingdom != decision.Kingdom) return false;
             if (LocalSubmittedDecisions.Contains(decision)) return true;
-            if (!TryGetClanId(Clan.PlayerClan, out string canonicalClanId)) return false;
+            if (!TryGetClanId(Clan.PlayerClan, out _)) return false;
 
             KingdomDecisionVoteState state = GetOrCreateState(decision);
             RefreshEligibleClanIds(state, decision);
             ApplyPendingRemoteVotes(state);
 
+            return IsSubmittedDecision(decision);
+        }
+
+        // Read only: UI refreshes call this, and replaying pending votes from here would refresh the panel again.
+        public bool IsSubmittedDecision(KingdomDecision decision)
+        {
+            if (decision == null || Clan.PlayerClan == null) return false;
+            if (Clan.PlayerClan.Kingdom != decision.Kingdom) return false;
+            if (LocalSubmittedDecisions.Contains(decision)) return true;
+            if (!DecisionStates.TryGetValue(decision, out KingdomDecisionVoteState state)) return false;
+            if (!TryGetClanId(Clan.PlayerClan, out string canonicalClanId)) return false;
+
             if (state.FinalVotes.ContainsKey(canonicalClanId)) return true;
 
             return state.RoundClans.TryGetValue(canonicalClanId, out KingdomDecisionRoundClanStatusData roundClan) &&
                    roundClan.HasFinalVote;
+        }
+
+        public void DismissSubmittedDecisionItem(DecisionItemBaseVM decisionItem)
+        {
+            if (decisionItem == null || !decisionItem.IsActive) return;
+
+            KingdomDecision decision = decisionItem.KingdomDecisionMaker?._decision;
+            TryGetKingdomId(decision?.Kingdom, out string kingdomId);
+            TryGetDecisionIndex(decision, out int decisionIndex);
+            Logger.Information(
+                "Kingdom decision panel closed after the vote was submitted for {KingdomId} decision {DecisionIndex}; the round continues",
+                kingdomId,
+                decisionIndex);
+            CloseDecisionItem(decisionItem);
         }
 
         public bool ShouldBlockLocalResolution(DecisionItemBaseVM decisionItem)

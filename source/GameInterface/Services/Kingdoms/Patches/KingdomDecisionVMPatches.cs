@@ -54,6 +54,36 @@ namespace GameInterface.Services.Kingdoms.Patches
             KingdomDecisionWaitingStatusWidgetPatch.EnsureAttached(__instance);
         }
 
+        // A submitted decision reopens only when clicked, so the automatic check skips it.
+        [HarmonyPatch(nameof(KingdomDecisionsVM.OnFrameTick))]
+        [HarmonyPrefix]
+        private static void OnFrameTickPrefix(KingdomDecisionsVM __instance)
+        {
+            MarkSubmittedDecisionsExamined(__instance);
+        }
+
+        [HarmonyPatch(nameof(KingdomDecisionsVM.HandleNextDecision))]
+        [HarmonyPrefix]
+        private static void HandleNextDecisionPrefix(KingdomDecisionsVM __instance)
+        {
+            MarkSubmittedDecisionsExamined(__instance);
+        }
+
+        private static void MarkSubmittedDecisionsExamined(KingdomDecisionsVM decisionsVm)
+        {
+            if (!TryGetVoteManager(out var voteManager)) return;
+            IEnumerable<KingdomDecision> decisions = Clan.PlayerClan?.Kingdom?.UnresolvedDecisions;
+            if (decisions == null) return;
+
+            foreach (KingdomDecision decision in decisions)
+            {
+                if (decisionsVm._examinedDecisionsSinceInit.Contains(decision)) continue;
+                if (!voteManager.IsSubmittedDecision(decision)) continue;
+
+                decisionsVm._examinedDecisionsSinceInit.Add(decision);
+            }
+        }
+
         [HarmonyPatch(nameof(KingdomDecisionsVM.OnFrameTick))]
         [HarmonyPostfix]
         private static void OnFrameTickPostfix(KingdomDecisionsVM __instance)
@@ -116,6 +146,9 @@ namespace GameInterface.Services.Kingdoms.Patches
     [HarmonyPatch(typeof(DecisionItemBaseVM))]
     internal class DecisionItemBaseVMPatches
     {
+        private static readonly TextObject SubmittedCloseHint =
+            new TextObject("Your vote is submitted. Close this screen; the result is announced when voting ends.");
+
         [HarmonyPatch("OnChangeVote")]
         [HarmonyPostfix]
         private static void OnChangeVotePostfix(DecisionOptionVM __0)
@@ -130,10 +163,31 @@ namespace GameInterface.Services.Kingdoms.Patches
         private static bool ExecuteFinalSelectionPrefix(DecisionItemBaseVM __instance)
         {
             if (!KingdomDecisionsVMPatches.TryGetVoteManager(out var voteManager)) return true;
+            if (voteManager.IsSubmittedDecision(__instance.KingdomDecisionMaker?._decision))
+            {
+                voteManager.DismissSubmittedDecisionItem(__instance);
+                return false;
+            }
             if (!voteManager.ShouldBlockLocalResolution(__instance)) return true;
 
             voteManager.TryPublishFinalVote(__instance);
             return false;
+        }
+
+        // Done closes a reopened submitted decision; the ballot itself stays locked.
+        [HarmonyPatch("RefreshCanEndDecision")]
+        [HarmonyPostfix]
+        private static void RefreshCanEndDecisionPostfix(DecisionItemBaseVM __instance)
+        {
+            if (!__instance._finalSelectionDone || !__instance.IsActive) return;
+            if (!KingdomDecisionsVMPatches.TryGetVoteManager(out var voteManager)) return;
+            if (!voteManager.IsSubmittedDecision(__instance.KingdomDecisionMaker?._decision)) return;
+
+            __instance.CanEndDecision = true;
+            if (__instance.EndDecisionHint != null)
+            {
+                __instance.EndDecisionHint.HintText = SubmittedCloseHint;
+            }
         }
 
         [HarmonyPatch("OnFinalize")]

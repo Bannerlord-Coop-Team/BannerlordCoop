@@ -1260,7 +1260,7 @@ public class PlayerKingdomCreationFlowTests : IDisposable
     }
 
     [Fact]
-    public void KingdomDecisionFinalVote_KeepsPanelOpenWithWaitingFeedback()
+    public void KingdomDecisionFinalVote_ClosesPanelAndReopensWithWaitingFeedback()
     {
         var client1 = Clients.First();
         var client2 = Clients.Skip(1).First();
@@ -1326,8 +1326,8 @@ public class PlayerKingdomCreationFlowTests : IDisposable
 
             decisionItem.ExecuteFinalSelection();
 
-            Assert.Same(decisionItem, decisionsVm.CurrentDecision);
-            Assert.True(decisionItem.IsActive);
+            Assert.Null(decisionsVm.CurrentDecision);
+            Assert.False(decisionItem.IsActive);
             Assert.True(decisionItem._finalSelectionDone);
             Assert.False(decisionItem.CanEndDecision);
             Assert.Equal(decisionDescription, decisionItem.DescriptionText);
@@ -1344,15 +1344,13 @@ public class PlayerKingdomCreationFlowTests : IDisposable
             Assert.Contains("Waiting for", waitingStatus);
             Assert.Contains(waitingHero.Name.ToString(), string.Join("\n", waitingColumns));
             Assert.Equal(4, waitingColumns.Count);
-            Assert.All(decisionItem.DecisionOptionsList, candidate => Assert.False(candidate.CanBeChosen));
 
-            decisionItem.OnFinalize();
             var reopenedDecisionsVm = new KingdomDecisionsVM(() => { });
             reopenedDecisionsVm.RefreshWith(decision);
             DecisionItemBaseVM reopenedDecisionItem = reopenedDecisionsVm.CurrentDecision;
 
             Assert.True(reopenedDecisionItem._finalSelectionDone);
-            Assert.False(reopenedDecisionItem.CanEndDecision);
+            Assert.True(reopenedDecisionItem.CanEndDecision);
             Assert.Equal(decisionDescription, reopenedDecisionItem.DescriptionText);
             Assert.Contains("Voting ends in", GetVoteManager(client1).RefreshDecisionTitle(reopenedDecisionItem));
             string reopenedWaitingStatus = GetVoteManager(client1).RefreshDecisionWaitingStatus(reopenedDecisionItem);
@@ -1360,7 +1358,15 @@ public class PlayerKingdomCreationFlowTests : IDisposable
             Assert.DoesNotContain("Voting ends in", reopenedWaitingStatus);
             Assert.Contains(waitingHero.Name.ToString(), string.Join("\n", GetVoteManager(client1).GetDecisionWaitingColumns(reopenedDecisionItem)));
             Assert.All(reopenedDecisionItem.DecisionOptionsList, candidate => Assert.False(candidate.CanBeChosen));
+
+            reopenedDecisionItem.ExecuteFinalSelection();
+
+            Assert.Null(reopenedDecisionsVm.CurrentDecision);
+            Assert.False(reopenedDecisionItem.IsActive);
         });
+
+        Assert.Single(client1.NetworkSentMessages.GetMessages<NetworkRequestKingdomDecisionVote>());
+        Assert.Empty(Server.NetworkSentMessages.GetMessages<NetworkKingdomDecisionResolved>());
     }
 
     [Fact]
@@ -1704,11 +1710,256 @@ public class PlayerKingdomCreationFlowTests : IDisposable
 
             Assert.True(GetVoteManager(client1).HasLocalPlayerSubmittedVote(decision));
             Assert.True(decisionItem._finalSelectionDone);
-            Assert.False(decisionItem.CanEndDecision);
+            Assert.True(decisionItem.CanEndDecision);
             Assert.Equal(decisionDescription, decisionItem.DescriptionText);
             Assert.Contains("Vote submitted", GetVoteManager(client1).RefreshDecisionWaitingStatus(decisionItem));
             Assert.DoesNotContain("Voting ends in", GetVoteManager(client1).RefreshDecisionWaitingStatus(decisionItem));
             Assert.All(decisionItem.DecisionOptionsList, candidate => Assert.False(candidate.CanBeChosen));
+
+            decisionItem.ExecuteFinalSelection();
+
+            Assert.Null(decisionsVm.CurrentDecision);
+            Assert.False(decisionItem.IsActive);
+        });
+
+        Assert.Empty(client1.NetworkSentMessages.GetMessages<NetworkRequestKingdomDecisionVote>());
+    }
+
+    [Fact]
+    public void KingdomDecisionFinalVote_ClickingSubmittedDecisionReopensClosableWaitingView()
+    {
+        var (client1, _, _, _, kingdomId) = SetUpPlayerDeclareWarVotes("TargetKingdomReopenClick");
+
+        IReadOnlyList<string> lines = CaptureKingdomVoteLog(() => client1.Call(() =>
+        {
+            KingdomDecision decision = Assert.Single(Clan.PlayerClan.Kingdom.UnresolvedDecisions);
+            var decisionsVm = new KingdomDecisionsVM(() => { });
+            SubmitDeclareWarVoteFromPanel(decisionsVm, decision);
+            Assert.Null(decisionsVm.CurrentDecision);
+
+            // The vote notification and coop.debug.kingdom.open_decision open the screen through HandleDecision.
+            var reopenedDecisionsVm = new KingdomDecisionsVM(() => { });
+            InquiryData inquiry = Assert.Single(CaptureInquiries(() => reopenedDecisionsVm.HandleDecision(decision)));
+            inquiry.AffirmativeAction();
+            DecisionItemBaseVM reopenedDecisionItem = reopenedDecisionsVm.CurrentDecision;
+
+            Assert.NotNull(reopenedDecisionItem);
+            Assert.True(reopenedDecisionItem.IsActive);
+            Assert.True(reopenedDecisionItem._finalSelectionDone);
+            Assert.True(reopenedDecisionItem.CanEndDecision);
+            Assert.Contains("Your vote is submitted", reopenedDecisionItem.EndDecisionHint.HintText.ToString());
+            Assert.All(reopenedDecisionItem.DecisionOptionsList, candidate => Assert.False(candidate.CanBeChosen));
+            string waitingStatus = GetVoteManager(client1).RefreshDecisionWaitingStatus(reopenedDecisionItem);
+            Assert.Contains("Vote submitted", waitingStatus);
+            Assert.Contains("Waiting for remaining players", waitingStatus);
+            Assert.False(string.IsNullOrWhiteSpace(
+                string.Join(string.Empty, GetVoteManager(client1).GetDecisionWaitingColumns(reopenedDecisionItem))));
+
+            reopenedDecisionItem.ExecuteFinalSelection();
+
+            Assert.Null(reopenedDecisionsVm.CurrentDecision);
+            Assert.False(reopenedDecisionItem.IsActive);
+            Assert.Empty(CaptureInquiries(reopenedDecisionsVm.OnFrameTick));
+        }));
+
+        Assert.Single(lines, line => line.Contains("Kingdom decision final selection"));
+        Assert.Equal(2, lines.Count(line => line.Contains("panel closed after the vote was submitted")));
+        Assert.Single(client1.NetworkSentMessages.GetMessages<NetworkRequestKingdomDecisionVote>());
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject<Kingdom>(kingdomId, out var kingdom));
+            Assert.Single(kingdom.UnresolvedDecisions);
+        });
+    }
+
+    [Fact]
+    public void KingdomDecisionFinalVote_ClosedSubmittedDecisionIsNotPromptedAgain()
+    {
+        var (client1, _, player1, _, kingdomId) = SetUpPlayerDeclareWarVotes("TargetKingdomNoReprompt");
+        KingdomDecisionsVM decisionsVm = null;
+
+        client1.Call(() =>
+        {
+            KingdomDecision decision = Assert.Single(Clan.PlayerClan.Kingdom.UnresolvedDecisions);
+            decisionsVm = new KingdomDecisionsVM(() => { });
+            // Kingdom tabs and the proposer's own panel open through RefreshWith, which does not mark it examined.
+            SubmitDeclareWarVoteFromPanel(decisionsVm, decision);
+
+            Assert.Empty(CaptureInquiries(decisionsVm.OnFrameTick));
+            Assert.Contains(decision, decisionsVm._examinedDecisionsSinceInit);
+
+            var reopenedScreenDecisionsVm = new KingdomDecisionsVM(() => { });
+            Assert.Empty(CaptureInquiries(reopenedScreenDecisionsVm.OnFrameTick));
+            Assert.Null(reopenedScreenDecisionsVm.CurrentDecision);
+
+            // The army tab refresh asks for the next decision without a frame tick first.
+            var armyRefreshDecisionsVm = new KingdomDecisionsVM(() => { });
+            Assert.Empty(CaptureInquiries(armyRefreshDecisionsVm.HandleNextDecision));
+            Assert.Null(armyRefreshDecisionsVm.CurrentDecision);
+        });
+
+        // A decision proposed later while the same kingdom screen stays open still prompts.
+        var laterTargetKingdomId = TestEnvironment.CreateRegisteredObject<Kingdom>();
+        var laterTargetPlayer = CreateSyncedPlayerContext("TargetKingdomNoRepromptLater", _ => false);
+        ConfigureClanInKingdom(laterTargetPlayer.ClanId, laterTargetKingdomId);
+        EnsureKingdomRegisteredEverywhere(laterTargetKingdomId);
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject<Kingdom>(kingdomId, out var kingdom));
+            Assert.True(Server.ObjectManager.TryGetObject<Kingdom>(laterTargetKingdomId, out var laterTargetKingdom));
+            Assert.True(Server.ObjectManager.TryGetObject<Clan>(player1.ClanId, out var proposerClan));
+            kingdom.AddDecision(new DeclareWarDecision(proposerClan, laterTargetKingdom));
+        });
+
+        client1.Call(() =>
+        {
+            Assert.Equal(2, Clan.PlayerClan.Kingdom.UnresolvedDecisions.Count);
+            KingdomDecision laterDecision = Clan.PlayerClan.Kingdom.UnresolvedDecisions[1];
+
+            InquiryData inquiry = Assert.Single(CaptureInquiries(decisionsVm.OnFrameTick));
+            inquiry.AffirmativeAction();
+
+            Assert.Same(laterDecision, decisionsVm.CurrentDecision.KingdomDecisionMaker._decision);
+        });
+    }
+
+    [Fact]
+    public void KingdomDecisionFinalVote_SecondQueuedDecisionPromptsAfterDismiss()
+    {
+        var (client1, _, _, _, _) = SetUpPlayerDeclareWarVotes("TargetKingdomQueued", decisionCount: 2);
+
+        client1.Call(() =>
+        {
+            List<KingdomDecision> decisions = Clan.PlayerClan.Kingdom.UnresolvedDecisions.ToList();
+            Assert.Equal(2, decisions.Count);
+            var decisionsVm = new KingdomDecisionsVM(() => { });
+            DecisionItemBaseVM firstDecisionItem = SubmitDeclareWarVoteFromPanel(decisionsVm, decisions[0]);
+
+            InquiryData inquiry = Assert.Single(CaptureInquiries(decisionsVm.OnFrameTick));
+            inquiry.AffirmativeAction();
+            DecisionItemBaseVM secondDecisionItem = decisionsVm.CurrentDecision;
+
+            Assert.Same(decisions[1], secondDecisionItem.KingdomDecisionMaker._decision);
+            Assert.False(secondDecisionItem._finalSelectionDone);
+            Assert.All(secondDecisionItem.DecisionOptionsList, candidate => Assert.True(candidate.CanBeChosen));
+
+            // A late second click on the closed first panel must not close the second one.
+            firstDecisionItem.ExecuteFinalSelection();
+
+            Assert.Same(secondDecisionItem, decisionsVm.CurrentDecision);
+            Assert.True(secondDecisionItem.IsActive);
+        });
+    }
+
+    [Fact]
+    public void KingdomDecisionFinalVote_RemoteVotesKeepReopenedViewClosableUntilResolution()
+    {
+        var (client1, client2, _, player2, kingdomId) = SetUpPlayerDeclareWarVotes("TargetKingdomRemoteVote");
+        KingdomDecisionsVM reopenedDecisionsVm = null;
+        DecisionItemBaseVM reopenedDecisionItem = null;
+
+        client1.Call(() =>
+        {
+            KingdomDecision decision = Assert.Single(Clan.PlayerClan.Kingdom.UnresolvedDecisions);
+            SubmitDeclareWarVoteFromPanel(new KingdomDecisionsVM(() => { }), decision);
+            reopenedDecisionsVm = new KingdomDecisionsVM(() => { });
+            reopenedDecisionsVm.RefreshWith(decision);
+            reopenedDecisionItem = reopenedDecisionsVm.CurrentDecision;
+
+            Assert.True(reopenedDecisionItem.CanEndDecision);
+        });
+
+        client2.SimulateMessage(this, new KingdomDecisionVoteRequested(CreateDeclareWarNoVote(kingdomId, isFinal: false)));
+
+        Assert.Contains(
+            client1.InternalMessages.GetMessages<ApplyKingdomDecisionVote>(),
+            message => message.ClanId == player2.ClanId && !message.VoteData.IsFinal);
+        client1.Call(() =>
+        {
+            Assert.True(reopenedDecisionItem.IsActive);
+            Assert.True(reopenedDecisionItem.CanEndDecision);
+        });
+
+        client2.SimulateMessage(this, new KingdomDecisionVoteRequested(CreateDeclareWarNoVote(kingdomId, isFinal: true)));
+
+        Assert.Single(
+            client1.InternalMessages.GetMessages<ApplyKingdomDecisionResolved>(),
+            message => message.KingdomId == kingdomId);
+        client1.Call(() =>
+        {
+            Assert.Null(reopenedDecisionsVm.CurrentDecision);
+            Assert.False(reopenedDecisionItem.IsActive);
+        });
+    }
+
+    [Fact]
+    public void KingdomDecisionFinalVote_ResolutionAfterCloseAppliesWithoutPanel()
+    {
+        var (client1, client2, _, _, kingdomId) = SetUpPlayerDeclareWarVotes("TargetKingdomResolvedAfterClose");
+        KingdomDecisionsVM decisionsVm = null;
+
+        client1.Call(() =>
+        {
+            KingdomDecision decision = Assert.Single(Clan.PlayerClan.Kingdom.UnresolvedDecisions);
+            decisionsVm = new KingdomDecisionsVM(() => { });
+            SubmitDeclareWarVoteFromPanel(decisionsVm, decision);
+
+            Assert.Null(decisionsVm.CurrentDecision);
+        });
+
+        client2.SimulateMessage(this, new KingdomDecisionVoteRequested(CreateDeclareWarVote(kingdomId, isFinal: true)));
+
+        var resolvedMessage = Assert.Single(
+            Server.NetworkSentMessages.GetMessages<NetworkKingdomDecisionResolved>(),
+            message => message.KingdomId == kingdomId);
+        Assert.Single(
+            client1.InternalMessages.GetMessages<ApplyKingdomDecisionResolved>(),
+            message => message.KingdomId == kingdomId);
+        Assert.Contains(
+            client1.InternalMessages.GetMessages<SendInformationMessage>(),
+            message => message.Text == resolvedMessage.NotificationText);
+        client1.Call(() =>
+        {
+            Assert.Null(decisionsVm.CurrentDecision);
+            Assert.Single(decisionsVm._solvedDecisionsSinceInit);
+        });
+    }
+
+    [Fact]
+    public void KingdomDecisionSubmittedView_PendingRemoteVoteReplaysOnceWithoutRecursion()
+    {
+        var (client1, _, player1, player2, kingdomId) = SetUpPlayerDeclareWarVotes("TargetKingdomPendingReplay");
+
+        client1.Call(() =>
+        {
+            KingdomDecision decision = Assert.Single(Clan.PlayerClan.Kingdom.UnresolvedDecisions);
+            var decisionsVm = new KingdomDecisionsVM(() => { });
+            decisionsVm.RefreshWith(decision);
+            DecisionItemBaseVM decisionItem = decisionsVm.CurrentDecision;
+            var voteManager = GetConcreteVoteManager(client1);
+
+            // Reconnected mid-round: only the round status says the local clan already voted.
+            voteManager.ApplyRoundStatus(CreateTwoClanRoundStatus(kingdomId, player1.ClanId, player2.ClanId, 60));
+            Assert.True(decisionItem._finalSelectionDone);
+
+            var pendingVotes = (System.Collections.IList)AccessTools
+                .Field(typeof(KingdomDecisionVoteManager), "PendingRemoteVotes")
+                .GetValue(voteManager);
+            Type pendingVoteType = AccessTools.Inner(typeof(KingdomDecisionVoteManager), "PendingKingdomDecisionVote");
+            pendingVotes.Add(Activator.CreateInstance(
+                pendingVoteType,
+                player2.ClanId,
+                CreateDeclareWarNoVote(kingdomId, isFinal: false)));
+
+            voteManager.ApplyRoundStatus(CreateTwoClanRoundStatus(kingdomId, player1.ClanId, player2.ClanId, 59));
+
+            Assert.Empty(pendingVotes);
+            Assert.True(decisionItem.IsActive);
+            Assert.True(decisionItem.CanEndDecision);
+            Assert.True(client1.ObjectManager.TryGetObject<Clan>(player2.ClanId, out var player2Clan));
+            DecisionOutcome noOutcome = decisionItem.KingdomDecisionMaker._possibleOutcomes
+                .Single(outcome => IsDeclareWarOutcome(outcome, false));
+            Assert.Single(noOutcome.SupporterList, supporter => ReferenceEquals(supporter.Clan, player2Clan));
         });
     }
 
@@ -3173,8 +3424,8 @@ public class PlayerKingdomCreationFlowTests : IDisposable
             string decisionDescription = decisionItem.DescriptionText;
             decisionItem.ExecuteFinalSelection();
 
-            Assert.Same(decisionItem, decisionsVm.CurrentDecision);
-            Assert.True(decisionItem.IsActive);
+            Assert.Null(decisionsVm.CurrentDecision);
+            Assert.False(decisionItem.IsActive);
             Assert.True(decisionItem._finalSelectionDone);
             Assert.Equal(decisionDescription, decisionItem.DescriptionText);
         });
@@ -4059,6 +4310,95 @@ public class PlayerKingdomCreationFlowTests : IDisposable
         {
             return lines.ToList();
         }
+    }
+
+    // Two player clans vote on declare-war decisions proposed by the first player's clan.
+    private (EnvironmentInstance Client1, EnvironmentInstance Client2, PlayerContext Player1, PlayerContext Player2, string KingdomId)
+        SetUpPlayerDeclareWarVotes(string targetControllerId, int decisionCount = 1)
+    {
+        var client1 = Clients.First();
+        var client2 = Clients.Skip(1).First();
+        client1.Resolve<IControllerIdProvider>().SetControllerId(ControllerId);
+        client2.Resolve<IControllerIdProvider>().SetControllerId(SecondControllerId);
+
+        var player1 = CreateSyncedPlayerContext(ControllerId, client1);
+        var player2 = CreateSyncedPlayerContext(SecondControllerId, client2);
+        var kingdomId = TestEnvironment.CreateRegisteredObject<Kingdom>();
+        ConfigureClanInKingdom(player1.ClanId, kingdomId);
+        ConfigureClanInKingdom(player2.ClanId, kingdomId);
+        EnsureKingdomRegisteredEverywhere(kingdomId);
+
+        var targetKingdomIds = new List<string>();
+        for (int i = 0; i < decisionCount; i++)
+        {
+            var targetKingdomId = TestEnvironment.CreateRegisteredObject<Kingdom>();
+            var targetPlayer = CreateSyncedPlayerContext(targetControllerId + i, _ => false);
+            ConfigureClanInKingdom(targetPlayer.ClanId, targetKingdomId);
+            EnsureKingdomRegisteredEverywhere(targetKingdomId);
+            targetKingdomIds.Add(targetKingdomId);
+        }
+
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject<Kingdom>(kingdomId, out var kingdom));
+            Assert.True(Server.ObjectManager.TryGetObject<Clan>(player1.ClanId, out var proposerClan));
+            foreach (string targetKingdomId in targetKingdomIds)
+            {
+                Assert.True(Server.ObjectManager.TryGetObject<Kingdom>(targetKingdomId, out var targetKingdom));
+                kingdom.AddDecision(new DeclareWarDecision(proposerClan, targetKingdom));
+            }
+        });
+
+        return (client1, client2, player1, player2, kingdomId);
+    }
+
+    private static DecisionItemBaseVM SubmitDeclareWarVoteFromPanel(KingdomDecisionsVM decisionsVm, KingdomDecision decision)
+    {
+        decisionsVm.RefreshWith(decision);
+        DecisionItemBaseVM decisionItem = decisionsVm.CurrentDecision;
+        DecisionOptionVM option = decisionItem.DecisionOptionsList.Single(candidate =>
+            IsDeclareWarOutcome(candidate.Option, true));
+        option.CurrentSupportWeight = Supporter.SupportWeights.FullyPush;
+        decisionItem._currentSelectedOption = option;
+        decisionItem.ExecuteFinalSelection();
+        return decisionItem;
+    }
+
+    private static IReadOnlyList<InquiryData> CaptureInquiries(Action action)
+    {
+        var inquiries = new List<InquiryData>();
+        Action<InquiryData, bool, bool> onShowInquiry = (data, _, _) => inquiries.Add(data);
+        EventInfo showInquiryEvent = typeof(InformationManager).GetEvent(
+            "OnShowInquiry",
+            BindingFlags.Public | BindingFlags.Static);
+        showInquiryEvent.AddEventHandler(null, onShowInquiry);
+        try
+        {
+            action();
+        }
+        finally
+        {
+            showInquiryEvent.RemoveEventHandler(null, onShowInquiry);
+        }
+
+        return inquiries;
+    }
+
+    private static KingdomDecisionRoundStatusData CreateTwoClanRoundStatus(
+        string kingdomId,
+        string localClanId,
+        string remoteClanId,
+        int secondsLeft)
+    {
+        return new KingdomDecisionRoundStatusData(
+            kingdomId,
+            0,
+            (DateTime.UtcNow + TimeSpan.FromSeconds(secondsLeft)).Ticks,
+            new[]
+            {
+                new KingdomDecisionRoundClanStatusData(localClanId, localClanId, ControllerId, true, true),
+                new KingdomDecisionRoundClanStatusData(remoteClanId, remoteClanId, SecondControllerId, false, true),
+            });
     }
 
     private PlayerContext CreateSyncedPlayerContext()
