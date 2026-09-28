@@ -420,7 +420,8 @@ public class BattleDamageRouter : IBattleDamageRouter
             blow.IsMissile,
             isMount,
             pending.ShotSequence,
-            pending.AttackerWeapon);
+            pending.AttackerWeapon,
+            session.OwnControllerId);
     }
 
     private void Handle_NetworkApplyBattleDamage(MessagePayload<NetworkApplyBattleDamage> payload)
@@ -710,7 +711,7 @@ public class BattleDamageRouter : IBattleDamageRouter
         Agent mountBeforeBlow = victim.IsMount ? null : victim.MountAgent;
         try
         {
-            BattleSpawnGate.RunWithRoutedAttackerWeapon(damage.AttackerWeapon,
+            BattleSpawnGate.RunWithRoutedBlow(damage.AttackerWeapon, damage.SourceControllerId,
                 () => victim.RegisterBlow(blow, in collisionData));
         }
         finally

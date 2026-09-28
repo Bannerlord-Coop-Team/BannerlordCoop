@@ -55,6 +55,9 @@ public static class BattleSpawnGate
     [System.ThreadStatic]
     private static WeaponComponentData _routedAttackerWeapon;
 
+    [System.ThreadStatic]
+    private static string _routedBlowSourceControllerId;
+
     /// <summary>
     /// Set around a puppet spawn (<c>CoopBattleController.SpawnPuppet</c>) so the spawn-capture patch does NOT
     /// re-capture and re-broadcast it — only locally owned native spawns should be captured. Thread-local: it
@@ -84,11 +87,14 @@ public static class BattleSpawnGate
 
     public static Func<Hero, bool?> HeroAgentAuthorityProbe { get; set; }
 
-    /// <summary>Temporarily exposes a routed missile's serialized weapon while vanilla calculates hit rewards.</summary>
-    public static void RunWithRoutedAttackerWeapon(WeaponComponentData attackerWeapon, Action applyBlow)
+    /// <summary>Exposes the routed blow's weapon and originating peer during native damage and sound playback.</summary>
+    public static void RunWithRoutedBlow(
+        WeaponComponentData attackerWeapon, string sourceControllerId, Action applyBlow)
     {
         var previousWeapon = _routedAttackerWeapon;
+        string previousSource = _routedBlowSourceControllerId;
         _routedAttackerWeapon = attackerWeapon;
+        _routedBlowSourceControllerId = sourceControllerId;
         try
         {
             applyBlow();
@@ -96,10 +102,12 @@ public static class BattleSpawnGate
         finally
         {
             _routedAttackerWeapon = previousWeapon;
+            _routedBlowSourceControllerId = previousSource;
         }
     }
 
     public static WeaponComponentData RoutedAttackerWeapon => _routedAttackerWeapon;
+    public static string RoutedBlowSourceControllerId => _routedBlowSourceControllerId;
 
     /// <summary>Runs a replicated puppet death with the owner's kill-feed metadata available to UI patches.</summary>
     public static void RunWithReplicatedDeath(
