@@ -8,7 +8,8 @@ namespace Missions.Agents.Messages;
 public enum MeleeHitPresentationKind
 {
     Blood = 1,
-    ShieldImpact = 2
+    ShieldImpact = 2,
+    BodyImpact = 3
 }
 
 /// <summary>Local collision result selected by the attacking peer.</summary>

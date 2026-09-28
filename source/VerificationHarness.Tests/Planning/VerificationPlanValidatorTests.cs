@@ -52,7 +52,7 @@ public sealed class VerificationPlanValidatorTests
 
         Assert.Equal("blocked-external-runtime", receipt.Verdict);
         Assert.Equal(
-            new[] { "dedicated-server-synthetic", "rendered-smoke", "full-live" },
+            new[] { "rendered-smoke", "full-live" },
             receipt.ExternalRuntimeProfiles);
     }
 
