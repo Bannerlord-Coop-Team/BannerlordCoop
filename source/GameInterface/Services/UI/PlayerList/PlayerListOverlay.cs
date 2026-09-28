@@ -60,7 +60,7 @@ internal sealed class PlayerListOverlay : GlobalLayer, IDisposable
     }
 
     // Requires the actual campaign map, not a map ticking behind a menu or mission.
-    private bool IsMapAvailable() => ScreenManager.TopScreen is MapScreen &&
+    internal static bool IsMapAvailable() => ScreenManager.TopScreen is MapScreen &&
         GameStateManager.Current?.ActiveState is MapState map && !map.AtMenu &&
         !LoadingWindow.IsLoadingWindowActive && !InformationManager.IsAnyInquiryActive() &&
         Campaign.Current?.ConversationManager?.IsConversationInProgress != true;

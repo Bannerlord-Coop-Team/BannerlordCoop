@@ -1,6 +1,6 @@
 ﻿using Common.Logging;
 using Coop.Core.Common.Configuration;
-using GameInterface.Services.Chat.Messages;
+using GameInterface.Services.UI.Motd;
 using Moq;
 using System;
 using System.Collections.Generic;
@@ -73,7 +73,7 @@ public sealed class ServerInfoConfigTests : IDisposable
     }
 
     [Fact]
-    public void ReadsMotdLinesInOrderAndLogsOnlyTheCount()
+    public void ReadsParagraphsInOrderAndLogsOnlyTheCount()
     {
         WriteInfoFile("{\"motd\":[\"Welcome to EU-1\",\"Restart 06:00 UTC\"]}");
 
@@ -81,7 +81,7 @@ public sealed class ServerInfoConfigTests : IDisposable
 
         Assert.Equal(new[] { "Welcome to EU-1", "Restart 06:00 UTC" }, config.Motd);
         string loaded = Assert.Single(LogsForThisTest());
-        Assert.Contains("motd 2 line(s)", loaded);
+        Assert.Contains("motd 2 paragraph(s)", loaded);
         Assert.DoesNotContain("Welcome", loaded);
     }
 
@@ -103,34 +103,90 @@ public sealed class ServerInfoConfigTests : IDisposable
         var config = new ServerInfoConfig(InfoFilePath);
 
         Assert.Empty(config.Motd);
-        Assert.Contains("motd 0 line(s)", Assert.Single(LogsForThisTest()));
+        Assert.Contains("motd 0 paragraph(s)", Assert.Single(LogsForThisTest()));
     }
 
     [Fact]
-    public void KeepsTheFirstFiveNonEmptyLines()
+    public void KeepsTheFirstTenNonEmptyParagraphs()
     {
-        WriteInfoFile("{\"motd\":[\"\",\"one\",\"   \",\"two\",\"three\",\"\\n\",\"four\",\"five\",\"six\",\"seven\"]}");
+        string[] entries = { "", "p1", "   ", "p2", "p3", "\\n", "p4", "p5", "p6", "p7", "p8", "p9", "p10", "p11", "p12" };
+        WriteInfoFile("{\"motd\":[" + string.Join(",", entries.Select(entry => "\"" + entry + "\"")) + "]}");
 
         var config = new ServerInfoConfig(InfoFilePath);
 
-        Assert.Equal(ServerInfoConfig.MaxMotdLines, config.Motd.Count);
-        Assert.Equal(new[] { "one", "two", "three", "four", "five" }, config.Motd);
-        Assert.Contains(LogsForThisTest(), log => log.Contains("was cut to 5 line(s)"));
+        Assert.Equal(MotdLimits.MaxParagraphs, config.Motd.Count);
+        Assert.Equal(Enumerable.Range(1, 10).Select(index => "p" + index), config.Motd);
+        Assert.Contains(LogsForThisTest(), log => log.Contains("was cut to 10 paragraph(s) and 2000 characters"));
     }
 
     [Fact]
-    public void ExactlyFiveLines_AreNotReportedAsCut()
+    public void ExactlyTheCaps_AreNotReportedAsCut()
     {
-        WriteInfoFile("{\"motd\":[\"one\",\"two\",\"three\",\"four\",\"five\"]}");
+        string[] entries = Enumerable.Range(0, MotdLimits.MaxParagraphs)
+            .Select(index => new string((char)('a' + index), MotdLimits.MaxLength / MotdLimits.MaxParagraphs)).ToArray();
+        WriteInfoFile("{\"motd\":[" + string.Join(",", entries.Select(entry => "\"" + entry + "\"")) + "]}");
 
         var config = new ServerInfoConfig(InfoFilePath);
 
-        Assert.Equal(5, config.Motd.Count);
+        Assert.Equal(entries, config.Motd);
+        Assert.Equal(MotdLimits.MaxLength, config.Motd.Sum(paragraph => paragraph.Length));
         Assert.DoesNotContain(LogsForThisTest(), log => log.Contains("was cut"));
     }
 
     [Fact]
-    public void ControlCharactersBecomeSpacesAndLinesAreTrimmed()
+    public void TotalLengthIsCappedAndLaterParagraphsAreDropped()
+    {
+        string first = new string('a', 1500);
+        string second = new string('b', 800);
+        WriteInfoFile("{\"motd\":[\"" + first + "\",\"" + second + "\",\"tail\"]}");
+
+        var config = new ServerInfoConfig(InfoFilePath);
+
+        Assert.Equal(new[] { first, new string('b', 500) }, config.Motd);
+        Assert.Contains(LogsForThisTest(), log => log.Contains("was cut to"));
+    }
+
+    [Fact]
+    public void NoLaterParagraphFillsTheRoomLeftByACut()
+    {
+        // The cut paragraph ends in a space that is trimmed, which leaves one character of room.
+        string first = new string('a', 1500);
+        string second = new string('b', 499) + " cccc";
+        WriteInfoFile("{\"motd\":[\"" + first + "\",\"" + second + "\",\"x\"]}");
+
+        var config = new ServerInfoConfig(InfoFilePath);
+
+        Assert.Equal(new[] { first, new string('b', 499) }, config.Motd);
+    }
+
+    [Fact]
+    public void ParagraphAfterAFullMotd_IsDroppedAndReported()
+    {
+        string full = new string('a', MotdLimits.MaxLength);
+        WriteInfoFile("{\"motd\":[\"" + full + "\",\"x\"]}");
+
+        var config = new ServerInfoConfig(InfoFilePath);
+
+        Assert.Equal(new[] { full }, config.Motd);
+        Assert.Contains(LogsForThisTest(), log => log.Contains("was cut to"));
+    }
+
+    [Fact]
+    public void CutNeverSplitsASurrogatePair()
+    {
+        // The pair starts at the last allowed index, so a plain cut would keep only its high half.
+        string line = new string('a', MotdLimits.MaxLength - 1) + "\U0001F600" + "tail";
+        WriteInfoFile("{\"motd\":[\"" + line + "\"]}");
+
+        var config = new ServerInfoConfig(InfoFilePath);
+
+        string cut = Assert.Single(config.Motd);
+        Assert.Equal(new string('a', MotdLimits.MaxLength - 1), cut);
+        Assert.False(char.IsHighSurrogate(cut[cut.Length - 1]));
+    }
+
+    [Fact]
+    public void ControlCharactersBecomeSpacesAndParagraphsAreTrimmed()
     {
         WriteInfoFile("{\"motd\":[\"  Rules:\\tbe nice\\nno griefing\\u0007  \"]}");
 
@@ -140,41 +196,23 @@ public sealed class ServerInfoConfigTests : IDisposable
     }
 
     [Fact]
-    public void LongLinesAreCutToTheChatLimit()
+    public void BracesAndTagsAreKeptAsWritten()
     {
-        string longLine = new string('a', ChatMessageLimits.MaxMessageLength + 50);
-        string exactLine = new string('b', ChatMessageLimits.MaxMessageLength);
-        WriteInfoFile("{\"motd\":[\"" + longLine + "\",\"" + exactLine + "\"]}");
+        WriteInfoFile("{\"motd\":[\"{PLAYER} {=coop_motd_title}x <b>bold</b>\"]}");
 
         var config = new ServerInfoConfig(InfoFilePath);
 
-        Assert.Equal(new string('a', ChatMessageLimits.MaxMessageLength), config.Motd[0]);
-        Assert.Equal(exactLine, config.Motd[1]);
-        Assert.Contains(LogsForThisTest(), log => log.Contains("was cut to"));
+        Assert.Equal("{PLAYER} {=coop_motd_title}x <b>bold</b>", Assert.Single(config.Motd));
     }
 
     [Fact]
-    public void CutNeverSplitsASurrogatePair()
+    public void NonAsciiTextAndEscapedPairsAreKept()
     {
-        // The pair starts at the last allowed index, so a plain cut would keep only its high half.
-        string line = new string('a', ChatMessageLimits.MaxMessageLength - 1) + "\U0001F600" + "tail";
-        WriteInfoFile("{\"motd\":[\"" + line + "\"]}");
+        WriteInfoFile("{\"motd\":[\"Willkommen überall, 欢迎\",\"smile \\ud83d\\ude00\"]}");
 
         var config = new ServerInfoConfig(InfoFilePath);
 
-        string cut = Assert.Single(config.Motd);
-        Assert.Equal(new string('a', ChatMessageLimits.MaxMessageLength - 1), cut);
-        Assert.False(char.IsHighSurrogate(cut[cut.Length - 1]));
-    }
-
-    [Fact]
-    public void NonAsciiTextIsKept()
-    {
-        WriteInfoFile("{\"motd\":[\"Willkommen \u00fcberall, \u6b22\u8fce\"]}");
-
-        var config = new ServerInfoConfig(InfoFilePath);
-
-        Assert.Equal("Willkommen \u00fcberall, \u6b22\u8fce", Assert.Single(config.Motd));
+        Assert.Equal(new[] { "Willkommen überall, 欢迎", "smile \U0001F600" }, config.Motd);
     }
 
     [Fact]
@@ -226,7 +264,24 @@ public sealed class ServerInfoConfigTests : IDisposable
         var config = new ServerInfoConfig(InfoFilePath);
 
         Assert.Equal(new[] { "Welcome to EU-1", "Restart 06:00 UTC" }, config.Motd);
-        Assert.Contains(LogsForThisTest(), log => log.Contains("has 5 entry(s) that are not strings"));
+        Assert.Contains(LogsForThisTest(), log => log.Contains("has 5 entry(s) that are not valid strings"));
+    }
+
+    // An operator tool that cuts an escaped emoji in half used to stop the server from starting.
+    [Theory]
+    [InlineData("\\ud83d")]
+    [InlineData("\\ude00 x")]
+    [InlineData("a \\ud83d b")]
+    [InlineData("\\ude00\\ud83d")]
+    public void LoneSurrogateEscape_IsSkippedWithAWarning(string entry)
+    {
+        WriteInfoFile("{\"motd\":[\"Welcome to EU-1\",\"" + entry + "\",\"Restart 06:00 UTC\"]}");
+
+        var config = new ServerInfoConfig(InfoFilePath);
+
+        Assert.Equal(new[] { "Welcome to EU-1", "Restart 06:00 UTC" }, config.Motd);
+        Assert.Contains(LogsForThisTest(), log => log.Contains("has 1 entry(s) that are not valid strings"));
+        Assert.Contains(LogsForThisTest(), log => log.Contains("motd 2 paragraph(s)"));
     }
 
     [Fact]

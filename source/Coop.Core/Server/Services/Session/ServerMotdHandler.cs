@@ -3,12 +3,13 @@ using Common.Messaging;
 using Common.Network;
 using Coop.Core.Common.Configuration;
 using Coop.Core.Server.Connections.Messages;
-using GameInterface.Services.Chat.Messages;
+using GameInterface.Services.UI.Motd;
 using LiteNetLib;
+using System.Linq;
 
 namespace Coop.Core.Server.Services.Session;
 
-/// <summary>Sends the operator's MOTD as System chat to each player whose campaign sync completed.</summary>
+/// <summary>Sends the operator's MOTD, as one message, to each player whose campaign sync completed.</summary>
 internal sealed class ServerMotdHandler : IHandler
 {
     private readonly IMessageBroker messageBroker;
@@ -39,15 +40,6 @@ internal sealed class ServerMotdHandler : IHandler
 
     private void SendMotd(NetPeer peer)
     {
-        foreach (string line in serverInfo.Motd)
-        {
-            network.SendImmediate(peer, new NetworkChatMessage(
-                ChatChannel.System,
-                string.Empty,
-                "System",
-                string.Empty,
-                string.Empty,
-                line));
-        }
+        network.Send(peer, new NetworkMotd(serverInfo.Motd.ToArray()));
     }
 }

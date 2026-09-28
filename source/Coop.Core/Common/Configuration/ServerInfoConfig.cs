@@ -1,5 +1,5 @@
 ﻿using Common.Logging;
-using GameInterface.Services.Chat.Messages;
+using GameInterface.Services.UI.Motd;
 using Serilog;
 using System;
 using System.Collections.Generic;
@@ -11,7 +11,7 @@ namespace Coop.Core.Common.Configuration;
 /// <summary>Operator-written details the server shares with joining players.</summary>
 public interface IServerInfoConfig
 {
-    /// <summary>Lines sent as System chat to each player after their campaign sync.</summary>
+    /// <summary>Paragraphs of the message of the day popup each player sees after their campaign sync.</summary>
     IReadOnlyList<string> Motd { get; }
 }
 
@@ -21,7 +21,6 @@ public interface IServerInfoConfig
 /// </summary>
 internal sealed class ServerInfoConfig : IServerInfoConfig
 {
-    internal const int MaxMotdLines = 5;
     private const string FileName = "server-info.json";
     private const string FileEnvironmentVariable = "COOP_SERVER_INFO_FILE";
 
@@ -67,7 +66,7 @@ internal sealed class ServerInfoConfig : IServerInfoConfig
 
             using JsonDocument document = JsonDocument.Parse(json);
             IReadOnlyList<string> motd = ReadMotd(document.RootElement, path);
-            Logger.Information("Server info loaded from {Path} (motd {Count} line(s))", path, motd.Count);
+            Logger.Information("Server info loaded from {Path} (motd {Count} paragraph(s))", path, motd.Count);
             return motd;
         }
         catch (Exception exception) when (
@@ -97,50 +96,73 @@ internal sealed class ServerInfoConfig : IServerInfoConfig
             return Array.Empty<string>();
         }
 
-        var lines = new List<string>();
+        var paragraphs = new List<string>();
+        int length = 0;
         int skipped = 0;
         bool trimmed = false;
         foreach (JsonElement entry in motd.EnumerateArray())
         {
-            if (entry.ValueKind != JsonValueKind.String)
+            if (!TryReadText(entry, out string text))
             {
                 skipped++;
                 continue;
             }
 
-            string line = RemoveControlCharacters(entry.GetString());
-            if (line.Length == 0) continue;
+            string paragraph = RemoveControlCharacters(text);
+            if (paragraph.Length == 0) continue;
 
-            if (lines.Count == MaxMotdLines)
+            int room = MotdLimits.MaxLength - length;
+            if (paragraphs.Count == MotdLimits.MaxParagraphs || room == 0)
             {
                 trimmed = true;
                 break;
             }
 
-            if (line.Length > ChatMessageLimits.MaxMessageLength)
+            if (paragraph.Length > room)
             {
-                line = Truncate(line);
+                // The rest of the file is dropped too, so no later paragraph gets a fragment.
+                paragraph = Truncate(paragraph, room);
+                if (paragraph.Length > 0) paragraphs.Add(paragraph);
                 trimmed = true;
+                break;
             }
 
-            lines.Add(line);
+            paragraphs.Add(paragraph);
+            length += paragraph.Length;
         }
 
         if (skipped > 0)
         {
-            Logger.Warning("Server info motd in {Path} has {Count} entry(s) that are not strings; skipping them", path, skipped);
+            Logger.Warning("Server info motd in {Path} has {Count} entry(s) that are not valid strings; skipping them", path, skipped);
         }
 
         if (trimmed)
         {
             Logger.Warning(
-                "Server info motd in {Path} was cut to {MaxLines} line(s) of at most {MaxLength} characters",
+                "Server info motd in {Path} was cut to {MaxParagraphs} paragraph(s) and {MaxLength} characters",
                 path,
-                MaxMotdLines,
-                ChatMessageLimits.MaxMessageLength);
+                MotdLimits.MaxParagraphs,
+                MotdLimits.MaxLength);
         }
 
-        return lines.ToArray();
+        return paragraphs.ToArray();
+    }
+
+    // A lone surrogate escape such as \ud83d cannot become a string, so that entry is skipped, not fatal.
+    private static bool TryReadText(JsonElement entry, out string text)
+    {
+        text = string.Empty;
+        if (entry.ValueKind != JsonValueKind.String) return false;
+
+        try
+        {
+            text = entry.GetString();
+            return true;
+        }
+        catch (InvalidOperationException)
+        {
+            return false;
+        }
     }
 
     private static string RemoveControlCharacters(string text)
@@ -154,12 +176,12 @@ internal sealed class ServerInfoConfig : IServerInfoConfig
         return new string(characters).Trim();
     }
 
-    private static string Truncate(string line)
+    private static string Truncate(string paragraph, int maxLength)
     {
-        int length = ChatMessageLimits.MaxMessageLength;
-        // Cut before a surrogate pair instead of sending half of it.
-        if (char.IsHighSurrogate(line[length - 1])) length--;
+        int length = maxLength;
+        // Cut before a surrogate pair instead of keeping half of it.
+        if (char.IsHighSurrogate(paragraph[length - 1])) length--;
 
-        return line.Substring(0, length).TrimEnd();
+        return paragraph.Substring(0, length).TrimEnd();
     }
 }
