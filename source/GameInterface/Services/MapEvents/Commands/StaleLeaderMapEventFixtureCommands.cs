@@ -9,6 +9,7 @@ using GameInterface.Services.MobileParties.Data;
 using GameInterface.Services.MobileParties.Extensions;
 using GameInterface.Services.MobileParties.Messages.Behavior;
 using GameInterface.Services.ObjectManager;
+using GameInterface.Services.Villages.Commands;
 using Serilog;
 using System;
 using System.Linq;
@@ -271,6 +272,9 @@ internal class StaleLeaderMapEventFixtureCommands
     {
         if (current.MapEvent != null && !current.MapEvent.IsFinalized)
             current.MapEvent.FinalizeEvent();
+        var involvedParties = new[] { current.Survivor.Party, current.Bandit?.Party };
+        if (MapEventDebugCommands.HasAttachedParties(current.MapEvent, involvedParties))
+            MapEventDebugCommands.RecoverPartiallyFinalizedMapEvent(current.MapEvent, involvedParties);
         if (current.Survivor.MapEvent != null)
             throw new InvalidOperationException("The AI party is still in a map event.");
         if (current.Bandit?.IsActive == true)
