@@ -10,12 +10,24 @@ using Coop.Core.Client.Messages;
 using Coop.Core.Common.Services.Connection.Messages;
 using Coop.Core.Server;
 using Coop.Core.Server.Connections;
+using Coop.Core.Server.Connections.Messages;
 using Coop.Core.Server.Services.Instances;
+using Coop.Core.Server.Services.Kingdoms;
+using Coop.Core.Server.Services.MobileParties;
+using Coop.Core.Server.Services.Save.Messages;
 using Coop.Core.Server.Services.Shutdown;
 using Coop.Core.Server.Services.Time;
+using GameInterface.CoopSessionData;
+using GameInterface.Services.CampaignService.Interfaces;
 using GameInterface.Services.Entity;
 using GameInterface.Services.GameDebug.Handlers;
 using GameInterface.Services.GameDebug.Messages;
+using GameInterface.Services.Heroes.Interfaces;
+using GameInterface.Services.Modules;
+using GameInterface.Services.Modules.Validators;
+using GameInterface.Services.ObjectManager;
+using GameInterface.Services.Players;
+using GameInterface.Services.Save.Messages;
 using LiteNetLib;
 using LiteNetLib.Utils;
 using Moq;
@@ -25,16 +37,18 @@ using System.Diagnostics;
 using System.Linq;
 using System.Net;
 using System.Threading;
+using System.Threading.Tasks;
 using Xunit;
 
 namespace Coop.Tests.Server.Services.Shutdown;
 
-/// <summary>Drives <see cref="CoopServer.OnConnectionRequest"/> and the client reject popup over loopback.</summary>
+/// <summary>Drives <see cref="CoopServer.OnConnectionRequest"/>, <see cref="CoopServer.OnPeerConnected"/> and the client reject popup over loopback.</summary>
 public class ServerAdmissionGateTests
 {
     private const string Password = "join-gate-test";
     private const string RestartingPopup = "The server is restarting. Try again in a few minutes.";
     private const string PasswordPopup = "The server password is incorrect.";
+    private const string SaveName = "MP";
 
     [Fact]
     public void Gate_StartsOpenAndTogglesBothWays()
@@ -106,6 +120,81 @@ public class ServerAdmissionGateTests
         Assert.Equal("The server rejected the connection.", Assert.Single(broker.GetMessagesFromType<SendPopupMessage>()).Text);
     }
 
+    [Fact]
+    public void TryAdmit_RegistersOnlyWhileTheGateIsOpen()
+    {
+        var gate = new ServerAdmissionGate();
+        int registered = 0;
+
+        Assert.True(gate.TryAdmit(() => registered++));
+        gate.Close();
+        Assert.False(gate.TryAdmit(() => registered++));
+        gate.Open();
+        Assert.True(gate.TryAdmit(() => registered++));
+
+        Assert.Equal(2, registered);
+    }
+
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public void PeerAcceptedWhileOpen_RegisteringAfterTheShutdownEnded_IsDisconnectedBeforeItJoins(bool saved)
+    {
+        using var race = new RegistrationRace();
+        race.ConnectAndHoldRegistration();
+
+        race.ScheduleShutdownNow();
+        Assert.Equal(ServerShutdownPhase.Saving, race.Coordinator.Phase);
+        if (saved) race.CompleteSave();
+        else race.ServerBroker.Publish(new object(), new GameSaveCompleted(SaveName, false));
+        var ended = saved ? ServerShutdownPhase.Completed : ServerShutdownPhase.Failed;
+        Assert.Equal(ended, race.Coordinator.Phase);
+
+        race.Register();
+        race.PumpUntil(() => race.ClientDisconnectReason != null);
+
+        Assert.Equal(ServerShutdownCoordinator.DisconnectReason, race.ClientDisconnectReason);
+        Assert.Equal(new[] { "save queued", "disconnected" }, race.ServerEvents);
+        Assert.Empty(race.Connections);
+        Assert.Equal(ended, race.Coordinator.Phase);
+    }
+
+    [Fact]
+    public async Task RegistrationOverlappingTheGateClosing_IsDrainedBeforeTheSave()
+    {
+        using var race = new RegistrationRace();
+        race.ConnectAndHoldRegistration();
+
+        using var registering = new ManualResetEventSlim();
+        using var release = new ManualResetEventSlim();
+        Action<MessagePayload<ConnectionStateChanged>> pause = _ =>
+        {
+            registering.Set();
+            release.Wait(TimeSpan.FromSeconds(5));
+        };
+        race.ServerBroker.Subscribe(pause);
+
+        // The connection logic enters its first state before it is added to the collection.
+        var registration = Task.Run(race.Register);
+        Assert.True(registering.Wait(TimeSpan.FromSeconds(5)));
+        var shutdown = Task.Run(race.ScheduleShutdownNow);
+
+        await Task.WhenAny(shutdown, Task.Delay(300));
+        Assert.False(shutdown.IsCompleted, "The shutdown got past the gate while a registration was still running.");
+        release.Set();
+        await Task.WhenAll(registration, shutdown).WaitAsync(TimeSpan.FromSeconds(5));
+
+        race.PumpUntil(() => race.ClientDisconnectReason != null && !race.Connections.Any());
+        // Starts the save if the server only saw the disconnect during the pump.
+        race.Coordinator.Tick();
+        race.CompleteSave();
+
+        Assert.Equal(ServerShutdownPhase.Completed, race.Coordinator.Phase);
+        Assert.Equal(ServerShutdownCoordinator.DisconnectReason, race.ClientDisconnectReason);
+        Assert.Equal(new[] { "registered", "disconnected", "save queued" }, race.ServerEvents);
+        GC.KeepAlive(pause);
+    }
+
     private static string ConnectAndReadPopup(bool gateOpen, string suppliedPassword)
     {
         using var broker = new TestMessageBroker();
@@ -126,23 +215,26 @@ public class ServerAdmissionGateTests
         if (!gateOpen) gate.Close();
 
         using var cancellation = new CancellationTokenSource();
-        using var server = new CoopServer(
-            CreateConfig(Password).Object,
-            new TestMessageBroker(),
-            Mock.Of<IPacketManager>(),
-            Mock.Of<IMessagePacketHandler>(),
-            Mock.Of<IConnectionMessageQueue>(),
-            gate,
-            Mock.Of<IControllerIdProvider>(),
-            Mock.Of<IMissionManager>(),
-            new Lazy<IOverloadedPeerManager>(() => Mock.Of<IOverloadedPeerManager>()),
-            Mock.Of<ISendCoalescer>(),
-            Mock.Of<ICommonSerializer>(),
-            Mock.Of<IReliableMessageBatcher<NetPeer>>(),
-            cancellation);
+        using var server = CreateServer(new TestMessageBroker(), gate, cancellation);
 
         RunLoopback(broker, server.OnConnectionRequest, suppliedPassword, complete, session);
     }
+
+    private static CoopServer CreateServer(TestMessageBroker broker, IServerAdmissionGate gate, CancellationTokenSource session) => new CoopServer(
+        CreateConfig(Password).Object,
+        broker,
+        Mock.Of<IPacketManager>(),
+        Mock.Of<IMessagePacketHandler>(),
+        Mock.Of<IConnectionMessageQueue>(),
+        gate,
+        new JoinPeerTerminator(),
+        Mock.Of<IControllerIdProvider>(),
+        Mock.Of<IMissionManager>(),
+        new Lazy<IOverloadedPeerManager>(() => Mock.Of<IOverloadedPeerManager>()),
+        Mock.Of<ISendCoalescer>(),
+        Mock.Of<ICommonSerializer>(),
+        Mock.Of<IReliableMessageBatcher<NetPeer>>(),
+        session);
 
     private static void RunLoopback(
         TestMessageBroker broker,
@@ -204,5 +296,133 @@ public class ServerAdmissionGateTests
         }
 
         Assert.True(complete(), "The bounded loopback connection did not finish.");
+    }
+
+    /// <summary>
+    /// A real server and client over loopback where the test decides when the accepted peer registers,
+    /// with a real <see cref="ConnectionCollection"/> and shutdown coordinator behind the server.
+    /// </summary>
+    private sealed class RegistrationRace : IDisposable
+    {
+        public readonly TestMessageBroker ServerBroker = new TestMessageBroker();
+        public readonly ConnectionCollection Connections;
+        public readonly ServerShutdownCoordinator Coordinator;
+        public readonly ConcurrentQueue<string> ServerEvents = new ConcurrentQueue<string>();
+
+        private readonly TestMessageBroker clientBroker = new TestMessageBroker();
+        private readonly CancellationTokenSource serverSession = new CancellationTokenSource();
+        private readonly CancellationTokenSource clientSession = new CancellationTokenSource();
+        private readonly CoopServer server;
+        private readonly CoopClient client;
+        private readonly NetManager serverTransport;
+        private readonly NetManager clientTransport;
+        private readonly Action<MessagePayload<PlayerConnected>> recordRegistration;
+        private NetPeer? acceptedPeer;
+
+        public RegistrationRace()
+        {
+            var gate = new ServerAdmissionGate();
+            server = CreateServer(ServerBroker, gate, serverSession);
+            Connections = new ConnectionCollection(ServerBroker, CreateConnectionContext(ServerBroker));
+            // Subscribed after the collection, so it runs once the peer is in it.
+            recordRegistration = _ => ServerEvents.Enqueue("registered");
+            ServerBroker.Subscribe(recordRegistration);
+
+            var saves = new Mock<ISaveInterface>();
+            saves.SetupGet(value => value.CanQueueSave).Returns(true);
+            saves.Setup(value => value.TryQueueSave(It.IsAny<string>()))
+                .Callback(() => ServerEvents.Enqueue("save queued"))
+                .Returns(true);
+            Coordinator = new ServerShutdownCoordinator(
+                ServerBroker,
+                Mock.Of<INetwork>(),
+                Connections,
+                new JoinPeerTerminator(),
+                gate,
+                saves.Object,
+                Mock.Of<IMissionManager>(),
+                () => DateTime.UtcNow,
+                _ => Mock.Of<IDisposable>(),
+                action => action());
+
+            // LiteNetLib reports the accepted peer here, and the test decides when the server registers it.
+            var serverListener = new EventBasedNetListener();
+            serverListener.ConnectionRequestEvent += server.OnConnectionRequest;
+            serverListener.PeerConnectedEvent += peer => acceptedPeer = peer;
+            serverListener.PeerDisconnectedEvent += (peer, info) =>
+            {
+                ServerEvents.Enqueue("disconnected");
+                server.OnPeerDisconnected(peer, info);
+            };
+            serverTransport = new NetManager(serverListener);
+
+            client = new CoopClient(CreateConfig(null).Object, clientBroker, Mock.Of<IPacketManager>(),
+                Mock.Of<IMessagePacketHandler>(), Mock.Of<ICommonSerializer>(),
+                Mock.Of<IReliableMessageBatcher<NetPeer>>(), clientSession);
+            clientTransport = new NetManager(client);
+        }
+
+        public string? ClientDisconnectReason =>
+            clientBroker.GetMessagesFromType<NetworkDisconnected>().SingleOrDefault()?.ServerReason;
+
+        /// <summary>Connects until the server has accepted the request, without registering the peer.</summary>
+        public void ConnectAndHoldRegistration()
+        {
+            Assert.True(serverTransport.StartInManualMode(0));
+            Assert.True(clientTransport.StartInManualMode(0));
+            clientTransport.Connect(IPAddress.Loopback.ToString(), serverTransport.LocalPort, Password);
+
+            PumpUntil(() => acceptedPeer != null && clientBroker.GetMessagesFromType<NetworkConnected>().Any());
+            Assert.Empty(ServerBroker.GetMessagesFromType<PlayerConnected>());
+        }
+
+        public void Register() => server.OnPeerConnected(acceptedPeer!);
+
+        public void ScheduleShutdownNow()
+        {
+            Assert.True(Coordinator.TrySchedule(0, SaveName, out string result), result);
+        }
+
+        public void CompleteSave()
+        {
+            ServerBroker.Publish(new object(), new CoopSessionWritten(SaveName, true));
+            ServerBroker.Publish(new object(), new GameSaveCompleted(SaveName, true));
+        }
+
+        public void PumpUntil(Func<bool> complete) =>
+            ServerAdmissionGateTests.PumpUntil(serverTransport, clientTransport, clientSession.Token, complete);
+
+        public void Dispose()
+        {
+            Coordinator.Dispose();
+            Connections.Dispose();
+            clientTransport.Stop();
+            serverTransport.Stop();
+            client.Dispose();
+            server.Dispose();
+            clientSession.Dispose();
+            serverSession.Dispose();
+        }
+
+        private static ConnectionContext CreateConnectionContext(TestMessageBroker broker) => new ConnectionContext(
+            broker,
+            Mock.Of<INetwork>(),
+            Mock.Of<IModuleValidator>(),
+            Mock.Of<IModuleInfoProvider>(),
+            Mock.Of<IPlayerManager>(),
+            Mock.Of<IPlayerPartyRestorer>(),
+            Mock.Of<IPlayerCreationRollback>(),
+            Mock.Of<IObjectManager>(),
+            Mock.Of<IHeroInterface>(),
+            Mock.Of<ICoopSessionProvider>(),
+            Mock.Of<ISaveInterface>(),
+            Mock.Of<IConnectionMessageQueue>(),
+            Mock.Of<ISendCoalescer>(),
+            Mock.Of<IAttachmentIdMapper>(),
+            Mock.Of<IExistingPlayerSender>(),
+            Mock.Of<ISteamBanList>(),
+            Mock.Of<IServerOptionsProvider>(),
+            Mock.Of<IJoinCampaignBaselineSender>(),
+            Mock.Of<IJoinCampaignKingdomBaseLineSender>());
     }
 }

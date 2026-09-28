@@ -45,6 +45,7 @@ public class CoopServer : CoopNetworkBase, ICoopServer
     private readonly IMessagePacketHandler messagePacketHandler;
     private readonly IConnectionMessageQueue connectionMessageQueue;
     private readonly IServerAdmissionGate admissionGate;
+    private readonly IJoinPeerTerminator peerTerminator;
     // Buffers per-change sends and merges them into one send per key. Drained each tick in Update.
     private readonly ISendCoalescer coalescer;
     // Lazy breaks the construction cycle: the manager depends on ITimeControlInterface, which depends
@@ -62,6 +63,7 @@ public class CoopServer : CoopNetworkBase, ICoopServer
         IMessagePacketHandler messagePacketHandler,
         IConnectionMessageQueue connectionMessageQueue,
         IServerAdmissionGate admissionGate,
+        IJoinPeerTerminator peerTerminator,
         IControllerIdProvider controllerIdProvider,
         IMissionManager missionManager,
         Lazy<IOverloadedPeerManager> overloadedPeerManager,
@@ -77,6 +79,7 @@ public class CoopServer : CoopNetworkBase, ICoopServer
         this.messagePacketHandler = messagePacketHandler;
         this.connectionMessageQueue = connectionMessageQueue;
         this.admissionGate = admissionGate;
+        this.peerTerminator = peerTerminator;
         this.missionManager = missionManager;
         this.overloadedPeerManager = overloadedPeerManager;
         this.coalescer = coalescer;
@@ -173,8 +176,11 @@ public class CoopServer : CoopNetworkBase, ICoopServer
 
     public override void OnPeerConnected(NetPeer peer)
     {
-        PlayerConnected message = new PlayerConnected(peer);
-        messageBroker.Publish(this, message);
+        // Registered under the gate, so a shutdown closing it either drains this peer or it never joins.
+        if (admissionGate.TryAdmit(() => messageBroker.Publish(this, new PlayerConnected(peer)))) return;
+
+        Logger.Information("Client {Peer} disconnected before joining: the server is restarting", peer.Id);
+        peerTerminator.Disconnect(peer, ServerShutdownCoordinator.DisconnectReason);
     }
 
     public override void OnPeerDisconnected(NetPeer peer, DisconnectInfo disconnectInfo)

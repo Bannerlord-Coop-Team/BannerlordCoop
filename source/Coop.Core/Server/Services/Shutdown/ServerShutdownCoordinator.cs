@@ -348,7 +348,7 @@ public class ServerShutdownCoordinator : IServerShutdownCoordinator
         BeginSave(now);
     }
 
-    // A join accepted just before the gate closed only shows up as a connection a poll later.
+    // Backstop only: CoopServer refuses to register a peer once joins are closed.
     private void DisconnectLateConnections()
     {
         int disconnected = DisconnectRemainingPeers();
