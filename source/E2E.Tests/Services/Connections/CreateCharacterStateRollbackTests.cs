@@ -51,6 +51,29 @@ public class CreateCharacterStateRollbackTests
     }
 
     [Fact]
+    public void HandleCaptureFailure_WhoseRollbackTimesOutWhileItRuns_RollsBackOnceThenDisconnects()
+    {
+        using var fixture = new Fixture(handleCaptureFails: true);
+        using var shortTimeout = GameThread.Instance.LimitFrameDrain(TimeSpan.FromSeconds(1), TimeSpan.FromSeconds(1));
+        Transfer? transfer = null;
+        bool pollerReturnedDuringRollback = false;
+        fixture.DuringRollback = () => pollerReturnedDuringRollback = transfer!.TryJoin(LongTimeout);
+        transfer = fixture.TransferHeroOnWorker();
+        fixture.WaitUntilQueued();
+
+        // The rollback starts and holds the game thread until the poller gave up on both waits.
+        fixture.Pump();
+        fixture.Pump();
+
+        Assert.True(pollerReturnedDuringRollback, "the poller did not time out while the rollback ran");
+        Assert.Null(transfer.Join());
+        fixture.Rollback.Verify(value => value.Rollback(It.IsAny<Player>(), RegistrationIds), Times.Once);
+        Assert.Equal(ConnectionState.ShutdownRequested, fixture.Peer.ConnectionState);
+        Assert.Empty(fixture.SentToOthers);
+        Assert.Equal(0, fixture.Queue.Count);
+    }
+
+    [Fact]
     public void SetupFailure_WhoseRollbackTimesOutBeforeItStarts_RollsBackOnceThenTellsTheOthersAndDisconnects()
     {
         using var fixture = new Fixture(handleCaptureFails: false);
