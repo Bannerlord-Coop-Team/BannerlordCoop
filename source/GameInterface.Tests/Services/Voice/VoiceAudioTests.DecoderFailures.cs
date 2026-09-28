@@ -83,7 +83,7 @@ public partial class VoiceAudioTests
         Assert.Equal(1, Volatile.Read(ref failures));
         Assert.Equal(2, h.DecoderCount);
         Assert.Equal("Ready", h.Audio.Status);
-        Assert.Equal(0, Volatile.Read(ref h.InputDisposals));
+        Assert.Equal(0, Volatile.Read(ref h.InputStopRequests));
         Assert.Equal(1, Volatile.Read(ref h.Clears));
         h.Device.Verify(x => x.Dispose(), Times.Never);
         h.Output.Verify(x => x.Open(It.IsAny<Action<Exception>>()), Times.Once);
