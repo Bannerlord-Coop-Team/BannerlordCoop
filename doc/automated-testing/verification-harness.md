@@ -9,7 +9,6 @@ host scripts consume its schema-versioned JSON plan instead of maintaining anoth
 | `unit` | ordinary test process | pure logic, codecs, and state machines |
 | `deterministic-peer` | isolated peer graphs in one process | wire copies, authority, ordering, registry use, and game-thread application |
 | `process-peer` | one server and two client processes | real UDP, Common serialization, reconnect, and process cleanup |
-| `dedicated-server-synthetic` | standalone server and two lightweight peers | boot, password, pre-save join protocol, connection generations, and server cleanup |
 | `rendered-smoke` | standalone server and two rendered clients | native client boot and a narrow functional or visual witness |
 | `full-live` | complete live campaign | UI, mission, Steam, save/load, and cross-client acceptance |
 
@@ -17,6 +16,10 @@ Profiles are cumulative and blocking. Selecting `process-peer`, for example, als
 and `deterministic-peer`. Unknown paths, invalid paths, and unavailable required executors fail
 closed; they never lower the selected tier. Native, UI, scene, mission, input, Steam, save/load,
 runtime-patching, and otherwise unclassified production boundaries remain `full-live`.
+
+Connection, password, module-validation, and reconnect changes use the existing live runner
+to exercise the affected behavior with real clients. Unrelated gameplay changes do not add
+a separate connection test.
 
 ## Plan and validate
 
