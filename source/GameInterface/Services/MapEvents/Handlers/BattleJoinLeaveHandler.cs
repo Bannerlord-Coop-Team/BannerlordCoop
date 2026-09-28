@@ -374,13 +374,14 @@ internal class BattleJoinLeaveHandler : IHandler
     }
 
     // Single-party removal does not auto-replicate (RemovePartyInternal uses RemoveAt, bypassing the
-    // collection sync), so remove authoritatively and broadcast the removal explicitly.
+    // collection sync), so remove authoritatively and broadcast the removal explicitly. A client that broke
+    // its siege camp waits for that broadcast to finish its menus, so an expired leave is queued again.
     private void RemovePartyFromBattleAndBroadcast(
         string partyId,
         bool finishLocalMenus = true,
         NetPeer requestingPeer = null)
     {
-        GameThread.RunSafe(
+        GameThread.RunCleanupSafe(
             () =>
             {
                 if (!objectManager.TryGetObjectWithLogging<PartyBase>(partyId, out var party)) return;
@@ -406,7 +407,6 @@ internal class BattleJoinLeaveHandler : IHandler
                         new BattleJoinCancelled(mapEventId, controllerId));
                 }
             },
-            blocking: true,
             context: nameof(RemovePartyFromBattleAndBroadcast));
     }
 

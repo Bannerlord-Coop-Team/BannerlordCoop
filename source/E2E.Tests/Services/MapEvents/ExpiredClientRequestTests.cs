@@ -4,6 +4,7 @@ using E2E.Tests.Environment;
 using E2E.Tests.Environment.Instance;
 using GameInterface.Services.MapEvents.Messages.Leave;
 using GameInterface.Services.MapEvents.Messages.Start;
+using GameInterface.Services.MobileParties.Messages.Behavior;
 using HarmonyLib;
 using LiteNetLib;
 using System.Reflection;
@@ -124,6 +125,48 @@ public class ExpiredClientRequestTests : MapEventTestBase
         Assert.True(reply.Accepted);
     }
 
+    [Fact]
+    public void ClientLeave_ExpiredOnTheServer_LeavesOnceOnTheNextPump()
+    {
+        var partyBaseId = JoinPartyToNewBattle();
+        var client = Clients.First();
+        var request = new NetworkRequestLeaveBattle(partyBaseId);
+
+        // A client that broke its siege camp waits for this leave to finish its menus.
+        Server.NetworkSentMessages.Clear();
+        Server.Call(() =>
+        {
+            using (GameThread.Instance.LimitFrameDrain(TimeSpan.FromSeconds(1), TimeSpan.FromMilliseconds(200)))
+                new PollerReceive<NetworkRequestLeaveBattle>(Server, client.NetPeer, request).AssertReturned();
+
+            Assert.True(Server.ObjectManager.TryGetObject<PartyBase>(partyBaseId, out var party));
+            Assert.NotNull(party.MapEvent);
+            Assert.Empty(Server.NetworkSentMessages.GetMessages<NetworkPartyLeftBattle>());
+            RunQueuedActions(Server);
+        }, LeaveDisabledMethods());
+
+        AssertLeftOnce(partyBaseId);
+    }
+
+    [Fact]
+    public void ClientLeave_TimingOutWhileItRuns_LeavesOnce()
+    {
+        var partyBaseId = JoinPartyToNewBattle();
+        var client = Clients.First();
+        var request = new NetworkRequestLeaveBattle(partyBaseId);
+
+        Server.NetworkSentMessages.Clear();
+        Server.Call(() =>
+        {
+            using (GameThread.Instance.LimitFrameDrain(TimeSpan.FromSeconds(1), TimeSpan.FromSeconds(2)))
+                RunHeldUntilThePollerGivesUp<NetworkRequestLeaveBattle, PartyBehaviorChangeAttempted>(client, request).AssertReturned();
+
+            RunQueuedActions(Server);
+        }, LeaveDisabledMethods());
+
+        AssertLeftOnce(partyBaseId);
+    }
+
     /// <summary>Joins the client's party to the attacker side and returns the request it sent, undelivered.</summary>
     private NetworkRequestJoinBattle RequestJoin(EnvironmentInstance client, string mapEventId, string partyId)
     {
@@ -143,6 +186,39 @@ public class ExpiredClientRequestTests : MapEventTestBase
         .Append(AccessTools.Method(typeof(TestNetworkRouter), nameof(TestNetworkRouter.SendReliablePayload),
             new[] { typeof(NetPeer), typeof(NetPeer), typeof(byte[]) }))
         .ToList();
+
+    /// <summary>Joins a new party to the attacker side of a new battle and returns its <see cref="PartyBase"/> id.</summary>
+    private string JoinPartyToNewBattle()
+    {
+        var mapEventPartyId = JoinPartyToSide(CreateServerMapEventSide());
+        string? partyBaseId = null;
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject<MapEventParty>(mapEventPartyId, out var mapEventParty));
+            Assert.True(Server.ObjectManager.TryGetId(mapEventParty.Party, out partyBaseId));
+        }, MapEventDisabledMethods);
+
+        Assert.NotNull(partyBaseId);
+        return partyBaseId!;
+    }
+
+    // The campaign-map locatable scan is unavailable headlessly.
+    private IReadOnlyList<MethodBase> LeaveDisabledMethods() => MapEventDisabledMethods
+        .Append(AccessTools.Method(typeof(MapEvent), "ResetUnsuitablePartiesThatWereTargetingThisMapEvent"))
+        .ToList();
+
+    private void AssertLeftOnce(string partyBaseId)
+    {
+        Assert.Equal(partyBaseId, Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkPartyLeftBattle>()).PartyId);
+        foreach (var instance in Clients.Prepend(Server))
+        {
+            instance.Call(() =>
+            {
+                Assert.True(instance.ObjectManager.TryGetObject<PartyBase>(partyBaseId, out var party));
+                Assert.Null(party.MapEvent);
+            });
+        }
+    }
 
     /// <summary>
     /// Receives <paramref name="request"/> on a poller and runs its queued action, holding the game thread inside it
