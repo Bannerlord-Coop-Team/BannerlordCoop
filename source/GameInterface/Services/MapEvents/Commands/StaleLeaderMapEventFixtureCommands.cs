@@ -182,6 +182,7 @@ internal class StaleLeaderMapEventFixtureCommands
 
                 if (fixture.Bandit.IsActive)
                     DestroyPartyAction.Apply(null, fixture.Bandit);
+                fixture.Survivor.SetNavigationModePoint(fixture.Settlement.GatePosition);
                 fixture.Survivor.SetMoveGoToSettlement(
                     fixture.Settlement, MobileParty.NavigationType.Default, isTargetingThePort: false);
                 MessageBroker.Instance.Publish(typeof(StaleLeaderMapEventFixtureCommands),
