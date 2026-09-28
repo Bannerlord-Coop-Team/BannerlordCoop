@@ -867,6 +867,42 @@ public class GenericQuestTypeAcceptSecurityTests : IDisposable
         });
     }
 
+    [Fact]
+    public void QuestScreenDoneAndClose_PreservesIssueRosterReadByDialogueCondition()
+    {
+        var fixture = SetupVillageOwner();
+        CreateIssueOnBothPeers(fixture);
+        var partyId = TestEnvironment.CreateRegisteredObject<MobileParty>();
+        var troopId = TestEnvironment.CreateRegisteredObject<CharacterObject>();
+
+        Client.Call(() =>
+        {
+            Assert.True(Client.ObjectManager.TryGetObject<Hero>(fixture.HeroId, out var owner));
+            Assert.True(Client.ObjectManager.TryGetObject<MobileParty>(partyId, out var party));
+            Assert.True(Client.ObjectManager.TryGetObject<CharacterObject>(troopId, out var troop));
+            var roster = owner.Issue.AlternativeSolutionSentTroops;
+            using (new AllowedThread())
+            {
+                Campaign.Current.MainParty = party;
+                party.MemberRoster.AddToCounts(troop, 6);
+            }
+
+            var screen = CreateQuestSelectionScreen(roster, party);
+            screen.RightOwnerParty = party.Party;
+            screen.PartyPresentationDoneButtonDelegate = (_, _, _, _, _, _, _, _, _) => true;
+            using (new AllowedThread())
+            {
+                party.MemberRoster.AddToCounts(troop, -6);
+                roster.AddToCounts(troop, 6);
+            }
+
+            Assert.True(screen.DoneLogic(false));
+            screen.OnPartyScreenClosed(false);
+            Assert.Equal(6, roster.GetTroopCount(troop));
+            Assert.Equal(6, screen.MemberRosters[(int)PartyScreenLogic.PartyRosterSide.Left].GetTroopCount(troop));
+        });
+    }
+
     [Theory]
     [InlineData(false)]
     [InlineData(true)]

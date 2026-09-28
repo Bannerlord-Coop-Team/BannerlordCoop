@@ -271,6 +271,12 @@ internal class PartyScreenLogicPatches
                         __instance,
                         duplicateLeftMemberRoster,
                         duplicateLeftPrisonerRoster);
+                    if (questSelectionRoster != null)
+                    {
+                        // The resumed dialogue checks the issue roster after the screen closes.
+                        questSelectionRoster.Clear();
+                        questSelectionRoster.Add(questSelectionSnapshot);
+                    }
                 }
                 finally
                 {
