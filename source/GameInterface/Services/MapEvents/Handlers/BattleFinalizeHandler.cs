@@ -296,12 +296,16 @@ internal class BattleFinalizeHandler : IHandler
     /// </summary>
     private string[] FinalizeAndCollectPlayers(MapEvent mapEvent, string[] knownPlayerPartyIds = null)
     {
-        if (!TryMarkFinalized(mapEvent))
-            return MapEventPlayerPartyCollector.Combine(knownPlayerPartyIds);
-
         string[] playerPartyIds = null;
         GameThread.RunSafe(() =>
         {
+            // Marked in the action, otherwise an expired call would keep the mark and refuse every later finalize.
+            if (!TryMarkFinalized(mapEvent))
+            {
+                playerPartyIds = MapEventPlayerPartyCollector.Combine(knownPlayerPartyIds);
+                return;
+            }
+
             try
             {
                 playerPartyIds = FinalizeOnGameThread(mapEvent, knownPlayerPartyIds);
