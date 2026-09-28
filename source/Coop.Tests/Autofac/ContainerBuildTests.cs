@@ -10,6 +10,7 @@ using Coop.Core.Server;
 using Coop.Core.Server.Services.Telemetry;
 using Coop.Tests.Mocks;
 using GameInterface;
+using GameInterface.Services.Missions;
 using GameInterface.Services.Voice;
 using Missions;
 using System.Collections.Generic;
@@ -51,10 +52,15 @@ namespace Coop.Tests.Autofac
                 .Where(command => command.GetType().Assembly == typeof(MissionModule).Assembly)
                 .ToArray();
 #if DEBUG
+            Assert.False(container.IsRegistered<IMissionMembershipRegistry>());
+            ICoopCommandRegistry catalog = container.Resolve<ICoopCommandRegistry>();
+            Assert.True(catalog.Contains("coop.debug.battle.hit_sound_fixture_route"));
+            Assert.True(catalog.Contains("coop.debug.battle.hit_sound_fixture_state"));
+            Assert.True(catalog.Contains("coop.debug.battle.hit_sound_trace"));
             Assert.Same(container.Resolve<IVoiceClient>(), container.Resolve<IVoiceSyntheticTest>());
             Assert.Equal(CoopCommandSide.Client, Assert.Single(registeredCommands,
                 command => $"{command.Prefix}.{command.Name}" == "coop.debug.voice.synthetic").Side);
-            Assert.Equal(31, missionCommands.Length);
+            Assert.Equal(41, missionCommands.Length);
             Assert.Contains(missionCommands, command => command.Name == "peer_state");
             Assert.Contains(missionCommands, command => command.Name == "controller_agents");
             Assert.Contains(missionCommands, command => command.Name == "drive_owned_agents");
@@ -96,7 +102,7 @@ namespace Coop.Tests.Autofac
             ICoopCommand[] registeredCommands = container.Resolve<IEnumerable<ICoopCommand>>().ToArray();
             Assert.DoesNotContain(registeredCommands, command => $"{command.Prefix}.{command.Name}" == "coop.debug.voice.synthetic");
             Assert.Equal(
-                new[] { "join_state", "restore_inactive_party", "stage_inactive_party" },
+                new[] { "join_state", "player_party_readiness", "restore_inactive_party", "stage_inactive_party" },
                 registeredCommands
                     .Where(command => command.Prefix == "coop.debug.connection")
                     .Select(command => command.Name)
