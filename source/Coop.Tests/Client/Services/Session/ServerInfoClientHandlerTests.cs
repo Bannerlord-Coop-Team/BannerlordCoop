@@ -9,34 +9,35 @@ using Xunit;
 
 namespace Coop.Tests.Client.Services.Session;
 
-/// <summary>Tests that the client hands the server's MOTD to the popup service on the game thread.</summary>
+/// <summary>Tests that the client hands the server's info to the panel service on the game thread.</summary>
 public sealed class ServerInfoClientHandlerTests : IDisposable
 {
     private readonly StubMessageBroker broker = new();
     private readonly Mock<IServerInfoService> service = new();
 
     [Fact]
-    public void CampaignReady_CreatesThePopup()
+    public void CampaignReady_CreatesThePanel()
     {
         using var handler = new ServerInfoClientHandler(broker, service.Object);
 
         broker.Publish(this, new ClientCampaignReady());
         DrainGameThread();
 
-        service.Verify(motd => motd.Initialize(), Times.Once);
+        service.Verify(serverInfo => serverInfo.Initialize(), Times.Once);
     }
 
     [Fact]
-    public void Motd_IsHandedToTheServiceAsSent()
+    public void ServerInfo_IsHandedToTheServiceAsSent()
     {
-        var paragraphs = new[] { "Welcome to EU-1", "{PLAYER} <b>Restart 06:00 UTC</b>" };
+        var info = new NetworkServerInfo(new[] { "Welcome to EU-1", "{PLAYER} <b>Restart 06:00 UTC</b>" }, new[] { "No griefing" },
+            new[] { new ServerInfoLink { Label = "Discord", Url = "https://discord.gg/example" } }, null);
         using var handler = new ServerInfoClientHandler(broker, service.Object);
 
-        broker.Publish(this, new NetworkServerInfo(paragraphs, null, null, null));
+        broker.Publish(this, info);
         DrainGameThread();
 
-        service.Verify(motd => motd.Show(paragraphs), Times.Once);
-        service.Verify(motd => motd.Initialize(), Times.Never);
+        service.Verify(serverInfo => serverInfo.Show(info), Times.Once);
+        service.Verify(serverInfo => serverInfo.Initialize(), Times.Never);
     }
 
     [Fact]

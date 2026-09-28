@@ -10,7 +10,7 @@ using TaleWorlds.ScreenSystem;
 
 namespace GameInterface.Services.UI.ServerInfo;
 
-/// <summary>The popup's screen side, kept apart so the show-once rules run without Gauntlet.</summary>
+/// <summary>The panel's screen side, kept apart so the show-once rules run without Gauntlet.</summary>
 internal interface IServerInfoPopup : IDisposable
 {
     bool CanOpen();
@@ -18,7 +18,7 @@ internal interface IServerInfoPopup : IDisposable
     void Close();
 }
 
-/// <summary>Shows the message of the day over the campaign map without pausing the shared world.</summary>
+/// <summary>Shows the server info panel over the campaign map without pausing the shared world.</summary>
 internal sealed class ServerInfoOverlay : GlobalLayer, IServerInfoPopup
 {
     private readonly ServerInfoVM viewModel;
@@ -27,7 +27,7 @@ internal sealed class ServerInfoOverlay : GlobalLayer, IServerInfoPopup
     private GauntletLayer layer;
     private GauntletMovieIdentifier movie;
 
-    // Receives the popup state, the chat focus guard and the service's per-frame check.
+    // Receives the panel state, the chat focus guard and the service's per-frame check.
     public ServerInfoOverlay(ServerInfoVM viewModel, IChatService chat, Action update)
     {
         this.viewModel = viewModel;
@@ -35,7 +35,7 @@ internal sealed class ServerInfoOverlay : GlobalLayer, IServerInfoPopup
         this.update = update;
     }
 
-    // Sits just above the player list (115) and stays unfocused until a message opens.
+    // Sits just above the player list (115) and stays unfocused until the panel opens.
     public void Initialize()
     {
         layer = new GauntletLayer("CoopServerInfo", 116);
@@ -45,7 +45,7 @@ internal sealed class ServerInfoOverlay : GlobalLayer, IServerInfoPopup
         ScreenManager.AddGlobalLayer(this, false);
     }
 
-    // Closes on the same conditions as the player list; while closed the service may open a pending message.
+    // Closes on the same conditions as the player list; while closed the service may open pending info.
     protected override void OnTick(float dt)
     {
         base.OnTick(dt);
@@ -55,7 +55,7 @@ internal sealed class ServerInfoOverlay : GlobalLayer, IServerInfoPopup
             return;
         }
         if (!PlayerListOverlay.IsMapAvailable() || !ReferenceEquals(ScreenManager.FocusedLayer, layer)) Close();
-        else if (Input.IsKeyReleased(InputKey.Escape)) Close();
+        else if (Input.IsKeyReleased(InputKey.Escape)) viewModel.HandleEscape();
     }
 
     // Uses the player list's toggle rules, so it waits while the list, chat typing or another modal has focus.

@@ -1,14 +1,15 @@
 ﻿using GameInterface.Services.Chat;
 using System;
 using System.Linq;
+using System.Text;
 
 namespace GameInterface.Services.UI.ServerInfo;
 
-/// <summary>Owns the client's message of the day popup for one co-op session.</summary>
+/// <summary>Owns the client's server info panel for one co-op session.</summary>
 public interface IServerInfoService : IGameAbstraction
 {
     void Initialize();
-    void Show(string[] paragraphs);
+    void Show(NetworkServerInfo info);
     string Describe();
 }
 
@@ -18,65 +19,79 @@ public sealed class ServerInfoService : IServerInfoService, IDisposable
     private readonly Func<ServerInfoVM, Action, IServerInfoPopup> createPopup;
     private readonly ServerInfoVM viewModel;
     private IServerInfoPopup popup;
-    private string[] pending;
+    private bool pending;
 
     // Builds the Gauntlet overlay only when Initialize runs on a client with a campaign.
-    public ServerInfoService(IChatService chat) : this((viewModel, update) =>
+    public ServerInfoService(IChatService chat, IServerInfoLinkRules linkRules, IBrowserLinkOpener opener) : this((viewModel, update) =>
     {
         var overlay = new ServerInfoOverlay(viewModel, chat, update);
         overlay.Initialize();
         return overlay;
-    })
+    }, linkRules, opener)
     {
     }
 
-    internal ServerInfoService(Func<ServerInfoVM, Action, IServerInfoPopup> createPopup)
+    internal ServerInfoService(Func<ServerInfoVM, Action, IServerInfoPopup> createPopup, IServerInfoLinkRules linkRules, IBrowserLinkOpener opener)
     {
         this.createPopup = createPopup;
-        viewModel = new ServerInfoVM(() => popup?.Close());
+        viewModel = new ServerInfoVM(() => popup?.Close(), linkRules, opener);
     }
 
-    // Creates the map overlay once; a message that arrived earlier waits for it.
+    // Creates the map overlay once; info that arrived earlier waits for it.
     public void Initialize()
     {
         if (popup != null) return;
         popup = createPopup(viewModel, Update);
     }
 
-    // Keeps the newest message for this join; missing or blank text shows nothing.
-    public void Show(string[] paragraphs)
+    // Keeps the newest info for this join; info with nothing to show opens nothing.
+    public void Show(NetworkServerInfo info)
     {
-        var text = paragraphs?.Where(paragraph => !string.IsNullOrWhiteSpace(paragraph)).ToArray() ?? Array.Empty<string>();
-        if (text.Length == 0) return;
-        if (viewModel.IsOpen)
+        if (!viewModel.SetContent(info))
         {
-            viewModel.SetParagraphs(text);
+            pending = false;
+            popup?.Close();
             return;
         }
-        pending = text;
+
+        // Info that arrives while the panel is open replaces it in place instead of opening it twice.
+        pending = !viewModel.IsOpen;
     }
 
-    // Runs each frame while closed: opens a pending message once, when the map is free.
+    // Runs each frame while closed: opens pending info once, on its first tab, when the map is free.
     internal void Update()
     {
-        if (pending == null || popup == null || viewModel.IsOpen || !popup.CanOpen()) return;
-        viewModel.SetParagraphs(pending);
-        pending = null;
+        if (!pending || popup == null || viewModel.IsOpen || !popup.CanOpen()) return;
+        pending = false;
+        viewModel.SelectFirstTab();
         popup.Open();
     }
 
-    // Exposes read-only popup state for manual verification on the receiving client.
-    public string Describe() => $"Open: {viewModel.IsOpen}\n" +
-        $"Pending: {(pending == null ? "none" : $"{pending.Length} paragraph(s)")}\n" +
-        $"Shown: {viewModel.Paragraphs.Count} paragraph(s)" +
-        string.Concat(viewModel.Paragraphs.Select((paragraph, index) => $"\n{index + 1}: {paragraph.Text}"));
+    // Exposes read-only panel state for manual verification on the receiving client.
+    public string Describe()
+    {
+        var tabs = viewModel.VisibleTabs.ToArray();
+        var text = new StringBuilder()
+            .Append("Open: ").Append(viewModel.IsOpen)
+            .Append("\nPending: ").Append(pending)
+            .Append("\nTab: ").Append(tabs.Length == 0 ? "none" : viewModel.SelectedTab.ToString())
+            .Append("\nTabs: ").Append(tabs.Length == 0 ? "none" : string.Join(", ", tabs))
+            .Append("\nCounts: motd ").Append(viewModel.Paragraphs.Count)
+            .Append(", rules ").Append(viewModel.Rules.Count)
+            .Append(", links ").Append(viewModel.Links.Count)
+            .Append(", news ").Append(viewModel.News.Count)
+            .Append("\nLink dialog: ").Append(viewModel.IsLinkDialogOpen ? "open " + viewModel.LinkDialogAddress : "closed");
+        for (int i = 0; i < viewModel.Links.Count; i++)
+            text.Append("\nLink ").Append(i + 1).Append(": ").Append(viewModel.Links[i].Label).Append(" | ").Append(viewModel.Links[i].Address);
+        return text.ToString();
+    }
 
     // Removes the global layer when the co-op session ends.
     public void Dispose()
     {
         popup?.Dispose();
         popup = null;
-        pending = null;
+        pending = false;
         viewModel.OnFinalize();
     }
 }

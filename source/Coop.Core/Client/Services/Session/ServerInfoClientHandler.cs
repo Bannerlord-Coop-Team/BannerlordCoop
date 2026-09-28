@@ -5,7 +5,7 @@ using GameInterface.Services.UI.ServerInfo;
 
 namespace Coop.Core.Client.Services.Session;
 
-/// <summary>Creates the message of the day popup with the campaign and hands it the server's text.</summary>
+/// <summary>Creates the server info panel with the campaign and hands it the server's info.</summary>
 internal sealed class ServerInfoClientHandler : IHandler
 {
     private readonly IMessageBroker broker;
@@ -27,11 +27,11 @@ internal sealed class ServerInfoClientHandler : IHandler
         service.Initialize();
     }, context: nameof(ServerInfoClientHandler));
 
-    // Keeps Gauntlet changes on the game thread; the service holds the text until the map is free.
+    // Keeps Gauntlet changes on the game thread; the service holds the info until the map is free.
     private void Receive(MessagePayload<NetworkServerInfo> payload) => GameThread.RunSafe(() =>
     {
         if (disposed) return;
-        service.Show(payload.What.Motd);
+        service.Show(payload.What);
     }, context: nameof(ServerInfoClientHandler));
 
     // Prevents queued messages from reopening a disposed session's UI.

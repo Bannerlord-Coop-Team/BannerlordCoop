@@ -46,7 +46,7 @@ internal class ServerInfoDebugCommands
         {
             if (!ContainerProvider.TryResolve<IServerInfoService>(out var service))
                 return new CoopCommandResult(false, "Message of the day unavailable.", "unavailable");
-            service.Show(Paragraphs(args));
+            service.Show(new NetworkServerInfo(Paragraphs(args), null, null, null));
             return new CoopCommandResult(true, service.Describe());
         }
 
