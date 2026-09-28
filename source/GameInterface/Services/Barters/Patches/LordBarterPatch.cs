@@ -42,7 +42,7 @@ internal static class LordBarterPatch
 
     [HarmonyPatch(nameof(BarterManager.BeginPlayerBarter))]
     [HarmonyPostfix]
-    private static void BeginPlayerBarterPostfix(BarterData args)
+    internal static void BeginPlayerBarterPostfix(BarterData args)
     {
         if (ModInformation.IsServer || CallOriginalPolicy.IsOriginalAllowed() || args == null) return;
         if (requestPending)
@@ -72,7 +72,7 @@ internal static class LordBarterPatch
 
     [HarmonyPatch(nameof(BarterManager.ApplyAndFinalizePlayerBarter))]
     [HarmonyPrefix]
-    private static bool ApplyAndFinalizePlayerBarterPrefix(Hero offererHero, BarterData barterData)
+    internal static bool ApplyAndFinalizePlayerBarterPrefix(Hero offererHero, BarterData barterData)
     {
         if (ModInformation.IsServer || CallOriginalPolicy.IsOriginalAllowed() ||
             offererHero == null || !offererHero.IsControlledByThisInstance() || !TryGetKind(barterData, out _))
@@ -89,10 +89,15 @@ internal static class LordBarterPatch
             return false;
         }
 
-        if (!TryCreateTerms(barterData.GetOfferedBarterables(), objectManager, out var terms, out var termFailure))
+        if (!TryCreateTerms(barterData.GetOfferedBarterables(), objectManager, out var terms, out var failedTerm))
         {
-            Logger.Warning("Lord barter with {TargetHero} has a term that cannot be sent: {Reason}", barterData.OtherHero?.StringId, termFailure);
-            ShowMessage($"{UnsendableMessage} {termFailure}");
+            Logger.Warning(
+                "Lord barter with {TargetHero} has a term that cannot be sent: {TermType} amount={Amount} owner={Owner}",
+                barterData.OtherHero?.StringId,
+                failedTerm?.GetType().Name,
+                failedTerm?.CurrentAmount,
+                failedTerm?.OriginalOwner?.StringId);
+            ShowMessage($"{UnsendableMessage} {DescribeTermFailure(failedTerm)}");
             return false;
         }
 
@@ -314,7 +319,7 @@ internal static class LordBarterPatch
 
         if (!objectManager.TryGetId(barterData.OtherHero, out var targetHeroId))
         {
-            failure = "The lord is not registered with the server.";
+            failure = "This lord could not be identified.";
             return false;
         }
 
@@ -351,7 +356,8 @@ internal static class LordBarterPatch
                 !objectManager.TryGetId(joinKingdom.TargetKingdom, out targetKingdomId))
             {
                 ClearPendingRequest();
-                failure = $"The kingdom {joinKingdom?.TargetKingdom?.StringId} is not registered with the server.";
+                failure = "The kingdom this lord would join could not be identified.";
+                Logger.Warning("Lord barter target kingdom {Kingdom} has no network id", joinKingdom?.TargetKingdom?.StringId);
                 return false;
             }
         }
@@ -438,10 +444,10 @@ internal static class LordBarterPatch
         return false;
     }
 
-    private static bool TryCreateTerms(IEnumerable<Barterable> barterables, IObjectManager manager, out List<PeaceBarterTerm> terms, out string failure)
+    private static bool TryCreateTerms(IEnumerable<Barterable> barterables, IObjectManager manager, out List<PeaceBarterTerm> terms, out Barterable failedTerm)
     {
         terms = new List<PeaceBarterTerm>();
-        failure = null;
+        failedTerm = null;
         foreach (var barterable in barterables)
         {
             if (barterable is SafePassageBarterable || barterable is NoAttackBarterable || barterable is JoinKingdomAsClanBarterable)
@@ -449,13 +455,29 @@ internal static class LordBarterPatch
             if (barterable == null || barterable.CurrentAmount <= 0 || !manager.TryGetId(barterable.OriginalOwner, out var ownerId) ||
                 !TryCreateTerm(barterable, ownerId, manager, out var term))
             {
-                failure = $"The offered {barterable?.GetType().Name} (amount {barterable?.CurrentAmount}) cannot be sent.";
+                failedTerm = barterable;
                 return false;
             }
 
             terms.Add(term);
         }
         return true;
+    }
+
+    private static string DescribeTermFailure(Barterable barterable)
+    {
+        var term = barterable switch
+        {
+            GoldBarterable => "gold",
+            ItemBarterable => "item",
+            FiefBarterable => "fief",
+            TransferPrisonerBarterable or SetPrisonerFreeBarterable => "prisoner",
+            _ => "term",
+        };
+
+        return barterable != null && barterable.CurrentAmount <= 0
+            ? $"The offered {term} is set to 0."
+            : $"The offered {term} cannot be sent.";
     }
 
     /// <summary>

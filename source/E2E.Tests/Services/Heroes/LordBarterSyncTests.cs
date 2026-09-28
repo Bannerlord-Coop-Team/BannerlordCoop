@@ -30,6 +30,7 @@ using TaleWorlds.CampaignSystem.Settlements;
 using TaleWorlds.CampaignSystem.Settlements.Locations;
 using TaleWorlds.CampaignSystem.Siege;
 using TaleWorlds.Core;
+using TaleWorlds.Library;
 using Xunit.Abstractions;
 
 namespace E2E.Tests.Services.Heroes;
@@ -41,6 +42,7 @@ public class LordBarterSyncTests : MapEventTestBase
     private static IFaction? safePassageTargetFaction;
     private static IFaction? safePassageNearbyFaction;
     private static SceneNotificationData? shownJoinKingdomScene;
+    private static readonly List<string> shownMessages = new();
 
     public LordBarterSyncTests(ITestOutputHelper output) : base(output)
     {
@@ -1642,6 +1644,119 @@ public class LordBarterSyncTests : MapEventTestBase
         }
 
         Server.PumpGameThread();
+    }
+
+    public enum UnsendableLordBarter
+    {
+        UnresolvedContext,
+        LordWithoutId,
+        KingdomWithoutId,
+        GoldAtZero,
+        ItemWithoutId,
+        FiefWithoutId,
+        ReleasedPrisonerWithoutId,
+        TransferredPrisonerWithoutId,
+        UnsupportedTerm,
+    }
+
+    /// <summary>
+    /// A lord barter the client can't send says why on Offer in plain words, never a type name, and
+    /// no request reaches the server.
+    /// </summary>
+    [Theory]
+    [InlineData(UnsendableLordBarter.UnresolvedContext, "The conversation with this lord could not be identified.")]
+    [InlineData(UnsendableLordBarter.LordWithoutId, "This lord could not be identified.")]
+    [InlineData(UnsendableLordBarter.KingdomWithoutId, "The kingdom this lord would join could not be identified.")]
+    [InlineData(UnsendableLordBarter.GoldAtZero, "The offered gold is set to 0.")]
+    [InlineData(UnsendableLordBarter.ItemWithoutId, "The offered item cannot be sent.")]
+    [InlineData(UnsendableLordBarter.FiefWithoutId, "The offered fief cannot be sent.")]
+    [InlineData(UnsendableLordBarter.ReleasedPrisonerWithoutId, "The offered prisoner cannot be sent.")]
+    [InlineData(UnsendableLordBarter.TransferredPrisonerWithoutId, "The offered prisoner cannot be sent.")]
+    [InlineData(UnsendableLordBarter.UnsupportedTerm, "The offered term cannot be sent.")]
+    public void LordBarter_ClientCannotSend_OfferSaysWhy(UnsendableLordBarter failure, string expectedReason)
+    {
+        var client = Clients.First();
+        var player = CreatePartyWithRegisteredLeader();
+        var target = CreatePartyWithRegisteredLeader();
+        var harmony = new Harmony($"e2e.lord-barter-unsendable.{Guid.NewGuid():N}");
+
+        RegisterPlayer(client, player.HeroId, player.MobilePartyId);
+        SetMainHero(player.HeroId);
+        client.NetworkSentMessages.Clear();
+        shownMessages.Clear();
+        harmony.Patch(
+            AccessTools.Method(typeof(InformationManager), nameof(InformationManager.DisplayMessage)),
+            prefix: new HarmonyMethod(typeof(LordBarterSyncTests), nameof(CaptureShownMessage)));
+
+        try
+        {
+            client.Call(() =>
+            {
+                Assert.True(client.ObjectManager.TryGetObject<Hero>(player.HeroId, out var playerHero));
+                Assert.True(client.ObjectManager.TryGetObject<MobileParty>(player.MobilePartyId, out var playerParty));
+                Assert.True(client.ObjectManager.TryGetObject<Hero>(target.HeroId, out var targetHero));
+                Assert.True(client.ObjectManager.TryGetObject<MobileParty>(target.MobilePartyId, out var targetParty));
+
+                var barter = CreateUnsendableBarter(failure, playerHero, playerParty.Party, targetHero, targetParty.Party);
+                LordBarterPatch.BeginPlayerBarterPostfix(barter);
+                Assert.False(LordBarterPatch.ApplyAndFinalizePlayerBarterPrefix(playerHero, barter));
+            });
+
+            Assert.Equal($"Unable to send the lord barter to the server. {expectedReason}", Assert.Single(shownMessages));
+            Assert.Empty(client.NetworkSentMessages.GetMessages<NetworkRequestLordBarter>());
+        }
+        finally
+        {
+            harmony.UnpatchAll(harmony.Id);
+            client.Call(LordBarterPatch.ClearPendingRequest);
+            shownMessages.Clear();
+        }
+    }
+
+    private static bool CaptureShownMessage(InformationMessage message)
+    {
+        shownMessages.Add(message.Information);
+        return false;
+    }
+
+    /// <summary>
+    /// Every case but the first two resolves the map party context, so the client authorizes it and
+    /// the failure comes from the offered term.
+    /// </summary>
+    private static BarterData CreateUnsendableBarter(
+        UnsendableLordBarter failure, Hero playerHero, PartyBase playerParty, Hero targetHero, PartyBase targetParty)
+    {
+        if (failure == UnsendableLordBarter.UnresolvedContext)
+            return new BarterData(playerHero, targetHero, playerParty, null, null);
+        if (failure == UnsendableLordBarter.LordWithoutId)
+            return new BarterData(playerHero, ObjectHelper.SkipConstructor<Hero>(), playerParty, targetParty, null);
+
+        Barterable term = failure switch
+        {
+            UnsendableLordBarter.KingdomWithoutId =>
+                new JoinKingdomAsClanBarterable(targetHero, ObjectHelper.SkipConstructor<Kingdom>(), isDefecting: true),
+            UnsendableLordBarter.GoldAtZero =>
+                new GoldBarterable(playerHero, targetHero, playerParty, targetParty, 1000),
+            UnsendableLordBarter.ItemWithoutId =>
+                new ItemBarterable(
+                    playerHero, targetHero, playerParty, targetParty, new ItemRosterElement(ObjectHelper.SkipConstructor<ItemObject>(), 1), 1),
+            UnsendableLordBarter.FiefWithoutId =>
+                new FiefBarterable(ObjectHelper.SkipConstructor<Settlement>(), playerHero, targetHero),
+            UnsendableLordBarter.ReleasedPrisonerWithoutId =>
+                new SetPrisonerFreeBarterable(ObjectHelper.SkipConstructor<Hero>(), playerHero, playerParty, targetHero),
+            UnsendableLordBarter.TransferredPrisonerWithoutId =>
+                new TransferPrisonerBarterable(ObjectHelper.SkipConstructor<Hero>(), playerHero, playerParty, targetHero, targetParty),
+            UnsendableLordBarter.UnsupportedTerm =>
+                new LeaveKingdomAsClanBarterable(targetHero, targetParty),
+            _ => throw new ArgumentOutOfRangeException(nameof(failure)),
+        };
+
+        var barter = new BarterData(playerHero, targetHero, playerParty, targetParty, null);
+        barter.AddBarterGroup(new DefaultsBarterGroup());
+        term.CurrentAmount = failure == UnsendableLordBarter.GoldAtZero ? 0 : 1;
+        term.SetIsOffered(true);
+        barter.AddBarterable<DefaultsBarterGroup>(term, false);
+        return barter;
     }
 
     public enum RecruiterRole
