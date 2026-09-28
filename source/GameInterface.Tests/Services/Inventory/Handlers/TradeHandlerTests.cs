@@ -148,6 +148,79 @@ public class TradeHandlerTests
         Assert.Contains("StringId=iron", error);
     }
 
+    [Theory]
+    [InlineData(0)]
+    [InlineData(1)]
+    [InlineData(5)]
+    public void ResolveLeftLootIds_ResolvesOccupiedEntriesWithoutLookingUpSpareCapacity(int itemCount)
+    {
+        var roster = new ItemRoster();
+        var objectManager = new Mock<IObjectManager>(MockBehavior.Strict);
+        for (int i = 0; i < itemCount; i++)
+        {
+            var item = new ItemObject($"discard_item_{i}");
+            string itemId = $"ItemObject_discard_item_{i}";
+            roster.AddToCounts(item, i + 1);
+            objectManager.Setup(m => m.TryGetId(item, out itemId)).Returns(true);
+        }
+        Assert.True(roster._data.Length > roster.Count);
+        using var handler = CreateHandler(objectManager.Object);
+
+        var resolved = handler.ResolveLeftLootIds(roster);
+
+        Assert.Equal(itemCount, resolved.Length);
+        for (int i = 0; i < itemCount; i++)
+        {
+            Assert.Equal($"ItemObject_discard_item_{i}", resolved[i].Item1.ItemObjectData.ItemObjectId);
+            Assert.Equal(i + 1, resolved[i].Item1.Amount);
+            Assert.Equal(i + 1, resolved[i].Item2);
+        }
+        objectManager.VerifyAll();
+    }
+
+    [Fact]
+    public void ResolveLeftLootIds_AfterRemoval_PreservesRemainingModifierAndAmount()
+    {
+        var removed = new ItemObject("grain");
+        var shield = new ItemObject("old_horsemans_kite_shield");
+        var thick = new ItemModifier();
+        var roster = new ItemRoster();
+        roster.AddToCounts(removed, 1);
+        roster.AddToCounts(new EquipmentElement(shield, thick), 3);
+        roster.AddToCounts(removed, -1);
+        string shieldId = "ItemObject_old_horsemans_kite_shield";
+        string thickId = "ItemModifier_thick";
+        var objectManager = new Mock<IObjectManager>(MockBehavior.Strict);
+        objectManager.Setup(m => m.TryGetId(shield, out shieldId)).Returns(true);
+        objectManager.Setup(m => m.TryGetId(thick, out thickId)).Returns(true);
+        using var handler = CreateHandler(objectManager.Object);
+
+        var resolved = Assert.Single(handler.ResolveLeftLootIds(roster));
+
+        Assert.Equal(shieldId, resolved.Item1.ItemObjectData.ItemObjectId);
+        Assert.Equal(thickId, resolved.Item1.ItemObjectData.ItemModifierId);
+        Assert.False(resolved.Item1.ItemObjectData.ItemModifierNull);
+        Assert.Equal(3, resolved.Item1.Amount);
+        Assert.Equal(3, resolved.Item2);
+        objectManager.VerifyAll();
+    }
+
+    [Fact]
+    public void ResolveLeftLootIds_UnregisteredOccupiedItem_StillAttemptsResolution()
+    {
+        var item = new ItemObject("iron");
+        var roster = new ItemRoster();
+        roster.AddToCounts(item, 1);
+        string itemId = null;
+        var objectManager = new Mock<IObjectManager>(MockBehavior.Strict);
+        objectManager.Setup(m => m.TryGetId(item, out itemId)).Returns(false);
+        using var handler = CreateHandler(objectManager.Object);
+
+        Assert.Empty(handler.ResolveLeftLootIds(roster));
+
+        objectManager.Verify(m => m.TryGetId(item, out itemId), Times.Once);
+    }
+
     private static TradeHandler CreateHandler(IObjectManager objectManager)
     {
         return new TradeHandler(
