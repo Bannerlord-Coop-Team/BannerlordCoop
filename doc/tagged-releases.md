@@ -6,50 +6,56 @@ binaries with the existing Azure signing account, and uploads
 `BannerlordCoop-v0.2.0.zip` to a **draft** GitHub release. The archive contains
 `Coop/`, ready to extract into Bannerlord's `Modules/` directory. The tag sets
 `CoopVersion` for this build and the module manifest; no source version edit is
-required. Nightly and manual builds are unchanged.
+required. Nightly and manual builds still read `CoopVersion` from
+`source/Directory.Build.props`.
 
-The private `Bannerlord-Coop-Team/BannerlordCoop.DedicatedServer` repository
-receives `build_release`, downloads that draft asset, builds/tests the server,
-uploads `BannerlordCoop-DedicatedServer-Linux64-v0.2.0.tar.zst` to the same draft,
-and pushes `ghcr.io/bannerlord-coop-team/bannerlordcoop-dedicatedserver:v0.2.0`.
-Only a successful completed server run sends `server_complete`.
-The public repository checks both workflow runs, the tag SHA, the server's
-result artifact, and both archive checksums before publishing. It then sends
-`promote_stable` with the verified image digest. Per the production owner's
-instruction, this final workflow **only prints the verified promotion command**.
-An operator must approve and execute it separately; neither workflow pushes
-`stable`. A server build failure leaves the release draft.
+The `Validate release tag` step fails unless the tag is a stable
+`vMAJOR.MINOR.PATCH` without leading zeros, such as `v0.2.0`.
 
-## Setup before the first tag
+`createDraft` in `.github/scripts/tag-release.cjs` reuses an existing draft for
+the tag, keeping its title and notes, or creates one named after the tag with
+generated release notes. If the updated draft no longer matches the tag, the
+pushed commit or the draft state, it stops before uploading or dispatching.
 
-- Merge the workflows/scripts in **both repositories' default branches**.
-  `repository_dispatch` and `workflow_run` receivers must exist there. The
-  tagged client commit must also contain the release workflow and script.
-- Add `RELEASE_DISPATCH_TOKEN` to both repositories: a fine-grained PAT with
-  access to both repositories, **Contents: read/write** and **Actions: read**.
-  Draft releases require authenticated access. Each repository's ordinary
-  `GITHUB_TOKEN` cannot dispatch to or read the other private repository.
+The draft job ends by sending `build_release` to the private
+`Bannerlord-Coop-Team/BannerlordCoop.DedicatedServer` repository. What that
+repository does next is maintained there. No workflow in this repository
+publishes the draft.
+
+## Setup
+
+- The tagged commit must contain `.github/workflows/release.yml` and
+  `.github/scripts/tag-release.cjs`, because a tag push runs the workflow file
+  from the pushed commit.
+- The `release` environment's deployment rule must allow `v*` tags. The sign
+  and draft jobs both use that environment.
+- Store `RELEASE_DISPATCH_TOKEN` as a `release` environment secret (a
+  repository secret also works), so only jobs allowed into that environment can
+  read it. This repository's draft job needs at least Contents read/write on
+  this repository and Contents write on the dedicated server repository. It
+  also needs Workflows write here when the tagged commit adds or changes files
+  under `.github/workflows` relative to `development`, because GitHub requires
+  it to create or update that release. Nothing in this repository needs
+  Actions: read on this token anymore. Check the dedicated server repository
+  before narrowing a shared token.
 - Keep the existing Azure signing secrets and `SIGNING_*` variables configured.
-  Allow the tag workflow's OIDC subject in Azure (the existing development
-  branch credential alone does not authorize `refs/tags/v0.2.0`).
-- Configure the private server workflow's build inputs and GHCR package write
-  permission as described in that repository. Its CI boot test requires explicit
-  terms acceptance via `RELEASE_CI_EULA_SHA256`; the pipeline does not accept
-  terms on the operator's behalf. Do not grant the client workflow package write
-  permission. The Linux archive must fit GitHub's 2 GiB asset limit.
-- Verify that the pinned server game inputs support the client's game version.
-  At implementation time the client declares `v1.4.8` while the private workflow
-  references `v1.4.7` input keys. Compatibility is not established by local
-  workflow tests; verify or update those inputs before the first release.
+  The sign job names the `release` environment, so its OIDC subject names that
+  environment, not the tag. The Azure app needs a federated credential for the
+  `release` environment in addition to the development-branch credential that
+  nightly and manual builds use.
+- Keep `release.yml`'s `GITHUB_TOKEN` at `contents: read` (plus
+  `id-token: write` in the sign job). The draft job's release and dispatch
+  calls use `RELEASE_DISPATCH_TOKEN`.
 - Protect `v*` tags against unauthorized creation, deletion and replacement.
   Treat the cross-repository token as a release credential.
 
-Creating/pushing a tag is an actual publication request, not a dry run. This
-implementation does not create `v0.2.0` or change secrets automatically.
+Pushing a tag is not a dry run. It creates or updates the draft and sends
+`build_release`.
 
 ## Dispatch contract
 
-All events use `repository_dispatch`. IDs and attempts are JSON numbers.
+The draft job sends one `repository_dispatch` event, `build_release`. IDs and
+attempts are JSON numbers.
 
 `build_release` fields:
 
@@ -63,34 +69,28 @@ All events use `repository_dispatch`. IDs and attempts are JSON numbers.
 }
 ```
 
-`server_complete` and `promote_stable` add `server_run_id`,
-`server_run_attempt`, and `image_digest` (`sha256:` followed by 64 lowercase
-hexadecimal digits). The server build workflow path is
-`.github/workflows/release.yml`; it uploads the Actions artifact `release-result`
-containing `release-result.json`. That JSON contains the completion fields plus
-`client_asset_sha256` and `server_asset_sha256` (64 lowercase hexadecimal digits,
-without a prefix). The completion notifier runs after the build succeeds, not
-inside the still-running build workflow.
+A successful draft job means GitHub accepted `build_release`, not that the
+dedicated server repository started or finished a build.
 
-The client draft description retains a `release-coordination` HTML comment
-with the original request. Leave this comment intact; it prevents a callback
-from an older client run/attempt from publishing a replacement draft.
+The draft description carries a `release-coordination` HTML comment.
+`createDraft` writes the latest `build_release` payload into it on every run.
+Leave it intact.
 
 ## Recovery and checks
 
-- Failed client build/sign/upload/dispatch: rerun the client release workflow.
-  Only draft client assets are replaced; published releases cannot be rebuilt.
-- Failed server build before upload: rerun the private server workflow. If a
-  previous attempt already uploaded the server archive, deliberately remove that
-  incomplete draft asset before rebuilding; server uploads do not overwrite it.
-  Its completion must reference the current run attempt and result artifact.
-- Failed server notification: rerun the private notification workflow, not the
-  already successful server build.
-- Failed publication callback: rerun **Publish release** after correcting the
-  cause. Verification runs again. If publication succeeded but promotion
-  dispatch failed, it only resends the promotion after verifying the assets.
-- Failed promotion-command verification: rerun the private promotion workflow.
-  It prints the command only, so a successful run does not mean `stable` changed.
+- Failed build, test, sign, upload or dispatch: rerun the release workflow.
+  Only the draft's client zip is replaced.
+- Prefer **Re-run failed jobs** while the job artifacts last (one day). Jobs
+  that passed are not run again, so a rerun of a failed draft job reuses the
+  signed package and the zip keeps its bytes. **Re-run all jobs** signs again
+  and replaces the zip. After a day, re-run all jobs.
+- Every rerun leaves other draft assets in place and sends `build_release`
+  again. If the dedicated server build has started, check that repository's
+  recovery steps first.
+- A 401, 403 or 404 in the draft job points at `RELEASE_DISPATCH_TOKEN`;
+  check its expiry and the permissions under Setup before replacing it.
+- Create tags with `git push`. If a release for the tag is already published,
+  the draft job stops after signing.
 - Never move a release tag to retry a build. Use a new version for changed code.
 
 Local targeted checks (no game deployment or GitHub mutations):
@@ -98,9 +98,3 @@ Local targeted checks (no game deployment or GitHub mutations):
 ```sh
 node --test .github/scripts/tag-release.test.cjs
 ```
-
-The first end-to-end release needs CI validation with the configured credentials.
-Check that the draft remains unpublished while the server is building, both
-assets exist and their GitHub `digest` fields match the result checksums, and
-the final command names the verified image digest. Confirm `stable` remains
-unchanged until an operator explicitly runs that command.

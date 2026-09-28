@@ -14,6 +14,7 @@ using GameInterface.Services.MobileParties.Messages.Unstuck;
 using GameInterface.Services.MobileParties.Messages.Behavior;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Players;
+using GameInterface.Services.Players.Data;
 using GameInterface.Services.SiegeEvents.Interfaces;
 using HarmonyLib;
 using Newtonsoft.Json;
@@ -1003,14 +1004,14 @@ internal static class SiegeDefenseArmyFixtureCommands
     private static class ObserveServerUnstuckCompletionPatch
     {
         [HarmonyPrefix]
-        private static void Prefix(string partyId, out ServerRecoveryCall __state)
+        private static void Prefix(Player player, out ServerRecoveryCall __state)
         {
             var observer = recoveryObserver;
             __state = default;
             try
             {
                 if (ModInformation.IsServer && observer?.MatchesCurrentCampaign() == true)
-                    __state = new ServerRecoveryCall(observer, observer.BeginServerRequest(partyId));
+                    __state = new ServerRecoveryCall(observer, observer.BeginServerRequest(player.MobilePartyId));
             }
             catch (Exception exception)
             {

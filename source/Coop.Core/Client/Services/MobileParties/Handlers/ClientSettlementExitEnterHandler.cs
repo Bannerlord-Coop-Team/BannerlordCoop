@@ -27,6 +27,7 @@ public class ClientSettlementExitEnterHandler : IHandler
     private readonly INetwork network;
     private readonly IObjectManager objectManager;
     private readonly ISettlementInterface settlementInterface;
+    private readonly IHideoutResultEncounter hideoutResultEncounter;
     // Local attempts and all response transitions run on the game thread.
     private PendingStart pendingStart;
     private uint pendingLeavePartyId;
@@ -35,12 +36,14 @@ public class ClientSettlementExitEnterHandler : IHandler
         IMessageBroker messageBroker,
         INetwork network,
         IObjectManager objectManager,
-        ISettlementInterface settlementInterface)
+        ISettlementInterface settlementInterface,
+        IHideoutResultEncounter hideoutResultEncounter)
     {
         this.messageBroker = messageBroker;
         this.network = network;
         this.objectManager = objectManager;
         this.settlementInterface = settlementInterface;
+        this.hideoutResultEncounter = hideoutResultEncounter;
         messageBroker.Subscribe<StartSettlementEncounterAttempted>(Handle);
         messageBroker.Subscribe<EndSettlementEncounterAttempted>(Handle);
         messageBroker.Subscribe<NetworkSettlementEncounterLeaveResult>(Handle);
@@ -254,6 +257,10 @@ public class ClientSettlementExitEnterHandler : IHandler
             {
                 settlementInterface.PartyLeaveSettlement(party);
             }
+
+            // Staged hideout loot lives on the encounter, so closing it here would discard the loot.
+            if (hideoutResultEncounter.TryKeepThroughLeave(party))
+                return;
 
             CloseStaleMainPartyEncounter(payload.PartyId);
         });
