@@ -7,9 +7,15 @@ namespace Coop.Core.Common.Configuration;
 /// Finds an operator file for the server: its own variable, then COOP_DATA_DIR, then the
 /// server-data folder beside the dedicated-server engine directory.
 /// </summary>
-internal static class ServerDataPath
+public interface IServerDataPath
 {
-    internal static string Resolve(string fileEnvironmentVariable, string fileName)
+    string Resolve(string fileEnvironmentVariable, string fileName);
+}
+
+/// <inheritdoc cref="IServerDataPath"/>
+internal sealed class ServerDataPath : IServerDataPath
+{
+    public string Resolve(string fileEnvironmentVariable, string fileName)
     {
         return Resolve(
             Environment.GetEnvironmentVariable(fileEnvironmentVariable),

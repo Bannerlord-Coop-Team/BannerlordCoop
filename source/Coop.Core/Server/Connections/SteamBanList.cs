@@ -32,7 +32,7 @@ internal sealed class SteamBanList : ISteamBanList
     private DateTime loadedWriteTimeUtc = DateTime.MinValue;
     private bool fileWasPresent;
 
-    public SteamBanList() : this(ResolvePath)
+    public SteamBanList(IServerDataPath dataPath) : this(() => dataPath.Resolve(BanFileEnvironmentVariable, FileName))
     {
     }
 
@@ -166,11 +166,6 @@ internal sealed class SteamBanList : ISteamBanList
     {
         string normalized = Normalize(steamId);
         if (normalized != null) result.Add(normalized);
-    }
-
-    private static string ResolvePath()
-    {
-        return ServerDataPath.Resolve(BanFileEnvironmentVariable, FileName);
     }
 
     internal static string ResolvePath(

@@ -27,7 +27,7 @@ internal sealed class ServerInfoConfig : IServerInfoConfig
 
     private static readonly ILogger Logger = LogManager.GetLogger<ServerInfoConfig>();
 
-    public ServerInfoConfig() : this(ResolvePath)
+    public ServerInfoConfig(IServerDataPath dataPath) : this(() => dataPath.Resolve(FileEnvironmentVariable, FileName))
     {
     }
 
@@ -161,18 +161,5 @@ internal sealed class ServerInfoConfig : IServerInfoConfig
         if (char.IsHighSurrogate(line[length - 1])) length--;
 
         return line.Substring(0, length).TrimEnd();
-    }
-
-    private static string ResolvePath()
-    {
-        return ServerDataPath.Resolve(FileEnvironmentVariable, FileName);
-    }
-
-    internal static string ResolvePath(
-        string? configuredPath,
-        string? coopDataDirectory,
-        string applicationBaseDirectory)
-    {
-        return ServerDataPath.Resolve(configuredPath, coopDataDirectory, applicationBaseDirectory, FileName);
     }
 }

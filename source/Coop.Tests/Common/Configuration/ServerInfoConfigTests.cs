@@ -1,6 +1,7 @@
 ﻿using Common.Logging;
 using Coop.Core.Common.Configuration;
 using GameInterface.Services.Chat.Messages;
+using Moq;
 using System;
 using System.Collections.Generic;
 using System.IO;
@@ -43,6 +44,32 @@ public sealed class ServerInfoConfigTests : IDisposable
 
         Assert.Empty(config.Motd);
         Assert.Empty(LogsForThisTest());
+    }
+
+    [Fact]
+    public void AsksTheDataPathForTheInfoFile()
+    {
+        WriteInfoFile("{\"motd\":[\"Welcome to EU-1\"]}");
+        var dataPath = new Mock<IServerDataPath>();
+        dataPath.Setup(path => path.Resolve("COOP_SERVER_INFO_FILE", "server-info.json")).Returns(InfoFilePath);
+
+        var config = new ServerInfoConfig(dataPath.Object);
+
+        Assert.Equal(new[] { "Welcome to EU-1" }, config.Motd);
+    }
+
+    [Fact]
+    public void DataPathThatThrows_LogsAnErrorAndIsNotFatal()
+    {
+        var dataPath = new Mock<IServerDataPath>();
+        dataPath.Setup(path => path.Resolve(It.IsAny<string>(), It.IsAny<string>()))
+            .Throws(new ArgumentException("Illegal characters in path " + directory));
+
+        var config = new ServerInfoConfig(dataPath.Object);
+
+        Assert.Empty(config.Motd);
+        // The log carries the exception, which names this test's folder.
+        Assert.Contains("could not be read", Assert.Single(LogsForThisTest()));
     }
 
     [Fact]
@@ -220,46 +247,6 @@ public sealed class ServerInfoConfigTests : IDisposable
 
         Assert.Empty(config.Motd);
         Assert.Contains("could not be read", Assert.Single(LogsForThisTest()));
-    }
-
-    [Fact]
-    public void ResolvePath_InfoFileVariableWinsOverDataDirectory()
-    {
-        string infoFile = Path.Combine(directory, "info", "eu-1.json");
-
-        string path = ServerInfoConfig.ResolvePath(
-            infoFile,
-            Path.Combine(directory, "configured-data"),
-            Path.Combine(directory, "engine", "bin", "server"));
-
-        Assert.Equal(infoFile, path);
-    }
-
-    [Fact]
-    public void ResolvePath_DataDirectoryWinsOverDeploymentFallback()
-    {
-        string dataDirectory = Path.Combine(directory, "configured-data");
-
-        string path = ServerInfoConfig.ResolvePath(
-            null,
-            dataDirectory,
-            Path.Combine(directory, "engine", "bin", "server"));
-
-        Assert.Equal(Path.Combine(dataDirectory, "server-info.json"), path);
-    }
-
-    [Theory]
-    [InlineData(null)]
-    [InlineData("")]
-    [InlineData("  ")]
-    public void ResolvePath_BlankValuesFallBackToServerDataBesideTheEngine(string? blank)
-    {
-        string path = ServerInfoConfig.ResolvePath(
-            blank,
-            blank,
-            Path.Combine(directory, "engine", "bin", "server"));
-
-        Assert.Equal(Path.GetFullPath(Path.Combine(directory, "server-data", "server-info.json")), path);
     }
 
     public void Dispose()
