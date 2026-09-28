@@ -84,6 +84,8 @@ public sealed class ModOptionsData
 
     public bool? GoldFoodInfluenceChangeForDisconnectedPlayers { get; set; }
 
+    public bool? BlockAiWarDeclarationsOnOfflinePlayers { get; set; }
+
     public int? PlayerBattleAiJoinWindowHours { get; set; }
 
     public bool? SpeedLimitWhilePlayersInBattle { get; set; }

@@ -175,12 +175,16 @@ internal class ClientSettlementHandler : IHandler
         messageBroker.Unsubscribe<NetworkChangeSettlementMilitia>(HandleMiltia);
         messageBroker.Unsubscribe<NetworkChangeSettlementGarrisonWagePaymentLimit>(HandleGarrisonWageLimit);
         messageBroker.Unsubscribe<NetworkChangeSettlementMobileParty>(HandleMobileParty);
+        messageBroker.Unsubscribe<NetworkChangeWallHitPointsRatio>(HandleHitPointsRatio);
         messageBroker.Unsubscribe<NetworkChangeLastVisitTimeOfOwner>(HandleLastVisitTimeOfOwner);
         messageBroker.Unsubscribe<LordConversationCampaignBehaviourPlayerChangedClaim>(HandleClientCampaignBehaviorClaim);
+        messageBroker.Unsubscribe<NetworkChangeLordConverationCampaignBehaviorPlayerClaimOther>(HandleClientOthersCampaignBehaviorClaim);
 
 
         messageBroker.Unsubscribe<LordConversationCampaignBehaviourPlayerChangedClaimValue>(HandleClientOthersCampaignBehaviorClaimValue);
         messageBroker.Unsubscribe<NetworkChangeLordConverationCampaignBehaviorPlayerClaimValueOther>(HandleClientOthersCampaignBehaviorClaimValue);
 
+        messageBroker.Unsubscribe<NetworkChangeSettlementClaimantCanBeClaimed>(HandleSettlementClaimaintCanBeClaimed);
+        messageBroker.Unsubscribe<NetworkSettlementAuditResults>(HandleAuditor);
     }
 }

@@ -117,6 +117,12 @@
     // true: Disconnected players have gold and food change.
     "goldFoodInfluenceChangeForDisconnectedPlayers": false,
 
+    // Stop AI kingdoms from proposing new wars on players who are offline.
+    // (Default) false: AI kingdoms propose wars as in vanilla.
+    // true: The server refuses AI war proposals and alliance calls to war against a player-ruled kingdom or an independent player clan while none of its players are online.
+    // Existing wars, rebellions, votes already in progress and player-proposed wars are not affected.
+    "blockAiWarDeclarationsOnOfflinePlayers": false,
+
     // Set grace period (hours) for AI parties to be able to join battles involving players.
     // Default is 6, meaning AI parties can only join a player battle within 6 hours of it starting.
     // If set to 0, AI parties will not join in player battles.
