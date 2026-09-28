@@ -2,7 +2,7 @@
   <Window>
     <Widget WidthSizePolicy="StretchToParent" HeightSizePolicy="StretchToParent" DoNotAcceptEvents="true" IsVisible="@IsOpen">
       <Children>
-        <DimensionSyncWidget Id="CoopMotdRoot" WidthSizePolicy="Fixed" SuggestedWidth="960" HeightSizePolicy="Fixed" HorizontalAlignment="Center" VerticalAlignment="Center"
+        <DimensionSyncWidget Id="CoopServerInfoRoot" WidthSizePolicy="Fixed" SuggestedWidth="960" HeightSizePolicy="Fixed" HorizontalAlignment="Center" VerticalAlignment="Center"
                              DimensionToSync="Vertical" WidgetToCopyHeightFrom="Content">
           <Children>
             <BrushWidget WidthSizePolicy="StretchToParent" HeightSizePolicy="StretchToParent" Brush="Frame1Brush">
@@ -19,8 +19,8 @@
             <ListPanel Id="Content" WidthSizePolicy="StretchToParent" HeightSizePolicy="CoverChildren" MinHeight="250" StackLayout.LayoutMethod="VerticalTopToBottom">
               <Children>
                 <Widget WidthSizePolicy="StretchToParent" HeightSizePolicy="Fixed" SuggestedHeight="116" DoNotAcceptEvents="true"/>
-                <ScrollablePanel Id="MotdScroll" WidthSizePolicy="StretchToParent" HeightSizePolicy="CoverChildren" MarginLeft="40" MarginRight="48"
-                                 AutoHideScrollBars="true" ClipRect="Clip" InnerPanel="Clip\Paragraphs" VerticalScrollbar="..\..\MotdScrollbar">
+                <ScrollablePanel Id="ServerInfoScroll" WidthSizePolicy="StretchToParent" HeightSizePolicy="CoverChildren" MarginLeft="40" MarginRight="48"
+                                 AutoHideScrollBars="true" ClipRect="Clip" InnerPanel="Clip\Paragraphs" VerticalScrollbar="..\..\ServerInfoScrollbar">
                   <Children>
                     <Widget Id="Clip" WidthSizePolicy="StretchToParent" HeightSizePolicy="CoverChildren" MaxHeight="420" ClipContents="true">
                       <Children>
@@ -36,14 +36,14 @@
                 <Widget WidthSizePolicy="StretchToParent" HeightSizePolicy="Fixed" SuggestedHeight="84" DoNotAcceptEvents="true"/>
               </Children>
             </ListPanel>
-            <ScrollbarWidget Id="MotdScrollbar" WidthSizePolicy="Fixed" SuggestedWidth="16" HeightSizePolicy="StretchToParent" HorizontalAlignment="Right" MarginRight="18" MarginTop="118" MarginBottom="86"
+            <ScrollbarWidget Id="ServerInfoScrollbar" WidthSizePolicy="Fixed" SuggestedWidth="16" HeightSizePolicy="StretchToParent" HorizontalAlignment="Right" MarginRight="18" MarginTop="118" MarginBottom="86"
                              AlignmentAxis="Vertical" Handle="Handle" MaxValue="100" MinValue="0" Sprite="scrollbar_9">
               <Children>
                 <Widget Id="Handle" WidthSizePolicy="Fixed" SuggestedWidth="6" HeightSizePolicy="Fixed" SuggestedHeight="36" MinHeight="20" HorizontalAlignment="Center" Sprite="BlankWhiteSquare_9" Color="#AA9760FF"/>
               </Children>
             </ScrollbarWidget>
             <Widget WidthSizePolicy="StretchToParent" HeightSizePolicy="Fixed" SuggestedHeight="1" VerticalAlignment="Bottom" MarginBottom="66" MarginLeft="24" MarginRight="24" Sprite="BlankWhiteSquare_9" Color="#AA976038" DoNotAcceptEvents="true"/>
-            <ButtonWidget Id="MotdClose" WidthSizePolicy="Fixed" SuggestedWidth="160" HeightSizePolicy="Fixed" SuggestedHeight="48" HorizontalAlignment="Right" VerticalAlignment="Bottom" MarginRight="26" MarginBottom="8" Brush="ScoreboardUnitRowBrush" Command.Click="ExecuteClose" DoNotPassEventsToChildren="true">
+            <ButtonWidget Id="ServerInfoClose" WidthSizePolicy="Fixed" SuggestedWidth="160" HeightSizePolicy="Fixed" SuggestedHeight="48" HorizontalAlignment="Right" VerticalAlignment="Bottom" MarginRight="26" MarginBottom="8" Brush="ScoreboardUnitRowBrush" Command.Click="ExecuteClose" DoNotPassEventsToChildren="true">
               <Children>
                 <InputKeyVisualWidget WidthSizePolicy="Fixed" SuggestedWidth="48" HeightSizePolicy="Fixed" SuggestedHeight="48" KeyID="Escape" DoNotAcceptEvents="true"/>
                 <TextWidget WidthSizePolicy="StretchToParent" HeightSizePolicy="StretchToParent" MarginLeft="58" MarginRight="12" Brush="Coop.PlayerList.Text" Brush.FontSize="23" Text="@CloseText" DoNotAcceptEvents="true"/>

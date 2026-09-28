@@ -2,7 +2,7 @@
 using Coop.Core.Client.Messages;
 using Coop.Core.Client.Services.Session;
 using Coop.Tests.Stubs;
-using GameInterface.Services.UI.Motd;
+using GameInterface.Services.UI.ServerInfo;
 using Moq;
 using System;
 using Xunit;
@@ -10,15 +10,15 @@ using Xunit;
 namespace Coop.Tests.Client.Services.Session;
 
 /// <summary>Tests that the client hands the server's MOTD to the popup service on the game thread.</summary>
-public sealed class ClientMotdHandlerTests : IDisposable
+public sealed class ServerInfoClientHandlerTests : IDisposable
 {
     private readonly StubMessageBroker broker = new();
-    private readonly Mock<IMotdService> service = new();
+    private readonly Mock<IServerInfoService> service = new();
 
     [Fact]
     public void CampaignReady_CreatesThePopup()
     {
-        using var handler = new ClientMotdHandler(broker, service.Object);
+        using var handler = new ServerInfoClientHandler(broker, service.Object);
 
         broker.Publish(this, new ClientCampaignReady());
         DrainGameThread();
@@ -30,9 +30,9 @@ public sealed class ClientMotdHandlerTests : IDisposable
     public void Motd_IsHandedToTheServiceAsSent()
     {
         var paragraphs = new[] { "Welcome to EU-1", "{PLAYER} <b>Restart 06:00 UTC</b>" };
-        using var handler = new ClientMotdHandler(broker, service.Object);
+        using var handler = new ServerInfoClientHandler(broker, service.Object);
 
-        broker.Publish(this, new NetworkMotd(paragraphs));
+        broker.Publish(this, new NetworkServerInfo(paragraphs));
         DrainGameThread();
 
         service.Verify(motd => motd.Show(paragraphs), Times.Once);
@@ -42,12 +42,12 @@ public sealed class ClientMotdHandlerTests : IDisposable
     [Fact]
     public void Dispose_Unsubscribes()
     {
-        var handler = new ClientMotdHandler(broker, service.Object);
+        var handler = new ServerInfoClientHandler(broker, service.Object);
         Assert.Equal(2, broker.GetTotalSubscribers());
 
         handler.Dispose();
         broker.Publish(this, new ClientCampaignReady());
-        broker.Publish(this, new NetworkMotd(new[] { "Welcome to EU-1" }));
+        broker.Publish(this, new NetworkServerInfo(new[] { "Welcome to EU-1" }));
         DrainGameThread();
 
         Assert.Equal(0, broker.GetTotalSubscribers());
@@ -61,6 +61,6 @@ public sealed class ClientMotdHandlerTests : IDisposable
 
     private static void DrainGameThread()
     {
-        GameThread.Run(() => { }, blocking: true, label: nameof(ClientMotdHandlerTests));
+        GameThread.Run(() => { }, blocking: true, label: nameof(ServerInfoClientHandlerTests));
     }
 }

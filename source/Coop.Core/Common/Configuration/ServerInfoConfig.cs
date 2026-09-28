@@ -1,5 +1,5 @@
 ﻿using Common.Logging;
-using GameInterface.Services.UI.Motd;
+using GameInterface.Services.UI.ServerInfo;
 using Serilog;
 using System;
 using System.Collections.Generic;
@@ -113,8 +113,8 @@ internal sealed class ServerInfoConfig : IServerInfoConfig
             string paragraph = RemoveControlCharacters(text);
             if (paragraph.Length == 0) continue;
 
-            int room = MotdLimits.MaxLength - length;
-            if (paragraphs.Count == MotdLimits.MaxParagraphs || room == 0)
+            int room = ServerInfoLimits.MaxLength - length;
+            if (paragraphs.Count == ServerInfoLimits.MaxParagraphs || room == 0)
             {
                 trimmed = true;
                 break;
@@ -143,8 +143,8 @@ internal sealed class ServerInfoConfig : IServerInfoConfig
             Logger.Warning(
                 "Server info motd in {Path} was cut to {MaxParagraphs} paragraph(s) and {MaxLength} characters",
                 path,
-                MotdLimits.MaxParagraphs,
-                MotdLimits.MaxLength);
+                ServerInfoLimits.MaxParagraphs,
+                ServerInfoLimits.MaxLength);
         }
 
         return paragraphs.ToArray();

@@ -8,10 +8,10 @@ using TaleWorlds.GauntletUI.Data;
 using TaleWorlds.InputSystem;
 using TaleWorlds.ScreenSystem;
 
-namespace GameInterface.Services.UI.Motd;
+namespace GameInterface.Services.UI.ServerInfo;
 
 /// <summary>The popup's screen side, kept apart so the show-once rules run without Gauntlet.</summary>
-internal interface IMotdPopup : IDisposable
+internal interface IServerInfoPopup : IDisposable
 {
     bool CanOpen();
     void Open();
@@ -19,16 +19,16 @@ internal interface IMotdPopup : IDisposable
 }
 
 /// <summary>Shows the message of the day over the campaign map without pausing the shared world.</summary>
-internal sealed class MotdOverlay : GlobalLayer, IMotdPopup
+internal sealed class ServerInfoOverlay : GlobalLayer, IServerInfoPopup
 {
-    private readonly MotdVM viewModel;
+    private readonly ServerInfoVM viewModel;
     private readonly IChatService chat;
     private readonly Action update;
     private GauntletLayer layer;
     private GauntletMovieIdentifier movie;
 
     // Receives the popup state, the chat focus guard and the service's per-frame check.
-    public MotdOverlay(MotdVM viewModel, IChatService chat, Action update)
+    public ServerInfoOverlay(ServerInfoVM viewModel, IChatService chat, Action update)
     {
         this.viewModel = viewModel;
         this.chat = chat;
@@ -38,8 +38,8 @@ internal sealed class MotdOverlay : GlobalLayer, IMotdPopup
     // Sits just above the player list (115) and stays unfocused until a message opens.
     public void Initialize()
     {
-        layer = new GauntletLayer("CoopMotd", 116);
-        movie = layer.LoadMovie("CoopMotdUIMovie", viewModel);
+        layer = new GauntletLayer("CoopServerInfo", 116);
+        movie = layer.LoadMovie("CoopServerInfoUIMovie", viewModel);
         layer.InputRestrictions.ResetInputRestrictions();
         Layer = layer;
         ScreenManager.AddGlobalLayer(this, false);

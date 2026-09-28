@@ -1,6 +1,6 @@
 ﻿using Common.Logging;
 using Coop.Core.Common.Configuration;
-using GameInterface.Services.UI.Motd;
+using GameInterface.Services.UI.ServerInfo;
 using Moq;
 using System;
 using System.Collections.Generic;
@@ -114,7 +114,7 @@ public sealed class ServerInfoConfigTests : IDisposable
 
         var config = new ServerInfoConfig(InfoFilePath);
 
-        Assert.Equal(MotdLimits.MaxParagraphs, config.Motd.Count);
+        Assert.Equal(ServerInfoLimits.MaxParagraphs, config.Motd.Count);
         Assert.Equal(Enumerable.Range(1, 10).Select(index => "p" + index), config.Motd);
         Assert.Contains(LogsForThisTest(), log => log.Contains("was cut to 10 paragraph(s) and 2000 characters"));
     }
@@ -122,14 +122,14 @@ public sealed class ServerInfoConfigTests : IDisposable
     [Fact]
     public void ExactlyTheCaps_AreNotReportedAsCut()
     {
-        string[] entries = Enumerable.Range(0, MotdLimits.MaxParagraphs)
-            .Select(index => new string((char)('a' + index), MotdLimits.MaxLength / MotdLimits.MaxParagraphs)).ToArray();
+        string[] entries = Enumerable.Range(0, ServerInfoLimits.MaxParagraphs)
+            .Select(index => new string((char)('a' + index), ServerInfoLimits.MaxLength / ServerInfoLimits.MaxParagraphs)).ToArray();
         WriteInfoFile("{\"motd\":[" + string.Join(",", entries.Select(entry => "\"" + entry + "\"")) + "]}");
 
         var config = new ServerInfoConfig(InfoFilePath);
 
         Assert.Equal(entries, config.Motd);
-        Assert.Equal(MotdLimits.MaxLength, config.Motd.Sum(paragraph => paragraph.Length));
+        Assert.Equal(ServerInfoLimits.MaxLength, config.Motd.Sum(paragraph => paragraph.Length));
         Assert.DoesNotContain(LogsForThisTest(), log => log.Contains("was cut"));
     }
 
@@ -162,7 +162,7 @@ public sealed class ServerInfoConfigTests : IDisposable
     [Fact]
     public void ParagraphAfterAFullMotd_IsDroppedAndReported()
     {
-        string full = new string('a', MotdLimits.MaxLength);
+        string full = new string('a', ServerInfoLimits.MaxLength);
         WriteInfoFile("{\"motd\":[\"" + full + "\",\"x\"]}");
 
         var config = new ServerInfoConfig(InfoFilePath);
@@ -175,13 +175,13 @@ public sealed class ServerInfoConfigTests : IDisposable
     public void CutNeverSplitsASurrogatePair()
     {
         // The pair starts at the last allowed index, so a plain cut would keep only its high half.
-        string line = new string('a', MotdLimits.MaxLength - 1) + "\U0001F600" + "tail";
+        string line = new string('a', ServerInfoLimits.MaxLength - 1) + "\U0001F600" + "tail";
         WriteInfoFile("{\"motd\":[\"" + line + "\"]}");
 
         var config = new ServerInfoConfig(InfoFilePath);
 
         string cut = Assert.Single(config.Motd);
-        Assert.Equal(new string('a', MotdLimits.MaxLength - 1), cut);
+        Assert.Equal(new string('a', ServerInfoLimits.MaxLength - 1), cut);
         Assert.False(char.IsHighSurrogate(cut[cut.Length - 1]));
     }
 

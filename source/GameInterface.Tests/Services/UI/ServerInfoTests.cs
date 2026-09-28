@@ -1,5 +1,5 @@
 ﻿using Common.Serialization;
-using GameInterface.Services.UI.Motd;
+using GameInterface.Services.UI.ServerInfo;
 using ProtoBuf;
 using System;
 using System.Collections.Generic;
@@ -12,7 +12,7 @@ using Xunit;
 namespace GameInterface.Tests.Services.UI;
 
 /// <summary>Protects the message of the day popup: literal text, show-once rules and its wire message.</summary>
-public class MotdTests
+public class ServerInfoTests
 {
     private static readonly string[] Welcome = { "Welcome to EU-1", "Restart 06:00 UTC" };
 
@@ -21,7 +21,7 @@ public class MotdTests
     public void ViewModelKeepsParagraphsLiteralAndCloses()
     {
         var closed = 0;
-        var vm = new MotdVM(() => closed++);
+        var vm = new ServerInfoVM(() => closed++);
         var literal = "{PLAYER} {=coop_motd_title}x <b>bold</b> <a href=\"event:1\">link</a>";
 
         vm.SetParagraphs(new[] { literal, "Second" });
@@ -174,11 +174,11 @@ public class MotdTests
     [Fact]
     public void MessageRoundTripsAsOneMessage()
     {
-        var paragraphs = new[] { "Willkommen überall, 欢迎 \U0001F600", "{PLAYER} <b>bold</b>", new string('a', MotdLimits.MaxLength) };
+        var paragraphs = new[] { "Willkommen überall, 欢迎 \U0001F600", "{PLAYER} <b>bold</b>", new string('a', ServerInfoLimits.MaxLength) };
 
-        var copy = Serializer.DeepClone(new NetworkMotd(paragraphs));
+        var copy = Serializer.DeepClone(new NetworkServerInfo(paragraphs));
         var serializer = new ProtoBufSerializer(new SerializableTypeMapper());
-        var wire = Assert.IsType<NetworkMotd>(serializer.Deserialize(serializer.Serialize(new NetworkMotd(paragraphs))));
+        var wire = Assert.IsType<NetworkServerInfo>(serializer.Deserialize(serializer.Serialize(new NetworkServerInfo(paragraphs))));
 
         Assert.Equal(paragraphs, copy.Paragraphs);
         Assert.Equal(paragraphs, wire.Paragraphs);
@@ -188,7 +188,7 @@ public class MotdTests
     [Fact]
     public void MovieBindsToTheViewModelsAndShowsPlainText()
     {
-        var document = XDocument.Load(FindRepositoryFile("UIMovies", "CoopMotdUIMovie.xml"));
+        var document = XDocument.Load(FindRepositoryFile("UIMovies", "CoopServerInfoUIMovie.xml"));
         var itemTemplate = Assert.Single(document.Descendants("ItemTemplate"));
         var paragraph = Assert.Single(itemTemplate.Elements());
 
@@ -196,18 +196,18 @@ public class MotdTests
         Assert.Equal("@Text", paragraph.Attribute("Text")?.Value);
         Assert.Empty(document.Descendants().Where(element => element.Name.LocalName.Contains("RichText")));
         Assert.Equal("{Paragraphs}", itemTemplate.Parent!.Attribute("DataSource")?.Value);
-        Assert.Contains(document.Descendants(), element => element.Attribute("Command.Click")?.Value == nameof(MotdVM.ExecuteClose));
+        Assert.Contains(document.Descendants(), element => element.Attribute("Command.Click")?.Value == nameof(ServerInfoVM.ExecuteClose));
         foreach (var binding in Bindings(document).Where(binding => !binding.Element.Ancestors("ItemTemplate").Any()))
-            Assert.NotNull(typeof(MotdVM).GetProperty(binding.Property));
+            Assert.NotNull(typeof(ServerInfoVM).GetProperty(binding.Property));
         foreach (var binding in Bindings(document).Where(binding => binding.Element.Ancestors("ItemTemplate").Any()))
-            Assert.NotNull(typeof(MotdParagraphVM).GetProperty(binding.Property));
+            Assert.NotNull(typeof(ServerInfoParagraphVM).GetProperty(binding.Property));
     }
 
     // Reuses the player list's brushes; the vanilla ones ship with Native, the co-op ones with the mod.
     [Fact]
     public void MovieUsesOnlyExistingBrushes()
     {
-        var document = XDocument.Load(FindRepositoryFile("UIMovies", "CoopMotdUIMovie.xml"));
+        var document = XDocument.Load(FindRepositoryFile("UIMovies", "CoopServerInfoUIMovie.xml"));
         var coopBrushes = XDocument.Load(FindRepositoryFile("deploy", "GUI", "Brushes", "CoopPlayerList.xml"))
             .Descendants("Brush").Select(brush => brush.Attribute("Name")!.Value).ToHashSet();
         var vanillaBrushes = new HashSet<string> { "Frame1Brush", "ScoreboardUnitRowBrush" };
@@ -225,11 +225,11 @@ public class MotdTests
     [Fact]
     public void PreviewSamplesFitTheServerCaps()
     {
-        Assert.InRange(MotdDebugCommands.SampleParagraphs.Length, 2, MotdLimits.MaxParagraphs);
-        Assert.Equal(MotdLimits.MaxParagraphs, MotdDebugCommands.LongSampleParagraphs.Length);
-        Assert.InRange(MotdDebugCommands.LongSampleParagraphs.Sum(paragraph => paragraph.Length), 1, MotdLimits.MaxLength);
+        Assert.InRange(ServerInfoDebugCommands.SampleParagraphs.Length, 2, ServerInfoLimits.MaxParagraphs);
+        Assert.Equal(ServerInfoLimits.MaxParagraphs, ServerInfoDebugCommands.LongSampleParagraphs.Length);
+        Assert.InRange(ServerInfoDebugCommands.LongSampleParagraphs.Sum(paragraph => paragraph.Length), 1, ServerInfoLimits.MaxLength);
         var registry = new Common.Commands.CoopCommandRegistry(
-            new Common.Commands.ICoopCommand[] { new MotdDebugCommands.MotdPreviewCoopCommand(), new MotdDebugCommands.MotdStateCoopCommand() },
+            new Common.Commands.ICoopCommand[] { new ServerInfoDebugCommands.ServerInfoPreviewCoopCommand(), new ServerInfoDebugCommands.ServerInfoStateCoopCommand() },
             new Serilog.LoggerConfiguration().CreateLogger());
         Assert.True(registry.Contains("coop.debug.ui.motd_preview"));
         Assert.True(registry.Contains("coop.debug.ui.motd_state"));
@@ -249,16 +249,16 @@ public class MotdTests
         return Path.Combine(new[] { directory!.FullName, first }.Concat(rest).ToArray());
     }
 
-    private sealed class FakePopup : IMotdPopup
+    private sealed class FakePopup : IServerInfoPopup
     {
-        public MotdVM? ViewModel { get; private set; }
+        public ServerInfoVM? ViewModel { get; private set; }
         public bool CanOpenResult { get; set; } = true;
         public int Created { get; private set; }
         public int Opened { get; private set; }
         public int Closed { get; private set; }
         public bool Disposed { get; private set; }
 
-        public MotdService CreateService() => new MotdService((viewModel, _) =>
+        public ServerInfoService CreateService() => new ServerInfoService((viewModel, _) =>
         {
             ViewModel = viewModel;
             Created++;

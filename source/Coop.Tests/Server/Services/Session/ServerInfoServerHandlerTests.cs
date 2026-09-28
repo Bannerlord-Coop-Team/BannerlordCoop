@@ -4,7 +4,7 @@ using Coop.Core.Server.Connections.Messages;
 using Coop.Core.Server.Services.Session;
 using Coop.Tests.Mocks;
 using Coop.Tests.Stubs;
-using GameInterface.Services.UI.Motd;
+using GameInterface.Services.UI.ServerInfo;
 using Moq;
 using System;
 using System.IO;
@@ -14,14 +14,14 @@ using Xunit;
 namespace Coop.Tests.Server.Services.Session;
 
 /// <summary>Tests the MOTD sent to a player after their campaign sync.</summary>
-public sealed class ServerMotdHandlerTests : IDisposable
+public sealed class ServerInfoServerHandlerTests : IDisposable
 {
     private readonly StubMessageBroker broker = new();
     private readonly TestNetwork network = new();
     private readonly Mock<IServerInfoConfig> serverInfo = new();
     private readonly string directory = Path.Combine(
         Path.GetTempPath(),
-        "BannerlordCoop-ServerMotdHandlerTests-" + Guid.NewGuid().ToString("N"));
+        "BannerlordCoop-ServerInfoServerHandlerTests-" + Guid.NewGuid().ToString("N"));
 
     [Fact]
     public void CampaignSync_SendsTheWholeMotdAsOneMessageToThatPeerOnly()
@@ -35,7 +35,7 @@ public sealed class ServerMotdHandlerTests : IDisposable
         DrainGameThread();
 
         var message = Assert.Single(network.GetPeerMessages(joiningPeer));
-        Assert.Equal(new[] { "Welcome to EU-1", "Restart 06:00 UTC" }, Assert.IsType<NetworkMotd>(message).Paragraphs);
+        Assert.Equal(new[] { "Welcome to EU-1", "Restart 06:00 UTC" }, Assert.IsType<NetworkServerInfo>(message).Paragraphs);
         Assert.False(network.SentNetworkMessages.ContainsKey(otherPeer.Id));
         Assert.Empty(network.ImmediateSends);
     }
@@ -67,8 +67,8 @@ public sealed class ServerMotdHandlerTests : IDisposable
         broker.Publish(rejoinedPeer, new PlayerCampaignSynchronized(rejoinedPeer));
         DrainGameThread();
 
-        Assert.Equal(2, network.GetPeerMessagesFromType<NetworkMotd>(peer).Count());
-        Assert.Single(network.GetPeerMessagesFromType<NetworkMotd>(rejoinedPeer));
+        Assert.Equal(2, network.GetPeerMessagesFromType<NetworkServerInfo>(peer).Count());
+        Assert.Single(network.GetPeerMessagesFromType<NetworkServerInfo>(rejoinedPeer));
     }
 
     // Uses the real file reader, so the caps and a broken escape reach the wire the way an operator writes them.
@@ -81,13 +81,13 @@ public sealed class ServerMotdHandlerTests : IDisposable
         string path = Path.Combine(directory, "server-info.json");
         File.WriteAllText(path, "{\"motd\":[" + string.Join(",", paragraphs) + "]}");
         var peer = network.CreatePeer();
-        using var handler = new ServerMotdHandler(broker, network, new ServerInfoConfig(path));
+        using var handler = new ServerInfoServerHandler(broker, network, new ServerInfoConfig(path));
 
         broker.Publish(peer, new PlayerCampaignSynchronized(peer));
         DrainGameThread();
 
-        var motd = Assert.Single(network.GetPeerMessagesFromType<NetworkMotd>(peer));
-        Assert.Equal(Enumerable.Range(1, MotdLimits.MaxParagraphs).Select(index => "Rule " + index), motd.Paragraphs);
+        var motd = Assert.Single(network.GetPeerMessagesFromType<NetworkServerInfo>(peer));
+        Assert.Equal(Enumerable.Range(1, ServerInfoLimits.MaxParagraphs).Select(index => "Rule " + index), motd.Paragraphs);
     }
 
     [Fact]
@@ -113,13 +113,13 @@ public sealed class ServerMotdHandlerTests : IDisposable
         if (Directory.Exists(directory)) Directory.Delete(directory, recursive: true);
     }
 
-    private ServerMotdHandler CreateHandler()
+    private ServerInfoServerHandler CreateHandler()
     {
-        return new ServerMotdHandler(broker, network, serverInfo.Object);
+        return new ServerInfoServerHandler(broker, network, serverInfo.Object);
     }
 
     private static void DrainGameThread()
     {
-        GameThread.Run(() => { }, blocking: true, label: nameof(ServerMotdHandlerTests));
+        GameThread.Run(() => { }, blocking: true, label: nameof(ServerInfoServerHandlerTests));
     }
 }

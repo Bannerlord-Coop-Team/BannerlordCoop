@@ -3,10 +3,10 @@ using Common.Commands;
 using System;
 using System.Linq;
 
-namespace GameInterface.Services.UI.Motd;
+namespace GameInterface.Services.UI.ServerInfo;
 
 /// <summary>[Debug] Shows and inspects the message of the day popup on a client without a server file.</summary>
-internal class MotdDebugCommands
+internal class ServerInfoDebugCommands
 {
     internal static readonly string[] SampleParagraphs =
     {
@@ -30,7 +30,7 @@ internal class MotdDebugCommands
         "Have fun, and thank you for playing. This last paragraph sits below the fold and only shows after scrolling down.",
     };
 
-    public sealed class MotdPreviewCoopCommand : ICoopCommand
+    public sealed class ServerInfoPreviewCoopCommand : ICoopCommand
     {
         public string Prefix => "coop.debug.ui";
         public string Name => "motd_preview";
@@ -44,7 +44,7 @@ internal class MotdDebugCommands
         // Goes through the same pending and focus rules as a real join, so it opens once the map is free.
         public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
         {
-            if (!ContainerProvider.TryResolve<IMotdService>(out var service))
+            if (!ContainerProvider.TryResolve<IServerInfoService>(out var service))
                 return new CoopCommandResult(false, "Message of the day unavailable.", "unavailable");
             service.Show(Paragraphs(args));
             return new CoopCommandResult(true, service.Describe());
@@ -58,7 +58,7 @@ internal class MotdDebugCommands
         }
     }
 
-    public sealed class MotdStateCoopCommand : ICoopCommand
+    public sealed class ServerInfoStateCoopCommand : ICoopCommand
     {
         public string Prefix => "coop.debug.ui";
         public string Name => "motd_state";
@@ -69,7 +69,7 @@ internal class MotdDebugCommands
         // Reads only this client's popup state.
         public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
         {
-            if (!ContainerProvider.TryResolve<IMotdService>(out var service))
+            if (!ContainerProvider.TryResolve<IServerInfoService>(out var service))
                 return new CoopCommandResult(false, "Message of the day unavailable.", "unavailable");
             return new CoopCommandResult(true, service.Describe());
         }

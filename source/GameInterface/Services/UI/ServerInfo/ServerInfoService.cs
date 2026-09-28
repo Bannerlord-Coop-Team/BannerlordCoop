@@ -2,38 +2,38 @@
 using System;
 using System.Linq;
 
-namespace GameInterface.Services.UI.Motd;
+namespace GameInterface.Services.UI.ServerInfo;
 
 /// <summary>Owns the client's message of the day popup for one co-op session.</summary>
-public interface IMotdService : IGameAbstraction
+public interface IServerInfoService : IGameAbstraction
 {
     void Initialize();
     void Show(string[] paragraphs);
     string Describe();
 }
 
-/// <inheritdoc cref="IMotdService"/>
-public sealed class MotdService : IMotdService, IDisposable
+/// <inheritdoc cref="IServerInfoService"/>
+public sealed class ServerInfoService : IServerInfoService, IDisposable
 {
-    private readonly Func<MotdVM, Action, IMotdPopup> createPopup;
-    private readonly MotdVM viewModel;
-    private IMotdPopup popup;
+    private readonly Func<ServerInfoVM, Action, IServerInfoPopup> createPopup;
+    private readonly ServerInfoVM viewModel;
+    private IServerInfoPopup popup;
     private string[] pending;
 
     // Builds the Gauntlet overlay only when Initialize runs on a client with a campaign.
-    public MotdService(IChatService chat) : this((viewModel, update) =>
+    public ServerInfoService(IChatService chat) : this((viewModel, update) =>
     {
-        var overlay = new MotdOverlay(viewModel, chat, update);
+        var overlay = new ServerInfoOverlay(viewModel, chat, update);
         overlay.Initialize();
         return overlay;
     })
     {
     }
 
-    internal MotdService(Func<MotdVM, Action, IMotdPopup> createPopup)
+    internal ServerInfoService(Func<ServerInfoVM, Action, IServerInfoPopup> createPopup)
     {
         this.createPopup = createPopup;
-        viewModel = new MotdVM(() => popup?.Close());
+        viewModel = new ServerInfoVM(() => popup?.Close());
     }
 
     // Creates the map overlay once; a message that arrived earlier waits for it.

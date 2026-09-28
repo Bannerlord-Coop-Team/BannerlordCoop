@@ -1,5 +1,5 @@
 ﻿using GameInterface.Services.UI.PlayerList;
-using GameInterface.Services.UI.Motd;
+using GameInterface.Services.UI.ServerInfo;
 using Autofac;
 using Common.Messaging;
 using Common.Network;
@@ -135,7 +135,7 @@ internal abstract class TestComponentBase
         RegisterMock<IConnectedPlayerCountService>(builder);
         RegisterMock<IChatService>(builder);
         RegisterMock<IPlayerListService>(builder);
-        RegisterMock<IMotdService>(builder);
+        RegisterMock<IServerInfoService>(builder);
         RegisterMock<IPlayerActivityReader>(builder);
         RegisterMock<IPlatformDisplayNameProvider>(builder);
         RegisterMock<IVoiceClient>(builder);
