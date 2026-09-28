@@ -40,6 +40,8 @@ namespace Coop.Tests.Autofac
             // Chat and the server info panel need each other; Lazy keeps that from being a cycle.
             Assert.NotNull(container.Resolve<global::GameInterface.Services.Chat.IChatService>());
             Assert.NotNull(container.Resolve<global::GameInterface.Services.UI.ServerInfo.IServerInfoService>());
+            // Both map panels take the shared map check from the container.
+            Assert.NotNull(container.Resolve<global::GameInterface.Services.UI.PlayerList.IPlayerListService>());
             Assert.Equal("Not started", container.Resolve<IVoiceAudio>().Status);
 
             var logic = container.Resolve<ILogic>();

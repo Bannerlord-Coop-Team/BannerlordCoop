@@ -1,6 +1,7 @@
 ﻿using GameInterface.Services.Players.Data;
 using GameInterface.Services.Chat;
 using GameInterface.Services.Entity;
+using GameInterface.Services.UI;
 using Common.Messaging;
 using GameInterface.Services.UI.CoopOptions;
 using GameInterface.Services.UI.CoopOptions.Providers.UITab;
@@ -125,7 +126,7 @@ public class PlayerListTests
     {
         var store = new Mock<ICoopOptionsStore>();
         store.Setup(x => x.LoadOrDefault()).Returns(new CoopOptionsData());
-        using var service = new PlayerListService(Mock.Of<IChatService>(), store.Object, Mock.Of<IMessageBroker>(), Mock.Of<IControllerIdProvider>());
+        using var service = new PlayerListService(Mock.Of<IChatService>(), store.Object, Mock.Of<IMessageBroker>(), Mock.Of<IControllerIdProvider>(), Mock.Of<IMapAvailability>());
         service.PreviewLayout(true);
         service.Update(new[] { new PlayerListEntry { ControllerId = "real", PlatformName = "Actual player" } });
         Assert.Contains("Preview Player 18", service.Describe());

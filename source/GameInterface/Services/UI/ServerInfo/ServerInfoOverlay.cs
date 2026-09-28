@@ -1,5 +1,4 @@
 ﻿using GameInterface.Services.Chat;
-using GameInterface.Services.UI.PlayerList;
 using SandBox.View.Map;
 using System;
 using TaleWorlds.Engine.GauntletUI;
@@ -23,15 +22,17 @@ internal sealed class ServerInfoOverlay : GlobalLayer, IServerInfoPopup
 {
     private readonly ServerInfoVM viewModel;
     private readonly IChatService chat;
+    private readonly IMapAvailability mapAvailability;
     private readonly Action update;
     private GauntletLayer layer;
     private GauntletMovieIdentifier movie;
 
-    // Receives the panel state, the chat focus guard and the service's per-frame check.
-    public ServerInfoOverlay(ServerInfoVM viewModel, IChatService chat, Action update)
+    // Receives the panel state, the chat focus guard, the map check shared with the player list and the service's per-frame check.
+    public ServerInfoOverlay(ServerInfoVM viewModel, IChatService chat, IMapAvailability mapAvailability, Action update)
     {
         this.viewModel = viewModel;
         this.chat = chat;
+        this.mapAvailability = mapAvailability;
         this.update = update;
     }
 
@@ -54,14 +55,14 @@ internal sealed class ServerInfoOverlay : GlobalLayer, IServerInfoPopup
             update();
             return;
         }
-        if (!PlayerListOverlay.IsMapAvailable() || !ReferenceEquals(ScreenManager.FocusedLayer, layer)) Close();
+        if (!mapAvailability.IsMapAvailable() || !ReferenceEquals(ScreenManager.FocusedLayer, layer)) Close();
         else if (Input.IsKeyReleased(InputKey.Escape)) viewModel.HandleEscape();
     }
 
     // Uses the player list's toggle rules, so it waits while the list, chat typing or another modal has focus.
     public bool CanOpen()
     {
-        if (!PlayerListOverlay.IsMapAvailable() || chat.IsTyping || Input.IsOnScreenKeyboardActive) return false;
+        if (!mapAvailability.IsMapAvailable() || chat.IsTyping || Input.IsOnScreenKeyboardActive) return false;
         var focused = ScreenManager.FocusedLayer;
         if (focused is GauntletLayer gauntlet &&
             gauntlet.UIContext.EventManager.FocusedWidget is EditableTextWidget) return false;

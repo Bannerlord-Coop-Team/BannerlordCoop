@@ -29,9 +29,9 @@ public sealed class ServerInfoService : IServerInfoService, IDisposable
     private bool pending;
 
     // Builds the Gauntlet overlay only when Initialize runs on a client with a campaign.
-    public ServerInfoService(IChatService chat, IServerInfoLinkRules linkRules, IBrowserLinkOpener opener) : this((viewModel, update) =>
+    public ServerInfoService(IChatService chat, IMapAvailability mapAvailability, IServerInfoLinkRules linkRules, IBrowserLinkOpener opener) : this((viewModel, update) =>
     {
-        var overlay = new ServerInfoOverlay(viewModel, chat, update);
+        var overlay = new ServerInfoOverlay(viewModel, chat, mapAvailability, update);
         overlay.Initialize();
         return overlay;
     }, linkRules, opener)
