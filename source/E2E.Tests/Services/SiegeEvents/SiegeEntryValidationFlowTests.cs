@@ -392,7 +392,7 @@ public class SiegeEntryValidationFlowTests : MapEventTestBase
 
         client.Call(() =>
         {
-            var settlement = PrepareClientMenuSettlement(client, context);
+            var settlement = PrepareClientMenuContext(client, context);
             Assert.True(client.ObjectManager.TryGetObject<MapEvent>(battle.MapEventId, out var mapEvent));
             using (new AllowedThread())
             {
@@ -430,7 +430,7 @@ public class SiegeEntryValidationFlowTests : MapEventTestBase
         var context = CreateEntryContext(client);
         client.Call(() =>
         {
-            var settlement = PrepareClientMenuSettlement(client, context);
+            var settlement = PrepareClientMenuContext(client, context);
             using (new AllowedThread()) MobileParty.MainParty.CurrentSettlement = settlement;
             Campaign.Current.PlayerEncounter = null;
 
@@ -455,7 +455,7 @@ public class SiegeEntryValidationFlowTests : MapEventTestBase
 
         client.Call(() =>
         {
-            var settlement = PrepareClientMenuSettlement(client, context);
+            var settlement = PrepareClientMenuContext(client, context);
             Assert.True(client.ObjectManager.TryGetObject<MapEvent>(battle.MapEventId, out var mapEvent));
             using (new AllowedThread())
             {
@@ -492,18 +492,23 @@ public class SiegeEntryValidationFlowTests : MapEventTestBase
             client.NetworkSentMessages.GetMessages<NetworkRequestStartSettlementEncounter>().Count());
     }
 
-    private static Settlement PrepareClientMenuSettlement(EnvironmentInstance client, EntryContext context)
+    private static Settlement PrepareClientMenuContext(EnvironmentInstance client, EntryContext context)
     {
+        Assert.True(client.ObjectManager.TryGetObject<MobileParty>(context.PartyId, out var party));
         Assert.True(client.ObjectManager.TryGetObject<Settlement>(context.SettlementId, out var settlement));
         Assert.True(client.ObjectManager.TryGetObject<Town>(context.TownId, out var town));
         Assert.True(client.ObjectManager.TryGetObject<Clan>(context.DefenderClanId, out var defenderClan));
         using (new AllowedThread())
         {
+            // Player registration does not replace the client's bootstrap main party.
+            Campaign.Current.MainParty = party;
             // CreateEntryContext wires the server city under AllowedThread, so prepare its client copy too.
             settlement.SetSettlementComponent(town);
             town.OwnerClan = defenderClan;
         }
 
+        Assert.Same(party, MobileParty.MainParty);
+        Assert.True(client.ObjectManager.TryGetHandle(MobileParty.MainParty, out _));
         Assert.True(settlement.IsTown);
         Assert.Equal(KillCharacterAction.KillCharacterActionDetail.None, Hero.MainHero.DeathMark);
         Assert.Null(MobileParty.MainParty.MapEvent);
