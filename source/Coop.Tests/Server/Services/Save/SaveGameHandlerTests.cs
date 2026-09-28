@@ -93,6 +93,23 @@ public class SaveGameHandlerTests
         Assert.False(written.Success);
     }
 
+    [Fact]
+    public void GameSaved_SessionSnapshotThrows_ReportsNotWritten()
+    {
+        var messageBroker = new TestMessageBroker();
+        var saveManager = new StubSaveManager(null!);
+        var playerRegistry = new Mock<IPlayerManager>();
+        playerRegistry.SetupGet(registry => registry.Players).Throws(new InvalidOperationException("registry changed"));
+        using var handler = CreateSavingHandler(messageBroker, saveManager, playerRegistry.Object);
+
+        messageBroker.Publish(new object(), new GameSaved(SaveName));
+
+        Assert.Empty(saveManager.WrittenSaveNames);
+        var written = Assert.Single(messageBroker.Messages.GetMessages<CoopSessionWritten>());
+        Assert.Equal(SaveName, written.SaveName);
+        Assert.False(written.Success);
+    }
+
     [Theory]
     // A save written before controller ids were unique can hold the duplicates in either order,
     // and the dead one comes first as often as not.
@@ -277,16 +294,23 @@ public class SaveGameHandlerTests
         return handler;
     }
 
-    private static SaveGameHandler CreateSavingHandler(TestMessageBroker messageBroker, StubSaveManager saveManager)
+    private static SaveGameHandler CreateSavingHandler(
+        TestMessageBroker messageBroker,
+        StubSaveManager saveManager,
+        IPlayerManager? playerRegistry = null)
     {
-        var playerRegistry = new Mock<IPlayerManager>();
-        playerRegistry.SetupGet(registry => registry.Players).Returns(Array.Empty<Player>());
+        if (playerRegistry == null)
+        {
+            var registry = new Mock<IPlayerManager>();
+            registry.SetupGet(value => value.Players).Returns(Array.Empty<Player>());
+            playerRegistry = registry.Object;
+        }
 
         return new SaveGameHandler(
             messageBroker,
             saveManager,
             new Mock<ICoopSessionProvider>().Object,
-            playerRegistry.Object,
+            playerRegistry,
             new Mock<IPlayerPartyRestorer>().Object,
             new Mock<INetwork>().Object,
             new Mock<IObjectManager>().Object);

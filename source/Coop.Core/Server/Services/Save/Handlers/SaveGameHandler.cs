@@ -89,6 +89,22 @@ internal class SaveGameHandler : IHandler
     private void Handle_GameSaved(MessagePayload<GameSaved> obj)
     {
         var saveName = obj.What.SaveName;
+        try
+        {
+            WriteCoopSession(saveName);
+        }
+        catch (Exception ex)
+        {
+            Logger.Error(ex, "Failed to write the co-op session for save {SaveName}", saveName);
+            messageBroker.Publish(this, new CoopSessionWritten(saveName, false));
+            return;
+        }
+
+        messageBroker.Publish(this, new CoopSessionWritten(saveName, true));
+    }
+
+    private void WriteCoopSession(string saveName)
+    {
         var current = coopSessionProvider.CoopSession;
         var empty = CoopSession.Empty;
 
@@ -108,18 +124,7 @@ internal class SaveGameHandler : IHandler
 
         coopSessionProvider.CoopSession = session;
 
-        try
-        {
-            saveManager.SaveCoopSession(saveName, session);
-        }
-        catch (Exception ex)
-        {
-            Logger.Error(ex, "Failed to write the co-op session for save {SaveName}", saveName);
-            messageBroker.Publish(this, new CoopSessionWritten(saveName, false));
-            return;
-        }
-
-        messageBroker.Publish(this, new CoopSessionWritten(saveName, true));
+        saveManager.SaveCoopSession(saveName, session);
     }
 
     private ICoopSession savedSession;
