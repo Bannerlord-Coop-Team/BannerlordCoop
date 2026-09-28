@@ -62,21 +62,30 @@ public class BattleSpawnGateTests : IDisposable
     }
 
     [Fact]
-    public void RoutedAttackerWeapon_IsScopedAndRestored()
+    public void RoutedBlow_RestoresWeaponAndSourceAfterNestedFailure()
     {
         var outerWeapon = new WeaponComponentData(null, WeaponClass.Arrow, default);
         var innerWeapon = new WeaponComponentData(null, WeaponClass.Bolt, default);
 
         Assert.Null(BattleSpawnGate.RoutedAttackerWeapon);
+        Assert.Null(BattleSpawnGate.RoutedBlowSourceControllerId);
 
-        BattleSpawnGate.RunWithRoutedAttackerWeapon(outerWeapon, () =>
+        BattleSpawnGate.RunWithRoutedBlow(outerWeapon, "outer", () =>
         {
             Assert.Same(outerWeapon, BattleSpawnGate.RoutedAttackerWeapon);
-            BattleSpawnGate.RunWithRoutedAttackerWeapon(innerWeapon,
-                () => Assert.Same(innerWeapon, BattleSpawnGate.RoutedAttackerWeapon));
+            Assert.Equal("outer", BattleSpawnGate.RoutedBlowSourceControllerId);
+            Assert.Throws<InvalidOperationException>(() =>
+                BattleSpawnGate.RunWithRoutedBlow(innerWeapon, "inner", () =>
+                {
+                    Assert.Same(innerWeapon, BattleSpawnGate.RoutedAttackerWeapon);
+                    Assert.Equal("inner", BattleSpawnGate.RoutedBlowSourceControllerId);
+                    throw new InvalidOperationException();
+                }));
             Assert.Same(outerWeapon, BattleSpawnGate.RoutedAttackerWeapon);
+            Assert.Equal("outer", BattleSpawnGate.RoutedBlowSourceControllerId);
         });
 
         Assert.Null(BattleSpawnGate.RoutedAttackerWeapon);
+        Assert.Null(BattleSpawnGate.RoutedBlowSourceControllerId);
     }
 }
