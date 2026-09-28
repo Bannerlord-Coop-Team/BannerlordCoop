@@ -4,6 +4,7 @@ using Common.Messaging;
 using GameInterface.Services.GameDebug.Messages;
 using Serilog;
 using System;
+using System.Threading;
 using TaleWorlds.Core;
 using TaleWorlds.Library;
 using TaleWorlds.MountAndBlade;
@@ -30,7 +31,7 @@ internal class DebugMessageHandler : IHandler
     public DebugMessageHandler(IMessageBroker messageBroker)
         : this(
             messageBroker,
-            action => GameThread.EnqueueSafe(action, context: nameof(DebugMessageHandler)),
+            EnqueueOutsideSession,
             IsPopupHostReady,
             () => DateTime.UtcNow,
             ShowPopup)
@@ -40,7 +41,7 @@ internal class DebugMessageHandler : IHandler
     internal DebugMessageHandler(IMessageBroker messageBroker, Action<string> showPopup)
         : this(
             messageBroker,
-            action => GameThread.EnqueueSafe(action, context: nameof(DebugMessageHandler)),
+            EnqueueOutsideSession,
             () => true,
             () => DateTime.UtcNow,
             showPopup)
@@ -110,6 +111,15 @@ internal class DebugMessageHandler : IHandler
 
             showPopup(text);
         });
+    }
+
+    // A popup usually explains why the session ended, so the teardown that cancels the session must not drop it.
+    private static void EnqueueOutsideSession(Action action)
+    {
+        using (GameThread.ActivateCancellation(CancellationToken.None))
+        {
+            GameThread.EnqueueSafe(action, context: nameof(DebugMessageHandler));
+        }
     }
 
     private static bool IsPopupHostReady()

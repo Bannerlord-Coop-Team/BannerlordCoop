@@ -94,10 +94,13 @@ public interface IMissionManager
     /// recovered instead of being dropped as stale.
     /// </summary>
     bool TryTakeExpiredConclusion(string instanceId);
+
+    /// <summary>Read-only snapshot of the instance counts.</summary>
+    MissionManagerDiagnostics GetDiagnostics();
 }
 
 /// <summary>Counts of the mission-manager state that can grow while a server runs.</summary>
-internal readonly struct MissionManagerDiagnostics
+public readonly struct MissionManagerDiagnostics
 {
     public int ActiveInstances { get; }
     public int MembershipBackedInstances { get; }
@@ -849,7 +852,7 @@ public class MissionManager : IMissionManager, IMissionMembershipRegistry
     }
 
     // Read-only snapshot of everything that can grow. Caller may hold the lock.
-    internal MissionManagerDiagnostics GetDiagnostics()
+    public MissionManagerDiagnostics GetDiagnostics()
     {
         lock (gate)
         {
