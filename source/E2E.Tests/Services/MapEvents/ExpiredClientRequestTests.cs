@@ -5,9 +5,12 @@ using E2E.Tests.Environment.Instance;
 using GameInterface.Services.MapEvents.Messages.Leave;
 using GameInterface.Services.MapEvents.Messages.Start;
 using GameInterface.Services.MobileParties.Messages.Behavior;
+using GameInterface.Services.PlayerCaptivityService.Messages;
 using HarmonyLib;
 using LiteNetLib;
 using System.Reflection;
+using TaleWorlds.CampaignSystem;
+using TaleWorlds.CampaignSystem.Actions;
 using TaleWorlds.CampaignSystem.MapEvents;
 using TaleWorlds.CampaignSystem.Party;
 using Xunit.Abstractions;
@@ -167,6 +170,45 @@ public class ExpiredClientRequestTests : MapEventTestBase
         AssertLeftOnce(partyBaseId);
     }
 
+    [Fact]
+    public void CaptivityRelease_ExpiredOnTheServer_ReleasesAndRepliesOnceOnTheNextPump()
+    {
+        var (heroId, partyId, captorPartyId, request) = CaptureAndRequestRelease();
+        var client = Clients.First();
+
+        // The client already cleared its captivity state and waits for the reply without a deadline.
+        Server.NetworkSentMessages.Clear();
+        Server.Call(() =>
+        {
+            using (GameThread.Instance.LimitFrameDrain(TimeSpan.FromSeconds(1), TimeSpan.FromMilliseconds(200)))
+                new PollerReceive<NetworkEndPlayerCaptivityAttempted>(Server, client.NetPeer, request).AssertReturned();
+
+            AssertCaptivity(Server, heroId, captorPartyId);
+            Assert.Empty(Server.NetworkSentMessages.GetMessages<NetworkPlayerCaptivityEnded>());
+            RunQueuedActions(Server);
+        }, ReleaseDisabledMethods());
+
+        AssertReleasedOnce(heroId, partyId);
+    }
+
+    [Fact]
+    public void CaptivityRelease_TimingOutWhileItRuns_ReleasesAndRepliesOnce()
+    {
+        var (heroId, partyId, _, request) = CaptureAndRequestRelease();
+        var client = Clients.First();
+
+        Server.NetworkSentMessages.Clear();
+        Server.Call(() =>
+        {
+            using (GameThread.Instance.LimitFrameDrain(TimeSpan.FromSeconds(1), TimeSpan.FromSeconds(2)))
+                RunHeldUntilThePollerGivesUp<NetworkEndPlayerCaptivityAttempted, PlayerPartyReleasedFromCaptivity>(client, request).AssertReturned();
+
+            RunQueuedActions(Server);
+        }, ReleaseDisabledMethods());
+
+        AssertReleasedOnce(heroId, partyId);
+    }
+
     /// <summary>Joins the client's party to the attacker side and returns the request it sent, undelivered.</summary>
     private NetworkRequestJoinBattle RequestJoin(EnvironmentInstance client, string mapEventId, string partyId)
     {
@@ -218,6 +260,39 @@ public class ExpiredClientRequestTests : MapEventTestBase
                 Assert.Null(party.MapEvent);
             });
         }
+    }
+
+    /// <summary>Captures a connected player and returns the release request its client sends after an escape.</summary>
+    private (string heroId, string partyId, string captorPartyId, NetworkEndPlayerCaptivityAttempted request) CaptureAndRequestRelease()
+    {
+        var (heroId, partyId) = CreatePlayerHeroParty("MyControllerId");
+        TestEnvironment.ConnectRegisteredPlayer(Clients.First(), "MyControllerId");
+        var captorPartyId = TestEnvironment.CreateRegisteredObject<MobileParty>();
+        DefeatPlayerPartyInBattle(heroId, partyId, captorPartyId);
+        AssertCaptivity(Server, heroId, captorPartyId);
+
+        CampaignVec2 position = default;
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject<MobileParty>(partyId, out var party));
+            position = party.Position;
+        });
+
+        var request = new NetworkEndPlayerCaptivityAttempted(
+            heroId, partyId, position, EndCaptivityDetail.ReleasedAfterEscape, null, 0);
+        return (heroId, partyId, captorPartyId, request);
+    }
+
+    // An escape releases from a still-active captor, and the disengage from it pathfinds on a live map scene.
+    private IReadOnlyList<MethodBase> ReleaseDisabledMethods() => MapEventDisabledMethods
+        .Append(AccessTools.Method(typeof(MobileParty), nameof(MobileParty.TeleportPartyToOutSideOfEncounterRadius)))
+        .ToList();
+
+    private void AssertReleasedOnce(string heroId, string partyId)
+    {
+        Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkPlayerCaptivityEnded>());
+        AssertCaptivity(Server, heroId, null);
+        AssertPlayerPartyRestored(Server, heroId, partyId);
     }
 
     /// <summary>
