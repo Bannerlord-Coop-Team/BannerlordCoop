@@ -6,7 +6,7 @@ using TaleWorlds.Library;
 
 namespace Missions.Agents.Messages;
 
-/// <summary>Replays collision presentation that native simulation produced only on the attacking peer.</summary>
+/// <summary>Replays collision presentation selected by the peer processing the hit.</summary>
 [ProtoContract(SkipConstructor = true)]
 public readonly struct NetworkMeleeHitPresentation : IEvent
 {
@@ -34,6 +34,12 @@ public readonly struct NetworkMeleeHitPresentation : IEvent
     [ProtoMember(8)]
     public float Strength { get; }
 
+    [ProtoMember(9)]
+    public int SoundIndex { get; }
+
+    [ProtoMember(10)]
+    public float ArmorType { get; }
+
     public NetworkMeleeHitPresentation(
         Guid victimAgentId,
         bool isMount,
@@ -42,7 +48,9 @@ public readonly struct NetworkMeleeHitPresentation : IEvent
         Vec3 collisionPosition,
         WeaponClass attackerWeaponClass,
         int physicsMaterialIndex,
-        float strength)
+        float strength,
+        int soundIndex = -1,
+        float armorType = 0f)
     {
         VictimAgentId = victimAgentId;
         IsMount = isMount;
@@ -52,5 +60,7 @@ public readonly struct NetworkMeleeHitPresentation : IEvent
         AttackerWeaponClass = attackerWeaponClass;
         PhysicsMaterialIndex = physicsMaterialIndex;
         Strength = strength;
+        SoundIndex = soundIndex;
+        ArmorType = armorType;
     }
 }
