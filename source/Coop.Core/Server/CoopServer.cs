@@ -52,6 +52,7 @@ public class CoopServer : CoopNetworkBase, ICoopServer
     // Co-hosted NAT-punch rendezvous for P2P instances (taverns etc.). The server's NetManager
     // already has NatPunchEnabled; the MissionManager answers the introduction requests.
     private readonly IMissionManager missionManager;
+    private readonly IUdpBindDiagnostics bindDiagnostics;
 
     public CoopServer(
         INetworkConfig configuration,
@@ -63,6 +64,7 @@ public class CoopServer : CoopNetworkBase, ICoopServer
         IMissionManager missionManager,
         Lazy<IOverloadedPeerManager> overloadedPeerManager,
         ISendCoalescer coalescer,
+        IUdpBindDiagnostics bindDiagnostics,
         ICommonSerializer serializer,
         IReliableMessageBatcher<NetPeer> reliableMessageBatcher,
         CancellationTokenSource sessionCancellation)
@@ -76,6 +78,7 @@ public class CoopServer : CoopNetworkBase, ICoopServer
         this.missionManager = missionManager;
         this.overloadedPeerManager = overloadedPeerManager;
         this.coalescer = coalescer;
+        this.bindDiagnostics = bindDiagnostics;
 
         // Netmanager initialization
         netManager.NatPunchEnabled = true;
@@ -197,12 +200,21 @@ public class CoopServer : CoopNetworkBase, ICoopServer
 
         if (netManager.Start(IPAddress.Any, IPAddress.IPv6Any, Config.Port))
         {
+            Logger.Information("Server listening on UDP port {Port}", netManager.LocalPort);
             StartNetworkPoller();
             messageBroker.Publish(this, new ServerListening());
             return;
         }
 
-        Logger.Error("Server failed to bind port {Port}; it may already be in use", Config.Port);
+        // LiteNetLib returns false without binding when it is already running.
+        if (netManager.IsRunning)
+        {
+            Logger.Warning("Server is already listening on UDP port {Port}; ignoring the second start", netManager.LocalPort);
+            return;
+        }
+
+        UdpBindFailure failure = bindDiagnostics.Describe(Config.Port);
+        Logger.Error("Server failed to bind UDP port {Port} ({SocketError:l}): {Detail:l}", Config.Port, failure.Error, failure.Detail);
     }
 
     public override void SendAll(IPacket packet)
