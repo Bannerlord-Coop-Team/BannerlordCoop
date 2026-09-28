@@ -2,261 +2,267 @@
   <Window>
     <Widget WidthSizePolicy="StretchToParent" HeightSizePolicy="StretchToParent" DoNotAcceptEvents="true" IsVisible="@IsOpen">
       <Children>
-        <DimensionSyncWidget Id="CoopServerInfoRoot" WidthSizePolicy="Fixed" SuggestedWidth="960" HeightSizePolicy="Fixed" HorizontalAlignment="Center" VerticalAlignment="Center"
-                             DimensionToSync="Vertical" WidgetToCopyHeightFrom="Content">
+        <!-- The frame is as high as the tallest panel and stays centred. The panel hangs from its top edge, so the title
+             and the tabs stay in place when a shorter tab is selected. -->
+        <Widget Id="CoopServerInfoFrame" WidthSizePolicy="Fixed" SuggestedWidth="960" HeightSizePolicy="Fixed" SuggestedHeight="620" HorizontalAlignment="Center" VerticalAlignment="Center" DoNotAcceptEvents="true">
           <Children>
-            <BrushWidget WidthSizePolicy="StretchToParent" HeightSizePolicy="StretchToParent" Brush="Frame1Brush">
+            <DimensionSyncWidget Id="CoopServerInfoRoot" WidthSizePolicy="Fixed" SuggestedWidth="960" HeightSizePolicy="Fixed" HorizontalAlignment="Center" VerticalAlignment="Top"
+                                 DimensionToSync="Vertical" WidgetToCopyHeightFrom="Content">
               <Children>
-                <Widget WidthSizePolicy="StretchToParent" HeightSizePolicy="StretchToParent" Sprite="BlankWhiteSquare_9" Color="#17161380" DoNotAcceptEvents="true"/>
-              </Children>
-            </BrushWidget>
-            <BrushWidget WidthSizePolicy="Fixed" SuggestedWidth="580" HeightSizePolicy="Fixed" SuggestedHeight="116" MarginLeft="12" MarginTop="-24" Brush="Coop.PlayerList.Title.Background" DoNotAcceptEvents="true">
-              <Children>
-                <TextWidget WidthSizePolicy="StretchToParent" HeightSizePolicy="StretchToParent" MarginLeft="74" MarginRight="40" Brush="Coop.PlayerList.Title.Text" Text="@Title" DoNotAcceptEvents="true"/>
-              </Children>
-            </BrushWidget>
+                <BrushWidget WidthSizePolicy="StretchToParent" HeightSizePolicy="StretchToParent" Brush="Frame1Brush">
+                  <Children>
+                    <Widget WidthSizePolicy="StretchToParent" HeightSizePolicy="StretchToParent" Sprite="BlankWhiteSquare_9" Color="#17161380" DoNotAcceptEvents="true"/>
+                  </Children>
+                </BrushWidget>
+                <BrushWidget WidthSizePolicy="Fixed" SuggestedWidth="580" HeightSizePolicy="Fixed" SuggestedHeight="116" MarginLeft="12" MarginTop="-24" Brush="Coop.PlayerList.Title.Background" DoNotAcceptEvents="true">
+                  <Children>
+                    <TextWidget WidthSizePolicy="StretchToParent" HeightSizePolicy="StretchToParent" MarginLeft="74" MarginRight="40" Brush="Coop.PlayerList.Title.Text" Text="@Title" DoNotAcceptEvents="true"/>
+                  </Children>
+                </BrushWidget>
 
-            <!-- Tabs: only tabs with content are shown, in this order. -->
-            <ListPanel Id="ServerInfoTabs" WidthSizePolicy="CoverChildren" HeightSizePolicy="Fixed" SuggestedHeight="48" HorizontalAlignment="Center" MarginTop="106"
-                       StackLayout.LayoutMethod="HorizontalLeftToRight">
-              <Children>
-                <ButtonWidget Id="ServerInfoTabMotd" WidthSizePolicy="Fixed" SuggestedWidth="216" HeightSizePolicy="Fixed" SuggestedHeight="48" MarginLeft="4" MarginRight="4"
-                              Brush="Header.Tab.Center" IsVisible="@HasMotd" IsSelected="@IsMotdSelected" Command.Click="ExecuteSelectTab" CommandParameter.Click="0"
-                              DoNotPassEventsToChildren="true" UpdateChildrenStates="true">
+                <!-- Tabs: only tabs with content are shown, in this order. -->
+                <ListPanel Id="ServerInfoTabs" WidthSizePolicy="CoverChildren" HeightSizePolicy="Fixed" SuggestedHeight="48" HorizontalAlignment="Center" MarginTop="106"
+                           StackLayout.LayoutMethod="HorizontalLeftToRight">
                   <Children>
-                    <TextWidget WidthSizePolicy="StretchToParent" HeightSizePolicy="StretchToParent" MarginLeft="6" MarginRight="6" Brush="Clan.TabControl.Text" Brush.FontSize="22" Text="@MotdTabText"/>
-                  </Children>
-                </ButtonWidget>
-                <ButtonWidget Id="ServerInfoTabRules" WidthSizePolicy="Fixed" SuggestedWidth="216" HeightSizePolicy="Fixed" SuggestedHeight="48" MarginLeft="4" MarginRight="4"
-                              Brush="Header.Tab.Center" IsVisible="@HasRules" IsSelected="@IsRulesSelected" Command.Click="ExecuteSelectTab" CommandParameter.Click="1"
-                              DoNotPassEventsToChildren="true" UpdateChildrenStates="true">
-                  <Children>
-                    <TextWidget WidthSizePolicy="StretchToParent" HeightSizePolicy="StretchToParent" MarginLeft="6" MarginRight="6" Brush="Clan.TabControl.Text" Brush.FontSize="22" Text="@RulesTabText"/>
-                  </Children>
-                </ButtonWidget>
-                <ButtonWidget Id="ServerInfoTabLinks" WidthSizePolicy="Fixed" SuggestedWidth="216" HeightSizePolicy="Fixed" SuggestedHeight="48" MarginLeft="4" MarginRight="4"
-                              Brush="Header.Tab.Center" IsVisible="@HasLinks" IsSelected="@IsLinksSelected" Command.Click="ExecuteSelectTab" CommandParameter.Click="2"
-                              DoNotPassEventsToChildren="true" UpdateChildrenStates="true">
-                  <Children>
-                    <TextWidget WidthSizePolicy="StretchToParent" HeightSizePolicy="StretchToParent" MarginLeft="6" MarginRight="6" Brush="Clan.TabControl.Text" Brush.FontSize="22" Text="@LinksTabText"/>
-                  </Children>
-                </ButtonWidget>
-                <ButtonWidget Id="ServerInfoTabNews" WidthSizePolicy="Fixed" SuggestedWidth="216" HeightSizePolicy="Fixed" SuggestedHeight="48" MarginLeft="4" MarginRight="4"
-                              Brush="Header.Tab.Center" IsVisible="@HasNews" IsSelected="@IsNewsSelected" Command.Click="ExecuteSelectTab" CommandParameter.Click="3"
-                              DoNotPassEventsToChildren="true" UpdateChildrenStates="true">
-                  <Children>
-                    <TextWidget WidthSizePolicy="StretchToParent" HeightSizePolicy="StretchToParent" MarginLeft="6" MarginRight="6" Brush="Clan.TabControl.Text" Brush.FontSize="22" Text="@NewsTabText"/>
-                  </Children>
-                </ButtonWidget>
-              </Children>
-            </ListPanel>
-            <Widget WidthSizePolicy="StretchToParent" HeightSizePolicy="Fixed" SuggestedHeight="1" MarginLeft="24" MarginRight="24" MarginTop="160" Sprite="BlankWhiteSquare_9" Color="#AA976038" DoNotAcceptEvents="true"/>
-
-            <!-- The height is the two fixed spacers (256) plus the shown tab, so 620 at most with the 364 high clip.
-                 It covers the whole panel and draws after the tabs, so it passes presses on to them. -->
-            <ListPanel Id="Content" WidthSizePolicy="StretchToParent" HeightSizePolicy="CoverChildren" StackLayout.LayoutMethod="VerticalTopToBottom" DoNotAcceptEvents="true">
-              <Children>
-                <Widget WidthSizePolicy="StretchToParent" HeightSizePolicy="Fixed" SuggestedHeight="172" DoNotAcceptEvents="true"/>
-
-                <Widget Id="ServerInfoMotdBody" WidthSizePolicy="StretchToParent" HeightSizePolicy="CoverChildren" IsVisible="@IsMotdSelected" DoNotAcceptEvents="true">
-                  <Children>
-                    <ScrollablePanel Id="ServerInfoMotdScroll" WidthSizePolicy="StretchToParent" HeightSizePolicy="CoverChildren" MarginLeft="40" MarginRight="48"
-                                     AutoHideScrollBars="true" ClipRect="ServerInfoMotdClip" InnerPanel="ServerInfoMotdClip\Paragraphs"
-                                     VerticalScrollbar="..\..\..\ServerInfoMotdScrollbarArea\ServerInfoMotdScrollbar">
+                    <ButtonWidget Id="ServerInfoTabMotd" WidthSizePolicy="Fixed" SuggestedWidth="216" HeightSizePolicy="Fixed" SuggestedHeight="48" MarginLeft="4" MarginRight="4"
+                                  Brush="Header.Tab.Center" IsVisible="@HasMotd" IsSelected="@IsMotdSelected" Command.Click="ExecuteSelectTab" CommandParameter.Click="0"
+                                  DoNotPassEventsToChildren="true" UpdateChildrenStates="true">
                       <Children>
-                        <Widget Id="ServerInfoMotdClip" WidthSizePolicy="StretchToParent" HeightSizePolicy="CoverChildren" MaxHeight="364" ClipContents="true">
-                          <Children>
-                            <ListPanel Id="Paragraphs" DataSource="{Paragraphs}" WidthSizePolicy="StretchToParent" HeightSizePolicy="CoverChildren" StackLayout.LayoutMethod="VerticalTopToBottom">
-                              <ItemTemplate>
-                                <TextWidget WidthSizePolicy="StretchToParent" HeightSizePolicy="CoverChildren" MarginTop="12" MarginBottom="12" Brush="Coop.PlayerList.Text" Brush.FontSize="24" Brush.TextVerticalAlignment="Top" Text="@Text" DoNotAcceptEvents="true"/>
-                              </ItemTemplate>
-                            </ListPanel>
-                          </Children>
-                        </Widget>
+                        <TextWidget WidthSizePolicy="StretchToParent" HeightSizePolicy="StretchToParent" MarginLeft="6" MarginRight="6" Brush="Clan.TabControl.Text" Brush.FontSize="22" Text="@MotdTabText"/>
                       </Children>
-                    </ScrollablePanel>
+                    </ButtonWidget>
+                    <ButtonWidget Id="ServerInfoTabRules" WidthSizePolicy="Fixed" SuggestedWidth="216" HeightSizePolicy="Fixed" SuggestedHeight="48" MarginLeft="4" MarginRight="4"
+                                  Brush="Header.Tab.Center" IsVisible="@HasRules" IsSelected="@IsRulesSelected" Command.Click="ExecuteSelectTab" CommandParameter.Click="1"
+                                  DoNotPassEventsToChildren="true" UpdateChildrenStates="true">
+                      <Children>
+                        <TextWidget WidthSizePolicy="StretchToParent" HeightSizePolicy="StretchToParent" MarginLeft="6" MarginRight="6" Brush="Clan.TabControl.Text" Brush.FontSize="22" Text="@RulesTabText"/>
+                      </Children>
+                    </ButtonWidget>
+                    <ButtonWidget Id="ServerInfoTabLinks" WidthSizePolicy="Fixed" SuggestedWidth="216" HeightSizePolicy="Fixed" SuggestedHeight="48" MarginLeft="4" MarginRight="4"
+                                  Brush="Header.Tab.Center" IsVisible="@HasLinks" IsSelected="@IsLinksSelected" Command.Click="ExecuteSelectTab" CommandParameter.Click="2"
+                                  DoNotPassEventsToChildren="true" UpdateChildrenStates="true">
+                      <Children>
+                        <TextWidget WidthSizePolicy="StretchToParent" HeightSizePolicy="StretchToParent" MarginLeft="6" MarginRight="6" Brush="Clan.TabControl.Text" Brush.FontSize="22" Text="@LinksTabText"/>
+                      </Children>
+                    </ButtonWidget>
+                    <ButtonWidget Id="ServerInfoTabNews" WidthSizePolicy="Fixed" SuggestedWidth="216" HeightSizePolicy="Fixed" SuggestedHeight="48" MarginLeft="4" MarginRight="4"
+                                  Brush="Header.Tab.Center" IsVisible="@HasNews" IsSelected="@IsNewsSelected" Command.Click="ExecuteSelectTab" CommandParameter.Click="3"
+                                  DoNotPassEventsToChildren="true" UpdateChildrenStates="true">
+                      <Children>
+                        <TextWidget WidthSizePolicy="StretchToParent" HeightSizePolicy="StretchToParent" MarginLeft="6" MarginRight="6" Brush="Clan.TabControl.Text" Brush.FontSize="22" Text="@NewsTabText"/>
+                      </Children>
+                    </ButtonWidget>
+                  </Children>
+                </ListPanel>
+                <Widget WidthSizePolicy="StretchToParent" HeightSizePolicy="Fixed" SuggestedHeight="1" MarginLeft="24" MarginRight="24" MarginTop="160" Sprite="BlankWhiteSquare_9" Color="#AA976038" DoNotAcceptEvents="true"/>
+
+                <!-- The height is the two fixed spacers (256) plus the shown tab, so 620 at most with the 364 high clip.
+                     It covers the whole panel and draws after the tabs, so it passes presses on to them. -->
+                <ListPanel Id="Content" WidthSizePolicy="StretchToParent" HeightSizePolicy="CoverChildren" StackLayout.LayoutMethod="VerticalTopToBottom" DoNotAcceptEvents="true">
+                  <Children>
+                    <Widget WidthSizePolicy="StretchToParent" HeightSizePolicy="Fixed" SuggestedHeight="172" DoNotAcceptEvents="true"/>
+
+                    <Widget Id="ServerInfoMotdBody" WidthSizePolicy="StretchToParent" HeightSizePolicy="CoverChildren" IsVisible="@IsMotdSelected" DoNotAcceptEvents="true">
+                      <Children>
+                        <ScrollablePanel Id="ServerInfoMotdScroll" WidthSizePolicy="StretchToParent" HeightSizePolicy="CoverChildren" MarginLeft="40" MarginRight="48"
+                                         AutoHideScrollBars="true" ClipRect="ServerInfoMotdClip" InnerPanel="ServerInfoMotdClip\Paragraphs"
+                                         VerticalScrollbar="..\..\..\ServerInfoMotdScrollbarArea\ServerInfoMotdScrollbar">
+                          <Children>
+                            <Widget Id="ServerInfoMotdClip" WidthSizePolicy="StretchToParent" HeightSizePolicy="CoverChildren" MaxHeight="364" ClipContents="true">
+                              <Children>
+                                <ListPanel Id="Paragraphs" DataSource="{Paragraphs}" WidthSizePolicy="StretchToParent" HeightSizePolicy="CoverChildren" StackLayout.LayoutMethod="VerticalTopToBottom">
+                                  <ItemTemplate>
+                                    <TextWidget WidthSizePolicy="StretchToParent" HeightSizePolicy="CoverChildren" MarginTop="12" MarginBottom="12" Brush="Coop.PlayerList.Text" Brush.FontSize="24" Brush.TextVerticalAlignment="Top" Text="@Text" DoNotAcceptEvents="true"/>
+                                  </ItemTemplate>
+                                </ListPanel>
+                              </Children>
+                            </Widget>
+                          </Children>
+                        </ScrollablePanel>
+                      </Children>
+                    </Widget>
+
+                    <Widget Id="ServerInfoRulesBody" WidthSizePolicy="StretchToParent" HeightSizePolicy="CoverChildren" IsVisible="@IsRulesSelected" DoNotAcceptEvents="true">
+                      <Children>
+                        <ScrollablePanel Id="ServerInfoRulesScroll" WidthSizePolicy="StretchToParent" HeightSizePolicy="CoverChildren" MarginLeft="40" MarginRight="48"
+                                         AutoHideScrollBars="true" ClipRect="ServerInfoRulesClip" InnerPanel="ServerInfoRulesClip\Rules"
+                                         VerticalScrollbar="..\..\..\ServerInfoRulesScrollbarArea\ServerInfoRulesScrollbar">
+                          <Children>
+                            <Widget Id="ServerInfoRulesClip" WidthSizePolicy="StretchToParent" HeightSizePolicy="CoverChildren" MaxHeight="364" ClipContents="true">
+                              <Children>
+                                <ListPanel Id="Rules" DataSource="{Rules}" WidthSizePolicy="StretchToParent" HeightSizePolicy="CoverChildren" StackLayout.LayoutMethod="VerticalTopToBottom">
+                                  <ItemTemplate>
+                                    <Widget WidthSizePolicy="StretchToParent" HeightSizePolicy="CoverChildren" MarginTop="10" MarginBottom="10" DoNotAcceptEvents="true">
+                                      <Children>
+                                        <TextWidget WidthSizePolicy="Fixed" SuggestedWidth="44" HeightSizePolicy="CoverChildren" Brush="Coop.PlayerList.Text" Brush.FontSize="24" Brush.FontColor="#C6B58DFF" Brush.TextVerticalAlignment="Top" Text="@Number" DoNotAcceptEvents="true"/>
+                                        <TextWidget WidthSizePolicy="StretchToParent" HeightSizePolicy="CoverChildren" MarginLeft="52" Brush="Coop.PlayerList.Text" Brush.FontSize="24" Brush.TextVerticalAlignment="Top" Text="@Text" DoNotAcceptEvents="true"/>
+                                      </Children>
+                                    </Widget>
+                                  </ItemTemplate>
+                                </ListPanel>
+                              </Children>
+                            </Widget>
+                          </Children>
+                        </ScrollablePanel>
+                      </Children>
+                    </Widget>
+
+                    <Widget Id="ServerInfoLinksBody" WidthSizePolicy="StretchToParent" HeightSizePolicy="CoverChildren" IsVisible="@IsLinksSelected" DoNotAcceptEvents="true">
+                      <Children>
+                        <ScrollablePanel Id="ServerInfoLinksScroll" WidthSizePolicy="StretchToParent" HeightSizePolicy="CoverChildren" MarginLeft="40" MarginRight="48"
+                                         AutoHideScrollBars="true" ClipRect="ServerInfoLinksClip" InnerPanel="ServerInfoLinksClip\Links"
+                                         VerticalScrollbar="..\..\..\ServerInfoLinksScrollbarArea\ServerInfoLinksScrollbar">
+                          <Children>
+                            <Widget Id="ServerInfoLinksClip" WidthSizePolicy="StretchToParent" HeightSizePolicy="CoverChildren" MaxHeight="364" ClipContents="true">
+                              <Children>
+                                <ListPanel Id="Links" DataSource="{Links}" WidthSizePolicy="StretchToParent" HeightSizePolicy="CoverChildren" MarginTop="8" MarginBottom="8" StackLayout.LayoutMethod="VerticalTopToBottom">
+                                  <ItemTemplate>
+                                    <ButtonWidget Id="ServerInfoLinkRow" WidthSizePolicy="StretchToParent" HeightSizePolicy="Fixed" SuggestedHeight="76" MarginTop="4" MarginBottom="4"
+                                                  Brush="ScoreboardUnitRowBrush" Command.Click="ExecuteOpen" DoNotPassEventsToChildren="true">
+                                      <Children>
+                                        <Widget WidthSizePolicy="StretchToParent" HeightSizePolicy="StretchToParent" Sprite="BlankWhiteSquare_9" Color="#E8E4DA08" DoNotAcceptEvents="true"/>
+                                        <TextWidget WidthSizePolicy="StretchToParent" HeightSizePolicy="Fixed" SuggestedHeight="32" MarginLeft="20" MarginRight="64" MarginTop="8" Brush="Coop.PlayerList.Text" Brush.FontSize="26" Text="@Label" DoNotAcceptEvents="true"/>
+                                        <ScrollingTextWidget WidthSizePolicy="StretchToParent" HeightSizePolicy="Fixed" SuggestedHeight="26" MarginLeft="20" MarginRight="64" MarginTop="42" Brush="Coop.PlayerList.Text" Brush.FontSize="20" Brush.FontColor="#C6B58DFF"
+                                                             Text="@Address" IsAutoScrolling="false" ScrollOnHoverWidget=".." DoNotAcceptEvents="true"/>
+                                        <Widget WidthSizePolicy="Fixed" SuggestedWidth="18" HeightSizePolicy="Fixed" SuggestedHeight="21" HorizontalAlignment="Right" VerticalAlignment="Center" MarginRight="24" Sprite="StdAssets\simple_dropdown_arrow_right" Color="#C6B58DFF" DoNotAcceptEvents="true"/>
+                                        <Widget WidthSizePolicy="StretchToParent" HeightSizePolicy="Fixed" SuggestedHeight="1" VerticalAlignment="Bottom" Sprite="BlankWhiteSquare_9" Color="#E8E4DA1A" DoNotAcceptEvents="true"/>
+                                      </Children>
+                                    </ButtonWidget>
+                                  </ItemTemplate>
+                                </ListPanel>
+                              </Children>
+                            </Widget>
+                          </Children>
+                        </ScrollablePanel>
+                      </Children>
+                    </Widget>
+
+                    <Widget Id="ServerInfoNewsBody" WidthSizePolicy="StretchToParent" HeightSizePolicy="CoverChildren" IsVisible="@IsNewsSelected" DoNotAcceptEvents="true">
+                      <Children>
+                        <ScrollablePanel Id="ServerInfoNewsScroll" WidthSizePolicy="StretchToParent" HeightSizePolicy="CoverChildren" MarginLeft="40" MarginRight="48"
+                                         AutoHideScrollBars="true" ClipRect="ServerInfoNewsClip" InnerPanel="ServerInfoNewsClip\News"
+                                         VerticalScrollbar="..\..\..\ServerInfoNewsScrollbarArea\ServerInfoNewsScrollbar">
+                          <Children>
+                            <Widget Id="ServerInfoNewsClip" WidthSizePolicy="StretchToParent" HeightSizePolicy="CoverChildren" MaxHeight="364" ClipContents="true">
+                              <Children>
+                                <ListPanel Id="News" DataSource="{News}" WidthSizePolicy="StretchToParent" HeightSizePolicy="CoverChildren" MarginTop="10" StackLayout.LayoutMethod="VerticalTopToBottom">
+                                  <ItemTemplate>
+                                    <ListPanel WidthSizePolicy="StretchToParent" HeightSizePolicy="CoverChildren" StackLayout.LayoutMethod="VerticalTopToBottom" DoNotAcceptEvents="true">
+                                      <Children>
+                                        <Widget WidthSizePolicy="StretchToParent" HeightSizePolicy="Fixed" SuggestedHeight="1" MarginTop="6" MarginBottom="16" Sprite="BlankWhiteSquare_9" Color="#AA976038" IsVisible="@HasDivider" DoNotAcceptEvents="true"/>
+                                        <TextWidget WidthSizePolicy="StretchToParent" HeightSizePolicy="CoverChildren" Brush="Coop.PlayerList.Text" Brush.FontSize="20" Brush.FontColor="#C6B58DFF" Brush.TextVerticalAlignment="Top" Text="@Date" IsVisible="@HasDate" DoNotAcceptEvents="true"/>
+                                        <TextWidget WidthSizePolicy="StretchToParent" HeightSizePolicy="CoverChildren" MarginTop="2" Brush="Coop.PlayerList.Text" Brush.FontSize="28" Brush.FontColor="#F4E1C4FF" Brush.TextVerticalAlignment="Top" Text="@Title" IsVisible="@HasTitle" DoNotAcceptEvents="true"/>
+                                        <TextWidget WidthSizePolicy="StretchToParent" HeightSizePolicy="CoverChildren" MarginTop="4" Brush="Coop.PlayerList.Text" Brush.FontSize="23" Brush.TextVerticalAlignment="Top" Text="@Text" IsVisible="@HasText" DoNotAcceptEvents="true"/>
+                                        <Widget WidthSizePolicy="StretchToParent" HeightSizePolicy="Fixed" SuggestedHeight="10" DoNotAcceptEvents="true"/>
+                                      </Children>
+                                    </ListPanel>
+                                  </ItemTemplate>
+                                </ListPanel>
+                              </Children>
+                            </Widget>
+                          </Children>
+                        </ScrollablePanel>
+                      </Children>
+                    </Widget>
+
+                    <Widget WidthSizePolicy="StretchToParent" HeightSizePolicy="Fixed" SuggestedHeight="84" DoNotAcceptEvents="true"/>
+                  </Children>
+                </ListPanel>
+
+                <!-- One scrollbar per tab; its area hides it with the tab, and the panel hides it when the text fits. -->
+                <Widget Id="ServerInfoMotdScrollbarArea" WidthSizePolicy="StretchToParent" HeightSizePolicy="StretchToParent" IsVisible="@IsMotdSelected" DoNotAcceptEvents="true">
+                  <Children>
+                    <ScrollbarWidget Id="ServerInfoMotdScrollbar" WidthSizePolicy="Fixed" SuggestedWidth="16" HeightSizePolicy="StretchToParent" HorizontalAlignment="Right" MarginRight="18" MarginTop="174" MarginBottom="86"
+                                     AlignmentAxis="Vertical" Handle="Handle" MaxValue="100" MinValue="0" Sprite="scrollbar_9">
+                      <Children>
+                        <Widget Id="Handle" WidthSizePolicy="Fixed" SuggestedWidth="6" HeightSizePolicy="Fixed" SuggestedHeight="36" MinHeight="20" HorizontalAlignment="Center" Sprite="BlankWhiteSquare_9" Color="#AA9760FF"/>
+                      </Children>
+                    </ScrollbarWidget>
+                  </Children>
+                </Widget>
+                <Widget Id="ServerInfoRulesScrollbarArea" WidthSizePolicy="StretchToParent" HeightSizePolicy="StretchToParent" IsVisible="@IsRulesSelected" DoNotAcceptEvents="true">
+                  <Children>
+                    <ScrollbarWidget Id="ServerInfoRulesScrollbar" WidthSizePolicy="Fixed" SuggestedWidth="16" HeightSizePolicy="StretchToParent" HorizontalAlignment="Right" MarginRight="18" MarginTop="174" MarginBottom="86"
+                                     AlignmentAxis="Vertical" Handle="Handle" MaxValue="100" MinValue="0" Sprite="scrollbar_9">
+                      <Children>
+                        <Widget Id="Handle" WidthSizePolicy="Fixed" SuggestedWidth="6" HeightSizePolicy="Fixed" SuggestedHeight="36" MinHeight="20" HorizontalAlignment="Center" Sprite="BlankWhiteSquare_9" Color="#AA9760FF"/>
+                      </Children>
+                    </ScrollbarWidget>
+                  </Children>
+                </Widget>
+                <Widget Id="ServerInfoLinksScrollbarArea" WidthSizePolicy="StretchToParent" HeightSizePolicy="StretchToParent" IsVisible="@IsLinksSelected" DoNotAcceptEvents="true">
+                  <Children>
+                    <ScrollbarWidget Id="ServerInfoLinksScrollbar" WidthSizePolicy="Fixed" SuggestedWidth="16" HeightSizePolicy="StretchToParent" HorizontalAlignment="Right" MarginRight="18" MarginTop="174" MarginBottom="86"
+                                     AlignmentAxis="Vertical" Handle="Handle" MaxValue="100" MinValue="0" Sprite="scrollbar_9">
+                      <Children>
+                        <Widget Id="Handle" WidthSizePolicy="Fixed" SuggestedWidth="6" HeightSizePolicy="Fixed" SuggestedHeight="36" MinHeight="20" HorizontalAlignment="Center" Sprite="BlankWhiteSquare_9" Color="#AA9760FF"/>
+                      </Children>
+                    </ScrollbarWidget>
+                  </Children>
+                </Widget>
+                <Widget Id="ServerInfoNewsScrollbarArea" WidthSizePolicy="StretchToParent" HeightSizePolicy="StretchToParent" IsVisible="@IsNewsSelected" DoNotAcceptEvents="true">
+                  <Children>
+                    <ScrollbarWidget Id="ServerInfoNewsScrollbar" WidthSizePolicy="Fixed" SuggestedWidth="16" HeightSizePolicy="StretchToParent" HorizontalAlignment="Right" MarginRight="18" MarginTop="174" MarginBottom="86"
+                                     AlignmentAxis="Vertical" Handle="Handle" MaxValue="100" MinValue="0" Sprite="scrollbar_9">
+                      <Children>
+                        <Widget Id="Handle" WidthSizePolicy="Fixed" SuggestedWidth="6" HeightSizePolicy="Fixed" SuggestedHeight="36" MinHeight="20" HorizontalAlignment="Center" Sprite="BlankWhiteSquare_9" Color="#AA9760FF"/>
+                      </Children>
+                    </ScrollbarWidget>
                   </Children>
                 </Widget>
 
-                <Widget Id="ServerInfoRulesBody" WidthSizePolicy="StretchToParent" HeightSizePolicy="CoverChildren" IsVisible="@IsRulesSelected" DoNotAcceptEvents="true">
+                <Widget WidthSizePolicy="StretchToParent" HeightSizePolicy="Fixed" SuggestedHeight="1" VerticalAlignment="Bottom" MarginBottom="66" MarginLeft="24" MarginRight="24" Sprite="BlankWhiteSquare_9" Color="#AA976038" DoNotAcceptEvents="true"/>
+                <TextWidget Id="ServerInfoHint" WidthSizePolicy="Fixed" SuggestedWidth="600" HeightSizePolicy="Fixed" SuggestedHeight="48" VerticalAlignment="Bottom" MarginLeft="40" MarginBottom="8" Brush="Coop.PlayerList.Text" Brush.FontSize="20" Brush.FontColor="#A89E88FF" Text="@HintText" DoNotAcceptEvents="true"/>
+                <ButtonWidget Id="ServerInfoClose" WidthSizePolicy="Fixed" SuggestedWidth="160" HeightSizePolicy="Fixed" SuggestedHeight="48" HorizontalAlignment="Right" VerticalAlignment="Bottom" MarginRight="26" MarginBottom="8" Brush="ScoreboardUnitRowBrush" Command.Click="ExecuteClose" DoNotPassEventsToChildren="true">
                   <Children>
-                    <ScrollablePanel Id="ServerInfoRulesScroll" WidthSizePolicy="StretchToParent" HeightSizePolicy="CoverChildren" MarginLeft="40" MarginRight="48"
-                                     AutoHideScrollBars="true" ClipRect="ServerInfoRulesClip" InnerPanel="ServerInfoRulesClip\Rules"
-                                     VerticalScrollbar="..\..\..\ServerInfoRulesScrollbarArea\ServerInfoRulesScrollbar">
-                      <Children>
-                        <Widget Id="ServerInfoRulesClip" WidthSizePolicy="StretchToParent" HeightSizePolicy="CoverChildren" MaxHeight="364" ClipContents="true">
-                          <Children>
-                            <ListPanel Id="Rules" DataSource="{Rules}" WidthSizePolicy="StretchToParent" HeightSizePolicy="CoverChildren" StackLayout.LayoutMethod="VerticalTopToBottom">
-                              <ItemTemplate>
-                                <Widget WidthSizePolicy="StretchToParent" HeightSizePolicy="CoverChildren" MarginTop="10" MarginBottom="10" DoNotAcceptEvents="true">
-                                  <Children>
-                                    <TextWidget WidthSizePolicy="Fixed" SuggestedWidth="44" HeightSizePolicy="CoverChildren" Brush="Coop.PlayerList.Text" Brush.FontSize="24" Brush.FontColor="#C6B58DFF" Brush.TextVerticalAlignment="Top" Text="@Number" DoNotAcceptEvents="true"/>
-                                    <TextWidget WidthSizePolicy="StretchToParent" HeightSizePolicy="CoverChildren" MarginLeft="52" Brush="Coop.PlayerList.Text" Brush.FontSize="24" Brush.TextVerticalAlignment="Top" Text="@Text" DoNotAcceptEvents="true"/>
-                                  </Children>
-                                </Widget>
-                              </ItemTemplate>
-                            </ListPanel>
-                          </Children>
-                        </Widget>
-                      </Children>
-                    </ScrollablePanel>
+                    <InputKeyVisualWidget WidthSizePolicy="Fixed" SuggestedWidth="48" HeightSizePolicy="Fixed" SuggestedHeight="48" KeyID="Escape" DoNotAcceptEvents="true"/>
+                    <TextWidget WidthSizePolicy="StretchToParent" HeightSizePolicy="StretchToParent" MarginLeft="58" MarginRight="12" Brush="Coop.PlayerList.Text" Brush.FontSize="23" Text="@CloseText" DoNotAcceptEvents="true"/>
                   </Children>
-                </Widget>
+                </ButtonWidget>
 
-                <Widget Id="ServerInfoLinksBody" WidthSizePolicy="StretchToParent" HeightSizePolicy="CoverChildren" IsVisible="@IsLinksSelected" DoNotAcceptEvents="true">
+                <!-- The link dialog covers the whole panel and takes its clicks until Open or Cancel. -->
+                <Widget Id="ServerInfoLinkDialog" WidthSizePolicy="StretchToParent" HeightSizePolicy="StretchToParent" IsVisible="@IsLinkDialogOpen">
                   <Children>
-                    <ScrollablePanel Id="ServerInfoLinksScroll" WidthSizePolicy="StretchToParent" HeightSizePolicy="CoverChildren" MarginLeft="40" MarginRight="48"
-                                     AutoHideScrollBars="true" ClipRect="ServerInfoLinksClip" InnerPanel="ServerInfoLinksClip\Links"
-                                     VerticalScrollbar="..\..\..\ServerInfoLinksScrollbarArea\ServerInfoLinksScrollbar">
+                    <Widget Id="ServerInfoLinkDialogBackdrop" WidthSizePolicy="StretchToParent" HeightSizePolicy="StretchToParent" Sprite="BlankWhiteSquare_9" Color="#0B0A08B3"/>
+                    <DimensionSyncWidget Id="ServerInfoLinkDialogBox" WidthSizePolicy="Fixed" SuggestedWidth="600" HeightSizePolicy="Fixed" HorizontalAlignment="Center" VerticalAlignment="Center"
+                                         DimensionToSync="Vertical" WidgetToCopyHeightFrom="DialogContent">
                       <Children>
-                        <Widget Id="ServerInfoLinksClip" WidthSizePolicy="StretchToParent" HeightSizePolicy="CoverChildren" MaxHeight="364" ClipContents="true">
+                        <BrushWidget WidthSizePolicy="StretchToParent" HeightSizePolicy="StretchToParent" Brush="Frame1Brush">
                           <Children>
-                            <ListPanel Id="Links" DataSource="{Links}" WidthSizePolicy="StretchToParent" HeightSizePolicy="CoverChildren" MarginTop="8" MarginBottom="8" StackLayout.LayoutMethod="VerticalTopToBottom">
-                              <ItemTemplate>
-                                <ButtonWidget Id="ServerInfoLinkRow" WidthSizePolicy="StretchToParent" HeightSizePolicy="Fixed" SuggestedHeight="76" MarginTop="4" MarginBottom="4"
-                                              Brush="ScoreboardUnitRowBrush" Command.Click="ExecuteOpen" DoNotPassEventsToChildren="true">
+                            <Widget WidthSizePolicy="StretchToParent" HeightSizePolicy="StretchToParent" Sprite="BlankWhiteSquare_9" Color="#100F0DF5" DoNotAcceptEvents="true"/>
+                          </Children>
+                        </BrushWidget>
+                        <ListPanel Id="DialogContent" WidthSizePolicy="StretchToParent" HeightSizePolicy="CoverChildren" StackLayout.LayoutMethod="VerticalTopToBottom">
+                          <Children>
+                            <TextWidget WidthSizePolicy="StretchToParent" HeightSizePolicy="Fixed" SuggestedHeight="44" MarginTop="30" MarginLeft="40" MarginRight="40" Brush="Coop.PlayerList.Text" Brush.FontSize="32" Brush.FontColor="#F4E1C4FF" Brush.TextHorizontalAlignment="Center" Text="@LinkDialogTitle" DoNotAcceptEvents="true"/>
+                            <Widget WidthSizePolicy="StretchToParent" HeightSizePolicy="Fixed" SuggestedHeight="1" MarginTop="12" MarginLeft="60" MarginRight="60" Sprite="BlankWhiteSquare_9" Color="#AA976038" DoNotAcceptEvents="true"/>
+                            <TextWidget WidthSizePolicy="StretchToParent" HeightSizePolicy="CoverChildren" MarginTop="20" MarginLeft="40" MarginRight="40" Brush="Coop.PlayerList.Text" Brush.FontSize="23" Brush.TextHorizontalAlignment="Center" Brush.TextVerticalAlignment="Top" Text="@LinkDialogText" DoNotAcceptEvents="true"/>
+                            <TextWidget Id="ServerInfoLinkDialogAddress" WidthSizePolicy="StretchToParent" HeightSizePolicy="CoverChildren" MarginTop="10" MarginLeft="40" MarginRight="40" Brush="Coop.PlayerList.Text" Brush.FontSize="21" Brush.FontColor="#C6B58DFF" Brush.TextHorizontalAlignment="Center" Brush.TextVerticalAlignment="Top" Text="@LinkDialogAddress" DoNotAcceptEvents="true"/>
+                            <ListPanel WidthSizePolicy="CoverChildren" HeightSizePolicy="Fixed" SuggestedHeight="52" HorizontalAlignment="Center" MarginTop="26" MarginBottom="32" StackLayout.LayoutMethod="HorizontalLeftToRight">
+                              <Children>
+                                <!-- Open is disabled for a moment after the dialog appears, so the second click of a double-click on a row cannot land on it. -->
+                                <ButtonWidget Id="ServerInfoLinkOpen" WidthSizePolicy="Fixed" SuggestedWidth="200" HeightSizePolicy="Fixed" SuggestedHeight="52" Brush="Popup.Done.Button" Command.Click="ExecuteOpenLink" IsEnabled="@IsOpenLinkEnabled" DoNotPassEventsToChildren="true" UpdateChildrenStates="true">
                                   <Children>
-                                    <Widget WidthSizePolicy="StretchToParent" HeightSizePolicy="StretchToParent" Sprite="BlankWhiteSquare_9" Color="#E8E4DA08" DoNotAcceptEvents="true"/>
-                                    <TextWidget WidthSizePolicy="StretchToParent" HeightSizePolicy="Fixed" SuggestedHeight="32" MarginLeft="20" MarginRight="64" MarginTop="8" Brush="Coop.PlayerList.Text" Brush.FontSize="26" Text="@Label" DoNotAcceptEvents="true"/>
-                                    <ScrollingTextWidget WidthSizePolicy="StretchToParent" HeightSizePolicy="Fixed" SuggestedHeight="26" MarginLeft="20" MarginRight="64" MarginTop="42" Brush="Coop.PlayerList.Text" Brush.FontSize="20" Brush.FontColor="#C6B58DFF"
-                                                         Text="@Address" IsAutoScrolling="false" ScrollOnHoverWidget=".." DoNotAcceptEvents="true"/>
-                                    <Widget WidthSizePolicy="Fixed" SuggestedWidth="18" HeightSizePolicy="Fixed" SuggestedHeight="21" HorizontalAlignment="Right" VerticalAlignment="Center" MarginRight="24" Sprite="StdAssets\simple_dropdown_arrow_right" Color="#C6B58DFF" DoNotAcceptEvents="true"/>
-                                    <Widget WidthSizePolicy="StretchToParent" HeightSizePolicy="Fixed" SuggestedHeight="1" VerticalAlignment="Bottom" Sprite="BlankWhiteSquare_9" Color="#E8E4DA1A" DoNotAcceptEvents="true"/>
+                                    <TextWidget WidthSizePolicy="StretchToParent" HeightSizePolicy="StretchToParent" Brush="Popup.Button.Text" Text="@OpenLinkText"/>
                                   </Children>
                                 </ButtonWidget>
-                              </ItemTemplate>
-                            </ListPanel>
-                          </Children>
-                        </Widget>
-                      </Children>
-                    </ScrollablePanel>
-                  </Children>
-                </Widget>
-
-                <Widget Id="ServerInfoNewsBody" WidthSizePolicy="StretchToParent" HeightSizePolicy="CoverChildren" IsVisible="@IsNewsSelected" DoNotAcceptEvents="true">
-                  <Children>
-                    <ScrollablePanel Id="ServerInfoNewsScroll" WidthSizePolicy="StretchToParent" HeightSizePolicy="CoverChildren" MarginLeft="40" MarginRight="48"
-                                     AutoHideScrollBars="true" ClipRect="ServerInfoNewsClip" InnerPanel="ServerInfoNewsClip\News"
-                                     VerticalScrollbar="..\..\..\ServerInfoNewsScrollbarArea\ServerInfoNewsScrollbar">
-                      <Children>
-                        <Widget Id="ServerInfoNewsClip" WidthSizePolicy="StretchToParent" HeightSizePolicy="CoverChildren" MaxHeight="364" ClipContents="true">
-                          <Children>
-                            <ListPanel Id="News" DataSource="{News}" WidthSizePolicy="StretchToParent" HeightSizePolicy="CoverChildren" MarginTop="10" StackLayout.LayoutMethod="VerticalTopToBottom">
-                              <ItemTemplate>
-                                <ListPanel WidthSizePolicy="StretchToParent" HeightSizePolicy="CoverChildren" StackLayout.LayoutMethod="VerticalTopToBottom" DoNotAcceptEvents="true">
+                                <ButtonWidget Id="ServerInfoLinkCancel" WidthSizePolicy="Fixed" SuggestedWidth="200" HeightSizePolicy="Fixed" SuggestedHeight="52" MarginLeft="24" Brush="Popup.Cancel.Button" Command.Click="ExecuteCancelLink" DoNotPassEventsToChildren="true" UpdateChildrenStates="true">
                                   <Children>
-                                    <Widget WidthSizePolicy="StretchToParent" HeightSizePolicy="Fixed" SuggestedHeight="1" MarginTop="6" MarginBottom="16" Sprite="BlankWhiteSquare_9" Color="#AA976038" IsVisible="@HasDivider" DoNotAcceptEvents="true"/>
-                                    <TextWidget WidthSizePolicy="StretchToParent" HeightSizePolicy="CoverChildren" Brush="Coop.PlayerList.Text" Brush.FontSize="20" Brush.FontColor="#C6B58DFF" Brush.TextVerticalAlignment="Top" Text="@Date" IsVisible="@HasDate" DoNotAcceptEvents="true"/>
-                                    <TextWidget WidthSizePolicy="StretchToParent" HeightSizePolicy="CoverChildren" MarginTop="2" Brush="Coop.PlayerList.Text" Brush.FontSize="28" Brush.FontColor="#F4E1C4FF" Brush.TextVerticalAlignment="Top" Text="@Title" IsVisible="@HasTitle" DoNotAcceptEvents="true"/>
-                                    <TextWidget WidthSizePolicy="StretchToParent" HeightSizePolicy="CoverChildren" MarginTop="4" Brush="Coop.PlayerList.Text" Brush.FontSize="23" Brush.TextVerticalAlignment="Top" Text="@Text" IsVisible="@HasText" DoNotAcceptEvents="true"/>
-                                    <Widget WidthSizePolicy="StretchToParent" HeightSizePolicy="Fixed" SuggestedHeight="10" DoNotAcceptEvents="true"/>
+                                    <TextWidget WidthSizePolicy="StretchToParent" HeightSizePolicy="StretchToParent" Brush="Popup.Button.Text" Text="@CancelLinkText"/>
                                   </Children>
-                                </ListPanel>
-                              </ItemTemplate>
+                                </ButtonWidget>
+                              </Children>
                             </ListPanel>
-                          </Children>
-                        </Widget>
-                      </Children>
-                    </ScrollablePanel>
-                  </Children>
-                </Widget>
-
-                <Widget WidthSizePolicy="StretchToParent" HeightSizePolicy="Fixed" SuggestedHeight="84" DoNotAcceptEvents="true"/>
-              </Children>
-            </ListPanel>
-
-            <!-- One scrollbar per tab; its area hides it with the tab, and the panel hides it when the text fits. -->
-            <Widget Id="ServerInfoMotdScrollbarArea" WidthSizePolicy="StretchToParent" HeightSizePolicy="StretchToParent" IsVisible="@IsMotdSelected" DoNotAcceptEvents="true">
-              <Children>
-                <ScrollbarWidget Id="ServerInfoMotdScrollbar" WidthSizePolicy="Fixed" SuggestedWidth="16" HeightSizePolicy="StretchToParent" HorizontalAlignment="Right" MarginRight="18" MarginTop="174" MarginBottom="86"
-                                 AlignmentAxis="Vertical" Handle="Handle" MaxValue="100" MinValue="0" Sprite="scrollbar_9">
-                  <Children>
-                    <Widget Id="Handle" WidthSizePolicy="Fixed" SuggestedWidth="6" HeightSizePolicy="Fixed" SuggestedHeight="36" MinHeight="20" HorizontalAlignment="Center" Sprite="BlankWhiteSquare_9" Color="#AA9760FF"/>
-                  </Children>
-                </ScrollbarWidget>
-              </Children>
-            </Widget>
-            <Widget Id="ServerInfoRulesScrollbarArea" WidthSizePolicy="StretchToParent" HeightSizePolicy="StretchToParent" IsVisible="@IsRulesSelected" DoNotAcceptEvents="true">
-              <Children>
-                <ScrollbarWidget Id="ServerInfoRulesScrollbar" WidthSizePolicy="Fixed" SuggestedWidth="16" HeightSizePolicy="StretchToParent" HorizontalAlignment="Right" MarginRight="18" MarginTop="174" MarginBottom="86"
-                                 AlignmentAxis="Vertical" Handle="Handle" MaxValue="100" MinValue="0" Sprite="scrollbar_9">
-                  <Children>
-                    <Widget Id="Handle" WidthSizePolicy="Fixed" SuggestedWidth="6" HeightSizePolicy="Fixed" SuggestedHeight="36" MinHeight="20" HorizontalAlignment="Center" Sprite="BlankWhiteSquare_9" Color="#AA9760FF"/>
-                  </Children>
-                </ScrollbarWidget>
-              </Children>
-            </Widget>
-            <Widget Id="ServerInfoLinksScrollbarArea" WidthSizePolicy="StretchToParent" HeightSizePolicy="StretchToParent" IsVisible="@IsLinksSelected" DoNotAcceptEvents="true">
-              <Children>
-                <ScrollbarWidget Id="ServerInfoLinksScrollbar" WidthSizePolicy="Fixed" SuggestedWidth="16" HeightSizePolicy="StretchToParent" HorizontalAlignment="Right" MarginRight="18" MarginTop="174" MarginBottom="86"
-                                 AlignmentAxis="Vertical" Handle="Handle" MaxValue="100" MinValue="0" Sprite="scrollbar_9">
-                  <Children>
-                    <Widget Id="Handle" WidthSizePolicy="Fixed" SuggestedWidth="6" HeightSizePolicy="Fixed" SuggestedHeight="36" MinHeight="20" HorizontalAlignment="Center" Sprite="BlankWhiteSquare_9" Color="#AA9760FF"/>
-                  </Children>
-                </ScrollbarWidget>
-              </Children>
-            </Widget>
-            <Widget Id="ServerInfoNewsScrollbarArea" WidthSizePolicy="StretchToParent" HeightSizePolicy="StretchToParent" IsVisible="@IsNewsSelected" DoNotAcceptEvents="true">
-              <Children>
-                <ScrollbarWidget Id="ServerInfoNewsScrollbar" WidthSizePolicy="Fixed" SuggestedWidth="16" HeightSizePolicy="StretchToParent" HorizontalAlignment="Right" MarginRight="18" MarginTop="174" MarginBottom="86"
-                                 AlignmentAxis="Vertical" Handle="Handle" MaxValue="100" MinValue="0" Sprite="scrollbar_9">
-                  <Children>
-                    <Widget Id="Handle" WidthSizePolicy="Fixed" SuggestedWidth="6" HeightSizePolicy="Fixed" SuggestedHeight="36" MinHeight="20" HorizontalAlignment="Center" Sprite="BlankWhiteSquare_9" Color="#AA9760FF"/>
-                  </Children>
-                </ScrollbarWidget>
-              </Children>
-            </Widget>
-
-            <Widget WidthSizePolicy="StretchToParent" HeightSizePolicy="Fixed" SuggestedHeight="1" VerticalAlignment="Bottom" MarginBottom="66" MarginLeft="24" MarginRight="24" Sprite="BlankWhiteSquare_9" Color="#AA976038" DoNotAcceptEvents="true"/>
-            <TextWidget Id="ServerInfoHint" WidthSizePolicy="Fixed" SuggestedWidth="600" HeightSizePolicy="Fixed" SuggestedHeight="48" VerticalAlignment="Bottom" MarginLeft="40" MarginBottom="8" Brush="Coop.PlayerList.Text" Brush.FontSize="20" Brush.FontColor="#A89E88FF" Text="@HintText" DoNotAcceptEvents="true"/>
-            <ButtonWidget Id="ServerInfoClose" WidthSizePolicy="Fixed" SuggestedWidth="160" HeightSizePolicy="Fixed" SuggestedHeight="48" HorizontalAlignment="Right" VerticalAlignment="Bottom" MarginRight="26" MarginBottom="8" Brush="ScoreboardUnitRowBrush" Command.Click="ExecuteClose" DoNotPassEventsToChildren="true">
-              <Children>
-                <InputKeyVisualWidget WidthSizePolicy="Fixed" SuggestedWidth="48" HeightSizePolicy="Fixed" SuggestedHeight="48" KeyID="Escape" DoNotAcceptEvents="true"/>
-                <TextWidget WidthSizePolicy="StretchToParent" HeightSizePolicy="StretchToParent" MarginLeft="58" MarginRight="12" Brush="Coop.PlayerList.Text" Brush.FontSize="23" Text="@CloseText" DoNotAcceptEvents="true"/>
-              </Children>
-            </ButtonWidget>
-
-            <!-- The link dialog covers the whole panel and takes its clicks until Open or Cancel. -->
-            <Widget Id="ServerInfoLinkDialog" WidthSizePolicy="StretchToParent" HeightSizePolicy="StretchToParent" IsVisible="@IsLinkDialogOpen">
-              <Children>
-                <Widget Id="ServerInfoLinkDialogBackdrop" WidthSizePolicy="StretchToParent" HeightSizePolicy="StretchToParent" Sprite="BlankWhiteSquare_9" Color="#0B0A08B3"/>
-                <DimensionSyncWidget Id="ServerInfoLinkDialogBox" WidthSizePolicy="Fixed" SuggestedWidth="600" HeightSizePolicy="Fixed" HorizontalAlignment="Center" VerticalAlignment="Center"
-                                     DimensionToSync="Vertical" WidgetToCopyHeightFrom="DialogContent">
-                  <Children>
-                    <BrushWidget WidthSizePolicy="StretchToParent" HeightSizePolicy="StretchToParent" Brush="Frame1Brush">
-                      <Children>
-                        <Widget WidthSizePolicy="StretchToParent" HeightSizePolicy="StretchToParent" Sprite="BlankWhiteSquare_9" Color="#100F0DF5" DoNotAcceptEvents="true"/>
-                      </Children>
-                    </BrushWidget>
-                    <ListPanel Id="DialogContent" WidthSizePolicy="StretchToParent" HeightSizePolicy="CoverChildren" StackLayout.LayoutMethod="VerticalTopToBottom">
-                      <Children>
-                        <TextWidget WidthSizePolicy="StretchToParent" HeightSizePolicy="Fixed" SuggestedHeight="44" MarginTop="30" MarginLeft="40" MarginRight="40" Brush="Coop.PlayerList.Text" Brush.FontSize="32" Brush.FontColor="#F4E1C4FF" Brush.TextHorizontalAlignment="Center" Text="@LinkDialogTitle" DoNotAcceptEvents="true"/>
-                        <Widget WidthSizePolicy="StretchToParent" HeightSizePolicy="Fixed" SuggestedHeight="1" MarginTop="12" MarginLeft="60" MarginRight="60" Sprite="BlankWhiteSquare_9" Color="#AA976038" DoNotAcceptEvents="true"/>
-                        <TextWidget WidthSizePolicy="StretchToParent" HeightSizePolicy="CoverChildren" MarginTop="20" MarginLeft="40" MarginRight="40" Brush="Coop.PlayerList.Text" Brush.FontSize="23" Brush.TextHorizontalAlignment="Center" Brush.TextVerticalAlignment="Top" Text="@LinkDialogText" DoNotAcceptEvents="true"/>
-                        <TextWidget Id="ServerInfoLinkDialogAddress" WidthSizePolicy="StretchToParent" HeightSizePolicy="CoverChildren" MarginTop="10" MarginLeft="40" MarginRight="40" Brush="Coop.PlayerList.Text" Brush.FontSize="21" Brush.FontColor="#C6B58DFF" Brush.TextHorizontalAlignment="Center" Brush.TextVerticalAlignment="Top" Text="@LinkDialogAddress" DoNotAcceptEvents="true"/>
-                        <ListPanel WidthSizePolicy="CoverChildren" HeightSizePolicy="Fixed" SuggestedHeight="52" HorizontalAlignment="Center" MarginTop="26" MarginBottom="32" StackLayout.LayoutMethod="HorizontalLeftToRight">
-                          <Children>
-                            <!-- Open is disabled for a moment after the dialog appears, so the second click of a double-click on a row cannot land on it. -->
-                            <ButtonWidget Id="ServerInfoLinkOpen" WidthSizePolicy="Fixed" SuggestedWidth="200" HeightSizePolicy="Fixed" SuggestedHeight="52" Brush="Popup.Done.Button" Command.Click="ExecuteOpenLink" IsEnabled="@IsOpenLinkEnabled" DoNotPassEventsToChildren="true" UpdateChildrenStates="true">
-                              <Children>
-                                <TextWidget WidthSizePolicy="StretchToParent" HeightSizePolicy="StretchToParent" Brush="Popup.Button.Text" Text="@OpenLinkText"/>
-                              </Children>
-                            </ButtonWidget>
-                            <ButtonWidget Id="ServerInfoLinkCancel" WidthSizePolicy="Fixed" SuggestedWidth="200" HeightSizePolicy="Fixed" SuggestedHeight="52" MarginLeft="24" Brush="Popup.Cancel.Button" Command.Click="ExecuteCancelLink" DoNotPassEventsToChildren="true" UpdateChildrenStates="true">
-                              <Children>
-                                <TextWidget WidthSizePolicy="StretchToParent" HeightSizePolicy="StretchToParent" Brush="Popup.Button.Text" Text="@CancelLinkText"/>
-                              </Children>
-                            </ButtonWidget>
                           </Children>
                         </ListPanel>
                       </Children>
-                    </ListPanel>
+                    </DimensionSyncWidget>
                   </Children>
-                </DimensionSyncWidget>
+                </Widget>
               </Children>
-            </Widget>
+            </DimensionSyncWidget>
           </Children>
-        </DimensionSyncWidget>
+        </Widget>
       </Children>
     </Widget>
   </Window>

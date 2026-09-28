@@ -78,6 +78,26 @@ public class ServerInfoUIMovieTests
         }
     }
 
+    // The panel's height follows the selected tab. It hangs from the top of a centred frame as high as the tallest
+    // panel, so the title and the tabs stay in place when the player switches tabs.
+    [Fact]
+    public void PanelKeepsItsTopEdgeWhenTheTabChanges()
+    {
+        var frame = Widget("CoopServerInfoFrame");
+        var root = Widget("CoopServerInfoRoot");
+        var spacers = Widget("Content").Element("Children")!.Elements().Where(element => element.Attribute("Id") == null).ToArray();
+
+        Assert.Same(frame, root.Parent!.Parent);
+        Assert.Equal("Center", frame.Attribute("VerticalAlignment")?.Value);
+        Assert.Equal("Top", root.Attribute("VerticalAlignment")?.Value);
+        Assert.Null(root.Attribute("MarginTop"));
+        Assert.Equal("true", frame.Attribute("DoNotAcceptEvents")?.Value);
+        Assert.Equal(Number(root, "SuggestedWidth"), Number(frame, "SuggestedWidth"));
+        // The tallest panel is the two spacers around a full 364 high clip.
+        Assert.Equal(2, spacers.Length);
+        Assert.Equal(spacers.Sum(spacer => Number(spacer, "SuggestedHeight")) + 364, Number(frame, "SuggestedHeight"));
+    }
+
     // The game hands a press to the last drawn widget under the pointer that accepts events, even one with no
     // command (EventManager.CollectEnableWidgetsAt). So whatever the panel draws after the tabs passes presses
     // on or sits below the tab row, and only the open link dialog covers them.
