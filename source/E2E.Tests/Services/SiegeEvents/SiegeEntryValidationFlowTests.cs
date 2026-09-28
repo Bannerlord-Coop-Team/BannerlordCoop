@@ -392,7 +392,7 @@ public class SiegeEntryValidationFlowTests : MapEventTestBase
 
         client.Call(() =>
         {
-            Assert.True(client.ObjectManager.TryGetObject<Settlement>(context.SettlementId, out var settlement));
+            var settlement = PrepareClientMenuSettlement(client, context);
             Assert.True(client.ObjectManager.TryGetObject<MapEvent>(battle.MapEventId, out var mapEvent));
             using (new AllowedThread())
             {
@@ -430,7 +430,7 @@ public class SiegeEntryValidationFlowTests : MapEventTestBase
         var context = CreateEntryContext(client);
         client.Call(() =>
         {
-            Assert.True(client.ObjectManager.TryGetObject<Settlement>(context.SettlementId, out var settlement));
+            var settlement = PrepareClientMenuSettlement(client, context);
             using (new AllowedThread()) MobileParty.MainParty.CurrentSettlement = settlement;
             Campaign.Current.PlayerEncounter = null;
 
@@ -455,7 +455,7 @@ public class SiegeEntryValidationFlowTests : MapEventTestBase
 
         client.Call(() =>
         {
-            Assert.True(client.ObjectManager.TryGetObject<Settlement>(context.SettlementId, out var settlement));
+            var settlement = PrepareClientMenuSettlement(client, context);
             Assert.True(client.ObjectManager.TryGetObject<MapEvent>(battle.MapEventId, out var mapEvent));
             using (new AllowedThread())
             {
@@ -490,6 +490,27 @@ public class SiegeEntryValidationFlowTests : MapEventTestBase
 
         Assert.Equal(explicitEntry || differentBattle || leaveBattle ? 2 : 1,
             client.NetworkSentMessages.GetMessages<NetworkRequestStartSettlementEncounter>().Count());
+    }
+
+    private static Settlement PrepareClientMenuSettlement(EnvironmentInstance client, EntryContext context)
+    {
+        Assert.True(client.ObjectManager.TryGetObject<Settlement>(context.SettlementId, out var settlement));
+        Assert.True(client.ObjectManager.TryGetObject<Town>(context.TownId, out var town));
+        Assert.True(client.ObjectManager.TryGetObject<Clan>(context.DefenderClanId, out var defenderClan));
+        using (new AllowedThread())
+        {
+            // CreateEntryContext wires the server city under AllowedThread, so prepare its client copy too.
+            settlement.SetSettlementComponent(town);
+            town.OwnerClan = defenderClan;
+        }
+
+        Assert.True(settlement.IsTown);
+        Assert.Equal(KillCharacterAction.KillCharacterActionDetail.None, Hero.MainHero.DeathMark);
+        Assert.Null(MobileParty.MainParty.MapEvent);
+        Assert.Null(MobileParty.MainParty.BesiegerCamp);
+        Assert.Null(MobileParty.MainParty.AttachedTo);
+        Assert.NotEqual(MobileParty.MainParty.MapFaction, settlement.MapFaction);
+        return settlement;
     }
 
     private EntryContext CreateEntryContext(EnvironmentInstance client)
@@ -542,7 +563,7 @@ public class SiegeEntryValidationFlowTests : MapEventTestBase
         client.NetworkSentMessages.Clear();
         foreach (var connectedClient in Clients)
             connectedClient.InternalMessages.Clear();
-        return new EntryContext(partyId, settlementId, townId);
+        return new EntryContext(partyId, settlementId, townId, defenderClanId);
     }
 
     private EntryContext CreateJoinContext(EnvironmentInstance client)
@@ -707,5 +728,6 @@ public class SiegeEntryValidationFlowTests : MapEventTestBase
     private sealed record EntryContext(
         string PartyId,
         string SettlementId,
-        string TownId);
+        string TownId,
+        string DefenderClanId);
 }
