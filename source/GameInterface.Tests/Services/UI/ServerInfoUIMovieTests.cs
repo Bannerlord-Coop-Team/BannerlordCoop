@@ -190,6 +190,22 @@ public class ServerInfoUIMovieTests
         Assert.Equal(nameof(ServerInfoLinkVM.ExecuteOpen), Widget("ServerInfoLinkRow").Attribute("Command.Click")?.Value);
     }
 
+    // A row shows its label, the full address under it and a text chevron on the right, and none of them takes
+    // the row's press.
+    [Fact]
+    public void LinkRowsShowTheirLabelAddressAndAChevron()
+    {
+        var children = Widget("ServerInfoLinkRow").Element("Children")!.Elements().ToArray();
+        var chevron = Widget("ServerInfoLinkChevron");
+
+        Assert.Contains(children, element => element.Name.LocalName == "TextWidget" && element.Attribute("Text")?.Value == "@Label");
+        Assert.Contains(children, element => element.Name.LocalName == "ScrollingTextWidget" && element.Attribute("Text")?.Value == "@Address");
+        Assert.Contains(chevron, children);
+        Assert.Equal(">", chevron.Attribute("Text")?.Value);
+        Assert.Equal("Right", chevron.Attribute("HorizontalAlignment")?.Value);
+        Assert.All(children, element => Assert.Equal("true", element.Attribute("DoNotAcceptEvents")?.Value));
+    }
+
     // Reuses the player list's brushes and the game's own tab and popup ones; no new brushes or sprites.
     [Fact]
     public void MovieUsesOnlyExistingBrushes()

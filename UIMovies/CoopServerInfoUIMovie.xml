@@ -120,11 +120,11 @@
                                     <ButtonWidget Id="ServerInfoLinkRow" WidthSizePolicy="StretchToParent" HeightSizePolicy="Fixed" SuggestedHeight="76" MarginTop="4" MarginBottom="4"
                                                   Brush="ScoreboardUnitRowBrush" Command.Click="ExecuteOpen" DoNotPassEventsToChildren="true">
                                       <Children>
-                                        <Widget WidthSizePolicy="StretchToParent" HeightSizePolicy="StretchToParent" Sprite="BlankWhiteSquare_9" Color="#E8E4DA08" DoNotAcceptEvents="true"/>
+                                        <Widget WidthSizePolicy="StretchToParent" HeightSizePolicy="StretchToParent" Sprite="BlankWhiteSquare_9" Color="#E8E4DA0F" DoNotAcceptEvents="true"/>
                                         <TextWidget WidthSizePolicy="StretchToParent" HeightSizePolicy="Fixed" SuggestedHeight="32" MarginLeft="20" MarginRight="64" MarginTop="8" Brush="Coop.PlayerList.Text" Brush.FontSize="26" Text="@Label" DoNotAcceptEvents="true"/>
                                         <ScrollingTextWidget WidthSizePolicy="StretchToParent" HeightSizePolicy="Fixed" SuggestedHeight="26" MarginLeft="20" MarginRight="64" MarginTop="42" Brush="Coop.PlayerList.Text" Brush.FontSize="20" Brush.FontColor="#C6B58DFF"
                                                              Text="@Address" IsAutoScrolling="false" ScrollOnHoverWidget=".." DoNotAcceptEvents="true"/>
-                                        <Widget WidthSizePolicy="Fixed" SuggestedWidth="18" HeightSizePolicy="Fixed" SuggestedHeight="21" HorizontalAlignment="Right" VerticalAlignment="Center" MarginRight="24" Sprite="StdAssets\simple_dropdown_arrow_right" Color="#C6B58DFF" DoNotAcceptEvents="true"/>
+                                        <TextWidget Id="ServerInfoLinkChevron" WidthSizePolicy="Fixed" SuggestedWidth="24" HeightSizePolicy="StretchToParent" HorizontalAlignment="Right" MarginRight="24" Brush="Coop.PlayerList.Text" Brush.FontSize="30" Brush.FontColor="#C6B58DFF" Brush.TextHorizontalAlignment="Center" Text="&gt;" DoNotAcceptEvents="true"/>
                                         <Widget WidthSizePolicy="StretchToParent" HeightSizePolicy="Fixed" SuggestedHeight="1" VerticalAlignment="Bottom" Sprite="BlankWhiteSquare_9" Color="#E8E4DA1A" DoNotAcceptEvents="true"/>
                                       </Children>
                                     </ButtonWidget>
