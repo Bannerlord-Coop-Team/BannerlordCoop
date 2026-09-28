@@ -14,39 +14,59 @@ using Xunit.Abstractions;
 namespace E2E.Tests.Services.MapEvents;
 
 /// <summary>
-/// Battle requests whose blocking game-thread call timed out on the server's poller. An expired call never runs,
-/// so it must not leave a mark or a pending request behind that refuses every later attempt.
+/// Client requests whose blocking game-thread call timed out on the server's poller. An expired call never runs,
+/// so it must not leave a pending request behind that refuses every later attempt, and a request the client
+/// doesn't send again must still run once.
 /// </summary>
-public class ExpiredBattleRequestTests : MapEventTestBase
+public class ExpiredClientRequestTests : MapEventTestBase
 {
     private static readonly TimeSpan LongTimeout = TimeSpan.FromSeconds(10);
 
-    public ExpiredBattleRequestTests(ITestOutputHelper output) : base(output) { }
+    public ExpiredClientRequestTests(ITestOutputHelper output) : base(output) { }
 
     [Fact]
-    public void ClientFinalize_ExpiredOnTheServer_LeavesNoMarkSoTheRetryFinalizes()
+    public void ClientFinalize_ExpiredOnTheServer_FinalizesOnceOnTheNextPump()
     {
         var mapEventCtx = CreateServerMapEvent();
         var client = Clients.First();
         var request = new NetworkMapEventFinalizeAttempted(mapEventCtx.MapEventId);
 
-        // The shared-hideout and raid-reset checks run, then the stalled game thread lets the finalize expire.
+        // A leaving side leader already closed its menu, so nothing asks for this finalize again.
+        Server.NetworkSentMessages.Clear();
         Server.Call(() =>
         {
-            using var shortTimeout = GameThread.Instance.LimitFrameDrain(TimeSpan.FromSeconds(1), TimeSpan.FromSeconds(1));
-            var receive = new PollerReceive<NetworkMapEventFinalizeAttempted>(Server, client.NetPeer, request);
-            RunNextQueuedAction(Server);
-            RunNextQueuedAction(Server);
-            receive.AssertTimedOut();
+            using (GameThread.Instance.LimitFrameDrain(TimeSpan.FromSeconds(1), TimeSpan.FromMilliseconds(200)))
+                new PollerReceive<NetworkMapEventFinalizeAttempted>(Server, client.NetPeer, request).AssertReturned();
+
+            Assert.True(Server.ObjectManager.TryGetObject<MapEvent>(mapEventCtx.MapEventId, out _), "the expired finalize ran");
+            Assert.Empty(Server.NetworkSentMessages.GetMessages<NetworkMapEventFinalized>());
+            RunQueuedActions(Server);
         }, MapEventDisabledMethods);
-        Server.PumpGameThread();
-        Assert.True(Server.ObjectManager.TryGetObject<MapEvent>(mapEventCtx.MapEventId, out _), "the expired finalize ran");
 
-        Server.Call(() => Server.SimulateMessage(client.NetPeer, request), MapEventDisabledMethods);
-
+        Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkMapEventFinalized>());
         Assert.False(Server.ObjectManager.TryGetObject<MapEvent>(mapEventCtx.MapEventId, out _));
         foreach (var instance in Clients)
             Assert.False(instance.ObjectManager.TryGetObject<MapEvent>(mapEventCtx.MapEventId, out _));
+    }
+
+    [Fact]
+    public void ClientFinalize_TimingOutWhileItRuns_FinalizesOnce()
+    {
+        var mapEventCtx = CreateServerMapEvent();
+        var client = Clients.First();
+        var request = new NetworkMapEventFinalizeAttempted(mapEventCtx.MapEventId);
+
+        Server.NetworkSentMessages.Clear();
+        Server.Call(() =>
+        {
+            using (GameThread.Instance.LimitFrameDrain(TimeSpan.FromSeconds(1), TimeSpan.FromSeconds(2)))
+                RunHeldUntilThePollerGivesUp<NetworkMapEventFinalizeAttempted, MapEventFinalized>(client, request).AssertReturned();
+
+            RunQueuedActions(Server);
+        }, MapEventDisabledMethods);
+
+        Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkMapEventFinalized>());
+        Assert.False(Server.ObjectManager.TryGetObject<MapEvent>(mapEventCtx.MapEventId, out _));
     }
 
     [Fact]
@@ -95,25 +115,7 @@ public class ExpiredBattleRequestTests : MapEventTestBase
         Server.Call(() =>
         {
             using var shortTimeout = GameThread.Instance.LimitFrameDrain(TimeSpan.FromSeconds(1), TimeSpan.FromSeconds(2));
-
-            // The join starts and holds the game thread until the poller gave up on both waits.
-            PollerReceive<NetworkRequestJoinBattle>? receive = null;
-            bool gaveUpWhileJoinRan = false;
-            Action<MessagePayload<BattleJoinAccepted>> holdJoin = _ => gaveUpWhileJoinRan = receive!.TryJoin(LongTimeout);
-            var broker = Server.Resolve<IMessageBroker>();
-            broker.Subscribe(holdJoin);
-            try
-            {
-                receive = new PollerReceive<NetworkRequestJoinBattle>(Server, client.NetPeer, request);
-                RunNextQueuedAction(Server);
-            }
-            finally
-            {
-                broker.Unsubscribe(holdJoin);
-            }
-
-            Assert.True(gaveUpWhileJoinRan, "the poller did not time out while the join ran");
-            receive!.AssertTimedOut();
+            RunHeldUntilThePollerGivesUp<NetworkRequestJoinBattle, BattleJoinAccepted>(client, request).AssertTimedOut();
         }, MapEventDisabledMethods);
         Server.PumpGameThread();
 
@@ -142,12 +144,49 @@ public class ExpiredBattleRequestTests : MapEventTestBase
             new[] { typeof(NetPeer), typeof(NetPeer), typeof(byte[]) }))
         .ToList();
 
+    /// <summary>
+    /// Receives <paramref name="request"/> on a poller and runs its queued action, holding the game thread inside it
+    /// on <typeparamref name="THold"/> until the poller gave up on both waits. Call inside the server's scope.
+    /// </summary>
+    private PollerReceive<TRequest> RunHeldUntilThePollerGivesUp<TRequest, THold>(EnvironmentInstance client, TRequest request)
+        where TRequest : IMessage
+        where THold : IMessage
+    {
+        PollerReceive<TRequest>? receive = null;
+        bool gaveUpWhileItRan = false;
+        Action<MessagePayload<THold>> hold = _ => gaveUpWhileItRan = receive!.TryJoin(LongTimeout);
+        var broker = Server.Resolve<IMessageBroker>();
+        broker.Subscribe(hold);
+        try
+        {
+            receive = new PollerReceive<TRequest>(Server, client.NetPeer, request);
+            RunNextQueuedAction(Server);
+        }
+        finally
+        {
+            broker.Unsubscribe(hold);
+        }
+
+        Assert.True(gaveUpWhileItRan, "the poller did not time out while the request ran");
+        return receive;
+    }
+
     /// <summary>Runs the next blocking action the poller queued. Call inside the instance's scope.</summary>
     private static void RunNextQueuedAction(EnvironmentInstance instance)
     {
         Assert.True(SpinWait.SpinUntil(() => instance.PendingGameThreadActionCount > 0, LongTimeout),
             "the poller queued no game-thread action");
         GameThread.Instance.Update(TimeSpan.Zero);
+    }
+
+    /// <summary>Runs everything queued inside the instance's scope, so its disabled methods stay in place.</summary>
+    private static void RunQueuedActions(EnvironmentInstance instance)
+    {
+        for (int pass = 0; instance.PendingGameThreadActionCount > 0; pass++)
+        {
+            Assert.True(pass < 10, "the game-thread queue did not drain");
+            GameThread.Instance.Update(TimeSpan.Zero);
+        }
     }
 
     /// <summary>
@@ -182,6 +221,13 @@ public class ExpiredBattleRequestTests : MapEventTestBase
         {
             Assert.True(thread.Join(LongTimeout), "the poller did not give up after the blocking timeout");
             Assert.IsType<TimeoutException>(failure?.GetBaseException());
+        }
+
+        /// <summary>The poller gave up without throwing, because the expired work was queued again.</summary>
+        public void AssertReturned()
+        {
+            Assert.True(thread.Join(LongTimeout), "the poller did not give up after the blocking timeout");
+            Assert.Null(failure);
         }
     }
 }
