@@ -257,7 +257,7 @@ public class ServerInfoServiceTests
         Assert.Equal(
             "Open: True\nPending: False\nTab: Links\nTabs: Motd, Rules, Links\nCounts: motd 1, rules 2, links 2, news 0\n" +
             "Link dialog: open https://discord.gg/example\n" +
-            "Link 1: Discord | https://discord.gg/example\nLink 2: https://example.com/ | https://example.com/",
+            "Link 1: Discord | https://discord.gg/example\nLink 2: example.com | https://example.com/",
             service.Describe());
     }
 

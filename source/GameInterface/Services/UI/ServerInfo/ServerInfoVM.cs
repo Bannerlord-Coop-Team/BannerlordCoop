@@ -186,10 +186,14 @@ internal sealed class ServerInfoVM : ViewModel
             return null;
         }
 
-        // An empty label shows the address, so every row still says where it goes.
-        string label = string.IsNullOrWhiteSpace(link.Label) ? address : link.Label;
+        // An empty label shows the site's name, and the full address is on the line under it.
+        string label = string.IsNullOrWhiteSpace(link.Label) ? HostOf(address) : link.Label;
         return new ServerInfoLinkVM(label, address, SetPendingLink);
     }
+
+    // The checked address always parses; its host is already in punycode, so a look-alike name shows as it is.
+    private static string HostOf(string address) =>
+        Uri.TryCreate(address, UriKind.Absolute, out Uri uri) ? uri.IdnHost : address;
 
     private void SetPendingLink(ServerInfoLinkVM link)
     {

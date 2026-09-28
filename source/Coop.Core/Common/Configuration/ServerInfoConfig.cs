@@ -261,7 +261,7 @@ internal sealed class ServerInfoConfig : IServerInfoConfig
         return links.ToArray();
     }
 
-    // A missing, empty or non-text label is kept empty; the client then shows the address.
+    // A missing, empty or non-text label is kept empty; the client then shows the host.
     private bool TryReadLink(JsonElement entry, ref bool trimmed, out ServerInfoLink link)
     {
         link = null;

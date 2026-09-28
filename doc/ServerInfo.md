@@ -28,7 +28,7 @@ Every key is optional. A file with only `motd`, as older servers have, keeps wor
 
 - `motd`: one paragraph per entry.
 - `rules`: one rule per entry. The panel numbers them 1., 2., ... in the order written.
-- `links`: each entry has a `url` and an optional `label`. A link without a label shows its address instead.
+- `links`: each entry has a `url` and an optional `label`. Each link shows its label with the full address under it. A link without a label shows its host, like `example.com`, as the label.
 - `news`: each entry has an optional `date`, `title` and `text`, and needs at least a title or a text. The date is free text shown as written. Entries are shown in the order written, so put the newest first.
 
 ## Limits

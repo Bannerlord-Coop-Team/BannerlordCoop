@@ -198,8 +198,10 @@ public sealed class ServerInfoVMTests : IDisposable
         Assert.Equal((literal, literal, literal), (news.Date, news.Title, news.Text));
     }
 
+    // The row shows the full address under its label, so a link without a label shows its host rather than the
+    // address twice. The host is the punycode one from the checked address, so a look-alike name shows as it is.
     [Fact]
-    public void LinkWithoutALabel_ShowsItsAddress()
+    public void LinkWithoutALabel_ShowsItsHost()
     {
         var vm = Create();
 
@@ -207,10 +209,19 @@ public sealed class ServerInfoVMTests : IDisposable
         {
             new ServerInfoLink { Label = "", Url = "https://example.com/rules" },
             new ServerInfoLink { Label = null, Url = "https://discord.gg/example" },
+            new ServerInfoLink { Label = "  ", Url = "https://bücher.example/" },
+            new ServerInfoLink { Label = "", Url = "https://status.example.com:8080/status?page=1#top" },
             new ServerInfoLink { Label = "Website", Url = "https://example.com/" },
         }, null));
 
-        Assert.Equal(new[] { ("https://example.com/rules", "https://example.com/rules"), ("https://discord.gg/example", "https://discord.gg/example"), ("Website", "https://example.com/") },
+        Assert.Equal(new[]
+            {
+                ("example.com", "https://example.com/rules"),
+                ("discord.gg", "https://discord.gg/example"),
+                ("xn--bcher-kva.example", "https://xn--bcher-kva.example/"),
+                ("status.example.com", "https://status.example.com:8080/status?page=1#top"),
+                ("Website", "https://example.com/"),
+            },
             vm.Links.Select(link => (link.Label, link.Address)));
     }
 
