@@ -29,6 +29,8 @@ public class SiegeGateHitApplier : ISiegeGateHitApplier
         }
 
         if (message.Damage < 200 || gate.State != CastleGate.GateState.Closed) return true;
+        // Vanilla stops hit reactions once the gate is destroyed, and a door without a skeleton throws on animate.
+        if (gate.IsDestroyed || gate._doorSkeleton is null) return true;
 
         gate._door?.SetAnimationAtChannelSynched(gate.HitAnimationName, 0);
         gate._plank?.SetAnimationAtChannelSynched(gate.PlankHitAnimationName, 0);
