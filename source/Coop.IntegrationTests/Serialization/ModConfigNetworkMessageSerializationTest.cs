@@ -81,6 +81,7 @@ namespace Coop.IntegrationTests.Serialization
                 EnablePlayerExecutions = true,
                 ShowPlayerNameplates = true,
                 PlayerWoundedBattleEntry = false,
+                BlockAiWarDeclarationsOnOfflinePlayers = true,
             });
 
             var copy = RoundTrip(new NetworkLoadModConfig(options)).ModOptions;
@@ -101,6 +102,7 @@ namespace Coop.IntegrationTests.Serialization
             Assert.True(copy.EnablePlayerClanMemberExecutions);
             Assert.True(copy.EnablePlayerExecutions);
             Assert.False(copy.PlayerWoundedBattleEntry);
+            Assert.True(copy.BlockAiWarDeclarationsOnOfflinePlayers);
 
             // Keys the operator left absent still resolve to the documented defaults, not to zero.
             Assert.True(copy.FastForwardEnabled);
@@ -155,6 +157,7 @@ namespace Coop.IntegrationTests.Serialization
             PlayerWoundedBattleEntry = false,
             CoopClansEnabled = false,
             VoiceEnabled = false,
+            BlockAiWarDeclarationsOnOfflinePlayers = false,
         });
 
         private static void AssertAllOptionsOff(ModOptions copy)
@@ -182,6 +185,7 @@ namespace Coop.IntegrationTests.Serialization
             Assert.False(copy.PlayerWoundedBattleEntry);
             Assert.False(copy.CoopClansEnabled);
             Assert.False(copy.VoiceEnabled);
+            Assert.False(copy.BlockAiWarDeclarationsOnOfflinePlayers);
         }
 
         private static T RoundTrip<T>(T original)

@@ -61,6 +61,7 @@ public class ServerModule : CommonModule
         builder.RegisterType<ServerContext>().AsSelf().InstancePerLifetimeScope();
         builder.RegisterType<ServerLogic>().As<IServerLogic>().As<ILogic>().InstancePerLifetimeScope();
         builder.RegisterType<CoopServer>().As<ICoopServer>().As<INetwork>().As<INetEventListener>().InstancePerLifetimeScope();
+        builder.RegisterType<UdpBindDiagnostics>().As<IUdpBindDiagnostics>().InstancePerDependency();
         builder.RegisterType<SendCoalescer>().As<ISendCoalescer>().InstancePerLifetimeScope();
         builder.RegisterType<CoopSaveManager>().As<ICoopSaveManager>().InstancePerLifetimeScope();
         builder.RegisterType<JoinCampaignBaselineSender>()
@@ -99,7 +100,12 @@ public class ServerModule : CommonModule
         builder.RegisterType<JoinPeerTerminator>().As<IJoinPeerTerminator>().InstancePerDependency();
         builder.RegisterType<OverloadedPeerManager>().As<IOverloadedPeerManager>().InstancePerLifetimeScope().AutoActivate();
 
+        // DEBUG builds, including MCP live-test runs, keep their heartbeats and battle counts off the production statistics.
+#if DEBUG
+        builder.RegisterType<DisabledServerTelemetryUploader>()
+#else
         builder.RegisterType<ServerTelemetryUploader>()
+#endif
             .As<IServerTelemetryUploader>()
             .As<IBattlesFoughtUploader>()
             .InstancePerLifetimeScope();
