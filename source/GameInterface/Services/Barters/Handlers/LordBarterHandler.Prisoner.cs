@@ -23,13 +23,6 @@ internal sealed partial class LordBarterHandler
             return false;
         }
 
-        // Vanilla hides the offer in the post-battle CapturedLord conversation.
-        if (mobileParty.MapEvent != null)
-        {
-            reason = PlayerPartyInBattleReason;
-            return false;
-        }
-
         reason = null;
         return true;
     }
@@ -66,6 +59,14 @@ internal sealed partial class LordBarterHandler
              targetHero.CurrentSettlement.OwnerClan != playerHero.Clan))
         {
             reason = PrisonerNotHeldReason;
+            return false;
+        }
+
+        // Vanilla hides the offer in the post-battle CapturedLord conversation, and a siege assault can
+        // start while a dungeon barter is open.
+        if (mobileParty.MapEvent != null)
+        {
+            reason = PlayerPartyInBattleReason;
             return false;
         }
 

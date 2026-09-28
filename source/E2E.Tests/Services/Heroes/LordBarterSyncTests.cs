@@ -1366,7 +1366,6 @@ public class LordBarterSyncTests : MapEventTestBase
         VassalRecruiter,
         NonLeaderClanmate,
         RulingClanPrisoner,
-        PlayerPartyInBattle,
     }
 
     /// <summary>
@@ -1380,7 +1379,6 @@ public class LordBarterSyncTests : MapEventTestBase
     [InlineData(PrisonerRecruitGuard.VassalRecruiter, "Only a kingdom leader")]
     [InlineData(PrisonerRecruitGuard.NonLeaderClanmate, "Only a kingdom leader")]
     [InlineData(PrisonerRecruitGuard.RulingClanPrisoner, "ruling clan")]
-    [InlineData(PrisonerRecruitGuard.PlayerPartyInBattle, "Your party is in a battle")]
     public void JoinKingdomBarter_PrisonerRecruitGuards_AreRejected(PrisonerRecruitGuard guard, string expectedReason)
     {
         var client = Clients.First();
@@ -1397,7 +1395,6 @@ public class LordBarterSyncTests : MapEventTestBase
         // A town the player owns, so only the own-party check refuses the captor's party id.
         var settlementId = CreateTownOwnedBy(
             guard == PrisonerRecruitGuard.CaptorPartyClaimedAsOwn ? fixture.PlayerHeroId : aiCaptor.HeroId);
-        var mapEvent = guard == PrisonerRecruitGuard.PlayerPartyInBattle ? CreateServerMapEvent() : null;
         var context = PeaceConversationContext.PlayerPartyPrisoner;
         var contextId = fixture.PlayerPartyId;
 
@@ -1418,12 +1415,6 @@ public class LordBarterSyncTests : MapEventTestBase
             {
                 TakePrisonerAction.Apply(playerParty.Party, targetHero);
             }
-
-            if (mapEvent != null)
-            {
-                Assert.True(Server.ObjectManager.TryGetObject<MapEvent>(mapEvent.MapEventId, out var battle));
-                playerParty.Party._mapEventSide = battle.AttackerSide;
-            }
         });
         if (guard == PrisonerRecruitGuard.AiCaptorInForeignSettlement)
         {
@@ -1435,29 +1426,146 @@ public class LordBarterSyncTests : MapEventTestBase
             contextId = aiCaptor.PartyId;
         }
 
+        var result = SendDefectionBarter(
+            client,
+            fixture,
+            context,
+            contextId,
+            guard == PrisonerRecruitGuard.GenericBarter ? LordBarterKind.Generic : LordBarterKind.JoinKingdomAsClan);
+
+        Assert.False(result.Accepted);
+        Assert.Contains(expectedReason, result.Reason);
+        AssertDefection(fixture, defected: false);
+
+        Server.PumpGameThread();
+    }
+
+    public enum PrisonerTalk
+    {
+        HeldByPlayerParty,
+        DungeonSettlementMenu,
+        DungeonLocation,
+    }
+
+    public enum PrisonerRecruiterBattle
+    {
+        EndsBeforeOffer,
+        StartsBeforeOffer,
+    }
+
+    /// <summary>
+    /// The requester's battle refuses a prisoner in every context, both when the barter is authorized
+    /// and on Offer, so a siege assault that starts during a dungeon barter refuses it too.
+    /// </summary>
+    [Theory]
+    [InlineData(PrisonerTalk.HeldByPlayerParty, PrisonerRecruiterBattle.EndsBeforeOffer, "The lord barter is no longer authorized.")]
+    [InlineData(PrisonerTalk.HeldByPlayerParty, PrisonerRecruiterBattle.StartsBeforeOffer, "Your party is in a battle.")]
+    [InlineData(PrisonerTalk.DungeonSettlementMenu, PrisonerRecruiterBattle.EndsBeforeOffer, "The lord barter is no longer authorized.")]
+    [InlineData(PrisonerTalk.DungeonSettlementMenu, PrisonerRecruiterBattle.StartsBeforeOffer, "Your party is in a battle.")]
+    [InlineData(PrisonerTalk.DungeonLocation, PrisonerRecruiterBattle.EndsBeforeOffer, "The lord barter is no longer authorized.")]
+    [InlineData(PrisonerTalk.DungeonLocation, PrisonerRecruiterBattle.StartsBeforeOffer, "Your party is in a battle.")]
+    public void JoinKingdomBarter_PrisonerRecruiterInBattle_IsRejected(
+        PrisonerTalk talk, PrisonerRecruiterBattle battleTiming, string expectedReason)
+    {
+        const string locationId = "e2e_prisoner_siege_dungeon";
+        const int initialPlayerGold = 1_000_000;
+        const int initialTargetGold = 50;
+        var client = Clients.First();
+        var fixture = CreateDefectionFixture(client);
+        var settlementId = CreateTownOwnedBy(fixture.PlayerHeroId);
+        var mapEvent = CreateServerMapEvent();
+        var tracker = Server.Resolve<LocationConversationTracker>();
+        var inDungeon = talk != PrisonerTalk.HeldByPlayerParty;
+        var (context, contextId) = talk switch
+        {
+            PrisonerTalk.DungeonSettlementMenu => (PeaceConversationContext.Settlement, settlementId),
+            PrisonerTalk.DungeonLocation => (PeaceConversationContext.Location, locationId),
+            _ => (PeaceConversationContext.PlayerPartyPrisoner, fixture.PlayerPartyId),
+        };
+
+        // In the dungeon the battle is a siege assault on the player's own town, defended from inside.
+        void SetRecruiterInBattle(bool inBattle) => Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject<MobileParty>(fixture.PlayerMobilePartyId, out var playerParty));
+            Assert.True(Server.ObjectManager.TryGetObject<MapEvent>(mapEvent.MapEventId, out var battle));
+            var side = inDungeon ? battle.DefenderSide : battle.AttackerSide;
+            playerParty.Party._mapEventSide = inBattle ? side : null;
+            Assert.Equal(inBattle, playerParty.MapEvent != null);
+        });
+
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject<Hero>(fixture.PlayerHeroId, out var playerHero));
+            Assert.True(Server.ObjectManager.TryGetObject<MobileParty>(fixture.PlayerMobilePartyId, out var playerParty));
+            Assert.True(Server.ObjectManager.TryGetObject<Hero>(fixture.TargetHeroId, out var targetHero));
+            Assert.True(Server.ObjectManager.TryGetObject<Settlement>(settlementId, out var settlement));
+            Assert.True(Server.ObjectManager.TryGetObject<MapEvent>(mapEvent.MapEventId, out var battle));
+
+            new GoldBarterBehavior().RegisterEvents();
+            new PrisonerReleaseCampaignBehavior().RegisterEvents();
+            playerHero.Gold = initialPlayerGold;
+            targetHero.Gold = initialTargetGold;
+            if (inDungeon)
+            {
+                playerParty.CurrentSettlement = settlement;
+                TakePrisonerAction.Apply(settlement.Party, targetHero);
+                battle._mapEventType = MapEvent.BattleTypes.Siege;
+                battle.MapEventSettlement = settlement;
+            }
+            else
+            {
+                TakePrisonerAction.Apply(playerParty.Party, targetHero);
+            }
+
+            if (talk == PrisonerTalk.DungeonLocation)
+            {
+                Assert.True(Server.ObjectManager.TryGetId(playerHero.CharacterObject, out var playerCharacterId));
+                Assert.True(Server.ObjectManager.TryGetId(targetHero.CharacterObject, out var targetCharacterId));
+                Assert.True(tracker.TryBeginEngagement(
+                    client.NetPeer,
+                    LocationConversationTracker.ComposeKey(locationId, playerCharacterId),
+                    LocationConversationTracker.ComposeKey(locationId, targetCharacterId)));
+            }
+        });
+
+        var harmony = AcceptEveryDefectionOffer(scoreFiefsAsZero: true);
         try
         {
+            if (battleTiming == PrisonerRecruiterBattle.EndsBeforeOffer)
+                SetRecruiterInBattle(true);
+
             var result = SendDefectionBarter(
                 client,
                 fixture,
                 context,
                 contextId,
-                guard == PrisonerRecruitGuard.GenericBarter ? LordBarterKind.Generic : LordBarterKind.JoinKingdomAsClan);
+                betweenAuthorizationAndRequest: () =>
+                    SetRecruiterInBattle(battleTiming == PrisonerRecruiterBattle.StartsBeforeOffer),
+                terms: new[]
+                {
+                    new PeaceBarterTerm(PeaceBarterTermType.Gold, fixture.PlayerHeroId, null, null, true, 100_000),
+                });
 
             Assert.False(result.Accepted);
-            Assert.Contains(expectedReason, result.Reason);
+            Assert.Equal(expectedReason, result.Reason);
+            Assert.Equal(initialPlayerGold, result.PlayerGold);
             AssertDefection(fixture, defected: false);
+            Server.Call(() =>
+            {
+                Assert.True(Server.ObjectManager.TryGetObject<Hero>(fixture.PlayerHeroId, out var playerHero));
+                Assert.True(Server.ObjectManager.TryGetObject<Hero>(fixture.TargetHeroId, out var targetHero));
+                Assert.True(Server.ObjectManager.TryGetObject<MobileParty>(fixture.PlayerMobilePartyId, out var playerParty));
+                Assert.True(Server.ObjectManager.TryGetObject<Settlement>(settlementId, out var settlement));
+                Assert.Equal(initialPlayerGold, playerHero.Gold);
+                Assert.Equal(initialTargetGold, targetHero.Gold);
+                Assert.Same(inDungeon ? settlement.Party : playerParty.Party, targetHero.PartyBelongedToAsPrisoner);
+            });
         }
         finally
         {
-            if (mapEvent != null)
-            {
-                Server.Call(() =>
-                {
-                    Assert.True(Server.ObjectManager.TryGetObject<MobileParty>(fixture.PlayerMobilePartyId, out var playerParty));
-                    playerParty.Party._mapEventSide = null;
-                });
-            }
+            harmony.UnpatchAll(harmony.Id);
+            SetRecruiterInBattle(false);
+            Server.Call(() => tracker.TryEndEngagement(client.NetPeer, out _));
         }
 
         Server.PumpGameThread();
