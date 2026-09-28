@@ -104,6 +104,10 @@ internal class BattleBlowInterceptPatch
         var parameter = new SoundEventParameter("Armor Type", soundParameterForArmorType);
 
         mission.MakeSound(hitSound, blow.GlobalPosition, soundCanBePredicted: false, isReliable: true, blow.OwnerId, victim.Index, ref parameter);
+        // Zero-damage contacts never reach the victim owner through the damage router.
+        if (blow.InflictedDamage <= 0)
+            MessageBroker.Instance.Publish(victim, new AgentHitSound(
+                victim, attacker, null, hitSound, blow.GlobalPosition, soundParameterForArmorType));
         if (blow.IsMissile && attacker != null)
             mission.MakeSoundOnlyOnRelatedPeer(CombatSoundContainer.SoundCodeMissionCombatPlayerhit, blow.GlobalPosition, attacker.Index);
 

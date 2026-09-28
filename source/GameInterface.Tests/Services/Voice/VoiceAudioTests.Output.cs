@@ -145,7 +145,7 @@ public partial class VoiceAudioTests
         if (captureFailed)
         {
             harness.Callbacks.First().error(new InvalidOperationException("microphone unplugged"));
-            Wait(() => Volatile.Read(ref harness.InputDisposals) == 1);
+            Wait(() => Volatile.Read(ref harness.InputStopRequests) == 1);
             Assert.Contains("Microphone unavailable", harness.Audio.Status);
         }
         harness.Audio.Retry();
