@@ -128,6 +128,7 @@ public class GameInterfaceModule : Module
         builder.RegisterType<LocalMovementBandwidth>().As<ILocalMovementBandwidth>().InstancePerDependency();
         builder.RegisterType<ChatPlayerName>().As<IChatPlayerNameResolver>().InstancePerDependency();
         builder.RegisterType<ServerInfoLinkRules>().As<IServerInfoLinkRules>().InstancePerDependency();
+        builder.RegisterType<BrowserLinkOpener>().As<IBrowserLinkOpener>().InstancePerDependency();
         builder.RegisterType<PlayerPartyRestorer>().As<IPlayerPartyRestorer>().InstancePerDependency();
         builder.RegisterType<PlayerCreationRollback>().As<IPlayerCreationRollback>().InstancePerDependency();
         builder.RegisterType<MobilePartyBehaviorSnapshot>().As<IMobilePartyBehaviorSnapshot>().InstancePerDependency();
