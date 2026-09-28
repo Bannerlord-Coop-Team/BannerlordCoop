@@ -16,7 +16,6 @@ using GameInterface.Services.Workshops;
 using System;
 using System.Collections.Concurrent;
 using System.IO;
-using System.Linq;
 using System.Text;
 using Xunit;
 using Xunit.Abstractions;
@@ -191,33 +190,21 @@ namespace Coop.Tests.Server.Services.Save
             Assert.Null(savedSession);
         }
 
-        // Fixed so the kept copy's name, derived from the bad file's write time, is known up front
-        private static readonly DateTime BadFileWriteTime = new DateTime(2026, 9, 27, 1, 2, 3, 456, DateTimeKind.Utc);
-        private const string BadFileCopySuffix = ".json.20260927T010203456Z.unreadable";
-
         [Fact]
-        public void LoadSession_NoFile_KeepsNoCopy()
+        public void LoadSession_NoFile_LogsNothing()
         {
             var saveManager = container.Resolve<ICoopSaveManager>();
             string saveName = NewSaveName();
 
-            try
-            {
-                ICoopSession? session = null;
-                var logs = CaptureLogs(saveName, () => session = saveManager.LoadCoopSession(saveName));
+            ICoopSession? session = null;
+            var logs = CaptureLogs(saveName, () => session = saveManager.LoadCoopSession(saveName));
 
-                Assert.Null(session);
-                Assert.Contains(logs, log => log.Contains("was not found"));
-                Assert.Empty(FindCopies(saveManager, saveName));
-            }
-            finally
-            {
-                DeleteSessionFiles(saveManager, saveName);
-            }
+            Assert.Null(session);
+            Assert.Empty(logs);
         }
 
         [Fact]
-        public void LoadSession_TruncatedFile_LogsErrorAndKeepsCopy()
+        public void LoadSession_TruncatedFile_LogsErrorAndWritesNoFile()
         {
             var saveManager = container.Resolve<ICoopSaveManager>();
             string saveName = NewSaveName();
@@ -232,10 +219,7 @@ namespace Coop.Tests.Server.Services.Save
 
                 Assert.Null(session);
                 Assert.Contains(logs, log => log.Contains("could not be read") && log.Contains("JsonException"));
-                Assert.Contains(logs, log => log.Contains("Kept a copy"));
-                string copy = Assert.Single(FindCopies(saveManager, saveName));
-                Assert.EndsWith(saveName + BadFileCopySuffix, copy);
-                Assert.Equal(truncated, File.ReadAllBytes(copy));
+                Assert.Single(Directory.GetFiles(saveManager.DefaultPath, saveName + "*"));
                 Assert.Equal(truncated, File.ReadAllBytes(path));
             }
             finally
@@ -245,7 +229,7 @@ namespace Coop.Tests.Server.Services.Save
         }
 
         [Fact]
-        public void LoadSession_EmptyFile_LogsErrorAndKeepsCopy()
+        public void LoadSession_EmptyFile_LogsError()
         {
             var saveManager = container.Resolve<ICoopSaveManager>();
             string saveName = NewSaveName();
@@ -259,8 +243,6 @@ namespace Coop.Tests.Server.Services.Save
 
                 Assert.Null(session);
                 Assert.Contains(logs, log => log.Contains("could not be read"));
-                string copy = Assert.Single(FindCopies(saveManager, saveName));
-                Assert.Empty(File.ReadAllBytes(copy));
             }
             finally
             {
@@ -269,7 +251,7 @@ namespace Coop.Tests.Server.Services.Save
         }
 
         [Fact]
-        public void LoadSession_JsonNull_LogsErrorAndKeepsCopy()
+        public void LoadSession_JsonNull_LogsError()
         {
             var saveManager = container.Resolve<ICoopSaveManager>();
             string saveName = NewSaveName();
@@ -283,7 +265,6 @@ namespace Coop.Tests.Server.Services.Save
 
                 Assert.Null(session);
                 Assert.Contains(logs, log => log.Contains("contains only null"));
-                Assert.Single(FindCopies(saveManager, saveName));
             }
             finally
             {
@@ -292,7 +273,7 @@ namespace Coop.Tests.Server.Services.Save
         }
 
         [Fact]
-        public void LoadSession_OldSchemaWithoutPlayers_WarnsKeepsCopyAndReturnsSession()
+        public void LoadSession_OldSchemaWithoutPlayers_WarnsAndReturnsSession()
         {
             var saveManager = container.Resolve<ICoopSaveManager>();
             string saveName = NewSaveName();
@@ -308,8 +289,6 @@ namespace Coop.Tests.Server.Services.Save
                 Assert.NotNull(session);
                 Assert.Null(session.Players);
                 Assert.Contains(logs, log => log.Contains("has no Players list"));
-                Assert.Single(FindCopies(saveManager, saveName, ".noplayers"));
-                Assert.Empty(FindCopies(saveManager, saveName));
             }
             finally
             {
@@ -318,7 +297,7 @@ namespace Coop.Tests.Server.Services.Save
         }
 
         [Fact]
-        public void LoadSession_EmptyPlayersArray_LogsLoadedLineAndKeepsNoCopy()
+        public void LoadSession_EmptyPlayersArray_LogsLoadedLine()
         {
             var saveManager = container.Resolve<ICoopSaveManager>();
             string saveName = NewSaveName();
@@ -334,7 +313,6 @@ namespace Coop.Tests.Server.Services.Save
                 Assert.Empty(session.Players);
                 Assert.Contains(logs, log => log.Contains("0 saved player registrations"));
                 Assert.DoesNotContain(logs, log => log.Contains("has no Players list"));
-                Assert.Empty(FindCopies(saveManager, saveName));
             }
             finally
             {
@@ -361,83 +339,6 @@ namespace Coop.Tests.Server.Services.Save
 
                 Assert.Null(session);
                 Assert.Contains(logs, log => log.Contains("could not be read") && log.Contains("IOException"));
-                Assert.Contains(logs, log => log.Contains("Could not keep a copy"));
-                Assert.Empty(FindCopies(saveManager, saveName));
-            }
-            finally
-            {
-                DeleteSessionFiles(saveManager, saveName);
-            }
-        }
-
-        [Fact]
-        public void LoadSession_SameUnreadableFileTwice_KeepsOneCopy()
-        {
-            var saveManager = container.Resolve<ICoopSaveManager>();
-            string saveName = NewSaveName();
-
-            try
-            {
-                WriteSessionFile(saveManager, saveName, Encoding.UTF8.GetBytes("{\"Players\": ["));
-
-                saveManager.LoadCoopSession(saveName);
-                var logs = CaptureLogs(saveName, () => saveManager.LoadCoopSession(saveName));
-
-                Assert.Contains(logs, log => log.Contains("already kept"));
-                Assert.Single(FindCopies(saveManager, saveName));
-            }
-            finally
-            {
-                DeleteSessionFiles(saveManager, saveName);
-            }
-        }
-
-        [Fact]
-        public void LoadSession_CopyNameTakenByDifferentFile_KeepsNumberedCopy()
-        {
-            var saveManager = container.Resolve<ICoopSaveManager>();
-            string saveName = NewSaveName();
-
-            try
-            {
-                byte[] truncated = Encoding.UTF8.GetBytes("{\"Players\": [");
-                WriteSessionFile(saveManager, saveName, truncated);
-                string takenPath = saveManager.DefaultPath + saveName + BadFileCopySuffix;
-                byte[] existing = Encoding.UTF8.GetBytes("{\"Pla");
-                File.WriteAllBytes(takenPath, existing);
-
-                ICoopSession? session = null;
-                var logs = CaptureLogs(saveName, () => session = saveManager.LoadCoopSession(saveName));
-
-                Assert.Null(session);
-                Assert.Equal(existing, File.ReadAllBytes(takenPath));
-                string numberedPath = saveManager.DefaultPath + saveName + ".json.20260927T010203456Z.2.unreadable";
-                Assert.Equal(truncated, File.ReadAllBytes(numberedPath));
-                Assert.Contains(logs, log => log.Contains("Kept a copy") && log.Contains(".2.unreadable"));
-            }
-            finally
-            {
-                DeleteSessionFiles(saveManager, saveName);
-            }
-        }
-
-        [Fact]
-        public void SaveSession_AfterUnreadableLoad_LeavesCopyIntact()
-        {
-            var saveManager = container.Resolve<ICoopSaveManager>();
-            string saveName = NewSaveName();
-
-            try
-            {
-                byte[] truncated = Encoding.UTF8.GetBytes("{\"Players\": [");
-                string path = WriteSessionFile(saveManager, saveName, truncated);
-                saveManager.LoadCoopSession(saveName);
-
-                saveManager.SaveCoopSession(saveName, NewSession(saveName));
-
-                Assert.NotEqual(truncated, File.ReadAllBytes(path));
-                string copy = Assert.Single(FindCopies(saveManager, saveName));
-                Assert.Equal(truncated, File.ReadAllBytes(copy));
             }
             finally
             {
@@ -464,7 +365,6 @@ namespace Coop.Tests.Server.Services.Save
 
                 Assert.NotNull(loaded);
                 Assert.Contains(logs, log => log.Contains("loaded from") && log.Contains("2 saved player registrations"));
-                Assert.Empty(FindCopies(saveManager, saveName));
             }
             finally
             {
@@ -496,15 +396,7 @@ namespace Coop.Tests.Server.Services.Save
             Directory.CreateDirectory(saveManager.DefaultPath);
             string path = saveManager.DefaultPath + saveName + saveManager.FileType;
             File.WriteAllBytes(path, contents);
-            File.SetLastWriteTimeUtc(path, BadFileWriteTime);
             return path;
-        }
-
-        private static string[] FindCopies(ICoopSaveManager saveManager, string saveName, string suffix = ".unreadable")
-        {
-            if (Directory.Exists(saveManager.DefaultPath) == false) return Array.Empty<string>();
-
-            return Directory.GetFiles(saveManager.DefaultPath, saveName + ".json.*" + suffix);
         }
 
         // Other test classes log in parallel, so only lines naming this test's file are kept

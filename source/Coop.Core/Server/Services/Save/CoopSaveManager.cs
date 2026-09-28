@@ -3,7 +3,6 @@ using Common.Serialization;
 using GameInterface.CoopSessionData.Save.Data;
 using Serilog;
 using System;
-using System.Globalization;
 using System.IO;
 using System.Linq;
 using TaleWorlds.Library;
@@ -77,7 +76,6 @@ namespace Coop.Core.Server.Services.Save
                 {
                     Logger.Error(e, "Co-op session JSON at {FilePath} could not be read; saved co-op session data (player registrations and per-player data) will not be restored and the next save of {SaveName} replaces the file",
                         GetFullPathForLog(filePath), saveName);
-                    KeepSessionCopy(filePath, UnreadableCopySuffix);
                     return null;
                 }
 
@@ -86,7 +84,6 @@ namespace Coop.Core.Server.Services.Save
                 {
                     Logger.Error("Co-op session JSON at {FilePath} contains only null; saved co-op session data (player registrations and per-player data) will not be restored and the next save of {SaveName} replaces the file",
                         GetFullPathForLog(filePath), saveName);
-                    KeepSessionCopy(filePath, UnreadableCopySuffix);
                     return null;
                 }
 
@@ -95,7 +92,6 @@ namespace Coop.Core.Server.Services.Save
                 {
                     Logger.Warning("Co-op session JSON at {FilePath} has no Players list; saved player registrations will not be restored and the next save of {SaveName} replaces the file",
                         GetFullPathForLog(filePath), saveName);
-                    KeepSessionCopy(filePath, NoPlayersCopySuffix);
                     return session;
                 }
 
@@ -104,76 +100,7 @@ namespace Coop.Core.Server.Services.Save
                 return session;
             }
 
-            Logger.Warning("Co-op session JSON was not found at {FilePath}; saved player registrations will not be restored",
-                GetFullPathForLog(filePath));
             return null;
-        }
-
-        private const string UnreadableCopySuffix = ".unreadable";
-        private const string NoPlayersCopySuffix = ".noplayers";
-        private const int MaxSessionCopyNames = 5;
-
-        // Named after the file's own write time, so restarts on the same file reuse one copy
-        private static void KeepSessionCopy(string filePath, string suffix)
-        {
-            string copyPath = null;
-            try
-            {
-                var source = new FileInfo(filePath);
-                if (source.Exists == false)
-                {
-                    Logger.Warning("Co-op session JSON {FilePath} disappeared before a copy could be kept", GetFullPathForLog(filePath));
-                    return;
-                }
-
-                string copyStem = string.Concat(filePath, ".", source.LastWriteTimeUtc.ToString("yyyyMMdd'T'HHmmssfff'Z'", CultureInfo.InvariantCulture));
-                for (int attempt = 1; attempt <= MaxSessionCopyNames; attempt++)
-                {
-                    copyPath = attempt == 1
-                        ? copyStem + suffix
-                        : string.Concat(copyStem, ".", attempt.ToString(CultureInfo.InvariantCulture), suffix);
-
-                    if (File.Exists(copyPath))
-                    {
-                        if (FilesMatch(filePath, copyPath))
-                        {
-                            Logger.Warning("Co-op session JSON {FilePath} is already kept at {CopyPath}", GetFullPathForLog(filePath), GetFullPathForLog(copyPath));
-                            return;
-                        }
-
-                        // A different file holds this name (a partial copy, or another file with the same write time)
-                        continue;
-                    }
-
-                    try
-                    {
-                        File.Copy(filePath, copyPath, false);
-                    }
-                    catch (IOException) when (FilesMatch(filePath, copyPath))
-                    {
-                        // Another load kept the same file between the check and the copy
-                    }
-
-                    Logger.Warning("Kept a copy of co-op session JSON {FilePath} at {CopyPath}", GetFullPathForLog(filePath), GetFullPathForLog(copyPath));
-                    return;
-                }
-
-                Logger.Error("Could not keep a copy of co-op session JSON {FilePath}: {Count} different files already use its copy names; back it up by hand before the next save replaces it",
-                    GetFullPathForLog(filePath), MaxSessionCopyNames);
-            }
-            catch (Exception e)
-            {
-                Logger.Error(e, "Could not keep a copy of co-op session JSON {FilePath} at {CopyPath}; back it up by hand before the next save replaces it",
-                    GetFullPathForLog(filePath), GetFullPathForLog(copyPath));
-            }
-        }
-
-        private static bool FilesMatch(string path, string otherPath)
-        {
-            var other = new FileInfo(otherPath);
-            if (other.Exists == false || other.Length != new FileInfo(path).Length) return false;
-
-            return File.ReadAllBytes(path).SequenceEqual(File.ReadAllBytes(otherPath));
         }
 
         // .NET Framework throws on path characters .NET Core accepts, and a log line must not throw
