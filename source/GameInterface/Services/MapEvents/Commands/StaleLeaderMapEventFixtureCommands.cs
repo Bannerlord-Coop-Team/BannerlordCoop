@@ -99,7 +99,7 @@ internal class StaleLeaderMapEventFixtureCommands
                 Logger.Error(e, "Failed to stage stale-leader fixture");
                 try
                 {
-                    RestoreFixture(fixture, behaviorSnapshot);
+                    RestoreFixture(fixture, behaviorSnapshot, objectManager);
                     fixture = null;
                 }
                 catch (Exception restoreError)
@@ -249,12 +249,13 @@ internal class StaleLeaderMapEventFixtureCommands
         {
             if (ModInformation.IsClient) return Failed("Run this command on the server.");
             if (fixture == null) return Failed("The stale-leader fixture is not active.");
-            if (!ContainerProvider.TryResolve<IMobilePartyBehaviorSnapshot>(out var behaviorSnapshot))
-                return Failed("Unable to resolve movement restore service.");
+            if (!ContainerProvider.TryResolve<IMobilePartyBehaviorSnapshot>(out var behaviorSnapshot) ||
+                !ContainerProvider.TryResolve<IObjectManager>(out var objectManager))
+                return Failed("Unable to resolve fixture restore services.");
             try
             {
                 var restored = fixture;
-                RestoreFixture(restored, behaviorSnapshot);
+                RestoreFixture(restored, behaviorSnapshot, objectManager);
                 fixture = null;
                 return Succeeded($"Stale-leader fixture restored|party={restored.Survivor.StringId}|" +
                     $"mapEvent={restored.Survivor.MapEvent?.StringId ?? "none"}|" +
@@ -268,13 +269,17 @@ internal class StaleLeaderMapEventFixtureCommands
         }
     }
 
-    private static void RestoreFixture(Fixture current, IMobilePartyBehaviorSnapshot behaviorSnapshot)
+    private static void RestoreFixture(Fixture current, IMobilePartyBehaviorSnapshot behaviorSnapshot,
+        IObjectManager objectManager)
     {
         if (current.MapEvent != null && !current.MapEvent.IsFinalized)
             current.MapEvent.FinalizeEvent();
         var involvedParties = new[] { current.Survivor.Party, current.Bandit?.Party };
-        if (MapEventDebugCommands.HasAttachedParties(current.MapEvent, involvedParties))
+        if (MapEventDebugCommands.HasAttachedParties(current.MapEvent, involvedParties) ||
+            (current.MapEvent != null && objectManager.Contains(current.MapEvent)))
             MapEventDebugCommands.RecoverPartiallyFinalizedMapEvent(current.MapEvent, involvedParties);
+        if (current.MapEvent != null && objectManager.Contains(current.MapEvent))
+            throw new InvalidOperationException("The fixture map event is still registered.");
         if (current.Survivor.MapEvent != null)
             throw new InvalidOperationException("The AI party is still in a map event.");
         if (current.Bandit?.IsActive == true)

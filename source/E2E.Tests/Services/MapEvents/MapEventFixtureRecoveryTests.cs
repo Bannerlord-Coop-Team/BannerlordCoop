@@ -11,8 +11,10 @@ public class MapEventFixtureRecoveryTests : MapEventTestBase
 {
     public MapEventFixtureRecoveryTests(ITestOutputHelper output) : base(output) { }
 
-    [Fact]
-    public void PartiallyFinalizedFixture_ReleasesPartiesAndRemovesReplicas()
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void PartiallyFinalizedFixture_ReleasesPartiesAndRemovesReplicas(bool partiesDetached)
     {
         var context = CreateServerMapEvent();
 
@@ -22,7 +24,14 @@ public class MapEventFixtureRecoveryTests : MapEventTestBase
             var parties = new[] { mapEvent.AttackerSide.LeaderParty, mapEvent.DefenderSide.LeaderParty };
             mapEvent.State = MapEventState.WaitingRemoval;
             Assert.True(mapEvent.IsFinalized);
-            Assert.True(MapEventDebugCommands.HasAttachedParties(mapEvent, parties));
+            if (partiesDetached)
+            {
+                foreach (var party in parties) party._mapEventSide = null;
+                mapEvent.AttackerSide.Clear();
+                mapEvent.DefenderSide.Clear();
+            }
+            Assert.Equal(!partiesDetached, MapEventDebugCommands.HasAttachedParties(mapEvent, parties));
+            Assert.True(Server.ObjectManager.Contains(mapEvent));
 
             MapEventDebugCommands.RecoverPartiallyFinalizedMapEvent(mapEvent, parties);
 
