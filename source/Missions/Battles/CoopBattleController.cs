@@ -560,7 +560,7 @@ public class CoopBattleController : CoopMissionController
         {
             Logger.Warning(
                 e,
-                "[BattleSync] Join replay barrier for {Controller} was abandoned because the session ended; the replay is not queued again",
+                "[BattleSync] Join replay barrier for {Controller} was canceled; the replay is not queued again",
                 controllerId);
         }
     }
