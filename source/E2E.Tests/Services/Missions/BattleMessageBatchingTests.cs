@@ -233,7 +233,7 @@ public class BattleMessageBatchingTests : MissionTestEnvironment
     {
         Guid victimId = CreateGuid(index);
         Guid attackerId = CreateGuid(index + 10_000);
-        switch (index % 3)
+        switch (index % 4)
         {
             case 0:
                 var blow = new Blow(index)
@@ -262,6 +262,11 @@ public class BattleMessageBatchingTests : MissionTestEnvironment
                     WeaponClass.OneHandedSword,
                     physicsMaterialIndex: -1,
                     strength: 1f);
+            case 2:
+                return new NetworkMeleeHitPresentation(
+                    victimId, false, MeleeHitPresentationKind.BodyImpact, -1,
+                    new Vec3(index, index + 1, index + 2), WeaponClass.Undefined,
+                    -1, 0f, 123, 0.75f);
             default:
                 return new NetworkBattleAgentDied(
                     victimId,
