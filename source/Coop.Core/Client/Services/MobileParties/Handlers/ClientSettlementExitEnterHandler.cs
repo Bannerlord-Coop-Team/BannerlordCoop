@@ -23,7 +23,7 @@ namespace Coop.Core.Client.Services.MobileParties.Handlers;
 public class ClientSettlementExitEnterHandler : IHandler
 {
 #if DEBUG
-    private readonly Serilog.ILogger Logger = Common.Logging.LogManager.GetLogger<ClientSettlementExitEnterHandler>();
+    private readonly Serilog.ILogger Logger = global::Common.Logging.LogManager.GetLogger<ClientSettlementExitEnterHandler>();
 #endif
     private readonly IMessageBroker messageBroker;
     private readonly INetwork network;
