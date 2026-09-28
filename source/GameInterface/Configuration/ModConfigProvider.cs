@@ -70,6 +70,9 @@ public readonly struct ModOptions
     [ProtoMember(24)]
     public readonly bool CoopClansEnabled { get; } = true;
 
+    [ProtoMember(25)]
+    public readonly bool BlockAiWarDeclarationsOnOfflinePlayers { get; } = false;
+
     public ModOptions(ModOptions previous, bool voiceEnabled)
     {
         this = previous;
@@ -85,6 +88,7 @@ public readonly struct ModOptions
         GoldFoodInfluenceChangeInSettlements = modOptionsData.GoldFoodInfluenceChangeInSettlements ?? GoldFoodInfluenceChangeInSettlements;
         GoldFoodInfluenceChangeInBattles = modOptionsData.GoldFoodInfluenceChangeInBattles ?? GoldFoodInfluenceChangeInBattles;
         GoldFoodInfluenceChangeForDisconnectedPlayers = modOptionsData.GoldFoodInfluenceChangeForDisconnectedPlayers ?? GoldFoodInfluenceChangeForDisconnectedPlayers;
+        BlockAiWarDeclarationsOnOfflinePlayers = modOptionsData.BlockAiWarDeclarationsOnOfflinePlayers ?? BlockAiWarDeclarationsOnOfflinePlayers;
         PlayerBattleAiJoinWindowHours = modOptionsData.PlayerBattleAiJoinWindowHours ?? PlayerBattleAiJoinWindowHours;
         SpeedLimitWhilePlayersInBattle = modOptionsData.SpeedLimitWhilePlayersInBattle ?? SpeedLimitWhilePlayersInBattle;
         EnsureUnaffiliatedWanderers = modOptionsData.EnsureUnaffiliatedWanderers ?? EnsureUnaffiliatedWanderers;

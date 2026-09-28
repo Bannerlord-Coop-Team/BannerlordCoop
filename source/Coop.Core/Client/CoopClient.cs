@@ -121,9 +121,7 @@ public class CoopClient : CoopNetworkBase, ICoopClient
             var rejectCode = ReadRejectCode(disconnectInfo);
             reconnectPending = false;
 
-            string message = rejectCode == ConnectionRejectCode.IncorrectPassword
-                ? "The server password is incorrect."
-                : "The server rejected the connection.";
+            string message = GetRejectMessage(rejectCode);
 
             Logger.Warning("Connection rejected by server: {Reason}", rejectCode);
             GameThread.RunSafe(() =>
@@ -172,6 +170,19 @@ public class CoopClient : CoopNetworkBase, ICoopClient
         }
     }
 
+    private static string GetRejectMessage(ConnectionRejectCode rejectCode)
+    {
+        switch (rejectCode)
+        {
+            case ConnectionRejectCode.IncorrectPassword:
+                return "The server password is incorrect.";
+            case ConnectionRejectCode.ServerRestarting:
+                return "The server is restarting. Try again in a few minutes.";
+            default:
+                return "The server rejected the connection.";
+        }
+    }
+
     private static ConnectionRejectCode ReadRejectCode(DisconnectInfo disconnectInfo)
     {
         var data = disconnectInfo.AdditionalData;
@@ -179,9 +190,9 @@ public class CoopClient : CoopNetworkBase, ICoopClient
 
         try
         {
-            if (data.TryGetByte(out var raw) && raw == (byte)ConnectionRejectCode.IncorrectPassword)
+            if (data.TryGetByte(out var raw) && Enum.IsDefined(typeof(ConnectionRejectCode), raw))
             {
-                return ConnectionRejectCode.IncorrectPassword;
+                return (ConnectionRejectCode)raw;
             }
 
             return ConnectionRejectCode.None;

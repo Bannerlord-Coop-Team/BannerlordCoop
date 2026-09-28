@@ -19,7 +19,8 @@ namespace Missions.Battles;
 
 /// <summary>
 /// Fields newly-owned reserve parties after a server refresh when no agents arrived to adopt. The local spawn
-/// pipeline registers and broadcasts them, attributes casualties, assigns formations, and orders them to charge.
+/// pipeline registers and broadcasts them, attributes casualties, assigns formations, and orders the formations
+/// the local player does not command to charge.
 /// </summary>
 public interface IReinforcementFielder : IDisposable
 {
@@ -330,19 +331,20 @@ public class ReinforcementFielder : IReinforcementFielder
 
         CountActiveOwnedHumans(out var activeOwnedDefenders, out var activeOwnedAttackers);
         CountActiveHumans(out var activeDefenders, out var activeAttackers);
-        var formations = new HashSet<Formation>();
+        var joinedFormations = new Dictionary<Formation, bool>();
         int defenderAvailable = AvailableRecoverySlots(
             defenderOwnedTarget, activeOwnedDefenders, targets.Defenders, activeDefenders);
         int attackerAvailable = AvailableRecoverySlots(
             attackerOwnedTarget, activeOwnedAttackers, targets.Attackers, activeAttackers);
-        int spawned = FieldRecoverySide(BattleSideEnum.Defender, defenderAvailable, formations);
-        spawned += FieldRecoverySide(BattleSideEnum.Attacker, attackerAvailable, formations);
+        int spawned = FieldRecoverySide(BattleSideEnum.Defender, defenderAvailable, joinedFormations);
+        spawned += FieldRecoverySide(BattleSideEnum.Attacker, attackerAvailable, joinedFormations);
 
-        ChargeFormations(formations);
+        ChargeFormations(joinedFormations, out var delegated, out var keptPlayerOrders, out var chargedNew);
 
         if (spawned > 0)
-            Logger.Information("[BattleSync] Fielded {Count} reserve troop(s) toward owned targets Defender={Def}, Attacker={Atk}",
-                spawned, defenderOwnedTarget, attackerOwnedTarget);
+            Logger.Information("[BattleSync] Fielded {Count} reserve troop(s) toward owned targets Defender={Def}, Attacker={Atk}; " +
+                "formations delegated={Delegated}, keptPlayerOrders={Kept}, chargedNew={ChargedNew}",
+                spawned, defenderOwnedTarget, attackerOwnedTarget, delegated, keptPlayerOrders, chargedNew);
     }
 
     private void CountActiveOwnedHumans(out int defenders, out int attackers)
@@ -378,7 +380,8 @@ public class ReinforcementFielder : IReinforcementFielder
 
     // Round-robin by party so every missing army party gets represented before one large reserve consumes the
     // whole side's active allocation. Exhausted parties leave the queue; the rest refill future casualty slots.
-    private int FieldRecoverySide(BattleSideEnum side, int available, HashSet<Formation> formations)
+    // joinedFormations maps each formation this batch reached to whether it was empty before the batch.
+    private int FieldRecoverySide(BattleSideEnum side, int available, Dictionary<Formation, bool> joinedFormations)
     {
         if (available <= 0) return 0;
 
@@ -418,7 +421,9 @@ public class ReinforcementFielder : IReinforcementFielder
             else if (origin != null)
             {
                 var agent = SpawnReinforcementTroop(Mission.Current, team, origin);
-                if (agent?.Formation != null) formations.Add(agent.Formation);
+                var formation = agent?.Formation;
+                if (formation != null)
+                    RecordJoinedFormation(joinedFormations, formation, formation.CountOfUnits);
                 spawned++;
                 available--;
             }
@@ -436,6 +441,15 @@ public class ReinforcementFielder : IReinforcementFielder
             }
         }
         return spawned;
+    }
+
+    // Only the first add records, right after it, so a count of 1 means the formation was empty before the
+    // batch. The host's own hero counts as a unit.
+    internal static void RecordJoinedFormation(
+        Dictionary<Formation, bool> joinedFormations, Formation formation, int countAfterAdd)
+    {
+        if (!joinedFormations.ContainsKey(formation))
+            joinedFormations.Add(formation, countAfterAdd <= 1);
     }
 
     private bool HasLivePartySeed(string partyId, int troopSeed)
@@ -512,14 +526,62 @@ public class ReinforcementFielder : IReinforcementFielder
     private int SlotsForOrigin(CoopAgentOrigin origin)
         => origin == null ? 1 : agentBudget.SlotsForOrigin(origin);
 
-    // A coop battle has no general commanding formations, so order each formation the reinforcements joined
-    // to engage — SetControlledByAI alone leaves them idle without an active behavior.
-    private static void ChargeFormations(HashSet<Formation> formations)
+    /// <summary>What a fielding batch does with a formation its troops joined.</summary>
+    internal enum JoinedFormationAction
     {
-        foreach (var formation in formations)
-        {
+        DelegateAndCharge,
+        ChargeWithoutDelegating,
+        KeepPlayerOrder,
+    }
+
+    // The host fields its own side's troops on its PlayerTeam, where it is usually the general. Delegating those
+    // formations turns Delegate Command on for every batch, and native BeforeSetOrder only turns it off again
+    // until the next batch, so a formation the player commands keeps its order.
+    internal static JoinedFormationAction ClassifyJoinedFormation(
+        bool onLocalPlayerTeam, bool localCommanderActive, bool isAIControlled, bool wasEmptyBeforeBatch)
+    {
+        if (!onLocalPlayerTeam || !localCommanderActive || isAIControlled)
+            return JoinedFormationAction.DelegateAndCharge;
+
+        return wasEmptyBeforeBatch
+            ? JoinedFormationAction.ChargeWithoutDelegating
+            : JoinedFormationAction.KeepPlayerOrder;
+    }
+
+    // SetControlledByAI alone leaves a formation idle without an active behavior, so it always comes with a
+    // Charge. A player formation that was empty only gets the Charge so its new troops engage.
+    internal static JoinedFormationAction ApplyJoinedFormation(
+        Formation formation, bool onLocalPlayerTeam, bool localCommanderActive, bool wasEmptyBeforeBatch)
+    {
+        var action = ClassifyJoinedFormation(
+            onLocalPlayerTeam, localCommanderActive, formation.IsAIControlled, wasEmptyBeforeBatch);
+        if (action == JoinedFormationAction.DelegateAndCharge)
             formation.SetControlledByAI(true);
+        if (action != JoinedFormationAction.KeepPlayerOrder)
             formation.SetMovementOrder(MovementOrder.MovementOrderCharge);
+        return action;
+    }
+
+    private static void ChargeFormations(
+        Dictionary<Formation, bool> joinedFormations,
+        out int delegated,
+        out int keptPlayerOrders,
+        out int chargedNew)
+    {
+        delegated = 0;
+        keptPlayerOrders = 0;
+        chargedNew = 0;
+
+        var playerTeam = Mission.Current.PlayerTeam;
+        bool localCommanderActive = Agent.Main != null && Agent.Main.IsActive();
+        foreach (var pair in joinedFormations)
+        {
+            var formation = pair.Key;
+            var action = ApplyJoinedFormation(
+                formation, formation.Team == playerTeam, localCommanderActive, wasEmptyBeforeBatch: pair.Value);
+            if (action == JoinedFormationAction.DelegateAndCharge) delegated++;
+            else if (action == JoinedFormationAction.KeepPlayerOrder) keptPlayerOrders++;
+            else chargedNew++;
         }
     }
 
@@ -546,8 +608,8 @@ public class ReinforcementFielder : IReinforcementFielder
 
         formationAssigner.Assign(agent);
 
-        // Wake the AI after assigning it to the charged recovery formation, otherwise it can retain stale
-        // enemy caches and stand idle.
+        // Wake the AI after assigning it to its formation, otherwise it can retain stale enemy caches and
+        // stand idle.
         AgentAiWaker.Wake(agent);
 
         return agent;
