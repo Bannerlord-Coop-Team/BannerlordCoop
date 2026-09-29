@@ -233,21 +233,31 @@ public class FreeOrCapturePrisonerHeroesTests : IDisposable
             client.NetworkSentMessages.Clear();
         Server.InternalMessages.Clear();
 
-        // Both local loot rolls got the companion, and the second winner runs before the release replicates.
-        RunFreeHeroes(Clients[0], fixture, new[] { companionId }, encounter =>
+        // Hold the first release so both local loot rolls see the companion as captive.
+        var router = Server.Resolve<TestNetworkRouter>();
+        router.PauseLink(Clients[0].NetPeer, Server.NetPeer);
+        try
         {
-            encounter.DoFreeOrCapturePrisonerHeroes();
-            Assert.Empty(openedConversations);
-        });
-        RunFreeHeroes(Clients[1], fixture with { RescuerPartyId = secondRescuerPartyId }, new[] { companionId }, encounter =>
-        {
-            encounter.DoFreeOrCapturePrisonerHeroes();
-            Assert.Empty(openedConversations);
-            Assert.Equal(PlayerEncounterState.LootParty, encounter.EncounterState);
-        });
+            RunFreeHeroes(Clients[0], fixture, new[] { companionId }, encounter =>
+            {
+                encounter.DoFreeOrCapturePrisonerHeroes();
+                Assert.Empty(openedConversations);
+            });
+            RunFreeHeroes(Clients[1], fixture with { RescuerPartyId = secondRescuerPartyId }, new[] { companionId }, encounter =>
+            {
+                encounter.DoFreeOrCapturePrisonerHeroes();
+                Assert.Empty(openedConversations);
+                Assert.Equal(PlayerEncounterState.LootParty, encounter.EncounterState);
+            });
 
-        foreach (var client in Clients)
-            Assert.Single(client.NetworkSentMessages.OfType<NetworkEndCaptivityAttempted>());
+            foreach (var client in Clients)
+                Assert.Single(client.NetworkSentMessages.OfType<NetworkEndCaptivityAttempted>());
+        }
+        finally
+        {
+            router.ResumeLink(Clients[0].NetPeer, Server.NetPeer);
+        }
+        router.DrainReady();
         testEnvironment.FlushCoalescer();
         AssertReleasedOnceEverywhere(companionId, fixture.CaptorPartyId);
     }

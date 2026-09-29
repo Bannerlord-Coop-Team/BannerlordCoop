@@ -61,6 +61,8 @@ public class GenericQuestTypeAcceptSecurityTests : IDisposable
         screen.CurrentData.RightMemberRoster = party.MemberRoster;
         screen.CurrentData.LeftPrisonerRoster = TroopRoster.CreateDummyTroopRoster();
         screen.CurrentData.RightPrisonerRoster = TroopRoster.CreateDummyTroopRoster();
+        screen.PrisonerRosters[(int)PartyScreenLogic.PartyRosterSide.Left] = screen.CurrentData.LeftPrisonerRoster;
+        screen.PrisonerRosters[(int)PartyScreenLogic.PartyRosterSide.Right] = screen.CurrentData.RightPrisonerRoster;
         screen._initialData.LeftMemberRoster = TroopRoster.CreateDummyTroopRoster();
         screen._initialData.RightMemberRoster = party.MemberRoster.CloneRosterData();
         screen._initialData.LeftPrisonerRoster = TroopRoster.CreateDummyTroopRoster();
