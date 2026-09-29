@@ -15,7 +15,8 @@ public interface ICoopFinalizer
     void Finalize(string closeText);
 
     /// <summary>
-    /// Makes the later finalizes in this session show <paramref name="closeText"/> once instead of their own text.
+    /// Makes every finalize in this session whose teardown has not run yet, including one queued after its hide timed out,
+    /// show <paramref name="closeText"/> once instead of its own text.
     /// </summary>
     void SetCloseText(string closeText);
 
