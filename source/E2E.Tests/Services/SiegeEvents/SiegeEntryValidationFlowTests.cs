@@ -11,6 +11,8 @@ using E2E.Tests.Services.MapEvents;
 using E2E.Tests.Util;
 using GameInterface.Services.GameDebug.Messages;
 using GameInterface.Services.MapEvents.Messages.Leave;
+using GameInterface.Services.MapEvents.Messages.Start;
+using GameInterface.Services.Settlements.Interfaces;
 using GameInterface.Services.MobileParties.Messages.Behavior;
 using GameInterface.Services.SiegeEvents.Interfaces;
 using GameInterface.Services.Villages.Interfaces;
@@ -18,6 +20,8 @@ using HarmonyLib;
 using System.Reflection;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Actions;
+using TaleWorlds.CampaignSystem.CampaignBehaviors;
+using TaleWorlds.CampaignSystem.GameMenus;
 using TaleWorlds.CampaignSystem.Encounters;
 using TaleWorlds.CampaignSystem.GameComponents;
 using TaleWorlds.CampaignSystem.MapEvents;
@@ -490,6 +494,87 @@ public class SiegeEntryValidationFlowTests : MapEventTestBase
 
         Assert.Equal(explicitEntry || differentBattle || leaveBattle ? 2 : 1,
             client.NetworkSentMessages.GetMessages<NetworkRequestStartSettlementEncounter>().Count());
+    }
+
+    [Fact]
+    public void RecoveredCityAssault_OpensJoinMenuAndRequestsExistingBattleOnlyAfterExplicitJoin()
+    {
+        var client = Clients.First();
+        var context = CreateEntryContext(client);
+        var battle = CreateServerMapEvent();
+        using var activation = new MethodCallRecorder(Priority.Last,
+            AccessTools.Method(typeof(GameMenu), nameof(GameMenu.ActivateGameMenu), new[] { typeof(string) }));
+        using var menuSwitch = new MethodCallRecorder(Priority.Last,
+            AccessTools.Method(typeof(GameMenu), nameof(GameMenu.SwitchToMenu), new[] { typeof(string) }));
+        client.NetworkSentMessages.Clear();
+
+        client.Call(() =>
+        {
+            var settlement = PrepareClientMenuContext(client, context);
+            Assert.True(client.ObjectManager.TryGetObject<MapEvent>(battle.MapEventId, out var mapEvent));
+            using (new AllowedThread())
+            {
+                MobileParty.MainParty.CurrentSettlement = settlement;
+                settlement.Party._mapEventSide = mapEvent.DefenderSide;
+                mapEvent._mapEventType = MapEvent.BattleTypes.Siege;
+                mapEvent.MapEventSettlement = settlement;
+                CreatePresentedSiege(MobileParty.MainParty, settlement);
+            }
+            Campaign.Current.PlayerEncounter = null;
+            Assert.True(mapEvent.CanPartyJoinBattle(PartyBase.MainParty, settlement.BattleSide));
+            using (new AllowedThread())
+                client.Resolve<ISettlementInterface>().StartSettlementEncounter(MobileParty.MainParty, settlement);
+
+            Assert.NotNull(PlayerEncounter.Current);
+            Assert.Same(settlement, PlayerEncounter.EncounterSettlement);
+            Assert.Same(mapEvent, PlayerEncounter.EncounteredBattle);
+            Assert.Null(PlayerEncounter.Battle);
+            Assert.Null(MobileParty.MainParty.MapEvent);
+            Assert.Equal(new[] { "join_encounter" }, activation.MenusFor(client));
+            Assert.Empty(client.NetworkSentMessages.GetMessages<NetworkRequestCreateMapEvent>());
+            Assert.Empty(client.NetworkSentMessages.GetMessages<NetworkRequestJoinBattle>());
+
+            var encounter = PlayerEncounter.Current;
+            Assert.Equal("join_encounter", new DefaultEncounterGameMenuModel().GetGenericStateMenu());
+            Assert.Same(encounter, PlayerEncounter.Current);
+            Assert.Empty(client.NetworkSentMessages.GetMessages<NetworkRequestStartSettlementEncounter>());
+
+            new EncounterGameMenuBehavior().game_menu_join_encounter_help_attackers_on_consequence(
+                new MenuCallbackArgs((MenuContext)null, null));
+            Assert.Null(MobileParty.MainParty.MapEvent);
+        }, WithoutNetworkDelivery().Concat(SiegeCreationDisabledMethods).ToList());
+
+        var request = Assert.Single(client.NetworkSentMessages.GetMessages<NetworkRequestJoinBattle>());
+        Assert.Equal(battle.MapEventId, request.MapEventId);
+        Assert.Equal(BattleSideEnum.Attacker, request.Side);
+        Assert.Empty(client.NetworkSentMessages.GetMessages<NetworkRequestCreateMapEvent>());
+    }
+
+    [Theory]
+    [InlineData(MapEvent.BattleTypes.Siege, true, "encounter")]
+    [InlineData(MapEvent.BattleTypes.FieldBattle, false, "encounter")]
+    public void SettlementEncounterMenu_PreservesDefenderAndNonAssaultMenus(
+        MapEvent.BattleTypes battleType, bool sameFaction, string expectedMenu)
+    {
+        var client = Clients.First();
+        var context = CreateEntryContext(client);
+        var battle = CreateServerMapEvent();
+        client.Call(() =>
+        {
+            var settlement = PrepareClientMenuContext(client, context);
+            Assert.True(client.ObjectManager.TryGetObject<MapEvent>(battle.MapEventId, out var mapEvent));
+            using (new AllowedThread())
+            {
+                MobileParty.MainParty.CurrentSettlement = settlement;
+                settlement.Party._mapEventSide = mapEvent.DefenderSide;
+                mapEvent._mapEventType = battleType;
+                if (sameFaction) settlement.Town.OwnerClan = MobileParty.MainParty.ActualClan;
+            }
+            Assert.Equal(expectedMenu, new DefaultEncounterGameMenuModel().GetEncounterMenu(
+                MobileParty.MainParty.Party, settlement.Party, out var startBattle, out var joinBattle));
+            Assert.False(startBattle);
+            Assert.False(joinBattle);
+        }, WithoutNetworkDelivery());
     }
 
     private static Settlement PrepareClientMenuContext(EnvironmentInstance client, EntryContext context)
