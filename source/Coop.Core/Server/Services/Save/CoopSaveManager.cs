@@ -4,6 +4,7 @@ using GameInterface.CoopSessionData.Save.Data;
 using Serilog;
 using System;
 using System.IO;
+using System.Linq;
 using TaleWorlds.Library;
 
 namespace Coop.Core.Server.Services.Save
@@ -65,20 +66,54 @@ namespace Coop.Core.Server.Services.Save
 
             if (File.Exists(filePath))
             {
+                CoopSession session;
                 try
                 {
                     var fileIO = new JsonFileIO();
-                    return fileIO.ReadFromFile<CoopSession>(filePath);
+                    session = fileIO.ReadFromFile<CoopSession>(filePath);
                 }
-                catch (Exception)
+                catch (Exception e)
                 {
+                    Logger.Error(e, "Co-op session JSON at {FilePath} could not be read; saved co-op session data (player registrations and per-player data) will not be restored and the next save of {SaveName} replaces the file",
+                        GetFullPathForLog(filePath), saveName);
                     return null;
                 }
+
+                // A file holding only a JSON null deserializes to null without throwing
+                if (session == null)
+                {
+                    Logger.Error("Co-op session JSON at {FilePath} contains only null; saved co-op session data (player registrations and per-player data) will not be restored and the next save of {SaveName} replaces the file",
+                        GetFullPathForLog(filePath), saveName);
+                    return null;
+                }
+
+                // Session files from mod builds before Players existed still load, but without their registrations
+                if (session.Players == null)
+                {
+                    Logger.Warning("Co-op session JSON at {FilePath} has no Players list; saved player registrations will not be restored and the next save of {SaveName} replaces the file",
+                        GetFullPathForLog(filePath), saveName);
+                    return session;
+                }
+
+                Logger.Information("Co-op session JSON loaded from {FilePath}: {PlayerCount} saved player registrations",
+                    GetFullPathForLog(filePath), session.Players.Count(player => player != null));
+                return session;
             }
 
-            Logger.Warning("Co-op session JSON was not found at {FilePath}; saved player registrations will not be restored",
-                Path.GetFullPath(filePath));
             return null;
+        }
+
+        // .NET Framework throws on path characters .NET Core accepts, and a log line must not throw
+        private static string GetFullPathForLog(string path)
+        {
+            try
+            {
+                return Path.GetFullPath(path);
+            }
+            catch (Exception)
+            {
+                return path;
+            }
         }
 
         /// <summary>

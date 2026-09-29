@@ -48,6 +48,8 @@ using TaleWorlds.CampaignSystem.Actions;
 using TaleWorlds.CampaignSystem.CampaignBehaviors;
 using TaleWorlds.CampaignSystem.Election;
 using TaleWorlds.CampaignSystem.Encyclopedia;
+using TaleWorlds.CampaignSystem.GameMenus;
+using TaleWorlds.CampaignSystem.GameState;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Party.PartyComponents;
 using TaleWorlds.CampaignSystem.Settlements;
@@ -4032,13 +4034,17 @@ public class PlayerKingdomCreationFlowTests : IDisposable
         });
     }
 
-    [Fact]
-    public void SwitchedPlayer_RefreshesPreExistingArmyTracker_AfterMainHeroWasStillWrongAtConstruction()
+    [Theory]
+    [InlineData(false, false)]
+    [InlineData(true, false)]
+    [InlineData(false, true)]
+    public void SwitchedPlayer_RefreshesArmyTrackerAndCamera_WithAssignedPartyOrCaptor(bool active, bool captive)
     {
         var client = TestEnvironment.Clients.First();
         client.Resolve<IControllerIdProvider>().SetControllerId(ControllerId);
 
         var player = CreateSyncedPlayerContext(ControllerId, _ => false);
+        var captor = captive ? CreateSyncedPlayerContext(SecondControllerId, _ => false) : null;
         var kingdomId = TestEnvironment.CreateRegisteredObject<Kingdom>();
         var armyId = TestEnvironment.CreateRegisteredObject<Army>();
         ConfigureClanInKingdom(client, player.ClanId, kingdomId);
@@ -4076,6 +4082,28 @@ public class PlayerKingdomCreationFlowTests : IDisposable
         // Act: real switch, publishes SwitchedPlayer at the end.
         client.Call(() =>
         {
+            Assert.True(client.ObjectManager.TryGetObject<MobileParty>(player.PartyId, out var assignedParty));
+            PartyBase expectedFollow = assignedParty.Party;
+            using (new AllowedThread())
+            {
+                assignedParty.IsActive = active;
+                if (captive)
+                {
+                    Assert.True(client.ObjectManager.TryGetObject<Hero>(player.HeroId, out var assignedHero));
+                    Assert.True(client.ObjectManager.TryGetObject<MobileParty>(captor.PartyId, out var captorParty));
+                    assignedHero._heroState = Hero.CharacterStates.Prisoner;
+                    assignedHero.PartyBelongedToAsPrisoner = captorParty.Party;
+                    // Native character switching removes and re-adds this existing prisoner.
+                    captorParty.PrisonRoster.AddToCounts(assignedHero.CharacterObject, 1);
+                    Assert.Equal(1, captorParty.PrisonRoster.GetTroopCount(assignedHero.CharacterObject));
+                    var states = Game.Current.GameStateManager;
+                    states._gameStates.Add(states.CreateState<MapState>());
+                    expectedFollow = captorParty.Party;
+                }
+            }
+            var oldParty = Campaign.Current.MainParty.Party;
+            Campaign.Current.CameraFollowParty = oldParty;
+            Assert.NotSame(assignedParty.Party, oldParty);
             var heroInterface = client.Resolve<IHeroInterface>();
             heroInterface.SwitchToPlayer(new Player(
                 ControllerId,
@@ -4083,7 +4111,20 @@ public class PlayerKingdomCreationFlowTests : IDisposable
                 player.PartyId,
                 player.ClanId,
                 player.CharacterId));
-        }, new[] { AccessTools.Method(typeof(InteractionsInitializationHandler), "Handle", new[] { typeof(MessagePayload<PlayerHeroChanged>) }) });
+            Assert.Same(expectedFollow, Campaign.Current.CameraFollowParty);
+            Assert.Equal(active, assignedParty.IsActive);
+            if (captive)
+                Assert.Equal(1, expectedFollow.PrisonRoster.GetTroopCount(Hero.MainHero.CharacterObject));
+        }, new[]
+        {
+            AccessTools.Method(typeof(InteractionsInitializationHandler), "Handle", new[] { typeof(MessagePayload<PlayerHeroChanged>) }),
+            // Native captivity still selects its captor; exclude the separate menu presentation handler.
+            AccessTools.Method(typeof(GameInterface.Services.PlayerCaptivityService.Handlers.PlayerCaptivityClientHandler),
+                "Handle_PlayerCaptivityChanged"),
+            // The camera and prisoner roster are exercised without opening the captivity UI.
+            AccessTools.Method(typeof(GameMenu), nameof(GameMenu.ActivateGameMenu), new[] { typeof(string) }),
+            AccessTools.Method(typeof(GameMenu), nameof(GameMenu.SwitchToMenu), new[] { typeof(string) }),
+        });
         GameThread.Run(() => { }, blocking: true);
 
         client.Call(() =>
@@ -4092,6 +4133,25 @@ public class PlayerKingdomCreationFlowTests : IDisposable
             Assert.Contains(
                 provider.GetTrackers(),
                 tracker => ReferenceEquals(tracker.TrackedObject, army));
+        });
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void SwitchToPlayer_UnresolvedRegistrationPreservesCamera(bool resolveHero)
+    {
+        var client = TestEnvironment.Clients.First();
+        var player = CreateSyncedPlayerContext(ControllerId, _ => false);
+        client.Call(() =>
+        {
+            var previousTarget = Campaign.Current.MainParty.Party;
+            Campaign.Current.CameraFollowParty = previousTarget;
+            client.Resolve<IHeroInterface>().SwitchToPlayer(new Player(
+                ControllerId, resolveHero ? player.HeroId : "missing-hero",
+                "missing-party", player.ClanId, player.CharacterId));
+            Assert.Same(previousTarget, Campaign.Current.CameraFollowParty);
+            Assert.Same(previousTarget, Campaign.Current.MainParty.Party);
         });
     }
 

@@ -1500,6 +1500,40 @@ internal static class BattleDebugCommands
                 .Select(supplier => $"{supplier.Side}:{supplier.PlayerPartyId}")
                 .ToArray();
 
+            ContainerProvider.TryResolve<INetworkAgentRegistry>(out var registry);
+            var humanAgents = mission.Agents.Where(agent => agent.IsActive() && agent.IsHuman)
+                .Select(agent =>
+                {
+                    CoopAgentInfo info = null;
+                    registry?.TryGetAgentInfo(agent, out info);
+                    bool locallyControlled = info != null && info.CurrentAuthority == controller.Session.OwnControllerId;
+                    return new
+                    {
+                        agentId = info?.AgentId.ToString("D"),
+                        index = agent.Index,
+                        side = agent.Team?.Side.ToString(),
+                        authority = info?.CurrentAuthority,
+                        locallyControlled,
+                        fleeing = agent.IsRunningAway,
+                        morale = locallyControlled ? (float?)agent.GetMorale() : null
+                    };
+                }).ToArray();
+            var routState = new
+            {
+                registryAvailable = registry != null,
+                sides = new[] { BattleSideEnum.Attacker, BattleSideEnum.Defender }.Select(side => new
+                {
+                    side = side.ToString(),
+                    active = humanAgents.Count(agent => agent.side == side.ToString()),
+                    fleeing = humanAgents.Count(agent => agent.side == side.ToString() && agent.fleeing),
+                    owned = humanAgents.Count(agent => agent.side == side.ToString() && agent.locallyControlled),
+                    ownedFleeing = humanAgents.Count(agent => agent.side == side.ToString() && agent.locallyControlled && agent.fleeing),
+                    minimumOwnedMorale = humanAgents.Where(agent => agent.side == side.ToString()).Min(agent => agent.morale)
+                }).ToArray(),
+                fleeingAgents = humanAgents.Where(agent => agent.fleeing).Take(20).ToArray(),
+                fleeingSamplesTruncated = humanAgents.Count(agent => agent.fleeing) > 20
+            };
+
             return Succeeded($"instance={controller.Session.InstanceId} host={controller.Session.IsLocalHost} " +
                 $"activated={controller.Deployment.IsActivated} committed={controller.Deployment.IsCommitted} " +
                 $"deploymentReady={deploymentReady} mainAgent={Agent.Main != null} activeAgents={activeAgents} " +
@@ -1509,7 +1543,8 @@ internal static class BattleDebugCommands
                 $"enemyAi={enemies.Count(agent => agent.IsAIControlled)} enemyFleeing={enemyFleeing} " +
                 $"enemyMovedSinceLast={moved} damageReceivedEvents={ownDamageEvents} " +
                 $"resultState={result?.BattleState.ToString() ?? "None"} " +
-                $"battleResolved={result?.BattleResolved ?? false} playerVictory={result?.PlayerVictory ?? false}");
+                $"battleResolved={result?.BattleResolved ?? false} playerVictory={result?.PlayerVictory ?? false}\n" +
+                "LIVE_TEST_JSON=" + JsonConvert.SerializeObject(routState));
         }
     }
 

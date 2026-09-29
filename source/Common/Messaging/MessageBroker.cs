@@ -2,6 +2,7 @@
 using Serilog;
 using System;
 using System.Collections.Generic;
+using System.Reflection;
 
 namespace Common.Messaging;
 
@@ -80,9 +81,16 @@ public class MessageBroker : IMessageBroker
                     // Making synchronous to maintain sequencing of packets
                     weakDelegate.Invoke(new object[] { payload });
                 }
+                catch (TargetInvocationException ex) when (ex.InnerException is not null)
+                {
+                    // MethodInfo.Invoke wraps what the handler threw, and the wrapper's own frames end here
+                    Logger.Error(ex.InnerException, "Failed to run {Method} for {MessageType}",
+                        weakDelegate.Method?.Name ?? "<unknown>", typeof(T).Name);
+                }
                 catch (Exception ex)
                 {
-                    Logger.Error(ex, "Failed to run {Method}", (weakDelegate.Instance as WeakDelegate)?.Method.Name ?? "<null>");
+                    Logger.Error(ex, "Failed to run {Method} for {MessageType}",
+                        weakDelegate.Method?.Name ?? "<unknown>", typeof(T).Name);
                 }
             }
         }
