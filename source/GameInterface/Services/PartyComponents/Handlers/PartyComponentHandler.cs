@@ -251,7 +251,8 @@ internal class PartyComponentHandler : IHandler
     {
         var obj = payload.What;
 
-        if (!objectManager.TryGetIdWithLogging(obj.Instance, out var partyComponentId))
+        string partyComponentId = null;
+        if (obj.Instance != null && !objectManager.TryGetIdWithLogging(obj.Instance, out partyComponentId))
             return;
         if (!objectManager.TryGetIdWithLogging(obj.MobileParty, out var partyId))
             return;
@@ -269,7 +270,9 @@ internal class PartyComponentHandler : IHandler
         {
             try
             {
-                if (!objectManager.TryGetObjectWithLogging<PartyComponent>(obj.InstanceId, out var partyComponent))
+                PartyComponent partyComponent = null;
+                if (obj.InstanceId != null &&
+                    !objectManager.TryGetObjectWithLogging(obj.InstanceId, out partyComponent))
                     return;
 
                 if (!objectManager.TryGetObjectWithLogging<MobileParty>(obj.MobilePartyId, out var mobileParty))
@@ -277,7 +280,7 @@ internal class PartyComponentHandler : IHandler
 
                 using (new AllowedThread())
                 {
-                    partyComponent.MobileParty = mobileParty;
+                    if (partyComponent != null) partyComponent.MobileParty = mobileParty;
                     mobileParty._partyComponent = partyComponent;
 
                     // The type flags (IsMilitia/IsLordParty/IsCaravan/etc.) are derived from the

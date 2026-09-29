@@ -15,6 +15,7 @@ using Moq;
 using System;
 using System.Collections.Generic;
 using System.Reflection;
+using System.Runtime.CompilerServices;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Election;
 using TaleWorlds.CampaignSystem.Party;
@@ -932,18 +933,8 @@ public class KingdomHandlerTests
 
     private static void RunWithBoundGameThread(Action action)
     {
-        bool ownsGameThreadMark = GameThread.Instance.GameThreadId == 0;
-        if (ownsGameThreadMark)
-            GameThread.Instance.MarkGameThread();
-        try
-        {
-            action();
-        }
-        finally
-        {
-            if (ownsGameThreadMark)
-                GameThread.Instance.RestoreGameThread(0);
-        }
+        RuntimeHelpers.RunModuleConstructor(typeof(Coop.Tests.Mocks.TestNetwork).Module.ModuleHandle);
+        action();
     }
 
     private static KingdomHandler CreateHandler(IObjectManager objectManager)

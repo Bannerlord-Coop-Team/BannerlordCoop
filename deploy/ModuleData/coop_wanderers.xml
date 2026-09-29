@@ -496,4 +496,36 @@
       <EquipmentSet id="npc_companion_equipment_template_battania" />
     </Equipments>
   </NPCCharacter>
+  <NPCCharacter
+    id="coop_wanderer_8886871f"
+    name="{=!}Batuhan Erkmen"
+    voice="earnest"
+    age="23"
+    default_group="Infantry"
+    is_template="true"
+    is_hero="false"
+    is_female="false"
+    culture="Culture.battania"
+    occupation="Wanderer"
+    skill_template="SkillSet.spc_wanderer_battania_9_skills">
+    <face>
+      <face_key_template value="BodyProperty.fighter_battania" />
+    </face>
+    <Traits>
+      <Trait id="Calculating" value="1" />
+      <Trait id="Generosity" value="-1" />
+      <Trait id="Mercy" value="-1" />
+      <Trait id="Valor" value="1" />
+    </Traits>
+    <Equipments>
+      <EquipmentRoster civilian="true">
+        <equipment slot="Head" id="Item.nordic_leather_cap" />
+        <equipment slot="Cape" id="Item.scarf" />
+        <equipment slot="Body" id="Item.steppe_armor" />
+        <equipment slot="Gloves" id="Item.armwraps" />
+        <equipment slot="Leg" id="Item.battania_fur_boots" />
+      </EquipmentRoster>
+      <EquipmentSet id="npc_companion_equipment_template_battania" />
+    </Equipments>
+  </NPCCharacter>
 </NPCCharacters>

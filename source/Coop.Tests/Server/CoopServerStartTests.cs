@@ -7,6 +7,7 @@ using Common.Tests.Utils;
 using Coop.Core.Server;
 using Coop.Core.Server.Connections;
 using Coop.Core.Server.Services.Instances;
+using Coop.Core.Server.Services.Shutdown;
 using Coop.Core.Server.Services.Session.Messages;
 using Coop.Core.Server.Services.Time;
 using GameInterface.Services.Entity;
@@ -126,6 +127,8 @@ public class CoopServerStartTests
             Mock.Of<IPacketManager>(),
             Mock.Of<IMessagePacketHandler>(),
             Mock.Of<IConnectionMessageQueue>(),
+            Mock.Of<IServerAdmissionGate>(),
+            Mock.Of<IJoinPeerTerminator>(),
             Mock.Of<IControllerIdProvider>(),
             Mock.Of<IMissionManager>(),
             new Lazy<IOverloadedPeerManager>(() => Mock.Of<IOverloadedPeerManager>()),
