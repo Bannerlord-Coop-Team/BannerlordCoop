@@ -12,9 +12,11 @@ public sealed partial class ChatService : IChatLiveTestHook
 {
     private int sentMessageCount;
 
+    partial void OnChatLineSent() => sentMessageCount++;
+
     // Goes through the same ActionSend as the Send button, so a live run proves !motd and a chat line
     // without operating-system input. It replaces anything typed and sends on the selected channel.
-    public bool SubmitForLiveTest(string text, out string state)
+    bool IChatLiveTestHook.SubmitForLiveTest(string text, out string state)
     {
         if (!overlay.IsEnabled)
         {

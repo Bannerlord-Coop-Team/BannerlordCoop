@@ -106,10 +106,11 @@ public sealed partial class ChatService : IChatService, IDisposable
     private void Send(NetworkSendChatMessage message)
     {
         network.SendAll(message);
-#if DEBUG
-        sentMessageCount++;
-#endif
+        OnChatLineSent();
     }
+
+    // Only the Debug live-test file implements this, so Release compiles the call out.
+    partial void OnChatLineSent();
 
     private void HandleChatVisibilitySelected(MessagePayload<ChatVisibilitySelected> payload)
     {
