@@ -507,8 +507,8 @@ public class SiegeEntryValidationFlowTests : MapEventTestBase
         var battle = CreateServerMapEvent();
         using var activation = new MethodCallRecorder(Priority.Last,
             AccessTools.Method(typeof(GameMenu), nameof(GameMenu.ActivateGameMenu), new[] { typeof(string) }));
-        using var menuSwitch = new MethodCallRecorder(Priority.Last,
-            AccessTools.Method(typeof(GameMenu), nameof(GameMenu.SwitchToMenu), new[] { typeof(string) }));
+        using var menuSwitch = new MethodCallRecorder(
+            AccessTools.Method(typeof(MenuContext), nameof(MenuContext.SwitchToMenu), new[] { typeof(string) }));
         var disabledMethods = MapEventDisabledMethods.Concat(SiegeCreationDisabledMethods).ToList();
         foreach (var instance in Clients.Append(Server))
         {
@@ -567,6 +567,12 @@ public class SiegeEntryValidationFlowTests : MapEventTestBase
             Assert.Equal("join_encounter", new DefaultEncounterGameMenuModel().GetGenericStateMenu());
             Assert.Same(recoveredEncounter, PlayerEncounter.Current);
             Assert.Empty(client.NetworkSentMessages.GetMessages<NetworkRequestStartSettlementEncounter>());
+
+            // Activation is recorded without rendering, so supply the menu context it would create.
+            var mapState = Game.Current.GameStateManager.CreateState<MapState>();
+            mapState._menuContext = ObjectHelper.SkipConstructor<MenuContext>();
+            mapState._menuContext.GameMenu = new GameMenu("join_encounter");
+            Game.Current.GameStateManager._gameStates.Add(mapState);
 
             new EncounterGameMenuBehavior().game_menu_join_encounter_help_attackers_on_consequence(
                 new MenuCallbackArgs((MenuContext)null, null));
