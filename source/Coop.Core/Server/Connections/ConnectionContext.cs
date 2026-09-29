@@ -39,7 +39,8 @@ public class ConnectionContext
         ISteamBanList steamBanList,
         IServerOptionsProvider serverOptionsProvider,
         IJoinCampaignBaselineSender joinCampaignBaselineSender,
-        IJoinCampaignKingdomBaseLineSender joinCampaignKingdomBaseLineSender)
+        IJoinCampaignKingdomBaseLineSender joinCampaignKingdomBaseLineSender,
+        IJoinValidationDenialLog joinValidationDenialLog)
     {
         MessageBroker = messageBroker;
         Network = network;
@@ -60,6 +61,7 @@ public class ConnectionContext
         ServerOptionsProvider = serverOptionsProvider;
         JoinCampaignBaselineSender = joinCampaignBaselineSender;
         JoinCampaignKingdomBaseLineSender = joinCampaignKingdomBaseLineSender;
+        JoinValidationDenialLog = joinValidationDenialLog;
     }
 
     public IMessageBroker MessageBroker { get; }
@@ -81,4 +83,5 @@ public class ConnectionContext
     public IServerOptionsProvider ServerOptionsProvider { get; }
     public IJoinCampaignBaselineSender JoinCampaignBaselineSender { get; }
     public IJoinCampaignKingdomBaseLineSender JoinCampaignKingdomBaseLineSender { get; }
+    public IJoinValidationDenialLog JoinValidationDenialLog { get; }
 }

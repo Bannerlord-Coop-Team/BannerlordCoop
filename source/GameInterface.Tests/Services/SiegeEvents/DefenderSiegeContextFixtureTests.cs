@@ -344,11 +344,102 @@ public class DefenderSiegeContextFixtureTests
     public void Start_UncapturedEligibleDefender_RefusesBeforeStartingSiege()
     {
         using var test = new AssaultFixture();
-        test.PrepareStartWithVisitor("hostile-lord");
-        Assert.False(test.Fixture.Start().Succeeded);
+        var visitor = test.PrepareCleanStart();
+        visitor.IsActive = true;
+        var result = test.Fixture.Start();
+        var evidence = JObject.Parse(result.Output.Substring("LIVE_TEST_JSON=".Length));
+        Assert.False(result.Succeeded);
+        Assert.Equal("uncaptured_assault_defender", (string)evidence["startFailureDetail"]);
+        Assert.Equal(new[] { visitor.StringId }, evidence["uncapturedAssaultDefenderIds"].ToObject<string[]>());
         Assert.False(test.StartAttempted);
         test.Siege.Verify(value => value.StartSiegeEvent(It.IsAny<MobileParty>(), It.IsAny<Settlement>()), Times.Never);
         Assert.Null(test.Settlement.SiegeEvent);
+    }
+
+    [Fact]
+    public void Start_LaterRefusal_DoesNotReportPreviousUncapturedDefender()
+    {
+        using var test = new AssaultFixture();
+        var visitor = test.PrepareCleanStart();
+        visitor.IsActive = true;
+        Assert.False(test.Fixture.Start().Succeeded);
+        visitor.IsActive = false;
+        test.Defenders[0]._currentSettlement = null;
+
+        var result = test.Fixture.Start();
+        var evidence = JObject.Parse(result.Output.Substring("LIVE_TEST_JSON=".Length));
+        Assert.Equal("defenders_changed", (string)evidence["startFailureDetail"]);
+        Assert.Empty(evidence["uncapturedAssaultDefenderIds"]);
+        Assert.False(test.StartAttempted);
+        test.Siege.Verify(value => value.StartSiegeEvent(It.IsAny<MobileParty>(), It.IsAny<Settlement>()), Times.Never);
+    }
+
+    [Theory]
+    [InlineData("server_required")]
+    [InlineData("captured_identity_changed")]
+    [InlineData("behavior_identity_changed")]
+    [InlineData("defenders_changed")]
+    [InlineData("uncaptured_assault_defender")]
+    [InlineData("start_already_attempted")]
+    [InlineData("already_restored")]
+    [InlineData("settlement_has_siege")]
+    [InlineData("settlement_has_map_event")]
+    [InlineData("besieger_has_map_event")]
+    [InlineData("besieger_has_camp")]
+    [InlineData("besieger_inactive")]
+    [InlineData("besieger_inside_settlement")]
+    [InlineData("besieger_at_sea")]
+    [InlineData("besieger_position_not_on_land")]
+    [InlineData("besieger_in_transition")]
+    [InlineData("besieger_in_army")]
+    [InlineData("besieger_attached")]
+    [InlineData("besieger_has_attached_parties")]
+    [InlineData("besieger_not_hostile")]
+    public void Start_ReportsExactRefusalWithoutStartingSiege(string reason)
+    {
+        using var test = new AssaultFixture();
+        var visitor = test.PrepareCleanStart();
+        var party = test.CapturedBesieger;
+        Assert.Null(AccessTools.Method(typeof(DefenderSiegeContextFixture), "GetStartFailure").Invoke(test.Fixture, null));
+        switch (reason)
+        {
+            case "server_required": ModInformation.IsServer = false; break;
+            case "captured_identity_changed": Assert.True(test.Objects.Remove(party)); break;
+            case "behavior_identity_changed":
+                AccessTools.Field(typeof(DefenderSiegeContextFixture), "originalBehaviorReferences").SetValue(test.Fixture, null);
+                break;
+            case "defenders_changed": test.Defenders[0]._currentSettlement = null; break;
+            case "uncaptured_assault_defender": visitor.IsActive = true; break;
+            case "start_already_attempted":
+                AccessTools.Field(typeof(DefenderSiegeContextFixture), "startAttempted").SetValue(test.Fixture, true);
+                break;
+            case "already_restored":
+                AccessTools.Field(typeof(DefenderSiegeContextFixture), "restored").SetValue(test.Fixture, true);
+                break;
+            case "settlement_has_siege": test.Settlement.SiegeEvent = ObjectHelper.SkipConstructor<SiegeEvent>(); break;
+            case "settlement_has_map_event": test.Settlement.Party._mapEventSide = test.Assault.DefenderSide; break;
+            case "besieger_has_map_event": party.Party._mapEventSide = test.Assault.AttackerSide; break;
+            case "besieger_has_camp": party._besiegerCamp = ObjectHelper.SkipConstructor<BesiegerCamp>(); break;
+            case "besieger_inactive": party.IsActive = false; break;
+            case "besieger_inside_settlement": party._currentSettlement = test.Settlement; break;
+            case "besieger_at_sea": party._isCurrentlyAtSea = true; break;
+            case "besieger_position_not_on_land": party._position = new CampaignVec2(new Vec2(12f, 24f), false); break;
+            case "besieger_in_transition": party.NavigationTransitionStartTime = CampaignTime.Hours(1f); break;
+            case "besieger_in_army": party._army = ObjectHelper.SkipConstructor<Army>(); break;
+            case "besieger_attached": party._attachedTo = visitor; break;
+            case "besieger_has_attached_parties": party._attachedParties.Add(visitor); break;
+            case "besieger_not_hostile": test.Settlement.Town._ownerClan = party.ActualClan; break;
+        }
+
+        var result = test.Fixture.Start();
+        var evidence = JObject.Parse(result.Output.Substring("LIVE_TEST_JSON=".Length));
+
+        Assert.False(result.Succeeded);
+        Assert.Equal("start_precondition_changed", (string)evidence["status"]);
+        Assert.Equal(reason, (string)evidence["startFailureDetail"]);
+        Assert.Equal(reason == "start_already_attempted", test.StartAttempted);
+        Assert.Equal(new CampaignVec2(new Vec2(12f, 24f), reason != "besieger_position_not_on_land"), party.Position);
+        test.Siege.Verify(value => value.StartSiegeEvent(It.IsAny<MobileParty>(), It.IsAny<Settlement>()), Times.Never);
     }
 
     [Fact]
@@ -588,6 +679,18 @@ public class DefenderSiegeContextFixtureTests
             Write("startAttempted", false);
             Write("createdSiege", null);
             Assert.Equal(kind != "non-hostile", visitor.MapFaction.IsAtWarWith(besieger.MapFaction));
+            return visitor;
+        }
+
+        public MobileParty PrepareCleanStart()
+        {
+            var visitor = PrepareStartWithVisitor("inactive");
+            if (Campaign.Current == null) Campaign.Current = ObjectHelper.SkipConstructor<Campaign>();
+            Write("campaign", Campaign.Current);
+            Settlement.Town._ownerClan = visitor.ActualClan;
+            Settlement.SettlementComponent = Settlement.Town;
+            CapturedBesieger.NavigationTransitionStartTime = CampaignTime.Zero;
+            CapturedBesieger._attachedParties = new MBList<MobileParty>();
             return visitor;
         }
 

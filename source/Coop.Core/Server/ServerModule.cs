@@ -22,6 +22,8 @@ using Coop.Core.Server.Services.MobileParties;
 using Coop.Core.Server.Services.Save;
 using Coop.Core.Server.Services.Session;
 using Coop.Core.Server.Services.Settlements;
+using Coop.Core.Server.Services.Shutdown;
+using Coop.Core.Server.Services.Shutdown.Commands;
 using Coop.Core.Server.Services.Telemetry;
 using Coop.Core.Server.Services.Time;
 using Coop.Core.Server.States;
@@ -61,6 +63,7 @@ public class ServerModule : CommonModule
         builder.RegisterType<ServerContext>().AsSelf().InstancePerLifetimeScope();
         builder.RegisterType<ServerLogic>().As<IServerLogic>().As<ILogic>().InstancePerLifetimeScope();
         builder.RegisterType<CoopServer>().As<ICoopServer>().As<INetwork>().As<INetEventListener>().InstancePerLifetimeScope();
+        builder.RegisterType<UdpBindDiagnostics>().As<IUdpBindDiagnostics>().InstancePerDependency();
         builder.RegisterType<SendCoalescer>().As<ISendCoalescer>().InstancePerLifetimeScope();
         builder.RegisterType<CoopSaveManager>().As<ICoopSaveManager>().InstancePerLifetimeScope();
         builder.RegisterType<JoinCampaignBaselineSender>()
@@ -92,12 +95,27 @@ public class ServerModule : CommonModule
         builder.RegisterType<SettlementEncounterDistanceValidator>()
             .As<ISettlementEncounterDistanceValidator>()
             .InstancePerDependency();
+
+        // Graceful restart, in Release too.
+        builder.RegisterType<ServerAdmissionGate>().As<IServerAdmissionGate>().InstancePerLifetimeScope();
+        // AutoActivate so it sees the GameLoaded save name.
+        builder.RegisterType<ServerShutdownCoordinator>()
+            .As<IServerShutdownCoordinator>()
+            .InstancePerLifetimeScope()
+            .AutoActivate();
+        builder.RegisterType<ServerShutdownCommand.ShutdownCoopCommand>().As<ICoopCommand>().InstancePerDependency();
+
         // Pauses time while a peer's packet queue is overloaded (slow client catching up). Constructed
         // as a CoopServer dependency, so it registers its unpause policy when the server is built.
         builder.RegisterType<JoinPeerTerminator>().As<IJoinPeerTerminator>().InstancePerDependency();
         builder.RegisterType<OverloadedPeerManager>().As<IOverloadedPeerManager>().InstancePerLifetimeScope().AutoActivate();
 
+        // DEBUG builds, including MCP live-test runs, keep their heartbeats and battle counts off the production statistics.
+#if DEBUG
+        builder.RegisterType<DisabledServerTelemetryUploader>()
+#else
         builder.RegisterType<ServerTelemetryUploader>()
+#endif
             .As<IServerTelemetryUploader>()
             .As<IBattlesFoughtUploader>()
             .InstancePerLifetimeScope();

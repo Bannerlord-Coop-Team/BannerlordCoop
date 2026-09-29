@@ -110,7 +110,13 @@ public sealed class DefenderSiegeFixtureCommandsTests : IDisposable
             snapshots.Setup(service => service.TryCreate(It.IsAny<MobileParty>(), out It.Ref<PartyBehaviorUpdateData>.IsAny))
                 .Returns((MobileParty party, out PartyBehaviorUpdateData data) =>
                 {
-                    data = new PartyBehaviorUpdateData { PartyPosition = party.Position };
+                    data = new PartyBehaviorUpdateData(
+                        null, default, null, default, party.Position, party.DefaultBehavior,
+                        party.TargetPosition, default)
+                    {
+                        PartyMoveMode = party.PartyMoveMode,
+                        MoveTargetPoint = party.MoveTargetPoint,
+                    };
                     return true;
                 });
             snapshots.Setup(service => service.CanApply(It.IsAny<MobileParty>(), It.IsAny<PartyBehaviorUpdateData>())).Returns(true);
@@ -125,6 +131,10 @@ public sealed class DefenderSiegeFixtureCommandsTests : IDisposable
                     }
 
                     party._position = data.PartyPosition;
+                    party.PartyMoveMode = data.PartyMoveMode;
+                    party.MoveTargetPoint = data.MoveTargetPoint;
+                    party.TargetPosition = data.TargetPosition;
+                    party.DefaultBehavior = data.DefaultBehavior;
                     return true;
                 });
             actions.Setup(service => service.Release(It.IsAny<Hero>())).Callback<Hero>(hero =>
@@ -761,6 +771,40 @@ public sealed class DefenderSiegeFixtureCommandsTests : IDisposable
     }
 
     [Fact]
+    public void Stage_StopsExistingMovementAndRestoreReplaysCapturedOrders()
+    {
+        PrepareStagingParties();
+        var target = new CampaignVec2(new Vec2(45f, 67f), isOnLand: true);
+        foreach (var captive in captives)
+        {
+            captive.Party.PartyMoveMode = MoveModeType.Point;
+            captive.Party.DefaultBehavior = AiBehavior.GoToPoint;
+            captive.Party.TargetPosition = target;
+            captive.Party.MoveTargetPoint = target;
+        }
+        AssertSuccess(Parse(DefenderSiegeFixtureCommands.Capture(new() { "testclient", "testclient2" })));
+
+        AssertSuccess(Parse(DefenderSiegeFixtureCommands.Stage(new())));
+
+        Assert.All(captives, captive =>
+        {
+            Assert.Equal(MoveModeType.Hold, captive.Party.PartyMoveMode);
+            Assert.Equal(AiBehavior.Hold, captive.Party.DefaultBehavior);
+            Assert.Equal(captive.Party.Position, captive.Party.MoveTargetPoint);
+            Assert.Equal(captive.Party.Position, captive.Party.NextTargetPosition);
+        });
+        AssertSuccess(Parse(DefenderSiegeFixtureCommands.Restore(new())));
+        Assert.All(captives, captive =>
+        {
+            Assert.Equal(MoveModeType.Point, captive.Party.PartyMoveMode);
+            Assert.Equal(AiBehavior.GoToPoint, captive.Party.DefaultBehavior);
+            Assert.Equal(target, captive.Party.MoveTargetPoint);
+            Assert.Equal(target, captive.Party.TargetPosition);
+        });
+        AssertSuccess(Parse(DefenderSiegeFixtureCommands.VerifyRestore(new())));
+    }
+
+    [Fact]
     public void StagingFixture_UnchangedIdentities_ClearsOnlyAfterRestoreVerification()
     {
         CaptureStagingFixture();
@@ -1352,6 +1396,105 @@ public sealed class DefenderSiegeFixtureCommandsTests : IDisposable
             objects, new[] { secondFallback, firstFallback, preferred }, parties));
     }
 
+    [Fact]
+    public void SelectStagingSettlement_UsesDanusticaOnlyWhenExplicitlyAllowed()
+    {
+        Settlement castle = CreateStagingCastle("castle_ES1");
+        Settlement danustica = CreateStagingCastle("town_ES1");
+        danustica.Town._isCastle = false;
+        Assert.True(danustica.IsTown);
+        MobileParty[] parties = captives.Select(captive => captive.Party).ToArray();
+        Assert.True(objects.AddExisting(castle.StringId, castle));
+        Assert.True(objects.AddExisting(danustica.StringId, danustica));
+
+        Assert.Null(DefenderSiegeFixtureCommands.SelectStagingSettlement(
+            objects, new[] { danustica }, parties));
+        Assert.Same(danustica, DefenderSiegeFixtureCommands.SelectStagingSettlement(
+            objects, new[] { danustica }, parties, allowDanustica: true));
+        Assert.Same(castle, DefenderSiegeFixtureCommands.SelectStagingSettlement(
+            objects, new[] { danustica, castle }, parties));
+    }
+
+    [Theory]
+    [InlineData("lord", false)]
+    [InlineData("other-garrison", false)]
+    [InlineData("other-militia", false)]
+    [InlineData("same-player-id", false)]
+    [InlineData("captured-player", true)]
+    [InlineData("garrison", true)]
+    [InlineData("militia", true)]
+    [InlineData("inactive", true)]
+    [InlineData("villager", true)]
+    [InlineData("caravan", true)]
+    public void SelectStagingSettlement_ExcludesUncapturedResidents(string kind, bool eligible)
+    {
+        Settlement settlement = CreateStagingCastle("castle_ES1");
+        Assert.True(objects.AddExisting(settlement.StringId, settlement));
+        MobileParty[] players = captives.Select(captive => captive.Party).ToArray();
+        var resident = ObjectHelper.SkipConstructor<MobileParty>();
+        resident.StringId = kind == "same-player-id" ? players[0].StringId : "resident";
+        resident.IsActive = kind != "inactive";
+        resident.IsVillager = kind == "villager";
+        resident.IsCaravan = kind == "caravan";
+        resident.IsGarrison = kind == "garrison" || kind == "other-garrison";
+        resident.IsMilitia = kind == "militia" || kind == "other-militia";
+        if (kind == "captured-player")
+        {
+            resident = players[0];
+            resident.IsActive = true;
+        }
+        if (kind == "garrison")
+        {
+            settlement.Town.GarrisonPartyComponent = ObjectHelper.SkipConstructor<GarrisonPartyComponent>();
+            settlement.Town.GarrisonPartyComponent.MobileParty = resident;
+        }
+        if (kind == "militia")
+        {
+            settlement.MilitiaPartyComponent = ObjectHelper.SkipConstructor<MilitiaPartyComponent>();
+            settlement.MilitiaPartyComponent.MobileParty = resident;
+        }
+        settlement._partiesCache.Add(resident);
+
+        var selected = DefenderSiegeFixtureCommands.SelectStagingSettlement(objects, new[] { settlement }, players);
+
+        Assert.Equal(eligible, ReferenceEquals(selected, settlement));
+        Assert.Same(resident, Assert.Single(settlement.Parties));
+    }
+
+    [Fact]
+    public void SelectStagingSettlement_SkipsOccupiedPreferredCastle()
+    {
+        Settlement preferred = CreateStagingCastle("castle_ES1");
+        Settlement fallback = CreateStagingCastle("castle_B1");
+        Assert.True(objects.AddExisting(preferred.StringId, preferred));
+        Assert.True(objects.AddExisting(fallback.StringId, fallback));
+        var resident = ObjectHelper.SkipConstructor<MobileParty>();
+        resident.IsActive = true;
+        preferred._partiesCache.Add(resident);
+
+        Assert.Same(fallback, DefenderSiegeFixtureCommands.SelectStagingSettlement(
+            objects, new[] { preferred, fallback }, captives.Select(captive => captive.Party)));
+        Assert.Same(resident, Assert.Single(preferred.Parties));
+    }
+
+    [Fact]
+    public void CaptureExactCastle_RejectsOccupiedTargetWithoutFallbackOrMutation()
+    {
+        Settlement preferred = PrepareStagingParties();
+        Settlement fallback = CreateStagingCastle("castle_B1");
+        Assert.True(objects.AddExisting(fallback.StringId, fallback));
+        var resident = ObjectHelper.SkipConstructor<MobileParty>();
+        resident.IsActive = true;
+        preferred._partiesCache.Add(resident);
+
+        var result = Parse(DefenderSiegeFixtureCommands.Capture(new() { "testclient", "testclient2", "castle_ES1" }));
+
+        Assert.False(result.Value<bool>("success"));
+        Assert.Null(AccessTools.Field(typeof(DefenderSiegeFixtureCommands), "pendingCapture").GetValue(null));
+        Assert.All(captives, captive => Assert.Same(preferred, captive.Party.CurrentSettlement));
+        Assert.Same(resident, Assert.Single(preferred.Parties));
+    }
+
     private Settlement PrepareStagingParties()
     {
         Settlement settlement = CreateStagingCastle("castle_ES1");
@@ -1369,6 +1512,7 @@ public sealed class DefenderSiegeFixtureCommandsTests : IDisposable
     {
         var settlement = ObjectHelper.SkipConstructor<Settlement>();
         settlement.StringId = id;
+        settlement._partiesCache = new MBList<MobileParty>();
         settlement.Party = ObjectHelper.SkipConstructor<PartyBase>();
         settlement.Party.Settlement = settlement;
         settlement.Party.ItemRoster = new ItemRoster();

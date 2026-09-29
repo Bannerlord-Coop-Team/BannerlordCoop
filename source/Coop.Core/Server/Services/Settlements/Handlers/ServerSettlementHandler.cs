@@ -213,9 +213,12 @@ internal class ServerSettlementHandler : IHandler
         messageBroker.Unsubscribe<SettlementWallHitPointsRatioChanged>(HandleWallRatio);
         messageBroker.Unsubscribe<SettlementChangedLastVisitTimeOfOwner>(HandleLastVisitOfOwner);
         messageBroker.Unsubscribe<ClientChangeLordConversationCampaignBehaviorPlayerClaim>(HandleLordConversationCampaignBehaviorPlayerClaim);
+        messageBroker.Unsubscribe<ClientChangeLordConversationCampaignBehaviorPlayerClaimValue>(HandleLordConversationCampaignBehaviorPlayerClaimValue);
 
         //Settlement.CanBeClaimed
         messageBroker.Unsubscribe<SettlementClaimantCanBeClaimedChanged>(HandleSettlementClaimaintCanBeClaimed);
 
+        messageBroker.Unsubscribe<RequestSettlementAudit>(Handle_Request);
+        messageBroker.Unsubscribe<SettlementAuditResponse>(Handle_Respond);
     }
 }

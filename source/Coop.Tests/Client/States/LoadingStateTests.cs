@@ -6,13 +6,17 @@ using GameInterface.Services.GameState.Interfaces;
 using GameInterface.Services.GameState.Messages;
 using GameInterface.Services.UI.Interfaces;
 using Moq;
+using System;
 using Xunit;
 using Xunit.Abstractions;
 
 namespace Coop.Tests.Client.States
 {
-    public class LoadingStateTests
+    [Collection(nameof(CampaignStateCollection))]
+    public class LoadingStateTests : IDisposable
     {
+        public void Dispose() => clientLogic.State.Dispose();
+
         private readonly IClientLogic clientLogic;
         private readonly ClientTestComponent clientComponent;
         private readonly Mock<ILoadingInterface> loadingInterfaceMock;

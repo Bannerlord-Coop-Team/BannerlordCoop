@@ -7,6 +7,7 @@ public enum ConnectionRejectCode : byte
 {
     None = 0,
     IncorrectPassword = 1,
+    ServerRestarting = 2,
 }
 
 /// <summary>

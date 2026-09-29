@@ -10,6 +10,7 @@ using Coop.Core.Client;
 using Coop.Core.Client.Messages;
 using Coop.Core.Client.Services.Discord;
 using Coop.Core.Client.Services.Session;
+using Coop.Core.Common;
 using Coop.Core.Common.Configuration;
 using Coop.Core.Common.Services.Connection.Messages;
 using Coop.Core.Common.Session;
@@ -537,6 +538,7 @@ namespace Coop.Core
             coopStarting = true;
             setCrashPhase("applying-patches");
             CancellationToken sessionCancellation = container.Resolve<CancellationTokenSource>().Token;
+            IPatchFailureReport patchFailureReport = container.Resolve<IPatchFailureReport>();
 
             Task.Factory.StartNew(() =>
             {
@@ -556,9 +558,15 @@ namespace Coop.Core
                     }
                     catch (Exception e)
                     {
-                        Logger.Error(e, "Applying patches failed while starting coop");
+                        Logger.Error(e, "Applying patches failed while starting coop. {LoadedCopies}", patchFailureReport.ListLoadedCopies(e));
                         CompleteCoopStart(startGeneration);
                         GameThread.RunSafe(loadingInterface.HideLoadingScreen);
+
+                        // A teardown during patching owns its own message.
+                        if (!sessionCancellation.IsCancellationRequested)
+                        {
+                            messageBroker.Publish(this, new SendPopupMessage(patchFailureReport.Describe(e)));
+                        }
                         return;
                     }
 

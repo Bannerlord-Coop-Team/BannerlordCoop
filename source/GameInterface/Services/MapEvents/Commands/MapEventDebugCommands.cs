@@ -810,6 +810,77 @@ public class MapEventDebugCommands
         }
     }
 
+    // coop.debug.map_event.engage_nearest_bandit PlayerOne [excludedPartyId]
+    /// <summary>
+    /// Places the nearest bandit next to a connected player and orders it to engage them, so the encounter starts
+    /// from the AI tick and goes through the server-detected conversation path.
+    /// </summary>
+    public sealed class EngageNearestBanditCoopCommand : ICoopCommand
+    {
+        public string Prefix => "coop.debug.map_event";
+
+        public string Name => "engage_nearest_bandit";
+
+        public string Description => "Places the nearest bandit next to a player and orders it to engage them.";
+
+        public CoopCommandSide Side => CoopCommandSide.Server;
+
+        public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
+        {
+            new ExpectedArgs("controller_id", "The controller id.", true),
+            new ExpectedArgs("excluded_party_id", "The excluded party id.", false),
+        };
+
+        public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
+        {
+            if (ModInformation.IsClient)
+                return Failed("Run this command on the server.");
+
+            if (!TryGetPlayerParty(args[0], requireReady: true, out var objectManager, out var playerParty, out var error))
+                return Failed(error);
+
+            if (playerParty.CurrentSettlement != null)
+                return Failed($"Player {args[0]} is in {playerParty.CurrentSettlement.StringId}; " +
+                              "run coop.debug.map_event.leave_settlement first.");
+
+            // A held or AI-disabled party would never move, so it is skipped.
+            var excludedPartyId = args.Count == 2 ? args[1] : null;
+            var playerPosition = playerParty.Position.ToVec2();
+            var banditParty = MobileParty.All
+                .Where(p => p.IsActive && p.IsBandit && p != playerParty
+                            && p.MapEvent == null && p.CurrentSettlement == null && p.MemberRoster.TotalManCount > 0
+                            && p.Ai?.IsDisabled == false
+                            && !MatchesPartyId(objectManager, p, excludedPartyId))
+                .OrderBy(p => p.Position.ToVec2().DistanceSquared(playerPosition))
+                .FirstOrDefault();
+
+            if (banditParty == null)
+                return Failed("No active bandit/looter party found on the map.");
+
+            banditParty.Position = new CampaignVec2(
+                new Vec2(playerParty.Position.X - 0.4f, playerParty.Position.Y),
+                isOnLand: true);
+            banditParty.SetMoveEngageParty(playerParty, MobileParty.NavigationType.Default);
+
+            // Keeps the engage order. Only a conversation hold release clears it, so a bandit never held keeps it.
+            banditParty.Ai.DoNotMakeNewDecisions = true;
+
+            MessageBroker.Instance.Publish(
+                typeof(MapEventDebugCommands),
+                new PartyBehaviorChangeAttempted(banditParty, forcePosition: true));
+
+            var partyId = objectManager.TryGetId(banditParty, out string registryId)
+                ? registryId
+                : banditParty.StringId;
+            var partyBaseId = objectManager.TryGetId(banditParty.Party, out string partyBaseRegistryId)
+                ? partyBaseRegistryId
+                : "<unregistered>";
+
+            return Succeeded($"Ordered {banditParty.Name} (StringId {banditParty.StringId}, " +
+                   $"registry id {partyId}, PartyBase id {partyBaseId}) to engage player {args[0]}.");
+        }
+    }
+
     // coop.debug.mapevent.bandit_attack_fixture_prepare PlayerOne mountain_bandits_24
     /// <summary>Prepares a reversible exact-bandit attack fixture for evidence capture.</summary>
     public sealed class BanditAttackFixturePrepareCoopCommand : ICoopCommand
@@ -2331,7 +2402,7 @@ public class MapEventDebugCommands
     private static bool HasAttachedFixtureParties(WoundedAlliedFixture fixture) =>
         HasAttachedParties(fixture.MapEvent, fixture.InvolvedParties);
 
-    private static bool HasAttachedParties(MapEvent mapEvent, PartyBase[] involvedParties) =>
+    internal static bool HasAttachedParties(MapEvent mapEvent, PartyBase[] involvedParties) =>
         mapEvent != null &&
         (involvedParties?.Any(p => p?._mapEventSide?.MapEvent == mapEvent) == true ||
          mapEvent.AttackerSide?.Parties.Count > 0 ||
@@ -2342,7 +2413,7 @@ public class MapEventDebugCommands
         RecoverPartiallyFinalizedMapEvent(fixture.MapEvent, fixture.InvolvedParties);
     }
 
-    private static void RecoverPartiallyFinalizedMapEvent(MapEvent mapEvent, PartyBase[] involvedParties)
+    internal static void RecoverPartiallyFinalizedMapEvent(MapEvent mapEvent, PartyBase[] involvedParties)
     {
         foreach (var party in involvedParties ?? Array.Empty<PartyBase>())
         {

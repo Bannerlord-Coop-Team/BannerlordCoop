@@ -1764,8 +1764,17 @@ public partial class SiegeMachineStateReplicator : ISiegeMachineStateReplicator
         if (state.HitPoints >= 0f && machine.DestructionComponent != null)
         {
             var destruction = machine.DestructionComponent;
+            bool wasDestroyed = destruction.IsDestroyed;
             destruction.HitPoint = state.HitPoints;
             SyncMissionSiegeWeaponHealth(destruction, state.HitPoints);
+            // Assigning HitPoint raises no destroyed event, so run the gate's own handler before the mesh swap like
+            // vanilla OnHit: it hides the plank, turns off the standing points and opens the gate navmesh. The
+            // component's OnDestroyed event isn't raised here, so its other listeners only run where the hit happened.
+            if (!wasDestroyed && destruction.IsDestroyed && machine is CastleGate destroyedGate)
+            {
+                destroyedGate.OnDestroyed(destruction, null, in MissionWeapon.Invalid, null, 0);
+            }
+
             // Forward only: destruction states never regress, and vanilla's broken-entity swap indexes
             // _destructionStates[state - 1], so applying a lower state (a local cosmetic hit ran ahead)
             // would index out of range. forcedId -1 = don't force the broken entity's MissionObjectId,
