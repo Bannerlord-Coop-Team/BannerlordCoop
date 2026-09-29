@@ -36,6 +36,30 @@ public class DebugMessageHandlerTests
     }
 
     [Fact]
+    public void SendPopupMessage_StillShowsWhenItsSessionEndsBeforeTheNextFrame()
+    {
+        using var shown = new ManualResetEventSlim(false);
+        using var tornDown = new ManualResetEventSlim(false);
+        using var messageBroker = new MessageBroker();
+        using var handler = new DebugMessageHandler(messageBroker, _ => shown.Set());
+        using var session = new CancellationTokenSource();
+
+        // A refused join publishes the popup and then runs the teardown that cancels the session.
+        using (GameThread.ActivateCancellation(session.Token))
+        {
+            GameThread.Run(() =>
+            {
+                messageBroker.Publish(this, new SendPopupMessage("The server is restarting."));
+                session.Cancel();
+                tornDown.Set();
+            });
+        }
+
+        Assert.True(tornDown.Wait(TimeSpan.FromSeconds(5)), "the teardown action did not run");
+        Assert.True(shown.Wait(TimeSpan.FromSeconds(5)), "the teardown dropped the popup");
+    }
+
+    [Fact]
     public void SendPopupMessage_WaitsUntilTheMainMenuScreenCanHostTheInquiry()
     {
         using var messageBroker = new MessageBroker();

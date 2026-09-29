@@ -36,6 +36,7 @@ public sealed class NearbyPartyReinforcerTests : IDisposable
 {
     static NearbyPartyReinforcerTests()
     {
+        RuntimeHelpers.RunModuleConstructor(typeof(Coop.Tests.Mocks.TestNetwork).Module.ModuleHandle);
         GameBootStrap.Initialize();
     }
 
@@ -409,20 +410,8 @@ public sealed class NearbyPartyReinforcerTests : IDisposable
         using var messageBroker = new MessageBroker();
         using var handler = new NearbyPartyReinforcementHandler(messageBroker, reinforcer);
 
-        bool ownsGameThreadMark = GameThread.Instance.GameThreadId == 0;
-        if (ownsGameThreadMark)
-            GameThread.Instance.MarkGameThread();
-
-        try
-        {
-            using (new AllowedThread())
-                messageBroker.Publish(mapEvent, new PartyRemovedFromMapEvent(removedParty));
-        }
-        finally
-        {
-            if (ownsGameThreadMark)
-                GameThread.Instance.RestoreGameThread(0);
-        }
+        using (new AllowedThread())
+            messageBroker.Publish(mapEvent, new PartyRemovedFromMapEvent(removedParty));
 
         Assert.True(reinforcer.WaitForCleanup());
         Assert.Equal(1, reinforcer.CleanupCount);
@@ -436,23 +425,11 @@ public sealed class NearbyPartyReinforcerTests : IDisposable
         using var messageBroker = new MessageBroker();
         using var handler = new NearbyPartyReinforcementHandler(messageBroker, reinforcer);
 
-        bool ownsGameThreadMark = GameThread.Instance.GameThreadId == 0;
-        if (ownsGameThreadMark)
-            GameThread.Instance.MarkGameThread();
-
-        try
+        using (new AllowedThread())
         {
-            using (new AllowedThread())
-            {
-                InteractionPatches.OpenAiJoinWindowAndPublish(
-                    mapEvent,
-                    () => messageBroker.Publish(mapEvent, new PlayerJoinedBattle()));
-            }
-        }
-        finally
-        {
-            if (ownsGameThreadMark)
-                GameThread.Instance.RestoreGameThread(0);
+            InteractionPatches.OpenAiJoinWindowAndPublish(
+                mapEvent,
+                () => messageBroker.Publish(mapEvent, new PlayerJoinedBattle()));
         }
 
         Assert.True(reinforcer.WaitForImmediateScan());

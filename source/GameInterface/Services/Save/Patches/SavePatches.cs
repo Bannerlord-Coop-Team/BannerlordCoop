@@ -39,11 +39,12 @@ internal class SaveStartedPatch
 [HarmonyPatch(typeof(SaveHandler), "OnSaveEnded")]
 internal class SaveEndedPatch
 {
-    static void Postfix(SaveHandler __instance)
+    internal static void Postfix(SaveHandler __instance, bool isSaveSuccessful, string newSaveGameName)
     {
         if (ModInformation.IsServer)
         {
             MessageBroker.Instance.Publish(__instance, new GameSaveStateChanged(false));
+            MessageBroker.Instance.Publish(__instance, new GameSaveCompleted(newSaveGameName, isSaveSuccessful));
         }
     }
 }
