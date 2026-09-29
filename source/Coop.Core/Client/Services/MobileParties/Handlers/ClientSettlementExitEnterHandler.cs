@@ -14,6 +14,7 @@ using TaleWorlds.CampaignSystem.GameMenus;
 using TaleWorlds.CampaignSystem.MapEvents;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Settlements;
+using TaleWorlds.Core;
 
 namespace Coop.Core.Client.Services.MobileParties.Handlers;
 
@@ -316,6 +317,13 @@ public class ClientSettlementExitEnterHandler : IHandler
 
         lastAutomaticRecovery = default;
         if (PlayerEncounter.Current == null || PlayerEncounter.EncounterSettlement == null)
+            return;
+
+        var battle = PlayerEncounter.Battle;
+        // The server exits the town before the pending assault join arrives on this same queue.
+        if (MobileParty.MainParty.MapEvent == null && PlayerEncounter.Current.IsJoinedBattle &&
+            PlayerEncounter.Current.PlayerSide == BattleSideEnum.Attacker && battle?.IsSiegeAssault == true &&
+            battle.MapEventSettlement == PlayerEncounter.EncounterSettlement)
             return;
 
         using (new AllowedThread())

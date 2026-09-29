@@ -20,6 +20,7 @@ using Serilog;
 using System;
 using System.Collections.Concurrent;
 using TaleWorlds.CampaignSystem;
+using TaleWorlds.CampaignSystem.Actions;
 using TaleWorlds.CampaignSystem.Encounters;
 using TaleWorlds.CampaignSystem.GameMenus;
 using TaleWorlds.CampaignSystem.MapEvents;
@@ -286,6 +287,15 @@ internal class BattleJoinLeaveHandler : IHandler
                     {
                         Logger.Warning("Ignoring join request: map event {MapEventId} has no side {Side}", data.MapEventId, data.Side);
                         return;
+                    }
+
+                    var mobileParty = party.MobileParty;
+                    if (data.Side == BattleSideEnum.Attacker && mapEvent.IsSiegeAssault &&
+                        mobileParty?.CurrentSettlement != null && mobileParty.CurrentSettlement == mapEvent.MapEventSettlement)
+                    {
+                        // The client's vanilla join consequence cannot apply this authoritative exit itself.
+                        LeaveSettlementAction.ApplyForParty(mobileParty);
+                        if (mobileParty.CurrentSettlement != null) return;
                     }
 
                     // The setter runs the native MapEventSide.AddPartyInternal on the server (NOT under AllowedThread), so the

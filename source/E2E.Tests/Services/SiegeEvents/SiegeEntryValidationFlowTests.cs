@@ -10,6 +10,7 @@ using E2E.Tests.Environment.Instance;
 using E2E.Tests.Services.MapEvents;
 using E2E.Tests.Util;
 using GameInterface.Services.GameDebug.Messages;
+using GameInterface.Services.MapEventSides.Messages;
 using GameInterface.Services.MapEvents.Messages.Leave;
 using GameInterface.Services.MapEvents.Messages.Start;
 using GameInterface.Services.Settlements.Interfaces;
@@ -497,7 +498,7 @@ public class SiegeEntryValidationFlowTests : MapEventTestBase
     }
 
     [Fact]
-    public void RecoveredCityAssault_OpensJoinMenuAndRequestsExistingBattleOnlyAfterExplicitJoin()
+    public void RecoveredCityAssault_ExplicitJoinLeavesTownOnAllPeersAndPreservesEncounter()
     {
         var client = Clients.First();
         var context = CreateEntryContext(client);
@@ -506,20 +507,36 @@ public class SiegeEntryValidationFlowTests : MapEventTestBase
             AccessTools.Method(typeof(GameMenu), nameof(GameMenu.ActivateGameMenu), new[] { typeof(string) }));
         using var menuSwitch = new MethodCallRecorder(Priority.Last,
             AccessTools.Method(typeof(GameMenu), nameof(GameMenu.SwitchToMenu), new[] { typeof(string) }));
-        client.NetworkSentMessages.Clear();
+        var disabledMethods = MapEventDisabledMethods.Concat(SiegeCreationDisabledMethods).ToList();
+        foreach (var instance in Clients.Append(Server))
+        {
+            instance.Call(() =>
+            {
+                Assert.True(instance.ObjectManager.TryGetObject<MobileParty>(context.PartyId, out var party));
+                Assert.True(instance.ObjectManager.TryGetObject<Settlement>(context.SettlementId, out var settlement));
+                Assert.True(instance.ObjectManager.TryGetObject<Town>(context.TownId, out var town));
+                Assert.True(instance.ObjectManager.TryGetObject<Clan>(context.DefenderClanId, out var defenderClan));
+                Assert.True(instance.ObjectManager.TryGetObject<MapEvent>(battle.MapEventId, out var mapEvent));
+                using (new AllowedThread())
+                {
+                    settlement.SetSettlementComponent(town);
+                    town.OwnerClan = defenderClan;
+                    party.CurrentSettlement = settlement;
+                    settlement.Party._mapEventSide = mapEvent.DefenderSide;
+                    mapEvent.DefenderSide.LeaderParty = settlement.Party;
+                    mapEvent._mapEventType = MapEvent.BattleTypes.Siege;
+                    mapEvent.MapEventSettlement = settlement;
+                    CreatePresentedSiege(party, settlement);
+                }
+            }, disabledMethods);
+        }
+        ClearMessages();
+        PlayerEncounter? recoveredEncounter = null;
 
         client.Call(() =>
         {
             var settlement = PrepareClientMenuContext(client, context);
             Assert.True(client.ObjectManager.TryGetObject<MapEvent>(battle.MapEventId, out var mapEvent));
-            using (new AllowedThread())
-            {
-                MobileParty.MainParty.CurrentSettlement = settlement;
-                settlement.Party._mapEventSide = mapEvent.DefenderSide;
-                mapEvent._mapEventType = MapEvent.BattleTypes.Siege;
-                mapEvent.MapEventSettlement = settlement;
-                CreatePresentedSiege(MobileParty.MainParty, settlement);
-            }
             Campaign.Current.PlayerEncounter = null;
             Assert.True(mapEvent.CanPartyJoinBattle(PartyBase.MainParty, settlement.BattleSide));
             using (new AllowedThread())
@@ -534,20 +551,46 @@ public class SiegeEntryValidationFlowTests : MapEventTestBase
             Assert.Empty(client.NetworkSentMessages.GetMessages<NetworkRequestCreateMapEvent>());
             Assert.Empty(client.NetworkSentMessages.GetMessages<NetworkRequestJoinBattle>());
 
-            var encounter = PlayerEncounter.Current;
+            recoveredEncounter = PlayerEncounter.Current;
             Assert.Equal("join_encounter", new DefaultEncounterGameMenuModel().GetGenericStateMenu());
-            Assert.Same(encounter, PlayerEncounter.Current);
+            Assert.Same(recoveredEncounter, PlayerEncounter.Current);
             Assert.Empty(client.NetworkSentMessages.GetMessages<NetworkRequestStartSettlementEncounter>());
 
             new EncounterGameMenuBehavior().game_menu_join_encounter_help_attackers_on_consequence(
                 new MenuCallbackArgs((MenuContext)null, null));
             Assert.Null(MobileParty.MainParty.MapEvent);
-        }, WithoutNetworkDelivery().Concat(SiegeCreationDisabledMethods).ToList());
+        }, disabledMethods);
 
         var request = Assert.Single(client.NetworkSentMessages.GetMessages<NetworkRequestJoinBattle>());
         Assert.Equal(battle.MapEventId, request.MapEventId);
         Assert.Equal(BattleSideEnum.Attacker, request.Side);
         Assert.Empty(client.NetworkSentMessages.GetMessages<NetworkRequestCreateMapEvent>());
+        Assert.True(Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkJoinBattleReply>()).Accepted);
+        var sent = Server.NetworkSentMessages.ToList();
+        var leave = Assert.Single(sent.OfType<NetworkPartyLeaveSettlement>());
+        Assert.True(sent.IndexOf(leave) < sent.FindIndex(message => message is NetworkAddBattleParty));
+        foreach (var instance in Clients.Append(Server))
+        {
+            instance.Call(() =>
+            {
+                Assert.True(instance.ObjectManager.TryGetObject<MobileParty>(context.PartyId, out var party));
+                Assert.True(instance.ObjectManager.TryGetObject<MapEvent>(battle.MapEventId, out var mapEvent));
+                Assert.Null(party.CurrentSettlement);
+                Assert.Same(mapEvent, party.MapEvent);
+                Assert.Same(mapEvent.AttackerSide, party.Party.MapEventSide);
+                Assert.NotNull(mapEvent.FindMapEventParty(party.Party));
+            });
+        }
+        client.Call(() =>
+        {
+            Assert.Same(recoveredEncounter, PlayerEncounter.Current);
+            Assert.Same(MobileParty.MainParty.MapEvent, PlayerEncounter.Battle);
+            Assert.True(PlayerEncounter.Current.IsJoinedBattle);
+            Assert.Contains("encounter", menuSwitch.MenusFor(client));
+            var attack = new MenuCallbackArgs((MenuContext)null, null);
+            Assert.True(new EncounterGameMenuBehavior().game_menu_encounter_attack_on_condition(attack));
+            Assert.True(attack.IsEnabled);
+        });
     }
 
     [Theory]
