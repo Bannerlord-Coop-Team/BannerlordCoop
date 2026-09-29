@@ -383,6 +383,8 @@ internal class GenericQuestTypeAcceptHandler : IHandler
                     RevertLocalTransfers(MobileParty.MainParty, transfer.Before, transfer.After);
                 else if (!pendingAlternativeAccepts[owner].ResetObserved)
                     RestoreSelectedTroops(MobileParty.MainParty, payload.What.SelectedTroops);
+                else
+                    RestoreMissingSelectedHeroes(MobileParty.MainParty, pendingAlternativeAccepts[owner].Troops);
                 using (new AllowedThread()) owner.Issue.AlternativeSolutionSentTroops.Clear();
                 return;
             }
@@ -626,6 +628,24 @@ internal class GenericQuestTypeAcceptHandler : IHandler
         }
     }
 
+    private static void RestoreMissingSelectedHeroes(MobileParty party, TroopRoster troops)
+    {
+        if (troops == null) return;
+        using (new AllowedThread())
+        {
+            foreach (var element in troops.GetTroopRoster())
+            {
+                if (!element.Character.IsHero ||
+                    party != null && party.MemberRoster.GetTroopCount(element.Character) > 0) continue;
+                if (party != null)
+                    ApplyLocalTransferDelta(party, element.Character, element.Number,
+                        element.WoundedNumber, element.Xp);
+                else
+                    element.Character.HeroObject.ChangeState(Hero.CharacterStates.Active);
+            }
+        }
+    }
+
     private static void RevertLocalTransfers(MobileParty party, TroopRoster before, TroopRoster after)
     {
         if (party == null) return;
@@ -684,7 +704,10 @@ internal class GenericQuestTypeAcceptHandler : IHandler
         pendingAlternativeAccepts.Remove(owner);
         if (TryTakeLocalTransfers(pending.Roster, out var laterTransfer))
             RevertLocalTransfers(pending.Party, laterTransfer.Before, laterTransfer.After);
-        if (!pending.ResetObserved) RestoreSelectedTroops(pending.Party, pending.Troops);
+        if (pending.ResetObserved)
+            RestoreMissingSelectedHeroes(pending.Party, pending.Troops);
+        else
+            RestoreSelectedTroops(pending.Party, pending.Troops);
 
         using (new AllowedThread())
         {

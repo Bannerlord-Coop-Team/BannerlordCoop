@@ -219,9 +219,9 @@ internal class PartyScreenLogicPatches
                 releasedPrisonersRoster,
                 takenPrisonersRoster,
                 recruitedPrisonersRoster,
-                __instance.MemberRosters[0],
+                questSelectionRoster == null ? __instance.MemberRosters[0] : __instance._initialData.LeftMemberRoster,
                 __instance.PrisonerRosters[0],
-                __instance.MemberRosters[1],
+                questSelectionRoster == null ? __instance.MemberRosters[1] : __instance._initialData.RightMemberRoster,
                 __instance.PrisonerRosters[1],
                 __instance._initialData.LeftMemberRoster,
                 __instance._initialData.LeftPrisonerRoster,
@@ -241,9 +241,8 @@ internal class PartyScreenLogicPatches
                 forceTransferId
             );
 
-            // Alternative acceptance owns the selected troop transfer on the server.
-            if (questSelectionRoster == null)
-                MessageBroker.Instance.Publish(__instance, message);
+            // Alternative acceptance owns the selected troop transfer; Done still applies quest wages.
+            MessageBroker.Instance.Publish(__instance, message);
             // Manage changing rosters on the server
             using (new AllowedThread())
             {
