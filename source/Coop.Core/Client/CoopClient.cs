@@ -12,9 +12,11 @@ using GameInterface.Services.GameDebug.Messages;
 using LiteNetLib;
 using Serilog;
 using System;
+using System.IO;
 using System.Linq;
 using System.Net;
 using System.Net.Sockets;
+using System.Security.Cryptography;
 using System.Threading;
 
 namespace Coop.Core.Client;
@@ -121,9 +123,7 @@ public class CoopClient : CoopNetworkBase, ICoopClient
             var rejectCode = ReadRejectCode(disconnectInfo);
             reconnectPending = false;
 
-            string message = rejectCode == ConnectionRejectCode.IncorrectPassword
-                ? "The server password is incorrect."
-                : "The server rejected the connection.";
+            string message = GetRejectMessage(rejectCode);
 
             Logger.Warning("Connection rejected by server: {Reason}", rejectCode);
             GameThread.RunSafe(() =>
@@ -172,6 +172,19 @@ public class CoopClient : CoopNetworkBase, ICoopClient
         }
     }
 
+    private static string GetRejectMessage(ConnectionRejectCode rejectCode)
+    {
+        switch (rejectCode)
+        {
+            case ConnectionRejectCode.IncorrectPassword:
+                return "The server password is incorrect.";
+            case ConnectionRejectCode.ServerRestarting:
+                return "The server is restarting. Try again in a few minutes.";
+            default:
+                return "The server rejected the connection.";
+        }
+    }
+
     private static ConnectionRejectCode ReadRejectCode(DisconnectInfo disconnectInfo)
     {
         var data = disconnectInfo.AdditionalData;
@@ -179,9 +192,9 @@ public class CoopClient : CoopNetworkBase, ICoopClient
 
         try
         {
-            if (data.TryGetByte(out var raw) && raw == (byte)ConnectionRejectCode.IncorrectPassword)
+            if (data.TryGetByte(out var raw) && Enum.IsDefined(typeof(ConnectionRejectCode), raw))
             {
-                return ConnectionRejectCode.IncorrectPassword;
+                return (ConnectionRejectCode)raw;
             }
 
             return ConnectionRejectCode.None;
@@ -207,11 +220,47 @@ public class CoopClient : CoopNetworkBase, ICoopClient
         var ip = ResolveConnectAddress(Config.Address, preferIPv6: false);
         ServerEndpoint = new IPEndPoint(ip, Config.Port);
 
+        if (!HasCompatibleLiteNetLib()) return;
+
         netManager.Start();
         StartNetworkPoller();
 
         Logger.Information("Attempting connection to {Endpoint}...", ServerEndpoint);
         netManager.Connect(ServerEndpoint, Config.Token);
+    }
+
+    private bool HasCompatibleLiteNetLib()
+    {
+        if (typeof(NetManager).GetMethod(nameof(NetManager.PollEvents), new[] { typeof(int) }) != null)
+            return true;
+
+        var assembly = typeof(NetManager).Assembly;
+        var path = assembly.Location;
+        string sha256 = "unavailable";
+        try
+        {
+            using (var stream = File.OpenRead(path))
+            using (var hasher = SHA256.Create())
+                sha256 = BitConverter.ToString(hasher.ComputeHash(stream)).Replace("-", "").ToLowerInvariant();
+        }
+        catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException || ex is ArgumentException)
+        {
+            Logger.Warning(ex, "Could not hash loaded LiteNetLib assembly at {Path}", path);
+        }
+
+        Logger.Error("Loaded LiteNetLib lacks NetManager.PollEvents(Int32): path={Path}, version={Version}, sha256={Sha256}",
+            path, assembly.GetName().Version, sha256);
+        // Let the join caller return before teardown, and keep its popup after session cancellation.
+        using (GameThread.ActivateCancellation(CancellationToken.None))
+        {
+            GameThread.EnqueueSafe(() =>
+            {
+                messageBroker.Publish(this, new SendPopupMessage(
+                    "Bannerlord loaded a LiteNetLib.dll that Coop cannot use. Close the game, check Coop_client.log for its loaded path, then remove or update that copy and reinstall Coop. If joining still fails, send the new log to support."));
+                messageBroker.Publish(this, new EndCoopMode());
+            }, context: "IncompatibleLiteNetLib");
+        }
+        return false;
     }
 
     private static IPAddress ResolveConnectAddress(string address, bool preferIPv6)

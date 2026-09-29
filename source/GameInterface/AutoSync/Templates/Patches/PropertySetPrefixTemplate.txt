@@ -10,7 +10,8 @@ public class {{ MemberDeclaringTypeName }}_{{ MemberName }}_PropertySetPrefix : 
         
         if (ModInformation.IsClient)
         {
-            Logger.Error("Client updated managed {member}", "{{MemberDeclaringType}}.{{MemberName}}");
+            Logger.Error("Client updated managed {member}; stack={StackTrace}",
+                "{{MemberDeclaringType}}.{{MemberName}}", System.Environment.StackTrace);
             return;
         }
         

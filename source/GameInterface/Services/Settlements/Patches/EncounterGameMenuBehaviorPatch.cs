@@ -23,6 +23,10 @@ namespace GameInterface.Services.Settlements.Patches
         }
 
         [HarmonyPrefix]
+        [HarmonyPatch("game_menu_castle_outside_on_init")]
+        public static bool CastleOutsidePrefix(MenuCallbackArgs args) => Prefix(args);
+
+        [HarmonyPrefix]
         [HarmonyPatch("game_menu_town_town_besiege_on_condition")]
         public static bool CheckFortificationEncounterSettlement(MenuCallbackArgs args)
         {
