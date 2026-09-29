@@ -34,9 +34,9 @@ public class DirectMigratedCommandTests
         Type[] commandTypes = GetCommandTypes();
 
 #if DEBUG
-        Assert.Equal(122, commandTypes.Length);
+        Assert.Equal(123, commandTypes.Length);
 #else
-        Assert.Equal(103, commandTypes.Length);
+        Assert.Equal(104, commandTypes.Length);
 #endif
         Assert.All(commandTypes, type =>
         {
