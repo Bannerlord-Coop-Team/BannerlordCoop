@@ -552,4 +552,34 @@
       </EquipmentRoster>
     </Equipments>
   </NPCCharacter>
+  <NPCCharacter
+    id="coop_fixed_npc_8886871f"
+    name="{=!}Thorin White"
+    default_group="Infantry"
+    level="1"
+    is_female="false"
+    is_hero="false"
+    is_template="false"
+    occupation="Townsfolk"
+    culture="Culture.battania"
+    is_hidden_encyclopedia="true"
+    coop_settlement="town_B1"
+    coop_location="tavern"
+    coop_spawn_tag="npc_common"
+    coop_dialogue="If you’ve come for trouble, you’ll find it. If not, you’re welcome here."
+    coop_enabled="true">
+    <face>
+      <face_key_template value="BodyProperty.townsman_battania" />
+    </face>
+    <skills />
+    <Equipments>
+      <EquipmentRoster civilian="true">
+        <equipment slot="Head" id="Item.padded_cap" />
+        <equipment slot="Cape" id="Item.a_aserai_scale_b_shoulder_e" />
+        <equipment slot="Body" id="Item.battania_woodland_chainmail" />
+        <equipment slot="Gloves" id="Item.mail_mitten_e" />
+        <equipment slot="Leg" id="Item.strapped_shoes" />
+      </EquipmentRoster>
+    </Equipments>
+  </NPCCharacter>
 </NPCCharacters>
