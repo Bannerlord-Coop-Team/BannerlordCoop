@@ -128,6 +128,13 @@ public class GameInterfaceModule : Module
         builder.RegisterType<NetworkOptionsTabProvider>().As<ICoopOptionsTabProvider>().InstancePerDependency();
         builder.RegisterType<LocalMovementBandwidth>().As<ILocalMovementBandwidth>().InstancePerDependency();
         builder.RegisterType<ChatPlayerName>().As<IChatPlayerNameResolver>().InstancePerDependency();
+#if DEBUG
+        // The session's own chat service from the IGameAbstraction scan; that registration already disposes it.
+        builder.Register(context => (IChatLiveTestHook)context.Resolve<IChatService>())
+            .As<IChatLiveTestHook>()
+            .ExternallyOwned()
+            .InstancePerDependency();
+#endif
         builder.RegisterType<ServerInfoLinkRules>().As<IServerInfoLinkRules>().InstancePerDependency();
         builder.RegisterType<BrowserLinkOpener>().As<IBrowserLinkOpener>().InstancePerDependency();
         builder.RegisterType<MapAvailability>().As<IMapAvailability>().InstancePerDependency();

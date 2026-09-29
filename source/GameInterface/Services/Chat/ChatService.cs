@@ -19,14 +19,10 @@ public interface IChatService : IGameAbstraction
     void Initialize();
     void Receive(NetworkChatMessage message);
     void ReceiveParticipants(NetworkChatParticipants participants);
-#if DEBUG
-    /// <summary>[Debug] Puts the text in the chat input and runs the Send button's action; false when chat is turned off.</summary>
-    bool SubmitForLiveTest(string text, out string state);
-#endif
 }
 
 /// <summary>Owns the client chat view model and overlay for one co-op session.</summary>
-public sealed class ChatService : IChatService, IDisposable
+public sealed partial class ChatService : IChatService, IDisposable
 {
     private readonly INetwork network;
     private readonly IPlayerManager playerManager;
@@ -35,9 +31,6 @@ public sealed class ChatService : IChatService, IDisposable
     private readonly IMessageBroker messageBroker;
     private readonly ChatVM viewModel;
     private readonly ChatOverlay overlay;
-#if DEBUG
-    private int sentMessageCount;
-#endif
 
     public ChatService(
         INetwork network,
@@ -117,31 +110,6 @@ public sealed class ChatService : IChatService, IDisposable
         sentMessageCount++;
 #endif
     }
-
-#if DEBUG
-    // Goes through the same ActionSend as the Send button, so a live run proves !motd and a chat line
-    // without operating-system input. It replaces anything typed and sends on the selected channel.
-    public bool SubmitForLiveTest(string text, out string state)
-    {
-        if (!overlay.IsEnabled)
-        {
-            state = "Chat is turned off in the co-op options, so nothing was typed or sent.";
-            return false;
-        }
-
-        int sentBefore = sentMessageCount;
-        viewModel.WrittenText = text;
-        viewModel.ActionSend();
-
-        string transcript = viewModel.TranscriptText;
-        string lastLine = transcript.Substring(transcript.LastIndexOf('\n') + 1);
-        state = "Sent: " + (sentMessageCount != sentBefore) +
-                "\nChannel: " + viewModel.ActiveChannelText +
-                "\nInput: " + (viewModel.WrittenText.Length == 0 ? "empty" : viewModel.WrittenText) +
-                "\nLast line: " + (lastLine.Length == 0 ? "none" : lastLine);
-        return true;
-    }
-#endif
 
     private void HandleChatVisibilitySelected(MessagePayload<ChatVisibilitySelected> payload)
     {

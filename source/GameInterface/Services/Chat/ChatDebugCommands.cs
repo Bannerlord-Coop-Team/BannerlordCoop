@@ -1,4 +1,4 @@
-#if DEBUG
+﻿#if DEBUG
 using Common.Commands;
 using GameInterface.Services.Chat.Messages;
 
@@ -26,12 +26,12 @@ internal class ChatDebugCommands
                 return new CoopCommandResult(false, "Give the chat line, for example !motd or \"hello there\".", "invalid_arguments");
             if (text.Length > ChatMessageLimits.MaxMessageLength)
                 return new CoopCommandResult(false, $"The chat input holds at most {ChatMessageLimits.MaxMessageLength} characters.", "text_too_long");
-            if (!ContainerProvider.TryResolve<IChatService>(out var chat))
+            if (!ContainerProvider.TryResolve<IChatLiveTestHook>(out var chat))
                 return new CoopCommandResult(false, "Chat unavailable.", "unavailable");
             return Submit(chat, text);
         }
 
-        internal static CoopCommandResult Submit(IChatService chat, string text) =>
+        internal static CoopCommandResult Submit(IChatLiveTestHook chat, string text) =>
             chat.SubmitForLiveTest(text, out string state)
                 ? new CoopCommandResult(true, state)
                 : new CoopCommandResult(false, state, "chat_disabled");

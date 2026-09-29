@@ -1,4 +1,5 @@
-#if DEBUG
+﻿#if DEBUG
+using Autofac;
 using Common.Commands;
 using Common.Messaging;
 using Common.Network;
@@ -99,6 +100,35 @@ public class ChatDebugCommandsTests
         Assert.Equal("chat_disabled", result.ErrorCode);
         serverInfo.Verify(service => service.Reopen(), Times.Never);
         network.Verify(value => value.SendAll(It.IsAny<IMessage>()), Times.Never);
+    }
+
+    // The command finds the chat through the Debug-only hook, so IChatService is the same in Debug and Release.
+    [Fact]
+    public void Command_TypesThroughTheRegisteredLiveTestHook()
+    {
+        using var chat = Create();
+        var builder = new ContainerBuilder();
+        builder.RegisterInstance(chat).As<IChatLiveTestHook>().ExternallyOwned();
+        using var container = builder.Build();
+        var command = new ChatDebugCommands.ChatSubmitCoopCommand();
+
+        CoopCommandResult result;
+        bool hadPreviousContainer = ContainerProvider.TryGetContainer(out var previousContainer);
+        try
+        {
+            using (ContainerProvider.UseContainerThreadSafe(container))
+                result = command.ProcessCommand(new CoopCommandArgsFactory().FromValues(new[] { "hello" }));
+        }
+        finally
+        {
+            if (hadPreviousContainer) ContainerProvider.SetContainer(previousContainer);
+            else ContainerProvider.Clear();
+        }
+
+        Assert.True(result.Succeeded);
+        Assert.StartsWith("Sent: True", result.Output);
+        network.Verify(value => value.SendAll(It.Is<IMessage>(message =>
+            message is NetworkSendChatMessage && ((NetworkSendChatMessage)message).Text == "hello")), Times.Once);
     }
 
     // Checked before the chat is looked up, so nothing is typed.
