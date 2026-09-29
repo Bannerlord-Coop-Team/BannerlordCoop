@@ -28,7 +28,7 @@ using AgentData = Missions.Agents.Packets.AgentData;
 namespace E2E.Tests.Services.Missions;
 
 /// <summary>Regression coverage for movement traffic and delivery selection.</summary>
-public class MovementTrafficTests : MissionTestEnvironment
+public partial class MovementTrafficTests : MissionTestEnvironment
 {
     private readonly ITestOutputHelper output;
 

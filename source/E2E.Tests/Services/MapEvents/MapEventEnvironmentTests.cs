@@ -1,8 +1,12 @@
 ﻿using E2E.Tests.Environment.Instance;
 using Common.Messaging;
+using Common.Logging;
+using GameInterface.Services.Heroes.Messages;
+using GameInterface.Services.MapEvents.TroopSupply;
 using Common.Util;
 using GameInterface.Services.Entity;
 using GameInterface.Services.MapEventParties.Messages;
+using GameInterface.Services.MapEvents.Messages;
 using GameInterface.Services.MobileParties.Extensions;
 using GameInterface.Services.MobilePartyAIs.Patches;
 using TaleWorlds.CampaignSystem;
@@ -22,6 +26,73 @@ namespace E2E.Tests.Services.MapEvents;
 public class MapEventEnvironmentTests : MapEventTestBase
 {
     public MapEventEnvironmentTests(ITestOutputHelper output) : base(output) { }
+
+    [Theory]
+    [InlineData(BattleState.None, BattleSideEnum.None)]
+    [InlineData(BattleState.AttackerVictory, BattleSideEnum.Attacker)]
+    [InlineData(BattleState.DefenderVictory, BattleSideEnum.Defender)]
+    public void RepeatedOverrideWinner_DoesNotWriteManagedStateOrSendRequest(BattleState state, BattleSideEnum winner)
+    {
+        var battle = CreateServerMapEvent();
+        var client = Clients.First();
+        var diagnostics = new List<string>();
+        Action<string> capture = message =>
+        {
+            if (message.Contains("Client updated managed") && message.Contains("BattleState"))
+                diagnostics.Add(message);
+        };
+        client.NetworkSentMessages.Clear();
+        OutputSinkManager.AddLogCallback(capture);
+        try
+        {
+            client.Call(() =>
+            {
+                Assert.True(client.ObjectManager.TryGetObject<MapEvent>(battle.MapEventId, out var mapEvent));
+                mapEvent._battleState = state;
+                mapEvent.SetOverrideWinner(winner);
+                Assert.Equal(state, mapEvent.BattleState);
+            });
+            Assert.Empty(client.NetworkSentMessages.GetMessages<NetworkChangeBattleState>());
+            Assert.Empty(diagnostics);
+        }
+        finally
+        {
+            OutputSinkManager.RemoveLogCallback(capture);
+        }
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void ChangedOverrideWinner_PreservesRequestAndServerValidation(bool runOnServer)
+    {
+        var battle = CreateServerMapEvent();
+        var client = Clients.First();
+        foreach (var instance in Clients.Append(Server))
+            instance.Call(() =>
+            {
+                Assert.True(instance.ObjectManager.TryGetObject<MapEvent>(battle.MapEventId, out var mapEvent));
+                mapEvent._battleState = BattleState.DefenderVictory;
+            });
+        client.NetworkSentMessages.Clear();
+        (runOnServer ? Server : client).Call(() =>
+        {
+            Assert.True((runOnServer ? Server : client).ObjectManager.TryGetObject<MapEvent>(battle.MapEventId, out var mapEvent));
+            mapEvent.SetOverrideWinner(BattleSideEnum.None);
+        });
+        var requests = client.NetworkSentMessages.GetMessages<NetworkChangeBattleState>();
+        if (runOnServer)
+            Assert.Empty(requests);
+        else
+            Assert.Equal(BattleState.None, Assert.Single(requests).BattleState);
+        foreach (var instance in Clients.Append(Server))
+            instance.Call(() =>
+            {
+                Assert.True(instance.ObjectManager.TryGetObject<MapEvent>(battle.MapEventId, out var mapEvent));
+                var expected = runOnServer || instance == client ? BattleState.None : BattleState.DefenderVictory;
+                Assert.Equal(expected, mapEvent.BattleState);
+            });
+    }
 
     [Fact]
     public void NewMapEvent_ClientReplicaStartsWithNoRetreatState()
@@ -256,6 +327,56 @@ public class MapEventEnvironmentTests : MapEventTestBase
                 Assert.True(client.ObjectManager.TryGetObject<Hero>(heroId, out var hero));
                 Assert.Equal(1, hero.HitPoints);
             });
+        }
+    }
+
+    [Theory]
+    [InlineData(true, 42.6f, 43)]
+    [InlineData(true, 0f, 1)]
+    [InlineData(true, 100f, 100)]
+    [InlineData(false, 25f, 100)]
+    public void AgentRemoval_RequestsOwnedHealthWithoutLocalManagedWrite(bool ownsHero, float agentHealth, int expectedHealth)
+    {
+        var client = Clients.First();
+        client.Resolve<IControllerIdProvider>().SetControllerId(ownsHero ? "owner" : "observer");
+        var (heroId, _) = CreatePlayerHeroParty("owner");
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject<Hero>(heroId, out var hero));
+            hero.HitPoints = 100;
+        });
+        client.NetworkSentMessages.Clear();
+        var diagnostics = new List<string>();
+        Action<string> capture = message =>
+        {
+            if (message.Contains("Client updated managed") && message.Contains("HitPoints"))
+                diagnostics.Add(message);
+        };
+        OutputSinkManager.AddLogCallback(capture);
+        try
+        {
+            client.Call(() =>
+            {
+                Assert.True(client.ObjectManager.TryGetObject<Hero>(heroId, out var hero));
+                var origin = new CoopAgentOrigin(hero.CharacterObject, null, -1, null, new UniqueTroopDescriptor(1));
+                origin.OnAgentRemoved(agentHealth);
+            });
+            foreach (var instance in Clients.Append(Server))
+                instance.Call(() =>
+                {
+                    Assert.True(instance.ObjectManager.TryGetObject<Hero>(heroId, out var hero));
+                    Assert.Equal(expectedHealth, hero.HitPoints);
+                });
+            var requests = client.NetworkSentMessages.GetMessages<NetworkHeroHitPointsChangeRequest>();
+            if (ownsHero && expectedHealth != 100)
+                Assert.Equal(expectedHealth, Assert.Single(requests).HitPoints);
+            else
+                Assert.Empty(requests);
+            Assert.Empty(diagnostics);
+        }
+        finally
+        {
+            OutputSinkManager.RemoveLogCallback(capture);
         }
     }
 

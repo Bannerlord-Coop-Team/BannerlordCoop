@@ -22,12 +22,13 @@ using Xunit.Abstractions;
 
 namespace Coop.Tests.Client.States;
 
-[CollectionDefinition("Campaign state frame drain", DisableParallelization = true)]
-public sealed class CampaignStateFrameDrainCollection
+// Drain-limit assertions observe the shared default game-thread queue.
+[CollectionDefinition(nameof(CampaignStateCollection), DisableParallelization = true)]
+public sealed class CampaignStateCollection
 {
 }
 
-[Collection("Campaign state frame drain")]
+[Collection(nameof(CampaignStateCollection))]
 public class CampaignStateTests : IDisposable
 {
     public void Dispose() => clientLogic.State.Dispose();

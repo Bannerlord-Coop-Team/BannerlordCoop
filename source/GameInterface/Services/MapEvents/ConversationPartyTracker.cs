@@ -257,6 +257,25 @@ internal sealed class ConversationPartyTracker : IHandler
         }
     }
 
+    /// <summary>
+    /// True when the player or <paramref name="partyId"/> is already in a conversation that is not between the two:
+    /// the player engages another party or is in a PvP conversation, or another player holds the party.
+    /// </summary>
+    public bool IsInOtherConversation(object engagerKey, string engagerPartyId, string partyId)
+    {
+        if (engagerKey == null || engagerPartyId == null || partyId == null) return false;
+
+        lock (stateLock)
+        {
+            // A refresh by the same party still passes, the bandit barter relies on the EngagerIsDefender merge.
+            if (engagements.TryGetValue(engagerKey, out var current))
+                return current.PartyId != partyId;
+
+            return pvpPartnersByPartyId.ContainsKey(engagerPartyId) ||
+                engagements.Values.Any(x => x.PartyId == partyId);
+        }
+    }
+
     /// <summary>Marks two player parties as being in a conversation with each other; only they may interact until it ends.</summary>
     public void BeginPvpConversation(string partyIdA, string partyIdB)
     {
