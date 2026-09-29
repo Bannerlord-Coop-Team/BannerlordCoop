@@ -14,6 +14,7 @@ namespace GameInterface.Services.Players.Patches;
 [HarmonyPatch(typeof(RetirementCampaignBehavior))]
 internal class RetirementCampaignBehaviorPatches
 {
+#if TESTER
     [HarmonyPatch(nameof(RetirementCampaignBehavior.OnSessionLaunched))]
     [HarmonyPrefix]
     public static bool OnSessionLaunchedPrefix() => ModInformation.IsClient;
@@ -49,4 +50,9 @@ internal class RetirementCampaignBehaviorPatches
 
         return false;
     }
+#else
+    [HarmonyPatch(nameof(RetirementCampaignBehavior.RegisterEvents))]
+    [HarmonyPrefix]
+    public static bool Prefix() => false;
+#endif
 }
