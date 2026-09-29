@@ -433,4 +433,28 @@
   <string
     id="generic_backstory.coop_wanderer_f992e349"
     text="{=!}A man relegated to the outdoors. Once a King now a servile vagabond." />
+  <string
+    id="prebackstory.coop_wanderer_8886871f"
+    text="{=!}I&apos;ve spent enough years on the road to know that battles are often decided long before swords are drawn. Perhaps we could be of use to one another." />
+  <string
+    id="backstory_a.coop_wanderer_8886871f"
+    text="{=!}I was raised among caravans, village elders, craftsmen, and men who made their living on the road. I was never the strongest among them, nor the loudest, but people learned that I remembered what others forgot. Routes, promises, debts, supplies, names — the small things that kept a company from falling apart." />
+  <string
+    id="backstory_b.coop_wanderer_8886871f"
+    text="{=!}In time, I was trusted with more than ledgers. I settled disputes, prepared journeys, dealt with merchants, and kept men moving when plans began to fail. I learned that good leadership is rarely about giving the loudest order. More often, it is knowing what will be needed tomorrow and making certain it is ready today." />
+  <string
+    id="backstory_c.coop_wanderer_8886871f"
+    text="{=!}Eventually I entered the service of a man who mistook recklessness for courage. He ignored advice, broke agreements, and expected others to repair the consequences. When his company finally collapsed, I walked away. Since then, I have chosen my leaders more carefully." />
+  <string
+    id="response_1.coop_wanderer_8886871f"
+    text="{=!}A company needs people who can see trouble before it arrives. I could use someone with that kind of judgment." />
+  <string
+    id="response_2.coop_wanderer_8886871f"
+    text="{=!}Many men claim to be wise when things are calm. I wonder how useful that wisdom is when everything goes wrong." />
+  <string
+    id="backstory_d.coop_wanderer_8886871f"
+    text="{=!}I have seen enough men undone by poor preparation and worse judgment. I prefer things done properly, before trouble has the chance to grow." />
+  <string
+    id="generic_backstory.coop_wanderer_8886871f"
+    text="{=!}A seasoned traveler shaped by years among caravans, craftsmen, merchants, and fighting men. He once served a reckless commander whose poor judgment brought his own company to ruin, an experience that taught him the value of foresight, disci" />
 </strings>
