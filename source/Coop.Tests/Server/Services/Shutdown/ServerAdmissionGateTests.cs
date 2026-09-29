@@ -248,6 +248,7 @@ public class ServerAdmissionGateTests
         Mock.Of<IMissionManager>(),
         new Lazy<IOverloadedPeerManager>(() => Mock.Of<IOverloadedPeerManager>()),
         Mock.Of<ISendCoalescer>(),
+        new UdpBindDiagnostics(),
         Mock.Of<ICommonSerializer>(),
         Mock.Of<IReliableMessageBatcher<NetPeer>>(),
         session);
@@ -440,7 +441,8 @@ public class ServerAdmissionGateTests
             Mock.Of<ISteamBanList>(),
             Mock.Of<IServerOptionsProvider>(),
             Mock.Of<IJoinCampaignBaselineSender>(),
-            Mock.Of<IJoinCampaignKingdomBaseLineSender>());
+            Mock.Of<IJoinCampaignKingdomBaseLineSender>(),
+            Mock.Of<IJoinValidationDenialLog>());
     }
 
     /// <summary>The real gate, which also signals once a shutdown has started closing it.</summary>

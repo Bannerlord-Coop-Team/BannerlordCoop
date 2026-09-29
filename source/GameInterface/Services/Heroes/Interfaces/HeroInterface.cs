@@ -175,6 +175,8 @@ internal class HeroInterface : IHeroInterface
         LogPlayerSwitchState("before", player, playerHero, playerParty);
 
         Campaign.Current.MainParty = playerParty;
+        // Joining parties can still be inactive when vanilla selects the camera target.
+        playerParty.Party.SetAsCameraFollowParty();
         Campaign.Current.PlayerDefaultFaction = playerHero.Clan;
 
         // Used to MainHero and CharacterObject
