@@ -154,6 +154,34 @@ public class TownDebugCommand
             sb.AppendFormat("InRebelliousState: '{0}'\n", town.InRebelliousState);
             sb.AppendFormat("GarrisonAutoRecruitmentIsEnabled: '{0}'\n", town.GarrisonAutoRecruitmentIsEnabled);
             sb.AppendFormat("Food stock '{0}' : \n", fief.FoodStocks);
+            var garrison = town.GarrisonParty;
+            var militia = town.Settlement.MilitiaPartyComponent?.MobileParty;
+            var siegeState = new
+            {
+                campaignDays = CampaignTime.Now.ToDays,
+                settlementId = town.Settlement.StringId,
+                ownerClanId = town.Settlement.OwnerClan?.StringId,
+                isRebelClan = town.Settlement.OwnerClan?.IsRebelClan,
+                inRebelliousState = town.InRebelliousState,
+                underSiege = town.Settlement.IsUnderSiege,
+                foodStocks = town.FoodStocks,
+                foodChange = town.FoodChange,
+                garrisonStarvationThreshold = -town.Prosperity / Campaign.Current.Models.SettlementFoodModel.NumberOfProsperityToEatOneFood,
+                settlementStarving = town.Settlement.IsStarving,
+                remainingFoodPercentage = town.Owner.RemainingFoodPercentage,
+                garrisonStarving = SettlementHelper.IsGarrisonStarving(town.Settlement),
+                garrisonId = garrison?.StringId,
+                garrisonSettlementId = garrison?.CurrentSettlement?.StringId,
+                garrisonInMapEvent = garrison?.MapEvent != null,
+                garrisonHealthy = garrison?.MemberRoster.TotalHealthyCount,
+                garrisonWounded = garrison?.MemberRoster.TotalWounded,
+                garrisonTotal = garrison?.MemberRoster.TotalManCount,
+                militiaId = militia?.StringId,
+                militiaHealthy = militia?.MemberRoster.TotalHealthyCount,
+                militiaWounded = militia?.MemberRoster.TotalWounded,
+                militiaTotal = militia?.MemberRoster.TotalManCount
+            };
+            sb.AppendLine("LIVE_TEST_JSON=" + Newtonsoft.Json.JsonConvert.SerializeObject(siegeState));
             sb.AppendFormat("TradeTaxAccumulated: '{0}'\n", town.TradeTaxAccumulated);
             sb.AppendFormat("_tradeTax: '{0}'\n", town._tradeTax);
             sb.AppendFormat("Sold Items: \n");

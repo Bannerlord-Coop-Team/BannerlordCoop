@@ -1,4 +1,4 @@
-using Coop.Tests.Stubs;
+﻿using Coop.Tests.Stubs;
 using GameInterface.Services.MapTracks.Interfaces;
 using GameInterface.Services.ObjectManager;
 using Moq;
@@ -23,7 +23,8 @@ public class MapTracksReconnectInitializationTests
         mapTracksInterface = new MapTracksCampaignBehaviorInterface(
             objectManager.Object,
             new StubMessageBroker(),
-            playerManager: null);
+            playerManager: null,
+            factionInterface: null);
     }
 
     [Fact]

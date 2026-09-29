@@ -37,6 +37,25 @@ namespace GameInterface.Services.Heroes.Patches
         }
     }
 
+    [HarmonyPatch(typeof(Hero), nameof(Hero.PowerModifier), MethodType.Getter)]
+    internal class HeroPowerModifierGetterPatch
+    {
+        [HarmonyPrefix]
+        internal static void Prefix(Hero __instance, out IDisposable __state)
+        {
+            __state = ModInformation.IsClient && __instance._powerModifier == -1f
+                ? CallOriginalPolicy.AllowOriginalsForCurrentOperation()
+                : null;
+        }
+
+        [HarmonyFinalizer]
+        internal static Exception Finalizer(IDisposable __state, Exception __exception)
+        {
+            __state?.Dispose();
+            return __exception;
+        }
+    }
+
     [HarmonyPatch]
     internal class HeroFieldPatches
     {

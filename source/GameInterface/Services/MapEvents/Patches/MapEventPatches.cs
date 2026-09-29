@@ -166,6 +166,24 @@ internal class MapEventPatches
         MessageBroker.Instance.Publish(__instance, new InstanceDestroyed<MapEvent>(__instance));
     }
 
+    [HarmonyPatch(nameof(MapEvent.SetOverrideWinner))]
+    [HarmonyPrefix]
+    private static bool Prefix_SetOverrideWinner(MapEvent __instance, BattleSideEnum winner)
+    {
+        if (ModInformation.IsServer || CallOriginalPolicy.IsOriginalAllowed())
+            return true;
+
+        var state = winner switch
+        {
+            BattleSideEnum.Attacker => BattleState.AttackerVictory,
+            BattleSideEnum.Defender => BattleState.DefenderVictory,
+            _ => BattleState.None
+        };
+
+        // Skip unchanged client writes before the managed setter reports them.
+        return state != __instance.BattleState;
+    }
+
     [HarmonyPatch(nameof(MapEvent.BattleState), MethodType.Setter)]
     [HarmonyPrefix]
     [HarmonyPriority(Priority.First)]
