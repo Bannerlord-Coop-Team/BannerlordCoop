@@ -892,6 +892,7 @@ public class GenericQuestTypeAcceptSecurityTests : IDisposable
                 Hero.MainHero.Gold = 1000;
                 party.MemberRoster.AddToCounts(troop, 6);
             }
+            Assert.True(Client.ObjectManager.AddNewObject(Hero.MainHero, out _));
 
             var screen = CreateQuestSelectionScreen(roster, party);
             screen.CurrentData.PartyGoldChangeAmount = -120;
