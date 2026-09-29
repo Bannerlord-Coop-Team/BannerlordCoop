@@ -529,9 +529,19 @@ public class SiegeEntryValidationFlowTests : MapEventTestBase
                     mapEvent._mapEventType = MapEvent.BattleTypes.Siege;
                     mapEvent.MapEventSettlement = settlement;
                     CreatePresentedSiege(party, settlement);
+                    // The skipped scene initializer also creates the collections read by siege strength calculations.
+                    settlement.SiegeEvent.BesiegerCamp.SiegeEngines = new SiegeEvent.SiegeEnginesContainer(
+                        BattleSideEnum.Attacker, null);
+                    settlement.SiegeEngines = new SiegeEvent.SiegeEnginesContainer(
+                        BattleSideEnum.Defender, null);
                 }
             }, disabledMethods);
         }
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject<Settlement>(context.SettlementId, out var settlement));
+            Assert.True(Campaign.Current.Models.CombatSimulationModel.GetSettlementAdvantage(settlement) > 0f);
+        });
         ClearMessages();
         PlayerEncounter? recoveredEncounter = null;
 
