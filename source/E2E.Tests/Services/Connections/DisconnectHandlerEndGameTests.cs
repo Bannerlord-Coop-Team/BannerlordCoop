@@ -18,7 +18,8 @@ namespace E2E.Tests.Services.Connections;
 
 /// <summary>
 /// Verifies a client disconnect still leaves the campaign once and then ends coop when its blocking
-/// <see cref="GameStateInterface.EndGame"/> times out. Lives in E2E because it needs an isolated game-thread queue.
+/// <see cref="GameStateInterface.EndGame"/> times out, and still shows its reason once when EndGame ends the
+/// session. Lives in E2E because it needs an isolated game-thread queue.
 /// </summary>
 public class DisconnectHandlerEndGameTests
 {
@@ -65,6 +66,56 @@ public class DisconnectHandlerEndGameTests
         Assert.Single(fixture.Broker.GetMessagesFromType<SendPopupMessage>());
     }
 
+    [Fact]
+    public void DisconnectWhoseEndGameEndsTheSessionWhileItRuns_ShowsTheReasonOnceWithoutAFinalize()
+    {
+        using var fixture = new Fixture();
+        Disconnect? disconnect = null;
+        bool pollerReturnedDuringEndGame = false;
+        // On the map EndGame destroys the game and CoopMod.OnGameEnd ends the session, whose network
+        // shutdown waits for the poller that is still in this handler.
+        fixture.DuringEndGame = () =>
+        {
+            fixture.Session.Cancel();
+            pollerReturnedDuringEndGame = disconnect!.TryJoin(LongTimeout);
+        };
+        disconnect = fixture.DisconnectOnWorker();
+        fixture.WaitUntilQueued();
+
+        fixture.PumpUntilIdle();
+
+        Assert.True(pollerReturnedDuringEndGame, "the poller kept waiting on EndGame after its session ended");
+        Assert.Null(disconnect.Join());
+        Assert.Equal(new[] { "EndGame" }, fixture.Order);
+        Assert.Equal(TimeoutText, Assert.Single(fixture.Broker.GetMessagesFromType<SendPopupMessage>()).Text);
+        Assert.Empty(fixture.Broker.GetMessagesFromType<EndCoopMode>());
+    }
+
+    [Fact]
+    public void DisconnectWhoseTimedOutEndGameEndsTheSessionWhenItRuns_ShowsTheReasonOnceWithoutAFinalize()
+    {
+        using var fixture = new Fixture();
+        using var shortTimeout = GameThread.Instance.LimitFrameDrain(TimeSpan.FromSeconds(1), TimeSpan.FromSeconds(2));
+        Disconnect? disconnect = null;
+        bool pollerReturnedDuringEndGame = false;
+        fixture.DuringEndGame = () =>
+        {
+            fixture.Session.Cancel();
+            pollerReturnedDuringEndGame = disconnect!.TryJoin(LongTimeout);
+        };
+        disconnect = fixture.DisconnectOnWorker();
+
+        // EndGame expired and was queued again, and the finalizer's hide now waits behind it.
+        Assert.True(SpinWait.SpinUntil(() => fixture.QueuedCount == 3, LongTimeout), "the finalizer's hide was never queued");
+        fixture.PumpUntilIdle();
+
+        Assert.True(pollerReturnedDuringEndGame, "the poller kept waiting on the hide after its session ended");
+        Assert.Null(disconnect.Join());
+        Assert.Equal(new[] { "EndGame" }, fixture.Order);
+        Assert.Equal(TimeoutText, Assert.Single(fixture.Broker.GetMessagesFromType<SendPopupMessage>()).Text);
+        Assert.Empty(fixture.Broker.GetMessagesFromType<EndCoopMode>());
+    }
+
     /// <summary>A connected client in a campaign, on its own game-thread queue.</summary>
     private sealed class Fixture : IDisposable
     {
@@ -72,14 +123,15 @@ public class DisconnectHandlerEndGameTests
         private readonly Campaign previousCampaign = Campaign.Current;
         private readonly Game previousGame = Game._current;
         private readonly IDisposable queueScope;
-        private readonly CancellationTokenSource session = new();
         private readonly GameThread.QueueContext queue = new();
         private readonly ConcurrentQueue<string> order = new();
         private readonly DisconnectHandler handler;
 
         public TestMessageBroker Broker { get; } = new();
+        public CancellationTokenSource Session { get; } = new();
         public Action? DuringEndGame { get; set; }
         public string[] Order => order.ToArray();
+        public int QueuedCount => queue.Count;
 
         public Fixture()
         {
@@ -103,7 +155,7 @@ public class DisconnectHandlerEndGameTests
         /// <summary>Delivers the disconnect on a worker inside the session, as the network poller does.</summary>
         public Disconnect DisconnectOnWorker() => new(() =>
         {
-            using (GameThread.ActivateCancellation(session.Token))
+            using (GameThread.ActivateCancellation(Session.Token))
             {
                 Broker.Publish(this, new NetworkDisconnected(new DisconnectInfo { Reason = DisconnectReason.Timeout }, null));
             }
@@ -132,7 +184,7 @@ public class DisconnectHandlerEndGameTests
                 Game._current = previousGame;
                 queueScope.Dispose();
                 GameThread.Instance.RestoreGameThread(previousGameThreadId);
-                session.Dispose();
+                Session.Dispose();
             }
         }
     }

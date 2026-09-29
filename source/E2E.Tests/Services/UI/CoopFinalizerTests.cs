@@ -20,11 +20,13 @@ namespace E2E.Tests.Services.UI;
 
 /// <summary>
 /// Verifies a module-validation rejection still releases the forced loading screen and ends coop once when
-/// the finalizer's blocking hide times out. Lives in E2E because it needs an isolated game-thread queue.
+/// the finalizer's blocking hide times out, and that a <see cref="CoopFinalizer.SetCloseText"/> text still shows
+/// once. Lives in E2E because it needs an isolated game-thread queue.
 /// </summary>
 public class CoopFinalizerTests
 {
     private const string Reason = "Wrong version of module 'Coop'";
+    private const string CloseText = "The server is restarting. Try again in a few minutes.";
     private static readonly TimeSpan ShortTimeout = TimeSpan.FromMilliseconds(200);
     private static readonly TimeSpan LongTimeout = TimeSpan.FromSeconds(10);
 
@@ -139,6 +141,84 @@ public class CoopFinalizerTests
         Assert.Equal(0, fixture.Queue.Count);
     }
 
+    [Fact]
+    public void RejectionWithACloseTextWhoseHideTimesOutBeforeItStarts_ShowsTheCloseTextOnce()
+    {
+        using var fixture = new Fixture();
+        using var shortTimeout = GameThread.Instance.LimitFrameDrain(TimeSpan.FromSeconds(1), ShortTimeout);
+
+        fixture.Finalizer.SetCloseText(CloseText);
+        Assert.Null(fixture.RejectOnWorker().Join());
+        fixture.Pump();
+        fixture.Pump();
+        fixture.Finalizer.ShowCloseText();
+
+        Assert.Equal(CloseText, Assert.Single(fixture.Broker.GetMessagesFromType<SendPopupMessage>()).Text);
+        Assert.Single(fixture.Broker.GetMessagesFromType<EndCoopMode>());
+        Assert.Equal(1, fixture.LoadingScreen.HideCount);
+        Assert.Equal(0, fixture.Queue.Count);
+    }
+
+    [Fact]
+    public void CloseTextSetAfterTheHideTimedOut_StillWinsInTheQueuedTeardown()
+    {
+        using var fixture = new Fixture();
+        using var shortTimeout = GameThread.Instance.LimitFrameDrain(TimeSpan.FromSeconds(1), ShortTimeout);
+        Assert.Null(fixture.RejectOnWorker().Join());
+
+        // A disconnect reaches the poller while the rejection's teardown still waits in the queue.
+        fixture.Finalizer.SetCloseText(CloseText);
+        fixture.Pump();
+        fixture.Pump();
+        fixture.Finalizer.ShowCloseText();
+
+        Assert.Equal(CloseText, Assert.Single(fixture.Broker.GetMessagesFromType<SendPopupMessage>()).Text);
+        Assert.Single(fixture.Broker.GetMessagesFromType<EndCoopMode>());
+        Assert.Equal(0, fixture.Queue.Count);
+    }
+
+    [Fact]
+    public void RejectionWithACloseTextWhoseHideTimesOutWhileRunning_ShowsTheCloseTextOnce()
+    {
+        using var fixture = new Fixture();
+        using var shortTimeout = GameThread.Instance.LimitFrameDrain(TimeSpan.FromSeconds(1), TimeSpan.FromSeconds(2));
+        fixture.Finalizer.SetCloseText(CloseText);
+        Rejection rejection = fixture.RejectOnWorker();
+        fixture.WaitUntilQueued();
+
+        bool rejectionReturnedDuringHide = false;
+        fixture.LoadingScreen.DuringHide = () => rejectionReturnedDuringHide = rejection.TryJoin(LongTimeout);
+        fixture.Pump();
+        fixture.Pump();
+
+        Assert.True(rejectionReturnedDuringHide, "the rejection did not time out while the hide ran");
+        Assert.Null(rejection.Join());
+        Assert.Equal(1, fixture.LoadingScreen.HideCount);
+        Assert.Equal(CloseText, Assert.Single(fixture.Broker.GetMessagesFromType<SendPopupMessage>()).Text);
+        Assert.Single(fixture.Broker.GetMessagesFromType<EndCoopMode>());
+        Assert.Equal(0, fixture.Queue.Count);
+    }
+
+    [Fact]
+    public void RejectionWithACloseTextWhoseHideTimedOut_AfterItsSessionEnded_LeavesTheCloseTextToShowOnce()
+    {
+        using var fixture = new Fixture();
+        using var shortTimeout = GameThread.Instance.LimitFrameDrain(TimeSpan.FromSeconds(1), ShortTimeout);
+        fixture.Finalizer.SetCloseText(CloseText);
+        Assert.Null(fixture.RejectOnWorker().Join());
+
+        // The dropped teardown never reached its popup, so the disconnect handler's ShowCloseText still shows it.
+        fixture.Session.Cancel();
+        fixture.Pump();
+        Assert.Empty(fixture.Broker.GetMessagesFromType<SendPopupMessage>());
+        fixture.Finalizer.ShowCloseText();
+        fixture.Finalizer.ShowCloseText();
+
+        Assert.Equal(CloseText, Assert.Single(fixture.Broker.GetMessagesFromType<SendPopupMessage>()).Text);
+        Assert.Empty(fixture.Broker.GetMessagesFromType<EndCoopMode>());
+        Assert.Equal(0, fixture.Queue.Count);
+    }
+
     /// <summary>A client in module validation with the forced loading screen up, on its own game-thread queue.</summary>
     private sealed class Fixture : IDisposable
     {
@@ -150,19 +230,21 @@ public class CoopFinalizerTests
         public CancellationTokenSource Session { get; } = new();
         public TestMessageBroker Broker { get; } = new();
         public ForcedLoadingScreen LoadingScreen { get; } = new();
+        public CoopFinalizer Finalizer { get; }
 
         public Fixture()
         {
             queueScope = GameThread.ActivateQueue(Queue);
             GameThread.Instance.MarkGameThread();
 
+            Finalizer = new CoopFinalizer(Broker, LoadingScreen);
             var logic = new Mock<IClientLogic>();
             state = new ValidateModuleState(
                 logic.Object,
                 Broker,
                 Mock.Of<INetwork>(),
                 Mock.Of<IControllerIdProvider>(),
-                new CoopFinalizer(Broker, LoadingScreen),
+                Finalizer,
                 Mock.Of<IGameStateInterface>(),
                 Mock.Of<IModuleInfoProvider>());
             logic.SetupGet(value => value.State).Returns(state);
