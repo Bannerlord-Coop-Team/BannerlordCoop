@@ -15,7 +15,8 @@ public interface ICoopFinalizer
     void Finalize(string closeText);
 
     /// <summary>
-    /// Makes the later finalizes in this session show <paramref name="closeText"/> once instead of their own text.
+    /// Makes every finalize in this session whose teardown has not run yet, including one queued after its hide timed out,
+    /// show <paramref name="closeText"/> once instead of its own text.
     /// </summary>
     void SetCloseText(string closeText);
 
@@ -63,9 +64,6 @@ public class CoopFinalizer : ICoopFinalizer
     /// <param name="closeText">Text for ending notification pop-up message</param>
     public void Finalize(string closeText = null)
     {
-        string overrideText = closeTextOverride;
-        closeText = overrideText ?? closeText;
-
         // A join/load flow may have force-shown the global loading window (ILoadingInterface keeps
         // it up across state transitions via the static LoadingWindowPatches.ForceLoadingWindow
         // flag, which even blocks native disables and survives the container teardown below).
@@ -79,9 +77,17 @@ public class CoopFinalizer : ICoopFinalizer
         // message handler denying validation runs there), so marshal it. Blocking so the screen is
         // down before the teardown messages below, and inline (no marshal) when already on the game
         // thread — e.g. the validation-timeout path.
-        GameThread.RunSafe(loadingInterface.HideLoadingScreen, blocking: true);
+        GameThread.RunCleanupSafe(loadingInterface.HideLoadingScreen, then: () => EndCoop(closeText));
+    }
 
-        // After the marshal above, which throws once the session is cancelled, and before EndCoopMode,
+    private void EndCoop(string closeText)
+    {
+        // Read here rather than when Finalize starts, so a SetCloseText that arrives while a timed-out hide
+        // waits in the queue still wins.
+        string overrideText = closeTextOverride;
+        closeText = overrideText ?? closeText;
+
+        // After the hide above, whose marshal throws once the session is cancelled, and before EndCoopMode,
         // whose teardown can wake a caller that shows the close text itself.
         bool firstToShow = Interlocked.Exchange(ref closeTextShown, 1) == 0;
 

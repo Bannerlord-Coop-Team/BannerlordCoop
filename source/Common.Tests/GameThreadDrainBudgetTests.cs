@@ -4,6 +4,7 @@ using Common;
 namespace Common.Tests;
 
 /// <summary>Verifies frame budgets preserve queue order, cancellation and runtime ownership.</summary>
+[Collection(nameof(GameThreadCollection))]
 public class GameThreadDrainBudgetTests : IDisposable
 {
     private readonly int previousGameThreadId = GameThread.Instance.GameThreadId;
