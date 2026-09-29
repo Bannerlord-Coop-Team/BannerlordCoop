@@ -12,9 +12,13 @@ internal readonly struct NetworkRequestLeaveBattle : ICommand
     [ProtoMember(2)]
     public readonly bool FinishLocalMenus;
 
-    public NetworkRequestLeaveBattle(string partyId, bool finishLocalMenus = true)
+    [ProtoMember(3)]
+    public readonly bool BreakSiege;
+
+    public NetworkRequestLeaveBattle(string partyId, bool finishLocalMenus = true, bool breakSiege = false)
     {
         PartyId = partyId;
         FinishLocalMenus = finishLocalMenus;
+        BreakSiege = breakSiege;
     }
 }

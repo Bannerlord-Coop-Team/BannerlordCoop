@@ -136,9 +136,9 @@ internal class BattleHandler : IHandler
     private static void RefreshCurrentEncounterMenu()
     {
         var menuContext = Campaign.Current?.CurrentMenuContext;
-        // The menu can activate before this queued update, so rebuild it with the new mode.
+        // Reevaluate options without rerunning encounter initialization and its battle-state writes.
         if (menuContext?.GameMenu?.StringId == "encounter")
-            menuContext.Refresh();
+            Campaign.Current.GameMenuManager.RefreshMenuOptionConditions(menuContext);
     }
 
     private void Handle_MapEventInvolvedPartiesAdded(MessagePayload<MapEventInvolvedPartiesAdded> payload)

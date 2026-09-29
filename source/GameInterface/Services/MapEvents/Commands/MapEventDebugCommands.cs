@@ -2402,7 +2402,7 @@ public class MapEventDebugCommands
     private static bool HasAttachedFixtureParties(WoundedAlliedFixture fixture) =>
         HasAttachedParties(fixture.MapEvent, fixture.InvolvedParties);
 
-    private static bool HasAttachedParties(MapEvent mapEvent, PartyBase[] involvedParties) =>
+    internal static bool HasAttachedParties(MapEvent mapEvent, PartyBase[] involvedParties) =>
         mapEvent != null &&
         (involvedParties?.Any(p => p?._mapEventSide?.MapEvent == mapEvent) == true ||
          mapEvent.AttackerSide?.Parties.Count > 0 ||
@@ -2413,7 +2413,7 @@ public class MapEventDebugCommands
         RecoverPartiallyFinalizedMapEvent(fixture.MapEvent, fixture.InvolvedParties);
     }
 
-    private static void RecoverPartiallyFinalizedMapEvent(MapEvent mapEvent, PartyBase[] involvedParties)
+    internal static void RecoverPartiallyFinalizedMapEvent(MapEvent mapEvent, PartyBase[] involvedParties)
     {
         foreach (var party in involvedParties ?? Array.Empty<PartyBase>())
         {

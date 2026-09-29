@@ -1,4 +1,7 @@
-﻿using Common.Messaging;
+﻿using Common.Logging;
+using Common.Messaging;
+using System.Collections.Concurrent;
+using System.Reflection;
 using System.Runtime.CompilerServices;
 
 namespace Common.Tests.Messaging;
@@ -54,6 +57,20 @@ public class MessageBrokerTests
         {
             Received++;
             log?.Add(name);
+        }
+    }
+
+    /// <summary>
+    /// Subscriber whose handler always throws, to exercise the failure logging of a publish.
+    /// </summary>
+    private sealed class ThrowingSubscriber
+    {
+        public int Received { get; private set; }
+
+        public void Handle(MessagePayload<ProbeMessage> payload)
+        {
+            Received++;
+            throw new InvalidOperationException("probe handler failure");
         }
     }
 
@@ -415,6 +432,51 @@ public class MessageBrokerTests
         GC.KeepAlive(live);
     }
 
+    [Fact]
+    public void Publish_WhenAHandlerThrows_LogsTheHandlerMethodName()
+    {
+        var broker = new ProbeBroker();
+        var thrower = new ThrowingSubscriber();
+        broker.Subscribe<ProbeMessage>(thrower.Handle);
+
+        var messages = PublishAndCaptureLog(broker);
+
+        Assert.Contains(messages, message => message.Contains("Failed to run \"Handle\" for \"ProbeMessage\""));
+        GC.KeepAlive(thrower);
+    }
+
+    [Fact]
+    public void Publish_WhenAHandlerThrows_LogsTheHandlerExceptionInsteadOfTheReflectionWrapper()
+    {
+        var broker = new ProbeBroker();
+        var thrower = new ThrowingSubscriber();
+        broker.Subscribe<ProbeMessage>(thrower.Handle);
+
+        var messages = PublishAndCaptureLog(broker);
+
+        var failure = Assert.Single(messages, message => message.Contains("Failed to run \"Handle\" for \"ProbeMessage\""));
+        Assert.Contains("probe handler failure", failure);
+        Assert.DoesNotContain(nameof(TargetInvocationException), failure);
+        GC.KeepAlive(thrower);
+    }
+
+    [Fact]
+    public void Publish_WhenAHandlerThrows_StillInvokesTheLaterSubscriber()
+    {
+        var broker = new ProbeBroker();
+        var thrower = new ThrowingSubscriber();
+        var later = new Subscriber();
+        broker.Subscribe<ProbeMessage>(thrower.Handle);
+        broker.Subscribe<ProbeMessage>(later.Handle);
+
+        broker.Publish(this, new ProbeMessage());
+
+        Assert.Equal(1, thrower.Received);
+        Assert.Equal(1, later.Received);
+        GC.KeepAlive(thrower);
+        GC.KeepAlive(later);
+    }
+
     private static void HandleTargetless(MessagePayload<ProbeMessage> payload) => targetlessReceived++;
 
     // Keeps the new subscriber out of the calling frame so the array slot stays its only root.
@@ -449,6 +511,25 @@ public class MessageBrokerTests
     private static void SubscribeUnrootedLambda(MessageBroker broker, List<string> received)
     {
         broker.Subscribe<ProbeMessage>(payload => received.Add("lambda"));
+    }
+
+    // Other test classes log through the same process-wide sink in parallel, so callers assert on the
+    // line this publish produced and never on the capture as a whole.
+    private ConcurrentQueue<string> PublishAndCaptureLog(MessageBroker broker)
+    {
+        var messages = new ConcurrentQueue<string>();
+        Action<string> callback = messages.Enqueue;
+        OutputSinkManager.AddLogCallback(callback);
+        try
+        {
+            broker.Publish(this, new ProbeMessage());
+        }
+        finally
+        {
+            OutputSinkManager.RemoveLogCallback(callback);
+        }
+
+        return messages;
     }
 
     private static void Collect()
