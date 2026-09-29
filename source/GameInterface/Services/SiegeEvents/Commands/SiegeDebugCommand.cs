@@ -1148,7 +1148,9 @@ public class SiegeDebugCommand
                 var joinOption = menu?.MenuOptions.FirstOrDefault(option => option.IdString == "join_encounter_help_attackers");
                 if (PlayerEncounter.Current == null || PlayerEncounter.EncounterSettlement != settlement ||
                     PlayerEncounter.EncounteredBattle != mapEvent || PartyBase.MainParty.MapEvent != null ||
-                    menu?.StringId != "join_encounter" || joinOption?.IsEnabled != true)
+                    menu?.StringId != "join_encounter" || joinOption == null ||
+                    !menu.GetMenuOptionConditionsHold(Game.Current, Campaign.Current.CurrentMenuContext,
+                        menu.MenuOptions.ToList().IndexOf(joinOption)) || !joinOption.IsEnabled)
                 {
                     return Failed("The recovered settlement encounter has no enabled attacker join choice");
                 }
@@ -1208,18 +1210,18 @@ public class SiegeDebugCommand
                 return Failed("Unable to resolve ObjectManager");
             }
 
-            var behavior = new EncounterGameMenuBehavior();
-            var attackArgs = new MenuCallbackArgs((MenuContext)null, null);
-            bool attackShown = PartyBase.MainParty.MapEvent != null && behavior.game_menu_encounter_attack_on_condition(attackArgs);
-            var simulationArgs = new MenuCallbackArgs((MenuContext)null, null);
-            bool simulationShown = PartyBase.MainParty.MapEvent != null && behavior.game_menu_encounter_order_attack_on_condition(simulationArgs);
-            var menu = Campaign.Current?.CurrentMenuContext?.GameMenu;
-            var renderedAttack = menu?.MenuOptions
-                .FirstOrDefault(option => option.IdString == "attack");
-            var renderedSimulation = menu?.MenuOptions
-                .FirstOrDefault(option => option.IdString == "str_order_attack");
-            var renderedJoinAttackers = menu?.MenuOptions
-                .FirstOrDefault(option => option.IdString == "join_encounter_help_attackers");
+            var menuContext = Campaign.Current.CurrentMenuContext;
+            var menu = menuContext?.GameMenu;
+            var options = menu?.MenuOptions.ToList();
+            int attackIndex = options?.FindIndex(option => option.IdString == "attack") ?? -1;
+            int simulationIndex = options?.FindIndex(option => option.IdString == "str_order_attack") ?? -1;
+            int joinIndex = options?.FindIndex(option => option.IdString == "join_encounter_help_attackers") ?? -1;
+            bool attackShown = attackIndex >= 0 && menu.GetMenuOptionConditionsHold(Game.Current, menuContext, attackIndex);
+            bool simulationShown = simulationIndex >= 0 && menu.GetMenuOptionConditionsHold(Game.Current, menuContext, simulationIndex);
+            bool joinShown = joinIndex >= 0 && menu.GetMenuOptionConditionsHold(Game.Current, menuContext, joinIndex);
+            bool attackEnabled = attackShown && options[attackIndex].IsEnabled;
+            bool simulationEnabled = simulationShown && options[simulationIndex].IsEnabled;
+            bool joinEnabled = joinShown && options[joinIndex].IsEnabled;
             var settlement = MobileParty.MainParty.BesiegedSettlement ?? MobileParty.MainParty.CurrentSettlement ?? PlayerEncounter.EncounterSettlement;
             var leader = settlement?.SiegeEvent?.BesiegerCamp?.LeaderParty;
             var mapEvent = PartyBase.MainParty?.MapEvent;
@@ -1250,24 +1252,22 @@ public class SiegeDebugCommand
                 mainPartyTracked,
                 joinAttackers = new
                 {
-                    rendered = renderedJoinAttackers != null,
-                    renderedEnabled = renderedJoinAttackers?.IsEnabled ?? false,
+                    rendered = joinShown,
+                    renderedEnabled = joinEnabled,
                 },
                 attack = new
                 {
                     shown = attackShown,
-                    enabled = attackArgs.IsEnabled,
-                    rendered = renderedAttack != null,
-                    renderedEnabled = renderedAttack?.IsEnabled ?? false,
-                    tooltip = attackArgs.Tooltip?.ToString() ?? "none",
+                    enabled = attackEnabled,
+                    rendered = attackShown,
+                    renderedEnabled = attackEnabled,
                 },
                 simulation = new
                 {
                     shown = simulationShown,
-                    enabled = simulationArgs.IsEnabled,
-                    rendered = renderedSimulation != null,
-                    renderedEnabled = renderedSimulation?.IsEnabled ?? false,
-                    tooltip = simulationArgs.Tooltip?.ToString() ?? "none",
+                    enabled = simulationEnabled,
+                    rendered = simulationShown,
+                    renderedEnabled = simulationEnabled,
                 },
             });
 
@@ -1275,10 +1275,10 @@ public class SiegeDebugCommand
                 $"leader={leader?.StringId ?? "none"} localLeader={leader == MobileParty.MainParty} " +
                 $"mapEvent={mapEventId} tracker={trackerId} tracked={tracker?._mapEventParties.Count ?? 0}/{involvedPartyCount} " +
                 $"mainPartyAttached={mainPartyAttached} mainPartyTracked={mainPartyTracked} " +
-                $"attackShown={attackShown} attackEnabled={attackArgs.IsEnabled} " +
-                $"attackRendered={renderedAttack != null} attackRenderedEnabled={renderedAttack?.IsEnabled ?? false} " +
-                $"simulationShown={simulationShown} simulationEnabled={simulationArgs.IsEnabled} " +
-                $"simulationRendered={renderedSimulation != null} simulationRenderedEnabled={renderedSimulation?.IsEnabled ?? false}" +
+                $"attackShown={attackShown} attackEnabled={attackEnabled} " +
+                $"attackRendered={attackShown} attackRenderedEnabled={attackEnabled} " +
+                $"simulationShown={simulationShown} simulationEnabled={simulationEnabled} " +
+                $"simulationRendered={simulationShown} simulationRenderedEnabled={simulationEnabled}" +
                 Environment.NewLine + "LIVE_TEST_JSON=" + structuredResult);
 
         }
