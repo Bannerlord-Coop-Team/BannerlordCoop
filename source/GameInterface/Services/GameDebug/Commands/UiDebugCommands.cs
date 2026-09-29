@@ -142,8 +142,8 @@ internal class UiDebugCommands
         bool followTargetReached = false;
         if (cameraView != null && cameraFollowParty != null)
         {
-            var followPosition = cameraFollowParty.MapEvent?.Position ?? cameraFollowParty.Position;
-            var targetDelta = followPosition.ToVec2() - cameraView._cameraTarget.AsVec2;
+            // Vanilla frames ports and sieges using an adjusted ideal target.
+            var targetDelta = cameraView.IdealCameraTarget.AsVec2 - cameraView._cameraTarget.AsVec2;
             followTargetReached = targetDelta.LengthSquared < 0.0001f;
         }
 
