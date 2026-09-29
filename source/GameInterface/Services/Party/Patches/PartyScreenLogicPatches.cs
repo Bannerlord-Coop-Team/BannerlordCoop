@@ -241,7 +241,9 @@ internal class PartyScreenLogicPatches
                 forceTransferId
             );
 
-            MessageBroker.Instance.Publish(__instance, message);
+            // Alternative acceptance owns the selected troop transfer on the server.
+            if (questSelectionRoster == null)
+                MessageBroker.Instance.Publish(__instance, message);
             // Manage changing rosters on the server
             using (new AllowedThread())
             {

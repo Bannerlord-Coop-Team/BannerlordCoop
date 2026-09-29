@@ -8,6 +8,7 @@ using GameInterface.Services.Issues.Interfaces;
 using GameInterface.Services.Issues.Messages;
 using GameInterface.Services.Players;
 using GameInterface.Services.Players.Data;
+using GameInterface.Services.Party.Messages;
 using HarmonyLib;
 using Helpers;
 using Moq;
@@ -868,7 +869,7 @@ public class GenericQuestTypeAcceptSecurityTests : IDisposable
     }
 
     [Fact]
-    public void QuestScreenDoneAndClose_PreservesIssueRosterReadByDialogueCondition()
+    public void QuestScreenDoneAndClose_SendsOnlyAlternativeAcceptanceAfterNativeClose()
     {
         var fixture = SetupVillageOwner();
         CreateIssueOnBothPeers(fixture);
@@ -898,8 +899,15 @@ public class GenericQuestTypeAcceptSecurityTests : IDisposable
 
             Assert.True(screen.DoneLogic(false));
             screen.OnPartyScreenClosed(false);
+            Assert.Empty(Client.NetworkSentMessages.GetMessages<NetworkCompleteDoneLogic>());
+            Assert.Equal(6, party.MemberRoster.GetTroopCount(troop));
             Assert.Equal(6, roster.GetTroopCount(troop));
             Assert.Equal(6, screen.MemberRosters[(int)PartyScreenLogic.PartyRosterSide.Left].GetTroopCount(troop));
+            owner.Issue.StartIssueWithAlternativeSolution();
+            var request = Assert.Single(Client.NetworkSentMessages.GetMessages<RequestQuestTypeAcceptAlternative>());
+            var selected = Client.Resolve<GameInterface.Services.TroopRosters.Interfaces.ITroopRosterInterface>()
+                .UnpackTroopRosterData(request.SentTroops).ToArray();
+            Assert.Equal(6, selected.Sum(element => element.Number));
         });
     }
 
