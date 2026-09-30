@@ -9,9 +9,11 @@ using GameInterface.Services.MapEvents.Messages.Leave;
 using GameInterface.Services.MobileParties.Messages.Behavior;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Settlements.Interfaces;
+using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Encounters;
 using TaleWorlds.CampaignSystem.GameMenus;
 using TaleWorlds.CampaignSystem.MapEvents;
+using TaleWorlds.CampaignSystem.GameState;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Settlements;
 using TaleWorlds.Core;
@@ -30,6 +32,7 @@ public class ClientSettlementExitEnterHandler : IHandler
     private readonly INetwork network;
     private readonly IObjectManager objectManager;
     private readonly ISettlementInterface settlementInterface;
+    private readonly IHideoutResultEncounter hideoutResultEncounter;
     // Local attempts and all response transitions run on the game thread.
     private PendingStart pendingStart;
     private uint pendingLeavePartyId;
@@ -39,12 +42,14 @@ public class ClientSettlementExitEnterHandler : IHandler
         IMessageBroker messageBroker,
         INetwork network,
         IObjectManager objectManager,
-        ISettlementInterface settlementInterface)
+        ISettlementInterface settlementInterface,
+        IHideoutResultEncounter hideoutResultEncounter)
     {
         this.messageBroker = messageBroker;
         this.network = network;
         this.objectManager = objectManager;
         this.settlementInterface = settlementInterface;
+        this.hideoutResultEncounter = hideoutResultEncounter;
         messageBroker.Subscribe<StartSettlementEncounterAttempted>(Handle);
         messageBroker.Subscribe<EndSettlementEncounterAttempted>(Handle);
         messageBroker.Subscribe<NetworkSettlementEncounterLeaveResult>(Handle);
@@ -303,6 +308,10 @@ public class ClientSettlementExitEnterHandler : IHandler
                 settlementInterface.PartyLeaveSettlement(party);
             }
 
+            // Staged hideout loot lives on the encounter, so closing it here would discard the loot.
+            if (hideoutResultEncounter.TryKeepThroughLeave(party))
+                return;
+
             CloseStaleMainPartyEncounter(payload.PartyId);
         });
     }
@@ -316,7 +325,23 @@ public class ClientSettlementExitEnterHandler : IHandler
             return;
 
         lastAutomaticRecovery = default;
-        if (PlayerEncounter.Current == null || PlayerEncounter.EncounterSettlement == null)
+        if (PlayerEncounter.Current == null)
+        {
+            var party = MobileParty.MainParty;
+            var menu = Campaign.Current.CurrentMenuContext?.GameMenu?.StringId;
+            if (party != null && party.CurrentSettlement == null && party.Party.MapEventSide == null &&
+                party.BesiegerCamp == null && party.SiegeEvent == null &&
+                Game.Current.GameStateManager.ActiveState is MapState &&
+                (menu == "town_outside" || menu == "castle_outside" ||
+                 menu == "siege_attacker_left" || menu == "siege_attacker_defeated"))
+            {
+                // Close settlement-only menus after the replicated leave.
+                using (new AllowedThread()) GameMenu.ExitToLast();
+            }
+            return;
+        }
+
+        if (PlayerEncounter.EncounterSettlement == null)
             return;
 
         var battle = PlayerEncounter.Battle;

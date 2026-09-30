@@ -1,11 +1,15 @@
 ﻿using Common.Messaging;
 using Common.Network;
+using Common.Network.Coalescing;
+using GameInterface.Services.TroopRosters.Messages;
+using TaleWorlds.CampaignSystem.Roster;
 using Common.Util;
 using E2E.Tests.Util;
 using GameInterface.Registry.Auto;
 using GameInterface.Services.MapEventSides.Messages;
 using GameInterface.Services.MapEvents;
 using GameInterface.Services.MapEvents.Handlers;
+using GameInterface.Services.MapEvents.Initialization;
 using GameInterface.Services.MapEvents.Messages;
 using GameInterface.Services.MapEvents.Messages.Leave;
 using GameInterface.Services.MapEvents.Messages.Start;
@@ -27,6 +31,114 @@ public class MapEventLifetimeTests : MapEventTestBase
     private static MobileParty? dispatchedSiegeLeader;
 
     public MapEventLifetimeTests(ITestOutputHelper output) : base(output) { }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void DestroyGraph_FlushesFinalCasualtiesBeforeRemovingRosterIds(bool abort)
+    {
+        var battle = CreateServerMapEvent(commit: !abort);
+        var troopId = TestEnvironment.CreateRegisteredObject<CharacterObject>();
+        var rosterIds = new List<string>();
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject<MapEvent>(battle.MapEventId, out var mapEvent));
+            var party = mapEvent.AttackerSide.Parties.First();
+            foreach (var roster in new[] { party._woundedInBattle, party._diedInBattle, party._routedInBattle })
+            {
+                Assert.True(Server.ObjectManager.TryGetId(roster, out var id));
+                rosterIds.Add(id);
+            }
+        });
+        var receivedRosters = Clients.SelectMany(client => rosterIds.Select(id =>
+        {
+            Assert.True(client.ObjectManager.TryGetObject<TroopRoster>(id, out var roster));
+            return roster;
+        })).ToArray();
+        TestEnvironment.FlushCoalescer();
+        Server.NetworkSentMessages.Clear();
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject<CharacterObject>(troopId, out var troop));
+            Assert.False(troop.IsHero);
+            foreach (var id in rosterIds)
+            {
+                Assert.True(Server.ObjectManager.TryGetObject<TroopRoster>(id, out var roster));
+                roster.AddToCounts(troop, 3);
+            }
+            Assert.True(Server.Resolve<ISendCoalescer>().HasPending);
+            Assert.True(Server.ObjectManager.TryGetObject<MapEvent>(battle.MapEventId, out var mapEvent));
+            if (abort)
+                Server.Resolve<IMapEventInitializationBarrier>().AbortServer(mapEvent);
+            else
+                Server.Resolve<IMessageBroker>().Publish(this, new InstanceDestroyed<MapEvent>(mapEvent));
+        });
+        TestEnvironment.FlushCoalescer();
+
+        var messages = Server.NetworkSentMessages.ToList();
+        int destruction = messages.FindIndex(message => abort
+            ? message is NetworkMapEventInitialized initialized && initialized.IsTerminal
+            : message is NetworkDestroyInstance<MapEvent>);
+        Assert.True(destruction >= 0);
+        var updates = messages.Select((message, index) => (message, index))
+            .Where(entry => entry.message is NetworkTroopRosterElementBatch).ToArray();
+        Assert.Equal(3, updates.Length);
+        Assert.All(updates, entry => Assert.True(entry.index < destruction));
+        Assert.All(receivedRosters, roster => Assert.Equal(3, roster.TotalManCount));
+        foreach (var instance in Clients.Append(Server))
+            foreach (var id in rosterIds)
+                Assert.False(instance.ObjectManager.TryGetObject<TroopRoster>(id, out _));
+    }
+
+    [Fact]
+    public void DestroyGraph_ResetsClientOffsetsUnderReceivePolicy_WithoutSuppressingServer()
+    {
+        var battle = CreateServerMapEvent();
+        foreach (var instance in Clients.Append(Server))
+        {
+            instance.Call(() =>
+            {
+                Assert.True(instance.ObjectManager.TryGetObject<MobileParty>(battle.AttackerPartyId, out var party));
+                using (new AllowedThread())
+                    party.EventPositionAdder = new TaleWorlds.Library.Vec2(1, 2);
+            });
+        }
+        var writes = new List<(bool Server, bool Allowed)>();
+        var setter = AccessTools.PropertySetter(typeof(MobileParty), nameof(MobileParty.EventPositionAdder));
+        var harmony = new Harmony($"map-event-destroy-offset-{Guid.NewGuid()}");
+        offsetWrites = writes;
+        harmony.Patch(setter, prefix: new HarmonyMethod(typeof(MapEventLifetimeTests), nameof(RecordOffsetWrite)));
+        try
+        {
+            foreach (var instance in Clients.Append(Server))
+            {
+                instance.Call(() =>
+                {
+                    Assert.True(instance.ObjectManager.TryGetObject<MapEvent>(battle.MapEventId, out var mapEvent));
+                    instance.Resolve<IMapEventInitializationBarrier>().DestroyGraph(mapEvent);
+                    Assert.True(instance.ObjectManager.TryGetObject<MobileParty>(battle.AttackerPartyId, out var party));
+                    Assert.Null(party.MapEvent);
+                    Assert.Equal(TaleWorlds.Library.Vec2.Zero, party.EventPositionAdder);
+                });
+            }
+
+            Assert.Contains(writes, write => write.Server && !write.Allowed);
+            Assert.Contains(writes, write => !write.Server && write.Allowed);
+            Assert.All(writes, write => Assert.Equal(!write.Server, write.Allowed));
+        }
+        finally
+        {
+            harmony.Unpatch(setter, HarmonyPatchType.Prefix, harmony.Id);
+            offsetWrites = null;
+        }
+    }
+
+    private static List<(bool Server, bool Allowed)>? offsetWrites;
+
+    private static void RecordOffsetWrite()
+    {
+        offsetWrites?.Add((Common.ModInformation.IsServer, AllowedThread.IsThisThreadAllowed()));
+    }
 
     [Fact]
     public void ServerCreate_MapEvent_SyncAllClients()
@@ -254,6 +366,20 @@ public class MapEventLifetimeTests : MapEventTestBase
             Assert.True(Server.ObjectManager.TryGetObject<MobileParty>(replacementMobilePartyId, out var replacement));
             Assert.Same(replacement.Party, mapEvent.DefenderSide.LeaderParty);
         }, disabledMethods);
+
+        foreach (var instance in Clients.Prepend(Server))
+        {
+            instance.Call(() =>
+            {
+                Assert.True(instance.ObjectManager.TryGetObject<MapEvent>(mapEventId!, out var mapEvent));
+                Assert.True(instance.ObjectManager.TryGetObject<MobileParty>(besiegerMobilePartyId, out var besieger));
+                Assert.Null(besieger.Party.MapEventSide);
+                Assert.NotNull(besieger.BesiegerCamp);
+                Assert.Same(besieger.BesiegerCamp, mapEvent.MapEventSettlement.SiegeEvent.BesiegerCamp);
+                // This fixture seeds the camp leader directly on the server.
+                if (instance == Server) Assert.Same(besieger, besieger.BesiegerCamp.LeaderParty);
+            }, disabledMethods);
+        }
 
         client.Call(() => client.Resolve<INetwork>().SendAll(
             new NetworkRequestJoinBattle(

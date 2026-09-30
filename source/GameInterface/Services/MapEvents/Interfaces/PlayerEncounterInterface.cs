@@ -1,6 +1,5 @@
 ﻿using Common;
 using Common.Logging;
-using GameInterface.Services.Clans.Extensions;
 using GameInterface.Services.Heroes.Extensions;
 using Serilog;
 using System.Linq;
@@ -14,6 +13,7 @@ namespace GameInterface.Services.MapEvents.Interfaces;
 public interface IPlayerEncounterInterface : IGameAbstraction
 {
     public void UpdateInternalAfterBattle(PlayerEncounter playerEncounter);
+    public void ReleaseHeroesWithoutConversation(PlayerEncounter playerEncounter);
 }
 
 public class PlayerEncounterInterface : IPlayerEncounterInterface
@@ -45,10 +45,7 @@ public class PlayerEncounterInterface : IPlayerEncounterInterface
                         playerEncounter.DoCaptureHeroes();
                         break;
                     case PlayerEncounterState.FreeHeroes:
-                        if (!TryReleaseForeignPlayerHero(playerEncounter))
-                        {
-                            playerEncounter.DoFreeOrCapturePrisonerHeroes();
-                        }
+                        playerEncounter.DoFreeOrCapturePrisonerHeroes();
                         break;
                     case PlayerEncounterState.LootParty:
                         playerEncounter.DoLootMembersAndPrisonersOfParty();
@@ -72,7 +69,7 @@ public class PlayerEncounterInterface : IPlayerEncounterInterface
         });
     }
 
-    private static bool TryReleaseForeignPlayerHero(PlayerEncounter playerEncounter)
+    public void ReleaseHeroesWithoutConversation(PlayerEncounter playerEncounter)
     {
         if (playerEncounter._capturedAlreadyPrisonerHeroes == null)
         {
@@ -82,18 +79,24 @@ public class PlayerEncounterInterface : IPlayerEncounterInterface
                 .ToList();
         }
 
-        var element = playerEncounter._capturedAlreadyPrisonerHeroes.LastOrDefault(candidate =>
-            candidate.Character?.HeroObject is Hero hero &&
-            hero.IsPrisoner &&
-            hero.PartyBelongedToAsPrisoner != PartyBase.MainParty &&
-            ShouldReleaseWithoutConversation(hero, Clan.PlayerClan));
+        var releasable = playerEncounter._capturedAlreadyPrisonerHeroes
+            .Where(candidate =>
+                candidate.Character?.HeroObject is Hero hero &&
+                hero.IsPrisoner &&
+                hero.PartyBelongedToAsPrisoner != PartyBase.MainParty &&
+                ShouldReleaseWithoutConversation(hero, Clan.PlayerClan))
+            .ToList();
 
-        var hero = element.Character?.HeroObject;
-        if (hero == null) return false;
+        foreach (var element in releasable)
+        {
+            var hero = element.Character.HeroObject;
 
-        playerEncounter._capturedAlreadyPrisonerHeroes.Remove(element);
-        EndCaptivityAction.ApplyByReleasedAfterBattle(hero);
-        return true;
+            // Dequeue first so a failed release cannot reopen the conversation either.
+            playerEncounter._capturedAlreadyPrisonerHeroes.Remove(element);
+            Logger.Information("Releasing {HeroId} of clan {ClanId} after battle without a conversation",
+                hero.StringId, hero.Clan?.StringId);
+            EndCaptivityAction.ApplyByReleasedAfterBattle(hero);
+        }
     }
 
     internal static bool ShouldReleaseWithoutConversation(Hero hero, Clan localPlayerClan)
@@ -103,9 +106,8 @@ public class PlayerEncounterInterface : IPlayerEncounterInterface
         if (hero.Clan != null && hero.Clan != localPlayerClan && hero.IsPlayerHero())
             return true;
 
-        return hero.CompanionOf != null &&
-               hero.CompanionOf != localPlayerClan &&
-               hero.CompanionOf.IsPlayerClan();
+        // Native only has a free prisoner line for the local clan's companions.
+        return hero.CompanionOf != null && hero.CompanionOf != localPlayerClan;
     }
 
     private void EndPlayerEncounter(PlayerEncounter playerEncounter)

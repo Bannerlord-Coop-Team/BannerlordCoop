@@ -12,6 +12,7 @@ using GameInterface.Services.UI.Interfaces;
 using GameInterface.Services.UI.JoinCancel;
 using GameInterface.Services.UI.Messages;
 using Serilog;
+using System;
 using System.Threading;
 using TaleWorlds.Library;
 
@@ -25,6 +26,9 @@ public class MainMenuState : ClientStateBase
 {
     private static readonly ILogger Logger = LogManager.GetLogger<MainMenuState>();
 
+    private const string ValidationStartFailedNotice =
+        "Coop could not start validating modules. See the coop log for details.";
+
     private readonly IMessageBroker messageBroker;
     private readonly INetwork network;
     private readonly IGameInterface gameInterface;
@@ -33,6 +37,7 @@ public class MainMenuState : ClientStateBase
     private readonly IJoinAttemptOverlay joinAttemptOverlay;
     private readonly JoinAttemptPresentation joinAttempt;
     private readonly ICoopFinalizer coopFinalizer;
+    private readonly IPatchFailureReport patchFailureReport;
 
     private volatile bool shown;
     private volatile bool connected;
@@ -47,7 +52,8 @@ public class MainMenuState : ClientStateBase
         ILoadingInterface loadingInterface,
         IJoinAttemptOverlay joinAttemptOverlay,
         JoinAttemptPresentation joinAttempt,
-        ICoopFinalizer coopFinalizer) : base(logic)
+        ICoopFinalizer coopFinalizer,
+        IPatchFailureReport patchFailureReport) : base(logic)
     {
         this.messageBroker = messageBroker;
         this.network = network;
@@ -57,6 +63,7 @@ public class MainMenuState : ClientStateBase
         this.joinAttemptOverlay = joinAttemptOverlay;
         this.joinAttempt = joinAttempt;
         this.coopFinalizer = coopFinalizer;
+        this.patchFailureReport = patchFailureReport;
         loadingInterface.HideLoadingScreen();
         messageBroker.Subscribe<NetworkConnected>(Handle_NetworkConnected);
         messageBroker.Subscribe<CancelJoinAttempt>(Handle_CancelJoinAttempt);
@@ -88,14 +95,33 @@ public class MainMenuState : ClientStateBase
             GameThread.RunSafe(joinAttemptOverlay.Hide, context: "HideJoinAttemptOverlay");
         }
 
-        loadingInterface.ShowLoadingScreen(
-            joinAttempt.Title,
-            "Applying patches...");
-        gameInterface.PatchAll();
-        loadingInterface.SetLoadingMessage(
-            joinAttempt.Title,
-            "Validating modules...");
-        Logic.ValidateModules();
+        // Cancel is down and nothing else releases the window once connected, so a failure here must end coop itself.
+        try
+        {
+            loadingInterface.ShowLoadingScreen(
+                joinAttempt.Title,
+                "Applying patches...");
+            gameInterface.PatchAll();
+        }
+        catch (Exception e)
+        {
+            Logger.Error(e, "Applying patches failed after connecting. {LoadedCopies}", patchFailureReport.ListLoadedCopies(e));
+            AbandonJoin(patchFailureReport.Describe(e));
+            return;
+        }
+
+        try
+        {
+            loadingInterface.SetLoadingMessage(
+                joinAttempt.Title,
+                "Validating modules...");
+            Logic.ValidateModules();
+        }
+        catch (Exception e)
+        {
+            Logger.Error(e, "Starting module validation failed after connecting");
+            AbandonJoin(ValidationStartFailedNotice);
+        }
     }
 
     internal void Handle_CancelJoinAttempt(MessagePayload<CancelJoinAttempt> obj)
@@ -118,13 +144,7 @@ public class MainMenuState : ClientStateBase
 
             Logger.Information("Player cancelled a {Intent} join attempt", joinAttempt.Intent);
 
-            // Held lobby membership would keep a host slot and make a retried join no-op.
-            if (joinAttempt.Intent == JoinIntent.PlayerSteam)
-            {
-                messageBroker.Publish(this, new SessionJoinAbandoned());
-            }
-
-            coopFinalizer.Finalize(closeText: null);
+            AbandonJoin(closeText: null);
 
             HideJoinAttempt();
             InformationManager.DisplayMessage(new InformationMessage(joinAttempt.CancelledNotice));
@@ -134,6 +154,23 @@ public class MainMenuState : ClientStateBase
             cancelling = false;
             throw;
         }
+    }
+
+    private void AbandonJoin(string closeText)
+    {
+        // Held lobby membership would keep a host slot and make a retried join no-op.
+        if (joinAttempt.Intent == JoinIntent.PlayerSteam)
+        {
+            // The lobby listener is game-thread only, and a patch failure reaches this on the network thread.
+            using (GameThread.ActivateCancellation(CancellationToken.None))
+            {
+                GameThread.RunSafe(
+                    () => messageBroker.Publish(this, new SessionJoinAbandoned()),
+                    context: nameof(SessionJoinAbandoned));
+            }
+        }
+
+        coopFinalizer.Finalize(closeText);
     }
 
     private void ShowJoinAttempt()

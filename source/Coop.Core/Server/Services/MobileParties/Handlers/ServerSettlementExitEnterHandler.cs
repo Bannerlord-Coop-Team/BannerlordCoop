@@ -213,6 +213,7 @@ public class ServerSettlementExitEnterHandler : IHandler
                 return;
             }
 
+            var leftSettlement = mobileParty.CurrentSettlement;
             LeaveHideoutMapEvent(mobileParty);
             settlementInterface.PartyLeaveSettlement(mobileParty);
 
@@ -225,6 +226,8 @@ public class ServerSettlementExitEnterHandler : IHandler
             network.SendAllBut(
                 peer,
                 new NetworkPartyLeaveSettlement(payload.PartyId));
+
+            messageBroker.Publish(this, new SettlementEncounterLeaveApplied(mobileParty, leftSettlement));
         }, context: nameof(NetworkRequestEndSettlementEncounter));
     }
 

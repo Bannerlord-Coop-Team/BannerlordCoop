@@ -19,7 +19,10 @@ internal class LifetimePatches<T>
 
         if (ModInformation.IsClient)
         {
-            Logger.Error("Client created managed {name}", __instance.GetType());
+            if (typeof(T) == typeof(Equipment))
+                Logger.Error("Client created managed {name}; caller={Caller}", __instance.GetType(), System.Environment.StackTrace);
+            else
+                Logger.Error("Client created managed {name}", __instance.GetType());
             return;
         }
 

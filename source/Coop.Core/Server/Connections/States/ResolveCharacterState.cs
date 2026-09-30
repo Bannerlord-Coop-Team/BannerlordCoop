@@ -12,6 +12,7 @@ using LiteNetLib;
 using Serilog;
 using System;
 using System.Linq;
+using System.Threading;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.Library;
 
@@ -34,6 +35,10 @@ public class ResolveCharacterState : ConnectionStateBase
     private readonly IModuleInfoProvider moduleInfoProvider;
     private readonly IExistingPlayerSender existingPlayerSender;
     private readonly ISteamBanList steamBanList;
+    private readonly IJoinValidationDenialLog denialLog;
+
+    // Refused validations on this connection; only the first is logged.
+    private int denials;
 
     public ResolveCharacterState(IConnectionLogic connectionLogic,
         IMessageBroker messageBroker,
@@ -44,7 +49,8 @@ public class ResolveCharacterState : ConnectionStateBase
         IObjectManager objectManager,
         IModuleInfoProvider moduleInfoProvider,
         IExistingPlayerSender existingPlayerSender,
-        ISteamBanList steamBanList)
+        ISteamBanList steamBanList,
+        IJoinValidationDenialLog denialLog)
         : base(connectionLogic)
     {
         this.messageBroker = messageBroker;
@@ -56,6 +62,7 @@ public class ResolveCharacterState : ConnectionStateBase
         this.moduleInfoProvider = moduleInfoProvider;
         this.existingPlayerSender = existingPlayerSender;
         this.steamBanList = steamBanList;
+        this.denialLog = denialLog;
 
         messageBroker.Subscribe<NetworkClientValidate>(Handle_ClientValidate);
         messageBroker.Subscribe<NetworkModuleVersionsValidate>(Handle_ModuleVersionsValidate);
@@ -65,6 +72,10 @@ public class ResolveCharacterState : ConnectionStateBase
     {
         messageBroker.Unsubscribe<NetworkClientValidate>(Handle_ClientValidate);
         messageBroker.Unsubscribe<NetworkModuleVersionsValidate>(Handle_ModuleVersionsValidate);
+
+        int total = Volatile.Read(ref denials);
+        if (total > 1)
+            LogDenial(() => denialLog.ReportRepeats(ConnectionLogic.Peer, total));
     }
 
     internal void Handle_ModuleVersionsValidate(MessagePayload<NetworkModuleVersionsValidate> obj)
@@ -77,6 +88,7 @@ public class ResolveCharacterState : ConnectionStateBase
 
         bool result;
         string error;
+        JoinDenialKind? denial = null;
         try
         {
             var clientModules = obj.What.Modules;
@@ -86,6 +98,7 @@ public class ResolveCharacterState : ConnectionStateBase
             {
                 result = false;
                 error = GetIncompatibleBuildReason(obj.What.CoopBuildVersion);
+                denial = JoinDenialKind.BuildMismatch;
             }
             else
             {
@@ -93,6 +106,10 @@ public class ResolveCharacterState : ConnectionStateBase
                     serverModules,
                     clientModules.Select(ConvertToModuleInfo),
                     out error);
+
+                // The client joins anyway on the lone Coop reason, so only log real refusals.
+                if (!result && !string.Equals(error, NetworkModuleVersionsValidated.UnsupportedCoopModuleReason, StringComparison.Ordinal))
+                    denial = JoinDenialKind.ModuleValidation;
             }
         }
         catch (Exception e)
@@ -111,6 +128,22 @@ public class ResolveCharacterState : ConnectionStateBase
             error,
             ModInformation.BuildVersion);
         network.SendImmediate(ConnectionLogic.Peer, validateMessage);
+
+        if (denial.HasValue && Interlocked.Increment(ref denials) == 1)
+            LogDenial(() => denialLog.Report(ConnectionLogic.Peer, denial.Value, obj.What.CoopBuildVersion, error));
+    }
+
+    private void LogDenial(Action log)
+    {
+        // Only a log line, so a failure must not escape into the network poller or a state change.
+        try
+        {
+            log();
+        }
+        catch (Exception e)
+        {
+            Logger.Error(e, "Logging the join validation denial for peer {Peer} failed", ConnectionLogic.Peer?.Id);
+        }
     }
 
     private static string GetIncompatibleBuildReason(string? clientBuildVersion)

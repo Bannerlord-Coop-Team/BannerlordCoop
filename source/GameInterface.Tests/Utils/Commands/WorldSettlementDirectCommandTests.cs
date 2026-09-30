@@ -54,9 +54,9 @@ public class WorldSettlementDirectCommandTests
         Type[] commandTypes = GetCommandTypes();
 
 #if DEBUG
-        Assert.Equal(148, commandTypes.Length);
+        Assert.Equal(150, commandTypes.Length);
 #else
-        Assert.Equal(123, commandTypes.Length);
+        Assert.Equal(125, commandTypes.Length);
 #endif
         Assert.All(commandTypes, type =>
         {
@@ -265,6 +265,9 @@ public class WorldSettlementDirectCommandTests
         return GetCommandTypes()
             .Select(type => (ICoopCommand)Activator.CreateInstance(
                 type,
+                type.GetConstructor(new[] { typeof(IObjectManager) }) != null
+                    ? new object[] { new ObjectManager(Serilog.Core.Logger.None) }
+                    :
 #if DEBUG
                 type.GetConstructor(new[] { typeof(IRaidLootWarningFixture) }) != null
                     ? new object[] { fixture }

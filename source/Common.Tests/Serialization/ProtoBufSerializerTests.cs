@@ -1,4 +1,6 @@
-﻿using Common.Serialization;
+﻿using Common.Messaging;
+using Common.Serialization;
+using Moq;
 using ProtoBuf;
 using ProtoBuf.Meta;
 
@@ -77,5 +79,27 @@ public class ProtoBufSerializerTests
 
         Assert.True(model.AutoCompile);
         Assert.False(metaType.UseConstructor);
+    }
+
+    [Fact]
+    public void Deserialize_UnknownTypeId_ReturnsNull()
+    {
+        // Wrapper bytes for TypeId -1 with a one-field payload.
+        byte[] data = { 0x08, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0x01, 0x12, 0x02, 0x08, 0x01 };
+        var mapper = new Mock<ISerializableTypeMapper>();
+        var serializer = new ProtoBufSerializer(mapper.Object);
+
+        Assert.Null(serializer.Deserialize(data));
+        Assert.Null(serializer.Deserialize<IMessage>(data));
+        mapper.Verify(m => m.TryGetType(-1, out It.Ref<Type>.IsAny), Times.Exactly(2));
+    }
+
+    [Fact]
+    public void Serialize_TypeTheMapperDoesNotKnow_Throws()
+    {
+        var serializer = new ProtoBufSerializer(Mock.Of<ISerializableTypeMapper>());
+
+        // A real contract, so the throw comes from the mapper check and not from protobuf-net.
+        Assert.Throws<InvalidOperationException>(() => serializer.Serialize(new SkipConstructorClass(1)));
     }
 }

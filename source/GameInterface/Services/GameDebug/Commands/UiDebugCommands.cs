@@ -139,13 +139,8 @@ internal class UiDebugCommands
         PartyBase cameraFollowParty = Campaign.Current?.CameraFollowParty;
         string cameraFollowPartyId = cameraFollowParty?.MobileParty?.StringId ?? "null";
         string cameraMode = cameraView?.CurrentCameraFollowMode.ToString() ?? "null";
-        bool followTargetReached = false;
-        if (cameraView != null && cameraFollowParty != null)
-        {
-            // Vanilla frames ports and sieges using an adjusted ideal target.
-            var targetDelta = cameraView.IdealCameraTarget.AsVec2 - cameraView._cameraTarget.AsVec2;
-            followTargetReached = targetDelta.LengthSquared < 0.0001f;
-        }
+        bool followTargetReached = cameraView != null &&
+            HasReachedCameraFollowTarget(cameraFollowParty, cameraView._cameraTarget.AsVec2);
 
         return $"menuView={mapScreen.IsInMenu} " +
                $"pendingMenuView={mapScreen._latestMenuContext != null} " +
@@ -156,6 +151,42 @@ internal class UiDebugCommands
                $"animation={cameraView?.CameraAnimationInProgress} " +
                $"fastMove={cameraView?._doFastCameraMovementToTarget} " +
                $"loading={LoadingWindow.IsLoadingWindowActive}";
+    }
+
+    internal static bool HasReachedCameraFollowTarget(PartyBase party, Vec2 cameraTarget)
+    {
+        if (party == null || !party.IsValid) return false;
+
+        var mobileParty = party.MobileParty;
+        var settlement = mobileParty?.CurrentSettlement ?? mobileParty?.BesiegedSettlement ??
+            party.MapEvent?.MapEventSettlement;
+        Vec2 target;
+        if (mobileParty != null && mobileParty.IsMainParty && settlement != null)
+        {
+            // Match vanilla's town/port framing, which differs from the party's position.
+            target = settlement.Position.ToVec2();
+            if (settlement.HasPort)
+            {
+                target += settlement.PortPosition.ToVec2();
+                if (settlement.IsUnderSiege)
+                {
+                    var leader = settlement.SiegeEvent?.BesiegerCamp?.LeaderParty;
+                    if (leader == null) return false;
+                    target = (target + leader.Position.ToVec2()) / 3f;
+                }
+                else
+                {
+                    target *= 0.5f;
+                }
+            }
+        }
+        else
+        {
+            target = (mobileParty != null ? party.MapEvent?.Position ?? party.Position :
+                party.Position).ToVec2();
+        }
+
+        return (target - cameraTarget).LengthSquared < 0.0001f;
     }
 
     public sealed class UiLeaveSettlementEncounterCoopCommand : ICoopCommand

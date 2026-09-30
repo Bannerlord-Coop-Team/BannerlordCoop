@@ -8,6 +8,7 @@ using GameInterface.Services.GameDebug.Commands;
 using GameInterface.Services.MapEvents.Messages.Leave;
 using GameInterface.Services.MobileParties.Extensions;
 using GameInterface.Services.MobileParties.Messages.Unstuck;
+using GameInterface.Services.Players;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.MapEvents;
 using TaleWorlds.CampaignSystem.Party;
@@ -145,6 +146,7 @@ public class UnstuckArmyPreservationTests : MapEventTestBase
                 Campaign.Current.MainParty = party;
             }
         });
+        Server.Call(() => Server.Resolve<IPlayerManager>().SetPeer(controllerId, client.NetPeer));
         return player;
     }
 

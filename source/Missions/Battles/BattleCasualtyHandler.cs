@@ -88,6 +88,8 @@ internal class BattleCasualtyHandler : IHandler
                         try
                         {
                             mapEventParty.OnTroopWounded(element.Descriptor);
+                            if (mapEventParty.Party.MapEventSide != null)
+                                mapEventParty.Party.MapEventSide.TroopCasualties++;
                         }
                         catch (IndexOutOfRangeException e)
                         {
@@ -102,6 +104,8 @@ internal class BattleCasualtyHandler : IHandler
                         try
                         {
                             mapEventParty.OnTroopKilled(element.Descriptor);
+                            if (mapEventParty.Party.MapEventSide != null)
+                                mapEventParty.Party.MapEventSide.TroopCasualties++;
                         }
                         catch (IndexOutOfRangeException e)
                         {

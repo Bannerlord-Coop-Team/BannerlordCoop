@@ -16,11 +16,39 @@ public interface ISaveInterface : IGameAbstraction
     SaveResults SaveCurrentGameToFile(string saveName);
     byte[] ReadSaveFile(string fileName);
     void DeleteSaveFile(string fileName);
+
+    /// <summary>True when a campaign's SaveHandler can take a queued save.</summary>
+    bool CanQueueSave { get; }
+
+    /// <summary>True while the campaign's SaveHandler has a save queued or running.</summary>
+    bool IsSaving { get; }
+
+    /// <summary>Queues a named save on the campaign's SaveHandler. False when no campaign is loaded.</summary>
+    bool TryQueueSave(string saveName);
+
+    /// <summary>The slot every save of an ironman campaign goes to, or null when the campaign is not ironman.</summary>
+    string IronmanSaveName { get; }
 }
 
 internal class SaveInterface : ISaveInterface
 {
     private readonly ILogger Logger = LogManager.GetLogger<SaveInterface>();
+
+    public bool CanQueueSave => Campaign.Current?.SaveHandler != null;
+
+    public bool IsSaving => Campaign.Current?.SaveHandler?.IsSaving == true;
+
+    public string IronmanSaveName =>
+        CampaignOptions.IsIronmanMode ? Campaign.Current?.SaveHandler?.IronmanModSaveName : null;
+
+    public bool TryQueueSave(string saveName)
+    {
+        var saveHandler = Campaign.Current?.SaveHandler;
+        if (saveHandler == null) return false;
+
+        saveHandler.SaveAs(saveName);
+        return true;
+    }
 
     public SaveResults SaveCurrentGame()
     {
