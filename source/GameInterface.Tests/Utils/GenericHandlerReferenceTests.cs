@@ -53,7 +53,8 @@ public class GenericHandlerReferenceTests
         var broker = new Mock<IMessageBroker>();
         broker.Setup(b => b.Subscribe(It.IsAny<Action<MessagePayload<LocalMessage>>>()))
             .Callback<Action<MessagePayload<LocalMessage>>>(s => subscriber = s);
-        using var handler = new TestHandler(broker.Object, manager.Object, network.Object, _ => skip);
+        using var handler = new TestHandler(broker.Object, manager.Object, network.Object);
+        handler.WireReference(_ => skip);
 
         subscriber(new MessagePayload<LocalMessage>(this, new LocalMessage(instance, value)));
 
@@ -76,8 +77,8 @@ public class GenericHandlerReferenceTests
         var broker = new Mock<IMessageBroker>();
         broker.Setup(b => b.Subscribe(It.IsAny<Action<MessagePayload<LocalMessage>>>()))
             .Callback<Action<MessagePayload<LocalMessage>>>(s => subscriber = s);
-        using var handler = new TestHandler(broker.Object, manager.Object, network.Object,
-            _ => throw new InvalidOperationException("null must not be filtered"));
+        using var handler = new TestHandler(broker.Object, manager.Object, network.Object);
+        handler.WireReference(_ => throw new InvalidOperationException("null must not be filtered"));
 
         subscriber(new MessagePayload<LocalMessage>(this, new LocalMessage(instance, null)));
 
@@ -104,8 +105,10 @@ public class GenericHandlerReferenceTests
 
     private sealed class TestHandler : GenericHandler<TestHandler, object>
     {
-        public TestHandler(IMessageBroker broker, IObjectManager manager, INetwork network, Predicate<object> skip)
-            : base(broker, manager, network)
+        public TestHandler(IMessageBroker broker, IObjectManager manager, INetwork network)
+            : base(broker, manager, network) { }
+
+        public void WireReference(Predicate<object> skip)
             => SubscribeGenericReference<object, LocalMessage, NetworkMessage>(skip);
     }
 }
