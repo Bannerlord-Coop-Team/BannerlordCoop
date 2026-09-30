@@ -19,7 +19,7 @@ public class GenericHandlerReferenceTests
 {
     [Theory]
     [InlineData(nameof(MapEvent.MapEventVisual), true)]
-    [InlineData(nameof(MapEvent.Component), false)]
+    [InlineData(nameof(MapEvent.StrengthOfSide), false)]
     public void FieldSubscription_FiltersHeadlessProvidersOnlyForMapEventVisual(string memberName, bool filtersHeadless)
     {
         var factory = new Mock<IAutoRegistryFactory>();
