@@ -38,7 +38,17 @@ function Command($Endpoint, [string]$Action) {
     $reply = Invoke-LiveTestClientAction -RequestedAction Command -TargetProcessId ([int]$Endpoint.process.pid) `
         -RequestedCommandName 'coop.debug.stance_link.handle_fixture' -RequestedArgumentsJson $argsJson -RequestTimeoutMilliseconds 30000
     Save-Json ("commands/{0:D3}-{1}-{2}.json" -f $script:ordinal,$Endpoint.process.pid,$Action) $reply
-    if ($reply.ExitCode -ne 0 -or -not $reply.Response.ok -or -not $reply.Response.result.found -or $reply.Response.result.succeeded -ne $true) {
+    $output = [string]$reply.Response.result.output
+    $pattern = if ($Action -ceq 'send') {
+        '^STANCE_HANDLE_SENT id=StanceLink_vlandia_empire handle=[0-9]+$'
+    } else {
+        '^STANCE_HANDLE_STATE action=' + [regex]::Escape($Action) + ' id=StanceLink_vlandia_empire handle=[0-9]+ sameString=True sameNumeric=(True|False) samePrepared=(True|False) received=[0-9]+$'
+    }
+    $succeeded = $reply.Response.result.PSObject.Properties['succeeded']
+    if ($reply.ExitCode -ne 0 -or -not $reply.Response.ok -or -not $reply.Response.result.found -or
+        $Endpoint.process.role -cnotin @('server','client') -or
+        ($Endpoint.process.role -cne 'server' -and $reply.Response.result.succeeded -ne $true) -or
+        ($null -ne $succeeded -and $succeeded.Value -ne $true) -or $output -cnotmatch $pattern) {
         throw "Fixture $Action failed for $($Endpoint.process.pid): $($reply.Response.result.output)"
     }
     $fields = @{}
