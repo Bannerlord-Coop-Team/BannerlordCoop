@@ -1,6 +1,11 @@
 ﻿using Common.Messaging;
 using Common.Network;
+using GameInterface.AutoSync;
+using GameInterface.AutoSync.Builders;
+using GameInterface.Registry.Auto;
 using GameInterface.Services.ObjectManager;
+using HarmonyLib;
+using TaleWorlds.CampaignSystem.MapEvents;
 using GameInterface.Utils;
 using GameInterface.Utils.LocalEvents;
 using GameInterface.Utils.NetworkEvents;
@@ -12,6 +17,23 @@ namespace GameInterface.Tests.Utils;
 
 public class GenericHandlerReferenceTests
 {
+    [Theory]
+    [InlineData(nameof(MapEvent.MapEventVisual), true)]
+    [InlineData(nameof(MapEvent.Component), false)]
+    public void FieldSubscription_FiltersHeadlessProvidersOnlyForMapEventVisual(string memberName, bool filtersHeadless)
+    {
+        var factory = new Mock<IAutoRegistryFactory>();
+        factory.Setup(f => f.IsManaged(It.IsAny<Type>())).Returns(true);
+        var builder = new AutoSyncFieldBuilder(factory.Object, new AutoSyncRegistry(), new AutoSyncConstantsBuilder());
+        var field = AccessTools.Field(typeof(MapEvent), memberName);
+
+        var result = builder.GetSubscription(new Debuggable<System.Reflection.FieldInfo>(field, false));
+
+        Assert.Equal(filtersHeadless, result.Contains("DedicatedServer.NoOpMapEventVisualCreator+NoOpMapEventVisual"));
+        Assert.Equal(filtersHeadless, result.Contains("MapEventBattleFactory+HeadlessMapEventVisual"));
+        Assert.Contains($"instance.{memberName} = value", result);
+    }
+
     [Theory]
     [InlineData(false, true, false)]
     [InlineData(true, true, true)]
@@ -37,6 +59,7 @@ public class GenericHandlerReferenceTests
 
         network.Verify(n => n.SendAll(It.Is<NetworkMessage>(m => m.InstanceId == 1 && m.ValueId == 2)),
             sent ? Times.Once() : Times.Never());
+        network.Verify(n => n.SendAll(It.IsAny<IMessage>()), sent ? Times.Once() : Times.Never());
         manager.Verify(m => m.TryGetHandleWithLogging(value, out valueId),
             !registered && skip ? Times.Never() : Times.Once());
     }
