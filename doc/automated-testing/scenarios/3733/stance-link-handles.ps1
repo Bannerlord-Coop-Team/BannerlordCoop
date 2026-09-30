@@ -62,7 +62,11 @@ function Capture([string]$Checkpoint) {
         $endpoint = @($clients | Where-Object { [int]$_.process.pid -eq $capture.ProcessId })[0]
         $relative = "screenshots/$Checkpoint-$($endpoint.process.platformId).png"
         $png = Join-Path $ArtifactDirectory $relative
-        $converted = Convert-LiveTestScreenshotToPng -BmpPath $capture.Path -PngPath $png
+        $completedPath = [IO.Path]::GetFullPath([string]$entry.path)
+        if (-not [string]::Equals([IO.Path]::GetDirectoryName($completedPath), $raw, [StringComparison]::OrdinalIgnoreCase)) {
+            throw 'Completed capture is outside the owned raw directory.'
+        }
+        $converted = Convert-LiveTestScreenshotToPng -BmpPath $completedPath -PngPath $png
         $bitmap = [Drawing.Bitmap]::new($png)
         try {
             $visible = $false
