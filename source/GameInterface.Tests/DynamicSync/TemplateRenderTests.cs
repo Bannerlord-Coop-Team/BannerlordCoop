@@ -33,6 +33,28 @@ public class TemplateRenderTests
         Assert.DoesNotContain("TryGetObjectWithLogging(type, data.ValueId", result);
     }
 
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public void ReferenceSet_FiltersHeadlessProvidersOnlyForMapEventVisual(bool headlessMapEventVisual)
+    {
+        var result = TemplateParser.Parse("Handlers.SubscribeSetReferenceTemplate", new
+        {
+            Interface = false,
+            MemberType = "IMapEventVisual",
+            MemberDeclaringType = "MapEvent",
+            MemberDeclaringTypeName = "MapEvent",
+            MemberName = "MapEventVisual",
+            ReadOnly = false,
+            Debug = false,
+            HeadlessMapEventVisual = headlessMapEventVisual,
+        });
+
+        Assert.Equal(headlessMapEventVisual, result.Contains("DedicatedServer.NoOpMapEventVisualCreator+NoOpMapEventVisual"));
+        Assert.Equal(headlessMapEventVisual, result.Contains("MapEventBattleFactory+HeadlessMapEventVisual"));
+        Assert.Contains("instance.MapEventVisual = value", result);
+    }
+
     [Fact(Skip = "Need regeneration")]
     public void PropertySetPrefixTest()
     {
