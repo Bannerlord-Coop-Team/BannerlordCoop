@@ -150,7 +150,9 @@ public class ArmyHandler : IHandler
         if (!objectManager.TryGetIdWithLogging(obj.Army, out var armyId)) return;
 
         bool isSettlement = obj.AiBehaviorObject is Settlement;
-        if (!objectManager.TryGetIdWithLogging(obj.AiBehaviorObject, out var objectId)) return;
+        string objectId = null;
+        if (obj.AiBehaviorObject != null &&
+            !objectManager.TryGetIdWithLogging(obj.AiBehaviorObject, out objectId)) return;
 
         var message = new NetworkSetArmyAiBehaviorObject(armyId, objectId, isSettlement);
 
@@ -166,6 +168,12 @@ public class ArmyHandler : IHandler
             if (objectManager.TryGetObjectWithLogging<Army>(obj.ArmyId, out var army) == false) return;
 
             IMapPoint mapPoint;
+            if (obj.AiBehaviorObjectId == null)
+            {
+                ArmyPatches.SetAiBehaviorObject(army, null);
+                return;
+            }
+
             if (obj.IsSettlement)
             {
                 if (!objectManager.TryGetObjectWithLogging<Settlement>(obj.AiBehaviorObjectId, out var settlement)) return;
