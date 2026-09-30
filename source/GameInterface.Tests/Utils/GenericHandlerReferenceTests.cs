@@ -1,5 +1,6 @@
 ﻿using Common.Messaging;
 using Common.Network;
+using Common.Util;
 using GameInterface.AutoSync;
 using GameInterface.AutoSync.Builders;
 using GameInterface.Registry.Auto;
@@ -17,6 +18,12 @@ namespace GameInterface.Tests.Utils;
 
 public class GenericHandlerReferenceTests
 {
+    [Fact]
+    public void TestHandler_IsExcludedFromProductionDiscovery()
+    {
+        Assert.DoesNotContain(typeof(TestHandler<>), InterfaceCollector.GetInterfaces<IHandler>("GameInterface"));
+    }
+
     [Theory]
     [InlineData(nameof(MapEvent.MapEventVisual), true)]
     [InlineData(nameof(MapEvent.StrengthOfSide), false)]
@@ -53,7 +60,7 @@ public class GenericHandlerReferenceTests
         var broker = new Mock<IMessageBroker>();
         broker.Setup(b => b.Subscribe(It.IsAny<Action<MessagePayload<LocalMessage>>>()))
             .Callback<Action<MessagePayload<LocalMessage>>>(s => subscriber = s);
-        using var handler = new TestHandler(broker.Object, manager.Object, network.Object);
+        using var handler = new TestHandler<object>(broker.Object, manager.Object, network.Object);
         handler.WireReference(_ => skip);
 
         subscriber(new MessagePayload<LocalMessage>(this, new LocalMessage(instance, value)));
@@ -77,7 +84,7 @@ public class GenericHandlerReferenceTests
         var broker = new Mock<IMessageBroker>();
         broker.Setup(b => b.Subscribe(It.IsAny<Action<MessagePayload<LocalMessage>>>()))
             .Callback<Action<MessagePayload<LocalMessage>>>(s => subscriber = s);
-        using var handler = new TestHandler(broker.Object, manager.Object, network.Object);
+        using var handler = new TestHandler<object>(broker.Object, manager.Object, network.Object);
         handler.WireReference(_ => throw new InvalidOperationException("null must not be filtered"));
 
         subscriber(new MessagePayload<LocalMessage>(this, new LocalMessage(instance, null)));
@@ -103,7 +110,8 @@ public class GenericHandlerReferenceTests
         }
     }
 
-    private sealed class TestHandler : GenericHandler<TestHandler, object>
+    // Open generic fixtures are excluded from production handler discovery.
+    private sealed class TestHandler<T> : GenericHandler<TestHandler<T>, object>
     {
         public TestHandler(IMessageBroker broker, IObjectManager manager, INetwork network)
             : base(broker, manager, network) { }
