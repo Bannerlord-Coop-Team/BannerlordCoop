@@ -5,6 +5,7 @@ source_root=$(git rev-parse --show-toplevel)
 carrier_root=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)
 attempt_root=${ISSUE1627_ATTEMPT_ROOT:?fresh attempt directory required}
 token=${ISSUE1627_RUN_TOKEN:?fresh token required}
+raw_capture_root='C:\Users\Andrew\AppData\Local\CodexLiveTestRaw\'"$token"
 head=${ISSUE_TO_PR_SOURCE_HEAD:?adopted head required}
 tree=${ISSUE_TO_PR_SOURCE_TREE:?adopted tree required}
 live_root=/mnt/c/Users/Andrew/.codex-runtime/live-testing/BannerlordCoop
@@ -76,4 +77,4 @@ cp "$carrier_root/1627-retreat-rejoin-health.ps1" "$attempt_root/scenario.ps1"
 env ROTATE_REPO="$live_root" /home/pwisorlowska/.codex/skills/rotate/scripts/rotate.sh --allow-large --committed "$source_root" >"$attempt_root/source-preparation.log" 2>&1
 /home/pwisorlowska/.codex/skills/start-integration-test/scripts/start-integration-test.sh --repo-root "$live_root" --source-identity-root "$source_root" --expected-tree "$tree" --clients 2 --run-token "$token" --runtime-profile visual --no-focus --keep-alive --crash-artifact-dir "$attempt_root/crash-dialogs" >"$attempt_root/launcher.log" 2>&1 &
 launcher_pid=$!
-"$hidden" "$powershell" -NoProfile -NonInteractive -WindowStyle Hidden -ExecutionPolicy Bypass -File "$(wslpath -w "$attempt_root/scenario.ps1")" -ArtifactDirectory "$(wslpath -w "$attempt_root")" -RawCaptureRoot "C:\Users\Andrew\AppData\Local\CodexLiveTestRaw\$token" -RunToken "$token" -ExpectedHead "$head" -ExpectedTree "$tree" >"$attempt_root/actions.log" 2>&1
+"$hidden" "$powershell" -NoProfile -NonInteractive -WindowStyle Hidden -ExecutionPolicy Bypass -File "$(wslpath -w "$attempt_root/scenario.ps1")" -ArtifactDirectory "$(wslpath -w "$attempt_root")" -RawCaptureRoot "$raw_capture_root" -RunToken "$token" -ExpectedHead "$head" -ExpectedTree "$tree" >"$attempt_root/actions.log" 2>&1
