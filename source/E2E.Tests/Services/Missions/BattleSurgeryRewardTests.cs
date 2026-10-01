@@ -67,6 +67,7 @@ public class BattleSurgeryRewardTests : MissionTestEnvironment
         Server.Call(() => after = Server.GetRegisteredObject<Hero>(surgeonId).HeroDeveloper.GetSkillXp(DefaultSkills.Medicine));
         Assert.True(expectedGain > 0);
         Assert.Equal(before + expectedGain, after);
+        FlushCoalescer();
         foreach (var observer in Clients)
             observer.Call(() => Assert.Equal(after, observer.GetRegisteredObject<Hero>(surgeonId).HeroDeveloper.GetSkillXp(DefaultSkills.Medicine)));
         var reward = Assert.Single(client.NetworkSentMessages.GetMessages<NetworkBattleSurgeryReward>());
