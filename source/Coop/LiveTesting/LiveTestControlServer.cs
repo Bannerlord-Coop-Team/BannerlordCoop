@@ -889,8 +889,6 @@ namespace Coop.LiveTesting
                 loadedCampaignId = Campaign.Current?.UniqueGameId,
                 loadedSaveNameConfirmed = false,
                 missionActive,
-                missionState = Mission.Current?.CurrentState.ToString(),
-                loadingWindowActive = LoadingWindow.IsLoadingWindowActive,
                 coopRunning,
                 coopState,
                 registeredPlayers,
@@ -904,10 +902,7 @@ namespace Coop.LiveTesting
                     GameStateManager.Current?.ActiveState is InitialState && !campaignLoaded,
                 deferredClientJoinAttempted = Volatile.Read(ref deferredClientJoinAttempted) != 0,
                 readyForCampaignTests,
-                // A mission exists before scene loading completes; ending it then skips TickLoading.
-                readyForMissionTests = readyForCampaignTests &&
-                    Mission.Current?.CurrentState == Mission.State.Continuing &&
-                    !LoadingWindow.IsLoadingWindowActive,
+                readyForMissionTests = readyForCampaignTests && missionActive,
             });
         }
 

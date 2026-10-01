@@ -51,7 +51,6 @@ public class MissionModule : Module
     protected override void Load(ContainerBuilder builder)
     {
 #if DEBUG
-        builder.RegisterType<MissionRetentionDiagnostics>().As<IMissionRetentionDiagnostics>().SingleInstance();
         builder.RegisterType<SiegeInteractionDebugBehavior>().AsSelf()
             .As<ISiegeInteractionDebugBehavior>().InstancePerDependency();
         builder.RegisterType<AgentHitSoundFixtureHandler>().As<IAgentHitSoundFixtureHandler>()
