@@ -59,7 +59,8 @@ public sealed class ArmyRemovalFixtureSetupCommand : ICoopCommand
         objectManager.TryGetId(parties[1], out var memberId);
         return new CoopCommandResult(true, "LIVE_TEST_JSON=" + JsonConvert.SerializeObject(new
         {
-            armyId, leaderId, memberId, leaderName = parties[0].Name.ToString(), memberName = parties[1].Name.ToString(),
+            armyId, armyName = army.Name.ToString(), leaderId, memberId, leaderName = parties[0].Name.ToString(), memberName = parties[1].Name.ToString(),
+            leaderHeroName = parties[0].LeaderHero.Name.ToString(), memberHeroName = parties[1].LeaderHero.Name.ToString(),
         }));
     }
 }
