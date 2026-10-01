@@ -212,7 +212,7 @@ public class GameInterfaceModule : Module
         builder.RegisterType<MapTrackerProviderHolder>().As<IMapTrackerProviderHolder>().InstancePerLifetimeScope();
 
 #if DEBUG
-        builder.RegisterModule<GameInterface.Services.LiveTesting.LiveTestUiModule>();
+        builder.RegisterModule<global::GameInterface.Services.LiveTesting.LiveTestUiModule>();
 #endif
         builder.RegisterModule<ServiceModule>();
         builder.RegisterModule<ObjectManagerModule>();
