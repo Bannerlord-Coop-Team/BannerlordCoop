@@ -295,6 +295,12 @@ catch {
     try { Capture 'failure' } catch { Save-Json 'failure-capture-error.json' @{ message=$_.Exception.Message } }
 }
 finally {
+    # The reloaded authority must stop before its hidden PowerShell host can exit.
+    try {
+        $cleanup = Stop-RemoteLiveRunScopedProcessesVerified -RunToken $RunToken -TimeoutSeconds 60
+        Save-Json 'cleanup.json' $cleanup
+        if (-not $cleanup.verifiedAbsent) { throw 'Owned processes remain after cleanup.' }
+    } catch { $restoreErrors += "Runtime cleanup: $($_.Exception.Message)" }
     try {
         Copy-Item -LiteralPath $raw -Destination (Join-Path $ArtifactDirectory 'raw-captures') -Recurse -ErrorAction Stop
         foreach ($file in @(Get-ChildItem -LiteralPath $raw -File)) {

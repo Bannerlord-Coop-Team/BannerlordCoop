@@ -65,8 +65,14 @@ finish() {
     set +e
     if [[ $runtime_started -eq 1 ]]; then
         cp "$inputs/live-server.pid" "$result/metadata/dedicated-server-pid.json" 2>/dev/null
-        record cleanup timeout 150s "${ps[@]}" -Mode Cleanup
-        cleanup_rc=$?
+        if [[ -f "$stage/result/cleanup.json" ]]; then
+            jq -e --arg token "$run_token" '.runToken == $token and .verifiedAbsent == true' \
+                "$stage/result/cleanup.json" >"$result/logs/cleanup-receipt.log"
+            cleanup_rc=$?
+        else
+            record cleanup timeout 150s "${ps[@]}" -Mode Cleanup
+            cleanup_rc=$?
+        fi
         if [[ -n "$launcher_pid" ]]; then
             # The launcher exits after its owned clients stop; bound a broken keep-alive.
             timeout 30s tail --pid="$launcher_pid" -f /dev/null
