@@ -230,6 +230,15 @@ function Roster-Fingerprint([object[]]$Entries) {
     $sha = [Security.Cryptography.SHA256]::Create()
     try { return ([BitConverter]::ToString($sha.ComputeHash([Text.Encoding]::UTF8.GetBytes($content)))).Replace('-','').ToLowerInvariant() } finally { $sha.Dispose() }
 }
+function Assert-RestoredLeadership([object]$Snapshot, [string]$Line) {
+    $expectedLeader = if ($null -eq $Snapshot.leaderId) { 'none' } else { [string]$Snapshot.leaderId }
+    if ($Line -notmatch '\|leader=([^|]+)\|leaderHitPoints=([^|]+)\|') { throw 'missing leader restoration diagnostic' }
+    if ($Matches[1] -cne $expectedLeader -or ($expectedLeader -cne 'none' -and $Matches[2] -cne [string]$Snapshot.leaderHealth)) { throw "restored leader identity/health mismatch: $($Snapshot.partyId)" }
+    foreach ($role in @('scout','surgeon','engineer','quartermaster')) {
+        $expected = if ($null -eq $Snapshot.$role) { 'none' } else { [string]$Snapshot.$role }
+        if ($Line -notmatch ("\|" + $role + '=([^|]+)\|') -or $Matches[1] -cne $expected) { throw "restored party role mismatch: $role" }
+    }
+}
 function Restore-Check([object]$Setup, [string]$Phase) {
     foreach ($snapshot in $Setup.originalRosters) {
         $read = Roster ($Phase + '-restored-roster-' + $snapshot.partyId) $snapshot.partyId 'testclient'
@@ -237,14 +246,18 @@ function Restore-Check([object]$Setup, [string]$Phase) {
         if (-not $line) { throw "missing restored party $($snapshot.partyId)" }
         $expected = Roster-Fingerprint @($snapshot.entries)
         if ($line -notmatch ('fingerprint=' + $expected + '$')) { throw "original counts/wounds/XP mismatch for $($snapshot.partyId)" }
-        if ($line -match '\|leader=([^|]+)\|leaderHitPoints=(\d+)\|') {
-            $heroId = $Matches[1]; $hp = [int]$Matches[2]
-            $original = @($Setup.originalHeroHealth | Where-Object heroId -CEQ $heroId)
-            if ($original.Count -ne 1 -or $hp -ne $original[0].health) { throw "restored leader health mismatch: $heroId" }
-        }
+        Assert-RestoredLeadership $snapshot $line
     }
 }
 if ($SelfCheck) {
+    $leadership = @{partyId='p';leaderId='hero';leaderHealth=84;scout='hero';surgeon=$null;engineer=$null;quartermaster=$null}
+    $leaderLine='|leader=hero|leaderHitPoints=84|scout=hero|surgeon=none|engineer=none|quartermaster=none|'
+    Assert-RestoredLeadership $leadership $leaderLine
+    foreach ($bad in @($leaderLine.Replace('leader=hero','leader=none'),$leaderLine.Replace('Points=84','Points=24'),$leaderLine.Replace('scout=hero','scout=none'))) {
+        $rejected=$false
+        try { Assert-RestoredLeadership $leadership $bad } catch { $rejected=$true }
+        if (-not $rejected) { throw 'lost leader/role/HP accepted' }
+    }
     $rosterEntries = @([pscustomobject]@{characterId='aserai_faris';number=18;wounded=1;xp=2440}, [pscustomobject]@{characterId='Player2863';number=1;wounded=0;xp=0})
     if ((Roster-Fingerprint $rosterEntries) -cne '79a1a6b5379b9e46ec9fafbe0e43098df2abfc5ae6d945e569684e951325b62a') { throw 'ordinal restored roster fingerprint mismatch' }
     $rosterEntries[0].xp++

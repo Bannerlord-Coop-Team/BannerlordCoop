@@ -2854,6 +2854,12 @@ public class MapEventDebugCommands
                     originalRosters = healthRosters.Select(snapshot => new
                     {
                         partyId = snapshot.Key.StringId,
+                        leaderId = snapshot.Key.LeaderHero?.StringId,
+                        leaderHealth = snapshot.Key.LeaderHero?.HitPoints,
+                        scout = snapshot.Key.Scout?.StringId,
+                        surgeon = snapshot.Key.Surgeon?.StringId,
+                        engineer = snapshot.Key.Engineer?.StringId,
+                        quartermaster = snapshot.Key.Quartermaster?.StringId,
                         entries = snapshot.Value.Select(element => new
                         {
                             characterId = element.Character.StringId,
@@ -3404,8 +3410,10 @@ public class MapEventDebugCommands
         if (rosters == null) return;
         foreach (var snapshot in rosters)
         {
-            snapshot.Key.MemberRoster.RemoveIf(element => true);
-            RestoreTroopRoster(snapshot.Key.MemberRoster, snapshot.Value);
+            // Removing heroes clears their party leadership and roles in vanilla.
+            snapshot.Key.MemberRoster.RemoveIf(element => !element.Character.IsHero);
+            foreach (var element in snapshot.Value.Where(element => !element.Character.IsHero))
+                snapshot.Key.MemberRoster.AddToCounts(element.Character, element.Number, false, element.WoundedNumber, element.Xp, true);
         }
         foreach (var snapshot in heroes)
             snapshot.Key.HitPoints = snapshot.Value;
