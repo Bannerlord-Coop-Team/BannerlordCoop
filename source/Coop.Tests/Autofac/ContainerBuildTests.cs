@@ -64,7 +64,7 @@ namespace Coop.Tests.Autofac
             Assert.Same(container.Resolve<IVoiceClient>(), container.Resolve<IVoiceSyntheticTest>());
             Assert.Equal(CoopCommandSide.Client, Assert.Single(registeredCommands,
                 command => $"{command.Prefix}.{command.Name}" == "coop.debug.voice.synthetic").Side);
-            Assert.Equal(41, missionCommands.Length);
+            Assert.Equal(43, missionCommands.Length);
             Assert.Contains(missionCommands, command => command.Name == "peer_state");
             Assert.Contains(missionCommands, command => command.Name == "controller_agents");
             Assert.Contains(missionCommands, command => command.Name == "drive_owned_agents");
@@ -107,6 +107,10 @@ namespace Coop.Tests.Autofac
             Assert.Equal(ServerShutdownPhase.Idle, container.Resolve<IServerShutdownCoordinator>().Phase);
 
 #if DEBUG
+            // Client diagnostics must be discoverable without constructing client-only network services.
+            Assert.False(container.IsRegistered<IRelayNetwork>());
+            Assert.True(container.Resolve<ICoopCommandRegistry>().Contains("coop.debug.mission.retention_collect"));
+            Assert.True(container.Resolve<ICoopCommandRegistry>().Contains("coop.debug.mission.retention_track"));
             Assert.False(container.IsRegistered<IVoiceSyntheticTest>());
             ICoopCommand[] registeredCommands = container.Resolve<IEnumerable<ICoopCommand>>().ToArray();
             Assert.DoesNotContain(registeredCommands, command => $"{command.Prefix}.{command.Name}" == "coop.debug.voice.synthetic");

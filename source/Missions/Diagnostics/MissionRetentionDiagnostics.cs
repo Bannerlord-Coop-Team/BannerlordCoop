@@ -130,14 +130,14 @@ public sealed class MissionRetentionCollectCommand : ICoopCommand
 {
     private readonly IMissionRetentionDiagnostics diagnostics;
     private readonly IMessageBroker broker;
-    private readonly IBattleNetwork network;
+    private readonly Func<IBattleNetwork> network;
     private readonly IMissionContext context;
     private readonly IObjectManager objects;
     private readonly INetworkAgentRegistry agents;
     private readonly INetworkWorldItemRegistry items;
 
     public MissionRetentionCollectCommand(IMissionRetentionDiagnostics diagnostics, IMessageBroker broker,
-        IBattleNetwork network, IMissionContext context, IObjectManager objects,
+        Func<IBattleNetwork> network, IMissionContext context, IObjectManager objects,
         INetworkAgentRegistry agents, INetworkWorldItemRegistry items)
     {
         this.diagnostics = diagnostics;
@@ -168,7 +168,7 @@ public sealed class MissionRetentionCollectCommand : ICoopCommand
             shared = new
             {
                 broker = RuntimeHelpers.GetHashCode(broker),
-                network = RuntimeHelpers.GetHashCode(network),
+                network = RuntimeHelpers.GetHashCode(network()),
                 context = RuntimeHelpers.GetHashCode(context),
                 objects = RuntimeHelpers.GetHashCode(objects),
                 agents = RuntimeHelpers.GetHashCode(agents),
