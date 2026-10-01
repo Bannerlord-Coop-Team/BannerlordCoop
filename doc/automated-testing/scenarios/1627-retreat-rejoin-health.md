@@ -57,6 +57,12 @@ workflow artifacts; these checks do not establish live coverage.
 Read `coop.debug.battle.health_state` on each client and
 `coop.debug.map_event.health_reserve_state` on the server. All return
 `LIVE_TEST_JSON`. Resolve agent ids from these actual responses, not fixed ids.
+The agent diagnostic uses character `StringId`; reserve `CharacterId` uses the
+registry's `CharacterObject_` prefix. Retain the binding after requiring an
+actual matching baseline reserve entry. Use that same binding for survivor,
+casualty and fresh-battle comparisons. A missing fresh troop match is a failure,
+not evidence of default health.
+
 Select an active owned hero, at least three
 owned regular troops, a healthy control troop, and an unspawned ledger entry.
 Require each tested player's actual ledger `entries.Length` to exceed `supplied`
@@ -113,7 +119,12 @@ Close that fixture through the same existing exit/cleanup commands. Capture
 final/restored PNGs on both clients.
 
 On the first failure, capture both renderable clients before cleanup and retain
-the first failure plus any cleanup errors. The existing carrier owns process
+the first failure plus any cleanup errors. After successful cleanup and campaign
+return, retain final/restored captures even if the scenario body failed. Use the
+original or fresh setup receipt belonging to the last created fixture for
+restoration checks; keep the first failure and failed verdict. Capture the
+reached final state even if a restoration comparison itself fails.
+The existing carrier owns process
 cleanup once. Retention must succeed before deleting only this attempt's raw
 capture directory. Every image receipt must retain role, checkpoint, pid,
 completion time, relative path and SHA-256. The parent independently accepts

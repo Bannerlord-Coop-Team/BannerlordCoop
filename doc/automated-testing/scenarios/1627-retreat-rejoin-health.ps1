@@ -18,6 +18,7 @@ $script:client1 = $null
 $script:client2 = $null
 $script:server = $null
 $script:fixtureActive = $false
+$script:cleanupSetup = $null
 $script:restored = $false
 $script:bodyPassed = $false
 $script:mapEventId = $null
@@ -191,6 +192,20 @@ function Distribution([object[]]$Agents, [string]$Party) {
     return @($Agents | Where-Object { $_.active -and $_.partyId -ceq $Party } |
         ForEach-Object { '{0}|{1}|{2}' -f $_.characterId, $_.hero, ([double]$_.health).ToString('R',[Globalization.CultureInfo]::InvariantCulture) } | Sort-Object) -join "`n"
 }
+function Reserve-Character([object[]]$Entries, [string]$StringId) {
+    if ([string]::IsNullOrWhiteSpace($StringId)) { throw 'nonempty character StringId required' }
+    $registryId = 'CharacterObject_' + $StringId
+    $matches = @($Entries | Where-Object { $_.CharacterId -ceq $registryId })
+    if ($matches.Count -eq 0) { throw "no reserve character matches $StringId ($registryId)" }
+    return $matches
+}
+function Capture-FinalRestoration([object]$Setup) {
+    Wait-Campaign 'final-first-campaign' $script:client1
+    Wait-Campaign 'final-second-campaign' $script:client2
+    try { Restore-Check $Setup 'final'; $script:restored=$true }
+    catch { Save-Json 'final-restoration-error.json' @{error=$_.Exception.Message}; Fail-Once 'final-restoration' $_.Exception.Message }
+    Capture 'final-restored-campaign'
+}
 function Roster([string]$Name, [string]$First, [string]$Second) {
     return Command $Name $script:server 'coop.debug.mobile_party.exact_battle_roster_status' @($First,$Second)
 }
@@ -228,7 +243,24 @@ if ($SelfCheck) {
     $rejected=$false
     try { Roster-Healthy $read 'missing' | Out-Null } catch { $rejected=$true }
     if (-not $rejected) { throw 'missing party accepted' }
-    'scenario self-check passed: health mismatch, order independence, exact party count, missing-party rejection'
+    $entries = @([pscustomobject]@{CharacterId='CharacterObject_imperial_recruit';Health=$null}, [pscustomobject]@{CharacterId='CharacterObject_Created_42';Health=37})
+    if (@(Reserve-Character $entries 'imperial_recruit').Count -ne 1 -or (Reserve-Character $entries 'Created_42').Health -ne 37) { throw 'StringId/registry binding failed' }
+    $rejected=$false
+    try { Reserve-Character $entries 'missing' | Out-Null } catch { $rejected=$true }
+    if (-not $rejected) { throw 'empty reserve match accepted' }
+    # Exercise final capture after a failed body without launching games.
+    function Wait-Campaign { }
+    function Restore-Check([object]$Setup) { if ($Setup.id -cne 'original') { throw 'wrong cleanup snapshot' } }
+    function Capture([string]$Stage) { $script:selfCheckCapture=$Stage }
+    $script:firstFailure=@{stage='original-failure';message='health mismatch'}
+    $script:bodyPassed=$false
+    Capture-FinalRestoration @{id='original'}
+    if ($script:selfCheckCapture -cne 'final-restored-campaign' -or -not $script:restored -or $script:firstFailure.stage -cne 'original-failure' -or $script:bodyPassed) { throw 'failed-body cleanup capture changed verdict or first failure' }
+    $script:selfCheckCapture=$null; $script:restored=$false
+    function Save-Json { }
+    Capture-FinalRestoration @{id='wrong'}
+    if ($script:selfCheckCapture -cne 'final-restored-campaign' -or $script:restored -or $script:firstFailure.stage -cne 'original-failure') { throw 'restoration failure suppressed capture or replaced first failure' }
+    'scenario self-check passed: health/order, party count, StringId/registry binding, missing-match rejection, failed-body final capture and first-failure preservation'
     return
 }
 try {
@@ -252,6 +284,7 @@ try {
     }
     $setup = Read-State 'fixture-setup' $script:server 'coop.debug.map_event.late_join_mode_fixture' @('testclient','testclient2','health')
     $script:fixtureActive = $true
+    $script:cleanupSetup = $setup
     $script:mapEventId = [string]$setup.mapEventId
     $null = Wait-Fixture 'first-mission' { param($s) $s.firstInMission }
     $null = Command 'second-join' $script:server 'coop.debug.map_event.late_join_mode_join'
@@ -268,6 +301,11 @@ try {
     $party = @($baselineReserve.parties | Where-Object partyId -CEQ $partyId)[0]
     if ($null -eq $party -or $party.entries.Count -le $party.supplied) { throw 'actual unsupplied reserve tail required' }
     $unspawned = $party.entries[[int]$party.supplied]
+    $bindings = @(@($hero) + $regular | Select-Object -ExpandProperty characterId -Unique | ForEach-Object {
+        $matched = @(Reserve-Character $party.entries $_)
+        @{characterStringId=$_; characterRegistryId=$matched[0].CharacterId}
+    })
+    Save-Json 'character-bindings.json' @{bindings=$bindings; source='AutoRegistryBase.RegisterExistingObject and AutoRegistryHandler.Handle_InstanceCreated'; verification='exact nonempty baseline reserve match'}
     Save-Json 'subjects.json' @{ hero=$hero; injured=$regular[0]; routed=$regular[1]; casualty=$regular[2]; healthy=$regular[3]; unspawned=$unspawned; partyId=$partyId }
     $baselineRoster = Roster 'baseline-rosters' 'testclient' 'testclient2'
     $firstRosterLine = @(([string]$baselineRoster.output) -split '\r?\n' | Where-Object { $_.StartsWith('party=') })[0]
@@ -302,10 +340,10 @@ try {
         $p = @($reserve.parties | Where-Object partyId -CEQ $partyId)[0]
         foreach ($survivor in $expected) {
             $count = @($expected | Where-Object { $_.characterId -ceq $survivor.characterId -and $_.health -eq $survivor.health }).Count
-            if (@($p.entries | Where-Object { $_.CharacterId -ceq $survivor.characterId -and $_.Health -eq $survivor.health }).Count -lt $count) { throw 'surviving injury missing from rebuilt reserve' }
+            if (@(Reserve-Character $p.entries $survivor.characterId | Where-Object { $_.Health -eq $survivor.health }).Count -lt $count) { throw 'surviving injury missing from rebuilt reserve' }
             if (@($state.agents | Where-Object { $_.active -and $_.partyId -ceq $partyId -and $_.characterId -ceq $survivor.characterId -and $_.health -eq $survivor.health }).Count -lt $count) { throw 'surviving injury missing from real respawned agents' }
         }
-        if (@($p.entries | Where-Object CharacterId -CEQ $regular[2].characterId).Count -ne 1199) { throw 'casualty included in rebuilt regular reserve' }
+        if (@(Reserve-Character $p.entries $regular[2].characterId).Count -ne 1199) { throw 'casualty included in rebuilt regular reserve' }
         if (@($p.entries | Select-Object -Skip $p.supplied | Where-Object { $null -eq $_.Health }).Count -eq 0) { throw 'unspawned healthy reserve default was lost' }
         if (@($state.agents | Where-Object { $_.active -and $_.partyId -ceq $partyId -and -not $_.hero -and $_.health -eq $regular[3].health }).Count -eq 0) { throw 'healthy control lost' }
         $other = Wait-Health "observer-round-$round" $script:client2 { param($s) (Distribution $s.agents $partyId) -ceq (Distribution $state.agents $partyId) }
@@ -322,12 +360,16 @@ try {
     Restore-Check $setup 'old'
     $fresh = Read-State 'fresh-fixture' $script:server 'coop.debug.map_event.late_join_mode_fixture' @('testclient','testclient2','health')
     $script:fixtureActive = $true
+    $script:cleanupSetup = $fresh
     if (($setup.originalHeroHealth | Sort-Object heroId | ConvertTo-Json -Compress) -cne ($fresh.originalHeroHealth | Sort-Object heroId | ConvertTo-Json -Compress)) { throw 'original roster hero health was not restored' }
     $script:mapEventId = [string]$fresh.mapEventId
     $null = Wait-Fixture 'fresh-first-mission' { param($s) $s.firstInMission }
     $freshHealth = Deploy 'fresh-deploy' $script:client1 'testclient'
     $freshReserve = Reserve 'fresh-reserve'
-    if (@($freshReserve.parties.entries | Where-Object { $_.CharacterId -ceq $regular[0].characterId -and $null -ne $_.Health }).Count -ne 0) { throw 'new battle inherited old regular health' }
+    $freshParty = @($freshReserve.parties | Where-Object partyId -CEQ $partyId)[0]
+    $freshTroops = @(Reserve-Character $freshParty.entries $regular[0].characterId)
+    Save-Json 'fresh-regular-defaults.json' $freshTroops
+    if (@($freshTroops | Where-Object { $null -ne $_.Health }).Count -ne 0) { throw 'new battle inherited old regular health' }
     $script:bodyPassed = $true
 } catch {
     Fail-Once 'health-scenario' $_.Exception.Message
@@ -342,8 +384,8 @@ try {
             $script:fixtureActive = $false
         } catch { Save-Json 'fixture-cleanup-error.json' @{error=$_.Exception.Message}; Fail-Once 'fixture-cleanup' $_.Exception.Message }
     }
-    if ($script:bodyPassed -and -not $script:fixtureActive) {
-        try { Restore-Check $fresh 'fresh'; Capture 'final-restored-campaign'; $script:restored=$true } catch { Fail-Once 'final-restoration' $_.Exception.Message }
+    if (-not $script:fixtureActive -and $null -ne $script:cleanupSetup) {
+        try { Capture-FinalRestoration $script:cleanupSetup } catch { Save-Json 'final-capture-error.json' @{error=$_.Exception.Message}; Fail-Once 'final-capture' $_.Exception.Message }
     }
     foreach ($endpoint in @($script:client1,$script:client2,$script:server)) {
         if ($null -ne $endpoint -and [string]$endpoint.result.logPath) {
