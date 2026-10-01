@@ -12,6 +12,7 @@ $ErrorActionPreference = 'Stop'
 Add-Type -AssemblyName System.Drawing
 . '\\wsl.localhost\Ubuntu\home\pwisorlowska\.codex\skills\issue-to-pr\scripts\live_test_client.ps1'
 
+$script:startedUtc = [DateTime]::UtcNow.ToString('o')
 $script:firstFailure = $null
 $script:images = @()
 $script:client1 = $null
@@ -327,6 +328,12 @@ try {
     $script:bodyPassed=$true
 } catch {
     Fail-Once 'retention-scenario' $_.Exception.Message
+    foreach ($record in @(Get-LiveTestEndpointRecords -ExpectedRunToken $RunToken)) {
+        try {
+            $status = Invoke-LiveTestClientAction -RequestedAction Status -TargetProcessId ([int]$record.pid) -RequestTimeoutMilliseconds 3000
+            Save-Json "failure-status-$($record.pid).json" $status.Response
+        } catch { Save-Json "failure-status-$($record.pid)-error.json" @{error=$_.Exception.Message} }
+    }
     if($null -ne $script:client1 -and $null -ne $script:client2){try{Capture 'decisive-first-failure'}catch{Save-Json 'failure-screenshot-error.json' @{error=$_.Exception.Message}}}
 } finally {
     try{
@@ -362,6 +369,18 @@ try {
         }
         if($script:originalPositions.Count -eq 2){Capture 'final-restored-campaign';$script:restored=$true}
     }catch{Fail-Once 'fixture-cleanup' $_.Exception.Message}
+    # Readiness can fail before endpoint assignment; retain token-bound native logs before shutdown.
+    try {
+        . '\\wsl.localhost\Ubuntu\home\pwisorlowska\.codex\skills\issue-to-pr\scripts\remote_live_runtime.ps1'
+        $state = @{runToken=$RunToken;startedUtc=$script:startedUtc}
+        $pidPath = '\\wsl.localhost\Ubuntu\home\pwisorlowska\.codex\runtime\issue-to-pr\local-dedicated-server\live-server.pid'
+        if (Test-Path -LiteralPath $pidPath) {
+            $pidState = Get-Content -LiteralPath $pidPath -Raw | ConvertFrom-Json
+            if ($pidState.runToken -ceq $RunToken) { $state.serverData = $pidState.serverData; $state.startedUtc = $pidState.startedUtc }
+        }
+        $diagnostics = Copy-RemoteLiveRuntimeDiagnostics -State $state -DestinationRoot (Join-Path $ArtifactDirectory 'runtime-diagnostics')
+        if ($diagnostics.errorCount -ne 0) { throw 'runtime diagnostic collection incomplete' }
+    } catch { Fail-Once 'runtime-diagnostics' $_.Exception.Message }
     foreach ($endpoint in @($script:client1,$script:client2,$script:server)) {
         if ($null -ne $endpoint -and [string]$endpoint.result.logPath) {
             try { Copy-Item -LiteralPath $endpoint.result.logPath -Destination (Join-Path $ArtifactDirectory ('runtime-' + $endpoint.process.pid + '.log')) -ErrorAction Stop } catch { Fail-Once 'log-retention' $_.Exception.Message }
