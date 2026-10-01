@@ -9,6 +9,19 @@ namespace GameInterface.Tests.Services.PartyVisuals;
 
 public class PartyVisualDebugCommandsTests
 {
+    [Theory]
+    [InlineData(0)]
+    [InlineData(1)]
+    [InlineData(2)]
+    public void CountPartyVisuals_CountsOnlyTheSelectedPartyIncludingDuplicates(int expectedCount)
+    {
+        var party = ObjectHelper.SkipConstructor<PartyBase>();
+        var otherParty = ObjectHelper.SkipConstructor<PartyBase>();
+        var visualParties = Enumerable.Repeat(party, expectedCount).Concat(new[] { otherParty });
+
+        Assert.Equal(expectedCount, PartyVisualDebugCommands.CountPartyVisuals(visualParties, party));
+    }
+
     [Fact]
     public void GetFixturePartiesForRestore_RetainsPartyAfterRegistryRenamesStringId()
     {
