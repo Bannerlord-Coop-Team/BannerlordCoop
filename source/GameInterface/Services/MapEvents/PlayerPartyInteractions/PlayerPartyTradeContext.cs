@@ -29,6 +29,9 @@ internal static class PlayerPartyTradeContext
     public static bool SuppressNativeCloseMessages { get; private set; }
 
     private static BarterVM activeBarterVM;
+#if DEBUG
+    internal static BarterVM ActiveBarterVM => activeBarterVM;
+#endif
     private static ButtonWidget resetButton;
     private static bool isApplyingServerOffer;
     private static readonly FieldInfo PrisonerCharacterField =
