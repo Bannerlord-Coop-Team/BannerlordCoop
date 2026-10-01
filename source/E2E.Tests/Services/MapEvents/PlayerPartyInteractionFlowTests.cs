@@ -13,6 +13,7 @@ using E2E.Tests.Environment.Instance;
 using E2E.Tests.Util;
 using GameInterface.CoopSessionData;
 using GameInterface.Services.Bandits.Messages;
+using GameInterface.Services.Barters;
 using GameInterface.Services.Barters.Messages;
 using GameInterface.Services.Entity;
 using GameInterface.Services.Inventory.Data;
@@ -1939,6 +1940,7 @@ public class PlayerPartyInteractionFlowTests : MapEventTestBase
                 data.AddBarterable<OtherBarterGroup>(new PlayerPartyTroopBarterable(
                     hero, otherHero, party, otherParty, new TroopRosterElement(troop) { _number = 5 }), false);
 
+            using var playerContext = new BarterPlayerContext(hero, party.MobileParty);
             var vm = new BarterVM(data);
             Assert.True(vm.InitializationIsOver);
             Assert.Empty(client1.NetworkSentMessages.GetMessages<NetworkPlayerPartyTradeOfferUpdated>());
