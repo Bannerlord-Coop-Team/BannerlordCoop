@@ -14,13 +14,13 @@ internal class ObjectManagerModule : Module
 
     protected override void Load(ContainerBuilder builder)
     {
-        builder.RegisterType<ObjectManager>().As<IObjectManager>().InstancePerLifetimeScope();
-        builder.RegisterType<RegistryCollection>().As<IRegistryCollection>().InstancePerLifetimeScope();
+        builder.RegisterType<ObjectManager>().As<IObjectManager>().SingleInstance();
+        builder.RegisterType<RegistryCollection>().As<IRegistryCollection>().SingleInstance();
 
 
         foreach (var type in GetRegistries())
         {
-            builder.RegisterType(type).AsSelf().InstancePerLifetimeScope().AutoActivate();
+            builder.RegisterType(type).AsSelf().SingleInstance().AutoActivate();
         }
 
         base.Load(builder);

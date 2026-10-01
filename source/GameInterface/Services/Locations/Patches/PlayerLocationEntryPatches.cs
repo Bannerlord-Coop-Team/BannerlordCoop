@@ -1,11 +1,13 @@
-using Common;
+﻿using Common;
 using Common.Logging;
 using Common.Messaging;
 using GameInterface.Services.Locations.Messages;
 using HarmonyLib;
 using SandBox;
 using Serilog;
+using System;
 using System.Collections.Generic;
+using System.Linq;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Settlements;
 using TaleWorlds.CampaignSystem.Settlements.Locations;
@@ -113,15 +115,33 @@ internal class PlayerLocationEntryPatches
             return;
         }
 
-        LocationMissionTracker.TryRegister(mission);
-
-        foreach (var behavior in behaviors)
+        var resolvedBehaviors = behaviors.ToArray();
+        try
         {
-            if (behavior is MissionBehavior missionBehavior)
+            foreach (var behavior in resolvedBehaviors)
             {
-                mission.AddMissionBehavior(missionBehavior);
-                Logger.Information("[LocationSync] Attached {Behavior} to mission '{Scene}'", behavior.GetType().Name, mission.SceneName);
+                if (behavior is MissionBehavior missionBehavior)
+                {
+                    mission.AddMissionBehavior(missionBehavior);
+                    Logger.Information("[LocationSync] Attached {Behavior} to mission '{Scene}'", behavior.GetType().Name, mission.SceneName);
+                }
             }
+            LocationMissionTracker.TryRegister(mission);
+        }
+        catch
+        {
+            foreach (var behavior in resolvedBehaviors.OfType<IDisposable>())
+            {
+                try { behavior.Dispose(); }
+                catch (Exception error) { Logger.Error(error, "Failed location attachment cleanup"); }
+            }
+            foreach (var behavior in resolvedBehaviors.OfType<MissionBehavior>())
+            {
+                if (!mission.MissionBehaviors.Contains(behavior)) continue;
+                try { mission.RemoveMissionBehavior(behavior); }
+                catch (Exception error) { Logger.Error(error, "Failed to remove a partially attached location behavior"); }
+            }
+            throw;
         }
     }
 }

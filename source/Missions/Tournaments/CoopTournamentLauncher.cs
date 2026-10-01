@@ -51,22 +51,16 @@ public class CoopTournamentLauncher : ICoopTournamentLauncher
     private readonly IObjectManager objectManager;
     private readonly ITournamentGameInterface tournamentGameInterface;
     private readonly Func<CoopTournamentController> controllerFactory;
-    private readonly Func<MissionMapTimeView> mapTimeViewFactory;
-    private readonly Func<PlayerNameplateMissionView> playerNameplateViewFactory;
 
     public CoopTournamentLauncher(
         Harmony harmony,
         IObjectManager objectManager,
         ITournamentGameInterface tournamentGameInterface,
-        Func<CoopTournamentController> controllerFactory,
-        Func<MissionMapTimeView> mapTimeViewFactory,
-        Func<PlayerNameplateMissionView> playerNameplateViewFactory)
+        Func<CoopTournamentController> controllerFactory)
     {
         this.objectManager = objectManager;
         this.tournamentGameInterface = tournamentGameInterface;
         this.controllerFactory = controllerFactory;
-        this.mapTimeViewFactory = mapTimeViewFactory;
-        this.playerNameplateViewFactory = playerNameplateViewFactory;
         TournamentCombatPatchInstaller.Install(harmony);
     }
 
@@ -91,29 +85,39 @@ public class CoopTournamentLauncher : ICoopTournamentLauncher
         CoopTournamentBehavior tournamentBehavior = null;
         CoopTournamentFightMissionController fightController = null;
 
-        Mission mission = MissionState.OpenNew(
-            "TournamentFight",
-            initializer,
-            _ => CreateBehaviors(
-                tournamentGame,
-                town.Settlement,
-                town.Culture,
-                !isSpectator,
-                snapshot,
-                out coopController,
-                out tournamentBehavior,
-                out fightController),
-            true,
-            true);
-
-        if (mission == null)
+        try
         {
-            uiContext.Clear(snapshot.SessionId);
-            return null;
-        }
+            Mission mission = MissionState.OpenNew(
+                "TournamentFight",
+                initializer,
+                _ => CreateBehaviors(
+                    tournamentGame,
+                    town.Settlement,
+                    town.Culture,
+                    !isSpectator,
+                    snapshot,
+                    out coopController,
+                    out tournamentBehavior,
+                    out fightController),
+                true,
+                true);
 
-        coopController.Initialize(snapshot, tournamentBehavior, fightController, mission);
-        return mission;
+            if (mission == null)
+            {
+                coopController?.Dispose();
+                uiContext.Clear(snapshot.SessionId);
+                return null;
+            }
+
+            coopController.Initialize(snapshot, tournamentBehavior, fightController, mission);
+            return mission;
+        }
+        catch
+        {
+            try { coopController?.Dispose(); }
+            finally { uiContext.Clear(snapshot.SessionId); }
+            throw;
+        }
     }
 
     private IEnumerable<MissionBehavior> CreateBehaviors(
@@ -155,8 +159,8 @@ public class CoopTournamentLauncher : ICoopTournamentLauncher
             new MissionOptionsComponent(),
             new HighlightsController(),
             new SandboxHighlightsController(),
-            mapTimeViewFactory(),
-            playerNameplateViewFactory(),
+            coopController.ResolveMissionBehavior<MissionMapTimeView>(),
+            coopController.ResolveMissionBehavior<PlayerNameplateMissionView>(),
             coopController
         };
         if (!behaviors.Select(behavior => behavior.GetType()).SequenceEqual(BehaviorOrder))
