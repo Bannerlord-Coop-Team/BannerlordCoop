@@ -1,4 +1,6 @@
 ﻿using Common;
+using System.Linq;
+using GameInterface.Services.ItemRosters.Messages;
 using Common.Logging;
 using Common.Messaging;
 using Common.Network;
@@ -114,7 +116,8 @@ internal class TradeHandler : IHandler
             currentSettlementComponentId,
             boughtItems,
             soldItems,
-            what.ForceTransferId
+            what.ForceTransferId,
+            what.InitialPlayerRoster
         );
 
         network.SendAll(message);
@@ -141,6 +144,16 @@ internal class TradeHandler : IHandler
 
             MobileParty currentMobileParty = null;
             if (message.CurrentMobilePartyId != null && !objectManager.TryGetObjectWithLogging<MobileParty>(message.CurrentMobilePartyId, out currentMobileParty)) return;
+
+            // The server may consume food after the client has submitted its inventory.
+            if (!MatchesInventoryBaseline(toRoster, message.InitialPlayerRoster))
+            {
+                ResendRoster(peer, toRoster);
+                if (fromRoster != null) ResendRoster(peer, fromRoster);
+                if (peer != null)
+                    network.Send(peer, new SendInformationMessage("Inventory changed while closing. Please try again."));
+                return;
+            }
 
             var boughtItems = ResolveTradeItems(message.BoughtItems);
             var soldItems = ResolveTradeItems(message.SoldItems);
@@ -202,6 +215,35 @@ internal class TradeHandler : IHandler
                 soldItems
             );
         });
+    }
+
+    internal static bool MatchesInventoryBaseline(ItemRoster roster, ItemRosterElement[] baseline)
+    {
+        if (baseline == null) return roster.Count == 0;
+        var occupied = baseline.Where(item => item.Amount != 0).ToArray();
+        if (roster.Count != occupied.Length) return false;
+        foreach (var item in occupied)
+        {
+            int index = roster.FindIndexOfElement(item.EquipmentElement);
+            if (index < 0 || roster.GetElementNumber(index) != item.Amount) return false;
+        }
+        return true;
+    }
+
+    private void ResendRoster(NetPeer peer, ItemRoster roster)
+    {
+        if (peer == null || !objectManager.TryGetHandleWithLogging(roster, out uint rosterId)) return;
+        var updates = new List<UpdateItemRoster>();
+        foreach (var item in roster)
+        {
+            if (!objectManager.TryGetHandleWithLogging(item.EquipmentElement.Item, out uint itemId)) return;
+            uint modifierId = 0;
+            if (item.EquipmentElement.ItemModifier != null &&
+                !objectManager.TryGetHandleWithLogging(item.EquipmentElement.ItemModifier, out modifierId)) return;
+            updates.Add(new UpdateItemRoster(rosterId, itemId, modifierId, item.Amount));
+        }
+        network.Send(peer, new ClearItemRoster(rosterId));
+        foreach (var update in updates) network.Send(peer, update);
     }
 
     private bool TryValidateForceTransfer(CompleteTrade message, NetPeer peer)

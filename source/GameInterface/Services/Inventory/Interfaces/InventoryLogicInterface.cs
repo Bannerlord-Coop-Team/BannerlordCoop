@@ -1,4 +1,8 @@
 ﻿using Common;
+using Common.Util;
+using GameInterface.Services.TownMarketDatas.Patches;
+using System.Runtime.CompilerServices;
+using TaleWorlds.CampaignSystem.Inventory;
 using Common.Logging;
 using GameInterface.Services.Inventory.TradeSkills.Interfaces;
 using GameInterface.Services.MobileParties.Extensions;
@@ -22,6 +26,11 @@ namespace GameInterface.Services.Inventory.Interfaces
 {
     public interface IInventoryLogicInterface : IGameAbstraction
     {
+        void CaptureInventoryBaseline(InventoryLogic logic);
+        ItemRosterElement[] GetInventoryBaseline(InventoryLogic logic);
+        bool TryApplyInventoryUpdate(ItemRoster roster, EquipmentElement element, int amount);
+        bool TryClearInventory(ItemRoster roster);
+
         void ApplyDoneLogic(
             ItemRoster fromRoster,
             ItemRoster toRoster,
@@ -53,6 +62,60 @@ namespace GameInterface.Services.Inventory.Interfaces
         {
             this.sessionTradePlayerDataInterface = sessionTradePlayerDataInterface;
             this.defaultItemDiscardModelInterface = defaultItemDiscardModelInterface;
+        }
+
+        private readonly ConditionalWeakTable<InventoryLogic, ItemRoster> inventoryBaselines = new();
+
+        public void CaptureInventoryBaseline(InventoryLogic logic)
+        {
+            inventoryBaselines.Remove(logic);
+            inventoryBaselines.Add(logic, new ItemRoster(logic._rosters[1]));
+        }
+
+        public ItemRosterElement[] GetInventoryBaseline(InventoryLogic logic)
+            => inventoryBaselines.TryGetValue(logic, out var baseline) ? baseline.ToArray() : null;
+
+        public bool TryApplyInventoryUpdate(ItemRoster roster, EquipmentElement element, int amount)
+            => TryApplyInventoryUpdate(InventoryScreenHelper.GetActiveInventoryState()?.InventoryLogic,
+                roster, element, amount);
+
+        internal bool TryApplyInventoryUpdate(InventoryLogic logic, ItemRoster roster,
+            EquipmentElement element, int amount)
+        {
+            if (logic == null || !ReferenceEquals(logic._rosters[1], roster) ||
+                !inventoryBaselines.TryGetValue(logic, out var baseline)) return false;
+
+            using (new AllowedThread())
+            using (TownMarketDataPatches.SuppressReceivedRosterUpdate())
+            {
+                // A pending sale cannot survive consumption of the same last items.
+                int index = roster.FindIndexOfElement(element);
+                int available = index < 0 ? 0 : roster.GetElementNumber(index);
+                if ((long)available + amount < 0) logic.Reset(false);
+                baseline.AddToCounts(element, amount);
+                logic._rostersBackup[1].AddToCounts(element, amount);
+                roster.AddToCounts(element, amount);
+                logic.AfterReset?.Invoke(logic, false);
+            }
+            return true;
+        }
+
+        public bool TryClearInventory(ItemRoster roster)
+        {
+            var logic = InventoryScreenHelper.GetActiveInventoryState()?.InventoryLogic;
+            if (logic == null || !ReferenceEquals(logic._rosters[1], roster) ||
+                !inventoryBaselines.TryGetValue(logic, out var baseline)) return false;
+
+            using (new AllowedThread())
+            using (TownMarketDataPatches.SuppressReceivedRosterUpdate())
+            {
+                logic.Reset(false);
+                baseline.Clear();
+                logic._rostersBackup[1].Clear();
+                roster.Clear();
+                logic.AfterReset?.Invoke(logic, false);
+            }
+            return true;
         }
 
         public void ApplyDoneLogic(
