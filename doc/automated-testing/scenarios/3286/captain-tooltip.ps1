@@ -185,11 +185,18 @@ try {
         $null = Assert-Captain $before $id
         Save-Json "captain-before-$owner.json" $before
         Capture "captain-before-$owner"
+        $null = State $client 'coop.debug.battle.captain_tooltip_hold' @('arm',$id)
         $after = State $client 'coop.debug.battle.captain_tooltip' @('show',$id)
         $captain = Assert-Captain $after $id
         Save-Json "captain-after-$owner.json" $after
         $observed += $captain
+        $hold = Wait-State $client 'coop.debug.battle.captain_tooltip_hold' @('state') { param($s) $s.armed -and $s.tooltipActive -and $s.activeFrames -ge 30 }
+        Save-Json "captain-hold-before-capture-$owner.json" $hold
         Capture "captain-after-$owner"
+        $hold = State $client 'coop.debug.battle.captain_tooltip_hold' @('state')
+        Save-Json "captain-hold-after-capture-$owner.json" $hold
+        if (-not $hold.armed -or -not $hold.tooltipActive -or $hold.activeFrames -lt 30) { throw 'Native tooltip did not remain active through capture.' }
+        $null = State $client 'coop.debug.battle.captain_tooltip_hold' @('release')
         $null = Command $client 'coop.debug.battle.captain_tooltip' @('hide',$id)
         $selected.Remove($owner)
         Capture "captain-closed-$owner"
@@ -224,7 +231,12 @@ catch {
 finally {
     foreach ($client in $clients) {
         if ($selected.ContainsKey($client.process.platformId)) {
-            try { $null = Command $client 'coop.debug.battle.captain_tooltip' @('hide',$selected[$client.process.platformId]) }
+            try {
+                $hold = State $client 'coop.debug.battle.captain_tooltip_hold' @('state')
+                Save-Json "captain-hold-failure-$($client.process.platformId).json" $hold
+                $null = State $client 'coop.debug.battle.captain_tooltip_hold' @('release')
+                $null = Command $client 'coop.debug.battle.captain_tooltip' @('hide',$selected[$client.process.platformId])
+            }
             catch { $restoreErrors += $_.Exception.Message }
         }
     }

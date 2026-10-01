@@ -4,6 +4,12 @@ using Common.Commands;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Players;
 using Helpers;
+using HarmonyLib;
+using System.Diagnostics;
+using TaleWorlds.Library;
+using TaleWorlds.MountAndBlade;
+using TaleWorlds.MountAndBlade.GauntletUI.Mission.Singleplayer;
+using TaleWorlds.MountAndBlade.ViewModelCollection.OrderOfBattle;
 using Newtonsoft.Json;
 using System;
 using System.Linq;
@@ -117,6 +123,112 @@ public sealed class CaptainTooltipFixtureCoopCommand : ICoopCommand
     private static string Roster(MobileParty party) => JsonConvert.SerializeObject(
         party.MemberRoster.GetTroopRoster().OrderBy(element => element.Character.StringId).Select(element => new
         { id = element.Character.StringId, element.Number, element.WoundedNumber, element.Xp }));
+
+    private static CoopCommandResult Failed(string reason) => new CoopCommandResult(false, reason, "command_failed");
+}
+
+public sealed class CaptainTooltipHoldCoopCommand : ICoopCommand
+{
+    private static Mission heldMission;
+    private static MissionGauntletOrderOfBattleUIHandler heldView;
+    private static OrderOfBattleHeroItemVM heldCaptain;
+    private static readonly Stopwatch lifetime = new Stopwatch();
+    private static int activeFrames;
+    private static int reopens;
+    private static int hides;
+    private static string firstHideTrace;
+    public string Prefix => "coop.debug.battle";
+    public string Name => "captain_tooltip_hold";
+    public string Description => "Keeps the real captain tooltip active briefly for no-input capture and retains hide diagnostics.";
+    public CoopCommandSide Side => CoopCommandSide.Client;
+    public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
+    {
+        new ExpectedArgs("action", "arm, state or release."),
+        new ExpectedArgs("character_id", "Actual deployment captain for arm.", false)
+    };
+
+    public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
+    {
+        if (ModInformation.IsServer) return Failed("Run on the client.");
+        if (args.Count == 1 && args[0] == "release") Release();
+        else if (args.Count == 2 && args[0] == "arm")
+        {
+            var view = Mission.Current?.GetMissionBehavior<MissionGauntletOrderOfBattleUIHandler>();
+            var item = view?._dataSource?._allHeroes.SingleOrDefault(hero => hero.IsShown &&
+                hero.Agent?.Character.StringId == args[1] && hero.Agent.IsActive());
+            if (Campaign.Current == null || Mission.Current == null || Mission.Current.IsDeploymentFinished || view?._isActive != true || item == null)
+                return Failed("The real visible deployment captain is required.");
+            Release();
+            heldMission = Mission.Current;
+            heldView = view;
+            heldCaptain = item;
+            activeFrames = reopens = hides = 0;
+            firstHideTrace = null;
+            lifetime.Restart();
+        }
+        else if (!(args.Count == 1 && args[0] == "state")) return Failed("Expected arm with character id, state or release.");
+        return new CoopCommandResult(true, "LIVE_TEST_JSON=" + JsonConvert.SerializeObject(new
+        {
+            armed = heldCaptain != null, characterId = heldCaptain?.Agent.Character.StringId,
+            tooltipActive = InformationManager.GetIsAnyTooltipActive(), activeFrames, reopens, hides, firstHideTrace
+        }));
+    }
+
+    private static void Release()
+    {
+        var item = heldCaptain;
+        heldCaptain = null;
+        heldMission = null;
+        heldView = null;
+        lifetime.Reset();
+        item?.Tooltip.ExecuteEndHint();
+    }
+
+    [HarmonyPatch(typeof(MissionGauntletOrderOfBattleUIHandler), nameof(MissionGauntletOrderOfBattleUIHandler.OnMissionScreenTick))]
+    private static class HoldTick
+    {
+        [HarmonyPostfix]
+        private static void Postfix(MissionGauntletOrderOfBattleUIHandler __instance)
+        {
+            if (heldCaptain == null || __instance != heldView) return;
+            if (Mission.Current != heldMission || heldMission.IsDeploymentFinished || !heldView._isActive ||
+                !heldCaptain.IsShown || !heldCaptain.Agent.IsActive() || lifetime.Elapsed.TotalSeconds >= 120 || reopens >= 10)
+            {
+                Release();
+                return;
+            }
+            if (InformationManager.GetIsAnyTooltipActive()) activeFrames++;
+            else
+            {
+                activeFrames = 0;
+                reopens++;
+                heldCaptain.Tooltip.ExecuteBeginHint();
+            }
+        }
+    }
+
+    [HarmonyPatch(typeof(MissionGauntletOrderOfBattleUIHandler), nameof(MissionGauntletOrderOfBattleUIHandler.OnMissionScreenFinalize))]
+    private static class ReleaseOnFinalize
+    {
+        [HarmonyPostfix]
+        private static void Postfix(MissionGauntletOrderOfBattleUIHandler __instance)
+        {
+            if (__instance == heldView) Release();
+        }
+    }
+
+    [HarmonyPatch(typeof(InformationManager), nameof(InformationManager.HideTooltip))]
+    private static class TraceHide
+    {
+        [HarmonyPrefix]
+        private static void Prefix()
+        {
+            if (heldCaptain == null) return;
+            hides++;
+            activeFrames = 0;
+            if (firstHideTrace == null) firstHideTrace = new StackTrace(false).ToString();
+        }
+    }
 
     private static CoopCommandResult Failed(string reason) => new CoopCommandResult(false, reason, "command_failed");
 }
