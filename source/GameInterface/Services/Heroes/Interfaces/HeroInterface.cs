@@ -221,6 +221,11 @@ internal class HeroInterface : IHeroInterface
             playerHero.PartyBelongedTo = null;
             messageBroker.Publish(this, new PlayerCaptivityChanged(playerHero.PartyBelongedToAsPrisoner));
         }
+        else
+        {
+            // Vanilla skips the camera target while a saved party is parked for login.
+            playerParty.Party.SetAsCameraFollowParty();
+        }
 
         // The transferred host save carries the server's always-visible party state
         // (PartyVisibilityServerPatches) and the native load path never rebuilds fog of war

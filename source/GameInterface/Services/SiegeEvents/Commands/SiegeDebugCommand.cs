@@ -12,7 +12,6 @@ using GameInterface.Services.MobileParties.Patches;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Party.Commands;
 using GameInterface.Services.Players;
-using GameInterface.Services.Settlements.Interfaces;
 using GameInterface.Services.SiegeEngines;
 using GameInterface.Services.SiegeEvents;
 using GameInterface.Services.SiegeEvents.Interfaces;
@@ -1145,23 +1144,28 @@ public class SiegeDebugCommand
             }
             else
             {
-                if (!ContainerProvider.TryResolve<ISettlementInterface>(out var settlementInterface))
+                var menu = Campaign.Current?.CurrentMenuContext?.GameMenu;
+                var joinOption = menu?.MenuOptions.FirstOrDefault(option => option.IdString == "join_encounter_help_attackers");
+                if (PlayerEncounter.Current == null || PlayerEncounter.EncounterSettlement != settlement ||
+                    PlayerEncounter.EncounteredBattle != mapEvent || PartyBase.MainParty.MapEvent != null ||
+                    menu?.StringId != "join_encounter" || joinOption == null ||
+                    !menu.GetMenuOptionConditionsHold(Game.Current, Campaign.Current.CurrentMenuContext,
+                        menu.MenuOptions.ToList().IndexOf(joinOption)) || !joinOption.IsEnabled)
                 {
-                    return Failed("Unable to resolve SettlementInterface");
+                    return Failed("The recovered settlement encounter has no enabled attacker join choice");
                 }
 
-                settlementInterface.StartSettlementEncounter(MobileParty.MainParty, settlement);
+                var behavior = new EncounterGameMenuBehavior();
+                behavior.game_menu_join_encounter_help_attackers_on_consequence(
+                    new MenuCallbackArgs(Campaign.Current.CurrentMenuContext, null));
             }
 
-            if (PlayerEncounter.Current == null)
+            if (alreadyInAssault)
             {
-                return Failed($"Unable to start the local encounter at {settlement.Name}");
-            }
-
-            if (!alreadyInAssault)
-                PlayerEncounter.JoinBattle(BattleSideEnum.Attacker);
-            else
+                if (PlayerEncounter.Current == null)
+                    return Failed($"Unable to open the local assault encounter at {settlement.Name}");
                 GameMenu.SwitchToMenu("encounter");
+            }
             MobileParty.MainParty.SetMoveModeHold();
             string output = alreadyInAssault
                 ? $"Opened the active siege assault at {settlement.Name} for an involved player party"
@@ -1206,17 +1210,19 @@ public class SiegeDebugCommand
                 return Failed("Unable to resolve ObjectManager");
             }
 
-            var behavior = new EncounterGameMenuBehavior();
-            var attackArgs = new MenuCallbackArgs((MenuContext)null, null);
-            bool attackShown = behavior.game_menu_encounter_attack_on_condition(attackArgs);
-            var simulationArgs = new MenuCallbackArgs((MenuContext)null, null);
-            bool simulationShown = behavior.game_menu_encounter_order_attack_on_condition(simulationArgs);
-            var menu = Campaign.Current?.CurrentMenuContext?.GameMenu;
-            var renderedAttack = menu?.MenuOptions
-                .FirstOrDefault(option => option.IdString == "attack");
-            var renderedSimulation = menu?.MenuOptions
-                .FirstOrDefault(option => option.IdString == "str_order_attack");
-            var settlement = MobileParty.MainParty?.BesiegedSettlement;
+            var menuContext = Campaign.Current.CurrentMenuContext;
+            var menu = menuContext?.GameMenu;
+            var options = menu?.MenuOptions.ToList();
+            int attackIndex = options?.FindIndex(option => option.IdString == "attack") ?? -1;
+            int simulationIndex = options?.FindIndex(option => option.IdString == "str_order_attack") ?? -1;
+            int joinIndex = options?.FindIndex(option => option.IdString == "join_encounter_help_attackers") ?? -1;
+            bool attackShown = attackIndex >= 0 && menu.GetMenuOptionConditionsHold(Game.Current, menuContext, attackIndex);
+            bool simulationShown = simulationIndex >= 0 && menu.GetMenuOptionConditionsHold(Game.Current, menuContext, simulationIndex);
+            bool joinShown = joinIndex >= 0 && menu.GetMenuOptionConditionsHold(Game.Current, menuContext, joinIndex);
+            bool attackEnabled = attackShown && options[attackIndex].IsEnabled;
+            bool simulationEnabled = simulationShown && options[simulationIndex].IsEnabled;
+            bool joinEnabled = joinShown && options[joinIndex].IsEnabled;
+            var settlement = MobileParty.MainParty.BesiegedSettlement ?? MobileParty.MainParty.CurrentSettlement ?? PlayerEncounter.EncounterSettlement;
             var leader = settlement?.SiegeEvent?.BesiegerCamp?.LeaderParty;
             var mapEvent = PartyBase.MainParty?.MapEvent;
             var tracker = mapEvent?.TroopUpgradeTracker;
@@ -1244,21 +1250,24 @@ public class SiegeDebugCommand
                 involvedPartyCount,
                 mainPartyAttached,
                 mainPartyTracked,
+                joinAttackers = new
+                {
+                    rendered = joinShown,
+                    renderedEnabled = joinEnabled,
+                },
                 attack = new
                 {
                     shown = attackShown,
-                    enabled = attackArgs.IsEnabled,
-                    rendered = renderedAttack != null,
-                    renderedEnabled = renderedAttack?.IsEnabled ?? false,
-                    tooltip = attackArgs.Tooltip?.ToString() ?? "none",
+                    enabled = attackEnabled,
+                    rendered = attackShown,
+                    renderedEnabled = attackEnabled,
                 },
                 simulation = new
                 {
                     shown = simulationShown,
-                    enabled = simulationArgs.IsEnabled,
-                    rendered = renderedSimulation != null,
-                    renderedEnabled = renderedSimulation?.IsEnabled ?? false,
-                    tooltip = simulationArgs.Tooltip?.ToString() ?? "none",
+                    enabled = simulationEnabled,
+                    rendered = simulationShown,
+                    renderedEnabled = simulationEnabled,
                 },
             });
 
@@ -1266,10 +1275,10 @@ public class SiegeDebugCommand
                 $"leader={leader?.StringId ?? "none"} localLeader={leader == MobileParty.MainParty} " +
                 $"mapEvent={mapEventId} tracker={trackerId} tracked={tracker?._mapEventParties.Count ?? 0}/{involvedPartyCount} " +
                 $"mainPartyAttached={mainPartyAttached} mainPartyTracked={mainPartyTracked} " +
-                $"attackShown={attackShown} attackEnabled={attackArgs.IsEnabled} " +
-                $"attackRendered={renderedAttack != null} attackRenderedEnabled={renderedAttack?.IsEnabled ?? false} " +
-                $"simulationShown={simulationShown} simulationEnabled={simulationArgs.IsEnabled} " +
-                $"simulationRendered={renderedSimulation != null} simulationRenderedEnabled={renderedSimulation?.IsEnabled ?? false}" +
+                $"attackShown={attackShown} attackEnabled={attackEnabled} " +
+                $"attackRendered={attackShown} attackRenderedEnabled={attackEnabled} " +
+                $"simulationShown={simulationShown} simulationEnabled={simulationEnabled} " +
+                $"simulationRendered={simulationShown} simulationRenderedEnabled={simulationEnabled}" +
                 Environment.NewLine + "LIVE_TEST_JSON=" + structuredResult);
 
         }
