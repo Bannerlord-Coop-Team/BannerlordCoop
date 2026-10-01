@@ -37,6 +37,9 @@ if($null -ne $pidReceipt){
     Copy-Item -LiteralPath $pidReceipt.standardOutputPath -Destination (Join-Path $root "dedicated-server.stdout.log") -ErrorAction Stop
     Copy-Item -LiteralPath $pidReceipt.standardErrorPath -Destination (Join-Path $root "dedicated-server.stderr.log") -ErrorAction Stop
 }
+$ports=@(Get-NetUDPEndpoint -LocalPort 4200 -ErrorAction SilentlyContinue)
+$ports | Select-Object LocalAddress,LocalPort,OwningProcess | ConvertTo-Json -Depth 8 | Set-Content -LiteralPath (Join-Path (Split-Path -Parent $path) "udp-cleanup.json")
+if ($ports.Count -ne 0) { throw "UDP4200 remains occupied" }
 if (-not $receipt.verifiedAbsent) { throw "token process tree remains" }
 ' >"$attempt_root/cleanup.log" 2>&1 || status=1
     if [[ -n $launcher_pid ]]; then
@@ -53,7 +56,7 @@ import json,hashlib,sys
 root=Path(sys.argv[1]);status=int(sys.argv[4]);files=[{'path':str(p.relative_to(root)),'sha256':hashlib.sha256(p.read_bytes()).hexdigest()} for p in root.rglob('*') if p.is_file()]
 actions=root/'result-manifest.json'
 if not actions.exists() or not json.loads(actions.read_text(encoding='utf-8-sig')).get('accepted'):status=1
-manifest={'head':sys.argv[2],'tree':sys.argv[3],'verdict':'passed' if status==0 else 'failed','exitCode':status,'files':files}
+manifest={'source':{'head':sys.argv[2],'tree':sys.argv[3]},'status':'passed' if status==0 else 'failed','head':sys.argv[2],'tree':sys.argv[3],'verdict':'passed' if status==0 else 'failed','exitCode':status,'files':files}
 (root/'terminal-manifest.json').write_text(json.dumps(manifest,sort_keys=True)+'\n')
 PY
     echo "STAGE7_LOCAL=$( [[ $status == 0 ]] && echo passed || echo failed ) result=$attempt_root/terminal-manifest.json"
@@ -90,8 +93,8 @@ server_args=(--dedicated-server-inputs-root /home/pwisorlowska/.codex/runtime/is
 prepare=("$helper/prepare_local_dedicated_server.sh" --repo-root "$live_root" --source-identity-root "$source_root" --expected-coop-head "$head" --expected-coop-tree "$tree" --dedicated-server-root "$dedicated_source" --run-token "$token" "${server_args[@]}")
 "$integration" --repo-root "$live_root" --source-identity-root "$source_root" --expected-tree "$tree" --clients 2 --clients-only --build-only >"$attempt_root/build.log" 2>&1
 "${prepare[@]}" >"$attempt_root/server-prepare.log" 2>&1
-"$integration" --repo-root "$live_root" --source-identity-root "$source_root" --expected-tree "$tree" --clients 2 --clients-only --record-prepared-build --dedicated-server-inputs-root /home/pwisorlowska/.codex/runtime/issue-to-pr/local-dedicated-server --expected-dedicated-server-tree "${dedicated[1]}" --expected-dedicated-server-ensure-script-sha256 "${dedicated[2]}" --expected-dedicated-server-run-windows-script-sha256 "${dedicated[3]}" >"$attempt_root/prepared-build.log" 2>&1
+"$integration" --repo-root "$live_root" --expected-tree "$tree" --clients 2 --clients-only --record-prepared-build --dedicated-server-inputs-root /home/pwisorlowska/.codex/runtime/issue-to-pr/local-dedicated-server --expected-dedicated-server-tree "${dedicated[1]}" --expected-dedicated-server-ensure-script-sha256 "${dedicated[2]}" --expected-dedicated-server-run-windows-script-sha256 "${dedicated[3]}" >"$attempt_root/prepared-build.log" 2>&1
 "${prepare[@]}" --start >"$attempt_root/server-start.log" 2>&1
-"$integration" --repo-root "$live_root" --source-identity-root "$source_root" --expected-tree "$tree" --clients 2 --run-token "$token" --runtime-profile visual --no-focus --keep-alive --clients-only --reuse-verified-build --crash-artifact-dir "$attempt_root/crash-dialogs" >"$attempt_root/launcher.log" 2>&1 &
+"$integration" --repo-root "$live_root" --expected-tree "$tree" --clients 2 --run-token "$token" --runtime-profile visual --no-focus --keep-alive --clients-only --reuse-verified-build --crash-artifact-dir "$attempt_root/crash-dialogs" >"$attempt_root/launcher.log" 2>&1 &
 launcher_pid=$!
 "$hidden" "$powershell" -NoProfile -NonInteractive -WindowStyle Hidden -ExecutionPolicy Bypass -File "$(wslpath -w "$attempt_root/scenario.ps1")" -ArtifactDirectory "$(wslpath -w "$attempt_root")" -RawCaptureRoot "$raw_capture_root" -RunToken "$token" -ExpectedHead "$head" -ExpectedTree "$tree" >"$attempt_root/actions.log" 2>&1

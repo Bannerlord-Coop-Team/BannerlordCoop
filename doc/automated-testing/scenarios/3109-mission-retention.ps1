@@ -111,11 +111,17 @@ function Wait-Deployment([string] $Name, [object] $Endpoint, [int] $Seconds = 12
 function Wait-Campaign([string] $Name, [object] $Endpoint, [int] $Seconds = 120) {
     $deadline = [DateTime]::UtcNow.AddSeconds($Seconds)
     $polls = @()
+    $stable = 0
     do {
         $reply = Invoke-LiveTestClientAction -RequestedAction Status -TargetProcessId ([int]$Endpoint.process.pid) -RequestTimeoutMilliseconds 30000
         $polls += $reply.Response
         if ($reply.ExitCode -eq 0 -and [bool]$reply.Response.ok -and
-            [bool]$reply.Response.result.readyForCampaignTests -and -not [bool]$reply.Response.result.missionActive) {
+            [bool]$reply.Response.result.readyForCampaignTests -and -not [bool]$reply.Response.result.missionActive -and
+            $null -ne $reply.Response.result.PSObject.Properties['gameThreadQueueDepth'] -and
+            [int]$reply.Response.result.gameThreadQueueDepth -eq 0) {
+            $stable++
+        } else { $stable=0 }
+        if($stable -ge 3) {
             Save-Json "$Name-polls.json" $polls
             return
         }
@@ -247,7 +253,7 @@ try {
     if($null -eq $script:server -or $script:server.process.role -cne 'server') { throw 'standalone server endpoint required' }
     Catalog 'server' $script:server @('coop.debug.players.party_state','coop.debug.mobile_party.position','coop.debug.mobile_party.restore_position','coop.debug.mobile_party.move_to_settlement','coop.debug.map_event.leave_settlement','coop.debug.map_event.late_join_mode_fixture','coop.debug.map_event.late_join_mode_fixture_state','coop.debug.map_event.late_join_mode_join','coop.debug.map_event.late_join_mode_enter','coop.debug.map_event.late_join_mode_exit_missions','coop.debug.map_event.late_join_mode_cleanup','coop.debug.tournaments.danustica_fixture_begin','coop.debug.tournaments.danustica_fixture_abort','coop.debug.tournaments.danustica_fixture_restore','coop.debug.tournaments.danustica_observe')
     foreach($c in $clients){
-        Catalog $c.role $c.endpoint @('coop.debug.mission.retention_track','coop.debug.mission.retention_collect','coop.debug.location.enter','coop.debug.location.leave','coop.debug.map_event.finish_current_encounter','coop.debug.map_event.deployment_state','coop.debug.tournaments.danustica_request_join','coop.debug.tournaments.danustica_request_start','coop.debug.tournaments.danustica_request_leave','coop.debug.tournaments.danustica_observe')
+        Catalog $c.role $c.endpoint @('coop.debug.mission.retention_track','coop.debug.mission.retention_collect','coop.debug.location.enter','coop.debug.location.leave','coop.debug.map_event.finish_current_encounter','coop.debug.map_event.encounter_state','coop.debug.map_event.deployment_state','coop.debug.tournaments.danustica_request_join','coop.debug.tournaments.danustica_request_start','coop.debug.tournaments.danustica_request_leave','coop.debug.tournaments.danustica_observe')
         $party=Json-Output (Command "$($c.role)-party" $script:server 'coop.debug.players.party_state' @($c.controller))
         if($party.controllerId -cne $c.controller -or -not $party.connected -or -not $party.active -or $party.mapEvent -cne 'none'){throw 'connected idle player required'}
         $c.partyId=[string]$party.partyId
@@ -339,6 +345,13 @@ try {
         }
         foreach($c in $clients){
             if(-not $script:originalPositions.ContainsKey($c.controller)){continue}
+            $encounter=Command "cleanup-$($c.role)-encounter" $c.endpoint 'coop.debug.map_event.encounter_state'
+            if([string]$encounter.output -match '(?m)^PlayerEncounter.Current: PRESENT'){
+                $null=Command "cleanup-$($c.role)-finish-encounter" $c.endpoint 'coop.debug.map_event.finish_current_encounter'
+                Wait-Campaign "cleanup-$($c.role)-finished-encounter" $c.endpoint
+                $after=Command "cleanup-$($c.role)-encounter-after" $c.endpoint 'coop.debug.map_event.encounter_state'
+                if([string]$after.output -notmatch '(?m)^PlayerEncounter.Current: <null>'){throw 'local encounter remains'}
+            }elseif([string]$encounter.output -notmatch '(?m)^PlayerEncounter.Current: <null>'){throw 'encounter presence observation missing'}
             $pos=Position "cleanup-$($c.role)-position" $c.partyId
             if($pos.settlement -cne 'none'){$null=Command "cleanup-$($c.role)-leave-settlement" $script:server 'coop.debug.map_event.leave_settlement' @($c.controller)}
             $original=$script:originalPositions[$c.controller]
@@ -377,6 +390,9 @@ try {
     if ($missing.Count -gt 0 -and $script:bodyPassed) { Fail-Once 'planned-captures' 'missing planned client capture' }
     $accepted=$script:bodyPassed -and $script:restored -and $retainedRaw -and $null -eq $script:firstFailure
     Save-Json 'actions-summary.json' @{accepted=$accepted; bodyPassed=$script:bodyPassed; restored=$script:restored; firstFailure=$script:firstFailure; images=$script:images}
-    Save-Json 'result-manifest.json' @{schemaVersion=2;runToken=$RunToken;expectedHead=$ExpectedHead;expectedTree=$ExpectedTree;accepted=$accepted;verdict=$(if($accepted){'passed'}else{'failed'});files=$script:images;firstFailure=$script:firstFailure}
+    $dataFiles=@(Get-ChildItem -LiteralPath $ArtifactDirectory -File -Recurse -Filter '*.json' | ForEach-Object {
+        @{path=$_.FullName.Substring($ArtifactDirectory.TrimEnd('\').Length+1).Replace('\','/');sha256=(Get-FileHash -LiteralPath $_.FullName -Algorithm SHA256).Hash.ToLowerInvariant()}
+    })
+    Save-Json 'result-manifest.json' @{schemaVersion=2;runToken=$RunToken;source=@{head=$ExpectedHead;tree=$ExpectedTree};expectedHead=$ExpectedHead;expectedTree=$ExpectedTree;accepted=$accepted;status=$(if($accepted){'passed'}else{'failed'});verdict=$(if($accepted){'passed'}else{'failed'});files=$script:images;dataFiles=$dataFiles;firstFailure=$script:firstFailure;dataPointers=@{completed='completed-native-cycles.json#/perClient';client1='tournament-3-client1-postgc-data.json#/retention';client2='tournament-3-client2-postgc-data.json#/retention'}}
     if (-not $accepted) { exit 1 }
 }
