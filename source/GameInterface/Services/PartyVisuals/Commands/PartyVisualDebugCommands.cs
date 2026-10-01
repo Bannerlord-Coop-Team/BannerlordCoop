@@ -82,6 +82,31 @@ internal class PartyVisualDebugCommands
     }
 
 #if DEBUG
+    public sealed class PreparePlayerCoopCommand : ICoopCommand
+    {
+        private readonly Lazy<ICoopCommandRegistry> commandRegistry;
+
+        public PreparePlayerCoopCommand(Lazy<ICoopCommandRegistry> commandRegistry)
+        {
+            this.commandRegistry = commandRegistry;
+        }
+
+        public string Prefix => "coop.debug.party_visuals";
+        public string Name => "prepare_player";
+        public string Description => "Runs production unstuck for a connected player before visual testing.";
+        public CoopCommandSide Side => CoopCommandSide.Server;
+        public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
+        {
+            new ExpectedArgs("player", "The connected controller id or hero name."),
+        };
+
+        public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
+        {
+            if (ModInformation.IsClient) return Failed("Run this command on the server.");
+            return commandRegistry.Value.ProcessCommand("coop.unstuck", args);
+        }
+    }
+
     /// <summary>Reports per-player visual lifetime and headless registry state without changing them.</summary>
     public sealed class PlayerStateCoopCommand : ICoopCommand
     {
