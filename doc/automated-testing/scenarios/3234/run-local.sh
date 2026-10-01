@@ -135,7 +135,7 @@ record build-cache "$integration" --repo-root "$live_root" --clients 2 --expecte
     --expected-dedicated-server-ensure-script-sha256 "$ensure_sha" --expected-dedicated-server-run-windows-script-sha256 "$run_sha"
 failure_stage=dedicated-start
 runtime_started=1
-record dedicated-start "${prepare[@]}" --start
+record dedicated-start "${prepare[@]}" --start --trace
 failure_stage=clients
 "$integration" --repo-root "$live_root" --clients 2 --run-token "$run_token" --expected-tree "$tree" --reuse-verified-build \
     --runtime-profile visual --crash-artifact-dir "$result/crash-dialogs" --keep-alive --no-focus --clients-only \
