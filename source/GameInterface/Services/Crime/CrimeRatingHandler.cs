@@ -10,6 +10,8 @@ using GameInterface.Services.Players;
 using LiteNetLib;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.GameMenus;
+using TaleWorlds.CampaignSystem.Actions;
+using TaleWorlds.CampaignSystem.ComponentInterfaces;
 using TaleWorlds.CampaignSystem.Settlements;
 
 namespace GameInterface.Services.Crime;
@@ -60,7 +62,9 @@ internal class CrimeRatingHandler : IHandler
                 || !objects.TryGetObjectWithLogging<Settlement>(payload.What.SettlementId, out var settlement)) return;
             var accepted = objects.TryGetObjectWithLogging<IFaction>(payload.What.FactionId, out var faction)
                 && settlement.MapFaction == faction && ratings.Pay(hero, settlement, payload.What.Method);
-            network.Send(peer, new NetworkCrimePaymentResult(player.HeroId, payload.What.SettlementId, accepted));
+            var leaveMenu = accepted && payload.What.Method != CrimeModel.PaymentMethod.Execution
+                && hero.DeathMark != KillCharacterAction.KillCharacterActionDetail.Murdered && hero.IsAlive;
+            network.Send(peer, new NetworkCrimePaymentResult(player.HeroId, payload.What.SettlementId, accepted, leaveMenu));
         });
     }
 
@@ -76,10 +80,10 @@ internal class CrimeRatingHandler : IHandler
                 || Settlement.CurrentSettlement != settlement || !Hero.MainHero.IsAlive
                 || (context?.GameMenu?.StringId != "town_inside_criminal"
                     && context?.GameMenu?.StringId != "town_discuss_criminal_surrender")) return;
-            if (data.Accepted)
-                GameMenu.SwitchToMenu(settlement.IsCastle ? "castle_outside" : "town_outside");
-            else
+            if (!data.Accepted)
                 Campaign.Current.GameMenuManager.RefreshMenuOptionConditions(context);
+            else if (data.LeaveMenu)
+                GameMenu.SwitchToMenu(settlement.IsCastle ? "castle_outside" : "town_outside");
         });
     }
 

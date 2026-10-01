@@ -77,11 +77,13 @@ internal readonly struct NetworkCrimePaymentResult : IEvent
     [ProtoMember(1)] public string HeroId { get; }
     [ProtoMember(2)] public string SettlementId { get; }
     [ProtoMember(3)] public bool Accepted { get; }
+    [ProtoMember(4)] public bool LeaveMenu { get; }
 
-    public NetworkCrimePaymentResult(string heroId, string settlementId, bool accepted)
+    public NetworkCrimePaymentResult(string heroId, string settlementId, bool accepted, bool leaveMenu)
     {
         HeroId = heroId;
         SettlementId = settlementId;
         Accepted = accepted;
+        LeaveMenu = leaveMenu;
     }
 }

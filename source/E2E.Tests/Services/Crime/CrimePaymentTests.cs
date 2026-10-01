@@ -179,6 +179,18 @@ public class CrimePaymentTests : IDisposable
         Assert.Empty(Client.InternalMessages.GetMessages<NetworkCrimePaymentResult>());
     }
 
+    [Theory]
+    [InlineData(false, 0)]
+    [InlineData(true, 1)]
+    public void PaymentResult_UsesServerDecisionBeforeDeathStateArrives(bool leaveMenu, int expectedTransitions)
+    {
+        Client.Call(() => Assert.True(Get<Hero>(Client, payer.HeroId).IsAlive));
+        Client.SimulateMessage(Server.NetPeer, new NetworkCrimePaymentResult(payer.HeroId, settlementId, true, leaveMenu));
+        Client.PumpGameThread();
+        Assert.Equal(expectedTransitions, menu.CountFor(Client));
+        Assert.Equal(0, menu.CountFor(environment.Clients.Last()));
+    }
+
     private void SelectFine()
         => Client.Call(() => CrimeCampaignBehavior.criminal_inside_menu_give_money_on_consequence(null));
 
