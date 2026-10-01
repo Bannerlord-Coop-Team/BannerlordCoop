@@ -82,6 +82,7 @@ internal class PartyVisualDebugCommands
     }
 
 #if DEBUG
+    /// <summary>Reports per-player visual lifetime and headless registry state without changing them.</summary>
     public sealed class PlayerStateCoopCommand : ICoopCommand
     {
         private readonly IObjectManager objectManager;
