@@ -68,28 +68,35 @@ public sealed class BattleHealthFixtureCommand : ICoopCommand
 /// <summary>Reads existing server reserve values without rebuilding or consuming them.</summary>
 public sealed class BattleHealthReserveStateCommand : ICoopCommand
 {
+    private readonly IObjectManager objects;
+    private readonly IBattleTroopLedger ledger;
+
+    public BattleHealthReserveStateCommand(IObjectManager objects, IBattleTroopLedger ledger)
+    {
+        this.objects = objects;
+        this.ledger = ledger;
+    }
+
     public string Prefix => "coop.debug.map_event";
     public string Name => "health_reserve_state";
     public string Description => "Reads troop identities, health and supplied counts in the battle ledger.";
     public CoopCommandSide Side => CoopCommandSide.Server;
     public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
     {
-        new ExpectedArgs("map_event_id", "Exact registered battle.")
+        new ExpectedArgs("map_event_id", "Retained battle id, including after finalization.")
     };
 
     public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
     {
-        if (ModInformation.IsClient || args.Count != 1 ||
-            !ContainerProvider.TryResolve<IObjectManager>(out var objects) ||
-            !objects.TryGetObject<MapEvent>(args[0], out _) ||
-            !ContainerProvider.TryResolve<IBattleTroopLedger>(out var ledger))
-            return new CoopCommandResult(false, "An exact server battle is required.", "command_failed");
+        if (ModInformation.IsClient || args.Count != 1 || string.IsNullOrWhiteSpace(args[0]))
+            return new CoopCommandResult(false, "A nonempty server battle id is required.", "command_failed");
+        bool registered = objects.TryGetObject<MapEvent>(args[0], out _);
         var parties = ledger.GetParties(args[0]).Select(partyId =>
         {
             ledger.TryGetReserve(args[0], partyId, out var entries, out int supplied);
             return new { partyId, supplied, entries };
         }).ToArray();
-        return new CoopCommandResult(true, "LIVE_TEST_JSON=" + JsonConvert.SerializeObject(new { mapEventId = args[0], parties }));
+        return new CoopCommandResult(true, "LIVE_TEST_JSON=" + JsonConvert.SerializeObject(new { mapEventId = args[0], registered, parties }));
     }
 }
 

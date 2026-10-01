@@ -17,8 +17,14 @@ screenshots document the real mission and campaign state, not numerical health.
    `coop.debug.map_event.battle_reward_fixture_prepare testclient testclient2`
    checks and closes only that unresolved saved event. Other preflight failures
    end the attempt; do not finalize an arbitrary battle.
-3. On the server run `coop.debug.map_event.late_join_mode_fixture testclient testclient2`,
-   retain its returned map-event id, then run
+3. On the server run `coop.debug.map_event.late_join_mode_fixture testclient testclient2 health`,
+   retain its returned map-event id and original roster/hero-health receipt. The
+   optional Debug `health` mode snapshots all three parties' exact roster counts,
+   wounds and experience and every roster hero's health. It keeps heroes and
+   stages 1,200 healthy culture-basic regular troops for each player and 1,200
+   ordinary bandits for the opponent, exceeding the current maximum battle size
+   of 1,000 without changing battle configuration, hero health or mortality.
+   Those synthetic roster writes are setup only. Then run
    `coop.debug.map_event.late_join_mode_join`. Read the existing fixture state to
    require both parties in that same unresolved event. Enter the second client
    through `coop.debug.map_event.late_join_mode_enter`.
@@ -39,7 +45,10 @@ Read `coop.debug.battle.health_state` on each client and
 `LIVE_TEST_JSON`. Resolve agent ids from these actual responses, not fixed ids.
 Select an active owned hero, at least three
 owned regular troops, a healthy control troop, and an unspawned ledger entry.
-Fail the runtime preflight if the save cannot supply them; do not silently drop
+Require each tested player's actual ledger `entries.Length` to exceed `supplied`
+after deployment, and select the unspawned descriptor from that unsupplied tail.
+Provisioned counts alone do not prove that a troop stayed unspawned.
+Fail the runtime preflight if the mission cannot supply them; do not silently drop
 coverage. Retain character names, party ids, descriptor seeds and agent ids.
 
 From the server invoke `coop.debug.map_event.health_fixture_request` with the
@@ -77,7 +86,11 @@ decisive pass PNGs on both clients and retain the exact numerical excerpts.
 
 Use `coop.debug.map_event.late_join_mode_exit_missions`, wait for both campaign
 returns, then `coop.debug.map_event.late_join_mode_cleanup` to finalize the test
-battle and restore its owned movement state. Require the old ledger to be empty.
+battle and restore its owned movement state. Query `coop.debug.map_event.health_reserve_state` with the retained old id even
+when the map event has been unregistered. Require `registered=false` and an empty
+`parties` array; a failed lookup is not evidence of an empty ledger. Cleanup also
+restores the exact original three rosters and captured hero health. Compare the
+restored values with the setup receipt.
 Create a new battle with the same fixture and inspect fresh reserves: no prior
 ordinary troop partial-health values may be carried forward. Hero campaign
 health is separate and must not be used to claim ordinary snapshot cleanup.
