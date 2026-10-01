@@ -132,6 +132,13 @@ prior=p['validation']['focusedDebug']; receipt=pathlib.Path(prior['receipt'])
 assert hashlib.sha256(receipt.read_bytes()).hexdigest() == prior['receiptSha256']
 changed=subprocess.check_output(['git','-C',root,'diff','--name-only',prior['sourceHead'],p['currentHead']],text=True).splitlines()
 allowed={'doc/automated-testing/scenarios/3286/run-local.sh','doc/automated-testing/scenarios/3286/captain-tooltip.ps1','source/GameInterface/Services/Armies/Commands/CaptainTooltipFixtureCoopCommand.cs'}
+module='source/GameInterface/GameInterfaceModule.cs'
+if module in changed:
+ original=subprocess.check_output(['git','-C',root,'show',prior['sourceHead']+':'+module])
+ current_module=subprocess.check_output(['git','-C',root,'show',p['currentHead']+':'+module])
+ registration=b'#if DEBUG\r\n        builder.RegisterModule<GameInterface.Services.LiveTesting.LiveTestUiModule>();\r\n#endif\r\n'
+ assert current_module.count(registration) == 1 and current_module.replace(registration,b'') == original, 'Tested module changed beyond reviewed DEBUG inspector registration'
+ allowed.add(module)
 assert set(changed) <= allowed, 'Tested dependencies changed'
 evidence=json.loads(receipt.read_text()); current=debug.requirement_from_pipeline(p,p['currentHead'],p['currentTree'])
 expected={**current,'sourceHead':prior['sourceHead'],'sourceTree':prior['sourceTree']}

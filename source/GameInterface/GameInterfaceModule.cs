@@ -211,6 +211,9 @@ public class GameInterfaceModule : Module
         builder.RegisterType<RetreatedMapEventPartyTracker>().As<IRetreatedMapEventPartyTracker>().InstancePerLifetimeScope();
         builder.RegisterType<MapTrackerProviderHolder>().As<IMapTrackerProviderHolder>().InstancePerLifetimeScope();
 
+#if DEBUG
+        builder.RegisterModule<GameInterface.Services.LiveTesting.LiveTestUiModule>();
+#endif
         builder.RegisterModule<ServiceModule>();
         builder.RegisterModule<ObjectManagerModule>();
         builder.RegisterModule<RegistryModule>();
