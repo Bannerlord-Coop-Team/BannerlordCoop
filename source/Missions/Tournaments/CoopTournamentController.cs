@@ -175,7 +175,6 @@ public class CoopTournamentController : CoopMissionController
             messageBroker.Subscribe<NetworkTournamentAgentKnockedOut>(Handle_AgentKnockedOut);
             messageBroker.Subscribe<NetworkTournamentRuntimeState>(Handle_RuntimeState);
             messageBroker.Subscribe<NetworkTournamentRoundEnded>(Handle_RoundEnded);
-
         }
         catch
         {

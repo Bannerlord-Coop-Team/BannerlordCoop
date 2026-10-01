@@ -105,7 +105,6 @@ public class CoopLocationsController : CoopMissionController, ILocationMissionLi
             populationDirector = new LocationPopulationDirector(messageBroker, session, bindingMap, npcPuppetSpawner);
 
             messageBroker.Subscribe<PlayerEnteredLocation>(Handle_PlayerEnteredLocation);
-
         }
         catch
         {

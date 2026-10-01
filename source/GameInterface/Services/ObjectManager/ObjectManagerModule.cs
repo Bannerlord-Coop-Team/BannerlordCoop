@@ -17,7 +17,6 @@ internal class ObjectManagerModule : Module
         builder.RegisterType<ObjectManager>().As<IObjectManager>().SingleInstance();
         builder.RegisterType<RegistryCollection>().As<IRegistryCollection>().SingleInstance();
 
-
         foreach (var type in GetRegistries())
         {
             builder.RegisterType(type).AsSelf().SingleInstance().AutoActivate();

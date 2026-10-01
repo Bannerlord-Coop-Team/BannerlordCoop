@@ -213,7 +213,6 @@ public class CoopBattleController : CoopMissionController
 
             // Decode order clips during battle setup so the first issued order does not hitch.
             coopMissionComponent.AgentVoiceHandler.WarmUp();
-
         }
         catch
         {
