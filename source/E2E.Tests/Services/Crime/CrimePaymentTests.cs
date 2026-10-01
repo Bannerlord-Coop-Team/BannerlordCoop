@@ -42,7 +42,7 @@ public class CrimePaymentTests : IDisposable
     public CrimePaymentTests(ITestOutputHelper output)
     {
         environment = new E2ETestEnvironment(output);
-        menu = new MethodCallRecorder(AccessTools.Method(typeof(GameMenu), nameof(GameMenu.SwitchToMenu)));
+        menu = new MethodCallRecorder(Priority.First, AccessTools.Method(typeof(GameMenu), nameof(GameMenu.SwitchToMenu)));
         // Keep native presentation and unrelated skill progression outside this payment regression.
         presentation = new MethodCallRecorder(
             AccessTools.Method(typeof(SkillLevelingManager), nameof(SkillLevelingManager.OnBribeGiven)),
