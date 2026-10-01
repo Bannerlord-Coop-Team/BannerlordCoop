@@ -1,5 +1,6 @@
 ﻿#if DEBUG
 using E2E.Tests.Util;
+using E2E.Tests.Services.MapEvents;
 using GameInterface.Services.Villages.Commands;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.MapEvents;
@@ -11,7 +12,7 @@ using Xunit.Abstractions;
 namespace E2E.Tests.Services.Missions;
 
 /// <summary>Checks that health fixture troops are bounded and original roster values are restored.</summary>
-public class HealthFixtureRosterTests : MissionTestEnvironment
+public class HealthFixtureRosterTests : MapEventTestBase
 {
     public HealthFixtureRosterTests(ITestOutputHelper output) : base(output)
     {
