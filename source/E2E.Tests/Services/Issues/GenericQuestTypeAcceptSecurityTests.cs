@@ -18,6 +18,7 @@ using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.ComponentInterfaces;
 using TaleWorlds.CampaignSystem.Encyclopedia;
 using TaleWorlds.CampaignSystem.Issues;
+using TaleWorlds.CampaignSystem.GameState;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Roster;
 using TaleWorlds.CampaignSystem.Settlements;
@@ -833,6 +834,105 @@ public class GenericQuestTypeAcceptSecurityTests : IDisposable
             }
 
             Assert.Equal(6, party.MemberRoster.GetTroopCount(troop));
+        });
+    }
+
+    [Theory]
+    [InlineData(false, false)]
+    [InlineData(false, true)]
+    [InlineData(true, false)]
+    [InlineData(true, true)]
+    public void CompetingAcceptance_BeforeDone_CancelsOpenSelectionWithoutCommittingWinnerTroops(
+        bool alternativeWinner, bool resetBeforeAcceptance)
+    {
+        var fixture = SetupVillageOwner();
+        CreateIssueOnBothPeers(fixture);
+        var partyId = TestEnvironment.CreateRegisteredObject<MobileParty>();
+        var localTroopId = TestEnvironment.CreateRegisteredObject<CharacterObject>();
+        var winningTroopId = TestEnvironment.CreateRegisteredObject<CharacterObject>();
+        var winningCompanionId = TestEnvironment.CreateRegisteredObject<Hero>();
+        Client.Resolve<IControllerIdProvider>().SetControllerId("player-A");
+
+        Client.Call(() =>
+        {
+            var owner = Client.GetRegisteredObject<Hero>(fixture.HeroId);
+            var companion = Client.GetRegisteredObject<Hero>(fixture.CompanionHeroId);
+            var winningCompanion = Client.GetRegisteredObject<Hero>(winningCompanionId);
+            var party = Client.GetRegisteredObject<MobileParty>(partyId);
+            var localTroop = Client.GetRegisteredObject<CharacterObject>(localTroopId);
+            var winningTroop = Client.GetRegisteredObject<CharacterObject>(winningTroopId);
+            var roster = owner.Issue.AlternativeSolutionSentTroops;
+            using (new AllowedThread())
+            {
+                Campaign.Current.MainParty = party;
+                Hero.MainHero.Gold = 1000;
+                party.MemberRoster.AddToCounts(localTroop, 6);
+                roster.AddToCounts(companion.CharacterObject, 1);
+            }
+            Assert.True(Client.ObjectManager.AddNewObject(Hero.MainHero, out _));
+            var screen = CreateQuestSelectionScreen(roster, party);
+            screen._initialData.LeftMemberRoster.Add(roster);
+            screen.RightOwnerParty = party.Party;
+            var doneCalls = 0;
+            var closedCalls = 0;
+            screen.PartyPresentationDoneButtonDelegate = (_, _, _, _, _, _, _, _, _) =>
+            {
+                doneCalls++;
+                return true;
+            };
+            screen.PartyScreenClosedEvent += (_, _, _, _, _, _, _) => closedCalls++;
+            var states = Game.Current.GameStateManager;
+            var partyState = states.CreateState<PartyState>();
+            partyState.PartyScreenLogic = screen;
+            states._gameStates.Add(partyState);
+
+            var before = TroopRoster.CreateDummyTroopRoster();
+            before.Add(roster);
+            using (new AllowedThread())
+            {
+                party.MemberRoster.AddToCounts(localTroop, -3);
+                roster.AddToCounts(localTroop, 3);
+            }
+            var after = TroopRoster.CreateDummyTroopRoster();
+            after.Add(roster);
+            Common.Messaging.MessageBroker.Instance.Publish(owner,
+                new QuestAlternativeTroopsTransferredLocally(roster, before, after));
+            if (resetBeforeAcceptance) screen.Reset(false);
+
+            if (alternativeWinner)
+            {
+                var winner = TroopRoster.CreateDummyTroopRoster();
+                winner.AddToCounts(winningCompanion.CharacterObject, 1);
+                winner.AddToCounts(winningTroop, 2);
+                var packed = Client.Resolve<GameInterface.Services.TroopRosters.Interfaces.ITroopRosterInterface>()
+                    .PackTroopRosterData(winner);
+                Common.Messaging.MessageBroker.Instance.Publish(owner,
+                    new NetworkQuestTypeAlternativeAccepted(fixture.HeroId, "player-B", default, null, packed));
+            }
+            else
+            {
+                Common.Messaging.MessageBroker.Instance.Publish(owner,
+                    new NetworkQuestTypeQuestAccepted(fixture.HeroId, "player-B", null));
+            }
+
+            Assert.Equal(6, party.MemberRoster.GetTroopCount(localTroop));
+            Assert.Equal(1, party.MemberRoster.GetTroopCount(companion.CharacterObject));
+            Assert.NotSame(roster, screen.MemberRosters[0]);
+            Assert.True(screen.DoneLogic(false));
+            screen.Reset(false);
+            screen.Reset(true);
+            screen.OnPartyScreenClosed(false);
+            screen.OnPartyScreenClosed(true);
+            Assert.Equal(0, doneCalls);
+            Assert.Equal(0, closedCalls);
+            Assert.Empty(Client.NetworkSentMessages.GetMessages<NetworkCompleteDoneLogic>());
+            Assert.Empty(Client.NetworkSentMessages.GetMessages<RequestQuestTypeAcceptAlternative>());
+            Assert.Equal(6, party.MemberRoster.GetTroopCount(localTroop));
+            Assert.Equal(1, party.MemberRoster.GetTroopCount(companion.CharacterObject));
+            Assert.Equal(0, party.MemberRoster.GetTroopCount(winningTroop));
+            Assert.Equal(0, party.MemberRoster.GetTroopCount(winningCompanion.CharacterObject));
+            Assert.Equal(alternativeWinner ? 2 : 0, roster.GetTroopCount(winningTroop));
+            Assert.Equal(alternativeWinner ? 1 : 0, roster.GetTroopCount(winningCompanion.CharacterObject));
         });
     }
 

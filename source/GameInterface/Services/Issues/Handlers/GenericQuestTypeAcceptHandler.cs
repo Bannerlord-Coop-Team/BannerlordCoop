@@ -15,6 +15,7 @@ using GameInterface.Services.Issues.Interfaces;
 using GameInterface.Services.Issues.Messages;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Party;
+using GameInterface.Services.Party.Patches;
 using GameInterface.Services.Players;
 using GameInterface.Services.Players.Data;
 using GameInterface.Services.TroopRosters.Data;
@@ -23,6 +24,9 @@ using LiteNetLib;
 using Serilog;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Issues;
+using TaleWorlds.CampaignSystem.GameState;
+using TaleWorlds.Core;
+using Helpers;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Roster;
 
@@ -304,6 +308,9 @@ internal class GenericQuestTypeAcceptHandler : IHandler
                 return;
             }
 
+            ownershipRegistry.SetOwner(owner, data.OwnerControllerId);
+            if (InvalidateOpenQuestSelection(owner))
+                using (new AllowedThread()) owner.Issue.AlternativeSolutionSentTroops.Clear();
             if (owner.Issue != null &&
                 TryTakeLocalTransfers(owner.Issue.AlternativeSolutionSentTroops, out var localTransfer))
             {
@@ -311,7 +318,6 @@ internal class GenericQuestTypeAcceptHandler : IHandler
                 using (new AllowedThread()) owner.Issue.AlternativeSolutionSentTroops.Clear();
             }
             if (owner.Issue != null) resetQuestScreens.Remove(owner.Issue.AlternativeSolutionSentTroops);
-            ownershipRegistry.SetOwner(owner, data.OwnerControllerId);
             RollbackPendingAlternativeAccept(owner);
             acceptedAlternativeTroops.Remove(owner);
         });
@@ -600,16 +606,41 @@ internal class GenericQuestTypeAcceptHandler : IHandler
                 return;
             }
 
+            ownershipRegistry.SetOwner(owner, data.OwnerControllerId);
+            if (InvalidateOpenQuestSelection(owner)) ApplyReceivedTroops(owner, data.SentTroops);
             if (TryTakeLocalTransfers(owner.Issue.AlternativeSolutionSentTroops, out var localTransfer))
                 RevertLocalTransfers(MobileParty.MainParty, localTransfer.Before, localTransfer.After);
             resetQuestScreens.Remove(owner.Issue.AlternativeSolutionSentTroops);
-            ownershipRegistry.SetOwner(owner, data.OwnerControllerId);
             acceptedAlternativeTroops[owner] = (owner.Issue, data.SentTroops);
             if (ownershipRegistry.IsLocalPeerOwner(owner))
                 pendingAlternativeAccepts.Remove(owner);
             else
                 RollbackPendingAlternativeAccept(owner);
         });
+    }
+
+    private bool InvalidateOpenQuestSelection(Hero owner)
+    {
+        if (owner.Issue == null || ownershipRegistry.IsLocalPeerOwner(owner)) return false;
+        var roster = owner.Issue.AlternativeSolutionSentTroops;
+        var screen = (Game.Current?.GameStateManager?.ActiveState as PartyState)?.PartyScreenLogic;
+        if (screen == null || screen._partyScreenMode != PartyScreenHelper.PartyScreenMode.QuestTroopManage ||
+            !ReferenceEquals(screen.MemberRosters[0], roster) ||
+            !ReferenceEquals(screen.MemberRosters[1], MobileParty.MainParty?.MemberRoster)) return false;
+
+        using (new AllowedThread())
+        {
+            // Cancel edits before detaching the screen from the winning issue's roster.
+            screen.Reset(true);
+            RestoreMissingSelectedHeroes(MobileParty.MainParty, screen._initialData.LeftMemberRoster);
+            var detached = TroopRoster.CreateDummyTroopRoster();
+            screen.MemberRosters[0] = detached;
+            screen.CurrentData.LeftMemberRoster = detached;
+        }
+        PartyScreenLogicPatches.InvalidateQuestScreen(screen);
+        localSelectionTransfers.Remove(roster);
+        resetQuestScreens.Remove(roster);
+        return true;
     }
 
     private static void RestoreSelectedTroops(MobileParty party, TroopRoster troops)

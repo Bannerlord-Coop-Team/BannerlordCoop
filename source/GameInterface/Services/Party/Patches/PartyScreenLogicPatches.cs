@@ -11,6 +11,7 @@ using Helpers;
 using Serilog;
 using System;
 using System.Collections.Generic;
+using System.Runtime.CompilerServices;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Actions;
 using TaleWorlds.CampaignSystem.GameState;
@@ -25,6 +26,10 @@ namespace GameInterface.Services.Party.Patches;
 internal class PartyScreenLogicPatches
 {
     private static readonly ILogger Logger = LogManager.GetLogger<PartyScreenLogic>();
+    private static readonly ConditionalWeakTable<PartyScreenLogic, object> invalidatedQuestScreens = new();
+
+    internal static void InvalidateQuestScreen(PartyScreenLogic screen)
+        => invalidatedQuestScreens.GetValue(screen, _ => new object());
     [ThreadStatic]
     private static bool _inCommit;
     [ThreadStatic]
@@ -38,8 +43,14 @@ internal class PartyScreenLogicPatches
 
     [HarmonyPatch(nameof(PartyScreenLogic.ValidateCommand))]
     [HarmonyPrefix]
-    public static bool ValidateCommandPrefix(PartyScreenLogic.PartyCommand command, ref bool __result)
+    public static bool ValidateCommandPrefix(PartyScreenLogic.PartyCommand command, ref bool __result, PartyScreenLogic __instance = null)
     {
+        if (__instance != null && invalidatedQuestScreens.TryGetValue(__instance, out _))
+        {
+            __result = false;
+            return false;
+        }
+
         // Force-transfer loot screens only honor member takes and dismissals: the
         // commit validation rejects any prisoner, upgrade, gold, influence, or
         // morale movement, which would fail after the screen already reset.
@@ -134,10 +145,16 @@ internal class PartyScreenLogicPatches
     }
 
     [HarmonyPatch(nameof(PartyScreenLogic.Reset))]
+    [HarmonyPrefix]
+    private static bool ResetPrefix(PartyScreenLogic __instance)
+        => !invalidatedQuestScreens.TryGetValue(__instance, out _);
+
+    [HarmonyPatch(nameof(PartyScreenLogic.Reset))]
     [HarmonyPostfix]
     public static void ResetPostfix(PartyScreenLogic __instance, bool fromCancel)
     {
-        if (!ModInformation.IsClient || fromCancel || InCommit ||
+        if (invalidatedQuestScreens.TryGetValue(__instance, out _) ||
+            !ModInformation.IsClient || fromCancel || InCommit ||
             __instance._partyScreenMode != PartyScreenHelper.PartyScreenMode.QuestTroopManage ||
             __instance.CurrentData == __instance._initialData ||
             __instance.MemberRosters[(int)PartyScreenLogic.PartyRosterSide.Right] != MobileParty.MainParty?.MemberRoster)
@@ -152,6 +169,12 @@ internal class PartyScreenLogicPatches
     [HarmonyPrefix]
     public static bool DoneLogicPrefix(PartyScreenLogic __instance, ref bool __result, bool isForced)
     {
+        if (invalidatedQuestScreens.TryGetValue(__instance, out _))
+        {
+            __result = true;
+            return false;
+        }
+
         if (Hero.MainHero.Gold < -__instance.CurrentData.PartyGoldChangeAmount && __instance.CurrentData.PartyGoldChangeAmount < 0)
         {
             MBInformationManager.AddQuickInformation(GameTexts.FindText("str_inventory_popup_player_not_enough_gold", null), 0, null, null, "");
@@ -309,6 +332,11 @@ internal class PartyScreenLogicPatches
         partyScreenLogic.MemberRosters[(int)PartyScreenLogic.PartyRosterSide.Left] = leftMemberRoster;
         partyScreenLogic.PrisonerRosters[(int)PartyScreenLogic.PartyRosterSide.Left] = leftPrisonerRoster;
     }
+
+    [HarmonyPatch(nameof(PartyScreenLogic.OnPartyScreenClosed))]
+    [HarmonyPrefix]
+    private static bool OnPartyScreenClosedPrefix(PartyScreenLogic __instance)
+        => !invalidatedQuestScreens.TryGetValue(__instance, out _);
 
     [HarmonyPatch(nameof(PartyScreenLogic.OnPartyScreenClosed))]
     [HarmonyPostfix]
