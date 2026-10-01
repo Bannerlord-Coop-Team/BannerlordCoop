@@ -3,6 +3,9 @@ using Common;
 using Common.Commands;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Players;
+using GameInterface.Services.LiveTesting;
+using TaleWorlds.Engine.GauntletUI;
+using TaleWorlds.GauntletUI.BaseTypes;
 using Helpers;
 using HarmonyLib;
 using System.Diagnostics;
@@ -129,6 +132,13 @@ public sealed class CaptainTooltipFixtureCoopCommand : ICoopCommand
 
 public sealed class CaptainTooltipHoldCoopCommand : ICoopCommand
 {
+    private readonly IUiWidgetAdapter widgets;
+
+    public CaptainTooltipHoldCoopCommand(IUiWidgetAdapter widgets)
+    {
+        this.widgets = widgets;
+    }
+
     private static Mission heldMission;
     private static MissionGauntletOrderOfBattleUIHandler heldView;
     private static OrderOfBattleHeroItemVM heldCaptain;
@@ -170,8 +180,34 @@ public sealed class CaptainTooltipHoldCoopCommand : ICoopCommand
         return new CoopCommandResult(true, "LIVE_TEST_JSON=" + JsonConvert.SerializeObject(new
         {
             armed = heldCaptain != null, characterId = heldCaptain?.Agent.Character.StringId,
-            tooltipActive = InformationManager.GetIsAnyTooltipActive(), activeFrames, reopens, hides, firstHideTrace
+            tooltipActive = InformationManager.GetIsAnyTooltipActive(), activeFrames, reopens, hides, firstHideTrace,
+            presentation = ReadPresentation()
         }));
+    }
+
+    private object ReadPresentation()
+    {
+        var stack = widgets.Discover();
+        if (stack.Truncated) return new { truncated = true };
+        var state = stack.Layers.SingleOrDefault(layer => layer.Name == "Tooltip");
+        if (state == null) return new { tooltipLayerFound = false };
+        var layer = state.Native as GauntletLayer;
+        var frame = widgets.Read(state.Native);
+        return new
+        {
+            tooltipLayerFound = true, state.Active, state.Finalized, state.Supported, state.RootVisible,
+            contextActive = layer?.UIContext.IsActive, contextAlpha = layer?.UIContext.ContextAlpha,
+            contextFrame = layer?.UIContext.LocalFrameNumber,
+            pageWidth = layer?.UIContext.Root.Size.X, pageHeight = layer?.UIContext.Root.Size.Y,
+            movies = state.Movies.OfType<GauntletMovieIdentifier>().Select(movie => movie.MovieName).ToArray(),
+            frame.Truncated, frame.ScopeComplete,
+            widgets = frame.Widgets.Select(item => new
+            {
+                item.Id, item.Type, item.Text, item.Value, item.Redacted, item.Parent,
+                item.Visible, item.X, item.Y, item.Width, item.Height,
+                alpha = ((Widget)item.Native).AlphaFactor, disabledRender = ((Widget)item.Native).DisableRender
+            }).ToArray()
+        };
     }
 
     private static void Release()
