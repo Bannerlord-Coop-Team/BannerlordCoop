@@ -94,6 +94,14 @@ function Assert-Captain($State, [string]$CharacterId) {
     }
     return $captain
 }
+function Test-TooltipPresentation($State) {
+    $tooltip = @($State.presentation.widgets | Where-Object { $_.Id -ceq 'TooltipWidget' })
+    $title = @($State.presentation.widgets | Where-Object { $_.Visible -and $_.Text -match 'Issue 3286 Captain' })
+    $skill = @($State.presentation.widgets | Where-Object { $_.Visible -and $_.Text -ceq '150' })
+    return ($State.armed -and $State.tooltipActive -and $State.activeFrames -ge 30 -and $State.anchorApplications -gt 0 -and
+        $tooltip.Count -eq 1 -and $tooltip[0].Visible -and $tooltip[0].nativeVisible -and
+        $tooltip[0].X -ge 0 -and $tooltip[0].Y -ge 0 -and $title.Count -gt 0 -and $skill.Count -gt 0)
+}
 function Capture([string]$Checkpoint) {
     if ($clients.Count -eq 0) { throw 'No renderable client endpoints are available.' }
     $captures = @($clients | ForEach-Object {
@@ -190,12 +198,12 @@ try {
         $captain = Assert-Captain $after $id
         Save-Json "captain-after-$owner.json" $after
         $observed += $captain
-        $hold = Wait-State $client 'coop.debug.battle.captain_tooltip_hold' @('state') { param($s) $s.armed -and $s.tooltipActive -and $s.activeFrames -ge 30 }
+        $hold = Wait-State $client 'coop.debug.battle.captain_tooltip_hold' @('state') { param($s) Test-TooltipPresentation $s }
         Save-Json "captain-hold-before-capture-$owner.json" $hold
         Capture "captain-after-$owner"
         $hold = State $client 'coop.debug.battle.captain_tooltip_hold' @('state')
         Save-Json "captain-hold-after-capture-$owner.json" $hold
-        if (-not $hold.armed -or -not $hold.tooltipActive -or $hold.activeFrames -lt 30) { throw 'Native tooltip did not remain active through capture.' }
+        if (-not (Test-TooltipPresentation $hold)) { throw 'Native captain title and skills did not remain visible through capture.' }
         $null = State $client 'coop.debug.battle.captain_tooltip_hold' @('release')
         $null = Command $client 'coop.debug.battle.captain_tooltip' @('hide',$id)
         $selected.Remove($owner)

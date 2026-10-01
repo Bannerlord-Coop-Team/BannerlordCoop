@@ -9,6 +9,9 @@ using TaleWorlds.GauntletUI.BaseTypes;
 using Helpers;
 using HarmonyLib;
 using System.Diagnostics;
+using System.Numerics;
+using TaleWorlds.GauntletUI;
+using TaleWorlds.GauntletUI.ExtraWidgets;
 using TaleWorlds.Library;
 using TaleWorlds.MountAndBlade;
 using TaleWorlds.MountAndBlade.GauntletUI.Mission.Singleplayer;
@@ -142,6 +145,11 @@ public sealed class CaptainTooltipHoldCoopCommand : ICoopCommand
     private static Mission heldMission;
     private static MissionGauntletOrderOfBattleUIHandler heldView;
     private static OrderOfBattleHeroItemVM heldCaptain;
+    private static Widget heldPortrait;
+    private static UIContext heldTooltipContext;
+    private static int anchorApplications;
+    private static readonly System.Reflection.MethodInfo positionTooltip =
+        AccessTools.Method(typeof(TooltipWidget), "SetMirroredPosition", new[] { typeof(Vector2) });
     private static readonly Stopwatch lifetime = new Stopwatch();
     private static int activeFrames;
     private static int reopens;
@@ -168,7 +176,24 @@ public sealed class CaptainTooltipHoldCoopCommand : ICoopCommand
                 hero.Agent?.Character.StringId == args[1] && hero.Agent.IsActive());
             if (Campaign.Current == null || Mission.Current == null || Mission.Current.IsDeploymentFinished || view?._isActive != true || item == null)
                 return Failed("The real visible deployment captain is required.");
+            var stack = widgets.Discover();
+            var deployment = stack.Layers.SingleOrDefault(layer => layer.Name == "MissionOrderOfBattle");
+            var tooltip = stack.Layers.SingleOrDefault(layer => layer.Name == "Tooltip");
+            if (stack.Truncated || deployment == null || !(tooltip?.Native is GauntletLayer tooltipLayer))
+                return Failed("The actual deployment and tooltip layers are required.");
+            var frame = widgets.Read(deployment.Native);
+            var list = frame.Widgets.SingleOrDefault(widget => widget.Id == "CaptainsList" && widget.Visible)?.Native as Widget;
+            int index = view._dataSource.UnassignedHeroes.IndexOf(item);
+            if (frame.Truncated || !frame.ScopeComplete || list == null || index < 0 ||
+                list.ChildCount != view._dataSource.UnassignedHeroes.Count || positionTooltip == null)
+                return Failed("The actual captain portrait binding is required.");
+            var portrait = list.GetChild(index);
+            if (!portrait.IsVisible || portrait.Size.X <= 0 || portrait.Size.Y <= 0)
+                return Failed("The selected captain portrait has not rendered.");
             Release();
+            heldPortrait = portrait;
+            heldTooltipContext = tooltipLayer.UIContext;
+            anchorApplications = 0;
             heldMission = Mission.Current;
             heldView = view;
             heldCaptain = item;
@@ -180,7 +205,9 @@ public sealed class CaptainTooltipHoldCoopCommand : ICoopCommand
         return new CoopCommandResult(true, "LIVE_TEST_JSON=" + JsonConvert.SerializeObject(new
         {
             armed = heldCaptain != null, characterId = heldCaptain?.Agent.Character.StringId,
-            tooltipActive = InformationManager.GetIsAnyTooltipActive(), activeFrames, reopens, hides, firstHideTrace,
+            tooltipActive = InformationManager.GetIsAnyTooltipActive(), activeFrames, reopens, hides, firstHideTrace, anchorApplications,
+            portrait = heldPortrait == null ? null : new { x = heldPortrait.GlobalPosition.X, y = heldPortrait.GlobalPosition.Y,
+                width = heldPortrait.Size.X, height = heldPortrait.Size.Y, nativeVisible = heldPortrait.IsVisible },
             presentation = ReadPresentation()
         }));
     }
@@ -199,13 +226,15 @@ public sealed class CaptainTooltipHoldCoopCommand : ICoopCommand
             contextActive = layer?.UIContext.IsActive, contextAlpha = layer?.UIContext.ContextAlpha,
             contextFrame = layer?.UIContext.LocalFrameNumber,
             pageWidth = layer?.UIContext.Root.Size.X, pageHeight = layer?.UIContext.Root.Size.Y,
+            mouseX = layer?.UIContext.EventManager.MousePosition.X, mouseY = layer?.UIContext.EventManager.MousePosition.Y,
+            usableLeft = layer?.UIContext.EventManager.LeftUsableAreaStart, usableTop = layer?.UIContext.EventManager.TopUsableAreaStart,
             movies = state.Movies.OfType<GauntletMovieIdentifier>().Select(movie => movie.MovieName).ToArray(),
             frame.Truncated, frame.ScopeComplete,
             widgets = frame.Widgets.Select(item => new
             {
                 item.Id, item.Type, item.Text, item.Value, item.Redacted, item.Parent,
                 item.Visible, item.X, item.Y, item.Width, item.Height,
-                alpha = ((Widget)item.Native).AlphaFactor, disabledRender = ((Widget)item.Native).DisableRender
+                nativeVisible = ((Widget)item.Native).IsVisible, alpha = ((Widget)item.Native).AlphaFactor, disabledRender = ((Widget)item.Native).DisableRender
             }).ToArray()
         };
     }
@@ -216,6 +245,8 @@ public sealed class CaptainTooltipHoldCoopCommand : ICoopCommand
         heldCaptain = null;
         heldMission = null;
         heldView = null;
+        heldPortrait = null;
+        heldTooltipContext = null;
         lifetime.Reset();
         item?.Tooltip.ExecuteEndHint();
     }
@@ -228,7 +259,8 @@ public sealed class CaptainTooltipHoldCoopCommand : ICoopCommand
         {
             if (heldCaptain == null || __instance != heldView) return;
             if (Mission.Current != heldMission || heldMission.IsDeploymentFinished || !heldView._isActive ||
-                !heldCaptain.IsShown || !heldCaptain.Agent.IsActive() || lifetime.Elapsed.TotalSeconds >= 120 || reopens >= 10)
+                !heldCaptain.IsShown || !heldCaptain.Agent.IsActive() || !heldPortrait.IsVisible ||
+                !heldView._dataSource.UnassignedHeroes.Contains(heldCaptain) || lifetime.Elapsed.TotalSeconds >= 120 || reopens >= 10)
             {
                 Release();
                 return;
@@ -240,6 +272,22 @@ public sealed class CaptainTooltipHoldCoopCommand : ICoopCommand
                 reopens++;
                 heldCaptain.Tooltip.ExecuteBeginHint();
             }
+        }
+    }
+
+    [HarmonyPatch(typeof(TooltipWidget), "OnLateUpdate")]
+    private static class AnchorOwnedTooltip
+    {
+        [HarmonyPostfix]
+        private static void Postfix(TooltipWidget __instance)
+        {
+            if (heldCaptain == null || Mission.Current != heldMission || __instance.Context != heldTooltipContext ||
+                __instance.Id != "TooltipWidget" || !__instance.IsVisible || !heldPortrait.IsVisible) return;
+            // Use the real portrait's canvas position with vanilla's usable-area conversion and clamping.
+            var anchor = heldPortrait.GlobalPosition + (heldPortrait.Size / 2) +
+                new Vector2(__instance.EventManager.LeftUsableAreaStart, __instance.EventManager.TopUsableAreaStart);
+            positionTooltip.Invoke(__instance, new object[] { anchor });
+            anchorApplications++;
         }
     }
 
