@@ -19,7 +19,7 @@ cleanup() {
     local status=$?
     trap - EXIT
     # The scenario requests shutdown once; recover only exact-token processes still alive.
-    "$hidden" --env "ISSUE1627_CLEANUP_TOKEN=$token" --env "ISSUE1627_CLEANUP_PATH=$(wslpath -w "$attempt_root/process-cleanup.json")" "$powershell" -NoProfile -NonInteractive -WindowStyle Hidden -Command '
+    "$hidden" --env "ISSUE1627_CLEANUP_TOKEN=$token" --env "ISSUE1627_CLEANUP_PATH=$(wslpath -w "$attempt_root/process-cleanup.json")" "$powershell" -NoProfile -NonInteractive -WindowStyle Hidden -ExecutionPolicy Bypass -Command '
 $token=$env:ISSUE1627_CLEANUP_TOKEN
 $path=$env:ISSUE1627_CLEANUP_PATH
 $ErrorActionPreference="Stop"
@@ -73,7 +73,7 @@ mapfile -t identity <"$attempt_root/source-identity.txt"
 python3 /home/pwisorlowska/.codex/skills/issue-to-pr/scripts/source_receipt.py --archive "$attempt_root/source.tar" --head "$head" --tree "$tree" --output "$attempt_root/source-receipt.json" >"$attempt_root/source-receipt.log"
 cp "$carrier_root/1627-retreat-rejoin-health.ps1" "$attempt_root/scenario.ps1"
 # Preserve the disposable bench before the launcher can build or inspect its cache.
-env ROTATE_REPO="$live_root" /home/pwisorlowska/.codex/skills/rotate/scripts/rotate.sh --committed "$source_root" >"$attempt_root/source-preparation.log" 2>&1
+env ROTATE_REPO="$live_root" /home/pwisorlowska/.codex/skills/rotate/scripts/rotate.sh --allow-large --committed "$source_root" >"$attempt_root/source-preparation.log" 2>&1
 /home/pwisorlowska/.codex/skills/start-integration-test/scripts/start-integration-test.sh --repo-root "$live_root" --source-identity-root "$source_root" --expected-tree "$tree" --clients 2 --run-token "$token" --runtime-profile visual --no-focus --keep-alive --crash-artifact-dir "$attempt_root/crash-dialogs" >"$attempt_root/launcher.log" 2>&1 &
 launcher_pid=$!
 "$hidden" "$powershell" -NoProfile -NonInteractive -WindowStyle Hidden -ExecutionPolicy Bypass -File "$(wslpath -w "$attempt_root/scenario.ps1")" -ArtifactDirectory "$(wslpath -w "$attempt_root")" -RawCaptureRoot "C:\Users\Andrew\AppData\Local\CodexLiveTestRaw\$token" -RunToken "$token" -ExpectedHead "$head" -ExpectedTree "$tree" >"$attempt_root/actions.log" 2>&1
