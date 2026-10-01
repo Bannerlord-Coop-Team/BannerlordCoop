@@ -1,5 +1,6 @@
 ﻿using Common.Messaging;
 using ProtoBuf;
+using TaleWorlds.CampaignSystem.ComponentInterfaces;
 
 namespace GameInterface.Services.Crime;
 
@@ -51,5 +52,36 @@ internal readonly struct NetworkCrimeRatingNotification : IEvent
         FactionId = factionId;
         Rating = rating;
         Delta = delta;
+    }
+}
+
+[ProtoContract(SkipConstructor = true)]
+internal readonly struct RequestCrimePayment : ICommand
+{
+    [ProtoMember(1)] public string SettlementId { get; }
+    [ProtoMember(2)] public CrimeModel.PaymentMethod Method { get; }
+
+    [ProtoMember(3)] public string FactionId { get; }
+
+    public RequestCrimePayment(string settlementId, string factionId, CrimeModel.PaymentMethod method)
+    {
+        SettlementId = settlementId;
+        FactionId = factionId;
+        Method = method;
+    }
+}
+
+[ProtoContract(SkipConstructor = true)]
+internal readonly struct NetworkCrimePaymentResult : IEvent
+{
+    [ProtoMember(1)] public string HeroId { get; }
+    [ProtoMember(2)] public string SettlementId { get; }
+    [ProtoMember(3)] public bool Accepted { get; }
+
+    public NetworkCrimePaymentResult(string heroId, string settlementId, bool accepted)
+    {
+        HeroId = heroId;
+        SettlementId = settlementId;
+        Accepted = accepted;
     }
 }

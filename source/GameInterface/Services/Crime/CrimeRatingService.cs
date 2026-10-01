@@ -9,6 +9,9 @@ using System.Collections.Generic;
 using System.Linq;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Actions;
+using TaleWorlds.CampaignSystem.CampaignBehaviors;
+using TaleWorlds.CampaignSystem.ComponentInterfaces;
+using TaleWorlds.CampaignSystem.Settlements;
 
 namespace GameInterface.Services.Crime;
 
@@ -18,6 +21,8 @@ internal interface ICrimeRatingService
     void Set(IFaction faction, float value);
     void Apply(Hero hero, IFaction faction, float delta, bool showNotification);
     void Request(IFaction faction, float delta, bool showNotification);
+    void RequestPayment(IFaction faction, CrimeModel.PaymentMethod method);
+    bool Pay(Hero hero, Settlement settlement, CrimeModel.PaymentMethod method);
     void Notify(IFaction faction, float previousRating);
     void DailyTick();
     void MakePeace(IFaction first, IFaction second);
@@ -80,6 +85,46 @@ internal class CrimeRatingService : ICrimeRatingService
     {
         if (!objects.TryGetIdWithLogging(faction, out var id)) return;
         network.SendAll(new RequestCrimeRatingChange(id, delta, showNotification));
+    }
+
+    public void RequestPayment(IFaction faction, CrimeModel.PaymentMethod method)
+    {
+        if (ModInformation.IsServer) return;
+        var settlement = Settlement.CurrentSettlement;
+        if (settlement == null || settlement.MapFaction != faction
+            || !objects.TryGetIdWithLogging(settlement, out var id)
+            || !objects.TryGetIdWithLogging(faction, out var factionId)) return;
+        network.SendAll(new RequestCrimePayment(id, factionId, method));
+    }
+
+    public bool Pay(Hero hero, Settlement settlement, CrimeModel.PaymentMethod method)
+    {
+        if (!ModInformation.IsServer || !TryGetPlayer(hero, out _) || !hero.IsAlive || hero.IsPrisoner
+            || hero.PartyBelongedTo == null || settlement == null || !settlement.IsFortification
+            || hero.PartyBelongedTo.CurrentSettlement != settlement || hero.PartyBelongedTo.MapEvent != null)
+            return false;
+        if (method != CrimeModel.PaymentMethod.Gold && method != CrimeModel.PaymentMethod.Influence
+            && method != CrimeModel.PaymentMethod.Punishment && method != CrimeModel.PaymentMethod.Execution
+            && method != (CrimeModel.PaymentMethod.Gold | CrimeModel.PaymentMethod.Punishment)) return false;
+
+        using (new MainHeroSubstitutionScope(hero, hero.PartyBelongedTo))
+        {
+            var faction = settlement.MapFaction;
+            if (faction == null || !CrimeCampaignBehavior.CanPayCriminalRatingValueWith(faction, method)) return false;
+            if ((method & CrimeModel.PaymentMethod.Gold) != 0)
+            {
+                var cost = PayForCrimeAction.GetClearCrimeCost(faction, CrimeModel.PaymentMethod.Gold);
+                if (float.IsNaN(cost) || float.IsInfinity(cost) || cost < 1f || cost >= int.MaxValue
+                    || hero.Gold < (int)cost) return false;
+            }
+            if (method == CrimeModel.PaymentMethod.Influence)
+            {
+                var cost = PayForCrimeAction.GetClearCrimeCost(faction, method);
+                if (float.IsNaN(cost) || float.IsInfinity(cost) || cost <= 0f || hero.Clan.Influence < cost) return false;
+            }
+            PayForCrimeAction.Apply(faction, method);
+            return true;
+        }
     }
 
     private IEnumerable<IFaction> Factions => Clan.NonBanditFactions.Cast<IFaction>()
