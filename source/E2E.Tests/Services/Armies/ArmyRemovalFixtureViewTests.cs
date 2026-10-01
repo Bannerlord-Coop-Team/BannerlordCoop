@@ -27,6 +27,8 @@ public class ArmyRemovalFixtureViewTests : IDisposable
                     "coop.debug.army.removal_fixture_view",
                     new CoopCommandArgsFactory().FromValues(new[] { "show", "missing-army-view-party" }));
                 Assert.False(result.Succeeded);
+                Assert.Equal("command_failed", result.ErrorCode);
+                Assert.Equal("The named lord party is missing.", result.Output);
                 Assert.Same(army, instance.GetRegisteredObject<Army>(armyId));
                 Assert.Same(army, leader.Army);
                 Assert.Contains(leader, army.Parties);
