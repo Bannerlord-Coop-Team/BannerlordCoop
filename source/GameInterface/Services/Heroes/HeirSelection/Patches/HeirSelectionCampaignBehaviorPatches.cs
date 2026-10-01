@@ -16,7 +16,6 @@ using TaleWorlds.Library;
 
 namespace GameInterface.Services.Heroes.HeirSelection.Patches;
 
-#if TESTER
 [HarmonyPatch(typeof(HeirSelectionCampaignBehavior))]
 internal class HeirSelectionCampaignBehaviorPatches
 {
@@ -93,4 +92,3 @@ internal class HeirSelectionCampaignBehaviorPatches
         return false;
     }
 }
-#endif

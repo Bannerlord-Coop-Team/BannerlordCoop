@@ -5,8 +5,10 @@ using HarmonyLib;
 using System;
 using System.Collections.Generic;
 using System.Reflection;
+using System.Reflection.Emit;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Actions;
+using TaleWorlds.CampaignSystem.CharacterDevelopment;
 using TaleWorlds.CampaignSystem.Party;
 
 namespace GameInterface.Services.Crime;
@@ -83,4 +85,22 @@ internal class HostileCrimeContextPatch
     }
 
     private static void Finalizer(MainHeroSubstitutionScope __state) => __state?.Dispose();
+
+    private static IEnumerable<CodeInstruction> Transpiler(IEnumerable<CodeInstruction> instructions)
+    {
+        var hostileTraits = AccessTools.Method(typeof(TraitLevelingHelper), nameof(TraitLevelingHelper.OnHostileAction));
+        var replacements = 0;
+        foreach (var instruction in instructions)
+        {
+            if (instruction.Calls(hostileTraits))
+            {
+                // The substituted player must not use the campaign's shared trait XP.
+                instruction.opcode = OpCodes.Pop;
+                instruction.operand = null;
+                replacements++;
+            }
+            yield return instruction;
+        }
+        if (replacements != 1) throw new InvalidOperationException("Hostile action trait call changed.");
+    }
 }
