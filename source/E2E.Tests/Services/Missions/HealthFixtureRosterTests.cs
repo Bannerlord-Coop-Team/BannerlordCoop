@@ -26,23 +26,24 @@ public class HealthFixtureRosterTests : MissionTestEnvironment
         {
             var party = Server.GetRegisteredObject<MapEvent>(mapEventId).DefenderSide.Parties[0].Party.MobileParty;
             var oldTroop = GameObjectCreator.CreateInitializedObject<CharacterObject>();
-            var newTroop = GameObjectCreator.CreateInitializedObject<CharacterObject>();
+            var upgradeTarget = GameObjectCreator.CreateInitializedObject<CharacterObject>();
             oldTroop.Level = 21;
-            newTroop.Level = 26;
-            oldTroop.UpgradeTargets = new[] { newTroop };
-            newTroop.UpgradeTargets = Array.Empty<CharacterObject>();
+            upgradeTarget.Level = 26;
+            oldTroop.UpgradeTargets = new[] { upgradeTarget };
+            upgradeTarget.UpgradeTargets = Array.Empty<CharacterObject>();
             party.MemberRoster.Clear();
             party.MemberRoster.AddToCounts(oldTroop, 7, woundedCount: 2, xpChange: 30);
             var original = party.MemberRoster.GetTroopRoster().ToArray();
             Assert.Equal(30, original[0].Xp);
-            MapEventDebugCommands.ProvisionHealthFixtureRoster(party.MemberRoster, newTroop);
-            Assert.Equal(1200, party.MemberRoster.GetTroopCount(newTroop));
+            MapEventDebugCommands.ProvisionHealthFixtureRoster(party.MemberRoster, oldTroop);
+            Assert.Equal(1200, party.MemberRoster.GetTroopCount(oldTroop));
             Assert.True(party.MemberRoster.TotalHealthyCount > BattleSizeProvider.MaximumBattleSize);
-            party.MemberRoster.AddToCounts(newTroop, -1);
+            party.MemberRoster.AddToCounts(oldTroop, -1);
+            party.MemberRoster.SetElementXp(party.MemberRoster.FindIndexOfTroop(oldTroop), 20);
             MapEventDebugCommands.RestoreHealthFixtureRosters(
                 new Dictionary<MobileParty, TroopRosterElement[]> { [party] = original },
                 new Dictionary<Hero, int>());
-            Assert.Equal(0, party.MemberRoster.GetTroopCount(newTroop));
+            Assert.Equal(0, party.MemberRoster.GetTroopCount(upgradeTarget));
             var restored = Assert.Single(party.MemberRoster.GetTroopRoster().Where(element => element.Number > 0));
             Assert.Same(oldTroop, restored.Character);
             Assert.Equal(original[0].Number, restored.Number);
