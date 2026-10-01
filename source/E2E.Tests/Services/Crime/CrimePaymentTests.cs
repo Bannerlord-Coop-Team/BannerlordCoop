@@ -60,9 +60,9 @@ public class CrimePaymentTests : IDisposable
                 using var scope = new AllowedThread();
                 var settlement = Get<Settlement>(instance, settlementId);
                 var town = Get<Town>(instance, townId);
-                settlement.Town = town;
-                town.Owner = settlement.Party;
+                settlement.SetSettlementComponent(town);
                 town._ownerClan = Get<Clan>(instance, factionId);
+                Assert.Same(Get<Clan>(instance, factionId), settlement.MapFaction);
                 Get<MobileParty>(instance, payer.MobilePartyId).CurrentSettlement = settlement;
                 Get<MobileParty>(instance, other.MobilePartyId).CurrentSettlement = settlement;
                 var players = instance.Resolve<IPlayerManager>();
@@ -84,6 +84,7 @@ public class CrimePaymentTests : IDisposable
             map._menuContext.GameMenu.StringId = "town_inside_criminal";
         });
         Flush();
+        Server.Resolve<TestNetworkRouter>().ReceiveContext = TestNetworkReceiveContext.PollerThread;
     }
 
     [Fact]
