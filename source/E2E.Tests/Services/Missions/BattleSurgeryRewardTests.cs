@@ -12,7 +12,19 @@ namespace E2E.Tests.Services.Missions;
 
 public class BattleSurgeryRewardTests : MissionTestEnvironment
 {
-    public BattleSurgeryRewardTests(ITestOutputHelper output) : base(output) { }
+    public BattleSurgeryRewardTests(ITestOutputHelper output) : base(output)
+    {
+        // The headless environment omits join-time registration of pre-existing skills.
+        uint medicineHandle = 0;
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.AddExisting("SkillObject_medicine", DefaultSkills.Medicine));
+            Assert.True(Server.ObjectManager.TryGetHandle(DefaultSkills.Medicine, out medicineHandle));
+        });
+        foreach (var client in Clients)
+            client.Call(() => Assert.True(client.ObjectManager.AddExisting(
+                "SkillObject_medicine", DefaultSkills.Medicine, medicineHandle)));
+    }
 
     [Theory]
     [InlineData(true)]
