@@ -557,3 +557,7 @@ source/.idea
 
 # Repo-local MCP publish, operator profiles and run artifacts
 /.mcp-local/
+
+# Generated issue-to-PR scenarios
+/doc/automated-testing/scenarios/**/*.ps1
+/doc/automated-testing/scenarios/**/*.sh
