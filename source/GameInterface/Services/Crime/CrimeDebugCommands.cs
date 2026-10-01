@@ -1,6 +1,9 @@
 ﻿#if DEBUG
 using Common.Commands;
 using GameInterface.Services.ObjectManager;
+using GameInterface.Services.Heroes.Patches;
+using Newtonsoft.Json;
+using TaleWorlds.CampaignSystem.Settlements;
 using GameInterface.Services.Players;
 using System.Globalization;
 using System.Linq;
@@ -34,6 +37,39 @@ public class CrimeDebugCommands
                 return $"hero={player.HeroId};faction={args[0]};rating={rating.ToString(CultureInfo.InvariantCulture)};war={hero?.MapFaction?.IsAtWarWith(faction)}";
             });
             return new CoopCommandResult(true, string.Join("\n", rows));
+        }
+    }
+
+    public sealed class Preflight : ICoopCommand
+    {
+        public string Prefix => "coop.debug.crime";
+        public string Name => "preflight";
+        public string Description => "Read concrete caravan, faction and daily-model inputs for crime verification.";
+        public CoopCommandSide Side => CoopCommandSide.Server;
+        public IExpectedArgs[] ExpectedArgs { get; } = System.Array.Empty<IExpectedArgs>();
+
+        public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
+        {
+            if (!ContainerProvider.TryResolve<IObjectManager>(out var objects)
+                || !ContainerProvider.TryResolve<IPlayerManager>(out var players)
+                || Settlement.Find("town_ES1")?.MapFaction == null)
+                return new CoopCommandResult(false, "Campaign services or Danustica unavailable.", "command_failed");
+            var faction = Settlement.Find("town_ES1").MapFaction;
+            if (!objects.TryGetIdWithLogging(faction, out var factionId))
+                return new CoopCommandResult(false, "Danustica faction unavailable.", "command_failed");
+            var caravans = MobileParty.All.Where(party => party.IsCaravan && party.MapFaction == faction)
+                .Select(party => objects.TryGetId(party, out var id) ? id : null).Where(id => id != null).ToArray();
+            var rows = players.Players.Select(player =>
+            {
+                if (!objects.TryGetObjectWithLogging<Hero>(player.HeroId, out var hero)) return null;
+                using (new MainHeroSubstitutionScope(hero, hero.PartyBelongedTo))
+                    return new { hero = player.HeroId, controller = player.ControllerId,
+                        daily = Campaign.Current.Models.CrimeModel.GetDailyCrimeRatingChange(faction).ResultNumber,
+                        war = hero.MapFaction.IsAtWarWith(faction), sameFaction = hero.MapFaction == faction };
+            }).Where(row => row != null).ToArray();
+            return new CoopCommandResult(true, JsonConvert.SerializeObject(new { faction = factionId, caravans, players = rows,
+                threshold = Campaign.Current.Models.CrimeModel.DeclareWarCrimeRatingThreshold,
+                alleyDaily = Campaign.Current.Models.AlleyModel.GetDailyCrimeRatingOfAlley }));
         }
     }
 
