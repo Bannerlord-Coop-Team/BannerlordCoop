@@ -34,4 +34,23 @@ public class VillageRaidTrackerPatchesTests
         Assert.Equal(expected,
             VillageRaidTrackerPatches.ShouldRemoveRaidBookmark(autoTracked, manuallyTracked, autoTrack, activeAttack));
     }
+
+    [Fact]
+    public void RepeatedRaidRefreshDoesNotRestoreAPlayerClearedBookmark()
+    {
+        var state = new VillageRaidTrackerPatches.RaidBookmarkState();
+        Assert.True(state.TryStartRaid());
+        Assert.False(state.TryStartRaid());
+    }
+
+    [Fact]
+    public void NewRaidAfterRaidEndCanTrackAgainWithoutOldBookmarkOwnership()
+    {
+        var state = new VillageRaidTrackerPatches.RaidBookmarkState();
+        Assert.True(state.TryStartRaid());
+        state.AutoTracked = true;
+        state.EndRaid();
+        Assert.False(state.AutoTracked);
+        Assert.True(state.TryStartRaid());
+    }
 }

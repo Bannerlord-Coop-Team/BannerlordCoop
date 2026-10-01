@@ -29,6 +29,7 @@ internal class VillageRaidTrackerPatches
         var state = nameplates.GetValue(__instance, _ => new RaidBookmarkState());
         if (nameplate == null) nameplate = state.Nameplate;
         if (nameplate == null) return;
+        state.Nameplate = nameplate;
         Refresh(__instance, nameplate, state);
     }
 
@@ -51,7 +52,8 @@ internal class VillageRaidTrackerPatches
         {
             var faction = village.MapFaction;
             var hero = Hero.MainHero;
-            if (hero != null && faction != null && ShouldAutoTrackRaid(BannerlordConfig.AutoTrackAttackedSettlements,
+            if (hero == null || faction == null || !state.TryStartRaid()) return;
+            if (ShouldAutoTrackRaid(BannerlordConfig.AutoTrackAttackedSettlements,
                 faction == hero.MapFaction, faction.Leader == hero))
             {
                 var wasTracked = Campaign.Current.VisualTrackerManager.CheckTracked(village.Settlement);
@@ -65,15 +67,29 @@ internal class VillageRaidTrackerPatches
             var shouldRemove = ShouldRemoveRaidBookmark(state.AutoTracked, nameplate._isTrackedManually,
                 BannerlordConfig.AutoTrackAttackedSettlements, village.Settlement.IsUnderSiege ||
                 village.Settlement.InRebelliousState);
-            state.AutoTracked = false;
+            state.EndRaid();
             if (shouldRemove) nameplate.Untrack();
         }
     }
 
-    private sealed class RaidBookmarkState
+    internal sealed class RaidBookmarkState
     {
         public SettlementNameplateVM Nameplate;
         public bool AutoTracked;
+        private bool raidObserved;
+
+        public bool TryStartRaid()
+        {
+            if (raidObserved) return false;
+            raidObserved = true;
+            return true;
+        }
+
+        public void EndRaid()
+        {
+            raidObserved = false;
+            AutoTracked = false;
+        }
     }
 
     internal static bool ShouldRemoveRaidBookmark(bool autoTracked, bool manuallyTracked, int autoTrack, bool activeAttack) =>
