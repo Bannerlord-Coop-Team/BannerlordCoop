@@ -1,4 +1,5 @@
 ﻿using Autofac;
+using Common.Logging;
 using Coop.Core.Server.Services.Save;
 using GameInterface.CoopSessionData.Save.Data;
 using GameInterface.Services.Alleys;
@@ -12,7 +13,10 @@ using GameInterface.Services.MobileParties;
 using GameInterface.Services.Players.Data;
 using GameInterface.Services.Smithing;
 using GameInterface.Services.Workshops;
+using System;
+using System.Collections.Concurrent;
 using System.IO;
+using System.Text;
 using Xunit;
 using Xunit.Abstractions;
 
@@ -184,6 +188,248 @@ namespace Coop.Tests.Server.Services.Save
 
             // Verification
             Assert.Null(savedSession);
+        }
+
+        [Fact]
+        public void LoadSession_NoFile_LogsNothing()
+        {
+            var saveManager = container.Resolve<ICoopSaveManager>();
+            string saveName = NewSaveName();
+
+            ICoopSession? session = null;
+            var logs = CaptureLogs(saveName, () => session = saveManager.LoadCoopSession(saveName));
+
+            Assert.Null(session);
+            Assert.Empty(logs);
+        }
+
+        [Fact]
+        public void LoadSession_TruncatedFile_LogsErrorAndWritesNoFile()
+        {
+            var saveManager = container.Resolve<ICoopSaveManager>();
+            string saveName = NewSaveName();
+
+            try
+            {
+                byte[] truncated = Encoding.UTF8.GetBytes("{\"UniqueGameId\": \"" + saveName + "\", \"Players\": [");
+                string path = WriteSessionFile(saveManager, saveName, truncated);
+
+                ICoopSession? session = null;
+                var logs = CaptureLogs(saveName, () => session = saveManager.LoadCoopSession(saveName));
+
+                Assert.Null(session);
+                Assert.Contains(logs, log => log.Contains("could not be read") && log.Contains("JsonException"));
+                Assert.Single(Directory.GetFiles(saveManager.DefaultPath, saveName + "*"));
+                Assert.Equal(truncated, File.ReadAllBytes(path));
+            }
+            finally
+            {
+                DeleteSessionFiles(saveManager, saveName);
+            }
+        }
+
+        [Fact]
+        public void LoadSession_EmptyFile_LogsError()
+        {
+            var saveManager = container.Resolve<ICoopSaveManager>();
+            string saveName = NewSaveName();
+
+            try
+            {
+                WriteSessionFile(saveManager, saveName, Array.Empty<byte>());
+
+                ICoopSession? session = null;
+                var logs = CaptureLogs(saveName, () => session = saveManager.LoadCoopSession(saveName));
+
+                Assert.Null(session);
+                Assert.Contains(logs, log => log.Contains("could not be read"));
+            }
+            finally
+            {
+                DeleteSessionFiles(saveManager, saveName);
+            }
+        }
+
+        [Fact]
+        public void LoadSession_JsonNull_LogsError()
+        {
+            var saveManager = container.Resolve<ICoopSaveManager>();
+            string saveName = NewSaveName();
+
+            try
+            {
+                WriteSessionFile(saveManager, saveName, Encoding.UTF8.GetBytes("null"));
+
+                ICoopSession? session = null;
+                var logs = CaptureLogs(saveName, () => session = saveManager.LoadCoopSession(saveName));
+
+                Assert.Null(session);
+                Assert.Contains(logs, log => log.Contains("contains only null"));
+            }
+            finally
+            {
+                DeleteSessionFiles(saveManager, saveName);
+            }
+        }
+
+        [Fact]
+        public void LoadSession_OldSchemaWithoutPlayers_WarnsAndReturnsSession()
+        {
+            var saveManager = container.Resolve<ICoopSaveManager>();
+            string saveName = NewSaveName();
+
+            try
+            {
+                // Shape written by mod builds that stored ControlledEntityMap instead of Players
+                WriteSessionFile(saveManager, saveName, Encoding.UTF8.GetBytes("{\"UniqueGameId\": \"" + saveName + "\", \"ControlledEntityMap\": {}}"));
+
+                ICoopSession? session = null;
+                var logs = CaptureLogs(saveName, () => session = saveManager.LoadCoopSession(saveName));
+
+                Assert.NotNull(session);
+                Assert.Null(session.Players);
+                Assert.Contains(logs, log => log.Contains("has no Players list"));
+            }
+            finally
+            {
+                DeleteSessionFiles(saveManager, saveName);
+            }
+        }
+
+        [Fact]
+        public void LoadSession_EmptyPlayersArray_LogsLoadedLine()
+        {
+            var saveManager = container.Resolve<ICoopSaveManager>();
+            string saveName = NewSaveName();
+
+            try
+            {
+                saveManager.SaveCoopSession(saveName, NewSession(saveName));
+
+                ICoopSession? session = null;
+                var logs = CaptureLogs(saveName, () => session = saveManager.LoadCoopSession(saveName));
+
+                Assert.NotNull(session);
+                Assert.Empty(session.Players);
+                Assert.Contains(logs, log => log.Contains("0 saved player registrations"));
+                Assert.DoesNotContain(logs, log => log.Contains("has no Players list"));
+            }
+            finally
+            {
+                DeleteSessionFiles(saveManager, saveName);
+            }
+        }
+
+        [Fact]
+        public void LoadSession_FileLockedByAnotherHandle_LogsErrorWithoutThrowing()
+        {
+            var saveManager = container.Resolve<ICoopSaveManager>();
+            string saveName = NewSaveName();
+
+            try
+            {
+                string path = WriteSessionFile(saveManager, saveName, Encoding.UTF8.GetBytes("{\"Players\": []}"));
+
+                ICoopSession? session = null;
+                string[] logs;
+                using (new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.None))
+                {
+                    logs = CaptureLogs(saveName, () => session = saveManager.LoadCoopSession(saveName));
+                }
+
+                Assert.Null(session);
+                Assert.Contains(logs, log => log.Contains("could not be read") && log.Contains("IOException"));
+            }
+            finally
+            {
+                DeleteSessionFiles(saveManager, saveName);
+            }
+        }
+
+        [Fact]
+        public void LoadSession_ValidFile_LogsLoadedLineWithPlayerCount()
+        {
+            var saveManager = container.Resolve<ICoopSaveManager>();
+            string saveName = NewSaveName();
+
+            try
+            {
+                var session = NewSession(saveName,
+                    new Player("MyPlayer1", "MyHero1", "MyParty1", "MyClan1", "MyCharacter1"),
+                    null,
+                    new Player("MyPlayer2", "MyHero2", "MyParty2", "MyClan2", "MyCharacter2"));
+                saveManager.SaveCoopSession(saveName, session);
+
+                ICoopSession? loaded = null;
+                var logs = CaptureLogs(saveName, () => loaded = saveManager.LoadCoopSession(saveName));
+
+                Assert.NotNull(loaded);
+                Assert.Contains(logs, log => log.Contains("loaded from") && log.Contains("2 saved player registrations"));
+            }
+            finally
+            {
+                DeleteSessionFiles(saveManager, saveName);
+            }
+        }
+
+        private static string NewSaveName() => "SessionLoadTest_" + Guid.NewGuid().ToString("N");
+
+        private static ICoopSession NewSession(string saveName, params Player?[] players)
+        {
+            var empty = CoopSession.Empty;
+            return new CoopSession(
+                saveName,
+                players,
+                empty.CraftingPlayerData,
+                empty.WorkshopPlayerData,
+                empty.CaravansPlayerData,
+                empty.AlleyPlayerData,
+                empty.InteractionsPlayerData,
+                empty.TradePlayerData,
+                empty.InventoryPlayerData,
+                empty.HeroMeetingData,
+                empty.AgingPlayerData);
+        }
+
+        private static string WriteSessionFile(ICoopSaveManager saveManager, string saveName, byte[] contents)
+        {
+            Directory.CreateDirectory(saveManager.DefaultPath);
+            string path = saveManager.DefaultPath + saveName + saveManager.FileType;
+            File.WriteAllBytes(path, contents);
+            return path;
+        }
+
+        // Other test classes log in parallel, so only lines naming this test's file are kept
+        private static string[] CaptureLogs(string marker, Action action)
+        {
+            var messages = new ConcurrentQueue<string>();
+            Action<string> callback = message =>
+            {
+                if (message.Contains(marker)) messages.Enqueue(message);
+            };
+
+            OutputSinkManager.AddLogCallback(callback);
+            try
+            {
+                action();
+            }
+            finally
+            {
+                OutputSinkManager.RemoveLogCallback(callback);
+            }
+
+            return messages.ToArray();
+        }
+
+        private static void DeleteSessionFiles(ICoopSaveManager saveManager, string saveName)
+        {
+            if (Directory.Exists(saveManager.DefaultPath) == false) return;
+
+            foreach (var file in Directory.GetFiles(saveManager.DefaultPath, saveName + "*"))
+            {
+                File.SetAttributes(file, FileAttributes.Normal);
+                File.Delete(file);
+            }
         }
     }
 }

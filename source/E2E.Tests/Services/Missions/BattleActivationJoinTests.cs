@@ -235,6 +235,55 @@ public class BattleActivationJoinTests : MissionTestEnvironment
     }
 
     [Fact]
+    public void ActiveBattleJoinReplay_ThatTimesOutBeforeItStarts_StillRunsOnce()
+    {
+        using var fixture = new MissionEngineFixture();
+        var (mapEventId, _) = SetupCoopBattle("host", "joiner");
+        var host = Clients.First();
+
+        CoopBattleController hostController = null!;
+        host.Call(() =>
+        {
+            CreateConnectedMission(fixture, host, mapEventId);
+            hostController = host.Resolve<CoopBattleController>();
+        });
+        EnterBattle(host, mapEventId);
+        host.Call(() => hostController.OnDeploymentFinished());
+        Assert.True(IsActivated(hostController));
+        var hostBattleNetwork = host.Resolve<MockBattleNetwork>();
+        hostBattleNetwork.NetworkSentMessages.Clear();
+        hostBattleNetwork.RouteMessages = false;
+
+        host.Call(() =>
+        {
+            // Nothing pumps while the join handler waits, so its blocking replay times out before it starts.
+            using var shortTimeout = GameThread.Instance.LimitFrameDrain(
+                TimeSpan.FromSeconds(1), TimeSpan.FromMilliseconds(200));
+            Exception failure = null!;
+            var thread = new Thread(() =>
+            {
+                try
+                {
+                    host.Resolve<IMessageBroker>().Publish(
+                        host,
+                        new NetworkMissionPeerEntered("unrouted-joiner", mapEventId));
+                }
+                catch (Exception exception)
+                {
+                    failure = exception;
+                }
+            });
+            thread.Start();
+            Assert.True(thread.Join(TimeSpan.FromSeconds(10)), "the join handler should give up after the blocking timeout");
+            if (failure != null) throw failure;
+        });
+        host.PumpGameThread();
+
+        Assert.Single(hostBattleNetwork.NetworkSentMessages.Messages, message => message is NetworkBattleActivated);
+        GC.KeepAlive(hostController);
+    }
+
+    [Fact]
     public void Joiner_IntoNotYetActivatedBattle_IsNotToldActive()
     {
         using var fixture = new MissionEngineFixture();

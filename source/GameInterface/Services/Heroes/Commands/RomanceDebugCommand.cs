@@ -74,8 +74,9 @@ internal class RomanceDebugCommand
         public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
         {
             return Succeeded($"{CommandNamespace}.list; {CommandNamespace}.status <player_hero_id> <npc_hero_id>; " +
-                $"{CommandNamespace}.start|compatible|agree|marry|divorce <player_hero_id> <npc_hero_id>. " +
-                "Only start, compatible, agree, marry, and divorce require the server console. " +
+                $"{CommandNamespace}.start|compatible|agree|marry|divorce <player_hero_id> <npc_hero_id>; " +
+                $"{CommandNamespace}.fail_practicalities <first_hero_id> <second_hero_id>. " +
+                "Only start, compatible, fail_practicalities, agree, marry, and divorce require the server console. " +
                 "Divorce does not restore pre-marriage clan or party changes.");
         }
     }
@@ -185,6 +186,48 @@ internal class RomanceDebugCommand
                     targetHero,
                     Romance.RomanceLevelEnum.CoupleDecidedThatTheyAreCompatible);
                 return Succeeded($"Changed romance between {playerHero.Name} and {targetHero.Name} to {Romance.RomanceLevelEnum.CoupleDecidedThatTheyAreCompatible}.");
+            });
+        }
+    }
+
+    public sealed class RomanceFailPracticalitiesCoopCommand : ICoopCommand
+    {
+        public string Prefix => CommandNamespace;
+
+        public string Name => "fail_practicalities";
+
+        public string Description => "Sets a marriage fixture pair to failed in practicalities.";
+
+        public CoopCommandSide Side => CoopCommandSide.Server;
+
+        public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
+        {
+            new ExpectedArgs("first_hero_id", "The first registered hero id.", true),
+            new ExpectedArgs("second_hero_id", "The second registered hero id.", true),
+        };
+
+        public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
+        {
+            const string command = CommandNamespace + ".fail_practicalities";
+            if (ModInformation.IsClient) return Failed("Command can only be run on the server.");
+
+            return RunOnGameThread(command, () =>
+            {
+                if (!CommandHelpers.TryGetObjectManager(out var objectManager, out string error))
+                    return Failed(error);
+                if (!objectManager.TryGetObject<Hero>(args[0], out var firstHero) ||
+                    !objectManager.TryGetObject<Hero>(args[1], out var secondHero) ||
+                    firstHero == secondHero || !firstHero.IsAlive || !secondHero.IsAlive ||
+                    firstHero.Spouse != null || secondHero.Spouse != null)
+                    return Failed("Both fixture heroes must exist, be alive, distinct, and unmarried.");
+
+                ChangeRomanticStateAction.Apply(
+                    firstHero,
+                    secondHero,
+                    Romance.RomanceLevelEnum.FailedInPracticalities);
+                if (Romance.GetRomanticLevel(firstHero, secondHero) != Romance.RomanceLevelEnum.FailedInPracticalities)
+                    return Failed("The romance state did not change to FailedInPracticalities.");
+                return Succeeded($"Changed romance between {firstHero.Name} and {secondHero.Name} to {Romance.RomanceLevelEnum.FailedInPracticalities}.");
             });
         }
     }

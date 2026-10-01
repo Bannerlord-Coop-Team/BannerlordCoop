@@ -1,3 +1,4 @@
+using GameInterface.Services.Tournaments.Data;
 using System;
 
 namespace Missions.Tournaments;
@@ -14,5 +15,12 @@ public static class TournamentDamageAuthority
         return attackerAgentId == Guid.Empty
             ? originControllerId == victimControllerId
             : originControllerId == attackerControllerId;
+    }
+
+    public static bool IsRemotePlayer(TournamentContestantData contestant, string localControllerId)
+    {
+        if (contestant == null || !contestant.IsHuman || contestant.IsReplaced) return false;
+        return !string.IsNullOrEmpty(contestant.ControllerId) &&
+               contestant.ControllerId != localControllerId;
     }
 }

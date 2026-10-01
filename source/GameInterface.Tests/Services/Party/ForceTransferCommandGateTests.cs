@@ -9,6 +9,7 @@ namespace GameInterface.Tests.Services.Party;
 /// The force volunteers screen must reject prisoner, upgrade, and execution
 /// commands before Done, since the commit validation cannot honor them.
 /// </summary>
+[Collection("Force transfer screen")]
 public class ForceTransferCommandGateTests
 {
     [Theory]

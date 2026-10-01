@@ -4,7 +4,6 @@ using E2E.Tests.Environment.Instance;
 using E2E.Tests.Services.MapEvents;
 using E2E.Tests.Util;
 using GameInterface.Services.Armies.Messages;
-using GameInterface.Services.GameDebug.Commands;
 using GameInterface.Services.MapEvents.Messages.Leave;
 using GameInterface.Services.MobileParties.Extensions;
 using GameInterface.Services.MobileParties.Messages.Unstuck;
@@ -192,8 +191,8 @@ public class UnstuckArmyPreservationTests : MapEventTestBase
         var client = Clients.First();
         client.Call(() =>
         {
-            var command = new UnstuckCommand.UnstuckCoopCommand();
-            var result = command.ProcessCommand(new CoopCommandArgsFactory().FromValues(Array.Empty<string>()));
+            var result = client.Resolve<ICoopCommandRegistry>()
+                .ProcessCommand("coop.unstuck", new CoopCommandArgsFactory().FromValues(Array.Empty<string>()));
             Assert.True(result.Succeeded, result.Output);
         });
         TestEnvironment.FlushCoalescer();
