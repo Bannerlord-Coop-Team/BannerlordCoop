@@ -232,7 +232,7 @@ function Position([string]$Name, [string]$PartyId) {
 }
 function Test-RestorablePosition([hashtable]$Position) {
     return (($Position.settlement -ceq 'none' -and $Position.moveMode -ceq 'Hold') -or
-        ($Position.settlement -ceq 'town_ES1' -and $Position.moveMode -ceq 'Point'))
+        ($Position.settlement -ceq 'town_ES1' -and @('Hold','Point') -ccontains $Position.moveMode))
 }
 function Test-PositionMatches([hashtable]$Actual, [hashtable]$Expected, [switch]$BeforeMovementRestore) {
     $fields=@('x','y','isOnLand','settlement')
@@ -264,6 +264,9 @@ if ($SelfCheck) {
     if(-not $rejected){throw 'replacement process accepted'}
     if(-not (Test-RestorablePosition @{settlement='town_ES1';moveMode='Point'}) -or
         -not (Test-RestorablePosition @{settlement='none';moveMode='Hold'}) -or
+        -not (Test-RestorablePosition @{settlement='town_ES1';moveMode='Hold'}) -or
+        (Test-RestorablePosition @{settlement='town_ES1';moveMode='Party'}) -or
+        (Test-RestorablePosition @{settlement='town_ES1'}) -or
         (Test-RestorablePosition @{settlement='none';moveMode='Point'}) -or
         (Test-RestorablePosition @{settlement='town_ES2';moveMode='Point'})) { throw 'position admission invalid' }
     $position=@{x='658.7773';y='277.1635';isOnLand='True';settlement='town_ES1';moveMode='Point'}
@@ -300,7 +303,7 @@ try {
         if($party.controllerId -cne $c.controller -or -not $party.connected -or -not $party.active -or $party.mapEvent -cne 'none'){throw 'connected idle player required'}
         $c.partyId=[string]$party.partyId
         $pos=Position "$($c.role)-original-position" $c.partyId
-        if(-not (Test-RestorablePosition $pos)){throw 'restorable map Hold or Danustica Point state required before mutation'}
+        if(-not (Test-RestorablePosition $pos)){throw 'restorable map Hold or Danustica Hold/Point state required before mutation'}
         $script:originalPositions[$c.controller]=$pos
         $null=Sample "$($c.role)-baseline" $c.role $c.endpoint
     }
