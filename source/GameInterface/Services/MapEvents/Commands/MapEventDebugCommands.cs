@@ -2645,6 +2645,57 @@ public class MapEventDebugCommands
         }
     }
 
+    public sealed class HoldAiConversationCoopCommand : ICoopCommand
+    {
+        public string Prefix => "coop.debug.map_event";
+
+        public string Name => "hold_ai_conversation";
+
+        public string Description => "Holds an AI lord party for a player's map conversation.";
+
+        public CoopCommandSide Side => CoopCommandSide.Server;
+
+        public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
+        {
+            new ExpectedArgs("controller_id", "The connected player's controller id.", true),
+            new ExpectedArgs("hero_id", "The AI lord's registered hero id.", true),
+        };
+
+        public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
+        {
+            if (ModInformation.IsClient) return Failed("Run this command on the server.");
+            if (!TryGetPlayerParty(args[0], requireReady: true, out var objectManager, out var playerParty, out var error))
+                return Failed(error);
+            if (!ContainerProvider.TryResolve<IPlayerManager>(out var playerManager) ||
+                !playerManager.TryGetPeer(args[0], out var peer) ||
+                !objectManager.TryGetObject(args[1], out Hero aiHero))
+                return Failed("The connected player peer or AI lord is unavailable.");
+
+            var aiParty = aiHero.PartyBelongedTo;
+            if (playerParty?.Party == null || !playerParty.IsActive || playerParty.MapEvent != null ||
+                aiParty?.Party == null || !aiParty.IsActive || aiParty.MapEvent != null ||
+                aiParty.IsPlayerParty() || aiParty.LeaderHero != aiHero ||
+                playerParty.CurrentSettlement != null || aiParty.CurrentSettlement != null ||
+                !objectManager.TryGetId(playerParty.Party, out var playerPartyId) ||
+                !objectManager.TryGetId(aiParty.Party, out var aiPartyId))
+                return Failed("Both parties must be active on the map, with the AI lord leading the target party.");
+
+            var tracker = ConversationPartyTracker.Instance;
+            if (tracker == null)
+                return Failed("The conversation tracker is unavailable.");
+            if (!ConversationPartyHold.TryEngage(
+                    tracker,
+                    peer,
+                    playerPartyId,
+                    aiParty,
+                    aiPartyId,
+                    engagerIsDefender: false))
+                return Failed("The server could not acquire the AI lord party conversation hold.");
+
+            return Succeeded($"Held {aiHero.Name}'s party {aiPartyId} for player {args[0]} ({playerPartyId}).");
+        }
+    }
+
     // coop.debug.mapevent.late_join_mode_fixture PlayerOne PlayerTwo
     /// <summary>
     /// Creates a server-authoritative battle, claims mission mode before the second player joins, then routes the
