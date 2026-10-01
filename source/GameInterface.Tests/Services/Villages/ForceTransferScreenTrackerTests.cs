@@ -5,6 +5,12 @@ using Xunit;
 
 namespace GameInterface.Tests.Services.Villages;
 
+[CollectionDefinition("Force transfer screen")]
+public sealed class ForceTransferScreenCollection
+{
+}
+
+[Collection("Force transfer screen")]
 public class ForceTransferScreenTrackerTests
 {
     [Fact]

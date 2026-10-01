@@ -4235,6 +4235,42 @@ public class PlayerKingdomCreationFlowTests : IDisposable
     }
 
     [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void SwitchToPlayer_FollowsRegisteredPartyWithoutChangingItsActivation(bool active)
+    {
+        var client = Clients.First();
+        client.Resolve<IControllerIdProvider>().SetControllerId(ControllerId);
+        var player = CreateSyncedPlayerContext(ControllerId, _ => false);
+        var throwawayClanId = TestEnvironment.CreateRegisteredObject<Clan>();
+
+        client.Call(() =>
+        {
+            Assert.True(client.ObjectManager.TryGetObject<Clan>(throwawayClanId, out var throwawayClan));
+            Assert.True(client.ObjectManager.TryGetObject<MobileParty>(player.PartyId, out var party));
+            Assert.True(client.ObjectManager.TryGetObject<Hero>(player.HeroId, out var hero));
+            using (new AllowedThread())
+            {
+                Hero.MainHero.Clan = throwawayClan;
+                Campaign.Current.PlayerDefaultFaction = throwawayClan;
+                party.IsActive = active;
+            }
+
+            Campaign.Current.CameraFollowParty = MobileParty.MainParty.Party;
+            Assert.NotSame(party, MobileParty.MainParty);
+            Assert.NotSame(party.Party, Campaign.Current.CameraFollowParty);
+            Assert.False(hero.IsPrisoner);
+
+            client.Resolve<IHeroInterface>().SwitchToPlayer(new Player(
+                ControllerId, player.HeroId, player.PartyId, player.ClanId, player.CharacterId));
+
+            Assert.Same(party, MobileParty.MainParty);
+            Assert.Same(party.Party, Campaign.Current.CameraFollowParty);
+            Assert.Equal(active, party.IsActive);
+        }, new[] { AccessTools.Method(typeof(InteractionsInitializationHandler), "Handle", new[] { typeof(MessagePayload<PlayerHeroChanged>) }) });
+    }
+
+    [Theory]
     [InlineData(false, false)]
     [InlineData(true, false)]
     [InlineData(false, true)]
