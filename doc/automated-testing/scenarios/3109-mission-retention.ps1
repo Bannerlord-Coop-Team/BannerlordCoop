@@ -9,6 +9,9 @@ param(
 )
 
 $ErrorActionPreference = 'Stop'
+if ($env:CODEX_HIDDEN_WINDOWS_CHILD_MARKER) {
+    [System.IO.File]::Open($env:CODEX_HIDDEN_WINDOWS_CHILD_MARKER, [System.IO.FileMode]::CreateNew).Dispose()
+}
 Add-Type -AssemblyName System.Drawing
 . '\\wsl.localhost\Ubuntu\home\pwisorlowska\.codex\skills\issue-to-pr\scripts\live_test_client.ps1'
 

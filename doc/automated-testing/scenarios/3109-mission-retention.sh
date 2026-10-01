@@ -97,4 +97,5 @@ prepare=("$helper/prepare_local_dedicated_server.sh" --repo-root "$live_root" --
 "${prepare[@]}" --start >"$attempt_root/server-start.log" 2>&1
 "$integration" --repo-root "$live_root" --expected-tree "$tree" --clients 2 --run-token "$token" --runtime-profile visual --no-focus --keep-alive --clients-only --reuse-verified-build --crash-artifact-dir "$attempt_root/crash-dialogs" >"$attempt_root/launcher.log" 2>&1 &
 launcher_pid=$!
-"$hidden" "$powershell" -NoProfile -NonInteractive -WindowStyle Hidden -ExecutionPolicy Bypass -File "$(wslpath -w "$attempt_root/scenario.ps1")" -ArtifactDirectory "$(wslpath -w "$attempt_root")" -RawCaptureRoot "$raw_capture_root" -RunToken "$token" -ExpectedHead "$head" -ExpectedTree "$tree" >"$attempt_root/actions.log" 2>&1
+scenario_marker="$attempt_root/scenario-started.marker"
+CODEX_HIDDEN_WINDOWS_RETRY_PRE_CHILD_MARKER="$scenario_marker" "$hidden" --env "CODEX_HIDDEN_WINDOWS_CHILD_MARKER=$(wslpath -w "$scenario_marker")" "$powershell" -NoProfile -NonInteractive -WindowStyle Hidden -ExecutionPolicy Bypass -File "$(wslpath -w "$attempt_root/scenario.ps1")" -ArtifactDirectory "$(wslpath -w "$attempt_root")" -RawCaptureRoot "$raw_capture_root" -RunToken "$token" -ExpectedHead "$head" -ExpectedTree "$tree" >"$attempt_root/actions.log" 2>&1
