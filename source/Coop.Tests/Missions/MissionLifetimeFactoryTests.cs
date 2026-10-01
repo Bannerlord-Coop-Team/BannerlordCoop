@@ -93,6 +93,19 @@ public class MissionLifetimeFactoryTests
         broker.Verify(x => x.Unsubscribe(It.IsAny<Action<MessagePayload<NetworkMissionJoinInfo>>>()), Times.Once);
     }
 
+    [Fact]
+    public void AbandonedGraphReleasesDependenciesWithoutLeavingTheActiveMission()
+    {
+        using var session = BuildSession();
+        var controller = session.Resolve<IMissionLifetimeFactory>()
+            .Create<ProbeController>(Array.Empty<Parameter>());
+        controller.Abandon();
+        controller.OnRemoveBehavior();
+        controller.Dispose();
+        Assert.False(controller.Left);
+        Assert.Equal(1, controller.Dependency.Disposals);
+    }
+
     private static IContainer BuildSession()
     {
         var builder = new ContainerBuilder();

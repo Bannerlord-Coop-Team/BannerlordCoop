@@ -167,7 +167,7 @@ public class MissionModule : Module
             }
             catch
             {
-                try { controller.Dispose(); }
+                try { controller.Abandon(); }
                 catch (Exception error) { LogManager.GetLogger<MissionModule>().Error(error, "Failed location composition cleanup"); }
                 throw;
             }

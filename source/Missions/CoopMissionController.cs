@@ -136,6 +136,7 @@ public abstract class CoopMissionController : MissionBehavior, IDisposable
     private MissionLifetime lifetime;
     private bool ended;
     private bool disposed;
+    protected bool IsAbandoned { get; private set; }
 
     internal void SetLifetime(MissionLifetime value) => lifetime = value;
 
@@ -145,6 +146,15 @@ public abstract class CoopMissionController : MissionBehavior, IDisposable
     {
         if (lifetime != null) lifetime.Dispose();
         else DisposeController();
+    }
+
+    // Failed composition owns its graph, but has not acquired the shared mission state.
+    public void Abandon()
+    {
+        if (ended) return;
+        ended = true;
+        IsAbandoned = true;
+        Cleanup(DisposeController, () => lifetime?.Dispose());
     }
 
     private void DisposeController()

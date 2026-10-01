@@ -54,7 +54,7 @@ internal class CoopBattleBehaviorAttacher : ICoopBattleBehaviorAttacher
         }
         catch
         {
-            try { controller.Dispose(); }
+            try { controller.Abandon(); }
             catch (Exception error) { Logger.Error(error, "Failed battle attachment cleanup"); }
             foreach (var behavior in behaviors)
             {

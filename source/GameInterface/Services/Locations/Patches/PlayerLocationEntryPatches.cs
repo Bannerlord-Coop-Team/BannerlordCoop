@@ -130,9 +130,9 @@ internal class PlayerLocationEntryPatches
         }
         catch
         {
-            foreach (var behavior in resolvedBehaviors.OfType<IDisposable>())
+            foreach (var behavior in resolvedBehaviors.OfType<ILocationMissionLifetime>())
             {
-                try { behavior.Dispose(); }
+                try { behavior.Abandon(); }
                 catch (Exception error) { Logger.Error(error, "Failed location attachment cleanup"); }
             }
             foreach (var behavior in resolvedBehaviors.OfType<MissionBehavior>())

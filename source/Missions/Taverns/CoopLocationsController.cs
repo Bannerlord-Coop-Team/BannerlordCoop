@@ -31,7 +31,7 @@ using TaleWorlds.MountAndBlade;
 
 namespace Missions.Taverns;
 
-public class CoopLocationsController : CoopMissionController, ILocationMissionBehavior
+public class CoopLocationsController : CoopMissionController, ILocationMissionLifetime
 {
     private static readonly ILogger Logger = LogManager.GetLogger<CoopLocationsController>();
     private readonly INetwork relayNetwork;
@@ -109,7 +109,7 @@ public class CoopLocationsController : CoopMissionController, ILocationMissionBe
         }
         catch
         {
-            try { Dispose(); }
+            try { Abandon(); }
             catch (Exception error) { Logger.Error(error, "Failed mission construction cleanup"); }
             throw;
         }

@@ -179,7 +179,7 @@ public class CoopTournamentController : CoopMissionController
         }
         catch
         {
-            try { Dispose(); }
+            try { Abandon(); }
             catch (Exception error) { Logger.Error(error, "Failed mission construction cleanup"); }
             throw;
         }

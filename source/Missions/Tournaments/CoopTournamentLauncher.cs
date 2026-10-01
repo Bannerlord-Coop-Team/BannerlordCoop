@@ -104,7 +104,7 @@ public class CoopTournamentLauncher : ICoopTournamentLauncher
 
             if (mission == null)
             {
-                coopController?.Dispose();
+                coopController?.Abandon();
                 uiContext.Clear(snapshot.SessionId);
                 return null;
             }
@@ -114,7 +114,11 @@ public class CoopTournamentLauncher : ICoopTournamentLauncher
         }
         catch
         {
-            try { coopController?.Dispose(); }
+            try
+            {
+                if (mission == null) coopController?.Abandon();
+                else coopController?.Dispose();
+            }
             finally { uiContext.Clear(snapshot.SessionId); }
             throw;
         }

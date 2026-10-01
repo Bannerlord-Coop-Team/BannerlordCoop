@@ -1,5 +1,6 @@
 ﻿using Autofac;
 using Common.Messaging;
+using Common.Util;
 using Common.Network;
 using Common.PacketHandlers;
 using E2E.Tests.Environment.Instance;
@@ -18,6 +19,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
 using System.Runtime.CompilerServices;
+using TaleWorlds.MountAndBlade;
 using Xunit;
 using Xunit.Abstractions;
 
@@ -32,12 +34,15 @@ public class MissionLifetimeTests : MissionTestEnvironment
     [InlineData(typeof(CoopBattleController), 0)]
     [InlineData(typeof(CoopBattleController), 1)]
     [InlineData(typeof(CoopBattleController), 2)]
+    [InlineData(typeof(CoopBattleController), 3)]
     [InlineData(typeof(CoopLocationsController), 0)]
     [InlineData(typeof(CoopLocationsController), 1)]
     [InlineData(typeof(CoopLocationsController), 2)]
+    [InlineData(typeof(CoopLocationsController), 3)]
     [InlineData(typeof(CoopTournamentController), 0)]
     [InlineData(typeof(CoopTournamentController), 1)]
     [InlineData(typeof(CoopTournamentController), 2)]
+    [InlineData(typeof(CoopTournamentController), 3)]
     public void EndedMissionGraphsAreCollectibleBeforeSessionShutdown(Type controllerType, int exitPath)
     {
         var client = Clients.Single();
@@ -97,12 +102,23 @@ public class MissionLifetimeTests : MissionTestEnvironment
             new WeakReference(component.MissileHandler), new WeakReference(component.WeaponDropHandler),
             new WeakReference(component.WeaponPickupHandler), new WeakReference(component.AgentDeathHandler)
         };
+        var registry = client.Resolve<INetworkAgentRegistry>();
+        var priorAgent = ObjectHelper.SkipConstructor<Agent>();
+        var priorId = Guid.NewGuid();
+        if (exitPath == 3)
+            Assert.True(registry.TryRegisterAgent("prior", "prior", "prior", priorId, 42, priorAgent));
         if (exitPath == 0) controller.OnEndMissionInternal();
         else if (exitPath == 1) controller.OnRemoveBehavior();
-        else controller.Dispose();
+        else if (exitPath == 2) controller.Dispose();
+        else controller.Abandon();
         controller.OnEndMissionInternal();
         controller.OnRemoveBehavior();
         controller.Dispose();
+        if (exitPath == 3)
+        {
+            Assert.True(registry.TryGetAgentInfo(priorId, out _));
+            registry.Clear();
+        }
         return references;
     }
 }
