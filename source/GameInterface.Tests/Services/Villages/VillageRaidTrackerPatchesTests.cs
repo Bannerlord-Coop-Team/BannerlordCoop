@@ -20,4 +20,18 @@ public class VillageRaidTrackerPatchesTests
         Assert.Equal(expected,
             VillageRaidTrackerPatches.ShouldAutoTrackRaid(autoTrack, sameFaction, isFactionLeader));
     }
+
+    [Theory]
+    [InlineData(true, false, 0, false, true)]
+    [InlineData(true, false, 1, false, true)]
+    [InlineData(false, false, 0, false, false)]
+    [InlineData(true, true, 0, false, false)]
+    [InlineData(true, false, 2, false, false)]
+    [InlineData(true, false, 0, true, false)]
+    public void RaidEndPreservesUnrelatedManualDisabledAndStillAttackedBookmarks(
+        bool autoTracked, bool manuallyTracked, int autoTrack, bool activeAttack, bool expected)
+    {
+        Assert.Equal(expected,
+            VillageRaidTrackerPatches.ShouldRemoveRaidBookmark(autoTracked, manuallyTracked, autoTrack, activeAttack));
+    }
 }
