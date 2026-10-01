@@ -40,8 +40,11 @@ public class BattleTroopReserveBuilderTests : MissionTestEnvironment
             builder.RecordHealth(mapEvent, party, new Dictionary<int, float>
             {
                 [original[0].Seed] = 37f,
-                [original[1].Seed] = 64f,
-            }, 3);
+                [original[1].Seed] = 80f,
+                [original[2].Seed] = 15f,
+            }, 3, new Dictionary<int, float> { [original[0].Seed] = 37f });
+            // A successor only sees the active survivor; the routed survivor remains on the server.
+            builder.RecordHealth(mapEvent, party, new Dictionary<int, float> { [original[1].Seed] = 64f }, 3);
             party.OnTroopKilled(party.Troops.Single(t => t.Descriptor.UniqueSeed == original[2].Seed).Descriptor);
             builder.ForgetController(mapEvent, "defender");
             party.Update();

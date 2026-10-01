@@ -436,7 +436,7 @@ public class PuppetSpawner : IPuppetSpawner
             Logger.Warning("[BattleSync] Puppet {AgentId} spawned with a fallback {Side} party; {Party} unresolved", data.AgentId, data.Side, data.MapEventPartyId);
         }
 
-        var origin = new CoopAgentOrigin(character, party, -1, null, new UniqueTroopDescriptor(data.TroopSeed));
+        var origin = new CoopAgentOrigin(character, party, -1, null, new UniqueTroopDescriptor(data.TroopSeed), data.MapEventPartyId);
 
         var missionEquipment = ResolveMissionEquipment(data.MissionEquipmentData);
 

@@ -16,12 +16,15 @@ public class NetworkBattleTroopHealth : IEvent
     public Dictionary<int, float> Survivors { get; }
     [ProtoMember(4)]
     public int SuppliedCount { get; }
+    [ProtoMember(5)]
+    public Dictionary<int, float> RoutedSurvivors { get; }
 
-    public NetworkBattleTroopHealth(string mapEventId, string partyId, Dictionary<int, float> survivors, int suppliedCount)
+    public NetworkBattleTroopHealth(string mapEventId, string partyId, Dictionary<int, float> survivors, int suppliedCount, Dictionary<int, float> routedSurvivors = null)
     {
         MapEventId = mapEventId;
         PartyId = partyId;
         Survivors = survivors;
         SuppliedCount = suppliedCount;
+        RoutedSurvivors = routedSurvivors;
     }
 }

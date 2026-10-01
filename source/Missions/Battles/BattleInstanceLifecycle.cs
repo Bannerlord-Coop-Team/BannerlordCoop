@@ -12,6 +12,7 @@ using Missions.Services.Network;
 using Serilog;
 using System;
 using System.Collections.Generic;
+using TaleWorlds.MountAndBlade;
 
 namespace Missions.Battles;
 
@@ -30,6 +31,9 @@ public interface IBattleInstanceLifecycle : IDisposable
     /// local mission-membership mirror so stale mission state cannot survive into a later re-entry.
     /// </summary>
     void Leave(bool wasRetreat);
+
+    /// <summary>Retain an owned routed survivor before it leaves the agent registry.</summary>
+    void RecordRoutedHealth(Agent agent);
 }
 
 /// <inheritdoc cref="IBattleInstanceLifecycle"/>
@@ -46,6 +50,8 @@ public class BattleInstanceLifecycle : IBattleInstanceLifecycle
     private readonly IBattleSession session;
     private readonly IMissionContext missionContext;
     private bool healthReported;
+    private readonly Dictionary<string, Dictionary<int, float>> healthByParty = new();
+    private readonly Dictionary<string, Dictionary<int, float>> routedByParty = new();
 
     public BattleInstanceLifecycle(
         IBattleNetwork network,
@@ -139,16 +145,29 @@ public class BattleInstanceLifecycle : IBattleInstanceLifecycle
         missionContext.EndInstance();
     }
 
+    public void RecordRoutedHealth(Agent agent)
+    {
+        if (healthReported || agent?.Origin is not CoopAgentOrigin origin) return;
+        origin.OnMissionEnded(agent.Health, ownsHealth: true);
+        if (!(agent.Health > 0f) || origin.MapEventPartyId == null) return;
+        if (!healthByParty.TryGetValue(origin.MapEventPartyId, out var survivors))
+            healthByParty[origin.MapEventPartyId] = survivors = new Dictionary<int, float>();
+        survivors[origin.UniqueSeed] = agent.Health;
+        if (!routedByParty.TryGetValue(origin.MapEventPartyId, out var routed))
+            routedByParty[origin.MapEventPartyId] = routed = new Dictionary<int, float>();
+        routed[origin.UniqueSeed] = agent.Health;
+    }
+
     private void ReportFinalHealth()
     {
         if (healthReported || !session.HasInstance) return;
         healthReported = true;
-        var healthByParty = new Dictionary<string, Dictionary<int, float>>();
         var suppliedByParty = new Dictionary<string, int>();
         foreach (var supplier in CoopTroopSupplierRegistry.GetSuppliers(session.InstanceId))
             foreach (var (partyId, supplied) in supplier.GetSuppliedByParty())
             {
-                healthByParty[partyId] = new Dictionary<int, float>();
+                if (!healthByParty.ContainsKey(partyId))
+                    healthByParty[partyId] = new Dictionary<int, float>();
                 suppliedByParty[partyId] = supplied;
             }
 
@@ -169,7 +188,8 @@ public class BattleInstanceLifecycle : IBattleInstanceLifecycle
 
         foreach (var party in healthByParty)
             relayNetwork.SendAll(new NetworkBattleTroopHealth(session.InstanceId, party.Key, party.Value,
-                suppliedByParty.TryGetValue(party.Key, out var supplied) ? supplied : 0));
+                suppliedByParty.TryGetValue(party.Key, out var supplied) ? supplied : 0,
+                routedByParty.TryGetValue(party.Key, out var routed) ? routed : null));
     }
 
     private void Handle_LeaveMission(MessagePayload<NetworkMissionLeft> payload)

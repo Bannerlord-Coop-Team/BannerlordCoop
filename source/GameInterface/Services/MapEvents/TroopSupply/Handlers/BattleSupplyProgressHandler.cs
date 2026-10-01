@@ -44,7 +44,7 @@ internal class BattleSupplyProgressHandler : IHandler
             if (!objectManager.TryGetObjectWithLogging<MapEvent>(message.MapEventId, out var mapEvent) ||
                 !objectManager.TryGetObjectWithLogging<MapEventParty>(message.PartyId, out var party)) return;
             if (party.Party?.MapEventSide?.MapEvent == mapEvent)
-                reserveBuilder.RecordHealth(mapEvent, party, message.Survivors, message.SuppliedCount);
+                reserveBuilder.RecordHealth(mapEvent, party, message.Survivors, message.SuppliedCount, message.RoutedSurvivors);
         }, context: nameof(Handle_NetworkBattleTroopHealth));
     }
 

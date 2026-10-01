@@ -139,7 +139,7 @@ public class CoopBattleController : CoopMissionController
             session,
             missionContext);
         deathReporter = new AgentDeathReporter(network, relayNetwork, messageBroker, objectManager, coopMissionComponent, session, casualties);
-        routReporter = new AgentRoutReporter(network, messageBroker, coopMissionComponent, session, casualties);
+        routReporter = new AgentRoutReporter(network, messageBroker, coopMissionComponent, session, casualties, lifecycle);
         puppetRoutApplier = new PuppetRoutApplier(messageBroker, coopMissionComponent, casualties);
         puppetDeathApplier = new PuppetDeathApplier(
             messageBroker,

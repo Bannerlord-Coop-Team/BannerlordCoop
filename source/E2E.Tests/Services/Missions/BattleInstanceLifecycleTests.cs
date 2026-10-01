@@ -2,6 +2,12 @@
 using System.Collections.Generic;
 using System.Linq;
 using Common.Messaging;
+using E2E.Tests.Environment.MockEngine;
+using GameInterface.Services.MapEvents.Messages;
+using GameInterface.Services.MapEvents.TroopSupply;
+using GameInterface.Services.MapEvents.TroopSupply.Messages;
+using TaleWorlds.CampaignSystem;
+using TaleWorlds.Core;
 using Common.Network;
 using GameInterface.Services.Entity;
 using GameInterface.Services.MapEvents;
@@ -20,6 +26,44 @@ namespace E2E.Tests.Services.Missions;
 public class BattleInstanceLifecycleTests : MissionTestEnvironment
 {
     public BattleInstanceLifecycleTests(ITestOutputHelper output) : base(output) { }
+
+    [Fact]
+    public void RoutedSurvivor_IsReportedAfterRegistryRemoval()
+    {
+        using var fixture = new MissionEngineFixture();
+        var (mapEventId, _) = SetupCoopBattle("A", "B");
+        var client = Clients.First();
+        client.Call(() =>
+        {
+            fixture.CreateMission(client);
+            var session = new BattleSession(client.Resolve<IControllerIdProvider>(), client.Resolve<IBattleHostRegistry>());
+            Assert.True(session.TryBegin(mapEventId));
+            var registry = client.Resolve<INetworkAgentRegistry>();
+            var component = new Mock<ICoopMissionComponent>();
+            component.SetupGet(value => value.AgentRegistry).Returns(registry);
+            var broker = client.Resolve<IMessageBroker>();
+            using var lifecycle = new BattleInstanceLifecycle(client.Resolve<IBattleNetwork>(), client.Resolve<INetwork>(),
+                broker, client.ObjectManager, component.Object, new RecordingWorldItemRegistry(), session,
+                client.Resolve<IMissionContext>());
+            using var reporter = new AgentRoutReporter(client.Resolve<IBattleNetwork>(), broker, component.Object,
+                session, new CasualtyAttributionMap(), lifecycle);
+            var character = (CharacterObject)Game.Current.PlayerTroop;
+            var origin = new CoopAgentOrigin(character, null, 0, null, new UniqueTroopDescriptor(77), "routed-party");
+            var agent = Mission.Current.SpawnAgent(new AgentBuildData(character)
+                .Controller(AgentControllerType.AI).TroopOrigin(origin));
+            agent.Health = 37f;
+            var agentId = Guid.NewGuid();
+            Assert.True(registry.TryRegisterAgent("A", agentId, agent));
+            broker.Publish(this, new BattleAgentRouted(agent));
+            Assert.False(registry.TryGetAgentInfo(agentId, out _));
+            lifecycle.Leave(wasRetreat: true);
+            var report = ProtoBuf.Serializer.DeepClone(client.NetworkSentMessages
+                .GetMessages<NetworkBattleTroopHealth>().Single());
+            Assert.Equal(mapEventId, report.MapEventId);
+            Assert.Equal(37f, report.Survivors[77]);
+            Assert.Equal(37f, report.RoutedSurvivors[77]);
+        });
+    }
 
     [Fact]
     [Trait("Requirement", "BR-054")]
