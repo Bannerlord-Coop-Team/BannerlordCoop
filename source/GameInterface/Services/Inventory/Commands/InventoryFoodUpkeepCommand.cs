@@ -5,6 +5,7 @@ using GameInterface.Services.MobileParties.Extensions;
 using GameInterface.Services.ObjectManager;
 using Helpers;
 using TaleWorlds.CampaignSystem;
+using TaleWorlds.CampaignSystem.GameState;
 using TaleWorlds.CampaignSystem.CampaignBehaviors;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.Core;
@@ -57,7 +58,7 @@ public sealed class InventoryFoodUpkeepCommand : ICoopCommand
         {
             if (ModInformation.IsServer || party != MobileParty.MainParty)
                 return Failed("Inventory actions require the owning client.");
-            var active = InventoryScreenHelper.GetActiveInventoryState();
+            var active = (GameStateManager.Current?.ActiveState as InventoryState);
             if (action == "open")
             {
                 if (active != null) return Failed("Inventory is already open.");
@@ -71,7 +72,7 @@ public sealed class InventoryFoodUpkeepCommand : ICoopCommand
             else return Failed("Unknown inventory action.");
         }
 
-        var logic = InventoryScreenHelper.GetActiveInventoryState()?.InventoryLogic;
+        var logic = (GameStateManager.Current?.ActiveState as InventoryState)?.InventoryLogic;
         int backupFood = logic?._rostersBackup[1]?.TotalFood ?? -1;
         return new CoopCommandResult(true,
             $"FOOD_UPKEEP action={action} party={partyId} before={before} food={party.ItemRoster.TotalFood} " +

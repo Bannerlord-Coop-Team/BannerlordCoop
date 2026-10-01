@@ -1,4 +1,6 @@
 ﻿using Common;
+using SandBox.GauntletUI;
+using TaleWorlds.ScreenSystem;
 using Common.Util;
 using GameInterface.Services.TownMarketDatas.Patches;
 using System.Runtime.CompilerServices;
@@ -12,6 +14,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using TaleWorlds.CampaignSystem;
+using TaleWorlds.CampaignSystem.GameState;
 using TaleWorlds.CampaignSystem.Actions;
 using TaleWorlds.CampaignSystem.CharacterDevelopment;
 using TaleWorlds.CampaignSystem.Party;
@@ -76,7 +79,7 @@ namespace GameInterface.Services.Inventory.Interfaces
             => inventoryBaselines.TryGetValue(logic, out var baseline) ? baseline.ToArray() : null;
 
         public bool TryApplyInventoryUpdate(ItemRoster roster, EquipmentElement element, int amount)
-            => TryApplyInventoryUpdate(InventoryScreenHelper.GetActiveInventoryState()?.InventoryLogic,
+            => TryApplyInventoryUpdate((GameStateManager.Current?.ActiveState as InventoryState)?.InventoryLogic,
                 roster, element, amount);
 
         internal bool TryApplyInventoryUpdate(InventoryLogic logic, ItemRoster roster,
@@ -95,14 +98,14 @@ namespace GameInterface.Services.Inventory.Interfaces
                 baseline.AddToCounts(element, amount);
                 logic._rostersBackup[1].AddToCounts(element, amount);
                 roster.AddToCounts(element, amount);
-                logic.AfterReset?.Invoke(logic, false);
+                RefreshInventory(logic);
             }
             return true;
         }
 
         public bool TryClearInventory(ItemRoster roster)
         {
-            var logic = InventoryScreenHelper.GetActiveInventoryState()?.InventoryLogic;
+            var logic = (GameStateManager.Current?.ActiveState as InventoryState)?.InventoryLogic;
             if (logic == null || !ReferenceEquals(logic._rosters[1], roster) ||
                 !inventoryBaselines.TryGetValue(logic, out var baseline)) return false;
 
@@ -113,9 +116,17 @@ namespace GameInterface.Services.Inventory.Interfaces
                 baseline.Clear();
                 logic._rostersBackup[1].Clear();
                 roster.Clear();
-                logic.AfterReset?.Invoke(logic, false);
+                RefreshInventory(logic);
             }
             return true;
+        }
+
+        private static void RefreshInventory(InventoryLogic logic)
+        {
+            if (Game.Current == null) return;
+            var view = (ScreenManager.TopScreen as GauntletInventoryScreen)?._dataSource;
+            if (view != null && ReferenceEquals(view._inventoryLogic, logic))
+                view.AfterReset(logic, false);
         }
 
         public void ApplyDoneLogic(

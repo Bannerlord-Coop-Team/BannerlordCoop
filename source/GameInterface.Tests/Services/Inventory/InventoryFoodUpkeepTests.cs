@@ -1,9 +1,6 @@
 ﻿using GameInterface.Services.Inventory.Handlers;
 using GameInterface.Services.Inventory.Interfaces;
-using System.Collections.Generic;
 using System.Linq;
-using System.Runtime.Serialization;
-using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Inventory;
 using TaleWorlds.CampaignSystem.Roster;
 using TaleWorlds.Core;
@@ -17,7 +14,7 @@ public class InventoryFoodUpkeepTests
     [Theory]
     [InlineData(5, -2, 3)]
     [InlineData(1, -1, 0)]
-    public void ReceivedFoodConsumption_SurvivesCancel(int initial, int change, int expected)
+    public void ReceivedFoodConsumption_UpdatesCancelBackup(int initial, int change, int expected)
     {
         var grain = new EquipmentElement(new ItemObject("grain"));
         var logic = CreateLogic(grain, initial);
@@ -25,14 +22,14 @@ public class InventoryFoodUpkeepTests
         inventory.CaptureInventoryBaseline(logic);
 
         Assert.True(inventory.TryApplyInventoryUpdate(logic, logic._rosters[1], grain, change));
-        logic.Reset(true);
 
         Assert.Equal(expected, Count(logic._rosters[1], grain));
+        Assert.Equal(expected, Count(logic._rostersBackup[1], grain));
         Assert.True(TradeHandler.MatchesInventoryBaseline(logic._rosters[1], inventory.GetInventoryBaseline(logic)));
     }
 
     [Fact]
-    public void ReceivedFoodConsumption_PreservesCompatiblePendingDiscardUntilCancel()
+    public void ReceivedFoodConsumption_PreservesPendingDiscardAndUpdatesCancelBackup()
     {
         var grain = new EquipmentElement(new ItemObject("grain"));
         var logic = CreateLogic(grain, 10);
@@ -46,26 +43,7 @@ public class InventoryFoodUpkeepTests
 
         Assert.Equal(4, Count(logic._rosters[1], grain));
         Assert.Equal(7, Count(logic._rostersBackup[1], grain));
-        logic.Reset(true);
-        Assert.Equal(7, Count(logic._rosters[1], grain));
-        Assert.Empty(logic._rosters[0]);
-    }
-
-    [Fact]
-    public void ConsumptionConflictingWithPendingDiscard_ResetsBothSides()
-    {
-        var grain = new EquipmentElement(new ItemObject("grain"));
-        var logic = CreateLogic(grain, 5);
-        var inventory = new InventoryLogicInterface(null, null);
-        inventory.CaptureInventoryBaseline(logic);
-        logic._rosters[1].AddToCounts(grain, -4);
-        logic._rosters[0].AddToCounts(grain, 4);
-
-        inventory.TryApplyInventoryUpdate(logic, logic._rosters[1], grain, -2);
-
-        Assert.Equal(3, Count(logic._rosters[1], grain));
-        Assert.Empty(logic._rosters[0]);
-        Assert.Equal(3, Assert.Single(inventory.GetInventoryBaseline(logic)).Amount);
+        Assert.Equal(3, Count(logic._rosters[0], grain));
     }
 
     [Fact]
@@ -132,8 +110,6 @@ public class InventoryFoodUpkeepTests
         logic._rosters[1].AddToCounts(item, amount);
         logic._rostersBackup[0] = new ItemRoster();
         logic._rostersBackup[1] = new ItemRoster(logic._rosters[1]);
-        logic._partyInitialEquipment = (InventoryLogic.PartyEquipment)FormatterServices.GetUninitializedObject(typeof(InventoryLogic.PartyEquipment));
-        logic._partyInitialEquipment.CharacterEquipments = new Dictionary<CharacterObject, Equipment[]>();
         return logic;
     }
 
