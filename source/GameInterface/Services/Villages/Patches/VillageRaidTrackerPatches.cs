@@ -1,4 +1,5 @@
-﻿using System.Runtime.CompilerServices;
+﻿using System;
+using System.Runtime.CompilerServices;
 using Common;
 using HarmonyLib;
 using SandBox.GauntletUI.Map;
@@ -6,6 +7,7 @@ using SandBox.View.Map;
 using SandBox.ViewModelCollection.Nameplate;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Settlements;
+using TaleWorlds.Engine;
 using TaleWorlds.MountAndBlade;
 
 namespace GameInterface.Services.Villages.Patches;
@@ -33,7 +35,8 @@ internal class VillageRaidTrackerPatches
         Refresh(__instance, nameplate, state);
     }
 
-    [HarmonyPatch(typeof(SettlementNameplateVM), MethodType.Constructor)]
+    [HarmonyPatch(typeof(SettlementNameplateVM), MethodType.Constructor, typeof(Settlement),
+        typeof(GameEntity), typeof(Camera), typeof(Action<CampaignVec2>))]
     [HarmonyPostfix]
     internal static void NameplateCreated(SettlementNameplateVM __instance)
     {

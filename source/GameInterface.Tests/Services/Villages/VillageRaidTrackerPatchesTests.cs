@@ -1,8 +1,15 @@
-﻿using GameInterface.Services.Villages.Patches;
+﻿using System;
+using GameInterface.Services.Villages.Patches;
+using HarmonyLib;
+using SandBox.ViewModelCollection.Nameplate;
+using TaleWorlds.CampaignSystem;
+using TaleWorlds.CampaignSystem.Settlements;
+using TaleWorlds.Engine;
 using Xunit;
 
 namespace GameInterface.Tests.Services.Villages;
 
+[Collection(ModInformationRoleCollection.Name)]
 public class VillageRaidTrackerPatchesTests
 {
     [Theory]
@@ -52,5 +59,24 @@ public class VillageRaidTrackerPatchesTests
         state.EndRaid();
         Assert.False(state.AutoTracked);
         Assert.True(state.TryStartRaid());
+    }
+
+    [Fact]
+    public void RaidTrackerBindsToNativeNameplateConstructor()
+    {
+        var harmony = new Harmony(nameof(VillageRaidTrackerPatchesTests));
+        try
+        {
+            harmony.CreateClassProcessor(typeof(VillageRaidTrackerPatches)).Patch();
+            var constructor = AccessTools.DeclaredConstructor(typeof(SettlementNameplateVM),
+                new[] { typeof(Settlement), typeof(GameEntity), typeof(Camera), typeof(Action<CampaignVec2>) });
+            Assert.NotNull(constructor);
+            Assert.Contains(Harmony.GetPatchInfo(constructor).Postfixes,
+                patch => patch.owner == harmony.Id && patch.PatchMethod.Name == nameof(VillageRaidTrackerPatches.NameplateCreated));
+        }
+        finally
+        {
+            harmony.UnpatchAll(harmony.Id);
+        }
     }
 }
