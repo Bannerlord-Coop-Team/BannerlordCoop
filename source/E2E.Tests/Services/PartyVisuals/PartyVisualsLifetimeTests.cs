@@ -33,9 +33,10 @@ namespace E2E.Tests.Services.PartyVisuals
             server.Call(() =>
             {
                 var party = new MobileParty();
+                var partyBase = new PartyBase(party);
                 Assert.True(server.ObjectManager.TryGetHandle(party, out var handle));
                 var before = server.ObjectManager.GetHandleMap();
-                server.Resolve<IMessageBroker>().Publish(this, new PartyVisualCreated(null, new PartyBase(party)));
+                server.Resolve<IMessageBroker>().Publish(this, new PartyVisualCreated(null, partyBase));
                 server.Resolve<IMessageBroker>().Publish(this, new PartyVisualDestroyed(null, party));
                 Assert.Equal(before.OrderBy(entry => entry.Key),
                     server.ObjectManager.GetHandleMap().OrderBy(entry => entry.Key));
