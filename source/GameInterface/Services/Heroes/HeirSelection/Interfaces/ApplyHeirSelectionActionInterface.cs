@@ -20,6 +20,7 @@ public interface IApplyHeirSelectionActionInterface : IGameAbstraction
 {
     void ApplyByDeath(Hero originalHero, Hero heir);
     void ApplyByRetirement(Hero originalHero, Hero heir);
+    void ApplyByRetirementWithoutHeir(Hero originalHero);
 }
 
 public class ApplyHeirSelectionActionInterface : IApplyHeirSelectionActionInterface
@@ -39,6 +40,12 @@ public class ApplyHeirSelectionActionInterface : IApplyHeirSelectionActionInterf
     public void ApplyByRetirement(Hero originalHero, Hero heir)
     {
         ApplyInternal(originalHero, heir, true);
+    }
+
+    public void ApplyByRetirementWithoutHeir(Hero originalHero)
+    {
+        DisableHeroAction.Apply(originalHero);
+        RecordRetirement(originalHero);
     }
 
     private void ApplyInternal(Hero originalHero, Hero heir, bool isRetirement = false)
@@ -74,12 +81,7 @@ public class ApplyHeirSelectionActionInterface : IApplyHeirSelectionActionInterf
                 originalParty.MemberRoster.RemoveTroop(originalHero.CharacterObject, 1, default, 0);
             }
 
-            // Broadcast log entry for all clients
-            messageBroker.Publish(this, new LogPlayerRetired(originalHero));
-
-            TextObject textObject = new TextObject("{=0MTzaxau}{?CHARACTER.GENDER}She{?}He{\\?} retired from adventuring, and was last seen with a group of mountain hermits living a life of quiet contemplation.", null);
-            textObject.SetCharacterProperties("CHARACTER", originalHero.CharacterObject, false);
-            originalHero.EncyclopediaText = textObject;
+            RecordRetirement(originalHero);
         }
         if (heir.CurrentSettlement != null && heir.PartyBelongedTo != null)
         {
@@ -124,5 +126,14 @@ public class ApplyHeirSelectionActionInterface : IApplyHeirSelectionActionInterf
                 CaravanPartyComponent.TransferCaravanOwnership(hero.PartyBelongedTo, newLeader, hero.PartyBelongedTo.HomeSettlement);
             }
         }
+    }
+
+    private void RecordRetirement(Hero originalHero)
+    {
+        messageBroker.Publish(this, new LogPlayerRetired(originalHero));
+
+        TextObject textObject = new TextObject("{=0MTzaxau}{?CHARACTER.GENDER}She{?}He{\\?} retired from adventuring, and was last seen with a group of mountain hermits living a life of quiet contemplation.", null);
+        textObject.SetCharacterProperties("CHARACTER", originalHero.CharacterObject, false);
+        originalHero.EncyclopediaText = textObject;
     }
 }
