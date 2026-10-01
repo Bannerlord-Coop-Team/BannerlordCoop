@@ -12,7 +12,7 @@ screenshots document the real mission and campaign state, not numerical health.
 1. Require the exact token-bound server and both client endpoints, current source
    build identity and campaign readiness. Cold endpoint startup gets 600000 ms.
    Validate all declared command names through their endpoint command catalogs.
-2. Read `coop.debug.map_event.late_join_mode_fixture_state` and player state before
+2. Read `coop.debug.map_event.late_join_mode_fixture_state testclient testclient2` and player state before
    setup. If the loaded save has the shared idle encounter, the existing server
    `coop.debug.map_event.battle_reward_fixture_prepare testclient testclient2`
    checks and closes only that unresolved saved event. Other preflight failures

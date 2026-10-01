@@ -35,9 +35,9 @@ public sealed class BattleHealthFixtureCommand : ICoopCommand
     public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
     {
         if (ModInformation.IsClient)
-            return new CoopCommandResult(false, "Run this command on the server.");
+            return new CoopCommandResult(false, "Run this command on the server.", "command_failed");
         if (args.Count < 3 || args.Count > 5)
-            return new CoopCommandResult(false, "Expected controller, map event and operation.");
+            return new CoopCommandResult(false, "Expected controller, map event and operation.", "command_failed");
         Guid agentId = Guid.Empty;
         int damage = 0;
         bool valid = (args[2] == "retreat" || args[2] == "deploy") && args.Count == 3;
@@ -48,7 +48,7 @@ public sealed class BattleHealthFixtureCommand : ICoopCommand
                 valid = valid && int.TryParse(args[4], out damage) && damage > 0 && damage <= 10000;
         }
         if (!valid)
-            return new CoopCommandResult(false, "Invalid operation, agent or damage.");
+            return new CoopCommandResult(false, "Invalid operation, agent or damage.", "command_failed");
         if (!ContainerProvider.TryResolve<IPlayerManager>(out var players) ||
             !players.TryGetPlayer(args[0], out var player) || !players.IsConnected(player) ||
             !players.TryGetPeer(args[0], out var peer) ||
@@ -59,7 +59,7 @@ public sealed class BattleHealthFixtureCommand : ICoopCommand
             party.MapEvent == null || party.MapEvent.IsFinalized ||
             !objects.TryGetId(party.MapEvent, out string mapEventId) || mapEventId != args[1] ||
             !ContainerProvider.TryResolve<INetwork>(out var network))
-            return new CoopCommandResult(false, "A connected participant in the exact unresolved battle is required.");
+            return new CoopCommandResult(false, "A connected participant in the exact unresolved battle is required.", "command_failed");
         network.Send(peer, new NetworkBattleHealthFixture(mapEventId, args[2], agentId, damage));
         return new CoopCommandResult(true, "Requested " + args[2] + ". Read the client state to verify completion.");
     }
@@ -83,7 +83,7 @@ public sealed class BattleHealthReserveStateCommand : ICoopCommand
             !ContainerProvider.TryResolve<IObjectManager>(out var objects) ||
             !objects.TryGetObject<MapEvent>(args[0], out _) ||
             !ContainerProvider.TryResolve<IBattleTroopLedger>(out var ledger))
-            return new CoopCommandResult(false, "An exact server battle is required.");
+            return new CoopCommandResult(false, "An exact server battle is required.", "command_failed");
         var parties = ledger.GetParties(args[0]).Select(partyId =>
         {
             ledger.TryGetReserve(args[0], partyId, out var entries, out int supplied);
