@@ -158,7 +158,7 @@ try {
     Save-Json 'alley-baseline.json' @{ output=$alleys }
     if ($alleys -notmatch '\[0\].*owner=(.+)') { throw 'Danustica alley zero is unavailable.' }
     $alleyOwner=$matches[1].Trim()
-    if ($alleyOwner -cne 'none') { throw 'Alley zero must be unowned for disposable verification.' }
+    if ($alleyOwner -cne 'none' -and $alleys -notmatch '\[0\] state=OccupiedByGangLeader ') { throw 'Alley zero must be unowned or gang-owned in the disposable campaign.' }
     Command $server 'coop.debug.alley.set_owner' @('town_ES1','0',$hero1) | Out-Null
     $deadline=[DateTime]::UtcNow.AddSeconds(60)
     do {
