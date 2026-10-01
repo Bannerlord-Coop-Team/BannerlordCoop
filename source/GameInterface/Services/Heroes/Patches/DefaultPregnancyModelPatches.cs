@@ -1,4 +1,4 @@
-﻿using GameInterface.Services.Heroes.Extensions;
+using GameInterface.Services.Heroes.Extensions;
 using HarmonyLib;
 using System;
 using TaleWorlds.CampaignSystem;
@@ -7,7 +7,6 @@ using TaleWorlds.CampaignSystem.GameComponents;
 
 namespace GameInterface.Services.Heroes.Patches;
 
-#if TESTER
 [HarmonyPatch(typeof(DefaultPregnancyModel))]
 internal class DefaultPregnancyModelPatches
 {
@@ -16,13 +15,13 @@ internal class DefaultPregnancyModelPatches
     public static bool GetDailyChanceOfPregnancyForHeroPrefix(DefaultPregnancyModel __instance, Hero hero, ref float __result)
     {
         int newNoChildren = hero.Children.Count + 1;
-        float targetHeroCount = (4 + 4 * hero.Clan.Tier);
+        float targetHeroCount = (4 + (4 * hero.Clan.Tier));
         int actualCount = hero.Clan.AliveLords.Count;
 
         float scalingFactor = (!hero.IsPlayerHero() && !hero.Spouse.IsPlayerHero()) 
-            ? Math.Min(1f, (2f * targetHeroCount - (float)actualCount) / targetHeroCount) : 1f;
+            ? Math.Min(1f, ((2f * targetHeroCount) - (float)actualCount) / targetHeroCount) : 1f;
 
-        float chance = (1.2f - (hero.Age - 18f) * 0.04f) / (float)(newNoChildren * newNoChildren) * 0.12f * scalingFactor;
+        float chance = (1.2f - ((hero.Age - 18f) * 0.04f)) / (float)(newNoChildren * newNoChildren) * 0.12f * scalingFactor;
         float baseNumber = (hero.Spouse != null && __instance.IsHeroAgeSuitableForPregnancy(hero)) ? chance : 0f;
         ExplainedNumber explainedNumber = new(baseNumber, false, null);
 
@@ -35,4 +34,3 @@ internal class DefaultPregnancyModelPatches
         return false;
     }
 }
-#endif

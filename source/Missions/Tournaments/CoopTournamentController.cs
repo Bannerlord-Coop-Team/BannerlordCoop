@@ -503,6 +503,26 @@ public class CoopTournamentController : CoopMissionController
         return false;
     }
 
+    // Vanilla only gives the main agent the player multiplier, and a remote player is a puppet here.
+    public void ApplyRemotePlayerDifficulty(Agent victimAgent, ref float multiplier)
+    {
+        Agent player = victimAgent?.IsMount == true ? victimAgent.RiderAgent : victimAgent;
+        if (player == null || snapshot == null) return;
+        if (!coopMissionComponent.AgentRegistry.TryGetAgentInfo(player, out var playerInfo)) return;
+
+        TournamentAgentSpawnData spawn = FindManifestAgent(playerInfo.AgentId);
+        TournamentContestantData contestant = spawn == null
+            ? null
+            : snapshot.Contestants.FirstOrDefault(data => data.SlotId == spawn.SlotId);
+        if (!TournamentDamageAuthority.IsRemotePlayer(contestant, session.OwnControllerId)) return;
+
+        multiplier = Mission.Current.DamageToPlayerMultiplier;
+        Logger.Debug(
+            "[Tournament] Using player received damage multiplier {Multiplier} for remote player {AgentId}",
+            multiplier,
+            playerInfo.AgentId);
+    }
+
     private void CaptureMissileProgressionData(
         Agent victim,
         Agent attacker,

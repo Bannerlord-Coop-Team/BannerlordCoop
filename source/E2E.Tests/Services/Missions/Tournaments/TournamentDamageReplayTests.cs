@@ -1,6 +1,7 @@
 ﻿using Common;
 using Common.Messaging;
 using Common.Network;
+using E2E.Tests.Environment.Instance;
 using E2E.Tests.Environment.Mock;
 using E2E.Tests.Environment.MockEngine;
 using GameInterface.Services.Tournaments.Data;
@@ -12,6 +13,8 @@ using Missions.Messages;
 using Missions.Services.Network;
 using Missions.Tournaments;
 using Missions.Tournaments.Messages;
+using Missions.Tournaments.Patches;
+using SandBox.GameComponents;
 using System.Reflection;
 using TaleWorlds.Core;
 using TaleWorlds.Library;
@@ -723,6 +726,386 @@ public class TournamentDamageReplayTests : MissionTestEnvironment
         });
     }
 
+    [Theory]
+    [InlineData(0.25f, false)]
+    [InlineData(0.5f, false)]
+    [InlineData(1f, false)]
+    [InlineData(0.25f, true)]
+    public void RemotePlayerVictim_DifficultyModelUsesPlayerReceivedDamage(
+        float damageToPlayerMultiplier,
+        bool attackerIsHuman)
+    {
+        using var fixture = new MissionEngineFixture();
+        using var combat = new VanillaCombatScope();
+        var source = Clients.First();
+        SetControllerId(source, "host");
+
+        source.Call(() =>
+        {
+            var mock = CreateCombatMission(fixture, source, damageToPlayerMultiplier, out var controller);
+            var registry = source.Resolve<INetworkAgentRegistry>();
+            Agent victim = mock.SpawnAgent(
+                new AgentBuildData(Game.Current.PlayerTroop).Controller(AgentControllerType.None));
+            Agent attacker = mock.SpawnAgent(
+                new AgentBuildData(Game.Current.PlayerTroop).Controller(AgentControllerType.AI));
+            if (attackerIsHuman)
+                mock.MainAgent = attacker;
+            Guid victimId = Guid.NewGuid();
+            Guid attackerId = Guid.NewGuid();
+            Assert.True(registry.TryRegisterAgent("friend", victimId, victim));
+            Assert.True(registry.TryRegisterAgent("host", attackerId, attacker));
+            ConfigureLiveMatch(
+                controller,
+                new[]
+                {
+                    CreateHumanContestant("victim-slot", "friend"),
+                    attackerIsHuman
+                        ? CreateHumanContestant("attacker-slot", "host")
+                        : CreateNpcContestant("attacker-slot")
+                },
+                CreateSpawnData(victimId, "victim-slot", "victim", "friend"),
+                CreateSpawnData(attackerId, "attacker-slot", "attacker", attackerIsHuman ? "host" : null));
+
+            Assert.Equal(
+                damageToPlayerMultiplier,
+                Mission.Current.GetDamageMultiplierOfCombatDifficulty(victim, attacker));
+        });
+    }
+
+    [Theory]
+    [InlineData(true, 0.25f)]
+    [InlineData(false, 1f)]
+    public void RemotePlayerMount_DifficultyModelUsesRiderOnlyWhileRidden(
+        bool ridden,
+        float expectedMultiplier)
+    {
+        using var fixture = new MissionEngineFixture();
+        using var combat = new VanillaCombatScope();
+        var source = Clients.First();
+        SetControllerId(source, "host");
+
+        source.Call(() =>
+        {
+            var mock = CreateCombatMission(fixture, source, 0.25f, out var controller);
+            var registry = source.Resolve<INetworkAgentRegistry>();
+            Agent rider = mock.SpawnAgent(
+                new AgentBuildData(Game.Current.PlayerTroop).Controller(AgentControllerType.None));
+            Agent mount = mock.SpawnMount(ridden ? rider : null);
+            Agent attacker = mock.SpawnAgent(
+                new AgentBuildData(Game.Current.PlayerTroop).Controller(AgentControllerType.AI));
+            Guid riderId = Guid.NewGuid();
+            Guid mountId = Guid.NewGuid();
+            Guid attackerId = Guid.NewGuid();
+            Assert.True(registry.TryRegisterAgent("friend", riderId, rider));
+            Assert.True(registry.TryRegisterAgent("friend", mountId, mount));
+            Assert.True(registry.TryRegisterAgent("host", attackerId, attacker));
+            ConfigureLiveMatch(
+                controller,
+                new[]
+                {
+                    CreateHumanContestant("victim-slot", "friend"),
+                    CreateNpcContestant("attacker-slot")
+                },
+                CreateSpawnData(riderId, "victim-slot", "victim", "friend", mountId),
+                CreateSpawnData(attackerId, "attacker-slot", "attacker", null));
+
+            Assert.Equal(
+                expectedMultiplier,
+                Mission.Current.GetDamageMultiplierOfCombatDifficulty(mount, attacker));
+            float multiplier = 1f;
+            controller.ApplyRemotePlayerDifficulty(mount, ref multiplier);
+            Assert.Equal(expectedMultiplier, multiplier);
+        });
+    }
+
+    [Fact]
+    public void OutsideTournament_DifficultyModelKeepsVanillaMultiplier()
+    {
+        using var fixture = new MissionEngineFixture();
+        using var combat = new VanillaCombatScope();
+        var client = Clients.First();
+
+        client.Call(() =>
+        {
+            var mock = fixture.CreateMission(client);
+            mock.DamageToPlayerMultiplier = 0.25f;
+            Agent victim = mock.SpawnAgent(
+                new AgentBuildData(Game.Current.PlayerTroop).Controller(AgentControllerType.None));
+
+            Assert.Equal(1f, Mission.Current.GetDamageMultiplierOfCombatDifficulty(victim, null));
+        });
+    }
+
+    [Theory]
+    [InlineData("npc")]
+    [InlineData("replaced")]
+    [InlineData("unmanifested")]
+    public void NonPlayerVictim_DifficultyModelKeepsVanillaMultiplier(string victimKind)
+    {
+        using var fixture = new MissionEngineFixture();
+        using var combat = new VanillaCombatScope();
+        var source = Clients.First();
+        SetControllerId(source, "host");
+
+        source.Call(() =>
+        {
+            var mock = CreateCombatMission(fixture, source, 0.25f, out var controller);
+            var registry = source.Resolve<INetworkAgentRegistry>();
+            Agent victim = mock.SpawnAgent(
+                new AgentBuildData(Game.Current.PlayerTroop).Controller(AgentControllerType.None));
+            Agent attacker = mock.SpawnAgent(
+                new AgentBuildData(Game.Current.PlayerTroop).Controller(AgentControllerType.AI));
+            Guid victimId = Guid.NewGuid();
+            Guid attackerId = Guid.NewGuid();
+            Assert.True(registry.TryRegisterAgent("friend", victimId, victim));
+            Assert.True(registry.TryRegisterAgent("host", attackerId, attacker));
+            TournamentContestantData victimContestant = victimKind switch
+            {
+                "npc" => CreateNpcContestant("victim-slot"),
+                "replaced" => new TournamentContestantData(
+                    "victim-slot", "victim", 2, "friend", "Friend", true, true, false, "displaced"),
+                _ => CreateHumanContestant("victim-slot", "friend")
+            };
+            TournamentAgentSpawnData[] agents = victimKind == "unmanifested"
+                ? new[] { CreateSpawnData(attackerId, "attacker-slot", "attacker", null) }
+                : new[]
+                {
+                    CreateSpawnData(victimId, "victim-slot", "victim", "friend"),
+                    CreateSpawnData(attackerId, "attacker-slot", "attacker", null)
+                };
+            ConfigureLiveMatch(
+                controller,
+                new[] { victimContestant, CreateNpcContestant("attacker-slot") },
+                agents);
+
+            Assert.Equal(1f, Mission.Current.GetDamageMultiplierOfCombatDifficulty(victim, attacker));
+        });
+    }
+
+    [Theory]
+    [InlineData(true, 0.25f)]
+    [InlineData(false, 1f)]
+    public void LocalPlayerVictim_DifficultyModelLeavesVanillaMultiplier(
+        bool isMainAgent,
+        float expectedMultiplier)
+    {
+        using var fixture = new MissionEngineFixture();
+        using var combat = new VanillaCombatScope();
+        var source = Clients.First();
+        SetControllerId(source, "host");
+
+        source.Call(() =>
+        {
+            var mock = CreateCombatMission(fixture, source, 0.25f, out var controller);
+            var registry = source.Resolve<INetworkAgentRegistry>();
+            Agent victim = mock.SpawnAgent(
+                new AgentBuildData(Game.Current.PlayerTroop).Controller(AgentControllerType.Player));
+            Agent attacker = mock.SpawnAgent(
+                new AgentBuildData(Game.Current.PlayerTroop).Controller(AgentControllerType.AI));
+            if (isMainAgent)
+                mock.MainAgent = victim;
+            Guid victimId = Guid.NewGuid();
+            Guid attackerId = Guid.NewGuid();
+            Assert.True(registry.TryRegisterAgent("host", victimId, victim));
+            Assert.True(registry.TryRegisterAgent("host", attackerId, attacker));
+            ConfigureLiveMatch(
+                controller,
+                new[]
+                {
+                    CreateHumanContestant("victim-slot", "host"),
+                    CreateNpcContestant("attacker-slot")
+                },
+                CreateSpawnData(victimId, "victim-slot", "victim", "host"),
+                CreateSpawnData(attackerId, "attacker-slot", "attacker", null));
+
+            Assert.Equal(
+                expectedMultiplier,
+                Mission.Current.GetDamageMultiplierOfCombatDifficulty(victim, attacker));
+        });
+    }
+
+    [Theory]
+    [InlineData(36f, false, false, 9)]
+    [InlineData(37f, false, false, 10)]
+    [InlineData(1f, false, false, 1)]
+    [InlineData(5000f, false, false, 1250)]
+    [InlineData(37f, true, false, 37)]
+    [InlineData(37f, false, true, 37)]
+    public void RemotePlayerStrike_BlowDamageCeilsOnceWithTheDifficulty(
+        float magnitude,
+        bool shieldBlocked,
+        bool fallDamage,
+        int expectedDamage)
+    {
+        using var fixture = new MissionEngineFixture();
+        using var combat = new VanillaCombatScope();
+        var source = Clients.First();
+        SetControllerId(source, "host");
+
+        source.Call(() =>
+        {
+            var mock = CreateCombatMission(fixture, source, 0.25f, out var controller);
+            (Agent victim, Agent attacker) = SpawnRemotePlayerAndNpc(mock, source, controller);
+            AttackCollisionData collisionData = CreateStrikeCollision(0);
+            if (shieldBlocked)
+                collisionData._attackBlockedWithShield = true;
+            if (fallDamage)
+                collisionData.FallSpeed = 5f;
+
+            ComputeVanillaStrikeDamage(victim, attacker, magnitude, ref collisionData);
+
+            Assert.Equal(expectedDamage, collisionData.InflictedDamage);
+        });
+    }
+
+    [Theory]
+    [InlineData(0.25f, true)]
+    [InlineData(1f, false)]
+    public void RemotePlayerStrike_ShrugOffDecidedOnCorrectedDamage(
+        float damageToPlayerMultiplier,
+        bool expectedShrugOff)
+    {
+        using var fixture = new MissionEngineFixture();
+        using var combat = new VanillaCombatScope();
+        var source = Clients.First();
+        SetControllerId(source, "host");
+
+        source.Call(() =>
+        {
+            var mock = CreateCombatMission(fixture, source, damageToPlayerMultiplier, out var controller);
+            (Agent victim, Agent attacker) = SpawnRemotePlayerAndNpc(mock, source, controller);
+            AttackCollisionData collisionData = CreateStrikeCollision(0);
+            ComputeVanillaStrikeDamage(victim, attacker, 36f, ref collisionData);
+            Blow blow = CreateStrike(attacker, collisionData.InflictedDamage);
+
+            Assert.Equal(
+                expectedShrugOff,
+                MissionGameModels.Current.AgentApplyDamageModel.DecideAgentShrugOffBlow(
+                    victim,
+                    in collisionData,
+                    in blow));
+        });
+    }
+
+    [Fact]
+    public void RemotePlayerVictim_BroadcastsComputedDamageWithoutRescaling()
+    {
+        using var fixture = new MissionEngineFixture();
+        var source = Clients.First();
+        SetControllerId(source, "host");
+
+        source.Call(() =>
+        {
+            var mock = fixture.CreateMission(source);
+            mock.DamageToPlayerMultiplier = 0.25f;
+            var controller = source.Resolve<CoopTournamentController>();
+            (Agent victim, Agent attacker) = SpawnRemotePlayerAndNpc(mock, source, controller);
+
+            // The difficulty model already applied the multiplier to this blow.
+            Assert.False(controller.InterceptBlow(victim, CreateStrike(attacker, 9), CreateStrikeCollision(9)));
+            InvokeProcessPendingLocalDamage(controller);
+
+            NetworkApplyTournamentDamage damage = Assert.Single(GetSentDamage(source));
+            Assert.Equal(9, damage.Blow.InflictedDamage);
+            Assert.Equal(9, damage.CollisionData.InflictedDamage);
+            Assert.True(AgentMirror.TryGet(victim, out var mirror));
+            Assert.Equal(91f, mirror.Health);
+        });
+    }
+
+    [Fact]
+    public void ReceivedDamage_ForLocalMainAgent_IsNotRescaled()
+    {
+        using var fixture = new MissionEngineFixture();
+        var victimPeer = Clients.First();
+        SetControllerId(victimPeer, "friend");
+
+        victimPeer.Call(() =>
+        {
+            var mock = fixture.CreateMission(victimPeer);
+            mock.DamageToPlayerMultiplier = 0.25f;
+            var controller = victimPeer.Resolve<CoopTournamentController>();
+            var registry = victimPeer.Resolve<INetworkAgentRegistry>();
+            Agent victim = mock.SpawnAgent(
+                new AgentBuildData(Game.Current.PlayerTroop).Controller(AgentControllerType.Player));
+            Agent attacker = mock.SpawnAgent(
+                new AgentBuildData(Game.Current.PlayerTroop).Controller(AgentControllerType.None));
+            mock.MainAgent = victim;
+            Guid victimId = Guid.NewGuid();
+            Guid attackerId = Guid.NewGuid();
+            Assert.True(registry.TryRegisterAgent("friend", victimId, victim));
+            Assert.True(registry.TryRegisterAgent("host", attackerId, attacker));
+            ConfigureLiveMatch(
+                controller,
+                new[]
+                {
+                    CreateHumanContestant("victim-slot", "friend"),
+                    CreateNpcContestant("attacker-slot")
+                },
+                CreateSpawnData(victimId, "victim-slot", "victim", "friend"),
+                CreateSpawnData(attackerId, "attacker-slot", "attacker", null));
+
+            InvokeApplyTournamentDamage(
+                controller,
+                new NetworkApplyTournamentDamage(
+                    "session",
+                    "match",
+                    1,
+                    "host",
+                    1,
+                    victimId,
+                    attackerId,
+                    CreateStrike(attacker, 9),
+                    CreateStrikeCollision(9)));
+
+            Assert.True(AgentMirror.TryGet(victim, out var mirror));
+            Assert.Equal(91f, mirror.Health);
+            Assert.Empty(GetSentDamage(victimPeer));
+        });
+    }
+
+    [Fact]
+    public void VictimPeerLocalBlow_StaysDropped()
+    {
+        using var fixture = new MissionEngineFixture();
+        var victimPeer = Clients.First();
+        SetControllerId(victimPeer, "friend");
+
+        victimPeer.Call(() =>
+        {
+            var mock = fixture.CreateMission(victimPeer);
+            mock.DamageToPlayerMultiplier = 0.25f;
+            var controller = victimPeer.Resolve<CoopTournamentController>();
+            var registry = victimPeer.Resolve<INetworkAgentRegistry>();
+            Agent victim = mock.SpawnAgent(
+                new AgentBuildData(Game.Current.PlayerTroop).Controller(AgentControllerType.Player));
+            Agent attacker = mock.SpawnAgent(
+                new AgentBuildData(Game.Current.PlayerTroop).Controller(AgentControllerType.None));
+            mock.MainAgent = victim;
+            Guid victimId = Guid.NewGuid();
+            Guid attackerId = Guid.NewGuid();
+            Assert.True(registry.TryRegisterAgent("friend", victimId, victim));
+            Assert.True(registry.TryRegisterAgent("host", attackerId, attacker));
+            ConfigureLiveMatch(
+                controller,
+                new[]
+                {
+                    CreateHumanContestant("victim-slot", "friend"),
+                    CreateNpcContestant("attacker-slot")
+                },
+                CreateSpawnData(victimId, "victim-slot", "victim", "friend"),
+                CreateSpawnData(attackerId, "attacker-slot", "attacker", null));
+
+            // Only the attacker owner broadcasts, so this locally scaled puppet swing is dropped.
+            Assert.False(controller.InterceptBlow(victim, CreateStrike(attacker, 9), CreateStrikeCollision(9)));
+            InvokeProcessPendingLocalDamage(controller);
+
+            Assert.Empty(GetSentDamage(victimPeer));
+            Assert.True(AgentMirror.TryGet(victim, out var mirror));
+            Assert.Equal(100f, mirror.Health);
+        });
+    }
+
     private static void InvokeApplyTournamentDamage(
         CoopTournamentController controller,
         NetworkApplyTournamentDamage message)
@@ -761,7 +1144,8 @@ public class TournamentDamageReplayTests : MissionTestEnvironment
         Guid agentId,
         string slotId,
         string characterId,
-        string controllerId) =>
+        string controllerId,
+        Guid mountAgentId = default) =>
         new(
             agentId,
             slotId,
@@ -775,7 +1159,7 @@ public class TournamentDamageReplayTests : MissionTestEnvironment
             Vec3.Zero,
             Vec2.Forward,
             100f,
-            Guid.Empty,
+            mountAgentId,
             null,
             0,
             Array.Empty<EquipmentElement>(),
@@ -832,6 +1216,150 @@ public class TournamentDamageReplayTests : MissionTestEnvironment
             BindingFlags.Instance | BindingFlags.NonPublic);
         Assert.NotNull(onLeaving);
         onLeaving.Invoke(controller, null);
+    }
+
+    private static void ConfigureLiveMatch(
+        CoopTournamentController controller,
+        TournamentContestantData[] contestants,
+        params TournamentAgentSpawnData[] agents)
+    {
+        TournamentSessionSnapshot snapshot = CreateLiveSnapshot(contestants);
+        SetField(controller, "snapshot", snapshot);
+        Assert.True(controller.Session.TryApplyState(
+            snapshot.SessionId,
+            snapshot.MissionInstanceId,
+            snapshot.Revision,
+            snapshot.BracketRevision,
+            snapshot.CurrentMatchId,
+            snapshot.HostControllerId,
+            Array.Empty<string>()));
+        SetField(
+            controller,
+            "latestManifest",
+            new TournamentSpawnManifestData("session", "match", 1, 1, 1, agents));
+    }
+
+    private static TournamentContestantData CreateHumanContestant(string slotId, string controllerId) =>
+        new(slotId, slotId, 1, controllerId, controllerId, true, false, false, null);
+
+    private static TournamentContestantData CreateNpcContestant(string slotId) =>
+        new(slotId, slotId, 2, null, slotId, false, false, false, null);
+
+    private static Blow CreateStrike(Agent attacker, int damage) =>
+        new(attacker.Index) { InflictedDamage = damage, DamageType = DamageTypes.Cut };
+
+    private static AttackCollisionData CreateStrikeCollision(int damage) =>
+        new()
+        {
+            _collisionResult = (int)CombatCollisionResult.StrikeAgent,
+            InflictedDamage = damage
+        };
+
+    private static List<NetworkApplyTournamentDamage> GetSentDamage(EnvironmentInstance instance) =>
+        Assert.IsType<MockBattleNetwork>(instance.Resolve<IBattleNetwork>())
+            .NetworkSentMessages.GetMessages<NetworkApplyTournamentDamage>().ToList();
+
+    private static MockMission CreateCombatMission(
+        MissionEngineFixture fixture,
+        EnvironmentInstance instance,
+        float damageToPlayerMultiplier,
+        out CoopTournamentController controller)
+    {
+        MockMission mock = fixture.CreateMission(instance);
+        mock.DamageToPlayerMultiplier = damageToPlayerMultiplier;
+        controller = instance.Resolve<CoopTournamentController>();
+        mock.Shell.MissionBehaviors.Add(controller);
+        return mock;
+    }
+
+    private static (Agent Victim, Agent Attacker) SpawnRemotePlayerAndNpc(
+        MockMission mock,
+        EnvironmentInstance instance,
+        CoopTournamentController controller)
+    {
+        var registry = instance.Resolve<INetworkAgentRegistry>();
+        Agent victim = mock.SpawnAgent(
+            new AgentBuildData(Game.Current.PlayerTroop).Controller(AgentControllerType.None));
+        Agent attacker = mock.SpawnAgent(
+            new AgentBuildData(Game.Current.PlayerTroop).Controller(AgentControllerType.AI));
+        Guid victimId = Guid.NewGuid();
+        Guid attackerId = Guid.NewGuid();
+        Assert.True(registry.TryRegisterAgent("friend", victimId, victim));
+        Assert.True(registry.TryRegisterAgent("host", attackerId, attacker));
+        ConfigureLiveMatch(
+            controller,
+            new[]
+            {
+                CreateHumanContestant("victim-slot", "friend"),
+                CreateNpcContestant("attacker-slot")
+            },
+            CreateSpawnData(victimId, "victim-slot", "victim", "friend"),
+            CreateSpawnData(attackerId, "attacker-slot", "attacker", null));
+        return (victim, attacker);
+    }
+
+    // Vanilla GetAttackCollisionResults builds AttackInformation with the mission's difficulty multiplier.
+    private static void ComputeVanillaStrikeDamage(
+        Agent victim,
+        Agent attacker,
+        float magnitude,
+        ref AttackCollisionData collisionData)
+    {
+        var attackInformation = new AttackInformation
+        {
+            VictimAgentAbsorbedDamageRatio = 1f,
+            DamageMultiplierOfBone = 1f,
+            CombatDifficultyMultiplier = Mission.Current.GetDamageMultiplierOfCombatDifficulty(victim, attacker)
+        };
+        MissionCombatMechanicsHelper.ComputeBlowDamage(
+            in attackInformation,
+            in collisionData,
+            null,
+            DamageTypes.Pierce,
+            magnitude,
+            0,
+            false,
+            out collisionData.InflictedDamage,
+            out collisionData.AbsorbedByArmor,
+            out _);
+    }
+
+    // The real stagger threshold reads perks and managed parameters, so it is pinned here.
+    private sealed class VanillaCombatScope : IDisposable
+    {
+        private const float StaggerThresholdDamage = 10f;
+        private readonly Harmony harmony = new($"e2e.tournamentdamage.difficulty.{Guid.NewGuid()}");
+        private readonly MissionGameModels previousModels = MissionGameModels.Current;
+
+        public VanillaCombatScope()
+        {
+            TournamentCombatPatchInstaller.Install(harmony);
+            harmony.Patch(
+                AccessTools.Method(
+                    typeof(SandboxAgentApplyDamageModel),
+                    nameof(SandboxAgentApplyDamageModel.CalculateStaggerThresholdDamage)),
+                prefix: new HarmonyMethod(AccessTools.Method(
+                    typeof(VanillaCombatScope),
+                    nameof(StaggerThreshold))));
+            _ = new MissionGameModels(new GameModel[]
+            {
+                new SandboxMissionDifficultyModel(),
+                new SandboxStrikeMagnitudeModel(),
+                new SandboxAgentApplyDamageModel()
+            });
+        }
+
+        public void Dispose()
+        {
+            harmony.UnpatchAll(harmony.Id);
+            MissionGameModels.Current = previousModels;
+        }
+
+        private static bool StaggerThreshold(ref float __result)
+        {
+            __result = StaggerThresholdDamage;
+            return false;
+        }
     }
 
     private static TournamentSessionSnapshot CreateLiveSnapshot(

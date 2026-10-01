@@ -2,6 +2,7 @@
 using GameInterface.Services.GameState.Interfaces;
 using GameInterface.Services.GameState.Messages;
 using Moq;
+using System.Runtime.CompilerServices;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.Core;
 using TaleWorlds.Localization;
@@ -11,6 +12,12 @@ namespace GameInterface.Tests.Services.GameState;
 
 public class GameStateInterfaceTests
 {
+    static GameStateInterfaceTests()
+    {
+        // EndGame marshals to the game thread; start the Coop.Tests pump even when this class runs alone.
+        RuntimeHelpers.RunModuleConstructor(typeof(Coop.Tests.Mocks.TestNetwork).Module.ModuleHandle);
+    }
+
     [Fact]
     public void EndGame_DoesNotPublishMainMenuEnteredBeforeInitialStateActivation()
     {

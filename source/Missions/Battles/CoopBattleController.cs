@@ -138,7 +138,7 @@ public class CoopBattleController : CoopMissionController
             worldItemRegistry,
             session,
             missionContext);
-        deathReporter = new AgentDeathReporter(network, relayNetwork, messageBroker, objectManager, coopMissionComponent, session, casualties);
+        deathReporter = new AgentDeathReporter(network, relayNetwork, messageBroker, coopMissionComponent, session, casualties);
         routReporter = new AgentRoutReporter(network, messageBroker, coopMissionComponent, session, casualties);
         puppetRoutApplier = new PuppetRoutApplier(messageBroker, coopMissionComponent, casualties);
         puppetDeathApplier = new PuppetDeathApplier(
@@ -529,21 +529,38 @@ public class CoopBattleController : CoopMissionController
             }
         }
 
+        // A timed-out blocking run never starts later, so the catch queues the replay again. The shared claim
+        // keeps it to one run when the first copy had already started.
+        int replayClaimed = 0;
+        void ReplayJoinStateOnce()
+        {
+            if (System.Threading.Interlocked.Exchange(ref replayClaimed, 1) == 0)
+                ReplayJoinState();
+        }
+
         // Only an active battle waits and guarantees replay before activation. Before activation an inline
         // commit broadcast may overtake this queued replay; that is safe while activation remains idempotent
         // and puppets spawn unpaused, and avoids blocking while the load-time game-thread queue cannot drain.
         try
         {
             GameThread.RunSafe(
-                ReplayJoinState,
+                ReplayJoinStateOnce,
                 blocking: Deployment.IsActivated,
                 context: nameof(SendJoinInfo));
         }
-        catch (Exception e) when (e is TimeoutException || e is OperationCanceledException)
+        catch (TimeoutException e)
+        {
+            GameThread.RunSafe(ReplayJoinStateOnce, context: nameof(SendJoinInfo));
+            Logger.Warning(
+                e,
+                "[BattleSync] Join replay barrier for {Controller} timed out; the replay is queued again",
+                controllerId);
+        }
+        catch (OperationCanceledException e)
         {
             Logger.Warning(
                 e,
-                "[BattleSync] Join replay barrier for {Controller} was abandoned; the replay stays queued",
+                "[BattleSync] Join replay barrier for {Controller} was canceled; the replay is not queued again",
                 controllerId);
         }
     }

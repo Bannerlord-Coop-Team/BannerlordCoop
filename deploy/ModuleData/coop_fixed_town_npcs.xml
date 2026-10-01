@@ -583,32 +583,32 @@
     </Equipments>
   </NPCCharacter>
   <NPCCharacter
-    id="coop_fixed_npc_2cb61191"
-    name="{=!}Kuthol"
+    id="coop_fixed_npc_a634d3aa"
+    name="{=!}Lashes"
     default_group="Infantry"
     level="1"
     is_female="false"
     is_hero="false"
     is_template="false"
     occupation="Townsfolk"
-    culture="Culture.sturgia"
+    culture="Culture.battania"
     is_hidden_encyclopedia="true"
-    coop_settlement="town_S1"
+    coop_settlement="town_B4"
     coop_location="tavern"
     coop_spawn_tag="npc_common"
-    coop_dialogue="Hurry up and get on with it."
+    coop_dialogue="Go away"
     coop_enabled="true">
     <face>
-      <face_key_template value="BodyProperty.townsman_sturgia" />
+      <face_key_template value="BodyProperty.townsman_battania" />
     </face>
     <skills />
     <Equipments>
       <EquipmentRoster civilian="true">
-        <equipment slot="Head" id="Item.segmented_skullcap_over_mail_coif" />
-        <equipment slot="Cape" id="Item.brass_lamellar_shoulder_white" />
-        <equipment slot="Body" id="Item.sturgian_lamellar_fortified" />
+        <equipment slot="Head" id="Item.sturgian_helmet_b_open" />
+        <equipment slot="Cape" id="Item.fur_cloak_c" />
+        <equipment slot="Body" id="Item.sturgian_lamellar_base" />
         <equipment slot="Gloves" id="Item.northern_plated_gloves" />
-        <equipment slot="Leg" id="Item.strapped_mail_chausses" />
+        <equipment slot="Leg" id="Item.strapped_leather_boots" />
       </EquipmentRoster>
     </Equipments>
   </NPCCharacter>
