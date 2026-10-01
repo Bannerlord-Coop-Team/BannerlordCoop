@@ -13,6 +13,7 @@ using GameInterface.Services.Players.Data;
 using GameInterface.Services.TroopRosters.Data;
 using GameInterface.Services.TroopRosters.Interfaces;
 using HarmonyLib;
+using LiteNetLib;
 using Helpers;
 using Moq;
 using SandBox.GauntletUI.Map;
@@ -64,6 +65,11 @@ public abstract class MapEventTestBase : IDisposable
             AccessTools.Method(typeof(GauntletMapEventVisual), nameof(GauntletMapEventVisual.Initialize)),
         };
     }
+
+    protected IReadOnlyList<MethodBase> WithoutNetworkDelivery() => MapEventDisabledMethods
+        .Append(AccessTools.Method(typeof(TestNetworkRouter), nameof(TestNetworkRouter.SendReliablePayload),
+            new[] { typeof(NetPeer), typeof(NetPeer), typeof(byte[]) }))
+        .ToList();
 
     public void Dispose() => TestEnvironment.Dispose();
 

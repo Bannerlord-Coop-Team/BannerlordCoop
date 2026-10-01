@@ -11,6 +11,7 @@ public readonly struct NetworkSetArmyAiBehaviorObject : ICommand
 {
     [ProtoMember(1)]
     public readonly string ArmyId;
+    // A null id explicitly clears the objective.
     [ProtoMember(2)]
     public readonly string AiBehaviorObjectId;
     [ProtoMember(3)]

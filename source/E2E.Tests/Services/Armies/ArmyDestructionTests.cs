@@ -1,6 +1,7 @@
 ﻿using E2E.Tests.Environment;
 using E2E.Tests.Util;
 using GameInterface.Services.Armies;
+using GameInterface.Services.Armies.Messages;
 using HarmonyLib;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Actions;
@@ -109,11 +110,12 @@ public class ArmyDestructionTests : IDisposable
     }
 
     [Fact]
-    public void ServerDisbandArmyWithoutMainParty_SyncAllClients()
+    public void ServerDisbandArmyWithoutMainParty_PreservesLocalCameraTargets()
     {
         var server = TestEnvironment.Server;
         string? armyId = null;
         string? leaderPartyId = null;
+        string? observerPartyId = null;
 
         server.Call(() =>
         {
@@ -123,20 +125,49 @@ public class ArmyDestructionTests : IDisposable
 
             Assert.True(server.ObjectManager.TryGetId(army, out armyId));
             Assert.True(server.ObjectManager.TryGetId(leaderParty, out leaderPartyId));
+            var observerParty = GameObjectCreator.CreateInitializedObject<MobileParty>();
+            Assert.True(server.ObjectManager.TryGetId(observerParty, out observerPartyId));
             Campaign.Current.MainParty = null;
             Assert.Null(MobileParty.MainParty);
+        });
 
+        var armyOwner = TestEnvironment.Clients.First();
+        foreach (var client in TestEnvironment.Clients)
+        {
+            client.Call(() =>
+            {
+                var localPartyId = client == armyOwner ? leaderPartyId : observerPartyId;
+                Campaign.Current.MainParty = client.GetRegisteredObject<MobileParty>(localPartyId);
+                Assert.False(Hero.MainHero.IsPrisoner);
+                Campaign.Current.CameraFollowParty = MobileParty.MainParty.Party;
+            });
+        }
+
+        server.NetworkSentMessages.Clear();
+        server.Call(() =>
+        {
+            var army = server.GetRegisteredObject<Army>(armyId);
+            var leaderParty = server.GetRegisteredObject<MobileParty>(leaderPartyId);
             server.Resolve<IArmyDisbander>().Disband(army, Army.ArmyDispersionReason.Unknown);
 
             Assert.Null(leaderParty.Army);
             Assert.False(server.ObjectManager.TryGetObject<Army>(armyId, out _));
         });
 
+        var removal = Assert.Single(server.NetworkSentMessages.GetMessages<NetworkRemovePartyInArmy>());
+        Assert.Equal(leaderPartyId, removal.MobilePartyId);
+        Assert.Empty(removal.ClientMobilePartyId);
         foreach (var client in TestEnvironment.Clients)
         {
-            Assert.False(client.ObjectManager.TryGetObject<Army>(armyId, out _));
-            Assert.True(client.ObjectManager.TryGetObject<MobileParty>(leaderPartyId, out var leaderParty));
-            Assert.Null(leaderParty.Army);
+            client.Call(() =>
+            {
+                Assert.False(client.ObjectManager.TryGetObject<Army>(armyId, out _));
+                var leaderParty = client.GetRegisteredObject<MobileParty>(leaderPartyId);
+                Assert.Null(leaderParty.Army);
+                var localPartyId = client == armyOwner ? leaderPartyId : observerPartyId;
+                var localParty = client.GetRegisteredObject<MobileParty>(localPartyId);
+                Assert.Same(localParty.Party, Campaign.Current.CameraFollowParty);
+            });
         }
     }
 }
