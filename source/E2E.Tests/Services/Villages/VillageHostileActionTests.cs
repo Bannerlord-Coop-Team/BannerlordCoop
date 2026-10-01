@@ -835,6 +835,7 @@ public class VillageHostileActionTests : MapEventTestBase
         AssertRaidProgressOutcome(Server, mapEventId!, componentId!, mobilePartyId, target.SettlementId, target.VillageId, itemId);
         foreach (var client in Clients)
         {
+            client.PumpGameThread();
             AssertRaidProgressOutcome(client, mapEventId!, componentId!, mobilePartyId, target.SettlementId, target.VillageId, itemId);
         }
     }
