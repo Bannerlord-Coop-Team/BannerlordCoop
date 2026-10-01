@@ -148,6 +148,8 @@ internal class CharacterNotificationDebugCommand
             int previousSkill = hero.GetSkillValue(perk.Skill);
             int target = Math.Min(400, Math.Max((int)Math.Ceiling(perk.RequiredSkillValue), previousSkill + 100));
             hero.HeroDeveloper.ChangeSkillLevel(perk.Skill, target - previousSkill, true);
+            // ChangeSkillLevel skips total XP, so drive the production level-up path separately.
+            hero.HeroDeveloper.GainRawXp(Math.Max(1, hero.HeroDeveloper.GetXpRequiredForLevel(previousLevel + 1) - hero.HeroDeveloper.TotalXp), true);
             return new CoopCommandResult(true, $"Advanced hero={hero.StringId} skill={perk.Skill.StringId} before={previousSkill} after={hero.GetSkillValue(perk.Skill)} levelBefore={previousLevel} levelAfter={hero.Level} perks={PerkHelper.AvailablePerkCountOfHero(hero)}");
         }
     }
