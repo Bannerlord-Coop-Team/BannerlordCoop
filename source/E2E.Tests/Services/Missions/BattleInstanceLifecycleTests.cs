@@ -41,6 +41,7 @@ public class BattleInstanceLifecycleTests : MissionTestEnvironment
             session.TryBegin(mapEventId);
             var worldItemRegistry = new RecordingWorldItemRegistry();
             var agentRegistry = new Mock<INetworkAgentRegistry>();
+            agentRegistry.Setup(registry => registry.GetControllerIds()).Returns(Array.Empty<string>());
             var missionComponent = new Mock<ICoopMissionComponent>();
             missionComponent.SetupGet(component => component.AgentRegistry).Returns(agentRegistry.Object);
 
@@ -77,6 +78,7 @@ public class BattleInstanceLifecycleTests : MissionTestEnvironment
                 client.Resolve<IBattleHostRegistry>());
             Assert.True(session.TryBegin(mapEventId));
             var agentRegistry = new Mock<INetworkAgentRegistry>();
+            agentRegistry.Setup(registry => registry.GetControllerIds()).Returns(Array.Empty<string>());
             var missionComponent = new Mock<ICoopMissionComponent>();
             missionComponent.SetupGet(component => component.AgentRegistry).Returns(agentRegistry.Object);
 
