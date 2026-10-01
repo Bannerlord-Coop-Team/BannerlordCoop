@@ -1,4 +1,5 @@
 ﻿#if DEBUG
+using Common;
 using Common.Commands;
 using GameInterface.Services.Armies.Patches;
 using HarmonyLib;
@@ -7,6 +8,7 @@ using SandBox.ViewModelCollection;
 using System.Linq;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.CharacterDevelopment;
+using TaleWorlds.CampaignSystem.Extensions;
 using TaleWorlds.Core;
 using TaleWorlds.MountAndBlade;
 using TaleWorlds.MountAndBlade.GauntletUI.Mission.Singleplayer;
