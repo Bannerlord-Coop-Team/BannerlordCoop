@@ -154,7 +154,7 @@ internal class PlayerDeletionHandler : IHandler
         {
             network.Send(peer, new NetworkDeletePlayerDenied(
                 "Cannot delete a player whose party is in a battle or siege; leave it first " +
-                "(coop.debug.mobileparty.unstuck can force the exit)."));
+                "(coop.unstuck can force the exit)."));
             return;
         }
 
