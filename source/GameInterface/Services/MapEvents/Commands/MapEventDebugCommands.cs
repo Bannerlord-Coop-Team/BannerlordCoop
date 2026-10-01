@@ -13,6 +13,7 @@ using GameInterface.Services.MobileParties.Extensions;
 using GameInterface.Services.MobileParties.Messages.Behavior;
 using GameInterface.Services.MapEvents;
 using GameInterface.Services.MapEvents.Handlers;
+using GameInterface.Services.MapEvents.Initialization;
 using GameInterface.Services.MapEvents.Messages;
 using GameInterface.Services.MapEvents.Messages.Conversation;
 using GameInterface.Services.MapEvents.Messages.Leave;
@@ -1141,6 +1142,15 @@ public class MapEventDebugCommands
                 return Failed($"Unable to resolve bandit party {args[1]}: {error}");
             }
 
+            if (!ContainerProvider.TryResolve<IMapEventInitializationBarrier>(out var barrier))
+            {
+                return Failed("MapEvent initialization barrier is unavailable.");
+            }
+
+            var mapEvent = playerParty.MapEvent;
+            var visual = mapEvent?.MapEventVisual;
+            bool visualRegistered = visual != null && objectManager.TryGetHandle(visual, out _);
+
             objectManager.TryGetId(playerParty, out string playerPartyId);
             objectManager.TryGetId(banditParty, out string banditPartyId);
             objectManager.TryGetId(playerParty.MapEvent, out string playerMapEventId);
@@ -1154,6 +1164,8 @@ public class MapEventDebugCommands
                    $"playerSettlement={playerParty.CurrentSettlement?.StringId ?? "none"}, " +
                    $"banditSettlement={banditParty.CurrentSettlement?.StringId ?? "none"}, " +
                    $"banditActive={banditParty.IsActive}, banditTroops={banditParty.MemberRoster.TotalManCount}, " +
+                   $"graphCommitted={barrier.IsCommitted(mapEvent)}, graphPending={barrier.IsPending(mapEvent)}, " +
+                   $"visualType={visual?.GetType().FullName ?? "none"}, visualRegistered={visualRegistered}, " +
                    $"menu={Campaign.Current?.CurrentMenuContext?.GameMenu?.StringId ?? "none"}.");
         }
     }
