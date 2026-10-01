@@ -234,18 +234,20 @@ function Test-RestorablePosition([hashtable]$Position) {
     return (($Position.settlement -ceq 'none' -and $Position.moveMode -ceq 'Hold') -or
         ($Position.settlement -ceq 'town_ES1' -and $Position.moveMode -ceq 'Point'))
 }
-function Test-PositionMatches([hashtable]$Actual, [hashtable]$Expected) {
-    foreach($field in @('x','y','isOnLand','moveMode','settlement')) {
+function Test-PositionMatches([hashtable]$Actual, [hashtable]$Expected, [switch]$BeforeMovementRestore) {
+    $fields=@('x','y','isOnLand','settlement')
+    if(-not $BeforeMovementRestore){$fields+='moveMode'}
+    foreach($field in $fields) {
         if(-not $Actual.ContainsKey($field) -or -not $Expected.ContainsKey($field) -or
             $Actual[$field] -cne $Expected[$field]) { return $false }
     }
     return $true
 }
-function Wait-Position([string]$Name, [string]$PartyId, [hashtable]$Expected) {
+function Wait-Position([string]$Name, [string]$PartyId, [hashtable]$Expected, [switch]$BeforeMovementRestore) {
     $deadline=[DateTime]::UtcNow.AddSeconds(120);$index=0
     do {
         $actual=Position "$Name-$index" $PartyId
-        if(Test-PositionMatches $actual $Expected) { return }
+        if(Test-PositionMatches $actual $Expected -BeforeMovementRestore:$BeforeMovementRestore) { return }
         $index++;Start-Sleep -Milliseconds 500
     } while([DateTime]::UtcNow -lt $deadline)
     throw "$Name party position, settlement or movement restoration did not converge"
@@ -270,7 +272,12 @@ if ($SelfCheck) {
         $changed=$position.Clone();$changed[$field]='wrong'
         if(Test-PositionMatches $changed $position) { throw "restoration mismatch accepted: $field" }
     }
-    'sample and position self-check passed';return
+    $held=$position.Clone();$held.moveMode='Hold'
+    if(-not (Test-PositionMatches $held $position -BeforeMovementRestore) -or (Test-PositionMatches $held $position)){throw 'arrival confused with full restoration'}
+    $sessionPattern='(?m)^session=TournamentSessionIdentity_1\|phase=Preparation\|revision=2\|.*humans=2\|'
+    if('session=TournamentSessionIdentity_1|phase=Preparation|revision=1|humans=2|' -match $sessionPattern -or
+        'session=TournamentSessionIdentity_1|phase=Preparation|revision=2|humans=2|' -notmatch $sessionPattern){throw 'stale tournament snapshot accepted'}
+    'sample, position and tournament self-check passed';return
 }
 try {
     if ($RawCaptureRoot -notmatch '^[A-Za-z]:\\' -or $RawCaptureRoot -notmatch [regex]::Escape($RunToken) -or (Test-Path -LiteralPath $RawCaptureRoot)) { throw 'fresh Windows-local token capture root required' }
@@ -286,7 +293,7 @@ try {
         if($null -eq $endpoint -or [string]$endpoint.result.buildVersion -notmatch [regex]::Escape($ExpectedHead)){throw 'exact client source missing'}
     }
     if($null -eq $script:server -or $script:server.process.role -cne 'server') { throw 'standalone server endpoint required' }
-    Catalog 'server' $script:server @('coop.debug.players.party_state','coop.debug.mobile_party.position','coop.debug.mobile_party.restore_position','coop.debug.mobile_party.move_to_settlement','coop.debug.map_event.leave_settlement','coop.debug.map_event.late_join_mode_fixture','coop.debug.map_event.late_join_mode_fixture_state','coop.debug.map_event.late_join_mode_join','coop.debug.map_event.late_join_mode_enter','coop.debug.map_event.late_join_mode_exit_missions','coop.debug.map_event.late_join_mode_cleanup','coop.debug.tournaments.danustica_fixture_begin','coop.debug.tournaments.danustica_fixture_abort','coop.debug.tournaments.danustica_fixture_restore','coop.debug.tournaments.danustica_observe')
+    Catalog 'server' $script:server @('coop.debug.players.party_state','coop.debug.mobile_party.position','coop.debug.mobile_party.movement_fixture','coop.debug.mobile_party.restore_position','coop.debug.mobile_party.move_to_settlement','coop.debug.map_event.leave_settlement','coop.debug.map_event.late_join_mode_fixture','coop.debug.map_event.late_join_mode_fixture_state','coop.debug.map_event.late_join_mode_join','coop.debug.map_event.late_join_mode_enter','coop.debug.map_event.late_join_mode_exit_missions','coop.debug.map_event.late_join_mode_cleanup','coop.debug.tournaments.danustica_fixture_begin','coop.debug.tournaments.danustica_fixture_abort','coop.debug.tournaments.danustica_fixture_restore','coop.debug.tournaments.danustica_observe')
     foreach($c in $clients){
         Catalog $c.role $c.endpoint @('coop.debug.mission.retention_track','coop.debug.mission.retention_collect','coop.debug.location.enter','coop.debug.location.leave','coop.debug.map_event.finish_current_encounter','coop.debug.map_event.encounter_state','coop.debug.map_event.deployment_state','coop.debug.tournaments.danustica_request_join','coop.debug.tournaments.danustica_request_start','coop.debug.tournaments.danustica_request_leave','coop.debug.tournaments.danustica_observe')
         $party=Json-Output (Command "$($c.role)-party" $script:server 'coop.debug.players.party_state' @($c.controller))
@@ -298,6 +305,7 @@ try {
         $null=Sample "$($c.role)-baseline" $c.role $c.endpoint
     }
     Capture 'baseline-campaign'
+    foreach($c in $clients){$null=Command "setup-$($c.role)-capture-movement" $script:server 'coop.debug.mobile_party.movement_fixture' @('capture',$c.partyId)}
     $script:positionSetupStarted=$true
     foreach($c in $clients) {
         $original=$script:originalPositions[$c.controller]
@@ -355,7 +363,10 @@ try {
         $begin=Command "$prefix-begin" $script:server 'coop.debug.tournaments.danustica_fixture_begin';$script:tournamentActive=$true
         if([string]$begin.output -notmatch 'created=True'){throw 'fixture-owned tournament required for abort/restore'}
         foreach($c in $clients){$null=Command "$prefix-$($c.role)-join" $c.endpoint 'coop.debug.tournaments.danustica_request_join';$null=Observe "$prefix-$($c.role)-joined" $c.endpoint 'phase=Preparation'}
-        $null=Observe "$prefix-both-joined" $script:server 'humans=2\|'
+        $joined=Observe "$prefix-both-joined" $script:server 'humans=2\|'
+        if([string]$joined.output -notmatch '(?m)^session=([^|]+)\|phase=Preparation\|revision=(\d+)\|'){throw 'joined session identity/revision missing'}
+        $startPattern='(?m)^session='+[regex]::Escape($Matches[1])+'\|phase=Preparation\|revision='+$Matches[2]+'\|.*humans=2\|'
+        foreach($c in $clients){$null=Observe "$prefix-$($c.role)-start-ready" $c.endpoint $startPattern}
         $null=Command "$prefix-start" $script:client1 'coop.debug.tournaments.danustica_request_start'
         foreach($c in $clients){
             $null=Observe "$prefix-$($c.role)-native" $c.endpoint 'nativeBracketReady=True'
@@ -395,7 +406,9 @@ try {
             if([string]$state.output -notmatch '(?m)^session=none'){$null=Command 'cleanup-tournament-abort' $script:server 'coop.debug.tournaments.danustica_fixture_abort'}
             $null=Command 'cleanup-tournament-restore' $script:server 'coop.debug.tournaments.danustica_fixture_restore';$script:tournamentActive=$false
         }
+        $positionsRestored=$true
         foreach($c in $clients){
+            try {
             if(-not $script:positionSetupStarted -or -not $script:originalPositions.ContainsKey($c.controller)){continue}
             $encounter=Command "cleanup-$($c.role)-encounter" $c.endpoint 'coop.debug.map_event.encounter_state'
             if([string]$encounter.output -match '(?m)^PlayerEncounter.Current: PRESENT'){
@@ -413,9 +426,12 @@ try {
                 $null=Command "cleanup-$($c.role)-restore-settlement" $script:server 'coop.debug.mobile_party.move_to_settlement' @($c.partyId,$original.settlement,'true')
             }
             Wait-Campaign "cleanup-$($c.role)-idle" $c.endpoint
+            Wait-Position "cleanup-$($c.role)-arrived" $c.partyId $original -BeforeMovementRestore
+            $null=Command "cleanup-$($c.role)-restore-movement" $script:server 'coop.debug.mobile_party.movement_fixture' @('restore',$c.partyId)
             Wait-Position "cleanup-$($c.role)-restored" $c.partyId $original
+            } catch {$positionsRestored=$false;Fail-Once "fixture-cleanup-$($c.role)" $_.Exception.Message}
         }
-        if($script:positionSetupStarted -and $script:originalPositions.Count -eq 2){Capture 'final-restored-campaign';$script:restored=$true}
+        if($positionsRestored -and $script:positionSetupStarted -and $script:originalPositions.Count -eq 2){Capture 'final-restored-campaign';$script:restored=$true}
     }catch{Fail-Once 'fixture-cleanup' $_.Exception.Message}
     # Readiness can fail before endpoint assignment; retain token-bound native logs before shutdown.
     try {
