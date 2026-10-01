@@ -1,7 +1,6 @@
 ﻿#if DEBUG
 using Common.Commands;
 using E2E.Tests.Environment;
-using GameInterface.Services.Armies.Commands;
 using TaleWorlds.CampaignSystem;
 using Xunit.Abstractions;
 
@@ -24,7 +23,8 @@ public class ArmyRemovalFixtureViewTests : IDisposable
             {
                 var army = instance.GetRegisteredObject<Army>(armyId);
                 var leader = army.LeaderParty;
-                var result = new ArmyRemovalFixtureViewCommand(instance.ObjectManager).ProcessCommand(
+                var result = instance.Resolve<ICoopCommandRegistry>().ProcessCommand(
+                    "coop.debug.army.removal_fixture_view",
                     new CoopCommandArgsFactory().FromValues(new[] { "show", "missing-army-view-party" }));
                 Assert.False(result.Succeeded);
                 Assert.Same(army, instance.GetRegisteredObject<Army>(armyId));
