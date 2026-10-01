@@ -557,3 +557,7 @@ source/.idea
 
 # Repo-local MCP publish, operator profiles and run artifacts
 /.mcp-local/
+
+# Generated scenario scripts run from ignored artifacts through the shared runner.
+/doc/automated-testing/scenarios/**/*.ps1
+/doc/automated-testing/scenarios/**/*.sh
