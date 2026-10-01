@@ -7,6 +7,20 @@ build/cache validation. Use the existing named-pipe command and screenshot
 actions, never desktop input. This checks numerical health persistence;
 screenshots document the real mission and campaign state, not numerical health.
 
+The executable scenario is [1627-retreat-rejoin-health.ps1](1627-retreat-rejoin-health.ps1).
+Its [lease workload](1627-retreat-rejoin-health.sh) reuses the shared driver,
+committed-source rotate and integration launcher. Invoke it once through the
+existing Local lease producer after primary review and source adoption. Bind
+`ISSUE1627_ATTEMPT_ROOT` to a fresh retained directory and `ISSUE1627_RUN_TOKEN`
+to a fresh token; the producer supplies the adopted source and lease identity.
+The canonical pipeline records shared helper hashes, which are checked before
+rotation. The workload freezes and validates its exact source archive before
+changing the bench.
+
+The scenario's `-SelfCheck` option exercises its comparison predicates without
+launching or mutating games. Parser and self-check receipts are retained in the
+workflow artifacts; these checks do not establish live coverage.
+
 ## Runtime preflight and setup
 
 1. Require the exact token-bound server and both client endpoints, current source
@@ -68,7 +82,8 @@ selected controller, exact returned map-event id and operation:
   Wait for campaign return and departure/reserve cleanup while the other client
   remains in the unresolved battle. Retain observations on all three endpoints.
 
-Re-enter through `coop.debug.map_event.enter_current_battle`, which calls the
+Re-enter on the withdrawing client through `coop.debug.map_event.enter_current_battle`
+with no arguments. It calls the
 production blocking mission-start coordinator. Finish deployment without a
 health reset. Compare the new owner and observer health distributions grouped
 by actual party and character id, since ordinary troop descriptor seeds can
