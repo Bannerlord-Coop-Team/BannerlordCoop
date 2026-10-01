@@ -941,6 +941,11 @@ public class GenericQuestTypeAcceptSecurityTests : IDisposable
             var troop = Client.GetRegisteredObject<CharacterObject>(troopId);
             var upgraded = Client.GetRegisteredObject<CharacterObject>(upgradedId);
             var roster = owner.Issue.AlternativeSolutionSentTroops;
+            var upgradeModel = new Mock<PartyTroopUpgradeModel>();
+            upgradeModel.Setup(model => model.GetXpCostForUpgrade(party.Party, troop, upgraded)).Returns(100);
+            upgradeModel.Setup(model => model.GetGoldCostForUpgrade(party.Party, troop, upgraded))
+                .Returns(new ExplainedNumber(20));
+            Campaign.Current.Models.PartyTroopUpgradeModel = upgradeModel.Object;
             using (new AllowedThread())
             {
                 Campaign.Current.MainParty = party;
@@ -950,11 +955,6 @@ public class GenericQuestTypeAcceptSecurityTests : IDisposable
                 roster.AddToCounts(companion.CharacterObject, 1);
             }
             Assert.True(Client.ObjectManager.AddNewObject(Hero.MainHero, out _));
-            var upgradeModel = new Mock<PartyTroopUpgradeModel>();
-            upgradeModel.Setup(model => model.GetXpCostForUpgrade(party.Party, troop, upgraded)).Returns(100);
-            upgradeModel.Setup(model => model.GetGoldCostForUpgrade(party.Party, troop, upgraded))
-                .Returns(new ExplainedNumber(20));
-            Campaign.Current.Models.PartyTroopUpgradeModel = upgradeModel.Object;
 
             var screen = CreateQuestSelectionScreen(roster, party);
             screen._initialData.LeftMemberRoster.AddToCounts(companion.CharacterObject, 1);
@@ -965,6 +965,7 @@ public class GenericQuestTypeAcceptSecurityTests : IDisposable
             var upgrade = new PartyScreenLogic.PartyCommand();
             upgrade.FillForUpgradeTroop(PartyScreenLogic.PartyRosterSide.Right,
                 PartyScreenLogic.TroopType.Member, troop, 1, 0, -1);
+            Assert.Equal(500, party.MemberRoster.GetElementXp(troop));
             Assert.True(screen.ValidateCommand(upgrade));
             using (new AllowedThread())
             {
