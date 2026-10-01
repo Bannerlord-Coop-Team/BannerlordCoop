@@ -64,6 +64,29 @@ public class InventoryFoodUpkeepTests
     }
 
     [Fact]
+    public void ConflictBackupRestore_DiscardsBothStagedSidesAndRetainsReceivedStock()
+    {
+        var grain = new EquipmentElement(new ItemObject("grain"));
+        var logic = CreateLogic(grain, 5);
+        logic._rosters[0].AddToCounts(grain, 10);
+        var inventory = new InventoryLogicInterface(null, null);
+        inventory.CaptureInventoryBaseline(logic);
+        logic._rosters[1].AddToCounts(grain, -5);
+        logic._rosters[0].AddToCounts(grain, 5);
+        // Simulate the roster backup refresh performed by native slaughter.
+        logic._rostersBackup[0] = new ItemRoster(logic._rosters[0]);
+        logic._rostersBackup[1] = new ItemRoster(logic._rosters[1]);
+        inventory.TryApplyInventoryUpdate(logic, logic._rosters[0], grain, 2);
+
+        inventory.RestoreInventoryBackup(logic);
+
+        Assert.Equal(5, Count(logic._rostersBackup[1], grain));
+        Assert.Equal(12, Count(logic._rostersBackup[0], grain));
+        logic._rostersBackup[1].Clear();
+        Assert.Equal(5, inventory.GetInventoryBaseline(logic).Single().Amount);
+    }
+
+    [Fact]
     public void ServerConsumptionAfterSubmission_RejectsStaleConfirmation()
     {
         var grain = new ItemObject("grain");
