@@ -1,4 +1,5 @@
 ﻿#if DEBUG
+using E2E.Tests.Util;
 using GameInterface.Services.Villages.Commands;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.MapEvents;
@@ -12,7 +13,10 @@ namespace E2E.Tests.Services.Missions;
 /// <summary>Checks that health fixture troops are bounded and original roster values are restored.</summary>
 public class HealthFixtureRosterTests : MissionTestEnvironment
 {
-    public HealthFixtureRosterTests(ITestOutputHelper output) : base(output) { }
+    public HealthFixtureRosterTests(ITestOutputHelper output) : base(output)
+    {
+        XpCapModels.Install(Server);
+    }
 
     [Fact]
     public void ProvisionAndRestore_PreservesOriginalTroopCountsWoundsAndExperience()
@@ -21,11 +25,16 @@ public class HealthFixtureRosterTests : MissionTestEnvironment
         Server.Call(() =>
         {
             var party = Server.GetRegisteredObject<MapEvent>(mapEventId).DefenderSide.Parties[0].Party.MobileParty;
-            var oldTroop = Server.CreateRegisteredObject<CharacterObject>("health_fixture_original");
-            var newTroop = Server.CreateRegisteredObject<CharacterObject>("health_fixture_regular");
+            var oldTroop = GameObjectCreator.CreateInitializedObject<CharacterObject>();
+            var newTroop = GameObjectCreator.CreateInitializedObject<CharacterObject>();
+            oldTroop.Level = 21;
+            newTroop.Level = 26;
+            oldTroop.UpgradeTargets = new[] { newTroop };
+            newTroop.UpgradeTargets = Array.Empty<CharacterObject>();
             party.MemberRoster.Clear();
             party.MemberRoster.AddToCounts(oldTroop, 7, woundedCount: 2, xpChange: 30);
             var original = party.MemberRoster.GetTroopRoster().ToArray();
+            Assert.Equal(30, original[0].Xp);
             MapEventDebugCommands.ProvisionHealthFixtureRoster(party.MemberRoster, newTroop);
             Assert.Equal(1200, party.MemberRoster.GetTroopCount(newTroop));
             Assert.True(party.MemberRoster.TotalHealthyCount > BattleSizeProvider.MaximumBattleSize);
