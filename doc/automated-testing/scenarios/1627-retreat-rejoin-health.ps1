@@ -221,17 +221,21 @@ function Roster-Healthy([object]$Read, [string]$Party) {
     if ($lines.Count -ne 1 -or $lines[0] -notmatch '\|healthy=(\d+)\|') { throw "missing exact healthy roster: $Party" }
     return [int]$Matches[1]
 }
+function Roster-Fingerprint([object[]]$Entries) {
+    $ordered = [Collections.Generic.List[object]]::new()
+    foreach ($entry in $Entries) { $ordered.Add($entry) }
+    $ordered.Sort([Comparison[object]]{ param($a,$b) [StringComparer]::Ordinal.Compare($a.characterId,$b.characterId) })
+    $content = ''
+    foreach ($entry in $ordered) { $content += "$($entry.characterId)|$($entry.number)|$($entry.wounded)|$($entry.xp)`r`n" }
+    $sha = [Security.Cryptography.SHA256]::Create()
+    try { return ([BitConverter]::ToString($sha.ComputeHash([Text.Encoding]::UTF8.GetBytes($content)))).Replace('-','').ToLowerInvariant() } finally { $sha.Dispose() }
+}
 function Restore-Check([object]$Setup, [string]$Phase) {
     foreach ($snapshot in $Setup.originalRosters) {
         $read = Roster ($Phase + '-restored-roster-' + $snapshot.partyId) $snapshot.partyId 'testclient'
         $line = @(([string]$read.output) -split '\r?\n' | Where-Object { $_.StartsWith("party=$($snapshot.partyId)|") })[0]
         if (-not $line) { throw "missing restored party $($snapshot.partyId)" }
-        $content = ''
-        foreach ($entry in @($snapshot.entries | Sort-Object characterId -CaseSensitive)) {
-            $content += "$($entry.characterId)|$($entry.number)|$($entry.wounded)|$($entry.xp)`r`n"
-        }
-        $sha = [Security.Cryptography.SHA256]::Create()
-        try { $expected = ([BitConverter]::ToString($sha.ComputeHash([Text.Encoding]::UTF8.GetBytes($content)))).Replace('-','').ToLowerInvariant() } finally { $sha.Dispose() }
+        $expected = Roster-Fingerprint @($snapshot.entries)
         if ($line -notmatch ('fingerprint=' + $expected + '$')) { throw "original counts/wounds/XP mismatch for $($snapshot.partyId)" }
         if ($line -match '\|leader=([^|]+)\|leaderHitPoints=(\d+)\|') {
             $heroId = $Matches[1]; $hp = [int]$Matches[2]
@@ -241,6 +245,10 @@ function Restore-Check([object]$Setup, [string]$Phase) {
     }
 }
 if ($SelfCheck) {
+    $rosterEntries = @([pscustomobject]@{characterId='aserai_faris';number=18;wounded=1;xp=2440}, [pscustomobject]@{characterId='Player2863';number=1;wounded=0;xp=0})
+    if ((Roster-Fingerprint $rosterEntries) -cne '79a1a6b5379b9e46ec9fafbe0e43098df2abfc5ae6d945e569684e951325b62a') { throw 'ordinal restored roster fingerprint mismatch' }
+    $rosterEntries[0].xp++
+    if ((Roster-Fingerprint $rosterEntries) -ceq '79a1a6b5379b9e46ec9fafbe0e43098df2abfc5ae6d945e569684e951325b62a') { throw 'changed roster XP accepted' }
     $a = [pscustomobject]@{ active=$true; partyId='p'; characterId='troop'; hero=$false; health=20.5 }
     $b = [pscustomobject]@{ active=$true; partyId='p'; characterId='troop'; hero=$false; health=21.5 }
     if ((Distribution @($a) 'p') -ceq (Distribution @($b) 'p')) { throw 'health mismatch accepted' }
