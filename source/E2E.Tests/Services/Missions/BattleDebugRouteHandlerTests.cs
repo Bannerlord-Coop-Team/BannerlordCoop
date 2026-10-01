@@ -3,6 +3,7 @@ using GameInterface.Services.GameDebug.Messages;
 using Missions.Battles;
 #if DEBUG
 using Missions.Diagnostics;
+using GameInterface.Services.GameDebug.Commands;
 #endif
 
 namespace E2E.Tests.Services.Missions;
@@ -33,6 +34,9 @@ public class BattleDebugRouteHandlerTests
         using var handler = new BattleDebugRouteHandler(messageBroker);
 
         Assert.Equal(1, messageBroker.GetSubscriberCount<NetworkRouteBattleEnemies>());
+#if DEBUG
+        Assert.Equal(1, messageBroker.GetSubscriberCount<NetworkBattleHealthFixture>());
+#endif
 
         messageBroker.Publish(this, new NetworkRouteBattleEnemies("map-event", 1));
 
