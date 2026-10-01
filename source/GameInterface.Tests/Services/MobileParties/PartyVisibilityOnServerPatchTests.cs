@@ -1,9 +1,10 @@
-using Common;
+﻿using Common;
 using Common.Util;
 using GameInterface.Services.MobileParties;
 using GameInterface.Services.MobileParties.Patches;
 using GameInterface.Tests;
 using System;
+using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Party;
 using Xunit;
 
@@ -124,4 +125,72 @@ public class PartyVisibilityOnServerPatchTests : IDisposable
 
         Assert.True(value);
     }
+    [Theory]
+    [InlineData(false, false, false)]
+    [InlineData(false, true, false)]
+    [InlineData(true, false, false)]
+    [InlineData(true, true, true)]
+    public void IsSpotted_ReleaseClientRequiresActiveAndNativeVisibility(bool active, bool nativeVisible, bool expected)
+    {
+        ModInformation.IsServer = false;
+        var party = ObjectHelper.SkipConstructor<MobileParty>();
+        party.IsActive = active;
+        var result = nativeVisible;
+
+        PartyIsSpottedServerPatch.Postfix(party, ref result);
+
+        Assert.Equal(expected, result);
+    }
+
+    [Theory]
+    [InlineData(false, true, false, true, 1)]
+    [InlineData(false, true, false, false, 1)]
+    [InlineData(false, false, true, true, 1)]
+    [InlineData(false, false, true, false, 1)]
+    [InlineData(false, true, true, true, 0)]
+    [InlineData(false, false, false, false, 0)]
+    [InlineData(true, true, false, true, 0)]
+    [InlineData(true, false, true, false, 0)]
+    public void ActivationChange_NotifiesClientNameplatesWithoutChangingNativeVisibility(
+        bool server, bool before, bool after, bool nativeVisible, int expectedEvents)
+    {
+        var previousCampaign = Campaign.Current;
+        var campaign = ObjectHelper.SkipConstructor<Campaign>();
+        var receiver = new VisibilityReceiver();
+        campaign.CampaignEventDispatcher = new CampaignEventDispatcher(new[] { receiver });
+        Campaign.Current = campaign;
+        try
+        {
+            ModInformation.IsServer = server;
+            var party = ObjectHelper.SkipConstructor<MobileParty>();
+            party.Party = ObjectHelper.SkipConstructor<PartyBase>();
+            party.IsActive = before;
+            party._isVisible = nativeVisible;
+            PartyVisibilityOnServerPatch.PrefixIsActive(party, out var previousActive);
+
+            party.IsActive = after;
+            PartyVisibilityOnServerPatch.PostfixIsActive(party, previousActive);
+
+            Assert.Equal(expectedEvents, receiver.Events);
+            if (expectedEvents != 0) Assert.Same(party.Party, receiver.Party);
+            Assert.Equal(nativeVisible, party.IsVisible);
+        }
+        finally
+        {
+            Campaign.Current = previousCampaign;
+        }
+    }
+
+    private sealed class VisibilityReceiver : CampaignEventReceiver
+    {
+        public int Events { get; private set; }
+        public PartyBase Party { get; private set; }
+
+        public override void OnPartyVisibilityChanged(PartyBase party)
+        {
+            Events++;
+            Party = party;
+        }
+    }
+
 }
