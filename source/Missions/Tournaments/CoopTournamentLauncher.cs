@@ -1,4 +1,6 @@
-﻿using GameInterface;
+﻿using Common.Logging;
+using Serilog;
+using GameInterface;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Tournaments;
 using GameInterface.Services.Tournaments.Data;
@@ -48,6 +50,7 @@ public class CoopTournamentLauncher : ICoopTournamentLauncher
         typeof(CoopTournamentController),
     };
 
+    private static readonly ILogger Logger = LogManager.GetLogger<CoopTournamentLauncher>();
     private readonly IObjectManager objectManager;
     private readonly ITournamentGameInterface tournamentGameInterface;
     private readonly Func<CoopTournamentController> controllerFactory;
@@ -117,11 +120,31 @@ public class CoopTournamentLauncher : ICoopTournamentLauncher
         {
             try
             {
-                if (mission == null) coopController?.Abandon();
-                else coopController?.Dispose();
+                CloseFailedMission(coopController, mission);
             }
+            catch (Exception error) { Logger.Error(error, "Failed to close an incomplete tournament mission"); }
             finally { uiContext.Clear(snapshot.SessionId); }
             throw;
+        }
+    }
+
+    internal void CloseFailedMission(CoopTournamentController controller, Mission mission)
+    {
+        if (mission == null)
+        {
+            controller?.Abandon();
+            return;
+        }
+
+        try { controller?.Dispose(); }
+        finally
+        {
+            try
+            {
+                if (controller != null && mission.MissionBehaviors.Contains(controller))
+                    mission.RemoveMissionBehavior(controller);
+            }
+            finally { mission.EndMission(); }
         }
     }
 

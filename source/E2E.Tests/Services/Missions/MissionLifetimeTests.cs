@@ -4,6 +4,7 @@ using Common.Util;
 using Common.Network;
 using Common.PacketHandlers;
 using E2E.Tests.Environment.Instance;
+using E2E.Tests.Environment.MockEngine;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Locations;
 using GameInterface.Services.MapEvents;
@@ -85,6 +86,29 @@ public class MissionLifetimeTests : MissionTestEnvironment
                 BattleSpawnGate.HeroAgentAuthorityProbe = previousHero;
                 BattleSpawnGate.MountAuthorityProbe = previousMount;
             }
+        });
+    }
+
+    [Fact]
+    public void FailedTournamentInitializationRemovesControllerAndEndsNativeMission()
+    {
+        using var fixture = new MissionEngineFixture();
+        var client = Clients.Single();
+        client.Call(() =>
+        {
+            var mission = fixture.CreateMission(client);
+            mission.Shell._otherMissionBehaviors = new List<MissionBehavior>();
+            var controller = client.Resolve<CoopTournamentController>();
+            mission.Shell.AddMissionBehavior(controller);
+            var launcher = ObjectHelper.SkipConstructor<CoopTournamentLauncher>();
+
+            launcher.CloseFailedMission(controller, mission.Shell);
+
+            Assert.True(mission.EndMissionCalled);
+            Assert.DoesNotContain(controller, mission.Shell.MissionBehaviors);
+            Assert.DoesNotContain(controller, mission.Shell._otherMissionBehaviors);
+            Assert.Null(controller.Mission);
+            controller.Dispose();
         });
     }
 
