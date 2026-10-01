@@ -43,51 +43,6 @@ internal static class BattleDebugCommands
         new CoopCommandResult(false, output, "command_failed");
 
 #if DEBUG
-    /// <summary>Reads actual agent health and origin identity on owners and observers.</summary>
-    public sealed class HealthStateCoopCommand : ICoopCommand
-    {
-        public string Prefix => "coop.debug.battle";
-        public string Name => "health_state";
-        public string Description => "Reads battle agent health without changing mission state.";
-        public CoopCommandSide Side => CoopCommandSide.Client;
-        public IExpectedArgs[] ExpectedArgs { get; } = Array.Empty<IExpectedArgs>();
-
-        public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
-        {
-            var mission = Mission.Current;
-            var controller = mission?.GetMissionBehavior<CoopBattleController>();
-            if (ModInformation.IsServer || controller == null ||
-                !ContainerProvider.TryResolve<INetworkAgentRegistry>(out var registry))
-                return Failed("An active client coop battle is required.");
-            var agents = mission.Agents.Where(agent => agent.IsHuman).Select(agent =>
-            {
-                registry.TryGetAgentInfo(agent, out var info);
-                var origin = agent.Origin as CoopAgentOrigin;
-                return new
-                {
-                    agentId = info?.AgentId.ToString("D"),
-                    authority = info?.CurrentAuthority,
-                    characterId = agent.Character?.StringId,
-                    name = agent.Character?.Name?.ToString(),
-                    hero = agent.Character?.IsHero == true,
-                    partyId = origin?.MapEventPartyId,
-                    seed = origin?.UniqueSeed,
-                    initialHealth = origin?.InitialHealth,
-                    health = agent.Health,
-                    healthLimit = agent.HealthLimit,
-                    active = agent.IsActive(),
-                    fleeing = agent.IsRunningAway
-                };
-            }).ToArray();
-            return Succeeded("LIVE_TEST_JSON=" + JsonConvert.SerializeObject(new
-            {
-                mapEventId = controller.Session.InstanceId,
-                ownControllerId = controller.Session.OwnControllerId,
-                agents
-            }));
-        }
-    }
-
     public sealed class CancelFixtureMissionReadyCoopCommand : ICoopCommand
     {
         public string Prefix => "coop.debug.battle";

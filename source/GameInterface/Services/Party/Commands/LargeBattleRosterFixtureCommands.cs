@@ -756,8 +756,6 @@ internal static class LargeBattleRosterFixtureCommands
             $"leader={leader?.StringId ?? "none"}|leaderHitPoints={leader?.HitPoints.ToString() ?? "none"}|" +
             $"position={party.Position.X:R},{party.Position.Y:R},{party.Position.IsOnLand}|" +
             $"moveMode={party.PartyMoveMode}|" +
-            $"scout={party.Scout?.StringId ?? "none"}|surgeon={party.Surgeon?.StringId ?? "none"}|" +
-            $"engineer={party.Engineer?.StringId ?? "none"}|quartermaster={party.Quartermaster?.StringId ?? "none"}|" +
             $"fingerprint={Fingerprint(roster)}");
     }
 

@@ -184,10 +184,6 @@ public class MapEventDebugCommands
         public string OpponentMobilePartyId { get; set; }
         public PartyBehaviorUpdateData OpponentBehavior { get; set; }
         public bool JoiningPartyJoined { get; set; }
-#if DEBUG
-        public Dictionary<MobileParty, TroopRosterElement[]> HealthRosters;
-        public Dictionary<Hero, int> HealthHeroes;
-#endif
     }
 
     private static WoundedAlliedFixture woundedAlliedFixture;
@@ -2656,9 +2652,6 @@ public class MapEventDebugCommands
         {
             new ExpectedArgs("first_controller_id", "The first controller id.", true),
             new ExpectedArgs("joining_controller_id", "The joining controller id.", true),
-#if DEBUG
-            new ExpectedArgs("health", "Optional literal health for reversible troop provisioning.", false),
-#endif
         };
 
         public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
@@ -2668,11 +2661,6 @@ public class MapEventDebugCommands
                 return Failed("Run this command on the server.");
             }
 
-#if DEBUG
-            bool healthSetup = args.Count == 3 && args[2] == "health";
-            if (args.Count != 2 && !healthSetup)
-                return Failed("Expected two controllers and optional literal health.");
-#endif
             if (lateJoinModeFixture != null)
             {
                 return Failed($"A late-join mode fixture is already active for map event {lateJoinModeFixture.MapEventId}.");
@@ -2747,60 +2735,12 @@ public class MapEventDebugCommands
                 return Failed("Unable to resolve fixture party ids.");
             }
 
-#if DEBUG
-            Dictionary<MobileParty, TroopRosterElement[]> healthRosters = null;
-            Dictionary<Hero, int> healthHeroes = null;
-            if (healthSetup)
-            {
-                var firstTroop = firstParty.LeaderHero?.Culture?.BasicTroop;
-                var joiningTroop = joiningParty.LeaderHero?.Culture?.BasicTroop;
-                var enemyTroop = opponentParty.MemberRoster.GetTroopRoster()
-                    .FirstOrDefault(element => !element.Character.IsHero).Character;
-                if (firstTroop == null || joiningTroop == null || enemyTroop == null)
-                    return Failed("Health setup requires both player leaders' basic troops and an ordinary bandit troop.");
-                healthRosters = new[] { firstParty, joiningParty, opponentParty }
-                    .ToDictionary(party => party, party => party.MemberRoster.GetTroopRoster().ToArray());
-                healthHeroes = healthRosters.Values.SelectMany(roster => roster)
-                    .Where(element => element.Character.IsHero).Select(element => element.Character.HeroObject)
-                    .Distinct().ToDictionary(hero => hero, hero => hero.HitPoints);
-                try
-                {
-                    ProvisionHealthFixtureRoster(firstParty.MemberRoster, firstTroop);
-                    ProvisionHealthFixtureRoster(joiningParty.MemberRoster, joiningTroop);
-                    ProvisionHealthFixtureRoster(opponentParty.MemberRoster, enemyTroop);
-                }
-                catch
-                {
-                    RestoreHealthFixtureRosters(healthRosters, healthHeroes);
-                    throw;
-                }
-            }
-#endif
-#if DEBUG
-            MapEvent mapEvent;
-            try
-            {
-                mapEvent = MapEventBattleFactory.CreateMapEvent(firstParty.Party, opponentParty.Party, default);
-            }
-            catch
-            {
-                RestoreHealthFixtureRosters(healthRosters, healthHeroes);
-                RestorePartyBehavior(firstParty, firstPlayerBehavior, behaviorSnapshot);
-                RestorePartyBehavior(joiningParty, joiningPlayerBehavior, behaviorSnapshot);
-                RestorePartyBehavior(opponentParty, opponentBehavior, behaviorSnapshot);
-                throw;
-            }
-#else
             var mapEvent = MapEventBattleFactory.CreateMapEvent(firstParty.Party, opponentParty.Party, default);
-#endif
             if (mapEvent == null || !objectManager.TryGetId(mapEvent, out string mapEventId))
             {
                 if (mapEvent != null && !mapEvent.IsFinalized)
                     mapEvent.FinalizeEvent();
 
-#if DEBUG
-                RestoreHealthFixtureRosters(healthRosters, healthHeroes);
-#endif
                 RestorePartyBehavior(firstParty, firstPlayerBehavior, behaviorSnapshot);
                 RestorePartyBehavior(joiningParty, joiningPlayerBehavior, behaviorSnapshot);
                 RestorePartyBehavior(opponentParty, opponentBehavior, behaviorSnapshot);
@@ -2810,10 +2750,6 @@ public class MapEventDebugCommands
             lateJoinModeFixture = new LateJoinModeFixture
             {
                 MapEventId = mapEventId,
-#if DEBUG
-                HealthRosters = healthRosters,
-                HealthHeroes = healthHeroes,
-#endif
                 FirstControllerId = args[0],
                 FirstPlayerPartyId = firstPartyId,
                 FirstPlayerMobilePartyId = firstMobilePartyId,
@@ -2844,38 +2780,6 @@ public class MapEventDebugCommands
                 mapEventId,
                 firstMobilePartyId));
 
-#if DEBUG
-            if (healthSetup)
-            {
-                return Succeeded("LIVE_TEST_JSON=" + JsonConvert.SerializeObject(new
-                {
-                    mapEventId,
-                    regularTroopsPerParty = HealthFixtureRegularTroops,
-                    originalRosters = healthRosters.Select(snapshot => new
-                    {
-                        partyId = snapshot.Key.StringId,
-                        leaderId = snapshot.Key.LeaderHero?.StringId,
-                        leaderHealth = snapshot.Key.LeaderHero?.HitPoints,
-                        scout = snapshot.Key.Scout?.StringId,
-                        surgeon = snapshot.Key.Surgeon?.StringId,
-                        engineer = snapshot.Key.Engineer?.StringId,
-                        quartermaster = snapshot.Key.Quartermaster?.StringId,
-                        entries = snapshot.Value.Select(element => new
-                        {
-                            characterId = element.Character.StringId,
-                            number = element.Number,
-                            wounded = element.WoundedNumber,
-                            xp = element.Xp
-                        }).ToArray()
-                    }).ToArray(),
-                    originalHeroHealth = healthHeroes.Select(snapshot => new
-                    {
-                        heroId = snapshot.Key.StringId,
-                        health = snapshot.Value
-                    }).ToArray()
-                }));
-            }
-#endif
             return Succeeded($"Late-join field-battle fixture created and first mission requested: mapEvent={mapEventId}, " +
                    $"eventType={mapEvent.EventType}, opponent={opponentParty.Name} ({opponentParty.StringId}), " +
                    $"firstPlayer={args[0]}, joiningPlayer={args[1]}, firstSide=Attacker.");
@@ -3387,38 +3291,9 @@ public class MapEventDebugCommands
             behaviorSnapshot,
             objectManager) && restored;
 
-#if DEBUG
-        RestoreHealthFixtureRosters(fixture.HealthRosters, fixture.HealthHeroes);
-#endif
         lateJoinModeFixture = null;
         return restored;
     }
-
-#if DEBUG
-    // More troops than BattleSizeProvider's maximum keeps a real unspawned reserve.
-    internal const int HealthFixtureRegularTroops = 1200;
-
-    internal static void ProvisionHealthFixtureRoster(TroopRoster roster, CharacterObject troop)
-    {
-        roster.RemoveIf(element => !element.Character.IsHero);
-        roster.AddToCounts(troop, HealthFixtureRegularTroops);
-    }
-
-    internal static void RestoreHealthFixtureRosters(
-        Dictionary<MobileParty, TroopRosterElement[]> rosters, Dictionary<Hero, int> heroes)
-    {
-        if (rosters == null) return;
-        foreach (var snapshot in rosters)
-        {
-            // Removing heroes clears their party leadership and roles in vanilla.
-            snapshot.Key.MemberRoster.RemoveIf(element => !element.Character.IsHero);
-            foreach (var element in snapshot.Value.Where(element => !element.Character.IsHero))
-                snapshot.Key.MemberRoster.AddToCounts(element.Character, element.Number, false, element.WoundedNumber, element.Xp, true);
-        }
-        foreach (var snapshot in heroes)
-            snapshot.Key.HitPoints = snapshot.Value;
-    }
-#endif
 
     private static bool RestorePartyBehavior(
         string mobilePartyId,
