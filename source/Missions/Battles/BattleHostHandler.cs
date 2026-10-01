@@ -1103,11 +1103,19 @@ internal class BattleHostHandler : IHandler
     {
         if (string.IsNullOrEmpty(controllerId)) return false;
 
-        bool added = GetOrCreateRuntimeState(mapEventId).AbsentControllers.Add(controllerId);
-        if (added)
-            Logger.Information("[BattleHost] {Controller} was marked absent from battle {MapEventId}; its parties fall to the host's reserve scope until it returns",
-                controllerId, mapEventId);
-        return added;
+        var runtimeState = GetOrCreateRuntimeState(mapEventId);
+        if (runtimeState.AbsentControllers.Contains(controllerId)) return false;
+
+        // Adoption persists even if the new host has not requested its reserves before the owner returns.
+        if (objectManager.TryGetObject<MapEvent>(mapEventId, out var mapEvent))
+            foreach (var side in BuildOwnedReserves(mapEventId, mapEvent, controllerId, includeEmptySides: false))
+                foreach (var party in side.Parties)
+                    runtimeState.HostGrantedParties.Add(party.PartyId);
+
+        runtimeState.AbsentControllers.Add(controllerId);
+        Logger.Information("[BattleHost] {Controller} was marked absent from battle {MapEventId}; its parties fall to the host's reserve scope until it returns",
+            controllerId, mapEventId);
+        return true;
     }
 
     private void MarkPresent(string mapEventId, string controllerId)

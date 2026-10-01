@@ -17,7 +17,7 @@ namespace E2E.Tests.Services.Missions;
 
 public class BattleTroopHealthAuthorizationTests : MissionTestEnvironment
 {
-    public BattleTroopHealthAuthorizationTests(ITestOutputHelper output) : base(output) { }
+    public BattleTroopHealthAuthorizationTests(ITestOutputHelper output) : base(output, numClients: 3) { }
 
     [Theory]
     [InlineData("other-party")]
@@ -31,7 +31,7 @@ public class BattleTroopHealthAuthorizationTests : MissionTestEnvironment
     public void UnauthorizedReport_CannotRetainRoutedHealthAfterOwnerReport(string invalidSender)
     {
         var (battleId, partyId, entries) = PrepareBattle(ownerEntered: invalidSender != "not-entered");
-        var owner = Clients.Last();
+        var owner = Clients.ElementAt(1);
         object sender = invalidSender == "other-party" ? Clients.First().NetPeer : owner.NetPeer;
         var report = HealthReport(battleId, partyId, entries, routedHealth: 1f);
 
@@ -66,7 +66,7 @@ public class BattleTroopHealthAuthorizationTests : MissionTestEnvironment
     public void ReplacedConnectionBeforeGameThreadApply_CannotRetainHealth()
     {
         var (battleId, partyId, entries) = PrepareBattle();
-        var owner = Clients.Last();
+        var owner = Clients.ElementAt(1);
         var report = HealthReport(battleId, partyId, entries, routedHealth: 1f);
         Server.SimulateMessage(owner.NetPeer, report, markGameThread: false);
         Server.Call(() => Server.Resolve<IPlayerManager>().SetPeer("owner", NetPeerExtensions.CreatePeer()));
@@ -81,7 +81,7 @@ public class BattleTroopHealthAuthorizationTests : MissionTestEnvironment
     public void CurrentOwner_ReportIsRetainedBeforeRetreat()
     {
         var (battleId, partyId, entries) = PrepareBattle();
-        SendHealth(Clients.Last(), HealthReport(battleId, partyId, entries, routedHealth: 37f));
+        SendHealth(Clients.ElementAt(1), HealthReport(battleId, partyId, entries, routedHealth: 37f));
         DepartBattle("owner", battleId, wasRetreat: true);
 
         AssertRebuiltHealth(battleId, partyId, entries, routedHealth: 37f);
@@ -98,7 +98,7 @@ public class BattleTroopHealthAuthorizationTests : MissionTestEnvironment
         AssertHost(Server, battleId, "owner");
 
         SendHealth(Clients.First(), HealthReport(battleId, partyId, entries, routedHealth: 1f));
-        SendHealth(Clients.Last(), HealthReport(battleId, partyId, entries, routedHealth: null));
+        SendHealth(Clients.ElementAt(1), HealthReport(battleId, partyId, entries, routedHealth: null));
         AssertRebuiltHealth(battleId, partyId, entries, routedHealth: 37f);
     }
 
@@ -107,18 +107,40 @@ public class BattleTroopHealthAuthorizationTests : MissionTestEnvironment
     {
         var (battleId, partyId, entries) = PrepareBattle();
         DepartBattle("owner", battleId);
-        EnterBattle(Clients.Last(), battleId);
+        EnterBattle(Clients.ElementAt(1), battleId);
 
         SendHealth(Clients.First(), HealthReport(battleId, partyId, entries, routedHealth: 37f));
         DepartBattle("host", battleId, wasRetreat: true);
-        SendHealth(Clients.Last(), HealthReport(battleId, partyId, entries, routedHealth: null));
+        SendHealth(Clients.ElementAt(1), HealthReport(battleId, partyId, entries, routedHealth: null));
+        AssertRebuiltHealth(battleId, partyId, entries, routedHealth: 37f);
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void ReturnedOwner_BeforePromotedHostRequestsReserves_PreservesAdoptedTroopHealth(bool ownerWasPromoted)
+    {
+        var (battleId, partyId, entries) = PrepareBattle(ownerEntered: false, successor: true);
+        var owner = Clients.ElementAt(1);
+        var successor = Clients.ElementAt(2);
+        EnterBattle(ownerWasPromoted ? owner : successor, battleId);
+        EnterBattle(ownerWasPromoted ? successor : owner, battleId);
+        DepartBattle("host", battleId);
+        AssertHost(Server, battleId, ownerWasPromoted ? "owner" : "successor",
+            ownerWasPromoted ? "successor" : "owner");
+        DepartBattle("owner", battleId);
+        AssertHost(Server, battleId, "successor");
+        EnterBattle(owner, battleId);
+
+        SendHealth(successor, HealthReport(battleId, partyId, entries, routedHealth: 37f));
+        SendHealth(owner, HealthReport(battleId, partyId, entries, routedHealth: null));
         AssertRebuiltHealth(battleId, partyId, entries, routedHealth: 37f);
     }
 
     private (string BattleId, string PartyId, TroopReserveEntry[] Entries) PrepareBattle(
-        bool ownerEntered = true, bool hostParty = false, bool aiParty = false)
+        bool ownerEntered = true, bool hostParty = false, bool aiParty = false, bool successor = false)
     {
-        var (battleId, _) = SetupCoopBattle("host", "owner");
+        var (battleId, _) = successor ? SetupCoopBattle("host", "owner", "successor") : SetupCoopBattle("host", "owner");
         var aiPartyId = aiParty ? CreateRegisteredObject<MobileParty>() : null;
         string partyId = null;
         TroopReserveEntry[] entries = null;
@@ -126,7 +148,8 @@ public class BattleTroopHealthAuthorizationTests : MissionTestEnvironment
         {
             var players = Server.Resolve<IPlayerManager>();
             players.SetPeer("host", Clients.First().NetPeer);
-            players.SetPeer("owner", Clients.Last().NetPeer);
+            players.SetPeer("owner", Clients.ElementAt(1).NetPeer);
+            if (successor) players.SetPeer("successor", Clients.ElementAt(2).NetPeer);
             var mapEvent = Server.GetRegisteredObject<MapEvent>(battleId);
             var party = hostParty ? mapEvent.AttackerSide.Parties[0] : mapEvent.DefenderSide.Parties[0];
             if (aiParty)
@@ -146,7 +169,7 @@ public class BattleTroopHealthAuthorizationTests : MissionTestEnvironment
             Assert.Equal(2, entries.Length);
         }, MapEventDisabledMethods);
         EnterBattle(Clients.First(), battleId);
-        if (ownerEntered) EnterBattle(Clients.Last(), battleId);
+        if (ownerEntered) EnterBattle(Clients.ElementAt(1), battleId);
         return (battleId, partyId, entries);
     }
 
