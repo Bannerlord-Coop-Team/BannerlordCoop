@@ -102,9 +102,15 @@ internal class GameStateInterface : IGameStateInterface
 
     public void LoadGame(string saveName)
     {
+#if DEBUG
+        Logger.Debug("LoadGame requested for {SaveName}", saveName);
+#endif
         messageBroker.Publish(this, new GameLoadStarted());
         GameThread.Run(() =>
         {
+#if DEBUG
+            Logger.Debug("LoadGame resolving {SaveName} on game thread", saveName);
+#endif
             var save = MBSaveLoad.GetSaveFiles(null).SingleOrDefault(x => x.Name == saveName);
 
             if (save == null)
@@ -121,7 +127,13 @@ internal class GameStateInterface : IGameStateInterface
     {
         LogModuleCompatibilityMismatches(save);
 
+#if DEBUG
+        Logger.Debug("LoadGameAction starting for {SaveName}", save.Name);
+#endif
         SandBoxSaveHelper.LoadGameAction(save, StartGame, null);
+#if DEBUG
+        Logger.Debug("LoadGameAction returned for {SaveName}", save.Name);
+#endif
     }
 
     private static void LogModuleCompatibilityMismatches(SaveGameFileInfo save)
@@ -145,7 +157,13 @@ internal class GameStateInterface : IGameStateInterface
 
     private void StartGame(LoadResult loadResult)
     {
+#if DEBUG
+        Logger.Debug("StartGame load callback entered");
+#endif
         MBGameManager.StartNewGame(new SandBoxGameManager(loadResult));
+#if DEBUG
+        Logger.Debug("StartGame StartNewGame returned");
+#endif
         MouseManager.ShowCursor(false);
     }
 

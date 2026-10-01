@@ -378,6 +378,30 @@ try {
             $pidState = Get-Content -LiteralPath $pidPath -Raw | ConvertFrom-Json
             if ($pidState.runToken -ceq $RunToken) { $state.serverData = $pidState.serverData; $state.startedUtc = $pidState.startedUtc }
         }
+        if ($null -ne $script:firstFailure) {
+            . '\\wsl.localhost\Ubuntu\home\pwisorlowska\.codex\skills\issue-to-pr\scripts\remote_live_process.ps1'
+            # Bound dump collection separately so a stalled client cannot strand cleanup.
+            $stateBase64 = [Convert]::ToBase64String([Text.Encoding]::UTF8.GetBytes(($state | ConvertTo-Json -Compress)))
+            $destinationBase64 = [Convert]::ToBase64String([Text.Encoding]::UTF8.GetBytes((Join-Path $ArtifactDirectory 'startup-diagnostics')))
+            $command = @"
+`$ErrorActionPreference = 'Stop'
+. '\\wsl.localhost\Ubuntu\home\pwisorlowska\.codex\skills\issue-to-pr\scripts\remote_live_runtime.ps1'
+`$state = [Text.Encoding]::UTF8.GetString([Convert]::FromBase64String('$stateBase64')) | ConvertFrom-Json
+`$destination = [Text.Encoding]::UTF8.GetString([Convert]::FromBase64String('$destinationBase64'))
+`$result = Copy-RemoteLiveRuntimeDiagnostics -State `$state -DestinationRoot `$destination -CaptureStartupMiniDump
+`$result | ConvertTo-Json -Depth 32
+if (`$result.errorCount -ne 0) { exit 1 }
+"@
+            $encoded = [Convert]::ToBase64String([Text.Encoding]::Unicode.GetBytes($command))
+            try {
+                $dumpResult = Invoke-RemoteLiveProcess -FileName (Join-Path $PSHOME 'powershell.exe') `
+                    -Arguments "-NoProfile -NonInteractive -WindowStyle Hidden -EncodedCommand $encoded" -TimeoutSeconds 60 `
+                    -StandardOutputPath (Join-Path $ArtifactDirectory 'startup-diagnostics.stdout.log') `
+                    -StandardErrorPath (Join-Path $ArtifactDirectory 'startup-diagnostics.stderr.log') `
+                    -TimeoutDescription 'token-bound startup stack collection'
+                Save-Json 'startup-diagnostics-process.json' $dumpResult
+            } catch { Save-Json 'startup-diagnostics-error.json' @{error=$_.Exception.Message} }
+        }
         $diagnostics = Copy-RemoteLiveRuntimeDiagnostics -State $state -DestinationRoot (Join-Path $ArtifactDirectory 'runtime-diagnostics')
         if ($diagnostics.errorCount -ne 0) { throw 'runtime diagnostic collection incomplete' }
     } catch { Fail-Once 'runtime-diagnostics' $_.Exception.Message }

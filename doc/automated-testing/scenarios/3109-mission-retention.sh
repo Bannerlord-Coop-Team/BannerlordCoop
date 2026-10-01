@@ -86,10 +86,10 @@ dedicated_source=/home/pwisorlowska/codex-projects/BannerlordCoop.DedicatedServe
 mapfile -t dedicated < <(python3 - "$source_root/artifacts/IssueToPr/pipeline-state.json" <<'PYD'
 import json,sys
 p=json.load(open(sys.argv[1]))['validation']['stage7Carrier']['dedicatedServer']
-for key in ('head','tree','ensureSha256','runWindowsSha256'):print(p[key])
+for key in ('head','tree','ensureSha256','runWindowsSha256','branch'):print(p[key])
 PYD
 )
-server_args=(--dedicated-server-inputs-root /home/pwisorlowska/.codex/runtime/issue-to-pr/local-dedicated-server --dedicated-server-branch main --expected-dedicated-server-head "${dedicated[0]}" --expected-dedicated-server-tree "${dedicated[1]}")
+server_args=(--dedicated-server-inputs-root /home/pwisorlowska/.codex/runtime/issue-to-pr/local-dedicated-server --dedicated-server-branch "${dedicated[4]}" --expected-dedicated-server-head "${dedicated[0]}" --expected-dedicated-server-tree "${dedicated[1]}")
 prepare=("$helper/prepare_local_dedicated_server.sh" --repo-root "$live_root" --source-identity-root "$source_root" --expected-coop-head "$head" --expected-coop-tree "$tree" --dedicated-server-root "$dedicated_source" --run-token "$token" "${server_args[@]}")
 "$integration" --repo-root "$live_root" --source-identity-root "$source_root" --expected-tree "$tree" --clients 2 --clients-only --build-only >"$attempt_root/build.log" 2>&1
 "${prepare[@]}" >"$attempt_root/server-prepare.log" 2>&1
