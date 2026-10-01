@@ -880,7 +880,13 @@ public class GenericQuestTypeAcceptSecurityTests : IDisposable
                 doneCalls++;
                 return true;
             };
-            screen.PartyScreenClosedEvent += (_, _, _, _, _, _, _) => closedCalls++;
+            var closeCallback = new PartyScreenLogicInitializationData
+            {
+                PartyScreenClosedDelegate = (_, _, _, _, _, _, _) => closedCalls++,
+            };
+            // Publicizer exposes the event backing field under the same name.
+            typeof(PartyScreenLogic).GetEvent("PartyScreenClosedEvent")!
+                .AddEventHandler(screen, closeCallback.PartyScreenClosedDelegate);
             var states = Game.Current.GameStateManager;
             var partyState = states.CreateState<PartyState>();
             partyState.PartyScreenLogic = screen;
