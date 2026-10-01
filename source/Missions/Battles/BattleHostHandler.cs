@@ -217,6 +217,7 @@ internal class BattleHostHandler : IHandler
         messageBroker.Subscribe<PlayerDisconnectedFromMapEvent>(Handle_PlayerDisconnectedFromMapEvent);
         messageBroker.Subscribe<NetworkRequestBattleReserves>(Handle_NetworkRequestBattleReserves);
         messageBroker.Subscribe<NetworkBattleSupplyProgress>(Handle_NetworkBattleSupplyProgress);
+        messageBroker.Subscribe<NetworkBattleTroopHealth>(Handle_NetworkBattleTroopHealth);
         messageBroker.Subscribe<MapEventInvolvedPartiesAdded>(Handle_MapEventInvolvedPartiesAdded);
         messageBroker.Subscribe<BattleResolvedStateRecorded>(Handle_BattleResolvedStateRecorded);
         messageBroker.Subscribe<CampaignTick>(Handle_CampaignTick);
@@ -233,6 +234,7 @@ internal class BattleHostHandler : IHandler
         messageBroker.Unsubscribe<PlayerDisconnectedFromMapEvent>(Handle_PlayerDisconnectedFromMapEvent);
         messageBroker.Unsubscribe<NetworkRequestBattleReserves>(Handle_NetworkRequestBattleReserves);
         messageBroker.Unsubscribe<NetworkBattleSupplyProgress>(Handle_NetworkBattleSupplyProgress);
+        messageBroker.Unsubscribe<NetworkBattleTroopHealth>(Handle_NetworkBattleTroopHealth);
         messageBroker.Unsubscribe<MapEventInvolvedPartiesAdded>(Handle_MapEventInvolvedPartiesAdded);
         messageBroker.Unsubscribe<BattleResolvedStateRecorded>(Handle_BattleResolvedStateRecorded);
         messageBroker.Unsubscribe<CampaignTick>(Handle_CampaignTick);
@@ -431,6 +433,35 @@ internal class BattleHostHandler : IHandler
 
             SendOwnedReserves(mapEventId, mapEvent, requester, requesterId, includeEmptySides);
         });
+    }
+
+    private void Handle_NetworkBattleTroopHealth(MessagePayload<NetworkBattleTroopHealth> payload)
+    {
+        if (ModInformation.IsClient || payload.Who is not NetPeer peer) return;
+        var message = payload.What;
+        if (string.IsNullOrEmpty(message.MapEventId) || string.IsNullOrEmpty(message.PartyId)) return;
+
+        GameThread.RunSafe(() =>
+        {
+            if (!playerManager.TryGetPlayer(peer, out var player) ||
+                !playerManager.TryGetPeer(player.ControllerId, out var currentPeer) ||
+                !ReferenceEquals(currentPeer, peer) ||
+                !battleRuntimeStates.TryGetValue(message.MapEventId, out var state) ||
+                !state.PresentControllers.Contains(player.ControllerId)) return;
+            if (!objectManager.TryGetObjectWithLogging<MapEvent>(message.MapEventId, out var mapEvent) ||
+                !objectManager.TryGetObjectWithLogging<MapEventParty>(message.PartyId, out var party) ||
+                party.Party?.MapEventSide?.MapEvent != mapEvent ||
+                !IsRequesterInBattle(mapEvent, player.ControllerId)) return;
+
+            // Use the same ownership scope as reserve grants, including army leaders and adopted parties.
+            foreach (var side in BuildOwnedReserves(message.MapEventId, mapEvent, player.ControllerId, includeEmptySides: false))
+                foreach (var reserve in side.Parties)
+                {
+                    if (reserve.PartyId != message.PartyId) continue;
+                    reserveBuilder.RecordHealth(mapEvent, party, message.Survivors, message.SuppliedCount, message.RoutedSurvivors);
+                    return;
+                }
+        }, context: nameof(Handle_NetworkBattleTroopHealth));
     }
 
     private void Handle_BattleResolvedStateRecorded(MessagePayload<BattleResolvedStateRecorded> payload)

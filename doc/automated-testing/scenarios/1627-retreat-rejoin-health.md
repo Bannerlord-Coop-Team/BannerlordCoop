@@ -7,19 +7,11 @@ build/cache validation. Use the existing named-pipe command and screenshot
 actions, never desktop input. This checks numerical health persistence;
 screenshots document the real mission and campaign state, not numerical health.
 
-The executable scenario is [1627-retreat-rejoin-health.ps1](1627-retreat-rejoin-health.ps1).
-Its [lease workload](1627-retreat-rejoin-health.sh) reuses the shared driver,
-committed-source rotate and integration launcher. Invoke it once through the
-existing Local lease producer after primary review and source adoption. Bind
-`ISSUE1627_ATTEMPT_ROOT` to a fresh retained directory and `ISSUE1627_RUN_TOKEN`
-to a fresh token; the producer supplies the adopted source and lease identity.
-The canonical pipeline records shared helper hashes, which are checked before
-rotation. The workload freezes and validates its exact source archive before
-changing the bench.
-
-The scenario's `-SelfCheck` option exercises its comparison predicates without
-launching or mutating games. Parser and self-check receipts are retained in the
-workflow artifacts; these checks do not establish live coverage.
+Keep generated commands and assertions in ignored `artifacts/IssueToPr/` and
+execute them through the shared `local_live_job.sh` carrier on the existing Local
+lease after review and source adoption. Bind the scenario hash, adopted source,
+fresh run token and retained result directory in the canonical pipeline. The
+shared runner owns source preparation, launch, capture and cleanup.
 
 ## Runtime preflight and setup
 
