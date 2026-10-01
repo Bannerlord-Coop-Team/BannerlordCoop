@@ -22,6 +22,36 @@ internal class HeroDeveloperCommands
 
     private static readonly ILogger Logger = LogManager.GetLogger<HeroDeveloperCommands>();
 
+    public sealed class HeroDeveloperMedicineXpCoopCommand : ICoopCommand
+    {
+        public string Prefix => "coop.debug.hero_developer";
+        public string Name => "medicine_xp";
+        public string Description => "Reports a registered hero's Medicine experience.";
+        public CoopCommandSide Side => CoopCommandSide.Both;
+        public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
+        {
+            new ExpectedArgs("hero_registry_id", "The registered hero id to inspect.", isRequired: true),
+        };
+
+        public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
+        {
+            if (!ContainerProvider.TryResolve<GameInterface.Services.ObjectManager.IObjectManager>(out var objectManager))
+                return Failed("Unable to resolve IObjectManager.");
+            if (!objectManager.TryGetObjectWithLogging<Hero>(args[0], out var hero) || hero.HeroDeveloper == null)
+                return Failed("The registered hero has no skill data.");
+
+            return Succeeded(Newtonsoft.Json.JsonConvert.SerializeObject(new
+            {
+                heroId = args[0],
+                heroName = hero.Name.ToString(),
+                medicineXp = hero.HeroDeveloper.GetSkillXp(DefaultSkills.Medicine),
+                medicineLevel = hero.GetSkillValue(DefaultSkills.Medicine),
+                partyId = hero.PartyBelongedTo?.StringId,
+                effectiveSurgeon = hero.PartyBelongedTo?.EffectiveSurgeon?.StringId,
+            }));
+        }
+    }
+
     /// <summary>
     /// Add skill xp to a hero with a skill object name.
     /// Examples:
