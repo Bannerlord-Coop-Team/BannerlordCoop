@@ -19,8 +19,12 @@ public class HealthFixtureRosterTests : MapEventTestBase
         XpCapModels.Install(Server);
     }
 
-    [Fact]
-    public void ProvisionAndRestore_PreservesOriginalTroopCountsWoundsAndExperience()
+    [Theory]
+    [InlineData(0)]
+    [InlineData(1)]
+    [InlineData(2)]
+    [InlineData(3)]
+    public void ProvisionAndRestore_PreservesOriginalTroopCountsWoundsExperienceAndRole(int roleIndex)
     {
         var (heroId, mobilePartyId) = CreatePlayerHeroParty("health-fixture-owner");
         Server.Call(() =>
@@ -37,10 +41,16 @@ public class HealthFixtureRosterTests : MapEventTestBase
             if (party.MemberRoster.GetTroopCount(hero.CharacterObject) == 0)
                 party.MemberRoster.AddToCounts(hero.CharacterObject, 1);
             party.ChangePartyLeader(hero);
-            party.SetPartyScout(hero);
-            party.SetPartySurgeon(hero);
-            party.SetPartyEngineer(hero);
-            party.SetPartyQuartermaster(hero);
+            var roles = new (Action<MobileParty, Hero> Assign, Func<MobileParty, Hero> Read)[]
+            {
+                ((value, member) => value.SetPartyScout(member), value => value.Scout),
+                ((value, member) => value.SetPartySurgeon(member), value => value.Surgeon),
+                ((value, member) => value.SetPartyEngineer(member), value => value.Engineer),
+                ((value, member) => value.SetPartyQuartermaster(member), value => value.Quartermaster),
+            };
+            var role = roles[roleIndex];
+            role.Assign(party, hero);
+            Assert.Same(hero, role.Read(party));
             hero.HitPoints = 84;
             party.MemberRoster.AddToCounts(oldTroop, 7, woundedCount: 2, xpChange: 30);
             var original = party.MemberRoster.GetTroopRoster().ToArray();
@@ -50,7 +60,7 @@ public class HealthFixtureRosterTests : MapEventTestBase
             Assert.Equal(1200, party.MemberRoster.GetTroopCount(oldTroop));
             Assert.Same(party, hero.PartyBelongedTo);
             Assert.Same(hero, party.LeaderHero);
-            Assert.Same(hero, party.Scout);
+            Assert.Same(hero, role.Read(party));
             hero.HitPoints = 24;
             Assert.True(party.MemberRoster.TotalHealthyCount > BattleSizeProvider.MaximumBattleSize);
             party.MemberRoster.AddToCounts(oldTroop, -1);
@@ -61,10 +71,7 @@ public class HealthFixtureRosterTests : MapEventTestBase
             Assert.Equal(0, party.MemberRoster.GetTroopCount(upgradeTarget));
             Assert.Same(party, hero.PartyBelongedTo);
             Assert.Same(hero, party.LeaderHero);
-            Assert.Same(hero, party.Scout);
-            Assert.Same(hero, party.Surgeon);
-            Assert.Same(hero, party.Engineer);
-            Assert.Same(hero, party.Quartermaster);
+            Assert.Same(hero, role.Read(party));
             Assert.Equal(84, hero.HitPoints);
             Assert.Equal(1, party.MemberRoster.GetTroopCount(hero.CharacterObject));
             var restored = Assert.Single(party.MemberRoster.GetTroopRoster().Where(element => !element.Character.IsHero && element.Number > 0));
