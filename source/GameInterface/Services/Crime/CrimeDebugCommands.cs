@@ -63,7 +63,7 @@ public class CrimeDebugCommands
             {
                 if (!objects.TryGetObjectWithLogging<Hero>(player.HeroId, out var hero)) return null;
                 using (new MainHeroSubstitutionScope(hero, hero.PartyBelongedTo))
-                    return new { hero = player.HeroId, controller = player.ControllerId,
+                    return new { hero = player.HeroId, controller = player.ControllerId, clan = player.ClanId, party = player.MobilePartyId,
                         daily = Campaign.Current.Models.CrimeModel.GetDailyCrimeRatingChange(faction).ResultNumber,
                         war = hero.MapFaction.IsAtWarWith(faction), sameFaction = hero.MapFaction == faction };
             }).Where(row => row != null).ToArray();

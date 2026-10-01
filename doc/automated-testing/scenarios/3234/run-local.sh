@@ -51,7 +51,8 @@ cp "$pipeline" "$result/metadata/pipeline-state.json"
 ps=("$hidden" "$powershell" -NoProfile -NonInteractive -WindowStyle Hidden -ExecutionPolicy Bypass -File "$(wslpath -w "$stage/scenario.ps1")"
     -RunToken "$run_token" -ArtifactDirectory "$(wslpath -w "$stage/result")"
     -LiveTestClientScript "$(wslpath -w "$stage/live_test_client.ps1")"
-    -RuntimeScript "$(wslpath -w "$stage/remote_live_runtime.ps1")" -ExpectedHead "$head")
+    -RuntimeScript "$(wslpath -w "$stage/remote_live_runtime.ps1")" -ExpectedHead "$head"
+    -ServerReceipt "$(wslpath -w "$stage/server-receipt.json")")
 launcher_pid=
 cleanup_rc=255
 runtime_started=0
@@ -140,6 +141,7 @@ failure_stage=clients
     --runtime-profile visual --crash-artifact-dir "$result/crash-dialogs" --keep-alive --no-focus --clients-only \
     >"$result/logs/launcher.stdout.log" 2>"$result/logs/launcher.stderr.log" &
 launcher_pid=$!
+cp "$inputs/live-server.pid" "$stage/server-receipt.json"
 failure_stage=scenario
 set +e
 record scenario timeout 1200s "${ps[@]}" -Mode Scenario

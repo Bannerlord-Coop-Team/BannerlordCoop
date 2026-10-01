@@ -5,6 +5,7 @@ param(
     [Parameter(Mandatory=$true)][string]$LiveTestClientScript,
     [Parameter(Mandatory=$true)][string]$RuntimeScript,
     [Parameter(Mandatory=$true)][string]$ExpectedHead,
+    [Parameter(Mandatory=$true)][string]$ServerReceipt,
     [ValidateSet('Scenario','Cleanup')][string]$Mode = 'Scenario'
 )
 $ErrorActionPreference = 'Stop'
@@ -176,33 +177,107 @@ try {
     $threshold=Read-Crime $server
     Assert-Crime 'threshold-war' $threshold[$hero1].rating $threshold[$hero2].rating $true
     Capture 'decisive'
-    $saveName="crime_$RunToken"
-    Command $server 'coop.debug.save.save_as' @($saveName) | Out-Null
+    $receipt=Get-Content -LiteralPath $ServerReceipt -Raw | ConvertFrom-Json
+    $data=[IO.Path]::GetFullPath([string]$receipt.serverData)
+    if ($receipt.runToken -cne $RunToken -or $data -notmatch '^[A-Za-z]:\\' -or
+        (Split-Path -Leaf $data) -cne "server-data-trace-$RunToken") { throw 'Save data is outside the exact disposable server receipt.' }
+    $config=Get-Content -LiteralPath (Join-Path $data 'server-config.json') -Raw | ConvertFrom-Json
+    $saveName=[string]$config.SaveName
+    if ([string]::IsNullOrWhiteSpace($saveName)) { $saveName='saveauto1' }
+    if ($saveName -match '[\\/]' -or $saveName -in @('.','..')) { throw 'Invalid configured save name.' }
+    $sav=Join-Path $data "Game Saves/$saveName.sav"
+    $json=Join-Path $data "Game Saves/$saveName.json"
+    $saveStarted=[DateTime]::UtcNow
+    if ((Command $server 'coop.debug.dedicated_server.save') -cne 'Dedicated-server save started.') { throw 'Dedicated save did not start.' }
     $deadline=[DateTime]::UtcNow.AddSeconds(120)
     do {
-        $saveState=Command $server 'coop.debug.save.state'
-        if ($saveState -ceq 'saveHandler=ready|isSaving=False') { break }
+        $saved=$false
+        if ((Test-Path -LiteralPath $sav) -and (Test-Path -LiteralPath $json)) {
+            $saved=(Get-Item $sav).Length -gt 0 -and (Get-Item $json).Length -gt 0 -and
+                (Get-Item $sav).LastWriteTimeUtc -ge $saveStarted -and (Get-Item $json).LastWriteTimeUtc -ge $saveStarted
+        }
+        if ($saved) { break }
         Start-Sleep -Milliseconds 500
     } while ([DateTime]::UtcNow -lt $deadline)
-    if ($saveState -cne 'saveHandler=ready|isSaving=False') { throw 'Actual campaign save did not finish.' }
-    Save-Json 'save-finished.json' @{ name=$saveName; state=$saveState; utc=[DateTime]::UtcNow.ToString('o'); reloadProved=$false }
+    if (-not $saved) { throw 'Fresh paired campaign/session save was not written.' }
+    $session=Get-Content -LiteralPath $json -Raw | ConvertFrom-Json
+    foreach ($hero in $heroIds) {
+        $player=@($session.Players | Where-Object { $_.HeroId -ceq $hero })
+        if ($player.Count -ne 1 -or [Math]::Abs($player[0].CrimeRatings.$faction-$threshold[$hero].rating) -ge 0.001) { throw 'Saved player crime dictionary differs.' }
+    }
+    New-Item -ItemType Directory -Path (Join-Path $ArtifactDirectory 'save') | Out-Null
+    Copy-Item $sav (Join-Path $ArtifactDirectory 'save/campaign.sav')
+    Copy-Item $json (Join-Path $ArtifactDirectory 'save/session-original.json')
+    Save-Json 'save/receipt.json' @{ serverReceipt=$receipt; saveName=$saveName; startedUtc=$saveStarted.ToString('o'); savSha256=(Get-FileHash $sav).Hash; jsonSha256=(Get-FileHash $json).Hash }
     foreach ($client in $clients) {
         Command $client 'coop.debug.connection.disconnect' | Out-Null
         $deadline=[DateTime]::UtcNow.AddSeconds(60)
+        $left=$false
         do {
             $status=Invoke-LiveTestClientAction -RequestedAction Status -TargetProcessId ([int]$client.process.pid) -RequestTimeoutMilliseconds 30000
             Save-Json ("disconnect-{0:D3}-{1}.json" -f (++$script:ordinal),$client.process.pid) $status
-            if (-not $status.Response.result.readyForCampaignTests) { break }
+            $left=$status.ExitCode -eq 0 -and $status.Response.ok -and $status.Response.process.runToken -ceq $RunToken -and
+                [int]$status.Response.process.pid -eq [int]$client.process.pid -and
+                $status.Response.result.campaignLoaded -eq $false -and $status.Response.result.coopRunning -eq $false -and
+                $status.Response.result.activeState -match '(^|\.)InitialState$'
+            if ($left) { break }
             Start-Sleep -Milliseconds 250
         } while ([DateTime]::UtcNow -lt $deadline)
-        if ($status.Response.result.readyForCampaignTests) { throw 'Client did not leave campaign before reconnect.' }
-        Command $client 'coop.debug.connection.reconnect' | Out-Null
-        $ready=@(Wait-LiveTestReadiness -ExpectedRunToken $RunToken -ClientCount 2 -ExpectedClientPlatformIds @('testclient','testclient2') `
-            -ReadyFor Campaign -RegisteredPlayerCount 2 -ConnectedPlayerCount 2 -ClientsOnly -AllowLegacyServerConnectionProbe -TimeoutMilliseconds 180000)
-        Save-Json "rejoin-$($client.process.pid).json" $ready
-        Assert-Crime "rejoin-$($client.process.pid)" $threshold[$hero1].rating $threshold[$hero2].rating $true
-        Command $server 'coop.debug.players.list' | Out-Null
+        if (-not $left) { throw 'Client teardown did not reach its token-bound initial state.' }
     }
+    $shutdown=Invoke-LiveTestClientAction -RequestedAction Shutdown -TargetProcessId ([int]$server.process.pid) -RequestTimeoutMilliseconds 30000
+    Save-Json 'save/server-shutdown.json' $shutdown
+    if ($shutdown.ExitCode -ne 0 -or -not $shutdown.Response.ok) { throw 'Saved authority shutdown failed.' }
+    $deadline=[DateTime]::UtcNow.AddSeconds(60)
+    do {
+        $remaining=@(Get-CimInstance Win32_Process | Where-Object { $_.ProcessId -eq [int]$receipt.pid -or $_.ProcessId -eq [int]$server.process.pid })
+        if ($remaining.Count -eq 0) { break }
+        Start-Sleep -Milliseconds 250
+    } while ([DateTime]::UtcNow -lt $deadline)
+    if ($remaining.Count -ne 0) { throw 'Original authority remains before saved reload.' }
+    # A stale saved clan id exercises the production registered-player replacement branch.
+    $replacement=@($session.Players | Where-Object { $_.HeroId -ceq $hero1 })[0]
+    $originalClan=[string]$replacement.ClanId
+    $replacement.ClanId="missing-clan-$RunToken"
+    [IO.File]::WriteAllText($json,($session | ConvertTo-Json -Depth 64),[Text.UTF8Encoding]::new($false))
+    Copy-Item $json (Join-Path $ArtifactDirectory 'save/session-replacement-input.json')
+    $exe=Join-Path (Split-Path -Parent $data) 'BannerlordCoopServer.exe'
+    $exeHash=(Get-FileHash $exe).Hash
+    $stdin=Join-Path $ArtifactDirectory 'save/reload-stdin.txt'
+    [IO.File]::Open($stdin,[IO.FileMode]::CreateNew).Dispose()
+    # Reuse the prepared dedicated executable and its existing hidden launch arguments.
+    $reload=Start-Process -FilePath $exe -ArgumentList @('--no-tui','--data-dir',('"'+$data+'"'),'--coop-test-run',$RunToken) `
+        -WorkingDirectory (Split-Path -Parent $exe) -WindowStyle Hidden -RedirectStandardInput $stdin `
+        -RedirectStandardOutput (Join-Path $ArtifactDirectory 'save/reload.stdout.log') `
+        -RedirectStandardError (Join-Path $ArtifactDirectory 'save/reload.stderr.log') -PassThru
+    Save-Json 'save/reload-process.json' @{ pid=$reload.Id; startedUtc=$reload.StartTime.ToUniversalTime().ToString('o'); runToken=$RunToken; serverData=$data; executableSha256=$exeHash }
+    $deadline=[DateTime]::UtcNow.AddMilliseconds(600000)
+    $serving=$false
+    do {
+        $engines=@(Get-CimInstance Win32_Process -Filter "Name = 'dotnet.exe'" | Where-Object {
+            $_.CommandLine -like '*TaleWorlds.Starter.DotNetCore.dll*' -and $_.CommandLine -like '*DedicatedServer.Windows*' -and
+            $_.CommandLine -match ('(?i)(?:^|\s)' + [regex]::Escape($RunToken) + '(?:\s|$|\")')
+        })
+        if ($engines.Count -eq 1) {
+            $reply=Invoke-LiveTestClientAction -RequestedAction Status -TargetProcessId ([int]$engines[0].ProcessId) -RequestTimeoutMilliseconds 30000
+            $serving=$reply.ExitCode -eq 0 -and $reply.Response.ok -and $reply.Response.process.runToken -ceq $RunToken -and $reply.Response.result.readyForCampaignTests
+            if ($serving) { $server=$reply.Response; break }
+        }
+        if ($reload.HasExited) { throw 'Saved authority exited before readiness.' }
+        Start-Sleep -Milliseconds 500
+    } while ([DateTime]::UtcNow -lt $deadline)
+    if (-not $serving) { throw 'Saved authority did not become ready within cold endpoint budget.' }
+    Save-Json 'save/reloaded-server-status.json' $reply
+    $restored=Command $server 'coop.debug.crime.preflight' | ConvertFrom-Json
+    Save-Json 'save/restored-player-registration.json' $restored
+    $restoredPlayer=@($restored.players | Where-Object { $_.hero -ceq $hero1 })
+    if ($restoredPlayer.Count -ne 1 -or $restoredPlayer[0].clan -cne $originalClan) { throw 'Production saved-player replacement did not restore the clan registration.' }
+    foreach ($client in $clients) { Command $client 'coop.debug.connection.reconnect' | Out-Null }
+    $ready=@(Wait-LiveTestReadiness -ExpectedRunToken $RunToken -ClientCount 2 -ExpectedClientPlatformIds @('testclient','testclient2') `
+        -ReadyFor Campaign -RegisteredPlayerCount 2 -ConnectedPlayerCount 2 -ClientsOnly -AllowLegacyServerConnectionProbe `
+        -EndpointStartupTimeoutMilliseconds 600000 -TimeoutMilliseconds 180000)
+    Save-Json 'save/rejoined-readiness.json' $ready
+    Assert-Crime 'saved-reload-replacement-rejoin' $threshold[$hero1].rating $threshold[$hero2].rating $true
     Capture 'final'
 }
 catch {
@@ -229,8 +304,8 @@ finally {
     Save-Json 'scenario-result.json' @{
         outcome=$(if ($null -eq $failure -and $restoreErrors.Count -eq 0) {'passed'} else {'failed'})
         sourceHead=$ExpectedHead; runToken=$RunToken; firstFailure=$failure; restoreErrors=$restoreErrors; screenshots=$images
-        claims=@('per-player isolation','production caravan coercion','owned-alley gain and ordinary decay','threshold war','actual save and real client reconnect')
-        coverageLimit='Server reload, saved-player replacement, notification UI and native input wiring remain unverified. Screenshots document rendered endpoints only; numerical behavior requires retained server/client data.'
+        claims=@('per-player isolation','production caravan coercion','owned-alley gain and ordinary decay','threshold war','actual paired save, authority reload, registered-player replacement and two-client rejoin')
+        coverageLimit='Notification UI and native input wiring remain unverified. Screenshots document rendered endpoints only; numerical behavior requires retained server/client data.'
     }
 }
 if ($null -ne $failure -or $restoreErrors.Count -ne 0) { exit 1 }
