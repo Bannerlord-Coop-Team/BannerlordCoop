@@ -32,7 +32,6 @@ internal class KillCharacterActionPatches
     [HarmonyPrefix]
     public static bool ApplyInternalPrefix(Hero victim, Hero killer, KillCharacterAction.KillCharacterActionDetail actionDetail, bool showNotification, bool isForced = false)
     {
-#if TESTER
         if (ModInformation.IsClient) return false;
 
         if (!victim.CanDie(actionDetail) && !isForced) return false;
@@ -167,9 +166,6 @@ internal class KillCharacterActionPatches
         }
 
         return false;
-#else
-        return ModInformation.IsServer;
-#endif
     }
 
     public static void HandleKingdomLeaderDeath(Hero victim)
