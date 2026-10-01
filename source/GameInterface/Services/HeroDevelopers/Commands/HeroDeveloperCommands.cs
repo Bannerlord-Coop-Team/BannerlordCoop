@@ -1,6 +1,7 @@
 ﻿using Common.Commands;
 using Common;
 using Common.Logging;
+using GameInterface.Services.ObjectManager;
 using Serilog;
 using System.Collections.Generic;
 using System.Reflection;
@@ -35,7 +36,7 @@ internal class HeroDeveloperCommands
 
         public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
         {
-            if (!ContainerProvider.TryResolve<GameInterface.Services.ObjectManager.IObjectManager>(out var objectManager))
+            if (!ContainerProvider.TryResolve<IObjectManager>(out var objectManager))
                 return Failed("Unable to resolve IObjectManager.");
             if (!objectManager.TryGetObjectWithLogging<Hero>(args[0], out var hero) || hero.HeroDeveloper == null)
                 return Failed("The registered hero has no skill data.");
