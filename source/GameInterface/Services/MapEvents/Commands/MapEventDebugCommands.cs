@@ -3394,8 +3394,7 @@ public class MapEventDebugCommands
 
     internal static void ProvisionHealthFixtureRoster(TroopRoster roster, CharacterObject troop)
     {
-        var heroes = roster.GetTroopRoster().Where(element => element.Character.IsHero).ToArray();
-        RestoreTroopRoster(roster, heroes);
+        roster.RemoveIf(element => !element.Character.IsHero);
         roster.AddToCounts(troop, HealthFixtureRegularTroops);
     }
 
@@ -3404,7 +3403,10 @@ public class MapEventDebugCommands
     {
         if (rosters == null) return;
         foreach (var snapshot in rosters)
+        {
+            snapshot.Key.MemberRoster.RemoveIf(element => true);
             RestoreTroopRoster(snapshot.Key.MemberRoster, snapshot.Value);
+        }
         foreach (var snapshot in heroes)
             snapshot.Key.HitPoints = snapshot.Value;
     }
