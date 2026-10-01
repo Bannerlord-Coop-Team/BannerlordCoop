@@ -42,7 +42,7 @@ internal sealed class LargeInventoryBarterFixtureCommand : ICoopCommand, IDispos
     public CoopCommandSide Side => CoopCommandSide.Both;
     public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
     {
-        new ExpectedArgs("operation", "stage, restore, watch, inspect, request, option or offer", true),
+        new ExpectedArgs("operation", "stage, restore, watch, inspect, request, option, cancel or offer", true),
         new ExpectedArgs("argument", "Registered mobile party id, or trade option", false),
         new ExpectedArgs("count", "Distinct item count for stage, from 1 to 512", false),
     };
@@ -81,6 +81,13 @@ internal sealed class LargeInventoryBarterFixtureCommand : ICoopCommand, IDispos
             if (!PlayerPartyInteractionDialogState.IsOptionEnabled(option)) return Failed("Option is not enabled.");
             PlayerPartyInteractionDialogState.Submit(option);
             return Succeeded("Submitted the production trade option.");
+        }
+        if (args[0] == "cancel" && args.Count == 1)
+        {
+            if (!PlayerPartyTradeContext.IsActive || !PlayerPartyTradeContext.CanCancel())
+                return Failed("No cancellable player barter session.");
+            PlayerPartyTradeContext.PublishLeave();
+            return Succeeded("Requested the production barter cancellation.");
         }
         if (args[0] == "offer" && args.Count == 1)
         {
