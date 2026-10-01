@@ -82,6 +82,7 @@ internal class BattleHostHandler : IHandler
         public readonly HashSet<string> AbsentControllers = new HashSet<string>();
         public readonly HashSet<string> PresentControllers = new HashSet<string>();
         public readonly HashSet<string> HostOwnedOfflineControllers = new HashSet<string>();
+        public readonly HashSet<string> HostGrantedParties = new HashSet<string>();
         public readonly List<PendingReturn> PendingReturns = new List<PendingReturn>();
         public HostEndpoint HostEndpoint;
         public BattleState ResolvedState;
@@ -453,14 +454,12 @@ internal class BattleHostHandler : IHandler
                 party.Party?.MapEventSide?.MapEvent != mapEvent ||
                 !IsRequesterInBattle(mapEvent, player.ControllerId)) return;
 
-            // Use the same ownership scope as reserve grants, including army leaders and adopted parties.
-            foreach (var side in BuildOwnedReserves(message.MapEventId, mapEvent, player.ControllerId, includeEmptySides: false))
-                foreach (var reserve in side.Parties)
-                {
-                    if (reserve.PartyId != message.PartyId) continue;
-                    reserveBuilder.RecordHealth(mapEvent, party, message.Survivors, message.SuppliedCount, message.RoutedSurvivors);
-                    return;
-                }
+            // Returning owners reclaim reserves, but their already fielded regulars stay with the host.
+            bool ownsRetainedAgents = hostRegistry.TryGet(message.MapEventId, out var assignment) &&
+                assignment.HostControllerId == player.ControllerId && state.HostGrantedParties.Contains(message.PartyId);
+            if (ownsRetainedAgents || BuildOwnedReserves(message.MapEventId, mapEvent, player.ControllerId, includeEmptySides: false)
+                .Exists(side => Array.Exists(side.Parties, reserve => reserve.PartyId == message.PartyId)))
+                reserveBuilder.RecordHealth(mapEvent, party, message.Survivors, message.SuppliedCount, message.RoutedSurvivors);
         }, context: nameof(Handle_NetworkBattleTroopHealth));
     }
 
@@ -528,6 +527,9 @@ internal class BattleHostHandler : IHandler
         {
             if (!includeEmptySides && (sideReserve.Parties == null || sideReserve.Parties.Length == 0))
                 continue;
+            if (isHost)
+                foreach (var party in sideReserve.Parties)
+                    GetOrCreateRuntimeState(mapEventId).HostGrantedParties.Add(party.PartyId);
             sides.Add(sideReserve);
         }
         return sides;

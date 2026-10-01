@@ -102,6 +102,19 @@ public class BattleTroopHealthAuthorizationTests : MissionTestEnvironment
         AssertRebuiltHealth(battleId, partyId, entries, routedHealth: 37f);
     }
 
+    [Fact]
+    public void ReturnedOwner_HostCanStillReportRoutedTroopsItAdopted()
+    {
+        var (battleId, partyId, entries) = PrepareBattle();
+        DepartBattle("owner", battleId);
+        EnterBattle(Clients.Last(), battleId);
+
+        SendHealth(Clients.First(), HealthReport(battleId, partyId, entries, routedHealth: 37f));
+        DepartBattle("host", battleId, wasRetreat: true);
+        SendHealth(Clients.Last(), HealthReport(battleId, partyId, entries, routedHealth: null));
+        AssertRebuiltHealth(battleId, partyId, entries, routedHealth: 37f);
+    }
+
     private (string BattleId, string PartyId, TroopReserveEntry[] Entries) PrepareBattle(
         bool ownerEntered = true, bool hostParty = false, bool aiParty = false)
     {
