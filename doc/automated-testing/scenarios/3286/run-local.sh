@@ -131,7 +131,8 @@ p=json.load(open(sys.argv[2])); root=sys.argv[3]; result=pathlib.Path(sys.argv[4
 prior=p['validation']['focusedDebug']; receipt=pathlib.Path(prior['receipt'])
 assert hashlib.sha256(receipt.read_bytes()).hexdigest() == prior['receiptSha256']
 changed=subprocess.check_output(['git','-C',root,'diff','--name-only',prior['sourceHead'],p['currentHead']],text=True).splitlines()
-assert all(path == 'doc/automated-testing/scenarios/3286/run-local.sh' for path in changed), 'Tested dependencies changed'
+allowed={'doc/automated-testing/scenarios/3286/run-local.sh','doc/automated-testing/scenarios/3286/captain-tooltip.ps1','source/GameInterface/Services/Armies/Commands/CaptainTooltipFixtureCoopCommand.cs'}
+assert set(changed) <= allowed, 'Tested dependencies changed'
 evidence=json.loads(receipt.read_text()); current=debug.requirement_from_pipeline(p,p['currentHead'],p['currentTree'])
 expected={**current,'sourceHead':prior['sourceHead'],'sourceTree':prior['sourceTree']}
 validated=debug.validate_evidence(evidence,expected,prior['sourceHead'],prior['sourceTree'],prior['sourceArchiveSha256'],receipt.parent)
@@ -141,7 +142,7 @@ for project in validated['projects']:
     target=destination/project['trx']; target.parent.mkdir(parents=True,exist_ok=True)
     shutil.copy2(receipt.parent/project['trx'],target)
     assert hashlib.sha256(target.read_bytes()).hexdigest() == project['sha256']
-reuse={'testedHead':prior['sourceHead'],'testedTree':prior['sourceTree'],'currentHead':p['currentHead'],'currentTree':p['currentTree'],'receiptSha256':prior['receiptSha256'],'limit':'Only the carrier changed; retained focused tests only, no live claim.'}
+reuse={'testedHead':prior['sourceHead'],'testedTree':prior['sourceTree'],'currentHead':p['currentHead'],'currentTree':p['currentTree'],'receiptSha256':prior['receiptSha256'],'limit':'Only the carrier, scenario and isolated new setup command changed; existing tested product/observer bytes unchanged. New setup is verified by this live attempt, not by reused tests.'}
 (result/'metadata/focused-debug-reuse.json').write_text(json.dumps(reuse,sort_keys=True)+'\n')
 print(json.dumps(reuse,sort_keys=True))
 PY

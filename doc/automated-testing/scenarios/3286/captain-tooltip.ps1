@@ -28,6 +28,8 @@ $clients = @()
 $selected = @{}
 $server = $null
 $fixtureActive = $false
+$captainFixtureActive = $false
+$currentControllers = @('testclient','testclient2')
 $images = @()
 $failure = $null
 $restoreErrors = @()
@@ -154,42 +156,58 @@ try {
     }
     $initial = State $server 'coop.debug.map_event.late_join_mode_fixture_state' @('testclient','testclient2')
     if ($initial.fixtureActive -or -not $initial.restored) { throw 'The existing battle fixture is not restored.' }
-    # The existing authoritative fixture selects a real hostile bandit and preserves party movement.
-    $fixtureActive = $true
-    $null = Command $server 'coop.debug.map_event.late_join_mode_fixture' @('testclient','testclient2')
-    $null = Wait-State $server 'coop.debug.map_event.late_join_mode_fixture_state' @('testclient','testclient2') { param($s) $s.firstInMission }
-    $null = Command $server 'coop.debug.map_event.late_join_mode_join' @()
-    $null = Command $server 'coop.debug.map_event.late_join_mode_enter' @()
-    $null = Wait-State $server 'coop.debug.map_event.late_join_mode_fixture_state' @('testclient','testclient2') { param($s) $s.firstInMission -and $s.joiningInMission }
-    $rosters = @($clients | ForEach-Object {
-        Wait-State $_ 'coop.debug.battle.captain_tooltip' @('observe') { param($s) @($s.captains).Count -gt 0 }
-    })
-    Save-Json 'captain-rosters.json' $rosters
-    $candidate = @($rosters[0].captains | Where-Object {
-        $_.characterId -cne $_.heroId -and $_.linkedHero -and $_.characterId -cin @($rosters[1].captains.characterId)
-    } | Sort-Object { @($_.perks).Count } -Descending | Select-Object -First 1)
-    if ($candidate.Count -ne 1) { throw 'Both real deployment rosters need the same mismatched-id captain.' }
-    $id = [string]$candidate[0].characterId
-    foreach ($client in $clients) {
-        $selected[$client.process.platformId] = $id
+    $captainFixtureActive = $true
+    $created = State $server 'coop.debug.battle.captain_tooltip_fixture' @('create','testclient','testclient2')
+    Save-Json 'created-captain.json' $created
+    if ($created.characterId -ceq $created.heroId -or $created.perkCount -lt 1) { throw 'The authoritative captain needs mismatched identities and real perks.' }
+    $id = [string]$created.characterId
+    $observed = @()
+    # Deployment ownership is local-party scoped; transfer the same hero between restored battles.
+    foreach ($owner in @('testclient','testclient2')) {
+        $joining = $(if ($owner -ceq 'testclient') {'testclient2'} else {'testclient'})
+        $currentControllers = @($owner,$joining)
+        if ($owner -ceq 'testclient2') {
+            $moved = State $server 'coop.debug.battle.captain_tooltip_fixture' @('move',$owner)
+            Save-Json 'transferred-captain.json' $moved
+            if ($moved.characterId -cne $id -or $moved.heroId -cne $created.heroId) { throw 'Transfer changed the common captain identity.' }
+        }
+        $fixtureActive = $true
+        $null = Command $server 'coop.debug.map_event.late_join_mode_fixture' $currentControllers
+        $null = Wait-State $server 'coop.debug.map_event.late_join_mode_fixture_state' $currentControllers { param($s) $s.firstInMission }
+        $null = Command $server 'coop.debug.map_event.late_join_mode_join' @()
+        $null = Command $server 'coop.debug.map_event.late_join_mode_enter' @()
+        $null = Wait-State $server 'coop.debug.map_event.late_join_mode_fixture_state' $currentControllers { param($s) $s.firstInMission -and $s.joiningInMission }
+        $client = @($clients | Where-Object { $_.process.platformId -ceq $owner })[0]
+        $roster = Wait-State $client 'coop.debug.battle.captain_tooltip' @('observe') { param($s) $id -cin @($s.captains.characterId) }
+        Save-Json "captain-roster-$owner.json" $roster
+        $selected[$owner] = $id
         $before = State $client 'coop.debug.battle.captain_tooltip' @('hide',$id)
         $null = Assert-Captain $before $id
-        Save-Json "captain-before-$($client.process.platformId).json" $before
-    }
-    Capture 'captain-before'
-    $observed = @()
-    foreach ($client in $clients) {
+        Save-Json "captain-before-$owner.json" $before
+        Capture "captain-before-$owner"
         $after = State $client 'coop.debug.battle.captain_tooltip' @('show',$id)
         $captain = Assert-Captain $after $id
-        Save-Json "captain-after-$($client.process.platformId).json" $after
+        Save-Json "captain-after-$owner.json" $after
         $observed += $captain
+        Capture "captain-after-$owner"
+        $null = Command $client 'coop.debug.battle.captain_tooltip' @('hide',$id)
+        $selected.Remove($owner)
+        Capture "captain-closed-$owner"
+        $null = Command $server 'coop.debug.map_event.late_join_mode_exit_missions' @()
+        $null = Wait-State $server 'coop.debug.map_event.late_join_mode_fixture_state' $currentControllers { param($s) -not $s.firstInMission -and -not $s.joiningInMission }
+        $null = Command $server 'coop.debug.map_event.late_join_mode_cleanup' @()
+        $restored = State $server 'coop.debug.map_event.late_join_mode_fixture_state' $currentControllers
+        Save-Json "restored-battle-$owner.json" $restored
+        if ($restored.fixtureActive -or -not $restored.restored) { throw 'Restore the battle before transferring the captain.' }
+        $fixtureActive = $false
+        $null = Wait-LiveTestReadiness -ExpectedRunToken $RunToken -ClientCount 2 -ExpectedClientPlatformIds @('testclient','testclient2') `
+            -ReadyFor Campaign -ClientsOnly -AllowLegacyServerConnectionProbe -TimeoutMilliseconds 180000
     }
     if ($observed[0].heroId -cne $observed[1].heroId -or $observed[0].name -cne $observed[1].name -or
         ($observed[0].skills | ConvertTo-Json -Depth 8 -Compress) -cne ($observed[1].skills | ConvertTo-Json -Depth 8 -Compress) -or
         ($observed[0].rows | ConvertTo-Json -Depth 8 -Compress) -cne ($observed[1].rows | ConvertTo-Json -Depth 8 -Compress)) {
-        throw 'Both clients must agree on the actual named captain, hero skills and production rows.'
+        throw 'Both clients must agree on the same transferred captain, hero skills and production rows.'
     }
-    Capture 'captain-after'
 }
 catch {
     $failure = $_.Exception.Message
@@ -216,13 +234,20 @@ finally {
     if ($fixtureActive -and $null -ne $server) {
         try {
             $null = Command $server 'coop.debug.map_event.late_join_mode_exit_missions' @()
-            $null = Wait-State $server 'coop.debug.map_event.late_join_mode_fixture_state' @('testclient','testclient2') { param($s) -not $s.firstInMission -and -not $s.joiningInMission }
+            $null = Wait-State $server 'coop.debug.map_event.late_join_mode_fixture_state' $currentControllers { param($s) -not $s.firstInMission -and -not $s.joiningInMission }
             $null = Command $server 'coop.debug.map_event.late_join_mode_cleanup' @()
-            $restored = State $server 'coop.debug.map_event.late_join_mode_fixture_state' @('testclient','testclient2')
+            $restored = State $server 'coop.debug.map_event.late_join_mode_fixture_state' $currentControllers
             Save-Json 'restored-fixture-state.json' $restored
             if ($restored.fixtureActive -or -not $restored.restored) { throw 'The authoritative battle fixture did not restore.' }
             $null = Wait-LiveTestReadiness -ExpectedRunToken $RunToken -ClientCount 2 -ExpectedClientPlatformIds @('testclient','testclient2') `
                 -ReadyFor Campaign -ClientsOnly -AllowLegacyServerConnectionProbe -TimeoutMilliseconds 180000
+        } catch { $restoreErrors += $_.Exception.Message }
+    }
+    if ($captainFixtureActive -and $null -ne $server) {
+        try {
+            $restoredCaptain = State $server 'coop.debug.battle.captain_tooltip_fixture' @('cleanup')
+            Save-Json 'restored-captain-fixture.json' $restoredCaptain
+            if ($restoredCaptain.fixtureActive -or -not $restoredCaptain.restored) { throw 'The created captain and player rosters did not restore.' }
             Capture 'restored'
         } catch { $restoreErrors += $_.Exception.Message }
     }
@@ -237,7 +262,7 @@ finally {
     Save-Json 'scenario-result.json' @{
         outcome=$(if ($null -eq $failure -and $restoreErrors.Count -eq 0) {'passed'} else {'failed'})
         sourceHead=$ExpectedHead; sourceTree=$ExpectedTree; runToken=$RunToken; firstFailure=$failure; restoreErrors=$restoreErrors
-        screenshots=$images; claims=@('same named campaign captain on both clients','linked hero despite mismatched ids','ten actual skill rows','four formation influence categories','production tooltip callback and extended perk data')
+        screenshots=$images; claims=@('same named captain in each client own-party deployment after authoritative transfer','linked hero despite mismatched ids','ten actual skill rows','four formation influence categories','production tooltip callback and extended perk data')
         coverageLimit='Native Alt-key and hover input wiring are excluded and unverified. Parent must inspect tooltip images before visual acceptance.'
     }
 }
