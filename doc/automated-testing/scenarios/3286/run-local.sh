@@ -122,6 +122,30 @@ record rotation "$rotate" --committed --allow-large "$source_root"
 failure_stage=focused-debug
 archive="$source_root/artifacts/IssueToPr/source.tar"
 archive_sha=$(sha256sum "$archive" | cut -d' ' -f1)
+if jq -e '.validation.focusedDebug.status == "passed"' "$pipeline" >/dev/null; then
+record focused-debug-reuse python3 - "$skill" "$pipeline" "$source_root" "$result" <<'PY'
+import hashlib, json, pathlib, shutil, subprocess, sys
+sys.path.insert(0, sys.argv[1])
+import debug_test_supplement as debug
+p=json.load(open(sys.argv[2])); root=sys.argv[3]; result=pathlib.Path(sys.argv[4])
+prior=p['validation']['focusedDebug']; receipt=pathlib.Path(prior['receipt'])
+assert hashlib.sha256(receipt.read_bytes()).hexdigest() == prior['receiptSha256']
+changed=subprocess.check_output(['git','-C',root,'diff','--name-only',prior['sourceHead'],p['currentHead']],text=True).splitlines()
+assert all(path == 'doc/automated-testing/scenarios/3286/run-local.sh' for path in changed), 'Tested dependencies changed'
+evidence=json.loads(receipt.read_text()); current=debug.requirement_from_pipeline(p,p['currentHead'],p['currentTree'])
+expected={**current,'sourceHead':prior['sourceHead'],'sourceTree':prior['sourceTree']}
+validated=debug.validate_evidence(evidence,expected,prior['sourceHead'],prior['sourceTree'],prior['sourceArchiveSha256'],receipt.parent)
+destination=result/'focused-debug'; destination.mkdir()
+shutil.copy2(receipt,destination/receipt.name)
+for project in validated['projects']:
+    target=destination/project['trx']; target.parent.mkdir(parents=True,exist_ok=True)
+    shutil.copy2(receipt.parent/project['trx'],target)
+    assert hashlib.sha256(target.read_bytes()).hexdigest() == project['sha256']
+reuse={'testedHead':prior['sourceHead'],'testedTree':prior['sourceTree'],'currentHead':p['currentHead'],'currentTree':p['currentTree'],'receiptSha256':prior['receiptSha256'],'limit':'Only the carrier changed; retained focused tests only, no live claim.'}
+(result/'metadata/focused-debug-reuse.json').write_text(json.dumps(reuse,sort_keys=True)+'\n')
+print(json.dumps(reuse,sort_keys=True))
+PY
+else
 record debug-requirement python3 "$skill/debug_test_supplement.py" requirement --pipeline "$pipeline" --source-head "$head" --source-tree "$tree"
 cp "$result/logs/debug-requirement.stdout.log" "$result/metadata/debug-requirement.json"
 record debug-package python3 "$skill/debug_test_supplement.py" package --requirement "$result/metadata/debug-requirement.json" --source-head "$head" --source-tree "$tree" --source-archive-sha256 "$archive_sha"
@@ -130,6 +154,7 @@ ISSUE_TO_PR_CI_ARTIFACT_DIR="$result/focused-debug" \
 ISSUE_TO_PR_DEBUG_TEST_SUPPLEMENT="$result/metadata/debug-package.json" \
 ISSUE_TO_PR_VERIFICATION_SOURCE_HEAD="$head" ISSUE_TO_PR_VERIFICATION_SOURCE_TREE="$tree" \
 record focused-debug "$skill/ci_docker.sh" --stage7-focused-debug-snapshot "$source_root" "itp-$run_token-debug" "$result/logs/focused-debug.log" 1 "$archive" "$archive_sha"
+fi
 failure_stage=build
 record build "$integration" --repo-root "$live_root" --clients 2 --expected-tree "$tree" --source-identity-root "$source_root" --clients-only --build-only
 ensure_sha=$(jq -r .dedicated.ensureScriptSha256 "$pins")
