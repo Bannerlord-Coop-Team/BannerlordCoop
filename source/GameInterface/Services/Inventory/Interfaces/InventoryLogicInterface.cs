@@ -94,7 +94,12 @@ namespace GameInterface.Services.Inventory.Interfaces
                 // A pending sale cannot survive consumption of the same last items.
                 int index = roster.FindIndexOfElement(element);
                 int available = index < 0 ? 0 : roster.GetElementNumber(index);
-                if ((long)available + amount < 0) logic.Reset(false);
+                if ((long)available + amount < 0)
+                {
+                    // Slaughter can replace the vanilla backup with uncommitted inventory.
+                    logic._rostersBackup[1] = new ItemRoster(baseline);
+                    logic.Reset(false);
+                }
                 baseline.AddToCounts(element, amount);
                 logic._rostersBackup[1].AddToCounts(element, amount);
                 roster.AddToCounts(element, amount);
