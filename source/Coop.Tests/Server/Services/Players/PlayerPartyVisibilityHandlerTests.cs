@@ -11,7 +11,6 @@ using GameInterface.Services.MapEvents.Messages.Leave;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.PlayerCaptivityService.Messages;
 using GameInterface.Services.PartyVisuals.Messages;
-using SandBox.View.Map.Managers;
 using GameInterface.Services.Players;
 using GameInterface.Services.Players.Data;
 using GameInterface.Services.SiegeEvents.Interfaces;
@@ -414,7 +413,8 @@ public class PlayerPartyVisibilityHandlerTests : IDisposable
     [Fact]
     public void HeadlessDisconnectAndReconnect_BroadcastsDestroyThenOneClientOnlyCreate()
     {
-        Assert.Null(MobilePartyVisualManager.Current);
+        var managerType = Type.GetType("SandBox.View.Map.Managers.MobilePartyVisualManager, SandBox.View", true)!;
+        Assert.Null(AccessTools.Property(managerType, "Current").GetValue(null));
         var player = CreatePlayer();
         var party = CreateParty();
         var hero = CreateActiveHero();
