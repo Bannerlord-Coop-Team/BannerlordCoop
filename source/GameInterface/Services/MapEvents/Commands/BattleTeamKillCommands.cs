@@ -1,16 +1,9 @@
-﻿using Common;
-using Common.Commands;
+﻿using Common.Commands;
 using Common.Logging;
 using GameInterface.Configuration;
 using GameInterface.Services.MobileParties.Extensions;
 using GameInterface.Utils.Commands;
 using Serilog;
-#if DEBUG
-using HarmonyLib;
-using Newtonsoft.Json;
-using SandBox;
-using SandBox.Missions.MissionLogics;
-#endif
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -483,106 +476,6 @@ internal class BattleTeamKillCommands
         }
     }
 
-#if DEBUG
-    [ThreadStatic]
-    private static Agent surgeryVictim;
-    [ThreadStatic]
-    private static Agent surgeryAffector;
-    [ThreadStatic]
-    private static string surgeryCallback;
-
-    /// <summary>Exercises a real casualty while preserving the party's active surgeon.</summary>
-    public sealed class KillSurgeryTroopCoopCommand : ICoopCommand
-    {
-        public string Prefix => "coop.debug.map_event";
-        public string Name => "kill_surgery_troop";
-        public string Description => "Removes one owned nonhero troop with a hostile blow and reports vanilla surgery eligibility.";
-        public CoopCommandSide Side => CoopCommandSide.Client;
-        public IExpectedArgs[] ExpectedArgs { get; } = Array.Empty<IExpectedArgs>();
-
-        public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
-        {
-            if (!ModConfigProvider.ModOptions.ClientsCanUseCheats)
-                return Failed("The host has disabled cheats on clients.");
-            var mission = Mission.Current;
-            var party = MobileParty.MainParty;
-            var logic = mission?.GetMissionBehavior<BattleSurgeonLogic>();
-            if (!ModInformation.IsClient || !BattleSpawnGate.IsCoopBattleActive || party == null || logic == null)
-                return Failed("An active client coop battle with surgery logic is required.");
-            if (!logic._surgeonAgents.TryGetValue(party.Party.Id, out var surgeon) || !surgeon.IsActive())
-                return Failed("The local party has no registered active mission surgeon.");
-            var victim = mission.Agents.FirstOrDefault(agent => agent.IsHuman && agent.IsActive()
-                && !agent.Character.IsHero && agent.Controller != AgentControllerType.None
-                && agent.GetComponent<CampaignAgentComponent>()?.OwnerParty == party.Party);
-            var affector = mission.Agents.FirstOrDefault(agent => agent.IsHuman && agent.IsActive()
-                && agent.Team != null && victim?.Team != null && agent.Team.IsEnemyOf(victim.Team));
-            if (victim == null || affector == null)
-                return Failed("An owned nonhero troop and an active hostile affector are required.");
-            surgeryVictim = victim;
-            surgeryAffector = null;
-            surgeryCallback = null;
-            try
-            {
-                Kill(victim, affector);
-                if (surgeryCallback == null)
-                    return Failed("Native casualty did not invoke the observed surgery callback.");
-                return Succeeded(surgeryCallback);
-            }
-            catch (Exception ex)
-            {
-                return Failed(CommandHelpers.FormatException("Surgery casualty", ex));
-            }
-            finally
-            {
-                surgeryVictim = null;
-                surgeryAffector = null;
-                surgeryCallback = null;
-            }
-        }
-    }
-
-    [HarmonyPatch(typeof(Mission), "GetAgentState",
-        new[] { typeof(Agent), typeof(Agent), typeof(DamageTypes), typeof(WeaponFlags) })]
-    private class SurgeryAffectorObservationPatch
-    {
-        [HarmonyPrefix]
-        private static void Prefix(Agent agent, Agent affectorAgent)
-        {
-            if (ReferenceEquals(agent, surgeryVictim)) surgeryAffector = affectorAgent;
-        }
-    }
-
-    [HarmonyPatch(typeof(BattleSurgeonLogic), "OnGetAgentState")]
-    private class SurgeryCallbackObservationPatch
-    {
-        [HarmonyPostfix]
-        private static void Postfix(BattleSurgeonLogic __instance, Agent agent, bool usedSurgery)
-        {
-            if (surgeryVictim == null || !ReferenceEquals(agent, surgeryVictim)) return;
-            var party = agent.GetComponent<CampaignAgentComponent>()?.OwnerParty;
-            Agent surgeon = null;
-            if (party != null) __instance._surgeonAgents.TryGetValue(party.Id, out surgeon);
-            surgeryCallback = JsonConvert.SerializeObject(new
-            {
-                victimIndex = agent.Index,
-                victimCharacter = agent.Character.StringId,
-                victimController = agent.Controller.ToString(),
-                affectorIndex = surgeryAffector?.Index,
-                hostileAffector = surgeryAffector?.Team != null && agent.Team != null
-                    && surgeryAffector.Team.IsEnemyOf(agent.Team),
-                partyId = party?.Id,
-                mapEventId = party?.MobileParty?.MapEvent?.StringId,
-                usedSurgery,
-                surgeonIndex = surgeon?.Index,
-                surgeonCharacter = surgeon?.Character?.StringId,
-                activeSurgeon = surgeon != null && surgeon.IsActive(),
-                effectiveSurgeon = party?.MobileParty?.EffectiveSurgeon?.StringId,
-            });
-            Logger.Information("Surgery casualty callback: {Receipt}", surgeryCallback);
-        }
-    }
-#endif
-
     /// <summary>Live agents on any team hostile to the player (host) team.</summary>
     private static bool TryGetEnemyAgents(out List<Agent> agents, out string failure)
     {
@@ -621,9 +514,9 @@ internal class BattleTeamKillCommands
         return killed;
     }
 
-    internal static void Kill(Agent agent, Agent affector = null)
+    internal static void Kill(Agent agent)
     {
-        var blow = new Blow(affector?.Index ?? agent.Index)
+        var blow = new Blow(agent.Index)
         {
             DamageType = DamageTypes.Pierce,
             BaseMagnitude = 100000f,
