@@ -22,6 +22,7 @@ public class BattleSurgeryRewardTests : MissionTestEnvironment
         var (mapEventId, partyIds) = SetupCoopBattle("attacker", "defender");
         var surgeonId = CreateRegisteredObject<Hero>();
         float before = 0;
+        float expectedGain = 0;
         Server.Call(() =>
         {
             var party = Server.GetRegisteredObject<MobileParty>(partyIds[0]);
@@ -30,6 +31,9 @@ public class BattleSurgeryRewardTests : MissionTestEnvironment
             party.SetPartySurgeon(surgeon);
             surgeon.HeroDeveloper.SetFocus(DefaultSkills.Medicine, 5);
             before = surgeon.HeroDeveloper.GetSkillXp(DefaultSkills.Medicine);
+            expectedGain = (surgerySuccess ? 30f : 15f)
+                * Campaign.Current.Models.GenericXpModel.GetXpMultiplier(surgeon)
+                * surgeon.HeroDeveloper.GetFocusFactor(DefaultSkills.Medicine);
         });
 
         var client = Clients.First();
@@ -49,10 +53,15 @@ public class BattleSurgeryRewardTests : MissionTestEnvironment
 
         float after = 0;
         Server.Call(() => after = Server.GetRegisteredObject<Hero>(surgeonId).HeroDeveloper.GetSkillXp(DefaultSkills.Medicine));
-        Assert.True(after > before);
+        Assert.True(expectedGain > 0);
+        Assert.Equal(before + expectedGain, after);
         foreach (var observer in Clients)
             observer.Call(() => Assert.Equal(after, observer.GetRegisteredObject<Hero>(surgeonId).HeroDeveloper.GetSkillXp(DefaultSkills.Medicine)));
-        Assert.Single(client.NetworkSentMessages.GetMessages<NetworkBattleSurgeryReward>());
+        var reward = Assert.Single(client.NetworkSentMessages.GetMessages<NetworkBattleSurgeryReward>());
+        Assert.Equal(partyIds[0], reward.PartyId);
+        Assert.Equal(mapEventId, reward.MapEventId);
+        Assert.Equal(surgerySuccess, reward.SurgerySuccess);
+        Assert.Equal(3, reward.TroopTier);
     }
 
     [Fact]
