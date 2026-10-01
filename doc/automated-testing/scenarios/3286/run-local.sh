@@ -136,7 +136,7 @@ module='source/GameInterface/GameInterfaceModule.cs'
 if module in changed:
  original=subprocess.check_output(['git','-C',root,'show',prior['sourceHead']+':'+module])
  current_module=subprocess.check_output(['git','-C',root,'show',p['currentHead']+':'+module])
- registration=b'#if DEBUG\r\n        builder.RegisterModule<GameInterface.Services.LiveTesting.LiveTestUiModule>();\r\n#endif\r\n'
+ registration=b'#if DEBUG\n        builder.RegisterModule<GameInterface.Services.LiveTesting.LiveTestUiModule>();\n#endif\n'
  assert current_module.count(registration) == 1 and current_module.replace(registration,b'') == original, 'Tested module changed beyond reviewed DEBUG inspector registration'
  allowed.add(module)
 assert set(changed) <= allowed, 'Tested dependencies changed'
