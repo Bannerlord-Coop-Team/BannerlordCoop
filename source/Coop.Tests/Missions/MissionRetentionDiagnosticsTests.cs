@@ -29,10 +29,11 @@ public class MissionRetentionDiagnosticsTests
     {
         var controller = new object();
         var component = new object();
-        diagnostics.Track(controller, new[] { component });
+        diagnostics.Track(controller, new object[] { component, DateTime.UtcNow });
         diagnostics.Track(controller, new[] { component });
         var sample = JObject.FromObject(diagnostics.Read(1));
         Assert.True(sample["cycles"]![0]!["controllerAlive"]!.Value<bool>());
+        Assert.Single(sample["cycles"]![0]!["types"]!);
         Assert.Equal(2, sample["cycles"]![0]!["types"]![0]!["observed"]!.Value<int>());
         Assert.False(sample["diagnosticFullCollection"]!.Value<bool>());
         GC.KeepAlive(controller);

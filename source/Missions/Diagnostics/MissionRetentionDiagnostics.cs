@@ -33,6 +33,8 @@ public sealed class MissionRetentionDiagnostics : IMissionRetentionDiagnostics
 
     public void Track(object controller, IEnumerable<object> objects)
     {
+        if (controller == null) throw new ArgumentNullException(nameof(controller));
+        if (controller.GetType().IsValueType) throw new ArgumentException("A reference-type controller is required.", nameof(controller));
         var cycle = cycles.FirstOrDefault(x => ReferenceEquals(x.Controller.Target, controller));
         if (cycle == null)
         {
@@ -40,7 +42,7 @@ public sealed class MissionRetentionDiagnostics : IMissionRetentionDiagnostics
             cycle = new Cycle(controller);
             cycles.Add(cycle);
         }
-        foreach (var value in objects.Append(controller).Where(x => x != null))
+        foreach (var value in objects.Append(controller).Where(x => x != null && !x.GetType().IsValueType))
         {
             if (cycle.Objects.Any(x => ReferenceEquals(x.Reference.Target, value))) continue;
             cycle.Objects.Add((value.GetType().FullName, new WeakReference(value)));
