@@ -1909,6 +1909,52 @@ public class PlayerPartyInteractionFlowTests : MapEventTestBase
             !s.ResponderAcceptedTrade);
     }
 
+    [Theory]
+    [InlineData(1)]
+    [InlineData(256)]
+    public void BarterInitialization_DoesNotSendOffersButLaterAmountChangesDo(int itemCount)
+    {
+        var (client1, client2, initiatorHeroId, responderHeroId, initiatorPartyId, responderPartyId) = CreateTwoPlayerPartiesWithHeroes();
+        var troopId = TestEnvironment.CreateRegisteredObject<CharacterObject>();
+        var sessionId = StartTrade(client1, client2, initiatorPartyId, responderPartyId);
+        client1.NetworkSentMessages.Clear();
+        Server.NetworkSentMessages.Clear();
+
+        client1.Call(() =>
+        {
+            Assert.True(client1.ObjectManager.TryGetObject<PartyBase>(initiatorPartyId, out var party));
+            Assert.True(client1.ObjectManager.TryGetObject<PartyBase>(responderPartyId, out var otherParty));
+            Assert.True(client1.ObjectManager.TryGetObject<Hero>(initiatorHeroId, out var hero));
+            Assert.True(client1.ObjectManager.TryGetObject<Hero>(responderHeroId, out var otherHero));
+            Assert.True(client1.ObjectManager.TryGetObject<CharacterObject>(troopId, out var troop));
+            PlayerPartyTradeContext.Begin(sessionId, party);
+
+            var data = new BarterData(hero, otherHero, party, otherParty, null, 0, false);
+            data.AddBarterGroup(new FiefBarterGroup());
+            data.AddBarterGroup(new PrisonerBarterGroup());
+            data.AddBarterGroup(new ItemBarterGroup());
+            data.AddBarterGroup(new OtherBarterGroup());
+            data.AddBarterGroup(new GoldBarterGroup());
+            for (var i = 0; i < itemCount; i++)
+                data.AddBarterable<OtherBarterGroup>(new PlayerPartyTroopBarterable(
+                    hero, otherHero, party, otherParty, new TroopRosterElement(troop) { _number = 5 }), false);
+
+            var vm = new BarterVM(data);
+            Assert.True(vm.InitializationIsOver);
+            Assert.Empty(client1.NetworkSentMessages.GetMessages<NetworkPlayerPartyTradeOfferUpdated>());
+            Assert.Empty(Server.NetworkSentMessages.GetMessages<NetworkPlayerPartyInteractionState>());
+
+            var item = vm.RightOtherList[0];
+            item.Barterable.SetIsOffered(true);
+            vm.RightOfferList.Add(item);
+            item.CurrentOfferedAmount = 3;
+        });
+
+        var offer = Assert.Single(client1.NetworkSentMessages.GetMessages<NetworkPlayerPartyTradeOfferUpdated>());
+        Assert.Equal(3, Assert.Single(offer.OfferedTroops).Number);
+        Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkPlayerPartyTradeOfferUpdated>());
+    }
+
     [Fact]
     public void TradeOfferUpdate_TroopOffer_AppliesAsOfferedOnOtherClient()
     {
