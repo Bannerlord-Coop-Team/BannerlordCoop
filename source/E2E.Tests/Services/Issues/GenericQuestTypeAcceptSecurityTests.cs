@@ -66,7 +66,8 @@ public class GenericQuestTypeAcceptSecurityTests : IDisposable
         screen.PrisonerRosters[(int)PartyScreenLogic.PartyRosterSide.Left] = screen.CurrentData.LeftPrisonerRoster;
         screen.PrisonerRosters[(int)PartyScreenLogic.PartyRosterSide.Right] = screen.CurrentData.RightPrisonerRoster;
         screen._initialData.LeftMemberRoster = TroopRoster.CreateDummyTroopRoster();
-        screen._initialData.RightMemberRoster = party.MemberRoster.CloneRosterData();
+        screen._initialData.RightMemberRoster = TroopRoster.CreateDummyTroopRoster();
+        screen._initialData.RightMemberRoster.Add(party.MemberRoster);
         screen._initialData.LeftPrisonerRoster = TroopRoster.CreateDummyTroopRoster();
         screen._initialData.RightPrisonerRoster = TroopRoster.CreateDummyTroopRoster();
         screen._initialData.RightItemRoster = new ItemRoster();
@@ -966,6 +967,7 @@ public class GenericQuestTypeAcceptSecurityTests : IDisposable
             upgrade.FillForUpgradeTroop(PartyScreenLogic.PartyRosterSide.Right,
                 PartyScreenLogic.TroopType.Member, troop, 1, 0, -1);
             Assert.Equal(500, party.MemberRoster.GetElementXp(troop));
+            Assert.Equal(500, screen._initialData.RightMemberRoster.GetElementXp(troop));
             Assert.True(screen.ValidateCommand(upgrade));
             using (new AllowedThread())
             {
