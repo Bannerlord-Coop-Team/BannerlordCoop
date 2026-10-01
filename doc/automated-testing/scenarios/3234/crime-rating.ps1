@@ -181,9 +181,7 @@ try {
     $data=[IO.Path]::GetFullPath([string]$receipt.serverData)
     if ($receipt.runToken -cne $RunToken -or $data -notmatch '^[A-Za-z]:\\' -or
         (Split-Path -Leaf $data) -cne "server-data-trace-$RunToken") { throw 'Save data is outside the exact disposable server receipt.' }
-    $common=@($server.result.loadedAssemblies | Where-Object { $_.name -ceq 'Common' })
-    if ($common.Count -ne 1) { throw 'Exact server module directory is unavailable.' }
-    $jsonLibrary=Join-Path (Split-Path -Parent $common[0].location) 'Newtonsoft.Json.dll'
+    $jsonLibrary=Join-Path (Split-Path -Parent $data) 'engine/bin/Win64_Shipping_Server/Newtonsoft.Json.dll'
     Add-Type -Path $jsonLibrary
     $config=[Newtonsoft.Json.Linq.JObject]::Parse((Get-Content -LiteralPath (Join-Path $data 'server-config.json') -Raw))
     $saveName=[string]$config.GetValue('SaveName',[StringComparison]::OrdinalIgnoreCase)
