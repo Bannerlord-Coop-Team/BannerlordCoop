@@ -84,10 +84,11 @@ public class CoopTournamentLauncher : ICoopTournamentLauncher
         CoopTournamentController coopController = null;
         CoopTournamentBehavior tournamentBehavior = null;
         CoopTournamentFightMissionController fightController = null;
+        Mission mission = null;
 
         try
         {
-            Mission mission = MissionState.OpenNew(
+            mission = MissionState.OpenNew(
                 "TournamentFight",
                 initializer,
                 _ => CreateBehaviors(
