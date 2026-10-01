@@ -48,6 +48,7 @@ using TaleWorlds.CampaignSystem.Actions;
 using TaleWorlds.CampaignSystem.CampaignBehaviors;
 using TaleWorlds.CampaignSystem.Election;
 using TaleWorlds.CampaignSystem.Encyclopedia;
+using TaleWorlds.CampaignSystem.GameComponents;
 using TaleWorlds.CampaignSystem.GameMenus;
 using TaleWorlds.CampaignSystem.GameState;
 using TaleWorlds.CampaignSystem.Party;
@@ -3561,6 +3562,205 @@ public class PlayerKingdomCreationFlowTests : IDisposable
         Assert.Single(
             Server.NetworkSentMessages.GetMessages<NetworkKingdomDecisionResolved>(),
             message => message.KingdomId == kingdomId);
+    }
+
+    // A war against a kingdom that has an ally makes the alliance behaviour propose a call to war in
+    // that kingdom. The server replicates the war to every client, and each client replays the war
+    // action locally.
+    [Fact]
+    public void KingdomDecisionAdded_WarDeclaredOnKingdomWithAlly_ClientHoldsOnlyServerDecisions()
+    {
+        var scenario = SetUpCallToWarScenario("Twin");
+        try
+        {
+            DeclareWarOnServer(scenario.KingdomId, scenario.EnemyId);
+
+            int serverDecisionCount = CountDecisions(Server, scenario.KingdomId);
+            int serverAddCount = Server.NetworkSentMessages.GetMessages<NetworkAddDecision>()
+                .Count(message => message.KingdomId == scenario.KingdomId);
+            Assert.Equal(1, serverDecisionCount);
+            foreach (var client in Clients)
+            {
+                int clientDecisionCount = CountDecisions(client, scenario.KingdomId);
+                Assert.True(
+                    clientDecisionCount == serverDecisionCount,
+                    $"A client holds {clientDecisionCount} decision(s) after the war declaration; the server holds " +
+                    $"{serverDecisionCount} and sent {serverAddCount} of them. " +
+                    $"Client decisions: {DescribeDecisionTypes(client, scenario.KingdomId)}.");
+            }
+        }
+        finally
+        {
+            RemoveAllianceWarListeners(scenario);
+        }
+    }
+
+    // Control: the same war with the alliance behaviour answering it on the server only.
+    [Fact]
+    public void KingdomDecisionAdded_WarDeclaredOnKingdomWithAllyHandledOnServerOnly_ClientHoldsOnlyServerDecisions()
+    {
+        var scenario = SetUpCallToWarScenario("NoTwin", clientsHandleWar: false);
+        try
+        {
+            DeclareWarOnServer(scenario.KingdomId, scenario.EnemyId);
+
+            Assert.Equal(1, CountDecisions(Server, scenario.KingdomId));
+            foreach (var client in Clients)
+            {
+                Assert.Equal(1, CountDecisions(client, scenario.KingdomId));
+            }
+        }
+        finally
+        {
+            RemoveAllianceWarListeners(scenario);
+        }
+    }
+
+    [Fact]
+    public void KingdomDecisionFinalVote_WarDeclaredOnKingdomWithAlly_ServerCountsVote()
+    {
+        var scenario = SetUpCallToWarScenario("TwinVote");
+        try
+        {
+            DeclareWarOnServer(scenario.KingdomId, scenario.EnemyId);
+
+            scenario.Client.Call(() =>
+            {
+                Assert.True(scenario.Client.ObjectManager.TryGetObject<Kingdom>(scenario.KingdomId, out var kingdom));
+                // The decision the server sent arrives after the replayed war, so it is the last entry.
+                KingdomDecision serverDecision = kingdom.UnresolvedDecisions.Last();
+                // The decision screen needs hero data the test campaign does not have, so the ballot goes
+                // through the election route, which finds the decision's list position the same way.
+                var election = new KingdomElection(serverDecision);
+                election._chosenOutcome = election._possibleOutcomes.Single(candidate =>
+                    candidate is ProposeCallToWarAgreementDecision.ProposeCallToWarAgreementDecisionOutcome outcome &&
+                    outcome.ShouldCallToWar);
+                Assert.True(GetVoteManager(scenario.Client).TryPublishFinalVoteForElection(election));
+            });
+
+            NetworkRequestKingdomDecisionVote sentVote = Assert.Single(
+                scenario.Client.NetworkSentMessages.GetMessages<NetworkRequestKingdomDecisionVote>(),
+                message => message.VoteData.IsFinal);
+            int serverDecisionCount = CountDecisions(Server, scenario.KingdomId);
+
+            Assert.True(
+                Server.NetworkSentMessages.GetMessages<NetworkChangeKingdomDecisionVote>()
+                    .Any(message => message.ClanId == scenario.LocalClanId && message.VoteData.IsFinal),
+                $"The server did not count the final vote. The client sent it for decision position " +
+                $"{sentVote.VoteData.DecisionIndex}; the server holds {serverDecisionCount} decision(s).");
+        }
+        finally
+        {
+            RemoveAllianceWarListeners(scenario);
+        }
+    }
+
+    private CallToWarScenario SetUpCallToWarScenario(string name, bool clientsHandleWar = true)
+    {
+        var client1 = Clients.First();
+        var client2 = Clients.Skip(1).First();
+        client1.Resolve<IControllerIdProvider>().SetControllerId(ControllerId);
+        client2.Resolve<IControllerIdProvider>().SetControllerId(SecondControllerId);
+
+        var player1 = CreateSyncedPlayerContext(ControllerId, client1);
+        var player2 = CreateSyncedPlayerContext(SecondControllerId, client2);
+        var kingdomId = TestEnvironment.CreateRegisteredObject<Kingdom>();
+        var allyId = TestEnvironment.CreateRegisteredObject<Kingdom>();
+        var enemyId = TestEnvironment.CreateRegisteredObject<Kingdom>();
+        var allyPlayer = CreateSyncedPlayerContext($"{name}Ally", _ => false);
+        var enemyPlayer = CreateSyncedPlayerContext($"{name}Enemy", _ => false);
+
+        ConfigureClanInKingdom(player1.ClanId, kingdomId);
+        ConfigureClanInKingdom(player2.ClanId, kingdomId);
+        ConfigureClanInKingdom(allyPlayer.ClanId, allyId);
+        ConfigureClanInKingdom(enemyPlayer.ClanId, enemyId);
+        EnsureKingdomRegisteredEverywhere(kingdomId);
+        EnsureKingdomRegisteredEverywhere(allyId);
+        EnsureKingdomRegisteredEverywhere(enemyId);
+
+        var behaviors = new List<(EnvironmentInstance Instance, AllianceCampaignBehavior Behavior)>();
+        IEnumerable<EnvironmentInstance> listeningInstances = clientsHandleWar ? new[] { Server }.Concat(Clients) : new[] { Server };
+        foreach (var instance in new[] { Server }.Concat(Clients))
+        {
+            bool listens = listeningInstances.Contains(instance);
+            AllianceCampaignBehavior behavior = null;
+            instance.Call(() =>
+            {
+                Assert.True(instance.ObjectManager.TryGetObject<Kingdom>(kingdomId, out var kingdom));
+                Assert.True(instance.ObjectManager.TryGetObject<Kingdom>(allyId, out var ally));
+                using (new AllowedThread())
+                {
+                    kingdom._alliedKingdoms ??= new MBList<Kingdom>();
+                    ally._alliedKingdoms ??= new MBList<Kingdom>();
+                    kingdom._alliedKingdoms.Add(ally);
+                    ally._alliedKingdoms.Add(kingdom);
+                }
+
+                if (!listens) return;
+
+                // The game registers this listener through the alliance behaviour of each campaign.
+                behavior = new AllianceCampaignBehavior();
+                CampaignEvents.WarDeclared.AddNonSerializedListener(behavior, behavior.OnWarDeclared);
+            });
+            if (behavior != null) behaviors.Add((instance, behavior));
+        }
+
+        return new CallToWarScenario(client1, kingdomId, enemyId, player1.ClanId, behaviors);
+    }
+
+    private void DeclareWarOnServer(string kingdomId, string enemyId)
+    {
+        // The call-to-war price needs campaign statistics the test campaign does not have, and the
+        // price plays no part in these tests, so it is left at zero on every side.
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject<Kingdom>(kingdomId, out var kingdom));
+            Assert.True(Server.ObjectManager.TryGetObject<Kingdom>(enemyId, out var enemy));
+            DeclareWarAction.ApplyByDefault(enemy, kingdom);
+        }, new[] { AccessTools.Method(typeof(DefaultAllianceModel), nameof(DefaultAllianceModel.GetCallToWarCost)) });
+
+        Assert.Contains(
+            Server.NetworkSentMessages.GetMessages<NetworkDeclareWar>(),
+            message => message.Faction1Id == enemyId && message.Faction2Id == kingdomId);
+    }
+
+    private static void RemoveAllianceWarListeners(CallToWarScenario scenario)
+    {
+        foreach (var (instance, behavior) in scenario.Behaviors)
+        {
+            instance.Call(() => CampaignEvents.WarDeclared.ClearListeners(behavior));
+        }
+    }
+
+    private static string DescribeDecisionTypes(EnvironmentInstance instance, string kingdomId)
+    {
+        string description = null;
+        instance.Call(() =>
+        {
+            Assert.True(instance.ObjectManager.TryGetObject<Kingdom>(kingdomId, out var kingdom));
+            description = kingdom.UnresolvedDecisions.Count == 0
+                ? "none"
+                : string.Join(", ", kingdom.UnresolvedDecisions.Select(decision => decision.GetType().Name));
+        });
+        return description;
+    }
+
+    private sealed record CallToWarScenario(
+        EnvironmentInstance Client,
+        string KingdomId,
+        string EnemyId,
+        string LocalClanId,
+        List<(EnvironmentInstance Instance, AllianceCampaignBehavior Behavior)> Behaviors);
+
+    private static int CountDecisions(EnvironmentInstance instance, string kingdomId)
+    {
+        int count = 0;
+        instance.Call(() =>
+        {
+            Assert.True(instance.ObjectManager.TryGetObject<Kingdom>(kingdomId, out var kingdom));
+            count = kingdom.UnresolvedDecisions.Count;
+        });
+        return count;
     }
 
     [Fact]
