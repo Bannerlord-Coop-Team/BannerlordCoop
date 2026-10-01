@@ -15,6 +15,7 @@ using Moq;
 using System;
 using System.Linq;
 using TaleWorlds.CampaignSystem;
+using TaleWorlds.CampaignSystem.ComponentInterfaces;
 using TaleWorlds.CampaignSystem.Encyclopedia;
 using TaleWorlds.CampaignSystem.Issues;
 using TaleWorlds.CampaignSystem.Party;
@@ -918,6 +919,89 @@ public class GenericQuestTypeAcceptSecurityTests : IDisposable
             var selected = Client.Resolve<GameInterface.Services.TroopRosters.Interfaces.ITroopRosterInterface>()
                 .UnpackTroopRosterData(request.SentTroops).ToArray();
             Assert.Equal(6, selected.Sum(element => element.Number));
+        });
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void QuestScreenDone_PreservesNativeUpgradeDeltaAndCost(bool selectUpgradedTroop)
+    {
+        var fixture = SetupVillageOwner();
+        CreateIssueOnBothPeers(fixture);
+        var partyId = TestEnvironment.CreateRegisteredObject<MobileParty>();
+        var troopId = TestEnvironment.CreateRegisteredObject<CharacterObject>();
+        var upgradedId = TestEnvironment.CreateRegisteredObject<CharacterObject>();
+
+        Client.Call(() =>
+        {
+            var owner = Client.GetRegisteredObject<Hero>(fixture.HeroId);
+            var companion = Client.GetRegisteredObject<Hero>(fixture.CompanionHeroId);
+            var party = Client.GetRegisteredObject<MobileParty>(partyId);
+            var troop = Client.GetRegisteredObject<CharacterObject>(troopId);
+            var upgraded = Client.GetRegisteredObject<CharacterObject>(upgradedId);
+            var roster = owner.Issue.AlternativeSolutionSentTroops;
+            using (new AllowedThread())
+            {
+                Campaign.Current.MainParty = party;
+                Hero.MainHero.Gold = 1000;
+                troop.UpgradeTargets = new[] { upgraded };
+                party.MemberRoster.AddToCounts(troop, 8, false, 1, 500);
+                roster.AddToCounts(companion.CharacterObject, 1);
+            }
+            Assert.True(Client.ObjectManager.AddNewObject(Hero.MainHero, out _));
+            var upgradeModel = new Mock<PartyTroopUpgradeModel>();
+            upgradeModel.Setup(model => model.GetXpCostForUpgrade(party.Party, troop, upgraded)).Returns(100);
+            upgradeModel.Setup(model => model.GetGoldCostForUpgrade(party.Party, troop, upgraded))
+                .Returns(new ExplainedNumber(20));
+            Campaign.Current.Models.PartyTroopUpgradeModel = upgradeModel.Object;
+
+            var screen = CreateQuestSelectionScreen(roster, party);
+            screen._initialData.LeftMemberRoster.AddToCounts(companion.CharacterObject, 1);
+            screen.CurrentData.PartyGoldChangeAmount = -120;
+            screen.RightPartyLeader = Hero.MainHero.CharacterObject;
+            screen.RightOwnerParty = party.Party;
+            screen.PartyPresentationDoneButtonDelegate = (_, _, _, _, _, _, _, _, _) => true;
+            var upgrade = new PartyScreenLogic.PartyCommand();
+            upgrade.FillForUpgradeTroop(PartyScreenLogic.PartyRosterSide.Right,
+                PartyScreenLogic.TroopType.Member, troop, 1, 0, -1);
+            Assert.True(screen.ValidateCommand(upgrade));
+            using (new AllowedThread())
+            {
+                screen.UpgradeTroop(upgrade);
+                Assert.Equal(1, party.MemberRoster.GetTroopCount(upgraded));
+                party.MemberRoster.AddToCounts(troop, -6, false, 0, -300);
+                roster.AddToCounts(troop, 6, false, 0, 300);
+                if (selectUpgradedTroop)
+                {
+                    party.MemberRoster.AddToCounts(upgraded, -1);
+                    roster.AddToCounts(upgraded, 1);
+                }
+            }
+
+            Assert.True(screen.DoneLogic(false));
+            screen.OnPartyScreenClosed(false);
+            var done = Assert.Single(Client.NetworkSentMessages.GetMessages<NetworkCompleteDoneLogic>());
+            Assert.Equal(-140, done.PartyGoldChangeAmount);
+            Assert.Empty(done.LeftMemberRosterData.Data);
+            Assert.Equal(2, done.RightMemberRosterData.Data.Length);
+            var originalDelta = Assert.Single(done.RightMemberRosterData.Data,
+                element => element.CharacterId == Client.GetHandle(troop));
+            Assert.Equal(-1, originalDelta.Number);
+            Assert.Equal(-100, originalDelta.Xp);
+            Assert.Equal(0, originalDelta.WoundedNumber);
+            var upgradeDelta = Assert.Single(done.RightMemberRosterData.Data,
+                element => element.CharacterId == Client.GetHandle(upgraded));
+            Assert.Equal(1, upgradeDelta.Number);
+            Assert.Equal(0, upgradeDelta.Xp);
+            Assert.Single(done.UpgradedTroopHistoryIds.Data);
+            owner.Issue.StartIssueWithAlternativeSolution();
+            var request = Assert.Single(Client.NetworkSentMessages.GetMessages<RequestQuestTypeAcceptAlternative>());
+            var selected = Client.Resolve<GameInterface.Services.TroopRosters.Interfaces.ITroopRosterInterface>()
+                .UnpackTroopRosterData(request.SentTroops).ToArray();
+            Assert.Equal(selectUpgradedTroop ? 1 : 0,
+                selected.Where(element => element.Character == upgraded).Sum(element => element.Number));
+            Assert.Equal(6, selected.Single(element => element.Character == troop).Number);
         });
     }
 

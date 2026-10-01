@@ -201,6 +201,16 @@ internal class PartyScreenLogicPatches
                 __instance.MemberRosters[(int)PartyScreenLogic.PartyRosterSide.Right] == MobileParty.MainParty?.MemberRoster
                 ? __instance.MemberRosters[(int)PartyScreenLogic.PartyRosterSide.Left] : null;
             var questSelectionSnapshot = questSelectionRoster == null ? null : CopyRoster(questSelectionRoster);
+            var rightMemberRoster = __instance.MemberRosters[1];
+            var initialRightMemberRoster = __instance._initialData.RightMemberRoster;
+            if (questSelectionRoster != null)
+            {
+                // Transfers cancel across both sides; upgrades and spent XP remain in the Done delta.
+                rightMemberRoster = CopyRoster(rightMemberRoster);
+                rightMemberRoster.Add(questSelectionRoster);
+                initialRightMemberRoster = CopyRoster(initialRightMemberRoster);
+                initialRightMemberRoster.Add(__instance._initialData.LeftMemberRoster);
+            }
             FlattenedTroopRoster recruitedPrisonersRoster = new FlattenedTroopRoster(4);
             foreach (Tuple<CharacterObject, int> tuple in __instance.CurrentData.RecruitedPrisonersHistory)
             {
@@ -221,11 +231,11 @@ internal class PartyScreenLogicPatches
                 recruitedPrisonersRoster,
                 questSelectionRoster == null ? __instance.MemberRosters[0] : __instance._initialData.LeftMemberRoster,
                 __instance.PrisonerRosters[0],
-                questSelectionRoster == null ? __instance.MemberRosters[1] : __instance._initialData.RightMemberRoster,
+                rightMemberRoster,
                 __instance.PrisonerRosters[1],
                 __instance._initialData.LeftMemberRoster,
                 __instance._initialData.LeftPrisonerRoster,
-                __instance._initialData.RightMemberRoster,
+                initialRightMemberRoster,
                 __instance._initialData.RightPrisonerRoster,
                 __instance.RightOwnerParty.ItemRoster,
                 __instance.CurrentData.UpgradedTroopsHistory,
