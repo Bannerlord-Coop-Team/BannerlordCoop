@@ -4,6 +4,9 @@ using Common.Network;
 using Common.PacketHandlers;
 using E2E.Tests.Environment.Instance;
 using GameInterface.Services.ObjectManager;
+using GameInterface.Services.Locations;
+using GameInterface.Services.Time.UI;
+using GameInterface.Services.UI.PlayerNameplates;
 using Missions;
 using Missions.Agents;
 using Missions.Battles;
@@ -55,7 +58,25 @@ public class MissionLifetimeTests : MissionTestEnvironment
     [MethodImpl(MethodImplOptions.NoInlining)]
     private static WeakReference[] CreateAndEnd(EnvironmentInstance client, Type controllerType, int exitPath)
     {
-        var controller = (CoopMissionController)client.Container.Resolve(controllerType);
+        CoopMissionController controller;
+        PlayerNameplateMissionView nameplates;
+        MissionMapTimeView mapTime;
+        if (controllerType == typeof(CoopLocationsController))
+        {
+            var behaviors = client.Resolve<IEnumerable<ILocationMissionBehavior>>().ToArray();
+            controller = behaviors.OfType<CoopLocationsController>().Single();
+            nameplates = behaviors.OfType<PlayerNameplateMissionView>().Single();
+            mapTime = behaviors.OfType<MissionMapTimeView>().Single();
+        }
+        else
+        {
+            controller = (CoopMissionController)client.Container.Resolve(controllerType);
+            nameplates = controller.ResolveMissionBehavior<PlayerNameplateMissionView>();
+            mapTime = controller.ResolveMissionBehavior<MissionMapTimeView>();
+        }
+        var nameplateResolver = typeof(PlayerNameplateMissionView)
+            .GetField("controllerResolver", BindingFlags.Instance | BindingFlags.NonPublic)!
+            .GetValue(nameplates)!;
         Assert.Same(client.Resolve<IMissionContext>(), controller.ResolveMissionBehavior<IMissionContext>());
         Assert.Same(client.Resolve<IBattleNetwork>(), controller.ResolveMissionBehavior<IBattleNetwork>());
         Assert.Same(client.Resolve<INetwork>(), controller.ResolveMissionBehavior<INetwork>());
@@ -71,6 +92,7 @@ public class MissionLifetimeTests : MissionTestEnvironment
         var references = new[]
         {
             new WeakReference(controller), new WeakReference(component),
+            new WeakReference(nameplates), new WeakReference(mapTime), new WeakReference(nameplateResolver),
             new WeakReference(component.AgentMovementHandler), new WeakReference(component.AgentActionHandler),
             new WeakReference(component.MissileHandler), new WeakReference(component.WeaponDropHandler),
             new WeakReference(component.WeaponPickupHandler), new WeakReference(component.AgentDeathHandler)

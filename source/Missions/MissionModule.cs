@@ -26,6 +26,7 @@ using Missions.Services.Network;
 using Missions.Taverns;
 using Missions.Tournaments;
 using Missions.Tournaments.Spectators;
+using System;
 using System.Collections.Generic;
 
 namespace Missions;
@@ -110,11 +111,9 @@ public class MissionModule : Module
         builder.RegisterType<NoopSteamMissionBridge>().As<ISteamMissionBridge>().SingleInstance();
         builder.RegisterType<MissionMapTimeView>()
             .AsSelf()
-            .As<ILocationMissionBehavior>()
             .InstancePerDependency();
         builder.RegisterType<PlayerNameplateMissionView>()
             .AsSelf()
-            .As<ILocationMissionBehavior>()
             .InstancePerDependency();
         builder.RegisterType<PlayerNameplateControllerResolver>()
             .As<IPlayerNameplateControllerResolver>()
@@ -153,7 +152,26 @@ public class MissionModule : Module
             .InstancePerMatchingLifetimeScope(MissionLifetimeFactory.MissionTag)
             .ExternallyOwned();
         builder.Register((context, parameters) => context.Resolve<IMissionLifetimeFactory>().Create<CoopLocationsController>(parameters))
-            .AsSelf().As<ILocationMissionBehavior>().InstancePerDependency().ExternallyOwned();
+            .AsSelf().InstancePerDependency().ExternallyOwned();
+        builder.Register(context =>
+        {
+            var controller = context.Resolve<CoopLocationsController>();
+            try
+            {
+                return new ILocationMissionBehavior[]
+                {
+                    controller.ResolveMissionBehavior<MissionMapTimeView>(),
+                    controller.ResolveMissionBehavior<PlayerNameplateMissionView>(),
+                    controller
+                };
+            }
+            catch
+            {
+                try { controller.Dispose(); }
+                catch (Exception error) { LogManager.GetLogger<MissionModule>().Error(error, "Failed location composition cleanup"); }
+                throw;
+            }
+        }).As<IEnumerable<ILocationMissionBehavior>>().InstancePerDependency();
 
         // Location NPC spawn-batch codec (stateless). The per-mission session/binding map/components
         // are constructed by CoopLocationsController itself (composition-root style, mirroring
