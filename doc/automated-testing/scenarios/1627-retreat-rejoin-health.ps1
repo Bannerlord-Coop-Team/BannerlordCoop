@@ -199,6 +199,13 @@ function Reserve-Character([object[]]$Entries, [string]$StringId) {
     if ($matches.Count -eq 0) { throw "no reserve character matches $StringId ($registryId)" }
     return $matches
 }
+function Owned-ReserveParty([object]$Health, [object]$Reserve, [string]$HeroStringId, [string]$Controller) {
+    $heroes = @($Health.agents | Where-Object { $_.active -and $_.hero -and $_.characterId -ceq $HeroStringId -and $_.authority -ceq $Controller })
+    if ($heroes.Count -ne 1 -or [string]::IsNullOrWhiteSpace($heroes[0].partyId)) { throw 'exactly one current owned matching hero/party required' }
+    $parties = @($Reserve.parties | Where-Object { $_.partyId -ceq $heroes[0].partyId })
+    if ($parties.Count -ne 1) { throw 'current owned MapEventParty reserve missing or ambiguous' }
+    return $parties[0]
+}
 function Capture-FinalRestoration([object]$Setup) {
     Wait-Campaign 'final-first-campaign' $script:client1
     Wait-Campaign 'final-second-campaign' $script:client2
@@ -248,6 +255,16 @@ if ($SelfCheck) {
     $rejected=$false
     try { Reserve-Character $entries 'missing' | Out-Null } catch { $rejected=$true }
     if (-not $rejected) { throw 'empty reserve match accepted' }
+    $freshState = @{agents=@(@{active=$true;hero=$true;characterId='Created_42';authority='testclient';partyId='MapEventParty_Created_fresh'})}
+    $freshLedger = @{parties=@(@{partyId='MapEventParty_Created_old';entries=@()}, @{partyId='MapEventParty_Created_fresh';entries=$entries})}
+    $resolved = Owned-ReserveParty $freshState $freshLedger 'Created_42' 'testclient'
+    if ($resolved.partyId -cne 'MapEventParty_Created_fresh' -or @(Reserve-Character $resolved.entries 'imperial_recruit').Count -ne 1) { throw 'fresh party was not resolved from current health' }
+    $rejected=$false
+    try { Owned-ReserveParty $freshState @{parties=@($freshLedger.parties[0])} 'Created_42' 'testclient' | Out-Null } catch { $rejected=$true }
+    if (-not $rejected) { throw 'destroyed old party identity accepted' }
+    $rejected=$false
+    try { Owned-ReserveParty @{agents=@($freshState.agents[0],$freshState.agents[0])} $freshLedger 'Created_42' 'testclient' | Out-Null } catch { $rejected=$true }
+    if (-not $rejected) { throw 'ambiguous owned hero identity accepted' }
     # Exercise final capture after a failed body without launching games.
     function Wait-Campaign { }
     function Restore-Check([object]$Setup) { if ($Setup.id -cne 'original') { throw 'wrong cleanup snapshot' } }
@@ -260,7 +277,7 @@ if ($SelfCheck) {
     function Save-Json { }
     Capture-FinalRestoration @{id='wrong'}
     if ($script:selfCheckCapture -cne 'final-restored-campaign' -or $script:restored -or $script:firstFailure.stage -cne 'original-failure') { throw 'restoration failure suppressed capture or replaced first failure' }
-    'scenario self-check passed: health/order, party count, StringId/registry binding, missing-match rejection, failed-body final capture and first-failure preservation'
+    'scenario self-check passed: health/order, party count, StringId/registry binding, missing-match rejection, distinct fresh party/stale rejection, ambiguous hero rejection, failed-body final capture and first-failure preservation'
     return
 }
 try {
@@ -366,7 +383,8 @@ try {
     $null = Wait-Fixture 'fresh-first-mission' { param($s) $s.firstInMission }
     $freshHealth = Deploy 'fresh-deploy' $script:client1 'testclient'
     $freshReserve = Reserve 'fresh-reserve'
-    $freshParty = @($freshReserve.parties | Where-Object partyId -CEQ $partyId)[0]
+    $freshParty = Owned-ReserveParty $freshHealth $freshReserve $hero.characterId 'testclient'
+    Save-Json 'fresh-party-binding.json' @{originalMapEventPartyId=$partyId; freshMapEventPartyId=$freshParty.partyId; heroStringId=$hero.characterId; controller='testclient'; health=$freshHealth; reserve=$freshReserve}
     $freshTroops = @(Reserve-Character $freshParty.entries $regular[0].characterId)
     Save-Json 'fresh-regular-defaults.json' $freshTroops
     if (@($freshTroops | Where-Object { $null -ne $_.Health }).Count -ne 0) { throw 'new battle inherited old regular health' }
