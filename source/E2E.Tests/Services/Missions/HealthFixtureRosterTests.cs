@@ -42,7 +42,8 @@ public class HealthFixtureRosterTests : MissionTestEnvironment
             MapEventDebugCommands.RestoreHealthFixtureRosters(
                 new Dictionary<MobileParty, TroopRosterElement[]> { [party] = original },
                 new Dictionary<Hero, int>());
-            var restored = Assert.Single(party.MemberRoster.GetTroopRoster());
+            Assert.Equal(0, party.MemberRoster.GetTroopCount(newTroop));
+            var restored = Assert.Single(party.MemberRoster.GetTroopRoster().Where(element => element.Number > 0));
             Assert.Same(oldTroop, restored.Character);
             Assert.Equal(original[0].Number, restored.Number);
             Assert.Equal(original[0].WoundedNumber, restored.WoundedNumber);
