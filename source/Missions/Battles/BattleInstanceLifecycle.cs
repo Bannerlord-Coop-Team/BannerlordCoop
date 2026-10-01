@@ -4,12 +4,14 @@ using Common.Network;
 using GameInterface.Services.MapEvents;
 using GameInterface.Services.MapEvents.Messages;
 using GameInterface.Services.MapEvents.TroopSupply;
+using GameInterface.Services.MapEvents.TroopSupply.Messages;
 using GameInterface.Services.ObjectManager;
 using Missions.Agents;
 using Missions.Messages;
 using Missions.Services.Network;
 using Serilog;
 using System;
+using System.Collections.Generic;
 
 namespace Missions.Battles;
 
@@ -43,6 +45,7 @@ public class BattleInstanceLifecycle : IBattleInstanceLifecycle
     private readonly INetworkWorldItemRegistry worldItemRegistry;
     private readonly IBattleSession session;
     private readonly IMissionContext missionContext;
+    private bool healthReported;
 
     public BattleInstanceLifecycle(
         IBattleNetwork network,
@@ -109,6 +112,7 @@ public class BattleInstanceLifecycle : IBattleInstanceLifecycle
 
     public void Leave(bool wasRetreat)
     {
+        ReportFinalHealth();
         BattleSpawnGate.EndBattle();
 
         if (session.HasInstance)
@@ -133,6 +137,39 @@ public class BattleInstanceLifecycle : IBattleInstanceLifecycle
         // a controller that drops while we are away would keep looking present. On re-entry (BR-054) the
         // server re-announces the current members, so the mirror is rebuilt fresh.
         missionContext.EndInstance();
+    }
+
+    private void ReportFinalHealth()
+    {
+        if (healthReported || !session.HasInstance) return;
+        healthReported = true;
+        var healthByParty = new Dictionary<string, Dictionary<int, float>>();
+        var suppliedByParty = new Dictionary<string, int>();
+        foreach (var supplier in CoopTroopSupplierRegistry.GetSuppliers(session.InstanceId))
+            foreach (var (partyId, supplied) in supplier.GetSuppliedByParty())
+            {
+                healthByParty[partyId] = new Dictionary<int, float>();
+                suppliedByParty[partyId] = supplied;
+            }
+
+        var registry = coopMissionComponent.AgentRegistry;
+        foreach (var controllerId in registry.GetControllerIds())
+            foreach (var info in registry.GetAgents(controllerId))
+            {
+                var agent = info.Agent;
+                if (agent?.Origin is not CoopAgentOrigin origin) continue;
+                bool ownsHealth = info.CurrentAuthority == session.OwnControllerId;
+                // Seal puppet callbacks too, before registry teardown removes the authority probe.
+                origin.OnMissionEnded(agent.Health, ownsHealth);
+                if (!ownsHealth || !agent.IsActive() || !(agent.Health > 0f) || origin.MapEventPartyId == null) continue;
+                if (!healthByParty.TryGetValue(origin.MapEventPartyId, out var survivors))
+                    healthByParty[origin.MapEventPartyId] = survivors = new Dictionary<int, float>();
+                survivors[origin.UniqueSeed] = agent.Health;
+            }
+
+        foreach (var party in healthByParty)
+            relayNetwork.SendAll(new NetworkBattleTroopHealth(session.InstanceId, party.Key, party.Value,
+                suppliedByParty.TryGetValue(party.Key, out var supplied) ? supplied : 0));
     }
 
     private void Handle_LeaveMission(MessagePayload<NetworkMissionLeft> payload)

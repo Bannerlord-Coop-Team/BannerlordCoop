@@ -21,6 +21,68 @@ public class BattleTroopReserveBuilderTests : MissionTestEnvironment
     public BattleTroopReserveBuilderTests(ITestOutputHelper output) : base(output) { }
 
     [Fact]
+    public void RetreatRejoin_PreservesSurvivorAndUnspawnedHealthUntilBattleEnds()
+    {
+        var (mapEventId, _) = SetupCoopBattle("attacker", "defender");
+        Server.Call(() =>
+        {
+            var mapEvent = Server.GetRegisteredObject<MapEvent>(mapEventId);
+            var party = mapEvent.DefenderSide.Parties[0];
+            var troop = Server.CreateRegisteredObject<CharacterObject>("retreat_health_troop");
+            party.Party.MemberRoster.Clear();
+            party.Party.MemberRoster.AddToCounts(troop, 3);
+            party.Update();
+            var builder = Server.Resolve<IBattleTroopReserveBuilder>();
+            TroopReserveEntry[] Reserve() => builder.GetOwnedReserves(mapEvent, "defender", false)
+                .Single(side => side.Side == BattleSideEnum.Defender).Parties.Single().Entries;
+
+            var original = Reserve();
+            builder.RecordHealth(mapEvent, party, new Dictionary<int, float>
+            {
+                [original[0].Seed] = 37f,
+                [original[1].Seed] = 64f,
+            }, 3);
+            party.OnTroopKilled(party.Troops.Single(t => t.Descriptor.UniqueSeed == original[2].Seed).Descriptor);
+            builder.ForgetController(mapEvent, "defender");
+            party.Update();
+            var rejoined = Reserve();
+            Assert.Equal(new float?[] { 37f, 64f }, rejoined.Select(entry => entry.Health));
+
+            // Only the first survivor fields this time; the injured reserve must not be healed.
+            builder.RecordHealth(mapEvent, party, new Dictionary<int, float> { [rejoined[0].Seed] = 21f }, 1);
+            builder.ForgetMapEvent(mapEvent, preserveHealth: true);
+            party.Update();
+            Assert.Equal(new float?[] { 21f, 64f }, Reserve().Select(entry => entry.Health));
+
+            builder.ForgetMapEvent(mapEvent);
+            Assert.All(Reserve(), entry => Assert.Null(entry.Health));
+        });
+    }
+
+    [Theory]
+    [InlineData(float.NaN)]
+    [InlineData(float.PositiveInfinity)]
+    [InlineData(-1f)]
+    [InlineData(0f)]
+    public void RetreatHealth_IgnoresInvalidSurvivorValues(float health)
+    {
+        var (mapEventId, _) = SetupCoopBattle("attacker", "defender");
+        Server.Call(() =>
+        {
+            var mapEvent = Server.GetRegisteredObject<MapEvent>(mapEventId);
+            var party = mapEvent.DefenderSide.Parties[0];
+            var builder = Server.Resolve<IBattleTroopReserveBuilder>();
+            var entries = builder.GetOwnedReserves(mapEvent, "defender", false)
+                .Single(side => side.Side == BattleSideEnum.Defender).Parties.Single().Entries;
+            Assert.NotEmpty(entries);
+            builder.RecordHealth(mapEvent, party, new Dictionary<int, float> { [entries[0].Seed] = health }, entries.Length);
+            builder.ForgetController(mapEvent, "defender");
+            Assert.All(builder.GetOwnedReserves(mapEvent, "defender", false).SelectMany(side => side.Parties)
+                .SelectMany(reserve => reserve.Entries), entry => Assert.Null(entry.Health));
+        });
+    }
+
+    [Fact]
     public void GetOwnedReserves_ExcludesTroopsThatCannotJoinBattle()
     {
         var (mapEventId, _) = SetupCoopBattle("attacker", "defender");

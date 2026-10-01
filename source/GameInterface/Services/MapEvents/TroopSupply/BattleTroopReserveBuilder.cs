@@ -80,7 +80,10 @@ public interface IBattleTroopReserveBuilder : IGameAbstraction
     /// holding the battle's reserves and a later battle on the SAME map event re-flattens all parties fresh
     /// (otherwise the AI/enemy parties the host had been fielding keep their advanced supplied pointers and
     /// never re-spawn on a restart).</summary>
-    void ForgetMapEvent(MapEvent mapEvent);
+    void ForgetMapEvent(MapEvent mapEvent, bool preserveHealth = false);
+
+    /// <summary>Keep surviving and unspawned troop health for this party's next reserve.</summary>
+    void RecordHealth(MapEvent mapEvent, MapEventParty party, IReadOnlyDictionary<int, float> survivors, int suppliedCount);
 }
 
 /// <inheritdoc cref="IBattleTroopReserveBuilder"/>
@@ -100,6 +103,7 @@ public class BattleTroopReserveBuilder : IBattleTroopReserveBuilder
     private readonly Dictionary<string, Dictionary<int, int>> ambushSupplyOrders =
         new Dictionary<string, Dictionary<int, int>>();
     private readonly Dictionary<string, Dictionary<string, string>> hideoutPartyReserves = new();
+    private readonly Dictionary<string, Dictionary<PartyBase, Dictionary<string, Queue<float>>>> retainedHealth = new();
     private readonly object gate = new object();
 
     public BattleTroopReserveBuilder(IBattleTroopLedger ledger, IObjectManager objectManager, IPlayerManager playerManager,
@@ -243,7 +247,7 @@ public class BattleTroopReserveBuilder : IBattleTroopReserveBuilder
         }
     }
 
-    public void ForgetMapEvent(MapEvent mapEvent)
+    public void ForgetMapEvent(MapEvent mapEvent, bool preserveHealth = false)
     {
         if (mapEvent == null) return;
         // A vanished mission host does not end the hideout attempt or restore spent escort slots.
@@ -253,6 +257,7 @@ public class BattleTroopReserveBuilder : IBattleTroopReserveBuilder
 
         lock (gate)
         {
+            if (!preserveHealth) retainedHealth.Remove(mapEventId);
             int forgotten = 0;
             foreach (var partyId in ledger.GetParties(mapEventId))
                 if (builtParties.Remove(partyId))
@@ -269,6 +274,50 @@ public class BattleTroopReserveBuilder : IBattleTroopReserveBuilder
             Logger.Information("[TroopSupply] Forgot ALL reserves of battle {MapEventId} ({Count} flatten-cache entries cleared)",
                 mapEventId, forgotten);
         }
+    }
+
+    public void RecordHealth(MapEvent mapEvent, MapEventParty party, IReadOnlyDictionary<int, float> survivors, int suppliedCount)
+    {
+        if (mapEvent == null || party?.Party == null || survivors == null || mapEvent.IsFinalized ||
+            !objectManager.TryGetId(mapEvent, out var mapEventId) ||
+            !objectManager.TryGetId(party, out var partyId)) return;
+
+        lock (gate)
+        {
+            if (!ledger.TryGetReserve(mapEventId, partyId, out var entries, out var supplied)) return;
+            supplied = Math.Min(entries.Count, Math.Max(supplied, suppliedCount));
+            var healthByCharacter = new Dictionary<string, Queue<float>>();
+            for (int i = 0; i < entries.Count; i++)
+            {
+                var entry = entries[i];
+                float? health = survivors.TryGetValue(entry.Seed, out var survivorHealth)
+                    ? survivorHealth
+                    : i >= supplied ? entry.Health : null;
+                if (!health.HasValue || !(health.Value > 0f) || float.IsInfinity(health.Value)) continue;
+                if (!healthByCharacter.TryGetValue(entry.CharacterId, out var values))
+                    healthByCharacter[entry.CharacterId] = values = new Queue<float>();
+                values.Enqueue(health.Value);
+            }
+            if (!retainedHealth.TryGetValue(mapEventId, out var parties))
+                retainedHealth[mapEventId] = parties = new Dictionary<PartyBase, Dictionary<string, Queue<float>>>();
+            // MapEventParty wrappers and descriptor seeds can change when a party rejoins.
+            parties[party.Party] = healthByCharacter;
+        }
+    }
+
+    private void RestoreHealth(string mapEventId, PartyBase party, List<TroopReserveEntry> entries)
+    {
+        if (!retainedHealth.TryGetValue(mapEventId, out var parties) ||
+            !parties.TryGetValue(party, out var healthByCharacter)) return;
+        for (int i = 0; i < entries.Count; i++)
+        {
+            var entry = entries[i];
+            if (!healthByCharacter.TryGetValue(entry.CharacterId, out var values) || values.Count == 0) continue;
+            entries[i] = new TroopReserveEntry(entry.Seed, entry.CharacterId, entry.FormationClass,
+                entry.SupplyOrder, values.Dequeue());
+        }
+        parties.Remove(party);
+        if (parties.Count == 0) retainedHealth.Remove(mapEventId);
     }
 
     private static int CountEntries(List<PartyReserve> parties)
@@ -314,6 +363,7 @@ public class BattleTroopReserveBuilder : IBattleTroopReserveBuilder
                     hideoutSelection.FilterReserve(mapEvent, party, entries);
                 if (supplyOrders == null)
                     PlacePlayerHeroFirstInReserve(party, entries);
+                RestoreHealth(mapEventId, party.Party, entries);
                 ledger.SetReserve(mapEventId, partyId, entries);
                 builtParties.Add(partyId);
                 Logger.Information("[TroopSupply] Built reserve: party {PartyId} side {Side} -> {Count} troops (roster was {Roster})",

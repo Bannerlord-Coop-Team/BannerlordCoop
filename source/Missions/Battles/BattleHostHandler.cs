@@ -832,7 +832,7 @@ internal class BattleHostHandler : IHandler
                 if (objectManager.TryGetObject<MapEvent>(mapEventId, out var abandonedEvent))
                 {
                     if (TryFinalizeAbandonedHideout(mapEventId, abandonedEvent)) return;
-                    reserveBuilder.ForgetMapEvent(abandonedEvent);
+                    reserveBuilder.ForgetMapEvent(abandonedEvent, preserveHealth: true);
                 }
 
                 // Battle over as far as this instance is concerned — drop its scope bookkeeping with it.
@@ -894,7 +894,7 @@ internal class BattleHostHandler : IHandler
                         hostlessRuntimeState.HostEndpoint = null; // the departed host's recorded peer is stale
 
                     if (objectManager.TryGetObject<MapEvent>(mapEventId, out var abandonedEvent))
-                        reserveBuilder.ForgetMapEvent(abandonedEvent);
+                        reserveBuilder.ForgetMapEvent(abandonedEvent, preserveHealth: true);
 
                     // A returner whose grant was pending on the departed host's flush ack must still be
                     // served (it is one of the still-loading participants). AFTER the re-flatten above, so
