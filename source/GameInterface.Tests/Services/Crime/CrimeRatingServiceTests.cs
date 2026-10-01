@@ -2,6 +2,7 @@
 using Common.Messaging;
 using Common.Network;
 using Common.Util;
+using ProtoBuf;
 using GameInterface.Services.Crime;
 using GameInterface.Services.Entity;
 using GameInterface.Services.Heroes.Patches;
@@ -16,11 +17,23 @@ using Xunit;
 
 namespace GameInterface.Tests.Services.Crime;
 
+[Collection(ModInformationRoleCollection.Name)]
 public class CrimeRatingServiceTests
 {
     static CrimeRatingServiceTests()
     {
         RuntimeHelpers.RunModuleConstructor(typeof(Coop.Tests.Mocks.TestNetwork).Module.ModuleHandle);
+    }
+
+    [Fact]
+    public void Notification_RoundTripRetainsRecipientAndAuthoritativeDelta()
+    {
+        var message = Serializer.DeepClone(new NetworkCrimeRatingNotification("first", "hero", "Kingdom_empire_s", 100f, 5f));
+        Assert.Equal("first", message.ControllerId);
+        Assert.Equal("hero", message.HeroId);
+        Assert.Equal("Kingdom_empire_s", message.FactionId);
+        Assert.Equal(100f, message.Rating);
+        Assert.Equal(5f, message.Delta);
     }
 
     [Fact]
@@ -49,6 +62,7 @@ public class CrimeRatingServiceTests
             ModInformation.IsServer = true;
             ResolvedMainHeroContext.ResolvedMainHero = firstHero;
             ratings.Set(faction, 20f);
+            ratings.Notify(faction, 15f);
             Assert.Equal(20f, ratings.Get(faction));
             ResolvedMainHeroContext.ResolvedMainHero = secondHero;
             Assert.Equal(0f, ratings.Get(faction));
@@ -59,7 +73,12 @@ public class CrimeRatingServiceTests
             network.Verify(n => n.SendAll(It.Is<IMessage>(m => m is NetworkCrimeRatingChanged
                 && ((NetworkCrimeRatingChanged)m).ControllerId == "first"
                 && ((NetworkCrimeRatingChanged)m).Rating == 20f)), Times.Once);
-            network.Verify(n => n.SendAll(It.IsAny<IMessage>()), Times.Exactly(2));
+            network.Verify(n => n.SendAll(It.IsAny<IMessage>()), Times.Exactly(3));
+            network.Verify(n => n.SendAll(It.Is<IMessage>(m => m is NetworkCrimeRatingNotification
+                && ((NetworkCrimeRatingNotification)m).ControllerId == "first"
+                && ((NetworkCrimeRatingNotification)m).HeroId == "firstHero"
+                && ((NetworkCrimeRatingNotification)m).Delta == 5f
+                && ((NetworkCrimeRatingNotification)m).Rating == 20f)), Times.Once);
         }
         finally
         {

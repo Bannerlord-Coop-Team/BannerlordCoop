@@ -34,3 +34,22 @@ internal readonly struct NetworkCrimeRatingChanged : IEvent
         Rating = rating;
     }
 }
+
+[ProtoContract(SkipConstructor = true)]
+internal readonly struct NetworkCrimeRatingNotification : IEvent
+{
+    [ProtoMember(1)] public string ControllerId { get; }
+    [ProtoMember(2)] public string HeroId { get; }
+    [ProtoMember(3)] public string FactionId { get; }
+    [ProtoMember(4)] public float Rating { get; }
+    [ProtoMember(5)] public float Delta { get; }
+
+    public NetworkCrimeRatingNotification(string controllerId, string heroId, string factionId, float rating, float delta)
+    {
+        ControllerId = controllerId;
+        HeroId = heroId;
+        FactionId = factionId;
+        Rating = rating;
+        Delta = delta;
+    }
+}

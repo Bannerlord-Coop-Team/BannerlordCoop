@@ -18,6 +18,7 @@ internal interface ICrimeRatingService
     void Set(IFaction faction, float value);
     void Apply(Hero hero, IFaction faction, float delta, bool showNotification);
     void Request(IFaction faction, float delta, bool showNotification);
+    void Notify(IFaction faction, float previousRating);
     void DailyTick();
     void MakePeace(IFaction first, IFaction second);
     void HeroDied(Hero hero);
@@ -65,6 +66,14 @@ internal class CrimeRatingService : ICrimeRatingService
             || float.IsNaN(delta) || float.IsInfinity(delta)) return;
         using (new MainHeroSubstitutionScope(hero, hero.PartyBelongedTo))
             ChangeCrimeRatingAction.Apply(faction, delta, showNotification);
+    }
+
+    public void Notify(IFaction faction, float previousRating)
+    {
+        if (!ModInformation.IsServer || !TryGetPlayer(CurrentHero, out var player)
+            || !objects.TryGetIdWithLogging(faction, out var id)) return;
+        var rating = Get(faction);
+        network.SendAll(new NetworkCrimeRatingNotification(player.ControllerId, player.HeroId, id, rating, rating - previousRating));
     }
 
     public void Request(IFaction faction, float delta, bool showNotification)

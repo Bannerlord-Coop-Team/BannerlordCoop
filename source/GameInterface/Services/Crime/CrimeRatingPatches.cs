@@ -48,12 +48,25 @@ internal class CrimeRatingSetterPatch
 [HarmonyPatch(typeof(ChangeCrimeRatingAction), nameof(ChangeCrimeRatingAction.ApplyInternal))]
 internal class CrimeRatingActionPatch
 {
-    private static bool Prefix(IFaction faction, float deltaCrimeRating, bool showNotification)
+    private static bool Prefix(IFaction faction, float deltaCrimeRating, ref bool showNotification, out float? __state)
     {
-        if (ModInformation.IsServer) return ResolvedMainHeroContext.ResolvedMainHero != null;
+        __state = null;
+        if (ModInformation.IsServer)
+        {
+            if (ResolvedMainHeroContext.ResolvedMainHero == null) return false;
+            if (showNotification) __state = faction.MainHeroCrimeRating;
+            showNotification = false;
+            return true;
+        }
         if (ContainerProvider.TryResolve<ICrimeRatingService>(out var ratings))
             ratings.Request(faction, deltaCrimeRating, showNotification);
         return false;
+    }
+
+    private static void Postfix(IFaction faction, float? __state)
+    {
+        if (__state.HasValue && ContainerProvider.TryResolve<ICrimeRatingService>(out var ratings))
+            ratings.Notify(faction, __state.Value);
     }
 }
 
