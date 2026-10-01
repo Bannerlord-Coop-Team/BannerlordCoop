@@ -2,6 +2,7 @@
 using Common.Logging;
 using Common.Messaging;
 using Common.Network;
+using GameInterface.Services.MobileParties.Extensions;
 using GameInterface.Services.MobileParties.Messages;
 using GameInterface.Services.ObjectManager;
 using Serilog;
@@ -46,10 +47,11 @@ internal class PartyWageLimitHandler : IHandler
 
     private void Handle_SetWagePaymentLimit(MessagePayload<SetWagePaymentLimit> obj)
     {
-        if (!objectManager.TryGetObjectWithLogging<MobileParty>(obj.What.MobilePartyId, out var mobileParty)) return;
-
         GameThread.RunSafe(() =>
         {
+            if (!objectManager.TryGetObjectWithLogging<MobileParty>(obj.What.MobilePartyId, out var mobileParty)) return;
+            if (mobileParty.IsPlayerParty()) return;
+
             mobileParty.SetWagePaymentLimit(obj.What.NewValue);
         });
     }

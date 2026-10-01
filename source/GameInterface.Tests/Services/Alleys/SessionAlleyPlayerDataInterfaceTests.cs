@@ -6,6 +6,7 @@ using GameInterface.Services.TroopRosters.Data;
 using Moq;
 using System;
 using System.Collections.Generic;
+using System.Text.Json;
 using Xunit;
 
 namespace GameInterface.Tests.Services.Alleys;
@@ -16,7 +17,7 @@ public class SessionAlleyPlayerDataInterfaceTests
     public void SetManagementData_PreservesLastRecruitTime()
     {
         const long lastRecruitTimeTicks = 12345;
-        var existing = new AlleyManagementData("old-overseer", Array.Empty<TroopRosterElementData>())
+        var existing = new AlleyManagementData("old-overseer", Array.Empty<AlleyRosterElementData>())
         {
             LastRecruitTimeTicks = lastRecruitTimeTicks
         };
@@ -28,7 +29,7 @@ public class SessionAlleyPlayerDataInterfaceTests
         sessionInterface.SetManagementData(
             "alley",
             "new-overseer",
-            new[] { new TroopRosterElementData("troop", 3, 0, 0) });
+            Array.Empty<TroopRosterElementData>());
 
         Assert.True(sessionInterface.TryGetManagementData("alley", out var updated));
         Assert.Equal("new-overseer", updated.OverseerId);
@@ -40,7 +41,7 @@ public class SessionAlleyPlayerDataInterfaceTests
     {
         var sessionInterface = CreateInterface(new Dictionary<string, AlleyManagementData>
         {
-            ["alley"] = new AlleyManagementData("overseer", Array.Empty<TroopRosterElementData>())
+            ["alley"] = new AlleyManagementData("overseer", Array.Empty<AlleyRosterElementData>())
         });
         const long lastRecruitTimeTicks = 67890;
 
@@ -48,6 +49,21 @@ public class SessionAlleyPlayerDataInterfaceTests
 
         Assert.True(sessionInterface.TryGetManagementData("alley", out var updated));
         Assert.Equal(lastRecruitTimeTicks, updated.LastRecruitTimeTicks);
+    }
+
+    [Fact]
+    public void ExistingStringBackedGarrisonJson_RoundTrips()
+    {
+        const string json = "{\"OverseerId\":\"hero\",\"Garrison\":[{\"CharacterId\":\"CharacterObject_troop\",\"Number\":3,\"WoundedNumber\":1,\"Xp\":42}]}";
+        var options = new JsonSerializerOptions { IncludeFields = true };
+
+        var data = JsonSerializer.Deserialize<AlleyManagementData>(json, options);
+
+        Assert.Equal("CharacterObject_troop", data.Garrison[0].CharacterId);
+        Assert.Equal(3, data.Garrison[0].Number);
+        Assert.Contains(
+            "\"CharacterId\":\"CharacterObject_troop\"",
+            JsonSerializer.Serialize(data.Garrison[0], options));
     }
 
     private static SessionAlleyPlayerDataInterface CreateInterface(
@@ -59,6 +75,6 @@ public class SessionAlleyPlayerDataInterfaceTests
 
         var provider = new Mock<ICoopSessionProvider>();
         provider.SetupGet(session => session.CoopSession).Returns(coopSession.Object);
-        return new SessionAlleyPlayerDataInterface(provider.Object);
+        return new SessionAlleyPlayerDataInterface(provider.Object, Mock.Of<IAlleyGarrisonData>());
     }
 }

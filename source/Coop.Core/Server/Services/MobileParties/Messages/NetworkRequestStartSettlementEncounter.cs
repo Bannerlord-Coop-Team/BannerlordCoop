@@ -10,14 +10,14 @@ namespace Coop.Core.Server.Services.MobileParties.Messages;
 internal readonly struct NetworkRequestStartSettlementEncounter : ICommand
 {
     [ProtoMember(1)]
-    public readonly string PartyId;
+    public readonly uint PartyId;
 
     [ProtoMember(2)]
-    public readonly string SettlementId;
+    public readonly uint SettlementId;
 
     public NetworkRequestStartSettlementEncounter(
-        string partyId,
-        string settlementId)
+        uint partyId,
+        uint settlementId)
     {
         PartyId = partyId;
         SettlementId = settlementId;

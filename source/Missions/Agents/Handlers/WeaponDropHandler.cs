@@ -563,7 +563,9 @@ public class WeaponDropHandler : IWeaponDropHandler
             hasLifeTime,
             remainingLifeTime,
             new AgentEquipmentData(dropped.Agent),
-            isCatchUp: false);
+            isCatchUp: false,
+            siegeEquipmentGrant: dropped.EquipmentIndex == EquipmentIndex.ExtraWeaponSlot
+                ? agentInfo.SiegeEquipmentGrant : Guid.Empty);
         return true;
     }
 
@@ -600,7 +602,8 @@ public class WeaponDropHandler : IWeaponDropHandler
             item.HasLifeTime,
             remainingLifeTime,
             currentEquipment: null,
-            isCatchUp: true);
+            isCatchUp: true,
+            siegeEquipmentGrant: source.SiegeEquipmentGrant);
         return true;
     }
 
@@ -645,7 +648,8 @@ public class WeaponDropHandler : IWeaponDropHandler
             source.HasLifeTime,
             remainingLifeTime,
             currentEquipment: null,
-            isCatchUp: true);
+            isCatchUp: true,
+            siegeEquipmentGrant: source.SiegeEquipmentGrant);
         return true;
     }
 
@@ -744,7 +748,7 @@ public class WeaponDropHandler : IWeaponDropHandler
             message.BannerCode, message.DataValue, message.Position, message.Rotation,
             message.SpawnFlags, message.HasLifeTime, remaining,
             message.HasCurrentEquipment ? message.CurrentEquipment : (AgentEquipmentData?)null,
-            message.IsCatchUp);
+            message.IsCatchUp, message.SiegeEquipmentGrant);
     }
 
     private void ApplyReadyNetworkDrop(NetworkWeaponDropped message, bool deferred = false)

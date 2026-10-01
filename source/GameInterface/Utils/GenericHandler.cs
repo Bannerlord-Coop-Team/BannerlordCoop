@@ -43,14 +43,14 @@ namespace GameInterface.Utils
             disposeFunctions.Add(() => messageBroker.Unsubscribe(payloadHandler));
         }
 
-        protected void Subscribe<TValue, TMessage>(Action<string, TMessage> messageHandler)
+        protected void Subscribe<TValue, TMessage>(Action<uint, TMessage> messageHandler)
             where TMessage : GenericEvent<TInstance, TValue>
         {
             Action<MessagePayload<TMessage>> payloadHandler = (payload) =>
             {
                 var data = payload.What;
 
-                if (!objectManager.TryGetIdWithLogging(data.Instance, out string instanceId)) return;
+                if (!objectManager.TryGetHandleWithLogging(data.Instance, out var instanceId)) return;
 
                 messageHandler(instanceId, data);
             };
@@ -67,10 +67,10 @@ namespace GameInterface.Utils
             Action<MessagePayload<TMessage>> payloadHandler = (payload) =>
             {
                 var data = payload.What;
-                if (!objectManager.TryGetIdWithLogging(data.Instance, out string instanceId)) return;
+                if (!objectManager.TryGetHandleWithLogging(data.Instance, out var instanceId)) return;
 
-                string valueId = null;
-                if (data.Value != null && !objectManager.TryGetIdWithLogging(data.Value, out valueId)) return;
+                uint valueId = 0;
+                if (data.Value != null && !objectManager.TryGetHandleWithLogging(data.Value, out valueId)) return;
 
                 network.SendAll((TNetworkMessage)ctor.Invoke(new object[] { instanceId, valueId }));
             };
@@ -107,7 +107,7 @@ namespace GameInterface.Utils
                     if (!objectManager.TryGetObjectWithLogging(data.InstanceId, out TInstance instance)) return;
 
                     TValue value = null;
-                    if (data.ValueId != null && !objectManager.TryGetObjectWithLogging(data.ValueId, out value)) return;
+                    if (data.ValueId != 0 && !objectManager.TryGetObjectWithLogging(data.ValueId, out value)) return;
 
                     messageHandler(instance, value, data);
                 });

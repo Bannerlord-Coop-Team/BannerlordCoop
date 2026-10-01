@@ -3,6 +3,7 @@ using Common.Network.Messages;
 using Coop.Core.Server.Connections.Messages;
 using Coop.Core.Server.Connections.States;
 using LiteNetLib;
+using GameInterface.Services.Players;
 using System;
 using System.Collections;
 using System.Collections.Concurrent;
@@ -23,7 +24,7 @@ public interface IConnectionCollection : IEnumerable<IConnectionLogic>, IDisposa
 }
 
 /// <inheritdoc cref="IConnectionCollection"/>
-public class ConnectionCollection : IConnectionCollection
+public class ConnectionCollection : IConnectionCollection, ICampaignSynchronization
 {
     public ConcurrentDictionary<NetPeer, IConnectionLogic> ConnectionStates { get; private set; } = new();
 

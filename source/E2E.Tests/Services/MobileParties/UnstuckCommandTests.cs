@@ -6,7 +6,6 @@ using E2E.Tests.Util;
 using GameInterface.Services.Armies.Messages;
 using GameInterface.Services.BugReporting;
 using GameInterface.Services.BugReporting.Messages;
-using GameInterface.Services.GameDebug.Commands;
 using GameInterface.Services.MapEvents.Messages.Leave;
 using GameInterface.Services.MobileParties.Extensions;
 using GameInterface.Services.MobileParties.Messages.Unstuck;
@@ -32,9 +31,10 @@ public sealed class UnstuckCommandReportingFactAttribute : FactAttribute
 }
 
 /// <summary>
-/// Verifies the dedicated unstuck flow: coop.debug.mobileparty.unstuck forwards a
+/// Verifies the dedicated unstuck flow: coop.unstuck forwards a
 /// <see cref="NetworkRequestPlayerUnstuck"/> to the server, the server force-applies each exit
-/// independently and replies with <see cref="NetworkPlayerUnstuckResult"/>, and the requesting
+/// independently for the sending connection's registered player and replies to that connection
+/// with <see cref="NetworkPlayerUnstuckResult"/>, and the requesting
 /// client runs local cleanup and publishes <see cref="PlayerUnstuckCompleted"/>.
 /// </summary>
 public class UnstuckCommandTests : MapEventTestBase
@@ -45,16 +45,18 @@ public class UnstuckCommandTests : MapEventTestBase
     public UnstuckCommandTests(ITestOutputHelper output) : base(output) { }
 
     [Fact]
-    public void Unstuck_OnServer_IsRejected()
+    public void Unstuck_OnServerWithoutAPlayer_AsksForThePlayer()
     {
         string output = null;
         Server.Call(() =>
         {
-            output = ExecuteUnstuck();
+            output = ExecuteUnstuck(Server);
         });
 
-        Assert.Equal("Command can only be run on a client.", output);
+        Assert.Equal("On the server coop.unstuck needs the player to unstick. " +
+            "Usage: coop.unstuck <controller id or \"hero name\">. coop.debug.players.list shows the current ids.", output);
         Assert.Empty(Server.NetworkSentMessages.GetMessages<NetworkRequestPlayerUnstuck>());
+        Assert.Empty(Server.NetworkSentMessages.GetMessages<NetworkPlayerUnstuckResult>());
     }
 
     [Fact]
@@ -65,7 +67,7 @@ public class UnstuckCommandTests : MapEventTestBase
         string output = null;
         Client.Call(() =>
         {
-            output = ExecuteUnstuck();
+            output = ExecuteUnstuck(Client);
         });
 
         Assert.Contains("Unstuck request sent", output);
@@ -201,46 +203,10 @@ public class UnstuckCommandTests : MapEventTestBase
     public void ServerUnstuckRequest_ClearsArmyAndSettlement_AndReportsResult()
     {
         var player = SetupRegisteredMainHeroAndParty();
-        var settlementId = TestEnvironment.CreateRegisteredObject<Settlement>();
-        var townId = TestEnvironment.CreateRegisteredObject<Town>();
-        var kingdomId = TestEnvironment.CreateRegisteredObject<Kingdom>();
-        var leaderPartyId = TestEnvironment.CreateRegisteredObject<MobileParty>();
+        RegisterOnServer(player, "unstuck-requester", Client);
+        StageArmyAndSettlement(player.PartyId);
 
-        Server.Call(() =>
-        {
-            Assert.True(Server.ObjectManager.TryGetObject<MobileParty>(player.PartyId, out var party));
-            Assert.True(Server.ObjectManager.TryGetObject<Settlement>(settlementId, out var settlement));
-            Assert.True(Server.ObjectManager.TryGetObject<Town>(townId, out var town));
-            Assert.True(Server.ObjectManager.TryGetObject<Kingdom>(kingdomId, out var kingdom));
-            Assert.True(Server.ObjectManager.TryGetObject<MobileParty>(leaderPartyId, out var leaderParty));
-
-            // Created outside AllowedThread so the army registers with the object manager.
-            var army = new Army(kingdom, leaderParty, Army.ArmyTypes.Patrolling);
-            Assert.True(Server.ObjectManager.TryGetId(army, out _));
-
-            using (new AllowedThread())
-            {
-                // The builder settlement has no component; the native leave calls
-                // SettlementComponent.OnPartyLeft, so wire the (no-op) town component.
-                settlement.SettlementComponent = town;
-
-                // Keep the leader in the army so removing the player does not cascade into a disband.
-                if (!army._parties.Contains(leaderParty)) army._parties.Add(leaderParty);
-                army._parties.Add(party);
-                party._army = army;
-
-                try
-                {
-                    party.CurrentSettlement = settlement;
-                }
-                catch (NullReferenceException)
-                {
-                    party.SetCurrentSettlementDirectly(settlement);
-                }
-            }
-        });
-
-        Server.SimulateMessage(this, new NetworkRequestPlayerUnstuck(player.PartyId, player.HeroId));
+        Server.SimulateMessage(Client.NetPeer, new NetworkRequestPlayerUnstuck(player.PartyId, player.HeroId));
 
         Server.Call(() =>
         {
@@ -260,9 +226,125 @@ public class UnstuckCommandTests : MapEventTestBase
     }
 
     [Fact]
+    public void ServerUnstuckRequest_NamingAnotherPlayersParty_UnsticksOnlyTheRequester()
+    {
+        var requester = SetupRegisteredMainHeroAndParty();
+        var other = CreatePlayerIds();
+        RegisterOnServer(requester, "unstuck-requester", Client);
+        RegisterOnServer(other, "unstuck-other", SecondClient);
+        StageArmyAndSettlement(requester.PartyId, other.PartyId);
+
+        Server.SimulateMessage(Client.NetPeer, new NetworkRequestPlayerUnstuck(other.PartyId, other.HeroId));
+
+        Server.Call(() =>
+        {
+            var requesterParty = Server.GetRegisteredObject<MobileParty>(requester.PartyId);
+            Assert.Null(requesterParty.Army);
+            Assert.Null(requesterParty.CurrentSettlement);
+
+            var otherParty = Server.GetRegisteredObject<MobileParty>(other.PartyId);
+            Assert.NotNull(otherParty.Army);
+            Assert.NotNull(otherParty.CurrentSettlement);
+        });
+
+        Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkRemovePartyInArmy>());
+        var result = Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkPlayerUnstuckResult>());
+        Assert.Equal(requester.PartyId, result.PartyId);
+    }
+
+    [Fact]
+    public void ServerUnstuckRequest_NamingAnAiPartyInBattle_LeavesItInTheBattle()
+    {
+        var requester = SetupRegisteredMainHeroAndParty();
+        RegisterOnServer(requester, "unstuck-requester", Client);
+        var battle = CreateServerMapEvent();
+
+        Server.SimulateMessage(Client.NetPeer, new NetworkRequestPlayerUnstuck(battle.AttackerPartyId, null));
+
+        Assert.Empty(Server.NetworkSentMessages.GetMessages<NetworkPartyLeftBattle>());
+        Server.Call(() =>
+        {
+            var attacker = Server.GetRegisteredObject<MobileParty>(battle.AttackerPartyId);
+            Assert.Same(Server.GetRegisteredObject<MapEvent>(battle.MapEventId), attacker.MapEvent);
+        });
+
+        var result = Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkPlayerUnstuckResult>());
+        Assert.Equal(requester.PartyId, result.PartyId);
+        Assert.Contains(result.Actions, action => action.Contains("No server-side stuck state"));
+    }
+
+    [Fact]
+    public void ServerUnstuckRequest_NamingAnotherCaptiveHero_DoesNotReleaseIt()
+    {
+        var requester = SetupRegisteredMainHeroAndParty();
+        var other = CreatePlayerIds();
+        RegisterOnServer(requester, "unstuck-requester", Client);
+        RegisterOnServer(other, "unstuck-other", SecondClient);
+
+        Server.Call(() =>
+        {
+            var hero = Server.GetRegisteredObject<Hero>(other.HeroId);
+            using (new AllowedThread())
+            {
+                hero._heroState = Hero.CharacterStates.Prisoner;
+            }
+        });
+
+        Server.SimulateMessage(Client.NetPeer, new NetworkRequestPlayerUnstuck(requester.PartyId, other.HeroId));
+
+        Server.Call(() => Assert.True(Server.GetRegisteredObject<Hero>(other.HeroId).IsPrisoner));
+
+        var result = Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkPlayerUnstuckResult>());
+        Assert.DoesNotContain(result.Actions, action => action.Contains("captivity release"));
+    }
+
+    [Fact]
+    public void ServerUnstuckRequest_FromUnregisteredPeer_AppliesNothing()
+    {
+        var player = SetupRegisteredMainHeroAndParty();
+        StageArmyAndSettlement(player.PartyId);
+
+        Server.SimulateMessage(Client.NetPeer, new NetworkRequestPlayerUnstuck(player.PartyId, player.HeroId));
+
+        AssertStillInArmyAndSettlement(player.PartyId);
+        Assert.Empty(Server.NetworkSentMessages.GetMessages<NetworkRemovePartyInArmy>());
+        Assert.Empty(Server.NetworkSentMessages.GetMessages<NetworkPlayerUnstuckResult>());
+    }
+
+    [Fact]
+    public void ServerUnstuckRequest_WithoutSourcePeer_AppliesNothing()
+    {
+        var player = SetupRegisteredMainHeroAndParty();
+        RegisterOnServer(player, "unstuck-requester", Client);
+        StageArmyAndSettlement(player.PartyId);
+
+        Server.SimulateMessage(this, new NetworkRequestPlayerUnstuck(player.PartyId, player.HeroId));
+
+        AssertStillInArmyAndSettlement(player.PartyId);
+        Assert.Empty(Server.NetworkSentMessages.GetMessages<NetworkRemovePartyInArmy>());
+        Assert.Empty(Server.NetworkSentMessages.GetMessages<NetworkPlayerUnstuckResult>());
+    }
+
+    [Fact]
+    public void ServerUnstuckRequest_SendsResultOnlyToTheRequester()
+    {
+        var requester = SetupRegisteredMainHeroAndParty();
+        var other = CreatePlayerIds();
+        RegisterOnServer(requester, "unstuck-requester", Client);
+        RegisterOnServer(other, "unstuck-other", SecondClient);
+
+        Server.SimulateMessage(Client.NetPeer, new NetworkRequestPlayerUnstuck(requester.PartyId, requester.HeroId));
+
+        Assert.Single(Client.InternalMessages.GetMessages<NetworkPlayerUnstuckResult>());
+        Assert.Single(Client.InternalMessages.GetMessages<PlayerUnstuckCompleted>());
+        Assert.Empty(SecondClient.InternalMessages.GetMessages<NetworkPlayerUnstuckResult>());
+    }
+
+    [Fact]
     public void ServerUnstuckRequest_WithCaptiveHero_ReportsCaptivityStep()
     {
         var player = SetupRegisteredMainHeroAndParty();
+        RegisterOnServer(player, "unstuck-requester", Client);
 
         Server.Call(() =>
         {
@@ -274,7 +356,7 @@ public class UnstuckCommandTests : MapEventTestBase
             }
         });
 
-        Server.SimulateMessage(this, new NetworkRequestPlayerUnstuck(player.PartyId, player.HeroId));
+        Server.SimulateMessage(Client.NetPeer, new NetworkRequestPlayerUnstuck(player.PartyId, player.HeroId));
 
         var result = Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkPlayerUnstuckResult>());
         Assert.Equal(player.PartyId, result.PartyId);
@@ -286,6 +368,7 @@ public class UnstuckCommandTests : MapEventTestBase
     public void ServerUnstuckRequest_WithMapEvent_RemovesPartyAndBroadcastsLeave()
     {
         var player = SetupRegisteredMainHeroAndParty();
+        RegisterOnServer(player, "unstuck-requester", Client);
         var mapEventContext = CreateServerMapEvent();
 
         Server.Call(() =>
@@ -298,7 +381,7 @@ public class UnstuckCommandTests : MapEventTestBase
             Assert.Same(mapEvent, party.MapEvent);
         }, MapEventDisabledMethods);
 
-        Server.SimulateMessage(this, new NetworkRequestPlayerUnstuck(player.PartyId, player.HeroId));
+        Server.SimulateMessage(Client.NetPeer, new NetworkRequestPlayerUnstuck(player.PartyId, player.HeroId));
 
         Server.Call(() =>
         {
@@ -317,8 +400,9 @@ public class UnstuckCommandTests : MapEventTestBase
     public void ServerUnstuckRequest_WithNothingStuck_ReportsClean()
     {
         var player = SetupRegisteredMainHeroAndParty();
+        RegisterOnServer(player, "unstuck-requester", Client);
 
-        Server.SimulateMessage(this, new NetworkRequestPlayerUnstuck(player.PartyId, player.HeroId));
+        Server.SimulateMessage(Client.NetPeer, new NetworkRequestPlayerUnstuck(player.PartyId, player.HeroId));
 
         var result = Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkPlayerUnstuckResult>());
         Assert.Equal(player.PartyId, result.PartyId);
@@ -380,10 +464,88 @@ public class UnstuckCommandTests : MapEventTestBase
         return new PlayerIds(heroId, characterId, partyId);
     }
 
-    private static string ExecuteUnstuck()
+    private PlayerIds CreatePlayerIds() => new PlayerIds(
+        TestEnvironment.CreateRegisteredObject<Hero>(),
+        TestEnvironment.CreateRegisteredObject<CharacterObject>(),
+        TestEnvironment.CreateRegisteredObject<MobileParty>());
+
+    /// <summary>Registers the player on the server and links it to the client's connection.</summary>
+    private void RegisterOnServer(PlayerIds player, string controllerId, EnvironmentInstance client)
     {
-        var command = new UnstuckCommand.UnstuckCoopCommand();
-        return command.ProcessCommand(new CoopCommandArgsFactory().FromValues(Array.Empty<string>())).Output;
+        Server.Call(() =>
+        {
+            var playerManager = Server.Resolve<IPlayerManager>();
+            Assert.True(playerManager.AddPlayer(new Player(
+                controllerId,
+                player.HeroId,
+                player.PartyId,
+                null,
+                player.CharacterId)));
+            playerManager.SetPeer(controllerId, client.NetPeer);
+        });
+    }
+
+    /// <summary>Puts each party in one AI-led army and one settlement on the server.</summary>
+    private void StageArmyAndSettlement(params string[] partyIds)
+    {
+        var settlementId = TestEnvironment.CreateRegisteredObject<Settlement>();
+        var townId = TestEnvironment.CreateRegisteredObject<Town>();
+        var kingdomId = TestEnvironment.CreateRegisteredObject<Kingdom>();
+        var leaderPartyId = TestEnvironment.CreateRegisteredObject<MobileParty>();
+
+        Server.Call(() =>
+        {
+            var settlement = Server.GetRegisteredObject<Settlement>(settlementId);
+            var town = Server.GetRegisteredObject<Town>(townId);
+            var kingdom = Server.GetRegisteredObject<Kingdom>(kingdomId);
+            var leaderParty = Server.GetRegisteredObject<MobileParty>(leaderPartyId);
+
+            // Created outside AllowedThread so the army registers with the object manager.
+            var army = new Army(kingdom, leaderParty, Army.ArmyTypes.Patrolling);
+            Assert.True(Server.ObjectManager.TryGetId(army, out _));
+
+            using (new AllowedThread())
+            {
+                // The builder settlement has no component; the native leave calls
+                // SettlementComponent.OnPartyLeft, so wire the (no-op) town component.
+                settlement.SettlementComponent = town;
+
+                // Keep the leader in the army so removing the player does not cascade into a disband.
+                if (!army._parties.Contains(leaderParty)) army._parties.Add(leaderParty);
+
+                foreach (var partyId in partyIds)
+                {
+                    var party = Server.GetRegisteredObject<MobileParty>(partyId);
+                    army._parties.Add(party);
+                    party._army = army;
+
+                    try
+                    {
+                        party.CurrentSettlement = settlement;
+                    }
+                    catch (NullReferenceException)
+                    {
+                        party.SetCurrentSettlementDirectly(settlement);
+                    }
+                }
+            }
+        });
+    }
+
+    private void AssertStillInArmyAndSettlement(string partyId)
+    {
+        Server.Call(() =>
+        {
+            var party = Server.GetRegisteredObject<MobileParty>(partyId);
+            Assert.NotNull(party.Army);
+            Assert.NotNull(party.CurrentSettlement);
+        });
+    }
+
+    private static string ExecuteUnstuck(EnvironmentInstance instance)
+    {
+        return instance.Resolve<ICoopCommandRegistry>()
+            .ProcessCommand("coop.unstuck", new CoopCommandArgsFactory().FromValues(Array.Empty<string>())).Output;
     }
 
 }

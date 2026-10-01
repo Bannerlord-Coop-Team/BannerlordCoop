@@ -1,4 +1,4 @@
-using GameInterface.Services.MobileParties.Messages;
+﻿using GameInterface.Services.MobileParties.Messages;
 using ProtoBuf;
 using System.Collections.Generic;
 using System.IO;
@@ -11,20 +11,20 @@ namespace GameInterface.Tests.Services.MobileParties
         [Fact]
         public void UpdateVolunteers_PreservesEmptySlotsAndIndices()
         {
-            var original = new UpdateVolunteers(new Dictionary<string, string[]>
+            var original = new UpdateVolunteers(new Dictionary<uint, uint[]>
             {
-                ["Hero_notable"] = new[] { "recruit_a", "", "recruit_b", "", "", "" },
-                ["Hero_empty"] = new[] { "", "", "", "", "", "" },
+                [1] = new uint[] { 3, 0, 4, 0, 0, 0 },
+                [2] = new uint[] { 0, 0, 0, 0, 0, 0 },
             });
 
             var copy = RoundTrip(original);
 
             Assert.Equal(
-                new[] { "recruit_a", "", "recruit_b", "", "", "" },
-                copy.UpdatedVolunteerTypeIds["Hero_notable"]);
+                new uint[] { 3, 0, 4, 0, 0, 0 },
+                copy.UpdatedVolunteerTypeIds[1]);
             Assert.Equal(
-                new[] { "", "", "", "", "", "" },
-                copy.UpdatedVolunteerTypeIds["Hero_empty"]);
+                new uint[] { 0, 0, 0, 0, 0, 0 },
+                copy.UpdatedVolunteerTypeIds[2]);
         }
 
         private static T RoundTrip<T>(T original)

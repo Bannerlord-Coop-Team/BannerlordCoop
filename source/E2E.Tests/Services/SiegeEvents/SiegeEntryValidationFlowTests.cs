@@ -69,8 +69,8 @@ public class SiegeEntryValidationFlowTests : MapEventTestBase
 
         client.Call(() => client.Resolve<INetwork>().SendAll(
             new NetworkRequestStartSettlementEncounter(
-                context.PartyId,
-                context.SettlementId)));
+                client.GetHandle<MobileParty>(context.PartyId),
+                client.GetHandle<Settlement>(context.SettlementId))));
 
         Assert.Single(
             Server.NetworkSentMessages.GetMessages<NetworkSettlementEncounterRejected>());
@@ -110,8 +110,8 @@ public class SiegeEntryValidationFlowTests : MapEventTestBase
 
         requester.Call(() => requester.Resolve<INetwork>().SendAll(
             new NetworkRequestStartSettlementEncounter(
-                context.PartyId,
-                context.SettlementId)));
+                requester.GetHandle<MobileParty>(context.PartyId),
+                requester.GetHandle<Settlement>(context.SettlementId))));
 
         Assert.Single(
             Server.NetworkSentMessages.GetMessages<NetworkSettlementEncounterRejected>());
@@ -155,7 +155,8 @@ public class SiegeEntryValidationFlowTests : MapEventTestBase
         ClearMessages();
 
         requester.Call(() => requester.Resolve<INetwork>().SendAll(
-            new NetworkRequestEndSettlementEncounter(context.PartyId)));
+            new NetworkRequestEndSettlementEncounter(
+                requester.GetHandle<MobileParty>(context.PartyId))));
 
         var result = Assert.Single(
             Server.NetworkSentMessages.GetMessages<NetworkSettlementEncounterLeaveResult>());

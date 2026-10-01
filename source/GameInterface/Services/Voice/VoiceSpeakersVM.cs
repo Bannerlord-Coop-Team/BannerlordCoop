@@ -8,6 +8,7 @@ public sealed class VoiceSpeakersVM : ViewModel
     private readonly IVoiceSpeakerNameResolver names;
     public VoiceSpeakersVM(IVoiceSpeakerNameResolver names) { this.names = names; }
     [DataSourceProperty] public MBBindingList<VoiceSpeakerVM> Speakers { get; } = new();
+    [DataSourceProperty] public MBBindingList<VoicePartyMarkerVM> PartyMarkers { get; } = new();
     [DataSourceProperty] public bool HasSpeakers => Speakers.Count > 0;
     [DataSourceProperty] public string Title => "Talking";
 

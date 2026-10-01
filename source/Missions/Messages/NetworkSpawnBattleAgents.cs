@@ -142,6 +142,12 @@ public class BattleAgentSpawnData
     public readonly long AuthorityRevision;
     [ProtoMember(25)]
     public readonly long MountAuthorityRevision;
+    [ProtoMember(26)]
+    public readonly string MountOwnerControllerId;
+    [ProtoMember(27)]
+    public readonly Guid SiegeEquipmentGrant;
+    [ProtoMember(28)]
+    public readonly long SiegeEquipmentGrantRevision;
 
     public BattleAgentSpawnData(
         Guid agentId,
@@ -166,7 +172,10 @@ public class BattleAgentSpawnData
         string mountMovementScopeId = null,
         bool isRunningAway = false,
         long authorityRevision = 0,
-        long mountAuthorityRevision = 0)
+        long mountAuthorityRevision = 0,
+        string mountOwnerControllerId = null,
+        Guid siegeEquipmentGrant = default,
+        long siegeEquipmentGrantRevision = 0)
     {
         AgentId = agentId;
         CharacterId = characterId;
@@ -193,5 +202,8 @@ public class BattleAgentSpawnData
         IsRunningAway = isRunningAway;
         AuthorityRevision = authorityRevision;
         MountAuthorityRevision = mountAuthorityRevision;
+        MountOwnerControllerId = mountOwnerControllerId ?? ownerControllerId;
+        SiegeEquipmentGrant = siegeEquipmentGrant;
+        SiegeEquipmentGrantRevision = siegeEquipmentGrantRevision;
     }
 }

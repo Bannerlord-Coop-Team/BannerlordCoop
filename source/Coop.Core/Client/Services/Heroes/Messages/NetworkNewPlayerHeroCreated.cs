@@ -1,4 +1,5 @@
 ﻿using Common.Messaging;
+using GameInterface.Services.Heroes.Data;
 using GameInterface.Services.Players.Data;
 using ProtoBuf;
 
@@ -13,11 +14,18 @@ public readonly struct NetworkNewPlayerHeroCreated : IEvent
     public readonly Player Player;
     [ProtoMember(3)]
     public readonly byte[] HeroData;
+    [ProtoMember(4)]
+    public readonly PlayerRegistrationHandles RegistrationHandles;
 
-    public NetworkNewPlayerHeroCreated(string controllerId, Player player, byte[] heroData)
+    public NetworkNewPlayerHeroCreated(
+        string controllerId,
+        Player player,
+        byte[] heroData,
+        PlayerRegistrationHandles registrationHandles = default)
     {
         ControllerId = controllerId;
         Player = player;
         HeroData = heroData;
+        RegistrationHandles = registrationHandles;
     }
 }

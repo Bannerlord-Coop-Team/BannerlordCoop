@@ -11,10 +11,13 @@ namespace GameInterface.Services.VillageMarketDatas.Messages
     {
         [ProtoMember(1)]
         public string MarketDataId { get; }
+        [ProtoMember(2)]
+        public uint Handle { get; }
 
-        public NetworkCreateVillageMarketData(string marketDataId)
+        public NetworkCreateVillageMarketData(string marketDataId, uint handle)
         {
             MarketDataId = marketDataId;
+            Handle = handle;
         }
     }
 }

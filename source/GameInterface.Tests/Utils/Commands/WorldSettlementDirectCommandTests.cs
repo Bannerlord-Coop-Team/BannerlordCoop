@@ -3,6 +3,10 @@ using Common;
 using Common.Commands;
 using Common.Util;
 using GameInterface.Services.ObjectManager;
+#if DEBUG
+using GameInterface.Services.Villages.Commands;
+using Moq;
+#endif
 using Serilog;
 using System;
 using System.Collections;
@@ -50,9 +54,9 @@ public class WorldSettlementDirectCommandTests
         Type[] commandTypes = GetCommandTypes();
 
 #if DEBUG
-        Assert.Equal(140, commandTypes.Length);
+        Assert.Equal(150, commandTypes.Length);
 #else
-        Assert.Equal(123, commandTypes.Length);
+        Assert.Equal(125, commandTypes.Length);
 #endif
         Assert.All(commandTypes, type =>
         {
@@ -255,8 +259,22 @@ public class WorldSettlementDirectCommandTests
 
     private static ICoopCommand[] CreateCommands()
     {
+#if DEBUG
+        var fixture = new Mock<IRaidLootWarningFixture>().Object;
+#endif
         return GetCommandTypes()
-            .Select(type => (ICoopCommand)Activator.CreateInstance(type))
+            .Select(type => (ICoopCommand)Activator.CreateInstance(
+                type,
+                type.GetConstructor(new[] { typeof(IObjectManager) }) != null
+                    ? new object[] { new ObjectManager(Serilog.Core.Logger.None) }
+                    :
+#if DEBUG
+                type.GetConstructor(new[] { typeof(IRaidLootWarningFixture) }) != null
+                    ? new object[] { fixture }
+                    : Array.Empty<object>()))
+#else
+                Array.Empty<object>()))
+#endif
             .ToArray();
     }
 

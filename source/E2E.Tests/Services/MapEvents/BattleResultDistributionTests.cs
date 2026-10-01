@@ -14,21 +14,16 @@ using GameInterface.Services.MapEvents.Messages.Leave;
 using GameInterface.Services.Players;
 using GameInterface.Services.TroopRosters.Data;
 using HarmonyLib;
-using Helpers;
 using TaleWorlds.CampaignSystem;
-using TaleWorlds.CampaignSystem.CampaignBehaviors;
 using TaleWorlds.CampaignSystem.Encounters;
 using TaleWorlds.CampaignSystem.GameComponents;
 using TaleWorlds.CampaignSystem.GameMenus;
-using TaleWorlds.CampaignSystem.GameState;
 using TaleWorlds.CampaignSystem.MapEvents;
-using TaleWorlds.CampaignSystem.Naval;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Roster;
 using TaleWorlds.Core;
 using TaleWorlds.ObjectSystem;
 using TaleWorlds.MountAndBlade;
-using TaleWorlds.Localization;
 using Xunit;
 using Xunit.Abstractions;
 
@@ -208,8 +203,8 @@ public class BattleResultDistributionTests : MapEventTestBase
 
             var lootedPrisoners = new Dictionary<string, TroopRosterData>
             {
-                { mep1Id, new TroopRosterData(new[] { new TroopRosterElementData(troopForP1, 1, 0, 0) }) },
-                { mep2Id, new TroopRosterData(new[] { new TroopRosterElementData(troopForP2, 1, 0, 0) }) },
+                { mep1Id, new TroopRosterData(new[] { new TroopRosterElementData(Server.GetHandle<CharacterObject>(troopForP1), 1, 0, 0) }) },
+                { mep2Id, new TroopRosterData(new[] { new TroopRosterElementData(Server.GetHandle<CharacterObject>(troopForP2), 1, 0, 0) }) },
             };
             if (emptyLoot) lootedPrisoners.Clear();
 
@@ -278,94 +273,6 @@ public class BattleResultDistributionTests : MapEventTestBase
                 CollectHideoutResultsFromMap(client, hasWaitingMenu: client == Clients.Last(), hasLoot: !emptyLoot);
     }
 
-    private void CollectHideoutResultsFromMap(EnvironmentInstance client, bool hasWaitingMenu, bool hasLoot)
-    {
-        var harmony = new Harmony($"hideout-loot-ui.{Guid.NewGuid()}");
-        harmony.Patch(AccessTools.Method(typeof(PartyScreenHelper), nameof(PartyScreenHelper.OpenScreenAsLoot)),
-            prefix: new HarmonyMethod(typeof(BattleResultDistributionTests), nameof(OpenLootPartyScreen)));
-        harmony.Patch(AccessTools.Method(typeof(InventoryScreenHelper), nameof(InventoryScreenHelper.OpenScreenAsLoot)),
-            prefix: new HarmonyMethod(typeof(BattleResultDistributionTests), nameof(OpenLootInventoryScreen)));
-        try
-        {
-            client.Call(() =>
-            {
-                var states = Game.Current.GameStateManager;
-                var mapState = states.CreateState<MapState>();
-                states._gameStates.Add(mapState);
-                if (hasWaitingMenu)
-                {
-                    var starter = new CampaignGameStarter(Campaign.Current.GameMenuManager, Campaign.Current.ConversationManager);
-                    starter.AddGameMenu("coop_hideout_waiting", "Waiting for another hero", _ => { });
-                    mapState._menuContext = Game.Current.ObjectManager.CreateObject<MenuContext>();
-                    mapState._menuContext.SwitchToMenu("coop_hideout_waiting");
-                }
-
-                var encounter = PlayerEncounter.Current;
-                encounter._alternativeReceivedLootShips = new List<Ship>();
-                new HideoutCampaignBehavior().game_menu_hideout_place_on_init(new MenuCallbackArgs(mapState, TextObject.GetEmpty()));
-                Assert.Same(encounter, PlayerEncounter.Current);
-                Assert.Null(MobileParty.MainParty.CurrentSettlement);
-                var missionState = ObjectHelper.SkipConstructor<MissionState>();
-                var previousMission = MissionState.Current;
-                MissionState.Current = missionState;
-                states._gameStates.Add(missionState);
-                try
-                {
-                    mapState.OnMapModeTick(0.1f);
-                    Assert.Equal(PlayerEncounterState.CaptureHeroes, encounter.EncounterState);
-                }
-                finally
-                {
-                    states._gameStates.Remove(missionState);
-                    MissionState.Current = previousMission;
-                }
-
-                mapState.OnMapModeTick(0.1f);
-                if (hasLoot)
-                {
-                    Assert.IsType<PartyState>(states.ActiveState);
-                    Assert.Equal(PlayerEncounterState.LootInventory, encounter.EncounterState);
-                    mapState.OnMapModeTick(0.1f);
-                    Assert.Equal(PlayerEncounterState.LootInventory, encounter.EncounterState);
-
-                    states._gameStates.RemoveAt(states._gameStates.Count - 1);
-                    mapState.OnMapModeTick(0.1f);
-                    Assert.IsType<InventoryState>(states.ActiveState);
-                    Assert.Equal(PlayerEncounterState.LootShips, encounter.EncounterState);
-                    mapState.OnMapModeTick(0.1f);
-                    Assert.Equal(PlayerEncounterState.LootShips, encounter.EncounterState);
-
-                    states._gameStates.RemoveAt(states._gameStates.Count - 1);
-                    mapState.OnMapModeTick(0.1f);
-                }
-                Assert.Null(PlayerEncounter.Current);
-                Assert.Null(MobileParty.MainParty.MapEvent);
-                Assert.Null(MobileParty.MainParty.CurrentSettlement);
-                Assert.Null(Campaign.Current.CurrentMenuContext);
-            }, MapEventDisabledMethods.Concat(new[]
-            {
-                AccessTools.Method(typeof(Campaign), nameof(Campaign.RealTick)),
-                AccessTools.Method(typeof(Campaign), nameof(Campaign.Tick)),
-            }).ToArray());
-        }
-        finally { harmony.UnpatchAll(harmony.Id); }
-    }
-
-    private static bool OpenLootPartyScreen()
-    {
-        var states = Game.Current.GameStateManager;
-        states._gameStates.Add(states.CreateState<PartyState>());
-        return false;
-    }
-
-    private static bool OpenLootInventoryScreen(Dictionary<PartyBase, ItemRoster> itemRostersToLoot)
-    {
-        Assert.True(itemRostersToLoot[PartyBase.MainParty].Sum(item => item.Amount) > 0);
-        var states = Game.Current.GameStateManager;
-        states._gameStates.Add(states.CreateState<InventoryState>());
-        return false;
-    }
-
     [Fact]
     [Trait("Requirement", "BR-081")]
     public void CommittedResults_UseServerAddressedPartyAndSide_WhenClientMapEventOmitsParty()
@@ -404,8 +311,8 @@ public class BattleResultDistributionTests : MapEventTestBase
                 new Dictionary<string, TroopRosterData>(),
                 new Dictionary<string, TroopRosterData>
                 {
-                    { mep1Id, new TroopRosterData(new[] { new TroopRosterElementData(troopForP1, 1, 0, 0) }) },
-                    { mep2Id, new TroopRosterData(new[] { new TroopRosterElementData(troopForP2, 1, 0, 0) }) },
+                    { mep1Id, new TroopRosterData(new[] { new TroopRosterElementData(Server.GetHandle<CharacterObject>(troopForP1), 1, 0, 0) }) },
+                    { mep2Id, new TroopRosterData(new[] { new TroopRosterElementData(Server.GetHandle<CharacterObject>(troopForP2), 1, 0, 0) }) },
                 });
 
             var network = Server.Resolve<INetwork>();
@@ -456,7 +363,7 @@ public class BattleResultDistributionTests : MapEventTestBase
                 {
                     {
                         playerMapEventPartyId,
-                        new TroopRosterData(new[] { new TroopRosterElementData(troop, 1, 0, 0) })
+                        new TroopRosterData(new[] { new TroopRosterElementData(Server.GetHandle<CharacterObject>(troop), 1, 0, 0) })
                     },
                 });
 

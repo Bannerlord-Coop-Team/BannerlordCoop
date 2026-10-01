@@ -112,6 +112,9 @@ internal class CaravanPartyComponentHandler : IHandler
         var instance = payload.What.Instance;
         var initArgs = payload.What.InitArgs;
 
+        // Ownership transfers create a component without spawn initialization.
+        if (initArgs == null) return;
+
         if (!objectManager.TryGetIdWithLogging(instance, out var caravanPartyComponentId)) return;
 
         // caravanLeader may legitimately be null

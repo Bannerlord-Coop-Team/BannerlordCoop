@@ -1,4 +1,4 @@
-using GameInterface.Services.Party.Handlers;
+﻿using GameInterface.Services.Party.Handlers;
 using GameInterface.Services.Party.Patches;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Roster;
@@ -47,19 +47,19 @@ public class PartyScreenPrisonerReleaseTests
     {
         var delta = new GameInterface.Services.TroopRosters.Data.TroopRosterData(new[]
         {
-            new GameInterface.Services.TroopRosters.Data.TroopRosterElementData("taken-hero", 1, 0, 0),
-            new GameInterface.Services.TroopRosters.Data.TroopRosterElementData("regular-troop", 3, 0, 0),
-            new GameInterface.Services.TroopRosters.Data.TroopRosterElementData("source-removal", -1, 0, 0),
+            new GameInterface.Services.TroopRosters.Data.TroopRosterElementData(1, 1, 0, 0),
+            new GameInterface.Services.TroopRosters.Data.TroopRosterElementData(2, 3, 0, 0),
+            new GameInterface.Services.TroopRosters.Data.TroopRosterElementData(3, -1, 0, 0),
         });
 
         var filtered = PartyDoneLogicHandler.FilterTakenHeroAdditions(
             delta,
-            new HashSet<string> { "taken-hero", "source-removal" });
+            new HashSet<uint> { 1, 3 });
 
         Assert.Collection(
             filtered.Data,
-            element => Assert.Equal("regular-troop", element.CharacterId),
-            element => Assert.Equal("source-removal", element.CharacterId));
+            element => Assert.Equal(2u, element.CharacterId),
+            element => Assert.Equal(3u, element.CharacterId));
     }
 
     [Theory]

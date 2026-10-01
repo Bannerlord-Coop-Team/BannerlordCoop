@@ -47,8 +47,8 @@ public class MapEventCollectionTests : MapEventTestBase
 
         var marker = Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkMapEventInitialized>());
         Assert.False(marker.IsTerminal);
-        Assert.NotNull(marker.TroopUpgradeTrackerId);
-        Assert.NotNull(marker.ComponentId);
+        Assert.NotEqual(0u, marker.TroopUpgradeTrackerHandle);
+        Assert.NotEqual(0u, marker.ComponentHandle);
         foreach (var instance in AllInstances) AssertCommitted(instance, staged);
         foreach (var client in Clients) AssertPending(client, staged, false);
     }
@@ -357,6 +357,7 @@ public class MapEventCollectionTests : MapEventTestBase
         });
 
         Server.SimulateMessage(this, new PlayerDisconnected(client.NetPeer, default));
+        Server.PumpGameThread();
 
         Server.Call(() =>
         {
@@ -379,6 +380,8 @@ public class MapEventCollectionTests : MapEventTestBase
             Assert.Equal(reconnectBeforeMapEventEnds, party.IsActive);
             Assert.Null(party.MapEvent);
         });
+
+        Server.PumpGameThread();
     }
 
     private static void AssertCommitted(EnvironmentInstance instance, MapEventContext staged) => instance.Call(() =>

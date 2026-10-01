@@ -1,3 +1,4 @@
+using Common;
 using Common.Messaging;
 using GameInterface.Policies;
 using GameInterface.Services.Issues.Generic;
@@ -39,11 +40,50 @@ internal class IssueManagerQuestCompletedReasonCapture
 internal class IssueFinalizedOwnershipGatePatch
 {
     [HarmonyPrefix]
-    private static bool Prefix(IssueBase __instance)
+    internal static bool Prefix(IssueBase __instance)
     {
         if (!DisableAllIssueBehaviorsExceptAllowlist.IsAllowlisted(__instance)) return true;
 
-        return IssueFinalizeAuthorityGuard.IsActive;
+        return IssueFinalizeAuthorityGuard.IsActive || CallOriginalPolicy.IsOriginalAllowedForOwnershipGate();
+    }
+}
+
+[HarmonyPatch(typeof(IssueBase))]
+internal class IssueExpiryFinalizeAuthorityPatch
+{
+    [HarmonyPatch(nameof(IssueBase.CompleteIssueWithTimedOut))]
+    [HarmonyPrefix]
+    private static void TimedOutPrefix(out IssueFinalizeAuthorityGuard __state)
+    {
+        __state = OpenGuardIfAuthoritative();
+    }
+
+    [HarmonyPatch(nameof(IssueBase.CompleteIssueWithTimedOut))]
+    [HarmonyFinalizer]
+    private static void TimedOutFinalizer(IssueFinalizeAuthorityGuard __state)
+    {
+        __state?.Dispose();
+    }
+
+    [HarmonyPatch(nameof(IssueBase.CompleteIssueWithStayAliveConditionsFailed))]
+    [HarmonyPrefix]
+    private static void StayAliveFailedPrefix(out IssueFinalizeAuthorityGuard __state)
+    {
+        __state = OpenGuardIfAuthoritative();
+    }
+
+    [HarmonyPatch(nameof(IssueBase.CompleteIssueWithStayAliveConditionsFailed))]
+    [HarmonyFinalizer]
+    private static void StayAliveFailedFinalizer(IssueFinalizeAuthorityGuard __state)
+    {
+        __state?.Dispose();
+    }
+
+    private static IssueFinalizeAuthorityGuard OpenGuardIfAuthoritative()
+    {
+        return CallOriginalPolicy.IsOriginalAllowed() || ModInformation.IsServer
+            ? new IssueFinalizeAuthorityGuard()
+            : null;
     }
 }
 

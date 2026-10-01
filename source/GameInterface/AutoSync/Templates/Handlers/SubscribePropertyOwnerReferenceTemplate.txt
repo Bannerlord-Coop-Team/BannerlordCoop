@@ -1,6 +1,6 @@
-Subscribe<{{ElementType}}, {{ MemberDeclaringTypeName}}_{{ MemberName }}_SetLocalMessage>((instanceId, data) =>
+﻿Subscribe<{{ElementType}}, {{ MemberDeclaringTypeName}}_{{ MemberName }}_SetLocalMessage>((instanceId, data) =>
 {
-    if (!objectManager.TryGetId(data.Value, out string id)) return;
+    if (!objectManager.TryGetHandle(data.Value, out uint id)) return;
     network.SendAll(new {{ MemberDeclaringTypeName}}_{{ MemberName }}_SetNetworkMessage(instanceId, id, data.PropertyValue));
 });
 SubscribeNetwork<{{ElementType}}, {{ MemberDeclaringTypeName}}_{{ MemberName }}_SetNetworkMessage>((instance, data) =>
@@ -17,7 +17,7 @@ SubscribeTracked((MessagePayload<Local_{{ MemberDeclaringTypeName}}_{{ MemberNam
 {
     var data = payload.What;
 
-    if (!objectManager.TryGetIdWithLogging(data.Instance, out var instanceId))
+    if (!objectManager.TryGetHandleWithLogging(data.Instance, out var instanceId))
         return;
 
     network.SendAll(new Network_{{ MemberDeclaringTypeName}}_{{ MemberName }}_PropertyOwnerClear(instanceId));

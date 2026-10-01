@@ -26,11 +26,16 @@ public class RetainedPlayerHeroBootstrapTests : MissionTestEnvironment
     public RetainedPlayerHeroBootstrapTests(ITestOutputHelper output) : base(output) { }
 
     [Theory]
-    [InlineData(true, false)]
-    [InlineData(false, false)]
-    [InlineData(true, true)]
-    [InlineData(false, true)]
-    public void AcceptedGrantBuildsOneInitialPlayerBeforeSetupEvenWhenHostChanges(bool catchUpFirst, bool spawnedByHost)
+    [InlineData(true, false, false, false, false)]
+    [InlineData(false, false, false, false, false)]
+    [InlineData(false, false, true, false, false)]
+    [InlineData(false, false, false, true, false)]
+    [InlineData(false, false, false, false, true)]
+    [InlineData(true, true, false, false, false)]
+    [InlineData(false, true, false, false, false)]
+    public void AcceptedGrantAttachesInitialPlayerBeforeSetupEvenWhenSpawnOrderingChanges(
+        bool catchUpFirst, bool spawnedByHost, bool puppetSpawnedFirst,
+        bool conflictingRefresh, bool conflictingRefreshFirst)
     {
         using var fixture = new MissionEngineFixture();
         var (battleId, partyIds) = SetupCoopBattle("holder", "returner");
@@ -80,19 +85,41 @@ public class RetainedPlayerHeroBootstrapTests : MissionTestEnvironment
                 .GetField("authorityMigrator", BindingFlags.Instance | BindingFlags.NonPublic).GetValue(controller);
             Assert.True(migrator.IsCurrentPlayerHandoff(grant));
             var broker = returner.Resolve<IMessageBroker>();
-            if (catchUpFirst) broker.Publish(this, new NetworkSpawnBattleAgents(new[] { previous }));
-            Assert.Empty(mission.Agents);
+            if (puppetSpawnedFirst)
+            {
+                var puppet = mission.SpawnAgent(new AgentBuildData(hero.CharacterObject)
+                    .Controller(AgentControllerType.None).Team(mission.DefenderTeam.Shell).Equipment(new Equipment()));
+                puppet.Health = previous.Health;
+                Assert.True(returner.Resolve<INetworkAgentRegistry>().TryRegisterAgent(
+                    "holder", "returner", "returner:old", previous.AgentId, 7, puppet, 1));
+                Assert.Single(mission.Agents);
+            }
+            else if (catchUpFirst)
+                broker.Publish(this, new NetworkSpawnBattleAgents(new[] { previous }));
+            if (!puppetSpawnedFirst) Assert.Empty(mission.Agents);
             Assert.Null(Mission.Current.InitialPlayerAgent);
+            var refresh = new BattleAgentSpawnData(previous.AgentId, characterId, default, BattleSideEnum.Defender,
+                17, "successor", eventPartyId, 1141, new Equipment(), default, null, movementId: 7,
+                originalOwnerControllerId: "returner", movementScopeId: "returner:old", authorityRevision: 2);
+            if (conflictingRefreshFirst)
+                broker.Publish(this, new NetworkSpawnBattleAgents(new[] { refresh }));
             broker.Publish(this, grant);
             broker.Publish(this, new NetworkBattleHostAssigned(battleId, "successor", new[] { "returner" }, 2));
-            if (!catchUpFirst) broker.Publish(this, new NetworkSpawnBattleAgents(new[] { previous }));
+            if (conflictingRefresh)
+            {
+                mission.DeploymentController.TeamSetupOver = true;
+                broker.Publish(this, new NetworkSpawnBattleAgents(new[] { refresh }));
+                Common.GameThread.Instance.Update(TimeSpan.Zero);
+            }
+            else if (!catchUpFirst && !puppetSpawnedFirst)
+                broker.Publish(this, new NetworkSpawnBattleAgents(new[] { previous }));
             spawner.DrainPendingPuppets();
             Assert.Single(mission.Agents);
-            Assert.Equal(1, mission.InitialPlayerBuildCount);
+            Assert.Equal(puppetSpawnedFirst ? 0 : 1, mission.InitialPlayerBuildCount);
             Assert.Same(Mission.Current.InitialPlayerAgent, Mission.Current.MainAgent);
             Assert.True(controller.HasRetainedPlayerAgent(Mission.Current.InitialPlayerAgent));
             Assert.False(spawnHandler.IsSized);
-            Assert.False(mission.DeploymentController.TeamSetupOver);
+            Assert.Equal(conflictingRefresh, mission.DeploymentController.TeamSetupOver);
             Assert.False(controller.Deployment.IsCommitted);
             Assert.Equal(AgentControllerType.None, Mission.Current.InitialPlayerAgent.Controller);
             Assert.True(returner.Resolve<INetworkAgentRegistry>().TryGetAgentInfo(previous.AgentId, out var info));
@@ -116,7 +143,7 @@ public class RetainedPlayerHeroBootstrapTests : MissionTestEnvironment
             Assert.Equal(0, phase.RemainingSpawnNumber);
             Assert.Empty(supplier.SupplyTroops(phase.InitialSpawnNumber));
             Assert.False(spawnHandler.IsSized);
-            Assert.False(mission.DeploymentController.TeamSetupOver);
+            Assert.Equal(conflictingRefresh, mission.DeploymentController.TeamSetupOver);
             Assert.False(controller.Deployment.IsCommitted);
             Assert.Equal("returner", info.CurrentAuthority);
             Assert.Equal(spawnedByHost ? 1 : 2, info.AuthorityRevision);
@@ -128,7 +155,7 @@ public class RetainedPlayerHeroBootstrapTests : MissionTestEnvironment
             broker.Publish(this, new NetworkSpawnBattleAgents(new[] { previous }));
             spawner.DrainPendingPuppets();
             Assert.Single(mission.Agents);
-            Assert.Equal(1, mission.InitialPlayerBuildCount);
+            Assert.Equal(puppetSpawnedFirst ? 0 : 1, mission.InitialPlayerBuildCount);
         });
     }
 }

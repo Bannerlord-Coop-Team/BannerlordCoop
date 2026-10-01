@@ -36,8 +36,9 @@ namespace GameInterface.Services.CharacterSkills.Handlers
             var payload = obj.What;
 
             if (objectManager.AddNewObject(payload.CharacterSkills, out string CharacterSkillsId) == false) return;
+            if (!objectManager.TryGetHandleWithLogging(payload.CharacterSkills, out var handle)) return;
 
-            var message = new NetworkCreateCharacterSkills(CharacterSkillsId);
+            var message = new NetworkCreateCharacterSkills(CharacterSkillsId, handle);
             network.SendAll(message);
         }
 
@@ -46,7 +47,7 @@ namespace GameInterface.Services.CharacterSkills.Handlers
             var payload = obj.What;
 
             var CharacterSkills = ObjectHelper.SkipConstructor<MBCharacterSkills>();
-            if (objectManager.AddExisting(payload.CharacterSkillsId, CharacterSkills) == false)
+            if (objectManager.AddExisting(payload.CharacterSkillsId, CharacterSkills, payload.Handle) == false)
             {
                 Logger.Error("Failed to add existing CharacterSkill, {id}", payload.CharacterSkillsId);
                 return;

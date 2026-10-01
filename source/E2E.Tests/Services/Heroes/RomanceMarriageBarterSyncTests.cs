@@ -308,6 +308,8 @@ public class RomanceMarriageBarterSyncTests : MapEventTestBase
         {
             harmony.UnpatchAll(harmony.Id);
         }
+
+        Server.PumpGameThread();
     }
 
     private static bool SuppressMarriageBarterableApply() => false;
@@ -497,6 +499,8 @@ public class RomanceMarriageBarterSyncTests : MapEventTestBase
                 initialCounterpartyGold + offeredGold,
                 assertMainHero: true);
         }
+
+        Server.PumpGameThread();
     }
 
     [Fact]
@@ -608,6 +612,8 @@ public class RomanceMarriageBarterSyncTests : MapEventTestBase
                 initialPlayerGold - offeredGold,
                 initialCounterpartyGold + offeredGold);
         }
+
+        Server.PumpGameThread();
     }
 
     [Fact]

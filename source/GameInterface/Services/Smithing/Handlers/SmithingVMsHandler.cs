@@ -111,6 +111,7 @@ internal class SmithingVMsHandler : IHandler
         });
     }
 
+    // Updates crafting state and presents results only for the active window's pending request.
     private void Handle_CreateCraftingResultPopup(MessagePayload<CreateCraftingResultPopup> obj)
     {
         GameThread.RunSafe(() =>
@@ -122,7 +123,9 @@ internal class SmithingVMsHandler : IHandler
 
             if (obj.What.Success)
             {
-                if (GameStateManager.Current.ActiveState is not CraftingState) return;
+                if (GameStateManager.Current.ActiveState is not CraftingState craftingState) return;
+
+                craftingState.CraftingLogic._craftedItemObject = obj.What.CraftedItem;
 
                 currentWeaponDesignVM.CraftedItemObject = obj.What.CraftedItem;
                 currentWeaponDesignVM.IsInFinalCraftingStage = true;

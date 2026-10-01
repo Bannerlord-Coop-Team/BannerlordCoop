@@ -36,7 +36,8 @@ public class ClientContext
         IPlayerManager playerManager,
         IMapTimeTrackerInterface mapTimeTrackerInterface,
         IJoinAttemptOverlay joinAttemptOverlay,
-        JoinAttemptPresentation joinAttempt)
+        JoinAttemptPresentation joinAttempt,
+        IPatchFailureReport patchFailureReport)
     {
         MessageBroker = messageBroker;
         Network = network;
@@ -52,6 +53,7 @@ public class ClientContext
         MapTimeTrackerInterface = mapTimeTrackerInterface;
         JoinAttemptOverlay = joinAttemptOverlay;
         JoinAttempt = joinAttempt;
+        PatchFailureReport = patchFailureReport;
     }
 
     public IMessageBroker MessageBroker { get; }
@@ -68,4 +70,5 @@ public class ClientContext
     public IMapTimeTrackerInterface MapTimeTrackerInterface { get; }
     public IJoinAttemptOverlay JoinAttemptOverlay { get; }
     public JoinAttemptPresentation JoinAttempt { get; }
+    public IPatchFailureReport PatchFailureReport { get; }
 }

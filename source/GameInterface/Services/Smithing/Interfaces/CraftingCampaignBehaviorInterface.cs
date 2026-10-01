@@ -21,7 +21,13 @@ public interface ICraftingCampaignBehaviorInterface : IGameAbstraction
     int DoSmelting(CraftingCampaignBehavior craftingBehavior, Hero craftingHero, EquipmentElement equipmentElement, out bool succeeded);
     int DoRefinement(CraftingCampaignBehavior craftingBehavior, Hero craftingHero, Crafting.RefiningFormula formula);
     int CreateCraftedWeaponInternal(CraftingCampaignBehavior craftingBehavior, Hero craftingHero, CraftingTemplate craftingTemplate, ItemModifierGroup itemModifierGroup, WeaponDesignElement[] usedPieces, ItemModifier weaponModifier, CultureObject culture, bool isFreeMode, TextObject name, string weaponName, string nextCraftedItemId, out bool succeeded);
-    ItemObject CreateAndRegisterCraftedItem(WeaponDesign weaponDesign, TextObject name, CultureObject culture, ItemModifierGroup itemModifierGroup, string craftedItemId);
+    ItemObject CreateAndRegisterCraftedItem(
+        WeaponDesign weaponDesign,
+        TextObject name,
+        CultureObject culture,
+        ItemModifierGroup itemModifierGroup,
+        string craftedItemId,
+        uint craftedItemHandle = 0);
     void AddCraftedItemToRoster(ItemRoster itemRoster, ItemModifier weaponModifier, ItemObject craftedItemObject);
     void DailyTickSettlement(CraftingCampaignBehavior craftingBehavior, Settlement settlement);
     bool TryGetCraftingBehavior(out CraftingCampaignBehavior craftingBehavior);
@@ -183,7 +189,13 @@ public class CraftingCampaignBehaviorInterface : ICraftingCampaignBehaviorInterf
         return newHeroCraftingStamina;
     }
 
-    public ItemObject CreateAndRegisterCraftedItem(WeaponDesign weaponDesign, TextObject name, CultureObject culture, ItemModifierGroup itemModifierGroup, string craftedItemId)
+    public ItemObject CreateAndRegisterCraftedItem(
+        WeaponDesign weaponDesign,
+        TextObject name,
+        CultureObject culture,
+        ItemModifierGroup itemModifierGroup,
+        string craftedItemId,
+        uint craftedItemHandle = 0)
     {
         ItemObject craftedItemObject = null;
         using (new AllowedThread())
@@ -199,7 +211,10 @@ public class CraftingCampaignBehaviorInterface : ICraftingCampaignBehaviorInterf
                 craftedItemId);
         }
 
-        objectManager.AddExisting(craftedItemId, craftedItemObject);
+        if (craftedItemHandle == 0)
+            objectManager.AddExisting(craftedItemId, craftedItemObject);
+        else
+            objectManager.AddExisting(craftedItemId, craftedItemObject, craftedItemHandle);
         MBObjectManager.Instance.RegisterObject<ItemObject>(craftedItemObject);
 
         return craftedItemObject;

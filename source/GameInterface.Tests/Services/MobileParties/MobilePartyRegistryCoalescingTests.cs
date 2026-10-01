@@ -26,24 +26,24 @@ public sealed class MobilePartyRegistryCoalescingTests
     private const string ItemRosterId = "ItemRoster_destroy-me";
     private const string MemberRosterId = "TroopRoster_destroy-me-members";
     private const string PrisonRosterId = "TroopRoster_destroy-me-prisoners";
-    private const string CompactItemRosterId = "destroy-me";
-    private const string CompactMemberRosterId = "destroy-me-members";
-    private const string CompactPrisonRosterId = "destroy-me-prisoners";
+    private const uint ItemRosterHandle = 2;
+    private const uint MemberRosterHandle = 3;
+    private const uint PrisonRosterHandle = 4;
 
     [Fact]
     public void Destroy_DropsPendingBehaviorBeforeNetworkDestroy_AndFlushHasNoLateUpdate()
     {
         const string fullPartyId = "MobileParty_destroy-me";
-        const string compactPartyId = "destroy-me";
+        const uint partyHandle = 1;
 
         var party = CreateParty();
 
         var objectManager = new ObjectManagerService(Mock.Of<ILogger>());
-        Assert.True(objectManager.AddExisting(fullPartyId, party));
+        Assert.True(objectManager.AddExisting(fullPartyId, party, 1));
 
         var coalescer = new SendCoalescer();
         coalescer.Enqueue(
-            new CoalesceKey("party-behavior", compactPartyId),
+            new CoalesceKey("party-behavior", partyHandle),
             new LatestWinsPayload(new PendingBehaviorUpdate()));
 
         var sent = new List<IMessage>();
@@ -76,7 +76,7 @@ public sealed class MobilePartyRegistryCoalescingTests
         Assert.True(mobilePartyDestroyedPublished);
         Assert.False(coalescer.HasPending);
         var destroy = Assert.IsType<NetworkDestroyInstance<MobileParty>>(Assert.Single(sent));
-        Assert.Equal(fullPartyId, destroy.InstanceId);
+        Assert.Equal(1u, destroy.InstanceHandle);
 
         coalescer.Flush(network.Object);
         Assert.Single(sent);
@@ -89,16 +89,16 @@ public sealed class MobilePartyRegistryCoalescingTests
         var clientParty = CreateParty();
         var serverObjectManager = new ObjectManagerService(Mock.Of<ILogger>());
         var clientObjectManager = new ObjectManagerService(Mock.Of<ILogger>());
-        Assert.True(serverObjectManager.AddExisting("MobileParty_destroy-me", serverParty));
+        Assert.True(serverObjectManager.AddExisting("MobileParty_destroy-me", serverParty, 1));
         RegisterRosters(serverObjectManager, serverParty);
         RegisterRosters(clientObjectManager, clientParty);
 
         var serverBroker = new MessageBroker();
         var clientBroker = new MessageBroker();
         var coalescer = new SendCoalescer();
-        EnqueueRosterUpdate(coalescer, CompactItemRosterId);
-        EnqueueRosterUpdate(coalescer, CompactMemberRosterId);
-        EnqueueRosterUpdate(coalescer, CompactPrisonRosterId);
+        EnqueueRosterUpdate(coalescer, ItemRosterHandle);
+        EnqueueRosterUpdate(coalescer, MemberRosterHandle);
+        EnqueueRosterUpdate(coalescer, PrisonRosterHandle);
         using var serverNetwork = new TestNetwork();
         var clientPeer = serverNetwork.CreatePeer();
         var clientNetwork = Mock.Of<INetwork>();
@@ -150,9 +150,9 @@ public sealed class MobilePartyRegistryCoalescingTests
 
     private static void RegisterRosters(ObjectManagerService objectManager, MobileParty party)
     {
-        Assert.True(objectManager.AddExisting(ItemRosterId, party.ItemRoster));
-        Assert.True(objectManager.AddExisting(MemberRosterId, party.MemberRoster));
-        Assert.True(objectManager.AddExisting(PrisonRosterId, party.PrisonRoster));
+        Assert.True(objectManager.AddExisting(ItemRosterId, party.ItemRoster, 2));
+        Assert.True(objectManager.AddExisting(MemberRosterId, party.MemberRoster, 3));
+        Assert.True(objectManager.AddExisting(PrisonRosterId, party.PrisonRoster, 4));
     }
 
     private static void AssertRostersRemoved(ObjectManagerService objectManager)
@@ -162,7 +162,7 @@ public sealed class MobilePartyRegistryCoalescingTests
         Assert.False(objectManager.Contains(PrisonRosterId));
     }
 
-    private static void EnqueueRosterUpdate(SendCoalescer coalescer, string rosterId)
+    private static void EnqueueRosterUpdate(SendCoalescer coalescer, uint rosterId)
     {
         coalescer.Enqueue(
             new CoalesceKey("roster-update", rosterId),
@@ -175,9 +175,9 @@ public sealed class MobilePartyRegistryCoalescingTests
 
     private readonly struct PendingRosterUpdate : ICommand
     {
-        public readonly string RosterId;
+        public readonly uint RosterId;
 
-        public PendingRosterUpdate(string rosterId)
+        public PendingRosterUpdate(uint rosterId)
         {
             RosterId = rosterId;
         }

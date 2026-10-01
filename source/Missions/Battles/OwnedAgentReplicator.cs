@@ -40,6 +40,7 @@ public interface IOwnedAgentReplicator : IDisposable
 
     /// <summary>[Owner, game thread] Send newly captured agents as bounded batches once per mission tick.</summary>
     void FlushPendingSpawns();
+    void FlushPendingFormations();
 
     /// <summary>
     /// [Owner, game thread] Replicate our own-party troops at their DEPLOYED positions so peers spawn matching
@@ -48,6 +49,9 @@ public interface IOwnedAgentReplicator : IDisposable
     /// call, before the native un-pause moves the troops, so the captured positions are the deployed ones.
     /// </summary>
     void BroadcastOwnDeployedTroops();
+
+    /// <summary>[Game thread] Refresh owned riders affected by an authority change, including their horses.</summary>
+    void BroadcastAuthorityRefresh(IReadOnlyCollection<Guid> changedAgentIds);
 }
 
 /// <inheritdoc cref="IOwnedAgentReplicator"/>
@@ -67,6 +71,7 @@ public class OwnedAgentReplicator : IOwnedAgentReplicator
     private readonly IBattleAuthorityMigrator authorityMigrator;
     private float retainedHeroRecoverySeconds;
     private readonly List<BattleAgentSpawnData> pendingSpawns = new List<BattleAgentSpawnData>();
+    private readonly HashSet<Agent> pendingFormations = new HashSet<Agent>();
 
     // The horse each of our riders SPAWNED with (rider id → mount id), so a record built while the rider is
     // momentarily dismounted still carries the horse's identity — a joiner's puppet spawns a horse from the
@@ -103,12 +108,48 @@ public class OwnedAgentReplicator : IOwnedAgentReplicator
             session.OwnControllerId + ":" + Guid.NewGuid().ToString("N");
 
         messageBroker.Subscribe<AgentSpawnedInBattle>(Handle_AgentSpawnedInBattle);
+        messageBroker.Subscribe<BattleAgentFormationChanged>(Handle_FormationChanged);
     }
 
     public void Dispose()
     {
         messageBroker.Unsubscribe<AgentSpawnedInBattle>(Handle_AgentSpawnedInBattle);
+        messageBroker.Unsubscribe<BattleAgentFormationChanged>(Handle_FormationChanged);
         pendingSpawns.Clear();
+        pendingFormations.Clear();
+    }
+
+    private void Handle_FormationChanged(MessagePayload<BattleAgentFormationChanged> payload)
+    {
+        var agent = payload.What.Agent;
+        if (coopMissionComponent.AgentRegistry.TryGetAgentInfo(agent, out var info)
+            && info.CurrentAuthority == session.OwnControllerId)
+            pendingFormations.Add(agent);
+    }
+
+    public void FlushPendingFormations()
+    {
+        if (pendingFormations.Count == 0) return;
+
+        var updates = new List<BattleAgentFormationData>();
+        foreach (var agent in pendingFormations)
+        {
+            if (!coopMissionComponent.AgentRegistry.TryGetAgentInfo(agent, out var info)
+                || info.CurrentAuthority != session.OwnControllerId || !agent.IsActive()
+                || agent.IsMount || !(agent.Character is CharacterObject character)
+                || deployment.ShouldWithhold(IsOwnPartyAgent(agent, character))) continue;
+
+            updates.Add(new BattleAgentFormationData(info.AgentId,
+                agent.Formation == null ? -1 : (int)agent.Formation.FormationIndex, info.AuthorityRevision));
+            if (updates.Count == NetworkBattleAgentFormations.MaxUpdates)
+            {
+                network.SendAll(new NetworkBattleAgentFormations(session.InstanceId, session.OwnControllerId, updates.ToArray()));
+                updates.Clear();
+            }
+        }
+        pendingFormations.Clear();
+        if (updates.Count > 0)
+            network.SendAll(new NetworkBattleAgentFormations(session.InstanceId, session.OwnControllerId, updates.ToArray()));
     }
 
     // Reading agent transforms must run on the game thread. SendJoinInfo supplies the blocking barrier when an
@@ -179,6 +220,20 @@ public class OwnedAgentReplicator : IOwnedAgentReplicator
         LogBatchSend("Committed deployment", records.Count, batches, null);
     }
 
+    public void BroadcastAuthorityRefresh(IReadOnlyCollection<Guid> changedAgentIds)
+    {
+        if (Mission.Current == null || changedAgentIds.Count == 0) return;
+        var changedIds = new HashSet<Guid>(changedAgentIds);
+        var records = BuildOwnedAgentRecords(ownPartyOnly: false);
+        records.RemoveAll(record => !changedIds.Contains(record.AgentId) && !changedIds.Contains(record.MountAgentId));
+        if (records.Count == 0) return;
+
+        var batches = spawnBatchCodec.Encode(records, SpawnBatchPurpose.CatchUp);
+        foreach (var batch in batches)
+            network.SendAll(batch);
+        LogBatchSend("Refreshed authority for", records.Count, batches, null);
+    }
+
     // [Game thread] Build spawn records for the battle agents WE currently own, at their CURRENT positions.
     // <paramref name="ownPartyOnly"/> limits it to the local player's own-party troops — used by the deployment
     // commit, which withholds those until they are placed; the joiner catch-up passes false to replay all we own.
@@ -232,7 +287,11 @@ public class OwnedAgentReplicator : IOwnedAgentReplicator
                     mountInfo?.MovementScopeId ?? info.MovementScopeId,
                 isRunningAway: agent.IsRunningAway,
                 authorityRevision: info.AuthorityRevision,
-                mountAuthorityRevision: mountInfo?.AuthorityRevision ?? 0));
+                mountAuthorityRevision: mountInfo?.AuthorityRevision ?? 0,
+                mountOwnerControllerId: mountInfo?.CurrentAuthority ?? info.CurrentAuthority,
+                siegeEquipmentGrant: agent.Equipment[EquipmentIndex.ExtraWeaponSlot].IsEmpty
+                    ? Guid.Empty : info.SiegeEquipmentGrant,
+                siegeEquipmentGrantRevision: info.SiegeEquipmentGrantRevision));
         }
         return records;
     }

@@ -100,7 +100,7 @@ internal class PartyRolesHandler : IHandler
 
         GameThread.RunSafe(() =>
         {
-            if (!GetHeroAndParty(data.HeroId, data.MobilePartyId, out var hero, out var mobileParty)) return;
+            if (!GetHeroAndParty(data.HeroId, data.MobilePartyId, out var hero, out var mobileParty, requirePartyMembership: false)) return;
 
             mobileParty.RemoveAllPartyRolesOfHero(hero);
             UpdateClientVM(data.MobilePartyId);
@@ -121,7 +121,7 @@ internal class PartyRolesHandler : IHandler
 
         GameThread.RunSafe(() =>
         {
-            if (!GetHeroAndParty(data.HeroId, data.MobilePartyId, out var hero, out var mobileParty)) return;
+            if (!GetHeroAndParty(data.HeroId, data.MobilePartyId, out var hero, out var mobileParty, requirePartyMembership: false)) return;
 
             mobileParty.RemovePartyRoleOfHero(hero, data.PartyRole);
 
@@ -300,7 +300,8 @@ internal class PartyRolesHandler : IHandler
         return true;
     }
 
-    private bool GetHeroAndParty(string heroId, string mobilePartyId, out Hero hero, out MobileParty mobileParty)
+    private bool GetHeroAndParty(string heroId, string mobilePartyId, out Hero hero, out MobileParty mobileParty,
+        bool requirePartyMembership = true)
     {
         hero = null;
         mobileParty = null;
@@ -309,11 +310,12 @@ internal class PartyRolesHandler : IHandler
         // Mobile party can already be destroyed when this gets called. Don't log a failed retrieval
         if (!objectManager.TryGetObject(mobilePartyId, out mobileParty)) return false;
 
-        return true;
+        // Role cleanup can target heroes who have already left the party.
+        return !requirePartyMembership || hero == null || hero.PartyBelongedTo == mobileParty;
     }
 
     private void UpdateClientVM(string mobilePartyId)
     {
-        network.SendAll(new RefreshAfterRoleAssignment(mobilePartyId));
+        network.SendAll(new NetworkRefreshAfterRoleAssignment(mobilePartyId));
     }
 }

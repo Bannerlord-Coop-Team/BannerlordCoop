@@ -1,4 +1,4 @@
-using Common.Messaging;
+﻿using Common.Messaging;
 using GameInterface.Services.Inventory.Data;
 using GameInterface.Services.MapEvents.Messages.Conversation;
 using GameInterface.Services.ObjectManager;
@@ -385,9 +385,9 @@ internal static class PlayerPartyTradeContext
         return result;
     }
 
-    private static Dictionary<string, int> BuildOfferedTroops(TroopRosterElementData[] offeredTroops)
+    private static Dictionary<uint, int> BuildOfferedTroops(TroopRosterElementData[] offeredTroops)
     {
-        var result = new Dictionary<string, int>();
+        var result = new Dictionary<uint, int>();
         if (offeredTroops == null) return result;
 
         foreach (var offeredTroop in offeredTroops)
@@ -529,13 +529,13 @@ internal static class PlayerPartyTradeContext
         return !string.IsNullOrEmpty(key);
     }
 
-    private static bool TryGetCharacterKey(CharacterObject character, IObjectManager objectManager, out string key)
+    private static bool TryGetCharacterKey(CharacterObject character, IObjectManager objectManager, out uint key)
     {
-        key = null;
+        key = 0;
 
         if (character == null) return false;
 
-        return objectManager.TryGetId(character, out key);
+        return objectManager.TryGetHandle(character, out key);
     }
 
     private static string GetItemKey(ItemObjectData itemObjectData)
@@ -580,6 +580,10 @@ internal static class PlayerPartyTradeContext
                 return "Clan service proposal accepted.";
             case PlayerPartyInteractionOutcomeType.ClanJoinDeclined:
                 return "Clan service proposal declined.";
+            case PlayerPartyInteractionOutcomeType.MarriageAccepted:
+                return GameTexts.FindText("str_coop_marriage_accepted").ToString();
+            case PlayerPartyInteractionOutcomeType.MarriageDeclined:
+                return GameTexts.FindText("str_coop_marriage_declined").ToString();
             case PlayerPartyInteractionOutcomeType.VassalAccepted:
                 return "Vassalage offer accepted.";
             case PlayerPartyInteractionOutcomeType.VassalDeclined:

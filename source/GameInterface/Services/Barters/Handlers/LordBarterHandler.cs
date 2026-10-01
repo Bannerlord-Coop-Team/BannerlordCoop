@@ -534,13 +534,13 @@ internal sealed partial class LordBarterHandler : IHandler
         if (!TryValidateConversation(peer, request, mobileParty, playerParty, targetParty, targetHero, out reason))
             return false;
 
-        if (targetHero.IsPrisoner || targetHero.Clan == null)
+        if (targetHero.Clan == null)
         {
             reason = "That lord is no longer available for barter.";
             return false;
         }
 
-        return true;
+        return !targetHero.IsPrisoner || IsPrisonerRecruitableBy(playerHero, mobileParty, targetHero, request, out reason);
     }
 
     /// <summary>
@@ -621,8 +621,12 @@ internal sealed partial class LordBarterHandler : IHandler
                 return IsMapPartyConversationLive(peer, request, mobileParty, playerParty, targetParty, ref reason);
 
             case PeaceConversationContext.Location:
-                reason = "The lord conversation is no longer active.";
+                reason = "The lord location conversation is no longer active.";
                 return IsLocationConversationLive(peer, request, targetHero, ref reason);
+
+            case PeaceConversationContext.PlayerPartyPrisoner:
+                reason = PrisonerNotHeldReason;
+                return IsHeldByRequesterParty(request, mobileParty, targetHero, ref reason);
 
             default:
                 // Refused rather than validated as a settlement conversation - accepting a context we
@@ -663,14 +667,29 @@ internal sealed partial class LordBarterHandler : IHandler
     {
         if (!objectManager.TryGetObject(request.ContextId, out PartyBase requestedParty) ||
             requestedParty != targetParty ||
-            requestedParty.MobileParty?.IsActive != true ||
-            requestedParty.MobileParty.MapEvent != null ||
-            mobileParty.MapEvent != null ||
-            !objectManager.TryGetId(playerParty, out var playerPartyId) ||
+            requestedParty.MobileParty?.IsActive != true)
+        {
+            return false;
+        }
+
+        if (mobileParty.MapEvent != null)
+        {
+            reason = PlayerPartyInBattleReason;
+            return false;
+        }
+
+        if (requestedParty.MobileParty.MapEvent != null)
+        {
+            reason = "The lord's party is in a battle.";
+            return false;
+        }
+
+        if (!objectManager.TryGetId(playerParty, out var playerPartyId) ||
             !conversationPartyTracker.TryGetEngagement(peer, out var engagement) ||
             engagement.PartyId != request.ContextId ||
             engagement.EngagerPartyId != playerPartyId)
         {
+            reason = "The conversation hold on the lord's party ended or belongs to another party.";
             return false;
         }
 
@@ -882,7 +901,7 @@ internal sealed partial class LordBarterHandler : IHandler
 
     private void FlushGold(Hero hero)
     {
-        if (sendCoalescer != null && hero != null && objectManager.TryGetId(hero, out var id)) sendCoalescer.FlushInstance(id, network);
+        if (sendCoalescer != null && hero != null && objectManager.TryGetHandle(hero, out var id)) sendCoalescer.FlushInstance(id, network);
     }
 
     // Both the Charm XP and the total XP are coalesced dictionary upserts on HeroDeveloper, so
@@ -891,7 +910,7 @@ internal sealed partial class LordBarterHandler : IHandler
     private void FlushHeroDeveloper(Hero hero)
     {
         if (sendCoalescer != null && hero?.HeroDeveloper != null &&
-            objectManager.TryGetId(hero.HeroDeveloper, out var id))
+            objectManager.TryGetHandle(hero.HeroDeveloper, out var id))
             sendCoalescer.FlushInstance(id, network);
     }
 

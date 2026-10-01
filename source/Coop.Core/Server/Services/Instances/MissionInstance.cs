@@ -1,4 +1,5 @@
 ﻿using LiteNetLib;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Net;
@@ -38,16 +39,21 @@ internal class MissionInstance
         public readonly IPEndPoint Internal;
         public readonly IPEndPoint External;
 
+        /// <summary>When the punch arrived, so an endpoint that never joins the mission can expire.</summary>
+        public readonly DateTime PunchedUtc;
+
         public Endpoints(
             string controllerId,
             NetPeer campaignPeer,
             IPEndPoint @internal,
-            IPEndPoint external)
+            IPEndPoint external,
+            DateTime punchedUtc)
         {
             ControllerId = controllerId;
             CampaignPeer = campaignPeer;
             Internal = @internal;
             External = external;
+            PunchedUtc = punchedUtc;
         }
     }
 }
@@ -57,11 +63,17 @@ internal sealed class MissionMembership
     public string ControllerId { get; }
     public NetPeer Peer { get; set; }
     public MissionInstance Instance { get; }
+    public Guid PeerCredential { get; set; }
 
-    public MissionMembership(string controllerId, NetPeer peer, MissionInstance instance)
+    public MissionMembership(
+        string controllerId,
+        NetPeer peer,
+        MissionInstance instance,
+        Guid peerCredential)
     {
         ControllerId = controllerId;
         Peer = peer;
         Instance = instance;
+        PeerCredential = peerCredential;
     }
 }

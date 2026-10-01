@@ -1,4 +1,5 @@
 ﻿using Common.Logging;
+using Common.Network;
 using Common.Network.Data;
 using GameInterface.Services.Missions;
 using GameInterface.Services.Players;
@@ -81,6 +82,54 @@ public interface IMissionManager
 
     /// <summary>Commits a successful conclusion or rolls its entry fence back after a failed apply.</summary>
     bool CompleteInstanceConclusion(string instanceId, bool succeeded);
+
+    /// <summary>
+    /// Hands over every instance whose conclusion was rolled back after its deadline, so the coordinator
+    /// can recover it. Each instance is handed over once.
+    /// </summary>
+    IReadOnlyList<string> TakeExpiredConclusions();
+
+    /// <summary>
+    /// Hands over one rolled-back instance, so a result that arrives after its own claim timed out is
+    /// recovered instead of being dropped as stale.
+    /// </summary>
+    bool TryTakeExpiredConclusion(string instanceId);
+
+    /// <summary>Read-only snapshot of the instance counts.</summary>
+    MissionManagerDiagnostics GetDiagnostics();
+}
+
+/// <summary>Counts of the mission-manager state that can grow while a server runs.</summary>
+public readonly struct MissionManagerDiagnostics
+{
+    public int ActiveInstances { get; }
+    public int MembershipBackedInstances { get; }
+    public int NatOnlyInstances { get; }
+    public int PunchEndpoints { get; }
+    public int ConcludingInstances { get; }
+    public int ConclusionTombstones { get; }
+    public int RolledBackConclusions { get; }
+    public long ExpiredEntries { get; }
+
+    public MissionManagerDiagnostics(
+        int activeInstances,
+        int membershipBackedInstances,
+        int natOnlyInstances,
+        int punchEndpoints,
+        int concludingInstances,
+        int conclusionTombstones,
+        int rolledBackConclusions,
+        long expiredEntries)
+    {
+        ActiveInstances = activeInstances;
+        MembershipBackedInstances = membershipBackedInstances;
+        NatOnlyInstances = natOnlyInstances;
+        PunchEndpoints = punchEndpoints;
+        ConcludingInstances = concludingInstances;
+        ConclusionTombstones = conclusionTombstones;
+        RolledBackConclusions = rolledBackConclusions;
+        ExpiredEntries = expiredEntries;
+    }
 }
 
 public enum MissionEntryStatus
@@ -95,7 +144,8 @@ public sealed class MissionEntryResult
     public string ControllerId { get; }
     public string InstanceId { get; }
     public MissionEntryStatus Status { get; }
-    public IReadOnlyList<(string controllerId, NetPeer peer)> ExistingMembers { get; }
+    public Guid PeerCredential { get; }
+    public IReadOnlyList<(string controllerId, NetPeer peer, Guid peerCredential)> ExistingMembers { get; }
     public IReadOnlyList<MissionDeparture> PreviousDepartures { get; }
     public bool IsFirstMember { get; }
 
@@ -103,13 +153,15 @@ public sealed class MissionEntryResult
         string controllerId,
         string instanceId,
         MissionEntryStatus status,
-        IReadOnlyList<(string controllerId, NetPeer peer)> existingMembers,
+        Guid peerCredential,
+        IReadOnlyList<(string controllerId, NetPeer peer, Guid peerCredential)> existingMembers,
         IReadOnlyList<MissionDeparture> previousDepartures,
         bool isFirstMember)
     {
         ControllerId = controllerId;
         InstanceId = instanceId;
         Status = status;
+        PeerCredential = peerCredential;
         ExistingMembers = existingMembers;
         PreviousDepartures = previousDepartures;
         IsFirstMember = isFirstMember;
@@ -146,11 +198,33 @@ public class MissionManager : IMissionManager, IMissionMembershipRegistry
     private readonly Dictionary<string, MissionMembership> byController = new Dictionary<string, MissionMembership>();
     private readonly Dictionary<NetPeer, long> relayRevocationCounts = new Dictionary<NetPeer, long>();
     private readonly Dictionary<string, MissionInstance> pendingEmptyInstances = new Dictionary<string, MissionInstance>();
-    private readonly HashSet<string> concludingInstances = new HashSet<string>();
-    private readonly HashSet<string> concludedInstances = new HashSet<string>();
+    // Both conclusion sets carry the time they were recorded, so each one can expire.
+    private readonly Dictionary<string, DateTime> concludingInstances = new Dictionary<string, DateTime>();
+    private readonly Dictionary<string, DateTime> concludedInstances = new Dictionary<string, DateTime>();
     private readonly Dictionary<string, IntroductionAuthorization> introductionAuthorizations = new();
     // Retired peers cannot authorize again, without retaining every disconnected socket for the session.
     private readonly ConditionalWeakTable<NetPeer, object> disconnectedPeers = new();
+    private readonly Dictionary<string, DateTime> expiredConclusions = new Dictionary<string, DateTime>();
+    private long expiredEntryCount;
+    private DateTime lastDiagnosticsUtc;
+
+    /// <summary>How long a punch endpoint may wait for its mission entry before it expires.</summary>
+    internal TimeSpan PunchEndpointLease { get; set; } = TimeSpan.FromMinutes(5);
+
+    /// <summary>
+    /// How long a finished instance keeps rejecting delayed duplicates, matching the longest a late
+    /// message can still be on its way (<see cref="NetworkJoinLimits.CampaignEntryTimeout"/>).
+    /// </summary>
+    internal TimeSpan ConclusionRetention { get; set; } = NetworkJoinLimits.CampaignEntryTimeout;
+
+    /// <summary>How long a conclusion may stay in flight before it is rolled back.</summary>
+    internal TimeSpan ConclusionDeadline { get; set; } = TimeSpan.FromMinutes(5);
+
+    /// <summary>Upper bound on retained conclusions, whatever the rate missions finish at.</summary>
+    private const int MaxConcludedInstances = 4096;
+
+    /// <summary>How often the counts above are written out while nothing is expiring.</summary>
+    private static readonly TimeSpan DiagnosticsInterval = TimeSpan.FromMinutes(5);
 
     /// <summary>Latest mission punch authorization for one controller's campaign session.</summary>
     private sealed class IntroductionAuthorization
@@ -193,17 +267,27 @@ public class MissionManager : IMissionManager, IMissionMembershipRegistry
 
         lock (gate)
         {
+            PruneExpired(DateTime.UtcNow);
             if (disconnectedPeers.TryGetValue(peer, out _) || IsConclusionFenced(instanceId) ||
                 !playerManager.TryGetPeer(controllerId, out var currentPeer) ||
                 !ReferenceEquals(currentPeer, peer))
                 return false;
 
+            Guid peerCredential = Guid.Empty;
+            if (byPeer.TryGetValue(peer, out var membership) &&
+                membership.ControllerId == controllerId && membership.Instance.Id == instanceId)
+                peerCredential = membership.PeerCredential;
+            if (controllerId.Length + instanceId.Length + 1 + (peerCredential == Guid.Empty ? 0 : 33)
+                > NatPunchModule.MaxTokenLength)
+                return false;
+
             if (!introductionAuthorizations.TryGetValue(controllerId, out var authorization) ||
                 !ReferenceEquals(authorization.Peer, peer) || authorization.RequestId != requestId ||
-                authorization.DiscoveryToken.InstanceId != instanceId)
+                authorization.DiscoveryToken.InstanceId != instanceId ||
+                authorization.DiscoveryToken.PeerCredential != peerCredential)
             {
                 authorization = new IntroductionAuthorization(peer, requestId,
-                    new ConnectionToken(controllerId, instanceId));
+                    new ConnectionToken(controllerId, instanceId, peerCredential));
                 introductionAuthorizations[controllerId] = authorization;
             }
 
@@ -223,6 +307,7 @@ public class MissionManager : IMissionManager, IMissionMembershipRegistry
 
         lock (gate)
         {
+            PruneExpired(DateTime.UtcNow);
             // Validation and insertion share the disconnect gate; a retired session cannot repunch.
             var authorization = introductionAuthorizations.Values.FirstOrDefault(candidate => candidate.Token == token);
             if (authorization == null || authorization.Punched ||
@@ -235,6 +320,13 @@ public class MissionManager : IMissionManager, IMissionMembershipRegistry
             }
 
             var connectionToken = authorization.DiscoveryToken;
+            if (connectionToken.PeerCredential != Guid.Empty &&
+                (!byPeer.TryGetValue(campaignPeer, out var membership) ||
+                 membership.ControllerId != connectionToken.ControllerId ||
+                 membership.Instance.Id != connectionToken.InstanceId ||
+                 membership.PeerCredential != connectionToken.PeerCredential))
+                return;
+
             string instanceId = connectionToken.InstanceId;
             if (IsConclusionFenced(instanceId))
             {
@@ -272,7 +364,8 @@ public class MissionManager : IMissionManager, IMissionMembershipRegistry
                 connectionToken.ControllerId,
                 campaignPeer,
                 localEndPoint,
-                remoteEndPoint));
+                remoteEndPoint,
+                DateTime.UtcNow));
         }
     }
 
@@ -331,6 +424,7 @@ public class MissionManager : IMissionManager, IMissionMembershipRegistry
 
         lock (gate)
         {
+            PruneExpired(DateTime.UtcNow);
             if (IsConclusionFenced(instanceId))
             {
                 Logger.Information("Ignoring mission entry by {Controller} for concluded instance {Instance}",
@@ -349,7 +443,8 @@ public class MissionManager : IMissionManager, IMissionMembershipRegistry
                     controllerId,
                     instanceId,
                     MissionEntryStatus.Unchanged,
-                    Array.Empty<(string, NetPeer)>(),
+                    peerMembership.PeerCredential,
+                    EntryMembers(peerMembership.Instance, controllerId),
                     Array.Empty<MissionDeparture>(),
                     isFirstMember: false);
                 return true;
@@ -363,13 +458,15 @@ public class MissionManager : IMissionManager, IMissionMembershipRegistry
 
                 byPeer.Remove(controllerMembership.Peer);
                 controllerMembership.Peer = peer;
+                controllerMembership.PeerCredential = CreatePeerCredential();
                 byPeer[peer] = controllerMembership;
 
-                var existingMembers = Members(controllerMembership.Instance, controllerId);
+                var existingMembers = EntryMembers(controllerMembership.Instance, controllerId);
                 result = new MissionEntryResult(
                     controllerId,
                     instanceId,
                     MissionEntryStatus.Reconnected,
+                    controllerMembership.PeerCredential,
                     existingMembers,
                     previousDepartures,
                     isFirstMember: false);
@@ -392,8 +489,12 @@ public class MissionManager : IMissionManager, IMissionMembershipRegistry
             }
 
             bool isFirstMember = instance.Memberships.Count == 0;
-            var others = Members(instance);
-            var membership = new MissionMembership(controllerId, peer, instance);
+            var others = EntryMembers(instance);
+            var membership = new MissionMembership(
+                controllerId,
+                peer,
+                instance,
+                CreatePeerCredential());
             instance.Memberships.Add(membership);
             byPeer[peer] = membership;
             byController[controllerId] = membership;
@@ -405,6 +506,7 @@ public class MissionManager : IMissionManager, IMissionMembershipRegistry
                 controllerId,
                 instanceId,
                 MissionEntryStatus.Entered,
+                membership.PeerCredential,
                 others,
                 previousDepartures,
                 isFirstMember);
@@ -509,7 +611,7 @@ public class MissionManager : IMissionManager, IMissionMembershipRegistry
             return;
 
         byInstanceId.Remove(instance.Id);
-        Logger.Information("Removed empty instance {Instance} after its last member left", instance.Id);
+        Logger.Information("Removed instance {Instance}: no members and no punch endpoints left", instance.Id);
     }
 
     public bool TryGetControllers(string instanceId, out IReadOnlyCollection<string> controllers)
@@ -536,13 +638,14 @@ public class MissionManager : IMissionManager, IMissionMembershipRegistry
 
         lock (gate)
         {
+            PruneExpired(DateTime.UtcNow);
             if ((byInstanceId.TryGetValue(instanceId, out var instance) && instance.Controllers.Count > 0) ||
                 IsConclusionFenced(instanceId))
             {
                 return false;
             }
 
-            concludingInstances.Add(instanceId);
+            concludingInstances[instanceId] = DateTime.UtcNow;
             if (instance != null)
                 pendingEmptyInstances[instanceId] = instance;
             byInstanceId.Remove(instanceId);
@@ -559,6 +662,7 @@ public class MissionManager : IMissionManager, IMissionMembershipRegistry
 
         lock (gate)
         {
+            PruneExpired(DateTime.UtcNow);
             if (!byInstanceId.TryGetValue(instanceId, out var instance) ||
                 IsConclusionFenced(instanceId))
             {
@@ -572,7 +676,8 @@ public class MissionManager : IMissionManager, IMissionMembershipRegistry
                 return false;
             }
 
-            return concludingInstances.Add(instanceId);
+            concludingInstances[instanceId] = DateTime.UtcNow;
+            return true;
         }
     }
 
@@ -583,29 +688,189 @@ public class MissionManager : IMissionManager, IMissionMembershipRegistry
 
         lock (gate)
         {
-            if (!concludingInstances.Remove(instanceId))
-                return false;
+            PruneExpired(DateTime.UtcNow);
+            return CompleteConclusion(instanceId, succeeded);
+        }
+    }
 
-            if (succeeded)
-            {
-                concludedInstances.Add(instanceId);
-                pendingEmptyInstances.Remove(instanceId);
-                return true;
-            }
+    /// <inheritdoc/>
+    public IReadOnlyList<string> TakeExpiredConclusions()
+    {
+        lock (gate)
+        {
+            PruneExpired(DateTime.UtcNow);
+            if (expiredConclusions.Count == 0)
+                return Array.Empty<string>();
 
-            if (pendingEmptyInstances.TryGetValue(instanceId, out var emptyInstance))
-            {
-                byInstanceId[instanceId] = emptyInstance;
-                pendingEmptyInstances.Remove(instanceId);
-            }
+            var expired = expiredConclusions.Keys.ToArray();
+            expiredConclusions.Clear();
+            return expired;
+        }
+    }
 
+    /// <inheritdoc/>
+    public bool TryTakeExpiredConclusion(string instanceId)
+    {
+        if (string.IsNullOrEmpty(instanceId))
+            return false;
+
+        lock (gate)
+        {
+            return expiredConclusions.Remove(instanceId);
+        }
+    }
+
+    // The rollback path uses this directly: going through the public method would restart the
+    // maintenance pass it is already running inside. Caller holds the lock.
+    private bool CompleteConclusion(string instanceId, bool succeeded)
+    {
+        if (!concludingInstances.Remove(instanceId))
+            return false;
+
+        if (succeeded)
+        {
+            RecordConclusion(instanceId, DateTime.UtcNow);
+            pendingEmptyInstances.Remove(instanceId);
             return true;
+        }
+
+        if (pendingEmptyInstances.TryGetValue(instanceId, out var emptyInstance))
+        {
+            byInstanceId[instanceId] = emptyInstance;
+            pendingEmptyInstances.Remove(instanceId);
+        }
+
+        return true;
+    }
+
+    // Every entry point below runs this before it reads an index, because rolling back a stalled
+    // conclusion puts its instance back into byInstanceId.
+    internal void PruneExpired(DateTime utcNow)
+    {
+        lock (gate)
+        {
+            long removedBefore = expiredEntryCount;
+            ExpirePunchEndpoints(utcNow);
+            RollBackStalledConclusions(utcNow);
+            PruneEmptyInstances();
+            ExpireConclusions(utcNow);
+
+            long removed = expiredEntryCount - removedBefore;
+            if (removed == 0 && utcNow - lastDiagnosticsUtc < DiagnosticsInterval)
+                return;
+
+            lastDiagnosticsUtc = utcNow;
+            var counts = GetDiagnostics();
+            Logger.Information(
+                "Mission state: dropped {Removed} ({Expired} in total), instances {Instances} " +
+                "({WithMembers} with members, {NatOnly} NAT-only), punch endpoints {Endpoints}, " +
+                "concluding {Concluding}, finished {Finished}, rolled back {RolledBack}",
+                removed,
+                counts.ExpiredEntries,
+                counts.ActiveInstances,
+                counts.MembershipBackedInstances,
+                counts.NatOnlyInstances,
+                counts.PunchEndpoints,
+                counts.ConcludingInstances,
+                counts.ConclusionTombstones,
+                counts.RolledBackConclusions);
+        }
+    }
+
+    // A punch from a controller that never entered the mission expires; a member's endpoint stays,
+    // because later joiners are still introduced to it. Caller holds the lock.
+    private void ExpirePunchEndpoints(DateTime utcNow)
+    {
+        foreach (var instance in byInstanceId.Values.Concat(pendingEmptyInstances.Values))
+        {
+            var members = new HashSet<string>(instance.Controllers);
+            expiredEntryCount += instance.PunchEndpoints.RemoveAll(endpoint =>
+                !members.Contains(endpoint.ControllerId) &&
+                utcNow - endpoint.PunchedUtc >= PunchEndpointLease);
+        }
+    }
+
+    // A conclusion whose result never arrived releases its fence like a failed one. Caller holds the lock.
+    private void RollBackStalledConclusions(DateTime utcNow)
+    {
+        foreach (var instanceId in concludingInstances
+            .Where(entry => utcNow - entry.Value >= ConclusionDeadline)
+            .Select(entry => entry.Key)
+            .ToArray())
+        {
+            Logger.Warning("Rolling back instance {Instance}: its conclusion did not report back in time",
+                instanceId);
+            CompleteConclusion(instanceId, succeeded: false);
+            expiredConclusions[instanceId] = utcNow;
+            expiredEntryCount++;
+        }
+    }
+
+    // Replay protection is only needed while a delayed duplicate can still arrive. Caller holds the lock.
+    private void ExpireConclusions(DateTime utcNow)
+    {
+        foreach (var instanceId in concludedInstances
+            .Where(entry => utcNow - entry.Value >= ConclusionRetention)
+            .Select(entry => entry.Key)
+            .ToArray())
+        {
+            concludedInstances.Remove(instanceId);
+            expiredEntryCount++;
+        }
+
+        foreach (var instanceId in expiredConclusions
+            .Where(entry => utcNow - entry.Value >= ConclusionRetention)
+            .Select(entry => entry.Key)
+            .ToArray())
+        {
+            expiredConclusions.Remove(instanceId);
+        }
+    }
+
+    // PruneIfEmpty itself only runs on the membership path, so a peer that only ever punched needs
+    // this sweep. Caller holds the lock.
+    private void PruneEmptyInstances()
+    {
+        foreach (var instance in byInstanceId.Values.ToArray())
+        {
+            PruneIfEmpty(instance);
+        }
+    }
+
+    // Remember a finished instance so a delayed duplicate is still rejected, bounded by dropping the
+    // oldest past the cap. Caller holds the lock.
+    private void RecordConclusion(string instanceId, DateTime utcNow)
+    {
+        concludedInstances[instanceId] = utcNow;
+
+        while (concludedInstances.Count > MaxConcludedInstances)
+        {
+            string oldest = concludedInstances.OrderBy(entry => entry.Value).First().Key;
+            concludedInstances.Remove(oldest);
+            expiredEntryCount++;
+        }
+    }
+
+    // Read-only snapshot of everything that can grow. Caller may hold the lock.
+    public MissionManagerDiagnostics GetDiagnostics()
+    {
+        lock (gate)
+        {
+            return new MissionManagerDiagnostics(
+                byInstanceId.Count,
+                byInstanceId.Values.Count(instance => instance.Memberships.Count > 0),
+                byInstanceId.Values.Count(instance => instance.Memberships.Count == 0),
+                byInstanceId.Values.Sum(instance => instance.PunchEndpoints.Count),
+                concludingInstances.Count,
+                concludedInstances.Count,
+                expiredConclusions.Count,
+                expiredEntryCount);
         }
     }
 
     // Caller holds gate when this is used from a mutation path.
     private bool IsConclusionFenced(string instanceId) =>
-        concludingInstances.Contains(instanceId) || concludedInstances.Contains(instanceId);
+        concludingInstances.ContainsKey(instanceId) || concludedInstances.ContainsKey(instanceId);
 
     private bool IsRelayRevoked(MissionMembership membership) =>
         relayRevocationCounts.ContainsKey(membership.Peer);
@@ -645,18 +910,36 @@ public class MissionManager : IMissionManager, IMissionMembershipRegistry
             byController.Remove(membership.ControllerId);
         }
 
-        var remaining = Members(membership.Instance);
+        var remaining = DepartureMembers(membership.Instance);
         PruneIfEmpty(membership.Instance);
         return new MissionDeparture(membership.ControllerId, membership.Instance.Id, remaining);
     }
 
-    private static IReadOnlyList<(string controllerId, NetPeer peer)> Members(
+    private static IReadOnlyList<(string controllerId, NetPeer peer, Guid peerCredential)> EntryMembers(
         MissionInstance instance,
         string excludedControllerId = null)
         => instance.Memberships
             .Where(member => member.ControllerId != excludedControllerId)
+            .Select(member => (member.ControllerId, member.Peer, member.PeerCredential))
+            .ToList();
+
+    private static IReadOnlyList<(string controllerId, NetPeer peer)> DepartureMembers(
+        MissionInstance instance)
+        => instance.Memberships
             .Select(member => (member.ControllerId, member.Peer))
             .ToList();
+
+    private Guid CreatePeerCredential()
+    {
+        Guid credential;
+        do
+        {
+            credential = Guid.NewGuid();
+        }
+        while (byController.Values.Any(member => member.PeerCredential == credential));
+
+        return credential;
+    }
 
     // A controller and peer are each in at most one instance, so prior punch slots are stale on a new punch.
     private void RemoveControllerEndpointEverywhere(string controllerId)

@@ -8,116 +8,140 @@ namespace GameInterface.Services.MapEvents.Messages.Start;
 public readonly struct NetworkMapEventInitialized : ICommand
 {
     [ProtoMember(1)]
-    public readonly string MapEventId;
+    public readonly uint MapEventHandle;
 
     [ProtoMember(2)]
     public readonly bool IsTerminal;
 
     [ProtoMember(3)]
-    public readonly string TroopUpgradeTrackerId;
+    public readonly uint TroopUpgradeTrackerHandle;
 
     [ProtoMember(4)]
-    public readonly string ComponentId;
+    public readonly uint ComponentHandle;
 
     [ProtoMember(5)]
-    public readonly string VisualId;
+    public readonly uint VisualHandle;
 
     [ProtoMember(6)]
     public readonly string SiegeEventId;
 
     [ProtoMember(7)]
-    public readonly string SiegeSettlementId;
+    public readonly uint SiegeEventHandle;
 
     [ProtoMember(8)]
-    public readonly string BesiegerCampId;
+    public readonly uint SiegeSettlementHandle;
 
     [ProtoMember(9)]
-    public readonly string SiegeLeaderPartyId;
+    public readonly string BesiegerCampId;
 
     [ProtoMember(10)]
-    public readonly string AttackerSiegeEnginesId;
+    public readonly uint BesiegerCampHandle;
 
     [ProtoMember(11)]
-    public readonly string DefenderSiegeEnginesId;
+    public readonly uint SiegeLeaderPartyHandle;
 
     [ProtoMember(12)]
-    public readonly long SiegeStartTimeTicks;
+    public readonly string AttackerSiegeEnginesId;
 
     [ProtoMember(13)]
-    public readonly string BesiegerStrategyId;
+    public readonly uint AttackerSiegeEnginesHandle;
 
     [ProtoMember(14)]
-    public readonly int BesiegerTroopsKilled;
+    public readonly string DefenderSiegeEnginesId;
 
     [ProtoMember(15)]
-    public readonly string[] BesiegerPartyIds;
+    public readonly uint DefenderSiegeEnginesHandle;
 
     [ProtoMember(16)]
-    public readonly SiegeEngineGraphSnapshot[] AttackerEngines;
+    public readonly long SiegeStartTimeTicks;
 
     [ProtoMember(17)]
+    public readonly string BesiegerStrategyId;
+
+    [ProtoMember(18)]
+    public readonly int BesiegerTroopsKilled;
+
+    [ProtoMember(19)]
+    public readonly uint[] BesiegerPartyHandles;
+
+    [ProtoMember(20)]
+    public readonly SiegeEngineGraphSnapshot[] AttackerEngines;
+
+    [ProtoMember(21)]
     public readonly SiegeEngineGraphSnapshot[] DefenderEngines;
 
     public NetworkMapEventInitialized(
-        string mapEventId,
+        uint mapEventHandle,
         bool isTerminal,
-        string troopUpgradeTrackerId = null,
-        string componentId = null,
-        string visualId = null)
+        uint troopUpgradeTrackerHandle = 0,
+        uint componentHandle = 0,
+        uint visualHandle = 0)
     {
-        MapEventId = mapEventId;
+        MapEventHandle = mapEventHandle;
         IsTerminal = isTerminal;
-        TroopUpgradeTrackerId = troopUpgradeTrackerId;
-        ComponentId = componentId;
-        VisualId = visualId;
+        TroopUpgradeTrackerHandle = troopUpgradeTrackerHandle;
+        ComponentHandle = componentHandle;
+        VisualHandle = visualHandle;
         SiegeEventId = null;
-        SiegeSettlementId = null;
+        SiegeEventHandle = 0;
+        SiegeSettlementHandle = 0;
         BesiegerCampId = null;
-        SiegeLeaderPartyId = null;
+        BesiegerCampHandle = 0;
+        SiegeLeaderPartyHandle = 0;
         AttackerSiegeEnginesId = null;
+        AttackerSiegeEnginesHandle = 0;
         DefenderSiegeEnginesId = null;
+        DefenderSiegeEnginesHandle = 0;
         SiegeStartTimeTicks = 0;
         BesiegerStrategyId = null;
         BesiegerTroopsKilled = 0;
-        BesiegerPartyIds = null;
+        BesiegerPartyHandles = null;
         AttackerEngines = null;
         DefenderEngines = null;
     }
 
     internal NetworkMapEventInitialized(
-        string mapEventId,
+        uint mapEventHandle,
         bool isTerminal,
-        string troopUpgradeTrackerId,
-        string componentId,
-        string visualId,
+        uint troopUpgradeTrackerHandle,
+        uint componentHandle,
+        uint visualHandle,
         SiegeEventGraphSnapshot siegeGraph)
-        : this(mapEventId, isTerminal, troopUpgradeTrackerId, componentId, visualId)
+        : this(mapEventHandle, isTerminal, troopUpgradeTrackerHandle, componentHandle, visualHandle)
     {
         SiegeEventId = siegeGraph.SiegeEventId;
-        SiegeSettlementId = siegeGraph.SettlementId;
+        SiegeEventHandle = siegeGraph.SiegeEventHandle;
+        SiegeSettlementHandle = siegeGraph.SettlementHandle;
         BesiegerCampId = siegeGraph.BesiegerCampId;
-        SiegeLeaderPartyId = siegeGraph.LeaderPartyId;
+        BesiegerCampHandle = siegeGraph.BesiegerCampHandle;
+        SiegeLeaderPartyHandle = siegeGraph.LeaderPartyHandle;
         AttackerSiegeEnginesId = siegeGraph.AttackerSiegeEnginesId;
+        AttackerSiegeEnginesHandle = siegeGraph.AttackerSiegeEnginesHandle;
         DefenderSiegeEnginesId = siegeGraph.DefenderSiegeEnginesId;
+        DefenderSiegeEnginesHandle = siegeGraph.DefenderSiegeEnginesHandle;
         SiegeStartTimeTicks = siegeGraph.SiegeStartTimeTicks;
         BesiegerStrategyId = siegeGraph.BesiegerStrategyId;
         BesiegerTroopsKilled = siegeGraph.BesiegerTroopsKilled;
-        BesiegerPartyIds = siegeGraph.BesiegerPartyIds;
+        BesiegerPartyHandles = siegeGraph.BesiegerPartyHandles;
         AttackerEngines = siegeGraph.AttackerEngines;
         DefenderEngines = siegeGraph.DefenderEngines;
     }
 
     internal SiegeEventGraphSnapshot SiegeGraph => new SiegeEventGraphSnapshot(
         SiegeEventId,
-        SiegeSettlementId,
+        SiegeEventHandle,
+        SiegeSettlementHandle,
         BesiegerCampId,
-        SiegeLeaderPartyId,
+        BesiegerCampHandle,
+        SiegeLeaderPartyHandle,
         AttackerSiegeEnginesId,
+        AttackerSiegeEnginesHandle,
         DefenderSiegeEnginesId,
+        DefenderSiegeEnginesHandle,
         SiegeStartTimeTicks,
         BesiegerStrategyId,
         BesiegerTroopsKilled,
-        BesiegerPartyIds,
+        BesiegerPartyHandles,
         AttackerEngines,
         DefenderEngines);
 }

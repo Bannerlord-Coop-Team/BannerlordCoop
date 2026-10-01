@@ -13,15 +13,15 @@ namespace AutoSync
     public record {{ MemberDeclaringTypeName}}_{{ MemberName }}_ChangeNetworkMessage : GenericNetworkReferenceEvent<{{ MemberDeclaringType}}, {{ ElementType }}>
     {
         [ProtoMember(1)]
-        public override string InstanceId { get; set; }
+        public override uint InstanceId { get; set; }
 
         [ProtoMember(2)]
-        public override string ValueId { get; set; }
+        public override uint ValueId { get; set; }
         
         [ProtoMember(3)]
         public int Index { get; set; }
 
-        public {{ MemberDeclaringTypeName}}_{{ MemberName }}_ChangeNetworkMessage(string instanceId, string valueId, int index) : base(instanceId, valueId)
+        public {{ MemberDeclaringTypeName}}_{{ MemberName }}_ChangeNetworkMessage(uint instanceId, uint valueId, int index) : base(instanceId, valueId)
         {
             Index = index;
         }

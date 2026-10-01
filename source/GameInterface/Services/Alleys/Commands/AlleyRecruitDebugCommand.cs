@@ -23,7 +23,6 @@ using TaleWorlds.CampaignSystem.Roster;
 using TaleWorlds.CampaignSystem.Settlements;
 using TaleWorlds.Core;
 using TaleWorlds.MountAndBlade;
-using static GameInterface.Services.ObjectManager.ObjectManager;
 
 namespace GameInterface.Services.Alleys.Commands;
 
@@ -72,7 +71,7 @@ public class AlleyRecruitDebugCommand
             if (owner.PartyBelongedTo == null) return Failed($"Hero '{args[2]}' has no party.");
             if (!objectManager.TryGetIdWithLogging(alley, out var alleyId) ||
                 !objectManager.TryGetIdWithLogging(owner, out var ownerId) ||
-                !objectManager.TryGetIdWithLogging(owner.CharacterObject, out var ownerCharacterId))
+                !objectManager.TryGetHandleWithLogging(owner.CharacterObject, out var ownerCharacterId))
                 return Failed("Unable to resolve the alley recruit fixture ids.");
 
             sessionInterface.TryGetManagementData(alleyId, out var originalManagementData);
@@ -218,18 +217,18 @@ public class AlleyRecruitDebugCommand
                     charactersToReset.Add(character);
                 }
 
-                if (!objectManager.TryGetIdWithLogging(fixture.PlayerParty.MemberRoster, out var rosterId))
+                if (!objectManager.TryGetHandleWithLogging(fixture.PlayerParty.MemberRoster, out var rosterId))
                     return Failed("Unable to resolve the fixture roster id.");
-                var resetCharacters = new List<(CharacterObject Character, string Id)>();
+                var resetCharacters = new List<(CharacterObject Character, uint Handle)>();
                 foreach (var character in charactersToReset.Distinct())
                 {
-                    if (!objectManager.TryGetIdWithLogging(character, out var characterId))
+                    if (!objectManager.TryGetHandleWithLogging(character, out var characterHandle))
                         return Failed($"Unable to resolve the fixture character id for '{character.StringId}'.");
-                    resetCharacters.Add((character, characterId));
+                    resetCharacters.Add((character, characterHandle));
                 }
 
                 RestoreRoster(fixture.PlayerParty.MemberRoster, fixture.MemberRoster);
-                sendCoalescer.DropInstance(Compact(rosterId, typeof(TroopRoster)));
+                sendCoalescer.DropInstance(rosterId);
                 foreach (var resetCharacter in resetCharacters)
                 {
                     var index = fixture.PlayerParty.MemberRoster.FindIndexOfTroop(resetCharacter.Character);
@@ -238,17 +237,17 @@ public class AlleyRecruitDebugCommand
                         : default;
                     network.SendAll(new NetworkTroopRosterSetWoundedNumber(
                         rosterId,
-                        resetCharacter.Id,
+                        resetCharacter.Handle,
                         index >= 0 ? element.WoundedNumber : 0));
                     network.SendAll(new NetworkTroopRosterSetNumber(
                         rosterId,
-                        resetCharacter.Id,
+                        resetCharacter.Handle,
                         index >= 0 ? element.Number : 0));
                     if (index >= 0)
                     {
                         network.SendAll(new NetworkTroopRosterElementBatch(
                             rosterId,
-                            resetCharacter.Id,
+                            resetCharacter.Handle,
                             new[] { TroopRosterElementOperation.SetXp(element.Xp) }));
                     }
                 }
@@ -321,18 +320,18 @@ public class AlleyRecruitDebugCommand
                 .Select(element => element.Character)
                 .Concat(fixture.MemberRoster.Select(element => element.Character))
                 .ToList();
-            if (!objectManager.TryGetIdWithLogging(fixture.PlayerParty.MemberRoster, out var rosterId))
+            if (!objectManager.TryGetHandleWithLogging(fixture.PlayerParty.MemberRoster, out var rosterId))
                 return Failed("Unable to resolve the fixture roster id.");
-            var resetCharacters = new List<(CharacterObject Character, string Id)>();
+            var resetCharacters = new List<(CharacterObject Character, uint Handle)>();
             foreach (var character in charactersToReset.Distinct())
             {
-                if (!objectManager.TryGetIdWithLogging(character, out var characterId))
+                if (!objectManager.TryGetHandleWithLogging(character, out var characterHandle))
                     return Failed($"Unable to resolve the fixture character id for '{character.StringId}'.");
-                resetCharacters.Add((character, characterId));
+                resetCharacters.Add((character, characterHandle));
             }
 
             RestoreRoster(fixture.PlayerParty.MemberRoster, fixture.MemberRoster);
-            sendCoalescer.DropInstance(Compact(rosterId, typeof(TroopRoster)));
+            sendCoalescer.DropInstance(rosterId);
             foreach (var resetCharacter in resetCharacters)
             {
                 var index = fixture.PlayerParty.MemberRoster.FindIndexOfTroop(resetCharacter.Character);
@@ -341,17 +340,17 @@ public class AlleyRecruitDebugCommand
                     : default;
                 network.SendAll(new NetworkTroopRosterSetWoundedNumber(
                     rosterId,
-                    resetCharacter.Id,
+                    resetCharacter.Handle,
                     index >= 0 ? element.WoundedNumber : 0));
                 network.SendAll(new NetworkTroopRosterSetNumber(
                     rosterId,
-                    resetCharacter.Id,
+                    resetCharacter.Handle,
                     index >= 0 ? element.Number : 0));
                 if (index >= 0)
                 {
                     network.SendAll(new NetworkTroopRosterElementBatch(
                         rosterId,
-                        resetCharacter.Id,
+                        resetCharacter.Handle,
                         new[] { TroopRosterElementOperation.SetXp(element.Xp) }));
                 }
             }
@@ -672,15 +671,15 @@ public class AlleyRecruitDebugCommand
             element => $"{element.Character.StringId}:{element.Number}"));
     }
 
-    private static AlleyManagementData CloneManagementData(AlleyManagementData data)
+    private static AlleyManagementState CloneManagementData(AlleyManagementState data)
     {
         if (data == null) return null;
-        return new AlleyManagementData(data.OverseerId, data.Garrison?.ToArray() ?? Array.Empty<TroopRosterElementData>())
-        {
-            UnderAttackByAlleyId = data.UnderAttackByAlleyId,
-            AttackResponseDueDate = data.AttackResponseDueDate,
-            LastRecruitTimeTicks = data.LastRecruitTimeTicks,
-        };
+        return new AlleyManagementState(
+            data.OverseerId,
+            data.Garrison?.ToArray() ?? Array.Empty<TroopRosterElementData>(),
+            data.UnderAttackByAlleyId,
+            data.AttackResponseDueDate,
+            data.LastRecruitTimeTicks);
     }
 
     internal static bool IsFixtureAlley(string alleyId)
@@ -714,7 +713,7 @@ public class AlleyRecruitDebugCommand
         public Alley Alley { get; }
         public string AlleyId { get; }
         public Hero OriginalOwner { get; }
-        public AlleyManagementData OriginalManagementData { get; }
+        public AlleyManagementState OriginalManagementData { get; }
         public MobileParty PlayerParty { get; }
         public TroopRosterElement[] MemberRoster { get; }
 
@@ -722,7 +721,7 @@ public class AlleyRecruitDebugCommand
             Alley alley,
             string alleyId,
             Hero originalOwner,
-            AlleyManagementData originalManagementData,
+            AlleyManagementState originalManagementData,
             MobileParty playerParty,
             TroopRosterElement[] memberRoster)
         {

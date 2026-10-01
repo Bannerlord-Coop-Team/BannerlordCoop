@@ -419,10 +419,10 @@ internal sealed class HideoutCampaignConsequencesHandler : IHandler
 
         foreach (var party in GetDefenderParties(settlement))
         {
-            if (!objectManager.TryGetId(party.MemberRoster, out var rosterId))
+            if (!objectManager.TryGetHandle(party.MemberRoster, out var rosterId))
                 continue;
 
-            sendCoalescer.FlushInstance(Compact(rosterId, typeof(TroopRoster)), network);
+            sendCoalescer.FlushInstance(rosterId, network);
         }
     }
 

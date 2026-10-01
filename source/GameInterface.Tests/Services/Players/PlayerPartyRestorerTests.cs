@@ -121,6 +121,7 @@ public class PlayerPartyRestorerTests
         Assert.Equal(player.HeroId, restored.HeroId);
         Assert.Equal(partyId, restored.MobilePartyId);
         Assert.Equal(clanId, restored.ClanId);
+        Assert.Equal(player.ClanId, restored.OriginalClanId);
         Assert.Equal(characterId, restored.CharacterObjectId);
         Assert.Equal(1, party.MemberRoster.GetTroopCount(hero.CharacterObject));
         Assert.Same(hero, party.LeaderHero);

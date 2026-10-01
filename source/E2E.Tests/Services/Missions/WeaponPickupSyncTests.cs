@@ -11,6 +11,7 @@ using Missions.Agents.Handlers;
 using Missions.Agents.Messages;
 using Missions.Agents.Packets;
 using Missions.Agents.Patches;
+using Missions.Battles;
 using Missions.Tournaments;
 using Missions.Tournaments.Messages;
 using ProtoBuf;
@@ -36,6 +37,20 @@ public class WeaponPickupSyncTests
     private static bool pickupRanInsideAllowedThread;
     private static bool runtimeEquipmentRanInsideAllowedThread;
     private static bool wieldRanInsideAllowedThread;
+
+    [Fact]
+    public void ReplicatedDrop_RoundTripsExactSiegeGrantIdentity()
+    {
+        new SurrogateCollection();
+        var message = new NetworkWeaponDropped(Guid.NewGuid(), Guid.NewGuid(), EquipmentIndex.ExtraWeaponSlot,
+            Guid.NewGuid(), "owner", "fork", null, null, 0, default, default, 0, false, 0,
+            new AgentEquipmentData(EquipmentIndex.None, EquipmentIndex.None, 0), false, Guid.NewGuid());
+        var copy = Serializer.DeepClone(message);
+        Assert.Equal(message.SiegeEquipmentGrant, copy.SiegeEquipmentGrant);
+        Assert.Equal(message.AgentId, copy.AgentId);
+        Assert.Equal(message.OriginControllerId, copy.OriginControllerId);
+        Assert.True(copy.HasCurrentEquipment);
+    }
 
     [Fact]
     public void ReplicatedPickup_RoundTripsCompleteMessage()
@@ -360,23 +375,32 @@ public class WeaponPickupSyncTests
             candidate => candidate.Category == MissionModule.WeaponPickupPatchCategory);
         var harmony = new Harmony(
             $"{nameof(MissionModule_RegistersWeaponPickupPatchCategory)}.{System.Guid.NewGuid()}");
+        var repeatedHarmony = new Harmony(harmony.Id + ".repeated");
         MethodInfo target = AccessTools.Method(typeof(Agent), "OnItemPickup");
 
         try
         {
             registration.Apply(harmony);
+            registration.Apply(repeatedHarmony);
 
             Patches patches = Harmony.GetPatchInfo(target);
             Assert.Contains(
                 patches.Postfixes,
                 patch => patch.owner == harmony.Id);
+            var grantTarget = AccessTools.Method(typeof(Agent), nameof(Agent.EquipWeaponToExtraSlotAndWield));
+            var grantPatches = Harmony.GetPatchInfo(grantTarget);
+            Assert.Contains(grantPatches.Postfixes, patch =>
+                patch.owner == harmony.Id && patch.PatchMethod.DeclaringType == typeof(LadderForkGrantPatch));
+            var pickupPatches = Harmony.GetPatchInfo(AccessTools.DeclaredMethod(typeof(Mangonel), "OnTick"));
+            Assert.Contains(pickupPatches.Transpilers, patch =>
+                patch.owner == harmony.Id && patch.PatchMethod.DeclaringType == typeof(MangonelAmmoPickupPatch));
+            Assert.Contains(pickupPatches.Transpilers, patch =>
+                patch.owner == repeatedHarmony.Id && patch.PatchMethod.DeclaringType == typeof(MangonelAmmoPickupPatch));
         }
         finally
         {
-            harmony.Unpatch(
-                target,
-                HarmonyPatchType.All,
-                harmony.Id);
+            repeatedHarmony.UnpatchAll(repeatedHarmony.Id);
+            harmony.UnpatchAll(harmony.Id);
         }
     }
 

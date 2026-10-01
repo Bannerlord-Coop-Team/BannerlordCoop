@@ -1,0 +1,20 @@
+<Brushes>
+  <Brush Name="Coop.PlayerList.Title.Background">
+    <Layers>
+      <BrushLayer Name="Default" Sprite="TitleHeader" OverlayMethod="CoverWithTexture" OverlaySprite="paper_texture_tile"/>
+    </Layers>
+    <Styles>
+      <Style Name="Default"><BrushLayer Name="Default" Color="#E9CEA1FF"/></Style>
+    </Styles>
+  </Brush>
+  <Brush Name="Coop.PlayerList.Title.Text" Font="Galahad" TextHorizontalAlignment="Left" TextVerticalAlignment="Center">
+    <Styles>
+      <Style Name="Default" FontSize="38" FontColor="#302316FF" TextOutlineAmount="0" TextGlowRadius="0" TextBlur="0" TextShadowOffset="0"/>
+    </Styles>
+  </Brush>
+  <Brush Name="Coop.PlayerList.Text" Font="Galahad" TextHorizontalAlignment="Left" TextVerticalAlignment="Center">
+    <Styles>
+      <Style Name="Default" FontSize="23" FontColor="#E8E4DAFF" TextOutlineAmount="0" TextGlowRadius="0" TextBlur="0" TextShadowOffset="0"/>
+    </Styles>
+  </Brush>
+</Brushes>

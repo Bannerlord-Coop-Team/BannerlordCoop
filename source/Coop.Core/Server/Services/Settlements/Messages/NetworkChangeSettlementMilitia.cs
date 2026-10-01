@@ -10,11 +10,11 @@ namespace Coop.Core.Server.Services.Settlements.Messages;
 public record NetworkChangeSettlementMilitia : IEvent
 {
     [ProtoMember(1)]
-    public string SettlementId { get; }
+    public uint SettlementId { get; }
     [ProtoMember(2)]
     public float Militia { get; }
 
-    public NetworkChangeSettlementMilitia(string settlementId, float militia)
+    public NetworkChangeSettlementMilitia(uint settlementId, float militia)
     {
         SettlementId = settlementId;
         Militia = militia;

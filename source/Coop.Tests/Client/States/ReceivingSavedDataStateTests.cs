@@ -52,7 +52,7 @@ namespace Coop.Tests.Client.States
                 new InventoryPlayerData(new(), new()),
                 new HeroMeetingData(new()),
                 new AgingPlayerData(new()),
-                new AttachmentIdMap(new()),
+                new AttachmentIdMap(new(), new()),
                 new ServerOptions(new()));
 
         [Fact]

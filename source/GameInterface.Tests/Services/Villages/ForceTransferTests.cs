@@ -5,6 +5,7 @@ using GameInterface.Services.TroopRosters.Data;
 using GameInterface.Services.Villages.Data;
 using GameInterface.Services.Villages.Interfaces;
 using System;
+using System.Collections.Generic;
 using Xunit;
 
 namespace GameInterface.Tests.Services.Villages;
@@ -89,18 +90,18 @@ public class ForceTransferTests
     [Fact]
     public void TryValidateVolunteersTake_ExactTake_Accepts()
     {
-        var delta = Delta(("imperial_recruit", 8));
+        var delta = Delta((1u, 8));
 
-        Assert.True(VillageHostileActionInterface.TryValidateVolunteersTake("imperial_recruit", 8, delta, out var error));
+        Assert.True(VillageHostileActionInterface.TryValidateVolunteersTake(1u, 8, delta, out var error));
         Assert.Null(error);
     }
 
     [Fact]
     public void TryValidateVolunteersTake_OverTake_Rejects()
     {
-        var delta = Delta(("imperial_recruit", 9));
+        var delta = Delta((1u, 9));
 
-        Assert.False(VillageHostileActionInterface.TryValidateVolunteersTake("imperial_recruit", 8, delta, out var error));
+        Assert.False(VillageHostileActionInterface.TryValidateVolunteersTake(1u, 8, delta, out var error));
         Assert.NotNull(error);
     }
 
@@ -109,18 +110,18 @@ public class ForceTransferTests
     {
         var delta = new TroopRosterData(new[]
         {
-            new TroopRosterElementData("imperial_recruit", 8, 0, 0),
-            new TroopRosterElementData("imperial_recruit", -2, 0, 0),
+            new TroopRosterElementData(1u, 8, 0, 0),
+            new TroopRosterElementData(1u, -2, 0, 0),
         });
 
-        Assert.True(VillageHostileActionInterface.TryValidateVolunteersTake("imperial_recruit", 8, delta, out _));
+        Assert.True(VillageHostileActionInterface.TryValidateVolunteersTake(1u, 8, delta, out _));
     }
 
     [Fact]
     public void TryValidateVolunteersTake_MissingPool_Rejects()
     {
-        Assert.False(VillageHostileActionInterface.TryValidateVolunteersTake(null, 0, Delta(("imperial_recruit", 1)), out _));
-        Assert.False(VillageHostileActionInterface.TryValidateVolunteersTake("imperial_recruit", 0, Delta(("imperial_recruit", 1)), out _));
+        Assert.False(VillageHostileActionInterface.TryValidateVolunteersTake(0, 0, Delta((1u, 1)), out _));
+        Assert.False(VillageHostileActionInterface.TryValidateVolunteersTake(1u, 0, Delta((1u, 1)), out _));
     }
 
     [Fact]
@@ -405,15 +406,15 @@ public class ForceTransferTests
     public void TryValidateVolunteersCommit_FullAndPartialTake_Accepts()
     {
         Assert.True(VolunteersCommit(
-            "imperial_recruit", 8,
-            Delta(("imperial_recruit", 8)),
-            Delta(("imperial_recruit", -8)),
+            1u, 8,
+            Delta((1u, 8)),
+            Delta((1u, -8)),
             out var error));
         Assert.Null(error);
         Assert.True(VolunteersCommit(
-            "imperial_recruit", 8,
-            Delta(("imperial_recruit", 5)),
-            Delta(("imperial_recruit", -5)),
+            1u, 8,
+            Delta((1u, 5)),
+            Delta((1u, -5)),
             out _));
     }
 
@@ -423,9 +424,9 @@ public class ForceTransferTests
         // Gaining phantom pool troops on the dummy left side (lost on apply,
         // or fabricated).
         Assert.False(VolunteersCommit(
-            "imperial_recruit", 8,
+            1u, 8,
             EmptyDelta(),
-            Delta(("imperial_recruit", 2)),
+            Delta((1u, 2)),
             out _));
     }
 
@@ -436,9 +437,9 @@ public class ForceTransferTests
         // troop onto the dummy left to free party room. The dummy is dropped
         // on apply, so the dismissal grants nothing; the take stays bounded.
         Assert.True(VolunteersCommit(
-            "imperial_recruit", 8,
-            Delta(("imperial_recruit", 8), ("vlandian_recruit", -1)),
-            Delta(("imperial_recruit", -8), ("vlandian_recruit", 1)),
+            1u, 8,
+            Delta((1u, 8), (2u, -1)),
+            Delta((1u, -8), (2u, 1)),
             out var error));
         Assert.Null(error);
     }
@@ -449,9 +450,9 @@ public class ForceTransferTests
         // Dismissing one already-owned recruit of the pool type: left final is
         // pool + 1 with the matching right-side loss proving it was owned.
         Assert.True(VolunteersCommit(
-            "imperial_recruit", 8,
-            Delta(("imperial_recruit", -1)),
-            Delta(("imperial_recruit", 1)),
+            1u, 8,
+            Delta((1u, -1)),
+            Delta((1u, 1)),
             out var error));
         Assert.Null(error);
     }
@@ -462,9 +463,9 @@ public class ForceTransferTests
         // Take the 8 authorized recruits while dismissing one owned recruit of
         // the same type to free party room.
         Assert.True(VolunteersCommit(
-            "imperial_recruit", 8,
-            Delta(("imperial_recruit", 8), ("imperial_recruit", -1)),
-            Delta(("imperial_recruit", -8), ("imperial_recruit", 1)),
+            1u, 8,
+            Delta((1u, 8), (1u, -1)),
+            Delta((1u, -8), (1u, 1)),
             out var error));
         Assert.Null(error);
     }
@@ -475,16 +476,16 @@ public class ForceTransferTests
         // Left +1 of the pool type with no matching right-side loss is a
         // fabricated pool remainder, not an owned dismissal.
         Assert.False(VolunteersCommit(
-            "imperial_recruit", 8,
+            1u, 8,
             EmptyDelta(),
-            Delta(("imperial_recruit", 1)),
+            Delta((1u, 1)),
             out _));
         // Dismissing 1 owned but gaining 2 on the left still exceeds the
         // owned-dismissal allowance.
         Assert.False(VolunteersCommit(
-            "imperial_recruit", 8,
-            Delta(("imperial_recruit", -1)),
-            Delta(("imperial_recruit", 2)),
+            1u, 8,
+            Delta((1u, -1)),
+            Delta((1u, 2)),
             out _));
     }
 
@@ -493,9 +494,9 @@ public class ForceTransferTests
     {
         // A negative left delta for a troop the dummy never held.
         Assert.False(VolunteersCommit(
-            "imperial_recruit", 8,
+            1u, 8,
             EmptyDelta(),
-            Delta(("vlandian_recruit", -1)),
+            Delta((2u, -1)),
             out _));
     }
 
@@ -504,11 +505,11 @@ public class ForceTransferTests
     {
         // Upgrades are blocked up front while a force screen is open, so any
         // gold movement fails the commit even with recorded upgrade history.
-        var upgrades = new[] { (fromId: "imperial_recruit", toId: "imperial_sergeant", number: 1) };
+        var upgrades = new[] { (fromId: 1u, toId: 3u, number: 1) };
         Assert.False(VillageHostileActionInterface.TryValidateVolunteersCommit(
-            "imperial_recruit", 8,
-            Delta(("imperial_recruit", 7), ("imperial_sergeant", 1)),
-            Delta(("imperial_recruit", -8)),
+            1u, 8,
+            Delta((1u, 7), (3u, 1)),
+            Delta((1u, -8)),
             EmptyDelta(), EmptyDelta(),
             0, 0, -100, 0, 0, false, null, upgrades, out _));
     }
@@ -523,9 +524,9 @@ public class ForceTransferTests
         int taken, int recruited, int gold, int influence, int morale)
     {
         Assert.False(VillageHostileActionInterface.TryValidateVolunteersCommit(
-            "imperial_recruit", 8,
-            Delta(("imperial_recruit", 8)),
-            Delta(("imperial_recruit", -8)),
+            1u, 8,
+            Delta((1u, 8)),
+            Delta((1u, -8)),
             EmptyDelta(),
             EmptyDelta(),
             taken, recruited, gold, influence, morale, false, null, null, out _));
@@ -535,15 +536,15 @@ public class ForceTransferTests
     public void TryValidateVolunteersCommit_PrisonerActionsOrDonation_Rejects()
     {
         Assert.False(VillageHostileActionInterface.TryValidateVolunteersCommit(
-            "imperial_recruit", 8,
-            Delta(("imperial_recruit", 8)),
-            Delta(("imperial_recruit", -8)),
+            1u, 8,
+            Delta((1u, 8)),
+            Delta((1u, -8)),
             EmptyDelta(), EmptyDelta(),
             0, 0, 0, 0, 0, true, null, null, out _));
         Assert.False(VillageHostileActionInterface.TryValidateVolunteersCommit(
-            "imperial_recruit", 8,
-            Delta(("imperial_recruit", 8)),
-            Delta(("imperial_recruit", -8)),
+            1u, 8,
+            Delta((1u, 8)),
+            Delta((1u, -8)),
             EmptyDelta(), EmptyDelta(),
             0, 0, 0, 0, 0, false, "town_ES1", null, out _));
     }
@@ -553,18 +554,18 @@ public class ForceTransferTests
     {
         // Taking prisoners through the volunteers screen is rejected.
         Assert.False(VillageHostileActionInterface.TryValidateVolunteersCommit(
-            "imperial_recruit", 8,
-            Delta(("imperial_recruit", 8)),
-            Delta(("imperial_recruit", -8)),
+            1u, 8,
+            Delta((1u, 8)),
+            Delta((1u, -8)),
             EmptyDelta(),
-            Delta(("imperial_recruit", 1)),
+            Delta((1u, 1)),
             0, 0, 0, 0, 0, false, null, null, out _));
         // A non-empty left prisoner delta is rejected.
         Assert.False(VillageHostileActionInterface.TryValidateVolunteersCommit(
-            "imperial_recruit", 8,
-            Delta(("imperial_recruit", 8)),
-            Delta(("imperial_recruit", -8)),
-            Delta(("imperial_recruit", -1)),
+            1u, 8,
+            Delta((1u, 8)),
+            Delta((1u, -8)),
+            Delta((1u, -1)),
             EmptyDelta(),
             0, 0, 0, 0, 0, false, null, null, out _));
     }
@@ -576,10 +577,10 @@ public class ForceTransferTests
         // already-owned ordinary prisoner. The screen must block this up front;
         // the commit rejects it as backstop.
         Assert.False(VillageHostileActionInterface.TryValidateVolunteersCommit(
-            "imperial_recruit", 8,
-            Delta(("imperial_recruit", 8)),
-            Delta(("imperial_recruit", -8)),
-            Delta(("vlandian_recruit", -1)),
+            1u, 8,
+            Delta((1u, 8)),
+            Delta((1u, -8)),
+            Delta((2u, -1)),
             EmptyDelta(),
             1, 0, 0, 0, 0, true, null, null, out _));
     }
@@ -590,14 +591,14 @@ public class ForceTransferTests
         // Take the village recruits while recruiting an eligible existing
         // prisoner: the recruited gain and history fail the commit backstop.
         Assert.False(VillageHostileActionInterface.TryValidateVolunteersCommit(
-            "imperial_recruit", 8,
-            Delta(("imperial_recruit", 8), ("vlandian_recruit", 1)),
-            Delta(("imperial_recruit", -8)),
+            1u, 8,
+            Delta((1u, 8), (2u, 1)),
+            Delta((1u, -8)),
             EmptyDelta(), EmptyDelta(),
             0, 1, 0, 0, 0, false, null, null, out _));
     }
     private static bool VolunteersCommit(
-        string troopId, int count, TroopRosterData rightDelta, TroopRosterData leftDelta, out string error)
+        uint troopId, int count, TroopRosterData rightDelta, TroopRosterData leftDelta, out string error)
     {
         return VillageHostileActionInterface.TryValidateVolunteersCommit(
             troopId, count, rightDelta, leftDelta,
@@ -610,12 +611,12 @@ public class ForceTransferTests
     {
         var delta = new TroopRosterData(new[]
         {
-            new TroopRosterElementData("imperial_recruit", 8, 0, 0),
-            new TroopRosterElementData("vlandian_recruit", 1, 0, 0),
+            new TroopRosterElementData(1u, 8, 0, 0),
+            new TroopRosterElementData(2u, 1, 0, 0),
         });
 
         Assert.False(VillageHostileActionInterface.TryValidateVolunteersTake(
-            "imperial_recruit", 8, delta, out _));
+            1u, 8, delta, out _));
     }
 
     [Fact]
@@ -623,22 +624,22 @@ public class ForceTransferTests
     {
         var delta = new TroopRosterData(new[]
         {
-            new TroopRosterElementData("imperial_recruit", 7, 0, 0),
-            new TroopRosterElementData("imperial_sergeant", 1, 0, 0),
+            new TroopRosterElementData(1u, 7, 0, 0),
+            new TroopRosterElementData(3u, 1, 0, 0),
         });
-        var upgrades = new[] { (fromId: "imperial_recruit", toId: "imperial_sergeant", number: 1) };
+        var upgrades = new[] { (fromId: 1u, toId: 3u, number: 1) };
 
         Assert.True(VillageHostileActionInterface.TryValidateVolunteersTake(
-            "imperial_recruit", 8, delta, out _, upgrades));
+            1u, 8, delta, out _, upgrades));
     }
 
     [Fact]
     public void TryValidateVolunteersCommit_OtherTroopGain_Rejects()
     {
         Assert.False(VillageHostileActionInterface.TryValidateVolunteersCommit(
-            "imperial_recruit", 8,
-            Delta(("imperial_recruit", 8), ("vlandian_recruit", 1)),
-            Delta(("imperial_recruit", -8)),
+            1u, 8,
+            Delta((1u, 8), (2u, 1)),
+            Delta((1u, -8)),
             EmptyDelta(), EmptyDelta(),
             0, 0, 0, 0, 0, false, null, null, out _));
     }
@@ -744,7 +745,7 @@ public class ForceTransferTests
         return new ItemRosterElementData(new ItemObjectData(id, null, true), amount);
     }
 
-    private static TroopRosterData Delta(params (string id, int number)[] entries)
+    private static TroopRosterData Delta(params (uint id, int number)[] entries)
     {
         var data = new TroopRosterElementData[entries.Length];
         for (int i = 0; i < entries.Length; i++)
@@ -758,10 +759,18 @@ public class ForceTransferTests
         public bool Contains(string id) { throw new NotImplementedException(); }
         public bool TryGetId(object obj, out string id) { throw new NotImplementedException(); }
         public bool TryGetIdWithLogging<T>(T obj, out string id) { throw new NotImplementedException(); }
+        public bool TryGetHandle(object obj, out uint handle) { throw new NotImplementedException(); }
+        public bool TryGetHandleWithLogging<T>(T obj, out uint handle) { throw new NotImplementedException(); }
         public bool TryGetObject<T>(string id, out T obj) { throw new NotImplementedException(); }
         public bool TryGetObjectWithLogging<T>(string id, out T obj) { throw new NotImplementedException(); }
+        public bool TryGetObject<T>(uint handle, out T obj) { throw new NotImplementedException(); }
+        public bool TryGetObjectWithLogging<T>(uint handle, out T obj) { throw new NotImplementedException(); }
         public bool AddExisting(string id, object obj) { throw new NotImplementedException(); }
+        public bool AddExisting(string id, object obj, uint handle) { throw new NotImplementedException(); }
         public bool AddNewObject(object obj, out string newId) { throw new NotImplementedException(); }
+        public IReadOnlyDictionary<string, uint> GetHandleMap() { throw new NotImplementedException(); }
+        public void SetJoinHandleMap(IReadOnlyDictionary<string, uint> handles) { throw new NotImplementedException(); }
+        public void ClearJoinHandleMap() { throw new NotImplementedException(); }
         public bool RunRegistrationTransaction(Func<bool> registerAndValidate) { throw new NotImplementedException(); }
         public bool Remove(object obj) { throw new NotImplementedException(); }
         public void Clear() { throw new NotImplementedException(); }

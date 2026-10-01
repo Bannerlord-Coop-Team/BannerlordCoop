@@ -533,8 +533,36 @@ public class CoopAgentInfo
 {
     private AgentEquipmentData authoritativeEquipment;
     private bool hasAuthoritativeEquipment;
+    private readonly HashSet<Guid> consumedSiegeGrants = new();
+    private long siegeGrantRevision;
+    private long siegeGrantAuthorityRevision;
+
+    internal Guid SiegeEquipmentGrant { get; private set; }
+    internal long SiegeEquipmentGrantRevision =>
+        siegeGrantAuthorityRevision == AuthorityRevision ? siegeGrantRevision : 0;
+
+    internal bool IsSiegeGrantConsumed(Guid grantId) => consumedSiegeGrants.Contains(grantId);
+
+    internal void RecordSiegeGrant(Guid grantId, long? revision = null)
+    {
+        SiegeEquipmentGrant = grantId;
+        if (revision.HasValue)
+        {
+            siegeGrantRevision = revision.Value;
+            siegeGrantAuthorityRevision = AuthorityRevision;
+        }
+    }
+
+    internal bool ConsumeSiegeGrant(Guid grantId)
+    {
+        if (grantId == Guid.Empty || !consumedSiegeGrants.Add(grantId)) return false;
+        if (SiegeEquipmentGrant != grantId) return false;
+        SiegeEquipmentGrant = Guid.Empty;
+        return true;
+    }
 
     internal bool UsesActionEquipment { get; set; }
+    internal volatile StandingPoint ReplicatedPilotPoint;
 
     public Agent Agent { get; }
     public Guid AgentId { get; }

@@ -1,4 +1,4 @@
-using E2E.Tests.Environment.Instance;
+﻿using E2E.Tests.Environment.Instance;
 using E2E.Tests.Util;
 using GameInterface.Services.PlayerCaptivityService.Messages;
 using GameInterface.Services.Players;
@@ -62,6 +62,8 @@ public class TournamentBettingFlowTests : SyncTestBase
         Assert.Equal(second.ThisRoundBettedDenars, replay.ThisRoundBettedDenars);
         Assert.Equal(second.ExpectedPayout, replay.ExpectedPayout);
         AssertGold(fixture, InitialGold - 100);
+
+        Server.PumpGameThread();
     }
 
     [Fact]
@@ -83,6 +85,8 @@ public class TournamentBettingFlowTests : SyncTestBase
             Assert.True(completed.IsCompleted);
             Assert.Equal(OpponentSlotId, completed.WinnerSlotId);
         });
+
+        Server.PumpGameThread();
     }
 
     [Fact]
@@ -104,6 +108,8 @@ public class TournamentBettingFlowTests : SyncTestBase
 
         Assert.Empty(Server.NetworkSentMessages.GetMessages<NetworkTournamentBetResult>());
         AssertGold(fixture, expectedGold);
+
+        Server.PumpGameThread();
     }
 
     [Fact]
@@ -132,6 +138,8 @@ public class TournamentBettingFlowTests : SyncTestBase
             Assert.Contains(current.Contestants, contestant =>
                 contestant.IsHuman && contestant.ControllerId == OtherControllerId);
         });
+
+        Server.PumpGameThread();
     }
 
     private TournamentFixture CreateFixture(bool humanOpponent = false)

@@ -1,5 +1,6 @@
 ﻿using GameInterface.AutoSync;
 using HarmonyLib;
+using GameInterface.Services.Buildings.Handlers;
 using Helpers;
 using TaleWorlds.CampaignSystem.CampaignBehaviors;
 using TaleWorlds.CampaignSystem.Settlements;
@@ -35,6 +36,7 @@ internal class TownSync : IAutoSync
         AutoSyncRegistry.AddTargetMethod(typeof(Town), AccessTools.Method(typeof(BuildingHelper), nameof(BuildingHelper.ChangeCurrentBuildingQueue)));
         AutoSyncRegistry.AddTargetMethod(typeof(Town), AccessTools.Method(typeof(BuildingHelper), nameof(BuildingHelper.CheckIfBuildingIsComplete)));
         AutoSyncRegistry.AddTargetMethod(typeof(Town), AccessTools.Method(typeof(BuildingHelper), nameof(BuildingHelper.BoostBuildingProcessWithGold)));
+        AutoSyncRegistry.AddTargetMethod(typeof(Town), AccessTools.Method(typeof(BuildingHelperHandler), nameof(BuildingHelperHandler.ApplyBoostBuildingProcessWithGold)));
         AutoSyncRegistry.AddTargetMethod(typeof(Town), AccessTools.Method(typeof(ClanVariablesCampaignBehavior), nameof(ClanVariablesCampaignBehavior.UpdateClanSettlementAutoRecruitment)));
         AutoSyncRegistry.AddTargetMethod(typeof(Town), AccessTools.Method(typeof(BuildingsCampaignBehavior), nameof(BuildingsCampaignBehavior.DecideBuildingQueue)));
         AutoSyncRegistry.AddTargetMethod(typeof(Town), AccessTools.Method(typeof(BuildingsCampaignBehavior), nameof(BuildingsCampaignBehavior.TickCurrentBuildingForTown)));

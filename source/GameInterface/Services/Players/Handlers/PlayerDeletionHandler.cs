@@ -3,10 +3,12 @@ using Common.Logging;
 using Common.Messaging;
 using Common.Network;
 using Common.Util;
+using GameInterface.CoopSessionData;
 using GameInterface.Services.Actions.Patches;
 using GameInterface.Services.Heroes.HeirSelection.Interfaces;
 using GameInterface.Services.MapEvents.Messages.Leave;
 using GameInterface.Services.ObjectManager;
+using GameInterface.Services.Players.Data;
 using GameInterface.Services.Players.Messages;
 using GameInterface.Services.SiegeEvents.Interfaces;
 using LiteNetLib;
@@ -33,6 +35,7 @@ internal class PlayerDeletionHandler : IHandler
     private readonly IObjectManager objectManager;
     private readonly IPlayerManager playerManager;
     private readonly ISiegeEventInterface siegeEventInterface;
+    private readonly ICoopSessionProvider sessionProvider;
     private readonly IApplyHeirSelectionActionInterface applyHeirSelectionActionInterface;
 
     public PlayerDeletionHandler(
@@ -41,6 +44,7 @@ internal class PlayerDeletionHandler : IHandler
         IObjectManager objectManager,
         IPlayerManager playerManager,
         ISiegeEventInterface siegeEventInterface,
+        ICoopSessionProvider sessionProvider,
         IApplyHeirSelectionActionInterface applyHeirSelectionActionInterface)
     {
         this.messageBroker = messageBroker;
@@ -48,6 +52,7 @@ internal class PlayerDeletionHandler : IHandler
         this.objectManager = objectManager;
         this.playerManager = playerManager;
         this.siegeEventInterface = siegeEventInterface;
+        this.sessionProvider = sessionProvider;
         this.applyHeirSelectionActionInterface = applyHeirSelectionActionInterface;
 
         messageBroker.Subscribe<PlayerDeleteRequested>(Handle_PlayerDeleteRequested);
@@ -204,6 +209,13 @@ internal class PlayerDeletionHandler : IHandler
                 requestedHeroId, player.HeroId);
         }
 
+        DeletePlayer(player, peer, keepConnected);
+    }
+
+    internal void CompleteGameOver(Player player) => DeletePlayer(player, null, keepConnected: true);
+
+    private void DeletePlayer(Player player, NetPeer peer, bool keepConnected)
+    {
         // Either may be gone already (e.g. the hero died earlier); the deletion still removes the
         // registration and whatever objects remain.
         objectManager.TryGetObject<Hero>(player.HeroId, out var hero);
@@ -214,14 +226,14 @@ internal class PlayerDeletionHandler : IHandler
         {
             network.Send(peer, new NetworkDeletePlayerDenied(
                 "Cannot delete a player whose party is in a battle or siege; leave it first " +
-                "(coop.debug.mobileparty.unstuck can force the exit)."));
+                "(coop.unstuck can force the exit)."));
             return;
         }
 
-        Logger.Information("Deleting player {ControllerId} (hero {HeroId}) at its own request",
+        Logger.Information("Deleting player {ControllerId} (hero {HeroId})",
             player.ControllerId, player.HeroId);
 
-        messageBroker.Publish(this, new PlayerDeletionStarted(peer));
+        if (peer != null) messageBroker.Publish(this, new PlayerDeletionStarted(peer));
 
         if (hasDied && party != null)
         {
@@ -242,16 +254,19 @@ internal class PlayerDeletionHandler : IHandler
         }
 
         playerManager.RemovePlayer(player);
+        sessionProvider.CoopSession.AgingPlayerData.PlayerSuccessions.Remove(player.HeroId);
 
-        network.SendAllBut(peer, new NetworkPlayerRemoved(player.ControllerId, player.HeroId));
+        var removed = new NetworkPlayerRemoved(player.ControllerId, player.HeroId);
+        if (peer == null) network.SendAll(removed);
+        else network.SendAllBut(peer, removed);
 
-        // Only the no-heir game-over request keeps its peer connected for the statistics screen
+        // Game-over cleanup also runs for offline players whose succession has ended.
         if (keepConnected && hasDied && hero?.Clan != null)
         {
             TryStep("player game over clan cleanup", () => CleanupPlayerClanAfterGameOver(hero));
         }
 
-        if (!keepConnected) peer.Disconnect();
+        if (!keepConnected) peer?.Disconnect();
 
         // Keep patches live and preserve the real death cause and killer.
         if (hero != null && hero.IsAlive)
@@ -278,22 +293,26 @@ internal class PlayerDeletionHandler : IHandler
         }
     }
 
-    private static void CleanupPlayerClanAfterGameOver(Hero playerHero)
+    private void CleanupPlayerClanAfterGameOver(Hero playerHero)
     {
         Clan playerClan = playerHero.Clan;
 
-        // Player registration has already been removed, so apply the same ruler succession used
-        // when an AI kingdom leader dies before considering whether the clan itself should end
-        if (playerClan.Leader == playerHero)
-        {
-            KillCharacterActionPatches.HandleKingdomLeaderDeath(playerHero);
-        }
+        // Surviving players and unresolved successions keep the coop clan alive.
+        if (playerClan.Heroes.Any(hero => playerManager.Contains(hero))) return;
+        if (playerClan.IsEliminated || playerClan.IsBanditFaction) return;
 
-        if (playerClan.IsEliminated ||
-            playerClan.IsBanditFaction ||
-            playerClan.GetHeirApparents().Count > 0) return;
+        var previousLeader = playerClan.Leader;
+        bool hasHeirs = playerClan.GetHeirApparents().Count > 0;
+        if (hasHeirs && previousLeader?.IsDead == true)
+            ChangeClanLeaderAction.ApplyWithoutSelectedNewLeader(playerClan);
 
-        if (playerClan.Leader == playerHero)
+        // The last game-over request may belong to a member rather than the deceased leader.
+        if (previousLeader?.IsDead == true)
+            KillCharacterActionPatches.HandleKingdomLeaderDeath(previousLeader);
+
+        if (hasHeirs) return;
+
+        if (playerClan.Leader?.IsDead == true)
         {
             DestroyClanAction.ApplyByClanLeaderDeath(playerClan);
         }

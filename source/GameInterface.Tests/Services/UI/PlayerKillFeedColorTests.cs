@@ -1,4 +1,5 @@
-﻿using Common;
+﻿using GameInterface.Services.UI.CoopOptions.Providers.UITab;
+using Common;
 using Common.Messaging;
 using Common.Network;
 using GameInterface.Services.Entity;
@@ -102,18 +103,18 @@ public class PlayerKillFeedColorTests
     }
 
     [Fact]
-    public void CoopOptionsVM_DefaultTabs_SelectsKillFeedColor()
+    public void CoopOptionsVM_DefaultTabs_SelectsUI()
     {
         var filePath = CreateTempFilePath();
         var viewModel = CoopOptionsVMTestFactory.Create(new CoopOptionsStore(filePath), new MessageBroker());
 
         var tab = viewModel.Tabs[0];
-        Assert.Equal(KillFeedOptionsTabProvider.TabName, tab.Name);
-        Assert.Equal(KillFeedOptionsTabProvider.TabId, tab.Id);
+        Assert.Equal("UI", tab.Name);
+        Assert.Equal(UIOptionsTabProvider.TabId, tab.Id);
         Assert.Same(tab, viewModel.SelectedTab);
         Assert.True(tab.IsSelected);
         Assert.True(viewModel.IsApplyButtonVisible);
-        var section = Assert.IsType<KillFeedSection>(Assert.Single(tab.Sections));
+        var section = Assert.IsType<UISection>(Assert.Single(tab.Sections)).KillFeed;
         Assert.Equal(KillFeedSection.SectionId, section.Id);
     }
 
@@ -229,8 +230,8 @@ public class PlayerKillFeedColorTests
     {
         // Change 07-AUG-26 - Stops existing kill feed tests assuming there is only one tab
         var tab = viewModel.Tabs[0];
-        Assert.Equal(KillFeedOptionsTabProvider.TabId, tab.Id);
-        return Assert.IsType<KillFeedSection>(Assert.Single(tab.Sections));
+        Assert.Equal(UIOptionsTabProvider.TabId, tab.Id);
+        return Assert.IsType<UISection>(Assert.Single(tab.Sections)).KillFeed;
     }
 
     private static CoopOptionsData CreateOptions(PlayerKillFeedColor color)

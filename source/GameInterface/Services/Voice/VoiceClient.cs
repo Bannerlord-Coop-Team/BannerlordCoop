@@ -16,6 +16,7 @@ public interface IVoiceClient : IDisposable
     void Configure(VoiceRanges ranges, long sentAt);
     void SetServerEnabled(bool enabled);
     IReadOnlyList<string> AudibleSpeakers { get; }
+    bool IsTransmitting { get; }
     void Receive(VoicePacket packet);
     void Apply(VoiceSettings settings);
     VoiceSettings Settings { get; }
@@ -28,6 +29,7 @@ public interface IVoiceClient : IDisposable
     void SetKeybindCapture(bool active);
 }
 
+/// <summary>Coordinates voice capture, playback and session eligibility on the client.</summary>
 public sealed partial class VoiceClient : IVoiceClient
 {
     private static readonly ILogger Logger = LogManager.GetLogger<VoiceClient>();
@@ -42,6 +44,8 @@ public sealed partial class VoiceClient : IVoiceClient
     private VoiceRanges ranges;
     private long epoch;
     private long lastHeartbeat;
+    private long? lastLocalSpeechAt;
+    private long lastLocalSpeechEpoch;
     private long testUntil;
     private uint audioSequence;
     private uint stateSequence;
@@ -72,6 +76,20 @@ public sealed partial class VoiceClient : IVoiceClient
     {
         get { lock (gate) return !disposed && serverEnabled && settings.ShowTalkingPlayers && settings.Enabled && !settings.Deafened
             ? audio.AudibleSpeakers : Array.Empty<string>(); }
+    }
+
+    // Reports recent transmitted speech for the local campaign-party indicator, not microphone testing.
+    public bool IsTransmitting
+    {
+        get
+        {
+            lock (gate) return !disposed && serverEnabled && error == null && settings.ShowTalkingPlayers &&
+                settings.Enabled && !settings.Muted && !settings.Deafened && !keybindCapture && !keybindCaptureEnding &&
+                clock.Milliseconds >= testUntil && snapshot != null && snapshot.Position.CanSpeak &&
+                snapshot.Focused && !snapshot.Typing && clock.Milliseconds - snapshot.SampledAt <= 100 &&
+                lastLocalSpeechAt.HasValue && lastLocalSpeechEpoch == snapshot.Position.Epoch &&
+                clock.Milliseconds - lastLocalSpeechAt.Value <= 200;
+        }
     }
 
     public void SetServerEnabled(bool enabled)
@@ -263,6 +281,7 @@ public sealed partial class VoiceClient : IVoiceClient
         }
     }
 
+    // Sends eligible captured frames and records recent local speech for the party marker.
     private void SendAudio(VoiceInputSnapshot captured, byte[] data)
     {
         lock (gate)
@@ -274,6 +293,11 @@ public sealed partial class VoiceClient : IVoiceClient
                 clock.Milliseconds - snapshot.SampledAt > 100 ||
                 (settings.GetActivation() == VoiceActivation.PushToTalk && !snapshot.PushToTalk)) return;
             SendVoicePacket(data);
+            if (audio.InputLevel >= 0.003f)
+            {
+                lastLocalSpeechAt = clock.Milliseconds;
+                lastLocalSpeechEpoch = snapshot.Position.Epoch;
+            }
         }
     }
 

@@ -39,6 +39,20 @@ public class CallOriginalPolicy
         return false;
     }
 
+    public static bool IsOriginalAllowedForOwnershipGate()
+    {
+        if (AreOriginalsAllowedOnAllThreads ||
+            AreOriginalsAllowedForCurrentOperation) return true;
+
+        if (ContainerProvider.TryResolve<ISyncPolicy>(out var syncPolicy) == false)
+        {
+            Logger.Error("Unable to resolve {name}", nameof(ISyncPolicy));
+            return true;
+        }
+
+        return syncPolicy.AllowOriginal();
+    }
+
     /// <summary>
     /// Allows original calls on every thread for the returned scope's lifetime. Use only around
     /// operations, such as the native save loader, that synchronously dispatch patched work to

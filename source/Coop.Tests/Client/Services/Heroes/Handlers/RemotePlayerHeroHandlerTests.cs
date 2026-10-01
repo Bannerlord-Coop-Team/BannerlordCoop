@@ -1,6 +1,7 @@
 ﻿using Common.Tests.Utils;
 using Coop.Core.Client.Services.Heroes.Handlers;
 using Coop.Core.Client.Services.Heroes.Messages;
+using GameInterface.Services.Heroes.Data;
 using GameInterface.Services.Heroes.Interfaces;
 using GameInterface.Services.Players;
 using GameInterface.Services.Players.Data;
@@ -44,17 +45,21 @@ public class RemotePlayerHeroHandlerTests
             Times.Once);
     }
 
-    private static NetworkNewPlayerHeroCreated NewHeroMessage(out Player player, out byte[] heroData)
+    private static NetworkNewPlayerHeroCreated NewHeroMessage(
+        out Player player,
+        out byte[] heroData,
+        out PlayerRegistrationHandles handles)
     {
         player = new Player("ctrl", "hero1", "party1", "clan1", "char1");
         heroData = new byte[] { 1, 2, 3 };
-        return new NetworkNewPlayerHeroCreated("ctrl", player, heroData);
+        handles = new PlayerRegistrationHandles(1, 2, 3, 4, 5, 6, 7, 8, 9);
+        return new NetworkNewPlayerHeroCreated("ctrl", player, heroData, handles);
     }
 
     [Fact]
     public void NewPlayerHeroCreated_RegistersAndUnpacksImmediately()
     {
-        var message = NewHeroMessage(out var player, out var heroData);
+        var message = NewHeroMessage(out var player, out var heroData, out var handles);
         playerManager.Setup(x => x.AddPlayer(player)).Returns(true);
 
         // No campaign-ready gate any more: the server queue already withheld this until the client is
@@ -62,7 +67,7 @@ public class RemotePlayerHeroHandlerTests
         messageBroker.Publish(this, message);
 
         playerManager.Verify(x => x.AddPlayer(player), Times.Once);
-        heroInterface.Verify(x => x.ClientUnpackHero(heroData, player), Times.Once);
+        heroInterface.Verify(x => x.ClientUnpackHero(heroData, player, handles), Times.Once);
     }
 
     [Fact]
@@ -76,13 +81,16 @@ public class RemotePlayerHeroHandlerTests
         messageBroker.Publish(this, new NetworkNewPlayerHeroCreated("ctrl", player, System.Array.Empty<byte>()));
 
         playerManager.Verify(x => x.AddPlayer(player), Times.Once);
-        heroInterface.Verify(x => x.ClientUnpackHero(It.IsAny<byte[]>(), It.IsAny<Player>()), Times.Never);
+        heroInterface.Verify(x => x.ClientUnpackHero(
+            It.IsAny<byte[]>(),
+            It.IsAny<Player>(),
+            It.IsAny<PlayerRegistrationHandles>()), Times.Never);
     }
 
     [Fact]
     public void DuplicatePlayer_DoesNotUnpack()
     {
-        var message = NewHeroMessage(out var player, out _);
+        var message = NewHeroMessage(out var player, out _, out _);
         // Already-known player: TryGetPlayer reports it, so the handler must bail before unpacking.
         playerManager
             .Setup(x => x.TryGetPlayer(player.ControllerId, out It.Ref<Player>.IsAny))
@@ -91,7 +99,10 @@ public class RemotePlayerHeroHandlerTests
         messageBroker.Publish(this, message);
 
         // A duplicate registration is logged and skipped — never unpacked or re-registered.
-        heroInterface.Verify(x => x.ClientUnpackHero(It.IsAny<byte[]>(), It.IsAny<Player>()), Times.Never);
+        heroInterface.Verify(x => x.ClientUnpackHero(
+            It.IsAny<byte[]>(),
+            It.IsAny<Player>(),
+            It.IsAny<PlayerRegistrationHandles>()), Times.Never);
         playerManager.Verify(x => x.AddPlayer(It.IsAny<Player>()), Times.Never);
     }
 

@@ -75,6 +75,17 @@ public class CreateCharacterState : ConnectionStateBase
             return;
         }
 
+        if (!heroInterface.TryGetRegistrationHandles(hero, out var registrationHandles))
+        {
+            Logger.Error("Failed to capture player graph handles; disconnecting the joining peer");
+            GameThread.RunCleanupSafe(() =>
+            {
+                var registrationIds = playerCreationRollback.CaptureRegistrationIds(player);
+                playerCreationRollback.Rollback(player, registrationIds);
+            }, then: () => ConnectionLogic.Peer.Disconnect(), context: "CreateCharacterState.PlayerCreationRollback");
+            return;
+        }
+
         if (!playerManager.AddPlayer(player))
         {
             // The controller already holds a registration — two joins for it raced into character
@@ -92,7 +103,7 @@ public class CreateCharacterState : ConnectionStateBase
         // First join: associate this peer with the player it just created.
         playerManager.SetPeer(controllerId, netPeer);
         // Send created to all other clients
-        var message = new NetworkNewPlayerHeroCreated(controllerId, player, data);
+        var message = new NetworkNewPlayerHeroCreated(controllerId, player, data, registrationHandles);
         network.SendAllBut(netPeer, message);
 
         // Run authoritative setup only after existing clients can create the referenced hero graph. Follow-up
@@ -109,19 +120,20 @@ public class CreateCharacterState : ConnectionStateBase
                 controllerId);
 
             var registrationIds = System.Array.Empty<string>();
-            GameThread.RunSafe(() =>
+            GameThread.RunCleanupSafe(() =>
             {
                 if (!playerManager.RemovePlayer(player))
                     Logger.Error("Failed to roll back player registration for {ControllerId}", controllerId);
 
                 registrationIds = playerCreationRollback.CaptureRegistrationIds(player);
                 playerCreationRollback.Rollback(player, registrationIds);
-            }, blocking: true, context: "CreateCharacterState.PlayerCreationRollback");
-
-            // Existing clients created this graph before setup ran. This final ordered message removes their
-            // player registration and every imported graph object after any setup-side cleanup broadcasts.
-            network.SendAllBut(netPeer, new NetworkPlayerCreationRolledBack(player, registrationIds));
-            ConnectionLogic.Peer.Disconnect();
+            }, then: () =>
+            {
+                // Existing clients created this graph before setup ran. This final ordered message removes their
+                // player registration and every imported graph object after any setup-side cleanup broadcasts.
+                network.SendAllBut(netPeer, new NetworkPlayerCreationRolledBack(player, registrationIds));
+                ConnectionLogic.Peer.Disconnect();
+            }, context: "CreateCharacterState.PlayerCreationRollback");
             return;
         }
 

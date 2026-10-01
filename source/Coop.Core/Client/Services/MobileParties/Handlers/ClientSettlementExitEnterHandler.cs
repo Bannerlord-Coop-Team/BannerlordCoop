@@ -8,10 +8,13 @@ using GameInterface.Services.MapEvents;
 using GameInterface.Services.MobileParties.Messages.Behavior;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Settlements.Interfaces;
+using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Encounters;
 using TaleWorlds.CampaignSystem.GameMenus;
+using TaleWorlds.CampaignSystem.GameState;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Settlements;
+using TaleWorlds.Core;
 
 namespace Coop.Core.Client.Services.MobileParties.Handlers;
 
@@ -24,20 +27,23 @@ public class ClientSettlementExitEnterHandler : IHandler
     private readonly INetwork network;
     private readonly IObjectManager objectManager;
     private readonly ISettlementInterface settlementInterface;
+    private readonly IHideoutResultEncounter hideoutResultEncounter;
     // Local attempts and all response transitions run on the game thread.
     private PendingStart pendingStart;
-    private string pendingLeavePartyId;
+    private uint pendingLeavePartyId;
 
     public ClientSettlementExitEnterHandler(
         IMessageBroker messageBroker,
         INetwork network,
         IObjectManager objectManager,
-        ISettlementInterface settlementInterface)
+        ISettlementInterface settlementInterface,
+        IHideoutResultEncounter hideoutResultEncounter)
     {
         this.messageBroker = messageBroker;
         this.network = network;
         this.objectManager = objectManager;
         this.settlementInterface = settlementInterface;
+        this.hideoutResultEncounter = hideoutResultEncounter;
         messageBroker.Subscribe<StartSettlementEncounterAttempted>(Handle);
         messageBroker.Subscribe<EndSettlementEncounterAttempted>(Handle);
         messageBroker.Subscribe<NetworkSettlementEncounterLeaveResult>(Handle);
@@ -64,8 +70,8 @@ public class ClientSettlementExitEnterHandler : IHandler
     {
         var payload = obj.What;
 
-        if (!objectManager.TryGetIdWithLogging(payload.Party, out var partyId)) return;
-        if (!objectManager.TryGetIdWithLogging(payload.Settlement, out var settlementId)) return;
+        if (!objectManager.TryGetHandleWithLogging(payload.Party, out var partyId)) return;
+        if (!objectManager.TryGetHandleWithLogging(payload.Settlement, out var settlementId)) return;
 
         if (pendingStart != null)
             return;
@@ -73,7 +79,7 @@ public class ClientSettlementExitEnterHandler : IHandler
         var request = new NetworkRequestStartSettlementEncounter(partyId, settlementId);
         pendingStart = new PendingStart(
             request,
-            pendingLeavePartyId == null ? PendingStartState.Sent : PendingStartState.Queued);
+            pendingLeavePartyId == 0 ? PendingStartState.Sent : PendingStartState.Queued);
 
         if (pendingStart.State == PendingStartState.Sent)
             network.SendAll(request);
@@ -83,9 +89,9 @@ public class ClientSettlementExitEnterHandler : IHandler
     {
         var payload = obj.What;
 
-        if (!objectManager.TryGetIdWithLogging(payload.Party, out var partyId)) return;
+        if (!objectManager.TryGetHandleWithLogging(payload.Party, out var partyId)) return;
 
-        if (pendingLeavePartyId != null)
+        if (pendingLeavePartyId != 0)
             return;
 
         pendingLeavePartyId = partyId;
@@ -101,20 +107,20 @@ public class ClientSettlementExitEnterHandler : IHandler
         GameThread.RunSafe(() => HandleStartApproved(payload.PartyId, payload.SettlementId));
     }
 
-    private void HandleStartApproved(string partyId, string settlementId)
+    private void HandleStartApproved(uint partyId, uint settlementId)
     {
         if (!IsPendingStart(partyId, settlementId, PendingStartState.Sent))
             return;
 
         pendingStart.State = PendingStartState.Approved;
-        if (pendingLeavePartyId != null)
+        if (pendingLeavePartyId != 0)
             return;
 
         pendingStart = null;
         ApplySettlementEncounter(partyId, settlementId);
     }
 
-    private void ApplySettlementEncounter(string partyId, string settlementId)
+    private void ApplySettlementEncounter(uint partyId, uint settlementId)
     {
         if (!objectManager.TryGetObjectWithLogging(partyId, out MobileParty party)) return;
         if (!objectManager.TryGetObjectWithLogging(settlementId, out Settlement settlement)) return;
@@ -140,7 +146,7 @@ public class ClientSettlementExitEnterHandler : IHandler
         });
     }
 
-    private bool IsPendingStart(string partyId, string settlementId, PendingStartState state) =>
+    private bool IsPendingStart(uint partyId, uint settlementId, PendingStartState state) =>
         pendingStart != null &&
         pendingStart.State == state &&
         pendingStart.Request.PartyId == partyId &&
@@ -171,12 +177,12 @@ public class ClientSettlementExitEnterHandler : IHandler
         HandleAppliedLeave(result.PartyId);
     }
 
-    private void HandleSuppressedLeave(string partyId)
+    private void HandleSuppressedLeave(uint partyId)
     {
         if (pendingLeavePartyId != partyId)
             return;
 
-        pendingLeavePartyId = null;
+        pendingLeavePartyId = 0;
         if (pendingStart == null || pendingStart.State == PendingStartState.Sent)
             return;
 
@@ -192,15 +198,15 @@ public class ClientSettlementExitEnterHandler : IHandler
         ApplySettlementEncounter(start.Request.PartyId, start.Request.SettlementId);
     }
 
-    private void HandleAppliedLeave(string partyId)
+    private void HandleAppliedLeave(uint partyId)
     {
-        bool resolvesPendingLeave = pendingLeavePartyId != null;
+        bool resolvesPendingLeave = pendingLeavePartyId != 0;
         if (resolvesPendingLeave)
         {
-            if (!string.IsNullOrEmpty(partyId) && pendingLeavePartyId != partyId)
+            if (partyId != 0 && pendingLeavePartyId != partyId)
                 return;
 
-            pendingLeavePartyId = null;
+            pendingLeavePartyId = 0;
             pendingStart = null;
         }
 
@@ -216,11 +222,11 @@ public class ClientSettlementExitEnterHandler : IHandler
         }
     }
 
-    private bool IsMainParty(string partyId)
+    private bool IsMainParty(uint partyId)
     {
         var mainParty = MobileParty.MainParty;
-        objectManager.TryGetId(mainParty, out var mainPartyId);
-        return string.IsNullOrEmpty(partyId) || partyId == mainPartyId;
+        objectManager.TryGetHandle(mainParty, out var mainPartyId);
+        return partyId == 0 || partyId == mainPartyId;
     }
 
     private void Handle(MessagePayload<NetworkPartyEnterSettlement> obj)
@@ -252,6 +258,10 @@ public class ClientSettlementExitEnterHandler : IHandler
                 settlementInterface.PartyLeaveSettlement(party);
             }
 
+            // Staged hideout loot lives on the encounter, so closing it here would discard the loot.
+            if (hideoutResultEncounter.TryKeepThroughLeave(party))
+                return;
+
             CloseStaleMainPartyEncounter(payload.PartyId);
         });
     }
@@ -259,12 +269,28 @@ public class ClientSettlementExitEnterHandler : IHandler
     // A server-driven leave (unstuck, debug teleport) carries no leave reply, so the
     // client-requested path that closes the menu never runs. Without this the town menu
     // stays open on the old settlement and the next enter cannot open its own menu.
-    private void CloseStaleMainPartyEncounter(string partyId)
+    private void CloseStaleMainPartyEncounter(uint partyId)
     {
         if (!IsMainParty(partyId))
             return;
 
-        if (PlayerEncounter.Current == null || PlayerEncounter.EncounterSettlement == null)
+        if (PlayerEncounter.Current == null)
+        {
+            var party = MobileParty.MainParty;
+            var menu = Campaign.Current.CurrentMenuContext?.GameMenu?.StringId;
+            if (party != null && party.CurrentSettlement == null && party.Party.MapEventSide == null &&
+                party.BesiegerCamp == null && party.SiegeEvent == null &&
+                Game.Current.GameStateManager.ActiveState is MapState &&
+                (menu == "town_outside" || menu == "castle_outside" ||
+                 menu == "siege_attacker_left" || menu == "siege_attacker_defeated"))
+            {
+                // Close settlement-only menus after the replicated leave.
+                using (new AllowedThread()) GameMenu.ExitToLast();
+            }
+            return;
+        }
+
+        if (PlayerEncounter.EncounterSettlement == null)
             return;
 
         using (new AllowedThread())

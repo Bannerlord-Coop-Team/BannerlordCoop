@@ -13,10 +13,10 @@ internal readonly struct NetworkTroopRosterElementBatch : ICommand, IJoinCatchUp
 {
     private const int MaxJoinCatchUpOperations = 32;
     [ProtoMember(1)]
-    public readonly string RosterId;
+    public readonly uint RosterId;
 
     [ProtoMember(2)]
-    public readonly string CharacterId;
+    public readonly uint CharacterId;
 
     [ProtoMember(3)]
     public readonly TroopRosterElementOperation[] Operations;
@@ -41,7 +41,7 @@ internal readonly struct NetworkTroopRosterElementBatch : ICommand, IJoinCatchUp
         return true;
     }
 
-    public NetworkTroopRosterElementBatch(string rosterId, string characterId,
+    public NetworkTroopRosterElementBatch(uint rosterId, uint characterId,
         TroopRosterElementOperation[] operations)
     {
         RosterId = rosterId;

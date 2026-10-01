@@ -44,11 +44,12 @@ internal class MobilePartyAiLifetimeHandler : IHandler
     {
         // Save loading constructs AI attachments before InitialServerState registers campaign objects.
         // MobilePartyAiRegistry registers those existing attachments after loading.
-        if (!objectManager.TryGetId(payload.What.Party, out var partyId)) return;
+        if (!objectManager.TryGetHandle(payload.What.Party, out var partyHandle)) return;
 
         if (!objectManager.AddNewObject(payload.What.Instance, out var partyAiId)) return;
+        if (!objectManager.TryGetHandleWithLogging(payload.What.Instance, out var partyAiHandle)) return;
 
-        network.SendAll(new NetworkCreateMobilePartyAi(partyAiId, partyId));
+        network.SendAll(new NetworkCreateMobilePartyAi(partyAiId, partyAiHandle, partyHandle));
     }
 
 
@@ -64,7 +65,7 @@ internal class MobilePartyAiLifetimeHandler : IHandler
             var newAi = ObjectHelper.SkipConstructor<MobilePartyAi>();
             AccessTools.Field(typeof(MobilePartyAi), nameof(MobilePartyAi._mobileParty)).SetValue(newAi, party);
 
-            objectManager.AddExisting(aiId, newAi);
+            objectManager.AddExisting(aiId, newAi, payload.What.MobilePartyAiHandle);
         }, context: nameof(Handle_NetworkCreateMobilePartyAi));
     }
 
@@ -72,7 +73,7 @@ internal class MobilePartyAiLifetimeHandler : IHandler
     {
         var ai = payload.What.Instance;
 
-        if (objectManager.TryGetId(ai, out var aiId) == false) return;
+        if (objectManager.TryGetHandle(ai, out var aiId) == false) return;
 
         network.SendAll(new NetworkDestroyMobilePartyAi(aiId));
     }

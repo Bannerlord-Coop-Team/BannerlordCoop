@@ -1,5 +1,4 @@
-﻿using GameInterface.Services.UI.CoopOptions.Providers.VoiceTab.Sections;
-using GameInterface.Services.Voice;
+﻿using GameInterface.Services.Voice;
 using System;
 using System.Collections.Generic;
 using TaleWorlds.InputSystem;
@@ -7,6 +6,12 @@ using TaleWorlds.MountAndBlade.ViewModelCollection.GameOptions;
 using TaleWorlds.ScreenSystem;
 
 namespace GameInterface.Services.UI.CoopOptions;
+
+// Supplies a key editor to the shared options capture popup.
+public interface ICoopKeybindingSection
+{
+    event Action<KeyOptionVM> KeybindRequested;
+}
 
 public interface ICoopOptionsKeybinding : IDisposable
 {
@@ -20,7 +25,7 @@ public sealed class CoopOptionsKeybinding : ICoopOptionsKeybinding
     private readonly ICoopKeybindingPopupFactory factory;
     private readonly IVoiceClient voice;
     private readonly IVoiceWindowFocus window;
-    private readonly List<VoiceSection> sections = new();
+    private readonly List<ICoopKeybindingSection> sections = new();
     private ICoopKeybindingPopup popup;
     private KeyOptionVM current;
     private Action restoreFocus;
@@ -39,10 +44,10 @@ public sealed class CoopOptionsKeybinding : ICoopOptionsKeybinding
         popup = factory.Create(SetKey, owner);
         foreach (var tab in options.Tabs)
             foreach (var section in tab.Sections)
-                if (section is VoiceSection voiceSection)
+                if (section is ICoopKeybindingSection keybindingSection)
                 {
-                    sections.Add(voiceSection);
-                    voiceSection.KeybindRequested += Request;
+                    sections.Add(keybindingSection);
+                    keybindingSection.KeybindRequested += Request;
                 }
     }
 
@@ -58,7 +63,7 @@ public sealed class CoopOptionsKeybinding : ICoopOptionsKeybinding
 
     private void SetKey(Key key)
     {
-        if (new VoiceSettings().IsSupportedPushToTalkKey(key.InputKey)) current?.Set(key.InputKey);
+        current?.Set(key.InputKey);
         EndCapture();
     }
 

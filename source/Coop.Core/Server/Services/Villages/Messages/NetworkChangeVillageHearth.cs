@@ -10,11 +10,11 @@ namespace Coop.Core.Server.Services.Villages.Messages;
 public record NetworkChangeVillageHearth : IEvent
 {
     [ProtoMember(1)]
-    public string VillageId { get; }
+    public uint VillageId { get; }
     [ProtoMember(2)]
     public float Hearth { get; }
 
-    public NetworkChangeVillageHearth(string villageId, float hearth)
+    public NetworkChangeVillageHearth(uint villageId, float hearth)
     {
         VillageId = villageId;
         Hearth = hearth;

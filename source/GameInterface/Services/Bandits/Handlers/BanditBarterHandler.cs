@@ -1,4 +1,4 @@
-using Common;
+﻿using Common;
 using Common.Logging;
 using Common.Messaging;
 using Common.Network;
@@ -488,7 +488,7 @@ internal sealed class BanditBarterHandler : IHandler
 
     private void FlushHeroGold(Hero hero)
     {
-        if (sendCoalescer == null || !objectManager.TryGetId(hero, out var heroId)) return;
+        if (sendCoalescer == null || !objectManager.TryGetHandle(hero, out var heroId)) return;
 
         sendCoalescer.FlushInstance(heroId, network);
     }

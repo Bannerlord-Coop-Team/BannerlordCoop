@@ -1,4 +1,5 @@
-using Common.Messaging;
+﻿using Common.Messaging;
+using GameInterface.Services.Clans.Data;
 using GameInterface.Services.Inventory.Data;
 using GameInterface.Services.MapEvents.PlayerPartyInteractions;
 using ProtoBuf;
@@ -42,6 +43,8 @@ internal readonly struct NetworkPlayerPartyInteractionState : ICommand
     public readonly PlayerPartyInteractionMercenaryUnavailableReason MercenaryUnavailableReason;
     [ProtoMember(17)]
     public readonly int MercenaryAwardMultiplier;
+    [ProtoMember(18)]
+    public readonly ClanJoinUnavailableReason ClanJoinUnavailableReason;
 
     public NetworkPlayerPartyInteractionState(
         string sessionId,
@@ -60,7 +63,8 @@ internal readonly struct NetworkPlayerPartyInteractionState : ICommand
         PlayerPartyInteractionOption[] enabledOptions = null,
         bool isHostile = false,
         PlayerPartyInteractionVassalUnavailableReason vassalUnavailableReason = PlayerPartyInteractionVassalUnavailableReason.None,
-        PlayerPartyInteractionMercenaryUnavailableReason mercenaryUnavailableReason = PlayerPartyInteractionMercenaryUnavailableReason.None)
+        PlayerPartyInteractionMercenaryUnavailableReason mercenaryUnavailableReason = PlayerPartyInteractionMercenaryUnavailableReason.None,
+        ClanJoinUnavailableReason clanJoinUnavailableReason = ClanJoinUnavailableReason.None)
     {
         SessionId = sessionId;
         PartyId = partyId;
@@ -79,5 +83,6 @@ internal readonly struct NetworkPlayerPartyInteractionState : ICommand
         VassalUnavailableReason = vassalUnavailableReason;
         MercenaryUnavailableReason = mercenaryUnavailableReason;
         MercenaryAwardMultiplier = mercenaryAwardMultiplier;
+        ClanJoinUnavailableReason = clanJoinUnavailableReason;
     }
 }

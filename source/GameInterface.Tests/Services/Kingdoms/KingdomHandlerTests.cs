@@ -15,6 +15,7 @@ using Moq;
 using System;
 using System.Collections.Generic;
 using System.Reflection;
+using System.Runtime.CompilerServices;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Election;
 using TaleWorlds.CampaignSystem.Party;
@@ -345,7 +346,7 @@ public class KingdomHandlerTests
     }
 
     [Fact]
-    public void NetworkGiftSettlementOwnership_MissingSenderClan_IsIgnored()
+    public void NetworkGiftSettlementOwnership_SenderHeroHasNoClan_IsIgnored()
     {
         var peer = ObjectHelper.SkipConstructor<NetPeer>();
         var player = ObjectHelper.SkipConstructor<Player>();
@@ -353,13 +354,14 @@ public class KingdomHandlerTests
         SetField(player, "HeroId", "sender-hero-id");
         var settlement = ObjectHelper.SkipConstructor<Settlement>();
         var receiverClan = ObjectHelper.SkipConstructor<Clan>();
+        var senderHero = ObjectHelper.SkipConstructor<Hero>();
 
         var objectManager = new Mock<IObjectManager>();
         var playerManager = new Mock<IPlayerManager>();
         playerManager
             .Setup(manager => manager.TryGetPlayer(peer, out player))
             .Returns(true);
-        SetupGiftObjects(objectManager, settlement, receiverClan, null!, null!);
+        SetupGiftObjects(objectManager, settlement, receiverClan, null!, senderHero);
 
         var handler = CreateNetworkGiftSettlementOwnershipHandler(objectManager.Object, playerManager.Object);
         RunWithBoundGameThread(() =>
@@ -371,7 +373,7 @@ public class KingdomHandlerTests
 
             Clan retrievedReceiverClan = null!;
             Settlement retrievedSettlement = null!;
-            Clan missingSenderClan = null!;
+            Hero retrievedSenderHero = null!;
             objectManager.Verify(
                 manager => manager.TryGetObjectWithLogging("settlement-id", out retrievedSettlement),
                 Times.Once);
@@ -379,7 +381,7 @@ public class KingdomHandlerTests
                 manager => manager.TryGetObjectWithLogging("receiver-clan-id", out retrievedReceiverClan),
                 Times.Once);
             objectManager.Verify(
-                manager => manager.TryGetObjectWithLogging("sender-clan-id", out missingSenderClan),
+                manager => manager.TryGetObjectWithLogging("sender-hero-id", out retrievedSenderHero),
                 Times.Once);
             objectManager.VerifyNoOtherCalls();
         });
@@ -413,16 +415,12 @@ public class KingdomHandlerTests
 
             Clan retrievedReceiverClan = null!;
             Settlement retrievedSettlement = null!;
-            Clan missingSenderClan = null!;
             Hero retrievedSenderHero = null!;
             objectManager.Verify(
                 manager => manager.TryGetObjectWithLogging("settlement-id", out retrievedSettlement),
                 Times.Once);
             objectManager.Verify(
                 manager => manager.TryGetObjectWithLogging("receiver-clan-id", out retrievedReceiverClan),
-                Times.Once);
-            objectManager.Verify(
-                manager => manager.TryGetObjectWithLogging("sender-clan-id", out missingSenderClan),
                 Times.Once);
             objectManager.Verify(
                 manager => manager.TryGetObjectWithLogging("sender-hero-id", out retrievedSenderHero),
@@ -464,7 +462,6 @@ public class KingdomHandlerTests
             DrainGameThread();
 
             Clan retrievedReceiverClan = null!;
-            Clan retrievedSenderClan = null!;
             Settlement retrievedSettlement = null!;
             Hero retrievedSenderHero = null!;
             objectManager.Verify(
@@ -472,9 +469,6 @@ public class KingdomHandlerTests
                 Times.Once);
             objectManager.Verify(
                 manager => manager.TryGetObjectWithLogging("receiver-clan-id", out retrievedReceiverClan),
-                Times.Once);
-            objectManager.Verify(
-                manager => manager.TryGetObjectWithLogging("sender-clan-id", out retrievedSenderClan),
                 Times.Once);
             objectManager.Verify(
                 manager => manager.TryGetObjectWithLogging("sender-hero-id", out retrievedSenderHero),
@@ -516,7 +510,6 @@ public class KingdomHandlerTests
             DrainGameThread();
 
             Clan retrievedReceiverClan = null!;
-            Clan retrievedSenderClan = null!;
             Settlement retrievedSettlement = null!;
             Hero retrievedSenderHero = null!;
             objectManager.Verify(
@@ -524,9 +517,6 @@ public class KingdomHandlerTests
                 Times.Once);
             objectManager.Verify(
                 manager => manager.TryGetObjectWithLogging("receiver-clan-id", out retrievedReceiverClan),
-                Times.Once);
-            objectManager.Verify(
-                manager => manager.TryGetObjectWithLogging("sender-clan-id", out retrievedSenderClan),
                 Times.Once);
             objectManager.Verify(
                 manager => manager.TryGetObjectWithLogging("sender-hero-id", out retrievedSenderHero),
@@ -570,7 +560,6 @@ public class KingdomHandlerTests
             DrainGameThread();
 
             Clan retrievedReceiverClan = null!;
-            Clan retrievedSenderClan = null!;
             Settlement retrievedSettlement = null!;
             Hero retrievedSenderHero = null!;
             objectManager.Verify(
@@ -578,9 +567,6 @@ public class KingdomHandlerTests
                 Times.Once);
             objectManager.Verify(
                 manager => manager.TryGetObjectWithLogging("receiver-clan-id", out retrievedReceiverClan),
-                Times.Once);
-            objectManager.Verify(
-                manager => manager.TryGetObjectWithLogging("sender-clan-id", out retrievedSenderClan),
                 Times.Once);
             objectManager.Verify(
                 manager => manager.TryGetObjectWithLogging("sender-hero-id", out retrievedSenderHero),
@@ -625,7 +611,6 @@ public class KingdomHandlerTests
             DrainGameThread();
 
             Clan retrievedReceiverClan = null!;
-            Clan retrievedSenderClan = null!;
             Hero retrievedSenderHero = null!;
             Settlement retrievedSettlement = null!;
             objectManager.Verify(
@@ -633,9 +618,6 @@ public class KingdomHandlerTests
                 Times.Once);
             objectManager.Verify(
                 manager => manager.TryGetObjectWithLogging("receiver-clan-id", out retrievedReceiverClan),
-                Times.Once);
-            objectManager.Verify(
-                manager => manager.TryGetObjectWithLogging("sender-clan-id", out retrievedSenderClan),
                 Times.Once);
             objectManager.Verify(
                 manager => manager.TryGetObjectWithLogging("sender-hero-id", out retrievedSenderHero),
@@ -674,18 +656,18 @@ public class KingdomHandlerTests
         {
             handler(new MessagePayload<NetworkGiftSettlementOwnership>(
             peer,
-            new NetworkGiftSettlementOwnership("settlement-id", "sender-clan-id")));
+            new NetworkGiftSettlementOwnership("settlement-id", "receiver-clan-id")));
             DrainGameThread();
 
-            Clan retrievedSenderClan = null!;
+            Clan retrievedReceiverClan = null!;
             Settlement retrievedSettlement = null!;
             Hero retrievedSenderHero = null!;
             objectManager.Verify(
                 manager => manager.TryGetObjectWithLogging("settlement-id", out retrievedSettlement),
                 Times.Once);
             objectManager.Verify(
-                manager => manager.TryGetObjectWithLogging("sender-clan-id", out retrievedSenderClan),
-                Times.Exactly(2));
+                manager => manager.TryGetObjectWithLogging("receiver-clan-id", out retrievedReceiverClan),
+                Times.Once);
             objectManager.Verify(
                 manager => manager.TryGetObjectWithLogging("sender-hero-id", out retrievedSenderHero),
                 Times.Once);
@@ -729,7 +711,6 @@ public class KingdomHandlerTests
             DrainGameThread();
 
             Clan retrievedReceiverClan = null!;
-            Clan retrievedSenderClan = null!;
             Settlement retrievedSettlement = null!;
             Hero retrievedSenderHero = null!;
             objectManager.Verify(
@@ -737,9 +718,6 @@ public class KingdomHandlerTests
                 Times.Once);
             objectManager.Verify(
                 manager => manager.TryGetObjectWithLogging("receiver-clan-id", out retrievedReceiverClan),
-                Times.Once);
-            objectManager.Verify(
-                manager => manager.TryGetObjectWithLogging("sender-clan-id", out retrievedSenderClan),
                 Times.Once);
             objectManager.Verify(
                 manager => manager.TryGetObjectWithLogging("sender-hero-id", out retrievedSenderHero),
@@ -785,7 +763,6 @@ public class KingdomHandlerTests
             DrainGameThread();
 
             Clan retrievedReceiverClan = null!;
-            Clan retrievedSenderClan = null!;
             Settlement retrievedSettlement = null!;
             Hero retrievedSenderHero = null!;
             objectManager.Verify(
@@ -793,9 +770,6 @@ public class KingdomHandlerTests
                 Times.Once);
             objectManager.Verify(
                 manager => manager.TryGetObjectWithLogging("receiver-clan-id", out retrievedReceiverClan),
-                Times.Once);
-            objectManager.Verify(
-                manager => manager.TryGetObjectWithLogging("sender-clan-id", out retrievedSenderClan),
                 Times.Once);
             objectManager.Verify(
                 manager => manager.TryGetObjectWithLogging("sender-hero-id", out retrievedSenderHero),
@@ -845,7 +819,6 @@ public class KingdomHandlerTests
             DrainGameThread();
 
             Clan retrievedReceiverClan = null!;
-            Clan retrievedSenderClan = null!;
             Settlement retrievedSettlement = null!;
             Hero retrievedSenderHero = null!;
             objectManager.Verify(
@@ -853,9 +826,6 @@ public class KingdomHandlerTests
                 Times.Once);
             objectManager.Verify(
                 manager => manager.TryGetObjectWithLogging("receiver-clan-id", out retrievedReceiverClan),
-                Times.Once);
-            objectManager.Verify(
-                manager => manager.TryGetObjectWithLogging("sender-clan-id", out retrievedSenderClan),
                 Times.Once);
             objectManager.Verify(
                 manager => manager.TryGetObjectWithLogging("sender-hero-id", out retrievedSenderHero),
@@ -870,7 +840,7 @@ public class KingdomHandlerTests
         GameBootStrap.Initialize();
         var peer = ObjectHelper.SkipConstructor<NetPeer>();
         var player = ObjectHelper.SkipConstructor<Player>();
-        SetField(player, "ClanId", "sender-clan-id");
+        SetField(player, "ClanId", "original-clan-id");
         SetField(player, "HeroId", "sender-hero-id");
         var settlement = ObjectHelper.SkipConstructor<Settlement>();
         var town = ObjectHelper.SkipConstructor<Town>();
@@ -943,7 +913,6 @@ public class KingdomHandlerTests
             DrainGameThread();
             var adjustedRelation = receiverClan.GetRelationWithClan(senderClan);
             Clan retrievedReceiverClan = null!;
-            Clan retrievedSenderClan = null!;
             Settlement retrievedSettlement = null!;
             Hero retrievedSenderHero = null!;
             objectManager.Verify(
@@ -951,9 +920,6 @@ public class KingdomHandlerTests
                 Times.Once);
             objectManager.Verify(
                 manager => manager.TryGetObjectWithLogging("receiver-clan-id", out retrievedReceiverClan),
-                Times.Once);
-            objectManager.Verify(
-                manager => manager.TryGetObjectWithLogging("sender-clan-id", out retrievedSenderClan),
                 Times.Once);
             objectManager.Verify(
                 manager => manager.TryGetObjectWithLogging("sender-hero-id", out retrievedSenderHero),
@@ -967,18 +933,8 @@ public class KingdomHandlerTests
 
     private static void RunWithBoundGameThread(Action action)
     {
-        bool ownsGameThreadMark = GameThread.Instance.GameThreadId == 0;
-        if (ownsGameThreadMark)
-            GameThread.Instance.MarkGameThread();
-        try
-        {
-            action();
-        }
-        finally
-        {
-            if (ownsGameThreadMark)
-                GameThread.Instance.RestoreGameThread(0);
-        }
+        RuntimeHelpers.RunModuleConstructor(typeof(Coop.Tests.Mocks.TestNetwork).Module.ModuleHandle);
+        action();
     }
 
     private static KingdomHandler CreateHandler(IObjectManager objectManager)
@@ -1077,10 +1033,11 @@ public class KingdomHandlerTests
             .Setup(manager => manager.TryGetObjectWithLogging("receiver-clan-id", out receiverClan))
             .Returns(receiverClan != null);
         objectManager
-            .Setup(manager => manager.TryGetObjectWithLogging("sender-clan-id", out senderClan))
-            .Returns(senderClan != null);
-        objectManager
             .Setup(manager => manager.TryGetObjectWithLogging("sender-hero-id", out senderHero))
             .Returns(senderHero != null);
+        if (senderHero != null)
+        {
+            senderHero._clan = senderClan;
+        }
     }
 }

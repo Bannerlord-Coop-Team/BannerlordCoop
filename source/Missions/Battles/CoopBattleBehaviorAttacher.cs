@@ -17,6 +17,9 @@ internal class CoopBattleBehaviorAttacher : ICoopBattleBehaviorAttacher
     // Autofac-provided factory: CoopBattleController is registered InstancePerDependency, so each call
     // builds a fresh controller that lives and is disposed with its mission.
     private readonly Func<CoopBattleController> controllerFactory;
+#if DEBUG
+    private readonly Func<SiegeInteractionDebugBehavior> siegeInteractionDebugFactory;
+#endif
     private readonly IMessageBroker messageBroker;
     private readonly INetwork relayNetwork;
     private readonly Func<MissionMapTimeView> mapTimeViewFactory;
@@ -26,6 +29,9 @@ internal class CoopBattleBehaviorAttacher : ICoopBattleBehaviorAttacher
         Func<CoopBattleController> controllerFactory,
         Func<MissionMapTimeView> mapTimeViewFactory,
         Func<PlayerNameplateMissionView> playerNameplateViewFactory,
+#if DEBUG
+        Func<SiegeInteractionDebugBehavior> siegeInteractionDebugFactory,
+#endif
         IMessageBroker messageBroker,
         INetwork relayNetwork)
     {
@@ -33,6 +39,9 @@ internal class CoopBattleBehaviorAttacher : ICoopBattleBehaviorAttacher
         this.mapTimeViewFactory = mapTimeViewFactory;
         this.playerNameplateViewFactory = playerNameplateViewFactory;
         this.messageBroker = messageBroker;
+#if DEBUG
+        this.siegeInteractionDebugFactory = siegeInteractionDebugFactory;
+#endif
         this.relayNetwork = relayNetwork;
     }
 
@@ -40,6 +49,9 @@ internal class CoopBattleBehaviorAttacher : ICoopBattleBehaviorAttacher
     {
         var controller = controllerFactory();
         mission.AddMissionBehavior(controller);
+#if DEBUG
+        mission.AddMissionBehavior(siegeInteractionDebugFactory());
+#endif
         mission.AddMissionBehavior(mapTimeViewFactory());
         mission.AddMissionBehavior(playerNameplateViewFactory());
         mission.AddMissionBehavior(new BattleResultReadyLogic(

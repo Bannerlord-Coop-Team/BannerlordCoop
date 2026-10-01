@@ -84,15 +84,21 @@ public sealed class ModOptionsData
 
     public bool? GoldFoodInfluenceChangeForDisconnectedPlayers { get; set; }
 
+    public bool? BlockAiWarDeclarationsOnOfflinePlayers { get; set; }
+
     public int? PlayerBattleAiJoinWindowHours { get; set; }
 
     public bool? SpeedLimitWhilePlayersInBattle { get; set; }
+
+    public bool? EnsureUnaffiliatedWanderers { get; set; }
 
     public int? WandererLimit { get; set; }
 
     public bool? WandererLimitScalesWithPlayers { get; set; }
 
     public int? PlayerKingdomClanTierRequired { get; set; }
+
+    public bool? CoopClansEnabled { get; set; }
 
     public bool? SmithingStaminaRecoveryOutsideSettlements { get; set; }
 

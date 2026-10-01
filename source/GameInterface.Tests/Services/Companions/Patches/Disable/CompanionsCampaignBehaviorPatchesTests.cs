@@ -97,6 +97,21 @@ public class CompanionsCampaignBehaviorPatchesTests
     }
 
     [Fact]
+    public void ShouldSpawnUnaffiliatedWanderer_RepeatedTemplates_UsesHeroPopulation()
+    {
+        var template = new CharacterObject { _occupation = Occupation.Wanderer };
+        var firstWanderer = CreateWanderer(template);
+        var secondWanderer = CreateWanderer(template);
+
+        Assert.True(CompanionsCampaignBehaviorPatches.ShouldSpawnUnaffiliatedWanderer(
+            new[] { firstWanderer, secondWanderer },
+            targetPopulation: 3));
+        Assert.False(CompanionsCampaignBehaviorPatches.ShouldSpawnUnaffiliatedWanderer(
+            new[] { firstWanderer, secondWanderer },
+            targetPopulation: 2));
+    }
+
+    [Fact]
     public void RepairStuckHeroes_MultipleStuckHeroes_RepairsEveryMatch()
     {
         var firstStuckHero = CreateHero(Hero.CharacterStates.Prisoner);
@@ -124,19 +139,25 @@ public class CompanionsCampaignBehaviorPatchesTests
         Settlement settlement = null)
     {
         var template = new CharacterObject { _occupation = Occupation.Wanderer };
+        var candidate = CreateWanderer(template);
+        candidate._stayingInSettlement = settlement;
+
+        var behavior = new CompanionsCampaignBehavior();
+        behavior._aliveCompanionTemplates.Add(template);
+        return (behavior, candidate);
+    }
+
+    private static Hero CreateWanderer(CharacterObject template)
+    {
         var generatedCharacter = new CharacterObject
         {
             _occupation = Occupation.Wanderer,
             _originCharacter = template,
         };
-        var candidate = CreateHero(Hero.CharacterStates.Active);
-        candidate._characterObject = generatedCharacter;
-        candidate.Occupation = Occupation.Wanderer;
-        candidate._stayingInSettlement = settlement;
-        generatedCharacter._heroObject = candidate;
-
-        var behavior = new CompanionsCampaignBehavior();
-        behavior._aliveCompanionTemplates.Add(template);
-        return (behavior, candidate);
+        var wanderer = CreateHero(Hero.CharacterStates.Active);
+        wanderer._characterObject = generatedCharacter;
+        wanderer.Occupation = Occupation.Wanderer;
+        generatedCharacter._heroObject = wanderer;
+        return wanderer;
     }
 }

@@ -1,4 +1,5 @@
 ﻿using Common.Messaging;
+using GameInterface.Services.Inventory.Data;
 using LiteNetLib;
 using ProtoBuf;
 using TaleWorlds.CampaignSystem;
@@ -127,5 +128,29 @@ public readonly struct ManageWarehouseRoster : ICommand
     {
         SettlementId = settlementId;
         NewWarehouseRosterData = newWarehouseRosterData;
+    }
+}
+
+[ProtoContract(SkipConstructor = true)]
+public readonly struct TransferWarehouseRoster : ICommand
+{
+    [ProtoMember(1)]
+    public readonly string OldOwnerId;
+
+    [ProtoMember(2)]
+    public readonly string NewOwnerId;
+
+    [ProtoMember(3)]
+    public readonly string SettlementId;
+
+    [ProtoMember(4)]
+    public readonly ItemRosterElementData[] WarehouseRoster;
+
+    public TransferWarehouseRoster(string oldOwnerId, string newOwnerId, string settlementId, ItemRosterElementData[] warehouseRoster)
+    {
+        OldOwnerId = oldOwnerId;
+        NewOwnerId = newOwnerId;
+        SettlementId = settlementId;
+        WarehouseRoster = warehouseRoster;
     }
 }

@@ -1,4 +1,4 @@
-using Common.Messaging;
+﻿using Common.Messaging;
 using ProtoBuf;
 
 namespace GameInterface.Services.TroopRosters.Messages;
@@ -11,9 +11,9 @@ namespace GameInterface.Services.TroopRosters.Messages;
 internal readonly struct NetworkTroopRosterRemoveZeroCounts : ICommand
 {
     [ProtoMember(1)]
-    public readonly string RosterId;
+    public readonly uint RosterId;
 
-    public NetworkTroopRosterRemoveZeroCounts(string rosterId)
+    public NetworkTroopRosterRemoveZeroCounts(uint rosterId)
     {
         RosterId = rosterId;
     }

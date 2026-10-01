@@ -12,9 +12,11 @@ using GameInterface.Services.MobileParties.Extensions;
 using GameInterface.Services.MapEventParties.Messages;
 using GameInterface.Services.MapEvents.Messages;
 using GameInterface.Services.MapEvents;
+using GameInterface.Services.MapEvents.Data;
 using GameInterface.Services.MapEvents.Messages.Leave;
 using GameInterface.Services.MapEvents.Handlers;
 using GameInterface.Services.Players;
+using GameInterface.Services.TroopRosters.Data;
 using GameInterface.Services.TroopRosters.Messages;
 using HarmonyLib;
 using GameInterface.Services.Villages.Interfaces;
@@ -22,12 +24,14 @@ using Moq;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Actions;
 using TaleWorlds.CampaignSystem.CampaignBehaviors;
+using TaleWorlds.CampaignSystem.Encounters;
 using TaleWorlds.CampaignSystem.MapEvents;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Party.PartyComponents;
 using TaleWorlds.CampaignSystem.Settlements;
 using TaleWorlds.Core;
 using TaleWorlds.Library;
+using TaleWorlds.ObjectSystem;
 using Xunit.Abstractions;
 
 namespace E2E.Tests.Services.MapEvents;
@@ -633,7 +637,8 @@ public class HideoutMapEventTests : MapEventTestBase
         {
             Server.Resolve<IMessageBroker>().Publish(
                 requester.NetPeer,
-                new NetworkRequestEndSettlementEncounter(playerPartyId));
+                new NetworkRequestEndSettlementEncounter(
+                    Server.GetHandle<MobileParty>(playerPartyId)));
         }, MapEventDisabledMethods);
 
         Server.Call(() =>
@@ -686,7 +691,8 @@ public class HideoutMapEventTests : MapEventTestBase
         {
             Server.Resolve<IMessageBroker>().Publish(
                 requester.NetPeer,
-                new NetworkRequestEndSettlementEncounter(joinedPartyId));
+                new NetworkRequestEndSettlementEncounter(
+                    Server.GetHandle<MobileParty>(joinedPartyId)));
         }, MapEventDisabledMethods);
 
         Server.Call(() =>
@@ -706,7 +712,8 @@ public class HideoutMapEventTests : MapEventTestBase
         var raid = CreateSharedHideout();
         var clients = Clients.ToArray();
 
-        Server.SimulateMessage(clients[0].NetPeer, new NetworkRequestEndSettlementEncounter(raid.LeaderPartyId));
+        Server.SimulateMessage(clients[0].NetPeer, new NetworkRequestEndSettlementEncounter(
+            Server.GetHandle<MobileParty>(raid.LeaderPartyId)));
 
         Server.Call(() =>
         {
@@ -719,7 +726,8 @@ public class HideoutMapEventTests : MapEventTestBase
             Assert.Same(joiner.Party, mapEvent.AttackerSide.LeaderParty);
         });
 
-        Server.SimulateMessage(clients[1].NetPeer, new NetworkRequestEndSettlementEncounter(raid.JoinerPartyId));
+        Server.SimulateMessage(clients[1].NetPeer, new NetworkRequestEndSettlementEncounter(
+            Server.GetHandle<MobileParty>(raid.JoinerPartyId)));
 
         Server.Call(() =>
         {
@@ -765,6 +773,7 @@ public class HideoutMapEventTests : MapEventTestBase
     {
         var raid = CreateSharedHideout();
         Server.SimulateMessage(this, new PlayerDisconnected(Clients.First().NetPeer, default));
+        Server.PumpGameThread();
 
         Server.Call(() =>
         {
@@ -781,7 +790,8 @@ public class HideoutMapEventTests : MapEventTestBase
         if (missionExit)
             Server.SimulateMessage(Clients.Last().NetPeer, new NetworkMapEventFinalizeAttempted(raid.MapEventId));
         else
-            Server.SimulateMessage(Clients.Last().NetPeer, new NetworkRequestEndSettlementEncounter(raid.JoinerPartyId));
+            Server.SimulateMessage(Clients.Last().NetPeer, new NetworkRequestEndSettlementEncounter(
+                Server.GetHandle<MobileParty>(raid.JoinerPartyId)));
 
         Server.Call(() =>
         {
@@ -941,8 +951,155 @@ public class HideoutMapEventTests : MapEventTestBase
         });
     }
 
+    [Theory]
+    [InlineData(PlayerEncounterState.Wait, false)]
+    [InlineData(PlayerEncounterState.ApplyResults, false)]
+    [InlineData(PlayerEncounterState.ApplyResults, true)]
+    public void VictoriousSharedHideout_ServerClearKeepsEachWinnersStagedLoot(
+        PlayerEncounterState startState, bool emptyLoot)
+    {
+        var raid = CreateSharedHideout();
+        var clients = Clients.ToArray();
+        var partyIds = new[] { raid.LeaderPartyId, raid.JoinerPartyId };
+        for (var index = 0; index < clients.Length; index++)
+            EnterHideoutBattleEncounter(clients[index], partyIds[index], raid.SettlementId, startState);
+        var lootItemId = CreateHideoutLootItem();
+        var prisonerId = TestEnvironment.CreateRegisteredObject<CharacterObject>();
+
+        Server.Call(() =>
+        {
+            Campaign.Current.MainParty = null;
+            Assert.True(Server.ObjectManager.TryGetObject<MapEvent>(raid.MapEventId, out var mapEvent));
+            Assert.True(Server.ObjectManager.TryGetObject<ItemObject>(lootItemId, out var lootItem));
+            mapEvent._battleState = BattleState.AttackerVictory;
+            mapEvent._mapEventResultsApplied = true;
+            var broker = Server.Resolve<IMessageBroker>();
+            broker.Publish(this, new CommitMapEventResults(mapEvent));
+
+            // Each winner gets its own loot before the finalize clears the hideout and destroys the map event.
+            for (var index = 0; index < clients.Length; index++)
+                SendHideoutLoot(mapEvent, clients[index], partyIds[index], emptyLoot ? null : lootItem, index + 2,
+                    emptyLoot ? null : prisonerId);
+            broker.Publish(this, new MapEventFinalizeAttempted(mapEvent));
+            Assert.False(Server.ObjectManager.TryGetObject<MapEvent>(raid.MapEventId, out _));
+        });
+
+        for (var index = 0; index < clients.Length; index++)
+        {
+            var client = clients[index];
+            var expectedLoot = emptyLoot ? 0 : index + 2;
+            client.Call(() =>
+            {
+                Assert.True(client.ObjectManager.TryGetObject<Settlement>(raid.SettlementId, out var settlement));
+                Assert.Empty(settlement.Parties);
+                Assert.False(client.ObjectManager.TryGetObject<MapEvent>(raid.MapEventId, out _));
+
+                var encounter = PlayerEncounter.Current;
+                Assert.NotNull(encounter);
+                Assert.Equal(PlayerEncounterState.CaptureHeroes, encounter.EncounterState);
+                Assert.Equal(expectedLoot, encounter.RosterToReceiveLootItems.Sum(item => item.Amount));
+                Assert.Equal(emptyLoot ? 0 : 1, encounter.RosterToReceiveLootPrisoners.TotalManCount);
+                Assert.Null(MobileParty.MainParty.CurrentSettlement);
+                Assert.Equal(settlement.GatePosition, MobileParty.MainParty.Position);
+                Assert.Equal(AiBehavior.Hold, MobileParty.MainParty.DefaultBehavior);
+            }, MapEventDisabledMethods);
+        }
+
+        foreach (var client in clients.Reverse())
+        {
+            CollectHideoutResultsFromMap(client, hasWaitingMenu: client == clients.Last(), hasLoot: !emptyLoot);
+            // Holding keeps the party from walking back into the cleared hideout after the loot.
+            client.Call(() => Assert.Equal(AiBehavior.Hold, MobileParty.MainParty.DefaultBehavior), MapEventDisabledMethods);
+        }
+    }
+
+    [Fact]
+    public void OtherPartyLeave_DoesNotMoveWinnerHoldingHideoutResults()
+    {
+        var raid = CreateSharedHideout();
+        var client = Clients.First();
+        EnterHideoutBattleEncounter(client, raid.LeaderPartyId, raid.SettlementId, PlayerEncounterState.Wait);
+
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject<MapEvent>(raid.MapEventId, out var mapEvent));
+            Assert.True(Server.ObjectManager.TryGetObject<MobileParty>(raid.JoinerPartyId, out var joiner));
+            SendHideoutLoot(mapEvent, client, raid.LeaderPartyId, lootItem: null, amount: 0, prisonerId: null);
+            LeaveSettlementAction.ApplyForParty(joiner);
+        }, MapEventDisabledMethods);
+
+        client.Call(() =>
+        {
+            Assert.True(client.ObjectManager.TryGetObject<Settlement>(raid.SettlementId, out var settlement));
+            Assert.True(client.ObjectManager.TryGetObject<MobileParty>(raid.JoinerPartyId, out var joiner));
+            Assert.Null(joiner.CurrentSettlement);
+            Assert.Equal(PlayerEncounterState.CaptureHeroes, PlayerEncounter.Current?.EncounterState);
+            Assert.Same(settlement, MobileParty.MainParty.CurrentSettlement);
+            Assert.Equal(EnteredHideoutPosition, MobileParty.MainParty.Position);
+            Assert.Equal(AiBehavior.GoToSettlement, MobileParty.MainParty.DefaultBehavior);
+        }, MapEventDisabledMethods);
+    }
+
+    [Fact]
+    public void ServerDrivenLeave_ClosesHideoutEncounterWithoutStagedResults()
+    {
+        var raid = CreateSharedHideout();
+        var client = Clients.First();
+        EnterHideoutBattleEncounter(client, raid.LeaderPartyId, raid.SettlementId, PlayerEncounterState.Wait);
+
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject<MobileParty>(raid.LeaderPartyId, out var leader));
+            LeaveSettlementAction.ApplyForParty(leader);
+        }, MapEventDisabledMethods);
+
+        client.Call(() =>
+        {
+            Assert.True(client.ObjectManager.TryGetObject<Settlement>(raid.SettlementId, out var settlement));
+            Assert.Null(PlayerEncounter.Current);
+            Assert.Null(MobileParty.MainParty.CurrentSettlement);
+            Assert.Equal(settlement.GatePosition, MobileParty.MainParty.Position);
+            Assert.Equal(AiBehavior.Hold, MobileParty.MainParty.DefaultBehavior);
+        }, MapEventDisabledMethods);
+    }
+
+    [Fact]
+    public void HideoutClear_ClosesUninvolvedPlayersSettlementEncounter()
+    {
+        var raid = CreateSharedHideout(joinerJoinsBattle: false);
+        var uninvolved = Clients.Last();
+        SetMockPlayerEncounter(uninvolved);
+        uninvolved.Call(() =>
+        {
+            Assert.True(uninvolved.ObjectManager.TryGetObject<MobileParty>(raid.JoinerPartyId, out var party));
+            Assert.True(uninvolved.ObjectManager.TryGetObject<Settlement>(raid.SettlementId, out var settlement));
+            Campaign.Current.MainParty = party;
+            PlayerEncounter.Current.EncounterSettlementAux = settlement;
+            Assert.Same(settlement, party.CurrentSettlement);
+            Assert.Null(party.MapEvent);
+        }, MapEventDisabledMethods);
+        EnableHeadlessEncounterFinish(uninvolved);
+
+        Server.Call(() =>
+        {
+            Campaign.Current.MainParty = null;
+            Assert.True(Server.ObjectManager.TryGetObject<MapEvent>(raid.MapEventId, out var mapEvent));
+            mapEvent._battleState = BattleState.AttackerVictory;
+            mapEvent._mapEventResultsApplied = true;
+            var broker = Server.Resolve<IMessageBroker>();
+            broker.Publish(this, new CommitMapEventResults(mapEvent));
+            broker.Publish(this, new MapEventFinalizeAttempted(mapEvent));
+        });
+
+        uninvolved.Call(() =>
+        {
+            Assert.Null(PlayerEncounter.Current);
+            Assert.Null(MobileParty.MainParty.CurrentSettlement);
+        }, MapEventDisabledMethods);
+    }
+
     private (string MapEventId, string SettlementId, string LeaderHeroId, string LeaderPartyId,
-        string JoinerHeroId, string JoinerPartyId) CreateSharedHideout()
+        string JoinerHeroId, string JoinerPartyId) CreateSharedHideout(bool joinerJoinsBattle = true)
     {
         var (leaderHeroId, leaderPartyId) = CreatePlayerHeroParty("shared-hideout-leader");
         var (joinerHeroId, joinerPartyId) = CreatePlayerHeroParty("shared-hideout-joiner");
@@ -967,7 +1124,8 @@ public class HideoutMapEventTests : MapEventTestBase
                 new HideoutEventComponent(mapEvent, isSendTroops: false), MapEvent.BattleTypes.Hideout);
             mapEvent.MapEventVisual = null;
             EnterSettlementAction.ApplyForParty(joiner, settlement);
-            joiner.Party.MapEventSide = mapEvent.AttackerSide;
+            if (joinerJoinsBattle)
+                joiner.Party.MapEventSide = mapEvent.AttackerSide;
             if (!Campaign.Current.MapEventManager.MapEvents.Contains(mapEvent))
                 Campaign.Current.MapEventManager.OnMapEventCreated(mapEvent);
             Assert.True(Server.ObjectManager.TryGetId(mapEvent, out mapEventId));
@@ -983,6 +1141,70 @@ public class HideoutMapEventTests : MapEventTestBase
             });
 
         return (mapEventId, settlementId, leaderHeroId, leaderPartyId, joinerHeroId, joinerPartyId);
+    }
+
+    private static readonly CampaignVec2 EnteredHideoutPosition = new(new Vec2(5f, 5f), true);
+
+    // Matches the encounter BattleMissionStartHandler opens for a player who joined the hideout battle.
+    private void EnterHideoutBattleEncounter(
+        EnvironmentInstance client, string partyId, string settlementId, PlayerEncounterState state)
+    {
+        var encounter = SetMockPlayerEncounter(client);
+        client.Call(() =>
+        {
+            Assert.True(client.ObjectManager.TryGetObject<MobileParty>(partyId, out var party));
+            Assert.True(client.ObjectManager.TryGetObject<Settlement>(settlementId, out var settlement));
+            Campaign.Current.MainParty = party;
+            party.Position = EnteredHideoutPosition;
+            party._defaultBehavior = AiBehavior.GoToSettlement;
+            encounter._mapEvent = party.MapEvent;
+            encounter.PlayerSide = BattleSideEnum.Attacker;
+            encounter.EncounterSettlementAux = settlement;
+            encounter.EncounterState = state;
+            Assert.True(encounter._mapEvent.IsHideoutBattle);
+            Assert.Same(settlement, party.CurrentSettlement);
+        }, MapEventDisabledMethods);
+        EnableHeadlessEncounterFinish(client);
+    }
+
+    private string CreateHideoutLootItem()
+    {
+        var lootItemId = TestEnvironment.CreateRegisteredObject<ItemObject>();
+        foreach (var instance in Clients.Prepend(Server))
+            instance.Call(() =>
+            {
+                Assert.True(instance.ObjectManager.TryGetObject<ItemObject>(lootItemId, out var item));
+                item.StringId = "hideout_result_loot";
+                // Loot packets resolve authored items through the native catalog, as a loaded campaign does.
+                MBObjectManager.Instance.RegisterObject(item);
+            });
+        return lootItemId;
+    }
+
+    private void SendHideoutLoot(MapEvent mapEvent, EnvironmentInstance client, string partyId, ItemObject? lootItem,
+        int amount, string? prisonerId)
+    {
+        Assert.True(Server.ObjectManager.TryGetObject<MobileParty>(partyId, out var party));
+        var mapEventParty = mapEvent.AttackerSide.Parties.Single(candidate => candidate.Party == party.Party);
+        Assert.True(Server.ObjectManager.TryGetId(mapEvent, out var mapEventId));
+        Assert.True(Server.ObjectManager.TryGetId(mapEventParty, out var mapEventPartyId));
+
+        var items = new Dictionary<string, ItemRosterElement[]>();
+        if (lootItem != null)
+            items[mapEventPartyId] = new[] { new ItemRosterElement(lootItem, amount) };
+        var prisoners = new Dictionary<string, TroopRosterData>();
+        if (prisonerId != null)
+            prisoners[mapEventPartyId] = new TroopRosterData(new[]
+            {
+                new TroopRosterElementData(Server.GetHandle<CharacterObject>(prisonerId), 1, 0, 0),
+            });
+
+        Server.Resolve<INetwork>().Send(client.NetPeer, new NetworkCommitMapEventResults(
+            mapEventId,
+            BattleSideEnum.Attacker,
+            BattleSideEnum.Attacker,
+            mapEventPartyId,
+            new NetworkPlayerLootData(items, new Dictionary<string, TroopRosterData>(), prisoners)));
     }
 
     private static void SetHideoutPreparationTimeout(EnvironmentInstance instance, TimeSpan timeout)

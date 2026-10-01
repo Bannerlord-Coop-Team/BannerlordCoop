@@ -185,7 +185,7 @@ namespace Coop.Tests.Server.Connections.States
                     new NetworkJoinCampaignBaseline(
                         123L,
                         TimeControlEnum.Play_1x,
-                        Array.Empty<MobilePartyJoinState>())));
+                        Array.Empty<NetworkMobilePartyJoinState>())));
             StartReplay(state);
             var beforeAck = serverComponent.TestNetwork.GetPeerMessages(playerPeer).ToArray();
             Assert.Equal(

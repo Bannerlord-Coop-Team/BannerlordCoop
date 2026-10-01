@@ -12,6 +12,17 @@ namespace GameInterface.Services.Clans.Patches;
 [HarmonyPatch(typeof(DefaultClanPoliticsModel))]
 internal class DefaultClanPoliticsModelPatches
 {
+    [HarmonyPatch(nameof(DefaultClanPoliticsModel.CanHeroBeGovernor))]
+    [HarmonyPrefix]
+    public static bool CanHeroBeGovernorPrefix(Hero hero, ref bool __result)
+    {
+        if (!hero.IsPlayerHero()) return true;
+
+        __result = hero.Clan != null && hero.Clan.Leader != hero && hero.IsActive &&
+            !hero.IsChild && hero.CanBeGovernorOrHavePartyRole();
+        return false;
+    }
+
     [HarmonyPatch(nameof(DefaultClanPoliticsModel.CalculateInfluenceChangeInternal))]
     [HarmonyPrefix]
     public static bool CalculateInfluenceChangeInternalPrefix(Clan clan, ref ExplainedNumber influenceChange)

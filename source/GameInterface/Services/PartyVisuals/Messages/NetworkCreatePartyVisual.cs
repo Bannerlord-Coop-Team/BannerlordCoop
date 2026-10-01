@@ -10,12 +10,19 @@ namespace GameInterface.Services.PartyVisuals.Messages
         public string PartyVisualId { get; }
 
         [ProtoMember(2)]
-        public string MobilePartyId { get; }
+        public uint PartyVisualHandle { get; }
 
-        public NetworkCreatePartyVisual(string partyVisualId, string mobilePartyId)
+        [ProtoMember(3)]
+        public uint MobilePartyHandle { get; }
+
+        public NetworkCreatePartyVisual(
+            string partyVisualId,
+            uint partyVisualHandle,
+            uint mobilePartyHandle)
         {
             PartyVisualId = partyVisualId;
-            MobilePartyId = mobilePartyId;
+            PartyVisualHandle = partyVisualHandle;
+            MobilePartyHandle = mobilePartyHandle;
         }
     }
 }

@@ -7,12 +7,12 @@ namespace GameInterface.Services.Heroes.Messages.Collections
     internal record NetworkUpdateCaravanList : ICommand
     {
         [ProtoMember(1)]
-        public string HeroId { get; }
+        public uint HeroId { get; }
 
         [ProtoMember(2)]
-        public string ValueId { get; }
+        public uint ValueId { get; }
 
-        public NetworkUpdateCaravanList(string heroId, string valueId)
+        public NetworkUpdateCaravanList(uint heroId, uint valueId)
         {
             HeroId = heroId;
             ValueId = valueId;

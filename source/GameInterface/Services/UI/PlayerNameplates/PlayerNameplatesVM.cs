@@ -51,6 +51,21 @@ public sealed class PlayerNameplatesVM : ViewModel
 public sealed class PlayerNameplateTargetVM : MissionAgentMarkerTargetVM
 {
     private string nameColor;
+    private bool isSpeaking;
+
+    // Native name markers rewrite child visibility and alpha, so hide the sprite through its color and width.
+    [DataSourceProperty] public string SpeakingIconColor => isSpeaking ? "#7FC875FF" : "#7FC87500";
+    [DataSourceProperty] public float SpeakingIconWidth => isSpeaking ? 32f : 0f;
+
+    // Shows or collapses the speaker icon without changing the player's name or marker visibility.
+    public void SetSpeaking(bool value)
+    {
+        if (isSpeaking == value) return;
+        isSpeaking = value;
+        OnPropertyChanged(nameof(SpeakingIconColor));
+        OnPropertyChanged(nameof(SpeakingIconWidth));
+    }
+
 
     public PlayerNameplateTargetVM(
         Agent agent,

@@ -120,7 +120,7 @@ namespace Coop.IntegrationTests.MobileParties
                 client1.SimulateMessage(
                     TestEnvironment.Server.NetPeer,
                     new NetworkSettlementEncounterLeaveResult(
-                        "party1",
+                        Handle(client1, party),
                         SettlementEncounterLeaveOutcome.Suppressed));
             });
 
@@ -131,7 +131,8 @@ namespace Coop.IntegrationTests.MobileParties
                 client1.SimulateMessage(
                     TestEnvironment.Server.NetPeer,
                     new NetworkStartSettlementEncounter(
-                        new NetworkRequestStartSettlementEncounter("party1", "settlement1"))));
+                        new NetworkRequestStartSettlementEncounter(
+                            Handle(client1, party), Handle(client1, settlement)))));
 
             client1.Resolve<Mock<ISettlementInterface>>()
                 .Verify(s => s.StartSettlementEncounter(party, settlement), Times.Once);
@@ -180,7 +181,8 @@ namespace Coop.IntegrationTests.MobileParties
                 client1.SimulateMessage(
                     TestEnvironment.Server.NetPeer,
                     new NetworkStartSettlementEncounter(
-                        new NetworkRequestStartSettlementEncounter("party1", "settlement1")));
+                        new NetworkRequestStartSettlementEncounter(
+                            Handle(client1, party), Handle(client1, settlement))));
             });
 
             client1.Resolve<Mock<ISettlementInterface>>()
@@ -190,7 +192,7 @@ namespace Coop.IntegrationTests.MobileParties
                 client1.SimulateMessage(
                     TestEnvironment.Server.NetPeer,
                     new NetworkSettlementEncounterLeaveResult(
-                        "party1",
+                        Handle(client1, party),
                         SettlementEncounterLeaveOutcome.Suppressed)));
 
             client1.Resolve<Mock<ISettlementInterface>>()
@@ -219,14 +221,15 @@ namespace Coop.IntegrationTests.MobileParties
                 client1.SimulateMessage(
                     TestEnvironment.Server.NetPeer,
                     new NetworkStartSettlementEncounter(
-                        new NetworkRequestStartSettlementEncounter("party1", "settlement1"))));
+                        new NetworkRequestStartSettlementEncounter(
+                            Handle(client1, party), Handle(client1, settlement)))));
             Assert.Equal(0, StartCallCount());
 
             GameThreadTestRunner.Run(() =>
                 client1.SimulateMessage(
                     TestEnvironment.Server.NetPeer,
                     new NetworkSettlementEncounterLeaveResult(
-                        "party1",
+                        Handle(client1, party),
                         SettlementEncounterLeaveOutcome.Applied)));
             Assert.Equal(0, StartCallCount());
 
@@ -234,7 +237,7 @@ namespace Coop.IntegrationTests.MobileParties
                 client1.SimulateMessage(
                     TestEnvironment.Server.NetPeer,
                     new NetworkSettlementEncounterLeaveResult(
-                        "party1",
+                        Handle(client1, party),
                         SettlementEncounterLeaveOutcome.Suppressed)));
 
             Assert.Equal(0, StartCallCount());
@@ -261,7 +264,8 @@ namespace Coop.IntegrationTests.MobileParties
                 client1.SimulateMessage(
                     TestEnvironment.Server.NetPeer,
                     new NetworkSettlementEncounterRejected(
-                        new NetworkRequestStartSettlementEncounter("party1", "settlement1"))));
+                        new NetworkRequestStartSettlementEncounter(
+                            Handle(client1, party), Handle(client1, settlement)))));
 
             GameThreadTestRunner.Run(() =>
                 client1.SimulateMessage(this, new StartSettlementEncounterAttempted(party, settlement)));
@@ -291,7 +295,8 @@ namespace Coop.IntegrationTests.MobileParties
                 client1.SimulateMessage(
                     TestEnvironment.Server.NetPeer,
                     new NetworkStartSettlementEncounter(
-                        new NetworkRequestStartSettlementEncounter("party1", "settlement2"))));
+                        new NetworkRequestStartSettlementEncounter(
+                            Handle(client1, party), Handle(client1, staleSettlement)))));
             GameThreadTestRunner.Run(() =>
                 client1.SimulateMessage(
                     this,
@@ -507,6 +512,13 @@ namespace Coop.IntegrationTests.MobileParties
                         string.Empty)));
                 playerManager.SetPeer(controllerId, client.NetPeer);
             });
+        }
+
+        private static uint Handle(EnvironmentInstance instance, object value)
+        {
+            Assert.True(instance.Resolve<GameInterface.Services.ObjectManager.IObjectManager>()
+                .TryGetHandle(value, out var handle));
+            return handle;
         }
     }
 }

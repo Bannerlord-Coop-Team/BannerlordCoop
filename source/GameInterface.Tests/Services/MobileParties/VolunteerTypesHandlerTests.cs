@@ -31,11 +31,11 @@ public class VolunteerTypesHandlerTests
         network.Setup(instance => instance.SendAll(It.IsAny<IMessage>())).Callback<IMessage>(sent.Add);
         using var handler = new VolunteerTypesHandler(broker, objectManager, network.Object, coalescer);
 
-        var heroA = CreateHero(objectManager, "Hero_hero_a");
-        var heroB = CreateHero(objectManager, "Hero_hero_b");
-        var troop1 = CreateCharacter(objectManager, "CharacterObject_troop_1");
-        var troop2 = CreateCharacter(objectManager, "CharacterObject_troop_2");
-        var troop3 = CreateCharacter(objectManager, "CharacterObject_troop_3");
+        var heroA = CreateHero(objectManager, "Hero_hero_a", 1);
+        var heroB = CreateHero(objectManager, "Hero_hero_b", 2);
+        var troop1 = CreateCharacter(objectManager, "CharacterObject_troop_1", 3);
+        var troop2 = CreateCharacter(objectManager, "CharacterObject_troop_2", 4);
+        var troop3 = CreateCharacter(objectManager, "CharacterObject_troop_3", 5);
 
         PublishAssignment(broker, heroA, troop1, 0);
         PublishAssignment(broker, heroA, troop2, 0);
@@ -47,8 +47,8 @@ public class VolunteerTypesHandlerTests
         coalescer.Flush(network.Object);
 
         var message = Assert.IsType<UpdateVolunteers>(Assert.Single(sent));
-        Assert.Equal("troop_2", message.UpdatedVolunteerTypeIds["hero_a"][0]);
-        Assert.Equal("troop_3", message.UpdatedVolunteerTypeIds["hero_b"][2]);
+        Assert.Equal(4u, message.UpdatedVolunteerTypeIds[1][0]);
+        Assert.Equal(5u, message.UpdatedVolunteerTypeIds[2][2]);
     }
 
     [Fact]
@@ -62,8 +62,8 @@ public class VolunteerTypesHandlerTests
         network.Setup(instance => instance.SendAll(It.IsAny<IMessage>())).Callback<IMessage>(sent.Add);
         using var handler = new VolunteerTypesHandler(broker, objectManager, network.Object, coalescer);
 
-        var hero = CreateHero(objectManager, "Hero_hero_a");
-        hero.VolunteerTypes[0] = CreateCharacter(objectManager, "CharacterObject_troop_1");
+        var hero = CreateHero(objectManager, "Hero_hero_a", 1);
+        hero.VolunteerTypes[0] = CreateCharacter(objectManager, "CharacterObject_troop_1", 2);
         var unresolvedTroop = ObjectHelper.SkipConstructor<CharacterObject>();
 
         broker.Publish(hero, new VolunteerTypesArrayUpdated(hero, unresolvedTroop, 0));
@@ -77,7 +77,7 @@ public class VolunteerTypesHandlerTests
         coalescer.Flush(network.Object);
 
         var message = Assert.IsType<UpdateVolunteers>(Assert.Single(sent));
-        Assert.Equal(string.Empty, message.UpdatedVolunteerTypeIds["hero_a"][0]);
+        Assert.Equal(0u, message.UpdatedVolunteerTypeIds[1][0]);
     }
 
     [Fact]
@@ -91,10 +91,10 @@ public class VolunteerTypesHandlerTests
         network.Setup(instance => instance.SendAll(It.IsAny<IMessage>())).Callback<IMessage>(sent.Add);
         using var handler = new VolunteerTypesHandler(broker, objectManager, network.Object, coalescer);
 
-        var heroA = CreateHero(objectManager, "Hero_hero_a");
-        var heroB = CreateHero(objectManager, "Hero_hero_b");
-        var troop1 = CreateCharacter(objectManager, "CharacterObject_troop_1");
-        var troop2 = CreateCharacter(objectManager, "CharacterObject_troop_2");
+        var heroA = CreateHero(objectManager, "Hero_hero_a", 1);
+        var heroB = CreateHero(objectManager, "Hero_hero_b", 2);
+        var troop1 = CreateCharacter(objectManager, "CharacterObject_troop_1", 3);
+        var troop2 = CreateCharacter(objectManager, "CharacterObject_troop_2", 4);
 
         heroA.VolunteerTypes[0] = troop1;
         broker.Publish(heroA, new VolunteersUpdated(new Dictionary<Hero, CharacterObject[]>
@@ -114,22 +114,22 @@ public class VolunteerTypesHandlerTests
         coalescer.Flush(network.Object);
 
         var message = Assert.IsType<UpdateVolunteers>(Assert.Single(sent));
-        Assert.Equal(string.Empty, message.UpdatedVolunteerTypeIds["hero_a"][0]);
-        Assert.Equal("troop_2", message.UpdatedVolunteerTypeIds["hero_b"][1]);
+        Assert.Equal(0u, message.UpdatedVolunteerTypeIds[1][0]);
+        Assert.Equal(4u, message.UpdatedVolunteerTypeIds[2][1]);
     }
 
-    private static Hero CreateHero(IObjectManager objectManager, string id)
+    private static Hero CreateHero(IObjectManager objectManager, string id, uint handle)
     {
         var hero = ObjectHelper.SkipConstructor<Hero>();
         hero.VolunteerTypes = new CharacterObject[6];
-        Assert.True(objectManager.AddExisting(id, hero));
+        Assert.True(objectManager.AddExisting(id, hero, handle));
         return hero;
     }
 
-    private static CharacterObject CreateCharacter(IObjectManager objectManager, string id)
+    private static CharacterObject CreateCharacter(IObjectManager objectManager, string id, uint handle)
     {
         var character = ObjectHelper.SkipConstructor<CharacterObject>();
-        Assert.True(objectManager.AddExisting(id, character));
+        Assert.True(objectManager.AddExisting(id, character, handle));
         return character;
     }
 

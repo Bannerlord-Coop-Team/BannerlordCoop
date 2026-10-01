@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Globalization;
 
 namespace Common.Network.Coalescing;
 
@@ -25,6 +26,16 @@ public readonly struct CoalesceKey : IEquatable<CoalesceKey>
         Channel = channel;
         InstanceId = instanceId;
         Member = member ?? string.Empty;
+    }
+
+    public CoalesceKey(string channel, uint instanceHandle, string member = "")
+        : this(channel, instanceHandle.ToString(CultureInfo.InvariantCulture), member)
+    {
+    }
+
+    public CoalesceKey(string channel, uint instanceHandle, uint memberHandle)
+        : this(channel, instanceHandle, memberHandle.ToString(CultureInfo.InvariantCulture))
+    {
     }
 
     public bool Equals(CoalesceKey other) =>

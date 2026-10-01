@@ -7,6 +7,7 @@ using Coop.Tests.Mocks;
 using GameInterface.CoopSessionData;
 using GameInterface.CoopSessionData.Save.Data;
 using GameInterface.Services.Heroes;
+using GameInterface.Services.Clans;
 using GameInterface.Services.Heroes.Enum;
 using GameInterface.Services.Heroes.Interaces;
 using GameInterface.Services.Heroes.Interfaces;
@@ -94,6 +95,8 @@ namespace Coop.Tests.Server.Connections.States
                 null!,
                 heroMeetingData,
                 null!);
+
+            session.ClanFinance["Hero_Player"] = new ClanFinanceSettings("Clan_Coop", "Hero_Leader", 600);
             serverComponent.Container.Resolve<Mock<ICoopSessionProvider>>()
                 .SetupGet(provider => provider.CoopSession)
                 .Returns(session);
@@ -109,6 +112,9 @@ namespace Coop.Tests.Server.Connections.States
             Assert.Equal(0, packet.ChunkIndex);
             Assert.Equal(1, packet.ChunkCount);
             Assert.Equal(1351, packet.HeroMeetingData.PlayerLastMeetingTimes["Hero_Player"]["lord_6_1"]);
+            Assert.Equal(600, packet.ClanFinance["Hero_Player"].DailyPayment);
+            session.ClanFinance.Clear();
+            Assert.Single(packet.ClanFinance);
             serverComponent.Container.Resolve<Mock<ITimeControlInterface>>()
                 .Verify(m => m.ServerSetTimeControl(It.IsAny<TimeControlEnum>()), Times.Never);
 

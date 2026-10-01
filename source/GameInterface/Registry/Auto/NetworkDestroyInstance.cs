@@ -7,10 +7,10 @@ namespace GameInterface.Registry.Auto;
 readonly struct NetworkDestroyInstance<T> : ICommand
 {
     [ProtoMember(1)]
-    public readonly string InstanceId;
+    public readonly uint InstanceHandle;
 
-    public NetworkDestroyInstance(string instanceId)
+    public NetworkDestroyInstance(uint instanceHandle)
     {
-        InstanceId = instanceId;
+        InstanceHandle = instanceHandle;
     }
 }

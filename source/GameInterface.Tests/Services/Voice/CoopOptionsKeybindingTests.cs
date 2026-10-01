@@ -19,6 +19,17 @@ namespace GameInterface.Tests.Services.Voice;
 [Collection("Voice keybinding UI")]
 public class CoopOptionsKeybindingTests
 {
+    // Decorative labels and checkbox graphics must not intercept clicks intended for voice controls.
+    [Fact]
+    public void VoiceButtonsKeepMouseEventsInsteadOfPassingThemToDecorations()
+    {
+        var movie = XDocument.Load(PopupUIMovieBindingTests.FindMoviePath("CoopOptionsUIMovie.xml"));
+        var voice = Assert.Single(movie.Descendants("ListPanel"), x => (string?)x.Attribute("DataSource") == "{VoiceTab}");
+        var buttons = voice.Descendants("ButtonWidget").ToArray();
+        Assert.NotEmpty(buttons);
+        Assert.All(buttons, button => Assert.Equal("true", (string?)button.Attribute("DoNotPassEventsToChildren")));
+    }
+
     [Fact]
     public void VoiceLayoutUsesNativeSelectorsTogglesAndSlidersWithGroupedSections()
     {

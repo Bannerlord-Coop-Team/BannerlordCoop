@@ -3,6 +3,7 @@ using Common.Logging;
 using Common.Messaging;
 using Common.Network;
 using GameInterface.Services.Clans.Messages;
+using GameInterface.Services.MobileParties.Extensions;
 using GameInterface.Services.ObjectManager;
 using Serilog;
 using TaleWorlds.CampaignSystem.Party;
@@ -52,10 +53,10 @@ internal class ClanPartyItemVMHandler : IHandler
 
     private void Handle_UpdatePartyBehaviorOnSelection(MessagePayload<UpdatePartyBehaviorOnSelection> obj)
     {
-        if (!objectManager.TryGetObjectWithLogging<MobileParty>(obj.What.MobilePartyId, out var mobileParty)) return;
-
         GameThread.RunSafe(() =>
         {
+            if (!objectManager.TryGetObjectWithLogging<MobileParty>(obj.What.MobilePartyId, out var mobileParty)) return;
+            if (mobileParty.IsPlayerParty()) return;
             mobileParty.SetPartyObjective(obj.What.PartyObjective);
         });
     }
@@ -69,18 +70,22 @@ internal class ClanPartyItemVMHandler : IHandler
 
     private void Handle_ChangeAutoRecruitForSettlement(MessagePayload<ChangeAutoRecruitForSettlement> obj)
     {
-        if (!objectManager.TryGetObjectWithLogging<Settlement>(obj.What.HomeSettlementId, out var homeSettlement)) return;
+        GameThread.RunSafe(() =>
+        {
+            if (!objectManager.TryGetObjectWithLogging<Settlement>(obj.What.HomeSettlementId, out var homeSettlement)) return;
+            if (homeSettlement.Town == null) return;
 
-        homeSettlement.Town.GarrisonAutoRecruitmentIsEnabled = obj.What.Value;
-
-        // Update on clients as directly assigning to fields isn't managed with dynamic sync
-        network.SendAll(new ChangeAutoRecruitForSettlementClients(obj.What.HomeSettlementId, obj.What.Value));
+            homeSettlement.Town.GarrisonAutoRecruitmentIsEnabled = obj.What.Value;
+            network.SendAll(new ChangeAutoRecruitForSettlementClients(obj.What.HomeSettlementId, obj.What.Value));
+        });
     }
 
     private void Handle_ChangeAutoRecruitForSettlementClients(MessagePayload<ChangeAutoRecruitForSettlementClients> obj)
     {
-        if (!objectManager.TryGetObjectWithLogging<Settlement>(obj.What.HomeSettlementId, out var homeSettlement)) return;
-        
-        homeSettlement.Town.GarrisonAutoRecruitmentIsEnabled = obj.What.Value;
+        GameThread.RunSafe(() =>
+        {
+            if (!objectManager.TryGetObjectWithLogging<Settlement>(obj.What.HomeSettlementId, out var homeSettlement)) return;
+            homeSettlement.Town.GarrisonAutoRecruitmentIsEnabled = obj.What.Value;
+        });
     }
 }

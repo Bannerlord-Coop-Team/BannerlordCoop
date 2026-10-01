@@ -34,9 +34,14 @@ public class JoinRosterReplayTests : SyncTestBase
     public JoinRosterReplayTests(ITestOutputHelper output) : base(output)
     {
         items = "join-replay-items";
-        Server.CreateRegisteredObject<ItemRoster>(items);
+        uint itemsHandle = 0;
+        Server.Call(() =>
+        {
+            Server.CreateRegisteredObject<ItemRoster>(items);
+            itemsHandle = Server.GetHandle<ItemRoster>(items);
+        });
         foreach (var client in Clients)
-            client.CreateRegisteredObject<ItemRoster>(items);
+            client.CreateRegisteredObject<ItemRoster>(items, itemsHandle);
         item = TestEnvironment.CreateRegisteredObject<ItemObject>();
         otherItem = TestEnvironment.CreateRegisteredObject<ItemObject>();
         troops = TestEnvironment.CreateRegisteredObject<TroopRoster>();
@@ -65,7 +70,7 @@ public class JoinRosterReplayTests : SyncTestBase
         for (int i = 0; i < 8; i++) messages.Add(Item(-10));
         messages.Add(Item(3));
         messages.Add(new ObserveRosters());
-        messages.Add(new NetworkItemRosterClear(items));
+        messages.Add(new NetworkItemRosterClear(Server.GetHandle<ItemRoster>(items)));
         messages.Add(Item(4, otherItem));
         messages.Add(Item(5));
         messages.Add(new ObserveRosters());
@@ -124,10 +129,17 @@ public class JoinRosterReplayTests : SyncTestBase
     }
 
     private IMessage Item(int amount, string? id = null) =>
-        new NetworkItemRosterUpdate(items, id ?? item, null!, amount);
+        new NetworkItemRosterUpdate(
+            Server.GetHandle<ItemRoster>(items),
+            Server.GetHandle<ItemObject>(id ?? item),
+            0,
+            amount);
 
     private IMessage Troop(TroopRosterElementOperation operation) =>
-        new NetworkTroopRosterElementBatch(troops, character, new[] { operation });
+        new NetworkTroopRosterElementBatch(
+            Server.GetHandle<TroopRoster>(troops),
+            Server.GetHandle<CharacterObject>(character),
+            new[] { operation });
 
     private string State(EnvironmentInstance client)
     {
@@ -165,9 +177,9 @@ public class JoinReplayVolumeTests
         var packets = new List<MessagePacket>();
         for (int burst = 0; burst < 1000; burst++)
         {
-            string id = "roster-" + burst;
-            for (int i = 0; i < 16; i++) Add(new NetworkItemRosterUpdate(id, "item", null!, 1));
-            for (int i = 0; i < 16; i++) Add(new NetworkTroopRosterElementBatch(id, "troop",
+            uint id = (uint)burst + 1;
+            for (int i = 0; i < 16; i++) Add(new NetworkItemRosterUpdate(id, 1, 0, 1));
+            for (int i = 0; i < 16; i++) Add(new NetworkTroopRosterElementBatch(id, 2,
                 new[] { TroopRosterElementOperation.AddCounts(1, 0, 1, true) }));
             Add(new AddOutputProgressForTown("workshop", 0.1f));
             Add(new AddOutputProgressForTown("workshop", -0.03f));
@@ -202,7 +214,7 @@ public class JoinReplayVolumeTests
     public void TroopMerges_BoundOperationsPreservePayloadAndRejectDifferentIdentities()
     {
         var operations = new[] { TroopRosterElementOperation.AddCounts(1, 1, 7, false) };
-        var packet = MessagePacket.Create(new NetworkTroopRosterElementBatch("roster", "troop", operations), serializer);
+        var packet = MessagePacket.Create(new NetworkTroopRosterElementBatch(1, 2, operations), serializer);
         operations[0] = TroopRosterElementOperation.SetXp(999);
         var packets = Enumerable.Repeat(packet, 65).ToArray();
         var result = Run(packets, true);
@@ -210,9 +222,9 @@ public class JoinReplayVolumeTests
             serializer.Deserialize<NetworkTroopRosterElementBatch>(value.Data).Operations.Length));
         Assert.All(result.Packets.SelectMany(value => serializer.Deserialize<NetworkTroopRosterElementBatch>(value.Data).Operations),
             operation => Assert.Equal(TroopRosterElementOperationKind.AddCounts, operation.Kind));
-        var other = MessagePacket.Create(new NetworkTroopRosterElementBatch("other", "troop", operations), serializer);
+        var other = MessagePacket.Create(new NetworkTroopRosterElementBatch(3, 2, operations), serializer);
         Assert.False(packet.TryMergeForJoinCatchUp(other, serializer, out _));
-        other = MessagePacket.Create(new NetworkTroopRosterElementBatch("roster", "hero", operations), serializer);
+        other = MessagePacket.Create(new NetworkTroopRosterElementBatch(1, 4, operations), serializer);
         Assert.False(packet.TryMergeForJoinCatchUp(other, serializer, out _));
     }
 

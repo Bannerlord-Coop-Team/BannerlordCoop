@@ -87,3 +87,17 @@ public class PartyComponentTranspilers
         instance.OnChangePartyLeader(newLeader);
     }
 }
+
+[HarmonyPatch(typeof(MobileParty), nameof(MobileParty.SetPartyComponent))]
+internal class PartyComponentClearPatch
+{
+    [HarmonyPostfix]
+    private static void Postfix(MobileParty __instance, PartyComponent partyComponent, bool __runOriginal)
+    {
+        if (!__runOriginal || CallOriginalPolicy.IsOriginalAllowed() || ModInformation.IsClient) return;
+        if (partyComponent != null) return;
+
+        // Clearing has no component setter to announce the otherwise atomic binding update.
+        MessageBroker.Instance.Publish(__instance, new PartyComponentMobilePartyUpdated(null, __instance));
+    }
+}

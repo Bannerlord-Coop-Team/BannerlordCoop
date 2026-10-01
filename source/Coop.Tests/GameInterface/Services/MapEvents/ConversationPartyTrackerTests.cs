@@ -162,4 +162,76 @@ public class ConversationPartyTrackerTests
         Assert.True(tracker.IsEmpty);
         Assert.False(tracker.TryGetEngagement("lord1", out _));
     }
+
+    [Fact]
+    public void IsInOtherConversation_WithoutConversations_IsFalse()
+    {
+        Assert.False(tracker.IsInOtherConversation(firstPlayer, "player1", "looter1"));
+    }
+
+    [Fact]
+    public void IsInOtherConversation_WhenEngagedWithSameParty_IsFalse()
+    {
+        // The same party attacking again refreshes the engagement, which the bandit barter needs.
+        tracker.TryBeginEngagement(firstPlayer, "player1", "looter1", wasAiDisabled: false);
+
+        Assert.False(tracker.IsInOtherConversation(firstPlayer, "player1", "looter1"));
+    }
+
+    [Fact]
+    public void IsInOtherConversation_WhenEngagedWithDifferentParty_IsTrue()
+    {
+        tracker.TryBeginEngagement(firstPlayer, "player1", "looter1", wasAiDisabled: false);
+
+        Assert.True(tracker.IsInOtherConversation(firstPlayer, "player1", "looter2"));
+    }
+
+    [Fact]
+    public void IsInOtherConversation_WhenPartyHeldByAnotherPlayer_IsTrue()
+    {
+        tracker.TryBeginEngagement(secondPlayer, "player2", "looter1", wasAiDisabled: false);
+
+        Assert.True(tracker.IsInOtherConversation(firstPlayer, "player1", "looter1"));
+    }
+
+    [Fact]
+    public void IsInOtherConversation_WhenPlayerInPvpConversation_IsTrue()
+    {
+        tracker.BeginPvpConversation("player1", "player2");
+
+        Assert.True(tracker.IsInOtherConversation(firstPlayer, "player1", "looter1"));
+    }
+
+    [Fact]
+    public void IsInOtherConversation_WhenAnotherPlayerIsBusy_IsFalse()
+    {
+        tracker.TryBeginEngagement(secondPlayer, "player2", "looter2", wasAiDisabled: false);
+        tracker.BeginPvpConversation("player3", "player4");
+
+        Assert.False(tracker.IsInOtherConversation(firstPlayer, "player1", "looter1"));
+    }
+
+    [Fact]
+    public void IsInOtherConversation_AfterConversationsEnd_IsFalse()
+    {
+        tracker.TryBeginEngagement(firstPlayer, "player1", "looter1", wasAiDisabled: false);
+        tracker.BeginPvpConversation("player2", "player3");
+
+        tracker.TryEndEngagement(firstPlayer, out _, out _);
+        tracker.EndPvpConversation("player3");
+
+        Assert.False(tracker.IsInOtherConversation(firstPlayer, "player1", "looter2"));
+        Assert.False(tracker.IsInOtherConversation(secondPlayer, "player2", "looter1"));
+    }
+
+    [Fact]
+    public void IsInOtherConversation_WithNullArgument_IsFalse()
+    {
+        tracker.TryBeginEngagement(firstPlayer, "player1", "looter1", wasAiDisabled: false);
+        tracker.BeginPvpConversation("player2", "player3");
+
+        Assert.False(tracker.IsInOtherConversation(null, "player1", "looter2"));
+        Assert.False(tracker.IsInOtherConversation(secondPlayer, null, "looter1"));
+        Assert.False(tracker.IsInOtherConversation(firstPlayer, "player1", null));
+    }
 }

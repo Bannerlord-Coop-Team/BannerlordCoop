@@ -1,5 +1,6 @@
-using Common.Messaging;
+﻿using Common.Messaging;
 using ProtoBuf;
+using System;
 
 namespace Missions.Messages;
 
@@ -23,15 +24,31 @@ public readonly struct NetworkMissionPeerEntered : IEvent
     [ProtoMember(3)]
     public readonly ulong SteamId;
 
+    /// <summary>
+    /// Server-issued credential that binds this controller to its current mission membership.
+    /// </summary>
+    [ProtoMember(4)]
+    public readonly Guid PeerCredential;
+
     public NetworkMissionPeerEntered(string controllerId, string instanceId)
-        : this(controllerId, instanceId, 0)
+        : this(controllerId, instanceId, 0, Guid.Empty)
     {
     }
 
     public NetworkMissionPeerEntered(string controllerId, string instanceId, ulong steamId)
+        : this(controllerId, instanceId, steamId, Guid.Empty)
+    {
+    }
+
+    public NetworkMissionPeerEntered(
+        string controllerId,
+        string instanceId,
+        ulong steamId,
+        Guid peerCredential)
     {
         ControllerId = controllerId;
         InstanceId = instanceId;
         SteamId = steamId;
+        PeerCredential = peerCredential;
     }
 }

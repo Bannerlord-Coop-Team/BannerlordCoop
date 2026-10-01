@@ -61,6 +61,12 @@ public class SiegeEventLifetimeTests : IDisposable
         string? besiegerPartyId = null;
         string? supportPartyId = null;
         string? preparationsId = null;
+        uint siegeEventHandle = 0;
+        uint settlementHandle = 0;
+        uint besiegerCampHandle = 0;
+        uint besiegerPartyHandle = 0;
+        uint supportPartyHandle = 0;
+        uint preparationsHandle = 0;
         long siegeStartTimeTicks = 0;
 
         // Act
@@ -76,17 +82,24 @@ public class SiegeEventLifetimeTests : IDisposable
                 var siegeEvent = settlement.SiegeEvent;
 
                 Assert.True(Server.ObjectManager.TryGetId(siegeEvent, out siegeEventId));
+                Assert.True(Server.ObjectManager.TryGetHandle(siegeEvent, out siegeEventHandle));
                 Assert.True(Server.ObjectManager.TryGetId(settlement, out settlementId));
+                Assert.True(Server.ObjectManager.TryGetHandle(settlement, out settlementHandle));
                 Assert.True(Server.ObjectManager.TryGetId(siegeEvent.BesiegerCamp, out besiegerCampId));
+                Assert.True(Server.ObjectManager.TryGetHandle(siegeEvent.BesiegerCamp, out besiegerCampHandle));
                 Assert.True(Server.ObjectManager.TryGetId(besiegerParty, out besiegerPartyId));
+                Assert.True(Server.ObjectManager.TryGetHandle(besiegerParty, out besiegerPartyHandle));
                 Assert.True(Server.ObjectManager.TryGetId(
                     siegeEvent.BesiegerCamp.SiegeEngines.SiegePreparations, out preparationsId));
+                Assert.True(Server.ObjectManager.TryGetHandle(
+                    siegeEvent.BesiegerCamp.SiegeEngines.SiegePreparations, out preparationsHandle));
                 siegeStartTimeTicks = siegeEvent.SiegeStartTime.NumTicks;
 
                 var supportParty = GameObjectCreator.CreateInitializedObject<MobileParty>();
                 supportParty._besiegerCamp = siegeEvent.BesiegerCamp;
                 siegeEvent.BesiegerCamp._besiegerParties.Add(supportParty);
                 Assert.True(Server.ObjectManager.TryGetId(supportParty, out supportPartyId));
+                Assert.True(Server.ObjectManager.TryGetHandle(supportParty, out supportPartyHandle));
                 Assert.True(Server.Resolve<ISiegeEventGraphSynchronizer>().TryCapture(
                     siegeEvent, out var snapshot, besiegerParty));
                 Server.Resolve<INetwork>().SendAll(new NetworkInitializeSiegeEvent(snapshot));
@@ -109,8 +122,10 @@ public class SiegeEventLifetimeTests : IDisposable
         var initializations = Server.NetworkSentMessages.GetMessages<NetworkInitializeSiegeEvent>().ToArray();
         Assert.Equal(2, initializations.Length);
         var initialization = initializations[^1];
-        Assert.NotNull(initialization.BesiegerPartyIds);
-        Assert.Contains(besiegerPartyId, initialization.BesiegerPartyIds);
+        Assert.NotNull(initialization.BesiegerPartyHandles);
+        Assert.Contains(besiegerPartyHandle, initialization.BesiegerPartyHandles);
+        Assert.Contains(supportPartyHandle, initialization.BesiegerPartyHandles);
+        Assert.Contains(initialization.AttackerEngines, engine => engine.Handle == preparationsHandle);
 
         foreach (var client in TestEnvironment.Clients)
         {
@@ -172,11 +187,15 @@ public class SiegeEventLifetimeTests : IDisposable
 
                 var legacySnapshot = new SiegeEventGraphSnapshot(
                     siegeEventId,
-                    settlementId,
+                    siegeEventHandle,
+                    settlementHandle,
                     besiegerCampId,
-                    besiegerPartyId,
+                    besiegerCampHandle,
+                    besiegerPartyHandle,
                     initialization.AttackerSiegeEnginesId,
-                    initialization.DefenderSiegeEnginesId);
+                    initialization.AttackerSiegeEnginesHandle,
+                    initialization.DefenderSiegeEnginesId,
+                    initialization.DefenderSiegeEnginesHandle);
                 Assert.True(client.Resolve<ISiegeEventGraphSynchronizer>().TryApply(legacySnapshot));
                 Assert.Equal(retainedStartTimeTicks, siegeEvent.SiegeStartTime.NumTicks);
                 Assert.Equal(9, besiegerCamp.NumberOfTroopsKilledOnSide);
@@ -211,19 +230,23 @@ public class SiegeEventLifetimeTests : IDisposable
         var serializer = new ProtoBufSerializer(new SerializableTypeMapper());
         var snapshot = new SiegeEventGraphSnapshot(
             "siege-event",
-            "settlement",
+            101,
+            102,
             "camp",
-            "leader",
+            103,
+            104,
             "attacker-engines",
+            105,
             "defender-engines",
+            106,
             1234,
             "strategy",
             7,
-            new[] { "leader", "support" },
+            new uint[] { 104, 107 },
             new[]
             {
                 new SiegeEngineGraphSnapshot(
-                    "preparation", "preparations", 0.75f, 1f, 100f, 100f,
+                    "preparation", 108, "preparations", 0.75f, 1f, 100f, 100f,
                     SiegeEngineGraphLocation.Preparation),
             },
             Array.Empty<SiegeEngineGraphSnapshot>());
@@ -232,7 +255,7 @@ public class SiegeEventLifetimeTests : IDisposable
         AssertGraph(snapshot, initialization.ToSnapshot());
 
         var mapCommit = RoundTrip(serializer, new NetworkMapEventInitialized(
-            "map-event", false, "tracker", "component", "visual", snapshot));
+            201, false, 202, 203, 204, snapshot));
         AssertGraph(snapshot, mapCommit.SiegeGraph);
     }
 
@@ -244,15 +267,19 @@ public class SiegeEventLifetimeTests : IDisposable
     private static void AssertGraph(SiegeEventGraphSnapshot expected, SiegeEventGraphSnapshot actual)
     {
         Assert.Equal(expected.SiegeEventId, actual.SiegeEventId);
-        Assert.Equal(expected.SettlementId, actual.SettlementId);
+        Assert.Equal(expected.SiegeEventHandle, actual.SiegeEventHandle);
+        Assert.Equal(expected.SettlementHandle, actual.SettlementHandle);
         Assert.Equal(expected.BesiegerCampId, actual.BesiegerCampId);
-        Assert.Equal(expected.LeaderPartyId, actual.LeaderPartyId);
+        Assert.Equal(expected.BesiegerCampHandle, actual.BesiegerCampHandle);
+        Assert.Equal(expected.LeaderPartyHandle, actual.LeaderPartyHandle);
         Assert.Equal(expected.AttackerSiegeEnginesId, actual.AttackerSiegeEnginesId);
+        Assert.Equal(expected.AttackerSiegeEnginesHandle, actual.AttackerSiegeEnginesHandle);
         Assert.Equal(expected.DefenderSiegeEnginesId, actual.DefenderSiegeEnginesId);
+        Assert.Equal(expected.DefenderSiegeEnginesHandle, actual.DefenderSiegeEnginesHandle);
         Assert.Equal(expected.SiegeStartTimeTicks, actual.SiegeStartTimeTicks);
         Assert.Equal(expected.BesiegerStrategyId, actual.BesiegerStrategyId);
         Assert.Equal(expected.BesiegerTroopsKilled, actual.BesiegerTroopsKilled);
-        Assert.Equal(expected.BesiegerPartyIds, actual.BesiegerPartyIds);
+        Assert.Equal(expected.BesiegerPartyHandles, actual.BesiegerPartyHandles);
         Assert.Equal(expected.AttackerEngines, actual.AttackerEngines);
         Assert.Equal(expected.DefenderEngines ?? Array.Empty<SiegeEngineGraphSnapshot>(),
             actual.DefenderEngines ?? Array.Empty<SiegeEngineGraphSnapshot>());

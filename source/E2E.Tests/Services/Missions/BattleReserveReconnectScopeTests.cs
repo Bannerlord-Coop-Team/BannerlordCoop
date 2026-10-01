@@ -329,6 +329,8 @@ public class BattleReserveReconnectScopeTests : MissionTestEnvironment
         {
             CoopTroopSupplierRegistry.ClearBattle(mapEventId);
         }
+
+        Server.PumpGameThread();
     }
 
     [Fact]
@@ -365,6 +367,8 @@ public class BattleReserveReconnectScopeTests : MissionTestEnvironment
         {
             CoopTroopSupplierRegistry.ClearBattle(mapEventId);
         }
+
+        Server.PumpGameThread();
     }
 
     /// <summary>

@@ -31,11 +31,12 @@ public class PlayerCreationRollbackTests
         hero._clan = clan;
         hero._characterObject = characterObject;
 
-        Assert.True(objectManager.AddExisting("Hero_player", hero));
-        Assert.True(objectManager.AddExisting("MobileParty_player", party));
-        Assert.True(objectManager.AddExisting("Clan_player", clan));
-        Assert.True(objectManager.AddExisting("CharacterObject_player", characterObject));
-        Assert.True(objectManager.AddExisting("TroopRoster_MemberRoster_player", orphanedRoster));
+        Assert.True(objectManager.AddExisting("Hero_player", hero, 1));
+        Assert.True(objectManager.AddExisting("MobileParty_player", party, 2));
+        Assert.True(objectManager.AddExisting("Clan_player", clan, 3));
+        Assert.True(objectManager.AddExisting("CharacterObject_player", characterObject, 4));
+        Assert.True(objectManager.AddExisting("TroopRoster_MemberRoster_player", orphanedRoster, 5));
+        Assert.True(objectManager.TryGetHandle(hero, out var heroHandle));
 
         var player = new Player(
             "controller",
@@ -58,7 +59,7 @@ public class PlayerCreationRollbackTests
         Assert.Contains("Hero_player", registrationIds);
         Assert.Contains("MobileParty_player", registrationIds);
         coalescer.Verify(instance => instance.DropInstance("Hero_player"), Times.Once);
-        coalescer.Verify(instance => instance.DropInstance("player"), Times.AtLeastOnce);
+        coalescer.Verify(instance => instance.DropInstance(heroHandle), Times.Once);
     }
 
     private static T Uninitialized<T>() where T : class =>

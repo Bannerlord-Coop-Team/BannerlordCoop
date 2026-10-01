@@ -69,6 +69,8 @@ public class LiteNetP2PClientTests
         try
         {
             client.ConnectToInstance("town_ES1|tavern");
+            Assert.Empty(requests);
+            broker.Publish(this, new NetworkMissionCredentialIssued("town_ES1|tavern", Guid.NewGuid()));
             var firstRequest = Assert.Single(requests);
             client.DisconnectPeers();
             broker.Publish(this, new NetworkMissionIntroductionAuthorized(
@@ -76,6 +78,8 @@ public class LiteNetP2PClientTests
             Assert.Equal(Guid.Empty, requestField.GetValue(client));
 
             client.ConnectToInstance(firstRequest.InstanceId);
+            Assert.Single(requests);
+            broker.Publish(this, new NetworkMissionCredentialIssued(firstRequest.InstanceId, Guid.NewGuid()));
             Assert.Equal(2, requests.Count);
             var currentRequest = requests[1];
             Assert.NotEqual(firstRequest.RequestId, currentRequest.RequestId);
@@ -142,6 +146,9 @@ public class LiteNetP2PClientTests
             batcher, () => new Common.Logging.ReceivePathDiagnostics());
         NetPeer peer = NetPeerExtensions.CreatePeer(97);
         GetPendingPeerControllers(client)[peer] = controllerId;
+        Guid peerCredential = Guid.NewGuid();
+        GetControllerPeerCredentials(client)[controllerId] = peerCredential;
+        GetPeerCredentials(client)[peer] = peerCredential;
 
         Task reliableSend = Task.Run(() => client.Send(
             controllerId,
@@ -169,9 +176,11 @@ public class LiteNetP2PClientTests
     }
 
     [Theory]
-    [InlineData(false)]
-    [InlineData(true)]
-    public void OnNetworkReceive_CountsMappingDecisionWithoutChangingDispatch(bool mapped)
+    [InlineData(false, DeliveryMethod.ReliableOrdered)]
+    [InlineData(true, DeliveryMethod.ReliableOrdered)]
+    [InlineData(false, DeliveryMethod.Unreliable)]
+    [InlineData(true, DeliveryMethod.Unreliable)]
+    public void OnNetworkReceive_CountsMappingDecisionWithoutChangingDispatch(bool mapped, DeliveryMethod deliveryMethod)
     {
         var serializer = new Mock<ICommonSerializer>();
         var packet = new Mock<IPacket>();
@@ -186,20 +195,29 @@ public class LiteNetP2PClientTests
             Mock.Of<IMessagePacketHandler>(), Mock.Of<IControllerIdProvider>(),
             Mock.Of<ISteamMissionBridge>(), Mock.Of<IMovementPacketCompressor>(),
             new ReliableMessageBatcher<string>(serializer.Object), () => diagnostics.Object);
+        client.ConnectToInstance("diagnostic-instance");
         NetPeer peer = NetPeerExtensions.CreatePeer(98);
         GetPendingPeerControllers(client)[peer] = "receiving-peer";
-        if (mapped) client.OnPeerConnected(peer);
+        if (mapped)
+        {
+            Guid credential = Guid.NewGuid();
+            GetControllerPeerCredentials(client)["receiving-peer"] = credential;
+            GetPeerCredentials(client)[peer] = credential;
+            client.OnPeerConnected(peer);
+        }
         var reader = ObjectHelper.SkipConstructor<NetPacketReader>();
         reader.SetSource(bytes);
 
-        client.OnNetworkReceive(peer, reader, 0, DeliveryMethod.ReliableOrdered);
+        client.OnNetworkReceive(peer, reader, 0, deliveryMethod);
 
+        bool buffered = !mapped && deliveryMethod == DeliveryMethod.ReliableOrdered;
+        ReceivePathEvent expectedEvent = mapped ? ReceivePathEvent.MappedReceive :
+            buffered ? ReceivePathEvent.PendingReliableBuffered : ReceivePathEvent.UnmappedDrop;
         diagnostics.Verify(d => d.Record(
-            mapped ? ReceivePathEvent.MappedReceive : ReceivePathEvent.UnmappedDrop,
-            3, SocketError.Success), Times.Once);
+            expectedEvent, 3, SocketError.Success), Times.Once);
         serializer.Verify(s => s.Deserialize(It.IsAny<byte[]>()), mapped ? Times.Once() : Times.Never());
         packetManager.Verify(p => p.HandleReceive(peer, packet.Object), mapped ? Times.Once() : Times.Never());
-        Assert.Equal(mapped ? 0 : 3, reader.AvailableBytes);
+        Assert.Equal(mapped || buffered ? 0 : 3, reader.AvailableBytes);
     }
 
     private static Dictionary<NetPeer, string> GetPendingPeerControllers(LiteNetP2PClient client)
@@ -208,6 +226,22 @@ public class LiteNetP2PClientTests
             "pendingPeerControllers",
             BindingFlags.Instance | BindingFlags.NonPublic)!;
         return Assert.IsType<Dictionary<NetPeer, string>>(field.GetValue(client));
+    }
+
+    private static Dictionary<string, Guid> GetControllerPeerCredentials(LiteNetP2PClient client)
+    {
+        FieldInfo field = typeof(LiteNetP2PClient).GetField(
+            "controllerPeerCredentials",
+            BindingFlags.Instance | BindingFlags.NonPublic)!;
+        return Assert.IsType<Dictionary<string, Guid>>(field.GetValue(client));
+    }
+
+    private static Dictionary<NetPeer, Guid> GetPeerCredentials(LiteNetP2PClient client)
+    {
+        FieldInfo field = typeof(LiteNetP2PClient).GetField(
+            "peerCredentials",
+            BindingFlags.Instance | BindingFlags.NonPublic)!;
+        return Assert.IsType<Dictionary<NetPeer, Guid>>(field.GetValue(client));
     }
 
     private sealed class PromotionRaceBatcher : IReliableMessageBatcher<string>, IDisposable

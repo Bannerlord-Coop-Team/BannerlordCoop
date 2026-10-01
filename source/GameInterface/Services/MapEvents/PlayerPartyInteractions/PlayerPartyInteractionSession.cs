@@ -1,3 +1,4 @@
+﻿using GameInterface.Services.Clans.Data;
 using GameInterface.Services.Inventory.Data;
 using GameInterface.Services.TroopRosters.Data;
 using LiteNetLib;
@@ -17,6 +18,7 @@ internal sealed class PlayerPartyInteractionSession
     public NetPeer ResponderPeer { get; set; }
     public bool IsHostile { get; }
     public PlayerPartyInteractionVassalUnavailableReason VassalUnavailableReason { get; set; }
+    public ClanJoinUnavailableReason ClanJoinUnavailableReason { get; set; }
     public PlayerPartyInteractionMercenaryUnavailableReason MercenaryUnavailableReason { get; set; }
     public int MercenaryAwardMultiplier { get; set; }
     public PlayerPartyInteractionProposal Proposal { get; set; }
@@ -40,6 +42,7 @@ internal sealed class PlayerPartyInteractionSession
 
     public HashSet<PlayerPartyInteractionOption> InitiatorOptions { get; } = new HashSet<PlayerPartyInteractionOption>();
     public HashSet<PlayerPartyInteractionOption> InitiatorEnabledOptions { get; } = new HashSet<PlayerPartyInteractionOption>();
+    public PlayerPartyInteractionOption[] ResponderClanOptions { get; set; } = System.Array.Empty<PlayerPartyInteractionOption>();
 
     public PlayerPartyInteractionSession(
         string sessionId,

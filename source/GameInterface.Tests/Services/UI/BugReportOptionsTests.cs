@@ -1,4 +1,5 @@
 ﻿using Common.Messaging;
+using GameInterface.Services.UI.CoopOptions.Providers.UITab;
 using GameInterface.Services.UI.BugReporting;
 using GameInterface.Services.UI.CoopOptions;
 using GameInterface.Services.UI.CoopOptions.Providers.BugReportTab;
@@ -14,31 +15,32 @@ using Xunit;
 
 namespace GameInterface.Tests.Services.UI;
 
+[Collection(nameof(CoopOptionsViewModelCollection))]
 public class BugReportOptionsTests
 {
     [Fact]
     public void BugReportOptions_DefaultToShowingTheButton()
     {
         using var messageBroker = new MessageBroker();
-        var provider = new BugReportOptionsTabProvider();
+        var provider = new UIOptionsTabProvider();
 
         var tab = provider.CreateTab(new CoopOptionsData(), messageBroker, _ => { });
 
-        Assert.Equal(BugReportOptionsTabProvider.TabName, tab.Name);
-        Assert.Equal(BugReportOptionsTabProvider.TabId, tab.Id);
+        Assert.Equal("UI", tab.Name);
+        Assert.Equal(UIOptionsTabProvider.TabId, tab.Id);
 
-        var section = Assert.IsType<BugReportSection>(Assert.Single(tab.Sections));
+        var section = Assert.IsType<UISection>(Assert.Single(tab.Sections)).BugReport;
         Assert.Equal(BugReportSection.SectionId, section.Id);
         Assert.True(section.ShowBugReportButton);
     }
 
     [Fact]
-    public void CoopOptionsMovie_BindsBugReportTabAndButtonVisibility()
+    public void CoopOptionsMovie_BindsBugReportVisibilityInsideUITab()
     {
         var document = XDocument.Load(FindMoviePath());
 
         var tab = Assert.Single(document.Descendants("ListPanel"),
-            element => element.Attribute("DataSource")?.Value == "{BugReportTab}");
+            element => element.Attribute("DataSource")?.Value == "{UITab}");
         Assert.Equal("@IsSelected", tab.Attribute("IsVisible")?.Value);
         Assert.Single(tab.Descendants("ButtonWidget"),
             element => element.Attribute("IsSelected")?.Value == "@ShowBugReportButton");
@@ -66,9 +68,9 @@ public class BugReportOptionsTests
                     DisclosureVersion = BugReportConsentCoordinator.CurrentDisclosureVersion,
                 });
             store.Save(existingOptions);
-            var provider = new BugReportOptionsTabProvider();
+            var provider = new UIOptionsTabProvider();
             var tab = provider.CreateTab(store.LoadOrDefault(), messageBroker, _ => { });
-            var section = Assert.IsType<BugReportSection>(Assert.Single(tab.Sections));
+            var section = Assert.IsType<UISection>(Assert.Single(tab.Sections)).BugReport;
 
             section.ShowBugReportButton = false;
             var options = store.LoadOrDefault();

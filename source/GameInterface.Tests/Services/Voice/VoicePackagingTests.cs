@@ -32,8 +32,12 @@ public class VoicePackagingTests
         foreach (string notice in new[] { "Concentus-LICENSE.txt", "NAudio-LICENSE.txt", "Microsoft-NET-LICENSE.txt", "Microsoft-NET-THIRD-PARTY-NOTICES.txt" })
             Assert.NotEmpty(File.ReadAllText(Path.Combine(path, "deploy/ThirdPartyNotices", notice)));
         var deploy = XDocument.Load(Path.Combine(path, "Deploy.targets"));
-        Assert.Contains(deploy.Descendants(), node => node.Name.LocalName == "DeployStaticFiles" &&
+        var deployTarget = Assert.Single(deploy.Descendants(), node => node.Name.LocalName == "Target" &&
+            (string?)node.Attribute("Name") == "DeployToGame");
+        Assert.Contains(deployTarget.Descendants(), node => node.Name.LocalName == "DeployStaticFiles" &&
             (string?)node.Attribute("Include") == "$(DeploySourceDir)\\**\\*");
+        Assert.Contains(deployTarget.Descendants(), node => node.Name.LocalName == "UIMovieFiles" &&
+            (string?)node.Attribute("Include") == "$(UIMoviesDir)\\**\\*");
         var movie = XDocument.Load(Path.Combine(path, "UIMovies/CoopOptionsUIMovie.xml"));
         Assert.Contains(movie.Descendants(), node => (string?)node.Attribute("DataSource") == "{VoiceTab}");
         Assert.Contains(movie.Descendants(), node => (string?)node.Attribute("Command.Click") == "ExecuteTest");

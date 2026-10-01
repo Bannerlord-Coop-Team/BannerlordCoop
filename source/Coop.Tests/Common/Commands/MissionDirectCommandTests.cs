@@ -5,10 +5,12 @@ using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
+using TaleWorlds.MountAndBlade;
 using Xunit;
 
 namespace Coop.Tests.Commands;
 
+[Collection("Mission.Current")]
 public class MissionDirectCommandTests
 {
     private static readonly HashSet<string> OwningTypes = new HashSet<string>
@@ -17,21 +19,37 @@ public class MissionDirectCommandTests
         "BattleDebugCommands",
     };
 
+#if DEBUG
+    // Required-only commands that still check args.Count, which CoopCommandRegistry.ArgumentsAreValid already enforces.
+    private static readonly HashSet<string> RequiredOnlyCountReaders = new HashSet<string>
+    {
+        "cancel_fixture_mission_ready",
+        "defer_fixture_mission_ready",
+    };
+#endif
+
     [Fact]
     public void MissionCommands_AreDirectNormalizedCommands()
     {
         Type[] commandTypes = GetCommandTypes();
 #if DEBUG
-        Assert.Equal(26, commandTypes.Length);
+        Assert.Equal(38, commandTypes.Length);
 #else
         Assert.Equal(15, commandTypes.Length);
 #endif
         ICoopCommand[] commands = commandTypes
-            .Select(type => (ICoopCommand)Activator.CreateInstance(type))
+            .Select(Instantiate)
             .ToArray();
         var registry = new CoopCommandRegistry(commands, new LoggerConfiguration().CreateLogger());
 
         Assert.Equal(commands.Length, registry.Commands.Count);
+#if DEBUG
+        Assert.Contains(commands, command => command.Name == "peer_state");
+        Assert.Contains(commands, command => command.Name == "controller_agents");
+        Assert.Contains(commands, command => command.Name == "drive_owned_agents");
+        Assert.Contains(commands, command => command.Name == "cancel_owned_agent_drive");
+        Assert.Contains(commands, command => command.Name == "owned_agent_drive_state");
+#endif
         Assert.All(commandTypes, type =>
         {
             Assert.Equal(typeof(object), type.BaseType);
@@ -50,13 +68,20 @@ public class MissionDirectCommandTests
     [Fact]
     public void ProcessCommand_ReadsCountOnlyForOptionalArguments()
     {
-        string[] countReaders = GetCommandTypes()
+        ICoopCommand[] countReaders = GetCommandTypes()
             .Where(type => CallsArgumentCount(type.GetMethod(nameof(ICoopCommand.ProcessCommand))))
-            .Select(type => ((ICoopCommand)Activator.CreateInstance(type)).Name)
-            .OrderBy(name => name)
+            .Select(Instantiate)
             .ToArray();
+        string[] names = countReaders.Select(command => command.Name).OrderBy(name => name).ToArray();
 
-        Assert.Equal(new[] { "ladder_state", "mount_state" }, countReaders);
+#if DEBUG
+        Assert.All(RequiredOnlyCountReaders, name => Assert.Contains(name, names));
+        Assert.All(countReaders, command => Assert.True(
+            RequiredOnlyCountReaders.Contains(command.Name) || command.ExpectedArgs.Any(arg => !arg.IsRequired),
+            $"{command.Name} reads args.Count without an optional argument"));
+#else
+        Assert.Equal(new[] { "ladder_state", "mount_state" }, names);
+#endif
     }
 
     [Fact]
@@ -90,6 +115,7 @@ public class MissionDirectCommandTests
     [Fact]
     public void BattleFixture_MissingMission_IsExplicitFailure()
     {
+        Assert.True(Mission.Current == null, "Mission.Current is set, a MissionCurrentScope leaked or ran in parallel");
         ICoopCommand command = CreateCommand("replication_fixture");
 
         CoopCommandResult result = command.ProcessCommand(new TestArgs(new[] { "initial" }));
@@ -124,12 +150,16 @@ public class MissionDirectCommandTests
 
     private static ICoopCommand CreateCommand(string name)
     {
-        Type type = Assert.Single(GetCommandTypes(), candidate =>
-        {
-            var command = (ICoopCommand)Activator.CreateInstance(candidate);
-            return command.Name == name;
-        });
-        return (ICoopCommand)Activator.CreateInstance(type);
+        Type type = Assert.Single(GetCommandTypes(), candidate => Instantiate(candidate).Name == name);
+        return Instantiate(type);
+    }
+
+    // Injected arguments are null, so only read metadata or IL from commands that take them.
+    private static ICoopCommand Instantiate(Type type)
+    {
+        ConstructorInfo[] constructors = type.GetConstructors();
+        Assert.True(constructors.Length == 1, $"{type.Name} needs exactly one public constructor");
+        return (ICoopCommand)constructors[0].Invoke(new object[constructors[0].GetParameters().Length]);
     }
 
     private static Type[] GetCommandTypes()

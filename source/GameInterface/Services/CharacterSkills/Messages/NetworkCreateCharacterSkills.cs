@@ -8,9 +8,12 @@ namespace GameInterface.Services.CharacterSkills.Messages
     {
         [ProtoMember(1)]
         public string CharacterSkillsId;
-        public NetworkCreateCharacterSkills(string characterSkillsId)
+        [ProtoMember(2)]
+        public uint Handle;
+        public NetworkCreateCharacterSkills(string characterSkillsId, uint handle)
         {
             CharacterSkillsId = characterSkillsId;
+            Handle = handle;
         }
     }
 }

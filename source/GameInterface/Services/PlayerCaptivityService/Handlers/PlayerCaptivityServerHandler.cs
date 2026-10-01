@@ -438,8 +438,9 @@ internal class PlayerCaptivityServerHandler : IHandler
         // The release touches party/roster game state the main-thread tick also touches, so defer the
         // apply to the game loop; resolve the object ids inside the lambda so a deferred create that lands
         // first is visible, and send the reply inside the lambda after the release runs so the client only
-        // leaves the captivity menus once the server has actually applied it.
-        GameThread.Run(() =>
+        // leaves the captivity menus once the server has actually applied it. The client already cleared its
+        // captivity state and waits for that reply without a deadline, so an expired release is queued again.
+        GameThread.RunCleanupSafe(() =>
         {
             try
             {
@@ -468,7 +469,7 @@ internal class PlayerCaptivityServerHandler : IHandler
             {
                 Logger.Error(e, "Failed to apply {Message}", nameof(NetworkEndPlayerCaptivityAttempted));
             }
-        }, blocking: true);
+        }, context: nameof(Handle_NetworkEndPlayerCaptivityAttempted));
     }
 
     /// <summary>
@@ -673,8 +674,7 @@ internal class PlayerCaptivityServerHandler : IHandler
     {
         var partyVisual = party.Party.GetPartyVisual();
         if (partyVisual == null) return;
-        if (!objectManager.TryGetIdWithLogging(partyVisual, out string partyVisualId)) return;
-        if (!objectManager.TryGetIdWithLogging(party, out string mobilePartyId)) return;
+        if (!objectManager.TryGetHandleWithLogging(party, out var mobilePartyHandle)) return;
 
         objectManager.Remove(partyVisual);
 
@@ -683,7 +683,7 @@ internal class PlayerCaptivityServerHandler : IHandler
             MobilePartyVisualManager.Current?.RemovePartyVisualForParty(party);
         }
 
-        network.SendAll(new NetworkDestroyPartyVisual(partyVisualId, mobilePartyId));
+        network.SendAll(new NetworkDestroyPartyVisual(mobilePartyHandle));
     }
 
     /// <summary>

@@ -13,41 +13,50 @@ internal class ClanCachePatches
 {
     [HarmonyPatch(nameof(Clan.OnWarPartyAdded))]
     [HarmonyPrefix]
-    public static void OnWarPartyAddedPostfix(ref Clan __instance, WarPartyComponent warPartyComponent)
+    public static bool OnWarPartyAddedPrefix(ref Clan __instance, WarPartyComponent warPartyComponent)
     {
-        if (ModInformation.IsClient || CallOriginalPolicy.IsOriginalAllowed()) return;
+        // ActualClan sync and the cache message can both apply the same membership change.
+        if (__instance.WarPartyComponents.Contains(warPartyComponent)) return false;
+
+        if (ModInformation.IsClient) return CallOriginalPolicy.IsOriginalAllowed();
 
         var message = new WarPartyAdded(__instance, warPartyComponent);
         MessageBroker.Instance.Publish(__instance, message);
+        return true;
     }
 
     [HarmonyPatch(nameof(Clan.OnWarPartyRemoved))]
     [HarmonyPrefix]
-    public static void OnWarPartyRemovedPostfix(ref Clan __instance, WarPartyComponent warPartyComponent)
+    public static bool OnWarPartyRemovedPrefix(ref Clan __instance, WarPartyComponent warPartyComponent)
     {
-        if (ModInformation.IsClient || CallOriginalPolicy.IsOriginalAllowed()) return;
+        if (!__instance.WarPartyComponents.Contains(warPartyComponent)) return false;
+
+        if (ModInformation.IsClient) return CallOriginalPolicy.IsOriginalAllowed();
 
         var message = new WarPartyRemoved(__instance, warPartyComponent);
         MessageBroker.Instance.Publish(__instance, message);
+        return true;
     }
 
     [HarmonyPatch(nameof(Clan.OnSupporterNotableAdded))]
     [HarmonyPrefix]
-    public static void OnSupporterNotableAddedPostfix(ref Clan __instance, Hero hero)
+    public static bool OnSupporterNotableAddedPrefix(ref Clan __instance, Hero hero)
     {
-        if (ModInformation.IsClient || CallOriginalPolicy.IsOriginalAllowed()) return;
+        if (ModInformation.IsClient) return CallOriginalPolicy.IsOriginalAllowed();
 
         var message = new SupporterNotableAdded(__instance, hero);
         MessageBroker.Instance.Publish(__instance, message);
+        return true;
     }
 
     [HarmonyPatch(nameof(Clan.OnSupporterNotableRemoved))]
     [HarmonyPrefix]
-    public static void OnSupporterNotableRemovedPostfix(ref Clan __instance, Hero hero)
+    public static bool OnSupporterNotableRemovedPrefix(ref Clan __instance, Hero hero)
     {
-        if (ModInformation.IsClient || CallOriginalPolicy.IsOriginalAllowed()) return;
+        if (ModInformation.IsClient) return CallOriginalPolicy.IsOriginalAllowed();
 
         var message = new SupporterNotableRemoved(__instance, hero);
         MessageBroker.Instance.Publish(__instance, message);
+        return true;
     }
 }

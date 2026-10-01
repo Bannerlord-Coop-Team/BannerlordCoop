@@ -1,6 +1,6 @@
-﻿using Common.Commands;
-using Autofac;
+﻿using Autofac;
 using Common;
+using Common.Commands;
 using Common.Network;
 using GameInterface.Services.Clans.Extensions;
 using GameInterface.Services.Clans.Messages;
@@ -111,11 +111,17 @@ namespace GameInterface.Services.GameDebug.Commands
                 if (!ModInformation.IsClient) return Failed("Command can only be run on a client.");
 
                 var clanScreen = ScreenManager.TopScreen as GauntletClanScreen;
+                var selectedParty = clanScreen?._dataSource?.ClanParties?.CurrentSelectedParty;
                 return Succeeded($"CLAN_SCREEN_STATE active={Game.Current?.GameStateManager?.ActiveState is ClanState} " +
                     $"topScreen={clanScreen != null} dataSource={clanScreen?._dataSource != null} " +
                     $"parties={clanScreen?._dataSource?.ClanParties?._parties?.Count ?? -1} " +
                     $"partiesSelected={clanScreen?._dataSource?.IsPartiesSelected ?? false} " +
-                    $"mainHero={Hero.MainHero?.StringId ?? "none"}");
+                    $"mainHero={Hero.MainHero?.StringId ?? "none"} " +
+                    $"heroClan={Hero.MainHero?.Clan?.StringId ?? "none"} playerClan={Clan.PlayerClan?.StringId ?? "none"} " +
+                    $"partyVm={selectedParty?.GetType().Name ?? "none"} selectedParty={selectedParty?.Party?.MobileParty?.StringId ?? "none"} " +
+                    $"heroMembers={string.Join(",", selectedParty?.HeroMembers.Select(member => member.HeroObject.StringId) ?? Enumerable.Empty<string>())} " +
+                    $"hasCompanion={selectedParty?.HasCompanion ?? false} " +
+                    $"roles={selectedParty?.Roles.Count ?? -1} enabledRoles={selectedParty?.Roles.Count(role => role.IsEnabled) ?? -1}");
         }
     }
 
@@ -284,7 +290,7 @@ namespace GameInterface.Services.GameDebug.Commands
 
                 for (int i = 0; i < count; i++)
                 {
-                    network.SendAll(new RefreshAfterRoleAssignment(args[0]));
+                    network.SendAll(new NetworkRefreshAfterRoleAssignment(args[0]));
                 }
 
                 return Succeeded($"REFRESH_BURST_SENT party={args[0]} count={count}");
@@ -305,6 +311,7 @@ namespace GameInterface.Services.GameDebug.Commands
             {
                 new ExpectedArgs("clan_id", "The registered player clan id."),
                 new ExpectedArgs("count", "The number of heirs to create, from 1 through 10."),
+                new ExpectedArgs("parent", "Optional player hero id or exact name; defaults to the clan leader.", false),
             };
 
             public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
@@ -324,6 +331,13 @@ namespace GameInterface.Services.GameDebug.Commands
                     return Failed("Targeted clan is not a player clan. Only add new heirs to player clans.");
 
                 Hero playerHero = playerClan.Leader;
+                if (args.Count == 3)
+                {
+                    if (!objectManager.TryGetObject(args[2], out playerHero))
+                        playerHero = playerClan.Heroes.FirstOrDefault(hero => hero.IsPlayerHero() && hero.Name.ToString() == args[2]);
+                    if (playerHero == null || !playerHero.IsPlayerHero() || playerHero.Clan != playerClan)
+                        return Failed("The parent must be a player in the selected clan.");
+                }
 
                 var templates = playerHero.Culture?.LordTemplates?
                     .Where(template => template != null)
@@ -347,9 +361,15 @@ namespace GameInterface.Services.GameDebug.Commands
 
                     relative.SetNewOccupation(Occupation.Lord);
                     if (playerHero.IsFemale)
+                    {
                         relative.Mother = playerHero;
+                        relative.Father = playerHero.Spouse;
+                    }
                     else
+                    {
                         relative.Father = playerHero;
+                        relative.Mother = playerHero.Spouse;
+                    }
                     relative.ChangeState(Hero.CharacterStates.Active);
                     createdHeroes.Add(relative);
                 }

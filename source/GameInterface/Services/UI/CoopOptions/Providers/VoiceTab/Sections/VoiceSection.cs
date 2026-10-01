@@ -12,7 +12,7 @@ using TaleWorlds.MountAndBlade.ViewModelCollection.GameOptions;
 
 namespace GameInterface.Services.UI.CoopOptions.Providers.VoiceTab.Sections;
 
-public sealed class VoiceSection : CoopOptionsSectionVM
+public sealed class VoiceSection : CoopOptionsSectionVM, ICoopKeybindingSection
 {
     public const string SectionId = "VoiceSection";
     private static readonly ILogger Logger = LogManager.GetLogger<VoiceSection>();

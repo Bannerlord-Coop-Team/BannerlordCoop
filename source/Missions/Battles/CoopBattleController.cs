@@ -75,6 +75,10 @@ public class CoopBattleController : CoopMissionController
     private readonly IReinforcementFielder reinforcementFielder;
     private readonly ISiegeEngineDeploymentReplicator siegeEngineDeployment;
     private readonly ISiegeMachineStateReplicator siegeMachineState;
+#if DEBUG
+    internal ISiegeMachineStateReplicator DebugSiegeMachineState => siegeMachineState;
+    internal bool DebugEndConditionHoldReleased => endConditionHoldReleased;
+#endif
     private readonly ISiegeWeaponFireReplicator siegeWeaponFire;
     private readonly IBattleHostRegistry hostRegistryRef;
     private readonly IMissionContext debugMissionContext;
@@ -108,7 +112,8 @@ public class CoopBattleController : CoopMissionController
         IPuppetMountStateRepairer puppetMountStateRepairer,
         IBattleAgentSpawnBatchCodec spawnBatchCodec,
         IBattleDamageDataMapper battleDamageDataMapper,
-        IMissionWeaponDataMapper missionWeaponDataMapper)
+        IMissionWeaponDataMapper missionWeaponDataMapper,
+        ISiegeGateHitApplier siegeGateHitApplier)
         : base(
             network,
             messageBroker,
@@ -151,8 +156,10 @@ public class CoopBattleController : CoopMissionController
             puppetMountStateRepairer,
             battleDamageDataMapper);
         reinforcementFielder = new ReinforcementFielder(messageBroker, objectManager, coopMissionComponent, session, deployment, formationAssigner, casualties, agentBudget);
-        authorityMigrator = new BattleAuthorityMigrator(relayNetwork, messageBroker, objectManager, playerManager, coopMissionComponent, session, casualties, deployment, formationAssigner, missionContext, reinforcementFielder);
-        replicator = new OwnedAgentReplicator(
+        OwnedAgentReplicator ownedAgentReplicator = null;
+        authorityMigrator = new BattleAuthorityMigrator(relayNetwork, messageBroker, objectManager, playerManager, coopMissionComponent, session, casualties, deployment, formationAssigner, missionContext, reinforcementFielder,
+            changedAgentIds => ownedAgentReplicator.BroadcastAuthorityRefresh(changedAgentIds));
+        ownedAgentReplicator = new OwnedAgentReplicator(
             network,
             messageBroker,
             objectManager,
@@ -163,6 +170,7 @@ public class CoopBattleController : CoopMissionController
             spawnBatchCodec,
             missionWeaponDataMapper,
             authorityMigrator);
+        replicator = ownedAgentReplicator;
         puppetSpawner = new PuppetSpawner(
             messageBroker,
             objectManager,
@@ -183,7 +191,7 @@ public class CoopBattleController : CoopMissionController
         // per-battle transient (see MissionModule), so this controller's per-battle lifetime resets it.
         siegeEngineDeployment = new SiegeEngineDeploymentReplicator(network, messageBroker, session, hostEpochPolicy);
         siegeMachineState = new SiegeMachineStateReplicator(network, messageBroker, session, coopMissionComponent.AgentRegistry, hostEpochPolicy);
-        siegeWeaponFire = new SiegeWeaponFireReplicator(network, messageBroker, coopMissionComponent.AgentRegistry);
+        siegeWeaponFire = new SiegeWeaponFireReplicator(network, messageBroker, coopMissionComponent.AgentRegistry, session, siegeMachineState, siegeGateHitApplier, hostEpochPolicy);
         supplyReporter = new SupplyProgressReporter(relayNetwork, session);
 
         hostRegistryRef = hostRegistry;
@@ -215,6 +223,7 @@ public class CoopBattleController : CoopMissionController
         authorityMigrator.Dispose();
         reinforcementFielder.Dispose();
         siegeEngineDeployment.Dispose();
+        coopMissionComponent.AgentActionHandler.BindPilotSeats(null, null);
         siegeMachineState.Dispose();
         siegeWeaponFire.Dispose();
         Deployment.Dispose();
@@ -249,7 +258,11 @@ public class CoopBattleController : CoopMissionController
         Deployment.OnMissionReady();
 
         if (Session.HasInstance)
+        {
+            // Battle entry and native mission initialization follow controller construction.
+            coopMissionComponent.AgentActionHandler.BindPilotSeats(Session.InstanceId, siegeMachineState);
             messageBroker.Publish(this, new BattleMissionReady(Session.InstanceId));
+        }
         else
             Logger.Warning("[BattleHost] Battle mission finished loading with no instance session — cannot announce mission-ready");
     }
@@ -258,6 +271,7 @@ public class CoopBattleController : CoopMissionController
     {
         // Reliable spawn work is queued before this frame's unreliable movement traffic.
         replicator.FlushPendingSpawns();
+        replicator.FlushPendingFormations();
         base.OnMissionTick(dt);
 
         // The mission host is the single siege authority (engine deployment and machine simulation);
@@ -307,7 +321,10 @@ public class CoopBattleController : CoopMissionController
         puppetRoutApplier.DrainPendingRouts();
 
         siegeEngineDeployment.DrainPending(dt);
+        // Puppets registered this frame need their buffered equipment before pending load requests drain.
+        coopMissionComponent.WeaponPickupHandler.RetryPendingSiegeGrants();
         siegeMachineState.Tick(dt);
+        siegeWeaponFire.Tick(dt);
         diagnostics.Tick(dt);
         supplyReporter.Tick(dt);
 
@@ -512,21 +529,38 @@ public class CoopBattleController : CoopMissionController
             }
         }
 
+        // A timed-out blocking run never starts later, so the catch queues the replay again. The shared claim
+        // keeps it to one run when the first copy had already started.
+        int replayClaimed = 0;
+        void ReplayJoinStateOnce()
+        {
+            if (System.Threading.Interlocked.Exchange(ref replayClaimed, 1) == 0)
+                ReplayJoinState();
+        }
+
         // Only an active battle waits and guarantees replay before activation. Before activation an inline
         // commit broadcast may overtake this queued replay; that is safe while activation remains idempotent
         // and puppets spawn unpaused, and avoids blocking while the load-time game-thread queue cannot drain.
         try
         {
             GameThread.RunSafe(
-                ReplayJoinState,
+                ReplayJoinStateOnce,
                 blocking: Deployment.IsActivated,
                 context: nameof(SendJoinInfo));
         }
-        catch (Exception e) when (e is TimeoutException || e is OperationCanceledException)
+        catch (TimeoutException e)
+        {
+            GameThread.RunSafe(ReplayJoinStateOnce, context: nameof(SendJoinInfo));
+            Logger.Warning(
+                e,
+                "[BattleSync] Join replay barrier for {Controller} timed out; the replay is queued again",
+                controllerId);
+        }
+        catch (OperationCanceledException e)
         {
             Logger.Warning(
                 e,
-                "[BattleSync] Join replay barrier for {Controller} was abandoned; the replay stays queued",
+                "[BattleSync] Join replay barrier for {Controller} was canceled; the replay is not queued again",
                 controllerId);
         }
     }

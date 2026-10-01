@@ -55,6 +55,7 @@ public abstract class CommonModule : Module
         builder.RegisterType<ModuleValidator>().As<IModuleValidator>().SingleInstance();
 
         builder.RegisterType<CoopFinalizer>().As<ICoopFinalizer>().InstancePerLifetimeScope();
+        builder.RegisterType<PatchFailureReport>().As<IPatchFailureReport>().InstancePerDependency();
 
         base.Load(builder);
     }

@@ -1,4 +1,4 @@
-using Common;
+﻿using Common;
 using Common.Logging;
 using Common.Messaging;
 using Common.Util;
@@ -989,20 +989,20 @@ internal class VillageHostileActionInterface : IVillageHostileActionInterface, I
     }
 
     internal static bool TryValidateVolunteersTake(
-        string troopId,
+        uint troopId,
         int troopCount,
         TroopRosterData rightMemberDelta,
         out string error,
-        IEnumerable<(string fromId, string toId, int number)> upgradedTroops = null)
+        IEnumerable<(uint fromId, uint toId, int number)> upgradedTroops = null)
     {
         error = null;
-        if (string.IsNullOrEmpty(troopId) || troopCount <= 0)
+        if (troopId == 0 || troopCount <= 0)
         {
             error = "no authorized recruit pool";
             return false;
         }
 
-        var gained = new Dictionary<string, int>(StringComparer.Ordinal);
+        var gained = new Dictionary<uint, int>();
         foreach (var element in rightMemberDelta.Data ?? Array.Empty<TroopRosterElementData>())
         {
             if (element.Number <= 0)
@@ -1020,12 +1020,12 @@ internal class VillageHostileActionInterface : IVillageHostileActionInterface, I
 
         // Gains of any other troop are only legitimate as recorded upgrades made
         // on the screen (e.g. upgrading a taken recruit); anything else is rejected.
-        var upgraded = new Dictionary<string, int>(StringComparer.Ordinal);
+        var upgraded = new Dictionary<uint, int>();
         if (upgradedTroops != null)
         {
             foreach (var (fromId, toId, number) in upgradedTroops)
             {
-                if (string.IsNullOrEmpty(toId) || number <= 0)
+                if (toId == 0 || number <= 0)
                     continue;
                 upgraded.TryGetValue(toId, out var count);
                 upgraded[toId] = count + number;
@@ -1180,7 +1180,7 @@ internal class VillageHostileActionInterface : IVillageHostileActionInterface, I
     // actions) must be untouched, otherwise the commit is rejected. Returning
     // troops to the pool (positive left delta up to the pool size) is allowed.
     internal static bool TryValidateVolunteersCommit(
-        string troopId,
+        uint troopId,
         int troopCount,
         TroopRosterData rightMemberDelta,
         TroopRosterData leftMemberDelta,
@@ -1193,7 +1193,7 @@ internal class VillageHostileActionInterface : IVillageHostileActionInterface, I
         int moraleChange,
         bool applyReleasedAndTakenActions,
         string donationSettlementId,
-        IEnumerable<(string fromId, string toId, int number)> upgradedTroops,
+        IEnumerable<(uint fromId, uint toId, int number)> upgradedTroops,
         out string error)
     {
         if (!TryValidateVolunteersTake(troopId, troopCount, rightMemberDelta, out error, upgradedTroops))
@@ -1208,14 +1208,14 @@ internal class VillageHostileActionInterface : IVillageHostileActionInterface, I
         // with the matching right-side loss proving it was player-originated.
         // Only taking troops off the empty dummy (negative final) or an
         // unmatched left gain is rejected.
-        var rightNetByTroop = new Dictionary<string, int>(StringComparer.Ordinal);
+        var rightNetByTroop = new Dictionary<uint, int>();
         foreach (var element in rightMemberDelta.Data ?? Array.Empty<TroopRosterElementData>())
         {
             rightNetByTroop.TryGetValue(element.CharacterId, out var net);
             rightNetByTroop[element.CharacterId] = net + element.Number;
         }
 
-        var leftNetByTroop = new Dictionary<string, int>(StringComparer.Ordinal);
+        var leftNetByTroop = new Dictionary<uint, int>();
         foreach (var element in leftMemberDelta.Data ?? Array.Empty<TroopRosterElementData>())
         {
             leftNetByTroop.TryGetValue(element.CharacterId, out var net);

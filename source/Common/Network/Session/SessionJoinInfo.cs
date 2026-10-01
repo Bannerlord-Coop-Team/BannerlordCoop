@@ -6,9 +6,9 @@
 /// </summary>
 public class SessionJoinInfo
 {
-    // Bumped to 3 when standalone servers began advertising their own game-server identity; a
+    // Bumped to 4 when synchronized object references moved from string ids to numeric handles; a
     // lobby written by a newer mod fails an older client's decode with an "update your mod" message.
-    public const int CurrentVersion = 3;
+    public const int CurrentVersion = 4;
 
     /// <summary>
     /// Sessions advertised at or above this version have a Steam tunnel listening, so a

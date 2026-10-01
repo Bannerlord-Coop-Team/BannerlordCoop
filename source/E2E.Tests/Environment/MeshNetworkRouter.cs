@@ -4,6 +4,7 @@ using Common.Util;
 using E2E.Tests.Environment.Instance;
 using E2E.Tests.Environment.Mock;
 using GameInterface.Services.Entity;
+using Missions.Services.Network;
 
 namespace E2E.Tests.Environment;
 
@@ -47,13 +48,22 @@ public class MeshNetworkRouter
         if (registration.InstanceId == instanceId) return;
 
         scheduler.Cancel(mesh);
+        RemovePeerMappings(registration);
         registration.InstanceId = instanceId;
+        foreach (ClientRegistration recipient in RecipientsOf(mesh))
+        {
+            registration.MissionContext.MapPeer(
+                ControllerIdOf(recipient.Instance), recipient.Mesh.NetPeer);
+            recipient.MissionContext.MapPeer(
+                ControllerIdOf(registration.Instance), mesh.NetPeer);
+        }
     }
 
     public void Stop(MockBattleNetwork mesh)
     {
         ClientRegistration registration = RegistrationOf(mesh);
         scheduler.Cancel(mesh);
+        RemovePeerMappings(registration);
         registration.InstanceId = null;
         registration.IsStarted = false;
     }
@@ -109,6 +119,15 @@ public class MeshNetworkRouter
         foreach (ClientRegistration recipient in RecipientsOf(sender))
             if (ControllerIdOf(recipient.Instance) != excludedControllerId)
                 SchedulePacket(sender, recipient, packet);
+    }
+
+    private void RemovePeerMappings(ClientRegistration registration)
+    {
+        foreach (ClientRegistration recipient in RecipientsOf(registration.Mesh))
+        {
+            registration.MissionContext.RemovePeer(recipient.Mesh.NetPeer);
+            recipient.MissionContext.RemovePeer(registration.Mesh.NetPeer);
+        }
     }
 
     private IEnumerable<ClientRegistration> RecipientsOf(MockBattleNetwork sender)
@@ -191,6 +210,7 @@ public class MeshNetworkRouter
     {
         public ClientInstance Instance { get; }
         public MockBattleNetwork Mesh { get; }
+        public IMissionContext MissionContext { get; }
         public bool IsStarted { get; set; }
         public string? InstanceId { get; set; }
 
@@ -198,6 +218,7 @@ public class MeshNetworkRouter
         {
             Instance = instance;
             Mesh = mesh;
+            MissionContext = instance.Resolve<IMissionContext>();
         }
     }
 }

@@ -21,12 +21,12 @@ public readonly struct ArmyLeaderPositionObserved : IEvent
 public readonly struct NetworkRequestArmyLeaderPositionConvergence : ICommand
 {
     [ProtoMember(1)]
-    public string LeaderPartyId { get; }
+    public uint LeaderPartyId { get; }
 
     [ProtoMember(2)]
     public CampaignVec2 Position { get; }
 
-    public NetworkRequestArmyLeaderPositionConvergence(string leaderPartyId, CampaignVec2 position)
+    public NetworkRequestArmyLeaderPositionConvergence(uint leaderPartyId, CampaignVec2 position)
     {
         LeaderPartyId = leaderPartyId;
         Position = position;

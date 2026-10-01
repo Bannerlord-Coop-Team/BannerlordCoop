@@ -285,11 +285,15 @@ public class PlayerManagerTests
         Assert.Same(current, resolved);
     }
 
+    // Replacing campaign objects preserves the same controller's peer and saved platform name.
     [Fact]
     public void ReplacePlayer_CurrentRegistration_UpdatesControllerAndPeerAtomically()
     {
         var playerManager = CreatePlayerManager(out _);
-        var registered = new Player(ControllerId, "Hero", "StaleParty", "Clan", "Character");
+        var registered = new Player(ControllerId, "Hero", "StaleParty", "Clan", "Character")
+        {
+            PlatformName = "Platform player"
+        };
         var replacement = new Player(ControllerId, "Hero", "RecoveredParty", "Clan", "Character");
         var peer = new TestNetwork().CreatePeer();
 
@@ -303,6 +307,7 @@ public class PlayerManagerTests
         Assert.True(playerManager.TryGetPlayer(peer, out var byPeer));
         Assert.Same(replacement, byPeer);
         Assert.Same(replacement, Assert.Single(playerManager.Players));
+        Assert.Equal("Platform player", replacement.PlatformName);
     }
 
     [Fact]
@@ -344,6 +349,34 @@ public class PlayerManagerTests
     }
 
     [Fact]
+    public void ReplacePlayer_CoopClan_KeepsOriginalClanControlled()
+    {
+        var manager = CreatePlayerManager(out var objects);
+        var originalClan = ObjectHelper.SkipConstructor<Clan>();
+        var coopClan = ObjectHelper.SkipConstructor<Clan>();
+        objects.Setup(value => value.TryGetObject("original-clan", out originalClan)).Returns(true);
+        objects.Setup(value => value.TryGetObjectWithLogging("original-clan", out originalClan)).Returns(true);
+        objects.Setup(value => value.TryGetObject("coop-clan", out coopClan)).Returns(true);
+        objects.Setup(value => value.TryGetObjectWithLogging("coop-clan", out coopClan)).Returns(true);
+        var registered = new Player(ControllerId, HeroId, PartyId, "original-clan", "character");
+        var restored = new Player(ControllerId, HeroId, PartyId, "coop-clan", "character", registered.OriginalClanId);
+        try
+        {
+            Assert.True(manager.AddPlayer(registered));
+            Assert.True(manager.ReplacePlayer(registered, restored));
+            Assert.True(manager.Contains(originalClan));
+            Assert.False(manager.Contains(coopClan));
+            Assert.True(manager.RemovePlayer(restored));
+            Assert.False(manager.Contains(originalClan));
+        }
+        finally
+        {
+            manager.RemovePlayer(restored);
+            manager.RemovePlayer(registered);
+        }
+    }
+
+    [Fact]
     public void ReplacePlayer_SupersededRegistration_LeavesCurrentRegistrationIntact()
     {
         var playerManager = CreatePlayerManager(out _);
@@ -357,6 +390,43 @@ public class PlayerManagerTests
 
         Assert.False(playerManager.ReplacePlayer(superseded, replacement));
         Assert.Same(current, Assert.Single(playerManager.Players));
+    }
+
+    [Fact]
+    public void RemovingOriginalOwnerKeepsClanControlledByAppointedPlayerLeader()
+    {
+        var manager = CreatePlayerManager(out var objects);
+        var clan = ObjectHelper.SkipConstructor<Clan>();
+        var oldHero = ObjectHelper.SkipConstructor<Hero>();
+        var newLeader = ObjectHelper.SkipConstructor<Hero>();
+        oldHero.OwnedCaravans = new();
+        newLeader.OwnedCaravans = new();
+        objects.Setup(value => value.TryGetObjectWithLogging("clan", out clan)).Returns(true);
+        objects.Setup(value => value.TryGetObject("clan", out clan)).Returns(true);
+        objects.Setup(value => value.TryGetObjectWithLogging("old-hero", out oldHero)).Returns(true);
+        objects.Setup(value => value.TryGetObject("old-hero", out oldHero)).Returns(true);
+        objects.Setup(value => value.TryGetObjectWithLogging("new-leader", out newLeader)).Returns(true);
+        objects.Setup(value => value.TryGetObject("new-leader", out newLeader)).Returns(true);
+        var original = new Player("original", "old-hero", "", "clan", "");
+        var successor = new Player("successor", "new-leader", "", "clan", "", "other-clan");
+        try
+        {
+            clan._leader = oldHero;
+            Assert.True(manager.AddPlayer(original));
+            Assert.True(manager.AddPlayer(successor));
+            clan._leader = newLeader;
+
+            Assert.True(manager.RemovePlayer(original));
+
+            Assert.True(manager.Contains(clan));
+            Assert.True(PlayerManager.TryGetControlledObjectInfo(clan, out var control));
+            Assert.Equal("successor", control.ObjectControllerId);
+        }
+        finally
+        {
+            manager.RemovePlayer(original);
+            manager.RemovePlayer(successor);
+        }
     }
 
     private static ConditionalWeakTable<object, ControlledObjectInfo> GetPlayerObjects() =>

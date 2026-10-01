@@ -179,6 +179,9 @@
     <AssemblyAttribute Include="System.Runtime.CompilerServices.InternalsVisibleTo">
       <_Parameter1>E2E.Tests</_Parameter1>
     </AssemblyAttribute>
+    <AssemblyAttribute Include="System.Runtime.CompilerServices.InternalsVisibleTo">
+      <_Parameter1>Coop.Tests</_Parameter1>
+    </AssemblyAttribute>
   </ItemGroup>
   <ItemGroup>
     <EmbeddedResource Include="Agents\Voice\vanilla_order_voice_manifest.json" />
@@ -205,9 +208,14 @@
     <Publicize Include="TaleWorlds.CampaignSystem.ViewModelCollection" />
     <Publicize Include="TaleWorlds.Core" />
     <Publicize Include="TaleWorlds.Engine" />
+    <Publicize Include="TaleWorlds.InputSystem:TaleWorlds.InputSystem.InputContext._registeredGameKeys" />
     <Publicize Include="TaleWorlds.GauntletUI" />
     <Publicize Include="TaleWorlds.GauntletUI.Data" />
     <Publicize Include="TaleWorlds.MountAndBlade" />
+    <Publicize Include="TaleWorlds.MountAndBlade.View:TaleWorlds.MountAndBlade.View.MissionViews.MissionMainAgentInteractionComponent._currentInteractableObject" />
+    <Publicize Include="TaleWorlds.MountAndBlade.View:TaleWorlds.MountAndBlade.View.MissionViews.MissionMainAgentController._autoDismountModeActive" />
+    <Publicize Include="TaleWorlds.MountAndBlade.View:TaleWorlds.MountAndBlade.View.MissionViews.MissionMainAgentController._activated" />
+    <Publicize Include="TaleWorlds.MountAndBlade.View:TaleWorlds.MountAndBlade.View.Screens.MissionScreen.CameraElevation" />
     <Publicize Include="TaleWorlds.ObjectSystem" />
     <Publicize Include="TaleWorlds.SaveSystem" />
     <Publicize Include="TaleWorlds.MountAndBlade.Mission" />

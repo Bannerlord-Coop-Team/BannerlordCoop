@@ -54,7 +54,7 @@ public class SystemDeveloperDirectCommandTests
         Type[] commandTypes = GetCommandTypes();
 
 #if DEBUG
-        Assert.Equal(104, commandTypes.Length);
+        Assert.Equal(105, commandTypes.Length);
 #else
         Assert.Equal(93, commandTypes.Length);
 #endif
@@ -233,6 +233,9 @@ public class SystemDeveloperDirectCommandTests
     {
         if (type == typeof(ModOptionsCommands.VoiceEnabledCoopCommand))
             return new ModOptionsCommands.VoiceEnabledCoopCommand(Mock.Of<INetwork>(), Mock.Of<IMessageBroker>());
+        // Only the metadata is read here, so the server dependencies can stay empty.
+        if (type == typeof(UnstuckCommand.UnstuckCoopCommand))
+            return new UnstuckCommand.UnstuckCoopCommand(null, null, null, null);
         return (ICoopCommand)Activator.CreateInstance(type)!;
     }
 

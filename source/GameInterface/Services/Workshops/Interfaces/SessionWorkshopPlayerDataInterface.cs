@@ -1,11 +1,14 @@
 ﻿using Common;
 using Common.Logging;
+using Common.Network;
 using GameInterface.CoopSessionData;
 using GameInterface.Services.Inventory.Data;
 using GameInterface.Services.ObjectManager;
+using GameInterface.Services.Workshops.Messages;
 using Serilog;
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.Core;
 
@@ -21,6 +24,7 @@ public interface ISessionWorkshopPlayerDataInterface : IGameAbstraction
     void UpdateWarehouseRoster(string ownerId, string settlementId, ItemRosterElement[] newWarehouseData);
     ItemRosterElement GetItemRosterElementFromData(ItemRosterElementData itemRosterElementData);
     void AddPlayerKeys(string playerHeroId);
+    void TransferWarehouseData(Hero oldOwner, Hero newOwner);
 }
 
 public class SessionWorkshopPlayerDataInterface : ISessionWorkshopPlayerDataInterface
@@ -28,12 +32,17 @@ public class SessionWorkshopPlayerDataInterface : ISessionWorkshopPlayerDataInte
     private static readonly ILogger Logger = LogManager.GetLogger<SessionWorkshopPlayerDataInterface>();
     private readonly ICoopSessionProvider coopSessionProvider;
     private readonly IObjectManager objectManager;
+    private readonly INetwork network;
     private WorkshopPlayerData WorkshopPlayerData => coopSessionProvider.CoopSession.WorkshopPlayerData;
 
-    public SessionWorkshopPlayerDataInterface(ICoopSessionProvider coopSessionProvider, IObjectManager objectManager)
+    public SessionWorkshopPlayerDataInterface(
+        ICoopSessionProvider coopSessionProvider,
+        IObjectManager objectManager,
+        INetwork network)
     {
         this.coopSessionProvider = coopSessionProvider;
         this.objectManager = objectManager;
+        this.network = network;
     }
 
     public void AddNewWarehouseDataIfNeeded(string ownerId, string settlementId)
@@ -217,6 +226,39 @@ public class SessionWorkshopPlayerDataInterface : ISessionWorkshopPlayerDataInte
     {
         TryResolveWarehouseElement(itemRosterElementData, out var result);
         return result;
+    }
+
+    public void TransferWarehouseData(Hero oldOwner, Hero newOwner)
+    {
+        GameThread.RunSafe(() =>
+        {
+            if (oldOwner == newOwner) return;
+            if (!objectManager.TryGetIdWithLogging(oldOwner, out var oldOwnerId)) return;
+            if (!objectManager.TryGetIdWithLogging(newOwner, out var newOwnerId)) return;
+
+            var warehouses = WorkshopPlayerData.PlayerWarehouseRosterPerSettlement;
+            if (!warehouses.TryGetValue(oldOwnerId, out var oldSlots)) return;
+
+            AddPlayerKeys(newOwnerId);
+
+            foreach (var source in oldSlots)
+            {
+                if (source.Key == null || source.Value == null) continue;
+
+                AddNewWarehouseDataIfNeeded(newOwnerId, source.Key);
+                var targetWarehouse = warehouses[newOwnerId].First(warehouse => warehouse.Key == source.Key).Value;
+                var mergedRoster = targetWarehouse.Concat(source.Value)
+                    .GroupBy(item => item.ItemObjectData)
+                    .Select(group => new ItemRosterElementData(group.Key, group.Sum(item => item.Amount)))
+                    .ToArray();
+
+                targetWarehouse.Clear();
+                targetWarehouse.AddRange(mergedRoster);
+                RemoveWarehouseData(oldOwnerId, source.Key);
+
+                network.SendAll(new TransferWarehouseRoster(oldOwnerId, newOwnerId, source.Key, mergedRoster));
+            }
+        });
     }
 
     private bool TryResolveWarehouseElementIds(ItemRosterElement itemRosterElement, out ItemRosterElementData itemRosterElementData)

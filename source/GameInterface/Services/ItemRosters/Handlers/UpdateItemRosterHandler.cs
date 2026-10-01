@@ -54,7 +54,7 @@ internal class UpdateItemRosterHandler : IHandler
                 }
 
                 ItemModifier modifier = null;
-                if (msg.ItemModifierId != null && objectManager.TryGetObject(msg.ItemModifierId, out modifier) == false)
+                if (msg.ItemModifierId != 0 && objectManager.TryGetObject(msg.ItemModifierId, out modifier) == false)
                 {
                     Logger.Error("Failed to update item roster, ItemModifier '{itemModifierId}' not found", msg.ItemModifierId);
                     return;

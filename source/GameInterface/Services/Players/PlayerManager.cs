@@ -162,7 +162,7 @@ public class PlayerManager : IPlayerManager
         // Add player objects for IsPlayer extension (i.e. MobilePartyExtensions)
         AddPlayerObject<MobileParty>(player.ControllerId, player.MobilePartyId);
         AddPlayerObject<Hero>(player.ControllerId, player.HeroId);
-        AddPlayerObject<Clan>(player.ControllerId, player.ClanId);
+        AddPlayerObject<Clan>(player.ControllerId, player.OriginalClanId ?? player.ClanId);
 
         return true;
     }
@@ -180,6 +180,7 @@ public class PlayerManager : IPlayerManager
                 !ReferenceEquals(current, registeredPlayer))
                 return false;
 
+            replacementPlayer.PlatformName = registeredPlayer.PlatformName;
             _players[registeredPlayer.ControllerId] = replacementPlayer;
 
             foreach (var peer in peerToPlayer
@@ -192,7 +193,9 @@ public class PlayerManager : IPlayerManager
 
         ReplacePlayerObject<MobileParty>(registeredPlayer.ControllerId, registeredPlayer.MobilePartyId, replacementPlayer.MobilePartyId);
         ReplacePlayerObject<Hero>(registeredPlayer.ControllerId, registeredPlayer.HeroId, replacementPlayer.HeroId);
-        ReplacePlayerObject<Clan>(registeredPlayer.ControllerId, registeredPlayer.ClanId, replacementPlayer.ClanId);
+        ReplacePlayerObject<Clan>(registeredPlayer.ControllerId,
+            registeredPlayer.OriginalClanId ?? registeredPlayer.ClanId,
+            replacementPlayer.OriginalClanId ?? replacementPlayer.ClanId);
         return true;
     }
 
@@ -270,11 +273,13 @@ public class PlayerManager : IPlayerManager
     /// <inheritdoc cref="IPlayerManager.Contains(object)"/>
     public bool Contains(object obj)
     {
-        return obj != null && PlayerObjects.TryGetValue(obj, out _);
+        return obj != null && TryGetControlledObjectInfo(obj, out _);
     }
 
     public static bool TryGetControlledObjectInfo(object obj, out ControlledObjectInfo info)
     {
+        // A coop clan can outlive its original player's registration after succession.
+        if (obj is Clan clan && clan.Leader != null && PlayerObjects.TryGetValue(clan.Leader, out info)) return true;
         return PlayerObjects.TryGetValue(obj, out info);
     }
     public void SetPeer(string controllerId, NetPeer peer)
@@ -340,7 +345,7 @@ public class PlayerManager : IPlayerManager
 
         RemovePlayerObject<MobileParty>(player.MobilePartyId);
         RemovePlayerObject<Hero>(player.HeroId);
-        RemovePlayerObject<Clan>(player.ClanId);
+        RemovePlayerObject<Clan>(player.OriginalClanId ?? player.ClanId);
 
         return true;
     }

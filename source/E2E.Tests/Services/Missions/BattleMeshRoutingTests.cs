@@ -29,6 +29,8 @@ public class BattleMeshRoutingTests : MissionTestEnvironment
 {
     public BattleMeshRoutingTests(ITestOutputHelper output) : base(output)
     {
+        SetControllerId(Clients.First(), "attacker");
+        SetControllerId(Clients.Skip(1).First(), "owner");
         foreach (var client in Clients)
         {
             var mesh = Assert.IsType<MockBattleNetwork>(client.Resolve<IBattleNetwork>());

@@ -143,7 +143,7 @@ public class AlleyDebugCommand
 
             // Drive the same authoritative take-over the in-game alley fight uses; for the cheat the granted
             // hero is both the owner and the overseer (single garrison member). AlleyManagementHandler applies it.
-            TroopRosterElementData[] garrison = objectManager.TryGetId(hero.CharacterObject, out var heroCharId)
+            TroopRosterElementData[] garrison = objectManager.TryGetHandle(hero.CharacterObject, out var heroCharId)
                 ? new[] { new TroopRosterElementData(heroCharId, 1, 0, 0) }
                 : new TroopRosterElementData[0];
 

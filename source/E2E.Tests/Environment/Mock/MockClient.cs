@@ -10,6 +10,8 @@ namespace E2E.Tests.Environment.Mock;
 
 public class MockClient : MockNetworkBase, ICoopClient
 {
+    private readonly TestNetworkRouter networkOrchestrator;
+
     public MockClient(
         TestNetworkRouter networkOrchestrator,
         IPacketManager packetManager,
@@ -17,11 +19,12 @@ public class MockClient : MockNetworkBase, ICoopClient
         IReliableMessageBatcher<NetPeer> reliableMessageBatcher) :
         base(networkOrchestrator, packetManager, serializer, reliableMessageBatcher)
     {
+        this.networkOrchestrator = networkOrchestrator;
     }
 
     public Guid ClientId => throw new NotImplementedException();
 
-    public IPEndPoint ServerEndpoint => throw new NotImplementedException();
+    public IPEndPoint ServerEndpoint => networkOrchestrator.ServerEndpoint;
 
     public void OnConnectionRequest(ConnectionRequest request)
     {

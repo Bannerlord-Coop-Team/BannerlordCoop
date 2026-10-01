@@ -1,4 +1,5 @@
-﻿using Serilog;
+﻿using Common;
+using Serilog;
 using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
@@ -31,6 +32,8 @@ public interface IObjectManager
     /// <returns>True if successful, false if failed</returns>
     bool TryGetId(object obj, out string id);
     bool TryGetIdWithLogging<T>(T obj, out string id);
+    bool TryGetHandle(object obj, out uint handle);
+    bool TryGetHandleWithLogging<T>(T obj, out uint handle);
 
     /// <summary>
     /// Attempts to get an object using a StringId and object type
@@ -41,6 +44,8 @@ public interface IObjectManager
     /// <returns>True if successful, false if failed</returns>
     bool TryGetObject<T>(string id, out T obj);
     bool TryGetObjectWithLogging<T>(string id, out T obj);
+    bool TryGetObject<T>(uint handle, out T obj);
+    bool TryGetObjectWithLogging<T>(uint handle, out T obj);
 
     /// <summary>
     /// Add an object with already existing StringId
@@ -49,6 +54,7 @@ public interface IObjectManager
     /// <param name="obj">Object to assosiate with id</param>
     /// <returns>True if successful, false if failed</returns>
     bool AddExisting(string id, object obj);
+    bool AddExisting(string id, object obj, uint handle);
 
     /// <summary>
     /// Adds an object without a registered StringId
@@ -57,6 +63,10 @@ public interface IObjectManager
     /// <param name="newId">Newly created StringId</param>
     /// <returns>True if successful, false if failed</returns>
     bool AddNewObject(object obj, out string newId);
+
+    IReadOnlyDictionary<string, uint> GetHandleMap();
+    void SetJoinHandleMap(IReadOnlyDictionary<string, uint> handles);
+    void ClearJoinHandleMap();
 
     /// <summary>
     /// Retains registrations made by <paramref name="registerAndValidate"/> only when it returns true.
@@ -100,8 +110,13 @@ public class ObjectManager : IObjectManager
 
     protected readonly ConcurrentDictionary<string, object> idObjs = new ConcurrentDictionary<string, object>();
     protected ConditionalWeakTable<object, string> objsIds = new ConditionalWeakTable<object, string>();
+    protected readonly ConcurrentDictionary<uint, object> handleObjs = new ConcurrentDictionary<uint, object>();
+    protected ConditionalWeakTable<object, HandleBox> objsHandles = new ConditionalWeakTable<object, HandleBox>();
+    private ConditionalWeakTable<object, HandleBox> retiredHandles = new ConditionalWeakTable<object, HandleBox>();
 
     private readonly ConcurrentDictionary<Type, int> objectCounters = new ConcurrentDictionary<Type, int>();
+    private IReadOnlyDictionary<string, uint> joinHandles;
+    private uint nextHandle = 1;
 
     private readonly object _gate = new();
 
@@ -141,25 +156,62 @@ public class ObjectManager : IObjectManager
 
         lock (_gate)
         {
-            // Skip to next id
-            GetUniqueTypeId(obj);
-
-            if (objsIds.TryGetValue(obj, out var _))
-            {
-                logger.Error("Object already registered: {ObjectType}", obj.GetType());
-                return false;
-            }
-
-            if (!idObjs.TryAdd(id, obj))
-            {
-                logger.Error("Duplicate id: {id}", id);
-                return false;
-            }
-
-            objsIds.Add(obj, id);
-
-            return true;
+            return AddExistingCore(id, obj, ResolveRegistrationHandle(id, obj), allowMissingHandle: true);
         }
+    }
+
+    public bool AddExisting(string id, object obj, uint handle)
+    {
+        if (string.IsNullOrEmpty(id)) return false;
+
+        if (obj == null) return false;
+
+        if (handle == 0)
+        {
+            logger.Error("Object handle 0 is reserved for null.");
+            return false;
+        }
+
+        lock (_gate)
+        {
+            return AddExistingCore(id, obj, handle, allowMissingHandle: false);
+        }
+    }
+
+    private bool AddExistingCore(string id, object obj, uint handle, bool allowMissingHandle)
+    {
+        // Skip to next id
+        GetUniqueTypeId(obj);
+
+        if (objsIds.TryGetValue(obj, out var _))
+        {
+            logger.Error("Object already registered: {ObjectType}", obj.GetType());
+            return false;
+        }
+
+        if (!idObjs.TryAdd(id, obj))
+        {
+            logger.Error("Duplicate id: {id}", id);
+            return false;
+        }
+
+        objsIds.Add(obj, id);
+
+        if (handle == 0 && !allowMissingHandle)
+        {
+            idObjs.TryRemove(id, out _);
+            objsIds.Remove(obj);
+            return false;
+        }
+
+        if (handle != 0 && !AddHandle(obj, handle))
+        {
+            idObjs.TryRemove(id, out _);
+            objsIds.Remove(obj);
+            return false;
+        }
+
+        return true;
     }
 
     public bool AddNewObject(object obj, out string newId)
@@ -188,6 +240,15 @@ public class ObjectManager : IObjectManager
             }
 
             objsIds.Add(obj, newId);
+
+            var handle = ResolveRegistrationHandle(newId, obj);
+            if (handle != 0 && !AddHandle(obj, handle))
+            {
+                idObjs.TryRemove(newId, out _);
+                objsIds.Remove(obj);
+                newId = null;
+                return false;
+            }
 
             return true;
         }
@@ -255,6 +316,34 @@ public class ObjectManager : IObjectManager
             return objsIds.TryGetValue(obj, out id);
         }
     }
+
+    public bool TryGetHandle(object obj, out uint handle)
+    {
+        handle = 0;
+        if (obj == null) return false;
+
+        lock (_gate)
+        {
+            if (!objsHandles.TryGetValue(obj, out var box)) return false;
+            handle = box.Value;
+            return true;
+        }
+    }
+
+    public bool TryGetObject<T>(uint handle, out T obj)
+    {
+        obj = default;
+        if (handle == 0 || !handleObjs.TryGetValue(handle, out var storedObj)) return false;
+
+        if (storedObj is not T castedObject)
+        {
+            logger.Error("Could not cast ({ActualType}) object to type {ObjectType}", storedObj.GetType(), typeof(T));
+            return false;
+        }
+
+        obj = castedObject;
+        return true;
+    }
     public bool TryGetObject<T>(string id, out T obj)
     {
         obj = default;
@@ -303,7 +392,15 @@ public class ObjectManager : IObjectManager
         {
             if (objsIds.TryGetValue(obj, out var id) == false) return false;
 
-            return idObjs.TryRemove(id, out _) && objsIds.Remove(obj);
+            var removed = idObjs.TryRemove(id, out _) && objsIds.Remove(obj);
+            if (objsHandles.TryGetValue(obj, out var box))
+            {
+                handleObjs.TryRemove(box.Value, out _);
+                objsHandles.Remove(obj);
+                retiredHandles.Remove(obj);
+                retiredHandles.Add(obj, box);
+            }
+            return removed;
         }
     }
 
@@ -315,8 +412,92 @@ public class ObjectManager : IObjectManager
                 continue;
 
             if (idObjs.TryRemove(entry.Key, out var registeredObject))
+            {
                 objsIds.Remove(registeredObject);
+                if (objsHandles.TryGetValue(registeredObject, out var box))
+                {
+                    handleObjs.TryRemove(box.Value, out _);
+                    objsHandles.Remove(registeredObject);
+                }
+            }
         }
+    }
+
+    public IReadOnlyDictionary<string, uint> GetHandleMap()
+    {
+        var handles = new Dictionary<string, uint>(StringComparer.Ordinal);
+        lock (_gate)
+        {
+            foreach (var entry in idObjs)
+            {
+                if (objsHandles.TryGetValue(entry.Value, out var box))
+                    handles[entry.Key] = box.Value;
+            }
+        }
+        return handles;
+    }
+
+    public void SetJoinHandleMap(IReadOnlyDictionary<string, uint> handles)
+    {
+        lock (_gate)
+        {
+            joinHandles = handles;
+        }
+    }
+
+    public void ClearJoinHandleMap()
+    {
+        lock (_gate)
+        {
+            joinHandles = null;
+        }
+    }
+
+    private uint ResolveRegistrationHandle(string id, object obj)
+    {
+        if (joinHandles != null && joinHandles.TryGetValue(id, out var mappedHandle))
+        {
+            if (mappedHandle == 0)
+                throw new InvalidOperationException($"Join handle for {id} cannot be zero.");
+            return mappedHandle;
+        }
+
+        if (retiredHandles.TryGetValue(obj, out var retiredHandle) &&
+            !handleObjs.ContainsKey(retiredHandle.Value))
+        {
+            return retiredHandle.Value;
+        }
+
+        if (!ModInformation.IsServer) return 0;
+
+        if (nextHandle == 0)
+            throw new InvalidOperationException("Object handle space exhausted.");
+        return nextHandle++;
+    }
+
+    private bool AddHandle(object obj, uint handle)
+    {
+        if (handle == 0)
+        {
+            logger.Error("Object handle 0 is reserved for null.");
+            return false;
+        }
+        if (objsHandles.TryGetValue(obj, out _))
+        {
+            logger.Error("Object already has a network handle: {ObjectType}", obj.GetType());
+            return false;
+        }
+        if (!handleObjs.TryAdd(handle, obj))
+        {
+            logger.Error("Duplicate object handle: {Handle}", handle);
+            return false;
+        }
+
+        objsHandles.Add(obj, new HandleBox(handle));
+        retiredHandles.Remove(obj);
+        if (handle >= nextHandle)
+            nextHandle = handle == uint.MaxValue ? 0 : handle + 1;
+        return true;
     }
 
     #region LogHelpers
@@ -358,6 +539,18 @@ public class ObjectManager : IObjectManager
         return true;
     }
 
+    public bool TryGetHandleWithLogging<T>(T obj, out uint handle)
+    {
+        handle = 0;
+        if (obj != null && TryGetHandle(obj, out handle)) return true;
+
+        logger.Error(
+            "[{ClassName}] Failed to get network handle for object of type {ObjectType}",
+            nameof(ObjectManager),
+            typeof(T));
+        return false;
+    }
+
     public bool TryGetObjectWithLogging<T>(string id, out T obj)
     {
         obj = default;
@@ -386,13 +579,40 @@ public class ObjectManager : IObjectManager
         return true;
     }
 
+    public bool TryGetObjectWithLogging<T>(uint handle, out T obj)
+    {
+        if (TryGetObject(handle, out obj)) return true;
+
+        logger.Error(
+            "[{ClassName}] Failed to get {name} using network handle {handle}",
+            nameof(ObjectManager),
+            typeof(T),
+            handle);
+        return false;
+    }
+
     public void Clear()
     {
         lock (_gate)
         {
             objsIds = new ConditionalWeakTable<object, string>();
+            objsHandles = new ConditionalWeakTable<object, HandleBox>();
+            retiredHandles = new ConditionalWeakTable<object, HandleBox>();
             idObjs.Clear();
+            handleObjs.Clear();
+            joinHandles = null;
+            nextHandle = 1;
         }
     }
     #endregion
+
+    protected sealed class HandleBox
+    {
+        public uint Value { get; }
+
+        public HandleBox(uint value)
+        {
+            Value = value;
+        }
+    }
 }
