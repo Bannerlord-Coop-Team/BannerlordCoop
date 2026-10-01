@@ -6,6 +6,7 @@ using Common.PacketHandlers;
 using E2E.Tests.Environment.Instance;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Locations;
+using GameInterface.Services.MapEvents;
 using GameInterface.Services.Time.UI;
 using GameInterface.Services.UI.PlayerNameplates;
 using Missions;
@@ -20,6 +21,7 @@ using System.Linq;
 using System.Reflection;
 using System.Runtime.CompilerServices;
 using TaleWorlds.MountAndBlade;
+using TaleWorlds.CampaignSystem;
 using Xunit;
 using Xunit.Abstractions;
 
@@ -58,6 +60,32 @@ public class MissionLifetimeTests : MissionTestEnvironment
         GC.Collect();
         Assert.All(references, reference => Assert.False(reference.IsAlive));
         GC.KeepAlive(client.Container);
+    }
+
+    [Fact]
+    public void AbandoningBattleRestoresPriorAuthorityProbes()
+    {
+        Clients.Single().Call(() =>
+        {
+            var previousHero = BattleSpawnGate.HeroAgentAuthorityProbe;
+            var previousMount = BattleSpawnGate.MountAuthorityProbe;
+            Func<Hero, bool?> hero = _ => true;
+            Func<Agent, bool?> mount = _ => true;
+            try
+            {
+                BattleSpawnGate.HeroAgentAuthorityProbe = hero;
+                BattleSpawnGate.MountAuthorityProbe = mount;
+                var controller = Clients.Single().Resolve<CoopBattleController>();
+                controller.Abandon();
+                Assert.Same(hero, BattleSpawnGate.HeroAgentAuthorityProbe);
+                Assert.Same(mount, BattleSpawnGate.MountAuthorityProbe);
+            }
+            finally
+            {
+                BattleSpawnGate.HeroAgentAuthorityProbe = previousHero;
+                BattleSpawnGate.MountAuthorityProbe = previousMount;
+            }
+        });
     }
 
     [MethodImpl(MethodImplOptions.NoInlining)]

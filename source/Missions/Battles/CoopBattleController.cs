@@ -93,6 +93,7 @@ public class CoopBattleController : CoopMissionController
     // Answer BattleSpawnGate.HeroAgentAuthorityProbe for paths in GameInterface (e.g. HeroExtensions.IsHealthControlledByThisInstance)
     private readonly Func<Hero, bool?> heroAgentAuthorityProbe;
     private Func<Hero, bool?> previousHeroAgentAuthorityProbe;
+    private Func<Agent, bool?> previousMountAuthorityProbe;
 
     public CoopBattleController(
         IBattleNetwork network,
@@ -151,6 +152,7 @@ public class CoopBattleController : CoopMissionController
                 coopMissionComponent,
                 casualties,
                 puppetMountStateRepairer);
+            previousMountAuthorityProbe = BattleSpawnGate.MountAuthorityProbe;
             damageRouter = new BattleDamageRouter(
                 network,
                 messageBroker,
@@ -247,6 +249,9 @@ public class CoopBattleController : CoopMissionController
                 if (BattleSpawnGate.HeroAgentAuthorityProbe == heroAgentAuthorityProbe)
                     BattleSpawnGate.HeroAgentAuthorityProbe = IsAbandoned ? previousHeroAgentAuthorityProbe : null;
                 previousHeroAgentAuthorityProbe = null;
+                if (IsAbandoned && BattleSpawnGate.MountAuthorityProbe == null)
+                    BattleSpawnGate.MountAuthorityProbe = previousMountAuthorityProbe;
+                previousMountAuthorityProbe = null;
                 // OnMissionTick sets these each frame; reset them here (their owner) so a stale authority
                 // never bleeds into the next siege before the first tick refreshes it.
                 if (IsAbandoned) return;
