@@ -4,6 +4,8 @@ using Common.Commands;
 using Coop.Core.Server.Services.Stances.Messages;
 using E2E.Tests.Environment.Instance;
 using GameInterface.Services.Heroes.Commands;
+using GameInterface.Services.HeroDevelopers.Commands;
+using Newtonsoft.Json.Linq;
 using GameInterface.Services.Heroes.Patches;
 using GameInterface.Services.GameDebug.Messages;
 using GameInterface.Services.Issues.Commands;
@@ -47,6 +49,131 @@ public class TheConquestOfSettlementIssueTests : IDisposable
     public void Dispose() => environment.Dispose();
 
 #if DEBUG
+    [Theory]
+    [InlineData("hero")]
+    [InlineData("party")]
+    [InlineData("player")]
+    public void MissingOwnerDiagnosticCancelsTheQuestAndRestoresTheSameRegistrations(string missing)
+    {
+        var created = CreateIssue();
+        var heroId = environment.CreateRegisteredObject<Hero>();
+        var partyId = environment.CreateRegisteredObject<MobileParty>();
+        Server.Call(() =>
+        {
+            var players = Server.Resolve<IPlayerManager>();
+            var player = new Player("cleanup-owner", heroId, partyId, "", "");
+            Assert.True(players.AddPlayer(player));
+            Assert.True(Server.ObjectManager.TryGetObject<Hero>(heroId, out var hero));
+            Assert.True(Server.ObjectManager.TryGetObject<MobileParty>(partyId, out var party));
+            Assert.True(Server.ObjectManager.TryGetHandle(hero, out var heroHandle));
+            Assert.True(Server.ObjectManager.TryGetHandle(party, out var partyHandle));
+            Assert.True(Server.ObjectManager.TryGetObject<Hero>(created.GiverId, out var giver));
+            Assert.True(Server.ObjectManager.TryGetObject<Settlement>(created.TargetId, out var target));
+            var quest = new Quest(created.IssueId + "_quest", giver, target, CampaignTime.DaysFromNow(60), 20000);
+            using (new AllowedThread())
+            {
+                giver.Issue.IssueQuest = quest;
+                giver.Issue.IsTriedToSolveBefore = true;
+                giver.Issue._issueState = IssueBase.IssueState.SolvingWithQuestSolution;
+                Campaign.Current.QuestManager.OnQuestStarted(quest);
+            }
+            var ownership = Server.Resolve<IIssueOwnershipRegistry>();
+            ownership.SetOwner(giver, player.ControllerId);
+            ownership.SetQuestOwner(quest.StringId, player.ControllerId);
+            var result = new ConquestQuestCommands.CancelMissingOwner().ProcessCommand(
+                new CoopCommandArgsFactory().FromValues(new[] { player.ControllerId, missing }));
+            Assert.True(result.Succeeded, result.Output);
+            Assert.False(JObject.Parse(result.Output)["during"].Value<bool>(missing + "Available"));
+            Assert.True(quest.IsFinalized);
+            Assert.Null(giver.Issue);
+            Assert.True(players.TryGetPlayer(player.ControllerId, out var restored));
+            Assert.Same(player, restored);
+            Assert.True(Server.ObjectManager.TryGetObject<Hero>(heroHandle, out var restoredHero));
+            Assert.True(Server.ObjectManager.TryGetObject<MobileParty>(partyHandle, out var restoredParty));
+            Assert.Same(hero, restoredHero);
+            Assert.Same(party, restoredParty);
+        });
+    }
+
+    [Fact]
+    public void ExpiryObservationKeepsTheNativeRandomDrawAndItsValue()
+    {
+        var method = AccessTools.Method(typeof(IssueManager), nameof(IssueManager.DailyTick));
+        var original = PatchProcessor.GetOriginalInstructions(method).ToList();
+        var observed = ConquestQuestCommands.IssueExpiryTimingPatch.Transpiler(original, method).ToList();
+        var random = AccessTools.PropertyGetter(typeof(MBRandom), nameof(MBRandom.RandomFloat));
+        Assert.True(ConquestQuestCommands.IssueExpiryTimingPatch.ObservationAvailable);
+        Assert.Equal(original.Count + 2, observed.Count);
+        Assert.Single(observed.Where(code => code.Calls(random)));
+        Assert.Single(observed.Where(code => code.Calls(AccessTools.Method(
+            typeof(ConquestQuestCommands.IssueExpiryTimingPatch), nameof(ConquestQuestCommands.IssueExpiryTimingPatch.ObserveRoll)))));
+        var created = CreateIssue();
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject<Hero>(created.GiverId, out var giver));
+            var history = ConquestQuestCommands.GetTickHistory(Campaign.Current.IssueManager);
+
+            Assert.Equal(0.2f, ConquestQuestCommands.IssueExpiryTimingPatch.ObserveRoll(0.2f, giver.Issue));
+            Assert.Equal(0.9f, ConquestQuestCommands.IssueExpiryTimingPatch.ObserveRoll(0.9f, giver.Issue));
+            var samples = history.ExpiryRolls.Reverse().Take(2).Reverse().Select(JObject.FromObject).ToArray();
+            Assert.Equal(2, samples.Length);
+            Assert.All(samples, sample => Assert.Equal(giver.Issue.StringId, sample.Value<string>("issueId")));
+            Assert.True(samples[0].Value<bool>("permitted"));
+            Assert.False(samples[1].Value<bool>("permitted"));
+            Assert.True(giver.Issue.IsOngoingWithoutQuest);
+            Assert.Null(giver.Issue.IssueQuest);
+        });
+    }
+
+    [Theory]
+    [InlineData("charm")]
+    [InlineData("mercy")]
+    [InlineData("female")]
+    [InlineData("persona_curt")]
+    [InlineData("persona_ironic")]
+    [InlineData("in_bloom")]
+    [InlineData("young_and_respectful")]
+    [InlineData("good_natured")]
+    [InlineData("tribute")]
+    public void SocialParameterWritesReplicateAndRestoreWithoutAcceptingStaleOrClientWrites(string parameter)
+    {
+        var heroId = environment.CreateRegisteredObject<Hero>();
+        var command = new HeroDeveloperCommands.HeroSocialParameterCoopCommand();
+        var args = new CoopCommandArgsFactory();
+        int ReadValue()
+        {
+            var result = command.ProcessCommand(args.FromValues(new[] { heroId, parameter }));
+            Assert.True(result.Succeeded, result.Output);
+            return JObject.Parse(result.Output).Value<int>("value");
+        }
+        var previous = 0;
+        var changed = 0;
+        Server.Call(() =>
+        {
+            previous = ReadValue();
+            changed = previous == 0 ? 1 : 0;
+            Assert.False(command.ProcessCommand(args.FromValues(new[] { heroId, parameter, changed.ToString() })).Succeeded);
+            Assert.False(command.ProcessCommand(args.FromValues(new[] { heroId, parameter, int.MaxValue.ToString(), previous.ToString() })).Succeeded);
+            var result = command.ProcessCommand(args.FromValues(new[] { heroId, parameter, changed.ToString(), previous.ToString() }));
+            Assert.True(result.Succeeded, result.Output);
+            Assert.Equal(previous, JObject.Parse(result.Output).Value<int>("before"));
+            Assert.Equal(changed, ReadValue());
+            Assert.False(command.ProcessCommand(args.FromValues(new[] { heroId, parameter, previous.ToString(), previous.ToString() })).Succeeded);
+            Assert.Equal(changed, ReadValue());
+        });
+        foreach (var client in environment.Clients)
+            client.Call(() =>
+            {
+                Assert.Equal(changed, ReadValue());
+                Assert.False(command.ProcessCommand(args.FromValues(new[] { heroId, parameter, previous.ToString(), changed.ToString() })).Succeeded);
+                Assert.Equal(changed, ReadValue());
+            });
+        Server.Call(() => Assert.True(command.ProcessCommand(args.FromValues(
+            new[] { heroId, parameter, previous.ToString(), changed.ToString() })).Succeeded));
+        foreach (var client in environment.Clients)
+            client.Call(() => Assert.Equal(previous, ReadValue()));
+    }
+
     [Theory]
     [InlineData(true)]
     [InlineData(false)]

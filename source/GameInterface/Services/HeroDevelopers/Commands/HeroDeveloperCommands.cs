@@ -1,6 +1,9 @@
 ﻿using Common.Commands;
 using Common;
 using Common.Logging;
+using GameInterface.Utils.Commands;
+using Newtonsoft.Json;
+using TaleWorlds.CampaignSystem.CharacterDevelopment;
 using Serilog;
 using System.Collections.Generic;
 using System.Reflection;
@@ -198,6 +201,67 @@ internal class HeroDeveloperCommands
 
             if (stringBuilder.Length > 0) return Succeeded(stringBuilder.ToString());
             else return Failed($"Unable to find hero with name or id of {strings[0]}");
+        }
+    }
+
+    public sealed class HeroSocialParameterCoopCommand : ICoopCommand
+    {
+        public string Prefix => "coop.debug.hero_developer";
+        public string Name => "social_parameter";
+        public string Description => "Read a hero's social parameter, or set it on the server only if its previous value still matches.";
+        public CoopCommandSide Side => CoopCommandSide.Both;
+        public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
+        {
+            new ExpectedArgs("hero_id", "The registered hero id.", isRequired: true),
+            new ExpectedArgs("parameter", "charm, mercy, female, persona_curt, persona_ironic, in_bloom, young_and_respectful, good_natured or tribute.", isRequired: true),
+            new ExpectedArgs("value", "Optional integer value; booleans use 0 or 1.", isRequired: false),
+            new ExpectedArgs("expected_value", "The previously read value, required for every write and restore.", isRequired: false),
+        };
+
+        public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
+        {
+            if (args.Count != 2 && args.Count != 4)
+                return Failed("Read with hero id and parameter; write with value and expected previous value.");
+            if (args.Count == 4 && !CommandHelpers.IsServerOnlyCommand(out var sideError, "coop.debug.hero_developer.social_parameter"))
+                return Failed(sideError);
+            if (!CommandHelpers.TryGetObjectManager(out var objects, out var error) ||
+                !CommandHelpers.TryGetManagedObject<Hero>(objects, args[0], out var hero, out error))
+                return Failed(error);
+            var name = args[1];
+            var trait = name switch
+            {
+                "mercy" => DefaultTraits.Mercy,
+                "persona_curt" => DefaultTraits.PersonaCurt,
+                "persona_ironic" => DefaultTraits.PersonaIronic,
+                _ => null,
+            };
+            var perk = name switch
+            {
+                "in_bloom" => DefaultPerks.Charm.InBloom,
+                "young_and_respectful" => DefaultPerks.Charm.YoungAndRespectful,
+                "good_natured" => DefaultPerks.Charm.GoodNatured,
+                "tribute" => DefaultPerks.Charm.Tribute,
+                _ => null,
+            };
+            if (trait == null && perk == null && name != "charm" && name != "female")
+                return Failed("Unknown social parameter.");
+            int ReadValue() => trait != null ? hero.GetTraitLevel(trait)
+                : perk != null ? (hero.GetPerkValue(perk) ? 1 : 0)
+                : name == "charm" ? hero.GetSkillValue(DefaultSkills.Charm) : (hero.IsFemale ? 1 : 0);
+            var before = ReadValue();
+            if (args.Count == 4)
+            {
+                var minimum = trait?.MinValue ?? 0;
+                var maximum = trait?.MaxValue ?? (name == "charm" ? 1023 : 1);
+                if (!int.TryParse(args[2], out var value) || value < minimum || value > maximum ||
+                    !int.TryParse(args[3], out var expected) || expected != before)
+                    return Failed($"Use a value from {minimum} to {maximum} and the current expected value {before}.");
+                if (trait != null) hero.SetTraitLevel(trait, value);
+                else if (perk != null) hero.SetPerkValueInternal(perk, value == 1);
+                else if (name == "charm") hero.SetSkillValue(DefaultSkills.Charm, value);
+                else hero.IsFemale = value == 1;
+            }
+            return Succeeded(JsonConvert.SerializeObject(new { heroId = args[0], parameter = name, before, value = ReadValue() }));
         }
     }
 

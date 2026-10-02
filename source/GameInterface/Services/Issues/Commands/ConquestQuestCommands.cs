@@ -6,13 +6,20 @@ using Common.Network;
 using GameInterface.Services.Entity;
 using GameInterface.Services.Heroes.Patches;
 using GameInterface.Services.Issues.Generic;
+using GameInterface.Services.Issues.Generic.Migrated.TheConquestOfSettlement;
 using GameInterface.Services.Issues.Generic.Migrated.GangLeaderNeedsToOffloadStolenGoods;
 using GameInterface.Services.Issues.Messages;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Players;
 using GameInterface.Utils.Commands;
 using Newtonsoft.Json;
+using HarmonyLib;
+using System.Collections.Generic;
+using System.Reflection;
+using System.Reflection.Emit;
+using System.Runtime.CompilerServices;
 using SandBox.GauntletUI;
+using System;
 using System.Linq;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.CharacterDevelopment;
@@ -30,6 +37,78 @@ using Quest = TheConquestOfSettlementIssueBehavior.TheConquestOfSettlementIssueQ
 
 public class ConquestQuestCommands
 {
+    internal sealed class TickHistory
+    {
+        public long IssueDailyCalls;
+        public long QuestHourlyCalls;
+        public long ExpiryRollCount;
+        public long LastIssueDailyTime;
+        public long LastQuestHourlyTime;
+        public readonly Queue<object> ExpiryRolls = new Queue<object>();
+    }
+
+    private static readonly ConditionalWeakTable<IssueManager, TickHistory> TickHistories = new();
+    internal static TickHistory GetTickHistory(IssueManager manager) => TickHistories.GetValue(manager, _ => new TickHistory());
+
+    [HarmonyPatch(typeof(IssueManager), nameof(IssueManager.DailyTick))]
+    internal class IssueExpiryTimingPatch
+    {
+        internal static bool ObservationAvailable;
+
+        [HarmonyTranspiler]
+        internal static IEnumerable<CodeInstruction> Transpiler(IEnumerable<CodeInstruction> instructions, MethodBase __originalMethod)
+        {
+            var codes = instructions.ToList();
+            var random = AccessTools.PropertyGetter(typeof(MBRandom), nameof(MBRandom.RandomFloat));
+            var sites = codes.Select((code, index) => (code, index)).Where(item => item.code.Calls(random)).ToArray();
+            var locals = __originalMethod.GetMethodBody().LocalVariables.Where(local => local.LocalType == typeof(IssueBase)).ToArray();
+            ObservationAvailable = sites.Length == 1 && locals.Length == 1 && sites[0].index + 1 < codes.Count &&
+                codes[sites[0].index + 1].opcode == OpCodes.Ldc_R4 && Equals(codes[sites[0].index + 1].operand, 0.2f);
+            if (!ObservationAvailable) return codes;
+            codes.InsertRange(sites[0].index + 1, new[]
+            {
+                new CodeInstruction(OpCodes.Ldloc, (short)locals[0].LocalIndex),
+                new CodeInstruction(OpCodes.Call, AccessTools.Method(typeof(IssueExpiryTimingPatch), nameof(ObserveRoll))),
+            });
+            return codes;
+        }
+
+        internal static float ObserveRoll(float value, IssueBase issue)
+        {
+            if (ModInformation.IsServer && issue is Issue)
+            {
+                var history = GetTickHistory(Campaign.Current.IssueManager);
+                // ponytail: retain 64 rolls; export between ticks for longer captures.
+                if (history.ExpiryRolls.Count == 64) history.ExpiryRolls.Dequeue();
+                history.ExpiryRolls.Enqueue(new { sequence = ++history.ExpiryRollCount, issueId = issue.StringId, due = issue.IssueDueTime.NumTicks,
+                    time = CampaignTime.Now.NumTicks, roll = value, permitted = value <= 0.2f });
+            }
+            return value;
+        }
+
+        [HarmonyPostfix]
+        private static void Postfix(IssueManager __instance, bool __runOriginal)
+        {
+            if (!__runOriginal) return;
+            var history = GetTickHistory(__instance);
+            history.IssueDailyCalls++;
+            history.LastIssueDailyTime = CampaignTime.Now.NumTicks;
+        }
+    }
+
+    [HarmonyPatch(typeof(QuestManager), nameof(QuestManager.HourlyTick))]
+    internal class QuestHourlyTimingPatch
+    {
+        [HarmonyPostfix]
+        private static void Postfix(bool __runOriginal)
+        {
+            if (!__runOriginal) return;
+            var history = GetTickHistory(Campaign.Current.IssueManager);
+            history.QuestHourlyCalls++;
+            history.LastQuestHourlyTime = CampaignTime.Now.NumTicks;
+        }
+    }
+
     public sealed class Journal : ICoopCommand
     {
         public string Prefix => "coop.debug.conquest";
@@ -217,6 +296,73 @@ public class ConquestQuestCommands
         }
     }
 
+    public sealed class CancelMissingOwner : ICoopCommand
+    {
+        public string Prefix => "coop.debug.conquest";
+        public string Name => "cancel_missing_owner";
+        public string Description => "Temporarily remove one owner registration, run the production conquest removal cleanup, and restore the same identity.";
+        public CoopCommandSide Side => CoopCommandSide.Server;
+        public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
+        {
+            new ExpectedArgs("controller_id", "The registered quest owner's controller.", isRequired: true),
+            new ExpectedArgs("missing", "hero, party or player registration.", isRequired: true),
+        };
+
+        public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
+        {
+            if (!CommandHelpers.IsServerOnlyCommand(out var error, "coop.debug.conquest.cancel_missing_owner"))
+                return new CoopCommandResult(false, error, "command_failed");
+            if (args.Count != 2 || (args[1] != "hero" && args[1] != "party" && args[1] != "player"))
+                return new CoopCommandResult(false, "Select an owner controller and missing hero, party or player.", "command_failed");
+            if (!CommandHelpers.TryGetObjectManager(out var objects, out error) ||
+                !ContainerProvider.TryResolve<IPlayerManager>(out var players) ||
+                !ContainerProvider.TryResolve<IIssueOwnershipRegistry>(out var ownership) ||
+                !ContainerProvider.TryResolve<IConquestQuest>(out var service) ||
+                !players.TryGetPlayer(args[0], out var player) ||
+                !objects.TryGetObject<Hero>(player.HeroId, out var hero) ||
+                !objects.TryGetObject<MobileParty>(player.MobilePartyId, out var party))
+                return new CoopCommandResult(false, "The registered owner, hero, party and quest services are required.", "command_failed");
+            if (party.MapEvent != null || party.SiegeEvent != null || party.BesiegerCamp != null)
+                return new CoopCommandResult(false, "Finish the owner's battle or siege before this cleanup diagnostic.", "command_failed");
+            var quests = Campaign.Current.QuestManager.Quests.OfType<Quest>().Where(quest => quest.IsOngoing &&
+                ownership.TryGetQuestOwner(quest.StringId, out var owner) && owner == player.ControllerId).ToArray();
+            if (quests.Length == 0)
+                return new CoopCommandResult(false, "This controller has no ongoing conquest quest.", "command_failed");
+            object removedObject = args[1] == "hero" ? hero : party;
+            if (!objects.TryGetId(removedObject, out var objectId) || !objects.TryGetHandle(removedObject, out var handle))
+                return new CoopCommandResult(false, "The selected object must have a registered id and handle.", "command_failed");
+            players.TryGetPeer(player.ControllerId, out var peer);
+            var removePlayer = args[1] == "player";
+            if (!(removePlayer ? players.RemovePlayer(player) : objects.Remove(removedObject)))
+                return new CoopCommandResult(false, "The selected registration was not removed.", "command_failed");
+            object during;
+            try
+            {
+                var heroAvailable = objects.TryGetObject<Hero>(player.HeroId, out _);
+                var partyAvailable = objects.TryGetObject<MobileParty>(player.MobilePartyId, out _);
+                var playerAvailable = players.TryGetPlayer(player.ControllerId, out _);
+                if ((args[1] == "hero" && heroAvailable) || (args[1] == "party" && partyAvailable) || (removePlayer && playerAvailable))
+                    throw new InvalidOperationException("The selected owner registration is still available.");
+                service.CancelForPlayerRemoval(player.ControllerId);
+                during = new { heroAvailable, partyAvailable, playerAvailable,
+                    quests = quests.Select(quest => new { quest.StringId, quest.IsOngoing, quest.IsFinalized }).ToArray() };
+            }
+            finally
+            {
+                var restored = removePlayer ? players.AddPlayer(player) : objects.AddExisting(objectId, removedObject, handle);
+                if (!restored) throw new InvalidOperationException("The original owner registration could not be restored.");
+                if (removePlayer && peer != null) players.SetPeer(player.ControllerId, peer);
+            }
+            return new CoopCommandResult(true, JsonConvert.SerializeObject(new
+            {
+                player.ControllerId, player.HeroId, player.MobilePartyId, missing = args[1], objectId, handle,
+                before = new { heroAvailable = true, partyAvailable = true, playerAvailable = true,
+                    ongoingQuests = quests.Select(quest => quest.StringId).ToArray() },
+                during, registrationRestored = true,
+            }));
+        }
+    }
+
     public sealed class Read : ICoopCommand
     {
         public string Prefix => "coop.debug.conquest";
@@ -313,6 +459,8 @@ public class ConquestQuestCommands
                 nextIssueIndex = Campaign.Current.IssueManager._nextIssueUniqueIndex,
                 hasIssueCooldown = Campaign.Current.IssueManager.HasIssueCoolDown(typeof(Issue), giver),
                 currentTime = CampaignTime.Now.NumTicks, tasks = quest?.TaskList.Count,
+                expiryObservationAvailable = IssueExpiryTimingPatch.ObservationAvailable,
+                timing = GetTickHistory(Campaign.Current.IssueManager),
                 trackEnabled = quest?.IsTrackEnabled, hasDiscussion = quest?.IsThereDiscussDialogFlow,
                 mirroredQuests = manager._quests.OfType<Quest>().Select(item => item.StringId).ToArray(),
                 visibleQuests = manager.Quests.OfType<Quest>().Select(item => item.StringId).ToArray(),
