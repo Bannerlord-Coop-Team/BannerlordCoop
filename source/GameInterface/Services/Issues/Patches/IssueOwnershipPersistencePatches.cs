@@ -1,4 +1,4 @@
-using Common.Logging;
+﻿using Common.Logging;
 using GameInterface.Services.Issues.Generic;
 using HarmonyLib;
 using Serilog;
@@ -17,6 +17,7 @@ internal class IssueOwnershipPersistencePatches
 
     private const string SaveKey = "_coop_issue_ownership";
     private const string GenerationSaveKey = "_coop_issue_generation";
+    private const string QuestOwnershipSaveKey = "_coop_quest_ownership";
 
     [HarmonyPatch(nameof(IssuesCampaignBehavior.SyncData))]
     [HarmonyPostfix]
@@ -58,6 +59,20 @@ internal class IssueOwnershipPersistencePatches
                     .Where(entry => entry?.IssueGiverHero != null && !string.IsNullOrEmpty(entry.OwnerControllerId))
                     .Select(entry => new KeyValuePair<Hero, string>(entry.IssueGiverHero, entry.OwnerControllerId)));
             }
+        }
+
+        List<QuestOwnershipSaveData> questOwners = null;
+        if (dataStore.IsSaving)
+        {
+            questOwners = ownershipRegistry.SnapshotQuests()
+                .Select(entry => new QuestOwnershipSaveData(entry.Key, entry.Value)).ToList();
+        }
+        dataStore.SyncData(QuestOwnershipSaveKey, ref questOwners);
+        if (dataStore.IsLoading)
+        {
+            ownershipRegistry.RestoreQuests((questOwners ?? new List<QuestOwnershipSaveData>())
+                .Where(entry => entry != null)
+                .Select(entry => new KeyValuePair<string, string>(entry.QuestId, entry.OwnerControllerId)));
         }
 
         List<IssueGenerationSaveData> generationSaveData = null;

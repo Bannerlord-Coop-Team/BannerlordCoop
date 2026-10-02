@@ -1,4 +1,4 @@
-using Common;
+﻿using Common;
 using Common.Messaging;
 using Common.Network;
 using Common.Util;
@@ -332,7 +332,7 @@ internal static class GangLeaderNeedsToOffloadStolenGoodsQuestType
 
     public static readonly PendingRegistry<PropertyOwner<PropertyObject>> OwnerTraitXpProgress = new();
 
-    private static void ApplyOwnerTraitXp(Hero owner, TraitObject trait, int xpValue)
+    internal static void ApplyOwnerTraitXp(Hero owner, TraitObject trait, int xpValue)
     {
         if (owner == null) return;
 

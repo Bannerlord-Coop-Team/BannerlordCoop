@@ -1,4 +1,5 @@
-using GameInterface.Services.Entity;
+﻿using GameInterface.Services.Entity;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using TaleWorlds.CampaignSystem;
 
@@ -13,11 +14,16 @@ public interface IIssueOwnershipRegistry
     bool IsLocalPeerOwner(Hero issueGiver);
     IReadOnlyCollection<KeyValuePair<Hero, string>> Snapshot();
     void RestoreAll(IEnumerable<KeyValuePair<Hero, string>> entries);
+    void SetQuestOwner(string questId, string controllerId);
+    bool TryGetQuestOwner(string questId, out string controllerId);
+    IReadOnlyCollection<KeyValuePair<string, string>> SnapshotQuests();
+    void RestoreQuests(IEnumerable<KeyValuePair<string, string>> entries);
 }
 
 internal sealed class IssueOwnershipRegistry : IIssueOwnershipRegistry
 {
     private readonly PendingRegistry<string> registry = new();
+    private readonly ConcurrentDictionary<string, string> questOwners = new();
 
     public void SetOwner(Hero issueGiver, string controllerId)
     {
@@ -34,6 +40,7 @@ internal sealed class IssueOwnershipRegistry : IIssueOwnershipRegistry
     public void ClearAll()
     {
         registry.ClearAll();
+        questOwners.Clear();
     }
 
     public bool TryGetOwnerControllerId(Hero issueGiver, out string controllerId)
@@ -57,5 +64,25 @@ internal sealed class IssueOwnershipRegistry : IIssueOwnershipRegistry
     public void RestoreAll(IEnumerable<KeyValuePair<Hero, string>> entries)
     {
         registry.RestoreAll(entries);
+    }
+
+    public void SetQuestOwner(string questId, string controllerId)
+    {
+        if (string.IsNullOrEmpty(questId) || string.IsNullOrEmpty(controllerId)) return;
+        questOwners[questId] = controllerId;
+    }
+
+    public bool TryGetQuestOwner(string questId, out string controllerId)
+    {
+        controllerId = null;
+        return questId != null && questOwners.TryGetValue(questId, out controllerId);
+    }
+
+    public IReadOnlyCollection<KeyValuePair<string, string>> SnapshotQuests() => questOwners.ToArray();
+
+    public void RestoreQuests(IEnumerable<KeyValuePair<string, string>> entries)
+    {
+        questOwners.Clear();
+        foreach (var entry in entries) SetQuestOwner(entry.Key, entry.Value);
     }
 }
