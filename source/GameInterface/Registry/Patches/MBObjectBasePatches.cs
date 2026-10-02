@@ -3,6 +3,7 @@ using HarmonyLib;
 using System;
 using System.Collections.Generic;
 using TaleWorlds.CampaignSystem.GameState;
+using TaleWorlds.CampaignSystem.Issues;
 using TaleWorlds.ObjectSystem;
 
 namespace GameInterface.Registry.Patches;
@@ -25,5 +26,7 @@ internal class MBObjectBasePatches
     public static HashSet<Type> allowedTypes = new HashSet<Type>()
     {
         typeof(MenuContext),
+        typeof(CapturedByBountyHuntersIssueBehavior.CapturedByBountyHuntersIssue),
+        typeof(CapturedByBountyHuntersIssueBehavior.CapturedByBountyHuntersIssueQuest),
     };
 }

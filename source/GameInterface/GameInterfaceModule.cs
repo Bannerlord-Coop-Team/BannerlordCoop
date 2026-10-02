@@ -24,6 +24,7 @@ using GameInterface.Services.Heroes.Commands;
 using GameInterface.Services.Heroes.Interfaces;
 using GameInterface.Services.Hideouts;
 using GameInterface.Services.Issues.Generic;
+using GameInterface.Services.Issues.Generic.Migrated.CapturedByBountyHunters;
 using GameInterface.Services.Issues.Interfaces;
 using GameInterface.Services.Kingdoms;
 using GameInterface.Services.Kingdoms.Patches;
@@ -144,6 +145,10 @@ public class GameInterfaceModule : Module
         builder.RegisterType<PartyVisibilitySweep>().As<IPartyVisibilitySweep>().InstancePerDependency();
         builder.RegisterType<ConversationRestartContextTracker>().As<IConversationRestartContextTracker>().InstancePerLifetimeScope();
         builder.RegisterType<IssueConversationTracker>().As<IIssueConversationTracker>().InstancePerLifetimeScope();
+        builder.RegisterType<PendingRegistry<TaleWorlds.Core.PropertyOwner<TaleWorlds.Core.PropertyObject>>>().InstancePerLifetimeScope();
+        builder.RegisterType<OwnerTraitXpProgress>().As<IOwnerTraitXpProgress>().InstancePerDependency();
+        builder.RegisterType<BountyHuntersQuestContext>().As<IBountyHuntersQuestContext>().InstancePerDependency();
+        builder.RegisterType<BountyHuntersJournalOwners>().As<IBountyHuntersJournalOwners>().InstancePerLifetimeScope();
         builder.RegisterType<IssueOwnershipRegistry>().As<IIssueOwnershipRegistry>().InstancePerLifetimeScope();
         builder.RegisterType<IssueGenerationRegistry>().As<IIssueGenerationRegistry>().InstancePerLifetimeScope();
         builder.RegisterType<AwaitingAlternativeSolutionTroopsRegistry>().As<IAwaitingAlternativeSolutionTroopsRegistry>().InstancePerLifetimeScope();

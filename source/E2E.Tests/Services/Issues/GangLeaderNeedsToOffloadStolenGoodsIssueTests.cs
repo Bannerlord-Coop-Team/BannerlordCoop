@@ -1,4 +1,4 @@
-using Common.Messaging;
+﻿using Common.Messaging;
 using Common.Util;
 using E2E.Tests.Environment;
 using E2E.Tests.Environment.Instance;
@@ -1382,18 +1382,18 @@ public class GangLeaderNeedsToOffloadStolenGoodsIssueTests : IDisposable
 
             var progress = new PropertyOwner<PropertyObject>();
             progress.SetPropertyValue(DefaultTraits.Calculating, 950);
-            GangLeaderNeedsToOffloadStolenGoodsQuestType.OwnerTraitXpProgress.Set(owner, progress);
+            Server.Resolve<PendingRegistry<PropertyOwner<PropertyObject>>>().Set(owner, progress);
 
             var behavior = new IssuesCampaignBehavior();
             var records = new Dictionary<string, object>();
             behavior.SyncData(new TestDataStore(isSaving: true, records));
 
-            GangLeaderNeedsToOffloadStolenGoodsQuestType.OwnerTraitXpProgress.ClearAll();
-            Assert.False(GangLeaderNeedsToOffloadStolenGoodsQuestType.OwnerTraitXpProgress.TryGet(owner, out _));
+            Server.Resolve<PendingRegistry<PropertyOwner<PropertyObject>>>().ClearAll();
+            Assert.False(Server.Resolve<PendingRegistry<PropertyOwner<PropertyObject>>>().TryGet(owner, out _));
 
             behavior.SyncData(new TestDataStore(isSaving: false, records));
 
-            Assert.True(GangLeaderNeedsToOffloadStolenGoodsQuestType.OwnerTraitXpProgress.TryGet(owner, out var restored));
+            Assert.True(Server.Resolve<PendingRegistry<PropertyOwner<PropertyObject>>>().TryGet(owner, out var restored));
             Assert.Equal(950, restored.GetPropertyValue(DefaultTraits.Calculating));
             Assert.Equal(0, owner.GetTraitLevel(DefaultTraits.Calculating));
         });
@@ -1590,11 +1590,11 @@ public class GangLeaderNeedsToOffloadStolenGoodsIssueTests : IDisposable
             Assert.Null(ownerB.Issue);
 
             Assert.Equal(1, ownerA.GetTraitLevel(DefaultTraits.Calculating));
-            Assert.True(GangLeaderNeedsToOffloadStolenGoodsQuestType.OwnerTraitXpProgress.TryGet(ownerA, out var progressA));
+            Assert.True(Server.Resolve<PendingRegistry<PropertyOwner<PropertyObject>>>().TryGet(ownerA, out var progressA));
             Assert.Equal(1050, progressA.GetPropertyValue(DefaultTraits.Calculating));
 
             Assert.Equal(0, ownerB.GetTraitLevel(DefaultTraits.Calculating));
-            Assert.True(GangLeaderNeedsToOffloadStolenGoodsQuestType.OwnerTraitXpProgress.TryGet(ownerB, out var progressB));
+            Assert.True(Server.Resolve<PendingRegistry<PropertyOwner<PropertyObject>>>().TryGet(ownerB, out var progressB));
             Assert.Equal(50, progressB.GetPropertyValue(DefaultTraits.Calculating));
 
             Assert.Equal(hostCalculatingXpBefore, Campaign.Current.PlayerTraitDeveloper.GetPropertyValue(DefaultTraits.Calculating));
@@ -1653,13 +1653,13 @@ public class GangLeaderNeedsToOffloadStolenGoodsIssueTests : IDisposable
                 Assert.Equal(rosterBefore + stolenTradeGoodAmount, MobileParty.MainParty.ItemRoster.GetItemNumber(stolenGood));
                 Assert.Equal(1000, Campaign.Current.PlayerTraitDeveloper.GetPropertyValue(DefaultTraits.Calculating));
                 Assert.Equal(1, mainHero.GetTraitLevel(DefaultTraits.Calculating));
-                Assert.False(GangLeaderNeedsToOffloadStolenGoodsQuestType.OwnerTraitXpProgress.TryGet(mainHero, out _));
-                Assert.False(GangLeaderNeedsToOffloadStolenGoodsQuestType.OwnerTraitXpProgress.TryGet(owner, out _));
+                Assert.False(Server.Resolve<PendingRegistry<PropertyOwner<PropertyObject>>>().TryGet(mainHero, out _));
+                Assert.False(Server.Resolve<PendingRegistry<PropertyOwner<PropertyObject>>>().TryGet(owner, out _));
 
                 TraitLevelingHelper.OnIssueSolvedThroughQuest(mainHero, new[] { new Tuple<TraitObject, int>(DefaultTraits.Calculating, 30) });
                 Assert.Equal(1030, Campaign.Current.PlayerTraitDeveloper.GetPropertyValue(DefaultTraits.Calculating));
                 Assert.Equal(1, mainHero.GetTraitLevel(DefaultTraits.Calculating));
-                Assert.False(GangLeaderNeedsToOffloadStolenGoodsQuestType.OwnerTraitXpProgress.TryGet(mainHero, out _));
+                Assert.False(Server.Resolve<PendingRegistry<PropertyOwner<PropertyObject>>>().TryGet(mainHero, out _));
             });
         }
         finally
