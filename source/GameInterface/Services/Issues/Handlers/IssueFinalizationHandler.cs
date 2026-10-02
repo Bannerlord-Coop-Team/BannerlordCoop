@@ -111,7 +111,10 @@ internal class IssueFinalizationHandler : IHandler
             var deferConsequence = reason == IssueFinalizeReason.QuestFail &&
                 descriptor?.ApplyQuestFailLocalOwnerConsequence != null &&
                 payload.What.ControllerId != null &&
-                playerManager.TryGetPlayer(payload.What.ControllerId, out var player) && !playerManager.IsConnected(player);
+                playerManager.TryGetPlayer(payload.What.ControllerId, out var player) &&
+                (!playerManager.IsConnected(player) || !playerManager.TryGetPeer(payload.What.ControllerId, out var peer) ||
+                 !ContainerProvider.TryResolve<ICampaignSynchronization>(out var synchronization) ||
+                 !synchronization.HasCompletedCampaignSynchronization(peer));
             if (deferConsequence)
             {
                 pendingConsequenceRegistry.DeferQuestFail(payload.What.ControllerId, descriptor.DisplayName, proof);

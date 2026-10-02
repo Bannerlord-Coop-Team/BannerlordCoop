@@ -38,7 +38,8 @@ internal sealed class PendingLocalOwnerConsequenceRegistry : IPendingLocalOwnerC
         var readyControllerIds = new List<string>();
         foreach (var controllerId in pendingQuestFailByController.Keys)
         {
-            if (playerManager.TryGetPeer(controllerId, out var peer) && synchronization.HasCompletedCampaignSynchronization(peer))
+            if (playerManager.TryGetPlayer(controllerId, out var player) && playerManager.IsConnected(player) &&
+                playerManager.TryGetPeer(controllerId, out var peer) && synchronization.HasCompletedCampaignSynchronization(peer))
             {
                 readyControllerIds.Add(controllerId);
             }

@@ -2720,8 +2720,12 @@ public class VillageNeedsCraftingMaterialsIssueTests : IDisposable
         }
     }
 
-    [Fact]
-    public void OnWarDeclared_PlayerCausedWar_WhileTheOwnerIsDisconnected_TheServerStillFinalizesAgainstTheRecordedOwnersRealFaction()
+    [Theory]
+    [InlineData(false, false)]
+    [InlineData(true, false)]
+    [InlineData(false, true)]
+    [InlineData(true, true)]
+    public void FactionChange_WhileOwnerIsUnavailable_ServerFinalizesRecordedOwnersQuest(bool reconnecting, bool clanChange)
     {
         var fixture = SetupIssueOwner();
         CreateIssueOnServer(fixture.HeroId);
@@ -2732,33 +2736,53 @@ public class VillageNeedsCraftingMaterialsIssueTests : IDisposable
         DeclareWarBetweenGiverAndOwner(Server, fixture, ownerHeroId);
 
         Server.Resolve<IPlayerManager>().ClearPeer(Client.NetPeer);
+        if (reconnecting)
+        {
+            Server.Resolve<Coop.Core.Server.Connections.ConnectionCollection>().ConnectionStates.TryRemove(Client.NetPeer, out _);
+            Server.Resolve<IPlayerManager>().SetPeer("player-A", Client.NetPeer);
+            Assert.False(Server.Resolve<ICampaignSynchronization>().HasCompletedCampaignSynchronization(Client.NetPeer));
+        }
 
         Server.Call(() =>
         {
             Assert.True(Server.ObjectManager.TryGetObject<Hero>(fixture.HeroId, out var giver));
             Assert.True(Server.ObjectManager.TryGetObject<Hero>(ownerHeroId, out var ownerHero));
             Assert.True(Server.Resolve<IPlayerManager>().TryGetPlayer("player-A", out var player));
-            Assert.False(Server.Resolve<IPlayerManager>().IsConnected(player));
+            Assert.Equal(reconnecting, Server.Resolve<IPlayerManager>().IsConnected(player));
 
-            CampaignEventDispatcher.Instance.OnWarDeclared(
-                giver.MapFaction, ownerHero.MapFaction, DeclareWarAction.DeclareWarDetail.CausedByPlayerHostility);
+            if (clanChange)
+            {
+                CampaignEventDispatcher.Instance.OnClanChangedKingdom(
+                    giver.Clan, oldKingdom: null, newKingdom: null,
+                    actionDetail: ChangeKingdomAction.ChangeKingdomActionDetail.JoinKingdomByDefection, showNotification: false);
+            }
+            else
+            {
+                CampaignEventDispatcher.Instance.OnWarDeclared(
+                    giver.MapFaction, ownerHero.MapFaction, DeclareWarAction.DeclareWarDetail.CausedByPlayerHostility);
+            }
         });
 
         var removed = Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkIssueRemoved>());
         Assert.Equal(fixture.HeroId, removed.OwnerId);
-        Assert.Equal(IssueFinalizeReason.QuestFail, removed.Reason);
-        Assert.Equal(VillageNeedsCraftingMaterialsQuestType.ProofFailWar, removed.Proof);
+        Assert.Equal(clanChange ? IssueFinalizeReason.QuestCancel : IssueFinalizeReason.QuestFail, removed.Reason);
+        Assert.Equal(clanChange ? (byte)0 : VillageNeedsCraftingMaterialsQuestType.ProofFailWar, removed.Proof);
 
-        Server.Call(() =>
+        foreach (var instance in AllInstances)
         {
-            Assert.True(Server.ObjectManager.TryGetObject<Hero>(fixture.HeroId, out var giver));
-            Assert.Null(giver.Issue);
-            Assert.False(Campaign.Current.IssueManager.Issues.ContainsKey(giver));
-        });
+            instance.Call(() =>
+            {
+                Assert.True(instance.ObjectManager.TryGetObject<Hero>(fixture.HeroId, out var giver));
+                Assert.Null(giver.Issue);
+                Assert.False(Campaign.Current.IssueManager.Issues.ContainsKey(giver));
+            });
+        }
     }
 
-    [Fact]
-    public void OnMapEventStarted_CoercionWhileTheOwnerIsDisconnected_DefersThePenaltyAndDeliversItOnRejoin_WithoutTouchingTheHostsTracker()
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void OnMapEventStarted_CoercionWhileOwnerIsUnavailable_DefersPenaltyUntilCampaignReady(bool reconnecting)
     {
         var fixture = SetupIssueOwner();
         CreateIssueOnServer(fixture.HeroId);
@@ -2782,6 +2806,12 @@ public class VillageNeedsCraftingMaterialsIssueTests : IDisposable
         });
 
         Server.Resolve<IPlayerManager>().ClearPeer(Client.NetPeer);
+        if (reconnecting)
+        {
+            Server.Resolve<Coop.Core.Server.Connections.ConnectionCollection>().ConnectionStates.TryRemove(Client.NetPeer, out _);
+            Server.Resolve<IPlayerManager>().SetPeer("player-A", Client.NetPeer);
+            Assert.False(Server.Resolve<ICampaignSynchronization>().HasCompletedCampaignSynchronization(Client.NetPeer));
+        }
 
         Server.Call(() =>
         {
@@ -2789,7 +2819,7 @@ public class VillageNeedsCraftingMaterialsIssueTests : IDisposable
             Assert.True(Server.ObjectManager.TryGetObject<MobileParty>(partyId, out var ownerParty));
             Assert.True(Server.ObjectManager.TryGetObject<Settlement>(fixture.SettlementId, out var settlement));
             Assert.True(Server.Resolve<IPlayerManager>().TryGetPlayer("player-A", out var player));
-            Assert.False(Server.Resolve<IPlayerManager>().IsConnected(player));
+            Assert.Equal(reconnecting, Server.Resolve<IPlayerManager>().IsConnected(player));
 
             var quest = Assert.IsType<VillageNeedsCraftingMaterialsIssueBehavior.VillageNeedsCraftingMaterialsIssueQuest>(giver.Issue.IssueQuest);
             MapEvent mapEvent;

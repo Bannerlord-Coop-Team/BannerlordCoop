@@ -30,8 +30,10 @@ public sealed class DisconnectedOwnerEvaluationSupport : IDisconnectedOwnerEvalu
     {
         if (ModInformation.IsClient) return false;
         if (!ownershipRegistry.TryGetOwnerControllerId(questGiver, out var ownerControllerId)) return false;
-        if (!playerManager.TryGetPlayer(ownerControllerId, out var player) ||
-            playerManager.IsConnected(player)) return false;
+        if (!playerManager.TryGetPlayer(ownerControllerId, out var player)) return false;
+        if (playerManager.IsConnected(player) && playerManager.TryGetPeer(ownerControllerId, out var peer) &&
+            ContainerProvider.TryResolve<ICampaignSynchronization>(out var synchronization) &&
+            synchronization.HasCompletedCampaignSynchronization(peer)) return false;
         if (!objectManager.TryGetObjectWithLogging<Hero>(player.HeroId, out var ownerHero)) return false;
 
         objectManager.TryGetObjectWithLogging<MobileParty>(player.MobilePartyId, out var ownerParty);
