@@ -4,6 +4,7 @@ using Common.Network;
 using Common.Util;
 using System.Linq;
 using GameInterface.Services.Heroes.HeirSelection.Messages;
+using GameInterface.Services.Heroes.Messages;
 using GameInterface.Services.Issues.Generic;
 using GameInterface.Services.ObjectManager;
 using TaleWorlds.CampaignSystem;
@@ -49,6 +50,7 @@ internal sealed class ArmyNeedsSuppliesHandler : IHandler
         broker.Subscribe<ArmyNeedsSuppliesJournalChanged>(PublishJournal);
         broker.Subscribe<NetworkArmyNeedsSuppliesJournal>(ReceiveJournal);
         broker.Subscribe<PlayerHeirSelectionCompleted>(CancelPredecessorQuests);
+        broker.Subscribe<PlayerHeroChanged>(RemoveObserverPresentation);
     }
 
     public void Dispose()
@@ -56,7 +58,20 @@ internal sealed class ArmyNeedsSuppliesHandler : IHandler
         broker.Unsubscribe<ArmyNeedsSuppliesJournalChanged>(PublishJournal);
         broker.Unsubscribe<NetworkArmyNeedsSuppliesJournal>(ReceiveJournal);
         broker.Unsubscribe<PlayerHeirSelectionCompleted>(CancelPredecessorQuests);
+        broker.Unsubscribe<PlayerHeroChanged>(RemoveObserverPresentation);
         QuestTypeRegistry.Unregister(descriptor);
+    }
+
+    private void RemoveObserverPresentation(MessagePayload<PlayerHeroChanged> payload)
+    {
+        if (ModInformation.IsServer) return;
+        foreach (var quest in Campaign.Current.QuestManager.Quests.OfType<Quest>())
+        {
+            if (quests.IsLocalOwner(quest)) continue;
+            quest.ClearRelatedFields();
+            quest.RemoveAllTrackedObjects();
+            quest.RemoveAllMapMarkers();
+        }
     }
 
     private void CancelPredecessorQuests(MessagePayload<PlayerHeirSelectionCompleted> payload)

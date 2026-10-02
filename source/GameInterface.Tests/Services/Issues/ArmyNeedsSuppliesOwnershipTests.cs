@@ -51,6 +51,7 @@ public class ArmyNeedsSuppliesOwnershipTests : IDisposable
         ModInformation.IsServer = wasServer;
         ArmyNeedsSuppliesCharacterChangePatch.OldPlayer = null;
         ArmyNeedsSuppliesCharacterChangePatch.NewPlayer = null;
+        ArmyNeedsSuppliesJournalViewPatch.IsBuilding = false;
     }
 
     [Fact]
@@ -98,8 +99,23 @@ public class ArmyNeedsSuppliesOwnershipTests : IDisposable
         service.LocalQuest = own;
         MBReadOnlyList<QuestBase> quests = new MBList<QuestBase> { own, other };
 
-        ArmyNeedsSuppliesPersonalJournalPatch.Postfix(ref quests);
+        ArmyNeedsSuppliesJournalViewPatch.Prefix(out var previous);
+        try { ArmyNeedsSuppliesPersonalJournalPatch.Postfix(ref quests); }
+        finally { ArmyNeedsSuppliesJournalViewPatch.Finalizer(previous); }
 
         Assert.Same(own, Assert.Single(quests));
+    }
+
+    [Fact]
+    public void EngineQuestCollectionRetainsItsIdentityAndNullIndexesOutsideJournalView()
+    {
+        MBReadOnlyList<QuestBase> quests = new MBList<QuestBase> { ObjectHelper.SkipConstructor<Quest>(), null };
+        var original = quests;
+
+        ArmyNeedsSuppliesPersonalJournalPatch.Postfix(ref quests);
+
+        Assert.Same(original, quests);
+        Assert.Equal(2, quests.Count);
+        Assert.Null(quests[1]);
     }
 }

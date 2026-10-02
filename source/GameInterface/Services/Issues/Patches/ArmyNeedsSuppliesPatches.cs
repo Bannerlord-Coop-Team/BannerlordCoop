@@ -14,6 +14,8 @@ using HarmonyLib;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.CampaignBehaviors;
 using TaleWorlds.CampaignSystem.Issues;
+using TaleWorlds.CampaignSystem.LogEntries;
+using TaleWorlds.CampaignSystem.ViewModelCollection.Quests;
 using TaleWorlds.Library;
 
 namespace GameInterface.Services.Issues.Patches;
@@ -33,9 +35,45 @@ internal class ArmyNeedsSuppliesPersonalJournalPatch
 {
     internal static void Postfix(ref MBReadOnlyList<QuestBase> __result)
     {
-        if (ModInformation.IsServer || CallOriginalPolicy.IsOriginalAllowedForOwnershipGate() ||
+        // Save repair relies on backing-list indexes; only the journal view gets a filtered copy.
+        if (!ArmyNeedsSuppliesJournalViewPatch.IsBuilding ||
             !ContainerProvider.TryResolve<IArmyNeedsSuppliesQuest>(out var service)) return;
         __result = new MBList<QuestBase>(__result.Where(quest => quest is not Quest supplies || service.IsLocalOwner(supplies)));
+    }
+}
+
+[HarmonyPatch(typeof(QuestsVM), MethodType.Constructor, typeof(Action))]
+internal class ArmyNeedsSuppliesJournalViewPatch
+{
+    [ThreadStatic] internal static bool IsBuilding;
+
+    internal static void Prefix(out bool __state)
+    {
+        __state = IsBuilding;
+        IsBuilding = ModInformation.IsClient && !CallOriginalPolicy.IsOriginalAllowedForOwnershipGate();
+    }
+
+    internal static void Finalizer(bool __state) => IsBuilding = __state;
+}
+
+[HarmonyPatch(typeof(JournalLogEntry), nameof(JournalLogEntry.IsEnded))]
+internal class ArmyNeedsSuppliesOldJournalPatch
+{
+    internal static bool Prefix(JournalLogEntry __instance, ref bool __result)
+    {
+        if (!ArmyNeedsSuppliesJournalViewPatch.IsBuilding ||
+            !ContainerProvider.TryResolve<IArmyNeedsSuppliesJournalOwners>(out var owners) || owners.IsVisible(__instance)) return true;
+        __result = false;
+        return false;
+    }
+}
+
+[HarmonyPatch(typeof(IssuesCampaignBehavior), nameof(IssuesCampaignBehavior.SyncData))]
+internal class ArmyNeedsSuppliesJournalOwnershipSavePatch
+{
+    private static void Postfix(IDataStore dataStore)
+    {
+        if (ContainerProvider.TryResolve<IArmyNeedsSuppliesJournalOwners>(out var owners)) owners.SyncData(dataStore);
     }
 }
 

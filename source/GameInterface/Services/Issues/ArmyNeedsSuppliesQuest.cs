@@ -8,6 +8,7 @@ using GameInterface.Services.Issues.Generic.Dispatch;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Players;
 using TaleWorlds.CampaignSystem;
+using TaleWorlds.CampaignSystem.CampaignBehaviors;
 using TaleWorlds.CampaignSystem.Issues;
 using TaleWorlds.CampaignSystem.Party;
 
@@ -28,12 +29,15 @@ internal sealed class ArmyNeedsSuppliesQuest : IArmyNeedsSuppliesQuest
     private readonly IObjectManager objects;
     private readonly IPlayerManager players;
     private readonly IIssueOwnershipRegistry owners;
+    private readonly IArmyNeedsSuppliesJournalOwners journalOwners;
 
-    public ArmyNeedsSuppliesQuest(IObjectManager objects, IPlayerManager players, IIssueOwnershipRegistry owners)
+    public ArmyNeedsSuppliesQuest(IObjectManager objects, IPlayerManager players, IIssueOwnershipRegistry owners,
+        IArmyNeedsSuppliesJournalOwners journalOwners)
     {
         this.objects = objects;
         this.players = players;
         this.owners = owners;
+        this.journalOwners = journalOwners;
     }
 
     public bool IsLocalOwner(Quest quest) => owners.IsLocalPeerOwner(quest.QuestGiver);
@@ -75,6 +79,8 @@ internal sealed class ArmyNeedsSuppliesQuest : IArmyNeedsSuppliesQuest
             !objects.TryGetIdWithLogging(Hero.MainHero, out var heroId)) return false;
         var player = players.Players.FirstOrDefault(candidate => candidate.HeroId == heroId);
         if (player == null) return false;
+        journalOwners.SetOwner(Campaign.Current.GetCampaignBehavior<JournalLogsCampaignBehavior>().GetRelatedLog(quest),
+            player.ControllerId);
 
         fields = new ArmyNeedsSuppliesAcceptance
         {
@@ -112,7 +118,12 @@ internal sealed class ArmyNeedsSuppliesQuest : IArmyNeedsSuppliesQuest
 
             // Observers retain the issue identity without adding another player's personal quest.
             fields.Journal.Apply(quest);
-            if (owners.IsLocalPeerOwner(owner)) quest.StartQuest();
+            if (owners.IsLocalPeerOwner(owner))
+            {
+                quest.StartQuest();
+                journalOwners.SetOwner(Campaign.Current.GetCampaignBehavior<JournalLogsCampaignBehavior>().GetRelatedLog(quest),
+                    fields.ControllerId);
+            }
         }
     }
 
