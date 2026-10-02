@@ -1276,6 +1276,10 @@ public class GangLeaderNeedsToOffloadStolenGoodsIssueTests : IDisposable
             Assert.True(Client.ObjectManager.TryGetObject<CharacterObject>(escortTroopId, out var escortTroop));
             using (new AllowedThread())
             {
+                Assert.True(Client.ObjectManager.TryGetObject<MobileParty>(partyId, out var party));
+                Campaign.Current.MainParty = party;
+                party.MemberRoster.AddToCounts(companion.CharacterObject, -1);
+                party.MemberRoster.AddToCounts(escortTroop, -20);
                 owner.Issue.AlternativeSolutionSentTroops.AddToCounts(companion.CharacterObject, 1);
                 owner.Issue.AlternativeSolutionSentTroops.AddToCounts(escortTroop, 20);
             }
@@ -1451,6 +1455,10 @@ public class GangLeaderNeedsToOffloadStolenGoodsIssueTests : IDisposable
             Assert.True(Client.ObjectManager.TryGetObject<CharacterObject>(escortTroopId, out var escortTroop));
             using (new AllowedThread())
             {
+                Assert.True(Client.ObjectManager.TryGetObject<MobileParty>(partyId, out var party));
+                Campaign.Current.MainParty = party;
+                party.MemberRoster.AddToCounts(companion.CharacterObject, -1);
+                party.MemberRoster.AddToCounts(escortTroop, -20);
                 owner.Issue.AlternativeSolutionSentTroops.AddToCounts(companion.CharacterObject, 1);
                 owner.Issue.AlternativeSolutionSentTroops.AddToCounts(escortTroop, 20);
             }
@@ -1539,6 +1547,10 @@ public class GangLeaderNeedsToOffloadStolenGoodsIssueTests : IDisposable
             Assert.True(client.ObjectManager.TryGetObject<CharacterObject>(escortTroopId, out var escortTroop));
             using (new AllowedThread())
             {
+                Assert.True(client.ObjectManager.TryGetObject<MobileParty>(partyId, out var party));
+                Campaign.Current.MainParty = party;
+                party.MemberRoster.AddToCounts(companion.CharacterObject, -1);
+                party.MemberRoster.AddToCounts(escortTroop, -20);
                 owner.Issue.AlternativeSolutionSentTroops.AddToCounts(companion.CharacterObject, 1);
                 owner.Issue.AlternativeSolutionSentTroops.AddToCounts(escortTroop, 20);
             }

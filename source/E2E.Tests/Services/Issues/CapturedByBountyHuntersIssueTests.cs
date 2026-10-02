@@ -328,7 +328,59 @@ public class CapturedByBountyHuntersIssueTests : IDisposable
         });
     }
 
-    private string AcceptFromFirstClient((string Giver, string Hideout) fixture, bool alternative = false, int clientIndex = 0)
+    [Theory]
+    [InlineData(false, false)]
+    [InlineData(true, false)]
+    [InlineData(false, true)]
+    [InlineData(true, true)]
+    public void LosingAlternativeSelectionKeepsItsTroops(bool winningAlternative, bool replyDuringSelection)
+    {
+        var fixture = CreateIssue();
+        var loser = environment.Clients.Last();
+        var router = environment.Server.Resolve<TestNetworkRouter>();
+        string companionId = null;
+        string troopId = null;
+        string partyId = null;
+        AcceptFromFirstClient(fixture, alternative: true, clientIndex: 1, beforeRequest: () =>
+        {
+            Assert.True(loser.ObjectManager.TryGetObject<Hero>(fixture.Giver, out var giver));
+            var selected = giver.Issue.AlternativeSolutionSentTroops;
+            var companion = selected.GetTroopRoster().Single(entry => entry.Character.IsHero).Character;
+            var troop = selected.GetTroopRoster().Single(entry => !entry.Character.IsHero).Character;
+            Assert.True(loser.ObjectManager.TryGetId(companion.HeroObject, out companionId));
+            Assert.True(loser.ObjectManager.TryGetId(troop, out troopId));
+            Assert.True(loser.ObjectManager.TryGetId(MobileParty.MainParty, out partyId));
+            Assert.Equal(0, MobileParty.MainParty.MemberRoster.GetTroopCount(companion));
+            Assert.Equal(15, MobileParty.MainParty.MemberRoster.GetTroopCount(troop));
+            if (replyDuringSelection) AcceptFromFirstClient(fixture, alternative: winningAlternative);
+            else router.SetLatency(loser.NetPeer, environment.Server.NetPeer, TimeSpan.FromSeconds(1));
+        });
+        if (!replyDuringSelection) AcceptFromFirstClient(fixture, alternative: winningAlternative);
+        router.AdvanceBy(TimeSpan.FromSeconds(1));
+        foreach (var instance in new[] { environment.Server }.Concat(environment.Clients))
+        {
+            instance.Call(() =>
+            {
+                Assert.True(instance.ObjectManager.TryGetObject<Hero>(fixture.Giver, out var giver));
+                Assert.True(instance.ObjectManager.TryGetObject<Hero>(companionId, out var companion));
+                Assert.True(instance.ObjectManager.TryGetObject<CharacterObject>(troopId, out var troop));
+                Assert.True(instance.ObjectManager.TryGetObject<MobileParty>(partyId, out var party));
+                Assert.Equal(1, party.MemberRoster.GetTroopCount(companion.CharacterObject));
+                Assert.Equal(25, party.MemberRoster.GetTroopCount(troop));
+                Assert.Same(party, companion.PartyBelongedTo);
+                Assert.False(companion.IsDisabled);
+                Assert.True(instance.Resolve<IIssueOwnershipRegistry>().TryGetOwnerControllerId(giver, out var owner));
+                Assert.Equal("bounty-owner", owner);
+                Assert.Equal(winningAlternative, giver.Issue.IsSolvingWithAlternative);
+                Assert.Equal(winningAlternative ? 11 : 0, giver.Issue.AlternativeSolutionSentTroops.TotalManCount);
+                Assert.Equal(0, giver.Issue.AlternativeSolutionSentTroops.GetTroopCount(companion.CharacterObject));
+                foreach (var sent in giver.Issue.AlternativeSolutionSentTroops.GetTroopRoster())
+                    Assert.Equal(0, party.MemberRoster.GetTroopCount(sent.Character));
+            });
+        }
+    }
+
+    private string AcceptFromFirstClient((string Giver, string Hideout) fixture, bool alternative = false, int clientIndex = 0, Action beforeRequest = null)
     {
         var playerId = environment.CreateRegisteredObject<Hero>();
         var partyId = environment.CreateRegisteredObject<MobileParty>();
@@ -376,15 +428,21 @@ public class CapturedByBountyHuntersIssueTests : IDisposable
             {
                 Assert.True(client.ObjectManager.TryGetObject<Hero>(companionId, out var companion));
                 Assert.True(client.ObjectManager.TryGetObject<CharacterObject>(troopId, out var troop));
+                Assert.Equal(1, party.MemberRoster.GetTroopCount(companion.CharacterObject));
+                Assert.Equal(25, party.MemberRoster.GetTroopCount(troop));
                 using (new AllowedThread())
                 {
+                    party.MemberRoster.AddToCounts(companion.CharacterObject, -1);
+                    party.MemberRoster.AddToCounts(troop, -10);
                     giver.Issue.AlternativeSolutionSentTroops.AddToCounts(companion.CharacterObject, 1);
                     giver.Issue.AlternativeSolutionSentTroops.AddToCounts(troop, 10);
                 }
+                beforeRequest?.Invoke();
                 giver.Issue.StartIssueWithAlternativeSolution();
             }
             else Assert.True(Campaign.Current.IssueManager.StartIssueQuest(giver));
         });
+        if (beforeRequest != null) return playerId;
         if (alternative) Assert.Single(environment.Server.NetworkSentMessages.GetMessages<NetworkQuestTypeAlternativeAccepted>().Where(message => message.OwnerId == fixture.Giver));
         else Assert.Single(environment.Server.NetworkSentMessages.GetMessages<NetworkQuestTypeQuestAccepted>().Where(message => message.OwnerId == fixture.Giver));
         return playerId;

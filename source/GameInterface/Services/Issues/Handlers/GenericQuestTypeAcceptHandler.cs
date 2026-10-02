@@ -232,6 +232,7 @@ internal class GenericQuestTypeAcceptHandler : IHandler
             if (!objectManager.TryGetObjectWithLogging<Hero>(data.OwnerId, out var owner)) return;
 
             var descriptor = QuestTypeRegistry.Get(owner.Issue);
+            RollbackAlternativeAccept(owner);
             ownershipRegistry.TryGetOwnerControllerId(owner, out var previousOwner);
             ownershipRegistry.SetOwner(owner, data.OwnerControllerId);
             try
@@ -299,8 +300,11 @@ internal class GenericQuestTypeAcceptHandler : IHandler
         }
         else
         {
+            if (!owner.Issue.IsOngoingWithoutQuest) return;
             generationRegistry.TryGetGeneration(owner, out var generation);
             var packedTroops = troopRosterInterface.PackTroopRosterData(owner.Issue.AlternativeSolutionSentTroops);
+            // Return the local selection before the server's roster changes arrive.
+            RollbackAlternativeAccept(owner);
             network.SendAll(new RequestQuestTypeAcceptAlternative(ownerId, generation, packedTroops));
         }
     }
@@ -428,6 +432,7 @@ internal class GenericQuestTypeAcceptHandler : IHandler
             if (!objectManager.TryGetObjectWithLogging<Hero>(data.OwnerId, out var owner) || owner.Issue == null) return;
 
             var descriptor = QuestTypeRegistry.Get(owner.Issue);
+            RollbackAlternativeAccept(owner);
             ownershipRegistry.TryGetOwnerControllerId(owner, out var previousOwner);
             ownershipRegistry.SetOwner(owner, data.OwnerControllerId);
             try
@@ -474,7 +479,7 @@ internal class GenericQuestTypeAcceptHandler : IHandler
 
     private static void RollbackAlternativeAccept(Hero owner)
     {
-        if (owner?.Issue == null) return;
+        if (owner?.Issue?.IsOngoingWithoutQuest != true) return;
 
         using (new AllowedThread())
         {
