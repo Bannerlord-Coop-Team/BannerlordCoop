@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using Common;
 using GameInterface.Services.Heroes.Patches;
 using GameInterface.Services.Issues.Interfaces;
@@ -46,12 +46,20 @@ public static class AlternativeSolutionCompletionRunner
 
     public static void CompleteOnServer(Hero owner, IssueBase issue)
     {
+        if (owner?.Issue != issue || issue == null || !issue.IsSolvingWithAlternative) return;
         using (new AlternativeSolutionCompletionAuthorityGuard())
         using (new IssueFinalizeAuthorityGuard())
         using (ResolveTrueOwnerScope(owner))
         {
             IssueManagerQuestCompletedReasonCapture.PendingReasons[owner] = IssueFinalizeReason.AlternativeSolutionSuccess;
-            issue.CompleteIssueWithAlternativeSolution();
+            try
+            {
+                issue.CompleteIssueWithAlternativeSolution();
+            }
+            finally
+            {
+                IssueManagerQuestCompletedReasonCapture.PendingReasons.Remove(owner);
+            }
         }
     }
 

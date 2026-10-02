@@ -1,4 +1,4 @@
-using Common.Messaging;
+﻿using Common.Messaging;
 using ProtoBuf;
 using TaleWorlds.CampaignSystem;
 
@@ -14,6 +14,7 @@ public enum IssueFinalizeReason : byte
     QuestBetrayal = 5,
     RejectedAccept = 6,
     AlternativeSolutionSuccess = 7,
+    AlternativeSolutionFail = 8,
 }
 
 public readonly struct IssueFinalizedTriggered : IEvent
@@ -73,10 +74,18 @@ public readonly struct NetworkIssueRemoved : IServerToClientCommand
     [ProtoMember(3)]
     public readonly byte Proof;
 
-    public NetworkIssueRemoved(string ownerId, IssueFinalizeReason reason, byte proof = 0)
+    [ProtoMember(4)]
+    public readonly string QuestId;
+
+    [ProtoMember(5)]
+    public readonly int Generation;
+
+    public NetworkIssueRemoved(string ownerId, IssueFinalizeReason reason, byte proof = 0, string questId = null, int generation = 0)
     {
         OwnerId = ownerId;
         Reason = reason;
         Proof = proof;
+        QuestId = questId;
+        Generation = generation;
     }
 }

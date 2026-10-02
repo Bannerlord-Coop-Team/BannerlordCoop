@@ -159,16 +159,26 @@ internal sealed class GangLeaderWeaponsQuestActions : IGangLeaderWeaponsQuestAct
 internal sealed class GangLeaderWeaponsActionScope : IDisposable
 {
     [ThreadStatic] private static Quest current;
+    [ThreadStatic] private static bool localOwner;
     private readonly Quest previous;
+    private readonly bool previousLocalOwner;
 
     public GangLeaderWeaponsActionScope(Quest quest)
     {
         previous = current;
+        previousLocalOwner = localOwner;
         current = quest;
+        localOwner = quest != null && ModInformation.IsClient &&
+            ContainerProvider.TryResolve<IIssueOwnershipRegistry>(out var ownership) && ownership.IsLocalPeerOwner(quest.QuestGiver);
     }
 
     public static bool Contains(Quest quest) => current == quest;
     public static Quest Current => current;
+    public static bool IsLocalOwner => localOwner;
 
-    public void Dispose() => current = previous;
+    public void Dispose()
+    {
+        current = previous;
+        localOwner = previousLocalOwner;
+    }
 }

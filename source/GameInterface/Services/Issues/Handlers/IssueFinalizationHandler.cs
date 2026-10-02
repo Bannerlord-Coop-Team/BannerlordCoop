@@ -1,4 +1,4 @@
-using Common;
+﻿using Common;
 using Common.Logging;
 using Common.Messaging;
 using Common.Network;
@@ -11,6 +11,7 @@ using GameInterface.Services.Players.Data;
 using LiteNetLib;
 using Serilog;
 using System;
+using System.Linq;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Issues;
 using TaleWorlds.CampaignSystem.Party;
@@ -267,7 +268,8 @@ internal class IssueFinalizationHandler : IHandler
             return false;
         }
 
-        if (reason == IssueFinalizeReason.RejectedAccept || reason == IssueFinalizeReason.AlternativeSolutionSuccess)
+        if (reason == IssueFinalizeReason.RejectedAccept || reason == IssueFinalizeReason.AlternativeSolutionSuccess ||
+            reason == IssueFinalizeReason.AlternativeSolutionFail)
         {
             Logger.Error("Rejecting {Message} claiming {Reason} for owner {Owner} - this reason can only originate server-side",
                 nameof(RequestIssueRemoved), reason, ownerId);
@@ -415,9 +417,19 @@ internal class IssueFinalizationHandler : IHandler
         var ownerId = payload.What.OwnerId;
         var reason = payload.What.Reason;
         var proof = payload.What.Proof;
+        var questId = payload.What.QuestId;
+        var generation = payload.What.Generation;
         GameThread.RunSafe(() =>
         {
             if (!objectManager.TryGetObjectWithLogging<Hero>(ownerId, out var owner)) return;
+            QuestBase detachedQuest = null;
+            if (questId != null)
+            {
+                if (!generationRegistry.TryGetGeneration(owner, out var current) || current != generation) return;
+                detachedQuest = Campaign.Current.QuestManager.Quests.FirstOrDefault(q =>
+                    q.QuestGiver == owner && q.StringId == questId && q.IsOngoing);
+                if (detachedQuest == null) return;
+            }
 
             Hero truePlayerHero = null;
             MobileParty ownerParty = null;
@@ -433,7 +445,8 @@ internal class IssueFinalizationHandler : IHandler
             {
                 using (new MainHeroSubstitutionScope(truePlayerHero ?? owner, ownerParty))
                 {
-                    IssueFinalizationSupport.FinalizeMirror(owner, reason, suppressReplicationPatches: true, skipConsequenceReapplication: true);
+                    IssueFinalizationSupport.FinalizeMirror(owner, reason, suppressReplicationPatches: true, skipConsequenceReapplication: true, detachedQuest: detachedQuest);
+                    if (detachedQuest != null) ownershipRegistry.Clear(owner);
                 }
             }
             finally

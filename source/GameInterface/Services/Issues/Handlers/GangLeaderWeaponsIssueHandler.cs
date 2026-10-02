@@ -2,6 +2,7 @@
 using Common.Messaging;
 using Common.Network;
 using Common.Util;
+using GameInterface.Services.Heroes.HeirSelection.Messages;
 using GameInterface.Services.Issues.Generic;
 using GameInterface.Services.Issues.Generic.CreationCapture;
 using GameInterface.Services.Issues.Generic.Migrated.GangLeaderNeedsWeapons;
@@ -16,8 +17,10 @@ using System.Collections.Generic;
 using System.Linq;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Issues;
+using TaleWorlds.CampaignSystem.LogEntries;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.Core;
+using TaleWorlds.Localization;
 
 namespace GameInterface.Services.Issues.Handlers;
 
@@ -62,6 +65,9 @@ internal sealed class GangLeaderWeaponsIssueHandler : IHandler
         broker.Subscribe<GangLeaderWeaponsStateChanged>(HandleStateChanged);
         broker.Subscribe<MapEventResultsCommitted>(HandleBattleResults);
         broker.Subscribe<GangLeaderWeaponsQuestEnded>(HandleQuestEnded);
+        broker.Subscribe<GangLeaderWeaponsAlternativeUpdated>(HandleAlternativeUpdated);
+        broker.Subscribe<NetworkGangLeaderWeaponsAlternative>(HandleNetworkAlternative);
+        broker.Subscribe<NetworkPlayerCharacterChangedAfterHeirSelection>(HandlePlayerChanged);
     }
 
     public void Dispose()
@@ -78,9 +84,35 @@ internal sealed class GangLeaderWeaponsIssueHandler : IHandler
         broker.Unsubscribe<GangLeaderWeaponsStateChanged>(HandleStateChanged);
         broker.Unsubscribe<MapEventResultsCommitted>(HandleBattleResults);
         broker.Unsubscribe<GangLeaderWeaponsQuestEnded>(HandleQuestEnded);
+        broker.Unsubscribe<GangLeaderWeaponsAlternativeUpdated>(HandleAlternativeUpdated);
+        broker.Unsubscribe<NetworkGangLeaderWeaponsAlternative>(HandleNetworkAlternative);
+        broker.Unsubscribe<NetworkPlayerCharacterChangedAfterHeirSelection>(HandlePlayerChanged);
         pendingGuardEntries.Clear();
         pendingBattle = null;
         pendingBattleRequestId = null;
+    }
+
+    private void HandlePlayerChanged(MessagePayload<NetworkPlayerCharacterChangedAfterHeirSelection> payload)
+    {
+        if (ModInformation.IsClient) return;
+        var data = payload.What;
+        var peer = payload.Who as NetPeer;
+        GameThread.RunSafe(() =>
+        {
+            if (peer == null || !players.TryGetPlayer(peer, out var player) ||
+                player.HeroId != data.NewPlayerId || player.MobilePartyId != data.NewMainPartyId ||
+                !objects.TryGetObjectWithLogging<Hero>(data.OldPlayerId, out var oldHero) ||
+                !objects.TryGetObjectWithLogging<Hero>(data.NewPlayerId, out var newHero) ||
+                !objects.TryGetObjectWithLogging<MobileParty>(data.NewMainPartyId, out var party)) return;
+            using (new GangLeaderWeaponsPlayerChangeScope(oldHero, newHero, party))
+            {
+                foreach (var quest in Campaign.Current.QuestManager.Quests.OfType<Quest>().ToArray())
+                {
+                    if (ownership.TryGetOwnerControllerId(quest.QuestGiver, out var owner) && owner == player.ControllerId)
+                        quest.CompleteQuestWithCancel(new TextObject("{=bYdhYidf}The quest was canceled because your clan leader, who made the original agreement, is no longer head of the clan.\""));
+                }
+            }
+        });
     }
 
     private void HandleCreated(MessagePayload<GangLeaderWeaponsIssueCreated> payload)
@@ -301,5 +333,49 @@ internal sealed class GangLeaderWeaponsIssueHandler : IHandler
                 objects.TryGetIdWithLogging(entry.Key, out var giverId) && generations.TryGetGeneration(entry.Key, out var generation))
                 PublishState(quest, giverId, generation, GangLeaderWeaponsAction.BattleWon, true);
         }
+    }
+
+    private void HandleAlternativeUpdated(MessagePayload<GangLeaderWeaponsAlternativeUpdated> payload)
+    {
+        if (ModInformation.IsClient) return;
+        var issue = payload.What.Issue;
+        if (!ownership.TryGetOwnerControllerId(issue.IssueOwner, out _) ||
+            !objects.TryGetIdWithLogging(issue.IssueOwner, out var giverId) ||
+            !generations.TryGetGeneration(issue.IssueOwner, out var generation)) return;
+        // Vanilla's failure log otherwise relies on a process-local text variable.
+        if (issue.AlternativeSolutionHero != null)
+        {
+            foreach (var log in issue.JournalEntries)
+                Helpers.StringHelpers.SetCharacterProperties("COMPANION", issue.AlternativeSolutionHero.CharacterObject, log.LogText);
+        }
+        network.SendAll(new NetworkGangLeaderWeaponsAlternative(giverId, generation, payload.What.Detail,
+            issue._areIssueEffectsResolved, issue.JournalEntries.Select(log => new GangLeaderWeaponsJournalEntry(log)).ToArray()));
+    }
+
+    private void HandleNetworkAlternative(MessagePayload<NetworkGangLeaderWeaponsAlternative> payload)
+    {
+        if (ModInformation.IsServer) return;
+        var data = payload.What;
+        GameThread.RunSafe(() =>
+        {
+            if (!objects.TryGetObjectWithLogging<Hero>(data.GiverId, out var giver) ||
+                !generations.TryGetGeneration(giver, out var generation) || generation != data.Generation ||
+                giver.Issue is not Issue issue || !issue.IsSolvingWithAlternative) return;
+            using (new AllowedThread())
+            {
+                issue._areIssueEffectsResolved = data.EffectsResolved;
+                issue._journalEntries.Clear();
+                foreach (var entry in data.Entries ?? System.Array.Empty<GangLeaderWeaponsJournalEntry>())
+                    issue._journalEntries.Add(new JournalLog(entry.Time, entry.Text, entry.Task, entry.Progress, entry.Range, entry.Type));
+                if (!ownership.IsLocalPeerOwner(giver)) return;
+                var history = Campaign.Current.LogEntryHistory.FindLastGameActionLog((JournalLogEntry log) => log.IsRelatedTo(issue));
+                if (history == null)
+                {
+                    history = new JournalLogEntry(issue.Title, giver, issue.CounterOfferHero, false, issue);
+                    LogEntry.AddLogEntry(history);
+                }
+                history.Update(issue.JournalEntries, data.Detail);
+            }
+        });
     }
 }
