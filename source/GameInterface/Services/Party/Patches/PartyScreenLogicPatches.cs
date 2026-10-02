@@ -33,8 +33,14 @@ internal class PartyScreenLogicPatches
 
     [HarmonyPatch(nameof(PartyScreenLogic.ValidateCommand))]
     [HarmonyPrefix]
-    public static bool ValidateCommandPrefix(PartyScreenLogic.PartyCommand command, ref bool __result)
+    public static bool ValidateCommandPrefix(PartyScreenLogic.PartyCommand command, ref bool __result, PartyScreenLogic __instance = null)
     {
+        if (ContainerProvider.TryResolve<IAlternativeSolutionTroopSelection>(out var selection) &&
+            selection.IsCommitPending(__instance))
+        {
+            __result = false;
+            return false;
+        }
         // Force-transfer loot screens only honor member takes and dismissals: the
         // commit validation rejects any prisoner, upgrade, gold, influence, or
         // morale movement, which would fail after the screen already reset.
@@ -74,6 +80,12 @@ internal class PartyScreenLogicPatches
     [HarmonyPrefix]
     public static bool DoneLogicPrefix(PartyScreenLogic __instance, ref bool __result, bool isForced)
     {
+        ContainerProvider.TryResolve<IAlternativeSolutionTroopSelection>(out var troopSelection);
+        if (troopSelection?.IsCommitPending(__instance) == true)
+        {
+            __result = false;
+            return false;
+        }
         if (Hero.MainHero.Gold < -__instance.CurrentData.PartyGoldChangeAmount && __instance.CurrentData.PartyGoldChangeAmount < 0)
         {
             MBInformationManager.AddQuickInformation(GameTexts.FindText("str_inventory_popup_player_not_enough_gold", null), 0, null, null, "");
@@ -119,11 +131,11 @@ internal class PartyScreenLogicPatches
             }
 
             ForceTransferScreenTracker.TryClaimForceTransferId(__instance.MemberRosters[0], out var forceTransferId);
-            ContainerProvider.TryResolve<IAlternativeSolutionTroopSelection>(out var troopSelection);
             var selectingIssue = troopSelection?.FindIssue(__instance);
             var currentMembers = __instance.MemberRosters[1];
             var initialMembers = __instance._initialData.RightMemberRoster;
             TroopRoster selectedTroops = null;
+            TroopRoster initialSelectedTroops = null;
             if (selectingIssue != null)
             {
                 // Quest transfers are committed by acceptance; upgrades still use the party transaction.
@@ -131,6 +143,8 @@ internal class PartyScreenLogicPatches
                 {
                     selectedTroops = TroopRoster.CreateDummyTroopRoster();
                     selectedTroops.Add(__instance.MemberRosters[0]);
+                    initialSelectedTroops = TroopRoster.CreateDummyTroopRoster();
+                    initialSelectedTroops.Add(__instance._initialData.LeftMemberRoster);
                     currentMembers = TroopRoster.CreateDummyTroopRoster();
                     currentMembers.Add(__instance.MemberRosters[1]);
                     for (int i = 0; i < currentMembers.Count; i++)
@@ -139,19 +153,20 @@ internal class PartyScreenLogicPatches
                     currentMembers.Add(selectedTroops);
                     initialMembers = TroopRoster.CreateDummyTroopRoster();
                     initialMembers.Add(__instance._initialData.RightMemberRoster);
-                    initialMembers.Add(__instance._initialData.LeftMemberRoster);
+                    initialMembers.Add(initialSelectedTroops);
                 }
             }
+            var commitId = selectingIssue == null ? null : troopSelection.BeginCommit(__instance);
             var message = new PartyDoneLogicAttempted(
                 Hero.MainHero,
                 releasedPrisonersRoster,
                 takenPrisonersRoster,
                 recruitedPrisonersRoster,
-                __instance.MemberRosters[0],
+                selectedTroops ?? __instance.MemberRosters[0],
                 __instance.PrisonerRosters[0],
                 currentMembers,
                 __instance.PrisonerRosters[1],
-                __instance._initialData.LeftMemberRoster,
+                initialSelectedTroops ?? __instance._initialData.LeftMemberRoster,
                 __instance._initialData.LeftPrisonerRoster,
                 initialMembers,
                 __instance._initialData.RightPrisonerRoster,
@@ -166,10 +181,11 @@ internal class PartyScreenLogicPatches
                 applyReleasedAndTakenPrisonerActions,
                 donationSettlement,
                 donatedPrisonersRoster,
-                forceTransferId
+                forceTransferId,
+                commitId
             );
 
-            MessageBroker.Instance.Publish(__instance, message);
+            if (selectingIssue == null) MessageBroker.Instance.Publish(__instance, message);
             // Manage changing rosters on the server
             using (new AllowedThread())
             {
@@ -211,35 +227,68 @@ internal class PartyScreenLogicPatches
                     InCommit = false;
                 }
             }
+            // Freeze the local baseline before an immediate authoritative reply can rebase it.
+            if (selectingIssue != null)
+            {
+                MessageBroker.Instance.Publish(__instance, message);
+                flag = ReferenceEquals(troopSelection.FindIssue(__instance), selectingIssue);
+            }
         }
         __result = flag;
         return false;
     }
 
+    [HarmonyPatch(nameof(PartyScreenLogic.IsDoneActive))]
+    [HarmonyPostfix]
+    private static void IsDoneActivePostfix(PartyScreenLogic __instance, ref bool __result)
+    {
+        if (ContainerProvider.TryResolve<IAlternativeSolutionTroopSelection>(out var selection) &&
+            selection.IsCommitPending(__instance)) __result = false;
+    }
+
     [HarmonyPatch(nameof(PartyScreenLogic.TransferTroop))]
     [HarmonyPrefix]
-    private static void TransferTroopPrefix(PartyScreenLogic __instance, PartyScreenLogic.PartyCommand command, ref int __state)
+    private static void TransferTroopPrefix(PartyScreenLogic __instance, PartyScreenLogic.PartyCommand command,
+        out (int Count, long Xp) __state)
     {
-        __state = -1;
+        __state = (-1, 0);
         if (command.Type != PartyScreenLogic.TroopType.Member ||
-            command.RosterSide != PartyScreenLogic.PartyRosterSide.Right || command.TotalNumber <= 0 ||
+            command.TotalNumber <= 0 ||
             !ContainerProvider.TryResolve<IAlternativeSolutionTroopSelection>(out var selection) ||
             selection.FindIssue(__instance) == null) return;
 
-        __state = __instance.MemberRosters[1].GetTroopCount(command.Character);
+        __state = (__instance.MemberRosters[(int)command.RosterSide].GetTroopCount(command.Character),
+            (long)__instance.MemberRosters[1].GetElementXp(command.Character) +
+            __instance.MemberRosters[0].GetElementXp(command.Character) -
+            __instance._initialData.LeftMemberRoster.GetElementXp(command.Character));
     }
 
     [HarmonyPatch(nameof(PartyScreenLogic.TransferTroop))]
     [HarmonyPostfix]
-    private static void TransferTroopPostfix(PartyScreenLogic __instance, PartyScreenLogic.PartyCommand command, int __state)
+    private static void TransferTroopPostfix(PartyScreenLogic __instance, PartyScreenLogic.PartyCommand command,
+        bool invokeUpdate, (int Count, long Xp) __state)
     {
-        var roster = __instance.MemberRosters[1];
-        if (__state < 0 || roster.GetTroopCount(command.Character) != __state - command.TotalNumber) return;
-        int index = roster.FindIndexOfTroop(command.Character);
-        if (index < 0 || roster.GetElementXp(index) == 0) return;
+        if (__state.Count < 0 ||
+            __instance.MemberRosters[(int)command.RosterSide].GetTroopCount(command.Character) != __state.Count - command.TotalNumber) return;
 
-        // Cap the remaining stack before another transfer can reuse its excess XP.
-        using (new AllowedThread()) roster.SetElementXp(index, roster.GetElementXp(index));
+        var roster = __instance.MemberRosters[1];
+        int index = roster.FindIndexOfTroop(command.Character);
+        int previousXp = roster.GetElementXp(command.Character);
+        using (new AllowedThread())
+        {
+            // A returned claim cannot make its duplicate XP spendable on another upgrade.
+            if (index >= 0 && previousXp > 0)
+                roster.SetElementXp(index, (int)Math.Min(previousXp, __state.Xp));
+
+            var baseline = __instance._initialData.LeftMemberRoster;
+            int baselineIndex = baseline.FindIndexOfTroop(command.Character);
+            if (baselineIndex >= 0)
+                baseline.SetElementXp(baselineIndex, (int)((long)roster.GetElementXp(command.Character) +
+                    __instance.MemberRosters[0].GetElementXp(command.Character) - __state.Xp));
+        }
+        if (invokeUpdate && previousXp != roster.GetElementXp(command.Character) &&
+            ContainerProvider.TryResolve<IPartyScreenRosterRefresher>(out var refresher))
+            refresher.RefreshXp(__instance, command.Character);
     }
 
     internal static void RestoreLeftRostersAfterCommit(

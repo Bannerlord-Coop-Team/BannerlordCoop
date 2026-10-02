@@ -13,6 +13,7 @@ using System;
 using System.Runtime.CompilerServices;
 using System.Threading;
 using TaleWorlds.CampaignSystem;
+using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Roster;
 using Xunit;
 
@@ -116,5 +117,9 @@ public class TroopRosterDeltaHandlerRefreshTests
         public bool TryRemoveZeroCounts(TroopRoster authoritativeRoster) => false;
 
         public bool TryApply(ItemRoster authoritativeRoster, Action<ItemRoster> applyAuthoritative) => false;
+
+        public void RefreshXp(PartyScreenLogic logic, CharacterObject character)
+        {
+        }
     }
 }

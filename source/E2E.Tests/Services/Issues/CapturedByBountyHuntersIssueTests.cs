@@ -484,6 +484,117 @@ public class CapturedByBountyHuntersIssueTests : IDisposable
     public void PartyScreenDoneKeepsTroopsStagedUntilAlternativeAcceptance(
         bool decline, bool upgrade, bool deferredReceive, bool repeatedDone, bool splitTransfer, bool editAfterDone,
         bool resetAfterEdit, bool reselectAfterDone)
+        => CheckPartyScreenSelection(decline, upgrade, deferredReceive, repeatedDone, splitTransfer, editAfterDone,
+            resetAfterEdit, reselectAfterDone, false);
+
+    [Theory]
+    [InlineData(false, false)]
+    [InlineData(true, false)]
+    [InlineData(false, true)]
+    [InlineData(true, true)]
+    public void PartyScreenDoneKeepsClaimXpOutOfLaterUpgrades(bool decline, bool deferredReceive)
+        => CheckPartyScreenSelection(decline, true, deferredReceive, true, false, false, false, true, true);
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void PartyScreenDoneRejectionClosesSelectionWithoutSpendingGold(bool deferredReceive)
+    {
+        var fixture = CreateIssue();
+        var client = environment.Clients.First();
+        var targetId = environment.CreateRegisteredObject<CharacterObject>();
+        AcceptFromFirstClient(fixture, alternative: true, submitAlternative: false, beforeRequest: () =>
+        {
+            var giver = client.GetRegisteredObject<Hero>(fixture.Giver);
+            var party = MobileParty.MainParty;
+            var sent = giver.Issue.AlternativeSolutionSentTroops;
+            var troop = sent.GetTroopRoster().Single(entry => !entry.Character.IsHero).Character;
+            Assert.True(client.ObjectManager.TryGetId(troop, out var troopId));
+            Assert.True(client.ObjectManager.TryGetId(party, out var partyId));
+            Assert.True(client.ObjectManager.TryGetId(Hero.MainHero, out var playerId));
+            foreach (var instance in new[] { environment.Server }.Concat(environment.Clients))
+            {
+                instance.Call(() =>
+                {
+                    using (new AllowedThread())
+                    {
+                        var original = instance.GetRegisteredObject<CharacterObject>(troopId);
+                        var target = instance.GetRegisteredObject<CharacterObject>(targetId);
+                        original.Level = 20;
+                        target.Level = 26;
+                        target.UpgradeTargets = Array.Empty<CharacterObject>();
+                        original.UpgradeTargets = new[] { target };
+                    }
+                });
+            }
+            environment.Server.Call(() =>
+            {
+                var authority = environment.Server.GetRegisteredObject<MobileParty>(partyId);
+                var original = environment.Server.GetRegisteredObject<CharacterObject>(troopId);
+                var player = environment.Server.GetRegisteredObject<Hero>(playerId);
+                player.ChangeHeroGold(10000 - player.Gold);
+                authority.MemberRoster.AddXpToTroop(original, 2 * original.GetUpgradeXpCost(authority.Party, 0));
+            });
+            environment.FlushCoalescer();
+            var logic = OpenAlternativeSelection(party, sent);
+            var command = new PartyScreenLogic.PartyCommand();
+            command.FillForUpgradeTroop(PartyScreenLogic.PartyRosterSide.Right, PartyScreenLogic.TroopType.Member, troop, 1, 0, -1);
+            using (new AllowedThread())
+            {
+                Assert.True(logic.ValidateCommand(command));
+                logic.UpgradeTroop(command);
+            }
+            if (deferredReceive) environment.Server.Resolve<TestNetworkRouter>().ReceiveContext = TestNetworkReceiveContext.PollerThread;
+            Assert.True(logic.DoneLogic(true));
+            Assert.True(client.Resolve<IAlternativeSolutionTroopSelection>().IsCommitPending(logic));
+            environment.Server.Call(() =>
+            {
+                var authority = environment.Server.GetRegisteredObject<MobileParty>(partyId);
+                var original = environment.Server.GetRegisteredObject<CharacterObject>(troopId);
+                authority.MemberRoster.SetElementXp(authority.MemberRoster.FindIndexOfTroop(original), 0);
+            });
+            environment.Server.PumpGameThread();
+            foreach (var recipient in environment.Clients) recipient.PumpGameThread();
+            Assert.False(client.Resolve<IAlternativeSolutionTroopSelection>().IsCommitPending(logic));
+            Assert.Null(Game.Current.GameStateManager.ActiveState);
+            Assert.Equal(0, sent.TotalManCount);
+            foreach (var instance in new[] { environment.Server }.Concat(environment.Clients))
+            {
+                instance.Call(() =>
+                {
+                    var authority = instance.GetRegisteredObject<MobileParty>(partyId);
+                    Assert.Equal(25, authority.MemberRoster.GetTroopCount(instance.GetRegisteredObject<CharacterObject>(troopId)));
+                    Assert.Equal(0, authority.MemberRoster.GetTroopCount(instance.GetRegisteredObject<CharacterObject>(targetId)));
+                    Assert.Equal(10000, instance.GetRegisteredObject<Hero>(playerId).Gold);
+                });
+            }
+        });
+        environment.Server.PumpGameThread();
+        foreach (var recipient in environment.Clients) recipient.PumpGameThread();
+        Assert.Empty(environment.Server.NetworkSentMessages.GetMessages<NetworkQuestTypeAlternativeAccepted>());
+    }
+
+    [Fact]
+    public void PartyScreenDoneIgnoresAReplyForAnOlderSelection()
+    {
+        var client = environment.Clients.First();
+        client.Call(() =>
+        {
+            var selection = client.Resolve<IAlternativeSolutionTroopSelection>();
+            var oldLogic = new PartyScreenLogic();
+            var currentLogic = new PartyScreenLogic();
+            var oldId = selection.BeginCommit(oldLogic);
+            var currentId = selection.BeginCommit(currentLogic);
+            selection.CompleteCommit(oldId, false);
+            Assert.True(selection.IsCommitPending(currentLogic));
+            selection.CompleteCommit(currentId, true);
+            Assert.False(selection.IsCommitPending(currentLogic));
+        });
+    }
+
+    private void CheckPartyScreenSelection(
+        bool decline, bool upgrade, bool deferredReceive, bool repeatedDone, bool splitTransfer, bool editAfterDone,
+        bool resetAfterEdit, bool reselectAfterDone, bool upgradeAfterDone)
     {
         var fixture = CreateIssue();
         var client = environment.Clients.First();
@@ -573,13 +684,13 @@ public class CapturedByBountyHuntersIssueTests : IDisposable
                 logic.TransferTroop(command, false);
             }
             if (deferredReceive) environment.Server.Resolve<TestNetworkRouter>().ReceiveContext = TestNetworkReceiveContext.PollerThread;
-            expectedSentXp = decline || !upgrade ? 0 : Math.Max(0, remainingXp - ((keepsAdditionalTroops ? 13 : 15) * troop.GetUpgradeXpCost(party.Party, 0)));
-            expectedPartyXp = remainingXp - expectedSentXp;
             if (upgrade) Assert.True(sent.GetElementXp(troop) > 0);
             if (repeatedDone)
             {
                 Assert.True(logic.DoneLogic(true));
+                AwaitPartyCommit();
                 Assert.True(logic.DoneLogic(true));
+                AwaitPartyCommit();
             }
             if (editAfterDone)
             {
@@ -600,9 +711,42 @@ public class CapturedByBountyHuntersIssueTests : IDisposable
                     logic.TransferTroop(command, false);
                 }
             }
+            if (upgradeAfterDone)
+            {
+                int cost = troop.GetUpgradeXpCost(party.Party, 0);
+                command.FillForUpgradeTroop(PartyScreenLogic.PartyRosterSide.Right, PartyScreenLogic.TroopType.Member,
+                    troop, (remainingXp / cost) + 1, 0, -1);
+                Assert.False(logic.ValidateCommand(command));
+                using (new AllowedThread())
+                {
+                    command.FillForUpgradeTroop(PartyScreenLogic.PartyRosterSide.Right, PartyScreenLogic.TroopType.Member, troop, 1, 0, -1);
+                    Assert.True(logic.ValidateCommand(command));
+                    logic.UpgradeTroop(command);
+                }
+                remainingXp -= cost;
+                upgradeCost += troop.GetUpgradeGoldCost(party.Party, 0);
+            }
+            int retainedCount = (keepsAdditionalTroops ? 13 : 15) - (upgradeAfterDone ? 1 : 0);
+            expectedSentXp = decline || !upgrade ? 0 : Math.Max(0, remainingXp - (retainedCount * troop.GetUpgradeXpCost(party.Party, 0)));
+            expectedPartyXp = remainingXp - expectedSentXp;
             Helpers.PartyScreenHelper.CloseScreen(false);
             Assert.Equal(1, closed);
             Assert.Null(Game.Current.GameStateManager.ActiveState);
+
+            void AwaitPartyCommit()
+            {
+                Assert.True(client.Resolve<IAlternativeSolutionTroopSelection>().IsCommitPending(logic));
+                Assert.False(logic.IsDoneActive());
+                Assert.False(logic.DoneLogic(true));
+                if (upgradeAfterDone)
+                {
+                    command.FillForUpgradeTroop(PartyScreenLogic.PartyRosterSide.Right, PartyScreenLogic.TroopType.Member, troop, 1, 0, -1);
+                    Assert.False(logic.ValidateCommand(command));
+                }
+                environment.Server.PumpGameThread();
+                foreach (var recipient in environment.Clients) recipient.PumpGameThread();
+                Assert.False(client.Resolve<IAlternativeSolutionTroopSelection>().IsCommitPending(logic));
+            }
         }, submitAlternative: false);
         environment.Server.PumpGameThread();
         environment.FlushCoalescer();
@@ -620,8 +764,8 @@ public class CapturedByBountyHuntersIssueTests : IDisposable
                 var target = instance.GetRegisteredObject<CharacterObject>(upgradedId);
                 var companion = instance.GetRegisteredObject<Hero>(companionId);
                 var giver = instance.GetRegisteredObject<Hero>(fixture.Giver);
-                Assert.Equal(decline ? (upgrade ? 20 : 25) : (keepsAdditionalTroops ? 13 : 15), party.MemberRoster.GetTroopCount(troop));
-                Assert.Equal(decline && upgrade ? 5 : 0, party.MemberRoster.GetTroopCount(target));
+                Assert.Equal((decline ? (upgrade ? 20 : 25) : (keepsAdditionalTroops ? 13 : 15)) - (upgradeAfterDone ? 1 : 0), party.MemberRoster.GetTroopCount(troop));
+                Assert.Equal((decline && upgrade ? 5 : 0) + (upgradeAfterDone ? 1 : 0), party.MemberRoster.GetTroopCount(target));
                 Assert.Equal(decline ? 1 : 0, party.MemberRoster.GetTroopCount(companion.CharacterObject));
                 Assert.Equal(decline ? 0 : (keepsAdditionalTroops ? 13 : 11), giver.Issue.AlternativeSolutionSentTroops.TotalManCount);
                 Assert.Equal(instance == environment.Server || instance == client ? expectedPartyXp : 0,

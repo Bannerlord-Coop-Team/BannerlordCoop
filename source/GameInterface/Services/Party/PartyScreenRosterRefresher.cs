@@ -24,6 +24,8 @@ internal interface IPartyScreenRosterRefresher
     bool TryRemoveZeroCounts(TroopRoster authoritativeRoster);
 
     bool TryApply(ItemRoster authoritativeRoster, Action<ItemRoster> applyAuthoritative);
+
+    void RefreshXp(PartyScreenLogic logic, CharacterObject character);
 }
 
 internal readonly struct PartyScreenSelectionIdentity
@@ -63,6 +65,9 @@ internal class PartyScreenRosterRefresher : IPartyScreenRosterRefresher
     {
         this.baselineProvider = baselineProvider;
     }
+
+    public void RefreshXp(PartyScreenLogic logic, CharacterObject character)
+        => RefreshTroop(logic, logic._initialData.RightMemberRoster, character, false, false);
 
     public bool TryApply(
         TroopRoster authoritativeRoster,

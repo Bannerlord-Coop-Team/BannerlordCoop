@@ -1,6 +1,7 @@
 ﻿using Common;
 using Common.Util;
 using Helpers;
+using System;
 using System.Linq;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.GameState;
@@ -15,12 +16,39 @@ internal interface IAlternativeSolutionTroopSelection
 {
     IssueBase FindIssue(PartyScreenLogic logic);
     void KeepSelection(IssueBase issue, TroopRoster selected);
+    bool IsCommitPending(PartyScreenLogic logic);
+    string BeginCommit(PartyScreenLogic logic);
+    void CompleteCommit(string commitId, bool accepted);
     void Rollback(Hero owner, bool closeScreen = true);
 }
 
 internal sealed class AlternativeSolutionTroopSelection : IAlternativeSolutionTroopSelection
 {
     private IssueBase returnedSelection;
+    private PartyScreenLogic pendingLogic;
+    private string pendingCommitId;
+
+    public bool IsCommitPending(PartyScreenLogic logic)
+        => pendingCommitId != null && ReferenceEquals(pendingLogic, logic);
+
+    public string BeginCommit(PartyScreenLogic logic)
+    {
+        pendingLogic = logic;
+        pendingCommitId = Guid.NewGuid().ToString("N");
+        return pendingCommitId;
+    }
+
+    public void CompleteCommit(string commitId, bool accepted)
+    {
+        if (pendingCommitId == null || pendingCommitId != commitId) return;
+        var logic = pendingLogic;
+        pendingLogic = null;
+        pendingCommitId = null;
+        var issue = FindIssue(logic);
+        if (issue == null) return;
+        if (!accepted) Rollback(issue.IssueOwner);
+        else logic.OnReset(false);
+    }
 
     public IssueBase FindIssue(PartyScreenLogic logic)
     {
@@ -57,6 +85,11 @@ internal sealed class AlternativeSolutionTroopSelection : IAlternativeSolutionTr
         var state = Game.Current.GameStateManager.ActiveState as PartyState;
         var logic = state?.PartyScreenLogic;
         bool hasOpenSelection = ReferenceEquals(FindIssue(logic), issue);
+        if (hasOpenSelection && ReferenceEquals(pendingLogic, logic))
+        {
+            pendingLogic = null;
+            pendingCommitId = null;
+        }
         using (new AllowedThread())
         {
             if (hasOpenSelection) logic.Reset(true);
