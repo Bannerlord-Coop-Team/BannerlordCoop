@@ -6,6 +6,7 @@ using Newtonsoft.Json.Linq;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.MapEvents;
 using TaleWorlds.CampaignSystem.Party;
+using TaleWorlds.Localization;
 using Xunit.Abstractions;
 
 namespace E2E.Tests.Services.MobileParties;
@@ -26,6 +27,7 @@ public class MobilePartyInfoCommandTests : MapEventTestBase
         {
             var leader = Server.GetRegisteredObject<MobileParty>(battle.AttackerPartyId);
             var member = Server.GetRegisteredObject<MobileParty>(memberId);
+            member.Party.SetCustomName(new TextObject("Diagnostic army member"));
             var army = new Army(GameObjectCreator.CreateInitializedObject<Kingdom>(), leader, Army.ArmyTypes.Raider);
             Assert.True(Server.ObjectManager.TryGetId(army, out armyId));
             member.Army = army;
@@ -40,7 +42,9 @@ public class MobilePartyInfoCommandTests : MapEventTestBase
         {
             instance.Call(() =>
             {
-                instance.GetRegisteredObject<MobileParty>(memberId).Ai.Tick(0.1f);
+                var member = instance.GetRegisteredObject<MobileParty>(memberId);
+                member.Party.SetCustomName(new TextObject("Diagnostic army member"));
+                member.Ai.Tick(0.1f);
                 var args = new CoopCommandArgsFactory().FromValues(new[] { memberId });
                 var result = new MobilePartyDebugCommand.InfoCoopCommand().ProcessCommand(args);
                 Assert.True(result.Succeeded, result.Output);
@@ -85,6 +89,7 @@ public class MobilePartyInfoCommandTests : MapEventTestBase
             instance.Call(() =>
             {
                 var party = instance.GetRegisteredObject<MobileParty>(partyId);
+                party.Party.SetCustomName(new TextObject("Diagnostic party"));
                 var factory = new CoopCommandArgsFactory();
                 var command = new MobilePartyDebugCommand.InfoCoopCommand();
                 var result = command.ProcessCommand(factory.FromValues(new[] { party.StringId }));
