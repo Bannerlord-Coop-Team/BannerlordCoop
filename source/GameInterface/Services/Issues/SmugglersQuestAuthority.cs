@@ -21,6 +21,7 @@ internal interface ISmugglersQuestAuthority
 {
     bool TryOpenOwnerScope(Hero issueGiver, out IDisposable scope);
     bool IsLocalOwner(QuestBase quest);
+    bool IsRemovedOwner(IssueBase issue);
     void OnPlayerReplaced(Player previous, Player replacement);
     void OnPlayerRemoved(Player player);
 }
@@ -47,6 +48,10 @@ internal sealed class SmugglersQuestAuthority : ISmugglersQuestAuthority
     }
 
     public bool IsLocalOwner(QuestBase quest) => ownershipRegistry.IsLocalPeerOwner(quest.QuestGiver);
+
+    public bool IsRemovedOwner(IssueBase issue) =>
+        ownershipRegistry.TryGetOwnerControllerId(issue.IssueOwner, out var controller)
+        && !playerManager.TryGetPlayer(controller, out _);
 
     public void OnPlayerReplaced(Player previous, Player replacement)
     {

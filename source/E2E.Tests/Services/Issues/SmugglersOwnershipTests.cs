@@ -348,6 +348,11 @@ public class SmugglersOwnershipTests : SyncTestBase
                     Server.Resolve<IAwaitingAlternativeSolutionTroopsRegistry>().Deposit(player.ControllerId, returns);
             }
             Server.Resolve<IIssueOwnershipRegistry>().SetOwner(giver, player.ControllerId);
+            var removedIssue = giver.Issue;
+            removedIssue.IsTriedToSolveBefore = true;
+            Game.Current.PlayerTroop = null;
+            Campaign.Current.MainParty = null;
+            Campaign.Current.PlayerDefaultFaction = null;
             Assert.True(Server.ObjectManager.Remove(Get<Hero>(Server, player.HeroId)));
             Assert.True(Server.ObjectManager.Remove(Get<MobileParty>(Server, player.MobilePartyId)));
             var notifications = new List<Hero>();
@@ -377,6 +382,10 @@ public class SmugglersOwnershipTests : SyncTestBase
                 It.Is<NetworkClientValidated>(message => !message.HeroExists && message.Player == null)), Times.Once);
             Assert.Null(Assert.Single(notifications));
             Assert.Null(giver.Issue);
+            Assert.Equal(IssueBase.IssueUpdateDetails.IssueCancel,
+                Campaign.Current.GetCampaignBehavior<JournalLogsCampaignBehavior>().GetRelatedLog(removedIssue)._lastIssueStatus);
+            Assert.Null(Game.Current.PlayerTroop);
+            Assert.Null(Campaign.Current.MainParty);
             Assert.False(Server.Resolve<IPlayerManager>().TryGetPlayer(player.ControllerId, out _));
             Assert.True(Server.Resolve<IPlayerManager>().TryGetPlayer(other.ControllerId, out _));
             Assert.False(Server.Resolve<IIssueOwnershipRegistry>().TryGetOwnerControllerId(giver, out _));

@@ -231,7 +231,13 @@ internal class SmugglersIssueCancellationPatch
         __state = null;
         if (__instance is not SmugglersIssueBehavior.SmugglersIssue || CallOriginalPolicy.IsOriginalAllowedForOwnershipGate()) return true;
         if (ModInformation.IsClient) return IssueFinalizeAuthorityGuard.IsActive;
-        if (IssueFinalizeAuthorityGuard.IsActive) return true;
+        if (IssueFinalizeAuthorityGuard.IsActive)
+        {
+            if (!ContainerProvider.TryResolve<ISmugglersQuestAuthority>(out var removedOwner)
+                || !removedOwner.IsRemovedOwner(__instance)) return true;
+            CancelAfterOwnerRemoval(__instance, log);
+            return false;
+        }
         if (__instance.IsOngoingWithoutQuest)
         {
             __state = new IssueFinalizeAuthorityGuard();
@@ -245,21 +251,23 @@ internal class SmugglersIssueCancellationPatch
         return false;
     }
 
+    private static void CancelAfterOwnerRemoval(IssueBase issue, TextObject log)
+    {
+        if (issue.IssueQuest is { IsOngoing: true } quest)
+        {
+            quest.CompleteQuestWithCancel(log);
+            return;
+        }
+        if (issue.IsSolvingWithAlternative)
+        {
+            issue.AddLog(new JournalLog(CampaignTime.Now, new TextObject("{=V5Za6d4h}Your troops have returned from their mission.")));
+            Campaign.Current.IssueManager.TryToMakeTroopsReturn(issue);
+        }
+        // Vanilla cancellation reads MainHero before dispatch; a removed character has no solver.
+        CampaignEventDispatcher.Instance.OnIssueUpdated(issue, IssueBase.IssueUpdateDetails.IssueCancel, null);
+        issue.IssueFinalized();
+    }
+
     [HarmonyFinalizer]
     private static void Finalizer(IDisposable __state) => __state?.Dispose();
-}
-
-[HarmonyPatch(typeof(CampaignEventDispatcher), nameof(CampaignEventDispatcher.OnIssueUpdated))]
-internal class SmugglersRemovedOwnerCancellationPatch
-{
-    [HarmonyPrefix]
-    private static void Prefix(IssueBase issue, IssueBase.IssueUpdateDetails details, ref Hero issueSolver)
-    {
-        if (ModInformation.IsServer && IssueFinalizeAuthorityGuard.IsActive
-            && issue is SmugglersIssueBehavior.SmugglersIssue && details == IssueBase.IssueUpdateDetails.IssueCancel
-            && ContainerProvider.TryResolve<IIssueOwnershipRegistry>(out var ownership)
-            && ownership.TryGetOwnerControllerId(issue.IssueOwner, out var controller)
-            && ContainerProvider.TryResolve<IPlayerManager>(out var players) && !players.TryGetPlayer(controller, out _))
-            issueSolver = null;
-    }
 }

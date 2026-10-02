@@ -42,6 +42,19 @@ internal class SmugglersAlternativeOwnerPatch
 [HarmonyPatch(typeof(JournalLogsCampaignBehavior), "OnIssueUpdated")]
 internal class SmugglersAlternativeOutcomeJournalPatch
 {
+    [HarmonyPrefix]
+    private static bool Prefix(JournalLogsCampaignBehavior __instance, IssueBase issue,
+        IssueBase.IssueUpdateDetails details, Hero issueSolver)
+    {
+        if (ModInformation.IsClient || !IssueFinalizeAuthorityGuard.IsActive
+            || issue is not SmugglersIssueBehavior.SmugglersIssue || details != IssueBase.IssueUpdateDetails.IssueCancel
+            || issueSolver != null || !ContainerProvider.TryResolve<ISmugglersQuestAuthority>(out var authority)
+            || !authority.IsRemovedOwner(issue)) return true;
+        __instance.OnIssueLogAdded(issue, true);
+        __instance.GetRelatedLog(issue).Update(__instance.GetEntries(issue), details);
+        return false;
+    }
+
     [HarmonyPostfix]
     private static void Postfix(IssueBase issue, IssueBase.IssueUpdateDetails details)
     {
