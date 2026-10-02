@@ -91,12 +91,12 @@ internal static class ScoutEnemyGarrisonsAuthorityPatches
     }
 
     [HarmonyPrefix]
-    internal static bool Prefix(Quest __instance, out IDisposable __state)
+    internal static bool Prefix(Quest __instance, MethodBase __originalMethod, out IDisposable __state)
     {
         __state = null;
         if (ModInformation.IsClient || !__instance.IsOngoing) return false;
         if (!ContainerProvider.TryResolve<IScoutEnemyGarrisonsService>(out var service)) return false;
-        __state = service.OpenAuthority(__instance);
+        __state = service.OpenAuthority(__instance, requireCurrentParty: __originalMethod.Name == "HourlyTick");
         return __state != null;
     }
 
@@ -183,7 +183,7 @@ internal static class ScoutEnemyGarrisonsCompletionPatches
         if (state.TryGet(quest, out var owner) && ScoutEnemyGarrisonsPlayerChangePatch.ChangingPlayer != null &&
             owner.Hero != ScoutEnemyGarrisonsPlayerChangePatch.ChangingPlayer) return false;
         if (!ContainerProvider.TryResolve<IScoutEnemyGarrisonsService>(out var service)) return false;
-        __state = service.OpenAuthority(quest, completing: true);
+        __state = service.OpenAuthority(quest, requireCurrentParty: false);
         if (__state != null) return true;
         if (__originalMethod.Name != nameof(QuestBase.CompleteQuestWithCancel) || quest.QuestGiver?.Issue?.IssueQuest == quest) return false;
         __state = new IssueFinalizeAuthorityGuard();

@@ -30,7 +30,7 @@ internal interface IScoutEnemyGarrisonsService
     void Accept(Hero giver);
     bool CaptureAcceptance(Hero giver, out ScoutEnemyGarrisonsAccept data);
     void MirrorAcceptance(Hero giver, ScoutEnemyGarrisonsAccept data);
-    IDisposable OpenAuthority(Quest quest, bool completing = false);
+    IDisposable OpenAuthority(Quest quest, bool requireCurrentParty = true);
     void PublishProgress(Quest quest);
     void ApplyProgress(NetworkScoutEnemyGarrisonsProgress data);
     bool HasPersonalQuest(Hero hero);
@@ -151,16 +151,16 @@ internal sealed class ScoutEnemyGarrisonsService : IScoutEnemyGarrisonsService
         }
     }
 
-    public IDisposable OpenAuthority(Quest quest, bool completing = false)
+    public IDisposable OpenAuthority(Quest quest, bool requireCurrentParty = true)
     {
         if (!state.TryGet(quest, out var owner) || owner.Hero == null) return null;
         if (players.TryGetPlayer(owner.ControllerId, out var player) &&
             objects.TryGetObjectWithLogging<Hero>(player.HeroId, out var hero) && hero == owner.Hero)
         {
             if (objects.TryGetObjectWithLogging<MobileParty>(player.MobilePartyId, out var party)) owner.Party = party;
-            else if (!completing) return null;
+            else if (requireCurrentParty) return null;
         }
-        else if (!completing) return null;
+        else if (requireCurrentParty) return null;
         return owner.Party == null ? null : new AuthorityScope(owner.Hero, owner.Party);
     }
 

@@ -12,6 +12,7 @@ using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Players;
 using GameInterface.Services.Players.Data;
 using GameInterface.Surrogates;
+using HarmonyLib;
 using Moq;
 using System;
 using System.Collections.Generic;
@@ -128,7 +129,7 @@ public class ScoutEnemyGarrisonsTests : IDisposable
         policy.Setup(x => x.AllowOriginal()).Returns(loading);
         using (new AllowedThread())
         {
-            Assert.False(ScoutEnemyGarrisonsAuthorityPatches.Prefix(NewQuest("issue_4_quest"), out var scope));
+            Assert.False(ScoutEnemyGarrisonsAuthorityPatches.Prefix(NewQuest("issue_4_quest"), null!, out var scope));
             Assert.Null(scope);
         }
     }
@@ -229,9 +230,13 @@ public class ScoutEnemyGarrisonsTests : IDisposable
     }
 
     [Theory]
-    [InlineData(false)]
-    [InlineData(true)]
-    public void MissingRegisteredPartyAllowsOnlyCompletionUsingTheRememberedOwner(bool completing)
+    [InlineData("HourlyTick", false)]
+    [InlineData("OnSettlementOwnerChanged", true)]
+    [InlineData("OnArmyDispersed", true)]
+    [InlineData("OnClanChangedKingdom", true)]
+    [InlineData("AllScoutingDone", true)]
+    [InlineData("CompleteQuestWithTimeOut", true)]
+    public void MissingRegisteredPartyBlocksPositionProgressButAllowsWorldEventsAndCompletion(string callback, bool allowed)
     {
         var quest = NewQuest("missing-party");
         Remember(quest, "player-A");
@@ -244,11 +249,21 @@ public class ScoutEnemyGarrisonsTests : IDisposable
         var objects = new Mock<IObjectManager>();
         objects.Setup(x => x.TryGetObjectWithLogging("hero", out registeredHero)).Returns(true);
         var service = new ScoutEnemyGarrisonsService(objects.Object, null!, null!, null!, players.Object, state);
+        var builder = new ContainerBuilder();
+        builder.RegisterInstance(state).As<IScoutEnemyGarrisonsQuestState>();
+        builder.RegisterInstance(service).As<IScoutEnemyGarrisonsService>();
+        ContainerProvider.SetContainer(builder.Build());
+        ModInformation.IsServer = true;
 
-        using (var authority = service.OpenAuthority(quest, completing))
+        IDisposable authority;
+        var runs = callback == nameof(QuestBase.CompleteQuestWithTimeOut)
+            ? ScoutEnemyGarrisonsCompletionPatches.Prefix(quest, AccessTools.DeclaredMethod(typeof(QuestBase), callback), out authority)
+            : ScoutEnemyGarrisonsAuthorityPatches.Prefix(quest, AccessTools.DeclaredMethod(typeof(Quest), callback), out authority);
+        using (authority)
         {
-            Assert.Equal(completing, authority != null);
-            Assert.Equal(completing, IssueFinalizeAuthorityGuard.IsActive);
+            Assert.Equal(allowed, runs);
+            Assert.Equal(allowed, authority != null);
+            Assert.Equal(allowed, IssueFinalizeAuthorityGuard.IsActive);
             Assert.Same(rememberedParty, owner.Party);
             Assert.False(AllowedThread.IsThisThreadAllowed());
         }
