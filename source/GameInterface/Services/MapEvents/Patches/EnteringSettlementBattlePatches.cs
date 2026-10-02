@@ -3,7 +3,6 @@ using HarmonyLib;
 using SandBox.Missions.MissionLogics;
 using System.Collections.Generic;
 using System.Runtime.CompilerServices;
-using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.Core;
 using TaleWorlds.MountAndBlade;
 
@@ -53,8 +52,10 @@ internal static class EnteringSettlementBattlePatches
     private static bool ControllableTroopsPrefix(WhileEnteringSettlementBattleMissionController __instance, ref int __result)
     {
         if (!BattleSpawnConfig.Enabled || !BattleSpawnGate.IsCoopBattleActive) return true;
-        var side = PartyBase.MainParty.Side;
-        __result = __instance._troopSuppliers[(int)side].GetNumberOfPlayerControllableTroops();
+        var side = __instance.Mission?.PlayerTeam?.Side ?? BattleSideEnum.None;
+        __result = side == BattleSideEnum.Attacker || side == BattleSideEnum.Defender
+            ? __instance._troopSuppliers[(int)side].GetNumberOfPlayerControllableTroops()
+            : 0;
         return false;
     }
 }
