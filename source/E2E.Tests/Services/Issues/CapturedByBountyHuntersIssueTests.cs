@@ -142,6 +142,102 @@ public class CapturedByBountyHuntersIssueTests : IDisposable
     }
 
     [Fact]
+    public void AiLordCompletionRemovesTheUnacceptedIssueFromEveryInstance()
+    {
+        var fixture = CreateIssue();
+        var solverId = environment.CreateRegisteredObject<Hero>();
+        environment.Server.Call(() =>
+        {
+            Assert.True(environment.Server.ObjectManager.TryGetObject<Hero>(fixture.Giver, out var giver));
+            Assert.True(environment.Server.ObjectManager.TryGetObject<Hero>(solverId, out var solver));
+            using (new AllowedThread()) solver.Occupation = Occupation.Lord;
+            Assert.True(giver.Issue.IsOngoingWithoutQuest);
+            giver.Issue.CompleteIssueWithAiLord(solver);
+            Assert.Null(giver.Issue);
+            Assert.True(Campaign.Current.IssueManager.HasIssueCoolDown(typeof(Issue), giver));
+        });
+        Assert.Single(environment.Server.NetworkSentMessages.GetMessages<NetworkIssueRemoved>());
+        foreach (var client in environment.Clients)
+        {
+            client.Call(() =>
+            {
+                Assert.True(client.ObjectManager.TryGetObject<Hero>(fixture.Giver, out var giver));
+                Assert.Null(giver.Issue);
+                Assert.Empty(Campaign.Current.LogEntryHistory.GameActionLogs.OfType<JournalLogEntry>());
+            });
+        }
+    }
+
+    [Fact]
+    public void RejectedServerFinalizationDoesNotRemoveClientIssues()
+    {
+        var fixture = CreateIssue();
+        environment.Server.Call(() =>
+        {
+            Assert.True(environment.Server.ObjectManager.TryGetObject<Hero>(fixture.Giver, out var giver));
+            var issue = giver.Issue;
+            issue.IssueFinalized();
+            Assert.Same(issue, giver.Issue);
+        });
+        Assert.Empty(environment.Server.NetworkSentMessages.GetMessages<NetworkIssueRemoved>());
+        foreach (var client in environment.Clients)
+        {
+            client.Call(() =>
+            {
+                Assert.True(client.ObjectManager.TryGetObject<Hero>(fixture.Giver, out var giver));
+                Assert.IsType<Issue>(giver.Issue);
+            });
+        }
+    }
+
+    [Fact]
+    public void OwnerJournalUpdatesDoNotRepeatOratoryRewards()
+    {
+        var fixture = CreateIssue();
+        Assert.True(TaleWorlds.Library.MathF.Round(DefaultPerks.Charm.Oratory.PrimaryBonus) > 0);
+        var playerId = AcceptFromFirstClient(fixture);
+        var clanId = environment.CreateRegisteredObject<Clan>();
+        var kingdomId = environment.CreateRegisteredObject<Kingdom>();
+        foreach (var instance in new[] { environment.Server }.Concat(environment.Clients))
+        {
+            instance.Call(() =>
+            {
+                Assert.True(instance.ObjectManager.TryGetObject<Hero>(playerId, out var player));
+                Assert.True(instance.ObjectManager.TryGetObject<Clan>(clanId, out var clan));
+                Assert.True(instance.ObjectManager.TryGetObject<Kingdom>(kingdomId, out var kingdom));
+                using (new AllowedThread())
+                {
+                    player.Clan = clan;
+                    clan.SetLeader(player);
+                    clan.Kingdom = kingdom;
+                    clan.Renown = 100f;
+                    clan.Influence = 100f;
+                    player.HeroDeveloper.AddPerk(DefaultPerks.Charm.Oratory);
+                }
+                Assert.True(player.GetPerkValue(DefaultPerks.Charm.Oratory));
+            });
+        }
+        environment.Server.Call(() =>
+        {
+            Assert.True(environment.Server.ObjectManager.TryGetObject<Hero>(fixture.Giver, out var giver));
+            Assert.True(environment.Server.Resolve<IBountyHuntersQuestContext>().TryOpen(giver, out var scope));
+            using (scope) ((Quest)giver.Issue.IssueQuest).SuccessConsequences();
+        });
+        Assert.Single(environment.Server.NetworkSentMessages.GetMessages<NetworkBountyHuntersJournal>()
+            .Where(message => message.Status == IssueBase.IssueUpdateDetails.IssueFinishedWithSuccess));
+        foreach (var instance in new[] { environment.Server }.Concat(environment.Clients))
+        {
+            instance.Call(() =>
+            {
+                Assert.True(instance.ObjectManager.TryGetObject<Clan>(clanId, out var clan));
+                var expected = 100f + TaleWorlds.Library.MathF.Round(DefaultPerks.Charm.Oratory.PrimaryBonus);
+                Assert.Equal(expected, clan.Renown);
+                Assert.Equal(expected, clan.Influence);
+            });
+        }
+    }
+
+    [Fact]
     public void AcceptedQuestCreatesAJournalOnlyForTheRecordedPlayer()
     {
         var fixture = CreateIssue();

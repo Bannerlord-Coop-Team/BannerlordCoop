@@ -130,9 +130,15 @@ internal class CapturedByBountyHuntersAlternativeCompletionPatch
     private static void End(IDisposable __state) => __state?.Dispose();
 }
 
-[HarmonyPatch(typeof(IssueBase), nameof(IssueBase.CompleteIssueWithCancel))]
-internal class CapturedByBountyHuntersIssueCancellationPatch
+[HarmonyPatch]
+internal class CapturedByBountyHuntersIssueCompletionPatches
 {
+    private static IEnumerable<MethodBase> TargetMethods()
+    {
+        yield return AccessTools.Method(typeof(IssueBase), nameof(IssueBase.CompleteIssueWithCancel));
+        yield return AccessTools.Method(typeof(IssueBase), nameof(IssueBase.CompleteIssueWithAiLord));
+    }
+
     [HarmonyPrefix]
     private static bool Begin(IssueBase __instance, out IDisposable __state)
     {
