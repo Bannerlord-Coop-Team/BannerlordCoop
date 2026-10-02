@@ -925,6 +925,8 @@ public class GenericQuestTypeAcceptSecurityTests : IDisposable
             typeof(PartyScreenLogic).GetEvent("PartyScreenClosedEvent")!
                 .AddEventHandler(screen, closeCallback.PartyScreenClosedDelegate);
             var states = Game.Current.GameStateManager;
+            // Closing the only test state must not shut down the native engine.
+            states.Owner = Mock.Of<IGameStateManagerOwner>();
             var partyState = states.CreateState<PartyState>();
             partyState.PartyScreenLogic = screen;
             states._gameStates.Add(partyState);
@@ -1248,6 +1250,8 @@ public class GenericQuestTypeAcceptSecurityTests : IDisposable
             typeof(PartyScreenLogic).GetEvent("PartyScreenClosedEvent")!
                 .AddEventHandler(screen, closeCallback.PartyScreenClosedDelegate);
             var states = Game.Current.GameStateManager;
+            // Closing the only test state must not shut down the native engine.
+            states.Owner = Mock.Of<IGameStateManagerOwner>();
             var partyState = states.CreateState<PartyState>();
             partyState.PartyScreenLogic = screen;
             states._gameStates.Add(partyState);
@@ -1434,11 +1438,15 @@ public class GenericQuestTypeAcceptSecurityTests : IDisposable
         var fixture = SetupVillageOwner();
         CreateIssueOnBothPeers(fixture);
         var controllerId = ConnectPlayer(fixture);
+        var expectedStartCost = 0;
         Server.Call(() =>
         {
             Assert.True(Server.ObjectManager.TryGetObject<MobileParty>(lastConnectedPartyId, out var party));
             Assert.True(Server.ObjectManager.TryGetObject<CharacterObject>(lastConnectedEligibleTroopId, out var eligibleTroop));
             party.MemberRoster.AddToCounts(eligibleTroop, 3);
+            var issue = (VillageNeedsToolsIssueBehavior.VillageNeedsToolsIssue)
+                Server.GetRegisteredObject<Hero>(fixture.HeroId).Issue;
+            expectedStartCost = issue.CostOfToolsForAlternativeSolution;
         });
         OpenConversation(fixture, controllerId);
         TestEnvironment.FlushCoalescer();
@@ -1510,7 +1518,7 @@ public class GenericQuestTypeAcceptSecurityTests : IDisposable
 
             Assert.True(owner.Issue.IsSolvingWithAlternative);
             Assert.True(owner.Issue.AlternativeSolutionReturnTimeForTroops.IsFuture);
-            Assert.Equal(1000000 - expectedWages, owner.Gold);
+            Assert.Equal(1000000 - expectedStartCost - expectedWages, owner.Gold);
 
             Assert.True(Server.Resolve<IIssueOwnershipRegistry>().TryGetOwnerControllerId(owner, out var ownerControllerId));
             Assert.Equal(controllerId, ownerControllerId);
@@ -1525,7 +1533,7 @@ public class GenericQuestTypeAcceptSecurityTests : IDisposable
             Assert.True(Client.ObjectManager.TryGetObject<Hero>(fixture.CompanionHeroId, out var companion));
             Assert.True(Client.ObjectManager.TryGetObject<CharacterObject>(lastConnectedEligibleTroopId, out var eligibleTroop));
             Assert.True(Client.Resolve<IIssueOwnershipRegistry>().IsLocalPeerOwner(owner));
-            Assert.Equal(1000000 - expectedWages, owner.Gold);
+            Assert.Equal(1000000 - expectedStartCost - expectedWages, owner.Gold);
             var acceptedTroops = Client.Resolve<GameInterface.Services.TroopRosters.Interfaces.ITroopRosterInterface>()
                 .UnpackTroopRosterData(accepted.SentTroops).ToArray();
             Assert.Equal(7, acceptedTroops.Sum(element => element.Number));
