@@ -129,10 +129,16 @@ internal class PartyScreenLogicPatches
                 // Quest transfers are committed by acceptance; upgrades still use the party transaction.
                 using (new AllowedThread())
                 {
-                    selectedTroops = __instance.MemberRosters[0].CloneRosterData();
-                    currentMembers = currentMembers.CloneRosterData();
+                    selectedTroops = TroopRoster.CreateDummyTroopRoster();
+                    selectedTroops.Add(__instance.MemberRosters[0]);
+                    currentMembers = TroopRoster.CreateDummyTroopRoster();
+                    currentMembers.Add(__instance.MemberRosters[1]);
+                    for (int i = 0; i < currentMembers.Count; i++)
+                        if (currentMembers.data[i].Xp > 0)
+                            __instance.RightOwnerParty.OnXpChanged(__instance.MemberRosters[1], ref currentMembers.data[i]);
                     currentMembers.Add(selectedTroops);
-                    initialMembers = initialMembers.CloneRosterData();
+                    initialMembers = TroopRoster.CreateDummyTroopRoster();
+                    initialMembers.Add(__instance._initialData.RightMemberRoster);
                     initialMembers.Add(__instance._initialData.LeftMemberRoster);
                 }
             }

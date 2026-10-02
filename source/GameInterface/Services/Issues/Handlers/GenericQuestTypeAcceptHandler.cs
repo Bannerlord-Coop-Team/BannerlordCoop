@@ -419,10 +419,17 @@ internal class GenericQuestTypeAcceptHandler : IHandler
             claimedRoster.AddToCounts(element.Character, element.Number, false, element.WoundedNumber, element.Xp, false);
         }
 
-        return player.MobilePartyId != null &&
-            objectManager.TryGetObjectWithLogging<MobileParty>(player.MobilePartyId, out var party)
-            ? troopValidator.Validate(claimedRoster, party.MemberRoster, preserveTroopXp: true)
-            : TroopRoster.CreateDummyTroopRoster();
+        if (player.MobilePartyId == null ||
+            !objectManager.TryGetObjectWithLogging<MobileParty>(player.MobilePartyId, out var party))
+            return TroopRoster.CreateDummyTroopRoster();
+
+        var validated = troopValidator.Validate(claimedRoster, party.MemberRoster);
+        for (int i = 0; i < validated.Count; i++)
+        {
+            var character = validated.GetCharacterAtIndex(i);
+            validated.SetElementXp(i, Math.Min(claimedRoster.GetElementXp(character), party.MemberRoster.GetElementXp(character)));
+        }
+        return validated;
     }
 
     private void Handle_NetworkQuestTypeAlternativeAccepted(MessagePayload<NetworkQuestTypeAlternativeAccepted> payload)

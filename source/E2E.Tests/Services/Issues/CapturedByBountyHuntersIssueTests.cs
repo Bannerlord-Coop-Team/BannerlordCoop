@@ -472,6 +472,8 @@ public class CapturedByBountyHuntersIssueTests : IDisposable
         string troopId = null;
         string companionId = null;
         int upgradeCost = 0;
+        int expectedPartyXp = 0;
+        int expectedSentXp = 0;
         string playerId = null;
         AcceptFromFirstClient(fixture, alternative: true, beforeRequest: () =>
         {
@@ -500,6 +502,7 @@ public class CapturedByBountyHuntersIssueTests : IDisposable
                         var target = instance.GetRegisteredObject<CharacterObject>(upgradedId);
                         using (new AllowedThread())
                         {
+                            original.Level = 20;
                             target.Level = 26;
                             target.UpgradeTargets = Array.Empty<CharacterObject>();
                             original.UpgradeTargets = new[] { target };
@@ -512,7 +515,8 @@ public class CapturedByBountyHuntersIssueTests : IDisposable
                     var authoritativeParty = environment.Server.GetRegisteredObject<MobileParty>(partyId);
                     var player = environment.Server.GetRegisteredObject<Hero>(playerId);
                     player.ChangeHeroGold(10000 - player.Gold);
-                    authoritativeParty.MemberRoster.AddXpToTroop(original, 25 * original.GetUpgradeXpCost(authoritativeParty.Party, 0));
+                    authoritativeParty.MemberRoster.AddXpToTroop(original, 23 * original.GetUpgradeXpCost(authoritativeParty.Party, 0));
+                    authoritativeParty.MemberRoster.AddToCounts(original, 0, false, 4);
                 });
                 environment.FlushCoalescer();
                 upgradeCost = 5 * troop.GetUpgradeGoldCost(party.Party, 0);
@@ -526,10 +530,12 @@ public class CapturedByBountyHuntersIssueTests : IDisposable
                 else giver.Issue.StartIssueWithAlternativeSolution();
             });
             var command = new PartyScreenLogic.PartyCommand();
+            int remainingXp = party.MemberRoster.GetElementXp(troop);
             using (new AllowedThread())
             {
                 if (upgrade)
                 {
+                    remainingXp -= 5 * troop.GetUpgradeXpCost(party.Party, 0);
                     command.FillForUpgradeTroop(PartyScreenLogic.PartyRosterSide.Right, PartyScreenLogic.TroopType.Member, troop, 5, 0, -1);
                     Assert.True(logic.ValidateCommand(command));
                     logic.UpgradeTroop(command);
@@ -541,6 +547,9 @@ public class CapturedByBountyHuntersIssueTests : IDisposable
                 logic.TransferTroop(command, false);
             }
             if (deferredReceive) environment.Server.Resolve<TestNetworkRouter>().ReceiveContext = TestNetworkReceiveContext.PollerThread;
+            expectedSentXp = decline ? 0 : sent.GetElementXp(troop);
+            expectedPartyXp = remainingXp - expectedSentXp;
+            if (upgrade) Assert.True(sent.GetElementXp(troop) > 0);
             Helpers.PartyScreenHelper.CloseScreen(false);
             Assert.Equal(1, closed);
             Assert.Null(Game.Current.GameStateManager.ActiveState);
@@ -565,6 +574,11 @@ public class CapturedByBountyHuntersIssueTests : IDisposable
                 Assert.Equal(decline && upgrade ? 5 : 0, party.MemberRoster.GetTroopCount(target));
                 Assert.Equal(decline ? 1 : 0, party.MemberRoster.GetTroopCount(companion.CharacterObject));
                 Assert.Equal(decline ? 0 : 11, giver.Issue.AlternativeSolutionSentTroops.TotalManCount);
+                Assert.Equal(instance == environment.Server || instance == client ? expectedPartyXp : 0,
+                    party.MemberRoster.GetElementXp(troop));
+                Assert.Equal(expectedSentXp, giver.Issue.AlternativeSolutionSentTroops.GetElementXp(troop));
+                Assert.Equal(upgrade ? 4 : 0, party.MemberRoster.TotalWoundedRegulars);
+                Assert.Equal(0, giver.Issue.AlternativeSolutionSentTroops.TotalWoundedRegulars);
                 if (upgrade) Assert.Equal(10000 - upgradeCost, instance.GetRegisteredObject<Hero>(playerId).Gold);
             });
         }

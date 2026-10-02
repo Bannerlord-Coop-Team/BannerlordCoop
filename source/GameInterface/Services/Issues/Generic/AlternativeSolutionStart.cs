@@ -91,7 +91,7 @@ public static class AlternativeSolutionStartRunner
         foreach (var element in validatedRoster.GetTroopRoster())
         {
             party.MemberRoster.AddToCounts(
-                element.Character, -element.Number, false, -element.WoundedNumber, 0, true, -1);
+                element.Character, -element.Number, false, -element.WoundedNumber, -element.Xp, true, -1);
         }
     }
 
