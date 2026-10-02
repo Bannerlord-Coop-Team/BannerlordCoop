@@ -234,6 +234,13 @@ internal static class VillageNeedsCraftingMaterialsQuestType
     private static bool ValidateQuestCancel(Issue issue)
         => issue.IssueOwner.CurrentSettlement?.IsRaided == true || IsAtWarWithRecordedOwner(issue);
 
+    private static void ApplyQuestCancelConsequence(Quest quest)
+    {
+        quest.CompleteQuestWithCancel(quest.QuestGiver.CurrentSettlement?.IsRaided == true
+            ? quest.QuestGiverVillageRaidedLogText
+            : quest.QuestCanceledWarDeclaredLogText);
+    }
+
     private static bool ValidateQuestFail(Issue issue)
     {
         if (issue.IssueQuest is not Quest quest) return false;
@@ -312,6 +319,7 @@ internal static class VillageNeedsCraftingMaterialsQuestType
             .WithQuestSuccessConsequence(ApplyQuestSuccessConsequence)
             .WithQuestSuccessLocalOwnerConsequence(ApplyQuestSuccessLocalOwnerConsequence)
             .WithQuestCancelValidation(ValidateQuestCancel)
+            .WithQuestCancelConsequence(ApplyQuestCancelConsequence)
             .WithQuestFailValidation(ValidateQuestFail)
             .WithQuestFailProofCapture(CaptureQuestFailProof)
             .WithQuestFailConsequence(ApplyQuestFailConsequence)

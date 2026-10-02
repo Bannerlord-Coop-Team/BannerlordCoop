@@ -757,8 +757,10 @@ public class VillageNeedsCraftingMaterialsIssueTests : IDisposable
         });
     }
 
-    [Fact]
-    public void RequestQuestTypeAcceptAlternative_MirrorsTheCapturedVanillaStateToEveryPeer()
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void RequestQuestTypeAcceptAlternative_MirrorsStateAndReturnsTroopsWhenGiverDies(bool giverDies)
     {
         var fixture = SetupIssueOwner();
         CreateIssueOnServer(fixture.HeroId);
@@ -825,6 +827,33 @@ public class VillageNeedsCraftingMaterialsIssueTests : IDisposable
             Assert.Equal("player-A", ownerControllerId);
             Assert.Equal(7, owner.Issue.AlternativeSolutionSentTroops.TotalManCount);
         });
+
+        if (!giverDies) return;
+
+        Client.Call(() =>
+        {
+            Assert.True(Client.ObjectManager.TryGetObject<Hero>(fixture.HeroId, out var giver));
+            Campaign.Current.IssueManager.OnHeroKilled(giver, null, default, false);
+            Assert.NotNull(giver.Issue);
+        });
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject<Hero>(fixture.HeroId, out var giver));
+            Campaign.Current.IssueManager.OnHeroKilled(giver, null, default, false);
+            Assert.True(Server.Resolve<IAwaitingAlternativeSolutionTroopsRegistry>().TryGet("player-A", out var troops));
+            Assert.Equal(7, troops.TotalManCount);
+        });
+        Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkIssueRemoved>());
+        foreach (var instance in AllInstances)
+        {
+            instance.Call(() =>
+            {
+                Assert.True(instance.ObjectManager.TryGetObject<Hero>(fixture.HeroId, out var giver));
+                Assert.Null(giver.Issue);
+                Assert.False(Campaign.Current.IssueManager.Issues.ContainsKey(giver));
+                Assert.False(instance.Resolve<IIssueOwnershipRegistry>().TryGetOwnerControllerId(giver, out _));
+            });
+        }
     }
 
     [Fact]
@@ -2559,6 +2588,83 @@ public class VillageNeedsCraftingMaterialsIssueTests : IDisposable
         Assert.Single(Client.InternalMessages.GetMessages<QuestTerminalOutcomeTriggered>());
     }
 
+    [Theory]
+    [InlineData("delivery")]
+    [InlineData("timeout")]
+    [InlineData("death")]
+    [InlineData("raid")]
+    public void TerminalOutcome_RemovesIssueAndMirrorsFinalJournalWithoutClientConsequences(string outcome)
+    {
+        var fixture = SetupIssueOwner();
+        CreateIssueOnServer(fixture.HeroId);
+        ForcePromisedPaymentEverywhere(fixture.HeroId);
+        var ownerHeroId = CreateDistinctOwnerHero(fixture);
+        var partyId = AcceptQuestFromClient(fixture, "player-A", ownerHeroId);
+        var quests = new Dictionary<EnvironmentInstance, VillageNeedsCraftingMaterialsIssueBehavior.VillageNeedsCraftingMaterialsIssueQuest>();
+        foreach (var instance in AllInstances)
+        {
+            instance.Call(() =>
+            {
+                Assert.True(instance.ObjectManager.TryGetObject<Hero>(fixture.HeroId, out var giver));
+                var quest = Assert.IsType<VillageNeedsCraftingMaterialsIssueBehavior.VillageNeedsCraftingMaterialsIssueQuest>(giver.Issue.IssueQuest);
+                quests.Add(instance, quest);
+                if (outcome == "timeout") quest.ChangeQuestDueTime(CampaignTime.DaysFromNow(-1f));
+                if (outcome == "delivery")
+                {
+                    Assert.True(instance.ObjectManager.TryGetObject<MobileParty>(partyId, out var party));
+                    using (new AllowedThread())
+                    {
+                        party.ItemRoster.AddToCounts(quest._requestedItem, quest._requestedItemAmount);
+                    }
+                }
+            });
+        }
+
+        if (outcome == "delivery")
+        {
+            Client.Call(() => quests[Client].Success());
+        }
+        else
+        {
+            Client.Call(() =>
+            {
+                var quest = quests[Client];
+                var power = quest.QuestGiver.Power;
+                var hearth = quest.QuestGiver.CurrentSettlement.Village.Hearth;
+                if (outcome == "timeout") Campaign.Current.QuestManager.HourlyTick();
+                if (outcome == "death") Campaign.Current.IssueManager.OnHeroKilled(quest.QuestGiver, null, default, false);
+                Assert.True(quest.IsOngoing);
+                Assert.Equal(power, quest.QuestGiver.Power);
+                Assert.Equal(hearth, quest.QuestGiver.CurrentSettlement.Village.Hearth);
+            });
+            Server.Call(() =>
+            {
+                Campaign.Current.MainParty = null;
+                var quest = quests[Server];
+                if (outcome == "timeout") Campaign.Current.QuestManager.HourlyTick();
+                if (outcome == "death") Campaign.Current.IssueManager.OnHeroKilled(quest.QuestGiver, null, default, false);
+                if (outcome == "raid") CampaignEventDispatcher.Instance.RaidCompleted(
+                    BattleSideEnum.Attacker, CreateCompletedRaidOn(quest.QuestGiver.CurrentSettlement));
+            });
+        }
+
+        var removal = Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkIssueRemoved>());
+        Assert.NotNull(removal.TerminalLog);
+        foreach (var instance in AllInstances)
+        {
+            instance.Call(() =>
+            {
+                var quest = quests[instance];
+                Assert.Null(quest.QuestGiver.Issue);
+                Assert.False(Campaign.Current.IssueManager.Issues.ContainsKey(quest.QuestGiver));
+                Assert.False(instance.Resolve<IIssueOwnershipRegistry>().TryGetOwnerControllerId(quest.QuestGiver, out _));
+                Assert.False(quest.IsOngoing);
+                Assert.Single(quest.JournalEntries.Where(log => log.LogText.ToString() == removal.TerminalLog.ToString()));
+                Assert.Equal(removal.TerminalLog.ToString(), quest.JournalEntries.Last().LogText.ToString());
+            });
+        }
+    }
+
     private static RaidEventComponent CreateCompletedRaidOn(Settlement settlement)
     {
         var mapEvent = ObjectHelper.SkipConstructor<MapEvent>();
@@ -2660,6 +2766,9 @@ public class VillageNeedsCraftingMaterialsIssueTests : IDisposable
         var ownerHeroId = CreateDistinctOwnerHero(fixture);
         var partyId = AcceptQuestFromClient(fixture, "player-A", ownerHeroId);
 
+        int ownerHonorBeforeDisconnect = 0;
+        Client.Call(() => ownerHonorBeforeDisconnect = Campaign.Current.PlayerTraitDeveloper.GetPropertyValue(DefaultTraits.Honor));
+
         float powerBefore = 0f;
         int ownerRelationBefore = 0;
         int hostHonorXpBefore = 0;
@@ -2713,6 +2822,8 @@ public class VillageNeedsCraftingMaterialsIssueTests : IDisposable
 
         int ownerHonorXpBeforeRejoin = 0;
         Client.Call(() => ownerHonorXpBeforeRejoin = Campaign.Current.PlayerTraitDeveloper.GetPropertyValue(DefaultTraits.Honor));
+        Assert.True(removed.LocalConsequenceDeferred);
+        Assert.Equal(ownerHonorBeforeDisconnect, ownerHonorXpBeforeRejoin);
 
         Server.Resolve<Coop.Core.Server.Connections.ConnectionCollection>().ConnectionStates.TryRemove(Client.NetPeer, out _);
         Server.Resolve<IPlayerManager>().SetPeer("player-A", Client.NetPeer);

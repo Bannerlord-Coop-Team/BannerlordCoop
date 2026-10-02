@@ -73,18 +73,6 @@ internal class IssueFinalizationHandler : IHandler
         });
     }
 
-    private static byte CaptureProof(IssueBase issue, IssueFinalizeReason reason)
-    {
-        var descriptor = QuestTypeRegistry.Get(issue);
-        return reason switch
-        {
-            IssueFinalizeReason.QuestSuccess => descriptor?.CaptureQuestSuccessProof?.Invoke(issue) ?? 0,
-            IssueFinalizeReason.QuestFail => descriptor?.CaptureQuestFailProof?.Invoke(issue) ?? 0,
-            IssueFinalizeReason.QuestBetrayal => descriptor?.CaptureQuestBetrayalProof?.Invoke(issue) ?? 0,
-            _ => (byte)0,
-        };
-    }
-
     private static void SetProofContext(IssueFinalizeReason reason, byte proof)
     {
         switch (reason)
@@ -117,13 +105,23 @@ internal class IssueFinalizationHandler : IHandler
 
         if (ModInformation.IsServer)
         {
-            var proof = IssueFinalizeAuthorityGuard.IsActive ? ReadProofContext(reason) : CaptureProof(owner.Issue, reason);
-            network.SendAll(new NetworkIssueRemoved(ownerId, reason, proof));
+            var proof = ReadProofContext(reason);
+            if (proof == 0) proof = payload.What.Proof;
+            var descriptor = QuestTypeRegistry.Get(payload.What.Issue);
+            var deferConsequence = reason == IssueFinalizeReason.QuestFail &&
+                descriptor?.ApplyQuestFailLocalOwnerConsequence != null &&
+                payload.What.ControllerId != null &&
+                playerManager.TryGetPlayer(payload.What.ControllerId, out var player) && !playerManager.IsConnected(player);
+            if (deferConsequence)
+            {
+                pendingConsequenceRegistry.DeferQuestFail(payload.What.ControllerId, descriptor.DisplayName, proof);
+            }
+            network.SendAll(new NetworkIssueRemoved(ownerId, reason, proof, deferConsequence, payload.What.TerminalLog));
         }
         else
         {
             generationRegistry.TryGetGeneration(owner, out var generation);
-            var proof = CaptureProof(owner.Issue, reason);
+            var proof = payload.What.Proof;
             network.SendAll(new RequestIssueRemoved(ownerId, reason, generation, proof));
         }
     }
@@ -136,40 +134,40 @@ internal class IssueFinalizationHandler : IHandler
 
         if (ModInformation.IsServer)
         {
-            FinalizeHostQuestTerminalOutcome(owner, ownerId, payload.What.ControllerId, reason);
+            FinalizeServerQuestTerminalOutcome(owner, ownerId, payload.What.ControllerId, reason);
         }
         else
         {
             generationRegistry.TryGetGeneration(owner, out var generation);
-            var proof = CaptureProof(owner.Issue, reason);
+            var proof = IssueFinalizationSupport.CaptureProof(owner.Issue, reason);
             network.SendAll(new RequestIssueRemoved(ownerId, reason, generation, proof));
         }
     }
 
-    private void FinalizeHostQuestTerminalOutcome(Hero owner, string ownerId, string hostControllerId, IssueFinalizeReason reason)
+    private void FinalizeServerQuestTerminalOutcome(Hero owner, string ownerId, string ownerControllerId, IssueFinalizeReason reason)
     {
-        if (hostControllerId == null || !playerManager.TryGetPlayer(hostControllerId, out var player))
+        if (ownerControllerId == null || !playerManager.TryGetPlayer(ownerControllerId, out var player))
         {
-            Logger.Error("Rejecting the host's own {Message} claiming {Reason} for owner {Owner} - could not resolve host's own Player",
+            Logger.Error("Rejecting server-triggered {Message} claiming {Reason} for owner {Owner} - could not resolve recorded owner's Player",
                 nameof(QuestTerminalOutcomeTriggered), reason, ownerId);
             return;
         }
 
         if (owner.Issue?.IssueQuest is not { IsOngoing: true } quest)
         {
-            Logger.Error("Rejecting the host's own {Message} claiming {Reason} for owner {Owner} - no ongoing quest to finalize",
+            Logger.Error("Rejecting server-triggered {Message} claiming {Reason} for owner {Owner} - no ongoing quest to finalize",
                 nameof(QuestTerminalOutcomeTriggered), reason, ownerId);
             return;
         }
 
-        MobileParty hostParty = null;
+        MobileParty ownerParty = null;
         if (player.MobilePartyId != null)
         {
-            objectManager.TryGetObjectWithLogging<MobileParty>(player.MobilePartyId, out hostParty);
+            objectManager.TryGetObjectWithLogging<MobileParty>(player.MobilePartyId, out ownerParty);
         }
 
         var descriptor = QuestTypeRegistry.Get(owner.Issue);
-        var proof = CaptureProof(owner.Issue, reason);
+        var proof = IssueFinalizationSupport.CaptureProof(owner.Issue, reason);
 
         SetProofContext(reason, proof);
         bool validated;
@@ -177,7 +175,7 @@ internal class IssueFinalizationHandler : IHandler
         {
             validated = reason switch
             {
-                IssueFinalizeReason.QuestSuccess => descriptor?.ValidateQuestSuccess?.Invoke(owner.Issue, hostParty) ?? false,
+                IssueFinalizeReason.QuestSuccess => descriptor?.ValidateQuestSuccess?.Invoke(owner.Issue, ownerParty) ?? false,
                 IssueFinalizeReason.QuestCancel => descriptor?.ValidateQuestCancel?.Invoke(owner.Issue) ?? false,
                 IssueFinalizeReason.QuestBetrayal => descriptor?.ValidateQuestBetrayal?.Invoke(owner.Issue) ?? false,
                 IssueFinalizeReason.QuestFail => descriptor?.ValidateQuestFail?.Invoke(owner.Issue) ?? false,
@@ -191,17 +189,12 @@ internal class IssueFinalizationHandler : IHandler
 
         if (!validated)
         {
-            Logger.Error("Rejecting the host's own {Message} claiming {Reason} for owner {Owner} - completion condition not met for the host's real state",
+            Logger.Error("Rejecting server-triggered {Message} claiming {Reason} for owner {Owner} - completion condition not met for the recorded owner's state",
                 nameof(QuestTerminalOutcomeTriggered), reason, ownerId);
             return;
         }
 
-        if (!FinalizeAndBroadcast(owner, ownerId, player, reason, proof)) return;
-
-        if (reason == IssueFinalizeReason.QuestFail && descriptor?.ApplyQuestFailLocalOwnerConsequence != null)
-        {
-            pendingConsequenceRegistry.DeferQuestFail(player.ControllerId, descriptor.DisplayName, proof);
-        }
+        FinalizeAndBroadcast(owner, ownerId, player, reason, proof);
     }
 
     private bool FinalizeAndBroadcast(Hero owner, string ownerId, Player player, IssueFinalizeReason reason, byte proof = 0)
@@ -455,6 +448,10 @@ internal class IssueFinalizationHandler : IHandler
             var isLocalPeerOwner = ownershipRegistry.IsLocalPeerOwner(owner);
             var descriptor = QuestTypeRegistry.Get(owner.Issue);
             var quest = owner.Issue?.IssueQuest;
+            if (quest != null && payload.What.TerminalLog != null)
+            {
+                quest.AddLog(payload.What.TerminalLog);
+            }
 
             SetProofContext(reason, proof);
             try
@@ -473,7 +470,7 @@ internal class IssueFinalizationHandler : IHandler
             {
                 descriptor?.ApplyQuestSuccessLocalOwnerConsequence?.Invoke(quest);
             }
-            else if (isLocalPeerOwner && reason == IssueFinalizeReason.QuestFail && quest != null)
+            else if (isLocalPeerOwner && reason == IssueFinalizeReason.QuestFail && quest != null && !payload.What.LocalConsequenceDeferred)
             {
                 descriptor?.ApplyQuestFailLocalOwnerConsequence?.Invoke(quest, proof);
             }

@@ -20,8 +20,12 @@ internal class VillageNeedsCraftingMaterialsQuestFailBranchObserverPatches
 {
     [HarmonyPatch("OnTimedOut")]
     [HarmonyPrefix]
-    private static void OnTimedOutPrefix(VillageNeedsCraftingMaterialsIssueBehavior.VillageNeedsCraftingMaterialsIssueQuest __instance) =>
+    private static bool OnTimedOutPrefix(VillageNeedsCraftingMaterialsIssueBehavior.VillageNeedsCraftingMaterialsIssueQuest __instance)
+    {
+        if (ModInformation.IsClient) return false;
         VillageNeedsCraftingMaterialsQuestType.ObserveQuestFail(__instance, VillageNeedsCraftingMaterialsQuestType.ProofFailTimeout);
+        return true;
+    }
 }
 
 [HarmonyPatch(typeof(VillageNeedsCraftingMaterialsIssueBehavior.VillageNeedsCraftingMaterialsIssueQuest), "CompleteQuestClickableConditions")]

@@ -1,5 +1,7 @@
 ﻿using GameInterface.Policies;
 using GameInterface.Services.Entity;
+using Common;
+using GameInterface.Services.Heroes.Patches;
 using GameInterface.Services.Issues.Generic;
 using GameInterface.Services.Issues.Generic.Migrated.VillageNeedsCraftingMaterials;
 using GameInterface.Services.Issues.Messages;
@@ -14,6 +16,32 @@ using TaleWorlds.CampaignSystem.Party;
 namespace GameInterface.Services.Issues.Patches;
 
 using Quest = VillageNeedsCraftingMaterialsIssueBehavior.VillageNeedsCraftingMaterialsIssueQuest;
+
+[HarmonyPatch(typeof(IssueManager), nameof(IssueManager.OnHeroKilled))]
+internal class VillageNeedsCraftingMaterialsGiverDeathPatch
+{
+    [HarmonyPrefix]
+    private static bool Prefix(Hero victim, out (IssueFinalizeAuthorityGuard Authority, MainHeroSubstitutionScope Owner) __state)
+    {
+        __state = default;
+        if (victim.Issue is not VillageNeedsCraftingMaterialsIssueBehavior.VillageNeedsCraftingMaterialsIssue) return true;
+        if (ModInformation.IsClient) return false;
+
+        __state.Authority = new IssueFinalizeAuthorityGuard();
+        if (VillageNeedsCraftingMaterialsQuestType.TryResolveRecordedOwner(victim, out var hero, out var party))
+        {
+            __state.Owner = new MainHeroSubstitutionScope(hero, party);
+        }
+        return true;
+    }
+
+    [HarmonyFinalizer]
+    private static void Finalizer((IssueFinalizeAuthorityGuard Authority, MainHeroSubstitutionScope Owner) __state)
+    {
+        __state.Owner?.Dispose();
+        __state.Authority?.Dispose();
+    }
+}
 
 [HarmonyPatch(typeof(Quest), "OnWarDeclared")]
 internal class VillageNeedsCraftingMaterialsQuestWarDeclaredGatePatch

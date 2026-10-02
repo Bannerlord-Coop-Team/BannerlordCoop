@@ -1,6 +1,8 @@
 ﻿using Common.Messaging;
 using ProtoBuf;
 using TaleWorlds.CampaignSystem;
+using TaleWorlds.CampaignSystem.Issues;
+using TaleWorlds.Localization;
 
 namespace GameInterface.Services.Issues.Messages;
 
@@ -20,11 +22,19 @@ public readonly struct IssueFinalizedTriggered : IEvent
 {
     public readonly Hero Owner;
     public readonly IssueFinalizeReason Reason;
+    public readonly IssueBase Issue;
+    public readonly string ControllerId;
+    public readonly TextObject TerminalLog;
+    public readonly byte Proof;
 
-    public IssueFinalizedTriggered(Hero owner, IssueFinalizeReason reason)
+    public IssueFinalizedTriggered(Hero owner, IssueFinalizeReason reason, IssueBase issue, string controllerId, TextObject terminalLog, byte proof)
     {
         Owner = owner;
         Reason = reason;
+        Issue = issue;
+        ControllerId = controllerId;
+        TerminalLog = terminalLog;
+        Proof = proof;
     }
 }
 
@@ -72,12 +82,18 @@ public readonly struct NetworkIssueRemoved : IServerToClientCommand
     public readonly IssueFinalizeReason Reason;
     [ProtoMember(3)]
     public readonly byte Proof;
+    [ProtoMember(4)]
+    public readonly bool LocalConsequenceDeferred;
+    [ProtoMember(5)]
+    public readonly TextObject TerminalLog;
 
-    public NetworkIssueRemoved(string ownerId, IssueFinalizeReason reason, byte proof = 0)
+    public NetworkIssueRemoved(string ownerId, IssueFinalizeReason reason, byte proof = 0, bool localConsequenceDeferred = false, TextObject terminalLog = null)
     {
         OwnerId = ownerId;
         Reason = reason;
         Proof = proof;
+        LocalConsequenceDeferred = localConsequenceDeferred;
+        TerminalLog = terminalLog;
     }
 }
 

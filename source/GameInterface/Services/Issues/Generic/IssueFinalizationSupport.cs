@@ -1,7 +1,8 @@
-using Common.Util;
+﻿using Common.Util;
 using GameInterface.Services.Issues.Messages;
 using System;
 using TaleWorlds.CampaignSystem;
+using TaleWorlds.CampaignSystem.Issues;
 
 namespace GameInterface.Services.Issues.Generic;
 
@@ -19,6 +20,18 @@ public sealed class IssueFinalizeAuthorityGuard : IDisposable
 
 internal static class IssueFinalizationSupport
 {
+    internal static byte CaptureProof(IssueBase issue, IssueFinalizeReason reason)
+    {
+        var descriptor = QuestTypeRegistry.Get(issue);
+        return reason switch
+        {
+            IssueFinalizeReason.QuestSuccess => descriptor?.CaptureQuestSuccessProof?.Invoke(issue) ?? 0,
+            IssueFinalizeReason.QuestFail => descriptor?.CaptureQuestFailProof?.Invoke(issue) ?? 0,
+            IssueFinalizeReason.QuestBetrayal => descriptor?.CaptureQuestBetrayalProof?.Invoke(issue) ?? 0,
+            _ => (byte)0,
+        };
+    }
+
     public static void FinalizeMirror(Hero owner, IssueFinalizeReason reason, bool suppressReplicationPatches = true, bool skipConsequenceReapplication = false)
     {
         if (owner?.Issue == null) return;
