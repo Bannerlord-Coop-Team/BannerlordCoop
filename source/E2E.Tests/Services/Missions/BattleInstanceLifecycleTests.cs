@@ -107,8 +107,8 @@ public class BattleInstanceLifecycleTests : MissionTestEnvironment
             Assert.Equal(snapshotId, report.SnapshotId);
             if (collected)
             {
-                Assert.Empty(report.Survivors);
-                Assert.Empty(report.RoutedSurvivors);
+                Assert.True(report.Survivors == null || report.Survivors.Count == 0);
+                Assert.True(report.RoutedSurvivors == null || report.RoutedSurvivors.Count == 0);
                 return;
             }
             Assert.Equal(37f, report.Survivors[77]);

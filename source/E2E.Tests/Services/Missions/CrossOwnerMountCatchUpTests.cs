@@ -43,6 +43,14 @@ public class CrossOwnerMountCatchUpTests : MissionTestEnvironment
         RunCatchUp(initialHost, departingController, disconnected);
     }
 
+    [Theory]
+    [InlineData("B")]
+    [InlineData("C")]
+    public void ReturnedRiderWithdrawal_RemovesAdoptedPartyFromBufferedAndPopulatedPeers(string initialHost)
+    {
+        RunCatchUp(initialHost, "B", disconnected: true, withdrawAfterReturn: true);
+    }
+
     public static IEnumerable<object[]> DelayedHorseDepartureCases()
     {
         foreach (string initialHost in new[] { "A", "C" })
@@ -70,7 +78,8 @@ public class CrossOwnerMountCatchUpTests : MissionTestEnvironment
     }
 
     private void RunCatchUp(string initialHost, string departingController, bool disconnected,
-        bool? refreshedFirst = null, bool atCapacity = false, bool refreshBeforeDeparture = false)
+        bool? refreshedFirst = null, bool atCapacity = false, bool refreshBeforeDeparture = false,
+        bool withdrawAfterReturn = false)
     {
         bool hasDeparture = departingController != null;
         bool delayedCatchUp = refreshedFirst.HasValue;
@@ -237,10 +246,17 @@ public class CrossOwnerMountCatchUpTests : MissionTestEnvironment
                         // Returning players cannot reclaim a horse or rider that already transferred.
                         broker.Publish(this, new NetworkMissionPeerEntered(departingController, mapEventId));
                         if (!delayedCatchUp)
-                            broker.Publish(this, new MissionPeerLeft(departingController, mapEventId));
+                        {
+                            if (departingController == "B" && !withdrawAfterReturn)
+                                broker.Publish(this, new MissionPeerDisconnected(departingController, mapEventId));
+                            else
+                                broker.Publish(this, new MissionPeerLeft(departingController, mapEventId));
+                        }
                     });
                 }
                 riderNetwork.RouteMessages = true;
+                if (withdrawAfterReturn)
+                    riderOwner.Call(() => riderNetwork.Send("C", oldBatch));
                 if (delayedCatchUp)
                 {
                     horseOwner.Call(() =>
@@ -270,6 +286,18 @@ public class CrossOwnerMountCatchUpTests : MissionTestEnvironment
                         spawner.DrainPendingPuppets();
                     });
                 }
+            }
+
+            if (withdrawAfterReturn)
+            {
+                foreach (var instance in new[] { populatedPeer, joiner })
+                    instance.Call(() =>
+                    {
+                        var registry = instance.Resolve<INetworkAgentRegistry>();
+                        Assert.False(registry.TryGetAgentInfo(riderId, out _));
+                        Assert.False(registry.TryGetAgentInfo(horseId, out _));
+                    });
+                return;
             }
 
             joiner.Call(() =>
