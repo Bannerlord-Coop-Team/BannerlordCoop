@@ -2,6 +2,10 @@
 using Common.Commands;
 using GameInterface;
 using Newtonsoft.Json;
+using Newtonsoft.Json.Linq;
+using GameInterface.Services.ObjectManager;
+using GameInterface.Services.Players;
+using TaleWorlds.CampaignSystem.Party;
 using System;
 using System.Collections.Generic;
 using System.Globalization;
@@ -34,13 +38,17 @@ internal class BattleReproductionFixtureCommands
             var missionSet = new HashSet<Agent>(missionAgents);
             var registered = registry == null ? Array.Empty<CoopAgentInfo>() :
                 registry.GetControllerIds().SelectMany(registry.GetAgents).ToArray();
+            var fixture = GetFixture(mission);
             var infos = registered.Where(info => info.Agent != null)
                 .GroupBy(info => info.Agent).ToDictionary(group => group.Key, group => group.First());
+            if (fixture != null)
+                foreach (var entry in infos) fixture.Identities[entry.Key] = entry.Value;
             var allAgents = missionAgents.Concat(infos.Keys).Distinct().ToArray();
             var observations = new List<object>();
             foreach (var agent in allAgents)
             {
-                infos.TryGetValue(agent, out var info);
+                bool isRegistered = infos.TryGetValue(agent, out var info);
+                if (info == null && fixture != null) fixture.Identities.TryGetValue(agent, out info);
                 try
                 {
                     bool active = agent.IsActive();
@@ -48,6 +56,9 @@ internal class BattleReproductionFixtureCommands
                     var entity = active ? agent.AgentVisuals?.GetEntity() : null;
                     observations.Add(new
                     {
+                        sampledAtUtc = DateTime.UtcNow,
+                        registered = isRegistered,
+                        missing = false,
                         agentId = info?.AgentId.ToString("D"),
                         originalOwner = info?.OriginalOwner,
                         authority = info?.CurrentAuthority,
@@ -95,7 +106,79 @@ internal class BattleReproductionFixtureCommands
                     .Where(group => group.Count() > 1).Select(group => group.Key.ToString("D")).ToArray(),
                 detachedRegistryIds = registered.Where(info => info.Agent == null)
                     .Select(info => info.AgentId.ToString("D")).ToArray(),
-                agents = observations
+                agents = MergeObservations(observations, fixture?.PreviousObservations)
+            }));
+        }
+    }
+
+    private static ReproductionFixtureBehavior GetFixture(Mission mission)
+    {
+        if (mission == null) return null;
+        var fixture = mission.GetMissionBehavior<ReproductionFixtureBehavior>();
+        if (fixture != null) return fixture;
+        fixture = new ReproductionFixtureBehavior();
+        mission.AddMissionBehavior(fixture);
+        return fixture;
+    }
+
+    internal static IReadOnlyList<JObject> MergeObservations(IEnumerable<object> observations,
+        IDictionary<string, JObject> history)
+    {
+        var rows = observations.Select(JObject.FromObject).ToList();
+        if (history == null) return rows;
+        var currentIds = new HashSet<string>();
+        foreach (var row in rows)
+        {
+            string id = (string)row["agentId"];
+            if (id == null) continue;
+            currentIds.Add(id);
+            history[id] = (JObject)row.DeepClone();
+        }
+        foreach (var entry in history.Where(entry => !currentIds.Contains(entry.Key)))
+        {
+            var missing = (JObject)entry.Value.DeepClone();
+            missing["lastObservedState"] = missing["state"];
+            missing["lastObservedHealth"] = missing["health"];
+            missing["missing"] = true;
+            missing["registered"] = false;
+            missing["inMission"] = false;
+            missing["active"] = false;
+            missing["state"] = "Missing";
+            missing["health"] = null;
+            missing["position"] = null;
+            missing["velocity"] = null;
+            rows.Add(missing);
+        }
+        return rows;
+    }
+
+    public sealed class RosterCoopCommand : ICoopCommand
+    {
+        public string Prefix => "coop.debug.battle";
+        public string Name => "reproduction_roster";
+        public string Description => "Reads a player's roster and hero health for fixture restoration.";
+        public CoopCommandSide Side => CoopCommandSide.Both;
+        public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
+        {
+            new ExpectedArgs("controller_id", "The player controller id.")
+        };
+        public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
+        {
+            if (!ContainerProvider.TryResolve<IPlayerManager>(out var players) ||
+                !ContainerProvider.TryResolve<IObjectManager>(out var objects) ||
+                !players.TryGetPlayer(args[0], out var player) ||
+                !objects.TryGetObject<MobileParty>(player.MobilePartyId, out var party))
+                return new CoopCommandResult(false, "Player party unavailable.", "command_failed");
+            var members = party.MemberRoster.GetTroopRoster()
+                .OrderBy(element => element.Character.StringId).Select(element => new
+                {
+                    characterId = element.Character.StringId, count = element.Number,
+                    wounded = element.WoundedNumber, xp = element.Xp,
+                    heroHealth = element.Character.IsHero ? (int?)element.Character.HeroObject.HitPoints : null
+                }).ToArray();
+            return new CoopCommandResult(true, "LIVE_TEST_JSON=" + JsonConvert.SerializeObject(new
+            {
+                partyId = player.MobilePartyId, leader = party.LeaderHero?.StringId, members
             }));
         }
     }
@@ -139,12 +222,7 @@ internal class BattleReproductionFixtureCommands
             if (mission == null || !(ScreenManager.TopScreen is MissionScreen screen) ||
                 ReferenceEquals(screen.CombatCamera, null))
                 return new CoopCommandResult(false, "A rendered mission is required.", "command_failed");
-            var camera = mission.GetMissionBehavior<ReproductionCameraBehavior>();
-            if (camera == null)
-            {
-                camera = new ReproductionCameraBehavior();
-                mission.AddMissionBehavior(camera);
-            }
+            var camera = GetFixture(mission);
             camera.Frame(screen, position, target, subject);
             return new CoopCommandResult(true, "LIVE_TEST_JSON=" + JsonConvert.SerializeObject(camera.Observe()));
         }
@@ -159,7 +237,7 @@ internal class BattleReproductionFixtureCommands
         public IExpectedArgs[] ExpectedArgs { get; } = Array.Empty<IExpectedArgs>();
         public CoopCommandResult ProcessCommand(ICoopCommandArgs args) => new CoopCommandResult(true,
             "LIVE_TEST_JSON=" + JsonConvert.SerializeObject(
-                Mission.Current?.GetMissionBehavior<ReproductionCameraBehavior>()?.Observe() ?? new { active = false }));
+                Mission.Current?.GetMissionBehavior<ReproductionFixtureBehavior>()?.Observe() ?? new { active = false }));
     }
 
     public sealed class RestoreCameraCoopCommand : ICoopCommand
@@ -171,13 +249,15 @@ internal class BattleReproductionFixtureCommands
         public IExpectedArgs[] ExpectedArgs { get; } = Array.Empty<IExpectedArgs>();
         public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
         {
-            Mission.Current?.GetMissionBehavior<ReproductionCameraBehavior>()?.Restore();
+            Mission.Current?.GetMissionBehavior<ReproductionFixtureBehavior>()?.Restore();
             return new CoopCommandResult(true, "Reproduction camera restored.");
         }
     }
 
-    internal sealed class ReproductionCameraBehavior : MissionBehavior
+    internal sealed class ReproductionFixtureBehavior : MissionBehavior
     {
+        internal readonly Dictionary<Agent, CoopAgentInfo> Identities = new();
+        internal readonly Dictionary<string, JObject> PreviousObservations = new();
         private MissionScreen screen;
         private Camera ownedCamera;
         private Camera previousCamera;

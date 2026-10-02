@@ -2,6 +2,9 @@
 using Missions.Battles;
 using System;
 using Xunit;
+using Newtonsoft.Json.Linq;
+using System.Collections.Generic;
+using System.Linq;
 
 namespace E2E.Tests.Services.Missions;
 
@@ -22,6 +25,21 @@ public class BattleReproductionFixtureCommandsTests
         Assert.Equal(2.5f, position.x);
         Assert.Equal(1f, target.z);
         Assert.Equal(Guid.Parse(subject), id);
+    }
+    [Fact]
+    public void MissingAgent_PreservesIdentityWithoutInventingHealthOrDeath()
+    {
+        var history = new Dictionary<string, JObject>();
+        BattleReproductionFixtureCommands.MergeObservations(new[]
+        {
+            new { agentId = "subject", active = true, health = 42f, state = "Active" }
+        }, history);
+        var missing = BattleReproductionFixtureCommands.MergeObservations(Array.Empty<object>(), history).Single();
+        Assert.Equal("subject", (string)missing["agentId"]);
+        Assert.True((bool)missing["missing"]);
+        Assert.Equal("Missing", (string)missing["state"]);
+        Assert.Equal(42f, (float)missing["lastObservedHealth"]);
+        Assert.Equal(JTokenType.Null, missing["health"].Type);
     }
 }
 #endif
