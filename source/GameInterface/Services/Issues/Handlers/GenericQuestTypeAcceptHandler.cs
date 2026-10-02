@@ -427,7 +427,19 @@ internal class GenericQuestTypeAcceptHandler : IHandler
         for (int i = 0; i < validated.Count; i++)
         {
             var character = validated.GetCharacterAtIndex(i);
-            validated.SetElementXp(i, Math.Min(claimedRoster.GetElementXp(character), party.MemberRoster.GetElementXp(character)));
+            int availableXp = party.MemberRoster.GetElementXp(character);
+            if (availableXp <= 0) continue;
+
+            var selected = validated.GetElementCopyAtIndex(i);
+            selected.Xp = Math.Min(claimedRoster.GetElementXp(character), availableXp);
+            party.Party.OnXpChanged(party.MemberRoster, ref selected);
+
+            var remaining = party.MemberRoster.GetElementCopyAtIndex(party.MemberRoster.FindIndexOfTroop(character));
+            remaining.Number -= selected.Number;
+            remaining.Xp = availableXp - selected.Xp;
+            party.Party.OnXpChanged(party.MemberRoster, ref remaining);
+            // Keep overflow with the sent troops instead of discarding it from the reduced party.
+            validated.SetElementXp(i, availableXp - remaining.Xp);
         }
         return validated;
     }

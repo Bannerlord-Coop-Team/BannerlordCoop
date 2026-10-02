@@ -197,11 +197,14 @@ internal class PartyScreenLogicPatches
                     // In vanilla, the rosters would already be updated but with this patch the rosters are reset on the client to be managed by the server.
                     // This assigns a duplicate version of the left rosters needed in extra logic handled by the PartyScreenHelper when closing the party screen.
                     // For example, the left member roster when creating a new clan party is not managed on the server but the server does need this data.
-                    RestoreLeftRostersAfterCommit(
-                        __instance,
-                        duplicateLeftMemberRoster,
-                        duplicateLeftPrisonerRoster);
-                    if (selectingIssue != null) __instance._initialData.CopyFromScreenData(__instance.CurrentData);
+                    if (selectingIssue == null)
+                    {
+                        RestoreLeftRostersAfterCommit(
+                            __instance,
+                            duplicateLeftMemberRoster,
+                            duplicateLeftPrisonerRoster);
+                    }
+                    else __instance._initialData.CopyFromScreenData(__instance.CurrentData);
                 }
                 finally
                 {
