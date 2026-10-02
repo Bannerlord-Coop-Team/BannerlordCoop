@@ -191,7 +191,7 @@ public sealed class MissionEngineFixture : IDisposable
         Prefix(typeof(Agent), "set_LookDirection", nameof(Agent_set_LookDirection));
         Prefix(typeof(Agent), nameof(Agent.GetMovementDirection), nameof(Agent_GetMovementDirection));
         Prefix(typeof(Agent), nameof(Agent.SetMovementDirection), nameof(Agent_SetMovementDirection));
-        harmony.Patch(AccessTools.Method(typeof(AgentData), "ApplyMovementDirection"),
+        harmony.Patch(AccessTools.Method(typeof(Missions.Agents.Packets.AgentData), "ApplyMovementDirection"),
             transpiler: new HarmonyMethod(AccessTools.Method(typeof(MissionEngineFixture), nameof(MovementDirectionBoundary))));
         Prefix(typeof(Agent), nameof(Agent.TeleportToPosition), nameof(Agent_TeleportToPosition));
         Prefix(typeof(Agent), "get_MovementLockedState", nameof(Agent_get_MovementLockedState));
