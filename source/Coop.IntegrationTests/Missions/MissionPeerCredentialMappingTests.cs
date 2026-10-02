@@ -24,6 +24,8 @@ using System.Threading.Tasks;
 
 namespace Coop.IntegrationTests.Missions;
 
+// Run alone so unrelated tests cannot starve the receive poller during bounded network checks.
+[Collection(MissionNetworkPollingCollection.Name)]
 public class MissionPeerCredentialMappingTests
 {
     private const string InstanceId = "battle-instance";
@@ -1078,4 +1080,10 @@ public class MissionPeerCredentialMappingTests
     }
 
     private sealed record ReceivedMessage(int Value) : IMessage;
+}
+
+[CollectionDefinition("Mission network polling", DisableParallelization = true)]
+public class MissionNetworkPollingCollection
+{
+    public const string Name = "Mission network polling";
 }
