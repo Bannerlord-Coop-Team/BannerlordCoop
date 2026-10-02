@@ -36,7 +36,7 @@ internal interface ILordNeedsHorsesQuest : IRaceArbitratedAcceptMirrorStrategy<L
     bool IsLocalOwner(Hero giver);
     bool IsLocalJournalOwner(MBObjectBase subject, Hero giver);
     bool TryResolvePlayer(Hero giver, out Hero hero, out MobileParty party);
-    IDisposable SelectPlayer(Hero giver);
+    bool TrySelectPlayer(Hero giver, out IDisposable scope);
     void RequestOutcome(Quest quest, IssueFinalizeReason reason);
     void WaitForAcceptance(Hero giver);
     void ResumeAcceptanceConversation(Hero giver, bool accepted);
@@ -347,11 +347,12 @@ internal sealed class LordNeedsHorsesQuest : ILordNeedsHorsesQuest
             objectManager.TryGetObjectWithLogging(player.MobilePartyId, out party);
     }
 
-    public IDisposable SelectPlayer(Hero giver)
+    public bool TrySelectPlayer(Hero giver, out IDisposable scope)
     {
-        if (!TryResolvePlayer(giver, out var hero, out var party))
-            throw new InvalidOperationException("Lord Needs Horses has no registered player owner");
-        return new MainHeroSubstitutionScope(hero, party);
+        scope = null;
+        if (!TryResolvePlayer(giver, out var hero, out var party)) return false;
+        scope = new MainHeroSubstitutionScope(hero, party);
+        return true;
     }
 
     public void RequestOutcome(Quest quest, IssueFinalizeReason reason)

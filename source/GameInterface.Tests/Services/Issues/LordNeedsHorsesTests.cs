@@ -15,6 +15,7 @@ using GameInterface.Services.Issues.Patches;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Party.Patches;
 using GameInterface.Services.Players;
+using GameInterface.Services.Players.Data;
 using GameInterface.Surrogates;
 using HarmonyLib;
 using Moq;
@@ -66,6 +67,63 @@ public class LordNeedsHorsesTests : IDisposable
         ContainerProvider.Clear();
         container.Dispose();
         ModInformation.IsServer = wasServer;
+    }
+
+    [Theory]
+    [InlineData(0)]
+    [InlineData(1)]
+    [InlineData(2)]
+    [InlineData(3)]
+    public void PlayerScope_MissingOwnerOrPlayerObjectsDoesNotThrowOrSelectAnotherPlayer(int resolvedSteps)
+    {
+        var owner = ObjectHelper.SkipConstructor<Hero>();
+        var hero = ObjectHelper.SkipConstructor<Hero>();
+        var controllerId = "player-A";
+        var player = new Player(controllerId, "hero-A", "party-A", "", "");
+        var ownership = new Mock<IIssueOwnershipRegistry>();
+        ownership.Setup(x => x.TryGetOwnerControllerId(owner, out controllerId)).Returns(resolvedSteps > 0);
+        var players = new Mock<IPlayerManager>();
+        players.Setup(x => x.TryGetPlayer(controllerId, out player)).Returns(resolvedSteps > 1);
+        var objects = new Mock<IObjectManager>();
+        objects.Setup(x => x.TryGetObjectWithLogging(player.HeroId, out hero)).Returns(resolvedSteps > 2);
+        var service = new LordNeedsHorsesQuest(objects.Object, players.Object, ownership.Object,
+            Mock.Of<IControllerIdProvider>(), Mock.Of<IMessageBroker>(),
+            Mock.Of<IBinaryPackageFactory>(), Mock.Of<IIssueGenerationRegistry>());
+
+        Assert.False(service.TrySelectPlayer(owner, out var scope));
+        Assert.Null(scope);
+    }
+
+    [Theory]
+    [InlineData(typeof(LordNeedsHorsesProgressPatch), "Progress", "ProgressFinished")]
+    [InlineData(typeof(LordNeedsHorsesWorldEventPatch), "WorldEvent", "WorldEventFinished")]
+    [InlineData(typeof(LordNeedsHorsesIssueCancelPatch), "Prefix", "Finalizer")]
+    [InlineData(typeof(LordNeedsHorsesFailurePatch), "Terminate", "Terminated")]
+    public void CampaignCallbacks_SkipUnresolvedOwnerThenResumeWithDisposablePlayerScope(
+        Type patchType, string prefix, string finalizer)
+    {
+        ModInformation.IsServer = true;
+        var giver = ObjectHelper.SkipConstructor<Hero>();
+        var issue = ObjectHelper.SkipConstructor<Issue>();
+        AccessTools.Property(typeof(IssueBase), nameof(IssueBase.IssueOwner)).SetValue(issue, giver);
+        AccessTools.Field(typeof(IssueBase), "_issueState").SetValue(issue, IssueBase.IssueState.SolvingWithAlternativeSolution);
+        var quest = ObjectHelper.SkipConstructor<Quest>();
+        AccessTools.Property(typeof(QuestBase), nameof(QuestBase.QuestGiver)).SetValue(quest, giver);
+        object subject = patchType == typeof(LordNeedsHorsesIssueCancelPatch) ? issue : quest;
+        object[] arguments = { subject, null };
+
+        Assert.False((bool)AccessTools.Method(patchType, prefix).Invoke(null, arguments));
+        Assert.False(IssueFinalizeAuthorityGuard.IsActive);
+        AccessTools.Method(patchType, finalizer).Invoke(null, new[] { arguments[1] });
+
+        var selectedScope = new Mock<IDisposable>();
+        IDisposable scope = selectedScope.Object;
+        quests.Setup(x => x.TrySelectPlayer(giver, out scope)).Returns(true);
+        arguments[1] = null;
+        Assert.True((bool)AccessTools.Method(patchType, prefix).Invoke(null, arguments));
+        AccessTools.Method(patchType, finalizer).Invoke(null, new[] { arguments[1] });
+        selectedScope.Verify(x => x.Dispose(), Times.Once);
+        Assert.False(IssueFinalizeAuthorityGuard.IsActive);
     }
 
     [Fact]

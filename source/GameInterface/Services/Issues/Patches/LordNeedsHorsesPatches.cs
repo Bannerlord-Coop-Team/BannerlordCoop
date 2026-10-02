@@ -396,9 +396,10 @@ internal class LordNeedsHorsesIssueCancelPatch
             CallOriginalPolicy.IsOriginalAllowedForOwnershipGate()) return true;
         if (ModInformation.IsClient) return false;
         if (!ContainerProvider.TryResolve<ILordNeedsHorsesQuest>(out var service)) return false;
-        __state = (__instance.IsSolvingWithAlternative || __instance.IsSolvingWithQuest
-            ? service.SelectPlayer(__instance.IssueOwner) : null,
-            new IssueFinalizeAuthorityGuard());
+        IDisposable playerScope = null;
+        if ((__instance.IsSolvingWithAlternative || __instance.IsSolvingWithQuest) &&
+            !service.TrySelectPlayer(__instance.IssueOwner, out playerScope)) return false;
+        __state = (playerScope, new IssueFinalizeAuthorityGuard());
         return true;
     }
 
@@ -427,8 +428,7 @@ internal class LordNeedsHorsesProgressPatch
         if (CallOriginalPolicy.IsOriginalAllowedForOwnershipGate()) return true;
         if (!ContainerProvider.TryResolve<ILordNeedsHorsesQuest>(out var service)) return false;
         if (ModInformation.IsClient) return service.IsLocalOwner(__instance.QuestGiver);
-        __state = service.SelectPlayer(__instance.QuestGiver);
-        return true;
+        return service.TrySelectPlayer(__instance.QuestGiver, out __state);
     }
 
     [HarmonyFinalizer]
@@ -454,8 +454,7 @@ internal class LordNeedsHorsesWorldEventPatch
         if (CallOriginalPolicy.IsOriginalAllowedForOwnershipGate()) return true;
         if (ModInformation.IsClient) return false;
         if (!ContainerProvider.TryResolve<ILordNeedsHorsesQuest>(out var service)) return false;
-        __state = service.SelectPlayer(__instance.QuestGiver);
-        return true;
+        return service.TrySelectPlayer(__instance.QuestGiver, out __state);
     }
 
     [HarmonyFinalizer]
@@ -500,7 +499,8 @@ internal class LordNeedsHorsesFailurePatch
         if (LordNeedsHorsesPlayerChangePatch.PreviousPlayer != null &&
             (!service.TryResolvePlayer(quest.QuestGiver, out var hero, out _) || hero != LordNeedsHorsesPlayerChangePatch.PreviousPlayer))
             return false;
-        __state = (service.SelectPlayer(quest.QuestGiver), new IssueFinalizeAuthorityGuard());
+        if (!service.TrySelectPlayer(quest.QuestGiver, out var playerScope)) return false;
+        __state = (playerScope, new IssueFinalizeAuthorityGuard());
         return true;
     }
 
