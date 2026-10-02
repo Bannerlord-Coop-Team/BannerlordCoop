@@ -2,6 +2,7 @@
 using Common.Messaging;
 using Common.Util;
 using GameInterface.Services.Heroes;
+using GameInterface.Services.Issues.Generic.Migrated.GangLeaderNeedsWeapons;
 using GameInterface.Services.Party.Messages;
 using GameInterface.Services.Villages;
 using HarmonyLib;
@@ -11,6 +12,7 @@ using System.Collections.Generic;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Actions;
 using TaleWorlds.CampaignSystem.GameState;
+using TaleWorlds.CampaignSystem.Issues;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Roster;
 using TaleWorlds.Core;
@@ -118,6 +120,33 @@ internal class PartyScreenLogicPatches
             }
 
             ForceTransferScreenTracker.TryClaimForceTransferId(__instance.MemberRosters[0], out var forceTransferId);
+            ContainerProvider.TryResolve<IGangLeaderWeaponsAcceptance>(out var weaponsAcceptance);
+            GangLeaderNeedsWeaponsIssueQuestBehavior.GangLeaderNeedsWeaponsIssue selectedIssue = null;
+            var rightMembers = __instance.MemberRosters[1];
+            var initialRightMembers = __instance._initialData.RightMemberRoster;
+            if (weaponsAcceptance?.TryGetAlternativeSelection(__instance, out selectedIssue) == true)
+            {
+                using (new AllowedThread())
+                {
+                    // Transfers remain a quest claim; upgrades still commit through the normal party handler.
+                    rightMembers = CombineMemberRosters(rightMembers, __instance.MemberRosters[0]);
+                    initialRightMembers = CombineMemberRosters(initialRightMembers, __instance._initialData.LeftMemberRoster);
+                    // Vanilla transfers can retain XP in both temporary stacks.
+                    for (var i = 0; i < rightMembers.Count; i++)
+                    {
+                        var element = rightMembers.GetElementCopyAtIndex(i);
+                        var xp = initialRightMembers.GetElementXp(element.Character);
+                        foreach (var upgrade in __instance.CurrentData.UpgradedTroopsHistory)
+                        {
+                            if (upgrade.Item1 == element.Character)
+                                xp -= Campaign.Current.Models.PartyTroopUpgradeModel.GetXpCostForUpgrade(
+                                    PartyBase.MainParty, upgrade.Item1, upgrade.Item2) * upgrade.Item3;
+                        }
+                        rightMembers.SetElementXp(i, element.Number > 0 ? Math.Max(xp, 0) : 0);
+                    }
+                }
+            }
+            else selectedIssue = null;
             var message = new PartyDoneLogicAttempted(
                 Hero.MainHero,
                 releasedPrisonersRoster,
@@ -125,11 +154,11 @@ internal class PartyScreenLogicPatches
                 recruitedPrisonersRoster,
                 __instance.MemberRosters[0],
                 __instance.PrisonerRosters[0],
-                __instance.MemberRosters[1],
+                rightMembers,
                 __instance.PrisonerRosters[1],
                 __instance._initialData.LeftMemberRoster,
                 __instance._initialData.LeftPrisonerRoster,
-                __instance._initialData.RightMemberRoster,
+                initialRightMembers,
                 __instance._initialData.RightPrisonerRoster,
                 __instance.RightOwnerParty.ItemRoster,
                 __instance.CurrentData.UpgradedTroopsHistory,
@@ -149,7 +178,10 @@ internal class PartyScreenLogicPatches
             // Manage changing rosters on the server
             using (new AllowedThread())
             {
-                TroopRoster duplicateLeftMemberRoster = __instance.MemberRosters[0].CloneRosterData();
+                TroopRoster duplicateLeftMemberRoster = selectedIssue == null
+                    ? __instance.MemberRosters[0].CloneRosterData()
+                    : TroopRoster.CreateDummyTroopRoster();
+                if (selectedIssue != null) duplicateLeftMemberRoster.Add(__instance.MemberRosters[0]);
                 TroopRoster duplicateLeftPrisonerRoster = __instance.PrisonerRosters[0].CloneRosterData();
 
                 InCommit = true;
@@ -166,15 +198,14 @@ internal class PartyScreenLogicPatches
                     __instance.CurrentData.TransferredPrisonersHistory = new List<Tuple<CharacterObject, int>>();
                     __instance.CurrentData.RecruitedPrisonersHistory = new List<Tuple<CharacterObject, int>>();
                     __instance.CurrentData.UsedUpgradeHorsesHistory = new List<Tuple<EquipmentElement, int>>();
-                    __instance._initialData.CopyFromScreenData(__instance.CurrentData);
-
                     // In vanilla, the rosters would already be updated but with this patch the rosters are reset on the client to be managed by the server.
                     // This assigns a duplicate version of the left rosters needed in extra logic handled by the PartyScreenHelper when closing the party screen.
                     // For example, the left member roster when creating a new clan party is not managed on the server but the server does need this data.
-                    RestoreLeftRostersAfterCommit(
-                        __instance,
-                        duplicateLeftMemberRoster,
-                        duplicateLeftPrisonerRoster);
+                    if (selectedIssue != null)
+                        weaponsAcceptance.FinishAlternativeSelection(selectedIssue, __instance, duplicateLeftMemberRoster);
+                    else
+                        RestoreLeftRostersAfterCommit(__instance, duplicateLeftMemberRoster, duplicateLeftPrisonerRoster);
+                    __instance._initialData.CopyFromScreenData(__instance.CurrentData);
                 }
                 finally
                 {
@@ -184,6 +215,14 @@ internal class PartyScreenLogicPatches
         }
         __result = flag;
         return false;
+    }
+
+    private static TroopRoster CombineMemberRosters(TroopRoster right, TroopRoster left)
+    {
+        var combined = TroopRoster.CreateDummyTroopRoster();
+        combined.Add(right);
+        combined.Add(left);
+        return combined;
     }
 
     internal static void RestoreLeftRostersAfterCommit(

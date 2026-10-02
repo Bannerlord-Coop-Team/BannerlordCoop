@@ -8,6 +8,7 @@ using GameInterface.Services.Entity;
 using GameInterface.Services.Heroes.Patches;
 using GameInterface.Services.Issues.Generic;
 using GameInterface.Services.Issues.Generic.AcceptMirror;
+using GameInterface.Services.Issues.Generic.Migrated.GangLeaderNeedsWeapons;
 using GameInterface.Services.Issues.Interfaces;
 using GameInterface.Services.Issues.Messages;
 using GameInterface.Services.ObjectManager;
@@ -38,6 +39,7 @@ internal class GenericQuestTypeAcceptHandler : IHandler
     private readonly IIssueOwnershipRegistry ownershipRegistry;
     private readonly IIssueGenerationRegistry generationRegistry;
     private readonly IIssueConversationTracker conversationTracker;
+    private readonly IGangLeaderWeaponsAcceptance weaponsAcceptance;
 
     public GenericQuestTypeAcceptHandler(
         IMessageBroker messageBroker,
@@ -48,7 +50,8 @@ internal class GenericQuestTypeAcceptHandler : IHandler
         IPrisonerSaleValidator troopValidator,
         IIssueOwnershipRegistry ownershipRegistry,
         IIssueGenerationRegistry generationRegistry,
-        IIssueConversationTracker conversationTracker)
+        IIssueConversationTracker conversationTracker,
+        IGangLeaderWeaponsAcceptance weaponsAcceptance)
     {
         this.messageBroker = messageBroker;
         this.objectManager = objectManager;
@@ -59,6 +62,7 @@ internal class GenericQuestTypeAcceptHandler : IHandler
         this.ownershipRegistry = ownershipRegistry;
         this.generationRegistry = generationRegistry;
         this.conversationTracker = conversationTracker;
+        this.weaponsAcceptance = weaponsAcceptance;
 
         messageBroker.Subscribe<QuestTypeQuestSolutionAcceptTriggered>(Handle_QuestTypeQuestSolutionAcceptTriggered);
         messageBroker.Subscribe<RequestQuestTypeAcceptQuest>(Handle_RequestQuestTypeAcceptQuest);
@@ -122,6 +126,7 @@ internal class GenericQuestTypeAcceptHandler : IHandler
         }
         else
         {
+            if (ownershipRegistry.TryGetOwnerControllerId(owner, out _)) return;
             generationRegistry.TryGetGeneration(owner, out var generation);
             network.SendAll(new RequestQuestTypeAcceptQuest(ownerId, generation));
         }
@@ -234,6 +239,7 @@ internal class GenericQuestTypeAcceptHandler : IHandler
             var descriptor = QuestTypeRegistry.Get(owner.Issue);
             var hadOwner = ownershipRegistry.TryGetOwnerControllerId(owner, out var previousOwner);
             if (hadOwner && previousOwner != data.OwnerControllerId) return;
+            if (!hadOwner) weaponsAcceptance.CancelAlternativeSelection(owner);
             ownershipRegistry.SetOwner(owner, data.OwnerControllerId);
             try
             {
@@ -300,6 +306,7 @@ internal class GenericQuestTypeAcceptHandler : IHandler
         }
         else
         {
+            if (ownershipRegistry.TryGetOwnerControllerId(owner, out _)) return;
             generationRegistry.TryGetGeneration(owner, out var generation);
             var packedTroops = troopRosterInterface.PackTroopRosterData(owner.Issue.AlternativeSolutionSentTroops);
             // Restore the local selection before the server's authoritative troop removal arrives.
@@ -415,10 +422,17 @@ internal class GenericQuestTypeAcceptHandler : IHandler
             claimedRoster.AddToCounts(element.Character, element.Number, false, element.WoundedNumber, element.Xp, false);
         }
 
-        return player.MobilePartyId != null &&
-            objectManager.TryGetObjectWithLogging<MobileParty>(player.MobilePartyId, out var party)
-            ? troopValidator.Validate(claimedRoster, party.MemberRoster, preserveTroopXp: true)
-            : TroopRoster.CreateDummyTroopRoster();
+        if (player.MobilePartyId == null ||
+            !objectManager.TryGetObjectWithLogging<MobileParty>(player.MobilePartyId, out var party))
+            return TroopRoster.CreateDummyTroopRoster();
+
+        var validated = troopValidator.Validate(claimedRoster, party.MemberRoster);
+        for (var i = 0; i < validated.Count; i++)
+        {
+            var character = validated.GetCharacterAtIndex(i);
+            validated.SetElementXp(i, Math.Min(claimedRoster.GetElementXp(character), party.MemberRoster.GetElementXp(character)));
+        }
+        return validated;
     }
 
     private void Handle_NetworkQuestTypeAlternativeAccepted(MessagePayload<NetworkQuestTypeAlternativeAccepted> payload)
@@ -433,6 +447,7 @@ internal class GenericQuestTypeAcceptHandler : IHandler
             var descriptor = QuestTypeRegistry.Get(owner.Issue);
             var hadOwner = ownershipRegistry.TryGetOwnerControllerId(owner, out var previousOwner);
             if (hadOwner && previousOwner != data.OwnerControllerId) return;
+            if (!hadOwner) weaponsAcceptance.CancelAlternativeSelection(owner);
             ownershipRegistry.SetOwner(owner, data.OwnerControllerId);
             try
             {
@@ -470,9 +485,10 @@ internal class GenericQuestTypeAcceptHandler : IHandler
         }
     }
 
-    private static void RollbackAlternativeAccept(Hero owner)
+    private void RollbackAlternativeAccept(Hero owner)
     {
         if (owner?.Issue == null) return;
+        if (weaponsAcceptance.RestoreAlternativeSelection(owner, closeScreen: false)) return;
 
         using (new AllowedThread())
         {

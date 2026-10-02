@@ -115,7 +115,7 @@ public class GameInterfaceModule : Module
         builder.RegisterType<PlayerManager>().As<IPlayerManager>().InstancePerLifetimeScope();
         builder.RegisterType<Services.Issues.Generic.Migrated.GangLeaderNeedsWeapons.GangLeaderWeaponsAcceptance>()
             .As<Services.Issues.Generic.Migrated.GangLeaderNeedsWeapons.IGangLeaderWeaponsAcceptance>()
-            .InstancePerDependency();
+            .InstancePerLifetimeScope();
         builder.RegisterType<Services.Issues.Generic.Migrated.GangLeaderNeedsWeapons.GangLeaderWeaponsQuestActions>()
             .As<Services.Issues.Generic.Migrated.GangLeaderNeedsWeapons.IGangLeaderWeaponsQuestActions>()
             .InstancePerDependency();

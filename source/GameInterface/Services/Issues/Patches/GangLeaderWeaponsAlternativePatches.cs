@@ -9,12 +9,59 @@ using System;
 using System.Collections.Generic;
 using System.Reflection;
 using TaleWorlds.CampaignSystem;
+using TaleWorlds.CampaignSystem.CampaignBehaviors;
+using TaleWorlds.CampaignSystem.Conversation;
 using TaleWorlds.CampaignSystem.Issues;
 using TaleWorlds.Localization;
 
 namespace GameInterface.Services.Issues.Patches;
 
 using Issue = GangLeaderNeedsWeaponsIssueQuestBehavior.GangLeaderNeedsWeaponsIssue;
+
+[HarmonyPatch]
+internal static class GangLeaderWeaponsAlternativeDialogPatch
+{
+    [HarmonyTargetMethods]
+    private static IEnumerable<MethodBase> TargetMethods()
+    {
+        yield return AccessTools.Method(typeof(IssuesCampaignBehavior), nameof(IssuesCampaignBehavior.issue_offer_player_accept_alternative_3_consequence));
+        yield return AccessTools.Method(typeof(IssuesCampaignBehavior), nameof(IssuesCampaignBehavior.issue_offer_player_accept_alternative_4_consequence));
+        yield return AccessTools.Method(typeof(IssuesCampaignBehavior), nameof(IssuesCampaignBehavior.issue_offer_player_accept_alternative_5_a_condition));
+        yield return AccessTools.Method(typeof(IssuesCampaignBehavior), nameof(IssuesCampaignBehavior.issue_offer_player_accept_alternative_5_a_consequence));
+        yield return AccessTools.Method(typeof(IssuesCampaignBehavior), nameof(IssuesCampaignBehavior.issue_offer_player_accept_alternative_5_b_consequence));
+        yield return AccessTools.Method(typeof(IssuesCampaignBehavior), nameof(IssuesCampaignBehavior.PartyScreenDoneClicked));
+    }
+
+    [HarmonyPrefix]
+    private static bool Prefix(MethodBase __originalMethod)
+    {
+        if (ModInformation.IsServer) return true;
+        var owner = Hero.OneToOneConversationHero;
+        if (owner?.Issue == null) return false;
+        if (owner.Issue is not Issue issue) return true;
+        if (!issue.IsOngoingWithoutQuest ||
+            (ContainerProvider.TryResolve<IIssueOwnershipRegistry>(out var ownership) &&
+                ownership.TryGetOwnerControllerId(owner, out _))) return false;
+        if (__originalMethod.Name == nameof(IssuesCampaignBehavior.PartyScreenDoneClicked) &&
+            issue.AlternativeSolutionSentTroops.TotalHeroes == 0) return false;
+        if (__originalMethod.Name != nameof(IssuesCampaignBehavior.issue_offer_player_accept_alternative_5_b_consequence)) return true;
+        if (ContainerProvider.TryResolve<IGangLeaderWeaponsAcceptance>(out var acceptance))
+            acceptance.RestoreAlternativeSelection(owner, closeScreen: false);
+        return false;
+    }
+}
+
+[HarmonyPatch(typeof(ConversationManager), nameof(ConversationManager.EndConversation))]
+internal static class GangLeaderWeaponsSelectionConversationEndPatch
+{
+    [HarmonyPrefix]
+    private static void Prefix()
+    {
+        if (ModInformation.IsClient &&
+            ContainerProvider.TryResolve<IGangLeaderWeaponsAcceptance>(out var acceptance))
+            acceptance.RestoreAlternativeSelection(Hero.OneToOneConversationHero, closeScreen: true);
+    }
+}
 
 [HarmonyPatch(typeof(Issue), nameof(Issue.AlternativeSolutionCondition))]
 internal static class GangLeaderWeaponsAlternativeEligibilityPatch

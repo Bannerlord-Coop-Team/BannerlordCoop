@@ -2,9 +2,14 @@
 using GameInterface.Services.Issues.Generic.AcceptMirror;
 using GameInterface.Services.Issues.Generic.CreationCapture;
 using GameInterface.Services.Issues.Generic.Dispatch;
+using Helpers;
 using ProtoBuf;
 using TaleWorlds.CampaignSystem;
+using TaleWorlds.CampaignSystem.GameState;
 using TaleWorlds.CampaignSystem.Issues;
+using TaleWorlds.CampaignSystem.Party;
+using TaleWorlds.CampaignSystem.Roster;
+using TaleWorlds.Core;
 using TaleWorlds.Localization;
 
 namespace GameInterface.Services.Issues.Generic.Migrated.GangLeaderNeedsWeapons;
@@ -18,10 +23,65 @@ internal interface IGangLeaderWeaponsAcceptance :
     IAlternativeAcceptMirrorStrategy<GangLeaderWeaponsAlternativeFields>
 {
     new void RejectAcceptance(Hero owner);
+    bool TryGetAlternativeSelection(PartyScreenLogic logic, out Issue issue);
+    void FinishAlternativeSelection(Issue issue, PartyScreenLogic logic, TroopRoster selectedTroops);
+    bool RestoreAlternativeSelection(Hero owner, bool closeScreen);
+    void CancelAlternativeSelection(Hero owner);
 }
 
 internal sealed class GangLeaderWeaponsAcceptance : IGangLeaderWeaponsAcceptance
 {
+    private Issue restoredSelection;
+
+    public void CancelAlternativeSelection(Hero owner)
+    {
+        if (owner?.Issue?.IsOngoingWithoutQuest == true &&
+            RestoreAlternativeSelection(owner, closeScreen: true) && Hero.OneToOneConversationHero == owner)
+            Campaign.Current.ConversationManager.EndConversation();
+    }
+
+    public bool TryGetAlternativeSelection(PartyScreenLogic logic, out Issue issue)
+    {
+        issue = Hero.OneToOneConversationHero?.Issue as Issue;
+        return issue?.IsOngoingWithoutQuest == true &&
+            ReferenceEquals(logic.CurrentData.LeftMemberRoster, issue.AlternativeSolutionSentTroops);
+    }
+
+    public void FinishAlternativeSelection(Issue issue, PartyScreenLogic logic, TroopRoster selectedTroops)
+    {
+        // Done restored the regular troops; the companion was removed before the screen opened.
+        MobileParty.MainParty.MemberRoster.Add(logic._initialData.LeftMemberRoster);
+        issue.AlternativeSolutionSentTroops.Clear();
+        issue.AlternativeSolutionSentTroops.Add(selectedTroops);
+        logic.MemberRosters[0] = issue.AlternativeSolutionSentTroops;
+        restoredSelection = issue;
+    }
+
+    public bool RestoreAlternativeSelection(Hero owner, bool closeScreen)
+    {
+        if (owner?.Issue is not Issue issue) return false;
+        if (!issue.IsOngoingWithoutQuest) return true;
+        if (issue.AlternativeSolutionSentTroops.TotalManCount == 0) return true;
+        var logic = (Game.Current?.GameStateManager?.ActiveState as PartyState)?.PartyScreenLogic;
+        var hasScreen = logic != null &&
+            ReferenceEquals(logic.CurrentData.LeftMemberRoster, issue.AlternativeSolutionSentTroops);
+        using (new AllowedThread())
+        {
+            if (restoredSelection != issue)
+            {
+                if (hasScreen) logic.Reset(true);
+                MobileParty.MainParty.MemberRoster.Add(issue.AlternativeSolutionSentTroops);
+            }
+            issue.AlternativeSolutionSentTroops.Clear();
+        }
+        if (restoredSelection == issue) restoredSelection = null;
+        if (hasScreen && closeScreen)
+        {
+            PartyScreenHelper.CloseScreen(false, fromCancel: true);
+        }
+        return true;
+    }
+
     public bool TryCaptureFields(Issue issue, out GangLeaderWeaponsCreationFields fields)
     {
         fields = default;
@@ -124,6 +184,7 @@ internal sealed class GangLeaderWeaponsAcceptance : IGangLeaderWeaponsAcceptance
     {
         if (ContainerProvider.TryResolve<IIssueOwnershipRegistry>(out var ownership) &&
             ownership.TryGetOwnerControllerId(owner, out _)) return;
+        CancelAlternativeSelection(owner);
         AcceptMirrorSupport.RejectAcceptance(owner);
     }
 }

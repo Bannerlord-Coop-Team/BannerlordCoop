@@ -4,6 +4,7 @@ using Common.Messaging;
 using Common.Network;
 using GameInterface.Services.Heroes.Patches;
 using GameInterface.Services.Issues.Generic;
+using GameInterface.Services.Issues.Generic.Migrated.GangLeaderNeedsWeapons;
 using GameInterface.Services.Issues.Messages;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Players;
@@ -28,6 +29,7 @@ internal class IssueFinalizationHandler : IHandler
     private readonly IPlayerManager playerManager;
     private readonly IIssueOwnershipRegistry ownershipRegistry;
     private readonly IIssueGenerationRegistry generationRegistry;
+    private readonly IGangLeaderWeaponsAcceptance weaponsAcceptance;
 
     public IssueFinalizationHandler(
         IMessageBroker messageBroker,
@@ -35,7 +37,8 @@ internal class IssueFinalizationHandler : IHandler
         INetwork network,
         IPlayerManager playerManager,
         IIssueOwnershipRegistry ownershipRegistry,
-        IIssueGenerationRegistry generationRegistry)
+        IIssueGenerationRegistry generationRegistry,
+        IGangLeaderWeaponsAcceptance weaponsAcceptance)
     {
         this.messageBroker = messageBroker;
         this.objectManager = objectManager;
@@ -43,6 +46,7 @@ internal class IssueFinalizationHandler : IHandler
         this.playerManager = playerManager;
         this.ownershipRegistry = ownershipRegistry;
         this.generationRegistry = generationRegistry;
+        this.weaponsAcceptance = weaponsAcceptance;
 
         messageBroker.Subscribe<IssueFinalizedTriggered>(Handle_IssueFinalizedTriggered);
         messageBroker.Subscribe<QuestTerminalOutcomeTriggered>(Handle_QuestTerminalOutcomeTriggered);
@@ -431,6 +435,7 @@ internal class IssueFinalizationHandler : IHandler
                 if (detachedQuest == null) return;
             }
 
+            weaponsAcceptance.CancelAlternativeSelection(owner);
             Hero truePlayerHero = null;
             MobileParty ownerParty = null;
             if (ownershipRegistry.TryGetOwnerControllerId(owner, out var recordedOwnerControllerId) &&
