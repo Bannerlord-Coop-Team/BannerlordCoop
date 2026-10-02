@@ -7,10 +7,13 @@ using GameInterface.Services.Issues.Interfaces;
 using GameInterface.Services.Issues.Messages;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Players;
+using GameInterface.Services.Players.Data;
 using LiteNetLib;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Issues;
 using TaleWorlds.CampaignSystem.Party;
+using TaleWorlds.Core;
+using TaleWorlds.Localization;
 
 namespace GameInterface.Services.Issues.Handlers;
 
@@ -41,6 +44,7 @@ internal sealed class ArtisanProductQuestActionHandler : IHandler
         broker.Subscribe<ArtisanProductQuestActionRequested>(HandleRequested);
         broker.Subscribe<RequestArtisanProductQuestAction>(HandleRequest);
         broker.Subscribe<NetworkArtisanProductQuestProgress>(HandleProgress);
+        broker.Subscribe<NetworkArtisanProductActionRejected>(HandleRejected);
     }
 
     public void Dispose()
@@ -48,6 +52,7 @@ internal sealed class ArtisanProductQuestActionHandler : IHandler
         broker.Unsubscribe<ArtisanProductQuestActionRequested>(HandleRequested);
         broker.Unsubscribe<RequestArtisanProductQuestAction>(HandleRequest);
         broker.Unsubscribe<NetworkArtisanProductQuestProgress>(HandleProgress);
+        broker.Unsubscribe<NetworkArtisanProductActionRejected>(HandleRejected);
     }
 
     private void HandleRequested(MessagePayload<ArtisanProductQuestActionRequested> payload)
@@ -68,17 +73,37 @@ internal sealed class ArtisanProductQuestActionHandler : IHandler
         GameThread.RunSafe(() =>
         {
             if (peer == null || !players.TryGetPlayer(peer, out var player)) return;
-            if (!objects.TryGetObjectWithLogging<Hero>(data.GiverId, out var giver)) return;
-            if (!ownership.TryGetOwnerControllerId(giver, out var owner) || owner != player.ControllerId) return;
-            if (!generations.TryGetGeneration(giver, out var generation) || generation != data.Generation) return;
-            if (giver.Issue is not Issue issue || issue.IssueQuest is not Quest quest) return;
-            if (!objects.TryGetObjectWithLogging<Hero>(player.HeroId, out var hero)) return;
-            if (!objects.TryGetObjectWithLogging<MobileParty>(player.MobilePartyId, out var party)) return;
-            if (!actions.TryApply(issue, hero, party, data.Action, data.ExpectedDelivered)) return;
+            if (!TryApply(data, player))
+                network.Send(peer, new NetworkArtisanProductActionRejected(data.GiverId, data.Generation, false));
+        });
+    }
 
-            if (quest.IsOngoing)
-                network.SendAll(new NetworkArtisanProductQuestProgress(data.GiverId, generation,
-                    quest._deliveredRawGoods, quest._counterOfferRefused, quest._counterOfferGiven));
+    private bool TryApply(RequestArtisanProductQuestAction data, Player player)
+    {
+        if (!objects.TryGetObjectWithLogging<Hero>(data.GiverId, out var giver)) return false;
+        if (!ownership.TryGetOwnerControllerId(giver, out var owner) || owner != player.ControllerId) return false;
+        if (!generations.TryGetGeneration(giver, out var generation) || generation != data.Generation) return false;
+        if (giver.Issue is not Issue issue || issue.IssueQuest is not Quest quest) return false;
+        if (!objects.TryGetObjectWithLogging<Hero>(player.HeroId, out var hero)) return false;
+        if (!objects.TryGetObjectWithLogging<MobileParty>(player.MobilePartyId, out var party)) return false;
+        if (!actions.TryApply(issue, hero, party, data.Action, data.ExpectedDelivered)) return false;
+
+        if (quest.IsOngoing)
+            network.SendAll(new NetworkArtisanProductQuestProgress(data.GiverId, generation,
+                quest._deliveredRawGoods, quest._counterOfferRefused, quest._counterOfferGiven));
+        return true;
+    }
+
+    private void HandleRejected(MessagePayload<NetworkArtisanProductActionRejected> payload)
+    {
+        if (ModInformation.IsServer) return;
+        var data = payload.What;
+        GameThread.RunSafe(() =>
+        {
+            if (!objects.TryGetObjectWithLogging<Hero>(data.GiverId, out var giver)) return;
+            if (!generations.TryGetGeneration(giver, out var generation) || generation != data.Generation) return;
+            if (data.LordStart) ArtisanProductQuestAcceptance.ResumeAcceptanceDialog(giver, accepted: false);
+            MBInformationManager.AddQuickInformation(new TextObject("{=coop_artisan_choice_changed}This quest has changed and your choice could not be applied. Check your journal before trying again."));
         });
     }
 

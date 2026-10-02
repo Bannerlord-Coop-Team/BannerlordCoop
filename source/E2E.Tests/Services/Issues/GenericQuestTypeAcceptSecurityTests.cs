@@ -98,6 +98,131 @@ public class GenericQuestTypeAcceptSecurityTests : IDisposable
 
     private record VillageFixture(string HeroId, string VillageId, string SettlementId, string ItemId, string CompanionHeroId);
 
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void StaleArtisanActionsRejectOnlyTheRequesterAndReleaseItsPendingLordDialog(bool lordStart)
+    {
+        var fixture = SetupVillageOwner();
+        var controllerId = ConnectPlayer(fixture);
+        foreach (var instance in TestEnvironment.Clients.Append(Server))
+            instance.Call(() =>
+            {
+                Assert.True(instance.ObjectManager.TryGetObject<Hero>(fixture.HeroId, out var owner));
+                Assert.True(instance.ObjectManager.TryGetObject<Hero>(fixture.CompanionHeroId, out var other));
+                Assert.True(instance.ObjectManager.TryGetObject<Settlement>(fixture.SettlementId, out var settlement));
+                Assert.True(instance.ObjectManager.TryGetObject<ItemObject>(fixture.ItemId, out var item));
+                using (new AllowedThread())
+                {
+                    owner.StayingInSettlement = settlement;
+                    owner.Occupation = Occupation.Artisan;
+                    instance.Resolve<IArtisanProductIssueCreation>().Apply(owner,
+                        new ArtisanProductIssueFields(settlement, other, item, other, CampaignTime.Never,
+                            "stale_artisan_action", Campaign.Current.IssueManager._nextIssueUniqueIndex + 1));
+                }
+                instance.Resolve<IIssueGenerationRegistry>().SetGeneration(owner, instance == Server ? 8 : 7);
+                instance.Resolve<IIssueOwnershipRegistry>().SetOwner(owner, controllerId);
+                if (instance == Server) return;
+                var conversation = Campaign.Current.ConversationManager;
+                var speaker = new Mock<IAgent>();
+                speaker.SetupGet(a => a.Character).Returns(owner.CharacterObject);
+                conversation._conversationAgents.Clear();
+                conversation._conversationAgents.Add(speaker.Object);
+                conversation.IsConversationInProgress = true;
+                conversation._isActive = false;
+                conversation._executeDoOptionContinue = false;
+                conversation.ActiveToken = conversation.GetStateIndex("issue_offer_player_accept_lord_2");
+                conversation.DoOptionContinue();
+                Assert.False(conversation._executeDoOptionContinue);
+            });
+
+        Client.Call(() =>
+        {
+            var network = Client.Resolve<INetwork>();
+            if (lordStart) network.SendAll(new RequestArtisanProductLordAction(fixture.HeroId, 7, ArtisanProductLordAction.Start));
+            else network.SendAll(new RequestArtisanProductQuestAction(fixture.HeroId, 7, ArtisanProductQuestAction.DeliverFully, 0));
+        });
+
+        var rejection = Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkArtisanProductActionRejected>());
+        Assert.Equal(fixture.HeroId, rejection.GiverId);
+        Assert.Equal(7, rejection.Generation);
+        Assert.Equal(lordStart, rejection.LordStart);
+        Assert.Single(Client.InternalMessages.GetMessages<NetworkArtisanProductActionRejected>());
+        Assert.Empty(Server.NetworkSentMessages.GetMessages<NetworkArtisanProductLordStarted>());
+        Assert.Empty(Server.NetworkSentMessages.GetMessages<NetworkArtisanProductQuestProgress>());
+        foreach (var instance in TestEnvironment.Clients.Prepend(Server))
+            instance.Call(() =>
+            {
+                Assert.True(instance.ObjectManager.TryGetObject<Hero>(fixture.HeroId, out var owner));
+                Assert.True(owner.Issue.IsOngoingWithoutQuest);
+                if (instance == Server) return;
+                if (instance != Client) Assert.Empty(instance.InternalMessages.GetMessages<NetworkArtisanProductActionRejected>());
+                var conversation = Campaign.Current.ConversationManager;
+                var resumed = instance == Client && lordStart;
+                Assert.Equal(conversation.GetStateIndex(resumed ? "issue_offer_hero_response_reject" : "issue_offer_player_accept_lord_2"),
+                    conversation.ActiveToken);
+                Assert.Equal(resumed, conversation._executeDoOptionContinue);
+            });
+    }
+
+    [Fact]
+    public void ArtisanLordStartedResumesTheWinnerAndRejectsTheOtherPlayersPendingChoice()
+        => AssertLordStartedDialog("issue_offer_player_accept_lord_2");
+
+    [Fact]
+    public void ArtisanLordStartedRejectsAPendingDirectChoiceEvenForTheSamePlayer()
+        => AssertLordStartedDialog("issue_classic_quest_start");
+
+    private void AssertLordStartedDialog(string pendingToken)
+    {
+        var fixture = SetupVillageOwner();
+        foreach (var client in TestEnvironment.Clients)
+            client.Call(() =>
+            {
+                Assert.True(client.ObjectManager.TryGetObject<Hero>(fixture.HeroId, out var owner));
+                Assert.True(client.ObjectManager.TryGetObject<Hero>(fixture.CompanionHeroId, out var other));
+                Assert.True(client.ObjectManager.TryGetObject<Settlement>(fixture.SettlementId, out var settlement));
+                Assert.True(client.ObjectManager.TryGetObject<ItemObject>(fixture.ItemId, out var item));
+                using (new AllowedThread())
+                {
+                    owner.StayingInSettlement = settlement;
+                    owner.Occupation = Occupation.Artisan;
+                    client.Resolve<IArtisanProductIssueCreation>().Apply(owner,
+                        new ArtisanProductIssueFields(settlement, other, item, other, CampaignTime.Never,
+                            "accepted_artisan_lord", Campaign.Current.IssueManager._nextIssueUniqueIndex + 1));
+                }
+                client.Resolve<IIssueGenerationRegistry>().SetGeneration(owner, 7);
+                client.Resolve<IControllerIdProvider>().SetControllerId(client == Client ? "winner" : "other-player");
+                var conversation = Campaign.Current.ConversationManager;
+                var speaker = new Mock<IAgent>();
+                speaker.SetupGet(a => a.Character).Returns(owner.CharacterObject);
+                conversation._conversationAgents.Clear();
+                conversation._conversationAgents.Add(speaker.Object);
+                conversation.IsConversationInProgress = true;
+                conversation._isActive = false;
+                conversation._executeDoOptionContinue = false;
+                conversation.ActiveToken = conversation.GetStateIndex(pendingToken);
+                conversation.DoOptionContinue();
+                Assert.False(conversation._executeDoOptionContinue);
+            });
+
+        Server.Call(() => Server.Resolve<INetwork>().SendAll(
+            new NetworkArtisanProductLordStarted(fixture.HeroId, 7, "winner", 1, CampaignTime.Now)));
+        foreach (var client in TestEnvironment.Clients)
+            client.Call(() =>
+            {
+                Assert.True(client.ObjectManager.TryGetObject<Hero>(fixture.HeroId, out var owner));
+                Assert.True(owner.Issue.IsSolvingWithLordSolution);
+                Assert.True(client.Resolve<IIssueOwnershipRegistry>().TryGetOwnerControllerId(owner, out var controller));
+                Assert.Equal("winner", controller);
+                var conversation = Campaign.Current.ConversationManager;
+                Assert.Equal(conversation.GetStateIndex(client == Client && pendingToken == "issue_offer_player_accept_lord_2"
+                    ? pendingToken : "issue_offer_hero_response_reject"),
+                    conversation.ActiveToken);
+                Assert.True(conversation._executeDoOptionContinue);
+            });
+    }
+
     private VillageFixture SetupVillageOwner()
     {
         var heroId = TestEnvironment.CreateRegisteredObject<Hero>();

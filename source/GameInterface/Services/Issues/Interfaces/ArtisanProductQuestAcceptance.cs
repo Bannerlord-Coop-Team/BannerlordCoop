@@ -161,7 +161,11 @@ internal sealed class ArtisanProductQuestAcceptance : IArtisanProductQuestAccept
     {
         var conversation = Campaign.Current.ConversationManager;
         if (!conversation.IsConversationInProgress || Hero.OneToOneConversationHero != owner ||
-            conversation.ActiveToken != conversation.GetStateIndex("issue_classic_quest_start")) return;
+            (conversation.ActiveToken != conversation.GetStateIndex("issue_classic_quest_start") &&
+            conversation.ActiveToken != conversation.GetStateIndex("issue_offer_player_accept_lord_2"))) return;
+        if (accepted)
+            accepted = conversation.ActiveToken == conversation.GetStateIndex("issue_classic_quest_start")
+                ? owner.Issue?.IsSolvingWithQuest == true : owner.Issue?.IsSolvingWithLordSolution == true;
         if (!accepted) conversation.ActiveToken = conversation.GetStateIndex("issue_offer_hero_response_reject");
         if (conversation.IsConversationFlowActive) conversation.DoOptionContinue();
         else conversation._executeDoOptionContinue = true;

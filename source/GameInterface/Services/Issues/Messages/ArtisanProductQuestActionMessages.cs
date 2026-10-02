@@ -36,6 +36,21 @@ public readonly struct RequestArtisanProductQuestAction : ICommand
 }
 
 [ProtoContract(SkipConstructor = true)]
+public readonly struct NetworkArtisanProductActionRejected : IServerToClientCommand
+{
+    [ProtoMember(1)] public readonly string GiverId;
+    [ProtoMember(2)] public readonly int Generation;
+    [ProtoMember(3)] public readonly bool LordStart;
+
+    public NetworkArtisanProductActionRejected(string giverId, int generation, bool lordStart)
+    {
+        GiverId = giverId;
+        Generation = generation;
+        LordStart = lordStart;
+    }
+}
+
+[ProtoContract(SkipConstructor = true)]
 public readonly struct NetworkArtisanProductQuestProgress : IServerToClientCommand
 {
     [ProtoMember(1)] public readonly string GiverId;

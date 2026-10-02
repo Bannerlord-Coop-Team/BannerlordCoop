@@ -7,6 +7,7 @@ using GameInterface.Services.Issues.Interfaces;
 using GameInterface.Services.Issues.Messages;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Players;
+using GameInterface.Services.Players.Data;
 using LiteNetLib;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Issues;
@@ -69,25 +70,34 @@ internal sealed class ArtisanProductLordActionHandler : IHandler
         GameThread.RunSafe(() =>
         {
             if (peer == null || !players.TryGetPlayer(peer, out var player)) return;
-            if (!objects.TryGetObjectWithLogging<Hero>(data.GiverId, out var giver)) return;
-            if (!generations.TryGetGeneration(giver, out var generation) || generation != data.Generation) return;
-            if (giver.Issue is not Issue issue) return;
-            if (data.Action == ArtisanProductLordAction.Start)
-            {
-                if (ownership.TryGetOwnerControllerId(giver, out _)) return;
-                if (!conversations.TryGetTrackedRequester(data.GiverId, player.ControllerId, out var tracked) || tracked != generation) return;
-            }
-            else if (!ownership.TryGetOwnerControllerId(giver, out var owner) || owner != player.ControllerId) return;
+            if (!TryApply(data, player))
+                network.Send(peer, new NetworkArtisanProductActionRejected(data.GiverId, data.Generation,
+                    data.Action == ArtisanProductLordAction.Start));
+        });
+    }
 
-            if (!objects.TryGetObjectWithLogging<Hero>(player.HeroId, out var hero)) return;
-            if (!objects.TryGetObjectWithLogging<MobileParty>(player.MobilePartyId, out var party)) return;
-            if (!actions.TryApply(issue, hero, party, data.Action)) return;
-            if (data.Action != ArtisanProductLordAction.Start) return;
+    private bool TryApply(RequestArtisanProductLordAction data, Player player)
+    {
+        if (!objects.TryGetObjectWithLogging<Hero>(data.GiverId, out var giver)) return false;
+        if (!generations.TryGetGeneration(giver, out var generation) || generation != data.Generation) return false;
+        if (giver.Issue is not Issue issue) return false;
+        if (data.Action == ArtisanProductLordAction.Start)
+        {
+            if (ownership.TryGetOwnerControllerId(giver, out _)) return false;
+            if (!conversations.TryGetTrackedRequester(data.GiverId, player.ControllerId, out var tracked) || tracked != generation) return false;
+        }
+        else if (!ownership.TryGetOwnerControllerId(giver, out var owner) || owner != player.ControllerId) return false;
 
+        if (!objects.TryGetObjectWithLogging<Hero>(player.HeroId, out var hero)) return false;
+        if (!objects.TryGetObjectWithLogging<MobileParty>(player.MobilePartyId, out var party)) return false;
+        if (!actions.TryApply(issue, hero, party, data.Action)) return false;
+        if (data.Action == ArtisanProductLordAction.Start)
+        {
             ownership.SetOwner(giver, player.ControllerId);
             network.SendAll(new NetworkArtisanProductLordStarted(data.GiverId, generation,
                 player.ControllerId, issue.IssueDifficultyMultiplier, CampaignTime.Now));
-        });
+        }
+        return true;
     }
 
     private void HandleStarted(MessagePayload<NetworkArtisanProductLordStarted> payload)
@@ -108,6 +118,7 @@ internal sealed class ArtisanProductLordActionHandler : IHandler
                 ownership.SetOwner(giver, data.ControllerId);
                 CampaignEvents.BeforeGameMenuOpenedEvent.AddNonSerializedListener(issue, issue.BeforeGameMenuOpened);
             }
+            ArtisanProductQuestAcceptance.ResumeAcceptanceDialog(giver, ownership.IsLocalPeerOwner(giver));
         });
     }
 }

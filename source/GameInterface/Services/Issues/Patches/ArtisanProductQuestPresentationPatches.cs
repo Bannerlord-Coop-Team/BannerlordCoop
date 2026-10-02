@@ -27,7 +27,8 @@ internal sealed class ArtisanProductAcceptanceDialogPatch
     private static bool WaitForAcceptance(ConversationManager __instance)
         => ModInformation.IsServer ||
             Hero.OneToOneConversationHero?.Issue is not ArtisanCantSellProductsAtAFairPriceIssueBehavior.ArtisanCantSellProductsAtAFairPriceIssue issue ||
-            !issue.IsOngoingWithoutQuest || __instance.ActiveToken != __instance.GetStateIndex("issue_classic_quest_start");
+            !issue.IsOngoingWithoutQuest || (__instance.ActiveToken != __instance.GetStateIndex("issue_classic_quest_start") &&
+            __instance.ActiveToken != __instance.GetStateIndex("issue_offer_player_accept_lord_2"));
 }
 
 [HarmonyPatch(typeof(Quest))]
