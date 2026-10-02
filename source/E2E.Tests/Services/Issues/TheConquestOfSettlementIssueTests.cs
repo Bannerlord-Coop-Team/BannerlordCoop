@@ -1,6 +1,7 @@
 ﻿using Common.Util;
 using E2E.Tests.Environment;
 using Common.Commands;
+using Coop.Core.Server.Services.Stances.Messages;
 using E2E.Tests.Environment.Instance;
 using GameInterface.Services.Heroes.Patches;
 using GameInterface.Services.GameDebug.Messages;
@@ -9,6 +10,7 @@ using GameInterface.Services.Issues.Generic;
 using GameInterface.Services.Issues.Generic.Migrated.TheConquestOfSettlement;
 using GameInterface.Services.Issues.Messages;
 using GameInterface.Services.Issues.Patches;
+using GameInterface.Services.Kingdoms.Commands;
 using GameInterface.Services.Players;
 using GameInterface.Services.Players.Data;
 using GameInterface.Services.Villages.Commands;
@@ -102,6 +104,37 @@ public class TheConquestOfSettlementIssueTests : IDisposable
         var request = Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkRouteBattleEnemies>());
         Assert.Equal(id, request.MapEventId);
         Assert.Equal(3, request.EnemiesToLeaveFighting);
+    }
+
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public void WarCommandCannotBorrowAnotherPlayersMissingHeroOrParty(bool missingHero)
+    {
+        var faction1Id = environment.CreateRegisteredObject<Kingdom>();
+        var faction2Id = environment.CreateRegisteredObject<Kingdom>();
+        var heroId = environment.CreateRegisteredObject<Hero>();
+        var partyId = environment.CreateRegisteredObject<MobileParty>();
+        Server.Call(() =>
+        {
+            var controller = "missing-war-actor";
+            Assert.True(Server.Resolve<IPlayerManager>().AddPlayer(new Player(controller,
+                missingHero ? "missing-hero" : heroId, missingHero ? partyId : "missing-party", "", "")));
+            Assert.True(Server.ObjectManager.TryGetObject<Kingdom>(faction1Id, out var faction1));
+            Assert.True(Server.ObjectManager.TryGetObject<Kingdom>(faction2Id, out var faction2));
+            var previousHero = ResolvedMainHeroContext.ResolvedMainHero;
+            var previousParty = Campaign.Current.MainParty;
+
+            var result = new KingdomDebugCommand.KingdomDeclareWarCoopCommand().ProcessCommand(
+                new CoopCommandArgsFactory().FromValues(new[] { faction1Id, faction2Id, "hostility", controller }));
+
+            Assert.False(result.Succeeded);
+            Assert.Contains("registered hero and party", result.Output);
+            Assert.False(FactionManager.IsAtWarAgainstFaction(faction1, faction2));
+            Assert.Empty(Server.NetworkSentMessages.GetMessages<NetworkDeclareWar>());
+            Assert.Same(previousHero, ResolvedMainHeroContext.ResolvedMainHero);
+            Assert.Same(previousParty, Campaign.Current.MainParty);
+        });
     }
 
     private NetworkConquestIssueCreated CreateIssue()

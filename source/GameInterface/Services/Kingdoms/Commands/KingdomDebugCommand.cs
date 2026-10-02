@@ -6,6 +6,7 @@ using Common.Logging;
 using Common.Messaging;
 using Common.Util;
 using GameInterface.Services.Clans.Messages;
+using GameInterface.Services.Heroes.Patches;
 using GameInterface.Services.Kingdoms;
 using GameInterface.Services.Kingdoms.Handlers;
 using GameInterface.Services.Kingdoms.Data;
@@ -25,6 +26,7 @@ using TaleWorlds.CampaignSystem.Actions;
 using TaleWorlds.CampaignSystem.CampaignBehaviors;
 using TaleWorlds.CampaignSystem.Election;
 using TaleWorlds.CampaignSystem.GameState;
+using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Party.PartyComponents;
 using TaleWorlds.CampaignSystem.Settlements;
 using TaleWorlds.CampaignSystem.ViewModelCollection.KingdomManagement.Decisions;
@@ -1546,16 +1548,32 @@ public class KingdomDebugCommand
 
         public string Description => "Declares war between two factions on the server.";
 
-        public CoopCommandSide Side => CoopCommandSide.Both;
+        public CoopCommandSide Side => CoopCommandSide.Server;
 
         public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
             new ExpectedArgs("faction1_id", "The first registered faction id."),
             new ExpectedArgs("faction2_id", "The second registered faction id."),
+            new ExpectedArgs("cause", "default, decision, hostility, rebellion, crime, creation, claim or agreement.", false),
+            new ExpectedArgs("actor_controller_id", "The registered acting player, or none (default).", false),
         };
 
         public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
         {
+            if (ModInformation.IsClient) return Failed("Run this command on the server.");
+            Action<IFaction, IFaction> declare;
+            switch (args.Count > 2 ? args[2] : "default")
+            {
+                case "default": declare = DeclareWarAction.ApplyByDefault; break;
+                case "decision": declare = DeclareWarAction.ApplyByKingdomDecision; break;
+                case "hostility": declare = DeclareWarAction.ApplyByPlayerHostility; break;
+                case "rebellion": declare = DeclareWarAction.ApplyByRebellion; break;
+                case "crime": declare = DeclareWarAction.ApplyByCrimeRatingChange; break;
+                case "creation": declare = DeclareWarAction.ApplyByKingdomCreation; break;
+                case "claim": declare = DeclareWarAction.ApplyByClaimOnThrone; break;
+                case "agreement": declare = DeclareWarAction.ApplyByCallToWarAgreement; break;
+                default: return Failed("Unknown war cause.");
+            }
             if (TryGetObjectManager(out var objectManager) == false)
             {
                 return Failed("Unable to resolve ObjectManager");
@@ -1571,7 +1589,21 @@ public class KingdomDebugCommand
                 return Failed($"Faction not found with id: {args[1]}");
             }
 
-            DeclareWarAction.ApplyByDefault(faction1, faction2);
+            if (faction1 == faction2 || FactionManager.IsAtWarAgainstFaction(faction1, faction2))
+                return Failed("Select different factions that are currently at peace.");
+            IDisposable actorScope = null;
+            if (args.Count > 3 && args[3] != "none")
+            {
+                if (!ContainerProvider.TryResolve<IPlayerManager>(out var players) ||
+                    !players.TryGetPlayer(args[3], out var player) ||
+                    !objectManager.TryGetObject<Hero>(player.HeroId, out var hero) ||
+                    !objectManager.TryGetObject<MobileParty>(player.MobilePartyId, out var party))
+                    return Failed("The acting player's registered hero and party are required.");
+                if (hero.MapFaction != faction1 && hero.MapFaction != faction2)
+                    return Failed("The acting player must belong to one of the factions.");
+                actorScope = new MainHeroSubstitutionScope(hero, party);
+            }
+            using (actorScope) declare(faction1, faction2);
             return Succeeded($"Declared war between '{faction1.Name}' and '{faction2.Name}'.");
         }
     }

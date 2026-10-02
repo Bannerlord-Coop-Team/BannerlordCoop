@@ -559,6 +559,7 @@ namespace GameInterface.Services.GameDebug.Commands
         {
             new ExpectedArgs("clan_id", "The registered clan id."),
             new ExpectedArgs("kingdom_id", "The registered kingdom id."),
+            new ExpectedArgs("join", "normal (default), defection or mercenary.", false),
         };
 
         public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
@@ -584,7 +585,24 @@ namespace GameInterface.Services.GameDebug.Commands
                     return Failed($"Argument2: Kingdom not found by ID: {kingdomId}");
                 }
 
-                ChangeKingdomAction.ApplyByJoinToKingdom(clan, newKingdom);
+                switch (args.Count > 2 ? args[2] : "normal")
+                {
+                    case "normal":
+                        ChangeKingdomAction.ApplyByJoinToKingdom(clan, newKingdom);
+                        break;
+                    case "defection":
+                        if (clan.Kingdom == null || clan.Kingdom == newKingdom)
+                            return Failed("Defection requires a current kingdom and a different destination.");
+                        ChangeKingdomAction.ApplyByJoinToKingdomByDefection(clan, clan.Kingdom, newKingdom);
+                        break;
+                    case "mercenary":
+                        if (clan.Kingdom != null)
+                            return Failed("Leave the current kingdom before joining as a mercenary.");
+                        ChangeKingdomAction.ApplyByJoinFactionAsMercenary(clan, newKingdom);
+                        break;
+                    default:
+                        return Failed("Join must be normal, defection or mercenary.");
+                }
 
                 return Succeeded(clan.Name.ToString() + " has join the kingdom : " + newKingdom.Name.ToString());
         }
@@ -890,6 +908,7 @@ namespace GameInterface.Services.GameDebug.Commands
         public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
             new ExpectedArgs("clan_id", "The registered clan id."),
+            new ExpectedArgs("leave", "normal (default) or rebellion.", false),
         };
 
         public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
@@ -911,7 +930,14 @@ namespace GameInterface.Services.GameDebug.Commands
 
                 Kingdom previousKingdom = clan.Kingdom;
                 string kingdomName = previousKingdom.Name.ToString();
-                if (clan.IsUnderMercenaryService)
+                var leave = args.Count > 1 ? args[1] : "normal";
+                if (leave != "normal" && leave != "rebellion")
+                    return Failed("Leave must be normal or rebellion.");
+                if (leave == "rebellion" && clan.IsUnderMercenaryService)
+                    return Failed("A mercenary clan must leave normally.");
+                if (leave == "rebellion")
+                    ChangeKingdomAction.ApplyByLeaveWithRebellionAgainstKingdom(clan);
+                else if (clan.IsUnderMercenaryService)
                     ChangeKingdomAction.ApplyByLeaveKingdomAsMercenary(clan);
                 else
                     ChangeKingdomAction.ApplyByLeaveKingdom(clan);

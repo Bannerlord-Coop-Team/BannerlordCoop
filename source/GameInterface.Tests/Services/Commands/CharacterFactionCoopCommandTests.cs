@@ -158,6 +158,9 @@ public class CharacterFactionCoopCommandTests
     [InlineData("coop.debug.romance", "marry", "player", "npc")]
     [InlineData("coop.debug.kingdom", "force_ally", "empire", "empire_s")]
     [InlineData("coop.debug.kingdom", "force_trade_agreement", "empire", "empire_s")]
+    [InlineData("coop.debug.kingdom", "declare_war", "empire", "empire_s", "hostility", "player")]
+    [InlineData("coop.debug.clan", "change_clan_kingdom", "clan", "empire_s", "defection")]
+    [InlineData("coop.debug.clan", "leave_kingdom", "clan", "rebellion")]
     public void ServerCommands_RunOnClient_ReturnExplicitFailures(
         string prefix,
         string name,
@@ -181,6 +184,7 @@ public class CharacterFactionCoopCommandTests
     [Theory]
     [InlineData("force_ally")]
     [InlineData("force_trade_agreement")]
+    [InlineData("declare_war")]
     public void KingdomForceCommands_RegistryRejectsClientExecution(string name)
     {
         bool originalIsServer = ModInformation.IsServer;
