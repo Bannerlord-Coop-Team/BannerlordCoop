@@ -1,4 +1,4 @@
-using Common.Logging;
+﻿using Common.Logging;
 using GameInterface.Services.Issues.Generic;
 using HarmonyLib;
 using Serilog;
@@ -57,6 +57,7 @@ internal class IssueOwnershipPersistencePatches
                 ownershipRegistry.RestoreAll(saveData
                     .Where(entry => entry?.IssueGiverHero != null && !string.IsNullOrEmpty(entry.OwnerControllerId))
                     .Select(entry => new KeyValuePair<Hero, string>(entry.IssueGiverHero, entry.OwnerControllerId)));
+                foreach (var entry in saveData) entry?.RestoreQuestReferences();
             }
         }
 

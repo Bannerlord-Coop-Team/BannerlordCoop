@@ -9,6 +9,20 @@ namespace GameInterface.Tests.Services.MapEvents;
 public class ConversationRestartContextTrackerTests
 {
     [Fact]
+    public void Consume_CallerSuppliedRequestId_PreservesEncounterFreshness()
+    {
+        var tracker = new ConversationRestartContextTracker();
+        var encounter = ObjectHelper.SkipConstructor<PlayerEncounter>();
+        const string requestId = "weapons-guard-fight";
+
+        Assert.Equal(requestId, tracker.Capture(encounter, requestId));
+
+        var replacement = ObjectHelper.SkipConstructor<PlayerEncounter>();
+        Assert.Equal(ConversationRestartDecision.Stale,
+            tracker.Consume(requestId, replacement, defender: null, attacker: null));
+    }
+
+    [Fact]
     public void Consume_SameExistingEncounter_AllowsVanillaReplacement()
     {
         var tracker = new ConversationRestartContextTracker();

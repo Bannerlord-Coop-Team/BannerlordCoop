@@ -4,6 +4,8 @@ using GameInterface.Services.Issues.Messages;
 using System;
 using System.Linq;
 using TaleWorlds.CampaignSystem;
+using TaleWorlds.CampaignSystem.Encounters;
+using TaleWorlds.CampaignSystem.GameMenus;
 using TaleWorlds.CampaignSystem.Issues;
 using TaleWorlds.CampaignSystem.MapEvents;
 using TaleWorlds.CampaignSystem.Party;
@@ -17,10 +19,29 @@ internal interface IGangLeaderWeaponsQuestActions
 {
     bool Apply(Quest quest, Hero owner, MobileParty party, GangLeaderWeaponsAction action);
     bool CompleteBattle(Quest quest, Hero owner, MobileParty party, MapEvent battle);
+    bool StartApprovedBattle(Quest quest);
 }
 
 internal sealed class GangLeaderWeaponsQuestActions : IGangLeaderWeaponsQuestActions
 {
+    public bool StartApprovedBattle(Quest quest)
+    {
+        if (ModInformation.IsServer || !quest.IsOngoing || !quest._highCrimeRatingWillBeApplied ||
+            quest._guardsParty == null || !quest._guardsParty.IsActive || quest._playerDodgedGuards) return false;
+        PlayerEncounter.StartBattle();
+        if (PlayerEncounter.Battle == null) return false;
+
+        var town = quest.QuestGiver.CurrentSettlement;
+        var upgradeLevel = town.IsTown ? town.Town.GetWallLevel() : 1;
+        var troopCount = (int)(5f + (15f * quest._issueDifficulty));
+        GameMenu.ActivateGameMenu("town");
+        CampaignMission.OpenBattleMissionWhileEnteringSettlement(
+            town.LocationComplex.GetLocationWithId("center").GetSceneName(upgradeLevel),
+            upgradeLevel, troopCount, troopCount);
+        quest._checkForBattleResult = true;
+        return true;
+    }
+
     public bool Apply(Quest quest, Hero owner, MobileParty party, GangLeaderWeaponsAction action)
     {
         if (ModInformation.IsClient) return false;
@@ -32,6 +53,11 @@ internal sealed class GangLeaderWeaponsQuestActions : IGangLeaderWeaponsQuestAct
         {
             switch (action)
             {
+                case GangLeaderWeaponsAction.CancelBattleStart:
+                    if (party.MapEvent != null || quest._guardsParty?.MapEvent != null) return false;
+                    quest._checkForBattleResult = false;
+                    quest._highCrimeRatingWillBeApplied = false;
+                    return true;
                 case GangLeaderWeaponsAction.RefreshProgress:
                     quest.CalculateAndSetRequestedItemCountOnPlayer();
                     return true;

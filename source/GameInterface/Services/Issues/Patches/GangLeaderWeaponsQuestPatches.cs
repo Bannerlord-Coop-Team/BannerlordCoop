@@ -6,6 +6,7 @@ using GameInterface.Services.Issues.Generic;
 using GameInterface.Services.Issues.Generic.Migrated.GangLeaderNeedsWeapons;
 using GameInterface.Services.Issues.Messages;
 using HarmonyLib;
+using System;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Encounters;
 using TaleWorlds.CampaignSystem.GameState;
@@ -54,6 +55,15 @@ internal static class GangLeaderWeaponsQuestPatches
     [HarmonyPrefix]
     private static bool DeliverPrefix(Quest __instance) => Request(__instance, GangLeaderWeaponsAction.DeliverWeapons);
 
+    [HarmonyPatch("StartFight")]
+    [HarmonyPrefix]
+    private static bool StartFightPrefix(Quest __instance) => Request(__instance, GangLeaderWeaponsAction.BeginBattle);
+
+    [HarmonyPatch("OnGameMenuOpened")]
+    [HarmonyPrefix]
+    private static bool GameMenuPrefix(Quest __instance) =>
+        CallOriginalPolicy.IsOriginalAllowedForOwnershipGate() || IsLocalOwner(__instance);
+
     private static bool IsAuthoritativeConsequence(Quest quest) =>
         CallOriginalPolicy.IsOriginalAllowedForOwnershipGate() ||
         (ModInformation.IsServer && GangLeaderWeaponsActionScope.Contains(quest));
@@ -74,6 +84,18 @@ internal static class GangLeaderWeaponsQuestPatches
     [HarmonyPrefix]
     private static bool ReturnWeaponsPrefix(Quest __instance) => IsAuthoritativeConsequence(__instance);
 
+    [HarmonyPatch("OnFailed")]
+    [HarmonyPrefix]
+    private static bool FailedPrefix(Quest __instance) => IsAuthoritativeConsequence(__instance);
+
+    [HarmonyPatch("OnTimedOut")]
+    [HarmonyPrefix]
+    private static bool TimedOutPrefix(Quest __instance) => IsAuthoritativeConsequence(__instance);
+
+    [HarmonyPatch("OnFinalize")]
+    [HarmonyPrefix]
+    private static bool FinalizePrefix(Quest __instance) => IsAuthoritativeConsequence(__instance);
+
     [HarmonyPatch("OnSettlementEnter")]
     [HarmonyPrefix]
     private static bool EnterPrefix(Quest __instance, MobileParty party, Settlement settlement)
@@ -89,14 +111,34 @@ internal static class GangLeaderWeaponsQuestPatches
 
     [HarmonyPatch("OnSettlementLeft")]
     [HarmonyPrefix]
-    private static bool LeavePrefix(Quest __instance, MobileParty party, Settlement settlement)
+    private static bool LeavePrefix(Quest __instance, MobileParty party, Settlement settlement, out IDisposable __state)
     {
+        __state = null;
         if (CallOriginalPolicy.IsOriginalAllowedForOwnershipGate() ||
             (ModInformation.IsServer && GangLeaderWeaponsActionScope.Contains(__instance))) return true;
+        if (ModInformation.IsServer)
+        {
+            if (settlement != __instance.QuestGiver.CurrentSettlement ||
+                !ContainerProvider.TryResolve<IGangLeaderWeaponsOwnerContext>(out var context) ||
+                !context.TryOpen(__instance, out __state)) return false;
+            return party == MobileParty.MainParty;
+        }
         if (party == MobileParty.MainParty && settlement == __instance.QuestGiver.CurrentSettlement)
             Request(__instance, GangLeaderWeaponsAction.LeaveTown);
         return false;
     }
+
+    [HarmonyPatch("OnSettlementLeft")]
+    [HarmonyPostfix]
+    private static void LeavePostfix(Quest __instance, MobileParty party, IDisposable __state)
+    {
+        if (__state != null && party == MobileParty.MainParty)
+            MessageBroker.Instance.Publish(__instance, new GangLeaderWeaponsStateChanged(__instance, GangLeaderWeaponsAction.LeaveTown));
+    }
+
+    [HarmonyPatch("OnSettlementLeft")]
+    [HarmonyFinalizer]
+    private static void LeaveFinalizer(IDisposable __state) => __state?.Dispose();
 
     [HarmonyPatch("OnPlayerInventoryChanged")]
     [HarmonyPrefix]

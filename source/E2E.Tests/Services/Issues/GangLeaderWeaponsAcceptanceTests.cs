@@ -2,6 +2,7 @@
 using E2E.Tests.Environment;
 using GameInterface.Services.Issues.Generic.CreationCapture;
 using GameInterface.Services.Issues.Generic.Migrated.GangLeaderNeedsWeapons;
+using GameInterface.Services.Issues.Patches;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Encyclopedia;
 using TaleWorlds.CampaignSystem.Issues;
@@ -85,6 +86,39 @@ public sealed class GangLeaderWeaponsAcceptanceTests : IDisposable
                 Assert.Empty(MobileParty.MainParty.ItemRoster);
             });
         }
+    }
+
+    [Fact]
+    public void OwnershipSaveRestoresTheSameGuardsOnlyToTheSavedQuest()
+    {
+        var giverId = CreateIssueCopies();
+        var guardsId = environment.CreateRegisteredObject<MobileParty>();
+        var client = environment.Clients.First();
+        client.Call(() =>
+        {
+            Assert.True(client.ObjectManager.TryGetObject<Hero>(giverId, out var giver));
+            Assert.True(client.ObjectManager.TryGetObject<MobileParty>(guardsId, out var guards));
+            var acceptance = client.Resolve<IGangLeaderWeaponsAcceptance>();
+            acceptance.MirrorQuestAccepted(giver, new GangLeaderWeaponsQuestFields("weapons_saved_quest",
+                CampaignTime.Days(25), 4700, 0, 21, 0.75f, 200, 17));
+            var quest = Assert.IsType<Quest>(giver.Issue.IssueQuest);
+            quest._guardsParty = guards;
+            quest._checkForBattleResult = true;
+            var saved = new IssueOwnershipSaveData(giver, "quest-owner");
+            quest._guardsParty = null;
+            quest._checkForBattleResult = false;
+
+            saved.RestoreQuestReferences();
+
+            Assert.Same(guards, quest._guardsParty);
+            Assert.True(quest._checkForBattleResult);
+            quest._guardsParty = null;
+            quest._checkForBattleResult = false;
+            saved.WeaponsQuestId = "a-different-quest";
+            saved.RestoreQuestReferences();
+            Assert.Null(quest._guardsParty);
+            Assert.False(quest._checkForBattleResult);
+        });
     }
 
     [Fact]

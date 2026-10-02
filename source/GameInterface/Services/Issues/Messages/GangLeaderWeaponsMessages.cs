@@ -23,6 +23,7 @@ internal enum GangLeaderWeaponsAction
     BattleLost,
     DeliverWeapons,
     RefreshProgress,
+    CancelBattleStart,
 }
 
 internal readonly struct GangLeaderWeaponsIssueCreated : IEvent
@@ -90,10 +91,11 @@ internal readonly struct NetworkGangLeaderWeaponsState : IServerToClientCommand
     [ProtoMember(9)] public readonly bool PersuasionTried;
     [ProtoMember(10)] public readonly ItemRosterElement[] ConfiscatedWeapons;
     [ProtoMember(11)] public readonly GangLeaderWeaponsAction Action;
+    [ProtoMember(12)] public readonly bool ActionAccepted;
 
     public NetworkGangLeaderWeaponsState(string giverId, int generation, string questId, string guardsPartyId,
         int collectedAmount, bool dodgedGuards, bool lowCrime, bool highCrime, bool persuasionTried,
-        ItemRosterElement[] confiscatedWeapons, GangLeaderWeaponsAction action)
+        ItemRosterElement[] confiscatedWeapons, GangLeaderWeaponsAction action, bool actionAccepted)
     {
         GiverId = giverId;
         Generation = generation;
@@ -106,5 +108,6 @@ internal readonly struct NetworkGangLeaderWeaponsState : IServerToClientCommand
         PersuasionTried = persuasionTried;
         ConfiscatedWeapons = confiscatedWeapons;
         Action = action;
+        ActionAccepted = actionAccepted;
     }
 }

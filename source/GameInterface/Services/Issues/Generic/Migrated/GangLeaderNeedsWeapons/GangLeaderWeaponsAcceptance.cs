@@ -17,6 +17,7 @@ internal interface IGangLeaderWeaponsAcceptance :
     IRaceArbitratedAcceptMirrorStrategy<GangLeaderWeaponsQuestFields>,
     IAlternativeAcceptMirrorStrategy<GangLeaderWeaponsAlternativeFields>
 {
+    new void RejectAcceptance(Hero owner);
 }
 
 internal sealed class GangLeaderWeaponsAcceptance : IGangLeaderWeaponsAcceptance
