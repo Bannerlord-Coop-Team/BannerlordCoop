@@ -356,81 +356,91 @@ public class CrossOwnerMountCatchUpTests : MissionTestEnvironment
                 });
             }
 
-            var movementSender = expectedHorseOwner == "A" ? horseOwner
-                : expectedHorseOwner == "B" ? riderOwner : joiner;
-            var movementReceiver = movementSender == joiner ? populatedPeer : joiner;
-            var riderAuthority = expectedRiderOwner == "B" ? riderOwner : joiner;
-            riderAuthority.Call(() =>
-            {
-                Assert.True(riderAuthority.Resolve<INetworkAgentRegistry>().TryGetAgentInfo(riderId, out var rider));
-                rider.Agent.MountAgent = null;
-                var packet = new MovementPacket(new[] { riderId }, new[] { new AgentData(rider.Agent) },
-                    expectedRiderOwner, new[] { expectedRiderRevision });
-                foreach (var recipient in new[] { movementSender, movementReceiver }.Distinct())
-                {
-                    if (recipient == riderAuthority) continue;
-                    riderAuthority.Resolve<MockBattleNetwork>().Send(
-                        recipient == horseOwner ? "A" : recipient == riderOwner ? "B" : "C", packet);
-                }
-            });
-            foreach (var instance in new[] { movementSender, movementReceiver })
-            {
-                instance.Call(() =>
-                {
-                    var registry = instance.Resolve<INetworkAgentRegistry>();
-                    Assert.True(registry.TryGetAgentInfo(horseId, out var horse));
-                    Assert.Null(horse.Agent.RiderAgent);
-                    Assert.True(AgentMirror.TryGet(horse.Agent, out var mirror));
-                    mirror.MovementDirection = Vec2.Zero;
-                });
-            }
-            movementSender.Call(() =>
-            {
-                Assert.True(movementSender.Resolve<INetworkAgentRegistry>().TryGetAgentInfo(horseId, out var horse));
-                Assert.True(AgentMirror.TryGet(horse.Agent, out var mirror));
-                mirror.MovementDirection = new Vec2(1f, 0f);
-                movementSender.Resolve<MockBattleNetwork>().Send(movementReceiver == joiner ? "C"
-                    : departingController == "B" ? "A" : "B",
-                    new MountMovementPacket(new[] { horseId }, new[] { new AgentMountData(horse.Agent, horseId) },
-                        expectedHorseOwner, new[] { expectedHorseRevision }));
-            });
-            movementReceiver.Call(() =>
-            {
-                Assert.True(movementReceiver.Resolve<INetworkAgentRegistry>().TryGetAgentInfo(horseId, out var horse));
-                Assert.True(AgentMirror.TryGet(horse.Agent, out var mirror));
-                Assert.Equal(new Vec2(1f, 0f), mirror.MovementDirection);
-            });
-            if (delayedCatchUp)
-            {
-                movementReceiver.Call(() =>
-                {
-                    Assert.Contains("A", movementReceiver.Resolve<IMissionContext>().ControllersInMission);
-                    Assert.True(movementReceiver.Resolve<IMissionContext>().TryGetPeer("A", out var peer));
-                    Assert.Same(horseOwner.Resolve<MockBattleNetwork>().NetPeer, peer);
-                });
-                horseOwner.Call(() =>
-                {
-                    Assert.True(horseOwner.Resolve<INetworkAgentRegistry>().TryGetAgentInfo(horseId, out var staleHorse));
-                    Assert.True(AgentMirror.TryGet(staleHorse.Agent, out var mirror));
-                    mirror.MovementDirection = new Vec2(0f, 1f);
-                    horseOwner.Resolve<MockBattleNetwork>().Send(movementReceiver == joiner ? "C" : "B",
-                        new MountMovementPacket(new[] { horseId }, new[] { new AgentMountData(staleHorse.Agent, horseId) },
-                            "A", new[] { 7L }));
-                });
-                movementReceiver.Call(() =>
-                {
-                    Assert.True(movementReceiver.Resolve<INetworkAgentRegistry>().TryGetAgentInfo(horseId, out var horse));
-                    Assert.Equal(expectedHorseOwner, horse.CurrentAuthority);
-                    Assert.Equal(8, horse.AuthorityRevision);
-                    Assert.True(AgentMirror.TryGet(horse.Agent, out var mirror));
-                    Assert.Equal(new Vec2(1f, 0f), mirror.MovementDirection);
-                });
-            }
+            AssertDismountedHorseMovement(horseOwner, riderOwner, joiner, populatedPeer, riderId, horseId,
+                expectedRiderOwner, expectedRiderRevision, expectedHorseOwner, expectedHorseRevision,
+                departingController, delayedCatchUp);
         }
         finally
         {
             foreach (var instance in clients)
                 instance.Call(BattleSpawnGate.EndBattle);
+        }
+    }
+
+    private void AssertDismountedHorseMovement(EnvironmentInstance horseOwner, EnvironmentInstance riderOwner,
+        EnvironmentInstance joiner, EnvironmentInstance populatedPeer, Guid riderId, Guid horseId,
+        string expectedRiderOwner, long expectedRiderRevision, string expectedHorseOwner, long expectedHorseRevision,
+        string departingController, bool delayedCatchUp)
+    {
+        var movementSender = expectedHorseOwner == "A" ? horseOwner
+            : expectedHorseOwner == "B" ? riderOwner : joiner;
+        var movementReceiver = movementSender == joiner ? populatedPeer : joiner;
+        var riderAuthority = expectedRiderOwner == "B" ? riderOwner : joiner;
+        riderAuthority.Call(() =>
+        {
+            Assert.True(riderAuthority.Resolve<INetworkAgentRegistry>().TryGetAgentInfo(riderId, out var rider));
+            rider.Agent.MountAgent = null;
+            var packet = new MovementPacket(new[] { riderId }, new[] { new AgentData(rider.Agent) },
+                expectedRiderOwner, new[] { expectedRiderRevision });
+            foreach (var recipient in new[] { movementSender, movementReceiver }.Distinct())
+            {
+                if (recipient == riderAuthority) continue;
+                riderAuthority.Resolve<MockBattleNetwork>().Send(
+                    recipient == horseOwner ? "A" : recipient == riderOwner ? "B" : "C", packet);
+            }
+        });
+        foreach (var instance in new[] { movementSender, movementReceiver })
+        {
+            instance.Call(() =>
+            {
+                var registry = instance.Resolve<INetworkAgentRegistry>();
+                Assert.True(registry.TryGetAgentInfo(horseId, out var horse));
+                Assert.Null(horse.Agent.RiderAgent);
+                Assert.True(AgentMirror.TryGet(horse.Agent, out var mirror));
+                mirror.MovementDirection = Vec2.Zero;
+            });
+        }
+        movementSender.Call(() =>
+        {
+            Assert.True(movementSender.Resolve<INetworkAgentRegistry>().TryGetAgentInfo(horseId, out var horse));
+            Assert.True(AgentMirror.TryGet(horse.Agent, out var mirror));
+            mirror.MovementDirection = new Vec2(1f, 0f);
+            movementSender.Resolve<MockBattleNetwork>().Send(movementReceiver == joiner ? "C"
+                : departingController == "B" ? "A" : "B",
+                new MountMovementPacket(new[] { horseId }, new[] { new AgentMountData(horse.Agent, horseId) },
+                    expectedHorseOwner, new[] { expectedHorseRevision }));
+        });
+        movementReceiver.Call(() =>
+        {
+            Assert.True(movementReceiver.Resolve<INetworkAgentRegistry>().TryGetAgentInfo(horseId, out var horse));
+            Assert.True(AgentMirror.TryGet(horse.Agent, out var mirror));
+            Assert.Equal(new Vec2(1f, 0f), mirror.MovementDirection);
+        });
+        if (delayedCatchUp)
+        {
+            movementReceiver.Call(() =>
+            {
+                Assert.Contains("A", movementReceiver.Resolve<IMissionContext>().ControllersInMission);
+                Assert.True(movementReceiver.Resolve<IMissionContext>().TryGetPeer("A", out var peer));
+                Assert.Same(horseOwner.Resolve<MockBattleNetwork>().NetPeer, peer);
+            });
+            horseOwner.Call(() =>
+            {
+                Assert.True(horseOwner.Resolve<INetworkAgentRegistry>().TryGetAgentInfo(horseId, out var staleHorse));
+                Assert.True(AgentMirror.TryGet(staleHorse.Agent, out var mirror));
+                mirror.MovementDirection = new Vec2(0f, 1f);
+                horseOwner.Resolve<MockBattleNetwork>().Send(movementReceiver == joiner ? "C" : "B",
+                    new MountMovementPacket(new[] { horseId }, new[] { new AgentMountData(staleHorse.Agent, horseId) },
+                        "A", new[] { 7L }));
+            });
+            movementReceiver.Call(() =>
+            {
+                Assert.True(movementReceiver.Resolve<INetworkAgentRegistry>().TryGetAgentInfo(horseId, out var horse));
+                Assert.Equal(expectedHorseOwner, horse.CurrentAuthority);
+                Assert.Equal(8, horse.AuthorityRevision);
+                Assert.True(AgentMirror.TryGet(horse.Agent, out var mirror));
+                Assert.Equal(new Vec2(1f, 0f), mirror.MovementDirection);
+            });
         }
     }
 
