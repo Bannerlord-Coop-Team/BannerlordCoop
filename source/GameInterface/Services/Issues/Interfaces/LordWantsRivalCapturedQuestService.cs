@@ -403,13 +403,13 @@ internal sealed class LordWantsRivalCapturedQuestService : ILordWantsRivalCaptur
         if (data.HeroId != player.HeroId ||
             !objectManager.TryGetObjectWithLogging<Hero>(player.HeroId, out var hero)) return;
 
+        var registry = GangLeaderNeedsToOffloadStolenGoodsQuestType.OwnerTraitXpProgress;
         if (data.IsBaseline)
         {
             if (objectManager.TryGetObjectWithLogging<Hero>(data.GiverId, out var giver) && giver.Issue is Issue issue &&
                 generations.TryGetGeneration(giver, out var generation) && generation == data.Generation &&
                 issue.IsOngoingWithoutQuest && IsPresentWithGiver(player.ControllerId, giver))
             {
-                var registry = GangLeaderNeedsToOffloadStolenGoodsQuestType.OwnerTraitXpProgress;
                 if (registry.TryGet(hero, out var progress) && progress.HasProperty(DefaultTraits.Honor))
                     SendTraitProgress(player, progress.GetPropertyValue(DefaultTraits.Honor));
                 else StoreHonorProgress(hero, data.HonorXp);
@@ -418,7 +418,8 @@ internal sealed class LordWantsRivalCapturedQuestService : ILordWantsRivalCaptur
         }
 
         // A personal XP change can already be in flight when its quest ends.
-        if (!TryEnterOwnerScope(player, out var scope)) return;
+        if (!registry.TryGet(hero, out var knownProgress) || !knownProgress.HasProperty(DefaultTraits.Honor) ||
+            !TryEnterOwnerScope(player, out var scope)) return;
         using (scope) TraitLevelingHelper.AddTraitXp(DefaultTraits.Honor, data.HonorXp);
     }
 

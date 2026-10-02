@@ -544,6 +544,68 @@ public sealed class LordWantsRivalCapturedTests : IDisposable
         });
     }
 
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void RejectedAcceptanceCannotStartHonorUpdatesWithoutAServerBaseline(bool hasOtherTrait)
+    {
+        foreach (var instance in Instances)
+            instance.Call(() =>
+            {
+                using (new AllowedThread()) Get<Hero>(instance, playerId).SetTraitLevel(DefaultTraits.Honor, 1);
+            });
+
+        var generation = 0;
+        Server.Call(() =>
+        {
+            generation = Server.Resolve<IIssueGenerationRegistry>().Bump(Get<Hero>(Server, giverId));
+            if (hasOtherTrait)
+            {
+                var progress = new PropertyOwner<PropertyObject>();
+                progress.SetPropertyValue(DefaultTraits.Calculating, 37);
+                GangLeaderNeedsToOffloadStolenGoodsQuestType.OwnerTraitXpProgress.Set(Get<Hero>(Server, playerId), progress);
+            }
+        });
+        Client.Call(() =>
+        {
+            Campaign.Current.PlayerTraitDeveloper.SetPropertyValue(DefaultTraits.Honor, 1500);
+            var giver = Get<Hero>(Client, giverId);
+            MessageBroker.Instance.Publish(giver, new IssueConversationOpenedLocally(giver, Controller));
+            Assert.True(Campaign.Current.IssueManager.StartIssueQuest(giver));
+        });
+        Server.Call(() => Assert.Null(Get<Hero>(Server, giverId).Issue.IssueQuest));
+        Client.Call(() => TraitLevelingHelper.OnIssueSolvedThroughQuest(Get<Hero>(Client, giverId), DefaultTraits.Honor, 20));
+
+        Assert.Empty(Server.NetworkSentMessages.GetMessages<NetworkRivalCapturedTraitProgress>());
+        Server.Call(() =>
+        {
+            var found = GangLeaderNeedsToOffloadStolenGoodsQuestType.OwnerTraitXpProgress
+                .TryGet(Get<Hero>(Server, playerId), out var progress);
+            Assert.Equal(hasOtherTrait, found);
+            if (found)
+            {
+                Assert.False(progress.HasProperty(DefaultTraits.Honor));
+                Assert.Equal(37, progress.GetPropertyValue(DefaultTraits.Calculating));
+            }
+            Assert.Equal(1, Get<Hero>(Server, playerId).GetTraitLevel(DefaultTraits.Honor));
+        });
+        Client.Call(() =>
+        {
+            Assert.Equal(1520, Campaign.Current.PlayerTraitDeveloper.GetPropertyValue(DefaultTraits.Honor));
+            Assert.Equal(1, Get<Hero>(Client, playerId).GetTraitLevel(DefaultTraits.Honor));
+            Client.Resolve<IIssueGenerationRegistry>().SetGeneration(Get<Hero>(Client, giverId), generation);
+        });
+        Accept();
+        Client.Call(() => TraitLevelingHelper.OnIssueSolvedThroughQuest(Get<Hero>(Client, giverId), DefaultTraits.Honor, 20));
+        Server.Call(() =>
+        {
+            Assert.True(GangLeaderNeedsToOffloadStolenGoodsQuestType.OwnerTraitXpProgress
+                .TryGet(Get<Hero>(Server, playerId), out var progress));
+            Assert.Equal(1540, progress.GetPropertyValue(DefaultTraits.Honor));
+        });
+        Client.Call(() => Assert.Equal(1540, Campaign.Current.PlayerTraitDeveloper.GetPropertyValue(DefaultTraits.Honor)));
+    }
+
     [Fact]
     public void RejectedAcceptanceRemovesTheStartedQuestAndItsUnownedIssue()
     {
