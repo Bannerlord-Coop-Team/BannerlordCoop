@@ -598,6 +598,7 @@ internal class BattleHostHandler : IHandler
         PendingHealthWithdrawal pending)
     {
         state.HealthWithdrawals.Remove(pending);
+        network.SendAll(new NetworkBattleTroopHealthCollected(mapEventId, pending.Parties.Keys.ToArray()));
         foreach (var party in pending.Parties)
         {
             reserveBuilder.ForgetParty(mapEvent, party.Value);
@@ -1057,6 +1058,11 @@ internal class BattleHostHandler : IHandler
             // If the departed member had a return grant pending (it re-entered and dropped AGAIN before the
             // host's flush ack), the grant is moot — cancel it rather than serve a gone peer.
             CancelPendingReturns(mapEventId, controllerId);
+            if (battleRuntimeStates.TryGetValue(mapEventId, out var departedState))
+                foreach (var report in departedState.HealthReports)
+                    if (report.Value.OwnerControllerId == controllerId
+                        && !departedState.HealthWithdrawals.Any(value => value.Parties.ContainsKey(report.Key)))
+                        report.Value.Owner = null;
 
             if (!hostRegistry.TryGet(mapEventId, out var assignment))
                 return; // no host elected yet — the departure bookkeeping above is all that applies

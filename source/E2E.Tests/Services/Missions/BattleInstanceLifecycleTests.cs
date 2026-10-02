@@ -65,8 +65,11 @@ public class BattleInstanceLifecycleTests : MissionTestEnvironment
         });
     }
 
-    [Fact]
-    public void WithdrawnAdoptedSurvivor_IsIncludedInRequestedHolderSnapshot()
+    [Theory]
+    [InlineData(false, false)]
+    [InlineData(true, false)]
+    [InlineData(true, true)]
+    public void WithdrawnAdoptedSurvivor_IsIncludedOnceInRequestedHolderSnapshot(bool promoted, bool collected)
     {
         using var fixture = new MissionEngineFixture();
         var (mapEventId, _) = SetupCoopBattle("A", "B");
@@ -75,7 +78,7 @@ public class BattleInstanceLifecycleTests : MissionTestEnvironment
         {
             fixture.CreateMission(client);
             var hosts = client.Resolve<IBattleHostRegistry>();
-            hosts.Set(mapEventId, new BattleHostAssignment("A", Array.Empty<string>(), 1));
+            hosts.Set(mapEventId, new BattleHostAssignment(promoted ? "B" : "A", Array.Empty<string>(), 1));
             var session = new BattleSession(client.Resolve<IControllerIdProvider>(), hosts);
             Assert.True(session.TryBegin(mapEventId));
             var registry = client.Resolve<INetworkAgentRegistry>();
@@ -92,16 +95,29 @@ public class BattleInstanceLifecycleTests : MissionTestEnvironment
             agent.Health = 37f;
             var agentId = Guid.NewGuid();
             Assert.True(registry.TryRegisterAgent("B", agentId, agent));
-            Assert.True(registry.TryTransferAuthority("A", agentId));
+            if (!promoted) Assert.True(registry.TryTransferAuthority("A", agentId));
             lifecycle.RecordWithdrawnHealth(agent);
             registry.RemoveAgent(agentId);
+            if (collected) broker.Publish(this, new NetworkBattleTroopHealthCollected(mapEventId, new[] { "withdrawn-party" }));
+            if (promoted) hosts.Set(mapEventId, new BattleHostAssignment("A", Array.Empty<string>(), 2));
             var snapshotId = Guid.NewGuid();
             broker.Publish(this, new NetworkRequestBattleTroopHealth(mapEventId, new[] { "withdrawn-party" }, snapshotId));
             var report = ProtoBuf.Serializer.DeepClone(client.NetworkSentMessages
                 .GetMessages<NetworkBattleTroopHealth>().Single());
             Assert.Equal(snapshotId, report.SnapshotId);
+            if (collected)
+            {
+                Assert.Empty(report.Survivors);
+                Assert.Empty(report.RoutedSurvivors);
+                return;
+            }
             Assert.Equal(37f, report.Survivors[77]);
             Assert.Equal(37f, report.RoutedSurvivors[77]);
+            broker.Publish(this, new NetworkRequestBattleTroopHealth(mapEventId, new[] { "withdrawn-party" }, Guid.NewGuid()));
+            var next = client.NetworkSentMessages.GetMessages<NetworkBattleTroopHealth>().Last();
+            Assert.Empty(next.Survivors);
+            Assert.Empty(next.RoutedSurvivors);
+            Assert.Equal(37f, report.Survivors[77]);
         });
     }
 

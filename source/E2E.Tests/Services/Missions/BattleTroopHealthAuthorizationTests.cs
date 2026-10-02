@@ -139,9 +139,10 @@ public class BattleTroopHealthAuthorizationTests : MissionTestEnvironment
     }
 
     [Theory]
-    [InlineData(false)]
-    [InlineData(true)]
-    public void ReturnedOwner_ReserveWaitsForCurrentHolderHealth(bool migrateHost)
+    [InlineData("none")]
+    [InlineData("before-withdrawal")]
+    [InlineData("during-snapshot")]
+    public void ReturnedOwner_ReserveWaitsForCurrentHolderHealth(string migration)
     {
         var (battleId, partyId, entries) = PrepareBattle(ownerEntered: false, successor: true);
         var host = Clients.First();
@@ -153,12 +154,21 @@ public class BattleTroopHealthAuthorizationTests : MissionTestEnvironment
         EnterBattle(owner, battleId);
         SendHealth(host, new NetworkBattleTroopHealth(battleId, partyId,
             new Dictionary<int, float> { [entries[0].Seed] = 80f }, 2));
-        if (migrateHost) DepartBattle("host", battleId, wasRetreat: true);
-        var holder = migrateHost ? successor : host;
-        string holderId = migrateHost ? "successor" : "host";
+        if (migration == "before-withdrawal") DepartBattle("host", battleId, wasRetreat: true);
+        var holder = migration != "none" ? successor : host;
+        string holderId = migration != "none" ? "successor" : "host";
         SendHealth(owner, HealthReport(battleId, partyId, entries, routedHealth: null));
         DepartBattle("owner", battleId, wasRetreat: true);
         var request = Server.NetworkSentMessages.GetMessages<NetworkRequestBattleTroopHealth>().Last();
+        if (migration == "during-snapshot")
+        {
+            var previousId = request.SnapshotId;
+            DepartBattle("host", battleId);
+            request = Server.NetworkSentMessages.GetMessages<NetworkRequestBattleTroopHealth>().Last();
+            Assert.NotEqual(previousId, request.SnapshotId);
+            SendHealth(successor, new NetworkBattleTroopHealth(battleId, partyId,
+                new Dictionary<int, float> { [entries[0].Seed] = 1f }, 0, snapshotId: previousId));
+        }
         Assert.Contains(partyId, request.PartyIds);
         Assert.NotEqual(Guid.Empty, request.SnapshotId);
         var reserveCount = Server.NetworkSentMessages.GetMessageCount<NetworkBattleTroopReserve>();
