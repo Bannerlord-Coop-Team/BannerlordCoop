@@ -1784,6 +1784,34 @@ public class MapEventDebugCommands
         }
     }
 
+    public sealed class RouteBattleEnemiesCoopCommand : ICoopCommand
+    {
+        public string Prefix => "coop.debug.map_event";
+        public string Name => "route_enemies";
+        public string Description => "Ask the active mission authority to retreat enemy agents in an exact map event.";
+        public CoopCommandSide Side => CoopCommandSide.Server;
+        public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
+        {
+            new ExpectedArgs("map_event_id", "The registered map event id.", true),
+            new ExpectedArgs("enemies_to_leave_fighting", "The number of active enemy agents to leave fighting.", true),
+        };
+
+        public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
+        {
+            if (ModInformation.IsClient)
+                return Failed("Run this command on the server.");
+            if (args.Count != 2 || !int.TryParse(args[1], out var remaining) || remaining < 0)
+                return Failed("Supply a map event id and a nonnegative enemy count.");
+            if (!TryGetObjectManager(out var objects) ||
+                !objects.TryGetObjectWithLogging<MapEvent>(args[0], out var mapEvent) || mapEvent.IsFinalized ||
+                !ContainerProvider.TryResolve<INetwork>(out var network))
+                return Failed("The active map event or network is unavailable.");
+
+            network.SendAll(new NetworkRouteBattleEnemies(args[0], remaining));
+            return Succeeded($"Retreat requested for mapEvent={args[0]}, enemiesToLeaveFighting={remaining}. Read mission and campaign state to verify completion.");
+        }
+    }
+
     public sealed class BattleRewardFixtureRouteEnemiesCoopCommand : ICoopCommand
     {
         public string Prefix => "coop.debug.map_event";

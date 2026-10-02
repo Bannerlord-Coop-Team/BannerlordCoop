@@ -1,11 +1,17 @@
 ﻿using Common.Util;
 using E2E.Tests.Environment;
+using Common.Commands;
 using E2E.Tests.Environment.Instance;
 using GameInterface.Services.Heroes.Patches;
+using GameInterface.Services.GameDebug.Messages;
+using GameInterface.Services.Issues.Commands;
 using GameInterface.Services.Issues.Generic;
 using GameInterface.Services.Issues.Generic.Migrated.TheConquestOfSettlement;
 using GameInterface.Services.Issues.Messages;
 using GameInterface.Services.Issues.Patches;
+using GameInterface.Services.Players;
+using GameInterface.Services.Players.Data;
+using GameInterface.Services.Villages.Commands;
 using Helpers;
 using System;
 using System.Linq;
@@ -13,6 +19,7 @@ using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Actions;
 using TaleWorlds.CampaignSystem.Encyclopedia;
 using TaleWorlds.CampaignSystem.Issues;
+using TaleWorlds.CampaignSystem.MapEvents;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Settlements;
 using Xunit.Abstractions;
@@ -33,6 +40,69 @@ public class TheConquestOfSettlementIssueTests : IDisposable
     }
 
     public void Dispose() => environment.Dispose();
+
+#if DEBUG
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public void EligibilityCannotBorrowAnotherPlayersMissingHeroOrParty(bool missingHero)
+    {
+        var created = CreateIssue();
+        var heroId = environment.CreateRegisteredObject<Hero>();
+        var partyId = environment.CreateRegisteredObject<MobileParty>();
+        Server.Call(() =>
+        {
+            var controller = "missing-object-player";
+            Assert.True(Server.Resolve<IPlayerManager>().AddPlayer(new Player(controller,
+                missingHero ? "missing-hero" : heroId, missingHero ? partyId : "missing-party", "", "")));
+            Assert.True(Server.ObjectManager.TryGetObject<Hero>(created.GiverId, out var giver));
+            var issue = giver.Issue;
+            var previousHero = ResolvedMainHeroContext.ResolvedMainHero;
+            var previousParty = Campaign.Current.MainParty;
+
+            var result = new ConquestQuestCommands.Eligibility().ProcessCommand(
+                new CoopCommandArgsFactory().FromValues(new[] { created.GiverId, controller }));
+
+            Assert.False(result.Succeeded);
+            Assert.Same(issue, giver.Issue);
+            Assert.True(issue.IsOngoingWithoutQuest);
+            Assert.Null(issue.IssueQuest);
+            Assert.Same(previousHero, ResolvedMainHeroContext.ResolvedMainHero);
+            Assert.Same(previousParty, Campaign.Current.MainParty);
+        });
+    }
+
+    [Fact]
+    public void JournalCannotOpenOnTheDedicatedAuthority()
+    {
+        Server.Call(() =>
+        {
+            var result = new ConquestQuestCommands.Journal().ProcessCommand(
+                new CoopCommandArgsFactory().FromValues(new[] { "open" }));
+            Assert.False(result.Succeeded);
+        });
+    }
+#endif
+
+    [Fact]
+    public void RoutingSendsOnlyTheValidatedMapEventToTheMissionAuthority()
+    {
+        var id = environment.CreateRegisteredObject<MapEvent>();
+        var command = new MapEventDebugCommands.RouteBattleEnemiesCoopCommand();
+        var args = new CoopCommandArgsFactory();
+        foreach (var client in environment.Clients)
+            client.Call(() => Assert.False(command.ProcessCommand(args.FromValues(new[] { id, "0" })).Succeeded));
+        Server.Call(() =>
+        {
+            Assert.False(command.ProcessCommand(args.FromValues(new[] { id, "-1" })).Succeeded);
+            Assert.False(command.ProcessCommand(args.FromValues(new[] { "missing-event", "0" })).Succeeded);
+            Assert.Empty(Server.NetworkSentMessages.GetMessages<NetworkRouteBattleEnemies>());
+            Assert.True(command.ProcessCommand(args.FromValues(new[] { id, "3" })).Succeeded);
+        });
+        var request = Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkRouteBattleEnemies>());
+        Assert.Equal(id, request.MapEventId);
+        Assert.Equal(3, request.EnemiesToLeaveFighting);
+    }
 
     private NetworkConquestIssueCreated CreateIssue()
     {
