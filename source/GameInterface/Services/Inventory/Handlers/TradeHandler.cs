@@ -148,10 +148,15 @@ internal class TradeHandler : IHandler
             // The server may consume food after the client has submitted its inventory.
             if (!MatchesInventoryBaseline(toRoster, message.InitialPlayerRoster))
             {
-                ResendRoster(peer, toRoster);
-                if (fromRoster != null) ResendRoster(peer, fromRoster);
                 if (peer != null)
+                {
+                    messageBroker.Publish(peer, new ResendItemRoster(toRoster));
+                    if (fromRoster != null) messageBroker.Publish(peer, new ResendItemRoster(fromRoster));
+                    network.Send(peer, new UpdateEquipmentClients(
+                        ResolveCharacterIdEquipmentsData(ownerParty, initialHero.CharacterObject),
+                        message.OwnerPartyId, message.InitialHeroId));
                     network.Send(peer, new SendInformationMessage("Inventory changed while closing. Please try again."));
+                }
                 return;
             }
 
@@ -228,22 +233,6 @@ internal class TradeHandler : IHandler
             if (index < 0 || roster.GetElementNumber(index) != item.Amount) return false;
         }
         return true;
-    }
-
-    private void ResendRoster(NetPeer peer, ItemRoster roster)
-    {
-        if (peer == null || !objectManager.TryGetHandleWithLogging(roster, out uint rosterId)) return;
-        var updates = new List<UpdateItemRoster>();
-        foreach (var item in roster)
-        {
-            if (!objectManager.TryGetHandleWithLogging(item.EquipmentElement.Item, out uint itemId)) return;
-            uint modifierId = 0;
-            if (item.EquipmentElement.ItemModifier != null &&
-                !objectManager.TryGetHandleWithLogging(item.EquipmentElement.ItemModifier, out modifierId)) return;
-            updates.Add(new UpdateItemRoster(rosterId, itemId, modifierId, item.Amount));
-        }
-        network.Send(peer, new ClearItemRoster(rosterId));
-        foreach (var update in updates) network.Send(peer, update);
     }
 
     private bool TryValidateForceTransfer(CompleteTrade message, NetPeer peer)
