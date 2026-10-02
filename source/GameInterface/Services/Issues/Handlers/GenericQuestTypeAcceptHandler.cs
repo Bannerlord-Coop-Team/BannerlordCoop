@@ -432,6 +432,8 @@ internal class GenericQuestTypeAcceptHandler : IHandler
         {
             if (!objectManager.TryGetObjectWithLogging<Hero>(data.OwnerId, out var owner) || owner.Issue == null) return;
 
+            var startingExtortion = owner.Issue is ExtortionByDesertersIssueBehavior.ExtortionByDesertersIssue &&
+                owner.Issue.IsOngoingWithoutQuest;
             var descriptor = QuestTypeRegistry.Get(owner.Issue);
             try
             {
@@ -447,6 +449,12 @@ internal class GenericQuestTypeAcceptHandler : IHandler
             }
 
             ownershipRegistry.SetOwner(owner, data.OwnerControllerId);
+            if (startingExtortion && owner.Issue.IsSolvingWithAlternative && ownershipRegistry.IsLocalPeerOwner(owner))
+            {
+                using (new AllowedThread())
+                    CampaignEventDispatcher.Instance.OnIssueUpdated(owner.Issue,
+                        IssueBase.IssueUpdateDetails.PlayerSentTroopsToQuest, Hero.MainHero);
+            }
         });
     }
 

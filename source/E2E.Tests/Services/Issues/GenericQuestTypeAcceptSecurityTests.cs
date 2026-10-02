@@ -2,7 +2,9 @@
 using E2E.Tests.Environment;
 using E2E.Tests.Environment.Instance;
 using GameInterface.Services.Entity;
+using GameInterface.Services.Issues.Data;
 using GameInterface.Services.Issues.Generic;
+using GameInterface.Services.Issues.Generic.AcceptMirror;
 using GameInterface.Services.Issues.Handlers;
 using GameInterface.Services.Issues.Interfaces;
 using GameInterface.Services.Issues.Messages;
@@ -10,6 +12,7 @@ using GameInterface.Services.Players;
 using GameInterface.Services.Players.Data;
 using HarmonyLib;
 using System;
+using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
 using TaleWorlds.CampaignSystem;
@@ -54,7 +57,7 @@ public class GenericQuestTypeAcceptSecurityTests : IDisposable
         var itemId = TestEnvironment.CreateRegisteredObject<ItemObject>();
         var companionHeroId = TestEnvironment.CreateRegisteredObject<Hero>();
 
-        foreach (var instance in new[] { Server, Client })
+        foreach (var instance in new[] { Server }.Concat(TestEnvironment.Clients))
         {
             instance.Call(() =>
             {
@@ -172,6 +175,79 @@ public class GenericQuestTypeAcceptSecurityTests : IDisposable
         TestEnvironment.ConnectRegisteredPlayer(Client, controllerId);
         Client.Resolve<IControllerIdProvider>().SetControllerId(controllerId);
         return controllerId;
+    }
+
+    [Fact]
+    public void ExtortionAlternativeAccepted_NotifiesOnlyItsNewOwnerOnce()
+    {
+        var fixture = SetupVillageOwner();
+        var controllerId = "extortion-owner";
+        var notifications = new List<(EnvironmentInstance Client, Hero Solver, bool IsOwner, bool ReceivedApply)>();
+        var listener = new object();
+        NetworkQuestTypeAlternativeAccepted accepted = default;
+        foreach (var instance in new[] { Server }.Concat(TestEnvironment.Clients))
+        {
+            instance.Call(() =>
+            {
+                Assert.True(instance.ObjectManager.TryGetObject<Hero>(fixture.HeroId, out var giver));
+                var potential = new PotentialIssueData(
+                    (in PotentialIssueData _, Hero hero) => new ExtortionByDesertersIssueBehavior.ExtortionByDesertersIssue(hero),
+                    typeof(ExtortionByDesertersIssueBehavior.ExtortionByDesertersIssue), IssueBase.IssueFrequency.VeryCommon);
+                if (giver.Issue == null)
+                {
+                    using (new AllowedThread())
+                        Assert.True(Campaign.Current.IssueManager.CreateNewIssue(in potential, giver));
+                }
+                Assert.IsType<ExtortionByDesertersIssueBehavior.ExtortionByDesertersIssue>(giver.Issue);
+
+                if (instance == Server)
+                {
+                    Assert.True(instance.ObjectManager.TryGetObject<Hero>(fixture.CompanionHeroId, out var companion));
+                    var troops = TroopRoster.CreateDummyTroopRoster();
+                    using (new AllowedThread()) troops.AddToCounts(companion.CharacterObject, 1);
+                    var state = new AlternativeSolutionVanillaState(CampaignTime.DaysFromNow(5),
+                        CampaignTime.DaysFromNow(4), 0.1f, 1, 1500, null);
+                    accepted = new NetworkQuestTypeAlternativeAccepted(fixture.HeroId, controllerId, state,
+                        GenericAcceptFieldsSerializer.Serialize(new ExtortionAlternativeAcceptFields(0.4f, state)),
+                        instance.Resolve<GameInterface.Services.TroopRosters.Interfaces.ITroopRosterInterface>()
+                            .PackTroopRosterData(troops));
+                    return;
+                }
+
+                instance.Resolve<IControllerIdProvider>().SetControllerId(instance == Client ? controllerId : "extortion-observer");
+                CampaignEvents.OnIssueUpdatedEvent.AddNonSerializedListener(listener, (issue, status, solver) =>
+                {
+                    if (issue == giver.Issue && status == IssueBase.IssueUpdateDetails.PlayerSentTroopsToQuest)
+                        notifications.Add((instance, solver, instance.Resolve<IIssueOwnershipRegistry>().IsLocalPeerOwner(giver),
+                            AllowedThread.IsThisThreadAllowed()));
+                });
+            });
+        }
+
+        try
+        {
+            Server.Call(() => Server.Resolve<Common.Network.INetwork>().SendAll(accepted));
+            foreach (var client in TestEnvironment.Clients)
+                client.Call(() =>
+                {
+                    Assert.True(client.ObjectManager.TryGetObject<Hero>(fixture.HeroId, out var giver));
+                    Assert.True(giver.Issue.IsSolvingWithAlternative);
+                    Assert.Single(giver.Issue.JournalEntries);
+                });
+            var notification = Assert.Single(notifications);
+            Assert.Same(Client, notification.Client);
+            Assert.True(notification.IsOwner);
+            Assert.True(notification.ReceivedApply);
+            Client.Call(() => Assert.Same(Hero.MainHero, notification.Solver));
+
+            Server.Call(() => Server.Resolve<Common.Network.INetwork>().SendAll(accepted));
+            Assert.Single(notifications);
+        }
+        finally
+        {
+            foreach (var client in TestEnvironment.Clients)
+                client.Call(() => CampaignEventDispatcher.Instance.RemoveListeners(listener));
+        }
     }
 
     [Fact]
