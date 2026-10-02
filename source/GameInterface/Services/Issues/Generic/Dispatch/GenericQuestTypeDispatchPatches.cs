@@ -1,4 +1,4 @@
-using Common;
+﻿using Common;
 using Common.Messaging;
 using GameInterface.Policies;
 using GameInterface.Services.Entity;
@@ -90,6 +90,8 @@ internal class GenericQuestTypeAlternativeSolutionOwnershipGatePatch
     {
         if (QuestTypeRegistry.Get(__instance)?.SupportsAlternativeAccept != true) return true;
 
+        if (__instance is ArtisanCantSellProductsAtAFairPriceIssueBehavior.ArtisanCantSellProductsAtAFairPriceIssue &&
+            ModInformation.IsServer && IssueFinalizeAuthorityGuard.IsActive) return true;
         return (ContainerProvider.TryResolve<IIssueOwnershipRegistry>(out var ownershipRegistry) && ownershipRegistry.IsLocalPeerOwner(__instance.IssueOwner))
             || AlternativeSolutionCompletionAuthorityGuard.IsActive
             || CallOriginalPolicy.IsOriginalAllowedForOwnershipGate();

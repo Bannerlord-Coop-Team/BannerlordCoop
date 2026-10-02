@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using GameInterface.Services.Heroes.Patches;
 using GameInterface.Services.Issues.Generic.AcceptMirror;
 using GameInterface.Services.ObjectManager;
@@ -8,6 +8,7 @@ using TaleWorlds.CampaignSystem.Issues;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Roster;
 using TaleWorlds.Localization;
+using System.Linq;
 
 namespace GameInterface.Services.Issues.Generic;
 
@@ -30,6 +31,9 @@ public static class AlternativeSolutionStartRunner
         using (new AlternativeSolutionStartAuthorityGuard())
         using (ResolveOwnerScope(truePlayer))
         {
+            if (owner.Issue is ArtisanCantSellProductsAtAFairPriceIssueBehavior.ArtisanCantSellProductsAtAFairPriceIssue &&
+                !owner.Issue.CheckPreconditions(owner, out _))
+                throw new InvalidOperationException("Artisan alternative acceptance preconditions changed");
             if (!owner.Issue.AlternativeSolutionCondition(out _))
                 throw new InvalidOperationException($"StartOnServer: AlternativeSolutionCondition rejected the accept for owner {owner.StringId}");
 
@@ -43,10 +47,24 @@ public static class AlternativeSolutionStartRunner
         using (new AlternativeSolutionStartAuthorityGuard())
         using (ResolveOwnerScope(truePlayer))
         {
+            if (owner.Issue is ArtisanCantSellProductsAtAFairPriceIssueBehavior.ArtisanCantSellProductsAtAFairPriceIssue &&
+                !owner.Issue.CheckPreconditions(owner, out _))
+                throw new InvalidOperationException("Artisan alternative acceptance preconditions changed");
             if (!owner.Issue.AlternativeSolutionCondition(out _))
                 throw new InvalidOperationException($"StartOnServerFromClaim: AlternativeSolutionCondition rejected the accept for owner {owner.StringId}");
             if (!DoTroopsSatisfyAlternativeSolution(owner.Issue, validatedRoster, out _))
                 throw new InvalidOperationException($"StartOnServerFromClaim: the validated roster does not satisfy the alternative solution requirement for owner {owner.StringId}");
+
+            if (owner.Issue is ArtisanCantSellProductsAtAFairPriceIssueBehavior.ArtisanCantSellProductsAtAFairPriceIssue)
+            {
+                var companions = validatedRoster.GetTroopRoster().Where(element => element.Character.IsHero).ToArray();
+                if (companions.Length != 1 || companions[0].Number != 1)
+                    throw new InvalidOperationException("Artisan alternative requires one companion");
+                var companion = companions[0].Character.HeroObject;
+                if (companion == Hero.MainHero || companion.PartyBelongedTo != MobileParty.MainParty ||
+                    !companion.CanHaveCampaignIssues() || companion.IsWounded || companion.IsPregnant)
+                    throw new InvalidOperationException("Artisan alternative companion is no longer eligible");
+            }
 
             RemoveFromTrueOwnerParty(validatedRoster);
 
@@ -93,7 +111,8 @@ public static class AlternativeSolutionStartRunner
         if (!objectManager.TryGetObjectWithLogging<Hero>(truePlayer.HeroId, out var trueOwnerHero))
             throw new InvalidOperationException($"ResolveOwnerScope: could not resolve true owner Hero {truePlayer.HeroId}");
 
-        objectManager.TryGetObjectWithLogging<MobileParty>(truePlayer.MobilePartyId, out var trueOwnerParty);
+        if (!objectManager.TryGetObjectWithLogging<MobileParty>(truePlayer.MobilePartyId, out var trueOwnerParty))
+            throw new InvalidOperationException($"ResolveOwnerScope: could not resolve true owner party {truePlayer.MobilePartyId}");
 
         return new MainHeroSubstitutionScope(trueOwnerHero, trueOwnerParty);
     }

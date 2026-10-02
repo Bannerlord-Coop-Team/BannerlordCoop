@@ -1,4 +1,4 @@
-using Common;
+﻿using Common;
 using Common.Messaging;
 using GameInterface.Policies;
 using GameInterface.Services.Issues.Generic;
@@ -42,6 +42,8 @@ internal class IssueFinalizedOwnershipGatePatch
     [HarmonyPrefix]
     internal static bool Prefix(IssueBase __instance)
     {
+        if (__instance is ArtisanCantSellProductsAtAFairPriceIssueBehavior.ArtisanCantSellProductsAtAFairPriceIssue &&
+            __instance.IssueOwner?.Issue != __instance) return false;
         if (!DisableAllIssueBehaviorsExceptAllowlist.IsAllowlisted(__instance)) return true;
 
         return IssueFinalizeAuthorityGuard.IsActive || CallOriginalPolicy.IsOriginalAllowedForOwnershipGate();
@@ -91,8 +93,10 @@ internal class IssueExpiryFinalizeAuthorityPatch
 internal class IssueFinalizedPatches
 {
     [HarmonyPostfix]
-    private static void Postfix(IssueBase __instance)
+    private static void Postfix(IssueBase __instance, bool __runOriginal)
     {
+        if (__instance is ArtisanCantSellProductsAtAFairPriceIssueBehavior.ArtisanCantSellProductsAtAFairPriceIssue &&
+            !__runOriginal) return;
         var owner = __instance.IssueOwner;
         var reason = IssueFinalizeReason.IssueOnly;
         if (owner != null && IssueManagerQuestCompletedReasonCapture.PendingReasons.TryGetValue(owner, out var pending))

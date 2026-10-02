@@ -1,9 +1,10 @@
-using Common;
+﻿using Common;
 using Common.Logging;
 using Common.Messaging;
 using Common.Network;
 using Common.Util;
 using System;
+using System.Linq;
 using GameInterface.Services.Entity;
 using GameInterface.Services.Heroes.Patches;
 using GameInterface.Services.Issues.Generic;
@@ -371,8 +372,10 @@ internal class GenericQuestTypeAcceptHandler : IHandler
 
             AlternativeSolutionVanillaState state;
             byte[] fieldsBytes = null;
+            Action rollback = null;
             try
             {
+                rollback = CaptureAlternativeRollback(owner, player, validatedRoster);
                 state = AlternativeSolutionStartRunner.StartOnServerFromClaim(owner, player, validatedRoster);
 
                 if (descriptor.TryArbitrateAlternativeAcceptBytes != null)
@@ -380,7 +383,7 @@ internal class GenericQuestTypeAcceptHandler : IHandler
                     var (accepted, bytes) = descriptor.TryArbitrateAlternativeAcceptBytes(owner, _ => true);
                     if (!accepted)
                     {
-                        RollbackFailedAlternativeAcceptStart(owner, player.ControllerId);
+                        rollback();
                         network.Send(requester, new NetworkQuestTypeAcceptRejected(ownerId, isAlternative: true));
                         return;
                     }
@@ -391,7 +394,7 @@ internal class GenericQuestTypeAcceptHandler : IHandler
             {
                 Logger.Error(e, "Failed to start {Message} for owner {Owner} after troop validation - rolling back",
                     nameof(RequestQuestTypeAcceptAlternative), ownerId);
-                RollbackFailedAlternativeAcceptStart(owner, player.ControllerId);
+                rollback?.Invoke();
                 network.Send(requester, new NetworkQuestTypeAcceptRejected(ownerId, isAlternative: true));
                 return;
             }
@@ -414,6 +417,74 @@ internal class GenericQuestTypeAcceptHandler : IHandler
             objectManager.TryGetObjectWithLogging<MobileParty>(player.MobilePartyId, out var party)
             ? troopValidator.Validate(claimedRoster, party.MemberRoster, preserveTroopXp: true)
             : TroopRoster.CreateDummyTroopRoster();
+    }
+
+    private Action CaptureAlternativeRollback(Hero giver, Player player, TroopRoster selection)
+    {
+        if (giver.Issue is not ArtisanCantSellProductsAtAFairPriceIssueBehavior.ArtisanCantSellProductsAtAFairPriceIssue issue)
+            return () => RollbackFailedAlternativeAcceptStart(giver, player.ControllerId);
+        if (!objectManager.TryGetObjectWithLogging<Hero>(player.HeroId, out var hero) ||
+            !objectManager.TryGetObjectWithLogging<MobileParty>(player.MobilePartyId, out var party))
+            throw new InvalidOperationException("Artisan alternative owner is unavailable");
+
+        var partyBefore = party.MemberRoster.GetTroopRoster().ToArray();
+        var sentBefore = issue.AlternativeSolutionSentTroops.GetTroopRoster().ToArray();
+        var heroes = selection.GetTroopRoster().Where(element => element.Character.IsHero)
+            .ToDictionary(element => element.Character.HeroObject, element => element.Character.HeroObject.HeroState);
+        var state = issue._issueState;
+        var dueTime = issue.IssueDueTime;
+        var tried = issue.IsTriedToSolveBefore;
+        var difficulty = issue._issueDifficultyMultiplier;
+        var logs = issue.JournalEntries.ToArray();
+        var alternative = AlternativeSolutionVanillaStateSync.Capture(issue);
+        var skill = issue._companionRewardSkill;
+        var journals = Campaign.Current.GetCampaignBehavior<TaleWorlds.CampaignSystem.CampaignBehaviors.JournalLogsCampaignBehavior>();
+        var history = journals?.GetRelatedLog(issue);
+        var historyStatus = history?._lastIssueStatus ?? IssueBase.IssueUpdateDetails.None;
+        return () =>
+        {
+            if (giver.Issue != issue) return;
+            using (new MainHeroSubstitutionScope(hero, party))
+            {
+                var partySnapshot = TroopRoster.CreateDummyTroopRoster();
+                var sentSnapshot = TroopRoster.CreateDummyTroopRoster();
+                foreach (var element in partyBefore) partySnapshot.Add(element);
+                foreach (var element in sentBefore) sentSnapshot.Add(element);
+                // Apply inverse deltas with server patches live, including any partial removal before an exception.
+                if (!troopRosterInterface.TryApplyTroopRosterDeltas(new[]
+                {
+                    (issue.AlternativeSolutionSentTroops, troopRosterInterface.PackTroopRosterDelta(sentSnapshot, issue.AlternativeSolutionSentTroops)),
+                    (party.MemberRoster, troopRosterInterface.PackTroopRosterDelta(partySnapshot, party.MemberRoster)),
+                })) throw new InvalidOperationException("Failed to restore artisan alternative troops");
+                foreach (var entry in heroes)
+                    if (entry.Key.HeroState != entry.Value) entry.Key.ChangeState(entry.Value);
+                issue._issueState = state;
+                issue.IssueDueTime = dueTime;
+                issue.IsTriedToSolveBefore = tried;
+                issue._issueDifficultyMultiplier = difficulty;
+                issue.AlternativeSolutionReturnTimeForTroops = alternative.ReturnTime;
+                issue.AlternativeSolutionIssueEffectClearTime = alternative.EffectClearTime;
+                issue._failureChance = alternative.FailureChance;
+                issue._alternativeSolutionCasualtyCount = alternative.CasualtyCount;
+                issue._totalTroopXpAmount = alternative.TotalTroopXpAmount;
+                issue._companionRewardSkill = skill;
+                var addedLogs = issue.JournalEntries.Except(logs).ToArray();
+                issue._journalEntries.Clear();
+                issue._journalEntries.AddRange(logs);
+                if (history != null) history.Update(journals.GetEntries(issue), historyStatus);
+                else
+                {
+                    var failedHistory = journals?.GetRelatedLog(issue);
+                    if (failedHistory != null) Campaign.Current.LogEntryHistory._logs.Remove(failedHistory);
+                }
+                var tracker = Campaign.Current.GetCampaignBehavior<TaleWorlds.CampaignSystem.CampaignBehaviors.ViewDataTrackerCampaignBehavior>();
+                if (tracker != null)
+                {
+                    tracker._unExaminedQuestLogs.RemoveAll(log => addedLogs.Contains(log));
+                    tracker._isUnExaminedQuestLogJournalEntriesDirty = true;
+                }
+            }
+        };
     }
 
     private void Handle_NetworkQuestTypeAlternativeAccepted(MessagePayload<NetworkQuestTypeAlternativeAccepted> payload)
