@@ -129,16 +129,23 @@ internal static class ScoutEnemyGarrisonsStartPatch
     [ThreadStatic] internal static bool SuppressConversationEnd;
 
     [HarmonyPrefix]
-    private static void Prefix(QuestBase __instance, out bool __state)
+    internal static void Prefix(QuestBase __instance, out bool __state)
     {
         __state = SuppressConversationEnd;
-        if (__instance is Quest)
-            SuppressConversationEnd = ModInformation.IsServer ||
-                !ContainerProvider.TryResolve<IScoutEnemyGarrisonsQuestState>(out var state) || !state.IsVisible(__instance);
+        if (__instance is not Quest) return;
+        SuppressConversationEnd = true;
+        if (ModInformation.IsClient && ContainerProvider.TryResolve<IScoutEnemyGarrisonsQuestState>(out var state) &&
+            state.IsVisible(__instance) && state.PendingAcceptance?.IssueQuest == __instance)
+        {
+            var conversation = Campaign.Current.ConversationManager;
+            SuppressConversationEnd = !conversation.IsConversationInProgress ||
+                conversation.OneToOneConversationHero != __instance.QuestGiver ||
+                conversation.ActiveToken != conversation.GetStateIndex("issue_classic_quest_start");
+        }
     }
 
     [HarmonyFinalizer]
-    private static void Finalizer(bool __state) => SuppressConversationEnd = __state;
+    internal static void Finalizer(bool __state) => SuppressConversationEnd = __state;
 }
 
 [HarmonyPatch(typeof(MapEventHelper), nameof(MapEventHelper.OnConversationEnd))]

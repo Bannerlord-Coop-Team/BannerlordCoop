@@ -183,6 +183,22 @@ public class ScoutEnemyGarrisonsTests : IDisposable
         }
     }
 
+    [Fact]
+    public void OwnerAcceptanceAfterItsConversationClosedCannotLeaveTheCurrentEncounter()
+    {
+        var quest = NewQuest("late-acceptance");
+        Remember(quest, "player-A");
+        ScoutEnemyGarrisonsStartPatch.Prefix(quest, out var previous);
+        try
+        {
+            Assert.False(ScoutEnemyGarrisonsEncounterPatch.Prefix());
+        }
+        finally
+        {
+            ScoutEnemyGarrisonsStartPatch.Finalizer(previous);
+        }
+    }
+
     [Theory]
     [InlineData(false)]
     [InlineData(true)]
