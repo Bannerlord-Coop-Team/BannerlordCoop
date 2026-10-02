@@ -1,4 +1,11 @@
-﻿using Common.Util;
+﻿using Common;
+using Coop.Core.Server.Connections;
+using Coop.Core.Server.Connections.Messages;
+using Coop.Core.Server.Connections.States;
+using GameInterface.Services.Modules;
+using GameInterface.Services.Modules.Validators;
+using Moq;
+using Common.Util;
 using Common.Messaging;
 using E2E.Tests.Environment;
 using E2E.Tests.Environment.Instance;
@@ -310,6 +317,112 @@ public class SmugglersOwnershipTests : SyncTestBase
         });
         foreach (var client in Clients) client.PumpGameThread();
         Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkQuestPlayerRemoved>());
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void MissingHeroValidationCancelsOldCommitmentOnGameThreadBeforeCharacterCreation(bool alternative)
+    {
+        var fixture = CreateIssue();
+        var player = RegisterPlayer(Clients.First(), "missing-owner");
+        var other = RegisterPlayer(Clients.Last(), "surviving-owner");
+        if (!alternative) SetupDirectQuest(fixture, player);
+        var companionId = TestEnvironment.CreateRegisteredObject<Hero>();
+        var replacementPartyId = TestEnvironment.CreateRegisteredObject<MobileParty>();
+        Server.Call(() =>
+        {
+            var giver = Get<Hero>(Server, fixture.Giver);
+            var companion = Get<Hero>(Server, companionId);
+            using (new AllowedThread())
+            {
+                var returns = TroopRoster.CreateDummyTroopRoster();
+                returns.AddToCounts(companion.CharacterObject, 1);
+                companion.ChangeState(Hero.CharacterStates.Disabled);
+                if (alternative)
+                {
+                    giver.Issue._issueState = IssueBase.IssueState.SolvingWithAlternativeSolution;
+                    giver.Issue.AlternativeSolutionSentTroops.Add(returns);
+                }
+                else
+                    Server.Resolve<IAwaitingAlternativeSolutionTroopsRegistry>().Deposit(player.ControllerId, returns);
+            }
+            Server.Resolve<IIssueOwnershipRegistry>().SetOwner(giver, player.ControllerId);
+            Assert.True(Server.ObjectManager.Remove(Get<Hero>(Server, player.HeroId)));
+            Assert.True(Server.ObjectManager.Remove(Get<MobileParty>(Server, player.MobilePartyId)));
+            var notifications = new List<Hero>();
+            CampaignEvents.OnIssueUpdatedEvent.AddNonSerializedListener(notifications, (issue, detail, solver) =>
+            {
+                if (issue.IssueOwner != giver || detail != IssueBase.IssueUpdateDetails.IssueCancel) return;
+                Assert.True(GameThread.Instance.IsGameThread);
+                notifications.Add(solver);
+            });
+            var connection = new Mock<IConnectionLogic>();
+            connection.SetupGet(value => value.Peer).Returns(Clients.First().NetPeer);
+            var validationNetwork = new Mock<INetwork>();
+            using var state = new ResolveCharacterState(connection.Object, Server.Resolve<IMessageBroker>(), validationNetwork.Object,
+                Mock.Of<IModuleValidator>(), Server.Resolve<IPlayerManager>(), Mock.Of<IPlayerPartyRestorer>(),
+                Server.ObjectManager, Mock.Of<IModuleInfoProvider>(), Mock.Of<IExistingPlayerSender>(),
+                Mock.Of<ISteamBanList>(), Mock.Of<IJoinValidationDenialLog>());
+            var validation = Task.Run(() => state.Handle_ClientValidate(new MessagePayload<NetworkClientValidate>(
+                Clients.First().NetPeer, new NetworkClientValidate(player.ControllerId))));
+            Assert.True(SpinWait.SpinUntil(() =>
+            {
+                GameThread.Instance.Update(TimeSpan.Zero);
+                return validation.IsCompleted;
+            }, TimeSpan.FromSeconds(10)));
+            validation.GetAwaiter().GetResult();
+            connection.Verify(value => value.CreateCharacter(), Times.Once);
+            validationNetwork.Verify(value => value.SendImmediate(Clients.First().NetPeer,
+                It.Is<NetworkClientValidated>(message => !message.HeroExists && message.Player == null)), Times.Once);
+            Assert.Null(Assert.Single(notifications));
+            Assert.Null(giver.Issue);
+            Assert.False(Server.Resolve<IPlayerManager>().TryGetPlayer(player.ControllerId, out _));
+            Assert.True(Server.Resolve<IPlayerManager>().TryGetPlayer(other.ControllerId, out _));
+            Assert.False(Server.Resolve<IIssueOwnershipRegistry>().TryGetOwnerControllerId(giver, out _));
+            Assert.False(Server.Resolve<IAwaitingAlternativeSolutionTroopsRegistry>().TryGet(player.ControllerId, out _));
+            Assert.True(companion.IsActive);
+            Assert.Equal(0, Get<MobileParty>(Server, other.MobilePartyId).MemberRoster.GetTroopCount(companion.CharacterObject));
+            var replacement = Get<MobileParty>(Server, replacementPartyId);
+            Assert.True(Server.ObjectManager.TryGetId(replacement.LeaderHero, out var heroId));
+            Assert.True(Server.ObjectManager.TryGetId(replacement.LeaderHero.Clan, out var clanId));
+            Assert.True(Server.ObjectManager.TryGetId(replacement.LeaderHero.CharacterObject, out var characterId));
+            Assert.True(Server.Resolve<IPlayerManager>().AddPlayer(new Player(player.ControllerId, heroId, replacementPartyId, clanId, characterId)));
+            Campaign.Current.IssueManager.DailyTick();
+            Assert.Equal(0, replacement.MemberRoster.GetTroopCount(companion.CharacterObject));
+            Assert.False(Server.Resolve<IAwaitingAlternativeSolutionTroopsRegistry>().TryGet(player.ControllerId, out _));
+        });
+        foreach (var client in Clients) client.PumpGameThread();
+        Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkQuestPlayerRemoved>());
+        Assert.Empty(Server.NetworkSentMessages.GetMessages<NetworkQuestTraitProgress>());
+    }
+
+    [Fact]
+    public void QueuedRemovalThatLosesToRegistrationReplacementDoesNotCancelItsQuest()
+    {
+        var fixture = CreateIssue();
+        var player = RegisterPlayer(Clients.First(), "replaced-owner");
+        SetupDirectQuest(fixture, player);
+        Server.Call(() =>
+        {
+            var players = Server.Resolve<IPlayerManager>();
+            var removal = Task.Run(() => players.RemovePlayer(player));
+            Assert.True(SpinWait.SpinUntil(() => Server.PendingGameThreadActionCount > 0 || removal.IsCompleted,
+                TimeSpan.FromSeconds(10)));
+            var replacement = new Player(player.ControllerId, player.HeroId, player.MobilePartyId, player.ClanId, player.CharacterObjectId);
+            Assert.True(players.ReplacePlayer(player, replacement));
+            Assert.True(SpinWait.SpinUntil(() =>
+            {
+                GameThread.Instance.Update(TimeSpan.Zero);
+                return removal.IsCompleted;
+            }, TimeSpan.FromSeconds(10)));
+            Assert.False(removal.GetAwaiter().GetResult());
+            Assert.True(players.TryGetPlayer(player.ControllerId, out var current));
+            Assert.Same(replacement, current);
+            Assert.True(Get<Hero>(Server, fixture.Giver).Issue.IssueQuest.IsOngoing);
+        });
+        Assert.Empty(Server.NetworkSentMessages.GetMessages<NetworkQuestPlayerRemoved>());
+        Assert.Empty(Server.NetworkSentMessages.GetMessages<NetworkIssueRemoved>());
     }
 
     [Fact]

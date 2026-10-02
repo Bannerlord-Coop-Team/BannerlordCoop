@@ -248,3 +248,18 @@ internal class SmugglersIssueCancellationPatch
     [HarmonyFinalizer]
     private static void Finalizer(IDisposable __state) => __state?.Dispose();
 }
+
+[HarmonyPatch(typeof(CampaignEventDispatcher), nameof(CampaignEventDispatcher.OnIssueUpdated))]
+internal class SmugglersRemovedOwnerCancellationPatch
+{
+    [HarmonyPrefix]
+    private static void Prefix(IssueBase issue, IssueBase.IssueUpdateDetails details, ref Hero issueSolver)
+    {
+        if (ModInformation.IsServer && IssueFinalizeAuthorityGuard.IsActive
+            && issue is SmugglersIssueBehavior.SmugglersIssue && details == IssueBase.IssueUpdateDetails.IssueCancel
+            && ContainerProvider.TryResolve<IIssueOwnershipRegistry>(out var ownership)
+            && ownership.TryGetOwnerControllerId(issue.IssueOwner, out var controller)
+            && ContainerProvider.TryResolve<IPlayerManager>(out var players) && !players.TryGetPlayer(controller, out _))
+            issueSolver = null;
+    }
+}

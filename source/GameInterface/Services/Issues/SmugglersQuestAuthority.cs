@@ -22,7 +22,7 @@ internal interface ISmugglersQuestAuthority
     bool TryOpenOwnerScope(Hero issueGiver, out IDisposable scope);
     bool IsLocalOwner(QuestBase quest);
     void OnPlayerReplaced(Player previous, Player replacement);
-    void OnPlayerRemoving(Player player);
+    void OnPlayerRemoved(Player player);
 }
 
 internal sealed class SmugglersQuestAuthority : ISmugglersQuestAuthority
@@ -68,7 +68,7 @@ internal sealed class SmugglersQuestAuthority : ISmugglersQuestAuthority
         owners.ReplacePlayer(oldHero, newHero);
     }
 
-    public void OnPlayerRemoving(Player player)
+    public void OnPlayerRemoved(Player player)
     {
         if (ModInformation.IsClient) return;
         var issues = Campaign.Current.IssueManager.Issues.Values
@@ -78,9 +78,8 @@ internal sealed class SmugglersQuestAuthority : ISmugglersQuestAuthority
         objectManager.TryGetObject<MobileParty>(player.MobilePartyId, out var party);
         if (issues.Length > 0)
         {
-            if (!objectManager.TryGetObjectWithLogging<Hero>(player.HeroId, out var hero))
-                throw new InvalidOperationException("Cannot remove a Smugglers owner before its quests can be canceled");
-            using (new OwnerScope(hero, party))
+            objectManager.TryGetObject<Hero>(player.HeroId, out var hero);
+            using (IDisposable scope = hero != null ? new OwnerScope(hero, party) : new IssueFinalizeAuthorityGuard())
             {
                 foreach (var issue in issues)
                 {
