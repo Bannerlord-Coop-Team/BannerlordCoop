@@ -34,13 +34,18 @@ internal static class LordWantsRivalCapturedQuestType
         public void MirrorQuestAccepted(Hero owner, RivalCapturedAcceptFields fields) =>
             Service.MirrorQuestAccepted(owner, fields);
 
-        public void RejectAcceptance(Hero owner) { }
+        public void RejectAcceptance(Hero owner) => Service.RejectAcceptance(owner);
     }
 
     static LordWantsRivalCapturedQuestType()
     {
         QuestTypeRegistry.Register(QuestDescriptorBuilder.For<Issue, Quest>("LordWantsRivalCaptured")
             .WithQuestSolutionAccept(new AcceptMirror())
+            .WithQuestSolutionAcceptTrigger((giver, _) =>
+            {
+                if (ContainerProvider.TryResolve<ILordWantsRivalCapturedQuestService>(out var service))
+                    service.PrepareAcceptance(giver);
+            })
             .WithCreationTrigger(issue => MessageBroker.Instance.Publish(issue, new RivalCapturedIssueCreated(issue)))
             .Build());
     }

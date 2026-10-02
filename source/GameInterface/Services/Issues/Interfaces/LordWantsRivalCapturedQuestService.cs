@@ -32,7 +32,9 @@ internal interface ILordWantsRivalCapturedQuestService
 {
     void BroadcastCreation(Issue issue);
     void MirrorCreation(NetworkRivalCapturedIssueCreated data);
+    void PrepareAcceptance(Hero giver);
     void ReplayQuestAccepted(Hero giver);
+    void RejectAcceptance(Hero giver);
     bool TryCaptureQuestFields(Hero giver, out RivalCapturedAcceptFields fields);
     void MirrorQuestAccepted(Hero giver, RivalCapturedAcceptFields fields);
     bool TryEnterOwnerScope(Quest quest, out IDisposable scope);
@@ -44,6 +46,8 @@ internal interface ILordWantsRivalCapturedQuestService
     void SendProgress(Quest quest);
     void MirrorProgress(NetworkRivalCapturedProgress data);
     void MirrorTraitProgress(NetworkRivalCapturedTraitProgress data);
+    void RequestTraitChange(int honorXp);
+    void ApplyTraitProgress(Player player, RequestRivalCapturedTraitProgress data);
     void RestoreLocalTraitProgress(Hero hero);
     void CancelPlayerQuests(string controllerId);
     void CheckCancellation(Quest quest, bool causedByPlayer);
@@ -110,7 +114,9 @@ internal sealed class LordWantsRivalCapturedQuestService : ILordWantsRivalCaptur
     public void ReplayQuestAccepted(Hero giver)
     {
         if (giver?.Issue is not Issue issue || !issue.IsOngoingWithoutQuest ||
-            !issue.CheckPreconditions(giver, out _)) return;
+            !issue.CheckPreconditions(giver, out _) || !TryGetCurrentPlayer(out _) ||
+            !generations.TryGetGeneration(giver, out _) ||
+            !GangLeaderNeedsToOffloadStolenGoodsQuestType.OwnerTraitXpProgress.TryGet(Hero.MainHero, out _)) return;
 
         using (new IssueDispatchReplayGuard())
         {
@@ -118,6 +124,12 @@ internal sealed class LordWantsRivalCapturedQuestService : ILordWantsRivalCaptur
             if (issue.IssueQuest is Quest quest && !quest.IsOngoing)
                 quest.QuestAcceptedConsequences();
         }
+    }
+
+    public void RejectAcceptance(Hero giver)
+    {
+        if (giver?.Issue?.IssueQuest is not Quest || ownership.TryGetOwnerControllerId(giver, out _)) return;
+        using (new IssueFinalizeAuthorityGuard()) giver.Issue.CompleteIssueWithCancel();
     }
 
     public bool TryCaptureQuestFields(Hero giver, out RivalCapturedAcceptFields fields)
@@ -159,8 +171,14 @@ internal sealed class LordWantsRivalCapturedQuestService : ILordWantsRivalCaptur
     {
         scope = null;
         if (!ownership.TryGetOwnerControllerId(quest.QuestGiver, out var controllerId) ||
-            !playerManager.TryGetPlayer(controllerId, out var player) ||
-            !objectManager.TryGetObjectWithLogging<Hero>(player.HeroId, out var hero) ||
+            !playerManager.TryGetPlayer(controllerId, out var player)) return false;
+        return TryEnterOwnerScope(player, out scope);
+    }
+
+    private bool TryEnterOwnerScope(Player player, out IDisposable scope)
+    {
+        scope = null;
+        if (!objectManager.TryGetObjectWithLogging<Hero>(player.HeroId, out var hero) ||
             !objectManager.TryGetObjectWithLogging<MobileParty>(player.MobilePartyId, out var party)) return false;
 
         scope = new OwnerScope(hero, party, xp => SendTraitProgress(player, xp));
@@ -187,10 +205,6 @@ internal sealed class LordWantsRivalCapturedQuestService : ILordWantsRivalCaptur
                 ownerTraitProgress = new PropertyOwner<PropertyObject>();
                 progress.Set(hero, ownerTraitProgress);
             }
-            if (!ownerTraitProgress.GetProperties().Contains(DefaultTraits.Honor))
-                ownerTraitProgress.SetPropertyValue(DefaultTraits.Honor,
-                    Campaign.Current.Models.CharacterDevelopmentModel.GetTraitXpRequiredForTraitLevel(
-                        DefaultTraits.Honor, hero.GetTraitLevel(DefaultTraits.Honor)));
             previousHonorXp = ownerTraitProgress.GetPropertyValue(DefaultTraits.Honor);
             heroScope = new MainHeroSubstitutionScope(hero, party);
             authority = new IssueFinalizeAuthorityGuard();
@@ -351,6 +365,59 @@ internal sealed class LordWantsRivalCapturedQuestService : ILordWantsRivalCaptur
     {
         if (!objectManager.TryGetObjectWithLogging<Hero>(data.HeroId, out var hero) || hero != Hero.MainHero) return;
         Campaign.Current.PlayerTraitDeveloper.SetPropertyValue(DefaultTraits.Honor, data.HonorXp);
+        StoreHonorProgress(hero, data.HonorXp);
+    }
+
+    public void PrepareAcceptance(Hero giver)
+    {
+        if (ModInformation.IsServer || giver?.Issue is not Issue || !giver.Issue.IsOngoingWithoutQuest) return;
+        RequestTraitProgress(giver, Campaign.Current.PlayerTraitDeveloper.GetPropertyValue(DefaultTraits.Honor), true);
+    }
+
+    public void RequestTraitChange(int honorXp)
+    {
+        var quest = Campaign.Current.QuestManager.Quests.OfType<Quest>()
+            .FirstOrDefault(candidate => candidate.IsOngoing && ownership.IsLocalPeerOwner(candidate.QuestGiver));
+        if (quest != null) RequestTraitProgress(quest.QuestGiver, honorXp, false);
+    }
+
+    private void RequestTraitProgress(Hero giver, int honorXp, bool isBaseline)
+    {
+        if (!objectManager.TryGetIdWithLogging(giver, out var giverId) ||
+            !objectManager.TryGetIdWithLogging(Hero.MainHero, out var heroId) ||
+            !generations.TryGetGeneration(giver, out var generation)) return;
+        StoreHonorProgress(Hero.MainHero, Campaign.Current.PlayerTraitDeveloper.GetPropertyValue(DefaultTraits.Honor));
+        network.SendAll(new RequestRivalCapturedTraitProgress(giverId, generation, honorXp, isBaseline, heroId));
+    }
+
+    public void ApplyTraitProgress(Player player, RequestRivalCapturedTraitProgress data)
+    {
+        if (data.HeroId != player.HeroId ||
+            !objectManager.TryGetObjectWithLogging<Hero>(player.HeroId, out var hero)) return;
+
+        if (data.IsBaseline)
+        {
+            if (objectManager.TryGetObjectWithLogging<Hero>(data.GiverId, out var giver) && giver.Issue is Issue issue &&
+                generations.TryGetGeneration(giver, out var generation) && generation == data.Generation &&
+                issue.IsOngoingWithoutQuest && IsPresentWithGiver(player.ControllerId, giver))
+                StoreHonorProgress(hero, data.HonorXp);
+            return;
+        }
+
+        // A personal XP change can already be in flight when its quest ends.
+        if (!TryEnterOwnerScope(player, out var scope)) return;
+        using (scope) TraitLevelingHelper.AddTraitXp(DefaultTraits.Honor, data.HonorXp);
+    }
+
+    private void StoreHonorProgress(Hero hero, int honorXp)
+    {
+        var registry = GangLeaderNeedsToOffloadStolenGoodsQuestType.OwnerTraitXpProgress;
+        if (!registry.TryGet(hero, out var progress))
+        {
+            progress = new PropertyOwner<PropertyObject>();
+            registry.Set(hero, progress);
+        }
+        progress.SetPropertyValue(DefaultTraits.Honor, honorXp);
     }
 
     public void RestoreLocalTraitProgress(Hero hero)

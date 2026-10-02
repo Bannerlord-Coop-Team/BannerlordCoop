@@ -133,3 +133,22 @@ internal readonly struct NetworkRivalCapturedTraitProgress : IServerToClientComm
         HonorXp = honorXp;
     }
 }
+
+[ProtoContract(SkipConstructor = true)]
+internal readonly struct RequestRivalCapturedTraitProgress : ICommand
+{
+    [ProtoMember(1)] public readonly string GiverId;
+    [ProtoMember(2)] public readonly int Generation;
+    [ProtoMember(3)] public readonly int HonorXp;
+    [ProtoMember(4)] public readonly bool IsBaseline;
+    [ProtoMember(5)] public readonly string HeroId;
+
+    public RequestRivalCapturedTraitProgress(string giverId, int generation, int honorXp, bool isBaseline, string heroId)
+    {
+        GiverId = giverId;
+        Generation = generation;
+        HonorXp = honorXp;
+        IsBaseline = isBaseline;
+        HeroId = heroId;
+    }
+}

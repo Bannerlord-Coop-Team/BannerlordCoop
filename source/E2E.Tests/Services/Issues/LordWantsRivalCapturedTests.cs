@@ -424,4 +424,119 @@ public sealed class LordWantsRivalCapturedTests : IDisposable
         Client.Call(() => Assert.Equal(-50, Campaign.Current.PlayerTraitDeveloper.GetPropertyValue(DefaultTraits.Honor)));
         OtherClient.Call(() => Assert.Equal(otherXp, Campaign.Current.PlayerTraitDeveloper.GetPropertyValue(DefaultTraits.Honor)));
     }
+
+    [Fact]
+    public void HonorChangesPreserveTheOwnersExistingXpAndRestoreTheLatestReceivedValue()
+    {
+        foreach (var instance in Instances)
+        {
+            instance.Call(() =>
+            {
+                using (new AllowedThread()) Get<Hero>(instance, playerId).SetTraitLevel(DefaultTraits.Honor, 1);
+                var saved = new PropertyOwner<PropertyObject>();
+                saved.SetPropertyValue(DefaultTraits.Calculating, 37);
+                GangLeaderNeedsToOffloadStolenGoodsQuestType.OwnerTraitXpProgress.Set(Get<Hero>(instance, playerId), saved);
+            });
+        }
+        Client.Call(() => Campaign.Current.PlayerTraitDeveloper.SetPropertyValue(DefaultTraits.Honor, 1500));
+        var otherXp = 0;
+        OtherClient.Call(() => otherXp = Campaign.Current.PlayerTraitDeveloper.GetPropertyValue(DefaultTraits.Honor));
+        Accept();
+
+        Server.Call(() =>
+        {
+            var shared = Campaign.Current.PlayerTraitDeveloper;
+            var sharedXp = shared.GetPropertyValue(DefaultTraits.Honor);
+            Assert.True(Server.Resolve<ILordWantsRivalCapturedQuestService>().TryEnterOwnerScope(GetQuest(Server), out var scope));
+            using (scope)
+            {
+                Assert.Equal(1500, Campaign.Current.PlayerTraitDeveloper.GetPropertyValue(DefaultTraits.Honor));
+                TraitLevelingHelper.OnIssueFailed(Get<Hero>(Server, giverId),
+                    new[] { Tuple.Create(DefaultTraits.Honor, -50) });
+            }
+            Assert.Same(shared, Campaign.Current.PlayerTraitDeveloper);
+            Assert.Equal(sharedXp, shared.GetPropertyValue(DefaultTraits.Honor));
+        });
+        Client.Call(() =>
+        {
+            Assert.Equal(1450, Campaign.Current.PlayerTraitDeveloper.GetPropertyValue(DefaultTraits.Honor));
+            TraitLevelingHelper.OnIssueSolvedThroughQuest(Get<Hero>(Client, giverId), DefaultTraits.Honor, 20);
+        });
+        foreach (var instance in new[] { Server, Client })
+        {
+            instance.Call(() =>
+            {
+                Assert.True(GangLeaderNeedsToOffloadStolenGoodsQuestType.OwnerTraitXpProgress
+                    .TryGet(Get<Hero>(instance, playerId), out var saved));
+                Assert.Equal(1470, saved.GetPropertyValue(DefaultTraits.Honor));
+                Assert.Equal(37, saved.GetPropertyValue(DefaultTraits.Calculating));
+            });
+        }
+        Client.Call(() =>
+        {
+            var player = Get<Hero>(Client, playerId);
+            Campaign.Current.PlayerTraitDeveloper = new PropertyOwner<PropertyObject>();
+            using (CallOriginalPolicy.AllowOriginalsForCurrentOperation())
+                Campaign.Current.QuestManager.OnPlayerCharacterChanged(player, player, Get<MobileParty>(Client, partyId), false);
+            Assert.Equal(1470, Campaign.Current.PlayerTraitDeveloper.GetPropertyValue(DefaultTraits.Honor));
+            Assert.True(GetQuest(Client).IsOngoing);
+        });
+        OtherClient.Call(() => Assert.Equal(otherXp, Campaign.Current.PlayerTraitDeveloper.GetPropertyValue(DefaultTraits.Honor)));
+    }
+
+    [Fact]
+    public void HonorBaselineRejectsStaleGenerationsAndQueuedDeltasKeepTheirPlayerIdentityAfterCompletion()
+    {
+        var generation = 0;
+        Server.Call(() => Assert.True(Server.Resolve<IIssueGenerationRegistry>()
+            .TryGetGeneration(Get<Hero>(Server, giverId), out generation)));
+        Server.SimulateMessage(Client.NetPeer, new RequestRivalCapturedTraitProgress(giverId, generation - 1, 900, true, playerId));
+        Server.Call(() => Assert.False(GangLeaderNeedsToOffloadStolenGoodsQuestType.OwnerTraitXpProgress
+            .TryGet(Get<Hero>(Server, playerId), out _)));
+        Accept();
+        Server.SimulateMessage(Client.NetPeer, new RequestRivalCapturedTraitProgress(giverId, generation, 900, true, playerId));
+        Server.SimulateMessage(Client.NetPeer, new RequestRivalCapturedTraitProgress(giverId, generation, 900, false, targetId));
+        Server.SimulateMessage(OtherClient.NetPeer, new RequestRivalCapturedTraitProgress(giverId, generation, 900, false, playerId));
+        Server.Call(() =>
+        {
+            Assert.True(GangLeaderNeedsToOffloadStolenGoodsQuestType.OwnerTraitXpProgress
+                .TryGet(Get<Hero>(Server, playerId), out var saved));
+            Assert.Equal(0, saved.GetPropertyValue(DefaultTraits.Honor));
+            GetQuest(Server).CompleteQuestWithTimeOut();
+        });
+        Server.SimulateMessage(Client.NetPeer, new RequestRivalCapturedTraitProgress(giverId, generation, 20, false, playerId));
+        Server.Call(() =>
+        {
+            Assert.True(GangLeaderNeedsToOffloadStolenGoodsQuestType.OwnerTraitXpProgress
+                .TryGet(Get<Hero>(Server, playerId), out var saved));
+            Assert.Equal(20, saved.GetPropertyValue(DefaultTraits.Honor));
+        });
+        Client.Call(() => Assert.Equal(20, Campaign.Current.PlayerTraitDeveloper.GetPropertyValue(DefaultTraits.Honor)));
+    }
+
+    [Fact]
+    public void RejectedAcceptanceRemovesTheStartedQuestAndItsUnownedIssue()
+    {
+        Client.Call(() => Client.Resolve<ILordWantsRivalCapturedQuestService>().PrepareAcceptance(Get<Hero>(Client, giverId)));
+        Server.Call(() =>
+        {
+            var giver = Get<Hero>(Server, giverId);
+            var strategy = QuestTypeRegistry.Get(giver.Issue).GetQuestSolutionAcceptMirror<RivalCapturedAcceptFields>();
+            Assert.True(Server.Resolve<IPlayerManager>().TryGetPlayer(Controller, out var player));
+            QuestSolutionStartRunner.RunGuarded(player, () =>
+            {
+                strategy.ReplayQuestAccepted(giver);
+                var quest = GetQuest(Server);
+                Assert.True(quest.IsOngoing);
+                Assert.False(Server.Resolve<IIssueOwnershipRegistry>().TryGetOwnerControllerId(giver, out _));
+                strategy.RejectAcceptance(giver);
+                Assert.True(quest.IsFinalized);
+                Assert.DoesNotContain(quest, Campaign.Current.QuestManager.Quests);
+                return true;
+            });
+        });
+        Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkIssueRemoved>());
+        foreach (var instance in Instances)
+            instance.Call(() => Assert.Null(Get<Hero>(instance, giverId).Issue));
+    }
 }

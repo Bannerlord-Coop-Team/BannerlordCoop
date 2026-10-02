@@ -11,9 +11,11 @@ using System.Collections.Generic;
 using System.Reflection;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.CampaignBehaviors;
+using TaleWorlds.CampaignSystem.CharacterDevelopment;
 using TaleWorlds.CampaignSystem.Issues;
 using TaleWorlds.CampaignSystem.MapEvents;
 using TaleWorlds.Localization;
+using TaleWorlds.Core;
 
 namespace GameInterface.Services.Issues.Patches;
 
@@ -48,6 +50,19 @@ internal class RivalCapturedStayAlivePatch
         if (__result && ModInformation.IsServer && !CallOriginalPolicy.IsOriginalAllowedForOwnershipGate() &&
             ContainerProvider.TryResolve<IPlayerManager>(out var players) && players.Contains(__instance.IssueOwner.Clan))
             __result = false;
+    }
+}
+
+[HarmonyPatch(typeof(TraitLevelingHelper), "AddTraitXp")]
+internal class RivalCapturedHonorProgressPatch
+{
+    private static void Prefix(int xpAmount, out int __state) => __state = xpAmount;
+
+    private static void Postfix(TraitObject trait, int __state)
+    {
+        if (ModInformation.IsClient && trait == DefaultTraits.Honor && !CallOriginalPolicy.IsOriginalAllowed() &&
+            ContainerProvider.TryResolve<ILordWantsRivalCapturedQuestService>(out var quests))
+            quests.RequestTraitChange(__state);
     }
 }
 

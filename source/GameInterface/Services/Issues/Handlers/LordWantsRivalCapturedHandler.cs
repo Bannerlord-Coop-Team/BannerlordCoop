@@ -24,6 +24,7 @@ internal sealed class LordWantsRivalCapturedHandler : IHandler
         messageBroker.Subscribe<RequestRivalCapturedChoice>(HandleChoice);
         messageBroker.Subscribe<NetworkRivalCapturedProgress>(HandleProgress);
         messageBroker.Subscribe<NetworkRivalCapturedTraitProgress>(HandleTraitProgress);
+        messageBroker.Subscribe<RequestRivalCapturedTraitProgress>(HandleTraitProgressRequest);
     }
 
     public void Dispose()
@@ -33,6 +34,7 @@ internal sealed class LordWantsRivalCapturedHandler : IHandler
         messageBroker.Unsubscribe<RequestRivalCapturedChoice>(HandleChoice);
         messageBroker.Unsubscribe<NetworkRivalCapturedProgress>(HandleProgress);
         messageBroker.Unsubscribe<NetworkRivalCapturedTraitProgress>(HandleTraitProgress);
+        messageBroker.Unsubscribe<RequestRivalCapturedTraitProgress>(HandleTraitProgressRequest);
     }
 
     private void HandleCreated(MessagePayload<RivalCapturedIssueCreated> payload)
@@ -66,5 +68,15 @@ internal sealed class LordWantsRivalCapturedHandler : IHandler
     {
         if (ModInformation.IsServer) return;
         GameThread.RunSafe(() => quests.MirrorTraitProgress(payload.What));
+    }
+
+    private void HandleTraitProgressRequest(MessagePayload<RequestRivalCapturedTraitProgress> payload)
+    {
+        if (ModInformation.IsClient) return;
+        GameThread.RunSafe(() =>
+        {
+            if (payload.Who is NetPeer peer && playerManager.TryGetPlayer(peer, out var player))
+                quests.ApplyTraitProgress(player, payload.What);
+        });
     }
 }
