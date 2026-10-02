@@ -67,6 +67,21 @@ public class HeadmanHerdReplicaTests
         => WithHerdEnabled(() => ExerciseAcceptance(true, alternativeFailure: completeFirst ? false : null,
             removePlayerAfterAlternative: completeFirst));
 
+    [Theory]
+    [InlineData(false, "hero")]
+    [InlineData(false, "party")]
+    [InlineData(false, "both")]
+    [InlineData(true, "hero")]
+    [InlineData(true, "party")]
+    [InlineData(true, "both")]
+    public void PlayerRemovalWithMissingObjectsStillReleasesCompanions(bool completeFirst, string missingObject)
+        => WithHerdEnabled(() => ExerciseAcceptance(true, alternativeFailure: completeFirst ? false : null,
+            removePlayerAfterAlternative: completeFirst, missingOwnerObject: missingObject));
+
+    [Fact]
+    public void AcceptedCompanionMissionIgnoresALatePickerCancel()
+        => WithHerdEnabled(() => ExerciseAcceptance(true, latePickerCancel: true));
+
     [Fact]
     public void FailedCompanionAcceptanceRestoresThePartyAndUnacceptedIssueOnBothClients()
         => ExerciseAcceptance(true, failAlternativeCapture: true);
@@ -109,7 +124,8 @@ public class HeadmanHerdReplicaTests
     }
 
     private void ExerciseAcceptance(bool alternative, bool? reject = null, bool? alternativeFailure = null,
-        bool failAlternativeCapture = false, string? staleCompanion = null, bool? removePlayerAfterAlternative = null)
+        bool failAlternativeCapture = false, string? staleCompanion = null, bool? removePlayerAfterAlternative = null,
+        string? missingOwnerObject = null, bool latePickerCancel = false)
     {
         using var environment = new E2ETestEnvironment(output);
         var server = environment.Server;
@@ -254,7 +270,17 @@ public class HeadmanHerdReplicaTests
                 {
                     giver.Issue.AlternativeSolutionSentTroops.AddToCounts(companion.CharacterObject, 1);
                     giver.Issue.AlternativeSolutionSentTroops.AddToCounts(troop, 30);
-                    giver.Issue.StartIssueWithAlternativeSolution();
+                    if (latePickerCancel)
+                    {
+                        var agent = new Mock<IAgent>();
+                        agent.SetupGet(value => value.Character).Returns(giver.CharacterObject);
+                        Campaign.Current.ConversationManager._conversationAgents.Clear();
+                        Campaign.Current.ConversationManager._conversationAgents.Add(agent.Object);
+                        using var playerScope = new MainHeroSubstitutionScope(requestedParty.LeaderHero, requestedParty);
+                        GenericQuestTypeAlternativePickerPatch.BeginSelection();
+                        IssuesCampaignBehavior.issue_offer_player_accept_alternative_5_a_consequence();
+                    }
+                    else giver.Issue.StartIssueWithAlternativeSolution();
                 }
                 else
                 {
@@ -326,6 +352,23 @@ public class HeadmanHerdReplicaTests
             });
         }
 
+        if (latePickerCancel)
+        {
+            client.Call(() =>
+            {
+                var giver = client.GetRegisteredObject<Hero>(giverId);
+                var party = client.GetRegisteredObject<MobileParty>(partyId);
+                var troop = client.GetRegisteredObject<CharacterObject>(troopId);
+                var companion = client.GetRegisteredObject<Hero>(companionId);
+                using var scope = new MainHeroSubstitutionScope(party.LeaderHero, party);
+                IssuesCampaignBehavior.issue_offer_player_accept_alternative_5_b_consequence();
+                Assert.True(giver.Issue.IsSolvingWithAlternative);
+                Assert.Equal(30, giver.Issue.AlternativeSolutionSentTroops.GetTroopCount(troop));
+                Assert.Equal(1, giver.Issue.AlternativeSolutionSentTroops.GetTroopCount(companion.CharacterObject));
+                Assert.Equal(0, party.MemberRoster.GetTroopCount(troop));
+            });
+        }
+
         void RemovePlayerAndAssertCleanup()
         {
             var leaderPartyId = environment.CreateRegisteredObject<MobileParty>();
@@ -351,7 +394,15 @@ public class HeadmanHerdReplicaTests
             testing.Unpatch(changeState, fixturePrefix.PatchMethod);
             try
             {
-                server.Call(() => server.Resolve<GameInterface.Services.Players.Handlers.PlayerDeletionHandler>().CompleteGameOver(player));
+                server.Call(() =>
+                {
+                    if (missingOwnerObject == "hero" || missingOwnerObject == "both")
+                        Assert.True(server.ObjectManager.Remove(server.GetRegisteredObject<Hero>(heroId)));
+                    if (missingOwnerObject == "party" || missingOwnerObject == "both")
+                        Assert.True(server.ObjectManager.Remove(server.GetRegisteredObject<MobileParty>(partyId)));
+                    server.Resolve<GameInterface.Services.Players.Handlers.PlayerDeletionHandler>().CompleteGameOver(player);
+                    Assert.False(server.Resolve<IPlayerManager>().TryGetPlayer(player.ControllerId, out _));
+                });
                 environment.FlushCoalescer();
             }
             finally
@@ -547,9 +598,12 @@ public class HeadmanHerdReplicaTests
     }
 
     [Theory]
-    [InlineData(false)]
-    [InlineData(true)]
-    public void PlayerChangeCancelsOnlyTheOwnersHerdAndJoinDoesNotCancelEitherQuest(bool removePlayer)
+    [InlineData(false, null)]
+    [InlineData(true, null)]
+    [InlineData(true, "hero")]
+    [InlineData(true, "party")]
+    [InlineData(true, "both")]
+    public void PlayerChangeCancelsOnlyTheOwnersHerdAndJoinDoesNotCancelEitherQuest(bool removePlayer, string? missingObject)
         => WithHerdEnabled(() =>
         {
             using var environment = new E2ETestEnvironment(output);
@@ -671,7 +725,14 @@ public class HeadmanHerdReplicaTests
             server.Call(() =>
             {
                 if (removePlayer)
+                {
+                    if (missingObject == "hero" || missingObject == "both")
+                        Assert.True(server.ObjectManager.Remove(server.GetRegisteredObject<Hero>(players[0].HeroId)));
+                    if (missingObject == "party" || missingObject == "both")
+                        Assert.True(server.ObjectManager.Remove(server.GetRegisteredObject<MobileParty>(partyIds[0])));
                     server.Resolve<GameInterface.Services.Players.Handlers.PlayerDeletionHandler>().CompleteGameOver(players[0]);
+                    Assert.False(server.Resolve<IPlayerManager>().TryGetPlayer(players[0].ControllerId, out _));
+                }
                 else server.Resolve<IHeadmanHerdQuestAuthority>().CancelForPlayerChange(players[0].ControllerId);
             });
             environment.FlushCoalescer();
@@ -804,8 +865,15 @@ public class HeadmanHerdReplicaTests
         });
     }
 
-    [Fact]
-    public void CompanionPickerCommitsWagesWithoutTransferringTroopsBeforeAcceptance()
+    [Theory]
+    [InlineData("active")]
+    [InlineData("removed-cancel")]
+    [InlineData("removed-accept")]
+    [InlineData("replacement-cancel")]
+    [InlineData("replacement-accept")]
+    [InlineData("generation-accept")]
+    [InlineData("removed-before-done")]
+    public void CompanionPickerCommitsWagesWithoutTransferringTroopsBeforeAcceptance(string ending)
     {
         using var environment = new E2ETestEnvironment(output, numClients: 1);
         var server = environment.Server;
@@ -871,15 +939,53 @@ public class HeadmanHerdReplicaTests
                 left.AddToCounts(troop, 6);
                 logic.SetPartyGoldChangeAmount(-120);
             }
+            void RemoveIssue()
+                => client.SimulateMessage(server.NetPeer, new NetworkIssueRemoved(giverId, IssueFinalizeReason.IssueOnly));
+
+            if (ending == "removed-before-done") RemoveIssue();
             Assert.True(logic.DoneLogic(false));
-            Assert.Single(client.NetworkSentMessages.GetMessages<NetworkCompleteDoneLogic>());
+            if (ending == "removed-before-done")
+                Assert.Empty(client.NetworkSentMessages.GetMessages<NetworkCompleteDoneLogic>());
+            else
+                Assert.Single(client.NetworkSentMessages.GetMessages<NetworkCompleteDoneLogic>());
             Assert.Equal(10, party.MemberRoster.GetTroopCount(troop));
             Assert.Equal(1, party.MemberRoster.GetTroopCount(companion.CharacterObject));
-            Assert.True(issue.IsOngoingWithoutQuest);
-            IssuesCampaignBehavior.issue_offer_player_accept_alternative_5_b_consequence();
+            if ((ending.StartsWith("removed-") && ending != "removed-before-done") || ending.StartsWith("replacement-"))
+                RemoveIssue();
+            IssueBase replacement = null!;
+            if (ending.StartsWith("replacement-"))
+            {
+                replacement = issues.ConstructReplicated(giver, null, giver, null);
+                issues.RegisterReplicated(giver, (HeadmanNeedsToDeliverAHerdIssueBehavior.HeadmanNeedsToDeliverAHerdIssue)replacement,
+                    "replacement-picker-herd", CampaignTime.Now, CampaignTime.DaysFromNow(30));
+                replacement.AlternativeSolutionSentTroops.AddToCounts(troop, 2);
+            }
+            if (ending == "generation-accept")
+                client.Resolve<IIssueGenerationRegistry>().Bump(giver);
+            if (ending != "active")
+            {
+                Assert.False(new IssuesCampaignBehavior().issue_offer_player_accept_alternative_5_a_condition());
+                Assert.False(IssuesCampaignBehavior.DoTroopsSatisfyAlternativeSolutionInternal(left, out var explanation));
+                Assert.NotNull(explanation);
+                new IssuesCampaignBehavior().issue_offer_player_accept_alternative_4_consequence();
+                IssuesCampaignBehavior.PartyScreenDoneClicked(null, left, leftPrisoners, party.Party,
+                    party.MemberRoster, party.PrisonRoster, false);
+            }
+            if (ending.EndsWith("-accept"))
+                IssuesCampaignBehavior.issue_offer_player_accept_alternative_5_a_consequence();
+            else
+                IssuesCampaignBehavior.issue_offer_player_accept_alternative_5_b_consequence();
+            Assert.Empty(client.InternalMessages.GetMessages<QuestTypeAlternativeAcceptTriggered>());
             Assert.Equal(10, party.MemberRoster.GetTroopCount(troop));
             Assert.Equal(1, party.MemberRoster.GetTroopCount(companion.CharacterObject));
-            Assert.Equal(0, issue.AlternativeSolutionSentTroops.TotalManCount);
+            if (replacement != null) Assert.Equal(2, replacement.AlternativeSolutionSentTroops.GetTroopCount(troop));
+            if (ending == "active") Assert.Equal(0, issue.AlternativeSolutionSentTroops.TotalManCount);
+            if (ending == "replacement-cancel")
+            {
+                conversation.BeginConversation();
+                Assert.Same(replacement, GenericQuestTypeAlternativePickerPatch.CurrentIssue());
+                Assert.True(GenericQuestTypeAlternativePickerPatch.IsCurrentSelection(replacement));
+            }
         });
         environment.FlushCoalescer();
         server.Call(() =>
@@ -888,7 +994,7 @@ public class HeadmanHerdReplicaTests
             Assert.True(server.ObjectManager.TryGetObject<Hero>(companionId, out var companion));
             Assert.True(server.ObjectManager.TryGetObject<MobileParty>(partyId, out var party));
             Assert.True(server.ObjectManager.TryGetObject<CharacterObject>(troopId, out var troop));
-            Assert.Equal(880, hero.Gold);
+            Assert.Equal(ending == "removed-before-done" ? 1000 : 880, hero.Gold);
             Assert.Equal(10, party.MemberRoster.GetTroopCount(troop));
             Assert.Equal(1, party.MemberRoster.GetTroopCount(companion.CharacterObject));
         });

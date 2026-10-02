@@ -98,6 +98,8 @@ internal class PartyDoneLogicHandler : IHandler
         var initialRightMembers = obj.What.InitialRightMemberRoster;
         var draftIssue = GenericQuestTypeAlternativePickerPatch.CurrentIssue();
         if (obj.What.PartyScreenMode == Helpers.PartyScreenHelper.PartyScreenMode.QuestTroopManage
+            && draftIssue != null && !GenericQuestTypeAlternativePickerPatch.IsCurrentSelection(draftIssue)) return;
+        if (obj.What.PartyScreenMode == Helpers.PartyScreenHelper.PartyScreenMode.QuestTroopManage
             && draftIssue != null && ReferenceEquals(draftIssue.AlternativeSolutionSentTroops, obj.What.LeftMemberRoster))
         {
             // Commit upgrades and wages now; acceptance owns the later transfer out of the party.

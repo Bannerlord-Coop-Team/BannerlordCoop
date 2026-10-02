@@ -9,6 +9,7 @@ using System;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.CampaignBehaviors;
 using TaleWorlds.CampaignSystem.Issues;
+using TaleWorlds.Localization;
 
 namespace GameInterface.Services.Issues.Patches;
 
@@ -42,11 +43,12 @@ internal static class HeadmanHerdAlternativeCompletionPatch
 internal static class HeadmanHerdIssueCancellationPatch
 {
     [HarmonyPrefix, HarmonyPriority(Priority.First)]
-    internal static bool Prefix(IssueBase __instance, out IDisposable __state)
+    internal static bool Prefix(IssueBase __instance, TextObject log, out IDisposable __state)
     {
         __state = null;
         if (__instance is not Issue || CallOriginalPolicy.IsOriginalAllowedForOwnershipGate()) return true;
         if (ModInformation.IsClient) return IssueFinalizeAuthorityGuard.IsActive;
+        if (HeadmanHerdQuestAuthority.CompleteOrphanedCancellation(__instance, log)) return false;
         if (!__instance.IsTriedToSolveBefore)
         {
             __state = new IssueFinalizeAuthorityGuard();

@@ -11,6 +11,7 @@ using TaleWorlds.CampaignSystem.Issues;
 using TaleWorlds.CampaignSystem.CampaignBehaviors;
 using TaleWorlds.CampaignSystem.Conversation;
 using TaleWorlds.CampaignSystem.Roster;
+using TaleWorlds.Localization;
 
 namespace GameInterface.Services.Issues.Generic.Dispatch;
 
@@ -115,12 +116,49 @@ internal class GenericQuestTypeAlternativeSolutionStartOwnershipGatePatch
 [HarmonyPatch(typeof(IssuesCampaignBehavior))]
 internal static class GenericQuestTypeAlternativePickerPatch
 {
+    private static IIssueConversationTracker Tracker =>
+        ContainerProvider.TryResolve<IIssueConversationTracker>(out var tracker) ? tracker : null;
+
     internal static IssueBase CurrentIssue()
     {
         if (ModInformation.IsServer || CallOriginalPolicy.IsOriginalAllowedForOwnershipGate()) return null;
+        if (Tracker?.AlternativePickerIssue is IssueBase captured) return captured;
         var issue = Hero.OneToOneConversationHero?.Issue;
         return issue?.IsOngoingWithoutQuest == true && QuestTypeRegistry.Get(issue)?.SupportsAlternativeAccept == true
             ? issue : null;
+    }
+
+    internal static void BeginSelection()
+    {
+        Tracker?.TrackAlternativePicker(null, 0);
+        var issue = CurrentIssue();
+        if (issue != null) CaptureSelection(issue);
+    }
+
+    private static void CaptureSelection(IssueBase issue)
+    {
+        var generation = 0;
+        if (ContainerProvider.TryResolve<IIssueGenerationRegistry>(out var generations))
+            generations.TryGetGeneration(issue.IssueOwner, out generation);
+        Tracker?.TrackAlternativePicker(issue, generation);
+    }
+
+    internal static bool IsCurrentSelection(IssueBase issue)
+    {
+        if (!ReferenceEquals(Hero.OneToOneConversationHero?.Issue, issue) || !issue.IsOngoingWithoutQuest) return false;
+        var tracker = Tracker;
+        if (tracker?.AlternativePickerIssue != issue) return true;
+        var generation = 0;
+        if (ContainerProvider.TryResolve<IIssueGenerationRegistry>(out var generations))
+            generations.TryGetGeneration(issue.IssueOwner, out generation);
+        return generation == tracker.AlternativePickerGeneration;
+    }
+
+    private static void EndStaleSelection()
+    {
+        // Keep the captured identity for callbacks already queued by the closed picker.
+        if (Campaign.Current.ConversationManager.IsConversationInProgress)
+            Campaign.Current.ConversationManager.EndConversation();
     }
 
     [HarmonyPrefix, HarmonyPatch(nameof(IssuesCampaignBehavior.issue_offer_player_accept_alternative_3_consequence))]
@@ -128,6 +166,12 @@ internal static class GenericQuestTypeAlternativePickerPatch
     {
         var issue = CurrentIssue();
         if (issue == null) return true;
+        if (!IsCurrentSelection(issue))
+        {
+            EndStaleSelection();
+            return false;
+        }
+        CaptureSelection(issue);
         if (ConversationSentence.SelectedRepeatObject is Hero hero)
         {
             issue.AlternativeSolutionSentTroops.Clear();
@@ -136,11 +180,25 @@ internal static class GenericQuestTypeAlternativePickerPatch
         return false;
     }
 
+    [HarmonyPrefix, HarmonyPatch(nameof(IssuesCampaignBehavior.issue_offer_player_accept_alternative_4_consequence))]
+    private static bool OpenPartyScreen()
+    {
+        var issue = CurrentIssue();
+        if (issue == null || IsCurrentSelection(issue)) return true;
+        EndStaleSelection();
+        return false;
+    }
+
     [HarmonyPrefix, HarmonyPatch(nameof(IssuesCampaignBehavior.issue_offer_player_accept_alternative_5_b_consequence))]
     private static bool CancelSelection()
     {
         var issue = CurrentIssue();
         if (issue == null) return true;
+        if (!IsCurrentSelection(issue))
+        {
+            EndStaleSelection();
+            return false;
+        }
         issue.AlternativeSolutionSentTroops.Clear();
         return false;
     }
@@ -150,18 +208,54 @@ internal static class GenericQuestTypeAlternativePickerPatch
     {
         var issue = CurrentIssue();
         if (issue == null) return true;
+        if (!IsCurrentSelection(issue))
+        {
+            EndStaleSelection();
+            return false;
+        }
         // The server acceptance runs the consequence after validating and removing these troops.
         issue.StartIssueWithAlternativeSolution();
         return false;
     }
 
     [HarmonyPrefix, HarmonyPatch(nameof(IssuesCampaignBehavior.PartyScreenDoneClicked))]
-    private static void RetainSelection(TroopRoster leftMemberRoster)
+    private static bool RetainSelection(TroopRoster leftMemberRoster)
     {
         var issue = CurrentIssue();
-        if (issue == null || ReferenceEquals(issue.AlternativeSolutionSentTroops, leftMemberRoster)) return;
-        issue.AlternativeSolutionSentTroops.Clear();
-        issue.AlternativeSolutionSentTroops.Add(leftMemberRoster);
+        if (issue == null) return true;
+        if (!IsCurrentSelection(issue))
+        {
+            EndStaleSelection();
+            return false;
+        }
+        if (!ReferenceEquals(issue.AlternativeSolutionSentTroops, leftMemberRoster))
+        {
+            issue.AlternativeSolutionSentTroops.Clear();
+            issue.AlternativeSolutionSentTroops.Add(leftMemberRoster);
+        }
+        return true;
+    }
+
+    [HarmonyPrefix, HarmonyPatch(nameof(IssuesCampaignBehavior.issue_offer_player_accept_alternative_5_a_condition))]
+    private static bool CanAccept(ref bool __result) => CheckSelection(ref __result);
+
+    [HarmonyPrefix, HarmonyPatch(nameof(IssuesCampaignBehavior.TroopTransferableDelegate))]
+    private static bool CanTransfer(ref bool __result) => CheckSelection(ref __result);
+
+    private static bool CheckSelection(ref bool result)
+    {
+        var issue = CurrentIssue();
+        if (issue == null || IsCurrentSelection(issue)) return true;
+        result = false;
+        return false;
+    }
+
+    [HarmonyPrefix, HarmonyPatch(nameof(IssuesCampaignBehavior.DoTroopsSatisfyAlternativeSolutionInternal))]
+    private static bool CheckTroops(ref bool __result, ref TextObject explanation)
+    {
+        if (CheckSelection(ref __result)) return true;
+        explanation = new TextObject("{=coop_issue_no_longer_available}This task is no longer available.");
+        return false;
     }
 
     internal static TroopRoster CombineRosters(TroopRoster right, TroopRoster left)

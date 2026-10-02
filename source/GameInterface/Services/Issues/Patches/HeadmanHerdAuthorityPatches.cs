@@ -63,3 +63,13 @@ internal static class HeadmanHerdTerminalAuthorityPatches
     [HarmonyFinalizer]
     private static void Finalizer(IDisposable __state) => __state?.Dispose();
 }
+
+
+[HarmonyPatch(typeof(Quest), nameof(Quest.OnCanceled))]
+[HarmonyPatchCategory(GameInterface.HARMONY_GAME_STARTED_CATEGORY)]
+internal static class HeadmanHerdRemovalCancellationPatch
+{
+    [HarmonyPrefix]
+    private static bool Prefix(Quest __instance)
+        => !HeadmanHerdQuestAuthority.CancelOrphanedHerd(__instance);
+}
