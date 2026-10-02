@@ -157,8 +157,8 @@ internal sealed class ScoutEnemyGarrisonsService : IScoutEnemyGarrisonsService
         if (players.TryGetPlayer(owner.ControllerId, out var player) &&
             objects.TryGetObjectWithLogging<Hero>(player.HeroId, out var hero) && hero == owner.Hero)
         {
-            if (!objects.TryGetObjectWithLogging<MobileParty>(player.MobilePartyId, out var party)) return null;
-            owner.Party = party;
+            if (objects.TryGetObjectWithLogging<MobileParty>(player.MobilePartyId, out var party)) owner.Party = party;
+            else if (!completing) return null;
         }
         else if (!completing) return null;
         return owner.Party == null ? null : new AuthorityScope(owner.Hero, owner.Party);

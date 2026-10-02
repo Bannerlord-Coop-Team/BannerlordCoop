@@ -229,6 +229,33 @@ public class ScoutEnemyGarrisonsTests : IDisposable
     }
 
     [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void MissingRegisteredPartyAllowsOnlyCompletionUsingTheRememberedOwner(bool completing)
+    {
+        var quest = NewQuest("missing-party");
+        Remember(quest, "player-A");
+        Assert.True(state.TryGet(quest, out var owner));
+        var rememberedParty = owner.Party;
+        var registeredHero = owner.Hero;
+        var player = new Player("player-A", "hero", "missing-party", "clan", "character");
+        var players = new Mock<IPlayerManager>();
+        players.Setup(x => x.TryGetPlayer("player-A", out player)).Returns(true);
+        var objects = new Mock<IObjectManager>();
+        objects.Setup(x => x.TryGetObjectWithLogging("hero", out registeredHero)).Returns(true);
+        var service = new ScoutEnemyGarrisonsService(objects.Object, null!, null!, null!, players.Object, state);
+
+        using (var authority = service.OpenAuthority(quest, completing))
+        {
+            Assert.Equal(completing, authority != null);
+            Assert.Equal(completing, IssueFinalizeAuthorityGuard.IsActive);
+            Assert.Same(rememberedParty, owner.Party);
+            Assert.False(AllowedThread.IsThisThreadAllowed());
+        }
+        Assert.False(IssueFinalizeAuthorityGuard.IsActive);
+    }
+
+    [Theory]
     [InlineData("identity", true)]
     [InlineData("lookup", true)]
     [InlineData("exception", true)]
