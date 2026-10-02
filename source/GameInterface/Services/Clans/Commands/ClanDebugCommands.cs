@@ -5,8 +5,10 @@ using Common.Network;
 using GameInterface.Services.Clans.Extensions;
 using GameInterface.Services.Clans.Messages;
 using GameInterface.Services.Heroes.Extensions;
+using GameInterface.Services.Heroes.Patches;
 using GameInterface.Services.Kingdoms;
 using GameInterface.Services.ObjectManager;
+using GameInterface.Services.Players;
 using GameInterface.Utils.Commands;
 using SandBox.GauntletUI;
 using System;
@@ -559,7 +561,8 @@ namespace GameInterface.Services.GameDebug.Commands
         {
             new ExpectedArgs("clan_id", "The registered clan id."),
             new ExpectedArgs("kingdom_id", "The registered kingdom id."),
-            new ExpectedArgs("join", "normal (default), defection or mercenary.", false),
+            new ExpectedArgs("join", "normal, defection or mercenary."),
+            new ExpectedArgs("actor_controller_id", "The registered acting player for native diplomacy callbacks."),
         };
 
         public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
@@ -585,23 +588,32 @@ namespace GameInterface.Services.GameDebug.Commands
                     return Failed($"Argument2: Kingdom not found by ID: {kingdomId}");
                 }
 
-                switch (args.Count > 2 ? args[2] : "normal")
+                if (args.Count < 4 ||
+                    !ContainerProvider.TryResolve<IPlayerManager>(out var players) ||
+                    !players.TryGetPlayer(args[3], out var player) ||
+                    !objectManager.TryGetObject<Hero>(player.HeroId, out var hero) ||
+                    !objectManager.TryGetObject<MobileParty>(player.MobilePartyId, out var party))
+                    return Failed("An acting player's registered hero and party are required.");
+                using (new MainHeroSubstitutionScope(hero, party))
                 {
-                    case "normal":
-                        ChangeKingdomAction.ApplyByJoinToKingdom(clan, newKingdom);
-                        break;
-                    case "defection":
-                        if (clan.Kingdom == null || clan.Kingdom == newKingdom)
-                            return Failed("Defection requires a current kingdom and a different destination.");
-                        ChangeKingdomAction.ApplyByJoinToKingdomByDefection(clan, clan.Kingdom, newKingdom);
-                        break;
-                    case "mercenary":
-                        if (clan.Kingdom != null)
-                            return Failed("Leave the current kingdom before joining as a mercenary.");
-                        ChangeKingdomAction.ApplyByJoinFactionAsMercenary(clan, newKingdom);
-                        break;
-                    default:
-                        return Failed("Join must be normal, defection or mercenary.");
+                    switch (args[2])
+                    {
+                        case "normal":
+                            ChangeKingdomAction.ApplyByJoinToKingdom(clan, newKingdom);
+                            break;
+                        case "defection":
+                            if (clan.Kingdom == null || clan.Kingdom == newKingdom)
+                                return Failed("Defection requires a current kingdom and a different destination.");
+                            ChangeKingdomAction.ApplyByJoinToKingdomByDefection(clan, clan.Kingdom, newKingdom);
+                            break;
+                        case "mercenary":
+                            if (clan.Kingdom != null)
+                                return Failed("Leave the current kingdom before joining as a mercenary.");
+                            ChangeKingdomAction.ApplyByJoinFactionAsMercenary(clan, newKingdom);
+                            break;
+                        default:
+                            return Failed("Join must be normal, defection or mercenary.");
+                    }
                 }
 
                 return Succeeded(clan.Name.ToString() + " has join the kingdom : " + newKingdom.Name.ToString());
@@ -908,7 +920,8 @@ namespace GameInterface.Services.GameDebug.Commands
         public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
             new ExpectedArgs("clan_id", "The registered clan id."),
-            new ExpectedArgs("leave", "normal (default) or rebellion.", false),
+            new ExpectedArgs("leave", "normal or rebellion."),
+            new ExpectedArgs("actor_controller_id", "The registered acting player for native diplomacy callbacks."),
         };
 
         public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
@@ -935,19 +948,28 @@ namespace GameInterface.Services.GameDebug.Commands
                     return Failed("Leave must be normal or rebellion.");
                 if (leave == "rebellion" && clan.IsUnderMercenaryService)
                     return Failed("A mercenary clan must leave normally.");
-                if (leave == "rebellion")
-                    ChangeKingdomAction.ApplyByLeaveWithRebellionAgainstKingdom(clan);
-                else if (clan.IsUnderMercenaryService)
-                    ChangeKingdomAction.ApplyByLeaveKingdomAsMercenary(clan);
-                else
-                    ChangeKingdomAction.ApplyByLeaveKingdom(clan);
+                if (args.Count < 3 ||
+                    !ContainerProvider.TryResolve<IPlayerManager>(out var players) ||
+                    !players.TryGetPlayer(args[2], out var player) ||
+                    !objectManager.TryGetObject<Hero>(player.HeroId, out var hero) ||
+                    !objectManager.TryGetObject<MobileParty>(player.MobilePartyId, out var party))
+                    return Failed("An acting player's registered hero and party are required.");
+                using (new MainHeroSubstitutionScope(hero, party))
+                {
+                    if (leave == "rebellion")
+                        ChangeKingdomAction.ApplyByLeaveWithRebellionAgainstKingdom(clan);
+                    else if (clan.IsUnderMercenaryService)
+                        ChangeKingdomAction.ApplyByLeaveKingdomAsMercenary(clan);
+                    else
+                        ChangeKingdomAction.ApplyByLeaveKingdom(clan);
 
-                kingdomMembershipState.MoveClanToKingdom(
-                    previousKingdom,
-                    kingdom: null,
-                    clan: clan,
-                    publishCollectionChanges: true,
-                    republishExistingCollections: true);
+                    kingdomMembershipState.MoveClanToKingdom(
+                        previousKingdom,
+                        kingdom: null,
+                        clan: clan,
+                        publishCollectionChanges: true,
+                        republishExistingCollections: true);
+                }
 
                 return Succeeded($"{clan.Name} left {kingdomName}");
         }

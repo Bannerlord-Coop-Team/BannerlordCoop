@@ -159,8 +159,9 @@ public class CharacterFactionCoopCommandTests
     [InlineData("coop.debug.kingdom", "force_ally", "empire", "empire_s")]
     [InlineData("coop.debug.kingdom", "force_trade_agreement", "empire", "empire_s")]
     [InlineData("coop.debug.kingdom", "declare_war", "empire", "empire_s", "hostility", "player")]
-    [InlineData("coop.debug.clan", "change_clan_kingdom", "clan", "empire_s", "defection")]
-    [InlineData("coop.debug.clan", "leave_kingdom", "clan", "rebellion")]
+    [InlineData("coop.debug.kingdom", "make_peace", "empire", "empire_s", "player")]
+    [InlineData("coop.debug.clan", "change_clan_kingdom", "clan", "empire_s", "defection", "player")]
+    [InlineData("coop.debug.clan", "leave_kingdom", "clan", "rebellion", "player")]
     public void ServerCommands_RunOnClient_ReturnExplicitFailures(
         string prefix,
         string name,
@@ -185,6 +186,7 @@ public class CharacterFactionCoopCommandTests
     [InlineData("force_ally")]
     [InlineData("force_trade_agreement")]
     [InlineData("declare_war")]
+    [InlineData("make_peace")]
     public void KingdomForceCommands_RegistryRejectsClientExecution(string name)
     {
         bool originalIsServer = ModInformation.IsServer;
@@ -199,7 +201,11 @@ public class CharacterFactionCoopCommandTests
 
             CoopCommandResult result = registry.ProcessCommand(
                 $"{command.Prefix}.{command.Name}",
-                new TestArgs(new[] { "empire", "empire_s" }));
+                new TestArgs(name == "declare_war"
+                    ? new[] { "empire", "empire_s", "default", "player" }
+                    : name == "make_peace"
+                        ? new[] { "empire", "empire_s", "player" }
+                        : new[] { "empire", "empire_s" }));
 
             Assert.False(result.Succeeded);
             Assert.Equal("command_wrong_side", result.ErrorCode);

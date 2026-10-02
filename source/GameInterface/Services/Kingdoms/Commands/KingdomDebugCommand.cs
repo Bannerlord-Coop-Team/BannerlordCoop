@@ -1554,15 +1554,16 @@ public class KingdomDebugCommand
         {
             new ExpectedArgs("faction1_id", "The first registered faction id."),
             new ExpectedArgs("faction2_id", "The second registered faction id."),
-            new ExpectedArgs("cause", "default, decision, hostility, rebellion, crime, creation, claim or agreement.", false),
-            new ExpectedArgs("actor_controller_id", "The registered acting player, or none (default).", false),
+            new ExpectedArgs("cause", "default, decision, hostility, rebellion, crime, creation, claim or agreement."),
+            new ExpectedArgs("actor_controller_id", "The registered acting player, required for native war callbacks."),
         };
 
         public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
         {
             if (ModInformation.IsClient) return Failed("Run this command on the server.");
+            if (args.Count < 4 || args[3] == "none") return Failed("A registered acting player is required.");
             Action<IFaction, IFaction> declare;
-            switch (args.Count > 2 ? args[2] : "default")
+            switch (args[2])
             {
                 case "default": declare = DeclareWarAction.ApplyByDefault; break;
                 case "decision": declare = DeclareWarAction.ApplyByKingdomDecision; break;
@@ -1591,19 +1592,14 @@ public class KingdomDebugCommand
 
             if (faction1 == faction2 || FactionManager.IsAtWarAgainstFaction(faction1, faction2))
                 return Failed("Select different factions that are currently at peace.");
-            IDisposable actorScope = null;
-            if (args.Count > 3 && args[3] != "none")
-            {
-                if (!ContainerProvider.TryResolve<IPlayerManager>(out var players) ||
-                    !players.TryGetPlayer(args[3], out var player) ||
-                    !objectManager.TryGetObject<Hero>(player.HeroId, out var hero) ||
-                    !objectManager.TryGetObject<MobileParty>(player.MobilePartyId, out var party))
-                    return Failed("The acting player's registered hero and party are required.");
-                if (hero.MapFaction != faction1 && hero.MapFaction != faction2)
-                    return Failed("The acting player must belong to one of the factions.");
-                actorScope = new MainHeroSubstitutionScope(hero, party);
-            }
-            using (actorScope) declare(faction1, faction2);
+            if (!ContainerProvider.TryResolve<IPlayerManager>(out var players) ||
+                !players.TryGetPlayer(args[3], out var player) ||
+                !objectManager.TryGetObject<Hero>(player.HeroId, out var hero) ||
+                !objectManager.TryGetObject<MobileParty>(player.MobilePartyId, out var party))
+                return Failed("The acting player's registered hero and party are required.");
+            if (hero.MapFaction != faction1 && hero.MapFaction != faction2)
+                return Failed("The acting player must belong to one of the factions.");
+            using (new MainHeroSubstitutionScope(hero, party)) declare(faction1, faction2);
             return Succeeded($"Declared war between '{faction1.Name}' and '{faction2.Name}'.");
         }
     }
@@ -1622,16 +1618,19 @@ public class KingdomDebugCommand
 
         public string Description => "Makes peace between two factions on the server.";
 
-        public CoopCommandSide Side => CoopCommandSide.Both;
+        public CoopCommandSide Side => CoopCommandSide.Server;
 
         public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
             new ExpectedArgs("faction1_id", "The first registered faction id."),
             new ExpectedArgs("faction2_id", "The second registered faction id."),
+            new ExpectedArgs("actor_controller_id", "The registered acting player for native peace callbacks."),
         };
 
         public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
         {
+            if (ModInformation.IsClient) return Failed("Run this command on the server.");
+            if (args.Count < 3) return Failed("A registered acting player is required.");
             if (TryGetObjectManager(out var objectManager) == false)
             {
                 return Failed("Unable to resolve ObjectManager");
@@ -1647,7 +1646,16 @@ public class KingdomDebugCommand
                 return Failed($"Faction not found with id: {args[1]}");
             }
 
-            MakePeaceAction.Apply(faction1, faction2);
+            if (faction1 == faction2 || !FactionManager.IsAtWarAgainstFaction(faction1, faction2))
+                return Failed("Select different factions that are currently at war.");
+            if (!ContainerProvider.TryResolve<IPlayerManager>(out var players) ||
+                !players.TryGetPlayer(args[2], out var player) ||
+                !objectManager.TryGetObject<Hero>(player.HeroId, out var hero) ||
+                !objectManager.TryGetObject<MobileParty>(player.MobilePartyId, out var party))
+                return Failed("The acting player's registered hero and party are required.");
+            if (hero.MapFaction != faction1 && hero.MapFaction != faction2)
+                return Failed("The acting player must belong to one of the factions.");
+            using (new MainHeroSubstitutionScope(hero, party)) MakePeaceAction.Apply(faction1, faction2);
             return Succeeded($"Made peace between '{faction1.Name}' and '{faction2.Name}'.");
         }
     }
