@@ -1,4 +1,4 @@
-using Common;
+﻿using Common;
 using Common.Logging;
 using Common.Messaging;
 using Common.Network;
@@ -162,7 +162,8 @@ internal class GenericQuestTypeAcceptHandler : IHandler
 
         descriptor = QuestTypeRegistry.Get(owner.Issue);
         var supports = isAlternative ? descriptor?.SupportsAlternativeAccept == true : descriptor?.SupportsQuestSolutionAccept == true;
-        var canAccept = supports && owner.Issue.IsOngoingWithoutQuest && owner.Issue.IssueStayAliveConditions();
+        var canAccept = supports && owner.Issue.IsOngoingWithoutQuest &&
+            QuestSolutionStartRunner.RunGuarded(player, () => owner.Issue.IssueStayAliveConditions());
         if (!canAccept)
         {
             network.Send(requester, new NetworkQuestTypeAcceptRejected(ownerId, isAlternative));
