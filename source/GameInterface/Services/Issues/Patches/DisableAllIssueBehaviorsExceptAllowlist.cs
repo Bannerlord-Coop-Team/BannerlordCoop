@@ -23,6 +23,7 @@ internal class DisableAllIssueBehaviorsExceptAllowlist
     internal static readonly HashSet<Type> Allowlist = new HashSet<Type>
     {
         typeof(GangLeaderNeedsToOffloadStolenGoodsIssueBehavior),
+        typeof(ExtortionByDesertersIssueBehavior),
     };
 
     internal static bool IsAllowlisted(IssueBase issue)

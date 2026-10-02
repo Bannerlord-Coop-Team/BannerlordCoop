@@ -1,8 +1,9 @@
-using Common.Messaging;
+﻿using Common.Messaging;
 using GameInterface.Services.Issues.Generic.AcceptMirror;
 using GameInterface.Services.TroopRosters.Data;
 using ProtoBuf;
 using TaleWorlds.CampaignSystem;
+using TaleWorlds.CampaignSystem.Roster;
 
 namespace GameInterface.Services.Issues.Messages;
 
@@ -22,11 +23,13 @@ public readonly struct QuestTypeAlternativeAcceptTriggered : IEvent
 {
     public readonly Hero Owner;
     public readonly string ControllerId;
+    public readonly TroopRoster SelectedTroops;
 
-    public QuestTypeAlternativeAcceptTriggered(Hero owner, string controllerId)
+    public QuestTypeAlternativeAcceptTriggered(Hero owner, string controllerId, TroopRoster selectedTroops = null)
     {
         Owner = owner;
         ControllerId = controllerId;
+        SelectedTroops = selectedTroops;
     }
 }
 

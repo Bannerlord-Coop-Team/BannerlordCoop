@@ -1,11 +1,10 @@
-using Common;
+﻿using Common;
 using Common.Logging;
 using Common.Messaging;
 using Common.Network;
 using Common.Util;
 using System;
 using GameInterface.Services.Entity;
-using GameInterface.Services.Heroes.Patches;
 using GameInterface.Services.Issues.Generic;
 using GameInterface.Services.Issues.Generic.AcceptMirror;
 using GameInterface.Services.Issues.Interfaces;
@@ -267,6 +266,7 @@ internal class GenericQuestTypeAcceptHandler : IHandler
             var hostControllerId = payload.What.ControllerId;
             if (hostControllerId == null || !playerManager.TryGetPlayer(hostControllerId, out var player)) return;
 
+            var startSnapshot = new AlternativeSolutionStartSnapshot(owner.Issue);
             AlternativeSolutionVanillaState state;
             try
             {
@@ -275,7 +275,7 @@ internal class GenericQuestTypeAcceptHandler : IHandler
             catch (Exception e)
             {
                 Logger.Error(e, "Failed to start the host's own alternative-solution accept for owner {Owner} - rolling back", ownerId);
-                RollbackFailedAlternativeAcceptStart(owner, hostControllerId);
+                RollbackFailedAlternativeAcceptStart(owner, hostControllerId, startSnapshot);
                 return;
             }
 
@@ -285,7 +285,7 @@ internal class GenericQuestTypeAcceptHandler : IHandler
                 var (accepted, bytes) = descriptor.TryArbitrateAlternativeAcceptBytes(owner, _ => true);
                 if (!accepted)
                 {
-                    RollbackFailedAlternativeAcceptStart(owner, hostControllerId);
+                    RollbackFailedAlternativeAcceptStart(owner, hostControllerId, startSnapshot);
                     return;
                 }
                 fieldsBytes = bytes;
@@ -298,7 +298,7 @@ internal class GenericQuestTypeAcceptHandler : IHandler
         else
         {
             generationRegistry.TryGetGeneration(owner, out var generation);
-            var packedTroops = troopRosterInterface.PackTroopRosterData(owner.Issue.AlternativeSolutionSentTroops);
+            var packedTroops = troopRosterInterface.PackTroopRosterData(payload.What.SelectedTroops ?? owner.Issue.AlternativeSolutionSentTroops);
             network.SendAll(new RequestQuestTypeAcceptAlternative(ownerId, generation, packedTroops));
         }
     }
@@ -369,6 +369,7 @@ internal class GenericQuestTypeAcceptHandler : IHandler
                 return;
             }
 
+            var startSnapshot = new AlternativeSolutionStartSnapshot(owner.Issue);
             AlternativeSolutionVanillaState state;
             byte[] fieldsBytes = null;
             try
@@ -380,7 +381,7 @@ internal class GenericQuestTypeAcceptHandler : IHandler
                     var (accepted, bytes) = descriptor.TryArbitrateAlternativeAcceptBytes(owner, _ => true);
                     if (!accepted)
                     {
-                        RollbackFailedAlternativeAcceptStart(owner, player.ControllerId);
+                        RollbackFailedAlternativeAcceptStart(owner, player.ControllerId, startSnapshot);
                         network.Send(requester, new NetworkQuestTypeAcceptRejected(ownerId, isAlternative: true));
                         return;
                     }
@@ -391,7 +392,7 @@ internal class GenericQuestTypeAcceptHandler : IHandler
             {
                 Logger.Error(e, "Failed to start {Message} for owner {Owner} after troop validation - rolling back",
                     nameof(RequestQuestTypeAcceptAlternative), ownerId);
-                RollbackFailedAlternativeAcceptStart(owner, player.ControllerId);
+                RollbackFailedAlternativeAcceptStart(owner, player.ControllerId, startSnapshot);
                 network.Send(requester, new NetworkQuestTypeAcceptRejected(ownerId, isAlternative: true));
                 return;
             }
@@ -471,30 +472,24 @@ internal class GenericQuestTypeAcceptHandler : IHandler
         }
     }
 
-    private void RollbackFailedAlternativeAcceptStart(Hero owner, string controllerId)
+    private void RollbackFailedAlternativeAcceptStart(Hero owner, string controllerId, AlternativeSolutionStartSnapshot snapshot)
     {
         if (owner?.Issue == null) return;
 
-        Hero trueOwnerHero = null;
-        MobileParty ownerParty = null;
-        if (!string.IsNullOrEmpty(controllerId) && playerManager.TryGetPlayer(controllerId, out var player))
-        {
-            if (player.HeroId != null) objectManager.TryGetObjectWithLogging<Hero>(player.HeroId, out trueOwnerHero);
-            if (player.MobilePartyId != null) objectManager.TryGetObjectWithLogging<MobileParty>(player.MobilePartyId, out ownerParty);
-        }
+        if (string.IsNullOrEmpty(controllerId) || !playerManager.TryGetPlayer(controllerId, out var player) ||
+            player.MobilePartyId == null || !objectManager.TryGetObjectWithLogging<MobileParty>(player.MobilePartyId, out var ownerParty))
+            throw new InvalidOperationException("Cannot return alternative-solution troops without their player's party.");
 
-        using (new MainHeroSubstitutionScope(trueOwnerHero ?? owner, ownerParty))
-        using (new AllowedThread())
+        var issue = owner.Issue;
+        var sentTroops = issue.AlternativeSolutionSentTroops;
+        foreach (var element in sentTroops.GetTroopRoster())
         {
-            var issue = owner.Issue;
-            var sentTroops = issue.AlternativeSolutionSentTroops;
-            if (MobileParty.MainParty != null && sentTroops.TotalManCount > 0)
-            {
-                MobileParty.MainParty.MemberRoster.Add(sentTroops);
-            }
-            sentTroops.Clear();
-            issue._issueState = IssueBase.IssueState.Ongoing;
+            if (element.Character.IsHero && element.Character.HeroObject.IsDisabled)
+                element.Character.HeroObject.ChangeState(Hero.CharacterStates.Active);
         }
+        ownerParty.MemberRoster.Add(sentTroops);
+        sentTroops.Clear();
+        snapshot.Restore();
 
         ownershipRegistry.Clear(owner);
     }
