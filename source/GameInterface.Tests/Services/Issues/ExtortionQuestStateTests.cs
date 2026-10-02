@@ -1,15 +1,21 @@
 ﻿using GameInterface.Services.Issues.Generic.AcceptMirror;
 using GameInterface.Services.Issues.Messages;
 using Common.Messaging;
+using Common.Network;
 using Common.Util;
 using GameInterface.Services.Issues;
+using GameInterface.Services.Entity;
 using GameInterface.Services.Issues.Generic;
+using GameInterface.Services.Issues.Handlers;
+using GameInterface.Services.MapEvents.Initialization;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Players;
 using GameInterface.Surrogates;
 using Moq;
+using System;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Issues;
+using TaleWorlds.CampaignSystem.MapEvents;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.Core;
 using TaleWorlds.Localization;
@@ -19,6 +25,47 @@ namespace GameInterface.Tests.Services.Issues;
 
 public class ExtortionQuestStateTests
 {
+    [Fact]
+    public void AmbushWaitsForTheAuthoritativeBattleAndSkipsAQuestFinishedDuringInitialization()
+    {
+        var quest = ObjectHelper.SkipConstructor<ExtortionByDesertersIssueBehavior.ExtortionByDesertersIssueQuest>();
+        quest._questState = QuestBase.QuestStates.Ongoing;
+        var battle = ObjectHelper.SkipConstructor<MapEvent>();
+        var objects = new Mock<IObjectManager>(MockBehavior.Strict);
+        objects.Setup(manager => manager.TryGetObjectWithLogging("ambush-server", out battle)).Returns(true);
+        var initialization = new Mock<IMapEventInitializationBarrier>(MockBehavior.Strict);
+        Action afterCommit = null;
+        initialization.Setup(barrier => barrier.RunAfterCommit(battle, It.IsAny<Action>()))
+            .Callback<MapEvent, Action>((_, action) => afterCommit = action);
+        var ownership = new IssueOwnershipRegistry();
+        var journal = new ExtortionQuestJournal(ownership, new Mock<IControllerIdProvider>().Object);
+        using var handler = new ExtortionQuestStateHandler(new Mock<IMessageBroker>().Object,
+            new Mock<INetwork>().Object, objects.Object, ownership, null, journal, initialization.Object);
+
+        handler.QueueAmbush(quest, "ambush-server");
+
+        Assert.NotNull(afterCommit);
+        quest._questState = QuestBase.QuestStates.Finalized;
+        afterCommit();
+        initialization.VerifyAll();
+        objects.VerifyAll();
+    }
+
+    [Fact]
+    public void AmbushMessagePreservesTheServerBattleIdentity()
+    {
+        _ = new SurrogateCollection();
+        var message = new NetworkExtortionQuestState("giver", "quest", 0, "deserters", "defenders",
+            new CampaignTime(1234), false, false, Array.Empty<ExtortionJournalEntry>(), true, "ambush-server");
+
+        var result = GenericAcceptFieldsSerializer.Deserialize<NetworkExtortionQuestState>(
+            GenericAcceptFieldsSerializer.Serialize(message));
+
+        Assert.True(result.StartAmbush);
+        Assert.Equal("ambush-server", result.AmbushMapEventId);
+        Assert.Equal("defenders", result.DefenderPartyId);
+    }
+
     [Fact]
     public void RemovedDesertersCannotDriveWorldActionsOrCompleteTheOwnersQuest()
     {

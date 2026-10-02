@@ -25,6 +25,7 @@ internal sealed class ExtortionAlternativeSelection
 
     public bool IsSelecting => issue != null;
     public TroopRoster SelectedTroops => troops;
+    public bool OwnsScreen(PartyScreenLogic logic) => ReferenceEquals(screen, logic);
 
     public ExtortionAlternativeSelection(IMessageBroker broker, IControllerIdProvider controller)
     {

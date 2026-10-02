@@ -131,18 +131,16 @@ internal sealed class ExtortionQuestMirrorScope : IDisposable
     private readonly ExtortionQuestMirrorScope previous;
     private readonly Hero owner;
     private readonly MobileParty deserterParty;
-    private readonly MobileParty defenderParty;
 
     public static bool IsActive => current != null;
 
-    public ExtortionQuestMirrorScope(Hero owner, MobileParty deserterParty, MobileParty defenderParty = null)
+    public ExtortionQuestMirrorScope(Hero owner, MobileParty deserterParty)
     {
         if (owner == null) throw new ArgumentNullException(nameof(owner));
         if (deserterParty == null) throw new ArgumentNullException(nameof(deserterParty));
         previous = current;
         this.owner = owner;
         this.deserterParty = deserterParty;
-        this.defenderParty = defenderParty;
         current = this;
     }
 
@@ -151,13 +149,6 @@ internal sealed class ExtortionQuestMirrorScope : IDisposable
         if (current == null || current.owner != quest.QuestGiver)
             throw new InvalidOperationException("Deserter quest creation requires the server's party identity.");
         quest._deserterMobileParty = current.deserterParty;
-    }
-
-    public static void ApplyDefender(Quest quest)
-    {
-        if (current == null || current.owner != quest.QuestGiver || current.defenderParty == null)
-            throw new InvalidOperationException("Deserter ambush requires the server's defender party identity.");
-        quest._defenderMobileParty = current.defenderParty;
     }
 
     public void Dispose() => current = previous;

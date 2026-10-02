@@ -1,13 +1,21 @@
 ﻿using Common.Messaging;
 using Common.Util;
+using Autofac;
+using Common;
 using GameInterface.Services.Entity;
 using GameInterface.Services.Issues;
+using GameInterface.Services.Issues.Patches;
 using GameInterface.Tests.Bootstrap;
+using HarmonyLib;
 using Moq;
+using System.Collections.Generic;
 using TaleWorlds.CampaignSystem;
+using TaleWorlds.CampaignSystem.ComponentInterfaces;
+using TaleWorlds.CampaignSystem.GameComponents;
 using TaleWorlds.CampaignSystem.Issues;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Roster;
+using TaleWorlds.Core;
 using Xunit;
 
 namespace GameInterface.Tests.Services.Issues;
@@ -25,8 +33,8 @@ public class ExtortionAlternativeSelectionTests
         var companion = ObjectHelper.SkipConstructor<Hero>();
         companion._characterObject = new CharacterObject();
         companion.CharacterObject.HeroObject = companion;
-        var troop = new CharacterObject();
         var upgraded = new CharacterObject();
+        var troop = new CharacterObject { UpgradeTargets = new[] { upgraded } };
         var realRoster = TroopRoster.CreateDummyTroopRoster();
         realRoster.AddToCounts(companion.CharacterObject, 1);
         realRoster.AddToCounts(troop, 9, xpChange: 90);
@@ -48,8 +56,43 @@ public class ExtortionAlternativeSelectionTests
         logic.MemberRosters[1] = data.RightMemberRoster;
         logic._initialData.RightMemberRoster = data.RightMemberRoster.CloneRosterData();
         selection.HideSelectedCompanion(logic);
-        logic.MemberRosters[1].AddToCounts(troop, -6, xpChange: -60);
-        logic.MemberRosters[0].AddToCounts(troop, 6, xpChange: 60);
+        var wasServer = ModInformation.IsServer;
+        var models = Campaign.Current._gameModels;
+        var upgradeModel = new Mock<PartyTroopUpgradeModel>();
+        upgradeModel.Setup(model => model.GetXpCostForUpgrade(It.IsAny<PartyBase>(), troop, upgraded)).Returns(10);
+        var harmony = new Harmony(nameof(SelectingTroopsPreservesTheRealPartyAndCommitsOnlyUpgrades));
+        var builder = new ContainerBuilder();
+        builder.RegisterInstance(selection);
+        using var container = builder.Build();
+        try
+        {
+            ModInformation.IsServer = false;
+            ContainerProvider.SetContainer(container);
+            Campaign.Current._gameModels = new GameModels(new List<GameModel>
+            {
+                new DefaultCharacterStatsModel(), upgradeModel.Object
+            });
+            harmony.CreateClassProcessor(typeof(ExtortionAlternativeScreenPatch)).Patch();
+            var command = new PartyScreenLogic.PartyCommand();
+            command.FillForTransferTroop(PartyScreenLogic.PartyRosterSide.Right,
+                PartyScreenLogic.TroopType.Member, troop, 6, 0, -1);
+            logic.TransferTroop(command, false);
+            Assert.Equal(30, logic.MemberRosters[1].GetElementXp(troop));
+            Assert.Equal(60, logic.MemberRosters[0].GetElementXp(troop));
+            command.FillForTransferTroop(PartyScreenLogic.PartyRosterSide.Left,
+                PartyScreenLogic.TroopType.Member, troop, 2, 0, -1);
+            logic.TransferTroop(command, false);
+            command.FillForTransferTroop(PartyScreenLogic.PartyRosterSide.Right,
+                PartyScreenLogic.TroopType.Member, troop, 2, 0, -1);
+            logic.TransferTroop(command, false);
+        }
+        finally
+        {
+            harmony.UnpatchAll(harmony.Id);
+            ContainerProvider.Clear();
+            ModInformation.IsServer = wasServer;
+            Campaign.Current._gameModels = models;
+        }
         logic.MemberRosters[1].AddToCounts(troop, -2, xpChange: -20);
         logic.MemberRosters[1].AddToCounts(upgraded, 2);
 

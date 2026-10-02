@@ -463,11 +463,24 @@ public class GenericQuestTypeAcceptSecurityTests : IDisposable
         CreateIssueOnBothPeers(fixture);
         var controllerId = ConnectPlayer(fixture);
         OpenConversation(fixture, controllerId);
+        var upgradeTargetId = TestEnvironment.CreateRegisteredObject<CharacterObject>();
+        foreach (var instance in new[] { Server }.Concat(TestEnvironment.Clients))
+        {
+            instance.Call(() =>
+            {
+                Assert.True(instance.ObjectManager.TryGetObject<CharacterObject>(lastConnectedEligibleTroopId, out var troop));
+                Assert.True(instance.ObjectManager.TryGetObject<CharacterObject>(upgradeTargetId, out var target));
+                target.Level = 30;
+                troop.UpgradeTargets = new[] { target };
+            });
+        }
         var originalCount = 0;
         Server.Call(() =>
         {
             Assert.True(Server.Resolve<IPlayerManager>().TryGetPlayer(controllerId, out var player));
             Assert.True(Server.ObjectManager.TryGetObject<MobileParty>(player.MobilePartyId, out var party));
+            Assert.True(Server.ObjectManager.TryGetObject<CharacterObject>(lastConnectedEligibleTroopId, out var troop));
+            party.MemberRoster.AddToCounts(troop, 4, xpChange: 1000);
             originalCount = party.MemberRoster.TotalManCount;
         });
 
@@ -478,7 +491,7 @@ public class GenericQuestTypeAcceptSecurityTests : IDisposable
             Assert.True(Client.ObjectManager.TryGetObject<CharacterObject>(lastConnectedEligibleTroopId, out var troop));
             var selection = TroopRoster.CreateDummyTroopRoster();
             selection.AddToCounts(companion.CharacterObject, 1);
-            selection.AddToCounts(troop, 6);
+            selection.AddToCounts(troop, 6, xpChange: 600);
             Assert.Equal(0, owner.Issue.AlternativeSolutionSentTroops.TotalManCount);
 
             Common.Messaging.MessageBroker.Instance.Publish(owner,
@@ -493,6 +506,12 @@ public class GenericQuestTypeAcceptSecurityTests : IDisposable
             Assert.True(owner.Issue.IsSolvingWithAlternative);
             Assert.Equal(7, owner.Issue.AlternativeSolutionSentTroops.TotalManCount);
             Assert.Equal(originalCount - 7, party.MemberRoster.TotalManCount);
+            Assert.True(Server.ObjectManager.TryGetObject<CharacterObject>(lastConnectedEligibleTroopId, out var troop));
+            Assert.Equal(400, party.MemberRoster.GetElementXp(troop));
+            Assert.Equal(600, owner.Issue.AlternativeSolutionSentTroops.GetElementXp(troop));
+            Campaign.Current.IssueManager.TryToMakeTroopsReturn(owner.Issue);
+            Assert.True(Server.Resolve<IAwaitingAlternativeSolutionTroopsRegistry>().TryGet(controllerId, out var returning));
+            Assert.Equal(600, returning.GetElementXp(troop));
         });
         var accepted = Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkQuestTypeAlternativeAccepted>());
         Assert.Equal(controllerId, accepted.OwnerControllerId);

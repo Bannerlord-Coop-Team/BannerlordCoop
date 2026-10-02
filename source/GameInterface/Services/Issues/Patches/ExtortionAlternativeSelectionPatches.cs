@@ -71,9 +71,10 @@ internal class ExtortionAlternativeSelectionPatches
     }
 }
 
-[HarmonyPatch(typeof(PartyScreenLogic), nameof(PartyScreenLogic.Initialize))]
+[HarmonyPatch(typeof(PartyScreenLogic))]
 internal class ExtortionAlternativeScreenPatch
 {
+    [HarmonyPatch(nameof(PartyScreenLogic.Initialize))]
     [HarmonyPrefix]
     private static void Prefix(PartyScreenLogic __instance, ref PartyScreenLogicInitializationData initializationData)
     {
@@ -81,11 +82,34 @@ internal class ExtortionAlternativeScreenPatch
             selection.PrepareScreen(__instance, ref initializationData);
     }
 
+    [HarmonyPatch(nameof(PartyScreenLogic.Initialize))]
     [HarmonyPostfix]
     private static void Postfix(PartyScreenLogic __instance)
     {
         if (ModInformation.IsClient && ContainerProvider.TryResolve<ExtortionAlternativeSelection>(out var selection))
             selection.HideSelectedCompanion(__instance);
+    }
+
+    [HarmonyPatch(nameof(PartyScreenLogic.TransferTroop))]
+    [HarmonyPrefix]
+    private static void TransferPrefix(PartyScreenLogic __instance, PartyScreenLogic.PartyCommand command, out int? __state)
+    {
+        __state = null;
+        if (ModInformation.IsClient && command.Type == PartyScreenLogic.TroopType.Member &&
+            command.RosterSide == PartyScreenLogic.PartyRosterSide.Right &&
+            ContainerProvider.TryResolve<ExtortionAlternativeSelection>(out var selection) && selection.OwnsScreen(__instance))
+            __state = __instance.MemberRosters[0].GetElementXp(command.Character);
+    }
+
+    [HarmonyPatch(nameof(PartyScreenLogic.TransferTroop))]
+    [HarmonyPostfix]
+    private static void TransferPostfix(PartyScreenLogic __instance, PartyScreenLogic.PartyCommand command, int? __state)
+    {
+        if (!__state.HasValue) return;
+        // Vanilla credits the left stack without debiting the private right stack.
+        var transferredXp = __instance.MemberRosters[0].GetElementXp(command.Character) - __state.Value;
+        __instance.MemberRosters[1].AddXpToTroop(command.Character, -transferredXp);
+        __instance.MemberRosters[1].UpdateVersion();
     }
 }
 

@@ -1,5 +1,4 @@
 ﻿using Common;
-using Common.Util;
 using HarmonyLib;
 using TaleWorlds.CampaignSystem.Issues;
 using TaleWorlds.CampaignSystem.MapEvents;
@@ -31,7 +30,7 @@ internal class ExtortionQuestWorldPatches
     private static bool StartAmbushPrefix(Quest __instance)
     {
         if (ModInformation.IsClient)
-            return ExtortionQuestMirrorScope.IsActive && AllowedThread.IsThisThreadAllowed();
+            return false;
         if (ContainerProvider.TryResolve<IExtortionQuestWorld>(out var world)) world.StartAmbush(__instance);
         return false;
     }

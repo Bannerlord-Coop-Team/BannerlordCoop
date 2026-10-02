@@ -120,10 +120,11 @@ internal readonly struct NetworkExtortionQuestState : IServerToClientCommand
     [ProtoMember(8)] public readonly bool AwayWarningSent;
     [ProtoMember(9)] public readonly ExtortionJournalEntry[] Journal;
     [ProtoMember(10)] public readonly bool StartAmbush;
+    [ProtoMember(11)] public readonly string AmbushMapEventId;
 
     public NetworkExtortionQuestState(string giverId, string questId, int state, string deserterPartyId,
         string defenderPartyId, CampaignTime runAwayDueTime, bool battleFinalized, bool awayWarningSent,
-        ExtortionJournalEntry[] journal, bool startAmbush = false)
+        ExtortionJournalEntry[] journal, bool startAmbush = false, string ambushMapEventId = null)
     {
         GiverId = giverId;
         QuestId = questId;
@@ -135,5 +136,6 @@ internal readonly struct NetworkExtortionQuestState : IServerToClientCommand
         AwayWarningSent = awayWarningSent;
         Journal = journal;
         StartAmbush = startAmbush;
+        AmbushMapEventId = ambushMapEventId;
     }
 }

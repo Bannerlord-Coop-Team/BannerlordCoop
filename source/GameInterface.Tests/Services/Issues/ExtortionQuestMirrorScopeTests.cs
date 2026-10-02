@@ -1,5 +1,7 @@
 ﻿using Common.Util;
 using GameInterface.Services.Issues;
+using Common;
+using HarmonyLib;
 using GameInterface.Services.Issues.Patches;
 using System;
 using TaleWorlds.CampaignSystem;
@@ -11,6 +13,7 @@ namespace GameInterface.Tests.Services.Issues;
 
 using Quest = ExtortionByDesertersIssueBehavior.ExtortionByDesertersIssueQuest;
 
+[Collection(ModInformationRoleCollection.Name)]
 public class ExtortionQuestMirrorScopeTests
 {
     [Fact]
@@ -31,22 +34,34 @@ public class ExtortionQuestMirrorScopeTests
     }
 
     [Fact]
-    public void AmbushBindsTheServerDefenderAndRejectsAnAcceptanceOnlyScope()
+    public void ClientAmbushCannotReplayWorldCreationEvenInsideAnAcceptanceScope()
     {
         var giver = ObjectHelper.SkipConstructor<Hero>();
         var deserters = ObjectHelper.SkipConstructor<MobileParty>();
         var defenders = ObjectHelper.SkipConstructor<MobileParty>();
         var quest = ObjectHelper.SkipConstructor<Quest>();
         quest._questGiver = giver;
+        quest._defenderMobileParty = defenders;
+        var harmony = new Harmony(nameof(ClientAmbushCannotReplayWorldCreationEvenInsideAnAcceptanceScope));
+        var wasServer = ModInformation.IsServer;
 
-        using (new ExtortionQuestMirrorScope(giver, deserters))
-            Assert.Throws<InvalidOperationException>(() => ExtortionQuestMirrorScope.ApplyDefender(quest));
-        Assert.Null(quest._defenderMobileParty);
-
-        using (new ExtortionQuestMirrorScope(giver, deserters, defenders))
+        try
         {
-            ExtortionQuestMirrorScope.ApplyDefender(quest);
+            ModInformation.IsServer = false;
+            harmony.CreateClassProcessor(typeof(ExtortionQuestDefenderCreationPatch)).Patch();
+            harmony.CreateClassProcessor(typeof(ExtortionQuestWorldPatches)).Patch();
+            using (new ExtortionQuestMirrorScope(giver, deserters))
+            using (new AllowedThread())
+            {
+                quest.StartAmbushEncounter();
+                quest.CreateDefenderParty();
+            }
             Assert.Same(defenders, quest._defenderMobileParty);
+        }
+        finally
+        {
+            harmony.UnpatchAll(harmony.Id);
+            ModInformation.IsServer = wasServer;
         }
     }
 

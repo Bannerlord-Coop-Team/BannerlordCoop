@@ -22,10 +22,5 @@ internal class ExtortionQuestCreationPatches
 internal class ExtortionQuestDefenderCreationPatch
 {
     [HarmonyPrefix]
-    private static bool Prefix(Quest __instance)
-    {
-        if (ModInformation.IsServer) return true;
-        ExtortionQuestMirrorScope.ApplyDefender(__instance);
-        return false;
-    }
+    private static bool Prefix() => ModInformation.IsServer;
 }

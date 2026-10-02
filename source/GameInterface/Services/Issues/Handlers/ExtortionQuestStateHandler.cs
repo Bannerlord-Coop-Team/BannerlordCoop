@@ -8,13 +8,19 @@ using GameInterface.Services.Heroes.HeirSelection.Messages;
 using GameInterface.Services.Issues.Generic.Migrated.GangLeaderNeedsToOffloadStolenGoods;
 using GameInterface.Services.Issues.Messages;
 using GameInterface.Services.MapEvents.Messages.Leave;
+using GameInterface.Services.MapEvents.Initialization;
 using GameInterface.Services.ObjectManager;
+using Helpers;
 using System;
 using System.Linq;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.CharacterDevelopment;
 using TaleWorlds.Core;
 using TaleWorlds.CampaignSystem.Issues;
+using TaleWorlds.CampaignSystem.Conversation;
+using TaleWorlds.CampaignSystem.Encounters;
+using TaleWorlds.CampaignSystem.GameMenus;
+using TaleWorlds.CampaignSystem.MapEvents;
 using TaleWorlds.CampaignSystem.Party;
 
 namespace GameInterface.Services.Issues.Handlers;
@@ -31,9 +37,11 @@ internal sealed class ExtortionQuestStateHandler : IHandler
     private readonly IIssueOwnershipRegistry ownership;
     private readonly IExtortionQuestWorld world;
     private readonly IExtortionQuestJournal journal;
+    private readonly IMapEventInitializationBarrier initialization;
 
     public ExtortionQuestStateHandler(IMessageBroker broker, INetwork network, IObjectManager objects,
-        IIssueOwnershipRegistry ownership, IExtortionQuestWorld world, IExtortionQuestJournal journal)
+        IIssueOwnershipRegistry ownership, IExtortionQuestWorld world, IExtortionQuestJournal journal,
+        IMapEventInitializationBarrier initialization)
     {
         this.broker = broker;
         this.network = network;
@@ -41,6 +49,7 @@ internal sealed class ExtortionQuestStateHandler : IHandler
         this.ownership = ownership;
         this.world = world;
         this.journal = journal;
+        this.initialization = initialization;
         ownership.OwnershipAssigned += journal.AssignOwner;
         broker.Subscribe<ExtortionQuestChanged>(Send);
         broker.Subscribe<NetworkExtortionQuestState>(Receive);
@@ -166,11 +175,14 @@ internal sealed class ExtortionQuestStateHandler : IHandler
         if (!objects.TryGetIdWithLogging(quest.QuestGiver, out var giverId)) return;
         if (!TryGetPartyId(quest._deserterMobileParty, out var deserterId) ||
             !TryGetPartyId(quest._defenderMobileParty, out var defenderId)) return;
+        string ambushId = null;
+        if (payload.What.StartAmbush &&
+            !objects.TryGetIdWithLogging(quest._deserterMobileParty?.MapEvent, out ambushId)) return;
 
         network.SendAll(new NetworkExtortionQuestState(giverId, quest.StringId, (int)quest._currentState,
             deserterId, defenderId, quest._desertersRunAwayTimeoutTime,
             quest._deserterBattleFinalizedForTheFirstTime, quest._playerAwayFromSettlementNotificationSent,
-            quest.JournalEntries.Select(entry => new ExtortionJournalEntry(entry)).ToArray(), payload.What.StartAmbush));
+            quest.JournalEntries.Select(entry => new ExtortionJournalEntry(entry)).ToArray(), payload.What.StartAmbush, ambushId));
     }
 
     private bool TryGetPartyId(MobileParty party, out string id)
@@ -227,11 +239,32 @@ internal sealed class ExtortionQuestStateHandler : IHandler
                 if (!previouslyWarned && data.AwayWarningSent)
                     MBInformationManager.AddQuickInformation(quest.OnPlayerLeftQuestSettlementNotificationText, 0,
                         giver.CharacterObject);
-                if (data.StartAmbush && deserters?.MapEvent?.IsRaid == true && defenders != null &&
-                    MobileParty.MainParty.MapEvent == deserters.MapEvent)
-                {
-                    using (new ExtortionQuestMirrorScope(giver, deserters, defenders)) quest.StartAmbushEncounter();
-                }
+                if (data.StartAmbush) QueueAmbush(quest, data.AmbushMapEventId);
+            }
+        });
+    }
+
+    internal void QueueAmbush(Quest quest, string mapEventId)
+    {
+        if (mapEventId == null || !objects.TryGetObjectWithLogging<MapEvent>(mapEventId, out var battle)) return;
+        initialization.RunAfterCommit(battle, () =>
+        {
+            if (!quest.IsOngoing || quest.QuestGiver.Issue?.IssueQuest != quest ||
+                !ownership.IsLocalPeerOwner(quest.QuestGiver) || !battle.IsRaid ||
+                quest._defenderMobileParty?.MapEvent != battle || quest._deserterMobileParty?.MapEvent != battle ||
+                MobileParty.MainParty.MapEvent != battle) return;
+
+            using (new AllowedThread())
+            {
+                // Adopt the existing raid without finishing it or replaying world creation.
+                PlayerEncounter.Start();
+                PlayerEncounter.Init();
+                PlayerEncounter.Current.PlayerPartyInitialStrength = PartyBase.MainParty.CalculateCurrentStrength();
+                var leader = ConversationHelper.GetConversationCharacterPartyLeader(quest._deserterMobileParty.Party);
+                GameMenu.ActivateGameMenu("encounter_meeting");
+                CampaignMapConversation.OpenConversation(
+                    new ConversationCharacterData(CharacterObject.PlayerCharacter, PartyBase.MainParty, noHorse: true),
+                    new ConversationCharacterData(leader, quest._deserterMobileParty.Party, noHorse: true));
             }
         });
     }
