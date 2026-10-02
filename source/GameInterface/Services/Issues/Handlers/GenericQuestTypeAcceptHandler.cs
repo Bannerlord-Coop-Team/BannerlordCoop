@@ -232,6 +232,9 @@ internal class GenericQuestTypeAcceptHandler : IHandler
             if (!objectManager.TryGetObjectWithLogging<Hero>(data.OwnerId, out var owner)) return;
 
             var descriptor = QuestTypeRegistry.Get(owner.Issue);
+            var hadOwner = ownershipRegistry.TryGetOwnerControllerId(owner, out var previousOwner);
+            if (hadOwner && previousOwner != data.OwnerControllerId) return;
+            ownershipRegistry.SetOwner(owner, data.OwnerControllerId);
             try
             {
                 if (descriptor?.MirrorQuestSolutionAcceptBytes != null)
@@ -245,12 +248,12 @@ internal class GenericQuestTypeAcceptHandler : IHandler
             }
             catch (Exception e)
             {
+                if (!hadOwner) ownershipRegistry.Clear(owner);
                 Logger.Error(e, "Failed to mirror {Message} for owner {Owner} - malformed or version-mismatched payload",
                     nameof(NetworkQuestTypeQuestAccepted), data.OwnerId);
                 return;
             }
 
-            ownershipRegistry.SetOwner(owner, data.OwnerControllerId);
         });
     }
 
@@ -426,6 +429,9 @@ internal class GenericQuestTypeAcceptHandler : IHandler
             if (!objectManager.TryGetObjectWithLogging<Hero>(data.OwnerId, out var owner) || owner.Issue == null) return;
 
             var descriptor = QuestTypeRegistry.Get(owner.Issue);
+            var hadOwner = ownershipRegistry.TryGetOwnerControllerId(owner, out var previousOwner);
+            if (hadOwner && previousOwner != data.OwnerControllerId) return;
+            ownershipRegistry.SetOwner(owner, data.OwnerControllerId);
             try
             {
                 ApplyReceivedTroops(owner, data.SentTroops);
@@ -440,12 +446,12 @@ internal class GenericQuestTypeAcceptHandler : IHandler
             }
             catch (Exception e)
             {
+                if (!hadOwner) ownershipRegistry.Clear(owner);
                 Logger.Error(e, "Failed to mirror {Message} for owner {Owner} - malformed or version-mismatched payload",
                     nameof(NetworkQuestTypeAlternativeAccepted), data.OwnerId);
                 return;
             }
 
-            ownershipRegistry.SetOwner(owner, data.OwnerControllerId);
         });
     }
 

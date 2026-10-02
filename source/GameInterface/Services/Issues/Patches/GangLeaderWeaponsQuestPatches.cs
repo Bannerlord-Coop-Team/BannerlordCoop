@@ -5,7 +5,9 @@ using GameInterface.Policies;
 using GameInterface.Services.Issues.Generic;
 using GameInterface.Services.Issues.Generic.Migrated.GangLeaderNeedsWeapons;
 using GameInterface.Services.Issues.Messages;
+using GameInterface.Services.Players;
 using HarmonyLib;
+using Helpers;
 using System;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Encounters;
@@ -209,4 +211,39 @@ internal static class GangLeaderWeaponsAlternativeStartPatch
     [HarmonyPrefix]
     private static bool Prefix() => AlternativeSolutionStartAuthorityGuard.IsActive ||
         CallOriginalPolicy.IsOriginalAllowedForOwnershipGate();
+}
+
+[HarmonyPatch(typeof(IssueBase), "get_IssueQuestCanBeDuplicated")]
+internal static class GangLeaderWeaponsDuplicateEligibilityPatch
+{
+    [HarmonyPrefix]
+    private static bool Prefix(IssueBase __instance, ref bool __result)
+    {
+        if (__instance is not Issue || CallOriginalPolicy.IsOriginalAllowedForOwnershipGate() ||
+            Hero.MainHero == null || !PlayerManager.TryGetControlledObjectInfo(Hero.MainHero, out var player) ||
+            !ContainerProvider.TryResolve<IIssueOwnershipRegistry>(out var ownership)) return true;
+        foreach (var entry in Campaign.Current.IssueManager.Issues)
+        {
+            if (entry.Value is not Issue || (!entry.Value.IsSolvingWithQuest && !entry.Value.IsSolvingWithAlternative)) continue;
+            if (!ownership.TryGetOwnerControllerId(entry.Key, out var controllerId) || controllerId == player.ObjectControllerId)
+            {
+                __result = false;
+                return false;
+            }
+        }
+        __result = true;
+        return false;
+    }
+}
+
+[HarmonyPatch(typeof(MapEventHelper), nameof(MapEventHelper.OnConversationEnd))]
+internal static class GangLeaderWeaponsObserverConversationPatch
+{
+    [HarmonyPrefix]
+    private static bool Prefix()
+    {
+        var quest = GangLeaderWeaponsActionScope.Current;
+        if (quest == null || ModInformation.IsServer || CallOriginalPolicy.IsOriginalAllowedForOwnershipGate()) return true;
+        return ContainerProvider.TryResolve<IIssueOwnershipRegistry>(out var ownership) && ownership.IsLocalPeerOwner(quest.QuestGiver);
+    }
 }

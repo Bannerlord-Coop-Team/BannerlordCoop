@@ -168,6 +168,7 @@ internal sealed class GangLeaderWeaponsActionScope : IDisposable
     }
 
     public static bool Contains(Quest quest) => current == quest;
+    public static Quest Current => current;
 
     public void Dispose() => current = previous;
 }

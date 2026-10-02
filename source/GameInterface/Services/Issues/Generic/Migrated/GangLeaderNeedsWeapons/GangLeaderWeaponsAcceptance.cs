@@ -44,6 +44,7 @@ internal sealed class GangLeaderWeaponsAcceptance : IGangLeaderWeaponsAcceptance
     public void ReplayQuestAccepted(Hero owner)
     {
         if (owner?.Issue is not Issue issue || !issue.IsOngoingWithoutQuest) return;
+        if (!issue.CheckPreconditions(owner, out _)) return;
 
         using (new IssueDispatchReplayGuard())
         {
@@ -80,7 +81,7 @@ internal sealed class GangLeaderWeaponsAcceptance : IGangLeaderWeaponsAcceptance
             var quest = new Quest(fields.QuestId, owner, fields.DueTime, fields.RewardGold,
                 fields.WeaponClassIndex, fields.Amount, fields.Difficulty, fields.AveragePrice);
             issue.IssueQuest = quest;
-            quest.StartQuest();
+            using (new GangLeaderWeaponsActionScope(quest)) quest.StartQuest();
             // Observers must not initialize another player's progress from their inventory.
             quest._collectedItemAmount = fields.CollectedAmount;
             quest._playerStartsQuestLog = quest.AddDiscreteLog(quest.PlayerStartsQuestLogText,
@@ -91,6 +92,7 @@ internal sealed class GangLeaderWeaponsAcceptance : IGangLeaderWeaponsAcceptance
     public void ReplayAlternativeAccepted(Hero owner)
     {
         if (owner?.Issue is not Issue issue || !issue.IsOngoingWithoutQuest) return;
+        if (!issue.CheckPreconditions(owner, out _)) return;
         using (new IssueDispatchReplayGuard())
         {
             issue.StartIssueWithAlternativeSolution();
@@ -100,7 +102,7 @@ internal sealed class GangLeaderWeaponsAcceptance : IGangLeaderWeaponsAcceptance
     public bool TryCaptureAlternativeFields(Hero owner, out GangLeaderWeaponsAlternativeFields fields)
     {
         fields = default;
-        if (owner?.Issue is not Issue issue) return false;
+        if (owner?.Issue is not Issue issue || !issue.IsSolvingWithAlternative) return false;
         fields = new GangLeaderWeaponsAlternativeFields(issue._issueDifficultyMultiplier,
             AlternativeSolutionVanillaStateSync.Capture(issue));
         return true;
