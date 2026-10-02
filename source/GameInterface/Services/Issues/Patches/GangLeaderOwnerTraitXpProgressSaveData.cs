@@ -1,4 +1,4 @@
-using Common.Logging;
+﻿using Common.Logging;
 using GameInterface.Services.Issues.Generic.Migrated.GangLeaderNeedsToOffloadStolenGoods;
 using HarmonyLib;
 using Serilog;
@@ -87,7 +87,6 @@ internal class GangLeaderOwnerTraitXpProgressPersistencePatches
             saveData = progressRegistry.Snapshot()
                 .SelectMany(kvp => kvp.Value.GetProperties()
                     .Select(trait => (trait, xp: kvp.Value.GetPropertyValue(trait)))
-                    .Where(t => t.xp != 0)
                     .Select(t => new GangLeaderOwnerTraitXpProgressSaveData(kvp.Key, t.trait.StringId, t.xp)))
                 .ToList();
         }
@@ -110,7 +109,8 @@ internal class GangLeaderOwnerTraitXpProgressPersistencePatches
                 progress = new PropertyOwner<PropertyObject>();
                 byOwner[entry.Owner] = progress;
             }
-            progress.SetPropertyValue(trait, entry.XpValue);
+            // Explicit zero entries distinguish known progress from an uninitialized trait.
+            progress._attributes[trait] = entry.XpValue;
         }
 
         progressRegistry.RestoreAll(byOwner);

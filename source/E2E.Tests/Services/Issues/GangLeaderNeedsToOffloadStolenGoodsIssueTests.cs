@@ -1,4 +1,4 @@
-using Common.Messaging;
+﻿using Common.Messaging;
 using Common.Util;
 using E2E.Tests.Environment;
 using E2E.Tests.Environment.Instance;
@@ -1065,7 +1065,7 @@ public class GangLeaderNeedsToOffloadStolenGoodsIssueTests : IDisposable
     }
 
     [Fact]
-    public void RequestIssueRemoved_QuestBetrayal_ByGivingBackTheGoods_OwnerAlreadyAtANonzeroHonorLevel_DoesNotDemoteIt()
+    public void GivingBackTheGoodsKeepsHonorLevelAndTheRewardSurvivesRivalQuestAcceptance()
     {
         var fixture = SetupIssueOwner();
         CreateIssueOnServer(fixture);
@@ -1117,6 +1117,71 @@ public class GangLeaderNeedsToOffloadStolenGoodsIssueTests : IDisposable
         {
             Assert.True(Server.ObjectManager.TryGetObject<Hero>(fixture.HeroId, out var owner));
             Assert.Equal(1, owner.GetTraitLevel(DefaultTraits.Honor));
+        });
+
+        var giverId = TestEnvironment.CreateRegisteredObject<Hero>();
+        var targetId = TestEnvironment.CreateRegisteredObject<Hero>();
+        var targetPartyId = TestEnvironment.CreateRegisteredObject<MobileParty>();
+        var kingdomId = TestEnvironment.CreateRegisteredObject<Kingdom>();
+        var troopId = TestEnvironment.CreateRegisteredObject<CharacterObject>();
+        foreach (var instance in AllInstances)
+        {
+            instance.Call(() =>
+            {
+                Assert.True(instance.ObjectManager.TryGetObject<Hero>(fixture.HeroId, out var player));
+                Assert.True(instance.ObjectManager.TryGetObject<Hero>(giverId, out var giver));
+                Assert.True(instance.ObjectManager.TryGetObject<Hero>(targetId, out var target));
+                Assert.True(instance.ObjectManager.TryGetObject<MobileParty>(partyId, out var party));
+                Assert.True(instance.ObjectManager.TryGetObject<MobileParty>(targetPartyId, out var targetParty));
+                Assert.True(instance.ObjectManager.TryGetObject<Kingdom>(kingdomId, out var kingdom));
+                Assert.True(instance.ObjectManager.TryGetObject<Settlement>(fixture.OwnerSettlementId, out var settlement));
+                Assert.True(instance.ObjectManager.TryGetObject<CharacterObject>(troopId, out var troop));
+                using (new AllowedThread())
+                {
+                    Campaign.Current.PlayerTraitDeveloper ??= new PropertyOwner<PropertyObject>();
+                    player.Clan.SetLeader(player);
+                    giver.Clan.SetLeader(giver);
+                    target.Clan.SetLeader(target);
+                    player.Clan._kingdom = kingdom;
+                    giver.Clan._kingdom = kingdom;
+                    player.Clan._tier = 2;
+                    giver.StayingInSettlement = settlement;
+                    player.PartyBelongedTo = party;
+                    target.PartyBelongedTo = targetParty;
+                    party.ActualClan = player.Clan;
+                    party.MemberRoster.AddToCounts(troop, 50);
+                    if (instance == Client) Campaign.Current.PlayerTraitDeveloper.SetPropertyValue(DefaultTraits.Honor, 0);
+                }
+            });
+        }
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject<Hero>(giverId, out var giver));
+            Assert.True(Server.ObjectManager.TryGetObject<Hero>(targetId, out var target));
+            var data = new PotentialIssueData((in PotentialIssueData _, Hero owner) =>
+                new LordWantsRivalCapturedIssueBehavior.LordWantsRivalCapturedIssue(owner, target),
+                typeof(LordWantsRivalCapturedIssueBehavior.LordWantsRivalCapturedIssue), IssueBase.IssueFrequency.Rare);
+            Assert.True(Campaign.Current.IssueManager.CreateNewIssue(in data, giver));
+        });
+        Client.Call(() =>
+        {
+            Assert.True(Client.ObjectManager.TryGetObject<Hero>(fixture.HeroId, out var player));
+            Assert.True(Client.ObjectManager.TryGetObject<MobileParty>(partyId, out var party));
+            Assert.True(Client.ObjectManager.TryGetObject<Hero>(giverId, out var giver));
+            using (new MainHeroSubstitutionScope(player, party))
+            {
+                MessageBroker.Instance.Publish(giver, new IssueConversationOpenedLocally(giver, "owner-controller"));
+                Assert.True(Campaign.Current.IssueManager.StartIssueQuest(giver));
+                Assert.Equal(1100, Campaign.Current.PlayerTraitDeveloper.GetPropertyValue(DefaultTraits.Honor));
+            }
+        });
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject<Hero>(fixture.HeroId, out var player));
+            Assert.True(Server.ObjectManager.TryGetObject<Hero>(giverId, out var giver));
+            Assert.True(giver.Issue.IssueQuest.IsOngoing);
+            Assert.True(GangLeaderNeedsToOffloadStolenGoodsQuestType.OwnerTraitXpProgress.TryGet(player, out var saved));
+            Assert.Equal(1100, saved.GetPropertyValue(DefaultTraits.Honor));
         });
     }
 
@@ -1382,6 +1447,7 @@ public class GangLeaderNeedsToOffloadStolenGoodsIssueTests : IDisposable
 
             var progress = new PropertyOwner<PropertyObject>();
             progress.SetPropertyValue(DefaultTraits.Calculating, 950);
+            progress._attributes[DefaultTraits.Honor] = 0;
             GangLeaderNeedsToOffloadStolenGoodsQuestType.OwnerTraitXpProgress.Set(owner, progress);
 
             var behavior = new IssuesCampaignBehavior();
@@ -1395,6 +1461,8 @@ public class GangLeaderNeedsToOffloadStolenGoodsIssueTests : IDisposable
 
             Assert.True(GangLeaderNeedsToOffloadStolenGoodsQuestType.OwnerTraitXpProgress.TryGet(owner, out var restored));
             Assert.Equal(950, restored.GetPropertyValue(DefaultTraits.Calculating));
+            Assert.True(restored.HasProperty(DefaultTraits.Honor));
+            Assert.Equal(0, restored.GetPropertyValue(DefaultTraits.Honor));
             Assert.Equal(0, owner.GetTraitLevel(DefaultTraits.Calculating));
         });
 

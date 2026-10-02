@@ -512,6 +512,36 @@ public sealed class LordWantsRivalCapturedTests : IDisposable
             Assert.Equal(20, saved.GetPropertyValue(DefaultTraits.Honor));
         });
         Client.Call(() => Assert.Equal(20, Campaign.Current.PlayerTraitDeveloper.GetPropertyValue(DefaultTraits.Honor)));
+        Client.Call(() => TraitLevelingHelper.OnIssueSolvedThroughQuest(Get<Hero>(Client, giverId), DefaultTraits.Honor, 20));
+        Server.Call(() =>
+        {
+            Assert.True(GangLeaderNeedsToOffloadStolenGoodsQuestType.OwnerTraitXpProgress
+                .TryGet(Get<Hero>(Server, playerId), out var saved));
+            Assert.Equal(40, saved.GetPropertyValue(DefaultTraits.Honor));
+        });
+    }
+
+    [Fact]
+    public void AcceptanceBaselineCannotOverwriteEstablishedZeroHonorProgress()
+    {
+        Client.Call(() => Client.Resolve<ILordWantsRivalCapturedQuestService>().PrepareAcceptance(Get<Hero>(Client, giverId)));
+        Server.Call(() =>
+        {
+            Assert.True(GangLeaderNeedsToOffloadStolenGoodsQuestType.OwnerTraitXpProgress
+                .TryGet(Get<Hero>(Server, playerId), out var saved));
+            Assert.True(saved.HasProperty(DefaultTraits.Honor));
+            Assert.Equal(0, saved.GetPropertyValue(DefaultTraits.Honor));
+        });
+        Client.Call(() => Campaign.Current.PlayerTraitDeveloper.SetPropertyValue(DefaultTraits.Honor, 500));
+        Accept();
+        Client.Call(() => Assert.Equal(0, Campaign.Current.PlayerTraitDeveloper.GetPropertyValue(DefaultTraits.Honor)));
+        Server.Call(() =>
+        {
+            Assert.True(GangLeaderNeedsToOffloadStolenGoodsQuestType.OwnerTraitXpProgress
+                .TryGet(Get<Hero>(Server, playerId), out var saved));
+            Assert.True(saved.HasProperty(DefaultTraits.Honor));
+            Assert.Equal(0, saved.GetPropertyValue(DefaultTraits.Honor));
+        });
     }
 
     [Fact]
