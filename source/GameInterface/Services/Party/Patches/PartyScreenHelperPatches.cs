@@ -71,6 +71,9 @@ internal class PartyScreenHelperPatches
         (PartyState State, PartyScreenLogic Screen, TroopRoster Roster) __state)
     {
         if (__state.State?.PartyScreenLogic != null || __state.Roster == null) return;
+        if (PartyScreenLogicPatches.IsQuestScreenInvalidated(__state.Screen) &&
+            Campaign.Current.ConversationManager.IsConversationInProgress)
+            Campaign.Current.ConversationManager.EndConversation();
         MessageBroker.Instance.Publish(__state.Screen, new QuestAlternativeTroopSelectionClosed(__state.Roster));
     }
 

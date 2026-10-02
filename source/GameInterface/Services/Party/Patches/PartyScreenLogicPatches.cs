@@ -11,6 +11,7 @@ using Helpers;
 using Serilog;
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Runtime.CompilerServices;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Actions;
@@ -29,7 +30,17 @@ internal class PartyScreenLogicPatches
     private static readonly ConditionalWeakTable<PartyScreenLogic, object> invalidatedQuestScreens = new();
 
     internal static void InvalidateQuestScreen(PartyScreenLogic screen)
-        => invalidatedQuestScreens.GetValue(screen, _ => new object());
+    {
+        invalidatedQuestScreens.GetValue(screen, _ => new object());
+        // Done only closes this screen now, so the empty selection must not disable it.
+        screen.PartyPresentationDoneButtonConditionDelegate = null;
+        screen.SetPartyGoldChangeAmount(0);
+        screen.OnReset(false);
+    }
+
+    internal static bool IsQuestScreenInvalidated(PartyScreenLogic screen)
+        => invalidatedQuestScreens.TryGetValue(screen, out _);
+
     [ThreadStatic]
     private static bool _inCommit;
     [ThreadStatic]
@@ -224,6 +235,7 @@ internal class PartyScreenLogicPatches
                 __instance.MemberRosters[(int)PartyScreenLogic.PartyRosterSide.Right] == MobileParty.MainParty?.MemberRoster
                 ? __instance.MemberRosters[(int)PartyScreenLogic.PartyRosterSide.Left] : null;
             var questSelectionSnapshot = questSelectionRoster == null ? null : CopyRoster(questSelectionRoster);
+            var partyGoldChangeAmount = __instance.CurrentData.PartyGoldChangeAmount;
             var rightMemberRoster = __instance.MemberRosters[1];
             var initialRightMemberRoster = __instance._initialData.RightMemberRoster;
             if (questSelectionRoster != null)
@@ -233,6 +245,8 @@ internal class PartyScreenLogicPatches
                 rightMemberRoster.Add(questSelectionRoster);
                 initialRightMemberRoster = CopyRoster(initialRightMemberRoster);
                 initialRightMemberRoster.Add(__instance._initialData.LeftMemberRoster);
+                partyGoldChangeAmount += questSelectionRoster.Sum(element =>
+                    element.Character.TroopWage * element.Number * __instance.QuestModeWageDaysMultiplier);
             }
             FlattenedTroopRoster recruitedPrisonersRoster = new FlattenedTroopRoster(4);
             foreach (Tuple<CharacterObject, int> tuple in __instance.CurrentData.RecruitedPrisonersHistory)
@@ -263,7 +277,7 @@ internal class PartyScreenLogicPatches
                 __instance.RightOwnerParty.ItemRoster,
                 __instance.CurrentData.UpgradedTroopsHistory,
                 __instance.CurrentData.LeftParty,
-                __instance.CurrentData.PartyGoldChangeAmount,
+                partyGoldChangeAmount,
                 __instance.CurrentData.PartyInfluenceChangeAmount.Item2,
                 __instance.CurrentData.PartyMoraleChangeAmount,
                 __instance.DoNotApplyGoldTransactions,
@@ -274,7 +288,7 @@ internal class PartyScreenLogicPatches
                 forceTransferId
             );
 
-            // Alternative acceptance owns the selected troop transfer; Done still applies quest wages.
+            // Alternative acceptance owns the troop transfer and wages; Done still commits upgrades.
             MessageBroker.Instance.Publish(__instance, message);
             // Manage changing rosters on the server
             using (new AllowedThread())

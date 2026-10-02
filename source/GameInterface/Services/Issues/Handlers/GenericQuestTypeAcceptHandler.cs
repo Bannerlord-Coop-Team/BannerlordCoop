@@ -23,6 +23,7 @@ using GameInterface.Services.TroopRosters.Interfaces;
 using LiteNetLib;
 using Serilog;
 using TaleWorlds.CampaignSystem;
+using TaleWorlds.CampaignSystem.Actions;
 using TaleWorlds.CampaignSystem.Issues;
 using TaleWorlds.CampaignSystem.GameState;
 using TaleWorlds.Core;
@@ -538,9 +539,10 @@ internal class GenericQuestTypeAcceptHandler : IHandler
 
             AlternativeSolutionVanillaState state;
             byte[] fieldsBytes = null;
+            int wages;
             try
             {
-                state = AlternativeSolutionStartRunner.StartOnServerFromClaim(owner, player, validatedRoster);
+                state = AlternativeSolutionStartRunner.StartOnServerFromClaim(owner, player, validatedRoster, out wages);
 
                 if (descriptor.TryArbitrateAlternativeAcceptBytes != null)
                 {
@@ -563,6 +565,11 @@ internal class GenericQuestTypeAcceptHandler : IHandler
                 return;
             }
 
+            QuestSolutionStartRunner.RunGuarded(player, () =>
+            {
+                GiveGoldAction.ApplyBetweenCharacters(null, Hero.MainHero, -wages, false);
+                return true;
+            });
             ownershipRegistry.SetOwner(owner, player.ControllerId);
             var validatedTroops = troopRosterInterface.PackTroopRosterData(owner.Issue.AlternativeSolutionSentTroops);
             network.SendAll(new NetworkQuestTypeAlternativeAccepted(ownerId, player.ControllerId, state, fieldsBytes, validatedTroops));

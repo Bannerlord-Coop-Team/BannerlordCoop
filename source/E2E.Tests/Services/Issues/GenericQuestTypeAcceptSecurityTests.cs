@@ -2,6 +2,7 @@
 using E2E.Tests.Environment;
 using E2E.Tests.Environment.Instance;
 using GameInterface.Services.Entity;
+using GameInterface.Services.Heroes.Patches;
 using GameInterface.Services.Issues.Generic;
 using GameInterface.Services.Issues.Generic.AcceptMirror;
 using GameInterface.Services.Issues.Interfaces;
@@ -14,7 +15,9 @@ using Helpers;
 using Moq;
 using System;
 using System.Linq;
+using System.Runtime.CompilerServices;
 using TaleWorlds.CampaignSystem;
+using TaleWorlds.CampaignSystem.CampaignBehaviors;
 using TaleWorlds.CampaignSystem.ComponentInterfaces;
 using TaleWorlds.CampaignSystem.Encyclopedia;
 using TaleWorlds.CampaignSystem.Issues;
@@ -22,6 +25,7 @@ using TaleWorlds.CampaignSystem.GameState;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Roster;
 using TaleWorlds.CampaignSystem.Settlements;
+using TaleWorlds.CampaignSystem.ViewModelCollection.Party;
 using TaleWorlds.Core;
 using Xunit.Abstractions;
 
@@ -73,6 +77,22 @@ public class GenericQuestTypeAcceptSecurityTests : IDisposable
         screen._initialData.RightPrisonerRoster = TroopRoster.CreateDummyTroopRoster();
         screen._initialData.RightItemRoster = new ItemRoster();
         return screen;
+    }
+
+    private static PartyVM CreateQuestSelectionView(PartyScreenLogic screen)
+    {
+        // Skip rendering setup while exercising native ExecuteDone and CloseScreen.
+        var view = (PartyVM)RuntimeHelpers.GetUninitializedObject(typeof(PartyVM));
+        view.PartyScreenLogic = screen;
+        view.MainPartyTroops = new();
+        view.MainPartyPrisoners = new();
+        view.OtherPartyTroops = new();
+        view.OtherPartyPrisoners = new();
+        view._lockedTroopIds = new();
+        view._lockedPrisonerIds = new();
+        // This constructor dependency is readonly in the native assembly.
+        AccessTools.Field(typeof(PartyVM), "_viewDataTracker").SetValue(view, Mock.Of<IViewDataTracker>());
+        return view;
     }
 
     private VillageFixture SetupVillageOwner()
@@ -842,7 +862,7 @@ public class GenericQuestTypeAcceptSecurityTests : IDisposable
     [InlineData(false, true)]
     [InlineData(true, false)]
     [InlineData(true, true)]
-    public void CompetingAcceptance_BeforeDone_CancelsOpenSelectionWithoutCommittingWinnerTroops(
+    public void CompetingAcceptance_ExecuteDone_ClosesInvalidatedSelectionWithoutCommittingWinnerTroops(
         bool alternativeWinner, bool resetBeforeAcceptance)
     {
         var fixture = SetupVillageOwner();
@@ -873,6 +893,18 @@ public class GenericQuestTypeAcceptSecurityTests : IDisposable
             var screen = CreateQuestSelectionScreen(roster, party);
             screen._initialData.LeftMemberRoster.Add(roster);
             screen.RightOwnerParty = party.Party;
+            screen._initialData.PartyGoldChangeAmount = -50;
+            Campaign.Current.ConversationManager._conversationAgents.Add(
+                Mock.Of<IAgent>(agent => agent.Character == owner.CharacterObject));
+            Campaign.Current.ConversationManager.IsConversationInProgress = true;
+            screen.PartyPresentationDoneButtonConditionDelegate = new IssuesCampaignBehavior().PartyScreenDoneCondition;
+            var view = CreateQuestSelectionView(screen);
+            bool? doneActiveAfterRefresh = null;
+            var refreshCallback = new PartyScreenLogic.AfterResetDelegate((logic, fromCancel) =>
+            {
+                if (!fromCancel) doneActiveAfterRefresh = logic.IsDoneActive();
+            });
+            typeof(PartyScreenLogic).GetEvent("AfterReset")!.AddEventHandler(screen, refreshCallback);
             var doneCalls = 0;
             var closedCalls = 0;
             screen.PartyPresentationDoneButtonDelegate = (_, _, _, _, _, _, _, _, _) =>
@@ -892,6 +924,10 @@ public class GenericQuestTypeAcceptSecurityTests : IDisposable
             partyState.PartyScreenLogic = screen;
             states._gameStates.Add(partyState);
 
+            Assert.False(screen.IsDoneActive());
+            view.ExecuteDone();
+            Assert.Same(screen, partyState.PartyScreenLogic);
+
             var before = TroopRoster.CreateDummyTroopRoster();
             before.Add(roster);
             using (new AllowedThread())
@@ -904,6 +940,7 @@ public class GenericQuestTypeAcceptSecurityTests : IDisposable
             Common.Messaging.MessageBroker.Instance.Publish(owner,
                 new QuestAlternativeTroopsTransferredLocally(roster, before, after));
             if (resetBeforeAcceptance) screen.Reset(false);
+            Hero.MainHero.Gold = 0;
 
             if (alternativeWinner)
             {
@@ -924,7 +961,12 @@ public class GenericQuestTypeAcceptSecurityTests : IDisposable
             Assert.Equal(6, party.MemberRoster.GetTroopCount(localTroop));
             Assert.Equal(1, party.MemberRoster.GetTroopCount(companion.CharacterObject));
             Assert.NotSame(roster, screen.MemberRosters[0]);
-            Assert.True(screen.DoneLogic(false));
+            Assert.True(doneActiveAfterRefresh);
+            Assert.True(screen.IsDoneActive());
+            view.ExecuteDone();
+            Assert.Null(partyState.PartyScreenLogic);
+            Assert.False(Campaign.Current.ConversationManager.IsConversationInProgress);
+            Assert.Empty(Campaign.Current.ConversationManager.ConversationAgents);
             screen.Reset(false);
             screen.Reset(true);
             screen.OnPartyScreenClosed(false);
@@ -981,7 +1023,7 @@ public class GenericQuestTypeAcceptSecurityTests : IDisposable
     }
 
     [Fact]
-    public void QuestScreenDoneAndClose_SendsWagesWithoutTroopCommitBeforeAlternativeAcceptance()
+    public void QuestScreenDoneAndClose_DefersWagesAndTroopTransferToAlternativeAcceptance()
     {
         var fixture = SetupVillageOwner();
         CreateIssueOnBothPeers(fixture);
@@ -1003,7 +1045,8 @@ public class GenericQuestTypeAcceptSecurityTests : IDisposable
             Assert.True(Client.ObjectManager.AddNewObject(Hero.MainHero, out _));
 
             var screen = CreateQuestSelectionScreen(roster, party);
-            screen.CurrentData.PartyGoldChangeAmount = -120;
+            screen.QuestModeWageDaysMultiplier = 4;
+            screen.CurrentData.PartyGoldChangeAmount = -troop.TroopWage * 6 * screen.QuestModeWageDaysMultiplier;
             screen.RightOwnerParty = party.Party;
             screen.PartyPresentationDoneButtonDelegate = (_, _, _, _, _, _, _, _, _) => true;
             using (new AllowedThread())
@@ -1015,7 +1058,7 @@ public class GenericQuestTypeAcceptSecurityTests : IDisposable
             Assert.True(screen.DoneLogic(false));
             screen.OnPartyScreenClosed(false);
             var done = Assert.Single(Client.NetworkSentMessages.GetMessages<NetworkCompleteDoneLogic>());
-            Assert.Equal(-120, done.PartyGoldChangeAmount);
+            Assert.Equal(0, done.PartyGoldChangeAmount);
             Assert.Empty(done.LeftMemberRosterData.Data);
             Assert.Empty(done.RightMemberRosterData.Data);
             Assert.Equal(6, party.MemberRoster.GetTroopCount(troop));
@@ -1065,7 +1108,7 @@ public class GenericQuestTypeAcceptSecurityTests : IDisposable
 
             var screen = CreateQuestSelectionScreen(roster, party);
             screen._initialData.LeftMemberRoster.AddToCounts(companion.CharacterObject, 1);
-            screen.CurrentData.PartyGoldChangeAmount = -120;
+            screen.QuestModeWageDaysMultiplier = 4;
             screen.RightPartyLeader = Hero.MainHero.CharacterObject;
             screen.RightOwnerParty = party.Party;
             screen.PartyPresentationDoneButtonDelegate = (_, _, _, _, _, _, _, _, _) => true;
@@ -1086,12 +1129,14 @@ public class GenericQuestTypeAcceptSecurityTests : IDisposable
                     party.MemberRoster.AddToCounts(upgraded, -1);
                     roster.AddToCounts(upgraded, 1);
                 }
+                screen.CurrentData.PartyGoldChangeAmount -= roster.Sum(element =>
+                    element.Character.TroopWage * element.Number * screen.QuestModeWageDaysMultiplier);
             }
 
             Assert.True(screen.DoneLogic(false));
             screen.OnPartyScreenClosed(false);
             var done = Assert.Single(Client.NetworkSentMessages.GetMessages<NetworkCompleteDoneLogic>());
-            Assert.Equal(-140, done.PartyGoldChangeAmount);
+            Assert.Equal(-20, done.PartyGoldChangeAmount);
             Assert.Empty(done.LeftMemberRosterData.Data);
             Assert.Equal(2, done.RightMemberRosterData.Data.Length);
             var originalDelta = Assert.Single(done.RightMemberRosterData.Data,
@@ -1114,20 +1159,43 @@ public class GenericQuestTypeAcceptSecurityTests : IDisposable
         });
     }
 
-    [Fact]
-    public void QuestScreenDone_RejectedAlternative_RestoresPreselectedCompanionOnce()
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void QuestScreenClose_RejectedAlternative_RestoresCompanionAndChargesOnlyUpgrades(bool upgradeTroop)
     {
         var fixture = SetupVillageOwner();
         CreateIssueOnBothPeers(fixture);
-        var partyId = TestEnvironment.CreateRegisteredObject<MobileParty>();
-        var troopId = TestEnvironment.CreateRegisteredObject<CharacterObject>();
-        var controllerId = "player-A-" + Guid.NewGuid();
-        Server.Call(() =>
+        ConnectPlayer(fixture);
+        var partyId = lastConnectedPartyId;
+        var troopId = lastConnectedEligibleTroopId;
+        var upgradedId = TestEnvironment.CreateRegisteredObject<CharacterObject>();
+        TestEnvironment.FlushCoalescer();
+        foreach (var instance in new[] { Server, Client })
         {
-            Assert.True(Server.Resolve<IPlayerManager>().AddPlayer(new Player(controllerId, fixture.HeroId, partyId, "", "")));
-        });
-        TestEnvironment.ConnectRegisteredPlayer(Client, controllerId);
-        Client.Resolve<IControllerIdProvider>().SetControllerId(controllerId);
+            instance.Call(() =>
+            {
+                var owner = instance.GetRegisteredObject<Hero>(fixture.HeroId);
+                var companion = instance.GetRegisteredObject<Hero>(fixture.CompanionHeroId);
+                var party = instance.GetRegisteredObject<MobileParty>(partyId);
+                var troop = instance.GetRegisteredObject<CharacterObject>(troopId);
+                var upgraded = instance.GetRegisteredObject<CharacterObject>(upgradedId);
+                var upgradeModel = new Mock<PartyTroopUpgradeModel>();
+                upgradeModel.Setup(model => model.GetXpCostForUpgrade(party.Party, troop, upgraded)).Returns(100);
+                upgradeModel.Setup(model => model.GetGoldCostForUpgrade(party.Party, troop, upgraded))
+                    .Returns(new ExplainedNumber(20));
+                Campaign.Current.Models.PartyTroopUpgradeModel = upgradeModel.Object;
+                using (new AllowedThread())
+                {
+                    owner.PartyBelongedTo = party;
+                    owner.Gold = 1000000;
+                    troop.UpgradeTargets = new[] { upgraded };
+                    party.MemberRoster.AddToCounts(troop, 8 - party.MemberRoster.GetTroopCount(troop), false, 0, 500);
+                    party.MemberRoster.AddToCounts(companion.CharacterObject,
+                        1 - party.MemberRoster.GetTroopCount(companion.CharacterObject));
+                }
+            });
+        }
         var router = Server.Resolve<TestNetworkRouter>();
         router.AutoDrainReady = false;
 
@@ -1137,47 +1205,80 @@ public class GenericQuestTypeAcceptSecurityTests : IDisposable
             Assert.True(Client.ObjectManager.TryGetObject<Hero>(fixture.CompanionHeroId, out var companion));
             Assert.True(Client.ObjectManager.TryGetObject<MobileParty>(partyId, out var party));
             Assert.True(Client.ObjectManager.TryGetObject<CharacterObject>(troopId, out var troop));
+            using var scope = new MainHeroSubstitutionScope(owner, party);
             var roster = owner.Issue.AlternativeSolutionSentTroops;
             using (new AllowedThread())
             {
-                Campaign.Current.MainParty = party;
-                party.MemberRoster.AddToCounts(troop, 6);
+                party.MemberRoster.AddToCounts(companion.CharacterObject, -1);
                 roster.AddToCounts(companion.CharacterObject, 1);
             }
 
             var screen = CreateQuestSelectionScreen(roster, party);
             screen._initialData.LeftMemberRoster.AddToCounts(companion.CharacterObject, 1);
+            screen.QuestModeWageDaysMultiplier = owner.Issue.GetTotalAlternativeSolutionDurationInDays();
+            screen.RightPartyLeader = owner.CharacterObject;
             screen.RightOwnerParty = party.Party;
             screen.PartyPresentationDoneButtonDelegate = (_, _, _, _, _, _, _, _, _) => true;
+            if (upgradeTroop)
+            {
+                var upgrade = new PartyScreenLogic.PartyCommand();
+                upgrade.FillForUpgradeTroop(PartyScreenLogic.PartyRosterSide.Right,
+                    PartyScreenLogic.TroopType.Member, troop, 1, 0, -1);
+                Assert.True(screen.ValidateCommand(upgrade));
+                using (new AllowedThread()) screen.UpgradeTroop(upgrade);
+            }
             using (new AllowedThread())
             {
                 party.MemberRoster.AddToCounts(troop, -6);
                 roster.AddToCounts(troop, 6);
             }
+            var wages = roster.Sum(element =>
+                element.Character.TroopWage * element.Number * screen.QuestModeWageDaysMultiplier);
+            Assert.True(wages > 0);
+            screen.CurrentData.PartyGoldChangeAmount -= wages;
+            var closeCallback = new PartyScreenLogicInitializationData
+            {
+                PartyScreenClosedDelegate = (_, _, _, _, _, _, _) => owner.Issue.StartIssueWithAlternativeSolution(),
+            };
+            typeof(PartyScreenLogic).GetEvent("PartyScreenClosedEvent")!
+                .AddEventHandler(screen, closeCallback.PartyScreenClosedDelegate);
+            var states = Game.Current.GameStateManager;
+            var partyState = states.CreateState<PartyState>();
+            partyState.PartyScreenLogic = screen;
+            states._gameStates.Add(partyState);
 
-            Assert.True(screen.DoneLogic(false));
-            screen.OnPartyScreenClosed(false);
+            PartyScreenHelper.CloseScreen(false);
+            Assert.Null(partyState.PartyScreenLogic);
             Assert.Equal(0, party.MemberRoster.GetTroopCount(companion.CharacterObject));
-            Assert.Equal(6, party.MemberRoster.GetTroopCount(troop));
-            owner.Issue.StartIssueWithAlternativeSolution();
+            var done = Assert.Single(Client.NetworkSentMessages.GetMessages<NetworkCompleteDoneLogic>());
+            Assert.Equal(upgradeTroop ? -20 : 0, done.PartyGoldChangeAmount);
         });
 
         router.DrainReady();
         router.AutoDrainReady = true;
         Server.PumpGameThread();
         Client.PumpGameThread();
+        TestEnvironment.FlushCoalescer();
+        Client.PumpGameThread();
 
         Assert.Single(Client.NetworkSentMessages.GetMessages<RequestQuestTypeAcceptAlternative>());
         Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkQuestTypeAcceptRejected>());
-        Client.Call(() =>
+        foreach (var instance in new[] { Server, Client })
         {
-            Assert.True(Client.ObjectManager.TryGetObject<Hero>(fixture.CompanionHeroId, out var companion));
-            Assert.True(Client.ObjectManager.TryGetObject<MobileParty>(partyId, out var party));
-            Assert.True(Client.ObjectManager.TryGetObject<CharacterObject>(troopId, out var troop));
-            Assert.Equal(1, party.MemberRoster.GetTroopCount(companion.CharacterObject));
-            Assert.Equal(Hero.CharacterStates.Active, companion.HeroState);
-            Assert.Equal(6, party.MemberRoster.GetTroopCount(troop));
-        });
+            instance.Call(() =>
+            {
+                var owner = instance.GetRegisteredObject<Hero>(fixture.HeroId);
+                var companion = instance.GetRegisteredObject<Hero>(fixture.CompanionHeroId);
+                var party = instance.GetRegisteredObject<MobileParty>(partyId);
+                var troop = instance.GetRegisteredObject<CharacterObject>(troopId);
+                var upgraded = instance.GetRegisteredObject<CharacterObject>(upgradedId);
+                Assert.Equal(1000000 - (upgradeTroop ? 20 : 0), owner.Gold);
+                Assert.Equal(1, party.MemberRoster.GetTroopCount(companion.CharacterObject));
+                Assert.Equal(upgradeTroop ? 7 : 8, party.MemberRoster.GetTroopCount(troop));
+                Assert.Equal(upgradeTroop ? 1 : 0, party.MemberRoster.GetTroopCount(upgraded));
+                if (instance == Client) Assert.Equal(Hero.CharacterStates.Active, companion.HeroState);
+            });
+        }
     }
 
     [Theory]
@@ -1340,6 +1441,7 @@ public class GenericQuestTypeAcceptSecurityTests : IDisposable
         Client.PumpGameThread();
         var memberCountBeforeSending = 0;
         var selectedCount = 0;
+        var expectedWages = 0;
         var router = Server.Resolve<TestNetworkRouter>();
         router.AutoDrainReady = false;
 
@@ -1364,6 +1466,9 @@ public class GenericQuestTypeAcceptSecurityTests : IDisposable
             var selected = TroopRoster.CreateDummyTroopRoster();
             selected.Add(owner.Issue.AlternativeSolutionSentTroops);
             selectedCount = selected.TotalManCount;
+            expectedWages = selected.Sum(element => element.Character.TroopWage * element.Number *
+                owner.Issue.GetTotalAlternativeSolutionDurationInDays());
+            Assert.True(expectedWages > 0);
             var screen = new PartyScreenLogic();
             if (!resetBeforeTrigger)
                 Common.Messaging.MessageBroker.Instance.Publish(owner,
@@ -1400,6 +1505,7 @@ public class GenericQuestTypeAcceptSecurityTests : IDisposable
 
             Assert.True(owner.Issue.IsSolvingWithAlternative);
             Assert.True(owner.Issue.AlternativeSolutionReturnTimeForTroops.IsFuture);
+            Assert.Equal(1000000 - expectedWages, owner.Gold);
 
             Assert.True(Server.Resolve<IIssueOwnershipRegistry>().TryGetOwnerControllerId(owner, out var ownerControllerId));
             Assert.Equal(controllerId, ownerControllerId);
@@ -1414,6 +1520,7 @@ public class GenericQuestTypeAcceptSecurityTests : IDisposable
             Assert.True(Client.ObjectManager.TryGetObject<Hero>(fixture.CompanionHeroId, out var companion));
             Assert.True(Client.ObjectManager.TryGetObject<CharacterObject>(lastConnectedEligibleTroopId, out var eligibleTroop));
             Assert.True(Client.Resolve<IIssueOwnershipRegistry>().IsLocalPeerOwner(owner));
+            Assert.Equal(1000000 - expectedWages, owner.Gold);
             var acceptedTroops = Client.Resolve<GameInterface.Services.TroopRosters.Interfaces.ITroopRosterInterface>()
                 .UnpackTroopRosterData(accepted.SentTroops).ToArray();
             Assert.Equal(7, acceptedTroops.Sum(element => element.Number));
