@@ -145,6 +145,7 @@ public class GameInterfaceModule : Module
         builder.RegisterType<PartyVisibilitySweep>().As<IPartyVisibilitySweep>().InstancePerDependency();
         builder.RegisterType<ConversationRestartContextTracker>().As<IConversationRestartContextTracker>().InstancePerLifetimeScope();
         builder.RegisterType<IssueConversationTracker>().As<IIssueConversationTracker>().InstancePerLifetimeScope();
+        builder.RegisterType<AlternativeSolutionTroopSelection>().As<IAlternativeSolutionTroopSelection>().InstancePerLifetimeScope();
         builder.RegisterType<PendingRegistry<TaleWorlds.Core.PropertyOwner<TaleWorlds.Core.PropertyObject>>>().InstancePerLifetimeScope();
         builder.RegisterType<OwnerTraitXpProgress>().As<IOwnerTraitXpProgress>().InstancePerDependency();
         builder.RegisterType<BountyHuntersQuestContext>().As<IBountyHuntersQuestContext>().InstancePerDependency();

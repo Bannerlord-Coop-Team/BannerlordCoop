@@ -2,6 +2,7 @@
 using Common.Messaging;
 using Common.Util;
 using GameInterface.Services.Heroes;
+using GameInterface.Services.Issues.Generic;
 using GameInterface.Services.Party.Messages;
 using GameInterface.Services.Villages;
 using HarmonyLib;
@@ -118,6 +119,23 @@ internal class PartyScreenLogicPatches
             }
 
             ForceTransferScreenTracker.TryClaimForceTransferId(__instance.MemberRosters[0], out var forceTransferId);
+            ContainerProvider.TryResolve<IAlternativeSolutionTroopSelection>(out var troopSelection);
+            var selectingIssue = troopSelection?.FindIssue(__instance);
+            var currentMembers = __instance.MemberRosters[1];
+            var initialMembers = __instance._initialData.RightMemberRoster;
+            TroopRoster selectedTroops = null;
+            if (selectingIssue != null)
+            {
+                // Quest transfers are committed by acceptance; upgrades still use the party transaction.
+                using (new AllowedThread())
+                {
+                    selectedTroops = __instance.MemberRosters[0].CloneRosterData();
+                    currentMembers = currentMembers.CloneRosterData();
+                    currentMembers.Add(selectedTroops);
+                    initialMembers = initialMembers.CloneRosterData();
+                    initialMembers.Add(__instance._initialData.LeftMemberRoster);
+                }
+            }
             var message = new PartyDoneLogicAttempted(
                 Hero.MainHero,
                 releasedPrisonersRoster,
@@ -125,11 +143,11 @@ internal class PartyScreenLogicPatches
                 recruitedPrisonersRoster,
                 __instance.MemberRosters[0],
                 __instance.PrisonerRosters[0],
-                __instance.MemberRosters[1],
+                currentMembers,
                 __instance.PrisonerRosters[1],
                 __instance._initialData.LeftMemberRoster,
                 __instance._initialData.LeftPrisonerRoster,
-                __instance._initialData.RightMemberRoster,
+                initialMembers,
                 __instance._initialData.RightPrisonerRoster,
                 __instance.RightOwnerParty.ItemRoster,
                 __instance.CurrentData.UpgradedTroopsHistory,
@@ -149,7 +167,7 @@ internal class PartyScreenLogicPatches
             // Manage changing rosters on the server
             using (new AllowedThread())
             {
-                TroopRoster duplicateLeftMemberRoster = __instance.MemberRosters[0].CloneRosterData();
+                TroopRoster duplicateLeftMemberRoster = selectedTroops ?? __instance.MemberRosters[0].CloneRosterData();
                 TroopRoster duplicateLeftPrisonerRoster = __instance.PrisonerRosters[0].CloneRosterData();
 
                 InCommit = true;
@@ -167,6 +185,8 @@ internal class PartyScreenLogicPatches
                     __instance.CurrentData.RecruitedPrisonersHistory = new List<Tuple<CharacterObject, int>>();
                     __instance.CurrentData.UsedUpgradeHorsesHistory = new List<Tuple<EquipmentElement, int>>();
                     __instance._initialData.CopyFromScreenData(__instance.CurrentData);
+
+                    if (selectingIssue != null) troopSelection.KeepSelection(selectingIssue, selectedTroops);
 
                     // In vanilla, the rosters would already be updated but with this patch the rosters are reset on the client to be managed by the server.
                     // This assigns a duplicate version of the left rosters needed in extra logic handled by the PartyScreenHelper when closing the party screen.

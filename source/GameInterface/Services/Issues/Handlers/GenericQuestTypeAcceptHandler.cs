@@ -38,6 +38,7 @@ internal class GenericQuestTypeAcceptHandler : IHandler
     private readonly IIssueOwnershipRegistry ownershipRegistry;
     private readonly IIssueGenerationRegistry generationRegistry;
     private readonly IIssueConversationTracker conversationTracker;
+    private readonly IAlternativeSolutionTroopSelection troopSelection;
 
     public GenericQuestTypeAcceptHandler(
         IMessageBroker messageBroker,
@@ -48,7 +49,8 @@ internal class GenericQuestTypeAcceptHandler : IHandler
         IPrisonerSaleValidator troopValidator,
         IIssueOwnershipRegistry ownershipRegistry,
         IIssueGenerationRegistry generationRegistry,
-        IIssueConversationTracker conversationTracker)
+        IIssueConversationTracker conversationTracker,
+        IAlternativeSolutionTroopSelection troopSelection)
     {
         this.messageBroker = messageBroker;
         this.objectManager = objectManager;
@@ -59,6 +61,7 @@ internal class GenericQuestTypeAcceptHandler : IHandler
         this.ownershipRegistry = ownershipRegistry;
         this.generationRegistry = generationRegistry;
         this.conversationTracker = conversationTracker;
+        this.troopSelection = troopSelection;
 
         messageBroker.Subscribe<QuestTypeQuestSolutionAcceptTriggered>(Handle_QuestTypeQuestSolutionAcceptTriggered);
         messageBroker.Subscribe<RequestQuestTypeAcceptQuest>(Handle_RequestQuestTypeAcceptQuest);
@@ -232,7 +235,7 @@ internal class GenericQuestTypeAcceptHandler : IHandler
             if (!objectManager.TryGetObjectWithLogging<Hero>(data.OwnerId, out var owner)) return;
 
             var descriptor = QuestTypeRegistry.Get(owner.Issue);
-            RollbackAlternativeAccept(owner);
+            troopSelection.Rollback(owner);
             ownershipRegistry.TryGetOwnerControllerId(owner, out var previousOwner);
             ownershipRegistry.SetOwner(owner, data.OwnerControllerId);
             try
@@ -304,7 +307,7 @@ internal class GenericQuestTypeAcceptHandler : IHandler
             generationRegistry.TryGetGeneration(owner, out var generation);
             var packedTroops = troopRosterInterface.PackTroopRosterData(owner.Issue.AlternativeSolutionSentTroops);
             // Return the local selection before the server's roster changes arrive.
-            RollbackAlternativeAccept(owner);
+            troopSelection.Rollback(owner, closeScreen: false);
             network.SendAll(new RequestQuestTypeAcceptAlternative(ownerId, generation, packedTroops));
         }
     }
@@ -432,7 +435,7 @@ internal class GenericQuestTypeAcceptHandler : IHandler
             if (!objectManager.TryGetObjectWithLogging<Hero>(data.OwnerId, out var owner) || owner.Issue == null) return;
 
             var descriptor = QuestTypeRegistry.Get(owner.Issue);
-            RollbackAlternativeAccept(owner);
+            troopSelection.Rollback(owner);
             ownershipRegistry.TryGetOwnerControllerId(owner, out var previousOwner);
             ownershipRegistry.SetOwner(owner, data.OwnerControllerId);
             try
@@ -474,21 +477,6 @@ internal class GenericQuestTypeAcceptHandler : IHandler
                 owner.Issue.AlternativeSolutionSentTroops.AddToCounts(
                     element.Character, element.Number, false, element.WoundedNumber, element.Xp, false);
             }
-        }
-    }
-
-    private static void RollbackAlternativeAccept(Hero owner)
-    {
-        if (owner?.Issue?.IsOngoingWithoutQuest != true) return;
-
-        using (new AllowedThread())
-        {
-            var sentTroops = owner.Issue.AlternativeSolutionSentTroops;
-            if (MobileParty.MainParty != null && sentTroops.TotalManCount > 0)
-            {
-                MobileParty.MainParty.MemberRoster.Add(sentTroops);
-            }
-            sentTroops.Clear();
         }
     }
 
@@ -539,7 +527,7 @@ internal class GenericQuestTypeAcceptHandler : IHandler
                 }
                 else
                 {
-                    RollbackAlternativeAccept(owner);
+                    troopSelection.Rollback(owner);
                 }
             }
             else if (descriptor?.RejectQuestSolutionAccept != null)

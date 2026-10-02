@@ -22,6 +22,8 @@ using TaleWorlds.CampaignSystem.CampaignBehaviors;
 using TaleWorlds.CampaignSystem.CharacterDevelopment;
 using TaleWorlds.CampaignSystem.Encyclopedia;
 using TaleWorlds.CampaignSystem.GameMenus;
+using TaleWorlds.CampaignSystem.GameState;
+using TaleWorlds.CampaignSystem.Roster;
 using TaleWorlds.CampaignSystem.Issues;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Party.PartyComponents;
@@ -190,8 +192,10 @@ public class CapturedByBountyHuntersIssueTests : IDisposable
         }
     }
 
-    [Fact]
-    public void OwnerJournalUpdatesDoNotRepeatOratoryRewards()
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void OwnerJournalUpdatesDoNotRepeatOratoryRewards(bool deferredReceive)
     {
         var fixture = CreateIssue();
         Assert.True(TaleWorlds.Library.MathF.Round(DefaultPerks.Charm.Oratory.PrimaryBonus) > 0);
@@ -217,12 +221,18 @@ public class CapturedByBountyHuntersIssueTests : IDisposable
                 Assert.True(player.GetPerkValue(DefaultPerks.Charm.Oratory));
             });
         }
+        var router = environment.Server.Resolve<TestNetworkRouter>();
+        if (deferredReceive) router.ReceiveContext = TestNetworkReceiveContext.PollerThread;
         environment.Server.Call(() =>
         {
             Assert.True(environment.Server.ObjectManager.TryGetObject<Hero>(fixture.Giver, out var giver));
             Assert.True(environment.Server.Resolve<IBountyHuntersQuestContext>().TryOpen(giver, out var scope));
             using (scope) ((Quest)giver.Issue.IssueQuest).SuccessConsequences();
         });
+        if (deferredReceive)
+        {
+            foreach (var client in environment.Clients) client.PumpGameThread();
+        }
         Assert.Single(environment.Server.NetworkSentMessages.GetMessages<NetworkBountyHuntersJournal>()
             .Where(message => message.Status == IssueBase.IssueUpdateDetails.IssueFinishedWithSuccess));
         foreach (var instance in new[] { environment.Server }.Concat(environment.Clients))
@@ -380,11 +390,269 @@ public class CapturedByBountyHuntersIssueTests : IDisposable
         }
     }
 
-    private string AcceptFromFirstClient((string Giver, string Hideout) fixture, bool alternative = false, int clientIndex = 0, Action beforeRequest = null)
+    [Theory]
+    [InlineData(false, false)]
+    [InlineData(true, false)]
+    [InlineData(false, true)]
+    [InlineData(true, true)]
+    public void OpenSelectionCannotEditAnotherPlayersAcceptedRoster(bool winningAlternative, bool resetSelection)
+    {
+        var fixture = CreateIssue();
+        var loser = environment.Clients.Last();
+        string partyId = null;
+        string companionId = null;
+        string troopId = null;
+        AcceptFromFirstClient(fixture, alternative: true, clientIndex: 1, beforeRequest: () =>
+        {
+            Assert.True(loser.ObjectManager.TryGetObject<Hero>(fixture.Giver, out var giver));
+            var party = MobileParty.MainParty;
+            var sent = giver.Issue.AlternativeSolutionSentTroops;
+            var companion = sent.GetTroopRoster().Single(entry => entry.Character.IsHero).Character;
+            var troop = sent.GetTroopRoster().Single(entry => !entry.Character.IsHero).Character;
+            Assert.True(loser.ObjectManager.TryGetId(party, out partyId));
+            Assert.True(loser.ObjectManager.TryGetId(companion.HeroObject, out companionId));
+            Assert.True(loser.ObjectManager.TryGetId(troop, out troopId));
+            using (new AllowedThread())
+            {
+                troop.UpgradeTargets = Array.Empty<CharacterObject>();
+                sent.AddToCounts(troop, -10);
+                party.MemberRoster.AddToCounts(troop, 10);
+            }
+            var logic = OpenAlternativeSelection(party, sent);
+            var state = Game.Current.GameStateManager.ActiveState;
+            var command = new PartyScreenLogic.PartyCommand();
+            command.FillForTransferTroop(PartyScreenLogic.PartyRosterSide.Right, PartyScreenLogic.TroopType.Member, troop, 10, 0, -1);
+            using (new AllowedThread()) logic.TransferTroop(command, false);
+            Assert.Equal(15, party.MemberRoster.GetTroopCount(troop));
+            logic.SavePartyScreenData();
+            AcceptFromFirstClient(fixture, alternative: winningAlternative, troopIdOverride: troopId);
+            Assert.NotSame(state, Game.Current.GameStateManager.ActiveState);
+            {
+                using (new AllowedThread())
+                {
+                    if (resetSelection) logic.Reset(true);
+                    else
+                    {
+                        command.FillForTransferTroop(winningAlternative ? PartyScreenLogic.PartyRosterSide.Left : PartyScreenLogic.PartyRosterSide.Right,
+                            PartyScreenLogic.TroopType.Member, troop, 1, 0, -1);
+                        logic.TransferTroop(command, false);
+                    }
+                }
+            }
+        });
+        foreach (var instance in new[] { environment.Server }.Concat(environment.Clients))
+        {
+            instance.Call(() =>
+            {
+                Assert.True(instance.ObjectManager.TryGetObject<Hero>(fixture.Giver, out var giver));
+                Assert.True(instance.ObjectManager.TryGetObject<MobileParty>(partyId, out var party));
+                Assert.True(instance.ObjectManager.TryGetObject<Hero>(companionId, out var companion));
+                Assert.True(instance.ObjectManager.TryGetObject<CharacterObject>(troopId, out var troop));
+                Assert.Equal(1, party.MemberRoster.GetTroopCount(companion.CharacterObject));
+                Assert.Equal(25, party.MemberRoster.GetTroopCount(troop));
+                Assert.Equal(winningAlternative ? 11 : 0, giver.Issue.AlternativeSolutionSentTroops.TotalManCount);
+                Assert.False(giver.Issue.AlternativeSolutionSentTroops.Contains(companion.CharacterObject));
+            });
+        }
+    }
+
+    [Theory]
+    [InlineData(false, false, false)]
+    [InlineData(true, false, false)]
+    [InlineData(false, true, false)]
+    [InlineData(true, true, false)]
+    [InlineData(false, true, true)]
+    [InlineData(true, true, true)]
+    public void PartyScreenDoneKeepsTroopsStagedUntilAlternativeAcceptance(bool decline, bool upgrade, bool deferredReceive)
+    {
+        var fixture = CreateIssue();
+        var client = environment.Clients.First();
+        var upgradedId = environment.CreateRegisteredObject<CharacterObject>();
+        string partyId = null;
+        string troopId = null;
+        string companionId = null;
+        int upgradeCost = 0;
+        string playerId = null;
+        AcceptFromFirstClient(fixture, alternative: true, beforeRequest: () =>
+        {
+            Assert.True(client.ObjectManager.TryGetObject<Hero>(fixture.Giver, out var giver));
+            var party = MobileParty.MainParty;
+            var sent = giver.Issue.AlternativeSolutionSentTroops;
+            var troop = sent.GetTroopRoster().Single(entry => !entry.Character.IsHero).Character;
+            var companion = sent.GetTroopRoster().Single(entry => entry.Character.IsHero).Character;
+            Assert.True(client.ObjectManager.TryGetId(party, out partyId));
+            Assert.True(client.ObjectManager.TryGetId(troop, out troopId));
+            Assert.True(client.ObjectManager.TryGetId(companion.HeroObject, out companionId));
+            using (new AllowedThread())
+            {
+                troop.UpgradeTargets = Array.Empty<CharacterObject>();
+                sent.AddToCounts(troop, -10);
+                party.MemberRoster.AddToCounts(troop, 10);
+            }
+            Assert.True(client.ObjectManager.TryGetId(Hero.MainHero, out playerId));
+            if (upgrade)
+            {
+                foreach (var instance in new[] { environment.Server }.Concat(environment.Clients))
+                {
+                    instance.Call(() =>
+                    {
+                        var original = instance.GetRegisteredObject<CharacterObject>(troopId);
+                        var target = instance.GetRegisteredObject<CharacterObject>(upgradedId);
+                        using (new AllowedThread())
+                        {
+                            target.Level = 26;
+                            target.UpgradeTargets = Array.Empty<CharacterObject>();
+                            original.UpgradeTargets = new[] { target };
+                        }
+                    });
+                }
+                environment.Server.Call(() =>
+                {
+                    var original = environment.Server.GetRegisteredObject<CharacterObject>(troopId);
+                    var authoritativeParty = environment.Server.GetRegisteredObject<MobileParty>(partyId);
+                    var player = environment.Server.GetRegisteredObject<Hero>(playerId);
+                    player.ChangeHeroGold(10000 - player.Gold);
+                    authoritativeParty.MemberRoster.AddXpToTroop(original, 25 * original.GetUpgradeXpCost(authoritativeParty.Party, 0));
+                });
+                environment.FlushCoalescer();
+                upgradeCost = 5 * troop.GetUpgradeGoldCost(party.Party, 0);
+            }
+            int closed = 0;
+            var logic = OpenAlternativeSelection(party, sent, (_, _, _, _, _, _, _) =>
+            {
+                closed++;
+                Assert.Equal(10, sent.TotalRegulars);
+                if (decline) client.Resolve<IAlternativeSolutionTroopSelection>().Rollback(giver, closeScreen: false);
+                else giver.Issue.StartIssueWithAlternativeSolution();
+            });
+            var command = new PartyScreenLogic.PartyCommand();
+            using (new AllowedThread())
+            {
+                if (upgrade)
+                {
+                    command.FillForUpgradeTroop(PartyScreenLogic.PartyRosterSide.Right, PartyScreenLogic.TroopType.Member, troop, 5, 0, -1);
+                    Assert.True(logic.ValidateCommand(command));
+                    logic.UpgradeTroop(command);
+                    var target = client.GetRegisteredObject<CharacterObject>(upgradedId);
+                    command.FillForTransferTroop(PartyScreenLogic.PartyRosterSide.Right, PartyScreenLogic.TroopType.Member, target, 5, 0, -1);
+                    logic.TransferTroop(command, false);
+                }
+                command.FillForTransferTroop(PartyScreenLogic.PartyRosterSide.Right, PartyScreenLogic.TroopType.Member, troop, upgrade ? 5 : 10, 0, -1);
+                logic.TransferTroop(command, false);
+            }
+            if (deferredReceive) environment.Server.Resolve<TestNetworkRouter>().ReceiveContext = TestNetworkReceiveContext.PollerThread;
+            Helpers.PartyScreenHelper.CloseScreen(false);
+            Assert.Equal(1, closed);
+            Assert.Null(Game.Current.GameStateManager.ActiveState);
+        }, submitAlternative: false);
+        environment.Server.PumpGameThread();
+        environment.FlushCoalescer();
+        foreach (var recipient in environment.Clients) recipient.PumpGameThread();
+        environment.Server.PumpGameThread();
+        foreach (var recipient in environment.Clients) recipient.PumpGameThread();
+        if (decline) Assert.Empty(environment.Server.NetworkSentMessages.GetMessages<NetworkQuestTypeAlternativeAccepted>());
+        else Assert.Single(environment.Server.NetworkSentMessages.GetMessages<NetworkQuestTypeAlternativeAccepted>());
+        foreach (var instance in new[] { environment.Server }.Concat(environment.Clients))
+        {
+            instance.Call(() =>
+            {
+                var party = instance.GetRegisteredObject<MobileParty>(partyId);
+                var troop = instance.GetRegisteredObject<CharacterObject>(troopId);
+                var target = instance.GetRegisteredObject<CharacterObject>(upgradedId);
+                var companion = instance.GetRegisteredObject<Hero>(companionId);
+                var giver = instance.GetRegisteredObject<Hero>(fixture.Giver);
+                Assert.Equal(decline ? (upgrade ? 20 : 25) : 15, party.MemberRoster.GetTroopCount(troop));
+                Assert.Equal(decline && upgrade ? 5 : 0, party.MemberRoster.GetTroopCount(target));
+                Assert.Equal(decline ? 1 : 0, party.MemberRoster.GetTroopCount(companion.CharacterObject));
+                Assert.Equal(decline ? 0 : 11, giver.Issue.AlternativeSolutionSentTroops.TotalManCount);
+                if (upgrade) Assert.Equal(10000 - upgradeCost, instance.GetRegisteredObject<Hero>(playerId).Gold);
+            });
+        }
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void IssueRemovalCancelsAnOpenAlternativeSelection(bool afterDone)
+    {
+        var fixture = CreateIssue();
+        var client = environment.Clients.First();
+        string partyId = null;
+        string troopId = null;
+        string companionId = null;
+        AcceptFromFirstClient(fixture, alternative: true, submitAlternative: false, beforeRequest: () =>
+        {
+            var giver = client.GetRegisteredObject<Hero>(fixture.Giver);
+            var party = MobileParty.MainParty;
+            var sent = giver.Issue.AlternativeSolutionSentTroops;
+            var troop = sent.GetTroopRoster().Single(entry => !entry.Character.IsHero).Character;
+            var companion = sent.GetTroopRoster().Single(entry => entry.Character.IsHero).Character;
+            Assert.True(client.ObjectManager.TryGetId(party, out partyId));
+            Assert.True(client.ObjectManager.TryGetId(troop, out troopId));
+            Assert.True(client.ObjectManager.TryGetId(companion.HeroObject, out companionId));
+            using (new AllowedThread())
+            {
+                troop.UpgradeTargets = Array.Empty<CharacterObject>();
+                sent.AddToCounts(troop, -10);
+                party.MemberRoster.AddToCounts(troop, 10);
+            }
+            var logic = OpenAlternativeSelection(party, sent);
+            var command = new PartyScreenLogic.PartyCommand();
+            command.FillForTransferTroop(PartyScreenLogic.PartyRosterSide.Right, PartyScreenLogic.TroopType.Member, troop, 10, 0, -1);
+            using (new AllowedThread()) logic.TransferTroop(command, false);
+            if (afterDone) Assert.True(logic.DoneLogic(false));
+            environment.Server.Call(() => environment.Server.GetRegisteredObject<Hero>(fixture.Giver).Issue.CompleteIssueWithCancel());
+            Assert.Null(Game.Current.GameStateManager.ActiveState);
+            using (new AllowedThread()) logic.Reset(true);
+        });
+        environment.FlushCoalescer();
+        foreach (var instance in new[] { environment.Server }.Concat(environment.Clients))
+        {
+            instance.Call(() =>
+            {
+                var party = instance.GetRegisteredObject<MobileParty>(partyId);
+                Assert.Null(instance.GetRegisteredObject<Hero>(fixture.Giver).Issue);
+                Assert.Equal(25, party.MemberRoster.GetTroopCount(instance.GetRegisteredObject<CharacterObject>(troopId)));
+                Assert.Equal(1, party.MemberRoster.GetTroopCount(instance.GetRegisteredObject<Hero>(companionId).CharacterObject));
+            });
+        }
+    }
+
+    private static PartyScreenLogic OpenAlternativeSelection(MobileParty party, TroopRoster sent, PartyScreenClosedDelegate onClosed = null)
+    {
+        var logic = new PartyScreenLogic();
+        var leftPrisoners = TroopRoster.CreateDummyTroopRoster();
+        logic.Initialize(new PartyScreenLogicInitializationData
+        {
+            LeftMemberRoster = sent,
+            LeftPrisonerRoster = leftPrisoners,
+            RightMemberRoster = party.MemberRoster,
+            RightPrisonerRoster = party.PrisonRoster,
+            RightOwnerParty = party.Party,
+            RightLeaderHero = Hero.MainHero,
+            MemberTransferState = PartyScreenLogic.TransferState.Transferable,
+            PrisonerTransferState = PartyScreenLogic.TransferState.NotTransferable,
+            AccompanyingTransferState = PartyScreenLogic.TransferState.Transferable,
+            PartyScreenMode = Helpers.PartyScreenHelper.PartyScreenMode.QuestTroopManage,
+            PartyPresentationDoneButtonDelegate = Helpers.PartyScreenHelper.ManageTroopsAndPrisonersDoneHandler,
+            PartyScreenClosedDelegate = onClosed,
+            TransferHealthiesGetWoundedsFirst = true,
+        });
+        var states = Game.Current.GameStateManager;
+        // Closing the managed screen must not destroy the headless test game.
+        states.Owner = Moq.Mock.Of<IGameStateManagerOwner>();
+        var state = states.CreateState<PartyState>();
+        state.PartyScreenLogic = logic;
+        state.PartyScreenMode = Helpers.PartyScreenHelper.PartyScreenMode.QuestTroopManage;
+        states._gameStates.Add(state);
+        return logic;
+    }
+
+    private string AcceptFromFirstClient((string Giver, string Hideout) fixture, bool alternative = false, int clientIndex = 0, Action beforeRequest = null, string troopIdOverride = null, bool submitAlternative = true)
     {
         var playerId = environment.CreateRegisteredObject<Hero>();
         var partyId = environment.CreateRegisteredObject<MobileParty>();
-        var troopId = environment.CreateRegisteredObject<CharacterObject>();
+        var troopId = troopIdOverride ?? environment.CreateRegisteredObject<CharacterObject>();
         var companionId = alternative ? environment.CreateRegisteredObject<Hero>() : null;
         var client = environment.Clients.ElementAt(clientIndex);
         var controller = clientIndex == 0 ? "bounty-owner" : "other-player";
@@ -438,7 +706,7 @@ public class CapturedByBountyHuntersIssueTests : IDisposable
                     giver.Issue.AlternativeSolutionSentTroops.AddToCounts(troop, 10);
                 }
                 beforeRequest?.Invoke();
-                giver.Issue.StartIssueWithAlternativeSolution();
+                if (submitAlternative) giver.Issue.StartIssueWithAlternativeSolution();
             }
             else Assert.True(Campaign.Current.IssueManager.StartIssueQuest(giver));
         });
