@@ -284,6 +284,7 @@ public sealed class GangLeaderWeaponsAcceptanceTests : IDisposable
                 Assert.True(instance.ObjectManager.TryGetObject<Hero>(ownerId, out var owner));
                 Assert.True(instance.ObjectManager.TryGetObject<Hero>(companionId, out var companion));
                 Assert.True(instance.ObjectManager.TryGetObject<Clan>(clanId, out var clan));
+                (Campaign.Current.GetCampaignBehavior<JournalLogsCampaignBehavior>() ?? new JournalLogsCampaignBehavior()).RegisterEvents();
                 using (new AllowedThread())
                 {
                     giver.CurrentSettlement.Town.OwnerClan = clan;
@@ -357,7 +358,7 @@ public sealed class GangLeaderWeaponsAcceptanceTests : IDisposable
                     Assert.True(client.Resolve<IAwaitingAlternativeSolutionTroopsRegistry>().TryGet(controller, out var returned));
                     Assert.Equal(1, returned.TotalManCount);
                 }
-                else Assert.Empty(ended);
+                else Assert.Empty(Campaign.Current.LogEntryHistory.GetGameActionLogs((JournalLogEntry log) => log.RelatedHero == giver));
             });
         }
         var removal = Assert.Single(server.NetworkSentMessages.GetMessages<NetworkIssueRemoved>());
@@ -423,6 +424,149 @@ public sealed class GangLeaderWeaponsAcceptanceTests : IDisposable
             Assert.Same(journal, quest._playerStartsQuestLog);
             Assert.Equal(20, quest._collectedItemAmount);
             Assert.Equal(20, journal.CurrentProgress);
+        });
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void RejectedAcceptPreservesTheOtherPlayersAcceptedMirror(bool alternative)
+    {
+        var giverId = CreateIssueCopies();
+        var companionId = environment.CreateRegisteredObject<Hero>();
+        var losingClient = environment.Clients.Last();
+        environment.Clients.First().Resolve<IControllerIdProvider>().SetControllerId("weapons-winning-owner");
+        losingClient.Resolve<IControllerIdProvider>().SetControllerId("weapons-losing-owner");
+        environment.Server.Call(() =>
+        {
+            var network = environment.Server.Resolve<INetwork>();
+            if (alternative)
+            {
+                Assert.True(environment.Server.ObjectManager.TryGetObject<Hero>(companionId, out var companion));
+                var roster = TroopRoster.CreateDummyTroopRoster();
+                using (new AllowedThread()) roster.AddToCounts(companion.CharacterObject, 1);
+                var troops = environment.Server.Resolve<ITroopRosterInterface>().PackTroopRosterData(roster);
+                var state = new AlternativeSolutionVanillaState(CampaignTime.Days(20), CampaignTime.Days(30), 0f, 0, 120f, null);
+                network.SendAll(new NetworkQuestTypeAlternativeAccepted(giverId, "weapons-winning-owner", state,
+                    GenericAcceptFieldsSerializer.Serialize(new GangLeaderWeaponsAlternativeFields(0.75f, state)), troops));
+            }
+            else
+            {
+                var fields = new GangLeaderWeaponsQuestFields("weapons_winning_quest", CampaignTime.Days(25), 4700, 0, 21, 0.75f, 200, 17);
+                network.SendAll(new NetworkQuestTypeQuestAccepted(giverId, "weapons-winning-owner", GenericAcceptFieldsSerializer.Serialize(fields)));
+            }
+            network.Send(losingClient.NetPeer, new NetworkQuestTypeAcceptRejected(giverId, alternative));
+        });
+
+        foreach (var client in environment.Clients)
+        {
+            client.Call(() =>
+            {
+                Assert.True(client.ObjectManager.TryGetObject<Hero>(giverId, out var giver));
+                var issue = Assert.IsType<Issue>(giver.Issue);
+                Assert.True(client.Resolve<IIssueOwnershipRegistry>().TryGetOwnerControllerId(giver, out var owner));
+                Assert.Equal("weapons-winning-owner", owner);
+                if (alternative)
+                {
+                    Assert.True(issue.IsSolvingWithAlternative);
+                    Assert.Equal(1, issue.AlternativeSolutionSentTroops.TotalManCount);
+                }
+                else
+                {
+                    var quest = Assert.IsType<Quest>(issue.IssueQuest);
+                    Assert.True(quest.IsOngoing);
+                    Assert.Equal("weapons_winning_quest", quest.StringId);
+                    Assert.Equal(17, quest._playerStartsQuestLog.CurrentProgress);
+                }
+            });
+        }
+    }
+
+    [Fact]
+    public void RejectedCompanionRequestRestoresTheLocalSelectionBeforeTheServerResponds()
+    {
+        var giverId = CreateIssueCopies(includeServer: true);
+        var ownerId = environment.CreateRegisteredObject<Hero>();
+        var companionId = environment.CreateRegisteredObject<Hero>();
+        var partyId = environment.CreateRegisteredObject<MobileParty>();
+        var clanId = environment.CreateRegisteredObject<Clan>();
+        var troopId = environment.CreateRegisteredObject<CharacterObject>();
+        const string controller = "weapons-rejected-companion-owner";
+        var server = environment.Server;
+        var client = environment.Clients.First();
+        client.Resolve<IControllerIdProvider>().SetControllerId(controller);
+        foreach (var instance in new[] { server, client })
+        {
+            instance.Call(() =>
+            {
+                Assert.True(instance.ObjectManager.TryGetObject<Hero>(giverId, out var giver));
+                Assert.True(instance.ObjectManager.TryGetObject<Hero>(ownerId, out var owner));
+                Assert.True(instance.ObjectManager.TryGetObject<Hero>(companionId, out var companion));
+                Assert.True(instance.ObjectManager.TryGetObject<MobileParty>(partyId, out var party));
+                Assert.True(instance.ObjectManager.TryGetObject<Clan>(clanId, out var clan));
+                Assert.True(instance.ObjectManager.TryGetObject<CharacterObject>(troopId, out var troop));
+                using (new AllowedThread())
+                {
+                    owner.Clan = clan;
+                    owner.Gold = 100000;
+                    giver.CurrentSettlement.Town.OwnerClan = clan;
+                    giver.CurrentSettlement.Town.Loyalty = 50;
+                    troop.Level = 20;
+                    party.MemberRoster.AddToCounts(companion.CharacterObject, 1);
+                    party.MemberRoster.AddToCounts(troop, giver.Issue.GetTotalAlternativeSolutionNeededMenCount());
+                }
+                instance.Resolve<IIssueGenerationRegistry>().SetGeneration(giver, 4);
+            });
+        }
+        server.Call(() =>
+        {
+            Assert.True(server.Resolve<IPlayerManager>().AddPlayer(new Player(controller, ownerId, partyId, "", "")));
+            server.Resolve<IIssueConversationTracker>().Register(giverId, controller, 4);
+            Assert.True(server.ObjectManager.TryGetObject<Hero>(giverId, out var giver));
+            Assert.True(giver.Issue.IssueStayAliveConditions());
+        });
+        environment.ConnectRegisteredPlayer(client, controller);
+
+        client.Call(() =>
+        {
+            Assert.True(client.ObjectManager.TryGetObject<Hero>(giverId, out var giver));
+            Assert.True(client.ObjectManager.TryGetObject<Hero>(companionId, out var companion));
+            Assert.True(client.ObjectManager.TryGetObject<MobileParty>(partyId, out var party));
+            Assert.True(client.ObjectManager.TryGetObject<CharacterObject>(troopId, out var troop));
+            var issue = Assert.IsType<Issue>(giver.Issue);
+            var needed = issue.GetTotalAlternativeSolutionNeededMenCount();
+            var before = party.MemberRoster.TotalManCount;
+            using (new AllowedThread())
+            {
+                Campaign.Current.MainParty = party;
+                party.MemberRoster.AddToCounts(companion.CharacterObject, -1);
+                party.MemberRoster.AddToCounts(troop, -needed);
+                issue.AlternativeSolutionSentTroops.AddToCounts(companion.CharacterObject, 1);
+                issue.AlternativeSolutionSentTroops.AddToCounts(troop, needed);
+            }
+
+            issue.StartIssueWithAlternativeSolution();
+
+            // A competing accepted mirror may arrive before this request's rejection.
+            Assert.Equal(before, party.MemberRoster.TotalManCount);
+            Assert.Empty(issue.AlternativeSolutionSentTroops.GetTroopRoster());
+        });
+
+        Assert.True(Assert.Single(server.NetworkSentMessages.GetMessages<NetworkQuestTypeAcceptRejected>()).IsAlternative);
+        Assert.Equal(IssueFinalizeReason.IssueOnly, Assert.Single(server.NetworkSentMessages.GetMessages<NetworkIssueRemoved>()).Reason);
+        client.Call(() =>
+        {
+            Assert.True(client.ObjectManager.TryGetObject<Hero>(giverId, out var giver));
+            Assert.True(client.ObjectManager.TryGetObject<MobileParty>(partyId, out var party));
+            Assert.True(client.ObjectManager.TryGetObject<Hero>(companionId, out var companion));
+            Assert.Equal(1, party.MemberRoster.GetTroopCount(companion.CharacterObject));
+            // CheckPreconditions cancels the issue when its town belongs to this player.
+            Assert.Null(giver.Issue);
+        });
+        server.Call(() =>
+        {
+            Assert.True(server.ObjectManager.TryGetObject<Hero>(ownerId, out var owner));
+            Assert.Equal(100000, owner.Gold);
         });
     }
 
@@ -523,8 +667,10 @@ public sealed class GangLeaderWeaponsAcceptanceTests : IDisposable
         });
     }
 
-    [Fact]
-    public void LoadedOrphanCancellationFinalizesBothMirrorsAndReturnsWeaponsOnlyOnce()
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void CancellationFinalizesBothMirrorsAndReturnsWeaponsOnlyOnce(bool orphan)
     {
         var giverId = CreateIssueCopies(includeServer: true);
         var ownerId = environment.CreateRegisteredObject<Hero>();
@@ -555,11 +701,19 @@ public sealed class GangLeaderWeaponsAcceptanceTests : IDisposable
                 if (instance == ownerClient)
                     Assert.Single(Campaign.Current.LogEntryHistory.GetGameActionLogs((JournalLogEntry log) => log.RelatedHero == giver));
                 quest._weaponsThatGuardTook.Add(new EquipmentElement(item), 7);
-                Campaign.Current.IssueManager._issues.Remove(giver);
+                if (orphan) Campaign.Current.IssueManager._issues.Remove(giver);
             });
         }
 
-        environment.Server.Call(() => Campaign.Current.QuestManager.OnGameLoaded(null));
+        environment.Server.Call(() =>
+        {
+            if (orphan) Campaign.Current.QuestManager.OnGameLoaded(null);
+            else
+            {
+                Assert.True(environment.Server.ObjectManager.TryGetObject<Hero>(giverId, out var giver));
+                giver.Issue.IssueQuest.CompleteQuestWithCancel();
+            }
+        });
         environment.Server.Call(() => environment.Server.Resolve<ISendCoalescer>().Flush(environment.Server.Resolve<INetwork>()));
 
         foreach (var instance in environment.Clients.Append(environment.Server))
@@ -578,8 +732,8 @@ public sealed class GangLeaderWeaponsAcceptanceTests : IDisposable
             });
         }
         var removal = Assert.Single(environment.Server.NetworkSentMessages.GetMessages<NetworkIssueRemoved>());
-        Assert.Equal(questId, removal.QuestId);
-        Assert.Equal(4, removal.Generation);
+        Assert.Equal(orphan ? questId : null, removal.QuestId);
+        if (orphan) Assert.Equal(4, removal.Generation);
         Assert.Equal(IssueFinalizeReason.QuestCancel, removal.Reason);
     }
 

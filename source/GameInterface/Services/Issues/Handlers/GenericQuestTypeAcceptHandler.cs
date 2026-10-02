@@ -302,6 +302,8 @@ internal class GenericQuestTypeAcceptHandler : IHandler
         {
             generationRegistry.TryGetGeneration(owner, out var generation);
             var packedTroops = troopRosterInterface.PackTroopRosterData(owner.Issue.AlternativeSolutionSentTroops);
+            // Restore the local selection before the server's authoritative troop removal arrives.
+            RollbackAlternativeAccept(owner);
             network.SendAll(new RequestQuestTypeAcceptAlternative(ownerId, generation, packedTroops));
         }
     }

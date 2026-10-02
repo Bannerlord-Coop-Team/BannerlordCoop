@@ -38,6 +38,25 @@ internal static class GangLeaderWeaponsJournalOwnerPatch
     }
 }
 
+[HarmonyPatch]
+internal static class GangLeaderWeaponsIssueJournalOwnerPatch
+{
+    [HarmonyTargetMethods]
+    private static IEnumerable<MethodBase> TargetMethods()
+    {
+        yield return AccessTools.Method(typeof(JournalLogsCampaignBehavior), "OnIssueUpdated");
+        yield return AccessTools.Method(typeof(JournalLogsCampaignBehavior), "OnIssueLogAdded");
+    }
+
+    [HarmonyPrefix]
+    private static bool Prefix(IssueBase issue)
+    {
+        if (issue is not Issue) return true;
+        return ModInformation.IsClient && ContainerProvider.TryResolve<IIssueOwnershipRegistry>(out var ownership) &&
+            ownership.IsLocalPeerOwner(issue.IssueOwner);
+    }
+}
+
 [HarmonyPatch(typeof(QuestsVM), nameof(QuestsVM.RefreshValues))]
 internal static class GangLeaderWeaponsJournalListPatch
 {

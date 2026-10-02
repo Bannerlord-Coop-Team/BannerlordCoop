@@ -120,7 +120,12 @@ internal sealed class GangLeaderWeaponsAcceptance : IGangLeaderWeaponsAcceptance
         }
     }
 
-    public void RejectAcceptance(Hero owner) => AcceptMirrorSupport.RejectAcceptance(owner);
+    public void RejectAcceptance(Hero owner)
+    {
+        if (ContainerProvider.TryResolve<IIssueOwnershipRegistry>(out var ownership) &&
+            ownership.TryGetOwnerControllerId(owner, out _)) return;
+        AcceptMirrorSupport.RejectAcceptance(owner);
+    }
 }
 
 [ProtoContract(SkipConstructor = true)]
