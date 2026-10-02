@@ -257,6 +257,7 @@ internal sealed class ExtortionQuestStateHandler : IHandler
             using (new AllowedThread())
             {
                 // Adopt the existing raid without finishing it or replaying world creation.
+                Campaign.Current.LocationEncounter = null;
                 PlayerEncounter.Start();
                 PlayerEncounter.Init();
                 PlayerEncounter.Current.PlayerPartyInitialStrength = PartyBase.MainParty.CalculateCurrentStrength();
