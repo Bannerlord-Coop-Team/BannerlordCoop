@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Roster;
@@ -30,7 +30,9 @@ internal sealed class AwaitingAlternativeSolutionTroopsRegistry : IAwaitingAlter
             troopsByOwnerControllerId[ownerControllerId] = existing;
         }
 
-        existing.Add(troops);
+        // Native SetElementXp does not invalidate GetTroopRoster's cached elements.
+        for (var i = 0; i < troops.Count; i++)
+            existing.Add(troops.GetElementCopyAtIndex(i));
     }
 
     public bool TryGet(string ownerControllerId, out TroopRoster troops)

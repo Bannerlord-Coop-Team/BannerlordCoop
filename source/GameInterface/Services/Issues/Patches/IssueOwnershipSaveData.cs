@@ -1,4 +1,4 @@
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.SaveSystem;
 
@@ -54,11 +54,13 @@ public sealed class IssueOwnershipSaveableTypeDefiner : SaveableTypeDefiner
     {
         AddClassDefinition(typeof(IssueOwnershipSaveData), 1);
         AddClassDefinition(typeof(IssueGenerationSaveData), 2);
+        AddClassDefinition(typeof(HeadmanHerdPersonalOwnershipSaveData), 3);
     }
 
     public override void DefineContainerDefinitions()
     {
         ConstructContainerDefinition(typeof(List<IssueOwnershipSaveData>));
         ConstructContainerDefinition(typeof(List<IssueGenerationSaveData>));
+        ConstructContainerDefinition(typeof(List<HeadmanHerdPersonalOwnershipSaveData>));
     }
 }

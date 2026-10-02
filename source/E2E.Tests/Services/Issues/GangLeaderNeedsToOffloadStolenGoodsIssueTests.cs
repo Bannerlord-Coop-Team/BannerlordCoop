@@ -1,5 +1,6 @@
-using Common.Messaging;
+﻿using Common.Messaging;
 using Common.Util;
+using Coop.Core.Client.Services.Heroes.Messages;
 using E2E.Tests.Environment;
 using E2E.Tests.Environment.Instance;
 using E2E.Tests.Util;
@@ -86,6 +87,17 @@ public class GangLeaderNeedsToOffloadStolenGoodsIssueTests : IDisposable
 
     private void OpenConversation(EnvironmentInstance instance, string ownerId, string controllerId)
     {
+        Player player = null;
+        Server.Call(() => Assert.True(Server.Resolve<IPlayerManager>().TryGetPlayer(controllerId, out player)));
+        foreach (var client in TestEnvironment.Clients)
+        {
+            client.Call(() =>
+            {
+                if (!client.Resolve<IPlayerManager>().TryGetPlayer(controllerId, out _))
+                    MessageBroker.Instance.Publish(this, new NetworkNewPlayerHeroCreated(controllerId, player, Array.Empty<byte>()));
+            });
+        }
+
         instance.Call(() =>
         {
             Assert.True(instance.ObjectManager.TryGetObject<Hero>(ownerId, out var owner));
@@ -1228,15 +1240,19 @@ public class GangLeaderNeedsToOffloadStolenGoodsIssueTests : IDisposable
 
         var partyId = TestEnvironment.CreateRegisteredObject<MobileParty>();
         var escortTroopId = TestEnvironment.CreateRegisteredObject<CharacterObject>();
+        var companionId = TestEnvironment.CreateRegisteredObject<Hero>();
         Server.Call(() =>
         {
             Assert.True(Server.ObjectManager.TryGetObject<MobileParty>(partyId, out var party));
             Assert.True(Server.ObjectManager.TryGetObject<Settlement>(fixture.OwnerSettlementId, out var settlement));
             Assert.True(Server.ObjectManager.TryGetObject<CharacterObject>(escortTroopId, out var escortTroop));
-            Assert.True(Server.ObjectManager.TryGetObject<Hero>(fixture.CounterOfferHeroId, out var companion));
+            Assert.True(Server.ObjectManager.TryGetObject<Hero>(companionId, out var companion));
             using (new AllowedThread())
             {
                 party.CurrentSettlement = settlement;
+                companion.ChangeState(Hero.CharacterStates.Active);
+                companion.PartyBelongedTo = party;
+                companion.HitPoints = 100;
                 party.MemberRoster.AddToCounts(companion.CharacterObject, 1);
                 escortTroop.Level = 15;
                 party.MemberRoster.AddToCounts(escortTroop, 20);
@@ -1272,7 +1288,7 @@ public class GangLeaderNeedsToOffloadStolenGoodsIssueTests : IDisposable
         Client.Call(() =>
         {
             Assert.True(Client.ObjectManager.TryGetObject<Hero>(fixture.HeroId, out var owner));
-            Assert.True(Client.ObjectManager.TryGetObject<Hero>(fixture.CounterOfferHeroId, out var companion));
+            Assert.True(Client.ObjectManager.TryGetObject<Hero>(companionId, out var companion));
             Assert.True(Client.ObjectManager.TryGetObject<CharacterObject>(escortTroopId, out var escortTroop));
             using (new AllowedThread())
             {
@@ -1422,15 +1438,19 @@ public class GangLeaderNeedsToOffloadStolenGoodsIssueTests : IDisposable
 
         var partyId = TestEnvironment.CreateRegisteredObject<MobileParty>();
         var escortTroopId = TestEnvironment.CreateRegisteredObject<CharacterObject>();
+        var companionId = TestEnvironment.CreateRegisteredObject<Hero>();
         Server.Call(() =>
         {
             Assert.True(Server.ObjectManager.TryGetObject<MobileParty>(partyId, out var party));
             Assert.True(Server.ObjectManager.TryGetObject<Settlement>(fixture.OwnerSettlementId, out var settlement));
             Assert.True(Server.ObjectManager.TryGetObject<CharacterObject>(escortTroopId, out var escortTroop));
-            Assert.True(Server.ObjectManager.TryGetObject<Hero>(fixture.CounterOfferHeroId, out var companion));
+            Assert.True(Server.ObjectManager.TryGetObject<Hero>(companionId, out var companion));
             using (new AllowedThread())
             {
                 party.CurrentSettlement = settlement;
+                companion.ChangeState(Hero.CharacterStates.Active);
+                companion.PartyBelongedTo = party;
+                companion.HitPoints = 100;
                 party.MemberRoster.AddToCounts(companion.CharacterObject, 1);
                 escortTroop.Level = 15;
                 party.MemberRoster.AddToCounts(escortTroop, 20);
@@ -1447,7 +1467,7 @@ public class GangLeaderNeedsToOffloadStolenGoodsIssueTests : IDisposable
         Client.Call(() =>
         {
             Assert.True(Client.ObjectManager.TryGetObject<Hero>(fixture.HeroId, out var owner));
-            Assert.True(Client.ObjectManager.TryGetObject<Hero>(fixture.CounterOfferHeroId, out var companion));
+            Assert.True(Client.ObjectManager.TryGetObject<Hero>(companionId, out var companion));
             Assert.True(Client.ObjectManager.TryGetObject<CharacterObject>(escortTroopId, out var escortTroop));
             using (new AllowedThread())
             {
@@ -1507,16 +1527,19 @@ public class GangLeaderNeedsToOffloadStolenGoodsIssueTests : IDisposable
     private void AcceptAlternativeSolutionFromClient(EnvironmentInstance client, GangLeaderFixture fixture, string controllerId)
     {
         var partyId = TestEnvironment.CreateRegisteredObject<MobileParty>();
+        var companionId = TestEnvironment.CreateRegisteredObject<Hero>();
         var escortTroopId = TestEnvironment.CreateRegisteredObject<CharacterObject>();
         Server.Call(() =>
         {
             Assert.True(Server.ObjectManager.TryGetObject<MobileParty>(partyId, out var party));
             Assert.True(Server.ObjectManager.TryGetObject<Settlement>(fixture.OwnerSettlementId, out var settlement));
             Assert.True(Server.ObjectManager.TryGetObject<CharacterObject>(escortTroopId, out var escortTroop));
-            Assert.True(Server.ObjectManager.TryGetObject<Hero>(fixture.CounterOfferHeroId, out var companion));
+            Assert.True(Server.ObjectManager.TryGetObject<Hero>(companionId, out var companion));
             using (new AllowedThread())
             {
                 party.CurrentSettlement = settlement;
+                companion.PartyBelongedTo = party;
+                companion.HitPoints = 100;
                 party.MemberRoster.AddToCounts(companion.CharacterObject, 1);
                 escortTroop.Level = 15;
                 party.MemberRoster.AddToCounts(escortTroop, 20);
@@ -1532,10 +1555,20 @@ public class GangLeaderNeedsToOffloadStolenGoodsIssueTests : IDisposable
             instance.Call(() => Assert.True(instance.ObjectManager.TryGetObject<CharacterObject>(escortTroopId, out _)));
         }
 
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject<MobileParty>(partyId, out var party));
+            Assert.True(Server.ObjectManager.TryGetObject<Hero>(companionId, out var companion));
+            Assert.Same(party, companion.PartyBelongedTo);
+            Assert.True(companion.CanHaveCampaignIssues(), "Companion has a conflicting campaign issue");
+            Assert.False(companion.IsWounded, $"Companion HP={companion.HitPoints}");
+            Assert.False(companion.IsPregnant);
+        });
+
         client.Call(() =>
         {
             Assert.True(client.ObjectManager.TryGetObject<Hero>(fixture.HeroId, out var owner));
-            Assert.True(client.ObjectManager.TryGetObject<Hero>(fixture.CounterOfferHeroId, out var companion));
+            Assert.True(client.ObjectManager.TryGetObject<Hero>(companionId, out var companion));
             Assert.True(client.ObjectManager.TryGetObject<CharacterObject>(escortTroopId, out var escortTroop));
             using (new AllowedThread())
             {
