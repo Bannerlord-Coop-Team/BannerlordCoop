@@ -1,4 +1,4 @@
-using Common.Messaging;
+﻿using Common.Messaging;
 using ProtoBuf;
 using TaleWorlds.CampaignSystem;
 
@@ -77,6 +77,21 @@ public readonly struct NetworkIssueRemoved : IServerToClientCommand
     {
         OwnerId = ownerId;
         Reason = reason;
+        Proof = proof;
+    }
+}
+
+[ProtoContract(SkipConstructor = true)]
+public readonly struct NetworkApplyPendingQuestFailConsequence : IServerToClientCommand
+{
+    [ProtoMember(1)]
+    public readonly string QuestTypeKey;
+    [ProtoMember(2)]
+    public readonly byte Proof;
+
+    public NetworkApplyPendingQuestFailConsequence(string questTypeKey, byte proof)
+    {
+        QuestTypeKey = questTypeKey;
         Proof = proof;
     }
 }
