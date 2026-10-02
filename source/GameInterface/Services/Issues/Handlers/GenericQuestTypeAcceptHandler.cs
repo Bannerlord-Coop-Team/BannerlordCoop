@@ -1,4 +1,4 @@
-using Common;
+﻿using Common;
 using Common.Logging;
 using Common.Messaging;
 using Common.Network;
@@ -429,8 +429,14 @@ internal class GenericQuestTypeAcceptHandler : IHandler
             try
             {
                 ApplyReceivedTroops(owner, data.SentTroops);
-                MirrorAlternativeAccepted(owner, data.State);
-                descriptor?.MirrorAlternativeAcceptBytes?.Invoke(owner, data.FieldsBytes);
+                if (descriptor?.MirrorAlternativeAcceptBytes != null)
+                {
+                    descriptor.MirrorAlternativeAcceptBytes(owner, data.FieldsBytes);
+                }
+                else
+                {
+                    MirrorAlternativeAccepted(owner, data.State);
+                }
             }
             catch (Exception e)
             {
