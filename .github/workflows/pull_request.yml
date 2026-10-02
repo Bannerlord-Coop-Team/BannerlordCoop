@@ -15,6 +15,22 @@ env:
 # Use the event's merge commit in every job so scripts, sources, and build artifacts
 # match the workflow, even when the PR branch is behind development.
 jobs:
+  nightly-publish-guard:
+    name: Nightly publish guard
+    runs-on: windows-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          ref: ${{ github.sha }}
+
+      - name: Test scheduled nightly publication decisions
+        shell: pwsh
+        run: ./.github/scripts/test-nightly-publish-guard.ps1
+
   build:
     runs-on: ubuntu-latest
     timeout-minutes: 30
