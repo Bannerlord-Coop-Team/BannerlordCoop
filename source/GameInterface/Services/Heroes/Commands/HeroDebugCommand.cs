@@ -579,6 +579,9 @@ public class HeroDebugCommand
             !objectManager.TryGetObject(player.HeroId, out actor) ||
             !objectManager.TryGetObject(player.MobilePartyId, out party)))
             return Failed("The acting player's registered hero and party are required.");
+        if (!requirePlayer && detail == KillCharacterAction.KillCharacterActionDetail.Executed &&
+            killer.IsPlayerHero() && killer != actor)
+            return Failed("A player execution killer must match the acting controller's hero.");
 
         using (requirePlayer ? null : new MainHeroSubstitutionScope(actor, party))
         {

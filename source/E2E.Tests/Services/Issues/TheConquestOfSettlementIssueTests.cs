@@ -166,6 +166,43 @@ public class TheConquestOfSettlementIssueTests : IDisposable
         });
     }
 
+    [Fact]
+    public void NpcExecutionRejectsAnotherPlayerAsKillerBeforeAddingADeathMark()
+    {
+        var npcId = environment.CreateRegisteredObject<Hero>();
+        var actorId = environment.CreateRegisteredObject<Hero>();
+        var actorPartyId = environment.CreateRegisteredObject<MobileParty>();
+        var killerId = environment.CreateRegisteredObject<Hero>();
+        var killerPartyId = environment.CreateRegisteredObject<MobileParty>();
+        Server.Call(() =>
+        {
+            var players = Server.Resolve<IPlayerManager>();
+            Assert.True(players.AddPlayer(new Player("death-actor", actorId, actorPartyId, "", "")));
+            Assert.True(players.AddPlayer(new Player("other-executor", killerId, killerPartyId, "", "")));
+            Assert.True(Server.ObjectManager.TryGetObject<Hero>(npcId, out var npc));
+            Assert.True(Server.ObjectManager.TryGetObject<Hero>(actorId, out var actor));
+            Assert.True(Server.ObjectManager.TryGetObject<Hero>(killerId, out var killer));
+            var previousDeathMark = npc.DeathMark;
+            var previousHero = ResolvedMainHeroContext.ResolvedMainHero;
+            var previousParty = Campaign.Current.MainParty;
+            var killed = 0;
+            CampaignEvents.HeroKilledEvent.AddNonSerializedListener(this, (_, _, _, _) => killed++);
+
+            var result = new HeroDebugCommand.HeroKillNpcCoopCommand().ProcessCommand(
+                new CoopCommandArgsFactory().FromValues(new[] { npcId, "execution", "death-actor", killerId }));
+
+            Assert.False(result.Succeeded);
+            Assert.Contains("must match the acting controller", result.Output);
+            Assert.True(npc.IsAlive);
+            Assert.True(actor.IsAlive);
+            Assert.True(killer.IsAlive);
+            Assert.Equal(previousDeathMark, npc.DeathMark);
+            Assert.Equal(0, killed);
+            Assert.Same(previousHero, ResolvedMainHeroContext.ResolvedMainHero);
+            Assert.Same(previousParty, Campaign.Current.MainParty);
+        });
+    }
+
     [Theory]
     [InlineData("old_age", KillCharacterAction.KillCharacterActionDetail.DiedOfOldAge)]
     [InlineData("battle", KillCharacterAction.KillCharacterActionDetail.DiedInBattle)]
