@@ -1,4 +1,4 @@
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.SaveSystem;
 
@@ -58,6 +58,7 @@ public sealed class IssueOwnershipSaveableTypeDefiner : SaveableTypeDefiner
 
     public override void DefineContainerDefinitions()
     {
+        ConstructContainerDefinition(typeof(Dictionary<TaleWorlds.ObjectSystem.MBObjectBase, Hero>));
         ConstructContainerDefinition(typeof(List<IssueOwnershipSaveData>));
         ConstructContainerDefinition(typeof(List<IssueGenerationSaveData>));
     }
