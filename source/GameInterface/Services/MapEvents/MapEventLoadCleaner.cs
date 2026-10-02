@@ -60,8 +60,11 @@ internal sealed class MapEventLoadCleaner : IMapEventLoadCleaner
                 if (!mobileParty.IsActive || mobileParty.IsPlayerParty())
                     continue;
 
-                // Army members must keep their leader and gathering orders after battle cleanup.
-                if (mobileParty.Army?.LeaderParty.IsPlayerParty() == true)
+                // Preserve attachments and gathering orders, but clear stale battle movement.
+                var armyLeader = mobileParty.Army?.LeaderParty;
+                if (armyLeader != null && armyLeader.IsPlayerParty() &&
+                    (mobileParty.AttachedTo == armyLeader ||
+                     (mobileParty.DefaultBehavior == AiBehavior.EscortParty && mobileParty.TargetParty == armyLeader)))
                     continue;
 
                 mobileParty.ResetNavigationToHold();
