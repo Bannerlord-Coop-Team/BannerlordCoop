@@ -363,6 +363,7 @@ public abstract class EnvironmentInstance : IDisposable
         private readonly Campaign previousCampaign;
         private readonly ICampaignMission previousCampaignMission;
         private readonly Game previousGame;
+        private readonly GameStateManager previousGameStateManager;
         private readonly TaleWorlds.MountAndBlade.Module previousModule;
         private readonly TestMessageBroker previousMessageBroker;
         private readonly bool wasServer;
@@ -406,6 +407,7 @@ public abstract class EnvironmentInstance : IDisposable
                 previousCampaign = Campaign.Current;
                 previousCampaignMission = CampaignMission.Current;
                 previousGame = Game.Current;
+                previousGameStateManager = GameStateManager._current;
                 previousModule = TaleWorlds.MountAndBlade.Module.CurrentModule;
                 if (GameInterface.ContainerProvider.TryGetContainer(out previousContainer) == false)
                 {
@@ -418,6 +420,8 @@ public abstract class EnvironmentInstance : IDisposable
                 // Set new static values
                 restorePreviousStatics = true;
                 instance.GameInstance.SetStatics();
+                // The public setter cleans the previous instance's states.
+                GameStateManager._current = instance.GameInstance.Game.GameStateManager;
                 CampaignMission.Current = instance.CampaignMissionContext;
 
                 ModInformation.IsServer = instance is ServerInstance;
@@ -473,6 +477,7 @@ public abstract class EnvironmentInstance : IDisposable
             Campaign.Current = previousCampaign;
             CampaignMission.Current = previousCampaignMission;
             Game.Current = previousGame;
+            GameStateManager._current = previousGameStateManager;
             TaleWorlds.MountAndBlade.Module.CurrentModule = previousModule;
             ModInformation.IsServer = wasServer;
             GameInterface.ContainerProvider.SetContainer(previousContainer);

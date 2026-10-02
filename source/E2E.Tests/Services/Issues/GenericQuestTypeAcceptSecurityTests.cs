@@ -187,6 +187,11 @@ public class GenericQuestTypeAcceptSecurityTests : IDisposable
             var playerManager = Server.Resolve<IPlayerManager>();
             Assert.True(playerManager.AddPlayer(new Player(controllerId, fixture.HeroId, partyId, "", "")));
         });
+        Client.Call(() =>
+        {
+            using (new AllowedThread())
+                Client.GetRegisteredObject<CharacterObject>(eligibleTroopId).Level = 20;
+        });
         lastConnectedEligibleTroopId = eligibleTroopId;
         lastConnectedPartyId = partyId;
         TestEnvironment.ConnectRegisteredPlayer(Client, controllerId);
