@@ -1,4 +1,4 @@
-using Common;
+﻿using Common;
 using Common.Logging;
 using Common.Messaging;
 using Common.Network;
@@ -108,10 +108,11 @@ internal class IssueManagerAlternativeSolutionTroopsPatches
         InformationManager.ShowInquiry(new InquiryData(string.Empty, textObject.ToString(), isAffirmativeOptionShown: true,
             isNegativeOptionShown: false, GameTexts.FindText("str_ok").ToString(), null, delegate
             {
-                MakeAlternativeTroopsReturn(troops);
-                MessageBroker.Instance.Publish(null, new AwaitingAlternativeSolutionTroopsDrainedLocally(localControllerId, troops));
-                if (ContainerProvider.TryResolve<IAwaitingAlternativeSolutionTroopsRegistry>(out var registryAtDrainTime))
+                if (ContainerProvider.TryResolve<IAwaitingAlternativeSolutionTroopsRegistry>(out var registryAtDrainTime)
+                    && registryAtDrainTime.TryGet(localControllerId, out var pending) && ReferenceEquals(pending, troops))
                 {
+                    MakeAlternativeTroopsReturn(troops, MobileParty.MainParty);
+                    MessageBroker.Instance.Publish(null, new AwaitingAlternativeSolutionTroopsDrainedLocally(localControllerId, troops));
                     registryAtDrainTime.Withdraw(localControllerId, troops);
                 }
                 _inquiryInFlight = false;
@@ -147,7 +148,7 @@ internal class IssueManagerAlternativeSolutionTroopsPatches
         return textObject;
     }
 
-    private static void MakeAlternativeTroopsReturn(TroopRoster roster)
+    internal static void MakeAlternativeTroopsReturn(TroopRoster roster, MobileParty recipient)
     {
         foreach (TroopRosterElement item in roster.GetTroopRoster())
         {
@@ -157,6 +158,7 @@ internal class IssueManagerAlternativeSolutionTroopsPatches
             }
         }
 
-        MobileParty.MainParty.MemberRoster.Add(roster);
+        // Game-over deletion can run after the old player's party was destroyed.
+        recipient?.MemberRoster.Add(roster);
     }
 }

@@ -212,9 +212,7 @@ internal static class SmugglersQuestType
 
         public void RejectAcceptance(Hero owner)
         {
-            if (ModInformation.IsServer || owner?.Issue == null) return;
-            if (!ContainerProvider.TryResolve<IIssueOwnershipRegistry>(out var ownership)) return;
-            if (!ownership.TryGetOwnerControllerId(owner, out _)) GenericQuestTypeAcceptHandler.RollbackAlternativeAccept(owner);
+            // The generic handler restores the request's retained selection, never the winner's roster.
         }
     }
 

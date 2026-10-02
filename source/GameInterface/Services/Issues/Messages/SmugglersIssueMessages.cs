@@ -82,3 +82,16 @@ public readonly struct NetworkSmugglersIssueCreated : IServerToClientCommand
         DueTimeTicks = dueTimeTicks;
     }
 }
+
+[ProtoContract(SkipConstructor = true)]
+internal readonly struct NetworkQuestPlayerRemoved : IServerToClientCommand
+{
+    [ProtoMember(1)] public readonly string ControllerId;
+    [ProtoMember(2)] public readonly string HeroId;
+
+    public NetworkQuestPlayerRemoved(string controllerId, string heroId)
+    {
+        ControllerId = controllerId;
+        HeroId = heroId;
+    }
+}

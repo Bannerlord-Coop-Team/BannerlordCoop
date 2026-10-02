@@ -4,6 +4,12 @@ using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Players;
 using GameInterface.Services.Players.Data;
 using Common;
+using Common.Network;
+using GameInterface.Services.Issues.Interfaces;
+using GameInterface.Services.Issues.Messages;
+using GameInterface.Services.Issues.Patches;
+using System.Linq;
+using TaleWorlds.CampaignSystem.Issues;
 using System;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Party;
@@ -16,6 +22,7 @@ internal interface ISmugglersQuestAuthority
     bool TryOpenOwnerScope(Hero issueGiver, out IDisposable scope);
     bool IsLocalOwner(QuestBase quest);
     void OnPlayerReplaced(Player previous, Player replacement);
+    void OnPlayerRemoving(Player player);
 }
 
 internal sealed class SmugglersQuestAuthority : ISmugglersQuestAuthority
@@ -24,14 +31,19 @@ internal sealed class SmugglersQuestAuthority : ISmugglersQuestAuthority
     private readonly IPlayerManager playerManager;
     private readonly IObjectManager objectManager;
     private readonly ISmugglersQuestOwners owners;
+    private readonly IAwaitingAlternativeSolutionTroopsRegistry returningTroops;
+    private readonly INetwork network;
 
     public SmugglersQuestAuthority(IIssueOwnershipRegistry ownershipRegistry,
-        IPlayerManager playerManager, IObjectManager objectManager, ISmugglersQuestOwners owners)
+        IPlayerManager playerManager, IObjectManager objectManager, ISmugglersQuestOwners owners,
+        IAwaitingAlternativeSolutionTroopsRegistry returningTroops, INetwork network)
     {
         this.ownershipRegistry = ownershipRegistry;
         this.playerManager = playerManager;
         this.objectManager = objectManager;
         this.owners = owners;
+        this.returningTroops = returningTroops;
+        this.network = network;
     }
 
     public bool IsLocalOwner(QuestBase quest) => ownershipRegistry.IsLocalPeerOwner(quest.QuestGiver);
@@ -54,6 +66,36 @@ internal sealed class SmugglersQuestAuthority : ISmugglersQuestAuthority
             }
         }
         owners.ReplacePlayer(oldHero, newHero);
+    }
+
+    public void OnPlayerRemoving(Player player)
+    {
+        if (ModInformation.IsClient) return;
+        var issues = Campaign.Current.IssueManager.Issues.Values
+            .Where(issue => issue is SmugglersIssueBehavior.SmugglersIssue
+                && ownershipRegistry.TryGetOwnerControllerId(issue.IssueOwner, out var controller)
+                && controller == player.ControllerId).ToArray();
+        objectManager.TryGetObject<MobileParty>(player.MobilePartyId, out var party);
+        if (issues.Length > 0)
+        {
+            if (!objectManager.TryGetObjectWithLogging<Hero>(player.HeroId, out var hero))
+                throw new InvalidOperationException("Cannot remove a Smugglers owner before its quests can be canceled");
+            using (new OwnerScope(hero, party))
+            {
+                foreach (var issue in issues)
+                {
+                    if (issue.IssueQuest is { IsOngoing: true } quest)
+                        quest.CompleteQuestWithCancel(new TextObject("{=CoopSmugglersPlayerRemoved}The quest was canceled because the accepting character was removed."));
+                    else
+                        issue.CompleteIssueWithCancel();
+                }
+            }
+        }
+        // Return survivors to the old character before deletion can reuse this controller id.
+        if (returningTroops.TryGet(player.ControllerId, out var troops))
+            IssueManagerAlternativeSolutionTroopsPatches.MakeAlternativeTroopsReturn(troops, party);
+        returningTroops.Clear(player.ControllerId);
+        network.SendAll(new NetworkQuestPlayerRemoved(player.ControllerId, player.HeroId));
     }
 
     public bool TryOpenOwnerScope(Hero issueGiver, out IDisposable scope)

@@ -3,6 +3,8 @@ using Common.Messaging;
 using Common.Network;
 using Common.Util;
 using GameInterface.Services.Issues.Generic;
+using GameInterface.Services.Issues.Interfaces;
+using GameInterface.Services.Players;
 using GameInterface.Services.Issues.Messages;
 using GameInterface.Services.ObjectManager;
 using System.Collections.Generic;
@@ -20,14 +22,20 @@ internal sealed class SmugglersIssueHandler : IHandler
     private readonly IObjectManager objectManager;
     private readonly INetwork network;
     private readonly IIssueGenerationRegistry generationRegistry;
+    private readonly IPlayerManager players;
+    private readonly IAwaitingAlternativeSolutionTroopsRegistry returningTroops;
 
     public SmugglersIssueHandler(IMessageBroker messageBroker, IObjectManager objectManager,
-        INetwork network, IIssueGenerationRegistry generationRegistry)
+        INetwork network, IIssueGenerationRegistry generationRegistry,
+        IPlayerManager players, IAwaitingAlternativeSolutionTroopsRegistry returningTroops)
     {
         this.messageBroker = messageBroker;
         this.objectManager = objectManager;
         this.network = network;
         this.generationRegistry = generationRegistry;
+        this.players = players;
+        this.returningTroops = returningTroops;
+        messageBroker.Subscribe<NetworkQuestPlayerRemoved>(Handle_PlayerRemoved);
         messageBroker.Subscribe<SmugglersIssueCreated>(Handle_SmugglersIssueCreated);
         messageBroker.Subscribe<NetworkSmugglersIssueCreated>(Handle_NetworkSmugglersIssueCreated);
         messageBroker.Subscribe<SmugglersQuestLogAdded>(Handle_SmugglersQuestLogAdded);
@@ -38,12 +46,24 @@ internal sealed class SmugglersIssueHandler : IHandler
 
     public void Dispose()
     {
+        messageBroker.Unsubscribe<NetworkQuestPlayerRemoved>(Handle_PlayerRemoved);
         messageBroker.Unsubscribe<SmugglersIssueCreated>(Handle_SmugglersIssueCreated);
         messageBroker.Unsubscribe<NetworkSmugglersIssueCreated>(Handle_NetworkSmugglersIssueCreated);
         messageBroker.Unsubscribe<SmugglersQuestLogAdded>(Handle_SmugglersQuestLogAdded);
         messageBroker.Unsubscribe<NetworkSmugglersQuestLog>(Handle_NetworkSmugglersQuestLog);
         messageBroker.Unsubscribe<SmugglersAlternativeJournalChanged>(Handle_AlternativeJournalChanged);
         messageBroker.Unsubscribe<NetworkSmugglersAlternativeJournal>(Handle_NetworkAlternativeJournal);
+    }
+
+    private void Handle_PlayerRemoved(MessagePayload<NetworkQuestPlayerRemoved> payload)
+    {
+        if (ModInformation.IsServer) return;
+        GameThread.RunSafe(() =>
+        {
+            var data = payload.What;
+            if (players.TryGetPlayer(data.ControllerId, out var player) && player.HeroId != data.HeroId) return;
+            returningTroops.Clear(data.ControllerId);
+        });
     }
 
     private void Handle_AlternativeJournalChanged(MessagePayload<SmugglersAlternativeJournalChanged> payload)

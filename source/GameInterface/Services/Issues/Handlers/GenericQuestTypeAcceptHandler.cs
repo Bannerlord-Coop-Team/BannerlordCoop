@@ -38,6 +38,7 @@ internal class GenericQuestTypeAcceptHandler : IHandler
     private readonly IIssueOwnershipRegistry ownershipRegistry;
     private readonly IIssueGenerationRegistry generationRegistry;
     private readonly IIssueConversationTracker conversationTracker;
+    private readonly PendingRegistry<(IssueBase Issue, int Generation, string ControllerId, MobileParty Party, TroopRosterData Troops)> pendingSmugglersSelections = new();
 
     public GenericQuestTypeAcceptHandler(
         IMessageBroker messageBroker,
@@ -293,12 +294,18 @@ internal class GenericQuestTypeAcceptHandler : IHandler
 
             ownershipRegistry.SetOwner(owner, hostControllerId);
             var hostTroops = troopRosterInterface.PackTroopRosterData(owner.Issue.AlternativeSolutionSentTroops);
-            network.SendAll(new NetworkQuestTypeAlternativeAccepted(ownerId, hostControllerId, state, fieldsBytes, hostTroops));
+            generationRegistry.TryGetGeneration(owner, out var generation);
+            network.SendAll(new NetworkQuestTypeAlternativeAccepted(ownerId, hostControllerId, state, fieldsBytes, hostTroops, generation));
         }
         else
         {
             generationRegistry.TryGetGeneration(owner, out var generation);
             var packedTroops = troopRosterInterface.PackTroopRosterData(owner.Issue.AlternativeSolutionSentTroops);
+            if (owner.Issue is SmugglersIssueBehavior.SmugglersIssue)
+            {
+                if (pendingSmugglersSelections.TryGet(owner, out _)) return;
+                pendingSmugglersSelections.Set(owner, (owner.Issue, generation, payload.What.ControllerId, MobileParty.MainParty, packedTroops));
+            }
             network.SendAll(new RequestQuestTypeAcceptAlternative(ownerId, generation, packedTroops));
         }
     }
@@ -318,7 +325,7 @@ internal class GenericQuestTypeAcceptHandler : IHandler
             {
                 Logger.Error("Rejecting {Message} from an unregistered/unknown requester for owner {Owner}",
                     nameof(RequestQuestTypeAcceptAlternative), ownerId);
-                if (requester != null) network.Send(requester, new NetworkQuestTypeAcceptRejected(ownerId, isAlternative: true));
+                if (requester != null) network.Send(requester, new NetworkQuestTypeAcceptRejected(ownerId, isAlternative: true, requestedGeneration));
                 return;
             }
 
@@ -326,7 +333,7 @@ internal class GenericQuestTypeAcceptHandler : IHandler
             {
                 Logger.Error("Rejecting {Message} for a stale/superseded issue generation for owner {Owner}",
                     nameof(RequestQuestTypeAcceptAlternative), ownerId);
-                network.Send(requester, new NetworkQuestTypeAcceptRejected(ownerId, isAlternative: true));
+                network.Send(requester, new NetworkQuestTypeAcceptRejected(ownerId, isAlternative: true, requestedGeneration));
                 return;
             }
 
@@ -335,7 +342,7 @@ internal class GenericQuestTypeAcceptHandler : IHandler
             {
                 Logger.Error("Rejecting {Message} for a requester with no tracked conversation with owner {Owner}",
                     nameof(RequestQuestTypeAcceptAlternative), ownerId);
-                network.Send(requester, new NetworkQuestTypeAcceptRejected(ownerId, isAlternative: true));
+                network.Send(requester, new NetworkQuestTypeAcceptRejected(ownerId, isAlternative: true, requestedGeneration));
                 return;
             }
 
@@ -344,7 +351,7 @@ internal class GenericQuestTypeAcceptHandler : IHandler
                 owner.Issue.IsOngoingWithoutQuest && owner.Issue.IssueStayAliveConditions();
             if (!canAccept)
             {
-                network.Send(requester, new NetworkQuestTypeAcceptRejected(ownerId, isAlternative: true));
+                network.Send(requester, new NetworkQuestTypeAcceptRejected(ownerId, isAlternative: true, requestedGeneration));
                 return;
             }
 
@@ -357,7 +364,7 @@ internal class GenericQuestTypeAcceptHandler : IHandler
             {
                 Logger.Error(e, "Failed to apply {Message} for owner {Owner} - malformed or version-mismatched payload",
                     nameof(RequestQuestTypeAcceptAlternative), ownerId);
-                network.Send(requester, new NetworkQuestTypeAcceptRejected(ownerId, isAlternative: true));
+                network.Send(requester, new NetworkQuestTypeAcceptRejected(ownerId, isAlternative: true, requestedGeneration));
                 return;
             }
 
@@ -365,7 +372,7 @@ internal class GenericQuestTypeAcceptHandler : IHandler
             {
                 Logger.Error("Rejecting {Message} for owner {Owner} - requester's validated troop roster is empty",
                     nameof(RequestQuestTypeAcceptAlternative), ownerId);
-                network.Send(requester, new NetworkQuestTypeAcceptRejected(ownerId, isAlternative: true));
+                network.Send(requester, new NetworkQuestTypeAcceptRejected(ownerId, isAlternative: true, requestedGeneration));
                 return;
             }
 
@@ -381,7 +388,7 @@ internal class GenericQuestTypeAcceptHandler : IHandler
                     if (!accepted)
                     {
                         RollbackFailedAlternativeAcceptStart(owner, player.ControllerId);
-                        network.Send(requester, new NetworkQuestTypeAcceptRejected(ownerId, isAlternative: true));
+                        network.Send(requester, new NetworkQuestTypeAcceptRejected(ownerId, isAlternative: true, requestedGeneration));
                         return;
                     }
                     fieldsBytes = bytes;
@@ -392,13 +399,13 @@ internal class GenericQuestTypeAcceptHandler : IHandler
                 Logger.Error(e, "Failed to start {Message} for owner {Owner} after troop validation - rolling back",
                     nameof(RequestQuestTypeAcceptAlternative), ownerId);
                 RollbackFailedAlternativeAcceptStart(owner, player.ControllerId);
-                network.Send(requester, new NetworkQuestTypeAcceptRejected(ownerId, isAlternative: true));
+                network.Send(requester, new NetworkQuestTypeAcceptRejected(ownerId, isAlternative: true, requestedGeneration));
                 return;
             }
 
             ownershipRegistry.SetOwner(owner, player.ControllerId);
             var validatedTroops = troopRosterInterface.PackTroopRosterData(owner.Issue.AlternativeSolutionSentTroops);
-            network.SendAll(new NetworkQuestTypeAlternativeAccepted(ownerId, player.ControllerId, state, fieldsBytes, validatedTroops));
+            network.SendAll(new NetworkQuestTypeAlternativeAccepted(ownerId, player.ControllerId, state, fieldsBytes, validatedTroops, currentGeneration));
         });
     }
 
@@ -428,6 +435,9 @@ internal class GenericQuestTypeAcceptHandler : IHandler
             var descriptor = QuestTypeRegistry.Get(owner.Issue);
             try
             {
+                if (pendingSmugglersSelections.TryGet(owner, out var pending)
+                    && pending.Generation == data.Generation && pending.ControllerId == data.OwnerControllerId)
+                    pendingSmugglersSelections.Clear(owner);
                 ApplyReceivedTroops(owner, data.SentTroops);
                 if (descriptor?.MirrorAlternativeAcceptBytes != null)
                     descriptor.MirrorAlternativeAcceptBytes(owner, data.FieldsBytes);
@@ -458,7 +468,22 @@ internal class GenericQuestTypeAcceptHandler : IHandler
         }
     }
 
-    internal static void RollbackAlternativeAccept(Hero owner)
+    private bool RestorePendingSmugglersSelection(Hero owner, int generation)
+    {
+        if (!pendingSmugglersSelections.TryGet(owner, out var pending)) return false;
+        if (pending.Generation != generation) return true;
+        pendingSmugglersSelections.Clear(owner);
+        using (new AllowedThread())
+        {
+            foreach (var element in troopRosterInterface.UnpackTroopRosterData(pending.Troops))
+                pending.Party.MemberRoster.AddToCounts(element.Character, element.Number, false, element.WoundedNumber, element.Xp, false);
+            if (owner.Issue == pending.Issue && !pending.Issue.IsSolvingWithAlternative)
+                pending.Issue.AlternativeSolutionSentTroops.Clear();
+        }
+        return true;
+    }
+
+    private static void RollbackAlternativeAccept(Hero owner)
     {
         if (owner?.Issue == null) return;
 
@@ -511,6 +536,7 @@ internal class GenericQuestTypeAcceptHandler : IHandler
         {
             if (!objectManager.TryGetObjectWithLogging<Hero>(ownerId, out var owner)) return;
 
+            if (isAlternative && RestorePendingSmugglersSelection(owner, payload.What.Generation)) return;
             var descriptor = QuestTypeRegistry.Get(owner.Issue);
             if (isAlternative)
             {

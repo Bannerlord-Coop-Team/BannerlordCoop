@@ -185,19 +185,39 @@ internal class SmugglersPlayerCharacterChangePatch
 [HarmonyPatch(typeof(QuestBase), nameof(QuestBase.CompleteQuestWithTimeOut))]
 internal class SmugglersQuestTimeoutPatch
 {
-    [HarmonyPrefix]
-    private static bool TimeoutPrefix(QuestBase __instance)
-    {
-        if (__instance is not Quest quest || CallOriginalPolicy.IsOriginalAllowedForOwnershipGate()) return true;
-        if (ModInformation.IsClient || !quest.IsOngoing) return false;
-        if (!ContainerProvider.TryResolve<ISmugglersQuestAuthority>(out var authority)
-            || !authority.TryOpenOwnerScope(quest.QuestGiver, out var scope)) return false;
+    [ThreadStatic]
+    internal static Quest CurrentQuest;
 
-        using (scope)
-        {
-            // Vanilla OnTimedOut calls FailQuest, which already finalizes this quest.
-            quest.FailQuest();
-        }
+    [HarmonyPrefix]
+    private static bool TimeoutPrefix(QuestBase __instance, out (Quest Previous, IDisposable Scope) __state)
+    {
+        __state = (CurrentQuest, null);
+        if (__instance is not Quest quest || CallOriginalPolicy.IsOriginalAllowedForOwnershipGate()) return true;
+        if (ModInformation.IsClient) return IssueFinalizeAuthorityGuard.IsActive;
+        if (!quest.IsOngoing || !ContainerProvider.TryResolve<ISmugglersQuestAuthority>(out var authority)
+            || !authority.TryOpenOwnerScope(quest.QuestGiver, out var scope)) return false;
+        __state = (CurrentQuest, scope);
+        CurrentQuest = quest;
+        return true;
+    }
+
+    [HarmonyFinalizer]
+    private static void Finalizer((Quest Previous, IDisposable Scope) __state)
+    {
+        CurrentQuest = __state.Previous;
+        __state.Scope?.Dispose();
+    }
+}
+
+[HarmonyPatch(typeof(QuestBase), nameof(QuestBase.CompleteQuestWithFail))]
+internal class SmugglersTimeoutFailurePatch
+{
+    [HarmonyPrefix]
+    private static bool Prefix(QuestBase __instance, TextObject cancelLog)
+    {
+        if (__instance != SmugglersQuestTimeoutPatch.CurrentQuest) return true;
+        // OnTimedOut still applies its penalties; the outer call owns the one timeout finalization.
+        if (cancelLog != null) __instance.AddLog(cancelLog);
         return false;
     }
 }
