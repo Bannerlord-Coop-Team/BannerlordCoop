@@ -122,25 +122,33 @@ internal sealed class ScoutEnemyGarrisonsService : IScoutEnemyGarrisonsService
 
     public void MirrorAcceptance(Hero giver, ScoutEnemyGarrisonsAccept data)
     {
-        if (giver.Issue is not Issue issue || !issue.IsOngoingWithoutQuest || issue.StringId != data.IssueId) return;
-        if (!objects.TryGetObjectWithLogging<Hero>(data.HeroId, out var hero) ||
-            !objects.TryGetObjectWithLogging<MobileParty>(data.PartyId, out var party) ||
-            !TryResolveTargets(data.TargetIds, out var targets)) return;
-
-        using (new AllowedThread())
-        using (new QuestSolutionStartAuthorityGuard())
-        using (new IssueDispatchReplayGuard())
-        using (new MainHeroSubstitutionScope(hero, party))
+        var accepted = false;
+        try
         {
-            SetTargets(issue, targets);
-            if (!Campaign.Current.IssueManager.StartIssueQuest(giver) || issue.IssueQuest is not Quest quest) return;
-            state.Remember(quest, data.ControllerId, hero, party);
-            ownership.SetOwner(giver, data.ControllerId);
-            quest.ChangeQuestDueTime(data.DueTime);
-            quest.QuestAcceptedConsequences();
-            if (state.IsVisible(quest)) quest.AddDialogs();
+            if (giver.Issue is not Issue issue || !issue.IsOngoingWithoutQuest || issue.StringId != data.IssueId) return;
+            if (!objects.TryGetObjectWithLogging<Hero>(data.HeroId, out var hero) ||
+                !objects.TryGetObjectWithLogging<MobileParty>(data.PartyId, out var party) ||
+                !TryResolveTargets(data.TargetIds, out var targets)) return;
+
+            using (new AllowedThread())
+            using (new QuestSolutionStartAuthorityGuard())
+            using (new IssueDispatchReplayGuard())
+            using (new MainHeroSubstitutionScope(hero, party))
+            {
+                SetTargets(issue, targets);
+                if (!Campaign.Current.IssueManager.StartIssueQuest(giver) || issue.IssueQuest is not Quest quest) return;
+                state.Remember(quest, data.ControllerId, hero, party);
+                ownership.SetOwner(giver, data.ControllerId);
+                quest.ChangeQuestDueTime(data.DueTime);
+                quest.QuestAcceptedConsequences();
+                if (state.IsVisible(quest)) quest.AddDialogs();
+                accepted = state.IsVisible(quest);
+            }
         }
-        FinishAcceptance(giver, state.IsVisible(giver.Issue.IssueQuest));
+        finally
+        {
+            FinishAcceptance(giver, accepted);
+        }
     }
 
     public IDisposable OpenAuthority(Quest quest, bool completing = false)

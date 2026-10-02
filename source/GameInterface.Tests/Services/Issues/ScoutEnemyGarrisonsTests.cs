@@ -16,6 +16,7 @@ using Moq;
 using System;
 using System.Collections.Generic;
 using TaleWorlds.CampaignSystem;
+using TaleWorlds.CampaignSystem.Conversation;
 using TaleWorlds.CampaignSystem.Issues;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Settlements;
@@ -27,6 +28,7 @@ namespace GameInterface.Tests.Services.Issues;
 
 using Quest = ScoutEnemyGarrisonsIssueBehavior.ScoutEnemyGarrisonsQuest;
 using QuestSettlement = ScoutEnemyGarrisonsIssueBehavior.QuestSettlement;
+using Issue = ScoutEnemyGarrisonsIssueBehavior.ScoutEnemyGarrisonsIssue;
 
 [Collection(ModInformationRoleCollection.Name)]
 public class ScoutEnemyGarrisonsTests : IDisposable
@@ -224,6 +226,50 @@ public class ScoutEnemyGarrisonsTests : IDisposable
         Assert.Equal(changedHero, authority == null);
         Assert.Same(changedHero ? originalParty : recoveredParty, owner.Party);
         Assert.Same(originalHero, owner.Hero);
+    }
+
+    [Theory]
+    [InlineData("identity", true)]
+    [InlineData("lookup", true)]
+    [InlineData("exception", true)]
+    [InlineData("identity", false)]
+    [InlineData("lookup", false)]
+    [InlineData("exception", false)]
+    public void FailedAcceptanceReleasesOnlyTheMatchingConversationWait(string failure, bool matchingGiver)
+    {
+        var previousCampaign = Campaign.Current;
+        var campaign = ObjectHelper.SkipConstructor<Campaign>();
+        campaign.ConversationManager = ObjectHelper.SkipConstructor<ConversationManager>();
+        var giver = ObjectHelper.SkipConstructor<Hero>();
+        var issue = ObjectHelper.SkipConstructor<Issue>();
+        issue.StringId = "pending-issue";
+        issue.IssueOwner = giver;
+        giver.OnIssueCreatedForHero(issue);
+        var pending = matchingGiver ? issue : ObjectHelper.SkipConstructor<Issue>();
+        if (!matchingGiver) pending.IssueOwner = ObjectHelper.SkipConstructor<Hero>();
+        state.PendingAcceptance = pending;
+        var objects = new Mock<IObjectManager>();
+        Hero missingHero = null!;
+        if (failure == "exception")
+            objects.Setup(x => x.TryGetObjectWithLogging("hero", out missingHero)).Throws<InvalidOperationException>();
+        var service = new ScoutEnemyGarrisonsService(objects.Object, null!, null!, null!, null!, state);
+        var data = new ScoutEnemyGarrisonsAccept("player-A", "hero", "party", Array.Empty<string>(), default,
+            failure == "identity" ? "different-issue" : issue.StringId);
+
+        try
+        {
+            Campaign.Current = campaign;
+            if (failure == "exception") Assert.Throws<InvalidOperationException>(() => service.MirrorAcceptance(giver, data));
+            else service.MirrorAcceptance(giver, data);
+
+            Assert.Same(matchingGiver ? null : pending, state.PendingAcceptance);
+            Assert.Equal(matchingGiver, ScoutEnemyGarrisonsAcceptContinuePatch.Prefix());
+            Assert.Null(issue.IssueQuest);
+        }
+        finally
+        {
+            Campaign.Current = previousCampaign;
+        }
     }
 
     [Fact]
