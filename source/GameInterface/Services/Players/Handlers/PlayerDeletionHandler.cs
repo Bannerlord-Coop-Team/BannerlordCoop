@@ -5,6 +5,7 @@ using Common.Network;
 using Common.Util;
 using GameInterface.CoopSessionData;
 using GameInterface.Services.Actions.Patches;
+using GameInterface.Services.Issues.Generic.Migrated.TheConquestOfSettlement;
 using GameInterface.Services.MapEvents.Messages.Leave;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Players.Data;
@@ -35,6 +36,7 @@ internal class PlayerDeletionHandler : IHandler
     private readonly IPlayerManager playerManager;
     private readonly ISiegeEventInterface siegeEventInterface;
     private readonly ICoopSessionProvider sessionProvider;
+    private readonly IConquestQuest conquestQuest;
 
     public PlayerDeletionHandler(
         IMessageBroker messageBroker,
@@ -42,7 +44,8 @@ internal class PlayerDeletionHandler : IHandler
         IObjectManager objectManager,
         IPlayerManager playerManager,
         ISiegeEventInterface siegeEventInterface,
-        ICoopSessionProvider sessionProvider)
+        ICoopSessionProvider sessionProvider,
+        IConquestQuest conquestQuest)
     {
         this.messageBroker = messageBroker;
         this.network = network;
@@ -50,6 +53,7 @@ internal class PlayerDeletionHandler : IHandler
         this.playerManager = playerManager;
         this.siegeEventInterface = siegeEventInterface;
         this.sessionProvider = sessionProvider;
+        this.conquestQuest = conquestQuest;
 
         messageBroker.Subscribe<PlayerDeleteRequested>(Handle_PlayerDeleteRequested);
         messageBroker.Subscribe<NetworkRequestDeletePlayer>(Handle_NetworkRequestDeletePlayer);
@@ -181,6 +185,7 @@ internal class PlayerDeletionHandler : IHandler
             TryStep("party settlement exit", () => LeaveSettlementAction.ApplyForParty(party));
         }
 
+        conquestQuest.CancelForPlayerRemoval(player.ControllerId);
         playerManager.RemovePlayer(player);
         sessionProvider.CoopSession.AgingPlayerData.PlayerSuccessions.Remove(player.HeroId);
 

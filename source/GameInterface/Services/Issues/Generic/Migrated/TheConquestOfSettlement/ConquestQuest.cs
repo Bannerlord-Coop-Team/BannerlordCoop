@@ -13,6 +13,7 @@ using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Issues;
 using TaleWorlds.CampaignSystem.LogEntries;
 using TaleWorlds.CampaignSystem.Party;
+using TaleWorlds.Localization;
 
 namespace GameInterface.Services.Issues.Generic.Migrated.TheConquestOfSettlement;
 
@@ -26,10 +27,14 @@ internal interface IConquestQuest : IRaceArbitratedAcceptMirrorStrategy<Conquest
     bool IsOwnedBy(Hero giver, Hero hero);
     bool IsVisible(QuestBase quest);
     bool IsVisible(JournalLogEntry entry);
+    void CancelForPlayerRemoval(string controllerId);
 }
 
 internal sealed class ConquestQuest : IConquestQuest
 {
+    [ThreadStatic]
+    internal static Quest CancellingRemovedPlayerQuest;
+
     private readonly IIssueOwnershipRegistry ownership;
     private readonly IPlayerManager players;
     private readonly IObjectManager objects;
@@ -94,7 +99,7 @@ internal sealed class ConquestQuest : IConquestQuest
             objects.TryGetObject<Hero>(candidate.HeroId, out var hero) && hero == Hero.MainHero &&
             objects.TryGetObject<MobileParty>(candidate.MobilePartyId, out var party) && party == MobileParty.MainParty);
         if (player == null) return;
-        if (!issue.CheckPreconditions(owner, out _)) return;
+        if (!issue.IssueStayAliveConditions() || !issue.CheckPreconditions(owner, out _)) return;
 
         using (new IssueDispatchReplayGuard())
         {
@@ -156,6 +161,28 @@ internal sealed class ConquestQuest : IConquestQuest
     public void RejectAcceptance(Hero owner)
     {
         // Acceptance is deferred until arbitration, so a rejected client has no speculative quest.
+    }
+
+    public void CancelForPlayerRemoval(string controllerId)
+    {
+        var quests = Campaign.Current.QuestManager.Quests.OfType<Quest>().Where(quest => quest.IsOngoing &&
+            ownership.TryGetQuestOwner(quest.StringId, out var ownerId) && ownerId == controllerId).ToArray();
+        var previous = CancellingRemovedPlayerQuest;
+        try
+        {
+            using (new IssueFinalizeAuthorityGuard())
+            {
+                foreach (var quest in quests)
+                {
+                    CancellingRemovedPlayerQuest = quest;
+                    quest.CompleteQuestWithCancel(new TextObject("{=coop_conquest_owner_removed}The quest was canceled because the character who accepted it is no longer available."));
+                }
+            }
+        }
+        finally
+        {
+            CancellingRemovedPlayerQuest = previous;
+        }
     }
 }
 

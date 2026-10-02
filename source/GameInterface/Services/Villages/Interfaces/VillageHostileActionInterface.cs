@@ -245,7 +245,10 @@ internal class VillageHostileActionInterface : IVillageHostileActionInterface, I
         BeHostileAction.ApplyEncounterHostileAction(mobileParty.Party, settlement.Party);
 
         if (!FactionManager.IsAtWarAgainstFaction(mobileParty.MapFaction, settlement.MapFaction))
-            DeclareWarAction.ApplyByPlayerHostility(mobileParty.MapFaction, settlement.MapFaction);
+        {
+            using (new GameInterface.Services.Heroes.Patches.MainHeroSubstitutionScope(mobileParty.LeaderHero, mobileParty))
+                DeclareWarAction.ApplyByPlayerHostility(mobileParty.MapFaction, settlement.MapFaction);
+        }
     }
 
     public void ApplyForceActionOutcome(MapEvent mapEvent, VillageHostileAction action)

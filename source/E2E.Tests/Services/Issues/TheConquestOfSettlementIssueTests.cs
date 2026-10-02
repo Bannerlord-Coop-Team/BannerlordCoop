@@ -1,19 +1,26 @@
 ﻿using Common.Util;
 using E2E.Tests.Environment;
 using E2E.Tests.Environment.Instance;
+using GameInterface.Services.Heroes.Patches;
 using GameInterface.Services.Issues.Generic;
+using GameInterface.Services.Issues.Generic.Migrated.TheConquestOfSettlement;
 using GameInterface.Services.Issues.Messages;
+using GameInterface.Services.Issues.Patches;
+using Helpers;
 using System;
 using System.Linq;
 using TaleWorlds.CampaignSystem;
+using TaleWorlds.CampaignSystem.Actions;
 using TaleWorlds.CampaignSystem.Encyclopedia;
 using TaleWorlds.CampaignSystem.Issues;
+using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Settlements;
 using Xunit.Abstractions;
 
 namespace E2E.Tests.Services.Issues;
 
 using Issue = TheConquestOfSettlementIssueBehavior.TheConquestOfSettlementIssue;
+using Quest = TheConquestOfSettlementIssueBehavior.TheConquestOfSettlementIssueQuest;
 
 public class TheConquestOfSettlementIssueTests : IDisposable
 {
@@ -94,5 +101,77 @@ public class TheConquestOfSettlementIssueTests : IDisposable
                 Assert.Equal(created.DueTime, issue.IssueDueTime);
             });
         }
+    }
+
+    [Theory]
+    [InlineData("owner", true)]
+    [InlineData("other", false)]
+    [InlineData("unknown", false)]
+    public void HostilityUsesTheInitiatorCapturedBeforeQuestOwnerSubstitution(string initiator, bool causedByOwner)
+    {
+        var ownerId = environment.CreateRegisteredObject<Hero>();
+        var otherId = environment.CreateRegisteredObject<Hero>();
+        var partyId = environment.CreateRegisteredObject<MobileParty>();
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject<Hero>(ownerId, out var owner));
+            Assert.True(Server.ObjectManager.TryGetObject<Hero>(otherId, out var other));
+            Assert.True(Server.ObjectManager.TryGetObject<MobileParty>(partyId, out var party));
+            var wasApplying = ConquestQuestEventPatches.IsApplying;
+            var previousTrigger = ConquestQuestEventPatches.TriggeringHero;
+            using (new MainHeroSubstitutionScope(owner, party))
+            {
+                try
+                {
+                    ConquestQuestEventPatches.IsApplying = true;
+                    ConquestQuestEventPatches.TriggeringHero = initiator == "owner" ? owner : initiator == "other" ? other : null;
+                    Assert.Equal(causedByOwner, DiplomacyHelper.IsWarCausedByPlayer(null, null,
+                        DeclareWarAction.DeclareWarDetail.CausedByPlayerHostility));
+                }
+                finally
+                {
+                    ConquestQuestEventPatches.TriggeringHero = previousTrigger;
+                    ConquestQuestEventPatches.IsApplying = wasApplying;
+                }
+            }
+        });
+    }
+
+    [Fact]
+    public void PlayerRemovalCancelsOnlyItsQuestEvenAfterThePlayerObjectsAreGone()
+    {
+        var created = CreateIssue();
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject<Hero>(created.GiverId, out var giver));
+            Assert.True(Server.ObjectManager.TryGetObject<Settlement>(created.TargetId, out var target));
+            var quest = new Quest(created.IssueId + "_quest", giver, target, CampaignTime.DaysFromNow(60), 20000);
+            var unrelated = ObjectHelper.SkipConstructor<Quest>();
+            unrelated.StringId = "another_players_quest";
+            var ownership = Server.Resolve<IIssueOwnershipRegistry>();
+            using (new AllowedThread())
+            {
+                giver.Issue.IssueQuest = quest;
+                giver.Issue.IsTriedToSolveBefore = true;
+                giver.Issue._issueState = IssueBase.IssueState.SolvingWithQuestSolution;
+                Campaign.Current.QuestManager.OnQuestStarted(quest);
+                Campaign.Current.QuestManager.OnQuestStarted(unrelated);
+            }
+            ownership.SetOwner(giver, "removed-player");
+            ownership.SetQuestOwner(quest.StringId, "removed-player");
+            ownership.SetQuestOwner(unrelated.StringId, "another-player");
+
+            Server.Resolve<IConquestQuest>().CancelForPlayerRemoval("removed-player");
+
+            Assert.True(quest.IsFinalized);
+            Assert.Null(giver.Issue);
+            Assert.DoesNotContain(quest, Campaign.Current.QuestManager.Quests);
+            Assert.Contains(unrelated, Campaign.Current.QuestManager.Quests);
+            Assert.False(ownership.TryGetOwnerControllerId(giver, out _));
+            Assert.Null(ConquestQuest.CancellingRemovedPlayerQuest);
+            Assert.True(ownership.TryGetQuestOwner(quest.StringId, out var historicalOwner));
+            Assert.Equal("removed-player", historicalOwner);
+            Campaign.Current.QuestManager.OnQuestFinalized(unrelated);
+        });
     }
 }

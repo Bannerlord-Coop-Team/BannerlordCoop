@@ -2,15 +2,18 @@
 using Common.Messaging;
 using Common.Util;
 using GameInterface.Policies;
+using GameInterface.Services.Heroes.Patches;
 using GameInterface.Services.Issues.Generic;
 using GameInterface.Services.Issues.Generic.Migrated.GangLeaderNeedsToOffloadStolenGoods;
 using GameInterface.Services.Issues.Generic.Migrated.TheConquestOfSettlement;
 using GameInterface.Services.Issues.Messages;
 using HarmonyLib;
+using Helpers;
 using System;
 using System.Collections.Generic;
 using System.Reflection;
 using TaleWorlds.CampaignSystem;
+using TaleWorlds.CampaignSystem.Actions;
 using TaleWorlds.CampaignSystem.CampaignBehaviors;
 using TaleWorlds.CampaignSystem.CharacterDevelopment;
 using TaleWorlds.CampaignSystem.Issues;
@@ -32,6 +35,8 @@ internal class ConquestQuestEventPatches
 {
     [ThreadStatic]
     internal static bool IsApplying;
+    [ThreadStatic]
+    internal static Hero TriggeringHero;
 
     private static IEnumerable<MethodBase> TargetMethods()
     {
@@ -40,22 +45,25 @@ internal class ConquestQuestEventPatches
     }
 
     [HarmonyPrefix]
-    private static bool Prefix(Quest __instance, out (IDisposable Scope, bool WasApplying) __state)
+    private static bool Prefix(Quest __instance, out (IDisposable Scope, bool WasApplying, Hero PreviousTrigger) __state)
     {
-        __state = (null, IsApplying);
+        __state = (null, IsApplying, TriggeringHero);
         if (CallOriginalPolicy.IsOriginalAllowedForOwnershipGate()) return true;
+        var triggeringHero = ResolvedMainHeroContext.ResolvedMainHero;
         if (ModInformation.IsClient || !__instance.IsOngoing ||
             !ContainerProvider.TryResolve<IConquestQuest>(out var service) ||
             !service.TryOpenOwnerScope(__instance.QuestGiver, out var scope)) return false;
-        __state = (scope, IsApplying);
+        __state = (scope, IsApplying, TriggeringHero);
         IsApplying = true;
+        TriggeringHero = triggeringHero;
         return true;
     }
 
     [HarmonyFinalizer]
-    private static void Finalizer((IDisposable Scope, bool WasApplying) __state)
+    private static void Finalizer((IDisposable Scope, bool WasApplying, Hero PreviousTrigger) __state)
     {
         IsApplying = __state.WasApplying;
+        TriggeringHero = __state.PreviousTrigger;
         __state.Scope?.Dispose();
     }
 }
@@ -70,12 +78,19 @@ internal class ConquestQuestCompletionPatches
     }
 
     [HarmonyPrefix]
-    private static bool Prefix(QuestBase __instance, out (IDisposable OwnerScope, IssueFinalizeAuthorityGuard Guard) __state)
+    private static bool Prefix(QuestBase __instance, MethodBase __originalMethod, out (IDisposable OwnerScope, IssueFinalizeAuthorityGuard Guard) __state)
     {
         __state = default;
         if (__instance is not Quest || CallOriginalPolicy.IsOriginalAllowedForOwnershipGate()) return true;
         if (!__instance.IsOngoing) return false;
         if (ModInformation.IsClient) return AllowedThread.IsThisThreadAllowed();
+        // Cancellation has no owner reward or party action, including after those objects are gone.
+        if (__originalMethod.Name == nameof(QuestBase.CompleteQuestWithCancel) &&
+            ReferenceEquals(ConquestQuest.CancellingRemovedPlayerQuest, __instance))
+        {
+            __state = (null, new IssueFinalizeAuthorityGuard());
+            return true;
+        }
         if (!ContainerProvider.TryResolve<IConquestQuest>(out var service)) return false;
         if (ConquestPlayerChangedPatch.IsChangingPlayer &&
             !service.IsOwnedBy(__instance.QuestGiver, ConquestPlayerChangedPatch.OldPlayer) &&
@@ -90,6 +105,18 @@ internal class ConquestQuestCompletionPatches
     {
         __state.Guard?.Dispose();
         __state.OwnerScope?.Dispose();
+    }
+}
+
+[HarmonyPatch(typeof(DiplomacyHelper), nameof(DiplomacyHelper.IsWarCausedByPlayer))]
+internal class ConquestWarInitiatorPatch
+{
+    [HarmonyPostfix]
+    private static void Postfix(DeclareWarAction.DeclareWarDetail declareWarDetail, ref bool __result)
+    {
+        if (ModInformation.IsClient || !ConquestQuestEventPatches.IsApplying ||
+            declareWarDetail != DeclareWarAction.DeclareWarDetail.CausedByPlayerHostility) return;
+        __result = ConquestQuestEventPatches.TriggeringHero != null && ConquestQuestEventPatches.TriggeringHero == Hero.MainHero;
     }
 }
 
