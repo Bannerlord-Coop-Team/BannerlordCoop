@@ -21,6 +21,14 @@ internal static class CreditsRoster
         "Lord Zippykins",
         "FCharles",
         "FreddyBoyLacroy",
+        "Batuhan Erkmen",
+        "Keeper",
+        "LimaPlug",
+        "Matt Erdy",
+        "matthew",
+        "Mike B",
+        "Patrick Smalley",
+        "StickyTape",
     };
 
     /// <summary>
