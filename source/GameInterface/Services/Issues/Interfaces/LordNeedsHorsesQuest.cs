@@ -323,11 +323,16 @@ internal sealed class LordNeedsHorsesQuest : ILordNeedsHorsesQuest
 
     public bool HasConflictingQuest(Issue issue)
     {
+        if (!objectManager.TryGetIdWithLogging(Hero.MainHero, out var heroId)) return true;
+        var solver = playerManager.Players.FirstOrDefault(player => player.HeroId == heroId);
+        if (solver == null) return true;
+
         foreach (var entry in Campaign.Current.IssueManager.Issues)
         {
             if (entry.Value is not Issue other || other == issue ||
                 (!other.IsSolvingWithQuest && !other.IsSolvingWithAlternative)) continue;
-            if (!TryResolvePlayer(entry.Key, out var hero, out _) || hero == Hero.MainHero) return true;
+            if (ownership.TryGetOwnerControllerId(entry.Key, out var ownerControllerId) &&
+                ownerControllerId == solver.ControllerId) return true;
         }
         return false;
     }

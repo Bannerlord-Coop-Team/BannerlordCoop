@@ -2,6 +2,7 @@
 using E2E.Tests.Environment;
 using E2E.Tests.Environment.Instance;
 using GameInterface.Services.Entity;
+using GameInterface.Services.Heroes.Patches;
 using GameInterface.Services.Issues.Generic;
 using GameInterface.Services.Issues.Generic.AcceptMirror;
 using GameInterface.Services.Issues.Handlers;
@@ -343,6 +344,88 @@ public class GenericQuestTypeAcceptSecurityTests : IDisposable
         });
     }
 
+    [Theory]
+    [InlineData(true, true, true)]
+    [InlineData(false, true, false)]
+    [InlineData(true, false, false)]
+    public void ArmyMemberGiver_RequiresAttachmentToTheArmyThisPlayerEncountered(
+        bool samePlayer, bool attached, bool expected)
+    {
+        var fixture = SetupVillageOwner();
+        var controllerId = ConnectPlayerAwayFromIssueGiver(fixture);
+        var giverPartyId = TestEnvironment.CreateRegisteredObject<MobileParty>();
+        var armyId = TestEnvironment.CreateRegisteredObject<Army>();
+        Server.Call(() =>
+        {
+            var giver = Server.GetRegisteredObject<Hero>(fixture.HeroId);
+            var giverParty = Server.GetRegisteredObject<MobileParty>(giverPartyId);
+            var army = Server.GetRegisteredObject<Army>(armyId);
+            Assert.True(Server.Resolve<IPlayerManager>().TryGetPlayer(controllerId, out var player));
+            var playerParty = Server.GetRegisteredObject<MobileParty>(player.MobilePartyId);
+            Assert.True(Server.ObjectManager.TryGetId(playerParty.Party, out var playerPartyId));
+            Assert.True(Server.ObjectManager.TryGetId(army.LeaderParty.Party, out var leaderPartyId));
+            using (new AllowedThread())
+            {
+                giver.StayingInSettlement = null;
+                giver.PartyBelongedTo = giverParty;
+                giverParty.Army = army;
+                if (attached) giverParty.AttachedTo = army.LeaderParty;
+            }
+            var tracker = Server.Resolve<ConversationPartyTracker>();
+            Assert.True(tracker.TryBeginEngagement(Client.NetPeer,
+                samePlayer ? playerPartyId : "another-player-party", leaderPartyId, false));
+            try
+            {
+                Assert.Equal(expected, Server.Resolve<IssueConversationHandler>()
+                    .IsRequesterPresentWithIssueGiver(controllerId, giver));
+                giverParty.AttachedTo = null;
+                Assert.False(Server.Resolve<IssueConversationHandler>()
+                    .IsRequesterPresentWithIssueGiver(controllerId, giver));
+            }
+            finally
+            {
+                tracker.TryEndEngagement(Client.NetPeer, out _, out _);
+            }
+        });
+    }
+
+    [Theory]
+    [InlineData(false, false, false)]
+    [InlineData(false, true, false)]
+    [InlineData(true, false, true)]
+    public void HorseQuestConflict_UsesTheSolversControllerWithoutResolvingOtherPlayersParties(
+        bool sameOwner, bool registerOtherOwner, bool expected)
+    {
+        var fixture = SetupVillageOwner();
+        var controllerId = ConnectPlayer(fixture);
+        var otherGiverId = TestEnvironment.CreateRegisteredObject<Hero>();
+        Server.Call(() =>
+        {
+            Assert.True(Server.Resolve<IPlayerManager>().TryGetPlayer(controllerId, out var player));
+            var hero = Server.GetRegisteredObject<Hero>(player.HeroId);
+            var party = Server.GetRegisteredObject<MobileParty>(player.MobilePartyId);
+            var giver = Server.GetRegisteredObject<Hero>(otherGiverId);
+            if (registerOtherOwner)
+                Assert.True(Server.Resolve<IPlayerManager>().AddPlayer(new Player("other-solver", otherGiverId, null, "", "")));
+            var active = ObjectHelper.SkipConstructor<LordNeedsHorsesIssueBehavior.LordNeedsHorsesIssue>();
+            active._issueState = IssueBase.IssueState.SolvingWithAlternativeSolution;
+            var ownership = Server.Resolve<IIssueOwnershipRegistry>();
+            ownership.SetOwner(giver, sameOwner ? controllerId : "other-solver");
+            Campaign.Current.IssueManager._issues.Add(giver, active);
+            try
+            {
+                using (new MainHeroSubstitutionScope(hero, party))
+                    Assert.Equal(expected, Server.Resolve<ILordNeedsHorsesQuest>().HasConflictingQuest(
+                        ObjectHelper.SkipConstructor<LordNeedsHorsesIssueBehavior.LordNeedsHorsesIssue>()));
+            }
+            finally
+            {
+                Campaign.Current.IssueManager._issues.Remove(giver);
+                ownership.Clear(giver);
+            }
+        });
+    }
+
     [Fact]
     public void RequestQuestTypeAcceptAlternative_PeerNeverOpenedConversation_RejectedDespiteFreshGeneration()
     {
@@ -480,24 +563,45 @@ public class GenericQuestTypeAcceptSecurityTests : IDisposable
     }
 
     [Theory]
-    [InlineData(6, 150, 450)]
-    [InlineData(10, 600, 0)]
+    [InlineData(6, false)]
+    [InlineData(10, false)]
+    [InlineData(6, true)]
     public void RequestQuestTypeAcceptAlternative_GenuineAccept_ConservesSelectedXpAndBroadcastsServerState(
-        int sentCount, int sentXp, int remainingXp)
+        int sentCount, bool gainXpAfterSelection)
     {
         var fixture = SetupVillageOwner();
         CreateIssueOnBothPeers(fixture);
         var controllerId = ConnectPlayer(fixture);
+        var targetId = TestEnvironment.CreateRegisteredObject<CharacterObject>();
+        foreach (var instance in new[] { Server }.Concat(TestEnvironment.Clients))
+        {
+            instance.Call(() =>
+            {
+                var troop = instance.GetRegisteredObject<CharacterObject>(lastConnectedEligibleTroopId);
+                var target = instance.GetRegisteredObject<CharacterObject>(targetId);
+                using (new AllowedThread())
+                {
+                    target.Level = 26;
+                    troop.Level = 20;
+                    troop.UpgradeTargets = new[] { target };
+                }
+            });
+        }
         string partyId = null;
+        int xpPerTroop = 0;
         Server.Call(() =>
         {
             Assert.True(Server.Resolve<IPlayerManager>().TryGetPlayer(controllerId, out var player));
             partyId = player.MobilePartyId;
             Assert.True(Server.ObjectManager.TryGetObject<MobileParty>(partyId, out var party));
             Assert.True(Server.ObjectManager.TryGetObject<CharacterObject>(lastConnectedEligibleTroopId, out var troop));
-            party.MemberRoster.AddToCounts(troop, 4, false, 0, 600);
+            xpPerTroop = troop.GetUpgradeXpCost(party.Party, 0);
+            Assert.True(xpPerTroop > 0);
+            party.MemberRoster.AddToCounts(troop, 4, false, 0, 9 * xpPerTroop);
+            Assert.Equal(9 * xpPerTroop, party.MemberRoster.GetElementXp(troop));
         });
         OpenConversation(fixture, controllerId);
+        int claimedXp = (sentCount - 1) * xpPerTroop;
 
         Client.Call(() =>
         {
@@ -507,9 +611,23 @@ public class GenericQuestTypeAcceptSecurityTests : IDisposable
             using (new AllowedThread())
             {
                 owner.Issue.AlternativeSolutionSentTroops.AddToCounts(companion.CharacterObject, 1);
-                owner.Issue.AlternativeSolutionSentTroops.AddToCounts(eligibleTroop, sentCount, false, 0, sentXp);
+                owner.Issue.AlternativeSolutionSentTroops.AddToCounts(eligibleTroop, sentCount, false, 0, claimedXp);
             }
+        });
 
+        if (gainXpAfterSelection)
+        {
+            Server.Call(() =>
+            {
+                var party = Server.GetRegisteredObject<MobileParty>(partyId);
+                var troop = Server.GetRegisteredObject<CharacterObject>(lastConnectedEligibleTroopId);
+                party.MemberRoster.AddXpToTroop(troop, xpPerTroop);
+                Assert.Equal(10 * xpPerTroop, party.MemberRoster.GetElementXp(troop));
+            });
+        }
+        Client.Call(() =>
+        {
+            var owner = Client.GetRegisteredObject<Hero>(fixture.HeroId);
             owner.Issue.StartIssueWithAlternativeSolution();
         });
 
@@ -532,6 +650,9 @@ public class GenericQuestTypeAcceptSecurityTests : IDisposable
             Assert.Equal(owner.Issue.AlternativeSolutionReturnTimeForTroops, accepted.State.ReturnTime);
         });
 
+        TestEnvironment.FlushCoalescer();
+        int expectedSentXp = claimedXp + (gainXpAfterSelection ? xpPerTroop : 0);
+        int expectedTotalXp = (gainXpAfterSelection ? 10 : 9) * xpPerTroop;
         foreach (var instance in new[] { Server, Client })
         {
             instance.Call(() =>
@@ -541,9 +662,9 @@ public class GenericQuestTypeAcceptSecurityTests : IDisposable
                 Assert.True(instance.ObjectManager.TryGetObject<CharacterObject>(lastConnectedEligibleTroopId, out var troop));
                 Assert.Equal(10 - sentCount, party.MemberRoster.GetTroopCount(troop));
                 var retainedXp = sentCount == 10 ? 0 : party.MemberRoster.GetElementXp(troop);
-                Assert.Equal(remainingXp, retainedXp);
-                Assert.Equal(sentXp, owner.Issue.AlternativeSolutionSentTroops.GetElementXp(troop));
-                Assert.Equal(600, retainedXp + owner.Issue.AlternativeSolutionSentTroops.GetElementXp(troop));
+                Assert.Equal((10 - sentCount) * xpPerTroop, retainedXp);
+                Assert.Equal(expectedSentXp, owner.Issue.AlternativeSolutionSentTroops.GetElementXp(troop));
+                Assert.Equal(expectedTotalXp, retainedXp + owner.Issue.AlternativeSolutionSentTroops.GetElementXp(troop));
             });
         }
     }

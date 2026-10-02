@@ -143,10 +143,16 @@ internal class IssueConversationHandler : IHandler
 
         if (issueGiver.CurrentSettlement != null) return party.CurrentSettlement == issueGiver.CurrentSettlement;
 
-        return issueGiver.PartyBelongedTo?.Party != null &&
-            objectManager.TryGetIdWithLogging(issueGiver.PartyBelongedTo.Party, out var giverPartyId) &&
-            objectManager.TryGetIdWithLogging(party.Party, out var requesterPartyId) &&
-            partyConversations.IsEngagerParty(giverPartyId, requesterPartyId);
+        var giverParty = issueGiver.PartyBelongedTo;
+        if (giverParty?.Party == null || !objectManager.TryGetIdWithLogging(party.Party, out var requesterPartyId)) return false;
+        if (objectManager.TryGetIdWithLogging(giverParty.Party, out var giverPartyId) &&
+            partyConversations.IsEngagerParty(giverPartyId, requesterPartyId)) return true;
+
+        // The army member menu keeps the encounter with its leader while opening the selected lord's dialogue.
+        var leader = giverParty.Army?.LeaderParty;
+        return leader?.AttachedParties.Contains(giverParty) == true &&
+            objectManager.TryGetIdWithLogging(leader.Party, out var leaderPartyId) &&
+            partyConversations.IsEngagerParty(leaderPartyId, requesterPartyId);
     }
 
     private static bool IsMirrorEligible(TaleWorlds.CampaignSystem.Issues.IssueBase issue)

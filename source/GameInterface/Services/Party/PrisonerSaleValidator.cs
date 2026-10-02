@@ -50,6 +50,16 @@ internal class PrisonerSaleValidator : IPrisonerSaleValidator
             var xpToTransfer = totalToSell == availableHealthy + availableWounded
                 ? availableXp
                 : Math.Min(Math.Max(requested.Xp, 0), availableXp);
+            if (preserveTroopXp && availableRoster.OwnerParty != null)
+            {
+                // Move any XP that vanilla would otherwise discard from the reduced stack.
+                var remainder = available;
+                remainder.Number = availableHealthy + availableWounded - totalToSell;
+                remainder.WoundedNumber = availableWounded - woundedToSell;
+                remainder.Xp = availableXp - xpToTransfer;
+                availableRoster.OwnerParty.OnXpChanged(availableRoster, ref remainder);
+                xpToTransfer = availableXp - remainder.Xp;
+            }
             validatedRoster.AddToCounts(
                 requested.Character,
                 totalToSell,
