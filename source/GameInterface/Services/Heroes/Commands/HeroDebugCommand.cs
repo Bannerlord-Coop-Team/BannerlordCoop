@@ -5,8 +5,10 @@ using GameInterface.Configuration;
 using GameInterface.Services.Heroes.Audit;
 using GameInterface.Services.Heroes.Extensions;
 using GameInterface.Services.Heroes.Interfaces;
+using GameInterface.Services.Heroes.Patches;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.ObjectManager.Extensions;
+using GameInterface.Services.Players;
 using GameInterface.Utils.Commands;
 using Newtonsoft.Json;
 using Serilog;
@@ -18,6 +20,7 @@ using System.Text;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Actions;
 using TaleWorlds.CampaignSystem.CampaignBehaviors;
+using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Settlements;
 using TaleWorlds.Core;
 using TaleWorlds.ObjectSystem;
@@ -512,40 +515,77 @@ public class HeroDebugCommand
         public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
         {
             if (!CommandHelpers.IsServerOnlyCommand(out var error, "coop.debug.hero.kill_player")) return Failed(error);
+            return KillRegisteredHero(args, requirePlayer: true);
+        }
+    }
 
-            if (!ContainerProvider.TryResolve<IObjectManager>(out var objectManager))
-                return Failed("Unable to resolve ObjectManager.");
-            if (!objectManager.TryGetObject(args[0], out Hero hero))
-                return Failed($"Hero with id {args[0]} not found.");
-            if (!hero.IsPlayerHero() || !hero.IsAlive)
-                return Failed("The hero must be a living registered player.");
+    public sealed class HeroKillNpcCoopCommand : ICoopCommand
+    {
+        public string Prefix => "coop.debug.hero";
+        public string Name => "kill_npc";
+        public string Description => "Kills a living registered NPC through the native death action in a registered player's context.";
+        public CoopCommandSide Side => CoopCommandSide.Server;
+        public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
+        {
+            new ExpectedArgs("hero_id", "The registered NPC hero id."),
+            new ExpectedArgs("death_detail", "One of old_age, battle, or execution."),
+            new ExpectedArgs("controller_id", "The acting player's registered controller id."),
+            new ExpectedArgs("killer_hero_id", "The optional registered killer hero id.", false),
+        };
 
-            KillCharacterAction.KillCharacterActionDetail detail;
-            switch (args[1].ToLowerInvariant())
-            {
-                case "old_age":
-                    detail = KillCharacterAction.KillCharacterActionDetail.DiedOfOldAge;
-                    break;
-                case "battle":
-                    detail = KillCharacterAction.KillCharacterActionDetail.DiedInBattle;
-                    break;
-                case "execution":
-                    detail = KillCharacterAction.KillCharacterActionDetail.Executed;
-                    break;
-                default:
-                    return Failed($"Unknown death detail: {args[1]}. Expected old_age, battle, or execution.");
-            }
+        public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
+        {
+            if (!CommandHelpers.IsServerOnlyCommand(out var error, "coop.debug.hero.kill_npc")) return Failed(error);
+            return KillRegisteredHero(args, requirePlayer: false);
+        }
+    }
 
-            Hero killer = null;
-            if (args.Count == 3 && !objectManager.TryGetObject(args[2], out killer))
-                return Failed($"Hero with id {args[2]} not found.");
-            if (detail == KillCharacterAction.KillCharacterActionDetail.Executed && killer == null)
-                return Failed("Execution requires a killer hero id, use coop.debug.hero.list to find one.");
+    private static CoopCommandResult KillRegisteredHero(ICoopCommandArgs args, bool requirePlayer)
+    {
+        if (!ContainerProvider.TryResolve<IObjectManager>(out var objectManager))
+            return Failed("Unable to resolve ObjectManager.");
+        if (!objectManager.TryGetObject(args[0], out Hero hero))
+            return Failed($"Hero with id {args[0]} not found.");
+        if (hero.IsPlayerHero() != requirePlayer || !hero.IsAlive)
+            return Failed(requirePlayer ? "The hero must be a living registered player." : "The hero must be a living registered NPC.");
 
+        KillCharacterAction.KillCharacterActionDetail detail;
+        switch (args[1].ToLowerInvariant())
+        {
+            case "old_age":
+                detail = KillCharacterAction.KillCharacterActionDetail.DiedOfOldAge;
+                break;
+            case "battle":
+                detail = KillCharacterAction.KillCharacterActionDetail.DiedInBattle;
+                break;
+            case "execution":
+                detail = KillCharacterAction.KillCharacterActionDetail.Executed;
+                break;
+            default:
+                return Failed($"Unknown death detail: {args[1]}. Expected old_age, battle, or execution.");
+        }
+
+        var killerIndex = requirePlayer ? 2 : 3;
+        Hero killer = null;
+        if (args.Count > killerIndex && !objectManager.TryGetObject(args[killerIndex], out killer))
+            return Failed($"Hero with id {args[killerIndex]} not found.");
+        if (detail == KillCharacterAction.KillCharacterActionDetail.Executed && killer == null)
+            return Failed("Execution requires a killer hero id, use coop.debug.hero.list to find one.");
+
+        Hero actor = null;
+        MobileParty party = null;
+        if (!requirePlayer && (!ContainerProvider.TryResolve<IPlayerManager>(out var players) ||
+            !players.TryGetPlayer(args[2], out var player) ||
+            !objectManager.TryGetObject(player.HeroId, out actor) ||
+            !objectManager.TryGetObject(player.MobilePartyId, out party)))
+            return Failed("The acting player's registered hero and party are required.");
+
+        using (requirePlayer ? null : new MainHeroSubstitutionScope(actor, party))
+        {
             hero.AddDeathMark(killer, detail);
             KillCharacterAction.ApplyByDeathMarkForced(hero, true);
-            return Succeeded($"Player {hero.Name} was killed with detail {detail}.");
         }
+        return Succeeded($"{(requirePlayer ? "Player" : "NPC")} {hero.Name} was killed with detail {detail}.");
     }
 
     public sealed class HeroIllDaysCoopCommand : ICoopCommand

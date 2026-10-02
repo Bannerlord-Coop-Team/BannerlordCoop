@@ -2,6 +2,7 @@
 using Common;
 using Common.Commands;
 using Common.Messaging;
+using Common.Network;
 using GameInterface.Services.Entity;
 using GameInterface.Services.Heroes.Patches;
 using GameInterface.Services.Issues.Generic;
@@ -38,7 +39,7 @@ public class ConquestQuestCommands
         public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
             new ExpectedArgs("action", "open, read or close.", isRequired: true),
-            new ExpectedArgs("quest_id", "An active or completed conquest quest id visible to this client."),
+            new ExpectedArgs("quest_id", "An active or completed conquest quest id visible to this client.", isRequired: false),
         };
 
         public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
@@ -153,6 +154,32 @@ public class ConquestQuestCommands
         }
     }
 
+    public sealed class RequestAccept : ICoopCommand
+    {
+        public string Prefix => "coop.debug.conquest";
+        public string Name => "request_accept";
+        public string Description => "Send one ordinary client acceptance request with the previously observed conquest generation.";
+        public CoopCommandSide Side => CoopCommandSide.Client;
+        public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
+        {
+            new ExpectedArgs("giver_id", "The giver hero registry id.", isRequired: true),
+            new ExpectedArgs("generation", "The generation retained from conquest.read before this request.", isRequired: true),
+        };
+
+        public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
+        {
+            if (ModInformation.IsServer || !int.TryParse(args[1], out var generation) || generation < 0)
+                return new CoopCommandResult(false, "A client and nonnegative observed generation are required.", "command_failed");
+            if (!CommandHelpers.TryGetObjectManager(out var objects, out var error) ||
+                !CommandHelpers.TryGetManagedObject<Hero>(objects, args[0], out var giver, out error))
+                return new CoopCommandResult(false, error, "command_failed");
+            if (giver.Issue is not Issue || !ContainerProvider.TryResolve<INetwork>(out var network))
+                return new CoopCommandResult(false, "The conquest issue and client network are required.", "command_failed");
+            network.SendAll(new RequestQuestTypeAcceptQuest(args[0], generation));
+            return new CoopCommandResult(true, JsonConvert.SerializeObject(new { requested = true, giverId = args[0], generation }));
+        }
+    }
+
     public sealed class Eligibility : ICoopCommand
     {
         public string Prefix => "coop.debug.conquest";
@@ -196,7 +223,11 @@ public class ConquestQuestCommands
         public string Name => "read";
         public string Description => "Read conquest identities, personal journal visibility, rewards and fortification state.";
         public CoopCommandSide Side => CoopCommandSide.Both;
-        public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[] { new ExpectedArgs("giver_id", "The giver hero registry id.", isRequired: true) };
+        public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
+        {
+            new ExpectedArgs("giver_id", "The giver hero registry id.", isRequired: true),
+            new ExpectedArgs("quest_id", "Optional retained quest id, including a completed quest from an earlier issue.", isRequired: false),
+        };
 
         public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
         {
@@ -211,22 +242,40 @@ public class ConquestQuestCommands
             ownership.TryGetOwnerControllerId(giver, out var owner);
             generations.TryGetGeneration(giver, out var generation);
             var issue = giver.Issue as Issue;
-            var quest = issue?.IssueQuest as Quest;
-            objects.TryGetId(issue?._targetSettlement, out var targetId);
             var manager = Campaign.Current.QuestManager;
+            var queriedQuestId = args.Count > 1 ? args[1] : issue?.IssueQuest?.StringId;
+            var quest = manager._quests.OfType<Quest>().FirstOrDefault(item => item.StringId == queriedQuestId && item.QuestGiver == giver);
+            ownership.TryGetQuestOwner(queriedQuestId, out var queriedQuestOwner);
+            var target = quest?._targetSettlement ?? (args.Count == 1 ? issue?._targetSettlement : null);
+            objects.TryGetId(target, out var targetId);
+            objects.TryGetId(giver.MapFaction, out var giverFactionId);
             var playerRows = players.Players.Select(player =>
             {
                 objects.TryGetObject<Hero>(player.HeroId, out var hero);
                 objects.TryGetObject<MobileParty>(player.MobilePartyId, out var party);
                 float? honorXp = hero != null && GangLeaderNeedsToOffloadStolenGoodsQuestType.OwnerTraitXpProgress.TryGet(hero, out var progress)
                     ? progress.GetPropertyValue(DefaultTraits.Honor) : null;
+                Hero relationActor = null;
+                Hero relationTarget = null;
+                if (hero != null) Campaign.Current.Models.DiplomacyModel.GetHeroesForEffectiveRelation(hero, giver, out relationActor, out relationTarget);
+                float? giverFactionCrimeRating = null;
+                if (giverFactionId != null)
+                {
+                    player.CrimeRatings.TryGetValue(giverFactionId, out var rating);
+                    giverFactionCrimeRating = rating;
+                }
                 return new { player.ControllerId, player.HeroId, player.MobilePartyId, registeredHero = hero != null,
                     registeredParty = party != null, gold = hero?.Gold, relation = hero?.GetRelation(giver),
                     renown = hero?.Clan?.Renown, influence = hero?.Clan?.Influence,
                     honor = hero?.GetTraitLevel(DefaultTraits.Honor), honorXp, prisoner = hero?.IsPrisoner,
                     partyActive = party?.IsActive, clanId = hero?.Clan?.StringId,
-                    relationActor = hero?.Clan?.Leader?.StringId, relationTarget = giver.Clan?.Leader?.StringId,
+                    relationActor = relationActor?.StringId, relationTarget = relationTarget?.StringId,
                     charm = hero?.GetSkillValue(DefaultSkills.Charm), oratory = hero?.GetPerkValue(DefaultPerks.Charm.Oratory),
+                    female = hero?.IsFemale, mercy = hero?.GetTraitLevel(DefaultTraits.Mercy),
+                    inBloom = hero?.GetPerkValue(DefaultPerks.Charm.InBloom),
+                    youngAndRespectful = hero?.GetPerkValue(DefaultPerks.Charm.YoungAndRespectful),
+                    goodNatured = hero?.GetPerkValue(DefaultPerks.Charm.GoodNatured),
+                    tribute = hero?.GetPerkValue(DefaultPerks.Charm.Tribute), giverFactionCrimeRating,
                     members = party?.MemberRoster.GetTroopRoster().Select(item => new
                         { id = item.Character.StringId, item.Number, item.WoundedNumber, item.Xp }).ToArray(),
                     prisoners = party?.PrisonRoster.GetTroopRoster().Select(item => new
@@ -235,16 +284,34 @@ public class ConquestQuestCommands
                         { id = item.EquipmentElement.Item?.StringId, modifier = item.EquipmentElement.ItemModifier?.StringId, item.Amount }).ToArray() };
             }).ToArray();
             var history = Campaign.Current.LogEntryHistory.GameActionLogs.OfType<JournalLogEntry>()
-                .Where(entry => entry.RelatedHero == giver && entry.Title.GetID() == "mvzh0HVk")
+                .Where(entry => entry.RelatedHero == giver && entry.Title.GetID() == "mvzh0HVk" &&
+                    (args.Count == 1 || entry._relatedObjectIds.Contains(queriedQuestId)))
                 .Select(entry => new { ids = entry._relatedObjectIds, visibleCompleted = entry.IsEnded(),
                     completion = entry._questCompletionDetail.ToString(), logs = entry.GetEntries().Select(log =>
                         new { text = log.LogText.ToString(), time = log.LogTime.NumTicks }).ToArray() }).ToArray();
+            var hasMapPoint = giver.GetMapPoint() != null;
+            float? distanceThreshold = hasMapPoint
+                ? Campaign.Current.GetAverageDistanceBetweenClosestTwoTownsWithNavigationType(MobileParty.NavigationType.Default) * 2f : null;
+            var distances = hasMapPoint ? Campaign.Current.AllTowns.Concat(Campaign.Current.AllCastles).Select(town =>
+            {
+                var position = giver.GetCampaignPosition();
+                var distance = Campaign.Current.Models.MapDistanceModel.GetDistance(town.Settlement, in position, false, MobileParty.NavigationType.Default);
+                objects.TryGetId(town.Settlement, out var id);
+                return new { id, town.Settlement.StringId, distance, enemy = town.MapFaction.IsAtWarWith(giver.MapFaction) };
+            }).ToArray() : null;
             return new CoopCommandResult(true, JsonConvert.SerializeObject(new
             {
                 localController = local.ControllerId, owner, generation, issueId = issue?.StringId, targetId,
+                queriedQuestId, queriedQuestOwner, questObjectPresent = quest != null,
                 questId = quest?.StringId, ongoing = quest?.IsOngoing, dueTime = quest?.QuestDueTime.NumTicks,
-                giverId = giver.StringId, giverPower = giver.Power, giverAlive = giver.IsAlive,
+                giverId = giver.StringId, giverRegistryId = args[0], giverPower = giver.Power, giverAlive = giver.IsAlive,
                 giverPrisoner = giver.IsPrisoner, giverClan = giver.Clan?.StringId, giverFaction = giver.MapFaction?.StringId,
+                giverFemale = giver.IsFemale, giverMercy = giver.GetTraitLevel(DefaultTraits.Mercy),
+                giverOccupation = giver.Occupation.ToString(), giver.IsFactionLeader, hasMapPoint, distanceThreshold, distances,
+                crimeWarThreshold = Campaign.Current.Models.CrimeModel.DeclareWarCrimeRatingThreshold,
+                issueCreated = issue?.IssueCreationTime.NumTicks, issueDue = issue?.IssueDueTime.NumTicks,
+                nextIssueIndex = Campaign.Current.IssueManager._nextIssueUniqueIndex,
+                hasIssueCooldown = Campaign.Current.IssueManager.HasIssueCoolDown(typeof(Issue), giver),
                 currentTime = CampaignTime.Now.NumTicks, tasks = quest?.TaskList.Count,
                 trackEnabled = quest?.IsTrackEnabled, hasDiscussion = quest?.IsThereDiscussDialogFlow,
                 mirroredQuests = manager._quests.OfType<Quest>().Select(item => item.StringId).ToArray(),
@@ -259,7 +326,17 @@ public class ConquestQuestCommands
                 logs = quest?.JournalEntries.Select(log => new { text = log.LogText.ToString(), time = log.LogTime.NumTicks }).ToArray(),
                 history, players = playerRows,
                 fortifications = giver.Clan?.Settlements.Where(settlement => settlement.IsFortification)
-                    .Select(settlement => new { settlement.StringId, settlement.Town.Security, settlement.Town.Loyalty }).ToArray(),
+                    .Select(settlement =>
+                    {
+                        var town = settlement.Town;
+                        var security = Campaign.Current.Models.SettlementSecurityModel.CalculateSecurityChange(town, true);
+                        var loyalty = Campaign.Current.Models.SettlementLoyaltyModel.CalculateLoyaltyChange(town, true);
+                        objects.TryGetId(settlement, out var id);
+                        return new { id, settlement.StringId, town.Security, town.Loyalty,
+                            securityChange = security.ResultNumber, loyaltyChange = loyalty.ResultNumber,
+                            securityInputs = security.GetLines().Select(line => new { line.name, line.number }).ToArray(),
+                            loyaltyInputs = loyalty.GetLines().Select(line => new { line.name, line.number }).ToArray() };
+                    }).ToArray(),
             }));
         }
     }

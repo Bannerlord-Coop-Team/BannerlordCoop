@@ -3,6 +3,7 @@ using E2E.Tests.Environment;
 using Common.Commands;
 using Coop.Core.Server.Services.Stances.Messages;
 using E2E.Tests.Environment.Instance;
+using GameInterface.Services.Heroes.Commands;
 using GameInterface.Services.Heroes.Patches;
 using GameInterface.Services.GameDebug.Messages;
 using GameInterface.Services.Issues.Commands;
@@ -14,6 +15,7 @@ using GameInterface.Services.Kingdoms.Commands;
 using GameInterface.Services.Players;
 using GameInterface.Services.Players.Data;
 using GameInterface.Services.Villages.Commands;
+using HarmonyLib;
 using Helpers;
 using System;
 using System.Linq;
@@ -24,6 +26,7 @@ using TaleWorlds.CampaignSystem.Issues;
 using TaleWorlds.CampaignSystem.MapEvents;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Settlements;
+using TaleWorlds.Core;
 using Xunit.Abstractions;
 
 namespace E2E.Tests.Services.Issues;
@@ -84,26 +87,170 @@ public class TheConquestOfSettlementIssueTests : IDisposable
             Assert.False(result.Succeeded);
         });
     }
+
+    [Fact]
+    public void ClientAcceptanceRetainsTheObservedGenerationAndCannotRunOnTheServer()
+    {
+        var created = CreateIssue();
+        var command = new ConquestQuestCommands.RequestAccept();
+        var args = new CoopCommandArgsFactory();
+        Server.Call(() => Assert.False(command.ProcessCommand(args.FromValues(new[] { created.GiverId, "73" })).Succeeded));
+        var client = environment.Clients.First();
+        client.Call(() =>
+        {
+            Assert.False(command.ProcessCommand(args.FromValues(new[] { created.GiverId, "-1" })).Succeeded);
+            Assert.False(command.ProcessCommand(args.FromValues(new[] { created.GiverId, "invalid" })).Succeeded);
+            Assert.Empty(client.NetworkSentMessages.GetMessages<RequestQuestTypeAcceptQuest>());
+            Assert.True(command.ProcessCommand(args.FromValues(new[] { created.GiverId, "73" })).Succeeded);
+        });
+        var request = Assert.Single(client.NetworkSentMessages.GetMessages<RequestQuestTypeAcceptQuest>());
+        Assert.Equal(created.GiverId, request.OwnerId);
+        Assert.Equal(73, request.Generation);
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject<Hero>(created.GiverId, out var giver));
+            Assert.Null(giver.Issue.IssueQuest);
+        });
+    }
 #endif
+
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public void NpcDeathRejectsMissingActorObjectsBeforeAddingADeathMark(bool missingHero)
+    {
+        var npcId = environment.CreateRegisteredObject<Hero>();
+        var actorId = environment.CreateRegisteredObject<Hero>();
+        var partyId = environment.CreateRegisteredObject<MobileParty>();
+        var command = new HeroDebugCommand.HeroKillNpcCoopCommand();
+        var args = new CoopCommandArgsFactory().FromValues(new[] { npcId, "old_age", "death-actor" });
+        foreach (var client in environment.Clients)
+            client.Call(() => Assert.False(command.ProcessCommand(args).Succeeded));
+        Server.Call(() =>
+        {
+            Assert.True(Server.Resolve<IPlayerManager>().AddPlayer(new Player("death-actor",
+                missingHero ? "missing-hero" : actorId, missingHero ? partyId : "missing-party", "", "")));
+            Assert.True(Server.ObjectManager.TryGetObject<Hero>(npcId, out var npc));
+            Assert.True(npc.IsAlive);
+            var previousDeathMark = npc.DeathMark;
+            var result = command.ProcessCommand(args);
+            Assert.False(result.Succeeded);
+            Assert.Contains("registered hero and party", result.Output);
+            Assert.True(npc.IsAlive);
+            Assert.Equal(previousDeathMark, npc.DeathMark);
+        });
+    }
+
+    [Fact]
+    public void NpcAndPlayerDeathCommandsCannotCrossTheirTargetRolesOrAcceptAnUnknownKiller()
+    {
+        var npcId = environment.CreateRegisteredObject<Hero>();
+        var actorId = environment.CreateRegisteredObject<Hero>();
+        var partyId = environment.CreateRegisteredObject<MobileParty>();
+        Server.Call(() =>
+        {
+            Assert.True(Server.Resolve<IPlayerManager>().AddPlayer(new Player("death-actor", actorId, partyId, "", "")));
+            var args = new CoopCommandArgsFactory();
+            Assert.False(new HeroDebugCommand.HeroKillPlayerCoopCommand().ProcessCommand(
+                args.FromValues(new[] { npcId, "old_age" })).Succeeded);
+            var command = new HeroDebugCommand.HeroKillNpcCoopCommand();
+            Assert.False(command.ProcessCommand(args.FromValues(new[] { actorId, "old_age", "death-actor" })).Succeeded);
+            Assert.False(command.ProcessCommand(args.FromValues(new[] { npcId, "execution", "death-actor" })).Succeeded);
+            Assert.False(command.ProcessCommand(args.FromValues(new[] { npcId, "battle", "death-actor", "missing-killer" })).Succeeded);
+            Assert.True(Server.ObjectManager.TryGetObject<Hero>(npcId, out var npc));
+            Assert.True(Server.ObjectManager.TryGetObject<Hero>(actorId, out var actor));
+            Assert.True(npc.IsAlive);
+            Assert.True(actor.IsAlive);
+            Assert.Equal(KillCharacterAction.KillCharacterActionDetail.None, npc.DeathMark);
+            Assert.Equal(KillCharacterAction.KillCharacterActionDetail.None, actor.DeathMark);
+        });
+    }
+
+    [Theory]
+    [InlineData("old_age", KillCharacterAction.KillCharacterActionDetail.DiedOfOldAge)]
+    [InlineData("battle", KillCharacterAction.KillCharacterActionDetail.DiedInBattle)]
+    [InlineData("execution", KillCharacterAction.KillCharacterActionDetail.Executed)]
+    public void NpcDeathRunsNativeCallbacksInTheSelectedPlayerContextAndRestoresIt(
+        string detail, KillCharacterAction.KillCharacterActionDetail expected)
+    {
+        var npcId = environment.CreateRegisteredObject<Hero>();
+        var actorId = environment.CreateRegisteredObject<Hero>();
+        var partyId = environment.CreateRegisteredObject<MobileParty>();
+        Server.Call(() =>
+        {
+            Assert.True(Server.Resolve<IPlayerManager>().AddPlayer(new Player("death-actor", actorId, partyId, "", "")));
+            Assert.True(Server.ObjectManager.TryGetObject<Hero>(npcId, out var npc));
+            Assert.True(Server.ObjectManager.TryGetObject<Hero>(actorId, out var actor));
+            Assert.True(Server.ObjectManager.TryGetObject<MobileParty>(partyId, out var party));
+            using (new AllowedThread()) npc.Clan = null;
+            var previousHero = ResolvedMainHeroContext.ResolvedMainHero;
+            var previousParty = Campaign.Current.MainParty;
+            var killed = 0;
+            CampaignEvents.HeroKilledEvent.AddNonSerializedListener(this, (victim, killer, actionDetail, _) =>
+            {
+                Assert.Same(npc, victim);
+                Assert.Same(actor, killer);
+                Assert.Same(actor, Hero.MainHero);
+                Assert.Same(party, MobileParty.MainParty);
+                Assert.Equal(expected, actionDetail);
+                killed++;
+            });
+            var result = new HeroDebugCommand.HeroKillNpcCoopCommand().ProcessCommand(
+                new CoopCommandArgsFactory().FromValues(new[] { npcId, detail, "death-actor", actorId }));
+            Assert.True(result.Succeeded);
+            Assert.Equal(1, killed);
+            Assert.False(npc.IsAlive);
+            Assert.True(actor.IsAlive);
+            Assert.Same(previousHero, ResolvedMainHeroContext.ResolvedMainHero);
+            Assert.Same(previousParty, Campaign.Current.MainParty);
+        }, new[] { AccessTools.Method(typeof(KillCharacterAction), "CreateObituary") });
+    }
 
     [Fact]
     public void RoutingSendsOnlyTheValidatedMapEventToTheMissionAuthority()
     {
         var id = environment.CreateRegisteredObject<MapEvent>();
         var command = new MapEventDebugCommands.RouteBattleEnemiesCoopCommand();
+        var registry = new CoopCommandRegistry(new[] { command }, Common.Logging.LogManager.GetLogger<TheConquestOfSettlementIssueTests>());
         var args = new CoopCommandArgsFactory();
         foreach (var client in environment.Clients)
             client.Call(() => Assert.False(command.ProcessCommand(args.FromValues(new[] { id, "0" })).Succeeded));
         Server.Call(() =>
         {
             Assert.False(command.ProcessCommand(args.FromValues(new[] { id, "-1" })).Succeeded);
+            Assert.False(command.ProcessCommand(args.FromValues(new[] { id, "0", "both" })).Succeeded);
             Assert.False(command.ProcessCommand(args.FromValues(new[] { "missing-event", "0" })).Succeeded);
             Assert.Empty(Server.NetworkSentMessages.GetMessages<NetworkRouteBattleEnemies>());
-            Assert.True(command.ProcessCommand(args.FromValues(new[] { id, "3" })).Succeeded);
+            Assert.True(registry.ProcessCommand("coop.debug.map_event.route_enemies", args.FromValues(new[] { id, "3" })).Succeeded);
         });
         var request = Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkRouteBattleEnemies>());
         Assert.Equal(id, request.MapEventId);
         Assert.Equal(3, request.EnemiesToLeaveFighting);
+        Assert.Null(request.Side);
+    }
+
+    [Theory]
+    [InlineData("attacker", BattleSideEnum.Attacker)]
+    [InlineData("defender", BattleSideEnum.Defender)]
+    public void RoutingCanSelectEitherSideWithoutAssigningABattleResult(string side, BattleSideEnum expected)
+    {
+        var id = environment.CreateRegisteredObject<MapEvent>();
+        var command = new MapEventDebugCommands.RouteBattleEnemiesCoopCommand();
+        var args = new CoopCommandArgsFactory().FromValues(new[] { id, "0", side });
+        foreach (var client in environment.Clients)
+            client.Call(() => Assert.False(command.ProcessCommand(args).Succeeded));
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject<MapEvent>(id, out var mapEvent));
+            var winner = mapEvent.WinningSide;
+            Assert.True(command.ProcessCommand(args).Succeeded);
+            Assert.Equal(winner, mapEvent.WinningSide);
+            Assert.False(mapEvent.IsFinalized);
+        });
+        var request = Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkRouteBattleEnemies>());
+        Assert.Equal(id, request.MapEventId);
+        Assert.Equal(expected, request.Side);
+        Assert.Equal(0, request.EnemiesToLeaveFighting);
     }
 
     [Theory]
