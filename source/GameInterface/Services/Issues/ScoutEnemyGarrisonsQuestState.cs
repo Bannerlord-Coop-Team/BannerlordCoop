@@ -4,14 +4,17 @@ using System.Linq;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.LogEntries;
 using TaleWorlds.CampaignSystem.Party;
+using TaleWorlds.CampaignSystem.Settlements;
 using TaleWorlds.SaveSystem;
 
 namespace GameInterface.Services.Issues;
 
 using Quest = TaleWorlds.CampaignSystem.Issues.ScoutEnemyGarrisonsIssueBehavior.ScoutEnemyGarrisonsQuest;
+using Issue = TaleWorlds.CampaignSystem.Issues.ScoutEnemyGarrisonsIssueBehavior.ScoutEnemyGarrisonsIssue;
 
 internal interface IScoutEnemyGarrisonsQuestState
 {
+    Issue PendingAcceptance { get; set; }
     void Remember(Quest quest, string controllerId, Hero hero, MobileParty party);
     bool TryGet(Quest quest, out ScoutEnemyGarrisonsQuestOwner owner);
     bool IsVisible(QuestBase quest);
@@ -19,12 +22,14 @@ internal interface IScoutEnemyGarrisonsQuestState
     void Capture(Quest quest);
     void Restore(Quest quest);
     void SyncData(IDataStore dataStore);
+    void RestoreClientTracking(QuestManager quests, VisualTrackerManager tracker);
 }
 
 internal sealed class ScoutEnemyGarrisonsQuestState : IScoutEnemyGarrisonsQuestState
 {
     private readonly IControllerIdProvider controllerIdProvider;
     private readonly Dictionary<string, ScoutEnemyGarrisonsQuestOwner> owners = new();
+    public Issue PendingAcceptance { get; set; }
 
     public ScoutEnemyGarrisonsQuestState(IControllerIdProvider controllerIdProvider)
     {
@@ -76,10 +81,25 @@ internal sealed class ScoutEnemyGarrisonsQuestState : IScoutEnemyGarrisonsQuestS
         List<ScoutEnemyGarrisonsQuestOwner> saved = dataStore.IsSaving ? owners.Values.ToList() : null;
         dataStore.SyncData("_coop_scout_garrison_owners", ref saved);
         if (!dataStore.IsLoading) return;
+        PendingAcceptance = null;
         owners.Clear();
         foreach (var owner in saved ?? Enumerable.Empty<ScoutEnemyGarrisonsQuestOwner>())
         {
             if (!string.IsNullOrEmpty(owner?.QuestId)) owners[owner.QuestId] = owner;
+        }
+    }
+
+    public void RestoreClientTracking(QuestManager quests, VisualTrackerManager tracker)
+    {
+        foreach (var pair in quests._trackedObjects.ToArray())
+        {
+            foreach (var quest in pair.Value.OfType<Quest>().Where(quest => !IsVisible(quest)).ToArray())
+            {
+                // The server saves one visual reference per enabled Scout target, not per giver.
+                if (quest.IsTrackEnabled && pair.Key is Settlement) tracker.RemoveTrackedObject(pair.Key);
+                pair.Value.Remove(quest);
+            }
+            if (pair.Value.Count == 0) quests._trackedObjects.Remove(pair.Key);
         }
     }
 }

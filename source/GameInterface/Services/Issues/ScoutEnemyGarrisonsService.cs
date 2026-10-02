@@ -30,10 +30,12 @@ internal interface IScoutEnemyGarrisonsService
     void Accept(Hero giver);
     bool CaptureAcceptance(Hero giver, out ScoutEnemyGarrisonsAccept data);
     void MirrorAcceptance(Hero giver, ScoutEnemyGarrisonsAccept data);
-    IDisposable OpenAuthority(Quest quest);
+    IDisposable OpenAuthority(Quest quest, bool completing = false);
     void PublishProgress(Quest quest);
     void ApplyProgress(NetworkScoutEnemyGarrisonsProgress data);
     bool HasPersonalQuest(Hero hero);
+    void RejectAcceptance(string giverId);
+    void CancelReplacedHeroQuests(Hero heir);
 }
 
 internal sealed class ScoutEnemyGarrisonsService : IScoutEnemyGarrisonsService
@@ -138,12 +140,50 @@ internal sealed class ScoutEnemyGarrisonsService : IScoutEnemyGarrisonsService
             quest.QuestAcceptedConsequences();
             if (state.IsVisible(quest)) quest.AddDialogs();
         }
+        FinishAcceptance(giver, state.IsVisible(giver.Issue.IssueQuest));
     }
 
-    public IDisposable OpenAuthority(Quest quest)
+    public IDisposable OpenAuthority(Quest quest, bool completing = false)
     {
-        if (!state.TryGet(quest, out var owner) || owner.Hero == null || owner.Party == null) return null;
-        return new AuthorityScope(owner.Hero, owner.Party);
+        if (!state.TryGet(quest, out var owner) || owner.Hero == null) return null;
+        if (players.TryGetPlayer(owner.ControllerId, out var player) &&
+            objects.TryGetObjectWithLogging<Hero>(player.HeroId, out var hero) && hero == owner.Hero)
+        {
+            if (!objects.TryGetObjectWithLogging<MobileParty>(player.MobilePartyId, out var party)) return null;
+            owner.Party = party;
+        }
+        else if (!completing) return null;
+        return owner.Party == null ? null : new AuthorityScope(owner.Hero, owner.Party);
+    }
+
+    public void RejectAcceptance(string giverId)
+    {
+        if (objects.TryGetObjectWithLogging<Hero>(giverId, out var giver)) FinishAcceptance(giver, false);
+    }
+
+    private void FinishAcceptance(Hero giver, bool accepted)
+    {
+        var pending = state.PendingAcceptance;
+        if (pending?.IssueOwner != giver) return;
+        state.PendingAcceptance = null;
+        var conversation = Campaign.Current.ConversationManager;
+        if (!conversation.IsConversationInProgress || conversation.OneToOneConversationHero != giver ||
+            conversation.ActiveToken != conversation.GetStateIndex("issue_classic_quest_start")) return;
+        if (accepted && giver.Issue == pending) conversation.DoOptionContinue();
+        else conversation.EndConversation();
+    }
+
+    public void CancelReplacedHeroQuests(Hero heir)
+    {
+        if (!ModInformation.IsServer || !objects.TryGetIdWithLogging(heir, out var heroId)) return;
+        var player = players.Players.SingleOrDefault(player => player.HeroId == heroId);
+        if (player == null) return;
+        foreach (var quest in Campaign.Current.QuestManager._quests.OfType<Quest>().ToArray())
+        {
+            if (quest.IsOngoing && state.TryGet(quest, out var owner) &&
+                owner.ControllerId == player.ControllerId && owner.Hero != heir)
+                quest.CompleteQuestWithCancel(new TextObject("{=bYdhYidf}The quest was canceled because your clan leader, who made the original agreement, is no longer head of the clan.\""));
+        }
     }
 
     public void PublishProgress(Quest quest)

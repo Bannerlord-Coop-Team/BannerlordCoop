@@ -8,6 +8,9 @@ using GameInterface.Services.Issues.Generic;
 using GameInterface.Services.Issues.Generic.AcceptMirror;
 using GameInterface.Services.Issues.Messages;
 using GameInterface.Services.Issues.Patches;
+using GameInterface.Services.ObjectManager;
+using GameInterface.Services.Players;
+using GameInterface.Services.Players.Data;
 using GameInterface.Surrogates;
 using Moq;
 using System;
@@ -15,6 +18,7 @@ using System.Collections.Generic;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Issues;
 using TaleWorlds.CampaignSystem.Party;
+using TaleWorlds.CampaignSystem.Settlements;
 using TaleWorlds.Core;
 using TaleWorlds.Localization;
 using Xunit;
@@ -29,13 +33,13 @@ public class ScoutEnemyGarrisonsTests : IDisposable
 {
     private readonly bool wasServer = ModInformation.IsServer;
     private readonly ScoutEnemyGarrisonsQuestState state;
+    private readonly Mock<ISyncPolicy> policy = new();
 
     public ScoutEnemyGarrisonsTests()
     {
         var controller = new Mock<IControllerIdProvider>();
         controller.SetupGet(x => x.ControllerId).Returns("player-A");
         state = new ScoutEnemyGarrisonsQuestState(controller.Object);
-        var policy = new Mock<ISyncPolicy>();
         policy.Setup(x => x.AllowOriginal()).Returns(false);
         var builder = new ContainerBuilder();
         builder.RegisterInstance(state).As<IScoutEnemyGarrisonsQuestState>();
@@ -114,9 +118,12 @@ public class ScoutEnemyGarrisonsTests : IDisposable
         Assert.Same(saved[0].Party, owner.Party);
     }
 
-    [Fact]
-    public void ClientWorldEventCannotAdvanceScoutingInsideAllowedThread()
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void ClientWorldEventCannotAdvanceScoutingDuringCampaignOrLoading(bool loading)
     {
+        policy.Setup(x => x.AllowOriginal()).Returns(loading);
         using (new AllowedThread())
         {
             Assert.False(ScoutEnemyGarrisonsAuthorityPatches.Prefix(NewQuest("issue_4_quest"), out var scope));
@@ -124,9 +131,12 @@ public class ScoutEnemyGarrisonsTests : IDisposable
         }
     }
 
-    [Fact]
-    public void ClientCompletionRequiresBothReceivedApplicationAndFinalizationAuthority()
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void ClientCompletionRequiresReceivedAuthorityEvenDuringLoading(bool loading)
     {
+        policy.Setup(x => x.AllowOriginal()).Returns(loading);
         var quest = NewQuest("issue_5_quest");
         using (new AllowedThread())
         {
@@ -136,6 +146,68 @@ public class ScoutEnemyGarrisonsTests : IDisposable
         }
         using (new IssueFinalizeAuthorityGuard())
             Assert.False(ScoutEnemyGarrisonsCompletionPatches.Prefix(quest, null!, out _));
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void LoadingRemovesObserverTargetsOnceAndPreservesOverlappingPersonalAndManualTracking(bool overlap)
+    {
+        var observerQuest = NewQuest("observer");
+        var personalQuest = NewQuest("personal");
+        Remember(observerQuest, "player-B");
+        Remember(personalQuest, "player-A");
+        observerQuest.IsTrackEnabled = true;
+        personalQuest.IsTrackEnabled = true;
+        var target = ObjectHelper.SkipConstructor<Settlement>();
+        var quests = new QuestManager();
+        var tracker = new VisualTrackerManager();
+        quests._trackedObjects.Add(target, new List<QuestBase> { observerQuest });
+        tracker.RegisterObject(target);
+        if (overlap)
+        {
+            quests._trackedObjects[target].Add(personalQuest);
+            tracker.RegisterObject(target);
+            tracker.RegisterObject(target);
+        }
+
+        state.RestoreClientTracking(quests, tracker);
+        state.RestoreClientTracking(quests, tracker);
+
+        Assert.Equal(overlap, tracker.CheckTracked(target));
+        Assert.Equal(overlap, quests._trackedObjects.ContainsKey(target));
+        if (overlap)
+        {
+            Assert.Equal(2, tracker._trackedObjects[target].TrackerCount);
+            Assert.Equal(new[] { personalQuest }, quests._trackedObjects[target]);
+        }
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void AuthorityUsesRecoveredPartyOnlyForTheOriginalQuestHero(bool changedHero)
+    {
+        var quest = NewQuest("recovered");
+        Remember(quest, "player-A");
+        Assert.True(state.TryGet(quest, out var owner));
+        var originalHero = owner.Hero;
+        var originalParty = owner.Party;
+        var recoveredParty = ObjectHelper.SkipConstructor<MobileParty>();
+        var registeredHero = changedHero ? ObjectHelper.SkipConstructor<Hero>() : owner.Hero;
+        var player = new Player("player-A", "hero", "recovered-party", "clan", "character");
+        var players = new Mock<IPlayerManager>();
+        players.Setup(x => x.TryGetPlayer("player-A", out player)).Returns(true);
+        var objects = new Mock<IObjectManager>();
+        objects.Setup(x => x.TryGetObjectWithLogging("hero", out registeredHero)).Returns(true);
+        objects.Setup(x => x.TryGetObjectWithLogging("recovered-party", out recoveredParty)).Returns(true);
+        var service = new ScoutEnemyGarrisonsService(objects.Object, null!, null!, null!, players.Object, state);
+
+        using var authority = service.OpenAuthority(quest);
+
+        Assert.Equal(changedHero, authority == null);
+        Assert.Same(changedHero ? originalParty : recoveredParty, owner.Party);
+        Assert.Same(originalHero, owner.Hero);
     }
 
     [Fact]

@@ -1,7 +1,6 @@
 ﻿using Common;
 using Common.Messaging;
 using Common.Util;
-using GameInterface.Policies;
 using GameInterface.Services.Issues.Generic;
 using GameInterface.Services.Issues.Messages;
 using HarmonyLib;
@@ -13,6 +12,7 @@ using System.Linq;
 using System.Reflection;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.CampaignBehaviors;
+using TaleWorlds.CampaignSystem.Conversation;
 using TaleWorlds.CampaignSystem.Issues;
 using TaleWorlds.CampaignSystem.LogEntries;
 using TaleWorlds.CampaignSystem.Settlements;
@@ -29,7 +29,7 @@ using Quest = ScoutEnemyGarrisonsIssueBehavior.ScoutEnemyGarrisonsQuest;
 internal static class ScoutEnemyGarrisonsGenerationPatch
 {
     [HarmonyPrefix]
-    private static bool Prefix() => ModInformation.IsServer || CallOriginalPolicy.IsOriginalAllowedForOwnershipGate();
+    private static bool Prefix() => ModInformation.IsServer;
 }
 
 [HarmonyPatch(typeof(ScoutEnemyGarrisonsIssueBehavior), "SuitableSettlementCondition")]
@@ -52,7 +52,7 @@ internal static class ScoutEnemyGarrisonsStayAlivePatch
     [HarmonyPrefix]
     private static bool Prefix(ref bool __result)
     {
-        if (ModInformation.IsServer || CallOriginalPolicy.IsOriginalAllowedForOwnershipGate()) return true;
+        if (ModInformation.IsServer) return true;
         // Only the server can reroll target settlements or expire the offered issue.
         __result = true;
         return false;
@@ -94,7 +94,6 @@ internal static class ScoutEnemyGarrisonsAuthorityPatches
     internal static bool Prefix(Quest __instance, out IDisposable __state)
     {
         __state = null;
-        if (CallOriginalPolicy.IsOriginalAllowedForOwnershipGate()) return true;
         if (ModInformation.IsClient || !__instance.IsOngoing) return false;
         if (!ContainerProvider.TryResolve<IScoutEnemyGarrisonsService>(out var service)) return false;
         __state = service.OpenAuthority(__instance);
@@ -121,7 +120,7 @@ internal static class ScoutEnemyGarrisonsAcceptedPatch
 {
     [HarmonyPrefix]
     internal static bool Prefix(Quest __instance) => __instance._startQuestLog == null &&
-        (QuestSolutionStartAuthorityGuard.IsActive || CallOriginalPolicy.IsOriginalAllowedForOwnershipGate());
+        QuestSolutionStartAuthorityGuard.IsActive;
 }
 
 [HarmonyPatch(typeof(QuestBase), nameof(QuestBase.StartQuest))]
@@ -153,7 +152,7 @@ internal static class ScoutEnemyGarrisonsEncounterPatch
 internal static class ScoutEnemyGarrisonsTimeoutLogPatch
 {
     [HarmonyPrefix]
-    private static bool Prefix() => ModInformation.IsServer || CallOriginalPolicy.IsOriginalAllowedForOwnershipGate();
+    private static bool Prefix() => ModInformation.IsServer;
 }
 
 [HarmonyPatch]
@@ -170,14 +169,14 @@ internal static class ScoutEnemyGarrisonsCompletionPatches
     internal static bool Prefix(QuestBase __instance, MethodBase __originalMethod, out IDisposable __state)
     {
         __state = null;
-        if (__instance is not Quest quest || CallOriginalPolicy.IsOriginalAllowedForOwnershipGate()) return true;
+        if (__instance is not Quest quest) return true;
         if (!quest.IsOngoing) return false;
         if (ModInformation.IsClient) return IssueFinalizeAuthorityGuard.IsActive && AllowedThread.IsThisThreadAllowed();
         if (!ContainerProvider.TryResolve<IScoutEnemyGarrisonsQuestState>(out var state)) return false;
         if (state.TryGet(quest, out var owner) && ScoutEnemyGarrisonsPlayerChangePatch.ChangingPlayer != null &&
             owner.Hero != ScoutEnemyGarrisonsPlayerChangePatch.ChangingPlayer) return false;
         if (!ContainerProvider.TryResolve<IScoutEnemyGarrisonsService>(out var service)) return false;
-        __state = service.OpenAuthority(quest);
+        __state = service.OpenAuthority(quest, completing: true);
         if (__state != null) return true;
         if (__originalMethod.Name != nameof(QuestBase.CompleteQuestWithCancel) || quest.QuestGiver?.Issue?.IssueQuest == quest) return false;
         __state = new IssueFinalizeAuthorityGuard();
@@ -203,7 +202,7 @@ internal static class ScoutEnemyGarrisonsIssueCompletionPatch
         out IssueFinalizeAuthorityGuard __state)
     {
         __state = null;
-        if (__instance is not Issue || CallOriginalPolicy.IsOriginalAllowedForOwnershipGate()) return true;
+        if (__instance is not Issue) return true;
         if (ModInformation.IsClient && !(IssueFinalizeAuthorityGuard.IsActive && AllowedThread.IsThisThreadAllowed())) return false;
         __state = new IssueFinalizeAuthorityGuard();
         if (__instance.IssueQuest is not Quest quest || !quest.IsOngoing) return true;
@@ -255,8 +254,7 @@ internal static class ScoutEnemyGarrisonsPlayerChangePatch
 internal static class ScoutEnemyGarrisonsRewardPatch
 {
     [HarmonyPrefix]
-    private static bool Prefix(IssueBase issue) => issue is not Issue || ModInformation.IsServer ||
-        CallOriginalPolicy.IsOriginalAllowedForOwnershipGate();
+    private static bool Prefix(IssueBase issue) => issue is not Issue || ModInformation.IsServer;
 }
 
 [HarmonyPatch(typeof(Quest), "InitializeQuestOnGameLoad")]
@@ -312,15 +310,65 @@ internal static class ScoutEnemyGarrisonsQuestListPatch
     }
 }
 
-[HarmonyPatch(typeof(QuestManager), nameof(QuestManager.TrackedObjects), MethodType.Getter)]
-internal static class ScoutEnemyGarrisonsTrackedListPatch
+[HarmonyPatch(typeof(QuestManager), nameof(QuestManager.AddTrackedObjectForQuest))]
+internal static class ScoutEnemyGarrisonsTrackedAddPatch
 {
-    [HarmonyPostfix]
-    private static void Postfix(ref MBReadOnlyDictionary<ITrackableCampaignObject, List<QuestBase>> __result)
+    [HarmonyPrefix]
+    private static bool Prefix(QuestBase relatedQuest) => relatedQuest is not Quest || ModInformation.IsServer ||
+        (ContainerProvider.TryResolve<IScoutEnemyGarrisonsQuestState>(out var state) && state.IsVisible(relatedQuest));
+}
+
+[HarmonyPatch(typeof(QuestManager), nameof(QuestManager.RemoveTrackedObjectForQuest))]
+internal static class ScoutEnemyGarrisonsTrackedRemovePatch
+{
+    [HarmonyPrefix]
+    private static bool Prefix(QuestManager __instance, ITrackableCampaignObject trackedObject, QuestBase relatedQuest)
     {
-        if (ModInformation.IsClient && ContainerProvider.TryResolve<IScoutEnemyGarrisonsQuestState>(out var state))
-            __result = __result.Where(pair => pair.Value.Any(state.IsVisible))
-                .ToDictionary(pair => pair.Key, pair => pair.Value.Where(state.IsVisible).ToList()).GetReadOnlyDictionary();
+        if (relatedQuest is not Quest || trackedObject is not Settlement) return true;
+        if (__instance._trackedObjects.TryGetValue(trackedObject, out var quests) && quests.Remove(relatedQuest))
+        {
+            if (quests.Count == 0) __instance._trackedObjects.Remove(trackedObject);
+            if (relatedQuest.IsTrackEnabled) Campaign.Current.VisualTrackerManager.RemoveTrackedObject(trackedObject);
+        }
+        return false;
+    }
+}
+
+[HarmonyPatch(typeof(ConversationManager), nameof(ConversationManager.DoOption), new[] { typeof(int) })]
+internal static class ScoutEnemyGarrisonsAcceptOptionPatch
+{
+    [HarmonyPrefix]
+    internal static bool Prefix(ConversationManager __instance, int optionIndex)
+    {
+        if (ModInformation.IsServer || !ContainerProvider.TryResolve<IScoutEnemyGarrisonsQuestState>(out var state)) return true;
+        if (state.PendingAcceptance != null) return false;
+        if (__instance.CurOptions[optionIndex].Id == "issue_offer_player_accept_quest" &&
+            __instance.OneToOneConversationHero?.Issue is Issue issue) state.PendingAcceptance = issue;
+        return true;
+    }
+}
+
+[HarmonyPatch]
+internal static class ScoutEnemyGarrisonsAcceptContinuePatch
+{
+    private static IEnumerable<MethodBase> TargetMethods()
+    {
+        yield return AccessTools.DeclaredMethod(typeof(ConversationManager), nameof(ConversationManager.DoOptionContinue));
+        yield return AccessTools.DeclaredMethod(typeof(ConversationManager), nameof(ConversationManager.ContinueConversation));
+    }
+
+    [HarmonyPrefix]
+    internal static bool Prefix() => ModInformation.IsServer ||
+        !ContainerProvider.TryResolve<IScoutEnemyGarrisonsQuestState>(out var state) || state.PendingAcceptance == null;
+}
+
+[HarmonyPatch(typeof(ConversationManager), nameof(ConversationManager.EndConversation))]
+internal static class ScoutEnemyGarrisonsAcceptEndPatch
+{
+    [HarmonyPrefix]
+    private static void Prefix()
+    {
+        if (ContainerProvider.TryResolve<IScoutEnemyGarrisonsQuestState>(out var state)) state.PendingAcceptance = null;
     }
 }
 
