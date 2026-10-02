@@ -5,6 +5,7 @@ using Common.Network;
 using Coop.Core.Client.Services.Heroes.Messages;
 using Coop.Core.Server.Connections.Messages;
 using GameInterface.Services.Modules;
+using GameInterface.Services.Issues.Interfaces;
 using GameInterface.Services.Modules.Validators;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Players;
@@ -36,6 +37,7 @@ public class ResolveCharacterState : ConnectionStateBase
     private readonly IExistingPlayerSender existingPlayerSender;
     private readonly ISteamBanList steamBanList;
     private readonly IJoinValidationDenialLog denialLog;
+    private readonly IHeadmanHerdQuestAuthority herdQuestAuthority;
 
     // Refused validations on this connection; only the first is logged.
     private int denials;
@@ -50,7 +52,8 @@ public class ResolveCharacterState : ConnectionStateBase
         IModuleInfoProvider moduleInfoProvider,
         IExistingPlayerSender existingPlayerSender,
         ISteamBanList steamBanList,
-        IJoinValidationDenialLog denialLog)
+        IJoinValidationDenialLog denialLog,
+        IHeadmanHerdQuestAuthority herdQuestAuthority)
         : base(connectionLogic)
     {
         this.messageBroker = messageBroker;
@@ -63,6 +66,7 @@ public class ResolveCharacterState : ConnectionStateBase
         this.existingPlayerSender = existingPlayerSender;
         this.steamBanList = steamBanList;
         this.denialLog = denialLog;
+        this.herdQuestAuthority = herdQuestAuthority;
 
         messageBroker.Subscribe<NetworkClientValidate>(Handle_ClientValidate);
         messageBroker.Subscribe<NetworkModuleVersionsValidate>(Handle_ModuleVersionsValidate);
@@ -212,7 +216,15 @@ public class ResolveCharacterState : ConnectionStateBase
             GameThread.Run(() =>
             {
                 heroExists = objectManager.TryGetObjectWithLogging(player.HeroId, out Hero _);
-                if (!heroExists) return;
+                if (!heroExists)
+                {
+                    if (!playerManager.TryGetPlayer(controllerId, out var current) || !ReferenceEquals(current, player))
+                        throw new InvalidOperationException("Player registration changed during reconnect cleanup.");
+                    herdQuestAuthority.CancelForPlayerRemoval(controllerId);
+                    if (!playerManager.RemovePlayer(player))
+                        throw new InvalidOperationException("Failed to remove the missing hero's registration.");
+                    return;
+                }
 
                 partyRestored = playerPartyRestorer.TryRestore(player, out restoredPlayer);
                 if (!partyRestored || ReferenceEquals(restoredPlayer, player)) return;
@@ -253,8 +265,6 @@ public class ResolveCharacterState : ConnectionStateBase
                 "Controller {ControllerId} is registered to hero {HeroId}, which no longer exists; " +
                 "dropping the stale registration and creating a new character",
                 controllerId, player.HeroId);
-
-            playerManager.RemovePlayer(player);
         }
 
         network.SendImmediate(peer, new NetworkClientValidated(false, null));

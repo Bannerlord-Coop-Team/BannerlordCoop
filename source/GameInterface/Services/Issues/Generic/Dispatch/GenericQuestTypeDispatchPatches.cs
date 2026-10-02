@@ -11,6 +11,8 @@ using TaleWorlds.CampaignSystem.Issues;
 using TaleWorlds.CampaignSystem.CampaignBehaviors;
 using TaleWorlds.CampaignSystem.Conversation;
 using TaleWorlds.CampaignSystem.Roster;
+using TaleWorlds.CampaignSystem.Party;
+using Helpers;
 using TaleWorlds.Localization;
 
 namespace GameInterface.Services.Issues.Generic.Dispatch;
@@ -154,11 +156,12 @@ internal static class GenericQuestTypeAlternativePickerPatch
         return generation == tracker.AlternativePickerGeneration;
     }
 
-    private static void EndStaleSelection()
+    private static void CloseStaleSelection()
     {
-        // Keep the captured identity for callbacks already queued by the closed picker.
-        if (Campaign.Current.ConversationManager.IsConversationInProgress)
-            Campaign.Current.ConversationManager.EndConversation();
+        // Let DoOption finish before the normal closing transition tears down the conversation.
+        var conversation = Campaign.Current.ConversationManager;
+        if (conversation.IsConversationInProgress)
+            conversation.ActiveToken = conversation.GetStateIndex("close_window");
     }
 
     [HarmonyPrefix, HarmonyPatch(nameof(IssuesCampaignBehavior.issue_offer_player_accept_alternative_3_consequence))]
@@ -168,7 +171,7 @@ internal static class GenericQuestTypeAlternativePickerPatch
         if (issue == null) return true;
         if (!IsCurrentSelection(issue))
         {
-            EndStaleSelection();
+            CloseStaleSelection();
             return false;
         }
         CaptureSelection(issue);
@@ -185,7 +188,7 @@ internal static class GenericQuestTypeAlternativePickerPatch
     {
         var issue = CurrentIssue();
         if (issue == null || IsCurrentSelection(issue)) return true;
-        EndStaleSelection();
+        CloseStaleSelection();
         return false;
     }
 
@@ -196,7 +199,7 @@ internal static class GenericQuestTypeAlternativePickerPatch
         if (issue == null) return true;
         if (!IsCurrentSelection(issue))
         {
-            EndStaleSelection();
+            CloseStaleSelection();
             return false;
         }
         issue.AlternativeSolutionSentTroops.Clear();
@@ -210,7 +213,7 @@ internal static class GenericQuestTypeAlternativePickerPatch
         if (issue == null) return true;
         if (!IsCurrentSelection(issue))
         {
-            EndStaleSelection();
+            CloseStaleSelection();
             return false;
         }
         // The server acceptance runs the consequence after validating and removing these troops.
@@ -225,8 +228,8 @@ internal static class GenericQuestTypeAlternativePickerPatch
         if (issue == null) return true;
         if (!IsCurrentSelection(issue))
         {
-            EndStaleSelection();
-            return false;
+            CloseStaleSelection();
+            return Campaign.Current.ConversationManager.IsConversationInProgress;
         }
         if (!ReferenceEquals(issue.AlternativeSolutionSentTroops, leftMemberRoster))
         {
@@ -235,6 +238,9 @@ internal static class GenericQuestTypeAlternativePickerPatch
         }
         return true;
     }
+
+    [HarmonyPrefix, HarmonyPatch(nameof(IssuesCampaignBehavior.issue_offer_player_accept_alternative_3_condition))]
+    private static bool CanListCompanion(ref bool __result) => CheckSelection(ref __result);
 
     [HarmonyPrefix, HarmonyPatch(nameof(IssuesCampaignBehavior.issue_offer_player_accept_alternative_5_a_condition))]
     private static bool CanAccept(ref bool __result) => CheckSelection(ref __result);
@@ -270,6 +276,33 @@ internal static class GenericQuestTypeAlternativePickerPatch
                 combined.AddToCounts(element.Character, element.Number, false, element.WoundedNumber, element.Xp);
             }
             return combined;
+        }
+    }
+}
+
+[HarmonyPatch(typeof(PartyScreenLogic))]
+internal static class GenericQuestTypeAlternativePickerResetPatch
+{
+    [HarmonyPrefix, HarmonyPatch(nameof(PartyScreenLogic.ResetLogic))]
+    private static void Reset(PartyScreenLogic __instance) => DetachStaleRoster(__instance);
+
+    [HarmonyPrefix, HarmonyPatch(nameof(PartyScreenLogic.ResetToLastSavedPartyScreenData))]
+    private static void ResetSaved(PartyScreenLogic __instance) => DetachStaleRoster(__instance);
+
+    private static void DetachStaleRoster(PartyScreenLogic logic)
+    {
+        if (ModInformation.IsServer || logic._partyScreenMode != PartyScreenHelper.PartyScreenMode.QuestTroopManage
+            || !ContainerProvider.TryResolve<IIssueConversationTracker>(out var tracker)) return;
+        var issue = tracker.AlternativePickerIssue;
+        if (issue == null || GenericQuestTypeAlternativePickerPatch.IsCurrentSelection(issue)
+            || !ReferenceEquals(logic.CurrentData.LeftMemberRoster, issue.AlternativeSolutionSentTroops)) return;
+
+        // A stale screen must not restore its draft over another player's accepted mission.
+        using (new AllowedThread())
+        {
+            var draft = TroopRoster.CreateDummyTroopRoster();
+            logic.CurrentData.LeftMemberRoster = draft;
+            logic.MemberRosters[(int)PartyScreenLogic.PartyRosterSide.Left] = draft;
         }
     }
 }

@@ -28,6 +28,7 @@ using GameInterface.Services.MapEvents.Participation;
 using GameInterface.Services.MapEvents.TroopSupply;
 using GameInterface.Services.MobileParties.Data;
 using GameInterface.Services.MobileParties.Interfaces;
+using GameInterface.Services.Issues.Interfaces;
 using GameInterface.Services.Modules;
 using GameInterface.Services.Modules.Validators;
 using GameInterface.Services.ObjectManager;
@@ -116,6 +117,7 @@ internal abstract class TestComponentBase
         RegisterPlayerManagerMock(builder);
         RegisterMock<IPlayerPartyRestorer>(builder);
         RegisterMock<IPlayerCreationRollback>(builder);
+        RegisterMock<IHeadmanHerdQuestAuthority>(builder);
         RegisterMock<ITimeControlInterface>(builder);
         RegisterMock<ITroopRosterInterface>(builder);
         RegisterMock<IMapTimeTrackerInterface>(builder);

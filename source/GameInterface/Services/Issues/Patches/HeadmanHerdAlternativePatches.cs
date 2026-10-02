@@ -100,3 +100,20 @@ internal static class HeadmanHerdIssueUpdatedConsequencePatch
     private static bool Prefix(IssueBase issue) => issue is not Issue || ModInformation.IsServer
         || CallOriginalPolicy.IsOriginalAllowedForOwnershipGate();
 }
+
+[HarmonyPatch(typeof(IssueBase), nameof(IssueBase.CompleteIssueWithAiLord))]
+internal static class HeadmanHerdAiCompletionPatch
+{
+    [HarmonyPrefix]
+    private static bool Prefix(IssueBase __instance, out IDisposable __state)
+    {
+        __state = null;
+        if (__instance is not Issue || CallOriginalPolicy.IsOriginalAllowedForOwnershipGate()) return true;
+        if (ModInformation.IsClient) return false;
+        __state = new IssueFinalizeAuthorityGuard();
+        return true;
+    }
+
+    [HarmonyFinalizer]
+    private static void Finalizer(IDisposable __state) => __state?.Dispose();
+}

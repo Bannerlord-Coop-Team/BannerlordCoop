@@ -261,7 +261,8 @@ internal static class HeadmanHerdIssueHistoryPatch
 {
     [HarmonyPrefix]
     private static bool Prefix(IssueBase issue, Hero issueSolver)
-        => issue is not HeadmanNeedsToDeliverAHerdIssueBehavior.HeadmanNeedsToDeliverAHerdIssue || issueSolver != null;
+        => issue is not HeadmanNeedsToDeliverAHerdIssueBehavior.HeadmanNeedsToDeliverAHerdIssue
+            || (issue.IsTriedToSolveBefore && issueSolver != null);
 }
 
 [HarmonyPatch]
