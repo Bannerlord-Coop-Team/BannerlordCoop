@@ -1064,8 +1064,11 @@ public class GangLeaderNeedsToOffloadStolenGoodsIssueTests : IDisposable
         });
     }
 
-    [Fact]
-    public void GivingBackTheGoodsKeepsHonorLevelAndTheRewardSurvivesRivalQuestAcceptance()
+    [Theory]
+    [InlineData(1, null, 0, 1100)]
+    [InlineData(0, -100, -100, 0)]
+    public void GivingBackTheGoodsKeepsHonorLevelAndTheRewardSurvivesRivalQuestAcceptance(
+        int startingLevel, int? savedXp, int clientXp, int expectedXp)
     {
         var fixture = SetupIssueOwner();
         CreateIssueOnServer(fixture);
@@ -1096,7 +1099,13 @@ public class GangLeaderNeedsToOffloadStolenGoodsIssueTests : IDisposable
         Server.Call(() =>
         {
             Assert.True(Server.ObjectManager.TryGetObject<Hero>(fixture.HeroId, out var owner));
-            owner.SetTraitLevel(DefaultTraits.Honor, 1);
+            owner.SetTraitLevel(DefaultTraits.Honor, startingLevel);
+            if (savedXp.HasValue)
+            {
+                var progress = new PropertyOwner<PropertyObject>();
+                progress.SetPropertyValue(DefaultTraits.Honor, savedXp.Value);
+                GangLeaderNeedsToOffloadStolenGoodsQuestType.OwnerTraitXpProgress.Set(owner, progress);
+            }
         });
 
         Client.Call(() =>
@@ -1116,7 +1125,7 @@ public class GangLeaderNeedsToOffloadStolenGoodsIssueTests : IDisposable
         Server.Call(() =>
         {
             Assert.True(Server.ObjectManager.TryGetObject<Hero>(fixture.HeroId, out var owner));
-            Assert.Equal(1, owner.GetTraitLevel(DefaultTraits.Honor));
+            Assert.Equal(startingLevel, owner.GetTraitLevel(DefaultTraits.Honor));
         });
 
         var giverId = TestEnvironment.CreateRegisteredObject<Hero>();
@@ -1150,7 +1159,7 @@ public class GangLeaderNeedsToOffloadStolenGoodsIssueTests : IDisposable
                     target.PartyBelongedTo = targetParty;
                     party.ActualClan = player.Clan;
                     party.MemberRoster.AddToCounts(troop, 50);
-                    if (instance == Client) Campaign.Current.PlayerTraitDeveloper.SetPropertyValue(DefaultTraits.Honor, 0);
+                    if (instance == Client) Campaign.Current.PlayerTraitDeveloper.SetPropertyValue(DefaultTraits.Honor, clientXp);
                 }
             });
         }
@@ -1172,16 +1181,17 @@ public class GangLeaderNeedsToOffloadStolenGoodsIssueTests : IDisposable
             {
                 MessageBroker.Instance.Publish(giver, new IssueConversationOpenedLocally(giver, "owner-controller"));
                 Assert.True(Campaign.Current.IssueManager.StartIssueQuest(giver));
-                Assert.Equal(1100, Campaign.Current.PlayerTraitDeveloper.GetPropertyValue(DefaultTraits.Honor));
             }
         });
+        Client.Call(() => Assert.Equal(expectedXp, Campaign.Current.PlayerTraitDeveloper.GetPropertyValue(DefaultTraits.Honor)));
         Server.Call(() =>
         {
             Assert.True(Server.ObjectManager.TryGetObject<Hero>(fixture.HeroId, out var player));
             Assert.True(Server.ObjectManager.TryGetObject<Hero>(giverId, out var giver));
             Assert.True(giver.Issue.IssueQuest.IsOngoing);
             Assert.True(GangLeaderNeedsToOffloadStolenGoodsQuestType.OwnerTraitXpProgress.TryGet(player, out var saved));
-            Assert.Equal(1100, saved.GetPropertyValue(DefaultTraits.Honor));
+            Assert.True(saved.HasProperty(DefaultTraits.Honor));
+            Assert.Equal(expectedXp, saved.GetPropertyValue(DefaultTraits.Honor));
         });
     }
 
