@@ -230,15 +230,30 @@ public class ScoutEnemyGarrisonsTests : IDisposable
     }
 
     [Theory]
-    [InlineData("HourlyTick", false)]
-    [InlineData("OnSettlementOwnerChanged", true)]
-    [InlineData("OnArmyDispersed", true)]
-    [InlineData("OnClanChangedKingdom", true)]
-    [InlineData("AllScoutingDone", true)]
-    [InlineData("CompleteQuestWithTimeOut", true)]
-    public void MissingRegisteredPartyBlocksPositionProgressButAllowsWorldEventsAndCompletion(string callback, bool allowed)
+    [InlineData("HourlyTick", false, 0)]
+    [InlineData("HourlyTick", false, 1)]
+    [InlineData("HourlyTick", false, 2)]
+    [InlineData("HourlyTick", true, -1)]
+    [InlineData("OnSettlementOwnerChanged", true, -1)]
+    [InlineData("OnArmyDispersed", true, -1)]
+    [InlineData("OnClanChangedKingdom", true, -1)]
+    [InlineData("AllScoutingDone", true, -1)]
+    [InlineData("CompleteQuestWithTimeOut", true, -1)]
+    public void MissingRegisteredPartyBlocksPositionProgressButAllowsWorldEventsAndCompletion(string callback, bool allowed, int hostileTarget)
     {
         var quest = NewQuest("missing-party");
+        quest.QuestGiver = ObjectHelper.SkipConstructor<Hero>();
+        quest.QuestGiver._clan = ObjectHelper.SkipConstructor<Clan>();
+        var targets = new[] { quest._questSettlement1, quest._questSettlement2, quest._questSettlement3 };
+        for (var i = 0; i < targets.Length; i++)
+        {
+            var faction = new Mock<IFaction>();
+            faction.Setup(x => x.IsAtWarWith(quest.QuestGiver.MapFaction)).Returns(i == hostileTarget);
+            var town = new Mock<Town>();
+            town.SetupGet(x => x.MapFaction).Returns(faction.Object);
+            targets[i].Settlement = ObjectHelper.SkipConstructor<Settlement>();
+            targets[i].Settlement.SettlementComponent = town.Object;
+        }
         Remember(quest, "player-A");
         Assert.True(state.TryGet(quest, out var owner));
         var rememberedParty = owner.Party;

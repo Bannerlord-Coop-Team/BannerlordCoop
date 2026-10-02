@@ -96,7 +96,11 @@ internal static class ScoutEnemyGarrisonsAuthorityPatches
         __state = null;
         if (ModInformation.IsClient || !__instance.IsOngoing) return false;
         if (!ContainerProvider.TryResolve<IScoutEnemyGarrisonsService>(out var service)) return false;
-        __state = service.OpenAuthority(__instance, requireCurrentParty: __originalMethod.Name == "HourlyTick");
+        // Hourly cancellation checks diplomacy before reading the owner's position.
+        var requireCurrentParty = __originalMethod.Name == "HourlyTick" &&
+            new[] { __instance._questSettlement1, __instance._questSettlement2, __instance._questSettlement3 }
+                .Any(target => target.Settlement.MapFaction.IsAtWarWith(__instance.QuestGiver.MapFaction));
+        __state = service.OpenAuthority(__instance, requireCurrentParty);
         return __state != null;
     }
 
