@@ -1,4 +1,4 @@
-using Common;
+﻿using Common;
 using Common.Logging;
 using Common.Messaging;
 using Common.Network;
@@ -6,6 +6,7 @@ using GameInterface.Services.Entity;
 using GameInterface.Services.Issues.Generic;
 using GameInterface.Services.Issues.Interfaces;
 using GameInterface.Services.Issues.Messages;
+using GameInterface.Services.MapEvents;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Players;
 using LiteNetLib;
@@ -25,6 +26,7 @@ internal class IssueConversationHandler : IHandler
     private readonly IPlayerManager playerManager;
     private readonly IIssueGenerationRegistry generationRegistry;
     private readonly IIssueConversationTracker conversationTracker;
+    private readonly ConversationPartyTracker partyConversations;
 
     public IssueConversationHandler(
         IMessageBroker messageBroker,
@@ -32,7 +34,8 @@ internal class IssueConversationHandler : IHandler
         INetwork network,
         IPlayerManager playerManager,
         IIssueGenerationRegistry generationRegistry,
-        IIssueConversationTracker conversationTracker)
+        IIssueConversationTracker conversationTracker,
+        ConversationPartyTracker partyConversations)
     {
         this.messageBroker = messageBroker;
         this.objectManager = objectManager;
@@ -40,6 +43,7 @@ internal class IssueConversationHandler : IHandler
         this.playerManager = playerManager;
         this.generationRegistry = generationRegistry;
         this.conversationTracker = conversationTracker;
+        this.partyConversations = partyConversations;
 
         messageBroker.Subscribe<IssueConversationOpenedLocally>(Handle_IssueConversationOpenedLocally);
         messageBroker.Subscribe<RequestIssueConversationOpened>(Handle_RequestIssueConversationOpened);
@@ -132,13 +136,17 @@ internal class IssueConversationHandler : IHandler
         return true;
     }
 
-    private bool IsRequesterPresentWithIssueGiver(string controllerId, Hero issueGiver)
+    internal bool IsRequesterPresentWithIssueGiver(string controllerId, Hero issueGiver)
     {
-        if (issueGiver.CurrentSettlement == null) return false;
         if (!playerManager.TryGetPlayer(controllerId, out var player) || player.MobilePartyId == null) return false;
         if (!objectManager.TryGetObjectWithLogging<MobileParty>(player.MobilePartyId, out var party)) return false;
 
-        return party.CurrentSettlement == issueGiver.CurrentSettlement;
+        if (issueGiver.CurrentSettlement != null) return party.CurrentSettlement == issueGiver.CurrentSettlement;
+
+        return issueGiver.PartyBelongedTo?.Party != null &&
+            objectManager.TryGetIdWithLogging(issueGiver.PartyBelongedTo.Party, out var giverPartyId) &&
+            objectManager.TryGetIdWithLogging(party.Party, out var requesterPartyId) &&
+            partyConversations.IsEngagerParty(giverPartyId, requesterPartyId);
     }
 
     private static bool IsMirrorEligible(TaleWorlds.CampaignSystem.Issues.IssueBase issue)

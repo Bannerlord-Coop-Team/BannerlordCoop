@@ -85,6 +85,24 @@ public class PrisonerSaleValidatorTests
         Assert.Equal(60, Assert.Single(available.GetTroopRoster()).Xp);
     }
 
+    [Theory]
+    [InlineData(2, 20, 20)]
+    [InlineData(2, 100, 60)]
+    [InlineData(2, -4, 0)]
+    [InlineData(5, 0, 60)]
+    public void Validate_SelectedXp_IsBoundedByTheAvailableStack(int count, int claimedXp, int expectedXp)
+    {
+        var character = ObjectHelper.SkipConstructor<CharacterObject>();
+        var selected = Element(character, count, 0);
+        selected.Xp = claimedXp;
+        var available = Element(character, 5, 0);
+        available.Xp = 60;
+
+        var result = validator.Validate(Roster(selected), Roster(available), preserveTroopXp: true);
+
+        Assert.Equal(expectedXp, Assert.Single(result.GetTroopRoster()).Xp);
+    }
+
     private static TroopRoster Roster(params TroopRosterElement[] elements)
     {
         var roster = new TroopRoster();

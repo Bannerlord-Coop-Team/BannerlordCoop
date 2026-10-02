@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using GameInterface.Services.Heroes.Patches;
 using GameInterface.Services.Issues.Generic.AcceptMirror;
 using GameInterface.Services.ObjectManager;
@@ -82,7 +82,7 @@ public static class AlternativeSolutionStartRunner
         foreach (var element in validatedRoster.GetTroopRoster())
         {
             party.MemberRoster.AddToCounts(
-                element.Character, -element.Number, false, -element.WoundedNumber, 0, true, -1);
+                element.Character, -element.Number, false, -element.WoundedNumber, -element.Xp, true, -1);
         }
     }
 
