@@ -111,6 +111,7 @@ public class GameInterfaceModule : Module
         builder.RegisterType<BinaryPackageFactory>().As<IBinaryPackageFactory>().SingleInstance();
         builder.RegisterType<ControllerIdProvider>().As<IControllerIdProvider>().SingleInstance();
         builder.RegisterType<TimeControlModeConverter>().As<ITimeControlModeConverter>().SingleInstance();
+        builder.RegisterType<Services.Crime.CrimeRatingService>().As<Services.Crime.ICrimeRatingService>().InstancePerDependency();
         builder.RegisterType<PlayerManager>().As<IPlayerManager>().SingleInstance();
         builder.RegisterType<HideoutPreparation>().As<IHideoutPreparation>().InstancePerDependency();
         builder.RegisterType<BugReportService>().As<IBugReportService>().SingleInstance().AutoActivate();

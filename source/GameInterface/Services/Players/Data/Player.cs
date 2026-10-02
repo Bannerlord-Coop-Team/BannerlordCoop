@@ -1,4 +1,5 @@
 ﻿using ProtoBuf;
+using System.Collections.Generic;
 
 namespace GameInterface.Services.Players.Data;
 
@@ -20,6 +21,15 @@ public class Player
     public string PlatformName { get; set; }
     [ProtoMember(7)]
     public readonly string OriginalClanId;
+
+    private Dictionary<string, float> crimeRatings;
+
+    [ProtoMember(8)]
+    public Dictionary<string, float> CrimeRatings
+    {
+        get => crimeRatings ?? (crimeRatings = new Dictionary<string, float>());
+        set => crimeRatings = value;
+    }
 
     // Associates one controller with its registered campaign objects.
     public Player(string controllerId, string heroId, string mobilePartyId, string clanId, string characterObjectId, string originalClanId = null)

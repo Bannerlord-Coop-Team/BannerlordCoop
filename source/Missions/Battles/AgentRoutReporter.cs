@@ -31,19 +31,22 @@ public class AgentRoutReporter : IAgentRoutReporter
     private readonly ICoopMissionComponent coopMissionComponent;
     private readonly IBattleSession session;
     private readonly ICasualtyAttributionMap casualties;
+    private readonly IBattleInstanceLifecycle lifecycle;
 
     public AgentRoutReporter(
         IBattleNetwork network,
         IMessageBroker messageBroker,
         ICoopMissionComponent coopMissionComponent,
         IBattleSession session,
-        ICasualtyAttributionMap casualties)
+        ICasualtyAttributionMap casualties,
+        IBattleInstanceLifecycle lifecycle)
     {
         this.network = network;
         this.messageBroker = messageBroker;
         this.coopMissionComponent = coopMissionComponent;
         this.session = session;
         this.casualties = casualties;
+        this.lifecycle = lifecycle;
 
         messageBroker.Subscribe<BattleAgentRouted>(Handle_BattleAgentRouted);
     }
@@ -75,6 +78,7 @@ public class AgentRoutReporter : IAgentRoutReporter
             Logger.Information("[DeathDiag] Broadcasting rout of agent {AgentId} to the battle mesh", info.AgentId);
             network.SendAll(new NetworkBattleAgentRouted(info.AgentId));
 
+            lifecycle.RecordRoutedHealth(payload.What.Agent);
             casualties.Forget(info.AgentId);
             registry.RemoveAgent(info.AgentId);
         });

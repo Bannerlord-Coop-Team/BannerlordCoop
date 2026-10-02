@@ -20,6 +20,7 @@ using Missions.Hideouts;
 using Serilog;
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using TaleWorlds.CampaignSystem.MapEvents;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.Core;
@@ -82,9 +83,33 @@ internal class BattleHostHandler : IHandler
         public readonly HashSet<string> AbsentControllers = new HashSet<string>();
         public readonly HashSet<string> PresentControllers = new HashSet<string>();
         public readonly HashSet<string> HostOwnedOfflineControllers = new HashSet<string>();
+        public readonly HashSet<string> HostGrantedParties = new HashSet<string>();
         public readonly List<PendingReturn> PendingReturns = new List<PendingReturn>();
+        public readonly Dictionary<string, PartyHealthReports> HealthReports = new();
+        public readonly List<PendingHealthWithdrawal> HealthWithdrawals = new();
+        public readonly Dictionary<string, PendingReturn> DeferredHealthGrants = new();
         public HostEndpoint HostEndpoint;
         public BattleState ResolvedState;
+    }
+
+    private sealed class PartyHealthReports
+    {
+        public NetworkBattleTroopHealth Owner;
+        public string OwnerControllerId;
+        public NetworkBattleTroopHealth Host;
+        public string HostControllerId;
+    }
+
+    private sealed class PendingHealthWithdrawal
+    {
+        public string ControllerId;
+        public readonly Dictionary<string, MapEventParty> Parties = new();
+        public readonly HashSet<string> AwaitedParties = new();
+        public Guid SnapshotId;
+        public string HostControllerId;
+        public NetPeer HostPeer;
+        public int HostEpoch;
+        public DateTime RetryUtc;
     }
 
     private sealed class HostEndpoint
@@ -217,6 +242,7 @@ internal class BattleHostHandler : IHandler
         messageBroker.Subscribe<PlayerDisconnectedFromMapEvent>(Handle_PlayerDisconnectedFromMapEvent);
         messageBroker.Subscribe<NetworkRequestBattleReserves>(Handle_NetworkRequestBattleReserves);
         messageBroker.Subscribe<NetworkBattleSupplyProgress>(Handle_NetworkBattleSupplyProgress);
+        messageBroker.Subscribe<NetworkBattleTroopHealth>(Handle_NetworkBattleTroopHealth);
         messageBroker.Subscribe<MapEventInvolvedPartiesAdded>(Handle_MapEventInvolvedPartiesAdded);
         messageBroker.Subscribe<BattleResolvedStateRecorded>(Handle_BattleResolvedStateRecorded);
         messageBroker.Subscribe<CampaignTick>(Handle_CampaignTick);
@@ -233,6 +259,7 @@ internal class BattleHostHandler : IHandler
         messageBroker.Unsubscribe<PlayerDisconnectedFromMapEvent>(Handle_PlayerDisconnectedFromMapEvent);
         messageBroker.Unsubscribe<NetworkRequestBattleReserves>(Handle_NetworkRequestBattleReserves);
         messageBroker.Unsubscribe<NetworkBattleSupplyProgress>(Handle_NetworkBattleSupplyProgress);
+        messageBroker.Unsubscribe<NetworkBattleTroopHealth>(Handle_NetworkBattleTroopHealth);
         messageBroker.Unsubscribe<MapEventInvolvedPartiesAdded>(Handle_MapEventInvolvedPartiesAdded);
         messageBroker.Unsubscribe<BattleResolvedStateRecorded>(Handle_BattleResolvedStateRecorded);
         messageBroker.Unsubscribe<CampaignTick>(Handle_CampaignTick);
@@ -371,6 +398,7 @@ internal class BattleHostHandler : IHandler
             // return's flush handshake is (still) in flight, the grant is deferred: fold this election-time
             // request into the pending grant (upgrading it to carry explicit empties) instead of serving
             // early from a ledger the host has not caught up yet.
+            if (DeferHealthGrant(mapEventId, requesterId, requester, includeEmptySides: true)) return;
             bool deferred = HandleControllerReturn(mapEventId, mapEvent, requesterId, requester,
                 includeEmptySides: true);
             RememberHostPeer(mapEventId, requesterId, requester);
@@ -420,6 +448,7 @@ internal class BattleHostHandler : IHandler
             // lagging ledger would re-issue descriptors the holder already fielded.
             bool includeEmptySides = hostRegistry.TryGet(mapEventId, out var assignment)
                 && assignment.HostControllerId == requesterId;
+            if (DeferHealthGrant(mapEventId, requesterId, requester, includeEmptySides)) return;
             bool deferred = HandleControllerReturn(mapEventId, mapEvent, requesterId, requester, includeEmptySides);
 
             // The current host's adoption/sweep re-request also refreshes its live peer (a promoted host
@@ -431,6 +460,165 @@ internal class BattleHostHandler : IHandler
 
             SendOwnedReserves(mapEventId, mapEvent, requester, requesterId, includeEmptySides);
         });
+    }
+
+    private void Handle_NetworkBattleTroopHealth(MessagePayload<NetworkBattleTroopHealth> payload)
+    {
+        if (ModInformation.IsClient || payload.Who is not NetPeer peer) return;
+        var message = payload.What;
+        if (string.IsNullOrEmpty(message.MapEventId) || string.IsNullOrEmpty(message.PartyId)) return;
+
+        GameThread.RunSafe(() =>
+        {
+            if (!playerManager.TryGetPlayer(peer, out var player) ||
+                !playerManager.TryGetPeer(player.ControllerId, out var currentPeer) ||
+                !ReferenceEquals(currentPeer, peer) ||
+                !battleRuntimeStates.TryGetValue(message.MapEventId, out var state) ||
+                !state.PresentControllers.Contains(player.ControllerId)) return;
+            if (!objectManager.TryGetObjectWithLogging<MapEvent>(message.MapEventId, out var mapEvent)) return;
+            var pending = state.HealthWithdrawals.FirstOrDefault(value => value.SnapshotId == message.SnapshotId);
+            bool snapshot = message.SnapshotId != Guid.Empty;
+            bool isHost = hostRegistry.TryGet(message.MapEventId, out var assignment)
+                && assignment.HostControllerId == player.ControllerId;
+            MapEventParty party;
+            if (snapshot)
+            {
+                if (pending == null || !isHost || pending.HostEpoch != assignment.Epoch
+                    || !ReferenceEquals(pending.HostPeer, peer)
+                    || !pending.AwaitedParties.Contains(message.PartyId)
+                    || !pending.Parties.TryGetValue(message.PartyId, out party)) return;
+            }
+            else
+            {
+                if (!objectManager.TryGetObjectWithLogging<MapEventParty>(message.PartyId, out party)
+                    || party.Party?.MapEventSide?.MapEvent != mapEvent
+                    || !IsRequesterInBattle(mapEvent, player.ControllerId)) return;
+                bool ownsRetainedAgents = isHost && state.HostGrantedParties.Contains(message.PartyId);
+                if (!ownsRetainedAgents && !BuildOwnedReserves(message.MapEventId, mapEvent,
+                    player.ControllerId, includeEmptySides: false)
+                    .Exists(side => Array.Exists(side.Parties, reserve => reserve.PartyId == message.PartyId))) return;
+            }
+
+            if (!state.HealthReports.TryGetValue(message.PartyId, out var reports))
+                state.HealthReports[message.PartyId] = reports = new PartyHealthReports();
+            if (isHost)
+            {
+                reports.Host = message;
+                reports.HostControllerId = player.ControllerId;
+                if (reports.OwnerControllerId == player.ControllerId) reports.Owner = null;
+            }
+            else
+            {
+                reports.Owner = message;
+                reports.OwnerControllerId = player.ControllerId;
+            }
+            ApplyPartyHealth(mapEvent, party, reports);
+            if (snapshot && pending.AwaitedParties.Remove(message.PartyId) && pending.AwaitedParties.Count == 0)
+                CompleteHealthWithdrawal(message.MapEventId, mapEvent, state, pending);
+        }, context: nameof(Handle_NetworkBattleTroopHealth));
+    }
+
+    private void ApplyPartyHealth(MapEvent mapEvent, MapEventParty party, PartyHealthReports reports)
+    {
+        var survivors = new Dictionary<int, float>();
+        var routed = new Dictionary<int, float>();
+        int supplied = 0;
+        foreach (var report in new[] { reports.Host, reports.Owner })
+        {
+            if (report == null) continue;
+            supplied = Math.Max(supplied, report.SuppliedCount);
+            if (report.Survivors != null)
+                foreach (var value in report.Survivors) survivors[value.Key] = value.Value;
+            if (report.RoutedSurvivors != null)
+                foreach (var value in report.RoutedSurvivors) routed[value.Key] = value.Value;
+        }
+        reserveBuilder.RecordHealth(mapEvent, party, survivors, supplied, routed);
+    }
+
+    private bool DeferHealthGrant(string mapEventId, string controllerId, NetPeer peer, bool includeEmptySides)
+    {
+        if (!battleRuntimeStates.TryGetValue(mapEventId, out var state) || state.HealthWithdrawals.Count == 0)
+            return false;
+        if (!state.DeferredHealthGrants.TryGetValue(controllerId, out var grant))
+            state.DeferredHealthGrants[controllerId] = grant = new PendingReturn
+            {
+                MapEventId = mapEventId, ReturnerControllerId = controllerId,
+            };
+        grant.ReturnerPeer = peer;
+        grant.IncludeEmptySides |= includeEmptySides;
+        return true;
+    }
+
+    private void WithdrawPartyReserves(string mapEventId, MapEvent mapEvent, string controllerId)
+    {
+        if (mapEvent.IsHideoutBattle) return;
+        var state = GetOrCreateRuntimeState(mapEventId);
+        if (state.HealthWithdrawals.Any(value => value.ControllerId == controllerId)) return;
+        var pending = new PendingHealthWithdrawal { ControllerId = controllerId };
+        foreach (var party in mapEvent.AttackerSide.Parties.Concat(mapEvent.DefenderSide.Parties))
+        {
+            if (party.Party?.MobileParty == null
+                || !objectManager.TryGetId(party.Party.MobileParty, out var mobilePartyId)
+                || !playerManager.Players.Any(player => player.ControllerId == controllerId && player.MobilePartyId == mobilePartyId)
+                || !objectManager.TryGetId(party, out var partyId)) continue;
+            pending.Parties.Add(partyId, party);
+            if (state.HostGrantedParties.Contains(partyId)) pending.AwaitedParties.Add(partyId);
+        }
+        state.HealthWithdrawals.Add(pending);
+        if (pending.AwaitedParties.Count == 0 || !hostRegistry.TryGet(mapEventId, out var assignment)
+            || assignment.HostControllerId == controllerId)
+            CompleteHealthWithdrawal(mapEventId, mapEvent, state, pending);
+        else
+            RequestWithdrawalHealth(mapEventId, mapEvent, state, pending);
+    }
+
+    private void RequestWithdrawalHealth(string mapEventId, MapEvent mapEvent, BattleRuntimeState state,
+        PendingHealthWithdrawal pending)
+    {
+        if (!hostRegistry.TryGet(mapEventId, out var assignment))
+        {
+            CompleteHealthWithdrawal(mapEventId, mapEvent, state, pending);
+            return;
+        }
+        pending.RetryUtc = DateTime.UtcNow + FlushAckDeadline;
+        if (!state.PresentControllers.Contains(assignment.HostControllerId)
+            || !playerManager.TryGetPeer(assignment.HostControllerId, out var peer)) return;
+        if (pending.HostEpoch != assignment.Epoch || !ReferenceEquals(pending.HostPeer, peer))
+        {
+            pending.SnapshotId = Guid.NewGuid();
+            pending.HostControllerId = assignment.HostControllerId;
+            pending.HostPeer = peer;
+            pending.HostEpoch = assignment.Epoch;
+        }
+        network.Send(peer, new NetworkRequestBattleTroopHealth(mapEventId,
+            pending.AwaitedParties.ToArray(), pending.SnapshotId));
+    }
+
+    private void CompleteHealthWithdrawal(string mapEventId, MapEvent mapEvent, BattleRuntimeState state,
+        PendingHealthWithdrawal pending)
+    {
+        state.HealthWithdrawals.Remove(pending);
+        network.SendAll(new NetworkBattleTroopHealthCollected(mapEventId, pending.Parties.Keys.ToArray()));
+        foreach (var party in pending.Parties)
+        {
+            reserveBuilder.ForgetParty(mapEvent, party.Value);
+            state.HealthReports.Remove(party.Key);
+            state.HostGrantedParties.Remove(party.Key);
+        }
+        if (state.HealthWithdrawals.Count != 0) return;
+        var grants = state.DeferredHealthGrants.Values.ToArray();
+        state.DeferredHealthGrants.Clear();
+        foreach (var grant in grants)
+        {
+            if (!state.PresentControllers.Contains(grant.ReturnerControllerId)
+                || !playerManager.TryGetPeer(grant.ReturnerControllerId, out var peer)
+                || !ReferenceEquals(peer, grant.ReturnerPeer)) continue;
+            RememberHostPeer(mapEventId, grant.ReturnerControllerId, peer);
+            if (!HandleControllerReturn(mapEventId, mapEvent, grant.ReturnerControllerId,
+                peer, grant.IncludeEmptySides)
+                && !TryDeferToPendingReturn(mapEventId, grant.ReturnerControllerId, peer, grant.IncludeEmptySides))
+                SendOwnedReserves(mapEventId, mapEvent, peer, grant.ReturnerControllerId, grant.IncludeEmptySides);
+        }
     }
 
     private void Handle_BattleResolvedStateRecorded(MessagePayload<BattleResolvedStateRecorded> payload)
@@ -457,7 +645,7 @@ internal class BattleHostHandler : IHandler
     /// skipped (entry replies — the unowned sides are not decided until the election).</summary>
     private void SendOwnedReserves(string mapEventId, MapEvent mapEvent, NetPeer requester, string requesterId, bool includeEmptySides)
     {
-        if (requester == null) return;
+        if (requester == null || DeferHealthGrant(mapEventId, requesterId, requester, includeEmptySides)) return;
         SendSideReserves(requester, mapEventId, mapEvent,
             BuildOwnedReserves(mapEventId, mapEvent, requesterId, includeEmptySides), flushRequested: false);
     }
@@ -497,6 +685,9 @@ internal class BattleHostHandler : IHandler
         {
             if (!includeEmptySides && (sideReserve.Parties == null || sideReserve.Parties.Length == 0))
                 continue;
+            if (isHost)
+                foreach (var party in sideReserve.Parties)
+                    GetOrCreateRuntimeState(mapEventId).HostGrantedParties.Add(party.PartyId);
             sides.Add(sideReserve);
         }
         return sides;
@@ -715,6 +906,10 @@ internal class BattleHostHandler : IHandler
         if (battleRuntimeStates.Count == 0) return;
 
         var now = DateTime.UtcNow;
+        foreach (var battle in battleRuntimeStates.ToArray())
+            foreach (var withdrawal in battle.Value.HealthWithdrawals.ToArray())
+                if (now >= withdrawal.RetryUtc && objectManager.TryGetObject<MapEvent>(battle.Key, out var mapEvent))
+                    RequestWithdrawalHealth(battle.Key, mapEvent, battle.Value, withdrawal);
         List<PendingReturn> expired = null;
         foreach (var runtimeState in battleRuntimeStates.Values)
             foreach (var pending in runtimeState.PendingReturns)
@@ -832,7 +1027,7 @@ internal class BattleHostHandler : IHandler
                 if (objectManager.TryGetObject<MapEvent>(mapEventId, out var abandonedEvent))
                 {
                     if (TryFinalizeAbandonedHideout(mapEventId, abandonedEvent)) return;
-                    reserveBuilder.ForgetMapEvent(abandonedEvent);
+                    reserveBuilder.ForgetMapEvent(abandonedEvent, preserveHealth: true);
                 }
 
                 // Battle over as far as this instance is concerned — drop its scope bookkeeping with it.
@@ -853,7 +1048,7 @@ internal class BattleHostHandler : IHandler
             if (payload.What.WasRetreat)
             {
                 if (mapEvent != null)
-                    reserveBuilder.ForgetController(mapEvent, controllerId);
+                    WithdrawPartyReserves(mapEventId, mapEvent, controllerId);
             }
             else
             {
@@ -863,6 +1058,11 @@ internal class BattleHostHandler : IHandler
             // If the departed member had a return grant pending (it re-entered and dropped AGAIN before the
             // host's flush ack), the grant is moot — cancel it rather than serve a gone peer.
             CancelPendingReturns(mapEventId, controllerId);
+            if (battleRuntimeStates.TryGetValue(mapEventId, out var departedState))
+                foreach (var report in departedState.HealthReports)
+                    if (report.Value.OwnerControllerId == controllerId
+                        && !departedState.HealthWithdrawals.Any(value => value.Parties.ContainsKey(report.Key)))
+                        report.Value.Owner = null;
 
             if (!hostRegistry.TryGet(mapEventId, out var assignment))
                 return; // no host elected yet — the departure bookkeeping above is all that applies
@@ -894,7 +1094,12 @@ internal class BattleHostHandler : IHandler
                         hostlessRuntimeState.HostEndpoint = null; // the departed host's recorded peer is stale
 
                     if (objectManager.TryGetObject<MapEvent>(mapEventId, out var abandonedEvent))
-                        reserveBuilder.ForgetMapEvent(abandonedEvent);
+                    {
+                        reserveBuilder.ForgetMapEvent(abandonedEvent, preserveHealth: true);
+                        if (battleRuntimeStates.TryGetValue(mapEventId, out var state))
+                            foreach (var withdrawal in state.HealthWithdrawals.ToArray())
+                                CompleteHealthWithdrawal(mapEventId, abandonedEvent, state, withdrawal);
+                    }
 
                     // A returner whose grant was pending on the departed host's flush ack must still be
                     // served (it is one of the still-loading participants). AFTER the re-flatten above, so
@@ -932,6 +1137,19 @@ internal class BattleHostHandler : IHandler
                 Logger.Information("[BattleHost] Successor {Controller} left battle {MapEventId}; successor line now: {Successors}",
                     controllerId, mapEventId, string.Join(", ", successors));
             }
+
+            if (mapEvent != null && battleRuntimeStates.TryGetValue(mapEventId, out var healthState))
+                foreach (var withdrawal in healthState.HealthWithdrawals.ToArray())
+                    if (withdrawal.HostControllerId == controllerId)
+                    {
+                        // A graceful holder already sent its final snapshots before its departure.
+                        if (payload.What.WasRetreat && withdrawal.AwaitedParties.All(partyId =>
+                            healthState.HealthReports.TryGetValue(partyId, out var reports)
+                            && reports.HostControllerId == controllerId && reports.Host != null))
+                            CompleteHealthWithdrawal(mapEventId, mapEvent, healthState, withdrawal);
+                        else
+                            RequestWithdrawalHealth(mapEventId, mapEvent, healthState, withdrawal);
+                    }
 
             if (newlyAbsent && mapEvent != null && assignment.HostControllerId != controllerId)
                 RefreshHostAfterMemberDrop(mapEventId, mapEvent, assignment.HostControllerId, controllerId);
@@ -1070,11 +1288,19 @@ internal class BattleHostHandler : IHandler
     {
         if (string.IsNullOrEmpty(controllerId)) return false;
 
-        bool added = GetOrCreateRuntimeState(mapEventId).AbsentControllers.Add(controllerId);
-        if (added)
-            Logger.Information("[BattleHost] {Controller} was marked absent from battle {MapEventId}; its parties fall to the host's reserve scope until it returns",
-                controllerId, mapEventId);
-        return added;
+        var runtimeState = GetOrCreateRuntimeState(mapEventId);
+        if (runtimeState.AbsentControllers.Contains(controllerId)) return false;
+
+        // Adoption persists even if the new host has not requested its reserves before the owner returns.
+        if (objectManager.TryGetObject<MapEvent>(mapEventId, out var mapEvent))
+            foreach (var side in BuildOwnedReserves(mapEventId, mapEvent, controllerId, includeEmptySides: false))
+                foreach (var party in side.Parties)
+                    runtimeState.HostGrantedParties.Add(party.PartyId);
+
+        runtimeState.AbsentControllers.Add(controllerId);
+        Logger.Information("[BattleHost] {Controller} was marked absent from battle {MapEventId}; its parties fall to the host's reserve scope until it returns",
+            controllerId, mapEventId);
+        return true;
     }
 
     private void MarkPresent(string mapEventId, string controllerId)
@@ -1100,6 +1326,7 @@ internal class BattleHostHandler : IHandler
     {
         if (!battleRuntimeStates.TryGetValue(mapEventId, out var runtimeState)) return;
         runtimeState.PresentControllers.Remove(controllerId);
+        runtimeState.DeferredHealthGrants.Remove(controllerId);
     }
 
     private void RefreshHostAfterMemberDrop(string mapEventId, MapEvent mapEvent, string hostControllerId,
@@ -1116,8 +1343,7 @@ internal class BattleHostHandler : IHandler
 
         var host = runtimeState.HostEndpoint;
         network.Send(host.Peer, new NetworkBattleReserveOwnershipExpanded(mapEventId));
-        var refresh = BuildOwnedReserves(mapEventId, mapEvent, hostControllerId, includeEmptySides: true);
-        SendSideReserves(host.Peer, mapEventId, mapEvent, refresh, flushRequested: false);
+        SendOwnedReserves(mapEventId, mapEvent, host.Peer, hostControllerId, includeEmptySides: true);
         Logger.Information("[BattleHost] Pushed {Dropped}'s remaining reserves to host {Host} in {MapEventId}",
             droppedControllerId, hostControllerId, mapEventId);
     }
