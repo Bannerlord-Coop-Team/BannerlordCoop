@@ -94,6 +94,13 @@ public class HeadmanHerdReplicaTests
         => WithHerdEnabled(() => ExerciseAcceptance(true, alternativeFailure: completeFirst ? false : null,
             removePlayerAfterAlternative: completeFirst, missingOwnerObject: missingObject, reconnectMissingHero: true));
 
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void SuccessionPreservesCompanionMissionAndPendingReturn(bool completeFirst)
+        => WithHerdEnabled(() => ExerciseAcceptance(true, alternativeFailure: completeFirst ? false : null,
+            removePlayerAfterAlternative: completeFirst, preserveCompanionsOnPlayerChange: true));
+
     [Fact]
     public void AcceptedCompanionMissionIgnoresALatePickerCancel()
         => WithHerdEnabled(() => ExerciseAcceptance(true, latePickerCancel: true));
@@ -153,7 +160,7 @@ public class HeadmanHerdReplicaTests
 
     private void ExerciseAcceptance(bool alternative, bool? reject = null, bool? alternativeFailure = null,
         bool failAlternativeCapture = false, string? staleCompanion = null, bool? removePlayerAfterAlternative = null,
-        string? missingOwnerObject = null, bool latePickerCancel = false, bool reconnectMissingHero = false)
+        string? missingOwnerObject = null, bool latePickerCancel = false, bool reconnectMissingHero = false, bool preserveCompanionsOnPlayerChange = false)
     {
         using var environment = new E2ETestEnvironment(output);
         var server = environment.Server;
@@ -424,6 +431,19 @@ public class HeadmanHerdReplicaTests
             {
                 server.Call(() =>
                 {
+                    if (preserveCompanionsOnPlayerChange)
+                    {
+                        var issueBefore = server.GetRegisteredObject<Hero>(giverId).Issue;
+                        var companion = server.GetRegisteredObject<Hero>(companionId);
+                        var stateBefore = companion.HeroState;
+                        var pending = server.Resolve<IAwaitingAlternativeSolutionTroopsRegistry>();
+                        var countBefore = pending.TryGet(player.ControllerId, out var before) ? before.TotalManCount : 0;
+                        server.Resolve<IHeadmanHerdQuestAuthority>().CancelForPlayerChange(player.ControllerId);
+                        Assert.Same(issueBefore, server.GetRegisteredObject<Hero>(giverId).Issue);
+                        Assert.Equal(stateBefore, companion.HeroState);
+                        Assert.Equal(countBefore, pending.TryGet(player.ControllerId, out var after) ? after.TotalManCount : 0);
+                        Assert.True(server.Resolve<IPlayerManager>().TryGetPlayer(player.ControllerId, out _));
+                    }
                     if (missingOwnerObject == "hero" || missingOwnerObject == "both")
                         Assert.True(server.ObjectManager.Remove(server.GetRegisteredObject<Hero>(heroId)));
                     if (missingOwnerObject == "party" || missingOwnerObject == "both")
@@ -630,6 +650,7 @@ public class HeadmanHerdReplicaTests
 
     [Theory]
     [InlineData(false, null)]
+    [InlineData(false, "party")]
     [InlineData(true, null)]
     [InlineData(true, "hero")]
     [InlineData(true, "party")]
@@ -757,12 +778,12 @@ public class HeadmanHerdReplicaTests
             });
             server.Call(() =>
             {
+                if (missingObject?.StartsWith("hero") == true || missingObject?.StartsWith("both") == true)
+                    Assert.True(server.ObjectManager.Remove(server.GetRegisteredObject<Hero>(players[0].HeroId)));
+                if (missingObject?.StartsWith("party") == true || missingObject?.StartsWith("both") == true)
+                    Assert.True(server.ObjectManager.Remove(server.GetRegisteredObject<MobileParty>(partyIds[0])));
                 if (removePlayer)
                 {
-                    if (missingObject?.StartsWith("hero") == true || missingObject?.StartsWith("both") == true)
-                        Assert.True(server.ObjectManager.Remove(server.GetRegisteredObject<Hero>(players[0].HeroId)));
-                    if (missingObject?.StartsWith("party") == true || missingObject?.StartsWith("both") == true)
-                        Assert.True(server.ObjectManager.Remove(server.GetRegisteredObject<MobileParty>(partyIds[0])));
                     if (missingObject?.EndsWith("-reconnect") == true)
                         ResolveMissingPlayer(server, clients[0], players[0]);
                     else
@@ -782,7 +803,7 @@ public class HeadmanHerdReplicaTests
                         Assert.True(instance.ObjectManager.TryGetObject<Hero>(giverIds[i], out var giver));
                         Assert.Equal(i == 0, quests[instance][i].IsFinalized);
                         Assert.Equal(i == 1, quests[instance][i].IsOngoing);
-                        if (!removePlayer || i == 1)
+                        if ((!removePlayer && missingObject == null) || i == 1)
                         {
                             Assert.True(instance.ObjectManager.TryGetObject<MobileParty>(partyIds[i], out var party));
                             Assert.Equal(i == 0 ? 0 : 5, party.ItemRoster.GetItemNumber(item));
@@ -967,7 +988,11 @@ public class HeadmanHerdReplicaTests
             logic.MemberRosters[1] = party.MemberRoster;
             logic.PrisonerRosters[1] = party.PrisonRoster;
             logic.RightOwnerParty = party.Party;
-            logic._partyScreenMode = Helpers.PartyScreenHelper.PartyScreenMode.QuestTroopManage;
+            var partyState = Game.Current.GameStateManager.CreateState<TaleWorlds.CampaignSystem.GameState.PartyState>();
+            partyState.PartyScreenMode = Helpers.PartyScreenHelper.PartyScreenMode.QuestTroopManage;
+            partyState.PartyScreenLogic = logic;
+            Game.Current.GameStateManager.PushState(partyState);
+            Assert.NotEqual(Helpers.PartyScreenHelper.PartyScreenMode.QuestTroopManage, logic._partyScreenMode);
             logic.CurrentData.BindRostersFrom(party.MemberRoster, party.PrisonRoster, left, leftPrisoners, party.Party, null);
             logic._initialData.InitializeCopyFrom(party.Party, null);
             logic._initialData.CopyFromPartyAndRoster(party.MemberRoster, party.PrisonRoster, left, leftPrisoners, party.Party);

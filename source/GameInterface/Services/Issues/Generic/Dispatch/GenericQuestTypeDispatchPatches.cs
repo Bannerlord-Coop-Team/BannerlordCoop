@@ -12,7 +12,6 @@ using TaleWorlds.CampaignSystem.CampaignBehaviors;
 using TaleWorlds.CampaignSystem.Conversation;
 using TaleWorlds.CampaignSystem.Roster;
 using TaleWorlds.CampaignSystem.Party;
-using Helpers;
 using TaleWorlds.Localization;
 
 namespace GameInterface.Services.Issues.Generic.Dispatch;
@@ -291,8 +290,7 @@ internal static class GenericQuestTypeAlternativePickerResetPatch
 
     private static void DetachStaleRoster(PartyScreenLogic logic)
     {
-        if (ModInformation.IsServer || logic._partyScreenMode != PartyScreenHelper.PartyScreenMode.QuestTroopManage
-            || !ContainerProvider.TryResolve<IIssueConversationTracker>(out var tracker)) return;
+        if (ModInformation.IsServer || !ContainerProvider.TryResolve<IIssueConversationTracker>(out var tracker)) return;
         var issue = tracker.AlternativePickerIssue;
         if (issue == null || GenericQuestTypeAlternativePickerPatch.IsCurrentSelection(issue)
             || !ReferenceEquals(logic.CurrentData.LeftMemberRoster, issue.AlternativeSolutionSentTroops)) return;

@@ -67,21 +67,17 @@ internal sealed class HeadmanHerdQuestAuthority : IHeadmanHerdQuestAuthority
         return true;
     }
 
-    public void CancelForPlayerChange(string controllerId)
-    {
-        var quests = Campaign.Current.QuestManager.Quests
-            .OfType<HeadmanNeedsToDeliverAHerdIssueBehavior.HeadmanNeedsToDeliverAHerdIssueQuest>().ToArray();
-        foreach (var quest in quests)
-            if (quest.IsOngoing && ownership.TryGetOwnerControllerId(quest.QuestGiver, out var owner) && owner == controllerId)
-                quest.CompleteQuestWithCancel(new TextObject("{=bYdhYidf}The quest was canceled because your clan leader, who made the original agreement, is no longer head of the clan.\""));
-    }
+    public void CancelForPlayerChange(string controllerId) => CancelOwnedIssues(controllerId, false);
 
-    public void CancelForPlayerRemoval(string controllerId)
+    public void CancelForPlayerRemoval(string controllerId) => CancelOwnedIssues(controllerId, true);
+
+    private void CancelOwnedIssues(string controllerId, bool removePlayer)
     {
         var issues = Campaign.Current.IssueManager.Issues.Values
             .OfType<HeadmanNeedsToDeliverAHerdIssueBehavior.HeadmanNeedsToDeliverAHerdIssue>()
-            .Where(issue => ownership.TryGetOwnerControllerId(issue.IssueOwner, out var owner) && owner == controllerId).ToArray();
-        if (issues.Length == 0 && !awaitingTroops.TryGet(controllerId, out _)) return;
+            .Where(issue => ownership.TryGetOwnerControllerId(issue.IssueOwner, out var owner) && owner == controllerId
+                && (removePlayer || issue.IssueQuest?.IsOngoing == true)).ToArray();
+        if (issues.Length == 0 && (!removePlayer || !awaitingTroops.TryGet(controllerId, out _))) return;
         Hero hero = null;
         MobileParty party = null;
         if (players.TryGetPlayer(controllerId, out var player))
@@ -93,7 +89,9 @@ internal sealed class HeadmanHerdQuestAuthority : IHeadmanHerdQuestAuthority
         using (hero != null && party != null ? new OwnerScope(hero, party) : null)
         using (new IssueFinalizeAuthorityGuard())
         {
-            var log = new TextObject("{=coop_herd_player_removed}The quest was canceled because its player left the campaign.");
+            var log = new TextObject(removePlayer
+                ? "{=coop_herd_player_removed}The quest was canceled because its player left the campaign."
+                : "{=bYdhYidf}The quest was canceled because your clan leader, who made the original agreement, is no longer head of the clan.\"");
             foreach (var issue in issues)
             {
                 var previousIssue = orphanedRemovalIssue;
@@ -114,7 +112,7 @@ internal sealed class HeadmanHerdQuestAuthority : IHeadmanHerdQuestAuthority
                     orphanedRemovalParty = previousParty;
                 }
             }
-            if (awaitingTroops.TryGet(controllerId, out var troops))
+            if (removePlayer && awaitingTroops.TryGet(controllerId, out var troops))
             {
                 // Release companions before the player's party and registration are removed.
                 if (hero != null && party != null)
