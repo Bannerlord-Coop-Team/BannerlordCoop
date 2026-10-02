@@ -201,6 +201,7 @@ internal class PartyScreenLogicPatches
                         __instance,
                         duplicateLeftMemberRoster,
                         duplicateLeftPrisonerRoster);
+                    if (selectingIssue != null) __instance._initialData.CopyFromScreenData(__instance.CurrentData);
                 }
                 finally
                 {
@@ -210,6 +211,32 @@ internal class PartyScreenLogicPatches
         }
         __result = flag;
         return false;
+    }
+
+    [HarmonyPatch(nameof(PartyScreenLogic.TransferTroop))]
+    [HarmonyPrefix]
+    private static void TransferTroopPrefix(PartyScreenLogic __instance, PartyScreenLogic.PartyCommand command, ref int __state)
+    {
+        __state = -1;
+        if (command.Type != PartyScreenLogic.TroopType.Member ||
+            command.RosterSide != PartyScreenLogic.PartyRosterSide.Right || command.TotalNumber <= 0 ||
+            !ContainerProvider.TryResolve<IAlternativeSolutionTroopSelection>(out var selection) ||
+            selection.FindIssue(__instance) == null) return;
+
+        __state = __instance.MemberRosters[1].GetTroopCount(command.Character);
+    }
+
+    [HarmonyPatch(nameof(PartyScreenLogic.TransferTroop))]
+    [HarmonyPostfix]
+    private static void TransferTroopPostfix(PartyScreenLogic __instance, PartyScreenLogic.PartyCommand command, int __state)
+    {
+        var roster = __instance.MemberRosters[1];
+        if (__state < 0 || roster.GetTroopCount(command.Character) != __state - command.TotalNumber) return;
+        int index = roster.FindIndexOfTroop(command.Character);
+        if (index < 0 || roster.GetElementXp(index) == 0) return;
+
+        // Cap the remaining stack before another transfer can reuse its excess XP.
+        using (new AllowedThread()) roster.SetElementXp(index, roster.GetElementXp(index));
     }
 
     internal static void RestoreLeftRostersAfterCommit(

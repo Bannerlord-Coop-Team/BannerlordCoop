@@ -40,7 +40,7 @@ internal sealed class AlternativeSolutionTroopSelection : IAlternativeSolutionTr
         using (new AllowedThread())
         {
             var sent = issue.AlternativeSolutionSentTroops;
-            MobileParty.MainParty.MemberRoster.Add(sent);
+            if (!ReferenceEquals(returnedSelection, issue)) MobileParty.MainParty.MemberRoster.Add(sent);
             sent.Clear();
             sent.Add(selected);
         }
@@ -59,7 +59,7 @@ internal sealed class AlternativeSolutionTroopSelection : IAlternativeSolutionTr
         bool hasOpenSelection = ReferenceEquals(FindIssue(logic), issue);
         using (new AllowedThread())
         {
-            if (hasOpenSelection && !ReferenceEquals(returnedSelection, issue)) logic.Reset(true);
+            if (hasOpenSelection) logic.Reset(true);
 
             var sent = issue.AlternativeSolutionSentTroops;
             if (ReferenceEquals(returnedSelection, issue)) returnedSelection = null;

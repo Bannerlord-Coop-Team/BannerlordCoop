@@ -457,13 +457,22 @@ public class CapturedByBountyHuntersIssueTests : IDisposable
     }
 
     [Theory]
-    [InlineData(false, false, false)]
-    [InlineData(true, false, false)]
-    [InlineData(false, true, false)]
-    [InlineData(true, true, false)]
-    [InlineData(false, true, true)]
-    [InlineData(true, true, true)]
-    public void PartyScreenDoneKeepsTroopsStagedUntilAlternativeAcceptance(bool decline, bool upgrade, bool deferredReceive)
+    [InlineData(false, false, false, false, false, false)]
+    [InlineData(true, false, false, false, false, false)]
+    [InlineData(false, true, false, false, false, false)]
+    [InlineData(true, true, false, false, false, false)]
+    [InlineData(false, true, true, false, false, false)]
+    [InlineData(true, true, true, false, false, false)]
+    [InlineData(false, false, false, true, false, false)]
+    [InlineData(true, false, false, true, false, false)]
+    [InlineData(false, true, true, true, false, false)]
+    [InlineData(true, true, true, true, false, false)]
+    [InlineData(false, true, false, false, true, false)]
+    [InlineData(true, true, false, false, true, false)]
+    [InlineData(false, false, false, true, false, true)]
+    [InlineData(true, false, false, true, false, true)]
+    public void PartyScreenDoneKeepsTroopsStagedUntilAlternativeAcceptance(
+        bool decline, bool upgrade, bool deferredReceive, bool repeatedDone, bool splitTransfer, bool editAfterDone)
     {
         var fixture = CreateIssue();
         var client = environment.Clients.First();
@@ -515,7 +524,7 @@ public class CapturedByBountyHuntersIssueTests : IDisposable
                     var authoritativeParty = environment.Server.GetRegisteredObject<MobileParty>(partyId);
                     var player = environment.Server.GetRegisteredObject<Hero>(playerId);
                     player.ChangeHeroGold(10000 - player.Gold);
-                    authoritativeParty.MemberRoster.AddXpToTroop(original, 23 * original.GetUpgradeXpCost(authoritativeParty.Party, 0));
+                    authoritativeParty.MemberRoster.AddXpToTroop(original, (splitTransfer ? 24 : 23) * original.GetUpgradeXpCost(authoritativeParty.Party, 0));
                     authoritativeParty.MemberRoster.AddToCounts(original, 0, false, 4);
                 });
                 environment.FlushCoalescer();
@@ -525,7 +534,7 @@ public class CapturedByBountyHuntersIssueTests : IDisposable
             var logic = OpenAlternativeSelection(party, sent, (_, _, _, _, _, _, _) =>
             {
                 closed++;
-                Assert.Equal(10, sent.TotalRegulars);
+                Assert.Equal(editAfterDone ? 12 : 10, sent.TotalRegulars);
                 if (decline) client.Resolve<IAlternativeSolutionTroopSelection>().Rollback(giver, closeScreen: false);
                 else giver.Issue.StartIssueWithAlternativeSolution();
             });
@@ -543,13 +552,27 @@ public class CapturedByBountyHuntersIssueTests : IDisposable
                     command.FillForTransferTroop(PartyScreenLogic.PartyRosterSide.Right, PartyScreenLogic.TroopType.Member, target, 5, 0, -1);
                     logic.TransferTroop(command, false);
                 }
-                command.FillForTransferTroop(PartyScreenLogic.PartyRosterSide.Right, PartyScreenLogic.TroopType.Member, troop, upgrade ? 5 : 10, 0, -1);
+                if (splitTransfer)
+                {
+                    command.FillForTransferTroop(PartyScreenLogic.PartyRosterSide.Right, PartyScreenLogic.TroopType.Member, troop, 2, 0, -1);
+                    logic.TransferTroop(command, false);
+                }
+                command.FillForTransferTroop(PartyScreenLogic.PartyRosterSide.Right, PartyScreenLogic.TroopType.Member, troop, upgrade ? (splitTransfer ? 3 : 5) : 10, 0, -1);
                 logic.TransferTroop(command, false);
             }
             if (deferredReceive) environment.Server.Resolve<TestNetworkRouter>().ReceiveContext = TestNetworkReceiveContext.PollerThread;
-            expectedSentXp = decline ? 0 : sent.GetElementXp(troop);
+            expectedSentXp = decline || !upgrade ? 0 : Math.Max(0, remainingXp - (15 * troop.GetUpgradeXpCost(party.Party, 0)));
             expectedPartyXp = remainingXp - expectedSentXp;
             if (upgrade) Assert.True(sent.GetElementXp(troop) > 0);
+            if (repeatedDone) Assert.True(logic.DoneLogic(true));
+            if (editAfterDone)
+            {
+                using (new AllowedThread())
+                {
+                    command.FillForTransferTroop(PartyScreenLogic.PartyRosterSide.Right, PartyScreenLogic.TroopType.Member, troop, 2, 0, -1);
+                    logic.TransferTroop(command, false);
+                }
+            }
             Helpers.PartyScreenHelper.CloseScreen(false);
             Assert.Equal(1, closed);
             Assert.Null(Game.Current.GameStateManager.ActiveState);
@@ -570,10 +593,10 @@ public class CapturedByBountyHuntersIssueTests : IDisposable
                 var target = instance.GetRegisteredObject<CharacterObject>(upgradedId);
                 var companion = instance.GetRegisteredObject<Hero>(companionId);
                 var giver = instance.GetRegisteredObject<Hero>(fixture.Giver);
-                Assert.Equal(decline ? (upgrade ? 20 : 25) : 15, party.MemberRoster.GetTroopCount(troop));
+                Assert.Equal(decline ? (upgrade ? 20 : 25) : (editAfterDone ? 13 : 15), party.MemberRoster.GetTroopCount(troop));
                 Assert.Equal(decline && upgrade ? 5 : 0, party.MemberRoster.GetTroopCount(target));
                 Assert.Equal(decline ? 1 : 0, party.MemberRoster.GetTroopCount(companion.CharacterObject));
-                Assert.Equal(decline ? 0 : 11, giver.Issue.AlternativeSolutionSentTroops.TotalManCount);
+                Assert.Equal(decline ? 0 : (editAfterDone ? 13 : 11), giver.Issue.AlternativeSolutionSentTroops.TotalManCount);
                 Assert.Equal(instance == environment.Server || instance == client ? expectedPartyXp : 0,
                     party.MemberRoster.GetElementXp(troop));
                 Assert.Equal(expectedSentXp, giver.Issue.AlternativeSolutionSentTroops.GetElementXp(troop));
