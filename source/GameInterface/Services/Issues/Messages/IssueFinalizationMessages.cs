@@ -1,4 +1,4 @@
-using Common.Messaging;
+﻿using Common.Messaging;
 using ProtoBuf;
 using TaleWorlds.CampaignSystem;
 
@@ -14,6 +14,7 @@ public enum IssueFinalizeReason : byte
     QuestBetrayal = 5,
     RejectedAccept = 6,
     AlternativeSolutionSuccess = 7,
+    AlternativeSolutionFail = 8,
 }
 
 public readonly struct IssueFinalizedTriggered : IEvent

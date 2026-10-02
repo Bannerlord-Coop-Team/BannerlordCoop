@@ -1,4 +1,4 @@
-using Common;
+﻿using Common;
 using Common.Logging;
 using Common.Messaging;
 using Common.Network;
@@ -267,7 +267,8 @@ internal class IssueFinalizationHandler : IHandler
             return false;
         }
 
-        if (reason == IssueFinalizeReason.RejectedAccept || reason == IssueFinalizeReason.AlternativeSolutionSuccess)
+        if (reason == IssueFinalizeReason.RejectedAccept || reason == IssueFinalizeReason.AlternativeSolutionSuccess ||
+            reason == IssueFinalizeReason.AlternativeSolutionFail)
         {
             Logger.Error("Rejecting {Message} claiming {Reason} for owner {Owner} - this reason can only originate server-side",
                 nameof(RequestIssueRemoved), reason, ownerId);

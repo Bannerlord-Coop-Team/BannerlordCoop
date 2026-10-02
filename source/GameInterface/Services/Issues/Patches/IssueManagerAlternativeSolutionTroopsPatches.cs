@@ -1,4 +1,4 @@
-using Common;
+﻿using Common;
 using Common.Logging;
 using Common.Messaging;
 using Common.Network;
@@ -27,7 +27,9 @@ internal class IssueManagerAlternativeSolutionTroopsPatches
 {
     private static readonly ILogger Logger = LogManager.GetLogger<IssueManagerAlternativeSolutionTroopsPatches>();
 
-    private static bool _inquiryInFlight;
+    private static InquiryData activeInquiry;
+
+    internal static void ResetReturnInquiry() => activeInquiry = null;
 
     [HarmonyPatch(typeof(IssueManager), nameof(IssueManager.TryToMakeTroopsReturn))]
     [HarmonyPrefix]
@@ -92,7 +94,7 @@ internal class IssueManagerAlternativeSolutionTroopsPatches
     internal static void TryCheckIfTroopsCanReturnToMainParty()
     {
         if (!IsLocalMainHeroSafelyAvailable() || MobileParty.MainParty == null) return;
-        if (_inquiryInFlight) return;
+        if (activeInquiry != null) return;
 
         if (!ContainerProvider.TryResolve<IControllerIdProvider>(out var controllerIdProvider)) return;
         var localControllerId = controllerIdProvider.ControllerId;
@@ -104,18 +106,16 @@ internal class IssueManagerAlternativeSolutionTroopsPatches
 
         TextObject textObject = BuildReturnedTroopsInquiryText(troops);
 
-        _inquiryInFlight = true;
-        InformationManager.ShowInquiry(new InquiryData(string.Empty, textObject.ToString(), isAffirmativeOptionShown: true,
+        InquiryData inquiry = null;
+        inquiry = new InquiryData(string.Empty, textObject.ToString(), isAffirmativeOptionShown: true,
             isNegativeOptionShown: false, GameTexts.FindText("str_ok").ToString(), null, delegate
             {
-                MakeAlternativeTroopsReturn(troops);
+                if (activeInquiry != inquiry) return;
+                activeInquiry = null;
                 MessageBroker.Instance.Publish(null, new AwaitingAlternativeSolutionTroopsDrainedLocally(localControllerId, troops));
-                if (ContainerProvider.TryResolve<IAwaitingAlternativeSolutionTroopsRegistry>(out var registryAtDrainTime))
-                {
-                    registryAtDrainTime.Withdraw(localControllerId, troops);
-                }
-                _inquiryInFlight = false;
-            }, null), pauseGameActiveState: true);
+            }, null);
+        activeInquiry = inquiry;
+        InformationManager.ShowInquiry(inquiry, pauseGameActiveState: true);
     }
 
     private static bool IsLocalMainHeroSafelyAvailable() => Game.Current?.PlayerTroop != null;
@@ -147,16 +147,4 @@ internal class IssueManagerAlternativeSolutionTroopsPatches
         return textObject;
     }
 
-    private static void MakeAlternativeTroopsReturn(TroopRoster roster)
-    {
-        foreach (TroopRosterElement item in roster.GetTroopRoster())
-        {
-            if (item.Character.IsHero)
-            {
-                item.Character.HeroObject.ChangeState(Hero.CharacterStates.Active);
-            }
-        }
-
-        MobileParty.MainParty.MemberRoster.Add(roster);
-    }
 }

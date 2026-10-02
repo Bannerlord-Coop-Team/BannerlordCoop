@@ -23,6 +23,7 @@ public class GameInterface : IGameInterface
     public const string HARMONY_CONFIGURED_MINOR_FACTION_CATEGORY = "ConfiguredMinorFactionPatches";
 
     public const string HARMONY_GAME_STARTED_CATEGORY = "GameStartedPatches";
+    public const string HARMONY_ISSUE_CONSEQUENCES_CATEGORY = "IssueConsequencePatches";
 
     private const string PatchingFailedEarlierMessage =
         "Patching failed earlier in this session. Restart Bannerlord before joining or hosting again.";
@@ -103,6 +104,8 @@ public class GameInterface : IGameInterface
         }
 
         AutoSyncPatcher.PatchAll();
+        // Compile quest consequences after the setters that synchronize their side effects.
+        harmony.PatchCategory(assembly, HARMONY_ISSUE_CONSEQUENCES_CATEGORY);
     }
 
     public void PatchGameStarted()

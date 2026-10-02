@@ -1,4 +1,4 @@
-using Common;
+﻿using Common;
 using Common.Logging;
 using Common.Messaging;
 using Common.Network;
@@ -232,6 +232,8 @@ internal class GenericQuestTypeAcceptHandler : IHandler
             if (!objectManager.TryGetObjectWithLogging<Hero>(data.OwnerId, out var owner)) return;
 
             var descriptor = QuestTypeRegistry.Get(owner.Issue);
+            ownershipRegistry.TryGetOwnerControllerId(owner, out var previousOwner);
+            ownershipRegistry.SetOwner(owner, data.OwnerControllerId);
             try
             {
                 if (descriptor?.MirrorQuestSolutionAcceptBytes != null)
@@ -245,12 +247,13 @@ internal class GenericQuestTypeAcceptHandler : IHandler
             }
             catch (Exception e)
             {
+                ownershipRegistry.Clear(owner);
+                if (previousOwner != null) ownershipRegistry.SetOwner(owner, previousOwner);
                 Logger.Error(e, "Failed to mirror {Message} for owner {Owner} - malformed or version-mismatched payload",
                     nameof(NetworkQuestTypeQuestAccepted), data.OwnerId);
                 return;
             }
 
-            ownershipRegistry.SetOwner(owner, data.OwnerControllerId);
         });
     }
 
@@ -426,20 +429,26 @@ internal class GenericQuestTypeAcceptHandler : IHandler
             if (!objectManager.TryGetObjectWithLogging<Hero>(data.OwnerId, out var owner) || owner.Issue == null) return;
 
             var descriptor = QuestTypeRegistry.Get(owner.Issue);
+            ownershipRegistry.TryGetOwnerControllerId(owner, out var previousOwner);
+            ownershipRegistry.SetOwner(owner, data.OwnerControllerId);
             try
             {
+                descriptor?.PrepareAlternativeAcceptMirror(owner);
                 ApplyReceivedTroops(owner, data.SentTroops);
-                MirrorAlternativeAccepted(owner, data.State);
-                descriptor?.MirrorAlternativeAcceptBytes?.Invoke(owner, data.FieldsBytes);
+                if (descriptor?.MirrorAlternativeAcceptBytes != null)
+                    descriptor.MirrorAlternativeAcceptBytes(owner, data.FieldsBytes);
+                else
+                    MirrorAlternativeAccepted(owner, data.State);
             }
             catch (Exception e)
             {
+                ownershipRegistry.Clear(owner);
+                if (previousOwner != null) ownershipRegistry.SetOwner(owner, previousOwner);
                 Logger.Error(e, "Failed to mirror {Message} for owner {Owner} - malformed or version-mismatched payload",
                     nameof(NetworkQuestTypeAlternativeAccepted), data.OwnerId);
                 return;
             }
 
-            ownershipRegistry.SetOwner(owner, data.OwnerControllerId);
         });
     }
 

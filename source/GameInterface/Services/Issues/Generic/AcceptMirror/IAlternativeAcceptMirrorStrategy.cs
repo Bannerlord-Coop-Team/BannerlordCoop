@@ -1,4 +1,4 @@
-using HarmonyLib;
+﻿using HarmonyLib;
 using ProtoBuf;
 using System.Reflection;
 using TaleWorlds.CampaignSystem;
@@ -18,6 +18,11 @@ public interface IAlternativeAcceptMirrorStrategy<TPayload>
     void MirrorAlternativeAccepted(Hero owner, TPayload payload);
 
     void RejectAcceptance(Hero owner);
+}
+
+public interface IAlternativeAcceptPreparation
+{
+    void PrepareForMirror(Hero owner);
 }
 
 [ProtoContract(SkipConstructor = true)]
@@ -64,6 +69,7 @@ internal static class AlternativeSolutionVanillaStateSync
 
     public static void Apply(IssueBase issue, AlternativeSolutionVanillaState state)
     {
+        issue.AlternativeSolutionHero.HeroState = Hero.CharacterStates.Disabled;
         issue.AlternativeSolutionReturnTimeForTroops = state.ReturnTime;
         issue.IssueDueTime = state.ReturnTime;
         issue.AlternativeSolutionIssueEffectClearTime = state.EffectClearTime;

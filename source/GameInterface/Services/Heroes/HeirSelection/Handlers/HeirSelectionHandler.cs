@@ -11,6 +11,7 @@ using GameInterface.Services.GameState.Messages;
 using GameInterface.Services.Heroes.Extensions;
 using GameInterface.Services.Heroes.HeirSelection.Interfaces;
 using GameInterface.Services.Heroes.HeirSelection.Messages;
+using GameInterface.Services.Issues.Interfaces;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.PlayerCaptivityService.Messages;
 using GameInterface.Services.Players;
@@ -46,6 +47,7 @@ internal class HeirSelectionHandler : IHandler
     private readonly ICoopSessionMigrator coopSessionMigrator;
     private readonly PlayerDeathCutsceneHandler cutscenesHandler;
     private readonly PlayerDeletionHandler playerDeletionHandler;
+    private readonly IArtisanOverpricedGoodsActions artisanActions;
     private readonly ISendCoalescer sendCoalescer;
     private readonly Dictionary<string, IMessage> sentSelections = new();
     private double lastCheckDays = -1;
@@ -65,6 +67,7 @@ internal class HeirSelectionHandler : IHandler
         ICoopSessionMigrator coopSessionMigrator,
         PlayerDeathCutsceneHandler cutscenesHandler,
         PlayerDeletionHandler playerDeletionHandler,
+        IArtisanOverpricedGoodsActions artisanActions,
         ISendCoalescer sendCoalescer = null)
     {
         this.messageBroker = messageBroker;
@@ -77,6 +80,7 @@ internal class HeirSelectionHandler : IHandler
         this.coopSessionMigrator = coopSessionMigrator;
         this.cutscenesHandler = cutscenesHandler;
         this.playerDeletionHandler = playerDeletionHandler;
+        this.artisanActions = artisanActions;
         this.sendCoalescer = sendCoalescer;
 
         messageBroker.Subscribe<CampaignTick>(Handle_CampaignTick);
@@ -383,6 +387,8 @@ internal class HeirSelectionHandler : IHandler
             Logger.Error($"Could not prepare heir {heirId} as the new player for controller {registeredPlayer.ControllerId}");
             return;
         }
+
+        artisanActions.CancelOwnedIssues(registeredPlayer, permanentRemoval: false);
 
         if (!playerManager.ReplacePlayer(registeredPlayer, replacementPlayer))
         {

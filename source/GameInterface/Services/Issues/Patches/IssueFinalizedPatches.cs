@@ -1,4 +1,4 @@
-using Common;
+﻿using Common;
 using Common.Messaging;
 using GameInterface.Policies;
 using GameInterface.Services.Issues.Generic;
@@ -22,6 +22,7 @@ internal class IssueManagerQuestCompletedReasonCapture
     private static void Prefix(QuestBase quest, QuestBase.QuestCompleteDetails detail)
     {
         if (quest?.QuestGiver == null) return;
+        if (quest.QuestGiver.Issue?.IssueQuest != quest) return;
         if (!DisableAllIssueBehaviorsExceptAllowlist.IsAllowlisted(quest.QuestGiver.Issue)) return;
 
         PendingReasons[quest.QuestGiver] = detail switch
