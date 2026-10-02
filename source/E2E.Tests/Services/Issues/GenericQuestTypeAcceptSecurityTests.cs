@@ -1,4 +1,5 @@
-using Common.Util;
+﻿using Common.Util;
+using Common.Network;
 using E2E.Tests.Environment;
 using E2E.Tests.Environment.Instance;
 using GameInterface.Services.Entity;
@@ -8,6 +9,7 @@ using GameInterface.Services.Issues.Messages;
 using GameInterface.Services.Players;
 using GameInterface.Services.Players.Data;
 using HarmonyLib;
+using Moq;
 using System;
 using System.Linq;
 using TaleWorlds.CampaignSystem;
@@ -40,6 +42,58 @@ public class GenericQuestTypeAcceptSecurityTests : IDisposable
     public void Dispose()
     {
         TestEnvironment.Dispose();
+    }
+
+    [Fact]
+    public void RemovingAnArtisanOfferResumesOnlyItsPendingDialogBeforeLateRejection()
+    {
+        var ownerId = TestEnvironment.CreateRegisteredObject<Hero>();
+        var otherId = TestEnvironment.CreateRegisteredObject<Hero>();
+        var settlementId = TestEnvironment.CreateRegisteredObject<Settlement>();
+        var itemId = TestEnvironment.CreateRegisteredObject<ItemObject>();
+        foreach (var client in TestEnvironment.Clients)
+            client.Call(() =>
+            {
+                Assert.True(client.ObjectManager.TryGetObject<Hero>(ownerId, out var owner));
+                Assert.True(client.ObjectManager.TryGetObject<Hero>(otherId, out var other));
+                Assert.True(client.ObjectManager.TryGetObject<Settlement>(settlementId, out var settlement));
+                Assert.True(client.ObjectManager.TryGetObject<ItemObject>(itemId, out var item));
+                using (new AllowedThread())
+                {
+                    owner.StayingInSettlement = settlement;
+                    client.Resolve<IArtisanProductIssueCreation>().Apply(owner,
+                        new ArtisanProductIssueFields(settlement, other, item, other, CampaignTime.Never,
+                            "pending_artisan_offer", Campaign.Current.IssueManager._nextIssueUniqueIndex + 1));
+                }
+                Assert.IsType<ArtisanCantSellProductsAtAFairPriceIssueBehavior.ArtisanCantSellProductsAtAFairPriceIssue>(owner.Issue);
+
+                var conversation = Campaign.Current.ConversationManager;
+                var speaker = new Mock<IAgent>();
+                speaker.SetupGet(a => a.Character).Returns((client == Client ? owner : other).CharacterObject);
+                conversation._conversationAgents.Clear();
+                conversation._conversationAgents.Add(speaker.Object);
+                conversation.IsConversationInProgress = true;
+                conversation._isActive = false;
+                conversation._executeDoOptionContinue = false;
+                conversation.ActiveToken = conversation.GetStateIndex("issue_classic_quest_start");
+                if (client == Client) conversation.DoOptionContinue();
+                Assert.False(conversation._executeDoOptionContinue);
+            });
+
+        Server.Call(() => Server.Resolve<INetwork>().SendAll(new NetworkIssueRemoved(ownerId, IssueFinalizeReason.IssueOnly)));
+        Server.Call(() => Server.Resolve<INetwork>().SendAll(new NetworkQuestTypeAcceptRejected(ownerId, isAlternative: false)));
+
+        foreach (var client in TestEnvironment.Clients)
+            client.Call(() =>
+            {
+                Assert.True(client.ObjectManager.TryGetObject<Hero>(ownerId, out var owner));
+                Assert.Null(owner.Issue);
+                Assert.False(Campaign.Current.IssueManager.Issues.ContainsKey(owner));
+                var conversation = Campaign.Current.ConversationManager;
+                Assert.Equal(conversation.GetStateIndex(client == Client
+                    ? "issue_offer_hero_response_reject" : "issue_classic_quest_start"), conversation.ActiveToken);
+                Assert.Equal(client == Client, conversation._executeDoOptionContinue);
+            });
     }
 
     private record VillageFixture(string HeroId, string VillageId, string SettlementId, string ItemId, string CompanionHeroId);

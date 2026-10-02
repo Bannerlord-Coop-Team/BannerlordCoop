@@ -157,7 +157,7 @@ internal sealed class ArtisanProductQuestAcceptance : IArtisanProductQuestAccept
         ResumeAcceptanceDialog(owner, accepted: false);
     }
 
-    private static void ResumeAcceptanceDialog(Hero owner, bool accepted)
+    internal static void ResumeAcceptanceDialog(Hero owner, bool accepted)
     {
         var conversation = Campaign.Current.ConversationManager;
         if (!conversation.IsConversationInProgress || Hero.OneToOneConversationHero != owner ||
