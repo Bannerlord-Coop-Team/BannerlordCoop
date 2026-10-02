@@ -11,6 +11,7 @@ using System.Linq;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Actions;
 using TaleWorlds.CampaignSystem.CampaignBehaviors;
+using TaleWorlds.CampaignSystem.Conversation;
 using TaleWorlds.CampaignSystem.Issues;
 using TaleWorlds.CampaignSystem.LogEntries;
 using TaleWorlds.CampaignSystem.ViewModelCollection.Quests;
@@ -18,6 +19,16 @@ using TaleWorlds.CampaignSystem.ViewModelCollection.Quests;
 namespace GameInterface.Services.Issues.Patches;
 
 using Quest = ArtisanCantSellProductsAtAFairPriceIssueBehavior.ArtisanCantSellProductsAtAFairPriceIssueQuest;
+
+[HarmonyPatch(typeof(ConversationManager), nameof(ConversationManager.DoOptionContinue))]
+internal sealed class ArtisanProductAcceptanceDialogPatch
+{
+    [HarmonyPrefix]
+    private static bool WaitForAcceptance(ConversationManager __instance)
+        => ModInformation.IsServer ||
+            Hero.OneToOneConversationHero?.Issue is not ArtisanCantSellProductsAtAFairPriceIssueBehavior.ArtisanCantSellProductsAtAFairPriceIssue issue ||
+            !issue.IsOngoingWithoutQuest || __instance.ActiveToken != __instance.GetStateIndex("issue_classic_quest_start");
+}
 
 [HarmonyPatch(typeof(Quest))]
 internal sealed class ArtisanProductQuestPresentationPatches

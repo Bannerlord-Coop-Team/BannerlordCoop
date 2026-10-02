@@ -17,7 +17,9 @@ internal sealed class ArtisanProductJournalPatches
         if (ModInformation.IsServer && IssueFinalizeAuthorityGuard.IsActive &&
             __instance is ArtisanCantSellProductsAtAFairPriceIssueBehavior.ArtisanCantSellProductsAtAFairPriceIssue issue &&
             issue.IssueOwner?.Issue == issue)
-            MessageBroker.Instance.Publish(issue, new ArtisanProductJournalChanged(issue));
+            // Vanilla reports decree success after IssueFinalized, too late for the removal snapshot.
+            MessageBroker.Instance.Publish(issue, new ArtisanProductJournalChanged(issue,
+                ArtisanProductLordActionPatches.CompletingDecree == issue ? IssueBase.IssueUpdateDetails.IssueFinishedWithSuccess : null));
     }
 
     [HarmonyPatch(typeof(IssueManager), nameof(IssueManager.DailyTick))]

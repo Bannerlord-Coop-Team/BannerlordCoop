@@ -97,6 +97,7 @@ internal sealed class ArtisanProductQuestAcceptance : IArtisanProductQuestAccept
             issue.IsTriedToSolveBefore = true;
             // Starting a received mirror must not grant goods or end an observer's conversation.
             quest._questState = QuestBase.QuestStates.Ongoing;
+            ownership.SetOwner(owner, fields.ControllerId);
             Campaign.Current.QuestManager.OnQuestStarted(quest);
             var taskName = new TextObject("{=L700FNht}Delivered {RAW_MATERIAL}");
             taskName.SetTextVariable("RAW_MATERIAL", issue._rawMaterialsToBeDelivered.Name);
@@ -112,6 +113,7 @@ internal sealed class ArtisanProductQuestAcceptance : IArtisanProductQuestAccept
                 quest.AddTrackedObject(issue._targetHero);
                 Campaign.Current.ConversationManager.AddDialogFlow(quest.GetCounterOfferDialogFlow(), quest);
                 Campaign.Current.ConversationManager.AddDialogFlow(quest.GetDeliveryDialogFlow(), quest);
+                ResumeAcceptanceDialog(owner, accepted: true);
             }
             else
             {
@@ -152,6 +154,17 @@ internal sealed class ArtisanProductQuestAcceptance : IArtisanProductQuestAccept
     public void RejectAcceptance(Hero owner)
     {
         // Selection was restored after sending; a rejection must not return another owner's accepted troops.
+        ResumeAcceptanceDialog(owner, accepted: false);
+    }
+
+    private static void ResumeAcceptanceDialog(Hero owner, bool accepted)
+    {
+        var conversation = Campaign.Current.ConversationManager;
+        if (!conversation.IsConversationInProgress || Hero.OneToOneConversationHero != owner ||
+            conversation.ActiveToken != conversation.GetStateIndex("issue_classic_quest_start")) return;
+        if (!accepted) conversation.ActiveToken = conversation.GetStateIndex("issue_offer_hero_response_reject");
+        if (conversation.IsConversationFlowActive) conversation.DoOptionContinue();
+        else conversation._executeDoOptionContinue = true;
     }
 
     private bool TryGetController(out string controllerId)

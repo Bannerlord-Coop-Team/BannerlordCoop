@@ -57,7 +57,7 @@ internal sealed class ArtisanProductJournalHandler : IHandler
             quest == null ? Array.Empty<ArtisanProductLogEntry>() : journal.Pack(quest.JournalEntries),
             quest == null ? -1 : quest._journalEntries.IndexOf(quest._playerStartsQuestLog),
             quest?._deliveredRawGoods ?? 0, quest?._counterOfferRefused ?? false,
-            history?._lastIssueStatus ?? IssueBase.IssueUpdateDetails.None,
+            payload.What.FinalStatus ?? history?._lastIssueStatus ?? IssueBase.IssueUpdateDetails.None,
             history?._questCompletionDetail ?? QuestBase.QuestCompleteDetails.Invalid,
             quest?._counterOfferGiven ?? false, issue._areIssueEffectsResolved));
     }

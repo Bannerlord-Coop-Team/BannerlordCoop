@@ -3,6 +3,7 @@ using Common.Messaging;
 using GameInterface.Services.Issues.Generic;
 using GameInterface.Services.Issues.Messages;
 using HarmonyLib;
+using System;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.CampaignBehaviors;
 using TaleWorlds.CampaignSystem.Issues;
@@ -14,6 +15,9 @@ using Issue = ArtisanCantSellProductsAtAFairPriceIssueBehavior.ArtisanCantSellPr
 [HarmonyPatch(typeof(IssueBase))]
 internal sealed class ArtisanProductLordActionPatches
 {
+    [ThreadStatic]
+    internal static IssueBase CompletingDecree;
+
     [HarmonyPatch(nameof(IssueBase.StartIssueWithLordSolution))]
     [HarmonyPrefix]
     private static bool Start(IssueBase __instance) => Request(__instance, ArtisanProductLordAction.Start);
@@ -24,7 +28,16 @@ internal sealed class ArtisanProductLordActionPatches
 
     [HarmonyPatch(nameof(IssueBase.CompleteIssueWithLordSolutionWithRefuseCounterOffer))]
     [HarmonyPrefix]
-    private static bool RefuseOffer(IssueBase __instance) => Request(__instance, ArtisanProductLordAction.RefuseMerchantOffer);
+    private static bool RefuseOffer(IssueBase __instance, out IssueBase __state)
+    {
+        __state = CompletingDecree;
+        if (ModInformation.IsServer && __instance is Issue) CompletingDecree = __instance;
+        return Request(__instance, ArtisanProductLordAction.RefuseMerchantOffer);
+    }
+
+    [HarmonyPatch(nameof(IssueBase.CompleteIssueWithLordSolutionWithRefuseCounterOffer))]
+    [HarmonyFinalizer]
+    private static void RefuseOfferFinished(IssueBase __state) => CompletingDecree = __state;
 
     [HarmonyPatch("BeforeGameMenuOpened")]
     [HarmonyPrefix]

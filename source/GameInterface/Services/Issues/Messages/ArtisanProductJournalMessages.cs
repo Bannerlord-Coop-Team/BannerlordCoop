@@ -8,9 +8,14 @@ namespace GameInterface.Services.Issues.Messages;
 public readonly struct ArtisanProductJournalChanged : IEvent
 {
     public readonly ArtisanCantSellProductsAtAFairPriceIssueBehavior.ArtisanCantSellProductsAtAFairPriceIssue Issue;
+    public readonly IssueBase.IssueUpdateDetails? FinalStatus;
 
-    public ArtisanProductJournalChanged(ArtisanCantSellProductsAtAFairPriceIssueBehavior.ArtisanCantSellProductsAtAFairPriceIssue issue)
-        => Issue = issue;
+    public ArtisanProductJournalChanged(ArtisanCantSellProductsAtAFairPriceIssueBehavior.ArtisanCantSellProductsAtAFairPriceIssue issue,
+        IssueBase.IssueUpdateDetails? finalStatus = null)
+    {
+        Issue = issue;
+        FinalStatus = finalStatus;
+    }
 }
 
 [ProtoContract(SkipConstructor = true)]
