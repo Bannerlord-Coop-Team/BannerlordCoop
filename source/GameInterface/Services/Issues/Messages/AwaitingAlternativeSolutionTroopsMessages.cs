@@ -1,4 +1,4 @@
-using Common.Messaging;
+﻿using Common.Messaging;
 using GameInterface.Services.TroopRosters.Data;
 using ProtoBuf;
 using TaleWorlds.CampaignSystem;
@@ -56,6 +56,21 @@ public readonly struct RequestAwaitingAlternativeSolutionTroopsDrain : ICommand
     public RequestAwaitingAlternativeSolutionTroopsDrain(TroopRosterData troops)
     {
         Troops = troops;
+    }
+}
+
+[ProtoContract(SkipConstructor = true)]
+public readonly struct NetworkAwaitingAlternativeSolutionTroopsDrainResult : IServerToClientCommand
+{
+    [ProtoMember(1)]
+    public readonly TroopRosterData RemainingTroops;
+    [ProtoMember(2)]
+    public readonly string OwnerControllerId;
+
+    public NetworkAwaitingAlternativeSolutionTroopsDrainResult(string ownerControllerId, TroopRosterData remainingTroops)
+    {
+        OwnerControllerId = ownerControllerId;
+        RemainingTroops = remainingTroops;
     }
 }
 

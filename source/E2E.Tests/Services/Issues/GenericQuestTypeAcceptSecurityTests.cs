@@ -1,13 +1,16 @@
-using Common.Util;
+﻿using Common.Util;
 using E2E.Tests.Environment;
 using E2E.Tests.Environment.Instance;
 using GameInterface.Services.Entity;
 using GameInterface.Services.Issues.Generic;
+using GameInterface.Services.Issues.Generic.AcceptMirror;
 using GameInterface.Services.Issues.Interfaces;
 using GameInterface.Services.Issues.Messages;
 using GameInterface.Services.Players;
 using GameInterface.Services.Players.Data;
+using GameInterface.Services.TroopRosters.Interfaces;
 using HarmonyLib;
+using Moq;
 using System;
 using System.Linq;
 using TaleWorlds.CampaignSystem;
@@ -198,6 +201,68 @@ public class GenericQuestTypeAcceptSecurityTests : IDisposable
             Assert.True(Server.ObjectManager.TryGetId(owner, out var ownerId));
             Assert.Equal(ownerId, rejection.OwnerId);
             Assert.False(Server.Resolve<IIssueOwnershipRegistry>().TryGetOwnerControllerId(owner, out _));
+        });
+    }
+
+    [Theory]
+    [InlineData(false, false, null)]
+    [InlineData(true, false, null)]
+    [InlineData(false, true, null)]
+    [InlineData(true, true, null)]
+    [InlineData(false, true, "previous-owner")]
+    [InlineData(true, true, "previous-owner")]
+    public void AcceptedMirror_SeesTheAcceptedOwnerAndRestoresPriorOwnershipIfItFails(
+        bool alternative, bool fail, string previousOwner)
+    {
+        var fixture = SetupVillageOwner();
+        CreateIssueOnBothPeers(fixture);
+        Client.Call(() =>
+        {
+            Assert.True(Client.ObjectManager.TryGetObject<Hero>(fixture.HeroId, out var giver));
+            Assert.True(Client.ObjectManager.TryGetObject<Hero>(fixture.CompanionHeroId, out var companion));
+            var ownership = Client.Resolve<IIssueOwnershipRegistry>();
+            if (previousOwner != null) ownership.SetOwner(giver, previousOwner);
+            string ownerSeenByMirror = null;
+            void ApplyMirror(Hero owner, int fields)
+            {
+                ownership.TryGetOwnerControllerId(owner, out ownerSeenByMirror);
+                if (fail) throw new InvalidOperationException("test mirror failure");
+            }
+
+            var direct = new Mock<IRaceArbitratedAcceptMirrorStrategy<int>>();
+            direct.Setup(strategy => strategy.MirrorQuestAccepted(giver, 42)).Callback<Hero, int>(ApplyMirror);
+            var companionStrategy = new Mock<IAlternativeAcceptMirrorStrategy<int>>();
+            companionStrategy.Setup(strategy => strategy.MirrorAlternativeAccepted(giver, 42)).Callback<Hero, int>(ApplyMirror);
+            var previousDescriptor = QuestTypeRegistry.Get(TestIssueType);
+            var descriptor = QuestDescriptorBuilder
+                .For<VillageNeedsToolsIssueBehavior.VillageNeedsToolsIssue, VillageNeedsToolsIssueBehavior.VillageNeedsToolsIssueQuest>("OwnershipTest")
+                .WithQuestSolutionAccept(direct.Object).WithAlternativeAccept(companionStrategy.Object).Build();
+            QuestTypeRegistry.Register(descriptor);
+            try
+            {
+                var fields = GenericAcceptFieldsSerializer.Serialize(42);
+                if (alternative)
+                {
+                    var troops = TroopRoster.CreateDummyTroopRoster();
+                    troops.AddToCounts(companion.CharacterObject, 1);
+                    Client.SimulateMessage(Server.NetPeer, new NetworkQuestTypeAlternativeAccepted(
+                        fixture.HeroId, "accepted-owner", default, fields,
+                        Client.Resolve<ITroopRosterInterface>().PackTroopRosterData(troops)));
+                }
+                else
+                {
+                    Client.SimulateMessage(Server.NetPeer,
+                        new NetworkQuestTypeQuestAccepted(fixture.HeroId, "accepted-owner", fields));
+                }
+
+                Assert.Equal("accepted-owner", ownerSeenByMirror);
+                ownership.TryGetOwnerControllerId(giver, out var recordedOwner);
+                Assert.Equal(fail ? previousOwner : "accepted-owner", recordedOwner);
+            }
+            finally
+            {
+                QuestTypeRegistry.Register(previousDescriptor);
+            }
         });
     }
 

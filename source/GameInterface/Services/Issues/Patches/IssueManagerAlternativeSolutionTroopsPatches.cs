@@ -1,8 +1,9 @@
-using Common;
+﻿using Common;
 using Common.Logging;
 using Common.Messaging;
 using Common.Network;
 using GameInterface.Services.Entity;
+using GameInterface.Services.Heroes.Patches;
 using GameInterface.Services.Issues.Generic;
 using GameInterface.Services.Issues.Interfaces;
 using GameInterface.Services.Issues.Messages;
@@ -50,6 +51,23 @@ internal class IssueManagerAlternativeSolutionTroopsPatches
 
         if (!ContainerProvider.TryResolve<IAwaitingAlternativeSolutionTroopsRegistry>(out var troopsRegistry)) return false;
 
+        if (ModInformation.IsServer &&
+            ContainerProvider.TryResolve<IPlayerManager>(out var players) &&
+            players.TryGetPlayer(ownerControllerId, out var player) &&
+            ContainerProvider.TryResolve<IObjectManager>(out var objects) &&
+            objects.TryGetObjectWithLogging<Hero>(player.HeroId, out var hero) &&
+            objects.TryGetObjectWithLogging<MobileParty>(player.MobilePartyId, out var party))
+        {
+            using (new MainHeroSubstitutionScope(hero, party))
+            {
+                if (Campaign.Current.Models.IssueModel.CanTroopsReturnFromAlternativeSolution())
+                {
+                    Campaign.Current.IssueManager.MakeAlternativeTroopsReturn(troops);
+                    return false;
+                }
+            }
+        }
+
         troopsRegistry.Deposit(ownerControllerId, troops);
         MessageBroker.Instance.Publish(issue, new AwaitingAlternativeSolutionTroopsDepositedLocally(issue.IssueOwner, ownerControllerId, troops));
 
@@ -60,13 +78,7 @@ internal class IssueManagerAlternativeSolutionTroopsPatches
 
     private static void NotifyTrueOwnerOfConfirmedDeposit(Hero issueOwner, string ownerControllerId, TroopRoster troops)
     {
-        if (!ModInformation.IsServer) return;
-
-        if (ContainerProvider.TryResolve<IControllerIdProvider>(out var controllerIdProvider)
-            && controllerIdProvider.ControllerId == ownerControllerId)
-        {
-            return;
-        }
+        if (ModInformation.IsClient) return;
 
         if (!ContainerProvider.TryResolve<IPlayerManager>(out var playerManager)) return;
         if (!playerManager.TryGetPeer(ownerControllerId, out var peer)) return;
@@ -91,6 +103,7 @@ internal class IssueManagerAlternativeSolutionTroopsPatches
 
     internal static void TryCheckIfTroopsCanReturnToMainParty()
     {
+        if (ModInformation.IsServer) return;
         if (!IsLocalMainHeroSafelyAvailable() || MobileParty.MainParty == null) return;
         if (_inquiryInFlight) return;
 
@@ -108,13 +121,7 @@ internal class IssueManagerAlternativeSolutionTroopsPatches
         InformationManager.ShowInquiry(new InquiryData(string.Empty, textObject.ToString(), isAffirmativeOptionShown: true,
             isNegativeOptionShown: false, GameTexts.FindText("str_ok").ToString(), null, delegate
             {
-                MakeAlternativeTroopsReturn(troops);
                 MessageBroker.Instance.Publish(null, new AwaitingAlternativeSolutionTroopsDrainedLocally(localControllerId, troops));
-                if (ContainerProvider.TryResolve<IAwaitingAlternativeSolutionTroopsRegistry>(out var registryAtDrainTime))
-                {
-                    registryAtDrainTime.Withdraw(localControllerId, troops);
-                }
-                _inquiryInFlight = false;
             }, null), pauseGameActiveState: true);
     }
 
@@ -147,16 +154,5 @@ internal class IssueManagerAlternativeSolutionTroopsPatches
         return textObject;
     }
 
-    private static void MakeAlternativeTroopsReturn(TroopRoster roster)
-    {
-        foreach (TroopRosterElement item in roster.GetTroopRoster())
-        {
-            if (item.Character.IsHero)
-            {
-                item.Character.HeroObject.ChangeState(Hero.CharacterStates.Active);
-            }
-        }
-
-        MobileParty.MainParty.MemberRoster.Add(roster);
-    }
+    internal static void CompleteReturnInquiry() => _inquiryInFlight = false;
 }

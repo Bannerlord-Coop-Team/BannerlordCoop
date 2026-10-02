@@ -2,6 +2,7 @@
 using Common.Messaging;
 using Common.Util;
 using GameInterface.Services.Heroes;
+using GameInterface.Services.Issues.Interfaces;
 using GameInterface.Services.Party.Messages;
 using GameInterface.Services.Villages;
 using HarmonyLib;
@@ -73,6 +74,13 @@ internal class PartyScreenLogicPatches
     [HarmonyPrefix]
     public static bool DoneLogicPrefix(PartyScreenLogic __instance, ref bool __result, bool isForced)
     {
+        if (ContainerProvider.TryResolve<ILordNeedsHorsesQuest>(out var horses) &&
+            horses.TryCompleteTroopSelection(__instance, out var accepted))
+        {
+            __result = accepted;
+            return false;
+        }
+
         if (Hero.MainHero.Gold < -__instance.CurrentData.PartyGoldChangeAmount && __instance.CurrentData.PartyGoldChangeAmount < 0)
         {
             MBInformationManager.AddQuickInformation(GameTexts.FindText("str_inventory_popup_player_not_enough_gold", null), 0, null, null, "");
