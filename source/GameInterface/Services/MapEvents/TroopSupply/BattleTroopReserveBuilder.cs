@@ -74,6 +74,7 @@ public interface IBattleTroopReserveBuilder : IGameAbstraction
     /// <summary>Forget a controller's withdrawn parties: drop them from the ledger and the built-set so that,
     /// if it rejoins, its party is re-flattened fresh (supplied pointer reset) and re-spawns.</summary>
     void ForgetController(MapEvent mapEvent, string controllerId);
+    void ForgetParty(MapEvent mapEvent, MapEventParty party);
 
     /// <summary>Forget EVERY reserve of a battle (its whole ledger entry + flatten cache). Called when a battle
     /// ENDS — concluded (victory) or fully ABANDONED (host left with no successors) — so the server stops
@@ -234,18 +235,20 @@ public class BattleTroopReserveBuilder : IBattleTroopReserveBuilder
         if (mapEvent.IsHideoutBattle) return;
         if (!objectManager.TryGetId(mapEvent, out var mapEventId)) return;
 
+        foreach (var party in EnumerateParties(mapEvent))
+            if (IsPartyRegisteredToController(party, controllerId))
+                ForgetParty(mapEvent, party);
+    }
+
+    public void ForgetParty(MapEvent mapEvent, MapEventParty party)
+    {
+        if (mapEvent == null || mapEvent.IsHideoutBattle || party == null
+            || !objectManager.TryGetId(mapEvent, out var mapEventId)
+            || !objectManager.TryGetId(party, out var partyId)) return;
         lock (gate)
         {
-            foreach (var party in EnumerateParties(mapEvent))
-            {
-                if (!objectManager.TryGetId(party, out var partyId)) continue;
-                if (!IsPartyRegisteredToController(party, controllerId)) continue;
-
-                ledger.RemoveParty(mapEventId, partyId);
-                builtParties.Remove(partyId);
-                Logger.Information("[TroopSupply] Forgot party {PartyId} of retreating {Controller} (re-flattens fresh on rejoin)",
-                    partyId, controllerId);
-            }
+            ledger.RemoveParty(mapEventId, partyId);
+            builtParties.Remove(partyId);
         }
     }
 

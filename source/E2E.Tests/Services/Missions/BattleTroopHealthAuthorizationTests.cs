@@ -5,6 +5,7 @@ using E2E.Tests.Environment.Instance;
 using GameInterface.Services.MapEvents.TroopSupply;
 using GameInterface.Services.MapEvents.TroopSupply.Messages;
 using GameInterface.Services.Players;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using TaleWorlds.CampaignSystem;
@@ -135,6 +136,85 @@ public class BattleTroopHealthAuthorizationTests : MissionTestEnvironment
         SendHealth(successor, HealthReport(battleId, partyId, entries, routedHealth: 37f));
         SendHealth(owner, HealthReport(battleId, partyId, entries, routedHealth: null));
         AssertRebuiltHealth(battleId, partyId, entries, routedHealth: 37f);
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void ReturnedOwner_ReserveWaitsForCurrentHolderHealth(bool migrateHost)
+    {
+        var (battleId, partyId, entries) = PrepareBattle(ownerEntered: false, successor: true);
+        var host = Clients.First();
+        var owner = Clients.ElementAt(1);
+        var successor = Clients.ElementAt(2);
+        EnterBattle(successor, battleId);
+        EnterBattle(owner, battleId);
+        DepartBattle("owner", battleId);
+        EnterBattle(owner, battleId);
+        SendHealth(host, new NetworkBattleTroopHealth(battleId, partyId,
+            new Dictionary<int, float> { [entries[0].Seed] = 80f }, 2));
+        if (migrateHost) DepartBattle("host", battleId, wasRetreat: true);
+        var holder = migrateHost ? successor : host;
+        string holderId = migrateHost ? "successor" : "host";
+        SendHealth(owner, HealthReport(battleId, partyId, entries, routedHealth: null));
+        DepartBattle("owner", battleId, wasRetreat: true);
+        var request = Server.NetworkSentMessages.GetMessages<NetworkRequestBattleTroopHealth>().Last();
+        Assert.Contains(partyId, request.PartyIds);
+        Assert.NotEqual(Guid.Empty, request.SnapshotId);
+        var reserveCount = Server.NetworkSentMessages.GetMessageCount<NetworkBattleTroopReserve>();
+        EnterBattle(owner, battleId);
+        Assert.Equal(reserveCount, Server.NetworkSentMessages.GetMessageCount<NetworkBattleTroopReserve>());
+
+        NetworkBattleTroopHealth Reply(Guid id) => new NetworkBattleTroopHealth(battleId, partyId,
+            new Dictionary<int, float> { [entries[0].Seed] = 37f }, 0, snapshotId: id);
+        SendHealth(holder, Reply(Guid.NewGuid()));
+        SendHealth(owner, Reply(request.SnapshotId));
+        Server.Call(() => Server.Resolve<IPlayerManager>().SetPeer(holderId, NetPeerExtensions.CreatePeer()));
+        SendHealth(holder, Reply(request.SnapshotId));
+        Assert.Equal(reserveCount, Server.NetworkSentMessages.GetMessageCount<NetworkBattleTroopReserve>());
+        Server.Call(() => Server.Resolve<IPlayerManager>().SetPeer(holderId, holder.NetPeer));
+        SendHealth(holder, Reply(request.SnapshotId));
+        Assert.True(Server.NetworkSentMessages.GetMessageCount<NetworkBattleTroopReserve>() > reserveCount);
+        Server.Call(() =>
+        {
+            var mapEvent = Server.GetRegisteredObject<MapEvent>(battleId);
+            var current = Server.Resolve<IBattleTroopReserveBuilder>().GetOwnedReserves(mapEvent, "owner", false)
+                .SelectMany(side => side.Parties).Single(party => party.PartyId == partyId).Entries;
+            Assert.Equal(37f, current.Single(entry => entry.CharacterId == entries[0].CharacterId).Health);
+            Assert.Equal(64f, current.Single(entry => entry.CharacterId == entries[1].CharacterId).Health);
+        });
+
+        // A duplicate reply cannot overwrite the rebuilt reserve.
+        SendHealth(holder, new NetworkBattleTroopHealth(battleId, partyId,
+            new Dictionary<int, float> { [entries[0].Seed] = 1f }, 0, snapshotId: request.SnapshotId));
+        Server.Call(() =>
+        {
+            var mapEvent = Server.GetRegisteredObject<MapEvent>(battleId);
+            var current = Server.Resolve<IBattleTroopReserveBuilder>().GetOwnedReserves(mapEvent, "owner", false)
+                .SelectMany(side => side.Parties).Single(party => party.PartyId == partyId).Entries;
+            Assert.Equal(37f, current.Single(entry => entry.CharacterId == entries[0].CharacterId).Health);
+            Assert.Equal(64f, current.Single(entry => entry.CharacterId == entries[1].CharacterId).Health);
+        });
+    }
+
+    [Fact]
+    public void SplitReports_KeepOtherHolderSurvivorsButReplaceSameHolderSnapshot()
+    {
+        var (battleId, partyId, entries) = PrepareBattle();
+        var host = Clients.First();
+        var owner = Clients.ElementAt(1);
+        DepartBattle("owner", battleId);
+        EnterBattle(owner, battleId);
+        SendHealth(host, new NetworkBattleTroopHealth(battleId, partyId,
+            new Dictionary<int, float> { [entries[0].Seed] = 37f }, 2));
+        SendHealth(owner, HealthReport(battleId, partyId, entries, routedHealth: null));
+        Server.Call(() =>
+        {
+            // The host's next complete snapshot omits its casualty; it must not be unioned forever.
+            Server.Resolve<IMessageBroker>().Publish(host.NetPeer,
+                new NetworkBattleTroopHealth(battleId, partyId, new Dictionary<int, float>(), 2));
+        });
+        AssertRebuiltHealth(battleId, partyId, entries, routedHealth: null);
     }
 
     private (string BattleId, string PartyId, TroopReserveEntry[] Entries) PrepareBattle(

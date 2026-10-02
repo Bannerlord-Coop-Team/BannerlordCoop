@@ -11,6 +11,7 @@ using Missions.Services.Network;
 using Serilog;
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.MapEvents;
 using TaleWorlds.CampaignSystem.Party;
@@ -62,6 +63,7 @@ public class BattleAuthorityMigrator : IBattleAuthorityMigrator
     private readonly IMissionContext missionContext;
     private readonly IReinforcementFielder reinforcementFielder;
     private readonly Action<IReadOnlyCollection<Guid>> authorityChanged;
+    private readonly IBattleInstanceLifecycle lifecycle;
 
     // Hosts whose own party withdrew — read when the promotion lands so the adoption knows to leave those
     // troops to the despawn instead of adopting them. Only touched from broker handlers,
@@ -85,6 +87,7 @@ public class BattleAuthorityMigrator : IBattleAuthorityMigrator
         IAgentFormationAssigner formationAssigner,
         IMissionContext missionContext,
         IReinforcementFielder reinforcementFielder,
+        IBattleInstanceLifecycle lifecycle,
         Action<IReadOnlyCollection<Guid>> authorityChanged = null)
     {
         this.relayNetwork = relayNetwork;
@@ -99,6 +102,7 @@ public class BattleAuthorityMigrator : IBattleAuthorityMigrator
         this.missionContext = missionContext;
         this.reinforcementFielder = reinforcementFielder;
         this.authorityChanged = authorityChanged;
+        this.lifecycle = lifecycle;
 
         messageBroker.Subscribe<NetworkMissionPeerEntered>(Handle_PeerEntered);
         messageBroker.Subscribe<MissionPeerLeft>(Handle_PeerLeft);
@@ -382,6 +386,7 @@ public class BattleAuthorityMigrator : IBattleAuthorityMigrator
                 var agent = info.Agent;
                 if (agent == null || agent.IsMount || !IsOwnPartyAgent(agent, playerParty, playerHero)) continue;
 
+                lifecycle.RecordWithdrawnHealth(agent);
                 if (agent.IsActive())
                     agent.FadeOut(false, true);
                 registry.RemoveAgent(info.AgentId);
@@ -418,9 +423,10 @@ public class BattleAuthorityMigrator : IBattleAuthorityMigrator
 
         GameThread.RunSafe(() =>
         {
-            var troops = registry.GetAgents(controllerId);
+            var controllers = registry.GetControllerIds();
+            var troops = controllers.SelectMany(registry.GetAgents).ToArray();
 
-            if (troops.Count == 0) return;
+            if (troops.Length == 0) return;
             if (Mission.Current == null) return;
 
             if (!TryGetPlayerParty(controllerId, out var retreaterParty, out var retreaterHero))
@@ -444,6 +450,7 @@ public class BattleAuthorityMigrator : IBattleAuthorityMigrator
                     : info.OriginalOwner == controllerId;
                 if (!isRetreatersOwn) continue;
 
+                lifecycle.RecordWithdrawnHealth(agent);
                 if (agent.IsActive())
                     agent.FadeOut(false, true);
                 registry.RemoveAgent(info.AgentId);
@@ -452,9 +459,9 @@ public class BattleAuthorityMigrator : IBattleAuthorityMigrator
                 despawned++;
             }
 
-            // A non-host owns nothing but its own party, and nobody adopts a retreater — clear or re-key ALL
-            // its registered mounts so none stays routed to a controller that no longer answers.
-            CleanUpDepartedMounts(controllerId, despawnedRiders, allMounts: true);
+            // Include adopted riders' mounts, but keep the holder's other cavalry in the battle.
+            foreach (var holderId in controllers)
+                CleanUpDepartedMounts(holderId, despawnedRiders, allMounts: holderId == controllerId);
 
             if (despawned > 0)
                 Logger.Information("[BattleSync] Despawned {Count} withdrawn troop(s) of {Controller}", despawned, controllerId);

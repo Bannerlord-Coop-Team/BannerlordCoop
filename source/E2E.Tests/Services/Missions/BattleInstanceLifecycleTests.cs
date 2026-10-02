@@ -66,6 +66,46 @@ public class BattleInstanceLifecycleTests : MissionTestEnvironment
     }
 
     [Fact]
+    public void WithdrawnAdoptedSurvivor_IsIncludedInRequestedHolderSnapshot()
+    {
+        using var fixture = new MissionEngineFixture();
+        var (mapEventId, _) = SetupCoopBattle("A", "B");
+        var client = Clients.First();
+        client.Call(() =>
+        {
+            fixture.CreateMission(client);
+            var hosts = client.Resolve<IBattleHostRegistry>();
+            hosts.Set(mapEventId, new BattleHostAssignment("A", Array.Empty<string>(), 1));
+            var session = new BattleSession(client.Resolve<IControllerIdProvider>(), hosts);
+            Assert.True(session.TryBegin(mapEventId));
+            var registry = client.Resolve<INetworkAgentRegistry>();
+            var component = new Mock<ICoopMissionComponent>();
+            component.SetupGet(value => value.AgentRegistry).Returns(registry);
+            var broker = client.Resolve<IMessageBroker>();
+            using var lifecycle = new BattleInstanceLifecycle(client.Resolve<IBattleNetwork>(), client.Resolve<INetwork>(),
+                broker, client.ObjectManager, component.Object, new RecordingWorldItemRegistry(), session,
+                client.Resolve<IMissionContext>());
+            var character = (CharacterObject)Game.Current.PlayerTroop;
+            var origin = new CoopAgentOrigin(character, null, 0, null, new UniqueTroopDescriptor(77), "withdrawn-party");
+            var agent = Mission.Current.SpawnAgent(new AgentBuildData(character)
+                .Controller(AgentControllerType.AI).TroopOrigin(origin));
+            agent.Health = 37f;
+            var agentId = Guid.NewGuid();
+            Assert.True(registry.TryRegisterAgent("B", agentId, agent));
+            Assert.True(registry.TryTransferAuthority("A", agentId));
+            lifecycle.RecordWithdrawnHealth(agent);
+            registry.RemoveAgent(agentId);
+            var snapshotId = Guid.NewGuid();
+            broker.Publish(this, new NetworkRequestBattleTroopHealth(mapEventId, new[] { "withdrawn-party" }, snapshotId));
+            var report = ProtoBuf.Serializer.DeepClone(client.NetworkSentMessages
+                .GetMessages<NetworkBattleTroopHealth>().Single());
+            Assert.Equal(snapshotId, report.SnapshotId);
+            Assert.Equal(37f, report.Survivors[77]);
+            Assert.Equal(37f, report.RoutedSurvivors[77]);
+        });
+    }
+
+    [Fact]
     [Trait("Requirement", "BR-054")]
     public void Leave_ClearsLocalMissionMembershipBeforeReentry()
     {

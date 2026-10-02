@@ -1,5 +1,6 @@
 ﻿using Common.Messaging;
 using ProtoBuf;
+using System;
 using System.Collections.Generic;
 
 namespace GameInterface.Services.MapEvents.TroopSupply.Messages;
@@ -19,12 +20,16 @@ public class NetworkBattleTroopHealth : IEvent
     [ProtoMember(5)]
     public Dictionary<int, float> RoutedSurvivors { get; }
 
-    public NetworkBattleTroopHealth(string mapEventId, string partyId, Dictionary<int, float> survivors, int suppliedCount, Dictionary<int, float> routedSurvivors = null)
+    [ProtoMember(6)]
+    public Guid SnapshotId { get; }
+
+    public NetworkBattleTroopHealth(string mapEventId, string partyId, Dictionary<int, float> survivors, int suppliedCount, Dictionary<int, float> routedSurvivors = null, Guid snapshotId = default)
     {
         MapEventId = mapEventId;
         PartyId = partyId;
         Survivors = survivors;
         SuppliedCount = suppliedCount;
         RoutedSurvivors = routedSurvivors;
+        SnapshotId = snapshotId;
     }
 }

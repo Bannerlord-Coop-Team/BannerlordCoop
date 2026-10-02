@@ -1,4 +1,5 @@
-﻿using Common.Logging;
+﻿using Common;
+using Common.Logging;
 using Common.Messaging;
 using Common.Network;
 using GameInterface.Services.MapEvents;
@@ -34,6 +35,9 @@ public interface IBattleInstanceLifecycle : IDisposable
 
     /// <summary>Retain an owned routed survivor before it leaves the agent registry.</summary>
     void RecordRoutedHealth(Agent agent);
+
+    /// <summary>Retain an owned survivor before another player's party is withdrawn.</summary>
+    void RecordWithdrawnHealth(Agent agent);
 }
 
 /// <inheritdoc cref="IBattleInstanceLifecycle"/>
@@ -74,12 +78,14 @@ public class BattleInstanceLifecycle : IBattleInstanceLifecycle
 
         messageBroker.Subscribe<PlayerEnteredBattle>(Handle_PlayerEnteredBattle);
         messageBroker.Subscribe<NetworkMissionLeft>(Handle_LeaveMission);
+        messageBroker.Subscribe<NetworkRequestBattleTroopHealth>(Handle_HealthRequest);
     }
 
     public void Dispose()
     {
         messageBroker.Unsubscribe<PlayerEnteredBattle>(Handle_PlayerEnteredBattle);
         messageBroker.Unsubscribe<NetworkMissionLeft>(Handle_LeaveMission);
+        messageBroker.Unsubscribe<NetworkRequestBattleTroopHealth>(Handle_HealthRequest);
     }
 
     // The battle mission was opened locally and the controller attached by BattleMissionEntryPatch before the
@@ -156,6 +162,39 @@ public class BattleInstanceLifecycle : IBattleInstanceLifecycle
         if (!routedByParty.TryGetValue(origin.MapEventPartyId, out var routed))
             routedByParty[origin.MapEventPartyId] = routed = new Dictionary<int, float>();
         routed[origin.UniqueSeed] = agent.Health;
+    }
+
+    public void RecordWithdrawnHealth(Agent agent)
+    {
+        if (coopMissionComponent.AgentRegistry.TryGetAgentInfo(agent, out var info)
+            && session.IsOwn(info.CurrentAuthority) && agent.IsActive())
+            RecordRoutedHealth(agent);
+    }
+
+    private void Handle_HealthRequest(MessagePayload<NetworkRequestBattleTroopHealth> payload)
+    {
+        if (ModInformation.IsServer) return;
+        var request = payload.What;
+        GameThread.RunSafe(() =>
+        {
+            if (healthReported || !session.HasInstance || request.MapEventId != session.InstanceId
+                || !session.IsLocalHost || request.SnapshotId == Guid.Empty || request.PartyIds == null) return;
+            foreach (var partyId in request.PartyIds)
+            {
+                if (string.IsNullOrEmpty(partyId)) continue;
+                var survivors = routedByParty.TryGetValue(partyId, out var routed)
+                    ? new Dictionary<int, float>(routed) : new Dictionary<int, float>();
+                foreach (var info in coopMissionComponent.AgentRegistry.GetAgents(session.OwnControllerId))
+                {
+                    var agent = info.Agent;
+                    if (agent?.Origin is CoopAgentOrigin origin && origin.MapEventPartyId == partyId
+                        && agent.IsActive() && agent.Health > 0f)
+                        survivors[origin.UniqueSeed] = agent.Health;
+                }
+                relayNetwork.SendAll(new NetworkBattleTroopHealth(session.InstanceId, partyId,
+                    survivors, 0, routed, request.SnapshotId));
+            }
+        }, context: nameof(Handle_HealthRequest));
     }
 
     private void ReportFinalHealth()
