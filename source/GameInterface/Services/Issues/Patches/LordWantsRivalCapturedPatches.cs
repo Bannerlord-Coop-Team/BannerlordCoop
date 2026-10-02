@@ -169,11 +169,17 @@ internal class RivalCapturedCompletionPatches
     private static bool Prefix(QuestBase __instance, MethodBase __originalMethod, out IDisposable __state)
     {
         __state = null;
-        if (__instance is not Quest quest || CallOriginalPolicy.IsOriginalAllowedForOwnershipGate()) return true;
+        if (__instance is not Quest quest) return true;
+        if (ModInformation.IsClient && RivalCapturedPlayerChangedPatch.OldPlayer != null &&
+            ContainerProvider.TryResolve<IIssueOwnershipRegistry>(out var ownership) &&
+            ownership.IsLocalPeerOwner(quest.QuestGiver)) return false;
+        if (CallOriginalPolicy.IsOriginalAllowedForOwnershipGate()) return true;
         if (!quest.IsOngoing) return false;
         if (quest.QuestGiver?.Issue?.IssueQuest != quest && __originalMethod.Name == nameof(QuestBase.CompleteQuestWithCancel))
             return true;
         if (ModInformation.IsClient) return IssueFinalizeAuthorityGuard.IsActive;
+        if (IssueFinalizeAuthorityGuard.IsActive && __originalMethod.Name == nameof(QuestBase.CompleteQuestWithCancel))
+            return true;
         if (!ContainerProvider.TryResolve<ILordWantsRivalCapturedQuestService>(out var quests)) return false;
         if (RivalCapturedPlayerChangedPatch.OldPlayer != null &&
             !quests.IsOwnedBy(quest, RivalCapturedPlayerChangedPatch.OldPlayer)) return false;
@@ -191,6 +197,7 @@ internal class RivalCapturedIssueCancellationPatch
         __state = null;
         if (__instance is not Issue || CallOriginalPolicy.IsOriginalAllowedForOwnershipGate()) return true;
         if (ModInformation.IsClient) return IssueFinalizeAuthorityGuard.IsActive;
+        if (IssueFinalizeAuthorityGuard.IsActive) return true;
         if (__instance.IssueQuest is Quest quest)
             return ContainerProvider.TryResolve<ILordWantsRivalCapturedQuestService>(out var quests) &&
                 quests.TryEnterOwnerScope(quest, out __state);
@@ -267,6 +274,12 @@ internal class RivalCapturedPlayerChangedPatch
     }
 
     private static void Finalizer(Hero __state) => OldPlayer = __state;
+
+    private static void Postfix(Hero newPlayer)
+    {
+        if (ModInformation.IsClient && ContainerProvider.TryResolve<ILordWantsRivalCapturedQuestService>(out var quests))
+            quests.RestoreLocalTraitProgress(newPlayer);
+    }
 }
 
 [HarmonyPatch(typeof(PlayerManager), nameof(PlayerManager.ReplacePlayer))]
@@ -276,7 +289,23 @@ internal class RivalCapturedPlayerReplacedPatch
     {
         if (__result && ModInformation.IsServer && registeredPlayer.HeroId != replacementPlayer.HeroId &&
             ContainerProvider.TryResolve<ILordWantsRivalCapturedQuestService>(out var quests))
-            quests.CancelReplacedPlayersQuests(registeredPlayer.ControllerId);
+            quests.CancelPlayerQuests(registeredPlayer.ControllerId);
+    }
+}
+
+[HarmonyPatch(typeof(PlayerManager), nameof(PlayerManager.RemovePlayer))]
+internal class RivalCapturedPlayerRemovedPatch
+{
+    private static void Prefix(PlayerManager __instance, Player player)
+    {
+        if (ModInformation.IsClient || player == null) return;
+
+        GameThread.Run(() =>
+        {
+            if (__instance.TryGetPlayer(player.ControllerId, out var registered) && ReferenceEquals(registered, player) &&
+                ContainerProvider.TryResolve<ILordWantsRivalCapturedQuestService>(out var quests))
+                quests.CancelPlayerQuests(player.ControllerId);
+        }, blocking: true);
     }
 }
 

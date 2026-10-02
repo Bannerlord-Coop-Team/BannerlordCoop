@@ -1,6 +1,5 @@
 ﻿using Common;
 using Common.Messaging;
-using GameInterface.Services.Heroes.Messages;
 using GameInterface.Services.Issues.Interfaces;
 using GameInterface.Services.Issues.Messages;
 using GameInterface.Services.Players;
@@ -25,7 +24,6 @@ internal sealed class LordWantsRivalCapturedHandler : IHandler
         messageBroker.Subscribe<RequestRivalCapturedChoice>(HandleChoice);
         messageBroker.Subscribe<NetworkRivalCapturedProgress>(HandleProgress);
         messageBroker.Subscribe<NetworkRivalCapturedTraitProgress>(HandleTraitProgress);
-        messageBroker.Subscribe<PlayerHeroChanged>(HandlePlayerHeroChanged);
     }
 
     public void Dispose()
@@ -35,7 +33,6 @@ internal sealed class LordWantsRivalCapturedHandler : IHandler
         messageBroker.Unsubscribe<RequestRivalCapturedChoice>(HandleChoice);
         messageBroker.Unsubscribe<NetworkRivalCapturedProgress>(HandleProgress);
         messageBroker.Unsubscribe<NetworkRivalCapturedTraitProgress>(HandleTraitProgress);
-        messageBroker.Unsubscribe<PlayerHeroChanged>(HandlePlayerHeroChanged);
     }
 
     private void HandleCreated(MessagePayload<RivalCapturedIssueCreated> payload)
@@ -69,10 +66,5 @@ internal sealed class LordWantsRivalCapturedHandler : IHandler
     {
         if (ModInformation.IsServer) return;
         GameThread.RunSafe(() => quests.MirrorTraitProgress(payload.What));
-    }
-
-    private void HandlePlayerHeroChanged(MessagePayload<PlayerHeroChanged> payload)
-    {
-        if (ModInformation.IsClient) quests.RestoreLocalTraitProgress(payload.What.NewHero);
     }
 }

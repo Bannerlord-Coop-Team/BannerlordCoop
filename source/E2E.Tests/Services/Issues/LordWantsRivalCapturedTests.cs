@@ -2,9 +2,11 @@
 using Common.Util;
 using E2E.Tests.Environment;
 using E2E.Tests.Environment.Instance;
+using GameInterface.Policies;
 using GameInterface.Services.Entity;
 using GameInterface.Services.Heroes.Patches;
 using GameInterface.Services.Issues.Generic;
+using GameInterface.Services.Issues.Generic.Migrated.GangLeaderNeedsToOffloadStolenGoods;
 using GameInterface.Services.Issues.Interfaces;
 using GameInterface.Services.Issues.Messages;
 using GameInterface.Services.MapEvents;
@@ -90,6 +92,7 @@ public sealed class LordWantsRivalCapturedTests : IDisposable
                     party.CurrentSettlement = settlement;
                     giver.StayingInSettlement = settlement;
                     party.MemberRoster.AddToCounts(Get<CharacterObject>(instance, troopId), 50);
+                    targetParty.MemberRoster.AddToCounts(target.CharacterObject, 1);
                     if (instance == Client)
                     {
                         Game.Current.PlayerTroop = player.CharacterObject;
@@ -209,6 +212,31 @@ public sealed class LordWantsRivalCapturedTests : IDisposable
     }
 
     [Fact]
+    public void FirstCounterOfferCapturesThePendingHeroOnceThroughTheServerAction()
+    {
+        Accept();
+        Server.Call(() => Assert.False(Get<Hero>(Server, targetId).IsPrisoner));
+        Client.Call(() => GetQuest(Client).FirstCounterOfferFinished());
+        Client.Call(() => GetQuest(Client).FirstCounterOfferFinished());
+        environment.FlushCoalescer();
+        Server.Call(() =>
+        {
+            var target = Get<Hero>(Server, targetId);
+            var party = Get<MobileParty>(Server, partyId);
+            Assert.True(target.IsPrisoner);
+            Assert.Same(party.Party, target.PartyBelongedToAsPrisoner);
+            Assert.Equal(1, party.PrisonRoster.GetTroopCount(target.CharacterObject));
+            Assert.Equal(4, GetQuest(Server).JournalEntries.Count);
+        });
+        Client.Call(() =>
+        {
+            Assert.True(GetQuest(Client)._firstCounterOfferMade);
+            Assert.Equal(4, GetQuest(Client).JournalEntries.Count);
+        });
+        OtherClient.Call(() => Assert.Null(Get<Hero>(OtherClient, giverId).Issue.IssueQuest));
+    }
+
+    [Fact]
     public void RepeatedCounterOfferRequestsDoNotCaptureTheSamePrisonerAgain()
     {
         Accept();
@@ -291,6 +319,63 @@ public sealed class LordWantsRivalCapturedTests : IDisposable
         });
         Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkIssueRemoved>());
         Client.Call(() => Assert.Null(Get<Hero>(Client, giverId).Issue));
+    }
+
+    [Fact]
+    public void PlayerChangeCallbackPreservesOwnedQuestAndRestoresSavedHonorXp()
+    {
+        Accept();
+        Client.Call(() =>
+        {
+            var player = Get<Hero>(Client, playerId);
+            var party = Get<MobileParty>(Client, partyId);
+            var quest = GetQuest(Client);
+            var progress = new PropertyOwner<PropertyObject>();
+            progress.SetPropertyValue(DefaultTraits.Honor, -37);
+            GangLeaderNeedsToOffloadStolenGoodsQuestType.OwnerTraitXpProgress.Set(player, progress);
+            Campaign.Current.PlayerTraitDeveloper = new PropertyOwner<PropertyObject>();
+
+            // Loading allows originals; this callback follows Campaign's trait-store reset.
+            using (CallOriginalPolicy.AllowOriginalsForCurrentOperation())
+                Campaign.Current.QuestManager.OnPlayerCharacterChanged(player, player, party, false);
+
+            Assert.Same(quest, GetQuest(Client));
+            Assert.True(quest.IsOngoing);
+            Assert.Single(quest.JournalEntries);
+            Assert.True(quest.IsTracked(Get<Hero>(Client, targetId)));
+            Assert.True(Client.Resolve<IIssueOwnershipRegistry>().IsLocalPeerOwner(quest.QuestGiver));
+            Assert.Equal(-37, Campaign.Current.PlayerTraitDeveloper.GetPropertyValue(DefaultTraits.Honor));
+        });
+        Server.Call(() => Assert.True(GetQuest(Server).IsOngoing));
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void PermanentRemovalCancelsOwnedQuestButRejectedRemovalDoesNot(bool ownerObjectsGone)
+    {
+        Accept();
+        Server.Call(() =>
+        {
+            var players = Server.Resolve<IPlayerManager>();
+            Assert.True(players.TryGetPlayer(Controller, out var registered));
+            Assert.False(players.RemovePlayer(new Player(Controller, playerId, partyId, "", "")));
+            Assert.True(GetQuest(Server).IsOngoing);
+            if (ownerObjectsGone)
+            {
+                Assert.True(Server.ObjectManager.Remove(Get<Hero>(Server, playerId)));
+                Assert.True(Server.ObjectManager.Remove(Get<MobileParty>(Server, partyId)));
+            }
+            Assert.True(players.RemovePlayer(registered));
+            Assert.Null(Get<Hero>(Server, giverId).Issue);
+            Assert.False(Server.Resolve<IIssueOwnershipRegistry>().TryGetOwnerControllerId(Get<Hero>(Server, giverId), out _));
+            Assert.True(Server.ObjectManager.TryGetId(Get<Hero>(Server, targetId).PartyBelongedTo, out var replacementPartyId));
+            Assert.True(players.AddPlayer(new Player(Controller, targetId, replacementPartyId, "", "")));
+            Assert.Empty(Campaign.Current.QuestManager.Quests.OfType<Quest>());
+        });
+        Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkIssueRemoved>());
+        Client.Call(() => Assert.Null(Get<Hero>(Client, giverId).Issue));
+        OtherClient.Call(() => Assert.Null(Get<Hero>(OtherClient, giverId).Issue));
     }
 
     [Fact]

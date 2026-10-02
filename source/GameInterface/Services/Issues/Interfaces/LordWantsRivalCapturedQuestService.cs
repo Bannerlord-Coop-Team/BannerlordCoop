@@ -45,7 +45,7 @@ internal interface ILordWantsRivalCapturedQuestService
     void MirrorProgress(NetworkRivalCapturedProgress data);
     void MirrorTraitProgress(NetworkRivalCapturedTraitProgress data);
     void RestoreLocalTraitProgress(Hero hero);
-    void CancelReplacedPlayersQuests(string controllerId);
+    void CancelPlayerQuests(string controllerId);
     void CheckCancellation(Quest quest, bool causedByPlayer);
     void OnBattleWon(MapEvent mapEvent);
     void RemoveOtherPlayersQuests(QuestManager manager);
@@ -273,13 +273,16 @@ internal sealed class LordWantsRivalCapturedQuestService : ILordWantsRivalCaptur
 
         using (scope)
         {
+            if (request.Choice == RivalCapturedChoice.HearCounterOffer && !quest._firstCounterOfferMade &&
+                !quest._targetHero.IsPrisoner)
+                TakePrisonerAction.Apply(PartyBase.MainParty, quest._targetHero);
+
             if (quest._targetHero.PartyBelongedToAsPrisoner != PartyBase.MainParty ||
                 !PartyBase.MainParty.PrisonRoster.Contains(quest._targetHero.CharacterObject)) return;
 
             switch (request.Choice)
             {
                 case RivalCapturedChoice.HearCounterOffer:
-                    // Battle results have already captured this hero on the server.
                     quest._firstCounterOfferMade = true;
                     SendProgress(quest);
                     break;
@@ -352,17 +355,24 @@ internal sealed class LordWantsRivalCapturedQuestService : ILordWantsRivalCaptur
 
     public void RestoreLocalTraitProgress(Hero hero)
     {
-        if (hero != null && GangLeaderNeedsToOffloadStolenGoodsQuestType.OwnerTraitXpProgress.TryGet(hero, out var progress) &&
+        if (hero != null && hero == Hero.MainHero &&
+            GangLeaderNeedsToOffloadStolenGoodsQuestType.OwnerTraitXpProgress.TryGet(hero, out var progress) &&
             progress.GetProperties().Contains(DefaultTraits.Honor))
             Campaign.Current.PlayerTraitDeveloper.SetPropertyValue(DefaultTraits.Honor, progress.GetPropertyValue(DefaultTraits.Honor));
     }
 
-    public void CancelReplacedPlayersQuests(string controllerId)
+    public void CancelPlayerQuests(string controllerId)
     {
-        foreach (var quest in Campaign.Current.QuestManager.Quests.OfType<Quest>().ToArray())
+        if (Campaign.Current?.QuestManager == null) return;
+
+        // Cancellation has no player reward and must also clean up a registration whose hero is gone.
+        using (new IssueFinalizeAuthorityGuard())
         {
-            if (quest.IsOngoing && ownership.TryGetOwnerControllerId(quest.QuestGiver, out var owner) && owner == controllerId)
-                quest.CompleteQuestWithCancel(new TextObject("{=bYdhYidf}The quest was canceled because your clan leader, who made the original agreement, is no longer head of the clan.\""));
+            foreach (var quest in Campaign.Current.QuestManager.Quests.OfType<Quest>().ToArray())
+            {
+                if (quest.IsOngoing && ownership.TryGetOwnerControllerId(quest.QuestGiver, out var owner) && owner == controllerId)
+                    quest.CompleteQuestWithCancel(new TextObject("{=bYdhYidf}The quest was canceled because your clan leader, who made the original agreement, is no longer head of the clan.\""));
+            }
         }
     }
 
