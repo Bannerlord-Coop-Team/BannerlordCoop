@@ -97,8 +97,9 @@ internal sealed class AlternativeSolutionTroopSelection : IAlternativeSolutionTr
     {
         var selected = issue.AlternativeSolutionSentTroops;
         var party = logic.RightOwnerParty;
-        foreach (var troop in selected.GetTroopRoster())
+        for (int i = 0; i < selected.Count; i++)
         {
+            var troop = selected.GetElementCopyAtIndex(i);
             int index = party.MemberRoster.FindIndexOfTroop(troop.Character);
             if (index < 0 || party.MemberRoster.GetElementNumber(index) < troop.Number ||
                 party.MemberRoster.GetElementWoundedNumber(index) < troop.WoundedNumber ||
@@ -110,9 +111,12 @@ internal sealed class AlternativeSolutionTroopSelection : IAlternativeSolutionTr
         {
             var remaining = logic.CurrentData.RightMemberRoster;
             remaining.Clear();
-            remaining.Add(party.MemberRoster);
-            foreach (var troop in selected.GetTroopRoster())
+            // XP-only updates do not invalidate the native roster's cached list.
+            for (int i = 0; i < party.MemberRoster.Count; i++)
+                remaining.Add(party.MemberRoster.GetElementCopyAtIndex(i));
+            for (int i = 0; i < selected.Count; i++)
             {
+                var troop = selected.GetElementCopyAtIndex(i);
                 int index = remaining.FindIndexOfTroop(troop.Character);
                 var element = remaining.GetElementCopyAtIndex(index);
                 int availableXp = element.Xp;
@@ -123,6 +127,7 @@ internal sealed class AlternativeSolutionTroopSelection : IAlternativeSolutionTr
                 remaining.AddToCounts(troop.Character, -troop.Number, false, -troop.WoundedNumber,
                     element.Xp - availableXp);
             }
+            selected.UpdateVersion();
             logic._initialData.CopyFromScreenData(logic.CurrentData);
             if (logic._savedData != null) logic.SavePartyScreenData();
         }

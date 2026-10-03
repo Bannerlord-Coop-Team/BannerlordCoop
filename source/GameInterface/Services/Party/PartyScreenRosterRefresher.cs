@@ -124,7 +124,7 @@ internal class PartyScreenRosterRefresher : IPartyScreenRosterRefresher
         applyAuthoritative(authoritativeRoster, character);
         var authoritative = RosterElementState.Read(authoritativeRoster, character);
         if (reserved != null && !RosterElementState.TryRebase(authoritative,
-            RosterElementState.Read(reserved, character), default, out authoritative))
+            RosterElementState.Read(reserved, character), default, out authoritative, allowUnassignedXp: true))
         {
             troopSelection.Rollback(troopSelection.FindIssue(logic)?.IssueOwner);
             notifyPendingChangesReset();
@@ -133,15 +133,34 @@ internal class PartyScreenRosterRefresher : IPartyScreenRosterRefresher
 
         RosterElementState rebasedSaved = default;
         bool canRebase =
-            RosterElementState.TryRebase(authoritative, previousBaseline, previousVisible, out var rebasedVisible) &&
+            RosterElementState.TryRebase(authoritative, previousBaseline, previousVisible, out var rebasedVisible,
+                allowUnassignedXp: reserved != null) &&
             (saved == null ||
                 RosterElementState.TryRebase(
                     authoritative,
                     previousBaseline,
                     previousSaved,
-                    out rebasedSaved));
+                    out rebasedSaved,
+                    allowUnassignedXp: reserved != null));
 
         authoritative.Write(baseline, character);
+        if (reserved != null && !TryBalanceSelectionXp(logic, baseline, reserved, character))
+        {
+            troopSelection.Rollback(troopSelection.FindIssue(logic)?.IssueOwner);
+            notifyPendingChangesReset();
+            return true;
+        }
+
+        if (canRebase)
+        {
+            rebasedVisible.Write(visible, character);
+            if (saved != null) rebasedSaved.Write(saved, character);
+            if (reserved != null)
+            {
+                canRebase = TryBalanceSelectionXp(logic, visible, logic.CurrentData.LeftMemberRoster, character) &&
+                    (saved == null || TryBalanceSelectionXp(logic, saved, logic._savedData.LeftMemberRoster, character));
+            }
+        }
         if (!canRebase)
         {
             logic.CurrentData.ResetUsing(logic._initialData);
@@ -152,8 +171,6 @@ internal class PartyScreenRosterRefresher : IPartyScreenRosterRefresher
             return true;
         }
 
-        rebasedVisible.Write(visible, character);
-        if (saved != null) rebasedSaved.Write(saved, character);
         RefreshRecruitablePrisoners(logic);
         RefreshTroop(
             logic,
@@ -161,6 +178,35 @@ internal class PartyScreenRosterRefresher : IPartyScreenRosterRefresher
             character,
             previousVisible.Number != rebasedVisible.Number,
             previousVisible.Wounded != rebasedVisible.Wounded);
+        if (reserved != null) RefreshTroop(logic, reserved, character, false, false);
+        return true;
+    }
+
+    private static bool TryBalanceSelectionXp(PartyScreenLogic logic, TroopRoster remaining,
+        TroopRoster selected, CharacterObject character)
+    {
+        int remainingIndex = remaining.FindIndexOfTroop(character);
+        if (remainingIndex < 0) return true;
+        var element = remaining.GetElementCopyAtIndex(remainingIndex);
+        int previousXp = element.Xp;
+        logic.RightOwnerParty.OnXpChanged(remaining, ref element);
+        int overflow = previousXp - element.Xp;
+        if (overflow == 0) return true;
+
+        int selectedIndex = selected.FindIndexOfTroop(character);
+        if (selectedIndex < 0) return false;
+        var selectedElement = selected.GetElementCopyAtIndex(selectedIndex);
+        long selectedXp = (long)selectedElement.Xp + overflow;
+        if (selectedXp > int.MaxValue) return false;
+        selectedElement.Xp = (int)selectedXp;
+        logic.RightOwnerParty.OnXpChanged(selected, ref selectedElement);
+        if (selectedElement.Xp != selectedXp) return false;
+
+        // Keep each screen snapshot within native stack caps without discarding earned XP.
+        remaining.SetElementXp(remainingIndex, element.Xp);
+        selected.SetElementXp(selectedIndex, selectedElement.Xp);
+        remaining.UpdateVersion();
+        selected.UpdateVersion();
         return true;
     }
 
@@ -503,7 +549,8 @@ internal class PartyScreenRosterRefresher : IPartyScreenRosterRefresher
             RosterElementState authoritative,
             RosterElementState previousBaseline,
             RosterElementState previousVisible,
-            out RosterElementState rebased)
+            out RosterElementState rebased,
+            bool allowUnassignedXp = false)
         {
             long number = authoritative.Number +
                 ((long)previousVisible.Number - previousBaseline.Number);
@@ -517,7 +564,7 @@ internal class PartyScreenRosterRefresher : IPartyScreenRosterRefresher
                 wounded > number ||
                 xp < 0 ||
                 xp > int.MaxValue ||
-                (number == 0 && xp != 0))
+                (!allowUnassignedXp && number == 0 && xp != 0))
             {
                 rebased = default;
                 return false;

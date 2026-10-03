@@ -79,18 +79,32 @@ internal class PartyDoneLogicHandler : IHandler
     // Client
     private void Handle_PartyDoneLogicAttempted(MessagePayload<PartyDoneLogicAttempted> obj)
     {
-        if (!objectManager.TryGetIdWithLogging(obj.What.MainHero, out var mainHeroId)) return;
+        NetworkCompleteDoneLogic? message = null;
+        try
+        {
+            message = PackPartyDoneLogic(obj.What);
+        }
+        finally
+        {
+            if (message == null) troopSelection.CompleteCommit(obj.What.QuestSelectionCommitId, false);
+        }
+        if (message.HasValue) network.SendAll(message.Value);
+    }
+
+    private NetworkCompleteDoneLogic? PackPartyDoneLogic(PartyDoneLogicAttempted attempt)
+    {
+        if (!objectManager.TryGetIdWithLogging(attempt.MainHero, out var mainHeroId)) return null;
 
         string leftPartyId = null;
-        if (obj.What.LeftParty != null && 
-            !objectManager.TryGetIdWithLogging(obj.What.LeftParty, out leftPartyId))
-            return;
+        if (attempt.LeftParty != null &&
+            !objectManager.TryGetIdWithLogging(attempt.LeftParty, out leftPartyId))
+            return null;
 
         // Not registered when donating
-        objectManager.TryGetId(obj.What.LeftPrisonerRoster, out var leftPrisonerRosterId);
+        objectManager.TryGetId(attempt.LeftPrisonerRoster, out var leftPrisonerRosterId);
 
         var upgradedTroopHistory = new UpgradedTroopHistoryData(new());
-        foreach (Tuple<CharacterObject, CharacterObject, int> tuple in obj.What.UpgradedTroopHistory)
+        foreach (Tuple<CharacterObject, CharacterObject, int> tuple in attempt.UpgradedTroopHistory)
         {
             if (!objectManager.TryGetHandleWithLogging(tuple.Item1, out var character1Id)) continue;
             if (!objectManager.TryGetHandleWithLogging(tuple.Item2, out var character2Id)) continue;
@@ -101,53 +115,51 @@ internal class PartyDoneLogicHandler : IHandler
         // Send only the per-troop change the player made (current minus the screen-open snapshot). Heroes and
         // companions that did not change net to zero and are omitted, so the server needs no special handling
         // for them when re-applying the delta.
-        var leftMemberRosterData = troopRosterInterface.PackTroopRosterDelta(obj.What.LeftMemberRoster, obj.What.InitialLeftMemberRoster);
-        var leftPrisonerRosterData = troopRosterInterface.PackTroopRosterDelta(obj.What.LeftPrisonerRoster, obj.What.InitialLeftPrisonerRoster);
-        var rightMemberRosterData = troopRosterInterface.PackTroopRosterDelta(obj.What.RightMemberRoster, obj.What.InitialRightMemberRoster);
-        var rightPrisonerRosterData = troopRosterInterface.PackTroopRosterDelta(obj.What.RightPrisonerRoster, obj.What.InitialRightPrisonerRoster);
+        var leftMemberRosterData = troopRosterInterface.PackTroopRosterDelta(attempt.LeftMemberRoster, attempt.InitialLeftMemberRoster);
+        var leftPrisonerRosterData = troopRosterInterface.PackTroopRosterDelta(attempt.LeftPrisonerRoster, attempt.InitialLeftPrisonerRoster);
+        var rightMemberRosterData = troopRosterInterface.PackTroopRosterDelta(attempt.RightMemberRoster, attempt.InitialRightMemberRoster);
+        var rightPrisonerRosterData = troopRosterInterface.PackTroopRosterDelta(attempt.RightPrisonerRoster, attempt.InitialRightPrisonerRoster);
 
-        var rightMemberOrderData = troopRosterInterface.PackTroopRosterOrderData(obj.What.RightMemberRoster);
+        var rightMemberOrderData = troopRosterInterface.PackTroopRosterOrderData(attempt.RightMemberRoster);
 
-        var releaserPartyPosition = GetReleaserPartyPosition(obj.What.MainHero);
+        var releaserPartyPosition = GetReleaserPartyPosition(attempt.MainHero);
 
         string donationSettlementId = null;
         FlattenedTroop[] donatedPrisonersRoster = null;
-        if (obj.What.DonationSettlement != null)
+        if (attempt.DonationSettlement != null)
         {
-            if (!objectManager.TryGetIdWithLogging(obj.What.DonationSettlement, out donationSettlementId)) return;
+            if (!objectManager.TryGetIdWithLogging(attempt.DonationSettlement, out donationSettlementId)) return null;
             donatedPrisonersRoster = FlattenedTroopSerializer.Serialize(
-                obj.What.DonatedPrisonersRoster,
+                attempt.DonatedPrisonersRoster,
                 objectManager);
         }
 
-        var message = new NetworkCompleteDoneLogic(
+        return new NetworkCompleteDoneLogic(
             mainHeroId,
-            FlattenedTroopSerializer.Serialize(obj.What.ReleasedPrisonersRoster, objectManager),
-            FlattenedTroopSerializer.Serialize(obj.What.TakenPrisonersRoster, objectManager),
-            FlattenedTroopSerializer.Serialize(obj.What.RecruitedPrisonersRoster, objectManager),
+            FlattenedTroopSerializer.Serialize(attempt.ReleasedPrisonersRoster, objectManager),
+            FlattenedTroopSerializer.Serialize(attempt.TakenPrisonersRoster, objectManager),
+            FlattenedTroopSerializer.Serialize(attempt.RecruitedPrisonersRoster, objectManager),
             leftMemberRosterData,
             leftPrisonerRosterData,
             rightMemberRosterData,
             rightPrisonerRosterData,
-            obj.What.RightOwnerPartyItemRosterData,
+            attempt.RightOwnerPartyItemRosterData,
             upgradedTroopHistory,
             leftPartyId,
             leftPrisonerRosterId,
-            obj.What.PartyGoldChangeAmount,
-            obj.What.PartyInfluenceChangeAmount,
-            obj.What.PartyMoraleChangeAmount,
-            obj.What.DoNotApplyGoldTransactions,
+            attempt.PartyGoldChangeAmount,
+            attempt.PartyInfluenceChangeAmount,
+            attempt.PartyMoraleChangeAmount,
+            attempt.DoNotApplyGoldTransactions,
             releaserPartyPosition,
-            obj.What.PartyScreenMode,
+            attempt.PartyScreenMode,
             rightMemberOrderData,
-            obj.What.ApplyReleasedAndTakenPrisonerActions,
+            attempt.ApplyReleasedAndTakenPrisonerActions,
             donationSettlementId,
             donatedPrisonersRoster,
-            obj.What.ForceTransferId,
-            obj.What.QuestSelectionCommitId
+            attempt.ForceTransferId,
+            attempt.QuestSelectionCommitId
         );
-
-        network.SendAll(message);
     }
 
     private void Handle_QuestSelectionCommitResult(MessagePayload<NetworkQuestSelectionCommitResult> payload)
