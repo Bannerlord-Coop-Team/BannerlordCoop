@@ -345,10 +345,8 @@ internal sealed class ChatVM : ViewModel
                         ? selectedChannel.ControllerId
                         : GlobalChannelId
                     : message.RecipientControllerId;
-                if (!IsFixedChannelId(channelId) && channelId.Length > 0)
+                if (channelId != GlobalChannelId)
                     EnsureDirectChannel(channelId, DisplayName(message.RecipientName, channelId));
-                else if (IsFixedChannelId(channelId) && channelId != GlobalChannelId && channelId != EventsChannelId)
-                    channelId = GlobalChannelId;
                 line = $"[Chat] {message.Text}";
                 notify = true;
                 break;
@@ -409,8 +407,7 @@ internal sealed class ChatVM : ViewModel
 
     private void AddLine(string channelId, ChatLineVM line, bool notify)
     {
-        if (!histories.TryGetValue(channelId, out var history))
-            history = histories[EnsureDirectChannel(channelId, channelId).ControllerId];
+        var history = histories[channelId];
 
         line.ToggleForceVisible(IsOpen);
         history.Add(line);

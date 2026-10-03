@@ -76,7 +76,6 @@ public sealed class ChatService : IChatService, IDisposable
 
     public void Initialize()
     {
-        vanillaLogGate.Activate();
         eventLog.Start(viewModel.ReceiveEvent);
         overlay.Initialize();
     }
@@ -110,7 +109,7 @@ public sealed class ChatService : IChatService, IDisposable
     {
         messageBroker.Unsubscribe<ChatVisibilitySelected>(HandleChatVisibilitySelected);
         eventLog.Dispose();
-        vanillaLogGate.Deactivate();
+        vanillaLogGate.SetReplacementVisible(false);
         overlay.Dispose();
     }
 

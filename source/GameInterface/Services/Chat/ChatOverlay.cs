@@ -333,8 +333,7 @@ internal sealed class ChatOverlay : GlobalLayer, IDisposable
             // Full focus release so gameplay keys work after resize; keep open-panel cursor
             ReleaseInputFocus();
             // Finish any active Fixed policies before taking a new snapshot
-            if (applyResizeToPanel || feedInnerPoliciesCaptured)
-                RestoreFeedInnerPolicies();
+            RestoreFeedInnerPolicies();
             applyResizeToPanel = false;
 
             isResizing = true;
@@ -505,7 +504,7 @@ internal sealed class ChatOverlay : GlobalLayer, IDisposable
         if (rmbDown && IsUnderChatRoot(eventManager.LatestMouseAlternateDownWidget))
             return true;
 
-        return isResizing;
+        return false;
     }
 
     private bool IsPointerOverOpenChat()

@@ -70,7 +70,7 @@ public class ChatServiceTests
     }
 
     [Fact]
-    public void Dispose_StopsEventLogAndDeactivatesVanillaGate()
+    public void Dispose_StopsEventLogAndHidesVanillaGateReplacement()
     {
         var gate = new Mock<IChatVanillaLogGate>();
         var eventLog = new Mock<IChatEventLog>();
@@ -79,7 +79,7 @@ public class ChatServiceTests
         service.Dispose();
 
         eventLog.Verify(value => value.Dispose(), Times.Once);
-        gate.Verify(value => value.Deactivate(), Times.Once);
+        gate.Verify(value => value.SetReplacementVisible(false), Times.Once);
     }
 
     private static ChatService CreateService(
