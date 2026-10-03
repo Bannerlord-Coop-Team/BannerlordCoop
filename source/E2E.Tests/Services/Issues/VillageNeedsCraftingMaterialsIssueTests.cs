@@ -797,7 +797,8 @@ public class VillageNeedsCraftingMaterialsIssueTests : IDisposable
             Assert.True(Client.ObjectManager.TryGetObject<CharacterObject>(eligibleTroopId, out var eligibleTroop));
             using (new AllowedThread())
             {
-                owner.Issue.AlternativeSolutionSentTroops.AddToCounts(companion.CharacterObject, 5);
+                owner.Issue.AlternativeSolutionSentTroops.AddToCounts(companion.CharacterObject, 1);
+                Assert.Equal(1, owner.Issue.AlternativeSolutionSentTroops.TotalHeroes);
                 owner.Issue.AlternativeSolutionSentTroops.AddToCounts(eligibleTroop, 6);
             }
             owner.Issue.StartIssueWithAlternativeSolution();
@@ -910,7 +911,8 @@ public class VillageNeedsCraftingMaterialsIssueTests : IDisposable
             Assert.True(Client.ObjectManager.TryGetObject<CharacterObject>(eligibleTroopId, out var eligibleTroop));
             using (new AllowedThread())
             {
-                owner.Issue.AlternativeSolutionSentTroops.AddToCounts(companion.CharacterObject, 5);
+                owner.Issue.AlternativeSolutionSentTroops.AddToCounts(companion.CharacterObject, 1);
+                Assert.Equal(1, owner.Issue.AlternativeSolutionSentTroops.TotalHeroes);
                 owner.Issue.AlternativeSolutionSentTroops.AddToCounts(eligibleTroop, 6);
             }
             owner.Issue.StartIssueWithAlternativeSolution();
@@ -924,10 +926,7 @@ public class VillageNeedsCraftingMaterialsIssueTests : IDisposable
             Assert.True(owner.Issue.IsSolvingWithAlternative);
             var issue = (IssueBase)owner.Issue;
 
-            using (new AllowedThread())
-            {
-                AlternativeSolutionCompletionRunner.CompleteOnServer(owner, issue);
-            }
+            AlternativeSolutionCompletionRunner.CompleteOnServer(owner, issue);
 
             Assert.True(Server.ObjectManager.TryGetObject<Hero>(fixture.HeroId, out var ownerAfter));
             Assert.Null(ownerAfter.Issue);
@@ -1069,7 +1068,8 @@ public class VillageNeedsCraftingMaterialsIssueTests : IDisposable
             Assert.True(Client.ObjectManager.TryGetObject<Hero>(companionHeroId, out var companion));
             using (new AllowedThread())
             {
-                owner.Issue.AlternativeSolutionSentTroops.AddToCounts(companion.CharacterObject, 5);
+                owner.Issue.AlternativeSolutionSentTroops.AddToCounts(companion.CharacterObject, 1);
+                Assert.Equal(1, owner.Issue.AlternativeSolutionSentTroops.TotalHeroes);
             }
             owner.Issue.StartIssueWithAlternativeSolution();
         });
@@ -1125,7 +1125,8 @@ public class VillageNeedsCraftingMaterialsIssueTests : IDisposable
             Assert.True(Client.ObjectManager.TryGetObject<CharacterObject>(eligibleTroopId, out var eligibleTroop));
             using (new AllowedThread())
             {
-                owner.Issue.AlternativeSolutionSentTroops.AddToCounts(companion.CharacterObject, 5);
+                owner.Issue.AlternativeSolutionSentTroops.AddToCounts(companion.CharacterObject, 1);
+                Assert.Equal(1, owner.Issue.AlternativeSolutionSentTroops.TotalHeroes);
                 owner.Issue.AlternativeSolutionSentTroops.AddToCounts(eligibleTroop, 6);
             }
             owner.Issue.StartIssueWithAlternativeSolution();
@@ -1701,12 +1702,7 @@ public class VillageNeedsCraftingMaterialsIssueTests : IDisposable
                 MapEvent mapEvent;
                 using (new AllowedThread())
                 {
-                    mapEvent = new MapEvent();
-                    mapEvent._mapEventType = MapEvent.BattleTypes.IsForcingSupplies;
-                    mapEvent.MapEventSettlement = settlement;
-                    mapEvent._sides[0] = new MapEventSide(mapEvent, BattleSideEnum.Defender, settlement.Party);
-                    mapEvent._sides[1] = new MapEventSide(mapEvent, BattleSideEnum.Attacker, party.Party);
-                    settlement.Party._mapEventSide = mapEvent.DefenderSide;
+                    mapEvent = CreateForcedSuppliesMapEvent(settlement, party);
                 }
                 Assert.True(mapEvent.IsForcingSupplies);
                 Assert.Same(settlement, mapEvent.MapEventSettlement);
@@ -2472,6 +2468,9 @@ public class VillageNeedsCraftingMaterialsIssueTests : IDisposable
         mapEvent._sides[0] = new MapEventSide(mapEvent, BattleSideEnum.Defender, settlement.Party);
         mapEvent._sides[1] = new MapEventSide(mapEvent, BattleSideEnum.Attacker, attacker.Party);
         settlement.Party._mapEventSide = mapEvent.DefenderSide;
+        attacker.Party._mapEventSide = mapEvent.AttackerSide;
+        Assert.Same(mapEvent, attacker.Party.MapEvent);
+        Assert.Same(mapEvent, settlement.Party.MapEvent);
         return mapEvent;
     }
 
