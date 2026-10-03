@@ -697,11 +697,14 @@ public class CapturedByBountyHuntersIssueTests : IDisposable
     }
 
     [Theory]
-    [InlineData(false, false)]
-    [InlineData(true, false)]
-    [InlineData(false, true)]
-    [InlineData(true, true)]
-    public void PartyScreenDoneRejectionClosesSelectionWithoutSpendingGold(bool deferredReceive, bool closeBeforeReply)
+    [InlineData(false, false, false)]
+    [InlineData(true, false, false)]
+    [InlineData(false, true, false)]
+    [InlineData(true, true, false)]
+    [InlineData(false, true, true)]
+    [InlineData(true, true, true)]
+    public void PartyScreenDoneRejectionClosesSelectionWithoutSpendingGold(
+        bool deferredReceive, bool closeBeforeReply, bool reopenScreen)
     {
         var fixture = CreateIssue();
         var client = environment.Clients.First();
@@ -755,6 +758,18 @@ public class CapturedByBountyHuntersIssueTests : IDisposable
             }
             else Assert.True(logic.DoneLogic(true));
             Assert.True(client.Resolve<IAlternativeSolutionTroopSelection>().IsCommitPending(logic));
+            PartyScreenLogic replacement = null;
+            bool doneDisabled = true;
+            if (reopenScreen)
+            {
+                replacement = OpenAlternativeSelection(party, TroopRoster.CreateDummyTroopRoster());
+                replacement._partyScreenMode = Helpers.PartyScreenHelper.PartyScreenMode.Normal;
+                ((PartyState)Game.Current.GameStateManager.ActiveState).PartyScreenMode = Helpers.PartyScreenHelper.PartyScreenMode.Normal;
+                Assert.False(replacement.IsDoneActive());
+                // The publicized backing field makes a direct event subscription ambiguous.
+                typeof(PartyScreenLogic).GetEvent("AfterReset").AddEventHandler(replacement,
+                    new PartyScreenLogic.AfterResetDelegate((screen, _) => doneDisabled = !screen.IsDoneActive()));
+            }
             environment.Server.Call(() =>
             {
                 var authority = environment.Server.GetRegisteredObject<MobileParty>(partyId);
@@ -764,6 +779,13 @@ public class CapturedByBountyHuntersIssueTests : IDisposable
             environment.Server.PumpGameThread();
             foreach (var recipient in environment.Clients) recipient.PumpGameThread();
             Assert.False(client.Resolve<IAlternativeSolutionTroopSelection>().IsCommitPending(logic));
+            if (reopenScreen)
+            {
+                Assert.Same(replacement, ((PartyState)Game.Current.GameStateManager.ActiveState).PartyScreenLogic);
+                Assert.True(replacement.IsDoneActive());
+                Assert.False(doneDisabled);
+                Helpers.PartyScreenHelper.CloseScreen(false, true);
+            }
             Assert.Null(Game.Current.GameStateManager.ActiveState);
             Assert.Equal(0, sent.TotalManCount);
             foreach (var instance in new[] { environment.Server }.Concat(environment.Clients))
@@ -1070,6 +1092,7 @@ public class CapturedByBountyHuntersIssueTests : IDisposable
         var fixture = CreateIssue();
         var client = environment.Clients.First();
         var upgradedId = environment.CreateRegisteredObject<CharacterObject>();
+        var reserveId = upgrade ? environment.CreateRegisteredObject<CharacterObject>() : null;
         var requiredItemId = requiresItem ? environment.CreateRegisteredObject<ItemObject>() : null;
         var requiredCategoryId = requiresItem ? environment.CreateRegisteredObject<ItemCategory>() : null;
         string partyId = null;
@@ -1135,6 +1158,9 @@ public class CapturedByBountyHuntersIssueTests : IDisposable
                     player.ChangeHeroGold(10000 - player.Gold);
                     authoritativeParty.MemberRoster.AddXpToTroop(original, (splitTransfer ? 24 : 23) * original.GetUpgradeXpCost(authoritativeParty.Party, 0));
                     authoritativeParty.MemberRoster.AddToCounts(original, 0, false, 4);
+                    // Keep the wounded upgrade fixture above the quest's healthy-troop requirement.
+                    authoritativeParty.MemberRoster.AddToCounts(environment.Server.GetRegisteredObject<CharacterObject>(reserveId), 3);
+                    Assert.Equal(25, authoritativeParty.MemberRoster.TotalHealthyCount - 1);
                     if (requiresItem)
                         authoritativeParty.ItemRoster.AddToCounts(environment.Server.GetRegisteredObject<ItemObject>(requiredItemId), 6);
                 });
@@ -1366,6 +1392,7 @@ public class CapturedByBountyHuntersIssueTests : IDisposable
             {
                 hero.Clan.SetLeader(hero);
                 troop.Level = 20;
+                party.MemberRoster.Clear();
                 party.MemberRoster.AddToCounts(hero.CharacterObject, 1);
                 party.MemberRoster.AddToCounts(troop, 25);
                 party.CurrentSettlement = giver.CurrentSettlement;

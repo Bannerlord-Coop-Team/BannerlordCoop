@@ -55,11 +55,9 @@ internal sealed class AlternativeSolutionTroopSelection : IAlternativeSolutionTr
         if (issue != null && ReferenceEquals(issue.IssueOwner.Issue, issue) &&
             (!accepted || (ReferenceEquals(FindIssue(logic), issue) && !RestoreSelection(logic, issue))))
             Rollback(issue.IssueOwner);
-        else
-        {
-            var active = (Game.Current.GameStateManager.ActiveState as PartyState)?.PartyScreenLogic;
-            if (active != null && ReferenceEquals(active.RightOwnerParty, logic.RightOwnerParty)) active.OnReset(false);
-        }
+
+        var active = (Game.Current.GameStateManager.ActiveState as PartyState)?.PartyScreenLogic;
+        if (active != null && ReferenceEquals(active.RightOwnerParty, logic.RightOwnerParty)) active.OnReset(false);
     }
 
     public IssueBase FindIssue(PartyScreenLogic logic)
