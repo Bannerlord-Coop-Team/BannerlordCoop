@@ -135,7 +135,10 @@ internal class PlayerPartyRestorer : IPlayerPartyRestorer
                 partyId,
                 clanId,
                 characterObjectId,
-                player.OriginalClanId ?? player.ClanId);
+                player.OriginalClanId ?? player.ClanId)
+            {
+                CrimeRatings = player.CrimeRatings
+            };
         }
 
         return true;

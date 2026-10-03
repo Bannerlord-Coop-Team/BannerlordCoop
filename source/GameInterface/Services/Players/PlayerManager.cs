@@ -181,6 +181,8 @@ public class PlayerManager : IPlayerManager
                 return false;
 
             replacementPlayer.PlatformName = registeredPlayer.PlatformName;
+            if (ModInformation.IsServer && replacementPlayer.HeroId == registeredPlayer.HeroId)
+                replacementPlayer.CrimeRatings = registeredPlayer.CrimeRatings;
             _players[registeredPlayer.ControllerId] = replacementPlayer;
 
             foreach (var peer in peerToPlayer
