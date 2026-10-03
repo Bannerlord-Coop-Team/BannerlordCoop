@@ -613,7 +613,8 @@ public sealed class LordWantsRivalCapturedTests : IDisposable
         Server.Call(() =>
         {
             var giver = Get<Hero>(Server, giverId);
-            var strategy = QuestTypeRegistry.Get(giver.Issue).GetQuestSolutionAcceptMirror<RivalCapturedAcceptFields>();
+            var descriptor = Assert.IsType<QuestTypeDescriptor<Issue, Quest>>(QuestTypeRegistry.Get(giver.Issue));
+            var strategy = descriptor.GetQuestSolutionAcceptMirror<RivalCapturedAcceptFields>();
             Assert.True(Server.Resolve<IPlayerManager>().TryGetPlayer(Controller, out var player));
             QuestSolutionStartRunner.RunGuarded(player, () =>
             {
