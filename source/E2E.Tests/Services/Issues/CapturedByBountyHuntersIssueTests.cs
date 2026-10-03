@@ -13,6 +13,7 @@ using GameInterface.Services.Issues.Generic.AcceptMirror;
 using GameInterface.Services.Issues.Generic.Migrated.CapturedByBountyHunters;
 using GameInterface.Services.Issues.Messages;
 using GameInterface.Services.Issues.Interfaces;
+using GameInterface.Services.Issues.Patches;
 using GameInterface.Services.Party;
 using GameInterface.Services.Players;
 using GameInterface.Services.Players.Data;
@@ -316,10 +317,49 @@ public class CapturedByBountyHuntersIssueTests : IDisposable
                 Assert.True(client.ObjectManager.TryGetObject<Hero>(fixture.Giver, out var giver));
                 Assert.True(giver.Issue.IsSolvingWithAlternative);
                 Assert.Equal(2, giver.Issue._alternativeSolutionCasualtyCount);
-                if (client == owner) Assert.Single(giver.Issue.JournalEntries);
-                else Assert.Empty(giver.Issue.JournalEntries);
+                var journalIssues = BountyHuntersAlternativeJournalFilterPatch.Filter(Campaign.Current.IssueManager.Issues).ToArray();
+                if (client == owner)
+                {
+                    Assert.Single(giver.Issue.JournalEntries);
+                    Assert.Contains(journalIssues, entry => ReferenceEquals(entry.Value, giver.Issue));
+                }
+                else
+                {
+                    Assert.Empty(giver.Issue.JournalEntries);
+                    Assert.DoesNotContain(journalIssues, entry => ReferenceEquals(entry.Value, giver.Issue));
+                }
+                Assert.Same(giver.Issue, Campaign.Current.IssueManager.Issues[giver]);
             });
         }
+    }
+
+    [Fact]
+    public void AlternativeJournalRechecksOwnershipAndPreservesUnrelatedIssues()
+    {
+        var fixture = CreateIssue();
+        var client = environment.Clients.First();
+        client.Call(() =>
+        {
+            var giver = client.GetRegisteredObject<Hero>(fixture.Giver);
+            var other = ObjectHelper.SkipConstructor<GangLeaderNeedsToOffloadStolenGoodsIssueBehavior.GangLeaderNeedsToOffloadStolenGoodsIssue>();
+            var issues = new[] { new KeyValuePair<Hero, IssueBase>(giver, giver.Issue), new KeyValuePair<Hero, IssueBase>(null, other) };
+            var ownership = client.Resolve<IIssueOwnershipRegistry>();
+            var controller = client.Resolve<IControllerIdProvider>();
+            controller.SetControllerId("bounty-owner");
+
+            Assert.Same(other, Assert.Single(BountyHuntersAlternativeJournalFilterPatch.Filter(issues)).Value);
+            ownership.SetOwner(giver, "bounty-owner");
+            Assert.Equal(issues, BountyHuntersAlternativeJournalFilterPatch.Filter(issues).ToArray());
+            controller.SetControllerId("other-player");
+            Assert.Same(other, Assert.Single(BountyHuntersAlternativeJournalFilterPatch.Filter(issues)).Value);
+            Assert.Same(giver.Issue, Campaign.Current.IssueManager.Issues[giver]);
+            Assert.True(giver.Issue.IsOngoingWithoutQuest);
+        });
+        environment.Server.Call(() =>
+        {
+            var issues = Campaign.Current.IssueManager.Issues;
+            Assert.Same(issues, BountyHuntersAlternativeJournalFilterPatch.Filter(issues));
+        });
     }
 
     [Theory]
