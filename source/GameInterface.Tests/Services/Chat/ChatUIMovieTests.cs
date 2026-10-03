@@ -69,6 +69,11 @@ public class ChatUIMovieTests
         Assert.Equal("false", resizeCapture.Attribute("IsVisible")?.Value);
         Assert.Null(resizeCapture.Attribute("DoNotAcceptEvents"));
 
+        // Closed default; ChatOverlay clears these while the panel is open
+        var openBackdrop = FindById(document, "CoopChatOpenBackdrop");
+        Assert.Equal("@IsOpen", openBackdrop.Attribute("IsVisible")?.Value);
+        Assert.Equal("true", openBackdrop.Attribute("DoNotAcceptEvents")?.Value);
+
         var feedList = FindById(document, "ChatFeedList");
         Assert.Equal("{VisibleLines}", feedList.Attribute("DataSource")?.Value);
         Assert.Contains(feedList.Descendants("RichTextWidget"),

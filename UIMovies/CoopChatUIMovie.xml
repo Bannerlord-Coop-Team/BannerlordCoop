@@ -5,14 +5,14 @@
         <!-- Captures mouse while resizing so the map does not get the drag. -->
         <Widget Id="CoopChatResizeCapture" WidthSizePolicy="StretchToParent" HeightSizePolicy="StretchToParent"
                 Sprite="BlankWhiteSquare_9" Color="#000000FF" AlphaFactor="0.01" IsVisible="false"/>
-        <!-- Root passes clicks through; only interactive children (tabs, input, resizer) take them. -->
+        <!-- Closed: root/feed pass clicks through. Open: ChatOverlay enables backdrop + feed hit-testing. -->
         <Widget Id="CoopChatRoot" WidthSizePolicy="Fixed" HeightSizePolicy="Fixed"
                 SuggestedWidth="@ChatBoxSizeX" SuggestedHeight="@ChatBoxSizeY"
                 MinWidth="425" MaxWidth="650" MinHeight="170" MaxHeight="470"
                 HorizontalAlignment="Left" VerticalAlignment="Bottom"
                 MarginLeft="27" MarginBottom="75" DoNotAcceptEvents="true">
           <Children>
-            <Widget WidthSizePolicy="StretchToParent" HeightSizePolicy="StretchToParent"
+            <Widget Id="CoopChatOpenBackdrop" WidthSizePolicy="StretchToParent" HeightSizePolicy="StretchToParent"
                     Sprite="BlankWhiteSquare_9" Color="#000000FF" AlphaFactor="0.5"
                     IsVisible="@IsOpen" DoNotAcceptEvents="true"/>
 

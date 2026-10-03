@@ -19,6 +19,8 @@ namespace GameInterface.Services.Chat;
 internal sealed class ChatOverlay : GlobalLayer, IDisposable
 {
     private const string InputWidgetId = "CoopChatMessageInput";
+    private const string ChatRootWidgetId = "CoopChatRoot";
+    private const string OpenBackdropWidgetId = "CoopChatOpenBackdrop";
     private const string FeedScrollablePanelId = "ChatFeedScrollablePanel";
     private const string ResizerWidgetId = "CoopChatResizer";
     private const string ResizeFrameWidgetId = "CoopChatResizeFrame";
@@ -32,6 +34,8 @@ internal sealed class ChatOverlay : GlobalLayer, IDisposable
     private GauntletLayer gauntletLayer;
     private GauntletMovieIdentifier movie;
     private EditableTextWidget inputWidget;
+    private Widget chatRootWidget;
+    private Widget openBackdropWidget;
     private ScrollablePanel feedScrollablePanel;
     private Widget resizerWidget;
     private Widget resizeFrameWidget;
@@ -45,6 +49,7 @@ internal sealed class ChatOverlay : GlobalLayer, IDisposable
     private float pinFeedLastMaxValue = -1f;
     private bool isResizing;
     private bool applyResizeToPanel;
+    private bool feedInnerPoliciesCaptured;
     private float resizeLerpRatio;
     private Vec2 resizeStartMousePosition;
     private Vec2 resizeOriginalSize;
@@ -90,9 +95,7 @@ internal sealed class ChatOverlay : GlobalLayer, IDisposable
 
         if (!dataSource.IsOpen)
         {
-            SetResizeCaptureVisible(false);
-            isResizing = false;
-            applyResizeToPanel = false;
+            CancelActiveResize();
             // Keep pinning while closed so new lines stay in view
             if (pinFeedToBottom)
                 ContinuePinFeedToBottom();
@@ -107,6 +110,7 @@ internal sealed class ChatOverlay : GlobalLayer, IDisposable
         }
 
         UpdateResize(dt);
+        UpdateOpenPanelCursorAndCapture();
 
         if (pinFeedToBottom)
             ContinuePinFeedToBottom();
@@ -120,7 +124,17 @@ internal sealed class ChatOverlay : GlobalLayer, IDisposable
                 isInputFocused,
                 Input.IsKeyPressed(InputKey.Escape),
                 Input.IsKeyPressed(InputKey.ControllerRRight)))
+        {
+            // Events don't have text focus so close on press
+            if (!dataSource.IsChatInputEnabled)
+            {
+                ClaimOpenPanelFocusForClose();
+                CloseInput();
+                return;
+            }
+
             FocusInput();
+        }
 
         if (ShouldCloseInput(
                 Input.IsKeyReleased(InputKey.Escape),
@@ -177,6 +191,8 @@ internal sealed class ChatOverlay : GlobalLayer, IDisposable
         dataSource.OnFinalize();
 
         inputWidget = null;
+        chatRootWidget = null;
+        openBackdropWidget = null;
         feedScrollablePanel = null;
         resizerWidget = null;
         resizeFrameWidget = null;
@@ -243,8 +259,7 @@ internal sealed class ChatOverlay : GlobalLayer, IDisposable
         bool isGameplayLayerFocused = ReferenceEquals(focusedLayer, gameplayLayer);
         bool isChatLayerFocused = ReferenceEquals(focusedLayer, gauntletLayer);
 
-        // Own the bottom-left event feed for the whole campaign; do not fall back to vanilla
-        // panels that clear the frame (character / clan / party).
+        // Don't fall back to vanilla feed when gameplay screens clear the frame
         bool shouldShow = ShouldShowPresentation(isCampaignContext, isConversationActive, isLoading);
         allowChatOpen = ShouldAllowChatOpen(
             isGameplayScreen && !isLoading,
@@ -275,6 +290,7 @@ internal sealed class ChatOverlay : GlobalLayer, IDisposable
         dataSource.SetOpen(true);
 
         ResolveFeedWidgets();
+        SetOpenPanelEventAcceptance(true);
         ignoreNextOutsideClick = true;
         FocusInput();
     }
@@ -314,8 +330,13 @@ internal sealed class ChatOverlay : GlobalLayer, IDisposable
         if (Input.IsKeyPressed(InputKey.LeftMouseButton) &&
             ReferenceEquals(gauntletLayer.UIContext.EventManager.HoveredWidget, resizerWidget))
         {
-            gauntletLayer.UIContext.EventManager.FocusedWidget = null;
-            isInputFocused = false;
+            // Full focus release so gameplay keys work after resize; keep open-panel cursor
+            ReleaseInputFocus();
+            // Finish any active Fixed policies before taking a new snapshot
+            if (applyResizeToPanel || feedInnerPoliciesCaptured)
+                RestoreFeedInnerPolicies();
+            applyResizeToPanel = false;
+
             isResizing = true;
             SetResizeCaptureVisible(true);
             resizeStartMousePosition = Input.MousePositionPixel;
@@ -326,15 +347,7 @@ internal sealed class ChatOverlay : GlobalLayer, IDisposable
             resizeFrameWidget.SuggestedWidth = dataSource.ChatBoxSizeX;
             resizeFrameWidget.SuggestedHeight = dataSource.ChatBoxSizeY;
 
-            if (feedScrollablePanel?.InnerPanel != null)
-            {
-                feedInnerWidthPolicy = feedScrollablePanel.InnerPanel.WidthSizePolicy;
-                feedInnerHeightPolicy = feedScrollablePanel.InnerPanel.HeightSizePolicy;
-                feedScrollablePanel.InnerPanel.WidthSizePolicy = SizePolicy.Fixed;
-                feedScrollablePanel.InnerPanel.HeightSizePolicy = SizePolicy.Fixed;
-                feedScrollablePanel.InnerPanel.SuggestedWidth = feedScrollablePanel.InnerPanel.Size.X;
-                feedScrollablePanel.InnerPanel.SuggestedHeight = feedScrollablePanel.InnerPanel.Size.Y;
-            }
+            CaptureAndFreezeFeedInnerPanel();
         }
         else if (Input.IsKeyReleased(InputKey.LeftMouseButton))
         {
@@ -371,15 +384,50 @@ internal sealed class ChatOverlay : GlobalLayer, IDisposable
                 dataSource.ChatBoxSizeY = targetHeight;
                 resizeFrameWidget.WidthSizePolicy = SizePolicy.StretchToParent;
                 resizeFrameWidget.HeightSizePolicy = SizePolicy.StretchToParent;
-                if (feedScrollablePanel?.InnerPanel != null)
-                {
-                    feedScrollablePanel.InnerPanel.WidthSizePolicy = feedInnerWidthPolicy;
-                    feedScrollablePanel.InnerPanel.HeightSizePolicy = feedInnerHeightPolicy;
-                }
-
+                RestoreFeedInnerPolicies();
                 applyResizeToPanel = false;
             }
         }
+    }
+
+    private void CaptureAndFreezeFeedInnerPanel()
+    {
+        if (feedScrollablePanel?.InnerPanel == null) return;
+
+        feedInnerWidthPolicy = feedScrollablePanel.InnerPanel.WidthSizePolicy;
+        feedInnerHeightPolicy = feedScrollablePanel.InnerPanel.HeightSizePolicy;
+        feedInnerPoliciesCaptured = true;
+        feedScrollablePanel.InnerPanel.WidthSizePolicy = SizePolicy.Fixed;
+        feedScrollablePanel.InnerPanel.HeightSizePolicy = SizePolicy.Fixed;
+        feedScrollablePanel.InnerPanel.SuggestedWidth = feedScrollablePanel.InnerPanel.Size.X;
+        feedScrollablePanel.InnerPanel.SuggestedHeight = feedScrollablePanel.InnerPanel.Size.Y;
+    }
+
+    private void RestoreFeedInnerPolicies()
+    {
+        if (!feedInnerPoliciesCaptured) return;
+
+        ResolveFeedWidgets();
+        if (feedScrollablePanel?.InnerPanel != null)
+        {
+            feedScrollablePanel.InnerPanel.WidthSizePolicy = feedInnerWidthPolicy;
+            feedScrollablePanel.InnerPanel.HeightSizePolicy = feedInnerHeightPolicy;
+        }
+
+        feedInnerPoliciesCaptured = false;
+    }
+
+    private void CancelActiveResize()
+    {
+        RestoreFeedInnerPolicies();
+        SetResizeCaptureVisible(false);
+        isResizing = false;
+        applyResizeToPanel = false;
+        if (resizeFrameWidget == null) return;
+
+        resizeFrameWidget.IsVisible = false;
+        resizeFrameWidget.WidthSizePolicy = SizePolicy.StretchToParent;
+        resizeFrameWidget.HeightSizePolicy = SizePolicy.StretchToParent;
     }
 
     private void ResolveFeedWidgets()
@@ -388,6 +436,8 @@ internal sealed class ChatOverlay : GlobalLayer, IDisposable
         if (root == null) return;
 
         inputWidget ??= root.FindChild(InputWidgetId, includeAllChildren: true) as EditableTextWidget;
+        chatRootWidget ??= root.FindChild(ChatRootWidgetId, includeAllChildren: true);
+        openBackdropWidget ??= root.FindChild(OpenBackdropWidgetId, includeAllChildren: true);
         feedScrollablePanel ??= root.FindChild(FeedScrollablePanelId, includeAllChildren: true) as ScrollablePanel;
         resizerWidget ??= root.FindChild(ResizerWidgetId, includeAllChildren: true);
         resizeFrameWidget ??= root.FindChild(ResizeFrameWidgetId, includeAllChildren: true);
@@ -401,23 +451,108 @@ internal sealed class ChatOverlay : GlobalLayer, IDisposable
             resizeCaptureWidget.IsVisible = visible;
     }
 
+    /// <summary>
+    /// Closed feed must stay click-through
+    /// While open the backdrop has control of mouse clicks and wheel for scrolling
+    /// </summary>
+    private void SetOpenPanelEventAcceptance(bool acceptEvents)
+    {
+        ResolveFeedWidgets();
+        bool doNotAccept = !acceptEvents;
+        if (openBackdropWidget != null)
+            openBackdropWidget.DoNotAcceptEvents = doNotAccept;
+        if (feedScrollablePanel != null)
+            feedScrollablePanel.DoNotAcceptEvents = doNotAccept;
+    }
+
+    private void UpdateOpenPanelCursorAndCapture()
+    {
+        if (gauntletLayer == null) return;
+
+        ResolveFeedWidgets();
+        bool holdFromChat = IsMouseHoldFromChat();
+        // Resize owns the capture widget while dragging
+        if (!isResizing && !applyResizeToPanel)
+            SetResizeCaptureVisible(holdFromChat);
+
+        // Typing path already claimed keyboard via FocusInput
+        if (isInputFocused) return;
+
+        bool overChat = IsPointerOverOpenChat();
+        bool mapLookActive = Input.IsKeyDown(InputKey.RightMouseButton) && !holdFromChat && !overChat;
+        bool showCursor = ShouldShowOpenPanelCursor(
+            inputFocused: false,
+            pointerOverChat: overChat,
+            mouseCaptureActive: holdFromChat || isResizing || applyResizeToPanel,
+            mapLookActive: mapLookActive);
+
+        // While open, keep the cursor up for tabs/resize; hide only during map RMB look
+        if (showCursor)
+            SetOpenPanelInputRestrictions(gauntletLayer.InputRestrictions);
+        else
+            gauntletLayer.InputRestrictions.SetInputRestrictions(false, InputUsageMask.Mouse);
+    }
+
+    private bool IsMouseHoldFromChat()
+    {
+        bool lmbDown = Input.IsKeyDown(InputKey.LeftMouseButton);
+        bool rmbDown = Input.IsKeyDown(InputKey.RightMouseButton);
+        if (!lmbDown && !rmbDown) return false;
+
+        var eventManager = gauntletLayer.UIContext.EventManager;
+        if (lmbDown && IsUnderChatRoot(eventManager.LatestMouseDownWidget))
+            return true;
+        if (rmbDown && IsUnderChatRoot(eventManager.LatestMouseAlternateDownWidget))
+            return true;
+
+        return isResizing;
+    }
+
+    private bool IsPointerOverOpenChat()
+    {
+        if (chatRootWidget == null) return false;
+
+        var eventManager = gauntletLayer.UIContext.EventManager;
+        if (IsUnderChatRoot(eventManager.HoveredWidget))
+            return true;
+
+        return chatRootWidget.IsPointInsideMeasuredArea(eventManager.MousePosition);
+    }
+
+    private bool IsUnderChatRoot(Widget widget)
+    {
+        if (chatRootWidget == null || widget == null) return false;
+
+        for (Widget current = widget; current != null; current = current.ParentWidget)
+        {
+            if (ReferenceEquals(current, chatRootWidget))
+                return true;
+        }
+
+        return false;
+    }
+
     private void CloseInput()
     {
         if (gauntletLayer == null) return;
 
         dataSource.SetOpen(false);
         ignoreNextOutsideClick = false;
-        SetResizeCaptureVisible(false);
-        isResizing = false;
-        applyResizeToPanel = false;
-        if (resizeFrameWidget != null)
-            resizeFrameWidget.IsVisible = false;
+        SetOpenPanelEventAcceptance(false);
+        CancelActiveResize();
         ReleaseInputFocus();
     }
 
     private void FocusInput()
     {
-        if (inputWidget == null || !dataSource.IsChatInputEnabled) return;
+        if (inputWidget == null) return;
+
+        // Events (read-only): show cursor for tabs/resize without focusing the disabled input
+        if (!dataSource.IsChatInputEnabled)
+        {
+            SetOpenPanelInputRestrictions(gauntletLayer.InputRestrictions);
+            return;
+        }
 
         gauntletLayer.InputRestrictions.SetInputRestrictions();
         gauntletLayer.IsFocusLayer = true;
@@ -433,6 +568,14 @@ internal sealed class ChatOverlay : GlobalLayer, IDisposable
         isInputFocused = true;
     }
 
+    /// <summary>Briefly own Escape so the game menu does not open, then CloseInput clears it.</summary>
+    private void ClaimOpenPanelFocusForClose()
+    {
+        gauntletLayer.InputRestrictions.SetInputRestrictions();
+        gauntletLayer.IsFocusLayer = true;
+        ScreenManager.TrySetFocus(gauntletLayer);
+    }
+
     private void ReleaseInputFocus()
     {
         gauntletLayer.UIContext.EventManager.FocusedWidget = null;
@@ -440,9 +583,11 @@ internal sealed class ChatOverlay : GlobalLayer, IDisposable
         isInputFocused = false;
         gauntletLayer.IsFocusLayer = false;
         ScreenManager.TryLoseFocus(gauntletLayer);
-        // Cursor stays while open so tabs and the resizer stay usable
         if (dataSource.IsOpen)
+        {
+            // Cursor visibility for the open panel is refreshed next tick
             SetOpenPanelInputRestrictions(gauntletLayer.InputRestrictions);
+        }
         else
             SetPassiveInputRestrictions(gauntletLayer.InputRestrictions);
     }
@@ -521,5 +666,19 @@ internal sealed class ChatOverlay : GlobalLayer, IDisposable
         inputRestrictions.SetInputRestrictions(
             isMouseVisible: true,
             mask: InputUsageMask.Mouse);
+    }
+
+    /// <summary>
+    /// Open panel keeps a cursor for UI, except during map RMB look which would warp a visible cursor.
+    /// </summary>
+    internal static bool ShouldShowOpenPanelCursor(
+        bool inputFocused,
+        bool pointerOverChat,
+        bool mouseCaptureActive,
+        bool mapLookActive)
+    {
+        if (inputFocused || pointerOverChat || mouseCaptureActive)
+            return true;
+        return !mapLookActive;
     }
 }

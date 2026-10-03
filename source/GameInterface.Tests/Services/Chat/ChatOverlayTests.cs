@@ -29,6 +29,27 @@ public class ChatOverlayTests
         Assert.True(inputRestrictions.MouseVisibility);
     }
 
+    [Theory]
+    [InlineData(true, false, false, false, true)]
+    [InlineData(false, true, false, false, true)]
+    [InlineData(false, false, true, false, true)]
+    [InlineData(false, false, false, false, true)]
+    [InlineData(false, false, false, true, false)]
+    [InlineData(false, true, false, true, true)]
+    public void OpenPanelCursor_HidesOnlyDuringMapLook(
+        bool inputFocused,
+        bool pointerOverChat,
+        bool mouseCaptureActive,
+        bool mapLookActive,
+        bool expected)
+    {
+        Assert.Equal(expected, ChatOverlay.ShouldShowOpenPanelCursor(
+            inputFocused,
+            pointerOverChat,
+            mouseCaptureActive,
+            mapLookActive));
+    }
+
     [Fact]
     public void OutsideMouseClick_ReleasesOnlyFocusedTextInput()
     {
