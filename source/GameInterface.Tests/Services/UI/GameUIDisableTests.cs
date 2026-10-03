@@ -11,6 +11,26 @@ namespace GameInterface.Tests.Services.UI;
 public class GameUIDisableTests
 {
     [Fact]
+    public void QuestsState_IsAllowedOnClientOnly()
+    {
+        var questsState = ObjectHelper.SkipConstructor<QuestsState>();
+        bool originalIsServer = ModInformation.IsServer;
+
+        try
+        {
+            ModInformation.IsServer = false;
+            Assert.True(GameUIDisable.PushStatePatch(questsState));
+
+            ModInformation.IsServer = true;
+            Assert.False(GameUIDisable.PushStatePatch(questsState));
+        }
+        finally
+        {
+            ModInformation.IsServer = originalIsServer;
+        }
+    }
+
+    [Fact]
     public void KingdomState_IsAllowedOnClientOnly()
     {
         var kingdomState = ObjectHelper.SkipConstructor<KingdomState>();
