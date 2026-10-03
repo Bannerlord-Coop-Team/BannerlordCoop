@@ -753,10 +753,28 @@ public class CapturedByBountyHuntersIssueTests : IDisposable
     [InlineData(23, true, 10, "reset")]
     public void PartyScreenDonePreservesXpEarnedAfterACommit(
         int initialUpgradeXp, bool deferredReceive, int selectedCount, string restoreSelection)
+        => CheckPartyScreenXpChange(initialUpgradeXp, deferredReceive, selectedCount, restoreSelection, true, false);
+
+    [Theory]
+    [InlineData(false, false, false, 10)]
+    [InlineData(false, false, true, 10)]
+    [InlineData(false, false, false, 25)]
+    [InlineData(false, false, true, 25)]
+    [InlineData(false, true, false, 10)]
+    [InlineData(false, true, true, 10)]
+    [InlineData(true, true, false, 10)]
+    [InlineData(true, true, true, 10)]
+    public void PartyScreenDonePreservesXpAtInitialSelectionAndCheaperUpgrades(
+        bool commitBeforeChange, bool cheapUpgrade, bool deferredReceive, int selectedCount)
+        => CheckPartyScreenXpChange(cheapUpgrade ? 24 : 23, deferredReceive, selectedCount, "none", commitBeforeChange, cheapUpgrade);
+
+    private void CheckPartyScreenXpChange(int initialUpgradeXp, bool deferredReceive, int selectedCount,
+        string restoreSelection, bool commitBeforeChange, bool cheapUpgrade)
     {
         var fixture = CreateIssue();
         var client = environment.Clients.First();
         var targetId = environment.CreateRegisteredObject<CharacterObject>();
+        var cheaperTargetId = cheapUpgrade ? environment.CreateRegisteredObject<CharacterObject>() : null;
         AcceptFromFirstClient(fixture, alternative: true, submitAlternative: false, beforeRequest: () =>
         {
             var giver = client.GetRegisteredObject<Hero>(fixture.Giver);
@@ -765,6 +783,7 @@ public class CapturedByBountyHuntersIssueTests : IDisposable
             var troop = sent.GetTroopRoster().Single(entry => !entry.Character.IsHero).Character;
             Assert.True(client.ObjectManager.TryGetId(party, out var partyId));
             Assert.True(client.ObjectManager.TryGetId(troop, out var troopId));
+            Assert.True(client.ObjectManager.TryGetId(Hero.MainHero, out var playerId));
             foreach (var instance in new[] { environment.Server }.Concat(environment.Clients))
             {
                 instance.Call(() =>
@@ -777,6 +796,13 @@ public class CapturedByBountyHuntersIssueTests : IDisposable
                         target.Level = 26;
                         target.UpgradeTargets = Array.Empty<CharacterObject>();
                         original.UpgradeTargets = new[] { target };
+                        if (cheapUpgrade)
+                        {
+                            var cheaperTarget = instance.GetRegisteredObject<CharacterObject>(cheaperTargetId);
+                            cheaperTarget.Level = 21;
+                            cheaperTarget.UpgradeTargets = Array.Empty<CharacterObject>();
+                            original.UpgradeTargets = new[] { target, cheaperTarget };
+                        }
                     }
                 });
             }
@@ -786,6 +812,11 @@ public class CapturedByBountyHuntersIssueTests : IDisposable
                 party.MemberRoster.AddToCounts(troop, 10);
             }
             int cost = troop.GetUpgradeXpCost(party.Party, 0);
+            environment.Server.Call(() =>
+            {
+                var player = environment.Server.GetRegisteredObject<Hero>(playerId);
+                player.ChangeHeroGold(10000 - player.Gold);
+            });
             environment.Server.Call(() => environment.Server.GetRegisteredObject<MobileParty>(partyId).MemberRoster
                 .AddXpToTroop(environment.Server.GetRegisteredObject<CharacterObject>(troopId), initialUpgradeXp * cost));
             environment.FlushCoalescer();
@@ -794,8 +825,11 @@ public class CapturedByBountyHuntersIssueTests : IDisposable
             command.FillForTransferTroop(PartyScreenLogic.PartyRosterSide.Right, PartyScreenLogic.TroopType.Member, troop, selectedCount, 0, -1);
             using (new AllowedThread()) logic.TransferTroop(command, false);
             if (deferredReceive) environment.Server.Resolve<TestNetworkRouter>().ReceiveContext = TestNetworkReceiveContext.PollerThread;
-            Assert.True(logic.DoneLogic(true));
-            FlushCommit();
+            if (commitBeforeChange)
+            {
+                Assert.True(logic.DoneLogic(true));
+                FlushCommit();
+            }
             if (restoreSelection != "none")
             {
                 command.FillForTransferTroop(PartyScreenLogic.PartyRosterSide.Left, PartyScreenLogic.TroopType.Member, troop, 5, 0, -1);
@@ -803,14 +837,34 @@ public class CapturedByBountyHuntersIssueTests : IDisposable
                 logic.SavePartyScreenData();
                 using (new AllowedThread()) logic.TransferTroop(command, false);
             }
-            environment.Server.Call(() => environment.Server.GetRegisteredObject<MobileParty>(partyId).MemberRoster
-                .AddXpToTroop(environment.Server.GetRegisteredObject<CharacterObject>(troopId), cost));
+            int spentXp = 0;
+            int spentGold = 0;
+            if (cheapUpgrade)
+            {
+                spentXp = troop.GetUpgradeXpCost(party.Party, 1);
+                spentGold = troop.GetUpgradeGoldCost(party.Party, 1);
+                Assert.InRange(spentXp, 1, cost - 1);
+                command.FillForUpgradeTroop(PartyScreenLogic.PartyRosterSide.Right, PartyScreenLogic.TroopType.Member, troop, 1, 1, -1);
+                using (new AllowedThread())
+                {
+                    Assert.True(logic.ValidateCommand(command));
+                    logic.UpgradeTroop(command);
+                }
+            }
+            else
+            {
+                environment.Server.Call(() => environment.Server.GetRegisteredObject<MobileParty>(partyId).MemberRoster
+                    .AddXpToTroop(environment.Server.GetRegisteredObject<CharacterObject>(troopId), cost));
+            }
             environment.FlushCoalescer();
             foreach (var recipient in environment.Clients) recipient.PumpGameThread();
-            int expected = (initialUpgradeXp + 1) * cost;
-            Assert.Equal(expected, party.MemberRoster.GetElementXp(troop));
-            AssertXp(logic.CurrentData);
-            AssertXp(logic._initialData);
+            int expected = cheapUpgrade ? (initialUpgradeXp * cost) - spentXp : (initialUpgradeXp + 1) * cost;
+            if (commitBeforeChange && !cheapUpgrade) Assert.Equal(expected, party.MemberRoster.GetElementXp(troop));
+            if (!cheapUpgrade)
+            {
+                AssertXp(logic.CurrentData);
+                AssertXp(logic._initialData);
+            }
             if (restoreSelection != "none")
             {
                 AssertXp(logic._savedData);
@@ -825,7 +879,9 @@ public class CapturedByBountyHuntersIssueTests : IDisposable
             FlushCommit();
             Assert.Equal(expected, party.MemberRoster.GetElementXp(troop));
             Assert.Equal(expected, logic.MemberRosters[1].GetElementXp(troop) + sent.GetElementXp(troop));
-            Assert.Equal(25 - selectedCount, logic.MemberRosters[1].GetTroopCount(troop));
+            AssertXp(logic.CurrentData);
+            int remainingCount = cheapUpgrade ? 24 : 25;
+            Assert.Equal(remainingCount - selectedCount, logic.MemberRosters[1].GetTroopCount(troop));
             Assert.Equal(selectedCount, sent.GetTroopCount(troop));
             foreach (var instance in new[] { environment.Server }.Concat(environment.Clients))
             {
@@ -833,9 +889,15 @@ public class CapturedByBountyHuntersIssueTests : IDisposable
                 {
                     var authority = instance.GetRegisteredObject<MobileParty>(partyId).MemberRoster;
                     var original = instance.GetRegisteredObject<CharacterObject>(troopId);
-                    Assert.Equal(25, authority.GetTroopCount(original));
+                    Assert.Equal(remainingCount, authority.GetTroopCount(original));
                     Assert.Equal(instance == environment.Server || instance == client ? expected : 0,
                         authority.GetElementXp(original));
+                    if (cheapUpgrade)
+                    {
+                        Assert.Equal(1, authority.GetTroopCount(instance.GetRegisteredObject<CharacterObject>(cheaperTargetId)));
+                        if (instance == environment.Server || instance == client)
+                            Assert.Equal(10000 - spentGold, instance.GetRegisteredObject<Hero>(playerId).Gold);
+                    }
                 });
             }
             client.Resolve<IAlternativeSolutionTroopSelection>().Rollback(giver);

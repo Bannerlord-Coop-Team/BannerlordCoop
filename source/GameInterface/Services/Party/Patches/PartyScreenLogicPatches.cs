@@ -150,9 +150,7 @@ internal class PartyScreenLogicPatches
                     initialSelectedTroops.Add(__instance._initialData.LeftMemberRoster);
                     currentMembers = TroopRoster.CreateDummyTroopRoster();
                     currentMembers.Add(__instance.MemberRosters[1]);
-                    for (int i = 0; i < currentMembers.Count; i++)
-                        if (currentMembers.data[i].Xp > 0)
-                            __instance.RightOwnerParty.OnXpChanged(__instance.MemberRosters[1], ref currentMembers.data[i]);
+                    // Native upgrades can leave overflow XP that still fits the combined party.
                     currentMembers.Add(selectedTroops);
                     initialMembers = TroopRoster.CreateDummyTroopRoster();
                     initialMembers.Add(__instance._initialData.RightMemberRoster);

@@ -59,7 +59,7 @@ internal sealed class AlternativeSolutionTroopSelection : IAlternativeSolutionTr
     public IssueBase FindIssue(PartyScreenLogic logic)
     {
         if (ModInformation.IsServer || logic == null ||
-            Game.Current.GameStateManager.ActiveState is not PartyState state ||
+            Game.Current?.GameStateManager?.ActiveState is not PartyState state ||
             state.PartyScreenMode != PartyScreenHelper.PartyScreenMode.QuestTroopManage ||
             !ReferenceEquals(state.PartyScreenLogic, logic)) return null;
 
