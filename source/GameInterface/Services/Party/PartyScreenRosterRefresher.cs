@@ -71,7 +71,12 @@ internal class PartyScreenRosterRefresher : IPartyScreenRosterRefresher
     }
 
     public void RefreshXp(PartyScreenLogic logic, CharacterObject character)
-        => RefreshTroop(logic, logic._initialData.RightMemberRoster, character, false, false);
+    {
+        if (logic.CurrentData.RightMemberRoster.GetTroopCount(character) > 0)
+            RefreshTroop(logic, logic._initialData.RightMemberRoster, character, false, false);
+        if (logic.CurrentData.LeftMemberRoster.GetTroopCount(character) > 0)
+            RefreshTroop(logic, logic._initialData.LeftMemberRoster, character, false, false);
+    }
 
     public bool TryApply(
         TroopRoster authoritativeRoster,

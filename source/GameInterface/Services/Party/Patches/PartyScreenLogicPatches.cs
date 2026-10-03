@@ -273,20 +273,31 @@ internal class PartyScreenLogicPatches
             __instance.MemberRosters[(int)command.RosterSide].GetTroopCount(command.Character) != __state.Count - command.TotalNumber) return;
 
         var roster = __instance.MemberRosters[1];
+        var selected = __instance.MemberRosters[0];
         int index = roster.FindIndexOfTroop(command.Character);
         int previousXp = roster.GetElementXp(command.Character);
+        int previousSelectedXp = selected.GetElementXp(command.Character);
         using (new AllowedThread())
         {
-            // Native right-side transfers leave their overflow XP on the source roster.
-            if (index >= 0 && previousXp > 0)
+            // Native transfers can duplicate or clamp XP on one side of the split party.
+            if (index >= 0 && __state.Xp > 0)
             {
                 var element = roster.GetElementCopyAtIndex(index);
-                element.Xp = (int)Math.Min(previousXp, __state.Xp - __instance.MemberRosters[0].GetElementXp(command.Character));
+                element.Xp = (int)Math.Min(int.MaxValue, Math.Max(0, __state.Xp - previousSelectedXp));
                 __instance.RightOwnerParty.OnXpChanged(roster, ref element);
                 roster.SetElementXp(index, element.Xp);
+                roster.UpdateVersion();
+            }
+            int selectedIndex = selected.FindIndexOfTroop(command.Character);
+            if (selectedIndex >= 0 && selected.GetElementNumber(selectedIndex) > 0 && __state.Xp > 0)
+            {
+                selected.SetElementXp(selectedIndex,
+                    (int)Math.Min(int.MaxValue, Math.Max(0, __state.Xp - roster.GetElementXp(command.Character))));
+                selected.UpdateVersion();
             }
         }
-        if (invokeUpdate && previousXp != roster.GetElementXp(command.Character) &&
+        if (invokeUpdate && (previousXp != roster.GetElementXp(command.Character) ||
+            previousSelectedXp != selected.GetElementXp(command.Character)) &&
             ContainerProvider.TryResolve<IPartyScreenRosterRefresher>(out var refresher))
             refresher.RefreshXp(__instance, command.Character);
     }

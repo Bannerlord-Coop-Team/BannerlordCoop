@@ -768,8 +768,17 @@ public class CapturedByBountyHuntersIssueTests : IDisposable
         bool commitBeforeChange, bool cheapUpgrade, bool deferredReceive, int selectedCount)
         => CheckPartyScreenXpChange(cheapUpgrade ? 24 : 23, deferredReceive, selectedCount, "none", commitBeforeChange, cheapUpgrade);
 
+    [Theory]
+    [InlineData(false, false)]
+    [InlineData(false, true)]
+    [InlineData(true, false)]
+    [InlineData(true, true)]
+    public void PartyScreenDonePreservesXpWhenReturningTroopsAfterACheaperUpgrade(
+        bool commitBeforeChange, bool deferredReceive)
+        => CheckPartyScreenXpChange(24, deferredReceive, 10, "none", commitBeforeChange, true, returnAfterUpgrade: true);
+
     private void CheckPartyScreenXpChange(int initialUpgradeXp, bool deferredReceive, int selectedCount,
-        string restoreSelection, bool commitBeforeChange, bool cheapUpgrade)
+        string restoreSelection, bool commitBeforeChange, bool cheapUpgrade, bool returnAfterUpgrade = false)
     {
         var fixture = CreateIssue();
         var client = environment.Clients.First();
@@ -849,6 +858,12 @@ public class CapturedByBountyHuntersIssueTests : IDisposable
                 {
                     Assert.True(logic.ValidateCommand(command));
                     logic.UpgradeTroop(command);
+                }
+                if (returnAfterUpgrade)
+                {
+                    command.FillForTransferTroop(PartyScreenLogic.PartyRosterSide.Left, PartyScreenLogic.TroopType.Member, troop, 5, 0, -1);
+                    using (new AllowedThread()) logic.TransferTroop(command, false);
+                    selectedCount -= 5;
                 }
             }
             else
