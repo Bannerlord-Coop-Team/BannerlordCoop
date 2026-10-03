@@ -158,9 +158,9 @@ internal class BattleMissionStartHandler : IHandler
                 }
 
                 operation = "validate naval battle";
-                if (mapEvent.IsNavalMapEvent)
+                if (!IsNavalBattleAdmitted(mapEvent.IsNavalMapEvent, ModInformation.IsNavalDlcActive))
                 {
-                    Logger.Warning("Rejecting attack mission start for map event {MapEventId}: naval battles are disabled", payload.What.MapEventId);
+                    Logger.Warning("Rejecting attack mission start for map event {MapEventId}: naval battles need NavalDLC active on the server", payload.What.MapEventId);
                     network.Send(requester, new NetworkBattleStartReply(payload.What.RequestId, false));
                     return;
                 }
@@ -724,9 +724,11 @@ internal class BattleMissionStartHandler : IHandler
                 return;
             }
 
-            if (battle.IsNavalMapEvent)
+            ICoopNavalBattleLauncher navalLauncher = null;
+            if (battle.IsNavalMapEvent && !ContainerProvider.TryResolve(out navalLauncher))
             {
-                Logger.Warning("Received {Message} for naval map event {MapEventId}, but naval battles are disabled", nameof(NetworkStartAttackMission), mapEventId);
+                Logger.Error("[BattleSync] ICoopNavalBattleLauncher unavailable (NavalDLC inactive); cannot open naval map event {MapEventId}", mapEventId);
+                LogAttackMissionLifecycle("naval launcher unavailable", sequence, mapEventId);
                 return;
             }
 
@@ -756,31 +758,39 @@ internal class BattleMissionStartHandler : IHandler
             // launcher lives in Missions and is resolved from the container. There is deliberately no native
             // fallback: the same unavailable container would prevent BattleMissionEntryPatch from attaching the
             // lifecycle that owns EndBattle, while the already-engaged spawn patches could corrupt native setup.
-            if (ContainerProvider.TryResolve(out ICoopFieldBattleLauncher battleLauncher))
+            Mission mission;
+            if (navalLauncher != null)
             {
-                var mission = battleLauncher.OpenCoopFieldBattle(missionInitializer);
-                if (mission != null)
-                {
-                    spawnGateEngaged = false; // the attached mission lifecycle owns EndBattle from here
-                    MissionStateFinalizeDiagnosticsPatch.RecordCorrelation(mission, sequence, mapEventId);
-                    Logger.Information(
-                        "[BattleMissionLifecycle] Attack mission opened: sequence={Sequence} mapEvent={MapEventId} scene={Scene} missionStatePresent={MissionStatePresent} missionPresent={MissionPresent}",
-                        sequence,
-                        mapEventId,
-                        mission.SceneName,
-                        MissionState.Current != null,
-                        Mission.Current != null);
-                }
-                else
-                {
-                    Logger.Error("[BattleSync] Coop field-battle launcher returned no mission");
-                    LogAttackMissionLifecycle("launcher returned no mission", sequence, mapEventId);
-                }
+                mission = navalLauncher.OpenCoopNavalBattle(missionInitializer);
+            }
+            else if (ContainerProvider.TryResolve(out ICoopFieldBattleLauncher battleLauncher))
+            {
+                mission = battleLauncher.OpenCoopFieldBattle(missionInitializer);
             }
             else
             {
                 Logger.Error("[BattleSync] ICoopFieldBattleLauncher unavailable; cannot safely open the field battle mission");
                 LogAttackMissionLifecycle("launcher unavailable", sequence, mapEventId);
+                return;
+            }
+
+            if (mission != null)
+            {
+                spawnGateEngaged = false; // the attached mission lifecycle owns EndBattle from here
+                MissionStateFinalizeDiagnosticsPatch.RecordCorrelation(mission, sequence, mapEventId);
+                Logger.Information(
+                    "[BattleMissionLifecycle] Attack mission opened: sequence={Sequence} mapEvent={MapEventId} naval={IsNaval} scene={Scene} missionStatePresent={MissionStatePresent} missionPresent={MissionPresent}",
+                    sequence,
+                    mapEventId,
+                    battle.IsNavalMapEvent,
+                    mission.SceneName,
+                    MissionState.Current != null,
+                    Mission.Current != null);
+            }
+            else
+            {
+                Logger.Error("[BattleSync] Coop battle launcher returned no mission");
+                LogAttackMissionLifecycle("launcher returned no mission", sequence, mapEventId);
             }
         }
         catch (Exception e)
@@ -838,6 +848,11 @@ internal class BattleMissionStartHandler : IHandler
     internal static void UnwindSpawnGateAfterFailedOpen(bool spawnGateEngaged)
     {
         if (spawnGateEngaged) BattleSpawnGate.EndBattle();
+    }
+
+    internal static bool IsNavalBattleAdmitted(bool isNavalMapEvent, bool navalDlcActive)
+    {
+        return !isNavalMapEvent || navalDlcActive;
     }
 
     internal static bool ShouldOpenBattleMission(bool isPlayerWounded, string localPartyId, string initiatingPartyId)

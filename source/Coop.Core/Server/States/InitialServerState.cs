@@ -55,8 +55,8 @@ public class InitialServerState : ServerStateBase
 
     internal void Handle_CampaignReady(MessagePayload<CampaignReady> payload)
     {
-        // Coop does not support DLC. Warn the host if any is enabled before the server becomes
-        // joinable; clients with DLC enabled are rejected separately during module validation.
+        // Coop supports no DLC other than NavalDLC. Warn the host if another is enabled before the server
+        // becomes joinable; clients with one enabled are rejected separately during module validation.
         if (!moduleValidator.ValidateNoDlc(moduleInfoProvider.GetModuleInfos(), out var dlcError))
         {
             Logger.Error("Hosting with unsupported modules enabled. {error}", dlcError);

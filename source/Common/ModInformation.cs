@@ -7,6 +7,12 @@ public static class ModInformation
 {
     public static bool IsServer { get; set; } = false;
     public static bool IsClient => !IsServer;
+
+    /// <summary>The module id of the War Sails DLC, the only DLC coop supports.</summary>
+    public const string NavalDlcModuleId = "NavalDLC";
+
+    /// <summary>Whether NavalDLC is an active module in this process. Set once at startup.</summary>
+    public static bool IsNavalDlcActive { get; set; }
 #if DEBUG
     public const string NavalLabCapabilityPrefix = "Coop.Debug.NavalLab.v1.";
     public static string NavalLabCapability { get; private set; }

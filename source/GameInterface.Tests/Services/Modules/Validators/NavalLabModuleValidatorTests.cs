@@ -27,11 +27,11 @@ public sealed class NavalLabModuleValidatorTests : IDisposable
     }
 
     [Fact]
-    public void OptInAbsent_RunTokenAloneDoesNotPermitDlc()
+    public void OptInAbsent_RunTokenAloneDoesNotEnterTheLab()
     {
         ModInformation.ConfigureNavalLab(null, "run", true);
         Assert.False(ModInformation.IsNavalLab);
-        Assert.False(new ModuleValidator().Validate(Modules(null), Modules(null), out _));
+        Assert.True(new ModuleValidator().Validate(Modules(null), Modules(null), out _));
     }
 
     [Theory]
@@ -58,7 +58,7 @@ public sealed class NavalLabModuleValidatorTests : IDisposable
         Assert.EndsWith(".run", ModInformation.NavalLabCapability);
         var validator = new ModuleValidator();
         Assert.True(validator.Validate(Modules("same"), Modules("same"), out _));
-        Assert.False(validator.ValidateNoDlc(Modules("same"), out _));
+        Assert.True(validator.ValidateNoDlc(Modules("same"), out _));
         var client = Modules("same");
         client.Add(new("OtherDlc", true, true, Version));
         Assert.False(validator.Validate(Modules("same"), client, out _));

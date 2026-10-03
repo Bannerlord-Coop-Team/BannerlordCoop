@@ -818,6 +818,143 @@ public class MapEventDebugCommands
         }
     }
 
+    // coop.debug.map_event.start_naval PlayerOne PlayerTwo
+    /// <summary>Moves the players' parties onto the nearest hostile AI party at sea and starts a naval battle with it.</summary>
+    public sealed class StartNavalCoopCommand : ICoopCommand
+    {
+        public string Prefix => "coop.debug.map_event";
+
+        public string Name => "start_naval";
+
+        public string Description => "Starts a naval battle between the players and the nearest hostile AI fleet at sea.";
+
+        public CoopCommandSide Side => CoopCommandSide.Server;
+
+        public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
+        {
+            new ExpectedArgs("controller_id", "The player the AI fleet attacks.", true),
+            new ExpectedArgs("ally_controller_id", "A second player who joins the defending side.", false),
+        };
+
+        public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
+        {
+            if (ModInformation.IsClient)
+                return Failed("Run this command on the server.");
+
+            if (!ModInformation.IsNavalDlcActive)
+                return Failed("NavalDLC is not active on the server.");
+
+            var allyControllerId = args.Count == 2 ? args[1] : null;
+            if (allyControllerId == args[0])
+                return Failed("The two players must be different.");
+
+            if (!TryGetPlayerParty(args[0], requireReady: true, out var objectManager, out var playerParty, out var error))
+                return Failed(error);
+
+            MobileParty allyParty = null;
+            if (allyControllerId != null &&
+                !TryGetPlayerParty(allyControllerId, requireReady: true, out _, out allyParty, out error))
+                return Failed(error);
+
+            if (playerParty.Ships.Count == 0)
+                return Failed($"Player {args[0]} has no ships.");
+
+            if (allyParty != null && allyParty.Ships.Count == 0)
+                return Failed($"Player {allyControllerId} has no ships.");
+
+            var playerPosition = playerParty.Position.ToVec2();
+            var enemyParty = MobileParty.All
+                .Where(party => IsNavalEnemy(party, playerParty))
+                .OrderBy(party => party.Position.ToVec2().DistanceSquared(playerPosition))
+                .FirstOrDefault();
+            if (enemyParty == null)
+                return Failed($"No hostile AI party with ships is at sea for player {args[0]}.");
+
+            PlaceAtSea(playerParty, enemyParty.Position);
+            if (allyParty != null)
+                PlaceAtSea(allyParty, enemyParty.Position);
+
+            StartBattleAction.Apply(enemyParty.Party, playerParty.Party);
+            var mapEvent = playerParty.MapEvent;
+            if (mapEvent == null)
+                return Failed($"StartBattleAction did not create a map event against {enemyParty.StringId}.");
+
+            if (!objectManager.TryGetId(mapEvent, out string mapEventId))
+                return Failed("The naval map event is not registered.");
+
+            if (allyParty != null && !TryJoinNavalAlly(objectManager, mapEventId, enemyParty, playerParty, allyParty, out error))
+                return Failed(error);
+
+            return Succeeded($"Started naval map event {mapEventId} (naval={mapEvent.IsNavalMapEvent}): " +
+                   $"{enemyParty.StringId} with {enemyParty.Ships.Count} ships attacks player {args[0]}" +
+                   (allyParty == null ? "." : $", joined by player {allyControllerId}."));
+        }
+
+        private static bool IsNavalEnemy(MobileParty party, MobileParty playerParty)
+        {
+            return party.IsActive &&
+                   !party.IsPlayerParty() &&
+                   party.IsCurrentlyAtSea &&
+                   party.Ships.Count > 0 &&
+                   party.MapEvent == null &&
+                   party.CurrentSettlement == null &&
+                   party.MemberRoster.TotalManCount > 0 &&
+                   party.MapFaction != null &&
+                   FactionManager.IsAtWarAgainstFaction(party.MapFaction, playerParty.MapFaction);
+        }
+
+        private static void PlaceAtSea(MobileParty party, CampaignVec2 position)
+        {
+            if (party.CurrentSettlement != null)
+                LeaveSettlementAction.ApplyForParty(party);
+
+            party.Position = position;
+            party.IsCurrentlyAtSea = true;
+            party.SetMoveModeHold();
+            party.ResetNavigationToHold();
+            MessageBroker.Instance.Publish(
+                typeof(MapEventDebugCommands),
+                new PartyBehaviorChangeAttempted(
+                    party,
+                    forcePosition: true,
+                    isCurrentlyAtSea: true,
+                    resetMovementToHold: true));
+        }
+
+        private static bool TryJoinNavalAlly(
+            IObjectManager objectManager,
+            string mapEventId,
+            MobileParty enemyParty,
+            MobileParty playerParty,
+            MobileParty allyParty,
+            out string error)
+        {
+            error = null;
+            allyParty.Party.MapEventSide = playerParty.Party.MapEventSide;
+            if (allyParty.MapEvent != playerParty.MapEvent)
+            {
+                error = "The ally party was not added to the naval map event.";
+                return false;
+            }
+
+            if (!ContainerProvider.TryResolve<INetwork>(out var network) ||
+                !objectManager.TryGetId(enemyParty.Party, out string enemyPartyId) ||
+                !objectManager.TryGetId(allyParty.Party, out string allyPartyId))
+            {
+                error = "Unable to resolve the naval ally encounter ids.";
+                return false;
+            }
+
+            // Opens the ally's encounter menu, the same way battle_reward_fixture_join does for its late joiner.
+            network.SendAll(new NetworkPlayerPartyHostileEncounterStarted(
+                $"debug-naval-join-{Guid.NewGuid():N}",
+                enemyPartyId,
+                allyPartyId,
+                mapEventId));
+            return true;
+        }
+    }
+
     // coop.debug.mapevent.bandit_attack_fixture_prepare PlayerOne mountain_bandits_24
     /// <summary>Prepares a reversible exact-bandit attack fixture for evidence capture.</summary>
     public sealed class BanditAttackFixturePrepareCoopCommand : ICoopCommand

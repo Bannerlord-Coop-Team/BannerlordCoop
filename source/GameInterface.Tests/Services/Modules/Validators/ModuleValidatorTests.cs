@@ -109,6 +109,36 @@ public class ModuleValidatorTests
     }
 
     [Fact]
+    public void Validate_AcceptsNavalDlc_WhenServerAndClientBothRunIt()
+    {
+        var serverModules = new List<ModuleInfo> { Native(), NavalDlc() };
+        var clientModules = new List<ModuleInfo> { Native(), NavalDlc() };
+
+        var result = new ModuleValidator().Validate(serverModules, clientModules, out var error);
+
+        Assert.True(result);
+        Assert.Null(error);
+    }
+
+    [Fact]
+    public void Validate_RequiresNavalDlc_WhenOnlyTheServerRunsIt()
+    {
+        var serverModules = new List<ModuleInfo> { Native(), NavalDlc() };
+        var clientModules = new List<ModuleInfo> { Native() };
+
+        var result = new ModuleValidator().Validate(serverModules, clientModules, out var error);
+
+        Assert.False(result);
+        Assert.Equal("To join the server the module 'NavalDLC' with version 'v1.0.0.352' is required.", error);
+    }
+
+    private static ModuleInfo Native() =>
+        new ModuleInfo { Id = "Native", IsOfficial = true, Version = new ApplicationVersion(ApplicationVersionType.Release, 1, 0, 0, 352) };
+
+    private static ModuleInfo NavalDlc() =>
+        new ModuleInfo { Id = "NavalDLC", IsOfficial = true, IsDlc = true, Version = new ApplicationVersion(ApplicationVersionType.Release, 1, 0, 0, 352) };
+
+    [Fact]
     public void Validate_ReturnsErrorMessage_WhenClientHasDlcEnabled()
     {
         // Arrange

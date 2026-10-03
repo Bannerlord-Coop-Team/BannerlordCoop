@@ -34,9 +34,9 @@ public class DirectMigratedCommandTests
         Type[] commandTypes = GetCommandTypes();
 
 #if DEBUG
-        Assert.Equal(120, commandTypes.Length);
+        Assert.Equal(121, commandTypes.Length);
 #else
-        Assert.Equal(101, commandTypes.Length);
+        Assert.Equal(102, commandTypes.Length);
 #endif
         Assert.All(commandTypes, type =>
         {
@@ -93,6 +93,7 @@ public class DirectMigratedCommandTests
             new[]
             {
                 "battle_reward_fixture_start",
+                "start_naval",
                 "start_nearest_bandit_attack",
                 "upgrade_party_screen_troop",
             },

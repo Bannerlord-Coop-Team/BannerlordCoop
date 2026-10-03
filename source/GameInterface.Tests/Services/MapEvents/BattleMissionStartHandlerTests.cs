@@ -7,6 +7,15 @@ namespace GameInterface.Tests.Services.MapEvents;
 
 public class BattleMissionStartHandlerTests
 {
+    [Theory]
+    [InlineData(false, false, true)]
+    [InlineData(true, false, false)]
+    [InlineData(true, true, true)]
+    public void IsNavalBattleAdmitted_RequiresNavalDlcOnlyForNavalMapEvents(bool isNaval, bool navalDlcActive, bool expected)
+    {
+        Assert.Equal(expected, BattleMissionStartHandler.IsNavalBattleAdmitted(isNaval, navalDlcActive));
+    }
+
     [Fact]
     public void GetOrCreateMissionInitializerSnapshot_ReusesFirstBattleInitializer()
     {

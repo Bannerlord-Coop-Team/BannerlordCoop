@@ -1,4 +1,5 @@
 ﻿using Autofac;
+using Common;
 using Common.Commands;
 using Common.Logging;
 using Common.Network.Session;
@@ -22,6 +23,8 @@ using Missions.Taverns;
 using Missions.Tournaments;
 using Missions.Tournaments.Spectators;
 using System.Collections.Generic;
+using System.IO;
+using Assembly = System.Reflection.Assembly;
 
 namespace Missions;
 
@@ -281,6 +284,17 @@ public class MissionModule : Module
             .InstancePerDependency();
         //builder.RegisterType<AgentDamageHandler>().As<IAgentDamageHandler>().InstancePerDependency();
         builder.RegisterType<AgentDeathHandler>().As<IAgentDeathHandler>().InstancePerDependency();
+
+        // Missions.Naval binds to NavalDLC types, so its module is loaded only while NavalDLC is active.
+        if (ModInformation.IsNavalDlcActive)
+            builder.RegisterAssemblyModules(LoadNavalMissionsAssembly());
+    }
+
+    // Same path the DEBUG naval lab loader uses, so both share one loaded copy of the assembly.
+    private static Assembly LoadNavalMissionsAssembly()
+    {
+        var directory = Path.GetDirectoryName(typeof(MissionModule).Assembly.Location);
+        return Assembly.LoadFrom(Path.Combine(directory, "Missions.Naval.dll"));
     }
 
     internal static IEnumerable<HarmonyPatchCategoryRegistration> CreatePatchCategoryRegistrations()

@@ -11,8 +11,8 @@ public interface IModuleValidator
 {
     /// <summary>
     /// Compares two lists of <see cref="ModuleInfo"/>, regardless of the order or sorting of the two lists. The server list specifies what the client list must fulfil. <para/>
-    /// Checks that the game versions match (changeset aside), that the client has no DLC enabled, and that community modules match exactly in both
-    /// directions, versions included. Official non-DLC modules and the DedicatedServer.* host modules are exempt from the exact match.
+    /// Checks that the game versions match (changeset aside), that the client has no unsupported DLC enabled, and that community modules and DLC
+    /// match exactly in both directions, versions included. Official non-DLC modules and the DedicatedServer.* host modules are exempt from the exact match.
     /// </summary>
     /// <param name="serverModules">The server modules</param>
     /// <param name="clientModules">The client modules</param>
@@ -20,8 +20,8 @@ public interface IModuleValidator
     public bool Validate(IEnumerable<ModuleInfo> serverModules, IEnumerable<ModuleInfo> clientModules, out string error);
 
     /// <summary>
-    /// Ensures none of the given modules is official optional content (DLC). Coop does not support
-    /// DLC, so it must be disabled on both the server and all connecting clients.
+    /// Ensures none of the given modules is unsupported official optional content (DLC). NavalDLC is the
+    /// only supported DLC; any other must be disabled on both the server and all connecting clients.
     /// </summary>
     /// <param name="modules">The modules to check.</param>
     /// <param name="error">Null if no DLC was enabled, otherwise a reason naming the enabled DLC.</param>
@@ -44,16 +44,13 @@ public class ModuleValidator : IModuleValidator
         var clientLab = clientModules.Where(module => module.Id?.StartsWith(Common.ModInformation.NavalLabCapabilityPrefix, StringComparison.Ordinal) == true).ToArray();
         bool lab = serverLab.Length == 1 && clientLab.Length == 1 && serverLab[0].Id == clientLab[0].Id;
         if ((serverLab.Length != 0 || clientLab.Length != 0)
-            && (!lab || !serverModules.Any(module => module.Id == "NavalDLC" && module.IsDlc)
-                || !clientModules.Any(module => module.Id == "NavalDLC" && module.IsDlc)))
+            && (!lab || !serverModules.Any(IsNavalDlc) || !clientModules.Any(IsNavalDlc)))
         {
             error = "Naval lab scope/capability or NavalDLC does not match.";
             return false;
         }
-        if (!ValidateNoDlc(lab ? clientModules.Where(module => module.Id != "NavalDLC") : clientModules, out error))
-#else
-        if (!ValidateNoDlc(clientModules, out error))
 #endif
+        if (!ValidateNoDlc(clientModules, out error))
         {
             return false;
         }
@@ -111,7 +108,9 @@ public class ModuleValidator : IModuleValidator
 
     public bool ValidateNoDlc(IEnumerable<ModuleInfo> modules, out string error)
     {
-        var dlcModules = (modules ?? Enumerable.Empty<ModuleInfo>()).Where(module => module.IsDlc).ToList();
+        var dlcModules = (modules ?? Enumerable.Empty<ModuleInfo>())
+            .Where(module => module.IsDlc && !IsNavalDlc(module))
+            .ToList();
 
         if (dlcModules.Any())
         {
@@ -123,6 +122,9 @@ public class ModuleValidator : IModuleValidator
         error = null;
         return true;
     }
+
+    private static bool IsNavalDlc(ModuleInfo module) =>
+        module.IsDlc && module.Id == Common.ModInformation.NavalDlcModuleId;
 
     /// <summary>
     /// Compares the game version (the version of the official module) of the server and the client.
