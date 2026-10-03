@@ -1,22 +1,24 @@
-namespace CoopMcpServer.Tests;
+﻿namespace CoopMcpServer.Tests;
 
 public sealed class InGameProcessLauncherTests
 {
     [Theory]
     [InlineData("server", false)]
+    [InlineData("client", false)]
     [InlineData("client", true)]
-    public void LaunchArgumentsAreStructuredAndClientsDeferJoining(string role, bool deferred)
+    [InlineData("server", true)]
+    public void LaunchArgumentsUseAutoConnectUnlessClientJoinIsDeferred(string role, bool deferClientJoin)
     {
         var profile = new LaunchProfile { Executable = @"C:\Game Folder\Bannerlord.exe" };
-        var info = new InGameProcessLauncher(new OwnedProcessFactory()).CreateStartInfo(profile, role, "testclient1", "run-token");
+        var info = new InGameProcessLauncher(new OwnedProcessFactory()).CreateStartInfo(profile, role, "testclient1", "run-token", deferClientJoin: deferClientJoin);
         Assert.False(info.UseShellExecute);
         Assert.Equal(profile.Executable, info.FileName);
         Assert.Equal(@"C:\Game Folder", info.WorkingDirectory);
-        Assert.Contains("/" + role, info.ArgumentList);
-        Assert.Contains("/autoconnect", info.ArgumentList);
-        Assert.Contains("run-token", info.ArgumentList);
-        Assert.Equal(deferred, info.ArgumentList.Contains("/cooptestmanualjoin"));
-        Assert.Contains("_MODULES_*Native*SandBoxCore*SandBox*StoryMode*Coop*_MODULES_", info.ArgumentList);
+        var expected = new List<string> { "/singleplayer", "/" + role, "/autoconnect",
+            "/platformId", "testclient1", "/cooptestrun", "run-token" };
+        if (role == "client" && deferClientJoin) expected.Add("/cooptestmanualjoin");
+        expected.Add("_MODULES_*Native*SandBoxCore*SandBox*StoryMode*Coop*_MODULES_");
+        Assert.Equal(expected, info.ArgumentList);
     }
 
     [Theory]

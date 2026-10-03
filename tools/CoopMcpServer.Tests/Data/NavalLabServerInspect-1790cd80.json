@@ -1,0 +1,326 @@
+{
+  "provenance": "Derived from actual server coop.debug.naval_lab.inspect artifacts of native run 1790cd80e6a040f9bd12facd71942384 in capture order; consecutive identical records dropped, nativeControls.stations and manifest.Combatants replaced by their counts, all other fields verbatim.",
+  "records": [
+    {
+      "file": "server-5a7623a5fde14f559f38d9a8d0ebb8c0.json",
+      "sha256": "22df1c0973211b0b2d025bc1ab4b9f2b4c10c9e5b51c1144c574daf047c4f12d",
+      "structuredResult": {
+        "manifest": {
+          "Mode": 4,
+          "IsTwoClientNative": true,
+          "AllPhysicsProbe": false,
+          "InstanceId": "naval-lab:4731ac0fde0d4db5bf652afb61303195",
+          "IncarnationId": "4731ac0f-de0d-4db5-bf65-2afb61303195",
+          "Controllers": [
+            "testclient1",
+            "testclient2"
+          ],
+          "Combatants": 10,
+          "Ships": [
+            "e510e95e-b37e-4216-a5b7-00821da572d1",
+            "a6dadaae-1215-4318-9360-3e515d38da5e"
+          ]
+        },
+        "ready": [],
+        "sceneReady": [],
+        "failure": null,
+        "nativeStartup": null,
+        "native": null,
+        "adapterMvid": null,
+        "host": null,
+        "campaignWriteBlocker": null,
+        "nativeControls": {
+          "ready": false,
+          "stationsCommitted": false,
+          "nativeReleaseSent": false,
+          "stations": 0
+        },
+        "recoverySupported": false
+      }
+    },
+    {
+      "file": "server-d115a315c9ea485f818ce016ec13314b.json",
+      "sha256": "6df4291cf2befca2b7048231070290cc4a53af05bb2a2a8ced30e612186f0621",
+      "structuredResult": {
+        "manifest": {
+          "Mode": 4,
+          "IsTwoClientNative": true,
+          "AllPhysicsProbe": false,
+          "InstanceId": "naval-lab:4731ac0fde0d4db5bf652afb61303195",
+          "IncarnationId": "4731ac0f-de0d-4db5-bf65-2afb61303195",
+          "Controllers": [
+            "testclient1",
+            "testclient2"
+          ],
+          "Combatants": 10,
+          "Ships": [
+            "e510e95e-b37e-4216-a5b7-00821da572d1",
+            "a6dadaae-1215-4318-9360-3e515d38da5e"
+          ]
+        },
+        "ready": [],
+        "sceneReady": [
+          "testclient1"
+        ],
+        "failure": null,
+        "nativeStartup": null,
+        "native": null,
+        "adapterMvid": null,
+        "host": {
+          "HostControllerId": "testclient1",
+          "SuccessorControllerIds": [],
+          "Epoch": 1
+        },
+        "campaignWriteBlocker": null,
+        "nativeControls": {
+          "ready": false,
+          "stationsCommitted": false,
+          "nativeReleaseSent": false,
+          "stations": 0
+        },
+        "recoverySupported": false
+      }
+    },
+    {
+      "file": "server-b4a5d260f732473ca8eb3f6fe8d94f71.json",
+      "sha256": "482eeda202295c91ef6200ae2df9fb230e392ab5b8197f611050ea8ce9f5fce4",
+      "structuredResult": {
+        "manifest": {
+          "Mode": 4,
+          "IsTwoClientNative": true,
+          "AllPhysicsProbe": false,
+          "InstanceId": "naval-lab:4731ac0fde0d4db5bf652afb61303195",
+          "IncarnationId": "4731ac0f-de0d-4db5-bf65-2afb61303195",
+          "Controllers": [
+            "testclient1",
+            "testclient2"
+          ],
+          "Combatants": 10,
+          "Ships": [
+            "e510e95e-b37e-4216-a5b7-00821da572d1",
+            "a6dadaae-1215-4318-9360-3e515d38da5e"
+          ]
+        },
+        "ready": [],
+        "sceneReady": [
+          "testclient1",
+          "testclient2"
+        ],
+        "failure": null,
+        "nativeStartup": null,
+        "native": null,
+        "adapterMvid": null,
+        "host": {
+          "HostControllerId": "testclient1",
+          "SuccessorControllerIds": [
+            "testclient2"
+          ],
+          "Epoch": 1
+        },
+        "campaignWriteBlocker": null,
+        "nativeControls": {
+          "ready": false,
+          "stationsCommitted": false,
+          "nativeReleaseSent": false,
+          "stations": 0
+        },
+        "recoverySupported": false
+      }
+    },
+    {
+      "file": "server-23124048904b4d07bb0901bbb6300fc2.json",
+      "sha256": "b62149021ef55c47b1efe83447989b7f3888f91bd888d1aedba1e86d87448768",
+      "structuredResult": {
+        "manifest": {
+          "Mode": 4,
+          "IsTwoClientNative": true,
+          "AllPhysicsProbe": false,
+          "InstanceId": "naval-lab:4731ac0fde0d4db5bf652afb61303195",
+          "IncarnationId": "4731ac0f-de0d-4db5-bf65-2afb61303195",
+          "Controllers": [
+            "testclient1",
+            "testclient2"
+          ],
+          "Combatants": 10,
+          "Ships": [
+            "e510e95e-b37e-4216-a5b7-00821da572d1",
+            "a6dadaae-1215-4318-9360-3e515d38da5e"
+          ]
+        },
+        "ready": [
+          "testclient1"
+        ],
+        "sceneReady": [
+          "testclient1",
+          "testclient2"
+        ],
+        "failure": null,
+        "nativeStartup": null,
+        "native": null,
+        "adapterMvid": null,
+        "host": {
+          "HostControllerId": "testclient1",
+          "SuccessorControllerIds": [
+            "testclient2"
+          ],
+          "Epoch": 1
+        },
+        "campaignWriteBlocker": null,
+        "nativeControls": {
+          "ready": false,
+          "stationsCommitted": false,
+          "nativeReleaseSent": false,
+          "stations": 0
+        },
+        "recoverySupported": false
+      }
+    },
+    {
+      "file": "server-b749275695884d089cd525fb1459f576.json",
+      "sha256": "62043da20a9a71608afec800f60b68daaf4b54ba10bfe4f6f9eb6d69eee91585",
+      "structuredResult": {
+        "manifest": {
+          "Mode": 4,
+          "IsTwoClientNative": true,
+          "AllPhysicsProbe": false,
+          "InstanceId": "naval-lab:4731ac0fde0d4db5bf652afb61303195",
+          "IncarnationId": "4731ac0f-de0d-4db5-bf65-2afb61303195",
+          "Controllers": [
+            "testclient1",
+            "testclient2"
+          ],
+          "Combatants": 10,
+          "Ships": [
+            "e510e95e-b37e-4216-a5b7-00821da572d1",
+            "a6dadaae-1215-4318-9360-3e515d38da5e"
+          ]
+        },
+        "ready": [
+          "testclient1",
+          "testclient2"
+        ],
+        "sceneReady": [
+          "testclient1",
+          "testclient2"
+        ],
+        "failure": null,
+        "nativeStartup": null,
+        "native": null,
+        "adapterMvid": null,
+        "host": {
+          "HostControllerId": "testclient1",
+          "SuccessorControllerIds": [
+            "testclient2"
+          ],
+          "Epoch": 1
+        },
+        "campaignWriteBlocker": null,
+        "nativeControls": {
+          "ready": false,
+          "stationsCommitted": false,
+          "nativeReleaseSent": false,
+          "stations": 0
+        },
+        "recoverySupported": false
+      }
+    },
+    {
+      "file": "server-8833edb8625d456f845ba42fd9d981f8.json",
+      "sha256": "dfa2c77ce159ec241bdbc97f3cc9e3a8e20ec5b6993704c6e99bb3fd2e189d21",
+      "structuredResult": {
+        "manifest": {
+          "Mode": 4,
+          "IsTwoClientNative": true,
+          "AllPhysicsProbe": false,
+          "InstanceId": "naval-lab:4731ac0fde0d4db5bf652afb61303195",
+          "IncarnationId": "4731ac0f-de0d-4db5-bf65-2afb61303195",
+          "Controllers": [
+            "testclient1",
+            "testclient2"
+          ],
+          "Combatants": 10,
+          "Ships": [
+            "e510e95e-b37e-4216-a5b7-00821da572d1",
+            "a6dadaae-1215-4318-9360-3e515d38da5e"
+          ]
+        },
+        "ready": [
+          "testclient1",
+          "testclient2"
+        ],
+        "sceneReady": [
+          "testclient1",
+          "testclient2"
+        ],
+        "failure": null,
+        "nativeStartup": null,
+        "native": null,
+        "adapterMvid": null,
+        "host": {
+          "HostControllerId": "testclient1",
+          "SuccessorControllerIds": [
+            "testclient2"
+          ],
+          "Epoch": 1
+        },
+        "campaignWriteBlocker": null,
+        "nativeControls": {
+          "ready": false,
+          "stationsCommitted": true,
+          "nativeReleaseSent": false,
+          "stations": 2
+        },
+        "recoverySupported": false
+      }
+    },
+    {
+      "file": "server-abf815164282472b9bda559391d617b6.json",
+      "sha256": "d531952d3f2ea84153f6cbc7f901ef0bc38565a1b7fa9c03493f03200bb8316f",
+      "structuredResult": {
+        "manifest": {
+          "Mode": 4,
+          "IsTwoClientNative": true,
+          "AllPhysicsProbe": false,
+          "InstanceId": "naval-lab:4731ac0fde0d4db5bf652afb61303195",
+          "IncarnationId": "4731ac0f-de0d-4db5-bf65-2afb61303195",
+          "Controllers": [
+            "testclient1",
+            "testclient2"
+          ],
+          "Combatants": 10,
+          "Ships": [
+            "e510e95e-b37e-4216-a5b7-00821da572d1",
+            "a6dadaae-1215-4318-9360-3e515d38da5e"
+          ]
+        },
+        "ready": [
+          "testclient1",
+          "testclient2"
+        ],
+        "sceneReady": [
+          "testclient1",
+          "testclient2"
+        ],
+        "failure": null,
+        "nativeStartup": null,
+        "native": null,
+        "adapterMvid": null,
+        "host": {
+          "HostControllerId": "testclient1",
+          "SuccessorControllerIds": [
+            "testclient2"
+          ],
+          "Epoch": 1
+        },
+        "campaignWriteBlocker": null,
+        "nativeControls": {
+          "ready": true,
+          "stationsCommitted": true,
+          "nativeReleaseSent": true,
+          "stations": 2
+        },
+        "recoverySupported": false
+      }
+    }
+  ]
+}

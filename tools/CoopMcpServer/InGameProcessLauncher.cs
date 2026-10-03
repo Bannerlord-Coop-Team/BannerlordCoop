@@ -1,4 +1,4 @@
-using System.Diagnostics;
+﻿using System.Diagnostics;
 
 namespace CoopMcpServer;
 
@@ -13,7 +13,7 @@ public interface IOwnedProcess : IDisposable
 
 public interface IGameProcessLauncher
 {
-    IOwnedProcess Launch(LaunchProfile profile, string role, string platformId, string runToken, string saveName = null);
+    IOwnedProcess Launch(LaunchProfile profile, string role, string platformId, string runToken, string saveName = null, bool deferClientJoin = false);
 }
 
 public sealed class InGameProcessLauncher : IGameProcessLauncher
@@ -21,10 +21,11 @@ public sealed class InGameProcessLauncher : IGameProcessLauncher
     private readonly IOwnedProcessFactory processes;
     public InGameProcessLauncher(IOwnedProcessFactory processes) { this.processes = processes; }
 
-    public IOwnedProcess Launch(LaunchProfile profile, string role, string platformId, string runToken, string saveName = null) =>
-        processes.Start(CreateStartInfo(profile, role, platformId, runToken, saveName));
+    public IOwnedProcess Launch(LaunchProfile profile, string role, string platformId, string runToken, string saveName = null, bool deferClientJoin = false) =>
+        processes.Start(CreateStartInfo(profile, role, platformId, runToken, saveName, deferClientJoin));
 
-    public ProcessStartInfo CreateStartInfo(LaunchProfile profile, string role, string platformId, string runToken, string saveName = null)
+    // Initial clients use DebugAutoConnect; staged clients wait for an explicit join.
+    public ProcessStartInfo CreateStartInfo(LaunchProfile profile, string role, string platformId, string runToken, string saveName = null, bool deferClientJoin = false)
     {
         var info = new ProcessStartInfo(profile.Executable)
         {
@@ -34,7 +35,7 @@ public sealed class InGameProcessLauncher : IGameProcessLauncher
         foreach (string argument in new[] { "/singleplayer", "/" + role, "/autoconnect",
             "/platformId", platformId, "/cooptestrun", runToken })
             info.ArgumentList.Add(argument);
-        if (role == "client") info.ArgumentList.Add("/cooptestmanualjoin");
+        if (role == "client" && deferClientJoin) info.ArgumentList.Add("/cooptestmanualjoin");
         if (role == "server" && saveName != null)
         {
             info.ArgumentList.Add("/coopsave");

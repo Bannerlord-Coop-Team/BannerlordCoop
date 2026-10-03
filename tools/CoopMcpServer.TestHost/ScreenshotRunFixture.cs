@@ -79,6 +79,9 @@ public sealed class ScreenshotRunFixture(string directory) : IRunOrchestrator
     public Task<ClientLaunchView> StartClientAsync(string runId, int index, CancellationToken token) => throw new NotSupportedException();
     public Task<RunView> GetAsync(string runId, CancellationToken token) => throw new NotSupportedException();
     public Task<object> WaitAsync(string runId, string instance, string state, int seconds, CancellationToken token) => throw new NotSupportedException();
+    public Task<object> WaitForDriftAsync(string runId, string instance, string operationId, string incarnation, int seconds, CancellationToken token) => throw new NotSupportedException();
+    public Task<object> WaitForControlAsync(string runId, string instance, string operationId, string incarnation, int slot, bool requireNeutral, int seconds, CancellationToken token) => throw new NotSupportedException();
+    public Task<object> WaitForLabAsync(string runId, string incarnation, string stage, int seconds, CancellationToken token) => throw new NotSupportedException();
     public Task<LogChunk> ReadLogsAsync(string runId, string instance, string cursor, int bytes, CancellationToken token) => throw new NotSupportedException();
     public Task<RunView> StopAsync(string runId) => throw new NotSupportedException();
     public Task StopAllAsync() => Task.CompletedTask;

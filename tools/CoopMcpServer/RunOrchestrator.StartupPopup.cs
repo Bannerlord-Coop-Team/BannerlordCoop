@@ -26,9 +26,9 @@ public sealed partial class RunOrchestrator
                 return;
             }
 
-            // Campaign readiness can precede the first rendered inquiry; never extend the caller's deadline.
+            // Loading eligibility uses the caller's deadline; only then spend the short popup budget.
             using var grace = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
-            grace.CancelAfter(TimeSpan.FromSeconds(3));
+            bool observationStarted = false;
             target.StartupPopup = new("not_observed");
             try
             {
@@ -40,6 +40,19 @@ public sealed partial class RunOrchestrator
                         if (layers.ValueKind == JsonValueKind.Object) target.StartupPopup = new("not_actionable");
                         return;
                     }
+                    if (LoadingObstructsStartupPopup(layers, query))
+                    {
+                        target.StartupPopup = new("loading_obstructed", Error: new LiveTestError(
+                            "startup_popup_loading_obstructed", "LoadingWindow above QueryManager still owns mouse input; no popup action attempted.", false));
+                        await Task.Delay(500, grace.Token);
+                        continue;
+                    }
+                    if (target.StartupPopup?.Outcome == "loading_obstructed") target.StartupPopup = new("not_observed");
+                    if (!observationStarted)
+                    {
+                        grace.CancelAfter(TimeSpan.FromSeconds(3));
+                        observationStarted = true;
+                    }
                     if (!query.GetProperty("active").GetBoolean() && query.GetProperty("rootCount").GetInt32() == 0)
                         target.StartupPopup = new("not_present");
                     else if (query.GetProperty("active").GetBoolean() && query.GetProperty("visible").GetBoolean() &&
@@ -47,7 +60,16 @@ public sealed partial class RunOrchestrator
                     {
                         string layer = query.GetProperty("layer").GetString();
                         var inspection = await ReadStartupPopupAsync(run, target, "ui-inspect", new { layer, offset = 0 }, grace.Token);
-                        if (inspection.ValueKind != JsonValueKind.Object) return;
+                        if (inspection.ValueKind != JsonValueKind.Object)
+                        {
+                            // Only a certain stale read can rediscover; keep the running grace and discard its references.
+                            if (target.StartupPopup?.Error is { Code: "stale_reference", OutcomeUncertain: false })
+                            {
+                                await Task.Delay(500, grace.Token);
+                                continue;
+                            }
+                            return;
+                        }
                         string button = FindStartupContinue(inspection, layer);
                         if (button != null)
                         {
@@ -92,6 +114,8 @@ public sealed partial class RunOrchestrator
     {
         var response = await pipe.SendAsync(target.Identity, method, parameters, false, cancellationToken);
         response = RecordResponse(run, target, response, false);
+        // Keep the last observed obstruction when a cancelled pipe read returns an error response.
+        cancellationToken.ThrowIfCancellationRequested();
         if (!response.Ok || response.Result is not JsonElement result)
         {
             target.StartupPopup = new(target.StartupPopupActionAttempted ? "unconfirmed" : "inspection_failed",
@@ -100,6 +124,14 @@ public sealed partial class RunOrchestrator
         }
         return result;
     }
+
+    // Match the adapter's upper-layer mouse domain, without inferring its native hit-test result.
+    private bool LoadingObstructsStartupPopup(JsonElement layers, JsonElement query) =>
+        layers.GetProperty("layers").EnumerateArray().Any(layer =>
+            layer.GetProperty("name").GetString() == "LoadingWindow" &&
+            layer.GetProperty("active").GetBoolean() &&
+            layer.GetProperty("stackIndex").GetInt32() > query.GetProperty("stackIndex").GetInt32() &&
+            (layer.GetProperty("inputMask").GetInt32() & 3) != 0); // InputUsageMask.MouseButtons | MouseWheels.
 
     private bool TryQueryLayer(JsonElement result, out JsonElement query)
     {

@@ -55,7 +55,7 @@ public sealed class McpStdioTests
             using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(30));
             await using var client = await McpClient.CreateAsync(transport, cancellationToken: timeout.Token);
             var tools = await client.ListToolsAsync(cancellationToken: timeout.Token);
-            string[] expected = { "deploy_mod", "list_saves", "start_run", "start_client", "preflight_run", "capture_screenshot", "get_run", "wait_for_state", "list_commands", "execute_command",
+            string[] expected = { "deploy_mod", "list_saves", "start_run", "start_client", "preflight_run", "capture_screenshot", "get_run", "wait_for_state", "wait_for_drift", "wait_for_control", "wait_for_lab", "list_commands", "execute_command",
                 "join_client", "read_logs", "screenshot", "screenshot_status", "options_menu", "ui_layers", "ui_inspect", "ui_action", "stop_run" };
             Assert.Equal(expected.Order(), tools.Select(t => t.Name).Order());
             var deploySchema = tools.Single(t => t.Name == "deploy_mod").JsonSchema;

@@ -133,6 +133,116 @@ public sealed class DebugToolsSchemaTests : IDisposable
         Assert.Equal(configuration, report.GetProperty("configuration").GetString());
     }
 
+    [Fact]
+    public async Task DriftWaitSdkWireCarriesOnlyFinalCamelCaseResponseAtScriptPath()
+    {
+        const string operation = "ea451533-21af-47ce-b889-887ee8da5e71", incarnation = "72a57da1-88b5-4f7e-9111-71f5c7a965f4";
+        await using var client = await Connect("drift");
+        var tools = await client.ListToolsAsync(cancellationToken: timeout.Token);
+        Assert.Equal(22, tools.Count);
+        var tool = tools.Single(t => t.Name == "wait_for_drift");
+        var schema = JsonSchema.FromText(tool.ReturnJsonSchema.Value.GetRawText());
+        string id = (await CallAndValidate(client, "start_run", new() { ["profile"] = "fixture", ["client_count"] = 2 })).GetProperty("runId").GetString();
+        var wire = new JsonObject();
+        string export = Environment.GetEnvironmentVariable("COOP_MCP_DRIFT_WIRE_EXPORT");
+        foreach (string instance in new[] { "client1", "client2" })
+        {
+            var result = await client.CallToolAsync("wait_for_drift", new Dictionary<string, object>
+            {
+                ["run_id"] = id, ["instance"] = instance, ["operation_id"] = operation, ["incarnation"] = incarnation, ["timeout_seconds"] = 40,
+            }, cancellationToken: timeout.Token);
+            wire[instance] = JsonSerializer.SerializeToNode(result, ModelContextProtocol.McpJsonUtilities.DefaultOptions);
+            if (export != null) File.WriteAllText(export, wire.ToJsonString(new JsonSerializerOptions { WriteIndented = true }));
+            Assert.NotEqual(true, result.IsError);
+            Assert.True(schema.Evaluate(result.StructuredContent.Value).IsValid);
+            // Same path the timed-protocol script reads: structuredContent.result.response.result.structuredResult.
+            var wait = result.StructuredContent.Value.GetProperty("result");
+            Assert.Equal("ended", wait.GetProperty("outcome").GetString());
+            Assert.Equal("duration_complete", wait.GetProperty("ended").GetString());
+            Assert.Equal(2, wait.GetProperty("polls").GetInt32());
+            // The SDK omits null members on the wire, so a final success carries no lastError.
+            Assert.False(wait.TryGetProperty("lastError", out var lastError) && lastError.ValueKind != JsonValueKind.Null);
+            var response = wait.GetProperty("response");
+            Assert.False(response.TryGetProperty("Result", out _));
+            Assert.True(response.GetProperty("ok").GetBoolean());
+            Assert.Equal(wait.GetProperty("responseId").GetString(), response.GetProperty("id").GetString());
+            var command = response.GetProperty("result");
+            Assert.True(command.GetProperty("succeeded").GetBoolean());
+            Assert.True(command.GetProperty("hasStructuredResult").GetBoolean());
+            var drift = command.GetProperty("structuredResult");
+            Assert.Equal(operation, drift.GetProperty("operationId").GetString());
+            Assert.Equal(incarnation, drift.GetProperty("incarnation").GetString());
+            Assert.Equal("duration_complete", drift.GetProperty("ended").GetString());
+            Assert.Equal(30.0, drift.GetProperty("sampledSpanSeconds").GetDouble());
+            Assert.True(drift.GetProperty("completeCoverage").GetBoolean());
+            Assert.All(drift.GetProperty("rows").EnumerateArray(), row =>
+            {
+                Assert.Equal(0, row.GetProperty("invalid").GetInt32());
+                Assert.Equal(0, row.GetProperty("occupancyLoss").GetInt32());
+            });
+            Assert.Equal(10, drift.GetProperty("rows").GetArrayLength());
+        }
+        await CallAndValidate(client, "stop_run", new() { ["run_id"] = id });
+    }
+
+    [Fact]
+    public async Task ControlWaitSdkWireCarriesOnlyFinalCamelCaseResponseAtScriptPath()
+    {
+        const string incarnation = "72a57da1-88b5-4f7e-9111-71f5c7a965f4";
+        string[][] operations = { new[] { "6d58832a-f320-4d32-aed7-29a7b4679622", "e65f0312-c6a5-4d46-9b80-98bae39c72c2" },
+            new[] { "b98d8246-831c-446d-b686-8cc1874cea62", "158bbdfc-8c80-4587-a15c-8058e0b189cf" } };
+        await using var client = await Connect("control");
+        var tools = await client.ListToolsAsync(cancellationToken: timeout.Token);
+        Assert.Equal(22, tools.Count);
+        var schema = JsonSchema.FromText(tools.Single(t => t.Name == "wait_for_control").ReturnJsonSchema.Value.GetRawText());
+        string id = (await CallAndValidate(client, "start_run", new() { ["profile"] = "fixture", ["client_count"] = 2 })).GetProperty("runId").GetString();
+        var wire = new JsonObject();
+        string export = Environment.GetEnvironmentVariable("COOP_MCP_CONTROL_WIRE_EXPORT");
+        for (int slot = 0; slot < 2; slot++)
+            foreach (bool neutral in new[] { false, true })
+            {
+                string instance = "client" + (slot + 1), operation = operations[slot][neutral ? 1 : 0];
+                var result = await client.CallToolAsync("wait_for_control", new Dictionary<string, object>
+                {
+                    ["run_id"] = id, ["instance"] = instance, ["operation_id"] = operation, ["incarnation"] = incarnation, ["slot"] = slot,
+                    ["require_neutral"] = neutral, ["timeout_seconds"] = 5,
+                }, cancellationToken: timeout.Token);
+                wire[instance + (neutral ? ":neutral" : ":pulse")] = JsonSerializer.SerializeToNode(result, ModelContextProtocol.McpJsonUtilities.DefaultOptions);
+                if (export != null) File.WriteAllText(export, wire.ToJsonString(new JsonSerializerOptions { WriteIndented = true }));
+                Assert.NotEqual(true, result.IsError);
+                Assert.True(schema.Evaluate(result.StructuredContent.Value).IsValid);
+                // Same path the timed-protocol script reads: structuredContent.result.response.result.structuredResult.status.
+                var wait = result.StructuredContent.Value.GetProperty("result");
+                Assert.Equal("completed", wait.GetProperty("outcome").GetString());
+                Assert.True(wait.GetProperty("reached").GetBoolean());
+                Assert.Equal("completed_axes_neutral_requested", wait.GetProperty("phase").GetString());
+                // The fixture shows the previous state first, so a prior or empty operation was polled and not accepted.
+                Assert.Equal(3, wait.GetProperty("polls").GetInt32());
+                var response = wait.GetProperty("response");
+                Assert.False(response.TryGetProperty("Result", out _));
+                Assert.True(response.GetProperty("ok").GetBoolean());
+                Assert.Equal(wait.GetProperty("responseId").GetString(), response.GetProperty("id").GetString());
+                var command = response.GetProperty("result");
+                Assert.True(command.GetProperty("succeeded").GetBoolean());
+                var control = command.GetProperty("structuredResult");
+                Assert.Equal(incarnation, control.GetProperty("incarnation").GetString());
+                Assert.Equal(1, control.GetProperty("host").GetProperty("Epoch").GetInt32());
+                var status = control.GetProperty("status");
+                Assert.Equal(incarnation, status.GetProperty("IncarnationId").GetString());
+                Assert.Equal(slot, status.GetProperty("ship").GetInt32());
+                Assert.Equal(operation, status.GetProperty("operationId").GetString());
+                Assert.True(status.GetProperty("pulseNeutralInputSequence").GetInt64() > status.GetProperty("pulseLastInputSequence").GetInt64());
+                var application = status.GetProperty("currentOwnerApplication")[slot];
+                if (neutral)
+                {
+                    Assert.Equal(0, application.GetProperty("rudder").GetDouble());
+                    Assert.Equal(0, application.GetProperty("longitudinal").GetInt32());
+                }
+                else Assert.Equal(slot == 0 ? 0.7 : -0.7, application.GetProperty("rudder").GetDouble(), 3);
+            }
+        await CallAndValidate(client, "stop_run", new() { ["run_id"] = id });
+    }
+
     private Task<McpClient> Connect(string scenario) => McpClient.CreateAsync(new StdioClientTransport(new StdioClientTransportOptions
     {
         Name = "Harmless launch output-schema fixture",

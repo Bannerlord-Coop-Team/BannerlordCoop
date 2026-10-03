@@ -1,0 +1,1733 @@
+{
+  "provenance": "Derived from actual client1 control-status artifacts of native run b00937993e5e48a6b5c7eb6234b6bce8 in capture order; transport, presentation, status.crewSpatial and status.localObservedShips removed, all other fields verbatim.",
+  "records": [
+    {
+      "file": "client1-c8050970c44046848c4aed4f47b6dee2.json",
+      "sha256": "f39167e899d36ea438f039407ccdfdafa712abeea1280cf6f9dfd88f2ff5772f",
+      "structuredResult": {
+        "incarnation": "809ffd44-2622-408a-920a-986e227b7f4c",
+        "mode": "TwoClientNative",
+        "host": {
+          "HostControllerId": "testclient1",
+          "Epoch": 1
+        },
+        "status": {
+          "IncarnationId": "809ffd44-2622-408a-920a-986e227b7f4c",
+          "epoch": 1,
+          "owner": "testclient1",
+          "ship": 0,
+          "nativeInputApplyCallback": 49,
+          "presentationSource": "owned_native",
+          "shipId": "f82d0420-f06f-47f4-8bdc-bc46289158dd",
+          "electedSimulator": true,
+          "ready": true,
+          "terminal": false,
+          "blocked": false,
+          "inputBlocker": null,
+          "sailToggleEligible": true,
+          "pulseRowStop": false,
+          "operationId": "00000000-0000-0000-0000-000000000000",
+          "phase": "not_requested",
+          "pulseSynthetic": true,
+          "pulseFirstInputSequence": 0,
+          "pulseLastInputSequence": 0,
+          "pulseNeutralInputSequence": 0,
+          "requestedLateralAxis": 0,
+          "requestedForwardAxis": 0,
+          "remainingSeconds": 0,
+          "pulseDeadlineUtcTicks": 0,
+          "lastSent": {
+            "IncarnationId": "809ffd44-2622-408a-920a-986e227b7f4c",
+            "Epoch": 1,
+            "Ship": 0,
+            "Sequence": 49,
+            "DeadlineUtcTicks": 639264056259637400,
+            "Lateral": 0,
+            "Longitudinal": 0,
+            "DoubleTap": 0,
+            "Rudder": 0,
+            "Sail": 0,
+            "HasHelm": true,
+            "IsValid": true
+          },
+          "ownerLastAppliedHelmInput": [
+            {
+              "IncarnationId": "809ffd44-2622-408a-920a-986e227b7f4c",
+              "Epoch": 1,
+              "Ship": 0,
+              "Sequence": 49,
+              "DeadlineUtcTicks": 639264056259637400,
+              "Lateral": 0,
+              "Longitudinal": 0,
+              "DoubleTap": 0,
+              "Rudder": 0,
+              "Sail": 0,
+              "HasHelm": true,
+              "IsValid": true
+            },
+            null
+          ],
+          "currentOwnerApplication": [
+            {
+              "rudder": 0,
+              "lateral": 0,
+              "longitudinal": 0,
+              "doubleTap": 0,
+              "sail": 0
+            },
+            null
+          ],
+          "forceApplications": 26,
+          "fixedTicks": 52,
+          "activeFixedTicks": 26,
+          "activeParallelFixedEntries": 26,
+          "preCompletionOrUnattributedFixedEntries": 0,
+          "timing": "local read; input sequences and source frame sequences are not local callback ordinals; no synchronized physics cut",
+          "unavailable": null
+        },
+        "expectedBothBodiesActive": false,
+        "serverShipSequences": [
+          0,
+          0
+        ],
+        "serverShipLastReject": [
+          null,
+          null
+        ],
+        "unavailable": null
+      }
+    },
+    {
+      "file": "client1-c791553b97114619ba853dfe07f3ed7d.json",
+      "sha256": "93a37a86951c025233dbfc53bfc59b2db4283bb5beb2f8837143ec62ea0189bc",
+      "structuredResult": {
+        "incarnation": "809ffd44-2622-408a-920a-986e227b7f4c",
+        "mode": "TwoClientNative",
+        "host": {
+          "HostControllerId": "testclient1",
+          "Epoch": 1
+        },
+        "status": {
+          "IncarnationId": "809ffd44-2622-408a-920a-986e227b7f4c",
+          "epoch": 1,
+          "owner": "testclient1",
+          "ship": 0,
+          "nativeInputApplyCallback": 1866,
+          "presentationSource": "owned_native",
+          "shipId": "f82d0420-f06f-47f4-8bdc-bc46289158dd",
+          "electedSimulator": true,
+          "ready": true,
+          "terminal": false,
+          "blocked": false,
+          "inputBlocker": null,
+          "sailToggleEligible": true,
+          "pulseRowStop": false,
+          "operationId": "00000000-0000-0000-0000-000000000000",
+          "phase": "not_requested",
+          "pulseSynthetic": true,
+          "pulseFirstInputSequence": 0,
+          "pulseLastInputSequence": 0,
+          "pulseNeutralInputSequence": 0,
+          "requestedLateralAxis": 0,
+          "requestedForwardAxis": 0,
+          "remainingSeconds": 0,
+          "pulseDeadlineUtcTicks": 0,
+          "lastSent": {
+            "IncarnationId": "809ffd44-2622-408a-920a-986e227b7f4c",
+            "Epoch": 1,
+            "Ship": 0,
+            "Sequence": 1866,
+            "DeadlineUtcTicks": 639264056566804000,
+            "Lateral": 0,
+            "Longitudinal": 0,
+            "DoubleTap": 0,
+            "Rudder": 0,
+            "Sail": 0,
+            "HasHelm": true,
+            "IsValid": true
+          },
+          "ownerLastAppliedHelmInput": [
+            {
+              "IncarnationId": "809ffd44-2622-408a-920a-986e227b7f4c",
+              "Epoch": 1,
+              "Ship": 0,
+              "Sequence": 1866,
+              "DeadlineUtcTicks": 639264056566804000,
+              "Lateral": 0,
+              "Longitudinal": 0,
+              "DoubleTap": 0,
+              "Rudder": 0,
+              "Sail": 0,
+              "HasHelm": true,
+              "IsValid": true
+            },
+            null
+          ],
+          "currentOwnerApplication": [
+            {
+              "rudder": 0,
+              "lateral": 0,
+              "longitudinal": 0,
+              "doubleTap": 0,
+              "sail": 0
+            },
+            null
+          ],
+          "forceApplications": 1721,
+          "fixedTicks": 3442,
+          "activeFixedTicks": 1721,
+          "activeParallelFixedEntries": 1721,
+          "preCompletionOrUnattributedFixedEntries": 0,
+          "timing": "local read; input sequences and source frame sequences are not local callback ordinals; no synchronized physics cut",
+          "unavailable": null
+        },
+        "expectedBothBodiesActive": false,
+        "serverShipSequences": [
+          0,
+          0
+        ],
+        "serverShipLastReject": [
+          null,
+          null
+        ],
+        "unavailable": null
+      }
+    },
+    {
+      "file": "client1-0320e8bc25114ddd94fcabb44b367215.json",
+      "sha256": "964ffe492593fa59744479378bd30737e10f7e37757594f8458a92c8a1684d37",
+      "structuredResult": {
+        "incarnation": "809ffd44-2622-408a-920a-986e227b7f4c",
+        "mode": "TwoClientNative",
+        "host": {
+          "HostControllerId": "testclient1",
+          "Epoch": 1
+        },
+        "status": {
+          "IncarnationId": "809ffd44-2622-408a-920a-986e227b7f4c",
+          "epoch": 1,
+          "owner": "testclient1",
+          "ship": 0,
+          "nativeInputApplyCallback": 1869,
+          "presentationSource": "owned_native",
+          "shipId": "f82d0420-f06f-47f4-8bdc-bc46289158dd",
+          "electedSimulator": true,
+          "ready": true,
+          "terminal": false,
+          "blocked": false,
+          "inputBlocker": null,
+          "sailToggleEligible": true,
+          "pulseRowStop": false,
+          "operationId": "00000000-0000-0000-0000-000000000000",
+          "phase": "not_requested",
+          "pulseSynthetic": true,
+          "pulseFirstInputSequence": 0,
+          "pulseLastInputSequence": 0,
+          "pulseNeutralInputSequence": 0,
+          "requestedLateralAxis": 0,
+          "requestedForwardAxis": 0,
+          "remainingSeconds": 0,
+          "pulseDeadlineUtcTicks": 0,
+          "lastSent": {
+            "IncarnationId": "809ffd44-2622-408a-920a-986e227b7f4c",
+            "Epoch": 1,
+            "Ship": 0,
+            "Sequence": 1869,
+            "DeadlineUtcTicks": 639264056567304100,
+            "Lateral": 0,
+            "Longitudinal": 0,
+            "DoubleTap": 0,
+            "Rudder": 0,
+            "Sail": 0,
+            "HasHelm": true,
+            "IsValid": true
+          },
+          "ownerLastAppliedHelmInput": [
+            {
+              "IncarnationId": "809ffd44-2622-408a-920a-986e227b7f4c",
+              "Epoch": 1,
+              "Ship": 0,
+              "Sequence": 1869,
+              "DeadlineUtcTicks": 639264056567304100,
+              "Lateral": 0,
+              "Longitudinal": 0,
+              "DoubleTap": 0,
+              "Rudder": 0,
+              "Sail": 0,
+              "HasHelm": true,
+              "IsValid": true
+            },
+            null
+          ],
+          "currentOwnerApplication": [
+            {
+              "rudder": 0,
+              "lateral": 0,
+              "longitudinal": 0,
+              "doubleTap": 0,
+              "sail": 0
+            },
+            null
+          ],
+          "forceApplications": 1724,
+          "fixedTicks": 3448,
+          "activeFixedTicks": 1724,
+          "activeParallelFixedEntries": 1724,
+          "preCompletionOrUnattributedFixedEntries": 0,
+          "timing": "local read; input sequences and source frame sequences are not local callback ordinals; no synchronized physics cut",
+          "unavailable": null
+        },
+        "expectedBothBodiesActive": false,
+        "serverShipSequences": [
+          0,
+          0
+        ],
+        "serverShipLastReject": [
+          null,
+          null
+        ],
+        "unavailable": null
+      }
+    },
+    {
+      "file": "client1-68537b9fc975492380fa2b20f9db3e8b.json",
+      "sha256": "7d58ccf654e1c8f891e0e85c64c20de88470fcae3252b52a87b12c89f216592a",
+      "structuredResult": {
+        "incarnation": "809ffd44-2622-408a-920a-986e227b7f4c",
+        "mode": "TwoClientNative",
+        "host": {
+          "HostControllerId": "testclient1",
+          "Epoch": 1
+        },
+        "status": {
+          "IncarnationId": "809ffd44-2622-408a-920a-986e227b7f4c",
+          "epoch": 1,
+          "owner": "testclient1",
+          "ship": 0,
+          "nativeInputApplyCallback": 1872,
+          "presentationSource": "owned_native",
+          "shipId": "f82d0420-f06f-47f4-8bdc-bc46289158dd",
+          "electedSimulator": true,
+          "ready": true,
+          "terminal": false,
+          "blocked": false,
+          "inputBlocker": null,
+          "sailToggleEligible": true,
+          "pulseRowStop": false,
+          "operationId": "6d58832a-f320-4d32-aed7-29a7b4679622",
+          "phase": "pending_synthetic_axes",
+          "pulseSynthetic": true,
+          "pulseFirstInputSequence": 1871,
+          "pulseLastInputSequence": 1872,
+          "pulseNeutralInputSequence": 0,
+          "requestedLateralAxis": 0.5,
+          "requestedForwardAxis": 1,
+          "remainingSeconds": 0.9511445999996795,
+          "pulseDeadlineUtcTicks": 639264056567202800,
+          "lastSent": {
+            "IncarnationId": "809ffd44-2622-408a-920a-986e227b7f4c",
+            "Epoch": 1,
+            "Ship": 0,
+            "Sequence": 1872,
+            "DeadlineUtcTicks": 639264056567202800,
+            "Lateral": -1,
+            "Longitudinal": 1,
+            "DoubleTap": 0,
+            "Rudder": 0.7,
+            "Sail": 0,
+            "HasHelm": true,
+            "IsValid": true
+          },
+          "ownerLastAppliedHelmInput": [
+            {
+              "IncarnationId": "809ffd44-2622-408a-920a-986e227b7f4c",
+              "Epoch": 1,
+              "Ship": 0,
+              "Sequence": 1872,
+              "DeadlineUtcTicks": 639264056567202800,
+              "Lateral": -1,
+              "Longitudinal": 1,
+              "DoubleTap": 0,
+              "Rudder": 0.7,
+              "Sail": 0,
+              "HasHelm": true,
+              "IsValid": true
+            },
+            null
+          ],
+          "currentOwnerApplication": [
+            {
+              "rudder": 0.7,
+              "lateral": -1,
+              "longitudinal": 1,
+              "doubleTap": 0,
+              "sail": 0
+            },
+            null
+          ],
+          "forceApplications": 1726,
+          "fixedTicks": 3452,
+          "activeFixedTicks": 1726,
+          "activeParallelFixedEntries": 1726,
+          "preCompletionOrUnattributedFixedEntries": 0,
+          "timing": "local read; input sequences and source frame sequences are not local callback ordinals; no synchronized physics cut",
+          "unavailable": null
+        },
+        "expectedBothBodiesActive": false,
+        "serverShipSequences": [
+          0,
+          0
+        ],
+        "serverShipLastReject": [
+          null,
+          null
+        ],
+        "unavailable": null
+      }
+    },
+    {
+      "file": "client1-16803d8f87de40f491a7ca897a5aad8a.json",
+      "sha256": "99800451896d72f97b3755ce02890589fd8d99cf55c0341e4aeb2942c69ceb79",
+      "structuredResult": {
+        "incarnation": "809ffd44-2622-408a-920a-986e227b7f4c",
+        "mode": "TwoClientNative",
+        "host": {
+          "HostControllerId": "testclient1",
+          "Epoch": 1
+        },
+        "status": {
+          "IncarnationId": "809ffd44-2622-408a-920a-986e227b7f4c",
+          "epoch": 1,
+          "owner": "testclient1",
+          "ship": 0,
+          "nativeInputApplyCallback": 1874,
+          "presentationSource": "owned_native",
+          "shipId": "f82d0420-f06f-47f4-8bdc-bc46289158dd",
+          "electedSimulator": true,
+          "ready": true,
+          "terminal": false,
+          "blocked": false,
+          "inputBlocker": null,
+          "sailToggleEligible": true,
+          "pulseRowStop": false,
+          "operationId": "6d58832a-f320-4d32-aed7-29a7b4679622",
+          "phase": "pending_synthetic_axes",
+          "pulseSynthetic": true,
+          "pulseFirstInputSequence": 1871,
+          "pulseLastInputSequence": 1874,
+          "pulseNeutralInputSequence": 0,
+          "requestedLateralAxis": 0.5,
+          "requestedForwardAxis": 1,
+          "remainingSeconds": 0.9180419000003894,
+          "pulseDeadlineUtcTicks": 639264056567202800,
+          "lastSent": {
+            "IncarnationId": "809ffd44-2622-408a-920a-986e227b7f4c",
+            "Epoch": 1,
+            "Ship": 0,
+            "Sequence": 1874,
+            "DeadlineUtcTicks": 639264056567202800,
+            "Lateral": -1,
+            "Longitudinal": 1,
+            "DoubleTap": 1,
+            "Rudder": 0.7,
+            "Sail": 0,
+            "HasHelm": true,
+            "IsValid": true
+          },
+          "ownerLastAppliedHelmInput": [
+            {
+              "IncarnationId": "809ffd44-2622-408a-920a-986e227b7f4c",
+              "Epoch": 1,
+              "Ship": 0,
+              "Sequence": 1874,
+              "DeadlineUtcTicks": 639264056567202800,
+              "Lateral": -1,
+              "Longitudinal": 1,
+              "DoubleTap": 1,
+              "Rudder": 0.7,
+              "Sail": 0,
+              "HasHelm": true,
+              "IsValid": true
+            },
+            null
+          ],
+          "currentOwnerApplication": [
+            {
+              "rudder": 0.7,
+              "lateral": -1,
+              "longitudinal": 1,
+              "doubleTap": 1,
+              "sail": 0
+            },
+            null
+          ],
+          "forceApplications": 1728,
+          "fixedTicks": 3456,
+          "activeFixedTicks": 1728,
+          "activeParallelFixedEntries": 1728,
+          "preCompletionOrUnattributedFixedEntries": 0,
+          "timing": "local read; input sequences and source frame sequences are not local callback ordinals; no synchronized physics cut",
+          "unavailable": null
+        },
+        "expectedBothBodiesActive": false,
+        "serverShipSequences": [
+          0,
+          0
+        ],
+        "serverShipLastReject": [
+          null,
+          null
+        ],
+        "unavailable": null
+      }
+    },
+    {
+      "file": "client1-74aeb32f950e42e79184b91ed0f202dc.json",
+      "sha256": "57bd2bd5b8db1229e4421cbdb1b24550e9129ab05dd948ab8f1f84a278ef8a92",
+      "structuredResult": {
+        "incarnation": "809ffd44-2622-408a-920a-986e227b7f4c",
+        "mode": "TwoClientNative",
+        "host": {
+          "HostControllerId": "testclient1",
+          "Epoch": 1
+        },
+        "status": {
+          "IncarnationId": "809ffd44-2622-408a-920a-986e227b7f4c",
+          "epoch": 1,
+          "owner": "testclient1",
+          "ship": 0,
+          "nativeInputApplyCallback": 1876,
+          "presentationSource": "owned_native",
+          "shipId": "f82d0420-f06f-47f4-8bdc-bc46289158dd",
+          "electedSimulator": true,
+          "ready": true,
+          "terminal": false,
+          "blocked": false,
+          "inputBlocker": null,
+          "sailToggleEligible": true,
+          "pulseRowStop": false,
+          "operationId": "6d58832a-f320-4d32-aed7-29a7b4679622",
+          "phase": "pending_synthetic_axes",
+          "pulseSynthetic": true,
+          "pulseFirstInputSequence": 1871,
+          "pulseLastInputSequence": 1876,
+          "pulseNeutralInputSequence": 0,
+          "requestedLateralAxis": 0.5,
+          "requestedForwardAxis": 1,
+          "remainingSeconds": 0.8855751999981294,
+          "pulseDeadlineUtcTicks": 639264056567202800,
+          "lastSent": {
+            "IncarnationId": "809ffd44-2622-408a-920a-986e227b7f4c",
+            "Epoch": 1,
+            "Ship": 0,
+            "Sequence": 1876,
+            "DeadlineUtcTicks": 639264056567202800,
+            "Lateral": -1,
+            "Longitudinal": 1,
+            "DoubleTap": 1,
+            "Rudder": 0.7,
+            "Sail": 0,
+            "HasHelm": true,
+            "IsValid": true
+          },
+          "ownerLastAppliedHelmInput": [
+            {
+              "IncarnationId": "809ffd44-2622-408a-920a-986e227b7f4c",
+              "Epoch": 1,
+              "Ship": 0,
+              "Sequence": 1876,
+              "DeadlineUtcTicks": 639264056567202800,
+              "Lateral": -1,
+              "Longitudinal": 1,
+              "DoubleTap": 1,
+              "Rudder": 0.7,
+              "Sail": 0,
+              "HasHelm": true,
+              "IsValid": true
+            },
+            null
+          ],
+          "currentOwnerApplication": [
+            {
+              "rudder": 0.7,
+              "lateral": -1,
+              "longitudinal": 1,
+              "doubleTap": 1,
+              "sail": 0
+            },
+            null
+          ],
+          "forceApplications": 1730,
+          "fixedTicks": 3460,
+          "activeFixedTicks": 1730,
+          "activeParallelFixedEntries": 1730,
+          "preCompletionOrUnattributedFixedEntries": 0,
+          "timing": "local read; input sequences and source frame sequences are not local callback ordinals; no synchronized physics cut",
+          "unavailable": null
+        },
+        "expectedBothBodiesActive": false,
+        "serverShipSequences": [
+          0,
+          0
+        ],
+        "serverShipLastReject": [
+          null,
+          null
+        ],
+        "unavailable": null
+      }
+    },
+    {
+      "file": "client1-21fc68fd22be489caf6a533f5ce02a43.json",
+      "sha256": "eb26b180b4209e18b46af1e11cc171450133c49959c92af9cea0cc702b8610f3",
+      "structuredResult": {
+        "incarnation": "809ffd44-2622-408a-920a-986e227b7f4c",
+        "mode": "TwoClientNative",
+        "host": {
+          "HostControllerId": "testclient1",
+          "Epoch": 1
+        },
+        "status": {
+          "IncarnationId": "809ffd44-2622-408a-920a-986e227b7f4c",
+          "epoch": 1,
+          "owner": "testclient1",
+          "ship": 0,
+          "nativeInputApplyCallback": 1878,
+          "presentationSource": "owned_native",
+          "shipId": "f82d0420-f06f-47f4-8bdc-bc46289158dd",
+          "electedSimulator": true,
+          "ready": true,
+          "terminal": false,
+          "blocked": false,
+          "inputBlocker": null,
+          "sailToggleEligible": true,
+          "pulseRowStop": false,
+          "operationId": "6d58832a-f320-4d32-aed7-29a7b4679622",
+          "phase": "pending_synthetic_axes",
+          "pulseSynthetic": true,
+          "pulseFirstInputSequence": 1871,
+          "pulseLastInputSequence": 1878,
+          "pulseNeutralInputSequence": 0,
+          "requestedLateralAxis": 0.5,
+          "requestedForwardAxis": 1,
+          "remainingSeconds": 0.852647399999114,
+          "pulseDeadlineUtcTicks": 639264056567202800,
+          "lastSent": {
+            "IncarnationId": "809ffd44-2622-408a-920a-986e227b7f4c",
+            "Epoch": 1,
+            "Ship": 0,
+            "Sequence": 1878,
+            "DeadlineUtcTicks": 639264056567202800,
+            "Lateral": -1,
+            "Longitudinal": 1,
+            "DoubleTap": 1,
+            "Rudder": 0.7,
+            "Sail": 0,
+            "HasHelm": true,
+            "IsValid": true
+          },
+          "ownerLastAppliedHelmInput": [
+            {
+              "IncarnationId": "809ffd44-2622-408a-920a-986e227b7f4c",
+              "Epoch": 1,
+              "Ship": 0,
+              "Sequence": 1878,
+              "DeadlineUtcTicks": 639264056567202800,
+              "Lateral": -1,
+              "Longitudinal": 1,
+              "DoubleTap": 1,
+              "Rudder": 0.7,
+              "Sail": 0,
+              "HasHelm": true,
+              "IsValid": true
+            },
+            null
+          ],
+          "currentOwnerApplication": [
+            {
+              "rudder": 0.7,
+              "lateral": -1,
+              "longitudinal": 1,
+              "doubleTap": 1,
+              "sail": 0
+            },
+            null
+          ],
+          "forceApplications": 1732,
+          "fixedTicks": 3464,
+          "activeFixedTicks": 1732,
+          "activeParallelFixedEntries": 1732,
+          "preCompletionOrUnattributedFixedEntries": 0,
+          "timing": "local read; input sequences and source frame sequences are not local callback ordinals; no synchronized physics cut",
+          "unavailable": null
+        },
+        "expectedBothBodiesActive": false,
+        "serverShipSequences": [
+          0,
+          0
+        ],
+        "serverShipLastReject": [
+          null,
+          null
+        ],
+        "unavailable": null
+      }
+    },
+    {
+      "file": "client1-ed02cfc1da8e440da0549446d070e69b.json",
+      "sha256": "d926a0ee3da28379404977c06125bad8b89f2de994cdf3c7a68bc38fb3725e63",
+      "structuredResult": {
+        "incarnation": "809ffd44-2622-408a-920a-986e227b7f4c",
+        "mode": "TwoClientNative",
+        "host": {
+          "HostControllerId": "testclient1",
+          "Epoch": 1
+        },
+        "status": {
+          "IncarnationId": "809ffd44-2622-408a-920a-986e227b7f4c",
+          "epoch": 1,
+          "owner": "testclient1",
+          "ship": 0,
+          "nativeInputApplyCallback": 1879,
+          "presentationSource": "owned_native",
+          "shipId": "f82d0420-f06f-47f4-8bdc-bc46289158dd",
+          "electedSimulator": true,
+          "ready": true,
+          "terminal": false,
+          "blocked": false,
+          "inputBlocker": null,
+          "sailToggleEligible": true,
+          "pulseRowStop": false,
+          "operationId": "6d58832a-f320-4d32-aed7-29a7b4679622",
+          "phase": "pending_synthetic_axes",
+          "pulseSynthetic": true,
+          "pulseFirstInputSequence": 1871,
+          "pulseLastInputSequence": 1879,
+          "pulseNeutralInputSequence": 0,
+          "requestedLateralAxis": 0.5,
+          "requestedForwardAxis": 1,
+          "remainingSeconds": 0.8324893999997585,
+          "pulseDeadlineUtcTicks": 639264056567202800,
+          "lastSent": {
+            "IncarnationId": "809ffd44-2622-408a-920a-986e227b7f4c",
+            "Epoch": 1,
+            "Ship": 0,
+            "Sequence": 1879,
+            "DeadlineUtcTicks": 639264056567202800,
+            "Lateral": -1,
+            "Longitudinal": 1,
+            "DoubleTap": 1,
+            "Rudder": 0.7,
+            "Sail": 0,
+            "HasHelm": true,
+            "IsValid": true
+          },
+          "ownerLastAppliedHelmInput": [
+            {
+              "IncarnationId": "809ffd44-2622-408a-920a-986e227b7f4c",
+              "Epoch": 1,
+              "Ship": 0,
+              "Sequence": 1879,
+              "DeadlineUtcTicks": 639264056567202800,
+              "Lateral": -1,
+              "Longitudinal": 1,
+              "DoubleTap": 1,
+              "Rudder": 0.7,
+              "Sail": 0,
+              "HasHelm": true,
+              "IsValid": true
+            },
+            null
+          ],
+          "currentOwnerApplication": [
+            {
+              "rudder": 0.7,
+              "lateral": -1,
+              "longitudinal": 1,
+              "doubleTap": 1,
+              "sail": 0
+            },
+            null
+          ],
+          "forceApplications": 1733,
+          "fixedTicks": 3466,
+          "activeFixedTicks": 1733,
+          "activeParallelFixedEntries": 1733,
+          "preCompletionOrUnattributedFixedEntries": 0,
+          "timing": "local read; input sequences and source frame sequences are not local callback ordinals; no synchronized physics cut",
+          "unavailable": null
+        },
+        "expectedBothBodiesActive": false,
+        "serverShipSequences": [
+          0,
+          0
+        ],
+        "serverShipLastReject": [
+          null,
+          null
+        ],
+        "unavailable": null
+      }
+    },
+    {
+      "file": "client1-0f095bd240434dd7a20ff4d38d12c07e.json",
+      "sha256": "e7fe99bf28037db89197672d874cfa5254f6be4293724071a609bf613368265d",
+      "structuredResult": {
+        "incarnation": "809ffd44-2622-408a-920a-986e227b7f4c",
+        "mode": "TwoClientNative",
+        "host": {
+          "HostControllerId": "testclient1",
+          "Epoch": 1
+        },
+        "status": {
+          "IncarnationId": "809ffd44-2622-408a-920a-986e227b7f4c",
+          "epoch": 1,
+          "owner": "testclient1",
+          "ship": 0,
+          "nativeInputApplyCallback": 1882,
+          "presentationSource": "owned_native",
+          "shipId": "f82d0420-f06f-47f4-8bdc-bc46289158dd",
+          "electedSimulator": true,
+          "ready": true,
+          "terminal": false,
+          "blocked": false,
+          "inputBlocker": null,
+          "sailToggleEligible": true,
+          "pulseRowStop": false,
+          "operationId": "6d58832a-f320-4d32-aed7-29a7b4679622",
+          "phase": "pending_synthetic_axes",
+          "pulseSynthetic": true,
+          "pulseFirstInputSequence": 1871,
+          "pulseLastInputSequence": 1882,
+          "pulseNeutralInputSequence": 0,
+          "requestedLateralAxis": 0.5,
+          "requestedForwardAxis": 1,
+          "remainingSeconds": 0.7858749000006355,
+          "pulseDeadlineUtcTicks": 639264056567202800,
+          "lastSent": {
+            "IncarnationId": "809ffd44-2622-408a-920a-986e227b7f4c",
+            "Epoch": 1,
+            "Ship": 0,
+            "Sequence": 1882,
+            "DeadlineUtcTicks": 639264056567202800,
+            "Lateral": -1,
+            "Longitudinal": 1,
+            "DoubleTap": 1,
+            "Rudder": 0.7,
+            "Sail": 0,
+            "HasHelm": true,
+            "IsValid": true
+          },
+          "ownerLastAppliedHelmInput": [
+            {
+              "IncarnationId": "809ffd44-2622-408a-920a-986e227b7f4c",
+              "Epoch": 1,
+              "Ship": 0,
+              "Sequence": 1882,
+              "DeadlineUtcTicks": 639264056567202800,
+              "Lateral": -1,
+              "Longitudinal": 1,
+              "DoubleTap": 1,
+              "Rudder": 0.7,
+              "Sail": 0,
+              "HasHelm": true,
+              "IsValid": true
+            },
+            null
+          ],
+          "currentOwnerApplication": [
+            {
+              "rudder": 0.7,
+              "lateral": -1,
+              "longitudinal": 1,
+              "doubleTap": 1,
+              "sail": 0
+            },
+            null
+          ],
+          "forceApplications": 1736,
+          "fixedTicks": 3472,
+          "activeFixedTicks": 1736,
+          "activeParallelFixedEntries": 1736,
+          "preCompletionOrUnattributedFixedEntries": 0,
+          "timing": "local read; input sequences and source frame sequences are not local callback ordinals; no synchronized physics cut",
+          "unavailable": null
+        },
+        "expectedBothBodiesActive": false,
+        "serverShipSequences": [
+          0,
+          0
+        ],
+        "serverShipLastReject": [
+          null,
+          null
+        ],
+        "unavailable": null
+      }
+    },
+    {
+      "file": "client1-316bc1af94ec4e58a258af7931ce0e5a.json",
+      "sha256": "0b83d63e0a38bc5abb6fd7bc1c782fca0c8280fec1ac03bd80550a041f376f99",
+      "structuredResult": {
+        "incarnation": "809ffd44-2622-408a-920a-986e227b7f4c",
+        "mode": "TwoClientNative",
+        "host": {
+          "HostControllerId": "testclient1",
+          "Epoch": 1
+        },
+        "status": {
+          "IncarnationId": "809ffd44-2622-408a-920a-986e227b7f4c",
+          "epoch": 1,
+          "owner": "testclient1",
+          "ship": 0,
+          "nativeInputApplyCallback": 1884,
+          "presentationSource": "owned_native",
+          "shipId": "f82d0420-f06f-47f4-8bdc-bc46289158dd",
+          "electedSimulator": true,
+          "ready": true,
+          "terminal": false,
+          "blocked": false,
+          "inputBlocker": null,
+          "sailToggleEligible": true,
+          "pulseRowStop": false,
+          "operationId": "6d58832a-f320-4d32-aed7-29a7b4679622",
+          "phase": "pending_synthetic_axes",
+          "pulseSynthetic": true,
+          "pulseFirstInputSequence": 1871,
+          "pulseLastInputSequence": 1884,
+          "pulseNeutralInputSequence": 0,
+          "requestedLateralAxis": 0.5,
+          "requestedForwardAxis": 1,
+          "remainingSeconds": 0.7509198000007018,
+          "pulseDeadlineUtcTicks": 639264056567202800,
+          "lastSent": {
+            "IncarnationId": "809ffd44-2622-408a-920a-986e227b7f4c",
+            "Epoch": 1,
+            "Ship": 0,
+            "Sequence": 1884,
+            "DeadlineUtcTicks": 639264056567202800,
+            "Lateral": -1,
+            "Longitudinal": 1,
+            "DoubleTap": 1,
+            "Rudder": 0.7,
+            "Sail": 0,
+            "HasHelm": true,
+            "IsValid": true
+          },
+          "ownerLastAppliedHelmInput": [
+            {
+              "IncarnationId": "809ffd44-2622-408a-920a-986e227b7f4c",
+              "Epoch": 1,
+              "Ship": 0,
+              "Sequence": 1884,
+              "DeadlineUtcTicks": 639264056567202800,
+              "Lateral": -1,
+              "Longitudinal": 1,
+              "DoubleTap": 1,
+              "Rudder": 0.7,
+              "Sail": 0,
+              "HasHelm": true,
+              "IsValid": true
+            },
+            null
+          ],
+          "currentOwnerApplication": [
+            {
+              "rudder": 0.7,
+              "lateral": -1,
+              "longitudinal": 1,
+              "doubleTap": 1,
+              "sail": 0
+            },
+            null
+          ],
+          "forceApplications": 1738,
+          "fixedTicks": 3476,
+          "activeFixedTicks": 1738,
+          "activeParallelFixedEntries": 1738,
+          "preCompletionOrUnattributedFixedEntries": 0,
+          "timing": "local read; input sequences and source frame sequences are not local callback ordinals; no synchronized physics cut",
+          "unavailable": null
+        },
+        "expectedBothBodiesActive": false,
+        "serverShipSequences": [
+          0,
+          0
+        ],
+        "serverShipLastReject": [
+          null,
+          null
+        ],
+        "unavailable": null
+      }
+    },
+    {
+      "file": "client1-dd0387623f7a42cfa52a6263d85b9da6.json",
+      "sha256": "e7a24ab6b9261303bae78ebde9a6d2c4b59a8f6d54eafac761dc73f1a313e69f",
+      "structuredResult": {
+        "incarnation": "809ffd44-2622-408a-920a-986e227b7f4c",
+        "mode": "TwoClientNative",
+        "host": {
+          "HostControllerId": "testclient1",
+          "Epoch": 1
+        },
+        "status": {
+          "IncarnationId": "809ffd44-2622-408a-920a-986e227b7f4c",
+          "epoch": 1,
+          "owner": "testclient1",
+          "ship": 0,
+          "nativeInputApplyCallback": 1886,
+          "presentationSource": "owned_native",
+          "shipId": "f82d0420-f06f-47f4-8bdc-bc46289158dd",
+          "electedSimulator": true,
+          "ready": true,
+          "terminal": false,
+          "blocked": false,
+          "inputBlocker": null,
+          "sailToggleEligible": true,
+          "pulseRowStop": false,
+          "operationId": "6d58832a-f320-4d32-aed7-29a7b4679622",
+          "phase": "pending_synthetic_axes",
+          "pulseSynthetic": true,
+          "pulseFirstInputSequence": 1871,
+          "pulseLastInputSequence": 1886,
+          "pulseNeutralInputSequence": 0,
+          "requestedLateralAxis": 0.5,
+          "requestedForwardAxis": 1,
+          "remainingSeconds": 0.7201118000011775,
+          "pulseDeadlineUtcTicks": 639264056567202800,
+          "lastSent": {
+            "IncarnationId": "809ffd44-2622-408a-920a-986e227b7f4c",
+            "Epoch": 1,
+            "Ship": 0,
+            "Sequence": 1886,
+            "DeadlineUtcTicks": 639264056567202800,
+            "Lateral": -1,
+            "Longitudinal": 1,
+            "DoubleTap": 1,
+            "Rudder": 0.7,
+            "Sail": 0,
+            "HasHelm": true,
+            "IsValid": true
+          },
+          "ownerLastAppliedHelmInput": [
+            {
+              "IncarnationId": "809ffd44-2622-408a-920a-986e227b7f4c",
+              "Epoch": 1,
+              "Ship": 0,
+              "Sequence": 1886,
+              "DeadlineUtcTicks": 639264056567202800,
+              "Lateral": -1,
+              "Longitudinal": 1,
+              "DoubleTap": 1,
+              "Rudder": 0.7,
+              "Sail": 0,
+              "HasHelm": true,
+              "IsValid": true
+            },
+            null
+          ],
+          "currentOwnerApplication": [
+            {
+              "rudder": 0.7,
+              "lateral": -1,
+              "longitudinal": 1,
+              "doubleTap": 1,
+              "sail": 0
+            },
+            null
+          ],
+          "forceApplications": 1740,
+          "fixedTicks": 3480,
+          "activeFixedTicks": 1740,
+          "activeParallelFixedEntries": 1740,
+          "preCompletionOrUnattributedFixedEntries": 0,
+          "timing": "local read; input sequences and source frame sequences are not local callback ordinals; no synchronized physics cut",
+          "unavailable": null
+        },
+        "expectedBothBodiesActive": false,
+        "serverShipSequences": [
+          0,
+          0
+        ],
+        "serverShipLastReject": [
+          null,
+          null
+        ],
+        "unavailable": null
+      }
+    },
+    {
+      "file": "client1-c357b7ed71134eb4bb4dfe9d18bcec9d.json",
+      "sha256": "a63e08ae22e80d51342422a6aa3dbb10087903628b441ec6f66d162fda69ad57",
+      "structuredResult": {
+        "incarnation": "809ffd44-2622-408a-920a-986e227b7f4c",
+        "mode": "TwoClientNative",
+        "host": {
+          "HostControllerId": "testclient1",
+          "Epoch": 1
+        },
+        "status": {
+          "IncarnationId": "809ffd44-2622-408a-920a-986e227b7f4c",
+          "epoch": 1,
+          "owner": "testclient1",
+          "ship": 0,
+          "nativeInputApplyCallback": 1888,
+          "presentationSource": "owned_native",
+          "shipId": "f82d0420-f06f-47f4-8bdc-bc46289158dd",
+          "electedSimulator": true,
+          "ready": true,
+          "terminal": false,
+          "blocked": false,
+          "inputBlocker": null,
+          "sailToggleEligible": true,
+          "pulseRowStop": false,
+          "operationId": "6d58832a-f320-4d32-aed7-29a7b4679622",
+          "phase": "pending_synthetic_axes",
+          "pulseSynthetic": true,
+          "pulseFirstInputSequence": 1871,
+          "pulseLastInputSequence": 1888,
+          "pulseNeutralInputSequence": 0,
+          "requestedLateralAxis": 0.5,
+          "requestedForwardAxis": 1,
+          "remainingSeconds": 0.6865155000014056,
+          "pulseDeadlineUtcTicks": 639264056567202800,
+          "lastSent": {
+            "IncarnationId": "809ffd44-2622-408a-920a-986e227b7f4c",
+            "Epoch": 1,
+            "Ship": 0,
+            "Sequence": 1888,
+            "DeadlineUtcTicks": 639264056567202800,
+            "Lateral": -1,
+            "Longitudinal": 1,
+            "DoubleTap": 1,
+            "Rudder": 0.7,
+            "Sail": 0,
+            "HasHelm": true,
+            "IsValid": true
+          },
+          "ownerLastAppliedHelmInput": [
+            {
+              "IncarnationId": "809ffd44-2622-408a-920a-986e227b7f4c",
+              "Epoch": 1,
+              "Ship": 0,
+              "Sequence": 1888,
+              "DeadlineUtcTicks": 639264056567202800,
+              "Lateral": -1,
+              "Longitudinal": 1,
+              "DoubleTap": 1,
+              "Rudder": 0.7,
+              "Sail": 0,
+              "HasHelm": true,
+              "IsValid": true
+            },
+            null
+          ],
+          "currentOwnerApplication": [
+            {
+              "rudder": 0.7,
+              "lateral": -1,
+              "longitudinal": 1,
+              "doubleTap": 1,
+              "sail": 0
+            },
+            null
+          ],
+          "forceApplications": 1741,
+          "fixedTicks": 3482,
+          "activeFixedTicks": 1741,
+          "activeParallelFixedEntries": 1741,
+          "preCompletionOrUnattributedFixedEntries": 0,
+          "timing": "local read; input sequences and source frame sequences are not local callback ordinals; no synchronized physics cut",
+          "unavailable": null
+        },
+        "expectedBothBodiesActive": false,
+        "serverShipSequences": [
+          0,
+          0
+        ],
+        "serverShipLastReject": [
+          null,
+          null
+        ],
+        "unavailable": null
+      }
+    },
+    {
+      "file": "client1-be104c3d49d541fba0e95d94f01f2afe.json",
+      "sha256": "d95fcfb8b724126484fe715fa43b1ca362a97213ebc95ce09f37d1a8173a0255",
+      "structuredResult": {
+        "incarnation": "809ffd44-2622-408a-920a-986e227b7f4c",
+        "mode": "TwoClientNative",
+        "host": {
+          "HostControllerId": "testclient1",
+          "Epoch": 1
+        },
+        "status": {
+          "IncarnationId": "809ffd44-2622-408a-920a-986e227b7f4c",
+          "epoch": 1,
+          "owner": "testclient1",
+          "ship": 0,
+          "nativeInputApplyCallback": 1890,
+          "presentationSource": "owned_native",
+          "shipId": "f82d0420-f06f-47f4-8bdc-bc46289158dd",
+          "electedSimulator": true,
+          "ready": true,
+          "terminal": false,
+          "blocked": false,
+          "inputBlocker": null,
+          "sailToggleEligible": true,
+          "pulseRowStop": false,
+          "operationId": "6d58832a-f320-4d32-aed7-29a7b4679622",
+          "phase": "pending_synthetic_axes",
+          "pulseSynthetic": true,
+          "pulseFirstInputSequence": 1871,
+          "pulseLastInputSequence": 1890,
+          "pulseNeutralInputSequence": 0,
+          "requestedLateralAxis": 0.5,
+          "requestedForwardAxis": 1,
+          "remainingSeconds": 0.6531539999996312,
+          "pulseDeadlineUtcTicks": 639264056567202800,
+          "lastSent": {
+            "IncarnationId": "809ffd44-2622-408a-920a-986e227b7f4c",
+            "Epoch": 1,
+            "Ship": 0,
+            "Sequence": 1890,
+            "DeadlineUtcTicks": 639264056567202800,
+            "Lateral": -1,
+            "Longitudinal": 1,
+            "DoubleTap": 1,
+            "Rudder": 0.7,
+            "Sail": 0,
+            "HasHelm": true,
+            "IsValid": true
+          },
+          "ownerLastAppliedHelmInput": [
+            {
+              "IncarnationId": "809ffd44-2622-408a-920a-986e227b7f4c",
+              "Epoch": 1,
+              "Ship": 0,
+              "Sequence": 1890,
+              "DeadlineUtcTicks": 639264056567202800,
+              "Lateral": -1,
+              "Longitudinal": 1,
+              "DoubleTap": 1,
+              "Rudder": 0.7,
+              "Sail": 0,
+              "HasHelm": true,
+              "IsValid": true
+            },
+            null
+          ],
+          "currentOwnerApplication": [
+            {
+              "rudder": 0.7,
+              "lateral": -1,
+              "longitudinal": 1,
+              "doubleTap": 1,
+              "sail": 0
+            },
+            null
+          ],
+          "forceApplications": 1743,
+          "fixedTicks": 3486,
+          "activeFixedTicks": 1743,
+          "activeParallelFixedEntries": 1743,
+          "preCompletionOrUnattributedFixedEntries": 0,
+          "timing": "local read; input sequences and source frame sequences are not local callback ordinals; no synchronized physics cut",
+          "unavailable": null
+        },
+        "expectedBothBodiesActive": false,
+        "serverShipSequences": [
+          0,
+          0
+        ],
+        "serverShipLastReject": [
+          null,
+          null
+        ],
+        "unavailable": null
+      }
+    },
+    {
+      "file": "client1-ed6a952780f148da9bc5443cd48fdb64.json",
+      "sha256": "cf8edd8b5b9c126caaa49cfae1ee7c95db237b1b3edcb26873167e721bc24011",
+      "structuredResult": {
+        "incarnation": "809ffd44-2622-408a-920a-986e227b7f4c",
+        "mode": "TwoClientNative",
+        "host": {
+          "HostControllerId": "testclient1",
+          "Epoch": 1
+        },
+        "status": {
+          "IncarnationId": "809ffd44-2622-408a-920a-986e227b7f4c",
+          "epoch": 1,
+          "owner": "testclient1",
+          "ship": 0,
+          "nativeInputApplyCallback": 1892,
+          "presentationSource": "owned_native",
+          "shipId": "f82d0420-f06f-47f4-8bdc-bc46289158dd",
+          "electedSimulator": true,
+          "ready": true,
+          "terminal": false,
+          "blocked": false,
+          "inputBlocker": null,
+          "sailToggleEligible": true,
+          "pulseRowStop": false,
+          "operationId": "6d58832a-f320-4d32-aed7-29a7b4679622",
+          "phase": "pending_synthetic_axes",
+          "pulseSynthetic": true,
+          "pulseFirstInputSequence": 1871,
+          "pulseLastInputSequence": 1892,
+          "pulseNeutralInputSequence": 0,
+          "requestedLateralAxis": 0.5,
+          "requestedForwardAxis": 1,
+          "remainingSeconds": 0.6198646999982884,
+          "pulseDeadlineUtcTicks": 639264056567202800,
+          "lastSent": {
+            "IncarnationId": "809ffd44-2622-408a-920a-986e227b7f4c",
+            "Epoch": 1,
+            "Ship": 0,
+            "Sequence": 1892,
+            "DeadlineUtcTicks": 639264056567202800,
+            "Lateral": -1,
+            "Longitudinal": 1,
+            "DoubleTap": 1,
+            "Rudder": 0.7,
+            "Sail": 0,
+            "HasHelm": true,
+            "IsValid": true
+          },
+          "ownerLastAppliedHelmInput": [
+            {
+              "IncarnationId": "809ffd44-2622-408a-920a-986e227b7f4c",
+              "Epoch": 1,
+              "Ship": 0,
+              "Sequence": 1892,
+              "DeadlineUtcTicks": 639264056567202800,
+              "Lateral": -1,
+              "Longitudinal": 1,
+              "DoubleTap": 1,
+              "Rudder": 0.7,
+              "Sail": 0,
+              "HasHelm": true,
+              "IsValid": true
+            },
+            null
+          ],
+          "currentOwnerApplication": [
+            {
+              "rudder": 0.7,
+              "lateral": -1,
+              "longitudinal": 1,
+              "doubleTap": 1,
+              "sail": 0
+            },
+            null
+          ],
+          "forceApplications": 1745,
+          "fixedTicks": 3490,
+          "activeFixedTicks": 1745,
+          "activeParallelFixedEntries": 1745,
+          "preCompletionOrUnattributedFixedEntries": 0,
+          "timing": "local read; input sequences and source frame sequences are not local callback ordinals; no synchronized physics cut",
+          "unavailable": null
+        },
+        "expectedBothBodiesActive": false,
+        "serverShipSequences": [
+          0,
+          0
+        ],
+        "serverShipLastReject": [
+          null,
+          null
+        ],
+        "unavailable": null
+      }
+    },
+    {
+      "file": "client1-cb2c6c076d134bcbb657bf4735f51778.json",
+      "sha256": "3e2e2e5021131ad472edfbc99fee21fae35343f2dd373b94c1c96430caec4cb6",
+      "structuredResult": {
+        "incarnation": "809ffd44-2622-408a-920a-986e227b7f4c",
+        "mode": "TwoClientNative",
+        "host": {
+          "HostControllerId": "testclient1",
+          "Epoch": 1
+        },
+        "status": {
+          "IncarnationId": "809ffd44-2622-408a-920a-986e227b7f4c",
+          "epoch": 1,
+          "owner": "testclient1",
+          "ship": 0,
+          "nativeInputApplyCallback": 1894,
+          "presentationSource": "owned_native",
+          "shipId": "f82d0420-f06f-47f4-8bdc-bc46289158dd",
+          "electedSimulator": true,
+          "ready": true,
+          "terminal": false,
+          "blocked": false,
+          "inputBlocker": null,
+          "sailToggleEligible": true,
+          "pulseRowStop": false,
+          "operationId": "6d58832a-f320-4d32-aed7-29a7b4679622",
+          "phase": "pending_synthetic_axes",
+          "pulseSynthetic": true,
+          "pulseFirstInputSequence": 1871,
+          "pulseLastInputSequence": 1894,
+          "pulseNeutralInputSequence": 0,
+          "requestedLateralAxis": 0.5,
+          "requestedForwardAxis": 1,
+          "remainingSeconds": 0.5854618999983359,
+          "pulseDeadlineUtcTicks": 639264056567202800,
+          "lastSent": {
+            "IncarnationId": "809ffd44-2622-408a-920a-986e227b7f4c",
+            "Epoch": 1,
+            "Ship": 0,
+            "Sequence": 1894,
+            "DeadlineUtcTicks": 639264056567202800,
+            "Lateral": -1,
+            "Longitudinal": 1,
+            "DoubleTap": 1,
+            "Rudder": 0.7,
+            "Sail": 0,
+            "HasHelm": true,
+            "IsValid": true
+          },
+          "ownerLastAppliedHelmInput": [
+            {
+              "IncarnationId": "809ffd44-2622-408a-920a-986e227b7f4c",
+              "Epoch": 1,
+              "Ship": 0,
+              "Sequence": 1894,
+              "DeadlineUtcTicks": 639264056567202800,
+              "Lateral": -1,
+              "Longitudinal": 1,
+              "DoubleTap": 1,
+              "Rudder": 0.7,
+              "Sail": 0,
+              "HasHelm": true,
+              "IsValid": true
+            },
+            null
+          ],
+          "currentOwnerApplication": [
+            {
+              "rudder": 0.7,
+              "lateral": -1,
+              "longitudinal": 1,
+              "doubleTap": 1,
+              "sail": 0
+            },
+            null
+          ],
+          "forceApplications": 1747,
+          "fixedTicks": 3494,
+          "activeFixedTicks": 1747,
+          "activeParallelFixedEntries": 1747,
+          "preCompletionOrUnattributedFixedEntries": 0,
+          "timing": "local read; input sequences and source frame sequences are not local callback ordinals; no synchronized physics cut",
+          "unavailable": null
+        },
+        "expectedBothBodiesActive": false,
+        "serverShipSequences": [
+          0,
+          0
+        ],
+        "serverShipLastReject": [
+          null,
+          null
+        ],
+        "unavailable": null
+      }
+    },
+    {
+      "file": "client1-6271bf8356fb4e27a630fd0f72ffd141.json",
+      "sha256": "7b347520b273f01226c4d97b643b06d63b56310735073f1af82b63d39fe8629d",
+      "structuredResult": {
+        "incarnation": "809ffd44-2622-408a-920a-986e227b7f4c",
+        "mode": "TwoClientNative",
+        "host": {
+          "HostControllerId": "testclient1",
+          "Epoch": 1
+        },
+        "status": {
+          "IncarnationId": "809ffd44-2622-408a-920a-986e227b7f4c",
+          "epoch": 1,
+          "owner": "testclient1",
+          "ship": 0,
+          "nativeInputApplyCallback": 1896,
+          "presentationSource": "owned_native",
+          "shipId": "f82d0420-f06f-47f4-8bdc-bc46289158dd",
+          "electedSimulator": true,
+          "ready": true,
+          "terminal": false,
+          "blocked": false,
+          "inputBlocker": null,
+          "sailToggleEligible": true,
+          "pulseRowStop": false,
+          "operationId": "6d58832a-f320-4d32-aed7-29a7b4679622",
+          "phase": "pending_synthetic_axes",
+          "pulseSynthetic": true,
+          "pulseFirstInputSequence": 1871,
+          "pulseLastInputSequence": 1896,
+          "pulseNeutralInputSequence": 0,
+          "requestedLateralAxis": 0.5,
+          "requestedForwardAxis": 1,
+          "remainingSeconds": 0.552817399999185,
+          "pulseDeadlineUtcTicks": 639264056567202800,
+          "lastSent": {
+            "IncarnationId": "809ffd44-2622-408a-920a-986e227b7f4c",
+            "Epoch": 1,
+            "Ship": 0,
+            "Sequence": 1896,
+            "DeadlineUtcTicks": 639264056567202800,
+            "Lateral": -1,
+            "Longitudinal": 1,
+            "DoubleTap": 1,
+            "Rudder": 0.7,
+            "Sail": 0,
+            "HasHelm": true,
+            "IsValid": true
+          },
+          "ownerLastAppliedHelmInput": [
+            {
+              "IncarnationId": "809ffd44-2622-408a-920a-986e227b7f4c",
+              "Epoch": 1,
+              "Ship": 0,
+              "Sequence": 1896,
+              "DeadlineUtcTicks": 639264056567202800,
+              "Lateral": -1,
+              "Longitudinal": 1,
+              "DoubleTap": 1,
+              "Rudder": 0.7,
+              "Sail": 0,
+              "HasHelm": true,
+              "IsValid": true
+            },
+            null
+          ],
+          "currentOwnerApplication": [
+            {
+              "rudder": 0.7,
+              "lateral": -1,
+              "longitudinal": 1,
+              "doubleTap": 1,
+              "sail": 0
+            },
+            null
+          ],
+          "forceApplications": 1749,
+          "fixedTicks": 3498,
+          "activeFixedTicks": 1749,
+          "activeParallelFixedEntries": 1749,
+          "preCompletionOrUnattributedFixedEntries": 0,
+          "timing": "local read; input sequences and source frame sequences are not local callback ordinals; no synchronized physics cut",
+          "unavailable": null
+        },
+        "expectedBothBodiesActive": false,
+        "serverShipSequences": [
+          0,
+          0
+        ],
+        "serverShipLastReject": [
+          null,
+          null
+        ],
+        "unavailable": null
+      }
+    },
+    {
+      "file": "client1-705a3eb98918443f9270806af3ee784e.json",
+      "sha256": "18e950e2fc5f3c3257377270694c9b6b98d3bb4e7d0412a8b7d4f26b5085b185",
+      "structuredResult": {
+        "incarnation": "809ffd44-2622-408a-920a-986e227b7f4c",
+        "mode": "TwoClientNative",
+        "host": {
+          "HostControllerId": "testclient1",
+          "Epoch": 1
+        },
+        "status": {
+          "IncarnationId": "809ffd44-2622-408a-920a-986e227b7f4c",
+          "epoch": 1,
+          "owner": "testclient1",
+          "ship": 0,
+          "nativeInputApplyCallback": 1898,
+          "presentationSource": "owned_native",
+          "shipId": "f82d0420-f06f-47f4-8bdc-bc46289158dd",
+          "electedSimulator": true,
+          "ready": true,
+          "terminal": false,
+          "blocked": false,
+          "inputBlocker": null,
+          "sailToggleEligible": true,
+          "pulseRowStop": false,
+          "operationId": "6d58832a-f320-4d32-aed7-29a7b4679622",
+          "phase": "pending_synthetic_axes",
+          "pulseSynthetic": true,
+          "pulseFirstInputSequence": 1871,
+          "pulseLastInputSequence": 1898,
+          "pulseNeutralInputSequence": 0,
+          "requestedLateralAxis": 0.5,
+          "requestedForwardAxis": 1,
+          "remainingSeconds": 0.518815799998265,
+          "pulseDeadlineUtcTicks": 639264056567202800,
+          "lastSent": {
+            "IncarnationId": "809ffd44-2622-408a-920a-986e227b7f4c",
+            "Epoch": 1,
+            "Ship": 0,
+            "Sequence": 1898,
+            "DeadlineUtcTicks": 639264056567202800,
+            "Lateral": -1,
+            "Longitudinal": 1,
+            "DoubleTap": 1,
+            "Rudder": 0.7,
+            "Sail": 0,
+            "HasHelm": true,
+            "IsValid": true
+          },
+          "ownerLastAppliedHelmInput": [
+            {
+              "IncarnationId": "809ffd44-2622-408a-920a-986e227b7f4c",
+              "Epoch": 1,
+              "Ship": 0,
+              "Sequence": 1898,
+              "DeadlineUtcTicks": 639264056567202800,
+              "Lateral": -1,
+              "Longitudinal": 1,
+              "DoubleTap": 1,
+              "Rudder": 0.7,
+              "Sail": 0,
+              "HasHelm": true,
+              "IsValid": true
+            },
+            null
+          ],
+          "currentOwnerApplication": [
+            {
+              "rudder": 0.7,
+              "lateral": -1,
+              "longitudinal": 1,
+              "doubleTap": 1,
+              "sail": 0
+            },
+            null
+          ],
+          "forceApplications": 1751,
+          "fixedTicks": 3502,
+          "activeFixedTicks": 1751,
+          "activeParallelFixedEntries": 1751,
+          "preCompletionOrUnattributedFixedEntries": 0,
+          "timing": "local read; input sequences and source frame sequences are not local callback ordinals; no synchronized physics cut",
+          "unavailable": null
+        },
+        "expectedBothBodiesActive": false,
+        "serverShipSequences": [
+          0,
+          0
+        ],
+        "serverShipLastReject": [
+          null,
+          null
+        ],
+        "unavailable": null
+      }
+    },
+    {
+      "file": "client1-01ac0d52dba642869dabeb573c151adc.json",
+      "sha256": "8683b473966101384c88e85c430ffa347299ae61881d87cf85df46674a5675f7",
+      "structuredResult": {
+        "incarnation": "809ffd44-2622-408a-920a-986e227b7f4c",
+        "mode": "TwoClientNative",
+        "host": {
+          "HostControllerId": "testclient1",
+          "Epoch": 1
+        },
+        "status": {
+          "IncarnationId": "809ffd44-2622-408a-920a-986e227b7f4c",
+          "epoch": 1,
+          "owner": "testclient1",
+          "ship": 0,
+          "nativeInputApplyCallback": 1900,
+          "presentationSource": "owned_native",
+          "shipId": "f82d0420-f06f-47f4-8bdc-bc46289158dd",
+          "electedSimulator": true,
+          "ready": true,
+          "terminal": false,
+          "blocked": false,
+          "inputBlocker": null,
+          "sailToggleEligible": true,
+          "pulseRowStop": false,
+          "operationId": "6d58832a-f320-4d32-aed7-29a7b4679622",
+          "phase": "pending_synthetic_axes",
+          "pulseSynthetic": true,
+          "pulseFirstInputSequence": 1871,
+          "pulseLastInputSequence": 1900,
+          "pulseNeutralInputSequence": 0,
+          "requestedLateralAxis": 0.5,
+          "requestedForwardAxis": 1,
+          "remainingSeconds": 0.48290260000067065,
+          "pulseDeadlineUtcTicks": 639264056567202800,
+          "lastSent": {
+            "IncarnationId": "809ffd44-2622-408a-920a-986e227b7f4c",
+            "Epoch": 1,
+            "Ship": 0,
+            "Sequence": 1900,
+            "DeadlineUtcTicks": 639264056567202800,
+            "Lateral": -1,
+            "Longitudinal": 1,
+            "DoubleTap": 1,
+            "Rudder": 0.7,
+            "Sail": 0,
+            "HasHelm": true,
+            "IsValid": true
+          },
+          "ownerLastAppliedHelmInput": [
+            {
+              "IncarnationId": "809ffd44-2622-408a-920a-986e227b7f4c",
+              "Epoch": 1,
+              "Ship": 0,
+              "Sequence": 1900,
+              "DeadlineUtcTicks": 639264056567202800,
+              "Lateral": -1,
+              "Longitudinal": 1,
+              "DoubleTap": 1,
+              "Rudder": 0.7,
+              "Sail": 0,
+              "HasHelm": true,
+              "IsValid": true
+            },
+            null
+          ],
+          "currentOwnerApplication": [
+            {
+              "rudder": 0.7,
+              "lateral": -1,
+              "longitudinal": 1,
+              "doubleTap": 1,
+              "sail": 0
+            },
+            null
+          ],
+          "forceApplications": 1753,
+          "fixedTicks": 3506,
+          "activeFixedTicks": 1753,
+          "activeParallelFixedEntries": 1753,
+          "preCompletionOrUnattributedFixedEntries": 0,
+          "timing": "local read; input sequences and source frame sequences are not local callback ordinals; no synchronized physics cut",
+          "unavailable": null
+        },
+        "expectedBothBodiesActive": false,
+        "serverShipSequences": [
+          0,
+          0
+        ],
+        "serverShipLastReject": [
+          null,
+          null
+        ],
+        "unavailable": null
+      }
+    }
+  ]
+}

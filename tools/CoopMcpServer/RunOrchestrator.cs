@@ -13,6 +13,9 @@ public interface IRunOrchestrator
     Task<ClientLaunchView> StartClientAsync(string runId, int clientIndex, CancellationToken cancellationToken);
     Task<RunView> GetAsync(string runId, CancellationToken cancellationToken);
     Task<object> WaitAsync(string runId, string instance, string state, int timeoutSeconds, CancellationToken cancellationToken);
+    Task<object> WaitForDriftAsync(string runId, string instance, string operationId, string incarnation, int timeoutSeconds, CancellationToken cancellationToken);
+    Task<object> WaitForControlAsync(string runId, string instance, string operationId, string incarnation, int slot, bool requireNeutral, int timeoutSeconds, CancellationToken cancellationToken);
+    Task<object> WaitForLabAsync(string runId, string incarnation, string stage, int timeoutSeconds, CancellationToken cancellationToken);
     Task<LiveTestResponse> RequestAsync(string runId, string instance, string method, object parameters, bool mutation, CancellationToken cancellationToken);
     Task<LogChunk> ReadLogsAsync(string runId, string instance, string cursor, int maxBytes, CancellationToken cancellationToken);
     Task<RunView> StopAsync(string runId);
@@ -133,11 +136,12 @@ public sealed partial class RunOrchestrator : IRunOrchestrator, IDeploymentRunGu
                     return View(run);
                 }
                 Save(run);
+                // Start every requested process before observing readiness so their boot work overlaps.
                 for (int index = 0; index <= clientCount; index++)
                 {
                     cancellationToken.ThrowIfCancellationRequested();
                     if (index > 0) run.ClientAttempts[index] = "outcome_unknown";
-                    LaunchInstance(run, launchProfile, index);
+                    LaunchInstance(run, launchProfile, index, deferClientJoin: false);
                     if (index > 0) run.ClientAttempts[index] = "launched";
                     Save(run);
                 }
@@ -200,7 +204,7 @@ public sealed partial class RunOrchestrator : IRunOrchestrator, IDeploymentRunGu
             Save(run);
             try
             {
-                LaunchInstance(run, profile, clientIndex);
+                LaunchInstance(run, profile, clientIndex, deferClientJoin: true);
                 run.ClientAttempts[clientIndex] = "launched";
             }
             catch (Exception e)
@@ -216,11 +220,12 @@ public sealed partial class RunOrchestrator : IRunOrchestrator, IDeploymentRunGu
         finally { lifecycle.Release(); }
     }
 
-    private void LaunchInstance(Run run, LaunchProfile profile, int index)
+    // Retain ownership immediately, regardless of whether the client joins automatically or later.
+    private void LaunchInstance(Run run, LaunchProfile profile, int index, bool deferClientJoin)
     {
         string role = index == 0 ? "server" : "client";
         string platformId = index == 0 ? profile.ServerPlatformId : profile.ClientPlatformIds[index - 1];
-        IOwnedProcess process = launcher.Launch(profile, role, platformId, run.Id, index == 0 ? run.RequestedSave?.Name : null);
+        IOwnedProcess process = launcher.Launch(profile, role, platformId, run.Id, index == 0 ? run.RequestedSave?.Name : null, deferClientJoin);
         lock (run.ArtifactGate)
             run.Instances.Add(new Instance
             {
@@ -265,6 +270,213 @@ public sealed partial class RunOrchestrator : IRunOrchestrator, IDeploymentRunGu
         Save(run);
         return new { reached, state, outcome = reached ? "reached" : !Alive(target) ? "process_exited" : deadlineExpired ? "deadline_expired" : "not_ready",
             deadlineExpired, lastError = target.Error, instance = View(target) };
+    }
+
+    public async Task<object> WaitForDriftAsync(string runId, string instance, string operationId, string incarnation, int timeoutSeconds, CancellationToken cancellationToken)
+    {
+        if (!Guid.TryParse(operationId, out var operation) || operation == Guid.Empty) throw new ArgumentException("operation_id must be a nonempty UUID.", nameof(operationId));
+        if (!Guid.TryParse(incarnation, out var fixture) || fixture == Guid.Empty) throw new ArgumentException("incarnation must be a nonempty UUID.", nameof(incarnation));
+        if (timeoutSeconds < 1 || timeoutSeconds > 90) throw new ArgumentOutOfRangeException(nameof(timeoutSeconds), "timeout_seconds must be 1..90.");
+        var run = FindRun(runId);
+        var target = FindInstance(run, instance);
+        if (target.Identity.Role != "client") throw new ArgumentException("Drift recordings are client-owned; use client1, client2, etc.");
+        var wait = await PollClientCommandAsync(run, target, "coop.debug.naval_lab.drift-status", timeoutSeconds, 500,
+            drift => ClassifyDrift(drift, operation, fixture), cancellationToken);
+        return new { outcome = wait.Outcome, reached = wait.Outcome == "ended", ended = wait.Outcome == "ended" ? wait.Structured.GetProperty("ended").GetString() : null,
+            deadlineExpired = wait.DeadlineExpired, polls = wait.Polls, elapsedMs = wait.ElapsedMs, lastError = wait.Response?.Error, responseId = wait.Response?.Id,
+            last = wait.DeadlineExpired && wait.HasStructured ? wait.Structured.EnumerateObject().Where(p => p.Name is "operationId" or "incarnation" or "sampledSpanSeconds" or "sampleCount")
+                .ToDictionary(p => p.Name, p => p.Value.Clone()) : null,
+            response = wait.DeadlineExpired ? null : wait.Response };
+    }
+
+    public async Task<object> WaitForControlAsync(string runId, string instance, string operationId, string incarnation, int slot, bool requireNeutral, int timeoutSeconds, CancellationToken cancellationToken)
+    {
+        if (!Guid.TryParse(operationId, out var operation) || operation == Guid.Empty) throw new ArgumentException("operation_id must be a nonempty UUID.", nameof(operationId));
+        if (!Guid.TryParse(incarnation, out var fixture) || fixture == Guid.Empty) throw new ArgumentException("incarnation must be a nonempty UUID.", nameof(incarnation));
+        if (slot < 0 || slot > 1) throw new ArgumentOutOfRangeException(nameof(slot), "slot must be 0 or 1.");
+        if (timeoutSeconds < 1 || timeoutSeconds > 30) throw new ArgumentOutOfRangeException(nameof(timeoutSeconds), "timeout_seconds must be 1..30.");
+        var run = FindRun(runId);
+        var target = FindInstance(run, instance);
+        if (target.Identity.Role != "client") throw new ArgumentException("Control pulses are observed on the owning client; use client1, client2, etc.");
+        var wait = await PollClientCommandAsync(run, target, "coop.debug.naval_lab.control-status", timeoutSeconds, 250,
+            control => ClassifyControl(control, operation, fixture, slot, requireNeutral), cancellationToken);
+        JsonElement status = default;
+        bool hasStatus = wait.HasStructured && wait.Structured.TryGetProperty("status", out status) && status.ValueKind == JsonValueKind.Object;
+        return new { outcome = wait.Outcome, reached = wait.Outcome == "completed",
+            phase = hasStatus && status.TryGetProperty("phase", out var phase) && phase.ValueKind == JsonValueKind.String ? phase.GetString() : null,
+            deadlineExpired = wait.DeadlineExpired, polls = wait.Polls, elapsedMs = wait.ElapsedMs, lastError = wait.Response?.Error, responseId = wait.Response?.Id,
+            last = wait.DeadlineExpired && hasStatus ? ControlSummary(status, slot) : null,
+            response = wait.DeadlineExpired ? null : wait.Response };
+    }
+
+    public async Task<object> WaitForLabAsync(string runId, string incarnation, string stage, int timeoutSeconds, CancellationToken cancellationToken)
+    {
+        if (!Guid.TryParse(incarnation, out var fixture) || fixture == Guid.Empty) throw new ArgumentException("incarnation must be a nonempty UUID.", nameof(incarnation));
+        if (stage != "deployable" && stage != "controls_ready") throw new ArgumentException("stage must be deployable or controls_ready.", nameof(stage));
+        if (timeoutSeconds < 1 || timeoutSeconds > 30) throw new ArgumentOutOfRangeException(nameof(timeoutSeconds), "timeout_seconds must be 1..30.");
+        var run = FindRun(runId);
+        // The server coordinator aggregates every owner's scene/ready reports and the committed native stations.
+        var target = FindInstance(run, "server");
+        var wait = await PollClientCommandAsync(run, target, "coop.debug.naval_lab.inspect", timeoutSeconds, 250,
+            inspect => ClassifyLab(inspect, fixture, stage == "controls_ready"), cancellationToken);
+        return new { outcome = wait.Outcome, reached = wait.Outcome == "reached", stage,
+            deadlineExpired = wait.DeadlineExpired, polls = wait.Polls, elapsedMs = wait.ElapsedMs, lastError = wait.Response?.Error, responseId = wait.Response?.Id,
+            last = wait.HasStructured ? LabSummary(wait.Structured) : null,
+            response = wait.DeadlineExpired ? null : wait.Response };
+    }
+
+    private sealed record CommandWait(string Outcome, LiveTestResponse Response, bool HasStructured, JsonElement Structured, bool DeadlineExpired, int Polls, long ElapsedMs);
+
+    // Polls one read-only instance command off the game thread; the instance gate is held per poll, never across the delay.
+    private async Task<CommandWait> PollClientCommandAsync(Run run, Instance target, string command, int timeoutSeconds, int delayMilliseconds,
+        Func<JsonElement, string> classify, CancellationToken cancellationToken)
+    {
+        long started = Environment.TickCount64;
+        using var timeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        timeout.CancelAfter(TimeSpan.FromSeconds(timeoutSeconds));
+        LiveTestResponse response = null;
+        string outcome;
+        int polls = 0;
+        try
+        {
+            while (true)
+            {
+                await target.Gate.WaitAsync(timeout.Token);
+                try
+                {
+                    if (!Alive(target)) { outcome = "process_exited"; break; }
+                    polls++;
+                    var reply = await pipe.SendAsync(target.Identity, "command", new { name = command, arguments = Array.Empty<string>() }, false, timeout.Token);
+                    // A transport failure caused by this wait's own deadline is the deadline, not a bridge fault.
+                    if (!reply.Ok) timeout.Token.ThrowIfCancellationRequested();
+                    response = reply;
+                }
+                finally { target.Gate.Release(); }
+                outcome = !response.Ok ? (Alive(target) ? "fault" : "process_exited")
+                    : response.Result is not JsonElement result || result.ValueKind != JsonValueKind.Object ||
+                        !result.TryGetProperty("succeeded", out var succeeded) || succeeded.ValueKind != JsonValueKind.True ? "fault"
+                    : !TryGetStructuredResult(response, out var structured) ? "malformed"
+                    : classify(structured);
+                if (outcome != null) break;
+                await Task.Delay(delayMilliseconds, timeout.Token);
+            }
+        }
+        catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested) { outcome = "deadline_expired"; }
+        bool deadlineExpired = outcome == "deadline_expired";
+        JsonElement final = default;
+        bool hasStructured = response != null && TryGetStructuredResult(response, out final);
+        if (response != null)
+        {
+            var recorded = RecordResponse(run, target, response, false);
+            if (recorded != response) outcome = "fault";
+            response = recorded;
+        }
+        Save(run);
+        return new CommandWait(outcome, response, hasStructured, final, deadlineExpired, polls, Environment.TickCount64 - started);
+    }
+
+    // Null means the requested recording is still running; any other value ends the wait.
+    private static string ClassifyDrift(JsonElement drift, Guid operation, Guid incarnation)
+    {
+        if (drift.TryGetProperty("unavailable", out var unavailable) && unavailable.ValueKind != JsonValueKind.Null) return "unavailable";
+        if (!TryGetGuid(drift, "operationId", out var actualOperation) || !TryGetGuid(drift, "incarnation", out var actualIncarnation) || !drift.TryGetProperty("ended", out var ended) ||
+            (ended.ValueKind != JsonValueKind.Null && ended.ValueKind != JsonValueKind.String)) return "malformed";
+        if (actualOperation != operation || actualIncarnation != incarnation) return "identity_mismatch";
+        return ended.ValueKind == JsonValueKind.String ? "ended" : null;
+    }
+
+    // Null means pending: an earlier or not yet received operation, the pulse still running, or neutral input not yet applied.
+    private static string ClassifyControl(JsonElement control, Guid operation, Guid incarnation, int slot, bool requireNeutral)
+    {
+        if (control.TryGetProperty("unavailable", out var unavailable) && unavailable.ValueKind != JsonValueKind.Null) return "unavailable";
+        if (!TryGetGuid(control, "incarnation", out var fixture) || !control.TryGetProperty("status", out var status) || status.ValueKind != JsonValueKind.Object ||
+            !TryGetGuid(status, "IncarnationId", out var statusFixture) || !TryGetGuid(status, "operationId", out var actualOperation) ||
+            !status.TryGetProperty("ship", out var ship) || ship.ValueKind != JsonValueKind.Number ||
+            !status.TryGetProperty("phase", out var phase) || phase.ValueKind != JsonValueKind.String) return "malformed";
+        if (fixture != incarnation || statusFixture != incarnation || !ship.TryGetInt32(out int actualSlot) || actualSlot != slot) return "identity_mismatch";
+        bool Is(JsonElement value, string name, JsonValueKind kind) => value.TryGetProperty(name, out var field) && field.ValueKind == kind;
+        bool EpochOne(JsonElement value, string name) => value.TryGetProperty(name, out var epoch) && epoch.ValueKind == JsonValueKind.Number && epoch.TryGetInt32(out int number) && number == 1;
+        if (!control.TryGetProperty("host", out var host) || host.ValueKind != JsonValueKind.Object || !EpochOne(host, "Epoch") || !EpochOne(status, "epoch") ||
+            !Is(status, "ready", JsonValueKind.True) || !Is(status, "terminal", JsonValueKind.False) || !Is(status, "blocked", JsonValueKind.False) ||
+            !Is(status, "inputBlocker", JsonValueKind.Null) || (status.TryGetProperty("unavailable", out var statusUnavailable) && statusUnavailable.ValueKind != JsonValueKind.Null))
+            return "ineligible";
+        if (actualOperation != operation || phase.GetString() == "pending_synthetic_axes") return null;
+        if (phase.GetString() != "completed_axes_neutral_requested") return "control_failed";
+        long Sequence(string name) => status.TryGetProperty(name, out var value) && value.ValueKind == JsonValueKind.Number && value.TryGetInt64(out long number) ? number : -1;
+        long first = Sequence("pulseFirstInputSequence"), last = Sequence("pulseLastInputSequence"), neutral = Sequence("pulseNeutralInputSequence");
+        if (first <= 0 || last < first || neutral <= last) return "malformed";
+        if (!requireNeutral) return "completed";
+        var application = OwnApplication(status, slot);
+        bool Zero(string name) => application is JsonElement own && own.TryGetProperty(name, out var value) && value.ValueKind == JsonValueKind.Number && value.GetDouble() == 0;
+        return Zero("rudder") && Zero("longitudinal") ? "completed" : null;
+    }
+
+    // Null means pending: scene/ready reports, the epoch-one host or committed native controls are still arriving.
+    private static string ClassifyLab(JsonElement inspect, Guid incarnation, bool requireControls)
+    {
+        if (!inspect.TryGetProperty("manifest", out var manifest)) return "malformed";
+        if (manifest.ValueKind == JsonValueKind.Null) return "unavailable";
+        if (manifest.ValueKind != JsonValueKind.Object || !TryGetGuid(manifest, "IncarnationId", out var actual) ||
+            !manifest.TryGetProperty("Controllers", out var controllers) || controllers.ValueKind != JsonValueKind.Array) return "malformed";
+        if (actual != incarnation) return "identity_mismatch";
+        if (!inspect.TryGetProperty("failure", out var failure) || (failure.ValueKind != JsonValueKind.Null && failure.ValueKind != JsonValueKind.String)) return "malformed";
+        if (failure.ValueKind == JsonValueKind.String) return "fixture_failed";
+        if (!inspect.TryGetProperty("ready", out var ready) || ready.ValueKind != JsonValueKind.Array ||
+            !inspect.TryGetProperty("sceneReady", out var sceneReady) || sceneReady.ValueKind != JsonValueKind.Array ||
+            !inspect.TryGetProperty("host", out var host) || (host.ValueKind != JsonValueKind.Null && host.ValueKind != JsonValueKind.Object)) return "malformed";
+        if (host.ValueKind == JsonValueKind.Object && (!host.TryGetProperty("Epoch", out var epoch) || epoch.ValueKind != JsonValueKind.Number ||
+            !epoch.TryGetInt32(out int number) || number != 1)) return "ineligible";
+        bool All(JsonElement reports) => controllers.EnumerateArray().All(id => id.ValueKind == JsonValueKind.String &&
+            reports.EnumerateArray().Any(r => r.ValueKind == JsonValueKind.String && r.GetString() == id.GetString()));
+        if (host.ValueKind == JsonValueKind.Null || controllers.GetArrayLength() == 0 || !All(sceneReady) || !All(ready)) return null;
+        if (!requireControls) return "reached";
+        if (!inspect.TryGetProperty("nativeControls", out var controls) || controls.ValueKind != JsonValueKind.Object) return "ineligible";
+        return controls.TryGetProperty("ready", out var controlsReady) && controlsReady.ValueKind == JsonValueKind.True ? "reached" : null;
+    }
+
+    private static Dictionary<string, object> LabSummary(JsonElement inspect)
+    {
+        JsonElement? Field(JsonElement value, string name) => value.ValueKind == JsonValueKind.Object && value.TryGetProperty(name, out var field) ? field.Clone() : null;
+        var summary = new Dictionary<string, object>
+        {
+            ["ready"] = Field(inspect, "ready"), ["sceneReady"] = Field(inspect, "sceneReady"), ["failure"] = Field(inspect, "failure"),
+            ["hostEpoch"] = Field(inspect, "host") is JsonElement host ? Field(host, "Epoch") : null,
+        };
+        if (Field(inspect, "manifest") is JsonElement manifest)
+        {
+            summary["incarnation"] = Field(manifest, "IncarnationId");
+            summary["controllers"] = Field(manifest, "Controllers");
+        }
+        if (Field(inspect, "nativeControls") is JsonElement controls)
+            summary["nativeControls"] = new { ready = Field(controls, "ready"), stationsCommitted = Field(controls, "stationsCommitted"), nativeReleaseSent = Field(controls, "nativeReleaseSent") };
+        return summary;
+    }
+
+    private static JsonElement? OwnApplication(JsonElement status, int slot) =>
+        status.TryGetProperty("currentOwnerApplication", out var applications) && applications.ValueKind == JsonValueKind.Array &&
+        applications.GetArrayLength() > slot && applications[slot].ValueKind == JsonValueKind.Object ? applications[slot] : null;
+
+    private static Dictionary<string, JsonElement> ControlSummary(JsonElement status, int slot)
+    {
+        var summary = status.EnumerateObject().Where(p => p.Name is "operationId" or "phase" or "remainingSeconds" or "pulseFirstInputSequence"
+            or "pulseLastInputSequence" or "pulseNeutralInputSequence").ToDictionary(p => p.Name, p => p.Value.Clone());
+        if (OwnApplication(status, slot) is JsonElement application) summary["application"] = application.Clone();
+        return summary;
+    }
+
+    private static bool TryGetGuid(JsonElement value, string name, out Guid id)
+    {
+        id = Guid.Empty;
+        return value.TryGetProperty(name, out var field) && field.ValueKind == JsonValueKind.String && Guid.TryParse(field.GetString(), out id);
+    }
+
+    private static bool TryGetStructuredResult(LiveTestResponse response, out JsonElement structured)
+    {
+        structured = default;
+        if (response.Result is not JsonElement result || result.ValueKind != JsonValueKind.Object ||
+            !result.TryGetProperty("hasStructuredResult", out var has) || has.ValueKind != JsonValueKind.True ||
+            !result.TryGetProperty("structuredResult", out structured) || structured.ValueKind != JsonValueKind.Object) return false;
+        return true;
     }
 
     public async Task<LiveTestResponse> RequestAsync(string runId, string instance, string method, object parameters,

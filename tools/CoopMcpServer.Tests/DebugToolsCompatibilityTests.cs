@@ -24,7 +24,7 @@ public sealed class DebugToolsCompatibilityTests
                 Arguments = new[] { "--config", config }, ShutdownTimeout = TimeSpan.FromSeconds(10),
             }), cancellationToken: timeout.Token);
             var tools = await client.ListToolsAsync(cancellationToken: timeout.Token);
-            Assert.Equal(19, tools.Count);
+            Assert.Equal(22, tools.Count);
             var baseline = JsonNode.Parse(File.ReadAllText(Path.Combine(AppContext.BaseDirectory, "Data", "DebugTools-5192afea.json"))).AsArray();
             Assert.Equal(17, baseline.Count);
             foreach (var original in baseline)
@@ -34,6 +34,19 @@ public sealed class DebugToolsCompatibilityTests
                 if (name == "ui_inspect" || name == "ui_action")
                 {
                     Assert.False(string.IsNullOrWhiteSpace(actual["description"].GetValue<string>()));
+                    actual["description"] = original["description"].DeepClone();
+                }
+                if (name == "start_run")
+                {
+                    Assert.Contains("client_count=2 starts server, client1 and client2", actual["description"].GetValue<string>());
+                    Assert.Contains("DebugAutoConnect (/autoconnect), not join_client", actual["description"].GetValue<string>());
+                    Assert.Contains("client_count=0 then start_client, readyToJoin and join_client", actual["description"].GetValue<string>());
+                    actual["description"] = original["description"].DeepClone();
+                }
+                if (name == "start_client")
+                {
+                    Assert.Contains("For manual joining, use start_run with client_count=0", actual["description"].GetValue<string>());
+                    Assert.Contains("Launching is not joining; wait readyToJoin, join_client", actual["description"].GetValue<string>());
                     actual["description"] = original["description"].DeepClone();
                 }
                 if (name == "wait_for_state")
@@ -73,6 +86,24 @@ public sealed class DebugToolsCompatibilityTests
             Assert.Equal(new[] { "instance", "run_id" }, layers.JsonSchema.GetProperty("required").EnumerateArray().Select(p => p.GetString()).Order());
             Assert.True(layers.ProtocolTool.Annotations.ReadOnlyHint);
             Assert.True(layers.ReturnJsonSchema.HasValue);
+            var drift = tools.Single(t => t.Name == "wait_for_drift");
+            string[] driftArguments = { "incarnation", "instance", "operation_id", "run_id", "timeout_seconds" };
+            Assert.Equal(driftArguments, drift.JsonSchema.GetProperty("properties").EnumerateObject().Select(p => p.Name).Order());
+            Assert.Equal(driftArguments, drift.JsonSchema.GetProperty("required").EnumerateArray().Select(p => p.GetString()).Order());
+            Assert.True(drift.ProtocolTool.Annotations.ReadOnlyHint);
+            Assert.True(drift.ReturnJsonSchema.HasValue);
+            var control = tools.Single(t => t.Name == "wait_for_control");
+            string[] controlArguments = { "incarnation", "instance", "operation_id", "require_neutral", "run_id", "slot", "timeout_seconds" };
+            Assert.Equal(controlArguments, control.JsonSchema.GetProperty("properties").EnumerateObject().Select(p => p.Name).Order());
+            Assert.Equal(controlArguments, control.JsonSchema.GetProperty("required").EnumerateArray().Select(p => p.GetString()).Order());
+            Assert.True(control.ProtocolTool.Annotations.ReadOnlyHint);
+            Assert.True(control.ReturnJsonSchema.HasValue);
+            var lab = tools.Single(t => t.Name == "wait_for_lab");
+            string[] labArguments = { "incarnation", "run_id", "stage", "timeout_seconds" };
+            Assert.Equal(labArguments, lab.JsonSchema.GetProperty("properties").EnumerateObject().Select(p => p.Name).Order());
+            Assert.Equal(labArguments, lab.JsonSchema.GetProperty("required").EnumerateArray().Select(p => p.GetString()).Order());
+            Assert.True(lab.ProtocolTool.Annotations.ReadOnlyHint);
+            Assert.True(lab.ReturnJsonSchema.HasValue);
             string export = Environment.GetEnvironmentVariable("COOP_MCP_SCHEMA_EXPORT");
             if (export != null)
                 File.WriteAllText(export, JsonSerializer.Serialize(tools.OrderBy(t => t.Name).Select(t => t.ProtocolTool),

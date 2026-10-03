@@ -18,6 +18,8 @@
     <Compile Include="../../source/GameInterface/Services/LiveTesting/LiveTestCommandDispatcher.cs" Link="LiveTestCommandDispatcher.cs" />
     <Compile Include="../../source/Common.Tests/LiveTesting/LiveTestProtocolTests.cs" Link="LiveTestProtocolTests.cs" />
     <None Update="Data/DebugTools-5192afea.json" CopyToOutputDirectory="PreserveNewest" />
+    <None Update="Data/NativeControlStatus-b0099378.json" CopyToOutputDirectory="PreserveNewest" />
+    <None Update="Data/NavalLabServerInspect-1790cd80.json" CopyToOutputDirectory="PreserveNewest" />
     <Using Include="Xunit" />
   </ItemGroup>
 </Project>

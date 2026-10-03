@@ -203,9 +203,23 @@ public sealed partial class RunOrchestratorTests : IDisposable
     }
 
     [Fact]
-    public async Task StartLaunchesDistinctOwnedInstancesWithoutImplyingReadinessOrJoining()
+    public async Task StartLaunchesInitialAutoConnectClientsBeforeAnyReadinessWait()
     {
+        pipe.Throw = true; // No bridge is available during any of the three launches.
+        launcher.AfterLaunch = () =>
+        {
+            Assert.Empty(pipe.Methods);
+            Assert.All(launcher.Processes, p => Assert.True(p.IsAlive));
+        };
         var run = await runs.StartAsync("test", 2, default);
+        Assert.Equal("started", run.State);
+        Assert.Equal(new[] { 3 }, preflight.Counts);
+        Assert.Equal(new[] { "server", "client1", "client2" }, run.Instances.Select(i => i.Name));
+        Assert.All(launcher.Arguments, args =>
+        {
+            Assert.Contains("/autoconnect", args);
+            Assert.DoesNotContain("/cooptestmanualjoin", args);
+        });
         Assert.Equal(3, run.Instances.Length);
         Assert.Equal(3, run.Instances.Select(i => i.Identity.PlatformId).Distinct().Count());
         Assert.All(run.Instances, i => { Assert.True(i.ProcessAlive); Assert.Null(i.Status); Assert.Equal(run.RunId, i.Identity.RunToken); });
@@ -237,16 +251,31 @@ public sealed partial class RunOrchestratorTests : IDisposable
         Assert.Equal(2, launcher.Processes.Count);
     }
 
-    [Fact]
-    public async Task PartialLaunchFailureStopsOnlySuccessfullyOwnedProcesses()
+    [Theory]
+    [InlineData(2)]
+    [InlineData(3)]
+    public async Task PartialLaunchFailureStopsOnlySuccessfullyOwnedProcesses(int failAt)
     {
-        launcher.FailAt = 2;
+        launcher.FailAt = failAt;
         pipe.Throw = true;
         var run = await runs.StartAsync("test", 2, default);
         Assert.Equal("launch_failed", run.State);
-        Assert.Single(launcher.Processes);
+        Assert.Equal(failAt - 1, launcher.Processes.Count);
         Assert.All(launcher.Processes, p => Assert.Equal(1, p.Stops));
-        Assert.All(run.Instances, i => Assert.False(i.ProcessAlive));
+        Assert.All(run.Instances, i => { Assert.False(i.ProcessAlive); Assert.True(i.CleanupComplete); });
+    }
+
+    [Fact]
+    public async Task CancellationAfterInitialLaunchCleansOwnedProcessBeforeLaunchingClients()
+    {
+        using var cancellation = new CancellationTokenSource();
+        launcher.AfterLaunch = cancellation.Cancel;
+        pipe.Throw = true;
+        var run = await runs.StartAsync("test", 2, cancellation.Token);
+        Assert.Equal("launch_failed", run.State);
+        Assert.Equal(1, Assert.Single(launcher.Processes).Stops);
+        Assert.True(Assert.Single(run.Instances).CleanupComplete);
+        Assert.Empty(run.ClientAttempts);
     }
 
     [Fact]
@@ -371,7 +400,10 @@ public sealed partial class RunOrchestratorTests : IDisposable
     public async Task StagedLaunchUsesIncrementalBudgetAndReservesEachSlotOnce()
     {
         var run = await runs.StartAsync("test", 0, default);
+        Assert.Equal("server", Assert.Single(run.Instances).Name);
+        Assert.DoesNotContain("/cooptestmanualjoin", Assert.Single(launcher.Arguments));
         var results = await Task.WhenAll(runs.StartClientAsync(run.RunId, 2, default), runs.StartClientAsync(run.RunId, 2, default));
+        Assert.Contains("/cooptestmanualjoin", launcher.Arguments[1]);
         Assert.Equal(new[] { "launched", "existing_running" }, results.Select(r => r.Outcome));
         Assert.Equal(2, launcher.Processes.Count);
         Assert.Equal(new[] { 1, 1 }, preflight.Counts);
@@ -496,12 +528,17 @@ public sealed partial class RunOrchestratorTests : IDisposable
         public int FailAt;
         public List<FakeProcess> Processes = new();
         public List<string> Saves = new();
-        public IOwnedProcess Launch(LaunchProfile profile, string role, string platformId, string runToken, string saveName = null)
+        public List<string[]> Arguments = new();
+        public Action AfterLaunch;
+        public IOwnedProcess Launch(LaunchProfile profile, string role, string platformId, string runToken, string saveName = null, bool deferClientJoin = false)
         {
             if (Processes.Count + 1 == FailAt) throw new IOException("fake launch failure");
             Saves.Add(saveName);
+            Arguments.Add(new InGameProcessLauncher(new OwnedProcessFactory())
+                .CreateStartInfo(profile, role, platformId, runToken, saveName, deferClientJoin).ArgumentList.ToArray());
             var process = new FakeProcess(Processes.Count + 1);
             Processes.Add(process);
+            AfterLaunch?.Invoke();
             return process;
         }
     }
