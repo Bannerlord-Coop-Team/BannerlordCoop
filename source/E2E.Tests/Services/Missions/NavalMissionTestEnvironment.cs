@@ -59,10 +59,10 @@ public class NavalMissionTestEnvironment : MissionTestEnvironment, IDisposable
     protected NavalTestAdapter Adapter(EnvironmentInstance client) =>
         client.Resolve<NavalTestAdapterLoader>().Adapter;
 
-    protected Guid CreateLab(NavalLabMode mode)
+    protected Guid CreateLab(NavalLabMode mode, int hullsPerParticipant = 1)
     {
         var operation = Guid.NewGuid();
-        Server.Call(() => Server.Resolve<INavalLabCoordinator>().Create(operation, "naval-A", "naval-B", mode));
+        Server.Call(() => Server.Resolve<INavalLabCoordinator>().Create(operation, "naval-A", "naval-B", mode, hullsPerParticipant));
         PumpAll();
         Assert.Equal(0, Server.Resolve<NavalTestAdapterLoader>().LoadCount);
         Assert.NotSame(Adapter(First), Adapter(Second));

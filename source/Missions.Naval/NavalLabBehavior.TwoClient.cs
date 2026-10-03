@@ -45,8 +45,9 @@ internal sealed partial class NavalLabBehavior
     internal bool CanPrepareTwoClientDeployment => factoryMaterialized && factoryReleased
         && !terminal && factoryAuthorityValid?.Invoke() == true;
 
+    // Only flagship stations are fixed; secondary hulls let vanilla detachments seat their owner-local rowers.
     internal bool OwnsFixedStationOrder(ShipOrder order) => order?._ownerShip?.ShipOrigin is NavalLabShipOrigin
-        && order._ownerShip.ShipsLogic?.Mission == Mission;
+        && order._ownerShip.ShipsLogic?.Mission == Mission && !IsSecondaryHull(Array.IndexOf(Ships, order._ownerShip));
 
     internal MissionShip GetLocalControlledShip()
     {

@@ -26,8 +26,14 @@ public sealed class NavalTestAdapterLoader : INavalMissionAdapterLoader
 /// frame application copies supplied values and makes no claim about water, contact or native input.
 /// </summary>
 public sealed class NavalTestAdapter : INavalMissionAdapter, INavalNativeMissionAdapter, INavalHelmReplicationAdapter, INavalLabShipAdapter,
-    INavalDeckAdapter, INavalRopeAdapter
+    INavalDeckAdapter, INavalRopeAdapter, INavalFleetAdapter
 {
+    public List<(int ship, bool follow)> FleetOrders { get; } = new();
+    public string RequestFleetOrder(int ship, bool follow)
+    {
+        FleetOrders.Add((ship, follow));
+        return "applied:simulated_fleet_order";
+    }
     public MockMission Mission { get; private set; } = null!;
     public NavalLabController? Controller { get; private set; }
     public NavalLabManifest? OpenedManifest { get; private set; }
@@ -90,6 +96,7 @@ public sealed class NavalTestAdapter : INavalMissionAdapter, INavalNativeMission
         OpenCount++;
         Calls.Add("open");
         OpenedManifest = manifest;
+        Frames = manifest.Ships.Select(_ => MatrixFrame.Identity).ToArray();
         Controller = Assert.IsType<NavalLabController>(controller);
         controller.Mission = Mission.Shell;
         if (ThrowOnOpen) throw new InvalidOperationException("simulated native open failure");
@@ -228,34 +235,37 @@ public sealed class NavalTestAdapter : INavalMissionAdapter, INavalNativeMission
     public List<NetworkNavalLabShipSample> CapturedShips { get; } = new();
     public List<NetworkNavalLabShipSample> AcceptedShips { get; } = new();
     public List<(int slot, MatrixFrame frame)> ForeignFrameWrites { get; } = new();
-    public NetworkNavalLabShipSample ShipSample(long sequence, long callback, MatrixFrame frame)
+    public NetworkNavalLabShipSample ShipSample(long sequence, long callback, MatrixFrame frame) =>
+        ShipSample(OwnSlot, sequence, callback, frame);
+    public NetworkNavalLabShipSample ShipSample(int slot, long sequence, long callback, MatrixFrame frame)
     {
-        Guid ship = OpenedManifest!.Ships[OwnSlot];
-        var presentation = new NetworkNavalLabPresentation(ship,
+        Guid ship = OpenedManifest!.Ships[slot];
+        var presentation = !OpenedManifest.IsFlagship(slot) ? null : new NetworkNavalLabPresentation(ship,
             new[] { new NetworkNavalLabSailPresentation(SailKeys[0], 0, 0, 0, 0, true, false, false, 0, 0) },
             OarKeys.Select((key, i) => new NetworkNavalLabOarPresentation(key, OarSides[i], 0, 0, 0, false,
                 NetworkNavalLabOarPresentation.FromFrame(MatrixFrame.Identity))).ToArray(), new float[10]);
-        return new NetworkNavalLabShipSample(OpenedManifest.InstanceId, OpenedManifest.IncarnationId, OwnSlot,
+        return new NetworkNavalLabShipSample(OpenedManifest.InstanceId, OpenedManifest.IncarnationId, slot,
             ship, ownControllerId, sequence, callback, NetworkNavalLabOarPresentation.FromFrame(frame), presentation,
             new NetworkNavalLabSailState(ship, 0, 0));
     }
-    public NetworkNavalLabShipSample CaptureOwnedShip(long sequence, long callback)
+    public NetworkNavalLabShipSample CaptureOwnedShip(int slot, long sequence, long callback)
     {
+        Assert.Equal(ownControllerId, OpenedManifest!.ShipController(slot));
         if (!CaptureShipSamples || InputAuthority?.Invoke() != true) return null!;
-        var sample = ShipSample(sequence, callback, Frames[OwnSlot]);
+        var sample = ShipSample(slot, sequence, callback, Frames[slot]);
         CapturedShips.Add(sample);
         return sample;
     }
     public bool ValidateForeignShip(NetworkNavalLabShipSample sample)
     {
-        Assert.NotEqual(OwnSlot, sample.Slot);
+        Assert.NotEqual(ownControllerId, OpenedManifest!.ShipController(sample.Slot));
         return !TerminalHold && sample.IsValid;
     }
     public void AcceptForeignShip(NetworkNavalLabShipSample sample)
-    { Assert.NotEqual(OwnSlot, sample.Slot); AcceptedShips.Add(sample); }
+    { Assert.NotEqual(ownControllerId, OpenedManifest!.ShipController(sample.Slot)); AcceptedShips.Add(sample); }
     public bool ApplyForeignShipFrame(int slot, MatrixFrame frame)
     {
-        Assert.NotEqual(OwnSlot, slot);
+        Assert.NotEqual(ownControllerId, OpenedManifest!.ShipController(slot));
         ForeignFrameWrites.Add((slot, frame));
         if (ThrowOnApply) throw new InvalidOperationException("simulated frame callback failure");
         if (FailApply) return false;

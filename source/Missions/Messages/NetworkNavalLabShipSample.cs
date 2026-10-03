@@ -35,7 +35,8 @@ public sealed class NetworkNavalLabShipSample : IEvent
 
     public bool IsValid => AuthorityRevision == 1 && Sequence > 0 && SourceCallback > 0
         && NetworkNavalLabOarPresentation.ValidFrame(Frame)
-        && Presentation?.IsValid == true && Presentation.ShipId == ShipId && Presentation.Sails.All(sail => sail.Type == 0)
+        // Flagship receivers require a presentation; secondary hull samples omit it.
+        && (Presentation == null || (Presentation.IsValid && Presentation.ShipId == ShipId && Presentation.Sails.All(sail => sail.Type == 0)))
         && SailState?.IsValid == true && SailState.ShipId == ShipId && SailState.Type == 0
         && (Ropes == null || (Ropes.Length <= 32 && Ropes.All(rope => rope?.IsValid == true)
             && Ropes.Select(rope => rope.SourceStation).Distinct().Count() == Ropes.Length));

@@ -61,6 +61,7 @@ public sealed partial class NavalLabController : CoopMissionController, INavalLa
     public void Start(NavalLabManifest manifest, INavalMissionAdapter adapter, Action onEnd)
     {
         this.manifest = manifest;
+        CreateHullStreams();
         this.adapter = adapter;
         this.onEnd = onEnd;
         session.TryBegin(manifest.InstanceId);
@@ -196,6 +197,16 @@ public sealed partial class NavalLabController : CoopMissionController, INavalLa
             if (action.DeadlineUtcTicks <= DateTime.UtcNow.Ticks || action.DeadlineUtcTicks > DateTime.UtcNow.AddSeconds(1).Ticks)
                 return "rejected:expired_control";
             return adapter.StartAgentControl(action.Kind, action.Ship, action.Rudder);
+        }
+        if (action.Kind == "fleet-follow" || action.Kind == "fleet-stop")
+        {
+            if (action.Ship < 0 || action.Ship >= manifest.Ships.Length || manifest.IsFlagship(action.Ship)
+                || manifest.ShipController(action.Ship) != session.OwnControllerId || action.Rudder != 0 || action.Row || !NativeControlsReady)
+                return "rejected:fleet_owner_not_ready";
+            if (action.DeadlineUtcTicks <= DateTime.UtcNow.Ticks || action.DeadlineUtcTicks > DateTime.UtcNow.AddSeconds(2).Ticks)
+                return "rejected:expired_fleet_order";
+            return (adapter as INavalFleetAdapter)?.RequestFleetOrder(action.Ship, action.Kind == "fleet-follow")
+                ?? "rejected:fleet_adapter_unavailable";
         }
         if (action.Kind == "sail-full" || action.Kind == "sail-raised" || action.Kind == "sail-square-raised")
         {

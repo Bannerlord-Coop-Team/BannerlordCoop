@@ -25,7 +25,7 @@ using TaleWorlds.ObjectSystem;
 
 namespace Missions.Naval;
 
-public sealed class NavalMissionAdapter : INavalMissionAdapter, INavalNativeMissionAdapter, INavalHelmReplicationAdapter, INavalDriftAdapter, INavalPresentationAdapter, INavalLabShipAdapter, INavalRopeAdapter, INavalDeckAdapter
+public sealed class NavalMissionAdapter : INavalMissionAdapter, INavalNativeMissionAdapter, INavalHelmReplicationAdapter, INavalDriftAdapter, INavalPresentationAdapter, INavalLabShipAdapter, INavalRopeAdapter, INavalDeckAdapter, INavalFleetAdapter
 {
     private NavalLabBehavior behavior;
     private readonly Harmony harmony = new Harmony("coop.warsails.lab.physics");
@@ -72,7 +72,8 @@ public sealed class NavalMissionAdapter : INavalMissionAdapter, INavalNativeMiss
         });
     }
 
-    public Missions.Messages.NetworkNavalLabShipSample CaptureOwnedShip(long sequence, long callback) => behavior.CaptureOwnedShip(sequence, callback);
+    public Missions.Messages.NetworkNavalLabShipSample CaptureOwnedShip(int slot, long sequence, long callback) => behavior.CaptureOwnedShip(slot, sequence, callback);
+    public string RequestFleetOrder(int ship, bool follow) => behavior?.RequestFleetOrder(ship, follow) ?? "rejected:no_fixture";
     public bool ValidateForeignShip(Missions.Messages.NetworkNavalLabShipSample sample) => behavior.ValidateForeignShip(sample);
     public void AcceptForeignShip(Missions.Messages.NetworkNavalLabShipSample sample) => behavior.AcceptForeignShip(sample);
     public bool ApplyForeignShipFrame(int slot, MatrixFrame frame) => behavior.ApplyForeignShipFrame(slot, frame);
@@ -159,6 +160,13 @@ internal sealed partial class NavalLabBehavior : MissionLogic
     public Agent[] Agents { get; private set; } = Array.Empty<Agent>();
     // Rope fixtures start inside the native 40 m hook range; the all-physics diagnostic keeps the original 60 m spacing.
     internal float HullSpacing => manifest.AllPhysicsProbe ? 60f : 24f;
+    // Flagships share the row; each secondary rank sits one spacing outward and two behind, beyond hook range of the other participant.
+    internal Vec3 HullOrigin(int slot)
+    {
+        int owner = manifest.OwnerOf(slot), rank = slot / manifest.Controllers.Length;
+        float outward = owner == 0 ? -1f : 1f;
+        return new Vec3(250f + (owner * HullSpacing) + (outward * rank * HullSpacing), 250f - (rank * 2f * HullSpacing), 0f);
+    }
     public object StartupDiagnostics { get; private set; }
     private Agent controlledAgent;
     private string controlKind;
@@ -179,7 +187,13 @@ internal sealed partial class NavalLabBehavior : MissionLogic
     {
         this.manifest = manifest;
         this.ownControllerId = ownControllerId;
-        originalOwnerHullRoles = manifest.Controllers.Select(owner => owner == ownControllerId).ToArray();
+        originalOwnerHullRoles = manifest.Ships.Select((_, slot) => manifest.ShipController(slot) == ownControllerId).ToArray();
+        int hulls = manifest.Ships.Length;
+        shipFixedEntries = new long[hulls]; shipParallelEntries = new long[hulls];
+        shipActiveFixedEntries = new long[hulls]; shipActiveParallelEntries = new long[hulls];
+        shipForceEntries = new long[hulls]; shipTargetRefreshes = new long[hulls]; shipOwnerWriteRejects = new long[hulls];
+        shipSentSequences = new long[hulls]; shipAcceptedSequences = new long[hulls]; shipAppliedSequences = new long[hulls];
+        foreignSailStates = new Missions.Messages.NetworkNavalLabSailState[hulls];
         this.hull = hull;
         this.troop = troop;
     }
@@ -231,11 +245,11 @@ internal sealed partial class NavalLabBehavior : MissionLogic
         for (int i = 0; i < Ships.Length; i++)
         {
             var frame = MatrixFrame.Identity;
-            frame.origin = new Vec3(250f + (i * HullSpacing), 250f, 0f);
+            frame.origin = HullOrigin(i);
             BeginFactoryHull(i);
             RecordStartup("factory_begin:" + i);
             Ships[i] = shipsLogic.SpawnShip(new NavalLabShipOrigin(hull, Reject),
-                in frame, teams[i], spawnAnchored: true, checkForFreeArea: false);
+                in frame, teams[manifest.OwnerOf(i)], spawnAnchored: true, checkForFreeArea: false);
             FinishFactoryHull(i);
             RecordStartup("factory_complete:" + i);
             if (!Ships[i].IsInitialized || Ships[i]._actuators == null || Ships[i].Physics == null
@@ -246,26 +260,39 @@ internal sealed partial class NavalLabBehavior : MissionLogic
             Ships[i].SetAnchor(true);
             if (Ships[i].InnerDeckLocalFrames.Count < NavalLabManifest.CrewPerShip)
                 throw new InvalidOperationException("Hull lacks the five required enumerated deck spawn frames.");
+            if (!manifest.IsFlagship(i))
+            {
+                if (OwnsFactoryHull(i)) SpawnFleetRowers(i, teams[manifest.OwnerOf(i)], agentsLogic);
+                continue;
+            }
             for (int j = 0; j < NavalLabManifest.CrewPerShip; j++)
             {
                 var index = (i * NavalLabManifest.CrewPerShip) + j;
-                var spawn = Ships[i].GlobalFrame.TransformToParent(Ships[i].InnerDeckLocalFrames[j]);
                 bool owned = ownControllerId == manifest.Controllers[i];
-                var origin = new NavalLabAgentOrigin(troop, index + 1, owned, Reject);
-                var agent = Mission.SpawnAgent(new AgentBuildData(troop)
-                    .Team(teams[i]).TroopOrigin(origin).Equipment(new Equipment())
-                    .InitialPosition(spawn.origin).InitialDirection(spawn.rotation.f.AsVec2)
-                    .Controller(owned ? (j == 0 ? AgentControllerType.Player : AgentControllerType.AI) : AgentControllerType.None));
-                agent.SetMortalityState(Agent.MortalityState.Invulnerable);
-                agent.GetComponent<AgentNavalComponent>().SetCanDrown(false);
-                agent.GetComponent<AgentNavalComponent>().SetCanBurn(false);
-                agent.Formation = Ships[i].Formation;
-                agentsLogic.AddAgentToShip(agent, Ships[i]);
+                var agent = SpawnFixtureAgent(i, j, teams[i], owned,
+                    owned ? (j == 0 ? AgentControllerType.Player : AgentControllerType.AI) : AgentControllerType.None, agentsLogic);
                 Agents[index] = agent;
                 if (owned && j == 0) Mission.MainAgent = agent;
             }
         }
         PrepareNativeDeployment();
+    }
+
+    private Agent SpawnFixtureAgent(int slot, int deckFrame, Team team, bool owned, AgentControllerType controller, NavalAgentsLogic agentsLogic)
+    {
+        var ship = Ships[slot];
+        var spawn = ship.GlobalFrame.TransformToParent(ship.InnerDeckLocalFrames[deckFrame]);
+        var origin = new NavalLabAgentOrigin(troop, (slot * NavalLabManifest.CrewPerShip) + deckFrame + 1, owned, Reject);
+        var agent = Mission.SpawnAgent(new AgentBuildData(troop)
+            .Team(team).TroopOrigin(origin).Equipment(new Equipment())
+            .InitialPosition(spawn.origin).InitialDirection(spawn.rotation.f.AsVec2)
+            .Controller(controller));
+        agent.SetMortalityState(Agent.MortalityState.Invulnerable);
+        agent.GetComponent<AgentNavalComponent>().SetCanDrown(false);
+        agent.GetComponent<AgentNavalComponent>().SetCanBurn(false);
+        agent.Formation = ship.Formation;
+        agentsLogic.AddAgentToShip(agent, ship);
+        return agent;
     }
 
     internal void RecordStartup(string phase)
@@ -334,8 +361,8 @@ internal sealed partial class NavalLabBehavior : MissionLogic
                 return new { slot, unavailable = "standing_point_unavailable" };
             return new
             {
-                slot, shipId = manifest.Ships[slot], owner = manifest.Controllers[slot],
-                ownerLocal = manifest.Controllers[slot] == ownControllerId,
+                slot, shipId = manifest.Ships[slot], owner = manifest.ShipController(slot),
+                ownerLocal = manifest.ShipController(slot) == ownControllerId,
                 standingPointId = point.Id.Id, standingPointCreatedAtRuntime = point.Id.CreatedAtRuntime,
                 standingPointPointer = point.GameEntity.Pointer.ToUInt64(),
                 point.IsDisabledForPlayers,
@@ -424,6 +451,7 @@ internal sealed partial class NavalLabBehavior : MissionLogic
         CancelPendingNativeHelm();
         CancelAgentControl();
         CancelNativeControls();
+        StopFleetOrders();
         foreach (var ship in Ships.Where(ship => ship?.Controller is PlayerShipController && OwnsFactoryHull(Array.IndexOf(Ships, ship))))
         {
             var input = ShipInputRecord.None();
@@ -462,6 +490,7 @@ internal sealed partial class NavalLabBehavior : MissionLogic
     {
         mode = manifest.Mode.ToString(),
         twoClientNative = InspectNativeControls(),
+        fleet = InspectFleet(),
         factoryAuthorityProbe = InspectFactoryProbe(),
         shipAuthority = InspectShipAuthority(),
         syntheticCrew = true,

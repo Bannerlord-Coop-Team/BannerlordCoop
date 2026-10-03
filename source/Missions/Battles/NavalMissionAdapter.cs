@@ -68,6 +68,12 @@ public interface INavalNativeMissionAdapter
     object InspectControlStatus();
 }
 
+/// <summary>Vanilla ship orders for the local participant's AI-captained secondary hulls; orders are not replicated.</summary>
+public interface INavalFleetAdapter
+{
+    string RequestFleetOrder(int ship, bool follow);
+}
+
 public enum NavalLabMode { TwoClientNative, TwoClientNativeAllPhysics }
 
 public sealed class NavalLabManifest
@@ -85,6 +91,13 @@ public sealed class NavalLabManifest
     public const string SceneId = "battle_terrain_opensea_northern";
     public const string HullId = "nord_medium_ship";
     public const int CrewPerShip = 5;
+    public const int MaxHullsPerParticipant = 2;
+    public int HullsPerParticipant => ships.Length / controllers.Length;
+    // Slots 0..participants-1 are the crewed flagships; each later slot belongs to participant slot % participants.
+    public int[] ShipOwners => Enumerable.Range(0, ships.Length).Select(OwnerOf).ToArray();
+    public int OwnerOf(int slot) => slot % controllers.Length;
+    public string ShipController(int slot) => controllers[OwnerOf(slot)];
+    public bool IsFlagship(int slot) => slot >= 0 && slot < controllers.Length;
 
     public NavalLabManifest(string instanceId, Guid incarnationId, string[] controllers,
         Guid[] combatants, Guid[] ships, NavalLabMode mode)
@@ -98,9 +111,10 @@ public sealed class NavalLabManifest
         if (combatants == null || combatants.Length != participants * CrewPerShip
             || combatants.Contains(Guid.Empty) || combatants.Distinct().Count() != combatants.Length)
             throw new ArgumentException("One immutable id per fixture combatant is required.", nameof(combatants));
-        if (ships == null || ships.Length != participants || ships.Contains(Guid.Empty) || ships.Distinct().Count() != participants
-            || ships.Intersect(combatants).Any())
-            throw new ArgumentException("One immutable ship id per participant is required.", nameof(ships));
+        if (ships == null || ships.Length < participants || ships.Length % participants != 0
+            || ships.Length > participants * MaxHullsPerParticipant || ships.Contains(Guid.Empty)
+            || ships.Distinct().Count() != ships.Length || ships.Intersect(combatants).Any())
+            throw new ArgumentException("One to " + MaxHullsPerParticipant + " immutable ship ids per participant are required.", nameof(ships));
         if (!Enum.IsDefined(typeof(NavalLabMode), mode)) throw new ArgumentException("Unknown lab mode.", nameof(mode));
         Mode = mode;
         InstanceId = instanceId;

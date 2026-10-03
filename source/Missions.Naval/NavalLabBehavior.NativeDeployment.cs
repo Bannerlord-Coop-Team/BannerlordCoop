@@ -93,12 +93,16 @@ internal sealed partial class NavalLabBehavior
         var ship = LocalShip;
         var main = LocalCaptain;
         var agents = Mission.GetMissionBehavior<NavalAgentsLogic>();
-        foreach (var fixtureShip in Ships)
+        for (int slot = 0; slot < Ships.Length; slot++)
         {
-            var captain = Agents[Array.IndexOf(Ships, fixtureShip) * NavalLabManifest.CrewPerShip];
-            agents.AssignCaptainToShip(captain, fixtureShip);
-            fixtureShip.Formation.PlayerOwner = captain;
-            fixtureShip.Formation.SetControlledByAI(false);
+            if (manifest.IsFlagship(slot))
+            {
+                var captain = Agents[slot * NavalLabManifest.CrewPerShip];
+                agents.AssignCaptainToShip(captain, Ships[slot]);
+                Ships[slot].Formation.PlayerOwner = captain;
+            }
+            // Team AI never orders lab formations; secondary hulls take only explicit fleet orders.
+            Ships[slot].Formation.SetControlledByAI(false);
         }
         ship.Formation.PlayerOwner = main;
         Mission.PlayerTeam.PlayerOrderController.Owner = main;
@@ -125,7 +129,7 @@ internal sealed partial class NavalLabBehavior
             Mission.OnDeploymentFinished();
             agents.SetDeploymentMode(false);
             ships.SetDeploymentMode(false);
-            foreach (var agent in Agents.Where(agent => agent.IsAIControlled))
+            foreach (var agent in Agents.Concat(fleetRowers).Where(agent => agent.IsAIControlled))
             {
                 agent.SetAlarmState(Agent.AIStateFlag.Alarmed);
                 agent.SetIsAIPaused(false);
@@ -139,8 +143,8 @@ internal sealed partial class NavalLabBehavior
             // Stock FinishDeployment clears DisableDying; this disposable lab deliberately retains it.
             Mission.OnAfterDeploymentFinished();
             Mission.SetMissionMode(MissionMode.Battle, true);
-            foreach (var ship in Ships) ship.SetController(ship == LocalShip
-                ? ShipControllerType.Player : ShipControllerType.None, autoUpdateController: false);
+            foreach (var ship in Ships) ship.SetController(ship == LocalShip ? ShipControllerType.Player
+                : IsOwnedSecondaryHull(Array.IndexOf(Ships, ship)) ? ShipControllerType.AI : ShipControllerType.None, autoUpdateController: false);
             if (Blocker != null || nativeDeploymentCallbacks != 1 || nativeAfterDeploymentCallbacks != 1
                 || !Mission.IsDeploymentFinished || Ships.Any(ship => !ship.IsDeployed
                     || ship.GameEntity.HasDynamicRigidBodyAndActiveSimulation() != FactoryBodyExpectedActive(Array.IndexOf(Ships, ship))))
@@ -202,7 +206,7 @@ internal sealed partial class NavalLabBehavior
             shipController = ship?.Controller?.GetType().FullName,
             sentInputSequence = nativeInputSequence, lastHelmPermission,
             stationManifests = appliedStations.Values.ToArray(),
-            storedInputs = Ships.Select(item => item?.PlayerController?._inputRecord).ToArray(),
+            storedInputs = Ships.Select(item => (item?.Controller as PlayerShipController)?._inputRecord).ToArray(),
             captain = InspectHelmAgent(ship?.Captain), pilot = InspectHelmAgent(ship?.ShipControllerMachine?.PilotAgent),
             mainAgent = InspectHelmAgent(Mission?.MainAgent),
             oarsmenLevel = ship?.ShipOrder?.OarsmenLevel,

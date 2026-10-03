@@ -11,8 +11,8 @@ namespace Missions.Battles;
 
 public sealed partial class NavalLabCoordinator
 {
-    private readonly long[] shipSampleSequences = new long[2];
-    private readonly string[] shipSampleRejections = new string[2];
+    private long[] shipSampleSequences = Array.Empty<long>();
+    private string[] shipSampleRejections = Array.Empty<string>();
 
     private void CheckStationPresentation(NetworkNavalLabStations value)
     {
@@ -31,30 +31,36 @@ public sealed partial class NavalLabCoordinator
         {
             var sample = payload.What;
             if (!HasFixture || sample.IncarnationId != store.Current.IncarnationId) return;
-            if (sample.Slot < 0 || sample.Slot >= 2) return;
-            int slot = sample.Slot;
             var manifest = store.Current;
+            if (sample.Slot < 0 || sample.Slot >= manifest.Ships.Length || sample.Slot >= shipSampleSequences.Length) return;
+            int slot = sample.Slot;
+            string owner = manifest.ShipController(slot);
             string reject = null;
             if (!NativeAssignmentValid || !nativeReleaseSent || !nativeState.Ready) reject = "not_ready_or_connected";
             else if (payload.Who is not NetPeer peer || !players.TryGetPlayer(peer, out var player)
-                || player.ControllerId != manifest.Controllers[slot]) reject = "sender_not_original_owner";
+                || player.ControllerId != owner) reject = "sender_not_original_owner";
             else if (sample.InstanceId != manifest.InstanceId || sample.ShipId != manifest.Ships[slot]
-                || sample.OriginalOwner != manifest.Controllers[slot] || sample.AuthorityRevision != 1) reject = "identity_or_revision";
+                || sample.OriginalOwner != owner || sample.AuthorityRevision != 1) reject = "identity_or_revision";
             else if (sample.Sequence <= shipSampleSequences[slot]) reject = "stale_sequence";
             else if (!sample.IsValid || sample.DeadlineUtcTicks <= DateTime.UtcNow.Ticks
                 || sample.DeadlineUtcTicks > DateTime.UtcNow.AddSeconds(1).Ticks) reject = "invalid_or_expired";
+            else if (!manifest.IsFlagship(slot))
+            {
+                // Secondary hulls carry no station inventory, so their samples are frame and sail only.
+                if (sample.Presentation != null || sample.Ropes != null) reject = "secondary_presentation_or_ropes";
+            }
             else
             {
                 var inventory = nativeState.Stations.Single(stations => stations.Ship == slot);
-                if (!sample.Presentation.Sails.Select(sail => sail.Key).SequenceEqual(inventory.SailKeys)
+                if (sample.Presentation == null || !sample.Presentation.Sails.Select(sail => sail.Key).SequenceEqual(inventory.SailKeys)
                     || !sample.Presentation.Oars.Select(oar => oar.Key).SequenceEqual(inventory.OarKeys)
                     || !sample.Presentation.Oars.Select(oar => oar.Side).SequenceEqual(inventory.OarSides)) reject = "unknown_inventory";
             }
             shipSampleRejections[slot] = reject;
             if (reject != null) return;
             shipSampleSequences[slot] = sample.Sequence;
-            foreach (var owner in manifest.Controllers.Where(owner => owner != manifest.Controllers[slot]))
-                if (players.TryGetPeer(owner, out var target)) network.Send(target, sample);
+            foreach (var foreign in manifest.Controllers.Where(id => id != owner))
+                if (players.TryGetPeer(foreign, out var target)) network.Send(target, sample);
         }, context: nameof(ReceiveShipSample));
     }
 }

@@ -11,17 +11,18 @@ namespace Missions.Naval;
 internal sealed partial class NavalLabBehavior
 {
     private readonly bool[] originalOwnerHullRoles;
-    private readonly long[] shipFixedEntries = new long[2];
-    private readonly long[] shipParallelEntries = new long[2];
-    private readonly long[] shipActiveFixedEntries = new long[2];
-    private readonly long[] shipActiveParallelEntries = new long[2];
-    private readonly long[] shipForceEntries = new long[2];
-    private readonly long[] shipTargetRefreshes = new long[2];
-    private readonly long[] shipOwnerWriteRejects = new long[2];
-    private readonly long[] shipSentSequences = new long[2];
-    private readonly long[] shipAcceptedSequences = new long[2];
-    private readonly long[] shipAppliedSequences = new long[2];
-    private readonly NetworkNavalLabSailState[] foreignSailStates = new NetworkNavalLabSailState[2];
+    // Per-hull counters, sized to the manifest's ships in the constructor.
+    private readonly long[] shipFixedEntries;
+    private readonly long[] shipParallelEntries;
+    private readonly long[] shipActiveFixedEntries;
+    private readonly long[] shipActiveParallelEntries;
+    private readonly long[] shipForceEntries;
+    private readonly long[] shipTargetRefreshes;
+    private readonly long[] shipOwnerWriteRejects;
+    private readonly long[] shipSentSequences;
+    private readonly long[] shipAcceptedSequences;
+    private readonly long[] shipAppliedSequences;
+    private readonly NetworkNavalLabSailState[] foreignSailStates;
     private long factoryUnattributedForceEntries;
     private long nativeInputCallback;
     private long nativeInputApplyCallback;
@@ -33,17 +34,19 @@ internal sealed partial class NavalLabBehavior
     private bool FactoryBodyExpectedActive(int slot) => slot >= 0 && slot < originalOwnerHullRoles.Length
         && (manifest.AllPhysicsProbe || OwnsFactoryHull(slot));
 
-    internal NetworkNavalLabShipSample CaptureOwnedShip(long sequence, long callback)
+    // Secondary hulls send frame and sail only; presentation, ropes and stations stay flagship-only.
+    internal NetworkNavalLabShipSample CaptureOwnedShip(int slot, long sequence, long callback)
     {
-        if (!PresentationReady || !OwnsFactoryHull(OwnSlot)) return null;
-        var presentation = CapturePresentation(sequence)?[OwnSlot];
-        var sail = ReadSailState(LocalShip, manifest.Ships[OwnSlot]);
-        if (presentation == null || sail == null) return null;
-        var sample = new NetworkNavalLabShipSample(manifest.InstanceId, manifest.IncarnationId, OwnSlot,
-            manifest.Ships[OwnSlot], ownControllerId, sequence, callback,
-            NetworkNavalLabOarPresentation.FromFrame(LocalShip.GlobalFrame), presentation, sail, CaptureRopes());
+        if (!PresentationReady || !OwnsFactoryHull(slot) || slot >= Ships.Length) return null;
+        bool flagship = manifest.IsFlagship(slot);
+        var presentation = flagship ? CapturePresentation(sequence)?[slot] : null;
+        var sail = ReadSailState(Ships[slot], manifest.Ships[slot]);
+        if ((flagship && presentation == null) || sail == null) return null;
+        var sample = new NetworkNavalLabShipSample(manifest.InstanceId, manifest.IncarnationId, slot,
+            manifest.Ships[slot], ownControllerId, sequence, callback,
+            NetworkNavalLabOarPresentation.FromFrame(Ships[slot].GlobalFrame), presentation, sail, flagship ? CaptureRopes() : null);
         if (!sample.IsValid) throw new InvalidOperationException("native.invalid_owned_sample");
-        shipSentSequences[OwnSlot] = sequence;
+        shipSentSequences[slot] = sequence;
         return sample;
     }
 
@@ -59,17 +62,21 @@ internal sealed partial class NavalLabBehavior
     {
         if (sample.Slot < 0 || sample.Slot >= Ships.Length) return false;
         if (OwnsFactoryHull(sample.Slot)) { shipOwnerWriteRejects[sample.Slot]++; return false; }
-        return PresentationReady && sample.InstanceId == manifest.InstanceId && sample.IncarnationId == manifest.IncarnationId
-            && sample.ShipId == manifest.Ships[sample.Slot] && sample.OriginalOwner == manifest.Controllers[sample.Slot]
-            && sample.IsValid && sample.Sequence > shipAcceptedSequences[sample.Slot]
-            && ValidatePresentation(PresentationFrames(sample)) && ValidateRopes(sample.Slot, sample.Ropes);
+        if (!PresentationReady || sample.InstanceId != manifest.InstanceId || sample.IncarnationId != manifest.IncarnationId
+            || sample.ShipId != manifest.Ships[sample.Slot] || sample.OriginalOwner != manifest.ShipController(sample.Slot)
+            || !sample.IsValid || sample.Sequence <= shipAcceptedSequences[sample.Slot]) return false;
+        if (!manifest.IsFlagship(sample.Slot)) return sample.Presentation == null && sample.Ropes == null;
+        return sample.Presentation != null && ValidatePresentation(PresentationFrames(sample)) && ValidateRopes(sample.Slot, sample.Ropes);
     }
 
     internal void AcceptForeignShip(NetworkNavalLabShipSample sample)
     {
         if (!ValidateForeignShip(sample)) throw new InvalidOperationException("native.foreign_sample_refused");
-        AcceptRopes(sample.Slot, sample.Ropes);
-        AcceptPresentation(PresentationFrames(sample));
+        if (manifest.IsFlagship(sample.Slot))
+        {
+            AcceptRopes(sample.Slot, sample.Ropes);
+            AcceptPresentation(PresentationFrames(sample));
+        }
         foreignSailStates[sample.Slot] = sample.SailState;
         shipAcceptedSequences[sample.Slot] = sample.Sequence;
     }
@@ -99,7 +106,7 @@ internal sealed partial class NavalLabBehavior
         unattributedForceEntries = Interlocked.Read(ref factoryUnattributedForceEntries),
         ships = manifest.Ships.Select((id, slot) => new
         {
-            slot, shipId = id, originalOwner = manifest.Controllers[slot], revision = 1,
+            slot, shipId = id, originalOwner = manifest.ShipController(slot), revision = 1, flagship = manifest.IsFlagship(slot),
             localRole = OwnsFactoryHull(slot) ? "owner" : "foreign",
             expectedActiveBeforeTerminal = FactoryBodyExpectedActive(slot),
             nativeController = slot < Ships.Length ? Ships[slot]?.Controller?.ControllerType.ToString() ?? "None" : "unavailable",

@@ -19,7 +19,8 @@ public sealed class NavalLabCreateCommand : ICoopCommand
         new ExpectedArgs("operation_id", "Idempotent operation UUID.", true),
         new ExpectedArgs("first_controller", "First connected client controller id.", true),
         new ExpectedArgs("second_controller", "Second distinct connected client controller id.", true),
-        new ExpectedArgs("mode", "two-client-native or two-client-native-all-physics (disposable diagnostic); one incarnation per run.", true)
+        new ExpectedArgs("mode", "two-client-native or two-client-native-all-physics (disposable diagnostic); one incarnation per run.", true),
+        new ExpectedArgs("hulls_per_participant", "Optional 1 (default) or 2; slots 0-1 are crewed flagships, later slots are AI-captained hulls of participant slot % 2.", false)
     };
     private static NavalLabMode ParseMode(ICoopCommandArgs args)
     {
@@ -30,7 +31,11 @@ public sealed class NavalLabCreateCommand : ICoopCommand
     }
     public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
     {
-        try { return new CoopCommandResult(true, "LIVE_TEST_JSON=" + JsonConvert.SerializeObject(coordinator.Create(Guid.Parse(args[0]), args[1], args[2], ParseMode(args)))); }
+        try
+        {
+            int hulls = args.Count > 4 ? int.Parse(args[4], CultureInfo.InvariantCulture) : 1;
+            return new CoopCommandResult(true, "LIVE_TEST_JSON=" + JsonConvert.SerializeObject(coordinator.Create(Guid.Parse(args[0]), args[1], args[2], ParseMode(args), hulls)));
+        }
         catch (Exception exception) { return new CoopCommandResult(false, exception.Message, "naval_lab_rejected"); }
     }
 }
@@ -46,8 +51,8 @@ public sealed class NavalLabActionCommand : ICoopCommand
     public IExpectedArgs[] ExpectedArgs { get; } =
     {
         new ExpectedArgs("operation_id", "Idempotent operation UUID.", true),
-        new ExpectedArgs("kind", "walk/turn (1s deck locomotion, two-client-native only), complete-deployment, sail-full/sail-raised/sail-square-raised, native-axes-pulse (<=1s, rudder=lateral, row=forward), native-axes-backward (<=1s, rudder=lateral, row=false), native-axes-neutral/native-row-stop (<=1s, rudder=0,row=false; preserve sail), native-take-helm/native-release-helm (two-client synthetic tests, not keyboard evidence; await helm-status observation), stop.", true),
-        new ExpectedArgs("ship", "Manifest ship index, 0 or 1.", true),
+        new ExpectedArgs("kind", "walk/turn (1s deck locomotion, two-client-native only), complete-deployment, sail-full/sail-raised/sail-square-raised, native-axes-pulse (<=1s, rudder=lateral, row=forward), native-axes-backward (<=1s, rudder=lateral, row=false), native-axes-neutral/native-row-stop (<=1s, rudder=0,row=false; preserve sail), native-take-helm/native-release-helm (two-client synthetic tests, not keyboard evidence; await helm-status observation), fleet-follow/fleet-stop (secondary hull slot, rudder=0, row=false; vanilla ShipOrder on the owner), stop.", true),
+        new ExpectedArgs("ship", "Manifest ship index: 0 or 1 for flagships, 2 or 3 for secondary hulls when created with 2 hulls per participant.", true),
         new ExpectedArgs("rudder", "Finite [-1,1]: axes lateral, walk forward input, turn radians/sec.", true),
         new ExpectedArgs("row", "Forward rowing for native-axes-pulse; other actions require false.", true)
     };

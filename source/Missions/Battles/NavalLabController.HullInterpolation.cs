@@ -18,8 +18,8 @@ public sealed partial class NavalLabController
         internal long Accepted, Applied, AcceptedCallback, AppliedCallback, ApplicationOrdinal, OwnerWriteRejects;
         internal string LastReject;
     }
-    private readonly HullStream[] hullStreams = { new HullStream(), new HullStream() };
-    private readonly long[] shipSentSequences = new long[2];
+    private HullStream[] hullStreams = Array.Empty<HullStream>();
+    private long[] shipSentSequences = Array.Empty<long>();
     private INavalLabShipAdapter ShipAdapter => adapter as INavalLabShipAdapter;
     private bool CanWriteFollowerHull => NativeReady && !disposed
         && Mission != null && Mission == TaleWorlds.MountAndBlade.Mission.Current;
@@ -29,27 +29,36 @@ public sealed partial class NavalLabController
         foreach (var stream in hullStreams) stream.Target = null;
     }
 
+    private void CreateHullStreams()
+    {
+        hullStreams = manifest.Ships.Select(_ => new HullStream()).ToArray();
+        shipSentSequences = new long[manifest.Ships.Length];
+    }
+
     private void SendOwnedShip()
     {
-        int slot = Array.IndexOf(manifest.Controllers, session.OwnControllerId);
-        var sample = ShipAdapter.CaptureOwnedShip(shipSentSequences[slot] + 1, callback);
-        if (sample == null) return;
-        shipSentSequences[slot] = sample.Sequence;
-        relay.SendAll(sample);
+        for (int slot = 0; slot < shipSentSequences.Length; slot++)
+        {
+            if (manifest.ShipController(slot) != session.OwnControllerId) continue;
+            var sample = ShipAdapter.CaptureOwnedShip(slot, shipSentSequences[slot] + 1, callback);
+            if (sample == null) continue;
+            shipSentSequences[slot] = sample.Sequence;
+            relay.SendAll(sample);
+        }
     }
 
     private void ReceiveShipSample(NetworkNavalLabShipSample sample)
     {
-        if (sample.Slot < 0 || sample.Slot >= 2) return;
+        if (sample.Slot < 0 || sample.Slot >= hullStreams.Length) return;
         var stream = hullStreams[sample.Slot];
-        if (manifest.Controllers[sample.Slot] == session.OwnControllerId)
+        if (manifest.ShipController(sample.Slot) == session.OwnControllerId)
         {
             stream.OwnerWriteRejects++;
             stream.LastReject = "owner_incoming_write";
             return;
         }
         if (!CanWriteFollowerHull || sample.InstanceId != manifest.InstanceId || sample.IncarnationId != manifest.IncarnationId
-            || sample.ShipId != manifest.Ships[sample.Slot] || sample.OriginalOwner != manifest.Controllers[sample.Slot]
+            || sample.ShipId != manifest.Ships[sample.Slot] || sample.OriginalOwner != manifest.ShipController(sample.Slot)
             || sample.AuthorityRevision != 1 || sample.Sequence <= stream.Accepted || !sample.IsValid
             || sample.DeadlineUtcTicks <= DateTime.UtcNow.Ticks || sample.DeadlineUtcTicks > DateTime.UtcNow.AddSeconds(1).Ticks)
         { stream.LastReject = "identity_readiness_sequence_or_expiry"; return; }
@@ -96,12 +105,12 @@ public sealed partial class NavalLabController
 
     private object[] ShipStreamStatus() => manifest.Ships.Select((id, slot) =>
     {
-        var stream = hullStreams[slot];
+        var stream = slot < hullStreams.Length ? hullStreams[slot] : new HullStream();
         return (object)new
         {
-            slot, shipId = id, originalOwner = manifest.Controllers[slot], revision = 1,
-            localRole = manifest.Controllers[slot] == session.OwnControllerId ? "owner" : "foreign",
-            sentSequence = shipSentSequences[slot], acceptedSequence = stream.Accepted, appliedSequence = stream.Applied,
+            slot, shipId = id, originalOwner = manifest.ShipController(slot), revision = 1,
+            localRole = manifest.ShipController(slot) == session.OwnControllerId ? "owner" : "foreign",
+            sentSequence = slot < shipSentSequences.Length ? shipSentSequences[slot] : 0, acceptedSequence = stream.Accepted, appliedSequence = stream.Applied,
             sourceCallback = stream.Target?.SourceCallback, stream.AcceptedCallback, stream.AppliedCallback,
             stream.ApplicationOrdinal, stream.Alpha, stream.OwnerWriteRejects, stream.LastReject,
             targetFrame = stream.Target?.Frame,

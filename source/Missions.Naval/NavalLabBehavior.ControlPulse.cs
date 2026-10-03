@@ -5,6 +5,7 @@ using System.Threading;
 using Common;
 using Missions.Messages;
 using NavalDLC.GauntletUI.MissionViews;
+using NavalDLC.Missions.ShipControl;
 using NavalDLC.View.MissionViews;
 using TaleWorlds.Library;
 using TaleWorlds.MountAndBlade;
@@ -131,7 +132,7 @@ internal sealed partial class NavalLabBehavior
             ownerLastAppliedHelmInput = lastReceivedNativeInput,
             currentOwnerApplication = ready ? Ships.Select(ship =>
             {
-                var input = ship?.PlayerController?._inputRecord;
+                var input = (ship?.Controller as PlayerShipController)?._inputRecord;
                 return input.HasValue && !float.IsNaN(input.Value.RudderLateral) && !float.IsInfinity(input.Value.RudderLateral)
                     ? new { rudder = input.Value.RudderLateral, lateral = (int)input.Value.RowerLateral,
                         longitudinal = (int)input.Value.RowerLongitudinal, doubleTap = (int)input.Value.RowerLongitudinalDoubleTap,

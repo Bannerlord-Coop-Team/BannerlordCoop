@@ -237,6 +237,30 @@ Record at least a before/after pair for the active case, without claiming asynch
 
 Do not declare stages 1–2 complete from this fixture. Actual campaign heroes, boarding, admissions, withdrawal/evacuation and host recovery remain outside current acceptance.
 
+### Fleet slice 1: two hulls per participant
+
+`create` takes an optional fifth argument, hulls per participant (`1` default, `2` maximum). With `2` the manifest has four ships: slots 0 and 1 stay the crewed flagships exactly as before, slot 2 belongs to the first create controller and slot 3 to the second (`shipOwners = [0,1,0,1]`). Combatants stay at ten.
+
+```text
+server coop.debug.naval_lab.create
+  ["5b0f7d0e-2a51-4c3e-9a41-0c7c1d7e2f10", "testclient1", "testclient2", "two-client-native", "2"]
+```
+
+Layout (identity heading, forward is +y): flagships at (250, 250) and (274, 250) as before; slot 2 at (226, 202) and slot 3 at (298, 202), one 24 m step outward and 48 m behind its own flagship. Only the two flagships are inside the 40 m hook range of each other; every hull pair across participants involving a secondary hull is at least 67 m apart.
+
+Each secondary hull is its own formation on its owner's team. On the owner only, it carries four AI rowers that are not combatants: never registered, replicated, station-committed or authority-checked. Vanilla detachments seat them after deployment (the lab's `ManageShipDetachments` suppression is lifted for secondary hulls only), because oars without a seated pilot give no thrust. After `complete-deployment` the owner sets the hull's native controller to `AI` (`autoUpdateController: false`); the other client keeps it `None` and kinematic. The owner streams frame and sail state for every owned hull; secondary samples carry no oar/sail presentation or ropes, so **foreign clients see a crewless secondary hull with retracted oars**. Replicating secondary crews and orders is a later slice.
+
+Orders use vanilla `ShipOrder` on the owner, routed through the normal action relay to that hull's owner only; `ship` must be a secondary slot and rudder/row must be `0`/`false`:
+
+```text
+server coop.debug.naval_lab.action
+  ["9d3c51a2-7f0e-4b64-8a2e-31f0a4c6d7b8", "fleet-follow", "2", "0", "false"]
+server coop.debug.naval_lab.action
+  ["c4e8a0b7-1d2f-4e39-b5a6-7f8091a2b3c4", "fleet-stop", "2", "0", "false"]
+```
+
+`fleet-follow` calls `SetShipFollowOrder(flagship, ±20)`, a target 20 m outward and 15 m behind the owner's flagship. `fleet-stop` calls `SetShipStopOrder`; any fixture cancel (not ready, terminal hold) also stops fleet orders. Read `coop.debug.naval_lab.inspect []` on the owner and check `native.fleet.ownedSecondaryHulls[]`: `controller` (`AI`), `movementOrder` (`Stop`/`Follow`), `orderTargetIsFlagship`, `aiControllable`, `aiHasTarget`, `distanceToFlagship`, `bearingFromFlagshipDegrees` (0 ahead, 90 starboard, ±180 astern), `flagshipLocalOffset` `[starboard, ahead]`, `followOffset`, `speed` and `seatedRowers`. A closing follower shows `flagshipLocalOffset` moving toward `followOffset` and `seatedRowers > 0`. `native.shipAuthority.ships[2|3]` and `control-status` `transport.ships[]` show the per-hull owner/foreign roles and sample sequences.
+
 ### In-process station drift recording
 
 Current source adds client-only `coop.debug.naval_lab.drift-start [operation_uuid, "30"]` and `coop.debug.naval_lab.drift-status []`. This is diagnostic recording, not a gameplay mutation. Use a fresh shared recording UUID on the two clients after all helm and station confirmations; their start times are still asynchronous. A duplicate UUID with the same duration returns the existing recording without resetting it. Only one recording is allowed per fixture, with duration 1-60 seconds.
