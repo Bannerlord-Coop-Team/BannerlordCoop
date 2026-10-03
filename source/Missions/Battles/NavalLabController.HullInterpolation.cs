@@ -21,7 +21,7 @@ public sealed partial class NavalLabController
     private readonly HullStream[] hullStreams = { new HullStream(), new HullStream() };
     private readonly long[] shipSentSequences = new long[2];
     private INavalLabShipAdapter ShipAdapter => adapter as INavalLabShipAdapter;
-    private bool CanWriteFollowerHull => NativeControlsReady && !disposed
+    private bool CanWriteFollowerHull => NativeReady && !disposed
         && Mission != null && Mission == TaleWorlds.MountAndBlade.Mission.Current;
 
     private void ClearHullTargets()

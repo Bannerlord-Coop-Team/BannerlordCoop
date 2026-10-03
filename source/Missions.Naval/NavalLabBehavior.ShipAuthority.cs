@@ -78,7 +78,7 @@ internal sealed partial class NavalLabBehavior
     {
         if (slot < 0 || slot >= Ships.Length) return false;
         if (OwnsFactoryHull(slot)) { shipOwnerWriteRejects[slot]++; return false; }
-        if (!PresentationReady || !factoryMaterialized || !factoryReleased || terminal) return false;
+        if (!PresentationReady || !factoryMaterialized || !factoryReleased) return false;
         CheckFactoryAssignment();
         var entity = Ships[slot].GameEntity;
         if (!entity.IsValid || entity.HasDynamicRigidBodyAndActiveSimulation() != manifest.AllPhysicsProbe)

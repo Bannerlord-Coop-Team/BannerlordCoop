@@ -27,7 +27,7 @@ internal sealed partial class NavalLabBehavior
 
     internal object InspectSailStatus()
     {
-        bool ready = !terminal && CanUseNativeControls;
+        bool ready = CanUseNativeControls;
         var view = Mission?.GetMissionBehavior<MissionGauntletShipControlView>();
         bool ownerView = view?._dataSource != null && view._playerControlledShip == LocalShip && GetLocalControlledShip() == LocalShip;
         return new
@@ -47,7 +47,7 @@ internal sealed partial class NavalLabBehavior
 
     internal NetworkNavalLabSailState[] ReadSailStates()
     {
-        if (terminal || !CanUseNativeControls) return null;
+        if (!CanUseNativeControls) return null;
         var states = new[] { ReadSailState(LocalShip, manifest.Ships[OwnSlot]) };
         return states.Any(state => state == null) ? null : states;
     }

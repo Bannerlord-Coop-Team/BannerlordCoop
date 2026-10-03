@@ -160,8 +160,8 @@ public sealed partial class NavalLabController : CoopMissionController, INavalLa
         if (action.Kind == "walk" || action.Kind == "turn")
         {
             if (manifest.Mode != NavalLabMode.TwoClientNative || action.Ship < 0 || action.Ship >= 2
-                || manifest.Controllers[action.Ship] != session.OwnControllerId || action.Row || !NativeControlsReady
-                || !NativeAgentAuthoritiesValid) return "rejected:owner_not_ready";
+                || manifest.Controllers[action.Ship] != session.OwnControllerId || action.Row || !NativeControlsReady)
+                return "rejected:owner_not_ready";
             if (float.IsNaN(action.Rudder) || float.IsInfinity(action.Rudder) || Math.Abs(action.Rudder) > 1)
                 return "rejected:invalid_control";
             if (action.DeadlineUtcTicks <= DateTime.UtcNow.Ticks || action.DeadlineUtcTicks > DateTime.UtcNow.AddSeconds(1).Ticks)
@@ -211,7 +211,6 @@ public sealed partial class NavalLabController : CoopMissionController, INavalLa
         {
             faultReported = true;
             released = false;
-            Logger.Error("[NavalLabTerminal] {Incarnation} adapter blocker: {Reason}", manifest.IncarnationId, adapter.Blocker);
             relay.SendAll(new NetworkNavalLabFault(manifest.IncarnationId, adapter.Blocker));
         }
         TickFollowerHull(dt);

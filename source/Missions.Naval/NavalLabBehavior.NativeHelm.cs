@@ -142,7 +142,7 @@ internal sealed partial class NavalLabBehavior
 
     private string NativeHelmIdentityBlocker()
     {
-        if (Mission == null || Mission != Mission.Current || !CanUseNativeControls || terminal)
+        if (Mission == null || Mission != Mission.Current || !CanUseNativeControls)
             return "native_helm_lifetime_or_authority";
         var ship = LocalShip;
         var machine = ship?.ShipControllerMachine;

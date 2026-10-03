@@ -95,8 +95,8 @@ internal sealed partial class NavalLabBehavior
     internal string DeckLocomotionBlocker()
     {
         if (manifest.AllPhysicsProbe) return "wrong_mode";
-        if (Mission == null || Mission != Mission.Current || !CanUseNativeControls || terminal || nativeTerminalHold
-            || Blocker != null) return "fixture_not_ready_or_terminal";
+        if (Mission == null || Mission != Mission.Current || !CanUseNativeControls)
+            return "fixture_not_ready_or_terminal";
         if (!nativeAutoHelmObserved || nativeHelmPhase == "requested" || nativeHelmPhase == "pending"
             || nativeHelmPhase == "failed") return "native_helm_transition";
         if (offeredHelm == null || offeredHelm.Occupied || !HelmReplicasReady) return "helm_release_not_confirmed";

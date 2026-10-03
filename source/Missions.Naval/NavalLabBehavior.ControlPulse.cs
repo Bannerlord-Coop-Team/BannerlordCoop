@@ -112,7 +112,7 @@ internal sealed partial class NavalLabBehavior
     internal object InspectControlStatus()
     {
         if (!GameThread.Instance.IsGameThread) return new { unavailable = "not_game_thread" };
-        bool ready = !terminal && CanUseNativeControls;
+        bool ready = CanUseNativeControls;
         var view = Mission?.GetMissionBehavior<MissionGauntletShipControlView>();
         return new
         {

@@ -67,8 +67,11 @@ public sealed partial class NavalLabController
         {
             terminalReason = reason;
             terminalCallback = callback;
+            // The single place readiness is lost; every fault, stop and teardown passes through here once.
+            Logger.Error("[NavalLabTerminal] {Incarnation} terminal hold: {Reason}", manifest?.IncarnationId, reason);
         }
         terminal = true;
+        agentAuthoritiesValid = false;
         released = false;
         try { CancelControls(); }
         catch (Exception exception)
@@ -96,7 +99,6 @@ public sealed partial class NavalLabController
             if (!faultReported)
             {
                 faultReported = true;
-                Logger.Error("[NavalLabTerminal] {Incarnation} local fault: {Reason}", manifest.IncarnationId, reason);
                 relay.SendAll(new NetworkNavalLabFault(manifest.IncarnationId, reason));
             }
         }

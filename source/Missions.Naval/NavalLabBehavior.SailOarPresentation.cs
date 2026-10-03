@@ -82,7 +82,7 @@ internal sealed partial class NavalLabBehavior
     private long oarCallsiteOrdinal;
     private string presentationUnavailable = "not_initialized";
     private bool PresentationReady => Mission != null && Mission == Mission.Current
-        && !terminal && !nativeTerminalHold && Blocker == null && CanUseNativeControls;
+        && CanUseNativeControls;
 
     private string SailKey(MissionSail sail, MissionShip ship)
     {

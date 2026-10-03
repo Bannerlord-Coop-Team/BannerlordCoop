@@ -30,6 +30,8 @@ internal sealed partial class NavalLabBehavior
     private readonly NetworkNavalLabHelmInput[] lastReceivedNativeInput = new NetworkNavalLabHelmInput[2];
     private bool lastHelmPermission;
     private readonly Dictionary<int, NetworkNavalLabStations> appliedStations = new();
+    // Committed oar machines per ship, resolved once; station keys are immutable for the fixture.
+    private readonly ShipOarMachine[][] committedMachines = new ShipOarMachine[2][];
     internal Action<NetworkNavalLabStations> SendStationRelease;
     // Released crew stay released; the owner authors each release revision, the other client only replays it.
     private readonly bool[][] releasedStations = { new bool[4], new bool[4] };
@@ -230,6 +232,7 @@ internal sealed partial class NavalLabBehavior
                 throw new InvalidOperationException("native.occupied_or_invalid_station");
         }
         appliedStations.Add(value.Ship, value);
+        committedMachines[value.Ship] = value.Keys.Select(key => inventory[key]).ToArray();
         for (int i = 0; i < 4; i++)
         {
             var machine = inventory[value.Keys[i]];
@@ -257,10 +260,10 @@ internal sealed partial class NavalLabBehavior
             || agent == Mission.MainAgent || agent.IsMainAgent || !agent.IsHuman
             || (slot == OwnSlot ? !agent.IsAIControlled : agent.Controller != AgentControllerType.None)
             || agent.MountAgent != null || agent.IsMount) return false;
-        Dictionary<string, ShipOarMachine> inventory;
-        try { inventory = StationInventory(slot); }
+        ShipOarMachine machine;
+        try { machine = CommittedMachines(stations)[crew]; }
         catch (InvalidOperationException) { return false; }
-        if (!inventory.TryGetValue(stations.Keys[crew], out var machine)) return false;
+        if (machine == null) return false;
         var point = machine.PilotStandingPoint;
         var ship = Ships[slot];
         return ship.GameEntity.IsValid && machine.GameEntity.IsValid && point != null && point.GameEntity.IsValid
@@ -285,14 +288,24 @@ internal sealed partial class NavalLabBehavior
         if (slot >= 0) shipTargetRefreshes[slot]++;
     }
 
+    private ShipOarMachine[] CommittedMachines(NetworkNavalLabStations stations)
+    {
+        if (committedMachines[stations.Ship] != null) return committedMachines[stations.Ship];
+        var inventory = StationInventory(stations.Ship);
+        var machines = stations.Keys.Select(key => inventory.TryGetValue(key, out var machine) ? machine : null).ToArray();
+        if (machines.All(machine => machine != null)) committedMachines[stations.Ship] = machines;
+        return machines;
+    }
+
     internal bool ObserveStations(NetworkNavalLabStations value) => ObserveStations(value, refreshTargets: false);
 
     private bool ObserveStations(NetworkNavalLabStations value, bool refreshTargets)
     {
-        var inventory = StationInventory(value.Ship);
+        var machines = CommittedMachines(value);
         for (int i = 0; i < 4; i++)
         {
-            if (!inventory.TryGetValue(value.Keys[i], out var machine))
+            var machine = machines[i];
+            if (machine == null)
                 return RecordStationObservationFailure(value, i, "station_missing", refreshTargets, null, null);
             var agent = Agents[(value.Ship * 5) + i + 1];
             var point = machine.PilotStandingPoint;

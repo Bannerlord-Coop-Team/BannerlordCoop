@@ -41,7 +41,7 @@ internal sealed partial class NavalLabBehavior
     private readonly long[] finalRopesApplied = new long[2];
 
     internal bool HasRopeExperiment => manifest.Mode == NavalLabMode.TwoClientNative;
-    internal bool RopeReady => HasRopeExperiment && CanUseNativeControls && !terminal
+    internal bool RopeReady => HasRopeExperiment && CanUseNativeControls
         && factoryReleased && Mission != null && Mission == Mission.Current;
 
     internal bool IsFixtureRopeMachine(ShipAttachmentMachine machine) => HasRopeExperiment && machine != null

@@ -29,8 +29,7 @@ internal sealed partial class NavalLabBehavior
     private ShipControllerMachine ReplicatedHelmMachine(int slot)
     {
         if (!GameThread.Instance.IsGameThread || Mission == null || Mission != Mission.Current
-            || !CanUseNativeControls || terminal || nativeTerminalHold || Blocker != null
-            || !nativeDeploymentComplete || nativeDeploymentCallbacks != 1 || nativeAfterDeploymentCallbacks != 1
+            || !CanUseNativeControls || nativeDeploymentCallbacks != 1 || nativeAfterDeploymentCallbacks != 1
             || !Mission.IsDeploymentFinished || Mission.Mode != MissionMode.Battle || GameNetwork.IsClientOrReplay
             || slot < 0 || slot >= Ships.Length)
             throw new InvalidOperationException("native.helm_replica_lifecycle");
@@ -135,7 +134,7 @@ internal sealed partial class NavalLabBehavior
 
     private void TickHelmOccupancy()
     {
-        if (!CanUseNativeControls || terminal || Blocker != null) return;
+        if (!CanUseNativeControls) return;
         try
         {
             for (int slot = 0; slot < 2; slot++)

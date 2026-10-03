@@ -29,7 +29,8 @@ internal sealed partial class NavalLabBehavior
     private int nativeDeploymentCallbacks;
     private int nativeAfterDeploymentCallbacks;
 
-    internal bool CanUseNativeControls => nativeDeploymentComplete && !nativeTerminalHold
+    // The one native readiness gate: deployment, no terminal hold or blocker, controller authority and owner identity.
+    internal bool CanUseNativeControls => nativeDeploymentComplete && !terminal && !nativeTerminalHold
         && Blocker == null && NativeAuthority?.Invoke() == true && HasNativeOwnerIdentity();
 
     private bool HasNativeOwnerIdentity()

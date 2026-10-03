@@ -33,6 +33,10 @@ public sealed partial class NavalLabController : INavalNativeController
     public bool NativeInputIngressReady => nativeControlsReleased && released && hydrated && !terminal;
     public bool NativeControlsReady => nativeControlsReleased && released && hydrated
         && AssignmentValid && adapter.Blocker == null && NativeAgentAuthoritiesValid;
+    // The registry walk runs once per tick; hot paths reuse it and keep the cheap lifecycle, epoch and blocker checks live.
+    private volatile bool agentAuthoritiesValid;
+    private bool FixtureAuthorityValid => agentAuthoritiesValid && released && hydrated && AssignmentValid && adapter.Blocker == null;
+    private bool NativeReady => nativeControlsReleased && FixtureAuthorityValid;
 
     public object NativeControlStatus() => new
     {
@@ -62,16 +66,16 @@ public sealed partial class NavalLabController : INavalNativeController
             NativeHelmMovementRevision, AcceptNativeStationMovement, deck ? CaptureNavalDeck : null, deck ? ResolveNavalDeckFrame : null);
         helm.ConfigureHelmReplication(value =>
         {
-            if (!NativeControlsReady || !NativeAgentAuthoritiesValid)
+            if (!NativeControlsReady)
                 throw new InvalidOperationException("native.helm_send_without_authority");
             if (value.Phase == "offer" && manifest.Controllers[value.Ship] != session.OwnControllerId)
                 throw new InvalidOperationException("native.helm_send_not_owner");
             relay.SendAll(value);
         }, agent => coopMissionComponent.AgentMovementHandler.Interpolator.Forget(agent));
         if (adapter is not INavalLabShipAdapter) throw new InvalidOperationException("native.ship_adapter_unavailable");
-        NativeAdapter.ConfigureNative(() => NativeControlsReady, input => ReceiveNativeInput(input, NativeControlsReady), release =>
+        NativeAdapter.ConfigureNative(() => NativeReady, input => ReceiveNativeInput(input, NativeControlsReady), release =>
         {
-            if (!NativeControlsReady || !NativeAgentAuthoritiesValid || release.Phase != "release"
+            if (!NativeControlsReady || release.Phase != "release"
                 || manifest.Controllers[release.Ship] != session.OwnControllerId)
                 throw new InvalidOperationException("native.station_release_without_authority");
             relay.SendAll(release);
@@ -99,7 +103,7 @@ public sealed partial class NavalLabController : INavalNativeController
         if (info == null) return null;
         int index = Array.IndexOf(manifest.Combatants, info.AgentId);
         if (index < 0 || index % NavalLabManifest.CrewPerShip != 0) return null;
-        if (!NativeControlsReady || Mission == null || Mission != TaleWorlds.MountAndBlade.Mission.Current
+        if (!NativeReady || Mission == null || Mission != TaleWorlds.MountAndBlade.Mission.Current
             || info.OriginalOwner != manifest.Controllers[index / NavalLabManifest.CrewPerShip]
             || info.CurrentAuthority != info.OriginalOwner || info.AuthorityRevision != 1
             || info.MovementScopeId != manifest.InstanceId + ":" + info.OriginalOwner || adapter.Agents[index] != info.Agent)
@@ -149,7 +153,7 @@ public sealed partial class NavalLabController : INavalNativeController
     {
         try
         {
-            if (!NativeControlsReady || !NativeAgentAuthoritiesValid || value.IncarnationId != manifest.IncarnationId
+            if (!NativeControlsReady || value.IncarnationId != manifest.IncarnationId
                 || value.Epoch != session.HostEpoch || value.Epoch != 1 || value.Ship < 0 || value.Ship >= 2
                 || value.ShipId != manifest.Ships[value.Ship]
                 || value.CombatantId != manifest.Combatants[value.Ship * NavalLabManifest.CrewPerShip])
@@ -164,9 +168,7 @@ public sealed partial class NavalLabController : INavalNativeController
 
     private bool IsCommittedOarStation(CoopAgentInfo info)
     {
-        if (!released || !hydrated || !AssignmentValid
-            || adapter.Blocker != null || Mission == null || Mission != TaleWorlds.MountAndBlade.Mission.Current
-            || !NativeAgentAuthoritiesValid || info == null
+        if (!FixtureAuthorityValid || Mission == null || Mission != TaleWorlds.MountAndBlade.Mission.Current || info == null
             || info.CurrentAuthority != info.OriginalOwner || info.AuthorityRevision != 1) return false;
         int index = Array.IndexOf(manifest.Combatants, info.AgentId);
         if (index < 0 || index % NavalLabManifest.CrewPerShip == 0 || adapter.Agents[index] != info.Agent
@@ -178,7 +180,7 @@ public sealed partial class NavalLabController : INavalNativeController
 
     private bool IsOccupiedHelmMovement(CoopAgentInfo info)
     {
-        if (!NativeControlsReady || Mission == null || Mission != TaleWorlds.MountAndBlade.Mission.Current
+        if (!NativeReady || Mission == null || Mission != TaleWorlds.MountAndBlade.Mission.Current
             || info == null || info.OriginalOwner != session.OwnControllerId || info.CurrentAuthority != info.OriginalOwner
             || info.AuthorityRevision != 1) return false;
         int slot = Array.IndexOf(manifest.Controllers, session.OwnControllerId);
@@ -237,11 +239,13 @@ public sealed partial class NavalLabController : INavalNativeController
             return;
         }
         nativeControlsReleased = true;
+        agentAuthoritiesValid = true;
     }
 
     private void TickNativeControls()
     {
         if (!NativeAgentAuthoritiesValid) throw new InvalidOperationException("native.agent_authority_changed");
+        agentAuthoritiesValid = true;
         foreach (var entry in pendingStations)
         {
             if (!NativeAdapter.ObserveStations(entry.Value)) throw new InvalidOperationException("native.station_occupancy_lost");
