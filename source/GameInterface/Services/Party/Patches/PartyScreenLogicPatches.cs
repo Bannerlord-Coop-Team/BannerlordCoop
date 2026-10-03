@@ -2,6 +2,7 @@
 using Common.Messaging;
 using Common.Util;
 using GameInterface.Services.Heroes;
+using GameInterface.Services.Issues.Interfaces;
 using GameInterface.Services.Party.Messages;
 using GameInterface.Services.Villages;
 using HarmonyLib;
@@ -103,6 +104,11 @@ internal class PartyScreenLogicPatches
         PartyScreenHelperPatches.ConsumePrisonerDonationRequest(
             out var donationSettlement,
             out var donatedPrisonersRoster);
+        if (__instance.PartyPresentationDoneButtonDelegate.Target is IArtisanProductAlternativeSelection)
+        {
+            __result = flag;
+            return false;
+        }
         if (flag)
         {
             FlattenedTroopRoster recruitedPrisonersRoster = new FlattenedTroopRoster(4);

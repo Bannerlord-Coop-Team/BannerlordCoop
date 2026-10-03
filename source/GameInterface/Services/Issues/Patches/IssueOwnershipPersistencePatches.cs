@@ -1,4 +1,4 @@
-using Common.Logging;
+﻿using Common.Logging;
 using GameInterface.Services.Issues.Generic;
 using HarmonyLib;
 using Serilog;
@@ -7,6 +7,7 @@ using System.Collections.Generic;
 using System.Linq;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.CampaignBehaviors;
+using TaleWorlds.CampaignSystem.LogEntries;
 
 namespace GameInterface.Services.Issues.Patches;
 
@@ -17,6 +18,7 @@ internal class IssueOwnershipPersistencePatches
 
     private const string SaveKey = "_coop_issue_ownership";
     private const string GenerationSaveKey = "_coop_issue_generation";
+    private const string JournalSaveKey = "_coop_issue_journal_ownership";
 
     [HarmonyPatch(nameof(IssuesCampaignBehavior.SyncData))]
     [HarmonyPostfix]
@@ -59,6 +61,21 @@ internal class IssueOwnershipPersistencePatches
                     .Select(entry => new KeyValuePair<Hero, string>(entry.IssueGiverHero, entry.OwnerControllerId)));
             }
         }
+
+        List<IssueJournalOwnershipSaveData> journalSaveData = null;
+        if (dataStore.IsSaving)
+        {
+            var retained = new HashSet<JournalLogEntry>(Campaign.Current.LogEntryHistory
+                .GetGameActionLogs((JournalLogEntry entry) => true));
+            journalSaveData = ownershipRegistry.JournalSnapshot()
+                .Where(entry => retained.Contains(entry.Key))
+                .Select(entry => new IssueJournalOwnershipSaveData(entry.Key, entry.Value)).ToList();
+        }
+        dataStore.SyncData(JournalSaveKey, ref journalSaveData);
+        if (dataStore.IsLoading)
+            ownershipRegistry.RestoreJournalOwners(journalSaveData?
+                .Where(entry => entry?.Journal != null)
+                .Select(entry => new KeyValuePair<JournalLogEntry, string>(entry.Journal, entry.OwnerControllerId)));
 
         List<IssueGenerationSaveData> generationSaveData = null;
         if (dataStore.IsSaving)

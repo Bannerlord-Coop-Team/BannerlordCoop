@@ -19,6 +19,7 @@ using GameInterface.Services.Voice;
 using GameInterface.Services.GameState.Interfaces;
 using GameInterface.Services.Heroes.Interaces;
 using GameInterface.Services.Heroes.Interfaces;
+using GameInterface.Services.Issues.Interfaces;
 using GameInterface.Services.Kingdoms;
 using GameInterface.Services.Locations.Hosting;
 using GameInterface.Services.MapEvents;
@@ -154,6 +155,7 @@ internal abstract class TestComponentBase
         RegisterMock<IServerOptionsProvider>(builder);
         RegisterMock<ISteamBanList>(builder);
         RegisterMock<ISaveNotificationInterface>(builder);
+        RegisterMock<IArtisanProductQuestActions>(builder);
 
         // ISaveInterface is consumed by TransferSaveState's constructor, which packages a save the
         // moment the state is entered. Give it a non-null default so simply entering the state does
