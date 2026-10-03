@@ -27,7 +27,7 @@ public sealed partial class NavalLabCoordinator : INavalRopeCoordinator
         {
             var value = payload.What;
             var manifest = store.Current;
-            if (!IsTwoClientNative || manifest.Mode != NavalLabMode.TwoClientNative || !value.IsValid
+            if (!HasFixture || manifest.Mode != NavalLabMode.TwoClientNative || !value.IsValid
                 || value.IncarnationId != manifest.IncarnationId || value.ShipId != manifest.Ships[value.Slot]) return;
             if (ModInformation.IsClient)
             {

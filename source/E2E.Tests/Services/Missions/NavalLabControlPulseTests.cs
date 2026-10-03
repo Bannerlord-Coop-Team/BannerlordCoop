@@ -95,18 +95,6 @@ public sealed class NavalLabControlPulseTests : NavalMissionTestEnvironment
     }
 
     [Theory]
-    [InlineData(NavalLabMode.FactoryAuthorityProbe)]
-    public void OldModesDoNotGainSyntheticAxesPulseActions(NavalLabMode mode)
-    {
-        CreateLab(mode); Ready(First); Ready(Second); Tick(First); Tick(Second);
-        var operation = Guid.NewGuid();
-        SendAction(First, new NetworkNavalLabAction(Manifest.IncarnationId, operation, 1, "native-axes-pulse", 0, 0, false, DateTime.UtcNow.AddSeconds(1).Ticks));
-        Assert.Equal("rejected:wrong_mode", Receipt(First, operation));
-        Assert.False(Action("native-axes-pulse", Guid.NewGuid()).Succeeded);
-        Assert.Contains("wrong_mode", Command(First, "control-status").Output);
-        Assert.Empty(Adapter(First).AxesPulses);
-    }
-    [Theory]
     [InlineData(false, 0)]
     [InlineData(false, 1)]
     [InlineData(true, 0)]
@@ -129,7 +117,6 @@ public sealed class NavalLabControlPulseTests : NavalMissionTestEnvironment
         var deadlines = typeof(NavalLabController).GetField("nativeInputDeadlines", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance)!;
         ((double[])deadlines.GetValue(Adapter(host).Controller)!)[slot] = 0.001;
         Tick(host); Assert.Contains(slot, Adapter(host).Neutralized); Assert.Empty(Adapter(follower).Neutralized);
-        Assert.Empty(Adapter(host).HelmCalls); Assert.Empty(Adapter(follower).HelmCalls);
         Assert.Contains("hostAcceptedInputSequences", Command(host, "control-status").Output);
         Assert.Contains("no_local_native_view", Command(Server, "control-status").Output);
     }

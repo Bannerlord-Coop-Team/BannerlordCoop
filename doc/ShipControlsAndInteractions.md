@@ -1,5 +1,7 @@
 # Ship controls and interaction prerequisites
 
+> **Removed modes (2026-10):** the `activation`, `held-helm`, `factory-authority-probe` and single-client (`create-single`) lab modes, the `helm`/`probe`/`jump`/`crew` actions and the `samples` command were removed. Only `two-client-native` and the `two-client-native-all-physics` diagnostic remain; sections below that describe the removed modes are historical.
+
 Developer and tester reference for campaign-independent War Sails battles. Investigation: **2026-09-10**. Vanilla facts below come from the installed assemblies identified in the evidence appendix, not assumed controls or signature-only API documentation.
 
 ## Read this before testing

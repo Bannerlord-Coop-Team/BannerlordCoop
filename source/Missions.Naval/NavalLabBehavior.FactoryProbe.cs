@@ -17,7 +17,7 @@ internal sealed partial class NavalLabBehavior
     private bool factoryAttempted;
     private bool factoryReleased;
     private bool factoryAnchorsReleased;
-    private bool factoryTerminal;
+    private bool terminal;
     private volatile bool factoryObserving;
     private volatile MissionShip[] completedFactoryHulls = Array.Empty<MissionShip>();
     private int factorySlot = -1;
@@ -28,7 +28,7 @@ internal sealed partial class NavalLabBehavior
 
     internal void MaterializeFactoryProbe(bool electedHost, Func<bool> authorityValid)
     {
-        if (!IsFactoryProbe || factoryAttempted || factoryTerminal)
+        if (factoryAttempted || terminal)
             throw new InvalidOperationException("factory_probe.invalid_lifecycle");
         if (authorityValid == null || !authorityValid()) throw new InvalidOperationException("factory_probe.no_assignment");
         factoryAttempted = true;
@@ -42,7 +42,6 @@ internal sealed partial class NavalLabBehavior
             if (completedFactoryHulls.Length != manifest.Ships.Length)
                 throw new InvalidOperationException("factory_probe.missing_completed_hook");
             factoryMaterialized = true;
-            Simulating = IsTwoClientNative || factoryHost;
             RecordFactoryPhase("materialized", null);
             RecordStartup("fixture_initialized");
         }
@@ -50,14 +49,14 @@ internal sealed partial class NavalLabBehavior
         {
             Reject(exception.ToString());
             // Only successful, fully checked initialization returns are eligible for terminal body hold.
-            HoldFactoryProbe();
+            Hold();
             throw;
         }
     }
 
     private void CheckFactoryAssignment()
     {
-        if (factoryTerminal || Blocker != null || factoryAuthorityValid?.Invoke() != true)
+        if (terminal || Blocker != null || factoryAuthorityValid?.Invoke() != true)
             throw new InvalidOperationException(Blocker ?? "factory_probe.assignment_changed");
     }
 
@@ -70,7 +69,7 @@ internal sealed partial class NavalLabBehavior
 
     internal void CompleteFactoryHull(MissionShip ship)
     {
-        if (!IsFactoryProbe || !factoryAttempted) return;
+        if (!factoryAttempted) return;
         if (factorySlot < 0 || factorySlot >= Ships.Length || completedFactoryHulls.Contains(ship)
             || ship == null || !ship.GameEntity.IsValid || !ship.IsInitialized || ship._actuators == null
             || ship.Physics?.IsInitialized != true || ship.Formation == null || ship.ShipOrder == null
@@ -98,40 +97,28 @@ internal sealed partial class NavalLabBehavior
         CheckFactoryAssignment();
     }
 
-    private void SetFactoryProbeAuthority(bool simulate)
+    public void SetAuthority(bool simulate)
     {
-        if (factoryTerminal || !factoryMaterialized) return;
+        if (terminal || !factoryMaterialized) return;
         CheckFactoryAssignment();
         foreach (var ship in completedFactoryHulls)
             if (!ship.GameEntity.IsValid || ship.GameEntity.HasDynamicRigidBodyAndActiveSimulation() != FactoryBodyExpectedActive(Array.IndexOf(Ships, ship)))
                 throw new InvalidOperationException("factory_probe.body_role_changed");
-        if (simulate != (IsTwoClientNative || factoryHost)) throw new InvalidOperationException("factory_probe.authority_mismatch");
-        if (!factoryAnchorsReleased && (!IsTwoClientNative || CanUseNativeInput))
+        if (!simulate) throw new InvalidOperationException("factory_probe.authority_mismatch");
+        if (!factoryAnchorsReleased && CanUseNativeInput)
         {
             foreach (var ship in completedFactoryHulls.Where(ship => FactoryBodyExpectedActive(Array.IndexOf(Ships, ship)))) ship.SetAnchor(false);
             factoryAnchorsReleased = true;
         }
         factoryReleased = true;
-        Simulating = IsTwoClientNative || factoryHost;
     }
 
-    internal bool CanApplyFactoryFrames()
-    {
-        if (IsTwoClientNative || !IsFactoryProbe || factoryTerminal || !factoryMaterialized || factoryHost) return false;
-        CheckFactoryAssignment();
-        foreach (var ship in completedFactoryHulls)
-            if (!ship.GameEntity.IsValid || ship.GameEntity.HasDynamicRigidBodyAndActiveSimulation())
-                throw new InvalidOperationException("factory_probe.follower_body_active_or_invalid");
-        return true;
-    }
-
-    private void HoldFactoryProbe()
+    public void Hold()
     {
         ClearPresentation();
-        if (factoryTerminal) return;
-        factoryTerminal = true;
+        if (terminal) return;
+        terminal = true;
         factoryObserving = false;
-        Simulating = false;
         try { CancelControls(); }
         catch (Exception exception) { Reject("factory_probe.control_cleanup_failed:" + exception); }
         foreach (var ship in completedFactoryHulls)
@@ -145,14 +132,14 @@ internal sealed partial class NavalLabBehavior
 
     internal void ObserveFactoryFixedTick(NavalPhysics physics, bool parallel)
     {
-        if (!IsFactoryProbe || !factoryObserving) return;
+        if (!factoryObserving) return;
         if (parallel) Interlocked.Increment(ref factoryParallelEntries);
         else Interlocked.Increment(ref FixedTicks);
         int slot = Array.FindIndex(completedFactoryHulls, ship => ship.Physics == physics);
         if (slot < 0)
         {
             Interlocked.Increment(ref factoryPreCompletionFixedEntries);
-            if (IsTwoClientNative || !factoryHost) Reject("factory_probe.fixed_entry_before_complete_or_unattributed");
+            Reject("factory_probe.fixed_entry_before_complete_or_unattributed");
             return;
         }
         if (parallel) Interlocked.Increment(ref shipParallelEntries[slot]);
@@ -169,13 +156,13 @@ internal sealed partial class NavalLabBehavior
 
     internal void ObserveFactoryForce(NavalPhysics physics)
     {
-        if (!IsFactoryProbe || !factoryObserving) return;
+        if (!factoryObserving) return;
         Interlocked.Increment(ref ForceApplications);
         int slot = Array.FindIndex(completedFactoryHulls, ship => ship.Physics == physics);
         if (slot < 0)
         {
             Interlocked.Increment(ref factoryUnattributedForceEntries);
-            if (IsTwoClientNative || !factoryHost) Reject("factory_probe.force_before_complete_or_unattributed");
+            Reject("factory_probe.force_before_complete_or_unattributed");
             return;
         }
         Interlocked.Increment(ref shipForceEntries[slot]);
@@ -193,14 +180,14 @@ internal sealed partial class NavalLabBehavior
         });
     }
 
-    private object InspectFactoryProbe() => !IsFactoryProbe ? null : new
+    private object InspectFactoryProbe() => new
     {
-        factoryHost, factoryAttempted, factoryMaterialized, factoryReleased, factoryAnchorsReleased, factoryTerminal,
+        factoryHost, factoryAttempted, factoryMaterialized, factoryReleased, factoryAnchorsReleased, terminal,
         preCompletionOrUnattributedFixedEntries = Interlocked.Read(ref factoryPreCompletionFixedEntries),
         parallelFixedEntries = Interlocked.Read(ref factoryParallelEntries), activeParallelFixedEntries = Interlocked.Read(ref factoryActiveParallelEntries),
         trace = factoryTrace.ToArray(), traceLimit = 16,
         unobserved = "native prefab/body creation before managed NavalPhysics callbacks; native solver and other force APIs; no parallel barrier",
-        followerFrameSemantics = IsTwoClientNative ? "Hull lerp, SetGlobalFrame(isTeleportation:false), navmesh and committed oar user target refresh; no native position lock guarantee" : "SetGlobalFrame(isTeleportation:true) plus navmesh; experimental contact, no support correction"
+        followerFrameSemantics = "Hull lerp, SetGlobalFrame(isTeleportation:false), navmesh and committed oar user target refresh; no native position lock guarantee"
     };
 }
 #endif

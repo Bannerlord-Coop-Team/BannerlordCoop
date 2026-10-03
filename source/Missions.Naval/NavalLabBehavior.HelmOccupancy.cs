@@ -28,8 +28,8 @@ internal sealed partial class NavalLabBehavior
 
     private ShipControllerMachine ReplicatedHelmMachine(int slot)
     {
-        if (!GameThread.Instance.IsGameThread || !IsTwoClientNative || Mission == null || Mission != Mission.Current
-            || !CanUseNativeControls || factoryTerminal || nativeTerminalHold || Blocker != null
+        if (!GameThread.Instance.IsGameThread || Mission == null || Mission != Mission.Current
+            || !CanUseNativeControls || terminal || nativeTerminalHold || Blocker != null
             || !nativeDeploymentComplete || nativeDeploymentCallbacks != 1 || nativeAfterDeploymentCallbacks != 1
             || !Mission.IsDeploymentFinished || Mission.Mode != MissionMode.Battle || GameNetwork.IsClientOrReplay
             || slot < 0 || slot >= Ships.Length)
@@ -135,7 +135,7 @@ internal sealed partial class NavalLabBehavior
 
     private void TickHelmOccupancy()
     {
-        if (!IsTwoClientNative || !CanUseNativeControls || factoryTerminal || Blocker != null) return;
+        if (!CanUseNativeControls || terminal || Blocker != null) return;
         try
         {
             for (int slot = 0; slot < 2; slot++)
@@ -175,7 +175,7 @@ internal sealed partial class NavalLabBehavior
 
     private void RefreshReplicatedFollowerHelmTarget()
     {
-        if (!IsTwoClientNative || factoryTerminal || Blocker != null) return;
+        if (terminal || Blocker != null) return;
         int slot = 1 - OwnSlot;
         var state = replicatedHelms[slot];
         if (state?.Occupied != true || observedHelmRevisions[slot] != state.Revision) return;

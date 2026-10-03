@@ -1,5 +1,7 @@
 # Factory-authority diagnostic, not two-playable-client acceptance
 
+> **Removed modes (2026-10):** the `activation`, `held-helm`, `factory-authority-probe` and single-client (`create-single`) lab modes, the `helm`/`probe`/`jump`/`crew` actions and the `samples` command were removed. Only `two-client-native` and the `two-client-native-all-physics` diagnostic remain; sections below that describe the removed modes are historical.
+
 This explicit DEBUG mode is the next bounded experiment after the parent-owned successful single-client run `2719563f90144c07bff5131fb1a9dd77`. That run retained the factory-active anchored body, completed native deployment callbacks once each, and rendered ship/crew/native HUD. It did not accept intentional steering, orders, release/retake or contact continuity. `SingleClientNative`, `Activation` and `HeldHelm` retain their prior paths.
 
 `FactoryAuthorityProbe` tests a different lifecycle, not another attempted inverse of `DisableDynamicBodySimulation`. It installs no new captain/UI/order integration, boarding, hull interactions, campaign fleet, recovery, admission or withdrawal policy. All ten actors remain synthetic infantry. `nativePass=false`, `deployApproved=false`; independent review and parent approval are required before deployment or launch.

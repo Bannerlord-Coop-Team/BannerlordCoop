@@ -21,15 +21,15 @@ using Xunit;
 namespace Coop.Tests.Missions.Battles;
 
 [Collection("Mission.Current")]
-public sealed class NavalLabSingleClientTeamAITests : IDisposable
+public sealed class NavalLabNativeTeamAITests : IDisposable
 {
-    private readonly Harmony harmony = new("coop.tests.naval.single.teamai");
+    private readonly Harmony harmony = new("coop.tests.naval.native.teamai");
     private readonly MissionCurrentScope scope = new();
     private readonly NavalLabBehavior fixture;
     private readonly NavalShipsLogic ships;
     private readonly NavalLabBattlePowerCalculationLogic power;
 
-    public NavalLabSingleClientTeamAITests()
+    public NavalLabNativeTeamAITests()
     {
         Patch(typeof(SoundEvent), nameof(SoundEvent.GetEventIdFromString), nameof(ZeroInt));
         Patch(typeof(MBAnimation), nameof(MBAnimation.GetActionCodeWithName), nameof(ZeroInt));
@@ -45,8 +45,8 @@ public sealed class NavalLabSingleClientTeamAITests : IDisposable
             prefix: new HarmonyMethod(GetType(), nameof(ShipPosition)));
         var id = Guid.NewGuid();
         fixture = new NavalLabBehavior(new NavalLabManifest("naval-lab:" + id.ToString("N"), id,
-            new[] { "A" }, Enumerable.Range(0, 5).Select(_ => Guid.NewGuid()).ToArray(),
-            new[] { Guid.NewGuid() }, NavalLabMode.SingleClientNative), "A", null!, null!);
+            new[] { "A", "B" }, Enumerable.Range(0, 10).Select(_ => Guid.NewGuid()).ToArray(),
+            new[] { Guid.NewGuid(), Guid.NewGuid() }, NavalLabMode.TwoClientNative), "A", null!, null!);
         ships = new NavalShipsLogic();
         power = new NavalLabBattlePowerCalculationLogic(fixture);
         var behaviors = new List<MissionBehavior> { ships, new NavalAgentsLogic(), fixture, power };

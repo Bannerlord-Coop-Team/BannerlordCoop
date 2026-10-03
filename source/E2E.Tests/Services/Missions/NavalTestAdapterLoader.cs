@@ -38,15 +38,10 @@ public sealed class NavalTestAdapter : INavalMissionAdapter, INavalNativeMission
     public bool ThrowOnOpen { get; set; }
     public bool Authority { get; private set; }
     public int OpenCount { get; private set; }
-    public int ApplyCount { get; private set; }
     public int CancelCount { get; private set; }
     public bool Disposed { get; private set; }
-    public List<(int ship, float rudder, bool row)> HelmCalls { get; } = new();
     public List<(string kind, int ship, float value)> AgentControlCalls { get; } = new();
     public List<string> Calls { get; } = new();
-    public NetworkNavalLabSailState[] SailStates { get; set; } = Array.Empty<NetworkNavalLabSailState>();
-    public List<NetworkNavalLabFrames> SailFeedback { get; } = new();
-    public int SailClears { get; private set; }
     public List<int> SailRequests { get; } = new();
     public List<(Guid operationId, int ship, bool take)> NativeHelmRequests { get; } = new();
     public List<(Guid operationId, int ship, float lateral, bool row, long deadline)> AxesPulses { get; } = new();
@@ -64,9 +59,6 @@ public sealed class NavalTestAdapter : INavalMissionAdapter, INavalNativeMission
     }
     public object InspectSailStatus() => new { simulated = true, requests = SailRequests.ToArray() };
     public string RequestSail(int state) { SailRequests.Add(state); return "requested:simulated_native_boundary"; }
-    public NetworkNavalLabSailState[] ReadSailStates() => SailStates;
-    public void ApplySailFeedback(NetworkNavalLabFrames frames) => SailFeedback.Add(frames);
-    public void ClearSailFeedback() => SailClears++;
     public MatrixFrame[] Frames { get; set; } = new[] { MatrixFrame.Identity, MatrixFrame.Identity };
 
     public void Bind(MockMission mission) => Mission = mission;
@@ -102,7 +94,7 @@ public sealed class NavalTestAdapter : INavalMissionAdapter, INavalNativeMission
         controller.Mission = Mission.Shell;
         if (ThrowOnOpen) throw new InvalidOperationException("simulated native open failure");
         this.ownControllerId = ownControllerId;
-        if (manifest.Mode != NavalLabMode.FactoryAuthorityProbe && manifest.Mode != NavalLabMode.TwoClientNative) SpawnActors(manifest, ownControllerId);
+        if (manifest.Mode != NavalLabMode.TwoClientNative) SpawnActors(manifest, ownControllerId);
         return Mission.Shell;
     }
     private void SpawnActors(NavalLabManifest manifest, string ownControllerId)
@@ -135,25 +127,14 @@ public sealed class NavalTestAdapter : INavalMissionAdapter, INavalNativeMission
         TerminalHold = true;
         Authority = false;
         try { CancelControls(); }
-        catch when (OpenedManifest?.Mode == NavalLabMode.FactoryAuthorityProbe || OpenedManifest?.Mode == NavalLabMode.TwoClientNative) { }
+        catch when (OpenedManifest?.Mode == NavalLabMode.TwoClientNative) { }
     }
     public void SetAuthority(bool simulate)
     {
         Calls.Add("authority:" + simulate);
-        Authority = simulate && Blocker == null && !TerminalHold
-            && (OpenedManifest?.Mode != NavalLabMode.SingleClientNative || DeploymentComplete);
+        Authority = simulate && Blocker == null && !TerminalHold;
     }
     public MatrixFrame[] ReadFrames() => (MatrixFrame[])Frames.Clone();
-    public bool ApplyFrames(MatrixFrame[] frames)
-    {
-        ApplyCount++;
-        Calls.Add("apply");
-        if (ThrowOnApply) throw new InvalidOperationException("simulated frame callback failure");
-        if (FailApply) return false;
-        Frames = (MatrixFrame[])frames.Clone();
-        return true;
-    }
-    public void SetHelm(int ship, float rudder, bool row) => HelmCalls.Add((ship, rudder, row));
     public string StartAgentControl(string kind, int ship, float value)
     {
         AgentControlCalls.Add((kind, ship, value));
@@ -166,7 +147,7 @@ public sealed class NavalTestAdapter : INavalMissionAdapter, INavalNativeMission
         Calls.Add("cancel");
         if (ThrowOnCancel) throw new InvalidOperationException("simulated control cancellation failure");
     }
-    public object Inspect() => new { simulated = true, authority = Authority, applyCount = ApplyCount };
+    public object Inspect() => new { simulated = true, authority = Authority };
     public Action<NetworkNavalLabHelmInput>? SendInput { get; private set; }
     public Func<bool>? InputAuthority { get; private set; }
     public List<NetworkNavalLabHelmInput> NativeInputs { get; } = new();

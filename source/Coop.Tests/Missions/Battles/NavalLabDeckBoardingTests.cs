@@ -37,11 +37,9 @@ public sealed class NavalLabDeckBoardingTests : IDisposable
 
     private static NavalLabBehavior Behavior(NavalLabMode mode)
     {
-        int participants = mode == NavalLabMode.SingleClientNative ? 1 : 2;
         var id = Guid.NewGuid();
-        var manifest = new NavalLabManifest("naval-lab:" + id.ToString("N"), id, new[] { "A", "B" }.Take(participants).ToArray(),
-            Enumerable.Range(0, participants * NavalLabManifest.CrewPerShip).Select(_ => Guid.NewGuid()).ToArray(),
-            Enumerable.Range(0, participants).Select(_ => Guid.NewGuid()).ToArray(), mode);
+        var manifest = new NavalLabManifest("naval-lab:" + id.ToString("N"), id, new[] { "A", "B" },
+            Enumerable.Range(0, 10).Select(_ => Guid.NewGuid()).ToArray(), new[] { Guid.NewGuid(), Guid.NewGuid() }, mode);
         return new NavalLabBehavior(manifest, "A", null!, null!);
     }
 
@@ -54,7 +52,7 @@ public sealed class NavalLabDeckBoardingTests : IDisposable
         finally { field.SetValue(null, previous); }
     }
 
-    // Same engine-boundary shell as NavalLabSingleClientTeamAITests: NativeObject's initializer needs IManaged.
+    // Same engine-boundary shell as NavalLabNativeTeamAITests: NativeObject's initializer needs IManaged.
     private static GameEntity EntityAtEngineBoundary()
     {
         var field = AccessTools.Field(typeof(TaleWorlds.DotNet.NativeObject).Assembly
@@ -82,8 +80,6 @@ public sealed class NavalLabDeckBoardingTests : IDisposable
     [Theory]
     [InlineData(NavalLabMode.TwoClientNative, 24f)]
     [InlineData(NavalLabMode.TwoClientNativeAllPhysics, 60f)]
-    [InlineData(NavalLabMode.SingleClientNative, 60f)]
-    [InlineData(NavalLabMode.FactoryAuthorityProbe, 60f)]
     public void OnlyTheRopeFixtureStartsInsideNativeHookRange(NavalLabMode mode, float spacing)
     {
         Assert.Equal(spacing, Behavior(mode).HullSpacing);

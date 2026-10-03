@@ -173,7 +173,7 @@ public sealed class NavalLabNativeHelmTests : IDisposable
         Occupancy(user, used); Tick(); Assert.Equal("pending", fixture.nativeHelmPhase);
         fixture.nativeHelmDeadline = 0; Tick(); Assert.Equal("failed", fixture.nativeHelmPhase);
         Assert.Equal("observation_timeout", fixture.nativeHelmFailure);
-        fixture.Hold(); fixture.CancelControls(); Assert.True(fixture.factoryTerminal);
+        fixture.Hold(); fixture.CancelControls(); Assert.True(fixture.terminal);
         Assert.Equal(1, stops); Assert.Equal(0, uses);
         Assert.Equal(Dispatch, fixture.RequestNativeHelm(id, 0, false));
         Assert.Equal("rejected:terminal_hold", fixture.RequestNativeHelm(Guid.NewGuid(), 0, false));

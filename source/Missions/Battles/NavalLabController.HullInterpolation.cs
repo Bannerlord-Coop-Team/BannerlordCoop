@@ -40,7 +40,7 @@ public sealed partial class NavalLabController
 
     public void ReceiveShipSample(NetworkNavalLabShipSample sample)
     {
-        if (!IsTwoClientNative || sample.Slot < 0 || sample.Slot >= 2) return;
+        if (sample.Slot < 0 || sample.Slot >= 2) return;
         var stream = hullStreams[sample.Slot];
         if (manifest.Controllers[sample.Slot] == session.OwnControllerId)
         {
@@ -64,12 +64,11 @@ public sealed partial class NavalLabController
             stream.Elapsed = 0;
             stream.LastReject = null;
         }
-        catch (Exception exception) { FailFactoryProbe(exception.ToString()); }
+        catch (Exception exception) { Fail(exception.ToString()); }
     }
 
     private void TickFollowerHull(float dt)
     {
-        if (!IsTwoClientNative) return;
         if (!CanWriteFollowerHull) { ClearHullTargets(); return; }
         if (float.IsNaN(dt) || float.IsInfinity(dt) || dt <= 0) return;
         for (int slot = 0; slot < hullStreams.Length; slot++)

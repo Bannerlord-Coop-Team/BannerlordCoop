@@ -41,7 +41,7 @@ internal sealed partial class NavalLabBehavior
     private readonly long[] finalRopesApplied = new long[2];
 
     internal bool HasRopeExperiment => manifest.Mode == NavalLabMode.TwoClientNative;
-    internal bool RopeReady => HasRopeExperiment && CanUseNativeControls && !factoryTerminal
+    internal bool RopeReady => HasRopeExperiment && CanUseNativeControls && !terminal
         && factoryReleased && Mission != null && Mission == Mission.Current;
 
     internal bool IsFixtureRopeMachine(ShipAttachmentMachine machine) => HasRopeExperiment && machine != null
@@ -372,7 +372,7 @@ internal sealed partial class NavalLabBehavior
     {
         int slot = Array.FindIndex(Ships, ship => ship?.Physics == physics);
         if (slot < 0) { Reject("rope.force_outside_fixture"); return false; }
-        if (factoryTerminal || nativeTerminalHold || Blocker != null) return false;
+        if (terminal || nativeTerminalHold || Blocker != null) return false;
         if (!OwnsFactoryHull(slot)) { Interlocked.Increment(ref ropeForeignWritesFiltered[kind]); return false; }
         Interlocked.Increment(ref ropeForceWrites[kind]);
         return true;

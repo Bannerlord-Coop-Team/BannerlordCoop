@@ -152,6 +152,8 @@ A conflicting new operation is rejected while pending. Duplicate operation IDs n
 
 ## Sail feedback and focused commands
 
+> The follower sail-feedback icon and "Sail status unavailable" label described in the next two paragraphs were removed with the factory-authority mode; they never ran in `TwoClientNative`.
+
 The follower sail icon now presents the elected simulator's observed `MissionSail.TargetSailSetting`, using the same categorical mapping as the native HUD. This is the **actuator target**, not the command echo and not a measured cloth deployment percentage or proof of propulsion. The existing 20 Hz frame message carries at most two ship-id/state/type entries plus a one-second UTC deadline. Incarnation, epoch, increasing frame sequence, original-owner readiness and successful frame application precede acceptance; the adapter checks exact ship IDs and its current native readiness again. This local lab uses the same machine clock. Expiry is also tracked locally with a monotonic clock. No follower sail, controller, actuator or physics state is written.
 
 The exact owner view's native `UpdateShipValues` postfix updates only `SetSailState` and `SailType`. Missing/stale/unready feedback hides the icon (installed prefab has exact type selectors 0/1/2, not -1) and shows **Sail status unavailable** above the HUD. Commands are not disabled just because feedback is unavailable. The noninteractive label belongs to that view's UI context, is unique across refreshes and removed before screen finalization. Single-client native and the elected simulator retain their stock readout. The native tick's later input handling changes request state only, not the displayed sail VM.

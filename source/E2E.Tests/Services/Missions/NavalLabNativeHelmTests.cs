@@ -93,17 +93,5 @@ public sealed class NavalLabNativeHelmTests : NavalMissionTestEnvironment
         Assert.Empty(Adapter(Second).NativeHelmRequests);
     }
 
-    [Theory]
-    [InlineData(NavalLabMode.FactoryAuthorityProbe)]
-    public void OldModesDoNotGainSyntheticNativeHelmActions(NavalLabMode mode)
-    {
-        CreateLab(mode); Ready(First); Ready(Second); Tick(First); Tick(Second);
-        var operation = Guid.NewGuid();
-        SendAction(First, new NetworkNavalLabAction(Manifest.IncarnationId, operation, 1, "native-take-helm", 0, 0, false, DateTime.UtcNow.AddSeconds(2).Ticks));
-        Assert.Equal("rejected:wrong_mode", Receipt(First, operation));
-        Assert.False(Action("native-take-helm", Guid.NewGuid()).Succeeded);
-        Assert.Contains("wrong_mode", Command(First, "helm-status").Output);
-        Assert.Empty(Adapter(First).NativeHelmRequests);
-    }
 }
 #endif

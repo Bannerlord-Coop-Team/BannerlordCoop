@@ -28,10 +28,8 @@ internal sealed partial class NavalLabBehavior
     private bool nativeTerminalHold;
     private int nativeDeploymentCallbacks;
     private int nativeAfterDeploymentCallbacks;
-    private int nativeOrders;
-    private string lastNativeOrder;
 
-    internal bool CanUseNativeControls => HasNativeViews && nativeDeploymentComplete && !nativeTerminalHold
+    internal bool CanUseNativeControls => nativeDeploymentComplete && !nativeTerminalHold
         && Blocker == null && NativeAuthority?.Invoke() == true && HasNativeOwnerIdentity();
 
     private bool HasNativeOwnerIdentity()
@@ -58,7 +56,7 @@ internal sealed partial class NavalLabBehavior
             | MissionGauntletShipControlView.ShipControlFeatureFlags.CutLoose
             | MissionGauntletShipControlView.ShipControlFeatureFlags.BallistaOrder
             | MissionGauntletShipControlView.ShipControlFeatureFlags.ShootBallista);
-        if (IsTwoClientNative) navalControl.SuspendFeature(MissionGauntletShipControlView.ShipControlFeatureFlags.ToggleOarsmen
+        navalControl.SuspendFeature(MissionGauntletShipControlView.ShipControlFeatureFlags.ToggleOarsmen
             | MissionGauntletShipControlView.ShipControlFeatureFlags.ShipFocus | MissionGauntletShipControlView.ShipControlFeatureFlags.ShipSelection);
         return new MissionBehavior[]
         {
@@ -99,7 +97,7 @@ internal sealed partial class NavalLabBehavior
             var captain = Agents[Array.IndexOf(Ships, fixtureShip) * NavalLabManifest.CrewPerShip];
             agents.AssignCaptainToShip(captain, fixtureShip);
             fixtureShip.Formation.PlayerOwner = captain;
-            if (IsTwoClientNative) fixtureShip.Formation.SetControlledByAI(false);
+            fixtureShip.Formation.SetControlledByAI(false);
         }
         ship.Formation.PlayerOwner = main;
         Mission.PlayerTeam.PlayerOrderController.Owner = main;
@@ -109,9 +107,8 @@ internal sealed partial class NavalLabBehavior
 
     internal string CompleteNativeDeployment()
     {
-        if (!HasNativeViews) return "rejected:wrong_mode";
         if (nativeTerminalHold || Blocker != null) return "rejected:fixture_blocked";
-        if ((IsTwoClientNative ? !CanPrepareTwoClientDeployment : NativeAuthority?.Invoke() != true) || !HasNativeOwnerIdentity()) return "rejected:owner_not_ready";
+        if (!CanPrepareTwoClientDeployment || !HasNativeOwnerIdentity()) return "rejected:owner_not_ready";
         if (nativeDeploymentComplete) return "already_deployed";
         var controlView = Mission.GetMissionBehavior<MissionGauntletShipControlView>();
         var orderView = Mission.GetMissionBehavior<MissionGauntletNavalOrderUIHandler>();
@@ -125,12 +122,6 @@ internal sealed partial class NavalLabBehavior
             var agents = Mission.GetMissionBehavior<NavalAgentsLogic>();
             ships.SetTeleportShips(false);
             Mission.OnDeploymentFinished();
-            // Native ship-wide callbacks must precede the spawn-use shortcut for every crew station.
-            if (IsSingleClientNative)
-            {
-                agents.GetTeamAgents(Mission.PlayerTeam.TeamSide, out var teamAgents);
-                teamAgents.AssignAndTeleportCrewToShipMachines(Ships[0]);
-            }
             agents.SetDeploymentMode(false);
             ships.SetDeploymentMode(false);
             foreach (var agent in Agents.Where(agent => agent.IsAIControlled))
@@ -147,15 +138,13 @@ internal sealed partial class NavalLabBehavior
             // Stock FinishDeployment clears DisableDying; this disposable lab deliberately retains it.
             Mission.OnAfterDeploymentFinished();
             Mission.SetMissionMode(MissionMode.Battle, true);
-            if (IsSingleClientNative) Ships[0].SetController(ShipControllerType.None, autoUpdateController: true);
-            else foreach (var ship in Ships) ship.SetController(ship == LocalShip
+            foreach (var ship in Ships) ship.SetController(ship == LocalShip
                 ? ShipControllerType.Player : ShipControllerType.None, autoUpdateController: false);
             if (Blocker != null || nativeDeploymentCallbacks != 1 || nativeAfterDeploymentCallbacks != 1
                 || !Mission.IsDeploymentFinished || Ships.Any(ship => !ship.IsDeployed
-                    || ship.GameEntity.HasDynamicRigidBodyAndActiveSimulation() != (IsSingleClientNative || FactoryBodyExpectedActive(Array.IndexOf(Ships, ship)))))
+                    || ship.GameEntity.HasDynamicRigidBodyAndActiveSimulation() != FactoryBodyExpectedActive(Array.IndexOf(Ships, ship))))
                 throw new InvalidOperationException("Native deployment or active factory body was not confirmed.");
             nativeDeploymentComplete = true;
-            Simulating = IsSingleClientNative || IsTwoClientNative || factoryHost;
             return "deployed";
         }
         catch (Exception exception)
@@ -168,18 +157,12 @@ internal sealed partial class NavalLabBehavior
 
     public override void OnDeploymentFinished()
     {
-        if (HasNativeViews) nativeDeploymentCallbacks++;
+        nativeDeploymentCallbacks++;
     }
 
     public override void OnAfterDeploymentFinished()
     {
-        if (HasNativeViews) nativeAfterDeploymentCallbacks++;
-    }
-
-    internal void ObserveNativeOrder(OrderType order)
-    {
-        nativeOrders++;
-        lastNativeOrder = order.ToString();
+        nativeAfterDeploymentCallbacks++;
     }
 
     private void CancelNativeControls()
@@ -198,7 +181,6 @@ internal sealed partial class NavalLabBehavior
 
     private object InspectNativeControls()
     {
-        if (!HasNativeViews) return null;
         var ship = LocalShip;
         var controls = Mission?.GetMissionBehavior<MissionShipControlView>();
         var gauntlet = controls as MissionGauntletShipControlView;
@@ -206,10 +188,10 @@ internal sealed partial class NavalLabBehavior
         return new
         {
             mode = manifest.Mode.ToString(), ownSlot = OwnSlot,
-            unsupported = IsTwoClientNative ? "formation orders, oars allocation, station reassignment, boarding, capture, weapons" : null,
+            unsupported = "formation orders, oars allocation, station reassignment, boarding, capture, weapons",
             deploymentAttempted = nativeDeploymentAttempted, deploymentComplete = nativeDeploymentComplete,
             terminalHold = nativeTerminalHold, nativeDeploymentCallbacks, nativeAfterDeploymentCallbacks,
-            inputEnabled = CanUseNativeControls, nativeOrders, lastNativeOrder,
+            inputEnabled = CanUseNativeControls,
             missionMode = Mission?.Mode.ToString(), nativeDeploymentFinished = Mission?.IsDeploymentFinished,
             controlView = controls?.GetType().FullName, orderView = orders?.GetType().FullName,
             movieLoaded = gauntlet?._gauntletLayer != null, controlDataSource = gauntlet?._dataSource != null,
@@ -219,7 +201,7 @@ internal sealed partial class NavalLabBehavior
             shipController = ship?.Controller?.GetType().FullName,
             sentInputSequence = nativeInputSequence, lastHelmPermission,
             stationManifests = appliedStations.Values.ToArray(),
-            storedInputs = IsTwoClientNative ? Ships.Select(item => item.PlayerController?._inputRecord).ToArray() : null,
+            storedInputs = Ships.Select(item => item?.PlayerController?._inputRecord).ToArray(),
             captain = InspectHelmAgent(ship?.Captain), pilot = InspectHelmAgent(ship?.ShipControllerMachine?.PilotAgent),
             mainAgent = InspectHelmAgent(Mission?.MainAgent),
             oarsmenLevel = ship?.ShipOrder?.OarsmenLevel,

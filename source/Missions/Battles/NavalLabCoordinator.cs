@@ -20,10 +20,8 @@ namespace Missions.Battles;
 public interface INavalLabCoordinator
 {
     object Create(Guid operationId, string firstController, string secondController, NavalLabMode mode);
-    object CreateSingle(Guid operationId, string controller);
     object Execute(Guid operationId, string kind, int ship, float rudder, bool row);
     object Inspect();
-    object Samples(long afterSequence);
     object SailStatus();
     object HelmStatus();
     object ControlStatus();
@@ -76,12 +74,8 @@ public sealed partial class NavalLabCoordinator : INavalLabCoordinator, IHandler
         broker.Subscribe<CampaignTick>(OnCampaignTick);
     }
 
-    public object CreateSingle(Guid operationId, string controller) =>
-        CreateFixture(operationId, new[] { controller }, NavalLabMode.SingleClientNative);
-
     public object Create(Guid operationId, string firstController, string secondController, NavalLabMode mode)
     {
-        if (mode == NavalLabMode.SingleClientNative) throw new ArgumentException("Use create-single for the single-client lab.");
         return CreateFixture(operationId, new[] { firstController, secondController }, mode);
     }
 
@@ -106,7 +100,7 @@ public sealed partial class NavalLabCoordinator : INavalLabCoordinator, IHandler
             Enumerable.Range(0, controllers.Length * NavalLabManifest.CrewPerShip).Select(_ => Guid.NewGuid()).ToArray(),
             controllers.Select(_ => Guid.NewGuid()).ToArray(), mode);
         store.Install(manifest);
-        if (manifest.IsTwoClientNative) nativeState.Initialize(manifest);
+        nativeState.Initialize(manifest);
         store.BeginOperation(incarnation, "activation");
         startOperation = operationId;
         var message = new NetworkNavalLabStart(manifest.InstanceId, incarnation, manifest.Controllers, manifest.Combatants, manifest.Ships, manifest.Mode);
@@ -121,7 +115,6 @@ public sealed partial class NavalLabCoordinator : INavalLabCoordinator, IHandler
     {
         if (ModInformation.IsClient) throw new InvalidOperationException("Run actions on the authoritative server.");
         if (store.Current == null) throw new InvalidOperationException("No lab exists.");
-        bool single = store.Current.Mode == NavalLabMode.SingleClientNative || IsTwoClientNative;
         bool deployment = kind == "complete-deployment";
         bool rope = kind == "rope-throw" || kind == "rope-miss" || kind == "rope-cut" || kind == "rope-plank-force";
         if (rope && (store.Current.Mode != NavalLabMode.TwoClientNative || row || rudder < 0 || rudder >= 32
@@ -130,22 +123,17 @@ public sealed partial class NavalLabCoordinator : INavalLabCoordinator, IHandler
         bool pulse = kind == "native-axes-pulse" || kind == "native-axes-backward" || kind == "native-axes-neutral" || kind == "native-row-stop";
         if (pulse && kind != "native-axes-pulse" && (row || (kind != "native-axes-backward" && rudder != 0)))
             throw new ArgumentException("Backward requires row=false; neutral/row-stop also require rudder=0.");
-        if (pulse && !IsTwoClientNative) throw new ArgumentException("Axes pulses require two-client-native.");
         bool nativeHelm = kind == "native-take-helm" || kind == "native-release-helm";
-        if (nativeHelm && (!IsTwoClientNative || rudder != 0 || row))
-            throw new ArgumentException("Native helm test actions require two-client-native, rudder=0 and row=false.");
+        if (nativeHelm && (rudder != 0 || row))
+            throw new ArgumentException("Native helm test actions require rudder=0 and row=false.");
         bool sail = kind == "sail-full" || kind == "sail-raised" || kind == "sail-square-raised";
-        if (sail && (!IsTwoClientNative || rudder != 0 || row))
-            throw new ArgumentException("Sail test actions require two-client-native, rudder=0 and row=false.");
+        if (sail && (rudder != 0 || row))
+            throw new ArgumentException("Sail test actions require rudder=0 and row=false.");
         bool deckWalk = store.Current.Mode == NavalLabMode.TwoClientNative && (kind == "walk" || kind == "turn");
-        if ((single && kind != "stop" && !deployment && !sail && !nativeHelm && !pulse && !rope && !deckWalk) || (deployment && !single))
-            throw new InvalidOperationException("Single-client native controls use keyboard/orders; only complete-deployment and stop are commands.");
+        if (kind != "stop" && !deployment && !sail && !nativeHelm && !pulse && !rope && !deckWalk)
+            throw new InvalidOperationException("Native controls use keyboard input; only the documented test actions and stop are commands.");
         if (deployment && (ship != 0 || rudder != 0 || row)) throw new ArgumentException("Deployment requires ship=0, rudder=0, row=false.");
-        bool agentControl = kind == "walk" || kind == "turn" || kind == "jump" || kind == "crew";
-        if (kind != "helm" && kind != "stop" && kind != "probe" && !agentControl && !deployment && !sail && !nativeHelm && !pulse && !rope)
-            throw new ArgumentException("Supported actions: helm, probe, walk, turn, jump, crew, stop.");
-        if (agentControl && (row || ((kind == "jump" || kind == "crew") && rudder != 0)))
-            throw new ArgumentException("Agent actions require row=false; jump and crew also require rudder=0.");
+        if (deckWalk && row) throw new ArgumentException("Deck locomotion requires row=false.");
         if (ship < 0 || ship >= store.Current.Ships.Length || float.IsNaN(rudder) || float.IsInfinity(rudder) || (!rope && Math.Abs(rudder) > 1))
             throw new ArgumentException("Invalid ship or control value.");
         string contents = kind + ":" + ship + ":" + rudder.ToString("R", CultureInfo.InvariantCulture) + ":" + row;
@@ -168,8 +156,7 @@ public sealed partial class NavalLabCoordinator : INavalLabCoordinator, IHandler
         var action = new NetworkNavalLabAction(store.Current.IncarnationId, operationId, host?.Epoch ?? 0, kind, ship, rudder, row,
             (nativeHelm || rope) ? DateTime.UtcNow.AddSeconds(2).Ticks : (sail || pulse || deckWalk) ? DateTime.UtcNow.AddSeconds(1).Ticks : 0,
             ropeTargetStation);
-        var targets = kind == "stop" || kind == "probe" || (deployment && IsTwoClientNative) ? store.Current.Controllers
-            : new[] { agentControl || sail || nativeHelm || pulse || rope ? store.Current.Controllers[ship] : host.HostControllerId };
+        var targets = kind == "stop" || deployment ? store.Current.Controllers : new[] { store.Current.Controllers[ship] };
         foreach (var target in targets)
             if (players.TryGetPeer(target, out var peer)) network.Send(peer, action);
         return store.InspectOperation(operationId);
@@ -178,7 +165,7 @@ public sealed partial class NavalLabCoordinator : INavalLabCoordinator, IHandler
     public object StartDrift(Guid operationId, int seconds)
     {
         if (!GameThread.Instance.IsGameThread) throw new InvalidOperationException("Drift recording requires the game thread.");
-        if (!IsTwoClientNative || adapter is not INavalDriftAdapter drift) throw new InvalidOperationException("No native client drift adapter.");
+        if (!HasFixture || adapter is not INavalDriftAdapter drift) throw new InvalidOperationException("No native client drift adapter.");
         return drift.StartDrift(operationId, seconds);
     }
 
@@ -194,9 +181,9 @@ public sealed partial class NavalLabCoordinator : INavalLabCoordinator, IHandler
         return new
         {
             incarnation = store.Current?.IncarnationId, mode = store.Current?.Mode.ToString(),
-            status = IsTwoClientNative ? (adapter as INavalNativeMissionAdapter)?.InspectHelmStatus() : null,
+            status = HasFixture ? (adapter as INavalNativeMissionAdapter)?.InspectHelmStatus() : null,
             terminalState = (controller as NavalLabController)?.TerminalStatus(),
-            unavailable = !IsTwoClientNative ? "wrong_mode_or_no_fixture" : adapter == null ? "no_local_native_view" : null
+            unavailable = !HasFixture ? "no_fixture" : adapter == null ? "no_local_native_view" : null
         };
     }
 
@@ -208,12 +195,12 @@ public sealed partial class NavalLabCoordinator : INavalLabCoordinator, IHandler
             incarnation = store.Current?.IncarnationId, mode = store.Current?.Mode.ToString(),
             host = store.Current != null && hosts.TryGet(store.Current.InstanceId, out var assignment)
                 ? new { assignment.HostControllerId, assignment.Epoch } : null,
-            status = IsTwoClientNative ? (adapter as INavalNativeMissionAdapter)?.InspectControlStatus() : null,
-            transport = IsTwoClientNative ? (controller as INavalNativeController)?.NativeControlStatus() : null,
+            status = HasFixture ? (adapter as INavalNativeMissionAdapter)?.InspectControlStatus() : null,
+            transport = HasFixture ? (controller as INavalNativeController)?.NativeControlStatus() : null,
             expectedBothBodiesActive = store.Current?.AllPhysicsProbe == true,
             serverShipSequences = shipSampleSequences, serverShipLastReject = shipSampleRejections,
-            presentation = IsTwoClientNative ? (adapter as INavalPresentationAdapter)?.InspectPresentationStatus() : null,
-            unavailable = !IsTwoClientNative ? "wrong_mode_or_no_fixture" : adapter == null ? "no_local_native_view" : null
+            presentation = HasFixture ? (adapter as INavalPresentationAdapter)?.InspectPresentationStatus() : null,
+            unavailable = !HasFixture ? "no_fixture" : adapter == null ? "no_local_native_view" : null
         };
     }
 
@@ -225,13 +212,10 @@ public sealed partial class NavalLabCoordinator : INavalLabCoordinator, IHandler
             incarnation = store.Current?.IncarnationId, mode = store.Current?.Mode.ToString(),
             host = store.Current != null && hosts.TryGet(store.Current.InstanceId, out var assignment)
                 ? new { assignment.HostControllerId, assignment.Epoch } : null,
-            status = IsTwoClientNative ? (adapter as INavalNativeMissionAdapter)?.InspectSailStatus() : null,
-            unavailable = !IsTwoClientNative ? "wrong_mode_or_no_fixture" : adapter == null ? "no_local_native_view" : null
+            status = HasFixture ? (adapter as INavalNativeMissionAdapter)?.InspectSailStatus() : null,
+            unavailable = !HasFixture ? "no_fixture" : adapter == null ? "no_local_native_view" : null
         };
     }
-
-    public object Samples(long afterSequence) => controller?.Samples(afterSequence)
-        ?? new { status = "unavailable:no_native_controller" };
 
     public object Inspect() => new
     {
@@ -244,7 +228,7 @@ public sealed partial class NavalLabCoordinator : INavalLabCoordinator, IHandler
         adapterMvid = adapter?.GetType().Assembly.ManifestModule.ModuleVersionId,
         host = store.Current != null && hosts.TryGet(store.Current.InstanceId, out var host) ? host : null,
         campaignWriteBlocker = store.CampaignWriteBlocker,
-        nativeControls = IsTwoClientNative ? new { ready = nativeState.Ready, stationsCommitted, nativeReleaseSent, stations = nativeState.Stations } : null,
+        nativeControls = HasFixture ? new { ready = nativeState.Ready, stationsCommitted, nativeReleaseSent, stations = nativeState.Stations } : null,
         recoverySupported = false
     };
 
@@ -263,7 +247,7 @@ public sealed partial class NavalLabCoordinator : INavalLabCoordinator, IHandler
                 adapter = loader.Load();
                 adapter.Preflight();
                 store.Install(manifest);
-                if (manifest.IsTwoClientNative) nativeState.Initialize(manifest);
+                nativeState.Initialize(manifest);
                 controller = controllerFactory();
                 Logger.Information("[NavalLabStartup] {Incarnation} open begin missionsMvid={MissionsMvid} adapterMvid={AdapterMvid}",
                     manifest.IncarnationId, typeof(NavalLabCoordinator).Assembly.ManifestModule.ModuleVersionId,
@@ -310,7 +294,7 @@ public sealed partial class NavalLabCoordinator : INavalLabCoordinator, IHandler
             string status = controller.Apply(action);
             store.RecordReceipt(action.OperationId, own.ControllerId, status);
             network.SendAll(new NetworkNavalLabReceipt(action.IncarnationId, action.OperationId, status));
-            if (IsTwoClientNative && action.Kind == "complete-deployment" && status == "deployed")
+            if (action.Kind == "complete-deployment" && status == "deployed")
             {
                 try { network.SendAll(((INavalNativeController)controller).CreateStations()); }
                 catch (Exception exception) { network.SendAll(new NetworkNavalLabFault(action.IncarnationId, exception.ToString())); }
@@ -327,7 +311,7 @@ public sealed partial class NavalLabCoordinator : INavalLabCoordinator, IHandler
             if (store.Current?.IncarnationId != receipt.IncarnationId || payload.Who is not NetPeer peer
                 || !players.TryGetPlayer(peer, out var player)
                 || !store.IsParticipant(store.Current.InstanceId, player.ControllerId)) return;
-            if (UsesFactoryLifecycle && receipt.OperationId == store.Current.IncarnationId)
+            if (receipt.OperationId == store.Current.IncarnationId)
             {
                 if (receipt.Status == "scene_ready") { sceneReady.Add(player.ControllerId); return; }
                 if (receipt.Status == "hydrated" && !sceneReady.Contains(player.ControllerId))
@@ -337,21 +321,20 @@ public sealed partial class NavalLabCoordinator : INavalLabCoordinator, IHandler
                 }
             }
             store.RecordReceipt(receipt.OperationId, player.ControllerId, receipt.Status);
-            if (IsTwoClientNative && receipt.Status == "deployed")
+            if (receipt.Status == "deployed")
             {
                 if (!NativeAssignmentValid) { HoldFixture("native.deployment_without_authority"); return; }
                 nativeState.Deploy(player.ControllerId);
             }
-            if (IsTwoClientNative && receipt.Status.StartsWith("failed:", StringComparison.Ordinal)) HoldFixture(receipt.Status);
+            if (receipt.Status.StartsWith("failed:", StringComparison.Ordinal)) HoldFixture(receipt.Status);
             if (receipt.OperationId != store.Current.IncarnationId) return;
             store.RecordReceipt(startOperation, player.ControllerId, receipt.Status);
             if (receipt.Status.StartsWith("failed:", StringComparison.Ordinal)) HoldFixture(receipt.Status);
-            string expectedReady = UsesFactoryLifecycle ? "hydrated" : "ready";
-            if (failure != null || receipt.Status != expectedReady || !ready.Add(player.ControllerId) || ready.Count != store.Current.Controllers.Length) return;
+            if (failure != null || receipt.Status != "hydrated" || !ready.Add(player.ControllerId) || ready.Count != store.Current.Controllers.Length) return;
             if (!hosts.TryGet(store.Current.InstanceId, out var host)) return;
-            if (UsesFactoryLifecycle && (host.Epoch != 1
+            if (host.Epoch != 1
                 || store.Current.Controllers.Any(id => !players.TryGetPeer(id, out _)
-                    || (id != host.HostControllerId && !host.SuccessorControllerIds.Contains(id)))))
+                    || (id != host.HostControllerId && !host.SuccessorControllerIds.Contains(id))))
             {
                 HoldFixture("factory_probe.assignment_changed_before_release");
                 return;

@@ -81,8 +81,8 @@ internal sealed partial class NavalLabBehavior
     private long presentationCapturedUtcTicks;
     private long oarCallsiteOrdinal;
     private string presentationUnavailable = "not_initialized";
-    private bool PresentationReady => IsTwoClientNative && Mission != null && Mission == Mission.Current
-        && !factoryTerminal && !nativeTerminalHold && Blocker == null && CanUseNativeControls;
+    private bool PresentationReady => Mission != null && Mission == Mission.Current
+        && !terminal && !nativeTerminalHold && Blocker == null && CanUseNativeControls;
 
     private string SailKey(MissionSail sail, MissionShip ship)
     {
@@ -291,7 +291,7 @@ internal sealed partial class NavalLabBehavior
     {
         combatant = Guid.Empty; controller = null; ordinal = 0;
         var inventory = presentationInventory;
-        if (!presentationCaptureEnabled || inventory == null || factoryTerminal || nativeTerminalHold || Blocker != null) return false;
+        if (!presentationCaptureEnabled || inventory == null || terminal || nativeTerminalHold || Blocker != null) return false;
         foreach (var entry in inventory)
         {
             int index = Array.IndexOf(entry.Machines, machine);

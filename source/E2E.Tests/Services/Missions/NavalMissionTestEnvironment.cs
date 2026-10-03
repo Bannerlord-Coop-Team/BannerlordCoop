@@ -95,12 +95,6 @@ public class NavalMissionTestEnvironment : MissionTestEnvironment, IDisposable
         PumpAll();
     }
 
-    protected void SendFrames(EnvironmentInstance sender, NetworkNavalLabFrames frames)
-    {
-        sender.Call(() => sender.Resolve<MockBattleNetwork>().SendAll(frames));
-        PumpAll();
-    }
-
     protected void SendShipSample(EnvironmentInstance sender, NetworkNavalLabShipSample sample)
     {
         sender.Call(() => sender.Resolve<INetwork>().SendAll(sample));
@@ -116,9 +110,6 @@ public class NavalMissionTestEnvironment : MissionTestEnvironment, IDisposable
     protected static string Receipt(EnvironmentInstance client, Guid operation) =>
         Assert.Single(client.NetworkSentMessages.GetMessages<NetworkNavalLabReceipt>(),
             receipt => receipt.OperationId == operation).Status;
-
-    protected JObject Samples(EnvironmentInstance client) =>
-        JObject.FromObject(client.Resolve<INavalLabCoordinator>().Samples(0));
 
     protected void PumpAll()
     {

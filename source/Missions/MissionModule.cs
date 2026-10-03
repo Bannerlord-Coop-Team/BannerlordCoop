@@ -211,7 +211,6 @@ public class MissionModule : Module
         builder.RegisterType<NavalLabSessionStore>().As<INavalLabSessionStore>().InstancePerLifetimeScope();
         builder.RegisterType<NavalMissionAdapterLoader>().As<INavalMissionAdapterLoader>().InstancePerDependency();
         builder.RegisterType<NavalLabNativeState>().As<INavalLabNativeState>().InstancePerDependency();
-        builder.RegisterType<NavalLabMeasurement>().As<INavalLabMeasurement>().InstancePerDependency();
         builder.RegisterType<NavalLabController>().As<INavalLabController>().InstancePerDependency();
         builder.RegisterType<NavalLabCoordinator>().As<INavalLabCoordinator>().As<INavalRopeCoordinator>().InstancePerLifetimeScope().AutoActivate();
 #endif

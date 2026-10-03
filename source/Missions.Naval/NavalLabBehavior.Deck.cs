@@ -28,7 +28,7 @@ internal sealed partial class NavalLabBehavior
         deckLocal = Vec3.Zero;
         deckSpeed = 0f;
         supportSlot = -1;
-        if (!IsTwoClientNative || manifest.AllPhysicsProbe || Mission == null || captain == null
+        if (manifest.AllPhysicsProbe || Mission == null || captain == null
             || captain != LocalCaptain || captain != Mission.MainAgent || offeredHelm == null || offeredHelm.Occupied
             || HasOccupiedLocalHelm()) return ResetDeckSpeed();
         supportSlot = CaptainSupportSlot(captain);
@@ -58,7 +58,7 @@ internal sealed partial class NavalLabBehavior
     internal bool TryGetCaptainDeckFrame(int captainSlot, int supportSlot, Agent captain, out MatrixFrame hullFrame)
     {
         hullFrame = default;
-        if (!IsTwoClientNative || manifest.AllPhysicsProbe || factoryTerminal || nativeTerminalHold || Blocker != null
+        if (manifest.AllPhysicsProbe || terminal || nativeTerminalHold || Blocker != null
             || Mission == null || Mission != Mission.Current || captainSlot == OwnSlot || captainSlot < 0
             || captainSlot >= Ships.Length || supportSlot < 0 || supportSlot >= Ships.Length || captain == null
             || Agents[captainSlot * NavalLabManifest.CrewPerShip] != captain) return false;
@@ -94,8 +94,8 @@ internal sealed partial class NavalLabBehavior
     // Synthetic walk/turn is allowed only for the own captain after a confirmed, stable helm release.
     internal string DeckLocomotionBlocker()
     {
-        if (!IsTwoClientNative || manifest.AllPhysicsProbe) return "wrong_mode";
-        if (Mission == null || Mission != Mission.Current || !CanUseNativeControls || factoryTerminal || nativeTerminalHold
+        if (manifest.AllPhysicsProbe) return "wrong_mode";
+        if (Mission == null || Mission != Mission.Current || !CanUseNativeControls || terminal || nativeTerminalHold
             || Blocker != null) return "fixture_not_ready_or_terminal";
         if (!nativeAutoHelmObserved || nativeHelmPhase == "requested" || nativeHelmPhase == "pending"
             || nativeHelmPhase == "failed") return "native_helm_transition";

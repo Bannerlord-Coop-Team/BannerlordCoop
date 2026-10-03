@@ -1,5 +1,7 @@
 # War Sails battle foundation: stages 1 and 2
 
+> **Removed modes (2026-10):** the `activation`, `held-helm`, `factory-authority-probe` and single-client (`create-single`) lab modes, the `helm`/`probe`/`jump`/`crew` actions and the `samples` command were removed. Only `two-client-native` and the `two-client-native-all-physics` diagnostic remain; sections below that describe the removed modes are historical.
+
 ## Factory-authority diagnostic candidate
 
 The parent-owned single-client run `2719563f90144c07bff5131fb1a9dd77` confirmed retained factory-active physics, deployment callbacks and rendered ship/native HUD. Intentional steering, orders, release and contact continuity remain unaccepted. The next explicit `FactoryAuthorityProbe` mode elects through empty scene readiness before either factory, then waits for separate complete hydration receipts. It preserves all three earlier modes and adds no native multiplayer captain/UI, admission, withdrawal or recovery policy. Its follower frame/contact path remains an experiment, not a supported physics seam. See [exact scope, instrumentation limits and bounded parent-only protocol](WarSailsFactoryAuthorityProbe.md). Independent review and explicit parent approval are required; `nativePass=false`, `deployApproved=false`.

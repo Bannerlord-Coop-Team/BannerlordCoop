@@ -15,8 +15,7 @@ internal sealed partial class NavalLabBehavior
     internal object InspectCrewSpatial()
     {
         if (!GameThread.Instance.IsGameThread) return new { unavailable = "not_game_thread" };
-        if (!IsTwoClientNative) return new { unavailable = "wrong_mode" };
-        if (Mission == null || Mission != Mission.Current || factoryTerminal || !nativeDeploymentComplete)
+        if (Mission == null || Mission != Mission.Current || terminal || !nativeDeploymentComplete)
             return new { unavailable = "mission_lifetime_or_deployment" };
         var rows = new List<object>();
         for (int slot = 0; slot < manifest.Ships.Length; slot++)

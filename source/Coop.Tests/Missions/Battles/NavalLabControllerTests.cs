@@ -45,35 +45,6 @@ public class NavalLabControllerTests
         registry.VerifyNoOtherCalls();
     }
 
-    [Theory]
-    [InlineData(null, "failed:incomplete native crew")]
-    [InlineData("System.InvalidOperationException: native init failed\n   at NativeFactory.InitForMission()", "failed:System.InvalidOperationException: native init failed\n   at NativeFactory.InitForMission()")]
-    public void FailedNativeInitialization_ReportsOriginalFailureWithoutReadiness(string? blocker, string expected)
-    {
-        using var broker = new TestMessageBroker();
-        var relay = new TestNetwork();
-        var peer = relay.CreatePeer();
-        var component = new Mock<ICoopMissionComponent> { DefaultValue = DefaultValue.Mock };
-        var adapter = new Mock<INavalMissionAdapter>();
-        adapter.SetupGet(value => value.Blocker).Returns(blocker);
-        adapter.SetupGet(value => value.Agents).Returns(Array.Empty<TaleWorlds.MountAndBlade.Agent>());
-        var own = Mock.Of<IControllerIdProvider>(value => value.ControllerId == "A");
-        using var controller = new NavalLabController(Mock.Of<IBattleNetwork>(), relay, broker, Mock.Of<IObjectManager>(),
-            component.Object, own, Mock.Of<IBattleHostRegistry>(), Mock.Of<IMissionContext>(), new NavalLabMeasurement());
-        var id = Guid.NewGuid();
-        var manifest = new NavalLabManifest("naval-lab:" + id.ToString("N"), id, new[] { "A" },
-            Enumerable.Range(0, 5).Select(_ => Guid.NewGuid()).ToArray(), new[] { Guid.NewGuid() }, NavalLabMode.SingleClientNative);
-        int readyCount = 0;
-        broker.Subscribe<BattleMissionReady>(_ => readyCount++);
-        controller.Start(manifest, adapter.Object, () => { });
-        controller.AfterStart();
-        Assert.Equal(expected, Assert.Single(relay.GetPeerMessagesFromType<NetworkNavalLabReceipt>(peer)).Status);
-        Assert.Equal(0, readyCount);
-        component.Verify(value => value.AgentRegistry.Clear(), Times.Never);
-        adapter.Verify(value => value.SetAuthority(true), Times.Never);
-        controller.AbortStart();
-    }
-
     [Fact]
     public void FailedOpen_RollsBackNetworkMembershipAndEveryControllerSubscription()
     {
@@ -88,7 +59,7 @@ public class NavalLabControllerTests
             .Throws(new InvalidOperationException("native open failed"));
         var own = Mock.Of<IControllerIdProvider>(value => value.ControllerId == "A");
         using var controller = new NavalLabController(mesh.Object, relay, broker, Mock.Of<IObjectManager>(),
-            component.Object, own, Mock.Of<IBattleHostRegistry>(), context.Object, new NavalLabMeasurement());
+            component.Object, own, Mock.Of<IBattleHostRegistry>(), context.Object);
         var id = Guid.NewGuid();
         var manifest = new NavalLabManifest("naval-lab:" + id.ToString("N"), id, new[] { "A", "B" },
             Enumerable.Range(0, 10).Select(_ => Guid.NewGuid()).ToArray(), new[] { Guid.NewGuid(), Guid.NewGuid() }, NavalLabMode.TwoClientNative);

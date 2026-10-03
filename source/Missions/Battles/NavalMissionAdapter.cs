@@ -18,8 +18,6 @@ public interface INavalMissionAdapter : IDisposable
     string CompleteDeployment();
     void Hold();
     MatrixFrame[] ReadFrames();
-    bool ApplyFrames(MatrixFrame[] frames);
-    void SetHelm(int ship, float rudder, bool row);
     string StartAgentControl(string kind, int ship, float value);
     void TickAgentControl(float dt);
     void CancelControls();
@@ -62,9 +60,6 @@ public interface INavalNativeMissionAdapter
     bool IsOccupiedHelmMovement(Guid incarnationId, Guid combatantId, Agent agent);
     void ApplyNativeInput(Missions.Messages.NetworkNavalLabHelmInput input);
     void NeutralizeNativeInput(int ship);
-    Missions.Messages.NetworkNavalLabSailState[] ReadSailStates();
-    void ApplySailFeedback(Missions.Messages.NetworkNavalLabFrames frames);
-    void ClearSailFeedback();
     object InspectSailStatus();
     string RequestSail(int state);
     string RequestNativeHelm(Guid operationId, int ship, bool take);
@@ -73,12 +68,11 @@ public interface INavalNativeMissionAdapter
     object InspectControlStatus();
 }
 
-public enum NavalLabMode { SingleClientNative, FactoryAuthorityProbe, TwoClientNative, TwoClientNativeAllPhysics }
+public enum NavalLabMode { TwoClientNative, TwoClientNativeAllPhysics }
 
 public sealed class NavalLabManifest
 {
     public NavalLabMode Mode { get; }
-    public bool IsTwoClientNative => Mode == NavalLabMode.TwoClientNative || AllPhysicsProbe;
     public bool AllPhysicsProbe => Mode == NavalLabMode.TwoClientNativeAllPhysics;
     public string InstanceId { get; }
     public Guid IncarnationId { get; }
@@ -97,7 +91,7 @@ public sealed class NavalLabManifest
     {
         if (incarnationId == Guid.Empty || instanceId != "naval-lab:" + incarnationId.ToString("N"))
             throw new ArgumentException("A tagged fixture incarnation is required.", nameof(instanceId));
-        int participants = mode == NavalLabMode.SingleClientNative ? 1 : 2;
+        const int participants = 2;
         if (controllers == null || controllers.Length != participants || controllers.Any(string.IsNullOrWhiteSpace)
             || controllers.Distinct().Count() != participants)
             throw new ArgumentException("The mode requires distinct participant controllers.", nameof(controllers));

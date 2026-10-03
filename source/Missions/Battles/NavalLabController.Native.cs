@@ -23,7 +23,6 @@ public interface INavalNativeController
 
 public sealed partial class NavalLabController : INavalNativeController
 {
-    private bool IsTwoClientNative => manifest?.IsTwoClientNative == true;
     private volatile bool nativeControlsReleased;
     private readonly Dictionary<int, NetworkNavalLabStations> pendingStations = new();
     private readonly HashSet<int> acknowledgedStations = new();
@@ -31,9 +30,9 @@ public sealed partial class NavalLabController : INavalNativeController
     private readonly double[] nativeInputDeadlines = new double[2];
     private INavalNativeMissionAdapter NativeAdapter => adapter as INavalNativeMissionAdapter;
     // Poll-thread admission reads only the published gate; registry validation stays on the game thread.
-    public bool NativeInputIngressReady => nativeControlsReleased && released && factoryHydrated && !factoryTerminal;
-    public bool NativeControlsReady => IsTwoClientNative && nativeControlsReleased && released && factoryHydrated
-        && FactoryAssignmentValid && adapter.Blocker == null && NativeAgentAuthoritiesValid;
+    public bool NativeInputIngressReady => nativeControlsReleased && released && hydrated && !terminal;
+    public bool NativeControlsReady => nativeControlsReleased && released && hydrated
+        && AssignmentValid && adapter.Blocker == null && NativeAgentAuthoritiesValid;
 
     public object NativeControlStatus() => new
     {
@@ -56,7 +55,6 @@ public sealed partial class NavalLabController : INavalNativeController
 
     private void ConfigureNativeAdapter()
     {
-        if (!IsTwoClientNative) return;
         if (NativeAdapter == null) throw new InvalidOperationException("native.adapter_unavailable");
         if (adapter is not INavalHelmReplicationAdapter helm) throw new InvalidOperationException("native.helm_adapter_unavailable");
         bool deck = manifest.Mode == NavalLabMode.TwoClientNative && adapter is INavalDeckAdapter;
@@ -93,12 +91,12 @@ public sealed partial class NavalLabController : INavalNativeController
         if (disposed || manifest == null || manifest.Controllers[value.Slot] == session.OwnControllerId
             || Mission == null || Mission != TaleWorlds.MountAndBlade.Mission.Current) return;
         try { (adapter as INavalRopeAdapter)?.AcceptFinalRopes(value); }
-        catch (Exception exception) { FailFactoryProbe(exception.ToString()); }
+        catch (Exception exception) { Fail(exception.ToString()); }
     }
 
     private long? NativeHelmMovementRevision(CoopAgentInfo info)
     {
-        if (!IsTwoClientNative || info == null) return null;
+        if (info == null) return null;
         int index = Array.IndexOf(manifest.Combatants, info.AgentId);
         if (index < 0 || index % NavalLabManifest.CrewPerShip != 0) return null;
         if (!NativeControlsReady || Mission == null || Mission != TaleWorlds.MountAndBlade.Mission.Current
@@ -158,7 +156,7 @@ public sealed partial class NavalLabController : INavalNativeController
                 throw new InvalidOperationException("native.helm_receive_without_identity_or_readiness");
             ((INavalHelmReplicationAdapter)adapter).ApplyHelmOccupancy(value);
         }
-        catch (Exception exception) { FailFactoryProbe(exception.ToString()); }
+        catch (Exception exception) { Fail(exception.ToString()); }
     }
 
     private bool IsCommittedOarMovement(CoopAgentInfo info) =>
@@ -166,7 +164,7 @@ public sealed partial class NavalLabController : INavalNativeController
 
     private bool IsCommittedOarStation(CoopAgentInfo info)
     {
-        if (!IsTwoClientNative || !released || !factoryHydrated || !FactoryAssignmentValid
+        if (!released || !hydrated || !AssignmentValid
             || adapter.Blocker != null || Mission == null || Mission != TaleWorlds.MountAndBlade.Mission.Current
             || !NativeAgentAuthoritiesValid || info == null
             || info.CurrentAuthority != info.OriginalOwner || info.AuthorityRevision != 1) return false;
@@ -180,7 +178,7 @@ public sealed partial class NavalLabController : INavalNativeController
 
     private bool IsOccupiedHelmMovement(CoopAgentInfo info)
     {
-        if (!IsTwoClientNative || !NativeControlsReady || Mission == null || Mission != TaleWorlds.MountAndBlade.Mission.Current
+        if (!NativeControlsReady || Mission == null || Mission != TaleWorlds.MountAndBlade.Mission.Current
             || info == null || info.OriginalOwner != session.OwnControllerId || info.CurrentAuthority != info.OriginalOwner
             || info.AuthorityRevision != 1) return false;
         int slot = Array.IndexOf(manifest.Controllers, session.OwnControllerId);
@@ -193,7 +191,7 @@ public sealed partial class NavalLabController : INavalNativeController
 
     public NetworkNavalLabStations CreateStations()
     {
-        if (!IsTwoClientNative || !FactoryAssignmentValid || !factoryHydrated || !NativeAgentAuthoritiesValid)
+        if (!AssignmentValid || !hydrated || !NativeAgentAuthoritiesValid)
             throw new InvalidOperationException("native.station_authority_unavailable");
         return NativeAdapter.CreateStations();
     }
@@ -203,7 +201,7 @@ public sealed partial class NavalLabController : INavalNativeController
         if (stations.Phase == "release") { ApplyStationRelease(stations); return; }
         try
         {
-            if (!IsTwoClientNative || !FactoryAssignmentValid || !factoryHydrated || !NativeAgentAuthoritiesValid
+            if (!AssignmentValid || !hydrated || !NativeAgentAuthoritiesValid
                 || stations.IncarnationId != manifest.IncarnationId || stations.Epoch != session.HostEpoch)
                 throw new InvalidOperationException("native.stations_stale");
             NativeAdapter.ApplyStations(stations);
@@ -212,30 +210,30 @@ public sealed partial class NavalLabController : INavalNativeController
             for (int i = 1; i < NavalLabManifest.CrewPerShip; i++)
                 coopMissionComponent.AgentMovementHandler.Interpolator.Forget(adapter.Agents[(stations.Ship * NavalLabManifest.CrewPerShip) + i]);
         }
-        catch (Exception exception) { FailFactoryProbe(exception.ToString()); }
+        catch (Exception exception) { Fail(exception.ToString()); }
     }
 
     // Replays the other owner's native rower dismount; the committed seat stops owning that rower's pose.
     private void ApplyStationRelease(NetworkNavalLabStations release)
     {
-        if (factoryTerminal) return;
+        if (terminal) return;
         try
         {
-            if (!IsTwoClientNative || !FactoryAssignmentValid || !factoryHydrated || !NativeAgentAuthoritiesValid
+            if (!AssignmentValid || !hydrated || !NativeAgentAuthoritiesValid
                 || release.IncarnationId != manifest.IncarnationId || release.Epoch != session.HostEpoch
                 || release.Ship < 0 || release.Ship >= 2 || manifest.Controllers[release.Ship] == session.OwnControllerId
                 || !pendingStations.TryGetValue(release.Ship, out var committed) || committed.Phase != "commit")
                 throw new InvalidOperationException("native.station_release_stale_or_not_foreign");
             NativeAdapter.ApplyStations(release);
         }
-        catch (Exception exception) { FailFactoryProbe(exception.ToString()); }
+        catch (Exception exception) { Fail(exception.ToString()); }
     }
 
     public void ReleaseNativeControls()
     {
-        if (!IsTwoClientNative || !FactoryAssignmentValid || acknowledgedStations.Count != 2 || !NativeAgentAuthoritiesValid)
+        if (!AssignmentValid || acknowledgedStations.Count != 2 || !NativeAgentAuthoritiesValid)
         {
-            FailFactoryProbe("native.early_controls_release");
+            Fail("native.early_controls_release");
             return;
         }
         nativeControlsReleased = true;
@@ -243,7 +241,6 @@ public sealed partial class NavalLabController : INavalNativeController
 
     private void TickNativeControls()
     {
-        if (!IsTwoClientNative) return;
         if (!NativeAgentAuthoritiesValid) throw new InvalidOperationException("native.agent_authority_changed");
         foreach (var entry in pendingStations)
         {
@@ -272,7 +269,7 @@ public sealed partial class NavalLabController : INavalNativeController
             if (input.HasHelm) NativeAdapter.ApplyNativeInput(input);
             else NativeAdapter.NeutralizeNativeInput(input.Ship);
         }
-        catch (Exception exception) { FailFactoryProbe(exception.ToString()); }
+        catch (Exception exception) { Fail(exception.ToString()); }
     }
 }
 #endif

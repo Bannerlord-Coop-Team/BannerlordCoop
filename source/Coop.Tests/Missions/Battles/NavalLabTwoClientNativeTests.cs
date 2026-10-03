@@ -66,15 +66,13 @@ public sealed class NavalLabTwoClientNativeTests : IDisposable
     private NavalLabBehavior Fixture(NavalLabMode mode, string owner = "A")
     {
         var id = Guid.NewGuid();
-        int count = mode == NavalLabMode.SingleClientNative ? 1 : 2;
         var fixture = new NavalLabBehavior(new NavalLabManifest("naval-lab:" + id.ToString("N"), id,
-            new[] { "A", "B" }.Take(count).ToArray(), Enumerable.Range(0, count * 5).Select(_ => Guid.NewGuid()).ToArray(),
-            Enumerable.Range(0, count).Select(_ => Guid.NewGuid()).ToArray(), mode), owner, null!, null!);
+            new[] { "A", "B" }, Enumerable.Range(0, 10).Select(_ => Guid.NewGuid()).ToArray(),
+            new[] { Guid.NewGuid(), Guid.NewGuid() }, mode), owner, null!, null!);
         AccessTools.PropertySetter(typeof(MissionBehavior), nameof(MissionBehavior.Mission)).Invoke(fixture, new object[] { scope.Instance });
         return fixture;
     }
     [Theory]
-    [InlineData("wrong_mode")]
     [InlineData("not_game_thread")]
     [InlineData("deployment")]
     [InlineData("terminal")]
@@ -83,12 +81,12 @@ public sealed class NavalLabTwoClientNativeTests : IDisposable
     {
         Patch(AccessTools.PropertyGetter(typeof(Common.GameThread), nameof(Common.GameThread.IsGameThread)),
             condition == "not_game_thread" ? nameof(False) : nameof(True));
-        var fixture = Fixture(condition == "wrong_mode" ? NavalLabMode.SingleClientNative : NavalLabMode.TwoClientNative);
+        var fixture = Fixture(NavalLabMode.TwoClientNative);
         fixture.nativeDeploymentComplete = condition != "deployment";
-        fixture.factoryTerminal = condition == "terminal";
+        fixture.terminal = condition == "terminal";
         if (condition == "mission") AccessTools.PropertySetter(typeof(MissionBehavior), nameof(MissionBehavior.Mission)).Invoke(fixture, new object?[] { null });
         var json = Newtonsoft.Json.Linq.JObject.Parse(Newtonsoft.Json.JsonConvert.SerializeObject(fixture.InspectCrewSpatial()));
-        Assert.Equal(condition == "wrong_mode" || condition == "not_game_thread" ? condition : "mission_lifetime_or_deployment",
+        Assert.Equal(condition == "not_game_thread" ? condition : "mission_lifetime_or_deployment",
             (string?)json["unavailable"]);
         Assert.Null(json["rows"]);
     }
@@ -186,14 +184,9 @@ public sealed class NavalLabTwoClientNativeTests : IDisposable
         NavalLabPhysicsPatches.Active = Fixture(NavalLabMode.TwoClientNative);
         order.ManageShipDetachments();
         Assert.Equal(1, stopped); Assert.Equal(1, assigned);
-        NavalLabPhysicsPatches.Active.factoryTerminal = true;
+        NavalLabPhysicsPatches.Active.terminal = true;
         order.ManageShipDetachments(); Assert.Equal(1, assigned);
-        foreach (var mode in new[] { NavalLabMode.SingleClientNative, NavalLabMode.FactoryAuthorityProbe })
-        {
-            NavalLabPhysicsPatches.Active = Fixture(mode);
-            order.ManageShipDetachments();
-        }
-        Assert.Equal(3, assigned);
+        Assert.Equal(1, assigned);
     }
     private static bool AllocatorGate(ShipOrder __instance)
     {
@@ -245,7 +238,7 @@ public sealed class NavalLabTwoClientNativeTests : IDisposable
         Assert.Same(fixture.LocalShip, logic.PlayerControlledShip);
         Set(localMain, "<CurrentlyUsedGameObject>k__BackingField", null);
         Assert.Null(logic.PlayerControlledShip);
-        fixture.factoryTerminal = true;
+        fixture.terminal = true;
         Assert.Null(logic.PlayerControlledShip);
     }
     private static bool Main(ref Agent __result) { __result = localMain; return false; }
@@ -301,7 +294,6 @@ public sealed class NavalLabTwoClientNativeTests : IDisposable
     }
     [Theory]
     [InlineData("matching")]
-    [InlineData("wrong_mode")]
     [InlineData("stale_incarnation")]
     [InlineData("stale_commit")]
     [InlineData("stale_epoch")]
@@ -331,7 +323,7 @@ public sealed class NavalLabTwoClientNativeTests : IDisposable
     public void CommittedOarMovement_RequiresExactLiveCommittedStation(string condition)
     {
         // Remote cases observe naval-A's committed ship from naval-B, where the rower is a controller-less puppet.
-        var fixture = Fixture(condition == "wrong_mode" ? NavalLabMode.FactoryAuthorityProbe : NavalLabMode.TwoClientNative,
+        var fixture = Fixture(NavalLabMode.TwoClientNative,
             condition.StartsWith("remote_") ? "B" : "A");
         Patch(AccessTools.PropertyGetter(typeof(Agent), nameof(Agent.Controller)), condition == "remote_replica" ? nameof(NoController) : nameof(AiController));
         Patch(AccessTools.Method(typeof(NavalLabBehavior), "StationInventory"), nameof(Inventory));
@@ -342,7 +334,7 @@ public sealed class NavalLabTwoClientNativeTests : IDisposable
         Patch(AccessTools.PropertyGetter(typeof(Agent), nameof(Agent.MountAgent)), condition == "mounted" ? nameof(Main) : nameof(NoMount));
         Patch(AccessTools.PropertyGetter(typeof(Agent), nameof(Agent.MovementLockedState)), condition == "frame_lock" ? nameof(Unlocked) : nameof(FrameLocked));
         fixture.nativeDeploymentComplete = condition != "deployment";
-        fixture.factoryTerminal = condition == "terminal";
+        fixture.terminal = condition == "terminal";
         fixture.nativeTerminalHold = condition == "native_hold";
         var agent = Shell<Agent>(); localMain = Shell<Agent>();
         Set(agent, "_pointer", new UIntPtr(456));

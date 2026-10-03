@@ -20,7 +20,7 @@ internal static class NavalLabPhysicsPatches
 {
     internal static volatile NavalLabBehavior Active;
 
-    private static bool NativeInputAllowed(Mission mission) => Active == null || !Active.HasNativeViews
+    private static bool NativeInputAllowed(Mission mission) => Active == null
         || Active.Mission != mission || Active.CanUseNativeInput;
 
     [HarmonyPatch(typeof(TaleWorlds.MountAndBlade.View.MissionViews.MissionMainAgentController), "OnPreMissionTick")]
@@ -35,7 +35,7 @@ internal static class NavalLabPhysicsPatches
         private static bool Prefix(NavalDLC.View.MissionViews.MissionShipControlView __instance)
         {
             var active = Active;
-            if (active?.IsTwoClientNative == true && active.Mission == __instance.Mission)
+            if (active != null && active.Mission == __instance.Mission)
             {
                 try { active.RouteNativeAxes(__instance); }
                 catch (Exception exception) { active.Reject("native.input_failed:" + exception); }
@@ -57,7 +57,7 @@ internal static class NavalLabPhysicsPatches
         private static bool Prefix(NavalDLC.GauntletUI.MissionViews.MissionGauntletNavalOrderUIHandler __instance)
         {
             var active = Active;
-            if (active?.IsTwoClientNative != true || active.Mission != __instance.Mission) return NativeInputAllowed(__instance.Mission);
+            if (active == null || active.Mission != __instance.Mission) return NativeInputAllowed(__instance.Mission);
             __instance._isReceivingInput = false;
             __instance._dataSource?.UpdateCanUseShortcuts(false);
             __instance._dataSource?.TryCloseToggleOrder();
@@ -72,7 +72,7 @@ internal static class NavalLabPhysicsPatches
         private static bool Prefix(Agent __instance, UsableMissionObject targetObject)
         {
             var active = Active;
-            if (active == null || !active.HasNativeViews || !active.Agents.Contains(__instance)) return true;
+            if (active == null || !active.Agents.Contains(__instance)) return true;
             return active.CanUseNativeInput && active.LocalCaptain == __instance
                 && (active.LocalShip.ShipControllerMachine.PilotStandingPoint == targetObject || active.AllowRopeUse(__instance, targetObject));
         }
@@ -86,18 +86,10 @@ internal static class NavalLabPhysicsPatches
             "SetOrder", "SetOrderWithPosition", "SetOrderWithTwoPositions", "SetOrderWithFormation", "SetOrderWithAgent"
         }.Select(name => AccessTools.DeclaredMethod(typeof(NavalDLC.Missions.AI.TeamAI.NavalOrderController), name));
 
-        private static bool Prefix(OrderController __instance, OrderType orderType)
+        private static bool Prefix(OrderController __instance)
         {
             var active = Active;
-            if (active == null || !active.HasNativeViews || !active.Mission.Teams.Contains(__instance.Team)) return true;
-            if (active.IsTwoClientNative) return false;
-            if (!active.CanUseNativeControls || __instance != active.Mission.PlayerTeam.PlayerOrderController
-                || __instance.SelectedFormations.Count != 1 || __instance.SelectedFormations[0] != active.Ships[0].Formation) return false;
-            // No opponent, retreat/removal, boarding or transfer fixture exists in this mode.
-            return orderType == OrderType.Move || orderType == OrderType.StandYourGround
-                || orderType == OrderType.Mount
-                || orderType == OrderType.AIControlOn || orderType == OrderType.AIControlOff
-                || orderType == OrderType.HoldFire || orderType == OrderType.FireAtWill;
+            return active == null || !active.Mission.Teams.Contains(__instance.Team);
         }
     }
 
@@ -115,7 +107,7 @@ internal static class NavalLabPhysicsPatches
         private static bool Prefix(OrderController __instance)
         {
             var active = Active;
-            return active == null || !active.HasNativeViews || !active.Mission.Teams.Contains(__instance.Team);
+            return active == null || !active.Mission.Teams.Contains(__instance.Team);
         }
     }
 
@@ -126,20 +118,9 @@ internal static class NavalLabPhysicsPatches
         {
             var active = Active;
             // NavalShipsLogic removes its hulls before the later co-op controller leaves.
-            if (active == null || (!active.IsSingleClientNative && !active.IsFactoryProbe) || active.Mission != __instance.Mission) return;
+            if (active == null || active.Mission != __instance.Mission) return;
             try { active.Hold(); }
             catch (Exception exception) { active.Reject("shutdown.hold_failed:" + exception.GetType().FullName); }
-        }
-    }
-
-    [HarmonyPatch(typeof(Team), "OrderController_OnOrderIssued")]
-    private static class SingleOrderObservation
-    {
-        private static void Prefix(Team __instance, OrderType orderType)
-        {
-            var active = Active;
-            if (active?.IsSingleClientNative == true && active.Mission.PlayerTeam == __instance)
-                active.ObserveNativeOrder(orderType);
         }
     }
 
@@ -239,18 +220,14 @@ internal static class NavalLabPhysicsPatches
             var active = Active;
             if (active != null && active.Mission == shipsLogic.Mission)
             {
-                if (active.IsFactoryProbe)
+                if (__exception != null)
                 {
-                    if (__exception != null)
-                    {
-                        active.Reject(__exception.ToString());
-                        return __exception;
-                    }
-                    try { active.CompleteFactoryHull(__instance); }
-                    catch (Exception exception) { active.Reject(exception.ToString()); return exception; }
+                    active.Reject(__exception.ToString());
+                    return __exception;
                 }
-                if (__exception != null) active.RecordInitializationFailure(__exception);
-                else active.RecordStartup("init_for_mission_complete");
+                try { active.CompleteFactoryHull(__instance); }
+                catch (Exception exception) { active.Reject(exception.ToString()); return exception; }
+                active.RecordStartup("init_for_mission_complete");
             }
             return __exception;
         }
@@ -259,15 +236,7 @@ internal static class NavalLabPhysicsPatches
     [HarmonyPatch(typeof(NavalPhysics), "OnFixedTick")]
     private static class FixedTick
     {
-        private static void Prefix(NavalPhysics __instance)
-        {
-            var active = Active;
-            if (active?.IsFactoryProbe == true) { active.ObserveFactoryFixedTick(__instance, parallel: false); return; }
-            if (active == null || !active.Ships.Any(ship => ship?.Physics == __instance)) return;
-            Interlocked.Increment(ref active.FixedTicks);
-            if (__instance.GameEntity.HasDynamicRigidBodyAndActiveSimulation())
-                Interlocked.Increment(ref active.ActiveFixedTicks);
-        }
+        private static void Prefix(NavalPhysics __instance) => Active?.ObserveFactoryFixedTick(__instance, parallel: false);
     }
 
     [HarmonyPatch(typeof(NavalPhysics), "OnParallelFixedTick")]
@@ -279,13 +248,7 @@ internal static class NavalLabPhysicsPatches
     [HarmonyPatch(typeof(NavalPhysics), nameof(NavalPhysics.ApplyForceToDynamicBody))]
     private static class AppliedForce
     {
-        private static void Prefix(NavalPhysics __instance)
-        {
-            var active = Active;
-            if (active?.IsFactoryProbe == true) { active.ObserveFactoryForce(__instance); return; }
-            if (active != null && active.Ships.Any(ship => ship?.Physics == __instance))
-                Interlocked.Increment(ref active.ForceApplications);
-        }
+        private static void Prefix(NavalPhysics __instance) => Active?.ObserveFactoryForce(__instance);
     }
 
     // Observes own-hull rowing on the physics thread after vanilla computed it; reads managed state only and changes nothing.

@@ -25,57 +25,10 @@ public sealed class NavalLabBehaviorTests : IDisposable
         Assert.False(SailWindProfile.IsSailWindProfileInitialized);
         var id = Guid.NewGuid();
         var manifest = new NavalLabManifest("naval-lab:" + id.ToString("N"), id, new[] { "A", "B" },
-            Enumerable.Range(0, 10).Select(_ => Guid.NewGuid()).ToArray(), new[] { Guid.NewGuid(), Guid.NewGuid() }, NavalLabMode.FactoryAuthorityProbe);
+            Enumerable.Range(0, 10).Select(_ => Guid.NewGuid()).ToArray(), new[] { Guid.NewGuid(), Guid.NewGuid() }, NavalLabMode.TwoClientNative);
         behavior = new NavalLabBehavior(manifest, "A", null!, null!);
         // MountAndBlade is not publicized in this test project.
         typeof(MissionBehavior).GetProperty(nameof(MissionBehavior.Mission))!.SetValue(behavior, mission.Instance);
-    }
-
-    [Fact]
-    public void OnBehaviorInitialize_MakesRealSailThrustAvailableBeforeAnyHullIsCreated()
-    {
-        behavior.OnBehaviorInitialize();
-
-        Assert.Empty(behavior.Ships);
-        Assert.Empty(behavior.Agents);
-        Assert.True(SailWindProfile.IsSailWindProfileInitialized);
-        var thrust = SailWindProfile.Instance.ComputeSailThrustValue(
-            SailType.Square, Vec2.Forward, Vec2.Forward, Vec2.Forward);
-        Assert.True(float.IsFinite(thrust));
-        Assert.True(thrust > 0f);
-        Assert.True(mission.Instance.IsNavalBattle);
-        Assert.True(mission.Instance.DisableDying);
-    }
-
-    [Fact]
-    public void OnBehaviorInitialize_ReusesProfileUntilMissionStateFinalized()
-    {
-        SailWindProfile.InitializeProfile();
-        var existing = SailWindProfile.Instance;
-        behavior.OnBehaviorInitialize();
-        Assert.Same(existing, SailWindProfile.Instance);
-
-        behavior.OnEndMissionInternal();
-        Assert.Same(existing, SailWindProfile.Instance);
-        behavior.OnMissionStateFinalized();
-        Assert.False(SailWindProfile.IsSailWindProfileInitialized);
-    }
-
-    [Fact]
-    public void StartupInventory_ReportsProfileStateEvenWhenSceneEnumerationFails()
-    {
-        behavior.RecordStartup("before_initialization");
-        var before = JObject.FromObject(behavior.StartupDiagnostics);
-        Assert.False((bool)before["sailWindProfileInitialized"]!);
-
-        behavior.OnBehaviorInitialize();
-        behavior.RecordStartup("scene_loaded");
-        var after = JObject.FromObject(behavior.StartupDiagnostics);
-        Assert.Equal("scene_loaded", (string?)after["phase"]);
-        Assert.True((bool)after["sailWindProfileInitialized"]!);
-        Assert.NotNull(after["inventoryFailure"]);
-        Assert.Null(behavior.Blocker);
-        Assert.Empty(behavior.Ships);
     }
 
     [Fact]
@@ -94,6 +47,9 @@ public sealed class NavalLabBehaviorTests : IDisposable
     {
         behavior.Ships = new MissionShip[2];
         behavior.Agents = new Agent[10];
+        // Native inspection reads mission behaviors; an empty list stands in for the absent native views.
+        typeof(Mission).GetField("<MissionBehaviors>k__BackingField", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic)!
+            .SetValue(mission.Instance, new System.Collections.Generic.List<MissionBehavior>());
         var json = JObject.FromObject(behavior.Inspect());
         Assert.Equal(2, (int)json["expectedShipCount"]!);
         Assert.Equal(10, (int)json["expectedAgentCount"]!);

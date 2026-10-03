@@ -14,10 +14,9 @@ public sealed partial class NavalLabCoordinator
     private readonly INavalLabNativeState nativeState;
     private bool stationsCommitted;
     private volatile bool nativeReleaseSent;
-    private bool IsTwoClientNative => store.Current?.IsTwoClientNative == true;
-    private bool UsesFactoryLifecycle => IsTwoClientNative || store.Current?.Mode == NavalLabMode.FactoryAuthorityProbe;
+    private bool HasFixture => store.Current != null;
 
-    private bool NativeAssignmentValid => IsTwoClientNative && failure == null && ready.Count == 2
+    private bool NativeAssignmentValid => HasFixture && failure == null && ready.Count == 2
         && hosts.TryGet(store.Current.InstanceId, out var host) && host.Epoch == 1
         && store.Current.Controllers.All(id => players.TryGetPeer(id, out _)
             && (host.HostControllerId == id || host.SuccessorControllerIds.Contains(id)));
@@ -26,7 +25,7 @@ public sealed partial class NavalLabCoordinator
     {
         GameThread.RunSafe(() =>
         {
-            if (!IsTwoClientNative || payload.What.IncarnationId != store.Current.IncarnationId) return;
+            if (!HasFixture || payload.What.IncarnationId != store.Current.IncarnationId) return;
             try
             {
                 if (ModInformation.IsClient)

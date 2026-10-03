@@ -16,7 +16,7 @@ internal sealed partial class NavalLabBehavior
 {
     private bool nativeAutoHelmAttempted;
     private bool nativeAutoHelmObserved;
-    internal bool CanUseNativeInput => CanUseNativeControls && (!IsTwoClientNative || (nativeAutoHelmObserved && HelmReplicasReady));
+    internal bool CanUseNativeInput => CanUseNativeControls && nativeAutoHelmObserved && HelmReplicasReady;
 
     private Guid nativeHelmOperation;
     private bool nativeHelmTake;
@@ -34,19 +34,18 @@ internal sealed partial class NavalLabBehavior
     private long nativeHelmObservedTick;
     private int nativeHelmUseCallbacks;
     private int nativeHelmStopCallbacks;
-    private bool HasUncertainNativeHelmDispatch => IsTwoClientNative && nativeHelmDispatched
+    private bool HasUncertainNativeHelmDispatch => nativeHelmDispatched
         && (nativeHelmPhase == "pending" || nativeHelmPhase == "failed");
 
     internal string RequestNativeHelm(Guid operationId, int slot, bool take)
     {
         if (!GameThread.Instance.IsGameThread) return "rejected:not_game_thread";
-        if (!IsTwoClientNative) return "rejected:wrong_mode";
         if (operationId == Guid.Empty || slot != OwnSlot) return "rejected:operation_or_owner";
         if (nativeHelmOperation == operationId)
             return take == nativeHelmTake ? nativeHelmReceipt : "rejected:conflicting_operation";
         if (controlledAgent != null) return "rejected:agent_control_active";
         if (nativeHelmPhase == "pending") return "rejected:native_helm_pending";
-        if (nativeHelmPhase == "failed" || factoryTerminal) return "rejected:terminal_hold";
+        if (nativeHelmPhase == "failed" || terminal) return "rejected:terminal_hold";
         if (!nativeAutoHelmObserved) return "rejected:auto_helm_setup_incomplete";
         if (!HelmReplicasReady) return "rejected:helm_replicas_pending";
         nativeHelmOperation = operationId;
@@ -90,8 +89,8 @@ internal sealed partial class NavalLabBehavior
 
     private void TrySeatNativeHelmAfterDeployment()
     {
-        if (!IsTwoClientNative || nativeAutoHelmAttempted || !nativeDeploymentComplete
-            || factoryTerminal || nativeTerminalHold || Blocker != null || NativeAuthority?.Invoke() != true) return;
+        if (nativeAutoHelmAttempted || !nativeDeploymentComplete
+            || terminal || nativeTerminalHold || Blocker != null || NativeAuthority?.Invoke() != true) return;
         nativeAutoHelmAttempted = true;
         nativeHelmTake = true;
         nativeHelmShip = LocalShip;
@@ -143,7 +142,7 @@ internal sealed partial class NavalLabBehavior
 
     private string NativeHelmIdentityBlocker()
     {
-        if (Mission == null || Mission != Mission.Current || !CanUseNativeControls || factoryTerminal)
+        if (Mission == null || Mission != Mission.Current || !CanUseNativeControls || terminal)
             return "native_helm_lifetime_or_authority";
         var ship = LocalShip;
         var machine = ship?.ShipControllerMachine;
@@ -163,7 +162,7 @@ internal sealed partial class NavalLabBehavior
 
     private bool HasOccupiedLocalHelm()
     {
-        if (!IsTwoClientNative || !nativeAutoHelmObserved || nativeHelmPhase == "pending" || nativeHelmPhase == "failed"
+        if (!nativeAutoHelmObserved || nativeHelmPhase == "pending" || nativeHelmPhase == "failed"
             || NativeHelmIdentityBlocker() != null) return false;
         var machine = nativeHelmShip.ShipControllerMachine;
         return machine.GameEntity.IsValid && !nativeHelmPoint.IsDeactivated
@@ -174,14 +173,6 @@ internal sealed partial class NavalLabBehavior
     internal bool IsOccupiedHelmMovement(Guid incarnationId, Guid combatantId, Agent agent) =>
         incarnationId == manifest.IncarnationId && HasOccupiedLocalHelm()
         && manifest.Combatants[OwnSlot * NavalLabManifest.CrewPerShip] == combatantId && agent == nativeHelmAgent;
-
-    private void RefreshFollowerHelmTarget()
-    {
-        if (IsTwoClientNative || factoryHost || !HasOccupiedLocalHelm() || !nativeHelmPoint.LockUserFrames) return;
-        // Refresh the native target after follower hull writes, without moving the actor directly.
-        var frame = nativeHelmPoint.GetUserFrameForAgent(nativeHelmAgent);
-        nativeHelmAgent.SetTargetPositionAndDirection(frame.Origin.AsVec2, in frame.Rotation.f);
-    }
 
     private string NativeHelmPrecondition(bool take)
     {
@@ -243,14 +234,14 @@ internal sealed partial class NavalLabBehavior
 
     private void CancelPendingNativeHelm()
     {
-        if (IsTwoClientNative && nativeHelmPhase == "pending") FailNativeHelm("terminal_before_observation");
+        if (nativeHelmPhase == "pending") FailNativeHelm("terminal_before_observation");
     }
 
     private void TickNativeHelm()
     {
         nativeHelmTicks++;
         TrySeatNativeHelmAfterDeployment();
-        if (!IsTwoClientNative || nativeHelmPhase != "pending" || nativeHelmTicks <= nativeHelmDispatchTick) return;
+        if (nativeHelmPhase != "pending" || nativeHelmTicks <= nativeHelmDispatchTick) return;
         string blocker = NativeHelmIdentityBlocker();
         if (blocker != null) { FailNativeHelm(blocker); return; }
         var user = nativeHelmPoint.UserAgent;
@@ -291,7 +282,7 @@ internal sealed partial class NavalLabBehavior
     {
         try
         {
-            if (Mission == null || Mission != Mission.Current || factoryTerminal || !nativeDeploymentComplete)
+            if (Mission == null || Mission != Mission.Current || terminal || !nativeDeploymentComplete)
                 return new { unavailable = "mission_lifetime_or_deployment" };
             var agent = LocalCaptain;
             var point = LocalShip?.ShipControllerMachine?.PilotStandingPoint;
@@ -343,7 +334,7 @@ internal sealed partial class NavalLabBehavior
             viewMatchesOwnHelm = view != null && LocalShip?.ShipControllerMachine != null
                 && view.ControllerMachine == LocalShip.ShipControllerMachine,
             inputPermitted = view != null && HasNativeInputPermission(view),
-            remotePilotReplication = InspectHelmOccupancy(), keyboardAcceptance = false, terminal = factoryTerminal,
+            remotePilotReplication = InspectHelmOccupancy(), keyboardAcceptance = false, terminal = terminal,
             observation = "Operation completion is a past tick observation; identity is the current read. Receipt is dispatch only."
         };
     }

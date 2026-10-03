@@ -1,5 +1,7 @@
 # Naval lab headless integration matrix
 
+> **Removed modes (2026-10):** the `activation`, `held-helm`, `factory-authority-probe` and single-client (`create-single`) lab modes, the `helm`/`probe`/`jump`/`crew` actions and the `samples` command were removed. Only `two-client-native` and the `two-client-native-all-physics` diagnostic remain; sections below that describe the removed modes are historical.
+
 `NavalMissionTestEnvironment` extends the existing `MissionTestEnvironment`. It uses production DI-resolved lab coordinators/controllers, membership/election handlers, registries, measurements and campaign guards. The existing campaign and mission routers serialize messages; both run naval receives as poll-thread work and recipient game-thread queues are pumped explicitly. Land fixtures retain their historical default delivery mode.
 
 Only the optional native adapter/loader and native save driver are replaced. Each client has its own `MockMission`, agent shells, frame storage and adapter call log. Readiness is the real controller's `AfterStart`, invoked explicitly instead of a native scene callback. There is no fixture campaign MapEvent, server party or alternate naval protocol. Test players provide connection identity only.

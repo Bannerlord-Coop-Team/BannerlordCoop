@@ -24,11 +24,11 @@ using Xunit;
 namespace Coop.Tests.Missions.Battles;
 
 [Collection("Mission.Current")]
-public sealed class NavalLabSingleClientShutdownTests : IDisposable
+public sealed class NavalLabMissionEndHoldTests : IDisposable
 {
-    private readonly Harmony harmony = new("coop.tests.naval.single.shutdown");
+    private readonly Harmony harmony = new("coop.tests.naval.mission_end_hold");
     private readonly MissionCurrentScope scope = new();
-    private static NavalLabSingleClientShutdownTests current = null!;
+    private static NavalLabMissionEndHoldTests current = null!;
     private NavalLabBehavior behavior;
     private MissionShip ship;
     private int bodyDisables;
@@ -37,16 +37,16 @@ public sealed class NavalLabSingleClientShutdownTests : IDisposable
     private bool failHold;
     private Exception? removalException;
 
-    public NavalLabSingleClientShutdownTests()
+    public NavalLabMissionEndHoldTests()
     {
         current = this;
         NavalDLC.Missions.ShipActuators.SailWindProfile.InitializeProfile();
         harmony.Patch(AccessTools.Method(typeof(SoundEvent), nameof(SoundEvent.GetEventIdFromString)),
-            prefix: new HarmonyMethod(typeof(NavalLabSingleClientShutdownTests), nameof(SoundId)));
+            prefix: new HarmonyMethod(typeof(NavalLabMissionEndHoldTests), nameof(SoundId)));
         var id = Guid.NewGuid();
         behavior = new NavalLabBehavior(new NavalLabManifest("naval-lab:" + id.ToString("N"), id,
-            new[] { "A" }, Enumerable.Range(0, 5).Select(_ => Guid.NewGuid()).ToArray(),
-            new[] { Guid.NewGuid() }, NavalLabMode.SingleClientNative), "A", null!, null!);
+            new[] { "A", "B" }, Enumerable.Range(0, 10).Select(_ => Guid.NewGuid()).ToArray(),
+            new[] { Guid.NewGuid(), Guid.NewGuid() }, NavalLabMode.TwoClientNative), "A", null!, null!);
         SetMission(behavior, scope.Instance);
         var managed = typeof(ScriptComponentBehavior).BaseType!.Assembly.GetType("TaleWorlds.DotNet.Managed")!;
         var moduleTypes = AccessTools.Field(managed, "_moduleTypes");
@@ -59,14 +59,15 @@ public sealed class NavalLabSingleClientShutdownTests : IDisposable
         finally { moduleTypes.SetValue(null, previous); }
         SetEntity(new UIntPtr(123));
         behavior.Ships = new[] { ship };
+        behavior.completedFactoryHulls = new[] { ship };
         NavalLabPhysicsPatches.Active = behavior;
         harmony.Patch(AccessTools.Method(typeof(GameEntityPhysicsExtensions), nameof(GameEntityPhysicsExtensions.DisableDynamicBodySimulation), new[] { typeof(WeakGameEntity) }),
-            prefix: new HarmonyMethod(typeof(NavalLabSingleClientShutdownTests), nameof(DisableBody)));
+            prefix: new HarmonyMethod(typeof(NavalLabMissionEndHoldTests), nameof(DisableBody)));
         var method = AccessTools.Method(typeof(NavalShipsLogic), "OnEndMission");
         var patch = typeof(NavalLabPhysicsPatches).GetNestedType("SingleMissionEndHold", BindingFlags.NonPublic)!;
         harmony.Patch(method, prefix: new HarmonyMethod(AccessTools.Method(patch, "Prefix")) { priority = Priority.First });
         // Engine removal boundary: invalidate the same cached hull identity, not a still-usable mock hull.
-        harmony.Patch(method, prefix: new HarmonyMethod(typeof(NavalLabSingleClientShutdownTests), nameof(RemoveNativeIdentities)) { priority = Priority.Last });
+        harmony.Patch(method, prefix: new HarmonyMethod(typeof(NavalLabMissionEndHoldTests), nameof(RemoveNativeIdentities)) { priority = Priority.Last });
     }
 
     private static void SetMission(MissionBehavior target, Mission? mission) =>
@@ -108,14 +109,14 @@ public sealed class NavalLabSingleClientShutdownTests : IDisposable
         Assert.Equal(1, bodyDisables);
         Assert.Equal(1, removalCalls);
         Assert.False(ship.GameEntity.IsValid);
-        Assert.True(behavior.nativeTerminalHold);
+        Assert.True(behavior.terminal);
         var adapter = new NavalMissionAdapter { behavior = behavior };
         using var broker = new TestMessageBroker();
         var component = new Mock<ICoopMissionComponent> { DefaultValue = DefaultValue.Mock };
         using var controller = new NavalLabController(Mock.Of<IBattleNetwork>(), new TestNetwork(), broker,
             Mock.Of<IObjectManager>(), component.Object,
             Mock.Of<IControllerIdProvider>(value => value.ControllerId == "A"), Mock.Of<IBattleHostRegistry>(),
-            Mock.Of<IMissionContext>(), new NavalLabMeasurement());
+            Mock.Of<IMissionContext>());
         AccessTools.Field(typeof(NavalLabController), "manifest").SetValue(controller, behavior.manifest);
         AccessTools.Field(typeof(NavalLabController), "adapter").SetValue(controller, adapter);
         AccessTools.Method(typeof(NavalLabController), "OnLeaving").Invoke(controller, null);
@@ -124,7 +125,6 @@ public sealed class NavalLabSingleClientShutdownTests : IDisposable
         adapter.Dispose();
         Assert.Equal(1, bodyDisables);
         Assert.Same(behavior, NavalLabPhysicsPatches.Active);
-        Assert.True(behavior.RequiresProcessExit);
     }
 
     [Fact]
@@ -132,7 +132,7 @@ public sealed class NavalLabSingleClientShutdownTests : IDisposable
     {
         EndShips(null);
         Assert.Equal(0, bodyDisables);
-        Assert.False(behavior.nativeTerminalHold);
+        Assert.False(behavior.terminal);
         Assert.Equal(1, removalCalls);
     }
 
@@ -144,7 +144,7 @@ public sealed class NavalLabSingleClientShutdownTests : IDisposable
         var thrown = Assert.Throws<TargetInvocationException>(() => EndShips(scope.Instance));
         Assert.Same(removalException, thrown.InnerException);
         Assert.Equal(1, removalCalls);
-        Assert.StartsWith("shutdown.hold_failed:", behavior.Blocker);
+        Assert.StartsWith("factory_probe.body_hold_failed:", behavior.Blocker);
         Assert.False(ship.GameEntity.IsValid);
     }
 

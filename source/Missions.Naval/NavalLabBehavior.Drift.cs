@@ -92,8 +92,8 @@ internal sealed partial class NavalLabBehavior
         return InspectDrift();
     }
 
-    private bool DriftLifetimeValid() => IsTwoClientNative && Mission != null && Mission == Mission.Current
-        && !factoryTerminal && !nativeTerminalHold && Blocker == null && nativeDeploymentComplete
+    private bool DriftLifetimeValid() => Mission != null && Mission == Mission.Current
+        && !terminal && !nativeTerminalHold && Blocker == null && nativeDeploymentComplete
         && factoryReleased && CanUseNativeControls && Mission.IsDeploymentFinished && Mission.Mode == MissionMode.Battle;
 
     public override void OnMissionTick(float dt)

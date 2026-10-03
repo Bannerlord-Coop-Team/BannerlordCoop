@@ -208,7 +208,7 @@ server coop.debug.naval_lab.action
   ["84b8a3f6-e678-4bf4-a86c-8a2f7d5b39ab", "native-release-helm", "0", "0", "false"]
 ```
 
-The pulse is at most one second; rudder argument is lateral axis, `row=true` requests forward rowing. Normal completion zeros axes while retaining sail choice; safety loss can stop input/raise sails. Other sail kinds are `sail-raised` and `sail-square-raised`. Normal `native-take-helm` remains aim/focus gated; auto setup is a distinct path. Don't substitute old `helm` or `probe` actions in TwoClientNative. The `activation` and `held-helm` lab modes were removed; `create` now requires an explicit mode.
+The pulse is at most one second; rudder argument is lateral axis, `row=true` requests forward rowing. Normal completion zeros axes while retaining sail choice; safety loss can stop input/raise sails. Other sail kinds are `sail-raised` and `sail-square-raised`. Normal `native-take-helm` remains aim/focus gated; auto setup is a distinct path. Don't substitute old `helm` or `probe` actions in TwoClientNative. The `activation`, `held-helm`, `factory-authority-probe` and single-client lab modes and the `samples` command were removed; `create` requires `two-client-native` (or the `two-client-native-all-physics` diagnostic).
 
 Read-only commands:
 
@@ -219,7 +219,6 @@ Read-only commands:
 | `coop.debug.naval_lab.control-status` | `[]` | Input gates, routing, spatial and movement-counter observations |
 | `coop.debug.naval_lab.sail-status` | `[]` | Owner request, host-observed sail target and follower presentation |
 | `coop.debug.naval_lab.receipt` | operation UUID | Server operation outcome after uncertain dispatch |
-| `coop.debug.naval_lab.samples` | `["0"]`, then greatest returned sequence | Existing bounded probe records, if a permitted probe window exists |
 | `coop.debug.mission.summary` / `.camera` | `[]` | Main agent, mission and stored camera/follow state |
 | `coop.debug.mission.agents` / `.views` | discover current command args | Bounded pages of agents/support and views |
 

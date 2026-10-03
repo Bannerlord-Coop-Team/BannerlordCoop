@@ -17,10 +17,10 @@ using Xunit;
 namespace Coop.Tests.Missions.Battles;
 
 [Collection("Mission.Current")]
-public sealed class NavalLabFactoryAuthorityProbeTests : IDisposable
+public sealed class NavalLabHullAuthorityTests : IDisposable
 {
     private readonly Harmony harmony = new("coop.tests.naval.factory-probe");
-    private static NavalLabFactoryAuthorityProbeTests current = null!;
+    private static NavalLabHullAuthorityTests current = null!;
     private readonly HashSet<UIntPtr> activeBodies = new();
     private readonly List<UIntPtr> disables = new();
     private int enables;
@@ -28,11 +28,11 @@ public sealed class NavalLabFactoryAuthorityProbeTests : IDisposable
     private bool validAssignment = true;
     private NavalLabBehavior behavior = null!;
 
-    public NavalLabFactoryAuthorityProbeTests()
+    public NavalLabHullAuthorityTests()
     {
         current = this;
         harmony.Patch(AccessTools.Method(typeof(SoundEvent), nameof(SoundEvent.GetEventIdFromString)),
-            prefix: new HarmonyMethod(typeof(NavalLabFactoryAuthorityProbeTests), nameof(SoundId)));
+            prefix: new HarmonyMethod(typeof(NavalLabHullAuthorityTests), nameof(SoundId)));
         Patch(nameof(GameEntityPhysicsExtensions.DisableDynamicBodySimulation), nameof(Disable));
         Patch(nameof(GameEntityPhysicsExtensions.EnableDynamicBody), nameof(Enable));
         Patch(nameof(GameEntityPhysicsExtensions.HasDynamicRigidBody), nameof(Dynamic));
@@ -41,7 +41,7 @@ public sealed class NavalLabFactoryAuthorityProbeTests : IDisposable
 
     private void Patch(string method, string prefix) => harmony.Patch(
         AccessTools.Method(typeof(GameEntityPhysicsExtensions), method, new[] { typeof(WeakGameEntity) }),
-        prefix: new HarmonyMethod(typeof(NavalLabFactoryAuthorityProbeTests), prefix));
+        prefix: new HarmonyMethod(typeof(NavalLabHullAuthorityTests), prefix));
     private static bool SoundId(ref int __result) { __result = 0; return false; }
     private static bool Disable(WeakGameEntity gameEntity) { current.disables.Add(gameEntity.Pointer); current.activeBodies.Remove(gameEntity.Pointer); return false; }
     private static bool Enable() { current.enables++; return false; }
@@ -62,17 +62,17 @@ public sealed class NavalLabFactoryAuthorityProbeTests : IDisposable
         finally { field.SetValue(null, previous); }
     }
 
-    private MissionShip Prepare(bool host, NavalLabMode mode = NavalLabMode.FactoryAuthorityProbe)
+    // The owned slot-zero hull is the active body; a foreign one must stay disabled.
+    private MissionShip Prepare(bool owner)
     {
         var id = Guid.NewGuid();
         var manifest = new NavalLabManifest("naval-lab:" + id.ToString("N"), id, new[] { "A", "B" },
-            Enumerable.Range(0, 10).Select(_ => Guid.NewGuid()).ToArray(), new[] { Guid.NewGuid(), Guid.NewGuid() }, mode);
-        behavior = new NavalLabBehavior(manifest, "A", null!, null!);
+            Enumerable.Range(0, 10).Select(_ => Guid.NewGuid()).ToArray(), new[] { Guid.NewGuid(), Guid.NewGuid() }, NavalLabMode.TwoClientNative);
+        behavior = new NavalLabBehavior(manifest, owner ? "A" : "B", null!, null!);
         AccessTools.PropertySetter(typeof(MissionBehavior), nameof(MissionBehavior.Mission)).Invoke(behavior, new object[] { Shell<Mission>() });
         behavior.Ships = new MissionShip[2];
         behavior.factoryAttempted = true;
         behavior.factoryObserving = true;
-        behavior.factoryHost = host;
         behavior.factorySlot = 0;
         behavior.factoryAuthorityValid = () => validAssignment;
         var ship = Shell<MissionShip>();
@@ -97,88 +97,17 @@ public sealed class NavalLabFactoryAuthorityProbeTests : IDisposable
         return ship;
     }
 
-    private readonly List<(UIntPtr entity, bool teleportation, float x)> frameWrites = new();
-    private readonly List<UIntPtr> navigationUpdates = new();
-    private static bool FrameWrite(WeakGameEntity __instance, in TaleWorlds.Library.MatrixFrame frame, bool isTeleportation)
-    {
-        current.frameWrites.Add((__instance.Pointer, isTeleportation, frame.origin.x));
-        return false;
-    }
-    private static bool NavigationUpdate(WeakGameEntity __instance)
-    {
-        current.navigationUpdates.Add(__instance.Pointer);
-        return false;
-    }
-
-    // Supplies controls readiness; frame authority and native-write calls remain under test.
-    private static bool NativeControlsReady(ref bool __result) { __result = true; return false; }
-
-    // Native mode writes only the foreign hull; earlier modes retain global teleported frame application.
-    [Theory]
-    [InlineData(NavalLabMode.TwoClientNative, false)]
-    [InlineData(NavalLabMode.FactoryAuthorityProbe, true)]
-    public void FrameApplication_UpdatesHullAndNavmeshThroughModeSpecificAuthority(NavalLabMode mode, bool teleportation)
-    {
-        using var mission = new MissionCurrentScope();
-        var first = Prepare(false, mode);
-        var second = Shell<MissionShip>();
-        var entity = Activator.CreateInstance(typeof(WeakGameEntity), BindingFlags.Instance | BindingFlags.NonPublic,
-            null, new object[] { new UIntPtr(42) }, null);
-        typeof(ScriptComponentBehavior).GetField("_gameEntity", BindingFlags.NonPublic | BindingFlags.Instance)!.SetValue(second, entity);
-        behavior.Ships = new[] { first, second };
-        behavior.completedFactoryHulls = behavior.Ships;
-        behavior.factoryMaterialized = true;
-        activeBodies.Clear();
-        harmony.Patch(AccessTools.Method(typeof(WeakGameEntity), nameof(WeakGameEntity.SetGlobalFrame)),
-            prefix: new HarmonyMethod(GetType(), nameof(FrameWrite)));
-        harmony.Patch(AccessTools.Method(typeof(WeakGameEntity), nameof(WeakGameEntity.UpdateAttachedNavigationMeshFaces)),
-            prefix: new HarmonyMethod(GetType(), nameof(NavigationUpdate)));
-        var adapter = new NavalMissionAdapter();
-        AccessTools.Field(typeof(NavalMissionAdapter), "behavior").SetValue(adapter, behavior);
-        var frames = new[] { TaleWorlds.Library.MatrixFrame.Identity, TaleWorlds.Library.MatrixFrame.Identity };
-        frames[0].origin.x = 3; frames[1].origin.x = 7;
-        if (mode == NavalLabMode.TwoClientNative)
-        {
-            AccessTools.PropertySetter(typeof(MissionBehavior), nameof(MissionBehavior.Mission)).Invoke(behavior, new object[] { mission.Instance });
-            harmony.Patch(AccessTools.PropertyGetter(typeof(NavalLabBehavior), "CanUseNativeControls"),
-                prefix: new HarmonyMethod(GetType(), nameof(NativeControlsReady)));
-            behavior.factoryReleased = true;
-            activeBodies.Add(new UIntPtr(41));
-            Assert.False(adapter.ApplyFrames(frames));
-            Assert.False(adapter.ApplyForeignShipFrame(0, frames[0]));
-            Assert.Empty(frameWrites); Assert.Empty(navigationUpdates);
-            Assert.True(adapter.ApplyForeignShipFrame(1, frames[1]));
-            Assert.Equal(new[] { (new UIntPtr(42), teleportation, 7f) }, frameWrites);
-            Assert.Equal(new[] { new UIntPtr(42) }, navigationUpdates);
-            Assert.Equal(new[] { new UIntPtr(41) }, activeBodies);
-            Assert.Equal(1, behavior.shipOwnerWriteRejects[0]);
-            Assert.Equal(1, behavior.shipTargetRefreshes[1]);
-            behavior.factoryTerminal = true;
-            Assert.False(adapter.ApplyFrames(frames));
-            Assert.False(adapter.ApplyForeignShipFrame(1, frames[1]));
-            Assert.Single(frameWrites); Assert.Single(navigationUpdates);
-        }
-        else
-        {
-            Assert.True(adapter.ApplyFrames(frames));
-            Assert.Equal(new[] { (new UIntPtr(41), teleportation, 3f), (new UIntPtr(42), teleportation, 7f) }, frameWrites);
-            Assert.Equal(new[] { new UIntPtr(41), new UIntPtr(42) }, navigationUpdates);
-            Assert.Empty(activeBodies);
-        }
-        Assert.Equal(0, enables);
-    }
-
     [Theory]
     [InlineData(false)]
     [InlineData(true)]
-    public void CompletedInitialization_RetainsHostAndDisablesFollowerWithoutEnable(bool host)
+    public void CompletedInitialization_RetainsOwnerAndDisablesForeignHullWithoutEnable(bool owner)
     {
-        var ship = Prepare(host);
+        var ship = Prepare(owner);
         behavior.CompleteFactoryHull(ship);
         Assert.Same(ship, behavior.Ships[0]);
         Assert.Single(behavior.completedFactoryHulls);
-        Assert.Equal(host, activeBodies.Contains(new UIntPtr(41)));
-        Assert.Equal(host ? 0 : 1, disables.Count);
+        Assert.Equal(owner, activeBodies.Contains(new UIntPtr(41)));
+        Assert.Equal(owner ? 0 : 1, disables.Count);
         Assert.Equal(0, enables);
         Assert.False(behavior.factoryMaterialized);
         Assert.False(behavior.factoryReleased);
@@ -283,25 +212,6 @@ public sealed class NavalLabFactoryAuthorityProbeTests : IDisposable
         Assert.Empty(disables);
         Assert.Empty(behavior.completedFactoryHulls);
         Assert.Contains("original init failure", behavior.Blocker);
-    }
-
-    // Prior modes ignore even an unattributed physics instance without inspecting native state.
-    [Theory]
-    [InlineData(NavalLabMode.SingleClientNative)]
-    public void ProbeObservers_DoNothingForPriorModes(NavalLabMode mode)
-    {
-        Prepare(false);
-        // Only the immutable mode differs; no native boundary may be read by the new observers.
-        var id = Guid.NewGuid();
-        int owners = mode == NavalLabMode.SingleClientNative ? 1 : 2;
-        behavior = new NavalLabBehavior(new NavalLabManifest("naval-lab:" + id.ToString("N"), id, new[] { "A", "B" }.Take(owners).ToArray(),
-            Enumerable.Range(0, owners * 5).Select(_ => Guid.NewGuid()).ToArray(), Enumerable.Range(0, owners).Select(_ => Guid.NewGuid()).ToArray(), mode), "A", null!, null!);
-        behavior.factoryObserving = true;
-        behavior.ObserveFactoryFixedTick(Shell<NavalPhysics>(), parallel: false);
-        behavior.ObserveFactoryForce(Shell<NavalPhysics>());
-        Assert.Equal(0, behavior.FixedTicks);
-        Assert.Equal(0, behavior.ForceApplications);
-        Assert.Null(behavior.Blocker);
     }
 
     public void Dispose()

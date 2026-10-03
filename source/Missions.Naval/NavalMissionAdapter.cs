@@ -35,7 +35,7 @@ public sealed class NavalMissionAdapter : INavalMissionAdapter, INavalNativeMiss
 
     public void Preflight()
     {
-        if (NavalLabPhysicsPatches.Active?.RequiresProcessExit == true)
+        if (NavalLabPhysicsPatches.Active != null)
             throw new InvalidOperationException("Held naval fixtures require process exit before another naval fixture can open.");
         if (Mission.Current != null) throw new InvalidOperationException("Leave the current mission before starting the naval lab.");
         if (MBObjectManager.Instance.GetObject<ShipHull>(NavalLabManifest.HullId) == null
@@ -51,8 +51,6 @@ public sealed class NavalMissionAdapter : INavalMissionAdapter, INavalNativeMiss
         var troop = CharacterObject.Find("imperial_infantryman");
         if (hull == null || troop == null) throw new InvalidOperationException("Installed lab hull or troop definition is unavailable.");
         behavior = new NavalLabBehavior(manifest, ownControllerId, hull, troop);
-        if (manifest.Mode == NavalLabMode.SingleClientNative)
-            behavior.NativeAuthority = () => controller is NavalLabController lab && lab.HasSingleClientAuthority;
         NavalLabPhysicsPatches.Active = behavior;
         harmony.PatchAll(typeof(NavalMissionAdapter).Assembly);
         var rec = new MissionInitializerRecord(NavalLabManifest.SceneId)
@@ -66,14 +64,10 @@ public sealed class NavalMissionAdapter : INavalMissionAdapter, INavalNativeMiss
             var behaviors = new List<MissionBehavior>
             {
                 new NavalShipsLogic(), new NavalAgentsLogic(), new WaveParametersComputerLogic(),
-                new AgentHumanAILogic(), new MissionOptionsComponent(), behavior, controller
+                new AgentHumanAILogic(), new MissionOptionsComponent(), behavior, controller,
+                new NavalLabBattlePowerCalculationLogic(behavior), new NavalTrajectoryPlanningLogic()
             };
-            if (manifest.Mode == NavalLabMode.SingleClientNative || manifest.IsTwoClientNative)
-            {
-                behaviors.Add(new NavalLabBattlePowerCalculationLogic(behavior));
-                behaviors.Add(new NavalTrajectoryPlanningLogic());
-                behaviors.AddRange(behavior.CreateNativeViews(mission));
-            }
+            behaviors.AddRange(behavior.CreateNativeViews(mission));
             return behaviors;
         });
     }
@@ -93,29 +87,6 @@ public sealed class NavalMissionAdapter : INavalMissionAdapter, INavalNativeMiss
     public string CompleteDeployment() => behavior?.CompleteNativeDeployment() ?? "rejected:unavailable";
     public void Hold() => behavior?.Hold();
     public MatrixFrame[] ReadFrames() => behavior?.Ships.Where(ship => ship != null).Select(ship => ship.GlobalFrame).ToArray() ?? Array.Empty<MatrixFrame>();
-    public bool ApplyFrames(MatrixFrame[] frames)
-    {
-        if (behavior == null || behavior.Blocker != null || behavior.IsSingleClientNative || behavior.IsTwoClientNative || behavior.Simulating || frames.Length != behavior.Ships.Length) return false;
-        if (behavior.IsFactoryProbe && !behavior.CanApplyFactoryFrames()) return false;
-        for (int i = 0; i < frames.Length; i++)
-        {
-            if (behavior.IsTwoClientNative && !behavior.CanApplyFactoryFrames()) return false;
-            var entity = behavior.Ships[i].GameEntity;
-            entity.SetGlobalFrame(frames[i], isTeleportation: !behavior.IsTwoClientNative);
-            entity.UpdateAttachedNavigationMeshFaces();
-        }
-        if (behavior.IsFactoryProbe && !behavior.CanApplyFactoryFrames()) return false;
-        if (behavior.IsTwoClientNative) behavior.RefreshFollowerStationTargets();
-        return true;
-    }
-    public void SetHelm(int ship, float rudder, bool row)
-    {
-        if (behavior == null || behavior.HasNativeViews || !behavior.Simulating || ship < 0 || ship >= behavior.Ships.Length) return;
-        var input = ShipInputRecord.None();
-        input.SetRudderLateral(rudder);
-        input.SetRowerLongitudinal(row ? RowerLongitudinalInput.Forward : RowerLongitudinalInput.Stop);
-        ((PlayerShipController)behavior.Ships[ship].Controller).SetInput(in input);
-    }
     public string StartAgentControl(string kind, int ship, float value) =>
         behavior?.StartAgentControl(kind, ship, value) ?? "rejected:unavailable";
     public void TickAgentControl(float dt) => behavior?.TickAgentControl(dt);
@@ -150,8 +121,6 @@ public sealed class NavalMissionAdapter : INavalMissionAdapter, INavalNativeMiss
     public void ApplyNativeInput(Missions.Messages.NetworkNavalLabHelmInput input) => behavior.ApplyNativeInput(input);
     public void NeutralizeNativeInput(int ship) => behavior.NeutralizeNativeInput(ship);
     public Missions.Messages.NetworkNavalLabSailState[] ReadSailStates() => behavior.ReadSailStates();
-    public void ApplySailFeedback(Missions.Messages.NetworkNavalLabFrames frames) => behavior.ApplySailFeedback(frames);
-    public void ClearSailFeedback() => behavior.ClearSailFeedback();
     public string RequestAxesPulse(Guid operationId, int ship, float lateral, bool row, long deadlineUtcTicks)
         => behavior?.RequestAxesPulse(operationId, ship, lateral, row, deadlineUtcTicks) ?? "rejected:no_fixture";
     public object StartDrift(Guid operationId, int seconds) => behavior?.StartDrift(operationId, seconds) ?? new { unavailable = "no_fixture" };
@@ -172,16 +141,9 @@ public sealed class NavalMissionAdapter : INavalMissionAdapter, INavalNativeMiss
         => behavior.RequestPresentationPulse(operationId, ship, lateral, kind, deadlineUtcTicks);
     public void Dispose()
     {
-        if (behavior?.IsSingleClientNative == true || behavior?.IsFactoryProbe == true) behavior.Hold();
+        behavior?.Hold();
         behavior?.CancelControls();
         // Held fixtures retain their exact capture and damage guards until process exit, including after behavior removal.
-        if (NavalLabPhysicsPatches.Active?.RequiresProcessExit == true)
-        {
-            behavior = null;
-            return;
-        }
-        NavalLabPhysicsPatches.Active = null;
-        harmony.UnpatchAll(harmony.Id);
         behavior = null;
     }
 }
@@ -195,23 +157,15 @@ internal sealed partial class NavalLabBehavior : MissionLogic
     private readonly BasicCharacterObject troop;
     public MissionShip[] Ships { get; private set; } = Array.Empty<MissionShip>();
     public Agent[] Agents { get; private set; } = Array.Empty<Agent>();
-    public bool Simulating { get; private set; }
-    internal bool IsSingleClientNative => manifest.Mode == NavalLabMode.SingleClientNative;
-    internal bool IsTwoClientNative => manifest.IsTwoClientNative;
-    // Rope fixtures start inside the native 40 m hook range; other modes keep the original 60 m spacing.
-    internal float HullSpacing => manifest.Mode == NavalLabMode.TwoClientNative ? 24f : 60f;
-    internal bool HasNativeViews => IsSingleClientNative || IsTwoClientNative;
-    internal bool IsFactoryProbe => manifest.Mode == NavalLabMode.FactoryAuthorityProbe || IsTwoClientNative;
-    internal bool RequiresProcessExit => IsSingleClientNative || IsFactoryProbe;
+    // Rope fixtures start inside the native 40 m hook range; the all-physics diagnostic keeps the original 60 m spacing.
+    internal float HullSpacing => manifest.AllPhysicsProbe ? 60f : 24f;
     public object StartupDiagnostics { get; private set; }
     private Agent controlledAgent;
     private string controlKind;
-    private int controlShip;
     private float controlValue;
     private double controlDeadline;
     private Vec2 previousInput;
     private Vec2 writtenInput;
-    private bool jumpWritten;
     private bool wasWalking;
     private static double ControlNow => (double)System.Diagnostics.Stopwatch.GetTimestamp() / System.Diagnostics.Stopwatch.Frequency;
     private string startupPhase = "not_started";
@@ -237,12 +191,12 @@ internal sealed partial class NavalLabBehavior : MissionLogic
         // DefaultNavalMissionLogic normally provides this before ships initialize their sails.
         if (!SailWindProfile.IsSailWindProfileInitialized)
             SailWindProfile.InitializeProfile();
-        if (HasNativeViews) InitializeNativeTeams();
+        InitializeNativeTeams();
     }
 
     public override void OnMissionStateFinalized()
     {
-        if (HasNativeViews) nativeTerminalHold = true;
+        nativeTerminalHold = true;
         SailWindProfile.FinalizeProfile();
     }
 
@@ -251,9 +205,6 @@ internal sealed partial class NavalLabBehavior : MissionLogic
         try
         {
             RecordStartup("scene_loaded");
-            if (IsFactoryProbe) return;
-            InitializeFixture();
-            RecordStartup("fixture_initialized");
         }
         catch (Exception exception)
         {
@@ -268,11 +219,7 @@ internal sealed partial class NavalLabBehavior : MissionLogic
     {
         if (Mission.MissionBehaviors.Any(item => item is CampaignMissionComponent || item is CoopBattleController))
             throw new InvalidOperationException("Campaign behavior attached to the synthetic lab.");
-        var teams = HasNativeViews ? nativeTeams : new[]
-        {
-            Mission.Teams.Add(BattleSideEnum.Attacker),
-            Mission.Teams.Add(BattleSideEnum.Defender)
-        };
+        var teams = nativeTeams;
         Mission.PlayerTeam = teams[Array.IndexOf(manifest.Controllers, ownControllerId)];
         teams[0].SetIsEnemyOf(teams[1], false);
         teams[1].SetIsEnemyOf(teams[0], false);
@@ -285,18 +232,18 @@ internal sealed partial class NavalLabBehavior : MissionLogic
         {
             var frame = MatrixFrame.Identity;
             frame.origin = new Vec3(250f + (i * HullSpacing), 250f, 0f);
-            if (IsFactoryProbe) BeginFactoryHull(i);
+            BeginFactoryHull(i);
             RecordStartup("factory_begin:" + i);
             Ships[i] = shipsLogic.SpawnShip(new NavalLabShipOrigin(hull, Reject),
-                in frame, teams[i], spawnAnchored: IsSingleClientNative || IsFactoryProbe, checkForFreeArea: false);
-            if (IsFactoryProbe) FinishFactoryHull(i);
+                in frame, teams[i], spawnAnchored: true, checkForFreeArea: false);
+            FinishFactoryHull(i);
             RecordStartup("factory_complete:" + i);
             if (!Ships[i].IsInitialized || Ships[i]._actuators == null || Ships[i].Physics == null
                 || !Ships[i].Physics.IsInitialized || Ships[i].Formation == null)
                 throw new InvalidOperationException("Factory returned an incomplete native ship at slot " + i);
             Ships[i].SetCanBeTakenOver(false);
-            Ships[i].SetController(HasNativeViews ? ShipControllerType.None : ShipControllerType.Player, autoUpdateController: false);
-            Ships[i].SetAnchor(IsSingleClientNative || IsFactoryProbe);
+            Ships[i].SetController(ShipControllerType.None, autoUpdateController: false);
+            Ships[i].SetAnchor(true);
             if (Ships[i].InnerDeckLocalFrames.Count < NavalLabManifest.CrewPerShip)
                 throw new InvalidOperationException("Hull lacks the five required enumerated deck spawn frames.");
             for (int j = 0; j < NavalLabManifest.CrewPerShip; j++)
@@ -318,16 +265,7 @@ internal sealed partial class NavalLabBehavior : MissionLogic
                 if (owned && j == 0) Mission.MainAgent = agent;
             }
         }
-        if (HasNativeViews)
-        {
-            PrepareNativeDeployment();
-            return;
-        }
-        Mission.IsDeploymentFinished = true;
-        Mission.AllowAiTicking = true;
-        shipsLogic.SetDeploymentMode(false);
-        agentsLogic.SetDeploymentMode(false);
-        agentsLogic.SetSpawnReinforcementsOnTick(false);
+        PrepareNativeDeployment();
     }
 
     internal void RecordStartup(string phase)
@@ -359,38 +297,6 @@ internal sealed partial class NavalLabBehavior : MissionLogic
         }
     }
 
-    internal void RecordInitializationFailure(Exception exception)
-    {
-        Logger.Error(exception, "[NavalLabStartup] {Incarnation} InitForMission failed", manifest.IncarnationId);
-        Reject(exception.ToString());
-        RecordStartup("init_for_mission_failed");
-    }
-
-    public void SetAuthority(bool simulate)
-    {
-        if (IsFactoryProbe) { SetFactoryProbeAuthority(simulate); return; }
-        if (nativeDeploymentComplete && (!simulate || !CanUseNativeControls)) Hold();
-    }
-
-    public void Hold()
-    {
-        ClearPresentation();
-        if (IsFactoryProbe) { HoldFactoryProbe(); return; }
-        if (nativeTerminalHold) return;
-        nativeTerminalHold = true;
-        if (Mission != null) Mission.AllowAiTicking = false;
-        try { CancelControls(); CancelNativeControls(); }
-        catch (Exception exception) { Reject("controls.cleanup_failed:" + exception.GetType().FullName); }
-        HoldBodies();
-    }
-
-    private void HoldBodies()
-    {
-        Simulating = false;
-        foreach (var ship in Ships.Where(ship => ship != null && ship.GameEntity.IsValid))
-            ship.GameEntity.DisableDynamicBodySimulation();
-    }
-
     public void Reject(string reason)
     {
         // Damage callbacks can run on a physics worker; body changes belong to the mission tick.
@@ -399,9 +305,8 @@ internal sealed partial class NavalLabBehavior : MissionLogic
 
     internal bool SuppressHeldCapture(ShipControllerMachine machine)
     {
-        if (!RequiresProcessExit || machine == null) return false;
-        int slot = IsTwoClientNative ? Array.FindIndex(Ships, candidate => candidate?.ShipControllerMachine == machine)
-            : Array.IndexOf(manifest.Controllers, ownControllerId);
+        if (machine == null) return false;
+        int slot = Array.FindIndex(Ships, candidate => candidate?.ShipControllerMachine == machine);
         if (slot < 0 || slot >= Ships.Length) return false;
         var ship = Ships[slot];
         if (ship == null || ship.ShipControllerMachine != machine || machine.AttachedShip != ship) return false;
@@ -411,12 +316,12 @@ internal sealed partial class NavalLabBehavior : MissionLogic
 
     public override void OnObjectUsed(Agent userAgent, UsableMissionObject usableGameObject)
     {
-        if (IsTwoClientNative && userAgent == nativeHelmAgent && usableGameObject == nativeHelmPoint) nativeHelmUseCallbacks++;
+        if (userAgent == nativeHelmAgent && usableGameObject == nativeHelmPoint) nativeHelmUseCallbacks++;
     }
 
     public override void OnObjectStoppedBeingUsed(Agent userAgent, UsableMissionObject usableGameObject)
     {
-        if (IsTwoClientNative && userAgent == nativeHelmAgent && usableGameObject == nativeHelmPoint) nativeHelmStopCallbacks++;
+        if (userAgent == nativeHelmAgent && usableGameObject == nativeHelmPoint) nativeHelmStopCallbacks++;
     }
 
     private object InspectHelmIdentity(MissionShip ship, int slot)
@@ -431,7 +336,6 @@ internal sealed partial class NavalLabBehavior : MissionLogic
             {
                 slot, shipId = manifest.Ships[slot], owner = manifest.Controllers[slot],
                 ownerLocal = manifest.Controllers[slot] == ownControllerId,
-                lifecycleInitialized = IsSingleClientNative && nativeDeploymentCallbacks == 1 && ship.IsDeployed,
                 standingPointId = point.Id.Id, standingPointCreatedAtRuntime = point.Id.CreatedAtRuntime,
                 standingPointPointer = point.GameEntity.Pointer.ToUInt64(),
                 point.IsDisabledForPlayers,
@@ -462,32 +366,23 @@ internal sealed partial class NavalLabBehavior : MissionLogic
 
     public string StartAgentControl(string kind, int ship, float value)
     {
-        if (IsTwoClientNative && kind != "walk" && kind != "turn") return "rejected:keyboard_controls_only";
-        if (kind != "walk" && kind != "turn" && kind != "jump" && kind != "crew") return "rejected:unknown_control";
-        string deckBlocker = IsTwoClientNative ? DeckLocomotionBlocker() : null;
+        if (kind != "walk" && kind != "turn") return "rejected:keyboard_controls_only";
+        string deckBlocker = DeckLocomotionBlocker();
         if (deckBlocker != null) return "rejected:" + deckBlocker;
         if (Blocker != null || ship < 0 || ship >= Ships.Length || manifest.Controllers[ship] != ownControllerId)
             return "rejected:not_original_owner_or_unavailable";
         if (float.IsNaN(value) || float.IsInfinity(value) || Math.Abs(value) > 1) return "rejected:invalid_control";
         if (controlledAgent != null) return "rejected:agent_control_active";
-        int index = (ship * NavalLabManifest.CrewPerShip) + (kind == "crew" ? 1 : 0);
-        var agent = Agents[index];
-        if (agent == null || agent.Pointer == UIntPtr.Zero || !agent.IsActive()
-            || (kind == "crew" ? !agent.IsAIControlled : !agent.IsPlayerControlled)) return "rejected:agent_unavailable";
-        if (kind == "crew" && (Mission.IsTeleportingAgents || Ships[ship].InnerDeckLocalFrames.Count <= NavalLabManifest.CrewPerShip
-            || agent.GetScriptedFlags() != Agent.AIScriptedFrameFlags.None)) return "rejected:deck_target_or_unscripted_crew_unavailable";
-        if (kind == "jump" && (agent.EventControlFlags & Agent.EventControlFlag.Jump) != 0)
-            return "rejected:jump_input_busy";
+        var agent = Agents[ship * NavalLabManifest.CrewPerShip];
+        if (agent == null || agent.Pointer == UIntPtr.Zero || !agent.IsActive() || !agent.IsPlayerControlled)
+            return "rejected:agent_unavailable";
         controlledAgent = agent;
         controlKind = kind;
-        controlShip = ship;
         controlValue = value;
         controlDeadline = ControlNow + 1;
         previousInput = agent.MovementInputVector;
         writtenInput = previousInput;
         wasWalking = agent.WalkMode;
-        jumpWritten = false;
-        if (!IsTwoClientNative) return "applied";
         if (kind == "turn") StartDeckTurn(agent);
         return "applied:synthetic_deck_locomotion_not_keyboard";
     }
@@ -499,7 +394,7 @@ internal sealed partial class NavalLabBehavior : MissionLogic
         TickAxesPulse();
         if (controlledAgent == null) return;
         if (ControlNow >= controlDeadline || Blocker != null || float.IsNaN(dt) || float.IsInfinity(dt) || dt < 0
-            || (IsTwoClientNative && DeckLocomotionBlocker() != null)) { CancelAgentControl(); return; }
+            || DeckLocomotionBlocker() != null) { CancelAgentControl(); return; }
         var agent = controlledAgent;
         if (agent.Pointer == UIntPtr.Zero || !agent.IsActive()) { CancelAgentControl(); return; }
         if (controlKind == "walk")
@@ -508,23 +403,8 @@ internal sealed partial class NavalLabBehavior : MissionLogic
             agent.MovementInputVector = writtenInput;
             agent.EventControlFlags |= Agent.EventControlFlag.Walk;
         }
-        else if (controlKind == "turn" && deckTurnController != null) TickDeckTurn(dt);
-        else if (controlKind == "turn") agent.LookDirectionAsAngle += controlValue * Math.Min(dt, 0.1f);
-        else if (controlKind == "jump")
-        {
-            if (!jumpWritten) { agent.EventControlFlags |= Agent.EventControlFlag.Jump; jumpWritten = true; }
-            else agent.EventControlFlags &= ~Agent.EventControlFlag.Jump;
-        }
-        else
-        {
-            if (Mission.IsTeleportingAgents) { Reject("crew control entered native teleport mode"); CancelAgentControl(); return; }
-            var ship = Ships[controlShip];
-            // Slot five is native-enumerated and not one of the five initial spawn slots; no relocation is used.
-            var target = ship.GlobalFrame.TransformToParent(ship.InnerDeckLocalFrames[NavalLabManifest.CrewPerShip]).origin;
-            var position = new WorldPosition(Mission.Scene, target);
-            if (position.GetNavMesh() == UIntPtr.Zero) { Reject("crew deck target has no native navmesh"); CancelAgentControl(); return; }
-            agent.SetScriptedPosition(ref position, false);
-        }
+        else if (deckTurnController != null) TickDeckTurn(dt);
+        else agent.LookDirectionAsAngle += controlValue * Math.Min(dt, 0.1f);
     }
 
     private void CancelAgentControl()
@@ -532,15 +412,10 @@ internal sealed partial class NavalLabBehavior : MissionLogic
         var agent = controlledAgent;
         controlledAgent = null;
         StopDeckTurn();
-        if (agent == null || agent.Pointer == UIntPtr.Zero || !agent.IsActive()) return;
-        if (controlKind == "walk")
-        {
-            if (agent.MovementInputVector == writtenInput) agent.MovementInputVector = previousInput;
-            agent.EventControlFlags &= ~Agent.EventControlFlag.Walk;
-            if (!wasWalking) agent.EventControlFlags |= Agent.EventControlFlag.Run;
-        }
-        if (jumpWritten) agent.EventControlFlags &= ~Agent.EventControlFlag.Jump;
-        if (controlKind == "crew") agent.DisableScriptedMovement();
+        if (agent == null || agent.Pointer == UIntPtr.Zero || !agent.IsActive() || controlKind != "walk") return;
+        if (agent.MovementInputVector == writtenInput) agent.MovementInputVector = previousInput;
+        agent.EventControlFlags &= ~Agent.EventControlFlag.Walk;
+        if (!wasWalking) agent.EventControlFlags |= Agent.EventControlFlag.Run;
     }
 
     public void CancelControls()
@@ -548,8 +423,8 @@ internal sealed partial class NavalLabBehavior : MissionLogic
         CancelAxesPulse("cancelled_safety_stop");
         CancelPendingNativeHelm();
         CancelAgentControl();
-        if ((IsSingleClientNative && !nativeTerminalHold) || IsTwoClientNative) CancelNativeControls();
-        foreach (var ship in Ships.Where(ship => ship?.Controller is PlayerShipController && (!IsTwoClientNative || OwnsFactoryHull(Array.IndexOf(Ships, ship)))))
+        CancelNativeControls();
+        foreach (var ship in Ships.Where(ship => ship?.Controller is PlayerShipController && OwnsFactoryHull(Array.IndexOf(Ships, ship))))
         {
             var input = ShipInputRecord.None();
             input.SetRudderLateral(0);
@@ -586,17 +461,15 @@ internal sealed partial class NavalLabBehavior : MissionLogic
     public object Inspect() => new
     {
         mode = manifest.Mode.ToString(),
-        singleClientNative = IsSingleClientNative ? InspectNativeControls() : null,
-        twoClientNative = IsTwoClientNative ? InspectNativeControls() : null,
+        twoClientNative = InspectNativeControls(),
         factoryAuthorityProbe = InspectFactoryProbe(),
-        shipAuthority = IsTwoClientNative ? InspectShipAuthority() : null,
+        shipAuthority = InspectShipAuthority(),
         syntheticCrew = true,
         agentControl = controlledAgent == null ? "inactive" : controlKind,
         controlledCombatant = controlledAgent == null ? (Guid?)null : manifest.Combatants[Array.IndexOf(Agents, controlledAgent)],
         startup = StartupDiagnostics,
         manifest.InstanceId,
         manifest.IncarnationId,
-        Simulating,
         Blocker,
         forceApplications = System.Threading.Interlocked.Read(ref ForceApplications),
         fixedTicks = System.Threading.Interlocked.Read(ref FixedTicks),

@@ -14,49 +14,6 @@ public sealed class NavalLabSailFeedbackTests : NavalMissionTestEnvironment
         CreateLab(NavalLabMode.TwoClientNative);
         Ready(secondFirst ? Second : First); Ready(secondFirst ? First : Second);
         Tick(First); Tick(Second); Execute("complete-deployment"); Tick(First); Tick(Second);
-        Adapter(First).SailFeedback.Clear(); Adapter(Second).SailFeedback.Clear();
-    }
-
-    [Theory]
-    [InlineData(false)]
-    [InlineData(true)]
-    public void ElectedHostObservationsTravelWithExactFrameIdentity_OnlyFollowerReceives(bool secondFirst)
-    {
-        Start(secondFirst);
-        var host = secondFirst ? Second : First; var follower = secondFirst ? First : Second;
-        Adapter(host).SailStates = new[] { new NetworkNavalLabSailState(Manifest.Ships[0], 0, 0), new NetworkNavalLabSailState(Manifest.Ships[1], 2, 0) };
-        Tick(host);
-        var feedback = Assert.Single(Adapter(follower).SailFeedback);
-        Assert.Equal(Manifest.IncarnationId, feedback.IncarnationId); Assert.Equal(1, feedback.Epoch);
-        Assert.True(feedback.Sequence > 0); Assert.True(feedback.SailDeadlineUtcTicks > DateTime.UtcNow.Ticks);
-        Assert.Equal(Manifest.Ships, feedback.SailStates.Select(state => state.ShipId));
-        Assert.Equal(new[] { 0, 2 }, feedback.SailStates.Select(state => state.State));
-        Assert.Empty(Adapter(host).SailFeedback); Assert.Empty(Adapter(follower).NativeInputs);
-        Assert.Empty(Adapter(follower).HelmCalls);
-    }
-
-    [Theory]
-    [InlineData("epoch")]
-    [InlineData("incarnation")]
-    [InlineData("old_sequence")]
-    [InlineData("terminal")]
-    public void RejectedFrameCannotRefreshPresentation(string condition)
-    {
-        Start(); Tick(First); Adapter(Second).SailFeedback.Clear();
-        if (condition == "terminal") Execute("stop");
-        var frame = new NetworkNavalLabFrames(condition == "incarnation" ? Guid.NewGuid() : Manifest.IncarnationId,
-            condition == "epoch" ? 2 : 1, condition == "old_sequence" ? 1 : 100, new float[24], 100,
-            sailStates: new[] { new NetworkNavalLabSailState(Manifest.Ships[0], 2, 0), new NetworkNavalLabSailState(Manifest.Ships[1], 2, 0) },
-            sailDeadlineUtcTicks: DateTime.UtcNow.AddSeconds(1).Ticks);
-        SendFrames(First, frame); Assert.Empty(Adapter(Second).SailFeedback);
-        Assert.Empty(Adapter(Second).NativeInputs);
-    }
-
-    [Fact]
-    public void FramesBeforeNativeReadinessDoNotApplyFeedback()
-    {
-        CreateLab(NavalLabMode.TwoClientNative); Ready(First); Ready(Second); Tick(First); Tick(Second);
-        Tick(First); Assert.Empty(Adapter(Second).SailFeedback); Assert.True(Adapter(Second).SailClears > 0);
     }
 
     private CoopCommandResult Command(E2E.Tests.Environment.Instance.EnvironmentInstance instance, string name, params string[] values)
@@ -87,16 +44,6 @@ public sealed class NavalLabSailFeedbackTests : NavalMissionTestEnvironment
         Assert.False(Command(Server, "action", Guid.NewGuid().ToString(), "sail-full", "1", "1", "false").Succeeded);
         Assert.False(Command(Server, "action", Guid.NewGuid().ToString(), "sail-full", "2", "0", "false").Succeeded);
         Assert.Empty(Adapter(First).NativeInputs); Assert.Empty(Adapter(Second).NativeInputs);
-    }
-
-    [Fact]
-    public void SailCommandsRejectOtherModes()
-    {
-        CreateLab(NavalLabMode.FactoryAuthorityProbe);
-        Ready(First);
-        Ready(Second);
-        Assert.False(Command(Server, "action", Guid.NewGuid().ToString(), "sail-raised", "0", "0", "false").Succeeded);
-        Assert.Contains("wrong_mode", Command(First, "sail-status").Output);
     }
 
     [Theory]

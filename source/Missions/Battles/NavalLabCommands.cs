@@ -12,46 +12,25 @@ public sealed class NavalLabCreateCommand : ICoopCommand
     public NavalLabCreateCommand(INavalLabCoordinator coordinator) => this.coordinator = coordinator;
     public string Prefix => "coop.debug.naval_lab";
     public string Name => "create";
-    public string Description => "Start the isolated two-client lab: factory-authority-probe or two-client-native; two-client-native-all-physics deliberately combines native physics and network corrections on foreign hulls.";
+    public string Description => "Start the isolated two-client lab: two-client-native; two-client-native-all-physics deliberately combines native physics and network corrections on foreign hulls.";
     public CoopCommandSide Side => CoopCommandSide.Server;
     public IExpectedArgs[] ExpectedArgs { get; } =
     {
         new ExpectedArgs("operation_id", "Idempotent operation UUID.", true),
         new ExpectedArgs("first_controller", "First connected client controller id.", true),
         new ExpectedArgs("second_controller", "Second distinct connected client controller id.", true),
-        new ExpectedArgs("mode", "factory-authority-probe, two-client-native or two-client-native-all-physics (disposable diagnostic); one incarnation per run.", true)
+        new ExpectedArgs("mode", "two-client-native or two-client-native-all-physics (disposable diagnostic); one incarnation per run.", true)
     };
     private static NavalLabMode ParseMode(ICoopCommandArgs args)
     {
         string mode = args.Count > 3 ? args[3] : null;
         if (mode == "two-client-native") return NavalLabMode.TwoClientNative;
         if (mode == "two-client-native-all-physics") return NavalLabMode.TwoClientNativeAllPhysics;
-        if (mode == "factory-authority-probe") return NavalLabMode.FactoryAuthorityProbe;
-        throw new ArgumentException("Mode must be factory-authority-probe, two-client-native or two-client-native-all-physics.");
+        throw new ArgumentException("Mode must be two-client-native or two-client-native-all-physics.");
     }
     public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
     {
         try { return new CoopCommandResult(true, "LIVE_TEST_JSON=" + JsonConvert.SerializeObject(coordinator.Create(Guid.Parse(args[0]), args[1], args[2], ParseMode(args)))); }
-        catch (Exception exception) { return new CoopCommandResult(false, exception.Message, "naval_lab_rejected"); }
-    }
-}
-
-public sealed class NavalLabCreateSingleCommand : ICoopCommand
-{
-    private readonly INavalLabCoordinator coordinator;
-    public NavalLabCreateSingleCommand(INavalLabCoordinator coordinator) => this.coordinator = coordinator;
-    public string Prefix => "coop.debug.naval_lab";
-    public string Name => "create-single";
-    public string Description => "One connected client, one native ship and four AI crew; preassigned synthetic captain, not a campaign battle.";
-    public CoopCommandSide Side => CoopCommandSide.Server;
-    public IExpectedArgs[] ExpectedArgs { get; } =
-    {
-        new ExpectedArgs("operation_id", "Idempotent operation UUID.", true),
-        new ExpectedArgs("controller", "Connected client controller id.", true)
-    };
-    public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
-    {
-        try { return new CoopCommandResult(true, "LIVE_TEST_JSON=" + JsonConvert.SerializeObject(coordinator.CreateSingle(Guid.Parse(args[0]), args[1]))); }
         catch (Exception exception) { return new CoopCommandResult(false, exception.Message, "naval_lab_rejected"); }
     }
 }
@@ -67,10 +46,10 @@ public sealed class NavalLabActionCommand : ICoopCommand
     public IExpectedArgs[] ExpectedArgs { get; } =
     {
         new ExpectedArgs("operation_id", "Idempotent operation UUID.", true),
-        new ExpectedArgs("kind", "helm (1s), probe (30s helm + samples), walk/turn/crew (1s), jump (edge), complete-deployment (native UI modes), sail-full/sail-raised/sail-square-raised, native-axes-pulse (<=1s, rudder=lateral, row=forward), native-axes-backward (<=1s, rudder=lateral, row=false), native-axes-neutral/native-row-stop (<=1s, rudder=0,row=false; preserve sail), native-take-helm/native-release-helm (two-client synthetic tests, not keyboard evidence; await helm-status observation), stop.", true),
+        new ExpectedArgs("kind", "walk/turn (1s deck locomotion, two-client-native only), complete-deployment, sail-full/sail-raised/sail-square-raised, native-axes-pulse (<=1s, rudder=lateral, row=forward), native-axes-backward (<=1s, rudder=lateral, row=false), native-axes-neutral/native-row-stop (<=1s, rudder=0,row=false; preserve sail), native-take-helm/native-release-helm (two-client synthetic tests, not keyboard evidence; await helm-status observation), stop.", true),
         new ExpectedArgs("ship", "Manifest ship index, 0 or 1.", true),
-        new ExpectedArgs("rudder", "Finite [-1,1]: helm/probe rudder, walk forward input, turn radians/sec; jump/crew require 0.", true),
-        new ExpectedArgs("row", "Oars for helm/probe; agent actions require false.", true)
+        new ExpectedArgs("rudder", "Finite [-1,1]: axes lateral, walk forward input, turn radians/sec.", true),
+        new ExpectedArgs("row", "Forward rowing for native-axes-pulse; other actions require false.", true)
     };
     public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
     {
@@ -142,23 +121,6 @@ public sealed class NavalLabControlStatusCommand : ICoopCommand
     {
         if (args.Count != 0) return new CoopCommandResult(false, "No arguments expected.", "invalid_arguments");
         return new CoopCommandResult(true, "LIVE_TEST_JSON=" + JsonConvert.SerializeObject(coordinator.ControlStatus()));
-    }
-}
-
-public sealed class NavalLabSamplesCommand : ICoopCommand
-{
-    private readonly INavalLabCoordinator coordinator;
-    public NavalLabSamplesCommand(INavalLabCoordinator coordinator) => this.coordinator = coordinator;
-    public string Prefix => "coop.debug.naval_lab";
-    public string Name => "samples";
-    public string Description => "Read up to eight retained source-paired observations after a sequence (0 starts a page). Not a physics cut.";
-    public CoopCommandSide Side => CoopCommandSide.Both;
-    public IExpectedArgs[] ExpectedArgs { get; } = { new ExpectedArgs("after_sequence", "Nonnegative source sequence cursor.", true) };
-    public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
-    {
-        if (!long.TryParse(args[0], NumberStyles.None, CultureInfo.InvariantCulture, out var cursor))
-            return new CoopCommandResult(false, "Invalid sequence cursor.", "invalid_sequence");
-        return new CoopCommandResult(true, "LIVE_TEST_JSON=" + JsonConvert.SerializeObject(coordinator.Samples(cursor)));
     }
 }
 

@@ -29,7 +29,7 @@ public sealed partial class NavalLabCoordinator
         GameThread.RunSafe(() =>
         {
             var sample = payload.What;
-            if (!IsTwoClientNative || sample.IncarnationId != store.Current.IncarnationId) return;
+            if (!HasFixture || sample.IncarnationId != store.Current.IncarnationId) return;
             if (ModInformation.IsClient)
             {
                 // Campaign clients receive this typed stream only over their server connection.

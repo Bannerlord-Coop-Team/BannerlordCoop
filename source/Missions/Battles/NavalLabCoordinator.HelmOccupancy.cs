@@ -22,7 +22,7 @@ public sealed partial class NavalLabCoordinator
         GameThread.RunSafe(() =>
         {
             var value = payload.What;
-            if (!IsTwoClientNative || value.IncarnationId != store.Current.IncarnationId) return;
+            if (!HasFixture || value.IncarnationId != store.Current.IncarnationId) return;
             try
             {
                 if (ModInformation.IsClient)

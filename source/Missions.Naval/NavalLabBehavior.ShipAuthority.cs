@@ -27,7 +27,7 @@ internal sealed partial class NavalLabBehavior
     private long nativeInputApplyCallback;
 
     private bool OwnsFactoryHull(int slot) => slot >= 0 && slot < originalOwnerHullRoles.Length
-        && (IsTwoClientNative ? originalOwnerHullRoles[slot] : factoryHost);
+        && originalOwnerHullRoles[slot];
 
     // This diagnostic changes body integration only, never original-owner input or snapshot authority.
     private bool FactoryBodyExpectedActive(int slot) => slot >= 0 && slot < originalOwnerHullRoles.Length
@@ -78,7 +78,7 @@ internal sealed partial class NavalLabBehavior
     {
         if (slot < 0 || slot >= Ships.Length) return false;
         if (OwnsFactoryHull(slot)) { shipOwnerWriteRejects[slot]++; return false; }
-        if (!PresentationReady || !factoryMaterialized || !factoryReleased || factoryTerminal) return false;
+        if (!PresentationReady || !factoryMaterialized || !factoryReleased || terminal) return false;
         CheckFactoryAssignment();
         var entity = Ships[slot].GameEntity;
         if (!entity.IsValid || entity.HasDynamicRigidBodyAndActiveSimulation() != manifest.AllPhysicsProbe)

@@ -193,7 +193,7 @@ public sealed class NavalLabControlPulseTests : IDisposable
     [Fact]
     public void StatusIsFiniteReadOnlyBoundedAndOffThreadDoesNotTouchNativeState()
     {
-        Request(); fixture.factoryTerminal = true;
+        Request(); fixture.terminal = true;
         string json = JsonConvert.SerializeObject(fixture.InspectControlStatus());
         Assert.DoesNotContain("NaN", json); Assert.DoesNotContain("Infinity", json); Assert.Contains("not_ready_or_terminal", json);
         Assert.Contains("local read", json); Assert.Single(sent);
@@ -245,7 +245,7 @@ public sealed class NavalLabControlPulseTests : IDisposable
             AccessTools.PropertySetter(typeof(ScreenManager), nameof(ScreenManager.TopScreen)).Invoke(null,
                 new object?[] { condition == "screen" ? null : screen });
             dialog = condition == "dialog";
-            fixture.nativeDeploymentComplete = condition != "deployment"; fixture.factoryTerminal = condition == "terminal";
+            fixture.nativeDeploymentComplete = condition != "deployment"; fixture.terminal = condition == "terminal";
             string result = Request();
             Assert.Equal(condition == "allowed", result.StartsWith("requested:"));
             Assert.Equal(condition == "allowed" ? 1 : 0, sent.Count);
@@ -374,13 +374,13 @@ public sealed class NavalLabControlPulseTests : IDisposable
         fixture.pulseDeadline = 0; fixture.RouteNativeAxes(view);
         Assert.Equal("completed_axes_neutral_requested", fixture.pulsePhase);
         observation.Record(fixture.LocalShip, generation, 0.02f, 0, 4, 4, 1, 2, 0, 0, false, 1);
-        fixture.factoryTerminal = true;
+        fixture.terminal = true;
         var status = JObject.Parse(JsonConvert.SerializeObject(fixture.InspectControlStatus()))["pulsePhysics"]!;
         Assert.Equal(first, (Guid)status["operationId"]!); Assert.False((bool)status["open"]!);
         Assert.Equal(1, (int)status["samples"]!); Assert.Equal(300f, (float)status["oarForwardForceMax"]!);
-        fixture.factoryTerminal = false;
+        fixture.terminal = false;
         var second = Guid.NewGuid(); Request(second);
-        fixture.factoryTerminal = true;
+        fixture.terminal = true;
         status = JObject.Parse(JsonConvert.SerializeObject(fixture.InspectControlStatus()))["pulsePhysics"]!;
         Assert.Equal(second, (Guid)status["operationId"]!); Assert.Equal(0, (int)status["samples"]!);
         Assert.Equal("no_own_hull_sample", (string)status["unavailable"]!);

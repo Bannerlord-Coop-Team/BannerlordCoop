@@ -39,7 +39,6 @@ internal sealed partial class NavalLabBehavior
     internal string RequestAxesPulse(Guid operationId, int slot, float lateral, bool row, long deadlineUtcTicks, float? forward = null, bool rowStop = false)
     {
         if (!GameThread.Instance.IsGameThread) return "rejected:not_game_thread";
-        if (!IsTwoClientNative) return "rejected:wrong_mode";
         if (operationId == Guid.Empty || slot != OwnSlot || float.IsNaN(lateral) || float.IsInfinity(lateral) || Math.Abs(lateral) > 1)
             return "rejected:operation_owner_or_axes";
         var axes = new Vec2(lateral, forward ?? (row ? 1 : 0));
@@ -113,15 +112,14 @@ internal sealed partial class NavalLabBehavior
     internal object InspectControlStatus()
     {
         if (!GameThread.Instance.IsGameThread) return new { unavailable = "not_game_thread" };
-        if (!IsTwoClientNative) return new { unavailable = "wrong_mode" };
-        bool ready = !factoryTerminal && CanUseNativeControls;
+        bool ready = !terminal && CanUseNativeControls;
         var view = Mission?.GetMissionBehavior<MissionGauntletShipControlView>();
         return new
         {
             manifest.IncarnationId, epoch = 1, owner = ownControllerId, ship = OwnSlot,
             nativeInputApplyCallback, presentationSource = "owned_native",
             shipId = OwnSlot >= 0 ? (Guid?)manifest.Ships[OwnSlot] : null, electedSimulator = factoryHost,
-            ready, terminal = factoryTerminal, blocked = Blocker != null,
+            ready, terminal = terminal, blocked = Blocker != null,
             inputBlocker = NativeInputBlocker(view),
             sailToggleEligible = ready && view?._playerControlledShip != null && HasNativeInputPermission(view) && view.GetCanToggleSail(),
             pulseRowStop,

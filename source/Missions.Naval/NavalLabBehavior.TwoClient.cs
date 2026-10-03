@@ -40,17 +40,17 @@ internal sealed partial class NavalLabBehavior
     private object firstStationObservationFailure;
     private object firstStationStopEntry;
     private object FirstStationStopEntry => System.Threading.Volatile.Read(ref firstStationStopEntry);
-    internal bool CanPrepareTwoClientDeployment => IsTwoClientNative && factoryMaterialized && factoryReleased
-        && !factoryTerminal && factoryAuthorityValid?.Invoke() == true;
+    internal bool CanPrepareTwoClientDeployment => factoryMaterialized && factoryReleased
+        && !terminal && factoryAuthorityValid?.Invoke() == true;
 
-    internal bool OwnsFixedStationOrder(ShipOrder order) => IsTwoClientNative && order?._ownerShip?.ShipOrigin is NavalLabShipOrigin
+    internal bool OwnsFixedStationOrder(ShipOrder order) => order?._ownerShip?.ShipOrigin is NavalLabShipOrigin
         && order._ownerShip.ShipsLogic?.Mission == Mission;
 
     internal MissionShip GetLocalControlledShip()
     {
         var captain = LocalCaptain;
         var point = LocalShip?.ShipControllerMachine?.PilotStandingPoint;
-        return nativeDeploymentComplete && !factoryTerminal && captain != null && point != null
+        return nativeDeploymentComplete && !terminal && captain != null && point != null
             && captain == Mission.MainAgent && captain.IsPlayerControlled
             && captain.CurrentlyUsedGameObject == point && point.UserAgent == captain ? LocalShip : null;
     }
@@ -126,7 +126,7 @@ internal sealed partial class NavalLabBehavior
 
     internal void ApplyNativeInput(NetworkNavalLabHelmInput input)
     {
-        if (!IsTwoClientNative || !CanUseNativeInput || input.Ship != OwnSlot || !input.IsValid) return;
+        if (!CanUseNativeInput || input.Ship != OwnSlot || !input.IsValid) return;
         var record = new ShipInputRecord((RowerLateralInput)input.Lateral, (RowerLongitudinalInput)input.Longitudinal,
             (RowerLongitudinalInput)input.DoubleTap, input.Rudder, (SailInput)input.Sail);
         Ships[input.Ship].PlayerController.SetInput(in record);
@@ -136,7 +136,7 @@ internal sealed partial class NavalLabBehavior
 
     internal void NeutralizeNativeInput(int slot)
     {
-        if (!IsTwoClientNative || slot != OwnSlot || slot < 0 || slot >= Ships.Length || Ships[slot]?.Controller is not PlayerShipController player) return;
+        if (slot != OwnSlot || slot < 0 || slot >= Ships.Length || Ships[slot]?.Controller is not PlayerShipController player) return;
         var stop = ShipInputRecord.Stop();
         player.SetInput(in stop);
         nativeInputApplyCallback = nativeInputCallback;
@@ -164,7 +164,7 @@ internal sealed partial class NavalLabBehavior
 
     private Dictionary<string, ShipOarMachine> StationInventory(int slot)
     {
-        if (!IsTwoClientNative || !nativeDeploymentComplete || factoryTerminal || Blocker != null
+        if (!nativeDeploymentComplete || terminal || Blocker != null
             || slot < 0 || slot >= Ships.Length) throw new InvalidOperationException("native.station_lifecycle");
         var ship = Ships[slot];
         if (!ship.IsDeployed || ship.ShipOrigin is not NavalLabShipOrigin || ship.ShipOrigin.Hull != hull)
@@ -244,8 +244,8 @@ internal sealed partial class NavalLabBehavior
     {
         int combatant = Array.IndexOf(manifest.Combatants, combatantId);
         int slot = combatant < 0 ? -1 : combatant / NavalLabManifest.CrewPerShip;
-        if (!IsTwoClientNative || incarnationId != manifest.IncarnationId || Mission == null || Mission != Mission.Current
-            || factoryTerminal || nativeTerminalHold || !nativeDeploymentComplete || Blocker != null
+        if (incarnationId != manifest.IncarnationId || Mission == null || Mission != Mission.Current
+            || terminal || nativeTerminalHold || !nativeDeploymentComplete || Blocker != null
             || slot < 0 || slot >= Ships.Length || !appliedStations.TryGetValue(slot, out var stations)
             || stations.IncarnationId != incarnationId || stations.Epoch != 1 || stations.Phase != "commit") return false;
         int crew = Array.IndexOf(stations.Combatants, combatantId);
@@ -272,7 +272,7 @@ internal sealed partial class NavalLabBehavior
 
     internal void RefreshFollowerStationTargets(int slot = -1)
     {
-        if (!IsTwoClientNative || !factoryReleased || factoryTerminal || nativeTerminalHold
+        if (!factoryReleased || terminal || nativeTerminalHold
             || Mission == null || Mission != Mission.Current)
             throw new InvalidOperationException("native.station_target_lifecycle");
         foreach (var stations in appliedStations.Values.Where(stations => stations.Ship == slot && !OwnsFactoryHull(stations.Ship)))
@@ -384,7 +384,7 @@ internal sealed partial class NavalLabBehavior
 
     internal bool CanTraceStationStop(ShipOarMachine machine)
     {
-        if (!HasRopeExperiment || !nativeDeploymentComplete || !factoryReleased || factoryTerminal || nativeTerminalHold
+        if (!HasRopeExperiment || !nativeDeploymentComplete || !factoryReleased || terminal || nativeTerminalHold
             || Blocker != null || FirstStationStopEntry != null) return false;
         var inventory = presentationInventory;
         if (inventory == null) return false;
@@ -402,7 +402,7 @@ internal sealed partial class NavalLabBehavior
 
     internal void RecordStationStopEntry(Agent agent, bool successful, Agent.StopUsingGameObjectFlags flags)
     {
-        if (!HasRopeExperiment || !nativeDeploymentComplete || !factoryReleased || factoryTerminal || nativeTerminalHold
+        if (!HasRopeExperiment || !nativeDeploymentComplete || !factoryReleased || terminal || nativeTerminalHold
             || Blocker != null || agent == null || FirstStationStopEntry != null) return;
         var inventory = presentationInventory;
         if (inventory == null) return;
