@@ -1,11 +1,14 @@
 ﻿using Common.Util;
 using E2E.Tests.Environment;
 using E2E.Tests.Environment.Instance;
+using E2E.Tests.Util;
+using GameInterface.Services.Heroes.Patches;
 using GameInterface.Services.Issues.Generic;
 using GameInterface.Services.Issues.Handlers;
 using GameInterface.Services.Issues.Messages;
 using GameInterface.Services.Party.Messages;
 using GameInterface.Services.Players.Data;
+using GameInterface.Services.TroopRosters.Interfaces;
 using HarmonyLib;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Actions;
@@ -138,6 +141,8 @@ public sealed class ArtisanProductAlternativeSelectionTests : IDisposable
         var observerId = environment.CreateRegisteredObject<Hero>();
         var partyId = environment.CreateRegisteredObject<MobileParty>();
         var troopId = environment.CreateRegisteredObject<CharacterObject>();
+        var targetId = environment.CreateRegisteredObject<CharacterObject>();
+        XpCapModels.Install(environment.Server);
         environment.Server.Call(() =>
         {
             var server = environment.Server;
@@ -146,6 +151,7 @@ public sealed class ArtisanProductAlternativeSelectionTests : IDisposable
             Assert.True(server.ObjectManager.TryGetObject<Hero>(observerId, out var observer));
             Assert.True(server.ObjectManager.TryGetObject<MobileParty>(partyId, out var party));
             Assert.True(server.ObjectManager.TryGetObject<CharacterObject>(troopId, out var troop));
+            Assert.True(server.ObjectManager.TryGetObject<CharacterObject>(targetId, out var target));
             var issue = ObjectHelper.SkipConstructor<Issue>();
             issue._issueOwner = giver;
             issue._issueState = IssueBase.IssueState.Ongoing;
@@ -158,20 +164,71 @@ public sealed class ArtisanProductAlternativeSelectionTests : IDisposable
                 giver.Issue = issue;
                 owner.Gold = 1000;
                 observer.Gold = 2000;
-                party.MemberRoster.AddToCounts(troop, 10);
-                selection.AddToCounts(troop, 6);
+                troop.Level = 6;
+                target.Level = 11;
+                troop.UpgradeTargets = new[] { target };
+                party.MemberRoster.AddToCounts(troop, 10, xpChange: 1500);
+                selection.AddToCounts(troop, 6, xpChange: 300);
             }
             var player = new Player("artisan-rollback-player", ownerId, partyId, "", "");
             var rollback = (Action)AccessTools.Method(typeof(GenericQuestTypeAcceptHandler), "CaptureAlternativeRollback")
                 .Invoke(server.Resolve<GenericQuestTypeAcceptHandler>(), new object[] { giver, player, selection });
             GiveGoldAction.ApplyBetweenCharacters(null, owner, -180);
-            party.MemberRoster.AddToCounts(troop, -6);
-            issue.AlternativeSolutionSentTroops.AddToCounts(troop, 6);
+            party.MemberRoster.AddToCounts(troop, -6, xpChange: -300);
+            issue.AlternativeSolutionSentTroops.Add(selection);
             rollback();
             Assert.Equal(1000, owner.Gold);
             Assert.Equal(2000, observer.Gold);
             Assert.Equal(10, party.MemberRoster.GetTroopCount(troop));
+            Assert.Equal(1500, party.MemberRoster.GetElementCopyAtIndex(party.MemberRoster.FindIndexOfTroop(troop)).Xp);
             Assert.Empty(issue.AlternativeSolutionSentTroops.GetTroopRoster());
+        });
+    }
+
+    [Theory]
+    [InlineData(6, 60, 0)]
+    [InlineData(6, 1500, 300)]
+    [InlineData(10, 60, 60)]
+    [InlineData(10, 3000, 3000)]
+    public void ArtisanAcceptanceConservesAuthoritativeXpAcrossSelectedAndRemainingTroops(int count, int xp, int sentXp)
+    {
+        var ownerId = environment.CreateRegisteredObject<Hero>();
+        var partyId = environment.CreateRegisteredObject<MobileParty>();
+        var troopId = environment.CreateRegisteredObject<CharacterObject>();
+        var targetId = environment.CreateRegisteredObject<CharacterObject>();
+        XpCapModels.Install(environment.Server);
+        environment.Server.Call(() =>
+        {
+            var server = environment.Server;
+            Assert.True(server.ObjectManager.TryGetObject<Hero>(ownerId, out var owner));
+            Assert.True(server.ObjectManager.TryGetObject<MobileParty>(partyId, out var party));
+            Assert.True(server.ObjectManager.TryGetObject<CharacterObject>(troopId, out var troop));
+            Assert.True(server.ObjectManager.TryGetObject<CharacterObject>(targetId, out var target));
+            var claim = TroopRoster.CreateDummyTroopRoster();
+            using (new AllowedThread())
+            {
+                troop.Level = 6;
+                target.Level = 11;
+                troop.UpgradeTargets = new[] { target };
+                party.MemberRoster.AddToCounts(troop, 10, xpChange: xp);
+                claim.AddToCounts(troop, count, xpChange: 500000);
+            }
+            Assert.Equal(300, Campaign.Current.Models.PartyTroopUpgradeModel.GetXpCostForUpgrade(party.Party, troop, target));
+            var player = new Player("artisan-xp-player", ownerId, partyId, "", "");
+            var packed = server.Resolve<ITroopRosterInterface>().PackTroopRosterData(claim);
+            var validated = (TroopRoster)AccessTools.Method(typeof(GenericQuestTypeAcceptHandler), "BuildValidatedSentTroops")
+                .Invoke(server.Resolve<GenericQuestTypeAcceptHandler>(), new object[] { player, packed });
+            using (new MainHeroSubstitutionScope(owner, party))
+                AccessTools.Method(typeof(AlternativeSolutionStartRunner), "RemoveFromTrueOwnerParty")
+                    .Invoke(null, new object[] { validated, true });
+
+            var sent = Assert.Single(validated.GetTroopRoster());
+            var remainingIndex = party.MemberRoster.FindIndexOfTroop(troop);
+            var remainingXp = remainingIndex < 0 ? 0 : party.MemberRoster.GetElementCopyAtIndex(remainingIndex).Xp;
+            Assert.Equal(count, sent.Number);
+            Assert.Equal(sentXp, sent.Xp);
+            Assert.Equal(10 - count, party.MemberRoster.GetTroopCount(troop));
+            Assert.Equal(xp, sent.Xp + remainingXp);
         });
     }
 

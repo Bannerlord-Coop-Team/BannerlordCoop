@@ -72,7 +72,8 @@ public static class AlternativeSolutionStartRunner
                 GiveGoldAction.ApplyBetweenCharacters(null, Hero.MainHero, -wages);
             }
 
-            RemoveFromTrueOwnerParty(validatedRoster);
+            RemoveFromTrueOwnerParty(validatedRoster,
+                owner.Issue is ArtisanCantSellProductsAtAFairPriceIssueBehavior.ArtisanCantSellProductsAtAFairPriceIssue);
 
             owner.Issue.AlternativeSolutionSentTroops.Clear();
             foreach (var element in validatedRoster.GetTroopRoster())
@@ -105,16 +106,34 @@ public static class AlternativeSolutionStartRunner
         return issue.DoTroopsSatisfyAlternativeSolution(troopRoster, out explanation);
     }
 
-    private static void RemoveFromTrueOwnerParty(TroopRoster validatedRoster)
+    private static void RemoveFromTrueOwnerParty(TroopRoster validatedRoster, bool transferTroopXp)
     {
         var party = Campaign.Current?.MainParty;
         if (party == null) return;
 
         foreach (var element in validatedRoster.GetTroopRoster())
         {
+            var xpToTransfer = 0;
+            if (transferTroopXp)
+            {
+                var available = party.MemberRoster.GetElementCopyAtIndex(party.MemberRoster.FindIndexOfTroop(element.Character));
+                xpToTransfer = available.Xp;
+                if (!element.Character.IsHero)
+                {
+                    var upgradeXp = element.Character.UpgradeTargets.Select(target =>
+                        Campaign.Current.Models.PartyTroopUpgradeModel.GetXpCostForUpgrade(party.Party, element.Character, target))
+                        .DefaultIfEmpty(0).Max();
+                    // Vanilla keeps XP with the remaining troops up to their upgrade capacity.
+                    var remainingCapacity = (long)(available.Number - element.Number) * upgradeXp;
+                    xpToTransfer = (int)Math.Max(0L, available.Xp - remainingCapacity);
+                }
+                validatedRoster.SetElementXp(validatedRoster.FindIndexOfTroop(element.Character), xpToTransfer);
+            }
             party.MemberRoster.AddToCounts(
-                element.Character, -element.Number, false, -element.WoundedNumber, 0, true, -1);
+                element.Character, -element.Number, false, -element.WoundedNumber, -xpToTransfer, true, -1);
         }
+        // SetElementXp leaves the cached roster enumeration unchanged until the version advances.
+        if (transferTroopXp) validatedRoster.UpdateVersion();
     }
 
     private static MainHeroSubstitutionScope ResolveOwnerScope(Player truePlayer)
