@@ -405,24 +405,18 @@ internal sealed class ChatVM : ViewModel
             allTrimmed = TrimHistory(allHistory);
         }
 
-        // Closed fade feed includes DMs without putting them in All
-        bool feedsPassive = feedsAll || !IsFixedChannelId(channelId);
-        ChatLineVM passiveTrimmed = null;
-        if (feedsPassive)
-        {
-            passiveHistory.Add(line);
-            passiveTrimmed = TrimHistory(passiveHistory);
-        }
+        // Closed fade feed includes Global, Events, DMs
+        passiveHistory.Add(line);
+        ChatLineVM passiveTrimmed = TrimHistory(passiveHistory);
 
         bool viewingThisChannel = IsOpen &&
             string.Equals(selectedChannel?.ControllerId, channelId, StringComparison.Ordinal);
         bool viewingAll = IsOpen && selectedChannel?.IsAll == true && feedsAll;
-        bool passiveFeed = !IsOpen && feedsPassive;
-        if (viewingThisChannel || viewingAll || passiveFeed)
+        if (!IsOpen)
+            AppendVisibleLine(line, passiveTrimmed);
+        else if (viewingThisChannel || viewingAll)
         {
-            ChatLineVM visibleTrimmed = passiveFeed
-                ? passiveTrimmed
-                : viewingAll ? allTrimmed : trimmed;
+            ChatLineVM visibleTrimmed = viewingAll ? allTrimmed : trimmed;
             AppendVisibleLine(line, visibleTrimmed);
         }
         else if (channelsById.TryGetValue(channelId, out var channel) && line.IsPlayerChat)

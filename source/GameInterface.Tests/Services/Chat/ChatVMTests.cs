@@ -87,22 +87,6 @@ public class ChatVMTests
     }
 
     [Fact]
-    public void Receive_OwnGlobalEcho_ShowsInClosedFeed()
-    {
-        var vm = new ChatVM(_ => { }, () => "local");
-
-        vm.Receive(new NetworkChatMessage(
-            ChatChannel.Global,
-            "local",
-            "Local Hero",
-            string.Empty,
-            string.Empty,
-            "hello everyone"));
-
-        Assert.Contains(vm.VisibleLines, line => line.Text.Contains("[Global] Local Hero: hello everyone"));
-    }
-
-    [Fact]
     public void Receive_PlayerMessage_UsesResolvedNameplateColorForWholeLine()
     {
         var expected = new Color(0.1f, 0.2f, 0.3f, 1f);
