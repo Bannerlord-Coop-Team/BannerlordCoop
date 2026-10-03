@@ -11,9 +11,12 @@ using E2E.Tests.Environment.Mock;
 using E2E.Tests.Environment.MockEngine;
 using GameInterface;
 using GameInterface.Policies;
+using GameInterface.Services.Entity;
 using Missions;
 using Missions.Agents.Handlers;
 using Missions.Battles;
+using Missions.Services.Network;
+using System.Diagnostics;
 using Xunit.Abstractions;
 using MockServerTelemetryUploader = Coop.IntegrationTests.Environment.Mock.MockServerTelemetryUploader;
 
@@ -121,6 +124,20 @@ public class TestEnvironment
             .AsSelf()
             .As<IVirtualNetworkScheduler>()
             .SingleInstance();
+        // A wall-clock heartbeat can wait on the mock receiver's static lock while teardown waits for that timer.
+        // MovementRateControllerTests exercises the real timer separately.
+        builder.Register(context => new MovementRateController(
+                context.Resolve<IBattleNetwork>(),
+                context.Resolve<IMessageBroker>(),
+                context.Resolve<IControllerIdProvider>(),
+                context.Resolve<IMissionContext>(),
+                Stopwatch.GetTimestamp,
+                Stopwatch.Frequency,
+                () => 60,
+                enableHeartbeat: false,
+                networkSettings: context.Resolve<IMovementNetworkSettings>()))
+            .As<IMovementRateController>()
+            .InstancePerDependency();
         builder.RegisterType<MockAgentVisualActionAccessor>()
             .As<IAgentVisualActionAccessor>()
             .InstancePerDependency();
