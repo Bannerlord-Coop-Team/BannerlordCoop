@@ -19,19 +19,13 @@ public sealed partial class NavalLabCoordinator
 
     private void ReceiveHelmOccupancy(MessagePayload<NetworkNavalLabHelmOccupancy> payload)
     {
+        if (ModInformation.IsClient) return;
         GameThread.RunSafe(() =>
         {
             var value = payload.What;
             if (!HasFixture || value.IncarnationId != store.Current.IncarnationId) return;
             try
             {
-                if (ModInformation.IsClient)
-                {
-                    if (controller is not INavalNativeController native)
-                        throw new InvalidOperationException("native.helm_controller_missing");
-                    native.ReceiveHelmOccupancy(value);
-                    return;
-                }
                 var manifest = store.Current;
                 if (!NativeAssignmentValid || !nativeReleaseSent || !nativeState.Ready
                     || payload.Who is not NetPeer peer || !players.TryGetPlayer(peer, out var player)
@@ -68,11 +62,7 @@ public sealed partial class NavalLabCoordinator
                 }
                 else throw new InvalidOperationException("native.helm_invalid_phase");
             }
-            catch (Exception exception)
-            {
-                if (ModInformation.IsServer) HoldFixture(exception.ToString());
-                else network.SendAll(new NetworkNavalLabFault(store.Current.IncarnationId, exception.ToString()));
-            }
+            catch (Exception exception) { HoldFixture(exception.ToString()); }
         }, context: nameof(ReceiveHelmOccupancy));
     }
 

@@ -23,17 +23,13 @@ public sealed partial class NavalLabCoordinator : INavalRopeCoordinator
     // Final rope state is relayed after a hold too: it is the only way the other owner converges on the frozen lifecycle.
     private void ReceiveFinalRopes(MessagePayload<NetworkNavalLabRopeFinal> payload)
     {
+        if (ModInformation.IsClient) return;
         GameThread.RunSafe(() =>
         {
             var value = payload.What;
             var manifest = store.Current;
             if (!HasFixture || manifest.Mode != NavalLabMode.TwoClientNative || !value.IsValid
                 || value.IncarnationId != manifest.IncarnationId || value.ShipId != manifest.Ships[value.Slot]) return;
-            if (ModInformation.IsClient)
-            {
-                (controller as INavalNativeController)?.ReceiveFinalRopes(value);
-                return;
-            }
             if (payload.Who is not NetPeer peer || !players.TryGetPlayer(peer, out var player)
                 || player.ControllerId != manifest.Controllers[value.Slot]
                 || !finalRopesForwarded.Add((value.IncarnationId, value.Slot))) return;

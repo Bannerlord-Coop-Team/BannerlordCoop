@@ -11,14 +11,9 @@ namespace Missions.Battles;
 public interface INavalNativeController
 {
     NetworkNavalLabStations CreateStations();
-    void ApplyStations(NetworkNavalLabStations stations);
     void ReleaseNativeControls();
-    void ReceiveNativeInput(NetworkNavalLabHelmInput input, bool readyAtReceive);
-    void ReceiveHelmOccupancy(NetworkNavalLabHelmOccupancy value);
-    void ReceiveFinalRopes(NetworkNavalLabRopeFinal value);
     object NativeControlStatus();
     bool NativeControlsReady { get; }
-    bool NativeInputIngressReady { get; }
 }
 
 public sealed partial class NavalLabController : INavalNativeController
@@ -29,8 +24,6 @@ public sealed partial class NavalLabController : INavalNativeController
     private readonly long[] nativeInputSequences = new long[2];
     private readonly double[] nativeInputDeadlines = new double[2];
     private INavalNativeMissionAdapter NativeAdapter => adapter as INavalNativeMissionAdapter;
-    // Poll-thread admission reads only the published gate; registry validation stays on the game thread.
-    public bool NativeInputIngressReady => nativeControlsReleased && released && hydrated && !terminal;
     public bool NativeControlsReady => nativeControlsReleased && released && hydrated
         && AssignmentValid && adapter.Blocker == null && NativeAgentAuthoritiesValid;
     // The registry walk runs once per tick; hot paths reuse it and keep the cheap lifecycle, epoch and blocker checks live.
@@ -89,10 +82,11 @@ public sealed partial class NavalLabController : INavalNativeController
         });
     }
 
-    // The coordinator already matched incarnation, mode and ship identity; this gate owns only lifetime and direction.
-    public void ReceiveFinalRopes(NetworkNavalLabRopeFinal value)
+    // Accepted even after a hold: the owner's final rope state is how this client converges on the frozen lifecycle.
+    private void ReceiveFinalRopes(NetworkNavalLabRopeFinal value)
     {
-        if (disposed || manifest == null || manifest.Controllers[value.Slot] == session.OwnControllerId
+        if (manifest.Mode != NavalLabMode.TwoClientNative || !value.IsValid || value.ShipId != manifest.Ships[value.Slot]
+            || manifest.Controllers[value.Slot] == session.OwnControllerId
             || Mission == null || Mission != TaleWorlds.MountAndBlade.Mission.Current) return;
         try { (adapter as INavalRopeAdapter)?.AcceptFinalRopes(value); }
         catch (Exception exception) { Fail(exception.ToString()); }
@@ -149,7 +143,7 @@ public sealed partial class NavalLabController : INavalNativeController
         return !expected.HasValue || (expected.Value >= 0 && revision == expected.Value);
     }
 
-    public void ReceiveHelmOccupancy(NetworkNavalLabHelmOccupancy value)
+    private void ReceiveHelmOccupancy(NetworkNavalLabHelmOccupancy value)
     {
         try
         {
@@ -198,7 +192,7 @@ public sealed partial class NavalLabController : INavalNativeController
         return NativeAdapter.CreateStations();
     }
 
-    public void ApplyStations(NetworkNavalLabStations stations)
+    private void ApplyStations(NetworkNavalLabStations stations)
     {
         if (stations.Phase == "release") { ApplyStationRelease(stations); return; }
         try
@@ -259,7 +253,7 @@ public sealed partial class NavalLabController : INavalNativeController
             }
     }
 
-    public void ReceiveNativeInput(NetworkNavalLabHelmInput input, bool readyAtReceive)
+    private void ReceiveNativeInput(NetworkNavalLabHelmInput input, bool readyAtReceive)
     {
         if (!readyAtReceive || !NativeControlsReady || input.IncarnationId != manifest.IncarnationId
             || input.Epoch != session.HostEpoch || input.Ship < 0 || input.Ship >= 2

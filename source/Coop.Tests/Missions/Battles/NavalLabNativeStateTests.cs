@@ -73,28 +73,6 @@ public sealed class NavalLabNativeStateTests
         if (kind == "mismatched_ack") Assert.Throws<InvalidOperationException>(() => state.Acknowledge("B", Stations(0, new[] { "w", "x", "y", "z" })));
         Assert.False(state.Ready);
     }
-    [Theory]
-    [InlineData("owner")]
-    [InlineData("epoch")]
-    [InlineData("incarnation")]
-    [InlineData("deadline")]
-    [InlineData("future_deadline")]
-    [InlineData("nan")]
-    [InlineData("enum")]
-    [InlineData("sequence")]
-    public void InvalidInputDoesNotConsumeSequence(string kind)
-    {
-        Ready(); long now = DateTime.UtcNow.Ticks;
-        var input = new NetworkNavalLabHelmInput(kind == "incarnation" ? Guid.NewGuid() : manifest.IncarnationId,
-            kind == "epoch" ? 2 : 1, 1, kind == "sequence" ? 0 : 1,
-            kind == "deadline" ? now : now + ((kind == "future_deadline" ? 2 : 1) * TimeSpan.TicksPerSecond),
-            true, kind == "enum" ? 3 : 1, 1, 0, kind == "nan" ? float.NaN : 0.5f, 2);
-        Assert.False(state.AcceptInput(kind == "owner" ? "A" : "B", input, now));
-        var valid = new NetworkNavalLabHelmInput(manifest.IncarnationId, 1, 1, 1, now + TimeSpan.TicksPerSecond, true, 1, 1, 0, 0.5f, 2);
-        Assert.True(state.AcceptInput("B", valid, now));
-        Assert.False(state.AcceptInput("B", valid, now));
-        state.Stop(); Assert.False(state.AcceptInput("B", valid, now));
-    }
     [Fact]
     public void CompleteWireRecordsRoundTrip()
     {

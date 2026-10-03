@@ -23,17 +23,12 @@ public sealed partial class NavalLabCoordinator
 
     private void ReceiveStations(MessagePayload<NetworkNavalLabStations> payload)
     {
+        if (ModInformation.IsClient) return;
         GameThread.RunSafe(() =>
         {
             if (!HasFixture || payload.What.IncarnationId != store.Current.IncarnationId) return;
             try
             {
-                if (ModInformation.IsClient)
-                {
-                    if ((payload.What.Phase == "commit" || payload.What.Phase == "release") && controller is INavalNativeController native)
-                        native.ApplyStations(payload.What);
-                    return;
-                }
                 if (!NativeAssignmentValid || payload.Who is not NetPeer peer || !players.TryGetPlayer(peer, out var player))
                     throw new InvalidOperationException("native.stations_without_authority");
                 CheckStationPresentation(payload.What);
@@ -64,11 +59,7 @@ public sealed partial class NavalLabCoordinator
                 }
                 else throw new InvalidOperationException("native.invalid_station_phase");
             }
-            catch (Exception exception)
-            {
-                if (ModInformation.IsServer) HoldFixture(exception.ToString());
-                else network.SendAll(new NetworkNavalLabFault(store.Current.IncarnationId, exception.ToString()));
-            }
+            catch (Exception exception) { HoldFixture(exception.ToString()); }
         }, context: nameof(ReceiveStations));
     }
 

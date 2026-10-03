@@ -21,6 +21,7 @@ public interface INavalLabController : IDisposable
     void Start(NavalLabManifest manifest, INavalMissionAdapter adapter, Action onEnd);
     void AbortStart();
     string Apply(NetworkNavalLabAction action);
+    object TerminalStatus();
 }
 
 public sealed partial class NavalLabController : CoopMissionController, INavalLabController
@@ -51,6 +52,10 @@ public sealed partial class NavalLabController : CoopMissionController, INavalLa
         this.context = context;
         this.hosts = hosts;
         session = new BattleSession(own, hosts);
+        broker.Subscribe<NetworkNavalLabShipSample>(OnShipSample);
+        broker.Subscribe<NetworkNavalLabStations>(OnStations);
+        broker.Subscribe<NetworkNavalLabHelmOccupancy>(OnHelmOccupancy);
+        broker.Subscribe<NetworkNavalLabRopeFinal>(OnFinalRopes);
     }
 
     public void Start(NavalLabManifest manifest, INavalMissionAdapter adapter, Action onEnd)
@@ -90,6 +95,30 @@ public sealed partial class NavalLabController : CoopMissionController, INavalLa
                 throw new InvalidOperationException("Cannot register a synthetic combatant.");
         }
     }
+
+    // Server-relayed fixture traffic for this incarnation; the coordinator only relays it on the server.
+    private void OnShipSample(MessagePayload<NetworkNavalLabShipSample> payload) => GameThread.RunSafe(() =>
+    {
+        if (IsCurrent(payload.What.IncarnationId)) ReceiveShipSample(payload.What);
+    }, context: nameof(OnShipSample));
+
+    private void OnStations(MessagePayload<NetworkNavalLabStations> payload) => GameThread.RunSafe(() =>
+    {
+        var stations = payload.What;
+        if (IsCurrent(stations.IncarnationId) && (stations.Phase == "commit" || stations.Phase == "release")) ApplyStations(stations);
+    }, context: nameof(OnStations));
+
+    private void OnHelmOccupancy(MessagePayload<NetworkNavalLabHelmOccupancy> payload) => GameThread.RunSafe(() =>
+    {
+        if (IsCurrent(payload.What.IncarnationId)) ReceiveHelmOccupancy(payload.What);
+    }, context: nameof(OnHelmOccupancy));
+
+    private void OnFinalRopes(MessagePayload<NetworkNavalLabRopeFinal> payload) => GameThread.RunSafe(() =>
+    {
+        if (IsCurrent(payload.What.IncarnationId)) ReceiveFinalRopes(payload.What);
+    }, context: nameof(OnFinalRopes));
+
+    private bool IsCurrent(Guid incarnationId) => !disposed && manifest != null && incarnationId == manifest.IncarnationId;
 
     private bool OriginalOwnersReady => manifest != null && hosts.TryGet(manifest.InstanceId, out var host)
         && manifest.Controllers.All(id => id == host.HostControllerId || host.SuccessorControllerIds.Contains(id));
@@ -276,6 +305,10 @@ public sealed partial class NavalLabController : CoopMissionController, INavalLa
         disposed = true;
         coopMissionComponent.AgentMovementHandler.ConfigureNavalStationMovement(null);
         Hold("disposed");
+        messageBroker.Unsubscribe<NetworkNavalLabShipSample>(OnShipSample);
+        messageBroker.Unsubscribe<NetworkNavalLabStations>(OnStations);
+        messageBroker.Unsubscribe<NetworkNavalLabHelmOccupancy>(OnHelmOccupancy);
+        messageBroker.Unsubscribe<NetworkNavalLabRopeFinal>(OnFinalRopes);
         base.Dispose();
     }
 }

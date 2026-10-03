@@ -182,7 +182,7 @@ public sealed partial class NavalLabCoordinator : INavalLabCoordinator, IHandler
         {
             incarnation = store.Current?.IncarnationId, mode = store.Current?.Mode.ToString(),
             status = HasFixture ? (adapter as INavalNativeMissionAdapter)?.InspectHelmStatus() : null,
-            terminalState = (controller as NavalLabController)?.TerminalStatus(),
+            terminalState = controller?.TerminalStatus(),
             unavailable = !HasFixture ? "no_fixture" : adapter == null ? "no_local_native_view" : null
         };
     }

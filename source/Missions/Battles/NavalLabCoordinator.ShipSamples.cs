@@ -26,16 +26,11 @@ public sealed partial class NavalLabCoordinator
 
     private void ReceiveShipSample(MessagePayload<NetworkNavalLabShipSample> payload)
     {
+        if (ModInformation.IsClient) return;
         GameThread.RunSafe(() =>
         {
             var sample = payload.What;
             if (!HasFixture || sample.IncarnationId != store.Current.IncarnationId) return;
-            if (ModInformation.IsClient)
-            {
-                // Campaign clients receive this typed stream only over their server connection.
-                (controller as NavalLabController)?.ReceiveShipSample(sample);
-                return;
-            }
             if (sample.Slot < 0 || sample.Slot >= 2) return;
             int slot = sample.Slot;
             var manifest = store.Current;

@@ -15,7 +15,6 @@ public interface INavalLabNativeState
     bool Acknowledge(string owner, NetworkNavalLabStations stations);
     void Release(string owner, NetworkNavalLabStations release);
     NetworkNavalLabStations[] Stations { get; }
-    bool AcceptInput(string owner, NetworkNavalLabHelmInput input, long nowUtcTicks);
     void Stop();
 }
 
@@ -25,7 +24,6 @@ public sealed class NavalLabNativeState : INavalLabNativeState
     private readonly HashSet<string> deployed = new();
     private readonly Dictionary<int, NetworkNavalLabStations> stations = new();
     private readonly HashSet<string> acknowledgements = new();
-    private readonly long[] sequences = new long[2];
     private readonly NetworkNavalLabStations[] releases = new NetworkNavalLabStations[2];
     private bool stopped;
     public bool Ready => !stopped && deployed.Count == 2 && stations.Count == 2 && acknowledgements.Count == 4;
@@ -99,17 +97,6 @@ public sealed class NavalLabNativeState : INavalLabNativeState
             || Enumerable.Range(0, 4).All(crew => value.Released[crew] == (prior?.Released[crew] ?? false)))
             throw new InvalidOperationException("native.station_release_order");
         releases[value.Ship] = value;
-    }
-
-    public bool AcceptInput(string owner, NetworkNavalLabHelmInput input, long nowUtcTicks)
-    {
-        if (!Ready || input == null || input.IncarnationId != manifest.IncarnationId || input.Epoch != 1
-            || input.Ship < 0 || input.Ship >= 2 || manifest.Controllers[input.Ship] != owner
-            || input.Sequence <= sequences[input.Ship] || input.Sequence <= 0
-            || input.DeadlineUtcTicks <= nowUtcTicks || input.DeadlineUtcTicks > nowUtcTicks + TimeSpan.TicksPerSecond
-            || !input.IsValid) return false;
-        sequences[input.Ship] = input.Sequence;
-        return true;
     }
 
     public void Stop() => stopped = true;

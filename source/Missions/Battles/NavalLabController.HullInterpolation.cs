@@ -38,7 +38,7 @@ public sealed partial class NavalLabController
         relay.SendAll(sample);
     }
 
-    public void ReceiveShipSample(NetworkNavalLabShipSample sample)
+    private void ReceiveShipSample(NetworkNavalLabShipSample sample)
     {
         if (sample.Slot < 0 || sample.Slot >= 2) return;
         var stream = hullStreams[sample.Slot];
