@@ -15,7 +15,8 @@ namespace GameInterface.Services.Issues.Generic;
 internal interface IAlternativeSolutionTroopSelection
 {
     IssueBase FindIssue(PartyScreenLogic logic);
-    void KeepSelection(IssueBase issue, TroopRoster selected);
+    void KeepSelection(PartyScreenLogic logic, IssueBase issue, TroopRoster selected, TroopRoster remaining);
+    TroopRoster GetReservedTroops(PartyScreenLogic logic, TroopRoster authoritativeRoster);
     bool IsCommitPending(PartyScreenLogic logic);
     string BeginCommit(PartyScreenLogic logic);
     void CompleteCommit(string commitId, bool accepted);
@@ -29,7 +30,9 @@ internal sealed class AlternativeSolutionTroopSelection : IAlternativeSolutionTr
     private string pendingCommitId;
 
     public bool IsCommitPending(PartyScreenLogic logic)
-        => pendingCommitId != null && ReferenceEquals(pendingLogic, logic);
+        => pendingCommitId != null &&
+           (ReferenceEquals(pendingLogic, logic) ||
+            (logic?.RightOwnerParty != null && ReferenceEquals(pendingLogic.RightOwnerParty, logic.RightOwnerParty)));
 
     public string BeginCommit(PartyScreenLogic logic)
     {
@@ -45,9 +48,12 @@ internal sealed class AlternativeSolutionTroopSelection : IAlternativeSolutionTr
         pendingLogic = null;
         pendingCommitId = null;
         var issue = FindIssue(logic);
-        if (issue == null) return;
-        if (!accepted) Rollback(issue.IssueOwner);
-        else logic.OnReset(false);
+        if (issue != null && (!accepted || !RestoreSelection(logic, issue))) Rollback(issue.IssueOwner);
+        else
+        {
+            var active = (Game.Current.GameStateManager.ActiveState as PartyState)?.PartyScreenLogic;
+            if (active != null && ReferenceEquals(active.RightOwnerParty, logic.RightOwnerParty)) active.OnReset(false);
+        }
     }
 
     public IssueBase FindIssue(PartyScreenLogic logic)
@@ -63,7 +69,7 @@ internal sealed class AlternativeSolutionTroopSelection : IAlternativeSolutionTr
             ReferenceEquals(issue.AlternativeSolutionSentTroops, logic.CurrentData.LeftMemberRoster));
     }
 
-    public void KeepSelection(IssueBase issue, TroopRoster selected)
+    public void KeepSelection(PartyScreenLogic logic, IssueBase issue, TroopRoster selected, TroopRoster remaining)
     {
         using (new AllowedThread())
         {
@@ -71,9 +77,56 @@ internal sealed class AlternativeSolutionTroopSelection : IAlternativeSolutionTr
             if (!ReferenceEquals(returnedSelection, issue)) MobileParty.MainParty.MemberRoster.Add(sent);
             sent.Clear();
             sent.Add(selected);
+            logic.CurrentData.RightMemberRoster = remaining;
+            logic.MemberRosters[1] = remaining;
         }
         // Done restored the party; this roster now records a claim, not a removal.
         returnedSelection = issue;
+    }
+
+    public TroopRoster GetReservedTroops(PartyScreenLogic logic, TroopRoster authoritativeRoster)
+    {
+        if (returnedSelection == null || logic == null ||
+            !ReferenceEquals(logic.RightOwnerParty?.MemberRoster, authoritativeRoster) ||
+            ReferenceEquals(logic.CurrentData.RightMemberRoster, authoritativeRoster)) return null;
+
+        return ReferenceEquals(returnedSelection, FindIssue(logic)) ? logic._initialData.LeftMemberRoster : null;
+    }
+
+    private bool RestoreSelection(PartyScreenLogic logic, IssueBase issue)
+    {
+        var selected = issue.AlternativeSolutionSentTroops;
+        var party = logic.RightOwnerParty;
+        foreach (var troop in selected.GetTroopRoster())
+        {
+            int index = party.MemberRoster.FindIndexOfTroop(troop.Character);
+            if (index < 0 || party.MemberRoster.GetElementNumber(index) < troop.Number ||
+                party.MemberRoster.GetElementWoundedNumber(index) < troop.WoundedNumber ||
+                party.MemberRoster.GetElementNumber(index) - party.MemberRoster.GetElementWoundedNumber(index) <
+                    troop.Number - troop.WoundedNumber) return false;
+        }
+
+        using (new AllowedThread())
+        {
+            var remaining = logic.CurrentData.RightMemberRoster;
+            remaining.Clear();
+            remaining.Add(party.MemberRoster);
+            foreach (var troop in selected.GetTroopRoster())
+            {
+                int index = remaining.FindIndexOfTroop(troop.Character);
+                var element = remaining.GetElementCopyAtIndex(index);
+                int availableXp = element.Xp;
+                element.Number -= troop.Number;
+                element.Xp = Math.Max(0, availableXp - troop.Xp);
+                party.OnXpChanged(remaining, ref element);
+                selected.SetElementXp(selected.FindIndexOfTroop(troop.Character), availableXp - element.Xp);
+                remaining.AddToCounts(troop.Character, -troop.Number, false, -troop.WoundedNumber,
+                    element.Xp - availableXp);
+            }
+            logic._initialData.CopyFromScreenData(logic.CurrentData);
+            if (logic._savedData != null) logic.SavePartyScreenData();
+        }
+        return true;
     }
 
     public void Rollback(Hero owner, bool closeScreen = true)
@@ -85,11 +138,6 @@ internal sealed class AlternativeSolutionTroopSelection : IAlternativeSolutionTr
         var state = Game.Current.GameStateManager.ActiveState as PartyState;
         var logic = state?.PartyScreenLogic;
         bool hasOpenSelection = ReferenceEquals(FindIssue(logic), issue);
-        if (hasOpenSelection && ReferenceEquals(pendingLogic, logic))
-        {
-            pendingLogic = null;
-            pendingCommitId = null;
-        }
         using (new AllowedThread())
         {
             if (hasOpenSelection) logic.Reset(true);

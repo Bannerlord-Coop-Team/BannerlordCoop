@@ -136,6 +136,7 @@ internal class PartyScreenLogicPatches
             var initialMembers = __instance._initialData.RightMemberRoster;
             TroopRoster selectedTroops = null;
             TroopRoster initialSelectedTroops = null;
+            TroopRoster remainingTroops = null;
             if (selectingIssue != null)
             {
                 // Quest transfers are committed by acceptance; upgrades still use the party transaction.
@@ -143,6 +144,8 @@ internal class PartyScreenLogicPatches
                 {
                     selectedTroops = TroopRoster.CreateDummyTroopRoster();
                     selectedTroops.Add(__instance.MemberRosters[0]);
+                    remainingTroops = TroopRoster.CreateDummyTroopRoster();
+                    remainingTroops.Add(__instance.MemberRosters[1]);
                     initialSelectedTroops = TroopRoster.CreateDummyTroopRoster();
                     initialSelectedTroops.Add(__instance._initialData.LeftMemberRoster);
                     currentMembers = TroopRoster.CreateDummyTroopRoster();
@@ -208,7 +211,8 @@ internal class PartyScreenLogicPatches
                     __instance.CurrentData.UsedUpgradeHorsesHistory = new List<Tuple<EquipmentElement, int>>();
                     __instance._initialData.CopyFromScreenData(__instance.CurrentData);
 
-                    if (selectingIssue != null) troopSelection.KeepSelection(selectingIssue, selectedTroops);
+                    if (selectingIssue != null)
+                        troopSelection.KeepSelection(__instance, selectingIssue, selectedTroops, remainingTroops);
 
                     // In vanilla, the rosters would already be updated but with this patch the rosters are reset on the client to be managed by the server.
                     // This assigns a duplicate version of the left rosters needed in extra logic handled by the PartyScreenHelper when closing the party screen.
@@ -259,8 +263,7 @@ internal class PartyScreenLogicPatches
 
         __state = (__instance.MemberRosters[(int)command.RosterSide].GetTroopCount(command.Character),
             (long)__instance.MemberRosters[1].GetElementXp(command.Character) +
-            __instance.MemberRosters[0].GetElementXp(command.Character) -
-            __instance._initialData.LeftMemberRoster.GetElementXp(command.Character));
+            __instance.MemberRosters[0].GetElementXp(command.Character));
     }
 
     [HarmonyPatch(nameof(PartyScreenLogic.TransferTroop))]
@@ -276,15 +279,14 @@ internal class PartyScreenLogicPatches
         int previousXp = roster.GetElementXp(command.Character);
         using (new AllowedThread())
         {
-            // A returned claim cannot make its duplicate XP spendable on another upgrade.
+            // Native right-side transfers leave their overflow XP on the source roster.
             if (index >= 0 && previousXp > 0)
-                roster.SetElementXp(index, (int)Math.Min(previousXp, __state.Xp));
-
-            var baseline = __instance._initialData.LeftMemberRoster;
-            int baselineIndex = baseline.FindIndexOfTroop(command.Character);
-            if (baselineIndex >= 0)
-                baseline.SetElementXp(baselineIndex, (int)((long)roster.GetElementXp(command.Character) +
-                    __instance.MemberRosters[0].GetElementXp(command.Character) - __state.Xp));
+            {
+                var element = roster.GetElementCopyAtIndex(index);
+                element.Xp = (int)Math.Min(previousXp, __state.Xp - __instance.MemberRosters[0].GetElementXp(command.Character));
+                __instance.RightOwnerParty.OnXpChanged(roster, ref element);
+                roster.SetElementXp(index, element.Xp);
+            }
         }
         if (invokeUpdate && previousXp != roster.GetElementXp(command.Character) &&
             ContainerProvider.TryResolve<IPartyScreenRosterRefresher>(out var refresher))

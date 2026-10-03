@@ -2,9 +2,11 @@
 using Helpers;
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Roster;
+using TaleWorlds.Core;
 using TaleWorlds.CampaignSystem.Settlements;
 
 namespace GameInterface.Services.Party.Messages;
@@ -25,7 +27,7 @@ public readonly struct PartyDoneLogicAttempted : IEvent
     public readonly TroopRoster InitialLeftPrisonerRoster;
     public readonly TroopRoster InitialRightMemberRoster;
     public readonly TroopRoster InitialRightPrisonerRoster;
-    public readonly ItemRoster RightOwnerPartyItemRoster;
+    public readonly ItemRosterElement[] RightOwnerPartyItemRosterData;
     public readonly List<Tuple<CharacterObject, CharacterObject, int>> UpgradedTroopHistory;
     public readonly PartyBase LeftParty;
     public readonly int PartyGoldChangeAmount;
@@ -78,7 +80,7 @@ public readonly struct PartyDoneLogicAttempted : IEvent
         InitialLeftPrisonerRoster = initialLeftPrisonerRoster;
         InitialRightMemberRoster = initialRightMemberRoster;
         InitialRightPrisonerRoster = initialRightPrisonerRoster;
-        RightOwnerPartyItemRoster = rightOwnerPartyItemRoster;
+        RightOwnerPartyItemRosterData = rightOwnerPartyItemRoster.ToArray();
         UpgradedTroopHistory = upgradedTroopHistory;
         LeftParty = leftParty;
         PartyGoldChangeAmount = partyGoldChangeAmount;

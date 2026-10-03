@@ -129,7 +129,7 @@ internal class PartyDoneLogicHandler : IHandler
             leftPrisonerRosterData,
             rightMemberRosterData,
             rightPrisonerRosterData,
-            obj.What.RightOwnerPartyItemRoster._data,
+            obj.What.RightOwnerPartyItemRosterData,
             upgradedTroopHistory,
             leftPartyId,
             leftPrisonerRosterId,

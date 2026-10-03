@@ -1,5 +1,6 @@
 ﻿using Common.Logging;
 using SandBox.GauntletUI;
+using GameInterface.Services.Issues.Generic;
 using Serilog;
 using System;
 using System.Collections.Generic;
@@ -60,10 +61,13 @@ internal class PartyScreenRosterRefresher : IPartyScreenRosterRefresher
 
     private static readonly ILogger Logger = LogManager.GetLogger<PartyScreenRosterRefresher>();
     private readonly IPartyScreenRosterBaselineProvider baselineProvider;
+    private readonly IAlternativeSolutionTroopSelection troopSelection;
 
-    public PartyScreenRosterRefresher(IPartyScreenRosterBaselineProvider baselineProvider)
+    public PartyScreenRosterRefresher(IPartyScreenRosterBaselineProvider baselineProvider,
+        IAlternativeSolutionTroopSelection troopSelection)
     {
         this.baselineProvider = baselineProvider;
+        this.troopSelection = troopSelection;
     }
 
     public void RefreshXp(PartyScreenLogic logic, CharacterObject character)
@@ -97,6 +101,13 @@ internal class PartyScreenRosterRefresher : IPartyScreenRosterRefresher
         var baseline = baselineProvider.GetBaselineRoster(logic, authoritativeRoster);
         if (baseline == null) return false;
 
+        var reserved = troopSelection.GetReservedTroops(logic, authoritativeRoster);
+        if (reserved != null && troopSelection.IsCommitPending(logic))
+        {
+            applyAuthoritative(authoritativeRoster, character);
+            return true;
+        }
+
         var visible = GetVisibleRoster(logic, baseline);
         var saved = GetSavedRoster(logic, baseline);
         var previousBaseline = RosterElementState.Read(baseline, character);
@@ -112,6 +123,13 @@ internal class PartyScreenRosterRefresher : IPartyScreenRosterRefresher
 
         applyAuthoritative(authoritativeRoster, character);
         var authoritative = RosterElementState.Read(authoritativeRoster, character);
+        if (reserved != null && !RosterElementState.TryRebase(authoritative,
+            RosterElementState.Read(reserved, character), default, out authoritative))
+        {
+            troopSelection.Rollback(troopSelection.FindIssue(logic)?.IssueOwner);
+            notifyPendingChangesReset();
+            return true;
+        }
 
         RosterElementState rebasedSaved = default;
         bool canRebase =
