@@ -154,7 +154,10 @@ internal class PartyScreenRosterRefresher : IPartyScreenRosterRefresher
         if (isIssueSelection && !TryBalanceSelectionXp(logic, baseline, logic._initialData.LeftMemberRoster,
             character, ref authoritative))
         {
+            authoritative.Write(baseline, character);
             troopSelection.Rollback(troopSelection.FindIssue(logic)?.IssueOwner);
+            if (ReferenceEquals(authoritativeRoster, visible))
+                authoritative.Write(authoritativeRoster, character, preserveXp: true);
             notifyPendingChangesReset();
             return true;
         }
@@ -181,12 +184,14 @@ internal class PartyScreenRosterRefresher : IPartyScreenRosterRefresher
         rebasedVisible.Write(visible, character);
         if (saved != null) rebasedSaved.Write(saved, character);
         RefreshRecruitablePrisoners(logic);
-        RefreshTroop(
-            logic,
-            baseline,
-            character,
-            previousVisible.Number != rebasedVisible.Number,
-            previousVisible.Wounded != rebasedVisible.Wounded);
+        if (!isIssueSelection || rebasedVisible.Number > 0 ||
+            previousVisible.Number != rebasedVisible.Number || previousVisible.Wounded != rebasedVisible.Wounded)
+            RefreshTroop(
+                logic,
+                baseline,
+                character,
+                previousVisible.Number != rebasedVisible.Number,
+                previousVisible.Wounded != rebasedVisible.Wounded);
         if (isIssueSelection && logic.CurrentData.LeftMemberRoster.GetTroopCount(character) > 0 &&
             logic.CurrentData.LeftMemberRoster.GetElementXp(character) != previousSelectedXp)
             RefreshTroop(logic, logic._initialData.LeftMemberRoster, character, false, false);
@@ -593,7 +598,7 @@ internal class PartyScreenRosterRefresher : IPartyScreenRosterRefresher
             return true;
         }
 
-        public void Write(TroopRoster roster, CharacterObject character)
+        public void Write(TroopRoster roster, CharacterObject character, bool preserveXp = false)
         {
             int index = roster.FindIndexOfTroop(character);
             if (!Exists)
@@ -609,7 +614,9 @@ internal class PartyScreenRosterRefresher : IPartyScreenRosterRefresher
             if (index < 0) index = roster.AddNewElement(character, -1);
             roster.SetElementNumber(index, Number);
             roster.SetElementWoundedNumber(index, Wounded);
-            roster.SetElementXp(index, Xp);
+            // A count-only authoritative change can retain XP above the reduced stack's cap.
+            if (preserveXp) roster.data[index].Xp = Xp;
+            else roster.SetElementXp(index, Xp);
             roster.InitializeCachedData();
         }
     }

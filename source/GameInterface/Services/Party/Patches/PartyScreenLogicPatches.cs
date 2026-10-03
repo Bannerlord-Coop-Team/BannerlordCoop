@@ -252,54 +252,81 @@ internal class PartyScreenLogicPatches
     [HarmonyPrefix]
     private static void TransferTroopPrefix(PartyScreenLogic __instance, PartyScreenLogic.PartyCommand command,
         out (int Count, long Xp) __state)
+        => __state = GetSelectionXp(__instance, command);
+
+    [HarmonyPatch(nameof(PartyScreenLogic.UpgradeTroop))]
+    [HarmonyPrefix]
+    private static void UpgradeTroopPrefix(PartyScreenLogic __instance, PartyScreenLogic.PartyCommand command,
+        out (int Count, long Xp) __state)
     {
-        __state = (-1, 0);
+        __state = GetSelectionXp(__instance, command);
+        if (__state.Count < 0) return;
+        if (command.UpgradeTarget < 0 || command.UpgradeTarget >= command.Character.UpgradeTargets.Length)
+        {
+            __state = (-1, 0);
+            return;
+        }
+        __state.Xp -= (long)command.Character.GetUpgradeXpCost(PartyBase.MainParty, command.UpgradeTarget) * command.TotalNumber;
+    }
+
+    private static (int Count, long Xp) GetSelectionXp(PartyScreenLogic logic, PartyScreenLogic.PartyCommand command)
+    {
         if (command.Type != PartyScreenLogic.TroopType.Member ||
             command.TotalNumber <= 0 ||
             !ContainerProvider.TryResolve<IAlternativeSolutionTroopSelection>(out var selection) ||
-            selection.FindIssue(__instance) == null) return;
+            selection.FindIssue(logic) == null) return (-1, 0);
 
-        __state = (__instance.MemberRosters[(int)command.RosterSide].GetTroopCount(command.Character),
-            (long)__instance.MemberRosters[1].GetElementXp(command.Character) +
-            __instance.MemberRosters[0].GetElementXp(command.Character));
+        return (logic.MemberRosters[(int)command.RosterSide].GetTroopCount(command.Character),
+            (long)logic.MemberRosters[1].GetElementXp(command.Character) +
+            logic.MemberRosters[0].GetElementXp(command.Character));
     }
 
     [HarmonyPatch(nameof(PartyScreenLogic.TransferTroop))]
     [HarmonyPostfix]
     private static void TransferTroopPostfix(PartyScreenLogic __instance, PartyScreenLogic.PartyCommand command,
         bool invokeUpdate, (int Count, long Xp) __state)
-    {
-        if (__state.Count < 0 ||
-            __instance.MemberRosters[(int)command.RosterSide].GetTroopCount(command.Character) != __state.Count - command.TotalNumber) return;
+        => ReconcileSelectionXp(__instance, command, invokeUpdate, __state);
 
-        var roster = __instance.MemberRosters[1];
-        var selected = __instance.MemberRosters[0];
+    [HarmonyPatch(nameof(PartyScreenLogic.UpgradeTroop))]
+    [HarmonyPostfix]
+    private static void UpgradeTroopPostfix(PartyScreenLogic __instance, PartyScreenLogic.PartyCommand command,
+        (int Count, long Xp) __state)
+        => ReconcileSelectionXp(__instance, command, true, __state);
+
+    private static void ReconcileSelectionXp(PartyScreenLogic logic, PartyScreenLogic.PartyCommand command,
+        bool invokeUpdate, (int Count, long Xp) state)
+    {
+        if (state.Count < 0 ||
+            logic.MemberRosters[(int)command.RosterSide].GetTroopCount(command.Character) != state.Count - command.TotalNumber) return;
+
+        var roster = logic.MemberRosters[1];
+        var selected = logic.MemberRosters[0];
         int index = roster.FindIndexOfTroop(command.Character);
         int previousXp = roster.GetElementXp(command.Character);
         int previousSelectedXp = selected.GetElementXp(command.Character);
         using (new AllowedThread())
         {
-            // Native transfers can duplicate or clamp XP on one side of the split party.
-            if (index >= 0 && __state.Xp > 0)
+            // Native transfers and depleted upgrades can lose XP from the split party.
+            if (index >= 0 && state.Xp > 0)
             {
                 var element = roster.GetElementCopyAtIndex(index);
-                element.Xp = (int)Math.Min(int.MaxValue, Math.Max(0, __state.Xp - previousSelectedXp));
-                __instance.RightOwnerParty.OnXpChanged(roster, ref element);
+                element.Xp = (int)Math.Min(int.MaxValue, Math.Max(0, state.Xp - previousSelectedXp));
+                logic.RightOwnerParty.OnXpChanged(roster, ref element);
                 roster.SetElementXp(index, element.Xp);
                 roster.UpdateVersion();
             }
             int selectedIndex = selected.FindIndexOfTroop(command.Character);
-            if (selectedIndex >= 0 && selected.GetElementNumber(selectedIndex) > 0 && __state.Xp > 0)
+            if (selectedIndex >= 0 && selected.GetElementNumber(selectedIndex) > 0 && state.Xp > 0)
             {
                 selected.SetElementXp(selectedIndex,
-                    (int)Math.Min(int.MaxValue, Math.Max(0, __state.Xp - roster.GetElementXp(command.Character))));
+                    (int)Math.Min(int.MaxValue, Math.Max(0, state.Xp - roster.GetElementXp(command.Character))));
                 selected.UpdateVersion();
             }
         }
         if (invokeUpdate && (previousXp != roster.GetElementXp(command.Character) ||
             previousSelectedXp != selected.GetElementXp(command.Character)) &&
             ContainerProvider.TryResolve<IPartyScreenRosterRefresher>(out var refresher))
-            refresher.RefreshXp(__instance, command.Character);
+            refresher.RefreshXp(logic, command.Character);
     }
 
     internal static void RestoreLeftRostersAfterCommit(
