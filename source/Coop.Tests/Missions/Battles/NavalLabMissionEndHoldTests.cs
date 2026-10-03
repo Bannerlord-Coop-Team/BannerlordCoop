@@ -20,6 +20,7 @@ using System.Runtime.Serialization;
 using TaleWorlds.Engine;
 using TaleWorlds.MountAndBlade;
 using Xunit;
+using static Coop.Tests.Missions.Battles.NavalLabTestShells;
 
 namespace Coop.Tests.Missions.Battles;
 
@@ -48,15 +49,7 @@ public sealed class NavalLabMissionEndHoldTests : IDisposable
             new[] { "A", "B" }, Enumerable.Range(0, 10).Select(_ => Guid.NewGuid()).ToArray(),
             new[] { Guid.NewGuid(), Guid.NewGuid() }, NavalLabMode.TwoClientNative), "A", null!, null!);
         SetMission(behavior, scope.Instance);
-        var managed = typeof(ScriptComponentBehavior).BaseType!.Assembly.GetType("TaleWorlds.DotNet.Managed")!;
-        var moduleTypes = AccessTools.Field(managed, "_moduleTypes");
-        var previous = moduleTypes.GetValue(null);
-        try
-        {
-            if (previous == null) moduleTypes.SetValue(null, new Dictionary<string, Type>());
-            ship = (MissionShip)FormatterServices.GetUninitializedObject(typeof(MissionShip));
-        }
-        finally { moduleTypes.SetValue(null, previous); }
+        ship = Shell<MissionShip>();
         SetEntity(new UIntPtr(123));
         behavior.Ships = new[] { ship };
         behavior.completedFactoryHulls = new[] { ship };

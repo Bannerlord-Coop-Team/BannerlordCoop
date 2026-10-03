@@ -3,6 +3,7 @@ using Missions.Agents.Packets;
 using Serilog;
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using TaleWorlds.Library;
 using TaleWorlds.MountAndBlade;
 
@@ -77,7 +78,6 @@ public class AgentPositionInterpolator : IAgentPositionInterpolator
     private float elapsed;
     private long updateSequence;
 #if DEBUG
-    private readonly Dictionary<Agent, NavalDeckTarget> _deckTargets = new Dictionary<Agent, NavalDeckTarget>();
     private NavalDeckFrameResolver navalDeckFrame;
     private long deckTargetsSet, deckTransitions, deckTicks, deckEvictions, deckTeleports;
     private float lastDeckError, maxDeckError;
@@ -94,7 +94,7 @@ public class AgentPositionInterpolator : IAgentPositionInterpolator
     {
         if (agent == null) return;
 #if DEBUG
-        if (_deckTargets.Remove(agent)) deckTransitions++;
+        if (HasDeckTarget(agent)) deckTransitions++;
 #endif
         StoreRiderTarget(agent, data);
     }
@@ -119,8 +119,8 @@ public class AgentPositionInterpolator : IAgentPositionInterpolator
     /// <summary>[Game thread] Configures the fixture hull resolver; clearing it drops every deck target.</summary>
     internal void ConfigureNavalDeck(NavalDeckFrameResolver resolver)
     {
-        foreach (Agent agent in _deckTargets.Keys) _targets.Remove(agent);
-        _deckTargets.Clear();
+        foreach (Agent agent in _targets.Where(pair => pair.Value.Deck.HasValue).Select(pair => pair.Key).ToList())
+            _targets.Remove(agent);
         navalDeckFrame = resolver;
         deckTargetsSet = deckTransitions = deckTicks = deckEvictions = deckTeleports = 0;
         lastDeckError = maxDeckError = 0f;
@@ -131,27 +131,30 @@ public class AgentPositionInterpolator : IAgentPositionInterpolator
     {
         if (agent == null || navalDeckFrame == null || !navalDeckFrame(agent, data.NavalDeckShip, out MatrixFrame hull))
             return false;
-        if (_targets.ContainsKey(agent) && !_deckTargets.ContainsKey(agent)) deckTransitions++;
+        if (_targets.ContainsKey(agent) && !HasDeckTarget(agent)) deckTransitions++;
         StoreRiderTarget(agent, data);
-        _deckTargets[agent] = new NavalDeckTarget(data.NavalDeckShip, data.NavalDeckLocal, hull,
-            data.MovementDirection, data.LookDirection);
+        _targets[agent] = _targets[agent].WithDeck(new NavalDeckTarget(data.NavalDeckShip, data.NavalDeckLocal, hull,
+            data.MovementDirection, data.LookDirection));
         deckTargetsSet++;
         return true;
     }
 
     internal object InspectNavalDeck() => new
     {
-        tracked = _deckTargets.Count, deckTargetsSet, deckTransitions, deckTicks, deckEvictions, deckTeleports,
+        tracked = _targets.Values.Count(target => target.Deck.HasValue), deckTargetsSet, deckTransitions, deckTicks, deckEvictions, deckTeleports,
         lastDeckError, maxDeckError,
         measurement = "Horizontal puppet-to-target error in the current follower hull frame, sampled before each native target write."
     };
+
+    private bool HasDeckTarget(Agent agent) => _targets.TryGetValue(agent, out TargetFrame target) && target.Deck.HasValue;
 
     // Rebuilds the stored target in the current hull frame; input and flags are frame-invariant.
     private bool TryResolveDeckTarget(Agent agent, TargetFrame stored, out TargetFrame resolved, out MatrixFrame hull)
     {
         resolved = stored;
         hull = default;
-        if (!_deckTargets.TryGetValue(agent, out NavalDeckTarget deck)) return true;
+        if (!stored.Deck.HasValue) return true;
+        NavalDeckTarget deck = stored.Deck.Value;
         if (agent.MountAgent != null || navalDeckFrame == null || !navalDeckFrame(agent, deck.Ship, out hull))
             return false;
         resolved = new TargetFrame(
@@ -185,7 +188,7 @@ public class AgentPositionInterpolator : IAgentPositionInterpolator
     {
         if (agent == null || data.MountData == null) return;
 #if DEBUG
-        if (_deckTargets.Remove(agent)) deckTransitions++;
+        if (HasDeckTarget(agent)) deckTransitions++;
 #endif
         _targets[agent] = new TargetFrame(
             data.Position,
@@ -247,9 +250,6 @@ public class AgentPositionInterpolator : IAgentPositionInterpolator
 
         _targets.Remove(agent);
         _mountedGuardProcessedSequences.Remove(agent);
-#if DEBUG
-        _deckTargets.Remove(agent);
-#endif
     }
 
     public bool TryGetTargetMovementFlags(
@@ -300,9 +300,6 @@ public class AgentPositionInterpolator : IAgentPositionInterpolator
     {
         _targets.Clear();
         _mountedGuardProcessedSequences.Clear();
-#if DEBUG
-        _deckTargets.Clear();
-#endif
     }
 
     private long GetNextUpdateSequence()
@@ -388,7 +385,7 @@ public class AgentPositionInterpolator : IAgentPositionInterpolator
             }
 
 #if DEBUG
-            bool deck = _deckTargets.TryGetValue(agent, out NavalDeckTarget deckTarget);
+            bool deck = target.Deck.HasValue;
             if (!TryResolveDeckTarget(agent, target, out target, out MatrixFrame hull))
             {
                 _evict.Add(agent);
@@ -397,7 +394,7 @@ public class AgentPositionInterpolator : IAgentPositionInterpolator
             if (deck)
             {
                 deckTicks++;
-                lastDeckError = deckTarget.HorizontalError(hull, agent.Position);
+                lastDeckError = pair.Value.Deck.Value.HorizontalError(hull, agent.Position);
                 maxDeckError = Math.Max(maxDeckError, lastDeckError);
             }
 #endif
@@ -435,10 +432,13 @@ public class AgentPositionInterpolator : IAgentPositionInterpolator
         {
             foreach (Agent agent in _evict)
             {
+#if DEBUG
+                bool deckEvicted = HasDeckTarget(agent);
+#endif
                 _targets.Remove(agent);
                 _mountedGuardProcessedSequences.Remove(agent);
 #if DEBUG
-                if (_deckTargets.Remove(agent))
+                if (deckEvicted)
                 {
                     deckEvictions++;
                     HaltDeckPuppet(agent);
@@ -641,6 +641,9 @@ public class AgentPositionInterpolator : IAgentPositionInterpolator
             MountedRiderState = mountedRiderState;
             UpdatedAt = updatedAt;
             UpdateSequence = updateSequence;
+#if DEBUG
+            Deck = null;
+#endif
         }
 
         public Vec3 Position { get; }
@@ -650,6 +653,17 @@ public class AgentPositionInterpolator : IAgentPositionInterpolator
         public ContinuousState MountedRiderState { get; }
         public float UpdatedAt { get; }
         public long UpdateSequence { get; }
+#if DEBUG
+        // A deck-relative pose; the stored world position is only its receive-time fallback.
+        public NavalDeckTarget? Deck { get; private set; }
+
+        public TargetFrame WithDeck(NavalDeckTarget deck)
+        {
+            TargetFrame copy = this;
+            copy.Deck = deck;
+            return copy;
+        }
+#endif
     }
 
     private readonly struct ContinuousState

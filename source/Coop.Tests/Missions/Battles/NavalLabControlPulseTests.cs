@@ -26,6 +26,7 @@ using TaleWorlds.MountAndBlade.View.MissionViews;
 using TaleWorlds.MountAndBlade.View.Screens;
 using TaleWorlds.ScreenSystem;
 using Xunit;
+using static Coop.Tests.Missions.Battles.NavalLabTestShells;
 
 namespace Coop.Tests.Missions.Battles;
 
@@ -68,13 +69,6 @@ public sealed class NavalLabControlPulseTests : IDisposable
     private static bool Input(ref IInputContext __result) { __result = input; return false; }
     private static bool TimeValue(ref float __result) { __result = 100; return false; }
     private static bool ForbiddenWrite() => throw new InvalidOperationException("owner pulse must not write a simulator or follower controller");
-    private static T Shell<T>()
-    {
-        var managed = typeof(ScriptComponentBehavior).BaseType!.Assembly.GetType("TaleWorlds.DotNet.Managed")!;
-        var field = AccessTools.Field(managed, "_moduleTypes"); var previous = field.GetValue(null);
-        try { if (previous == null) field.SetValue(null, new Dictionary<string, Type>()); return (T)FormatterServices.GetUninitializedObject(typeof(T)); }
-        finally { field.SetValue(null, previous); }
-    }
     private string Request(Guid? id = null, float lateral = 0.5f, bool row = true, long? deadline = null, int slot = 1)
         => fixture.RequestAxesPulse(id ?? Guid.NewGuid(), slot, lateral, row, deadline ?? DateTime.UtcNow.AddSeconds(1).Ticks);
 
@@ -206,7 +200,6 @@ public sealed class NavalLabControlPulseTests : IDisposable
     private static bool Main(ref Agent __result) { __result = captain; return false; }
     private static bool True(ref bool __result) { __result = true; return false; }
     private static bool Dialog(ref bool __result) { __result = dialog; return false; }
-    private static void Set(object target, string name, object? value) => AccessTools.Field(target.GetType(), name).SetValue(target, value);
 
     [Theory]
     [InlineData("allowed")]

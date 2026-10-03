@@ -27,6 +27,7 @@ using TaleWorlds.Library;
 using TaleWorlds.MountAndBlade;
 using TaleWorlds.TwoDimension;
 using Xunit;
+using static Coop.Tests.Missions.Battles.NavalLabTestShells;
 
 namespace Coop.Tests.Missions.Battles;
 
@@ -58,7 +59,7 @@ public sealed class NavalLabSailFeedbackTests : IDisposable
         Patch(AccessTools.Method(typeof(ShipOrder), nameof(ShipOrder.GetIsCuttingLoose)), nameof(False));
         Patch(AccessTools.Method(typeof(ShipOrder), nameof(ShipOrder.GetIsAttemptingBoarding)), nameof(False));
         Patch(AccessTools.Method(typeof(PlayerShipController), nameof(PlayerShipController.SetInput)), nameof(ForbiddenWrite));
-        scene = (Scene)AccessTools.Method(typeof(NavalLabNativeTeamAITests), "CreateSceneAtEngineBoundary").Invoke(null, null)!;
+        scene = SceneAtEngineBoundary();
         var id = Guid.NewGuid();
         manifest = new NavalLabManifest("naval-lab:" + id.ToString("N"), id, new[] { "A", "B" },
             Enumerable.Range(0, 10).Select(_ => Guid.NewGuid()).ToArray(), new[] { Guid.NewGuid(), Guid.NewGuid() }, NavalLabMode.TwoClientNative);
@@ -86,14 +87,6 @@ public sealed class NavalLabSailFeedbackTests : IDisposable
     private static bool Wind(ref Vec2 __result) { __result = new Vec2(1, 0); return false; }
     private static bool Frame(ref MatrixFrame __result) { __result = MatrixFrame.Identity; return false; }
     private static bool Sails(MissionShip __instance, ref MBReadOnlyList<MissionSail> __result) { __result = sails[__instance]; return false; }
-    private static void Set(object target, string field, object? value) => AccessTools.Field(target.GetType(), field).SetValue(target, value);
-    private static T Shell<T>()
-    {
-        var managed = typeof(ScriptComponentBehavior).BaseType!.Assembly.GetType("TaleWorlds.DotNet.Managed")!;
-        var field = AccessTools.Field(managed, "_moduleTypes"); var previous = field.GetValue(null);
-        try { if (previous == null) field.SetValue(null, new Dictionary<string, Type>()); return (T)FormatterServices.GetUninitializedObject(typeof(T)); }
-        finally { field.SetValue(null, previous); }
-    }
     private static MissionShip Ship(float target)
     {
         var ship = Shell<MissionShip>(); var sail = Shell<MissionSail>(); var definition = Shell<ShipSail>();

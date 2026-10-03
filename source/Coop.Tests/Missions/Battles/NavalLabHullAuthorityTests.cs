@@ -13,6 +13,7 @@ using System.Runtime.Serialization;
 using TaleWorlds.Engine;
 using TaleWorlds.MountAndBlade;
 using Xunit;
+using static Coop.Tests.Missions.Battles.NavalLabTestShells;
 
 namespace Coop.Tests.Missions.Battles;
 
@@ -48,19 +49,6 @@ public sealed class NavalLabHullAuthorityTests : IDisposable
     private static bool Dynamic(ref bool __result) { __result = current.dynamicBody; return false; }
     private static bool Active(WeakGameEntity gameEntity, ref bool __result) { __result = current.activeBodies.Contains(gameEntity.Pointer); return false; }
 
-    private static T Shell<T>()
-    {
-        // Engine assemblies are not publicized by Coop.Tests; supply the normal managed script catalog boundary.
-        var managed = typeof(ScriptComponentBehavior).BaseType!.Assembly.GetType("TaleWorlds.DotNet.Managed")!;
-        var field = managed.GetField("_moduleTypes", BindingFlags.Static | BindingFlags.NonPublic)!;
-        var previous = field.GetValue(null);
-        try
-        {
-            if (previous == null) field.SetValue(null, new Dictionary<string, Type>());
-            return (T)FormatterServices.GetUninitializedObject(typeof(T));
-        }
-        finally { field.SetValue(null, previous); }
-    }
 
     // The owned slot-zero hull is the active body; a foreign one must stay disabled.
     private MissionShip Prepare(bool owner)

@@ -18,6 +18,7 @@ using TaleWorlds.Engine;
 using TaleWorlds.Library;
 using TaleWorlds.MountAndBlade;
 using Xunit;
+using static Coop.Tests.Missions.Battles.NavalLabTestShells;
 
 namespace Coop.Tests.Missions.Battles;
 
@@ -94,14 +95,6 @@ public sealed class NavalLabNativeHelmTests : IDisposable
     private static bool NoAgent(ref Agent? __result) { __result = null; return false; }
     private static bool Main(ref Agent __result) { __result = current.agent; return false; }
     private static bool Precondition(ref string? __result) { __result = null; return !current.bypassPrecondition; }
-    private static void Set(object target, string name, object? value) => AccessTools.Field(target.GetType(), name).SetValue(target, value);
-    private static T Shell<T>()
-    {
-        var managed = typeof(ScriptComponentBehavior).BaseType!.Assembly.GetType("TaleWorlds.DotNet.Managed")!;
-        var field = AccessTools.Field(managed, "_moduleTypes"); var previous = field.GetValue(null);
-        try { if (previous == null) field.SetValue(null, new Dictionary<string, Type>()); return (T)FormatterServices.GetUninitializedObject(typeof(T)); }
-        finally { field.SetValue(null, previous); }
-    }
     private static void Entity(ScriptComponentBehavior target, ulong pointer) => Set(target, "_gameEntity",
         Activator.CreateInstance(typeof(WeakGameEntity), BindingFlags.Instance | BindingFlags.NonPublic, null, new object[] { new UIntPtr(pointer) }, null));
     private void Occupancy(bool user, bool used)

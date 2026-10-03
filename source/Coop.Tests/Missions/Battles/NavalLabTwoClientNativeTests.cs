@@ -15,6 +15,7 @@ using TaleWorlds.Engine;
 using TaleWorlds.Library;
 using TaleWorlds.MountAndBlade;
 using Xunit;
+using static Coop.Tests.Missions.Battles.NavalLabTestShells;
 
 namespace Coop.Tests.Missions.Battles;
 
@@ -50,19 +51,6 @@ public sealed class NavalLabTwoClientNativeTests : IDisposable
     private static bool False(ref bool __result) { __result = false; return false; }
     private static bool Stop() { stopped++; return false; }
     private static bool Assign(UsableMachine __instance) { assigned++; weaponTarget = __instance is RangedSiegeWeapon; return false; }
-    private static void Set(object instance, string field, object? value) => AccessTools.Field(instance.GetType(), field).SetValue(instance, value);
-    private static T Shell<T>()
-    {
-        var managed = typeof(ScriptComponentBehavior).BaseType!.Assembly.GetType("TaleWorlds.DotNet.Managed")!;
-        var field = managed.GetField("_moduleTypes", BindingFlags.Static | BindingFlags.NonPublic)!;
-        var previous = field.GetValue(null);
-        try
-        {
-            if (previous == null) field.SetValue(null, new Dictionary<string, Type>());
-            return (T)FormatterServices.GetUninitializedObject(typeof(T));
-        }
-        finally { field.SetValue(null, previous); }
-    }
     private NavalLabBehavior Fixture(NavalLabMode mode, string owner = "A")
     {
         var id = Guid.NewGuid();

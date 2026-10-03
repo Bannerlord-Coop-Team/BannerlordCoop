@@ -14,6 +14,7 @@ using TaleWorlds.MountAndBlade;
 using Xunit;
 using Attachment = NavalDLC.Missions.Objects.UsableMachines.ShipAttachmentMachine.ShipAttachment;
 using RopeState = NavalDLC.Missions.Objects.UsableMachines.ShipAttachmentMachine.ShipAttachment.ShipAttachmentState;
+using static Coop.Tests.Missions.Battles.NavalLabTestShells;
 
 namespace Coop.Tests.Missions.Battles;
 
@@ -43,39 +44,6 @@ public sealed class NavalLabDeckBoardingTests : IDisposable
         return new NavalLabBehavior(manifest, "A", null!, null!);
     }
 
-    private static void Set(object target, string name, object? value) => AccessTools.Field(target.GetType(), name).SetValue(target, value);
-    private static T Shell<T>()
-    {
-        var managed = typeof(ScriptComponentBehavior).BaseType!.Assembly.GetType("TaleWorlds.DotNet.Managed")!;
-        var field = AccessTools.Field(managed, "_moduleTypes"); var previous = field.GetValue(null);
-        try { if (previous == null) field.SetValue(null, new Dictionary<string, Type>()); return (T)FormatterServices.GetUninitializedObject(typeof(T)); }
-        finally { field.SetValue(null, previous); }
-    }
-
-    // Same engine-boundary shell as NavalLabNativeTeamAITests: NativeObject's initializer needs IManaged.
-    private static GameEntity EntityAtEngineBoundary()
-    {
-        var field = AccessTools.Field(typeof(TaleWorlds.DotNet.NativeObject).Assembly
-            .GetType("TaleWorlds.DotNet.LibraryApplicationInterface"), "IManaged");
-        var previous = field.GetValue(null);
-        try
-        {
-            field.SetValue(null, typeof(DispatchProxy).GetMethod(nameof(DispatchProxy.Create))!
-                .MakeGenericMethod(field.FieldType, typeof(NativeReferenceBoundary)).Invoke(null, null));
-            var entity = Shell<GameEntity>();
-            GC.SuppressFinalize(entity);
-            // GameEntity equality treats a zero pointer as null.
-            Set(entity, "<Pointer>k__BackingField", new UIntPtr(0x1234));
-            return entity;
-        }
-        finally { field.SetValue(null, previous); }
-    }
-
-    public class NativeReferenceBoundary : DispatchProxy
-    {
-        protected override object? Invoke(MethodInfo? targetMethod, object?[]? args) =>
-            targetMethod!.ReturnType == typeof(int) ? 0 : null;
-    }
 
     [Theory]
     [InlineData(NavalLabMode.TwoClientNative, 24f)]

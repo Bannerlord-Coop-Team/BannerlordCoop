@@ -17,6 +17,7 @@ using TaleWorlds.Engine;
 using TaleWorlds.Library;
 using TaleWorlds.MountAndBlade;
 using Xunit;
+using static Coop.Tests.Missions.Battles.NavalLabTestShells;
 
 namespace Coop.Tests.Missions.Battles;
 
@@ -56,7 +57,7 @@ public sealed class NavalLabNativeTeamAITests : IDisposable
         Set(scope.Instance, "<Teams>k__BackingField", new Mission.TeamCollection(scope.Instance));
         Set(scope.Instance, "_activeMissionObjects", new MBList<MissionObject>());
         Set(scope.Instance, "_listeners", new List<IMissionListener>());
-        Set(scope.Instance, "<Scene>k__BackingField", CreateSceneAtEngineBoundary());
+        Set(scope.Instance, "<Scene>k__BackingField", SceneAtEngineBoundary());
         Set(scope.Instance, "<MissionTimeTracker>k__BackingField", new MissionTimeTracker());
         fixture.InitializeNativeTeams();
         Set(scope.Instance, "<CurrentState>k__BackingField", Mission.State.Continuing);
@@ -177,39 +178,6 @@ public sealed class NavalLabNativeTeamAITests : IDisposable
     private static void MakeDecision(Team team) => AccessTools.Method(typeof(TeamAIComponent), "MakeDecision").Invoke(team.TeamAI, null);
     private void Patch(Type type, string method, string prefix) =>
         harmony.Patch(AccessTools.Method(type, method), prefix: new HarmonyMethod(GetType(), prefix));
-    private static void Set(object instance, string field, object value) => AccessTools.Field(instance.GetType(), field).SetValue(instance, value);
-    private static T Shell<T>()
-    {
-        var managed = typeof(ScriptComponentBehavior).BaseType!.Assembly.GetType("TaleWorlds.DotNet.Managed")!;
-        var moduleTypes = AccessTools.Field(managed, "_moduleTypes");
-        var previous = moduleTypes.GetValue(null);
-        try
-        {
-            if (previous == null) moduleTypes.SetValue(null, new Dictionary<string, Type>());
-            return (T)FormatterServices.GetUninitializedObject(typeof(T));
-        }
-        finally { moduleTypes.SetValue(null, previous); }
-    }
-    private static Scene CreateSceneAtEngineBoundary()
-    {
-        var assembly = typeof(TaleWorlds.DotNet.NativeObject).Assembly;
-        var field = AccessTools.Field(assembly.GetType("TaleWorlds.DotNet.LibraryApplicationInterface"), "IManaged");
-        var previous = field.GetValue(null);
-        try
-        {
-            field.SetValue(null, typeof(DispatchProxy).GetMethod(nameof(DispatchProxy.Create))!
-                .MakeGenericMethod(field.FieldType, typeof(NativeReferenceBoundary)).Invoke(null, null));
-            var scene = Shell<Scene>();
-            GC.SuppressFinalize(scene);
-            return scene;
-        }
-        finally { field.SetValue(null, previous); }
-    }
-    public class NativeReferenceBoundary : DispatchProxy
-    {
-        protected override object? Invoke(MethodInfo? targetMethod, object?[]? args) =>
-            targetMethod!.ReturnType == typeof(int) ? 0 : null;
-    }
     private static bool ZeroInt(ref int __result) { __result = 0; return false; }
     private static bool ZeroTime(ref float __result) { __result = 0f; return false; }
     private static bool NoEnemies(ref bool __result) { __result = false; return false; }

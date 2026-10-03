@@ -16,6 +16,7 @@ using Newtonsoft.Json.Linq;
 using TaleWorlds.Engine;
 using TaleWorlds.Library;
 using Xunit;
+using static Coop.Tests.Missions.Battles.NavalLabTestShells;
 
 namespace Coop.Tests.Missions.Battles;
 
@@ -34,16 +35,7 @@ public sealed class NavalLabPulsePhysicsObservationTests : IDisposable
         NavalLabPhysicsPatches.Active = null;
     }
 
-    // Builds an engine-free managed shell for native-backed script components.
-    private static T Shell<T>()
-    {
-        var managed = typeof(ScriptComponentBehavior).BaseType!.Assembly.GetType("TaleWorlds.DotNet.Managed")!;
-        var field = AccessTools.Field(managed, "_moduleTypes"); var previous = field.GetValue(null);
-        try { if (previous == null) field.SetValue(null, new Dictionary<string, Type>()); return (T)FormatterServices.GetUninitializedObject(typeof(T)); }
-        finally { field.SetValue(null, previous); }
-    }
 
-    private static void Set(object target, string name, object? value) => AccessTools.Field(target.GetType(), name).SetValue(target, value);
     private static bool Zero(ref int __result) { __result = 0; return false; }
     private JObject Read() => JObject.FromObject(observation.Snapshot());
 

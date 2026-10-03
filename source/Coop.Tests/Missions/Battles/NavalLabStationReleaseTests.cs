@@ -14,6 +14,7 @@ using TaleWorlds.Core;
 using TaleWorlds.Engine;
 using TaleWorlds.MountAndBlade;
 using Xunit;
+using static Coop.Tests.Missions.Battles.NavalLabTestShells;
 
 namespace Coop.Tests.Missions.Battles;
 
@@ -69,14 +70,6 @@ public sealed class NavalLabStationReleaseTests : IDisposable
         var machine = inventory.Values.First(candidate => candidate.PilotStandingPoint.UserAgent == __instance);
         Seat(machine, __instance, false);
         return false;
-    }
-    private static void Set(object target, string name, object? value) => AccessTools.Field(target.GetType(), name).SetValue(target, value);
-    private static T Shell<T>()
-    {
-        var managed = typeof(ScriptComponentBehavior).BaseType!.Assembly.GetType("TaleWorlds.DotNet.Managed")!;
-        var field = AccessTools.Field(managed, "_moduleTypes"); var previous = field.GetValue(null);
-        try { if (previous == null) field.SetValue(null, new Dictionary<string, Type>()); return (T)FormatterServices.GetUninitializedObject(typeof(T)); }
-        finally { field.SetValue(null, previous); }
     }
 
     // A complete native seat: point user, used object, sitting and last pilot, or a complete native stop-use.
