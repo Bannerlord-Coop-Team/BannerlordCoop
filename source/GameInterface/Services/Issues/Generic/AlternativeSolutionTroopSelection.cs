@@ -26,6 +26,7 @@ internal interface IAlternativeSolutionTroopSelection
 internal sealed class AlternativeSolutionTroopSelection : IAlternativeSolutionTroopSelection
 {
     private IssueBase returnedSelection;
+    private IssueBase pendingIssue;
     private PartyScreenLogic pendingLogic;
     private string pendingCommitId;
 
@@ -36,6 +37,7 @@ internal sealed class AlternativeSolutionTroopSelection : IAlternativeSolutionTr
 
     public string BeginCommit(PartyScreenLogic logic)
     {
+        pendingIssue = FindIssue(logic);
         pendingLogic = logic;
         pendingCommitId = Guid.NewGuid().ToString("N");
         return pendingCommitId;
@@ -45,10 +47,14 @@ internal sealed class AlternativeSolutionTroopSelection : IAlternativeSolutionTr
     {
         if (pendingCommitId == null || pendingCommitId != commitId) return;
         var logic = pendingLogic;
+        var issue = pendingIssue;
+        pendingIssue = null;
         pendingLogic = null;
         pendingCommitId = null;
-        var issue = FindIssue(logic);
-        if (issue != null && (!accepted || !RestoreSelection(logic, issue))) Rollback(issue.IssueOwner);
+        // The selection screen can close before the server rejects its commit.
+        if (issue != null && ReferenceEquals(issue.IssueOwner.Issue, issue) &&
+            (!accepted || (ReferenceEquals(FindIssue(logic), issue) && !RestoreSelection(logic, issue))))
+            Rollback(issue.IssueOwner);
         else
         {
             var active = (Game.Current.GameStateManager.ActiveState as PartyState)?.PartyScreenLogic;

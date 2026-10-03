@@ -339,6 +339,41 @@ public class CapturedByBountyHuntersIssueTests : IDisposable
     }
 
     [Theory]
+    [InlineData(null, false)]
+    [InlineData(null, true)]
+    [InlineData("previous-owner", false)]
+    [InlineData("previous-owner", true)]
+    public void MalformedAlternativeAcceptanceClearsTheReceivedClaim(string previousOwner, bool invalidPayload)
+    {
+        var fixture = CreateIssue();
+        var client = environment.Clients.First();
+        AcceptFromFirstClient(fixture, alternative: true, submitAlternative: false, beforeRequest: () =>
+        {
+            var giver = client.GetRegisteredObject<Hero>(fixture.Giver);
+            var sent = giver.Issue.AlternativeSolutionSentTroops;
+            var companion = sent.GetTroopRoster().Single(entry => entry.Character.IsHero).Character;
+            var troop = sent.GetTroopRoster().Single(entry => !entry.Character.IsHero).Character;
+            var troops = client.Resolve<ITroopRosterInterface>().PackTroopRosterData(sent);
+            var state = new AlternativeSolutionVanillaState(CampaignTime.DaysFromNow(5), CampaignTime.DaysFromNow(4), 0.2f, 2, 1000, null);
+            var fields = invalidPayload ? new byte[] { 0x0f } : GenericAcceptFieldsSerializer.Serialize(
+                new BountyHuntersAlternativeAcceptFields(state, 0.25f, Array.Empty<JournalLog>()));
+            var owners = client.Resolve<IIssueOwnershipRegistry>();
+            owners.Clear(giver);
+            if (previousOwner != null) owners.SetOwner(giver, previousOwner);
+
+            client.Resolve<IMessageBroker>().Publish(null,
+                new NetworkQuestTypeAlternativeAccepted(fixture.Giver, "new-owner", state, fields, troops));
+
+            Assert.Equal(previousOwner != null, owners.TryGetOwnerControllerId(giver, out var restored));
+            Assert.Equal(previousOwner, restored);
+            Assert.True(giver.Issue.IsOngoingWithoutQuest);
+            Assert.Equal(0, sent.TotalManCount);
+            Assert.Equal(1, MobileParty.MainParty.MemberRoster.GetTroopCount(companion));
+            Assert.Equal(25, MobileParty.MainParty.MemberRoster.GetTroopCount(troop));
+        });
+    }
+
+    [Theory]
     [InlineData(false, false)]
     [InlineData(true, false)]
     [InlineData(false, true)]
@@ -662,9 +697,11 @@ public class CapturedByBountyHuntersIssueTests : IDisposable
     }
 
     [Theory]
-    [InlineData(false)]
-    [InlineData(true)]
-    public void PartyScreenDoneRejectionClosesSelectionWithoutSpendingGold(bool deferredReceive)
+    [InlineData(false, false)]
+    [InlineData(true, false)]
+    [InlineData(false, true)]
+    [InlineData(true, true)]
+    public void PartyScreenDoneRejectionClosesSelectionWithoutSpendingGold(bool deferredReceive, bool closeBeforeReply)
     {
         var fixture = CreateIssue();
         var client = environment.Clients.First();
@@ -711,7 +748,12 @@ public class CapturedByBountyHuntersIssueTests : IDisposable
                 logic.UpgradeTroop(command);
             }
             if (deferredReceive) environment.Server.Resolve<TestNetworkRouter>().ReceiveContext = TestNetworkReceiveContext.PollerThread;
-            Assert.True(logic.DoneLogic(true));
+            if (closeBeforeReply)
+            {
+                Helpers.PartyScreenHelper.CloseScreen(false);
+                Assert.Null(Game.Current.GameStateManager.ActiveState);
+            }
+            else Assert.True(logic.DoneLogic(true));
             Assert.True(client.Resolve<IAlternativeSolutionTroopSelection>().IsCommitPending(logic));
             environment.Server.Call(() =>
             {

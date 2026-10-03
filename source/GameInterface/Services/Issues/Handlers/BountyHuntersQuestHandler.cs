@@ -55,7 +55,7 @@ internal sealed class BountyHuntersQuestHandler : IHandler
             foreach (var entry in owners.Snapshot().Where(entry => entry.Value == player.ControllerId))
             {
                 if (entry.Key.Issue?.IssueQuest is CapturedByBountyHuntersIssueBehavior.CapturedByBountyHuntersIssueQuest quest)
-                    quest.CompleteQuestWithCancel(new TextObject("{=bYdhYidf}The quest was canceled because your clan leader, who made the original agreement, is no longer head of the clan.\""));
+                    quest.CompleteQuestWithCancel(new TextObject("{=bYdhYidf}The quest was canceled because your clan leader, who made the original agreement, is no longer head of the clan."));
             }
         });
     }

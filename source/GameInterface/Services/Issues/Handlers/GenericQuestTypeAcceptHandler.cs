@@ -453,7 +453,8 @@ internal class GenericQuestTypeAcceptHandler : IHandler
         {
             if (!objectManager.TryGetObjectWithLogging<Hero>(data.OwnerId, out var owner) || owner.Issue == null) return;
 
-            var descriptor = QuestTypeRegistry.Get(owner.Issue);
+            var issue = owner.Issue;
+            var descriptor = QuestTypeRegistry.Get(issue);
             troopSelection.Rollback(owner);
             ownershipRegistry.TryGetOwnerControllerId(owner, out var previousOwner);
             ownershipRegistry.SetOwner(owner, data.OwnerControllerId);
@@ -471,6 +472,10 @@ internal class GenericQuestTypeAcceptHandler : IHandler
             }
             catch (Exception e)
             {
+                if (ReferenceEquals(owner.Issue, issue) && issue.IsOngoingWithoutQuest)
+                {
+                    using (new AllowedThread()) issue.AlternativeSolutionSentTroops.Clear();
+                }
                 RestoreMirrorOwner(owner, previousOwner);
                 Logger.Error(e, "Failed to mirror {Message} for owner {Owner} - malformed or version-mismatched payload",
                     nameof(NetworkQuestTypeAlternativeAccepted), data.OwnerId);
