@@ -227,6 +227,8 @@ internal sealed class ChatVM : ViewModel
     {
         if (!enabled && IsOpen)
             SetOpen(false);
+        if (!enabled)
+            SetUnreadMessageCount(0);
 
         IsPlayerChatEnabled = enabled;
     }
@@ -471,8 +473,20 @@ internal sealed class ChatVM : ViewModel
         if (!histories.TryGetValue(channelId, out var history))
             return;
 
-        // Closed always shows recent All lines (channel tab only applies while open)
-        int firstLine = IsOpen ? 0 : Math.Max(0, history.Count - VisibleHistoryLines);
+        // Closed: filter first, then take the last N eligible All lines
+        int firstLine = 0;
+        if (!IsOpen)
+        {
+            firstLine = history.Count;
+            int eligible = 0;
+            for (int i = history.Count - 1; i >= 0 && eligible < VisibleHistoryLines; i--)
+            {
+                if (history[i].IsPlayerChat && !IsPlayerChatEnabled) continue;
+                eligible++;
+                firstLine = i;
+            }
+        }
+
         for (int i = firstLine; i < history.Count; i++)
         {
             var historyLine = history[i];

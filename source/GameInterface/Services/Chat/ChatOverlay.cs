@@ -270,16 +270,26 @@ internal sealed class ChatOverlay : GlobalLayer, IDisposable
         if (!allowChatOpen && dataSource.IsOpen)
             CloseInput();
 
-        if (gauntletLayer.IsActive == shouldShow)
+        if (gauntletLayer.IsActive != shouldShow)
         {
-            vanillaLogGate.SetReplacementVisible(shouldShow);
-            return shouldShow;
+            if (!shouldShow) CloseInput();
+            ScreenManager.SetSuspendLayer(gauntletLayer, !shouldShow);
         }
 
-        if (!shouldShow) CloseInput();
-        ScreenManager.SetSuspendLayer(gauntletLayer, !shouldShow);
         vanillaLogGate.SetReplacementVisible(shouldShow);
+        // Menus/options sit under this global layer; drop mouse so their widgets stay clickable
+        if (shouldShow && !dataSource.IsOpen)
+            ApplyClosedFeedInputRestrictions();
+
         return shouldShow;
+    }
+
+    private void ApplyClosedFeedInputRestrictions()
+    {
+        if (allowChatOpen)
+            SetPassiveInputRestrictions(gauntletLayer.InputRestrictions);
+        else
+            SetDisplayOnlyInputRestrictions(gauntletLayer.InputRestrictions);
     }
 
     private void OpenInput()
@@ -588,7 +598,7 @@ internal sealed class ChatOverlay : GlobalLayer, IDisposable
             SetOpenPanelInputRestrictions(gauntletLayer.InputRestrictions);
         }
         else
-            SetPassiveInputRestrictions(gauntletLayer.InputRestrictions);
+            ApplyClosedFeedInputRestrictions();
     }
 
     internal static bool ShouldReleaseInputFocus(
@@ -653,11 +663,20 @@ internal sealed class ChatOverlay : GlobalLayer, IDisposable
                (isGameplayLayerFocused || isChatLayerFocused);
     }
 
+    /// <summary>Closed feed on map/mission: mouse mask for hit-testing, widgets stay click-through.</summary>
     internal static void SetPassiveInputRestrictions(InputRestrictions inputRestrictions)
     {
         inputRestrictions.SetInputRestrictions(
             isMouseVisible: false,
             mask: InputUsageMask.Mouse);
+    }
+
+    /// <summary>Closed feed over menus/options: no mouse so lower Gauntlet screens receive clicks.</summary>
+    internal static void SetDisplayOnlyInputRestrictions(InputRestrictions inputRestrictions)
+    {
+        inputRestrictions.SetInputRestrictions(
+            isMouseVisible: false,
+            mask: InputUsageMask.Invalid);
     }
 
     internal static void SetOpenPanelInputRestrictions(InputRestrictions inputRestrictions)

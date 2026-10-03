@@ -283,6 +283,48 @@ public class ChatVMTests
     }
 
     [Fact]
+    public void SetPlayerChatEnabled_False_KeepsOlderEventsInClosedFeed()
+    {
+        var vm = new ChatVM(_ => { }, () => "local");
+        vm.ReceiveEvent("Settlement captured.", Color.White);
+        for (int i = 0; i < 12; i++)
+        {
+            vm.Receive(new NetworkChatMessage(
+                ChatChannel.Global,
+                "other",
+                "Other Hero",
+                string.Empty,
+                string.Empty,
+                $"chat {i}"));
+        }
+
+        vm.SetPlayerChatEnabled(false);
+
+        Assert.DoesNotContain(vm.VisibleLines, line => line.IsPlayerChat);
+        Assert.Contains(vm.VisibleLines, line => line.Text == "Settlement captured.");
+    }
+
+    [Fact]
+    public void SetPlayerChatEnabled_False_ClearsUnreadNotification()
+    {
+        var vm = new ChatVM(_ => { }, () => "local");
+        vm.Receive(new NetworkChatMessage(
+            ChatChannel.Direct,
+            "other-controller",
+            "Other Hero",
+            "local",
+            "Local Hero",
+            "meet me in Pravend"));
+
+        Assert.True(vm.HasUnreadNotification);
+
+        vm.SetPlayerChatEnabled(false);
+
+        Assert.False(vm.HasUnreadNotification);
+        Assert.Equal("0", vm.UnreadNotificationText);
+    }
+
+    [Fact]
     public void Receive_GlobalWhileClosedOnGlobalTab_StillShowsInPassiveFeed()
     {
         var vm = new ChatVM(_ => { }, () => "local");

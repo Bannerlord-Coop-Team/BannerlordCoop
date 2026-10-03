@@ -19,6 +19,17 @@ public class ChatOverlayTests
     }
 
     [Fact]
+    public void DisplayOnlyInputRestrictions_LeaveMouseToUnderlyingMenuScreens()
+    {
+        var inputRestrictions = new InputRestrictions(900);
+
+        ChatOverlay.SetDisplayOnlyInputRestrictions(inputRestrictions);
+
+        Assert.Equal(InputUsageMask.Invalid, inputRestrictions.InputUsageMask);
+        Assert.False(inputRestrictions.MouseVisibility);
+    }
+
+    [Fact]
     public void OpenPanelInputRestrictions_ShowCursorWithoutClaimingKeyboard()
     {
         var inputRestrictions = new InputRestrictions(900);
