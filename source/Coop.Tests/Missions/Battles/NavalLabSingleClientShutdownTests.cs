@@ -136,24 +136,6 @@ public sealed class NavalLabSingleClientShutdownTests : IDisposable
         Assert.Equal(1, removalCalls);
     }
 
-    [Theory]
-    [InlineData(NavalLabMode.Activation)]
-    [InlineData(NavalLabMode.HeldHelm)]
-    public void PreRemovalHook_DoesNotChangeEitherTwoClientMode(NavalLabMode mode)
-    {
-        var id = Guid.NewGuid();
-        behavior = new NavalLabBehavior(new NavalLabManifest("naval-lab:" + id.ToString("N"), id,
-            new[] { "A", "B" }, Enumerable.Range(0, 10).Select(_ => Guid.NewGuid()).ToArray(),
-            new[] { Guid.NewGuid(), Guid.NewGuid() }, mode), "A", null!, null!);
-        SetMission(behavior, scope.Instance);
-        behavior.Ships = new[] { ship };
-        NavalLabPhysicsPatches.Active = behavior;
-        EndShips(scope.Instance);
-        Assert.Equal(0, bodyDisables);
-        Assert.False(behavior.nativeTerminalHold);
-        Assert.Equal(1, removalCalls);
-    }
-
     [Fact]
     public void HoldFailure_DoesNotPreventOriginalRemovalOrReplaceItsException()
     {

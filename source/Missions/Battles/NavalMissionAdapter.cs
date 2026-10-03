@@ -20,7 +20,6 @@ public interface INavalMissionAdapter : IDisposable
     MatrixFrame[] ReadFrames();
     bool ApplyFrames(MatrixFrame[] frames);
     void SetHelm(int ship, float rudder, bool row);
-    string SetHeldHelm(int ship, bool take);
     string StartAgentControl(string kind, int ship, float value);
     void TickAgentControl(float dt);
     void CancelControls();
@@ -74,7 +73,7 @@ public interface INavalNativeMissionAdapter
     object InspectControlStatus();
 }
 
-public enum NavalLabMode { Activation, HeldHelm, SingleClientNative, FactoryAuthorityProbe, TwoClientNative, TwoClientNativeAllPhysics }
+public enum NavalLabMode { SingleClientNative, FactoryAuthorityProbe, TwoClientNative, TwoClientNativeAllPhysics }
 
 public sealed class NavalLabManifest
 {
@@ -94,7 +93,7 @@ public sealed class NavalLabManifest
     public const int CrewPerShip = 5;
 
     public NavalLabManifest(string instanceId, Guid incarnationId, string[] controllers,
-        Guid[] combatants, Guid[] ships, NavalLabMode mode = NavalLabMode.Activation)
+        Guid[] combatants, Guid[] ships, NavalLabMode mode)
     {
         if (incarnationId == Guid.Empty || instanceId != "naval-lab:" + incarnationId.ToString("N"))
             throw new ArgumentException("A tagged fixture incarnation is required.", nameof(instanceId));

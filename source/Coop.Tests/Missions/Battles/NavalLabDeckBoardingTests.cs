@@ -82,8 +82,6 @@ public sealed class NavalLabDeckBoardingTests : IDisposable
     [Theory]
     [InlineData(NavalLabMode.TwoClientNative, 24f)]
     [InlineData(NavalLabMode.TwoClientNativeAllPhysics, 60f)]
-    [InlineData(NavalLabMode.Activation, 60f)]
-    [InlineData(NavalLabMode.HeldHelm, 60f)]
     [InlineData(NavalLabMode.SingleClientNative, 60f)]
     [InlineData(NavalLabMode.FactoryAuthorityProbe, 60f)]
     public void OnlyTheRopeFixtureStartsInsideNativeHookRange(NavalLabMode mode, float spacing)

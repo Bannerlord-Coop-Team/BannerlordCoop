@@ -16,7 +16,7 @@ public sealed class NetworkNavalLabStart : IEvent
     [ProtoMember(5)] public readonly Guid[] Ships;
     [ProtoMember(6)] public readonly NavalLabMode Mode;
     public NetworkNavalLabStart(string instanceId, Guid incarnationId, string[] controllers, Guid[] combatants, Guid[] ships,
-        NavalLabMode mode = NavalLabMode.Activation)
+        NavalLabMode mode)
     {
         Mode = mode;
         InstanceId = instanceId;

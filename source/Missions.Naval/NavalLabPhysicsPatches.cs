@@ -143,47 +143,14 @@ internal static class NavalLabPhysicsPatches
         }
     }
 
-    [HarmonyPatch(typeof(Agent), nameof(Agent.UseGameObject))]
-    private static class HeldUseTrace
-    {
-        private static void Prefix(Agent __instance, UsableMissionObject usedObject, out NavalLabBehavior.HelmTraceCall __state)
-        {
-            __state = null;
-            try { __state = Active?.BeginHelmTrace(__instance, usedObject, "use"); }
-            catch { }
-        }
-
-        private static void Finalizer(NavalLabBehavior.HelmTraceCall __state, Exception __exception)
-        {
-            try { NavalLabBehavior.EndHelmTrace(__state, __exception); }
-            catch { }
-        }
-    }
-
     [HarmonyPatch(typeof(Agent), "StopUsingGameObjectAux")]
-    private static class HeldStopTrace
+    private static class StationStopEntry
     {
-        private static void Prefix(Agent __instance, bool isSuccessful, Agent.StopUsingGameObjectFlags flags,
-            out NavalLabBehavior.HelmTraceCall __state)
+        private static void Prefix(Agent __instance, bool isSuccessful, Agent.StopUsingGameObjectFlags flags)
         {
-            __state = null;
             try { Active?.RecordStationStopEntry(__instance, isSuccessful, flags); }
             catch { }
-            try { __state = Active?.BeginHelmTrace(__instance, __instance.CurrentlyUsedGameObject, "stop"); }
-            catch { }
         }
-
-        private static void Finalizer(NavalLabBehavior.HelmTraceCall __state, Exception __exception)
-        {
-            try { NavalLabBehavior.EndHelmTrace(__state, __exception); }
-            catch { }
-        }
-    }
-
-    [HarmonyPatch(typeof(ShipControllerMachine), "OnTick")]
-    private static class HeldHelmTick
-    {
-        private static void Prefix(ShipControllerMachine __instance) => Active?.BeforeHeldHelmTick(__instance);
     }
 
     [HarmonyPatch(typeof(ShipControllerMachine), "OnTick")]

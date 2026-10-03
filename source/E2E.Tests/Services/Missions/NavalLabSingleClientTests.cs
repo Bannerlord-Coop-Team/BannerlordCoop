@@ -81,7 +81,6 @@ public sealed class NavalLabSingleClientTests : NavalMissionTestEnvironment
         Assert.Equal("rejected:wrong_mode", Receipt(First, operation));
         Assert.Empty(Adapter(First).HelmCalls);
         Assert.Empty(Adapter(First).AgentControlCalls);
-        Assert.Empty(Adapter(First).HeldHelmCalls);
     }
 
     [Theory]

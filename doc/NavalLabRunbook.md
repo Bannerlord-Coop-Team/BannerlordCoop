@@ -208,7 +208,7 @@ server coop.debug.naval_lab.action
   ["84b8a3f6-e678-4bf4-a86c-8a2f7d5b39ab", "native-release-helm", "0", "0", "false"]
 ```
 
-The pulse is at most one second; rudder argument is lateral axis, `row=true` requests forward rowing. Normal completion zeros axes while retaining sail choice; safety loss can stop input/raise sails. Other sail kinds are `sail-raised` and `sail-square-raised`. Normal `native-take-helm` remains aim/focus gated; auto setup is a distinct path. Don't substitute old `helm`, `probe` or held-mode `take-helm` actions in TwoClientNative.
+The pulse is at most one second; rudder argument is lateral axis, `row=true` requests forward rowing. Normal completion zeros axes while retaining sail choice; safety loss can stop input/raise sails. Other sail kinds are `sail-raised` and `sail-square-raised`. Normal `native-take-helm` remains aim/focus gated; auto setup is a distinct path. Don't substitute old `helm` or `probe` actions in TwoClientNative. The `activation` and `held-helm` lab modes were removed; `create` now requires an explicit mode.
 
 Read-only commands:
 

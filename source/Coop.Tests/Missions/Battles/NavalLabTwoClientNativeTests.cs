@@ -188,12 +188,12 @@ public sealed class NavalLabTwoClientNativeTests : IDisposable
         Assert.Equal(1, stopped); Assert.Equal(1, assigned);
         NavalLabPhysicsPatches.Active.factoryTerminal = true;
         order.ManageShipDetachments(); Assert.Equal(1, assigned);
-        foreach (var mode in new[] { NavalLabMode.Activation, NavalLabMode.HeldHelm, NavalLabMode.SingleClientNative, NavalLabMode.FactoryAuthorityProbe })
+        foreach (var mode in new[] { NavalLabMode.SingleClientNative, NavalLabMode.FactoryAuthorityProbe })
         {
             NavalLabPhysicsPatches.Active = Fixture(mode);
             order.ManageShipDetachments();
         }
-        Assert.Equal(5, assigned);
+        Assert.Equal(3, assigned);
     }
     private static bool AllocatorGate(ShipOrder __instance)
     {

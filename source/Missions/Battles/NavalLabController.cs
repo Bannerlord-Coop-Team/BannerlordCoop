@@ -256,11 +256,6 @@ public sealed partial class NavalLabController : CoopMissionController, INavalLa
         if (action.Ship < 0 || action.Ship >= manifest.Ships.Length || float.IsNaN(action.Rudder)
             || float.IsInfinity(action.Rudder) || Math.Abs(action.Rudder) > 1)
             return "rejected:invalid_control";
-        bool heldHelm = action.Kind == "take-helm" || action.Kind == "release-helm";
-        if ((manifest.Mode == NavalLabMode.HeldHelm) != heldHelm) return "rejected:wrong_mode";
-        if (heldHelm && (action.Rudder != 0 || action.Row)) return "rejected:invalid_control";
-        if (heldHelm && (action.DeadlineUtcTicks <= DateTime.UtcNow.Ticks
-            || action.DeadlineUtcTicks > DateTime.UtcNow.AddSeconds(30).Ticks)) return "rejected:expired_control";
         if (action.Kind == "probe")
         {
             string status = measurement.Begin(action.OperationId, action.Epoch, Now);
@@ -292,15 +287,10 @@ public sealed partial class NavalLabController : CoopMissionController, INavalLa
             || info.OriginalOwner != session.OwnControllerId || info.CurrentAuthority != session.OwnControllerId
             || info.AuthorityRevision != 1 || adapter.Agents.Length <= index || adapter.Agents[index] != info.Agent)
             return "rejected:agent_authority_changed_or_unavailable";
-        if (heldHelm) return adapter.SetHeldHelm(action.Ship, action.Kind == "take-helm");
         return adapter.StartAgentControl(action.Kind, action.Ship, action.Rudder);
     }
 
-    private void HoldAdapter()
-    {
-        if (manifest?.Mode == NavalLabMode.SingleClientNative || IsFactoryProbe) adapter?.Hold();
-        else adapter?.SetAuthority(false);
-    }
+    private void HoldAdapter() => adapter?.Hold();
 
     private void CancelControls(string reason)
     {
@@ -358,8 +348,7 @@ public sealed partial class NavalLabController : CoopMissionController, INavalLa
             adapter.SetHelm(1, 0, false);
         }
         measurement.Active(Now);
-        // Activation can discover an inactive native body in this same callback.
-        adapter.SetAuthority(fixtureReady && (IsTwoClientNative || session.IsLocalHost) && manifest.Mode != NavalLabMode.HeldHelm);
+        adapter.SetAuthority(fixtureReady && (IsTwoClientNative || session.IsLocalHost));
         if (manifest.Mode == NavalLabMode.SingleClientNative && (adapter.Blocker != null
             || (released && !HasSingleClientAuthority))) adapter.Hold();
         if (adapter.Blocker != null)
@@ -391,7 +380,7 @@ public sealed partial class NavalLabController : CoopMissionController, INavalLa
             sendTime = 0;
             SendOwnedShip();
         }
-        if (!IsTwoClientNative && fixtureReady && (manifest.Mode == NavalLabMode.Activation || IsFactoryProbe) && session.IsLocalHost && sendTime >= 0.05f)
+        if (!IsTwoClientNative && fixtureReady && IsFactoryProbe && session.IsLocalHost && sendTime >= 0.05f)
         {
             sendTime = 0;
             var frames = adapter.ReadFrames();
@@ -427,7 +416,7 @@ public sealed partial class NavalLabController : CoopMissionController, INavalLa
         {
             var message = payload.What;
             if (IsTwoClientNative || disposed || !released || adapter.Blocker != null || manifest == null
-                || (manifest.Mode != NavalLabMode.Activation && !IsFactoryProbe)
+                || !IsFactoryProbe
                 || !probeReadyAtReceive || (IsFactoryProbe && (!factoryHydrated || factoryTerminal || !FactoryAssignmentValid)) || !OriginalOwnersReady
                 || message.IncarnationId != manifest.IncarnationId || session.IsLocalHost
                 || session.HostEpoch != 1 || message.Epoch != session.HostEpoch || message.Sequence <= lastReceived

@@ -36,7 +36,7 @@ public sealed class NavalMissionAdapter : INavalMissionAdapter, INavalNativeMiss
     public void Preflight()
     {
         if (NavalLabPhysicsPatches.Active?.RequiresProcessExit == true)
-            throw new InvalidOperationException("Held helm fixtures require process exit before another naval fixture can open.");
+            throw new InvalidOperationException("Held naval fixtures require process exit before another naval fixture can open.");
         if (Mission.Current != null) throw new InvalidOperationException("Leave the current mission before starting the naval lab.");
         if (MBObjectManager.Instance.GetObject<ShipHull>(NavalLabManifest.HullId) == null
             || CharacterObject.Find("imperial_infantryman") == null)
@@ -116,7 +116,6 @@ public sealed class NavalMissionAdapter : INavalMissionAdapter, INavalNativeMiss
         input.SetRowerLongitudinal(row ? RowerLongitudinalInput.Forward : RowerLongitudinalInput.Stop);
         ((PlayerShipController)behavior.Ships[ship].Controller).SetInput(in input);
     }
-    public string SetHeldHelm(int ship, bool take) => behavior?.SetHeldHelm(ship, take) ?? "rejected:unavailable";
     public string StartAgentControl(string kind, int ship, float value) =>
         behavior?.StartAgentControl(kind, ship, value) ?? "rejected:unavailable";
     public void TickAgentControl(float dt) => behavior?.TickAgentControl(dt);
@@ -174,7 +173,6 @@ public sealed class NavalMissionAdapter : INavalMissionAdapter, INavalNativeMiss
     public void Dispose()
     {
         if (behavior?.IsSingleClientNative == true || behavior?.IsFactoryProbe == true) behavior.Hold();
-        behavior?.StopActivationDiagnostics();
         behavior?.CancelControls();
         // Held fixtures retain their exact capture and damage guards until process exit, including after behavior removal.
         if (NavalLabPhysicsPatches.Active?.RequiresProcessExit == true)
@@ -198,124 +196,14 @@ internal sealed partial class NavalLabBehavior : MissionLogic
     public MissionShip[] Ships { get; private set; } = Array.Empty<MissionShip>();
     public Agent[] Agents { get; private set; } = Array.Empty<Agent>();
     public bool Simulating { get; private set; }
-    internal bool IsHeldHelm => manifest.Mode == NavalLabMode.HeldHelm;
     internal bool IsSingleClientNative => manifest.Mode == NavalLabMode.SingleClientNative;
     internal bool IsTwoClientNative => manifest.IsTwoClientNative;
     // Rope fixtures start inside the native 40 m hook range; other modes keep the original 60 m spacing.
     internal float HullSpacing => manifest.Mode == NavalLabMode.TwoClientNative ? 24f : 60f;
     internal bool HasNativeViews => IsSingleClientNative || IsTwoClientNative;
     internal bool IsFactoryProbe => manifest.Mode == NavalLabMode.FactoryAuthorityProbe || IsTwoClientNative;
-    internal bool RequiresProcessExit => IsHeldHelm || IsSingleClientNative || IsFactoryProbe;
+    internal bool RequiresProcessExit => IsSingleClientNative || IsFactoryProbe;
     public object StartupDiagnostics { get; private set; }
-    private readonly bool[] helmLifecycleInitialized = new bool[2];
-    private Agent heldHelmAgent;
-    private StandingPoint heldHelmPoint;
-    private double heldHelmDeadline;
-    private string heldHelmStatus = "not_taken";
-    private int helmUseCallbacks;
-    private int helmStopCallbacks;
-    private int helmTakeCalls;
-    private int helmReleaseCalls;
-    internal const int HelmTraceLimit = 32;
-    internal const int HelmTraceStackLimit = 8;
-    private readonly List<HelmTraceRecord> helmTrace = new List<HelmTraceRecord>();
-
-    internal sealed class HelmTraceRecord
-    {
-        public int Sequence { get; internal set; }
-        public int? EntrySequence { get; internal set; }
-        public string Phase { get; internal set; }
-        public int ThreadId { get; internal set; }
-        public long Timestamp { get; internal set; }
-        public string AgentUsedObject { get; internal set; }
-        public string PointUser { get; internal set; }
-        public bool LeaseMatches { get; internal set; }
-        public string ExceptionType { get; internal set; }
-        public string NativeState { get; } = "unavailable:native_lifetime_not_proven;managed_identities_only";
-        public string[] Stack { get; internal set; } = Array.Empty<string>();
-    }
-
-    internal sealed class HelmTraceCall
-    {
-        internal NavalLabBehavior Behavior;
-        internal Agent Agent;
-        internal UsableMissionObject Point;
-        internal string Operation;
-        internal int EntrySequence;
-    }
-
-    internal HelmTraceRecord[] HelmTrace
-    {
-        get { lock (helmTrace) return helmTrace.ToArray(); }
-    }
-
-    private bool IsHelmTracePair(Agent agent, UsableMissionObject point)
-    {
-        if (!IsHeldHelm || agent == null || point == null) return false;
-        int slot = Array.IndexOf(manifest.Controllers, ownControllerId);
-        return slot >= 0 && slot < Ships.Length && slot * NavalLabManifest.CrewPerShip < Agents.Length
-            && Agents[slot * NavalLabManifest.CrewPerShip] == agent
-            && Ships[slot]?.ShipControllerMachine?.PilotStandingPoint == point;
-    }
-
-    internal HelmTraceCall BeginHelmTrace(Agent agent, UsableMissionObject point, string operation)
-    {
-        try
-        {
-            if (!IsHelmTracePair(agent, point)) return null;
-            int sequence = RecordHelmTrace(agent, point, operation + ":entry", stack: true);
-            return sequence == 0 ? null : new HelmTraceCall
-            {
-                Behavior = this, Agent = agent, Point = point, Operation = operation, EntrySequence = sequence
-            };
-        }
-        catch { return null; }
-    }
-
-    internal static void EndHelmTrace(HelmTraceCall call, Exception exception)
-    {
-        if (call == null) return;
-        // Keep the entry pair because StopUsingGameObjectAux clears the agent's used object before returning.
-        call.Behavior.RecordHelmTrace(call.Agent, call.Point, call.Operation + ":exit", call.EntrySequence, exception);
-    }
-
-    private int RecordHelmTrace(Agent agent, UsableMissionObject point, string phase,
-        int? entrySequence = null, Exception exception = null, bool stack = false)
-    {
-        try
-        {
-            lock (helmTrace)
-            {
-                if (helmTrace.Count >= HelmTraceLimit || !IsHelmTracePair(agent, point)) return 0;
-                var record = new HelmTraceRecord
-                {
-                    Sequence = helmTrace.Count + 1, EntrySequence = entrySequence, Phase = phase,
-                    ThreadId = System.Threading.Thread.CurrentThread.ManagedThreadId,
-                    Timestamp = System.Diagnostics.Stopwatch.GetTimestamp(),
-                    // Both getters read managed fields; never query action/controller pointers from these hooks.
-                    AgentUsedObject = agent.CurrentlyUsedGameObject == null ? "none" : agent.CurrentlyUsedGameObject == point ? "exact" : "other",
-                    PointUser = point.UserAgent == null ? "none" : point.UserAgent == agent ? "exact" : "other",
-                    LeaseMatches = heldHelmAgent == agent && heldHelmPoint == point,
-                    ExceptionType = exception?.GetType().FullName
-                };
-                if (stack)
-                {
-                    var frames = new List<string>();
-                    for (int i = 0; i < HelmTraceStackLimit; i++)
-                    {
-                        var method = new System.Diagnostics.StackFrame(i + 2, false).GetMethod();
-                        if (method == null) break;
-                        string name = method.DeclaringType?.FullName + "." + method.Name;
-                        frames.Add(name.Length > 180 ? name.Substring(0, 180) : name);
-                    }
-                    record.Stack = frames.ToArray();
-                }
-                helmTrace.Add(record);
-                return record.Sequence;
-            }
-        }
-        catch { return 0; }
-    }
     private Agent controlledAgent;
     private string controlKind;
     private int controlShip;
@@ -327,11 +215,6 @@ internal sealed partial class NavalLabBehavior : MissionLogic
     private bool wasWalking;
     private static double ControlNow => (double)System.Diagnostics.Stopwatch.GetTimestamp() / System.Diagnostics.Stopwatch.Frequency;
     private string startupPhase = "not_started";
-    internal const int ActivationTransitionLimit = 32;
-    private readonly List<ActivationTransition> activationTransitions = new List<ActivationTransition>();
-    private long activationCallbackOrdinal;
-    private bool activationDiagnosticsStopped;
-    internal ActivationTransition[] ActivationTransitions => activationTransitions.ToArray();
     public long ForceApplications;
     public long FixedTicks;
     public long ActiveFixedTicks;
@@ -360,13 +243,11 @@ internal sealed partial class NavalLabBehavior : MissionLogic
     public override void OnMissionStateFinalized()
     {
         if (HasNativeViews) nativeTerminalHold = true;
-        StopActivationDiagnostics();
         SailWindProfile.FinalizeProfile();
     }
 
     public override void AfterStart()
     {
-        activationCallbackOrdinal++;
         try
         {
             RecordStartup("scene_loaded");
@@ -413,8 +294,6 @@ internal sealed partial class NavalLabBehavior : MissionLogic
             if (!Ships[i].IsInitialized || Ships[i]._actuators == null || Ships[i].Physics == null
                 || !Ships[i].Physics.IsInitialized || Ships[i].Formation == null)
                 throw new InvalidOperationException("Factory returned an incomplete native ship at slot " + i);
-            if (!IsSingleClientNative && !IsFactoryProbe) DisableStartupBody(i);
-            else if (IsSingleClientNative) RecordActivationTransition(i, "factory_active_no_disable");
             Ships[i].SetCanBeTakenOver(false);
             Ships[i].SetController(HasNativeViews ? ShipControllerType.None : ShipControllerType.Player, autoUpdateController: false);
             Ships[i].SetAnchor(IsSingleClientNative || IsFactoryProbe);
@@ -449,24 +328,6 @@ internal sealed partial class NavalLabBehavior : MissionLogic
         shipsLogic.SetDeploymentMode(false);
         agentsLogic.SetDeploymentMode(false);
         agentsLogic.SetSpawnReinforcementsOnTick(false);
-        if (manifest.Mode == NavalLabMode.HeldHelm)
-        {
-            int slot = Array.IndexOf(manifest.Controllers, ownControllerId);
-            var machine = Ships[slot].ShipControllerMachine;
-            if (machine?.PilotStandingPoint == null || machine.AttachedShip != Ships[slot]
-                || Ships[slot].Formation.Team != Mission.PlayerTeam)
-                throw new InvalidOperationException("Owned native helm standing point is unavailable.");
-            // Only the owned helm needs cleanup components and naval logic references, not ship-wide deployment.
-            InitializeHelmLifecycle(slot);
-        }
-    }
-
-    internal void InitializeHelmLifecycle(int slot)
-    {
-        if (manifest.Mode != NavalLabMode.HeldHelm || slot < 0 || slot >= Ships.Length
-            || manifest.Controllers[slot] != ownControllerId || helmLifecycleInitialized[slot]) return;
-        Ships[slot].ShipControllerMachine.OnDeploymentFinished();
-        helmLifecycleInitialized[slot] = true;
     }
 
     internal void RecordStartup(string phase)
@@ -507,222 +368,33 @@ internal sealed partial class NavalLabBehavior : MissionLogic
 
     public void SetAuthority(bool simulate)
     {
-        activationCallbackOrdinal++;
         if (IsFactoryProbe) { SetFactoryProbeAuthority(simulate); return; }
-        if (IsSingleClientNative)
-        {
-            if (nativeDeploymentComplete && (!simulate || !CanUseNativeControls)) Hold();
-            return;
-        }
-        simulate &= Blocker == null && manifest.Mode == NavalLabMode.Activation;
-        if (!simulate)
-        {
-            if (Simulating) HoldBodies();
-            return;
-        }
-        if (Ships.Length != manifest.Ships.Length || Ships.Any(ship => ship == null || !ship.GameEntity.IsValid))
-        {
-            Reject("ship.activation_unconfirmed:incomplete_hulls");
-            RecordActivationRollback();
-            HoldBodies(recordActivationRollback: true);
-            return;
-        }
-        if (!Simulating)
-            for (int i = 0; i < Ships.Length; i++)
-            {
-                RecordActivationTransition(i, "host_enable_before");
-                Ships[i].GameEntity.EnableDynamicBody();
-                RecordActivationTransition(i, "host_enable_after");
-            }
-
-        // The native enable call alone is not evidence that force integration is active.
-        int inactive = Array.FindIndex(Ships, ship => !ship.GameEntity.HasDynamicRigidBodyAndActiveSimulation());
-        if (inactive >= 0)
-        {
-            Reject("ship.activation_unconfirmed:slot_" + inactive);
-            RecordActivationRollback();
-            HoldBodies(recordActivationRollback: true);
-            return;
-        }
-        Simulating = true;
+        if (nativeDeploymentComplete && (!simulate || !CanUseNativeControls)) Hold();
     }
 
     public void Hold()
     {
         ClearPresentation();
         if (IsFactoryProbe) { HoldFactoryProbe(); return; }
-        if (IsSingleClientNative)
-        {
-            if (nativeTerminalHold) return;
-            nativeTerminalHold = true;
-            if (Mission != null) Mission.AllowAiTicking = false;
-            try { CancelControls(); CancelNativeControls(); }
-            catch (Exception exception) { Reject("controls.cleanup_failed:" + exception.GetType().FullName); }
-        }
+        if (nativeTerminalHold) return;
+        nativeTerminalHold = true;
+        if (Mission != null) Mission.AllowAiTicking = false;
+        try { CancelControls(); CancelNativeControls(); }
+        catch (Exception exception) { Reject("controls.cleanup_failed:" + exception.GetType().FullName); }
         HoldBodies();
     }
 
-    private void HoldBodies(bool recordActivationRollback = false)
+    private void HoldBodies()
     {
         Simulating = false;
         foreach (var ship in Ships.Where(ship => ship != null && ship.GameEntity.IsValid))
-        {
             ship.GameEntity.DisableDynamicBodySimulation();
-            if (recordActivationRollback) RecordActivationTransition(Array.IndexOf(Ships, ship), "rollback_disable_after");
-        }
-    }
-
-    internal void DisableStartupBody(int slot)
-    {
-        RecordActivationTransition(slot, "startup_disable_before");
-        Ships[slot].GameEntity.DisableDynamicBodySimulation();
-        RecordActivationTransition(slot, "startup_disable_after");
-    }
-
-    internal void StopActivationDiagnostics() => activationDiagnosticsStopped = true;
-
-    private void RecordActivationRollback()
-    {
-        for (int i = 0; i < manifest.Ships.Length; i++)
-            RecordActivationTransition(i, "rollback_before");
-    }
-
-    internal void RecordActivationTransition(int slot, string phase)
-    {
-        // Stop before any native query, including after teardown or when retention is full.
-        if (activationDiagnosticsStopped || activationTransitions.Count >= ActivationTransitionLimit) return;
-        var row = new ActivationTransition
-        {
-            Sequence = activationTransitions.Count + 1, Slot = slot, Phase = phase,
-            CallbackOrdinal = activationCallbackOrdinal,
-            FixedTicks = System.Threading.Interlocked.Read(ref FixedTicks)
-        };
-        try
-        {
-            var ship = slot >= 0 && slot < Ships.Length ? Ships[slot] : null;
-            if (ship == null) row.Unavailable = "ship_not_created";
-            else
-            {
-                var entity = ship.GameEntity;
-                row.NativePointer = entity.Pointer.ToUInt64();
-                if (!entity.IsValid) row.Unavailable = "invalid_ship_entity";
-                else if (!ship.IsInitialized || ship._actuators == null || ship.Physics?.IsInitialized != true || ship.Formation == null)
-                    row.Unavailable = "incomplete_ship";
-                else
-                {
-                    row.DynamicBody = ActivationRead<bool>.Read(() => entity.HasDynamicRigidBody());
-                    if (row.DynamicBody.Value == true)
-                    {
-                        row.ActiveSimulation = ActivationRead<bool>.Read(() => entity.HasDynamicRigidBodyAndActiveSimulation());
-                        row.BodyFlag = ActivationRead<uint>.Read(() => (uint)entity.BodyFlag);
-                        row.PhysicsState = ActivationRead<bool>.Read(() => entity.GetPhysicsState());
-                    }
-                    else row.Unavailable = row.DynamicBody.Value == false ? "dynamic_body_missing" : "dynamic_body_read_error";
-                }
-            }
-        }
-        catch (Exception exception) { row.Error = exception.GetType().FullName; }
-        activationTransitions.Add(row);
-        try { Logger.Information("[NavalLabActivation] {Incarnation} {@Transition}", manifest.IncarnationId, row); }
-        catch (Exception) { /* Logging must not prevent the following native mutation or rollback. */ }
-    }
-
-    internal sealed class ActivationRead<T> where T : struct
-    {
-        public T? Value { get; private set; }
-        public string Unavailable { get; private set; }
-        public string Error { get; private set; }
-
-        public ActivationRead(string unavailable) { Unavailable = unavailable; }
-
-        internal static ActivationRead<T> Read(Func<T> getter)
-        {
-            var result = new ActivationRead<T>(null);
-            try { result.Value = getter(); }
-            catch (Exception exception) { result.Error = exception.GetType().FullName; }
-            return result;
-        }
-    }
-
-    internal sealed class ActivationTransition
-    {
-        public int Sequence { get; internal set; }
-        public int Slot { get; internal set; }
-        public ulong? NativePointer { get; internal set; }
-        public string Phase { get; internal set; }
-        public long CallbackOrdinal { get; internal set; }
-        public long FixedTicks { get; internal set; }
-        public string Unavailable { get; internal set; }
-        public string Error { get; internal set; }
-        public ActivationRead<bool> DynamicBody { get; internal set; } = new ActivationRead<bool>("hull_not_readable");
-        public ActivationRead<bool> ActiveSimulation { get; internal set; } = new ActivationRead<bool>("dynamic_body_not_confirmed");
-        public ActivationRead<uint> BodyFlag { get; internal set; } = new ActivationRead<uint>("dynamic_body_not_confirmed");
-        public ActivationRead<bool> PhysicsState { get; internal set; } = new ActivationRead<bool>("dynamic_body_not_confirmed");
-        public ActivationRead<uint> PhysicsDescBodyFlag { get; } = new ActivationRead<uint>("omitted_root_physics_definition_precondition_unverified");
-        public ActivationRead<bool> KinematicBody { get; } = new ActivationRead<bool>("omitted_hull_getter_preconditions_unverified");
-        public ActivationRead<bool> StaticBody { get; } = new ActivationRead<bool>("omitted_hull_getter_preconditions_unverified");
-        public ActivationRead<bool> EngineBodySleeping { get; } = new ActivationRead<bool>("omitted_hull_getter_preconditions_unverified");
-        public ActivationRead<bool> DynamicBodyStationary { get; } = new ActivationRead<bool>("omitted_disabled_hull_preconditions_unverified");
     }
 
     public void Reject(string reason)
     {
         // Damage callbacks can run on a physics worker; body changes belong to the mission tick.
         System.Threading.Interlocked.CompareExchange(ref blocker, reason, null);
-    }
-
-    public string SetHeldHelm(int ship, bool take)
-    {
-        if (manifest.Mode != NavalLabMode.HeldHelm) return "rejected:wrong_mode";
-        if (Blocker != null || ship < 0 || ship >= Ships.Length || manifest.Controllers[ship] != ownControllerId)
-            return "rejected:not_original_owner_or_unavailable";
-        var machine = Ships[ship]?.ShipControllerMachine;
-        var point = machine?.PilotStandingPoint;
-        if (point == null || !point.GameEntity.IsValid || machine.AttachedShip != Ships[ship])
-            return "rejected:standing_point_unavailable";
-        if (!helmLifecycleInitialized[ship]) return "rejected:helm_lifecycle_unavailable";
-        int index = ship * NavalLabManifest.CrewPerShip;
-        var agent = Agents.Length > index ? Agents[index] : null;
-        if (agent == null || agent.Pointer == UIntPtr.Zero || !agent.IsActive() || agent != Mission.MainAgent
-            || !agent.IsPlayerControlled || Ships[ship].Formation == null || agent.Formation != Ships[ship].Formation)
-            return "rejected:main_agent_unavailable";
-        if (GameNetwork.IsClientOrReplay) return "rejected:native_network_client_or_replay";
-        if (point.UserAgent != null && point.UserAgent != agent) return "rejected:foreign_occupant";
-        if (agent.CurrentlyUsedGameObject != null && agent.CurrentlyUsedGameObject != point)
-            return "rejected:agent_using_other_object";
-        if ((point.UserAgent == agent) != (agent.CurrentlyUsedGameObject == point))
-            return "rejected:inconsistent_use_identity";
-        if (!take)
-        {
-            if (point.UserAgent == null) return heldHelmAgent == agent && heldHelmPoint == point ? ReleaseHeldHelm() : "already_released";
-            if (heldHelmAgent != agent || heldHelmPoint != point) return "rejected:unowned_use";
-            return ReleaseHeldHelm();
-        }
-        // UseGameObject repeats OnUse even for the same user, so never repeat the native call or placement.
-        if (point.UserAgent == agent) return heldHelmAgent == agent && heldHelmPoint == point ? "already_taken" : "rejected:unowned_use";
-        if (heldHelmAgent == agent && heldHelmPoint == point) ReleaseHeldHelm();
-        if (point.HasAIMovingTo || point.MovingAgent != null) return "rejected:standing_point_reserved";
-        if (controlledAgent != null || heldHelmAgent != null) return "rejected:control_active";
-        if (point.IsDeactivated || point.IsDisabledForPlayers || machine.IsAttachedShipVacant()) return "rejected:helm_disabled_or_ship_vacant";
-        heldHelmAgent = agent;
-        heldHelmPoint = point;
-        heldHelmDeadline = ControlNow + 30;
-        try
-        {
-            helmTakeCalls++;
-            agent.UseGameObject(point);
-            if (point.UserAgent != agent || agent.CurrentlyUsedGameObject != point || machine.PilotAgent != agent)
-                throw new InvalidOperationException("Native helm use identity was not established.");
-            // Vanilla's initial pilot placement only, never a moving-deck support correction.
-            machine.OnPilotAssignedDuringSpawn();
-            return heldHelmStatus = "taken";
-        }
-        catch (Exception exception)
-        {
-            ReleaseHeldHelm();
-            Reject("helm.take_failed:" + exception.GetType().FullName);
-            return heldHelmStatus = "failed:" + exception.GetType().FullName;
-        }
     }
 
     internal bool SuppressHeldCapture(ShipControllerMachine machine)
@@ -737,98 +409,15 @@ internal sealed partial class NavalLabBehavior : MissionLogic
         return true;
     }
 
-    internal void BeforeHeldHelmTick(ShipControllerMachine machine)
-    {
-        if (manifest.Mode != NavalLabMode.HeldHelm || heldHelmAgent == null) return;
-        int slot = Array.IndexOf(manifest.Controllers, ownControllerId);
-        if (slot < 0 || slot >= Ships.Length || Ships[slot]?.ShipControllerMachine != machine) return;
-        if (machine.PilotStandingPoint == heldHelmPoint && heldHelmPoint.UserAgent == null
-            && heldHelmAgent.CurrentlyUsedGameObject == null)
-        {
-            RetireHeldHelm();
-            heldHelmStatus = "released:native_stop";
-            return;
-        }
-        if (machine.PilotStandingPoint != heldHelmPoint || heldHelmPoint.UserAgent != heldHelmAgent
-            || heldHelmAgent.CurrentlyUsedGameObject != heldHelmPoint)
-        {
-            Reject("helm.use_identity_changed_before_tick");
-            return;
-        }
-        if (heldHelmPoint.IsDeactivated || heldHelmPoint.IsDisabledForPlayers || machine.IsAttachedShipVacant())
-        {
-            // Failed cleanup retains the lease; the separate capture-branch barrier still applies this tick.
-            string result = ReleaseHeldHelm();
-            if (result == "released") heldHelmStatus = "released:helm_disabled_or_ship_vacant";
-            else Reject("helm.pre_tick_release_failed:" + result);
-        }
-    }
-
-    private string ReleaseHeldHelm()
-    {
-        var agent = heldHelmAgent;
-        var point = heldHelmPoint;
-        if (agent == null) return "already_released";
-        try
-        {
-            if (agent.Pointer == UIntPtr.Zero || !agent.IsActive() || point == null || !point.GameEntity.IsValid)
-                return heldHelmStatus = "unavailable:release_identity";
-            if (agent.CurrentlyUsedGameObject == null && point.UserAgent == null) return heldHelmStatus = "already_released";
-            // StopUsingGameObject clears UserAgent unconditionally; never clear another user's occupation.
-            if (agent.CurrentlyUsedGameObject != point || (point.UserAgent != null && point.UserAgent != agent))
-                return heldHelmStatus = "rejected:release_identity_changed";
-            helmReleaseCalls++;
-            agent.StopUsingGameObject();
-            return heldHelmStatus = agent.CurrentlyUsedGameObject == null && point.UserAgent == null
-                ? "released" : "failed:release_not_confirmed";
-        }
-        catch (Exception exception)
-        {
-            Reject("helm.release_failed:" + exception.GetType().FullName);
-            return heldHelmStatus = "failed:" + exception.GetType().FullName;
-        }
-        finally
-        {
-            if (agent.CurrentlyUsedGameObject == null && point != null && point.UserAgent == null) RetireHeldHelm();
-        }
-    }
-
-    private void RetireHeldHelm()
-    {
-        var agent = heldHelmAgent;
-        var point = heldHelmPoint;
-        RecordHelmTrace(agent, point, "retirement:before");
-        heldHelmAgent = null;
-        heldHelmPoint = null;
-        heldHelmDeadline = 0;
-        RecordHelmTrace(agent, point, "retirement:after");
-    }
-
     public override void OnObjectUsed(Agent userAgent, UsableMissionObject usableGameObject)
     {
-        RecordHelmTrace(userAgent, usableGameObject, "use:callback");
-        if (userAgent == heldHelmAgent && usableGameObject == heldHelmPoint) helmUseCallbacks++;
         if (IsTwoClientNative && userAgent == nativeHelmAgent && usableGameObject == nativeHelmPoint) nativeHelmUseCallbacks++;
     }
 
     public override void OnObjectStoppedBeingUsed(Agent userAgent, UsableMissionObject usableGameObject)
     {
-        RecordHelmTrace(userAgent, usableGameObject, "stop:callback");
-        if (userAgent == heldHelmAgent && usableGameObject == heldHelmPoint) helmStopCallbacks++;
         if (IsTwoClientNative && userAgent == nativeHelmAgent && usableGameObject == nativeHelmPoint) nativeHelmStopCallbacks++;
     }
-
-    private object InspectHeldHelm() => new
-    {
-        supported = manifest.Mode == NavalLabMode.HeldHelm,
-        remoteUseReplication = "unimplemented",
-        keyboardViewInputForwarding = "unimplemented",
-        status = heldHelmStatus,
-        remainingSeconds = heldHelmAgent == null ? 0 : Math.Max(0, heldHelmDeadline - ControlNow),
-        helmTakeCalls, helmReleaseCalls, helmUseCallbacks, helmStopCallbacks,
-        trace = HelmTrace, traceLimit = HelmTraceLimit,
-        ships = Ships.Select((ship, slot) => InspectHelmIdentity(ship, slot)).ToArray()
-    };
 
     private object InspectHelmIdentity(MissionShip ship, int slot)
     {
@@ -842,7 +431,7 @@ internal sealed partial class NavalLabBehavior : MissionLogic
             {
                 slot, shipId = manifest.Ships[slot], owner = manifest.Controllers[slot],
                 ownerLocal = manifest.Controllers[slot] == ownControllerId,
-                lifecycleInitialized = IsSingleClientNative ? nativeDeploymentCallbacks == 1 && ship.IsDeployed : helmLifecycleInitialized[slot],
+                lifecycleInitialized = IsSingleClientNative && nativeDeploymentCallbacks == 1 && ship.IsDeployed,
                 standingPointId = point.Id.Id, standingPointCreatedAtRuntime = point.Id.CreatedAtRuntime,
                 standingPointPointer = point.GameEntity.Pointer.ToUInt64(),
                 point.IsDisabledForPlayers,
@@ -908,7 +497,6 @@ internal sealed partial class NavalLabBehavior : MissionLogic
         TickNativeHelm();
         TickHelmOccupancy();
         TickAxesPulse();
-        if (heldHelmAgent != null && (ControlNow >= heldHelmDeadline || Blocker != null)) ReleaseHeldHelm();
         if (controlledAgent == null) return;
         if (ControlNow >= controlDeadline || Blocker != null || float.IsNaN(dt) || float.IsInfinity(dt) || dt < 0
             || (IsTwoClientNative && DeckLocomotionBlocker() != null)) { CancelAgentControl(); return; }
@@ -960,7 +548,6 @@ internal sealed partial class NavalLabBehavior : MissionLogic
         CancelAxesPulse("cancelled_safety_stop");
         CancelPendingNativeHelm();
         CancelAgentControl();
-        ReleaseHeldHelm();
         if ((IsSingleClientNative && !nativeTerminalHold) || IsTwoClientNative) CancelNativeControls();
         foreach (var ship in Ships.Where(ship => ship?.Controller is PlayerShipController && (!IsTwoClientNative || OwnsFactoryHull(Array.IndexOf(Ships, ship)))))
         {
@@ -1003,12 +590,10 @@ internal sealed partial class NavalLabBehavior : MissionLogic
         twoClientNative = IsTwoClientNative ? InspectNativeControls() : null,
         factoryAuthorityProbe = InspectFactoryProbe(),
         shipAuthority = IsTwoClientNative ? InspectShipAuthority() : null,
-        heldHelm = InspectHeldHelm(),
         syntheticCrew = true,
         agentControl = controlledAgent == null ? "inactive" : controlKind,
         controlledCombatant = controlledAgent == null ? (Guid?)null : manifest.Combatants[Array.IndexOf(Agents, controlledAgent)],
         startup = StartupDiagnostics,
-        activationTransitions = ActivationTransitions,
         manifest.InstanceId,
         manifest.IncarnationId,
         Simulating,

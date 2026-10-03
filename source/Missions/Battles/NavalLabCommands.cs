@@ -12,23 +12,22 @@ public sealed class NavalLabCreateCommand : ICoopCommand
     public NavalLabCreateCommand(INavalLabCoordinator coordinator) => this.coordinator = coordinator;
     public string Prefix => "coop.debug.naval_lab";
     public string Name => "create";
-    public string Description => "Start the isolated two-client lab: activation (default), held-helm, factory-authority-probe or two-client-native; two-client-native-all-physics deliberately combines native physics and network corrections on foreign hulls.";
+    public string Description => "Start the isolated two-client lab: factory-authority-probe or two-client-native; two-client-native-all-physics deliberately combines native physics and network corrections on foreign hulls.";
     public CoopCommandSide Side => CoopCommandSide.Server;
     public IExpectedArgs[] ExpectedArgs { get; } =
     {
         new ExpectedArgs("operation_id", "Idempotent operation UUID.", true),
         new ExpectedArgs("first_controller", "First connected client controller id.", true),
         new ExpectedArgs("second_controller", "Second distinct connected client controller id.", true),
-        new ExpectedArgs("mode", "activation (default), held-helm, factory-authority-probe or two-client-native or two-client-native-all-physics (disposable diagnostic); one incarnation per run.", false)
+        new ExpectedArgs("mode", "factory-authority-probe, two-client-native or two-client-native-all-physics (disposable diagnostic); one incarnation per run.", true)
     };
     private static NavalLabMode ParseMode(ICoopCommandArgs args)
     {
-        if (args.Count == 3 || args[3] == "activation") return NavalLabMode.Activation;
-        if (args[3] == "held-helm") return NavalLabMode.HeldHelm;
-        if (args[3] == "two-client-native") return NavalLabMode.TwoClientNative;
-        if (args[3] == "two-client-native-all-physics") return NavalLabMode.TwoClientNativeAllPhysics;
-        if (args[3] == "factory-authority-probe") return NavalLabMode.FactoryAuthorityProbe;
-        throw new ArgumentException("Mode must be activation, held-helm, factory-authority-probe, two-client-native or two-client-native-all-physics.");
+        string mode = args.Count > 3 ? args[3] : null;
+        if (mode == "two-client-native") return NavalLabMode.TwoClientNative;
+        if (mode == "two-client-native-all-physics") return NavalLabMode.TwoClientNativeAllPhysics;
+        if (mode == "factory-authority-probe") return NavalLabMode.FactoryAuthorityProbe;
+        throw new ArgumentException("Mode must be factory-authority-probe, two-client-native or two-client-native-all-physics.");
     }
     public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
     {
@@ -68,9 +67,9 @@ public sealed class NavalLabActionCommand : ICoopCommand
     public IExpectedArgs[] ExpectedArgs { get; } =
     {
         new ExpectedArgs("operation_id", "Idempotent operation UUID.", true),
-        new ExpectedArgs("kind", "helm (1s), probe (30s helm + samples), walk/turn/crew (1s), jump (edge), take-helm (30s held use), release-helm, complete-deployment (native UI modes), sail-full/sail-raised/sail-square-raised, native-axes-pulse (<=1s, rudder=lateral, row=forward), native-axes-backward (<=1s, rudder=lateral, row=false), native-axes-neutral/native-row-stop (<=1s, rudder=0,row=false; preserve sail), native-take-helm/native-release-helm (two-client synthetic tests, not keyboard evidence; await helm-status observation), stop.", true),
+        new ExpectedArgs("kind", "helm (1s), probe (30s helm + samples), walk/turn/crew (1s), jump (edge), complete-deployment (native UI modes), sail-full/sail-raised/sail-square-raised, native-axes-pulse (<=1s, rudder=lateral, row=forward), native-axes-backward (<=1s, rudder=lateral, row=false), native-axes-neutral/native-row-stop (<=1s, rudder=0,row=false; preserve sail), native-take-helm/native-release-helm (two-client synthetic tests, not keyboard evidence; await helm-status observation), stop.", true),
         new ExpectedArgs("ship", "Manifest ship index, 0 or 1.", true),
-        new ExpectedArgs("rudder", "Finite [-1,1]: helm/probe rudder, walk forward input, turn radians/sec; jump/crew/take-helm/release-helm require 0.", true),
+        new ExpectedArgs("rudder", "Finite [-1,1]: helm/probe rudder, walk forward input, turn radians/sec; jump/crew require 0.", true),
         new ExpectedArgs("row", "Oars for helm/probe; agent actions require false.", true)
     };
     public CoopCommandResult ProcessCommand(ICoopCommandArgs args)

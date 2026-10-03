@@ -19,7 +19,7 @@ namespace Missions.Battles;
 
 public interface INavalLabCoordinator
 {
-    object Create(Guid operationId, string firstController, string secondController, NavalLabMode mode = NavalLabMode.Activation);
+    object Create(Guid operationId, string firstController, string secondController, NavalLabMode mode);
     object CreateSingle(Guid operationId, string controller);
     object Execute(Guid operationId, string kind, int ship, float rudder, bool row);
     object Inspect();
@@ -79,7 +79,7 @@ public sealed partial class NavalLabCoordinator : INavalLabCoordinator, IHandler
     public object CreateSingle(Guid operationId, string controller) =>
         CreateFixture(operationId, new[] { controller }, NavalLabMode.SingleClientNative);
 
-    public object Create(Guid operationId, string firstController, string secondController, NavalLabMode mode = NavalLabMode.Activation)
+    public object Create(Guid operationId, string firstController, string secondController, NavalLabMode mode)
     {
         if (mode == NavalLabMode.SingleClientNative) throw new ArgumentException("Use create-single for the single-client lab.");
         return CreateFixture(operationId, new[] { firstController, secondController }, mode);
@@ -141,12 +141,8 @@ public sealed partial class NavalLabCoordinator : INavalLabCoordinator, IHandler
         if ((single && kind != "stop" && !deployment && !sail && !nativeHelm && !pulse && !rope && !deckWalk) || (deployment && !single))
             throw new InvalidOperationException("Single-client native controls use keyboard/orders; only complete-deployment and stop are commands.");
         if (deployment && (ship != 0 || rudder != 0 || row)) throw new ArgumentException("Deployment requires ship=0, rudder=0, row=false.");
-        bool heldHelm = kind == "take-helm" || kind == "release-helm";
-        if (kind != "stop" && ((store.Current.Mode == NavalLabMode.HeldHelm) != heldHelm))
-            throw new InvalidOperationException("Held-helm mode supports only take-helm, release-helm and stop; activation mode is unchanged.");
-        if (heldHelm && (rudder != 0 || row)) throw new ArgumentException("Held helm actions require rudder=0 and row=false.");
         bool agentControl = kind == "walk" || kind == "turn" || kind == "jump" || kind == "crew";
-        if (kind != "helm" && kind != "stop" && kind != "probe" && !agentControl && !heldHelm && !deployment && !sail && !nativeHelm && !pulse && !rope)
+        if (kind != "helm" && kind != "stop" && kind != "probe" && !agentControl && !deployment && !sail && !nativeHelm && !pulse && !rope)
             throw new ArgumentException("Supported actions: helm, probe, walk, turn, jump, crew, stop.");
         if (agentControl && (row || ((kind == "jump" || kind == "crew") && rudder != 0)))
             throw new ArgumentException("Agent actions require row=false; jump and crew also require rudder=0.");
@@ -170,10 +166,10 @@ public sealed partial class NavalLabCoordinator : INavalLabCoordinator, IHandler
         }
         else if (!store.BeginOperation(operationId, contents)) return store.InspectOperation(operationId);
         var action = new NetworkNavalLabAction(store.Current.IncarnationId, operationId, host?.Epoch ?? 0, kind, ship, rudder, row,
-            heldHelm ? DateTime.UtcNow.AddSeconds(30).Ticks : (nativeHelm || rope) ? DateTime.UtcNow.AddSeconds(2).Ticks : (sail || pulse || deckWalk) ? DateTime.UtcNow.AddSeconds(1).Ticks : 0,
+            (nativeHelm || rope) ? DateTime.UtcNow.AddSeconds(2).Ticks : (sail || pulse || deckWalk) ? DateTime.UtcNow.AddSeconds(1).Ticks : 0,
             ropeTargetStation);
         var targets = kind == "stop" || kind == "probe" || (deployment && IsTwoClientNative) ? store.Current.Controllers
-            : new[] { agentControl || heldHelm || sail || nativeHelm || pulse || rope ? store.Current.Controllers[ship] : host.HostControllerId };
+            : new[] { agentControl || sail || nativeHelm || pulse || rope ? store.Current.Controllers[ship] : host.HostControllerId };
         foreach (var target in targets)
             if (players.TryGetPeer(target, out var peer)) network.Send(peer, action);
         return store.InspectOperation(operationId);

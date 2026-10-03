@@ -45,7 +45,7 @@ public sealed class NavalLabSingleClientTests : IDisposable
         Assert.Equal("A", Assert.Single(manifest.Controllers));
         Assert.Single(manifest.Ships);
         Assert.Equal(5, manifest.Combatants.Length);
-        foreach (var mode in new[] { NavalLabMode.Activation, NavalLabMode.HeldHelm })
+        foreach (var mode in new[] { NavalLabMode.FactoryAuthorityProbe, NavalLabMode.TwoClientNative })
             Assert.Throws<ArgumentException>(() => new NavalLabManifest(manifest.InstanceId, manifest.IncarnationId,
                 manifest.Controllers, manifest.Combatants, manifest.Ships, mode));
         Assert.Throws<ArgumentException>(() => new NavalLabManifest(manifest.InstanceId, manifest.IncarnationId,
@@ -69,7 +69,6 @@ public sealed class NavalLabSingleClientTests : IDisposable
     {
         behavior.SetAuthority(false);
         behavior.SetAuthority(true);
-        Assert.Empty(behavior.ActivationTransitions);
         Assert.False(behavior.nativeTerminalHold);
         Assert.False(behavior.Simulating);
         Assert.Null(behavior.Blocker);

@@ -27,7 +27,7 @@ public class NavalLabIsolationTests
         var id = Guid.NewGuid();
         var store = new NavalLabSessionStore();
         store.Install(new NavalLabManifest("naval-lab:" + id.ToString("N"), id, new[] { "A", "B" },
-            Enumerable.Range(0, 10).Select(_ => Guid.NewGuid()).ToArray(), new[] { Guid.NewGuid(), Guid.NewGuid() }));
+            Enumerable.Range(0, 10).Select(_ => Guid.NewGuid()).ToArray(), new[] { Guid.NewGuid(), Guid.NewGuid() }, NavalLabMode.TwoClientNative));
         return store;
     }
 

@@ -36,7 +36,6 @@ public sealed class NavalTestAdapter : INavalMissionAdapter, INavalNativeMission
     public object StartupDiagnostics => new { simulated = true };
     public bool FailApply { get; set; }
     public bool ThrowOnOpen { get; set; }
-    public bool FailActivation { get; set; }
     public bool Authority { get; private set; }
     public int OpenCount { get; private set; }
     public int ApplyCount { get; private set; }
@@ -44,8 +43,6 @@ public sealed class NavalTestAdapter : INavalMissionAdapter, INavalNativeMission
     public bool Disposed { get; private set; }
     public List<(int ship, float rudder, bool row)> HelmCalls { get; } = new();
     public List<(string kind, int ship, float value)> AgentControlCalls { get; } = new();
-    public List<(int ship, bool take)> HeldHelmCalls { get; } = new();
-    public bool HeldHelmTaken { get; private set; }
     public List<string> Calls { get; } = new();
     public NetworkNavalLabSailState[] SailStates { get; set; } = Array.Empty<NetworkNavalLabSailState>();
     public List<NetworkNavalLabFrames> SailFeedback { get; } = new();
@@ -143,7 +140,6 @@ public sealed class NavalTestAdapter : INavalMissionAdapter, INavalNativeMission
     public void SetAuthority(bool simulate)
     {
         Calls.Add("authority:" + simulate);
-        if (simulate && FailActivation) Blocker = "ship.activation_unconfirmed:slot_0";
         Authority = simulate && Blocker == null && !TerminalHold
             && (OpenedManifest?.Mode != NavalLabMode.SingleClientNative || DeploymentComplete);
     }
@@ -158,13 +154,6 @@ public sealed class NavalTestAdapter : INavalMissionAdapter, INavalNativeMission
         return true;
     }
     public void SetHelm(int ship, float rudder, bool row) => HelmCalls.Add((ship, rudder, row));
-    public string SetHeldHelm(int ship, bool take)
-    {
-        HeldHelmCalls.Add((ship, take));
-        if (take == HeldHelmTaken) return take ? "already_taken" : "already_released";
-        HeldHelmTaken = take;
-        return take ? "taken" : "released";
-    }
     public string StartAgentControl(string kind, int ship, float value)
     {
         AgentControlCalls.Add((kind, ship, value));
@@ -176,7 +165,6 @@ public sealed class NavalTestAdapter : INavalMissionAdapter, INavalNativeMission
         CancelCount++;
         Calls.Add("cancel");
         if (ThrowOnCancel) throw new InvalidOperationException("simulated control cancellation failure");
-        HeldHelmTaken = false;
     }
     public object Inspect() => new { simulated = true, authority = Authority, applyCount = ApplyCount };
     public Action<NetworkNavalLabHelmInput>? SendInput { get; private set; }

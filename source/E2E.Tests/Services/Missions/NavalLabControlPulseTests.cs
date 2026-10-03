@@ -95,8 +95,6 @@ public sealed class NavalLabControlPulseTests : NavalMissionTestEnvironment
     }
 
     [Theory]
-    [InlineData(NavalLabMode.Activation)]
-    [InlineData(NavalLabMode.HeldHelm)]
     [InlineData(NavalLabMode.FactoryAuthorityProbe)]
     public void OldModesDoNotGainSyntheticAxesPulseActions(NavalLabMode mode)
     {

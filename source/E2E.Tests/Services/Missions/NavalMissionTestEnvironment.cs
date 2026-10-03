@@ -59,7 +59,7 @@ public class NavalMissionTestEnvironment : MissionTestEnvironment, IDisposable
     protected NavalTestAdapter Adapter(EnvironmentInstance client) =>
         client.Resolve<NavalTestAdapterLoader>().Adapter;
 
-    protected Guid CreateLab(NavalLabMode mode = NavalLabMode.Activation)
+    protected Guid CreateLab(NavalLabMode mode)
     {
         var operation = Guid.NewGuid();
         Server.Call(() => Server.Resolve<INavalLabCoordinator>().Create(operation, "naval-A", "naval-B", mode));
@@ -73,15 +73,6 @@ public class NavalMissionTestEnvironment : MissionTestEnvironment, IDisposable
     {
         client.Call(() => Adapter(client).Controller!.AfterStart());
         PumpAll();
-    }
-
-    protected void StartReleased(NavalLabMode mode = NavalLabMode.Activation)
-    {
-        CreateLab(mode);
-        Ready(First);
-        Ready(Second);
-        Assert.Single(Actions(First), action => action.Kind == "release");
-        Assert.Single(Actions(Second), action => action.Kind == "release");
     }
 
     protected Guid Execute(string kind, int ship = 0, float value = 0, bool row = false, Guid? operation = null)

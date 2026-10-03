@@ -41,7 +41,7 @@ public sealed class NavalLabCoordinatorTests : IDisposable
         ModInformation.IsServer = false;
         var id = Guid.NewGuid();
         manifest = new NavalLabManifest("naval-lab:" + id.ToString("N"), id, new[] { "A", "B" },
-            Enumerable.Range(0, 10).Select(_ => Guid.NewGuid()).ToArray(), new[] { Guid.NewGuid(), Guid.NewGuid() });
+            Enumerable.Range(0, 10).Select(_ => Guid.NewGuid()).ToArray(), new[] { Guid.NewGuid(), Guid.NewGuid() }, NavalLabMode.TwoClientNative);
         loader.Setup(value => value.Load()).Returns(adapter.Object);
         var own = Mock.Of<IControllerIdProvider>(value => value.ControllerId == "A");
         coordinator = new NavalLabCoordinator(broker, network, store, players.Object,
@@ -51,7 +51,7 @@ public sealed class NavalLabCoordinatorTests : IDisposable
     private void Start()
     {
         broker.Publish(this, new NetworkNavalLabStart(manifest.InstanceId, manifest.IncarnationId,
-            manifest.Controllers, manifest.Combatants, manifest.Ships));
+            manifest.Controllers, manifest.Combatants, manifest.Ships, manifest.Mode));
         GameThread.Run(() => { }, blocking: true);
     }
 

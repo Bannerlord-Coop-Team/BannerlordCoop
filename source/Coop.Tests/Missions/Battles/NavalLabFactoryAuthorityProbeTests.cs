@@ -117,8 +117,6 @@ public sealed class NavalLabFactoryAuthorityProbeTests : IDisposable
     [Theory]
     [InlineData(NavalLabMode.TwoClientNative, false)]
     [InlineData(NavalLabMode.FactoryAuthorityProbe, true)]
-    [InlineData(NavalLabMode.Activation, true)]
-    [InlineData(NavalLabMode.HeldHelm, true)]
     public void FrameApplication_UpdatesHullAndNavmeshThroughModeSpecificAuthority(NavalLabMode mode, bool teleportation)
     {
         using var mission = new MissionCurrentScope();
@@ -289,8 +287,6 @@ public sealed class NavalLabFactoryAuthorityProbeTests : IDisposable
 
     // Prior modes ignore even an unattributed physics instance without inspecting native state.
     [Theory]
-    [InlineData(NavalLabMode.Activation)]
-    [InlineData(NavalLabMode.HeldHelm)]
     [InlineData(NavalLabMode.SingleClientNative)]
     public void ProbeObservers_DoNothingForPriorModes(NavalLabMode mode)
     {

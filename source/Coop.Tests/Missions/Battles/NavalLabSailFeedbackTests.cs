@@ -191,7 +191,7 @@ public sealed class NavalLabSailFeedbackTests : IDisposable
     public void HostAndOtherModesRetainNativeReadout()
     {
         InstallPresentation(); fixture.factoryHost = true; TickView(); Assert.Equal("Raised", vm.SailState);
-        foreach (var mode in new[] { NavalLabMode.Activation, NavalLabMode.HeldHelm, NavalLabMode.SingleClientNative, NavalLabMode.FactoryAuthorityProbe })
+        foreach (var mode in new[] { NavalLabMode.SingleClientNative, NavalLabMode.FactoryAuthorityProbe })
         {
             int count = mode == NavalLabMode.SingleClientNative ? 1 : 2;
             var prior = new NavalLabManifest(manifest.InstanceId, manifest.IncarnationId, manifest.Controllers.Take(count).ToArray(),

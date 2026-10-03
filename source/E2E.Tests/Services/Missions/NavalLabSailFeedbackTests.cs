@@ -92,7 +92,9 @@ public sealed class NavalLabSailFeedbackTests : NavalMissionTestEnvironment
     [Fact]
     public void SailCommandsRejectOtherModes()
     {
-        StartReleased();
+        CreateLab(NavalLabMode.FactoryAuthorityProbe);
+        Ready(First);
+        Ready(Second);
         Assert.False(Command(Server, "action", Guid.NewGuid().ToString(), "sail-raised", "0", "0", "false").Succeeded);
         Assert.Contains("wrong_mode", Command(First, "sail-status").Output);
     }

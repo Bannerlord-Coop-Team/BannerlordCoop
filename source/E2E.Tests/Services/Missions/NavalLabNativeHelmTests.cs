@@ -94,8 +94,6 @@ public sealed class NavalLabNativeHelmTests : NavalMissionTestEnvironment
     }
 
     [Theory]
-    [InlineData(NavalLabMode.Activation)]
-    [InlineData(NavalLabMode.HeldHelm)]
     [InlineData(NavalLabMode.FactoryAuthorityProbe)]
     public void OldModesDoNotGainSyntheticNativeHelmActions(NavalLabMode mode)
     {

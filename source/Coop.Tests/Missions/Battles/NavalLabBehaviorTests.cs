@@ -25,7 +25,7 @@ public sealed class NavalLabBehaviorTests : IDisposable
         Assert.False(SailWindProfile.IsSailWindProfileInitialized);
         var id = Guid.NewGuid();
         var manifest = new NavalLabManifest("naval-lab:" + id.ToString("N"), id, new[] { "A", "B" },
-            Enumerable.Range(0, 10).Select(_ => Guid.NewGuid()).ToArray(), new[] { Guid.NewGuid(), Guid.NewGuid() });
+            Enumerable.Range(0, 10).Select(_ => Guid.NewGuid()).ToArray(), new[] { Guid.NewGuid(), Guid.NewGuid() }, NavalLabMode.FactoryAuthorityProbe);
         behavior = new NavalLabBehavior(manifest, "A", null!, null!);
         // MountAndBlade is not publicized in this test project.
         typeof(MissionBehavior).GetProperty(nameof(MissionBehavior.Mission))!.SetValue(behavior, mission.Instance);

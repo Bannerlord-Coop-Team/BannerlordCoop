@@ -15,7 +15,7 @@ public class NavalLabSessionStoreTests
         var id = incarnation ?? Guid.NewGuid();
         return new NavalLabManifest("naval-lab:" + id.ToString("N"), id, new[] { "A", "B" },
             combatants ?? Enumerable.Range(0, 10).Select(_ => Guid.NewGuid()).ToArray(),
-            ships ?? new[] { Guid.NewGuid(), Guid.NewGuid() });
+            ships ?? new[] { Guid.NewGuid(), Guid.NewGuid() }, NavalLabMode.TwoClientNative);
     }
 
     [Fact]
@@ -31,7 +31,7 @@ public class NavalLabSessionStoreTests
     {
         var valid = Manifest();
         Assert.Throws<ArgumentException>(() => new NavalLabManifest("mapEvent1", valid.IncarnationId,
-            valid.Controllers, valid.Combatants, valid.Ships));
+            valid.Controllers, valid.Combatants, valid.Ships, valid.Mode));
     }
 
     [Fact]
@@ -121,7 +121,7 @@ public class NavalLabSessionStoreTests
     {
         var manifest = Manifest();
         var copy = Serializer.DeepClone(new NetworkNavalLabStart(manifest.InstanceId, manifest.IncarnationId,
-            manifest.Controllers, manifest.Combatants, manifest.Ships));
+            manifest.Controllers, manifest.Combatants, manifest.Ships, manifest.Mode));
         Assert.Equal(manifest.InstanceId, copy.InstanceId);
         Assert.Equal(manifest.IncarnationId, copy.IncarnationId);
         Assert.Equal(manifest.Controllers, copy.Controllers);

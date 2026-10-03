@@ -100,7 +100,7 @@ internal sealed partial class NavalLabBehavior
         if (!nativeAutoHelmObserved || nativeHelmPhase == "requested" || nativeHelmPhase == "pending"
             || nativeHelmPhase == "failed") return "native_helm_transition";
         if (offeredHelm == null || offeredHelm.Occupied || !HelmReplicasReady) return "helm_release_not_confirmed";
-        if (pulsePending || heldHelmAgent != null) return "control_active";
+        if (pulsePending) return "control_active";
         try
         {
             if (ObserveHelmState(OwnSlot, ReplicatedHelmMachine(OwnSlot))) return "helm_occupied";
