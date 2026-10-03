@@ -114,5 +114,4 @@ internal class IssueManagerAlternativeSolutionTroopsPatches
         textObject.SetTextVariable("NUMBER", troops.TotalManCount);
         return textObject;
     }
-
 }
