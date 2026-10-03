@@ -4,6 +4,7 @@ using GameInterface.Services.Issues.Generic.AcceptMirror;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Players.Data;
 using TaleWorlds.CampaignSystem;
+using TaleWorlds.CampaignSystem.Actions;
 using TaleWorlds.CampaignSystem.Issues;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Roster;
@@ -64,6 +65,11 @@ public static class AlternativeSolutionStartRunner
                 if (companion == Hero.MainHero || companion.PartyBelongedTo != MobileParty.MainParty ||
                     !companion.CanHaveCampaignIssues() || companion.IsWounded || companion.IsPregnant)
                     throw new InvalidOperationException("Artisan alternative companion is no longer eligible");
+
+                var wages = GetArtisanAlternativeWages(owner.Issue, validatedRoster, companion);
+                if (wages < 0 || Hero.MainHero.Gold < wages)
+                    throw new InvalidOperationException("Artisan alternative wages are no longer affordable");
+                GiveGoldAction.ApplyBetweenCharacters(null, Hero.MainHero, -wages);
             }
 
             RemoveFromTrueOwnerParty(validatedRoster);
@@ -79,6 +85,13 @@ public static class AlternativeSolutionStartRunner
             owner.Issue.StartIssueWithAlternativeSolution();
             return AlternativeSolutionVanillaStateSync.Capture(owner.Issue);
         }
+    }
+
+    internal static int GetArtisanAlternativeWages(IssueBase issue, TroopRoster selection, Hero companion)
+    {
+        // The server has not assigned the selected companion to the issue yet.
+        var days = (int)Campaign.Current.Models.IssueModel.GetDurationOfResolutionForHero(companion, issue).ToDays;
+        return selection.GetTroopRoster().Sum(element => checked(element.Character.TroopWage * element.Number * days));
     }
 
     private static bool DoTroopsSatisfyAlternativeSolution(IssueBase issue, TroopRoster troopRoster, out TextObject explanation)

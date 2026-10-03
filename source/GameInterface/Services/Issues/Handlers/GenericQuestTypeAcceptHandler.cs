@@ -428,6 +428,7 @@ internal class GenericQuestTypeAcceptHandler : IHandler
             throw new InvalidOperationException("Artisan alternative owner is unavailable");
 
         var partyBefore = party.MemberRoster.GetTroopRoster().ToArray();
+        var goldBefore = hero.Gold;
         var sentBefore = issue.AlternativeSolutionSentTroops.GetTroopRoster().ToArray();
         var heroes = selection.GetTroopRoster().Where(element => element.Character.IsHero)
             .ToDictionary(element => element.Character.HeroObject, element => element.Character.HeroObject.HeroState);
@@ -446,6 +447,8 @@ internal class GenericQuestTypeAcceptHandler : IHandler
             if (giver.Issue != issue) return;
             using (new MainHeroSubstitutionScope(hero, party))
             {
+                if (hero.Gold != goldBefore)
+                    TaleWorlds.CampaignSystem.Actions.GiveGoldAction.ApplyBetweenCharacters(null, hero, goldBefore - hero.Gold);
                 var partySnapshot = TroopRoster.CreateDummyTroopRoster();
                 var sentSnapshot = TroopRoster.CreateDummyTroopRoster();
                 foreach (var element in partyBefore) partySnapshot.Add(element);

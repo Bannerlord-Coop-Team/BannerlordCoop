@@ -117,6 +117,7 @@ public class GameInterfaceModule : Module
         builder.RegisterType<ArtisanProductQuestActions>().As<IArtisanProductQuestActions>().InstancePerDependency();
         builder.RegisterType<ArtisanProductLordActions>().As<IArtisanProductLordActions>().InstancePerDependency();
         builder.RegisterType<ArtisanProductQuestAcceptance>().As<IArtisanProductQuestAcceptance>().InstancePerDependency();
+        builder.RegisterType<ArtisanProductAlternativeSelection>().As<IArtisanProductAlternativeSelection>().InstancePerDependency();
         builder.RegisterType<ArtisanProductJournal>().As<IArtisanProductJournal>().InstancePerDependency();
         builder.RegisterType<ArtisanProductAuthority>().As<IArtisanProductAuthority>().InstancePerDependency();
         builder.RegisterType<ArtisanProductTraits>().As<IArtisanProductTraits>().InstancePerDependency();
