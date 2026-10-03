@@ -1,4 +1,5 @@
 ﻿using System.IO;
+using System.Linq;
 using System.Runtime.CompilerServices;
 using System.Xml.Linq;
 using Xunit;
@@ -37,12 +38,8 @@ public class ChatUIMovieTests
         Assert.Equal("@MuteButtonText", muteButton.Attribute("Parameter.Text")?.Value);
         Assert.Equal("@IsMuteButtonVisible", muteButton.Attribute("IsVisible")?.Value);
 
-        var unreadBadge = FindById(document, "CoopChatUnreadBadge");
-        Assert.Equal("@HasUnreadNotification", unreadBadge.Attribute("IsVisible")?.Value);
-        Assert.Equal("Bottom", unreadBadge.Attribute("VerticalAlignment")?.Value);
-        Assert.Equal("Right", unreadBadge.Attribute("HorizontalAlignment")?.Value);
-        Assert.Contains(unreadBadge.Descendants("TextWidget"),
-            element => element.Attribute("Text")?.Value == "@UnreadNotificationText");
+        Assert.Empty(document.Descendants().Where(
+            element => element.Attribute("Id")?.Value == "CoopChatUnreadBadge"));
 
         var chatPanel = FindById(document, "CoopChatRoot");
         Assert.Equal("true", chatPanel.Attribute("DoNotAcceptEvents")?.Value);

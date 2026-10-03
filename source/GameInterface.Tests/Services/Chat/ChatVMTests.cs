@@ -57,7 +57,7 @@ public class ChatVMTests
     }
 
     [Fact]
-    public void Receive_DirectMessage_AddsUnreadNotificationWithoutOpeningChat()
+    public void Receive_DirectMessage_ShowsInClosedFeed_NotInAll()
     {
         var vm = new ChatVM(_ => { }, () => "local");
 
@@ -72,16 +72,13 @@ public class ChatVMTests
         var all = vm.Channels.Single(channel => channel.IsAll);
         var direct = vm.Channels.Single(channel => channel.ControllerId == "other-controller");
         Assert.True(all.IsSelected);
-        Assert.True(direct.HasUnreadMessages);
+        Assert.False(direct.HasUnreadMessages);
         Assert.False(vm.IsOpen);
-        Assert.True(vm.HasUnreadNotification);
-        Assert.Equal("1", vm.UnreadNotificationText);
-        Assert.Empty(vm.VisibleLines);
+        Assert.Contains(vm.VisibleLines, line => line.Text.Contains("[From Other Hero] Other Hero: meet me in Pravend"));
 
         vm.SetOpen(true);
 
-        Assert.False(vm.HasUnreadNotification);
-        Assert.Empty(vm.VisibleLines);
+        Assert.DoesNotContain(vm.VisibleLines, line => line.Text.Contains("[From Other Hero]"));
 
         direct.ExecuteSelection();
 
@@ -90,7 +87,7 @@ public class ChatVMTests
     }
 
     [Fact]
-    public void Receive_OwnGlobalEcho_DoesNotAddUnreadNotification()
+    public void Receive_OwnGlobalEcho_ShowsInClosedFeed()
     {
         var vm = new ChatVM(_ => { }, () => "local");
 
@@ -102,8 +99,6 @@ public class ChatVMTests
             string.Empty,
             "hello everyone"));
 
-        Assert.False(vm.HasUnreadNotification);
-        Assert.Equal("0", vm.UnreadNotificationText);
         Assert.Contains(vm.VisibleLines, line => line.Text.Contains("[Global] Local Hero: hello everyone"));
     }
 
@@ -305,7 +300,30 @@ public class ChatVMTests
     }
 
     [Fact]
-    public void SetPlayerChatEnabled_False_ClearsUnreadNotification()
+    public void Receive_DirectWhileOpenOnAll_MarksUnreadAndOmitsFromAll()
+    {
+        var vm = new ChatVM(_ => { }, () => "local");
+        vm.SetOpen(true);
+
+        vm.Receive(new NetworkChatMessage(
+            ChatChannel.Direct,
+            "other-controller",
+            "Other Hero",
+            "local",
+            "Local Hero",
+            "meet me in Pravend"));
+
+        var direct = vm.Channels.Single(channel => channel.ControllerId == "other-controller");
+        Assert.True(direct.HasUnreadMessages);
+        Assert.DoesNotContain(vm.VisibleLines, line => line.Text.Contains("[From Other Hero]"));
+
+        vm.SetOpen(false);
+
+        Assert.Contains(vm.VisibleLines, line => line.Text.Contains("[From Other Hero] Other Hero: meet me in Pravend"));
+    }
+
+    [Fact]
+    public void SetPlayerChatEnabled_False_HidesDirectFromClosedFeed()
     {
         var vm = new ChatVM(_ => { }, () => "local");
         vm.Receive(new NetworkChatMessage(
@@ -315,13 +333,14 @@ public class ChatVMTests
             "local",
             "Local Hero",
             "meet me in Pravend"));
+        vm.ReceiveEvent("Settlement captured.", Color.White);
 
-        Assert.True(vm.HasUnreadNotification);
+        Assert.Contains(vm.VisibleLines, line => line.IsPlayerChat);
 
         vm.SetPlayerChatEnabled(false);
 
-        Assert.False(vm.HasUnreadNotification);
-        Assert.Equal("0", vm.UnreadNotificationText);
+        Assert.DoesNotContain(vm.VisibleLines, line => line.IsPlayerChat);
+        Assert.Contains(vm.VisibleLines, line => line.Text == "Settlement captured.");
     }
 
     [Fact]
@@ -421,7 +440,6 @@ public class ChatVMTests
             "direct noise"));
 
         Assert.Empty(vm.VisibleLines);
-        Assert.False(vm.HasUnreadNotification);
         Assert.False(muted.HasUnreadMessages);
 
         muted.ExecuteSelection();

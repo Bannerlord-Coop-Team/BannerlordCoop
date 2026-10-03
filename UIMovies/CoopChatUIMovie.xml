@@ -163,19 +163,6 @@
               </Children>
             </ListPanel>
 
-            <Widget Id="CoopChatUnreadBadge" WidthSizePolicy="Fixed" SuggestedWidth="34"
-                    HeightSizePolicy="Fixed" SuggestedHeight="28" HorizontalAlignment="Right"
-                    VerticalAlignment="Bottom" MarginRight="10" MarginBottom="10"
-                    Sprite="BlankWhiteSquare_9" Color="#B52D24FF"
-                    IsVisible="@HasUnreadNotification" DoNotAcceptEvents="true">
-              <Children>
-                <TextWidget WidthSizePolicy="StretchToParent" HeightSizePolicy="StretchToParent"
-                            Brush="Clan.TabControl.Text" Brush.FontSize="16"
-                            Brush.TextHorizontalAlignment="Center" Brush.TextVerticalAlignment="Center"
-                            Text="@UnreadNotificationText"/>
-              </Children>
-            </Widget>
-
             <Widget Id="CoopChatResizeFrame" WidthSizePolicy="StretchToParent" HeightSizePolicy="StretchToParent"
                     Sprite="WhiteFrame_9" VerticalAlignment="Bottom" IsVisible="false" DoNotAcceptEvents="true"/>
             <ImageWidget Id="CoopChatResizer" WidthSizePolicy="Fixed" HeightSizePolicy="Fixed"

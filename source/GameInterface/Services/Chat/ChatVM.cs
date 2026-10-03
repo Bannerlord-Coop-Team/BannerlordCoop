@@ -33,9 +33,10 @@ internal sealed class ChatVM : ViewModel
     private string writtenText = string.Empty;
     private bool isOpen;
     private bool playerChatEnabled = true;
-    private int unreadMessageCount;
     private float chatBoxSizeX;
     private float chatBoxSizeY;
+    // Closed fade feed: Events + Global + DMs (All stays public-only)
+    private readonly List<ChatLineVM> passiveHistory = new List<ChatLineVM>();
 
     public ChatVM(
         Action<NetworkSendChatMessage> send,
@@ -92,14 +93,6 @@ internal sealed class ChatVM : ViewModel
 
     [DataSourceProperty]
     public string MuteButtonText => selectedChannel?.IsMuted == true ? "Unmute" : "Mute";
-
-    [DataSourceProperty]
-    public bool HasUnreadNotification => unreadMessageCount > 0;
-
-    [DataSourceProperty]
-    public string UnreadNotificationText => unreadMessageCount > 99
-        ? "99+"
-        : unreadMessageCount.ToString();
 
     public bool IsPlayerChatEnabled
     {
@@ -218,17 +211,12 @@ internal sealed class ChatVM : ViewModel
         if (open && !IsPlayerChatEnabled) return;
 
         IsOpen = open;
-        if (!open) return;
-
-        SetUnreadMessageCount(0);
     }
 
     public void SetPlayerChatEnabled(bool enabled)
     {
         if (!enabled && IsOpen)
             SetOpen(false);
-        if (!enabled)
-            SetUnreadMessageCount(0);
 
         IsPlayerChatEnabled = enabled;
     }
@@ -298,7 +286,7 @@ internal sealed class ChatVM : ViewModel
     {
         if (string.IsNullOrEmpty(text)) return;
 
-        AddLine(EventsChannelId, new ChatLineVM(text, color, isPlayerChat: false), notify: false);
+        AddLine(EventsChannelId, new ChatLineVM(text, color, isPlayerChat: false));
     }
 
     public void Receive(NetworkChatMessage message)
@@ -313,17 +301,12 @@ internal sealed class ChatVM : ViewModel
 
         string channelId;
         string line;
-        bool notify;
 
         switch (message.Channel)
         {
             case ChatChannel.Global:
                 channelId = GlobalChannelId;
                 line = $"[Global] {DisplayName(message.SenderName, message.SenderControllerId)}: {message.Text}";
-                notify = !string.Equals(
-                    message.SenderControllerId,
-                    getLocalControllerId(),
-                    StringComparison.Ordinal);
                 AddParticipant(message.SenderControllerId, message.SenderName);
                 break;
             case ChatChannel.Direct:
@@ -339,7 +322,6 @@ internal sealed class ChatVM : ViewModel
                 line = sentByLocalPlayer
                     ? $"[To {otherName}] You: {message.Text}"
                     : $"[From {otherName}] {otherName}: {message.Text}";
-                notify = !sentByLocalPlayer;
                 break;
             case ChatChannel.System:
                 channelId = string.IsNullOrEmpty(message.RecipientControllerId)
@@ -350,7 +332,6 @@ internal sealed class ChatVM : ViewModel
                 if (channelId != GlobalChannelId)
                     EnsureDirectChannel(channelId, DisplayName(message.RecipientName, channelId));
                 line = $"[Chat] {message.Text}";
-                notify = true;
                 break;
             default:
                 return;
@@ -358,8 +339,7 @@ internal sealed class ChatVM : ViewModel
 
         AddLine(
             channelId,
-            new ChatLineVM(line, getPlayerColor(message.SenderControllerId), isPlayerChat: true),
-            notify);
+            new ChatLineVM(line, getPlayerColor(message.SenderControllerId), isPlayerChat: true));
     }
 
     private void EnsureFixedChannel(string channelId, string displayName, ChatChannelKind kind)
@@ -407,7 +387,7 @@ internal sealed class ChatVM : ViewModel
         UpdateVisibleLines();
     }
 
-    private void AddLine(string channelId, ChatLineVM line, bool notify)
+    private void AddLine(string channelId, ChatLineVM line)
     {
         var history = histories[channelId];
 
@@ -415,7 +395,7 @@ internal sealed class ChatVM : ViewModel
         history.Add(line);
         ChatLineVM trimmed = TrimHistory(history);
 
-        // Also append to All
+        // Also append to All (public feeds only)
         ChatLineVM allTrimmed = null;
         bool feedsAll = channelId == EventsChannelId || channelId == GlobalChannelId;
         if (feedsAll)
@@ -425,20 +405,28 @@ internal sealed class ChatVM : ViewModel
             allTrimmed = TrimHistory(allHistory);
         }
 
+        // Closed fade feed includes DMs without putting them in All
+        bool feedsPassive = feedsAll || !IsFixedChannelId(channelId);
+        ChatLineVM passiveTrimmed = null;
+        if (feedsPassive)
+        {
+            passiveHistory.Add(line);
+            passiveTrimmed = TrimHistory(passiveHistory);
+        }
+
         bool viewingThisChannel = IsOpen &&
             string.Equals(selectedChannel?.ControllerId, channelId, StringComparison.Ordinal);
         bool viewingAll = IsOpen && selectedChannel?.IsAll == true && feedsAll;
-        bool passiveAll = !IsOpen && feedsAll;
-        if (viewingThisChannel || viewingAll || passiveAll)
+        bool passiveFeed = !IsOpen && feedsPassive;
+        if (viewingThisChannel || viewingAll || passiveFeed)
         {
-            ChatLineVM visibleTrimmed = viewingAll || passiveAll ? allTrimmed : trimmed;
+            ChatLineVM visibleTrimmed = passiveFeed
+                ? passiveTrimmed
+                : viewingAll ? allTrimmed : trimmed;
             AppendVisibleLine(line, visibleTrimmed);
         }
         else if (channelsById.TryGetValue(channelId, out var channel) && line.IsPlayerChat)
             channel.MarkUnread();
-
-        if (notify && !IsOpen && line.IsPlayerChat && IsPlayerChatEnabled)
-            SetUnreadMessageCount(Math.Min(unreadMessageCount + 1, 999));
     }
 
     private static ChatLineVM TrimHistory(List<ChatLineVM> history)
@@ -465,15 +453,19 @@ internal sealed class ChatVM : ViewModel
 
     private void UpdateVisibleLines()
     {
-        string channelId = IsOpen
-            ? selectedChannel?.ControllerId ?? AllChannelId
-            : AllChannelId;
-
         VisibleLines.Clear();
-        if (!histories.TryGetValue(channelId, out var history))
-            return;
 
-        // Closed: filter first, then take the last N eligible All lines
+        IList<ChatLineVM> history;
+        if (!IsOpen)
+            history = passiveHistory;
+        else if (!histories.TryGetValue(
+                     selectedChannel?.ControllerId ?? AllChannelId,
+                     out var channelHistory))
+            return;
+        else
+            history = channelHistory;
+
+        // Closed: filter first, then take the last N eligible passive lines
         int firstLine = 0;
         if (!IsOpen)
         {
@@ -521,15 +513,6 @@ internal sealed class ChatVM : ViewModel
         if (!histories.TryGetValue(channelId, out var history)) return;
         for (int i = 0; i < history.Count; i++)
             history[i].ToggleForceVisible(IsOpen);
-    }
-
-    private void SetUnreadMessageCount(int count)
-    {
-        if (unreadMessageCount == count) return;
-
-        unreadMessageCount = count;
-        OnPropertyChanged(nameof(HasUnreadNotification));
-        OnPropertyChanged(nameof(UnreadNotificationText));
     }
 
     private static bool IsFixedChannelId(string channelId)
