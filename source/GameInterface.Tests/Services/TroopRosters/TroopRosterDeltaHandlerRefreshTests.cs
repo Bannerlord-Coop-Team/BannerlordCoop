@@ -102,6 +102,8 @@ public class TroopRosterDeltaHandlerRefreshTests
 
     private sealed class ApplyingPartyScreenRosterRefresher : IPartyScreenRosterRefresher
     {
+        public void RefreshDoneState(PartyScreenLogic logic) { }
+
         public int ApplyCount { get; private set; }
 
         public bool TryApply(

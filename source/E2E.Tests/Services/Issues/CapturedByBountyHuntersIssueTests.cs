@@ -13,6 +13,7 @@ using GameInterface.Services.Issues.Generic.AcceptMirror;
 using GameInterface.Services.Issues.Generic.Migrated.CapturedByBountyHunters;
 using GameInterface.Services.Issues.Messages;
 using GameInterface.Services.Issues.Interfaces;
+using GameInterface.Services.Party;
 using GameInterface.Services.Players;
 using GameInterface.Services.Players.Data;
 using GameInterface.Services.TroopRosters.Interfaces;
@@ -29,7 +30,9 @@ using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Party.PartyComponents;
 using TaleWorlds.CampaignSystem.LogEntries;
 using TaleWorlds.CampaignSystem.Settlements;
+using TaleWorlds.CampaignSystem.ViewModelCollection.Party;
 using TaleWorlds.Core;
+using TaleWorlds.Core.ViewModelCollection.Information;
 using TaleWorlds.Library;
 using TaleWorlds.Localization;
 using Xunit.Abstractions;
@@ -584,6 +587,46 @@ public class CapturedByBountyHuntersIssueTests : IDisposable
         foreach (var recipient in environment.Clients) recipient.PumpGameThread();
     }
 
+    [Fact]
+    public void PartyScreenDoneRefreshPreservesLockSelections()
+    {
+        var fixture = CreateIssue();
+        var client = environment.Clients.First();
+        AcceptFromFirstClient(fixture, alternative: true, submitAlternative: false, beforeRequest: () =>
+        {
+            var giver = client.GetRegisteredObject<Hero>(fixture.Giver);
+            var logic = OpenAlternativeSelection(MobileParty.MainParty, giver.Issue.AlternativeSolutionSentTroops);
+            var view = ObjectHelper.SkipConstructor<PartyVM>();
+            view.PartyScreenLogic = logic;
+            view.DoneHint = new HintViewModel(new TextObject("pending"));
+            view.IsDoneDisabled = true;
+            view.IsCancelDisabled = true;
+            view._lockedTroopIds = new List<string> { "current-troop" };
+            view._lockedPrisonerIds = new List<string> { "current-prisoner" };
+            view._initialLockedTroopIds = new List<string> { "initial-troop" };
+            view._initialLockedPrisonerIds = new List<string> { "initial-prisoner" };
+            view._initialSortType = PartyScreenLogic.TroopSortType.Count;
+            view._initialSortAscending = true;
+            var refresher = (PartyScreenRosterRefresher)client.Resolve<IPartyScreenRosterRefresher>();
+
+            refresher.RefreshDoneState(new PartyScreenLogic(), view);
+            Assert.True(view.IsDoneDisabled);
+            Assert.Equal("pending", view.DoneHint.HintText.ToString());
+            refresher.RefreshDoneState(logic, view);
+
+            Assert.False(view.IsDoneDisabled);
+            Assert.False(view.IsCancelDisabled);
+            Assert.Equal(string.Empty, view.DoneHint.HintText.ToString());
+            Assert.Equal(new[] { "current-troop" }, view._lockedTroopIds);
+            Assert.Equal(new[] { "current-prisoner" }, view._lockedPrisonerIds);
+            Assert.Equal(new[] { "initial-troop" }, view._initialLockedTroopIds);
+            Assert.Equal(new[] { "initial-prisoner" }, view._initialLockedPrisonerIds);
+            Assert.Equal(PartyScreenLogic.TroopSortType.Count, view._initialSortType);
+            Assert.True(view._initialSortAscending);
+            client.Resolve<IAlternativeSolutionTroopSelection>().Rollback(giver);
+        });
+    }
+
     [Theory]
     [InlineData("add", false)]
     [InlineData("add", true)]
@@ -759,7 +802,7 @@ public class CapturedByBountyHuntersIssueTests : IDisposable
             else Assert.True(logic.DoneLogic(true));
             Assert.True(client.Resolve<IAlternativeSolutionTroopSelection>().IsCommitPending(logic));
             PartyScreenLogic replacement = null;
-            bool doneDisabled = true;
+            int replacementResets = 0;
             if (reopenScreen)
             {
                 replacement = OpenAlternativeSelection(party, TroopRoster.CreateDummyTroopRoster());
@@ -768,7 +811,7 @@ public class CapturedByBountyHuntersIssueTests : IDisposable
                 Assert.False(replacement.IsDoneActive());
                 // The publicized backing field makes a direct event subscription ambiguous.
                 typeof(PartyScreenLogic).GetEvent("AfterReset").AddEventHandler(replacement,
-                    new PartyScreenLogic.AfterResetDelegate((screen, _) => doneDisabled = !screen.IsDoneActive()));
+                    new PartyScreenLogic.AfterResetDelegate((_, _) => replacementResets++));
             }
             environment.Server.Call(() =>
             {
@@ -783,7 +826,7 @@ public class CapturedByBountyHuntersIssueTests : IDisposable
             {
                 Assert.Same(replacement, ((PartyState)Game.Current.GameStateManager.ActiveState).PartyScreenLogic);
                 Assert.True(replacement.IsDoneActive());
-                Assert.False(doneDisabled);
+                Assert.Equal(0, replacementResets);
                 Helpers.PartyScreenHelper.CloseScreen(false, true);
             }
             Assert.Null(Game.Current.GameStateManager.ActiveState);

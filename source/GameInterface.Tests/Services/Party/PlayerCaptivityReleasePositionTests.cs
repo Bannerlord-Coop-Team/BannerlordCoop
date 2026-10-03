@@ -5,6 +5,7 @@ using GameInterface.Services.Entity;
 using GameInterface.Services.Issues.Generic;
 using GameInterface.Services.MapEventParties;
 using GameInterface.Services.ObjectManager;
+using GameInterface.Services.Party;
 using GameInterface.Services.Party.Data;
 using GameInterface.Services.Party.Handlers;
 using GameInterface.Services.Party.Messages;
@@ -49,7 +50,7 @@ public class PlayerCaptivityReleasePositionTests
             network.Object,
             troopRosterInterface.Object,
             villageHostileActionInterface.Object,
-            new AlternativeSolutionTroopSelection());
+            new AlternativeSolutionTroopSelection(() => Mock.Of<IPartyScreenRosterRefresher>()));
     }
 
     [Fact]

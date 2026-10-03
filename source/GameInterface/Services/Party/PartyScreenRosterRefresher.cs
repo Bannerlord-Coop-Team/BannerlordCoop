@@ -9,6 +9,7 @@ using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.GameState;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Roster;
+using TaleWorlds.CampaignSystem.ViewModelCollection.Party;
 using TaleWorlds.Core;
 using TaleWorlds.Localization;
 using TaleWorlds.ScreenSystem;
@@ -27,6 +28,8 @@ internal interface IPartyScreenRosterRefresher
     bool TryApply(ItemRoster authoritativeRoster, Action<ItemRoster> applyAuthoritative);
 
     void RefreshXp(PartyScreenLogic logic, CharacterObject character);
+
+    void RefreshDoneState(PartyScreenLogic logic);
 }
 
 internal readonly struct PartyScreenSelectionIdentity
@@ -76,6 +79,16 @@ internal class PartyScreenRosterRefresher : IPartyScreenRosterRefresher
             RefreshTroop(logic, logic._initialData.RightMemberRoster, character, false, false);
         if (logic.CurrentData.LeftMemberRoster.GetTroopCount(character) > 0)
             RefreshTroop(logic, logic._initialData.LeftMemberRoster, character, false, false);
+    }
+
+    public void RefreshDoneState(PartyScreenLogic logic) => RefreshDoneState(logic, GetPartyVm(logic));
+
+    internal void RefreshDoneState(PartyScreenLogic logic, PartyVM partyVm)
+    {
+        if (partyVm == null || !ReferenceEquals(partyVm.PartyScreenLogic, logic)) return;
+        partyVm.IsDoneDisabled = !logic.IsDoneActive();
+        partyVm.DoneHint.HintText = new TextObject("{=!}" + logic.DoneReasonString);
+        partyVm.IsCancelDisabled = !logic.IsCancelActive();
     }
 
     public bool TryApply(
@@ -377,7 +390,7 @@ internal class PartyScreenRosterRefresher : IPartyScreenRosterRefresher
         replacement.UpdateRecruitable();
     }
 
-    private static void RefreshTroop(
+    private void RefreshTroop(
         PartyScreenLogic logic,
         TroopRoster baseline,
         CharacterObject character,
@@ -412,9 +425,7 @@ internal class PartyScreenRosterRefresher : IPartyScreenRosterRefresher
         if (numberChanged)
         {
             partyVm.RefreshPartyInformation();
-            partyVm.IsDoneDisabled = !logic.IsDoneActive();
-            partyVm.DoneHint.HintText = new TextObject("{=!}" + logic.DoneReasonString);
-            partyVm.IsCancelDisabled = !logic.IsCancelActive();
+            RefreshDoneState(logic, partyVm);
             RefreshSort(logic, partyVm, identity);
 
             if (identity.Side == PartyScreenLogic.PartyRosterSide.Right)

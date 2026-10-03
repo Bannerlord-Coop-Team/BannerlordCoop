@@ -1,5 +1,6 @@
 ﻿using Common;
 using Common.Util;
+using GameInterface.Services.Party;
 using Helpers;
 using System;
 using System.Linq;
@@ -25,10 +26,16 @@ internal interface IAlternativeSolutionTroopSelection
 
 internal sealed class AlternativeSolutionTroopSelection : IAlternativeSolutionTroopSelection
 {
+    private readonly Func<IPartyScreenRosterRefresher> rosterRefresher;
     private IssueBase returnedSelection;
     private IssueBase pendingIssue;
     private PartyScreenLogic pendingLogic;
     private string pendingCommitId;
+
+    public AlternativeSolutionTroopSelection(Func<IPartyScreenRosterRefresher> rosterRefresher)
+    {
+        this.rosterRefresher = rosterRefresher;
+    }
 
     public bool IsCommitPending(PartyScreenLogic logic)
         => pendingCommitId != null &&
@@ -57,7 +64,9 @@ internal sealed class AlternativeSolutionTroopSelection : IAlternativeSolutionTr
             Rollback(issue.IssueOwner);
 
         var active = (Game.Current.GameStateManager.ActiveState as PartyState)?.PartyScreenLogic;
-        if (active != null && ReferenceEquals(active.RightOwnerParty, logic.RightOwnerParty)) active.OnReset(false);
+        if (active == null || !ReferenceEquals(active.RightOwnerParty, logic.RightOwnerParty)) return;
+        if (ReferenceEquals(active, logic)) active.OnReset(false);
+        else rosterRefresher().RefreshDoneState(active);
     }
 
     public IssueBase FindIssue(PartyScreenLogic logic)
