@@ -189,7 +189,7 @@ public sealed partial class NavalLabController : CoopMissionController, INavalLa
             return "rejected:wrong_mode";
         if (IsTwoClientNative)
         {
-            if (action.Kind == "rope-throw" || action.Kind == "rope-miss" || action.Kind == "rope-cut")
+            if (action.Kind == "rope-throw" || action.Kind == "rope-miss" || action.Kind == "rope-cut" || action.Kind == "rope-plank-force")
             {
                 if (manifest.Mode != NavalLabMode.TwoClientNative || action.Ship < 0 || action.Ship >= 2
                     || manifest.Controllers[action.Ship] != session.OwnControllerId || !NativeControlsReady)
@@ -221,6 +221,18 @@ public sealed partial class NavalLabController : CoopMissionController, INavalLa
                 if (action.DeadlineUtcTicks <= DateTime.UtcNow.Ticks || action.DeadlineUtcTicks > DateTime.UtcNow.AddSeconds(2).Ticks)
                     return "rejected:expired_control";
                 return NativeAdapter.RequestNativeHelm(action.OperationId, action.Ship, action.Kind == "native-take-helm");
+            }
+            // Scripted captain locomotion after a confirmed release; not keyboard evidence.
+            if (action.Kind == "walk" || action.Kind == "turn")
+            {
+                if (manifest.Mode != NavalLabMode.TwoClientNative || action.Ship < 0 || action.Ship >= 2
+                    || manifest.Controllers[action.Ship] != session.OwnControllerId || action.Row || !NativeControlsReady
+                    || !NativeAgentAuthoritiesValid) return "rejected:owner_not_ready";
+                if (float.IsNaN(action.Rudder) || float.IsInfinity(action.Rudder) || Math.Abs(action.Rudder) > 1)
+                    return "rejected:invalid_control";
+                if (action.DeadlineUtcTicks <= DateTime.UtcNow.Ticks || action.DeadlineUtcTicks > DateTime.UtcNow.AddSeconds(1).Ticks)
+                    return "rejected:expired_control";
+                return adapter.StartAgentControl(action.Kind, action.Ship, action.Rudder);
             }
             if (action.Kind == "sail-full" || action.Kind == "sail-raised" || action.Kind == "sail-square-raised")
             {
@@ -359,6 +371,7 @@ public sealed partial class NavalLabController : CoopMissionController, INavalLa
         {
             faultReported = true;
             released = false;
+            FactoryProbeLogger.Error("[NavalLabTerminal] {Incarnation} adapter blocker: {Reason}", manifest.IncarnationId, adapter.Blocker);
             relay.SendAll(new NetworkNavalLabFault(manifest.IncarnationId, adapter.Blocker));
         }
         TickFollowerHull(dt);

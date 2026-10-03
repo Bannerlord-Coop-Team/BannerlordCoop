@@ -139,6 +139,7 @@ internal sealed partial class NavalLabBehavior
             try { if (ship.GameEntity.IsValid) ship.GameEntity.DisableDynamicBodySimulation(); }
             catch (Exception exception) { Reject("factory_probe.body_hold_failed:" + exception); }
         }
+        SendFinalRopeState();
         RecordFactoryPhase("terminal_hold", null);
     }
 

@@ -2,6 +2,16 @@
 
 Operational handoff for a fresh testing agent. Read this before building, deploying or launching. This is a disposable DEBUG experiment, not production naval support.
 
+## Current source correction (2026-09-29)
+
+The operational sections below predate the per-ship authority checkpoint and must not be used as a current acceptance checklist without these corrections:
+
+- In `TwoClientNative`, each original client simulates its own hull. The other hull receives server-forwarded owner samples. Check active/force counters **per hull**, not by elected host versus follower process. `AllPhysicsProbe` is diagnostic only, not a valid acceptance mode.
+- Experimental rope and plank replication exists, including an occupied/unknown plank-removal guard. Forced plank actions bypass normal eligibility and do not prove keyboard boarding, safe crossing or evacuation.
+- Coop, Missions.Naval and the ordinary complete Coop.Tests project compile. The focused control-pulse, factory-authority and oar-callsite classes pass 66 tests after reviewed repairs. These are managed checks, not native acceptance.
+- The rebuilt standalone MCP exposes 19 tools. Use actual catalog/schema discovery rather than the historical 18-tool count below.
+- Arrivals, occupied withdrawal/evacuation, actual campaign heroes and recoverable naval host migration remain unvalidated; arrival/withdrawal/recovery machinery is not implemented by this fixed fixture. Stages 1–2 are not complete.
+
 ## 1. What the lab is
 
 Use **TwoClientNative** for current ship-control work:

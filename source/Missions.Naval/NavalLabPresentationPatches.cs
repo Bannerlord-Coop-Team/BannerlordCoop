@@ -19,6 +19,8 @@ internal static partial class NavalLabPresentationPatches
         internal readonly NetworkNavalLabOarPresentation State;
         internal readonly long Sequence;
         internal bool TraceEnabled;
+        internal StopInputs StopInputs;
+        internal object StopCallsite;
         internal Guid Combatant;
         internal string Controller;
         internal long Ordinal;
@@ -59,6 +61,7 @@ internal static partial class NavalLabPresentationPatches
             var state = NavalLabPhysicsPatches.Active?.FindOarPresentation(__instance, out sequence);
             oarScope = new OarScope(__instance, state, sequence);
             var active = NavalLabPhysicsPatches.Active;
+            if (active?.CanTraceStationStop(__instance) == true) oarScope.StopInputs = new StopInputs();
             if (active != null) oarScope.TraceEnabled = active.BeginOarCallsiteTrace(__instance,
                 out oarScope.Combatant, out oarScope.Controller, out oarScope.Ordinal);
         }

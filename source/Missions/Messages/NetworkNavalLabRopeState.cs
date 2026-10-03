@@ -25,13 +25,19 @@ public sealed class NetworkNavalLabRopeState
     [ProtoMember(11)] public float[] CurveTarget;
     [ProtoMember(12)] public float CurveAngle;
 
+    [ProtoMember(13)] public float[] PlankFlight;
+    [ProtoMember(14)] public int DecorationPlanks;
+
     public bool IsValid => SourceStation >= 0 && SourceStation < 32 && !string.IsNullOrEmpty(SourceKey)
         && TargetStation >= -1 && TargetStation < MaxTargetStations && (TargetStation == -1 || !string.IsNullOrEmpty(TargetKey))
-        && Generation > 0 && (State == 0 || State == 1 || State == 4 || State == 5)
+        && Generation > 0 && (State >= 0 && State <= 5)
         && !float.IsNaN(Length) && !float.IsInfinity(Length) && Length >= 0 && Length <= 200
         && NetworkNavalLabOarPresentation.ValidFrame(HookFrame)
         && (CurveTarget == null || (CurveTarget.Length == 3 && CurveTarget.All(value => NetworkNavalLabPresentation.Bounded(value, -1000, 1000))
             && NetworkNavalLabPresentation.Bounded(CurveAngle, -180, 180)))
-        && History != null && History.Length <= 8 && History.All(state => state == 0 || state == 1 || state == 4 || state == 5);
+        && ((State != 2 && State != 3) || (TargetStation >= 0 && PlankFlight?.Length == 8
+            && PlankFlight.All(value => NetworkNavalLabPresentation.Bounded(value, -10000, 10000)) && PlankFlight[3] > 0))
+        && (State != 3 || (DecorationPlanks >= 2 && DecorationPlanks <= 80))
+        && History != null && History.Length <= 8 && History.All(state => state >= 0 && state <= 5);
 }
 #endif

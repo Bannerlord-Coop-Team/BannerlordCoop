@@ -326,9 +326,14 @@ public sealed class NavalLabTwoClientNativeTests : IDisposable
     [InlineData("point_lock")]
     [InlineData("frame_lock")]
     [InlineData("point_lifetime")]
-    public void CommittedOarMovement_RequiresExactLiveCommittedOwnerStation(string condition)
+    [InlineData("remote_replica")]
+    [InlineData("remote_ai_replica")]
+    public void CommittedOarMovement_RequiresExactLiveCommittedStation(string condition)
     {
-        var fixture = Fixture(condition == "wrong_mode" ? NavalLabMode.FactoryAuthorityProbe : NavalLabMode.TwoClientNative);
+        // Remote cases observe naval-A's committed ship from naval-B, where the rower is a controller-less puppet.
+        var fixture = Fixture(condition == "wrong_mode" ? NavalLabMode.FactoryAuthorityProbe : NavalLabMode.TwoClientNative,
+            condition.StartsWith("remote_") ? "B" : "A");
+        Patch(AccessTools.PropertyGetter(typeof(Agent), nameof(Agent.Controller)), condition == "remote_replica" ? nameof(NoController) : nameof(AiController));
         Patch(AccessTools.Method(typeof(NavalLabBehavior), "StationInventory"), nameof(Inventory));
         Patch(AccessTools.Method(typeof(Agent), nameof(Agent.IsActive)), condition == "inactive" ? nameof(False) : nameof(True));
         Patch(AccessTools.PropertyGetter(typeof(Agent), nameof(Agent.IsHuman)), nameof(True));
@@ -368,12 +373,14 @@ public sealed class NavalLabTwoClientNativeTests : IDisposable
             condition == "stale_epoch" ? 2 : 1, 0, condition == "not_committed" ? "offer" : "commit",
             fixture.manifest.Combatants.Skip(1).Take(4).ToArray(), new[] { condition == "missing_key" ? "other-key" : "fixed-key", "b", "c", "d" });
         if (condition != "missing_commit") fixture.appliedStations.Add(0, commit);
-        Assert.Equal(condition == "matching", fixture.IsCommittedOarMovement(
+        Assert.Equal(condition == "matching" || condition == "remote_replica", fixture.IsCommittedOarMovement(
             condition == "stale_incarnation" ? Guid.NewGuid() : incarnation,
             condition == "foreign_actor" ? fixture.manifest.Combatants[6] : id, agent));
         Assert.Equal(0, stopped + assigned);
     }
     private static bool NoMount(ref Agent? __result) { __result = null; return false; }
+    private static bool NoController(ref TaleWorlds.Core.AgentControllerType __result) { __result = TaleWorlds.Core.AgentControllerType.None; return false; }
+    private static bool AiController(ref TaleWorlds.Core.AgentControllerType __result) { __result = TaleWorlds.Core.AgentControllerType.AI; return false; }
     private static bool FrameLocked(ref AgentMovementLockedState __result) { __result = AgentMovementLockedState.FrameLocked; return false; }
     private static bool Unlocked(ref AgentMovementLockedState __result) { __result = AgentMovementLockedState.None; return false; }
 

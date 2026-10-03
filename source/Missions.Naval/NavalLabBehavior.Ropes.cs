@@ -25,6 +25,7 @@ internal sealed partial class NavalLabBehavior
         internal NetworkNavalLabRopeState Last;
         internal float[] CurveTarget;
         internal float CurveAngle;
+        internal int DecorationPlanks;
         internal readonly List<int> History = new();
     }
 
@@ -34,9 +35,10 @@ internal sealed partial class NavalLabBehavior
     private readonly long[] ropeForceWrites = new long[3];
     private readonly long[] ropeForeignWritesFiltered = new long[3];
     private long ropeJointTicks;
-    private long ropeBridgeChecksBlocked;
     private bool applyingRope;
     private Guid ropeCommandOperation;
+    internal Action<NetworkNavalLabRopeFinal> SendFinalRopes;
+    private readonly long[] finalRopesApplied = new long[2];
 
     internal bool HasRopeExperiment => manifest.Mode == NavalLabMode.TwoClientNative;
     internal bool RopeReady => HasRopeExperiment && CanUseNativeControls && !factoryTerminal
@@ -65,7 +67,9 @@ internal sealed partial class NavalLabBehavior
     internal bool AllowRopeConnection(ShipAttachmentMachine source, ShipAttachmentPointMachine target, bool forceBridge)
     {
         if (!IsFixtureRopeMachine(source)) return true;
-        if (!RopeReady || forceBridge || source.CurrentAttachment != null || source.LinkedAttachmentPointMachine?.CurrentAttachment != null) return false;
+        // Replica creation may also replay the owner's final state after a terminal hold.
+        if ((!RopeReady && !applyingRope) || forceBridge || source.CurrentAttachment != null
+            || source.LinkedAttachmentPointMachine?.CurrentAttachment != null) return false;
         if (target != null && (target.OwnerShip == source.OwnerShip || Array.IndexOf(Ships, target.OwnerShip) < 0
             || target.CurrentAttachment != null || target.LinkedAttachmentMachine?.CurrentAttachment != null)) return false;
         return applyingRope || source.OwnerShip == LocalShip;
@@ -91,23 +95,12 @@ internal sealed partial class NavalLabBehavior
     internal bool AllowRopeState(Attachment attachment, RopeState state)
     {
         if (!IsFixtureRope(attachment)) return true;
-        if (state == RopeState.BridgeThrown || state == RopeState.BridgeConnected)
-        {
-            Reject("rope.bridge_transition_attempt");
-            return false;
-        }
         if (!IsOwnedRope(attachment) && !applyingRope) return false;
+        if (state == RopeState.BrokenAndWaitingForRemoval && !AllowPlankRemoval(attachment)) return false;
         if (ropes.TryGetValue(attachment.AttachmentSource, out var record) && record.Attachment == attachment
             && (record.History.Count == 0 || record.History[record.History.Count - 1] != (int)state) && record.History.Count < 8)
             record.History.Add((int)state);
         return true;
-    }
-
-    internal bool AllowRopeBridge(Attachment attachment)
-    {
-        if (!IsFixtureRope(attachment)) return true;
-        Interlocked.Increment(ref ropeBridgeChecksBlocked);
-        return false;
     }
 
     internal string RequestRope(NetworkNavalLabAction action)
@@ -118,9 +111,11 @@ internal sealed partial class NavalLabBehavior
         int index = (int)action.Rudder;
         if (index >= ropeSources[OwnSlot].Length) return "rejected:rope_source_missing";
         var source = ropeSources[OwnSlot][index];
+        if (action.Kind == "rope-plank-force") return RequestPlank(source);
         if (action.Kind == "rope-cut")
         {
             if (source.CurrentAttachment == null) return "already_clear";
+            if (!AllowPlankRemoval(source.CurrentAttachment)) return "rejected:plank_occupied_or_unknown";
             if (source.CurrentAttachment.AttachmentTarget == null)
                 source.CurrentAttachment.SetAttachmentState(RopeState.BrokenAndWaitingForRemoval);
             else source.DisconnectAttachment();
@@ -205,10 +200,34 @@ internal sealed partial class NavalLabBehavior
             TargetKey = targetIndex < 0 ? null : EntityKey(attachment.AttachmentTarget.GameEntity, Ships[1 - OwnSlot]),
             Generation = record.Generation, State = (int)attachment.State, Length = Math.Max(0, attachment._currentRopeLength),
             HookFrame = hook, History = record.History.ToArray(), OperationId = record.OperationId,
-            CurveTarget = record.CurveTarget, CurveAngle = record.CurveAngle
+            CurveTarget = record.CurveTarget, CurveAngle = record.CurveAngle,
+            PlankFlight = CapturePlankFlight(attachment), DecorationPlanks = record.DecorationPlanks
         };
         if (!state.IsValid) throw new InvalidOperationException("rope.invalid_native_state");
         return state;
+    }
+
+    // At terminal hold the owner's rope ticks are frozen, so its captured lifecycle is final and both owners can converge on it.
+    private void SendFinalRopeState()
+    {
+        if (!HasRopeExperiment || ropeSources == null || SendFinalRopes == null) return;
+        try
+        {
+            var ropes = CaptureRopes();
+            if (ropes.Length > 0) SendFinalRopes(new NetworkNavalLabRopeFinal(manifest.IncarnationId, OwnSlot, manifest.Ships[OwnSlot], ropes));
+        }
+        catch (Exception exception) { Reject("rope.final_state_unavailable:" + exception.GetType().Name); }
+    }
+
+    // One discrete replay of the owner's final lifecycle; frozen ticks keep native physics off afterwards.
+    internal void AcceptFinalRopes(NetworkNavalLabRopeFinal value)
+    {
+        if (!HasRopeExperiment || ropeSources == null || value.Slot == OwnSlot)
+            throw new InvalidOperationException("rope.final_state_without_replica_inventory");
+        if (!ValidateRopes(value.Slot, value.Ropes)) throw new InvalidOperationException("rope.final_state_invalid");
+        AcceptRopes(value.Slot, value.Ropes);
+        foreach (var rope in value.Ropes) PresentFinalReplica(value.Slot, rope);
+        finalRopesApplied[value.Slot]++;
     }
 
     private bool ValidateRopes(int sourceSlot, NetworkNavalLabRopeState[] values)
@@ -241,6 +260,7 @@ internal sealed partial class NavalLabBehavior
                     record.Attachment = null;
                 }
                 record.Last = value;
+                record.DecorationPlanks = value.DecorationPlanks;
                 if (value.State == (int)RopeState.BrokenAndWaitingForRemoval)
                 {
                     source.CurrentAttachment?.SetAttachmentState(RopeState.BrokenAndWaitingForRemoval);
@@ -268,13 +288,15 @@ internal sealed partial class NavalLabBehavior
                     attachment.AttachmentTarget = target;
                     target.AssignConnection(attachment);
                 }
-                if (value.State == (int)RopeState.RopesPulling && attachment.ShipAttachmentJoint == null)
+                if ((value.State == (int)RopeState.RopesPulling || value.State == (int)RopeState.BridgeThrown
+                    || value.State == (int)RopeState.BridgeConnected) && attachment.ShipAttachmentJoint == null)
                 {
                     var position = source.RopeVisual.GameEntity.GlobalPosition;
                     var target = attachment.AttachmentTarget;
                     var local = target.HookAttachLocalPosition;
                     attachment.InitializeShipAttachmentJoint(position, target.GameEntity.GetGlobalFrame().TransformToParent(local));
                 }
+                ApplyPlank(attachment, value);
                 attachment.SetAttachmentState((RopeState)value.State);
                 attachment._currentRopeLength = value.Length;
                 attachment._hookGlobalFrame = NetworkNavalLabOarPresentation.ToFrame(value.HookFrame);
@@ -295,6 +317,13 @@ internal sealed partial class NavalLabBehavior
         if (!ropes.TryGetValue(attachment.AttachmentSource, out var record) || record.Last == null)
             throw new InvalidOperationException("rope.replica_state_missing");
         if (attachment.State == RopeState.BrokenAndWaitingForRemoval) return false;
+        if (attachment.State == RopeState.BridgeThrown || attachment.State == RopeState.BridgeConnected) return true;
+        UpdateReplicaRopeVisual(attachment, record);
+        return false;
+    }
+
+    private void UpdateReplicaRopeVisual(Attachment attachment, RopeRecord record)
+    {
         var source = attachment.AttachmentSource.RopeVisual.GameEntity.GlobalPosition;
         var hook = NetworkNavalLabOarPresentation.ToFrame(record.Last.HookFrame);
         var target = hook.origin;
@@ -308,7 +337,20 @@ internal sealed partial class NavalLabBehavior
         else attachment.AttachmentSource.RopeVisual.UpdateRopeMeshVisualAccordingToTargetPointLinear(in source, in target);
         hook.origin = target;
         attachment._hookGlobalFrame = hook;
-        return false;
+    }
+
+    // Ticks stay frozen after a hold, so lay out the replayed final state once.
+    private void PresentFinalReplica(int slot, NetworkNavalLabRopeState value)
+    {
+        var attachment = ropeSources[slot][value.SourceStation].CurrentAttachment;
+        if (attachment == null || !ropes.TryGetValue(attachment.AttachmentSource, out var record)) return;
+        if (attachment.State == RopeState.BridgeThrown)
+        {
+            attachment.ArrangePlanksMT();
+            attachment.ArrangePlanks();
+        }
+        else if (attachment.State == RopeState.RopeThrown || attachment.State == RopeState.RopesPulling)
+            UpdateReplicaRopeVisual(attachment, record);
     }
 
     internal void ObserveRopeCurve(Attachment attachment, Vec3 target, float angle)
@@ -341,14 +383,14 @@ internal sealed partial class NavalLabBehavior
 
     internal object InspectRopes()
     {
-        if (!RopeReady) return new { ready = false, mode = manifest.Mode.ToString(), blocker = Blocker };
+        if (!RopeReady) return new { ready = false, mode = manifest.Mode.ToString(), blocker = Blocker, firstStationObservationFailure, firstStationStopEntry = FirstStationStopEntry, finalRopesApplied = finalRopesApplied.ToArray() };
         EnsureRopeInventory();
         return new
         {
-            ready = true, incarnation = manifest.IncarnationId, ownSlot = OwnSlot,
+            ready = true, incarnation = manifest.IncarnationId, ownSlot = OwnSlot, finalRopesApplied = finalRopesApplied.ToArray(), firstStationObservationFailure, firstStationStopEntry = FirstStationStopEntry,
             solver = "vanilla joint on each client, own endpoint writes only, native foreign velocity reads unvalidated",
-            bridgeAllowed = false, nativePlankPreallocationRetained = true, keyboardAcceptance = false,
-            ropeJointTicks = Interlocked.Read(ref ropeJointTicks), bridgeChecksBlocked = Interlocked.Read(ref ropeBridgeChecksBlocked),
+            bridgeAllowed = true, nativePlankPreallocationRetained = true, keyboardAcceptance = false,
+            ropeJointTicks = Interlocked.Read(ref ropeJointTicks),
             forceKinds = new[] { "force", "torque", "global_force_at_local_position" },
             ownForceWrites = ropeForceWrites.Select(value => value).ToArray(), foreignForceWritesFiltered = ropeForeignWritesFiltered.Select(value => value).ToArray(),
             ships = Ships.Select((ship, slot) => new
@@ -365,10 +407,11 @@ internal sealed partial class NavalLabBehavior
                     jointDistanceError = source.CurrentAttachment?.ShipAttachmentJoint == null ? null : RopeNumber(source.CurrentAttachment.ShipAttachmentJoint.CurrentDistanceError),
                     localJointBroken = source.CurrentAttachment?.ShipAttachmentJoint?.IsBroken,
                     bridgeConnected = source.CurrentAttachment?.IsNavmeshConnected == true,
+                    plank = InspectPlank(source.CurrentAttachment),
                     published = ropes.TryGetValue(source, out var record) ? record.Last : null,
                     targets = ropeTargets[1 - slot].Select((target, targetIndex) => new
                     {
-                        targetIndex, distance = RopeNumber((target.GameEntity.GlobalPosition - source.GameEntity.GlobalPosition).Length),
+                        targetIndex, nearbyOccupiedOars = NearbyOccupiedOars(source, target), distance = RopeNumber((target.GameEntity.GlobalPosition - source.GameEntity.GlobalPosition).Length),
                         nativeSelectionScore = RopeNumber(ShipAttachmentMachine.ComputePotentialAttachmentValue(source, target,
                             checkInteractionDistance: false, checkConnectionBlock: false, allowWiderAngleBetweenConnections: true))
                     }).ToArray()

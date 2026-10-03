@@ -30,6 +30,16 @@ internal sealed partial class NavalLabBehavior
     private readonly NetworkNavalLabHelmInput[] lastReceivedNativeInput = new NetworkNavalLabHelmInput[2];
     private bool lastHelmPermission;
     private readonly Dictionary<int, NetworkNavalLabStations> appliedStations = new();
+    internal Action<NetworkNavalLabStations> SendStationRelease;
+    // Released crew stay released; the owner authors each release revision, the other client only replays it.
+    private readonly bool[][] releasedStations = { new bool[4], new bool[4] };
+    private readonly long[] stationReleaseRevisions = new long[2];
+    private readonly double[][] unconfirmedReleaseDeadlines = { new double[4], new double[4] };
+    // Only a rower once observed seated can be released; a failed initial seat stays a fault.
+    private readonly bool[][] seatedStations = { new bool[4], new bool[4] };
+    private object firstStationObservationFailure;
+    private object firstStationStopEntry;
+    private object FirstStationStopEntry => System.Threading.Volatile.Read(ref firstStationStopEntry);
     internal bool CanPrepareTwoClientDeployment => IsTwoClientNative && factoryMaterialized && factoryReleased
         && !factoryTerminal && factoryAuthorityValid?.Invoke() == true;
 
@@ -70,6 +80,7 @@ internal sealed partial class NavalLabBehavior
         {
             pulsePending = false;
             pulseCompleting = true;
+            pulsePhysicsObservation.Close();
         }
         var input = ShipInputRecord.Stop();
         if (permission)
@@ -94,6 +105,7 @@ internal sealed partial class NavalLabBehavior
             if (pulsePending || pulseCompleting)
             {
                 pulsePending = pulseCompleting = false;
+                pulsePhysicsObservation.Close();
                 pulsePhase = "failed_dispatch_safety_hold";
             }
             throw;
@@ -189,6 +201,7 @@ internal sealed partial class NavalLabBehavior
 
     internal void ApplyStations(NetworkNavalLabStations value)
     {
+        if (value.Phase == "release") { ApplyStationRelease(value); return; }
         var inventory = StationInventory(value.Ship);
         var ordered = inventory.OrderBy(pair => pair.Key, StringComparer.Ordinal).ToArray();
         if (!value.HasPresentationInventory || !value.SailKeys.SequenceEqual(Ships[value.Ship].Sails.Select(sail => SailKey(sail, Ships[value.Ship])))
@@ -229,23 +242,27 @@ internal sealed partial class NavalLabBehavior
 
     internal bool IsCommittedOarMovement(Guid incarnationId, Guid combatantId, Agent agent)
     {
+        int combatant = Array.IndexOf(manifest.Combatants, combatantId);
+        int slot = combatant < 0 ? -1 : combatant / NavalLabManifest.CrewPerShip;
         if (!IsTwoClientNative || incarnationId != manifest.IncarnationId || Mission == null || Mission != Mission.Current
             || factoryTerminal || nativeTerminalHold || !nativeDeploymentComplete || Blocker != null
-            || OwnSlot < 0 || OwnSlot >= Ships.Length || !appliedStations.TryGetValue(OwnSlot, out var stations)
+            || slot < 0 || slot >= Ships.Length || !appliedStations.TryGetValue(slot, out var stations)
             || stations.IncarnationId != incarnationId || stations.Epoch != 1 || stations.Phase != "commit") return false;
         int crew = Array.IndexOf(stations.Combatants, combatantId);
-        int index = (OwnSlot * NavalLabManifest.CrewPerShip) + crew + 1;
-        if (crew < 0 || crew >= 4 || stations.Keys == null || stations.Keys.Length != 4
+        int index = (slot * NavalLabManifest.CrewPerShip) + crew + 1;
+        // The original owner's rower stays AI-driven; its replica on the other client is a controller-less puppet.
+        if (crew < 0 || crew >= 4 || releasedStations[slot][crew] || stations.Keys == null || stations.Keys.Length != 4
             || index >= Agents.Length || manifest.Combatants[index] != combatantId || Agents[index] != agent
             || agent == null || agent.Pointer == UIntPtr.Zero || agent.Mission != Mission || !agent.IsActive()
-            || agent == Mission.MainAgent || agent.IsMainAgent || !agent.IsHuman || !agent.IsAIControlled
+            || agent == Mission.MainAgent || agent.IsMainAgent || !agent.IsHuman
+            || (slot == OwnSlot ? !agent.IsAIControlled : agent.Controller != AgentControllerType.None)
             || agent.MountAgent != null || agent.IsMount) return false;
         Dictionary<string, ShipOarMachine> inventory;
-        try { inventory = StationInventory(OwnSlot); }
+        try { inventory = StationInventory(slot); }
         catch (InvalidOperationException) { return false; }
         if (!inventory.TryGetValue(stations.Keys[crew], out var machine)) return false;
         var point = machine.PilotStandingPoint;
-        var ship = Ships[OwnSlot];
+        var ship = Ships[slot];
         return ship.GameEntity.IsValid && machine.GameEntity.IsValid && point != null && point.GameEntity.IsValid
             && !point.IsDeactivated && ship.Captain != agent && agent.Formation == ship.Formation
             && machine._oar?.OwnerShip == ship && machine.PilotAgent == agent && point.UserAgent == agent
@@ -275,21 +292,35 @@ internal sealed partial class NavalLabBehavior
         var inventory = StationInventory(value.Ship);
         for (int i = 0; i < 4; i++)
         {
-            if (!inventory.TryGetValue(value.Keys[i], out var machine)) return false;
+            if (!inventory.TryGetValue(value.Keys[i], out var machine))
+                return RecordStationObservationFailure(value, i, "station_missing", refreshTargets, null, null);
             var agent = Agents[(value.Ship * 5) + i + 1];
             var point = machine.PilotStandingPoint;
             var ship = Ships[value.Ship];
+            // A released rower is neither seat-checked nor repinned to its station target.
+            if (releasedStations[value.Ship][i]) continue;
+            if (seatedStations[value.Ship][i] && IsNativeStationRelease(value.Ship, agent, machine))
+            {
+                if (!ObserveNativeStationRelease(value, i, refreshTargets, machine, agent)) return false;
+                continue;
+            }
             if (refreshTargets && (agent == null || agent.Pointer == UIntPtr.Zero || agent.Mission != Mission
                 || agent == Mission.MainAgent || agent.IsMainAgent || !agent.IsHuman || agent.MountAgent != null || agent.IsMount
                 || !ship.GameEntity.IsValid || !machine.GameEntity.IsValid || point == null || !point.GameEntity.IsValid
                 || point.IsDeactivated || ship.Captain == agent || agent.Formation != ship.Formation
                 || machine._oar?.OwnerShip != ship || !point.LockUserFrames
-                || agent.MovementLockedState != AgentMovementLockedState.FrameLocked)) return false;
-            if (agent == null || !agent.IsActive()
-                || (manifest.Controllers[value.Ship] == ownControllerId ? !agent.IsAIControlled : agent.Controller != AgentControllerType.None)
-                || machine.PilotAgent != agent || machine.PilotStandingPoint.UserAgent != agent
-                || agent.CurrentlyUsedGameObject != machine.PilotStandingPoint || !machine._isPilotSitting || machine._lastPilotAgent != agent)
-                return false;
+                || agent.MovementLockedState != AgentMovementLockedState.FrameLocked))
+                return RecordStationObservationFailure(value, i, "target_refresh_precondition", refreshTargets, machine, agent);
+            string failure = agent == null ? "agent_missing"
+                : !agent.IsActive() ? "agent_inactive"
+                : (manifest.Controllers[value.Ship] == ownControllerId ? !agent.IsAIControlled : agent.Controller != AgentControllerType.None) ? "controller_mismatch"
+                : machine.PilotAgent != agent ? "pilot_mismatch"
+                : machine.PilotStandingPoint.UserAgent != agent ? "point_user_mismatch"
+                : agent.CurrentlyUsedGameObject != machine.PilotStandingPoint ? "used_object_mismatch"
+                : !machine._isPilotSitting ? "not_sitting"
+                : machine._lastPilotAgent != agent ? "last_pilot_mismatch" : null;
+            if (failure != null) return RecordStationObservationFailure(value, i, failure, refreshTargets, machine, agent);
+            seatedStations[value.Ship][i] = true;
             if (refreshTargets)
             {
                 var frame = point.GetUserFrameForAgent(agent);
@@ -297,6 +328,157 @@ internal sealed partial class NavalLabBehavior
             }
         }
         return true;
+    }
+
+    // A complete native stop-use by a still-valid crew actor, not a partial or foreign occupancy.
+    private bool IsNativeStationRelease(int slot, Agent agent, ShipOarMachine machine) =>
+        agent != null && agent.IsActive() && machine.PilotAgent == null && machine.PilotStandingPoint.UserAgent == null
+        && agent.CurrentlyUsedGameObject != machine.PilotStandingPoint
+        && (manifest.Controllers[slot] == ownControllerId ? agent.IsAIControlled : agent.Controller == AgentControllerType.None);
+
+    private bool ObserveNativeStationRelease(NetworkNavalLabStations value, int crew, bool refreshTargets, ShipOarMachine machine, Agent agent)
+    {
+        int slot = value.Ship;
+        if (manifest.Controllers[slot] != ownControllerId)
+        {
+            // Bridge side effects can unseat a replica before the owner's release arrives; only an unconfirmed release faults.
+            if (unconfirmedReleaseDeadlines[slot][crew] == 0) unconfirmedReleaseDeadlines[slot][crew] = ControlNow + 2;
+            return ControlNow < unconfirmedReleaseDeadlines[slot][crew]
+                || RecordStationObservationFailure(value, crew, "release_unconfirmed_by_owner", refreshTargets, machine, agent);
+        }
+        if (SendStationRelease == null)
+            return RecordStationObservationFailure(value, crew, "release_without_sender", refreshTargets, machine, agent);
+        releasedStations[slot][crew] = true;
+        SendStationRelease(appliedStations[slot].WithRelease(++stationReleaseRevisions[slot], releasedStations[slot]));
+        return true;
+    }
+
+    // Replays the owner's ordered release through native stop-use; a stale revision never repins a released rower.
+    private void ApplyStationRelease(NetworkNavalLabStations value)
+    {
+        int slot = value.Ship;
+        if (value.IncarnationId != manifest.IncarnationId || value.Epoch != 1 || slot < 0 || slot >= Ships.Length
+            || manifest.Controllers[slot] == ownControllerId || !appliedStations.TryGetValue(slot, out var committed)
+            || !committed.Keys.SequenceEqual(value.Keys) || !committed.Combatants.SequenceEqual(value.Combatants)
+            || value.Released == null || value.Released.Length != 4)
+            throw new InvalidOperationException("native.station_release_identity");
+        if (value.Revision <= stationReleaseRevisions[slot]) return;
+        if (value.Revision != stationReleaseRevisions[slot] + 1
+            || Enumerable.Range(0, 4).Any(crew => releasedStations[slot][crew] && !value.Released[crew]))
+            throw new InvalidOperationException("native.station_release_order");
+        var inventory = StationInventory(slot);
+        for (int crew = 0; crew < 4; crew++)
+        {
+            if (!value.Released[crew] || releasedStations[slot][crew]) continue;
+            var agent = Agents[(slot * 5) + crew + 1];
+            var point = inventory[value.Keys[crew]].PilotStandingPoint;
+            if (agent == null || !agent.IsActive() || agent.Controller != AgentControllerType.None
+                || (point.UserAgent != null && point.UserAgent != agent))
+                throw new InvalidOperationException("native.station_release_actor");
+            if (point.UserAgent == agent || agent.CurrentlyUsedGameObject == point) agent.StopUsingGameObject();
+            releasedStations[slot][crew] = true;
+            unconfirmedReleaseDeadlines[slot][crew] = 0;
+        }
+        stationReleaseRevisions[slot] = value.Revision;
+    }
+
+    internal bool CanTraceStationStop(ShipOarMachine machine)
+    {
+        if (!HasRopeExperiment || !nativeDeploymentComplete || !factoryReleased || factoryTerminal || nativeTerminalHold
+            || Blocker != null || FirstStationStopEntry != null) return false;
+        var inventory = presentationInventory;
+        if (inventory == null) return false;
+        foreach (var entry in inventory)
+        {
+            int index = Array.IndexOf(entry.Machines, machine);
+            if (index < 0) continue;
+            var agent = entry.Actors[index];
+            var point = machine.PilotStandingPoint;
+            return agent != null && point != null && ReferenceEquals(point.UserAgent, agent)
+                && ReferenceEquals(agent.CurrentlyUsedGameObject, point);
+        }
+        return false;
+    }
+
+    internal void RecordStationStopEntry(Agent agent, bool successful, Agent.StopUsingGameObjectFlags flags)
+    {
+        if (!HasRopeExperiment || !nativeDeploymentComplete || !factoryReleased || factoryTerminal || nativeTerminalHold
+            || Blocker != null || agent == null || FirstStationStopEntry != null) return;
+        var inventory = presentationInventory;
+        if (inventory == null) return;
+        for (int slot = 0; slot < inventory.Length; slot++)
+        {
+            var entry = inventory[slot];
+            for (int crew = 0; crew < entry.Actors.Length; crew++)
+            {
+                if (!ReferenceEquals(entry.Actors[crew], agent)) continue;
+                var machine = entry.Machines[crew];
+                var point = machine.PilotStandingPoint;
+                // Match published fixture references only; this hook may run on a parallel native callback.
+                if (point == null || !ReferenceEquals(agent.CurrentlyUsedGameObject, point)
+                    || !ReferenceEquals(point.UserAgent, agent)) return;
+                var stack = new List<object>();
+                for (int i = 0; i < 8; i++)
+                {
+                    var frame = new System.Diagnostics.StackFrame(i + 1, false);
+                    var method = frame.GetMethod();
+                    if (method == null) break;
+                    string name = method.DeclaringType?.FullName + "." + method.Name;
+                    stack.Add(new { method = name.Length > 180 ? name.Substring(0, 180) : name, ilOffset = frame.GetILOffset() });
+                }
+                object record = new
+                {
+                    slot, stationIndex = crew, key = entry.OarKeys[crew], combatant = entry.Combatants[crew], owner = manifest.Controllers[slot],
+                    successful, flags = flags.ToString(), threadId = System.Threading.Thread.CurrentThread.ManagedThreadId,
+                    timestamp = System.Diagnostics.Stopwatch.GetTimestamp(),
+                    localMissionTick = System.Threading.Interlocked.Read(ref nativeHelmTicks),
+                    pilotMatches = ReferenceEquals(machine.PilotAgent, agent), machine._isPilotSitting,
+                    lastPilotMatches = ReferenceEquals(machine._lastPilotAgent, agent), stack = stack.ToArray(),
+                    oarCallsite = NavalLabPresentationPatches.StationStopCallsite(agent),
+                    observation = "First exact seated rower StopUsingGameObjectAux entry, before original cleanup; not proof of completion. No native pointer reads."
+                };
+                System.Threading.Interlocked.CompareExchange(ref firstStationStopEntry, record, null);
+                return;
+            }
+        }
+    }
+
+    private bool RecordStationObservationFailure(NetworkNavalLabStations value, int crew, string reason,
+        bool refreshTargets, ShipOarMachine machine, Agent agent)
+    {
+        if (firstStationObservationFailure != null) return false;
+        object native = null;
+        string unavailable = null;
+        try
+        {
+            var point = machine?.PilotStandingPoint;
+            if (Mission == null || Mission != Mission.Current || agent == null || agent.Pointer == UIntPtr.Zero
+                || agent.Mission != Mission || machine == null || !machine.GameEntity.IsValid
+                || point == null || !point.GameEntity.IsValid) unavailable = "native_identity_unavailable";
+            else native = new
+            {
+                agentIndex = agent.Index, controller = agent.Controller.ToString(), active = agent.IsActive(),
+                pointId = point.Id.Id, machineId = machine.Id.Id,
+                pilotIndex = machine.PilotAgent?.Index, pointUserIndex = point.UserAgent?.Index,
+                usedObjectId = agent.CurrentlyUsedGameObject?.Id.Id, lastPilotIndex = machine._lastPilotAgent?.Index,
+                sitting = machine._isPilotSitting, point.IsDeactivated, point.LockUserFrames,
+                movementLockedState = agent.MovementLockedState.ToString(),
+                disablingRampCount = machine._disablingAttachmentRampEntities.Count,
+                pilotRemovalTime = RopeNumber(machine._pilotRemovalTime.Item1),
+                pilotRemovalFlags = machine._pilotRemovalTime.Item2.ToString(),
+                action0 = agent.GetCurrentAction(0).Index, action1 = agent.GetCurrentAction(1).Index
+            };
+        }
+        catch (Exception exception) { unavailable = exception.GetType().Name; }
+        // Retain the first failed predicate before terminal cleanup can clear native identities.
+        firstStationObservationFailure = new
+        {
+            reason, ship = value.Ship, crew, key = value.Keys[crew], combatant = value.Combatants[crew],
+            owner = manifest.Controllers[value.Ship], localMissionTick = nativeHelmTicks,
+            refreshTargets, native, unavailable,
+            observation = "First failed station predicate; extra scalar reads are later, non-atomic, and do not identify the writer."
+        };
+        return false;
     }
 }
 #endif

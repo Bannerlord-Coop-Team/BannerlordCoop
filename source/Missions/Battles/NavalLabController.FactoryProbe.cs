@@ -98,6 +98,7 @@ public sealed partial class NavalLabController
             if (!faultReported)
             {
                 faultReported = true;
+                FactoryProbeLogger.Error("[NavalLabTerminal] {Incarnation} local fault: {Reason}", manifest.IncarnationId, reason);
                 relay.SendAll(new NetworkNavalLabFault(manifest.IncarnationId, reason));
             }
         }

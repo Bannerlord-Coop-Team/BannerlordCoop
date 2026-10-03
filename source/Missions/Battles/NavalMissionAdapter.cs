@@ -45,9 +45,17 @@ public interface INavalHelmReplicationAdapter
     long HelmMovementRevision(Guid combatantId, Agent agent);
 }
 
+/// <summary>Captain deck poses on any fixture support hull; the captain slot alone carries identity.</summary>
+public interface INavalDeckAdapter
+{
+    bool TryCaptureOwnCaptainDeck(Agent captain, Vec3 worldPosition, out int supportSlot, out Vec3 deckLocal, out float deckSpeed);
+    bool TryGetCaptainDeckFrame(int captainSlot, int supportSlot, Agent captain, out MatrixFrame hullFrame);
+}
+
 public interface INavalNativeMissionAdapter
 {
-    void ConfigureNative(Func<bool> authority, Action<Missions.Messages.NetworkNavalLabHelmInput> sendInput);
+    void ConfigureNative(Func<bool> authority, Action<Missions.Messages.NetworkNavalLabHelmInput> sendInput,
+        Action<Missions.Messages.NetworkNavalLabStations> sendStationRelease);
     Missions.Messages.NetworkNavalLabStations CreateStations();
     void ApplyStations(Missions.Messages.NetworkNavalLabStations stations);
     bool ObserveStations(Missions.Messages.NetworkNavalLabStations stations);

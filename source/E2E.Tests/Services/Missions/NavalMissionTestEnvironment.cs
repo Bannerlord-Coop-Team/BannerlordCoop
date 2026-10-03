@@ -110,6 +110,15 @@ public class NavalMissionTestEnvironment : MissionTestEnvironment, IDisposable
         PumpAll();
     }
 
+    protected void SendShipSample(EnvironmentInstance sender, NetworkNavalLabShipSample sample)
+    {
+        sender.Call(() => sender.Resolve<INetwork>().SendAll(sample));
+        PumpAll();
+    }
+
+    protected JToken ShipStream(EnvironmentInstance client, int slot) =>
+        JObject.FromObject(Adapter(client).Controller!.NativeControlStatus())["ships"]![slot]!;
+
     protected static NetworkNavalLabAction[] Actions(EnvironmentInstance client) =>
         client.InternalMessages.GetMessages<NetworkNavalLabAction>().ToArray();
 

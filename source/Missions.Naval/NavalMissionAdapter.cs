@@ -25,7 +25,7 @@ using TaleWorlds.ObjectSystem;
 
 namespace Missions.Naval;
 
-public sealed class NavalMissionAdapter : INavalMissionAdapter, INavalNativeMissionAdapter, INavalHelmReplicationAdapter, INavalDriftAdapter, INavalPresentationAdapter, INavalLabShipAdapter, INavalRopeAdapter
+public sealed class NavalMissionAdapter : INavalMissionAdapter, INavalNativeMissionAdapter, INavalHelmReplicationAdapter, INavalDriftAdapter, INavalPresentationAdapter, INavalLabShipAdapter, INavalRopeAdapter, INavalDeckAdapter
 {
     private NavalLabBehavior behavior;
     private readonly Harmony harmony = new Harmony("coop.warsails.lab.physics");
@@ -85,6 +85,8 @@ public sealed class NavalMissionAdapter : INavalMissionAdapter, INavalNativeMiss
     public object InspectShipAuthority() => behavior.InspectShipAuthority();
     public string RequestRope(Missions.Messages.NetworkNavalLabAction action) => behavior?.RequestRope(action) ?? "rejected:no_rope_fixture";
     public object InspectRopes() => behavior?.InspectRopes();
+    public void ConfigureFinalRopes(Action<Missions.Messages.NetworkNavalLabRopeFinal> send) => behavior.SendFinalRopes = send;
+    public void AcceptFinalRopes(Missions.Messages.NetworkNavalLabRopeFinal value) => behavior?.AcceptFinalRopes(value);
     public void SetAuthority(bool simulate) => behavior?.SetAuthority(simulate);
     public void MaterializeFactoryProbe(bool electedHost, Func<bool> authorityValid) =>
         behavior.MaterializeFactoryProbe(electedHost, authorityValid);
@@ -118,10 +120,23 @@ public sealed class NavalMissionAdapter : INavalMissionAdapter, INavalNativeMiss
     public string StartAgentControl(string kind, int ship, float value) =>
         behavior?.StartAgentControl(kind, ship, value) ?? "rejected:unavailable";
     public void TickAgentControl(float dt) => behavior?.TickAgentControl(dt);
+    public bool TryCaptureOwnCaptainDeck(Agent captain, Vec3 worldPosition, out int supportSlot, out Vec3 deckLocal, out float deckSpeed)
+    {
+        supportSlot = -1;
+        deckLocal = Vec3.Zero;
+        deckSpeed = 0;
+        return behavior?.TryCaptureOwnCaptainDeck(captain, worldPosition, out supportSlot, out deckLocal, out deckSpeed) == true;
+    }
+    public bool TryGetCaptainDeckFrame(int captainSlot, int supportSlot, Agent captain, out MatrixFrame hullFrame)
+    {
+        hullFrame = default;
+        return behavior?.TryGetCaptainDeckFrame(captainSlot, supportSlot, captain, out hullFrame) == true;
+    }
     public void CancelControls() => behavior?.CancelControls();
     public object Inspect() => behavior?.Inspect();
-    public void ConfigureNative(Func<bool> authority, Action<Missions.Messages.NetworkNavalLabHelmInput> sendInput)
-    { behavior.NativeAuthority = authority; behavior.SendNativeInput = sendInput; }
+    public void ConfigureNative(Func<bool> authority, Action<Missions.Messages.NetworkNavalLabHelmInput> sendInput,
+        Action<Missions.Messages.NetworkNavalLabStations> sendStationRelease)
+    { behavior.NativeAuthority = authority; behavior.SendNativeInput = sendInput; behavior.SendStationRelease = sendStationRelease; }
     public Missions.Messages.NetworkNavalLabStations CreateStations() => behavior.CreateStations();
     public void ApplyStations(Missions.Messages.NetworkNavalLabStations stations) => behavior.ApplyStations(stations);
     public bool ObserveStations(Missions.Messages.NetworkNavalLabStations stations) => behavior.ObserveStations(stations);
@@ -186,6 +201,8 @@ internal sealed partial class NavalLabBehavior : MissionLogic
     internal bool IsHeldHelm => manifest.Mode == NavalLabMode.HeldHelm;
     internal bool IsSingleClientNative => manifest.Mode == NavalLabMode.SingleClientNative;
     internal bool IsTwoClientNative => manifest.IsTwoClientNative;
+    // Rope fixtures start inside the native 40 m hook range; other modes keep the original 60 m spacing.
+    internal float HullSpacing => manifest.Mode == NavalLabMode.TwoClientNative ? 24f : 60f;
     internal bool HasNativeViews => IsSingleClientNative || IsTwoClientNative;
     internal bool IsFactoryProbe => manifest.Mode == NavalLabMode.FactoryAuthorityProbe || IsTwoClientNative;
     internal bool RequiresProcessExit => IsHeldHelm || IsSingleClientNative || IsFactoryProbe;
@@ -386,7 +403,7 @@ internal sealed partial class NavalLabBehavior : MissionLogic
         for (int i = 0; i < Ships.Length; i++)
         {
             var frame = MatrixFrame.Identity;
-            frame.origin = new Vec3(250f + (i * 60f), 250f, 0f);
+            frame.origin = new Vec3(250f + (i * HullSpacing), 250f, 0f);
             if (IsFactoryProbe) BeginFactoryHull(i);
             RecordStartup("factory_begin:" + i);
             Ships[i] = shipsLogic.SpawnShip(new NavalLabShipOrigin(hull, Reject),
@@ -856,8 +873,10 @@ internal sealed partial class NavalLabBehavior : MissionLogic
 
     public string StartAgentControl(string kind, int ship, float value)
     {
-        if (IsTwoClientNative) return "rejected:keyboard_controls_only";
+        if (IsTwoClientNative && kind != "walk" && kind != "turn") return "rejected:keyboard_controls_only";
         if (kind != "walk" && kind != "turn" && kind != "jump" && kind != "crew") return "rejected:unknown_control";
+        string deckBlocker = IsTwoClientNative ? DeckLocomotionBlocker() : null;
+        if (deckBlocker != null) return "rejected:" + deckBlocker;
         if (Blocker != null || ship < 0 || ship >= Ships.Length || manifest.Controllers[ship] != ownControllerId)
             return "rejected:not_original_owner_or_unavailable";
         if (float.IsNaN(value) || float.IsInfinity(value) || Math.Abs(value) > 1) return "rejected:invalid_control";
@@ -879,7 +898,9 @@ internal sealed partial class NavalLabBehavior : MissionLogic
         writtenInput = previousInput;
         wasWalking = agent.WalkMode;
         jumpWritten = false;
-        return "applied";
+        if (!IsTwoClientNative) return "applied";
+        if (kind == "turn") StartDeckTurn(agent);
+        return "applied:synthetic_deck_locomotion_not_keyboard";
     }
 
     public void TickAgentControl(float dt)
@@ -889,7 +910,8 @@ internal sealed partial class NavalLabBehavior : MissionLogic
         TickAxesPulse();
         if (heldHelmAgent != null && (ControlNow >= heldHelmDeadline || Blocker != null)) ReleaseHeldHelm();
         if (controlledAgent == null) return;
-        if (ControlNow >= controlDeadline || Blocker != null || float.IsNaN(dt) || float.IsInfinity(dt) || dt < 0) { CancelAgentControl(); return; }
+        if (ControlNow >= controlDeadline || Blocker != null || float.IsNaN(dt) || float.IsInfinity(dt) || dt < 0
+            || (IsTwoClientNative && DeckLocomotionBlocker() != null)) { CancelAgentControl(); return; }
         var agent = controlledAgent;
         if (agent.Pointer == UIntPtr.Zero || !agent.IsActive()) { CancelAgentControl(); return; }
         if (controlKind == "walk")
@@ -898,6 +920,7 @@ internal sealed partial class NavalLabBehavior : MissionLogic
             agent.MovementInputVector = writtenInput;
             agent.EventControlFlags |= Agent.EventControlFlag.Walk;
         }
+        else if (controlKind == "turn" && deckTurnController != null) TickDeckTurn(dt);
         else if (controlKind == "turn") agent.LookDirectionAsAngle += controlValue * Math.Min(dt, 0.1f);
         else if (controlKind == "jump")
         {
@@ -920,6 +943,7 @@ internal sealed partial class NavalLabBehavior : MissionLogic
     {
         var agent = controlledAgent;
         controlledAgent = null;
+        StopDeckTurn();
         if (agent == null || agent.Pointer == UIntPtr.Zero || !agent.IsActive()) return;
         if (controlKind == "walk")
         {

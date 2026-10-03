@@ -16,7 +16,7 @@ internal static partial class NavalLabPresentationPatches
 {
     internal static IEnumerable<CodeInstruction> InstrumentOarCallsites(IEnumerable<CodeInstruction> instructions)
     {
-        var code = instructions.ToList();
+        var code = InstrumentOarStopInputs(instructions).ToList();
         var observers = new Dictionary<MethodInfo, string>
         {
             [AccessTools.PropertyGetter(typeof(MissionOar), nameof(MissionOar.IsExtracted))] = nameof(ConsumeExtracted),

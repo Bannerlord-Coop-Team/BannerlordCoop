@@ -3,6 +3,7 @@ using HarmonyLib;
 using NavalDLC.Missions.NavalPhysics;
 using NavalDLC.Missions.Objects;
 using NavalDLC.Missions.Objects.UsableMachines;
+using NavalDLC.Missions.ShipActuators;
 using System.Linq;
 using System.Collections.Generic;
 using System.Reflection.Emit;
@@ -10,6 +11,7 @@ using System;
 using System.Threading;
 using TaleWorlds.Core;
 using TaleWorlds.Engine;
+using TaleWorlds.Library;
 using TaleWorlds.MountAndBlade;
 
 namespace Missions.Naval;
@@ -161,9 +163,12 @@ internal static class NavalLabPhysicsPatches
     [HarmonyPatch(typeof(Agent), "StopUsingGameObjectAux")]
     private static class HeldStopTrace
     {
-        private static void Prefix(Agent __instance, out NavalLabBehavior.HelmTraceCall __state)
+        private static void Prefix(Agent __instance, bool isSuccessful, Agent.StopUsingGameObjectFlags flags,
+            out NavalLabBehavior.HelmTraceCall __state)
         {
             __state = null;
+            try { Active?.RecordStationStopEntry(__instance, isSuccessful, flags); }
+            catch { }
             try { __state = Active?.BeginHelmTrace(__instance, __instance.CurrentlyUsedGameObject, "stop"); }
             catch { }
         }
@@ -313,6 +318,34 @@ internal static class NavalLabPhysicsPatches
             if (active?.IsFactoryProbe == true) { active.ObserveFactoryForce(__instance); return; }
             if (active != null && active.Ships.Any(ship => ship?.Physics == __instance))
                 Interlocked.Increment(ref active.ForceApplications);
+        }
+    }
+
+    // Observes own-hull rowing on the physics thread after vanilla computed it; reads managed state only and changes nothing.
+    [HarmonyPatch(typeof(ShipActuators), "FixedUpdateRowers")]
+    private static class PulseRowingObservation
+    {
+        // Captures the open window id before this tick's rowing, so a reset during the tick drops the sample.
+        private static void Prefix(ShipActuators __instance, out int __state) =>
+            __state = Active?.pulsePhysicsObservation.Generation(__instance._ownerMissionShip) ?? -1;
+
+        // Reads the values vanilla just used or wrote on this thread, outside the observation lock.
+        private static void Postfix(ShipActuators __instance, int __state, float fixedDt, in ShipActuatorRecord actuatorInput,
+            in MatrixFrame shipEntityGlobalFrame, float shipForwardSpeed)
+        {
+            if (__state < 0) return;
+            // Vanilla applies every oar force along this flattened body forward axis.
+            var forward = shipEntityGlobalFrame.rotation.f;
+            forward.z = 0;
+            forward.Normalize();
+            float oarForwardForce = 0;
+            for (int i = 0; i < __instance._leftOarForces.Count; i++) oarForwardForce += Vec3.DotProduct(__instance._leftOarForces[i].Force, forward);
+            for (int i = 0; i < __instance._rightOarForces.Count; i++) oarForwardForce += Vec3.DotProduct(__instance._rightOarForces[i].Force, forward);
+            var owner = __instance._ownerMissionShip;
+            var physics = owner.Physics;
+            Active?.pulsePhysicsObservation.Record(owner, __state, fixedDt, actuatorInput.RowerThrust, __instance.ComputeUsedOarCount(),
+                __instance._leftSideOars.Count + __instance._rightSideOars.Count, __instance._rowersPhase, __instance._lastFramePhaseRate,
+                oarForwardForce, shipForwardSpeed, physics.IsAnchored, physics.LastSubmergedHeightFactorForActuators);
         }
     }
 

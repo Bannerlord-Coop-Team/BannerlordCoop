@@ -113,45 +113,43 @@ public sealed class NavalLabTwoClientNativeTests : NavalMissionTestEnvironment
     }
 
     [Fact]
-    public void ControlStatus_FrameTimingAdvancesOnlyAfterSuccessfulFollowerApply()
+    public void ControlStatus_FrameTimingAdvancesOnlyAfterSuccessfulForeignApply()
     {
-        Start(); Execute("complete-deployment"); Tick(First); Tick(Second);
-        Newtonsoft.Json.Linq.JObject Status() => Newtonsoft.Json.Linq.JObject.FromObject(
-            ((INavalNativeController)Adapter(Second).Controller!).NativeControlStatus());
-        var values = new float[24];
-        values[0] = values[4] = values[8] = values[12] = values[16] = values[20] = 1;
-        SendFrames(First, new NetworkNavalLabFrames(Manifest.IncarnationId, 1, 100, values, 700));
-        Tick(Second); // Accepted targets only become applied endpoints after the interpolation window.
-        var observed = Status();
-        Assert.Equal(100, (long)observed["lastAppliedFrameSequence"]!);
-        Assert.Equal(700, (long)observed["lastAppliedSourceCallback"]!);
-        Assert.True((long)observed["lastAppliedUtcTicks"]! > 0);
-        Assert.Equal(Newtonsoft.Json.Linq.JTokenType.Null, observed["hostSentFrameSequence"]!.Type);
-        SendFrames(First, new NetworkNavalLabFrames(Manifest.IncarnationId, 1, 99, values, 701));
-        Assert.Equal(observed["lastAppliedUtcTicks"], Status()["lastAppliedUtcTicks"]);
-        Adapter(Second).FailApply = true;
-        SendFrames(First, new NetworkNavalLabFrames(Manifest.IncarnationId, 1, 101, values, 702));
+        Start();
+        foreach (var client in Clients) Adapter(client).CaptureShipSamples = false;
+        Execute("complete-deployment"); Tick(First); Tick(Second);
+        SendShipSample(First, Adapter(First).ShipSample(100, 700, TaleWorlds.Library.MatrixFrame.Identity));
+        Assert.Equal(0, (long)ShipStream(Second, 0)["appliedSequence"]!);
         Tick(Second);
-        var failed = Status();
-        Assert.Equal(101, (long)failed["lastReceivedFrameSequence"]!);
-        Assert.Equal(100, (long)failed["lastAppliedFrameSequence"]!);
-        Assert.Equal(observed["lastAppliedSourceCallback"], failed["lastAppliedSourceCallback"]);
-        Assert.Equal(observed["lastAppliedUtcTicks"], failed["lastAppliedUtcTicks"]);
+        var observed = ShipStream(Second, 0);
+        Assert.Equal(100, (long)observed["appliedSequence"]!);
+        Assert.Equal(700, (long)observed["sourceCallback"]!);
+        Assert.True((long)observed["AppliedCallback"]! > (long)observed["AcceptedCallback"]!);
+        Assert.Equal(0, (long)observed["sentSequence"]!);
+        SendShipSample(First, Adapter(First).ShipSample(99, 701, TaleWorlds.Library.MatrixFrame.Identity));
+        Assert.Equal(observed["AppliedCallback"], ShipStream(Second, 0)["AppliedCallback"]);
+        Adapter(Second).FailApply = true;
+        SendShipSample(First, Adapter(First).ShipSample(101, 702, TaleWorlds.Library.MatrixFrame.Identity));
+        Tick(Second);
+        var failed = ShipStream(Second, 0);
+        Assert.Equal(101, (long)failed["acceptedSequence"]!);
+        Assert.Equal(100, (long)failed["appliedSequence"]!);
+        Assert.Equal(observed["AppliedCallback"], failed["AppliedCallback"]);
+        Assert.Equal(observed["ApplicationOrdinal"], failed["ApplicationOrdinal"]);
     }
 
     [Theory]
     [InlineData(false)]
     [InlineData(true)]
-    public void BothDeployAndFourOccupancyAcksGateInput_OriginalOwnerRoutesOnlyToElectedHost(bool secondFirst)
+    public void BothDeployAndFourOccupancyAcksGateInput_EachOriginalOwnerAppliesOnlyItsOwnInput(bool secondFirst)
     {
         Start(secondFirst);
         var host = secondFirst ? Second : First;
         var follower = secondFirst ? First : Second;
-        int remoteSlot = secondFirst ? 0 : 1;
         Assert.All(Clients, client => Assert.False(Adapter(client).InputAuthority!()));
-        follower.Call(() => follower.Resolve<INetwork>().SendAll(Input(remoteSlot)));
-        PumpAll();
-        Assert.Empty(Adapter(host).NativeInputs);
+        foreach (var client in Clients)
+            client.Call(() => Adapter(client).SendInput!(Input(client == First ? 0 : 1)));
+        Assert.All(Clients, client => Assert.Empty(Adapter(client).NativeInputs));
         Guid deployment = Execute("complete-deployment");
         Assert.All(Clients, client =>
         {
@@ -174,13 +172,19 @@ public sealed class NavalLabTwoClientNativeTests : NavalMissionTestEnvironment
                 Assert.Equal(1, info.AuthorityRevision);
             }
         }
-        follower.Call(() => Adapter(follower).SendInput!(Input(remoteSlot, 2)));
-        PumpAll();
-        Assert.Equal(remoteSlot, Assert.Single(Adapter(host).NativeInputs).Ship);
-        Assert.Empty(Adapter(follower).NativeInputs);
-        follower.Call(() => Adapter(follower).SendInput!(Input(remoteSlot, 3, helm: false)));
-        PumpAll();
-        Assert.Contains(remoteSlot, Adapter(host).Neutralized);
+        foreach (var client in Clients)
+        {
+            int slot = client == First ? 0 : 1;
+            client.Call(() => Adapter(client).SendInput!(Input(slot, 2)));
+            Assert.Equal(slot, Assert.Single(Adapter(client).NativeInputs).Ship);
+            client.Call(() => Adapter(client).SendInput!(Input(1 - slot, 3)));
+            Assert.Single(Adapter(client).NativeInputs);
+            client.Call(() => Adapter(client).SendInput!(Input(slot, 3, helm: false)));
+            Assert.Equal(slot, Assert.Single(Adapter(client).Neutralized));
+            Assert.False(Adapter(client).TerminalHold);
+            Assert.True(Adapter(client).InputAuthority!());
+            Assert.Empty(client.NetworkSentMessages.GetMessages<NetworkNavalLabHelmInput>());
+        }
         Execute("complete-deployment");
         Assert.All(Clients, client => Assert.Equal(1, Adapter(client).DeploymentCalls));
     }
@@ -190,20 +194,22 @@ public sealed class NavalLabTwoClientNativeTests : NavalMissionTestEnvironment
     [InlineData("epoch")]
     [InlineData("expired")]
     [InlineData("duplicate")]
-    public void InvalidInputNeverReachesHostAdapter(string kind)
+    public void InvalidInputNeverReachesOwnerAdapter(string kind)
     {
         Start(); Execute("complete-deployment"); Tick(First); Tick(Second);
         var input = Input(1);
         Second.Call(() => Adapter(Second).SendInput!(input)); PumpAll();
-        Assert.Single(Adapter(First).NativeInputs);
+        Assert.Single(Adapter(Second).NativeInputs);
         var rejected = kind switch
         {
             "owner" => Input(0, 2), "epoch" => Input(1, 2, epoch: 2),
             "expired" => Input(1, 2, deadline: DateTime.UtcNow.AddSeconds(-1).Ticks), _ => input
         };
         Second.Call(() => Adapter(Second).SendInput!(rejected)); PumpAll();
-        Assert.Single(Adapter(First).NativeInputs);
-        Assert.Empty(Adapter(Second).NativeInputs);
+        Assert.Single(Adapter(Second).NativeInputs);
+        Assert.Empty(Adapter(First).NativeInputs);
+        Assert.False(Adapter(Second).TerminalHold);
+        Assert.True(Adapter(Second).InputAuthority!());
     }
 
     [Theory]
@@ -236,18 +242,20 @@ public sealed class NavalLabTwoClientNativeTests : NavalMissionTestEnvironment
     [Theory]
     [InlineData(false)]
     [InlineData(true)]
-    public void DepartureInvalidatesQueuedInputWithoutAgentAdoption(bool secondFirst)
+    public void DepartureHoldsLocalInputWithoutAgentAdoption(bool secondFirst)
     {
         Start(secondFirst); Execute("complete-deployment"); Tick(First); Tick(Second);
         var host = secondFirst ? Second : First;
         var follower = secondFirst ? First : Second;
-        follower.Call(() => Adapter(follower).SendInput!(Input(secondFirst ? 0 : 1)));
+        host.Call(() => Adapter(host).SendInput!(Input(secondFirst ? 1 : 0)));
+        Assert.Single(Adapter(host).NativeInputs);
         follower.Call(() => follower.Resolve<INetwork>().SendAll(new NetworkMissionLeft(
             secondFirst ? "naval-A" : "naval-B", Manifest.InstanceId)));
         Server.PumpGameThread(); PumpAll(); Tick(host);
         Assert.True(Adapter(host).TerminalHold);
         Assert.False(Adapter(host).InputAuthority!());
-        Assert.Empty(Adapter(host).NativeInputs);
+        host.Call(() => Adapter(host).SendInput!(Input(secondFirst ? 1 : 0, 2)));
+        Assert.Single(Adapter(host).NativeInputs);
         for (int i = 0; i < 10; i++)
         {
             Assert.True(host.Resolve<INetworkAgentRegistry>().TryGetAgentInfo(Manifest.Combatants[i], out var info));
@@ -267,15 +275,52 @@ public sealed class NavalLabTwoClientNativeTests : NavalMissionTestEnvironment
     }
 
     [Fact]
-    public void LocalDeadmanClearsHostInputWithoutFollowerSimulation()
+    public void LocalDeadmanClearsOnlyOwnerInput()
     {
         Start(); Execute("complete-deployment"); Tick(First); Tick(Second);
         Second.Call(() => Adapter(Second).SendInput!(Input(1))); PumpAll();
         var deadlines = typeof(NavalLabController).GetField("nativeInputDeadlines", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance)!;
-        ((double[])deadlines.GetValue(Adapter(First).Controller)!) [1] = 0.001;
-        Tick(First);
-        Assert.Contains(1, Adapter(First).Neutralized);
-        Assert.Empty(Adapter(Second).Neutralized);
+        ((double[])deadlines.GetValue(Adapter(Second).Controller)!) [1] = 0.001;
+        Tick(Second);
+        Assert.Equal(1, Assert.Single(Adapter(Second).Neutralized));
+        Assert.Empty(Adapter(First).Neutralized);
+    }
+
+    [Fact]
+    public void ForeignCommittedOarStation_DropsBufferedTargetAndRejectsLateMovementUntilStationInvalid()
+    {
+        Start();
+        var manifest = Manifest;
+        Guid seatedId = manifest.Combatants[1], unseatedId = manifest.Combatants[2];
+        bool seated = true;
+        // naval-A withholds its seated rower as the real owner does; on naval-B that rower is a seated foreign puppet.
+        foreach (var client in Clients) Adapter(client).CommittedOarMovement = (_, id, _) => seated && id == seatedId;
+        void Receive(Guid id) => Second.Call(() =>
+        {
+            Assert.True(Second.Resolve<INetworkAgentRegistry>().TryGetAgentInfo(id, out var info));
+            Adapter(Second).Controller!.AgentMovementHandler.HandlePacket(null,
+                new global::Missions.Agents.Packets.MovementPacket(new[] { id }, new[] { new global::Missions.Agents.Packets.AgentData(info.Agent) }));
+        });
+        bool HasTarget(Guid id)
+        {
+            bool found = false;
+            Second.Call(() =>
+            {
+                Assert.True(Second.Resolve<INetworkAgentRegistry>().TryGetAgentInfo(id, out var info));
+                found = Adapter(Second).Controller!.AgentMovementHandler.Interpolator.TryGetTargetFrame(info.Agent, out _, out _, out _);
+            });
+            return found;
+        }
+        Receive(seatedId);
+        Assert.True(HasTarget(seatedId));
+        Execute("complete-deployment"); Tick(First); Tick(Second);
+        Assert.False(HasTarget(seatedId));
+        Receive(seatedId); Receive(unseatedId);
+        Assert.False(HasTarget(seatedId));
+        Assert.True(HasTarget(unseatedId));
+        seated = false;
+        Receive(seatedId);
+        Assert.True(HasTarget(seatedId));
     }
 }
 #endif

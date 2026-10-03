@@ -29,6 +29,9 @@ public sealed class NetworkNavalLabStations : IEvent
     [ProtoMember(7)] public string[] SailKeys { get; private set; }
     [ProtoMember(8)] public string[] OarKeys { get; private set; }
     [ProtoMember(9)] public int[] OarSides { get; private set; }
+    // Owner-authored "release" phase only: monotonic per-ship revision and released crew flags.
+    [ProtoMember(10)] public long Revision { get; private set; }
+    [ProtoMember(11)] public bool[] Released { get; private set; }
     public bool HasPresentationInventory => SailKeys != null && SailKeys.Length > 0 && SailKeys.Length <= 16
         && System.Linq.Enumerable.All(SailKeys, NetworkNavalLabPresentation.ValidKey)
         && System.Linq.Enumerable.Distinct(SailKeys).Count() == SailKeys.Length
@@ -44,6 +47,9 @@ public sealed class NetworkNavalLabStations : IEvent
         Combatants = (Guid[])combatants.Clone(); Keys = (string[])keys.Clone();
     }
     public NetworkNavalLabStations WithPhase(string phase) => new(IncarnationId, Epoch, Ship, phase, Combatants, Keys, SailKeys, OarKeys, OarSides);
+    public NetworkNavalLabStations WithRelease(long revision, bool[] released) =>
+        new(IncarnationId, Epoch, Ship, "release", Combatants, Keys, SailKeys, OarKeys, OarSides)
+        { Revision = revision, Released = (bool[])released.Clone() };
 }
 
 [ProtoContract(SkipConstructor = true)]

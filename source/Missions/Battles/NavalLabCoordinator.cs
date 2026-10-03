@@ -72,6 +72,7 @@ public sealed partial class NavalLabCoordinator : INavalLabCoordinator, IHandler
         broker.Subscribe<NetworkNavalLabAction>(ReceiveAction);
         broker.Subscribe<NetworkNavalLabReceipt>(ReceiveReceipt);
         broker.Subscribe<NetworkNavalLabFault>(ReceiveFault);
+        broker.Subscribe<NetworkNavalLabRopeFinal>(ReceiveFinalRopes);
         broker.Subscribe<CampaignTick>(OnCampaignTick);
     }
 
@@ -122,7 +123,7 @@ public sealed partial class NavalLabCoordinator : INavalLabCoordinator, IHandler
         if (store.Current == null) throw new InvalidOperationException("No lab exists.");
         bool single = store.Current.Mode == NavalLabMode.SingleClientNative || IsTwoClientNative;
         bool deployment = kind == "complete-deployment";
-        bool rope = kind == "rope-throw" || kind == "rope-miss" || kind == "rope-cut";
+        bool rope = kind == "rope-throw" || kind == "rope-miss" || kind == "rope-cut" || kind == "rope-plank-force";
         if (rope && (store.Current.Mode != NavalLabMode.TwoClientNative || row || rudder < 0 || rudder >= 32
             || rudder != Math.Truncate(rudder) || (kind == "rope-throw" ? ropeTargetStation < 0 || ropeTargetStation >= NetworkNavalLabRopeState.MaxTargetStations : ropeTargetStation != -1)))
             throw new ArgumentException("Ropes require normal two-client-native and valid station indexes.");
@@ -136,7 +137,8 @@ public sealed partial class NavalLabCoordinator : INavalLabCoordinator, IHandler
         bool sail = kind == "sail-full" || kind == "sail-raised" || kind == "sail-square-raised";
         if (sail && (!IsTwoClientNative || rudder != 0 || row))
             throw new ArgumentException("Sail test actions require two-client-native, rudder=0 and row=false.");
-        if ((single && kind != "stop" && !deployment && !sail && !nativeHelm && !pulse && !rope) || (deployment && !single))
+        bool deckWalk = store.Current.Mode == NavalLabMode.TwoClientNative && (kind == "walk" || kind == "turn");
+        if ((single && kind != "stop" && !deployment && !sail && !nativeHelm && !pulse && !rope && !deckWalk) || (deployment && !single))
             throw new InvalidOperationException("Single-client native controls use keyboard/orders; only complete-deployment and stop are commands.");
         if (deployment && (ship != 0 || rudder != 0 || row)) throw new ArgumentException("Deployment requires ship=0, rudder=0, row=false.");
         bool heldHelm = kind == "take-helm" || kind == "release-helm";
@@ -153,7 +155,7 @@ public sealed partial class NavalLabCoordinator : INavalLabCoordinator, IHandler
         string contents = kind + ":" + ship + ":" + rudder.ToString("R", CultureInfo.InvariantCulture) + ":" + row;
         if (rope) contents += ":" + ropeTargetStation;
         if (kind != "stop" && store.TryInspectOperation(operationId, contents, out var existingReceipt)) return existingReceipt;
-        if ((nativeHelm || pulse || rope) && !nativeReleaseSent) throw new InvalidOperationException("Native stations are not ready.");
+        if ((nativeHelm || pulse || rope || deckWalk) && !nativeReleaseSent) throw new InvalidOperationException("Native stations are not ready.");
         if (!hosts.TryGet(store.Current.InstanceId, out var host) && kind != "stop")
             throw new InvalidOperationException("The fixture has no elected mission-ready host.");
         if (kind != "stop" && (host.Epoch != 1 || ready.Count != store.Current.Controllers.Length || failure != null
@@ -168,7 +170,7 @@ public sealed partial class NavalLabCoordinator : INavalLabCoordinator, IHandler
         }
         else if (!store.BeginOperation(operationId, contents)) return store.InspectOperation(operationId);
         var action = new NetworkNavalLabAction(store.Current.IncarnationId, operationId, host?.Epoch ?? 0, kind, ship, rudder, row,
-            heldHelm ? DateTime.UtcNow.AddSeconds(30).Ticks : (nativeHelm || rope) ? DateTime.UtcNow.AddSeconds(2).Ticks : (sail || pulse) ? DateTime.UtcNow.AddSeconds(1).Ticks : 0,
+            heldHelm ? DateTime.UtcNow.AddSeconds(30).Ticks : (nativeHelm || rope) ? DateTime.UtcNow.AddSeconds(2).Ticks : (sail || pulse || deckWalk) ? DateTime.UtcNow.AddSeconds(1).Ticks : 0,
             ropeTargetStation);
         var targets = kind == "stop" || kind == "probe" || (deployment && IsTwoClientNative) ? store.Current.Controllers
             : new[] { agentControl || heldHelm || sail || nativeHelm || pulse || rope ? store.Current.Controllers[ship] : host.HostControllerId };
@@ -374,7 +376,7 @@ public sealed partial class NavalLabCoordinator : INavalLabCoordinator, IHandler
             if (store.Current?.IncarnationId != payload.What.IncarnationId || payload.Who is not NetPeer peer
                 || !players.TryGetPlayer(peer, out var player)
                 || !store.IsParticipant(store.Current.InstanceId, player.ControllerId)) return;
-            HoldFixture(payload.What.Reason);
+            HoldFixture(payload.What.Reason, player.ControllerId);
         }, context: nameof(ReceiveFault));
     }
 
@@ -383,13 +385,15 @@ public sealed partial class NavalLabCoordinator : INavalLabCoordinator, IHandler
         if (ModInformation.IsServer && store.CampaignWriteBlocker != null) HoldFixture(store.CampaignWriteBlocker);
     }
 
-    private void HoldFixture(string reason)
+    private void HoldFixture(string reason, string origin = "server")
     {
         if (store.Current == null || holdOperation != Guid.Empty) return;
         var operation = Guid.NewGuid();
         store.BeginEmergencyOperation(operation, "hold");
         holdOperation = operation;
         failure = reason;
+        // The first hold is the only fault reason recorded on the server.
+        Logger.Error("[NavalLabTerminal] {Incarnation} fixture held by {Origin}: {Reason}", store.Current.IncarnationId, origin, reason);
         nativeState.Stop();
         foreach (var target in store.Current.Controllers)
             if (players.TryGetPeer(target, out var peer))
@@ -405,6 +409,7 @@ public sealed partial class NavalLabCoordinator : INavalLabCoordinator, IHandler
         broker.Unsubscribe<NetworkNavalLabAction>(ReceiveAction);
         broker.Unsubscribe<NetworkNavalLabReceipt>(ReceiveReceipt);
         broker.Unsubscribe<NetworkNavalLabFault>(ReceiveFault);
+        broker.Unsubscribe<NetworkNavalLabRopeFinal>(ReceiveFinalRopes);
         broker.Unsubscribe<CampaignTick>(OnCampaignTick);
         loader.Dispose();
     }

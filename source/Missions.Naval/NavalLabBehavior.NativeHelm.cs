@@ -44,6 +44,7 @@ internal sealed partial class NavalLabBehavior
         if (operationId == Guid.Empty || slot != OwnSlot) return "rejected:operation_or_owner";
         if (nativeHelmOperation == operationId)
             return take == nativeHelmTake ? nativeHelmReceipt : "rejected:conflicting_operation";
+        if (controlledAgent != null) return "rejected:agent_control_active";
         if (nativeHelmPhase == "pending") return "rejected:native_helm_pending";
         if (nativeHelmPhase == "failed" || factoryTerminal) return "rejected:terminal_hold";
         if (!nativeAutoHelmObserved) return "rejected:auto_helm_setup_incomplete";
@@ -331,6 +332,7 @@ internal sealed partial class NavalLabBehavior
             action = nativeHelmOperation == Guid.Empty ? null : nativeHelmTake ? "native-take-helm" : "native-release-helm",
             dispatched = nativeHelmDispatched, phase = nativeHelmPhase, pending = nativeHelmPhase == "pending",
             failure = nativeHelmFailure, receipt = nativeHelmReceipt, lastOutcome = nativeHelmLastOutcome,
+            firstStationObservationFailure, firstStationStopEntry = FirstStationStopEntry,
             nativeHelmDispatchTick, nativeHelmObservedTick, nativeHelmUseCallbacks, nativeHelmStopCallbacks,
             remainingObservationSeconds = nativeHelmPhase == "pending" ? Math.Max(0, nativeHelmDeadline - ControlNow) : 0,
             identity = OwnSlot >= 0 && OwnSlot < Ships.Length ? InspectHelmIdentity(LocalShip, OwnSlot) : null,

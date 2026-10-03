@@ -12,15 +12,15 @@ public sealed class NavalLabRopeActionCommand : ICoopCommand
     public NavalLabRopeActionCommand(INavalRopeCoordinator coordinator) => this.coordinator = coordinator;
     public string Prefix => "coop.debug.naval_lab";
     public string Name => "rope-action";
-    public string Description => "Native diagnostic throw/miss/cut on an original-owner hook station. Not keyboard/crew-use evidence; no boarding bridge.";
+    public string Description => "Native diagnostic throw/miss/cut on an original-owner hook station. plank-force advances an attached rope using native forced bridge creation. Not keyboard/crew-use evidence.";
     public CoopCommandSide Side => CoopCommandSide.Server;
     public IExpectedArgs[] ExpectedArgs { get; } =
     {
         new ExpectedArgs("operation_id", "Idempotent UUID.", true),
-        new ExpectedArgs("kind", "throw (explicit target), miss (untargeted native flight), cut.", true),
+        new ExpectedArgs("kind", "throw (explicit target), miss (untargeted native flight), cut, plank-force (bypasses bridge distance/speed/facing).", true),
         new ExpectedArgs("source_ship", "Original source owner slot 0 or 1; cut routes to that same owner.", true),
         new ExpectedArgs("source_station", "Source hook index from rope-status.", true),
-        new ExpectedArgs("target_station", "Other hull's target index from rope-status; -1 for miss/cut.", true)
+        new ExpectedArgs("target_station", "Other hull's target index from rope-status; -1 for miss/cut/plank-force.", true)
     };
     public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
     {
@@ -40,7 +40,7 @@ public sealed class NavalLabRopeStatusCommand : ICoopCommand
     public NavalLabRopeStatusCommand(INavalRopeCoordinator coordinator) => this.coordinator = coordinator;
     public string Prefix => "coop.debug.naval_lab";
     public string Name => "rope-status";
-    public string Description => "Read stable hook/target indexes, native connection lifecycle and owner-endpoint force counters. Not an atomic physics cut.";
+    public string Description => "Read stable hook/target indexes, native rope/plank, collision geometry, navmesh, occupancy and owner-endpoint force counters. Not an atomic physics cut.";
     public CoopCommandSide Side => CoopCommandSide.Client;
     public IExpectedArgs[] ExpectedArgs => Array.Empty<IExpectedArgs>();
     public CoopCommandResult ProcessCommand(ICoopCommandArgs args)

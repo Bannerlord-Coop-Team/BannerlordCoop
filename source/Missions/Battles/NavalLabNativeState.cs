@@ -13,6 +13,7 @@ public interface INavalLabNativeState
     bool Deploy(string owner);
     bool Offer(string owner, NetworkNavalLabStations stations);
     bool Acknowledge(string owner, NetworkNavalLabStations stations);
+    void Release(string owner, NetworkNavalLabStations release);
     NetworkNavalLabStations[] Stations { get; }
     bool AcceptInput(string owner, NetworkNavalLabHelmInput input, long nowUtcTicks);
     void Stop();
@@ -25,6 +26,7 @@ public sealed class NavalLabNativeState : INavalLabNativeState
     private readonly Dictionary<int, NetworkNavalLabStations> stations = new();
     private readonly HashSet<string> acknowledgements = new();
     private readonly long[] sequences = new long[2];
+    private readonly NetworkNavalLabStations[] releases = new NetworkNavalLabStations[2];
     private bool stopped;
     public bool Ready => !stopped && deployed.Count == 2 && stations.Count == 2 && acknowledgements.Count == 4;
     public NetworkNavalLabStations[] Stations => stations.Values.OrderBy(item => item.Ship).ToArray();
@@ -81,6 +83,22 @@ public sealed class NavalLabNativeState : INavalLabNativeState
         if (deployed.Count != 2 || stations.Count != 2 || !stations.TryGetValue(value.Ship, out var prior) || !Same(prior, value))
             throw new InvalidOperationException("native.early_or_mismatched_ack");
         return acknowledgements.Add(owner + ":" + value.Ship);
+    }
+
+    // Only the original owner releases its committed stations, one ordered revision at a time and never re-occupied.
+    public void Release(string owner, NetworkNavalLabStations value)
+    {
+        CheckOwner(owner);
+        CheckStations(value);
+        if (!Ready || value.Phase != "release" || manifest.Controllers[value.Ship] != owner
+            || !stations.TryGetValue(value.Ship, out var committed) || !Same(committed, value))
+            throw new InvalidOperationException("native.station_release_identity");
+        var prior = releases[value.Ship];
+        if (value.Released == null || value.Released.Length != 4 || value.Revision != (prior?.Revision ?? 0) + 1
+            || Enumerable.Range(0, 4).Any(crew => prior?.Released[crew] == true && !value.Released[crew])
+            || Enumerable.Range(0, 4).All(crew => value.Released[crew] == (prior?.Released[crew] ?? false)))
+            throw new InvalidOperationException("native.station_release_order");
+        releases[value.Ship] = value;
     }
 
     public bool AcceptInput(string owner, NetworkNavalLabHelmInput input, long nowUtcTicks)

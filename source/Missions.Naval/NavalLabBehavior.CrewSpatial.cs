@@ -1,6 +1,7 @@
 ﻿#if DEBUG
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using Common;
 using Missions.Battles;
 using NavalDLC.Missions.Objects.UsableMachines;
@@ -33,6 +34,7 @@ internal sealed partial class NavalLabBehavior
         {
             sampledUtcTicks = DateTime.UtcNow.Ticks, localMissionTick = nativeHelmTicks,
             rows = rows.ToArray(), rowLimit = 8,
+            releasedStations = releasedStations.Select(slot => slot.ToArray()).ToArray(), stationReleaseRevisions = stationReleaseRevisions.ToArray(),
             measurement = "Native getters sampled on the game thread, not an atomic physics/render cut. Stepped root and occupancy are not contact proof."
         };
     }

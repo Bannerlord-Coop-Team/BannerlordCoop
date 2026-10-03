@@ -7,5 +7,7 @@ public interface INavalRopeAdapter
 {
     string RequestRope(NetworkNavalLabAction action);
     object InspectRopes();
+    void ConfigureFinalRopes(System.Action<NetworkNavalLabRopeFinal> send);
+    void AcceptFinalRopes(NetworkNavalLabRopeFinal value);
 }
 #endif

@@ -84,6 +84,8 @@ namespace Missions.Agents.Packets
         {
 #if DEBUG
             NavalHelmRevision = 0;
+            NavalDeckShip = 0;
+            NavalDeckLocal = Vec3.Zero;
 #endif
             Position = agent.Position;
             MovementDirection = agent.GetMovementDirection();
@@ -186,7 +188,7 @@ namespace Missions.Agents.Packets
         public AgentMountData MountData { get; }
         /// <summary>The owner's real ground speed, m/s — drives the on-foot puppet's locomotion throttle.</summary>
         [ProtoMember(8)]
-        public float Speed { get; }
+        public float Speed { get; private set; }
         /// <summary>The owner's current translation and turn inputs.</summary>
         [ProtoMember(9)]
         public uint MovementFlag { get; }
@@ -194,6 +196,24 @@ namespace Missions.Agents.Packets
         // Fixed-fixture helm fence only; absent from the production Release schema.
         [ProtoMember(10)]
         public long NavalHelmRevision { get; set; }
+        // Fixed-fixture deck pose: 0 is world, otherwise fixture slot + 1 with a hull-local position.
+        [ProtoMember(11)]
+        public int NavalDeckShip { get; private set; }
+        [ProtoMember(12)]
+        public Vec3 NavalDeckLocal { get; private set; }
+        public bool ShouldSerializeNavalDeckLocal() => NavalDeckShip != 0;
+
+        internal bool HasValidNavalDeck => NavalDeckShip >= 1 && NavalDeckShip <= 2 && NavalDeckLocal.IsValid
+            && Position.IsValid && LookDirection.IsValid && MovementDirection.IsValid
+            && !float.IsNaN(Speed) && !float.IsInfinity(Speed) && Speed >= 0f;
+
+        // Speed becomes deck-relative so the puppet throttle excludes hull motion.
+        internal void StampNavalDeck(int deckShip, Vec3 deckLocal, float deckSpeed)
+        {
+            NavalDeckShip = deckShip;
+            NavalDeckLocal = deckLocal;
+            Speed = deckSpeed;
+        }
 #endif
     }
 }

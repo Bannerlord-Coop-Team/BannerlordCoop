@@ -60,6 +60,7 @@ internal sealed partial class NavalLabBehavior
         pulsePending = true;
         pulsePhase = "pending_synthetic_axes";
         pulseFirstInputSequence = pulseLastInputSequence = pulseNeutralInputSequence = 0;
+        pulsePhysicsObservation.Begin(operationId, LocalShip);
         try
         {
             RouteNativeAxes(view);
@@ -68,6 +69,7 @@ internal sealed partial class NavalLabBehavior
         catch (Exception exception)
         {
             pulsePending = pulseCompleting = false;
+            pulsePhysicsObservation.Close();
             pulsePhase = "failed_dispatch_safety_hold";
             Reject("native.axes_pulse_dispatch_failed:" + exception.GetType().FullName);
             return pulseReceipt = "failed:synthetic_axes_dispatch_uncertain";
@@ -90,6 +92,7 @@ internal sealed partial class NavalLabBehavior
     {
         if (!pulsePending) return;
         pulsePending = pulseCompleting = false;
+        pulsePhysicsObservation.Close();
         pulsePhase = reason;
         // Safety loss retains the existing complete Stop semantics, including raised sails.
         var stop = new NetworkNavalLabHelmInput(manifest.IncarnationId, 1, OwnSlot, ++nativeInputSequence,
@@ -138,6 +141,7 @@ internal sealed partial class NavalLabBehavior
             }).ToArray() : null,
             localObservedShips = ready ? Ships.Select(InspectShip).ToArray() : null,
             crewSpatial = InspectCrewSpatial(),
+            pulsePhysics = pulsePhysicsObservation.Snapshot(),
             forceApplications = Interlocked.Read(ref ForceApplications), fixedTicks = Interlocked.Read(ref FixedTicks),
             activeFixedTicks = Interlocked.Read(ref ActiveFixedTicks),
             activeParallelFixedEntries = Interlocked.Read(ref factoryActiveParallelEntries),

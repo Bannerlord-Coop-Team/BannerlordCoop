@@ -36,7 +36,8 @@ public interface IAgentMovementHandler : IPacketHandler, IDisposable
 #if DEBUG
     void ConfigureNavalLab();
     void ConfigureNavalStationMovement(Func<CoopAgentInfo, bool> eligibility, Func<CoopAgentInfo, bool> helmEligibility = null,
-        Func<CoopAgentInfo, long?> helmRevision = null, Func<CoopAgentInfo, long, bool> acceptHelmMovement = null);
+        Func<CoopAgentInfo, long?> helmRevision = null, Func<CoopAgentInfo, long, bool> acceptStationMovement = null,
+        NavalDeckPoseCapture deckCapture = null, NavalDeckFrameResolver deckFrame = null);
     object InspectNavalStationMovement();
 #endif
 
@@ -1825,9 +1826,15 @@ public partial class AgentMovementHandler : IAgentMovementHandler
                     continue;
 
 #if DEBUG
-                if (acceptNavalHelmMovement?.Invoke(agentInfo, data.NavalHelmRevision) == false)
+                if (acceptNavalStationMovement?.Invoke(agentInfo, data.NavalHelmRevision) == false)
                 {
                     _interpolator.Forget(agent);
+                    continue;
+                }
+                // The interpolator owns a deck pose and its rebased directions every tick.
+                if (data.NavalDeckShip != 0)
+                {
+                    ApplyNavalDeckMovement(agent, data);
                     continue;
                 }
 #endif

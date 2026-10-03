@@ -21,6 +21,8 @@ public sealed class NavalLabBuildConfigurationTests
         Assert.Null(typeof(global::Missions.MissionModule).Assembly.GetType("Missions.Battles.NavalLabCoordinator"));
         Assert.Null(typeof(global::Missions.Agents.Handlers.IAgentMovementHandler).GetMethod("ConfigureNavalStationMovement"));
         Assert.Null(typeof(global::Missions.Agents.Handlers.AgentMovementHandler).GetMethod("InspectNavalStationMovement"));
+        Assert.Null(typeof(global::Missions.Agents.Packets.AgentData).GetProperty("NavalDeckShip"));
+        Assert.Null(typeof(global::Missions.Agents.Packets.AgentData).GetProperty("NavalDeckLocal"));
         Assert.Null(typeof(MovementTrafficTests).GetMethod("NavalStationSuppression_DropsOnlyDueRecipientActorHistory_ExitSendsCurrentCapture"));
         Assert.Null(typeof(NavalLabBuildConfigurationTests).Assembly.GetType(
             "E2E.Tests.Services.Missions.NavalLabRoutingTests"));

@@ -7,6 +7,7 @@ using HarmonyLib;
 using NavalDLC.Missions.NavalPhysics;
 using NavalDLC.Missions.Objects.UsableMachines;
 using TaleWorlds.Engine;
+using TaleWorlds.Core;
 using TaleWorlds.Library;
 using ForceMode = TaleWorlds.Engine.GameEntityPhysicsExtensions.ForceMode;
 using Attachment = NavalDLC.Missions.Objects.UsableMachines.ShipAttachmentMachine.ShipAttachment;
@@ -28,9 +29,49 @@ internal static class NavalLabRopePatches
     }
 
     [HarmonyPatch(typeof(Attachment), nameof(Attachment.CheckAndConnectBridge))]
-    private static class NoBridge
+    private static class PlankEligibility
     {
-        private static bool Prefix(Attachment __instance) => NavalLabPhysicsPatches.Active?.AllowRopeBridge(__instance) != false;
+        private static bool Prefix(Attachment __instance, ref bool forceBridge) =>
+            NavalLabPhysicsPatches.Active?.AllowPlankCheck(__instance, ref forceBridge) != false;
+    }
+
+    [HarmonyPatch(typeof(Attachment), "TickThrownBridge")]
+    private static class ReplicaPlankFlight
+    {
+        private static bool Prefix(Attachment __instance) => NavalLabPhysicsPatches.Active?.TickReplicaPlankFlight(__instance) != false;
+    }
+
+    [HarmonyPatch(typeof(Attachment), "CheckAndBreakAttachment")]
+    private static class CanonicalBreak
+    {
+        private static bool Prefix(Attachment __instance) => NavalLabPhysicsPatches.Active?.AllowAttachmentBreakCheck(__instance) != false;
+    }
+
+    [HarmonyPatch(typeof(ShipAttachmentMachine), nameof(ShipAttachmentMachine.DisconnectAttachment))]
+    private static class EmptyDisconnect
+    {
+        private static bool Prefix(ShipAttachmentMachine __instance) => NavalLabPhysicsPatches.Active?.AllowPlankRemoval(__instance.CurrentAttachment) != false;
+    }
+
+    [HarmonyPatch(typeof(Attachment), nameof(Attachment.Destroy))]
+    private static class EmptyDestroy
+    {
+        private static bool Prefix(Attachment __instance) => NavalLabPhysicsPatches.Active?.AllowPlankRemoval(__instance) != false;
+    }
+
+    [HarmonyPatch(typeof(Attachment), nameof(Attachment.OnFixedTick))]
+    private static class AttachmentSolverScope
+    {
+        private static bool Prefix(Attachment __instance, out NavalLabBehavior __state)
+        {
+            __state = solver;
+            var active = NavalLabPhysicsPatches.Active;
+            if (active?.IsFixtureRope(__instance) != true) return true;
+            if (!active.RopeReady) return false;
+            solver = active;
+            return true;
+        }
+        private static void Finalizer(NavalLabBehavior __state) => solver = __state;
     }
 
     [HarmonyPatch(typeof(ShipAttachmentMachineConnectionLogic), "OnTick")]
@@ -86,6 +127,7 @@ internal static class NavalLabRopePatches
         {
             foreach (var name in new[] { "StabilizeShipUps", "AlignShips", "ApplyConstraintImpulse", "ReduceRelativeDrift" })
                 yield return AccessTools.DeclaredMethod(typeof(Joint), name);
+            yield return AccessTools.DeclaredMethod(typeof(Attachment), nameof(Attachment.OnFixedTick));
         }
         private static IEnumerable<CodeInstruction> Transpiler(IEnumerable<CodeInstruction> instructions)
         {
@@ -110,6 +152,53 @@ internal static class NavalLabRopePatches
             if (replaced < 2) throw new InvalidOperationException("Native rope force callsites changed.");
         }
     }
+
+    [ThreadStatic] private static Random cosmeticRandom;
+
+    [HarmonyPatch]
+    private static class PlankCosmetics
+    {
+        private static IEnumerable<MethodBase> TargetMethods()
+        {
+            foreach (var name in new[] { "SpawnPlankEntities", "ConnectBridge", "AddRopesToBridge" })
+                yield return AccessTools.DeclaredMethod(typeof(Attachment), name);
+        }
+        private static void Prefix(Attachment __instance, MethodBase __originalMethod, out Random __state)
+        {
+            __state = cosmeticRandom;
+            cosmeticRandom = NavalLabPhysicsPatches.Active?.PlankCosmeticRandom(__instance, __originalMethod.Name);
+        }
+        private static void Finalizer(Random __state) => cosmeticRandom = __state;
+        private static IEnumerable<CodeInstruction> Transpiler(IEnumerable<CodeInstruction> instructions)
+        {
+            int replaced = 0;
+            foreach (var instruction in instructions)
+            {
+                if (instruction.opcode == OpCodes.Call && instruction.operand is MethodInfo method && method.DeclaringType == typeof(MBRandom))
+                {
+                    string wrapper = method.Name == "get_RandomFloat" ? nameof(CosmeticFloat)
+                        : method.Name == "RandomInt" && method.GetParameters().Length == 1 ? nameof(CosmeticInt)
+                        : method.Name == "RandomInt" && method.GetParameters().Length == 2 ? nameof(CosmeticRange) : null;
+                    if (wrapper == null) throw new InvalidOperationException("Plank cosmetic random callsite changed.");
+                    instruction.operand = AccessTools.DeclaredMethod(typeof(NavalLabRopePatches), wrapper);
+                    replaced++;
+                }
+                else if (instruction.opcode == OpCodes.Ldfld && instruction.operand is FieldInfo field
+                    && field.DeclaringType == typeof(Attachment) && field.Name == "_numberOfPlanksNeeded")
+                {
+                    instruction.opcode = OpCodes.Call;
+                    instruction.operand = AccessTools.DeclaredMethod(typeof(NavalLabRopePatches), nameof(DecorationCount));
+                }
+                yield return instruction;
+            }
+            if (replaced == 0) throw new InvalidOperationException("Plank cosmetic random callsites missing.");
+        }
+    }
+
+    private static float CosmeticFloat() => cosmeticRandom == null ? MBRandom.RandomFloat : (float)cosmeticRandom.NextDouble();
+    private static int CosmeticInt(int max) => cosmeticRandom == null ? MBRandom.RandomInt(max) : cosmeticRandom.Next(max);
+    private static int CosmeticRange(int min, int max) => cosmeticRandom == null ? MBRandom.RandomInt(min, max) : cosmeticRandom.Next(min, max);
+    private static int DecorationCount(Attachment attachment) => NavalLabPhysicsPatches.Active?.PlankDecorationCount(attachment) ?? attachment._numberOfPlanksNeeded;
 
     private static void Force(NavalPhysics physics, in Vec3 forceVec, ForceMode mode)
     {

@@ -17,6 +17,7 @@ using NavalDLC.Missions.ShipControl;
 using NavalDLC.Missions.ShipInput;
 using NavalDLC.View.MissionViews;
 using Newtonsoft.Json;
+using Newtonsoft.Json.Linq;
 using TaleWorlds.Engine;
 using TaleWorlds.InputSystem;
 using TaleWorlds.Library;
@@ -111,6 +112,7 @@ public sealed class NavalLabControlPulseTests : IDisposable
         Assert.True(message.DeadlineUtcTicks <= DateTime.UtcNow.AddSeconds(1).Ticks);
     }
 
+    // Checks operation deduplication while native callbacks alone publish pulse refreshes.
     [Fact]
     public void DuplicateDoesNotRestartOrExtendAndConflictDoesNotReplacePendingPulse()
     {
@@ -120,13 +122,21 @@ public sealed class NavalLabControlPulseTests : IDisposable
         Assert.StartsWith("rejected:conflicting", Request(operation, lateral: -1));
         Assert.Equal("rejected:axes_pulse_pending", Request());
         Assert.Equal(deadline, fixture.pulseDeadline); Assert.Equal(utc, fixture.pulseDeadlineUtcTicks);
-        for (int i = 0; i < 5; i++) { fixture.nextNativeInput = 0; fixture.TickAxesPulse(); }
+        // Mission ticks enforce safety; only native input callbacks refresh the pulse.
+        for (int i = 0; i < 5; i++) fixture.TickAxesPulse();
+        Assert.Single(sent);
+        for (int i = 0; i < 5; i++) fixture.RouteNativeAxes(view);
+        Assert.Equal(6, sent.Count);
         Assert.All(sent, message => Assert.Equal(utc, message.DeadlineUtcTicks));
         fixture.pulseDeadline = 0; fixture.TickAxesPulse();
+        Assert.Equal(6, sent.Count); Assert.True(fixture.pulsePending);
+        fixture.RouteNativeAxes(view);
+        Assert.Equal(7, sent.Count); Assert.False(fixture.pulsePending);
         int count = sent.Count;
         Assert.StartsWith("requested:", Request(operation)); fixture.TickAxesPulse(); Assert.Equal(count, sent.Count);
     }
 
+    // Checks callback-driven expiry preserves the current sail and cannot be refreshed by mission ticks.
     [Theory]
     [InlineData(0)]
     [InlineData(1)]
@@ -137,6 +147,9 @@ public sealed class NavalLabControlPulseTests : IDisposable
         AccessTools.Field(view.GetType(), "SailControl").SetValue(view, (SailInput)sail);
         fixture.pulseDeadline = 0;
         fixture.TickAxesPulse();
+        Assert.Single(sent); Assert.True(fixture.pulsePending);
+        fixture.RouteNativeAxes(view);
+        Assert.Equal(2, sent.Count);
         var neutral = sent.Last();
         Assert.True(neutral.HasHelm); Assert.Equal(0, neutral.Rudder); Assert.Equal(0, neutral.Lateral);
         Assert.Equal(0, neutral.Longitudinal); Assert.Equal(0, neutral.DoubleTap); Assert.Equal(sail, neutral.Sail);
@@ -257,20 +270,34 @@ public sealed class NavalLabControlPulseTests : IDisposable
         fixture.TickAxesPulse(); Assert.Empty(sent);
     }
 
-    [Fact]
-    public void RealHostSetterAndProcessorDistinguishNormalAxisNeutralFromUnchangedSafetyStop()
+    // Only the original owner applies input, independently of which client is the elected simulator.
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void RealOwnerSetterAndProcessorDistinguishNormalAxisNeutralFromUnchangedSafetyStop(bool electedHost)
     {
         harmony.Unpatch(AccessTools.Method(typeof(PlayerShipController), nameof(PlayerShipController.SetInput)), HarmonyPatchType.Prefix, harmony.Id);
         Patch(AccessTools.PropertyGetter(typeof(NavalLabBehavior), "CanUseNativeControls"), nameof(True));
         fixture.Ships = new[] { Shell<MissionShip>(), Shell<MissionShip>() };
         var player = new PlayerShipController(fixture.LocalShip);
+        var foreignPlayer = new PlayerShipController(fixture.Ships[0]);
         Set(fixture.LocalShip, "<Controller>k__BackingField", player);
+        Set(fixture.Ships[0], "<Controller>k__BackingField", foreignPlayer);
+        Patch(AccessTools.PropertyGetter(typeof(NavalLabBehavior), "HelmReplicasReady"), nameof(True));
+        fixture.factoryHost = electedHost;
         Request();
-        fixture.factoryHost = false; fixture.ApplyNativeInput(sent[0]);
+        // Owner input still requires completed automatic helm setup.
+        fixture.ApplyNativeInput(sent[0]);
         Assert.Equal(SailInput.Raised, player.Update(0).Sail);
-        fixture.factoryHost = true; fixture.ApplyNativeInput(sent[0]);
+        fixture.nativeAutoHelmObserved = true;
+        var input = sent[0];
+        fixture.ApplyNativeInput(new NetworkNavalLabHelmInput(input.IncarnationId, input.Epoch, 0, input.Sequence,
+            input.DeadlineUtcTicks, input.HasHelm, input.Lateral, input.Longitudinal, input.DoubleTap, input.Rudder, input.Sail));
+        Assert.Equal(SailInput.Raised, foreignPlayer.Update(0).Sail);
+        Assert.Equal(SailInput.Raised, player.Update(0).Sail);
+        fixture.ApplyNativeInput(input);
         Assert.Equal(SailInput.Full, player.Update(0).Sail); Assert.NotEqual(0, player.Update(0).RudderLateral);
-        fixture.pulseDeadline = 0; fixture.TickAxesPulse(); fixture.ApplyNativeInput(sent.Last());
+        fixture.pulseDeadline = 0; fixture.TickAxesPulse(); fixture.RouteNativeAxes(view); fixture.ApplyNativeInput(sent.Last());
         var neutral = player.Update(0);
         Assert.Equal(0, neutral.RudderLateral); Assert.Equal(RowerLongitudinalInput.None, neutral.RowerLongitudinal);
         Assert.Equal(SailInput.Full, neutral.Sail);
@@ -290,6 +317,7 @@ public sealed class NavalLabControlPulseTests : IDisposable
         return false;
     }
 
+    // Checks owner-side status excludes non-finite native controller values without dispatching input.
     [Theory]
     [InlineData(float.NaN)]
     [InlineData(float.PositiveInfinity)]
@@ -305,10 +333,11 @@ public sealed class NavalLabControlPulseTests : IDisposable
         fixture.factoryHost = true;
         var json = JsonConvert.SerializeObject(fixture.InspectControlStatus());
         Assert.DoesNotContain("NaN", json); Assert.DoesNotContain("Infinity", json);
-        Assert.Contains("\"currentHostApplication\":[null,null]", json);
+        Assert.Contains("\"currentOwnerApplication\":[null,null]", json);
         Assert.Empty(sent);
     }
 
+    // Both safety cancellation and callback-driven neutral dispatch must end a failed pulse without retry.
     [Theory]
     [InlineData(false)]
     [InlineData(true)]
@@ -323,11 +352,38 @@ public sealed class NavalLabControlPulseTests : IDisposable
         else
         {
             fixture.pulseDeadline = 0;
-            Assert.Throws<InvalidOperationException>(() => fixture.TickAxesPulse());
+            fixture.TickAxesPulse();
+            Assert.True(fixture.pulsePending); Assert.Single(sent);
+            Assert.Throws<InvalidOperationException>(() => fixture.RouteNativeAxes(view));
         }
         Assert.False(fixture.pulsePending); Assert.False(fixture.pulseCompleting);
         Assert.StartsWith("failed_", fixture.pulsePhase); Assert.Equal(0, fixture.pulseNeutralInputSequence);
         fixture.TickAxesPulse(); Assert.Single(sent);
+    }
+
+    // Pulse completion freezes the own-hull physics summary in control status until the next operation.
+    [Fact]
+    public void CompletedPulseRetainsPhysicsSummaryInControlStatusUntilNextOperation()
+    {
+        fixture.Ships = new[] { Shell<MissionShip>(), Shell<MissionShip>() };
+        var first = Guid.NewGuid(); Request(first);
+        var observation = fixture.pulsePhysicsObservation;
+        int generation = observation.Generation(fixture.LocalShip);
+        Assert.Equal(-1, observation.Generation(fixture.Ships[0]));
+        observation.Record(fixture.LocalShip, generation, 0.02f, 1, 4, 4, 1, 2, 300, 0.4f, false, 1);
+        fixture.pulseDeadline = 0; fixture.RouteNativeAxes(view);
+        Assert.Equal("completed_axes_neutral_requested", fixture.pulsePhase);
+        observation.Record(fixture.LocalShip, generation, 0.02f, 0, 4, 4, 1, 2, 0, 0, false, 1);
+        fixture.factoryTerminal = true;
+        var status = JObject.Parse(JsonConvert.SerializeObject(fixture.InspectControlStatus()))["pulsePhysics"]!;
+        Assert.Equal(first, (Guid)status["operationId"]!); Assert.False((bool)status["open"]!);
+        Assert.Equal(1, (int)status["samples"]!); Assert.Equal(300f, (float)status["oarForwardForceMax"]!);
+        fixture.factoryTerminal = false;
+        var second = Guid.NewGuid(); Request(second);
+        fixture.factoryTerminal = true;
+        status = JObject.Parse(JsonConvert.SerializeObject(fixture.InspectControlStatus()))["pulsePhysics"]!;
+        Assert.Equal(second, (Guid)status["operationId"]!); Assert.Equal(0, (int)status["samples"]!);
+        Assert.Equal("no_own_hull_sample", (string)status["unavailable"]!);
     }
 
     public void Dispose() { harmony.UnpatchAll(harmony.Id); scope.Dispose(); }

@@ -5,6 +5,7 @@ using Missions;
 using Missions.Battles;
 using Missions.Messages;
 using Newtonsoft.Json.Linq;
+using TaleWorlds.Library;
 using Xunit.Abstractions;
 
 namespace E2E.Tests.Services.Missions;
@@ -16,56 +17,50 @@ public sealed class NavalLabHullInterpolationTests : NavalMissionTestEnvironment
     private void Start()
     {
         CreateLab(NavalLabMode.TwoClientNative);
+        foreach (var client in Clients) Adapter(client).CaptureShipSamples = false;
         Ready(First); Ready(Second); Tick(First); Tick(Second);
+        Execute("complete-deployment"); Tick(First); Tick(Second);
+        Adapter(Second).Frames[1] = new MatrixFrame(Mat3.Identity, new Vec3(73, 0, 0));
     }
 
-    private JObject Status() => JObject.FromObject(Adapter(Second).Controller!.NativeControlStatus());
-    private JToken Hull() => Status()["hullInterpolation"]!;
-    private void Target(long sequence, float x, Guid probe = default)
-    {
-        var values = new float[24];
-        for (int slot = 0; slot < 2; slot++)
-        {
-            values[slot * 12] = values[(slot * 12) + 4] = values[(slot * 12) + 8] = 1;
-            values[(slot * 12) + 9] = x + slot;
-        }
-        SendFrames(First, new NetworkNavalLabFrames(Manifest.IncarnationId, 1, sequence, values, sequence * 10, probe));
-    }
+    private JToken Hull() => ShipStream(Second, 0);
+    private void Target(long sequence, float x) => SendShipSample(First,
+        Adapter(First).ShipSample(sequence, sequence * 10, new MatrixFrame(Mat3.Identity, new Vec3(x, 0, 0))));
 
     private void Pose(float x)
     {
         Assert.Equal(x, Adapter(Second).Frames[0].origin.x, 4);
-        Assert.Equal(x + 1, Adapter(Second).Frames[1].origin.x, 4);
-        Assert.False(Adapter(Second).Authority);
+        Assert.Equal(73, Adapter(Second).Frames[1].origin.x);
+        Assert.All(Adapter(Second).ForeignFrameWrites, write => Assert.Equal(0, write.slot));
+        Assert.Equal(0, (long)ShipStream(Second, 1)["appliedSequence"]!);
+        Assert.DoesNotContain("apply", Adapter(Second).Calls);
     }
 
     [Fact]
-    public void FirstExact_NextTargetInterpolatesBothHulls_ReplacementStartsAtLastWrittenPose()
+    public void ForeignHullInterpolatesFromReadback_ReplacementStartsAtLastWrittenPose_OwnHullNeverChanges()
     {
-        Start(); Target(100, 0); Pose(0);
-        Assert.Equal(1, Adapter(Second).ApplyCount);
-        Target(101, 10); Pose(0);
-        Assert.Equal(101, (long)Hull()["acceptedTargetSequence"]!);
-        Assert.Equal(100, (long)Status()["lastAppliedFrameSequence"]!);
+        Start(); Target(100, 10); Pose(0);
+        Assert.Empty(Adapter(Second).ForeignFrameWrites);
+        Assert.Equal(100, (long)Hull()["acceptedSequence"]!);
+        Assert.Equal(0, (long)Hull()["appliedSequence"]!);
         Tick(Second, 0.01f); Pose(2);
-        Assert.Equal(0.2f, (float)Hull()["applicationAlpha"]!, 4);
-        Assert.Equal(1010, (long)Hull()["applicationSourceCallback"]!);
-        Assert.False((bool)Hull()["applicationCompletedTarget"]!);
-        Assert.Equal(2, (float)Hull()["lastNativeReadbackFrames"]![9]!, 4);
+        Assert.Equal(0.2f, (float)Hull()["Alpha"]!, 4);
+        Assert.Equal(1000, (long)Hull()["sourceCallback"]!);
+        Assert.Equal(100, (long)Hull()["appliedSequence"]!);
+        Assert.Equal(2, (float)Hull()["observedFrame"]![9]!, 4);
         Target(102, 20); Pose(2);
         Tick(Second, 0.025f); Pose(11);
-        Target(101, -100); // A delayed source sequence cannot replace the accepted target.
-        Assert.Equal(102, (long)Hull()["acceptedTargetSequence"]!);
+        Target(101, -100);
+        Assert.Equal(102, (long)Hull()["acceptedSequence"]!);
         Tick(Second, 0.025f); Pose(20);
-        Assert.Equal(102, (long)Status()["lastAppliedFrameSequence"]!);
-        Assert.Equal(1020, (long)Status()["lastAppliedSourceCallback"]!);
-        Assert.True((bool)Hull()["applicationCompletedTarget"]!);
-        Assert.False((bool)Hull()["pending"]!);
-        int writes = Adapter(Second).ApplyCount;
+        Assert.Equal(102, (long)Hull()["appliedSequence"]!);
+        Assert.Equal(1020, (long)Hull()["sourceCallback"]!);
+        Assert.Equal(1, (float)Hull()["Alpha"]!);
+        int writes = Adapter(Second).ForeignFrameWrites.Count;
         Tick(Second, 10); Tick(Second, 10); Pose(20);
-        Assert.Equal(writes, Adapter(Second).ApplyCount);
+        Assert.Equal(writes, Adapter(Second).ForeignFrameWrites.Count);
         Target(103, 30); Tick(Second, 0.025f); Pose(25);
-        Assert.Equal(103, (long)Hull()["applicationTargetSequence"]!);
+        Assert.Equal(103, (long)Hull()["appliedSequence"]!);
     }
 
     [Theory]
@@ -76,20 +71,20 @@ public sealed class NavalLabHullInterpolationTests : NavalMissionTestEnvironment
     [InlineData(float.NegativeInfinity)]
     public void InvalidDeltaDoesNotAdvanceOrWrite(float dt)
     {
-        Start(); Target(100, 0); Target(101, 10);
-        int writes = Adapter(Second).ApplyCount;
+        Start(); Target(100, 10);
         Tick(Second, dt); Pose(0);
-        Assert.Equal(writes, Adapter(Second).ApplyCount);
+        Assert.Empty(Adapter(Second).ForeignFrameWrites);
+        Assert.Equal(0, (long)Hull()["appliedSequence"]!);
         Tick(Second, 0.025f); Pose(5);
     }
 
     [Fact]
     public void LargeFiniteDeltaClampsAtExactEndpointWithoutExtrapolation()
     {
-        Start(); Target(100, 0); Target(101, 10);
+        Start(); Target(100, 10);
         Tick(Second, float.MaxValue); Pose(10);
-        Assert.Equal(1, (float)Hull()["applicationAlpha"]!);
-        Assert.Equal(2, Adapter(Second).ApplyCount);
+        Assert.Equal(1, (float)Hull()["Alpha"]!);
+        Assert.Single(Adapter(Second).ForeignFrameWrites);
     }
 
     [Theory]
@@ -102,8 +97,8 @@ public sealed class NavalLabHullInterpolationTests : NavalMissionTestEnvironment
     [InlineData("mission")]
     public void TerminalOrLifetimeLossCancelsPendingHullWrites(string kind)
     {
-        Start(); Target(100, 0); Target(101, 10); Tick(Second, 0.01f);
-        int writes = Adapter(Second).ApplyCount;
+        Start(); Target(100, 10); Tick(Second, 0.01f);
+        int writes = Adapter(Second).ForeignFrameWrites.Count;
         var manifest = Manifest;
         if (kind == "stop") Execute("stop");
         if (kind == "departure")
@@ -121,9 +116,9 @@ public sealed class NavalLabHullInterpolationTests : NavalMissionTestEnvironment
             if (kind == "mission") controller.Mission = null;
         });
         Tick(Second, 0.05f); Tick(Second, 0.05f);
-        Assert.Equal(writes, Adapter(Second).ApplyCount);
-        Assert.False((bool)Hull()["pending"]!);
-        Assert.Equal(JTokenType.Null, Hull()["targetFrames"]!.Type);
+        Assert.Equal(writes, Adapter(Second).ForeignFrameWrites.Count);
+        Assert.Equal(JTokenType.Null, Hull()["targetFrame"]!.Type);
+        Pose(2);
     }
 
     [Theory]
@@ -131,37 +126,36 @@ public sealed class NavalLabHullInterpolationTests : NavalMissionTestEnvironment
     [InlineData(true)]
     public void NativeApplyRefusalOrExceptionDuringInterpolationTerminallyHolds(bool throws)
     {
-        Start(); Target(100, 0); Target(101, 10);
+        Start(); Target(100, 10); Tick(Second); Target(101, 20);
+        var applied = (long)Hull()["AppliedCallback"]!;
         Adapter(Second).FailApply = !throws; Adapter(Second).ThrowOnApply = throws;
         Tick(Second, 0.025f);
         Assert.True(Adapter(Second).TerminalHold);
-        Assert.Equal(100, (long)Status()["lastAppliedFrameSequence"]!);
-        Assert.Equal(1, (long)Hull()["applicationOrdinal"]!);
-        int writes = Adapter(Second).ApplyCount;
-        Tick(Second); Assert.Equal(writes, Adapter(Second).ApplyCount);
-        Assert.False((bool)Hull()["pending"]!);
+        Assert.Equal(100, (long)Hull()["appliedSequence"]!);
+        Assert.Equal(applied, (long)Hull()["AppliedCallback"]!);
+        Assert.Equal(1, (long)Hull()["ApplicationOrdinal"]!);
+        int writes = Adapter(Second).ForeignFrameWrites.Count;
+        Tick(Second); Assert.Equal(writes, Adapter(Second).ForeignFrameWrites.Count);
+        Assert.Equal(JTokenType.Null, Hull()["targetFrame"]!.Type);
+        Pose(10);
     }
 
     [Fact]
-    public void SamplesWaitForEndpoint_AndSupersededTargetsNeverClaimAnAppliedEndpoint()
+    public void SupersededUnwrittenTargetNeverClaimsAnApplication_AndCallbacksIdentifyPartialWrites()
     {
-        Start(); Target(100, 0);
-        Guid probe = Guid.NewGuid();
-        // The public native commands forbid probe controls; exercise the measurement seam directly.
-        Second.Call(() => Assert.Equal("applied", Second.Resolve<INavalLabMeasurement>().Begin(probe, 1,
-            (double)System.Diagnostics.Stopwatch.GetTimestamp() / System.Diagnostics.Stopwatch.Frequency)));
-        Target(101, 10, probe); Tick(Second, 0); Tick(Second, 0.01f);
-        Assert.Empty((JArray)Samples(Second)["measurement"]!["samples"]!);
-        Target(102, 20, probe);
-        var superseded = Samples(Second)["measurement"]!["samples"]![0]!;
-        Assert.Equal("superseded_before_interpolation_endpoint", (string?)superseded["error"]);
-        Assert.Equal(JTokenType.Null, superseded["appliedCallback"]!.Type);
-        Tick(Second, 0.05f); Tick(Second, 0);
-        var complete = Samples(Second)["measurement"]!["samples"]![1]!;
-        Assert.Equal(102, (long)complete["sequence"]!);
-        Assert.Equal(JTokenType.Null, complete["error"]!.Type);
-        Assert.True((long)complete["appliedCallback"]! < (long)complete["observedCallback"]!);
-        Assert.Equal(1, (float)complete["native"]!["hullInterpolation"]!["applicationAlpha"]!);
+        Start(); Target(100, 10);
+        Tick(Second, 0);
+        Assert.Equal(0, (long)Hull()["appliedSequence"]!);
+        Assert.Equal(0, (long)Hull()["ApplicationOrdinal"]!);
+        Target(101, 20); Tick(Second, 0.01f); Pose(4);
+        Assert.Equal(101, (long)Hull()["acceptedSequence"]!);
+        Assert.Equal(101, (long)Hull()["appliedSequence"]!);
+        Assert.Equal(1, (long)Hull()["ApplicationOrdinal"]!);
+        Assert.True((long)Hull()["AcceptedCallback"]! < (long)Hull()["AppliedCallback"]!);
+        Assert.Equal(0.2f, (float)Hull()["Alpha"]!, 4);
+        Tick(Second, 0.05f); Pose(20);
+        Assert.Equal(2, (long)Hull()["ApplicationOrdinal"]!);
+        Assert.Equal(1, (float)Hull()["Alpha"]!);
     }
 }
 #endif

@@ -110,13 +110,18 @@ public sealed class NavalLabFactoryAuthorityProbeTests : IDisposable
         return false;
     }
 
+    // Supplies controls readiness; frame authority and native-write calls remain under test.
+    private static bool NativeControlsReady(ref bool __result) { __result = true; return false; }
+
+    // Native mode writes only the foreign hull; earlier modes retain global teleported frame application.
     [Theory]
     [InlineData(NavalLabMode.TwoClientNative, false)]
     [InlineData(NavalLabMode.FactoryAuthorityProbe, true)]
     [InlineData(NavalLabMode.Activation, true)]
     [InlineData(NavalLabMode.HeldHelm, true)]
-    public void ApplyFrames_UpdatesBothHullAndNavmesh_OnlyTwoClientNativeUsesFalse(NavalLabMode mode, bool teleportation)
+    public void FrameApplication_UpdatesHullAndNavmeshThroughModeSpecificAuthority(NavalLabMode mode, bool teleportation)
     {
+        using var mission = new MissionCurrentScope();
         var first = Prepare(false, mode);
         var second = Shell<MissionShip>();
         var entity = Activator.CreateInstance(typeof(WeakGameEntity), BindingFlags.Instance | BindingFlags.NonPublic,
@@ -134,18 +139,35 @@ public sealed class NavalLabFactoryAuthorityProbeTests : IDisposable
         AccessTools.Field(typeof(NavalMissionAdapter), "behavior").SetValue(adapter, behavior);
         var frames = new[] { TaleWorlds.Library.MatrixFrame.Identity, TaleWorlds.Library.MatrixFrame.Identity };
         frames[0].origin.x = 3; frames[1].origin.x = 7;
-        Assert.True(adapter.ApplyFrames(frames));
-        Assert.Equal(new[] { (new UIntPtr(41), teleportation, 3f), (new UIntPtr(42), teleportation, 7f) }, frameWrites);
-        Assert.Equal(new[] { new UIntPtr(41), new UIntPtr(42) }, navigationUpdates);
-        Assert.Equal(0, enables);
-        Assert.Empty(activeBodies);
         if (mode == NavalLabMode.TwoClientNative)
         {
+            AccessTools.PropertySetter(typeof(MissionBehavior), nameof(MissionBehavior.Mission)).Invoke(behavior, new object[] { mission.Instance });
+            harmony.Patch(AccessTools.PropertyGetter(typeof(NavalLabBehavior), "CanUseNativeControls"),
+                prefix: new HarmonyMethod(GetType(), nameof(NativeControlsReady)));
+            behavior.factoryReleased = true;
+            activeBodies.Add(new UIntPtr(41));
+            Assert.False(adapter.ApplyFrames(frames));
+            Assert.False(adapter.ApplyForeignShipFrame(0, frames[0]));
+            Assert.Empty(frameWrites); Assert.Empty(navigationUpdates);
+            Assert.True(adapter.ApplyForeignShipFrame(1, frames[1]));
+            Assert.Equal(new[] { (new UIntPtr(42), teleportation, 7f) }, frameWrites);
+            Assert.Equal(new[] { new UIntPtr(42) }, navigationUpdates);
+            Assert.Equal(new[] { new UIntPtr(41) }, activeBodies);
+            Assert.Equal(1, behavior.shipOwnerWriteRejects[0]);
+            Assert.Equal(1, behavior.shipTargetRefreshes[1]);
             behavior.factoryTerminal = true;
             Assert.False(adapter.ApplyFrames(frames));
-            Assert.Equal(2, frameWrites.Count);
-            Assert.Equal(2, navigationUpdates.Count);
+            Assert.False(adapter.ApplyForeignShipFrame(1, frames[1]));
+            Assert.Single(frameWrites); Assert.Single(navigationUpdates);
         }
+        else
+        {
+            Assert.True(adapter.ApplyFrames(frames));
+            Assert.Equal(new[] { (new UIntPtr(41), teleportation, 3f), (new UIntPtr(42), teleportation, 7f) }, frameWrites);
+            Assert.Equal(new[] { new UIntPtr(41), new UIntPtr(42) }, navigationUpdates);
+            Assert.Empty(activeBodies);
+        }
+        Assert.Equal(0, enables);
     }
 
     [Theory]
@@ -193,18 +215,20 @@ public sealed class NavalLabFactoryAuthorityProbeTests : IDisposable
         Assert.False(activeBodies.Contains(new UIntPtr(41)));
     }
 
+    // Unattributed callbacks must reject the probe without querying an incomplete native body.
     [Fact]
     public void UnknownPreCompletionFixedEntry_RejectsFollowerWithoutReadingPartialNativeBody()
     {
         Prepare(false);
         behavior.ObserveFactoryFixedTick(Shell<NavalPhysics>(), parallel: true);
-        Assert.Equal("factory_probe.follower_fixed_entry_before_complete_or_unattributed", behavior.Blocker);
+        Assert.Equal("factory_probe.fixed_entry_before_complete_or_unattributed", behavior.Blocker);
         Assert.Equal(1, behavior.factoryPreCompletionFixedEntries);
         Assert.Equal(0, behavior.ActiveFixedTicks);
         Assert.Equal(0, behavior.factoryActiveParallelEntries);
         Assert.Empty(disables);
     }
 
+    // Attributes callbacks to the completed physics instance, including rejected foreign force attempts.
     [Fact]
     public void CompletedInactiveFollower_CountsCallbacksSeparatelyFromActiveAndForceEntries()
     {
@@ -214,17 +238,23 @@ public sealed class NavalLabFactoryAuthorityProbeTests : IDisposable
         behavior.ObserveFactoryFixedTick(ship.Physics, parallel: true);
         Assert.Equal(1, behavior.FixedTicks);
         Assert.Equal(1, behavior.factoryParallelEntries);
+        Assert.Equal(new long[] { 1, 0 }, behavior.shipFixedEntries);
+        Assert.Equal(new long[] { 1, 0 }, behavior.shipParallelEntries);
         Assert.Equal(0, behavior.ActiveFixedTicks);
         Assert.Equal(0, behavior.ForceApplications);
         Assert.Null(behavior.Blocker);
-        behavior.ObserveFactoryForce();
-        Assert.Equal("factory_probe.follower_force_entry", behavior.Blocker);
+        behavior.ObserveFactoryForce(ship.Physics);
+        Assert.Equal("factory_probe.foreign_force_entry:0", behavior.Blocker);
         Assert.Equal(1, behavior.ForceApplications);
+        Assert.Equal(new long[] { 1, 0 }, behavior.shipForceEntries);
+        Assert.Equal(0, behavior.factoryUnattributedForceEntries);
         behavior.Hold();
-        behavior.ObserveFactoryForce();
+        behavior.ObserveFactoryForce(ship.Physics);
         Assert.Equal(1, behavior.ForceApplications);
+        Assert.Equal(new long[] { 1, 0 }, behavior.shipForceEntries);
     }
 
+    // A foreign active callback records its slot and terminal hold never reenables the body.
     [Fact]
     public void FollowerActiveEntry_RejectsAndTerminalHoldNeverReenablesBody()
     {
@@ -233,7 +263,8 @@ public sealed class NavalLabFactoryAuthorityProbeTests : IDisposable
         activeBodies.Add(new UIntPtr(41));
         behavior.ObserveFactoryFixedTick(ship.Physics, parallel: false);
         Assert.Equal(1, behavior.ActiveFixedTicks);
-        Assert.Equal("factory_probe.follower_active_fixed_entry", behavior.Blocker);
+        Assert.Equal("factory_probe.foreign_active_fixed_entry:0", behavior.Blocker);
+        Assert.Equal(new long[] { 1, 0 }, behavior.shipActiveFixedEntries);
         behavior.Hold();
         int count = disables.Count;
         behavior.Hold();
@@ -256,6 +287,7 @@ public sealed class NavalLabFactoryAuthorityProbeTests : IDisposable
         Assert.Contains("original init failure", behavior.Blocker);
     }
 
+    // Prior modes ignore even an unattributed physics instance without inspecting native state.
     [Theory]
     [InlineData(NavalLabMode.Activation)]
     [InlineData(NavalLabMode.HeldHelm)]
@@ -270,7 +302,7 @@ public sealed class NavalLabFactoryAuthorityProbeTests : IDisposable
             Enumerable.Range(0, owners * 5).Select(_ => Guid.NewGuid()).ToArray(), Enumerable.Range(0, owners).Select(_ => Guid.NewGuid()).ToArray(), mode), "A", null!, null!);
         behavior.factoryObserving = true;
         behavior.ObserveFactoryFixedTick(Shell<NavalPhysics>(), parallel: false);
-        behavior.ObserveFactoryForce();
+        behavior.ObserveFactoryForce(Shell<NavalPhysics>());
         Assert.Equal(0, behavior.FixedTicks);
         Assert.Equal(0, behavior.ForceApplications);
         Assert.Null(behavior.Blocker);

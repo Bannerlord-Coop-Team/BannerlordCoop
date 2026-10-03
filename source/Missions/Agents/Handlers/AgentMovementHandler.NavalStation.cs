@@ -3,25 +3,37 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using Missions.Agents.Packets;
+using TaleWorlds.Library;
+using TaleWorlds.MountAndBlade;
 
 namespace Missions.Agents.Handlers;
 
+/// <summary>Captures an owner actor's hull-local pose and deck-relative speed from its captured world position.</summary>
+public delegate bool NavalDeckPoseCapture(CoopAgentInfo info, Vec3 worldPosition, out int deckShip, out Vec3 deckLocal,
+    out float deckSpeed);
+
 public partial class AgentMovementHandler
 {
+    private NavalDeckPoseCapture navalDeckCapture;
+    private long navalDeckStamped, navalDeckWorldFallback, navalDeckAccepted, navalDeckRejected;
     private Func<CoopAgentInfo, bool> navalStationEligibility;
     private Func<CoopAgentInfo, bool> navalHelmEligibility;
     private Func<CoopAgentInfo, long?> navalHelmRevision;
-    private Func<CoopAgentInfo, long, bool> acceptNavalHelmMovement;
+    private Func<CoopAgentInfo, long, bool> acceptNavalStationMovement;
     private readonly Dictionary<RecipientMovementState, Dictionary<Guid, NavalStationMovementCounts>> navalStationMovement = new();
 
     public void ConfigureNavalStationMovement(Func<CoopAgentInfo, bool> eligibility, Func<CoopAgentInfo, bool> helmEligibility = null,
-        Func<CoopAgentInfo, long?> helmRevision = null, Func<CoopAgentInfo, long, bool> acceptHelmMovement = null)
+        Func<CoopAgentInfo, long?> helmRevision = null, Func<CoopAgentInfo, long, bool> acceptStationMovement = null,
+        NavalDeckPoseCapture deckCapture = null, NavalDeckFrameResolver deckFrame = null)
     {
         navalStationEligibility = eligibility;
         navalHelmEligibility = helmEligibility;
         navalHelmRevision = helmRevision;
-        acceptNavalHelmMovement = acceptHelmMovement;
+        acceptNavalStationMovement = acceptStationMovement;
         navalStationMovement.Clear();
+        navalDeckCapture = deckCapture;
+        navalDeckStamped = navalDeckWorldFallback = navalDeckAccepted = navalDeckRejected = 0;
+        _interpolator.ConfigureNavalDeck(deckFrame);
     }
 
     private void StampNavalHelmMovement(string scope, ushort[] compactIds, Guid[] canonicalIds, AgentData[] data)
@@ -33,8 +45,30 @@ public partial class AgentMovementHandler
             bool found = scope == null ? agentRegistry.TryGetAgentInfo(canonicalIds[i], out info)
                 : agentRegistry.TryGetAgentInfo(scope, compactIds[i], out info);
             // Stamp at packet construction, not capture; unrelated actors always keep the default field.
-            data[i].NavalHelmRevision = found ? navalHelmRevision(info) ?? 0 : 0;
+            long revision = found ? navalHelmRevision(info) ?? 0 : 0;
+            data[i].NavalHelmRevision = revision;
+            if (revision < 1 || navalDeckCapture == null || data[i].MountData != null) continue;
+            // A released captain expected on deck that still sends a world pose is counted, never hidden.
+            if (navalDeckCapture(info, data[i].Position, out int deckShip, out Vec3 deckLocal, out float deckSpeed))
+            {
+                data[i].StampNavalDeck(deckShip, deckLocal, deckSpeed);
+                navalDeckStamped++;
+            }
+            else navalDeckWorldFallback++;
         }
+    }
+
+    // [Game thread] Deck poses never fall back to world; an unresolvable deck pose clears the buffered target.
+    private void ApplyNavalDeckMovement(Agent agent, AgentData data)
+    {
+        if (data.NavalHelmRevision >= 1 && data.HasValidNavalDeck && data.MountData == null && !agent.HasMount
+            && _interpolator.TrySetRiderDeckTarget(agent, data))
+        {
+            navalDeckAccepted++;
+            return;
+        }
+        _interpolator.Forget(agent);
+        navalDeckRejected++;
     }
 
     public object InspectNavalStationMovement() => new
@@ -42,6 +76,11 @@ public partial class AgentMovementHandler
         enabled = navalStationEligibility != null || navalHelmEligibility != null,
         sampledUtcTicks = DateTime.UtcNow.Ticks,
         rows = navalStationMovement.Values.SelectMany(rows => rows.Values).ToArray(),
+        deck = new
+        {
+            stamped = navalDeckStamped, worldFallback = navalDeckWorldFallback,
+            accepted = navalDeckAccepted, rejected = navalDeckRejected, interpolator = _interpolator.InspectNavalDeck()
+        },
         measurement = "Per-recipient cadence-admitted captures and successful send callbacks, not receive or native target observations."
     };
 

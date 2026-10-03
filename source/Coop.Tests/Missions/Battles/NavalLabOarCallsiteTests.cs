@@ -23,7 +23,7 @@ public sealed class NavalLabOarCallsiteTests
     {
         var original = PatchProcessor.GetOriginalInstructions(AccessTools.Method(typeof(ShipOarMachine), "OnTickParallel2")).ToArray();
         var instrumented = NavalLabPresentationPatches.InstrumentOarCallsites(original).ToArray();
-        Assert.Equal(original.Length + 6, instrumented.Length);
+        Assert.Equal(original.Length + 24, instrumented.Length);
         Assert.Equal(6, instrumented.Count(code => code.Calls(AccessTools.Method(typeof(NavalLabPresentationPatches), "TraceSetAction"))));
         Assert.Single(instrumented.Where(code => code.Calls(AccessTools.Method(typeof(NavalLabPresentationPatches), "TraceHandIk"))));
         Assert.Single(instrumented.Where(code => code.Calls(AccessTools.Method(typeof(MissionOar), nameof(MissionOar.IsInRowingMotion)))));
@@ -131,6 +131,54 @@ public sealed class NavalLabOarCallsiteTests
             foreach (int index in Enumerable.Range(0, code.Length).Where(i => code[i].Calls(method)))
                 Assert.True(code[index + 1].Calls(wrapper));
         }
+    }
+
+    // Verifies every installed stop remains reachable through one wrapper with its own ordinal.
+    [Fact]
+    public void InstalledStopCallsitesKeepOriginalReadsAndDistinctStopOrdinals()
+    {
+        var original = PatchProcessor.GetOriginalInstructions(AccessTools.Method(typeof(ShipOarMachine), "OnTickParallel2")).ToArray();
+        var code = NavalLabPresentationPatches.InstrumentOarStopInputs(original).ToArray();
+        var stop = AccessTools.Method(typeof(Agent), nameof(Agent.StopUsingGameObjectMT));
+        var wrapper = AccessTools.Method(typeof(NavalLabPresentationPatches), "TraceStationStop");
+        var indices = Enumerable.Range(0, code.Length).Where(i => code[i].Calls(wrapper)).ToArray();
+        Assert.Equal(3, indices.Length);
+        Assert.Equal(new[] { 0, 1, 2 }, indices.Select(i => (int)code[i - 1].operand));
+        Assert.All(indices, i => Assert.Equal(System.Reflection.Emit.OpCodes.Ldc_I4, code[i - 1].opcode));
+        Assert.DoesNotContain(code, instruction => instruction.Calls(stop));
+        Assert.Equal(original.Where(instruction => !instruction.Calls(stop)), code.Where(instruction => original.Contains(instruction)));
+        Assert.Throws<InvalidOperationException>(() => NavalLabPresentationPatches.InstrumentOarStopInputs(
+            original.Where(instruction => !instruction.Calls(stop))).ToArray());
+    }
+
+    // Checks that stop diagnostics preserve stack values and publish an immutable, partial snapshot.
+    [Fact]
+    public void StopObserversPreserveValuesAndLeaveShortCircuitedInputsAbsent()
+    {
+        var previous = NavalLabPresentationPatches.oarScope;
+        try
+        {
+            var inputs = new NavalLabPresentationPatches.StopInputs();
+            NavalLabPresentationPatches.oarScope = new NavalLabPresentationPatches.OarScope(null!, null!, 0) { StopInputs = inputs };
+            Assert.True(NavalLabPresentationPatches.ObserveStopSitting(true));
+            Assert.False(NavalLabPresentationPatches.ObserveStopStruck(false));
+            Assert.Equal((AgentMovementLockedState)0, NavalLabPresentationPatches.ObserveStopMovement((AgentMovementLockedState)0));
+            Assert.False(NavalLabPresentationPatches.ObserveStopAlternative(false));
+            Assert.True(float.IsNaN(NavalLabPresentationPatches.ObserveStopRemovalTime(float.NaN)));
+            Assert.Equal(12f, NavalLabPresentationPatches.ObserveStopMissionTime(12f));
+            var snapshot = inputs.Snapshot();
+            NavalLabPresentationPatches.ObserveStopAlternative(true);
+            var saved = JObject.FromObject(snapshot);
+            Assert.Single((JArray)saved["alternatives"]!);
+            Assert.False((bool)saved["alternatives"]![0]!);
+            Assert.Empty((JArray)saved["currentActions"]!);
+            Assert.Equal(JTokenType.Null, saved["removalTimes"]![0]!.Type);
+            Assert.Null(NavalLabPresentationPatches.StationStopCallsite(null!));
+            NavalLabPresentationPatches.oarScope = null!;
+            Assert.False(NavalLabPresentationPatches.ObserveStopSitting(false));
+            Assert.True(NavalLabPresentationPatches.ObserveStopAlternative(true));
+        }
+        finally { NavalLabPresentationPatches.oarScope = previous; }
     }
 
     [Fact]

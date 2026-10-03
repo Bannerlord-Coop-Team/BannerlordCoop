@@ -31,7 +31,7 @@ public sealed partial class NavalLabCoordinator
             {
                 if (ModInformation.IsClient)
                 {
-                    if (payload.What.Phase == "commit" && controller is INavalNativeController native)
+                    if ((payload.What.Phase == "commit" || payload.What.Phase == "release") && controller is INavalNativeController native)
                         native.ApplyStations(payload.What);
                     return;
                 }
@@ -55,6 +55,13 @@ public sealed partial class NavalLabCoordinator
                             if (players.TryGetPeer(owner, out var target)) network.Send(target,
                                 new NetworkNavalLabAction(store.Current.IncarnationId, id, 1, "native-controls-ready", 0, 0, false));
                     }
+                }
+                else if (payload.What.Phase == "release")
+                {
+                    // The original owner already applied its own native dismount; only the other owner replays it.
+                    nativeState.Release(player.ControllerId, payload.What);
+                    foreach (var owner in store.Current.Controllers.Where(owner => owner != player.ControllerId))
+                        if (players.TryGetPeer(owner, out var target)) network.Send(target, payload.What);
                 }
                 else throw new InvalidOperationException("native.invalid_station_phase");
             }
