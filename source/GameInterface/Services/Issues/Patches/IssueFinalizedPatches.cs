@@ -1,4 +1,4 @@
-using Common;
+﻿using Common;
 using Common.Messaging;
 using GameInterface.Policies;
 using GameInterface.Services.Issues.Generic;
@@ -91,7 +91,7 @@ internal class IssueExpiryFinalizeAuthorityPatch
 internal class IssueFinalizedPatches
 {
     [HarmonyPostfix]
-    private static void Postfix(IssueBase __instance)
+    private static void Postfix(IssueBase __instance, bool __runOriginal)
     {
         var owner = __instance.IssueOwner;
         var reason = IssueFinalizeReason.IssueOnly;
@@ -101,8 +101,7 @@ internal class IssueFinalizedPatches
             IssueManagerQuestCompletedReasonCapture.PendingReasons.Remove(owner);
         }
 
-        var wasGenuinelyFinalized = !DisableAllIssueBehaviorsExceptAllowlist.IsAllowlisted(__instance) || IssueFinalizeAuthorityGuard.IsActive;
-        if (wasGenuinelyFinalized)
+        if (__runOriginal)
         {
             if (ContainerProvider.TryResolve<IIssueOwnershipRegistry>(out var ownershipRegistry)) ownershipRegistry.Clear(owner);
 
@@ -117,6 +116,7 @@ internal class IssueFinalizedPatches
 
         if (CallOriginalPolicy.IsOriginalAllowed()) return;
         if (!DisableAllIssueBehaviorsExceptAllowlist.IsAllowlisted(__instance)) return;
+        if (ModInformation.IsServer && !__runOriginal) return;
 
         MessageBroker.Instance.Publish(__instance, new IssueFinalizedTriggered(owner, reason));
     }

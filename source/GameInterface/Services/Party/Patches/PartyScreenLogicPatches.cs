@@ -2,6 +2,7 @@
 using Common.Messaging;
 using Common.Util;
 using GameInterface.Services.Heroes;
+using GameInterface.Services.Issues.Generic;
 using GameInterface.Services.Party.Messages;
 using GameInterface.Services.Villages;
 using HarmonyLib;
@@ -32,8 +33,14 @@ internal class PartyScreenLogicPatches
 
     [HarmonyPatch(nameof(PartyScreenLogic.ValidateCommand))]
     [HarmonyPrefix]
-    public static bool ValidateCommandPrefix(PartyScreenLogic.PartyCommand command, ref bool __result)
+    public static bool ValidateCommandPrefix(PartyScreenLogic.PartyCommand command, ref bool __result, PartyScreenLogic __instance = null)
     {
+        if (ContainerProvider.TryResolve<IAlternativeSolutionTroopSelection>(out var selection) &&
+            selection.IsCommitPending(__instance))
+        {
+            __result = false;
+            return false;
+        }
         // Force-transfer loot screens only honor member takes and dismissals: the
         // commit validation rejects any prisoner, upgrade, gold, influence, or
         // morale movement, which would fail after the screen already reset.
@@ -73,6 +80,12 @@ internal class PartyScreenLogicPatches
     [HarmonyPrefix]
     public static bool DoneLogicPrefix(PartyScreenLogic __instance, ref bool __result, bool isForced)
     {
+        ContainerProvider.TryResolve<IAlternativeSolutionTroopSelection>(out var troopSelection);
+        if (troopSelection?.IsCommitPending(__instance) == true)
+        {
+            __result = false;
+            return false;
+        }
         if (Hero.MainHero.Gold < -__instance.CurrentData.PartyGoldChangeAmount && __instance.CurrentData.PartyGoldChangeAmount < 0)
         {
             MBInformationManager.AddQuickInformation(GameTexts.FindText("str_inventory_popup_player_not_enough_gold", null), 0, null, null, "");
@@ -118,18 +131,45 @@ internal class PartyScreenLogicPatches
             }
 
             ForceTransferScreenTracker.TryClaimForceTransferId(__instance.MemberRosters[0], out var forceTransferId);
+            var selectingIssue = troopSelection?.FindIssue(__instance);
+            var currentMembers = __instance.MemberRosters[1];
+            var initialMembers = __instance._initialData.RightMemberRoster;
+            TroopRoster selectedTroops = null;
+            TroopRoster initialSelectedTroops = null;
+            TroopRoster remainingTroops = null;
+            if (selectingIssue != null)
+            {
+                // Quest transfers are committed by acceptance; upgrades still use the party transaction.
+                using (new AllowedThread())
+                {
+                    selectedTroops = TroopRoster.CreateDummyTroopRoster();
+                    selectedTroops.Add(__instance.MemberRosters[0]);
+                    remainingTroops = TroopRoster.CreateDummyTroopRoster();
+                    remainingTroops.Add(__instance.MemberRosters[1]);
+                    initialSelectedTroops = TroopRoster.CreateDummyTroopRoster();
+                    initialSelectedTroops.Add(__instance._initialData.LeftMemberRoster);
+                    currentMembers = TroopRoster.CreateDummyTroopRoster();
+                    currentMembers.Add(__instance.MemberRosters[1]);
+                    // Native upgrades can leave overflow XP that still fits the combined party.
+                    currentMembers.Add(selectedTroops);
+                    initialMembers = TroopRoster.CreateDummyTroopRoster();
+                    initialMembers.Add(__instance._initialData.RightMemberRoster);
+                    initialMembers.Add(initialSelectedTroops);
+                }
+            }
+            var commitId = selectingIssue == null ? null : troopSelection.BeginCommit(__instance);
             var message = new PartyDoneLogicAttempted(
                 Hero.MainHero,
                 releasedPrisonersRoster,
                 takenPrisonersRoster,
                 recruitedPrisonersRoster,
-                __instance.MemberRosters[0],
+                selectedTroops ?? __instance.MemberRosters[0],
                 __instance.PrisonerRosters[0],
-                __instance.MemberRosters[1],
+                currentMembers,
                 __instance.PrisonerRosters[1],
-                __instance._initialData.LeftMemberRoster,
+                initialSelectedTroops ?? __instance._initialData.LeftMemberRoster,
                 __instance._initialData.LeftPrisonerRoster,
-                __instance._initialData.RightMemberRoster,
+                initialMembers,
                 __instance._initialData.RightPrisonerRoster,
                 __instance.RightOwnerParty.ItemRoster,
                 __instance.CurrentData.UpgradedTroopsHistory,
@@ -142,14 +182,15 @@ internal class PartyScreenLogicPatches
                 applyReleasedAndTakenPrisonerActions,
                 donationSettlement,
                 donatedPrisonersRoster,
-                forceTransferId
+                forceTransferId,
+                commitId
             );
 
-            MessageBroker.Instance.Publish(__instance, message);
+            if (selectingIssue == null) MessageBroker.Instance.Publish(__instance, message);
             // Manage changing rosters on the server
             using (new AllowedThread())
             {
-                TroopRoster duplicateLeftMemberRoster = __instance.MemberRosters[0].CloneRosterData();
+                TroopRoster duplicateLeftMemberRoster = selectedTroops ?? __instance.MemberRosters[0].CloneRosterData();
                 TroopRoster duplicateLeftPrisonerRoster = __instance.PrisonerRosters[0].CloneRosterData();
 
                 InCommit = true;
@@ -168,22 +209,124 @@ internal class PartyScreenLogicPatches
                     __instance.CurrentData.UsedUpgradeHorsesHistory = new List<Tuple<EquipmentElement, int>>();
                     __instance._initialData.CopyFromScreenData(__instance.CurrentData);
 
+                    if (selectingIssue != null)
+                        troopSelection.KeepSelection(__instance, selectingIssue, selectedTroops, remainingTroops);
+
                     // In vanilla, the rosters would already be updated but with this patch the rosters are reset on the client to be managed by the server.
                     // This assigns a duplicate version of the left rosters needed in extra logic handled by the PartyScreenHelper when closing the party screen.
                     // For example, the left member roster when creating a new clan party is not managed on the server but the server does need this data.
-                    RestoreLeftRostersAfterCommit(
-                        __instance,
-                        duplicateLeftMemberRoster,
-                        duplicateLeftPrisonerRoster);
+                    if (selectingIssue == null)
+                    {
+                        RestoreLeftRostersAfterCommit(
+                            __instance,
+                            duplicateLeftMemberRoster,
+                            duplicateLeftPrisonerRoster);
+                    }
+                    else __instance._initialData.CopyFromScreenData(__instance.CurrentData);
                 }
                 finally
                 {
                     InCommit = false;
                 }
             }
+            // Freeze the local baseline before an immediate authoritative reply can rebase it.
+            if (selectingIssue != null)
+            {
+                MessageBroker.Instance.Publish(__instance, message);
+                flag = ReferenceEquals(troopSelection.FindIssue(__instance), selectingIssue);
+            }
         }
         __result = flag;
         return false;
+    }
+
+    [HarmonyPatch(nameof(PartyScreenLogic.IsDoneActive))]
+    [HarmonyPostfix]
+    private static void IsDoneActivePostfix(PartyScreenLogic __instance, ref bool __result)
+    {
+        if (ContainerProvider.TryResolve<IAlternativeSolutionTroopSelection>(out var selection) &&
+            selection.IsCommitPending(__instance)) __result = false;
+    }
+
+    [HarmonyPatch(nameof(PartyScreenLogic.TransferTroop))]
+    [HarmonyPrefix]
+    private static void TransferTroopPrefix(PartyScreenLogic __instance, PartyScreenLogic.PartyCommand command,
+        out (int Count, long Xp) __state)
+        => __state = GetSelectionXp(__instance, command);
+
+    [HarmonyPatch(nameof(PartyScreenLogic.UpgradeTroop))]
+    [HarmonyPrefix]
+    private static void UpgradeTroopPrefix(PartyScreenLogic __instance, PartyScreenLogic.PartyCommand command,
+        out (int Count, long Xp) __state)
+    {
+        __state = GetSelectionXp(__instance, command);
+        if (__state.Count < 0) return;
+        if (command.UpgradeTarget < 0 || command.UpgradeTarget >= command.Character.UpgradeTargets.Length)
+        {
+            __state = (-1, 0);
+            return;
+        }
+        __state.Xp -= (long)command.Character.GetUpgradeXpCost(PartyBase.MainParty, command.UpgradeTarget) * command.TotalNumber;
+    }
+
+    private static (int Count, long Xp) GetSelectionXp(PartyScreenLogic logic, PartyScreenLogic.PartyCommand command)
+    {
+        if (command.Type != PartyScreenLogic.TroopType.Member ||
+            command.TotalNumber <= 0 ||
+            !ContainerProvider.TryResolve<IAlternativeSolutionTroopSelection>(out var selection) ||
+            selection.FindIssue(logic) == null) return (-1, 0);
+
+        return (logic.MemberRosters[(int)command.RosterSide].GetTroopCount(command.Character),
+            (long)logic.MemberRosters[1].GetElementXp(command.Character) +
+            logic.MemberRosters[0].GetElementXp(command.Character));
+    }
+
+    [HarmonyPatch(nameof(PartyScreenLogic.TransferTroop))]
+    [HarmonyPostfix]
+    private static void TransferTroopPostfix(PartyScreenLogic __instance, PartyScreenLogic.PartyCommand command,
+        bool invokeUpdate, (int Count, long Xp) __state)
+        => ReconcileSelectionXp(__instance, command, invokeUpdate, __state);
+
+    [HarmonyPatch(nameof(PartyScreenLogic.UpgradeTroop))]
+    [HarmonyPostfix]
+    private static void UpgradeTroopPostfix(PartyScreenLogic __instance, PartyScreenLogic.PartyCommand command,
+        (int Count, long Xp) __state)
+        => ReconcileSelectionXp(__instance, command, true, __state);
+
+    private static void ReconcileSelectionXp(PartyScreenLogic logic, PartyScreenLogic.PartyCommand command,
+        bool invokeUpdate, (int Count, long Xp) state)
+    {
+        if (state.Count < 0 ||
+            logic.MemberRosters[(int)command.RosterSide].GetTroopCount(command.Character) != state.Count - command.TotalNumber) return;
+
+        var roster = logic.MemberRosters[1];
+        var selected = logic.MemberRosters[0];
+        int index = roster.FindIndexOfTroop(command.Character);
+        int previousXp = roster.GetElementXp(command.Character);
+        int previousSelectedXp = selected.GetElementXp(command.Character);
+        using (new AllowedThread())
+        {
+            // Native transfers and depleted upgrades can lose XP from the split party.
+            if (index >= 0 && state.Xp > 0)
+            {
+                var element = roster.GetElementCopyAtIndex(index);
+                element.Xp = (int)Math.Min(int.MaxValue, Math.Max(0, state.Xp - previousSelectedXp));
+                logic.RightOwnerParty.OnXpChanged(roster, ref element);
+                roster.SetElementXp(index, element.Xp);
+                roster.UpdateVersion();
+            }
+            int selectedIndex = selected.FindIndexOfTroop(command.Character);
+            if (selectedIndex >= 0 && selected.GetElementNumber(selectedIndex) > 0 && state.Xp > 0)
+            {
+                selected.SetElementXp(selectedIndex,
+                    (int)Math.Min(int.MaxValue, Math.Max(0, state.Xp - roster.GetElementXp(command.Character))));
+                selected.UpdateVersion();
+            }
+        }
+        if (invokeUpdate && (previousXp != roster.GetElementXp(command.Character) ||
+            previousSelectedXp != selected.GetElementXp(command.Character)) &&
+            ContainerProvider.TryResolve<IPartyScreenRosterRefresher>(out var refresher))
+            refresher.RefreshXp(logic, command.Character);
     }
 
     internal static void RestoreLeftRostersAfterCommit(

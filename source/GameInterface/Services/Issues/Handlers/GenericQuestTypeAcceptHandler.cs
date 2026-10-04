@@ -1,4 +1,4 @@
-using Common;
+﻿using Common;
 using Common.Logging;
 using Common.Messaging;
 using Common.Network;
@@ -38,6 +38,7 @@ internal class GenericQuestTypeAcceptHandler : IHandler
     private readonly IIssueOwnershipRegistry ownershipRegistry;
     private readonly IIssueGenerationRegistry generationRegistry;
     private readonly IIssueConversationTracker conversationTracker;
+    private readonly IAlternativeSolutionTroopSelection troopSelection;
 
     public GenericQuestTypeAcceptHandler(
         IMessageBroker messageBroker,
@@ -48,7 +49,8 @@ internal class GenericQuestTypeAcceptHandler : IHandler
         IPrisonerSaleValidator troopValidator,
         IIssueOwnershipRegistry ownershipRegistry,
         IIssueGenerationRegistry generationRegistry,
-        IIssueConversationTracker conversationTracker)
+        IIssueConversationTracker conversationTracker,
+        IAlternativeSolutionTroopSelection troopSelection)
     {
         this.messageBroker = messageBroker;
         this.objectManager = objectManager;
@@ -59,6 +61,7 @@ internal class GenericQuestTypeAcceptHandler : IHandler
         this.ownershipRegistry = ownershipRegistry;
         this.generationRegistry = generationRegistry;
         this.conversationTracker = conversationTracker;
+        this.troopSelection = troopSelection;
 
         messageBroker.Subscribe<QuestTypeQuestSolutionAcceptTriggered>(Handle_QuestTypeQuestSolutionAcceptTriggered);
         messageBroker.Subscribe<RequestQuestTypeAcceptQuest>(Handle_RequestQuestTypeAcceptQuest);
@@ -232,6 +235,9 @@ internal class GenericQuestTypeAcceptHandler : IHandler
             if (!objectManager.TryGetObjectWithLogging<Hero>(data.OwnerId, out var owner)) return;
 
             var descriptor = QuestTypeRegistry.Get(owner.Issue);
+            troopSelection.Rollback(owner);
+            ownershipRegistry.TryGetOwnerControllerId(owner, out var previousOwner);
+            ownershipRegistry.SetOwner(owner, data.OwnerControllerId);
             try
             {
                 if (descriptor?.MirrorQuestSolutionAcceptBytes != null)
@@ -245,12 +251,12 @@ internal class GenericQuestTypeAcceptHandler : IHandler
             }
             catch (Exception e)
             {
+                RestoreMirrorOwner(owner, previousOwner);
                 Logger.Error(e, "Failed to mirror {Message} for owner {Owner} - malformed or version-mismatched payload",
                     nameof(NetworkQuestTypeQuestAccepted), data.OwnerId);
                 return;
             }
 
-            ownershipRegistry.SetOwner(owner, data.OwnerControllerId);
         });
     }
 
@@ -297,8 +303,11 @@ internal class GenericQuestTypeAcceptHandler : IHandler
         }
         else
         {
+            if (!owner.Issue.IsOngoingWithoutQuest) return;
             generationRegistry.TryGetGeneration(owner, out var generation);
             var packedTroops = troopRosterInterface.PackTroopRosterData(owner.Issue.AlternativeSolutionSentTroops);
+            // Return the local selection before the server's roster changes arrive.
+            troopSelection.Rollback(owner, closeScreen: false);
             network.SendAll(new RequestQuestTypeAcceptAlternative(ownerId, generation, packedTroops));
         }
     }
@@ -410,10 +419,29 @@ internal class GenericQuestTypeAcceptHandler : IHandler
             claimedRoster.AddToCounts(element.Character, element.Number, false, element.WoundedNumber, element.Xp, false);
         }
 
-        return player.MobilePartyId != null &&
-            objectManager.TryGetObjectWithLogging<MobileParty>(player.MobilePartyId, out var party)
-            ? troopValidator.Validate(claimedRoster, party.MemberRoster, preserveTroopXp: true)
-            : TroopRoster.CreateDummyTroopRoster();
+        if (player.MobilePartyId == null ||
+            !objectManager.TryGetObjectWithLogging<MobileParty>(player.MobilePartyId, out var party))
+            return TroopRoster.CreateDummyTroopRoster();
+
+        var validated = troopValidator.Validate(claimedRoster, party.MemberRoster);
+        for (int i = 0; i < validated.Count; i++)
+        {
+            var character = validated.GetCharacterAtIndex(i);
+            int availableXp = party.MemberRoster.GetElementXp(character);
+            if (availableXp <= 0) continue;
+
+            var selected = validated.GetElementCopyAtIndex(i);
+            selected.Xp = Math.Min(claimedRoster.GetElementXp(character), availableXp);
+            party.Party.OnXpChanged(party.MemberRoster, ref selected);
+
+            var remaining = party.MemberRoster.GetElementCopyAtIndex(party.MemberRoster.FindIndexOfTroop(character));
+            remaining.Number -= selected.Number;
+            remaining.Xp = availableXp - selected.Xp;
+            party.Party.OnXpChanged(party.MemberRoster, ref remaining);
+            // Keep overflow with the sent troops instead of discarding it from the reduced party.
+            validated.SetElementXp(i, availableXp - remaining.Xp);
+        }
+        return validated;
     }
 
     private void Handle_NetworkQuestTypeAlternativeAccepted(MessagePayload<NetworkQuestTypeAlternativeAccepted> payload)
@@ -425,22 +453,42 @@ internal class GenericQuestTypeAcceptHandler : IHandler
         {
             if (!objectManager.TryGetObjectWithLogging<Hero>(data.OwnerId, out var owner) || owner.Issue == null) return;
 
-            var descriptor = QuestTypeRegistry.Get(owner.Issue);
+            var issue = owner.Issue;
+            var descriptor = QuestTypeRegistry.Get(issue);
+            troopSelection.Rollback(owner);
+            ownershipRegistry.TryGetOwnerControllerId(owner, out var previousOwner);
+            ownershipRegistry.SetOwner(owner, data.OwnerControllerId);
             try
             {
                 ApplyReceivedTroops(owner, data.SentTroops);
-                MirrorAlternativeAccepted(owner, data.State);
-                descriptor?.MirrorAlternativeAcceptBytes?.Invoke(owner, data.FieldsBytes);
+                if (descriptor?.MirrorAlternativeAcceptBytes != null)
+                {
+                    descriptor.MirrorAlternativeAcceptBytes(owner, data.FieldsBytes);
+                }
+                else
+                {
+                    MirrorAlternativeAccepted(owner, data.State);
+                }
             }
             catch (Exception e)
             {
+                if (ReferenceEquals(owner.Issue, issue) && issue.IsOngoingWithoutQuest)
+                {
+                    using (new AllowedThread()) issue.AlternativeSolutionSentTroops.Clear();
+                }
+                RestoreMirrorOwner(owner, previousOwner);
                 Logger.Error(e, "Failed to mirror {Message} for owner {Owner} - malformed or version-mismatched payload",
                     nameof(NetworkQuestTypeAlternativeAccepted), data.OwnerId);
                 return;
             }
 
-            ownershipRegistry.SetOwner(owner, data.OwnerControllerId);
         });
+    }
+
+    private void RestoreMirrorOwner(Hero owner, string previousOwner)
+    {
+        ownershipRegistry.Clear(owner);
+        if (previousOwner != null) ownershipRegistry.SetOwner(owner, previousOwner);
     }
 
     private void ApplyReceivedTroops(Hero owner, TroopRosterData troops)
@@ -453,21 +501,6 @@ internal class GenericQuestTypeAcceptHandler : IHandler
                 owner.Issue.AlternativeSolutionSentTroops.AddToCounts(
                     element.Character, element.Number, false, element.WoundedNumber, element.Xp, false);
             }
-        }
-    }
-
-    private static void RollbackAlternativeAccept(Hero owner)
-    {
-        if (owner?.Issue == null) return;
-
-        using (new AllowedThread())
-        {
-            var sentTroops = owner.Issue.AlternativeSolutionSentTroops;
-            if (MobileParty.MainParty != null && sentTroops.TotalManCount > 0)
-            {
-                MobileParty.MainParty.MemberRoster.Add(sentTroops);
-            }
-            sentTroops.Clear();
         }
     }
 
@@ -518,7 +551,7 @@ internal class GenericQuestTypeAcceptHandler : IHandler
                 }
                 else
                 {
-                    RollbackAlternativeAccept(owner);
+                    troopSelection.Rollback(owner);
                 }
             }
             else if (descriptor?.RejectQuestSolutionAccept != null)

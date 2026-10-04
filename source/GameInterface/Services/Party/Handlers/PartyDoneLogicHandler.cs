@@ -2,6 +2,8 @@
 using Common.Logging;
 using Common.Messaging;
 using Common.Network;
+using Common.Network.Coalescing;
+using GameInterface.Services.Issues.Generic;
 using GameInterface.Services.GameDebug.Messages;
 using GameInterface.Services.Heroes.Extensions;
 using GameInterface.Services.MapEventParties;
@@ -42,45 +44,67 @@ internal class PartyDoneLogicHandler : IHandler
     private readonly INetwork network;
     private readonly ITroopRosterInterface troopRosterInterface;
     private readonly IVillageHostileActionInterface villageHostileActionInterface;
+    private readonly IAlternativeSolutionTroopSelection troopSelection;
+    private readonly ISendCoalescer coalescer;
 
     public PartyDoneLogicHandler(
         IMessageBroker messageBroker,
         IObjectManager objectManager,
         INetwork network,
         ITroopRosterInterface troopRosterInterface,
-        IVillageHostileActionInterface villageHostileActionInterface)
+        IVillageHostileActionInterface villageHostileActionInterface,
+        IAlternativeSolutionTroopSelection troopSelection,
+        ISendCoalescer coalescer = null)
     {
         this.messageBroker = messageBroker;
         this.objectManager = objectManager;
         this.network = network;
         this.troopRosterInterface = troopRosterInterface;
         this.villageHostileActionInterface = villageHostileActionInterface;
+        this.troopSelection = troopSelection;
+        this.coalescer = coalescer;
 
         messageBroker.Subscribe<PartyDoneLogicAttempted>(Handle_PartyDoneLogicAttempted);
         messageBroker.Subscribe<NetworkCompleteDoneLogic>(Handle_CompletePartyDoneLogic);
+        messageBroker.Subscribe<NetworkQuestSelectionCommitResult>(Handle_QuestSelectionCommitResult);
     }
 
     public void Dispose()
     {
         messageBroker.Unsubscribe<PartyDoneLogicAttempted>(Handle_PartyDoneLogicAttempted);
         messageBroker.Unsubscribe<NetworkCompleteDoneLogic>(Handle_CompletePartyDoneLogic);
+        messageBroker.Unsubscribe<NetworkQuestSelectionCommitResult>(Handle_QuestSelectionCommitResult);
     }
 
     // Client
     private void Handle_PartyDoneLogicAttempted(MessagePayload<PartyDoneLogicAttempted> obj)
     {
-        if (!objectManager.TryGetIdWithLogging(obj.What.MainHero, out var mainHeroId)) return;
+        NetworkCompleteDoneLogic? message = null;
+        try
+        {
+            message = PackPartyDoneLogic(obj.What);
+        }
+        finally
+        {
+            if (message == null) troopSelection.CompleteCommit(obj.What.QuestSelectionCommitId, false);
+        }
+        if (message.HasValue) network.SendAll(message.Value);
+    }
+
+    private NetworkCompleteDoneLogic? PackPartyDoneLogic(PartyDoneLogicAttempted attempt)
+    {
+        if (!objectManager.TryGetIdWithLogging(attempt.MainHero, out var mainHeroId)) return null;
 
         string leftPartyId = null;
-        if (obj.What.LeftParty != null && 
-            !objectManager.TryGetIdWithLogging(obj.What.LeftParty, out leftPartyId))
-            return;
+        if (attempt.LeftParty != null &&
+            !objectManager.TryGetIdWithLogging(attempt.LeftParty, out leftPartyId))
+            return null;
 
         // Not registered when donating
-        objectManager.TryGetId(obj.What.LeftPrisonerRoster, out var leftPrisonerRosterId);
+        objectManager.TryGetId(attempt.LeftPrisonerRoster, out var leftPrisonerRosterId);
 
         var upgradedTroopHistory = new UpgradedTroopHistoryData(new());
-        foreach (Tuple<CharacterObject, CharacterObject, int> tuple in obj.What.UpgradedTroopHistory)
+        foreach (Tuple<CharacterObject, CharacterObject, int> tuple in attempt.UpgradedTroopHistory)
         {
             if (!objectManager.TryGetHandleWithLogging(tuple.Item1, out var character1Id)) continue;
             if (!objectManager.TryGetHandleWithLogging(tuple.Item2, out var character2Id)) continue;
@@ -91,52 +115,57 @@ internal class PartyDoneLogicHandler : IHandler
         // Send only the per-troop change the player made (current minus the screen-open snapshot). Heroes and
         // companions that did not change net to zero and are omitted, so the server needs no special handling
         // for them when re-applying the delta.
-        var leftMemberRosterData = troopRosterInterface.PackTroopRosterDelta(obj.What.LeftMemberRoster, obj.What.InitialLeftMemberRoster);
-        var leftPrisonerRosterData = troopRosterInterface.PackTroopRosterDelta(obj.What.LeftPrisonerRoster, obj.What.InitialLeftPrisonerRoster);
-        var rightMemberRosterData = troopRosterInterface.PackTroopRosterDelta(obj.What.RightMemberRoster, obj.What.InitialRightMemberRoster);
-        var rightPrisonerRosterData = troopRosterInterface.PackTroopRosterDelta(obj.What.RightPrisonerRoster, obj.What.InitialRightPrisonerRoster);
+        var leftMemberRosterData = troopRosterInterface.PackTroopRosterDelta(attempt.LeftMemberRoster, attempt.InitialLeftMemberRoster);
+        var leftPrisonerRosterData = troopRosterInterface.PackTroopRosterDelta(attempt.LeftPrisonerRoster, attempt.InitialLeftPrisonerRoster);
+        var rightMemberRosterData = troopRosterInterface.PackTroopRosterDelta(attempt.RightMemberRoster, attempt.InitialRightMemberRoster);
+        var rightPrisonerRosterData = troopRosterInterface.PackTroopRosterDelta(attempt.RightPrisonerRoster, attempt.InitialRightPrisonerRoster);
 
-        var rightMemberOrderData = troopRosterInterface.PackTroopRosterOrderData(obj.What.RightMemberRoster);
+        var rightMemberOrderData = troopRosterInterface.PackTroopRosterOrderData(attempt.RightMemberRoster);
 
-        var releaserPartyPosition = GetReleaserPartyPosition(obj.What.MainHero);
+        var releaserPartyPosition = GetReleaserPartyPosition(attempt.MainHero);
 
         string donationSettlementId = null;
         FlattenedTroop[] donatedPrisonersRoster = null;
-        if (obj.What.DonationSettlement != null)
+        if (attempt.DonationSettlement != null)
         {
-            if (!objectManager.TryGetIdWithLogging(obj.What.DonationSettlement, out donationSettlementId)) return;
+            if (!objectManager.TryGetIdWithLogging(attempt.DonationSettlement, out donationSettlementId)) return null;
             donatedPrisonersRoster = FlattenedTroopSerializer.Serialize(
-                obj.What.DonatedPrisonersRoster,
+                attempt.DonatedPrisonersRoster,
                 objectManager);
         }
 
-        var message = new NetworkCompleteDoneLogic(
+        return new NetworkCompleteDoneLogic(
             mainHeroId,
-            FlattenedTroopSerializer.Serialize(obj.What.ReleasedPrisonersRoster, objectManager),
-            FlattenedTroopSerializer.Serialize(obj.What.TakenPrisonersRoster, objectManager),
-            FlattenedTroopSerializer.Serialize(obj.What.RecruitedPrisonersRoster, objectManager),
+            FlattenedTroopSerializer.Serialize(attempt.ReleasedPrisonersRoster, objectManager),
+            FlattenedTroopSerializer.Serialize(attempt.TakenPrisonersRoster, objectManager),
+            FlattenedTroopSerializer.Serialize(attempt.RecruitedPrisonersRoster, objectManager),
             leftMemberRosterData,
             leftPrisonerRosterData,
             rightMemberRosterData,
             rightPrisonerRosterData,
-            obj.What.RightOwnerPartyItemRoster._data,
+            attempt.RightOwnerPartyItemRosterData,
             upgradedTroopHistory,
             leftPartyId,
             leftPrisonerRosterId,
-            obj.What.PartyGoldChangeAmount,
-            obj.What.PartyInfluenceChangeAmount,
-            obj.What.PartyMoraleChangeAmount,
-            obj.What.DoNotApplyGoldTransactions,
+            attempt.PartyGoldChangeAmount,
+            attempt.PartyInfluenceChangeAmount,
+            attempt.PartyMoraleChangeAmount,
+            attempt.DoNotApplyGoldTransactions,
             releaserPartyPosition,
-            obj.What.PartyScreenMode,
+            attempt.PartyScreenMode,
             rightMemberOrderData,
-            obj.What.ApplyReleasedAndTakenPrisonerActions,
+            attempt.ApplyReleasedAndTakenPrisonerActions,
             donationSettlementId,
             donatedPrisonersRoster,
-            obj.What.ForceTransferId
+            attempt.ForceTransferId,
+            attempt.QuestSelectionCommitId
         );
+    }
 
-        network.SendAll(message);
+    private void Handle_QuestSelectionCommitResult(MessagePayload<NetworkQuestSelectionCommitResult> payload)
+    {
+        if (ModInformation.IsServer) return;
+        GameThread.RunSafe(() => troopSelection.CompleteCommit(payload.What.CommitId, payload.What.Accepted));
     }
 
     private static CampaignVec2 GetReleaserPartyPosition(Hero mainHero)
@@ -159,154 +188,168 @@ internal class PartyDoneLogicHandler : IHandler
         
         GameThread.RunSafe(() =>
         {
-            if (!objectManager.TryGetObjectWithLogging<Hero>(message.MainHeroId, out var mainHero)) return;
-
-            if (!TryResolveCompleteDoneLogic(
-                message,
-                out var leftParty,
-                out var leftPrisonerRoster,
-                out var donationSettlement,
-                out var upgradedTroopHistory)) return;
-
-            var releasedPrisonersRoster = FlattenedTroopSerializer.Deserialize(message.ReleasedPrisonersRoster, objectManager);
-            var takenPrisonersRoster = FlattenedTroopSerializer.Deserialize(message.TakenPrisonersRoster, objectManager);
-            var recruitedPrisonersRoster = FlattenedTroopSerializer.Deserialize(message.RecruitedPrisonersRoster, objectManager);
-            var donatedPrisonersRoster = FlattenedTroopSerializer.Deserialize(message.DonatedPrisonersRoster, objectManager);
-
-            if (ModInformation.IsServer && message.PartyScreenMode == Helpers.PartyScreenHelper.PartyScreenMode.Loot)
+            bool accepted = false;
+            try
             {
-                if (message.ForceTransferId != null)
+                if (!objectManager.TryGetObjectWithLogging<Hero>(message.MainHeroId, out var mainHero)) return;
+
+                if (!TryResolveCompleteDoneLogic(
+                    message,
+                    out var leftParty,
+                    out var leftPrisonerRoster,
+                    out var donationSettlement,
+                    out var upgradedTroopHistory)) return;
+
+                var releasedPrisonersRoster = FlattenedTroopSerializer.Deserialize(message.ReleasedPrisonersRoster, objectManager);
+                var takenPrisonersRoster = FlattenedTroopSerializer.Deserialize(message.TakenPrisonersRoster, objectManager);
+                var recruitedPrisonersRoster = FlattenedTroopSerializer.Deserialize(message.RecruitedPrisonersRoster, objectManager);
+                var donatedPrisonersRoster = FlattenedTroopSerializer.Deserialize(message.DonatedPrisonersRoster, objectManager);
+
+                if (ModInformation.IsServer && message.PartyScreenMode == Helpers.PartyScreenHelper.PartyScreenMode.Loot)
                 {
-                    if (!TryValidateForceTransfer(message, mainHero, requester))
-                        return;
-                }
-                else if (mainHero.PartyBelongedTo != null &&
-                    objectManager.TryGetId(mainHero.PartyBelongedTo, out var committerPartyId) &&
-                    villageHostileActionInterface.HasPendingForceTransferForParty(committerPartyId))
-                {
-                    // Attribution missed (see ForceTransferScreenTracker): the cap cannot
-                    // be enforced on this commit. Logged so live runs prove attribution
-                    // works; still applied under the trusted-client model.
-                    logger.Warning(
-                        "ForceTransfer loot commit without attribution while a pool is pending (Hero={HeroId})",
-                        message.MainHeroId);
-                }
-            }
-
-            var releasedPlayerCaptivityEvents = new List<PlayerCaptivityEndedByServer>();
-            var leftPrisonerRosterData = message.LeftPrisonerRosterData;
-            var rightPrisonerRosterData = message.RightPrisonerRosterData;
-            // Validate the client-reported release/take history against the signed delta before
-            // removing player-prisoner releases from the apply delta. Player releases are handled
-            // by PlayerCaptivityServerHandler rather than by a roster mutation, so validating the
-            // filtered delta would always reject a legitimate dismissal (the -1 entry is gone).
-            var signedRightPrisonerRosterData = rightPrisonerRosterData;
-            // SellPrisonersHandler owns ransom releases so the same player is not released twice.
-            if (message.PartyScreenMode != Helpers.PartyScreenHelper.PartyScreenMode.Ransom)
-            {
-                releasedPlayerCaptivityEvents = CreatePlayerCaptivityReleaseEvents(
-                    message.LeftPrisonerRosterData,
-                    message.RightPrisonerRosterData,
-                    HasLeftPrisonerTransferDestination(
-                        message.ApplyReleasedAndTakenPrisonerActions,
-                        leftParty != null,
-                        leftPrisonerRoster != null,
-                        donationSettlement != null),
-                    message.ReleaserPartyPosition,
-                    out leftPrisonerRosterData,
-                    out rightPrisonerRosterData);
-            }
-            var takenHeroCharacterIds = new HashSet<uint>();
-            var actionRostersAreValid =
-                !message.ApplyReleasedAndTakenPrisonerActions ||
-                TryValidatePrisonerActionRosters(
-                    releasedPrisonersRoster,
-                    takenPrisonersRoster,
-                    recruitedPrisonersRoster,
-                    signedRightPrisonerRosterData,
-                    out takenHeroCharacterIds);
-            if (!actionRostersAreValid)
-            {
-                logger.Error("Rejected Party screen prisoner actions because transfer history did not match the signed right-prisoner delta");
-                return;
-            }
-
-            if (donationSettlement != null &&
-                mainHero.PartyBelongedTo.CurrentSettlement != donationSettlement)
-            {
-                logger.Warning(
-                    "Rejected Party screen prisoner donation because {MainHeroId} is no longer at {SettlementId}",
-                    message.MainHeroId,
-                    message.DonationSettlementId);
-                return;
-            }
-
-            if (donationSettlement != null &&
-                !TryValidatePrisonerDonationRosters(
-                    donatedPrisonersRoster,
-                    message.LeftPrisonerRosterData,
-                    signedRightPrisonerRosterData))
-            {
-                logger.Error("Rejected Party screen prisoner donation because the donated roster did not match both signed prisoner deltas");
-                return;
-            }
-
-            if (donationSettlement != null &&
-                !HasPrisonerDonationCapacity(
-                    donationSettlement,
-                    message.LeftPrisonerRosterData))
-            {
-                logger.Warning(
-                    "Rejected Party screen prisoner donation because {SettlementId} no longer has enough prisoner capacity",
-                    message.DonationSettlementId);
-                return;
-            }
-
-            var applicableTakenPrisonersRoster = FilterIneligibleTakenHeroes(takenPrisonersRoster);
-            if (message.ApplyReleasedAndTakenPrisonerActions)
-            {
-                rightPrisonerRosterData = FilterTakenHeroAdditions(
-                    rightPrisonerRosterData,
-                    takenHeroCharacterIds);
-            }
-
-            var rosterDeltas = CreateRosterDeltas(
-                mainHero,
-                leftParty,
-                leftPrisonerRoster,
-                donationSettlement,
-                message,
-                leftPrisonerRosterData,
-                rightPrisonerRosterData);
-
-            // Only apply deltas if not ransoming. SellPrisonersAction already changes troop rosters
-            if (message.PartyScreenMode != Helpers.PartyScreenHelper.PartyScreenMode.Ransom)
-            {
-                if (!troopRosterInterface.TryApplyTroopRosterDeltas(rosterDeltas))
-                {
-                    logger.Warning(
-                        "Rejected party changes for {MainHeroId}: {Reason}",
-                        message.MainHeroId,
-                        PartyChangedMessage);
-                    if (requester != null)
+                    if (message.ForceTransferId != null)
                     {
-                        network.Send(requester, new SendInformationMessage(PartyChangedMessage));
+                        if (!TryValidateForceTransfer(message, mainHero, requester))
+                            return;
                     }
+                    else if (mainHero.PartyBelongedTo != null &&
+                        objectManager.TryGetId(mainHero.PartyBelongedTo, out var committerPartyId) &&
+                        villageHostileActionInterface.HasPendingForceTransferForParty(committerPartyId))
+                    {
+                        // Attribution missed (see ForceTransferScreenTracker): the cap cannot
+                        // be enforced on this commit. Logged so live runs prove attribution
+                        // works; still applied under the trusted-client model.
+                        logger.Warning(
+                            "ForceTransfer loot commit without attribution while a pool is pending (Hero={HeroId})",
+                            message.MainHeroId);
+                    }
+                }
+
+                var releasedPlayerCaptivityEvents = new List<PlayerCaptivityEndedByServer>();
+                var leftPrisonerRosterData = message.LeftPrisonerRosterData;
+                var rightPrisonerRosterData = message.RightPrisonerRosterData;
+                // Validate the client-reported release/take history against the signed delta before
+                // removing player-prisoner releases from the apply delta. Player releases are handled
+                // by PlayerCaptivityServerHandler rather than by a roster mutation, so validating the
+                // filtered delta would always reject a legitimate dismissal (the -1 entry is gone).
+                var signedRightPrisonerRosterData = rightPrisonerRosterData;
+                // SellPrisonersHandler owns ransom releases so the same player is not released twice.
+                if (message.PartyScreenMode != Helpers.PartyScreenHelper.PartyScreenMode.Ransom)
+                {
+                    releasedPlayerCaptivityEvents = CreatePlayerCaptivityReleaseEvents(
+                        message.LeftPrisonerRosterData,
+                        message.RightPrisonerRosterData,
+                        HasLeftPrisonerTransferDestination(
+                            message.ApplyReleasedAndTakenPrisonerActions,
+                            leftParty != null,
+                            leftPrisonerRoster != null,
+                            donationSettlement != null),
+                        message.ReleaserPartyPosition,
+                        out leftPrisonerRosterData,
+                        out rightPrisonerRosterData);
+                }
+                var takenHeroCharacterIds = new HashSet<uint>();
+                var actionRostersAreValid =
+                    !message.ApplyReleasedAndTakenPrisonerActions ||
+                    TryValidatePrisonerActionRosters(
+                        releasedPrisonersRoster,
+                        takenPrisonersRoster,
+                        recruitedPrisonersRoster,
+                        signedRightPrisonerRosterData,
+                        out takenHeroCharacterIds);
+                if (!actionRostersAreValid)
+                {
+                    logger.Error("Rejected Party screen prisoner actions because transfer history did not match the signed right-prisoner delta");
                     return;
                 }
-            }
-            PublishPlayerCaptivityReleaseEvents(releasedPlayerCaptivityEvents);
-            ApplyRightOwnerPartyItemRoster(mainHero, message);
-            if (message.ApplyReleasedAndTakenPrisonerActions)
-                ApplyReleasedAndTakenPrisonerActions(mainHero, releasedPrisonersRoster, applicableTakenPrisonersRoster);
-            if (donationSettlement != null)
-                ApplyPrisonerDonationEffects(mainHero, donationSettlement, donatedPrisonersRoster);
-            NotifyTakenPrisonersChanged(applicableTakenPrisonersRoster);
-            ApplyPartyRewardChanges(mainHero, message);
-            ApplyUpgradedTroopHistory(mainHero, upgradedTroopHistory);
-            ApplyPrisonerRecruitmentEffects(mainHero, message, recruitedPrisonersRoster);
 
-            ApplyRosterOrder(mainHero.PartyBelongedTo.MemberRoster, message.RightMemberOrderData);
+                if (donationSettlement != null &&
+                    mainHero.PartyBelongedTo.CurrentSettlement != donationSettlement)
+                {
+                    logger.Warning(
+                        "Rejected Party screen prisoner donation because {MainHeroId} is no longer at {SettlementId}",
+                        message.MainHeroId,
+                        message.DonationSettlementId);
+                    return;
+                }
+
+                if (donationSettlement != null &&
+                    !TryValidatePrisonerDonationRosters(
+                        donatedPrisonersRoster,
+                        message.LeftPrisonerRosterData,
+                        signedRightPrisonerRosterData))
+                {
+                    logger.Error("Rejected Party screen prisoner donation because the donated roster did not match both signed prisoner deltas");
+                    return;
+                }
+
+                if (donationSettlement != null &&
+                    !HasPrisonerDonationCapacity(
+                        donationSettlement,
+                        message.LeftPrisonerRosterData))
+                {
+                    logger.Warning(
+                        "Rejected Party screen prisoner donation because {SettlementId} no longer has enough prisoner capacity",
+                        message.DonationSettlementId);
+                    return;
+                }
+
+                var applicableTakenPrisonersRoster = FilterIneligibleTakenHeroes(takenPrisonersRoster);
+                if (message.ApplyReleasedAndTakenPrisonerActions)
+                {
+                    rightPrisonerRosterData = FilterTakenHeroAdditions(
+                        rightPrisonerRosterData,
+                        takenHeroCharacterIds);
+                }
+
+                var rosterDeltas = CreateRosterDeltas(
+                    mainHero,
+                    leftParty,
+                    leftPrisonerRoster,
+                    donationSettlement,
+                    message,
+                    leftPrisonerRosterData,
+                    rightPrisonerRosterData);
+
+                // Only apply deltas if not ransoming. SellPrisonersAction already changes troop rosters
+                if (message.PartyScreenMode != Helpers.PartyScreenHelper.PartyScreenMode.Ransom)
+                {
+                    if (!troopRosterInterface.TryApplyTroopRosterDeltas(rosterDeltas))
+                    {
+                        logger.Warning(
+                            "Rejected party changes for {MainHeroId}: {Reason}",
+                            message.MainHeroId,
+                            PartyChangedMessage);
+                        if (requester != null)
+                        {
+                            network.Send(requester, new SendInformationMessage(PartyChangedMessage));
+                        }
+                        return;
+                    }
+                }
+                PublishPlayerCaptivityReleaseEvents(releasedPlayerCaptivityEvents);
+                ApplyRightOwnerPartyItemRoster(mainHero, message);
+                if (message.ApplyReleasedAndTakenPrisonerActions)
+                    ApplyReleasedAndTakenPrisonerActions(mainHero, releasedPrisonersRoster, applicableTakenPrisonersRoster);
+                if (donationSettlement != null)
+                    ApplyPrisonerDonationEffects(mainHero, donationSettlement, donatedPrisonersRoster);
+                NotifyTakenPrisonersChanged(applicableTakenPrisonersRoster);
+                ApplyPartyRewardChanges(mainHero, message);
+                ApplyUpgradedTroopHistory(mainHero, upgradedTroopHistory);
+                ApplyPrisonerRecruitmentEffects(mainHero, message, recruitedPrisonersRoster);
+
+                ApplyRosterOrder(mainHero.PartyBelongedTo.MemberRoster, message.RightMemberOrderData);
+                accepted = true;
+            }
+            finally
+            {
+                if (requester != null && message.QuestSelectionCommitId != null)
+                {
+                    // The reply must follow every authoritative roster and reward update.
+                    coalescer?.Flush(network);
+                    network.Send(requester, new NetworkQuestSelectionCommitResult(message.QuestSelectionCommitId, accepted));
+                }
+            }
         });
     }
 
