@@ -224,6 +224,20 @@ public class PlayerKingdomCreationFlowTests : IDisposable
                 Observe(instance, "before-command");
             });
 
+        var notifiedMemberships = new Dictionary<EnvironmentInstance, List<Kingdom>>();
+        foreach (var client in Clients)
+            client.Call(() =>
+            {
+                Assert.True(client.ObjectManager.TryGetObject<Clan>(player.ClanId, out var clan));
+                var memberships = new List<Kingdom>();
+                notifiedMemberships.Add(client, memberships);
+                CampaignEvents.OnClanChangedKingdomEvent.AddNonSerializedListener(this,
+                    (changed, oldKingdom, newKingdom, detail, show) =>
+                    {
+                        if (changed == clan) memberships.Add(clan.Kingdom);
+                    });
+            });
+
         Server.Call(() =>
         {
             Assert.True(Server.ObjectManager.TryGetObject<Clan>(player.ClanId, out var clan));
@@ -270,6 +284,12 @@ public class PlayerKingdomCreationFlowTests : IDisposable
             client.PumpGameThread();
         foreach (var instance in new[] { Server }.Concat(Clients))
             instance.Call(() => Observe(instance, "after-pump"));
+        foreach (var client in Clients)
+            client.Call(() =>
+            {
+                CampaignEvents.OnClanChangedKingdomEvent.ClearListeners(this);
+                Assert.Null(Assert.Single(notifiedMemberships[client]));
+            });
         foreach (var instance in new[] { Server }.Concat(Clients))
             instance.Call(() =>
             {
@@ -278,6 +298,41 @@ public class PlayerKingdomCreationFlowTests : IDisposable
                 Assert.Null(clan.Kingdom);
                 Assert.DoesNotContain(clan, kingdom.Clans);
             });
+    }
+
+    [Fact]
+    public void RepeatedKingdomMembershipDoesNotResetClientInfluence()
+    {
+        var player = CreateSyncedPlayerContext();
+        var kingdomId = TestEnvironment.CreateRegisteredObject<Kingdom>();
+        ConfigureClanInKingdom(player.ClanId, kingdomId);
+        EnsureKingdomRegisteredEverywhere(kingdomId);
+        const float influence = 123f;
+        foreach (var client in Clients)
+            client.Call(() =>
+            {
+                Assert.True(client.ObjectManager.TryGetObject<Clan>(player.ClanId, out var clan));
+                using (new AllowedThread())
+                {
+                    clan._influence = influence;
+                }
+            });
+
+        Server.Call(() => Server.Resolve<INetwork>().SendAll(new NetworkSetClanKingdom(player.ClanId, kingdomId)));
+        foreach (var client in Clients)
+        {
+            client.PumpGameThread();
+            client.Call(() =>
+            {
+                Assert.True(client.ObjectManager.TryGetObject<Clan>(player.ClanId, out var clan));
+                Assert.True(client.ObjectManager.TryGetObject<Kingdom>(kingdomId, out var kingdom));
+                Assert.Same(kingdom, clan.Kingdom);
+                Assert.Equal(influence, clan.Influence);
+                Assert.Same(clan, Assert.Single(kingdom.Clans));
+                Assert.Contains(client.InternalMessages.GetMessages<NetworkSetClanKingdom>(),
+                    message => message.ClanId == player.ClanId && message.KingdomId == kingdomId);
+            });
+        }
     }
 
     [Fact]

@@ -150,6 +150,39 @@ public class TheConquestOfSettlementIssueTests : IDisposable
         var heroId = environment.CreateRegisteredObject<Hero>();
         var command = new HeroDeveloperCommands.HeroSocialParameterCoopCommand();
         var args = new CoopCommandArgsFactory();
+        MBObjectBase GetKey() => parameter switch
+        {
+            "charm" => DefaultSkills.Charm,
+            "mercy" => DefaultTraits.Mercy,
+            "persona_curt" => DefaultTraits.PersonaCurt,
+            "persona_ironic" => DefaultTraits.PersonaIronic,
+            "in_bloom" => DefaultPerks.Charm.InBloom,
+            "young_and_respectful" => DefaultPerks.Charm.YoungAndRespectful,
+            "good_natured" => DefaultPerks.Charm.GoodNatured,
+            "tribute" => DefaultPerks.Charm.Tribute,
+            _ => null,
+        };
+        if (parameter != "female")
+        {
+            // Headless setup omits join-time registration of the existing default keys.
+            uint keyHandle = 0;
+            string keyId = null;
+            Server.Call(() =>
+            {
+                var key = GetKey();
+                keyId = $"{key.GetType().Name}_{key.StringId}";
+                Assert.True(Server.ObjectManager.AddExisting(keyId, key));
+                Assert.True(Server.ObjectManager.TryGetHandle(key, out keyHandle));
+            });
+            foreach (var client in environment.Clients)
+                client.Call(() =>
+                {
+                    var key = GetKey();
+                    Assert.True(client.ObjectManager.AddExisting(keyId, key, keyHandle));
+                    Assert.True(client.ObjectManager.TryGetObject<MBObjectBase>(keyHandle, out var registered));
+                    Assert.Same(key, registered);
+                });
+        }
         int ReadValue()
         {
             var result = command.ProcessCommand(args.FromValues(new[] { heroId, parameter }));
@@ -161,18 +194,7 @@ public class TheConquestOfSettlementIssueTests : IDisposable
         void Observe(EnvironmentInstance instance, string phase)
         {
             Assert.True(instance.ObjectManager.TryGetObject<Hero>(heroId, out var hero));
-            MBObjectBase key = parameter switch
-            {
-                "charm" => DefaultSkills.Charm,
-                "mercy" => DefaultTraits.Mercy,
-                "persona_curt" => DefaultTraits.PersonaCurt,
-                "persona_ironic" => DefaultTraits.PersonaIronic,
-                "in_bloom" => DefaultPerks.Charm.InBloom,
-                "young_and_respectful" => DefaultPerks.Charm.YoungAndRespectful,
-                "good_natured" => DefaultPerks.Charm.GoodNatured,
-                "tribute" => DefaultPerks.Charm.Tribute,
-                _ => null,
-            };
+            var key = GetKey();
             var heroRegistered = instance.ObjectManager.TryGetHandle(hero, out var heroHandle);
             var keyRegistered = instance.ObjectManager.TryGetHandle(key, out var keyHandle);
             JArray Messages(System.Collections.Generic.IEnumerable<IMessage> messages)

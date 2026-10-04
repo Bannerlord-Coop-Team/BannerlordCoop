@@ -74,6 +74,8 @@ internal class ClanKingdomHandler : IHandler
                 if (!objectManager.TryGetObjectWithLogging<Kingdom>(payload.What.KingdomId, out kingdom)) return;
             }
 
+            if (clan.Kingdom == kingdom) return;
+
             using (new AllowedThread())
             {
                 clan.SetKingdomInternal(kingdom);
@@ -95,6 +97,8 @@ internal class ClanKingdomHandler : IHandler
             if (!objectManager.TryGetIdWithLogging(payload.What.NewKingdom, out newKingdomId)) return;
         }
 
+        // Republish current membership before callbacks even when the native setter was not intercepted.
+        messageBroker.Publish(this, new SetClanKingdom(payload.What.Clan, payload.What.Clan.Kingdom));
         network.SendAll(new NetworkOnClanChangedKingdom(clanId, oldKingdomId, newKingdomId, payload.What.Detail));
     }
 
