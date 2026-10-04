@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using GameInterface.Services.Issues.Generic.AcceptMirror;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Issues;
@@ -85,6 +85,8 @@ public abstract class QuestTypeDescriptor
     public Action<Hero, byte[]> MirrorAlternativeAcceptBytes { get; }
 
     public Action<Hero> RejectAlternativeAccept { get; }
+
+    public virtual void PrepareAlternativeAcceptMirror(Hero owner) { }
 
     protected QuestTypeDescriptor(
         Type issueType,
@@ -225,6 +227,12 @@ public sealed class QuestTypeDescriptor<TIssue, TQuest> : QuestTypeDescriptor
 
     public IAlternativeAcceptMirrorStrategy<TPayload> GetAlternativeAcceptMirror<TPayload>()
         => _alternativeAcceptMirrorStrategy as IAlternativeAcceptMirrorStrategy<TPayload>;
+
+    public override void PrepareAlternativeAcceptMirror(Hero owner)
+    {
+        if (_alternativeAcceptMirrorStrategy is IAlternativeAcceptPreparation preparation)
+            preparation.PrepareForMirror(owner);
+    }
 }
 
 public static class QuestDescriptorBuilder

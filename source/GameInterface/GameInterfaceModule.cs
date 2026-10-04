@@ -146,6 +146,11 @@ public class GameInterfaceModule : Module
         builder.RegisterType<IssueConversationTracker>().As<IIssueConversationTracker>().InstancePerLifetimeScope();
         builder.RegisterType<IssueOwnershipRegistry>().As<IIssueOwnershipRegistry>().InstancePerLifetimeScope();
         builder.RegisterType<IssueGenerationRegistry>().As<IIssueGenerationRegistry>().InstancePerLifetimeScope();
+        builder.RegisterType<ArtisanOverpricedGoodsIssueInterface>().As<IArtisanOverpricedGoodsIssueInterface>().InstancePerDependency();
+        builder.RegisterType<ArtisanOverpricedGoodsActions>().As<IArtisanOverpricedGoodsActions>().InstancePerDependency();
+        builder.RegisterType<ArtisanAlternativeSelection>().As<IArtisanAlternativeSelection>().InstancePerLifetimeScope();
+        builder.RegisterType<ArtisanQuestOwnerContext>().As<IArtisanQuestOwnerContext>().InstancePerDependency();
+        builder.RegisterType<ArtisanJournalOwnership>().As<IArtisanJournalOwnership>().InstancePerLifetimeScope();
         builder.RegisterType<AwaitingAlternativeSolutionTroopsRegistry>().As<IAwaitingAlternativeSolutionTroopsRegistry>().InstancePerLifetimeScope();
         builder.RegisterType<BattleHostRegistry>().As<IBattleHostRegistry>().InstancePerLifetimeScope();
         builder.RegisterType<LocationHostRegistry>().As<ILocationHostRegistry>().InstancePerLifetimeScope();

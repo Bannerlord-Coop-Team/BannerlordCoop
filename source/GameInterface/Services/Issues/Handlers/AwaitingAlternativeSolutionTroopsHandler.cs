@@ -4,9 +4,12 @@ using Common.Messaging;
 using Common.Network;
 using Common.Util;
 using GameInterface.Services.Entity;
+using GameInterface.Services.GameState.Messages;
+using GameInterface.Services.Heroes.Patches;
 using GameInterface.Services.Issues.Generic;
 using GameInterface.Services.Issues.Interfaces;
 using GameInterface.Services.Issues.Messages;
+using GameInterface.Services.Issues.Patches;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Party;
 using GameInterface.Services.Players;
@@ -16,6 +19,7 @@ using LiteNetLib;
 using Serilog;
 using System.Collections.Generic;
 using TaleWorlds.CampaignSystem;
+using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Roster;
 
 namespace GameInterface.Services.Issues.Handlers;
@@ -63,6 +67,8 @@ internal class AwaitingAlternativeSolutionTroopsHandler : IHandler
 
         messageBroker.Subscribe<AwaitingAlternativeSolutionTroopsDrainedLocally>(Handle_AwaitingAlternativeSolutionTroopsDrainedLocally);
         messageBroker.Subscribe<RequestAwaitingAlternativeSolutionTroopsDrain>(Handle_RequestAwaitingAlternativeSolutionTroopsDrain);
+        messageBroker.Subscribe<NetworkAwaitingAlternativeSolutionTroopsDrained>(Handle_NetworkAwaitingAlternativeSolutionTroopsDrained);
+        messageBroker.Subscribe<MainMenuEntered>(Handle_MainMenuEntered);
     }
 
     public void Dispose()
@@ -74,6 +80,13 @@ internal class AwaitingAlternativeSolutionTroopsHandler : IHandler
 
         messageBroker.Unsubscribe<AwaitingAlternativeSolutionTroopsDrainedLocally>(Handle_AwaitingAlternativeSolutionTroopsDrainedLocally);
         messageBroker.Unsubscribe<RequestAwaitingAlternativeSolutionTroopsDrain>(Handle_RequestAwaitingAlternativeSolutionTroopsDrain);
+        messageBroker.Unsubscribe<NetworkAwaitingAlternativeSolutionTroopsDrained>(Handle_NetworkAwaitingAlternativeSolutionTroopsDrained);
+        messageBroker.Unsubscribe<MainMenuEntered>(Handle_MainMenuEntered);
+    }
+
+    private void Handle_MainMenuEntered(MessagePayload<MainMenuEntered> payload)
+    {
+        if (ModInformation.IsClient) IssueManagerAlternativeSolutionTroopsPatches.ResetReturnInquiry();
     }
 
     private void Handle_AwaitingAlternativeSolutionTroopsDepositedLocally(MessagePayload<AwaitingAlternativeSolutionTroopsDepositedLocally> payload)
@@ -146,46 +159,77 @@ internal class AwaitingAlternativeSolutionTroopsHandler : IHandler
     private void Handle_NetworkAwaitingAlternativeSolutionTroopsDepositRejected(MessagePayload<NetworkAwaitingAlternativeSolutionTroopsDepositRejected> payload)
     {
         if (ModInformation.IsServer) return;
-        if (!ContainerProvider.TryResolve<IControllerIdProvider>(out var controllerIdProvider)) return;
+        GameThread.RunSafe(() =>
+        {
+            if (!ContainerProvider.TryResolve<IControllerIdProvider>(out var controllerIdProvider)) return;
 
-        var localControllerId = controllerIdProvider.ControllerId;
-        if (string.IsNullOrEmpty(localControllerId)) return;
+            var localControllerId = controllerIdProvider.ControllerId;
+            if (string.IsNullOrEmpty(localControllerId)) return;
 
-        Logger.Error("Server rejected {Message} for owner {OwnerId} - rolling back the local speculative deposit",
-            nameof(RequestAwaitingAlternativeSolutionTroopsDeposit), payload.What.OwnerId);
-        troopsRegistry.Clear(localControllerId);
+            Logger.Error("Server rejected {Message} for owner {OwnerId} - rolling back the local speculative deposit",
+                nameof(RequestAwaitingAlternativeSolutionTroopsDeposit), payload.What.OwnerId);
+            troopsRegistry.Clear(localControllerId);
+        });
     }
 
     private void Handle_NetworkAwaitingAlternativeSolutionTroopsDepositConfirmed(MessagePayload<NetworkAwaitingAlternativeSolutionTroopsDepositConfirmed> payload)
     {
         if (ModInformation.IsServer) return;
-        if (!ContainerProvider.TryResolve<IControllerIdProvider>(out var controllerIdProvider)) return;
+        GameThread.RunSafe(() =>
+        {
+            if (!ContainerProvider.TryResolve<IControllerIdProvider>(out var controllerIdProvider)) return;
 
-        var localControllerId = controllerIdProvider.ControllerId;
-        if (string.IsNullOrEmpty(localControllerId)) return;
+            var localControllerId = controllerIdProvider.ControllerId;
+            if (string.IsNullOrEmpty(localControllerId)) return;
 
-        troopsRegistry.Deposit(localControllerId, UnpackToRoster(payload.What.Troops));
+            troopsRegistry.Deposit(localControllerId, UnpackToRoster(payload.What.Troops));
+        });
     }
 
     private void Handle_AwaitingAlternativeSolutionTroopsDrainedLocally(MessagePayload<AwaitingAlternativeSolutionTroopsDrainedLocally> payload)
     {
         if (ModInformation.IsServer) return;
 
-        var packed = troopRosterInterface.PackTroopRosterData(payload.What.Troops);
-        network.SendAll(new RequestAwaitingAlternativeSolutionTroopsDrain(packed));
+        network.SendAll(new RequestAwaitingAlternativeSolutionTroopsDrain());
     }
 
     private void Handle_RequestAwaitingAlternativeSolutionTroopsDrain(MessagePayload<RequestAwaitingAlternativeSolutionTroopsDrain> payload)
     {
         if (ModInformation.IsClient) return;
 
-        if (payload.Who is not NetPeer requester || !playerManager.TryGetPlayer(requester, out var player))
+        GameThread.RunSafe(() =>
         {
-            Logger.Error("Rejecting {Message} from an unregistered/unknown requester", nameof(RequestAwaitingAlternativeSolutionTroopsDrain));
-            return;
-        }
+            if (payload.Who is not NetPeer requester || !playerManager.TryGetPlayer(requester, out var player))
+            {
+                Logger.Error("Rejecting {Message} from an unregistered/unknown requester", nameof(RequestAwaitingAlternativeSolutionTroopsDrain));
+                return;
+            }
 
-        troopsRegistry.Withdraw(player.ControllerId, UnpackToRoster(payload.What.Troops));
+            if (!objectManager.TryGetObjectWithLogging<MobileParty>(player.MobilePartyId, out var party)) return;
+            if (!objectManager.TryGetObjectWithLogging<Hero>(player.HeroId, out var hero)) return;
+            using (new MainHeroSubstitutionScope(hero, party))
+            {
+                if (!Campaign.Current.Models.IssueModel.CanTroopsReturnFromAlternativeSolution()) return;
+                if (troopsRegistry.TryGet(player.ControllerId, out var returned))
+                {
+                    foreach (var element in returned.GetTroopRoster())
+                        if (element.Character.IsHero) element.Character.HeroObject.HeroState = Hero.CharacterStates.Active;
+                    party.MemberRoster.Add(returned);
+                    troopsRegistry.Clear(player.ControllerId);
+                }
+            }
+            network.Send(requester, new NetworkAwaitingAlternativeSolutionTroopsDrained());
+        });
+    }
+
+    private void Handle_NetworkAwaitingAlternativeSolutionTroopsDrained(MessagePayload<NetworkAwaitingAlternativeSolutionTroopsDrained> payload)
+    {
+        if (ModInformation.IsServer) return;
+        GameThread.RunSafe(() =>
+        {
+            if (ContainerProvider.TryResolve<IControllerIdProvider>(out var controller))
+                troopsRegistry.Clear(controller.ControllerId);
+        });
     }
 
     private TroopRoster UnpackToRoster(TroopRosterData troops)
