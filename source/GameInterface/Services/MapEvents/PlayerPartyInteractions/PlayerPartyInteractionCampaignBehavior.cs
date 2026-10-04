@@ -134,9 +134,7 @@ public class PlayerPartyInteractionCampaignBehavior : CampaignBehaviorBase
             IsTradeProposalEnabled,
             null);
 
-#if TESTER
         AddMarriageDialogs(starter);
-#endif
 
         starter.AddPlayerLine(
             "coop_player_party_interaction_services",
@@ -160,7 +158,6 @@ public class PlayerPartyInteractionCampaignBehavior : CampaignBehaviorBase
             IsHostileDemandEnabled,
             null);
 
-#if TESTER
         starter.AddPlayerLine(
             "coop_player_party_interaction_join_clan",
             ServiceToken,
@@ -171,7 +168,6 @@ public class PlayerPartyInteractionCampaignBehavior : CampaignBehaviorBase
             PlayerPartyDialogPriority,
             IsJoinClanEnabled,
             null);
-#endif
 
         starter.AddPlayerLine(
             "coop_player_party_interaction_vassal",
