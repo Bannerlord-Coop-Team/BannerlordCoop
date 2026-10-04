@@ -18,8 +18,10 @@ public sealed class VideoCapture : IVideoCapture
     public const int SheetFrames = 8;
     public const int SheetColumns = 4;
     public const int SheetTileWidth = 480;
+    public static readonly TimeSpan StallTimeout = TimeSpan.FromSeconds(10);
     private const int MaxEmbeddedSheetBytes = 8 * 1024 * 1024;
     private static readonly TimeSpan FinalizeGrace = TimeSpan.FromSeconds(30);
+    private static readonly string ScaleFilter = "scale='trunc(min(" + MaxOutputWidth + ",iw)/2)*2':-2";
     private readonly IRunOrchestrator runs;
     private readonly CoopMcpServerSettings settings;
     private readonly IGameWindowLocator windows;
@@ -41,10 +43,26 @@ public sealed class VideoCapture : IVideoCapture
         if (executable == null) return Failure(target, null, null, null, "ffmpeg_unavailable", ffmpegProblem);
         if (!target.ProcessAlive) return Failure(target, executable, null, null, "process_exited", "The owned instance process has exited; nothing was recorded.");
         CaptureRegion region = windows.Resolve(target.Pid);
-        FfmpegResult recording;
+        FfmpegResult recording = null;
         try
         {
-            recording = await ffmpeg.RunAsync(executable, RecordArguments(region, seconds, target.VideoPath), TimeSpan.FromSeconds(seconds) + FinalizeGrace, cancellationToken);
+            TimeSpan budget = TimeSpan.FromSeconds(seconds) + FinalizeGrace;
+            if (region.Mode == GameWindowLocator.WindowRegion)
+            {
+                if (!await SupportsWindowCaptureAsync(executable, cancellationToken))
+                    region = region with { FallbackReason = "This ffmpeg has no gfxcapture hwnd option; recorded the on-screen window region, which includes windows drawn over it." };
+                else
+                {
+                    recording = await ffmpeg.RunAsync(executable, WindowCaptureArguments(region.WindowHandle, seconds, target.VideoPath), budget, StallTimeout, cancellationToken);
+                    if (recording.Stalled && LastProgressValue(recording.Progress, "frame") == 0)
+                    {
+                        region = region with { FallbackReason = "Window capture produced no frames within " + StallTimeout.TotalSeconds + " s; recorded the on-screen window region instead. gfxcapture stderr: " + recording.ErrorTail };
+                        recording = null;
+                    }
+                    else region = region with { Mode = GameWindowLocator.WindowCapture };
+                }
+            }
+            recording ??= await ffmpeg.RunAsync(executable, RecordArguments(region, seconds, target.VideoPath), budget, StallTimeout, cancellationToken);
         }
         catch (OperationCanceledException)
         {
@@ -55,19 +73,21 @@ public sealed class VideoCapture : IVideoCapture
             return Failure(target, executable, region, null, "ffmpeg_start_failed", e.Message);
         }
         int frames = LastProgressValue(recording.Progress, "frame");
-        if (recording.TimedOut || recording.ExitCode != 0 || frames <= 0 || !File.Exists(target.VideoPath))
+        if (recording.TimedOut || recording.Stalled || recording.ExitCode != 0 || frames <= 0 || !File.Exists(target.VideoPath))
             return Failure(target, executable, region, recording, "recording_failed",
-                recording.TimedOut ? "ffmpeg did not finish within the recording budget and was stopped." : "ffmpeg did not produce a complete recording.");
+                recording.TimedOut ? "ffmpeg did not finish within the recording budget and was stopped."
+                : recording.Stalled ? "Capture stopped delivering frames for " + StallTimeout.TotalSeconds + " s and ffmpeg was stopped; the mp4 is incomplete."
+                : "ffmpeg did not produce a complete recording.");
         double duration = Math.Round((double)frames / Fps, 3);
         double[] timestamps = Enumerable.Range(0, SheetFrames).Select(i => Math.Round(i * duration / SheetFrames, 3)).ToArray();
         FfmpegResult sheet;
         try
         {
-            sheet = await ffmpeg.RunAsync(executable, SheetArguments(target.VideoPath, duration, target.ContactSheetPath), FinalizeGrace, cancellationToken);
+            sheet = await ffmpeg.RunAsync(executable, SheetArguments(target.VideoPath, duration, target.ContactSheetPath), FinalizeGrace, null, cancellationToken);
         }
         catch (OperationCanceledException)
         {
-            sheet = new FfmpegResult(null, false, "", "Contact sheet generation was cancelled.");
+            sheet = new FfmpegResult(null, false, false, "", "Contact sheet generation was cancelled.");
         }
         var metadata = new Dictionary<string, object>
         {
@@ -108,14 +128,32 @@ public sealed class VideoCapture : IVideoCapture
         return null;
     }
 
+    private async Task<bool> SupportsWindowCaptureAsync(string executable, CancellationToken cancellationToken)
+    {
+        var help = await ffmpeg.RunAsync(executable, ["-hide_banner", "-h", "filter=gfxcapture"], TimeSpan.FromSeconds(10), null, cancellationToken);
+        return help.ExitCode == 0 && help.Progress.Contains("hwnd", StringComparison.Ordinal);
+    }
+
+    // Windows.Graphics.Capture of the window's own surface, independent of z-order; fps fills gaps when the window presents slower.
+    public static string[] WindowCaptureArguments(long windowHandle, int seconds, string output) =>
+    [
+        "-nostdin", "-hide_banner", "-loglevel", "error", "-y", "-progress", "pipe:1", "-nostats",
+        "-filter_complex", "gfxcapture=hwnd=" + windowHandle.ToString(CultureInfo.InvariantCulture) + ":max_framerate=" + Fps +
+            ":capture_cursor=0,hwdownload,format=bgra,fps=" + Fps + "," + ScaleFilter + "[v]",
+        "-map", "[v]", "-t", seconds.ToString(CultureInfo.InvariantCulture), .. EncoderArguments(output),
+    ];
+
     public static string[] RecordArguments(CaptureRegion region, int seconds, string output) =>
     [
         "-nostdin", "-hide_banner", "-loglevel", "error", "-y", "-progress", "pipe:1", "-nostats",
         "-f", "gdigrab", "-framerate", Fps.ToString(CultureInfo.InvariantCulture),
         "-offset_x", region.X.ToString(CultureInfo.InvariantCulture), "-offset_y", region.Y.ToString(CultureInfo.InvariantCulture),
         "-video_size", region.Width.ToString(CultureInfo.InvariantCulture) + "x" + region.Height.ToString(CultureInfo.InvariantCulture),
-        "-i", "desktop", "-t", seconds.ToString(CultureInfo.InvariantCulture),
-        "-vf", "scale='trunc(min(" + MaxOutputWidth + ",iw)/2)*2':-2",
+        "-i", "desktop", "-t", seconds.ToString(CultureInfo.InvariantCulture), "-vf", ScaleFilter, .. EncoderArguments(output),
+    ];
+
+    private static string[] EncoderArguments(string output) =>
+    [
         "-c:v", "libx264", "-preset", "veryfast", "-pix_fmt", "yuv420p", "-b:v", Bitrate, "-maxrate", Bitrate, "-bufsize", "8M",
         "-movflags", "+faststart", output,
     ];
@@ -140,7 +178,7 @@ public sealed class VideoCapture : IVideoCapture
         return value;
     }
 
-    private static object Diagnostics(FfmpegResult result) => result == null ? null : new { result.ExitCode, result.TimedOut, result.ErrorTail };
+    private static object Diagnostics(FfmpegResult result) => result == null ? null : new { result.ExitCode, result.TimedOut, result.Stalled, result.ErrorTail };
 
     private static CallToolResult Failure(VideoTarget target, string executable, CaptureRegion region, FfmpegResult result, string code, string message) =>
         Result(new Dictionary<string, object>
