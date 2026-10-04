@@ -46,7 +46,10 @@ internal class TheConquestOfSettlementHandler : IHandler
     {
         if (ModInformation.IsClient) return;
         var issue = payload.What.Issue;
-        issue.StringId = "coop_conquest_" + issue.StringId;
+        using (new AllowedThread())
+        {
+            issue.StringId = "coop_conquest_" + issue.StringId;
+        }
         if (!objects.TryGetIdWithLogging(issue.IssueOwner, out var giverId)) return;
         if (!objects.TryGetIdWithLogging(issue._targetSettlement, out var targetId)) return;
         network.SendAll(new NetworkConquestIssueCreated(giverId, targetId, generations.Bump(issue.IssueOwner), issue.IssueDueTime, issue.StringId));

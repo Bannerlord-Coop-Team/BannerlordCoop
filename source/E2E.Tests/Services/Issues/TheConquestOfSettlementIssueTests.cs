@@ -80,6 +80,11 @@ public class TheConquestOfSettlementIssueTests : IDisposable
             var ownership = Server.Resolve<IIssueOwnershipRegistry>();
             ownership.SetOwner(giver, player.ControllerId);
             ownership.SetQuestOwner(quest.StringId, player.ControllerId);
+            Assert.Equal(created.IssueId + "_quest", quest.StringId);
+            Assert.True(quest.IsOngoing);
+            Assert.Contains(quest, Campaign.Current.QuestManager.Quests);
+            Assert.True(ownership.TryGetQuestOwner(quest.StringId, out var questOwner));
+            Assert.Equal(player.ControllerId, questOwner);
             var result = new ConquestQuestCommands.CancelMissingOwner().ProcessCommand(
                 new CoopCommandArgsFactory().FromValues(new[] { player.ControllerId, missing }));
             Assert.True(result.Succeeded, result.Output);
@@ -162,16 +167,22 @@ public class TheConquestOfSettlementIssueTests : IDisposable
             Assert.Equal(changed, ReadValue());
         });
         foreach (var client in environment.Clients)
+        {
+            client.PumpGameThread();
             client.Call(() =>
             {
                 Assert.Equal(changed, ReadValue());
                 Assert.False(command.ProcessCommand(args.FromValues(new[] { heroId, parameter, previous.ToString(), changed.ToString() })).Succeeded);
                 Assert.Equal(changed, ReadValue());
             });
+        }
         Server.Call(() => Assert.True(command.ProcessCommand(args.FromValues(
             new[] { heroId, parameter, previous.ToString(), changed.ToString() })).Succeeded));
         foreach (var client in environment.Clients)
+        {
+            client.PumpGameThread();
             client.Call(() => Assert.Equal(previous, ReadValue()));
+        }
     }
 
     [Theory]
@@ -472,6 +483,8 @@ public class TheConquestOfSettlementIssueTests : IDisposable
                 typeof(Issue), IssueBase.IssueFrequency.VeryCommon);
             Assert.True(Campaign.Current.IssueManager.CreateNewIssue(in potential, giver));
         });
+        foreach (var client in environment.Clients)
+            client.PumpGameThread();
         return Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkConquestIssueCreated>());
     }
 
@@ -561,10 +574,10 @@ public class TheConquestOfSettlementIssueTests : IDisposable
             Assert.True(Server.ObjectManager.TryGetObject<Settlement>(created.TargetId, out var target));
             var quest = new Quest(created.IssueId + "_quest", giver, target, CampaignTime.DaysFromNow(60), 20000);
             var unrelated = ObjectHelper.SkipConstructor<Quest>();
-            unrelated.StringId = "another_players_quest";
             var ownership = Server.Resolve<IIssueOwnershipRegistry>();
             using (new AllowedThread())
             {
+                unrelated.StringId = "another_players_quest";
                 giver.Issue.IssueQuest = quest;
                 giver.Issue.IsTriedToSolveBefore = true;
                 giver.Issue._issueState = IssueBase.IssueState.SolvingWithQuestSolution;
@@ -574,6 +587,16 @@ public class TheConquestOfSettlementIssueTests : IDisposable
             ownership.SetOwner(giver, "removed-player");
             ownership.SetQuestOwner(quest.StringId, "removed-player");
             ownership.SetQuestOwner(unrelated.StringId, "another-player");
+            Assert.Equal(created.IssueId + "_quest", quest.StringId);
+            Assert.Equal("another_players_quest", unrelated.StringId);
+            Assert.True(quest.IsOngoing);
+            Assert.True(unrelated.IsOngoing);
+            Assert.Contains(quest, Campaign.Current.QuestManager.Quests);
+            Assert.Contains(unrelated, Campaign.Current.QuestManager.Quests);
+            Assert.True(ownership.TryGetQuestOwner(quest.StringId, out var questOwner));
+            Assert.Equal("removed-player", questOwner);
+            Assert.True(ownership.TryGetQuestOwner(unrelated.StringId, out var unrelatedOwner));
+            Assert.Equal("another-player", unrelatedOwner);
 
             Server.Resolve<IConquestQuest>().CancelForPlayerRemoval("removed-player");
 
@@ -581,6 +604,9 @@ public class TheConquestOfSettlementIssueTests : IDisposable
             Assert.Null(giver.Issue);
             Assert.DoesNotContain(quest, Campaign.Current.QuestManager.Quests);
             Assert.Contains(unrelated, Campaign.Current.QuestManager.Quests);
+            Assert.True(unrelated.IsOngoing);
+            Assert.True(ownership.TryGetQuestOwner(unrelated.StringId, out var retainedOwner));
+            Assert.Equal("another-player", retainedOwner);
             Assert.False(ownership.TryGetOwnerControllerId(giver, out _));
             Assert.Null(ConquestQuest.CancellingRemovedPlayerQuest);
             Assert.True(ownership.TryGetQuestOwner(quest.StringId, out var historicalOwner));

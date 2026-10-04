@@ -185,11 +185,17 @@ public class PlayerKingdomCreationFlowTests : IDisposable
             Assert.True(Server.ObjectManager.TryGetObject<Clan>(player.ClanId, out var clan));
             Assert.True(Server.ObjectManager.TryGetObject<Hero>(player.HeroId, out var hero));
             Assert.True(Server.ObjectManager.TryGetObject<Kingdom>(kingdomId, out var kingdom));
+            using (new AllowedThread())
+            {
+                kingdom.Name = new TextObject("Rebellion kingdom");
+            }
             var previousHero = ResolvedMainHeroContext.ResolvedMainHero;
             var previousParty = Campaign.Current.MainParty;
             var command = new ClanDebugCommands.ClanLeaveKingdomCoopCommand();
             var args = new CoopCommandArgsFactory();
-            Assert.False(command.ProcessCommand(args.FromValues(new[] { player.ClanId, "rebellion" })).Succeeded);
+            var missingActor = command.ProcessCommand(args.FromValues(new[] { player.ClanId, "rebellion" }));
+            Assert.False(missingActor.Succeeded);
+            Assert.Contains("An acting player's registered hero and party are required.", missingActor.Output);
             Assert.Same(kingdom, clan.Kingdom);
             Assert.Contains(clan, kingdom.Clans);
             Assert.Empty(Server.NetworkSentMessages.GetMessages<NetworkDeclareWar>());
@@ -217,6 +223,8 @@ public class PlayerKingdomCreationFlowTests : IDisposable
         }, new[] { AccessTools.Method(typeof(DefaultAllianceModel), nameof(DefaultAllianceModel.GetCallToWarCost)) });
         Assert.Contains(Server.NetworkSentMessages.GetMessages<NetworkDeclareWar>(),
             message => message.Detail == (int)DeclareWarAction.DeclareWarDetail.CausedByRebellion);
+        foreach (var client in Clients)
+            client.PumpGameThread();
         foreach (var instance in new[] { Server }.Concat(Clients))
             instance.Call(() =>
             {
