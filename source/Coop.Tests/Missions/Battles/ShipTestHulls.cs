@@ -11,7 +11,11 @@ namespace Coop.Tests.Missions.Battles;
 internal static class ShipTestHulls
 {
     // ScriptComponentBehavior's type initializer reads the managed module type catalog the engine normally fills.
-    internal static MissionObject Create()
+    internal static MissionObject Create() => Uninitialized<TestHull>();
+
+    internal static UsableMissionObject CreatePoint() => Uninitialized<StandingPoint>();
+
+    private static T Uninitialized<T>()
     {
         var managed = typeof(ScriptComponentBehavior).BaseType!.Assembly.GetType("TaleWorlds.DotNet.Managed")!;
         var field = AccessTools.Field(managed, "_moduleTypes");
@@ -19,7 +23,7 @@ internal static class ShipTestHulls
         try
         {
             if (previous == null) field.SetValue(null, new Dictionary<string, Type>());
-            return (MissionObject)RuntimeHelpers.GetUninitializedObject(typeof(TestHull));
+            return (T)RuntimeHelpers.GetUninitializedObject(typeof(T));
         }
         finally
         {

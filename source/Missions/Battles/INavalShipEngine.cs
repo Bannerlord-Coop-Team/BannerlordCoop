@@ -48,4 +48,14 @@ public interface INavalShipEngine
 
     /// <summary>[Game thread] Seats a puppet at, or releases it from, a station the way the owner did.</summary>
     void ApplyStationUse(Agent agent, UsableMissionObject point, bool inUse);
+
+    /// <summary>Whether the agent is the point's user and uses it.</summary>
+    bool IsSeated(Agent agent, UsableMissionObject point);
+
+    /// <summary>Whether the agent is still an active mission agent.</summary>
+    bool IsAlive(Agent agent);
+
+    /// <summary>[Game thread] Re-targets a seated puppet at its station's user frame on the current hull frame.</summary>
+    void PinToStation(Agent agent, UsableMissionObject point);
+
 }

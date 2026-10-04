@@ -47,10 +47,11 @@ public class AgentStationUseReplicator : IAgentStationUseReplicator
     private readonly Dictionary<Guid, NetworkAgentStationUse> ownSeated = new Dictionary<Guid, NetworkAgentStationUse>();
     private readonly Dictionary<Guid, long> appliedRevisions = new Dictionary<Guid, long>();
     private readonly List<PendingUse> pending = new List<PendingUse>();
+    private readonly Dictionary<Guid, AppliedSeat> appliedSeats = new Dictionary<Guid, AppliedSeat>();
     private float elapsed;
     private bool seatsAnnounced;
     private bool applyingRemote;
-    private long sent, applied, dropped, localPuppetReleases;
+    private long sent, applied, dropped, localPuppetReleases, pinned;
 
     public AgentStationUseReplicator(
         IBattleNetwork network,
@@ -95,7 +96,6 @@ public class AgentStationUseReplicator : IAgentStationUseReplicator
             // Only the owner's stream may move a puppet off a station; anything else is a local desync worth seeing.
             if (!applyingRemote && !change.InUse)
             {
-                localPuppetReleases++;
                 Logger.Warning("[NavalSync] Puppet {AgentId} left a station locally, not by its owner", info.AgentId);
             }
             return;
@@ -145,6 +145,42 @@ public class AgentStationUseReplicator : IAgentStationUseReplicator
         }
 
         DrainPending();
+        RefreshAppliedSeats();
+    }
+
+    // [Game thread] Runs after this frame's hull frame writes. A puppet the owner keeps seated is re-pinned to its station's
+    // user frame on the moved hull, as the lab did; if vanilla released it locally it is re-seated once per owner revision.
+    internal void RefreshAppliedSeats()
+    {
+        if (appliedSeats.Count == 0) return;
+
+        var leftAgents = new List<Guid>();
+        foreach (var entry in appliedSeats)
+        {
+            var seat = entry.Value;
+            if (!engine.IsAlive(seat.Agent))
+            {
+                leftAgents.Add(entry.Key);
+                continue;
+            }
+
+            if (!engine.IsSeated(seat.Agent, seat.Point))
+            {
+                if (seat.Reseated) continue;
+
+                seat.Reseated = true;
+                localPuppetReleases++;
+                Logger.Warning("[NavalSync] Puppet {AgentId} was released from its station locally; re-seating it once", entry.Key);
+                Apply(seat.Agent, seat.Point, inUse: true);
+                if (!engine.IsSeated(seat.Agent, seat.Point)) continue;
+            }
+
+            engine.PinToStation(seat.Agent, seat.Point);
+            pinned++;
+        }
+
+        foreach (var agentId in leftAgents)
+            appliedSeats.Remove(agentId);
     }
 
     private void DrainPending()
@@ -189,7 +225,14 @@ public class AgentStationUseReplicator : IAgentStationUseReplicator
 
         appliedRevisions[use.AgentId] = use.Revision;
         Apply(info.Agent, point, use.InUse);
+        RecordAppliedSeat(use.AgentId, info.Agent, use.InUse ? point : null);
         return true;
+    }
+
+    internal void RecordAppliedSeat(Guid agentId, Agent agent, UsableMissionObject point)
+    {
+        if (point == null) appliedSeats.Remove(agentId);
+        else appliedSeats[agentId] = new AppliedSeat(agent, point);
     }
 
     // The station owns the puppet's pose from here, so the buffered owner pose is dropped before seating.
@@ -243,9 +286,25 @@ public class AgentStationUseReplicator : IAgentStationUseReplicator
         applied,
         dropped,
         localPuppetReleases,
+        pinned,
+        appliedSeats = appliedSeats.Count,
         pending = pending.Count,
         ownSeated = ownSeated.Count,
     };
+
+    private sealed class AppliedSeat
+    {
+        public AppliedSeat(Agent agent, UsableMissionObject point)
+        {
+            Agent = agent;
+            Point = point;
+        }
+
+        public Agent Agent { get; }
+        public UsableMissionObject Point { get; }
+        // Set once a local release was re-seated; the next owner revision gives the seat a fresh attempt.
+        public bool Reseated { get; set; }
+    }
 
     private readonly struct PendingUse
     {

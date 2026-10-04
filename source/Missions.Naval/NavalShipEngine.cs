@@ -234,13 +234,46 @@ public class NavalShipEngine : INavalShipEngine
     {
         if (inUse)
         {
-            if (agent.CurrentlyUsedGameObject == point) return;
+            if (IsSeated(agent, point)) return;
             if (agent.CurrentlyUsedGameObject != null) agent.StopUsingGameObject(isSuccessful: true, Agent.StopUsingGameObjectFlags.None);
             agent.UseGameObject(point);
+
+            // A controller-less puppet never walks into the seat; seat it the way vanilla seats spawn crew (as the lab
+            // did): the helm sets its steering action and pins the pilot, an oar sits its rower down at once.
+            var machine = PilotMachineOf(point);
+            if (machine != null && machine.PilotAgent == agent) machine.OnPilotAssignedDuringSpawn();
             return;
         }
 
         if (agent.CurrentlyUsedGameObject == point)
             agent.StopUsingGameObject(isSuccessful: true, Agent.StopUsingGameObjectFlags.None);
+    }
+
+    public bool IsAlive(Agent agent) => agent != null && agent.IsActive();
+
+    public bool IsSeated(Agent agent, UsableMissionObject point) =>
+        agent != null && point != null && agent.IsActive() && point.UserAgent == agent && agent.CurrentlyUsedGameObject == point;
+
+    // The lab re-pinned every seated foreign actor on each hull frame write; vanilla's seat lock alone lets it slide.
+    public void PinToStation(Agent agent, UsableMissionObject point)
+    {
+        if (!point.LockUserFrames) return;
+
+        var frame = point.GetUserFrameForAgent(agent);
+        agent.SetTargetPositionAndDirection(frame.Origin.AsVec2, in frame.Rotation.f);
+    }
+
+    // The machine whose pilot point this is; the point entity sits at most a few levels below its machine.
+    private static UsableMachine PilotMachineOf(UsableMissionObject point)
+    {
+        var entity = point.GameEntity;
+        for (int depth = 0; depth < 4 && entity.IsValid; depth++)
+        {
+            var machine = entity.GetScriptComponents<UsableMachine>().FirstOrDefault(candidate => candidate.PilotStandingPoint == point);
+            if (machine != null) return machine;
+            entity = entity.Parent;
+        }
+
+        return null;
     }
 }
