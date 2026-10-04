@@ -179,16 +179,21 @@ public class PlayerKingdomCreationFlowTests : IDisposable
         ConfigureClanInKingdom(ruler.ClanId, kingdomId);
         ConfigureClanInKingdom(player.ClanId, kingdomId);
         EnsureKingdomRegisteredEverywhere(kingdomId);
+        foreach (var instance in new[] { Server }.Concat(Clients))
+            instance.Call(() =>
+            {
+                Assert.True(instance.ObjectManager.TryGetObject<Kingdom>(kingdomId, out var kingdom));
+                using (new AllowedThread())
+                {
+                    kingdom.Name = new TextObject("Rebellion kingdom");
+                }
+            });
 
         Server.Call(() =>
         {
             Assert.True(Server.ObjectManager.TryGetObject<Clan>(player.ClanId, out var clan));
             Assert.True(Server.ObjectManager.TryGetObject<Hero>(player.HeroId, out var hero));
             Assert.True(Server.ObjectManager.TryGetObject<Kingdom>(kingdomId, out var kingdom));
-            using (new AllowedThread())
-            {
-                kingdom.Name = new TextObject("Rebellion kingdom");
-            }
             var previousHero = ResolvedMainHeroContext.ResolvedMainHero;
             var previousParty = Campaign.Current.MainParty;
             var command = new ClanDebugCommands.ClanLeaveKingdomCoopCommand();
