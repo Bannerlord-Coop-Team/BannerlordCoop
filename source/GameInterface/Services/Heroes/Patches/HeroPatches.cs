@@ -1,7 +1,13 @@
-﻿using Common.Util;
+﻿using Common;
+using Common.Logging;
+using Common.Messaging;
+using Common.Util;
 using GameInterface.Extentions;
+using GameInterface.Policies;
 using GameInterface.Services.Clans.Extensions;
+using GameInterface.Services.Heroes.Messages;
 using HarmonyLib;
+using Serilog;
 using System.Linq;
 using TaleWorlds.CampaignSystem;
 
@@ -13,6 +19,22 @@ namespace GameInterface.Services.Heroes.Patches
     [HarmonyPatch(typeof(Hero))]
     public class HeroPatches
     {
+        private static readonly ILogger Logger = LogManager.GetLogger<HeroPatches>();
+
+        [HarmonyPatch(nameof(Hero.ChangeState))]
+        [HarmonyPrefix]
+        private static void ChangeStatePrefix(Hero __instance, Hero.CharacterStates newState)
+        {
+            if (CallOriginalPolicy.IsOriginalAllowed()) return;
+            if (ModInformation.IsClient)
+            {
+                Logger.Error("Client updated managed {var}", nameof(Hero._heroState));
+                return;
+            }
+
+            MessageBroker.Instance.Publish(__instance, new HeroStateChanged((int)newState, __instance));
+        }
+
         /// <summary>
         /// Patch for determining whether a Hero is a player's hero or not.
         /// </summary>

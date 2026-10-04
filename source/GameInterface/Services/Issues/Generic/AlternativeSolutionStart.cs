@@ -1,4 +1,5 @@
-using System;
+﻿using System;
+using System.Linq;
 using GameInterface.Services.Heroes.Patches;
 using GameInterface.Services.Issues.Generic.AcceptMirror;
 using GameInterface.Services.ObjectManager;
@@ -38,7 +39,8 @@ public static class AlternativeSolutionStartRunner
         }
     }
 
-    public static AlternativeSolutionVanillaState StartOnServerFromClaim(Hero owner, Player truePlayer, TroopRoster validatedRoster)
+    public static AlternativeSolutionVanillaState StartOnServerFromClaim(Hero owner, Player truePlayer,
+        TroopRoster validatedRoster, out int wages)
     {
         using (new AlternativeSolutionStartAuthorityGuard())
         using (ResolveOwnerScope(truePlayer))
@@ -57,6 +59,10 @@ public static class AlternativeSolutionStartRunner
                     element.Character, element.Number, false, element.WoundedNumber, element.Xp, false);
             }
 
+            // Vanilla opens the wage-charging quest screen only when more than one soldier is needed.
+            var wageDays = owner.Issue.GetTotalAlternativeSolutionNeededMenCount() > 1
+                ? owner.Issue.GetTotalAlternativeSolutionDurationInDays() : 0;
+            wages = validatedRoster.Sum(element => element.Character.TroopWage * element.Number * wageDays);
             owner.Issue.AlternativeSolutionStartConsequence();
             owner.Issue.StartIssueWithAlternativeSolution();
             return AlternativeSolutionVanillaStateSync.Capture(owner.Issue);

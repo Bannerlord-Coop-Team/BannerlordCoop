@@ -1,9 +1,12 @@
-using Common;
+﻿using Common;
 using Common.Logging;
 using Common.Messaging;
 using Common.Network;
 using Common.Util;
 using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Runtime.CompilerServices;
 using GameInterface.Services.Entity;
 using GameInterface.Services.Heroes.Patches;
 using GameInterface.Services.Issues.Generic;
@@ -12,6 +15,7 @@ using GameInterface.Services.Issues.Interfaces;
 using GameInterface.Services.Issues.Messages;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Party;
+using GameInterface.Services.Party.Patches;
 using GameInterface.Services.Players;
 using GameInterface.Services.Players.Data;
 using GameInterface.Services.TroopRosters.Data;
@@ -19,7 +23,11 @@ using GameInterface.Services.TroopRosters.Interfaces;
 using LiteNetLib;
 using Serilog;
 using TaleWorlds.CampaignSystem;
+using TaleWorlds.CampaignSystem.Actions;
 using TaleWorlds.CampaignSystem.Issues;
+using TaleWorlds.CampaignSystem.GameState;
+using TaleWorlds.Core;
+using Helpers;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Roster;
 
@@ -28,6 +36,26 @@ namespace GameInterface.Services.Issues.Handlers;
 internal class GenericQuestTypeAcceptHandler : IHandler
 {
     private static readonly ILogger Logger = LogManager.GetLogger<GenericQuestTypeAcceptHandler>();
+    internal static string LastServerQuestAcceptTrace { get; private set; }
+
+    private static void TraceServerQuestAccept(string phase, Hero owner, IssueBase initialIssue, QuestTypeDescriptor descriptor)
+    {
+        var issue = owner.Issue;
+        var quest = issue?.IssueQuest;
+        var manager = Campaign.Current.QuestManager;
+        var managerIssueSame = Campaign.Current.IssueManager.Issues.TryGetValue(owner, out var managerIssue) &&
+            ReferenceEquals(managerIssue, issue);
+        var trace = $"phase={phase} descriptor={descriptor?.DisplayName ?? "none"} " +
+            $"arbitrated={descriptor?.TryArbitrateQuestSolutionAcceptBytes != null} " +
+            $"initialIssueRef={RuntimeHelpers.GetHashCode(initialIssue)} issueRef={(issue == null ? 0 : RuntimeHelpers.GetHashCode(issue))} " +
+            $"managerIssueSame={managerIssueSame} managerRef={RuntimeHelpers.GetHashCode(manager)} " +
+            $"quest={quest?.StringId ?? "none"} registered={QuestSolutionStartRunner.HasRegisteredQuest(owner)} " +
+            $"trackedQuestCount={manager.Quests.Count(candidate => candidate.StringId == initialIssue.StringId + "_quest")}";
+        LastServerQuestAcceptTrace = string.IsNullOrEmpty(LastServerQuestAcceptTrace)
+            ? trace
+            : LastServerQuestAcceptTrace + " / " + trace;
+        Logger.Information("Quest accept state: {Trace}", trace);
+    }
 
     private readonly IMessageBroker messageBroker;
     private readonly IObjectManager objectManager;
@@ -38,6 +66,10 @@ internal class GenericQuestTypeAcceptHandler : IHandler
     private readonly IIssueOwnershipRegistry ownershipRegistry;
     private readonly IIssueGenerationRegistry generationRegistry;
     private readonly IIssueConversationTracker conversationTracker;
+    private readonly Dictionary<Hero, (IssueBase Issue, MobileParty Party, TroopRoster Troops, TroopRoster Roster, PartyScreenLogic Screen, bool ResetObserved)> pendingAlternativeAccepts = new();
+    private readonly Dictionary<Hero, (IssueBase Issue, TroopRosterData Troops)> acceptedAlternativeTroops = new();
+    private readonly Dictionary<TroopRoster, (TroopRoster Before, TroopRoster After)> localSelectionTransfers = new();
+    private readonly Dictionary<TroopRoster, (PartyScreenLogic Screen, TroopRoster SelectedTroops)> resetQuestScreens = new();
 
     public GenericQuestTypeAcceptHandler(
         IMessageBroker messageBroker,
@@ -65,6 +97,9 @@ internal class GenericQuestTypeAcceptHandler : IHandler
         messageBroker.Subscribe<NetworkQuestTypeQuestAccepted>(Handle_NetworkQuestTypeQuestAccepted);
 
         messageBroker.Subscribe<QuestTypeAlternativeAcceptTriggered>(Handle_QuestTypeAlternativeAcceptTriggered);
+        messageBroker.Subscribe<QuestAlternativeTroopsTransferredLocally>(Handle_QuestAlternativeTroopsTransferredLocally);
+        messageBroker.Subscribe<QuestAlternativeTroopSelectionClosed>(Handle_QuestAlternativeTroopSelectionClosed);
+        messageBroker.Subscribe<QuestAlternativeTroopSelectionReset>(Handle_QuestAlternativeTroopSelectionReset);
         messageBroker.Subscribe<RequestQuestTypeAcceptAlternative>(Handle_RequestQuestTypeAcceptAlternative);
         messageBroker.Subscribe<NetworkQuestTypeAlternativeAccepted>(Handle_NetworkQuestTypeAlternativeAccepted);
 
@@ -78,6 +113,9 @@ internal class GenericQuestTypeAcceptHandler : IHandler
         messageBroker.Unsubscribe<NetworkQuestTypeQuestAccepted>(Handle_NetworkQuestTypeQuestAccepted);
 
         messageBroker.Unsubscribe<QuestTypeAlternativeAcceptTriggered>(Handle_QuestTypeAlternativeAcceptTriggered);
+        messageBroker.Unsubscribe<QuestAlternativeTroopsTransferredLocally>(Handle_QuestAlternativeTroopsTransferredLocally);
+        messageBroker.Unsubscribe<QuestAlternativeTroopSelectionClosed>(Handle_QuestAlternativeTroopSelectionClosed);
+        messageBroker.Unsubscribe<QuestAlternativeTroopSelectionReset>(Handle_QuestAlternativeTroopSelectionReset);
         messageBroker.Unsubscribe<RequestQuestTypeAcceptAlternative>(Handle_RequestQuestTypeAcceptAlternative);
         messageBroker.Unsubscribe<NetworkQuestTypeAlternativeAccepted>(Handle_NetworkQuestTypeAlternativeAccepted);
 
@@ -111,6 +149,13 @@ internal class GenericQuestTypeAcceptHandler : IHandler
                     return owner.Issue.StartIssueWithQuest();
                 });
                 if (!started) return;
+                if (descriptor.TryArbitrateQuestSolutionAcceptBytes != null &&
+                    !QuestSolutionStartRunner.HasRegisteredQuest(owner))
+                {
+                    Logger.Error("Quest-solution accept for owner {Owner} did not leave a registered ongoing quest - finalizing rejected accept", ownerId);
+                    IssueFinalizationSupport.FinalizeMirror(owner, IssueFinalizeReason.RejectedAccept, suppressReplicationPatches: false);
+                    return;
+                }
 
                 ownershipRegistry.SetOwner(owner, hostControllerId);
                 network.SendAll(new NetworkQuestTypeQuestAccepted(ownerId, hostControllerId, fieldsBytes));
@@ -189,6 +234,9 @@ internal class GenericQuestTypeAcceptHandler : IHandler
                 return;
             }
 
+            var initialIssue = owner.Issue;
+            LastServerQuestAcceptTrace = null;
+            TraceServerQuestAccept("validated", owner, initialIssue, descriptor);
             byte[] fieldsBytes = null;
             try
             {
@@ -202,9 +250,18 @@ internal class GenericQuestTypeAcceptHandler : IHandler
                     }
                     return owner.Issue.StartIssueWithQuest();
                 });
+                TraceServerQuestAccept("after-start", owner, initialIssue, descriptor);
                 if (!started)
                 {
                     Logger.Error("Replayed accept for owner {Owner} but could not read back its quest fields - rolled back and rejecting", ownerId);
+                    network.Send(requester, new NetworkQuestTypeAcceptRejected(ownerId, isAlternative: false));
+                    return;
+                }
+                if (descriptor.TryArbitrateQuestSolutionAcceptBytes != null &&
+                    !QuestSolutionStartRunner.HasRegisteredQuest(owner))
+                {
+                    Logger.Error("Quest-solution accept for owner {Owner} did not leave a registered ongoing quest - finalizing rejected accept", ownerId);
+                    IssueFinalizationSupport.FinalizeMirror(owner, IssueFinalizeReason.RejectedAccept, suppressReplicationPatches: false);
                     network.Send(requester, new NetworkQuestTypeAcceptRejected(ownerId, isAlternative: false));
                     return;
                 }
@@ -218,7 +275,9 @@ internal class GenericQuestTypeAcceptHandler : IHandler
             }
 
             ownershipRegistry.SetOwner(owner, player.ControllerId);
+            TraceServerQuestAccept("before-broadcast", owner, initialIssue, descriptor);
             network.SendAll(new NetworkQuestTypeQuestAccepted(ownerId, player.ControllerId, fieldsBytes));
+            TraceServerQuestAccept("broadcasted", owner, initialIssue, descriptor);
         });
     }
 
@@ -251,6 +310,17 @@ internal class GenericQuestTypeAcceptHandler : IHandler
             }
 
             ownershipRegistry.SetOwner(owner, data.OwnerControllerId);
+            if (InvalidateOpenQuestSelection(owner))
+                using (new AllowedThread()) owner.Issue.AlternativeSolutionSentTroops.Clear();
+            if (owner.Issue != null &&
+                TryTakeLocalTransfers(owner.Issue.AlternativeSolutionSentTroops, out var localTransfer))
+            {
+                RevertLocalTransfers(MobileParty.MainParty, localTransfer.Before, localTransfer.After);
+                using (new AllowedThread()) owner.Issue.AlternativeSolutionSentTroops.Clear();
+            }
+            if (owner.Issue != null) resetQuestScreens.Remove(owner.Issue.AlternativeSolutionSentTroops);
+            RollbackPendingAlternativeAccept(owner);
+            acceptedAlternativeTroops.Remove(owner);
         });
     }
 
@@ -261,6 +331,20 @@ internal class GenericQuestTypeAcceptHandler : IHandler
 
         var descriptor = QuestTypeRegistry.Get(owner.Issue);
         if (descriptor?.SupportsAlternativeAccept != true) return;
+        if (ownershipRegistry.TryGetOwnerControllerId(owner, out _))
+        {
+            if (ModInformation.IsClient && payload.What.SelectedTroops != null)
+            {
+                if (TryTakeLocalTransfers(owner.Issue.AlternativeSolutionSentTroops, out var transfer))
+                    RevertLocalTransfers(MobileParty.MainParty, transfer.Before, transfer.After);
+                if (acceptedAlternativeTroops.TryGetValue(owner, out var winningTroops) &&
+                    ReferenceEquals(owner.Issue, winningTroops.Issue))
+                    ApplyReceivedTroops(owner, winningTroops.Troops);
+                else
+                    using (new AllowedThread()) owner.Issue.AlternativeSolutionSentTroops.Clear();
+            }
+            return;
+        }
 
         if (ModInformation.IsServer)
         {
@@ -297,10 +381,94 @@ internal class GenericQuestTypeAcceptHandler : IHandler
         }
         else
         {
+            if (pendingAlternativeAccepts.TryGetValue(owner, out var pending) &&
+                !ReferenceEquals(pending.Issue, owner.Issue))
+                RollbackPendingAlternativeAccept(owner);
+            if (pendingAlternativeAccepts.ContainsKey(owner))
+            {
+                if (TryTakeLocalTransfers(owner.Issue.AlternativeSolutionSentTroops, out var transfer))
+                    RevertLocalTransfers(MobileParty.MainParty, transfer.Before, transfer.After);
+                else if (!pendingAlternativeAccepts[owner].ResetObserved)
+                    RestoreSelectedTroops(MobileParty.MainParty, payload.What.SelectedTroops);
+                else
+                    RestoreMissingSelectedHeroes(MobileParty.MainParty, pendingAlternativeAccepts[owner].Troops);
+                using (new AllowedThread()) owner.Issue.AlternativeSolutionSentTroops.Clear();
+                return;
+            }
             generationRegistry.TryGetGeneration(owner, out var generation);
-            var packedTroops = troopRosterInterface.PackTroopRosterData(owner.Issue.AlternativeSolutionSentTroops);
+            var roster = owner.Issue.AlternativeSolutionSentTroops;
+            var resetObserved = resetQuestScreens.TryGetValue(roster, out var reset) &&
+                (payload.What.Screen == null || ReferenceEquals(payload.What.Screen, reset.Screen));
+            resetQuestScreens.Remove(roster);
+            var selectedTroops = TroopRoster.CreateDummyTroopRoster();
+            selectedTroops.Add(payload.What.SelectedTroops?.TotalManCount > 0 ? payload.What.SelectedTroops :
+                resetObserved && reset.SelectedTroops != null ? reset.SelectedTroops : roster);
+            pendingAlternativeAccepts[owner] = (owner.Issue, MobileParty.MainParty, selectedTroops,
+                roster, payload.What.Screen ?? reset.Screen, resetObserved);
+            localSelectionTransfers.Remove(roster);
+            var packedTroops = troopRosterInterface.PackTroopRosterData(selectedTroops);
             network.SendAll(new RequestQuestTypeAcceptAlternative(ownerId, generation, packedTroops));
+            using (new AllowedThread()) owner.Issue.AlternativeSolutionSentTroops.Clear();
         }
+    }
+
+    private void Handle_QuestAlternativeTroopsTransferredLocally(MessagePayload<QuestAlternativeTroopsTransferredLocally> payload)
+    {
+        var transfer = payload.What;
+        if (transfer.Roster == null) return;
+        var before = localSelectionTransfers.TryGetValue(transfer.Roster, out var previous)
+            ? previous.Before : transfer.Before;
+        localSelectionTransfers[transfer.Roster] = (before, transfer.After);
+    }
+
+    private void Handle_QuestAlternativeTroopSelectionClosed(MessagePayload<QuestAlternativeTroopSelectionClosed> payload)
+    {
+        if (payload.What.Roster == null) return;
+        localSelectionTransfers.Remove(payload.What.Roster);
+        resetQuestScreens.Remove(payload.What.Roster);
+    }
+
+    private void Handle_QuestAlternativeTroopSelectionReset(MessagePayload<QuestAlternativeTroopSelectionReset> payload)
+    {
+        if (payload.What.Roster == null) return;
+        localSelectionTransfers.Remove(payload.What.Roster);
+        if (payload.What.SelectedTroops != null ||
+            !resetQuestScreens.TryGetValue(payload.What.Roster, out var previous) ||
+            !ReferenceEquals(previous.Screen, payload.What.Screen) || previous.SelectedTroops == null)
+            resetQuestScreens[payload.What.Roster] = (payload.What.Screen, payload.What.SelectedTroops);
+        Hero pendingOwner = null;
+        foreach (var pair in pendingAlternativeAccepts)
+        {
+            if (!ReferenceEquals(pair.Value.Roster, payload.What.Roster)) continue;
+            pendingOwner = pair.Key;
+            break;
+        }
+        if (pendingOwner == null)
+        {
+            foreach (var accepted in acceptedAlternativeTroops)
+            {
+                if (ReferenceEquals(accepted.Key.Issue, accepted.Value.Issue) &&
+                    ReferenceEquals(accepted.Value.Issue.AlternativeSolutionSentTroops, payload.What.Roster))
+                {
+                    ApplyReceivedTroops(accepted.Key, accepted.Value.Troops);
+                    break;
+                }
+            }
+            return;
+        }
+        var pending = pendingAlternativeAccepts[pendingOwner];
+        if (pending.Screen == null || !ReferenceEquals(pending.Screen, payload.What.Screen)) return;
+        if (pending.ResetObserved) return;
+        pendingAlternativeAccepts[pendingOwner] = (pending.Issue, pending.Party, pending.Troops,
+            pending.Roster, pending.Screen, true);
+    }
+
+    private bool TryTakeLocalTransfers(TroopRoster roster, out (TroopRoster Before, TroopRoster After) transfer)
+    {
+        transfer = default;
+        if (roster == null || !localSelectionTransfers.TryGetValue(roster, out transfer)) return false;
+        localSelectionTransfers.Remove(roster);
+        return true;
     }
 
     private void Handle_RequestQuestTypeAcceptAlternative(MessagePayload<RequestQuestTypeAcceptAlternative> payload)
@@ -371,9 +539,10 @@ internal class GenericQuestTypeAcceptHandler : IHandler
 
             AlternativeSolutionVanillaState state;
             byte[] fieldsBytes = null;
+            int wages;
             try
             {
-                state = AlternativeSolutionStartRunner.StartOnServerFromClaim(owner, player, validatedRoster);
+                state = AlternativeSolutionStartRunner.StartOnServerFromClaim(owner, player, validatedRoster, out wages);
 
                 if (descriptor.TryArbitrateAlternativeAcceptBytes != null)
                 {
@@ -396,6 +565,11 @@ internal class GenericQuestTypeAcceptHandler : IHandler
                 return;
             }
 
+            QuestSolutionStartRunner.RunGuarded(player, () =>
+            {
+                GiveGoldAction.ApplyBetweenCharacters(null, Hero.MainHero, -wages, false);
+                return true;
+            });
             ownershipRegistry.SetOwner(owner, player.ControllerId);
             var validatedTroops = troopRosterInterface.PackTroopRosterData(owner.Issue.AlternativeSolutionSentTroops);
             network.SendAll(new NetworkQuestTypeAlternativeAccepted(ownerId, player.ControllerId, state, fieldsBytes, validatedTroops));
@@ -440,7 +614,113 @@ internal class GenericQuestTypeAcceptHandler : IHandler
             }
 
             ownershipRegistry.SetOwner(owner, data.OwnerControllerId);
+            if (InvalidateOpenQuestSelection(owner)) ApplyReceivedTroops(owner, data.SentTroops);
+            if (TryTakeLocalTransfers(owner.Issue.AlternativeSolutionSentTroops, out var localTransfer))
+                RevertLocalTransfers(MobileParty.MainParty, localTransfer.Before, localTransfer.After);
+            resetQuestScreens.Remove(owner.Issue.AlternativeSolutionSentTroops);
+            acceptedAlternativeTroops[owner] = (owner.Issue, data.SentTroops);
+            if (ownershipRegistry.IsLocalPeerOwner(owner))
+                pendingAlternativeAccepts.Remove(owner);
+            else
+                RollbackPendingAlternativeAccept(owner);
         });
+    }
+
+    private bool InvalidateOpenQuestSelection(Hero owner)
+    {
+        if (owner.Issue == null || ownershipRegistry.IsLocalPeerOwner(owner)) return false;
+        var roster = owner.Issue.AlternativeSolutionSentTroops;
+        var screen = (Game.Current?.GameStateManager?.ActiveState as PartyState)?.PartyScreenLogic;
+        if (screen == null || screen._partyScreenMode != PartyScreenHelper.PartyScreenMode.QuestTroopManage ||
+            !ReferenceEquals(screen.MemberRosters[0], roster) ||
+            !ReferenceEquals(screen.MemberRosters[1], MobileParty.MainParty?.MemberRoster)) return false;
+
+        using (new AllowedThread())
+        {
+            // Cancel edits before detaching the screen from the winning issue's roster.
+            screen.Reset(true);
+            RestoreMissingSelectedHeroes(MobileParty.MainParty, screen._initialData.LeftMemberRoster);
+            var detached = TroopRoster.CreateDummyTroopRoster();
+            screen.MemberRosters[0] = detached;
+            screen.CurrentData.LeftMemberRoster = detached;
+        }
+        PartyScreenLogicPatches.InvalidateQuestScreen(screen);
+        localSelectionTransfers.Remove(roster);
+        resetQuestScreens.Remove(roster);
+        return true;
+    }
+
+    private static void RestoreSelectedTroops(MobileParty party, TroopRoster troops)
+    {
+        if (troops == null) return;
+        using (new AllowedThread())
+        {
+            foreach (var element in troops.GetTroopRoster())
+            {
+                if (party != null)
+                    ApplyLocalTransferDelta(party, element.Character, element.Number,
+                        element.WoundedNumber, element.Xp);
+                else if (element.Character.IsHero)
+                    element.Character.HeroObject.ChangeState(Hero.CharacterStates.Active);
+            }
+        }
+    }
+
+    private static void RestoreMissingSelectedHeroes(MobileParty party, TroopRoster troops)
+    {
+        if (troops == null) return;
+        using (new AllowedThread())
+        {
+            foreach (var element in troops.GetTroopRoster())
+            {
+                if (!element.Character.IsHero ||
+                    party != null && party.MemberRoster.GetTroopCount(element.Character) > 0) continue;
+                if (party != null)
+                    ApplyLocalTransferDelta(party, element.Character, element.Number,
+                        element.WoundedNumber, element.Xp);
+                else
+                    element.Character.HeroObject.ChangeState(Hero.CharacterStates.Active);
+            }
+        }
+    }
+
+    private static void RevertLocalTransfers(MobileParty party, TroopRoster before, TroopRoster after)
+    {
+        if (party == null) return;
+        var seen = new HashSet<CharacterObject>();
+        using (new AllowedThread())
+        {
+            foreach (var element in before.GetTroopRoster())
+            {
+                seen.Add(element.Character);
+                var index = after.FindIndexOfTroop(element.Character);
+                var current = index >= 0 ? after.GetElementCopyAtIndex(index) : default;
+                ApplyLocalTransferDelta(party, element.Character,
+                    current.Number - element.Number,
+                    current.WoundedNumber - element.WoundedNumber,
+                    current.Xp - element.Xp);
+            }
+            foreach (var element in after.GetTroopRoster())
+            {
+                if (!seen.Add(element.Character)) continue;
+                ApplyLocalTransferDelta(party, element.Character,
+                    element.Number, element.WoundedNumber, element.Xp);
+            }
+        }
+    }
+
+    private static void ApplyLocalTransferDelta(MobileParty party, CharacterObject character,
+        int count, int wounded, int xp)
+    {
+        if (count == 0 && wounded == 0 && xp == 0) return;
+        var restoredByActivation = 0;
+        if (count > 0 && character.IsHero && character.HeroObject.HeroState != Hero.CharacterStates.Active)
+        {
+            var beforeActivation = party.MemberRoster.GetTroopCount(character);
+            character.HeroObject.ChangeState(Hero.CharacterStates.Active);
+            restoredByActivation = party.MemberRoster.GetTroopCount(character) - beforeActivation;
+        }
+        party.MemberRoster.AddToCounts(character, count - restoredByActivation, false, wounded, xp, true);
     }
 
     private void ApplyReceivedTroops(Hero owner, TroopRosterData troops)
@@ -456,18 +736,24 @@ internal class GenericQuestTypeAcceptHandler : IHandler
         }
     }
 
-    private static void RollbackAlternativeAccept(Hero owner)
+    private void RollbackPendingAlternativeAccept(Hero owner)
     {
-        if (owner?.Issue == null) return;
+        if (!pendingAlternativeAccepts.TryGetValue(owner, out var pending)) return;
+        pendingAlternativeAccepts.Remove(owner);
+        if (TryTakeLocalTransfers(pending.Roster, out var laterTransfer))
+            RevertLocalTransfers(pending.Party, laterTransfer.Before, laterTransfer.After);
+        if (pending.ResetObserved)
+            RestoreMissingSelectedHeroes(pending.Party, pending.Troops);
+        else
+            RestoreSelectedTroops(pending.Party, pending.Troops);
 
         using (new AllowedThread())
         {
-            var sentTroops = owner.Issue.AlternativeSolutionSentTroops;
-            if (MobileParty.MainParty != null && sentTroops.TotalManCount > 0)
+            var hasWinner = ownershipRegistry.TryGetOwnerControllerId(owner, out _);
+            if (ReferenceEquals(owner.Issue, pending.Issue) && (!hasWinner || !owner.Issue.IsSolvingWithAlternative))
             {
-                MobileParty.MainParty.MemberRoster.Add(sentTroops);
+                owner.Issue.AlternativeSolutionSentTroops.Clear();
             }
-            sentTroops.Clear();
         }
     }
 
@@ -509,17 +795,13 @@ internal class GenericQuestTypeAcceptHandler : IHandler
         {
             if (!objectManager.TryGetObjectWithLogging<Hero>(ownerId, out var owner)) return;
 
+            var resetRoster = owner.Issue?.AlternativeSolutionSentTroops;
             var descriptor = QuestTypeRegistry.Get(owner.Issue);
             if (isAlternative)
             {
-                if (descriptor?.RejectAlternativeAccept != null)
-                {
-                    descriptor.RejectAlternativeAccept(owner);
-                }
-                else
-                {
-                    RollbackAlternativeAccept(owner);
-                }
+                if (!ownershipRegistry.TryGetOwnerControllerId(owner, out _))
+                    descriptor?.RejectAlternativeAccept?.Invoke(owner);
+                RollbackPendingAlternativeAccept(owner);
             }
             else if (descriptor?.RejectQuestSolutionAccept != null)
             {
@@ -529,6 +811,7 @@ internal class GenericQuestTypeAcceptHandler : IHandler
             {
                 AcceptMirrorSupport.RejectAcceptance(owner);
             }
+            if (resetRoster != null) resetQuestScreens.Remove(resetRoster);
         });
     }
 

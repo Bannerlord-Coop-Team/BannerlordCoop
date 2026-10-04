@@ -53,9 +53,13 @@ public readonly struct RequestAwaitingAlternativeSolutionTroopsDrain : ICommand
     [ProtoMember(1)]
     public readonly TroopRosterData Troops;
 
-    public RequestAwaitingAlternativeSolutionTroopsDrain(TroopRosterData troops)
+    [ProtoMember(2)]
+    public readonly string Revision;
+
+    public RequestAwaitingAlternativeSolutionTroopsDrain(TroopRosterData troops, string revision)
     {
         Troops = troops;
+        Revision = revision;
     }
 }
 
@@ -79,9 +83,29 @@ public readonly struct NetworkAwaitingAlternativeSolutionTroopsDepositConfirmed 
     [ProtoMember(2)]
     public readonly TroopRosterData Troops;
 
-    public NetworkAwaitingAlternativeSolutionTroopsDepositConfirmed(string ownerId, TroopRosterData troops)
+    [ProtoMember(3)]
+    public readonly string Revision;
+
+    public NetworkAwaitingAlternativeSolutionTroopsDepositConfirmed(string ownerId, TroopRosterData troops, string revision)
     {
         OwnerId = ownerId;
         Troops = troops;
+        Revision = revision;
+    }
+}
+
+[ProtoContract(SkipConstructor = true)]
+public readonly struct NetworkAwaitingAlternativeSolutionTroopsDrainConfirmed : IServerToClientCommand
+{
+    [ProtoMember(1)]
+    public readonly TroopRosterData Troops;
+
+    [ProtoMember(2)]
+    public readonly string Revision;
+
+    public NetworkAwaitingAlternativeSolutionTroopsDrainConfirmed(TroopRosterData troops, string revision)
+    {
+        Troops = troops;
+        Revision = revision;
     }
 }

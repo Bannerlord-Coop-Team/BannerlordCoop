@@ -1,4 +1,4 @@
-using Common;
+﻿using Common;
 using Common.Logging;
 using Common.Messaging;
 using Common.Network;
@@ -53,12 +53,12 @@ internal class IssueManagerAlternativeSolutionTroopsPatches
         troopsRegistry.Deposit(ownerControllerId, troops);
         MessageBroker.Instance.Publish(issue, new AwaitingAlternativeSolutionTroopsDepositedLocally(issue.IssueOwner, ownerControllerId, troops));
 
-        NotifyTrueOwnerOfConfirmedDeposit(issue.IssueOwner, ownerControllerId, troops);
+        NotifyTrueOwnerOfConfirmedDeposit(issue.IssueOwner, ownerControllerId);
 
         return false;
     }
 
-    private static void NotifyTrueOwnerOfConfirmedDeposit(Hero issueOwner, string ownerControllerId, TroopRoster troops)
+    private static void NotifyTrueOwnerOfConfirmedDeposit(Hero issueOwner, string ownerControllerId)
     {
         if (!ModInformation.IsServer) return;
 
@@ -76,9 +76,12 @@ internal class IssueManagerAlternativeSolutionTroopsPatches
 
         if (!ContainerProvider.TryResolve<ITroopRosterInterface>(out var troopRosterInterface)) return;
         if (!ContainerProvider.TryResolve<INetwork>(out var network)) return;
+        if (!ContainerProvider.TryResolve<IAwaitingAlternativeSolutionTroopsRegistry>(out var troopsRegistry) ||
+            !troopsRegistry.TryGet(ownerControllerId, out var pending) ||
+            !troopsRegistry.TryGetRevision(ownerControllerId, out var revision)) return;
 
-        var packed = troopRosterInterface.PackTroopRosterData(troops);
-        network.Send(peer, new NetworkAwaitingAlternativeSolutionTroopsDepositConfirmed(ownerId, packed));
+        var packed = troopRosterInterface.PackTroopRosterData(pending);
+        network.Send(peer, new NetworkAwaitingAlternativeSolutionTroopsDepositConfirmed(ownerId, packed, revision));
     }
 
     [HarmonyPatch(typeof(IssueManager), "CheckIfTroopsCanReturnToMainParty")]
@@ -108,14 +111,23 @@ internal class IssueManagerAlternativeSolutionTroopsPatches
         InformationManager.ShowInquiry(new InquiryData(string.Empty, textObject.ToString(), isAffirmativeOptionShown: true,
             isNegativeOptionShown: false, GameTexts.FindText("str_ok").ToString(), null, delegate
             {
-                MakeAlternativeTroopsReturn(troops);
-                MessageBroker.Instance.Publish(null, new AwaitingAlternativeSolutionTroopsDrainedLocally(localControllerId, troops));
-                if (ContainerProvider.TryResolve<IAwaitingAlternativeSolutionTroopsRegistry>(out var registryAtDrainTime))
-                {
-                    registryAtDrainTime.Withdraw(localControllerId, troops);
-                }
+                ReturnAwaitingTroops();
                 _inquiryInFlight = false;
             }, null), pauseGameActiveState: true);
+    }
+
+    internal static bool ReturnAwaitingTroops()
+    {
+        if (ModInformation.IsServer || MobileParty.MainParty == null) return false;
+        if (!ContainerProvider.TryResolve<IControllerIdProvider>(out var controllerIdProvider) ||
+            string.IsNullOrEmpty(controllerIdProvider.ControllerId)) return false;
+        if (!ContainerProvider.TryResolve<IAwaitingAlternativeSolutionTroopsRegistry>(out var troopsRegistry) ||
+            !troopsRegistry.TryGet(controllerIdProvider.ControllerId, out var troops)) return false;
+
+        MessageBroker.Instance.Publish(null,
+            new AwaitingAlternativeSolutionTroopsDrainedLocally(controllerIdProvider.ControllerId, troops));
+        _inquiryInFlight = false;
+        return true;
     }
 
     private static bool IsLocalMainHeroSafelyAvailable() => Game.Current?.PlayerTroop != null;
@@ -145,18 +157,5 @@ internal class IssueManagerAlternativeSolutionTroopsPatches
 
         textObject.SetTextVariable("NUMBER", troops.TotalManCount);
         return textObject;
-    }
-
-    private static void MakeAlternativeTroopsReturn(TroopRoster roster)
-    {
-        foreach (TroopRosterElement item in roster.GetTroopRoster())
-        {
-            if (item.Character.IsHero)
-            {
-                item.Character.HeroObject.ChangeState(Hero.CharacterStates.Active);
-            }
-        }
-
-        MobileParty.MainParty.MemberRoster.Add(roster);
     }
 }

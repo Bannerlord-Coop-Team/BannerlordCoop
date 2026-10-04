@@ -221,7 +221,7 @@ internal static class IssueGiveCatalog
 
         Wire("GangLeaderNeedsToOffloadStolenGoods", typeof(GangLeaderNeedsToOffloadStolenGoodsIssueBehavior.GangLeaderNeedsToOffloadStolenGoodsIssue), hero =>
         {
-            var hideout = AnyHideout();
+            var hideout = Settlement.All.FirstOrDefault(s => s.IsHideout && s.Hideout.IsInfested);
             return hideout == null
                 ? Fail("no hideout settlement exists in the current campaign")
                 : Ok(h => new GangLeaderNeedsToOffloadStolenGoodsIssueBehavior.GangLeaderNeedsToOffloadStolenGoodsIssue(h, hideout));

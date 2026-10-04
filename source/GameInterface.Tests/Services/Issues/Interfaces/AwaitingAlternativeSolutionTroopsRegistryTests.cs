@@ -88,4 +88,25 @@ public class AwaitingAlternativeSolutionTroopsRegistryTests
 
         Assert.False(registry.TryGet("player-A", out _));
     }
+
+    [Fact]
+    public void Revision_SurvivesRestoreAndChangesForAnIdenticalLaterDeposit()
+    {
+        var registry = new AwaitingAlternativeSolutionTroopsRegistry();
+        var x = NewCharacter();
+        registry.Deposit("player-A", Roster((x, 5)));
+        Assert.True(registry.TryGetRevision("player-A", out var firstRevision));
+
+        var saved = Assert.Single(registry.Snapshot());
+        registry.ClearAll();
+        registry.Restore(saved.OwnerControllerId, saved.Troops, saved.Revision);
+        Assert.True(registry.TryGetRevision("player-A", out var restoredRevision));
+        Assert.Equal(firstRevision, restoredRevision);
+
+        registry.Withdraw("player-A", saved.Troops);
+        Assert.False(registry.TryGetRevision("player-A", out _));
+        registry.Deposit("player-A", Roster((x, 5)));
+        Assert.True(registry.TryGetRevision("player-A", out var laterRevision));
+        Assert.NotEqual(firstRevision, laterRevision);
+    }
 }

@@ -1,9 +1,12 @@
 ﻿using Common.Messaging;
 using Common.Network;
 using Common.Util;
+using Coop.Core.Client.Services.Heroes.Messages;
 using E2E.Tests.Environment;
 using E2E.Tests.Environment.Instance;
+using GameInterface.Policies;
 using GameInterface.Services.Entity;
+using GameInterface.Services.Heroes.Messages;
 using GameInterface.Services.Issues.Generic;
 using GameInterface.Services.Issues.Interfaces;
 using GameInterface.Services.Issues.Messages;
@@ -40,7 +43,7 @@ public class AwaitingAlternativeSolutionTroopsTests : IDisposable
     public AwaitingAlternativeSolutionTroopsTests(ITestOutputHelper output)
     {
         TestQuestTypeFixture.EnsureVillageNeedsToolsRegistered();
-        TestEnvironment = new E2ETestEnvironment(output);
+        TestEnvironment = new E2ETestEnvironment(output, numClients: 1);
     }
 
     public void Dispose()
@@ -79,6 +82,7 @@ public class AwaitingAlternativeSolutionTroopsTests : IDisposable
                     hero.StayingInSettlement = settlement;
                     hero.Occupation = Occupation.RuralNotable;
                     AccessTools.Property(typeof(ItemObject), nameof(ItemObject.Value)).SetValue(item, 40);
+                    companion.CharacterObject.HeroObject = companion;
                     companion.ChangeState(Hero.CharacterStates.Disabled);
                 }
             });
@@ -150,6 +154,7 @@ public class AwaitingAlternativeSolutionTroopsTests : IDisposable
     {
         var controllerId = "player-A-" + Guid.NewGuid();
         int depositedManCount = 0;
+        string completedRevision = null;
 
         var fixture = SetupVillageOwner();
         CreateIssueOnBothPeers(fixture);
@@ -256,6 +261,14 @@ public class AwaitingAlternativeSolutionTroopsTests : IDisposable
             Assert.True(Server.Resolve<IAwaitingAlternativeSolutionTroopsRegistry>().TryGet(controllerId, out var serverDeposited));
             Assert.True(serverDeposited.TotalManCount >= 1);
             depositedManCount = serverDeposited.TotalManCount;
+            Assert.True(Server.Resolve<IAwaitingAlternativeSolutionTroopsRegistry>().TryGetRevision(controllerId, out completedRevision));
+        });
+        Client.Call(() =>
+        {
+            Assert.True(Client.Resolve<IAwaitingAlternativeSolutionTroopsRegistry>().TryGet(controllerId, out var confirmed));
+            Assert.Equal(depositedManCount, confirmed.TotalManCount);
+            Assert.True(Client.Resolve<IAwaitingAlternativeSolutionTroopsRegistry>().TryGetRevision(controllerId, out var revision));
+            Assert.Equal(completedRevision, revision);
         });
 
         Server.Call(() =>
@@ -274,17 +287,35 @@ public class AwaitingAlternativeSolutionTroopsTests : IDisposable
             Assert.Equal(depositedManCount, restored.TotalManCount);
         });
 
-        var clientPartyId = TestEnvironment.CreateRegisteredObject<MobileParty>();
         Client.Call(() =>
         {
-            Assert.True(Client.ObjectManager.TryGetObject<MobileParty>(clientPartyId, out var clientParty));
-            clientParty.IsActive = false;
+            Assert.True(Client.ObjectManager.TryGetObject<MobileParty>(partyId, out var clientParty));
             Campaign.Current.MainParty = clientParty;
+        });
+
+        Hero serverCompanion = null;
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject<Hero>(fixture.CompanionHeroId, out var companion));
+            Assert.Same(companion, companion.CharacterObject.HeroObject);
+            Assert.Equal(Hero.CharacterStates.Disabled, companion.HeroState);
+            Assert.False(CallOriginalPolicy.IsOriginalAllowed());
+            Assert.True(Server.Resolve<IAwaitingAlternativeSolutionTroopsRegistry>().TryGet(controllerId, out var pending));
+            var pendingCompanion = Assert.Single(pending.GetTroopRoster().Where(element => element.Character.IsHero));
+            Assert.Same(companion, pendingCompanion.Character.HeroObject);
+            serverCompanion = companion;
         });
 
         object capturedInquiry = null;
         var onShowInquiry = InquiryCaptureHandler.MakeDelegate(data => capturedInquiry = data);
         InquiryCaptureHandler.OnShowInquiryEvent.AddEventHandler(null, onShowInquiry);
+        var serverActivationMessagesBeforeDrain = Server.NetworkSentMessages.GetMessages<NetworkHeroStateChanged>()
+            .Count(message => message.HeroId == fixture.CompanionHeroId && message.HeroState == (int)Hero.CharacterStates.Active);
+        var clientActivationMessagesBeforeDrain = Client.InternalMessages.GetMessages<ChangeHeroState>()
+            .Count(message => message.HeroId == fixture.CompanionHeroId && message.HeroState == (int)Hero.CharacterStates.Active);
+        var serverActivationEventsBeforeDrain = Server.InternalMessages.GetMessages<HeroStateChanged>()
+            .Count(message => ReferenceEquals(message.Hero, serverCompanion)
+                && message.HeroState == (int)Hero.CharacterStates.Active);
         try
         {
             Client.Call(() =>
@@ -297,33 +328,119 @@ public class AwaitingAlternativeSolutionTroopsTests : IDisposable
 
             Assert.NotNull(capturedInquiry);
 
+            Server.Resolve<TestNetworkRouter>().ReceiveContext = TestNetworkReceiveContext.PollerThread;
             Client.Call(() => InquiryCaptureHandler.InvokeAffirmativeAction(capturedInquiry));
+            Server.PumpGameThread();
+            TestEnvironment.FlushCoalescer();
+            Client.PumpGameThread();
         }
         finally
         {
             InquiryCaptureHandler.OnShowInquiryEvent.RemoveEventHandler(null, onShowInquiry);
         }
 
+        Assert.Single(Client.NetworkSentMessages.GetMessages<RequestAwaitingAlternativeSolutionTroopsDrain>());
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject<MobileParty>(partyId, out var party));
+            Assert.True(Server.ObjectManager.TryGetObject<Hero>(fixture.CompanionHeroId, out var companion));
+            Assert.True(Server.ObjectManager.TryGetObject<CharacterObject>(eligibleTroopId, out var eligibleTroop));
+            Assert.Equal(1, party.MemberRoster.GetTroopCount(companion.CharacterObject));
+            Assert.Equal(6, party.MemberRoster.GetTroopCount(eligibleTroop));
+            Assert.Equal(Hero.CharacterStates.Active, companion.HeroState);
+            Assert.False(Server.Resolve<IAwaitingAlternativeSolutionTroopsRegistry>().TryGet(controllerId, out _));
+        });
+        Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkAwaitingAlternativeSolutionTroopsDrainConfirmed>());
+        Assert.True(Server.InternalMessages.GetMessages<HeroStateChanged>()
+            .Count(message => ReferenceEquals(message.Hero, serverCompanion)
+                && message.HeroState == (int)Hero.CharacterStates.Active)
+            > serverActivationEventsBeforeDrain, "Server did not publish companion activation");
+        Assert.True(Server.NetworkSentMessages.GetMessages<NetworkHeroStateChanged>()
+            .Count(message => message.HeroId == fixture.CompanionHeroId && message.HeroState == (int)Hero.CharacterStates.Active)
+            > serverActivationMessagesBeforeDrain, "Server did not broadcast companion activation");
+        Assert.True(Client.InternalMessages.GetMessages<ChangeHeroState>()
+            .Count(message => message.HeroId == fixture.CompanionHeroId && message.HeroState == (int)Hero.CharacterStates.Active)
+            > clientActivationMessagesBeforeDrain, "Client did not receive companion activation");
         Client.Call(() =>
         {
             Assert.True(Client.ObjectManager.TryGetObject<Hero>(fixture.CompanionHeroId, out var companion));
             Assert.Equal(Hero.CharacterStates.Active, companion.HeroState);
+        });
+        Client.Call(() =>
+        {
+            Assert.True(Client.ObjectManager.TryGetObject<Hero>(fixture.CompanionHeroId, out var companion));
+            Assert.True(Client.ObjectManager.TryGetObject<CharacterObject>(eligibleTroopId, out var eligibleTroop));
+            Assert.Equal(Hero.CharacterStates.Active, companion.HeroState);
 
-            Assert.True(Client.ObjectManager.TryGetObject<MobileParty>(clientPartyId, out var clientParty));
-            Assert.True(clientParty.MemberRoster.Contains(companion.CharacterObject));
+            Assert.True(Client.ObjectManager.TryGetObject<MobileParty>(partyId, out var clientParty));
+            Assert.Equal(1, clientParty.MemberRoster.GetTroopCount(companion.CharacterObject));
+            Assert.Equal(6, clientParty.MemberRoster.GetTroopCount(eligibleTroop));
 
             Assert.False(Client.Resolve<IAwaitingAlternativeSolutionTroopsRegistry>().TryGet(controllerId, out _));
         });
+        Server.Resolve<TestNetworkRouter>().ReceiveContext = TestNetworkReceiveContext.GameThread;
 
-        Assert.Single(Client.NetworkSentMessages.GetMessages<RequestAwaitingAlternativeSolutionTroopsDrain>());
+        Client.Call(() =>
+        {
+            Assert.True(Client.ObjectManager.TryGetObject<Hero>(fixture.CompanionHeroId, out var companion));
+            Assert.True(Client.ObjectManager.TryGetObject<CharacterObject>(eligibleTroopId, out var eligibleTroop));
+            var stalePending = TroopRoster.CreateDummyTroopRoster();
+            stalePending.AddToCounts(companion.CharacterObject, 1);
+            stalePending.AddToCounts(eligibleTroop, 6);
+            Client.Resolve<IAwaitingAlternativeSolutionTroopsRegistry>().Deposit(controllerId, stalePending);
+            MessageBroker.Instance.Publish(null, new AwaitingAlternativeSolutionTroopsDrainedLocally(controllerId, stalePending));
+        });
         Server.Call(() =>
         {
-            Assert.False(Server.Resolve<IAwaitingAlternativeSolutionTroopsRegistry>().TryGet(controllerId, out _));
+            Assert.True(Server.ObjectManager.TryGetObject<MobileParty>(partyId, out var party));
+            Assert.True(Server.ObjectManager.TryGetObject<Hero>(fixture.CompanionHeroId, out var companion));
+            Assert.True(Server.ObjectManager.TryGetObject<CharacterObject>(eligibleTroopId, out var eligibleTroop));
+            Assert.Equal(1, party.MemberRoster.GetTroopCount(companion.CharacterObject));
+            Assert.Equal(6, party.MemberRoster.GetTroopCount(eligibleTroop));
+        });
+        Assert.Equal(2, Server.NetworkSentMessages.GetMessages<NetworkAwaitingAlternativeSolutionTroopsDrainConfirmed>().Count());
+        Client.Call(() => Assert.False(Client.Resolve<IAwaitingAlternativeSolutionTroopsRegistry>().TryGet(controllerId, out _)));
+
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject<Hero>(fixture.CompanionHeroId, out var companion));
+            Assert.True(Server.ObjectManager.TryGetObject<CharacterObject>(eligibleTroopId, out var eligibleTroop));
+            var laterDeposit = TroopRoster.CreateDummyTroopRoster();
+            laterDeposit.AddToCounts(companion.CharacterObject, 1);
+            laterDeposit.AddToCounts(eligibleTroop, 6);
+            Server.Resolve<IAwaitingAlternativeSolutionTroopsRegistry>().Deposit(controllerId, laterDeposit);
+        });
+        Client.Call(() =>
+        {
+            Assert.True(Client.ObjectManager.TryGetObject<Hero>(fixture.CompanionHeroId, out var companion));
+            Assert.True(Client.ObjectManager.TryGetObject<CharacterObject>(eligibleTroopId, out var eligibleTroop));
+            var oldRequest = TroopRoster.CreateDummyTroopRoster();
+            oldRequest.AddToCounts(companion.CharacterObject, 1);
+            oldRequest.AddToCounts(eligibleTroop, 6);
+            Client.Resolve<IAwaitingAlternativeSolutionTroopsRegistry>().Restore(controllerId, oldRequest, completedRevision);
+            MessageBroker.Instance.Publish(null, new AwaitingAlternativeSolutionTroopsDrainedLocally(controllerId, oldRequest));
+        });
+        Server.Call(() =>
+        {
+            Assert.True(Server.Resolve<IAwaitingAlternativeSolutionTroopsRegistry>().TryGet(controllerId, out var laterDeposit));
+            Assert.Equal(7, laterDeposit.TotalManCount);
+            Assert.True(Server.Resolve<IAwaitingAlternativeSolutionTroopsRegistry>().TryGetRevision(controllerId, out var revision));
+            Assert.NotEqual(completedRevision, revision);
+        });
+        Assert.Equal(2, Server.NetworkSentMessages.GetMessages<NetworkAwaitingAlternativeSolutionTroopsDrainConfirmed>().Count());
+        TestEnvironment.FlushCoalescer();
+        Client.PumpGameThread();
+        Client.Call(() =>
+        {
+            Assert.True(Client.Resolve<IAwaitingAlternativeSolutionTroopsRegistry>().TryGet(controllerId, out var laterDeposit));
+            Assert.Equal(7, laterDeposit.TotalManCount);
+            Assert.True(Client.Resolve<IAwaitingAlternativeSolutionTroopsRegistry>().TryGetRevision(controllerId, out var revision));
+            Assert.NotEqual(completedRevision, revision);
         });
     }
 
     [Fact]
-    public void ClientOwnedAlternativeSolutionCompletion_ServerBroadcastsConfirmedDeposit_ClientsOwnHourlyTickDrainsItIntoMainParty()
+    public void ClientOwnedAlternativeSolutionCompletion_ServerBroadcastsConfirmedDeposit_HourlyTickRequestsAuthoritativeReturn()
     {
         var controllerId = "player-A-" + Guid.NewGuid();
 
@@ -394,13 +511,11 @@ public class AwaitingAlternativeSolutionTroopsTests : IDisposable
             Assert.True(deposited.TotalManCount >= 1);
         });
 
-        var clientPartyId = TestEnvironment.CreateRegisteredObject<MobileParty>();
         Client.Call(() =>
         {
-            Assert.True(Client.ObjectManager.TryGetObject<MobileParty>(clientPartyId, out var clientParty));
+            Assert.True(Client.ObjectManager.TryGetObject<MobileParty>(partyId, out var clientParty));
             using (new AllowedThread())
             {
-                clientParty.IsActive = false;
                 Campaign.Current.MainParty = clientParty;
             }
         });
@@ -425,11 +540,26 @@ public class AwaitingAlternativeSolutionTroopsTests : IDisposable
             InquiryCaptureHandler.OnShowInquiryEvent.RemoveEventHandler(null, onShowInquiry);
         }
 
+        Assert.Single(Client.NetworkSentMessages.GetMessages<RequestAwaitingAlternativeSolutionTroopsDrain>());
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject<MobileParty>(partyId, out var party));
+            Assert.True(Server.ObjectManager.TryGetObject<Hero>(fixture.CompanionHeroId, out var companion));
+            Assert.True(Server.ObjectManager.TryGetObject<CharacterObject>(eligibleTroopId, out var eligibleTroop));
+            Assert.Equal(1, party.MemberRoster.GetTroopCount(companion.CharacterObject));
+            Assert.Equal(6, party.MemberRoster.GetTroopCount(eligibleTroop));
+            Assert.Equal(Hero.CharacterStates.Active, companion.HeroState);
+            Assert.False(Server.Resolve<IAwaitingAlternativeSolutionTroopsRegistry>().TryGet(controllerId, out _));
+        });
+        Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkAwaitingAlternativeSolutionTroopsDrainConfirmed>());
+        TestEnvironment.FlushCoalescer();
         Client.Call(() =>
         {
             Assert.True(Client.ObjectManager.TryGetObject<Hero>(fixture.CompanionHeroId, out var companion));
-            Assert.True(Client.ObjectManager.TryGetObject<MobileParty>(clientPartyId, out var clientParty));
-            Assert.True(clientParty.MemberRoster.Contains(companion.CharacterObject));
+            Assert.True(Client.ObjectManager.TryGetObject<CharacterObject>(eligibleTroopId, out var eligibleTroop));
+            Assert.True(Client.ObjectManager.TryGetObject<MobileParty>(partyId, out var clientParty));
+            Assert.Equal(1, clientParty.MemberRoster.GetTroopCount(companion.CharacterObject));
+            Assert.Equal(6, clientParty.MemberRoster.GetTroopCount(eligibleTroop));
 
             Assert.False(Client.Resolve<IAwaitingAlternativeSolutionTroopsRegistry>().TryGet(controllerId, out _));
         });
@@ -558,6 +688,45 @@ public class AwaitingAlternativeSolutionTroopsTests : IDisposable
         {
             Assert.False(Client.Resolve<IAwaitingAlternativeSolutionTroopsRegistry>().TryGet(controllerId, out _));
         });
+
+        var pendingTroopId = TestEnvironment.CreateRegisteredObject<CharacterObject>();
+        string confirmedRevision = null;
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject<CharacterObject>(pendingTroopId, out var pendingTroop));
+            var confirmedTroops = TroopRoster.CreateDummyTroopRoster();
+            confirmedTroops.AddToCounts(pendingTroop, 2);
+            var registry = Server.Resolve<IAwaitingAlternativeSolutionTroopsRegistry>();
+            registry.Deposit(controllerId, confirmedTroops);
+            Assert.True(registry.TryGetRevision(controllerId, out confirmedRevision));
+        });
+        Client.Call(() =>
+        {
+            Assert.True(Client.ObjectManager.TryGetObject<Hero>(fixture.HeroId, out var owner));
+            Assert.True(Client.ObjectManager.TryGetObject<CharacterObject>(pendingTroopId, out var pendingTroop));
+            var confirmedTroops = TroopRoster.CreateDummyTroopRoster();
+            confirmedTroops.AddToCounts(pendingTroop, 2);
+            var speculativeTroops = TroopRoster.CreateDummyTroopRoster();
+            speculativeTroops.AddToCounts(pendingTroop, 1);
+            var registry = Client.Resolve<IAwaitingAlternativeSolutionTroopsRegistry>();
+            registry.Restore(controllerId, confirmedTroops, confirmedRevision);
+            registry.Deposit(controllerId, speculativeTroops);
+            MessageBroker.Instance.Publish(owner,
+                new AwaitingAlternativeSolutionTroopsDepositedLocally(owner, controllerId, speculativeTroops));
+        });
+        Server.Call(() =>
+        {
+            Assert.True(Server.Resolve<IAwaitingAlternativeSolutionTroopsRegistry>().TryGet(controllerId, out var pending));
+            Assert.Equal(2, pending.TotalManCount);
+        });
+        Client.Call(() =>
+        {
+            var registry = Client.Resolve<IAwaitingAlternativeSolutionTroopsRegistry>();
+            Assert.True(registry.TryGet(controllerId, out var pending));
+            Assert.Equal(2, pending.TotalManCount);
+            Assert.True(registry.TryGetRevision(controllerId, out var revision));
+            Assert.Equal(confirmedRevision, revision);
+        });
     }
 
     [Fact]
@@ -600,32 +769,30 @@ public class AwaitingAlternativeSolutionTroopsTests : IDisposable
     }
 
     [Fact]
-    public void OnHourlyTick_ListenServerHostOwnsAwaitingTroops_DrainsThemBackIntoMainParty()
+    public void OnHourlyTick_DedicatedServerLeavesAwaitingTroopsForTheOwner()
     {
         var fixture = SetupVillageOwner();
         CreateIssueOnBothPeers(fixture);
 
-        string serverControllerId = null;
+        var controllerId = "player-A-" + Guid.NewGuid();
+        var partyId = TestEnvironment.CreateRegisteredObject<MobileParty>();
         Server.Call(() =>
         {
             Assert.True(Server.ObjectManager.TryGetObject<Hero>(fixture.HeroId, out var owner));
             Assert.True(Server.ObjectManager.TryGetObject<Hero>(fixture.CompanionHeroId, out var companion));
-            Assert.NotNull(Game.Current?.PlayerTroop);
-            Assert.NotNull(MobileParty.MainParty);
-
-            serverControllerId = "host-" + Guid.NewGuid();
-            Server.Resolve<IControllerIdProvider>().SetControllerId(serverControllerId);
-            Server.Resolve<IIssueOwnershipRegistry>().SetOwner(owner, serverControllerId);
+            Assert.True(Server.Resolve<IPlayerManager>().AddPlayer(
+                new Player(controllerId, fixture.HeroId, partyId, "", "")));
+            Server.Resolve<IIssueOwnershipRegistry>().SetOwner(owner, controllerId);
 
             var roster = TroopRoster.CreateDummyTroopRoster();
             using (new AllowedThread())
             {
                 roster.AddToCounts(companion.CharacterObject, 1);
             }
-            Server.Resolve<IAwaitingAlternativeSolutionTroopsRegistry>().Deposit(serverControllerId, roster);
-
-            if (Hero.MainHero.IsPrisoner) Hero.MainHero.ChangeState(Hero.CharacterStates.Active);
+            Server.Resolve<IAwaitingAlternativeSolutionTroopsRegistry>().Deposit(controllerId, roster);
         });
+        TestEnvironment.ConnectRegisteredPlayer(Client, controllerId);
+        Client.Resolve<IControllerIdProvider>().SetControllerId(controllerId);
 
         object capturedInquiry = null;
         var onShowInquiry = InquiryCaptureHandler.MakeDelegate(data => capturedInquiry = data);
@@ -634,27 +801,34 @@ public class AwaitingAlternativeSolutionTroopsTests : IDisposable
         {
             Server.Call(() =>
             {
-                new IssuesCampaignBehavior().RegisterEvents();
-                CampaignEvents.Instance.HourlyTick();
+                var previousPlayerTroop = Game.Current.PlayerTroop;
+                var previousMainParty = Campaign.Current.MainParty;
+                Game.Current.PlayerTroop = null;
+                Campaign.Current.MainParty = null;
+                try
+                {
+                    Assert.Null(Game.Current.PlayerTroop);
+                    Assert.Null(MobileParty.MainParty);
+                    new IssuesCampaignBehavior().RegisterEvents();
+                    CampaignEvents.Instance.HourlyTick();
+                    Assert.Null(capturedInquiry);
+                    Assert.False(IssueManagerAlternativeSolutionTroopsPatches.ReturnAwaitingTroops());
+                    Assert.True(Server.ObjectManager.TryGetObject<Hero>(fixture.CompanionHeroId, out var companion));
+                    Assert.Equal(Hero.CharacterStates.Disabled, companion.HeroState);
+                    Assert.True(Server.Resolve<IAwaitingAlternativeSolutionTroopsRegistry>().TryGet(controllerId, out var pending));
+                    Assert.Equal(1, pending.TotalManCount);
+                }
+                finally
+                {
+                    Campaign.Current.MainParty = previousMainParty;
+                    Game.Current.PlayerTroop = previousPlayerTroop;
+                }
             });
-
-            Assert.NotNull(capturedInquiry);
-
-            Server.Call(() => InquiryCaptureHandler.InvokeAffirmativeAction(capturedInquiry));
         }
         finally
         {
             InquiryCaptureHandler.OnShowInquiryEvent.RemoveEventHandler(null, onShowInquiry);
         }
-
-        Server.Call(() =>
-        {
-            Assert.True(Server.ObjectManager.TryGetObject<Hero>(fixture.CompanionHeroId, out var companion));
-            Assert.Equal(Hero.CharacterStates.Active, companion.HeroState);
-            Assert.True(MobileParty.MainParty.MemberRoster.Contains(companion.CharacterObject));
-
-            Assert.False(Server.Resolve<IAwaitingAlternativeSolutionTroopsRegistry>().TryGet(serverControllerId, out _));
-        });
     }
 
     [Fact]

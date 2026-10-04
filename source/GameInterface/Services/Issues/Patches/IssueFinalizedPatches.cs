@@ -1,11 +1,14 @@
-using Common;
+﻿using Common;
 using Common.Messaging;
+using Common.Logging;
 using GameInterface.Policies;
 using GameInterface.Services.Issues.Generic;
 using GameInterface.Services.Issues.Interfaces;
 using GameInterface.Services.Issues.Messages;
 using GameInterface.Services.ObjectManager;
 using HarmonyLib;
+using Serilog;
+using System;
 using System.Collections.Generic;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Issues;
@@ -23,6 +26,7 @@ internal class IssueManagerQuestCompletedReasonCapture
     {
         if (quest?.QuestGiver == null) return;
         if (!DisableAllIssueBehaviorsExceptAllowlist.IsAllowlisted(quest.QuestGiver.Issue)) return;
+        if (PendingReasons.TryGetValue(quest.QuestGiver, out var pending) && pending == IssueFinalizeReason.RejectedAccept) return;
 
         PendingReasons[quest.QuestGiver] = detail switch
         {
@@ -39,12 +43,41 @@ internal class IssueManagerQuestCompletedReasonCapture
 [HarmonyPatch(typeof(IssueBase), nameof(IssueBase.IssueFinalized))]
 internal class IssueFinalizedOwnershipGatePatch
 {
+    private static readonly ILogger Logger = LogManager.GetLogger<IssueFinalizedOwnershipGatePatch>();
+    internal static string LastServerTrace { get; private set; }
+
     [HarmonyPrefix]
     internal static bool Prefix(IssueBase __instance)
     {
         if (!DisableAllIssueBehaviorsExceptAllowlist.IsAllowlisted(__instance)) return true;
 
-        return IssueFinalizeAuthorityGuard.IsActive || CallOriginalPolicy.IsOriginalAllowedForOwnershipGate();
+        var allowed = IssueFinalizeAuthorityGuard.IsActive || CallOriginalPolicy.IsOriginalAllowedForOwnershipGate();
+        if (ModInformation.IsServer)
+        {
+            var stack = Environment.StackTrace;
+            LastServerTrace = $"issue={__instance.StringId} allowed={allowed} quest={__instance.IssueQuest?.StringId} stack={stack.Replace(Environment.NewLine, " | ")}";
+            Logger.Information("Issue finalization for {Issue} allowed={Allowed} quest={Quest} stack={Stack}",
+                __instance.StringId, allowed, __instance.IssueQuest?.StringId, stack);
+        }
+        return allowed;
+    }
+}
+
+[HarmonyPatch(typeof(QuestManager), nameof(QuestManager.OnQuestFinalized))]
+internal class IssueQuestFinalizedTracePatch
+{
+    private static readonly ILogger Logger = LogManager.GetLogger<IssueQuestFinalizedTracePatch>();
+    internal static string LastServerTrace { get; private set; }
+
+    [HarmonyPrefix]
+    private static void Prefix(QuestBase quest)
+    {
+        if (ModInformation.IsClient ||
+            quest is not GangLeaderNeedsToOffloadStolenGoodsIssueBehavior.GangLeaderNeedsToOffloadStolenGoodsIssueQuest) return;
+        var stack = Environment.StackTrace;
+        LastServerTrace = $"quest={quest.StringId} ongoing={quest.IsOngoing} issue={quest.QuestGiver?.Issue?.StringId} stack={stack.Replace(Environment.NewLine, " | ")}";
+        Logger.Information("Quest manager finalizing {Quest} ongoing={Ongoing} issue={Issue} stack={Stack}",
+            quest.StringId, quest.IsOngoing, quest.QuestGiver?.Issue?.StringId, stack);
     }
 }
 

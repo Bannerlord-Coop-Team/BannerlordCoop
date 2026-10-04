@@ -1,3 +1,4 @@
+﻿using Common.Commands;
 using Common.Messaging;
 using Common.Util;
 using E2E.Tests.Environment;
@@ -6,6 +7,7 @@ using E2E.Tests.Util;
 using GameInterface.Policies;
 using GameInterface.Services.Entity;
 using GameInterface.Services.Heroes.Patches;
+using GameInterface.Services.Issues.Commands;
 using GameInterface.Services.Issues.Generic;
 using GameInterface.Services.Issues.Generic.AcceptMirror;
 using GameInterface.Services.Issues.Generic.Migrated.GangLeaderNeedsToOffloadStolenGoods;
@@ -267,6 +269,14 @@ public class GangLeaderNeedsToOffloadStolenGoodsIssueTests : IDisposable
 
         CreateIssueOnServer(fixture);
 
+        string serverIssueId = null;
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject<Hero>(fixture.HeroId, out var owner));
+            Assert.StartsWith("issue_", owner.Issue.StringId);
+            serverIssueId = owner.Issue.StringId;
+        });
+
         var created = Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkGangLeaderStolenGoodsIssueCreated>());
         Assert.Equal(fixture.HeroId, created.OwnerId);
         Assert.Equal(fixture.IssueHideoutSettlementId, created.IssueHideoutId);
@@ -279,6 +289,7 @@ public class GangLeaderNeedsToOffloadStolenGoodsIssueTests : IDisposable
             {
                 Assert.True(client.ObjectManager.TryGetObject<Hero>(fixture.HeroId, out var owner));
                 var mirrored = Assert.IsType<GangLeaderNeedsToOffloadStolenGoodsIssueBehavior.GangLeaderNeedsToOffloadStolenGoodsIssue>(owner.Issue);
+                Assert.Equal(serverIssueId, mirrored.StringId);
 
                 Assert.True(client.ObjectManager.TryGetObject<Settlement>(fixture.IssueHideoutSettlementId, out var issueHideoutSettlement));
                 Assert.True(client.ObjectManager.TryGetObject<Hero>(fixture.CounterOfferHeroId, out var counterOfferHero));
@@ -286,6 +297,62 @@ public class GangLeaderNeedsToOffloadStolenGoodsIssueTests : IDisposable
                 Assert.Same(issueHideoutSettlement, mirrored._issueHideout);
                 Assert.Equal(0, mirrored._randomForStolenTradeGood);
                 Assert.Same(counterOfferHero, mirrored.CounterOfferHero);
+            });
+        }
+    }
+
+    [Fact]
+    public void StageAcceptThenReset_RemovesTheSameIssueFromServerAndClients()
+    {
+        var fixture = SetupIssueOwner();
+        string issueId = null;
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject<Hero>(fixture.HeroId, out var owner));
+            Assert.True(Server.ObjectManager.TryGetObject<Settlement>(fixture.OwnerSettlementId, out var settlement));
+            Assert.True(Server.ObjectManager.TryGetObject<Settlement>(fixture.IssueHideoutSettlementId, out var hideout));
+            using (new AllowedThread())
+            {
+                settlement.Town.Security = 50f;
+                settlement.CollectNotablesToCache();
+                RegisterHideoutWithCampaign(hideout.Hideout);
+                Campaign.Current.CampaignObjectManager.Settlements =
+                    new MBList<Settlement>(Campaign.Current.CampaignObjectManager.Settlements) { hideout };
+            }
+
+            var args = new CoopCommandArgsFactory().FromValues(new[] { fixture.HeroId });
+            var staged = new IssuesDebugCommand.IssuesStageAcceptCoopCommand().ProcessCommand(args);
+            Assert.Contains("Staged unaccepted", staged.Output);
+            Assert.Contains($"settlement '{settlement.StringId}'", staged.Output);
+            issueId = owner.Issue.StringId;
+            Assert.StartsWith("issue_", issueId);
+        });
+
+        foreach (var client in TestEnvironment.Clients)
+        {
+            client.Call(() =>
+            {
+                Assert.True(client.ObjectManager.TryGetObject<Hero>(fixture.HeroId, out var owner));
+                Assert.Equal(issueId, owner.Issue.StringId);
+            });
+        }
+
+        Server.Call(() =>
+        {
+            var args = new CoopCommandArgsFactory().FromValues(new[] { fixture.HeroId });
+            var reset = new IssuesDebugCommand.IssuesResetAcceptCoopCommand().ProcessCommand(args);
+            Assert.Contains("Reset staged issue", reset.Output);
+            Assert.True(Server.ObjectManager.TryGetObject<Hero>(fixture.HeroId, out var owner));
+            Assert.Null(owner.Issue);
+        });
+
+        Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkIssueRemoved>());
+        foreach (var client in TestEnvironment.Clients)
+        {
+            client.Call(() =>
+            {
+                Assert.True(client.ObjectManager.TryGetObject<Hero>(fixture.HeroId, out var owner));
+                Assert.Null(owner.Issue);
             });
         }
     }
@@ -352,6 +419,51 @@ public class GangLeaderNeedsToOffloadStolenGoodsIssueTests : IDisposable
         });
 
         Assert.Empty(Client.NetworkSentMessages.GetMessages<NetworkGangLeaderStolenGoodsIssueCreated>());
+    }
+
+    [Fact]
+    public void OpenAccept_ReportsTrackedConversationBeforeQuestHasAnOwner()
+    {
+        var fixture = SetupIssueOwner();
+        CreateIssueOnServer(fixture);
+        var partyId = TestEnvironment.CreateRegisteredObject<MobileParty>();
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject<MobileParty>(partyId, out var party));
+            Assert.True(Server.ObjectManager.TryGetObject<Settlement>(fixture.OwnerSettlementId, out var settlement));
+            using (new AllowedThread()) { party.CurrentSettlement = settlement; }
+            Assert.True(Server.Resolve<IPlayerManager>().AddPlayer(
+                new Player("player-A", fixture.HeroId, partyId, "", "")));
+        });
+        TestEnvironment.ConnectRegisteredPlayer(Client, "player-A");
+        Client.Resolve<IControllerIdProvider>().SetControllerId("player-A");
+
+        var args = new CoopCommandArgsFactory().FromValues(new[] { fixture.HeroId, "player-A" });
+        Client.Call(() =>
+        {
+            var before = new IssuesDebugCommand.IssuesObserveAcceptCoopCommand().ProcessCommand(args);
+            Assert.Contains("trackedConversationGeneration=none", before.Output);
+            var opened = new IssuesDebugCommand.IssuesOpenAcceptCoopCommand().ProcessCommand(
+                new CoopCommandArgsFactory().FromValues(new[] { fixture.HeroId }));
+            Assert.True(opened.Succeeded, opened.Output);
+        });
+
+        Server.Call(() =>
+        {
+            Assert.True(Server.Resolve<IIssueConversationTracker>().TryGetTrackedRequester(
+                fixture.HeroId, "player-A", out var generation));
+            var observed = new IssuesDebugCommand.IssuesObserveAcceptCoopCommand().ProcessCommand(args);
+            Assert.Contains($"trackedConversationGeneration={generation}", observed.Output);
+            Assert.Contains("controller=none", observed.Output);
+        });
+        Client.Call(() =>
+        {
+            Assert.True(Client.Resolve<IIssueConversationTracker>().TryGetTrackedRequester(
+                fixture.HeroId, "player-A", out var generation));
+            var observed = new IssuesDebugCommand.IssuesObserveAcceptCoopCommand().ProcessCommand(args);
+            Assert.Contains($"trackedConversationGeneration={generation}", observed.Output);
+            Assert.Contains("controller=none", observed.Output);
+        });
     }
 
     [Fact]
@@ -543,6 +655,7 @@ public class GangLeaderNeedsToOffloadStolenGoodsIssueTests : IDisposable
         Server.Call(() =>
         {
             Assert.True(Server.ObjectManager.TryGetObject<Hero>(fixture.HeroId, out var owner));
+            Assert.False(QuestSolutionStartRunner.HasRegisteredQuest(owner));
             Assert.True(Server.Resolve<IIssueGenerationRegistry>().TryGetGeneration(owner, out generation));
             Server.Resolve<IMessageBroker>().Publish(Client.NetPeer, new RequestQuestTypeAcceptQuest(fixture.HeroId, generation));
         });
@@ -552,7 +665,9 @@ public class GangLeaderNeedsToOffloadStolenGoodsIssueTests : IDisposable
         Server.Call(() =>
         {
             Assert.True(Server.ObjectManager.TryGetObject<Hero>(fixture.HeroId, out var owner));
+            Assert.True(QuestSolutionStartRunner.HasRegisteredQuest(owner));
             var quest = Assert.IsType<GangLeaderNeedsToOffloadStolenGoodsIssueBehavior.GangLeaderNeedsToOffloadStolenGoodsIssueQuest>(owner.Issue.IssueQuest);
+            Assert.Equal(owner.Issue.StringId + "_quest", quest.StringId);
             Assert.Contains(quest, Campaign.Current.QuestManager.Quests);
             Assert.NotNull(quest._playerStartsQuestLog);
 
@@ -576,6 +691,63 @@ public class GangLeaderNeedsToOffloadStolenGoodsIssueTests : IDisposable
             client.Call(() =>
             {
                 Assert.True(client.ObjectManager.TryGetObject<Hero>(fixture.HeroId, out var owner));
+                Assert.Null(owner.Issue);
+            });
+        }
+    }
+
+    private static bool SkipServerGangLeaderQuestStart(QuestBase __instance) =>
+        Common.ModInformation.IsClient ||
+        __instance is not GangLeaderNeedsToOffloadStolenGoodsIssueBehavior.GangLeaderNeedsToOffloadStolenGoodsIssueQuest;
+
+    [Fact]
+    public void RequestQuestTypeAcceptQuest_QuestNotRegistered_RemovesIssueOnEveryPeer()
+    {
+        var fixture = SetupIssueOwner();
+        CreateIssueOnServer(fixture);
+
+        var partyId = TestEnvironment.CreateRegisteredObject<MobileParty>();
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject<MobileParty>(partyId, out var party));
+            Assert.True(Server.ObjectManager.TryGetObject<Settlement>(fixture.OwnerSettlementId, out var settlement));
+            using (new AllowedThread()) party.CurrentSettlement = settlement;
+            Assert.True(Server.Resolve<IPlayerManager>().AddPlayer(new Player("player-A", fixture.HeroId, partyId, "", "")));
+        });
+        TestEnvironment.ConnectRegisteredPlayer(Client, "player-A");
+        OpenConversation(Client, fixture.HeroId, "player-A");
+
+        var harmony = new Harmony($"e2e.gang-leader-quest-start.{Guid.NewGuid():N}");
+        try
+        {
+            harmony.Patch(
+                AccessTools.Method(typeof(QuestBase), nameof(QuestBase.StartQuest)),
+                prefix: new HarmonyMethod(typeof(GangLeaderNeedsToOffloadStolenGoodsIssueTests), nameof(SkipServerGangLeaderQuestStart)));
+
+            Server.Call(() =>
+            {
+                Assert.True(Server.ObjectManager.TryGetObject<Hero>(fixture.HeroId, out var owner));
+                Assert.True(Server.Resolve<IIssueGenerationRegistry>().TryGetGeneration(owner, out var generation));
+                Server.Resolve<IMessageBroker>().Publish(Client.NetPeer, new RequestQuestTypeAcceptQuest(fixture.HeroId, generation));
+            });
+        }
+        finally
+        {
+            harmony.UnpatchAll(harmony.Id);
+        }
+
+        Assert.Empty(Server.NetworkSentMessages.GetMessages<NetworkQuestTypeQuestAccepted>());
+        Assert.Equal(IssueFinalizeReason.RejectedAccept,
+            Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkIssueRemoved>()).Reason);
+        Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkQuestTypeAcceptRejected>());
+        Server.Call(() => Assert.DoesNotContain(
+            Campaign.Current.QuestManager.TrackedObjects.Values.SelectMany(quests => quests),
+            quest => quest.StringId.EndsWith("_quest") && quest.QuestGiver.StringId == fixture.HeroId));
+        foreach (var instance in AllInstances)
+        {
+            instance.Call(() =>
+            {
+                Assert.True(instance.ObjectManager.TryGetObject<Hero>(fixture.HeroId, out var owner));
                 Assert.Null(owner.Issue);
             });
         }
