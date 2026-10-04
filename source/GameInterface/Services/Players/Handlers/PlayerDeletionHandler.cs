@@ -7,6 +7,7 @@ using GameInterface.CoopSessionData;
 using GameInterface.Services.Actions.Patches;
 using GameInterface.Services.MapEvents.Messages.Leave;
 using GameInterface.Services.ObjectManager;
+using GameInterface.Services.Issues.Interfaces;
 using GameInterface.Services.Players.Data;
 using GameInterface.Services.Players.Messages;
 using GameInterface.Services.SiegeEvents.Interfaces;
@@ -35,6 +36,7 @@ internal class PlayerDeletionHandler : IHandler
     private readonly IPlayerManager playerManager;
     private readonly ISiegeEventInterface siegeEventInterface;
     private readonly ICoopSessionProvider sessionProvider;
+    private readonly IHeadmanHerdQuestAuthority herdQuestAuthority;
 
     public PlayerDeletionHandler(
         IMessageBroker messageBroker,
@@ -42,7 +44,8 @@ internal class PlayerDeletionHandler : IHandler
         IObjectManager objectManager,
         IPlayerManager playerManager,
         ISiegeEventInterface siegeEventInterface,
-        ICoopSessionProvider sessionProvider)
+        ICoopSessionProvider sessionProvider,
+        IHeadmanHerdQuestAuthority herdQuestAuthority)
     {
         this.messageBroker = messageBroker;
         this.network = network;
@@ -50,6 +53,7 @@ internal class PlayerDeletionHandler : IHandler
         this.playerManager = playerManager;
         this.siegeEventInterface = siegeEventInterface;
         this.sessionProvider = sessionProvider;
+        this.herdQuestAuthority = herdQuestAuthority;
 
         messageBroker.Subscribe<PlayerDeleteRequested>(Handle_PlayerDeleteRequested);
         messageBroker.Subscribe<NetworkRequestDeletePlayer>(Handle_NetworkRequestDeletePlayer);
@@ -160,6 +164,8 @@ internal class PlayerDeletionHandler : IHandler
 
         Logger.Information("Deleting player {ControllerId} (hero {HeroId})",
             player.ControllerId, player.HeroId);
+
+        herdQuestAuthority.CancelForPlayerRemoval(player.ControllerId);
 
         if (peer != null) messageBroker.Publish(this, new PlayerDeletionStarted(peer));
 

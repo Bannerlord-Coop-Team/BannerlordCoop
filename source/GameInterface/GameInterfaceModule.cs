@@ -216,6 +216,21 @@ public class GameInterfaceModule : Module
         builder.RegisterModule<global::GameInterface.Services.LiveTesting.LiveTestUiModule>();
 #endif
         builder.RegisterModule<ServiceModule>();
+        builder.RegisterInstance(Services.Issues.Generic.Migrated.GangLeaderNeedsToOffloadStolenGoods.GangLeaderNeedsToOffloadStolenGoodsQuestType.OwnerTraitXpProgress);
+        builder.RegisterType<Services.Issues.Interfaces.QuestOwnerTraitXp>()
+            .As<Services.Issues.Interfaces.IQuestOwnerTraitXp>().InstancePerDependency();
+        builder.RegisterType<Services.Issues.Interfaces.HeadmanHerdPersonalOwnership>()
+            .As<Services.Issues.Interfaces.IHeadmanHerdPersonalOwnership>().SingleInstance();
+        builder.RegisterType<Services.Issues.Interfaces.HeadmanHerdGenerationContext>()
+            .As<Services.Issues.Interfaces.IHeadmanHerdGenerationContext>().InstancePerDependency();
+        builder.RegisterType<Services.Issues.Interfaces.HeadmanHerdDeliveryInterface>()
+            .As<Services.Issues.Interfaces.IHeadmanHerdDeliveryInterface>().InstancePerDependency();
+        builder.RegisterType<Services.Issues.Interfaces.HeadmanHerdQuestAuthority>()
+            .As<Services.Issues.Interfaces.IHeadmanHerdQuestAuthority>().InstancePerDependency();
+        builder.RegisterType<Services.Issues.Interfaces.HeadmanNeedsToDeliverAHerdIssueInterface>()
+            .As<Services.Issues.Interfaces.IHeadmanNeedsToDeliverAHerdIssueInterface>().InstancePerDependency();
+        builder.RegisterType<Services.Issues.Interfaces.HeadmanNeedsToDeliverAHerdAcceptInterface>()
+            .As<Services.Issues.Interfaces.IHeadmanNeedsToDeliverAHerdAcceptInterface>().InstancePerDependency();
         builder.RegisterModule<ObjectManagerModule>();
         builder.RegisterModule<RegistryModule>();
         builder.RegisterModule<AutoSyncModule>();

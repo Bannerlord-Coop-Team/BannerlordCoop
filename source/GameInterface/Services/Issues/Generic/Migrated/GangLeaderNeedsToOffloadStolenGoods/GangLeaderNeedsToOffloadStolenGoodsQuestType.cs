@@ -1,4 +1,4 @@
-using Common;
+﻿using Common;
 using Common.Messaging;
 using Common.Network;
 using Common.Util;
@@ -334,25 +334,9 @@ internal static class GangLeaderNeedsToOffloadStolenGoodsQuestType
 
     private static void ApplyOwnerTraitXp(Hero owner, TraitObject trait, int xpValue)
     {
-        if (owner == null) return;
-
-        if (!OwnerTraitXpProgress.TryGet(owner, out var progress))
-        {
-            progress = new PropertyOwner<PropertyObject>();
-        }
-        var traitLevelBefore = owner.GetTraitLevel(trait);
-        if (progress.GetPropertyValue(trait) == 0)
-        {
-            progress.SetPropertyValue(trait, Campaign.Current.Models.CharacterDevelopmentModel.GetTraitXpRequiredForTraitLevel(trait, traitLevelBefore));
-        }
-        Campaign.Current.Models.CharacterDevelopmentModel.GetTraitLevelForTraitXp(
-            owner, trait, xpValue + progress.GetPropertyValue(trait), out var traitLevel, out var traitXp);
-        progress.SetPropertyValue(trait, traitXp);
-        OwnerTraitXpProgress.Set(owner, progress);
-        if (traitLevel != traitLevelBefore)
-        {
-            owner.SetTraitLevel(trait, traitLevel);
-        }
+        if (!ContainerProvider.TryResolve<IQuestOwnerTraitXp>(out var traits))
+            throw new InvalidOperationException("Quest owner trait XP service is unavailable");
+        traits.Apply(owner, trait, xpValue);
     }
 
     internal static void ApplyAlternativeSolutionSuccessConsequence(Issue issue)

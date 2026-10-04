@@ -1,4 +1,4 @@
-using Common.Util;
+﻿using Common.Util;
 using GameInterface.Services.Issues.Interfaces;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Roster;
@@ -18,6 +18,23 @@ public class AwaitingAlternativeSolutionTroopsRegistryTests
             roster.AddToCounts(character, number, false, 0, 0, true);
         }
         return roster;
+    }
+
+    [Fact]
+    public void DepositPreservesXpAwardedAfterTheNativeRosterCacheWasRead()
+    {
+        var registry = new AwaitingAlternativeSolutionTroopsRegistry();
+        var character = NewCharacter();
+        var troops = Roster((character, 3));
+        Assert.Equal(0, troops.GetTroopRoster()[0].Xp);
+        troops.SetElementXp(0, 420);
+
+        registry.Deposit("player-A", troops);
+
+        Assert.True(registry.TryGet("player-A", out var returned));
+        Assert.Equal(3, returned.GetTroopCount(character));
+        Assert.Equal(420, returned.GetElementXp(0));
+        Assert.False(registry.TryGet("player-B", out _));
     }
 
     [Fact]

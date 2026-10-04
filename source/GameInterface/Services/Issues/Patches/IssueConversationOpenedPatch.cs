@@ -1,6 +1,7 @@
-using Common.Messaging;
+﻿using Common.Messaging;
 using GameInterface.Services.Entity;
 using GameInterface.Services.Issues.Generic;
+using GameInterface.Services.Issues.Generic.Dispatch;
 using GameInterface.Services.Issues.Messages;
 using HarmonyLib;
 using TaleWorlds.CampaignSystem;
@@ -14,6 +15,7 @@ internal class IssueConversationOpenedPatch
     [HarmonyPostfix]
     private static void Postfix()
     {
+        GenericQuestTypeAlternativePickerPatch.BeginSelection();
         var issueGiver = Hero.OneToOneConversationHero;
         if (issueGiver?.Issue == null) return;
         var descriptor = QuestTypeRegistry.Get(issueGiver.Issue);

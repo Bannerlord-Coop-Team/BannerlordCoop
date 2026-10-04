@@ -6,6 +6,7 @@ using Coop.Core.Server.Connections;
 using Coop.Core.Server.Connections.Messages;
 using Coop.Core.Server.Connections.States;
 using Coop.Tests.Mocks;
+using GameInterface.Services.Issues.Interfaces;
 using GameInterface.Services.Modules;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Players;
@@ -374,6 +375,11 @@ namespace Coop.Tests.Server.Connections.States
                 })
                 .Returns(true);
 
+            var herdAuthority = serverComponent.Container.Resolve<Mock<IHeadmanHerdQuestAuthority>>();
+            playerManagerMock.Setup(value => value.RemovePlayer(player))
+                .Callback(() => herdAuthority.Verify(value => value.CancelForPlayerRemoval(player.ControllerId), Times.Once))
+                .Returns(true);
+
             // Act
             var payload = new MessagePayload<NetworkClientValidate>(
                 playerPeer, new NetworkClientValidate(player.ControllerId));
@@ -676,7 +682,8 @@ namespace Coop.Tests.Server.Connections.States
                 context.ModuleInfoProvider,
                 context.ExistingPlayerSender,
                 context.SteamBanList,
-                context.JoinValidationDenialLog);
+                context.JoinValidationDenialLog,
+                context.HerdQuestAuthority);
             var message = new MessagePayload<NetworkModuleVersionsValidate>(
                 playerPeer, new NetworkModuleVersionsValidate(modules, "9.9.9+deadbeef"));
 

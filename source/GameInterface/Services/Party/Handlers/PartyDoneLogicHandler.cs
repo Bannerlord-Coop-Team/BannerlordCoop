@@ -1,4 +1,5 @@
-﻿using Common;
+﻿using GameInterface.Services.Issues.Generic.Dispatch;
+using Common;
 using Common.Logging;
 using Common.Messaging;
 using Common.Network;
@@ -93,7 +94,19 @@ internal class PartyDoneLogicHandler : IHandler
         // for them when re-applying the delta.
         var leftMemberRosterData = troopRosterInterface.PackTroopRosterDelta(obj.What.LeftMemberRoster, obj.What.InitialLeftMemberRoster);
         var leftPrisonerRosterData = troopRosterInterface.PackTroopRosterDelta(obj.What.LeftPrisonerRoster, obj.What.InitialLeftPrisonerRoster);
-        var rightMemberRosterData = troopRosterInterface.PackTroopRosterDelta(obj.What.RightMemberRoster, obj.What.InitialRightMemberRoster);
+        var rightMembers = obj.What.RightMemberRoster;
+        var initialRightMembers = obj.What.InitialRightMemberRoster;
+        var draftIssue = GenericQuestTypeAlternativePickerPatch.CurrentIssue();
+        if (obj.What.PartyScreenMode == Helpers.PartyScreenHelper.PartyScreenMode.QuestTroopManage
+            && draftIssue != null && !GenericQuestTypeAlternativePickerPatch.IsCurrentSelection(draftIssue)) return;
+        if (obj.What.PartyScreenMode == Helpers.PartyScreenHelper.PartyScreenMode.QuestTroopManage
+            && draftIssue != null && ReferenceEquals(draftIssue.AlternativeSolutionSentTroops, obj.What.LeftMemberRoster))
+        {
+            // Commit upgrades and wages now; acceptance owns the later transfer out of the party.
+            rightMembers = GenericQuestTypeAlternativePickerPatch.CombineRosters(rightMembers, obj.What.LeftMemberRoster);
+            initialRightMembers = GenericQuestTypeAlternativePickerPatch.CombineRosters(initialRightMembers, obj.What.InitialLeftMemberRoster);
+        }
+        var rightMemberRosterData = troopRosterInterface.PackTroopRosterDelta(rightMembers, initialRightMembers);
         var rightPrisonerRosterData = troopRosterInterface.PackTroopRosterDelta(obj.What.RightPrisonerRoster, obj.What.InitialRightPrisonerRoster);
 
         var rightMemberOrderData = troopRosterInterface.PackTroopRosterOrderData(obj.What.RightMemberRoster);

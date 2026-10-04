@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using Common;
 using GameInterface.Services.Heroes.Patches;
 using GameInterface.Services.Issues.Interfaces;
@@ -68,7 +68,8 @@ public static class AlternativeSolutionCompletionRunner
         if (!objectManager.TryGetObjectWithLogging<Hero>(player.HeroId, out var trueOwnerHero))
             throw new InvalidOperationException($"ResolveTrueOwnerScope: could not resolve true owner Hero {player.HeroId}");
 
-        objectManager.TryGetObjectWithLogging<MobileParty>(player.MobilePartyId, out var trueOwnerParty);
+        if (!objectManager.TryGetObjectWithLogging<MobileParty>(player.MobilePartyId, out var trueOwnerParty))
+            throw new InvalidOperationException($"ResolveTrueOwnerScope: could not resolve true owner party {player.MobilePartyId}");
 
         return new MainHeroSubstitutionScope(trueOwnerHero, trueOwnerParty);
     }
