@@ -39,6 +39,7 @@ public sealed class NavalInspectCoopCommand : ICoopCommand
             isHost = controller.Session.IsLocalHost,
             deploymentCommitted = controller.Deployment.IsCommitted,
             ownReservePresent = mission.GetMissionBehavior<CoopNavalReserveGuard>()?.ReservePresent,
+            shipSync = mission.GetMissionBehavior<CoopNavalBattleBehavior>()?.ShipReplicator.Inspect(),
             mainAgent = Agent.Main?.Character?.StringId,
             mainAgentUsing = Agent.Main?.CurrentlyUsedGameObject is UsableMissionObject used ? used.GameEntity.Name : null,
             ships = shipsLogic.AllShips.Select(ship => new
@@ -54,6 +55,7 @@ public sealed class NavalInspectCoopCommand : ICoopCommand
                 helm = ship.ShipControllerMachine?.PilotAgent?.Character?.StringId,
                 controller = ship.Controller?.ControllerType.ToString() ?? "None",
                 activeBody = ship.GameEntity.IsValid ? (bool?)ship.GameEntity.HasDynamicRigidBodyAndActiveSimulation() : null,
+                foreign = NavalForeignHulls.Contains(ship),
                 hitPoints = ship.HitPoints,
                 maxHitPoints = ship.ShipOrigin.MaxHitPoints,
                 position = ship.GlobalFrame.origin.ToString(),

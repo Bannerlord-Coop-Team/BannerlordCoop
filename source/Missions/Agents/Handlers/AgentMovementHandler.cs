@@ -43,6 +43,9 @@ public interface IAgentMovementHandler : IPacketHandler, IDisposable
 
     bool TrySetForcedBulkHz(int? hz, out string error);
 
+    /// <summary>Puppets the predicate holds are left to their naval hull instead of the owner's world pose.</summary>
+    void ConfigureShipCrewMovement(Func<Agent, bool> holdsWorldPose);
+
     bool TrySetForcedReceiverCapHz(int? hz, out string error);
 
     /// <summary>Per-frame position smoother for received puppets; ticked by CoopMissionController.OnMissionTick.</summary>
@@ -532,6 +535,10 @@ public partial class AgentMovementHandler : IAgentMovementHandler
         initialConfiguredBulkHz = movementRateController.Snapshot.BulkHz;
 #endif
     }
+
+    private Func<Agent, bool> shipCrewHoldsWorldPose;
+
+    public void ConfigureShipCrewMovement(Func<Agent, bool> holdsWorldPose) => shipCrewHoldsWorldPose = holdsWorldPose;
 
     public bool TrySetForcedBulkHz(int? hz, out string error) =>
         movementRateController.TrySetForcedBulkHz(hz, out error);
@@ -1824,6 +1831,13 @@ public partial class AgentMovementHandler : IAgentMovementHandler
                 // stale position/input snapshot the AI then fights.
                 if (agentRegistry.IsLocallyControlled(agent))
                     continue;
+
+                // Owner world poses lag a replicated hull's deck and would drag its crew off it (deck poses are S3).
+                if (shipCrewHoldsWorldPose?.Invoke(agent) == true)
+                {
+                    _interpolator.Forget(agent);
+                    continue;
+                }
 
 #if DEBUG
                 if (acceptNavalStationMovement?.Invoke(agentInfo, data.NavalHelmRevision) == false)

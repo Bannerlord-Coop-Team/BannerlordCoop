@@ -142,6 +142,9 @@ public class BattleAgentSpawnData
     public readonly long AuthorityRevision;
     [ProtoMember(25)]
     public readonly long MountAuthorityRevision;
+    // The naval hull this agent crews (Guid.Empty off ships); peers hold the puppet until that hull exists.
+    [ProtoMember(26)]
+    public readonly Guid ShipId;
 
     public BattleAgentSpawnData(
         Guid agentId,
@@ -166,7 +169,8 @@ public class BattleAgentSpawnData
         string mountMovementScopeId = null,
         bool isRunningAway = false,
         long authorityRevision = 0,
-        long mountAuthorityRevision = 0)
+        long mountAuthorityRevision = 0,
+        Guid shipId = default)
     {
         AgentId = agentId;
         CharacterId = characterId;
@@ -193,5 +197,6 @@ public class BattleAgentSpawnData
         IsRunningAway = isRunningAway;
         AuthorityRevision = authorityRevision;
         MountAuthorityRevision = mountAuthorityRevision;
+        ShipId = shipId;
     }
 }

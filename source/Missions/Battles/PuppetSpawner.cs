@@ -54,6 +54,7 @@ public class PuppetSpawner : IPuppetSpawner
     private readonly IBattleAgentSpawnBatchCodec spawnBatchCodec;
     private readonly IPuppetRoutApplier puppetRoutApplier;
     private readonly IBattleAuthorityMigrator authorityMigrator;
+    private readonly IBattleTeamResolver teamResolver;
 
     // Spawn records can arrive before their mission team or world-stream party. Buffer them until both exist;
     // agents without that identity later break team ownership and scoreboard attribution.
@@ -77,7 +78,8 @@ public class PuppetSpawner : IPuppetSpawner
         IMissionWeaponDataMapper missionWeaponDataMapper,
         IPuppetRoutApplier puppetRoutApplier = null,
         IBattleAgentSpawnBatchCodec spawnBatchCodec = null,
-        IBattleAuthorityMigrator authorityMigrator = null)
+        IBattleAuthorityMigrator authorityMigrator = null,
+        IBattleTeamResolver teamResolver = null)
     {
         this.messageBroker = messageBroker;
         this.objectManager = objectManager;
@@ -92,6 +94,7 @@ public class PuppetSpawner : IPuppetSpawner
         this.spawnBatchCodec = spawnBatchCodec ?? new BattleAgentSpawnBatchCodec();
         this.puppetRoutApplier = puppetRoutApplier;
         this.authorityMigrator = authorityMigrator;
+        this.teamResolver = teamResolver ?? new BattleTeamResolver();
 
         messageBroker.Subscribe<NetworkSpawnBattleAgents>(Handle_NetworkSpawnBattleAgents);
         messageBroker.Subscribe<NetworkMissionPeerEntered>(Handle_PeerEntered);
@@ -200,8 +203,13 @@ public class PuppetSpawner : IPuppetSpawner
         int slotsNeeded = agentBudget.SlotsForEquipment(data.SpawnEquipment);
         if (slotsNeeded > slotsAvailable) return false; // at capacity — buffer
 
-        var team = ResolvePuppetTeam(data);
+        var team = teamResolver.ResolveReplicatedTeam(data.Side, isOwnAgent);
         if (team == null) return false;                                 // teams not created yet — buffer
+
+        // Crew of a hull waits for that hull and joins its local formation, which is the hull's ship assignment.
+        NetworkShipInfo crewShip = null;
+        if (data.ShipId != Guid.Empty && !coopMissionComponent.ShipRegistry.TryGet(data.ShipId, out crewShip))
+            return false;                                               // hull not spawned yet — buffer
 
         if (!objectManager.TryGetObjectWithLogging(data.CharacterId, out CharacterObject character))
         {
@@ -274,7 +282,7 @@ public class PuppetSpawner : IPuppetSpawner
         agent.FadeIn();
         if (data.Health > 0) agent.Health = data.Health;
 
-        formationAssigner.Assign(agent, data.FormationIndex);
+        formationAssigner.Assign(agent, crewShip?.Formation != null ? (int)crewShip.Formation.FormationIndex : data.FormationIndex);
 
         // Adopt our own hero as the controllable main agent of this mission.
         if (isOwnHero)
@@ -578,31 +586,6 @@ public class PuppetSpawner : IPuppetSpawner
             if (involved?.Party != null) return involved.Party;
         }
 
-        return null;
-    }
-
-    // Another owner's puppet must stay off PlayerTeam because every formation there is locally commandable.
-    // Use the side's non-player team; missing main or ally teams are buffered until initialization completes.
-    private Team ResolvePuppetTeam(BattleAgentSpawnData data)
-    {
-        var mainTeam = BattleTeams.Resolve(data.Side);
-        if (mainTeam == null) return null;
-
-        // Our OWN troop replicated back to us (e.g. our own-party deployment broadcast echoed over the mesh) belongs
-        // on our own team — it is the one puppet we DO control.
-        if (session.IsOwn(data.OwnerControllerId))
-            return mainTeam;
-
-        var playerTeam = Mission.Current.PlayerTeam;
-        if (mainTeam != playerTeam) return mainTeam;          // main team isn't ours (we're an ally) — safe to use
-
-        // The side's main team IS our PlayerTeam, so route to the side's ally team instead so we can't command it.
-        var allyTeam = data.Side == BattleSideEnum.Attacker
-            ? Mission.Current.AttackerAllyTeam
-            : Mission.Current.DefenderAllyTeam;
-        if (allyTeam != null && allyTeam != playerTeam) return allyTeam;
-
-        // Never put another player's party on the local command team.
         return null;
     }
 

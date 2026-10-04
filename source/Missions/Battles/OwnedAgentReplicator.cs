@@ -212,9 +212,19 @@ public class OwnedAgentReplicator : IOwnedAgentReplicator
                     mountInfo?.MovementScopeId ?? info.MovementScopeId,
                 isRunningAway: agent.IsRunningAway,
                 authorityRevision: info.AuthorityRevision,
-                mountAuthorityRevision: mountInfo?.AuthorityRevision ?? 0));
+                mountAuthorityRevision: mountInfo?.AuthorityRevision ?? 0,
+                shipId: GetCrewShipId(agent)));
         }
         return records;
+    }
+
+    // The hull whose formation the agent serves on, so peers seat its puppet on their copy of that hull.
+    private Guid GetCrewShipId(Agent agent)
+    {
+        return coopMissionComponent.ShipRegistry != null &&
+               coopMissionComponent.ShipRegistry.TryGetByFormation(agent.Formation, out var ship)
+            ? ship.ShipId
+            : Guid.Empty;
     }
 
     // The registry id of the agent's current mount, or Guid.Empty when on foot / the horse isn't registered
@@ -359,7 +369,8 @@ public class OwnedAgentReplicator : IOwnedAgentReplicator
             movementScopeId: movementScopeId,
             mountOriginalOwnerControllerId: owner,
             mountMovementScopeId: movementScopeId,
-            isRunningAway: agent.IsRunningAway);
+            isRunningAway: agent.IsRunningAway,
+            shipId: GetCrewShipId(agent));
 
         // Populate MapEvent's UpgradeTroopTracker with spawned agent to handle on the server during battle.
         if (!isDebugReplicationFixture)

@@ -43,14 +43,23 @@ public class CoopNavalBattleLauncher : ICoopNavalBattleLauncher
     private readonly ICoopBattleBehaviorAttacher behaviorAttacher;
     private readonly IBattleAgentBudget agentBudget;
     private readonly ICoopShipSnapshotBuilder shipSnapshotBuilder;
+    private readonly IBattleNetwork network;
+    private readonly INavalShipEngine shipEngine;
+    private readonly IBattleTeamResolver teamResolver;
 
     public CoopNavalBattleLauncher(
         IMessageBroker messageBroker,
         IObjectManager objectManager,
         ICoopBattleBehaviorAttacher behaviorAttacher,
         IBattleAgentBudget agentBudget,
-        ICoopShipSnapshotBuilder shipSnapshotBuilder)
+        ICoopShipSnapshotBuilder shipSnapshotBuilder,
+        IBattleNetwork network,
+        INavalShipEngine shipEngine,
+        IBattleTeamResolver teamResolver)
     {
+        this.network = network;
+        this.shipEngine = shipEngine;
+        this.teamResolver = teamResolver;
         this.messageBroker = messageBroker;
         this.objectManager = objectManager;
         this.behaviorAttacher = behaviorAttacher;
@@ -165,9 +174,19 @@ public class CoopNavalBattleLauncher : ICoopNavalBattleLauncher
         });
 
         behaviorAttacher.Attach(mission);
+        AttachNavalServices(mission);
         mission.SetPlayerCanTakeControlOfAnotherAgentWhenDead();
         Logger.Information("[NavalBattle] Opened coop naval battle for {MapEventId} (player side {Side})", mapEventId, playerSide);
         return mission;
+    }
+
+    // The ship services share the attached controller's per-battle session, deployment and mission component.
+    private void AttachNavalServices(Mission mission)
+    {
+        var controller = mission.GetMissionBehavior<CoopBattleController>();
+        var shipReplicator = new BattleShipReplicator(network, messageBroker, controller.Session, controller.Deployment,
+            controller.MissionComponent, shipEngine, teamResolver, objectManager);
+        mission.AddMissionBehavior(new CoopNavalBattleBehavior(shipReplicator));
     }
 
     // Own party only: vanilla GetMapEventPartiesOfPlayerTeams takes the first non-NPC party as the player's,

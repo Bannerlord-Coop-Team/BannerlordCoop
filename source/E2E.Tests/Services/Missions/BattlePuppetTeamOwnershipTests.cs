@@ -387,6 +387,81 @@ public class BattlePuppetTeamOwnershipTests : MissionTestEnvironment
     }
 
     [Fact]
+    public void CrewRecord_BuffersUntilItsHullRegisters()
+    {
+        using var fixture = new MissionEngineFixture();
+        var (_, partyIds) = SetupCoopBattle("local", "enemy");
+        var client = Clients.First();
+        var agentId = Guid.NewGuid();
+        var shipId = Guid.NewGuid();
+        var characterId = CreateRegisteredObject<CharacterObject>();
+
+        client.Call(() =>
+        {
+            var mission = fixture.CreateMission(client);
+            mission.PlayerTeam = mission.AttackerTeam;
+            mission.AddTeam(BattleSideEnum.Defender);
+
+            Assert.True(client.ObjectManager.TryGetObject<MobileParty>(partyIds[1], out var enemyParty));
+            var mapEventParty = enemyParty.MapEvent.DefenderSide.Parties
+                .Single(party => party.Party == enemyParty.Party);
+            Assert.True(client.ObjectManager.TryGetId(mapEventParty, out var mapEventPartyId));
+
+            var deployment = new Mock<IBattleDeploymentCoordinator>();
+            deployment.SetupGet(d => d.IsCommitted).Returns(true);
+            var missionComponent = client.Resolve<ICoopMissionComponent>();
+            using var spawner = new PuppetSpawner(
+                client.Resolve<IMessageBroker>(),
+                client.ObjectManager,
+                client.Resolve<GameInterface.Services.Players.IPlayerManager>(),
+                missionComponent,
+                Mock.Of<IBattleSession>(),
+                new CasualtyAttributionMap(),
+                deployment.Object,
+                Mock.Of<IAgentFormationAssigner>(),
+                new BattleAgentBudget(),
+                client.Resolve<IMissionWeaponDataMapper>());
+
+            var record = new BattleAgentSpawnData(
+                agentId, characterId, default, BattleSideEnum.Defender, 100f, "host", mapEventPartyId, 1,
+                new Equipment(), new BodyProperties(), new MissionEquipmentData(new()), shipId: shipId);
+            client.Resolve<IMessageBroker>().Publish(this, new NetworkSpawnBattleAgents(new[] { record }));
+            spawner.DrainPendingPuppets();
+
+            var registry = client.Resolve<INetworkAgentRegistry>();
+            Assert.False(registry.TryGetAgentInfo(agentId, out _));
+
+            var hull = CreateTestHull();
+            Assert.True(missionComponent.ShipRegistry.TryRegister(
+                new NetworkShipInfo(shipId, "host", mapEventPartyId, true, hull, null)));
+            spawner.DrainPendingPuppets();
+
+            Assert.True(registry.TryGetAgentInfo(agentId, out _));
+        });
+    }
+
+    // ScriptComponentBehavior's type initializer reads the managed module type catalog the engine normally fills.
+    private static MissionObject CreateTestHull()
+    {
+        var managed = typeof(TaleWorlds.Engine.ScriptComponentBehavior).BaseType!.Assembly.GetType("TaleWorlds.DotNet.Managed")!;
+        var field = AccessTools.Field(managed, "_moduleTypes");
+        var previous = field.GetValue(null);
+        try
+        {
+            if (previous == null) field.SetValue(null, new Dictionary<string, Type>());
+            return (MissionObject)System.Runtime.CompilerServices.RuntimeHelpers.GetUninitializedObject(typeof(TestHull));
+        }
+        finally
+        {
+            field.SetValue(null, previous);
+        }
+    }
+
+    private sealed class TestHull : MissionObject
+    {
+    }
+
+    [Fact]
     public void FleeingCatchUpRecord_SpawnsPuppetAsRunningAway()
     {
         using var fixture = new MissionEngineFixture();

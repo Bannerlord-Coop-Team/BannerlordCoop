@@ -36,6 +36,9 @@ public abstract class CoopMissionController : MissionBehavior, IDisposable
     internal IAgentMovementHandler AgentMovementHandler =>
         coopMissionComponent.AgentMovementHandler;
 
+    /// <summary>This mission's registries and sync handlers, shared with services composed outside the controller.</summary>
+    public ICoopMissionComponent MissionComponent => coopMissionComponent;
+
     protected CoopMissionController(
         IBattleNetwork network,
         IMessageBroker messageBroker,

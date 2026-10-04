@@ -1,6 +1,8 @@
 ﻿using Autofac;
 using Common.Commands;
+using GameInterface;
 using GameInterface.Services.MapEvents;
+using Missions.Battles;
 
 namespace Missions.Naval;
 
@@ -10,15 +12,23 @@ namespace Missions.Naval;
 /// </summary>
 public class NavalMissionModule : Module
 {
+    // The DEBUG naval lab's PatchAll over this assembly applies these too; its hulls never register, so the gates pass them.
+    internal const string PatchCategory = "CoopNavalShipPatches";
+
     protected override void Load(ContainerBuilder builder)
     {
         base.Load(builder);
+
+        builder.RegisterInstance(new HarmonyPatchCategoryRegistration(typeof(NavalMissionModule).Assembly, PatchCategory));
 
         builder.RegisterType<CoopNavalBattleLauncher>()
             .As<ICoopNavalBattleLauncher>()
             .InstancePerDependency();
         builder.RegisterType<CoopShipSnapshotBuilder>()
             .As<ICoopShipSnapshotBuilder>()
+            .InstancePerDependency();
+        builder.RegisterType<NavalShipEngine>()
+            .As<INavalShipEngine>()
             .InstancePerDependency();
         builder.RegisterType<NavalInspectCoopCommand>()
             .As<ICoopCommand>()
