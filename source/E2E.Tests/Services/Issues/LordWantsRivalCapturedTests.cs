@@ -310,6 +310,70 @@ public sealed class LordWantsRivalCapturedTests : IDisposable
         OtherClient.Call(() => Assert.Null(Get<Hero>(OtherClient, giverId).Issue.IssueQuest));
     }
 
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void ReleaseKeepsTheOwnersCounterOfferFlagConsistentWithTheServer(bool capturedByAnotherParty)
+    {
+        var otherCaptorId = environment.CreateRegisteredObject<Settlement>();
+        Accept();
+        Client.Call(() => GetQuest(Client).FirstCounterOfferFinished());
+        environment.FlushCoalescer();
+        Client.Call(() => Assert.True(GetQuest(Client)._firstCounterOfferMade));
+
+        string[] expectedJournal = null;
+        Server.Call(() =>
+        {
+            var quest = GetQuest(Server);
+            var target = Get<Hero>(Server, targetId);
+            var ownerParty = Get<MobileParty>(Server, partyId).Party;
+            var otherCaptor = Get<Settlement>(Server, otherCaptorId).Party;
+            Assert.True(quest._firstCounterOfferMade);
+            Assert.True(target.IsPrisoner);
+            Assert.Same(ownerParty, target.PartyBelongedToAsPrisoner);
+            if (capturedByAnotherParty)
+            {
+                TakePrisonerAction.Apply(otherCaptor, target);
+                Assert.Same(otherCaptor, target.PartyBelongedToAsPrisoner);
+                Assert.Equal(1, otherCaptor.PrisonRoster.GetTroopCount(target.CharacterObject));
+            }
+            Assert.Equal(1, ownerParty.PrisonRoster.GetTroopCount(target.CharacterObject));
+            var previousLogCount = quest.JournalEntries.Count;
+
+            EndCaptivityAction.ApplyByEscape(target);
+
+            Assert.True(quest.IsOngoing);
+            Assert.False(target.IsPrisoner);
+            Assert.Equal(!capturedByAnotherParty, quest._firstCounterOfferMade);
+            Assert.Equal(previousLogCount + (capturedByAnotherParty ? 1 : 0), quest.JournalEntries.Count);
+            expectedJournal = quest.JournalEntries.Select(log => log.LogText.ToString()).ToArray();
+        });
+        environment.FlushCoalescer();
+
+        Client.Call(() =>
+        {
+            var quest = GetQuest(Client);
+            Assert.True(quest.IsOngoing);
+            Assert.Equal(!capturedByAnotherParty, quest._firstCounterOfferMade);
+            Assert.Equal(expectedJournal, quest.JournalEntries.Select(log => log.LogText.ToString()).ToArray());
+        });
+        OtherClient.Call(() =>
+        {
+            Assert.Null(Get<Hero>(OtherClient, giverId).Issue.IssueQuest);
+            Assert.Empty(Campaign.Current.QuestManager.Quests.OfType<Quest>());
+        });
+        foreach (var instance in Instances)
+        {
+            instance.Call(() =>
+            {
+                var target = Get<Hero>(instance, targetId);
+                Assert.Equal(capturedByAnotherParty ? 1 : 0,
+                    Get<MobileParty>(instance, partyId).PrisonRoster.GetTroopCount(target.CharacterObject));
+                Assert.Equal(0, Get<Settlement>(instance, otherCaptorId).Party.PrisonRoster.GetTroopCount(target.CharacterObject));
+            });
+        }
+    }
+
     [Fact]
     public void RepeatedCounterOfferRequestsDoNotCaptureTheSamePrisonerAgain()
     {

@@ -225,6 +225,20 @@ internal class RivalCapturedIssueCancellationPatch
     private static void Finalizer(IDisposable __state) => __state?.Dispose();
 }
 
+[HarmonyPatch(typeof(Quest), "OnHeroPrisonerReleased")]
+internal class RivalCapturedPrisonerReleasedPatch
+{
+    private static void Prefix(Quest __instance, out bool __state) => __state = __instance._firstCounterOfferMade;
+
+    private static void Postfix(Quest __instance, bool __state)
+    {
+        // The release callback resets the offer after its AddLog progress snapshot.
+        if (ModInformation.IsServer && __state && !__instance._firstCounterOfferMade &&
+            ContainerProvider.TryResolve<ILordWantsRivalCapturedQuestService>(out var quests))
+            quests.SendProgress(__instance);
+    }
+}
+
 [HarmonyPatch(typeof(QuestBase))]
 internal class RivalCapturedJournalPatches
 {
