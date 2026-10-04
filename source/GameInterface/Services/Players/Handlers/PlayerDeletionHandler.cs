@@ -181,6 +181,8 @@ internal class PlayerDeletionHandler : IHandler
             TryStep("party settlement exit", () => LeaveSettlementAction.ApplyForParty(party));
         }
 
+        // Personal quest cleanup still needs the registered hero and party.
+        messageBroker.Publish(this, new PlayerDeleting(player));
         playerManager.RemovePlayer(player);
         sessionProvider.CoopSession.AgingPlayerData.PlayerSuccessions.Remove(player.HeroId);
 

@@ -144,6 +144,9 @@ public class GameInterfaceModule : Module
         builder.RegisterType<PartyVisibilitySweep>().As<IPartyVisibilitySweep>().InstancePerDependency();
         builder.RegisterType<ConversationRestartContextTracker>().As<IConversationRestartContextTracker>().InstancePerLifetimeScope();
         builder.RegisterType<IssueConversationTracker>().As<IIssueConversationTracker>().InstancePerLifetimeScope();
+        builder.RegisterType<Services.Issues.ArmyNeedsSuppliesJournalOwners>().As<Services.Issues.IArmyNeedsSuppliesJournalOwners>().InstancePerLifetimeScope();
+        builder.RegisterType<Services.Issues.ArmyNeedsSuppliesDelivery>().As<Services.Issues.IArmyNeedsSuppliesDelivery>().InstancePerDependency();
+        builder.RegisterType<Services.Issues.ArmyNeedsSuppliesQuest>().As<Services.Issues.IArmyNeedsSuppliesQuest>().InstancePerDependency();
         builder.RegisterType<IssueOwnershipRegistry>().As<IIssueOwnershipRegistry>().InstancePerLifetimeScope();
         builder.RegisterType<IssueGenerationRegistry>().As<IIssueGenerationRegistry>().InstancePerLifetimeScope();
         builder.RegisterType<AwaitingAlternativeSolutionTroopsRegistry>().As<IAwaitingAlternativeSolutionTroopsRegistry>().InstancePerLifetimeScope();
