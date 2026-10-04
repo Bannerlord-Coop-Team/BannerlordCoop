@@ -68,6 +68,7 @@ internal class InteractionsInitializationHandler : IHandler
         PerkResetCampaignBehavior perkResetCampaignBehavior = Campaign.Current.GetCampaignBehavior<PerkResetCampaignBehavior>();
         EncounterGameMenuBehavior encounterGameMenuBehavior = Campaign.Current.GetCampaignBehavior<EncounterGameMenuBehavior>();
         TavernEmployeesCampaignBehavior tavernEmployeesCampaignBehavior = Campaign.Current.GetCampaignBehavior<TavernEmployeesCampaignBehavior>();
+        RetirementCampaignBehavior retirementCampaignBehavior = Campaign.Current.GetCampaignBehavior<RetirementCampaignBehavior>();
 
         villagerCampaignBehavior._interactedVillagers = GetInteractedVillagers(playerHeroId);
         caravansCampaignBehavior._interactedCaravans = GetInteractedCaravans(playerHeroId);
@@ -80,6 +81,7 @@ internal class InteractionsInitializationHandler : IHandler
         tavernEmployeesCampaignBehavior._orderedDrinkThisDayInSettlement = GetOrderedDrinkThisDayInSettlement(playerHeroId);
         tavernEmployeesCampaignBehavior._hasBoughtTunToParty = GetHasBoughtTunToParty(playerHeroId);
         tavernEmployeesCampaignBehavior._hasMetWithRansomBroker = GetHasMetRansomBroker(playerHeroId);
+        retirementCampaignBehavior._hasTalkedWithHermitBefore = GetHasMetHermit(playerHeroId);
 
         network.SendAll(new NetworkInitializeServerInteractionsDataKeys(playerHeroId));
     }
@@ -231,5 +233,12 @@ internal class InteractionsInitializationHandler : IHandler
         if (interactionsPlayerData?.PlayerHasMetRansomBroker?.ContainsKey(playerHeroId) != true) return false;
 
         return interactionsPlayerData.PlayerHasMetRansomBroker[playerHeroId];
+    }
+
+    private bool GetHasMetHermit(string playerHeroId)
+    {
+        if (interactionsPlayerData?.PlayerHasMetHermit?.ContainsKey(playerHeroId) != true) return false;
+
+        return interactionsPlayerData.PlayerHasMetHermit[playerHeroId];
     }
 }
