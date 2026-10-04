@@ -24,6 +24,7 @@ public interface ISessionInteractionsPlayerDataInterface : IGameAbstraction
     void UpdateDrinkThisDayInSettlement(string playerHeroId, string settlementId);
     void UpdateHasBoughtTunToParty(string playerHeroId, bool hasBought);
     void UpdateHasMetRandomBroker(string playerHeroId, bool hasMet);
+    void UpdateHasMetHermit(string playerHeroId, bool hasMet);
     bool DailyTickDrinkThisDayInSettlement();
     bool WeeklyTickHasBoughtToTunToParty();
     void RemoveInteractedVillagersForAllPlayers(string mobilePartyId);
@@ -154,6 +155,13 @@ public class SessionInteractionsPlayerDataInterface : ISessionInteractionsPlayer
         if (!IsPlayerHeroIdValid(playerHeroId)) return;
 
         InteractionsPlayerData.PlayerHasMetRansomBroker[playerHeroId] = hasMet;
+    }
+
+    public void UpdateHasMetHermit(string playerHeroId, bool hasMet)
+    {
+        if (!IsPlayerHeroIdValid(playerHeroId)) return;
+
+        InteractionsPlayerData.PlayerHasMetHermit[playerHeroId] = hasMet;
     }
 
     public bool DailyTickDrinkThisDayInSettlement()
@@ -287,6 +295,10 @@ public class SessionInteractionsPlayerDataInterface : ISessionInteractionsPlayer
         if (!InteractionsPlayerData.PlayerHasMetRansomBroker.ContainsKey(playerHeroId))
         {
             InteractionsPlayerData.PlayerHasMetRansomBroker[playerHeroId] = false;
+        }
+        if (!InteractionsPlayerData.PlayerHasMetHermit.ContainsKey(playerHeroId))
+        {
+            InteractionsPlayerData.PlayerHasMetHermit[playerHeroId] = false;
         }
     }
 
