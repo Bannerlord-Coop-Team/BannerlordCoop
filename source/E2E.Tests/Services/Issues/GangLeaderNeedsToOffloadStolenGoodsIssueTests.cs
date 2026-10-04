@@ -1159,7 +1159,13 @@ public class GangLeaderNeedsToOffloadStolenGoodsIssueTests : IDisposable
                     target.PartyBelongedTo = targetParty;
                     party.ActualClan = player.Clan;
                     party.MemberRoster.AddToCounts(troop, 50);
-                    if (instance == Client) Campaign.Current.PlayerTraitDeveloper.SetPropertyValue(DefaultTraits.Honor, clientXp);
+                    if (instance == Client)
+                    {
+                        Game.Current.PlayerTroop = player.CharacterObject;
+                        Campaign.Current.MainParty = party;
+                        Campaign.Current.PlayerDefaultFaction = player.Clan;
+                        Campaign.Current.PlayerTraitDeveloper.SetPropertyValue(DefaultTraits.Honor, clientXp);
+                    }
                 }
             });
         }
@@ -1183,7 +1189,12 @@ public class GangLeaderNeedsToOffloadStolenGoodsIssueTests : IDisposable
                 Assert.True(Campaign.Current.IssueManager.StartIssueQuest(giver));
             }
         });
-        Client.Call(() => Assert.Equal(expectedXp, Campaign.Current.PlayerTraitDeveloper.GetPropertyValue(DefaultTraits.Honor)));
+        Client.Call(() =>
+        {
+            Assert.True(Client.ObjectManager.TryGetObject<Hero>(fixture.HeroId, out var player));
+            Assert.Same(player, Hero.MainHero);
+            Assert.Equal(expectedXp, Campaign.Current.PlayerTraitDeveloper.GetPropertyValue(DefaultTraits.Honor));
+        });
         Server.Call(() =>
         {
             Assert.True(Server.ObjectManager.TryGetObject<Hero>(fixture.HeroId, out var player));

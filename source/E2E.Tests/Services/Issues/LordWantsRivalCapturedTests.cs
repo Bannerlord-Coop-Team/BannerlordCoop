@@ -90,6 +90,7 @@ public sealed class LordWantsRivalCapturedTests : IDisposable
                     party.ActualClan = player.Clan;
                     targetParty.ActualClan = target.Clan;
                     party.CurrentSettlement = settlement;
+                    giverParty.CurrentSettlement = settlement;
                     giver.StayingInSettlement = settlement;
                     party.MemberRoster.AddToCounts(Get<CharacterObject>(instance, troopId), 50);
                     targetParty.MemberRoster.AddToCounts(target.CharacterObject, 1);
@@ -110,6 +111,7 @@ public sealed class LordWantsRivalCapturedTests : IDisposable
         OtherClient.Resolve<IControllerIdProvider>().SetControllerId("other-rival-player");
         Server.Call(() =>
         {
+            Assert.True(Server.Resolve<ILordWantsRivalCapturedQuestService>().IsPresentWithGiver(Controller, Get<Hero>(Server, giverId)));
             var target = Get<Hero>(Server, targetId);
             var data = new PotentialIssueData((in PotentialIssueData _, Hero giver) => new Issue(giver, target),
                 typeof(Issue), IssueBase.IssueFrequency.Rare);
