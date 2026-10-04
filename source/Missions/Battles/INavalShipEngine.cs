@@ -25,6 +25,12 @@ public interface INavalShipEngine
     /// <summary>Moves a foreign hull's kinematic body and its attached navmesh.</summary>
     void ApplyForeignFrame(MissionObject hull, MatrixFrame frame);
 
+    /// <summary>The hull's effective helm input this frame.</summary>
+    BattleShipInput ReadInput(MissionObject hull);
+
+    /// <summary>Drives a copied hull's oars and sails with its owner's helm input.</summary>
+    void ApplyInput(MissionObject hull, BattleShipInput input);
+
     /// <summary>Whether the hull's rigid body is simulating (diagnostics).</summary>
     bool IsBodyActive(MissionObject hull);
 

@@ -167,7 +167,7 @@ public class BattleShipReplicator : IBattleShipReplicator
             var stream = GetStream(ship.ShipId);
             stream.Sent++;
             network.SendAll(new NetworkBattleShipSample(ship.ShipId, session.OwnControllerId, stream.Sent, deadline,
-                NetworkBattleShipSample.FromFrame(engine.GetFrame(ship.Hull))));
+                NetworkBattleShipSample.FromFrame(engine.GetFrame(ship.Hull)), engine.ReadInput(ship.Hull)));
         }
     }
 
@@ -245,6 +245,7 @@ public class BattleShipReplicator : IBattleShipReplicator
             return;
         }
 
+        engine.ApplyInput(ship.Hull, sample.Input);
         stream.Start = stream.HasWritten ? stream.Written : engine.GetFrame(ship.Hull);
         stream.Target = sample;
         stream.Accepted = sample.Sequence;
@@ -260,6 +261,7 @@ public class BattleShipReplicator : IBattleShipReplicator
         if (sample.Sequence <= acceptedSequence) return "stale";
         if (sample.DeadlineUtcTicks <= nowUtcTicks || sample.DeadlineUtcTicks > nowUtcTicks + SampleLifetimeTicks) return "expired";
         if (!sample.HasValidFrame) return "invalid_frame";
+        if (!sample.Input.IsValid) return "invalid_input";
         return null;
     }
 

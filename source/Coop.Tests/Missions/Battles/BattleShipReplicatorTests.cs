@@ -64,6 +64,34 @@ public class BattleShipReplicatorTests
     }
 
     [Fact]
+    public void ValidateSample_RejectsANonFiniteRudder()
+    {
+        var ship = new NetworkShipInfo(Guid.NewGuid(), Peer, null, false, CreateHull(), null);
+        long now = DateTime.UtcNow.Ticks;
+        var sample = new NetworkBattleShipSample(ship.ShipId, Peer, 1, now + TimeSpan.FromMilliseconds(500).Ticks,
+            NetworkBattleShipSample.FromFrame(MatrixFrame.Identity), new BattleShipInput(0, 1, 0, float.NaN, 2));
+
+        Assert.Equal("invalid_input", BattleShipReplicator.ValidateSample(ship, Own, sample, 0, now));
+    }
+
+    [Fact]
+    public void Sample_RoundTripsTheHelmInput()
+    {
+        var input = new BattleShipInput(1, 2, 0, -0.5f, 2);
+        var sample = new NetworkBattleShipSample(Guid.NewGuid(), Peer, 7, 1234,
+            NetworkBattleShipSample.FromFrame(MatrixFrame.Identity), input);
+
+        using var stream = new MemoryStream();
+        Serializer.Serialize(stream, sample);
+        stream.Position = 0;
+        var copy = Serializer.Deserialize<NetworkBattleShipSample>(stream);
+
+        Assert.Equal(input, copy.Input);
+        Assert.Equal(sample.Frame, copy.Frame);
+        Assert.Equal(7, copy.Sequence);
+    }
+
+    [Fact]
     public void SpawnRecord_RoundTripsTheHullDescriptor()
     {
         var record = new BattleShipSpawnData(Guid.NewGuid(), Peer, "MapEventParty_1", false, BattleSideEnum.Defender, 2,

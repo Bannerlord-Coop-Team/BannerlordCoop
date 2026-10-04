@@ -6,6 +6,7 @@ using NavalDLC.Missions;
 using NavalDLC.Missions.Objects;
 using NavalDLC.Missions.Objects.UsableMachines;
 using NavalDLC.Missions.ShipControl;
+using NavalDLC.Missions.ShipInput;
 using System;
 using System.Collections.Generic;
 using System.Globalization;
@@ -96,6 +97,27 @@ public class NavalShipEngine : INavalShipEngine
 
         entity.SetGlobalFrame(frame, isTeleportation: false);
         entity.UpdateAttachedNavigationMeshFaces();
+    }
+
+    public BattleShipInput ReadInput(MissionObject hull)
+    {
+        var input = ((MissionShip)hull)._inputRecord;
+        return new BattleShipInput((int)input.RowerLateral, (int)input.RowerLongitudinal,
+            (int)input.RowerLongitudinalDoubleTap, input.RudderLateral, (int)input.Sail);
+    }
+
+    // A copy has no controller, so nothing overwrites this record before its actuators read it.
+    public void ApplyInput(MissionObject hull, BattleShipInput input)
+    {
+        if (!Enum.IsDefined(typeof(RowerLateralInput), input.RowerLateral)
+            || !Enum.IsDefined(typeof(RowerLongitudinalInput), input.RowerLongitudinal)
+            || !Enum.IsDefined(typeof(RowerLongitudinalInput), input.RowerLongitudinalDoubleTap)
+            || !Enum.IsDefined(typeof(SailInput), input.Sail))
+            return;
+
+        var record = new ShipInputRecord((RowerLateralInput)input.RowerLateral, (RowerLongitudinalInput)input.RowerLongitudinal,
+            (RowerLongitudinalInput)input.RowerLongitudinalDoubleTap, input.Rudder, (SailInput)input.Sail);
+        ((MissionShip)hull).SetInputRecord(in record);
     }
 
     public bool IsBodyActive(MissionObject hull)

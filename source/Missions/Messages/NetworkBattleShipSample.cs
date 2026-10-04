@@ -17,14 +17,18 @@ public sealed class NetworkBattleShipSample : IEvent
     [ProtoMember(3)] public readonly long Sequence;
     [ProtoMember(4)] public readonly long DeadlineUtcTicks;
     [ProtoMember(5)] public readonly float[] Frame;
+    /// <summary>The hull's helm input, replayed on copies for oar and sail presentation.</summary>
+    [ProtoMember(6)] public readonly BattleShipInput Input;
 
-    public NetworkBattleShipSample(Guid shipId, string ownerControllerId, long sequence, long deadlineUtcTicks, float[] frame)
+    public NetworkBattleShipSample(Guid shipId, string ownerControllerId, long sequence, long deadlineUtcTicks, float[] frame,
+        BattleShipInput input = default)
     {
         ShipId = shipId;
         OwnerControllerId = ownerControllerId;
         Sequence = sequence;
         DeadlineUtcTicks = deadlineUtcTicks;
         Frame = frame;
+        Input = input;
     }
 
     public bool HasValidFrame => IsValidFrame(Frame);
