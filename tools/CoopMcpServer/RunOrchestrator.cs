@@ -21,7 +21,10 @@ public interface IRunOrchestrator
     Task<RunView> StopAsync(string runId);
     Task StopAllAsync();
     string ScreenshotPath(string runId, string instance);
+    VideoTarget ResolveVideoTarget(string runId, string instance);
 }
+
+public sealed record VideoTarget(string VideoPath, string ContactSheetPath, int Pid, bool ProcessAlive);
 
 #nullable enable annotations
 public sealed record InstanceView(string Name, InstanceIdentity Identity, bool ProcessAlive,
@@ -561,6 +564,15 @@ public sealed partial class RunOrchestrator : IRunOrchestrator, IDeploymentRunGu
         var run = FindRun(runId);
         FindInstance(run, instance);
         return Path.Combine(run.Directory, instance + "-" + Guid.NewGuid().ToString("N") + ".bmp");
+    }
+
+    // The owned process handle stays open until stop, so its PID cannot be reused while it is alive.
+    public VideoTarget ResolveVideoTarget(string runId, string instance)
+    {
+        var run = FindRun(runId);
+        var target = FindInstance(run, instance);
+        string stem = Path.Combine(run.Directory, instance + "-video-" + Guid.NewGuid().ToString("N"));
+        return new VideoTarget(stem + ".mp4", stem + "-sheet.png", target.Identity.Pid, Alive(target));
     }
 
     public async Task<RunView> StopAsync(string runId)

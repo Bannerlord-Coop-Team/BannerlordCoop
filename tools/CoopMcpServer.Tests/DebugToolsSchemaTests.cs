@@ -139,7 +139,7 @@ public sealed class DebugToolsSchemaTests : IDisposable
         const string operation = "ea451533-21af-47ce-b889-887ee8da5e71", incarnation = "72a57da1-88b5-4f7e-9111-71f5c7a965f4";
         await using var client = await Connect("drift");
         var tools = await client.ListToolsAsync(cancellationToken: timeout.Token);
-        Assert.Equal(22, tools.Count);
+        Assert.Equal(23, tools.Count);
         var tool = tools.Single(t => t.Name == "wait_for_drift");
         var schema = JsonSchema.FromText(tool.ReturnJsonSchema.Value.GetRawText());
         string id = (await CallAndValidate(client, "start_run", new() { ["profile"] = "fixture", ["client_count"] = 2 })).GetProperty("runId").GetString();
@@ -193,7 +193,7 @@ public sealed class DebugToolsSchemaTests : IDisposable
             new[] { "b98d8246-831c-446d-b686-8cc1874cea62", "158bbdfc-8c80-4587-a15c-8058e0b189cf" } };
         await using var client = await Connect("control");
         var tools = await client.ListToolsAsync(cancellationToken: timeout.Token);
-        Assert.Equal(22, tools.Count);
+        Assert.Equal(23, tools.Count);
         var schema = JsonSchema.FromText(tools.Single(t => t.Name == "wait_for_control").ReturnJsonSchema.Value.GetRawText());
         string id = (await CallAndValidate(client, "start_run", new() { ["profile"] = "fixture", ["client_count"] = 2 })).GetProperty("runId").GetString();
         var wire = new JsonObject();

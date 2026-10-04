@@ -153,7 +153,7 @@ public sealed class McpSetupTests
         await using var client = await McpClient.CreateAsync(transport, cancellationToken: timeout.Token);
         var tools = await client.ListToolsAsync(cancellationToken: timeout.Token);
         string[] expected = { "deploy_mod", "list_saves", "start_run", "start_client", "preflight_run", "capture_screenshot", "get_run", "wait_for_state", "wait_for_drift", "wait_for_control", "wait_for_lab", "list_commands", "execute_command",
-            "join_client", "read_logs", "screenshot", "screenshot_status", "options_menu", "ui_layers", "ui_inspect", "ui_action", "stop_run" };
+            "join_client", "read_logs", "screenshot", "screenshot_status", "options_menu", "ui_layers", "ui_inspect", "ui_action", "stop_run", "record_video" };
         Assert.Equal(expected.Order(), tools.Select(tool => tool.Name).Order());
         Assert.False(Directory.Exists(Path.Combine(fixture.Root, ".mcp-local", "runs")));
     }

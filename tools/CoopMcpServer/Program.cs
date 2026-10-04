@@ -37,7 +37,11 @@ builder.Services.AddTransient<IDeploymentTools, DeploymentTools>();
 builder.Services.AddTransient<IScreenshotImageEncoder, ScreenshotImageEncoder>();
 builder.Services.AddTransient<IScreenshotCapture, ScreenshotCapture>();
 builder.Services.AddTransient<IDebugTools, DebugTools>();
-builder.Services.AddMcpServer().WithStdioServerTransport().WithTools<DebugTools>().WithTools<DeploymentTools>();
+builder.Services.AddTransient<IGameWindowLocator, GameWindowLocator>();
+builder.Services.AddTransient<IFfmpegRunner, FfmpegRunner>();
+builder.Services.AddTransient<IVideoCapture, VideoCapture>();
+builder.Services.AddTransient<IVideoTools, VideoTools>();
+builder.Services.AddMcpServer().WithStdioServerTransport().WithTools<DebugTools>().WithTools<DeploymentTools>().WithTools<VideoTools>();
 using var host = builder.Build();
 var runs = host.Services.GetRequiredService<IRunOrchestrator>();
 try

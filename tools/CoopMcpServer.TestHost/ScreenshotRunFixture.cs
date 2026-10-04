@@ -85,4 +85,5 @@ public sealed class ScreenshotRunFixture(string directory) : IRunOrchestrator
     public Task<LogChunk> ReadLogsAsync(string runId, string instance, string cursor, int bytes, CancellationToken token) => throw new NotSupportedException();
     public Task<RunView> StopAsync(string runId) => throw new NotSupportedException();
     public Task StopAllAsync() => Task.CompletedTask;
+    public VideoTarget ResolveVideoTarget(string runId, string instance) => throw new NotSupportedException();
 }

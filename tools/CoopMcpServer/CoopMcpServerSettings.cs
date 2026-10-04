@@ -5,6 +5,8 @@ namespace CoopMcpServer;
 public sealed class CoopMcpServerSettings
 {
     public string ArtifactDirectory { get; set; }
+    // Optional absolute ffmpeg.exe for record_video; PATH is searched when omitted.
+    public string FfmpegPath { get; set; }
     public Dictionary<string, LaunchProfile> Profiles { get; set; } = new();
 
     public static CoopMcpServerSettings Load(string path)

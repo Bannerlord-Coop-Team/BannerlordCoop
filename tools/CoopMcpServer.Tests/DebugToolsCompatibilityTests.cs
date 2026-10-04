@@ -24,7 +24,7 @@ public sealed class DebugToolsCompatibilityTests
                 Arguments = new[] { "--config", config }, ShutdownTimeout = TimeSpan.FromSeconds(10),
             }), cancellationToken: timeout.Token);
             var tools = await client.ListToolsAsync(cancellationToken: timeout.Token);
-            Assert.Equal(22, tools.Count);
+            Assert.Equal(23, tools.Count);
             var baseline = JsonNode.Parse(File.ReadAllText(Path.Combine(AppContext.BaseDirectory, "Data", "DebugTools-5192afea.json"))).AsArray();
             Assert.Equal(17, baseline.Count);
             foreach (var original in baseline)
@@ -104,6 +104,11 @@ public sealed class DebugToolsCompatibilityTests
             Assert.Equal(labArguments, lab.JsonSchema.GetProperty("required").EnumerateArray().Select(p => p.GetString()).Order());
             Assert.True(lab.ProtocolTool.Annotations.ReadOnlyHint);
             Assert.True(lab.ReturnJsonSchema.HasValue);
+            var video = tools.Single(t => t.Name == "record_video");
+            string[] videoArguments = { "instance", "run_id", "seconds" };
+            Assert.Equal(videoArguments, video.JsonSchema.GetProperty("properties").EnumerateObject().Select(p => p.Name).Order());
+            Assert.Equal(videoArguments, video.JsonSchema.GetProperty("required").EnumerateArray().Select(p => p.GetString()).Order());
+            Assert.True(video.ProtocolTool.Annotations.ReadOnlyHint);
             string export = Environment.GetEnvironmentVariable("COOP_MCP_SCHEMA_EXPORT");
             if (export != null)
                 File.WriteAllText(export, JsonSerializer.Serialize(tools.OrderBy(t => t.Name).Select(t => t.ProtocolTool),
