@@ -18,6 +18,7 @@ using System.Linq;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Encounters;
 using TaleWorlds.CampaignSystem.MapEvents;
+using TaleWorlds.CampaignSystem.Naval;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.Core;
 using TaleWorlds.Library;
@@ -29,8 +30,8 @@ namespace Missions.Naval;
 
 /// <summary>
 /// Coop replacement for <c>NavalMissions.OpenNavalBattleMission</c>. Keeps the vanilla naval behavior list but
-/// fields only the local player's own party: coop troop suppliers, own-party ships wrapped in
-/// <see cref="CoopShipOrigin"/>, own-party captains, no <c>NavalBattleEndLogic</c> (campaign ship capture) and no
+/// fields only the local player's own party: coop troop suppliers, detached snapshots of own-party ships from
+/// <see cref="ICoopShipSnapshotBuilder"/>, own-party captains, no <c>NavalBattleEndLogic</c> (campaign ship capture) and no
 /// <c>ShipRetreatLogic</c> (naval retreat is disabled). Other players' and AI hulls are not spawned here.
 /// </summary>
 public class CoopNavalBattleLauncher : ICoopNavalBattleLauncher
@@ -41,17 +42,20 @@ public class CoopNavalBattleLauncher : ICoopNavalBattleLauncher
     private readonly IObjectManager objectManager;
     private readonly ICoopBattleBehaviorAttacher behaviorAttacher;
     private readonly IBattleAgentBudget agentBudget;
+    private readonly ICoopShipSnapshotBuilder shipSnapshotBuilder;
 
     public CoopNavalBattleLauncher(
         IMessageBroker messageBroker,
         IObjectManager objectManager,
         ICoopBattleBehaviorAttacher behaviorAttacher,
-        IBattleAgentBudget agentBudget)
+        IBattleAgentBudget agentBudget,
+        ICoopShipSnapshotBuilder shipSnapshotBuilder)
     {
         this.messageBroker = messageBroker;
         this.objectManager = objectManager;
         this.behaviorAttacher = behaviorAttacher;
         this.agentBudget = agentBudget;
+        this.shipSnapshotBuilder = shipSnapshotBuilder;
     }
 
     public Mission OpenCoopNavalBattle(MissionInitializerRecord rec)
@@ -94,7 +98,7 @@ public class CoopNavalBattleLauncher : ICoopNavalBattleLauncher
 
         var ownCampaignShips = new MBList<IShipOrigin> { deploymentModel.GetSuitablePlayerShip(ownMapEventParty, ownTeamParties) };
         deploymentModel.FillShipsOfTeamParties(ownTeamParties, ownTeamLimit, ownCampaignShips);
-        var ownShips = ownCampaignShips.Select(ship => (IShipOrigin)new CoopShipOrigin(ship)).ToMBList();
+        var ownShips = ownCampaignShips.Select(ship => (IShipOrigin)shipSnapshotBuilder.Build((Ship)ship)).ToMBList();
         var captains = OrderOwnCaptains(CoopFieldBattleLauncher.OwnPartyHeroesByPriority(),
             PartyBase.MainParty.LeaderHero?.CharacterObject.StringId, ownShips.Count);
 

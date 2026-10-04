@@ -2,6 +2,7 @@
 using Missions.Battles;
 using NavalDLC.Missions.MissionLogics;
 using NavalDLC.Missions.Objects;
+using TaleWorlds.CampaignSystem.Naval;
 using Newtonsoft.Json;
 using System;
 using System.Linq;
@@ -43,7 +44,8 @@ public sealed class NavalInspectCoopCommand : ICoopCommand
             ships = shipsLogic.AllShips.Select(ship => new
             {
                 hull = ship.ShipOrigin.Hull?.StringId,
-                origin = ship.ShipOrigin is CoopShipOrigin ? "coop" : ship.ShipOrigin.GetType().Name,
+                origin = ship.ShipOrigin.GetType().Name,
+                detachedFromParty = ship.ShipOrigin is Ship campaignShip ? (bool?)(campaignShip.Owner?.Ships.Contains(campaignShip) != true) : null,
                 team = ship.Team?.TeamSide.ToString(),
                 formation = ship.Formation?.FormationIndex.ToString(),
                 isPlayerShip = ship.IsPlayerShip,

@@ -17,6 +17,9 @@ public class NavalMissionModule : Module
         builder.RegisterType<CoopNavalBattleLauncher>()
             .As<ICoopNavalBattleLauncher>()
             .InstancePerDependency();
+        builder.RegisterType<CoopShipSnapshotBuilder>()
+            .As<ICoopShipSnapshotBuilder>()
+            .InstancePerDependency();
         builder.RegisterType<NavalInspectCoopCommand>()
             .As<ICoopCommand>()
             .InstancePerDependency();
