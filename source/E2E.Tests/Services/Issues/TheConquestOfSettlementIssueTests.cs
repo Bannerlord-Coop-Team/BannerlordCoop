@@ -1,6 +1,7 @@
 ﻿using Common.Util;
 using E2E.Tests.Environment;
 using Common.Commands;
+using Common.Messaging;
 using Coop.Core.Server.Services.Stances.Messages;
 using E2E.Tests.Environment.Instance;
 using GameInterface.Services.Heroes.Commands;
@@ -23,12 +24,14 @@ using System;
 using System.Linq;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Actions;
+using TaleWorlds.CampaignSystem.CharacterDevelopment;
 using TaleWorlds.CampaignSystem.Encyclopedia;
 using TaleWorlds.CampaignSystem.Issues;
 using TaleWorlds.CampaignSystem.MapEvents;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Settlements;
 using TaleWorlds.Core;
+using TaleWorlds.ObjectSystem;
 using Xunit.Abstractions;
 
 namespace E2E.Tests.Services.Issues;
@@ -39,10 +42,12 @@ using Quest = TheConquestOfSettlementIssueBehavior.TheConquestOfSettlementIssueQ
 public class TheConquestOfSettlementIssueTests : IDisposable
 {
     private readonly E2ETestEnvironment environment;
+    private readonly ITestOutputHelper output;
     private EnvironmentInstance Server => environment.Server;
 
     public TheConquestOfSettlementIssueTests(ITestOutputHelper output)
     {
+        this.output = output;
         environment = new E2ETestEnvironment(output);
     }
 
@@ -153,9 +158,67 @@ public class TheConquestOfSettlementIssueTests : IDisposable
         }
         var previous = 0;
         var changed = 0;
+        void Observe(EnvironmentInstance instance, string phase)
+        {
+            Assert.True(instance.ObjectManager.TryGetObject<Hero>(heroId, out var hero));
+            MBObjectBase key = parameter switch
+            {
+                "charm" => DefaultSkills.Charm,
+                "mercy" => DefaultTraits.Mercy,
+                "persona_curt" => DefaultTraits.PersonaCurt,
+                "persona_ironic" => DefaultTraits.PersonaIronic,
+                "in_bloom" => DefaultPerks.Charm.InBloom,
+                "young_and_respectful" => DefaultPerks.Charm.YoungAndRespectful,
+                "good_natured" => DefaultPerks.Charm.GoodNatured,
+                "tribute" => DefaultPerks.Charm.Tribute,
+                _ => null,
+            };
+            var heroRegistered = instance.ObjectManager.TryGetHandle(hero, out var heroHandle);
+            var keyRegistered = instance.ObjectManager.TryGetHandle(key, out var keyHandle);
+            JArray Messages(System.Collections.Generic.IEnumerable<IMessage> messages)
+            {
+                var rows = new JArray();
+                foreach (var item in messages.Select((message, index) => new { message, index }))
+                {
+                    var type = item.message.GetType();
+                    if (!type.Name.StartsWith("Hero__heroTraits_Set") &&
+                        !type.Name.StartsWith("Hero__heroSkills_Set") &&
+                        !type.Name.StartsWith("Hero__heroPerks_Set")) continue;
+                    var row = new JObject { ["index"] = item.index, ["type"] = type.FullName };
+                    // Generated message types exist only after the runtime AutoSync build.
+                    foreach (var name in new[] { "InstanceId", "ValueId", "PropertyValue" })
+                    {
+                        var property = type.GetProperty(name);
+                        if (property != null) row[name] = JToken.FromObject(property.GetValue(item.message));
+                    }
+                    foreach (var name in new[] { "Instance", "Value" })
+                    {
+                        var property = type.GetProperty(name);
+                        if (property == null) continue;
+                        var value = property.GetValue(item.message);
+                        row[name + "Registered"] = instance.ObjectManager.TryGetHandle(value, out var handle);
+                        row[name + "Handle"] = handle;
+                        row[name + "StringId"] = (value as MBObjectBase)?.StringId;
+                    }
+                    rows.Add(row);
+                }
+                return rows;
+            }
+            output.WriteLine(new JObject
+            {
+                ["diagnostic"] = "social-parameter", ["phase"] = phase, ["parameter"] = parameter,
+                ["role"] = ReferenceEquals(instance, Server) ? "server" : "client-" + Array.IndexOf(environment.Clients.ToArray(), instance),
+                ["heroId"] = heroId, ["heroRegistered"] = heroRegistered, ["heroHandle"] = heroHandle,
+                ["keyType"] = key?.GetType().FullName, ["keyId"] = key?.StringId,
+                ["keyRegistered"] = keyRegistered, ["keyHandle"] = keyHandle,
+                ["value"] = ReadValue(), ["pendingApplies"] = instance.PendingGameThreadActionCount,
+                ["sent"] = Messages(instance.NetworkSentMessages), ["published"] = Messages(instance.InternalMessages),
+            }.ToString(Newtonsoft.Json.Formatting.None));
+        }
         Server.Call(() =>
         {
             previous = ReadValue();
+            Observe(Server, "before-write");
             changed = previous == 0 ? 1 : 0;
             Assert.False(command.ProcessCommand(args.FromValues(new[] { heroId, parameter, changed.ToString() })).Succeeded);
             Assert.False(command.ProcessCommand(args.FromValues(new[] { heroId, parameter, int.MaxValue.ToString(), previous.ToString() })).Succeeded);
@@ -165,12 +228,16 @@ public class TheConquestOfSettlementIssueTests : IDisposable
             Assert.Equal(changed, ReadValue());
             Assert.False(command.ProcessCommand(args.FromValues(new[] { heroId, parameter, previous.ToString(), previous.ToString() })).Succeeded);
             Assert.Equal(changed, ReadValue());
+            Observe(Server, "after-write");
         });
+        foreach (var client in environment.Clients)
+            client.Call(() => Observe(client, "before-pump"));
         foreach (var client in environment.Clients)
         {
             client.PumpGameThread();
             client.Call(() =>
             {
+                Observe(client, "after-pump");
                 Assert.Equal(changed, ReadValue());
                 Assert.False(command.ProcessCommand(args.FromValues(new[] { heroId, parameter, previous.ToString(), changed.ToString() })).Succeeded);
                 Assert.Equal(changed, ReadValue());

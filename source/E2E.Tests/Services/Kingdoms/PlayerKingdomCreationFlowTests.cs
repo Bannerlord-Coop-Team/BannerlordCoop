@@ -79,6 +79,7 @@ public class PlayerKingdomCreationFlowTests : IDisposable
     private const string KingdomName = "Real Kingdom";
 
     private E2ETestEnvironment TestEnvironment { get; }
+    private readonly ITestOutputHelper output;
     private EnvironmentInstance Server => TestEnvironment.Server;
     private IEnumerable<EnvironmentInstance> Clients => TestEnvironment.Clients;
     private static IKingdomDecisionVoteManager GetVoteManager(EnvironmentInstance instance) =>
@@ -88,6 +89,7 @@ public class PlayerKingdomCreationFlowTests : IDisposable
 
     public PlayerKingdomCreationFlowTests(ITestOutputHelper output)
     {
+        this.output = output;
         TestEnvironment = new E2ETestEnvironment(output);
     }
 
@@ -179,6 +181,38 @@ public class PlayerKingdomCreationFlowTests : IDisposable
         ConfigureClanInKingdom(ruler.ClanId, kingdomId);
         ConfigureClanInKingdom(player.ClanId, kingdomId);
         EnsureKingdomRegisteredEverywhere(kingdomId);
+        void Observe(EnvironmentInstance instance, string phase)
+        {
+            Assert.True(instance.ObjectManager.TryGetObject<Clan>(player.ClanId, out var clan));
+            Assert.True(instance.ObjectManager.TryGetObject<Kingdom>(kingdomId, out var kingdom));
+            var clanRegistered = instance.ObjectManager.TryGetHandle(clan, out var clanHandle);
+            var kingdomRegistered = instance.ObjectManager.TryGetHandle(kingdom, out var kingdomHandle);
+            var setter = AccessTools.PropertySetter(typeof(Clan), nameof(Clan.Kingdom));
+            var internalSetter = AccessTools.Method(typeof(Clan), nameof(Clan.SetKingdomInternal));
+            output.WriteLine(Newtonsoft.Json.JsonConvert.SerializeObject(new
+            {
+                diagnostic = "rebellion-membership", phase,
+                role = ReferenceEquals(instance, Server) ? "server" : "client-" + Array.IndexOf(Clients.ToArray(), instance),
+                player.ClanId, clanRegistered, clanHandle, kingdomId, kingdomRegistered, kingdomHandle,
+                clanKingdom = clan.Kingdom?.StringId, backingKingdom = clan._kingdom?.StringId,
+                kingdomClans = kingdom._clans?.Select(member => member?.StringId).ToArray(),
+                pendingApplies = instance.PendingGameThreadActionCount,
+                localSets = instance.InternalMessages.GetMessages<SetClanKingdom>()
+                    .Select(message => new { clan = message.Clan?.StringId, kingdom = message.Kingdom?.StringId }).ToArray(),
+                sentSets = instance.NetworkSentMessages.GetMessages<NetworkSetClanKingdom>().ToArray(),
+                receivedSets = instance.InternalMessages.GetMessages<NetworkSetClanKingdom>().ToArray(),
+                sentChanges = instance.NetworkSentMessages.GetMessages<NetworkOnClanChangedKingdom>().ToArray(),
+                receivedChanges = instance.InternalMessages.GetMessages<NetworkOnClanChangedKingdom>().ToArray(),
+                membershipMessageOrder = instance.InternalMessages.Select((message, index) => new { message, index })
+                    .Where(item => item.message is SetClanKingdom || item.message is NetworkSetClanKingdom ||
+                        item.message is NetworkOnClanChangedKingdom || item.message.GetType().Name.StartsWith("Kingdom__clans_"))
+                    .Select(item => new { item.index, type = item.message.GetType().FullName }).ToArray(),
+                setterPrefixes = Harmony.GetPatchInfo(setter)?.Prefixes
+                    .Select(patch => patch.PatchMethod.DeclaringType.FullName + "." + patch.PatchMethod.Name).ToArray(),
+                internalSetterPrefixes = Harmony.GetPatchInfo(internalSetter)?.Prefixes
+                    .Select(patch => patch.PatchMethod.DeclaringType.FullName + "." + patch.PatchMethod.Name).ToArray(),
+            }));
+        }
         foreach (var instance in new[] { Server }.Concat(Clients))
             instance.Call(() =>
             {
@@ -187,6 +221,7 @@ public class PlayerKingdomCreationFlowTests : IDisposable
                 {
                     kingdom.Name = new TextObject("Rebellion kingdom");
                 }
+                Observe(instance, "before-command");
             });
 
         Server.Call(() =>
@@ -215,6 +250,7 @@ public class PlayerKingdomCreationFlowTests : IDisposable
             try
             {
                 var result = command.ProcessCommand(args.FromValues(new[] { player.ClanId, "rebellion", ControllerId }));
+                Observe(Server, "after-command");
                 Assert.True(result.Succeeded, result.Output);
                 Assert.Equal(1, changes);
                 Assert.True(clan.IsAtWarWith(kingdom));
@@ -228,8 +264,12 @@ public class PlayerKingdomCreationFlowTests : IDisposable
         }, new[] { AccessTools.Method(typeof(DefaultAllianceModel), nameof(DefaultAllianceModel.GetCallToWarCost)) });
         Assert.Contains(Server.NetworkSentMessages.GetMessages<NetworkDeclareWar>(),
             message => message.Detail == (int)DeclareWarAction.DeclareWarDetail.CausedByRebellion);
+        foreach (var instance in new[] { Server }.Concat(Clients))
+            instance.Call(() => Observe(instance, "before-pump"));
         foreach (var client in Clients)
             client.PumpGameThread();
+        foreach (var instance in new[] { Server }.Concat(Clients))
+            instance.Call(() => Observe(instance, "after-pump"));
         foreach (var instance in new[] { Server }.Concat(Clients))
             instance.Call(() =>
             {
