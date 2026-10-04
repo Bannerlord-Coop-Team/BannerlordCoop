@@ -1,5 +1,4 @@
-﻿#if DEBUG
-using System;
+﻿using System;
 using System.Linq;
 using E2E.Tests.Environment.Mock;
 using E2E.Tests.Environment.MockEngine;
@@ -31,23 +30,23 @@ public sealed class NavalDeckMovementTests : MissionTestEnvironment
         public Agent Puppet = null!;
         public MirrorAgent Mirror = null!;
         public Guid Id;
-        public long Expected = 2;
+        public Guid HullId = Guid.NewGuid();
         public bool Resolves = true;
         public MatrixFrame Hull = new MatrixFrame(Mat3.Identity, new Vec3(10f, 20f, 0f));
-        // Owner world directions are localised against the follower hull at receive time.
+        // Owner world directions are localised against the local hull at receive time.
         public MatrixFrame ReceiveHull;
 
-        public void Receive(AgentData data)
+        public void Receive(AgentData data, Guid[]? deckShips = null)
         {
             ReceiveHull = Hull;
-            Handler.HandlePacket(null, new MovementPacket(new[] { Id }, new[] { data }));
+            Handler.HandlePacket(null, new MovementPacket(new[] { Id }, new[] { data }, deckShips ?? new[] { HullId }));
         }
 
         public void Tick() => Handler.Interpolator.Tick(1f / 60f);
 
         public bool HasTarget => Handler.Interpolator.TryGetTargetFrame(Puppet, out _, out _, out _);
 
-        public JToken Deck => JObject.FromObject(Handler.InspectNavalStationMovement())["deck"]!;
+        public JToken Deck => JObject.FromObject(Handler.InspectShipDecks());
 
         public void MoveHull(float yaw, Vec3 translation)
         {
@@ -55,7 +54,7 @@ public sealed class NavalDeckMovementTests : MissionTestEnvironment
             Hull.origin = Hull.origin + translation;
         }
 
-        public AgentData Data(long revision, int deckShip, Vec3 world)
+        public AgentData Data(bool onDeck, Vec3 world)
         {
             Agent source = Mission.SpawnAgent(new AgentBuildData(Game.Current.PlayerTroop).Controller(AgentControllerType.None));
             Assert.True(AgentMirror.TryGet(source, out var mirror));
@@ -64,8 +63,7 @@ public sealed class NavalDeckMovementTests : MissionTestEnvironment
             mirror.LookDirection = new Vec3(1f, 0f, 0f);
             mirror.InputVector = new Vec2(0f, 1f);
             var data = new AgentData(source);
-            data.NavalHelmRevision = revision;
-            if (deckShip != 0) data.StampNavalDeck(deckShip, Local, 1.5f);
+            if (onDeck) data.StampDeck(HullId, 1, Local, 1.5f);
             return data;
         }
 
@@ -100,12 +98,11 @@ public sealed class NavalDeckMovementTests : MissionTestEnvironment
             Assert.True(peer.Resolve<INetworkAgentRegistry>().TryRegisterAgent("owner", receiver.Id, receiver.Puppet));
             if (configureDeck)
             {
-                receiver.Handler.ConfigureNavalStationMovement(_ => false, null, null,
-                    (_, revision) => revision == receiver.Expected, null,
-                    (Agent agent, int ship, out MatrixFrame frame) =>
+                receiver.Handler.ConfigureShipDecks(null,
+                    (Agent agent, Guid ship, out MatrixFrame frame) =>
                     {
                         frame = receiver.Hull;
-                        return receiver.Resolves && ship == 1 && agent == receiver.Puppet;
+                        return receiver.Resolves && ship == receiver.HullId && agent == receiver.Puppet;
                     });
             }
             test(receiver);
@@ -118,7 +115,7 @@ public sealed class NavalDeckMovementTests : MissionTestEnvironment
         using var fixture = new MissionEngineFixture();
         WithReceiver(fixture, receiver =>
         {
-            receiver.Receive(receiver.Data(2, 1, new Vec3(100f, 100f, 0f)));
+            receiver.Receive(receiver.Data(true, new Vec3(100f, 100f, 0f)));
             receiver.AssertFollowsHull();
             for (int i = 0; i < 3; i++)
             {
@@ -133,17 +130,15 @@ public sealed class NavalDeckMovementTests : MissionTestEnvironment
     }
 
     [Fact]
-    public void ReleaseReseatAndModeTransitions_RejectStaleRevisionsWithoutTeleport()
+    public void HullThatStopsResolving_EvictsAndHaltsTheDeckPuppet_AndWorldDeckTransitionsKeepTheTarget()
     {
         using var fixture = new MissionEngineFixture();
         WithReceiver(fixture, receiver =>
         {
-            AgentData released = receiver.Data(2, 1, Vec3.Zero);
-            receiver.Receive(released);
+            receiver.Receive(receiver.Data(true, Vec3.Zero));
             receiver.MoveHull(0.1f, new Vec3(0.3f, 0f, 0f));
             receiver.AssertFollowsHull();
 
-            // Re-seat: the replica is no longer released, so the next tick evicts and halts the deck puppet.
             receiver.Resolves = false;
             receiver.Tick();
             Assert.False(receiver.HasTarget);
@@ -151,24 +146,16 @@ public sealed class NavalDeckMovementTests : MissionTestEnvironment
             AssertNear(receiver.Mirror.Position.AsVec2, receiver.Mirror.LastTargetPosition);
             Assert.Equal(1, (long)receiver.Deck["interpolator"]!["deckEvictions"]!);
 
-            receiver.Expected = -1;
-            receiver.Receive(released);
-            Assert.False(receiver.HasTarget);
-
-            // Next release: the late previous revision is rejected and only the current one is followed.
-            receiver.Expected = 4;
             receiver.Resolves = true;
-            receiver.Receive(released);
-            Assert.False(receiver.HasTarget);
-            receiver.Receive(receiver.Data(4, 1, Vec3.Zero));
+            receiver.Receive(receiver.Data(true, Vec3.Zero));
             receiver.MoveHull(-0.1f, new Vec3(0f, 0.4f, 0f));
             receiver.AssertFollowsHull();
 
             Vec3 world = receiver.Mirror.Position + new Vec3(1f, 0f, 0f);
-            receiver.Receive(receiver.Data(4, 0, world));
+            receiver.Receive(receiver.Data(false, world));
             receiver.Tick();
             AssertNear(world.AsVec2, receiver.Mirror.LastTargetPosition);
-            receiver.Receive(receiver.Data(4, 1, Vec3.Zero));
+            receiver.Receive(receiver.Data(true, Vec3.Zero));
             receiver.AssertFollowsHull();
 
             Assert.Equal(2, (long)receiver.Deck["interpolator"]!["deckTransitions"]!);
@@ -179,21 +166,20 @@ public sealed class NavalDeckMovementTests : MissionTestEnvironment
     [Theory]
     [InlineData("no_resolver")]
     [InlineData("unresolved_hull")]
-    [InlineData("unreleased_revision")]
+    [InlineData("index_outside_table")]
     [InlineData("non_finite_pose")]
-    public void DeckPacket_WithoutResolvableReleasedPose_IsRejectedNotAppliedAsWorld(string condition)
+    public void DeckPacket_WithoutResolvablePose_IsRejectedNotAppliedAsWorld(string condition)
     {
         using var fixture = new MissionEngineFixture();
         WithReceiver(fixture, receiver =>
         {
             if (condition == "no_resolver")
-                receiver.Handler.ConfigureNavalStationMovement(_ => false, null, null, (_, _) => true);
+                receiver.Handler.ConfigureShipDecks(null, null);
             receiver.Resolves = condition != "unresolved_hull";
-            receiver.Expected = condition == "unreleased_revision" ? 0 : 2;
-            AgentData data = receiver.Data(receiver.Expected, 1, Vec3.Zero);
-            if (condition == "non_finite_pose") data.StampNavalDeck(1, new Vec3(float.NaN, 0f, 0f), 1f);
+            AgentData data = receiver.Data(true, Vec3.Zero);
+            if (condition == "non_finite_pose") data.StampDeck(receiver.HullId, 1, new Vec3(float.NaN, 0f, 0f), 1f);
 
-            receiver.Receive(data);
+            receiver.Receive(data, condition == "index_outside_table" ? Array.Empty<Guid>() : null);
             receiver.Tick();
 
             Assert.False(receiver.HasTarget);
@@ -209,19 +195,19 @@ public sealed class NavalDeckMovementTests : MissionTestEnvironment
         WithReceiver(fixture, receiver =>
         {
             Vec3 world = receiver.Mirror.Position + new Vec3(2f, -1f, 0f);
-            AgentData data = receiver.Data(0, 0, world);
+            AgentData data = receiver.Data(false, world);
 
             receiver.Receive(data);
             receiver.Tick();
 
-            Assert.Equal(0, data.NavalDeckShip);
+            Assert.Equal(0, data.DeckShipIndex);
             Assert.Equal(world.AsVec2, receiver.Mirror.LastTargetPosition);
             Assert.Equal(0, receiver.Mirror.TeleportToPositionCalls);
         }, configureDeck: false);
     }
 
     [Fact]
-    public void ReleasedCaptainPacket_IsStampedOnDeck_AndCountsWorldFallbackWhenCaptureFails()
+    public void OwnedAgentOnAHull_IsStampedWithThePacketHullTable_AndSendsWorldWhenCaptureFails()
     {
         using var fixture = new MissionEngineFixture();
         var peer = Clients.First();
@@ -229,42 +215,43 @@ public sealed class NavalDeckMovementTests : MissionTestEnvironment
         peer.Call(() =>
         {
             var mock = CreateMovementMission(fixture, peer);
-            Agent captain = mock.SpawnAgent(new AgentBuildData(Game.Current.PlayerTroop).Controller(AgentControllerType.None));
-            Assert.True(AgentMirror.TryGet(captain, out var mirror));
-            Assert.True(peer.Resolve<INetworkAgentRegistry>().TryRegisterAgent("peer", Guid.NewGuid(), 1, captain));
+            Agent sailor = mock.SpawnAgent(new AgentBuildData(Game.Current.PlayerTroop).Controller(AgentControllerType.None));
+            Assert.True(AgentMirror.TryGet(sailor, out var mirror));
+            Assert.True(peer.Resolve<INetworkAgentRegistry>().TryRegisterAgent("peer", Guid.NewGuid(), 1, sailor));
             var handler = peer.Resolve<ICoopMissionComponent>().AgentMovementHandler;
             var network = Assert.IsType<MockBattleNetwork>(peer.Resolve<IBattleNetwork>());
+            Guid hull = Guid.NewGuid();
             bool captures = true;
-            handler.ConfigureNavalStationMovement(_ => false, _ => false, _ => 2, null,
-                (CoopAgentInfo info, Vec3 world, out int ship, out Vec3 local, out float speed) =>
+            handler.ConfigureShipDecks(
+                (CoopAgentInfo info, Vec3 world, out Guid ship, out Vec3 local, out float speed) =>
                 {
-                    ship = 1;
+                    ship = hull;
                     local = world - new Vec3(10f, 0f, 0f);
                     speed = 0.75f;
                     return captures;
-                });
+                },
+                null);
 
             mirror.Position = new Vec3(12f, 0f, 0f);
             mirror.RealGlobalVelocity = new Vec3(3f, 0f, 0f);
             handler.PollMovement(0f);
-            AgentData deck = Assert.Single(network.NetworkSentPackets.GetPackets<MovementPacket>().SelectMany(p => p.Agents));
-            Assert.Equal(2, deck.NavalHelmRevision);
-            Assert.Equal(1, deck.NavalDeckShip);
-            Assert.Equal(new Vec3(2f, 0f, 0f), deck.NavalDeckLocal);
+            MovementPacket deckPacket = Assert.Single(network.NetworkSentPackets.GetPackets<MovementPacket>());
+            AgentData deck = Assert.Single(deckPacket.Agents);
+            Assert.Equal(new[] { hull }, deckPacket.DeckShips);
+            Assert.Equal(1, deck.DeckShipIndex);
+            Assert.Equal(new Vec3(2f, 0f, 0f), deck.DeckLocal);
             Assert.Equal(0.75f, deck.Speed);
 
             captures = false;
             mirror.Position = new Vec3(13f, 0f, 0f);
             network.NetworkSentPackets.Packets.Clear();
             handler.PollMovement(0.1f);
-            AgentData world = Assert.Single(network.NetworkSentPackets.GetPackets<MovementPacket>().SelectMany(p => p.Agents));
-            Assert.Equal(2, world.NavalHelmRevision);
-            Assert.Equal(0, world.NavalDeckShip);
+            MovementPacket worldPacket = Assert.Single(network.NetworkSentPackets.GetPackets<MovementPacket>());
+            AgentData world = Assert.Single(worldPacket.Agents);
+            Assert.Null(worldPacket.DeckShips);
+            Assert.Equal(0, world.DeckShipIndex);
             Assert.Equal(3f, world.Speed);
-
-            var status = JObject.FromObject(handler.InspectNavalStationMovement())["deck"]!;
-            Assert.Equal(1, (long)status["stamped"]!);
-            Assert.Equal(1, (long)status["worldFallback"]!);
+            Assert.Equal(1, (long)JObject.FromObject(handler.InspectShipDecks())["stamped"]!);
         });
     }
 
@@ -274,4 +261,3 @@ public sealed class NavalDeckMovementTests : MissionTestEnvironment
         Assert.InRange(actual.Y, expected.Y - 0.0005f, expected.Y + 0.0005f);
     }
 }
-#endif

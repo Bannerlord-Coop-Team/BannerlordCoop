@@ -106,33 +106,34 @@ public sealed partial class NavalLabController : INavalNativeController
     }
 
     // Called only for a released revision, which already bound the actor to this incarnation's captain identity.
-    private bool CaptureNavalDeck(CoopAgentInfo info, Vec3 worldPosition, out int deckShip, out Vec3 deckLocal, out float deckSpeed)
+    private bool CaptureNavalDeck(CoopAgentInfo info, Vec3 worldPosition, out Guid deckShip, out Vec3 deckLocal, out float deckSpeed)
     {
-        deckShip = 0;
+        deckShip = Guid.Empty;
         deckLocal = Vec3.Zero;
         deckSpeed = 0;
         int slot = Array.IndexOf(manifest.Controllers, session.OwnControllerId);
-        if (slot < 0 || info?.OriginalOwner != session.OwnControllerId
+        if (slot < 0 || info?.OriginalOwner != session.OwnControllerId || !(NativeHelmMovementRevision(info) >= 1)
             || Array.IndexOf(manifest.Combatants, info.AgentId) != slot * NavalLabManifest.CrewPerShip
             || !((INavalDeckAdapter)adapter).TryCaptureOwnCaptainDeck(info.Agent, worldPosition, out int supportSlot,
                 out deckLocal, out deckSpeed)
             || supportSlot < 0 || supportSlot >= manifest.Ships.Length)
             return false;
-        deckShip = supportSlot + 1;
+        deckShip = manifest.Ships[supportSlot];
         return true;
     }
 
     // A foreign captain keeps its origin identity and released revision; deckShip only selects the support hull.
-    private bool ResolveNavalDeckFrame(Agent agent, int deckShip, out MatrixFrame hullFrame)
+    private bool ResolveNavalDeckFrame(Agent agent, Guid deckShip, out MatrixFrame hullFrame)
     {
         hullFrame = default;
         int index = Array.IndexOf(adapter.Agents, agent);
         int captainSlot = index / NavalLabManifest.CrewPerShip;
+        int supportSlot = Array.IndexOf(manifest.Ships, deckShip);
         if (index < 0 || index % NavalLabManifest.CrewPerShip != 0 || captainSlot >= manifest.Controllers.Length
-            || manifest.Controllers[captainSlot] == session.OwnControllerId || deckShip < 1 || deckShip > manifest.Ships.Length
+            || manifest.Controllers[captainSlot] == session.OwnControllerId || supportSlot < 0
             || !coopMissionComponent.AgentRegistry.TryGetAgentInfo(manifest.Combatants[index], out var info)
             || info.Agent != agent || !(NativeHelmMovementRevision(info) >= 1)) return false;
-        return ((INavalDeckAdapter)adapter).TryGetCaptainDeckFrame(captainSlot, deckShip - 1, agent, out hullFrame);
+        return ((INavalDeckAdapter)adapter).TryGetCaptainDeckFrame(captainSlot, supportSlot, agent, out hullFrame);
     }
 
     private bool AcceptNativeStationMovement(CoopAgentInfo info, long revision)

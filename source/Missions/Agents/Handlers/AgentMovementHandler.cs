@@ -43,8 +43,16 @@ public interface IAgentMovementHandler : IPacketHandler, IDisposable
 
     bool TrySetForcedBulkHz(int? hz, out string error);
 
-    /// <summary>Puppets the predicate holds are left to their naval hull instead of the owner's world pose.</summary>
-    void ConfigureShipCrewMovement(Func<Agent, bool> holdsWorldPose);
+    /// <summary>Owned agents the capture places on a hull send hull-local poses; received ones rebase on the resolved local hull.</summary>
+    void ConfigureShipDecks(NavalDeckPoseCapture capture, NavalDeckFrameResolver resolver);
+
+    /// <summary>Owned agents the predicate holds (seated at a ship station) send no world movement.</summary>
+    void ConfigureSeatedMovement(Func<CoopAgentInfo, bool> isSeated);
+
+    /// <summary>[Game thread] Drops the puppet's buffered movement target, so a station or other driver owns its pose.</summary>
+    void ForgetMovementTarget(Agent agent);
+
+    object InspectShipDecks();
 
     bool TrySetForcedReceiverCapHz(int? hz, out string error);
 
@@ -504,6 +512,8 @@ public partial class AgentMovementHandler : IAgentMovementHandler
         _dismountedHorses.Clear();
         resolvedMountIdentities.Clear();
         recipientMovementStates.Clear();
+        ConfigureShipDecks(null, null);
+        ConfigureSeatedMovement(null);
 #if DEBUG
         ConfigureNavalStationMovement(null);
 #endif
@@ -535,10 +545,6 @@ public partial class AgentMovementHandler : IAgentMovementHandler
         initialConfiguredBulkHz = movementRateController.Snapshot.BulkHz;
 #endif
     }
-
-    private Func<Agent, bool> shipCrewHoldsWorldPose;
-
-    public void ConfigureShipCrewMovement(Func<Agent, bool> holdsWorldPose) => shipCrewHoldsWorldPose = holdsWorldPose;
 
     public bool TrySetForcedBulkHz(int? hz, out string error) =>
         movementRateController.TrySetForcedBulkHz(hz, out error);
@@ -1034,6 +1040,7 @@ public partial class AgentMovementHandler : IAgentMovementHandler
             }
 
             Guid agentId = captured.AgentInfo.AgentId;
+            if (WithholdSeatedMovement(recipient, captured)) continue;
 #if DEBUG
             if (WithholdNavalStationMovement(controllerId, recipient, captured)) continue;
 #endif
@@ -1699,12 +1706,13 @@ public partial class AgentMovementHandler : IAgentMovementHandler
         Guid[] canonicalIds,
         AgentData[] data)
     {
+        Guid[] deckShips = StampDecks(identityScopeId, compactIds, canonicalIds, data);
 #if DEBUG
         StampNavalHelmMovement(identityScopeId, compactIds, canonicalIds, data);
 #endif
         return identityScopeId == null
-            ? new MovementPacket(canonicalIds, data)
-            : new MovementPacket(identityScopeId, compactIds, data);
+            ? new MovementPacket(canonicalIds, data, deckShips)
+            : new MovementPacket(identityScopeId, compactIds, data, deckShips);
     }
 
     private static IPacket CreateMountMovementPacket(
@@ -1734,12 +1742,14 @@ public partial class AgentMovementHandler : IAgentMovementHandler
         var snapshots = new ReceivedMovement[idCount];
         for (int i = 0; i < idCount; i++)
         {
+            AgentData data = movement.Agents[i];
+            data.ResolveDeckShip(movement.DeckShips);
             snapshots[i] = new ReceivedMovement(
                 movement.IdentityScopeId,
                 usesCompactIds ? movement.AgentIds[i] : (ushort)0,
                 usesCompactIds ? Guid.Empty : movement.AgentGuids[i],
                 usesCompactIds,
-                movement.Agents[i]);
+                data);
         }
 
         QueueReceivedMovement(snapshots);
@@ -1832,26 +1842,19 @@ public partial class AgentMovementHandler : IAgentMovementHandler
                 if (agentRegistry.IsLocallyControlled(agent))
                     continue;
 
-                // Owner world poses lag a replicated hull's deck and would drag its crew off it (deck poses are S3).
-                if (shipCrewHoldsWorldPose?.Invoke(agent) == true)
-                {
-                    _interpolator.Forget(agent);
-                    continue;
-                }
-
 #if DEBUG
                 if (acceptNavalStationMovement?.Invoke(agentInfo, data.NavalHelmRevision) == false)
                 {
                     _interpolator.Forget(agent);
                     continue;
                 }
+#endif
                 // The interpolator owns a deck pose and its rebased directions every tick.
-                if (data.NavalDeckShip != 0)
+                if (data.DeckShipIndex != 0)
                 {
-                    ApplyNavalDeckMovement(agent, data);
+                    ApplyDeckMovement(agent, data);
                     continue;
                 }
-#endif
                 Agent previousMount = agent.MountAgent;
                 SyncMountState(
                     agent,

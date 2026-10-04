@@ -51,6 +51,8 @@ public class BattleShipReplicator : IBattleShipReplicator
     private bool spawningForeignHull;
     private bool spawnRecordsSent;
     private float sendElapsed;
+    private float elapsed;
+    private readonly Dictionary<Guid, DeckSpeedSample> deckSpeeds = new Dictionary<Guid, DeckSpeedSample>();
 
     private INetworkShipRegistry Registry => missionComponent.ShipRegistry;
 
@@ -73,7 +75,7 @@ public class BattleShipReplicator : IBattleShipReplicator
         this.teamResolver = teamResolver;
         this.objectManager = objectManager;
 
-        missionComponent.AgentMovementHandler.ConfigureShipCrewMovement(IsCrewOfStreamedForeignHull);
+        missionComponent.AgentMovementHandler.ConfigureShipDecks(CaptureDeck, ResolveDeckFrame);
         messageBroker.Subscribe<ShipSpawnedInBattle>(Handle_ShipSpawned);
         messageBroker.Subscribe<NetworkSpawnBattleShips>(Handle_NetworkSpawnBattleShips);
         messageBroker.Subscribe<NetworkBattleShipSample>(Handle_NetworkBattleShipSample);
@@ -82,7 +84,7 @@ public class BattleShipReplicator : IBattleShipReplicator
 
     public void Dispose()
     {
-        missionComponent.AgentMovementHandler.ConfigureShipCrewMovement(null);
+        missionComponent.AgentMovementHandler.ConfigureShipDecks(null, null);
         messageBroker.Unsubscribe<ShipSpawnedInBattle>(Handle_ShipSpawned);
         messageBroker.Unsubscribe<NetworkSpawnBattleShips>(Handle_NetworkSpawnBattleShips);
         messageBroker.Unsubscribe<NetworkBattleShipSample>(Handle_NetworkBattleShipSample);
@@ -106,6 +108,7 @@ public class BattleShipReplicator : IBattleShipReplicator
 
     public void Tick(float dt)
     {
+        elapsed += Math.Max(0f, dt);
         PruneRemovedHulls();
         DrainPendingForeignHulls();
 
@@ -286,14 +289,68 @@ public class BattleShipReplicator : IBattleShipReplicator
         }
     }
 
-    // Crew poses are world-space; while a foreign hull streams, its crew rides the deck instead.
-    private bool IsCrewOfStreamedForeignHull(Agent agent)
+    // [Game thread] Any owned on-foot agent on a registered hull sends a hull-local pose, so it rides the deck on every peer.
+    internal bool CaptureDeck(CoopAgentInfo info, Vec3 worldPosition, out Guid deckShip, out Vec3 deckLocal, out float deckSpeed)
     {
-        return agent?.Formation != null
-            && Registry.TryGetByFormation(agent.Formation, out var ship)
-            && !IsOwnHull(ship)
-            && streams.TryGetValue(ship.ShipId, out var stream)
-            && stream.Target != null;
+        deckShip = Guid.Empty;
+        deckLocal = Vec3.Zero;
+        deckSpeed = 0f;
+        var hull = engine.GetSupportHull(info?.Agent);
+        if (hull == null || !Registry.TryGetByHull(hull, out var ship)) return false;
+
+        var frame = engine.GetFrame(hull);
+        if (!NetworkBattleShipSample.IsValidFrame(NetworkBattleShipSample.FromFrame(frame))) return false;
+
+        deckLocal = frame.TransformToLocalNonOrthogonal(worldPosition);
+        if (!deckLocal.IsValid) return false;
+
+        deckShip = ship.ShipId;
+        deckSpeed = DeckSpeed(info.AgentId, ship.ShipId, deckLocal);
+        return true;
+    }
+
+    // Finite difference of hull-local positions, so the puppet's walk throttle never includes hull motion.
+    private float DeckSpeed(Guid agentId, Guid shipId, Vec3 local)
+    {
+        deckSpeeds.TryGetValue(agentId, out var previous);
+        float dt = elapsed - previous.Time;
+        if (previous.Ship != shipId || dt < 0f || dt > 0.5f)
+        {
+            deckSpeeds[agentId] = new DeckSpeedSample(shipId, local, elapsed, 0f);
+            return 0f;
+        }
+
+        if (dt < 0.005f) return previous.Speed;
+
+        float speed = (local - previous.Local).AsVec2.Length / dt;
+        deckSpeeds[agentId] = new DeckSpeedSample(shipId, local, elapsed, speed);
+        return speed;
+    }
+
+    // [Game thread] The local hull, owned or copied, that a received deck pose is relative to.
+    internal bool ResolveDeckFrame(Agent agent, Guid deckShip, out MatrixFrame hullFrame)
+    {
+        hullFrame = default;
+        if (!Registry.TryGet(deckShip, out var ship)) return false;
+
+        hullFrame = engine.GetFrame(ship.Hull);
+        return NetworkBattleShipSample.IsValidFrame(NetworkBattleShipSample.FromFrame(hullFrame));
+    }
+
+    private readonly struct DeckSpeedSample
+    {
+        public DeckSpeedSample(Guid ship, Vec3 local, float time, float speed)
+        {
+            Ship = ship;
+            Local = local;
+            Time = time;
+            Speed = speed;
+        }
+
+        public Guid Ship { get; }
+        public Vec3 Local { get; }
+        public float Time { get; }
+        public float Speed { get; }
     }
 
     private void Handle_PeerEntered(MessagePayload<NetworkMissionPeerEntered> payload)

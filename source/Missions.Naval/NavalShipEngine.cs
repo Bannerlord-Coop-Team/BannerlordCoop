@@ -2,10 +2,13 @@
 using Missions.Battles;
 using Missions.Messages;
 using NavalDLC.Missions.MissionLogics;
+using NavalDLC.Missions;
 using NavalDLC.Missions.Objects;
+using NavalDLC.Missions.Objects.UsableMachines;
 using NavalDLC.Missions.ShipControl;
 using System;
 using System.Collections.Generic;
+using System.Globalization;
 using System.Linq;
 using TaleWorlds.CampaignSystem.MapEvents;
 using TaleWorlds.CampaignSystem.Naval;
@@ -103,4 +106,119 @@ public class NavalShipEngine : INavalShipEngine
 
     public string ControllerName(MissionObject hull) =>
         ((MissionShip)hull).Controller?.ControllerType.ToString() ?? ShipControllerType.None.ToString();
+
+    public MissionObject GetSupportHull(Agent agent)
+    {
+        if (agent == null || !agent.IsActive() || agent.HasMount) return null;
+
+        var stepped = agent.GetComponent<AgentNavalComponent>()?.SteppedShip;
+        if (stepped != null && stepped.GetIsAgentOnShip(agent)) return stepped;
+
+        return PlankSourceHull(agent);
+    }
+
+    // A connected plank belongs to no hull; its rope's source hull is the reference frame, as in the naval lab.
+    private static MissionShip PlankSourceHull(Agent agent)
+    {
+        var shipsLogic = ShipsLogic;
+        if (shipsLogic == null) return null;
+
+        foreach (var ship in shipsLogic.AllShips)
+        {
+            foreach (var machine in ship.AttachmentMachines)
+            {
+                var attachment = machine.CurrentAttachment;
+                if (attachment?.State == ShipAttachmentMachine.ShipAttachment.ShipAttachmentState.BridgeConnected
+                    && IsOnPlank(agent, attachment))
+                    return ship;
+            }
+        }
+
+        return null;
+    }
+
+    private static bool IsOnPlank(Agent agent, ShipAttachmentMachine.ShipAttachment attachment)
+    {
+        int face = agent.GetCurrentNavigationFaceId();
+        if (attachment._navMeshBridge != null && face >= attachment._bridgeNavmeshId && face <= attachment._bridgeNavmeshId + 4)
+            return true;
+
+        var stepped = agent.GetSteppedEntity();
+        if (!stepped.IsValid) return false;
+
+        var bridge = attachment._bridge?.WeakEntity ?? WeakGameEntity.Invalid;
+        var navmesh = attachment._navMeshBridge?.WeakEntity ?? WeakGameEntity.Invalid;
+        return stepped == attachment.AttachmentSource.PlankBridgePhysicsEntity.WeakEntity
+            || (bridge.IsValid && stepped.Root == bridge) || (navmesh.IsValid && stepped.Root == navmesh)
+            || attachment.AttachmentSource.RampPhysicsList.Any(entity => entity.WeakEntity == stepped)
+            || (attachment.AttachmentTarget != null && attachment.AttachmentTarget.RampPhysicsList.Any(entity => entity.WeakEntity == stepped));
+    }
+
+    public bool TryDescribeStation(UsableMissionObject point, out MissionObject hull, out string stationKey, out int pointIndex)
+    {
+        hull = null;
+        stationKey = null;
+        pointIndex = -1;
+        var shipsLogic = ShipsLogic;
+        if (point == null || shipsLogic == null || !point.GameEntity.IsValid) return false;
+
+        // Named child paths are content identities, never process-local native pointers.
+        var parts = new List<string>();
+        var entity = point.GameEntity;
+        while (entity.IsValid && parts.Count < 16)
+        {
+            var ship = shipsLogic.AllShips.FirstOrDefault(candidate => candidate.GameEntity == entity);
+            if (ship != null)
+            {
+                parts.Reverse();
+                hull = ship;
+                stationKey = string.Join("/", parts);
+                pointIndex = point.GameEntity.GetScriptComponents<UsableMissionObject>().ToList().IndexOf(point);
+                return pointIndex >= 0;
+            }
+
+            var parent = entity.Parent;
+            if (!parent.IsValid) return false;
+            int index = parent.GetChildren().ToList().IndexOf(entity);
+            if (index < 0) return false;
+            parts.Add(index.ToString(CultureInfo.InvariantCulture) + ":" + entity.Name);
+            entity = parent;
+        }
+
+        return false;
+    }
+
+    public UsableMissionObject ResolveStation(MissionObject hull, string stationKey, int pointIndex)
+    {
+        var entity = ((MissionShip)hull).GameEntity;
+        if (!entity.IsValid || stationKey == null || pointIndex < 0) return null;
+
+        foreach (var part in stationKey.Split(new[] { '/' }, StringSplitOptions.RemoveEmptyEntries))
+        {
+            int separator = part.IndexOf(':');
+            if (separator <= 0 || !int.TryParse(part.Substring(0, separator), NumberStyles.Integer, CultureInfo.InvariantCulture, out int index)
+                || index >= entity.ChildCount)
+                return null;
+
+            var child = entity.GetChild(index);
+            if (!child.IsValid || child.Name != part.Substring(separator + 1)) return null;
+            entity = child;
+        }
+
+        return entity.GetScriptComponents<UsableMissionObject>().Skip(pointIndex).FirstOrDefault();
+    }
+
+    public void ApplyStationUse(Agent agent, UsableMissionObject point, bool inUse)
+    {
+        if (inUse)
+        {
+            if (agent.CurrentlyUsedGameObject == point) return;
+            if (agent.CurrentlyUsedGameObject != null) agent.StopUsingGameObject(isSuccessful: true, Agent.StopUsingGameObjectFlags.None);
+            agent.UseGameObject(point);
+            return;
+        }
+
+        if (agent.CurrentlyUsedGameObject == point)
+            agent.StopUsingGameObject(isSuccessful: true, Agent.StopUsingGameObjectFlags.None);
+    }
 }

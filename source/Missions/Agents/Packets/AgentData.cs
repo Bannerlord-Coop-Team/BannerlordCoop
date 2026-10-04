@@ -84,9 +84,10 @@ namespace Missions.Agents.Packets
         {
 #if DEBUG
             NavalHelmRevision = 0;
-            NavalDeckShip = 0;
-            NavalDeckLocal = Vec3.Zero;
 #endif
+            DeckShipIndex = 0;
+            DeckLocal = Vec3.Zero;
+            DeckShip = System.Guid.Empty;
             Position = agent.Position;
             MovementDirection = agent.GetMovementDirection();
             LookDirection = agent.LookDirection;
@@ -196,24 +197,37 @@ namespace Missions.Agents.Packets
         // Fixed-fixture helm fence only; absent from the production Release schema.
         [ProtoMember(10)]
         public long NavalHelmRevision { get; set; }
-        // Fixed-fixture deck pose: 0 is world, otherwise fixture slot + 1 with a hull-local position.
+#endif
+        // Deck pose: 0 is a world pose, otherwise a 1-based index into the packet's DeckShips with a hull-local position.
         [ProtoMember(11)]
-        public int NavalDeckShip { get; private set; }
+        public int DeckShipIndex { get; private set; }
         [ProtoMember(12)]
-        public Vec3 NavalDeckLocal { get; private set; }
-        public bool ShouldSerializeNavalDeckLocal() => NavalDeckShip != 0;
+        public Vec3 DeckLocal { get; private set; }
+        public bool ShouldSerializeDeckLocal() => DeckShipIndex != 0;
 
-        internal bool HasValidNavalDeck => NavalDeckShip >= 1 && NavalDeckShip <= 2 && NavalDeckLocal.IsValid
+        /// <summary>The hull this deck pose is relative to, resolved from the packet's DeckShips on receive.</summary>
+        [ProtoIgnore]
+        public System.Guid DeckShip { get; private set; }
+
+        internal bool HasValidDeck => DeckShipIndex >= 1 && DeckShip != System.Guid.Empty && DeckLocal.IsValid
             && Position.IsValid && LookDirection.IsValid && MovementDirection.IsValid
             && !float.IsNaN(Speed) && !float.IsInfinity(Speed) && Speed >= 0f;
 
         // Speed becomes deck-relative so the puppet throttle excludes hull motion.
-        internal void StampNavalDeck(int deckShip, Vec3 deckLocal, float deckSpeed)
+        internal void StampDeck(System.Guid deckShip, int deckShipIndex, Vec3 deckLocal, float deckSpeed)
         {
-            NavalDeckShip = deckShip;
-            NavalDeckLocal = deckLocal;
+            DeckShip = deckShip;
+            DeckShipIndex = deckShipIndex;
+            DeckLocal = deckLocal;
             Speed = deckSpeed;
         }
-#endif
+
+        // An index outside the table leaves DeckShip empty, so the pose is rejected rather than read as world.
+        internal void ResolveDeckShip(System.Guid[] deckShips)
+        {
+            DeckShip = DeckShipIndex >= 1 && deckShips != null && DeckShipIndex <= deckShips.Length
+                ? deckShips[DeckShipIndex - 1]
+                : System.Guid.Empty;
+        }
     }
 }

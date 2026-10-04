@@ -77,11 +77,9 @@ public class AgentPositionInterpolator : IAgentPositionInterpolator
     private readonly List<Agent> _evict = new List<Agent>();
     private float elapsed;
     private long updateSequence;
-#if DEBUG
     private NavalDeckFrameResolver navalDeckFrame;
     private long deckTargetsSet, deckTransitions, deckTicks, deckEvictions, deckTeleports;
     private float lastDeckError, maxDeckError;
-#endif
 
     public AgentPositionInterpolator() : this(null) { }
 
@@ -93,9 +91,7 @@ public class AgentPositionInterpolator : IAgentPositionInterpolator
     public void SetRiderTarget(Agent agent, AgentData data)
     {
         if (agent == null) return;
-#if DEBUG
         if (HasDeckTarget(agent)) deckTransitions++;
-#endif
         StoreRiderTarget(agent, data);
     }
 
@@ -115,8 +111,7 @@ public class AgentPositionInterpolator : IAgentPositionInterpolator
             updateSequence: GetNextUpdateSequence());
     }
 
-#if DEBUG
-    /// <summary>[Game thread] Configures the fixture hull resolver; clearing it drops every deck target.</summary>
+    /// <summary>[Game thread] Configures the hull frame resolver; clearing it drops every deck target.</summary>
     internal void ConfigureNavalDeck(NavalDeckFrameResolver resolver)
     {
         foreach (Agent agent in _targets.Where(pair => pair.Value.Deck.HasValue).Select(pair => pair.Key).ToList())
@@ -129,11 +124,11 @@ public class AgentPositionInterpolator : IAgentPositionInterpolator
     /// <summary>Records a deck-relative rider target; false when its hull frame cannot be resolved now.</summary>
     internal bool TrySetRiderDeckTarget(Agent agent, AgentData data)
     {
-        if (agent == null || navalDeckFrame == null || !navalDeckFrame(agent, data.NavalDeckShip, out MatrixFrame hull))
+        if (agent == null || navalDeckFrame == null || !navalDeckFrame(agent, data.DeckShip, out MatrixFrame hull))
             return false;
         if (_targets.ContainsKey(agent) && !HasDeckTarget(agent)) deckTransitions++;
         StoreRiderTarget(agent, data);
-        _targets[agent] = _targets[agent].WithDeck(new NavalDeckTarget(data.NavalDeckShip, data.NavalDeckLocal, hull,
+        _targets[agent] = _targets[agent].WithDeck(new NavalDeckTarget(data.DeckShip, data.DeckLocal, hull,
             data.MovementDirection, data.LookDirection));
         deckTargetsSet++;
         return true;
@@ -182,14 +177,11 @@ public class AgentPositionInterpolator : IAgentPositionInterpolator
         AgentData.ApplyMovementInput(agent, Vec2.Zero);
         AgentData.ApplyLocomotionMovementFlags(agent, Agent.MovementControlFlag.None);
     }
-#endif
 
     public void SetMountedRiderTarget(Agent agent, AgentData data)
     {
         if (agent == null || data.MountData == null) return;
-#if DEBUG
         if (HasDeckTarget(agent)) deckTransitions++;
-#endif
         _targets[agent] = new TargetFrame(
             data.Position,
             new ContinuousState(
@@ -326,10 +318,8 @@ public class AgentPositionInterpolator : IAgentPositionInterpolator
                 continue;
 
             TargetFrame target = pair.Value;
-#if DEBUG
             if (!TryResolveDeckTarget(agent, target, out target, out _))
                 continue;
-#endif
             if (agent.MountAgent != null && target.HasMountSnapPosition)
             {
                 target.MountedRiderState.ApplyLookDirection(agent);
@@ -384,7 +374,6 @@ public class AgentPositionInterpolator : IAgentPositionInterpolator
                 continue;
             }
 
-#if DEBUG
             bool deck = target.Deck.HasValue;
             if (!TryResolveDeckTarget(agent, target, out target, out MatrixFrame hull))
             {
@@ -397,7 +386,6 @@ public class AgentPositionInterpolator : IAgentPositionInterpolator
                 lastDeckError = pair.Value.Deck.Value.HorizontalError(hull, agent.Position);
                 maxDeckError = Math.Max(maxDeckError, lastDeckError);
             }
-#endif
 
             // Mounted riders are eased onto their horse's reported position directly, so they don't use snapDistance.
             if (agent.MountAgent != null)
@@ -420,9 +408,7 @@ public class AgentPositionInterpolator : IAgentPositionInterpolator
                 MoveTowardTarget(agent, target);
             else
             {
-#if DEBUG
                 if (deck) deckTeleports++;
-#endif
                 Teleport(agent, target);
             }
             target.AgentState.Apply(agent);
@@ -432,18 +418,14 @@ public class AgentPositionInterpolator : IAgentPositionInterpolator
         {
             foreach (Agent agent in _evict)
             {
-#if DEBUG
                 bool deckEvicted = HasDeckTarget(agent);
-#endif
                 _targets.Remove(agent);
                 _mountedGuardProcessedSequences.Remove(agent);
-#if DEBUG
                 if (deckEvicted)
                 {
                     deckEvictions++;
                     HaltDeckPuppet(agent);
                 }
-#endif
             }
             _evict.Clear();
         }
@@ -641,9 +623,7 @@ public class AgentPositionInterpolator : IAgentPositionInterpolator
             MountedRiderState = mountedRiderState;
             UpdatedAt = updatedAt;
             UpdateSequence = updateSequence;
-#if DEBUG
             Deck = null;
-#endif
         }
 
         public Vec3 Position { get; }
@@ -653,7 +633,6 @@ public class AgentPositionInterpolator : IAgentPositionInterpolator
         public ContinuousState MountedRiderState { get; }
         public float UpdatedAt { get; }
         public long UpdateSequence { get; }
-#if DEBUG
         // A deck-relative pose; the stored world position is only its receive-time fallback.
         public NavalDeckTarget? Deck { get; private set; }
 
@@ -663,7 +642,6 @@ public class AgentPositionInterpolator : IAgentPositionInterpolator
             copy.Deck = deck;
             return copy;
         }
-#endif
     }
 
     private readonly struct ContinuousState

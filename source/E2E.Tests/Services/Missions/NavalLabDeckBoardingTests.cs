@@ -43,9 +43,9 @@ public sealed class NavalLabDeckBoardingTests : NavalMissionTestEnvironment
             int targetWrites = mirror.SetTargetPositionAndDirectionCalls;
             var data = new AgentData(info.Agent);
             data.NavalHelmRevision = revision;
-            data.StampNavalDeck(deckShip, Local, 0.5f);
+            data.StampDeck(Manifest.Ships[deckShip - 1], 1, Local, 0.5f);
             var handler = Adapter(Second).Controller!.AgentMovementHandler;
-            handler.HandlePacket(null, new MovementPacket(new[] { id }, new[] { data }));
+            handler.HandlePacket(null, new MovementPacket(new[] { id }, new[] { data }, new[] { Manifest.Ships[deckShip - 1] }));
             handler.Interpolator.Tick(1f / 60f);
             Assert.Equal(0, mirror.TeleportToPositionCalls);
             if (handler.Interpolator.TryGetTargetFrame(info.Agent, out _, out _, out _)

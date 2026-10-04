@@ -1,5 +1,4 @@
-﻿#if DEBUG
-using System;
+﻿using System;
 using System.IO;
 using Common.Serialization;
 using GameInterface.Surrogates;
@@ -19,40 +18,42 @@ public sealed class AgentDataNavalDeckWireTests
     }
 
     [ProtoContract]
-    public sealed class NavalTagProbe
+    public sealed class DeckTagProbe
     {
-        [ProtoMember(10)] public long? HelmRevision { get; set; }
-        [ProtoMember(11)] public int? DeckShip { get; set; }
+        [ProtoMember(11)] public int? DeckShipIndex { get; set; }
         [ProtoMember(12)] public byte[]? DeckLocal { get; set; }
     }
 
     [Fact]
-    public void OrdinaryWorldRecord_WritesNoNavalFields()
+    public void OrdinaryWorldRecord_WritesNoDeckFields()
     {
-        NavalTagProbe probe = Probe(default(AgentData));
+        DeckTagProbe probe = Probe(default(AgentData));
 
-        Assert.Null(probe.HelmRevision);
-        Assert.Null(probe.DeckShip);
+        Assert.Null(probe.DeckShipIndex);
         Assert.Null(probe.DeckLocal);
     }
 
     [Fact]
-    public void DeckRecord_RoundTripsThroughMovementPacketBitExact()
+    public void DeckRecord_RoundTripsThroughMovementPacketWithItsHullTable()
     {
+        Guid firstHull = Guid.NewGuid();
+        Guid secondHull = Guid.NewGuid();
         var data = default(AgentData);
-        data.NavalHelmRevision = 7;
-        data.StampNavalDeck(2, new Vec3(1.25f, -3.5f, 0.75f), 1.5f);
+        data.StampDeck(secondHull, 2, new Vec3(1.25f, -3.5f, 0.75f), 1.5f);
         var serializer = new ProtoBufSerializer(new SerializableTypeMapper());
 
-        var restored = Assert.IsType<MovementPacket>(serializer.Deserialize(
-            serializer.Serialize(new MovementPacket(new[] { Guid.NewGuid() }, new[] { data }))));
+        var restored = Assert.IsType<MovementPacket>(serializer.Deserialize(serializer.Serialize(
+            new MovementPacket(new[] { Guid.NewGuid() }, new[] { data }, new[] { firstHull, secondHull }))));
 
+        Assert.Equal(new[] { firstHull, secondHull }, restored.DeckShips);
         AgentData agent = Assert.Single(restored.Agents);
-        Assert.Equal(7, agent.NavalHelmRevision);
-        Assert.Equal(2, agent.NavalDeckShip);
-        Assert.Equal(new Vec3(1.25f, -3.5f, 0.75f), agent.NavalDeckLocal);
+        Assert.Equal(Guid.Empty, agent.DeckShip);
+        agent.ResolveDeckShip(restored.DeckShips);
+        Assert.Equal(2, agent.DeckShipIndex);
+        Assert.Equal(secondHull, agent.DeckShip);
+        Assert.Equal(new Vec3(1.25f, -3.5f, 0.75f), agent.DeckLocal);
         Assert.Equal(1.5f, agent.Speed);
-        Assert.True(agent.HasValidNavalDeck);
+        Assert.True(agent.HasValidDeck);
         Assert.NotNull(Probe(data).DeckLocal);
     }
 
@@ -60,38 +61,48 @@ public sealed class AgentDataNavalDeckWireTests
     public void RecordWithoutDeckFields_DecodesAsWorld()
     {
         using var stream = new MemoryStream();
-        Serializer.Serialize(stream, new NavalTagProbe { HelmRevision = 3 });
+        Serializer.Serialize(stream, new DeckTagProbe());
         stream.Position = 0;
 
         AgentData data = Serializer.Deserialize<AgentData>(stream);
 
-        Assert.Equal(3, data.NavalHelmRevision);
-        Assert.Equal(0, data.NavalDeckShip);
-        Assert.Equal(Vec3.Zero, data.NavalDeckLocal);
+        Assert.Equal(0, data.DeckShipIndex);
+        Assert.Equal(Vec3.Zero, data.DeckLocal);
+    }
+
+    [Theory]
+    [InlineData(3)]
+    [InlineData(-1)]
+    public void DeckIndexOutsideTheHullTable_ResolvesToNoHull(int index)
+    {
+        var data = default(AgentData);
+        data.StampDeck(Guid.NewGuid(), index, Vec3.Zero, 0f);
+
+        data.ResolveDeckShip(new[] { Guid.NewGuid(), Guid.NewGuid() });
+
+        Assert.Equal(Guid.Empty, data.DeckShip);
+        Assert.False(data.HasValidDeck);
     }
 
     [Theory]
     [InlineData(0, 0f, 0f)]
-    [InlineData(3, 0f, 0f)]
-    [InlineData(-1, 0f, 0f)]
     [InlineData(1, float.NaN, 0f)]
     [InlineData(1, float.PositiveInfinity, 0f)]
     [InlineData(1, 0f, float.NaN)]
     [InlineData(1, 0f, -1f)]
-    public void InvalidDeckPose_IsNotValid(int ship, float localX, float speed)
+    public void InvalidDeckPose_IsNotValid(int index, float localX, float speed)
     {
         var data = default(AgentData);
-        data.StampNavalDeck(ship, new Vec3(localX, 0f, 0f), speed);
+        data.StampDeck(Guid.NewGuid(), index, new Vec3(localX, 0f, 0f), speed);
 
-        Assert.False(data.HasValidNavalDeck);
+        Assert.False(data.HasValidDeck);
     }
 
-    private static NavalTagProbe Probe(AgentData data)
+    private static DeckTagProbe Probe(AgentData data)
     {
         using var stream = new MemoryStream();
         Serializer.Serialize(stream, data);
         stream.Position = 0;
-        return Serializer.Deserialize<NavalTagProbe>(stream);
+        return Serializer.Deserialize<DeckTagProbe>(stream);
     }
 }
-#endif
