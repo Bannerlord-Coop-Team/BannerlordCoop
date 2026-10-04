@@ -23,6 +23,7 @@ public sealed class NavalLabStartupTests : IDisposable
 {
     private readonly string previous = ModInformation.NavalLabCapability;
     private readonly bool previousRole = ModInformation.IsServer;
+    private readonly bool previousNavalDlc = ModInformation.IsNavalDlcActive;
 
     public NavalLabStartupTests()
     {
@@ -31,19 +32,22 @@ public sealed class NavalLabStartupTests : IDisposable
     }
 
     [Theory]
-    [InlineData(false)]
-    [InlineData(true)]
-    public void InitialServerState_StartsFreshOnlyWithExplicitLabOptIn(bool optedIn)
+    [InlineData(false, false)]
+    [InlineData(true, false)]
+    [InlineData(false, true)]
+    public void InitialServerState_StartsFreshWithLabOptInOrNavalDlc(bool optedIn, bool navalDlcActive)
     {
         if (optedIn) Enable();
+        ModInformation.IsNavalDlcActive = navalDlcActive;
+        bool startsFresh = optedIn || navalDlcActive;
         var game = new Mock<IGameStateInterface>();
         using var broker = new MessageBroker();
         using var state = new InitialServerState(Mock.Of<IServerLogic>(), broker, Mock.Of<IRegistryManager>(),
             Mock.Of<IMapEventLoadCleaner>(), Mock.Of<IModuleInfoProvider>(), Mock.Of<IModuleValidator>(),
             game.Object, Mock.Of<ILoadingInterface>());
         state.Start();
-        game.Verify(value => value.StartNewGame(), optedIn ? Times.Once() : Times.Never());
-        game.Verify(value => value.LoadGame("MP"), optedIn ? Times.Never() : Times.Once());
+        game.Verify(value => value.StartNewGame(), startsFresh ? Times.Once() : Times.Never());
+        game.Verify(value => value.LoadGame("MP"), startsFresh ? Times.Never() : Times.Once());
         game.VerifyNoOtherCalls();
     }
 
@@ -67,6 +71,7 @@ public sealed class NavalLabStartupTests : IDisposable
     {
         typeof(ModInformation).GetProperty(nameof(ModInformation.NavalLabCapability))!.SetValue(null, previous);
         ModInformation.IsServer = previousRole;
+        ModInformation.IsNavalDlcActive = previousNavalDlc;
     }
 }
 #endif
