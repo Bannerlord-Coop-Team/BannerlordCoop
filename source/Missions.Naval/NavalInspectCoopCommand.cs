@@ -91,6 +91,7 @@ public sealed class NavalInspectCoopCommand : ICoopCommand
                 deckShip = onDeck ? (Guid?)deckShip : null,
                 deckLocal = onDeck ? deckLocal.ToString() : null,
                 station = naval?.StationUseReplicator.DescribeStation(agent),
+                ownSeat = info != null && naval != null && naval.StationUseReplicator.IsOwnSeat(info.AgentId),
             };
         })
         .ToArray();

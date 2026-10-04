@@ -22,6 +22,9 @@ public interface IAgentStationUseReplicator : IDisposable
     /// <summary>[Game thread] The station an agent uses on a registered hull, or null (diagnostics).</summary>
     string DescribeStation(Agent agent);
 
+    /// <summary>Whether this client seated the agent and withholds its movement and actions (diagnostics).</summary>
+    bool IsOwnSeat(System.Guid agentId);
+
     object Inspect();
 }
 
@@ -46,7 +49,8 @@ public class AgentStationUseReplicator : IAgentStationUseReplicator
     private readonly List<PendingUse> pending = new List<PendingUse>();
     private float elapsed;
     private bool seatsAnnounced;
-    private long sent, applied, dropped;
+    private bool applyingRemote;
+    private long sent, applied, dropped, localPuppetReleases;
 
     public AgentStationUseReplicator(
         IBattleNetwork network,
@@ -64,6 +68,7 @@ public class AgentStationUseReplicator : IAgentStationUseReplicator
         this.deployment = deployment;
 
         missionComponent.AgentMovementHandler.ConfigureSeatedMovement(IsSeatedByOwner);
+        missionComponent.AgentActionHandler.ConfigureStationOwnedAgents(IsSeatedByOwner);
         messageBroker.Subscribe<AgentStationUseChanged>(Handle_AgentStationUseChanged);
         messageBroker.Subscribe<NetworkAgentStationUse>(Handle_NetworkAgentStationUse);
         messageBroker.Subscribe<NetworkMissionPeerEntered>(Handle_PeerEntered);
@@ -72,6 +77,7 @@ public class AgentStationUseReplicator : IAgentStationUseReplicator
     public void Dispose()
     {
         missionComponent.AgentMovementHandler.ConfigureSeatedMovement(null);
+        missionComponent.AgentActionHandler.ConfigureStationOwnedAgents(null);
         messageBroker.Unsubscribe<AgentStationUseChanged>(Handle_AgentStationUseChanged);
         messageBroker.Unsubscribe<NetworkAgentStationUse>(Handle_NetworkAgentStationUse);
         messageBroker.Unsubscribe<NetworkMissionPeerEntered>(Handle_PeerEntered);
@@ -82,8 +88,18 @@ public class AgentStationUseReplicator : IAgentStationUseReplicator
     {
         var change = payload.What;
         var agents = missionComponent.AgentRegistry;
-        if (change.Agent == null || !agents.IsLocallyControlled(change.Agent) || !agents.TryGetAgentInfo(change.Agent, out var info))
+        if (change.Agent == null || !agents.TryGetAgentInfo(change.Agent, out var info)) return;
+
+        if (!agents.IsLocallyControlled(change.Agent))
+        {
+            // Only the owner's stream may move a puppet off a station; anything else is a local desync worth seeing.
+            if (!applyingRemote && !change.InUse)
+            {
+                localPuppetReleases++;
+                Logger.Warning("[NavalSync] Puppet {AgentId} left a station locally, not by its owner", info.AgentId);
+            }
             return;
+        }
 
         if (!engine.TryDescribeStation(change.Point, out var hull, out var stationKey, out int pointIndex)
             || !missionComponent.ShipRegistry.TryGetByHull(hull, out var ship))
@@ -103,6 +119,8 @@ public class AgentStationUseReplicator : IAgentStationUseReplicator
     }
 
     private bool IsSeatedByOwner(CoopAgentInfo info) => info != null && ownSeated.ContainsKey(info.AgentId);
+
+    public bool IsOwnSeat(Guid agentId) => ownSeated.ContainsKey(agentId);
 
     private void Handle_NetworkAgentStationUse(MessagePayload<NetworkAgentStationUse> payload)
     {
@@ -178,7 +196,16 @@ public class AgentStationUseReplicator : IAgentStationUseReplicator
     internal void Apply(Agent agent, UsableMissionObject point, bool inUse)
     {
         missionComponent.AgentMovementHandler.ForgetMovementTarget(agent);
-        engine.ApplyStationUse(agent, point, inUse);
+        applyingRemote = true;
+        try
+        {
+            engine.ApplyStationUse(agent, point, inUse);
+        }
+        finally
+        {
+            applyingRemote = false;
+        }
+
         applied++;
     }
 
@@ -215,6 +242,7 @@ public class AgentStationUseReplicator : IAgentStationUseReplicator
         sent,
         applied,
         dropped,
+        localPuppetReleases,
         pending = pending.Count,
         ownSeated = ownSeated.Count,
     };

@@ -70,6 +70,30 @@ public class BattleBlockingSyncTests : MissionTestEnvironment
     }
 
     [Fact]
+    public void PollActions_StationOwnedAgent_SendsNoActionUntilItLeavesTheStation()
+    {
+        RunScenario("owner", context =>
+        {
+            var agentId = Guid.NewGuid();
+            SpawnRegisteredAgent(context, "owner", agentId, AgentControllerType.Player, out MirrorAgent mirror);
+            bool seated = true;
+            context.Component.AgentActionHandler.ConfigureStationOwnedAgents(info => seated && info.AgentId == agentId);
+            context.Component.AgentActionHandler.PollActions();
+
+            mirror.MovementFlags = Agent.MovementControlFlag.DefendLeft;
+            mirror.GuardMode = Agent.GuardMode.Left;
+            context.Component.AgentActionHandler.PollActions();
+            Assert.Empty(context.Network.NetworkSentPackets.GetPackets<AgentActionPacket>());
+
+            seated = false;
+            context.Component.AgentActionHandler.PollActions();
+
+            AgentActionPacket packet = Assert.Single(context.Network.NetworkSentPackets.GetPackets<AgentActionPacket>());
+            Assert.Equal(agentId, Assert.Single(packet.AgentIds));
+        });
+    }
+
+    [Fact]
     public void PollActions_PreNative_EmitsOnlyMainPlayerInput()
     {
         RunScenario("owner", context =>

@@ -45,6 +45,12 @@ public interface IAgentActionHandler : IPacketHandler, IDisposable
     /// <summary>[Game thread] Apply queued remote actions and restore retained guard state before native collision.</summary>
     void ApplyRemoteGuardStates();
 
+    /// <summary>
+    /// Owned agents the predicate holds (seated at a ship station) send no action changes: the station machine animates
+    /// their puppet on every peer, and a replicated channel action makes the helm drop its pilot.
+    /// </summary>
+    void ConfigureStationOwnedAgents(Func<CoopAgentInfo, bool> isStationOwned);
+
     /// <summary>[Game thread] Reapply retained defend input after continuous movement replay.</summary>
     void RefreshRemoteGuardStatesAfterMovement();
 }
@@ -75,6 +81,10 @@ public class AgentActionHandler : IAgentActionHandler
     private readonly IGuardReactionHandler guardReactionHandler;
 
     // Outbound observation and sequence share one record because both belong to the local agent's action stream.
+    private Func<CoopAgentInfo, bool> isStationOwned;
+
+    public void ConfigureStationOwnedAgents(Func<CoopAgentInfo, bool> isStationOwned) => this.isStationOwned = isStationOwned;
+
     private readonly Dictionary<Guid, LocalAgentActionState> _localAgentStates =
         new Dictionary<Guid, LocalAgentActionState>();
 
@@ -227,7 +237,7 @@ public class AgentActionHandler : IAgentActionHandler
             agent,
             actionSyncedAgent);
 #endif
-        if (!actionSyncedAgent) return;
+        if (!actionSyncedAgent || isStationOwned?.Invoke(info) == true) return;
 
         int action0 = agent.GetCurrentAction(0).Index;
         int action1 = agent.GetCurrentAction(1).Index;
