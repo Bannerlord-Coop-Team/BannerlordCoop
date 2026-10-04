@@ -773,34 +773,39 @@ internal class PartyCommands
             var heroes = FindHeroesWithParty(name);
             if (heroes.Count == 0) return Failed("No hero named \"" + name + "\" with a party found.");
 
-            var troopsToAdd = new Dictionary<string, int>()
-            {
-                { "imperial_vigla_recruit", 5 },
-                { "imperial_recruit", 2 },
-                { "imperial_equite", 2 },
-                { "imperial_heavy_horseman", 2 }
-            };
-
             StringBuilder stringBuilder = new StringBuilder();
             foreach (var hero in heroes)
             {
-                var memberRoster = hero.PartyBelongedTo.MemberRoster;
-                foreach (var troopId in troopsToAdd.Keys)
-                {
-                    if (!objectManager.TryGetObject(troopId, out CharacterObject characterObject))
-                    {
-                        stringBuilder.AppendLine("Failed to retrieve object for CharacterObject id: " + troopId);
-                    }
-                    else
-                    {
-                        memberRoster.AddToCounts(characterObject, troopsToAdd[troopId]);
-                    }
-                }
-
+                AddTroopTemplate(hero.PartyBelongedTo.MemberRoster, objectManager, stringBuilder);
                 stringBuilder.AppendLine(hero.Name.ToString() + " was given troops.");
             }
 
             return Succeeded(stringBuilder.ToString());
+        }
+    }
+
+    // The 11 troops one add_troops call gives a party.
+    private static readonly Dictionary<string, int> TroopTemplate = new Dictionary<string, int>()
+    {
+        { "imperial_vigla_recruit", 5 },
+        { "imperial_recruit", 2 },
+        { "imperial_equite", 2 },
+        { "imperial_heavy_horseman", 2 }
+    };
+
+    /// <summary>Adds one add_troops template to the roster, logging any troop id that does not resolve.</summary>
+    internal static void AddTroopTemplate(TroopRoster memberRoster, IObjectManager objectManager, StringBuilder log)
+    {
+        foreach (var troop in TroopTemplate)
+        {
+            if (!objectManager.TryGetObject(troop.Key, out CharacterObject characterObject))
+            {
+                log.AppendLine("Failed to retrieve object for CharacterObject id: " + troop.Key);
+            }
+            else
+            {
+                memberRoster.AddToCounts(characterObject, troop.Value);
+            }
         }
     }
 

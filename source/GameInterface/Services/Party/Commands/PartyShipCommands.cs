@@ -4,7 +4,9 @@ using Common.Logging;
 using GameInterface.Services.Villages.Commands;
 using Serilog;
 using System;
+using System.Globalization;
 using System.Linq;
+using System.Text;
 using TaleWorlds.CampaignSystem.Actions;
 using TaleWorlds.CampaignSystem.Naval;
 using TaleWorlds.Core;
@@ -66,6 +68,47 @@ public class PartyShipCommands
                 hullId, party.StringId, args[0]);
             return Succeeded($"Added {hullId} to {party.StringId} (ships={party.Ships.Count}). " +
                    $"Player {args[0]} must rejoin to see the ship.");
+        }
+    }
+
+    // coop.debug.party.add_troops PlayerOne 2
+    /// <summary>Gives a player's party the mobile_party.add_troops template, addressed by controller id instead of hero name.</summary>
+    public sealed class AddTroopsCoopCommand : ICoopCommand
+    {
+        private const int MaxTemplates = 20;
+
+        public string Prefix => "coop.debug.party";
+
+        public string Name => "add_troops";
+
+        public string Description => "Gives a player's party the add_troops template (11 troops) count times.";
+
+        public CoopCommandSide Side => CoopCommandSide.Server;
+
+        public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
+        {
+            new ExpectedArgs("controller_id", "The player whose party receives the troops.", true),
+            new ExpectedArgs("count", $"How many 11-troop templates to add, 1 to {MaxTemplates}; 1 when omitted.", false),
+        };
+
+        public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
+        {
+            if (ModInformation.IsClient)
+                return Failed("Run this command on the server.");
+
+            int count = 1;
+            if (args.Count == 2 &&
+                (!int.TryParse(args[1], NumberStyles.Integer, CultureInfo.InvariantCulture, out count) || count < 1 || count > MaxTemplates))
+                return Failed($"count must be an integer from 1 to {MaxTemplates}.");
+
+            if (!MapEventDebugCommands.TryGetPlayerParty(args[0], requireReady: false, out var objectManager, out var party, out var error))
+                return Failed(error);
+
+            var log = new StringBuilder();
+            for (int i = 0; i < count; i++)
+                PartyCommands.AddTroopTemplate(party.MemberRoster, objectManager, log);
+
+            return Succeeded(log + $"{party.StringId} now has {party.MemberRoster.TotalManCount} members.");
         }
     }
 

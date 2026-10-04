@@ -21,6 +21,18 @@ public class PartyShipCommandsTests
         Assert.Equal(expectedOutput, result.Output);
     }
 
+    [Theory]
+    [InlineData(false, "Run this command on the server.", "PlayerOne")]
+    [InlineData(true, "count must be an integer from 1 to 20.", "PlayerOne", "0")]
+    [InlineData(true, "count must be an integer from 1 to 20.", "PlayerOne", "many")]
+    public void AddTroops_RejectsInvalidRequestsBeforeTouchingTheCampaign(bool isServer, string expectedOutput, params string[] args)
+    {
+        var result = RunWithRole(isServer, true, new PartyShipCommands.AddTroopsCoopCommand(), args);
+
+        Assert.False(result.Succeeded);
+        Assert.Equal(expectedOutput, result.Output);
+    }
+
     [Fact]
     public void ListShips_RequiresNavalDlc()
     {
