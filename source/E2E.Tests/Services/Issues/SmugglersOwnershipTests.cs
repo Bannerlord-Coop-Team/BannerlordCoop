@@ -453,6 +453,8 @@ public class SmugglersOwnershipTests : SyncTestBase
             client.Call(() =>
             {
                 using var scope = new AllowedThread();
+                Campaign.Current.EncyclopediaManager ??= new EncyclopediaManager();
+                Campaign.Current.EncyclopediaManager.CreateEncyclopediaPages();
                 Hero.MainHero.ChangeState(Hero.CharacterStates.Active);
                 var roster = TroopRoster.CreateDummyTroopRoster();
                 roster.AddToCounts(Get<Hero>(client, companionId).CharacterObject, 1);
