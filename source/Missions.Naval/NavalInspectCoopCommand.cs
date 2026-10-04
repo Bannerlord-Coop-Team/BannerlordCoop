@@ -40,6 +40,7 @@ public sealed class NavalInspectCoopCommand : ICoopCommand
             deploymentCommitted = controller.Deployment.IsCommitted,
             ownReservePresent = mission.GetMissionBehavior<CoopNavalReserveGuard>()?.ReservePresent,
             shipSync = mission.GetMissionBehavior<CoopNavalBattleBehavior>()?.ShipReplicator.Inspect(),
+            agents = InspectAgents(mission, controller.MissionComponent),
             mainAgent = Agent.Main?.Character?.StringId,
             mainAgentUsing = Agent.Main?.CurrentlyUsedGameObject is UsableMissionObject used ? used.GameEntity.Name : null,
             ships = shipsLogic.AllShips.Select(ship => new
@@ -64,4 +65,24 @@ public sealed class NavalInspectCoopCommand : ICoopCommand
 
         return new CoopCommandResult(true, "NAVAL_INSPECT " + JsonConvert.SerializeObject(state));
     }
+
+    // Registered human agents with the hull whose formation they serve on, so a puppet's hull is visible.
+    private static object[] InspectAgents(Mission mission, ICoopMissionComponent missionComponent) => mission.Agents
+        .Where(agent => agent.IsHuman && agent.IsActive())
+        .Select(agent =>
+        {
+            missionComponent.AgentRegistry.TryGetAgentInfo(agent, out var info);
+            missionComponent.ShipRegistry.TryGetByFormation(agent.Formation, out var ship);
+            return (object)new
+            {
+                name = agent.Name,
+                agentId = info?.AgentId,
+                owner = info?.CurrentAuthority,
+                team = agent.Team?.TeamSide.ToString(),
+                formation = agent.Formation?.FormationIndex.ToString(),
+                shipId = ship?.ShipId,
+                shipOwner = ship?.CurrentAuthority,
+            };
+        })
+        .ToArray();
 }

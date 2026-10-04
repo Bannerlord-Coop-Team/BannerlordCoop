@@ -100,7 +100,8 @@ public class BattleShipReplicator : IBattleShipReplicator
 
         var ship = new NetworkShipInfo(Guid.NewGuid(), session.OwnControllerId, GetOwnMapEventPartyId(), false, hull, formation);
         if (Registry.TryRegister(ship))
-            Logger.Information("[NavalSync] Registered own hull {ShipId} on formation {Formation}", ship.ShipId, formation.FormationIndex);
+            Logger.Information("[NavalSync] Registered own hull {ShipId} on formation {Formation} at deployment position {Position}",
+                ship.ShipId, formation.FormationIndex, engine.GetFrame(hull).origin);
     }
 
     public void Tick(float dt)
