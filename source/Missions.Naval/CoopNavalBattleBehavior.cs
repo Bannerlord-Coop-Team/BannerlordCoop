@@ -23,6 +23,7 @@ public class CoopNavalBattleBehavior : MissionLogic
     {
         ShipReplicator.Dispose();
         NavalForeignHulls.Clear();
+        NavalPlayerDeploymentSlot.Reset();
         base.OnEndMissionInternal();
     }
 }

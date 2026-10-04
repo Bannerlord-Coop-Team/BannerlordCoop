@@ -5,6 +5,7 @@ using GameInterface.Services.MapEvents.Extensions;
 using GameInterface.Services.MapEvents.Messages;
 using GameInterface.Services.MapEvents.TroopSupply;
 using GameInterface.Services.ObjectManager;
+using GameInterface.Services.Players;
 using Missions.Battles;
 using NavalDLC;
 using NavalDLC.Missions;
@@ -46,6 +47,7 @@ public class CoopNavalBattleLauncher : ICoopNavalBattleLauncher
     private readonly IBattleNetwork network;
     private readonly INavalShipEngine shipEngine;
     private readonly IBattleTeamResolver teamResolver;
+    private readonly IPlayerManager playerManager;
 
     public CoopNavalBattleLauncher(
         IMessageBroker messageBroker,
@@ -55,8 +57,10 @@ public class CoopNavalBattleLauncher : ICoopNavalBattleLauncher
         ICoopShipSnapshotBuilder shipSnapshotBuilder,
         IBattleNetwork network,
         INavalShipEngine shipEngine,
-        IBattleTeamResolver teamResolver)
+        IBattleTeamResolver teamResolver,
+        IPlayerManager playerManager)
     {
+        this.playerManager = playerManager;
         this.network = network;
         this.shipEngine = shipEngine;
         this.teamResolver = teamResolver;
@@ -99,8 +103,11 @@ public class CoopNavalBattleLauncher : ICoopNavalBattleLauncher
         bool isPlayerAttacker = playerSide == BattleSideEnum.Attacker;
         var deploymentModel = NavalDLCManager.Instance.GameModels.ShipDeploymentModel;
 
-        SplitPlayerSideParties(mapEvent.GetMapEventSide(playerSide).Parties, PartyBase.MainParty,
+        var sideParties = mapEvent.GetMapEventSide(playerSide).Parties;
+        SplitPlayerSideParties(sideParties, PartyBase.MainParty,
             out var ownMapEventParty, out var ownTeamParties, out var allyTeamParties);
+        NavalPlayerDeploymentSlot.Rank = NavalPlayerDeploymentSlot.RankOf(
+            sideParties.Select(party => party.Party), PartyBase.MainParty, GetPlayerParties().Contains);
         deploymentModel.GetShipDeploymentLimitsOfPlayerTeams(ownTeamParties, allyTeamParties,
             out var ownTeamLimit, out var allyTeamLimit);
         var enemyLimit = deploymentModel.GetTeamShipDeploymentLimit(mapEvent.GetMapEventSide(playerSide.GetOppositeSide()).Parties);
@@ -119,9 +126,9 @@ public class CoopNavalBattleLauncher : ICoopNavalBattleLauncher
             0,
         };
 
-        Logger.Information("[NavalBattle] Opening coop naval battle {MapEventId}: side={Side} ownShips={ShipCount} " +
+        Logger.Information("[NavalBattle] Opening coop naval battle {MapEventId}: side={Side} deploymentRank={Rank} ownShips={ShipCount} " +
             "hulls={Hulls} captains={Captains} deployable={Deployable} crewCapacity={CrewCapacity}",
-            mapEventId, playerSide, ownShips.Count, string.Join(",", ownShips.Select(ship => ship.Hull.StringId)),
+            mapEventId, playerSide, NavalPlayerDeploymentSlot.Rank, ownShips.Count, string.Join(",", ownShips.Select(ship => ship.Hull.StringId)),
             string.Join(",", captains), deployableOwnShipCount, maxDeployableTroopCountPerTeam[0]);
 
         rec.AtmosphereOnCampaign.NauticalInfo.UsesNavalSimulatedWater = 1;
@@ -178,6 +185,18 @@ public class CoopNavalBattleLauncher : ICoopNavalBattleLauncher
         mission.SetPlayerCanTakeControlOfAnotherAgentWhenDead();
         Logger.Information("[NavalBattle] Opened coop naval battle for {MapEventId} (player side {Side})", mapEventId, playerSide);
         return mission;
+    }
+
+    private HashSet<PartyBase> GetPlayerParties()
+    {
+        var parties = new HashSet<PartyBase>();
+        foreach (var player in playerManager.Players)
+        {
+            if (objectManager.TryGetObject<MobileParty>(player.MobilePartyId, out var party))
+                parties.Add(party.Party);
+        }
+
+        return parties;
     }
 
     // The ship services share the attached controller's per-battle session, deployment and mission component.

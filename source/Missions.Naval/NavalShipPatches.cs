@@ -2,6 +2,7 @@
 using HarmonyLib;
 using Missions.Messages;
 using NavalDLC.Missions;
+using NavalDLC.Missions.Deployment;
 using NavalDLC.Missions.MissionLogics;
 using NavalDLC.Missions.Objects;
 using NavalDLC.Missions.ShipControl;
@@ -54,5 +55,35 @@ internal class ForeignHullControllerPatch
     {
         foreach (var ship in NavalForeignHulls.All)
             ship.SetController(ShipControllerType.None, autoUpdateController: false);
+    }
+}
+
+// Marks the initial plan of a side so the plan patch below shifts only that plan, not later Order of Battle replans.
+[HarmonyPatch(typeof(DefaultNavalMissionLogic), nameof(DefaultNavalMissionLogic.MakeDeploymentPlansForSide))]
+[HarmonyPatchCategory(NavalMissionModule.PatchCategory)]
+internal class NavalSidePlanScopePatch
+{
+    [HarmonyPrefix]
+    private static void Prefix(DefaultNavalMissionLogic __instance) => NavalPlayerDeploymentSlot.PlanningSide = __instance;
+
+    [HarmonyFinalizer]
+    private static void Finalizer() => NavalPlayerDeploymentSlot.PlanningSide = null;
+}
+
+// Replans keep the stored offset, so shifting the initial plan moves this client's fleet for the whole deployment.
+[HarmonyPatch(typeof(NavalMissionDeploymentPlanningLogic), nameof(NavalMissionDeploymentPlanningLogic.MakeDeploymentPlan))]
+[HarmonyPatchCategory(NavalMissionModule.PatchCategory)]
+internal class PlayerFleetDeploymentSlotPatch
+{
+    [HarmonyPrefix]
+    private static void Prefix(Team team, ref float spawnPathOffset)
+    {
+        var planningSide = NavalPlayerDeploymentSlot.PlanningSide;
+        int rank = NavalPlayerDeploymentSlot.Rank;
+        var mission = Mission.Current;
+        if (planningSide == null || rank <= 0 || mission == null || team != mission.PlayerTeam) return;
+
+        float teamRange = planningSide.GetTeamSpawnPathOffsetRange(mission.GetInitialSpawnPathData(team.Side).Path, team);
+        spawnPathOffset = NavalPlayerDeploymentSlot.ShiftSpawnPathOffset(spawnPathOffset, rank, teamRange);
     }
 }
