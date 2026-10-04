@@ -332,6 +332,10 @@ public class SmugglersOwnershipTests : SyncTestBase
         var replacementPartyId = TestEnvironment.CreateRegisteredObject<MobileParty>();
         Server.Call(() =>
         {
+            var journal = new JournalLogsCampaignBehavior();
+            Campaign.Current.AddCampaignBehaviorManager(new CampaignBehaviorManager(
+                new CampaignBehaviorBase[] { journal }));
+            journal.RegisterEvents();
             var giver = Get<Hero>(Server, fixture.Giver);
             var companion = Get<Hero>(Server, companionId);
             using (new AllowedThread())
