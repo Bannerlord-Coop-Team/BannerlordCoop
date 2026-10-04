@@ -85,7 +85,9 @@ public class ServerModule : CommonModule
         // Withholds world broadcasts from a peer until it has the transfer save and has entered the
         // campaign. AutoActivate so it subscribes to connection lifecycle events before any peer joins.
         builder.RegisterType<ConnectionMessageQueue>().As<IConnectionMessageQueue>().InstancePerLifetimeScope().AutoActivate();
+        builder.RegisterType<ServerDataPath>().As<IServerDataPath>().InstancePerDependency();
         builder.RegisterType<SteamBanList>().As<ISteamBanList>().InstancePerDependency();
+        builder.RegisterType<ServerInfoConfig>().As<IServerInfoConfig>().InstancePerLifetimeScope();
 
         builder.RegisterType<MissionManager>()
             .As<IMissionManager>()

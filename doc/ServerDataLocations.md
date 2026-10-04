@@ -1,6 +1,6 @@
 # Server data locations
 
-This page lists where the co-op server looks for `mod-config.json`, the session `.json` next to each save and `steam-bans.json`, and which environment variables change those places. It describes the code on the `development` branch. Older builds differ; the log lines below show what yours does.
+This page lists where the co-op server looks for `mod-config.json`, the session `.json` next to each save, `steam-bans.json` and `server-info.json`, and which environment variables change those places. It describes the code on the `development` branch. Older builds differ; the log lines below show what yours does.
 
 Only the server reads these files. Players who join get the server's mod options and do not need to set anything. A host who plays from the game normally sets none of the variables. The dedicated server's own files (`server-config.json`, its logs and the `--data-dir` option) are described in its `release-info.txt`.
 
@@ -41,11 +41,25 @@ The server reads one file, the first that applies:
 2. `steam-bans.json` in the folder named by `COOP_DATA_DIR`.
 3. `..\..\..\server-data\steam-bans.json`, relative to the folder that holds the server program. This is used only when neither variable is set.
 
-`BANNERLORD_USER_DIR` is not used. To move only the ban file, set `COOP_STEAM_BAN_FILE`, because `COOP_DATA_DIR` also moves `mod-config.json`. Keep the file outside the server's install folder.
+`BANNERLORD_USER_DIR` is not used. To move only the ban file, set `COOP_STEAM_BAN_FILE`, because `COOP_DATA_DIR` also moves `mod-config.json` and `server-info.json`. Keep the file outside the server's install folder.
 
 The server never creates the file or its folder. A missing file logs nothing, and nobody is banned. The first time a Steam player joins after the server starts or the file changes, the log shows `Steam ban list loaded from <path> (<n> id(s))`. If `COOP_STEAM_BAN_FILE` names a folder, the list is never read and each Steam join logs `Steam ban list could not be reloaded from <path>`.
 
 See [Steam bans](SteamBans.md) for the file format and which ids are loaded.
+
+## server-info.json
+
+The server reads one file, the first that applies:
+
+1. The file named by `COOP_SERVER_INFO_FILE`. This is the file itself, not its folder.
+2. `server-info.json` in the folder named by `COOP_DATA_DIR`.
+3. `..\..\..\server-data\server-info.json`, relative to the folder that holds the server program. This is used only when neither variable is set.
+
+`BANNERLORD_USER_DIR` is not used. To move only this file, set `COOP_SERVER_INFO_FILE`.
+
+The server never creates the file. It reads it once when it starts, so restart the server after editing it. A missing file logs nothing, and players see no Server Info panel. When the file is read, the log shows `Server info loaded from <path> (motd <n> paragraph(s), rules <n>, links <n>, news <n>)`.
+
+See [Server info](ServerInfo.md) for the file format, the limits and which links are kept.
 
 ## Setting the variables
 
@@ -54,6 +68,6 @@ See [Steam bans](SteamBans.md) for the file format and which ids are loaded.
 - An empty variable counts as unset. Leave a variable unset rather than setting it to spaces.
 - On Windows, set them as User variables of the account that runs the server, or as System variables. On Linux the names are case-sensitive.
 - The server uses the values it was started with. Restart it after a change. When you host from the game, fully exit the game and Steam, then start them again.
-- Setting, changing or removing a variable does not move your files. Copy what the variable moves to the new folder first: `mod-config.json` for either folder variable, `steam-bans.json` for `COOP_DATA_DIR`, and each save's `.json` for `BANNERLORD_USER_DIR`. Otherwise the server starts on template settings, nobody is banned, or returning players go to character creation.
+- Setting, changing or removing a variable does not move your files. Copy what the variable moves to the new folder first: `mod-config.json` for either folder variable, `steam-bans.json` and `server-info.json` for `COOP_DATA_DIR`, and each save's `.json` for `BANNERLORD_USER_DIR`. Otherwise the server starts on template settings, nobody is banned, players see no server info, or returning players go to character creation.
 - The server creates the folders for `mod-config.json` and the session `.json` when they are missing, and needs write access to them.
 - In a container, point the variables at a mounted volume. Files in the container's own filesystem are lost when it is recreated.

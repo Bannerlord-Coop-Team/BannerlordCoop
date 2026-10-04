@@ -7,73 +7,77 @@ using TaleWorlds.GauntletUI.Data;
 using TaleWorlds.InputSystem;
 using TaleWorlds.ScreenSystem;
 
-namespace GameInterface.Services.UI.PlayerList;
+namespace GameInterface.Services.UI.ServerInfo;
 
-/// <summary>Displays the roster over the campaign map without pausing the shared world.</summary>
-internal sealed class PlayerListOverlay : GlobalLayer, IDisposable
+/// <summary>The panel's screen side, kept apart so the show-once rules run without Gauntlet.</summary>
+internal interface IServerInfoPopup : IDisposable
 {
-    private readonly PlayerListVM viewModel;
+    bool CanOpen();
+    void Open();
+    void Close();
+}
+
+/// <summary>Shows the server info panel over the campaign map without pausing the shared world.</summary>
+internal sealed class ServerInfoOverlay : GlobalLayer, IServerInfoPopup
+{
+    private readonly ServerInfoVM viewModel;
     private readonly IChatService chat;
     private readonly IMapAvailability mapAvailability;
-    private readonly Func<InputKey> toggleKey;
+    private readonly Action update;
     private GauntletLayer layer;
     private GauntletMovieIdentifier movie;
 
-    // Receives presentation state, the chat focus guard and the map check shared with the server info panel.
-    public PlayerListOverlay(PlayerListVM viewModel, IChatService chat, IMapAvailability mapAvailability, Func<InputKey> toggleKey)
+    // Receives the panel state, the chat focus guard, the map check shared with the player list and the service's per-frame check.
+    public ServerInfoOverlay(ServerInfoVM viewModel, IChatService chat, IMapAvailability mapAvailability, Action update)
     {
         this.viewModel = viewModel;
         this.chat = chat;
         this.mapAvailability = mapAvailability;
-        this.toggleKey = toggleKey;
+        this.update = update;
     }
 
-    // Keeps an unfocused layer available to receive the map toggle while closed.
+    // Sits just above the player list (115) and stays unfocused until the panel opens.
     public void Initialize()
     {
-        layer = new GauntletLayer("CoopPlayerList", 115);
-        movie = layer.LoadMovie("CoopPlayerListUIMovie", viewModel);
+        layer = new GauntletLayer("CoopServerInfo", 116);
+        movie = layer.LoadMovie("CoopServerInfoUIMovie", viewModel);
         layer.InputRestrictions.ResetInputRestrictions();
         Layer = layer;
         ScreenManager.AddGlobalLayer(this, false);
     }
 
-    // Closes outside gameplay and routes the same toggle used by the debug UI command.
+    // Closes on the same conditions as the player list; while closed the service may open pending info.
     protected override void OnTick(float dt)
     {
         base.OnTick(dt);
-        if (!mapAvailability.IsMapAvailable())
+        if (!viewModel.IsOpen)
         {
-            Close();
+            update();
             return;
         }
-        if (viewModel.IsOpen && !ReferenceEquals(ScreenManager.FocusedLayer, layer))
-        {
-            Close();
-            return;
-        }
-        if (Input.IsKeyPressed(toggleKey())) Toggle();
-        else if (viewModel.IsOpen && Input.IsKeyReleased(InputKey.Escape)) Close();
+        if (!mapAvailability.IsMapAvailable() || !ReferenceEquals(ScreenManager.FocusedLayer, layer)) Close();
+        else if (Input.IsKeyReleased(InputKey.Escape)) viewModel.HandleEscape();
+        else viewModel.Tick(dt);
     }
 
-    // Opens only when gameplay owns focus; never steals typing or another modal's input.
-    public bool Toggle()
+    // Uses the player list's toggle rules, so it waits while the list, chat typing or another modal has focus.
+    public bool CanOpen()
     {
-        if (viewModel.IsOpen)
-        {
-            Close();
-            return true;
-        }
         if (!mapAvailability.IsMapAvailable() || chat.IsTyping || Input.IsOnScreenKeyboardActive) return false;
         var focused = ScreenManager.FocusedLayer;
         if (focused is GauntletLayer gauntlet &&
             gauntlet.UIContext.EventManager.FocusedWidget is EditableTextWidget) return false;
-        if (focused != null && focused != ((MapScreen)ScreenManager.TopScreen).SceneLayer) return false;
+        return focused == null || focused == ((MapScreen)ScreenManager.TopScreen).SceneLayer;
+    }
+
+    // Takes input focus like the open player list.
+    public void Open()
+    {
+        if (viewModel.IsOpen) return;
         viewModel.IsOpen = true;
         layer.InputRestrictions.SetInputRestrictions();
         layer.IsFocusLayer = true;
         ScreenManager.TrySetFocus(layer);
-        return true;
     }
 
     // Releases focus without changing campaign time controls.

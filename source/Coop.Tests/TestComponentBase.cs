@@ -1,9 +1,11 @@
 ﻿using GameInterface.Services.UI.PlayerList;
+using GameInterface.Services.UI.ServerInfo;
 using Autofac;
 using Common.Messaging;
 using Common.Network;
 using Common.Serialization;
 using Common.Tests.Utils;
+using Coop.Core.Common.Configuration;
 using Coop.Core.Server.Connections;
 using Coop.Core.Server.Services.Kingdoms;
 using Coop.Core.Server.Services.MobileParties;
@@ -137,6 +139,8 @@ internal abstract class TestComponentBase
         RegisterMock<IConnectedPlayerCountService>(builder);
         RegisterMock<IChatService>(builder);
         RegisterMock<IPlayerListService>(builder);
+        RegisterMock<IServerInfoService>(builder);
+        RegisterServerInfoConfigMock(builder);
         RegisterMock<IPlayerActivityReader>(builder);
         RegisterMock<IPlatformDisplayNameProvider>(builder);
         RegisterMock<IVoiceClient>(builder);
@@ -185,6 +189,21 @@ internal abstract class TestComponentBase
         mock.Setup(m => m.Players).Returns(Array.Empty<Player>());
         builder.RegisterInstance(mock).AsSelf().SingleInstance();
         builder.RegisterInstance(mock.Object).As<IPlayerManager>().SingleInstance();
+    }
+
+    /// <summary>
+    /// ServerModule's <see cref="ServerInfoConfig"/> reads server-info.json from the machine running the tests.
+    /// Give every test an empty one instead, so no test depends on that file.
+    /// </summary>
+    private void RegisterServerInfoConfigMock(ContainerBuilder builder)
+    {
+        var mock = new Mock<IServerInfoConfig>();
+        mock.Setup(m => m.Motd).Returns(Array.Empty<string>());
+        mock.Setup(m => m.Rules).Returns(Array.Empty<string>());
+        mock.Setup(m => m.Links).Returns(Array.Empty<ServerInfoLink>());
+        mock.Setup(m => m.News).Returns(Array.Empty<ServerInfoNews>());
+        builder.RegisterInstance(mock).AsSelf().SingleInstance();
+        builder.RegisterInstance(mock.Object).As<IServerInfoConfig>().SingleInstance();
     }
 
     private IContainer SetupContainerProvider(ContainerBuilder builder)

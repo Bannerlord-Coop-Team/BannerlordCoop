@@ -10,11 +10,14 @@ using GameInterface.Services.UI.CoopOptions;
 using GameInterface.Services.UI.CoopOptions.Providers.ChatTab;
 using GameInterface.Services.UI.CoopOptions.Providers.ChatTab.Sections;
 using GameInterface.Services.UI.Messages;
+using GameInterface.Services.UI.ServerInfo;
 using Moq;
+using System;
 using Xunit;
 
 namespace GameInterface.Tests.Services.Chat;
 
+[Collection(ViewModelCollection.Name)]
 public class ChatServiceTests
 {
     [Fact]
@@ -26,6 +29,17 @@ public class ChatServiceTests
         var snapshot = Assert.IsType<NetworkChatParticipants>(serializer.Deserialize(payload));
 
         Assert.Equal(new[] { "first", "second" }, snapshot.ControllerIds);
+    }
+
+    // The panel waits on chat typing, so chat may only reach the panel after both exist.
+    [Fact]
+    public void Construction_DoesNotResolveTheServerInfoPanel()
+    {
+        var serverInfo = new Lazy<IServerInfoService>(() => throw new InvalidOperationException("resolved during construction"));
+
+        using var service = CreateService(serverInfo: serverInfo);
+
+        Assert.False(serverInfo.IsValueCreated);
     }
 
     [Fact]
@@ -80,12 +94,13 @@ public class ChatServiceTests
         Assert.True(service.IsChatEnabled);
     }
 
-    private static ChatService CreateService(
+    internal static ChatService CreateService(
         Mock<INetwork>? network = null,
         Mock<IPlayerManager>? playerManager = null,
         Mock<IChatPlayerNameResolver>? playerNameResolver = null,
         Mock<ICoopOptionsStore>? optionsStore = null,
-        IMessageBroker? messageBroker = null)
+        IMessageBroker? messageBroker = null,
+        Lazy<IServerInfoService>? serverInfo = null)
     {
         network ??= new Mock<INetwork>();
         playerManager ??= new Mock<IPlayerManager>();
@@ -105,7 +120,8 @@ public class ChatServiceTests
             playerNameResolver.Object,
             controllerIdProvider.Object,
             optionsStore.Object,
-            messageBroker);
+            messageBroker,
+            serverInfo ?? new Lazy<IServerInfoService>(() => new Mock<IServerInfoService>().Object));
     }
 
     private static Player Player(string controllerId)

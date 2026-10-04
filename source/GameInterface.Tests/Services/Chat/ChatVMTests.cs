@@ -6,12 +6,13 @@ using Xunit;
 
 namespace GameInterface.Tests.Services.Chat;
 
+[Collection(ViewModelCollection.Name)]
 public class ChatVMTests
 {
     [Fact]
     public void ActionOpen_RaisesRequestForOverlay()
     {
-        var vm = new ChatVM(_ => { }, () => "local");
+        var vm = new ChatVM(_ => { }, () => "local", () => true);
         bool openRequested = false;
         vm.OpenRequested += () => openRequested = true;
 
@@ -25,7 +26,7 @@ public class ChatVMTests
     public void ActionSend_DefaultChannel_SendsTrimmedGlobalRequest()
     {
         var sent = new List<NetworkSendChatMessage>();
-        var vm = new ChatVM(sent.Add, () => "local");
+        var vm = new ChatVM(sent.Add, () => "local", () => true);
         vm.SetOpen(true);
         vm.WrittenText = "  hello world  ";
 
@@ -43,7 +44,7 @@ public class ChatVMTests
     public void ActionSend_SelectedPlayer_SendsDirectRequestToControllerId()
     {
         var sent = new List<NetworkSendChatMessage>();
-        var vm = new ChatVM(sent.Add, () => "local");
+        var vm = new ChatVM(sent.Add, () => "local", () => true);
         vm.AddParticipant("other-controller", "Other Hero");
         vm.Channels.Single(channel => channel.ControllerId == "other-controller").ExecuteSelection();
         vm.WrittenText = "secret";
@@ -59,7 +60,7 @@ public class ChatVMTests
     [Fact]
     public void Receive_DirectMessage_AddsRibbonNotificationWithoutOpeningChat()
     {
-        var vm = new ChatVM(_ => { }, () => "local");
+        var vm = new ChatVM(_ => { }, () => "local", () => true);
 
         vm.Receive(new NetworkChatMessage(
             ChatChannel.Direct,
@@ -94,7 +95,7 @@ public class ChatVMTests
     [Fact]
     public void Receive_OwnGlobalEcho_DoesNotAddRibbonNotification()
     {
-        var vm = new ChatVM(_ => { }, () => "local");
+        var vm = new ChatVM(_ => { }, () => "local", () => true);
 
         vm.Receive(new NetworkChatMessage(
             ChatChannel.Global,
@@ -111,7 +112,7 @@ public class ChatVMTests
     [Fact]
     public void ActionToggleMute_SelectedPlayer_UpdatesChannelAndButtonState()
     {
-        var vm = new ChatVM(_ => { }, () => "local");
+        var vm = new ChatVM(_ => { }, () => "local", () => true);
         vm.AddParticipant("other-controller", "Other Hero");
         var direct = vm.Channels.Single(channel => channel.ControllerId == "other-controller");
 
@@ -138,7 +139,7 @@ public class ChatVMTests
     [Fact]
     public void Receive_FromMutedPlayer_SuppressesGlobalAndDirectMessages()
     {
-        var vm = new ChatVM(_ => { }, () => "local");
+        var vm = new ChatVM(_ => { }, () => "local", () => true);
         vm.AddParticipant("muted-controller", "Muted Hero");
         var global = vm.Channels.Single(channel => channel.IsGlobal);
         var muted = vm.Channels.Single(channel => channel.ControllerId == "muted-controller");
@@ -184,7 +185,7 @@ public class ChatVMTests
     [Fact]
     public void SetParticipants_ReplacesOfflineChannelsAndSelectsGlobalFallback()
     {
-        var vm = new ChatVM(_ => { }, () => "local");
+        var vm = new ChatVM(_ => { }, () => "local", () => true);
         vm.SetParticipants(new[]
         {
             (ControllerId: "offline", DisplayName: "Offline Hero"),
@@ -200,5 +201,87 @@ public class ChatVMTests
         Assert.DoesNotContain(vm.Channels, channel => channel.ControllerId == "offline");
         Assert.Contains(vm.Channels, channel => channel.ControllerId == "online");
         Assert.True(vm.Channels.Single(channel => channel.IsGlobal).IsSelected);
+    }
+
+    // !motd stays on this client in any case and with spaces around it.
+    [Theory]
+    [InlineData("!motd")]
+    [InlineData("  !MOTD  ")]
+    [InlineData("!Motd")]
+    public void ActionSend_ServerInfoCommand_ReopensThePanelInsteadOfSending(string text)
+    {
+        var sent = new List<NetworkSendChatMessage>();
+        int reopened = 0;
+        var vm = new ChatVM(sent.Add, () => "local", () => { reopened++; return true; });
+        bool closeRequested = false;
+        vm.CloseRequested += () => closeRequested = true;
+        vm.SetOpen(true);
+        vm.WrittenText = text;
+
+        vm.ActionSend();
+
+        Assert.Empty(sent);
+        Assert.Equal(1, reopened);
+        Assert.True(closeRequested);
+        Assert.Equal(string.Empty, vm.WrittenText);
+        Assert.Equal(string.Empty, vm.TranscriptText);
+    }
+
+    [Fact]
+    public void ActionSend_ServerInfoCommandInADirectChannel_IsNotSentEither()
+    {
+        var sent = new List<NetworkSendChatMessage>();
+        int reopened = 0;
+        var vm = new ChatVM(sent.Add, () => "local", () => { reopened++; return true; });
+        vm.AddParticipant("other-controller", "Other Hero");
+        vm.Channels.Single(channel => channel.ControllerId == "other-controller").ExecuteSelection();
+        vm.WrittenText = "!motd";
+
+        vm.ActionSend();
+
+        Assert.Empty(sent);
+        Assert.Equal(1, reopened);
+    }
+
+    // Without info from this server the chat stays open and says so, and still sends nothing.
+    [Fact]
+    public void ActionSend_ServerInfoCommandWithoutInfo_WritesALocalLineAndSendsNothing()
+    {
+        var sent = new List<NetworkSendChatMessage>();
+        var vm = new ChatVM(sent.Add, () => "local", () => false);
+        bool closeRequested = false;
+        vm.CloseRequested += () => closeRequested = true;
+        vm.SetOpen(true);
+        vm.WrittenText = "!motd";
+
+        vm.ActionSend();
+
+        Assert.Empty(sent);
+        Assert.False(closeRequested);
+        Assert.True(vm.IsOpen);
+        Assert.Equal("[Chat] This server has no server info.", vm.TranscriptText);
+        Assert.Equal(string.Empty, vm.WrittenText);
+        Assert.False(vm.HasUnreadNotification);
+    }
+
+    // Only the exact command is local; anything else is a normal chat message.
+    [Theory]
+    [InlineData("!motd extra")]
+    [InlineData("!motd!")]
+    [InlineData("motd")]
+    [InlineData("! motd")]
+    [InlineData("see !motd")]
+    [InlineData("hello")]
+    public void ActionSend_OtherText_IsSentNormally(string text)
+    {
+        var sent = new List<NetworkSendChatMessage>();
+        int reopened = 0;
+        var vm = new ChatVM(sent.Add, () => "local", () => { reopened++; return true; });
+        vm.WrittenText = text;
+
+        vm.ActionSend();
+
+        Assert.Equal(text, Assert.Single(sent).Text);
+        Assert.Equal(0, reopened);
     }
 }

@@ -1,4 +1,5 @@
 ﻿using Autofac;
+using Autofac.Core;
 using Common.Commands;
 using Common.LogicStates;
 using Common.Network;
@@ -38,6 +39,11 @@ namespace Coop.Tests.Autofac
             Assert.NotNull(container.Resolve<global::GameInterface.Services.UI.CoopOptions.ICoopOptionsKeybinding>());
             Assert.NotNull(container.Resolve<global::GameInterface.Services.UI.CoopOptions.ICoopKeybindingPopupFactory>());
             Assert.NotNull(container.Resolve<IVoiceWindowFocus>());
+            // Chat and the server info panel need each other; Lazy keeps that from being a cycle.
+            Assert.NotNull(container.Resolve<global::GameInterface.Services.Chat.IChatService>());
+            Assert.NotNull(container.Resolve<global::GameInterface.Services.UI.ServerInfo.IServerInfoService>());
+            // Both map panels take the shared map check from the container.
+            Assert.NotNull(container.Resolve<global::GameInterface.Services.UI.PlayerList.IPlayerListService>());
             Assert.Equal("Not started", container.Resolve<IVoiceAudio>().Status);
 
             var logic = container.Resolve<ILogic>();
@@ -61,6 +67,15 @@ namespace Coop.Tests.Autofac
             Assert.True(catalog.Contains("coop.debug.battle.hit_sound_fixture_route"));
             Assert.True(catalog.Contains("coop.debug.battle.hit_sound_fixture_state"));
             Assert.True(catalog.Contains("coop.debug.battle.hit_sound_trace"));
+            Assert.True(catalog.Contains("coop.debug.ui.server_info_preview"));
+            Assert.True(catalog.Contains("coop.debug.ui.server_info_state"));
+            Assert.True(catalog.Contains("coop.debug.ui.chat_submit"));
+            // chat_submit must type into the chat on screen, not a second chat service, and must not dispose it twice.
+            Assert.Same(container.Resolve<global::GameInterface.Services.Chat.IChatService>(),
+                container.Resolve<global::GameInterface.Services.Chat.IChatLiveTestHook>());
+            Assert.True(container.ComponentRegistry.TryGetRegistration(
+                new TypedService(typeof(global::GameInterface.Services.Chat.IChatLiveTestHook)), out var chatHook));
+            Assert.Equal(InstanceOwnership.ExternallyOwned, chatHook.Ownership);
             Assert.Same(container.Resolve<IVoiceClient>(), container.Resolve<IVoiceSyntheticTest>());
             Assert.Equal(CoopCommandSide.Client, Assert.Single(registeredCommands,
                 command => $"{command.Prefix}.{command.Name}" == "coop.debug.voice.synthetic").Side);

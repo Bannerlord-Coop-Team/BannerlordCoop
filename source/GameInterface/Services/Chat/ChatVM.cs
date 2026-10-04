@@ -2,6 +2,7 @@ using GameInterface.Services.Chat.Messages;
 using System;
 using System.Collections.Generic;
 using TaleWorlds.Library;
+using TaleWorlds.Localization;
 
 namespace GameInterface.Services.Chat;
 
@@ -11,9 +12,11 @@ internal sealed class ChatVM : ViewModel
     private const string GlobalChannelId = "";
     private const int MaxHistoryPerChannel = 50;
     private const int VisibleHistoryLines = 12;
+    private const string ServerInfoCommand = "!motd";
 
     private readonly Action<NetworkSendChatMessage> send;
     private readonly Func<string> getLocalControllerId;
+    private readonly Func<bool> reopenServerInfo;
     private readonly Dictionary<string, ChatChannelVM> channelsById =
         new Dictionary<string, ChatChannelVM>(StringComparer.Ordinal);
     private readonly Dictionary<string, List<string>> histories =
@@ -25,13 +28,15 @@ internal sealed class ChatVM : ViewModel
     private bool isOpen;
     private int unreadMessageCount;
 
-    public ChatVM(Action<NetworkSendChatMessage> send, Func<string> getLocalControllerId)
+    public ChatVM(Action<NetworkSendChatMessage> send, Func<string> getLocalControllerId, Func<bool> reopenServerInfo)
     {
         if (send == null) throw new ArgumentNullException(nameof(send));
         if (getLocalControllerId == null) throw new ArgumentNullException(nameof(getLocalControllerId));
+        if (reopenServerInfo == null) throw new ArgumentNullException(nameof(reopenServerInfo));
 
         this.send = send;
         this.getLocalControllerId = getLocalControllerId;
+        this.reopenServerInfo = reopenServerInfo;
 
         Channels = new MBBindingList<ChatChannelVM>();
         var global = EnsureChannel(GlobalChannelId, "Global");
@@ -129,6 +134,13 @@ internal sealed class ChatVM : ViewModel
         string text = WrittenText.Trim();
         if (text.Length == 0) return;
 
+        if (string.Equals(text, ServerInfoCommand, StringComparison.OrdinalIgnoreCase))
+        {
+            WrittenText = string.Empty;
+            ReopenServerInfo();
+            return;
+        }
+
         var channel = selectedChannel?.IsGlobal == false ? ChatChannel.Direct : ChatChannel.Global;
         string recipientControllerId = channel == ChatChannel.Direct
             ? selectedChannel.ControllerId
@@ -141,6 +153,20 @@ internal sealed class ChatVM : ViewModel
     public void ActionClose()
     {
         CloseRequested?.Invoke();
+    }
+
+    // !motd stays on this client: it never reaches the server or other players.
+    private void ReopenServerInfo()
+    {
+        if (reopenServerInfo())
+        {
+            // An open chat keeps input focus, so it closes to let the panel open.
+            CloseRequested?.Invoke();
+            return;
+        }
+
+        string line = new TextObject("{=coop_server_info_none}This server has no server info.").ToString();
+        AddLine(selectedChannel?.ControllerId ?? GlobalChannelId, $"[Chat] {line}", notify: false);
     }
 
     public void ActionToggleMute()
