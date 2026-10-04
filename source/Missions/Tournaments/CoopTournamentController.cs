@@ -155,24 +155,33 @@ public class CoopTournamentController : CoopMissionController
             coopMissionComponent,
             Missions.Agents.Handlers.MovementCadenceProfile.Tournament)
     {
-        this.relayNetwork = relayNetwork;
-        this.worldItemRegistry = worldItemRegistry;
-        this.guardedHitWindow = guardedHitWindow;
-        this.missionContext = missionContext;
-        spectatorAgentManager = spectatorAgentManagerFactory.Create(coopMissionComponent);
-        session = new TournamentMissionSession(controllerIdProvider);
-        coopMissionComponent.WeaponDropHandler.ConfigureLocalHostProvider(
-            () => session.IsLocalHost);
-        matchLifecycle = new TournamentMatchLifecycle(coopMissionComponent, worldItemRegistry);
-        agentSpawner = new TournamentAgentSpawner(objectManager, controllerIdProvider, coopMissionComponent);
-        manifestBuilder = new TournamentSpawnManifestBuilder(objectManager, coopMissionComponent);
+        try
+        {
+            this.relayNetwork = relayNetwork;
+            this.worldItemRegistry = worldItemRegistry;
+            this.guardedHitWindow = guardedHitWindow;
+            this.missionContext = missionContext;
+            spectatorAgentManager = spectatorAgentManagerFactory.Create(coopMissionComponent);
+            session = new TournamentMissionSession(controllerIdProvider);
+            coopMissionComponent.WeaponDropHandler.ConfigureLocalHostProvider(
+                () => session.IsLocalHost);
+            matchLifecycle = new TournamentMatchLifecycle(coopMissionComponent, worldItemRegistry);
+            agentSpawner = new TournamentAgentSpawner(objectManager, controllerIdProvider, coopMissionComponent);
+            manifestBuilder = new TournamentSpawnManifestBuilder(objectManager, coopMissionComponent);
 
-        messageBroker.Subscribe<TournamentSessionUpdated>(Handle_SessionUpdated);
-        messageBroker.Subscribe<TournamentSpawnManifestUpdated>(Handle_ManifestUpdated);
-        messageBroker.Subscribe<NetworkApplyTournamentDamage>(Handle_ApplyTournamentDamage);
-        messageBroker.Subscribe<NetworkTournamentAgentKnockedOut>(Handle_AgentKnockedOut);
-        messageBroker.Subscribe<NetworkTournamentRuntimeState>(Handle_RuntimeState);
-        messageBroker.Subscribe<NetworkTournamentRoundEnded>(Handle_RoundEnded);
+            messageBroker.Subscribe<TournamentSessionUpdated>(Handle_SessionUpdated);
+            messageBroker.Subscribe<TournamentSpawnManifestUpdated>(Handle_ManifestUpdated);
+            messageBroker.Subscribe<NetworkApplyTournamentDamage>(Handle_ApplyTournamentDamage);
+            messageBroker.Subscribe<NetworkTournamentAgentKnockedOut>(Handle_AgentKnockedOut);
+            messageBroker.Subscribe<NetworkTournamentRuntimeState>(Handle_RuntimeState);
+            messageBroker.Subscribe<NetworkTournamentRoundEnded>(Handle_RoundEnded);
+        }
+        catch
+        {
+            try { Abandon(); }
+            catch (Exception error) { Logger.Error(error, "Failed mission construction cleanup"); }
+            throw;
+        }
     }
 
     public ITournamentMissionSession Session => session;
@@ -2182,16 +2191,17 @@ public class CoopTournamentController : CoopMissionController
         session.Reset();
     }
 
-    public override void Dispose()
+    protected override void DisposeMission()
     {
-        messageBroker.Unsubscribe<TournamentSessionUpdated>(Handle_SessionUpdated);
-        messageBroker.Unsubscribe<TournamentSpawnManifestUpdated>(Handle_ManifestUpdated);
-        messageBroker.Unsubscribe<NetworkApplyTournamentDamage>(Handle_ApplyTournamentDamage);
-        messageBroker.Unsubscribe<NetworkTournamentAgentKnockedOut>(Handle_AgentKnockedOut);
-        messageBroker.Unsubscribe<NetworkTournamentRuntimeState>(Handle_RuntimeState);
-        messageBroker.Unsubscribe<NetworkTournamentRoundEnded>(Handle_RoundEnded);
-        pendingLocalDamage.Clear();
-        guardedHitWindow.Dispose();
-        base.Dispose();
+        Cleanup(
+            () => messageBroker.Unsubscribe<TournamentSessionUpdated>(Handle_SessionUpdated),
+            () => messageBroker.Unsubscribe<TournamentSpawnManifestUpdated>(Handle_ManifestUpdated),
+            () => messageBroker.Unsubscribe<NetworkApplyTournamentDamage>(Handle_ApplyTournamentDamage),
+            () => messageBroker.Unsubscribe<NetworkTournamentAgentKnockedOut>(Handle_AgentKnockedOut),
+            () => messageBroker.Unsubscribe<NetworkTournamentRuntimeState>(Handle_RuntimeState),
+            () => messageBroker.Unsubscribe<NetworkTournamentRoundEnded>(Handle_RoundEnded),
+            () => pendingLocalDamage.Clear(),
+            () => guardedHitWindow?.Dispose(),
+            base.DisposeMission);
     }
 }

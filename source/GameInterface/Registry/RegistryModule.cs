@@ -11,12 +11,12 @@ internal class RegistryModule : Module
 {
     protected override void Load(ContainerBuilder builder)
     {
-        builder.RegisterType<RegistryManager>().As<IRegistryManager>().InstancePerLifetimeScope().AutoActivate();
-        builder.RegisterType<AutoRegistryFactory>().As<IAutoRegistryFactory>().InstancePerLifetimeScope().AutoActivate();
+        builder.RegisterType<RegistryManager>().As<IRegistryManager>().SingleInstance().AutoActivate();
+        builder.RegisterType<AutoRegistryFactory>().As<IAutoRegistryFactory>().SingleInstance().AutoActivate();
 
         foreach (var type in GetRegistries())
         {
-            builder.RegisterType(type).AsSelf().InstancePerLifetimeScope().AutoActivate();
+            builder.RegisterType(type).AsSelf().SingleInstance().AutoActivate();
         }
 
         base.Load(builder);

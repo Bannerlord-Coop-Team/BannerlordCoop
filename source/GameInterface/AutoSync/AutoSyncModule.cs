@@ -13,32 +13,32 @@ internal class AutoSyncModule : Module
 {
     protected override void Load(ContainerBuilder builder)
     {
-        builder.RegisterType<AutoSyncPatchCollector>().As<IAutoSyncPatchCollector>().InstancePerLifetimeScope();
+        builder.RegisterType<AutoSyncPatchCollector>().As<IAutoSyncPatchCollector>().SingleInstance();
 
-        builder.RegisterType<AutoSyncRegistry>().InstancePerLifetimeScope();
-        builder.RegisterType<AutoSyncPatcher>().InstancePerLifetimeScope();
-        builder.RegisterType<AutoSyncBuilder>().InstancePerLifetimeScope();
-        builder.RegisterType<AutoSyncAssemblyInfoBuilder>().InstancePerLifetimeScope();
-        builder.RegisterType<AutoSyncPatchBuilder>().InstancePerLifetimeScope();
-        builder.RegisterType<AutoSyncFieldBuilder>().InstancePerLifetimeScope();
-        builder.RegisterType<AutoSyncFieldArrayBuilder>().InstancePerLifetimeScope();
-        builder.RegisterType<AutoSyncFieldMBListBuilder>().InstancePerLifetimeScope();
-        builder.RegisterType<AutoSyncFieldListBuilder>().InstancePerLifetimeScope();
-        builder.RegisterType<AutoSyncFieldQueueBuilder>().InstancePerLifetimeScope();
-        builder.RegisterType<AutoSyncFieldDictionaryBuilder>().InstancePerLifetimeScope();
-        builder.RegisterType<AutoSyncPropertyBuilder>().InstancePerLifetimeScope();
-        builder.RegisterType<AutoSyncPropertyArrayBuilder>().InstancePerLifetimeScope();
-        builder.RegisterType<AutoSyncPropertyMBListBuilder>().InstancePerLifetimeScope();
-        builder.RegisterType<AutoSyncPropertyListBuilder>().InstancePerLifetimeScope();
-        builder.RegisterType<AutoSyncPropertyQueueBuilder>().InstancePerLifetimeScope();
-        builder.RegisterType<AutoSyncPropertyDictionaryBuilder>().InstancePerLifetimeScope();
-        builder.RegisterType<AutoSyncConstantsBuilder>().InstancePerLifetimeScope();
-        builder.RegisterType<AutoSyncFieldPropertyOwnerBuilder>().InstancePerLifetimeScope();
-        builder.RegisterType<AutoSyncHandler>().InstancePerLifetimeScope();
+        builder.RegisterType<AutoSyncRegistry>().SingleInstance();
+        builder.RegisterType<AutoSyncPatcher>().SingleInstance();
+        builder.RegisterType<AutoSyncBuilder>().SingleInstance();
+        builder.RegisterType<AutoSyncAssemblyInfoBuilder>().SingleInstance();
+        builder.RegisterType<AutoSyncPatchBuilder>().SingleInstance();
+        builder.RegisterType<AutoSyncFieldBuilder>().SingleInstance();
+        builder.RegisterType<AutoSyncFieldArrayBuilder>().SingleInstance();
+        builder.RegisterType<AutoSyncFieldMBListBuilder>().SingleInstance();
+        builder.RegisterType<AutoSyncFieldListBuilder>().SingleInstance();
+        builder.RegisterType<AutoSyncFieldQueueBuilder>().SingleInstance();
+        builder.RegisterType<AutoSyncFieldDictionaryBuilder>().SingleInstance();
+        builder.RegisterType<AutoSyncPropertyBuilder>().SingleInstance();
+        builder.RegisterType<AutoSyncPropertyArrayBuilder>().SingleInstance();
+        builder.RegisterType<AutoSyncPropertyMBListBuilder>().SingleInstance();
+        builder.RegisterType<AutoSyncPropertyListBuilder>().SingleInstance();
+        builder.RegisterType<AutoSyncPropertyQueueBuilder>().SingleInstance();
+        builder.RegisterType<AutoSyncPropertyDictionaryBuilder>().SingleInstance();
+        builder.RegisterType<AutoSyncConstantsBuilder>().SingleInstance();
+        builder.RegisterType<AutoSyncFieldPropertyOwnerBuilder>().SingleInstance();
+        builder.RegisterType<AutoSyncHandler>().SingleInstance();
 
         foreach (var type in GetAutoSyncClasses())
         {
-            builder.RegisterType(type).AsSelf().InstancePerLifetimeScope().AutoActivate();
+            builder.RegisterType(type).AsSelf().SingleInstance().AutoActivate();
         }
 
         base.Load(builder);

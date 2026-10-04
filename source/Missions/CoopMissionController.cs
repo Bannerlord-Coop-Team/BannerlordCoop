@@ -1,4 +1,5 @@
-﻿using Common.Logging;
+﻿using Autofac;
+using Common.Logging;
 using Common.Messaging;
 using GameInterface.Services.ObjectManager;
 using LiteNetLib;
@@ -9,7 +10,8 @@ using Missions.Diagnostics;
 #endif
 using Missions.Messages;
 using Serilog;
-using System; 
+using System;
+using System.Runtime.ExceptionServices;
 using TaleWorlds.MountAndBlade;
 
 namespace Missions;
@@ -20,7 +22,7 @@ namespace Missions;
 /// the join-info handshake wiring — announce ourselves when a peer connects, and process a peer's
 /// <see cref="NetworkMissionJoinInfo"/> when it arrives. Subclasses supply the mission-specific behaviour:
 /// how to build their own join info, how to spawn a peer's agents, plus any extra subscriptions
-/// (overriding <see cref="Dispose"/>) and leave logic (overriding <see cref="OnLeaving"/>).
+/// (overriding <see cref="DisposeMission"/>) and leave logic (overriding <see cref="OnLeaving"/>).
 /// </summary>
 public abstract class CoopMissionController : MissionBehavior, IDisposable
 {
@@ -49,8 +51,22 @@ public abstract class CoopMissionController : MissionBehavior, IDisposable
         this.coopMissionComponent = coopMissionComponent;
         coopMissionComponent.AgentMovementHandler.Configure(movementCadenceProfile);
 
-        messageBroker.Subscribe<NetworkMissionPeerEntered>(Handle_MissionPeerEntered);
-        messageBroker.Subscribe<NetworkMissionJoinInfo>(Handle_JoinInfo);
+        try
+        {
+            messageBroker.Subscribe<NetworkMissionPeerEntered>(Handle_MissionPeerEntered);
+            messageBroker.Subscribe<NetworkMissionJoinInfo>(Handle_JoinInfo);
+        }
+        catch
+        {
+            try
+            {
+                Cleanup(
+                    () => messageBroker.Unsubscribe<NetworkMissionPeerEntered>(Handle_MissionPeerEntered),
+                    () => messageBroker.Unsubscribe<NetworkMissionJoinInfo>(Handle_JoinInfo));
+            }
+            catch (Exception error) { Logger.Error(error, "Failed base mission construction cleanup"); }
+            throw;
+        }
     }
 
     public override void OnPreMissionTick(float dt)
@@ -117,7 +133,38 @@ public abstract class CoopMissionController : MissionBehavior, IDisposable
 #endif
     }
 
-    public virtual void Dispose()
+    private MissionLifetime lifetime;
+    private bool ended;
+    private bool disposed;
+    protected bool IsAbandoned { get; private set; }
+
+    internal void SetLifetime(MissionLifetime value) => lifetime = value;
+
+    internal T ResolveMissionBehavior<T>() => lifetime.Scope.Resolve<T>();
+
+    public void Dispose()
+    {
+        if (lifetime != null) lifetime.Dispose();
+        else DisposeController();
+    }
+
+    // Failed composition owns its graph, but has not acquired the shared mission state.
+    public void Abandon()
+    {
+        if (ended) return;
+        ended = true;
+        IsAbandoned = true;
+        Cleanup(DisposeController, () => lifetime?.Dispose());
+    }
+
+    private void DisposeController()
+    {
+        if (disposed) return;
+        disposed = true;
+        DisposeMission();
+    }
+
+    protected virtual void DisposeMission()
     {
         messageBroker.Unsubscribe<NetworkMissionPeerEntered>(Handle_MissionPeerEntered);
         messageBroker.Unsubscribe<NetworkMissionJoinInfo>(Handle_JoinInfo);
@@ -149,41 +196,42 @@ public abstract class CoopMissionController : MissionBehavior, IDisposable
     /// </summary>
     protected virtual void OnLeaving() { }
 
+    public override void OnRemoveBehavior() => OnEndMissionInternal();
+
     public override void OnEndMissionInternal()
     {
-        try
+        if (ended) return;
+        ended = true;
+        Cleanup(
+            coopMissionComponent.AgentMovementHandler.Dispose,
+            coopMissionComponent.AgentActionHandler.Dispose,
+            coopMissionComponent.AgentVoiceHandler.Dispose,
+            coopMissionComponent.MissileHandler.Dispose,
+            coopMissionComponent.WeaponDropHandler.Dispose,
+            coopMissionComponent.WeaponPickupHandler.Dispose,
+            coopMissionComponent.ShieldDamageHandler.Dispose,
+            coopMissionComponent.CombatHitPresentationHandler.Dispose,
+            coopMissionComponent.AgentDeathHandler.Dispose,
+            OnLeaving,
+            base.OnEndMission,
+            DisposeController,
+            coopMissionComponent.AgentRegistry.Clear,
+            () => lifetime?.Dispose());
+    }
+
+    // Attempt every cleanup step before propagating the first failure to the caller.
+    protected void Cleanup(params Action[] actions)
+    {
+        Exception first = null;
+        foreach (var action in actions)
         {
-            // Detach the per-mission agent handlers FIRST, before mission state and native agents are freed. Both
-            // detach deterministically here instead of leaking their packet-handler registration until the GC
-            // finalizer runs.
-            coopMissionComponent.AgentMovementHandler.Dispose();
-            coopMissionComponent.AgentActionHandler.Dispose();
-            coopMissionComponent.AgentVoiceHandler.Dispose();
-
-            coopMissionComponent.MissileHandler.Dispose();
-            coopMissionComponent.WeaponDropHandler.Dispose();
-            coopMissionComponent.WeaponPickupHandler.Dispose();
-            coopMissionComponent.ShieldDamageHandler.Dispose();
-            coopMissionComponent.CombatHitPresentationHandler.Dispose();
-            coopMissionComponent.AgentDeathHandler.Dispose();
-
-            OnLeaving();
-
-            base.OnEndMission();
-        }
-        finally
-        {
-            // Detach and clear on every exit path, because the registry outlives the mission and a throw in a
-            // step above would otherwise keep wrappers around destroyed native agents reachable from the
-            // campaign map. Detach first: the services that register agents are torn down in Dispose.
-            try
+            try { action(); }
+            catch (Exception error)
             {
-                Dispose();
-            }
-            finally
-            {
-                coopMissionComponent.AgentRegistry.Clear();
+                if (first == null) first = error;
+                Logger.Error(error, "Mission cleanup failed");
             }
         }
+        if (first != null) ExceptionDispatchInfo.Capture(first).Throw();
     }
 }
