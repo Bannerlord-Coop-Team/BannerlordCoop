@@ -122,7 +122,8 @@ internal sealed class LordWantsRivalCapturedQuestService : ILordWantsRivalCaptur
         using (new IssueDispatchReplayGuard())
         {
             if (!Campaign.Current.IssueManager.StartIssueQuest(giver)) return;
-            if (issue.IssueQuest is Quest quest && !quest.IsOngoing)
+            if (issue.IssueQuest is Quest quest && quest.IsOngoing &&
+                !Campaign.Current.QuestManager.Quests.Contains(quest))
                 quest.QuestAcceptedConsequences();
         }
     }
@@ -141,6 +142,7 @@ internal sealed class LordWantsRivalCapturedQuestService : ILordWantsRivalCaptur
     {
         fields = default;
         if (giver?.Issue?.IssueQuest is not Quest quest || !quest.IsOngoing ||
+            !Campaign.Current.QuestManager.Quests.Contains(quest) ||
             !TryGetCurrentPlayer(out var player) || !generations.TryGetGeneration(giver, out var generation)) return false;
 
         fields = new RivalCapturedAcceptFields(player.ControllerId, generation, quest.QuestDueTime, CaptureState(quest));
@@ -167,7 +169,8 @@ internal sealed class LordWantsRivalCapturedQuestService : ILordWantsRivalCaptur
             if (issue.IsOngoingWithoutQuest && !Campaign.Current.IssueManager.StartIssueQuest(giver)) return;
             if (issue.IssueQuest is not Quest quest) return;
             quest.ChangeQuestDueTime(fields.DueTime);
-            if (!quest.IsOngoing) quest.QuestAcceptedConsequences();
+            if (quest.IsOngoing && !Campaign.Current.QuestManager.Quests.Contains(quest))
+                quest.QuestAcceptedConsequences();
             ApplyState(quest, fields.State);
         }
     }

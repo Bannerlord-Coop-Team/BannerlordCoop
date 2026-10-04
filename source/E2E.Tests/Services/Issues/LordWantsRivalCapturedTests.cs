@@ -182,6 +182,78 @@ public sealed class LordWantsRivalCapturedTests : IDisposable
     }
 
     [Fact]
+    public void RepeatedAcceptanceDoesNotRegisterOrInitializeTheQuestAgain()
+    {
+        Accept();
+        var accepted = Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkQuestTypeQuestAccepted>());
+        Client.SimulateMessage(Server.NetPeer, accepted);
+
+        foreach (var instance in new[] { Server, Client })
+        {
+            instance.Call(() =>
+            {
+                var quest = GetQuest(instance);
+                Assert.Same(quest, Assert.Single(Campaign.Current.QuestManager.Quests.OfType<Quest>()));
+                var initialLog = Assert.Single(quest.JournalEntries);
+                Assert.True(quest.IsTracked(Get<Hero>(instance, targetId)));
+
+                using (new QuestSolutionStartAuthorityGuard())
+                    quest.QuestAcceptedConsequences();
+
+                Assert.Same(quest, Assert.Single(Campaign.Current.QuestManager.Quests.OfType<Quest>()));
+                Assert.Same(initialLog, Assert.Single(quest.JournalEntries));
+                Assert.Single(Campaign.Current.QuestManager.TrackedObjects[Get<Hero>(instance, targetId)]);
+            });
+        }
+
+        OtherClient.Call(() => Assert.Empty(Campaign.Current.QuestManager.Quests.OfType<Quest>()));
+    }
+
+    [Fact]
+    public void CreatedQuestNeedsAcceptanceAuthorityAndCannotRestartAfterFinalization()
+    {
+        Server.Call(() =>
+        {
+            var giver = Get<Hero>(Server, giverId);
+            Assert.True(Server.Resolve<IPlayerManager>().TryGetPlayer(Controller, out var player));
+            Assert.True(QuestSolutionStartRunner.RunGuarded(player,
+                () => Campaign.Current.IssueManager.StartIssueQuest(giver)));
+            var quest = GetQuest(Server);
+            Assert.True(quest.IsOngoing);
+            Assert.Empty(quest.JournalEntries);
+            Assert.DoesNotContain(quest, Campaign.Current.QuestManager.Quests);
+            Assert.False(QuestSolutionStartRunner.RunGuarded(player,
+                () => Server.Resolve<ILordWantsRivalCapturedQuestService>().TryCaptureQuestFields(giver, out _)));
+
+            quest.QuestAcceptedConsequences();
+            Assert.Empty(quest.JournalEntries);
+            Assert.DoesNotContain(quest, Campaign.Current.QuestManager.Quests);
+
+            QuestSolutionStartRunner.RunGuarded(player, () =>
+            {
+                quest.QuestAcceptedConsequences();
+                Assert.Same(quest, Assert.Single(Campaign.Current.QuestManager.Quests.OfType<Quest>()));
+                Assert.Single(quest.JournalEntries);
+                Assert.True(quest.IsTracked(Get<Hero>(Server, targetId)));
+                Assert.True(Server.Resolve<ILordWantsRivalCapturedQuestService>().TryCaptureQuestFields(giver, out _));
+                return true;
+            });
+
+            Server.Resolve<ILordWantsRivalCapturedQuestService>().RejectAcceptance(giver);
+            Assert.True(quest.IsFinalized);
+            var finalLogCount = quest.JournalEntries.Count;
+            QuestSolutionStartRunner.RunGuarded(player, () =>
+            {
+                quest.QuestAcceptedConsequences();
+                return true;
+            });
+            Assert.True(quest.IsFinalized);
+            Assert.Equal(finalLogCount, quest.JournalEntries.Count);
+            Assert.DoesNotContain(quest, Campaign.Current.QuestManager.Quests);
+        });
+    }
+
+    [Fact]
     public void ClientWorldCallbackDoesNotRewardEvenDuringAReceivedWorldUpdate()
     {
         Accept();

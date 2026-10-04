@@ -8,6 +8,7 @@ using GameInterface.Services.Players.Data;
 using HarmonyLib;
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Reflection;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.CampaignBehaviors;
@@ -99,7 +100,8 @@ internal class RivalCapturedDialoguePatches
     private static bool AcceptPrefix(Quest __instance)
     {
         return CallOriginalPolicy.IsOriginalAllowedForOwnershipGate() ||
-            (QuestSolutionStartAuthorityGuard.IsActive && !__instance.IsOngoing);
+            (QuestSolutionStartAuthorityGuard.IsActive && __instance.IsOngoing &&
+                !Campaign.Current.QuestManager.Quests.Contains(__instance));
     }
 
     [HarmonyPatch("FirstCounterOfferFinished")]
