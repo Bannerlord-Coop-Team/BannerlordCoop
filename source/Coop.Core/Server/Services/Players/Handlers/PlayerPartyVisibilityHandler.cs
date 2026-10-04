@@ -332,15 +332,18 @@ internal class PlayerPartyVisibilityHandler : IHandler
     /// </summary>
     private void RemoveVisual(MobileParty party)
     {
-        var partyVisual = party.Party.GetPartyVisual();
-        if (partyVisual == null) return;
         if (!objectManager.TryGetHandleWithLogging(party, out var mobilePartyHandle))
             return;
-        objectManager.Remove(partyVisual);
 
-        using (new AllowedThread())
+        var partyVisual = party.Party.GetPartyVisual();
+        if (partyVisual != null)
         {
-            AccessTools.Method(typeof(MobilePartyVisualManager), "RemovePartyVisualForParty").Invoke(MobilePartyVisualManager.Current, new object[] { party });
+            objectManager.Remove(partyVisual);
+
+            using (new AllowedThread())
+            {
+                AccessTools.Method(typeof(MobilePartyVisualManager), "RemovePartyVisualForParty").Invoke(MobilePartyVisualManager.Current, new object[] { party });
+            }
         }
 
         network.SendAll(new NetworkDestroyPartyVisual(mobilePartyHandle));
@@ -353,6 +356,13 @@ internal class PlayerPartyVisibilityHandler : IHandler
     /// </summary>
     private void CreateVisual(MobileParty party, string mobilePartyId)
     {
+        if (MobilePartyVisualManager.Current == null)
+        {
+            if (objectManager.TryGetHandleWithLogging(party, out var partyHandle))
+                network.SendAll(new NetworkCreatePartyVisual(partyHandle));
+            return;
+        }
+
         using (new AllowedThread())
         {
             party.CreateNewPartyVisual();

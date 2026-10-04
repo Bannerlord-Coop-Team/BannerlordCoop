@@ -52,13 +52,20 @@ public class PartyVisualLifetimeHandler : IHandler
         // visuals are registered by PartyVisualRegistry after loading, so skip this live-create path.
         if (!objectManager.TryGetId(mobileParty, out string mobilePartyId))
         {
-            if (!string.IsNullOrEmpty(mobileParty.StringId))
+            if (payload.What.MobilePartyVisual != null && !string.IsNullOrEmpty(mobileParty.StringId))
             {
                 skippedVisualIds.Remove(payload.What.MobilePartyVisual);
                 skippedVisualIds.Add(
                     payload.What.MobilePartyVisual,
                     $"{nameof(MobilePartyVisual)}_{mobileParty.StringId}");
             }
+            return;
+        }
+
+        if (payload.What.MobilePartyVisual == null)
+        {
+            if (objectManager.TryGetHandleWithLogging(mobileParty, out var partyHandle))
+                network.SendAll(new NetworkCreatePartyVisual(partyHandle));
             return;
         }
 
@@ -90,7 +97,7 @@ public class PartyVisualLifetimeHandler : IHandler
                 mobileParty.CreateNewPartyVisual();
 
                 var partyVisual = mobileParty.Party.GetPartyVisual();
-                if (partyVisual != null)
+                if (partyVisual != null && partyVisualId != null)
                     objectManager.AddExisting(partyVisualId, partyVisual, payload.What.PartyVisualHandle);
             }
         }, context: $"create party visual {partyVisualId}");
@@ -99,6 +106,13 @@ public class PartyVisualLifetimeHandler : IHandler
     private void Handle(MessagePayload<PartyVisualDestroyed> payload)
     {
         var partyVisual = payload.What.MobilePartyVisual;
+        if (partyVisual == null)
+        {
+            if (objectManager.TryGetHandleWithLogging(payload.What.MobileParty, out var partyHandle))
+                network.SendAll(new NetworkDestroyPartyVisual(partyHandle));
+            return;
+        }
+
         var isRegistered = objectManager.TryGetId(partyVisual, out string partyVisualId);
         if (!isRegistered && !skippedVisualIds.TryGetValue(partyVisual, out partyVisualId))
         {

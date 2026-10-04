@@ -15,6 +15,12 @@ namespace GameInterface.Services.PartyVisuals.Messages
         [ProtoMember(3)]
         public uint MobilePartyHandle { get; }
 
+        // Headless servers identify client-only visuals by their owning party, without a visual registration.
+        public NetworkCreatePartyVisual(uint mobilePartyHandle)
+            : this(null, 0, mobilePartyHandle)
+        {
+        }
+
         public NetworkCreatePartyVisual(
             string partyVisualId,
             uint partyVisualHandle,
