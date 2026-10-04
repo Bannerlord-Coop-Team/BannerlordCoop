@@ -1,9 +1,17 @@
-using System;
+﻿using System;
 using TaleWorlds.Library;
 
 namespace GameInterface.Services.Chat;
 
-/// <summary>One selectable global or direct-message channel.</summary>
+internal enum ChatChannelKind
+{
+    All = 0,
+    Events = 1,
+    Global = 2,
+    Direct = 3,
+}
+
+/// <summary>One selectable feed or direct-message channel.</summary>
 internal sealed class ChatChannelVM : ViewModel
 {
     private readonly Action<ChatChannelVM> select;
@@ -12,17 +20,31 @@ internal sealed class ChatChannelVM : ViewModel
     private bool hasUnreadMessages;
     private bool isMuted;
 
-    public ChatChannelVM(string controllerId, string displayName, Action<ChatChannelVM> select)
+    public ChatChannelVM(
+        string controllerId,
+        string displayName,
+        ChatChannelKind kind,
+        Action<ChatChannelVM> select)
     {
         if (select == null) throw new ArgumentNullException(nameof(select));
 
         ControllerId = controllerId ?? string.Empty;
+        Kind = kind;
         this.displayName = string.IsNullOrWhiteSpace(displayName) ? ControllerId : displayName;
         this.select = select;
     }
 
     public string ControllerId { get; }
-    public bool IsGlobal => ControllerId.Length == 0;
+
+    public ChatChannelKind Kind { get; }
+
+    public bool IsAll => Kind == ChatChannelKind.All;
+
+    public bool IsEvents => Kind == ChatChannelKind.Events;
+
+    public bool IsGlobal => Kind == ChatChannelKind.Global;
+
+    public bool IsDirect => Kind == ChatChannelKind.Direct;
 
     [DataSourceProperty]
     public string Name
