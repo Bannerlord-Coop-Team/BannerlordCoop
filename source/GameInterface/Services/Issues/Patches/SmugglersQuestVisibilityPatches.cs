@@ -38,11 +38,31 @@ internal class SmugglersJournalVisibilityPatch
                 __instance.OldQuestsList.Remove(item);
         }
 
-        if (!__instance.ActiveQuestsList.Contains(__instance.SelectedQuest)
-            && !__instance.OldQuestsList.Contains(__instance.SelectedQuest))
-            __instance.SetSelectedItem(__instance.ActiveQuestsList.FirstOrDefault() ?? __instance.OldQuestsList.FirstOrDefault());
+        RefreshSelection(__instance, __instance._viewDataTracker);
         __instance.IsThereAnyQuest = __instance.ActiveQuestsList.Count + __instance.OldQuestsList.Count > 0;
         __instance.RefreshValues();
+    }
+
+    internal static void RefreshSelection(QuestsVM viewModel, IViewDataTracker viewDataTracker)
+    {
+        if (viewModel.ActiveQuestsList.Contains(viewModel.SelectedQuest)
+            || viewModel.OldQuestsList.Contains(viewModel.SelectedQuest)) return;
+
+        var nextQuest = viewModel.ActiveQuestsList.FirstOrDefault() ?? viewModel.OldQuestsList.FirstOrDefault();
+        if (nextQuest != null)
+        {
+            viewModel.SetSelectedItem(nextQuest);
+            return;
+        }
+
+        // Vanilla SetSelectedItem dereferences its argument even when the journal is empty.
+        if (viewModel.SelectedQuest != null) viewModel.SelectedQuest.IsSelected = false;
+        viewModel.SelectedQuest = null;
+        viewModel.CurrentQuestStages.Clear();
+        viewModel.CurrentQuestGiverHero = null;
+        viewModel.CurrentQuestTitle = string.Empty;
+        viewModel.IsCurrentQuestGiverHeroHidden = true;
+        viewDataTracker.SetQuestSelection(null);
     }
 }
 
