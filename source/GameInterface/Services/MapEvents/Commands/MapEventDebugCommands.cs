@@ -3469,7 +3469,7 @@ public class MapEventDebugCommands
         }
     }
 
-    private static bool TryGetPlayerParty(
+    internal static bool TryGetPlayerParty(
         string controllerId,
         bool requireReady,
         out IObjectManager objectManager,
