@@ -26,6 +26,9 @@ public interface IBattleShipReplicator : IDisposable
 
     /// <summary>[Game thread] Registry and stream state per hull (diagnostics).</summary>
     object Inspect();
+
+    /// <summary>[Game thread] The registered hull an on-foot agent stands on and its hull-local position.</summary>
+    bool TryGetDeckPose(Agent agent, Vec3 worldPosition, out Guid deckShip, out Vec3 deckLocal);
 }
 
 /// <inheritdoc cref="IBattleShipReplicator"/>
@@ -292,10 +295,19 @@ public class BattleShipReplicator : IBattleShipReplicator
     // [Game thread] Any owned on-foot agent on a registered hull sends a hull-local pose, so it rides the deck on every peer.
     internal bool CaptureDeck(CoopAgentInfo info, Vec3 worldPosition, out Guid deckShip, out Vec3 deckLocal, out float deckSpeed)
     {
+        deckSpeed = 0f;
+        if (!TryGetDeckPose(info?.Agent, worldPosition, out deckShip, out deckLocal)) return false;
+
+        deckSpeed = DeckSpeed(info.AgentId, deckShip, deckLocal);
+        return true;
+    }
+
+    /// <summary>[Game thread] The registered hull an on-foot agent stands on and its hull-local position.</summary>
+    public bool TryGetDeckPose(Agent agent, Vec3 worldPosition, out Guid deckShip, out Vec3 deckLocal)
+    {
         deckShip = Guid.Empty;
         deckLocal = Vec3.Zero;
-        deckSpeed = 0f;
-        var hull = engine.GetSupportHull(info?.Agent);
+        var hull = engine.GetSupportHull(agent);
         if (hull == null || !Registry.TryGetByHull(hull, out var ship)) return false;
 
         var frame = engine.GetFrame(hull);
@@ -305,7 +317,6 @@ public class BattleShipReplicator : IBattleShipReplicator
         if (!deckLocal.IsValid) return false;
 
         deckShip = ship.ShipId;
-        deckSpeed = DeckSpeed(info.AgentId, ship.ShipId, deckLocal);
         return true;
     }
 

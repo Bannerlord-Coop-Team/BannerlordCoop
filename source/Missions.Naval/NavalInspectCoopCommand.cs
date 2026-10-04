@@ -7,6 +7,7 @@ using Newtonsoft.Json;
 using System;
 using System.Linq;
 using TaleWorlds.Engine;
+using TaleWorlds.Library;
 using TaleWorlds.MountAndBlade;
 
 namespace Missions.Naval;
@@ -40,7 +41,9 @@ public sealed class NavalInspectCoopCommand : ICoopCommand
             deploymentCommitted = controller.Deployment.IsCommitted,
             ownReservePresent = mission.GetMissionBehavior<CoopNavalReserveGuard>()?.ReservePresent,
             shipSync = mission.GetMissionBehavior<CoopNavalBattleBehavior>()?.ShipReplicator.Inspect(),
-            agents = InspectAgents(mission, controller.MissionComponent),
+            shipDecks = controller.MissionComponent.AgentMovementHandler.InspectShipDecks(),
+            stationUse = mission.GetMissionBehavior<CoopNavalBattleBehavior>()?.StationUseReplicator.Inspect(),
+            agents = InspectAgents(mission, controller.MissionComponent, mission.GetMissionBehavior<CoopNavalBattleBehavior>()),
             mainAgent = Agent.Main?.Character?.StringId,
             mainAgentUsing = Agent.Main?.CurrentlyUsedGameObject is UsableMissionObject used ? used.GameEntity.Name : null,
             ships = shipsLogic.AllShips.Select(ship => new
@@ -67,12 +70,15 @@ public sealed class NavalInspectCoopCommand : ICoopCommand
     }
 
     // Registered human agents with the hull whose formation they serve on, so a puppet's hull is visible.
-    private static object[] InspectAgents(Mission mission, ICoopMissionComponent missionComponent) => mission.Agents
+    private static object[] InspectAgents(Mission mission, ICoopMissionComponent missionComponent, CoopNavalBattleBehavior naval) => mission.Agents
         .Where(agent => agent.IsHuman && agent.IsActive())
         .Select(agent =>
         {
             missionComponent.AgentRegistry.TryGetAgentInfo(agent, out var info);
             missionComponent.ShipRegistry.TryGetByFormation(agent.Formation, out var ship);
+            Guid deckShip = Guid.Empty;
+            Vec3 deckLocal = Vec3.Zero;
+            bool onDeck = naval != null && naval.ShipReplicator.TryGetDeckPose(agent, agent.Position, out deckShip, out deckLocal);
             return (object)new
             {
                 name = agent.Name,
@@ -82,6 +88,9 @@ public sealed class NavalInspectCoopCommand : ICoopCommand
                 formation = agent.Formation?.FormationIndex.ToString(),
                 shipId = ship?.ShipId,
                 shipOwner = ship?.CurrentAuthority,
+                deckShip = onDeck ? (Guid?)deckShip : null,
+                deckLocal = onDeck ? deckLocal.ToString() : null,
+                station = naval?.StationUseReplicator.DescribeStation(agent),
             };
         })
         .ToArray();

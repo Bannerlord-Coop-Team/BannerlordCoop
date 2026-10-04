@@ -87,3 +87,60 @@ internal class PlayerFleetDeploymentSlotPatch
         spawnPathOffset = NavalPlayerDeploymentSlot.ShiftSpawnPathOffset(spawnPathOffset, rank, teamRange);
     }
 }
+
+// Owners announce station use; the replicator ignores agents this client does not drive.
+[HarmonyPatch(typeof(Agent), nameof(Agent.UseGameObject))]
+[HarmonyPatchCategory(NavalMissionModule.PatchCategory)]
+internal class AgentStationUsePatch
+{
+    [HarmonyPostfix]
+    private static void Postfix(Agent __instance, UsableMissionObject usedObject)
+    {
+        if (!CoopNavalMissionScope.IsActive || usedObject == null) return;
+
+        MessageBroker.Instance.Publish(__instance, new AgentStationUseChanged(__instance, usedObject, inUse: true));
+    }
+}
+
+// Every release path (death, order, AI, player) ends in StopUsingGameObjectAux.
+[HarmonyPatch(typeof(Agent), nameof(Agent.StopUsingGameObjectAux))]
+[HarmonyPatchCategory(NavalMissionModule.PatchCategory)]
+internal class AgentStationReleasePatch
+{
+    [HarmonyPrefix]
+    private static void Prefix(Agent __instance, out UsableMissionObject __state) => __state = __instance.CurrentlyUsedGameObject;
+
+    [HarmonyPostfix]
+    private static void Postfix(Agent __instance, UsableMissionObject __state)
+    {
+        if (!CoopNavalMissionScope.IsActive || __state == null || __instance.CurrentlyUsedGameObject == __state) return;
+
+        MessageBroker.Instance.Publish(__instance, new AgentStationUseChanged(__instance, __state, inUse: false));
+    }
+}
+
+// The player can only take the helm of a hull it owns; a copied hull is steered by its owner.
+[HarmonyPatch(typeof(Agent), nameof(Agent.HandleStartUsingAction))]
+[HarmonyPatchCategory(NavalMissionModule.PatchCategory)]
+internal class ForeignHelmUsePatch
+{
+    [HarmonyPrefix]
+    private static bool Prefix(Agent __instance, UsableMissionObject targetObject) =>
+        AllowsStart(__instance.IsMainAgent, IsForeignHelm(targetObject));
+
+    internal static bool AllowsStart(bool isMainAgent, bool isForeignHelm) => !isMainAgent || !isForeignHelm;
+
+    private static bool IsForeignHelm(UsableMissionObject point)
+    {
+        if (point is not StandingPoint standingPoint) return false;
+
+        foreach (var ship in NavalForeignHulls.All)
+        {
+            var helm = ship.ShipControllerMachine;
+            if (helm != null && (helm.PilotStandingPoint == standingPoint || helm.StandingPoints.Contains(standingPoint)))
+                return true;
+        }
+
+        return false;
+    }
+}
