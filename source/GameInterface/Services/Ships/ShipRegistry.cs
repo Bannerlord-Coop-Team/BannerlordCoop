@@ -4,7 +4,6 @@ using HarmonyLib;
 using Serilog;
 using System;
 using System.Collections.Generic;
-using System.Linq;
 using System.Reflection;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Naval;
@@ -24,9 +23,26 @@ internal class ShipRegistry : AutoRegistryBase<Ship>
 
     public override void RegisterAllObjects()
     {
-        foreach (var ship in Campaign.Current.CampaignObjectManager.MobileParties.SelectMany(party => party.Ships))
+        foreach (var party in Campaign.Current.CampaignObjectManager.MobileParties)
         {
-            RegisterExistingObject(ship.Owner.MobileParty?.StringId, ship);
+            if (party.Ships == null) continue;
+
+            var index = 0;
+            foreach (var ship in party.Ships)
+            {
+                RegisterExistingObject($"MobileParty_{party.StringId}_{index++}", ship);
+            }
+        }
+
+        foreach (var settlement in Campaign.Current.CampaignObjectManager.Settlements)
+        {
+            if (settlement.Party == null || settlement.Party.Ships == null) continue;
+
+            var index = 0;
+            foreach (var ship in settlement.Party.Ships)
+            {
+                RegisterExistingObject($"Settlement_{settlement.StringId}_{index++}", ship);
+            }
         }
     }
 
