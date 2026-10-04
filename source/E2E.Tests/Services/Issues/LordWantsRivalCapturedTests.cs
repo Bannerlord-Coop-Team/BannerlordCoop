@@ -386,7 +386,11 @@ public sealed class LordWantsRivalCapturedTests : IDisposable
         Server.Call(() =>
         {
             var giver = Get<Hero>(Server, giverId);
-            using (new AllowedThread()) giver.StayingInSettlement = null;
+            using (new AllowedThread())
+            {
+                giver.StayingInSettlement = null;
+                giver.PartyBelongedTo.CurrentSettlement = null;
+            }
             var service = Server.Resolve<ILordWantsRivalCapturedQuestService>();
             Assert.False(service.IsPresentWithGiver(Controller, giver));
             Assert.True(Server.ObjectManager.TryGetId(giver.PartyBelongedTo.Party, out var targetPartyId));
