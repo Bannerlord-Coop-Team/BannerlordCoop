@@ -1,4 +1,4 @@
-using Common.Util;
+﻿using Common.Util;
 using System;
 using System.Collections.Generic;
 using TaleWorlds.CampaignSystem;
@@ -26,6 +26,11 @@ internal static class SimpleIssueFactoryRegistry
 
     private static readonly Dictionary<Type, Entry> ByType = new Dictionary<Type, Entry>
     {
+        [typeof(ExtortionByDesertersIssueBehavior.ExtortionByDesertersIssue)] = new Entry(
+            "ExtortionByDeserters",
+            typeof(ExtortionByDesertersIssueBehavior.ExtortionByDesertersIssue),
+            owner => new ExtortionByDesertersIssueBehavior.ExtortionByDesertersIssue(owner),
+            IssueBase.IssueFrequency.Common),
         [typeof(ArmyNeedsSuppliesIssueBehavior.ArmyNeedsSuppliesIssue)] = new Entry(
             "ArmyNeedsSupplies",
             typeof(ArmyNeedsSuppliesIssueBehavior.ArmyNeedsSuppliesIssue),

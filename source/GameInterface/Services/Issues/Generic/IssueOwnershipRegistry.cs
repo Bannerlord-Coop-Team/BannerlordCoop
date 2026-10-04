@@ -1,11 +1,13 @@
-using GameInterface.Services.Entity;
+﻿using GameInterface.Services.Entity;
 using System.Collections.Generic;
+using System;
 using TaleWorlds.CampaignSystem;
 
 namespace GameInterface.Services.Issues.Generic;
 
 public interface IIssueOwnershipRegistry
 {
+    event Action<Hero, string> OwnershipAssigned;
     void SetOwner(Hero issueGiver, string controllerId);
     void Clear(Hero issueGiver);
     void ClearAll();
@@ -17,6 +19,7 @@ public interface IIssueOwnershipRegistry
 
 internal sealed class IssueOwnershipRegistry : IIssueOwnershipRegistry
 {
+    public event Action<Hero, string> OwnershipAssigned;
     private readonly PendingRegistry<string> registry = new();
 
     public void SetOwner(Hero issueGiver, string controllerId)
@@ -24,6 +27,7 @@ internal sealed class IssueOwnershipRegistry : IIssueOwnershipRegistry
         if (issueGiver == null || string.IsNullOrEmpty(controllerId)) return;
 
         registry.Set(issueGiver, controllerId);
+        OwnershipAssigned?.Invoke(issueGiver, controllerId);
     }
 
     public void Clear(Hero issueGiver)

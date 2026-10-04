@@ -1,5 +1,6 @@
-using System;
+﻿using System;
 using GameInterface.Services.Heroes.Patches;
+using System.Linq;
 using GameInterface.Services.Issues.Generic.AcceptMirror;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Players.Data;
@@ -7,9 +8,48 @@ using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Issues;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Roster;
+using TaleWorlds.Core;
 using TaleWorlds.Localization;
 
 namespace GameInterface.Services.Issues.Generic;
+
+internal readonly struct AlternativeSolutionStartSnapshot
+{
+    private readonly IssueBase issue;
+    private readonly AlternativeSolutionVanillaState state;
+    private readonly CampaignTime dueTime;
+    private readonly float difficulty;
+    private readonly bool tried;
+    private readonly SkillObject rewardSkill;
+    private readonly JournalLog[] journal;
+
+    public AlternativeSolutionStartSnapshot(IssueBase issue)
+    {
+        this.issue = issue;
+        state = AlternativeSolutionVanillaStateSync.Capture(issue);
+        dueTime = issue.IssueDueTime;
+        difficulty = issue._issueDifficultyMultiplier;
+        tried = issue.IsTriedToSolveBefore;
+        rewardSkill = issue._companionRewardSkill;
+        journal = issue.JournalEntries.ToArray();
+    }
+
+    public void Restore()
+    {
+        issue._issueState = IssueBase.IssueState.Ongoing;
+        issue.IssueDueTime = dueTime;
+        issue._issueDifficultyMultiplier = difficulty;
+        issue.IsTriedToSolveBefore = tried;
+        issue.AlternativeSolutionReturnTimeForTroops = state.ReturnTime;
+        issue.AlternativeSolutionIssueEffectClearTime = state.EffectClearTime;
+        issue._failureChance = state.FailureChance;
+        issue._alternativeSolutionCasualtyCount = state.CasualtyCount;
+        issue._totalTroopXpAmount = state.TotalTroopXpAmount;
+        issue._companionRewardSkill = rewardSkill;
+        issue._journalEntries.Clear();
+        issue._journalEntries.AddRange(journal);
+    }
+}
 
 public sealed class AlternativeSolutionStartAuthorityGuard : IDisposable
 {
@@ -47,6 +87,9 @@ public static class AlternativeSolutionStartRunner
                 throw new InvalidOperationException($"StartOnServerFromClaim: AlternativeSolutionCondition rejected the accept for owner {owner.StringId}");
             if (!DoTroopsSatisfyAlternativeSolution(owner.Issue, validatedRoster, out _))
                 throw new InvalidOperationException($"StartOnServerFromClaim: the validated roster does not satisfy the alternative solution requirement for owner {owner.StringId}");
+            if (owner.Issue is ExtortionByDesertersIssueBehavior.ExtortionByDesertersIssue &&
+                !IsExtortionSelectionValid(owner.Issue, validatedRoster))
+                throw new InvalidOperationException("The selected deserter mission companion or troops are no longer eligible.");
 
             RemoveFromTrueOwnerParty(validatedRoster);
 
@@ -63,7 +106,7 @@ public static class AlternativeSolutionStartRunner
         }
     }
 
-    private static bool DoTroopsSatisfyAlternativeSolution(IssueBase issue, TroopRoster troopRoster, out TextObject explanation)
+    internal static bool DoTroopsSatisfyAlternativeSolution(IssueBase issue, TroopRoster troopRoster, out TextObject explanation)
     {
         var neededMenCount = issue.GetTotalAlternativeSolutionNeededMenCount();
         if (troopRoster.TotalRegulars >= neededMenCount && troopRoster.TotalRegulars - troopRoster.TotalWoundedRegulars < neededMenCount)
@@ -74,6 +117,23 @@ public static class AlternativeSolutionStartRunner
         return issue.DoTroopsSatisfyAlternativeSolution(troopRoster, out explanation);
     }
 
+    private static bool IsExtortionSelectionValid(IssueBase issue, TroopRoster roster)
+    {
+        if (roster.TotalHeroes != 1) return false;
+        foreach (var element in roster.GetTroopRoster())
+        {
+            if (element.Character.IsHero)
+            {
+                var companion = element.Character.HeroObject;
+                if (companion == Hero.MainHero || companion.PartyBelongedTo != MobileParty.MainParty ||
+                    !companion.CanHaveCampaignIssues() || companion.IsWounded || companion.IsPregnant) return false;
+            }
+            else if (element.Character.IsNotTransferableInPartyScreen ||
+                !issue.IsTroopTypeNeededByAlternativeSolution(element.Character)) return false;
+        }
+        return true;
+    }
+
     private static void RemoveFromTrueOwnerParty(TroopRoster validatedRoster)
     {
         var party = Campaign.Current?.MainParty;
@@ -82,7 +142,7 @@ public static class AlternativeSolutionStartRunner
         foreach (var element in validatedRoster.GetTroopRoster())
         {
             party.MemberRoster.AddToCounts(
-                element.Character, -element.Number, false, -element.WoundedNumber, 0, true, -1);
+                element.Character, -element.Number, false, -element.WoundedNumber, -element.Xp, true, -1);
         }
     }
 
@@ -93,7 +153,8 @@ public static class AlternativeSolutionStartRunner
         if (!objectManager.TryGetObjectWithLogging<Hero>(truePlayer.HeroId, out var trueOwnerHero))
             throw new InvalidOperationException($"ResolveOwnerScope: could not resolve true owner Hero {truePlayer.HeroId}");
 
-        objectManager.TryGetObjectWithLogging<MobileParty>(truePlayer.MobilePartyId, out var trueOwnerParty);
+        if (!objectManager.TryGetObjectWithLogging<MobileParty>(truePlayer.MobilePartyId, out var trueOwnerParty))
+            throw new InvalidOperationException($"ResolveOwnerScope: could not resolve true owner party {truePlayer.MobilePartyId}");
 
         return new MainHeroSubstitutionScope(trueOwnerHero, trueOwnerParty);
     }
