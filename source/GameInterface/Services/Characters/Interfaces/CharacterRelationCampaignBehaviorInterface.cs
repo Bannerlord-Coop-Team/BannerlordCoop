@@ -23,7 +23,6 @@ namespace GameInterface.Services.Characters.Interfaces;
 
 public interface ICharacterRelationCampaignBehaviorInterface : IGameAbstraction
 {
-    void OnHeroKilled(Hero victim, Hero killer, KillCharacterAction.KillCharacterActionDetail detail, bool showNotification = true);
     void OnPrisonerDonatedToSettlement(MobileParty donatingParty, FlattenedTroopRoster donatedPrisoners, Settlement donatedSettlement);
     void DailyTick();
     void OnSettlementOwnerChanged(Settlement settlement, bool openToClaim, Hero newOwner, Hero oldOwner, Hero capturerHero, ChangeOwnerOfSettlementAction.ChangeOwnerOfSettlementDetail detail);
@@ -38,51 +37,6 @@ public class CharacterRelationCampaignBehaviorInterface : ICharacterRelationCamp
         IMessageBroker messageBroker)
     {
         this.messageBroker = messageBroker;
-    }
-
-    public void OnHeroKilled(Hero victim, Hero killer, KillCharacterAction.KillCharacterActionDetail detail, bool showNotification = true)
-    {
-        // Replace Hero.MainHero check
-        if ((detail != KillCharacterAction.KillCharacterActionDetail.Executed
-            && detail != KillCharacterAction.KillCharacterActionDetail.ExecutionAfterMapEvent)
-            || !killer.IsPlayerHero() || victim.Clan == null) return;
-        
-        int numberOfClansWithHurtRelations = 0;
-        foreach (Clan clan in Clan.All)
-        {
-            if (!clan.IsEliminated && !clan.IsBanditFaction && clan != killer.Clan)
-            {
-                int relationChangeForExecutingHero = Campaign.Current.Models.ExecutionRelationModel.GetRelationChangeForExecutingHero(victim, clan.Leader, out bool showQuickNotification);
-                if (relationChangeForExecutingHero != 0)
-                {
-                    Hero leader = clan.Leader;
-                    try
-                    {
-                        ResolvedMainHeroContext.ResolvedMainHero = killer;
-                        ChangeRelationAction.ApplyPlayerRelation(leader, relationChangeForExecutingHero, true, false);
-                    }
-                    finally
-                    {
-                        ResolvedMainHeroContext.ResolvedMainHero = null;
-                    }
-                    
-                    if (showQuickNotification)
-                    {
-                        numberOfClansWithHurtRelations++;
-
-                        // Notify relation decreased with clan
-                        var message = new NotifyRelationDecreasedByExecution(killer, clan, leader.GetRelation(killer), MathF.Abs(relationChangeForExecutingHero));
-                        messageBroker.Publish(this, message);
-                    }
-                }
-            }
-        }
-        if (numberOfClansWithHurtRelations > 0)
-        {
-            // Notify execution hurt relations summary
-            var message = new NotifyRelationDecreasedByExecutionSummary(killer, numberOfClansWithHurtRelations);
-            messageBroker.Publish(this, message);
-        }
     }
 
     public void OnPrisonerDonatedToSettlement(MobileParty donatingParty, FlattenedTroopRoster donatedPrisoners, Settlement donatedSettlement)

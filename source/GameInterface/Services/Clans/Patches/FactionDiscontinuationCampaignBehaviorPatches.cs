@@ -46,7 +46,9 @@ internal class FactionDiscontinuationCampaignBehaviorPatches
         {
             __instance._independentClans.Remove(clan);
         }
-        if (clan.IsPlayerClan() && oldKingdom != null && __instance.CanKingdomBeDiscontinued(oldKingdom))
+        // v1.5 checks the kingdom a clan leaves whatever the clan, except when the kingdom itself is
+        // being destroyed (it used to check only after the player clan left).
+        if (detail != ChangeKingdomAction.ChangeKingdomActionDetail.LeaveByKingdomDestruction && oldKingdom != null && __instance.CanKingdomBeDiscontinued(oldKingdom))
         {
             __instance.DiscontinueKingdom(oldKingdom);
         }

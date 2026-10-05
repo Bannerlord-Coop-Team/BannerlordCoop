@@ -144,7 +144,10 @@ internal class PerkResetCampaignBehaviorHandler : IHandler
             {
                 int index = (i + num) % companionsCount;
                 Hero targetCompanion = playerClan.Companions[index];
-                if ((targetCompanion.PartyBelongedTo?.MapEvent) == null)
+                // v1.5 also leaves captive companions, and any a campaign behavior vetoes, in the clan.
+                bool canBeReleased = true;
+                CampaignEventDispatcher.Instance.CanHeroBeReleased(targetCompanion, ref canBeReleased);
+                if ((targetCompanion.PartyBelongedTo?.MapEvent) == null && targetCompanion.PartyBelongedToAsPrisoner == null && canBeReleased)
                 {
                     Settlement currentSettlement = targetCompanion.CurrentSettlement;
                     if ((currentSettlement?.Party.MapEvent) == null && !Campaign.Current.IssueManager.IssueSolvingCompanionList.Contains(targetCompanion))

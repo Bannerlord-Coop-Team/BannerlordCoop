@@ -28,14 +28,9 @@ internal class ChangePlayerCharacterActionPatches
         // player whose party is empty (0 members) or only holds a wounded leader would have
         // their party destroyed and the character deleted.
         MobileParty targetHeroParty = hero.PartyBelongedTo;
-        CampaignVec2 position = MobileParty.MainParty.Anchor.Position;
-        CampaignVec2 lastUsedDisembarkPosition = MobileParty.MainParty.Anchor.GetLastUsedDisembarkPosition();
+        AnchorPoint anchor = new AnchorPoint(MobileParty.MainParty.Anchor);
         bool isCurrentlyAtSea = MobileParty.MainParty.IsCurrentlyAtSea;
         Game.Current.PlayerTroop = hero.CharacterObject;
-        if (MobileParty.MainParty.Anchor.IsMovingToPoint)
-        {
-            MobileParty.MainParty.Anchor.ResetMoveTarget();
-        }
 
         CampaignEventDispatcher.Instance.OnBeforePlayerCharacterChanged(mainHero, hero);
         Campaign.Current.OnPlayerCharacterChanged(out var isMainPartyChanged);
@@ -56,10 +51,9 @@ internal class ChangePlayerCharacterActionPatches
             mainParty.CancelNavigationTransition();
         }
 
-        if (MobileParty.MainParty.Ships.Count > 0 && position.IsValid() && !MobileParty.MainParty.Anchor.IsValid && !MobileParty.MainParty.IsCurrentlyAtSea)
+        if (MobileParty.MainParty.Ships.Count > 0 && !MobileParty.MainParty.Anchor.IsValid && !MobileParty.MainParty.IsCurrentlyAtSea)
         {
-            MobileParty.MainParty.Anchor.SetPosition(position);
-            MobileParty.MainParty.Anchor.SetLastUsedDisembarkPosition(lastUsedDisembarkPosition);
+            MobileParty.MainParty.SetAnchor(anchor);
         }
 
         if (mainParty != MobileParty.MainParty && mainParty.IsActive && mainParty != targetHeroParty)

@@ -22,16 +22,8 @@ internal class DisableCharacterRelationCampaignBehavior
 [HarmonyPatch(typeof(CharacterRelationCampaignBehavior))]
 internal class CharacterRelationCampaignBehaviorPatches
 {
-    [HarmonyPatch(nameof(CharacterRelationCampaignBehavior.OnHeroKilled))]
-    [HarmonyPrefix]
-    public static bool OnHeroKilledPrefix(Hero victim, Hero killer, KillCharacterAction.KillCharacterActionDetail detail, bool showNotification = true)
-    {
-        ContainerProvider.TryResolve<ICharacterRelationCampaignBehaviorInterface>(out var characterRelationBehaviorInterface);
-
-        characterRelationBehaviorInterface.OnHeroKilled(victim, killer, detail, showNotification);
-
-        return false;
-    }
+    // v1.5 moved execution consequences out of this behavior (OnHeroKilled is gone) into the
+    // new blood feud system in ExecutionCampaignBehavior, which is not multiplayer-aware yet.
 
     [HarmonyPatch(nameof(CharacterRelationCampaignBehavior.OnPrisonerDonatedToSettlement))]
     [HarmonyPrefix]

@@ -141,17 +141,23 @@ internal class CompanionRolesHandler : IHandler
                 {
                     mainParty.MemberRoster.AddToCounts(oneToOneConversationHero.CharacterObject, -1, false, 0, 0, true, -1);
                 }
-                MobileParty partyBelongedTo = oneToOneConversationHero.PartyBelongedTo;
-                if (partyBelongedTo == null)
+                MobileParty mobileParty = oneToOneConversationHero.PartyBelongedTo;
+                if (mobileParty == null)
                 {
-                    MobileParty mobileParty = LordPartyComponent.CreateLordParty(oneToOneConversationHero.CharacterObject.StringId, oneToOneConversationHero, mainParty.Position, 3f, selectedFief, oneToOneConversationHero);
-                    mobileParty.MemberRoster.AddToCounts(clan.Culture.BasicTroop, MBRandom.RandomInt(12, 15), false, 0, 0, true, -1);
-                    mobileParty.MemberRoster.AddToCounts(clan.Culture.EliteBasicTroop, MBRandom.RandomInt(10, 15), false, 0, 0, true, -1);
+                    mobileParty = LordPartyComponent.CreateLordParty(oneToOneConversationHero.CharacterObject.StringId, oneToOneConversationHero, mainParty.Position, 3f, selectedFief, oneToOneConversationHero);
                 }
                 else
                 {
-                    partyBelongedTo.ActualClan = clan;
-                    partyBelongedTo.Party.SetVisualAsDirty();
+                    mobileParty.ActualClan = clan;
+                    mobileParty.Party.SetVisualAsDirty();
+                }
+                // v1.5 tops the new clan's party, created or kept, up to 33 men, half basic and half elite.
+                if (mobileParty.MemberRoster.TotalManCount < 33)
+                {
+                    int missing = 33 - mobileParty.MemberRoster.TotalManCount;
+                    int basic = missing / 2;
+                    mobileParty.MemberRoster.AddToCounts(clan.Culture.BasicTroop, basic, false, 0, 0, true, -1);
+                    mobileParty.MemberRoster.AddToCounts(clan.Culture.EliteBasicTroop, missing - basic, false, 0, 0, true, -1);
                 }
                 companionRolesCampaignBehavior.AdjustCompanionsEquipment(oneToOneConversationHero);
                 companionRolesCampaignBehavior.SpawnNewHeroesForNewCompanionClan(oneToOneConversationHero, clan, selectedFief);
