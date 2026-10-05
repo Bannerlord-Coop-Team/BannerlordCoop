@@ -131,8 +131,11 @@ internal sealed class CoopHideoutMissionLogic : MissionLogic
         if (!deployed)
         {
             deployed = true;
+            // v1.5 finishes deployment through OnInitialSpawnCompleted, as HideoutMissionController now does:
+            // it marks both sides spawned, then runs OnDeploymentFinished and the new OnAfterDeploymentFinished
+            // (agent stats and mission equipment are initialized there).
             if (!battle.Deployment.IsCommitted)
-                Mission.OnDeploymentFinished();
+                Mission.OnInitialSpawnCompleted(BattleSideEnum.None);
         }
 
         hadAttackers |= HasActive(BattleSideEnum.Attacker);

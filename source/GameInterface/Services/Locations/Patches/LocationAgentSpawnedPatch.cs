@@ -21,7 +21,7 @@ namespace GameInterface.Services.Locations.Patches;
 /// method: its <c>IsCoopBattleActive</c> gate is false in a settlement, and this gate is false in a
 /// battle.
 /// </summary>
-[HarmonyPatch(typeof(Mission), nameof(Mission.SpawnAgent), new[] { typeof(AgentBuildData), typeof(bool) })]
+[HarmonyPatch(typeof(Mission), nameof(Mission.SpawnAgent), new[] { typeof(AgentBuildData), typeof(bool), typeof(Equipment), typeof(ItemObject) })]
 internal class LocationAgentSpawnedPatch
 {
     [HarmonyPostfix]

@@ -1,4 +1,5 @@
 ﻿using SandBox.Conversation.MissionLogics;
+using HarmonyLib;
 using SandBox;
 using SandBox.Missions;
 using SandBox.Missions.MissionLogics;
@@ -146,6 +147,11 @@ internal sealed class CoopHideoutAssaultController : HideoutMissionController, I
 internal sealed class CoopHideoutAmbushController : HideoutAmbushMissionController, ICoopHideoutNativeController, IMissionAgentSpawnLogic
 {
     internal const float StealthFailCounterSeconds = 15f;
+    // v1.5 made these base fields readonly (set by the constructor); co-op fills them once it knows the battle.
+    private static readonly AccessTools.FieldRef<HideoutAmbushMissionController, int> InitialHideoutPopulation =
+        AccessTools.FieldRefAccess<HideoutAmbushMissionController, int>(nameof(_initialHideoutPopulation));
+    private static readonly AccessTools.FieldRef<HideoutAmbushMissionController, int> PlayerTroopCount =
+        AccessTools.FieldRefAccess<HideoutAmbushMissionController, int>(nameof(_playerTroopCount));
     private readonly CoopHideoutMissionLogic coop;
     private bool locationListenerRegistered;
 
@@ -190,10 +196,10 @@ internal sealed class CoopHideoutAmbushController : HideoutAmbushMissionControll
             InitializeMission();
         _isMissionInitialized = true;
         _troopsInitialized = true;
-        _initialHideoutPopulation = coop.InitialPopulation;
+        InitialHideoutPopulation(this) = coop.InitialPopulation;
         if (!authority) return;
 
-        _playerTroopCount = coop.Attacker.NumTroopsNotSupplied;
+        PlayerTroopCount(this) = coop.Attacker.NumTroopsNotSupplied;
         InitializeTroops();
         if (!locationListenerRegistered)
         {
@@ -245,7 +251,7 @@ internal sealed class CoopHideoutAmbushController : HideoutAmbushMissionControll
     {
         _bossAgent = boss;
         _enemyTeam = Mission.DefenderTeam;
-        _initialHideoutPopulation = initialPopulation;
+        InitialHideoutPopulation(this) = initialPopulation;
         _battleResolved = phase == HideoutPhase.Resolved;
         _currentHideoutMissionState = phase switch
         {
