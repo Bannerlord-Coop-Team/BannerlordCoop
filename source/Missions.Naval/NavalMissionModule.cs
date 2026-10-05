@@ -36,5 +36,19 @@ public class NavalMissionModule : Module
         builder.RegisterType<NavalRopeStatusCoopCommand>()
             .As<ICoopCommand>()
             .InstancePerDependency();
+#if DEBUG
+        builder.RegisterType<NavalDebugHulls>()
+            .As<INavalDebugHulls>()
+            .InstancePerDependency();
+        builder.RegisterType<NavalHelmCoopCommand>()
+            .As<ICoopCommand>()
+            .InstancePerDependency();
+        builder.RegisterType<NavalRopeDebugCommands.RopeListCoopCommand>()
+            .As<ICoopCommand>()
+            .InstancePerDependency();
+        builder.RegisterType<NavalRopeDebugCommands.RopeThrowCoopCommand>()
+            .As<ICoopCommand>()
+            .InstancePerDependency();
+#endif
     }
 }

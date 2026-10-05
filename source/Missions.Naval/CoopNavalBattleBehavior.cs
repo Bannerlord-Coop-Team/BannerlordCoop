@@ -30,6 +30,9 @@ public class CoopNavalBattleBehavior : MissionLogic
         StationUseReplicator.Dispose();
         ShipReplicator.Dispose();
         NavalRopes.Clear();
+#if DEBUG
+        NavalHelmOverride.Clear();
+#endif
         NavalForeignHulls.Clear();
         NavalPlayerDeploymentSlot.Reset();
         base.OnEndMissionInternal();
