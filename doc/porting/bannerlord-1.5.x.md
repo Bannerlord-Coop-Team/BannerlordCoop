@@ -32,6 +32,8 @@ A second comparison of v1.4.8 and v1.5.4 behavior after the port found more gaps
 | `9fa7f447e` Replicate the v1.5 party command resets | Clan screen |
 | `453e8a842` Follow more v1.5 campaign changes | Heroes, executions, barters, governors |
 | `b02090451` Keep the hideout ambush deployment with co-op | Missions |
+| `8f4be3d91` Keep AI from attacking next to stronger players | AI |
+| `96bcc4718` Sync volunteers taken by garrison auto-recruitment | Recruitment (also on `development`, not a v1.5 change) |
 
 Each commit body lists its changes.
 
@@ -132,6 +134,8 @@ Each commit body lists its changes.
 - Party morale changes are floats.
 - Safe passage no longer hides the bribed parties from the AI for 32 hours; they decide again at once.
   Co-op's lord and bandit barter handlers do the same.
+- v1.5.4 stops an AI party from starting a fight next to a main party stronger than itself. Co-op
+  applies that check to every player party (`DefaultMobilePartyAIModelPatches.cs`).
 
 ### New v1.5 campaign behaviors
 
