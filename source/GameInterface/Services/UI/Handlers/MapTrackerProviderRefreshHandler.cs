@@ -4,7 +4,6 @@ using Common.Network;
 using GameInterface.Services.Clans.Messages;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.UI.Messages;
-using GameInterface.Services.UI.Patches;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Party;
 
@@ -18,18 +17,15 @@ internal class MapTrackerProviderRefreshHandler : IHandler
     private readonly IMessageBroker messageBroker;
     private readonly INetwork network;
     private readonly IObjectManager objectManager;
-    private readonly IMapTrackerProviderHolder holder;
 
     public MapTrackerProviderRefreshHandler(
         IMessageBroker messageBroker,
         INetwork network,
-        IObjectManager objectManager,
-        IMapTrackerProviderHolder holder)
+        IObjectManager objectManager)
     {
         this.messageBroker = messageBroker;
         this.network = network;
         this.objectManager = objectManager;
-        this.holder = holder;
 
         messageBroker.Subscribe<SwitchedPlayer>(Handle_SwitchedPlayer);
         messageBroker.Subscribe<NetworkRefreshClanManagement>(Handle_NetworkRefreshClanManagement);
@@ -53,10 +49,12 @@ internal class MapTrackerProviderRefreshHandler : IHandler
         messageBroker.Unsubscribe<NetworkMapTrackerPartyRemoved>(Handle_NetworkMapTrackerPartyRemoved);
     }
 
+    // v1.5 keeps the trackers on the campaign (MapTrackerManager) instead of a SandBox view-model provider.
+    private static MapTrackerManager Trackers => Campaign.Current?.MapTrackerManager;
+
     private void Handle_SwitchedPlayer(MessagePayload<SwitchedPlayer> payload)
     {
-        if (holder.Current == null) return;
-        holder.Current.ResetTrackers();
+        Trackers?.ResetTrackers();
     }
 
     private void Handle_NetworkRefreshClanManagement(MessagePayload<NetworkRefreshClanManagement> obj)
@@ -65,12 +63,12 @@ internal class MapTrackerProviderRefreshHandler : IHandler
 
         GameThread.RunSafe(() =>
         {
-            if (holder.Current == null) return;
+            if (Trackers == null) return;
             if (!objectManager.TryGetObjectWithLogging<Clan>(obj.What.ClanId, out var clan)) return;
 
             if (clan != Clan.PlayerClan) return;
 
-            holder.Current.ResetTrackers();
+            Trackers.ResetTrackers();
         });
     }
 
@@ -87,7 +85,7 @@ internal class MapTrackerProviderRefreshHandler : IHandler
         {
             if (!objectManager.TryGetObjectWithLogging<MobileParty>(obj.What.MobilePartyId, out var mobileParty)) return;
 
-            holder.Current?.AddIfEligible(mobileParty);
+            Trackers?.Refresh(mobileParty);
         });
     }
 
@@ -104,7 +102,9 @@ internal class MapTrackerProviderRefreshHandler : IHandler
         {
             if (!objectManager.TryGetObjectWithLogging<MobileParty>(obj.What.MobilePartyId, out var mobileParty)) return;
 
-            holder.Current?.RemoveIfExists(mobileParty);
+            // As vanilla MapTrackerCampaignBehavior.OnPartyRemoved: drop a manual tracker, then re-evaluate.
+            Trackers?.RemoveMapTracker(mobileParty);
+            Trackers?.Refresh(mobileParty);
         });
     }
 }

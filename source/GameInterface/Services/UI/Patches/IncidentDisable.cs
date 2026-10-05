@@ -1,10 +1,10 @@
 ﻿using HarmonyLib;
-using TaleWorlds.CampaignSystem.CampaignBehaviors;
 using TaleWorlds.CampaignSystem.Incidents;
 
 namespace GameInterface.Services.UI.Patches
 {
-    [HarmonyPatch(typeof(IncidentsCampaignBehaviour))]
+    // v1.5 moved incident selection out of IncidentsCampaignBehaviour into the campaign's IncidentManager.
+    [HarmonyPatch(typeof(IncidentManager))]
     internal class IncidentDisable
     {
         [HarmonyPatch("InvokeIncident")]
