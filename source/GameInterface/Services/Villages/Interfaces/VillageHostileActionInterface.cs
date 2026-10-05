@@ -278,7 +278,7 @@ internal class VillageHostileActionInterface : IVillageHostileActionInterface, I
                 ApplyForceVolunteersOutcome(attacker, settlement);
                 break;
             case VillageHostileAction.ForceSupplies:
-                ApplyForceSuppliesOutcome(attacker, settlement, mapEvent);
+                ApplyForceSuppliesOutcome(attacker, settlement);
                 break;
         }
     }
@@ -432,7 +432,7 @@ internal class VillageHostileActionInterface : IVillageHostileActionInterface, I
         }
     }
 
-    private void ApplyForceSuppliesOutcome(MobileParty mobileParty, Settlement settlement, MapEvent mapEvent)
+    private void ApplyForceSuppliesOutcome(MobileParty mobileParty, Settlement settlement)
     {
         var village = settlement.Village;
         var rewardUnits = ComputeSuppliesRewardUnits(village.Hearth);
@@ -486,7 +486,9 @@ internal class VillageHostileActionInterface : IVillageHostileActionInterface, I
         {
             settlement.SettlementHitPoints *= 0.2f;
         }
-        SkillLevelingManager.OnForceSupplies(mobileParty, lootedItems, !mapEvent.IsPlayerMapEvent);
+        // The outcome only runs after the party beat the village in a map event; v1.5 passes
+        // attacked: true for that case (v1.4.8 had the flag inverted).
+        SkillLevelingManager.OnForceSupplies(mobileParty, lootedItems, attacked: true);
 
         AuthorizeAndAnnounceTransfer(
             VillageHostileAction.ForceSupplies,
@@ -502,7 +504,7 @@ internal class VillageHostileActionInterface : IVillageHostileActionInterface, I
         var village = settlement.Village;
         var recruitCount = ComputeVolunteerCount(
             village.Hearth,
-            mobileParty.HasPerk(DefaultPerks.Roguery.InBestLight, false),
+            mobileParty.HasPerk(DefaultPerks.Roguery.InBestLight, out _),
             settlement.Notables.Count);
 
         var troop = settlement.Culture?.BasicTroop;
@@ -1190,7 +1192,7 @@ internal class VillageHostileActionInterface : IVillageHostileActionInterface, I
         int recruitedPrisonerCount,
         int goldChange,
         int influenceChange,
-        int moraleChange,
+        float moraleChange,
         bool applyReleasedAndTakenActions,
         string donationSettlementId,
         IEnumerable<(uint fromId, uint toId, int number)> upgradedTroops,
@@ -1267,7 +1269,7 @@ internal class VillageHostileActionInterface : IVillageHostileActionInterface, I
         // The loot screen offers no legitimate gold, influence, or morale source:
         // troop upgrades are blocked up front while a force screen is open (see
         // the ValidateCommand patch), so any such delta is rejected here.
-        if (goldChange != 0 || influenceChange != 0 || moraleChange != 0)
+        if (goldChange != 0 || influenceChange != 0 || moraleChange != 0f)
         {
             error = "gold/influence/morale change is not zero";
             return false;

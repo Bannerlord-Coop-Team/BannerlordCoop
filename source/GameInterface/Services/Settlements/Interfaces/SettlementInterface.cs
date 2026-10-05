@@ -110,7 +110,13 @@ internal class SettlementInterface : ISettlementInterface
         // besieger-camp position instead of the gate.
         var leftSettlement = mainParty.CurrentSettlement ?? Settlement.CurrentSettlement;
         if (leftSettlement != null)
-            mainParty.Position = leftSettlement.GatePosition;
+        {
+            // v1.5 leaves a party that is at sea at the port, still sailing.
+            if (mainParty.IsCurrentlyAtSea)
+                mainParty.SetSailAtPosition(leftSettlement.PortPosition);
+            else
+                mainParty.Position = leftSettlement.GatePosition;
+        }
 
         // ExitToLast returns to the map inside Finish. Hold first so the still-active target cannot
         // immediately start another encounter before Finish returns to this method.

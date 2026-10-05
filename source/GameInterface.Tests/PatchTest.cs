@@ -57,8 +57,10 @@ namespace GameInterface.Tests
             {
                 var patched = harmony.CreateClassProcessor(typeof(PlayerLeaveSettlementPatch)).Patch();
 
-                Assert.Contains(patched, method => method.Name.Contains("game_menu_village_hostile_action_warn_leave_on_consequence"));
                 Assert.Contains(patched, method => method.Name.Contains("village_looted_leave_on_consequence"));
+                // v1.5's "Forget it" on the hostile action menus returns to the village menu
+                // without finishing the encounter, so it is not a settlement leave.
+                Assert.DoesNotContain(patched, method => method.Name.Contains("game_menu_hostile_action_leave_on_consequence"));
             }
             finally
             {
