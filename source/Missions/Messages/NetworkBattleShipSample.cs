@@ -21,11 +21,14 @@ public sealed class NetworkBattleShipSample : IEvent
     [ProtoMember(6)] public readonly BattleShipInput Input;
     /// <summary>The hull's rope at every throw station that has thrown one, null when none has.</summary>
     [ProtoMember(7)] public readonly BattleRopeState[] Ropes;
+    /// <summary>The sender's battle host epoch; AI-hull samples from a superseded host generation are dropped.</summary>
+    [ProtoMember(8)] public readonly int HostEpoch;
 
     public NetworkBattleShipSample(Guid shipId, string ownerControllerId, long sequence, long deadlineUtcTicks, float[] frame,
-        BattleShipInput input = default, BattleRopeState[] ropes = null)
+        BattleShipInput input = default, BattleRopeState[] ropes = null, int hostEpoch = 0)
     {
         Ropes = ropes;
+        HostEpoch = hostEpoch;
         ShipId = shipId;
         OwnerControllerId = ownerControllerId;
         Sequence = sequence;

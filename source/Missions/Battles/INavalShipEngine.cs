@@ -59,6 +59,15 @@ public interface INavalShipEngine
     /// <summary>[Game thread] Re-targets a seated puppet at its station's user frame on the current hull frame.</summary>
     void PinToStation(Agent agent, UsableMissionObject point);
 
+    /// <summary>
+    /// [Game thread] Hands an AI (NPC) hull's simulation to this client or away from it: an owned hull gets an active
+    /// body and the AI controller, a foreign one a kinematic body following its owner's samples and no controller.
+    /// </summary>
+    void SetNpcHullAuthority(MissionObject hull, bool owned);
+
+    /// <summary>Whether an agent is seated at the hull's helm (diagnostics).</summary>
+    bool HasHelmPilot(MissionObject hull);
+
     /// <summary>[Game thread] The ropes this client threw from an own hull, keyed by the registered ids of the hulls they target.</summary>
     BattleRopeState[] CaptureRopes(MissionObject hull, Func<MissionObject, Guid> shipIdOf);
 

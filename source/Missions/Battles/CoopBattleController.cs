@@ -60,6 +60,9 @@ public class CoopBattleController : CoopMissionController
 
     /// <summary>Reports final siege engine state before the shared result is applied.</summary>
     public ISiegeEngineStateReporter SiegeEngineStateReporter { get; }
+
+    /// <summary>BR-102: the battle's shared host-epoch receiver policy for host-authority messages.</summary>
+    public IHostEpochPolicy HostEpochPolicy { get; }
     private readonly IBattleInstanceLifecycle lifecycle;
     private readonly IOwnedAgentReplicator replicator;
     private readonly IAgentDeathReporter deathReporter;
@@ -185,6 +188,7 @@ public class CoopBattleController : CoopMissionController
         supplyReporter = new SupplyProgressReporter(relayNetwork, session);
 
         hostRegistryRef = hostRegistry;
+        HostEpochPolicy = hostEpochPolicy;
         Session = session;
         Deployment = deployment;
         ResultCommitter = new BattleResultCommitter(network, relayNetwork, session);

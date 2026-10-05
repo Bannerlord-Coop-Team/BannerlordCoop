@@ -15,6 +15,8 @@ internal static class NavalForeignHulls
 
     public static void Add(MissionShip ship) => hulls.Add(ship);
 
+    public static void Remove(MissionShip ship) => hulls.Remove(ship);
+
     public static bool Contains(MissionShip ship) => ship != null && hulls.Contains(ship);
 
     public static void Clear() => hulls.Clear();

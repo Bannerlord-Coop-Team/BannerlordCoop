@@ -31,6 +31,12 @@ public interface IBattleShipReplicator : IDisposable
     /// <summary>[Game thread] The registered hull an on-foot agent stands on and its hull-local position.</summary>
     bool TryGetDeckPose(Agent agent, Vec3 worldPosition, out Guid deckShip, out Vec3 deckLocal);
 
+    /// <summary>
+    /// [Game thread, host] Registers an AI (NPC) party's hull the host spawned, owned by the host, and announces it
+    /// so peers spawn a copy on that party's side.
+    /// </summary>
+    Guid RegisterNpcHull(MissionObject hull, Formation formation, string mapEventPartyId);
+
     /// <summary>[Game thread] Rope state per throw station of every registered hull (diagnostics).</summary>
     object InspectRopes();
 }
@@ -52,6 +58,7 @@ public class BattleShipReplicator : IBattleShipReplicator
     private readonly INavalShipEngine engine;
     private readonly IBattleTeamResolver teamResolver;
     private readonly IObjectManager objectManager;
+    private readonly IHostEpochPolicy hostEpochPolicy;
 
     private readonly Dictionary<Guid, ShipStream> streams = new Dictionary<Guid, ShipStream>();
     private readonly List<BattleShipSpawnData> pendingForeignHulls = new List<BattleShipSpawnData>();
@@ -76,7 +83,8 @@ public class BattleShipReplicator : IBattleShipReplicator
         ICoopMissionComponent missionComponent,
         INavalShipEngine engine,
         IBattleTeamResolver teamResolver,
-        IObjectManager objectManager)
+        IObjectManager objectManager,
+        IHostEpochPolicy hostEpochPolicy)
     {
         this.network = network;
         this.messageBroker = messageBroker;
@@ -86,6 +94,7 @@ public class BattleShipReplicator : IBattleShipReplicator
         this.engine = engine;
         this.teamResolver = teamResolver;
         this.objectManager = objectManager;
+        this.hostEpochPolicy = hostEpochPolicy;
 
         missionComponent.AgentMovementHandler.ConfigureShipDecks(CaptureDeck, ResolveDeckFrame);
         messageBroker.Subscribe<ShipSpawnedInBattle>(Handle_ShipSpawned);
@@ -94,6 +103,7 @@ public class BattleShipReplicator : IBattleShipReplicator
         messageBroker.Subscribe<NetworkMissionPeerEntered>(Handle_PeerEntered);
         messageBroker.Subscribe<BattleMissionLeaving>(Handle_MissionLeaving);
         messageBroker.Subscribe<NetworkBattleRopeFinal>(Handle_NetworkBattleRopeFinal);
+        messageBroker.Subscribe<BattleHostMigrated>(Handle_BattleHostMigrated);
     }
 
     public void Dispose()
@@ -105,6 +115,7 @@ public class BattleShipReplicator : IBattleShipReplicator
         messageBroker.Unsubscribe<NetworkMissionPeerEntered>(Handle_PeerEntered);
         messageBroker.Unsubscribe<BattleMissionLeaving>(Handle_MissionLeaving);
         messageBroker.Unsubscribe<NetworkBattleRopeFinal>(Handle_NetworkBattleRopeFinal);
+        messageBroker.Unsubscribe<BattleHostMigrated>(Handle_BattleHostMigrated);
     }
 
     // [Game thread] Published synchronously by the spawn postfix. Hulls this client fields go on PlayerTeam; the
@@ -120,6 +131,52 @@ public class BattleShipReplicator : IBattleShipReplicator
         if (Registry.TryRegister(ship))
             Logger.Information("[NavalSync] Registered own hull {ShipId} on formation {Formation} at deployment position {Position}",
                 ship.ShipId, formation.FormationIndex, engine.GetFrame(hull).origin);
+    }
+
+    public Guid RegisterNpcHull(MissionObject hull, Formation formation, string mapEventPartyId)
+    {
+        var ship = new NetworkShipInfo(Guid.NewGuid(), session.OwnControllerId, mapEventPartyId, true, hull, formation);
+        if (!Registry.TryRegister(ship)) return Guid.Empty;
+
+        // AI is never withheld behind the deployment commit, so peers see these hulls as soon as they exist.
+        network.SendAll(new NetworkSpawnBattleShips(new[] { engine.Describe(hull, ship) }));
+        Logger.Information("[NavalSync] Registered AI hull {ShipId} of party {PartyId} on formation {Formation} at {Position}",
+            ship.ShipId, mapEventPartyId, formation?.FormationIndex, engine.GetFrame(hull).origin);
+        return ship.ShipId;
+    }
+
+    // AI hulls follow the battle host. Every client moves their authority; the new host takes over simulating
+    // them and the old host, if it is still here, hands them back to the samples.
+    private void Handle_BattleHostMigrated(MessagePayload<BattleHostMigrated> payload)
+    {
+        var migrated = payload.What;
+        if (migrated.MapEventId != session.InstanceId) return;
+
+        GameThread.RunSafe(() => TransferNpcHulls(migrated.NewHostControllerId ?? session.OwnControllerId),
+            context: nameof(Handle_BattleHostMigrated));
+    }
+
+    /// <summary>[Game thread] Moves every AI hull to <paramref name="newHost"/> and flips local simulation where ours changed.</summary>
+    internal int TransferNpcHulls(string newHost)
+    {
+        int transferred = 0;
+        foreach (var ship in Registry.Ships)
+        {
+            if (!ship.IsNpcParty || ship.CurrentAuthority == newHost) continue;
+
+            bool wasOwn = IsOwnHull(ship);
+            ship.CurrentAuthority = newHost;
+            bool isOwn = IsOwnHull(ship);
+            if (wasOwn != isOwn) engine.SetNpcHullAuthority(ship.Hull, isOwn);
+
+            // The old owner's interpolation target must not keep writing frames to a hull this client now simulates.
+            var stream = GetStream(ship.ShipId);
+            stream.Target = null;
+            transferred++;
+            Logger.Information("[NavalSync] AI hull {ShipId} moved to host {Host}{Local}", ship.ShipId, newHost, isOwn ? " (this client)" : "");
+        }
+
+        return transferred;
     }
 
     public void Tick(float dt)
@@ -181,7 +238,7 @@ public class BattleShipReplicator : IBattleShipReplicator
             stream.Sent++;
             network.SendAll(new NetworkBattleShipSample(ship.ShipId, session.OwnControllerId, stream.Sent, deadline,
                 NetworkBattleShipSample.FromFrame(engine.GetFrame(ship.Hull)), engine.ReadInput(ship.Hull),
-                engine.CaptureRopes(ship.Hull, ShipIdOf)));
+                engine.CaptureRopes(ship.Hull, ShipIdOf), session.HostEpoch));
         }
     }
 
@@ -297,12 +354,17 @@ public class BattleShipReplicator : IBattleShipReplicator
             return;
         }
 
-        var rejection = ValidateSample(ship, session.OwnControllerId, sample, stream.Accepted, DateTime.UtcNow.Ticks);
+        var rejection = ValidateSample(ship, session.OwnControllerId, sample, stream.Accepted, stream.AcceptedEpoch, DateTime.UtcNow.Ticks);
+        // BR-102: an AI hull follows the host, so a superseded hosting generation is dropped like siege state.
+        if (rejection == null && ship.IsNpcParty && hostEpochPolicy.IsStale(sample.HostEpoch, session.HostEpoch))
+            rejection = "stale_epoch";
         if (rejection != null)
         {
             stream.Reject(rejection);
             return;
         }
+
+        if (ship.IsNpcParty) stream.AcceptedEpoch = sample.HostEpoch;
 
         engine.ApplyInput(ship.Hull, sample.Input);
         engine.ApplyRopes(ship.Hull, sample.Ropes, HullOf, final: false);
@@ -314,11 +376,15 @@ public class BattleShipReplicator : IBattleShipReplicator
 
     /// <summary>Why a sample must be dropped, or null to accept it.</summary>
     internal static string ValidateSample(NetworkShipInfo ship, string ownControllerId, NetworkBattleShipSample sample,
-        long acceptedSequence, long nowUtcTicks)
+        long acceptedSequence, int acceptedEpoch, long nowUtcTicks)
     {
         if (ship.CurrentAuthority == ownControllerId) return "own_hull";
         if (sample.OwnerControllerId != ship.CurrentAuthority) return "not_authority";
-        if (sample.Sequence <= acceptedSequence) return "stale";
+
+        // A new host numbers an AI hull's samples from its own stream, so a newer epoch restarts the sequence.
+        if (ship.IsNpcParty && sample.HostEpoch < acceptedEpoch) return "stale_epoch";
+        bool newEpoch = ship.IsNpcParty && sample.HostEpoch > acceptedEpoch;
+        if (!newEpoch && sample.Sequence <= acceptedSequence) return "stale";
         if (sample.DeadlineUtcTicks <= nowUtcTicks || sample.DeadlineUtcTicks > nowUtcTicks + SampleLifetimeTicks) return "expired";
         if (!sample.HasValidFrame) return "invalid_frame";
         if (!sample.Input.IsValid) return "invalid_input";
@@ -335,7 +401,7 @@ public class BattleShipReplicator : IBattleShipReplicator
         {
             var stream = entry.Value;
             var target = stream.Target;
-            if (target == null || !Registry.TryGet(entry.Key, out var ship)) continue;
+            if (target == null || !Registry.TryGet(entry.Key, out var ship) || IsOwnHull(ship)) continue;
 
             if (target.DeadlineUtcTicks <= now)
             {
@@ -484,6 +550,8 @@ public class BattleShipReplicator : IBattleShipReplicator
                 rejects = stream?.Rejects ?? 0,
                 lastReject = stream?.LastReject,
                 streaming = stream?.Target != null,
+                epoch = IsOwnHull(ship) ? session.HostEpoch : stream?.AcceptedEpoch ?? 0,
+                helmPilot = engine.HasHelmPilot(ship.Hull),
             };
         }).ToArray(),
     };
@@ -505,6 +573,7 @@ public class BattleShipReplicator : IBattleShipReplicator
         public float Elapsed;
         public long Sent;
         public long Accepted;
+        public int AcceptedEpoch;
         public long Applied;
         public long Rejects;
         public string LastReject;

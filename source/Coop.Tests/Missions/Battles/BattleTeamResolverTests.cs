@@ -28,6 +28,16 @@ public class BattleTeamResolverTests
     }
 
     [Fact]
+    public void Choose_TheHostsAiHullOnTheEnemySide_GoesToTheEnemyMainTeamOnAPeer()
+    {
+        var enemyMain = new object();
+        var enemyAlly = new object();
+        var playerTeam = new object();
+
+        Assert.Same(enemyMain, BattleTeamResolver.Choose(enemyMain, enemyAlly, playerTeam, isOwn: false));
+    }
+
+    [Fact]
     public void Choose_AnotherOwnerOnOurSideWithoutAllyTeam_Waits()
     {
         Assert.Null(BattleTeamResolver.Choose(Main, null, Main, isOwn: false));

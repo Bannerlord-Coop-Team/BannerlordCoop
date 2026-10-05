@@ -204,7 +204,7 @@ public class CoopNavalBattleLauncher : ICoopNavalBattleLauncher
     {
         var controller = mission.GetMissionBehavior<CoopBattleController>();
         var shipReplicator = new BattleShipReplicator(network, messageBroker, controller.Session, controller.Deployment,
-            controller.MissionComponent, shipEngine, teamResolver, objectManager);
+            controller.MissionComponent, shipEngine, teamResolver, objectManager, controller.HostEpochPolicy);
         var stationUseReplicator = new AgentStationUseReplicator(network, messageBroker, controller.Session,
             controller.MissionComponent, shipEngine, controller.Deployment);
         mission.AddMissionBehavior(new CoopNavalBattleBehavior(shipReplicator, stationUseReplicator));

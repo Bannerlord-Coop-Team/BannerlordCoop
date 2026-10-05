@@ -90,6 +90,25 @@ public class NavalShipEngine : INavalShipEngine
         return ship;
     }
 
+    public void SetNpcHullAuthority(MissionObject hull, bool owned)
+    {
+        var ship = (MissionShip)hull;
+        var entity = ship.GameEntity;
+        if (owned)
+        {
+            NavalForeignHulls.Remove(ship);
+            if (entity.IsValid) entity.EnableDynamicBody();
+            ship.SetController(ShipControllerType.AI);
+            return;
+        }
+
+        NavalForeignHulls.Add(ship);
+        ship.SetController(ShipControllerType.None, autoUpdateController: false);
+        if (entity.IsValid) entity.DisableDynamicBodySimulation();
+    }
+
+    public bool HasHelmPilot(MissionObject hull) => ((MissionShip)hull).ShipControllerMachine?.PilotAgent != null;
+
     public MatrixFrame GetFrame(MissionObject hull) => ((MissionShip)hull).GlobalFrame;
 
     public void ApplyForeignFrame(MissionObject hull, MatrixFrame frame)
