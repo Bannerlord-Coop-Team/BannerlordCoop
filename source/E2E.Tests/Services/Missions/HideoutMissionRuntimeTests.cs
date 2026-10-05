@@ -165,6 +165,42 @@ public sealed class HideoutMissionRuntimeTests : MissionTestEnvironment
         Assert.False(defender.IsPopulated);
     }
 
+    [Fact]
+    public void NativeAmbushLoadingFinished_LeavesTheDeploymentFinishToTheCoopLogic()
+    {
+        using var fixture = new MissionEngineFixture();
+        var harmony = new Harmony($"hideout-loading-finished.{Guid.NewGuid()}");
+        harmony.Patch(AccessTools.Method(typeof(Mission), nameof(Mission.OnInitialSpawnCompleted)),
+            prefix: new HarmonyMethod(typeof(HideoutMissionRuntimeTests), nameof(RecordInitialSpawnCompleted)));
+        initialSpawnCompletedCount = 0;
+        try
+        {
+            Clients.First().Call(() =>
+            {
+                var mission = fixture.CreateMission(Clients.First());
+                var attacker = new CoopTroopSupplier("raid", BattleSideEnum.Attacker, null, null);
+                var defender = new CoopTroopSupplier("raid", BattleSideEnum.Defender, null, null);
+                var logic = new CoopHideoutMissionLogic(Mock.Of<IBattleNetwork>(), Mock.Of<IMessageBroker>(),
+                    Mock.Of<IMissionContext>(), defender, attacker, false);
+                var native = new CoopHideoutAmbushController(logic, new IMissionTroopSupplier[] { logic.Defender, logic.Attacker });
+                AccessTools.Field(typeof(Mission), "<MissionBehaviors>k__BackingField").SetValue(mission.Shell,
+                    new List<MissionBehavior> { native });
+                AccessTools.Property(typeof(MissionBehavior), nameof(MissionBehavior.Mission)).SetValue(native, mission.Shell);
+                try
+                {
+                    // v1.5 runs this hook right after AfterStart, before the co-op session has elected a host.
+                    mission.Shell.AfterMissionLoadingFinished();
+                    Assert.Equal(0, initialSpawnCompletedCount);
+                }
+                finally { logic.OnRemoveBehavior(); }
+            });
+        }
+        finally { harmony.UnpatchAll(harmony.Id); }
+    }
+
+    private static int initialSpawnCompletedCount;
+    private static bool RecordInitialSpawnCompleted() { initialSpawnCompletedCount++; return false; }
+
     [Theory]
     [InlineData(true)]
     [InlineData(false)]
