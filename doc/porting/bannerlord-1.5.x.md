@@ -25,6 +25,14 @@ the Steam beta on 2026-10-05.
 | `9cca25cd2` Update tests for Bannerlord v1.5.3 | Tests |
 | `0d8dd2280` Follow Bannerlord v1.5.4 | v1.5.4 changes |
 
+A second comparison of v1.4.8 and v1.5.4 behavior after the port found more gaps, fixed in:
+
+| Commit | Area |
+|---|---|
+| `9fa7f447e` Replicate the v1.5 party command resets | Clan screen |
+| `453e8a842` Follow more v1.5 campaign changes | Heroes, executions, barters, governors |
+| `b02090451` Keep the hideout ambush deployment with co-op | Missions |
+
 Each commit body lists its changes.
 
 ## Engine changes and how co-op follows them
@@ -71,6 +79,11 @@ Each commit body lists its changes.
   `PartyConfiguration`.
 - Role assignment moved to `ClanPartiesVM.AssignHeroToRole`. AI army calls skip lords who may not
   join armies, as v1.5 does.
+- v1.5 resets a hero's commands when the hero stops being a companion, becomes the player character
+  or leaves the player clan, by clearing a field that is not synced. The server makes each reset
+  through the synced hero properties and counts every player's clan as the player clan
+  (`PartyConfigurationCampaignBehaviorPatches.cs`). The server's heir switch never raises the player
+  character event, so it resets the heir itself (`HeirSelectionHandler.cs`).
 
 ### Villages and leaving settlements
 
@@ -90,6 +103,11 @@ Each commit body lists its changes.
 - Several vanilla methods co-op re-implements changed; the port follows them (stealth equipment in
   heir selection, aging and execution marks, kingdom discontinuation, companion removal, companion
   party top-up, execution scenes, blood feud prisoner sales).
+- The execute answer to a defeated lord now opens a prompt whose "Forget It" takes the lord prisoner.
+  A client cannot take prisoners itself, so co-op sends that capture to the server like the capture
+  answer (`LordConversationsCampaignBehaviorPatches.cs`).
+- A calculating player loses relation on first meeting a town notable. The server applies it to the
+  player who met the notable, on the first meeting it records for that player (`HeroMeetingHandler.cs`).
 
 ### Kingdoms
 
@@ -103,7 +121,7 @@ Each commit body lists its changes.
 - Personality traits gained effects in several models. The party wage model replacement
   (`DefaultPartyWageModelInterface.cs`) was re-derived from v1.5.3.
 - Player governors count as present for the new governor trait effects, as co-op already did for
-  governor perks (`CoopClanGovernorPatches.cs`).
+  governor perks (`CoopClanGovernorPatches.cs`, and the garrison wage in the wage model replacement).
 - A generous hero can hire more mercenaries than the town stock, on the client and the server.
 
 ### Other campaign APIs
@@ -112,19 +130,24 @@ Each commit body lists its changes.
 - Incidents moved to `IncidentManager`.
 - `Campaign` takes `AdvancedStartOptionsData` (`GameStateInterface.cs`).
 - Party morale changes are floats.
+- Safe passage no longer hides the bribed parties from the AI for 32 hours; they decide again at once.
+  Co-op's lord and bandit barter handlers do the same.
 
 ### New v1.5 campaign behaviors
 
 These change synced state, so they run on the server only (`DisableV15CampaignBehaviors.cs`):
-`HeroDailyXpCampaignBehavior`, `EmptyClanPartiesCampaignBehavior` (clients report no empty clan
-parties, since that list belongs to the server's player clan), `PartyConfigurationCampaignBehavior`
-and `BattleWreckageCampaignBehavior`.
+`HeroDailyXpCampaignBehavior` (player heroes get no daily xp, as vanilla gives none to the player),
+`EmptyClanPartiesCampaignBehavior` (clients report no empty clan parties, since that list belongs to
+the server's player clan), `PartyConfigurationCampaignBehavior` (its resets reach clients through
+the clan screen patches above) and `BattleWreckageCampaignBehavior`.
 
 ### Missions
 
 - `Mission.SpawnAgent` takes two more optional parameters.
 - The hideout ambush controller fields are read only and are written through `FieldRefAccess`.
-- Deployment finishes through `Mission.OnInitialSpawnCompleted` (`CoopHideoutMissionLogic.cs`).
+- Deployment finishes through `Mission.OnInitialSpawnCompleted` (`CoopHideoutMissionLogic.cs`). The
+  hideout ambush controller now also finishes it in `OnAfterMissionLoadingFinished`, while the mission
+  is still loading; co-op's controller skips that, so deployment still waits for the battle session.
 - Save loading moved to `SaveLoadVM.LoadSavesAsync` (`MissionsLoadUI.cs`).
 
 ## Changes in v1.5.4
@@ -144,6 +167,14 @@ and `BattleWreckageCampaignBehavior`.
 - Blood feuds and empty clan parties are keyed on the local main hero and player clan. They run on
   the server only and are not multiplayer-aware yet.
 - Naval (War Sails) content stays unsupported, including the set sail and disembark leave paths.
+- A failed courtship can be retried after a season in v1.5. The co-op server refuses that retry, and a
+  client loses its courtship attempt history when it reconnects.
+- Two v1.5 AI reactions check the server's main party and player clan, so they never fire for co-op
+  players: when a player's clan changes kingdom, lords no longer at war with it keep chasing the
+  player until their next AI decision, and an AI party that agreed not to attack a player can still
+  pick the settlement that player last attacked.
+- v1.5 kills a player marked to die in battle when the battle ends. That listener checks the server's
+  main hero, so a co-op player probably dies at the next daily tick instead; not checked in game.
 
 ## Porting the dedicated server
 
@@ -173,7 +204,7 @@ clients.
   `development` too.
 - The bodies of all 2,336 game methods patched in GameInterface were diffed from v1.4.8 to v1.5.3 and
   from v1.5.3 to v1.5.4, and the changes reviewed.
-- Unit tests (4,094) and E2E tests (2,700) pass in Release. On Windows, run E2E in 16 shards
+- Unit tests (4,095) and E2E tests (2,708, 5 of them skipped as on `development`) pass in Release. On Windows, run E2E in 16 shards
   (`sh ../.github/scripts/run-e2e-shard.sh <n> 16` from `source`): with 8, a shard's test filter can
   exceed the command-line length limit.
 - Not done yet: a live session with a server and two clients, the dedicated server, and CI, whose
