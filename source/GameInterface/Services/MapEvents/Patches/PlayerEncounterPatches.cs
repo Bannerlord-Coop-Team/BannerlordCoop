@@ -19,6 +19,8 @@ using SandBox.View.Map;
 using Serilog;
 using System;
 using System.Collections.Generic;
+using System.Linq;
+using System.Reflection;
 using System.Reflection.Emit;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.CampaignBehaviors;
@@ -97,6 +99,9 @@ internal class PlayerEncounterPatches
     {
         // The server is authoritative and creates the MapEvent locally.
         if (ModInformation.IsServer) return true;
+
+        // v1.5 clears the previous round's result here instead of in ContinueBattle.
+        __instance._campaignBattleResult = null;
 
         // Approved restarts run under AllowedThread, but clients must still adopt the same server-authoritative
         // MapEvent and id instead of creating an unregistered local copy.
@@ -271,13 +276,6 @@ internal class PlayerEncounterPatches
 
         MessageBroker.Instance.Publish(__instance, message);
 
-        return false;
-    }
-
-    [HarmonyPatch(nameof(PlayerEncounter.CheckNearbyPartiesToJoinPlayerMapEvent))]
-    [HarmonyPrefix]
-    private static bool PrefixCheckNearbyPartiesToJoinPlayerMapEvent()
-    {
         return false;
     }
 
@@ -532,4 +530,22 @@ internal class PlayerEncounterPatches
         // Wait for the previous loot screen to finish leaving before opening the next one.
         return activeState is PartyState or InventoryState || !isMapScreenTop;
     }
+}
+
+/// <summary>
+/// v1.5 moved PlayerEncounter.CheckNearbyPartiesToJoinPlayerMapEvent into the map event components:
+/// StartBattleInternal now calls <see cref="MapEventComponent.AddNearbyPartiesToPlayerMapEvent"/>, which
+/// each component type overrides. Co-op keeps skipping the local nearby-party pull, so every override is patched.
+/// </summary>
+[HarmonyPatch]
+internal class SkipAddNearbyPartiesToPlayerMapEventPatch
+{
+    private static IEnumerable<MethodBase> TargetMethods() =>
+        typeof(MapEventComponent).Assembly.GetTypes()
+            .Where(type => !type.IsAbstract && type.IsSubclassOf(typeof(MapEventComponent)))
+            .Select(type => AccessTools.DeclaredMethod(type, nameof(MapEventComponent.AddNearbyPartiesToPlayerMapEvent)))
+            .Where(method => method != null);
+
+    [HarmonyPrefix]
+    private static bool Prefix() => false;
 }

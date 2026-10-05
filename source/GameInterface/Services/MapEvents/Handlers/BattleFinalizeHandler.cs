@@ -374,7 +374,9 @@ internal class BattleFinalizeHandler : IHandler
             && mapEvent.BattleState != BattleState.AttackerVictory
             && mapEvent.BattleState != BattleState.DefenderVictory)
         {
-            mapEvent._keepSiegeEvent = true;
+            // v1.5 keeps this flag on the siege assault component.
+            if (mapEvent.Component is SiegeAssaultEventComponent siegeAssault)
+                siegeAssault._keepSiegeEvent = true;
             mapEvent.AttackerSide?.LeaderParty?.MobileParty?.RecalculateShortTermBehavior();
         }
 

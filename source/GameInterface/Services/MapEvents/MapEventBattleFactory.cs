@@ -42,16 +42,16 @@ internal sealed class MapEventBattleFactory
 
         var mapEventManager = Campaign.Current.MapEventManager;
 
-        if (TryCreateForcedMapEvent(attacker, defender, flags, mapEventManager, out var mapEvent))
+        if (TryCreateForcedMapEvent(attacker, defender, flags, out var mapEvent))
             return mapEvent;
 
         if (defender.IsSettlement)
-            return CreateSettlementMapEvent(attacker, defender, flags, mapEventManager);
+            return CreateSettlementMapEvent(attacker, defender, flags);
 
         if (TryCreateAmbushOrBlockadeMapEvent(attacker, defender, flags, out mapEvent))
             return mapEvent;
 
-        if (TryCreateMobileSettlementMapEvent(attacker, defender, mapEventManager, out mapEvent))
+        if (TryCreateMobileSettlementMapEvent(attacker, defender, out mapEvent))
             return mapEvent;
 
         return CreateFieldBattleEvent(attacker, defender, mapEventManager);
@@ -95,7 +95,6 @@ internal sealed class MapEventBattleFactory
         PartyBase attacker,
         PartyBase defender,
         BattleCreationFlags flags,
-        MapEventManager mapEventManager,
         out MapEvent mapEvent)
     {
         mapEvent = null;
@@ -107,7 +106,7 @@ internal sealed class MapEventBattleFactory
 
         if (flags.ForceSallyOut)
         {
-            mapEvent = mapEventManager.StartSallyOutMapEvent(attacker, defender);
+            mapEvent = SiegeSallyOutEventComponent.CreateSiegeSallyOutEvent(attacker, defender).MapEvent;
             return true;
         }
 
@@ -129,11 +128,10 @@ internal sealed class MapEventBattleFactory
     private static MapEvent CreateSettlementMapEvent(
         PartyBase attacker,
         PartyBase defender,
-        BattleCreationFlags flags,
-        MapEventManager mapEventManager)
+        BattleCreationFlags flags)
     {
         if (defender.Settlement.IsFortification)
-            return mapEventManager.StartSiegeMapEvent(attacker, defender);
+            return SiegeAssaultEventComponent.CreateSiegeAssaultMapEvent(attacker, defender).MapEvent;
 
         if (defender.Settlement.IsVillage)
             return RaidEventComponent.CreateRaidEvent(attacker, defender).MapEvent;
@@ -163,13 +161,13 @@ internal sealed class MapEventBattleFactory
 
         if (flags.ForceBlockadeAttack)
         {
-            mapEvent = BlockadeBattleMapEvent.CreateBlockadeBattleMapEvent(attacker, defender, false).MapEvent;
+            mapEvent = BlockadeBattleEventComponent.CreateBlockadeBattleMapEvent(attacker, defender, false).MapEvent;
             return true;
         }
 
         if (flags.ForceBlockadeSallyOutAttack)
         {
-            mapEvent = BlockadeBattleMapEvent.CreateBlockadeBattleMapEvent(attacker, defender, true).MapEvent;
+            mapEvent = BlockadeBattleEventComponent.CreateBlockadeBattleMapEvent(attacker, defender, true).MapEvent;
             return true;
         }
 
@@ -179,7 +177,6 @@ internal sealed class MapEventBattleFactory
     private static bool TryCreateMobileSettlementMapEvent(
         PartyBase attacker,
         PartyBase defender,
-        MapEventManager mapEventManager,
         out MapEvent mapEvent)
     {
         mapEvent = null;
@@ -188,16 +185,16 @@ internal sealed class MapEventBattleFactory
             && attacker.MobileParty.CurrentSettlement.SiegeEvent != null)
         {
             if (attacker.MobileParty.IsTargetingPort)
-                mapEvent = BlockadeBattleMapEvent.CreateBlockadeBattleMapEvent(attacker, defender, true).MapEvent;
+                mapEvent = BlockadeBattleEventComponent.CreateBlockadeBattleMapEvent(attacker, defender, true).MapEvent;
             else
-                mapEvent = mapEventManager.StartSallyOutMapEvent(attacker, defender);
+                mapEvent = SiegeSallyOutEventComponent.CreateSiegeSallyOutEvent(attacker, defender).MapEvent;
 
             return true;
         }
 
         if (defender.IsMobile && defender.MobileParty.BesiegedSettlement != null)
         {
-            mapEvent = mapEventManager.StartSiegeOutsideMapEvent(attacker, defender);
+            mapEvent = SiegeOutsideEventComponent.CreateSiegeOutsideMapEvent(attacker, defender).MapEvent;
             return true;
         }
 
@@ -206,15 +203,12 @@ internal sealed class MapEventBattleFactory
 
     private static MapEvent CreateFieldBattleEvent(PartyBase attacker, PartyBase defender, MapEventManager mapEventManager)
     {
+        // v1.5 creates the visual inside Initialize; HeadlessMapEventVisualPatch covers a headless host.
         var mapEvent = new MapEvent();
-        if (Campaign.Current?.VisualCreator?.MapEventVisualCreator == null)
-            mapEvent.MapEventVisual = HeadlessMapEventVisual.Instance;
-
         mapEvent.Initialize(
             attacker,
             defender,
-            new FieldBattleEventComponent(mapEvent),
-            MapEvent.BattleTypes.FieldBattle);
+            new FieldBattleEventComponent(mapEvent));
 
         if (!mapEventManager.MapEvents.Contains(mapEvent))
             mapEventManager.OnMapEventCreated(mapEvent);
@@ -222,7 +216,7 @@ internal sealed class MapEventBattleFactory
         return mapEvent;
     }
 
-    private sealed class HeadlessMapEventVisual : IMapEventVisual
+    internal sealed class HeadlessMapEventVisual : IMapEventVisual
     {
         public static readonly HeadlessMapEventVisual Instance = new HeadlessMapEventVisual();
 

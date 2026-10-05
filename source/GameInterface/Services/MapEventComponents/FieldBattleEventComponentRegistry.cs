@@ -26,6 +26,9 @@ internal class FieldBattleEventComponentRegistry : AutoRegistryBase<FieldBattleE
 
     public override void OnClientCreated(FieldBattleEventComponent obj, string id)
     {
+        // A client replica skips the constructor, so its v1.5 party position caches start null.
+        // OnAfterLoad recreates them, as it does for a component loaded from a save.
+        obj.OnAfterLoad();
     }
 
     public override void OnClientDestroyed(FieldBattleEventComponent obj, string id)

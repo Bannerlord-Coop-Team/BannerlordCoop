@@ -581,7 +581,7 @@ internal class MapEventPatches
 
     [HarmonyPrefix]
     [HarmonyPatch(nameof(MapEvent.Initialize))]
-    static bool PrefixInitialize(MapEvent __instance, PartyBase attackerParty, PartyBase defenderParty, MapEventComponent component, MapEvent.BattleTypes mapEventType)
+    static bool PrefixInitialize(MapEvent __instance, PartyBase attackerParty, PartyBase defenderParty, MapEventComponent component)
     {
         if (CallOriginalPolicy.IsOriginalAllowed()) return true;
 

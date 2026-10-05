@@ -209,23 +209,22 @@ public class MapEventResultsInterface : IMapEventResultsInterface
                     playerLootData.LootedPrisoners[winnerPlayerParty] = new();
                 }
 
-                // Replace the following check to just check if its a naval map event. Only used for MapEvents involving players
-                // mapEvent.IsPlayerMapEvent && PlayerEncounter.Current.IsNavalEncounterFinishedWithDisengage
-                if (mapEvent.IsNavalMapEvent) // TODO Change to only do this for naval encounters where ships disengage rather than total victories(?)
-                {
-                    mapEvent.LootDefeatedPartyShips(winnerParties, defeatedParties); // TODO
-                }
-                else
-                {
+                // v1.5 lets the map event component decide what the winners loot (a naval battle the player
+                // disengaged from loots only ships), as vanilla's CalculateAndCommitMapEventResults does.
+                var component = mapEvent.Component;
+                if (component.CanLootDefeatedPartyCasualties())
                     LootDefeatedPartyCasualties(winnerParties, defeatedParties, winnerPlayerParties, winningSideIncludesPlayers, playerLootData.LootedItems);
+                if (component.CanLootDefeatedPartyItems())
                     LootDefeatedPartyItems(winnerParties, defeatedParties, playerLootData.LootedItems);
+                if (component.CanLootDefeatedPartyPrisoners())
                     LootDefeatedPartyPrisoners(winnerParties, defeatedParties, playerLootData.LootedMembers);
-                    mapEvent.LootDefeatedPartyShips(winnerParties, defeatedParties); // TODO
+                if (component.CanLootDefeatedPartyShips(out bool partiallyLootShips))
+                    mapEvent.LootDefeatedPartyShips(winnerParties, defeatedParties, partiallyLootShips);
+                if (component.CanCaptureDefeatedPartyMembers())
                     CaptureDefeatedPartyMembers(mapEvent, winnerParties, defeatedParties, playerLootData.LootedPrisoners);
 #if DEBUG
-                    raidLootWarningFixture?.SeedLoot(mapEvent, playerLootData.LootedItems);
+                raidLootWarningFixture?.SeedLoot(mapEvent, playerLootData.LootedItems);
 #endif
-                }
 
                 SplitHideoutLoot(mapEvent, playerLootData);
 

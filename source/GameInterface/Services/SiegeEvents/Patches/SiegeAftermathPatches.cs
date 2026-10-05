@@ -119,7 +119,7 @@ internal class SiegeAftermathPatches
         if (mapEvent == null) return false;
 
         var battleSide = (!mapEvent.IsSallyOut && !mapEvent.IsBlockadeSallyOut) ? BattleSideEnum.Attacker : BattleSideEnum.Defender;
-        if ((!mapEvent.IsSiegeAssault && !mapEvent.IsSiegeOutside && !mapEvent.IsSallyOut && !mapEvent.IsBlockadeSallyOut)
+        if ((!mapEvent.IsSiegeAssault && !mapEvent.IsSallyOut && !mapEvent.IsBlockadeSallyOut)
             || mapEvent.WinningSide != battleSide || mapEvent.MapEventSettlement == null)
         {
             return false;
@@ -208,7 +208,7 @@ internal class SiegeAftermathPatches
     private static bool OnMapEventEndedPrefix(SiegeAftermathCampaignBehavior __instance, MapEvent mapEvent)
     {
         var battleSide = (!mapEvent.IsSallyOut && !mapEvent.IsBlockadeSallyOut) ? BattleSideEnum.Attacker : BattleSideEnum.Defender;
-        if ((!mapEvent.IsSiegeAssault && !mapEvent.IsSiegeOutside && !mapEvent.IsSallyOut && !mapEvent.IsBlockadeSallyOut)
+        if ((!mapEvent.IsSiegeAssault && !mapEvent.IsSallyOut && !mapEvent.IsBlockadeSallyOut)
             || mapEvent.WinningSide != battleSide || mapEvent.MapEventSettlement == null)
         {
             return false;

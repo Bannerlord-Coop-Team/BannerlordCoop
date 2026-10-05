@@ -707,7 +707,7 @@ internal class BattleMissionStartHandler : IHandler
             return MissionSettlementResolution.Retry;
 
         using (new AllowedThread())
-            battle.MapEventSettlement = settlement;
+            battle.Component.MapEventSettlement = settlement;
         return MissionSettlementResolution.Resolved;
     }
 
