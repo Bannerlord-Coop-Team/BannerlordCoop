@@ -1,4 +1,5 @@
-﻿using Missions.Naval;
+﻿using HarmonyLib;
+using Missions.Naval;
 using Xunit;
 
 namespace Coop.Tests.Missions.Battles;
@@ -30,5 +31,31 @@ public class NavalNpcFleetSpawnerTests
     public void ShipCount_FollowsVanillasLimitShipTroopAndFormationCaps(int limit, int ships, int troops, int formations, int expected)
     {
         Assert.Equal(expected, NavalNpcFleetSpawner.ShipCount(limit, ships, troops, formations));
+    }
+
+    [Theory]
+    [InlineData(0, NavalNpcFleetSpawner.Failed)]
+    [InlineData(1, NavalNpcFleetSpawner.Fielded)]
+    [InlineData(3, NavalNpcFleetSpawner.Fielded)]
+    public void Outcome_ReportsAFailedAttemptInsteadOfStayingReady(int hullsSpawned, string expected)
+    {
+        Assert.Equal(expected, NavalNpcFleetSpawner.Outcome(hullsSpawned));
+    }
+
+    [Fact]
+    public void LatePlanNotificationPatch_BindsAndOnlySilencesTheLatePlan()
+    {
+        Assert.False(NavalLateDeploymentPlan.IsMaking);
+        Assert.True(LateDeploymentPlanNotificationPatch.Prefix());
+
+        var harmony = new Harmony("coop.tests.naval.late_plan");
+        try
+        {
+            Assert.NotEmpty(harmony.CreateClassProcessor(typeof(LateDeploymentPlanNotificationPatch)).Patch());
+        }
+        finally
+        {
+            harmony.UnpatchAll(harmony.Id);
+        }
     }
 }

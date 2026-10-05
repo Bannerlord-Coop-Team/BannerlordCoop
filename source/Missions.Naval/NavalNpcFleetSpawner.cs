@@ -47,6 +47,8 @@ public class NavalNpcFleetSpawner : INavalNpcFleetSpawner
     internal const string WaitingForReserve = "waiting_for_reserve";
     internal const string AlreadyFielded = "already_fielded";
     internal const string Ready = "ready";
+    internal const string Fielded = "fielded";
+    internal const string Failed = "failed";
 
     private readonly IBattleSession session;
     private readonly IBattleShipReplicator shipReplicator;
@@ -118,6 +120,7 @@ public class NavalNpcFleetSpawner : INavalNpcFleetSpawner
 
         if (state != Ready) return;
 
+        // One attempt: it consumes reserve troops, so a failure is reported once instead of retried every tick.
         done = true;
         try
         {
@@ -128,7 +131,11 @@ public class NavalNpcFleetSpawner : INavalNpcFleetSpawner
             failure = exception.GetType().Name + ": " + exception.Message;
             Logger.Error(exception, "[NavalBattle] Could not field the AI fleet of {MapEventId}", session.InstanceId);
         }
+
+        state = Outcome(hullsSpawned);
     }
+
+    internal static string Outcome(int hullsSpawned) => hullsSpawned > 0 ? Fielded : Failed;
 
     private void SpawnFleet(Mission mission, CoopTroopSupplier supplier, MBList<MapEventParty> parties)
     {
@@ -168,10 +175,45 @@ public class NavalNpcFleetSpawner : INavalNpcFleetSpawner
         for (int index = 0; index < count; index++)
             shipsLogic.SetShipAssignment(team.TeamSide, formations[index].FormationIndex, ships[index].snapshot);
 
-        // The enemy side was planned with no ships at deployment start, so its plan is made now, after the fact.
-        navalLogic.MakeDeploymentPlansForSide(enemySide);
+        try
+        {
+            // The enemy side was planned with no ships at deployment start, so its plan is made now, after the fact.
+            NavalLateDeploymentPlan.MakeForSide(navalLogic, enemySide);
+            SpawnAssignedHulls(shipsLogic, planning, team, formations.Take(count).ToList(), ships, parties);
+        }
+        finally
+        {
+            // An assignment without a hull would count as a ship in every later plan and spawn query.
+            foreach (var formation in formations.Take(count))
+            {
+                if (shipsLogic.GetShipAssignment(team.TeamSide, formation.FormationIndex).MissionShip == null)
+                    shipsLogic.ClearShipAssignment(team.TeamSide, (int)formation.FormationIndex);
+            }
+        }
 
-        for (int index = 0; index < count; index++)
+        if (hullsSpawned == 0)
+        {
+            failure = "no hull spawned";
+            return;
+        }
+
+        // The naval spawn logic's team crewing (AllocateAndDeployInitialTroopsOfTeam), with the late origins.
+        var teamSide = team.TeamSide;
+        agentsLogic.AddTroopOrigins(teamSide, troops);
+        agentsLogic.AutoComputeDesiredTroopCountsPerShip(teamSide);
+        agentsLogic.AssignTroops(teamSide);
+        agentsLogic.InitializeReinforcementTimers(teamSide);
+        agentsLogic.SetSpawnReinforcementsOnTick(teamSide, true);
+        troopsFielded = agentsLogic.SpawnNextBatch(teamSide);
+        agentsLogic.AssignAndTeleportCrewToShipMachines(teamSide);
+        Logger.Information("[NavalBattle] Fielded {Hulls} AI hull(s) and a first crew batch of {Troops} on {Team}",
+            hullsSpawned, troopsFielded, team.TeamSide);
+    }
+
+    private void SpawnAssignedHulls(NavalShipsLogic shipsLogic, NavalMissionDeploymentPlanningLogic planning, Team team,
+        List<Formation> formations, List<(Ship snapshot, PartyBase owner)> ships, MBList<MapEventParty> parties)
+    {
+        for (int index = 0; index < formations.Count; index++)
         {
             var formation = formations[index];
             var plan = planning.GetFormationPlan(team, formation.FormationIndex);
@@ -190,18 +232,6 @@ public class NavalNpcFleetSpawner : INavalNpcFleetSpawner
             shipReplicator.RegisterNpcHull(hull, formation, PartyIdOf(parties, ships[index].owner));
             hullsSpawned++;
         }
-
-        // The naval spawn logic's team crewing (AllocateAndDeployInitialTroopsOfTeam), with the late origins.
-        var teamSide = team.TeamSide;
-        agentsLogic.AddTroopOrigins(teamSide, troops);
-        agentsLogic.AutoComputeDesiredTroopCountsPerShip(teamSide);
-        agentsLogic.AssignTroops(teamSide);
-        agentsLogic.InitializeReinforcementTimers(teamSide);
-        agentsLogic.SetSpawnReinforcementsOnTick(teamSide, true);
-        troopsFielded = agentsLogic.SpawnNextBatch(teamSide);
-        agentsLogic.AssignAndTeleportCrewToShipMachines(teamSide);
-        Logger.Information("[NavalBattle] Fielded {Hulls} AI hull(s) and a first crew batch of {Troops} on {Team}",
-            hullsSpawned, troopsFielded, team.TeamSide);
     }
 
     private CoopTroopSupplier EnemySupplier() =>
