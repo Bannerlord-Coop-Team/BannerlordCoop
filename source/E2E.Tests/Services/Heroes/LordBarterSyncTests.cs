@@ -32,6 +32,7 @@ using TaleWorlds.CampaignSystem.Siege;
 using TaleWorlds.Core;
 using TaleWorlds.Library;
 using Xunit.Abstractions;
+using E2E.Tests.Util;
 
 namespace E2E.Tests.Services.Heroes;
 
@@ -1509,8 +1510,8 @@ public class LordBarterSyncTests : MapEventTestBase
             {
                 playerParty.CurrentSettlement = settlement;
                 TakePrisonerAction.Apply(settlement.Party, targetHero);
-                battle._mapEventType = MapEvent.BattleTypes.Siege;
-                battle.MapEventSettlement = settlement;
+                battle.SetBattleType(MapEvent.BattleTypes.Siege);
+                battle.SetMapEventSettlement(settlement);
             }
             else
             {

@@ -76,8 +76,8 @@ public class SiegeAssaultLeaveTests : MapEventTestBase
             {
                 Assert.True(instance.ObjectManager.TryGetObject<MapEvent>(battle.MapEventId, out var mapEvent));
                 Assert.True(instance.ObjectManager.TryGetObject<SiegeEvent>(siegeId, out var siege));
-                mapEvent._mapEventType = MapEvent.BattleTypes.Siege;
-                mapEvent.MapEventSettlement = siege.BesiegedSettlement;
+                mapEvent.SetBattleType(MapEvent.BattleTypes.Siege);
+                mapEvent.SetMapEventSettlement(siege.BesiegedSettlement);
                 siege.BesiegedSettlement.SiegeEvent = siege;
                 siege.BesiegedSettlement.Party._mapEventSide = mapEvent.DefenderSide;
                 mapEvent.DefenderSide.LeaderParty = siege.BesiegedSettlement.Party;
@@ -151,6 +151,18 @@ public class SiegeAssaultLeaveTests : MapEventTestBase
                 sallyOut ? BattleSideEnum.Defender : BattleSideEnum.Attacker);
         SetMapEventType(mapEvent.MapEventId,
             sallyOut ? MapEvent.BattleTypes.SallyOut : MapEvent.BattleTypes.Siege);
+        if (sallyOut)
+        {
+            // A v1.5 sally out finalizes through its component, which reads the besieged settlement.
+            var settlementId = TestEnvironment.CreateRegisteredObject<Settlement>();
+            foreach (var instance in Clients.Append(Server))
+                instance.Call(() =>
+                {
+                    Assert.True(instance.ObjectManager.TryGetObject<MapEvent>(mapEvent.MapEventId, out var battle));
+                    Assert.True(instance.ObjectManager.TryGetObject<Settlement>(settlementId, out var settlement));
+                    battle.SetMapEventSettlement(settlement);
+                });
+        }
         var leavingClient = Clients.First();
         SetMainParty(leavingClient, partyId);
         var siegeEventId = SetClientOnlyCamp(leavingClient, partyId);
@@ -394,12 +406,12 @@ public class SiegeAssaultLeaveTests : MapEventTestBase
             Assert.True(client.ObjectManager.TryGetObject<MobileParty>(partyId, out var party));
             Assert.True(client.ObjectManager.TryGetObject<SiegeEvent>(siegeEventId, out var siegeEvent));
 
-            mapEvent._mapEventType = MapEvent.BattleTypes.Siege;
+            mapEvent.SetBattleType(MapEvent.BattleTypes.Siege);
             var settlement = siegeEvent.BesiegedSettlement;
             settlement.SiegeEvent = siegeEvent;
             settlement.Party._mapEventSide = mapEvent.DefenderSide;
             mapEvent.DefenderSide.LeaderParty = settlement.Party;
-            mapEvent.MapEventSettlement = settlement;
+            mapEvent.SetMapEventSettlement(settlement);
             party._currentSettlement = settlement;
 
             var encounter = ObjectHelper.SkipConstructor<PlayerEncounter>();
@@ -549,12 +561,12 @@ public class SiegeAssaultLeaveTests : MapEventTestBase
             Assert.True(client.ObjectManager.TryGetObject<MobileParty>(partyId, out var party));
             Assert.True(client.ObjectManager.TryGetObject<SiegeEvent>(siegeEventId, out var siegeEvent));
 
-            mapEvent._mapEventType = MapEvent.BattleTypes.Siege;
+            mapEvent.SetBattleType(MapEvent.BattleTypes.Siege);
             var settlement = siegeEvent.BesiegedSettlement;
             settlement.SiegeEvent = siegeEvent;
             settlement.Party._mapEventSide = mapEvent.DefenderSide;
             mapEvent.DefenderSide.LeaderParty = settlement.Party;
-            mapEvent.MapEventSettlement = settlement;
+            mapEvent.SetMapEventSettlement(settlement);
             party._currentSettlement = settlement;
 
             var encounter = ObjectHelper.SkipConstructor<PlayerEncounter>();
@@ -632,7 +644,7 @@ public class SiegeAssaultLeaveTests : MapEventTestBase
             Assert.True(client.ObjectManager.TryGetObject<SiegeEvent>(siegeEventId, out var siegeEvent));
             var settlement = siegeEvent.BesiegedSettlement;
             settlement.Party._mapEventSide = mapEvent.DefenderSide;
-            mapEvent.MapEventSettlement = settlement;
+            mapEvent.SetMapEventSettlement(settlement);
 
             PlayerEncounter.Start();
             PlayerEncounter.Current._mapEvent = mapEvent;
@@ -783,7 +795,7 @@ public class SiegeAssaultLeaveTests : MapEventTestBase
             instance.Call(() =>
             {
                 Assert.True(instance.ObjectManager.TryGetObject<MapEvent>(mapEventId, out var mapEvent));
-                mapEvent._mapEventType = battleType;
+                mapEvent.SetBattleType(battleType);
             });
         }
     }

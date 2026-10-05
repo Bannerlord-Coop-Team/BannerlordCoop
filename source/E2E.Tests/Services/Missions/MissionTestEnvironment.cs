@@ -117,7 +117,7 @@ public class MissionTestEnvironment : E2ETestEnvironment
 
             var mapEvent = GameObjectCreator.CreateInitializedObject<MapEvent>();
             mapEvent.MapEventVisual = ObjectHelper.SkipConstructor<GauntletMapEventVisual>();
-            mapEvent.Initialize(parties[0].Party, parties[1].Party);
+            mapEvent.Initialize(parties[0].Party, parties[1].Party, new FieldBattleEventComponent(mapEvent));
 
             // Any additional players reinforce the attacker side (coop allies).
             for (int i = 2; i < parties.Length; i++)

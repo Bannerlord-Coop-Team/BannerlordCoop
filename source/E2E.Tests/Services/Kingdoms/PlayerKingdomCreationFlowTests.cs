@@ -4300,19 +4300,17 @@ public class PlayerKingdomCreationFlowTests : IDisposable
             }
         });
 
-        MapTrackerProvider provider = null;
+        RecordingMapTrackersHandler provider = null;
         client.Call(() =>
         {
             // MainHero still wrong at construction; reproduces the real bug.
             Assert.True(client.ObjectManager.TryGetObject<Hero>(player.HeroId, out var playerHero));
             Assert.NotSame(playerHero, Hero.MainHero);
 
-            provider = new MapTrackerProvider();
+            provider = RecordingMapTrackersHandler.Attach();
 
             Assert.True(client.ObjectManager.TryGetObject<Army>(armyId, out var army));
-            Assert.DoesNotContain(
-                provider.GetTrackers(),
-                tracker => ReferenceEquals(tracker.TrackedObject, army));
+            Assert.DoesNotContain(provider.Trackers, tracker => ReferenceEquals(tracker, army));
         });
 
         // Act: real switch, publishes SwitchedPlayer at the end.
@@ -4366,9 +4364,7 @@ public class PlayerKingdomCreationFlowTests : IDisposable
         client.Call(() =>
         {
             Assert.True(client.ObjectManager.TryGetObject<Army>(armyId, out var army));
-            Assert.Contains(
-                provider.GetTrackers(),
-                tracker => ReferenceEquals(tracker.TrackedObject, army));
+            Assert.Contains(provider.Trackers, tracker => ReferenceEquals(tracker, army));
         });
     }
 
@@ -4430,14 +4426,12 @@ public class PlayerKingdomCreationFlowTests : IDisposable
 
         // Provider exists before the army,
         // testing the live ArmyCreated listener, not ResetTrackers.
-        MapTrackerProvider provider = null;
-        client.Call(() => provider = new MapTrackerProvider());
+        RecordingMapTrackersHandler provider = null;
+        client.Call(() => provider = RecordingMapTrackersHandler.Attach());
         client.Call(() =>
         {
             Assert.True(client.ObjectManager.TryGetObject<Kingdom>(kingdomId, out var kingdom));
-            Assert.DoesNotContain(
-                provider.GetTrackers(),
-                tracker => kingdom.Armies.Contains(tracker.TrackedObject as Army));
+            Assert.DoesNotContain(provider.Trackers, tracker => kingdom.Armies.Contains(tracker as Army));
         });
 
         // Act: CreateArmy on the server, which syncs the events to the clients through a postfix.
@@ -4458,11 +4452,40 @@ public class PlayerKingdomCreationFlowTests : IDisposable
         client.Call(() =>
         {
             Assert.True(client.ObjectManager.TryGetObject<Army>(armyId, out var army));
-            Assert.Contains(
-                provider.GetTrackers(),
-                tracker => ReferenceEquals(tracker.TrackedObject, army));
+            Assert.Contains(provider.Trackers, tracker => ReferenceEquals(tracker, army));
         });
     }
+
+    /// <summary>
+    /// v1.5 replaced SandBox's MapTrackerProvider (which listened to campaign events itself) with the
+    /// campaign's MapTrackerManager, fed by MapTrackerCampaignBehavior and shown through a handler (the
+    /// map view). This stands in for that view: it rebuilds from the manager when attached, as the view does.
+    /// </summary>
+    private sealed class RecordingMapTrackersHandler : IMapTrackersHandler
+    {
+        public HashSet<ITrackableCampaignObject> Trackers { get; } = new();
+
+        public static RecordingMapTrackersHandler Attach()
+        {
+            new MapTrackerCampaignBehavior().RegisterEvents();
+            var handler = new RecordingMapTrackersHandler();
+            Campaign.Current.MapTrackerManager.Handler = handler;
+            handler.ResetTrackers();
+            return handler;
+        }
+
+        public void OnTrackerAdded(ITrackableCampaignObject trackable) => Trackers.Add(trackable);
+
+        public void OnTrackerRemoved(ITrackableCampaignObject trackable) => Trackers.Remove(trackable);
+
+        public void ResetTrackers()
+        {
+            Trackers.Clear();
+            foreach (var tracker in Campaign.Current.MapTrackerManager.GetAllTrackers())
+                Trackers.Add(tracker);
+        }
+    }
+
     private static void ConfigureArmyInKingdom(EnvironmentInstance instance, string kingdomId, string armyId)
     {
         instance.Call(() =>

@@ -1,6 +1,7 @@
 ﻿using Common.Util;
 using HarmonyLib;
 using SandBox;
+using TaleWorlds.CampaignSystem.AdvancedStartOptions;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.CharacterDevelopment;
 using TaleWorlds.CampaignSystem.Map;
@@ -39,14 +40,15 @@ public class GameInstance
                 var modules = ModuleHelper.GetOfficialModuleIds().Append("Coop");
                 VirtualFolders.PlatformDLCPaths.Remove("NavalDLC");
                 ModuleHelper.InitializeModules(modules.ToArray());
-                GameManager = new SandBoxGameManager(() => new Campaign(CampaignGameMode.Campaign));
-                Campaign = new Campaign(CampaignGameMode.Campaign);
+                GameManager = new SandBoxGameManager(() => new Campaign(CampaignGameMode.Campaign, new AdvancedStartOptionsData()));
+                Campaign = new Campaign(CampaignGameMode.Campaign, new AdvancedStartOptionsData());
                 Game = Game.CreateGame(Campaign, GameManager);
                 MBObjectManager = MBObjectManager.Instance;
 
                 Campaign.SiegeEventManager = new SiegeEventManager();
                 Campaign.MapEventManager = new MapEventManager();
-                Campaign.MapMarkerManager = new MapMarkerManager();
+                // v1.5 moved map markers into the MapTrackerManager.
+                Campaign.MapTrackerManager = new MapTrackerManager();
 
                 RegisterType<ItemObject>(MBObjectManager);
                 RegisterType<Settlement>(MBObjectManager);

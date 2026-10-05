@@ -18,7 +18,8 @@ public class TroopSacrificeModelPartyPatchTests
         var original = PatchProcessor.GetOriginalInstructions(method).ToArray();
         var mainParty = AccessTools.PropertyGetter(typeof(MobileParty), nameof(MobileParty.MainParty));
         var playerCharacter = AccessTools.PropertyGetter(typeof(CharacterObject), nameof(CharacterObject.PlayerCharacter));
-        Assert.Single(original.Where(instruction => instruction.Calls(mainParty)));
+        // v1.5 reads MainParty twice: its battle environment, then the Improviser perk bonus.
+        Assert.Equal(2, original.Count(instruction => instruction.Calls(mainParty)));
         Assert.Single(original.Where(instruction => instruction.Calls(playerCharacter)));
 
         var patched = TroopSacrificeModelPartyPatch.Transpiler(original).ToArray();

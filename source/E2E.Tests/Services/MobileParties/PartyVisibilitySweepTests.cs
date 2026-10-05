@@ -2,7 +2,9 @@ using E2E.Tests.Environment;
 using E2E.Tests.Environment.Instance;
 using E2E.Tests.Util;
 using GameInterface.Services.MobileParties;
+using System.Linq;
 using System.Runtime.Serialization;
+using TaleWorlds.CampaignSystem.Settlements;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.ComponentInterfaces;
 using TaleWorlds.CampaignSystem.Party;
@@ -191,5 +193,28 @@ public class PartyVisibilitySweepTests : IDisposable
         public override float GetPartySpottingRatioForMainPartySeeingRange(MobileParty party) => 1f;
 
         public override float GetHideoutSpottingDistance() => 30f;
+
+        // v1.5 moved the per-party visibility rule into the model. Same rule with the fixed ranges:
+        // attached army followers copy their leader, everyone else is visible within seeing range.
+        public override void GetMobilePartyVisibilityAndInspectedState(MobileParty mobileParty, Vec2[] points, float seeingRange, out bool isVisible, out bool isInspected, out bool isDistanceDependent)
+        {
+            isDistanceDependent = true;
+            if (mobileParty.Army != null && mobileParty.Army.LeaderParty.AttachedParties.IndexOf(mobileParty) >= 0)
+            {
+                isVisible = mobileParty.Army.LeaderParty.IsVisible;
+                isInspected = false;
+                return;
+            }
+
+            float range = seeingRange * GetPartySpottingRatioForMainPartySeeingRange(mobileParty);
+            isVisible = mobileParty.IsActive && points.Any(point => point.Distance(mobileParty.Position.ToVec2()) <= range);
+            isInspected = isVisible;
+        }
+
+        public override void GetSettlementInspectedState(Settlement settlement, Vec2[] points, float seeingRange, out bool isInspected, out bool isDistanceDependent)
+        {
+            isDistanceDependent = true;
+            isInspected = points.Any(point => point.Distance(settlement.GatePosition.ToVec2()) <= seeingRange);
+        }
     }
 }

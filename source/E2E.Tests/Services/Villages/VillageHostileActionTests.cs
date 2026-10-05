@@ -1443,8 +1443,7 @@ public class VillageHostileActionTests : MapEventTestBase
             mapEvent.Initialize(
                 mobileParty.Party,
                 settlement.Party,
-                new RaidEventComponent(mapEvent),
-                MapEvent.BattleTypes.Raid);
+                new RaidEventComponent(mapEvent));
 
             Assert.True(mapEvent.IsActiveSlowVillageRaid());
             Assert.True(InvokeMapEventUpdatePrefix(mapEvent));
@@ -1786,8 +1785,7 @@ public class VillageHostileActionTests : MapEventTestBase
             mapEvent.Initialize(
                 mobileParty.Party,
                 settlement.Party,
-                new RaidEventComponent(mapEvent),
-                MapEvent.BattleTypes.Raid);
+                new RaidEventComponent(mapEvent));
 
             Assert.True(mapEvent.IsUnopposedVillageRaid());
             Assert.Equal(TimeControlEnum.Play_2x, Server.Resolve<ITimeControlInterface>().GetTimeControl());
@@ -3788,27 +3786,23 @@ public class VillageHostileActionTests : MapEventTestBase
         mapEvent.MapEventVisual = MockMapEventVisual();
 
         MapEventComponent component;
-        MapEvent.BattleTypes battleType;
         switch (action)
         {
             case VillageHostileAction.Raid:
                 component = new RaidEventComponent(mapEvent);
-                battleType = MapEvent.BattleTypes.Raid;
                 break;
             case VillageHostileAction.ForceVolunteers:
                 component = new ForceVolunteersEventComponent(mapEvent);
-                battleType = (MapEvent.BattleTypes)3;
                 break;
             case VillageHostileAction.ForceSupplies:
                 component = new ForceSuppliesEventComponent(mapEvent);
-                battleType = (MapEvent.BattleTypes)4;
                 break;
             default:
                 throw new ArgumentOutOfRangeException(nameof(action), action, null);
         }
 
-        mapEvent.Initialize(attacker, defender, component, battleType);
-        mapEvent.MapEventSettlement = defender.Settlement;
+        mapEvent.Initialize(attacker, defender, component);
+        mapEvent.SetMapEventSettlement(defender.Settlement);
         mapEvent.Position = defender.Position;
         mapEvent.State = MapEventState.Wait;
 

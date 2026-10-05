@@ -22,6 +22,7 @@ using TaleWorlds.CampaignSystem.Roster;
 using TaleWorlds.Core;
 using Xunit;
 using Xunit.Abstractions;
+using E2E.Tests.Util;
 
 namespace E2E.Tests.Services.Missions;
 
@@ -50,7 +51,7 @@ public class BattleAbandonmentTests : MissionTestEnvironment
         Server.Call(() =>
         {
             Assert.True(Server.ObjectManager.TryGetObject<MapEvent>(mapEventId, out var battle));
-            battle._mapEventType = MapEvent.BattleTypes.Hideout;
+            battle.SetBattleType(MapEvent.BattleTypes.Hideout);
         });
         EnterBattle(clients[0], mapEventId);
         EnterBattle(clients[1], mapEventId);
@@ -82,7 +83,7 @@ public class BattleAbandonmentTests : MissionTestEnvironment
         Server.Call(() =>
         {
             Assert.True(Server.ObjectManager.TryGetObject<MapEvent>(mapEventId, out var mapEvent));
-            mapEvent._mapEventType = MapEvent.BattleTypes.Hideout;
+            mapEvent.SetBattleType(MapEvent.BattleTypes.Hideout);
             partyBaseIds = MapEventPlayerPartyCollector.CollectPartyIds(mapEvent, Server.ObjectManager);
         });
         EnterBattle(clients[0], mapEventId);

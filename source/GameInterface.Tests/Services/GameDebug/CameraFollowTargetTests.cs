@@ -11,6 +11,7 @@ using TaleWorlds.CampaignSystem.Settlements;
 using TaleWorlds.CampaignSystem.Siege;
 using TaleWorlds.Library;
 using Xunit;
+using GameInterface.Tests.Utils;
 
 namespace GameInterface.Tests.Services.GameDebug;
 
@@ -144,7 +145,7 @@ public sealed class CameraFollowTargetTests : IDisposable
     {
         var mapEvent = ObjectHelper.SkipConstructor<MapEvent>();
         mapEvent.Position = Position(x, y);
-        mapEvent.MapEventSettlement = settlement;
+        mapEvent.SetMapEventSettlement(settlement);
         party._mapEventSide = ObjectHelper.SkipConstructor<MapEventSide>();
         AccessTools.Field(typeof(MapEventSide), "_mapEvent").SetValue(party._mapEventSide, mapEvent);
     }

@@ -435,7 +435,7 @@ public class SiegeInteractionBattleTests : MissionTestEnvironment
             var missionSettlement = CreateSettlementWithCenterScenes();
             if (!client.ObjectManager.TryGetId(missionSettlement, out var missionSettlementId))
                 Assert.True(client.ObjectManager.AddNewObject(missionSettlement, out missionSettlementId));
-            mapEvent.MapEventSettlement = null;
+            mapEvent.SetMapEventSettlement(null);
             var attackerEngineState = new SiegeEngineState("e2e_attacker_engine", 1, 50f, 100f);
             var defenderEngineState = new SiegeEngineState("e2e_defender_engine", 2, 75f, 125f);
             var snapshot = new NetworkStartSiegeMission(
@@ -486,7 +486,7 @@ public class SiegeInteractionBattleTests : MissionTestEnvironment
             finally
             {
                 Campaign.Current.MainParty = previousMainParty;
-                mapEvent.MapEventSettlement = previousSettlement;
+                mapEvent.SetMapEventSettlement(previousSettlement);
                 ContainerProvider.SetContainer(client.Container);
                 BattleSpawnGate.EndBattle();
             }
@@ -563,8 +563,7 @@ public class SiegeInteractionBattleTests : MissionTestEnvironment
 
             // Non-field Initialize branches require a complete live siege/port graph. Build the synced graph
             // through the safe field path, then stamp the interaction identity on every replica below.
-            mapEvent.Initialize(parties[0].Party, parties[1].Party, fieldComponent,
-                MapEvent.BattleTypes.FieldBattle);
+            mapEvent.Initialize(parties[0].Party, parties[1].Party, fieldComponent);
 
             if (includeAiParties)
             {
@@ -572,9 +571,10 @@ public class SiegeInteractionBattleTests : MissionTestEnvironment
                 parties[3].Party.MapEventSide = mapEvent.DefenderSide;
             }
 
-            mapEvent.Component = isSiegeAmbush
-                ? new SiegeAmbushEventComponent(mapEvent)
-                : null;
+            // v1.5 derives the battle type from the component and never allows a null one: an ambush
+            // gets its real component here, every other interaction type is stamped on each replica below.
+            if (isSiegeAmbush)
+                mapEvent.Component = new SiegeAmbushEventComponent(mapEvent);
 
             mapEvent.MapEventVisual = null;
             if (!Campaign.Current.MapEventManager.MapEvents.Contains(mapEvent))
@@ -592,7 +592,8 @@ public class SiegeInteractionBattleTests : MissionTestEnvironment
             instance.Call(() =>
             {
                 Assert.True(instance.ObjectManager.TryGetObject<MapEvent>(mapEventId!, out var mapEvent));
-                mapEvent._mapEventType = eventType;
+                if (!isSiegeAmbush)
+                    mapEvent.SetBattleType(eventType);
                 mapEvent.Position = new CampaignVec2(default, isOnLand: true);
             });
         }
@@ -676,7 +677,8 @@ public class SiegeInteractionBattleTests : MissionTestEnvironment
         instance.Call(() =>
         {
             Assert.True(instance.ObjectManager.TryGetObject<MapEvent>(context.MapEventId, out var mapEvent));
-            Assert.Equal(eventType, mapEvent.EventType);
+            // v1.5 reports an ambush as its own battle type instead of an untyped event with an ambush component.
+            Assert.Equal(isSiegeAmbush ? MapEvent.BattleTypes.SiegeAmbush : eventType, mapEvent.EventType);
             Assert.Equal(isSiegeAmbush, mapEvent.IsSiegeAmbush);
             Assert.Equal(AttackerPlayerTroops + AttackerAiTroops, mapEvent.AttackerSide.TroopCount);
             Assert.Equal(DefenderPlayerTroops + DefenderAiTroops, mapEvent.DefenderSide.TroopCount);
@@ -768,13 +770,12 @@ public class SiegeInteractionBattleTests : MissionTestEnvironment
         {
             Assert.True(Server.ObjectManager.TryGetObject<MapEvent>(mapEventId, out var mapEvent));
             Assert.True(Server.ObjectManager.TryGetObject<MobileParty>(partyId, out var party));
-            var interactionType = mapEvent._mapEventType;
+            // v1.5 reads the battle type from the component and never allows a null one, so the
+            // join runs through a temporary field battle component instead of a null component.
             var interactionComponent = mapEvent.Component;
-            mapEvent._mapEventType = MapEvent.BattleTypes.FieldBattle;
-            mapEvent.Component = null;
+            mapEvent.SetBattleType(MapEvent.BattleTypes.FieldBattle);
             party.Party.MapEventSide = mapEvent.GetMapEventSide(side);
-            mapEvent._mapEventType = interactionType;
-            mapEvent.Component = interactionComponent;
+            mapEvent.RestoreComponent(interactionComponent);
             var mapEventParty = mapEvent.GetMapEventSide(side).Parties.Last(value => value.Party == party.Party);
             Assert.True(Server.ObjectManager.TryGetId(mapEventParty, out mapEventPartyId));
             Server.Resolve<IMessageBroker>().Publish(this,

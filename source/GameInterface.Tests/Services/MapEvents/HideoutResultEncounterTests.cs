@@ -3,6 +3,7 @@ using GameInterface.Services.MapEvents;
 using TaleWorlds.CampaignSystem.Encounters;
 using TaleWorlds.CampaignSystem.MapEvents;
 using Xunit;
+using GameInterface.Tests.Utils;
 
 namespace GameInterface.Tests.Services.MapEvents;
 
@@ -58,7 +59,7 @@ public class HideoutResultEncounterTests
     private static PlayerEncounter CreateEncounter(MapEvent.BattleTypes battleType, PlayerEncounterState state)
     {
         var mapEvent = ObjectHelper.SkipConstructor<MapEvent>();
-        mapEvent._mapEventType = battleType;
+        mapEvent.SetBattleType(battleType);
         var encounter = ObjectHelper.SkipConstructor<PlayerEncounter>();
         encounter._mapEvent = mapEvent;
         encounter.EncounterState = state;

@@ -8,6 +8,7 @@ using TaleWorlds.CampaignSystem.Settlements;
 using TaleWorlds.CampaignSystem.Siege;
 using TaleWorlds.Core;
 using Xunit;
+using GameInterface.Tests.Utils;
 
 namespace GameInterface.Tests.Services.SiegeEvents;
 
@@ -25,7 +26,7 @@ public class SiegePreparationPromptPatchesTests
         bool expected)
     {
         var mapEvent = ObjectHelper.SkipConstructor<MapEvent>();
-        mapEvent._mapEventType = battleType;
+        mapEvent.SetBattleType(battleType);
         mapEvent._battleState = battleState;
 
         Assert.Equal(

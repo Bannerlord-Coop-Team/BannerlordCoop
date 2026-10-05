@@ -41,7 +41,7 @@ public class HideoutTeleportCommandTests : MapEventTestBase
             var eastern = CreateHideout("Eastern hideout", Position(102, 101));
             var destination = selectSecond ? western : eastern;
             Assert.True(Server.ObjectManager.TryGetId(destination, out destinationId));
-            Assert.False(destination.Hideout.IsSpotted);
+            Assert.False(destination.IsVisible);
             var town = GameObjectCreator.CreateInitializedObject<Settlement>();
             town.SetSettlementComponent(GameObjectCreator.CreateInitializedObject<Town>());
             town.GatePosition = Position(100, 100);
@@ -70,7 +70,7 @@ public class HideoutTeleportCommandTests : MapEventTestBase
                 Assert.True(instance.ObjectManager.TryGetObject<MobileParty>(other.partyId, out var otherParty));
                 Assert.Equal(otherPosition, otherParty.Position);
                 Assert.True(instance.ObjectManager.TryGetObject<Settlement>(destinationId, out var destination));
-                Assert.True(destination.Hideout.IsSpotted);
+                Assert.True(destination.IsVisible);
                 destination.Party.UpdateVisibilityAndInspected(party.Position, 10f);
                 Assert.True(destination.IsVisible);
             });
@@ -112,13 +112,13 @@ public class HideoutTeleportCommandTests : MapEventTestBase
             var result = Execute(selected.partyId);
 
             Assert.Equal(hasAvailableHideout, result.Succeeded);
-            Assert.False(unavailable.Hideout.IsSpotted);
+            Assert.False(unavailable.IsVisible);
             Assert.Null(Campaign.Current.MainParty);
             if (hasAvailableHideout)
             {
                 Assert.Contains("Available hideout", result.Output);
                 Assert.Equal(available.GatePosition, party.Position);
-                Assert.True(available.Hideout.IsSpotted);
+                Assert.True(available.IsVisible);
             }
             else
             {
@@ -201,6 +201,9 @@ public class HideoutTeleportCommandTests : MapEventTestBase
     {
         var settlement = GameObjectCreator.CreateInitializedObject<Settlement>();
         settlement.SetSettlementComponent(GameObjectCreator.CreateInitializedObject<Hideout>());
+        // A new hideout starts hidden, as Hideout.OnInit leaves an authored one (v1.5 keeps the
+        // spotted state on the settlement, which is constructed visible).
+        settlement.Hideout.OnInit();
         settlement._name = new TextObject(name);
         settlement._position = entrance;
         settlement.GatePosition = entrance;

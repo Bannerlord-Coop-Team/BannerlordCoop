@@ -12,6 +12,7 @@ namespace E2E.Tests.Services.Hideouts
         public HideoutSyncTests(ITestOutputHelper output) : base(output)
         {
             HideoutId = TestEnvironment.CreateRegisteredObject<Hideout>();
+            TestEnvironment.CreateRegisteredObject<Settlement>();
         }
 
         [Fact]
@@ -23,7 +24,9 @@ namespace E2E.Tests.Services.Hideouts
         [Fact]
         public void Server_Hideout_Properties()
         {
-            TestEnvironment.AssertProperty<Hideout, bool>(nameof(Hideout.IsSpotted), true);
+            // v1.5 removed Hideout.IsSpotted: a spotted hideout is a visible settlement. A new settlement
+            // starts visible and Hideout.OnInit hides it, so the sync is checked by hiding one.
+            TestEnvironment.AssertProperty<Settlement, bool>(nameof(Settlement.IsVisible), false, defaultValue: true);
             //TestEnvironment.AssertProperty<Hideout, string>(nameof(Hideout.SceneName), "testScene");
         }
     }

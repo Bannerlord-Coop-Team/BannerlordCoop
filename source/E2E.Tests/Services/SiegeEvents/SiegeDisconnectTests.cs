@@ -201,7 +201,7 @@ public class SiegeDisconnectTests : MapEventTestBase
             instance.Call(() =>
             {
                 Assert.True(instance.ObjectManager.TryGetObject<MapEvent>(mapEvent.MapEventId, out var activeMapEvent));
-                activeMapEvent._mapEventType = MapEvent.BattleTypes.Siege;
+                activeMapEvent.SetBattleType(MapEvent.BattleTypes.Siege);
             });
         }
         ConfigureStaleSiegeMenu(
@@ -348,8 +348,8 @@ public class SiegeDisconnectTests : MapEventTestBase
             Assert.True(Server.ObjectManager.TryGetObject<MobileParty>(bystanderPartyId, out var bystander));
 
             var mapEvent = GameObjectCreator.CreateInitializedObject<MapEvent>();
-            mapEvent._mapEventType = MapEvent.BattleTypes.Siege;
-            mapEvent.MapEventSettlement = siegeEvent.BesiegedSettlement;
+            mapEvent.SetBattleType(MapEvent.BattleTypes.Siege);
+            mapEvent.SetMapEventSettlement(siegeEvent.BesiegedSettlement);
 
             var defenderSide = new MapEventSide(
                 mapEvent,

@@ -19,6 +19,7 @@ using TaleWorlds.Core;
 using TaleWorlds.Library;
 using TaleWorlds.MountAndBlade;
 using Xunit.Abstractions;
+using E2E.Tests.Util;
 
 namespace E2E.Tests.Services.MapEvents;
 
@@ -63,7 +64,7 @@ public class BattleMissionStartHandlerTests : MapEventTestBase
         {
             Assert.True(client.ObjectManager.TryGetObject<MapEvent>(mapEvent.MapEventId, out var clientBattle));
             if (isHideout)
-                clientBattle._mapEventType = MapEvent.BattleTypes.Hideout;
+                clientBattle.SetBattleType(MapEvent.BattleTypes.Hideout);
             Assert.True(client.ObjectManager.TryGetObject<MobileParty>(nonInitiatingPartyId, out var localParty));
             var previousMainParty = Campaign.Current.MainParty;
             Campaign.Current.MainParty = localParty;

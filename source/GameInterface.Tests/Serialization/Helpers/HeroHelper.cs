@@ -52,6 +52,7 @@ internal class HeroHelper
         hero._battleEquipment = (Equipment)FormatterServices.GetUninitializedObject(typeof(Equipment));
         hero._civilianEquipment = (Equipment)FormatterServices.GetUninitializedObject(typeof(Equipment));
         hero._stealthEquipment = (Equipment)FormatterServices.GetUninitializedObject(typeof(Equipment));
+        hero._partyConfiguration = new PartyConfiguration { CanJoinArmy = false, CanRaid = true, CanDonateTroopsToGarrison = false, CanHaveFleet = true };
         hero.CaptivityStartTime = new CampaignTime();
         hero.PreferredUpgradeFormation = ReflectionExtensions.Random<FormationClass>();
         hero._heroState = ReflectionExtensions.Random<Hero.CharacterStates>();

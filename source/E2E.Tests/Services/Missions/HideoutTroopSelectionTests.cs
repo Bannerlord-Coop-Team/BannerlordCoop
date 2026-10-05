@@ -328,8 +328,8 @@ public class HideoutTroopSelectionTests : MissionTestEnvironment
         Assert.True(Server.ObjectManager.TryGetObject<MapEvent>(mapEventId, out var mapEvent));
         var settlement = GameObjectCreator.CreateInitializedObject<Settlement>();
         settlement.SetSettlementComponent(GameObjectCreator.CreateInitializedObject<Hideout>());
-        mapEvent.MapEventSettlement = settlement;
-        mapEvent._mapEventType = MapEvent.BattleTypes.Hideout;
+        mapEvent.SetMapEventSettlement(settlement);
+        mapEvent.SetBattleType(MapEvent.BattleTypes.Hideout);
         return (settlement, mapEvent, Server.Resolve<IHideoutTroopSelection>());
     }
 

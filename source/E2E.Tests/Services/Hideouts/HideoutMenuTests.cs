@@ -99,7 +99,7 @@ public class HideoutMenuTests : MapEventTestBase
                 using var playerContext = new BarterPlayerContext(hero, party);
                 var battle = GameObjectCreator.CreateInitializedObject<MapEvent>();
                 battle.MapEventVisual = MockMapEventVisual();
-                battle.Initialize(party.Party, settlement.Party, new HideoutEventComponent(battle, false), MapEvent.BattleTypes.Hideout);
+                battle.Initialize(party.Party, settlement.Party, new HideoutEventComponent(battle, false));
                 battle.MapEventVisual = null;
                 Campaign.Current.MapEventManager.OnMapEventCreated(battle);
             }

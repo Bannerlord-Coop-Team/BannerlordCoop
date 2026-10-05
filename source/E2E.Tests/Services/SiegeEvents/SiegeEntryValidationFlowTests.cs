@@ -526,8 +526,8 @@ public class SiegeEntryValidationFlowTests : MapEventTestBase
                     party.CurrentSettlement = settlement;
                     settlement.Party._mapEventSide = mapEvent.DefenderSide;
                     mapEvent.DefenderSide.LeaderParty = settlement.Party;
-                    mapEvent._mapEventType = MapEvent.BattleTypes.Siege;
-                    mapEvent.MapEventSettlement = settlement;
+                    mapEvent.SetBattleType(MapEvent.BattleTypes.Siege);
+                    mapEvent.SetMapEventSettlement(settlement);
                     CreatePresentedSiege(party, settlement);
                     // The skipped scene initializer also creates the collections read by siege strength calculations.
                     settlement.SiegeEvent.BesiegerCamp.SiegeEngines = new SiegeEvent.SiegeEnginesContainer(
@@ -628,7 +628,7 @@ public class SiegeEntryValidationFlowTests : MapEventTestBase
             {
                 MobileParty.MainParty.CurrentSettlement = settlement;
                 settlement.Party._mapEventSide = mapEvent.DefenderSide;
-                mapEvent._mapEventType = battleType;
+                mapEvent.SetBattleType(battleType);
                 if (sameFaction) settlement.Town.OwnerClan = MobileParty.MainParty.ActualClan;
             }
             Assert.Equal(expectedMenu, new DefaultEncounterGameMenuModel().GetEncounterMenu(

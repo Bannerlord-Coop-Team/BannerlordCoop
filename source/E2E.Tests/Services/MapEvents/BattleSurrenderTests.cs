@@ -21,6 +21,7 @@ using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.Core;
 using Xunit;
 using Xunit.Abstractions;
+using E2E.Tests.Util;
 
 namespace E2E.Tests.Services.MapEvents;
 
@@ -56,7 +57,7 @@ public class BattleSurrenderTests : MapEventTestBase
         Server.Call(() =>
         {
             Assert.True(Server.ObjectManager.TryGetObject<MapEvent>(setup.ctx.MapEventId, out var battle));
-            battle._mapEventType = MapEvent.BattleTypes.Hideout;
+            battle.SetBattleType(MapEvent.BattleTypes.Hideout);
             Server.Resolve<IBattleHostRegistry>().Set(setup.ctx.MapEventId,
                 new BattleHostAssignment("1", new[] { "2" }, 2));
             Assert.True(ServerBattleModeArbiter.TryClaimMission(setup.ctx.MapEventId));

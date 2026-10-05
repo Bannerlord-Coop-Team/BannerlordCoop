@@ -89,8 +89,7 @@ public class HideoutMapEventTests : MapEventTestBase
                 mapEvent.Initialize(
                     playerParty.Party,
                     settlement.Party,
-                    new HideoutEventComponent(mapEvent, isSendTroops: false),
-                    MapEvent.BattleTypes.Hideout);
+                    new HideoutEventComponent(mapEvent, isSendTroops: false));
             }
             finally
             {
@@ -134,6 +133,9 @@ public class HideoutMapEventTests : MapEventTestBase
             settlement._position = new CampaignVec2(Vec2.Zero, true);
             var hideout = GameObjectCreator.CreateInitializedObject<Hideout>();
             settlement.SetSettlementComponent(hideout);
+            // A new hideout starts hidden, as Hideout.OnInit leaves an authored one (v1.5 keeps the
+            // spotted state on the settlement, which is constructed visible).
+            hideout.OnInit();
 
             var requiredBanditParties = System.Math.Max(
                 1,
@@ -156,11 +158,10 @@ public class HideoutMapEventTests : MapEventTestBase
 
             var behavior = new HideoutCampaignBehavior();
             behavior.HourlyTickSettlement(settlement);
-            Assert.False(hideout.IsSpotted);
+            Assert.False(settlement.IsVisible);
 
             playerParty.IsActive = true;
             behavior.HourlyTickSettlement(settlement);
-            Assert.True(hideout.IsSpotted);
             Assert.True(settlement.IsVisible);
         });
     }
@@ -579,8 +580,7 @@ public class HideoutMapEventTests : MapEventTestBase
             mapEvent.Initialize(
                 playerParty.Party,
                 settlement.Party,
-                new HideoutEventComponent(mapEvent, isSendTroops: true),
-                MapEvent.BattleTypes.Hideout);
+                new HideoutEventComponent(mapEvent, isSendTroops: true));
             mapEvent.MapEventVisual = null;
 
             if (!Campaign.Current.MapEventManager.MapEvents.Contains(mapEvent))
@@ -621,8 +621,7 @@ public class HideoutMapEventTests : MapEventTestBase
             mapEvent.Initialize(
                 playerParty.Party,
                 settlement.Party,
-                new HideoutEventComponent(mapEvent, isSendTroops: false),
-                MapEvent.BattleTypes.Hideout);
+                new HideoutEventComponent(mapEvent, isSendTroops: false));
             mapEvent.MapEventVisual = null;
 
             if (!Campaign.Current.MapEventManager.MapEvents.Contains(mapEvent))
@@ -675,8 +674,7 @@ public class HideoutMapEventTests : MapEventTestBase
             mapEvent.Initialize(
                 leaderParty.Party,
                 settlement.Party,
-                new HideoutEventComponent(mapEvent, isSendTroops: false),
-                MapEvent.BattleTypes.Hideout);
+                new HideoutEventComponent(mapEvent, isSendTroops: false));
             joinedParty.Party.MapEventSide = mapEvent.AttackerSide;
             mapEvent.MapEventVisual = null;
 
@@ -845,7 +843,7 @@ public class HideoutMapEventTests : MapEventTestBase
             {
                 Assert.True(instance.ObjectManager.TryGetObject<Settlement>(raid.SettlementId, out var settlement));
                 Assert.Empty(settlement.Parties);
-                Assert.False(settlement.Hideout.IsSpotted);
+                Assert.False(settlement.IsVisible);
                 Assert.True(instance.ObjectManager.TryGetObject<MobileParty>(raid.LeaderPartyId, out var leader));
                 Assert.True(instance.ObjectManager.TryGetObject<MobileParty>(raid.JoinerPartyId, out var joiner));
                 Assert.Null(leader.CurrentSettlement);
@@ -883,7 +881,6 @@ public class HideoutMapEventTests : MapEventTestBase
                     settlement.Hideout, false, null, settlement.Position);
                 EnterSettlementAction.ApplyForParty(bandits, settlement);
             }
-            settlement.Hideout.IsSpotted = true;
             settlement.IsVisible = true;
             Assert.True(settlement.Hideout.IsInfested);
 
@@ -917,7 +914,7 @@ public class HideoutMapEventTests : MapEventTestBase
             {
                 Assert.True(instance.ObjectManager.TryGetObject<Settlement>(raid.SettlementId, out var settlement));
                 Assert.Equal(!attackersWon, settlement.Hideout.IsInfested);
-                Assert.Equal(!attackersWon, settlement.Hideout.IsSpotted);
+                Assert.Equal(!attackersWon, settlement.IsVisible);
                 if (attackersWon)
                 {
                     settlement.Party.UpdateVisibilityAndInspected(settlement.Position);
@@ -1117,11 +1114,14 @@ public class HideoutMapEventTests : MapEventTestBase
             var settlement = GameObjectCreator.CreateInitializedObject<Settlement>();
             settlement._position = new CampaignVec2(Vec2.Zero, true);
             settlement.SetSettlementComponent(GameObjectCreator.CreateInitializedObject<Hideout>());
+            // A new hideout starts hidden, as Hideout.OnInit leaves an authored one (v1.5 keeps the
+            // spotted state on the settlement, which is constructed visible).
+            settlement.Hideout.OnInit();
             EnterSettlementAction.ApplyForParty(leader, settlement);
             var mapEvent = GameObjectCreator.CreateInitializedObject<MapEvent>();
             mapEvent.MapEventVisual = MockMapEventVisual();
             mapEvent.Initialize(leader.Party, settlement.Party,
-                new HideoutEventComponent(mapEvent, isSendTroops: false), MapEvent.BattleTypes.Hideout);
+                new HideoutEventComponent(mapEvent, isSendTroops: false));
             mapEvent.MapEventVisual = null;
             EnterSettlementAction.ApplyForParty(joiner, settlement);
             if (joinerJoinsBattle)

@@ -93,11 +93,9 @@ public class HideoutRaidEntryTests : MapEventTestBase
         var visualPatch = new Harmony($"HideoutRaidEntryTests.{Guid.NewGuid()}");
         visualPatch.Patch(AccessTools.PropertyGetter(typeof(CampaignTime), nameof(CampaignTime.Now)),
             postfix: new HarmonyMethod(typeof(HideoutRaidEntryTests), nameof(ProvideCampaignTime)));
+        // v1.5 Initialize creates the visual itself, and a headless host gets a no-op visual.
         var initialize = AccessTools.Method(typeof(MapEvent), nameof(MapEvent.Initialize),
-            new[] { typeof(PartyBase), typeof(PartyBase), typeof(MapEventComponent), typeof(MapEvent.BattleTypes) });
-        visualPatch.Patch(initialize,
-            prefix: new HarmonyMethod(typeof(HideoutRaidEntryTests), nameof(ProvideHeadlessVisual)),
-            postfix: new HarmonyMethod(typeof(HideoutRaidEntryTests), nameof(ClearHeadlessVisual)));
+            new[] { typeof(PartyBase), typeof(PartyBase), typeof(MapEventComponent) });
         try
         {
             Server.SimulateMessage(clients[0].NetPeer,
@@ -109,7 +107,8 @@ public class HideoutRaidEntryTests : MapEventTestBase
             if (abortFirstCreation)
             {
                 // An unregistered visual makes the real initialization barrier abort its graph.
-                visualPatch.Unpatch(initialize, HarmonyPatchType.Postfix, visualPatch.Id);
+                visualPatch.Patch(initialize,
+                    postfix: new HarmonyMethod(typeof(HideoutRaidEntryTests), nameof(ProvideUnregisteredVisual)));
                 Server.Call(() => Server.Resolve<IMessageBroker>().Publish(clients[0].NetPeer,
                     new NetworkHideoutRaidEntryRequest("aborted-first", settlementId, isDirectAssault, false,
                         new[] { new HideoutTroopSelectionEntry(firstCharacterId, 1),
@@ -127,8 +126,7 @@ public class HideoutRaidEntryTests : MapEventTestBase
                     Assert.Equal(14, selections.GetRemaining(settlement, 14));
                     Assert.Null(Campaign.Current.MainParty);
                 });
-                visualPatch.Patch(initialize,
-                    postfix: new HarmonyMethod(typeof(HideoutRaidEntryTests), nameof(ClearHeadlessVisual)));
+                visualPatch.Unpatch(initialize, HarmonyPatchType.Postfix, visualPatch.Id);
             }
 
             Server.Call(() => Server.Resolve<IMessageBroker>().Publish(clients[0].NetPeer,
@@ -264,9 +262,7 @@ public class HideoutRaidEntryTests : MapEventTestBase
         return characterId;
     }
 
-    private static void ProvideHeadlessVisual(MapEvent __instance) => __instance.MapEventVisual = MockMapEventVisual();
-
-    private static void ClearHeadlessVisual(MapEvent __instance) => __instance.MapEventVisual = null;
+    private static void ProvideUnregisteredVisual(MapEvent __instance) => __instance.MapEventVisual = MockMapEventVisual();
 
     private static void ProvideCampaignTime(ref CampaignTime __result) => __result = Campaign.Current.MapTimeTracker.Now;
 }
