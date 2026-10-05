@@ -87,7 +87,7 @@ public class KingdomRegistryTests
         Assert.NotNull(kingdom._deadLordsCache);
         Assert.NotNull(kingdom._warPartyComponentsCache);
         Assert.NotNull(kingdom.EncyclopediaText);
-        Assert.NotNull(kingdom.EncyclopediaTitle);
+        Assert.NotNull(kingdom.FormalName);
         Assert.NotNull(kingdom.EncyclopediaRulerTitle);
         Assert.Empty(kingdom.UnresolvedDecisions);
     }

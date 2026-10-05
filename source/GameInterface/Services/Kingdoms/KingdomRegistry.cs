@@ -91,7 +91,7 @@ internal class KingdomRegistry : AutoRegistryBase<Kingdom>
         obj._deadLordsCache ??= new MBList<Hero>();
         obj._warPartyComponentsCache ??= new MBList<WarPartyComponent>();
         obj.EncyclopediaText ??= TextObject.GetEmpty();
-        obj.EncyclopediaTitle ??= TextObject.GetEmpty();
+        obj.FormalName ??= TextObject.GetEmpty();
         obj.EncyclopediaRulerTitle ??= TextObject.GetEmpty();
     }
 

@@ -72,7 +72,7 @@ public class KingdomSyncTests : SyncTestBase
         TestEnvironment.AssertReferenceProperty<Kingdom, CultureObject>(nameof(Kingdom.Culture));
         TestEnvironment.AssertProperty<Kingdom, TextObject>(nameof(Kingdom.EncyclopediaRulerTitle), new TextObject("ruler"), kingdom.EncyclopediaRulerTitle);
         TestEnvironment.AssertProperty<Kingdom, TextObject>(nameof(Kingdom.EncyclopediaText), new TextObject("encycText"), kingdom.EncyclopediaText);
-        TestEnvironment.AssertProperty<Kingdom, TextObject>(nameof(Kingdom.EncyclopediaTitle), new TextObject("encycTitle"), kingdom.EncyclopediaTitle);
+        TestEnvironment.AssertProperty<Kingdom, TextObject>(nameof(Kingdom.FormalName), new TextObject("encycTitle"), kingdom.FormalName);
         TestEnvironment.AssertProperty<Kingdom, TextObject>(nameof(Kingdom.InformalName), new TextObject("informalName"), kingdom.InformalName);
         //TestEnvironment.AssertReferenceProperty<Kingdom, Settlement>(nameof(Kingdom.InitialHomeLand));
         //TestEnvironment.AssertProperty<Kingdom, uint>(nameof(Kingdom.LabelColor), 7);
