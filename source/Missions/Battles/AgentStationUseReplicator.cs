@@ -150,6 +150,15 @@ public class AgentStationUseReplicator : IAgentStationUseReplicator
 
     // [Game thread] Runs after this frame's hull frame writes. A puppet the owner keeps seated is re-pinned to its station's
     // user frame on the moved hull, as the lab did; if vanilla released it locally it is re-seated once per owner revision.
+    /// <summary>
+    /// An applied seat follows a remote owner's announcements. It ends when the puppet dies or when this client adopts
+    /// it (host migration): from then on vanilla seats it, possibly on a replacement hull.
+    /// </summary>
+    internal static bool KeepsAppliedSeat(bool alive, bool ownedHere) => alive && !ownedHere;
+
+    private bool IsOwnedHere(Guid agentId) =>
+        missionComponent.AgentRegistry.TryGetAgentInfo(agentId, out var info) && info.CurrentAuthority == session.OwnControllerId;
+
     internal void RefreshAppliedSeats()
     {
         if (appliedSeats.Count == 0) return;
@@ -158,7 +167,7 @@ public class AgentStationUseReplicator : IAgentStationUseReplicator
         foreach (var entry in appliedSeats)
         {
             var seat = entry.Value;
-            if (!engine.IsAlive(seat.Agent))
+            if (!KeepsAppliedSeat(engine.IsAlive(seat.Agent), IsOwnedHere(entry.Key)))
             {
                 leftAgents.Add(entry.Key);
                 continue;

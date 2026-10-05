@@ -90,6 +90,7 @@ public class AgentStationUseReplicatorTests
         var component = new Mock<ICoopMissionComponent>();
         component.SetupGet(c => c.AgentMovementHandler).Returns(Mock.Of<IAgentMovementHandler>());
         component.SetupGet(c => c.AgentActionHandler).Returns(Mock.Of<IAgentActionHandler>());
+        component.SetupGet(c => c.AgentRegistry).Returns(Mock.Of<INetworkAgentRegistry>());
         return new AgentStationUseReplicator(Mock.Of<IBattleNetwork>(), new MessageBroker(), Mock.Of<IBattleSession>(),
             component.Object, engine, Mock.Of<IBattleDeploymentCoordinator>());
     }

@@ -510,7 +510,10 @@ public class BattleAuthorityMigrator : IBattleAuthorityMigrator
                 // an explicit Charge so the NPCs actually engage. (Freshly spawned troops move because their
                 // OWNER's team AI drives them; these adopted puppets have no such driver and need the order.)
                 foreach (var formation in formations)
-                    formation.SetMovementOrder(MovementOrder.MovementOrderCharge);
+                {
+                    if (ShouldChargeAdoptedFormation(IsShipCrew(formation)))
+                        formation.SetMovementOrder(MovementOrder.MovementOrderCharge);
+                }
 
                 // TEMP diagnostic: how many adopted agents actually became AI-controlled, across how many
                 // formations (each ordered to Charge above). The per-formation state is covered by the
@@ -528,6 +531,15 @@ public class BattleAuthorityMigrator : IBattleAuthorityMigrator
         // no agents to adopt and continues them from those pointers. Runs even when nothing was adopted.
         RequestReserves();
     }
+
+    /// <summary>
+    /// A land formation needs an explicit Charge to engage. A naval hull's crew must not get one: its ship order drives
+    /// it, and a charge would send it off the deck; the ship replicator re-crews the hull it takes over instead.
+    /// </summary>
+    internal static bool ShouldChargeAdoptedFormation(bool isShipCrew) => !isShipCrew;
+
+    private bool IsShipCrew(Formation formation) =>
+        coopMissionComponent.ShipRegistry != null && coopMissionComponent.ShipRegistry.TryGetByFormation(formation, out _);
 
     // [Game thread] The player party (and hero) behind a controller id, from the session-scoped player
     // registry. The party is how own-party agents are identified across clients: puppets carry their origin

@@ -53,6 +53,14 @@ public class AgentRoutReporter : IAgentRoutReporter
         messageBroker.Unsubscribe<BattleAgentRouted>(Handle_BattleAgentRouted);
     }
 
+    /// <summary>
+    /// Whether a routed removal is a battlefield rout. A leaving client's teardown also removes agents as routed (the
+    /// naval ships logic removes every hull with its crew in <c>OnEndMission</c>); peers must not despawn those, because
+    /// the departure path decides which of them withdraw and which the successor adopts.
+    /// </summary>
+    internal static bool IsBattlefieldRout(bool missionEnded, Mission.State missionState) =>
+        !missionEnded && missionState == Mission.State.Continuing;
+
     public void OnAgentFleeing(Agent agent)
     {
         var registry = coopMissionComponent.AgentRegistry;
@@ -63,8 +71,12 @@ public class AgentRoutReporter : IAgentRoutReporter
         network.SendAll(new NetworkBattleAgentFleeing(info.AgentId));
     }
 
+    // Published synchronously from Mission.OnAgentRemoved, so the mission state is the one the removal happened in.
     private void Handle_BattleAgentRouted(MessagePayload<BattleAgentRouted> payload)
     {
+        var mission = payload.What.Agent?.Mission;
+        if (mission == null || !IsBattlefieldRout(mission.MissionEnded, mission.CurrentState)) return;
+
         var registry = coopMissionComponent.AgentRegistry;
 
         GameThread.RunSafe(() =>
