@@ -189,9 +189,9 @@
 
     // How long a lord remembers refusing to defect to your kingdom.
     // Vanilla records each failed persuasion and refuses that lord until the
-    // record expires after one in-game year. Only the machine that ran the
+    // refusal cools down after one in-game season. Only the machine that ran the
     // conversation records it, so co-op has to decide what a client's list means.
-    // (Default) "Vanilla":     a refusal blocks that lord for one in-game year, as in singleplayer.
+    // (Default) "Vanilla":     a refusal blocks that lord for one in-game season, as in singleplayer.
     // "NeverExpire": a refusal blocks that lord for the rest of the session.
     // "AlwaysRetry": a refusal never blocks; you can ask the same lord again straight away.
     "lordDefectionRetries": "Vanilla",

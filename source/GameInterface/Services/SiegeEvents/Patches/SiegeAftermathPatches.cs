@@ -251,11 +251,9 @@ internal class SiegeAftermathPatches
                 __instance._playerEncounterAftermathDamagedBuildings.Clear();
                 __instance._besiegerParty = leaderParty;
                 __instance._prevSettlementOwnerClan = settlement.OwnerClan;
-                // Vanilla's army-member test: in the besieger's own army, or in an army the player
-                // does not lead.
+                // Vanilla's army-member test (v1.5.4): in an army the player does not lead.
                 __instance._wasPlayerArmyMember = leaderParty != MobileParty.MainParty
-                    && ((leaderParty?.Army != null && leaderParty.Army.Parties.Contains(MobileParty.MainParty))
-                        || (MobileParty.MainParty.Army != null && MobileParty.MainParty.Army.LeaderParty != MobileParty.MainParty));
+                    && MobileParty.MainParty.Army != null && MobileParty.MainParty.Army.LeaderParty != MobileParty.MainParty;
                 if (ContainerProvider.TryResolve<ISiegeEventInterface>(out var siegeEventInterface))
                 {
                     siegeEventInterface.SetLocalAftermathNarrationContext(settlement);

@@ -232,8 +232,11 @@ public class KingdomHandler : IHandler
 
         var shortName = GameTexts.FindText("str_generic_kingdom_short_name", null);
         shortName.SetTextVariable("KINGDOM_SHORT_NAME", rawName);
+
+        var formalName = GameTexts.FindText("str_generic_kingdom_formal_name", null);
+        formalName.SetTextVariable("KINGDOM_FORMAL_NAME", rawName);
         
-        kingdom.ChangeKingdomName(fullName, shortName, fullName);
+        kingdom.ChangeKingdomName(fullName, shortName, formalName);
     }
 
     private static void RejectKingdomNameChange(ChangeKingdomName payload, string reason)

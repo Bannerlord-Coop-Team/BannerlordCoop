@@ -128,13 +128,13 @@ public sealed class ModOptionsData
 /// How long a lord remembers refusing a recruitment attempt.
 /// </summary>
 /// <remarks>
-/// Vanilla keeps each attempt for one in-game year and blocks the lord until it expires. That
+/// Vanilla blocks the lord for one in-game season after a refused attempt. That
 /// bookkeeping is filled in only by the machine that ran the conversation, so co-op has to choose
 /// what a client's list means.
 /// </remarks>
 public enum LordDefectionRetryMode
 {
-    /// <summary>Vanilla: a refusal blocks that lord for one in-game year, then expires.</summary>
+    /// <summary>Vanilla: a refusal blocks that lord for one in-game season, then expires.</summary>
     Vanilla,
 
     /// <summary>A refusal blocks that lord for the rest of the session.</summary>

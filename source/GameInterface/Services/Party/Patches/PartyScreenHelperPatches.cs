@@ -82,10 +82,14 @@ internal class PartyScreenHelperPatches
     [HarmonyPrefix]
     public static bool SellPrisonersDoneHandlerPrefix(ref bool __result, TroopRoster leftPrisonRoster)
     {
+        __result = true;
+
+        // v1.5.4 sells nothing when no prisoners were left on the sale side.
+        if (leftPrisonRoster == null || leftPrisonRoster.TotalManCount <= 0)
+            return false;
+
         var message = new PrisonersSold(MobileParty.MainParty.Party, leftPrisonRoster);
         MessageBroker.Instance.Publish(null, message);
-
-        __result = true;
         return false;
     }
 

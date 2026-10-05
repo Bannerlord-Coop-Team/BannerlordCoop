@@ -80,7 +80,7 @@ Players who retreat or disconnect are handled by the campaign and battle synchro
 
 For the most reliable experience:
 
-- Use the supported Bannerlord game version (currently **v1.5.3**)
+- Use the supported Bannerlord game version (currently **v1.5.4**)
 - Disable all other mods
 - Do not enable the War Sails DLC
 - Ensure every player is using the same mod version

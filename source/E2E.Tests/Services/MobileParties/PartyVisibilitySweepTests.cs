@@ -196,9 +196,8 @@ public class PartyVisibilitySweepTests : IDisposable
 
         // v1.5 moved the per-party visibility rule into the model. Same rule with the fixed ranges:
         // attached army followers copy their leader, everyone else is visible within seeing range.
-        public override void GetMobilePartyVisibilityAndInspectedState(MobileParty mobileParty, Vec2[] points, float seeingRange, out bool isVisible, out bool isInspected, out bool isDistanceDependent)
+        public override void GetMobilePartyVisibilityAndInspectedState(MobileParty mobileParty, Vec2[] points, float seeingRange, out bool isVisible, out bool isInspected)
         {
-            isDistanceDependent = true;
             if (mobileParty.Army != null && mobileParty.Army.LeaderParty.AttachedParties.IndexOf(mobileParty) >= 0)
             {
                 isVisible = mobileParty.Army.LeaderParty.IsVisible;
@@ -210,6 +209,8 @@ public class PartyVisibilitySweepTests : IDisposable
             isVisible = mobileParty.IsActive && points.Any(point => point.Distance(mobileParty.Position.ToVec2()) <= range);
             isInspected = isVisible;
         }
+
+        public override bool IsVisibilityPersistent(MobileParty mobileParty) => false;
 
         public override void GetSettlementInspectedState(Settlement settlement, Vec2[] points, float seeingRange, out bool isInspected, out bool isDistanceDependent)
         {

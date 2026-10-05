@@ -41,7 +41,11 @@ public static class PartyBaseVisibilityExtensions
         bool isInspected = false;
         if (mobileParty.IsActive && IsVisibleFromOutside(mobileParty))
         {
-            model.GetMobilePartyVisibilityAndInspectedState(mobileParty, points, seeingRange, out isVisible, out isInspected, out _);
+            // Like the vanilla sweep, leave a party whose visibility the model treats as persistent
+            // (true sight, the player's captor, garrisons, militia) as it is.
+            if (model.IsVisibilityPersistent(mobileParty)) return;
+
+            model.GetMobilePartyVisibilityAndInspectedState(mobileParty, points, seeingRange, out isVisible, out isInspected);
         }
 
         mobileParty.IsVisible = isVisible;

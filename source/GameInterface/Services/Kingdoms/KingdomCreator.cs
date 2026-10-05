@@ -110,7 +110,6 @@ internal class KingdomCreator : IKingdomCreator
                 name,
                 culture,
                 rulingClan,
-                name,
                 culture.DefaultPolicyList,
                 TextObject.GetEmpty(),
                 name,

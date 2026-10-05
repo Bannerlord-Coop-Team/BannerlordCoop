@@ -18,23 +18,23 @@ internal class KingdomManagerPatches
     private static bool Prefix(KingdomManager __instance, Kingdom kingdom)
     {
         Clan rulingClan = kingdom.RulingClan;
-        int num = kingdom.Clans.Count((Clan x) => !x.IsUnderMercenaryService);
         if (rulingClan == Clan.PlayerClan)
         {
             kingdom.Banner = new Banner(Clan.PlayerClan.Banner);
         }
-        if (num > 1)
+        // v1.5.4 hands the throne to the most influential clan that may rule, if any.
+        float num = float.MinValue;
+        Clan clan = null;
+        foreach (Clan clan2 in kingdom.Clans)
         {
-            float num2 = float.MinValue;
-            Clan clan = null;
-            foreach (Clan clan2 in kingdom.Clans)
+            if (clan2 != rulingClan && Campaign.Current.Models.DiplomacyModel.IsClanEligibleToBecomeRuler(clan2) && clan2.Influence > num)
             {
-                if (clan2 != rulingClan && clan2.Influence > num2)
-                {
-                    num2 = clan2.Influence;
-                    clan = clan2;
-                }
+                num = clan2.Influence;
+                clan = clan2;
             }
+        }
+        if (clan != null)
+        {
             MessageBroker.Instance.Publish(__instance, new RulingClanChanged(kingdom, clan));
             GameThread.WaitWhilePumping(() => kingdom.RulingClan == clan, DateTime.UtcNow.AddSeconds(5));
             kingdom.AddDecision(new KingSelectionKingdomDecision(rulingClan, rulingClan)

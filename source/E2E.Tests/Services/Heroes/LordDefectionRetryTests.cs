@@ -14,10 +14,9 @@ namespace E2E.Tests.Services.Heroes;
 /// </summary>
 /// <remarks>
 /// The blocker these guard is NOT <c>CanAttemptToPersuade</c>. It is
-/// <c>conversation_lord_from_ruling_clan_on_condition</c>, which refuses on
-/// <c>Any(a => a.PersuadedHero == OneToOneConversationHero)</c> - a predicate that checks neither age
-/// nor success - and returns before the gate is consulted. So AlwaysRetry only works if this lord's
-/// records are gone. The active persuasion still needs <c>CanAttemptToPersuade</c> to recognize a fresh
+/// <c>conversation_lord_from_ruling_clan_on_condition</c>, which refuses while the lord has an
+/// unsuccessful attempt still in its cooldown and returns before the gate is consulted. So AlwaysRetry
+/// only works if this lord's records are gone. The active persuasion still needs <c>CanAttemptToPersuade</c> to recognize a fresh
 /// failure and populate its final refusal line.
 /// </remarks>
 public class LordDefectionRetryTests : IDisposable
@@ -91,7 +90,7 @@ public class LordDefectionRetryTests : IDisposable
             LordDefectionRetryPatches.ConversationLordFromRulingClanPatch.ClearAttemptsForRetry(
                 behavior, lord, mode);
 
-            // Vanilla needs its own week/year rules to decide; NeverExpire needs the refusal to stand.
+            // Vanilla needs its own week/season rules to decide; NeverExpire needs the refusal to stand.
             Assert.Single(behavior._previousDefectionPersuasionAttempts);
         });
     }
@@ -128,6 +127,39 @@ public class LordDefectionRetryTests : IDisposable
 
                 Assert.True(runOriginal);
                 Assert.False(result);
+            }
+            finally
+            {
+                ModConfigProvider.ModOptions = previousOptions;
+            }
+        });
+    }
+
+    /// <summary>
+    /// v1.5.4 expires a refusal by its one-season cooldown instead of pruning the record, so
+    /// NeverExpire keeps every attempt in its cooldown.
+    /// </summary>
+    [Theory]
+    [InlineData(LordDefectionRetryMode.Vanilla, false)]
+    [InlineData(LordDefectionRetryMode.NeverExpire, true)]
+    public void OldRefusal_StaysInCooldownOnlyForNeverExpire(LordDefectionRetryMode mode, bool expected)
+    {
+        var server = TestEnvironment.Server;
+
+        server.Call(() =>
+        {
+            var previousOptions = ModConfigProvider.ModOptions;
+            try
+            {
+                ModConfigProvider.ModOptions = new ModOptions(new ModOptionsData
+                {
+                    LordDefectionRetries = mode,
+                });
+
+                var behavior = new LordDefectionCampaignBehavior();
+                var twoSeasonsAgo = CampaignTime.DaysFromNow(-2f * CampaignTime.DaysInSeason);
+
+                Assert.Equal(expected, behavior.IsPersuiasionAttemptInCooldown(twoSeasonsAgo));
             }
             finally
             {

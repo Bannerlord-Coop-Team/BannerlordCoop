@@ -264,7 +264,7 @@
     <ModName>Coop</ModName>
     <MainClass>CoopMod</MainClass>
     <ModVersion>v$(CoopVersion)</ModVersion>
-    <GameVersion>v1.5.3</GameVersion>
+    <GameVersion>v1.5.4</GameVersion>
   </PropertyGroup>
   <Import Project="$(MSBuildProjectDirectory)\..\..\Deploy.targets" />
 </Project>
