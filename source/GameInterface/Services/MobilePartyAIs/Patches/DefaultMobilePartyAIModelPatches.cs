@@ -1,8 +1,10 @@
 ﻿using Common;
 using GameInterface.Services.MapEvents;
+using GameInterface.Services.MobileParties.Extensions;
 using HarmonyLib;
 using System.Collections.Generic;
 using System.Linq;
+using System.Reflection.Emit;
 using System.Runtime.CompilerServices;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.GameComponents;
@@ -135,6 +137,29 @@ internal class DefaultMobilePartyAIModelPatches
         if (persistedDisableTimes.Count == 0)
             PersistedDisablePlayerAttackTimes.Remove(attackerParty);
     }
+
+    // v1.5.4 stops an AI party from attacking next to a main party stronger than itself. The server's main party
+    // is never a player's, so that check reads any player party instead. The method's later IsMainParty read is
+    // older and stays.
+    [HarmonyPatch(nameof(DefaultMobilePartyAIModel.GetBestInitiativeBehavior))]
+    [HarmonyTranspiler]
+    internal static IEnumerable<CodeInstruction> StrongerPlayerNearbyTranspiler(IEnumerable<CodeInstruction> instructions)
+    {
+        var codes = instructions.ToList();
+        var isMainParty = AccessTools.PropertyGetter(typeof(MobileParty), nameof(MobileParty.IsMainParty));
+        var strength = AccessTools.PropertyGetter(typeof(PartyBase), nameof(PartyBase.EstimatedStrength));
+        var helper = AccessTools.Method(typeof(DefaultMobilePartyAIModelPatches), nameof(IsMainOrPlayerParty));
+        for (int i = 0; i < codes.Count; i++)
+        {
+            if (!codes[i].Calls(isMainParty) || !codes.Skip(i + 1).Take(6).Any(code => code.Calls(strength))) continue;
+
+            codes[i].opcode = OpCodes.Call;
+            codes[i].operand = helper;
+        }
+        return codes;
+    }
+
+    internal static bool IsMainOrPlayerParty(MobileParty party) => party.IsMainParty || party.IsPlayerParty();
 
     [HarmonyPatch(nameof(DefaultMobilePartyAIModel.ShouldConsiderAttacking))]
     [HarmonyPostfix]
