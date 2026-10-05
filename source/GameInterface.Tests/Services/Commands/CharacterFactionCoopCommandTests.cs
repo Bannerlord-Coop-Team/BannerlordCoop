@@ -38,9 +38,9 @@ public class CharacterFactionCoopCommandTests
         Type[] commandTypes = GetCommandTypes();
 
 #if DEBUG
-        Assert.Equal(142, commandTypes.Length);
+        Assert.Equal(143, commandTypes.Length);
 #else
-        Assert.Equal(137, commandTypes.Length);
+        Assert.Equal(138, commandTypes.Length);
 #endif
         Assert.All(commandTypes, type =>
         {
@@ -156,6 +156,7 @@ public class CharacterFactionCoopCommandTests
     [Theory]
     [InlineData("coop.debug.army", "create", "empire", "town_ES1", "hero", "Raider")]
     [InlineData("coop.debug.romance", "marry", "player", "npc")]
+    [InlineData("coop.debug.hero", "kill_npc", "npc", "old_age", "player")]
     [InlineData("coop.debug.kingdom", "force_ally", "empire", "empire_s")]
     [InlineData("coop.debug.kingdom", "force_trade_agreement", "empire", "empire_s")]
     [InlineData("coop.debug.kingdom", "declare_war", "empire", "empire_s", "hostility", "player")]
