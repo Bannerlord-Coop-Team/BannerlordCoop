@@ -6,10 +6,12 @@ namespace Missions.Naval;
 /// <summary>Drives the coop naval services of one battle mission and tears them down with it.</summary>
 public class CoopNavalBattleBehavior : MissionLogic
 {
-    public CoopNavalBattleBehavior(IBattleShipReplicator shipReplicator, IAgentStationUseReplicator stationUseReplicator)
+    public CoopNavalBattleBehavior(IBattleShipReplicator shipReplicator, IAgentStationUseReplicator stationUseReplicator,
+        INavalNpcFleetSpawner npcFleetSpawner)
     {
         ShipReplicator = shipReplicator;
         StationUseReplicator = stationUseReplicator;
+        NpcFleetSpawner = npcFleetSpawner;
         CoopNavalMissionScope.IsActive = true;
     }
 
@@ -17,11 +19,14 @@ public class CoopNavalBattleBehavior : MissionLogic
 
     public IAgentStationUseReplicator StationUseReplicator { get; }
 
+    public INavalNpcFleetSpawner NpcFleetSpawner { get; }
+
     public override void OnMissionTick(float dt)
     {
         base.OnMissionTick(dt);
         ShipReplicator.Tick(dt);
         StationUseReplicator.Tick(dt);
+        NpcFleetSpawner.Tick();
     }
 
     public override void OnEndMissionInternal()

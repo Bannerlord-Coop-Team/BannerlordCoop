@@ -181,7 +181,7 @@ public class CoopNavalBattleLauncher : ICoopNavalBattleLauncher
         });
 
         behaviorAttacher.Attach(mission);
-        AttachNavalServices(mission);
+        AttachNavalServices(mission, playerSide.GetOppositeSide());
         mission.SetPlayerCanTakeControlOfAnotherAgentWhenDead();
         Logger.Information("[NavalBattle] Opened coop naval battle for {MapEventId} (player side {Side})", mapEventId, playerSide);
         return mission;
@@ -200,14 +200,16 @@ public class CoopNavalBattleLauncher : ICoopNavalBattleLauncher
     }
 
     // The ship services share the attached controller's per-battle session, deployment and mission component.
-    private void AttachNavalServices(Mission mission)
+    private void AttachNavalServices(Mission mission, BattleSideEnum enemySide)
     {
         var controller = mission.GetMissionBehavior<CoopBattleController>();
         var shipReplicator = new BattleShipReplicator(network, messageBroker, controller.Session, controller.Deployment,
             controller.MissionComponent, shipEngine, teamResolver, objectManager, controller.HostEpochPolicy);
         var stationUseReplicator = new AgentStationUseReplicator(network, messageBroker, controller.Session,
             controller.MissionComponent, shipEngine, controller.Deployment);
-        mission.AddMissionBehavior(new CoopNavalBattleBehavior(shipReplicator, stationUseReplicator));
+        var npcFleetSpawner = new NavalNpcFleetSpawner(controller.Session, shipReplicator, controller.MissionComponent.ShipRegistry,
+            shipSnapshotBuilder, objectManager, playerManager, enemySide);
+        mission.AddMissionBehavior(new CoopNavalBattleBehavior(shipReplicator, stationUseReplicator, npcFleetSpawner));
     }
 
     // Own party only: vanilla GetMapEventPartiesOfPlayerTeams takes the first non-NPC party as the player's,

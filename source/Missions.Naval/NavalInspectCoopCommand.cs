@@ -42,6 +42,8 @@ public sealed class NavalInspectCoopCommand : ICoopCommand
             ownReservePresent = mission.GetMissionBehavior<CoopNavalReserveGuard>()?.ReservePresent,
             shipSync = mission.GetMissionBehavior<CoopNavalBattleBehavior>()?.ShipReplicator.Inspect(),
             shipDecks = controller.MissionComponent.AgentMovementHandler.InspectShipDecks(),
+            hostEpoch = controller.Session.HostEpoch,
+            npcFleet = InspectNpcFleet(controller, mission.GetMissionBehavior<CoopNavalBattleBehavior>()),
             stationUse = mission.GetMissionBehavior<CoopNavalBattleBehavior>()?.StationUseReplicator.Inspect(),
             agents = InspectAgents(mission, controller.MissionComponent, mission.GetMissionBehavior<CoopNavalBattleBehavior>()),
             mainAgent = Agent.Main?.Character?.StringId,
@@ -67,6 +69,21 @@ public sealed class NavalInspectCoopCommand : ICoopCommand
         };
 
         return new CoopCommandResult(true, "NAVAL_INSPECT " + JsonConvert.SerializeObject(state));
+    }
+
+    // AI hulls with their authority and how many have a pilot at the helm (the AI captain steers through it).
+    private static object InspectNpcFleet(CoopBattleController controller, CoopNavalBattleBehavior naval)
+    {
+        var hulls = controller.MissionComponent.ShipRegistry.Ships.Where(ship => ship.IsNpcParty).ToArray();
+        return new
+        {
+            spawner = naval?.NpcFleetSpawner.Inspect(),
+            isLocalHost = controller.Session.IsLocalHost,
+            hulls = hulls.Length,
+            ownedHere = hulls.Count(ship => ship.CurrentAuthority == controller.Session.OwnControllerId),
+            helmPilotsSeated = hulls.Count(ship => (ship.Hull as MissionShip)?.ShipControllerMachine?.PilotAgent != null),
+            aiControllers = hulls.Count(ship => (ship.Hull as MissionShip)?.Controller?.ControllerType == NavalDLC.Missions.ShipControl.ShipControllerType.AI),
+        };
     }
 
     // Registered human agents with the hull whose formation they serve on, so a puppet's hull is visible.
