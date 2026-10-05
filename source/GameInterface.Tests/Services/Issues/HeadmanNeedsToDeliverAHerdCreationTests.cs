@@ -10,6 +10,7 @@ using GameInterface.Services.Issues.Messages;
 using GameInterface.Services.ObjectManager;
 using Moq;
 using GameInterface.Surrogates;
+using System.Runtime.CompilerServices;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.Localization;
 using Xunit;
@@ -19,6 +20,11 @@ namespace GameInterface.Tests.Services.Issues;
 [Collection(ModInformationRoleCollection.Name)]
 public class HeadmanNeedsToDeliverAHerdCreationTests
 {
+    static HeadmanNeedsToDeliverAHerdCreationTests()
+    {
+        RuntimeHelpers.RunModuleConstructor(typeof(Coop.Tests.Mocks.TestNetwork).Module.ModuleHandle);
+    }
+
     [Fact]
     public void AcceptancePayloadFreezesJournalTimeProgressAndAlternativeTerms()
     {
@@ -48,9 +54,7 @@ public class HeadmanNeedsToDeliverAHerdCreationTests
     public void ReceivedCreationCannotResurrectAnAlreadyObservedGeneration(int current, int received)
     {
         var originalRole = ModInformation.IsServer;
-        var wasGameThread = GameThread.Instance.IsGameThread;
         ModInformation.IsServer = false;
-        GameThread.Instance.MarkGameThread();
         try
         {
             var owner = ObjectHelper.SkipConstructor<Hero>();
@@ -65,6 +69,7 @@ public class HeadmanNeedsToDeliverAHerdCreationTests
 
             broker.Publish(this, new NetworkHeadmanNeedsToDeliverAHerdIssueCreated(
                 "giver", "destination", "target", "sheep", received, "issue_30", 123, 456));
+            GameThread.Run(() => { }, blocking: true);
 
             objects.Verify(x => x.TryGetObjectWithLogging("giver", out owner), Times.Once);
             objects.VerifyNoOtherCalls();
@@ -75,7 +80,6 @@ public class HeadmanNeedsToDeliverAHerdCreationTests
         finally
         {
             ModInformation.IsServer = originalRole;
-            if (!wasGameThread) GameThread.Instance.UnmarkGameThread();
         }
     }
 
