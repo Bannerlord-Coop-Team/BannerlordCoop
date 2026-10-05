@@ -154,18 +154,19 @@ public class CharacterFactionCoopCommandTests
     }
 
     [Theory]
-    [InlineData("coop.debug.army", "create", "empire", "town_ES1", "hero", "Raider")]
-    [InlineData("coop.debug.romance", "marry", "player", "npc")]
-    [InlineData("coop.debug.hero", "kill_npc", "npc", "old_age", "player")]
-    [InlineData("coop.debug.kingdom", "force_ally", "empire", "empire_s")]
-    [InlineData("coop.debug.kingdom", "force_trade_agreement", "empire", "empire_s")]
-    [InlineData("coop.debug.kingdom", "declare_war", "empire", "empire_s", "hostility", "player")]
-    [InlineData("coop.debug.kingdom", "make_peace", "empire", "empire_s", "player")]
-    [InlineData("coop.debug.clan", "change_clan_kingdom", "clan", "empire_s", "defection", "player")]
-    [InlineData("coop.debug.clan", "leave_kingdom", "clan", "rebellion", "player")]
+    [InlineData("coop.debug.army", "create", "Command is only available to run on the server", "empire", "town_ES1", "hero", "Raider")]
+    [InlineData("coop.debug.romance", "marry", "Command can only be run on the server.", "player", "npc")]
+    [InlineData("coop.debug.hero", "kill_npc", "The 'coop.debug.hero.kill_npc' command cannot be used on the client. It is intended for server use only.", "npc", "old_age", "player")]
+    [InlineData("coop.debug.kingdom", "force_ally", "Command is only available to run on the server", "empire", "empire_s")]
+    [InlineData("coop.debug.kingdom", "force_trade_agreement", "Command is only available to run on the server", "empire", "empire_s")]
+    [InlineData("coop.debug.kingdom", "declare_war", "Run this command on the server.", "empire", "empire_s", "hostility", "player")]
+    [InlineData("coop.debug.kingdom", "make_peace", "Run this command on the server.", "empire", "empire_s", "player")]
+    [InlineData("coop.debug.clan", "change_clan_kingdom", "Command is only available to run on the server", "clan", "empire_s", "defection", "player")]
+    [InlineData("coop.debug.clan", "leave_kingdom", "Command is only available to run on the server", "clan", "rebellion", "player")]
     public void ServerCommands_RunOnClient_ReturnExplicitFailures(
         string prefix,
         string name,
+        string expectedOutput,
         params string[] args)
     {
         bool originalIsServer = ModInformation.IsServer;
@@ -176,6 +177,7 @@ public class CharacterFactionCoopCommandTests
 
             Assert.False(result.Succeeded);
             Assert.Equal("command_failed", result.ErrorCode);
+            Assert.Equal(expectedOutput, result.Output);
         }
         finally
         {
