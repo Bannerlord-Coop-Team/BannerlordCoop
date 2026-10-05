@@ -10,6 +10,8 @@ using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Encounters;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Roster;
+using TaleWorlds.CampaignSystem.SceneInformationPopupTypes;
+using TaleWorlds.Core;
 using Xunit;
 
 namespace GameInterface.Tests.Services.Heroes;
@@ -83,6 +85,95 @@ public class LordConversationsCampaignBehaviorPatchesTests
             OneToOneConversationHero = null!;
         }
     }
+
+    [Fact]
+    public void CaptureAndKill_ForgetIt_RequestsTheCaptureFromTheServer()
+    {
+        var previousCampaign = Campaign.Current;
+        var harmony = new Harmony($"{nameof(LordConversationsCampaignBehaviorPatchesTests)}.{Guid.NewGuid():N}");
+        var victim = ObjectHelper.SkipConstructor<Hero>();
+        var mainParty = ObjectHelper.SkipConstructor<PartyBase>();
+        var mainMobileParty = ObjectHelper.SkipConstructor<MobileParty>();
+        mainMobileParty.Party = mainParty;
+        var campaign = ObjectHelper.SkipConstructor<Campaign>();
+        campaign.MainParty = mainMobileParty;
+
+        var published = new List<TakeLordPrisoner>();
+        Action<MessagePayload<TakeLordPrisoner>> capture = payload => published.Add(payload.What);
+
+        try
+        {
+            OneToOneConversationHero = victim;
+            Campaign.Current = campaign;
+            harmony.Patch(
+                AccessTools.PropertyGetter(typeof(Hero), nameof(Hero.OneToOneConversationHero)),
+                prefix: new HarmonyMethod(AccessTools.Method(
+                    typeof(LordConversationsCampaignBehaviorPatchesTests),
+                    nameof(GetOneToOneConversationHeroPrefix))));
+            harmony.Patch(
+                AccessTools.Method(
+                    typeof(HeroExecutionSceneNotificationData),
+                    nameof(HeroExecutionSceneNotificationData.CreateForPlayerExecutingHero)),
+                prefix: new HarmonyMethod(AccessTools.Method(
+                    typeof(LordConversationsCampaignBehaviorPatchesTests),
+                    nameof(CaptureExecutionPromptPrefix))));
+            harmony.Patch(
+                AccessTools.Method(typeof(MBInformationManager), nameof(MBInformationManager.ShowSceneNotification)),
+                prefix: new HarmonyMethod(AccessTools.Method(
+                    typeof(LordConversationsCampaignBehaviorPatchesTests),
+                    nameof(SkipShowSceneNotificationPrefix))));
+            MessageBroker.Instance.Subscribe(capture);
+
+            bool runOriginal = LordConversationsCampaignBehaviorPatches
+                .ConversationTalkLordDefeatToLordCaptureAndKillOnConsequencePrefix();
+            // The conversation has closed by the time the player answers the prompt.
+            OneToOneConversationHero = null!;
+
+            Assert.False(runOriginal);
+            Assert.Same(victim, executionPromptVictim);
+            Assert.Null(executionPromptAffirmativeAction);
+            Assert.True(executionPromptShowsNegativeOption);
+            Assert.Empty(published);
+
+            executionPromptNegativeAction!();
+
+            TakeLordPrisoner request = Assert.Single(published);
+            Assert.Same(mainParty, request.MainParty);
+            Assert.Same(victim, request.ConversationHero);
+        }
+        finally
+        {
+            MessageBroker.Instance.Unsubscribe(capture);
+            harmony.UnpatchAll(harmony.Id);
+            Campaign.Current = previousCampaign;
+            OneToOneConversationHero = null!;
+            executionPromptVictim = null;
+            executionPromptAffirmativeAction = null;
+            executionPromptNegativeAction = null;
+        }
+    }
+
+    private static Hero? executionPromptVictim;
+    private static Action? executionPromptAffirmativeAction;
+    private static bool executionPromptShowsNegativeOption;
+    private static Action? executionPromptNegativeAction;
+
+    private static bool CaptureExecutionPromptPrefix(
+        Hero dyingHero,
+        Action onAffirmativeAction,
+        bool showNegativeOption,
+        Action onNegativeAction,
+        ref HeroExecutionSceneNotificationData __result)
+    {
+        executionPromptVictim = dyingHero;
+        executionPromptAffirmativeAction = onAffirmativeAction;
+        executionPromptShowsNegativeOption = showNegativeOption;
+        executionPromptNegativeAction = onNegativeAction;
+        __result = ObjectHelper.SkipConstructor<HeroExecutionSceneNotificationData>();
+        return false;
+    }
+
+    private static bool SkipShowSceneNotificationPrefix() => false;
 
     private static bool GetOneToOneConversationHeroPrefix(ref Hero __result)
     {

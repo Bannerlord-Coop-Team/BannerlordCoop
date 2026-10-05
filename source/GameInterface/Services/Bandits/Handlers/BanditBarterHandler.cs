@@ -125,6 +125,7 @@ internal sealed class BanditBarterHandler : IHandler
                     playerParty,
                     protectionUntil);
                 protectedParty.SetMoveModeHold();
+                protectedParty.Ai.ForceDefaultBehaviorUpdate();
                 protectedParty.Ai.SetInitiative(0f, 0.8f, 8f);
             }
 

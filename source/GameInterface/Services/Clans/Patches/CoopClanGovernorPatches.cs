@@ -5,6 +5,7 @@ using System.Reflection.Emit;
 using GameInterface.Services.Heroes.Extensions;
 using Helpers;
 using TaleWorlds.CampaignSystem;
+using TaleWorlds.CampaignSystem.CampaignBehaviors;
 using TaleWorlds.CampaignSystem.GameComponents;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Settlements;
@@ -132,6 +133,18 @@ internal class CoopClanGovernorPatches
     public static IEnumerable<CodeInstruction> GovernorWorkshopTranspiler(IEnumerable<CodeInstruction> instructions)
         => GovernorBonusTranspiler(instructions);
 
-    private static Settlement GetGovernorSettlement(Hero hero)
+    [HarmonyPatch(typeof(DefaultSettlementProsperityModel), nameof(DefaultSettlementProsperityModel.CalculateHearthChangeInternal))]
+    [HarmonyTranspiler]
+    public static IEnumerable<CodeInstruction> GovernorHearthTranspiler(IEnumerable<CodeInstruction> instructions)
+        => GovernorBonusTranspiler(instructions);
+
+    // The other CurrentSettlement read here is the static Settlement.CurrentSettlement, which the swap leaves alone.
+    [HarmonyPatch(typeof(RebellionsCampaignBehavior), nameof(RebellionsCampaignBehavior.DailyTickSettlement))]
+    [HarmonyTranspiler]
+    public static IEnumerable<CodeInstruction> GovernorRebellionTranspiler(IEnumerable<CodeInstruction> instructions)
+        => GovernorBonusTranspiler(instructions);
+
+    /// <summary>A player governor counts as present in the town they govern, wherever they are.</summary>
+    internal static Settlement GetGovernorSettlement(Hero hero)
         => hero.IsPlayerHero() && hero.GovernorOf != null ? hero.GovernorOf.Settlement : hero.CurrentSettlement;
 }

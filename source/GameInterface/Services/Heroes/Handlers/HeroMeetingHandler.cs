@@ -5,9 +5,12 @@ using GameInterface.Services.Heroes.Interfaces;
 using GameInterface.Services.Heroes.Messages;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Players;
+using Helpers;
 using LiteNetLib;
 using System.Collections.Generic;
 using TaleWorlds.CampaignSystem;
+using TaleWorlds.CampaignSystem.Actions;
+using TaleWorlds.CampaignSystem.CharacterDevelopment;
 
 namespace GameInterface.Services.Heroes.Handlers;
 
@@ -99,14 +102,29 @@ internal class HeroMeetingHandler : IHandler
         GameThread.RunSafe(() =>
         {
             if (payload.Who is not NetPeer peer || !playerManager.TryGetPlayer(peer, out var player)) return;
-            if (!objectManager.TryGetObjectWithLogging<Hero>(player.HeroId, out _)) return;
-            if (!objectManager.TryGetObjectWithLogging<Hero>(meeting.MetHeroId, out _)) return;
+            if (!objectManager.TryGetObjectWithLogging<Hero>(player.HeroId, out var playerHero)) return;
+            if (!objectManager.TryGetObjectWithLogging<Hero>(meeting.MetHeroId, out var metHero)) return;
 
-            sessionHeroMeetingDataInterface.RecordMeeting(
+            var firstMeeting = sessionHeroMeetingDataInterface.RecordMeeting(
                 player.HeroId,
                 meeting.MetHeroId,
                 meeting.LastMeetingTimeTicks);
+            if (firstMeeting)
+                ApplyFirstMeetingRelation(playerHero, metHero);
         }, context: nameof(Handle));
+    }
+
+    // Mirrors v1.5 HeroKnownInformationCampaignBehavior.OnPlayerMetHero, which applies this only for the
+    // server's own main hero: a calculating player loses relation on first meeting a town notable.
+    private static void ApplyFirstMeetingRelation(Hero playerHero, Hero metHero)
+    {
+        if (!metHero.IsNotable || metHero.CurrentSettlement?.IsTown != true) return;
+
+        var relationChange = (int)TraitEffectHelper.GetTraitEffectBonus(
+            playerHero,
+            DefaultPersonalityTraitEffects.CalculatingNotableRelationEffect);
+        if (relationChange != 0)
+            ChangeRelationAction.ApplyRelationChangeBetweenHeroes(playerHero, metHero, relationChange, showQuickNotification: false);
     }
 
     private static void RecordMeeting(

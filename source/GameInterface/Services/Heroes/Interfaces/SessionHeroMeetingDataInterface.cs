@@ -7,7 +7,8 @@ namespace GameInterface.Services.Heroes.Interfaces;
 
 public interface ISessionHeroMeetingDataInterface
 {
-    void RecordMeeting(string playerHeroId, string metHeroId, long lastMeetingTimeTicks);
+    /// <summary>Records a meeting; returns true when it is the player's first meeting with that hero.</summary>
+    bool RecordMeeting(string playerHeroId, string metHeroId, long lastMeetingTimeTicks);
 }
 
 public class SessionHeroMeetingDataInterface : ISessionHeroMeetingDataInterface
@@ -20,13 +21,13 @@ public class SessionHeroMeetingDataInterface : ISessionHeroMeetingDataInterface
         this.coopSessionProvider = coopSessionProvider;
     }
 
-    public void RecordMeeting(string playerHeroId, string metHeroId, long lastMeetingTimeTicks)
+    public bool RecordMeeting(string playerHeroId, string metHeroId, long lastMeetingTimeTicks)
     {
         var heroMeetingData = coopSessionProvider.CoopSession?.HeroMeetingData;
         if (heroMeetingData?.PlayerLastMeetingTimes == null)
         {
             Logger.Error("HeroMeetingData was null; cannot record meeting for {PlayerHeroId}", playerHeroId);
-            return;
+            return false;
         }
 
         if (!heroMeetingData.PlayerLastMeetingTimes.TryGetValue(playerHeroId, out var meetingTimes) || meetingTimes == null)
@@ -35,6 +36,8 @@ public class SessionHeroMeetingDataInterface : ISessionHeroMeetingDataInterface
             heroMeetingData.PlayerLastMeetingTimes[playerHeroId] = meetingTimes;
         }
 
+        var firstMeeting = !meetingTimes.ContainsKey(metHeroId);
         meetingTimes[metHeroId] = lastMeetingTimeTicks;
+        return firstMeeting;
     }
 }

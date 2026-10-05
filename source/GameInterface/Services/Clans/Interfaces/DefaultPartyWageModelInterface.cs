@@ -1,4 +1,5 @@
 using GameInterface.Services.Clans.Extensions;
+using GameInterface.Services.Clans.Patches;
 using GameInterface.Services.Heroes.Extensions;
 using GameInterface.Services.MobileParties.Extensions;
 using Helpers;
@@ -193,7 +194,8 @@ public class DefaultPartyWageModelInterface : IDefaultPartyWageModelInterface
         else if (mobileParty.IsGarrison)
         {
             Hero governor = mobileParty.CurrentSettlement?.Town?.Governor;
-            if (governor != null && governor.CurrentSettlement == mobileParty.CurrentSettlement)
+            // Same presence rule as the other governor trait effects (CoopClanGovernorPatches).
+            if (governor != null && CoopClanGovernorPatches.GetGovernorSettlement(governor) == mobileParty.CurrentSettlement)
             {
                 TraitEffectHelper.ApplyTraitEffect(governor, DefaultPersonalityTraitEffects.GenerosityUpkeepReductionEffect, ref result);
             }

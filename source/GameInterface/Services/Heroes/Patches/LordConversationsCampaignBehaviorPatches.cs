@@ -6,6 +6,8 @@ using Helpers;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.CampaignBehaviors;
 using TaleWorlds.CampaignSystem.Encounters;
+using TaleWorlds.CampaignSystem.SceneInformationPopupTypes;
+using TaleWorlds.Core;
 
 namespace GameInterface.Services.Heroes.Patches;
 
@@ -64,6 +66,24 @@ internal class LordConversationsCampaignBehaviorPatches
 
         var message = new TakeLordPrisoner(Campaign.Current.MainParty.Party, CharacterObject.OneToOneConversationCharacter.HeroObject);
         MessageBroker.Instance.Publish(null, message);
+
+        return false;
+    }
+
+    // v1.5 asks before executing, and "Forget It" takes the lord prisoner instead. Vanilla's delegate
+    // calls TakePrisonerAction, which only the server may run, so route it like the capture answer.
+    // Executing still goes through HeroExecutionScenePatch.
+    [HarmonyPatch(nameof(LordConversationsCampaignBehavior.conversation_talk_lord_defeat_to_lord_capture_and_kill_on_consequence))]
+    [HarmonyPrefix]
+    public static bool ConversationTalkLordDefeatToLordCaptureAndKillOnConsequencePrefix()
+    {
+        Hero victim = Hero.OneToOneConversationHero;
+        MBInformationManager.ShowSceneNotification(HeroExecutionSceneNotificationData.CreateForPlayerExecutingHero(
+            victim,
+            null,
+            SceneNotificationData.RelevantContextType.Any,
+            showNegativeOption: true,
+            () => MessageBroker.Instance.Publish(null, new TakeLordPrisoner(Campaign.Current.MainParty.Party, victim))));
 
         return false;
     }
