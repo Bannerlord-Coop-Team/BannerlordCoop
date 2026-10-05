@@ -21,6 +21,13 @@ class FeatureMapTests(unittest.TestCase):
         self.assertEqual((join["side"], join["arguments"]), ("Client", ""))
         lifecycle = commands["coop.debug.town.apply_garrison_lifecycle"]
         self.assertEqual((lifecycle["side"], lifecycle["arguments"]), ("Server", "townId; operation"))
+        self.assertEqual(commands["coop.debug.romance.list"]["arguments"], "")
+        self.assertEqual(commands["coop.debug.romance.status"]["arguments"], "unresolved")
+        self.assertEqual(commands["coop.debug.romance.start"]["side"], "Server")
+        self.assertEqual(commands["coop.debug.romance.fail_practicalities"]["arguments"], "first_hero_id; second_hero_id")
+        self.assertEqual(commands["coop.debug.hero.issues"]["arguments"], "")
+        for name in ("observe", "start", "finish"):
+            self.assertEqual(commands["coop.debug.mobileparty.clan_lord_fixture_" + name]["arguments"], "unresolved")
         town = [row["arguments"] for row in rows if row["kind"] == "sync-registration"
                 and row["source"] == "source/GameInterface/Services/Towns/TownSync.cs"]
         self.assertTrue(any("Town.Governor" in value for value in town))
@@ -56,6 +63,15 @@ class FeatureMapTests(unittest.TestCase):
             with patch.object(feature_map, "ROOT", root), patch.object(feature_map, "FEATURES", root / "features"):
                 with contextlib.redirect_stdout(io.StringIO()):
                     feature_map.validate()
+                repository_sources = {root / source["assembly"]: (root / source["assembly"]).read_bytes()
+                                      for source in manifest["sources"].values() if source["provider"] == "repository"}
+                for encoding, newline in (("utf-8", "\n"), ("utf-8-sig", "\r\n")):
+                    for source, content in repository_sources.items():
+                        source.write_text(content.decode("utf-8-sig").replace("\r\n", "\n"), encoding=encoding, newline=newline)
+                    with contextlib.redirect_stdout(io.StringIO()):
+                        feature_map.validate()
+                for source, content in repository_sources.items():
+                    source.write_bytes(content)
                 command = root / "source/GameInterface/Services/Towns/Commands/TownDebugCommand.cs"
                 saved_command = command.read_bytes()
                 with patch.object(feature_map, "source_files", return_value=[command]):

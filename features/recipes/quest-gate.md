@@ -2,7 +2,8 @@
 
 Status: draft, source-inspected only. Static inventory is retained; normal runtime/dialogue
 observations have not been exercised. The direct game driver and a source-bound owned run
-were unavailable during authoring.
+were unavailable during authoring. Type-specific admission is also blocked: no inspected
+read-only command maps an existing issue ID to its concrete issue type.
 
 Behavior: normal issue availability follows the explicit source allowlist. A factory or debug
 catalog entry does not enable normal quest gameplay. The current 43 installed registered issue
@@ -19,6 +20,12 @@ Use [the focused branch map](../quest-branches.md) and [source cases](../source-
 to distinguish this normal type-gate recipe from the 31 interpreted stolen-goods cases.
 Other registered issue types remain disabled; registrations do not supply terminal-result oracles.
 
+Prerequisite for the excluded-type admission oracle: an isolated save with pre-existing
+excluded issues and an independently recorded giver ID, issue ID and concrete type. The normal
+allowlist disables excluded behaviors' `RegisterEvents`, so a fresh campaign does not supply
+those issue-generation scenarios when the gate applies. Do not change the gate or debug-grant
+an excluded issue to fabricate the fixture.
+
 Read-only static discovery from the root:
 
 ```powershell
@@ -32,13 +39,19 @@ or debug-granting a disabled issue. On server/client1/client2, confirm and execu
 `coop.debug.issues.list_types`, `[]`, and `coop.debug.hero.issues`, `[]`.
 The second command lists actual giver/issue IDs and can fail because no hero currently has
 an issue; that is a recorded setup blocker, not a game-support failure or an invented giver.
+It does not print issue types. `list_types` describes the grant catalog, not those live IDs.
+The give/complete commands can print a type but change state and cannot be used as inspection.
 
-Select an actual accessible notable with an existing issue from the returned IDs; inspect the
-giver's current issue type through the available registered hero inspection and real dialogue.
+Type-specific admission remains blocked until a read-only observation exposes the concrete
+type for the returned giver/issue pair and agrees with the isolated fixture's recorded type.
+No such operation is named here because the inspected driver does not supply one. Record
+this missing observation and do not execute or report the type-gating slice as passed.
+The read-only issue/catalog inventory and the independent journal/UI slice remain distinct.
+
+Once that prerequisite is supplied, select an accessible notable with the identified issue.
 Prefer Danustica when it contains an eligible giver. Do not hard-code generated notable IDs,
 substitute an arbitrary hero or overwrite an existing quest. Keep the selected actual IDs in
-the run evidence. If the runtime cannot identify an issue type independently, stop this slice
-with that precise missing observation.
+the run evidence. Do not infer a concrete type from its StringId or dialogue text.
 
 Drive the ordinary client conversation/issue option with the real game UI, obtaining fresh
 native layer/snapshot/element IDs via `ui_inspect` before interaction. Inspect both normal

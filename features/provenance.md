@@ -25,7 +25,8 @@ not semantic correctness, runtime loading or every later source read.
 [behavior-sources.json](baseline/behavior-sources.json) keeps the eight complete source
 identities used by [source-cases.csv](source-cases.csv): six installed types and two repository
 production files. It records logical owning DLL/version/hash, normalized complete-source digest
-and line count; repository files have separate byte hashes. The native fallback used existing
+and line count; repository files retain separate byte hashes, while `check` compares their
+normalized text digest so BOM/newline conversion does not imply a source change. The native fallback used existing
 focus-safe `ilspycmd` / `ICSharpCode.Decompiler` version `10.1.0.8386`. Both installed DLL hashes
 were rechecked after discovery and matched. Span checks use these frozen source identities;
 `check` does not inspect a current game installation or re-prove the source interpretation.

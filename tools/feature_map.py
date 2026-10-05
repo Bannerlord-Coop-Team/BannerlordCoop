@@ -20,6 +20,10 @@ def digest(path):
     return hashlib.sha256(path.read_bytes()).hexdigest()
 
 
+def normalized_digest(path):
+    return hashlib.sha256(path.read_text(encoding="utf-8-sig").encode("utf-8")).hexdigest()
+
+
 def relative(path):
     return path.relative_to(ROOT).as_posix()
 
@@ -59,16 +63,28 @@ def inventory_rows():
         sha = digest(path)
         src = relative(path)
         area = domain(Path(src))
+        constants = {}
+        for identifier, value in re.findall(r'\bconst\s+string\s+(\w+)\s*=\s*"([^"]*)"\s*;', code):
+            constants.setdefault(identifier, set()).add(value)
         commands = list(re.finditer(r"\bclass\s+(\w+)\s*:\s*ICoopCommand\b", code))
         for index, match in enumerate(commands):
             block = code[match.end():commands[index + 1].start() if index + 1 < len(commands) else len(code)]
-            prefix = re.search(r'\bPrefix\s*=>\s*"([^"]+)"', block)
+            prefix = re.search(r'\bPrefix\s*=>\s*("[^"]+"|\w+)\s*;', block)
+            prefix_value = ""
+            if prefix:
+                if prefix[1].startswith('"'):
+                    prefix_value = prefix[1].strip('"')
+                elif len(constants.get(prefix[1], set())) == 1:
+                    prefix_value = next(iter(constants[prefix[1]]))
             name = re.search(r'\bName\s*=>\s*"([^"]+)"', block)
             side = re.search(r"\bSide\s*=>\s*CoopCommandSide\.(\w+)", block)
             header = block.split("ProcessCommand", 1)[0]
             args = re.findall(r'new\s+(?:\w*ExpectedArgs)\s*\(\s*"([^"]+)"', header)
-            key = prefix[1] + "." + name[1] if prefix and name else match[1]
-            add("command", area, key, match[1], side[1] if side else "unresolved", "; ".join(args),
+            declaration = re.search(r"\bExpectedArgs\b[^=]*?(?:=>|=)\s*(.*?);", header, re.DOTALL)
+            empty = declaration and re.fullmatch(r"(?:System\.)?Array\.Empty<[^>]+>\(\)", declaration[1].strip())
+            arguments = "; ".join(args) if args else "" if empty else "unresolved"
+            key = prefix_value + "." + name[1] if prefix_value and name else "unresolved:" + match[1]
+            add("command", area, key, match[1], side[1] if side else "unresolved", arguments,
                 src, code.count("\n", 0, match.start()) + 1, sha, "declaration-only")
         if not src.startswith(("source/Coop/", "source/GameInterface/", "source/Missions/", "source/Coop.Core/")):
             continue
@@ -202,7 +218,7 @@ def validate():
             errors.append(key + ": empty source")
         if source["provider"] == "repository":
             resolved = (ROOT / source["assembly"]).resolve()
-            if not resolved.is_relative_to(ROOT) or not resolved.is_file() or digest(resolved) != source["sha256"]:
+            if not resolved.is_relative_to(ROOT) or not resolved.is_file() or normalized_digest(resolved) != source["decompiled_sha256"]:
                 errors.append(key + ": repository behavior source changed")
         elif installed_hashes.get(source["assembly"]) != source["sha256"]:
             errors.append(key + ": source differs from installed baseline")

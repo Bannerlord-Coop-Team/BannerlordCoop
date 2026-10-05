@@ -79,3 +79,17 @@ are retained in the complete-source manifest. Installed definition snapshots rem
 The earlier passing selector exercise is retained with its exact original source/scope.
 No harness rebuild, CI, game build/deployment, launch, save or owner/lane change was performed
 for this reduction. All 63 source cases retain `runtime: unrun`.
+
+## Review corrections
+
+Corrections to the review of documentation head `4b51faa483b59e1b4cbc133c3600bbcf83a2265b`
+narrow the partial-stock restore to matching proposal slots, scope atomic rejection to the
+focus batch, bind prior perk/attribute application and quest caller/consequence spans, and
+carry release exclusions/experimental support into the catalog. The quest-type admission
+recipe remains blocked on read-only type identification and pre-existing excluded issues.
+
+`python tools/feature_map.py check` passed with 385 behaviors, 63 cases and runtime
+`{"unrun": 63}`. `python tools/test_feature_map.py -v` passed both focused checks in 2.843
+seconds, including constant-prefix discovery, unresolved non-literal arguments and normalized
+BOM/newline source validation while retaining rejection of actual source drift. No `source/`
+file changed, and no case, gameplay recipe or selector was run by these corrections.

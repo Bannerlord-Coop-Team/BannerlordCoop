@@ -62,7 +62,7 @@ inventory, every-branch census or per-perk page tree is committed.
 | [Two-client admission](recipes/two-clients.md) | join readiness, distinct identities, shared observation and disconnect | draft; source-inspected; needs an owned source-bound Debug runtime |
 | [Danustica tournament](recipes/tournament.md) | shared lobby, start/choice, leave and owned fixture restore | draft; same runtime requirement |
 | [Danustica garrison](recipes/garrison.md) | authoritative lifecycle and both clients' backlinks | draft; same runtime requirement |
-| [Quest gate](recipes/quest-gate.md) | normal allowlist, debug catalog distinction and journal restriction | draft; normal runtime/UI observations missing |
+| [Quest gate](recipes/quest-gate.md) | normal allowlist, debug catalog distinction and journal restriction | draft; type admission blocked on read-only type observation and pre-existing excluded issues |
 
 The recipes are a starter set. Tournament admission does not prove every round, bet or reward;
 the quest gate does not prove quest completion. StoryMode, native engine/input, native multiplayer,

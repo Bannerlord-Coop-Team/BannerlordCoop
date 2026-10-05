@@ -30,7 +30,10 @@ references are not a playable server hero/party; the co-op host has neither.
 | lose hideout fight | `FailQuestByLosingHideoutBattle`, 782-788 | failure, both powers -5, giver relation -5; battle casualties/party recovery remain separate |
 | alternative success | `AlternativeSolutionEndWithSuccessConsequence`, 186-201 | configured reward gold/goods, issue-owner relation change +10, giver power +5, counter-offer power -5, merchant power -3, Calculating XP +50 |
 
-Earlier payment and goods handling are separate flow actions, not inferred from these terminal
+The four pay/unpaid keep/return cases also bind `GetAfterHideoutMerchantDialogFlow`, 670-710,
+which dispatches the selected branch using `_isPayingForGoods`. The meeting case binds both
+its condition, 882-895, and conversation consequence, 877-880.
+Earlier payment and goods handling are separate flow actions, not inferred from terminal
 methods. Runtime amounts/goods, affected notable set, giver, quest ID, owner hero/party and
 hideout must be read from the actual quest/registry before action and retained in evidence.
 Do not substitute fabricated gold or roster values. Companion/troop return is separate from

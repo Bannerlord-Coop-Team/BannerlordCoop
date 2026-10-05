@@ -418,18 +418,18 @@ Entry: Campaign army UI / map
 
 | ID | Action | Outcome variants | Required observation | Support / evidence |
 | --- | --- | --- | --- | --- |
-| armies.001 | Create army | leader eligible; influence; available parties | one registered army owns the intended leader and invited parties | unverified / candidate |
-| armies.002 | Invite party to army | eligible; already attached; other player | accepted party joins the intended army once | unverified / candidate |
-| armies.003 | Join army | client request; automatic AI arrival | party attachment and army membership agree | unverified / candidate |
-| armies.004 | Leave army | voluntary; battle; disband | party detaches from the intended army and can move independently | unverified / candidate |
-| armies.005 | Army cohesion | daily decay; spend influence; leader change | cohesion/influence change once on the authoritative side | unverified / candidate |
-| armies.006 | Army supplies | food sharing; shortages; party loss | food and shortage effects agree for participating parties | unverified / candidate |
-| armies.007 | Army objective | attack; defend; besiege; patrol | member movement follows the current authoritative army order | unverified / candidate |
-| armies.008 | Army encounter | field battle; siege defense; relief | all participating parties share the correct map event sides | unverified / candidate |
-| armies.009 | Disband army | leader action; cohesion loss; leader removed | all members detach without retaining a dead army reference | unverified / candidate |
-| armies.010 | Army leader replacement | leader removed; eligible survivor | new leader and resulting orders agree | unverified / candidate |
+| armies.001 | Create army | leader eligible; influence; available parties | one registered army owns the intended leader and invited parties | experimental; gameplay unverified / candidate |
+| armies.002 | Invite party to army | eligible; already attached; other player | accepted party joins the intended army once | experimental; gameplay unverified / candidate |
+| armies.003 | Join army | client request; automatic AI arrival | party attachment and army membership agree | experimental; gameplay unverified / candidate |
+| armies.004 | Leave army | voluntary; battle; disband | party detaches from the intended army and can move independently | experimental; gameplay unverified / candidate |
+| armies.005 | Army cohesion | daily decay; spend influence; leader change | cohesion/influence change once on the authoritative side | experimental; gameplay unverified / candidate |
+| armies.006 | Army supplies | food sharing; shortages; party loss | food and shortage effects agree for participating parties | experimental; gameplay unverified / candidate |
+| armies.007 | Army objective | attack; defend; besiege; patrol | member movement follows the current authoritative army order | experimental; gameplay unverified / candidate |
+| armies.008 | Army encounter | field battle; siege defense; relief | all participating parties share the correct map event sides | experimental; gameplay unverified / candidate |
+| armies.009 | Disband army | leader action; cohesion loss; leader removed | all members detach without retaining a dead army reference | experimental; gameplay unverified / candidate |
+| armies.010 | Army leader replacement | leader removed; eligible survivor | new leader and resulting orders agree | experimental; gameplay unverified / candidate |
 
-Sources: [source/GameInterface/Services/Armies](../source/GameInterface/Services/Armies), [source/GameInterface/Services/MapEvents](../source/GameInterface/Services/MapEvents), [source/GameInterface/Services/MobileParties](../source/GameInterface/Services/MobileParties)
+Sources: [README.md](../README.md), [source/GameInterface/Services/Armies](../source/GameInterface/Services/Armies), [source/GameInterface/Services/MapEvents](../source/GameInterface/Services/MapEvents), [source/GameInterface/Services/MobileParties](../source/GameInterface/Services/MobileParties)
 
 ## quests
 
@@ -519,24 +519,24 @@ Entry: Siege camp / settlement siege menu / assault mission
 
 | ID | Action | Outcome variants | Required observation | Support / evidence |
 | --- | --- | --- | --- | --- |
-| sieges.001 | Begin siege | town; castle; army leader; lone party | one registered siege event links correct besieger and settlement | unverified / candidate |
-| sieges.002 | Join besieger camp | leader; army member; second player | party joins the correct siege side and observes shared progress | unverified / candidate |
-| sieges.003 | Leave siege | leader departure; nonleader departure; final besieger | siege persists or ends according to remaining authoritative participants | unverified / candidate |
-| sieges.004 | Build siege camp | progress; interruption; settlement relieved | camp readiness agrees across peers | unverified / candidate |
-| sieges.005 | Queue siege engine | ram; tower; catapult; ballista; trebuchet where available | selected valid engine enters the correct construction slot | unverified / candidate |
-| sieges.006 | Construct siege engine | progress; completion; destroyed during build | engine identity and progress agree | unverified / candidate |
-| sieges.007 | Move engine to reserve | active slot; reserved slot; replacement | one engine occupies the intended slot/reserve | unverified / candidate |
-| sieges.008 | Siege bombardment | engine hit; wall damage; engine destroyed | health and construction/destruction effects converge | unverified / candidate |
-| sieges.009 | Wall breach | unbreached; one breach; multiple breaches | mission defenses reflect authoritative wall state | unverified / candidate |
-| sieges.010 | Siege supply shortage | food exhausted; garrison starvation; militia | food and troop attrition agree without double daily losses | unverified / candidate |
-| sieges.011 | Lead siege assault | ready; not ready; attacking army | all participating clients enter the correct assault map event | unverified / candidate |
-| sieges.012 | Defend siege | garrison; militia; player party; relief army | defender roster and battle side contain the intended participants | unverified / candidate |
-| sieges.013 | Sally out | eligible defenders; blocked action | accepted sally creates the correct encounter and returns state | unverified / candidate |
-| sieges.014 | Siege ambush | launch; destroy engines; retreat; completion | engine losses and returned party state agree | unverified / candidate |
-| sieges.015 | Relieve siege | attack besiegers; join defense; besieger defeat | siege lifecycle and army attachments converge | unverified / candidate |
-| sieges.016 | Capture settlement aftermath | show mercy; pillage; devastate | accepted choice produces the intended ownership/roster/relations state | unverified / candidate |
+| sieges.001 | Begin siege | town; castle; army leader; lone party | one registered siege event links correct besieger and settlement | experimental; gameplay unverified / candidate |
+| sieges.002 | Join besieger camp | leader; army member; second player | party joins the correct siege side and observes shared progress | experimental; gameplay unverified / candidate |
+| sieges.003 | Leave siege | leader departure; nonleader departure; final besieger | siege persists or ends according to remaining authoritative participants | experimental; gameplay unverified / candidate |
+| sieges.004 | Build siege camp | progress; interruption; settlement relieved | camp readiness agrees across peers | experimental; gameplay unverified / candidate |
+| sieges.005 | Queue siege engine | ram; tower; catapult; ballista; trebuchet where available | selected valid engine enters the correct construction slot | experimental; gameplay unverified / candidate |
+| sieges.006 | Construct siege engine | progress; completion; destroyed during build | engine identity and progress agree | experimental; gameplay unverified / candidate |
+| sieges.007 | Move engine to reserve | active slot; reserved slot; replacement | one engine occupies the intended slot/reserve | experimental; gameplay unverified / candidate |
+| sieges.008 | Siege bombardment | engine hit; wall damage; engine destroyed | health and construction/destruction effects converge | experimental; gameplay unverified / candidate |
+| sieges.009 | Wall breach | unbreached; one breach; multiple breaches | mission defenses reflect authoritative wall state | experimental; gameplay unverified / candidate |
+| sieges.010 | Siege supply shortage | food exhausted; garrison starvation; militia | food and troop attrition agree without double daily losses | experimental; gameplay unverified / candidate |
+| sieges.011 | Lead siege assault | ready; not ready; attacking army | all participating clients enter the correct assault map event | experimental; gameplay unverified / candidate |
+| sieges.012 | Defend siege | garrison; militia; player party; relief army | defender roster and battle side contain the intended participants | experimental; gameplay unverified / candidate |
+| sieges.013 | Sally out | eligible defenders; blocked action | accepted sally creates the correct encounter and returns state | experimental; gameplay unverified / candidate |
+| sieges.014 | Siege ambush | launch; destroy engines; retreat; completion | engine losses and returned party state agree | experimental; gameplay unverified / candidate |
+| sieges.015 | Relieve siege | attack besiegers; join defense; besieger defeat | siege lifecycle and army attachments converge | experimental; gameplay unverified / candidate |
+| sieges.016 | Capture settlement aftermath | show mercy; pillage; devastate | accepted choice produces the intended ownership/roster/relations state | experimental; gameplay unverified / candidate |
 
-Sources: [source/GameInterface/Services/BesiegerCamps](../source/GameInterface/Services/BesiegerCamps), [source/GameInterface/Services/MapEvents](../source/GameInterface/Services/MapEvents), [source/GameInterface/Services/SiegeEngines](../source/GameInterface/Services/SiegeEngines), [source/GameInterface/Services/SiegeEvents](../source/GameInterface/Services/SiegeEvents), [source/Missions](../source/Missions)
+Sources: [README.md](../README.md), [source/GameInterface/Services/BesiegerCamps](../source/GameInterface/Services/BesiegerCamps), [source/GameInterface/Services/MapEvents](../source/GameInterface/Services/MapEvents), [source/GameInterface/Services/SiegeEngines](../source/GameInterface/Services/SiegeEngines), [source/GameInterface/Services/SiegeEvents](../source/GameInterface/Services/SiegeEvents), [source/Missions](../source/Missions)
 
 ## naval
 
@@ -544,17 +544,17 @@ Entry: Installed naval menu paths / optional mod mission module
 
 | ID | Action | Outcome variants | Required observation | Support / evidence |
 | --- | --- | --- | --- | --- |
-| naval.001 | Embark party | port; shoreline where allowed; ships available | embark path exists for the enabled module set and retains party identity | unknown; no Missions.Naval project in bound tree / candidate |
-| naval.002 | Disembark party | port; landing; invalid location | accepted landing produces one authoritative land party | unknown; no Missions.Naval project in bound tree / candidate |
-| naval.003 | Naval campaign movement | sea route; destination; retreat | party movement and ship identity converge where naval opt-in is active | unknown; no Missions.Naval project in bound tree / candidate |
-| naval.004 | Naval encounter | hostile fleet; join ally; disengage | current encounter side and outcome agree for enabled naval support | unknown; no Missions.Naval project in bound tree / candidate |
-| naval.005 | Naval battle entry | ship selection; player/team ownership | players board the intended registered vessels | unknown; no Missions.Naval project in bound tree / candidate |
-| naval.006 | Ship movement | course; speed; collision | ship authority and observed movement agree | unknown; no Missions.Naval project in bound tree / candidate |
-| naval.007 | Boarding combat | board; repel; casualties | agents and roster casualties remain associated with correct parties | unknown; no Missions.Naval project in bound tree / candidate |
-| naval.008 | Naval projectile hit | ship; crew; water miss | impact/damage is applied once to the intended target | unknown; no Missions.Naval project in bound tree / candidate |
-| naval.009 | Naval disable/opt-in boundary | module absent; opt-in absent; enabled | unsupported launch/action is visible and not reported as tested support | unknown; no Missions.Naval project in bound tree / candidate |
+| naval.001 | Embark party | port; shoreline where allowed; ships available | embark path exists for the enabled module set and retains party identity | release-excluded: do not enable War Sails DLC (README.md:88); support planned; no Missions.Naval project in bound tree / candidate |
+| naval.002 | Disembark party | port; landing; invalid location | accepted landing produces one authoritative land party | release-excluded: do not enable War Sails DLC (README.md:88); support planned; no Missions.Naval project in bound tree / candidate |
+| naval.003 | Naval campaign movement | sea route; destination; retreat | party movement and ship identity converge where naval opt-in is active | release-excluded: do not enable War Sails DLC (README.md:88); support planned; no Missions.Naval project in bound tree / candidate |
+| naval.004 | Naval encounter | hostile fleet; join ally; disengage | current encounter side and outcome agree for enabled naval support | release-excluded: do not enable War Sails DLC (README.md:88); support planned; no Missions.Naval project in bound tree / candidate |
+| naval.005 | Naval battle entry | ship selection; player/team ownership | players board the intended registered vessels | release-excluded: do not enable War Sails DLC (README.md:88); support planned; no Missions.Naval project in bound tree / candidate |
+| naval.006 | Ship movement | course; speed; collision | ship authority and observed movement agree | release-excluded: do not enable War Sails DLC (README.md:88); support planned; no Missions.Naval project in bound tree / candidate |
+| naval.007 | Boarding combat | board; repel; casualties | agents and roster casualties remain associated with correct parties | release-excluded: do not enable War Sails DLC (README.md:88); support planned; no Missions.Naval project in bound tree / candidate |
+| naval.008 | Naval projectile hit | ship; crew; water miss | impact/damage is applied once to the intended target | release-excluded: do not enable War Sails DLC (README.md:88); support planned; no Missions.Naval project in bound tree / candidate |
+| naval.009 | Naval disable/opt-in boundary | module absent; opt-in absent; enabled | unsupported launch/action is visible and not reported as tested support | release-excluded: do not enable War Sails DLC (README.md:88); support planned; no Missions.Naval project in bound tree / candidate |
 
-Sources: [features/baseline/installed.json](../features/baseline/installed.json), [source/GameInterface/Services/MobileParties](../source/GameInterface/Services/MobileParties), [source/Missions](../source/Missions)
+Sources: [README.md](../README.md), [features/baseline/installed.json](../features/baseline/installed.json), [source/GameInterface/Services/MobileParties](../source/GameInterface/Services/MobileParties), [source/Missions](../source/Missions)
 
 ## ai
 
