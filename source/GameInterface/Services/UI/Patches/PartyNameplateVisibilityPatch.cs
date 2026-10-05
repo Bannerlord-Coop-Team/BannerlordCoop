@@ -48,6 +48,8 @@ internal class PartyNameplateVisibilityPatch
         if (party.Position.ToVec2().DistanceSquared(mainPartyPosition) > viewingDistanceSquared)
         {
             __instance._isVisibleOnMapBind = false;
+            // v1.5 nameplates also show a ship banner, which keeps the widget visible on its own.
+            __instance._isShipBannerVisibleBind = false;
         }
     }
 }

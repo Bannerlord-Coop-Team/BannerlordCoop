@@ -6,6 +6,7 @@ using Common.Util;
 using GameInterface.Serialization;
 using GameInterface.Serialization.External;
 using GameInterface.Services.Heroes.Data;
+using GameInterface.Services.MobileParties.Extensions;
 using GameInterface.Services.MobileParties;
 using GameInterface.Services.MobileParties.Patches;
 using GameInterface.Services.ObjectManager;

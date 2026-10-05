@@ -1,4 +1,5 @@
 using Common;
+using GameInterface.Services.MobileParties.Extensions;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Settlements;

@@ -10,18 +10,18 @@ using Xunit;
 namespace GameInterface.Tests.Services.MobileParties;
 
 /// <summary>
-/// Tests for the forced-spotted override. On the server (and when debug visibility is on) live
+/// Tests for the forced-spotted override (on the IsVisible getter since v1.5 removed IsSpotted). On the server (and when debug visibility is on) live
 /// parties are always spotted, but a destroyed party must read as unspotted, or the map nameplate
 /// machinery keeps re-creating its banner after the destruction replicates. Release clients keep
 /// whatever the native spotting logic computed.
 /// </summary>
 [Collection(ModInformationRoleCollection.Name)]
-public class PartyIsSpottedServerPatchTests : IDisposable
+public class PartyIsVisibleGetterServerPatchTests : IDisposable
 {
     private readonly bool wasServer;
     private readonly bool wasForceAllVisible;
 
-    public PartyIsSpottedServerPatchTests()
+    public PartyIsVisibleGetterServerPatchTests()
     {
         wasServer = ModInformation.IsServer;
         wasForceAllVisible = DebugPartyVisibility.ForceAllVisible;
@@ -44,7 +44,7 @@ public class PartyIsSpottedServerPatchTests : IDisposable
         ModInformation.IsServer = true;
 
         var result = false;
-        PartyIsSpottedServerPatch.Postfix(party, ref result);
+        PartyIsVisibleGetterServerPatch.Postfix(party, ref result);
 
         Assert.True(result);
     }
@@ -57,7 +57,7 @@ public class PartyIsSpottedServerPatchTests : IDisposable
         ModInformation.IsServer = true;
 
         var result = true;
-        PartyIsSpottedServerPatch.Postfix(party, ref result);
+        PartyIsVisibleGetterServerPatch.Postfix(party, ref result);
 
         Assert.False(result);
     }
@@ -70,11 +70,11 @@ public class PartyIsSpottedServerPatchTests : IDisposable
         ModInformation.IsServer = false;
 
         var unspotted = false;
-        PartyIsSpottedServerPatch.Postfix(party, ref unspotted);
+        PartyIsVisibleGetterServerPatch.Postfix(party, ref unspotted);
         Assert.False(unspotted);
 
         var spotted = true;
-        PartyIsSpottedServerPatch.Postfix(party, ref spotted);
+        PartyIsVisibleGetterServerPatch.Postfix(party, ref spotted);
         Assert.True(spotted);
     }
 
@@ -87,7 +87,7 @@ public class PartyIsSpottedServerPatchTests : IDisposable
         DebugPartyVisibility.ForceAllVisible = true;
 
         var result = false;
-        PartyIsSpottedServerPatch.Postfix(party, ref result);
+        PartyIsVisibleGetterServerPatch.Postfix(party, ref result);
 
         Assert.True(result);
     }

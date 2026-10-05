@@ -69,7 +69,7 @@ public sealed class HideoutTeleportCommand : IHideoutTeleportCommand
         if (!behaviorSnapshot.TryCreate(party, out var data))
             return new CoopCommandResult(false, "Unable to read the party's movement state.", "party_unavailable");
 
-        hideout.Hideout.IsSpotted = true;
+        hideout.IsVisible = true;
         data.PartyPosition = hideout.GatePosition;
         data.ForcePosition = true;
         data.IsCurrentlyAtSea = false;
