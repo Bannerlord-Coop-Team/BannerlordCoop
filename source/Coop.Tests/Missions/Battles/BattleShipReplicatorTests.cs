@@ -5,6 +5,7 @@ using Missions.Agents.Handlers;
 using Missions.Battles;
 using Missions.Messages;
 using Moq;
+using Newtonsoft.Json.Linq;
 using ProtoBuf;
 using System;
 using System.IO;
@@ -169,6 +170,19 @@ public class BattleShipReplicatorTests
         var final = new NetworkBattleRopeFinal(ship.ShipId, sender, new[] { rope });
 
         Assert.Equal(expected, BattleShipReplicator.ValidateFinalRopes(ship, Own, final));
+    }
+
+    [Fact]
+    public void Inspect_ReportsEachHullsHelmInput()
+    {
+        var harness = new Harness(committed: true);
+        harness.Engine.Setup(e => e.ReadInput(harness.OwnHull)).Returns(new BattleShipInput(1, 2, 0, -0.5f, 2));
+
+        var ship = JObject.FromObject(harness.Replicator.Inspect())["ships"]![0]!;
+
+        Assert.Equal(-0.5f, (float)ship["input"]!["Rudder"]!);
+        Assert.Equal(2, (int)ship["input"]!["RowerLongitudinal"]!);
+        Assert.Equal(2, (int)ship["input"]!["Sail"]!);
     }
 
     [Fact]

@@ -33,5 +33,8 @@ public class NavalMissionModule : Module
         builder.RegisterType<NavalInspectCoopCommand>()
             .As<ICoopCommand>()
             .InstancePerDependency();
+        builder.RegisterType<NavalRopeStatusCoopCommand>()
+            .As<ICoopCommand>()
+            .InstancePerDependency();
     }
 }

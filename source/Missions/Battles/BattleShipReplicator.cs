@@ -477,6 +477,7 @@ public class BattleShipReplicator : IBattleShipReplicator
                 team = ship.Formation?.Team?.TeamSide.ToString(),
                 bodyActive = engine.IsBodyActive(ship.Hull),
                 controller = engine.ControllerName(ship.Hull),
+                input = engine.ReadInput(ship.Hull),
                 sent = stream?.Sent ?? 0,
                 accepted = stream?.Accepted ?? 0,
                 applied = stream?.Applied ?? 0,
