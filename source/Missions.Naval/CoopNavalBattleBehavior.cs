@@ -29,6 +29,7 @@ public class CoopNavalBattleBehavior : MissionLogic
         CoopNavalMissionScope.IsActive = false;
         StationUseReplicator.Dispose();
         ShipReplicator.Dispose();
+        NavalRopes.Clear();
         NavalForeignHulls.Clear();
         NavalPlayerDeploymentSlot.Reset();
         base.OnEndMissionInternal();

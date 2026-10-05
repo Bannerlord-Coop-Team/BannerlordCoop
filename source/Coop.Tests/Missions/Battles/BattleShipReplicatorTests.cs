@@ -75,6 +75,103 @@ public class BattleShipReplicatorTests
     }
 
     [Fact]
+    public void ValidateSample_RejectsAnInvalidRopeSet()
+    {
+        var ship = new NetworkShipInfo(Guid.NewGuid(), Peer, null, false, CreateHull(), null);
+        long now = DateTime.UtcNow.Ticks;
+        var ropes = new[] { NavalRopesTests.Rope(1, BattleRopeState.RopesPulling), NavalRopesTests.Rope(2, BattleRopeState.Removed) };
+        var sample = new NetworkBattleShipSample(ship.ShipId, Peer, 1, now + TimeSpan.FromMilliseconds(500).Ticks,
+            NetworkBattleShipSample.FromFrame(MatrixFrame.Identity), default, ropes);
+
+        Assert.Equal("invalid_ropes", BattleShipReplicator.ValidateSample(ship, Own, sample, 0, now));
+    }
+
+    [Fact]
+    public void Tick_SendsTheOwnHullRopesWithEachSample()
+    {
+        var harness = new Harness(committed: true);
+        var ropes = new[] { NavalRopesTests.Rope(1, BattleRopeState.RopeThrown) };
+        harness.Engine.Setup(e => e.CaptureRopes(harness.OwnHull, It.IsAny<Func<MissionObject, Guid>>())).Returns(ropes);
+
+        harness.Replicator.Tick(0.1f);
+
+        harness.Network.Verify(n => n.SendAll(It.Is<IMessage>(m =>
+            m is NetworkBattleShipSample && ((NetworkBattleShipSample)m).Ropes == ropes)), Times.Once);
+    }
+
+    [Fact]
+    public void RopeTargets_ResolveTheLocalPlayersOwnHull()
+    {
+        var harness = new Harness(committed: true);
+        var copy = CreateHull();
+        var copyId = Guid.NewGuid();
+        harness.Registry.TryRegister(new NetworkShipInfo(copyId, Peer, "MapEventParty_2", false, copy, null));
+
+        // A peer's rope that hooked this client's hull targets it by the own hull's id.
+        Assert.Same(harness.OwnHull, harness.Replicator.HullOf(harness.OwnShipId));
+        Assert.Same(copy, harness.Replicator.HullOf(copyId));
+        Assert.Equal(harness.OwnShipId, harness.Replicator.ShipIdOf(harness.OwnHull));
+        Assert.Null(harness.Replicator.HullOf(Guid.NewGuid()));
+        Assert.Equal(Guid.Empty, harness.Replicator.ShipIdOf(CreateHull()));
+    }
+
+    [Fact]
+    public void MissionLeaving_SendsTheOwnHullsFinalRopes()
+    {
+        var harness = new Harness(committed: true);
+        var ropes = new[] { NavalRopesTests.Rope(2, BattleRopeState.BridgeConnected) };
+        harness.Engine.Setup(e => e.CaptureRopes(harness.OwnHull, It.IsAny<Func<MissionObject, Guid>>())).Returns(ropes);
+        harness.Replicator.Tick(0.1f);
+
+        harness.Broker.Publish(this, new BattleMissionLeaving("instance"));
+
+        harness.Network.Verify(n => n.SendAll(It.Is<IMessage>(m => m is NetworkBattleRopeFinal
+            && ((NetworkBattleRopeFinal)m).ShipId == harness.OwnShipId
+            && ((NetworkBattleRopeFinal)m).OwnerControllerId == Own
+            && ((NetworkBattleRopeFinal)m).Ropes == ropes)), Times.Once);
+    }
+
+    [Fact]
+    public void MissionLeaving_WithoutRopes_SendsNoFinalState()
+    {
+        var harness = new Harness(committed: true);
+        harness.Replicator.Tick(0.1f);
+
+        harness.Broker.Publish(this, new BattleMissionLeaving("instance"));
+
+        harness.Network.Verify(n => n.SendAll(It.Is<IMessage>(m => m is NetworkBattleRopeFinal)), Times.Never);
+    }
+
+    [Fact]
+    public void MissionLeaving_BeforeTheHullsWereAnnounced_SendsNoFinalState()
+    {
+        var harness = new Harness(committed: false);
+        harness.Engine.Setup(e => e.CaptureRopes(harness.OwnHull, It.IsAny<Func<MissionObject, Guid>>()))
+            .Returns(new[] { NavalRopesTests.Rope(1, BattleRopeState.RopeThrown) });
+        harness.Replicator.Tick(0.1f);
+
+        harness.Broker.Publish(this, new BattleMissionLeaving("instance"));
+
+        harness.Network.Verify(n => n.SendAll(It.IsAny<IMessage>()), Times.Never);
+    }
+
+    [Theory]
+    [InlineData(Peer, Peer, true, null)]
+    [InlineData(Peer, "someone_else", true, "not_authority")]
+    [InlineData(Own, Own, true, "own_hull")]
+    [InlineData(Peer, Peer, false, "invalid_ropes")]
+    public void ValidateFinalRopes_AcceptsOnlyTheHullAuthoritysValidRopes(string authority, string sender, bool valid, string expected)
+    {
+        var ship = new NetworkShipInfo(Guid.NewGuid(), authority, null, false, CreateHull(), null);
+        var rope = NavalRopesTests.Rope(3, BattleRopeState.Removed);
+        if (!valid) rope.Generation = 0;
+
+        var final = new NetworkBattleRopeFinal(ship.ShipId, sender, new[] { rope });
+
+        Assert.Equal(expected, BattleShipReplicator.ValidateFinalRopes(ship, Own, final));
+    }
+
+    [Fact]
     public void Sample_RoundTripsTheHelmInput()
     {
         var input = new BattleShipInput(1, 2, 0, -0.5f, 2);
@@ -124,16 +221,20 @@ public class BattleShipReplicatorTests
     private sealed class Harness
     {
         public Mock<IBattleNetwork> Network { get; } = new Mock<IBattleNetwork>();
+        public Mock<INavalShipEngine> Engine { get; } = new Mock<INavalShipEngine>();
+        public MessageBroker Broker { get; } = new MessageBroker();
+        public NetworkShipRegistry Registry { get; } = new NetworkShipRegistry();
+        public MissionObject OwnHull { get; } = CreateHull();
+        public Guid OwnShipId { get; } = Guid.NewGuid();
         public BattleShipReplicator Replicator { get; }
 
         public Harness(bool committed)
         {
-            var hull = CreateHull();
-            var registry = new NetworkShipRegistry();
-            registry.TryRegister(new NetworkShipInfo(Guid.NewGuid(), Own, "MapEventParty_1", false, hull, null));
+            var hull = OwnHull;
+            Registry.TryRegister(new NetworkShipInfo(OwnShipId, Own, "MapEventParty_1", false, hull, null));
 
             var component = new Mock<ICoopMissionComponent>();
-            component.SetupGet(c => c.ShipRegistry).Returns(registry);
+            component.SetupGet(c => c.ShipRegistry).Returns(Registry);
             component.SetupGet(c => c.AgentMovementHandler).Returns(Mock.Of<IAgentMovementHandler>());
 
             var session = new Mock<IBattleSession>();
@@ -143,7 +244,7 @@ public class BattleShipReplicatorTests
             var deployment = new Mock<IBattleDeploymentCoordinator>();
             deployment.SetupGet(d => d.IsCommitted).Returns(committed);
 
-            var engine = new Mock<INavalShipEngine>();
+            var engine = Engine;
             engine.SetupGet(e => e.Hulls).Returns(new[] { hull });
             engine.Setup(e => e.GetFrame(hull)).Returns(MatrixFrame.Identity);
             engine.Setup(e => e.Describe(hull, It.IsAny<NetworkShipInfo>())).Returns((MissionObject _, NetworkShipInfo info) =>
@@ -151,7 +252,7 @@ public class BattleShipReplicatorTests
                     0, NetworkBattleShipSample.FromFrame(MatrixFrame.Identity), "northern_light_ship", null, null, null, null,
                     100f, 50f, 1, ""));
 
-            Replicator = new BattleShipReplicator(Network.Object, new MessageBroker(), session.Object, deployment.Object,
+            Replicator = new BattleShipReplicator(Network.Object, Broker, session.Object, deployment.Object,
                 component.Object, engine.Object, Mock.Of<IBattleTeamResolver>(), Mock.Of<IObjectManager>());
         }
     }

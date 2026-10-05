@@ -16,8 +16,9 @@ namespace Missions.Battles;
 
 /// <summary>
 /// Replicates naval hulls over the mission mesh. Own hulls register when they spawn, are announced to peers at
-/// the first deployment commit and stream their frame at 20 Hz; other owners' hulls are spawned as kinematic
-/// copies and follow those frames.
+/// the first deployment commit and stream their frame, helm input and ropes at 20 Hz; other owners' hulls are
+/// spawned as kinematic copies and follow those samples. Ropes ride the samples because each one carries every
+/// station's generation-ordered state, so a later sample repairs a rejected one; leaving sends them once more.
 /// </summary>
 public interface IBattleShipReplicator : IDisposable
 {
@@ -29,6 +30,9 @@ public interface IBattleShipReplicator : IDisposable
 
     /// <summary>[Game thread] The registered hull an on-foot agent stands on and its hull-local position.</summary>
     bool TryGetDeckPose(Agent agent, Vec3 worldPosition, out Guid deckShip, out Vec3 deckLocal);
+
+    /// <summary>[Game thread] Rope state per throw station of every registered hull (diagnostics).</summary>
+    object InspectRopes();
 }
 
 /// <inheritdoc cref="IBattleShipReplicator"/>
@@ -56,8 +60,13 @@ public class BattleShipReplicator : IBattleShipReplicator
     private float sendElapsed;
     private float elapsed;
     private readonly Dictionary<Guid, DeckSpeedSample> deckSpeeds = new Dictionary<Guid, DeckSpeedSample>();
+    private long finalRopesSent, finalRopesAccepted, finalRopesRejected;
 
     private INetworkShipRegistry Registry => missionComponent.ShipRegistry;
+
+    internal Guid ShipIdOf(MissionObject hull) => Registry.TryGetByHull(hull, out var ship) ? ship.ShipId : Guid.Empty;
+
+    internal MissionObject HullOf(Guid shipId) => Registry.TryGet(shipId, out var ship) ? ship.Hull : null;
 
     public BattleShipReplicator(
         IBattleNetwork network,
@@ -83,6 +92,8 @@ public class BattleShipReplicator : IBattleShipReplicator
         messageBroker.Subscribe<NetworkSpawnBattleShips>(Handle_NetworkSpawnBattleShips);
         messageBroker.Subscribe<NetworkBattleShipSample>(Handle_NetworkBattleShipSample);
         messageBroker.Subscribe<NetworkMissionPeerEntered>(Handle_PeerEntered);
+        messageBroker.Subscribe<BattleMissionLeaving>(Handle_MissionLeaving);
+        messageBroker.Subscribe<NetworkBattleRopeFinal>(Handle_NetworkBattleRopeFinal);
     }
 
     public void Dispose()
@@ -92,6 +103,8 @@ public class BattleShipReplicator : IBattleShipReplicator
         messageBroker.Unsubscribe<NetworkSpawnBattleShips>(Handle_NetworkSpawnBattleShips);
         messageBroker.Unsubscribe<NetworkBattleShipSample>(Handle_NetworkBattleShipSample);
         messageBroker.Unsubscribe<NetworkMissionPeerEntered>(Handle_PeerEntered);
+        messageBroker.Unsubscribe<BattleMissionLeaving>(Handle_MissionLeaving);
+        messageBroker.Unsubscribe<NetworkBattleRopeFinal>(Handle_NetworkBattleRopeFinal);
     }
 
     // [Game thread] Published synchronously by the spawn postfix. Hulls this client fields go on PlayerTeam; the
@@ -167,8 +180,54 @@ public class BattleShipReplicator : IBattleShipReplicator
             var stream = GetStream(ship.ShipId);
             stream.Sent++;
             network.SendAll(new NetworkBattleShipSample(ship.ShipId, session.OwnControllerId, stream.Sent, deadline,
-                NetworkBattleShipSample.FromFrame(engine.GetFrame(ship.Hull)), engine.ReadInput(ship.Hull)));
+                NetworkBattleShipSample.FromFrame(engine.GetFrame(ship.Hull)), engine.ReadInput(ship.Hull),
+                engine.CaptureRopes(ship.Hull, ShipIdOf)));
         }
+    }
+
+    // [Game thread] Published by the battle controller before it stops the mesh; samples end here, so peers get the
+    // ropes' final state once more instead of keeping the last sample.
+    private void Handle_MissionLeaving(MessagePayload<BattleMissionLeaving> payload)
+    {
+        if (!spawnRecordsSent) return;
+
+        foreach (var ship in Registry.Ships.Where(IsOwnHull))
+        {
+            var ropes = engine.CaptureRopes(ship.Hull, ShipIdOf);
+            if (ropes == null || ropes.Length == 0) continue;
+
+            network.SendAll(new NetworkBattleRopeFinal(ship.ShipId, session.OwnControllerId, ropes));
+            finalRopesSent++;
+        }
+    }
+
+    private void Handle_NetworkBattleRopeFinal(MessagePayload<NetworkBattleRopeFinal> payload)
+    {
+        var final = payload.What;
+        GameThread.RunSafe(() => AcceptFinalRopes(final), context: nameof(Handle_NetworkBattleRopeFinal));
+    }
+
+    private void AcceptFinalRopes(NetworkBattleRopeFinal final)
+    {
+        if (Mission.Current == null || final == null) return;
+
+        if (!Registry.TryGet(final.ShipId, out var ship) || ValidateFinalRopes(ship, session.OwnControllerId, final) != null)
+        {
+            finalRopesRejected++;
+            return;
+        }
+
+        engine.ApplyRopes(ship.Hull, final.Ropes, HullOf, final: true);
+        finalRopesAccepted++;
+    }
+
+    /// <summary>Why a final rope state must be dropped, or null to apply it.</summary>
+    internal static string ValidateFinalRopes(NetworkShipInfo ship, string ownControllerId, NetworkBattleRopeFinal final)
+    {
+        if (ship.CurrentAuthority == ownControllerId) return "own_hull";
+        if (final.OwnerControllerId != ship.CurrentAuthority) return "not_authority";
+        if (final.Ropes == null || !BattleRopeState.AreValid(final.Ropes)) return "invalid_ropes";
+        return null;
     }
 
     private void Handle_NetworkSpawnBattleShips(MessagePayload<NetworkSpawnBattleShips> payload)
@@ -246,6 +305,7 @@ public class BattleShipReplicator : IBattleShipReplicator
         }
 
         engine.ApplyInput(ship.Hull, sample.Input);
+        engine.ApplyRopes(ship.Hull, sample.Ropes, HullOf, final: false);
         stream.Start = stream.HasWritten ? stream.Written : engine.GetFrame(ship.Hull);
         stream.Target = sample;
         stream.Accepted = sample.Sequence;
@@ -262,6 +322,7 @@ public class BattleShipReplicator : IBattleShipReplicator
         if (sample.DeadlineUtcTicks <= nowUtcTicks || sample.DeadlineUtcTicks > nowUtcTicks + SampleLifetimeTicks) return "expired";
         if (!sample.HasValidFrame) return "invalid_frame";
         if (!sample.Input.IsValid) return "invalid_input";
+        if (!BattleRopeState.AreValid(sample.Ropes)) return "invalid_ropes";
         return null;
     }
 
@@ -424,6 +485,14 @@ public class BattleShipReplicator : IBattleShipReplicator
                 streaming = stream?.Target != null,
             };
         }).ToArray(),
+    };
+
+    public object InspectRopes() => new
+    {
+        finalRopesSent,
+        finalRopesAccepted,
+        finalRopesRejected,
+        stations = engine.InspectRopes(Registry.Ships.Select(ship => ship.Hull).ToArray(), ShipIdOf),
     };
 
     private sealed class ShipStream

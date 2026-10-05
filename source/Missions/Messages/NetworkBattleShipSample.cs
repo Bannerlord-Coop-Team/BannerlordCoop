@@ -6,7 +6,7 @@ using TaleWorlds.Library;
 
 namespace Missions.Messages;
 
-/// <summary>Owner to peers over the mission mesh, 20 Hz: one owned hull's world frame.</summary>
+/// <summary>Owner to peers over the mission mesh, 20 Hz: one owned hull's world frame, helm input and ropes.</summary>
 [ProtoContract(SkipConstructor = true)]
 public sealed class NetworkBattleShipSample : IEvent
 {
@@ -19,10 +19,13 @@ public sealed class NetworkBattleShipSample : IEvent
     [ProtoMember(5)] public readonly float[] Frame;
     /// <summary>The hull's helm input, replayed on copies for oar and sail presentation.</summary>
     [ProtoMember(6)] public readonly BattleShipInput Input;
+    /// <summary>The hull's rope at every throw station that has thrown one, null when none has.</summary>
+    [ProtoMember(7)] public readonly BattleRopeState[] Ropes;
 
     public NetworkBattleShipSample(Guid shipId, string ownerControllerId, long sequence, long deadlineUtcTicks, float[] frame,
-        BattleShipInput input = default)
+        BattleShipInput input = default, BattleRopeState[] ropes = null)
     {
+        Ropes = ropes;
         ShipId = shipId;
         OwnerControllerId = ownerControllerId;
         Sequence = sequence;

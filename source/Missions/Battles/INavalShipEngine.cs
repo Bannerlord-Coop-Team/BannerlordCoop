@@ -1,4 +1,5 @@
 ﻿using Missions.Messages;
+using System;
 using System.Collections.Generic;
 using TaleWorlds.Library;
 using TaleWorlds.MountAndBlade;
@@ -58,4 +59,12 @@ public interface INavalShipEngine
     /// <summary>[Game thread] Re-targets a seated puppet at its station's user frame on the current hull frame.</summary>
     void PinToStation(Agent agent, UsableMissionObject point);
 
+    /// <summary>[Game thread] The ropes this client threw from an own hull, keyed by the registered ids of the hulls they target.</summary>
+    BattleRopeState[] CaptureRopes(MissionObject hull, Func<MissionObject, Guid> shipIdOf);
+
+    /// <summary>[Game thread] Replays another owner's ropes on its copied hull; <paramref name="final"/> lays them out once more for good.</summary>
+    void ApplyRopes(MissionObject hull, BattleRopeState[] ropes, Func<Guid, MissionObject> hullOf, bool final);
+
+    /// <summary>[Game thread] Rope state per throw station and the joint force counters (diagnostics).</summary>
+    object InspectRopes(IEnumerable<MissionObject> hulls, Func<MissionObject, Guid> shipIdOf);
 }

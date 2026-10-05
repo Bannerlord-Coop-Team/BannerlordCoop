@@ -23,6 +23,8 @@ namespace Missions.Naval;
 /// <inheritdoc cref="INavalShipEngine"/>
 public class NavalShipEngine : INavalShipEngine
 {
+    private const int MaxPathDepth = 16;
+
     private readonly ICoopShipSnapshotBuilder snapshotBuilder;
     private readonly IObjectManager objectManager;
 
@@ -159,7 +161,7 @@ public class NavalShipEngine : INavalShipEngine
         return null;
     }
 
-    private static bool IsOnPlank(Agent agent, ShipAttachmentMachine.ShipAttachment attachment)
+    internal static bool IsOnPlank(Agent agent, ShipAttachmentMachine.ShipAttachment attachment)
     {
         int face = agent.GetCurrentNavigationFaceId();
         if (attachment._navMeshBridge != null && face >= attachment._bridgeNavmeshId && face <= attachment._bridgeNavmeshId + 4)
@@ -184,50 +186,79 @@ public class NavalShipEngine : INavalShipEngine
         var shipsLogic = ShipsLogic;
         if (point == null || shipsLogic == null || !point.GameEntity.IsValid) return false;
 
-        // Named child paths are content identities, never process-local native pointers.
-        var parts = new List<string>();
         var entity = point.GameEntity;
-        while (entity.IsValid && parts.Count < 16)
+        for (int depth = 0; depth <= MaxPathDepth && entity.IsValid; depth++)
         {
             var ship = shipsLogic.AllShips.FirstOrDefault(candidate => candidate.GameEntity == entity);
             if (ship != null)
             {
-                parts.Reverse();
+                stationKey = EntityPath(point.GameEntity, ship.GameEntity);
+                if (stationKey == null) return false;
+
                 hull = ship;
-                stationKey = string.Join("/", parts);
                 pointIndex = point.GameEntity.GetScriptComponents<UsableMissionObject>().ToList().IndexOf(point);
                 return pointIndex >= 0;
             }
 
-            var parent = entity.Parent;
-            if (!parent.IsValid) return false;
-            int index = parent.GetChildren().ToList().IndexOf(entity);
-            if (index < 0) return false;
-            parts.Add(index.ToString(CultureInfo.InvariantCulture) + ":" + entity.Name);
-            entity = parent;
+            entity = entity.Parent;
         }
 
         return false;
     }
 
-    public UsableMissionObject ResolveStation(MissionObject hull, string stationKey, int pointIndex)
+    /// <summary>
+    /// The entity's indexed, named child path below <paramref name="hullEntity"/>, or null outside it. Named child
+    /// paths are content identities, never process-local native pointers.
+    /// </summary>
+    internal static string EntityPath(WeakGameEntity entity, WeakGameEntity hullEntity)
     {
-        var entity = ((MissionShip)hull).GameEntity;
-        if (!entity.IsValid || stationKey == null || pointIndex < 0) return null;
+        var parts = new List<string>();
+        while (entity.IsValid && parts.Count <= MaxPathDepth)
+        {
+            if (entity == hullEntity)
+            {
+                parts.Reverse();
+                return string.Join("/", parts);
+            }
 
-        foreach (var part in stationKey.Split(new[] { '/' }, StringSplitOptions.RemoveEmptyEntries))
+            var parent = entity.Parent;
+            if (!parent.IsValid) return null;
+            int index = parent.GetChildren().ToList().IndexOf(entity);
+            if (index < 0) return null;
+            parts.Add(index.ToString(CultureInfo.InvariantCulture) + ":" + entity.Name);
+            entity = parent;
+        }
+
+        return null;
+    }
+
+    /// <summary>The entity at <paramref name="path"/> below <paramref name="hullEntity"/>; invalid when it is not there.</summary>
+    internal static WeakGameEntity ResolvePath(WeakGameEntity hullEntity, string path)
+    {
+        var entity = hullEntity;
+        if (!entity.IsValid || path == null) return WeakGameEntity.Invalid;
+
+        foreach (var part in path.Split(new[] { '/' }, StringSplitOptions.RemoveEmptyEntries))
         {
             int separator = part.IndexOf(':');
             if (separator <= 0 || !int.TryParse(part.Substring(0, separator), NumberStyles.Integer, CultureInfo.InvariantCulture, out int index)
                 || index >= entity.ChildCount)
-                return null;
+                return WeakGameEntity.Invalid;
 
             var child = entity.GetChild(index);
-            if (!child.IsValid || child.Name != part.Substring(separator + 1)) return null;
+            if (!child.IsValid || child.Name != part.Substring(separator + 1)) return WeakGameEntity.Invalid;
             entity = child;
         }
 
-        return entity.GetScriptComponents<UsableMissionObject>().Skip(pointIndex).FirstOrDefault();
+        return entity;
+    }
+
+    public UsableMissionObject ResolveStation(MissionObject hull, string stationKey, int pointIndex)
+    {
+        if (pointIndex < 0) return null;
+
+        var entity = ResolvePath(((MissionShip)hull).GameEntity, stationKey);
+        return entity.IsValid ? entity.GetScriptComponents<UsableMissionObject>().Skip(pointIndex).FirstOrDefault() : null;
     }
 
     public void ApplyStationUse(Agent agent, UsableMissionObject point, bool inUse)
@@ -262,6 +293,15 @@ public class NavalShipEngine : INavalShipEngine
         var frame = point.GetUserFrameForAgent(agent);
         agent.SetTargetPositionAndDirection(frame.Origin.AsVec2, in frame.Rotation.f);
     }
+
+    public BattleRopeState[] CaptureRopes(MissionObject hull, Func<MissionObject, Guid> shipIdOf) =>
+        NavalRopes.Capture((MissionShip)hull, shipIdOf);
+
+    public void ApplyRopes(MissionObject hull, BattleRopeState[] ropes, Func<Guid, MissionObject> hullOf, bool final) =>
+        NavalRopes.Apply((MissionShip)hull, ropes, hullOf, final);
+
+    public object InspectRopes(IEnumerable<MissionObject> hulls, Func<MissionObject, Guid> shipIdOf) =>
+        NavalRopes.Inspect(hulls.OfType<MissionShip>(), shipIdOf);
 
     // The machine whose pilot point this is; the point entity sits at most a few levels below its machine.
     private static UsableMachine PilotMachineOf(UsableMissionObject point)

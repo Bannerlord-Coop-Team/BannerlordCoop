@@ -592,6 +592,7 @@ public class CoopBattleController : CoopMissionController
 
     protected override void OnLeaving()
     {
+        messageBroker.Publish(this, new BattleMissionLeaving(Session.InstanceId));
         damageRouter.FlushForMissionEnd();
 
         var missionResult = Mission.Current?.MissionResult;
