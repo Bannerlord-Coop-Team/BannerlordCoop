@@ -201,6 +201,9 @@ internal class TradeHandler : IHandler
                 boughtItems,
                 soldItems
             );
+
+            // Replacing InventoryLogic.DoneLogic means vanilla PlayerInventoryExchangeEvent never fires, so publish our own once the rosters are written
+            messageBroker.Publish(this, new PlayerInventoryExchangeApplied(hero));
         });
     }
 

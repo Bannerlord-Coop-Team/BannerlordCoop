@@ -2,12 +2,14 @@
 using Common.Logging;
 using Common.Messaging;
 using Common.Network;
+using GameInterface.Services.Inventory.Messages;
 using GameInterface.Services.Issues.Generic;
 using GameInterface.Services.Issues.Generic.Migrated.VillageNeedsCraftingMaterials;
 using GameInterface.Services.Issues.Messages;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Players;
 using Serilog;
+using System.Linq;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Issues;
 using TaleWorlds.Core;
@@ -44,6 +46,7 @@ internal class VillageNeedsCraftingMaterialsIssueHandler : IHandler
         messageBroker.Subscribe<NetworkVillageCraftingIssueCreated>(Handle_NetworkVillageCraftingIssueCreated);
         messageBroker.Subscribe<VillageCraftingProgressChanged>(Handle_VillageCraftingProgressChanged);
         messageBroker.Subscribe<NetworkVillageCraftingProgressChanged>(Handle_NetworkVillageCraftingProgressChanged);
+        messageBroker.Subscribe<PlayerInventoryExchangeApplied>(Handle_PlayerInventoryExchangeApplied);
     }
 
     public void Dispose()
@@ -52,6 +55,23 @@ internal class VillageNeedsCraftingMaterialsIssueHandler : IHandler
         messageBroker.Unsubscribe<NetworkVillageCraftingIssueCreated>(Handle_NetworkVillageCraftingIssueCreated);
         messageBroker.Unsubscribe<VillageCraftingProgressChanged>(Handle_VillageCraftingProgressChanged);
         messageBroker.Unsubscribe<NetworkVillageCraftingProgressChanged>(Handle_NetworkVillageCraftingProgressChanged);
+        messageBroker.Unsubscribe<PlayerInventoryExchangeApplied>(Handle_PlayerInventoryExchangeApplied);
+    }
+
+    private void Handle_PlayerInventoryExchangeApplied(MessagePayload<PlayerInventoryExchangeApplied> payload)
+    {
+        if (ModInformation.IsClient) return;
+        if (!objectManager.TryGetIdWithLogging(payload.What.Hero, out var heroId)) return;
+
+        foreach (var quest in Campaign.Current.QuestManager.Quests
+            .OfType<VillageNeedsCraftingMaterialsIssueBehavior.VillageNeedsCraftingMaterialsIssueQuest>().ToList())
+        {
+            if (!quest.IsOngoing || quest.QuestGiver.Issue?.IssueQuest != quest) continue;
+            if (!ownershipRegistry.TryGetOwnerControllerId(quest.QuestGiver, out var controllerId)) continue;
+            if (!playerManager.TryGetPlayer(controllerId, out var player) || player.HeroId != heroId) continue;
+
+            quest.UpdateQuestLog();
+        }
     }
 
     private void Handle_VillageCraftingProgressChanged(MessagePayload<VillageCraftingProgressChanged> payload)

@@ -3,6 +3,8 @@ using Common.Util;
 using E2E.Tests.Environment;
 using E2E.Tests.Environment.Instance;
 using GameInterface.Services.Entity;
+using GameInterface.Services.Inventory.Data;
+using GameInterface.Services.Inventory.Messages;
 using GameInterface.Services.Issues.Generic;
 using GameInterface.Services.Issues.Generic.AcceptMirror;
 using GameInterface.Services.Issues.Generic.Migrated.VillageNeedsCraftingMaterials;
@@ -2142,6 +2144,79 @@ public class VillageNeedsCraftingMaterialsIssueTests : IDisposable
                 client.Resolve<IMessageBroker>().Publish(Server.NetPeer,
                     new NetworkVillageCraftingProgressChanged(fixture.HeroId, generation - 1, 0));
                 Assert.Equal(requestedAmount, quest._playerAcceptedQuestLog.CurrentProgress);
+            });
+        }
+    }
+
+    [Fact]
+    public void CompletedInventoryExchange_RefreshesOnlyTheRecordedOwnersProgressOnEveryPeer_InBothDirections()
+    {
+        var fixture = SetupIssueOwner();
+        var ownerHeroId = CreateDistinctOwnerHero(fixture);
+        CreateIssueOnServer(fixture.HeroId);
+        ForcePromisedPaymentEverywhere(fixture.HeroId);
+        RegisterRefiningMaterialsEverywhere();
+        var partyId = AcceptQuestFromClient(fixture, "player-A", ownerHeroId);
+
+        string rosterId = null;
+        ItemObject requestedItem = null;
+        var requestedAmount = 0;
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject<Hero>(fixture.HeroId, out var giver));
+            Assert.True(Server.ObjectManager.TryGetObject<MobileParty>(partyId, out var party));
+            var quest = Assert.IsType<VillageNeedsCraftingMaterialsIssueBehavior.VillageNeedsCraftingMaterialsIssueQuest>(giver.Issue.IssueQuest);
+            requestedItem = quest._requestedItem;
+            requestedAmount = quest._requestedItemAmount;
+            Assert.True(requestedAmount > 0);
+            Assert.Equal(0, quest._playerAcceptedQuestLog.CurrentProgress);
+            Assert.True(Server.ObjectManager.TryGetId(party.ItemRoster, out rosterId));
+        });
+        var progressMessagesBefore = Server.NetworkSentMessages.GetMessages<NetworkVillageCraftingProgressChanged>().Count();
+
+        SendCompletedInventoryExchange(ownerHeroId, partyId, rosterId, new[] { new ItemRosterElement(requestedItem, requestedAmount, null) });
+        AssertCraftingProgressOnEveryPeer(fixture, requestedAmount, hasNeededItemsLog: true);
+
+        // An exchange by anyone but the recorded owner must not recount the owner's quest
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject<Hero>(fixture.HeroId, out var giver));
+            Assert.True(Server.ObjectManager.TryGetObject<MobileParty>(partyId, out var party));
+            using (new AllowedThread())
+            {
+                party.ItemRoster.AddToCounts(requestedItem, -requestedAmount);
+            }
+            Server.Resolve<IMessageBroker>().Publish(this, new PlayerInventoryExchangeApplied(giver));
+        });
+        AssertCraftingProgressOnEveryPeer(fixture, requestedAmount, hasNeededItemsLog: true);
+
+        SendCompletedInventoryExchange(ownerHeroId, partyId, rosterId, Array.Empty<ItemRosterElement>());
+        AssertCraftingProgressOnEveryPeer(fixture, 0, hasNeededItemsLog: false);
+        Assert.Equal(progressMessagesBefore + 2, Server.NetworkSentMessages.GetMessages<NetworkVillageCraftingProgressChanged>().Count());
+    }
+
+    private void SendCompletedInventoryExchange(string heroId, string partyId, string rosterId, ItemRosterElement[] rosterData)
+    {
+        Server.Call(() =>
+        {
+            Server.Resolve<IMessageBroker>().Publish(Client.NetPeer, new CompleteTrade(
+                null, true, rosterId, null, rosterData, new Dictionary<string, EquipmentData[]>(),
+                false, false, false, heroId, heroId, 0, 0, partyId, null, true, null,
+                Array.Empty<(ItemRosterElementData, int)>(), Array.Empty<(ItemRosterElementData, int)>()));
+        });
+    }
+
+    private void AssertCraftingProgressOnEveryPeer(CraftingFixture fixture, int progress, bool hasNeededItemsLog)
+    {
+        foreach (var instance in AllInstances)
+        {
+            instance.Call(() =>
+            {
+                Assert.True(instance.ObjectManager.TryGetObject<Hero>(fixture.HeroId, out var giver));
+                var quest = Assert.IsType<VillageNeedsCraftingMaterialsIssueBehavior.VillageNeedsCraftingMaterialsIssueQuest>(giver.Issue.IssueQuest);
+                Assert.True(quest.IsOngoing);
+                Assert.Equal(progress, quest._playerAcceptedQuestLog.CurrentProgress);
+                Assert.Equal(hasNeededItemsLog, quest._playerHasNeededItemsLog != null);
             });
         }
     }
