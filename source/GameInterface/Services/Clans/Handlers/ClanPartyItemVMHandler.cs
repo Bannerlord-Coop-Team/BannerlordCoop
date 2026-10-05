@@ -2,12 +2,15 @@
 using Common.Logging;
 using Common.Messaging;
 using Common.Network;
+using GameInterface.Services.Clans.Data;
 using GameInterface.Services.Clans.Messages;
+using GameInterface.Services.Heroes.Extensions;
 using GameInterface.Services.MobileParties.Extensions;
 using GameInterface.Services.ObjectManager;
 using Serilog;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Settlements;
+using TaleWorlds.CampaignSystem;
 
 namespace GameInterface.Services.Clans.Handlers;
 
@@ -28,8 +31,8 @@ internal class ClanPartyItemVMHandler : IHandler
         this.objectManager = objectManager;
         this.network = network;
 
-        messageBroker.Subscribe<PartyBehaviorUpdatedOnSelection>(Handle_PartyBehaviorUpdatedOnSelection);
-        messageBroker.Subscribe<UpdatePartyBehaviorOnSelection>(Handle_UpdatePartyBehaviorOnSelection);
+        messageBroker.Subscribe<PartyConfigurationChangedOnSelection>(Handle_PartyConfigurationChangedOnSelection);
+        messageBroker.Subscribe<UpdatePartyConfigurationOnSelection>(Handle_UpdatePartyConfigurationOnSelection);
         messageBroker.Subscribe<AutoRecruitChangedForSettlement>(Handle_AutoRecruitChangedForSettlement);
         messageBroker.Subscribe<ChangeAutoRecruitForSettlement>(Handle_ChangeAutoRecruitForSettlement);
         messageBroker.Subscribe<ChangeAutoRecruitForSettlementClients>(Handle_ChangeAutoRecruitForSettlementClients);
@@ -37,27 +40,27 @@ internal class ClanPartyItemVMHandler : IHandler
 
     public void Dispose()
     {
-        messageBroker.Unsubscribe<PartyBehaviorUpdatedOnSelection>(Handle_PartyBehaviorUpdatedOnSelection);
-        messageBroker.Unsubscribe<UpdatePartyBehaviorOnSelection>(Handle_UpdatePartyBehaviorOnSelection);
+        messageBroker.Unsubscribe<PartyConfigurationChangedOnSelection>(Handle_PartyConfigurationChangedOnSelection);
+        messageBroker.Unsubscribe<UpdatePartyConfigurationOnSelection>(Handle_UpdatePartyConfigurationOnSelection);
         messageBroker.Unsubscribe<AutoRecruitChangedForSettlement>(Handle_AutoRecruitChangedForSettlement);
         messageBroker.Unsubscribe<ChangeAutoRecruitForSettlement>(Handle_ChangeAutoRecruitForSettlement);
         messageBroker.Unsubscribe<ChangeAutoRecruitForSettlementClients>(Handle_ChangeAutoRecruitForSettlementClients);
     }
 
-    private void Handle_PartyBehaviorUpdatedOnSelection(MessagePayload<PartyBehaviorUpdatedOnSelection> obj)
+    private void Handle_PartyConfigurationChangedOnSelection(MessagePayload<PartyConfigurationChangedOnSelection> obj)
     {
-        if (!objectManager.TryGetIdWithLogging(obj.What.MobileParty, out var mobilePartyId)) return;
+        if (!objectManager.TryGetIdWithLogging(obj.What.Leader, out var leaderHeroId)) return;
 
-        network.SendAll(new UpdatePartyBehaviorOnSelection(mobilePartyId, obj.What.PartyObjective));
+        network.SendAll(new UpdatePartyConfigurationOnSelection(leaderHeroId, obj.What.Flag, obj.What.Value));
     }
 
-    private void Handle_UpdatePartyBehaviorOnSelection(MessagePayload<UpdatePartyBehaviorOnSelection> obj)
+    private void Handle_UpdatePartyConfigurationOnSelection(MessagePayload<UpdatePartyConfigurationOnSelection> obj)
     {
         GameThread.RunSafe(() =>
         {
-            if (!objectManager.TryGetObjectWithLogging<MobileParty>(obj.What.MobilePartyId, out var mobileParty)) return;
-            if (mobileParty.IsPlayerParty()) return;
-            mobileParty.SetPartyObjective(obj.What.PartyObjective);
+            if (!objectManager.TryGetObjectWithLogging<Hero>(obj.What.LeaderHeroId, out var leader)) return;
+            if (leader.IsPlayerHero()) return;
+            PartyConfigurationFlags.Set(leader, obj.What.Flag, obj.What.Value);
         });
     }
 

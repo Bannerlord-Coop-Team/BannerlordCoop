@@ -9,6 +9,7 @@ using HarmonyLib;
 using Moq;
 using System;
 using System.Collections.Generic;
+using TaleWorlds.CampaignSystem.ViewModelCollection.ClanManagement.ClanPartyItem;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.ViewModelCollection.ClanManagement;
@@ -165,7 +166,8 @@ public class ClanPartiesVMPatchesTests
 
     private static ClanPartyItemVM CreatePartyItem(MobileParty party)
     {
-        var item = ObjectHelper.SkipConstructor<ClanPartyItemVM>();
+        // v1.5 made ClanPartyItemVM abstract; an existing party's row is a ClanPartyItemWithPartyVM.
+        var item = ObjectHelper.SkipConstructor<ClanPartyItemWithPartyVM>();
         AccessTools.Field(typeof(ClanPartyItemVM), "<Party>k__BackingField").SetValue(item, party.Party);
         return item;
     }
