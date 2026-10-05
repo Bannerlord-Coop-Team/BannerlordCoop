@@ -145,6 +145,24 @@ public class BattleShipReplicatorTests
     }
 
     [Fact]
+    public void TransferNpcHulls_ToThisClient_RebindsTheShipToTheReplacementHull()
+    {
+        var harness = new Harness(committed: true);
+        var copy = CreateHull();
+        var fresh = CreateHull();
+        var ai = new NetworkShipInfo(Guid.NewGuid(), Peer, "MapEventParty_9", true, copy, null);
+        harness.Registry.TryRegister(ai);
+        harness.Engine.Setup(e => e.SetNpcHullAuthority(copy, true)).Returns(fresh);
+
+        harness.Replicator.TransferNpcHulls(Own);
+
+        Assert.True(harness.Registry.TryGet(ai.ShipId, out var ship));
+        Assert.Same(fresh, ship.Hull);
+        Assert.Equal(Own, ship.CurrentAuthority);
+        Assert.False(harness.Registry.TryGetByHull(copy, out _));
+    }
+
+    [Fact]
     public void TransferNpcHulls_AwayFromThisClient_HandsTheHullBackToSamples()
     {
         var harness = new Harness(committed: true);

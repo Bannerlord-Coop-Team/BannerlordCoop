@@ -13,6 +13,10 @@ public interface INetworkShipRegistry
     bool TryGet(Guid shipId, out NetworkShipInfo ship);
     bool TryGetByHull(MissionObject hull, out NetworkShipInfo ship);
     bool TryGetByFormation(Formation formation, out NetworkShipInfo ship);
+
+    /// <summary>Points <paramref name="shipId"/> at a replacement hull, keeping its identity, authority and party.</summary>
+    bool TryRebindHull(Guid shipId, MissionObject hull);
+
     bool Remove(Guid shipId);
 }
 
@@ -35,8 +39,10 @@ public class NetworkShipInfo
     public string OriginalOwner { get; }
     public string MapEventPartyId { get; }
     public bool IsNpcParty { get; }
-    public MissionObject Hull { get; }
+    public MissionObject Hull { get; private set; }
     public Formation Formation { get; }
+
+    internal void RebindHull(MissionObject hull) => Hull = hull;
 }
 
 /// <inheritdoc cref="INetworkShipRegistry"/>
@@ -68,6 +74,15 @@ public class NetworkShipRegistry : INetworkShipRegistry
     {
         ship = formation == null ? null : ships.Values.FirstOrDefault(entry => ReferenceEquals(entry.Formation, formation));
         return ship != null;
+    }
+
+    public bool TryRebindHull(Guid shipId, MissionObject hull)
+    {
+        if (hull == null || !ships.TryGetValue(shipId, out var ship)) return false;
+        if (TryGetByHull(hull, out var other) && other != ship) return false;
+
+        ship.RebindHull(hull);
+        return true;
     }
 
     public bool Remove(Guid shipId) => ships.Remove(shipId);

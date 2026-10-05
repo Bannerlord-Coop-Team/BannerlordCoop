@@ -90,21 +90,62 @@ public class NavalShipEngine : INavalShipEngine
         return ship;
     }
 
-    public void SetNpcHullAuthority(MissionObject hull, bool owned)
+    public MissionObject SetNpcHullAuthority(MissionObject hull, bool owned)
     {
         var ship = (MissionShip)hull;
-        var entity = ship.GameEntity;
-        if (owned)
-        {
-            NavalForeignHulls.Remove(ship);
-            if (entity.IsValid) entity.EnableDynamicBody();
-            ship.SetController(ShipControllerType.AI);
-            return;
-        }
+        if (owned) return ReplaceCopyWithSimulatedHull(ship);
 
         NavalForeignHulls.Add(ship);
         ship.SetController(ShipControllerType.None, autoUpdateController: false);
-        if (entity.IsValid) entity.DisableDynamicBodySimulation();
+        if (ship.GameEntity.IsValid) ship.GameEntity.DisableDynamicBodySimulation();
+        return ship;
+    }
+
+    // EnableDynamicBody does not undo DisableDynamicBodySimulation (live: the body stayed inactive), and the engine has
+    // no other inverse, so the copy is swapped for a hull spawned the way the host spawned it.
+    private static MissionShip ReplaceCopyWithSimulatedHull(MissionShip copy)
+    {
+        var mission = Mission.Current;
+        var shipsLogic = ShipsLogic;
+        var agentsLogic = mission?.GetMissionBehavior<NavalAgentsLogic>();
+        var formation = copy.Formation;
+        var team = copy.Team;
+        if (shipsLogic == null || agentsLogic == null || formation == null || team == null || !copy.GameEntity.IsValid)
+            return copy;
+
+        var origin = copy.ShipOrigin;
+        var frame = copy.GlobalFrame;
+        var crew = mission.Agents.Where(agent => agent.IsActive() && agent.IsHuman && agent.Formation == formation).ToList();
+
+        // Nobody may stay on a machine of the hull that is about to be removed, nor be tracked as its crew.
+        foreach (var agent in mission.Agents)
+        {
+            if (agent.IsActive() && agent.CurrentlyUsedGameObject is UsableMissionObject used
+                && used.GameEntity.IsValid && used.GameEntity.Root == copy.GameEntity)
+                agent.StopUsingGameObject(isSuccessful: true, Agent.StopUsingGameObjectFlags.None);
+        }
+
+        foreach (var agent in crew)
+        {
+            if (agentsLogic.IsAgentOnAnyShip(agent, out var onShip) && onShip == copy)
+                agentsLogic.RemoveAgentFromShip(agent, copy);
+        }
+
+        NavalForeignHulls.Remove(copy);
+        shipsLogic.RemoveShip(copy);
+
+        var fresh = shipsLogic.SpawnShip(origin, in frame, team, formation, spawnAnchored: false, checkForFreeArea: false);
+        fresh.SetController(ShipControllerType.AI);
+        formation.SetControlledByAI(true);
+
+        // The adopted crew become the new hull's crew; vanilla seats the helm and oars and moves them onto its deck.
+        foreach (var agent in crew)
+        {
+            if (agent.IsActive()) agentsLogic.AddAgentToShip(agent, fresh);
+        }
+
+        agentsLogic.AssignAndTeleportCrewToShipMachines(fresh);
+        return fresh;
     }
 
     public bool HasHelmPilot(MissionObject hull) => ((MissionShip)hull).ShipControllerMachine?.PilotAgent != null;

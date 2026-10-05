@@ -60,10 +60,12 @@ public interface INavalShipEngine
     void PinToStation(Agent agent, UsableMissionObject point);
 
     /// <summary>
-    /// [Game thread] Hands an AI (NPC) hull's simulation to this client or away from it: an owned hull gets an active
-    /// body and the AI controller, a foreign one a kinematic body following its owner's samples and no controller.
+    /// [Game thread] Hands an AI (NPC) hull's simulation to this client or away from it. Released, the hull becomes a
+    /// kinematic copy following its owner's samples. Taken over, a copy is replaced by a fresh simulated hull of the same
+    /// ship at the same frame under the AI controller, crewed by its formation's agents, because a copy's body cannot
+    /// be re-activated. Returns the hull that now stands for the ship.
     /// </summary>
-    void SetNpcHullAuthority(MissionObject hull, bool owned);
+    MissionObject SetNpcHullAuthority(MissionObject hull, bool owned);
 
     /// <summary>Whether an agent is seated at the hull's helm (diagnostics).</summary>
     bool HasHelmPilot(MissionObject hull);

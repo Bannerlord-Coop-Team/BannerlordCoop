@@ -167,7 +167,12 @@ public class BattleShipReplicator : IBattleShipReplicator
             bool wasOwn = IsOwnHull(ship);
             ship.CurrentAuthority = newHost;
             bool isOwn = IsOwnHull(ship);
-            if (wasOwn != isOwn) engine.SetNpcHullAuthority(ship.Hull, isOwn);
+            if (wasOwn != isOwn)
+            {
+                var hull = engine.SetNpcHullAuthority(ship.Hull, isOwn);
+                if (hull != null && !ReferenceEquals(hull, ship.Hull) && !Registry.TryRebindHull(ship.ShipId, hull))
+                    Logger.Error("[NavalSync] Could not rebind AI hull {ShipId} to its replacement", ship.ShipId);
+            }
 
             // The old owner's interpolation target must not keep writing frames to a hull this client now simulates.
             var stream = GetStream(ship.ShipId);
