@@ -222,7 +222,7 @@ public class FoodConsumptionBehaviorInterface : IFoodConsumptionBehaviorInterfac
     {
         GameThread.RunSafe(() =>
         {
-            if (MBRandom.RandomFloat < DefaultPerks.Riding.Breeder.PrimaryBonus && !mobileParty.IsCurrentlyAtSea && mobileParty.HasPerk(DefaultPerks.Riding.Breeder, false) && (mobileParty.ItemRoster.NumberOfLivestockAnimals > 1 || mobileParty.ItemRoster.NumberOfPackAnimals > 1 || mobileParty.ItemRoster.NumberOfMounts > 1))
+            if (MBRandom.RandomFloat < DefaultPerks.Riding.Breeder.PrimaryBonus && mobileParty.HasPerk(DefaultPerks.Riding.Breeder, out _) && (mobileParty.ItemRoster.NumberOfLivestockAnimals > 1 || mobileParty.ItemRoster.NumberOfPackAnimals > 1 || mobileParty.ItemRoster.NumberOfMounts > 1))
             {
                 int numberOfAnimalsInParty = mobileParty.ItemRoster.NumberOfLivestockAnimals + mobileParty.ItemRoster.NumberOfPackAnimals + mobileParty.ItemRoster.NumberOfMounts;
                 ItemRosterElement randomAnimal = mobileParty.ItemRoster.GetRandomElementWithPredicate((ItemRosterElement x) => x.EquipmentElement.Item.HasHorseComponent);

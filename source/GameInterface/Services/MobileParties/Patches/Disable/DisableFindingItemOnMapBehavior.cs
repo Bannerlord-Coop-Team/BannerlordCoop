@@ -26,7 +26,7 @@ internal class FindingItemOnMapBehaviorPatches
     [HarmonyPrefix]
     public static bool DailyTickPartyPrefix(FindingItemOnMapBehavior __instance, MobileParty party)
     {
-        if (MBRandom.RandomFloat < DefaultPerks.Scouting.BeastWhisperer.PrimaryBonus && party.HasPerk(DefaultPerks.Scouting.BeastWhisperer, false))
+        if (MBRandom.RandomFloat < DefaultPerks.Scouting.BeastWhisperer.PrimaryBonus && party.HasPerk(DefaultPerks.Scouting.BeastWhisperer, out _))
         {
             TerrainType faceTerrainType = Campaign.Current.MapSceneWrapper.GetFaceTerrainType(party.CurrentNavigationFace);
             if (faceTerrainType == TerrainType.Steppe || faceTerrainType == TerrainType.Plain)

@@ -3,9 +3,11 @@ using Common.Messaging;
 using GameInterface.Services.MobileParties.Handlers;
 using GameInterface.Services.MobileParties.Messages;
 using HarmonyLib;
+using Helpers;
 using System.Collections.Generic;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.CampaignBehaviors;
+using TaleWorlds.CampaignSystem.CharacterDevelopment;
 using TaleWorlds.CampaignSystem.Encounters;
 using TaleWorlds.CampaignSystem.GameMenus;
 using TaleWorlds.CampaignSystem.Party;
@@ -145,7 +147,8 @@ internal class RecruitmentCampaignBehaviorPatch
         if (unitPrice <= 0)
             return false;
 
-        int count = GetMercenaryHireCount(selectedMercenaryCount, mercenaryData.Number, Hero.MainHero.Gold, unitPrice);
+        int hireLimit = GetMercenaryHireLimit(Hero.MainHero, mercenaryData.Number);
+        int count = GetMercenaryHireCount(selectedMercenaryCount, hireLimit, Hero.MainHero.Gold, unitPrice);
         if (count <= 0)
             return false;
 
@@ -170,6 +173,18 @@ internal class RecruitmentCampaignBehaviorPatch
     internal static bool IsMercenaryStockChanged(CharacterObject previousTroopType, int previousNumber, CharacterObject currentTroopType, int currentNumber)
     {
         return previousTroopType != currentTroopType || previousNumber != currentNumber;
+    }
+
+    /// <summary>
+    /// The most mercenaries <paramref name="hero"/> may hire from a town stock of
+    /// <paramref name="availableMercenaries"/>. v1.5 lets a generous hero hire beyond the stock
+    /// (Generosity mercenary recruitment trait effect), as the vanilla menu and tavern dialog do.
+    /// </summary>
+    internal static int GetMercenaryHireLimit(Hero hero, int availableMercenaries)
+    {
+        var limit = new ExplainedNumber(availableMercenaries);
+        TraitEffectHelper.ApplyTraitEffect(hero, DefaultPersonalityTraitEffects.GenerosityMercenaryRecruitmentEffect, ref limit);
+        return limit.RoundedResultNumber;
     }
 
     internal static int GetMercenaryHireCount(int selectedMercenaryCount, int availableMercenaries, int heroGold, int unitPrice)

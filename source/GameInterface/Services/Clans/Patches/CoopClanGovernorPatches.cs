@@ -110,6 +110,28 @@ internal class CoopClanGovernorPatches
     public static IEnumerable<CodeInstruction> GovernorConstructionTranspiler(IEnumerable<CodeInstruction> instructions)
         => GovernorBonusTranspiler(instructions);
 
+    // v1.5 personality trait effects that apply only while the governor is in town. Each of these
+    // methods reads CurrentSettlement once, on the governor.
+    [HarmonyPatch(typeof(DefaultBuildingConstructionModel), nameof(DefaultBuildingConstructionModel.GetBoostCost))]
+    [HarmonyTranspiler]
+    public static IEnumerable<CodeInstruction> GovernorBoostCostTranspiler(IEnumerable<CodeInstruction> instructions)
+        => GovernorBonusTranspiler(instructions);
+
+    [HarmonyPatch(typeof(DefaultSettlementFoodModel), nameof(DefaultSettlementFoodModel.CalculateTownFoodChangeInternal))]
+    [HarmonyTranspiler]
+    public static IEnumerable<CodeInstruction> GovernorFoodTranspiler(IEnumerable<CodeInstruction> instructions)
+        => GovernorBonusTranspiler(instructions);
+
+    [HarmonyPatch(typeof(DefaultSettlementLoyaltyModel), nameof(DefaultSettlementLoyaltyModel.CalculateLoyaltyChangeInternal))]
+    [HarmonyTranspiler]
+    public static IEnumerable<CodeInstruction> GovernorLoyaltyTranspiler(IEnumerable<CodeInstruction> instructions)
+        => GovernorBonusTranspiler(instructions);
+
+    [HarmonyPatch(typeof(DefaultWorkshopModel), nameof(DefaultWorkshopModel.GetEffectiveConversionSpeedOfProduction))]
+    [HarmonyTranspiler]
+    public static IEnumerable<CodeInstruction> GovernorWorkshopTranspiler(IEnumerable<CodeInstruction> instructions)
+        => GovernorBonusTranspiler(instructions);
+
     private static Settlement GetGovernorSettlement(Hero hero)
         => hero.IsPlayerHero() && hero.GovernorOf != null ? hero.GovernorOf.Settlement : hero.CurrentSettlement;
 }

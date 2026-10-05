@@ -48,28 +48,27 @@ internal class MobilePartyTrainingBehaviorPatches
         {
             if (mobileParty.IsCurrentlyAtSea)
             {
-                SkillLevelingManager.OnTravelOnWater(mobileParty, mobileParty._lastCalculatedSpeed);
-                return false;
-            }
-            using (List<TroopRosterElement>.Enumerator enumerator = mobileParty.MemberRoster.GetTroopRoster().GetEnumerator())
-            {
-                while (enumerator.MoveNext())
+                if (!mobileParty.IsInNavalAutoTravel)
                 {
-                    TroopRosterElement troopRosterElement = enumerator.Current;
-                    if (troopRosterElement.Character.IsHero)
-                    {
-                        if (troopRosterElement.Character.Equipment.Horse.IsEmpty)
-                        {
-                            SkillLevelingManager.OnTravelOnFoot(troopRosterElement.Character.HeroObject, mobileParty._lastCalculatedSpeed);
-                        }
-                        else
-                        {
-                            SkillLevelingManager.OnTravelOnHorse(troopRosterElement.Character.HeroObject, mobileParty._lastCalculatedSpeed);
-                        }
-                    }
+                    SkillLevelingManager.OnTravelOnWater(mobileParty);
                 }
                 return false;
             }
+            foreach (TroopRosterElement troopRosterElement in mobileParty.MemberRoster.GetTroopRoster())
+            {
+                if (troopRosterElement.Character.IsHero)
+                {
+                    if (troopRosterElement.Character.Equipment.Horse.IsEmpty)
+                    {
+                        SkillLevelingManager.OnTravelOnFoot(troopRosterElement.Character.HeroObject);
+                    }
+                    else
+                    {
+                        SkillLevelingManager.OnTravelOnHorse(troopRosterElement.Character.HeroObject);
+                    }
+                }
+            }
+            return false;
         }
 
         return true;

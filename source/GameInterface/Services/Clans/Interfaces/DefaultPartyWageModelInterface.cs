@@ -1,11 +1,10 @@
-﻿using GameInterface.Services.Clans.Extensions;
+using GameInterface.Services.Clans.Extensions;
 using GameInterface.Services.Heroes.Extensions;
 using GameInterface.Services.MobileParties.Extensions;
 using Helpers;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.CharacterDevelopment;
 using TaleWorlds.CampaignSystem.GameComponents;
-using TaleWorlds.CampaignSystem.MapEvents;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Roster;
 using TaleWorlds.CampaignSystem.Settlements;
@@ -37,6 +36,7 @@ public class DefaultPartyWageModelInterface : IDefaultPartyWageModelInterface
         int banditsWage = 0;
         int caravanGuardsWage = 0;
         int mercenariesWage = 0;
+        bool hasAidCorps = mobileParty.HasPerk(DefaultPerks.Steward.AidCorps, out _);
         for (int i = 0; i < troopRoster.Count; i++)
         {
             var elementCopyAtIndex = troopRoster.GetElementCopyAtIndex(i);
@@ -65,7 +65,6 @@ public class DefaultPartyWageModelInterface : IDefaultPartyWageModelInterface
             else
             {
                 // Actually apply Aid Corps bonus. Vanilla's implementation doesn't do anything
-                bool hasAidCorps = mobileParty.HasPerk(DefaultPerks.Steward.AidCorps, false);
                 int numberOfTroopsToPayWages = elementCopyAtIndex.Number - (hasAidCorps ? elementCopyAtIndex.WoundedNumber : 0);
 
                 int totalWageForTroopType = character.TroopWage * numberOfTroopsToPayWages;
@@ -86,14 +85,14 @@ public class DefaultPartyWageModelInterface : IDefaultPartyWageModelInterface
         {
             totalWage -= banditsWage;
             var banditBonus = new ExplainedNumber((float)banditsWage, false, null);
-            PerkHelper.AddPerkBonusForCharacter(DefaultPerks.Roguery.DeepPockets, mobileParty.LeaderHero.CharacterObject, false, ref banditBonus, false);
+            PerkHelper.AddPerkBonusForCharacter(DefaultPerks.Roguery.DeepPockets, mobileParty.CurrentBattleEnvironment, mobileParty.LeaderHero.CharacterObject, false, ref banditBonus);
             totalWage += (int)banditBonus.ResultNumber;
         }
         if (eliteArchersWage > 0)
         {
             totalWage -= eliteArchersWage;
             var eliteArcherBonus = new ExplainedNumber((float)eliteArchersWage, false, null);
-            PerkHelper.AddPerkBonusForParty(DefaultPerks.Crossbow.PickedShots, mobileParty, true, ref eliteArcherBonus, mobileParty.IsCurrentlyAtSea);
+            PerkHelper.AddPerkBonusForParty(DefaultPerks.Crossbow.PickedShots, mobileParty, true, ref eliteArcherBonus);
             totalWage += (int)eliteArcherBonus.ResultNumber;
         }
 
@@ -103,16 +102,17 @@ public class DefaultPartyWageModelInterface : IDefaultPartyWageModelInterface
         var buildingEffects = new ExplainedNumber(1f, false, null);
         HandleGarrisonParty(__instance, mobileParty, infantryWage, archersWage, cavalryWage, ref result, ref buildingEffects);
 
+        var leaderClan = mobileParty.LeaderHero?.Clan;
+        var militaryCoronaeValue = (leaderClan?.Kingdom != null && !leaderClan.IsUnderMercenaryService && leaderClan.Kingdom.ActivePolicies.Contains(DefaultPolicies.MilitaryCoronae)) ? 0.1f : 0f;
+
         AddPerkFactor(mobileParty, DefaultPerks.Trade.SwordForBarter, caravanGuardsWage, true, ref result);
         AddPerkFactor(mobileParty, DefaultPerks.Steward.Contractors, mercenariesWage, false, ref result);
         AddPerkFactor(mobileParty, DefaultPerks.Trade.MercenaryConnections, mercenariesWage, true, ref result);
 
-        var leaderClan = mobileParty.LeaderHero?.Clan;
-        var militaryCoronaeValue = (leaderClan?.Kingdom != null && !leaderClan.IsUnderMercenaryService && leaderClan.Kingdom.ActivePolicies.Contains(DefaultPolicies.MilitaryCoronae)) ? 0.1f : 0f;
         result.AddFactor(militaryCoronaeValue, DefaultPolicies.MilitaryCoronae.Name);
         result.AddFactor(buildingEffects.ResultNumber - 1f, __instance._buildingEffects);
 
-        AddOtherFactors(__instance, mobileParty, ref result);
+        AddOtherFactors(mobileParty, ref result);
 
         return result;
     }
@@ -133,9 +133,9 @@ public class DefaultPartyWageModelInterface : IDefaultPartyWageModelInterface
         {
             if (mobileParty.CurrentSettlement.IsFortification)
             {
-                PerkHelper.AddPerkBonusForTown(DefaultPerks.OneHanded.MilitaryTradition, mobileParty.CurrentSettlement.Town, ref result);
-                PerkHelper.AddPerkBonusForTown(DefaultPerks.TwoHanded.Berserker, mobileParty.CurrentSettlement.Town, ref result);
-                PerkHelper.AddPerkBonusForTown(DefaultPerks.Steward.DrillSergant, mobileParty.CurrentSettlement.Town, ref result);
+                PerkHelper.AddPerkBonusForTown(DefaultPerks.OneHanded.MilitaryTradition, mobileParty.CurrentSettlement.Town, false, ref result);
+                PerkHelper.AddPerkBonusForTown(DefaultPerks.TwoHanded.Berserker, mobileParty.CurrentSettlement.Town, false, ref result);
+                PerkHelper.AddPerkBonusForTown(DefaultPerks.Steward.DrillSergant, mobileParty.CurrentSettlement.Town, false, ref result);
                 float troopRatio = (float)infantryWage / result.BaseNumber;
                 __instance.CalculatePartialGarrisonWageReduction(troopRatio, mobileParty, DefaultPerks.Polearm.StandardBearer, ref result, true);
                 float troopRatio2 = (float)archersWage / result.BaseNumber;
@@ -145,20 +145,17 @@ public class DefaultPartyWageModelInterface : IDefaultPartyWageModelInterface
             }
             if (mobileParty.CurrentSettlement.IsCastle)
             {
-                PerkHelper.AddPerkBonusForTown(DefaultPerks.Bow.HunterClan, mobileParty.CurrentSettlement.Town, ref result);
-                PerkHelper.AddPerkBonusForTown(DefaultPerks.Steward.StiffUpperLip, mobileParty.CurrentSettlement.Town, ref result);
+                PerkHelper.AddPerkBonusForTown(DefaultPerks.Bow.HunterClan, mobileParty.CurrentSettlement.Town, false, ref result);
+                PerkHelper.AddPerkBonusForTown(DefaultPerks.Steward.StiffUpperLip, mobileParty.CurrentSettlement.Town, false, ref result);
             }
-            if (mobileParty.CurrentSettlement.Owner.Culture.HasFeat(DefaultCulturalFeats.EmpireGarrisonWageFeat))
-            {
-                result.AddFactor(DefaultCulturalFeats.EmpireGarrisonWageFeat.EffectBonus, __instance._cultureText);
-            }
+            FeatHelper.ApplyCultureFeat(mobileParty.CurrentSettlement.Owner.Culture, DefaultCulturalFeats.EmpireGarrisonWageFeat, ref result);
             mobileParty.CurrentSettlement.Town.AddEffectOfBuildings(BuildingEffectEnum.GarrisonWageReduction, ref buildingEffects);
         }
     }
 
     private void AddPerkFactor(MobileParty mobileParty, PerkObject perk, int numTroops, bool checkSecondaryBonus, ref ExplainedNumber result)
     {
-        if (mobileParty.HasPerk(perk, checkSecondaryBonus))
+        if (mobileParty.HasPerk(perk, out _, checkSecondaryBonus))
         {
             float factor = (float)numTroops / result.BaseNumber;
             if (factor > 0f)
@@ -169,31 +166,37 @@ public class DefaultPartyWageModelInterface : IDefaultPartyWageModelInterface
         }
     }
 
-    private void AddOtherFactors(DefaultPartyWageModel __instance, MobileParty mobileParty, ref ExplainedNumber result)
+    private void AddOtherFactors(MobileParty mobileParty, ref ExplainedNumber result)
     {
-        if (PartyBaseHelper.HasFeat(mobileParty.Party, DefaultCulturalFeats.AseraiIncreasedWageFeat))
-        {
-            result.AddFactor(DefaultCulturalFeats.AseraiIncreasedWageFeat.EffectBonus, __instance._cultureText);
-        }
-        if (!mobileParty.IsCurrentlyAtSea && mobileParty.HasPerk(DefaultPerks.Steward.Frugal, false))
-        {
-            result.AddFactor(DefaultPerks.Steward.Frugal.PrimaryBonus, DefaultPerks.Steward.Frugal.Name);
-        }
+        FeatHelper.ApplyCultureFeat(mobileParty.Party, DefaultCulturalFeats.AseraiIncreasedWageFeat, ref result);
+        PerkHelper.AddPerkBonusForParty(DefaultPerks.Steward.Frugal, mobileParty, true, ref result);
         if (mobileParty.Army != null)
         {
-            PerkHelper.AddPerkBonusForParty(DefaultPerks.Steward.EfficientCampaigner, mobileParty, false, ref result, mobileParty.IsCurrentlyAtSea);
+            PerkHelper.AddPerkBonusForParty(DefaultPerks.Steward.EfficientCampaigner, mobileParty, false, ref result);
         }
-        if (mobileParty.SiegeEvent != null && mobileParty.SiegeEvent.BesiegerCamp.HasInvolvedPartyForEventType(mobileParty.Party, MapEvent.BattleTypes.Siege) && mobileParty.HasPerk(DefaultPerks.Steward.MasterOfWarcraft, false))
+        if (mobileParty.SiegeEvent != null && mobileParty.SiegeEvent.BesiegerCamp.HasInvolvedPartyForEventType(mobileParty.Party))
         {
-            result.AddFactor(DefaultPerks.Steward.MasterOfWarcraft.PrimaryBonus, DefaultPerks.Steward.MasterOfWarcraft.Name);
+            PerkHelper.AddPerkBonusForParty(DefaultPerks.Steward.MasterOfWarcraft, mobileParty, true, ref result);
         }
         if (mobileParty.EffectiveQuartermaster != null)
         {
-            PerkHelper.AddEpicPerkBonusForCharacter(DefaultPerks.Steward.PriceOfLoyalty, mobileParty.EffectiveQuartermaster.CharacterObject, DefaultSkills.Steward, true, ref result, Campaign.Current.Models.CharacterDevelopmentModel.MaxSkillRequiredForEpicPerkBonus, false);
+            PerkHelper.AddEpicPerkBonusForCharacter(DefaultPerks.Steward.PriceOfLoyalty, mobileParty.CurrentBattleEnvironment, mobileParty.EffectiveQuartermaster.CharacterObject, DefaultSkills.Steward, true, ref result, Campaign.Current.Models.CharacterDevelopmentModel.MaxSkillRequiredForEpicPerkBonus);
         }
-        if (mobileParty.CurrentSettlement != null && mobileParty.LeaderHero != null && mobileParty.LeaderHero.GetPerkValue(DefaultPerks.Trade.ContentTrades))
+        if (mobileParty.CurrentSettlement != null)
         {
-            result.AddFactor(DefaultPerks.Trade.ContentTrades.SecondaryBonus, DefaultPerks.Trade.ContentTrades.Name);
+            PerkHelper.AddPerkBonusForParty(DefaultPerks.Trade.ContentTrades, mobileParty, false, ref result);
+        }
+        if (mobileParty.LeaderHero != null)
+        {
+            TraitEffectHelper.ApplyTraitEffect(mobileParty.LeaderHero, DefaultPersonalityTraitEffects.GenerosityUpkeepReductionEffect, ref result);
+        }
+        else if (mobileParty.IsGarrison)
+        {
+            Hero governor = mobileParty.CurrentSettlement?.Town?.Governor;
+            if (governor != null && governor.CurrentSettlement == mobileParty.CurrentSettlement)
+            {
+                TraitEffectHelper.ApplyTraitEffect(governor, DefaultPersonalityTraitEffects.GenerosityUpkeepReductionEffect, ref result);
+            }
         }
     }
 }
